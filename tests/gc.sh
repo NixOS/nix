@@ -2,7 +2,7 @@ storeExpr=$($TOP/src/nix-instantiate/nix-instantiate dependencies.nix)
 outPath=$($TOP/src/nix-store/nix-store -rvv "$storeExpr")
 
 # Set a GC root.
-ln -s $outPath "$NIX_LOCALSTATE_DIR"/nix/gcroots/foo
+ln -s $outPath "$NIX_STATE_DIR"/gcroots/foo
 
 $NIX_BIN_DIR/nix-collect-garbage
 

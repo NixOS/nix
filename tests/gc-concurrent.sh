@@ -4,9 +4,7 @@ outPath1=$($TOP/src/nix-store/nix-store -q $storeExpr1)
 storeExpr2=$($TOP/src/nix-instantiate/nix-instantiate gc-concurrent2.nix)
 outPath2=$($TOP/src/nix-store/nix-store -q $storeExpr2)
 
-ls -l test-tmp/state/temproots
-
-ln -s $storeExpr2 "$NIX_LOCALSTATE_DIR"/nix/gcroots/foo2
+ln -s $storeExpr2 "$NIX_STATE_DIR"/gcroots/foo2
 
 # Start build #1 in the background.  It starts immediately.
 $TOP/src/nix-store/nix-store -rvv "$storeExpr1" &

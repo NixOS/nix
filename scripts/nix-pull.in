@@ -19,8 +19,8 @@ $binDir = "@bindir@" unless defined $binDir;
 my $libexecDir = $ENV{"NIX_LIBEXEC_DIR"};
 $libexecDir = "@libexecdir@" unless defined $libexecDir;
 
-my $localStateDir = $ENV{"NIX_LOCALSTATE_DIR"};
-$localStateDir = "@localstatedir@" unless defined $localStateDir;
+my $stateDir = $ENV{"NIX_STATE_DIR"};
+$stateDir = "@localstatedir@/nix" unless defined $stateDir;
 
 
 # Obtain URLs either from the command line or from a configuration file.
@@ -49,7 +49,7 @@ sub processURL {
         or die "cannot hash `$manifest'";
     chomp $hash;
     
-    my $finalPath = "$localStateDir/nix/manifests/$baseName-$hash.nixmanifest";
+    my $finalPath = "$stateDir/manifests/$baseName-$hash.nixmanifest";
     
     system("mv '$manifest' '$finalPath'") == 0
         or die "cannot move `$manifest' to `$finalPath";

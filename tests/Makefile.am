@@ -5,12 +5,12 @@ extra1 = $(TEST_ROOT)/shared
 TESTS_ENVIRONMENT = TEST_ROOT=$(TEST_ROOT) \
   NIX_STORE_DIR=$(TEST_ROOT)/store \
   NIX_DATA_DIR=$(TEST_ROOT)/data \
-  NIX_LOG_DIR=$(TEST_ROOT)/log \
-  NIX_STATE_DIR=$(TEST_ROOT)/state \
+  NIX_LOCALSTATE_DIR=$(TEST_ROOT)/var \
+  NIX_LOG_DIR=$(TEST_ROOT)/var/log/nix \
+  NIX_STATE_DIR=$(TEST_ROOT)/var/nix \
   NIX_DB_DIR=$(TEST_ROOT)/db \
   NIX_BIN_DIR=$(TEST_ROOT)/bin \
   NIX_LIBEXEC_DIR=$(TEST_ROOT)/bin \
-  NIX_LOCALSTATE_DIR=$(TEST_ROOT)/state \
   REAL_BIN_DIR=$(bindir) \
   REAL_LIBEXEC_DIR=$(libexecdir) \
   REAL_LOCALSTATE_DIR=$(localstatedir) \

@@ -9,7 +9,8 @@ mkdir "$TEST_ROOT"
 
 mkdir "$NIX_STORE_DIR"
 mkdir "$NIX_DATA_DIR"
-mkdir "$NIX_LOG_DIR"
+mkdir "$NIX_LOCALSTATE_DIR"
+mkdir -p "$NIX_LOG_DIR"
 mkdir "$NIX_STATE_DIR"
 mkdir "$NIX_DB_DIR"
 
@@ -23,10 +24,9 @@ mkdir $NIX_BIN_DIR/nix
 ln -s $TOP/scripts/download-using-manifests.pl $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/readmanifest.pm $NIX_BIN_DIR/nix/
 
-mkdir -p "$NIX_LOCALSTATE_DIR"/nix/manifests
-mkdir -p "$NIX_LOCALSTATE_DIR"/nix/gcroots
-mkdir -p "$NIX_LOCALSTATE_DIR"/log/nix
-mkdir -p "$NIX_LOCALSTATE_DIR"/temproots
+mkdir -p "$NIX_STATE_DIR"/manifests
+mkdir -p "$NIX_STATE_DIR"/gcroots
+mkdir -p "$NIX_STATE_DIR"/temproots
 
 mkdir $NIX_DATA_DIR/nix
 cp -prd $TOP/corepkgs $NIX_DATA_DIR/nix/
