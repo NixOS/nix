@@ -54,11 +54,7 @@ void runProgram(const string & program,
 
     /* Create a temporary directory where the build will take
        place. */
-    static int counter = 0;
-    string tmpDir = (format("/tmp/nix-%1%-%2%") % getpid() % counter++).str();
-
-    if (mkdir(tmpDir.c_str(), 0777) == -1)
-        throw SysError(format("creating directory `%1%'") % tmpDir);
+    string tmpDir = createTempDir();
 
     AutoDelete delTmpDir(tmpDir);
 

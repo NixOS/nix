@@ -72,6 +72,9 @@ void deletePath(const string & path);
 /* Make a path read-only recursively. */
 void makePathReadOnly(const string & path);
 
+/* Create a temporary directory. */
+string createTempDir();
+
 
 /* Messages. */
 

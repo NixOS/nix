@@ -171,6 +171,26 @@ void makePathReadOnly(const string & path)
 }
 
 
+static string tempName()
+{
+    static int counter = 0;
+    char * s = getenv("TMPDIR");
+    string tmpRoot = s ? canonPath(string(s)) : "/tmp";
+    return (format("%1%/nix-%2%-%3%") % tmpRoot % getpid() % counter++).str();
+}
+
+
+string createTempDir()
+{
+    while (1) {
+	string tmpDir = tempName();
+	if (mkdir(tmpDir.c_str(), 0777) == 0) return tmpDir;
+	if (errno != EEXIST)
+	    throw SysError(format("creating directory `%1%'") % tmpDir);
+    }
+}
+
+
 Verbosity verbosity = lvlError;
 
 static int nestingLevel = 0;
