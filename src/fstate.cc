@@ -359,8 +359,6 @@ void fstateRefs2(FState fs, StringSet & paths)
     else if (ATmatch(fs, "Derive(<str>, <str>, [<list>], <str>, [<list>])", 
             &s1, &s2, &ins, &s3, &e2))
     {
-        paths.insert(s3);
-
         while (!ATisEmpty(ins)) {
             fstateRefs2(ATgetFirst(ins), paths);
             ins = ATgetNext(ins);

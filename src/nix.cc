@@ -160,7 +160,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             break;
 
         case qRefs: {
-            Strings refs = fstateRefs(termFromHash(hash));
+            Strings refs = fstateRefs(realiseFState(termFromHash(hash)));
             for (Strings::iterator j = refs.begin(); 
                  j != refs.end(); j++)
                 cout << format("%s\n") % *j;
