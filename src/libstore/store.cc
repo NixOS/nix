@@ -282,7 +282,8 @@ static PathSet getReferers(const Transaction & txn, const Path & storePath)
 void setReferences(const Transaction & txn, const Path & storePath,
     const PathSet & references)
 {
-    if (!isRealisablePath(txn, storePath))
+    /* For unrealisable paths, we can only clear the references. */
+    if (references.size() > 0 && !isRealisablePath(txn, storePath))
         throw Error(
             format("cannot set references for path `%1%' which is invalid and has no substitutes")
             % storePath);
