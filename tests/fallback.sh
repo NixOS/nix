@@ -1,4 +1,4 @@
-storeExpr=$($TOP/src/nix-instantiate/nix-instantiate fall-back.nix)
+storeExpr=$($TOP/src/nix-instantiate/nix-instantiate fallback.nix)
 
 echo "store expr is $storeExpr"
 
