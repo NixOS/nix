@@ -16,6 +16,7 @@ install-data-local: init-state
 if INIT_STATE
 if SETUID_HACK
 INIT_FLAGS = -g @NIX_GROUP@ -o @NIX_USER@
+GROUP_WRITABLE = -m 775
 endif
 init-state:
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix
@@ -23,7 +24,8 @@ init-state:
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/log/nix
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/profiles
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/gcroots
-	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/gcroots/tmp
+	$(INSTALL) $(INIT_FLAGS) $(GROUP_WRITABLE) -d $(DESTDIR)$(localstatedir)/nix/gcroots/tmp
+	$(INSTALL) $(INIT_FLAGS) $(GROUP_WRITABLE) -d $(DESTDIR)$(localstatedir)/nix/gcroots/channels
 	rm -f $(DESTDIR)$(localstatedir)/nix/gcroots/profiles
 	ln -s $(localstatedir)/nix/profiles $(DESTDIR)$(localstatedir)/nix/gcroots/profiles
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(prefix)/store

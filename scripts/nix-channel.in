@@ -2,6 +2,8 @@
 
 use strict;
 
+my $rootsDir = "@localstatedir@/nix/gcroots/channels";
+
 
 # Figure out the name of the `.nix-channels' file to use.
 my $home = $ENV{"HOME"};
@@ -79,18 +81,33 @@ sub update {
         "(import @datadir@/nix/corepkgs/channels/unpack.nix) " .
         "{inputs = $nixExpr; system = \"@system@\";}";
 
-    # Instantiate and realise it.
+    # Instantiate the Nix expression.
     my $storeExpr = `echo '$nixExpr' | @bindir@/nix-instantiate -`
         or die "cannot instantiate Nix expression";
     chomp $storeExpr;
 
-    my $outPath = `nix-store -qnfB '$storeExpr'`
+    # Register the store expression as a root of the garbage
+    # collector.
+    my $userName = getpwuid($<);
+    die "who ARE you? go away" unless defined $userName;
+
+    my $rootFile = "$rootsDir/$userName.gcroot";
+    my $tmpRootFile = "$rootsDir/$userName-tmp.gcroot";
+    
+    open ROOT, ">$tmpRootFile" or die "cannot create `$tmpRootFile'";
+    print ROOT "$storeExpr";
+    close ROOT;
+
+    # Realise the store expression.
+    my $outPath = `nix-store -qnf '$storeExpr'`
         or die "cannot realise store expression";
     chomp $outPath;
 
     # Make it the default Nix expression for `nix-env'.
     system "@bindir@/nix-env --import '$outPath'";
     die "cannot pull set default Nix expression to `$outPath'" if ($? != 0);
+
+    rename $tmpRootFile, $rootFile or die "cannot rename `$tmpRootFile' to `$rootFile'";
 }
 
 
