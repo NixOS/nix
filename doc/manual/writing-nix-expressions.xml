@@ -447,7 +447,7 @@ following:
 <programlisting>
 (import pkgs/system/i686-linux.nix).hello</programlisting>
 
-Call it <filename>test.nix</filename>.  Then you can build it without
+Call it <filename>test.nix</filename>.  You can then build it without
 installing it using the command <command>nix-build</command>:
 
 <screen>
@@ -501,7 +501,86 @@ run in parallel.  Typically this should be the number of CPUs.</para>
 
 <sect2><title>The generic builder</title>
 
-<para>TODO</para>
+<para>Recall from <xref linkend='ex-hello-builder' /> that the builder
+looked something like this:
+
+<programlisting>
+PATH=$perl/bin:$PATH
+tar xvfz $src
+cd hello-*
+./configure --prefix=$out
+make
+make install</programlisting>
+
+The builders for almost all Unix packages look like this — set up some
+environment variables, unpack the sources, configure, build, and
+install.  For this reason the standard environment provides some Bash
+functions that automate the build process.  A builder using the
+generic build facilities in shown in <xref linkend='ex-hello-builder2'
+/>.</para>
+
+<example id='ex-hello-builder2'><title>Build script using the generic
+build functions</title>
+<programlisting>
+buildInputs="$perl" <co id='ex-hello-builder2-co-1' />
+
+. $stdenv/setup <co id='ex-hello-builder2-co-2' />
+
+genericBuild <co id='ex-hello-builder2-co-3' /></programlisting>
+</example>
+
+<calloutlist>
+
+  <callout arearefs='ex-hello-builder2-co-1'>
+    
+    <para>The <envar>buildInputs</envar> variable tells
+    <filename>setup</filename> to use the indicated components as
+    <quote>inputs</quote>.  This means that if a component provides a
+    <filename>bin</filename> subdirectory, it's added to
+    <envar>PATH</envar>; if it has a <filename>include</filename>
+    subdirectory, it's added to GCC's header search path; and so
+    on.</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-builder2-co-2'>
+
+    <para>The function <function>genericBuild</function> is defined in
+    the file <literal>$stdenv/setup</literal>.</para>
+
+  </callout>
+  
+  <callout arearefs='ex-hello-builder2-co-3'>
+
+    <para>The final step calls the shell function
+    <function>genericBuild</function>, which performs the steps that
+    were done explicitly in <xref linkend='ex-hello-builder' />.  The
+    generic builder is smart enough to figure out whether to unpack
+    the sources using <command>gzip</command>,
+    <command>bzip2</command>, etc.  It can be customised in many ways;
+    see <xref linkend='sec-standard-environment' />.</para>
+
+  </callout>
+  
+</calloutlist>
+
+<para>Discerning readers will note that the
+<envar>buildInputs</envar> could just as well have been set in the Nix
+expression, like this:
+
+<programlisting>
+  buildInputs = [perl];</programlisting>
+
+The <varname>perl</varname> attribute can then be removed, and the
+builder becomes even shorter:
+
+<programlisting>
+. $stdenv/setup
+genericBuilder></programlisting>
+
+In fact, <varname>mkDerivation</varname> provides a default builder
+that looks exactly like that, so it is actually possible to omit the
+builder for Hello entirely.</para>
 
 </sect2>
 
@@ -661,7 +740,7 @@ shortened using the <literal>inherit</literal> keyword.  For instance,
 -->
 
 
-<simplesect><title>Lets</title>
+<simplesect><title>Let expressions</title>
 
 <para>TODO</para>
 
@@ -691,7 +770,7 @@ shortened using the <literal>inherit</literal> keyword.  For instance,
 </simplesect>
 
 
-<simplesect><title><quote>With</quote> expressions</title>
+<simplesect><title>With expressions</title>
 
 <para>TODO</para>
 
@@ -723,7 +802,7 @@ shortened using the <literal>inherit</literal> keyword.  For instance,
 
 
 
-<sect1><title>The standard environment</title>
+<sect1 id='sec-standard-environment'><title>The standard environment</title>
 
 <para>TODO</para>
 
