@@ -61,6 +61,6 @@ rename($tmplink, $current) or die "cannot rename $tmplink";
 
 if (!$keep && defined $oldlink) {
     print "deleting old $oldlink\n";
-    unlink $tmplink || print "cannot delete $tmplink";
-    unlink "$tmplink.hash" || print "cannot delete $tmplink.hash";
+    unlink($oldlink) == 1 || print "cannot delete $oldlink\n";
+    unlink("$oldlink.hash") == 1 || print "cannot delete $oldlink.hash\n";
 }
