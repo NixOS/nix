@@ -1,11 +1,11 @@
 # Berkeley DB
 
-DB = db-4.0.14
+DB = db-4.1.25
 
 $(DB).tar.gz:
 	@echo "Nix requires Berkeley DB to build."
-	@echo "Please download version 4.0.14 from"
-	@echo "  http://www.sleepycat.com/update/snapshot/db-4.0.14.tar.gz"
+	@echo "Please download version 4.1.25 from"
+	@echo "  http://www.sleepycat.com/update/snapshot/db-4.1.25.tar.gz"
 	@echo "and place it in the externals/ directory."
 	false
 
@@ -28,12 +28,12 @@ build-db: have-db
 
 # CWI ATerm
 
-ATERM = aterm-2.0
+ATERM = aterm-2.0.5
 
 $(ATERM).tar.gz:
 	@echo "Nix requires the CWI ATerm library to build."
-	@echo "Please download version 2.0 from"
-	@echo "  http://www.cwi.nl/projects/MetaEnv/aterm/aterm-2.0.tar.gz"
+	@echo "Please download version 2.0.5 from"
+	@echo "  http://www.cwi.nl/projects/MetaEnv/aterm/aterm-2.0.5.tar.gz"
 	@echo "and place it in the externals/ directory."
 	false
 

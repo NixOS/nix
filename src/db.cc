@@ -160,6 +160,7 @@ void Database::open(const string & path)
         env->set_lg_bsize(32 * 1024); /* default */
         env->set_lg_max(256 * 1024); /* must be > 4 * lg_bsize */
         env->set_lk_detect(DB_LOCK_DEFAULT);
+        env->set_flags(DB_TXN_WRITE_NOSYNC, 1);
         
 
         /* The following code provides automatic recovery of the
@@ -252,11 +253,11 @@ void Database::close()
         {
             debug(format("closing table %1%") % i->first);
             Db * db = i->second;
-            db->close(0);
+            db->close(DB_NOSYNC);
             delete db;
         }
 
-        env->txn_checkpoint(0, 0, 0);
+//         env->txn_checkpoint(0, 0, 0);
         env->close(0);
 
     } catch (DbException e) { rethrow(e); }
@@ -285,8 +286,8 @@ TableId Database::openTable(const string & tableName)
         Db * db = new Db(env, 0);
 
         try {
-            // !!! fixme when switching to BDB 4.1: use txn.
-            db->open(tableName.c_str(), 0, DB_HASH, DB_CREATE, 0666);
+            db->open(0, tableName.c_str(), 0, 
+                DB_HASH, DB_CREATE | DB_AUTO_COMMIT, 0666);
         } catch (...) {
             delete db;
             throw;
