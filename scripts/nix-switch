@@ -1,6 +1,14 @@
 #! /usr/bin/perl -w
 
 use strict;
+
+my $keep = 0;
+
+if (scalar @ARGV > 0 && $ARGV[0] eq "--keep") {
+    shift @ARGV;
+    $keep = 1;
+}
+
 my $hash = $ARGV[0];
 $hash || die "no package hash specified";
 
@@ -31,6 +39,12 @@ open HASH, "> $hashfile" or die "cannot create $hashfile";
 print HASH "$hash\n";
 close HASH;
 
+my $current = "$linkdir/current";
+
+# Read the current generation so that we can delete it (if --keep
+# wasn't specified).
+my $oldlink = readlink($current);
+
 # Make $link the current generation by pointing $linkdir/current to
 # it.  The rename() system call is supposed to be essentially atomic
 # on Unix.  That is, if we have links `current -> X' and `new_current
@@ -39,10 +53,14 @@ close HASH;
 # condition.  This is sufficient to atomically switch the current link
 # tree.
 
-my $current = "$linkdir/current";
-
 print "switching $current to $link\n";
 
 my $tmplink = "$linkdir/new_current";
 symlink($link, $tmplink) or die "cannot create $tmplink";
 rename($tmplink, $current) or die "cannot rename $tmplink";
+
+if (!$keep && defined $oldlink) {
+    print "deleting old $oldlink\n";
+    unlink $tmplink || print "cannot delete $tmplink";
+    unlink "$tmplink.hash" || print "cannot delete $tmplink.hash";
+}
