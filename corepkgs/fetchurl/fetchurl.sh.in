@@ -4,7 +4,7 @@ echo "downloading $url into $out..."
 @wget@ "$url" -O "$out" || exit 1
 
 actual=$(@bindir@/nix-hash --flat $out)
-if ! test "$actual" == "$md5"; then
+if test "$actual" != "$md5"; then
     echo "hash is $actual, expected $md5"
     exit 1
 fi
