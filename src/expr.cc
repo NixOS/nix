@@ -37,12 +37,15 @@ Path writeTerm(ATerm t, const string & suffix)
 
     Path path = canonPath(nixStore + "/" + 
         (string) h + suffix + ".nix");
-    if (!ATwriteToNamedTextFile(t, path.c_str()))
-        throw Error(format("cannot write aterm %1%") % path);
 
-    Transaction txn(nixDB);
-    registerValidPath(txn, path);
-    txn.commit();
+    if (!isValidPath(path)) {
+        if (!ATwriteToNamedTextFile(t, path.c_str()))
+            throw Error(format("cannot write aterm %1%") % path);
+
+        Transaction txn(nixDB);
+        registerValidPath(txn, path);
+        txn.commit();
+    }
 
     return path;
 }
