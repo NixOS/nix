@@ -53,10 +53,18 @@ static Expr substExpr(string x, Expr rep, Expr e)
         else
             return e;
 
-    if (ATmatch(e, "Function(<str>, <term>)", &s, &e2))
-        if (x == s)
-            return e;
-    /* !!! unfair substitutions */
+    ATermList formals;
+    if (ATmatch(e, "Function([<list>], <term>)", &formals, &e2)) {
+        while (!ATisEmpty(formals)) {
+            if (!ATmatch(ATgetFirst(formals), "<str>", &s))
+                throw badTerm("not a list of formals", (ATerm) formals);
+            if (x == (string) s)
+                return e;
+            formals = ATgetNext(formals);
+        }
+    }
+
+    /* ??? unfair substitutions? */
 
     /* Generically substitute in subterms. */
 
@@ -332,6 +340,8 @@ static Expr evalExpr2(EvalState & state, Expr e)
 
 static Expr evalExpr(EvalState & state, Expr e)
 {
+    Nest nest(lvlVomit, format("evaluating expression: %1%") % printTerm(e));
+
     /* Consult the memo table to quickly get the normal form of
        previously evaluated expressions. */
     NormalForms::iterator i = state.normalForms.find(e);
