@@ -1,12 +1,22 @@
 #include "profiles.hh"
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
-Path createGeneration(Path profile, Path outPath, Path drvPath)
+
+static bool cmpGensByNumber(const Generation & a, const Generation & b)
 {
+    return a.number < b.number;
+}
+
+
+Generations findGenerations(Path profile)
+{
+    Generations gens;
+
     Path profileDir = dirOf(profile);
     string profileName = baseNameOf(profile);
-    
-    unsigned int num = 0;
     
     Strings names = readDirectory(profileDir);
     for (Strings::iterator i = names.begin(); i != names.end(); ++i) {
@@ -16,9 +26,32 @@ Path createGeneration(Path profile, Path outPath, Path drvPath)
         if (p == string::npos) continue;
         istringstream str(string(s, 0, p));
         unsigned int n;
-        if (str >> n && str.eof() && n >= num) num = n + 1;
+        if (str >> n && str.eof()) {
+            Generation gen;
+            gen.path = profileDir + "/" + *i;
+            gen.number = n;
+            struct stat st;
+            if (lstat(gen.path.c_str(), &st) != 0)
+                throw SysError(format("statting `%1%'") % gen.path);
+            gen.creationTime = st.st_mtime;
+            gens.push_back(gen);
+        }
     }
 
+    gens.sort(cmpGensByNumber);
+
+    return gens;
+}
+
+
+Path createGeneration(Path profile, Path outPath, Path drvPath)
+{
+    /* The new generation number should be higher than old the
+       previous ones. */
+    Generations gens = findGenerations(profile);
+    unsigned int num = gens.size() > 0 ? gens.front().number : 0;
+        
+    /* Create the new generation. */
     Path generation, gcrootSrc;
 
     while (1) {

@@ -1,5 +1,3 @@
-#include <cerrno>
-
 #include "profiles.hh"
 #include "names.hh"
 #include "globals.hh"
@@ -8,6 +6,9 @@
 #include "parser.hh"
 #include "eval.hh"
 #include "help.txt.hh"
+
+#include <cerrno>
+#include <ctime>
 
 
 struct Globals
@@ -460,14 +461,35 @@ static void opSwitchProfile(Globals & globals,
     Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flags `%1%'") % opFlags.front());
+        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
     if (opArgs.size() != 1)
-        throw UsageError(format("`--profile' takes exactly one argument"));
+        throw UsageError(format("exactly one argument expected"));
 
     Path profile = opArgs.front();
     Path profileLink = getHomeDir() + "/.nix-profile";
 
     switchLink(profileLink, profile);
+}
+
+
+static void opListGenerations(Globals & globals,
+    Strings opFlags, Strings opArgs)
+{
+    if (opFlags.size() > 0)
+        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
+    if (opArgs.size() != 0)
+        throw UsageError(format("no arguments expected"));
+
+    Generations gens = findGenerations(globals.profile);
+
+    for (Generations::iterator i = gens.begin(); i != gens.end(); ++i) {
+        tm t;
+        if (!localtime_r(&i->creationTime, &t)) throw Error("cannot convert time");
+        cout << format("%|4|   %|4|-%|02|-%|02| %|02|:%|02|:%|02|\n")
+            % i->number
+            % (t.tm_year + 1900) % (t.tm_mon + 1) % t.tm_mday
+            % t.tm_hour % t.tm_min % t.tm_sec;
+    }
 }
 
 
@@ -477,7 +499,7 @@ static void opDefaultExpr(Globals & globals,
     if (opFlags.size() > 0)
         throw UsageError(format("unknown flags `%1%'") % opFlags.front());
     if (opArgs.size() != 1)
-        throw UsageError(format("`--import' takes exactly one argument"));
+        throw UsageError(format("exactly one argument expected"));
 
     Path defNixExpr = absPath(opArgs.front());
     Path defNixExprLink = getDefNixExprPath();
@@ -526,6 +548,8 @@ void run(Strings args)
         }
         else if (arg == "--switch-profile" || arg == "-S")
             op = opSwitchProfile;
+        else if (arg == "--list-generations")
+            op = opListGenerations;
         else if (arg[0] == '-')
             opFlags.push_back(arg);
         else
