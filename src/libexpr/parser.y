@@ -41,11 +41,11 @@ ATerm makePos(YYLTYPE * loc, void * data)
   ATermList ts;
 }
 
-%type <t> start expr expr_function expr_assert expr_if expr_op
+%type <t> start expr expr_function expr_if expr_op
 %type <t> expr_app expr_select expr_simple bind inheritsrc formal
 %type <ts> binds ids expr_list formals
 %token <t> ID INT STR PATH URI
-%token IF THEN ELSE ASSERT LET REC INHERIT EQ NEQ AND OR IMPL
+%token IF THEN ELSE ASSERT WITH LET REC INHERIT EQ NEQ AND OR IMPL
 
 %nonassoc IMPL
 %left OR
@@ -67,12 +67,10 @@ expr_function
     { $$ = ATmake("Function(<term>, <term>, <term>)", $2, $5, CUR_POS); }
   | ID ':' expr_function
     { $$ = ATmake("Function1(<term>, <term>, <term>)", $1, $3, CUR_POS); }
-  | expr_assert
-  ;
-
-expr_assert
-  : ASSERT expr ';' expr_assert
+  | ASSERT expr ';' expr_function
     { $$ = ATmake("Assert(<term>, <term>, <term>)", $2, $4, CUR_POS); }
+  | WITH expr ';' expr_function
+    { $$ = ATmake("With(<term>, <term>, <term>)", $2, $4, CUR_POS); }
   | expr_if
   ;
 

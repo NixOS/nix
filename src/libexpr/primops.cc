@@ -205,7 +205,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
         try {
             processBinding(state, value, ne, ss);
         } catch (Error & e) {
-            throw Error(format("while processing derivation attribute `%1%' at %2%:\n%3%")
+            throw Error(format("while processing the derivation attribute `%1%' at %2%:\n%3%")
                 % key % showPos(pos) % e.msg());
         }
 

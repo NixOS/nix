@@ -17,18 +17,12 @@ available for installation.</para>
 <para>In Nix, different users can have different <quote>views</quote>
 on the set of installed applications.  That is, there might be lots of
 applications present on the system (possibly in many different
-versions), but users can have a specific selection of those
-active — where <quote>active</quote> just means that it appears
-in a directory in the user's <envar>PATH</envar>.</para>
-
-<para>Such a view on the set of installed applications is called a
-<emphasis>user environment</emphasis>, which is just a directory tree
-consisting of symlinks to the files of the active applications.  In
-Nix, operations such as upgrading or removing components never
-overwrite or remove the files of those components, and they don't even
-touch the user environments that point to them.  Rather, they cause a
-<emphasis>new</emphasis> user environment to be constructed based on
-the old one.</para>
+versions), but users can have a specific selection of those active —
+where <quote>active</quote> just means that it appears in a directory
+in the user's <envar>PATH</envar>.  Such a view on the set of
+installed applications is called a <emphasis>user
+environment</emphasis>, which is just a directory tree consisting of
+symlinks to the files of the active applications.  </para>
 
 <para>Components are installed from a set of <emphasis>Nix
 expressions</emphasis> that tell Nix how to build those components,
@@ -168,7 +162,21 @@ set.</para></footnote></para>
 
 <sect1><title>Profiles</title>
 
-<para>Bla</para>
+<para>In Nix, operations such as upgrading or removing components
+never overwrite or remove the files of those components, and they
+don't even touch the user environments that point to them.  Rather,
+they cause a <emphasis>new</emphasis> user environment to be
+constructed based on the old one.  This is illustrated in Figure
+bla.</para>
+
+<figure><title>User environments</title>
+  <mediaobject>
+    <imageobject>
+      <imagedata fileref='figures/userenv-frame3.png' format='PNG' />
+    </imageobject>
+  </mediaobject>
+</figure>
+
 
 </sect1>
 

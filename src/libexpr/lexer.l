@@ -48,6 +48,7 @@ if          { return IF; }
 then        { return THEN; }
 else        { return ELSE; }
 assert      { return ASSERT; }
+with        { return WITH; }
 let         { return LET; }
 rec         { return REC; }
 inherit     { return INHERIT; }

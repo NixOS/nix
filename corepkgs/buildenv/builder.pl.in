@@ -27,7 +27,7 @@ sub createLinks {
             $srcFile =~ /\/nix-support$/ ||
             $srcFile =~ /\/log$/)
         {
-            # Do noting.
+            # Do nothing.
 	}
 
         elsif (-d $srcFile) {

@@ -296,7 +296,7 @@ void checkVarDefs(const ATermMap & defs, Expr e)
     ATMatcher m;
     ATerm name;
     ATermList formals;
-    ATerm body;
+    ATerm with, body;
     ATermList rbnds, nrbnds;
 
     if (atMatch(m, e) >> "Var" >> name) {
@@ -339,6 +339,13 @@ void checkVarDefs(const ATermMap & defs, Expr e)
             defs2.set(name, (ATerm) ATempty);
         }
         checkVarDefs(defs2, (ATerm) rbnds);
+    }
+
+    else if (atMatch(m, e) >> "With" >> with >> body) {
+        /* We can't check the body without evaluating the definitions
+           (which is an arbitrary expression), so we don't do that
+           here but only when actually evaluating the `with'. */
+        checkVarDefs(defs, with);
     }
     
     else if (ATgetType(e) == AT_APPL) {
