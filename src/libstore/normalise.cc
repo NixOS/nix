@@ -1254,6 +1254,7 @@ void RealisationGoal::init()
     trace("init");
 
     if (querySuccessor(nePath, nfPath)) {
+        nrFailed = 0;
         isNormalised();
         return;
     }
@@ -1276,6 +1277,11 @@ void RealisationGoal::init()
 void RealisationGoal::isNormalised()
 {
     trace("has been normalised");
+
+    if (nrFailed != 0) {
+        amDone(false);
+        return;
+    }
 
     nfPath = queryNormalForm(nePath);
 
