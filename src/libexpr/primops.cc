@@ -9,7 +9,8 @@ static Expr primImport(EvalState & state, const ATermVector & args)
 {
     ATMatcher m;
     string path;
-    if (!(atMatch(m, args[0]) >> "Path" >> path))
+    Expr fn = evalExpr(state, args[0]);
+    if (!(atMatch(m, fn) >> "Path" >> path))
         throw Error("path expected");
     return evalFile(state, path);
 }
