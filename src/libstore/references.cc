@@ -17,6 +17,7 @@ static void search(const string & s,
     for (Strings::iterator i = ids.begin();
          i != ids.end(); )
     {
+        checkInterrupt();
         if (s.find(*i) == string::npos)
             i++;
         else {
@@ -31,6 +32,8 @@ static void search(const string & s,
 void checkPath(const string & path,
     Strings & ids, Strings & seen)
 {
+    checkInterrupt();
+    
     struct stat st;
     if (lstat(path.c_str(), &st))
         throw SysError(format("getting attributes of path `%1%'") % path);

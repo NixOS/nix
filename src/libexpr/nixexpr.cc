@@ -87,6 +87,8 @@ string aterm2String(ATerm t)
 
 ATerm bottomupRewrite(TermFun & f, ATerm e)
 {
+    checkInterrupt();
+
     if (ATgetType(e) == AT_APPL) {
         AFun fun = ATgetAFun(e);
         int arity = ATgetArity(fun);
@@ -149,6 +151,8 @@ Expr makeAttrs(const ATermMap & attrs)
 
 Expr substitute(const ATermMap & subs, Expr e)
 {
+    checkInterrupt();
+
     ATMatcher m;
     string s;
 

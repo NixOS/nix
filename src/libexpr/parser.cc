@@ -26,6 +26,8 @@ struct Cleanup : TermFun
 
     virtual ATerm operator () (ATerm e)
     {
+        checkInterrupt();
+        
         ATMatcher m;
         string s;
 

@@ -19,11 +19,14 @@ bool lockFile(int fd, LockType lockType, bool wait)
     lock.l_len = 0; /* entire file */
 
     if (wait) {
-        while (fcntl(fd, F_SETLKW, &lock) != 0)
+        while (fcntl(fd, F_SETLKW, &lock) != 0) {
+            checkInterrupt();
             if (errno != EINTR)
                 throw SysError(format("acquiring/releasing lock"));
+        }
     } else {
         while (fcntl(fd, F_SETLK, &lock) != 0) {
+            checkInterrupt();
             if (errno == EACCES || errno == EAGAIN) return false;
             if (errno != EINTR) 
                 throw SysError(format("acquiring/releasing lock"));
@@ -55,6 +58,7 @@ PathLocks::PathLocks(const PathSet & _paths)
     
     /* Acquire the lock for each path. */
     for (Paths::iterator i = paths.begin(); i != paths.end(); i++) {
+        checkInterrupt();
         Path path = *i;
         Path lockPath = path + ".lock";
 
@@ -87,6 +91,7 @@ PathLocks::~PathLocks()
         close(*i);
 
     for (Paths::iterator i = paths.begin(); i != paths.end(); i++) {
+        checkInterrupt();
         if (deletePaths) {
             /* This is not safe in general! */
             unlink(i->c_str());

@@ -96,6 +96,7 @@ Path normaliseStoreExpr(const Path & _nePath, PathSet pending)
     for (PathSet::iterator i = ne.derivation.inputs.begin();
          i != ne.derivation.inputs.end(); i++)
     {
+        checkInterrupt();
         Path nfPath = normaliseStoreExpr(*i, pending);
         realiseClosure(nfPath, pending);
         /* !!! nfPath should be a root of the garbage collector while
@@ -193,6 +194,7 @@ Path normaliseStoreExpr(const Path & _nePath, PathSet pending)
         for (Paths::iterator j = refPaths.begin();
 	     j != refPaths.end(); j++)
 	{
+            checkInterrupt();
 	    Path path = *j;
 	    elem.refs.insert(path);
             if (inClosures.find(path) != inClosures.end())
@@ -209,6 +211,7 @@ Path normaliseStoreExpr(const Path & _nePath, PathSet pending)
     PathSet donePaths;
 
     while (!usedPaths.empty()) {
+        checkInterrupt();
 	PathSet::iterator i = usedPaths.begin();
 	Path path = *i;
 	usedPaths.erase(i);
@@ -291,6 +294,7 @@ void ensurePath(const Path & path, PathSet pending)
     for (Paths::iterator i = subPaths.begin(); 
          i != subPaths.end(); i++)
     {
+        checkInterrupt();
         try {
             normaliseStoreExpr(*i, pending);
             if (isValidPath(path)) return;
@@ -337,6 +341,8 @@ static void requisitesWorker(const Path & nePath,
     bool includeExprs, bool includeSuccessors,
     PathSet & paths, PathSet & doneSet)
 {
+    checkInterrupt();
+    
     if (doneSet.find(nePath) != doneSet.end()) return;
     doneSet.insert(nePath);
 

@@ -108,7 +108,9 @@ void runProgram(const string & program,
     int status;
     if (waitpid(pid, &status, 0) != pid)
         throw Error("unable to wait for child");
-    
+
+    checkInterrupt();
+
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
 	if (keepFailed) {
 	    printMsg(lvlTalkative, 

@@ -80,6 +80,7 @@ void Transaction::moveTo(Transaction & t)
 
 void Database::requireEnv()
 {
+    checkInterrupt();
     if (!env) throw Error("database environment not open");
 }
 
@@ -310,6 +311,8 @@ TableId Database::openTable(const string & tableName)
 bool Database::queryString(const Transaction & txn, TableId table, 
     const string & key, string & data)
 {
+    checkInterrupt();
+
     try {
         Db * db = getDb(table);
 
@@ -367,6 +370,7 @@ bool Database::queryStrings(const Transaction & txn, TableId table,
 void Database::setString(const Transaction & txn, TableId table,
     const string & key, const string & data)
 {
+    checkInterrupt();
     try {
         Db * db = getDb(table);
         Dbt kt((void *) key.c_str(), key.length());
@@ -402,6 +406,7 @@ void Database::setStrings(const Transaction & txn, TableId table,
 void Database::delPair(const Transaction & txn, TableId table,
     const string & key)
 {
+    checkInterrupt();
     try {
         Db * db = getDb(table);
         Dbt kt((void *) key.c_str(), key.length());
@@ -423,9 +428,11 @@ void Database::enumTable(const Transaction & txn, TableId table,
         DestroyDbc destroyDbc(dbc);
 
         Dbt kt, dt;
-        while (dbc->get(&kt, &dt, DB_NEXT) != DB_NOTFOUND)
+        while (dbc->get(&kt, &dt, DB_NEXT) != DB_NOTFOUND) {
+            checkInterrupt();
             keys.push_back(
                 string((char *) kt.get_data(), kt.get_size()));
+        }
 
     } catch (DbException e) { rethrow(e); }
 }

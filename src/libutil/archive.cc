@@ -83,6 +83,7 @@ static void dumpContents(const Path & path, unsigned int size,
     unsigned int total = 0;
     ssize_t n;
     while ((n = read(fd, buf, sizeof(buf)))) {
+        checkInterrupt();
         if (n == -1) throw SysError("reading file " + path);
         total += n;
         sink(buf, n);
@@ -200,6 +201,8 @@ static void restoreEntry(const Path & path, RestoreSource & source)
     if (s != "(") throw badArchive("expected open tag");
 
     while (1) {
+        checkInterrupt();
+
         s = readString(source);
 
         if (s == ")") {
@@ -224,6 +227,7 @@ static void restoreContents(int fd, const Path & path, RestoreSource & source)
     unsigned char buf[65536];
 
     while (left) {
+        checkInterrupt();
         unsigned int n = sizeof(buf);
         if (n > left) n = left;
         source(buf, n);
@@ -247,6 +251,8 @@ static void restore(const Path & path, RestoreSource & source)
     AutoCloseFD fd;
 
     while (1) {
+        checkInterrupt();
+
         s = readString(source);
 
         if (s == ")") {

@@ -227,6 +227,8 @@ Expr evalExpr2(EvalState & state, Expr e)
 
 Expr evalExpr(EvalState & state, Expr e)
 {
+    checkInterrupt();
+    
     startNest(nest, lvlVomit,
         format("evaluating expression: %1%") % e);
 

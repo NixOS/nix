@@ -133,7 +133,7 @@ void copyPath(const Path & src, const Path & dst)
             source.fd = fds[0];
             restorePath(dst, source);
             _exit(0);
-        }  catch (exception & e) {
+        } catch (exception & e) {
             cerr << "error: " << e.what() << endl;
         }
         _exit(1);        

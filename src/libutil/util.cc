@@ -132,6 +132,7 @@ Strings readDirectory(const Path & path)
 
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir)) { /* sic */
+        checkInterrupt();
         string name = dirent->d_name;
         if (name == "." || name == "..") continue;
         names.push_back(name);
@@ -144,6 +145,8 @@ Strings readDirectory(const Path & path)
 
 void deletePath(const Path & path)
 {
+    checkInterrupt();
+
     printMsg(lvlVomit, format("deleting path `%1%'") % path);
 
     struct stat st;
@@ -170,6 +173,8 @@ void deletePath(const Path & path)
 
 void makePathReadOnly(const Path & path)
 {
+    checkInterrupt();
+
     struct stat st;
     if (lstat(path.c_str(), &st))
 	throw SysError(format("getting attributes of path `%1%'") % path);
@@ -199,6 +204,7 @@ static Path tempName()
 Path createTempDir()
 {
     while (1) {
+        checkInterrupt();
 	Path tmpDir = tempName();
 	if (mkdir(tmpDir.c_str(), 0777) == 0) return tmpDir;
 	if (errno != EEXIST)
@@ -246,6 +252,7 @@ void Nest::open(Verbosity level, const format & f)
 
 void printMsg_(Verbosity level, const format & f)
 {
+    checkInterrupt();
     if (level > verbosity) return;
     string spaces;
     for (int i = 0; i < nestingLevel; i++)
@@ -257,6 +264,7 @@ void printMsg_(Verbosity level, const format & f)
 void readFull(int fd, unsigned char * buf, size_t count)
 {
     while (count) {
+        checkInterrupt();
         ssize_t res = read(fd, (char *) buf, count);
         if (res == -1) throw SysError("reading from file");
         if (res == 0) throw Error("unexpected end-of-file");
@@ -269,6 +277,7 @@ void readFull(int fd, unsigned char * buf, size_t count)
 void writeFull(int fd, const unsigned char * buf, size_t count)
 {
     while (count) {
+        checkInterrupt();
         ssize_t res = write(fd, (char *) buf, count);
         if (res == -1) throw SysError("writing to file");
         count -= res;
@@ -344,3 +353,11 @@ AutoCloseDir::operator DIR *()
     return dir;
 }
 
+
+volatile sig_atomic_t _isInterrupted = 0;
+
+void _interrupted()
+{
+    _isInterrupted = 0;
+    throw Error("interrupted by the user");
+}

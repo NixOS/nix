@@ -12,6 +12,12 @@ extern "C" {
 #include "config.h"
 
 
+void sigintHandler(int signo)
+{
+    _isInterrupted = 1;
+}
+
+
 /* Initialize and reorder arguments, then call the actual argument
    processor. */
 static void initAndRun(int argc, char * * argv)
@@ -22,6 +28,15 @@ static void initAndRun(int argc, char * * argv)
     nixLogDir = NIX_LOG_DIR;
     nixStateDir = (string) NIX_STATE_DIR;
     nixDBPath = (string) NIX_STATE_DIR + "/db";
+
+    /* Catch SIGINT. */
+    struct sigaction act, oact;
+    act.sa_handler = sigintHandler;
+    sigfillset(&act.sa_mask);
+    act.sa_flags = 0;
+    if (sigaction(SIGINT, &act, &oact))
+        throw SysError("installing handler for SIGINT");
+    printMsg(lvlError, "SIG HANDLER INSTALLED");
 
     /* Put the arguments in a vector. */
     Strings args, remaining;

@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include <boost/format.hpp>
 
@@ -177,6 +178,18 @@ public:
     void operator =(DIR * dir);
     operator DIR *();
 };
+
+
+/* User interruption. */
+
+extern volatile sig_atomic_t _isInterrupted;
+
+void _interrupted();
+
+void inline checkInterrupt()
+{
+    if (_isInterrupted) _interrupted();
+}
 
 
 #endif /* !__UTIL_H */
