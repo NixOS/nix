@@ -5,13 +5,11 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/time.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
-#include <utime.h>
 
-#include "normalise.hh"
+#include "build.hh"
 #include "references.hh"
 #include "pathlocks.hh"
 #include "globals.hh"
@@ -282,60 +280,6 @@ const char * * strings2CharPtrs(const Strings & ss)
         *p++ = i->c_str();
     *p = 0;
     return arr;
-}
-
-
-/* "Fix", or canonicalise, the meta-data of the files in a store path
-   after it has been built.  In particular:
-   - the last modification date on each file is set to 0 (i.e.,
-     00:00:00 1/1/1970 UTC)
-   - the permissions are set of 444 or 555 (i.e., read-only with or
-     without execute permission; setuid bits etc. are cleared)
-   - the owner and group are set to the Nix user and group, if we're
-     in a setuid Nix installation
-*/
-void canonicalisePathMetaData(const Path & path)
-{
-    checkInterrupt();
-
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-	throw SysError(format("getting attributes of path `%1%'") % path);
-
-    if (!S_ISLNK(st.st_mode)) {
-
-        /* Mask out all type related bits. */
-        mode_t mode = st.st_mode & ~S_IFMT;
-        
-        if (mode != 0444 && mode != 0555) {
-            mode = (st.st_mode & S_IFMT)
-                 | 0444
-                 | (st.st_mode & S_IXUSR ? 0111 : 0);
-            if (chmod(path.c_str(), mode) == -1)
-                throw SysError(format("changing mode of `%1%' to %2$o") % path % mode);
-        }
-
-        if (st.st_uid != getuid() || st.st_gid != getgid()) {
-            if (chown(path.c_str(), getuid(), getgid()) == -1)
-                throw SysError(format("changing owner/group of `%1%' to %2%/%3%")
-                    % path % getuid() % getgid());
-        }
-
-        if (st.st_mtime != 0) {
-            struct utimbuf utimbuf;
-            utimbuf.actime = st.st_atime;
-            utimbuf.modtime = 0;
-            if (utime(path.c_str(), &utimbuf) == -1) 
-                throw SysError(format("changing modification time of `%1%'") % path);
-        }
-
-    }
-
-    if (S_ISDIR(st.st_mode)) {
-        Strings names = readDirectory(path);
-	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
-	    canonicalisePathMetaData(path + "/" + *i);
-    }
 }
 
 
@@ -1041,6 +985,7 @@ void DerivationGoal::computeClosure()
         format("determining closure for `%1%'") % drvPath);
 
     map<Path, PathSet> allReferences;
+    map<Path, Hash> contentHashes;
     
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
@@ -1109,6 +1054,12 @@ void DerivationGoal::computeClosure()
         }
 
         allReferences[path] = references;
+
+        /* Hash the contents of the path.  The hash is stored in the
+           database so that we can verify later on whether nobody has
+           messed with the store.  !!! inefficient: it would be nice
+           if we could combine this with filterReferences(). */
+        contentHashes[path] = hashPath(htSHA256, path);
     }
 
     /* Register each output path as valid, and register the sets of
@@ -1127,7 +1078,8 @@ void DerivationGoal::computeClosure()
     for (DerivationOutputs::iterator i = drv.outputs.begin(); 
          i != drv.outputs.end(); ++i)
     {
-        registerValidPath(txn, i->second.path);
+        registerValidPath(txn, i->second.path,
+            contentHashes[i->second.path]);
         setReferences(txn, i->second.path,
             allReferences[i->second.path]);
     }
@@ -1460,9 +1412,11 @@ void SubstitutionGoal::finished()
 
     canonicalisePathMetaData(storePath);
 
+    Hash contentHash = hashPath(htSHA256, storePath);
+
     Transaction txn;
     createStoreTransaction(txn);
-    registerValidPath(txn, storePath);
+    registerValidPath(txn, storePath, contentHash);
     txn.commit();
 
     outputLock->setDeletion(true);

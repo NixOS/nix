@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include "globals.hh"
-#include "normalise.hh"
+#include "build.hh"
 #include "gc.hh"
 #include "archive.hh"
 #include "shared.hh"
@@ -187,7 +187,7 @@ static void opValidPath(Strings opFlags, Strings opArgs)
     createStoreTransaction(txn);
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); ++i)
-        registerValidPath(txn, *i);
+        registerValidPath(txn, *i, hashPath(htSHA256, *i));
     txn.commit();
 }
 

@@ -1,7 +1,7 @@
-#ifndef __NORMALISE_H
-#define __NORMALISE_H
+#ifndef __BUILD_H
+#define __BUILD_H
 
-#include "storeexpr.hh"
+#include "derivations.hh"
 
 /* Perform the specified derivations, if necessary.  That is, do
    whatever is necessary to create the output paths of the derivation.
@@ -44,4 +44,4 @@ void computeFSClosure(const Path & storePath,
 void storePathRequisites(const Path & storePath,
     bool includeOutputs, PathSet & paths);
 
-#endif /* !__NORMALISE_H */
+#endif /* !__BUILD_H */

@@ -1,5 +1,5 @@
 #include "dotgraph.hh"
-#include "normalise.hh"
+#include "build.hh"
 
 
 #if 0

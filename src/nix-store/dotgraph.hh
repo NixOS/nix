@@ -1,7 +1,7 @@
 #ifndef __DOTGRAPH_H
 #define __DOTGRAPH_H
 
-#include "storeexpr.hh"
+#include "util.hh"
 
 void printDotGraph(const PathSet & roots);
 

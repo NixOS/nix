@@ -1,7 +1,7 @@
 #include "profiles.hh"
 #include "names.hh"
 #include "globals.hh"
-#include "normalise.hh"
+#include "build.hh"
 #include "shared.hh"
 #include "parser.hh"
 #include "eval.hh"

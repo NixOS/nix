@@ -2,7 +2,7 @@
 #include <iostream>
 
 #include "globals.hh"
-#include "normalise.hh"
+#include "build.hh"
 #include "shared.hh"
 #include "eval.hh"
 #include "parser.hh"

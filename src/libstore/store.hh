@@ -51,11 +51,27 @@ Substitutes querySubstitutes(const Path & srcPath);
 /* Deregister all substitutes. */
 void clearSubstitutes();
 
-/* Register the validity of a path. */
-void registerValidPath(const Transaction & txn, const Path & path);
+/* Register the validity of a path, i.e., that `path' exists, that the
+   paths referenced by it exists, and in the case of an output path of
+   a derivation, that it has been produced by a succesful execution of
+   the derivation (or something equivalent).  Also register the hash
+   of the file system contents of the path.  The hash must be a
+   SHA-256 hash. */
+void registerValidPath(const Transaction & txn,
+    const Path & path, const Hash & hash);
 
 /* Throw an exception if `path' is not directly in the Nix store. */
 void assertStorePath(const Path & path);
+
+/* "Fix", or canonicalise, the meta-data of the files in a store path
+   after it has been built.  In particular:
+   - the last modification date on each file is set to 0 (i.e.,
+     00:00:00 1/1/1970 UTC)
+   - the permissions are set of 444 or 555 (i.e., read-only with or
+     without execute permission; setuid bits etc. are cleared)
+   - the owner and group are set to the Nix user and group, if we're
+     in a setuid Nix installation. */
+void canonicalisePathMetaData(const Path & path);
 
 /* Checks whether a path is valid. */ 
 bool isValidPath(const Path & path);

@@ -55,7 +55,7 @@ void checkStoreNotSymlink(Path path)
 }
 
 
-void initStoreExprHelpers();
+void initDerivationsHelpers();
 
 
 /* Initialize and reorder arguments, then call the actual argument
@@ -105,7 +105,7 @@ static void initAndRun(int argc, char * * argv)
     if (lt != "") setLogType(lt);
 
     /* ATerm stuff.  !!! find a better place to put this */
-    initStoreExprHelpers();
+    initDerivationsHelpers();
     
     /* Put the arguments in a vector. */
     Strings args, remaining;

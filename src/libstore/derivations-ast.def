@@ -1,4 +1,4 @@
-init initStoreExprHelpers
+init initDerivationsHelpers
 
 Derive | ATermList ATermList ATermList string string ATermList ATermList | ATerm |
 

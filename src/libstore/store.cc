@@ -2,7 +2,10 @@
 #include <algorithm>
 
 #include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
+#include <utime.h>
 
 #include "store.hh"
 #include "globals.hh"
@@ -181,6 +184,51 @@ void assertStorePath(const Path & path)
 }
 
 
+void canonicalisePathMetaData(const Path & path)
+{
+    checkInterrupt();
+
+    struct stat st;
+    if (lstat(path.c_str(), &st))
+	throw SysError(format("getting attributes of path `%1%'") % path);
+
+    if (!S_ISLNK(st.st_mode)) {
+
+        /* Mask out all type related bits. */
+        mode_t mode = st.st_mode & ~S_IFMT;
+        
+        if (mode != 0444 && mode != 0555) {
+            mode = (st.st_mode & S_IFMT)
+                 | 0444
+                 | (st.st_mode & S_IXUSR ? 0111 : 0);
+            if (chmod(path.c_str(), mode) == -1)
+                throw SysError(format("changing mode of `%1%' to %2$o") % path % mode);
+        }
+
+        if (st.st_uid != getuid() || st.st_gid != getgid()) {
+            if (chown(path.c_str(), getuid(), getgid()) == -1)
+                throw SysError(format("changing owner/group of `%1%' to %2%/%3%")
+                    % path % getuid() % getgid());
+        }
+
+        if (st.st_mtime != 0) {
+            struct utimbuf utimbuf;
+            utimbuf.actime = st.st_atime;
+            utimbuf.modtime = 0;
+            if (utime(path.c_str(), &utimbuf) == -1) 
+                throw SysError(format("changing modification time of `%1%'") % path);
+        }
+
+    }
+
+    if (S_ISDIR(st.st_mode)) {
+        Strings names = readDirectory(path);
+	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
+	    canonicalisePathMetaData(path + "/" + *i);
+    }
+}
+
+
 static bool isValidPathTxn(const Path & path, const Transaction & txn)
 {
     string s;
@@ -318,12 +366,24 @@ void clearSubstitutes()
 }
 
 
-void registerValidPath(const Transaction & txn, const Path & _path)
+void registerValidPath(const Transaction & txn,
+    const Path & _path, const Hash & hash)
 {
     Path path(canonPath(_path));
     assertStorePath(path);
+
+    assert(hash.type == htSHA256);
+    
     debug(format("registering path `%1%'") % path);
-    nixDB.setString(txn, dbValidPaths, path, "");
+    nixDB.setString(txn, dbValidPaths, path, "sha256:" + printHash(hash));
+
+    /* Check that all referenced paths are also valid. */
+    Paths references;
+    nixDB.queryStrings(txn, dbReferences, path, references);
+    for (Paths::iterator i = references.begin(); i != references.end(); ++i)
+        if (!isValidPathTxn(*i, txn))
+            throw Error(format("cannot register path `%1%' as valid, since its reference `%2%' is invalid")
+                % path % *i);
 }
 
 
@@ -385,10 +445,10 @@ Path addToStore(const Path & _srcPath)
                 throw Error(format("contents of `%1%' changed while copying it to `%2%' (%3% -> %4%)")
                     % srcPath % dstPath % printHash(h) % printHash(h2));
 
-            makePathReadOnly(dstPath);
+            canonicalisePathMetaData(dstPath);
             
             Transaction txn(nixDB);
-            registerValidPath(txn, dstPath);
+            registerValidPath(txn, dstPath, h);
             txn.commit();
         }
 
@@ -417,10 +477,10 @@ Path addTextToStore(const string & suffix, const string & s)
 
             writeStringToFile(dstPath, s);
 
-            makePathReadOnly(dstPath);
+            canonicalisePathMetaData(dstPath);
             
             Transaction txn(nixDB);
-            registerValidPath(txn, dstPath);
+            registerValidPath(txn, dstPath, hashPath(htSHA256, dstPath));
             txn.commit();
         }
 

@@ -1,5 +1,5 @@
-#ifndef __STOREEXPR_H
-#define __STOREEXPR_H
+#ifndef __DERIVATIONS_H
+#define __DERIVATIONS_H
 
 #include "aterm.hh"
 #include "store.hh"
@@ -59,4 +59,4 @@ ATerm unparseDerivation(const Derivation & drv);
 bool isDerivation(const string & fileName);
 
 
-#endif /* !__STOREEXPR_H */
+#endif /* !__DERIVATIONS_H */

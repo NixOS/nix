@@ -1,7 +1,7 @@
 #ifndef __GC_H
 #define __GC_H
 
-#include "storeexpr.hh"
+#include "util.hh"
 
 
 /* Determine the set of "live" store paths, given a set of root store
