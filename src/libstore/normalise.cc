@@ -1088,6 +1088,31 @@ void NormalisationGoal::createClosure()
         }
         nf.closure.roots.insert(path);
 
+        /* Check that fixed-output derivations produced the right
+           outputs (i.e., the content hash should match the specified
+           hash). */ 
+        if (i->second.hash != "") {
+            HashType ht = parseHashType(i->second.hashAlgo);
+            if (ht == htUnknown)
+                throw Error(format("unknown hash algorithm `%1%'") % i->second.hashAlgo);
+            Hash h = parseHash(ht, i->second.hash);
+            Hash h2 = hashFile(ht, path);
+            if (h != h2)
+                throw Error(
+                    format("output path `%1% should have %2% hash `%3%', instead has `%4%'")
+                    % path % i->second.hashAlgo % printHash(h) % printHash(h2));
+
+            /* Also, the output path should be a regular file withouth
+               execute permission. */
+            struct stat st;
+            if (lstat(path.c_str(), &st))
+                throw SysError(format("getting attributes of path `%1%'") % path);
+            if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
+                throw Error(
+                    format("output path `%1% should be a non-executable regular file")
+                    % path);
+        }
+
 	canonicalisePathMetaData(path);
 
 	/* For this output path, find the references to other paths contained
