@@ -243,16 +243,33 @@ bool isValidPath(const Path & path)
 }
 
 
-void unregisterValidPath(const Path & _path)
+static void invalidatePath(const Path & path, Transaction & txn)
 {
-    Path path(canonPath(_path));
-    Transaction txn(nixDB);
-
     debug(format("unregistering path `%1%'") % path);
 
     nixDB.delPair(txn, dbValidPaths, path);
 
-    txn.commit();
+    /* Remove any successor mappings to this path (but not *from*
+       it). */
+    Paths revs;
+    nixDB.queryStrings(txn, dbSuccessorsRev, path, revs);
+    for (Paths::iterator i = revs.begin(); i != revs.end(); ++i)
+        nixDB.delPair(txn, dbSuccessors, *i);
+    nixDB.delPair(txn, dbSuccessorsRev, path);
+
+    /* Remove any substitute mappings to this path. */
+    revs.clear();
+    nixDB.queryStrings(txn, dbSubstitutesRev, path, revs);
+    for (Paths::iterator i = revs.begin(); i != revs.end(); ++i) {
+        Paths subs;
+        nixDB.queryStrings(txn, dbSubstitutes, *i, subs);
+        remove(subs.begin(), subs.end(), path);
+        if (subs.size() > 0)
+            nixDB.setStrings(txn, dbSubstitutes, *i, subs);
+        else
+            nixDB.delPair(txn, dbSubstitutes, *i);
+    }
+    nixDB.delPair(txn, dbSubstitutesRev, path);
 }
 
 
@@ -289,6 +306,8 @@ Path addToStore(const Path & _srcPath)
             registerValidPath(txn, dstPath);
             txn.commit();
         }
+
+        outputLock.setDeletion(true);
     }
 
     return dstPath;
@@ -310,6 +329,8 @@ void addTextToStore(const Path & dstPath, const string & s)
             registerValidPath(txn, dstPath);
             txn.commit();
         }
+
+        outputLock.setDeletion(true);
     }
 }
 
@@ -321,7 +342,9 @@ void deleteFromStore(const Path & _path)
     if (!isInPrefix(path, nixStore))
         throw Error(format("path `%1%' is not in the store") % path);
 
-    unregisterValidPath(path);
+    Transaction txn(nixDB);
+    invalidatePath(path, txn);
+    txn.commit();
 
     deletePath(path);
 }
@@ -332,50 +355,43 @@ void verifyStore()
     Transaction txn(nixDB);
 
     Paths paths;
+    PathSet validPaths;
     nixDB.enumTable(txn, dbValidPaths, paths);
 
-    for (Paths::iterator i = paths.begin();
-         i != paths.end(); i++)
+    for (Paths::iterator i = paths.begin(); i != paths.end(); ++i)
     {
         Path path = *i;
         if (!pathExists(path)) {
             debug(format("path `%1%' disappeared") % path);
-            nixDB.delPair(txn, dbValidPaths, path);
-            nixDB.delPair(txn, dbSuccessorsRev, path);
-            nixDB.delPair(txn, dbSubstitutesRev, path);
-        }
+            invalidatePath(path, txn);
+        } else
+            validPaths.insert(path);
     }
 
-#if 0    
-    Strings subs;
-    nixDB.enumTable(txn, dbSubstitutes, subs);
-
-    for (Strings::iterator i = subs.begin();
-         i != subs.end(); i++)
-    {
-        FSId srcId = parseHash(*i);
-
-        Strings subIds;
-        nixDB.queryStrings(txn, dbSubstitutes, srcId, subIds);
-
-        for (Strings::iterator j = subIds.begin();     
-             j != subIds.end(); )
+    Paths sucs;
+    nixDB.enumTable(txn, dbSuccessors, sucs);
+    for (Paths::iterator i = sucs.begin(); i != sucs.end(); ++i) {
+        /* Note that *i itself does not have to be valid, just its
+           successor. */
+        Path sucPath;
+        if (nixDB.queryString(txn, dbSuccessors, *i, sucPath) &&
+            validPaths.find(sucPath) == validPaths.end())
         {
-            FSId subId = parseHash(*j);
-            
-            Strings subPaths;
-            nixDB.queryStrings(txn, dbId2Paths, subId, subPaths);
-            if (subPaths.size() == 0) {
-                debug(format("erasing substitute %1% for %2%") 
-                    % (string) subId % (string) srcId);
-                j = subIds.erase(j);
-            } else j++;
+            debug(format("found successor mapping to non-existent path `%1%'") % sucPath);
+            nixDB.delPair(txn, dbSuccessors, *i);
         }
-
-        nixDB.setStrings(txn, dbSubstitutes, srcId, subIds);
     }
-#endif
 
+    Paths rsucs;
+    nixDB.enumTable(txn, dbSuccessorsRev, rsucs);
+    for (Paths::iterator i = rsucs.begin(); i != rsucs.end(); ++i) {
+        if (validPaths.find(*i) == validPaths.end()) {
+            debug(format("found reverse successor mapping for non-existent path `%1%'") % *i);
+            nixDB.delPair(txn, dbSuccessorsRev, *i);
+        }
+    }
+
+#if 0
     Paths sucs;
     nixDB.enumTable(txn, dbSuccessors, sucs);
 
@@ -395,6 +411,7 @@ void verifyStore()
             nixDB.setStrings(txn, dbSuccessorsRev, sucPath, revs);
         }
     }
+#endif
 
     txn.commit();
 }

@@ -48,9 +48,6 @@ Paths querySubstitutes(const Path & srcPath);
 /* Register the validity of a path. */
 void registerValidPath(const Transaction & txn, const Path & path);
 
-/* Unregister the validity of a path. */
-void unregisterValidPath(const Path & path);
-
 /* Checks whether a path is valid. */ 
 bool isValidPath(const Path & path);
 

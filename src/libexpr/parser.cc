@@ -66,23 +66,9 @@ struct Cleanup : TermFun
 };
 
 
-Expr parseExprFromFile(Path path)
+static Expr parse(const char * text, const string & location,
+    const Path & basePath)
 {
-    assert(path[0] == '/');
-
-#if 0
-    /* Perhaps this is already an imploded parse tree? */
-    Expr e = ATreadFromNamedFile(path.c_str());
-    if (e) return e;
-#endif
-
-    /* If `path' refers to a directory, append `/default.nix'. */
-    struct stat st;
-    if (stat(path.c_str(), &st))
-        throw SysError(format("getting status of `%1%'") % path);
-    if (S_ISDIR(st.st_mode))
-        path = canonPath(path + "/default.nix");
-
     /* Initialise the SDF libraries. */
     static bool initialised = false;
     static ATerm parseTable = 0;
@@ -113,26 +99,13 @@ Expr parseExprFromFile(Path path)
         initialised = true;
     }
 
-    /* Read the input file.  We can't use SGparseFile() because it's
-       broken, so we read the input ourselves and call
-       SGparseString(). */
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY);
-    if (fd == -1) throw SysError(format("opening `%1%'") % path);
-
-    if (fstat(fd, &st) == -1)
-        throw SysError(format("statting `%1%'") % path);
-
-    char text[st.st_size + 1];
-    readFull(fd, (unsigned char *) text, st.st_size);
-    text[st.st_size] = 0;
-
     /* Parse it. */
-    ATerm result = SGparseString(lang, "Expr", text);
+    ATerm result = SGparseString(lang, "Expr", (char *) text);
     if (!result)
-        throw SysError(format("parse failed in `%1%'") % path);
+        throw SysError(format("parse failed in `%1%'") % location);
     if (SGisParseError(result))
         throw Error(format("parse error in `%1%': %2%")
-            % path % result);
+            % location % result);
 
     /* Implode it. */
     PT_ParseTree tree = PT_makeParseTreeFromTerm(result);
@@ -155,10 +128,50 @@ Expr parseExprFromFile(Path path)
         throw Error(format("cannot implode parse tree"));
 
     printMsg(lvlVomit, format("imploded parse tree of `%1%': %2%")
-        % path % imploded);
+        % location % imploded);
 
     /* Finally, clean it up. */
     Cleanup cleanup;
-    cleanup.basePath = dirOf(path);
+    cleanup.basePath = basePath;
     return bottomupRewrite(cleanup, imploded);
+}
+
+
+Expr parseExprFromFile(Path path)
+{
+    assert(path[0] == '/');
+
+#if 0
+    /* Perhaps this is already an imploded parse tree? */
+    Expr e = ATreadFromNamedFile(path.c_str());
+    if (e) return e;
+#endif
+
+    /* If `path' refers to a directory, append `/default.nix'. */
+    struct stat st;
+    if (stat(path.c_str(), &st))
+        throw SysError(format("getting status of `%1%'") % path);
+    if (S_ISDIR(st.st_mode))
+        path = canonPath(path + "/default.nix");
+
+    /* Read the input file.  We can't use SGparseFile() because it's
+       broken, so we read the input ourselves and call
+       SGparseString(). */
+    AutoCloseFD fd = open(path.c_str(), O_RDONLY);
+    if (fd == -1) throw SysError(format("opening `%1%'") % path);
+
+    if (fstat(fd, &st) == -1)
+        throw SysError(format("statting `%1%'") % path);
+
+    char text[st.st_size + 1];
+    readFull(fd, (unsigned char *) text, st.st_size);
+    text[st.st_size] = 0;
+
+    return parse(text, path, dirOf(path));
+}
+
+
+Expr parseExprFromString(const string & s, const Path & basePath)
+{
+    return parse(s.c_str(), "(string)", basePath);
 }

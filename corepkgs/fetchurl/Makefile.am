@@ -1,10 +1,11 @@
-all-local: fetchurl.sh
+all-local: builder.sh
 
 install-exec-local:
-	$(INSTALL) -d $(datadir)/fix/fetchurl
-	$(INSTALL_DATA) fetchurl.fix $(datadir)/fix/fetchurl
-	$(INSTALL_PROGRAM) fetchurl.sh $(datadir)/fix/fetchurl
+	$(INSTALL) -d $(datadir)/nix/corepkgs
+	$(INSTALL) -d $(datadir)/nix/corepkgs/fetchurl
+	$(INSTALL_DATA) default.nix $(datadir)/nix/corepkgs/fetchurl
+	$(INSTALL_PROGRAM) builder.sh $(datadir)/nix/corepkgs/fetchurl
 
 include ../../substitute.mk
 
-EXTRA_DIST = fetchurl.fix fetchurl.sh.in
+EXTRA_DIST = default.nix builder.sh.in

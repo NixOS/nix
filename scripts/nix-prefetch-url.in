@@ -22,27 +22,29 @@ print "file has hash $hash\n";
 my $out2 = "@prefix@/store/nix-prefetch-url-$hash";
 rename $out, $out2;
 
-# Create a Fix expression.
-my $fixexpr = 
-    "App(IncludeFix(\"fetchurl/fetchurl.fix\"), " .
-    "[(\"url\", \"$url\"), (\"md5\", \"$hash\")])";
+# Create a Nix expression.
+my $nixexpr =
+    "(import @datadir@/nix/corepkgs/fetchurl) " .
+    "{url = $url; md5 = \"$hash\"; system = \"@host@\"}";
+
+print "expr: $nixexpr\n";
 
 # Instantiate a Nix expression.
-print STDERR "running fix...\n";
-my $pid = open2(\*READ, \*WRITE, "fix -") or die "cannot run fix";
+print STDERR "instantiating Nix expression...\n";
+my $pid = open2(\*READ, \*WRITE, "nix-instantiate -") or die "cannot run nix-instantiate";
 
-print WRITE $fixexpr;
+print WRITE $nixexpr;
 close WRITE;
 
-my $id = <READ>;
-chomp $id;
+my $drvpath = <READ>;
+chomp $drvpath;
 
 waitpid $pid, 0;
-$? == 0 or die "fix failed";
+$? == 0 or die "nix-instantiate failed";
 
 # Run Nix.
-print STDERR "running nix...\n";
-system "nix --install $id > /dev/null";
-$? == 0 or die "`nix --install' failed";
+print STDERR "realising store expression $drvpath...\n";
+system "nix-store --realise $drvpath > /dev/null";
+$? == 0 or die "realisation failed";
 
 unlink $out2;

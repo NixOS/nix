@@ -5,6 +5,7 @@
 #include "normalise.hh"
 #include "shared.hh"
 #include "eval.hh"
+#include "parser.hh"
 
 
 #if 0
@@ -29,9 +30,9 @@ static Path searchPath(const Paths & searchDirs, const Path & relPath)
 static Expr evalStdin(EvalState & state)
 {
     startNest(nest, lvlTalkative, format("evaluating standard input"));
-    Expr e = ATreadFromFile(stdin);
-    if (!e) 
-        throw Error(format("unable to read a term from stdin"));
+    string s, s2;
+    while (getline(cin, s2)) s += s2 + "\n";
+    Expr e = parseExprFromString(s, absPath("."));
     return evalExpr(state, e);
 }
 

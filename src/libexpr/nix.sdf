@@ -104,6 +104,7 @@ exports
     "\"" ~[\n\"]* "\"" -> Str
 
     PathComp ("/" PathComp)+ -> Path
+    ("/" PathComp)+ -> Path
     [a-zA-Z0-9\.\_\-\+]+ -> PathComp
 
     "true" -> Bool
@@ -184,7 +185,7 @@ exports
     [0-9] -> Udigit
 
   lexical restrictions
-    Uri -/- [a-zA-Z0-9\-\_\.\!\~\*\'\(\)]
+    Uri -/- [a-zA-Z0-9\-\_\.\!\~\*\'\(\)\/]
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -1,4 +1,4 @@
-bin_SCRIPTS = nix-switch nix-collect-garbage \
+bin_SCRIPTS = nix-collect-garbage \
  nix-pull nix-push nix-prefetch-url
 
 noinst_SCRIPTS = nix-profile.sh

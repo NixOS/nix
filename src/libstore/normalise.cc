@@ -82,6 +82,7 @@ Path normaliseStoreExpr(const Path & _nePath, PathSet pending)
             debug(format("skipping build of expression `%1%', someone beat us to it")
 		  % (string) nePath);
             if (ne.type != StoreExpr::neClosure) abort();
+            outputLocks.setDeletion(true);
             return nePath2;
         }
     }
