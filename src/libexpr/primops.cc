@@ -1,3 +1,5 @@
+#include <time.h>
+
 #include "primops.hh"
 #include "normalise.hh"
 #include "globals.hh"
@@ -320,4 +322,10 @@ Expr primIsNull(EvalState & state, Expr arg)
     arg = evalExpr(state, arg);
     ATMatcher m;
     return makeBool(atMatch(m, arg) >> "Null");
+}
+
+
+Expr primCurTime(EvalState & state)
+{
+    return ATmake("Int(<int>)", time(0));
 }

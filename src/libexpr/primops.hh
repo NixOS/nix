@@ -34,5 +34,10 @@ Expr primNull(EvalState & state);
 /* Determine whether the argument is the null value. */
 Expr primIsNull(EvalState & state, Expr arg);
 
+/* Return the current time.  !!! hack, impure - although due to
+   memoization of evaluation results this should always yield the same
+   value for a particular run of the program. */
+Expr primCurTime(EvalState & state);
+
 
 #endif /* !__PRIMOPS_H */

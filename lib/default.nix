@@ -5,7 +5,12 @@ rec {
   compileC = {main, localIncludes ? []}: stdenv.mkDerivation {
     name = "compile-c";
     builder = ./compile-c.sh;
-    inherit main localIncludes;
+    localIncludes =
+      if localIncludes == "auto" then
+        import (findIncludes {main = toString main; hack = curTime;})
+      else
+        localIncludes;
+    inherit main;
   };
 
   /*
@@ -16,10 +21,10 @@ rec {
   };
   */
 
-  findIncludes = {main}: stdenv.mkDerivation {
+  findIncludes = {main, hack}: stdenv.mkDerivation {
     name = "find-includes";
     builder = ./find-includes.sh;
-    inherit main;
+    inherit main hack;
   };
   
   link = {objects, programName ? "program"}: stdenv.mkDerivation {

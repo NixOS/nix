@@ -28,6 +28,7 @@ EvalState::EvalState()
     addPrimOp0("true", primTrue);
     addPrimOp0("false", primFalse);
     addPrimOp0("null", primNull);
+    addPrimOp0("curTime", primCurTime);
 
     addPrimOp1("import", primImport);
     addPrimOp1("derivation", primDerivation);
