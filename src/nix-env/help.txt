@@ -13,6 +13,10 @@ The previous operations take a list of derivation names.  The special
 name `*' may be used to indicate all derivations.
 
   --switch-profile / -S [FILE]: switch to specified profile
+  --switch-generation / -G NUMBER: switch to specified generation of profile
+  --rollback: switch to the previous generation
+  --list-generations: list available generations of a profile
+  
   --import / -I FILE: set default Nix expression
 
   --version: output version information

@@ -11,6 +11,14 @@ struct Generation
     int number;
     Path path;
     time_t creationTime;
+    Generation()
+    {
+        number = -1;
+    }
+    operator bool() const
+    {
+        return number != -1;
+    }
 };
 
 typedef list<Generation> Generations;

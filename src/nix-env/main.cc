@@ -472,6 +472,61 @@ static void opSwitchProfile(Globals & globals,
 }
 
 
+static const int prevGen = -2;
+
+
+static void switchGeneration(Globals & globals, int dstGen)
+{
+    int curGen;
+    Generations gens = findGenerations(globals.profile, curGen);
+
+    Generation dst;
+    for (Generations::iterator i = gens.begin(); i != gens.end(); ++i)
+        if ((dstGen == prevGen && i->number < curGen) ||
+            (dstGen >= 0 && i->number == dstGen))
+            dst = *i;
+
+    if (!dst)
+        if (dstGen == prevGen)
+            throw Error(format("no generation older than the current (%1%) exists")
+                % curGen);
+        else
+            throw Error(format("generation %1% does not exist") % dstGen);
+
+    switchLink(globals.profile, dst.path);
+}
+
+
+static void opSwitchGeneration(Globals & globals,
+    Strings opFlags, Strings opArgs)
+{
+    if (opFlags.size() > 0)
+        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
+    if (opArgs.size() != 1)
+        throw UsageError(format("exactly one argument expected"));
+
+    istringstream str(opArgs.front());
+    int dstGen;
+    str >> dstGen;
+    if (!str || !str.eof())
+        throw UsageError(format("expected a generation number"));
+
+    switchGeneration(globals, dstGen);
+}
+
+
+static void opRollback(Globals & globals,
+    Strings opFlags, Strings opArgs)
+{
+    if (opFlags.size() > 0)
+        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
+    if (opArgs.size() != 0)
+        throw UsageError(format("no arguments expected"));
+
+    switchGeneration(globals, prevGen);
+}
+
+
 static void opListGenerations(Globals & globals,
     Strings opFlags, Strings opArgs)
 {
@@ -550,6 +605,10 @@ void run(Strings args)
         }
         else if (arg == "--switch-profile" || arg == "-S")
             op = opSwitchProfile;
+        else if (arg == "--switch-generation" || arg == "-G")
+            op = opSwitchGeneration;
+        else if (arg == "--rollback")
+            op = opRollback;
         else if (arg == "--list-generations")
             op = opListGenerations;
         else if (arg[0] == '-')
