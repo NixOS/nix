@@ -60,15 +60,18 @@ extern string thisSystem;
    is also canonicalised. */
 Path absPath(Path path, Path dir = "");
 
-/* Canonicalise a path (as in realpath(3)). */
+/* Canonicalise a path by removing all `.' or `..' components and
+   double or trailing slashes. */
 Path canonPath(const Path & path);
 
-/* Return the directory part of the given path, i.e., everything
-   before the final `/'. */
+/* Return the directory part of the given canonical path, i.e.,
+   everything before the final `/'.  If the path is the root or an
+   immediate child thereof (e.g., `/foo'), this means an empty string
+   is returned. */
 Path dirOf(const Path & path);
 
-/* Return the base name of the given path, i.e., everything following
-   the final `/'. */
+/* Return the base name of the given canonical path, i.e., everything
+   following the final `/'. */
 string baseNameOf(const Path & path);
 
 /* Return true iff the given path exists. */

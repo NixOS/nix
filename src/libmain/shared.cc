@@ -1,6 +1,9 @@
-
 #include <iostream>
 #include <cctype>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 extern "C" {
 #include <aterm2.h>
@@ -27,6 +30,22 @@ void setLogType(string lt)
 }
 
 
+void checkStoreNotSymlink(Path path)
+{
+    struct stat st;
+    while (path.size()) {
+        if (lstat(path.c_str(), &st))
+            throw SysError(format("getting status of `%1%'") % path);
+        if (S_ISLNK(st.st_mode))
+            throw Error(format(
+                "the path `%1%' is a symlink; "
+                "this is not allowed for the Nix store and its parent directories")
+                % path);
+        path = dirOf(path);
+    }
+}
+
+
 /* Initialize and reorder arguments, then call the actual argument
    processor. */
 static void initAndRun(int argc, char * * argv)
@@ -39,11 +58,15 @@ static void initAndRun(int argc, char * * argv)
     }
     
     /* Setup Nix paths. */
-    nixStore = NIX_STORE_DIR;
-    nixDataDir = NIX_DATA_DIR;
-    nixLogDir = NIX_LOG_DIR;
-    nixStateDir = (string) NIX_STATE_DIR;
-    nixDBPath = (string) NIX_STATE_DIR + "/db";
+    nixStore = canonPath(NIX_STORE_DIR);
+    nixDataDir = canonPath(NIX_DATA_DIR);
+    nixLogDir = canonPath(NIX_LOG_DIR);
+    nixStateDir = canonPath(NIX_STATE_DIR);
+    nixDBPath = canonPath(NIX_STATE_DIR) + "/db";
+
+    /* Check that the store directory and its parent are not
+       symlinks. */
+    checkStoreNotSymlink(nixStore);
 
     /* Catch SIGINT. */
     struct sigaction act, oact;
