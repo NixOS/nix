@@ -128,12 +128,15 @@ AM_CONDITIONAL(HAVE_ATERM, test -n "$aterm")
 if test -z "$aterm"; then
   aterm_lib='-L${top_builddir}/externals/inst-aterm/lib -lATerm'
   aterm_include='-I${top_builddir}/externals/inst-aterm/include'
+  aterm_bin='${top_builddir}/externals/inst-aterm/bin'
 else
   aterm_lib="-L$aterm/lib -lATerm"
   aterm_include="-I$aterm/include"
+  aterm_bin="$aterm/bin"
 fi
 AC_SUBST(aterm_lib)
 AC_SUBST(aterm_include)
+AC_SUBST(aterm_bin)
 
 AC_CHECK_LIB(pthread, pthread_mutex_init)
 

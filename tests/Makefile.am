@@ -11,6 +11,7 @@ TESTS_ENVIRONMENT = TEST_ROOT=$(TEST_ROOT) \
   NIX_BUILD_HOOK= \
   TOP=$(shell pwd)/.. \
   SHARED=$(extra1) \
+  aterm_bin=$(aterm_bin) \
   $(SHELL) -e
 
 simple.sh: simple.nix

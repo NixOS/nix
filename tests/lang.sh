@@ -16,7 +16,7 @@ for i in lang/parse-okay-*.nix; do
         echo "FAIL: $i should parse"
         fail=1
     fi
-    if ! cmp lang/$i.ast lang/$i.exp; then
+    if ! $aterm_bin/atdiff lang/$i.ast lang/$i.exp; then
         echo "FAIL: parse tree of $i not as expected"
         fail=1
     fi
@@ -38,7 +38,7 @@ for i in lang/eval-okay-*.nix; do
         echo "FAIL: $i should evaluate"
         fail=1
     fi
-    if ! cmp lang/$i.out lang/$i.exp; then
+    if ! $aterm_bin/atdiff lang/$i.out lang/$i.exp; then
         echo "FAIL: evaluation result of $i not as expected"
         fail=1
     fi

@@ -19,7 +19,7 @@ assert javahlBindings -> j2sdk != null;
 stdenv.mkDerivation {
   name = "subversion-1.1.1";
 
-  builder = ./builder.sh;
+  builder = /foo/bar;
   src = fetchurl {
     url = http://subversion.tigris.org/tarballs/subversion-1.1.1.tar.bz2;
     md5 = "a180c3fe91680389c210c99def54d9e0";
@@ -28,7 +28,7 @@ stdenv.mkDerivation {
   # This is a hopefully temporary fix for the problem that
   # libsvnjavahl.so isn't linked against libstdc++, which causes
   # loading the library into the JVM to fail.
-  patches = if javahlBindings then [./javahl.patch] else [];
+  patches = if javahlBindings then [/javahl.patch] else [];
 
   openssl = if sslSupport then openssl else null;
   httpd = if httpServer then httpd else null;
