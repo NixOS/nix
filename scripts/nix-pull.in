@@ -10,18 +10,18 @@ do { $tmpdir = tmpnam(); }
 until mkdir $tmpdir, 0777;
 
 my $manifest = "$tmpdir/manifest";
-my $conffile = "@sysconfdir@/nix/prebuilts.conf";
+my $confFile = "@sysconfdir@/nix/prebuilts.conf";
 
 #END { unlink $manifest; rmdir $tmpdir; }
 
 
 # Obtain URLs either from the command line or from a configuration file.
-my %storepaths2urls;
+my %storePaths2urls;
 my %urls2hashes;
 my %successors;
 sub doURL {
     my $url = shift;
-    processURL $manifest, $url, \%storepaths2urls, \%urls2hashes, \%successors;
+    processURL $manifest, $url, \%storePaths2urls, \%urls2hashes, \%successors;
 }
 if (scalar @ARGV > 0) {
     while (@ARGV) {
@@ -29,7 +29,7 @@ if (scalar @ARGV > 0) {
 	doURL $url;
     }
 } else {
-    open CONFFILE, "<$conffile";
+    open CONFFILE, "<$confFile";
     while (<CONFFILE>) {
         chomp;
         if (/^\s*(\S+)\s*(\#.*)?$/) {
@@ -41,59 +41,43 @@ if (scalar @ARGV > 0) {
 }
 
 
-# Create a Nix expression for the substitutes.
-my $fullexpr = "[";
-
-my @storepaths;
-foreach my $storepath (keys %storepaths2urls) {
-    # Construct a Nix expression that fetches and unpacks a
-    # Nix archive from the network.
-    my $url = $storepaths2urls{$storepath};
-    my $hash = $urls2hashes{$url};
-    my $fetch =
-	"(import @datadir@/nix/corepkgs/fetchurl) " .
-	"{url = $url; md5 = \"$hash\"; system = \"@system@\";}";
-    my $nixexpr =
-	"((import @datadir@/nix/corepkgs/nar/unnar.nix) " .
-	"{narFile = ($fetch); outPath = \"$storepath\"; system = \"@system@\";}) ";
-    $fullexpr .= $nixexpr; # !!! O(n^2)?
-    push @storepaths, $storepath;
-}
-
-$fullexpr .= "]";
+my $size = scalar (keys %storePaths2urls);
+print "$size store paths in manifest\n";
 
 
-# Instantiate store expressions from the Nix expressions we created above.
-print STDERR "instantiating store expressions...\n";
-my $pid = open2(\*READ, \*WRITE, "@bindir@/nix-instantiate -") or die "cannot run nix-instantiate";
+# Instantiate a store expression that builds the substitute program
+# (the program that fetches URLs and unpacks them into the store).
+my $nixExpr =
+    "(import @datadir@/nix/corepkgs/nix-pull) " .
+    "{system = \"@system@\";}";
 
-print WRITE $fullexpr;
-close WRITE;
-my $i = 0;
-my %substitutes;
-while (<READ>) {
-    chomp;
-    die unless /^\//;
-    my $subpath = $_;
-    die unless ($i < scalar @storepaths);
-    $substitutes{$storepaths[$i++]} = $subpath;
-}
-
-waitpid $pid, 0;
-$? == 0 or die "nix-instantiate failed";
+print STDERR "instantiating store expression...\n";
+my $storeExpr = `echo '$nixExpr' | @bindir@/nix-instantiate -`
+    or die "cannot instantiate Nix expression";
+chomp $storeExpr;
 
 
 # Register all substitutes.
 print STDERR "registering substitutes...\n";
-my @subs = %substitutes;
-while (scalar @subs > 0) {
-    my $n = scalar @subs;
-    if ($n > 256) { $n = 256 };
-    my @subs2 = @subs[0..$n - 1];
-    @subs = @subs[$n..scalar @subs - 1];
-    system "@bindir@/nix-store --substitute @subs2";
-    if ($?) { die "`nix-store --substitute' failed"; }
+
+my $pid = open2(\*READ, \*WRITE, "@bindir@/nix-store --substitute")
+    or die "cannot run nix-store";
+
+close READ;
+
+foreach my $storePath (keys %storePaths2urls) {
+    print WRITE "$storePath\n";
+    print WRITE "$storeExpr\n";
+    print WRITE "/fetch\n";
+    print WRITE "2\n";
+    print WRITE "$storePaths2urls{$storePath}\n";
+    print WRITE "$urls2hashes{$storePaths2urls{$storePath}}\n";
 }
+
+close WRITE;
+
+waitpid $pid, 0;
+$? == 0 or die "nix-store failed";
 
 
 # Register all successors.

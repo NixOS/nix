@@ -25,13 +25,17 @@ test -e $tmpPath2 || mv $tmpPath1 $tmpPath2 # !!! race
 storeExpr=$( \
   echo "(import @datadir@/nix/corepkgs/fetchurl) \
         {url = $url; md5 = \"$hash\"; system = \"@system@\";}" \
-  | nix-instantiate -)
+  | @bindir@/nix-instantiate -)
 
 # Realise it.
-finalPath=$(nix-store -qnB --force-realise $storeExpr)
+finalPath=$(@bindir@/nix-store -qnB --force-realise $storeExpr)
 
 echo "path is $finalPath" >&2
 
 rm -rf $tmpPath2 || true
 
 echo $hash
+
+if test -n "$PRINT_PATH"; then
+    echo $finalPath
+fi

@@ -3,7 +3,7 @@ use strict;
 sub processURL {
     my $manifest = shift;
     my $url = shift;
-    my $storepaths2urls = shift;
+    my $storePaths2urls = shift;
     my $urls2hashes = shift;
     my $successors = shift;
 
@@ -18,7 +18,7 @@ sub processURL {
 
     my $inside = 0;
 
-    my $storepath;
+    my $storePath;
     my $narurl;
     my $hash;
     my @preds;
@@ -31,7 +31,7 @@ sub processURL {
         if (!$inside) {
             if (/^\{$/) { 
                 $inside = 1;
-                undef $storepath;
+                undef $storePath;
                 undef $narurl;
                 undef $hash;
                 @preds = ();
@@ -41,16 +41,16 @@ sub processURL {
             if (/^\}$/) {
                 $inside = 0;
 
-		$$storepaths2urls{$storepath} = $narurl;
+		$$storePaths2urls{$storePath} = $narurl;
 		$$urls2hashes{$narurl} = $hash;
 
                 foreach my $p (@preds) {
-		    $$successors{$p} = $storepath;
+		    $$successors{$p} = $storePath;
                 }
 
             }
             elsif (/^\s*StorePath:\s*(\/\S+)\s*$/) {
-                $storepath = $1;
+                $storePath = $1;
             }
             elsif (/^\s*NarURL:\s*(\S+)\s*$/) {
                 $narurl = $1;
