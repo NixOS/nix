@@ -19,7 +19,16 @@ for i in "$@"; do
             for j in $storeExpr; do
                 echo "store expression is $j" >&2
             done
-            nix-store -qnfv $extraArgs $storeExpr
+            outPath=$(nix-store -qnfv $extraArgs $storeExpr)
+            echo $outPath
+            if test -e result; then
+                if ! test -L result; then
+                    echo "cannot remove \`result\' (not a symlink)"
+                    exit 1
+                fi
+                rm result
+            fi
+            ln -s $outPath result
             ;;
     esac
 done
