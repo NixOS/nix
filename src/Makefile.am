@@ -1,11 +1,11 @@
 bin_PROGRAMS = nix fix
 
-nix_SOURCES = nix.cc md5.c
-nix_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall
+CXXFLAGS = -DSYSTEM=\"@host@\" -Wall
+
+nix_SOURCES = nix.cc db.cc util.cc md5.c
 nix_LDADD = -ldb_cxx-4 -lATerm
 
-fix_SOURCES = fix.cc md5.c
-fix_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall
+fix_SOURCES = fix.cc util.cc md5.c
 fix_LDADD = -lATerm
 
 install-data-local:

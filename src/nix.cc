@@ -11,13 +11,12 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#include <db_cxx.h>
-
 extern "C" {
 #include <aterm1.h>
 }
 
 #include "util.hh"
+#include "db.hh"
 
 using namespace std;
 
@@ -30,91 +29,7 @@ static string dbNetSources = "netsources";
 
 
 static string nixSourcesDir;
-
-
-/* Wrapper classes that ensures that the database is closed upon
-   object destruction. */
-class Db2 : public Db 
-{
-public:
-    Db2(DbEnv *env, u_int32_t flags) : Db(env, flags) { }
-    ~Db2() { close(0); }
-};
-
-
-class DbcClose 
-{
-    Dbc * cursor;
-public:
-    DbcClose(Dbc * c) : cursor(c) { }
-    ~DbcClose() { cursor->close(); }
-};
-
-
-auto_ptr<Db2> openDB(const string & dbname, bool readonly)
-{
-    auto_ptr<Db2> db(new Db2(0, 0));
-
-    db->open((nixHomeDir + "/var/nix/pkginfo.db").c_str(), dbname.c_str(),
-        DB_HASH, readonly ? DB_RDONLY : DB_CREATE, 0666);
-
-    return db;
-}
-
-
-bool queryDB(const string & dbname, const string & key, string & data)
-{
-    int err;
-    auto_ptr<Db2> db = openDB(dbname, true);
-
-    Dbt kt((void *) key.c_str(), key.length());
-    Dbt dt;
-
-    err = db->get(0, &kt, &dt, 0);
-    if (err) return false;
-
-    data = string((char *) dt.get_data(), dt.get_size());
-    
-    return true;
-}
-
-
-void setDB(const string & dbname, const string & key, const string & data)
-{
-    auto_ptr<Db2> db = openDB(dbname, false);
-    Dbt kt((void *) key.c_str(), key.length());
-    Dbt dt((void *) data.c_str(), data.length());
-    db->put(0, &kt, &dt, 0);
-}
-
-
-void delDB(const string & dbname, const string & key)
-{
-    auto_ptr<Db2> db = openDB(dbname, false);
-    Dbt kt((void *) key.c_str(), key.length());
-    db->del(0, &kt, 0);
-}
-
-
-typedef pair<string, string> DBPair;
-typedef list<DBPair> DBPairs;
-
-
-void enumDB(const string & dbname, DBPairs & contents)
-{
-    auto_ptr<Db2> db = openDB(dbname, false);
-
-    Dbc * cursor;
-    db->cursor(0, &cursor, 0);
-    DbcClose cursorCloser(cursor);
-
-    Dbt kt, dt;
-    while (cursor->get(&kt, &dt, DB_NEXT) != DB_NOTFOUND) {
-        string key((char *) kt.get_data(), kt.get_size());
-        string data((char *) dt.get_data(), dt.get_size());
-        contents.push_back(DBPair(key, data));
-    }
-}
+static string nixDB;
 
 
 /* Download object referenced by the given URL into the sources
@@ -150,7 +65,7 @@ string getFile(string hash)
 
         string fn, url;
 
-        if (queryDB(dbRefs, hash, fn)) {
+        if (queryDB(nixDB, dbRefs, hash, fn)) {
 
             /* Verify that the file hasn't changed. !!! race */
             if (hashFile(fn) != hash)
@@ -163,7 +78,7 @@ string getFile(string hash)
             throw Error("consistency problem: file fetched from " + url + 
                 " should have hash " + hash + ", but it doesn't");
 
-        if (!queryDB(dbNetSources, hash, url))
+        if (!queryDB(nixDB, dbNetSources, hash, url))
             throw Error("a file with hash " + hash + " is requested, "
                 "but it is not known to exist locally or on the network");
 
@@ -171,7 +86,7 @@ string getFile(string hash)
         
         fn = fetchURL(url);
         
-        setDB(dbRefs, hash, fn);
+        setDB(nixDB, dbRefs, hash, fn);
     }
 }
 
@@ -332,7 +247,7 @@ void installPkg(string hash)
 
             /* Try to use a prebuilt. */
             string prebuiltHash, prebuiltFile;
-            if (queryDB(dbPrebuilts, hash, prebuiltHash)) {
+            if (queryDB(nixDB, dbPrebuilts, hash, prebuiltHash)) {
 
                 try {
                     prebuiltFile = getFile(prebuiltHash);
@@ -398,7 +313,7 @@ build:
         throw;
     }
 
-    setDB(dbInstPkgs, hash, path);
+    setDB(nixDB, dbInstPkgs, hash, path);
 }
 
 
@@ -406,7 +321,7 @@ string getPkg(string hash)
 {
     string path;
     checkHash(hash);
-    while (!queryDB(dbInstPkgs, hash, path))
+    while (!queryDB(nixDB, dbInstPkgs, hash, path))
         installPkg(hash);
     return path;
 }
@@ -470,9 +385,9 @@ void delPkg(string hash)
 {
     string path;
     checkHash(hash);
-    if (queryDB(dbInstPkgs, hash, path)) {
+    if (queryDB(nixDB, dbInstPkgs, hash, path)) {
         int res = system(("chmod -R +w " + path + " && rm -rf " + path).c_str()); // !!! escaping
-        delDB(dbInstPkgs, hash); // not a bug ??? 
+        delDB(nixDB, dbInstPkgs, hash); // not a bug ??? 
         if (WEXITSTATUS(res) != 0)
             cerr << "errors deleting " + path + ", ignoring" << endl;
     }
@@ -509,7 +424,7 @@ void registerPrebuilt(string pkgHash, string prebuiltHash)
 {
     checkHash(pkgHash);
     checkHash(prebuiltHash);
-    setDB(dbPrebuilts, pkgHash, prebuiltHash);
+    setDB(nixDB, dbPrebuilts, pkgHash, prebuiltHash);
 }
 
 
@@ -517,7 +432,7 @@ string registerFile(string filename)
 {
     filename = absPath(filename);
     string hash = hashFile(filename);
-    setDB(dbRefs, hash, filename);
+    setDB(nixDB, dbRefs, hash, filename);
     return hash;
 }
 
@@ -525,7 +440,7 @@ string registerFile(string filename)
 void registerURL(string hash, string url)
 {
     checkHash(hash);
-    setDB(dbNetSources, hash, url);
+    setDB(nixDB, dbNetSources, hash, url);
     /* !!! currently we allow only one network source per hash */
 }
 
@@ -535,18 +450,18 @@ void registerInstalledPkg(string hash, string path)
 {
     checkHash(hash);
     if (path == "")
-        delDB(dbInstPkgs, hash);
+        delDB(nixDB, dbInstPkgs, hash);
     else
-        setDB(dbInstPkgs, hash, path);
+        setDB(nixDB, dbInstPkgs, hash, path);
 }
 
 
 void initDB()
 {
-    openDB(dbRefs, false);
-    openDB(dbInstPkgs, false);
-    openDB(dbPrebuilts, false);
-    openDB(dbNetSources, false);
+    createDB(nixDB, dbRefs);
+    createDB(nixDB, dbInstPkgs);
+    createDB(nixDB, dbPrebuilts);
+    createDB(nixDB, dbNetSources);
 }
 
 
@@ -555,7 +470,7 @@ void verifyDB()
     /* Check that all file references are still valid. */
     DBPairs fileRefs;
     
-    enumDB(dbRefs, fileRefs);
+    enumDB(nixDB, dbRefs, fileRefs);
 
     for (DBPairs::iterator it = fileRefs.begin();
          it != fileRefs.end(); it++)
@@ -563,18 +478,18 @@ void verifyDB()
         try {
             if (hashFile(it->second) != it->first) {
                 cerr << "file " << it->second << " has changed\n";
-                delDB(dbRefs, it->first);
+                delDB(nixDB, dbRefs, it->first);
             }
         } catch (BadRefError e) { /* !!! better error check */ 
             cerr << "file " << it->second << " has disappeared\n";
-            delDB(dbRefs, it->first);
+            delDB(nixDB, dbRefs, it->first);
         }
     }
 
     /* Check that all installed packages are still there. */
     DBPairs instPkgs;
 
-    enumDB(dbInstPkgs, instPkgs);
+    enumDB(nixDB, dbInstPkgs, instPkgs);
 
     for (DBPairs::iterator it = instPkgs.begin();
          it != instPkgs.end(); it++)
@@ -582,7 +497,7 @@ void verifyDB()
         struct stat st;
         if (stat(it->second.c_str(), &st) == -1) {
             cerr << "package " << it->first << " has disappeared\n";
-            delDB(dbInstPkgs, it->first);
+            delDB(nixDB, dbInstPkgs, it->first);
         }
     }
 
@@ -595,7 +510,7 @@ void listInstalledPkgs()
 {
     DBPairs instPkgs;
 
-    enumDB(dbInstPkgs, instPkgs);
+    enumDB(nixDB, dbInstPkgs, instPkgs);
 
     for (DBPairs::iterator it = instPkgs.begin();
          it != instPkgs.end(); it++)
@@ -777,6 +692,7 @@ void run(Strings::iterator argCur, Strings::iterator argEnd)
     if (homeDir) nixHomeDir = homeDir;
 
     nixSourcesDir = nixHomeDir + "/var/nix/sources";
+    nixDB = nixHomeDir + "/var/nix/pkginfo.db";
 
     /* Parse the global flags. */
     for ( ; argCur != argEnd; argCur++) {
@@ -856,11 +772,7 @@ int main(int argc, char * * argv)
     argCur++;
 
     try {
-        try {
-            run(argCur, argEnd);
-        } catch (DbException e) {
-            throw Error(e.what());
-        }
+        run(argCur, argEnd);
     } catch (UsageError & e) {
         cerr << "error: " << e.what() << endl
              << "Try `nix -h' for more information.\n";
