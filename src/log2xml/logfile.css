@@ -1,74 +1,44 @@
-body
-{
+body {
     font-family: sans-serif;
     background: white;
 }
 
 
-td.line
-{
-    width: 100%;
-}
-
-
-blockquote.body
-{
+blockquote.body {
     padding: 6px 0px;
-    margin: 0px 1px;
+    margin: 0px 0px;
 }
 
 
-table.x, tr.x
-{
-    border-collapse: separate;
-    border-spacing: 0pt;
-    margin: 0em 0em 0em 0em;
-    padding: 0em 0em 0em 0em;
+div.line, div.lastline {
+    position: relative;
 }
 
-
-tr.x > td.dummy
-{
-    vertical-align: top;
-    margin: 0em 0em 0em 0em;
-    padding: 0.5em 0em 0em 0em;
-    border-left: 3px solid #6185a0;
+div.line {
+    border-left: 0.1em solid #6185a0;
 }
 
-
-tr.x > td.dummy > div.dummy
-{
-    width: 1.5em;
-    height: 3px;
-    margin: 0em 0em 0em 0em;
-    border-top: 3px solid #6185a0;
+span.lineconn {
+    position: absolute;
+    height: 0.5em;
+    width: 1em;
+    border-bottom: 0.1em solid #6185a0;
 }
 
-
-table.y, tr.y
-{
-    border-collapse: separate;
-    border-spacing: 0pt;
-    margin: 0em 0em 0em 0em;
-    padding: 0em 0em 0em 0em;
+div.lastline > span.lineconn {
+    border-left: 0.1em solid #6185a0;
 }
 
-
-tr.y > td.dummy
-{
-    vertical-align: top;
-    margin: 0em 0em 0em 0em;
-    padding: 0em 0em 0em 0em;
+span.linebody {
+    position: relative;
 }
 
+div.line > span.linebody {
+    left: 1.1em;
+}
 
-tr.y > td.dummy > div.dummy
-{
-    width: 1.5em;
-    height: 6px;
-    margin: 0em 0em 0em 0em;
-    border-left: 3px solid #6185a0;
-    border-bottom: 3px solid #6185a0;
+div.lastline > span.linebody {
+    left: 1.2em;
 }
 
 

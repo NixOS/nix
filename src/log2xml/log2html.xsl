@@ -22,28 +22,20 @@
       <blockquote class='body'>
         <xsl:for-each select='line|nest'>
           <xsl:if test="position() != last()">
-            <table class='x'>
-              <tr class='x'>
-                <td class='dummy'>
-                  <div class='dummy' />
-                </td>
-                <td class='line'>
-                  <xsl:apply-templates select='.'/>
-                </td>
-              </tr>
-            </table>
+            <div class='line'>
+              <span class='lineconn' />
+              <span class='linebody'>
+                <xsl:apply-templates select='.'/>
+              </span>
+            </div>
           </xsl:if>
           <xsl:if test="position() = last()">
-            <table class='y'>
-              <tr class='y'>
-                <td class='dummy'>
-                  <div class='dummy' />
-                </td>
-                <td class='line'>
-                  <xsl:apply-templates select='.'/>
-                </td>
-              </tr>
-            </table>
+            <div class='lastline'>
+              <span class='lineconn' />
+              <span class='linebody'>
+                <xsl:apply-templates select='.'/>
+              </span>
+            </div>
           </xsl:if>
         </xsl:for-each>
       </blockquote>
