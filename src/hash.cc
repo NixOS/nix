@@ -14,7 +14,7 @@ Hash::Hash()
 }
 
 
-bool Hash::operator == (Hash h2)
+bool Hash::operator == (const Hash & h2) const
 {
     for (unsigned int i = 0; i < hashSize; i++)
         if (hash[i] != h2.hash[i]) return false;
@@ -22,7 +22,7 @@ bool Hash::operator == (Hash h2)
 }
 
 
-bool Hash::operator != (Hash h2)
+bool Hash::operator != (const Hash & h2) const
 {
     return !(*this == h2);
 }

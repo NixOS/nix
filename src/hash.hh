@@ -17,10 +17,10 @@ struct Hash
     Hash();
 
     /* Check whether two hash are equal. */
-    bool operator == (Hash h2);
+    bool operator == (const Hash & h2) const;
 
     /* Check whether two hash are not equal. */
-    bool operator != (Hash h2);
+    bool operator != (const Hash & h2) const;
 
     /* For sorting. */
     bool operator < (const Hash & h) const;

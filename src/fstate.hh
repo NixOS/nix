@@ -115,5 +115,7 @@ Slice normaliseFState(FSId id);
 /* Realise a Slice in the file system. */
 void realiseSlice(const Slice & slice);
 
+Strings fstatePaths(FSId id);
+
 
 #endif /* !__FSTATE_H */

@@ -41,7 +41,7 @@ static ArgType argType = atpUnknown;
    Source selection for --install, --dump:
 
      --file / -f: by file name  !!! -> path
-     --hash / -h: by hash
+     --hash / -h: by hash (identifier)
 
    Query flags:
 
@@ -76,15 +76,15 @@ static void getArgType(Strings & flags)
 }
 
 
-static Hash argToHash(const string & arg)
+static FSId argToId(const string & arg)
 {
     if (argType == atpHash)
         return parseHash(arg);
     else if (argType == atpPath) {
         string path;
-        Hash hash;
-        addToStore(arg, path, hash);
-        return hash;
+        FSId id;
+        addToStore(arg, path, id);
+        return id;
     }
     else abort();
 }
@@ -99,10 +99,7 @@ static void opInstall(Strings opFlags, Strings opArgs)
 
     for (Strings::iterator it = opArgs.begin();
          it != opArgs.end(); it++)
-    {
-        StringSet paths;
-        realiseFState(hash2fstate(argToHash(*it)), paths);
-    }
+        realiseSlice(normaliseFState(argToId(*it)));
 }
 
 
@@ -128,9 +125,9 @@ static void opAdd(Strings opFlags, Strings opArgs)
          it != opArgs.end(); it++)
     {
         string path;
-        Hash hash;
-        addToStore(*it, path, hash);
-        cout << format("%1% %2%\n") % (string) hash % path;
+        FSId id;
+        addToStore(*it, path, id);
+        cout << format("%1% %2%\n") % (string) id % path;
     }
 }
 
@@ -156,10 +153,11 @@ static void opQuery(Strings opFlags, Strings opArgs)
     for (Strings::iterator it = opArgs.begin();
          it != opArgs.end(); it++)
     {
-        Hash hash = argToHash(*it);
+        FSId id = argToId(*it);
 
         switch (query) {
 
+#if 0
         case qPath: {
             StringSet refs;
             cout << format("%s\n") % 
@@ -176,6 +174,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 cout << format("%s\n") % *j;
             break;
         }
+#endif
 
         default:
             abort();
@@ -192,9 +191,9 @@ static void opSuccessor(Strings opFlags, Strings opArgs)
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); )
     {
-        Hash fsHash = parseHash(*i++);
-        Hash scHash = parseHash(*i++);
-        registerSuccessor(fsHash, scHash);
+        FSId id1 = parseHash(*i++);
+        FSId id2 = parseHash(*i++);
+        registerSuccessor(id1, id2);
     }
 }
 
@@ -207,9 +206,9 @@ static void opSubstitute(Strings opFlags, Strings opArgs)
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); )
     {
-        Hash srcHash = parseHash(*i++);
-        Hash subHash = parseHash(*i++);
-        registerSubstitute(srcHash, subHash);
+        FSId src = parseHash(*i++);
+        FSId sub = parseHash(*i++);
+        registerSubstitute(src, sub);
     }
 }
 
@@ -238,7 +237,7 @@ static void opDump(Strings opFlags, Strings opArgs)
     string arg = *opArgs.begin();
     string path;
     
-    if (argType == atpHash) path = expandHash(parseHash(arg));
+    if (argType == atpHash) path = expandId(parseHash(arg));
     else if (argType == atpPath) path = arg;
 
     dumpPath(path, sink);

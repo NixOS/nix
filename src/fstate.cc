@@ -194,228 +194,6 @@ static FSId storeSuccessor(const FSId & id1, FState sc)
 }
 
 
-#if 0
-static FState realise(FState fs, StringSet & paths)
-{
-    char * s1, * s2, * s3;
-    Content content;
-    ATermList refs, ins, bnds;
-
-    /* First repeatedly try to substitute $fs$ by any known successors
-       in order to speed up the rewrite process. */
-    {
-        string fsHash, scHash;
-        while (queryDB(nixDB, dbSuccessors, fsHash = hashTerm(fs), scHash)) {
-            debug(format("successor %1% -> %2%") % (string) fsHash % scHash);
-            string path;
-            FState fs2 = termFromHash(parseHash(scHash), &path);
-            paths.insert(path);
-            if (fs == fs2) {
-                debug(format("successor cycle detected in %1%") % printTerm(fs));
-                break;
-            }
-            fs = fs2;
-        }
-    }
-
-    /* Fall through. */
-
-    if (ATmatch(fs, "Include(<str>)", &s1)) {
-        string path;
-        fs = termFromHash(parseHash(s1), &path);
-        paths.insert(path);
-        return realise(fs, paths);
-    }
-    
-    else if (ATmatch(fs, "Path(<str>, <term>, [<list>])", &s1, &content, &refs)) {
-        string path(s1);
-
-        msg(format("realising atomic path %1%") % path);
-        Nest nest(true);
-
-        if (path[0] != '/')
-            throw Error(format("path `%1% is not absolute") % path);
-
-        /* Realise referenced paths. */
-        ATermList refs2 = ATempty;
-        while (!ATisEmpty(refs)) {
-            refs2 = ATinsert(refs2, realise(ATgetFirst(refs), paths));
-            refs = ATgetNext(refs);
-        }
-        refs2 = ATreverse(refs2);
-
-        if (!ATmatch(content, "Hash(<str>)", &s1))
-            throw badTerm("hash expected", content);
-        Hash hash = parseHash(s1);
-
-        /* Normal form. */
-        ATerm nf = ATmake("Path(<str>, <term>, <term>)",
-            path.c_str(), content, refs2);
-
-        /* Register the normal form. */
-        nf = storeSuccessor(fs, nf, paths);
-        
-        /* Expand the hash into the target path. */
-        expandHash(hash, path);
-
-        return nf;
-    }
-
-    else if (ATmatch(fs, "Derive(<str>, <str>, [<list>], <str>, [<list>])",
-                 &s1, &s2, &ins, &s3, &bnds)) 
-    {
-        string platform(s1), builder(s2), outPath(s3);
-
-        msg(format("realising derivate path %1%") % outPath);
-        Nest nest(true);
-
-        checkPlatform(platform);
-        
-        /* Realise inputs. */
-        Strings inPaths;
-        ATermList ins2 = ATempty;
-        while (!ATisEmpty(ins)) {
-            FState in = realise(ATgetFirst(ins), paths);
-            inPaths.push_back(fstatePath(in));
-            ins2 = ATinsert(ins2, in);
-            ins = ATgetNext(ins);
-        }
-        ins = ATreverse(ins2);
-
-        /* Build the environment. */
-        Environment env;
-        while (!ATisEmpty(bnds)) {
-            ATerm bnd = ATgetFirst(bnds);
-            if (!ATmatch(bnd, "(<str>, <str>)", &s1, &s2))
-                throw badTerm("tuple of strings expected", bnd);
-            env[s1] = s2;
-            bnds = ATgetNext(bnds);
-        }
-
-        /* Check whether the target already exists. */
-        if (pathExists(outPath))
-            deleteFromStore(outPath);
-//             throw Error(format("path %1% already exists") % outPath);
-
-        /* Run the builder. */
-        runProgram(builder, env);
-        
-        /* Check whether the result was created. */
-        if (!pathExists(outPath))
-            throw Error(format("program %1% failed to create a result in %2%")
-                % builder % outPath);
-
-#if 0
-        /* Remove write permission from the value. */
-        int res = system(("chmod -R -w " + targetPath).c_str()); // !!! escaping
-        if (WEXITSTATUS(res) != 0)
-            throw Error("cannot remove write permission from " + targetPath);
-#endif
-
-        /* Hash the result. */
-        Hash outHash = hashPath(outPath);
-
-        /* Register targetHash -> targetPath.  !!! this should be in
-           values.cc. */
-        registerPath(outPath, outHash);
-
-        /* Filter out inputs that are not referenced in the output. */
-        for (Strings::iterator i = inPaths.begin();
-             i != inPaths.end(); i++)
-            debug(format("in: %1%") % *i);
-
-        Strings outPaths = filterReferences(outPath, inPaths);
-
-        for (Strings::iterator i = outPaths.begin();
-             i != outPaths.end(); i++)
-            debug(format("out: %1%") % *i);
-
-        ins2 = ATempty;
-        while (!ATisEmpty(ins)) {
-            FState in = ATgetFirst(ins);
-            string path = fstatePath(in);
-            for (Strings::iterator i = outPaths.begin();
-                 i != outPaths.end(); i++)
-                if (path.find(*i) != string::npos) {
-                    debug(format("out2: %1%") % path);
-                    ins2 = ATinsert(ins2, in);
-                }
-            ins = ATgetNext(ins);
-        }
-        ins = ATreverse(ins2);
-        
-        /* Register the normal form of fs. */
-        FState nf = ATmake("Path(<str>, Hash(<str>), <term>)",
-            outPath.c_str(), ((string) outHash).c_str(), ins);
-        nf = storeSuccessor(fs, nf, paths);
-
-        return nf;
-    }
-
-    throw badTerm("bad fstate expression", fs);
-}
-
-
-FState realiseFState(FState fs, StringSet & paths)
-{
-    return realise(fs, paths);
-}
-
-
-string fstatePath(FState fs)
-{
-    char * s1, * s2, * s3;
-    FState e1, e2;
-    if (ATmatch(fs, "Path(<str>, <term>, [<list>])", &s1, &e1, &e2))
-        return s1;
-    else if (ATmatch(fs, "Derive(<str>, <str>, [<list>], <str>, [<list>])",
-                   &s1, &s2, &e1, &s3, &e2))
-        return s3;
-    else if (ATmatch(fs, "Include(<str>)", &s1))
-        return fstatePath(termFromHash(parseHash(s1)));
-    else
-        return "";
-}
-
-
-void fstateRefs2(FState fs, StringSet & paths)
-{
-    char * s1, * s2, * s3;
-    FState e1, e2;
-    ATermList refs, ins;
-
-    if (ATmatch(fs, "Path(<str>, <term>, [<list>])", &s1, &e1, &refs)) {
-        paths.insert(s1);
-
-        while (!ATisEmpty(refs)) {
-            fstateRefs2(ATgetFirst(refs), paths);
-            refs = ATgetNext(refs);
-        }
-    }
-
-    else if (ATmatch(fs, "Derive(<str>, <str>, [<list>], <str>, [<list>])", 
-            &s1, &s2, &ins, &s3, &e2))
-    {
-        while (!ATisEmpty(ins)) {
-            fstateRefs2(ATgetFirst(ins), paths);
-            ins = ATgetNext(ins);
-        }
-    }
-
-    else if (ATmatch(fs, "Include(<str>)", &s1))
-        fstateRefs2(termFromHash(parseHash(s1)), paths);
-
-    else throw badTerm("bad fstate expression", fs);
-}
-
-
-void fstateRefs(FState fs, StringSet & paths)
-{
-    fstateRefs2(fs, paths);
-}
-#endif
-
-
 static void parseIds(ATermList ids, FSIds & out)
 {
     while (!ATisEmpty(ids)) {
@@ -424,7 +202,6 @@ static void parseIds(ATermList ids, FSIds & out)
         if (!ATmatch(id, "<str>", &s))
             throw badTerm("not an id", id);
         out.push_back(parseHash(s));
-        debug(s);
         ids = ATgetNext(ids);
     }
 }
@@ -690,4 +467,46 @@ void realiseSlice(const Slice & slice)
         SliceElem elem = *i;
         expandId(elem.id, elem.path);
     }
+}
+
+
+Strings fstatePaths(FSId id)
+{
+    Strings paths;
+
+    FState fs = termFromId(id);
+
+    ATermList outs, ins, bnds;
+    char * builder;
+    char * platform;
+
+    if (ATgetType(fs) == AT_APPL && 
+        (string) ATgetName(ATgetAFun(fs)) == "Slice")
+    {
+        Slice slice = parseSlice(fs);
+
+        /* !!! fix complexity */
+        for (FSIds::const_iterator i = slice.roots.begin();
+             i != slice.roots.end(); i++)
+            for (SliceElems::const_iterator j = slice.elems.begin();
+                 j != slice.elems.end(); j++)
+                if (*i == j->id) paths.push_back(j->path);
+    }
+
+    else if (ATmatch(fs, "Derive([<list>], [<list>], <str>, <str>, [<list>])",
+                 &outs, &ins, &builder, &platform, &bnds))
+    {
+        while (!ATisEmpty(outs)) {
+            ATerm t = ATgetFirst(outs);
+            char * s1, * s2;
+            if (!ATmatch(t, "(<str>, <str>)", &s1, &s2))
+                throw badTerm("string expected", t);
+            paths.push_back(s1);
+            outs = ATgetNext(outs);
+        }
+    }
+    
+    else throw badTerm("in fstatePaths", fs);
+
+    return paths;
 }

@@ -107,10 +107,9 @@ static Expr evalExpr(Expr e)
 
     /* Normal forms. */
     if (ATmatch(e, "<str>", &s1) ||
-        ATmatch(e, "Function([<list>], <term>)", &e1, &e2))
+        ATmatch(e, "Function([<list>], <term>)", &e1, &e2) ||
+        ATmatch(e, "FSId(<str>)", &s1))
         return e;
-
-    if (fstatePath(e) != "") return e; /* !!! hack */
 
     /* Application. */
     if (ATmatch(e, "App(<term>, [<list>])", &e1, &e2)) {
@@ -130,10 +129,12 @@ static Expr evalExpr(Expr e)
     if (ATmatch(e, "Relative(<str>)", &s1)) {
         string srcPath = searchPath(s1);
         string dstPath;
-        Hash hash;
-        addToStore(srcPath, dstPath, hash, true);
-        return ATmake("Path(<str>, Hash(<str>), [])",
-            dstPath.c_str(), ((string) hash).c_str());
+        FSId id;
+        addToStore(srcPath, dstPath, id, true);
+        FState fs = ATmake("Slice([<str>], [(<str>, <str>, [])])",
+            ((string) id).c_str(), dstPath.c_str(), ((string) id).c_str());
+        return ATmake("FSId(<str>)", 
+            ((string) writeTerm(fs, "", 0)).c_str());
     }
 
     /* Packages are transformed into Derive fstate expressions. */
@@ -160,10 +161,13 @@ static Expr evalExpr(Expr e)
         {
             string key = it->first;
             ATerm value = it->second;
+            char * id;
 
-            string path = fstatePath(value);
-            if (path != "") {
-                ins = ATinsert(ins, value);
+            if (ATmatch(value, "FSId(<str>)", &id)) {
+                Strings paths = fstatePaths(parseHash(id));
+                if (paths.size() != 1) abort();
+                string path = *(paths.begin());
+                ins = ATinsert(ins, ATmake("<str>", id));
                 env = ATinsert(env, ATmake("(<str>, <str>)",
                     key.c_str(), path.c_str()));
                 if (key == "build") builder = path;
@@ -182,7 +186,7 @@ static Expr evalExpr(Expr e)
         /* Hash the normal form to produce a unique but deterministic
            path name for this package. */
         ATerm nf = ATmake("Package(<term>)", ATreverse(bnds));
-        Hash hash = hashTerm(nf);
+        FSId outId = hashTerm(nf);
 
         if (builder == "")
             throw badTerm("no builder specified", nf);
@@ -190,19 +194,20 @@ static Expr evalExpr(Expr e)
         if (name == "")
             throw badTerm("no package name specified", nf);
         
-        string out = 
-            canonPath(nixStore + "/" + ((string) hash).c_str() + "-" + name);
+        string outPath = 
+            canonPath(nixStore + "/" + ((string) outId).c_str() + "-" + name);
 
-        env = ATinsert(env, ATmake("(<str>, <str>)", "out", out.c_str()));
-
+        env = ATinsert(env, ATmake("(<str>, <str>)", "out", outPath.c_str()));
+        
         /* Construct the result. */
-        e = ATmake("Derive(<str>, <str>, <term>, <str>, <term>)",
-            SYSTEM, builder.c_str(), ins, out.c_str(), env);
+        FState fs = 
+            ATmake("Derive([(<str>, <str>)], <term>, <str>, <str>, <term>)",
+                outPath.c_str(), ((string) outId).c_str(),
+                ins, builder.c_str(), SYSTEM, env);
 
         /* Write the resulting term into the Nix store directory. */
-        Hash eHash = writeTerm(e, "-d-" + name);
-
-        return ATmake("Include(<str>)", ((string) eHash).c_str());
+        return ATmake("FSId(<str>)", 
+            ((string) writeTerm(fs, "-d-" + name, 0)).c_str());
     }
 
     /* BaseName primitive function. */
@@ -258,7 +263,7 @@ void run(Strings args)
     {
         Expr e = evalFile(*it);
         char * s;
-        if (ATmatch(e, "Include(<str>)", &s)) {
+        if (ATmatch(e, "FSId(<str>)", &s)) {
             cout << format("%1%\n") % s;
         }
         else throw badTerm("top level is not a package", e);
