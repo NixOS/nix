@@ -5,7 +5,7 @@
 
 #include "aterm.hh"
 #include "hash.hh"
-#include "fixexpr.hh"
+#include "nixexpr.hh"
 
 
 typedef map<Path, PathSet> DrvPaths;

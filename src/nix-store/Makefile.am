@@ -1,15 +1,13 @@
 bin_PROGRAMS = nix-store
 
-nix_store_SOURCES = nix.cc dotgraph.cc
+nix_store_SOURCES = main.cc dotgraph.cc
 nix_store_LDADD = ../libmain/libmain.a ../libstore/libstore.a ../libutil/libutil.a \
  ../boost/format/libformat.a -L../../externals/inst/lib -ldb_cxx -lATerm
 
-nix.o: nix-help.txt.hh
+main.o: help.txt.hh
 
 %.hh: %
-	echo -n '"' > $@
-	sed 's|\(.*\)|\1\\n\\|' < $< >> $@
-	echo '"' >> $@
+	../bin2c/bin2c helpText < $< > $@ || (rm $@ && exit 1)
 
 AM_CXXFLAGS = \
  -I.. -I../../externals/inst/include -I../libutil -I../libstore -I../libmain

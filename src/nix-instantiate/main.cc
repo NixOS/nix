@@ -70,7 +70,7 @@ void run(Strings args)
 
 #if 0
     state.searchDirs.push_back(".");
-    state.searchDirs.push_back(nixDataDir + "/fix");
+    state.searchDirs.push_back(nixDataDir + "/nix");
 #endif
     
     for (Strings::iterator it = args.begin();
@@ -114,4 +114,4 @@ void run(Strings args)
 }
 
 
-string programId = "fix";
+string programId = "nix-instantiate";

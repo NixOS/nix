@@ -13,7 +13,6 @@ extern "C" {
 #include "aterm.hh"
 #include "parser.hh"
 #include "shared.hh"
-#include "fixexpr.hh"
 #include "parse-table.h"
 
 
@@ -76,12 +75,12 @@ Expr parseExprFromFile(Path path)
     if (e) return e;
 #endif
 
-    /* If `path' refers to a directory, append `/default.fix'. */
+    /* If `path' refers to a directory, append `/default.nix'. */
     struct stat st;
     if (stat(path.c_str(), &st))
         throw SysError(format("getting status of `%1%'") % path);
     if (S_ISDIR(st.st_mode))
-        path = canonPath(path + "/default.fix");
+        path = canonPath(path + "/default.nix");
 
     /* Initialise the SDF libraries. */
     static bool initialised = false;
@@ -95,12 +94,12 @@ Expr parseExprFromFile(Path path)
 
         ATprotect(&parseTable);
         parseTable = ATreadFromBinaryString(
-            (char *) fixParseTable, sizeof fixParseTable);
+            (char *) nixParseTable, sizeof nixParseTable);
         if (!parseTable)
             throw Error(format("cannot construct parse table term"));
 
         ATprotect(&lang);
-        lang = ATmake("Fix");
+        lang = ATmake("Nix");
         if (!SGopenLanguageFromTerm(
                 (char *) programId.c_str(), lang, parseTable))
             throw Error(format("cannot open language"));

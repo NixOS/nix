@@ -1,6 +1,6 @@
 bin_PROGRAMS = nix-instantiate
 
-nix_instantiate_SOURCES = fixexpr.cc parser.cc eval.cc primops.cc fix.cc
+nix_instantiate_SOURCES = nixexpr.cc parser.cc eval.cc primops.cc main.cc
 nix_instantiate_LDADD = ../libmain/libmain.a ../libstore/libstore.a ../libutil/libutil.a \
  ../boost/format/libformat.a -L../../externals/inst/lib -ldb_cxx \
  -lsglr -lATB -lconversion -lasfix2 -lmept -lATerm
@@ -13,14 +13,10 @@ AM_CXXFLAGS = \
 
 parser.o: parse-table.h
 
-parse-table.h: fix.tbl bin2c
-	./bin2c fixParseTable < $< > $@ || (rm $@ && exit 1)
-
-noinst_PROGRAMS = bin2c
-
-bin2c_SOURCES = bin2c.c
+parse-table.h: nix.tbl
+	../bin2c/bin2c nixParseTable < $< > $@ || (rm $@ && exit 1)
 
 %.tbl: %.sdf
 	../../externals/inst/bin/sdf2table -i $< -o $@
 
-CLEANFILES = parse-table.h fix.tbl
+CLEANFILES = parse-table.h nix.tbl

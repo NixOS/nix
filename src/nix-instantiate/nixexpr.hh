@@ -1,5 +1,5 @@
-#ifndef __FIXEXPR_H
-#define __FIXEXPR_H
+#ifndef __NIXEXPR_H
+#define __NIXEXPR_H
 
 #include <map>
 
@@ -8,7 +8,7 @@
 #include "util.hh"
 
 
-/* Fix expressions are represented as ATerms.  The maximal sharing
+/* Nix expressions are represented as ATerms.  The maximal sharing
    property of the ATerm library allows us to implement caching of
    normals forms efficiently. */
 typedef ATerm Expr;
@@ -72,4 +72,4 @@ Expr substitute(const ATermMap & subs, Expr e);
 Expr makeBool(bool b);
 
 
-#endif /* !__FIXEXPR_H */
+#endif /* !__NIXEXPR_H */

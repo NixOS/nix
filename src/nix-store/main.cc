@@ -6,6 +6,7 @@
 #include "archive.hh"
 #include "shared.hh"
 #include "dotgraph.hh"
+#include "help.txt.hh"
 
 
 typedef void (* Operation) (Strings opFlags, Strings opArgs);
@@ -13,9 +14,7 @@ typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
 static void printHelp()
 {
-    cout <<
-#include "nix-help.txt.hh"
-        ;
+    cout << string((char *) helpText, sizeof helpText);
     exit(0);
 }
 
@@ -301,4 +300,4 @@ void run(Strings args)
 }
 
 
-string programId = "nix";
+string programId = "nix-store";
