@@ -3,6 +3,7 @@ Function(["nar", "name"],
     [ ("name", Var("name"))
     , ("build", Relative("nar/unnar.sh"))
     , ("nar", Var("nar"))
+    , ("id", Var("id"))
     ]
   )
 )

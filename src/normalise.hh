@@ -5,11 +5,11 @@
 
 
 /* Normalise an fstate-expression, that is, return an equivalent
-   Slice. */
-Slice normaliseFState(FSId id);
+   Slice.  (For the meaning of `pending', see expandId()). */
+Slice normaliseFState(FSId id, FSIdSet pending = FSIdSet());
 
 /* Realise a Slice in the file system. */
-void realiseSlice(const Slice & slice);
+void realiseSlice(const Slice & slice, FSIdSet pending = FSIdSet());
 
 /* Get the list of root (output) paths of the given
    fstate-expression. */

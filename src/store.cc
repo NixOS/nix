@@ -165,8 +165,11 @@ bool isInPrefix(const string & path, const string & _prefix)
 
 
 string expandId(const FSId & id, const string & target,
-    const string & prefix)
+    const string & prefix, FSIdSet pending)
 {
+    debug(format("expanding %1%") % (string) id);
+    Nest nest(true);
+
     Strings paths;
 
     if (!target.empty() && !isInPrefix(target, prefix))
@@ -203,30 +206,24 @@ string expandId(const FSId & id, const string & target,
         }
     }
 
-    /* Try to realise the substitutes. */
+    if (pending.find(id) != pending.end())
+        throw Error(format("id %1% already being expanded") % (string) id);
+    pending.insert(id);
 
+    /* Try to realise the substitutes, but only if this id is not
+       already being realised by a substitute. */
     Strings subs;
     queryListDB(nixDB, dbSubstitutes, id, subs); /* non-existence = ok */
 
     for (Strings::iterator it = subs.begin(); it != subs.end(); it++) {
         FSId subId = parseHash(*it);
-        Slice slice = normaliseFState(subId);
-        realiseSlice(slice);
-        
-        Strings paths = fstatePaths(subId, true);
-        if (paths.size() != 1) 
-            throw Error("substitute created more than 1 path");
-        string path = *(paths.begin());
 
-        if (target.empty())
-            return path; /* !!! prefix */
-        else {
-            if (path != target) {
-                copyPath(path, target);
-                registerPath(target, id);
-            }
-            return target;
-        }
+        debug(format("trying substitute %1%") % (string) subId);
+
+        Slice slice = normaliseFState(subId, pending);
+        realiseSlice(slice, pending);
+
+        return expandId(id, target, prefix, pending);
     }
     
     throw Error(format("cannot expand id `%1%'") % (string) id);

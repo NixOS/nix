@@ -24,7 +24,7 @@ static FSId storeSuccessor(const FSId & id1, ATerm sc)
 typedef set<FSId> FSIdSet;
 
 
-Slice normaliseFState(FSId id)
+Slice normaliseFState(FSId id, FSIdSet pending)
 {
     debug(format("normalising fstate %1%") % (string) id);
     Nest nest(true);
@@ -57,8 +57,8 @@ Slice normaliseFState(FSId id)
 
     for (FSIds::iterator i = fs.derive.inputs.begin();
          i != fs.derive.inputs.end(); i++) {
-        Slice slice = normaliseFState(*i);
-        realiseSlice(slice);
+        Slice slice = normaliseFState(*i, pending);
+        realiseSlice(slice, pending);
 
         for (SliceElems::iterator j = slice.elems.begin();
              j != slice.elems.end(); j++)
@@ -93,7 +93,7 @@ Slice normaliseFState(FSId id)
          i != outPaths.end(); i++)
     {
         try {
-            expandId(i->second, i->first);
+            expandId(i->second, i->first, "/", pending);
         } catch (Error & e) {
             debug(format("fast build failed: %1%") % e.what());
             fastBuild = false;
@@ -175,7 +175,7 @@ Slice normaliseFState(FSId id)
 }
 
 
-void realiseSlice(const Slice & slice)
+void realiseSlice(const Slice & slice, FSIdSet pending)
 {
     debug(format("realising slice"));
     Nest nest(true);
@@ -209,7 +209,7 @@ void realiseSlice(const Slice & slice)
     {
         SliceElem elem = *i;
         debug(format("expanding %1% in %2%") % (string) elem.id % elem.path);
-        expandId(elem.id, elem.path);
+        expandId(elem.id, elem.path, "/", pending);
     }
 }
 

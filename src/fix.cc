@@ -9,11 +9,13 @@
 typedef ATerm Expr;
 
 typedef map<ATerm, ATerm> NormalForms;
+typedef map<FSId, Hash> PkgHashes;
 
 struct EvalState 
 {
     Strings searchDirs;
     NormalForms normalForms;
+    PkgHashes pkgHashes; /* normalised package hashes */
 };
 
 
@@ -104,6 +106,23 @@ static Expr substExprMany(ATermList formals, ATermList args, Expr body)
 }
 
 
+Hash hashPackage(EvalState & state, FState fs)
+{
+    if (fs.type == FState::fsDerive) {
+        for (FSIds::iterator i = fs.derive.inputs.begin();
+             i != fs.derive.inputs.end(); i++)
+        {
+            PkgHashes::iterator j = state.pkgHashes.find(*i);
+            if (j == state.pkgHashes.end())
+                throw Error(format("unknown package id %1%") % (string) *i);
+            *i = j->second;
+        }
+    }
+    debug(printTerm(unparseFState(fs)));
+    return hashTerm(unparseFState(fs));
+}
+
+
 static Expr evalExpr2(EvalState & state, Expr e)
 {
     char * s1;
@@ -117,9 +136,10 @@ static Expr evalExpr2(EvalState & state, Expr e)
         return e;
 
     try {
-        parseFState(e);
-        return ATmake("FSId(<str>)", 
-            ((string) writeTerm(e, "")).c_str());
+        Hash pkgHash = hashPackage(state, parseFState(e));
+        FSId pkgId = writeTerm(e, "");
+        state.pkgHashes[pkgId] = pkgHash;
+        return ATmake("FSId(<str>)", ((string) pkgId).c_str());
     } catch (...) { /* !!! catch parse errors only */
     }
 
@@ -153,10 +173,10 @@ static Expr evalExpr2(EvalState & state, Expr e)
         fs.slice.roots.push_back(id);
         fs.slice.elems.push_back(elem);
 
-        FSId termId = hashString("producer-" + (string) id
-            + "-" + dstPath);
-        writeTerm(unparseFState(fs), "", termId);
-        return ATmake("FSId(<str>)", ((string) termId).c_str());
+        Hash pkgHash = hashPackage(state, fs);
+        FSId pkgId = writeTerm(unparseFState(fs), "");
+        state.pkgHashes[pkgId] = pkgHash;
+        return ATmake("FSId(<str>)", ((string) pkgId).c_str());
     }
 
     /* Packages are transformed into Derive fstate expressions. */
@@ -179,6 +199,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
         fs.derive.platform = SYSTEM;
         string name;
         FSId outId;
+        bool outIdGiven = false;
         bnds = ATempty;
 
         for (map<string, ATerm>::iterator it = bndMap.begin();
@@ -198,7 +219,10 @@ static Expr evalExpr2(EvalState & state, Expr e)
             }
             else if (ATmatch(value, "<str>", &s1)) {
                 if (key == "name") name = s1;
-                if (key == "id") outId = parseHash(s1);
+                if (key == "id") { 
+                    outId = parseHash(s1);
+                    outIdGiven = true;
+                }
                 fs.derive.env.push_back(StringPair(key, s1));
             }
             else throw badTerm("invalid package argument", value);
@@ -215,8 +239,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
         
         /* Hash the fstate-expression with no outputs to produce a
            unique but deterministic path name for this package. */
-        if (outId == FSId())
-            outId = hashTerm(unparseFState(fs));
+        if (!outIdGiven) outId = hashPackage(state, fs);
         string outPath = 
             canonPath(nixStore + "/" + ((string) outId).c_str() + "-" + name);
         fs.derive.env.push_back(StringPair("out", outPath));
@@ -224,10 +247,12 @@ static Expr evalExpr2(EvalState & state, Expr e)
         debug(format("%1%: %2%") % (string) outId % name);
 
         /* Write the resulting term into the Nix store directory. */
-        FSId termId = hashString("producer-" + (string) outId
-            + "-" + outPath);
-        writeTerm(unparseFState(fs), "-d-" + name, termId);
-        return ATmake("FSId(<str>)", ((string) termId).c_str());
+        Hash pkgHash = outIdGiven
+            ? hashString((string) outId + outPath)
+            : hashPackage(state, fs);
+        FSId pkgId = writeTerm(unparseFState(fs), "-d-" + name);
+        state.pkgHashes[pkgId] = pkgHash;
+        return ATmake("FSId(<str>)", ((string) pkgId).c_str());
     }
 
     /* BaseName primitive function. */

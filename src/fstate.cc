@@ -62,9 +62,6 @@ static void parseIds(ATermList ids, FSIds & out)
 }
 
 
-typedef set<FSId> FSIdSet;
-
-
 static void checkSlice(const Slice & slice)
 {
     if (slice.elems.size() == 0)
