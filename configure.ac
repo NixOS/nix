@@ -1,13 +1,13 @@
-AC_INIT(nix, "0.4")
+AC_INIT(nix, "0.5")
 AC_CONFIG_SRCDIR(README)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE
 
 # Put the revision number in the version.
-if REVISION=`svnversion $srcdir 2> /dev/null`; then
-   if test "$REVISION" != "exported"; then
-      VERSION="$VERSION-r$REVISION"
-   fi
+if REVISION=`test -d $srcdir/.svn && svnversion $srcdir 2> /dev/null`; then
+   VERSION="$VERSION-r$REVISION"
+elif REVISION=`cat $srcdir/svn-revision 2> /dev/null`; then
+   VERSION="$VERSION-r$REVISION"
 fi
 
 AC_PREFIX_DEFAULT(/nix)
