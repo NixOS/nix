@@ -13,7 +13,9 @@ open LOGFILE, ">>$logFile" or die "cannot open log file $logFile";
 die unless scalar @ARGV == 1;
 my $targetPath = $ARGV[0];
 
-print LOGFILE "$$ get $targetPath\n";
+my $date = `date`;
+chomp $date;
+print LOGFILE "$$ get $targetPath $date\n";
 
 
 # Load all manifests.
@@ -110,6 +112,9 @@ while ($queueFront < scalar @queue) {
         foreach my $narFile (@{$narFileList}) {
             print "  NAR from $narFile->{url}\n";
             addEdge "start", $u, $narFile->{size}, "narfile", $narFile;
+            if ($u eq $targetPath) {
+                print LOGFILE "$$ full-download-would-be $narFile->{size}\n";
+            }
         }
 
     }
