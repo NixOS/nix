@@ -166,7 +166,10 @@ string expandHash(const Hash & hash, const string & target,
         {
             string path = *i;
             try {
+#if 0
                 if (path == target && hashPath(path) == hash)
+#endif
+                if (path == target && pathExists(path))
                     return path;
             } catch (Error & e) {
                 debug(format("stale path: %1%") % e.msg());
