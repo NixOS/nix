@@ -5,6 +5,12 @@
 
     <listitem>
       <para>
+        The man-pages generated from the DocBook documentation are ugly.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
         Unify the concepts of successors and substitutes into a
         general notion of <emphasis>equivalent expressions</emphasis>.
         Expressions are equivalent if they have the same target paths

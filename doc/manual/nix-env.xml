@@ -15,6 +15,14 @@
         </group>
         <replaceable>path</replaceable>
       </arg>
+      <arg>
+        <group choice='req'>
+          <arg choice='plain'><option>--profile</option></arg>
+          <arg choice='plain'><option>-p</option></arg>
+        </group>
+        <replaceable>path</replaceable>
+      </arg>
+      <arg><option>--dry-run</option></arg>
       <arg choice='plain'><replaceable>operation</replaceable></arg>
       <arg rep='repeat'><replaceable>options</replaceable></arg>
       <arg rep='repeat'><replaceable>arguments</replaceable></arg>
@@ -72,11 +80,42 @@
         <term><option>--file</option> / <option>-f</option></term>
         <listitem>
           <para>
-            Specifies the Nix expression used by the
+            Specifies the Nix expression (designated below as the
+            <emphasis>active Nix expression</emphasis>) used by the
             <option>--install</option>, <option>--upgrade</option>,
             and <option>--query --available</option> operations to
             obtain derivations.  The default is
             <filename>~/.nix-defexpr</filename>.
+          </para>
+        </listitem>
+      </varlistentry>
+      
+      <varlistentry>
+        <term><option>--profile</option> / <option>-p</option></term>
+        <listitem>
+          <para>
+            Specifies the profile to be used by those operations that
+            operate on a profile (designated below as the
+            <emphasis>active profile</emphasis>).  A profile is
+            sequence of user environments called
+            <emphasis>generations</emphasis>, one of which is the
+            <emphasis>current generation</emphasis>.  The default
+            profile is the target of the symbolic link
+            <filename>~/.nix-profile</filename> (see below).
+          </para>
+        </listitem>
+      </varlistentry>
+      
+      <varlistentry>
+        <term><option>--dry-run</option></term>
+        <listitem>
+          <para>
+            For the <option>--install</option>,
+            <option>--upgrade</option> and
+            <option>--uninstall</option> operations, this flag will
+            cause <command>nix-env</command> to print what
+            <emphasis>would</emphasis> be done if this flag had not
+            been specified, without actually doing it.
           </para>
         </listitem>
       </varlistentry>
@@ -114,12 +153,12 @@
         <term><filename>~/.nix-profile</filename></term>
         <listitem>
           <para>
-            A symbolic link to the user's current profile.  The
-            default profile is
+            A symbolic link to the user's current profile.  By
+            default, this symlink points to
             <filename><replaceable>prefix</replaceable>/var/nix/profiles/default</filename>.
             The <envar>PATH</envar> environment variable should
-            include <filename>~/.nix-profile/bin</filename> for the user
-            environment to be visible to the user.
+            include <filename>~/.nix-profile/bin</filename> for the
+            user environment to be visible to the user.
           </para>
         </listitem>
       </varlistentry>
@@ -143,6 +182,7 @@
           <arg choice='plain'><option>--install</option></arg>
           <arg choice='plain'><option>-i</option></arg>
         </group>
+        <arg choice='plain' rep='repeat'><replaceable>drvnames</replaceable></arg>
       </cmdsynopsis>
     </refsection>
 
@@ -150,6 +190,189 @@
       <title>Description</title>
             
       <para>
+        The install operation creates a new user environment, based on
+        the current generation of the active profile, to which the
+        derivations designated by <replaceable>drvnames</replaceable>
+        in the active Nix expression are added.
+      </para>
+
+    </refsection>
+            
+    <refsection>
+      <title>Examples</title>
+
+      <screen>
+$ nix-env --install gcc-3.3.2 <lineannotation>(install specific version)</lineannotation>
+$ nix-env --install gcc <lineannotation>(just pick any version)</lineannotation>
+$ nix-env -f ~/foo.nix -i '*' <lineannotation>(install everything in <filename>foo.nix</filename>)</lineannotation></screen>
+
+    </refsection>
+    
+  </refsection>
+
+
+  
+  <!--######################################################################-->
+
+  <refsection>
+    <title>Operation <option>--upgrade</option></title>
+
+    <refsection>
+      <title>Synopsis</title>
+      <cmdsynopsis>
+        <command>nix-env</command>
+        <group choice='req'>
+          <arg choice='plain'><option>--upgrade</option></arg>
+          <arg choice='plain'><option>-u</option></arg>
+        </group>
+        <group choice='opt'>
+          <arg choice='plain'><option>--lt</option></arg>
+          <arg choice='plain'><option>--leq</option></arg>
+          <arg choice='plain'><option>--always</option></arg>
+        </group>
+        <arg choice='plain' rep='repeat'><replaceable>drvnames</replaceable></arg>
+      </cmdsynopsis>
+    </refsection>
+
+    <refsection>
+      <title>Description</title>
+            
+      <para>
+        The upgrade operation creates a new user environment, based on
+        the current generation of the active profile, in which all
+        derivations designated by <replaceable>drvnames</replaceable>
+        for which there are newer versions in the active Nix
+        expression are replaced by those newer versions.  Matching
+        derivations for which there are no newer versions are left
+        untouched; this is not an error.  It is also not an error if
+        an element of <replaceable>drvnames</replaceable> matches no
+        installed derivations.
+      </para>
+
+      <para>
+        If multiple derivations in the active Nix expression match an
+        installed derivation, the one with the highest version is
+        selected.
+      </para>
+
+    </refsection>
+            
+    <refsection>
+      <title>Flags</title>
+
+      <variablelist>
+
+        <varlistentry>
+          <term><option>--lt</option></term>
+          <listitem>
+            <para>
+              Only upgrade a derivation to newer versions.  This is
+              the default.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><option>--leq</option></term>
+          <listitem>
+            <para>
+              In addition to upgrading to newer versions, also
+              <quote>upgrade</quote> to derivations that have the same
+              version.  Version are not a unique identification of a
+              derivation, so there may be many derivations that have
+              the same version.  This flag may be useful to force
+              <quote>synchronisation</quote> between the installed and
+              available derivations.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><option>--always</option></term>
+          <listitem>
+            <para>
+              In addition to upgrading to newer versions, also
+              <quote>upgrade</quote> to derivations that have the same
+              or a lower version.  I.e., derivations may actually be
+              downgraded depending on what is available in the active
+              Nix expression.
+            </para>
+          </listitem>
+        </varlistentry>
+
+      </variablelist>
+
+    </refsection>
+
+    <refsection>
+      <title>Examples</title>
+
+      <screen>
+$ nix-env --upgrade gcc
+upgrading `gcc-3.3.1' to `gcc-3.4'
+
+$ nix-env --upgrade pan
+<lineannotation>(no upgrades available, so nothing happens)</lineannotation>
+
+$ nix-env -u '*' <lineannotation>(try to upgrade everything)</lineannotation>
+upgrading `hello-2.1.2' to `hello-2.1.3'
+upgrading `mozilla-1.2' to `mozilla-1.4'</screen>        
+
+    </refsection>
+    
+    <refsection>
+      <title>Versions</title>
+
+      <para>
+        The upgrade operation determines whether a derivation
+        <varname>y</varname> is an upgrade of a derivation
+        <varname>x</varname> by looking at their respective
+        <literal>name</literal> attributes.  The names (e.g.,
+        <literal>gcc-3.3.1</literal> are split into two parts: the
+        package name (<literal>gcc</literal>), and the version
+        (<literal>3.3.1</literal>).  The version part starts after the
+        first dash not following by a letter.  <varname>x</varname> is
+        considered an upgrade of <varname>y</varname> if their package
+        names match, and the version of <varname>y</varname> is higher
+        that that of <varname>x</varname>.
+      </para>
+
+      <para>
+        The versions are compared by splitting them into contiguous
+        components of numbers and letters.  E.g.,
+        <literal>3.3.1pre5</literal> is split into <literal>[3, 3, 1,
+        "pre", 5]</literal>.  These lists are then compared
+        lexicographically (from left to right).  Corresponding
+        components <varname>a</varname> and <varname>b</varname> are
+        compared as follows.  If they are both numbers, integer
+        comparison is used.  If <varname>a</varname> is an empty
+        string and <varname>b</varname> is a number,
+        <varname>a</varname> is considered less than
+        <varname>b</varname>.  The special string component
+        <literal>pre</literal> (for <emphasis>pre-release</emphasis>)
+        is considered to be less than other components.  String
+        components are considered less than number components.
+        Otherwise, they are compared lexicographically (i.e., using
+        case-sensitive string comparison).
+      </para>
+
+      <para>
+        This is illustrated by the following examples:
+
+        <screen>
+1.0 &lt; 2.3
+2.1 &lt; 2.3
+2.3 = 2.3
+2.5 > 2.3
+3.1 > 2.3
+2.3.1 > 2.3
+2.3.1 > 2.3a
+2.3pre1 &lt; 2.3
+2.3pre3 &lt; 2.3pre12
+2.3a &lt; 2.3c
+2.3pre1 &lt; 2.3c
+2.3pre1 &lt; 2.3q</screen>
+        
       </para>
 
     </refsection>
@@ -157,4 +380,218 @@
   </refsection>
 
   
+
+  <!--######################################################################-->
+
+  <refsection>
+    <title>Operation <option>--uninstall</option></title>
+
+    <refsection>
+      <title>Synopsis</title>
+      <cmdsynopsis>
+        <command>nix-env</command>
+        <group choice='req'>
+          <arg choice='plain'><option>--uninstall</option></arg>
+          <arg choice='plain'><option>-e</option></arg>
+        </group>
+        <arg choice='plain' rep='repeat'><replaceable>drvnames</replaceable></arg>
+      </cmdsynopsis>
+    </refsection>
+
+    <refsection>
+      <title>Description</title>
+            
+      <para>
+        The uninstall operation creates a new user environment, based
+        on the current generation of the active profile, from which the
+        derivations designated by <replaceable>drvnames</replaceable>
+        are removed.
+      </para>
+
+    </refsection>
+            
+    <refsection>
+      <title>Examples</title>
+
+      <screen>
+$ nix-env --uninstall gcc
+$ nix-env -e '*' <lineannotation>(remove everything)</lineannotation></screen>
+
+    </refsection>
+    
+  </refsection>
+
+
+  
+  <!--######################################################################-->
+
+  <refsection>
+    <title>Operation <option>--query</option></title>
+
+    <refsection>
+      <title>Synopsis</title>
+      <cmdsynopsis>
+        <command>nix-env</command>
+        <group choice='req'>
+          <arg choice='plain'><option>--query</option></arg>
+          <arg choice='plain'><option>-q</option></arg>
+        </group>
+        <group choice='opt'>
+          <arg choice='plain'><option>--installed</option></arg>
+          <arg choice='plain'><option>--available</option></arg>
+          <arg choice='plain'><option>-a</option></arg>
+        </group>
+        <group choice='req'>
+          <arg choice='plain'><option>--name</option></arg>
+          <arg choice='plain'><option>--expr</option></arg>
+          <arg choice='plain'><option>--status</option></arg>
+          <arg choice='plain'><option>-s</option></arg>
+        </group>
+      </cmdsynopsis>
+    </refsection>
+
+    <refsection>
+      <title>Description</title>
+            
+      <para>
+        The query operation displays information about either the
+        derivations that are installed in the current generation of
+        the active profile (<option>--installed</option>), or the
+        derivations that are available for installation in the active
+        Nix expression (<option>--available</option>).
+      </para>
+
+      <para>
+        The derivations are sorted by their <literal>name</literal>
+        attributes.
+      </para>
+
+    </refsection>
+
+    <refsection>
+      <title>Source selection</title>
+
+      <para>
+        The following flags specify the set of derivations on which
+        the query operates.
+      </para>
+
+      <variablelist>
+
+        <varlistentry>
+          <term><option>--installed</option></term>
+          <listitem>
+            <para>
+              The query operates on the derivations that are installed
+              in the current generation of the active profile.  This
+              is the default
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><option>--available</option> / <option>-a</option></term>
+          <listitem>
+            <para>
+              The query operates on the derivations that are available
+              in the active Nix expression.
+            </para>
+          </listitem>
+        </varlistentry>
+
+      </variablelist>
+            
+    </refsection>
+
+    <refsection>
+      <title>Queries</title>
+
+      <para>
+        The following flags specify what information to display about
+        the selected derivations.  Only one type of query may be
+        specified.
+      </para>
+
+      <variablelist>
+
+        <varlistentry>
+          <term><option>--name</option></term>
+          <listitem>
+            <para>
+              Prints the <literal>name</literal> attribute of each
+              derivation.  This is the default.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><option>--expr</option></term>
+          <listitem>
+            <para>
+              Prints the store expression in the Nix store that
+              described the derivation.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><option>--status</option> / <option>-s</option></term>
+          <listitem>
+            <para>
+              Prints the <emphasis>status</emphasis> of each
+              derivation, followed by its <literal>name</literal>
+              attribute.  The status consists of three characters.
+              The first is <literal>I</literal> or
+              <literal>-</literal>, indicating whether the derivation
+              is currently installed in the current generation of the
+              active profile.  This is by definition the case for
+              <option>--installed</option>, but not for
+              <option>--available</option>.  The second is
+              <literal>P</literal> or <literal>-</literal>, indicating
+              whether the derivation is present on the system.  This
+              indicates whether installation of an available
+              derivation will require the derivation to be built.  The
+              third is <literal>S</literal> or <literal>-</literal>,
+              indicating whether a substitute is available for the
+              derivation.
+            </para>
+          </listitem>
+        </varlistentry>
+
+      </variablelist>
+              
+    </refsection>
+
+    <refsection>
+      <title>Examples</title>
+
+      <screen>
+$ nix-env -q <lineannotation>(show installed derivations)</lineannotation>
+MozillaFirebird-0.7
+bison-1.875c
+docbook-xml-4.2
+...
+
+$ nix-env -qa <lineannotation>(show available derivations)</lineannotation>
+GConf-2.4.0.1
+MPlayer-1.0pre3
+MozillaFirebird-0.7
+ORBit2-2.8.3
+...
+
+$ nix-env -qas <lineannotation>(show status of available derivations)</lineannotation>
+-P- GConf-2.4.0.1 <lineannotation>(not installed but present)</lineannotation>
+--S MPlayer-1.0pre3 <lineannotation>(not present, but there is a substitute for fast installation)</lineannotation>
+--S MozillaFirebird-0.7 <lineannotation>(i.e., this is not the installed Firebird, even though the version is the same!)</lineannotation>
+IP- bison-1.875c <lineannotation>(installed and by definition present)</lineannotation>
+...
+
+$ nix-env -f ./foo.nix -qa <lineannotation>(show available derivations in the Nix expression <filename>foo.nix</filename>)</lineannotation>
+foo-1.2.3</screen>
+
+    </refsection>
+    
+  </refsection>
+  
+    
 </refentry>
