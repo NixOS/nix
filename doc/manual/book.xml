@@ -1,0 +1,102 @@
+<?xml version="1.0"?>
+<!DOCTYPE book SYSTEM "/nix/current/xml/dtd/docbook/docbookx.dtd"
+[
+]>
+
+<book>
+  <title>Nix: The Manual</title>
+
+
+  <!--======================================================================-->
+
+  <chapter>
+    <title>Introduction</title>
+
+    <para>
+      Nix is a system for the automatic creation and distribution of data, such
+      as computer programs and other software artifacts.
+    </para>
+
+  </chapter>
+
+
+  <!--======================================================================-->
+
+  <chapter>
+    <title>Installation</title>
+
+    <sect1>
+      <title>Prerequisites</title>
+
+      <para>
+	Nix uses Sleepycat's Berkeley DB and CWI's ATerm library.  However,
+	these are fetched automatically as part of the build process.
+      </para>
+
+      <para>
+	Other than that, you need a good C++ compiler.  GCC 2.95 does not
+	appear to work; please use GCC 3.x.
+      </para>
+    </sect1>
+
+    <sect1>
+      <title>Obtaining Nix</title>
+
+      <para>
+	Nix can be obtained from its <ulink
+	  url='http://losser.st-lab.cs.uu.nl:12080/repos/trace/nix/trunk'>Subversion 
+	  repository</ulink>.  For example, the following command will check
+	out the latest revision into a directory called
+	<filename>nix</filename>:
+      </para>
+
+      <screen>
+$ svn checkout http://losser.st-lab.cs.uu.nl:12080/repos/trace/nix/trunk nix</screen>
+
+      <para>
+	Likewise, specific releases can be obtained from the <ulink
+	  url='http://losser.st-lab.cs.uu.nl:12080/repos/trace/nix/tags'>tags
+	  directory</ulink> of the repository.  If you don't have Subversion,
+	you can download a <ulink
+	  url='http://losser.st-lab.cs.uu.nl:12080/dist/trace/'>compressed
+	  tar-file</ulink> of the latest revision of the repository.
+      </para>
+
+    </sect1>
+
+    <sect1>
+      <title>Building Nix</title>
+
+      <para>
+	To build Nix, do the following:
+      </para>
+
+      <screen>
+$ autoreconf -i
+$ ./configure <replaceable>options...</replaceable>
+$ make
+$ make install</screen>
+
+      <para>
+	Currently, the only useful switch for <command>configure</command> is
+	<option>--prefix=<replaceable>prefix</replaceable></option> to specify
+	where Nix is to be installed.  The default installation directory is
+	<filename>/nix</filename>.  You can change this to any location you
+	like.  You should ensure that you have write permission to the
+	installation prefix. 
+      </para>
+
+      <warning>
+	<para>
+	  It is advisable <emphasis>not</emphasis> to change the installation
+	  prefix, since doing so will in all likelihood make it impossible to
+	  use derivates built on other systems.
+	</para>
+      </warning>
+
+    </sect1>
+
+  </chapter>
+
+
+</book>

@@ -1,10 +1,11 @@
 DOCBOOK_DTD = /nix/current/xml/dtd/docbook
-DOCBOOK_XSL  =/nix/current/xml/xsl/docbook/
+DOCBOOK_XSL = /nix/current/xml/xsl/docbook
+
+all: check html
 
 check:
 	SP_CHARSET_FIXED=YES SP_ENCODING=XML \
-	nsgmls -wxml -c /usr/share/sgml/opensp/xml.soc -c $(DOCBOOK_DTD)/docbook.cat -ges book.xml
+	nsgmls -wxml -c /usr/share/doc/packages/sp/html-xml/xml.soc -c $(DOCBOOK_DTD)/docbook.cat -ges book.xml
 
 html:
-	mkdir -p out
-	xsltproc --output out/book.html $(DOCBOOK_XSL)/html/docbook.xsl book.xml
+	xsltproc --output book.html $(DOCBOOK_XSL)/html/docbook.xsl book.xml
