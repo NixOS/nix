@@ -364,3 +364,15 @@ Expr makeBool(bool b)
 {
     return b ? ATmake("Bool(True)") : ATmake("Bool(False)");
 }
+
+
+Expr makeString(const string & s)
+{
+    return ATmake("Str(<str>)", s.c_str());
+}
+
+
+Expr makePath(const Path & path)
+{
+    return ATmake("Path(<str>)", path.c_str());
+}

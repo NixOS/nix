@@ -338,6 +338,20 @@ Expr evalExpr2(EvalState & state, Expr e)
         return makeBool(attrs.get(name) != 0);
     }
 
+    /* String or path concatenation. */
+    if (atMatch(m, e) >> "OpPlus" >> e1 >> e2) {
+        e1 = evalExpr(state, e1);
+        e2 = evalExpr(state, e2);
+        string s1, s2;
+        if (atMatch(m, e1) >> "Str" >> s1 &&
+            atMatch(m, e2) >> "Str" >> s2)
+            return makeString(s1 + s2);
+        else if (atMatch(m, e1) >> "Path" >> s1 &&
+            atMatch(m, e2) >> "Path" >> s2)
+            return makeString(canonPath(s1 + "/" + s2));
+        else throw Error("wrong argument types in `+' operator");
+    }
+
     /* Barf. */
     throw badTerm("invalid expression", e);
 }

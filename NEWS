@@ -49,7 +49,12 @@ Major changes include the following:
 
 * Nix expression language changes:
 
+  * New language construct: `with E1; E2' brings all attributes
+    defined in the attribute set E1 in scope in E2.
+
   * Added a `map' function.
+
+  * Various new operators (e.g., string concatenation).
 
 * An Emacs mode for editing Nix expressions (with syntax highlighting
   and indentation) has been added.

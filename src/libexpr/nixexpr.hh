@@ -92,5 +92,11 @@ void checkVarDefs(const ATermMap & def, Expr e);
 /* Create an expression representing a boolean. */
 Expr makeBool(bool b);
 
+/* Create an expression representing a string. */
+Expr makeString(const string & s);
+
+/* Create an expression representing a path. */
+Expr makePath(const Path & path);
+
 
 #endif /* !__NIXEXPR_H */

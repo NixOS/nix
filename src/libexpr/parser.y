@@ -53,6 +53,7 @@ ATerm makePos(YYLTYPE * loc, void * data)
 %nonassoc EQ NEQ
 %right UPDATE
 %left NEG
+%left '+'
 %nonassoc '?'
 %nonassoc '~'
 
@@ -90,6 +91,7 @@ expr_op
   | expr_op UPDATE expr_op { $$ = ATmake("OpUpdate(<term>, <term>)", $1, $3); }
   | expr_op '~' expr_op { $$ = ATmake("SubPath(<term>, <term>)", $1, $3); }
   | expr_op '?' ID { $$ = ATmake("OpHasAttr(<term>, <term>)", $1, $3); }
+  | expr_op '+' expr_op { $$ = ATmake("OpPlus(<term>, <term>)", $1, $3); }
   | expr_app
   ;
 

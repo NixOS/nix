@@ -273,8 +273,8 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
 
     attrs.set("outPath", ATmake("(Path(<str>), NoPos)", outPath.c_str()));
     attrs.set("drvPath", ATmake("(Path(<str>), NoPos)", drvPath.c_str()));
-    attrs.set("drvHash", ATmake("(Str(<str>), NoPos)", ((string) drvHash).c_str()));
-    attrs.set("type", ATmake("(Str(\"derivation\"), NoPos)"));
+    attrs.set("drvHash", ATmake("(<term>, NoPos)", makeString(drvHash)));
+    attrs.set("type", ATmake("(<term>, NoPos)", makeString("derivation")));
 
     return makeAttrs(attrs);
 }
@@ -284,8 +284,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
    following the last slash. */
 static Expr primBaseNameOf(EvalState & state, const ATermVector & args)
 {
-    string s = evalString(state, args[0]);
-    return ATmake("Str(<str>)", baseNameOf(s).c_str());
+    return makeString(baseNameOf(evalString(state, args[0])));
 }
 
 
@@ -298,7 +297,7 @@ static Expr primToString(EvalState & state, const ATermVector & args)
     if (atMatch(m, arg) >> "Str" >> s ||
         atMatch(m, arg) >> "Path" >> s ||
         atMatch(m, arg) >> "Uri" >> s)
-        return ATmake("Str(<str>)", s.c_str());
+        return makeString(s);
     else throw Error("cannot coerce value to string");
 }
 
