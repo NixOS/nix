@@ -3,20 +3,20 @@
 
 #include "derivations.hh"
 
-/* Perform the specified derivations, if necessary.  That is, do
-   whatever is necessary to create the output paths of the derivation.
-   If the output paths already exists, we're done.  If they have
-   substitutes, we can use those instead.  Otherwise, the build action
-   described by the derivation is performed, after recursively
-   building any sub-derivations. */
+/* Ensure that the output paths of the derivation are valid.  If they
+   are already valid, this is a no-op.  Otherwise, validity can
+   be reached in two ways.  First, if the output paths have
+   substitutes, then those can be used.  Second, the output paths can
+   be created by running the builder, after recursively building any
+   sub-derivations. */
 void buildDerivations(const PathSet & drvPaths);
 
-/* Ensure that a path exists, possibly by instantiating it by
-   realising a substitute. */
+/* Ensure that a path is valid.  If it is not currently valid, it may
+   be made valid by running a substitute (if defined for the path). */
 void ensurePath(const Path & storePath);
 
-/* Read a derivation store expression, after ensuring its existence
-   through ensurePath(). */
+/* Read a derivation, after ensuring its existence through
+   ensurePath(). */
 Derivation derivationFromPath(const Path & drvPath);
 
 /* Place in `paths' the set of all store paths in the file system

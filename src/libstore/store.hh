@@ -45,7 +45,7 @@ typedef list<pair<Path, Substitute> > SubstitutePairs;
 void registerSubstitutes(const Transaction & txn,
     const SubstitutePairs & subPairs);
 
-/* Return the substitutes expression for the given path. */
+/* Return the substitutes for the given path. */
 Substitutes querySubstitutes(const Path & srcPath);
 
 /* Deregister all substitutes. */

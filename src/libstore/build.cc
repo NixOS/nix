@@ -15,7 +15,7 @@
 #include "globals.hh"
 
 
-/* !!! TODO storeExprFromPath shouldn't be used here */
+/* !!! TODO derivationFromPath shouldn't be used here */
 
 
 static string pathNullDevice = "/dev/null";
@@ -129,7 +129,7 @@ private:
     unsigned int nrChildren;
 
     /* Maps used to prevent multiple instantiations of a goal for the
-       same expression / path. */
+       same derivation / path. */
     WeakGoalMap derivationGoals;
     WeakGoalMap substitutionGoals;
 
@@ -290,10 +290,10 @@ const char * * strings2CharPtrs(const Strings & ss)
 class DerivationGoal : public Goal
 {
 private:
-    /* The path of the derivation store expression. */
+    /* The path of the derivation. */
     Path drvPath;
 
-    /* The derivation store expression stored at drvPath. */
+    /* The derivation stored at drvPath. */
     Derivation drv;
     
     /* The remainder is state held during the build. */
@@ -415,7 +415,7 @@ void DerivationGoal::init()
 {
     trace("init");
 
-    /* The first thing to do is to make sure that the store expression
+    /* The first thing to do is to make sure that the derivation
        exists.  If it doesn't, it may be created through a
        substitute. */
     addWaitee(worker.makeSubstitutionGoal(drvPath));
@@ -735,8 +735,8 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
             % showPaths(outputPaths(drv.outputs)));
         
         /* Write the information that the hook needs to perform the
-           build, i.e., the set of input paths (including closure
-           expressions), the set of output paths, and [!!!]. */
+           build, i.e., the set of input paths, the set of output
+           paths, and [!!!]. */
         
         Path inputListFN = tmpDir + "/inputs";
         Path outputListFN = tmpDir + "/outputs";
@@ -791,7 +791,7 @@ bool DerivationGoal::prepareBuild()
        reuse its results.  (Strictly speaking the first check can be
        omitted, but that would be less efficient.)  Note that since we
        now hold the locks on the output paths, no other process can
-       build this expression, so no further checks are necessary. */
+       build this derivation, so no further checks are necessary. */
     if (allOutputsValid()) {
         debug(format("skipping build of derivation `%1%', someone beat us to it")
             % drvPath);
@@ -910,7 +910,7 @@ void DerivationGoal::startBuilder()
        in the store or in the build directory). */
     env["NIX_STORE"] = nixStore;
 
-    /* Add all bindings specified in the derivation expression. */
+    /* Add all bindings specified in the derivation. */
     for (StringPairs::iterator i = drv.env.begin();
          i != drv.env.end(); ++i)
         env[i->first] = i->second;

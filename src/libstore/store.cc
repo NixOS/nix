@@ -51,7 +51,7 @@ static TableId dbReferers = 0;
    One system can compute a derivate and put it on a website (as a Nix
    archive), for instance, and then another system can register a
    substitute for that derivate.  The substitute in this case might be
-   a Nix expression that fetches the Nix archive.
+   a Nix derivation that fetches the Nix archive.
 */
 static TableId dbSubstitutes = 0;
 

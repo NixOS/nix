@@ -22,7 +22,7 @@ Path writeDerivation(const Derivation & drv, const string & name)
 static void checkPath(const string & s)
 {
     if (s.size() == 0 || s[0] != '/')
-        throw Error(format("bad path `%1%' in store expression") % s);
+        throw Error(format("bad path `%1%' in derivation") % s);
 }
     
 
