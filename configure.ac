@@ -81,6 +81,13 @@ AC_PATH_PROG(xsltproc, xsltproc, false)
 AC_PATH_PROG(flex, flex, false)
 AC_PATH_PROG(bison, bison, false)
 NEED_PROG(perl, perl)
+NEED_PROG(tar, tar)
+                
+AC_PATH_PROG(mkdir, mkdir, false)
+AC_ARG_WITH(coreutils-bin, AC_HELP_STRING([--with-coreutils-bin=PATH],
+  [path of mkdir, etc.]),
+  coreutils=$withval, coreutils=$(dirname $mkdir))
+AC_SUBST(coreutils)
 
 AC_ARG_WITH(docbook-catalog, AC_HELP_STRING([--with-docbook-catalog=PATH],
   [path of the DocBook XML DTD]),

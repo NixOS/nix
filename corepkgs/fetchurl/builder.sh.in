@@ -1,13 +1,11 @@
 #! @shell@ -e
 
-export PATH=/bin:/usr/bin
-
 echo "downloading $url into $out"
 
 prefetch=@storedir@/nix-prefetch-url-$outputHash
 if test -f "$prefetch"; then
     echo "using prefetched $prefetch";
-    mv $prefetch $out
+    @coreutils@/mv $prefetch $out
 else
     @curl@ --fail --location --max-redirs 20 "$url" > "$out"
 fi

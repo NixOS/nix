@@ -1,9 +1,7 @@
 #! @shell@ -e
 
-export PATH=/bin:/usr/bin # !!! impure
-
-mkdir $out
-mkdir $out/tmp
+@coreutils@/mkdir $out
+@coreutils@/mkdir $out/tmp
 cd $out/tmp
 
 expr=$out/default.nix
@@ -12,8 +10,8 @@ echo '[' > $expr
 nr=0
 for i in $inputs; do
     echo "unpacking $i"
-    @bunzip2@ < $i | tar xvf -
-    mv * ../$nr # !!! hacky
+    @bunzip2@ < $i | @tar@ xvf -
+    @coreutils@/mv * ../$nr # !!! hacky
     echo "(import ./$nr)" >> $expr
     nr=$(($nr + 1))
 done
@@ -21,4 +19,4 @@ done
 echo ']' >> $expr
 
 cd ..
-rmdir tmp
+@coreutils@/rmdir tmp

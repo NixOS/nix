@@ -14,6 +14,8 @@
 	 -e "s^@bzip2\@^$(bzip2)^g" \
 	 -e "s^@bunzip2\@^$(bunzip2)^g" \
 	 -e "s^@perl\@^$(perl)^g" \
+	 -e "s^@coreutils\@^$(coreutils)^g" \
+	 -e "s^@tar\@^$(tar)^g" \
 	 -e "s^@version\@^$(VERSION)^g" \
 	 < $< > $@ || rm $@
 	if test -x $<; then chmod +x $@; fi

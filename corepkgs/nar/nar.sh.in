@@ -1,10 +1,7 @@
 #! @shell@ -e
 
-# !!! impure; fix this
-export PATH=/bin:/usr/bin
-
 echo "packing $path into $out..."
-mkdir $out
+@coreutils@/mkdir $out
 dst=$out/tmp.nar.bz2
 @bindir@/nix-store --dump "$path" > tmp
 
@@ -14,4 +11,4 @@ dst=$out/tmp.nar.bz2
 
 @bindir@/nix-hash --flat --type $hashAlgo --base32 $dst > $out/narbz2-hash
 
-mv $out/tmp.nar.bz2 $out/$(cat $out/narbz2-hash).nar.bz2
+@coreutils@/mv $out/tmp.nar.bz2 $out/$(@coreutils@/cat $out/narbz2-hash).nar.bz2
