@@ -10,67 +10,62 @@ extern "C" {
 using namespace std;
 
 
-/* Abstract syntax of Nix values:
+/* Abstract syntax of Nix expressions.
 
-   e := Deref(e) -- external expression
-      | Hash(h) -- value reference
-      | Str(s) -- string constant
-      | Bool(b) -- boolean constant
-      | Var(x) -- variable
-      | App(e, e) -- application
-      | Lam(x, e) -- lambda abstraction
-      | Exec(platform, e, [Arg(e, e)])
-          -- primitive; execute e with args e* on platform
-      ;
+   An expression describes a (partial) state of the file system in a
+   referentially transparent way.  The operational effect of
+   evaluating an expression is that the state described by the
+   expression is realised.
 
-   TODO: Deref(e) allows computed external expressions, which might be
-   too expressive; perhaps this should be Deref(h).
+     File : String * Content * [Expr] -> Expr
 
-   Semantics
+   File(path, content, refs) specifies a file object (its full path
+   and contents), along with all file objects referenced by it (that
+   is, that it has pointers to).  We assume that all files are
+   self-referential.  This prevents us from having to deal with
+   cycles.
 
-   Each rule given as eval(e) => e', i.e., expression e has a normal
-   form e'.
+     Derive : String * Expr * [Expr] * [String] -> Expr
 
-   eval(Deref(Hash(h))) => eval(loadExpr(h))
+   Derive(platform, builder, ins, outs) specifies the creation of new
+   file objects (in paths declared by `outs') by the execution of a
+   program `builder' on a platform `platform'.  This execution takes
+   place in a file system state and in an environment given by `ins'.
 
-   eval(Hash(h)) => Hash(h) # idem for Str, Bool
+     Str : String -> Expr
 
-   eval(App(e1, e2)) => eval(App(e1', e2))
-     where e1' = eval(e1)
+   A string constant.
 
-   eval(App(Lam(var, body), arg)) =>
-     eval(subst(var, arg, body))
+     Tup : Expr * Expr -> Expr
 
-   eval(Exec(platform, prog, args)) => Hash(h)
-     where
-       fn = ... name of the output (random or by hashing expr) ...
-       h =
-         if exec( fn 
-                , eval(platform) => Str(...)
-                , getFile(eval(prog))
-                , map(makeArg . eval, args)
-                ) then
-           hashPath(fn)
-         else
-           undef
-       ... register ...
+   Tuples of expressions.
 
-   makeArg(Arg(Str(nm), (Hash(h), h))) => (nm, getFile(h))
-   makeArg(Arg(Str(nm), (Str(s), _))) => (nm, s)
-   makeArg(Arg(Str(nm), (Bool(True), _))) => (nm, "1")
-   makeArg(Arg(Str(nm), (Bool(False), _))) => (nm, undef)
+     Regular : String -> Content
+     Directory : [(String, Content)] -> Content
+     Hash : String -> Content
 
-   subst(x, e1, e2) is defined as a generic topdown term
-   traversal of e2, replacing each `Var(x)' with e1, and not
-   descending into `Lam(x, _)'.
+   File content, given either explicitly or implicitly through a cryptographic hash.
 
-   Note: all stored expressions must be closed. !!! ugly
+   The set of expressions in {\em $f$-normal form} is as follows:
 
-   getFile :: Hash -> FileName
-   loadExpr :: Hash -> FileName
-   hashExpr :: Expr -> Hash 
-   hashPath :: FileName -> Hash
-   exec :: FileName -> Platform -> FileName -> [(String, String)] -> Status
+     File : String * Content * [FExpr] -> FExpr
+
+   These are completely evaluated Nix expressions.
+
+   The set of expressions in {\em $d$-normal form} is as follows:
+
+     File : String * Content * [DExpr] -> DExpr
+     Derive : String * DExpr * [Tup] * [String] -> DExpr
+
+     Tup : Str * DExpr -> Tup
+     Tup : Str * Str -> Tup
+
+     Str : String -> Str
+
+   These are Nix expressions in which the file system result of Derive
+   expressions has not yet been computed.  This is useful for, e.g.,
+   querying dependencies.
+
 */
 
 typedef ATerm Expr;
