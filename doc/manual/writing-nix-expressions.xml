@@ -575,7 +575,7 @@ builder becomes even shorter:
 
 <programlisting>
 . $stdenv/setup
-genericBuilder</programlisting>
+genericBuild</programlisting>
 
 In fact, <varname>mkDerivation</varname> provides a default builder
 that looks exactly like that, so it is actually possible to omit the
@@ -1371,7 +1371,7 @@ following:
 </para>
 
 <para>The <filename>setup</filename> script also exports a function
-called <function>genericBuilder</function> that knows how to build
+called <function>genericBuild</function> that knows how to build
 typical Autoconf-style components.  It can be customised to perform
 builds for any type of component.  It is advisable to use
 <function>genericBuild</function> since it provides facilities that
