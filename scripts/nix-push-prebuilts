@@ -34,7 +34,7 @@ close PKGS;
 
 # Push the prebuilts to the server. !!! FIXME
 
-system "rsync -av -e ssh '$exportdir'/ losser:/home/eelco/public_html/nix-prebuilts/";
+system "rsync -av -e ssh '$exportdir'/ eelco\@losser.st-lab.cs.uu.nl:/home/eelco/public_html/nix-prebuilts/";
 
 # Rerun `nix-pull-prebuilts' to rescan the prebuilt source locations.
 
