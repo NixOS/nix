@@ -28,6 +28,7 @@ typedef void (* Operation) (Globals & globals,
 struct DrvInfo
 {
     string name;
+    string system;
     Path drvPath;
     Path outPath;
     Hash drvHash;
@@ -55,6 +56,12 @@ bool parseDerivation(EvalState & state, Expr e, DrvInfo & drv)
     a = queryAttr(e, "name");
     if (!a) throw badTerm("derivation name missing", e);
     drv.name = evalString(state, a);
+
+    a = queryAttr(e, "system");
+    if (!a)
+        drv.system = "unknown";
+    else
+        drv.system = evalString(state, a);
 
     a = queryAttr(e, "drvPath");
     if (!a) throw badTerm("derivation path missing", e);
@@ -181,11 +188,13 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
             "Attrs(["
             "Bind(\"type\", Str(\"derivation\"), NoPos), "
             "Bind(\"name\", Str(<str>), NoPos), "
+            "Bind(\"system\", Str(<str>), NoPos), "
             "Bind(\"drvPath\", Path(<str>), NoPos), "
             "Bind(\"drvHash\", Str(<str>), NoPos), "
             "Bind(\"outPath\", Path(<str>), NoPos)"
             "])",
             i->second.name.c_str(),
+            i->second.system.c_str(),
             i->second.drvPath.c_str(),
             ((string) i->second.drvHash).c_str(),
             i->second.outPath.c_str());
@@ -454,14 +463,19 @@ static bool cmpDrvByName(const DrvInfo & a, const DrvInfo & b)
 static void opQuery(Globals & globals,
     Strings opFlags, Strings opArgs)
 {
-    enum { qName, qDrvPath, qStatus } query = qName;
+    bool printStatus = false;
+    bool printName = true;
+    bool printSystem = false;
+    bool printDrvPath = false;
+
     enum { sInstalled, sAvailable } source = sInstalled;
 
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
-        if (*i == "--name") query = qName;
-        else if (*i == "--expr") query = qDrvPath;
-        else if (*i == "--status" || *i == "-s") query = qStatus;
+        if (*i == "--status" || *i == "-s") printStatus = true;
+        else if (*i == "--no-name") printName = false;
+        else if (*i == "--system") printSystem = true;
+        else if (*i == "--expr") printDrvPath = true;
         else if (*i == "--installed") source = sInstalled;
         else if (*i == "--available" || *i == "-a") source = sAvailable;
         else throw UsageError(format("unknown flag `%1%'") % *i);
@@ -490,44 +504,43 @@ static void opQuery(Globals & globals,
     for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i)
         drvs2.push_back(i->second);
     sort(drvs2.begin(), drvs2.end(), cmpDrvByName);
+
+    /* We only need to know the installed paths when we are querying
+       the status of the derivation. */
+    PathSet installedPaths; /* output paths of installed drvs */
     
-    /* Perform the specified query on the derivations. */
-    switch (query) {
-
-        case qName: {
-            for (DrvInfoList::iterator i = drvs2.begin(); i != drvs2.end(); ++i)
-                cout << format("%1%\n") % i->name;
-            break;
-        }
+    if (printStatus) {
+        DrvInfos installed;
+        queryInstalled(globals.state, installed, globals.profile);
         
-        case qDrvPath: {
-            for (DrvInfoList::iterator i = drvs2.begin(); i != drvs2.end(); ++i)
-                cout << format("%1%\n") % i->drvPath;
-            break;
-        }
-        
-        case qStatus: {
-            DrvInfos installed;
-            queryInstalled(globals.state, installed, globals.profile);
-
-            PathSet installedPaths; /* output paths of installed drvs */
-            for (DrvInfos::iterator i = installed.begin();
-                 i != installed.end(); ++i)
-                installedPaths.insert(i->second.outPath);
+        for (DrvInfos::iterator i = installed.begin();
+             i != installed.end(); ++i)
+            installedPaths.insert(i->second.outPath);
+    }
             
-            for (DrvInfoList::iterator i = drvs2.begin(); i != drvs2.end(); ++i) {
-                Substitutes subs = querySubstitutes(i->drvPath);
-                cout << format("%1%%2%%3% %4%\n")
-                    % (installedPaths.find(i->outPath)
-                        != installedPaths.end() ? 'I' : '-')
-                    % (isValidPath(i->outPath) ? 'P' : '-')
-                    % (subs.size() > 0 ? 'S' : '-')
-                    % i->name;
-            }
-            break;
-        }
+    /* Print the desired columns. */
+    for (DrvInfoList::iterator i = drvs2.begin(); i != drvs2.end(); ++i) {
+
+        Strings columns;
         
-        default: abort();
+        if (printStatus) {
+            Substitutes subs = querySubstitutes(i->drvPath);
+            columns.push_back(
+                (string) (installedPaths.find(i->outPath)
+                    != installedPaths.end() ? "I" : "-")
+                + (isValidPath(i->outPath) ? "P" : "-")
+                + (subs.size() > 0 ? "S" : "-"));
+        }
+
+        if (printName) columns.push_back(i->name);
+
+        if (printSystem) columns.push_back(i->system);
+
+        if (printDrvPath) columns.push_back(i->drvPath);
+        
+        for (Strings::iterator j = columns.begin(); j != columns.end(); ++j)
+            cout << *j << " ";
+        cout << endl;
     }
 }
 
