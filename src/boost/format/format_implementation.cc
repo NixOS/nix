@@ -20,8 +20,8 @@
 #ifndef BOOST_FORMAT_IMPLEMENTATION_HPP
 #define BOOST_FORMAT_IMPLEMENTATION_HPP
 
-//#include <boost/throw_exception.hpp>
-//#include <boost/assert.hpp>
+#include <boost/throw_exception.hpp>
+#include <boost/assert.hpp>
 #include <boost/format.hpp>
 
 namespace boost {

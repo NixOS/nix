@@ -24,7 +24,7 @@
 #include "boost/format/format_class.hpp"
 #include "boost/format/group.hpp"
 
-//#include "boost/throw_exception.hpp"
+#include "boost/throw_exception.hpp"
 
 namespace boost {
 namespace io {

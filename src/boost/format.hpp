@@ -34,16 +34,6 @@
 
 #include <boost/format/macros_default.hpp>
 
-namespace boost 
-{
-    template<class E> void throw_exception(E const & e)
-    {
-        throw e;
-    }
-}
-
-#define BOOST_ASSERT(expr) assert(expr)
-
 
 // ****  Forward declarations ----------------------------------
 #include <boost/format/format_fwd.hpp>           // basic_format<Ch,Tr>, and other frontends

@@ -20,7 +20,7 @@
 #define BOOST_FORMAT_FUNCS_HPP
 
 #include "boost/format.hpp"
-//#include "boost/throw_exception.hpp"
+#include "boost/throw_exception.hpp"
 
 namespace boost {
 
