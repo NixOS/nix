@@ -460,6 +460,36 @@ static bool cmpDrvByName(const DrvInfo & a, const DrvInfo & b)
 }
 
 
+typedef list<Strings> Table;
+
+
+void printTable(Table & table)
+{
+    int nrColumns = table.front().size();
+    
+    vector<int> widths;
+    widths.resize(nrColumns);
+    
+    for (Table::iterator i = table.begin(); i != table.end(); ++i) {
+        assert(i->size() == nrColumns);
+        Strings::iterator j; int column;
+        for (j = i->begin(), column = 0; j != i->end(); ++j, ++column)
+            if (j->size() > widths[column]) widths[column] = j->size();
+    }
+
+    for (Table::iterator i = table.begin(); i != table.end(); ++i) { 
+        Strings::iterator j; int column;
+        for (j = i->begin(), column = 0; j != i->end(); ++j, ++column)
+        {
+            cout << *j;
+            if (column < nrColumns - 1)
+                cout << string(widths[column] - j->size() + 2, ' ');
+        }
+        cout << endl;
+    }
+}
+
+
 static void opQuery(Globals & globals,
     Strings opFlags, Strings opArgs)
 {
@@ -519,6 +549,8 @@ static void opQuery(Globals & globals,
     }
             
     /* Print the desired columns. */
+    Table table;
+    
     for (DrvInfoList::iterator i = drvs2.begin(); i != drvs2.end(); ++i) {
 
         Strings columns;
@@ -537,11 +569,11 @@ static void opQuery(Globals & globals,
         if (printSystem) columns.push_back(i->system);
 
         if (printDrvPath) columns.push_back(i->drvPath);
-        
-        for (Strings::iterator j = columns.begin(); j != columns.end(); ++j)
-            cout << *j << " ";
-        cout << endl;
+
+        table.push_back(columns);
     }
+
+    printTable(table);
 }
 
 
