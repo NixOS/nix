@@ -111,6 +111,29 @@ $ autoreconf -i</screen>
 
   </sect1>
 
+
+  <sect1>
+    <title>Using Nix</title>
+
+    <para>
+      To use Nix, some environment variables should be set.  In particular,
+      <literal>PATH</literal> should contain the directories
+      <filename><replaceable>prefix</replaceable>/bin</filename> and
+      <filename><replaceable>prefix</replaceable>/var/nix/links/current/bin</filename>. 
+      The first directory contains the Nix tools themselves, while the second
+      contains to the current <emphasis>user environment</emphasis> (an
+      automatically generated package consisting of symlinks to installed
+      packages).  The simplest way to set the required environment variables is
+      to include the file
+      <filename><replaceable>prefix</replaceable>/etc/profile.d/nix.sh</filename> 
+      in your <filename>~/.bashrc</filename> (or similar), like this:
+    </para>
+
+    <screen>
+. <replaceable>prefix</replaceable>/etc/profile.d/nix.sh</screen>
+
+  </sect1>
+
 </chapter>
 
 <!--

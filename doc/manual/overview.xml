@@ -1,0 +1,32 @@
+<chapter>
+  <title>Overview</title>
+
+  <para>
+    This chapter provides a guided tour of Nix.
+  </para>
+
+  <sect1>
+    <title>Basic package management</title>
+
+    <para>
+      Let's start from the perspective of an end-user.  Common operations at
+      this level are to install and remove packages, ask what packages are
+      installed or available for installation, and so on.
+    </para>
+
+    <para>
+      To install packages, a <emphasis>Nix expression</emphasis> is required
+      that tells Nix how to build that package.  There is a <ulink
+        url='https://svn.cs.uu.nl:12443/dist/trace/trace-nixpkgs-trunk.tar.bz2'>standard 
+        distribution of Nix expressions</ulink> for many common packages.
+    </para>
+
+  </sect1>
+
+</chapter>
+
+<!--
+local variables:
+sgml-parent-document: ("book.xml" "chapter")
+end:
+-->

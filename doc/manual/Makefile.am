@@ -4,7 +4,8 @@ XMLLINT = $(ENV) $(xmllint) $(xmlflags) --catalogs
 XSLTPROC = $(ENV) $(xsltproc) $(xmlflags) --catalogs
 
 SOURCES = book.xml introduction.xml installation.xml \
- nix-store-reference.xml \
+ overview.xml \
+ nix-store-reference.xml nix-instantiate-reference.xml \
  troubleshooting.xml bugs.xml
 
 book.is-valid: $(SOURCES)

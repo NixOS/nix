@@ -5,6 +5,7 @@
 [
 <!ENTITY introduction SYSTEM "introduction.xml">
 <!ENTITY installation SYSTEM "installation.xml">
+<!ENTITY overview SYSTEM "overview.xml">
 <!ENTITY nix-store-reference SYSTEM "nix-store-reference.xml">
 <!ENTITY nix-instantiate-reference SYSTEM "nix-instantiate-reference.xml">
 <!ENTITY troubleshooting SYSTEM "troubleshooting.xml">
@@ -27,6 +28,7 @@
 
   &introduction;
   &installation;
+  &overview;
 
   <appendix>
     <title>Command Reference</title>
