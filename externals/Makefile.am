@@ -60,7 +60,7 @@ SDF2 = sdf2-bundle-1.6
 $(SDF2).tar.gz:
 	@echo "Nix requires the SDF2 bundle to build."
 	@echo "Please download version 1.6 from"
-	@echo "  ftp://ftp.stratego-language.org/pub/stratego/sdf2/sdf2-bundle-1.6.tar.gzP"
+	@echo "  ftp://ftp.stratego-language.org/pub/stratego/sdf2/sdf2-bundle-1.6.tar.gz"
 	@echo "and place it in the externals/ directory."
 	false
 
