@@ -8,7 +8,6 @@
 #include "db.hh"
 #include "archive.hh"
 #include "pathlocks.hh"
-#include "normalise.hh"
 
 
 struct CopySink : DumpSink
@@ -31,7 +30,7 @@ struct CopySource : RestoreSource
 };
 
 
-void copyPath(string src, string dst)
+void copyPath(const Path & src, const Path & dst)
 {
     debug(format("copying `%1%' to `%2%'") % src % dst);
 
@@ -82,7 +81,7 @@ void copyPath(string src, string dst)
 }
 
 
-void registerSubstitute(const FSId & srcId, const FSId & subId)
+void registerSubstitute(const Path & srcPath, const Path & subPath)
 {
 #if 0
     Strings subs;
@@ -98,202 +97,89 @@ void registerSubstitute(const FSId & srcId, const FSId & subId)
 
     /* For now, accept only one substitute per id. */
     Strings subs;
-    subs.push_back(subId);
+    subs.push_back(subPath);
     
     Transaction txn(nixDB);
-    nixDB.setStrings(txn, dbSubstitutes, srcId, subs);
+    nixDB.setStrings(txn, dbSubstitutes, srcPath, subs);
     txn.commit();
 }
 
 
-void registerPath(const Transaction & txn,
-    const string & _path, const FSId & id)
+void registerValidPath(const Transaction & txn, const Path & _path)
 {
-    string path(canonPath(_path));
-
-    debug(format("registering path `%1%' with id %2%")
-        % path % (string) id);
-
-    string oldId;
-    if (nixDB.queryString(txn, dbPath2Id, path, oldId)) {
-        if (id != parseHash(oldId))
-            throw Error(format("path `%1%' already contains id %2%")
-                % path % oldId);
-        return;
-    }
-
-    nixDB.setString(txn, dbPath2Id, path, id);
-
-    Strings paths;
-    nixDB.queryStrings(txn, dbId2Paths, id, paths); /* non-existence = ok */
-    
-    paths.push_back(path);
-    
-    nixDB.setStrings(txn, dbId2Paths, id, paths);
+    Path path(canonPath(_path));
+    debug(format("registering path `%1%'") % path);
+    nixDB.setString(txn, dbValidPaths, path, "");
 }
 
 
-void unregisterPath(const string & _path)
+bool isValidPath(const Path & path)
 {
-    string path(canonPath(_path));
+    string s;
+    return nixDB.queryString(noTxn, dbValidPaths, path, s);
+}
+
+
+void unregisterValidPath(const Path & _path)
+{
+    Path path(canonPath(_path));
     Transaction txn(nixDB);
 
     debug(format("unregistering path `%1%'") % path);
 
-    string _id;
-    if (!nixDB.queryString(txn, dbPath2Id, path, _id)) {
-        txn.abort();
-        return;
-    }
-    FSId id(parseHash(_id));
-
-    nixDB.delPair(txn, dbPath2Id, path);
-
-    Strings paths, paths2;
-    nixDB.queryStrings(txn, dbId2Paths, id, paths); /* non-existence = ok */
-
-    for (Strings::iterator it = paths.begin();
-         it != paths.end(); it++)
-        if (*it != path) paths2.push_back(*it);
-
-    nixDB.setStrings(txn, dbId2Paths, id, paths2);
+    nixDB.delPair(txn, dbValidPaths, path);
 
     txn.commit();
 }
 
 
-bool queryPathId(const string & path, FSId & id)
-{
-    string s;
-    if (!nixDB.queryString(noTxn, dbPath2Id, absPath(path), s)) return false;
-    id = parseHash(s);
-    return true;
-}
-
-
-bool isInPrefix(const string & path, const string & _prefix)
+static bool isInPrefix(const string & path, const string & _prefix)
 {
     string prefix = canonPath(_prefix + "/");
     return string(path, 0, prefix.size()) == prefix;
 }
 
 
-string expandId(const FSId & id, const string & target,
-    const string & prefix, FSIdSet pending, bool ignoreSubstitutes)
+Path addToStore(const Path & _srcPath)
 {
-    Nest nest(lvlDebug, format("expanding %1%") % (string) id);
-
-    Strings paths;
-
-    if (!target.empty() && !isInPrefix(target, prefix))
-        abort();
-
-    nixDB.queryStrings(noTxn, dbId2Paths, id, paths);
-
-    /* Pick one equal to `target'. */
-    if (!target.empty()) {
-
-        for (Strings::iterator i = paths.begin();
-             i != paths.end(); i++)
-        {
-            string path = *i;
-            if (path == target && pathExists(path))
-                return path;
-        }
-        
-    }
-
-    /* Arbitrarily pick the first one that exists and isn't stale. */
-    for (Strings::iterator it = paths.begin();
-         it != paths.end(); it++)
-    {
-        string path = *it;
-        if (isInPrefix(path, prefix) && pathExists(path)) {
-            if (target.empty())
-                return path;
-            else {
-                /* Acquire a lock on the target path. */
-                Strings lockPaths;
-                lockPaths.push_back(target);
-                PathLocks outputLock(lockPaths);
-
-                /* Copy. */
-                copyPath(path, target);
-
-                /* Register the target path. */
-                Transaction txn(nixDB);
-                registerPath(txn, target, id);
-                txn.commit();
-
-                return target;
-            }
-        }
-    }
-
-    if (!ignoreSubstitutes) {
-        
-        if (pending.find(id) != pending.end())
-            throw Error(format("id %1% already being expanded") % (string) id);
-        pending.insert(id);
-
-        /* Try to realise the substitutes, but only if this id is not
-           already being realised by a substitute. */
-        Strings subs;
-        nixDB.queryStrings(noTxn, dbSubstitutes, id, subs); /* non-existence = ok */
-
-        for (Strings::iterator it = subs.begin(); it != subs.end(); it++) {
-            FSId subId = parseHash(*it);
-
-            debug(format("trying substitute %1%") % (string) subId);
-
-            realiseClosure(normaliseNixExpr(subId, pending), pending);
-
-            return expandId(id, target, prefix, pending);
-        }
-
-    }
-    
-    throw Error(format("cannot expand id `%1%'") % (string) id);
-}
-
-    
-void addToStore(string srcPath, string & dstPath, FSId & id,
-    bool deterministicName)
-{
+    Path srcPath(absPath(_srcPath));
     debug(format("adding `%1%' to the store") % srcPath);
 
-    srcPath = absPath(srcPath);
-    id = hashPath(srcPath);
+    Hash h = hashPath(srcPath);
 
     string baseName = baseNameOf(srcPath);
-    dstPath = canonPath(nixStore + "/" + (string) id + "-" + baseName);
+    Path dstPath = canonPath(nixStore + "/" + (string) h + "-" + baseName);
 
-    try {
-        dstPath = expandId(id, deterministicName ? dstPath : "", 
-            nixStore, FSIdSet(), true);
-        return;
-    } catch (...) {
+    if (!isValidPath(dstPath)) { 
+
+        /* The first check above is an optimisation to prevent
+           unnecessary lock acquisition. */
+
+        PathSet lockPaths;
+        lockPaths.insert(dstPath);
+        PathLocks outputLock(lockPaths);
+
+        if (!isValidPath(dstPath)) {
+            copyPath(srcPath, dstPath);
+
+            Transaction txn(nixDB);
+            registerValidPath(txn, dstPath);
+            txn.commit();
+        }
     }
-    
-    Strings lockPaths;
-    lockPaths.push_back(dstPath);
-    PathLocks outputLock(lockPaths);
 
-    copyPath(srcPath, dstPath);
-
-    Transaction txn(nixDB);
-    registerPath(txn, dstPath, id);
-    txn.commit();
+    return dstPath;
 }
 
 
-void deleteFromStore(const string & path)
+void deleteFromStore(const Path & _path)
 {
-    string prefix =  + "/";
-    if (!isInPrefix(path, nixStore))
-        throw Error(format("path %1% is not in the store") % path);
+    Path path(canonPath(_path));
 
-    unregisterPath(path);
+    if (!isInPrefix(path, nixStore))
+        throw Error(format("path `%1%' is not in the store") % path);
+
+    unregisterValidPath(path);
 
     deletePath(path);
 }
@@ -305,6 +191,7 @@ void verifyStore()
 
     /* !!! verify that the result is consistent */
 
+#if 0
     Strings paths;
     nixDB.enumTable(txn, dbPath2Id, paths);
 
@@ -421,6 +308,7 @@ void verifyStore()
             }
         }
     }
+#endif
 
     txn.commit();
 }

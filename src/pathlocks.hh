@@ -8,10 +8,10 @@ class PathLocks
 {
 private:
     list<int> fds;
-    Strings paths;
+    Paths paths;
 
 public:
-    PathLocks(const Strings & _paths);
+    PathLocks(const PathSet & _paths);
     ~PathLocks();
 };
 

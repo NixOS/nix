@@ -11,9 +11,6 @@
 typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
 
-static bool pathArgs = false;
-
-
 static void printHelp()
 {
     cout <<
@@ -24,16 +21,9 @@ static void printHelp()
 
 
 
-static FSId argToId(const string & arg)
+static Path checkPath(const Path & arg)
 {
-    if (!pathArgs)
-        return parseHash(arg);
-    else {
-        FSId id;
-        if (!queryPathId(arg, id))
-            throw Error(format("don't know id of `%1%'") % arg);
-        return id;
-    }
+    return arg; /* !!! check that arg is in the store */
 }
 
 
@@ -42,12 +32,12 @@ static void opInstall(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
-    for (Strings::iterator it = opArgs.begin();
-         it != opArgs.end(); it++)
+    for (Strings::iterator i = opArgs.begin();
+         i != opArgs.end(); i++)
     {
-        FSId id = normaliseNixExpr(argToId(*it));
-        realiseClosure(id);
-        cout << format("%1%\n") % (string) id;
+        Path nfPath = normaliseNixExpr(checkPath(*i));
+        realiseClosure(nfPath);
+        cout << format("%1%\n") % (string) nfPath;
     }
 }
 
@@ -59,7 +49,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
 
     for (Strings::iterator it = opArgs.begin();
          it != opArgs.end(); it++)
-        deleteFromStore(absPath(*it));
+        deleteFromStore(checkPath(*it));
 }
 
 
@@ -69,27 +59,21 @@ static void opAdd(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
-    for (Strings::iterator it = opArgs.begin();
-         it != opArgs.end(); it++)
-    {
-        string path;
-        FSId id;
-        addToStore(*it, path, id);
-        cout << format("%1% %2%\n") % (string) id % path;
-    }
+    for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); i++)
+        cout << format("%1%\n") % addToStore(*i);
 }
 
 
-FSId maybeNormalise(const FSId & id, bool normalise)
+Path maybeNormalise(const Path & ne, bool normalise)
 {
-    return normalise ? normaliseNixExpr(id) : id;
+    return normalise ? normaliseNixExpr(ne) : ne;
 }
 
 
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qList, qRequisites, qGenerators, qExpansion, qGraph 
+    enum { qList, qRequisites, qGenerators, qGraph 
     } query = qList;
     bool normalise = false;
     bool includeExprs = true;
@@ -100,7 +84,6 @@ static void opQuery(Strings opFlags, Strings opArgs)
         if (*i == "--list" || *i == "-l") query = qList;
         else if (*i == "--requisites" || *i == "-r") query = qRequisites;
         else if (*i == "--generators" || *i == "-g") query = qGenerators;
-        else if (*i == "--expansion" || *i == "-e") query = qExpansion;
         else if (*i == "--graph") query = qGraph;
         else if (*i == "--normalise" || *i == "-n") normalise = true;
         else if (*i == "--exclude-exprs") includeExprs = false;
@@ -110,12 +93,12 @@ static void opQuery(Strings opFlags, Strings opArgs)
     switch (query) {
         
         case qList: {
-            StringSet paths;
+            PathSet paths;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                Strings paths2 = nixExprPaths(
-                    maybeNormalise(argToId(*i), normalise));
+                StringSet paths2 = nixExprRoots(
+                    maybeNormalise(checkPath(*i), normalise));
                 paths.insert(paths2.begin(), paths2.end());
             }
             for (StringSet::iterator i = paths.begin(); 
@@ -129,8 +112,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                Strings paths2 = nixExprRequisites(
-                    maybeNormalise(argToId(*i), normalise),
+                StringSet paths2 = nixExprRequisites(
+                    maybeNormalise(checkPath(*i), normalise),
                     includeExprs, includeSuccessors);
                 paths.insert(paths2.begin(), paths2.end());
             }
@@ -140,11 +123,12 @@ static void opQuery(Strings opFlags, Strings opArgs)
             break;
         }
 
+#if 0
         case qGenerators: {
             FSIds outIds;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
-                outIds.push_back(argToId(*i));
+                outIds.push_back(checkPath(*i));
 
             FSIds genIds = findGenerators(outIds);
 
@@ -153,21 +137,13 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 cout << format("%s\n") % expandId(*i);
             break;
         }
-
-        case qExpansion: {
-            for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); i++)
-                /* !!! should not use substitutes; this is a query,
-                   it should not have side-effects */
-                cout << format("%s\n") % expandId(parseHash(*i));
-            break;
-        }
+#endif
 
         case qGraph: {
-            FSIds roots;
+            PathSet roots;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
-                roots.push_back(maybeNormalise(argToId(*i), normalise));
+                roots.insert(maybeNormalise(checkPath(*i), normalise));
 	    printDotGraph(roots);
             break;
         }
@@ -187,9 +163,9 @@ static void opSuccessor(Strings opFlags, Strings opArgs)
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); )
     {
-        FSId id1 = parseHash(*i++);
-        FSId id2 = parseHash(*i++);
-        registerSuccessor(txn, id1, id2);
+        Path path1 = checkPath(*i++);
+        Path path2 = checkPath(*i++);
+        registerSuccessor(txn, path1, path2);
     }
     txn.commit();
 }
@@ -203,8 +179,8 @@ static void opSubstitute(Strings opFlags, Strings opArgs)
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); )
     {
-        FSId src = parseHash(*i++);
-        FSId sub = parseHash(*i++);
+        Path src = checkPath(*i++);
+        Path sub = checkPath(*i++);
         registerSubstitute(src, sub);
     }
 }
@@ -229,9 +205,7 @@ static void opDump(Strings opFlags, Strings opArgs)
     if (opArgs.size() != 1) throw UsageError("only one argument allowed");
 
     StdoutSink sink;
-    string arg = *opArgs.begin();
-    string path = pathArgs ? arg : expandId(parseHash(arg));
-
+    string path = *opArgs.begin();
     dumpPath(path, sink);
 }
 
@@ -311,8 +285,6 @@ void run(Strings args)
             op = opInit;
         else if (arg == "--verify")
             op = opVerify;
-        else if (arg == "--path" || arg == "-p")
-            pathArgs = true;
         else if (arg == "--verbose" || arg == "-v")
             verbosity = (Verbosity) ((int) verbosity + 1);
         else if (arg == "--keep-failed" || arg == "-K")

@@ -13,42 +13,36 @@ extern Database nixDB;
 
 /* Database tables. */
 
-/* dbPath2Id :: Path -> FSId
 
-   Each pair (p, id) records that path $p$ contains an expansion of
-   $id$. */
-extern TableId dbPath2Id;
+/* dbValidPaths :: Path -> ()
 
-
-/* dbId2Paths :: FSId -> [Path]
-
-   A mapping from ids to lists of paths. */
-extern TableId dbId2Paths;
+   The existence of a key $p$ indicates that path $p$ is valid (that
+   is, produced by a succesful build). */
+extern TableId dbValidPaths;
 
 
-/* dbSuccessors :: FSId -> FSId
+/* dbSuccessors :: Path -> Path
 
-   Each pair $(id_1, id_2)$ in this mapping records the fact that a
-   successor of a Nix expression stored in a file with identifier
-   $id_1$ is stored in a file with identifier $id_2$.
+   Each pair $(p_1, p_2)$ in this mapping records the fact that the
+   Nix expression stored at path $p_1$ has a successor expression
+   stored at path $p_2$.
 
-   Note that a term $y$ is successor of $x$ iff there exists a
+   Note that a term $y$ is a successor of $x$ iff there exists a
    sequence of rewrite steps that rewrites $x$ into $y$.
 */
 extern TableId dbSuccessors;
 
 
-/* dbSubstitutes :: FSId -> [FSId]
+/* dbSubstitutes :: Path -> [Path]
 
-   Each pair $(id, [ids])$ tells Nix that it can realise any of the
-   Nix expressions referenced by the identifiers in $ids$ to
-   generate a path with identifier $id$.
+   Each pair $(p, [ps])$ tells Nix that it can realise any of the
+   Nix expressions stored at paths $ps$ to produce a path $p$.
 
    The main purpose of this is for distributed caching of derivates.
-   One system can compute a derivate with hash $h$ and put it on a
-   website (as a Nix archive), for instance, and then another system
-   can register a substitute for that derivate.  The substitute in
-   this case might be a Nix expression that fetches the Nix archive.
+   One system can compute a derivate and put it on a website (as a Nix
+   archive), for instance, and then another system can register a
+   substitute for that derivate.  The substitute in this case might be
+   a Nix expression that fetches the Nix archive.
 */
 extern TableId dbSubstitutes;
 

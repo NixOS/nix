@@ -30,13 +30,6 @@ struct Hash
 };
 
 
-class BadRefError : public Error
-{
-public:
-    BadRefError(string _err) : Error(_err) { };
-};
-
-
 /* Parse a hexadecimal representation of a hash code. */
 Hash parseHash(const string & s);
 
@@ -47,12 +40,12 @@ bool isHash(const string & s);
 Hash hashString(const string & s);
 
 /* Compute the hash of the given file. */
-Hash hashFile(const string & fileName);
+Hash hashFile(const Path & path);
 
 /* Compute the hash of the given path.  The hash is defined as
    md5(dump(path)).
 */
-Hash hashPath(const string & path);
+Hash hashPath(const Path & path);
 
 
 #endif /* !__HASH_H */

@@ -4,7 +4,7 @@
 #include "util.hh"
 
 
-Strings filterReferences(const string & path, const Strings & refs);
+Strings filterReferences(const Path & path, const Strings & refs);
 
 
 #endif /* !__VALUES_H */

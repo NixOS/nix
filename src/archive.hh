@@ -1,6 +1,6 @@
 #include <string>
 
-using namespace std;
+#include "util.hh"
 
 
 /* dumpPath creates a Nix archive of the specified path.  The format
@@ -45,7 +45,7 @@ struct DumpSink
     virtual void operator () (const unsigned char * data, unsigned int len) = 0;
 };
 
-void dumpPath(const string & path, DumpSink & sink);
+void dumpPath(const Path & path, DumpSink & sink);
 
 
 struct RestoreSource
@@ -57,4 +57,4 @@ struct RestoreSource
     virtual void operator () (unsigned char * data, unsigned int len) = 0;
 };
 
-void restorePath(const string & path, RestoreSource & source);
+void restorePath(const Path & path, RestoreSource & source);

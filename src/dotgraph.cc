@@ -45,24 +45,24 @@ static string symbolicName(const string & path)
 }
 
 
-string pathLabel(const FSId & id, const string & path)
+string pathLabel(const Path & nePath, const string & elemPath)
 {
-    return (string) id + "-" + path;
+    return (string) nePath + "-" + elemPath;
 }
 
 
-void printClosure(const FSId & id, const NixExpr & fs)
+void printClosure(const Path & nePath, const NixExpr & fs)
 {
-    Strings workList(fs.closure.roots.begin(), fs.closure.roots.end());
-    StringSet doneSet;
+    PathSet workList(fs.closure.roots);
+    PathSet doneSet;
 
-    for (Strings::iterator i = workList.begin(); i != workList.end(); i++) {
-	cout << makeEdge(pathLabel(id, *i), id);
+    for (PathSet::iterator i = workList.begin(); i != workList.end(); i++) {
+	cout << makeEdge(pathLabel(nePath, *i), nePath);
     }
 
     while (!workList.empty()) {
-	string path = workList.front();
-	workList.pop_front();
+	Path path = *(workList.begin());
+	workList.erase(path);
 
 	if (doneSet.find(path) == doneSet.end()) {
 	    doneSet.insert(path);
@@ -74,41 +74,41 @@ void printClosure(const FSId & id, const NixExpr & fs)
 	    for (StringSet::const_iterator i = elem->second.refs.begin();
 		 i != elem->second.refs.end(); i++)
 	    {
-		workList.push_back(*i);
-		cout << makeEdge(pathLabel(id, *i), pathLabel(id, path));
+		workList.insert(*i);
+		cout << makeEdge(pathLabel(nePath, *i), pathLabel(nePath, path));
 	    }
 
-	    cout << makeNode(pathLabel(id, path), 
+	    cout << makeNode(pathLabel(nePath, path), 
 		symbolicName(path), "#ff0000");
 	}
     }
 }
 
 
-void printDotGraph(const FSIds & roots)
+void printDotGraph(const PathSet & roots)
 {
-    FSIds workList(roots.begin(), roots.end());
-    FSIdSet doneSet;
+    PathSet workList(roots);
+    PathSet doneSet;
             
     cout << "digraph G {\n";
 
     while (!workList.empty()) {
-	FSId id = workList.front();
-	workList.pop_front();
+	Path nePath = *(workList.begin());
+	workList.erase(nePath);
 
-	if (doneSet.find(id) == doneSet.end()) {
-	    doneSet.insert(id);
+	if (doneSet.find(nePath) == doneSet.end()) {
+	    doneSet.insert(nePath);
                     
-	    NixExpr ne = parseNixExpr(termFromId(id));
+	    NixExpr ne = parseNixExpr(termFromPath(nePath));
 
 	    string label, colour;
                     
 	    if (ne.type == NixExpr::neDerivation) {
-		for (FSIdSet::iterator i = ne.derivation.inputs.begin();
+		for (PathSet::iterator i = ne.derivation.inputs.begin();
 		     i != ne.derivation.inputs.end(); i++)
 		{
-		    workList.push_back(*i);
-		    cout << makeEdge(*i, id);
+		    workList.insert(*i);
+		    cout << makeEdge(*i, nePath);
 		}
 
 		label = "derivation";
@@ -121,12 +121,12 @@ void printDotGraph(const FSIds & roots)
 	    else if (ne.type == NixExpr::neClosure) {
 		label = "<closure>";
 		colour = "#00ffff";
-		printClosure(id, ne);
+		printClosure(nePath, ne);
 	    }
 
 	    else abort();
 
-	    cout << makeNode(id, label, colour);
+	    cout << makeNode(nePath, label, colour);
 	}
     }
 

@@ -54,11 +54,11 @@ Hash parseHash(const string & s)
 {
     Hash hash;
     if (s.length() != Hash::hashSize * 2)
-        throw BadRefError("invalid hash: " + s);
+        throw Error(format("invalid hash `%1%'") % s);
     for (unsigned int i = 0; i < Hash::hashSize; i++) {
         string s2(s, i * 2, 2);
         if (!isxdigit(s2[0]) || !isxdigit(s2[1])) 
-            throw BadRefError("invalid hash: " + s);
+            throw Error(format("invalid hash `%1%'") % s);
         istringstream str(s2);
         int n;
         str >> hex >> n;
@@ -89,15 +89,15 @@ Hash hashString(const string & s)
 }
 
 
-Hash hashFile(const string & fileName)
+Hash hashFile(const Path & path)
 {
     Hash hash;
-    FILE * file = fopen(fileName.c_str(), "rb");
+    FILE * file = fopen(path.c_str(), "rb");
     if (!file)
-        throw SysError("file `" + fileName + "' does not exist");
+        throw SysError(format("file `%1%' does not exist") % path);
     int err = md5_stream(file, hash.hash);
     fclose(file);
-    if (err) throw SysError("cannot hash file " + fileName);
+    if (err) throw SysError(format("cannot hash file `%1%'") % path);
     return hash;
 }
 
@@ -113,7 +113,7 @@ struct HashSink : DumpSink
 };
 
 
-Hash hashPath(const string & path)
+Hash hashPath(const Path & path)
 {
     Hash hash;
     HashSink sink;

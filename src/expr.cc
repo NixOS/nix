@@ -22,37 +22,33 @@ Hash hashTerm(ATerm t)
 }
 
 
-ATerm termFromId(const FSId & id)
+ATerm termFromPath(const Path & path)
 {
-    string path = expandId(id);
     ATerm t = ATreadFromNamedFile(path.c_str());
     if (!t) throw Error(format("cannot read aterm from `%1%'") % path);
     return t;
 }
 
 
-FSId writeTerm(ATerm t, const string & suffix, FSId id)
+Path writeTerm(ATerm t, const string & suffix)
 {
-    /* By default, the id of a term is its hash. */
-    if (id == FSId()) id = hashTerm(t);
+    /* The id of a term is its hash. */
+    Hash h = hashTerm(t);
 
-    string path = canonPath(nixStore + "/" + 
-        (string) id + suffix + ".nix");
+    Path path = canonPath(nixStore + "/" + 
+        (string) h + suffix + ".nix");
     if (!ATwriteToNamedTextFile(t, path.c_str()))
         throw Error(format("cannot write aterm %1%") % path);
 
-//     debug(format("written term %1% = %2%") % (string) id %
-//         printTerm(t));
-
     Transaction txn(nixDB);
-    registerPath(txn, path, id);
+    registerValidPath(txn, path);
     txn.commit();
 
-    return id;
+    return path;
 }
 
 
-static void parsePaths(ATermList paths, StringSet & out)
+static void parsePaths(ATermList paths, PathSet & out)
 {
     while (!ATisEmpty(paths)) {
         char * s;
@@ -70,19 +66,19 @@ static void checkClosure(const Closure & closure)
     if (closure.elems.size() == 0)
         throw Error("empty closure");
 
-    StringSet decl;
+    PathSet decl;
     for (ClosureElems::const_iterator i = closure.elems.begin();
          i != closure.elems.end(); i++)
         decl.insert(i->first);
     
-    for (StringSet::const_iterator i = closure.roots.begin();
+    for (PathSet::const_iterator i = closure.roots.begin();
          i != closure.roots.end(); i++)
         if (decl.find(*i) == decl.end())
             throw Error(format("undefined root path `%1%'") % *i);
     
     for (ClosureElems::const_iterator i = closure.elems.begin();
          i != closure.elems.end(); i++)
-        for (StringSet::const_iterator j = i->second.refs.begin();
+        for (PathSet::const_iterator j = i->second.refs.begin();
              j != i->second.refs.end(); j++)
             if (decl.find(*j) == decl.end())
                 throw Error(
@@ -102,13 +98,12 @@ static bool parseClosure(ATerm t, Closure & closure)
     parsePaths(roots, closure.roots);
 
     while (!ATisEmpty(elems)) {
-        char * s1, * s2;
+        char * s1;
         ATermList refs;
         ATerm t = ATgetFirst(elems);
-        if (!ATmatch(t, "(<str>, <str>, [<list>])", &s1, &s2, &refs))
+        if (!ATmatch(t, "(<str>, [<list>])", &s1, &refs))
             throw badTerm("not a closure element", t);
         ClosureElem elem;
-        elem.id = parseHash(s2);
         parsePaths(refs, elem.refs);
         closure.elems[s1] = elem;
         elems = ATgetNext(elems);
@@ -135,23 +130,8 @@ static bool parseDerivation(ATerm t, Derivation & derivation)
         args = ATempty;
     }
 
-    while (!ATisEmpty(outs)) {
-        char * s1, * s2;
-        ATerm t = ATgetFirst(outs);
-        if (!ATmatch(t, "(<str>, <str>)", &s1, &s2))
-            throw badTerm("not a derivation output", t);
-        derivation.outputs[s1] = parseHash(s2);
-        outs = ATgetNext(outs);
-    }
-
-    while (!ATisEmpty(ins)) {
-        char * s;
-        ATerm t = ATgetFirst(ins);
-        if (!ATmatch(t, "<str>", &s))
-            throw badTerm("not an id", t);
-        derivation.inputs.insert(parseHash(s));
-        ins = ATgetNext(ins);
-    }
+    parsePaths(outs, derivation.outputs);
+    parsePaths(ins, derivation.inputs);
 
     derivation.builder = builder;
     derivation.platform = platform;
@@ -190,10 +170,10 @@ NixExpr parseNixExpr(ATerm t)
 }
 
 
-static ATermList unparsePaths(const StringSet & paths)
+static ATermList unparsePaths(const PathSet & paths)
 {
     ATermList l = ATempty;
-    for (StringSet::const_iterator i = paths.begin();
+    for (PathSet::const_iterator i = paths.begin();
          i != paths.end(); i++)
         l = ATinsert(l, ATmake("<str>", i->c_str()));
     return ATreverse(l);
@@ -208,9 +188,8 @@ static ATerm unparseClosure(const Closure & closure)
     for (ClosureElems::const_iterator i = closure.elems.begin();
          i != closure.elems.end(); i++)
         elems = ATinsert(elems,
-            ATmake("(<str>, <str>, <term>)",
+            ATmake("(<str>, <term>)",
                 i->first.c_str(),
-                ((string) i->second.id).c_str(),
                 unparsePaths(i->second.refs)));
 
     return ATmake("Closure(<term>, <term>)", roots, elems);
@@ -219,18 +198,6 @@ static ATerm unparseClosure(const Closure & closure)
 
 static ATerm unparseDerivation(const Derivation & derivation)
 {
-    ATermList outs = ATempty;
-    for (DerivationOutputs::const_iterator i = derivation.outputs.begin();
-         i != derivation.outputs.end(); i++)
-        outs = ATinsert(outs,
-            ATmake("(<str>, <str>)", 
-                i->first.c_str(), ((string) i->second).c_str()));
-    
-    ATermList ins = ATempty;
-    for (FSIdSet::const_iterator i = derivation.inputs.begin();
-         i != derivation.inputs.end(); i++)
-        ins = ATinsert(ins, ATmake("<str>", ((string) *i).c_str()));
-
     ATermList args = ATempty;
     for (Strings::const_iterator i = derivation.args.begin();
          i != derivation.args.end(); i++)
@@ -244,8 +211,8 @@ static ATerm unparseDerivation(const Derivation & derivation)
                 i->first.c_str(), i->second.c_str()));
 
     return ATmake("Derive(<term>, <term>, <str>, <str>, <term>, <term>)",
-        ATreverse(outs),
-        ATreverse(ins),
+        unparsePaths(derivation.outputs),
+        unparsePaths(derivation.inputs),
         derivation.platform.c_str(),
         derivation.builder.c_str(),
         ATreverse(args),

@@ -10,10 +10,10 @@
 #include "globals.hh"
 
 
-void realise(FSId id)
+void realise(Path nePath)
 {
-    Nest nest(lvlDebug, format("TEST: realising %1%") % (string) id);
-    realiseClosure(normaliseNixExpr(id));
+    Nest nest(lvlDebug, format("TEST: realising `%1%'") % nePath);
+    realiseClosure(normaliseNixExpr(nePath));
 }
 
 
@@ -48,12 +48,12 @@ void runTests()
     try {
         h = parseHash("blah blah");
         abort();
-    } catch (BadRefError err) { };
+    } catch (Error err) { };
 
     try {
         h = parseHash("0b0ffd0538622bfe20b92c4aa57254d99");
         abort();
-    } catch (BadRefError err) { };
+    } catch (Error err) { };
 
     /* Path canonicalisation. */
     cout << canonPath("/./../././//") << endl;
@@ -97,76 +97,59 @@ void runTests()
 
     /* Expression evaluation. */
 
-    FSId builder1id;
-    string builder1fn;
-    addToStore("./test-builder-1.sh", builder1fn, builder1id);
+    Path builder1fn;
+    builder1fn = addToStore("./test-builder-1.sh");
 
     ATerm fs1 = ATmake(
-        "Closure([<str>], [(<str>, <str>, [])])",
+        "Closure([<str>], [(<str>, [])])",
         builder1fn.c_str(),
-        builder1fn.c_str(),
-        ((string) builder1id).c_str());
-    FSId fs1id = writeTerm(fs1, "");
+        builder1fn.c_str());
+    Path fs1ne = writeTerm(fs1, "-c");
 
-    realise(fs1id);
-    realise(fs1id);
+    realise(fs1ne);
+    realise(fs1ne);
 
-    ATerm fs2 = ATmake(
-        "Closure([<str>], [(<str>, <str>, [])])",
-        (builder1fn + "_bla").c_str(),
-        (builder1fn + "_bla").c_str(),
-        ((string) builder1id).c_str());
-    FSId fs2id = writeTerm(fs2, "");
-
-    realise(fs2id);
-    realise(fs2id);
-
-    string out1id = hashString("foo"); /* !!! bad */
-    string out1fn = nixStore + "/" + (string) out1id + "-hello.txt";
+    string out1h = hashString("foo"); /* !!! bad */
+    Path out1fn = nixStore + "/" + (string) out1h + "-hello.txt";
     ATerm fs3 = ATmake(
-        "Derive([(<str>, <str>)], [<str>], <str>, <str>, [], [(\"out\", <str>)])",
+        "Derive([<str>], [<str>], <str>, <str>, [], [(\"out\", <str>)])",
         out1fn.c_str(),
-        ((string) out1id).c_str(),
-        ((string) fs1id).c_str(),
+        fs1ne.c_str(),
         thisSystem.c_str(),
-        ((string) builder1fn).c_str(),
+        builder1fn.c_str(),
         out1fn.c_str());
     debug(printTerm(fs3));
-    FSId fs3id = writeTerm(fs3, "");
+    Path fs3ne = writeTerm(fs3, "-d");
 
-    realise(fs3id);
-    realise(fs3id);
+    realise(fs3ne);
+    realise(fs3ne);
 
 
-    FSId builder4id;
-    string builder4fn;
-    addToStore("./test-builder-2.sh", builder4fn, builder4id);
+    Path builder4fn = addToStore("./test-builder-2.sh");
 
     ATerm fs4 = ATmake(
-        "Closure([<str>], [(<str>, <str>, [])])",
+        "Closure([<str>], [(<str>, [])])",
         builder4fn.c_str(),
-        builder4fn.c_str(),
-        ((string) builder4id).c_str());
-    FSId fs4id = writeTerm(fs4, "");
+        builder4fn.c_str());
+    Path fs4ne = writeTerm(fs4, "-c");
 
-    realise(fs4id);
+    realise(fs4ne);
 
-    string out5id = hashString("bar"); /* !!! bad */
-    string out5fn = nixStore + "/" + (string) out5id + "-hello2";
+    string out5h = hashString("bar"); /* !!! bad */
+    Path out5fn = nixStore + "/" + (string) out5h + "-hello2";
     ATerm fs5 = ATmake(
-        "Derive([(<str>, <str>)], [<str>], <str>, <str>, [], [(\"out\", <str>), (\"builder\", <str>)])",
+        "Derive([<str>], [<str>], <str>, <str>, [], [(\"out\", <str>), (\"builder\", <str>)])",
         out5fn.c_str(),
-        ((string) out5id).c_str(),
-        ((string) fs4id).c_str(),
+        fs4ne.c_str(),
         thisSystem.c_str(),
-        ((string) builder4fn).c_str(),
+        builder4fn.c_str(),
         out5fn.c_str(),
-        ((string) builder4fn).c_str());
+        builder4fn.c_str());
     debug(printTerm(fs5));
-    FSId fs5id = writeTerm(fs5, "");
+    Path fs5ne = writeTerm(fs5, "-d");
 
-    realise(fs5id);
-    realise(fs5id);
+    realise(fs5ne);
+    realise(fs5ne);
 }
 
 

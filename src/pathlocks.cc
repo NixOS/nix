@@ -13,20 +13,20 @@
 static StringSet lockedPaths; /* !!! not thread-safe */
 
 
-PathLocks::PathLocks(const Strings & _paths)
+PathLocks::PathLocks(const PathSet & _paths)
 {
     /* Note that `fds' is built incrementally so that the destructor
        will only release those locks that we have already acquired. */
 
     /* Sort the paths.  This assures that locks are always acquired in
        the same order, thus preventing deadlocks. */
-    Strings paths(_paths);
+    Paths paths(_paths.begin(), _paths.end());
     paths.sort();
     
     /* Acquire the lock for each path. */
-    for (Strings::iterator i = paths.begin(); i != paths.end(); i++) {
-        string path = *i;
-        string lockPath = path + ".lock";
+    for (Paths::iterator i = paths.begin(); i != paths.end(); i++) {
+        Path path = *i;
+        Path lockPath = path + ".lock";
 
         debug(format("locking path `%1%'") % path);
 
@@ -64,6 +64,6 @@ PathLocks::~PathLocks()
     for (list<int>::iterator i = fds.begin(); i != fds.end(); i++)
         close(*i);
 
-    for (Strings::iterator i = paths.begin(); i != paths.end(); i++)
+    for (Paths::iterator i = paths.begin(); i != paths.end(); i++)
         lockedPaths.erase(*i);
 }

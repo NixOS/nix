@@ -3,6 +3,6 @@
 
 #include "expr.hh"
 
-void printDotGraph(const FSIds & roots);
+void printDotGraph(const PathSet & roots);
 
 #endif /* !__DOTGRAPH_H */

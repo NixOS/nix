@@ -49,7 +49,7 @@ static void writeString(const string & s, DumpSink & sink)
 static void dump(const string & path, DumpSink & sink);
 
 
-static void dumpEntries(const string & path, DumpSink & sink)
+static void dumpEntries(const Path & path, DumpSink & sink)
 {
     DIR * dir = opendir(path.c_str());
     if (!dir) throw SysError("opening directory " + path);
@@ -82,7 +82,7 @@ static void dumpEntries(const string & path, DumpSink & sink)
 }
 
 
-static void dumpContents(const string & path, unsigned int size, 
+static void dumpContents(const Path & path, unsigned int size, 
     DumpSink & sink)
 {
     writeString("contents", sink);
@@ -110,7 +110,7 @@ static void dumpContents(const string & path, unsigned int size,
 }
 
 
-static void dump(const string & path, DumpSink & sink)
+static void dump(const Path & path, DumpSink & sink)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
@@ -150,7 +150,7 @@ static void dump(const string & path, DumpSink & sink)
 }
 
 
-void dumpPath(const string & path, DumpSink & sink)
+void dumpPath(const Path & path, DumpSink & sink)
 {
     writeString(archiveVersion1, sink);
     dump(path, sink);
@@ -207,10 +207,10 @@ static void skipGeneric(RestoreSource & source)
 }
 
 
-static void restore(const string & path, RestoreSource & source);
+static void restore(const Path & path, RestoreSource & source);
 
 
-static void restoreEntry(const string & path, RestoreSource & source)
+static void restoreEntry(const Path & path, RestoreSource & source)
 {
     string s, name;
 
@@ -235,7 +235,7 @@ static void restoreEntry(const string & path, RestoreSource & source)
 }
 
 
-static void restoreContents(int fd, const string & path, RestoreSource & source)
+static void restoreContents(int fd, const Path & path, RestoreSource & source)
 {
     unsigned int size = readInt(source);
     unsigned int left = size;
@@ -254,7 +254,7 @@ static void restoreContents(int fd, const string & path, RestoreSource & source)
 }
 
 
-static void restore(const string & path, RestoreSource & source)
+static void restore(const Path & path, RestoreSource & source)
 {
     string s;
 
@@ -331,7 +331,7 @@ static void restore(const string & path, RestoreSource & source)
 }
 
 
-void restorePath(const string & path, RestoreSource & source)
+void restorePath(const Path & path, RestoreSource & source)
 {
     if (readString(source) != archiveVersion1)
         throw badArchive("expected Nix archive");

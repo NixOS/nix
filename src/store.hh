@@ -9,44 +9,27 @@
 using namespace std;
 
 
-typedef Hash FSId;
-
-typedef set<FSId> FSIdSet;
-
-
 /* Copy a path recursively. */
-void copyPath(string src, string dst);
+void copyPath(const Path & src, const Path & dst);
 
 /* Register a substitute. */
-void registerSubstitute(const FSId & srcId, const FSId & subId);
+void registerSubstitute(const Path & srcPath, const Path & subPath);
 
-/* Register a path keyed on its id. */
-void registerPath(const Transaction & txn,
-    const string & path, const FSId & id);
+/* Register the validity of a path. */
+void registerValidPath(const Transaction & txn, const Path & path);
 
-/* Query the id of a path. */
-bool queryPathId(const string & path, FSId & id);
+/* Unregister the validity of a path. */
+void unregisterValidPath(const Path & path);
 
-/* Return a path whose contents have the given hash.  If target is
-   not empty, ensure that such a path is realised in target (if
-   necessary by copying from another location).  If prefix is not
-   empty, only return a path that is an descendent of prefix.
+/* Checks whether a path is valid. */ 
+bool isValidPath(const Path & path);
 
-   The list of pending ids are those that already being expanded.
-   This prevents infinite recursion for ids realised through a
-   substitute (since when we build the substitute, we would first try
-   to expand the id... kaboom!). */
-string expandId(const FSId & id, const string & target = "",
-    const string & prefix = "/", FSIdSet pending = FSIdSet(),
-    bool ignoreSubstitutes = false);
-
-/* Copy a file to the nixStore directory and register it in dbRefs.
-   Return the hash code of the value. */
-void addToStore(string srcPath, string & dstPath, FSId & id,
-    bool deterministicName = false);
+/* Copy the contents of a path to the store and register the validity
+   the resulting path.  The resulting path is returned. */
+Path addToStore(const Path & srcPath);
 
 /* Delete a value from the nixStore directory. */
-void deleteFromStore(const string & path);
+void deleteFromStore(const Path & path);
 
 void verifyStore();
 

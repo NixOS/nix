@@ -5,8 +5,7 @@
 Database nixDB;
 
 
-TableId dbPath2Id;
-TableId dbId2Paths;
+TableId dbValidPaths;
 TableId dbSuccessors;
 TableId dbSubstitutes;
 
@@ -23,8 +22,7 @@ bool keepFailed = false;
 void openDB()
 {
     nixDB.open(nixDBPath);
-    dbPath2Id = nixDB.openTable("path2id");
-    dbId2Paths = nixDB.openTable("id2paths");
+    dbValidPaths = nixDB.openTable("validpaths");
     dbSuccessors = nixDB.openTable("successors");
     dbSubstitutes = nixDB.openTable("substitutes");
 }

@@ -10,31 +10,27 @@ extern "C" {
 
 /* Abstract syntax of Nix expressions. */
 
-typedef list<FSId> FSIds;
-
 struct ClosureElem
 {
-    FSId id;
-    StringSet refs;
+    PathSet refs;
 };
 
-typedef map<string, ClosureElem> ClosureElems;
+typedef map<Path, ClosureElem> ClosureElems;
 
 struct Closure
 {
-    StringSet roots;
+    PathSet roots;
     ClosureElems elems;
 };
 
-typedef map<string, FSId> DerivationOutputs;
 typedef map<string, string> StringPairs;
 
 struct Derivation
 {
-    DerivationOutputs outputs;
-    FSIdSet inputs;
+    PathSet outputs;
+    PathSet inputs; /* Nix expressions, not actual inputs */
     string platform;
-    string builder;
+    Path builder;
     Strings args;
     StringPairs env;
 };
@@ -57,11 +53,11 @@ Error badTerm(const format & f, ATerm t);
 /* Hash an aterm. */
 Hash hashTerm(ATerm t);
 
-/* Read an aterm from disk, given its id. */
-ATerm termFromId(const FSId & id);
+/* Read an aterm from disk. */
+ATerm termFromPath(const Path & path);
 
-/* Write an aterm to the Nix store directory, and return its hash. */
-FSId writeTerm(ATerm t, const string & suffix, FSId id = FSId());
+/* Write an aterm to the Nix store directory, and return its path. */
+Path writeTerm(ATerm t, const string & suffix);
 
 /* Parse a Nix expression. */
 NixExpr parseNixExpr(ATerm t);

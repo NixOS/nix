@@ -9,12 +9,12 @@
 typedef ATerm Expr;
 
 typedef map<ATerm, ATerm> NormalForms;
-typedef map<FSId, Strings> PkgPaths;
-typedef map<FSId, Hash> PkgHashes;
+typedef map<Path, PathSet> PkgPaths;
+typedef map<Path, Hash> PkgHashes;
 
 struct EvalState 
 {
-    Strings searchDirs;
+    Paths searchDirs;
     NormalForms normalForms;
     PkgPaths pkgPaths;
     PkgHashes pkgHashes; /* normalised package hashes */
@@ -28,18 +28,18 @@ struct EvalState
 };
 
 
-static Expr evalFile(EvalState & state, string fileName);
+static Expr evalFile(EvalState & state, const Path & path);
 static Expr evalExpr(EvalState & state, Expr e);
 
 
-static string searchPath(const Strings & searchDirs, string relPath)
+static Path searchPath(const Paths & searchDirs, const Path & relPath)
 {
     if (string(relPath, 0, 1) == "/") return relPath;
 
-    for (Strings::const_iterator i = searchDirs.begin();
+    for (Paths::const_iterator i = searchDirs.begin();
          i != searchDirs.end(); i++)
     {
-        string path = *i + "/" + relPath;
+        Path path = *i + "/" + relPath;
         if (pathExists(path)) return path;
     }
 
@@ -121,14 +121,14 @@ static Expr substExprMany(ATermList formals, ATermList args, Expr body)
 }
 
 
-static Strings nixExprPathsCached(EvalState & state, const FSId & id)
+static PathSet nixExprRootsCached(EvalState & state, const Path & nePath)
 {
-    PkgPaths::iterator i = state.pkgPaths.find(id);
+    PkgPaths::iterator i = state.pkgPaths.find(nePath);
     if (i != state.pkgPaths.end())
         return i->second;
     else {
-        Strings paths = nixExprPaths(id);
-        state.pkgPaths[id] = paths;
+        PathSet paths = nixExprRoots(nePath);
+        state.pkgPaths[nePath] = paths;
         return paths;
     }
 }
@@ -137,13 +137,13 @@ static Strings nixExprPathsCached(EvalState & state, const FSId & id)
 static Hash hashPackage(EvalState & state, NixExpr ne)
 {
     if (ne.type == NixExpr::neDerivation) {
-	FSIdSet inputs2;
-        for (FSIdSet::iterator i = ne.derivation.inputs.begin();
+	PathSet inputs2;
+        for (PathSet::iterator i = ne.derivation.inputs.begin();
              i != ne.derivation.inputs.end(); i++)
         {
             PkgHashes::iterator j = state.pkgHashes.find(*i);
             if (j == state.pkgHashes.end())
-                throw Error(format("unknown package id %1%") % (string) *i);
+                throw Error(format("don't know expression `%1%'") % (string) *i);
             inputs2.insert(j->second);
         }
 	ne.derivation.inputs = inputs2;
@@ -156,12 +156,12 @@ static string processBinding(EvalState & state, Expr e, NixExpr & ne)
 {
     char * s1;
 
-    if (ATmatch(e, "FSId(<str>)", &s1)) {
-        FSId id = parseHash(s1);
-        Strings paths = nixExprPathsCached(state, id);
+    if (ATmatch(e, "NixExpr(<str>)", &s1)) {
+        Path nePath(s1);
+        PathSet paths = nixExprRootsCached(state, nePath);
         if (paths.size() != 1) abort();
-        string path = *(paths.begin());
-        ne.derivation.inputs.insert(id);
+        Path path = *(paths.begin());
+        ne.derivation.inputs.insert(nePath);
         return path;
     }
     
@@ -200,14 +200,14 @@ static Expr evalExpr2(EvalState & state, Expr e)
         ATmatch(e, "True") ||
         ATmatch(e, "False") ||
         ATmatch(e, "Function([<list>], <term>)", &e1, &e2) ||
-        ATmatch(e, "FSId(<str>)", &s1))
+        ATmatch(e, "NixExpr(<str>)", &s1))
         return e;
 
     try {
         Hash pkgHash = hashPackage(state, parseNixExpr(e));
-        FSId pkgId = writeTerm(e, "");
-        state.pkgHashes[pkgId] = pkgHash;
-        return ATmake("FSId(<str>)", ((string) pkgId).c_str());
+        Path pkgPath = writeTerm(e, "");
+        state.pkgHashes[pkgPath] = pkgHash;
+        return ATmake("NixExpr(<str>)", pkgPath.c_str());
     } catch (...) { /* !!! catch parse errors only */
     }
 
@@ -254,32 +254,29 @@ static Expr evalExpr2(EvalState & state, Expr e)
 
     /* Fix inclusion. */
     if (ATmatch(e, "IncludeFix(<str>)", &s1)) {
-        string fileName(s1);
+        Path fileName(s1);
         return evalFile(state, s1);
     }
 
     /* Relative files. */
     if (ATmatch(e, "Relative(<str>)", &s1)) {
-        string srcPath = searchPath(state.searchDirs, s1);
-        string dstPath;
-        FSId id;
-        addToStore(srcPath, dstPath, id, true);
+        Path srcPath = searchPath(state.searchDirs, s1);
+        Path dstPath = addToStore(srcPath);
 
         ClosureElem elem;
-        elem.id = id;
         NixExpr ne;
         ne.type = NixExpr::neClosure;
         ne.closure.roots.insert(dstPath);
         ne.closure.elems[dstPath] = elem;
 
         Hash pkgHash = hashPackage(state, ne);
-        FSId pkgId = writeTerm(unparseNixExpr(ne), "");
-        state.pkgHashes[pkgId] = pkgHash;
+        Path pkgPath = writeTerm(unparseNixExpr(ne), "");
+        state.pkgHashes[pkgPath] = pkgHash;
 
-        msg(lvlChatty, format("copied `%1%' -> %2%")
-            % srcPath % (string) pkgId);
+        msg(lvlChatty, format("copied `%1%' -> closure `%2%'")
+            % srcPath % pkgPath);
 
-        return ATmake("FSId(<str>)", ((string) pkgId).c_str());
+        return ATmake("NixExpr(<str>)", pkgPath.c_str());
     }
 
     /* Packages are transformed into Nix derivation expressions. */
@@ -302,8 +299,8 @@ static Expr evalExpr2(EvalState & state, Expr e)
         ne.type = NixExpr::neDerivation;
         ne.derivation.platform = SYSTEM;
         string name;
-        FSId outId;
-        bool outIdGiven = false;
+        Hash outHash;
+        bool outHashGiven = false;
         bnds = ATempty;
 
         for (map<string, ATerm>::iterator it = bndMap.begin();
@@ -331,8 +328,8 @@ static Expr evalExpr2(EvalState & state, Expr e)
                 if (key == "build") ne.derivation.builder = s;
                 if (key == "name") name = s;
                 if (key == "id") { 
-                    outId = parseHash(s);
-                    outIdGiven = true;
+                    outHash = parseHash(s);
+                    outHashGiven = true;
                 }
             }
 
@@ -348,23 +345,23 @@ static Expr evalExpr2(EvalState & state, Expr e)
         
         /* Hash the Nix expression with no outputs to produce a
            unique but deterministic path name for this package. */
-        if (!outIdGiven) outId = hashPackage(state, ne);
-        string outPath = 
-            canonPath(nixStore + "/" + ((string) outId).c_str() + "-" + name);
+        if (!outHashGiven) outHash = hashPackage(state, ne);
+        Path outPath = 
+            canonPath(nixStore + "/" + ((string) outHash).c_str() + "-" + name);
         ne.derivation.env["out"] = outPath;
-        ne.derivation.outputs[outPath] = outId;
+        ne.derivation.outputs.insert(outPath);
 
         /* Write the resulting term into the Nix store directory. */
-        Hash pkgHash = outIdGiven
-            ? hashString((string) outId + outPath)
+        Hash pkgHash = outHashGiven
+            ? hashString((string) outHash + outPath)
             : hashPackage(state, ne);
-        FSId pkgId = writeTerm(unparseNixExpr(ne), "-d-" + name);
-        state.pkgHashes[pkgId] = pkgHash;
+        Path pkgPath = writeTerm(unparseNixExpr(ne), "-d-" + name);
+        state.pkgHashes[pkgPath] = pkgHash;
 
-        msg(lvlChatty, format("instantiated `%1%' -> %2%")
-            % name % (string) pkgId);
+        msg(lvlChatty, format("instantiated `%1%' -> `%2%'")
+            % name % pkgPath);
 
-        return ATmake("FSId(<str>)", ((string) pkgId).c_str());
+        return ATmake("NixExpr(<str>)", pkgPath.c_str());
     }
 
     /* BaseName primitive function. */
@@ -401,9 +398,9 @@ static Expr evalExpr(EvalState & state, Expr e)
 }
 
 
-static Expr evalFile(EvalState & state, string relPath)
+static Expr evalFile(EvalState & state, const Path & relPath)
 {
-    string path = searchPath(state.searchDirs, relPath);
+    Path path = searchPath(state.searchDirs, relPath);
     Nest nest(lvlTalkative, format("evaluating file `%1%'") % path);
     Expr e = ATreadFromNamedFile(path.c_str());
     if (!e) 
@@ -422,16 +419,16 @@ static Expr evalStdin(EvalState & state)
 }
 
 
-static void printFSId(EvalState & state, Expr e)
+static void printNixExpr(EvalState & state, Expr e)
 {
     ATermList es;
     char * s;
-    if (ATmatch(e, "FSId(<str>)", &s)) {
+    if (ATmatch(e, "NixExpr(<str>)", &s)) {
         cout << format("%1%\n") % s;
     } 
     else if (ATmatch(e, "[<list>]", &es)) {
         while (!ATisEmpty(es)) {
-            printFSId(state, evalExpr(state, ATgetFirst(es)));
+            printNixExpr(state, evalExpr(state, ATgetFirst(es)));
             es = ATgetNext(es);
         }
     }
@@ -472,14 +469,14 @@ void run(Strings args)
 
     if (readStdin) {
         Expr e = evalStdin(state);
-        printFSId(state, e);
+        printNixExpr(state, e);
     }
 
     for (Strings::iterator it = files.begin();
          it != files.end(); it++)
     {
         Expr e = evalFile(state, *it);
-        printFSId(state, e);
+        printNixExpr(state, e);
     }
 }
 

@@ -258,6 +258,8 @@ void Database::delPair(const Transaction & txn, TableId table,
         Db * db = getDb(table);
         Dbt kt((void *) key.c_str(), key.length());
         db->del(txn.txn, &kt, 0);
+        /* Non-existence of a pair with the given key is not an
+           error. */
     } catch (DbException e) { rethrow(e); }
 }
 
