@@ -39,11 +39,11 @@ be performed.  These are documented below.</para>
 <para>This section lists the options that are common to all
 operations.  These options are allowed for every subcommand, though
 they may not always have an effect.  See also <xref
-linkend="sec-common-options" />.</para>
+linkend="sec-common-options" /> for a list of common options.</para>
 
 <variablelist>
 
-  <varlistentry><term><option>--add-root</option> <replaceable>path</replaceable></term>
+  <varlistentry id="opt-add-root"><term><option>--add-root</option> <replaceable>path</replaceable></term>
 
     <listitem><para>Causes the result of a build action
     (<option>--realise</option> and <option>--force-realise</option>)

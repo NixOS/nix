@@ -1,89 +1,97 @@
 <refentry>
-  <refnamediv>
-    <refname>nix-instantiate</refname>
-    <refpurpose>instantiate store expressions from Nix expressions</refpurpose>
-  </refnamediv>
+  
+<refnamediv>
+  <refname>nix-instantiate</refname>
+  <refpurpose>instantiate store derivations from Nix expressions</refpurpose>
+</refnamediv>
 
-  <refsynopsisdiv>
-    <cmdsynopsis>
-      <command>nix-instantiate</command>
-      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common-syn.xml#xpointer(/nop/*)" />
-      <group choice='opt'>
-        <arg choice='plain'><option>--parse-only</option></arg>
-        <arg choice='plain'><option>--eval-only</option></arg>
-      </group>
-      <arg choice='plain' rep='repeat'><replaceable>files</replaceable></arg>
-    </cmdsynopsis>
-  </refsynopsisdiv>
+<refsynopsisdiv>
+  <cmdsynopsis>
+    <command>nix-instantiate</command>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common-syn.xml#xpointer(/nop/*)" />
+    <arg><option>--add-root</option> <replaceable>path</replaceable></arg>
+    <arg><option>--indirect</option></arg>
+    <group choice='opt'>
+      <arg choice='plain'><option>--parse-only</option></arg>
+      <arg choice='plain'><option>--eval-only</option></arg>
+    </group>
+    <arg choice='plain' rep='repeat'><replaceable>files</replaceable></arg>
+  </cmdsynopsis>
+</refsynopsisdiv>
 
-  <refsection>
-    <title>Description</title>
 
-    <para>
-      The command <command>nix-instantiate</command> generates
-      (low-level) store expressions from (high-level) Nix expressions.
-      It loads and evaluates the Nix expressions in each of
-      <replaceable>files</replaceable>.  Each top-level expression
-      should evaluate to a derivation, a list of derivations, or a set
-      of derivations.  The paths of the resulting store expressions
-      are printed on standard output.
-    </para>
+<refsection><title>Description</title>
 
-    <para>
-      This command is generally used for testing Nix expression before
-      they are used with <command>nix-env</command>.  See also <xref
-      linkend="sec-common-options" />.
-    </para>
+<para>The command <command>nix-instantiate</command> generates <link
+linkend="gloss-derivation">store derivations</link> from (high-level)
+Nix expressions.  It loads and evaluates the Nix expressions in each
+of <replaceable>files</replaceable>.  Each top-level expression should
+evaluate to a derivation, a list of derivations, or a set of
+derivations.  The paths of the resulting store derivations are printed
+on standard output.</para>
 
-  </refsection>
+<para>Most users and developers don’t need to use this command
+(<command>nix-env</command> and <command>nix-build</command> perform
+store derivation instantiation from Nix expressions automatically).
+It is most commonly used for implementing new deployment
+policies.</para>
 
-  <refsection>
-    <title>Options</title>
+<para>See also <xref linkend="sec-common-options" /> for a list of
+common options.</para>
 
-    <variablelist>
+</refsection>
 
-      <varlistentry>
-        <term><option>--parse-only</option></term>
-        <listitem>
-          <para>
-            Just parse the input files, and print their abstract
-            syntax trees on standard output in ATerm format.
-          </para>
-        </listitem>
-      </varlistentry>
+
+<refsection><title>Options</title>
+
+<variablelist>
+
+  <varlistentry>
+    <term><option>--add-root</option> <replaceable>path</replaceable></term>
+    <term><option>--indirect</option></term>
+
+    <listitem><para>See the <link linkend="opt-add-root">corresponding
+    options</link> in <command>nix-store</command>.</para></listitem>
+
+  </varlistentry>
+
+    
+  <varlistentry><term><option>--parse-only</option></term>
+  
+    <listitem><para>Just parse the input files, and print their
+    abstract syntax trees on standard output in ATerm
+    format.</para></listitem>
+    
+  </varlistentry>
       
-      <varlistentry>
-        <term><option>--eval-only</option></term>
-        <listitem>
-          <para>
-            Just parse and evaluate the input files, and print the
-            resulting values on standard output.  No instantiation of
-            store expressions takes place.
-          </para>
-        </listitem>
-      </varlistentry>
+  <varlistentry><term><option>--eval-only</option></term>
+  
+    <listitem><para>Just parse and evaluate the input files, and print
+    the resulting values on standard output.  No instantiation of
+    store derivations takes place.</para></listitem>
+    
+  </varlistentry>
 
-    </variablelist>
+</variablelist>
 
-  </refsection>
+</refsection>
 
-  <refsection>
-    <title>Examples</title>
 
-    <screen>
-$ nix-instantiate gcc.nix <lineannotation>(instantiate)</lineannotation>
-/nix/store/468abdcb93aa22bb721142615b97698b-d-gcc-3.3.2.store
+<refsection><title>Examples</title>
 
-$ nix-store -r $(nix-instantiate gcc.nix) <lineannotation>(build)</lineannotation>
+<screen>
+$ nix-instantiate test.nix <lineannotation>(instantiate)</lineannotation>
+/nix/store/cigxbmvy6dzix98dxxh9b6shg7ar5bvs-perl-BerkeleyDB-0.26.drv
 
-$ nix-store -r $(nix-instantiate gcc.nix) <lineannotation>(print output path)</lineannotation>
-/nix/store/9afa718cddfdfe94b5b9303d0430ceb1-gcc-3.3.2
+$ nix-store -r $(nix-instantiate test.nix) <lineannotation>(build)</lineannotation>
+<replaceable>...</replaceable>
+/nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26 <lineannotation>(output path)</lineannotation>
 
-$ ls -l /nix/store/9afa718cddfdfe94b5b9303d0430ceb1-gcc-3.3.2
-dr-xr-xr-x    2 eelco    users         360 2003-12-01 16:12 bin
-dr-xr-xr-x    3 eelco    users          72 2003-12-01 16:12 include
+$ ls -l /nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26
+dr-xr-xr-x    2 eelco    users        4096 1970-01-01 01:00 lib
 ...</screen>
 
-  </refsection>
-    
+</refsection>
+
+
 </refentry>

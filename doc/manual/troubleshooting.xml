@@ -1,8 +1,31 @@
 <appendix>
   <title>Troubleshooting</title>
 
-  <para>
-    (Nothing.)
+  <para>This section provides solutions for some common problems.</para>
+
+  <sect1><title>Berkeley DB: <quote>Cannot allocate memory</quote></title>
+
+  <para>Symptom: Nix operations (in particular the
+  <command>nix-store</command> operations <option>--gc</option>,
+  <option>--verify</option>, and <option>--clear-substitutes</option>
+  — the latter being called by <command>nix-channel
+  --update</command>) failing:
+
+<screen>
+$ nix-store --verify
+error: Db::del: Cannot allocate memory</screen>
+
+   Possible solution: make sure that no Nix processes are running,
+   then do:
+
+<screen>
+$ cd /nix/var/nix/db
+$ rm __db.00*</screen>
+
   </para>
+
+  
+  </sect1>
+  
 	
 </appendix>

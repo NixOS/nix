@@ -3,10 +3,16 @@
 <glosslist>
 
 
-<glossentry><glossterm>derivation</glossterm>
+<glossentry id="gloss-derivation"><glossterm>derivation</glossterm>
 
   <glossdef><para>A description of a build action.  The result of a
-  derivation is a store object.</para></glossdef>
+  derivation is a store object.  Derivations are typically specified
+  in Nix expressions using the <link
+  linkend="ssec-derivation"><function>derivation</function>
+  primitive</link>.  These are translated into low-level
+  <emphasis>store derivations</emphasis> (implicitly by
+  <command>nix-env</command> and <command>nix-build</command>, or
+  explicitly by <command>nix-instantiate</command>).</para></glossdef>
 
 </glossentry>
 
@@ -69,6 +75,21 @@
   Nix expressions for your components.  Nix expressions are translated
   to derivations that are stored in the Nix store.  These derivations
   can then be built.</para></glossdef>
+
+</glossentry>
+
+
+<glossentry><glossterm>closure</glossterm>
+
+  <glossdef><para>The closure of a store path is the set of store
+  paths that are directly or indirectly “reachable” from that store
+  path.  For instance, if the store object at path
+  <varname>P</varname> contains a reference to path
+  <varname>Q</varname>, then <varname>Q</varname> is in the closure of
+  <varname>P</varname>.  For correct deployment it is necessary to
+  deploy whole closures, since otherwise at runtime files could be
+  missing.  The command <command>nix-store -qR</command> prints out
+  closures of store paths.</para></glossdef>
 
 </glossentry>
 
