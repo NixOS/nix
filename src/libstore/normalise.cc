@@ -1417,7 +1417,7 @@ void SubstitutionGoal::finished()
 
 void SubstitutionGoal::trace(const format & f)
 {
-    debug(format("substitution of `%1%': %2%") % nePath % f);
+    debug(format("substitution of `%1%': %2%") % storePath % f);
 }
 
 
