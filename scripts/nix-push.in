@@ -139,7 +139,12 @@ for (my $n = 0; $n < scalar @storepaths; $n++) {
         while (<PREDS>) {
             chomp;
             die unless (/^\//);
-            print MANIFEST "  SuccOf: $_\n";
+            my $pred = $_;
+            # Only include predecessors that are themselves being
+            # pushed.
+            if (defined $storepaths{$pred}) {
+                print MANIFEST "  SuccOf: $pred\n";
+            }
         }
         close PREDS;
     }
