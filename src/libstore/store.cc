@@ -401,6 +401,9 @@ Path addToStore(const Path & _srcPath)
         PathLocks outputLock(lockPaths);
 
         if (!isValidPath(dstPath)) {
+
+            if (pathExists(dstPath)) deletePath(dstPath);
+            
             copyPath(srcPath, dstPath);
 
             Transaction txn(nixDB);
@@ -426,6 +429,9 @@ void addTextToStore(const Path & dstPath, const string & s)
         PathLocks outputLock(lockPaths);
 
         if (!isValidPath(dstPath)) {
+
+            if (pathExists(dstPath)) deletePath(dstPath);
+
             writeStringToFile(dstPath, s);
 
             Transaction txn(nixDB);
