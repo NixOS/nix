@@ -50,6 +50,12 @@ struct Cleanup : TermFun
             return ATmake("Int(<int>)", n);
         }
 
+        if (ATmatch(e, "Bool(\"true\")", &s))
+            return ATmake("Bool(True)");
+        
+        if (ATmatch(e, "Bool(\"false\")", &s))
+            return ATmake("Bool(False)");
+
         return e;
     }
 };

@@ -84,8 +84,8 @@ static string processBinding(EvalState & state, Expr e, NixExpr & ne)
 
     if (ATmatch(e, "Str(<str>)", &s)) return s;
     if (ATmatch(e, "Uri(<str>)", &s)) return s;
-    if (ATmatch(e, "True")) return "1";
-    if (ATmatch(e, "False")) return "";
+    if (ATmatch(e, "Bool(True)")) return "1";
+    if (ATmatch(e, "Bool(False)")) return "";
 
     if (ATmatch(e, "Attrs([<list>])", &es)) {
         Expr a = queryAttr(e, "type");

@@ -68,6 +68,9 @@ exports
     Expr "==" Expr
     -> Expr {cons("OpEq")}
 
+    Bool
+    -> Expr {cons("Bool")}
+
   context-free priorities
 
     Expr "." Id -> Expr
@@ -84,10 +87,19 @@ exports
   lexical syntax
     [a-zA-Z\_][a-zA-Z0-9\_\']* -> Id
     "rec" -> Id {reject}
+    "true" -> Id {reject}
+    "false" -> Id {reject}
+
     [0-9]+ -> Int
+
     "\"" ~[\n\"]* "\"" -> Str
+
     PathComp ("/" PathComp)+ -> Path
     [a-zA-Z0-9\.\_\-]+ -> PathComp
+
+    "true" -> Bool
+    "false" -> Bool
+
   lexical restrictions
     Id -/- [a-zA-Z0-9\_\']
     Int -/- [0-9]

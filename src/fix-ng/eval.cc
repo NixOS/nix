@@ -109,8 +109,8 @@ Path evalPath(EvalState & state, Expr e)
 bool evalBool(EvalState & state, Expr e)
 {
     e = evalExpr(state, e);
-    if (ATmatch(e, "True")) return true;
-    else if (ATmatch(e, "False")) return false;
+    if (ATmatch(e, "Bool(True)")) return true;
+    else if (ATmatch(e, "Bool(False)")) return false;
     else throw badTerm("expecting a boolean", e);
 }
 
@@ -124,6 +124,7 @@ Expr evalExpr2(EvalState & state, Expr e)
     if (ATmatch(e, "Str(<str>)", &s1) ||
         ATmatch(e, "Path(<str>)", &s1) ||
         ATmatch(e, "Uri(<str>)", &s1) ||
+        ATmatch(e, "Bool(<term>)", &e1) ||
         ATmatch(e, "Function([<list>], <term>)", &e1, &e2) ||
         ATmatch(e, "Attrs([<list>])", &e1) ||
         ATmatch(e, "List([<list>])", &e1))
@@ -188,7 +189,7 @@ Expr evalExpr2(EvalState & state, Expr e)
     if (ATmatch(e, "OpEq(<term>, <term>)", &e1, &e2)) {
         string s1 = evalString(state, e1);
         string s2 = evalString(state, e2);
-        return s1 == s2 ? ATmake("True") : ATmake("False");
+        return s1 == s2 ? ATmake("Bool(True)") : ATmake("Bool(False)");
     }
 
     /* Barf. */
