@@ -2,6 +2,7 @@
 #include <map>
 
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 
 extern "C" {
@@ -15,7 +16,15 @@ static string nixDescriptorDir;
 static string nixSourcesDir;
 
 
+/* Mapping of Fix file names to the hashes of the resulting Nix
+   descriptors. */
 typedef map<string, string> DescriptorMap;
+
+
+/* Forward declarations. */
+
+string instantiateDescriptor(string filename,
+    DescriptorMap & done);
 
 
 void registerFile(string filename)
@@ -52,12 +61,15 @@ string fetchURL(string url)
 {
     string filename = baseNameOf(url);
     string fullname = nixSourcesDir + "/" + filename;
-    /* !!! quoting */
-    string shellCmd =
-        "cd " + nixSourcesDir + " && wget --quiet -N \"" + url + "\"";
-    int res = system(shellCmd.c_str());
-    if (WEXITSTATUS(res) != 0)
-        throw Error("cannot fetch " + url);
+    struct stat st;
+    if (stat(fullname.c_str(), &st)) {
+        /* !!! quoting */
+        string shellCmd =
+            "cd " + nixSourcesDir + " && wget --quiet -N \"" + url + "\"";
+        int res = system(shellCmd.c_str());
+        if (WEXITSTATUS(res) != 0)
+            throw Error("cannot fetch " + url);
+    }
     return fullname;
 }
 
@@ -101,17 +113,21 @@ string evaluateFile(ATerm e, string dir)
             throw Error("cannot copy " + filename);
         registerFile(nixSourcesDir + "/" + baseNameOf(filename));
         return hashFile(filename);
-    } else throw Error("invalid hash expression");
+    } else throw Error("invalid file expression");
 }
 
 
-string evaluatePkg(ATerm e, DescriptorMap & done)
+string evaluatePkg(ATerm e, string dir, DescriptorMap & done)
 {
     char * s;
+    ATerm t;
     if (ATmatch(e, "<str>", &s)) {
         checkHash(s);
         return s;
-    } else throw Error("invalid hash expression");
+    } else if (ATmatch(e, "Fix(<term>)", &t)) {
+        string filename = absPath(evaluateStr(t), dir); /* !!! */
+        return instantiateDescriptor(filename, done);
+    } else throw Error("invalid pkg expression");
 }
 
 
@@ -125,7 +141,7 @@ ATerm evaluate(ATerm e, string dir, DescriptorMap & done)
     else if (ATmatch(e, "File(<term>)", &t))
         return ATmake("File(<str>)", evaluateFile(t, dir).c_str());
     else if (ATmatch(e, "Pkg(<term>)", &t))
-        return ATmake("Pkg(<str>)", evaluatePkg(t, done).c_str());
+        return ATmake("Pkg(<str>)", evaluatePkg(t, dir, done).c_str());
     else throw Error("invalid expression type");
 }
 
@@ -215,8 +231,8 @@ string instantiateDescriptor(string filename,
     /* Register it with Nix. */
     registerFile(outFilename);
 
-    done[filename] = outFilename;
-    return outFilename;
+    done[filename] = outHash;
+    return outHash;
 }
 
 
