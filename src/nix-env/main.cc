@@ -402,6 +402,8 @@ void run(Strings args)
             op = opUninstall;
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
+        else if (arg[0] == '-')
+            opFlags.push_back(arg);
         else
             opArgs.push_back(arg);
 
