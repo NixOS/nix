@@ -13,6 +13,7 @@ mkdir "$NIX_LOCALSTATE_DIR"
 mkdir -p "$NIX_LOG_DIR"
 mkdir "$NIX_STATE_DIR"
 mkdir "$NIX_DB_DIR"
+mkdir "$NIX_CONF_DIR"
 
 mkdir $NIX_BIN_DIR
 ln -s $TOP/src/nix-store/nix-store $NIX_BIN_DIR/
@@ -27,6 +28,12 @@ ln -s $TOP/scripts/readmanifest.pm $NIX_BIN_DIR/nix/
 mkdir -p "$NIX_STATE_DIR"/manifests
 mkdir -p "$NIX_STATE_DIR"/gcroots
 mkdir -p "$NIX_STATE_DIR"/temproots
+
+cat > "$NIX_CONF_DIR"/nix.conf <<EOF
+gc-keep-outputs = false
+gc-keep-derivations = false
+env-keep-derivations = false
+EOF
 
 mkdir $NIX_DATA_DIR/nix
 cp -prd $TOP/corepkgs $NIX_DATA_DIR/nix/

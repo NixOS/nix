@@ -9,6 +9,7 @@ TESTS_ENVIRONMENT = TEST_ROOT=$(TEST_ROOT) \
   NIX_LOG_DIR=$(TEST_ROOT)/var/log/nix \
   NIX_STATE_DIR=$(TEST_ROOT)/var/nix \
   NIX_DB_DIR=$(TEST_ROOT)/db \
+  NIX_CONF_DIR=$(TEST_ROOT)/etc \
   NIX_BIN_DIR=$(TEST_ROOT)/bin \
   NIX_LIBEXEC_DIR=$(TEST_ROOT)/bin \
   REAL_BIN_DIR=$(bindir) \
@@ -39,7 +40,7 @@ gc-concurrent.sh: gc-concurrent.nix gc-concurrent2.nix
 TESTS = init.sh hash.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
   build-hook.sh substitutes.sh substitutes2.sh fallback.sh nix-push.sh gc.sh \
   gc-concurrent.sh verify.sh nix-pull.sh
-#TESTS = init.sh nix-push.sh nix-pull.sh
+#TESTS = init.sh gc.sh
 
 XFAIL_TESTS =
 
