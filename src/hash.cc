@@ -192,7 +192,7 @@ static void dumpContents(const string & path, unsigned int size,
     int fd = open(path.c_str(), O_RDONLY);
     if (!fd) throw SysError("opening file " + path);
     
-    unsigned char buf[16384];
+    unsigned char buf[65536];
 
     unsigned int total = 0;
     ssize_t n;
@@ -213,8 +213,6 @@ static void dumpContents(const string & path, unsigned int size,
 
 void dumpPath(const string & path, DumpSink & sink)
 {
-    cerr << path << endl;
-
     struct stat st;
     if (lstat(path.c_str(), &st))
         throw SysError("getting attributes of path " + path);
@@ -225,11 +223,25 @@ void dumpPath(const string & path, DumpSink & sink)
         writeString("type", sink);
         writeString("regular", sink);
         dumpContents(path, st.st_size, sink);
-    } else if (S_ISDIR(st.st_mode)) {
+    } 
+
+    else if (S_ISDIR(st.st_mode)) {
         writeString("type", sink);
         writeString("directory", sink);
         dumpEntries(path, sink);
-    } else throw Error("unknown file type: " + path);
+    }
+
+    else if (S_ISLNK(st.st_mode)) {
+        writeString("type", sink);
+        writeString("symlink", sink);
+        char buf[st.st_size];
+        if (readlink(path.c_str(), buf, st.st_size) != st.st_size)
+            throw SysError("reading symbolic link " + path);
+        writeString("target", sink);
+        writeString(string(buf, st.st_size), sink);
+    }
+
+    else throw Error("unknown file type: " + path);
 
     writeString(")", sink);
 }
