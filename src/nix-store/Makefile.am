@@ -12,7 +12,7 @@ main.o: help.txt.hh
 AM_CXXFLAGS = \
  -I.. -I../../externals/inst/include -I../libutil -I../libstore -I../libmain
 
-install-data-local:
+init-state-local:
 	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix
 	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix/db
 	$(INSTALL) -d $(DESTDIR)$(localstatedir)/log/nix

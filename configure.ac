@@ -63,6 +63,11 @@ AC_ARG_WITH(xml-flags, AC_HELP_STRING([--with-xml-flags=FLAGS],
   xmlflags=$withval, xmlflags=)
 AC_SUBST(xmlflags)
 
+AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
+  [path of the Nix store]),
+  storedir=$withval, storedir='${prefix}/store')
+AC_SUBST(storedir)
+
 AC_CHECK_LIB(pthread, pthread_mutex_init)
 
 AM_CONFIG_HEADER([config.h])
