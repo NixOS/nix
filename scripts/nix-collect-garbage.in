@@ -5,7 +5,7 @@ my $storedir = "@prefix@/store";
 
 my %alive;
 
-open HASHES, "nix -qrh \$(cat $linkdir/*.hash) |" or die "in `nix -qrh'";
+open HASHES, "nix --query --refs \$(cat $linkdir/*.hash) |" or die "in `nix -qrh'";
 while (<HASHES>) {
 	chomp;
 	$alive{$_} = 1;

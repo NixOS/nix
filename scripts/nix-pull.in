@@ -28,21 +28,22 @@ while (<CONFFILE>) {
             my $fn = $1;
             next if $fn =~ /\.\./;
             next if $fn =~ /\//;
-            next unless $fn =~ /-([0-9a-z]{32})(-s-([0-9a-z]{32}))?\.nar.bz2$/;
+            next unless $fn =~ /^([0-9a-z]{32})-([0-9a-z]{32})(-s-([0-9a-z]{32}))?.*\.nar\.bz2$/;
             my $hash = $1;
-            my $fshash = $3;
+            my $id = $2;
+            my $fsid = $4;
 
-            print "registering $hash -> $url/$fn\n";
+            print "registering $id -> $url/$fn\n";
 
             # Construct a Fix expression that fetches and unpacks a
             # Nix archive from the network.
             my $fetch =
               "App(IncludeFix(\"fetchurl/fetchurl.fix\"), " .
-              "[(\"url\", \"$url/$fn\"), (\"md5\", \"ignore\")])";
+              "[(\"url\", \"$url/$fn\"), (\"md5\", \"$hash\")])";
             my $fixexpr = 
                 "App(IncludeFix(\"nar/unnar.fix\"), " .
                 "[ (\"nar\", $fetch)" .
-                ", (\"name\", \"fetched-$hash\")" .
+                ", (\"name\", \"fetched-$id\")" .
                 "])";
             
             my $fixfile = "/tmp/nix-pull-tmp.fix";
@@ -51,19 +52,19 @@ while (<CONFFILE>) {
             close FIX;
 
             # Instantiate a Nix expression from the Fix expression.
-            my $nhash = `fix $fixfile`;
+            my $nid = `fix $fixfile`;
             $? and die "instantiating Nix archive expression";
-            chomp $nhash;
-            die unless $nhash =~ /^([0-9a-z]{32})$/;
+            chomp $nid;
+            die unless $nid =~ /^([0-9a-z]{32})$/;
 
-            push @subs, $hash;
-            push @subs, $nhash;
+            push @subs, $id;
+            push @subs, $nid;
 
             # Does the name encode a successor relation?
-            if (defined $fshash) {
-                print "NORMAL $fshash -> $hash\n";
-                push @sucs, $fshash;
-                push @sucs, $hash;
+            if (defined $fsid) {
+                print "NORMAL $fsid -> $id\n";
+                push @sucs, $fsid;
+                push @sucs, $id;
             }
         }
 
