@@ -170,7 +170,8 @@ static Expr evalExpr(Expr e)
         if (name == "")
             throw badTerm("no package name specified", nf);
         
-        string out = nixStore + "/" + ((string) hash).c_str() + "-" + name;
+        string out = 
+            canonPath(nixStore + "/" + ((string) hash).c_str() + "-" + name);
 
         env = ATinsert(env, ATmake("(<str>, <str>)", "out", out.c_str()));
 

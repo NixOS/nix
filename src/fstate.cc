@@ -163,7 +163,7 @@ Hash writeTerm(ATerm t)
     if (!ATwriteToNamedTextFile(t, path.c_str()))
         throw Error(format("cannot write aterm %1%") % path);
     Hash hash = hashPath(path);
-    string path2 = nixStore + "/" + (string) hash + ".nix";
+    string path2 = canonPath(nixStore + "/" + (string) hash + ".nix");
     if (rename(path.c_str(), path2.c_str()) == -1)
         throw SysError(format("renaming %1% to %2%") % path % path2);
     registerPath(path2, hash);

@@ -177,7 +177,7 @@ void addToStore(string srcPath, string & dstPath, Hash & hash)
     }
     
     string baseName = baseNameOf(srcPath);
-    dstPath = nixStore + "/" + (string) hash + "-" + baseName;
+    dstPath = canonPath(nixStore + "/" + (string) hash + "-" + baseName);
 
     copyPath(srcPath, dstPath);
 
