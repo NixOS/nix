@@ -34,6 +34,9 @@ public:
 };
 
 
+static string pathNullDevice = "/dev/null";
+
+
 /* Run a program. */
 void runProgram(const string & program, 
     const Strings & args, const Environment & env)
@@ -96,6 +99,13 @@ void runProgram(const string & program,
             /* Dup stderr to stdin. */
             if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
                 throw SysError("cannot dup stderr into stdout");
+
+	    /* Reroute stdin to /dev/null. */
+	    int fdDevNull = open(pathNullDevice.c_str(), O_RDWR);
+	    if (fdDevNull == -1)
+		throw SysError(format("cannot open `%1%'") % pathNullDevice);
+	    if (dup2(fdDevNull, STDIN_FILENO) == -1)
+		throw SysError("cannot dup null device into stdin");
 
             /* Execute the program.  This should not return. */
             execve(program.c_str(), (char * *) argArr, (char * *) envArr);
