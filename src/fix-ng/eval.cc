@@ -5,6 +5,7 @@
 
 
 EvalState::EvalState()
+    : normalForms(32768, 75)
 {
     blackHole = ATmake("BlackHole()");
     if (!blackHole) throw Error("cannot build black hole");
@@ -20,32 +21,43 @@ Expr getAttr(EvalState & state, Expr e, const string & name)
 /* Substitute an argument set into the body of a function. */
 static Expr substArgs(Expr body, ATermList formals, Expr arg)
 {
-    Subs subs;
+    ATermMap subs;
     Expr undefined = ATmake("Undefined");
 
     /* Get the formal arguments. */
     while (!ATisEmpty(formals)) {
+        ATerm t = ATgetFirst(formals);
         char * s;
-        if (!ATmatch(ATgetFirst(formals), "<str>", &s))
+        if (!ATmatch(t, "<str>", &s))
             abort(); /* can't happen */
-        subs[s] = undefined;
+        subs.set(t, undefined);
         formals = ATgetNext(formals);
     }
 
     /* Get the actual arguments, and check that they match with the
        formals. */
-    Attrs args;
+    ATermMap args;
     queryAllAttrs(arg, args);
-    for (Attrs::iterator i = args.begin(); i != args.end(); i++) {
-        if (subs.find(i->first) == subs.end())
-            throw badTerm(format("argument `%1%' not declared") % i->first, arg);
-        subs[i->first] = i->second;
+    for (ATermList keys = args.keys(); !ATisEmpty(keys); 
+         keys = ATgetNext(keys))
+    {
+        Expr key = ATgetFirst(keys);
+        Expr cur = subs.get(key);
+        if (!cur)
+            throw badTerm(format("argument `%1%' not declared")
+                % aterm2String(key), arg);
+        subs.set(key, args.get(key));
     }
 
     /* Check that all arguments are defined. */
-    for (Subs::iterator i = subs.begin(); i != subs.end(); i++)
-        if (i->second == undefined)
-            throw badTerm(format("formal argument `%1%' missing") % i->first, arg);
+    for (ATermList keys = subs.keys(); !ATisEmpty(keys); 
+         keys = ATgetNext(keys))
+    {
+        Expr key = ATgetFirst(keys);
+        if (subs.get(key) == undefined)
+            throw badTerm(format("formal argument `%1%' missing")
+                % aterm2String(key), arg);
+    }
     
     return substitute(subs, body);
 }
@@ -59,26 +71,26 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
 ATerm expandRec(ATerm e, ATermList bnds)
 {
     /* Create the substitution list. */
-    Subs subs;
+    ATermMap subs;
     ATermList bs = bnds;
     while (!ATisEmpty(bs)) {
         char * s;
         Expr e2;
         if (!ATmatch(ATgetFirst(bs), "Bind(<str>, <term>)", &s, &e2))
             abort(); /* can't happen */
-        subs[s] = ATmake("Select(<term>, <str>)", e, s);
+        subs.set(s, ATmake("Select(<term>, <str>)", e, s));
         bs = ATgetNext(bs);
     }
 
     /* Create the non-recursive set. */
-    Attrs as;
+    ATermMap as;
     bs = bnds;
     while (!ATisEmpty(bs)) {
         char * s;
         Expr e2;
         if (!ATmatch(ATgetFirst(bs), "Bind(<str>, <term>)", &s, &e2))
             abort(); /* can't happen */
-        as[s] = substitute(subs, e2);
+        as.set(s, substitute(subs, e2));
         bs = ATgetNext(bs);
     }
 
@@ -205,18 +217,18 @@ Expr evalExpr(EvalState & state, Expr e)
 
     /* Consult the memo table to quickly get the normal form of
        previously evaluated expressions. */
-    NormalForms::iterator i = state.normalForms.find(e);
-    if (i != state.normalForms.end()) {
-        if (i->second == state.blackHole)
+    Expr nf = state.normalForms.get(e);
+    if (nf) {
+        if (nf == state.blackHole)
             throw badTerm("infinite recursion", e);
         state.nrCached++;
-        return i->second;
+        return nf;
     }
 
     /* Otherwise, evaluate and memoize. */
-    state.normalForms[e] = state.blackHole;
-    Expr nf = evalExpr2(state, e);
-    state.normalForms[e] = nf;
+    state.normalForms.set(e, state.blackHole);
+    nf = evalExpr2(state, e);
+    state.normalForms.set(e, nf);
     return nf;
 }
 

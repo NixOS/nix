@@ -2,6 +2,91 @@
 #include "expr.hh"
 
 
+ATermMap::ATermMap(unsigned int initialSize, unsigned int maxLoadPct)
+{
+    table = ATtableCreate(initialSize, maxLoadPct);
+    if (!table) throw Error("cannot create ATerm table");
+}
+
+
+ATermMap::ATermMap(const ATermMap & map)
+    : table(0)
+{
+    ATermList keys = map.keys();
+
+    /* !!! adjust allocation for load pct */
+    table = ATtableCreate(ATgetLength(keys), map.maxLoadPct);
+    if (!table) throw Error("cannot create ATerm table");
+
+    for (; !ATisEmpty(keys); keys = ATgetNext(keys)) {
+        ATerm key = ATgetFirst(keys);
+        set(key, map.get(key));
+    }
+}
+
+
+ATermMap::~ATermMap()
+{
+    if (table) ATtableDestroy(table);
+}
+
+
+void ATermMap::set(ATerm key, ATerm value)
+{
+    return ATtablePut(table, key, value);
+}
+
+
+void ATermMap::set(const string & key, ATerm value)
+{
+    set(string2ATerm(key), value);
+}
+
+
+ATerm ATermMap::get(ATerm key) const
+{
+    return ATtableGet(table, key);
+}
+
+
+ATerm ATermMap::get(const string & key) const
+{
+    return get(string2ATerm(key));
+}
+
+
+void ATermMap::remove(ATerm key)
+{
+    ATtableRemove(table, key);
+}
+
+
+void ATermMap::remove(const string & key)
+{
+    remove(string2ATerm(key));
+}
+
+
+ATermList ATermMap::keys() const
+{
+    ATermList keys = ATtableKeys(table);
+    if (!keys) throw Error("cannot query aterm map keys");
+    return keys;
+}
+
+
+ATerm string2ATerm(const string & s)
+{
+    return (ATerm) ATmakeAppl0(ATmakeAFun((char *) s.c_str(), 0, ATtrue));
+}
+
+
+string aterm2String(ATerm t)
+{
+    return ATgetName(ATgetAFun(t));
+}
+    
+
 ATerm bottomupRewrite(TermFun & f, ATerm e)
 {
     if (ATgetType(e) == AT_APPL) {
@@ -31,7 +116,7 @@ ATerm bottomupRewrite(TermFun & f, ATerm e)
 }
 
 
-void queryAllAttrs(Expr e, Attrs & attrs)
+void queryAllAttrs(Expr e, ATermMap & attrs)
 {
     ATermList bnds;
     if (!ATmatch(e, "Attrs([<list>])", &bnds))
@@ -42,7 +127,7 @@ void queryAllAttrs(Expr e, Attrs & attrs)
         Expr e;
         if (!ATmatch(ATgetFirst(bnds), "Bind(<str>, <term>)", &s, &e))
             abort(); /* can't happen */
-        attrs[s] = e;
+        attrs.set(s, e);
         bnds = ATgetNext(bnds);
     }
 }
@@ -50,33 +135,32 @@ void queryAllAttrs(Expr e, Attrs & attrs)
 
 Expr queryAttr(Expr e, const string & name)
 {
-    Attrs attrs;
+    ATermMap attrs;
     queryAllAttrs(e, attrs);
-    Attrs::iterator i = attrs.find(name);
-    return i == attrs.end() ? 0 : i->second;
+    return attrs.get(name);
 }
 
 
-Expr makeAttrs(const Attrs & attrs)
+Expr makeAttrs(const ATermMap & attrs)
 {
-    ATermList bnds = ATempty;
-    for (Attrs::const_iterator i = attrs.begin(); i != attrs.end(); i++)
+    ATermList bnds = ATempty, keys = attrs.keys();
+    while (!ATisEmpty(keys)) {
+        Expr key = ATgetFirst(keys);
         bnds = ATinsert(bnds, 
-            ATmake("Bind(<str>, <term>)", i->first.c_str(), i->second));
+            ATmake("Bind(<term>, <term>)", key, attrs.get(key)));
+        keys = ATgetNext(keys);
+    }
     return ATmake("Attrs(<term>)", ATreverse(bnds));
 }
 
 
-ATerm substitute(Subs & subs, ATerm e)
+Expr substitute(const ATermMap & subs, Expr e)
 {
     char * s;
 
     if (ATmatch(e, "Var(<str>)", &s)) {
-        Subs::iterator i = subs.find(s);
-        if (i == subs.end())
-            return e;
-        else
-            return i->second;
+        Expr sub = subs.get(s);
+        return sub ? sub : e;
     }
 
     /* In case of a function, filter out all variables bound by this
@@ -84,11 +168,11 @@ ATerm substitute(Subs & subs, ATerm e)
     ATermList formals;
     ATerm body;
     if (ATmatch(e, "Function([<list>], <term>)", &formals, &body)) {
-        Subs subs2(subs);
+        ATermMap subs2(subs);
         ATermList fs = formals;
         while (!ATisEmpty(fs)) {
             if (!ATmatch(ATgetFirst(fs), "<str>", &s)) abort();
-            subs2.erase(s);
+            subs2.remove(s);
             fs = ATgetNext(fs);
         }
         return ATmake("Function(<term>, <term>)", formals,
@@ -98,13 +182,13 @@ ATerm substitute(Subs & subs, ATerm e)
     /* Idem for a mutually recursive attribute set. */
     ATermList bindings;
     if (ATmatch(e, "Rec([<list>])", &bindings)) {
-        Subs subs2(subs);
+        ATermMap subs2(subs);
         ATermList bnds = bindings;
         while (!ATisEmpty(bnds)) {
             Expr e;
             if (!ATmatch(ATgetFirst(bnds), "Bind(<str>, <term>)", &s, &e))
                 abort(); /* can't happen */
-            subs2.erase(s);
+            subs2.remove(s);
             bnds = ATgetNext(bnds);
         }
         return ATmake("Rec(<term>)", substitute(subs2, (ATerm) bindings));

@@ -7,13 +7,12 @@
 #include "expr.hh"
 
 
-typedef map<Expr, Expr> NormalForms;
 typedef map<Path, PathSet> DrvPaths;
 typedef map<Path, Hash> DrvHashes;
 
 struct EvalState 
 {
-    NormalForms normalForms;
+    ATermMap normalForms;
     DrvPaths drvPaths;
     DrvHashes drvHashes; /* normalised derivation hashes */
     Expr blackHole;

@@ -123,7 +123,7 @@ Expr primDerivation(EvalState & state, Expr args)
 {
     Nest nest(lvlVomit, "evaluating derivation");
 
-    Attrs attrs;
+    ATermMap attrs;
     args = evalExpr(state, args);
     queryAllAttrs(args, attrs);
 
@@ -136,9 +136,11 @@ Expr primDerivation(EvalState & state, Expr args)
     Hash outHash;
     bool outHashGiven = false;
 
-    for (Attrs::iterator i = attrs.begin(); i != attrs.end(); i++) {
-        string key = i->first;
-        Expr value = i->second;
+    for (ATermList keys = attrs.keys(); !ATisEmpty(keys); 
+         keys = ATgetNext(keys))
+    {
+        string key = aterm2String(ATgetFirst(keys));
+        Expr value = attrs.get(key);
         Nest nest(lvlVomit, format("processing attribute `%1%'") % key);
 
         /* The `args' attribute is special: it supplies the
@@ -198,9 +200,9 @@ Expr primDerivation(EvalState & state, Expr args)
     msg(lvlChatty, format("instantiated `%1%' -> `%2%'")
         % drvName % drvPath);
 
-    attrs["outPath"] = ATmake("Path(<str>)", outPath.c_str());
-    attrs["drvPath"] = ATmake("Path(<str>)", drvPath.c_str());
-    attrs["type"] = ATmake("Str(\"derivation\")");
+    attrs.set("outPath", ATmake("Path(<str>)", outPath.c_str()));
+    attrs.set("drvPath", ATmake("Path(<str>)", drvPath.c_str()));
+    attrs.set("type", ATmake("Str(\"derivation\")"));
 
     return makeAttrs(attrs);
 }
