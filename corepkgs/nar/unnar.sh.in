@@ -1,4 +1,6 @@
 #! /bin/sh
 
+export PATH=/bin:/usr/bin
+
 echo "unpacking $nar to $out..."
 bunzip2 < $nar | @bindir@/nix --restore "$out" || exit 1
