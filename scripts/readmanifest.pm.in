@@ -1,6 +1,34 @@
 use strict;
 
 
+sub addPatch {
+    my $patches = shift;
+    my $storePath = shift;
+    my $patch = shift;
+
+    $$patches{$storePath} = []
+        unless defined $$patches{$storePath};
+
+    my $patchList = $$patches{$storePath};
+
+    my $found = 0;
+    foreach my $patch2 (@{$patchList}) {
+        if ($patch2->{url} eq $patch->{url}) {
+            if ($patch2->{hash} eq $patch->{hash}) {
+                $found = 1 if ($patch2->{basePath} eq $patch->{basePath});
+            } else {
+                die "conflicting hashes for URL $patch->{url}, " .
+                    "namely $patch2->{hash} and $patch->{hash}";
+            }
+        }
+    }
+    
+    if (!$found) {
+        push @{$patchList}, $patch;
+    }
+}
+
+
 sub readManifest {
     my $manifest = shift;
     my $narFiles = shift;
@@ -81,31 +109,11 @@ sub readManifest {
                 }
 
                 elsif ($type eq "patch") {
-
-                    $$patches{$storePath} = []
-                        unless defined $$patches{$storePath};
-
-                    my $patchList = $$patches{$storePath};
-
-                    my $found = 0;
-                    foreach my $patch (@{$patchList}) {
-                        if ($patch->{url} eq $url) {
-                            if ($patch->{hash} eq $hash) {
-                                $found = 1 if ($patch->{basePath} eq $basePath);
-                            } else {
-                                die "conflicting hashes for URL $url, " .
-                                    "namely $patch->{hash} and $hash";
-                            }
-                        }
-                    }
-                    if (!$found) {
-                        push @{$patchList},
-                            { url => $url, hash => $hash, size => $size
-                            , basePath => $basePath, baseHash => $baseHash
-                            , narHash => $narHash, type => $patchType
-                            };
-                    }
-                    
+                    addPatch $patches, $storePath,
+                        { url => $url, hash => $hash, size => $size
+                        , basePath => $basePath, baseHash => $baseHash
+                        , narHash => $narHash, patchType => $patchType
+                        };
                 }
 
             }
