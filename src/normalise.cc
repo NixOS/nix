@@ -26,7 +26,7 @@ typedef set<FSId> FSIdSet;
 
 Slice normaliseFState(FSId id, FSIdSet pending)
 {
-    Nest nest(lvlDebug, format("normalising fstate %1%") % (string) id);
+    Nest nest(lvlTalkative, format("normalising fstate %1%") % (string) id);
 
     /* Try to substitute $id$ by any known successors in order to
        speed up the rewrite process. */
@@ -80,7 +80,7 @@ Slice normaliseFState(FSId id, FSIdSet pending)
     for (DeriveOutputs::iterator i = fs.derive.outputs.begin();
          i != fs.derive.outputs.end(); i++)
     {
-        debug(format("building %1% in %2%") % (string) i->second % i->first);
+        debug(format("building %1% in `%2%'") % (string) i->second % i->first);
         outPaths[i->first] = i->second;
         inPaths.push_back(i->first);
     }
@@ -94,7 +94,7 @@ Slice normaliseFState(FSId id, FSIdSet pending)
         try {
             expandId(i->second, i->first, "/", pending);
         } catch (Error & e) {
-            debug(format("fast build failed: %1%") % e.what());
+            debug(format("fast build failed for %1%") % e.what());
             fastBuild = false;
             break;
         }
@@ -109,12 +109,12 @@ Slice normaliseFState(FSId id, FSIdSet pending)
                 throw Error(format("path `%1%' exists") % i->first);
 
         /* Run the builder. */
-        debug(format("building..."));
+        msg(lvlChatty, format("building..."));
         runProgram(fs.derive.builder, env);
-        debug(format("build completed"));
+        msg(lvlChatty, format("build completed"));
         
     } else
-        debug(format("skipping build"));
+        msg(lvlChatty, format("fast build succesful"));
 
     /* Check whether the output paths were created, and register each
        one. */
@@ -167,7 +167,7 @@ Slice normaliseFState(FSId id, FSIdSet pending)
 
     fs.type = FState::fsSlice;
     ATerm nf = unparseFState(fs);
-    debug(format("normal form: %1%") % printTerm(nf));
+    msg(lvlVomit, format("normal form: %1%") % printTerm(nf));
     storeSuccessor(id, nf);
 
     return fs.slice;
@@ -206,7 +206,7 @@ void realiseSlice(const Slice & slice, FSIdSet pending)
          i != slice.elems.end(); i++)
     {
         SliceElem elem = *i;
-        debug(format("expanding %1% in %2%") % (string) elem.id % elem.path);
+        debug(format("expanding %1% in `%2%'") % (string) elem.id % elem.path);
         expandId(elem.id, elem.path, "/", pending);
     }
 }

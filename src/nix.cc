@@ -307,16 +307,8 @@ void run(Strings args)
             op = opVerify;
         else if (arg == "--path" || arg == "-p")
             pathArgs = true;
-        else if (arg == "--verbose" || arg == "-v") {
-            if (it == args.end()) throw UsageError(
-                format("`%1%' requires an argument") % arg);
-            istringstream str(*it++);
-            int lvl;
-            str >> lvl;
-            if (str.fail()) throw UsageError(
-                format("`%1%' requires an integer argument") % arg);
-            verbosity = (Verbosity) lvl;
-        }
+        else if (arg == "--verbose" || arg == "-v")
+            verbosity = (Verbosity) ((int) verbosity + 1);
         else if (arg[0] == '-')
             opFlags.push_back(arg);
         else

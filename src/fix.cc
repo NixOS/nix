@@ -118,7 +118,6 @@ Hash hashPackage(EvalState & state, FState fs)
             *i = j->second;
         }
     }
-    debug(printTerm(unparseFState(fs)));
     return hashTerm(unparseFState(fs));
 }
 
@@ -176,6 +175,10 @@ static Expr evalExpr2(EvalState & state, Expr e)
         Hash pkgHash = hashPackage(state, fs);
         FSId pkgId = writeTerm(unparseFState(fs), "");
         state.pkgHashes[pkgId] = pkgHash;
+
+        msg(lvlChatty, format("copied `%1%' -> %2%")
+            % srcPath % (string) pkgId);
+
         return ATmake("FSId(<str>)", ((string) pkgId).c_str());
     }
 
@@ -244,7 +247,6 @@ static Expr evalExpr2(EvalState & state, Expr e)
             canonPath(nixStore + "/" + ((string) outId).c_str() + "-" + name);
         fs.derive.env.push_back(StringPair("out", outPath));
         fs.derive.outputs.push_back(DeriveOutput(outPath, outId));
-        debug(format("%1%: %2%") % (string) outId % name);
 
         /* Write the resulting term into the Nix store directory. */
         Hash pkgHash = outIdGiven
@@ -252,6 +254,10 @@ static Expr evalExpr2(EvalState & state, Expr e)
             : hashPackage(state, fs);
         FSId pkgId = writeTerm(unparseFState(fs), "-d-" + name);
         state.pkgHashes[pkgId] = pkgHash;
+
+        msg(lvlChatty, format("instantiated `%1%' -> %2%")
+            % name % (string) pkgId);
+
         return ATmake("FSId(<str>)", ((string) pkgId).c_str());
     }
 
@@ -285,6 +291,7 @@ static Expr evalExpr(EvalState & state, Expr e)
 static Expr evalFile(EvalState & state, string relPath)
 {
     string path = searchPath(state.searchDirs, relPath);
+    Nest nest(lvlTalkative, format("evaluating file `%1%'") % path);
     Expr e = ATreadFromNamedFile(path.c_str());
     if (!e) 
         throw Error(format("unable to read a term from `%1%'") % path);
@@ -310,16 +317,8 @@ void run(Strings args)
                 throw UsageError(format("argument required in `%1%'") % arg);
             state.searchDirs.push_back(*it++);
         }
-        else if (arg == "--verbose" || arg == "-v") {
-            if (it == args.end()) throw UsageError(
-                format("`%1%' requires an argument") % arg);
-            istringstream str(*it++);
-            int lvl;
-            str >> lvl;
-            if (str.fail()) throw UsageError(
-                format("`%1%' requires an integer argument") % arg);
-            verbosity = (Verbosity) lvl;
-        }
+        else if (arg == "--verbose" || arg == "-v")
+            verbosity = (Verbosity) ((int) verbosity + 1);
         else if (arg[0] == '-')
             throw UsageError(format("unknown flag `%1%`") % arg);
         else

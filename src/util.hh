@@ -73,10 +73,11 @@ void deletePath(string path);
 /* Messages. */
 
 typedef enum { 
-    lvlError = 0, 
-    lvlNormal = 5,
-    lvlDebug = 10,
-    lvlDebugMore = 15
+    lvlError, 
+    lvlTalkative,
+    lvlChatty,
+    lvlDebug,
+    lvlVomit
 } Verbosity;
 
 extern Verbosity verbosity; /* supress msgs > this */
@@ -91,7 +92,7 @@ public:
 };
 
 void msg(Verbosity level, const format & f);
-void debug(const format & f); /* shorthand */
+void debug(const format & f); /* short-hand for msg(lvlDebug, ...) */
 
 
 /* Wrappers arount read()/write() that read/write exactly the

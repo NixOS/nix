@@ -130,7 +130,7 @@ void deletePath(string path)
 }
 
 
-Verbosity verbosity = lvlNormal;
+Verbosity verbosity = lvlError;
 
 static int nestingLevel = 0;
 
@@ -165,7 +165,7 @@ void msg(Verbosity level, const format & f)
 
 void debug(const format & f)
 {
-    msg(lvlDebug, format("debug: %1%") % f.str());
+    msg(lvlDebug, f);
 }
 
 

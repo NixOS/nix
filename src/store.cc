@@ -167,7 +167,6 @@ bool isInPrefix(const string & path, const string & _prefix)
 string expandId(const FSId & id, const string & target,
     const string & prefix, FSIdSet pending)
 {
-    debug(format("expanding %1%") % (string) id);
     Nest nest(lvlDebug, format("expanding %1%") % (string) id);
 
     Strings paths;
