@@ -8,4 +8,4 @@ install-exec-local:
 
 include ../../substitute.mk
 
-EXTRA_DIST = default.nix unpack.sh.in
+EXTRA_DIST = unpack.nix unpack.sh.in
