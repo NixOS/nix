@@ -64,3 +64,45 @@ tr.y > td.dummy > div.dummy
     border-left: 3px solid #6185a0;
     border-bottom: 3px solid #6185a0;
 }
+
+
+em.storeref
+{
+    color: #500000;
+}
+
+
+em.storeref:hover
+{
+    background-color: #eeeeee;
+}
+
+
+*.popup {
+    display: none;
+/*    background: url('http://losser.st-lab.cs.uu.nl/~mbravenb/menuback.png') repeat; */
+    background: #ffffcd;
+    border: solid #555555 1px;
+    position: absolute;
+    top: 1.5em;
+    left: 0.5em;
+    margin: 0;
+    padding: 0;
+    z-index: 100;
+}
+
+
+em.storeref {
+    position: static;
+}
+
+
+span.z {
+    position: absolute;
+    width: 100%;
+}
+
+
+em.storeref:hover > span.z > *.popup {
+    display: block;
+}

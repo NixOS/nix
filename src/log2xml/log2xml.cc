@@ -35,12 +35,7 @@ void Decoder::pushChar(char c)
                 state = stEscape;
             } else if (c == '\n') {
                 finishLine();
-            } else if (c == '<')
-                line += "&lt;";
-            else if (c == '&')
-                line += "&amp;";
-            else
-                line += c;
+            } else line += c;
             break;
 
         case stEscape:
@@ -78,9 +73,43 @@ void Decoder::pushChar(char c)
 
 void Decoder::finishLine()
 {
+    string storeDir = "/nix/store/";
+    int sz = storeDir.size();
     string tag = inHeader ? "head" : "line";
     cout << "<" << tag << ">";
-    cout << line;
+
+    for (int i = 0; i < line.size(); i++) {
+
+        if (line[i] == '<') cout << "&lt;";
+        else if (line[i] == '&') cout << "&amp;";
+        else if (i + sz + 33 < line.size() &&
+            string(line, i, sz) == storeDir &&
+            line[i + sz + 32] == '-')
+        {
+            int j = i + sz + 32;
+            /* skip name */
+            while (!strchr("/\n\r\t ()[]:;?<>", line[j])) j++;
+            int k = j;
+            while (!strchr("\n\r\t ()[]:;?<>", line[k])) k++;
+            // !!! escaping
+            cout << "<storeref>"
+                 << "<storedir>"
+                 << string(line, i, sz)
+                 << "</storedir>"
+                 << "<hash>"
+                 << string(line, i + sz, 32)
+                 << "</hash>"
+                 << "<name>"
+                 << string(line, i + sz + 32, j - (i + sz + 32))
+                 << "</name>"
+                 << "<path>"
+                 << string(line, j, k - j)
+                 << "</path>"
+                 << "</storeref>";
+            i = k - 1;
+        } else cout << line[i];
+    }
+    
     cout << "</" << tag << ">" << endl;
     line = "";
     inHeader = false;
