@@ -319,6 +319,9 @@ void setReferences(const Transaction & txn, const Path & storePath,
 
     Paths oldReferences;
     nixDB.queryStrings(txn, dbReferences, storePath, oldReferences);
+
+    PathSet oldReferences2(oldReferences.begin(), oldReferences.end());
+    if (oldReferences2 == references) return;
     
     nixDB.setStrings(txn, dbReferences, storePath,
         Paths(references.begin(), references.end()));
@@ -454,6 +457,9 @@ void registerSubstitute(const Transaction & txn,
     
     Substitutes subs = readSubstitutes(txn, srcPath);
 
+    if (find(subs.begin(), subs.end(), sub) != subs.end())
+        return;
+
     /* New substitutes take precedence over old ones.  If the
        substitute is already present, it's moved to the front. */
     remove(subs.begin(), subs.end(), sub);
@@ -469,6 +475,9 @@ Substitutes querySubstitutes(const Transaction & txn, const Path & srcPath)
 }
 
 
+static void invalidatePath(Transaction & txn, const Path & path);
+
+
 void clearSubstitutes()
 {
     Transaction txn(nixDB);
@@ -477,10 +486,20 @@ void clearSubstitutes()
     Paths subKeys;
     nixDB.enumTable(txn, dbSubstitutes, subKeys);
     for (Paths::iterator i = subKeys.begin(); i != subKeys.end(); ++i) {
+        
         /* Delete all substitutes for path *i. */
         nixDB.delPair(txn, dbSubstitutes, *i);
+        
+        /* Maintain the cleanup invariant. */
+        if (!isValidPathTxn(txn, *i))
+            invalidatePath(txn, *i);
     }
 
+    /* !!! there should be no referers to any of the invalid
+       substitutable paths.  This should be the case by construction
+       (the only referers can be other invalid substitutable paths,
+       which have all been removed now). */
+    
     txn.commit();
 }
 
@@ -541,7 +560,7 @@ void registerValidPath(const Transaction & txn,
 
 /* Invalidate a path.  The caller is responsible for checking that
    there are no referers. */
-static void invalidatePath(const Path & path, Transaction & txn)
+static void invalidatePath(Transaction & txn, const Path & path)
 {
     debug(format("unregistering path `%1%'") % path);
 
@@ -673,7 +692,7 @@ void deleteFromStore(const Path & _path)
             (referers.size() == 1 &&
                 *referers.begin() != path))
             throw Error(format("cannot delete path `%1%' because it is in use") % path);
-        invalidatePath(path, txn);
+        invalidatePath(txn, path);
     }
     txn.commit();
 
@@ -692,10 +711,10 @@ void verifyStore(bool checkContents)
     for (Paths::iterator i = paths.begin(); i != paths.end(); ++i) {
         if (!pathExists(*i)) {
             printMsg(lvlError, format("path `%1%' disappeared") % *i);
-            invalidatePath(*i, txn);
+            invalidatePath(txn, *i);
         } else if (!isStorePath(*i)) {
             printMsg(lvlError, format("path `%1%' is not in the Nix store") % *i);
-            invalidatePath(*i, txn);
+            invalidatePath(txn, *i);
         } else {
             if (checkContents) {
                 Hash expected = queryHash(txn, *i);
