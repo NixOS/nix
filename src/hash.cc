@@ -6,14 +6,12 @@ extern "C" {
 #include <iostream>
 
 
-/* Create a zeroed hash object. */
 Hash::Hash()
 {
     memset(hash, 0, sizeof(hash));
 }
 
 
-/* Check whether two hash are equal. */
 bool Hash::operator == (Hash & h2)
 {
     for (unsigned int i = 0; i < hashSize; i++)
@@ -22,14 +20,12 @@ bool Hash::operator == (Hash & h2)
 }
 
 
-/* Check whether two hash are not equal. */
 bool Hash::operator != (Hash & h2)
 {
     return !(*this == h2);
 }
 
 
-/* Convert a hash code into a hexadecimal representation. */
 Hash::operator string() const
 {
     ostringstream str;
@@ -42,7 +38,6 @@ Hash::operator string() const
 }
 
     
-/* Parse a hexadecimal representation of a hash code. */
 Hash parseHash(const string & s)
 {
     Hash hash;
@@ -61,7 +56,6 @@ Hash parseHash(const string & s)
 }
 
 
-/* Verify that a reference is valid (that is, is a MD5 hash code). */
 bool isHash(const string & s)
 {
     if (s.length() != 32) return false;
@@ -75,7 +69,6 @@ bool isHash(const string & s)
 }
 
 
-/* Compute the MD5 hash of a file. */
 Hash hashString(const string & s)
 {
     Hash hash;
@@ -84,7 +77,6 @@ Hash hashString(const string & s)
 }
 
 
-/* Compute the MD5 hash of a file. */
 Hash hashFile(const string & fileName)
 {
     Hash hash;
