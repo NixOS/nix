@@ -25,7 +25,6 @@ make
 %install
 rm -rf $RPM_BUILD_ROOT
 make DESTDIR=$RPM_BUILD_ROOT install
-(cd src/nix-store && make DESTDIR=$RPM_BUILD_ROOT init-state-local)
 strip $RPM_BUILD_ROOT/%{_prefix}/bin/* || true
 
 %clean

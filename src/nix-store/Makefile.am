@@ -11,10 +11,3 @@ main.o: help.txt.hh
 
 AM_CXXFLAGS = \
  -I.. ${bdb_include} $(aterm_include) -I../libutil -I../libstore -I../libmain
-
-init-state-local:
-	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix
-	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix/db
-	$(INSTALL) -d $(DESTDIR)$(localstatedir)/log/nix
-	$(INSTALL) -d $(DESTDIR)$(prefix)/store
-#	$(bindir)/nix-store --init

@@ -10,3 +10,16 @@ rpm: nix.spec dist
 
 relname:
 	echo -n $(distdir) > relname
+
+install-data-local: init-state
+
+if INIT_STATE
+init-state:
+	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix
+	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix/db
+	$(INSTALL) -d $(DESTDIR)$(localstatedir)/log/nix
+	$(INSTALL) -d $(DESTDIR)$(prefix)/store
+#	$(bindir)/nix-store --init
+else
+init-state:
+endif
