@@ -1,3 +1,4 @@
 #! /bin/sh
 
-bunzip2 < $nar | /tmp/nix/bin/nix --restore "$out" || exit 1
+echo "unpacking $nar to $out..."
+bunzip2 < $nar | /nix/bin/nix --restore "$out" || exit 1
