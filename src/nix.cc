@@ -13,42 +13,14 @@ typedef void (* Operation) (Strings opFlags, Strings opArgs);
 static bool pathArgs = false;
 
 
-/* Nix syntax:
+static void printHelp()
+{
+    cout <<
+#include "nix-help.txt.hh"
+        ;
+    exit(0);
+}
 
-   nix [OPTIONS...] [ARGUMENTS...]
-
-   Operations:
-
-     --install / -i: realise an fstate
-     --delete / -d: delete paths from the Nix store
-     --add / -A: copy a path to the Nix store
-     --query / -q: query information
-
-     --successor: register a successor expression
-     --substitute: register a substitute expression
-
-     --dump: dump a path as a Nix archive
-     --restore: restore a path from a Nix archive
-
-     --init: initialise the Nix database
-     --verify: verify Nix structures
-
-     --version: output version information
-     --help: display help
-
-   Source selection for --install, --dump:
-
-     --path / -p: by file name  !!! -> path
-
-   Query flags:
-
-     --list / -l: query the output paths (roots) of an fstate 
-     --refs / -r: query paths referenced by an fstate
-
-   Options:
-
-     --verbose / -v: verbose operation
-*/
 
 
 static FSId argToId(const string & arg)
@@ -104,10 +76,17 @@ static void opAdd(Strings opFlags, Strings opArgs)
 }
 
 
+string dotQuote(const string & s)
+{
+    return "\"" + s + "\"";
+}
+
+
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qList, qRefs, qGenerators, qExpansion } query = qList;
+    enum { qList, qRefs, qGenerators, qExpansion, qGraph 
+    } query = qList;
 
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); i++)
@@ -115,6 +94,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--refs" || *i == "-r") query = qRefs;
         else if (*i == "--generators" || *i == "-g") query = qGenerators;
         else if (*i == "--expansion" || *i == "-e") query = qExpansion;
+        else if (*i == "--graph") query = qGraph;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
     switch (query) {
@@ -167,6 +147,60 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 /* !!! should not use substitutes; this is a query,
                    it should not have side-effects */
                 cout << format("%s\n") % expandId(parseHash(*i));
+            break;
+        }
+
+        case qGraph: {
+
+            FSIds workList;
+
+            for (Strings::iterator i = opArgs.begin();
+                 i != opArgs.end(); i++)
+                workList.push_back(argToId(*i));
+
+            FSIdSet doneSet;
+            
+            cout << "digraph G {\n";
+
+            while (!workList.empty()) {
+                FSId id = workList.front();
+                workList.pop_front();
+
+                if (doneSet.find(id) == doneSet.end()) {
+                    doneSet.insert(id);
+                    
+                    FState fs = parseFState(termFromId(id));
+
+                    string label;
+                    
+                    if (fs.type == FState::fsDerive) {
+                        for (FSIds::iterator i = fs.derive.inputs.begin();
+                             i != fs.derive.inputs.end(); i++)
+                        {
+                            workList.push_back(*i);
+                            cout << dotQuote(*i) << " -> "
+                                 << dotQuote(id) << ";\n";
+                        }
+
+                        label = "derive";
+                        for (StringPairs::iterator i = fs.derive.env.begin();
+                             i != fs.derive.env.end(); i++)
+                            if (i->first == "name") label = i->second;
+                    }
+
+                    else if (fs.type == FState::fsSlice) {
+                        label = baseNameOf((*fs.slice.elems.begin()).path);
+                    }
+
+                    else abort();
+
+                    cout << dotQuote(id) << "[label = "
+                         << dotQuote(label)
+                         << "];\n";
+                }
+            }
+
+            cout << "}\n";
             break;
         }
 
@@ -309,6 +343,8 @@ void run(Strings args)
             pathArgs = true;
         else if (arg == "--verbose" || arg == "-v")
             verbosity = (Verbosity) ((int) verbosity + 1);
+        else if (arg == "--help")
+            printHelp();
         else if (arg[0] == '-')
             opFlags.push_back(arg);
         else

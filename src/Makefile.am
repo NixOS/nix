@@ -33,6 +33,13 @@ libshared_a_CXXFLAGS = \
  -DNIX_LOG_DIR=\"$(localstatedir)/log/nix\" \
  $(AM_CXXFLAGS)
 
+nix.o: nix-help.txt.hh
+
+%.hh: %
+	echo -n '"' > $@
+	sed 's|\(.*\)|\1\\n\\|' < $< >> $@
+	echo '"' >> $@
+
 install-data-local:
 	$(INSTALL) -d $(localstatedir)/nix
 	$(INSTALL) -d $(localstatedir)/nix/links

@@ -1,0 +1,36 @@
+nix [OPTIONS...] [ARGUMENTS...]
+
+Operations:
+
+  --install / -i: realise an fstate
+  --delete / -d: delete paths from the Nix store
+  --add / -A: copy a path to the Nix store
+  --query / -q: query information
+
+  --successor: register a successor expression
+  --substitute: register a substitute expression
+
+  --dump: dump a path as a Nix archive
+  --restore: restore a path from a Nix archive
+
+  --init: initialise the Nix database
+  --verify: verify Nix structures
+
+  --version: output version information
+  --help: display help
+
+Source selection for --install, --dump:
+
+  --path / -p: by file name  !!! -> path
+
+Query flags:
+
+  --list / -l: query the output paths (roots) of an fstate (default)
+  --refs / -r: query paths referenced by an fstate
+  --generators / -g: find expressions producing a subset of given ids
+  --expansion / -e: print a path containing id
+  --graph: print a dot graph rooted at given ids
+
+Options:
+
+  --verbose / -v: verbose operation (may be repeated)
