@@ -12,8 +12,8 @@ bool lockFile(int fd, LockType lockType, bool wait);
 class PathLocks 
 {
 private:
-    list<int> fds;
-    Paths paths;
+    typedef pair<int, Path> FDPair;
+    list<FDPair> fds;
     bool deletePaths;
 
 public:

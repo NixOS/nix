@@ -61,7 +61,7 @@ PathLocks::PathLocks(const PathSet & paths)
 void PathLocks::lockPaths(const PathSet & _paths)
 {
     /* May be called only once! */
-    assert(this->paths.empty());
+    assert(fds.empty());
     
     /* Note that `fds' is built incrementally so that the destructor
        will only release those locks that we have already acquired. */
@@ -83,20 +83,38 @@ void PathLocks::lockPaths(const PathSet & _paths)
             debug(format("already holding lock on `%1%'") % lockPath);
             continue;
         }
+
+        AutoCloseFD fd;
         
-        /* Open/create the lock file. */
-        int fd = open(lockPath.c_str(), O_WRONLY | O_CREAT, 0666);
-        if (fd == -1)
-            throw SysError(format("opening lock file `%1%'") % lockPath);
+        while (1) {
+        
+            /* Open/create the lock file. */
+            fd = open(lockPath.c_str(), O_WRONLY | O_CREAT, 0666);
+            if (fd == -1)
+                throw SysError(format("opening lock file `%1%'") % lockPath);
 
-        fds.push_back(fd);
-        this->paths.push_back(lockPath);
+            /* Acquire an exclusive lock. */
+            lockFile(fd, ltWrite, true);
 
-        /* Acquire an exclusive lock. */
-        lockFile(fd, ltWrite, true);
+            debug(format("lock acquired on `%1%'") % lockPath);
 
-        debug(format("lock acquired on `%1%'") % lockPath);
+            /* Check that the lock file hasn't become stale (i.e.,
+               hasn't been unlinked). */
+            struct stat st;
+            if (fstat(fd, &st) == -1)
+                throw SysError(format("statting lock file `%1%'") % lockPath);
+            if (st.st_size != 0)
+                /* This lock file has been unlinked, so we're holding
+                   a lock on a deleted file.  This means that other
+                   processes may create and acquire a lock on
+                   `lockPath', and proceed.  So we must retry. */
+                debug(format("open lock file `%1%' has become stale") % lockPath);
+            else
+                break;
+        }
 
+        /* Use borrow so that the descriptor isn't closed. */
+        fds.push_back(FDPair(fd.borrow(), lockPath));
         lockedPaths.insert(lockPath);
     }
 }
@@ -104,19 +122,22 @@ void PathLocks::lockPaths(const PathSet & _paths)
 
 PathLocks::~PathLocks()
 {
-    for (list<int>::iterator i = fds.begin(); i != fds.end(); i++)
-        if (close(*i) != 0) throw SysError("closing fd");
-
-    for (Paths::iterator i = paths.begin(); i != paths.end(); i++) {
-        checkInterrupt();
+    for (list<FDPair>::iterator i = fds.begin(); i != fds.end(); i++) {
         if (deletePaths) {
-            /* This is not safe in general! */
-            unlink(i->c_str());
+            /* Write a (meaningless) token to the file to indicate to
+               other processes waiting on this lock that the lock is
+               stale (deleted). */
+            if (write(i->first, "d", 1) == 1) {
+                unlink(i->second.c_str());
+            }
             /* Note that the result of unlink() is ignored; removing
                the lock file is an optimisation, not a necessity. */
         }
-        lockedPaths.erase(*i);
-        debug(format("lock released on `%1%'") % *i);
+        lockedPaths.erase(i->second);
+        if (close(i->first) == -1)
+            printMsg(lvlError,
+                format("error (ignored): cannot close lock file on `%1%'") % i->second);
+        debug(format("lock released on `%1%'") % i->second);
     }
 }
 

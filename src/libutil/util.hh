@@ -184,6 +184,7 @@ public:
     operator int();
     void close();
     bool isOpen();
+    int borrow();
 };
 
 

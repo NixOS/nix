@@ -415,6 +415,15 @@ bool AutoCloseFD::isOpen()
 }
 
 
+/* Pass responsibility for closing this fd to the caller. */
+int AutoCloseFD::borrow()
+{
+    int oldFD = fd;
+    fd = -1;
+    return oldFD;
+}
+
+
 void Pipe::create()
 {
     int fds[2];
