@@ -40,9 +40,5 @@ PathSet storeExprRoots(const Path & nePath);
 PathSet storeExprRequisites(const Path & nePath,
     bool includeExprs, bool includeSuccessors);
 
-/* Return the list of the paths of all known store expressions whose
-   output paths are completely contained in the set `outputs'. */
-PathSet findGenerators(const PathSet & outputs);
-
 
 #endif /* !__NORMALISE_H */

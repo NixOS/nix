@@ -388,7 +388,7 @@ static void invalidatePath(const Path & path, Transaction & txn)
                 subs2.push_back(*j);
             else
                 found = true;
-        if (!found) throw Error("integrity error in substitutes mapping");
+        // !!!        if (!found) throw Error("integrity error in substitutes mapping");
         writeSubstitutes(txn, *i, subs);
 
 	/* If path *i now has no substitutes left, and is not valid,

@@ -3,6 +3,7 @@
 
 #include "globals.hh"
 #include "normalise.hh"
+#include "gc.hh"
 #include "archive.hh"
 #include "shared.hh"
 #include "dotgraph.hh"
@@ -29,17 +30,6 @@ static void opRealise(Strings opFlags, Strings opArgs)
         Path nfPath = realiseStoreExpr(*i);
         cout << format("%1%\n") % (string) nfPath;
     }
-}
-
-
-/* Delete a path in the Nix store directory. */
-static void opDelete(Strings opFlags, Strings opArgs)
-{
-    if (!opFlags.empty()) throw UsageError("unknown flag");
-
-    for (Strings::iterator it = opArgs.begin();
-         it != opArgs.end(); it++)
-        deleteFromStore(*it);
 }
 
 
@@ -220,6 +210,60 @@ static void opIsValid(Strings opFlags, Strings opArgs)
 }
 
 
+static void opGC(Strings opFlags, Strings opArgs)
+{
+    if (opFlags.size() != 1) throw UsageError("missing flag");
+    if (!opArgs.empty())
+        throw UsageError("no arguments expected");
+
+    /* Do what? */
+    string flag = opFlags.front();
+    enum { soPrintLive, soPrintDead, soDelete } subOp;
+    if (flag == "--print-live") subOp = soPrintLive;
+    else if (flag == "--print-dead") subOp = soPrintDead;
+    else if (flag == "--delete") subOp = soDelete;
+    else throw UsageError(format("bad sub-operation `%1% in GC") % flag);
+        
+    Paths roots;
+    while (1) {
+        Path root;
+        getline(cin, root);
+        if (cin.eof()) break;
+        roots.push_back(root);
+    }
+
+    PathSet live = findLivePaths(roots);
+
+    if (subOp == soPrintLive) {
+        for (PathSet::iterator i = live.begin(); i != live.end(); ++i)
+            cout << *i << endl;
+        return;
+    }
+
+    PathSet dead = findDeadPaths(live);
+
+    if (subOp == soPrintDead) {
+        for (PathSet::iterator i = dead.begin(); i != dead.end(); ++i)
+            cout << *i << endl;
+        return;
+    }
+
+    if (subOp == soDelete) {
+
+        /* !!! What happens if the garbage collector run is aborted
+           halfway through?  In particular, dead paths can always
+           become live again (through re-instantiation), and might
+           then refer to deleted paths. => check instantiation
+           invariants */
+
+        for (PathSet::iterator i = dead.begin(); i != dead.end(); ++i) {
+            printMsg(lvlInfo, format("deleting `%1%'") % *i);
+            deleteFromStore(*i);
+        }
+    }
+}
+
+
 /* A sink that writes dump output to stdout. */
 struct StdoutSink : DumpSink
 {
@@ -298,8 +342,6 @@ void run(Strings args)
 
         if (arg == "--realise" || arg == "-r")
             op = opRealise;
-        else if (arg == "--delete" || arg == "-d")
-            op = opDelete;
         else if (arg == "--add" || arg == "-A")
             op = opAdd;
         else if (arg == "--query" || arg == "-q")
@@ -312,6 +354,8 @@ void run(Strings args)
             op = opValidPath;
         else if (arg == "--isvalid")
             op = opIsValid;
+        else if (arg == "--gc")
+            op = opGC;
         else if (arg == "--dump")
             op = opDump;
         else if (arg == "--restore")
