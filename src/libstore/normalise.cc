@@ -164,10 +164,10 @@ public:
     /* Registers / unregisters a running child process. */
     void childStarted(GoalPtr goal, pid_t pid, int fdOutput,
         bool inBuildSlot);
-    void childTerminated(pid_t pid);
+    void childTerminated(pid_t pid, bool wakeSleepers = true);
 
     /* Add a goal to the set of goals waiting for a build slot. */
-    void waitForBuildSlot(GoalPtr goal);
+    void waitForBuildSlot(GoalPtr goal, bool reallyWait = false);
     
     /* Loop until the specified top-level goal has finished.  Returns
        true if it has finished succesfully. */
@@ -225,7 +225,7 @@ void Goal::waiteeDone(GoalPtr waitee, bool success)
             goal->waiters = waiters2;
         }
         waitees.clear();
-        
+
         worker.wakeUp(shared_from_this());
     }
 }
@@ -553,7 +553,7 @@ void NormalisationGoal::tryToBuild()
                 return;
             case rpPostpone:
                 /* Not now; wait until at least one child finishes. */
-                worker.waitForBuildSlot(shared_from_this());
+                worker.waitForBuildSlot(shared_from_this(), true);
                 return;
             case rpDecline:
                 /* We should do it ourselves. */
@@ -813,7 +813,7 @@ void NormalisationGoal::terminateBuildHook()
     debug("terminating build hook");
     pid_t savedPid = pid;
     pid.wait(true);
-    worker.childTerminated(savedPid);
+    worker.childTerminated(savedPid, false);
     fromHook.readSide.close();
     toHook.writeSide.close();
     fdLogFile.close();
@@ -1821,7 +1821,7 @@ void Worker::childStarted(GoalPtr goal,
 }
 
 
-void Worker::childTerminated(pid_t pid)
+void Worker::childTerminated(pid_t pid, bool wakeSleepers)
 {
     Children::iterator i = children.find(pid);
     assert(i != children.end());
@@ -1833,21 +1833,29 @@ void Worker::childTerminated(pid_t pid)
 
     children.erase(pid);
 
-    /* Wake up goals waiting for a build slot. */
-    for (WeakGoals::iterator i = wantingToBuild.begin();
-         i != wantingToBuild.end(); ++i)
-    {
-        GoalPtr goal = i->lock();
-        if (goal) wakeUp(goal);
+    if (wakeSleepers) {
+        
+        /* Wake up goals waiting for a build slot. */
+        for (WeakGoals::iterator i = wantingToBuild.begin();
+             i != wantingToBuild.end(); ++i)
+        {
+            GoalPtr goal = i->lock();
+            if (goal) wakeUp(goal);
+        }
+
+        wantingToBuild.clear();
+        
     }
-    wantingToBuild.clear();
 }
 
 
-void Worker::waitForBuildSlot(GoalPtr goal)
+void Worker::waitForBuildSlot(GoalPtr goal, bool reallyWait)
 {
     debug("wait for build slot");
-    if (canBuildMore())
+    if (reallyWait && children.size() == 0)
+        throw Error("waiting for a build slot, yet there are no children - "
+            "maybe the build hook gave an inappropriate `postpone' reply?");
+    if (!reallyWait && canBuildMore())
         wakeUp(goal); /* we can do it right away */
     else
         wantingToBuild.insert(goal);
@@ -1981,7 +1989,7 @@ Path realiseStoreExpr(const Path & nePath)
 
     Worker worker;
     if (!worker.run(worker.makeRealisationGoal(nePath)))
-        throw Error(format("realisation of store expressions `%1%' failed") % nePath);
+        throw Error(format("realisation of store expression `%1%' failed") % nePath);
 
     return queryNormalForm(nePath);
 }
