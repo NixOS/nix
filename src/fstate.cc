@@ -217,6 +217,9 @@ static void parseIds(ATermList ids, FSIds & out)
 }
 
 
+static void checkSlice(const Slice & slice);
+
+
 /* Parse a slice. */
 static Slice parseSlice(FState fs)
 {
@@ -241,6 +244,8 @@ static Slice parseSlice(FState fs)
         slice.elems.push_back(elem);
         elems = ATgetNext(elems);
     }
+
+    checkSlice(slice);
 
     return slice;
 }
@@ -414,6 +419,9 @@ static Slice normaliseFState2(FSId id, StringSet & usedPaths)
             if ((k = inMap.find(*j)) != inMap.end()) {
                 elem.refs.push_back(k->second.id);
                 used.insert(k->second.id);
+                for (FSIds::iterator m = k->second.refs.begin();
+                     m != k->second.refs.end(); m++)
+                    used.insert(*m);
             } else if ((l = outPaths.find(*j)) != outPaths.end()) {
                 elem.refs.push_back(l->second);
                 used.insert(l->second);
@@ -441,6 +449,8 @@ static Slice normaliseFState2(FSId id, StringSet & usedPaths)
     storeSuccessor(id, nf, &fsPath);
     usedPaths.insert(fsPath);
 
+    parseSlice(nf); /* check */
+
     return slice;
 }
 
@@ -460,10 +470,7 @@ static void checkSlice(const Slice & slice)
     FSIdSet decl;
     for (SliceElems::const_iterator i = slice.elems.begin();
          i != slice.elems.end(); i++)
-    {
-        debug((string) i->id);
         decl.insert(i->id);
-    }
     
     for (FSIds::const_iterator i = slice.roots.begin();
          i != slice.roots.end(); i++)
@@ -483,8 +490,6 @@ void realiseSlice(const Slice & slice)
 {
     debug(format("realising slice"));
     Nest nest(true);
-
-    checkSlice(slice);
 
     /* Perhaps all paths already contain the right id? */
 
