@@ -18,6 +18,14 @@ Path normaliseNixExpr(const Path & nePath, PathSet pending = PathSet());
    its output paths through substitutes... kaboom!). */
 void realiseClosure(const Path & nePath, PathSet pending = PathSet());
 
+/* Ensure that a path exists, possibly by instantiating it by
+   realising a substitute. */
+void ensurePath(const Path & path, PathSet pending = PathSet());
+
+/* Read a Nix expression, after ensuring its existence through
+   ensurePath(). */
+NixExpr exprFromPath(const Path & path, PathSet pending = PathSet());
+
 /* Get the list of root (output) paths of the given Nix expression. */
 PathSet nixExprRoots(const Path & nePath);
 

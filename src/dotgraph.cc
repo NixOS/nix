@@ -1,4 +1,5 @@
 #include "dotgraph.hh"
+#include "normalise.hh"
 
 
 static string dotQuote(const string & s)
@@ -98,8 +99,8 @@ void printDotGraph(const PathSet & roots)
 
 	if (doneSet.find(nePath) == doneSet.end()) {
 	    doneSet.insert(nePath);
-                    
-	    NixExpr ne = parseNixExpr(termFromPath(nePath));
+
+	    NixExpr ne = exprFromPath(nePath);
 
 	    string label, colour;
                     

@@ -42,6 +42,9 @@ Paths queryPredecessors(const Path & sucPath);
 /* Register a substitute. */
 void registerSubstitute(const Path & srcPath, const Path & subPath);
 
+/* Return the substitutes expression for the given path. */
+Paths querySubstitutes(const Path & srcPath);
+
 /* Register the validity of a path. */
 void registerValidPath(const Transaction & txn, const Path & path);
 

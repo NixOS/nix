@@ -22,14 +22,6 @@ Hash hashTerm(ATerm t)
 }
 
 
-ATerm termFromPath(const Path & path)
-{
-    ATerm t = ATreadFromNamedFile(path.c_str());
-    if (!t) throw Error(format("cannot read aterm from `%1%'") % path);
-    return t;
-}
-
-
 Path writeTerm(ATerm t, const string & suffix)
 {
     /* The id of a term is its hash. */

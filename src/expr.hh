@@ -53,9 +53,6 @@ Error badTerm(const format & f, ATerm t);
 /* Hash an aterm. */
 Hash hashTerm(ATerm t);
 
-/* Read an aterm from disk. */
-ATerm termFromPath(const Path & path);
-
 /* Write an aterm to the Nix store directory, and return its path. */
 Path writeTerm(ATerm t, const string & suffix);
 

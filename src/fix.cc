@@ -299,6 +299,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
         ne.type = NixExpr::neDerivation;
         ne.derivation.platform = SYSTEM;
         string name;
+        Path outPath;
         Hash outHash;
         bool outHashGiven = false;
         bnds = ATempty;
@@ -327,6 +328,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
 
                 if (key == "build") ne.derivation.builder = s;
                 if (key == "name") name = s;
+                if (key == "outPath") outPath = s;
                 if (key == "id") { 
                     outHash = parseHash(s);
                     outHashGiven = true;
@@ -343,11 +345,13 @@ static Expr evalExpr2(EvalState & state, Expr e)
         if (name == "")
             throw badTerm("no package name specified", e);
         
-        /* Hash the Nix expression with no outputs to produce a
-           unique but deterministic path name for this package. */
+        /* Determine the output path. */
         if (!outHashGiven) outHash = hashPackage(state, ne);
-        Path outPath = 
-            canonPath(nixStore + "/" + ((string) outHash).c_str() + "-" + name);
+        if (outPath == "")
+            /* Hash the Nix expression with no outputs to produce a
+               unique but deterministic path name for this package. */
+            outPath = 
+                canonPath(nixStore + "/" + ((string) outHash).c_str() + "-" + name);
         ne.derivation.env["out"] = outPath;
         ne.derivation.outputs.insert(outPath);
 

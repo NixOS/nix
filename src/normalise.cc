@@ -122,7 +122,7 @@ Path normaliseNixExpr(const Path & _nePath, PathSet pending)
     Path nePath = useSuccessor(_nePath);
 
     /* Get the Nix expression. */
-    NixExpr ne = parseNixExpr(termFromPath(nePath));
+    NixExpr ne = exprFromPath(nePath, pending);
 
     /* If this is a normal form (i.e., a closure) we are done. */
     if (ne.type == NixExpr::neClosure) return nePath;
@@ -172,7 +172,7 @@ Path normaliseNixExpr(const Path & _nePath, PathSet pending)
     {
         Path nePath2 = useSuccessor(nePath);
         if (nePath != nePath2) {
-            NixExpr ne = parseNixExpr(termFromPath(nePath2));
+            NixExpr ne = exprFromPath(nePath2, pending);
             debug(format("skipping build of expression `%1%', someone beat us to it")
 		  % (string) nePath);
             if (ne.type != NixExpr::neClosure) abort();
@@ -193,7 +193,7 @@ Path normaliseNixExpr(const Path & _nePath, PathSet pending)
         realiseClosure(nfPath, pending);
         /* !!! nfPath should be a root of the garbage collector while
            we are building */
-        NixExpr ne = parseNixExpr(termFromPath(nfPath));
+        NixExpr ne = exprFromPath(nfPath, pending);
         if (ne.type != NixExpr::neClosure) abort();
         for (ClosureElems::iterator j = ne.closure.elems.begin();
              j != ne.closure.elems.end(); j++)
@@ -364,16 +364,49 @@ void realiseClosure(const Path & nePath, PathSet pending)
 {
     Nest nest(lvlDebug, format("realising closure `%1%'") % nePath);
 
-    NixExpr ne = parseNixExpr(termFromPath(nePath));
+    NixExpr ne = exprFromPath(nePath, pending);
     if (ne.type != NixExpr::neClosure)
         throw Error(format("expected closure in `%1%'") % nePath);
     
     for (ClosureElems::const_iterator i = ne.closure.elems.begin();
          i != ne.closure.elems.end(); i++)
-        assert(isValidPath(i->first));
-#if 0
-        expandId(i->second.id, i->first, "/", pending);
-#endif
+        ensurePath(i->first, pending);
+}
+
+
+void ensurePath(const Path & path, PathSet pending)
+{
+    /* If the path is already valid, we're done. */
+    if (isValidPath(path)) return;
+    
+    /* Otherwise, try the substitutes. */
+    Paths subPaths = querySubstitutes(path);
+
+    for (Paths::iterator i = subPaths.begin(); 
+         i != subPaths.end(); i++)
+    {
+        try {
+            normaliseNixExpr(*i, pending);
+            if (isValidPath(path)) return;
+            throw Error(format("substitute failed to produce expected output path"));
+        } catch (Error & e) {
+            msg(lvlTalkative, 
+                format("building of substitute `%1%' for `%2%' failed: %3%")
+                % *i % path % e.what());
+        }
+    }
+
+    throw Error(format("path `%1%' is required, "
+        "but there are no (successful) substitutes") % path);
+}
+
+
+NixExpr exprFromPath(const Path & path, PathSet pending)
+{
+    ensurePath(path, pending);
+    ATerm t = ATreadFromNamedFile(path.c_str());
+    if (!t) throw Error(format("cannot read aterm from `%1%'") % path);
+    return parseNixExpr(t);
 }
 
 
@@ -381,7 +414,7 @@ PathSet nixExprRoots(const Path & nePath)
 {
     PathSet paths;
 
-    NixExpr ne = parseNixExpr(termFromPath(nePath));
+    NixExpr ne = exprFromPath(nePath);
 
     if (ne.type == NixExpr::neClosure)
         paths.insert(ne.closure.roots.begin(), ne.closure.roots.end());
@@ -401,7 +434,7 @@ static void requisitesWorker(const Path & nePath,
     if (doneSet.find(nePath) != doneSet.end()) return;
     doneSet.insert(nePath);
 
-    NixExpr ne = parseNixExpr(termFromPath(nePath));
+    NixExpr ne = exprFromPath(nePath);
 
     if (ne.type == NixExpr::neClosure)
         for (ClosureElems::iterator i = ne.closure.elems.begin();

@@ -175,7 +175,8 @@ void registerSuccessor(const Transaction & txn,
 
     Paths revs;
     nixDB.queryStrings(txn, dbSuccessorsRev, sucPath, revs);
-    revs.push_back(srcPath);
+    if (find(revs.begin(), revs.end(), srcPath) == revs.end())
+        revs.push_back(srcPath);
 
     nixDB.setString(txn, dbSuccessors, srcPath, sucPath);
     nixDB.setStrings(txn, dbSuccessorsRev, sucPath, revs);
@@ -212,12 +213,21 @@ void registerSubstitute(const Path & srcPath, const Path & subPath)
 
     Paths revs;
     nixDB.queryStrings(txn, dbSubstitutesRev, subPath, revs);
-    revs.push_back(srcPath);
+    if (find(revs.begin(), revs.end(), srcPath) == revs.end())
+        revs.push_back(srcPath);
     
     nixDB.setStrings(txn, dbSubstitutes, srcPath, subs);
     nixDB.setStrings(txn, dbSubstitutesRev, subPath, revs);
 
     txn.commit();
+}
+
+
+Paths querySubstitutes(const Path & srcPath)
+{
+    Paths subPaths;
+    nixDB.queryStrings(noTxn, dbSubstitutes, srcPath, subPaths);
+    return subPaths;
 }
 
 

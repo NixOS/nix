@@ -2,11 +2,18 @@
 
 use strict;
 use IPC::Open2;
+use POSIX qw(tmpnam);
 
-my $tmpfile = "@localstatedir@/nix/pull.tmp";
+my $tmpdir;
+do { $tmpdir = tmpnam(); }
+until mkdir $tmpdir, 0777;
+
+my $manifest = "$tmpdir/manifest";
 my $conffile = "@sysconfdir@/nix/prebuilts.conf";
 
-my @ids;
+#END { unlink $manifest; rmdir $tmpdir; }
+
+my @srcpaths;
 my @subs;
 my @sucs;
 
@@ -20,69 +27,88 @@ while (<CONFFILE>) {
     chomp;
     if (/^\s*(\S+)\s*(\#.*)?$/) {
         my $url = $1;
+	$url =~ s/\/$//;
 
         print "obtaining list of Nix archives at $url...\n";
 
-        system "wget '$url' -O '$tmpfile' 2> /dev/null"; # !!! escape
+        system "wget '$url'/MANIFEST -O '$manifest' 2> /dev/null"; # !!! escape
         if ($?) { die "`wget' failed"; }
         
-        open INDEX, "<$tmpfile";
+        open MANIFEST, "<$manifest";
 
-        while (<INDEX>) {
-            # Get all links to prebuilts, that is, file names of the
-            # form foo-HASH-HASH.tar.bz2.
-            next unless (/HREF=\"([^\"]*)\"/);
-            my $fn = $1;
-            next if $fn =~ /\.\./;
-            next if $fn =~ /\//;
-            next unless $fn =~ /^([0-9a-z]{32})-([0-9a-z]{32})(.*)\.nar\.bz2$/;
-            my $hash = $1;
-            my $id = $2;
-            my $outname = $3;
-            my $fsid;
-            if ($outname =~ /^-/) {
-                next unless $outname =~ /^-((s-([0-9a-z]{32}))?.*)$/;
-                $outname = $1;
-                $fsid = $3;
-            } else {
-                $outname = "unnamed";
-            }
+	my $inside = 0;
 
-            print STDERR "$id ($outname)\n";
+	my $storepath;
+	my $narname;
+	my $hash;
+	my @preds;
 
-            # Construct a Fix expression that fetches and unpacks a
-            # Nix archive from the network.
-            my $fetch =
-              "App(IncludeFix(\"fetchurl/fetchurl.fix\"), " .
-              "[(\"url\", \"$url/$fn\"), (\"md5\", \"$hash\")])";
-            my $fixexpr = 
-                "App(IncludeFix(\"nar/unnar.fix\"), " .
-                "[ (\"nar\", $fetch)" .
-                ", (\"name\", \"$outname\")" .
-                ", (\"id\", \"$id\")" .
-                "])";
-            
-	    if (!$first) { $fullexpr .= "," };
-	    $first = 0;
-	    $fullexpr .= $fixexpr; # !!! O(n^2)?
+        while (<MANIFEST>) {
+	    chomp;
+	    s/\#.*$//g;
+	    next if (/^$/);
 
-	    push @ids, $id;
+	    if (!$inside) {
+		if (/^\{$/) { 
+		    $inside = 1;
+		    undef $storepath;
+		    undef $narname;
+		    undef $hash;
+		    @preds = ();
+		}
+		else { die "bad line: $_"; }
+	    } else {
+		if (/^\}$/) {
+		    $inside = 0;
+		    my $fullurl = "$url/$narname";
+		    print "$storepath\n";
 
-            # Does the name encode a successor relation?
-            if (defined $fsid) {
-                push @sucs, $fsid;
-                push @sucs, $id;
-            }
+		    # Construct a Fix expression that fetches and unpacks a
+		    # Nix archive from the network.
+		    my $fetch =
+			"App(IncludeFix(\"fetchurl/fetchurl.fix\"), " .
+			"[(\"url\", \"$fullurl\"), (\"md5\", \"$hash\")])";
+		    my $fixexpr = 
+			"App(IncludeFix(\"nar/unnar.fix\"), " .
+			"[ (\"nar\", $fetch)" .
+			", (\"outPath\", \"$storepath\")" .
+			"])";
+		    
+		    if (!$first) { $fullexpr .= "," };
+		    $first = 0;
+		    $fullexpr .= $fixexpr; # !!! O(n^2)?
+
+		    push @srcpaths, $storepath;
+
+		    foreach my $p (@preds) {
+			push @sucs, $p;
+			push @sucs, $storepath;
+		    }
+
+		}
+		elsif (/^\s*StorePath:\s*(\/\S+)\s*$/) {
+		    $storepath = $1;
+		}
+		elsif (/^\s*NarName:\s*(\S+)\s*$/) {
+		    $narname = $1;
+		}
+		elsif (/^\s*MD5:\s*(\S+)\s*$/) {
+		    $hash = $1;
+		}
+		elsif (/^\s*SuccOf:\s*(\/\S+)\s*$/) {
+		    push @preds, $1;
+		}
+		else { die "bad line: $_"; }
+	    }
         }
 
-        close INDEX;
-
-        unlink $tmpfile;
+        close MANIFEST;
     }
 
 }
 
 $fullexpr .= "]";
+
 
 # Instantiate Nix expressions from the Fix expressions we created above.
 print STDERR "running fix...\n";
@@ -93,23 +119,28 @@ close WRITE;
 my $i = 0;
 while (<READ>) {
     chomp;
-    die unless /^([0-9a-z]{32})$/;
-    my $nid = $1;
-    die unless ($i < scalar @ids);
-    my $id = $ids[$i++];
-    push @subs, $id;
-    push @subs, $nid;
+    die unless /^\//;
+    my $subpath = $_;
+    die unless ($i < scalar @srcpaths);
+    my $srcpath = $srcpaths[$i++];
+    push @subs, $srcpath;
+    push @subs, $subpath;
+    print "$srcpath $subpath\n";
 }
 
 waitpid $pid, 0;
 $? == 0 or die "fix failed";
 
+
 # Register all substitutes.
 print STDERR "registering substitutes...\n";
+print "@subs\n";
 system "nix --substitute @subs";
 if ($?) { die "`nix --substitute' failed"; }
 
+
 # Register all successors.
 print STDERR "registering successors...\n";
-system "nix --successor @sucs";
+print "@sucs\n";
+system "nix --successor -vvvv @sucs";
 if ($?) { die "`nix --successor' failed"; }

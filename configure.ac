@@ -1,4 +1,4 @@
-AC_INIT(nix, "0.3")
+AC_INIT(nix, "0.4")
 AC_CONFIG_SRCDIR(src/nix.cc)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE
