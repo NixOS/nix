@@ -13,24 +13,24 @@ man1_MANS = nix-env.1 nix-store.1 nix-instantiate.1 \
 
 FIGURES = figures/user-environments.png
 
-SOURCES = manual.xml introduction.xml installation.xml \
+MANUAL_SRCS = manual.xml introduction.xml installation.xml \
  package-management.xml writing-nix-expressions.xml \
  build-farm.xml \
  $(man1_MANS:.1=.xml) \
  troubleshooting.xml bugs.xml opt-common.xml opt-common-syn.xml \
  quick-start.xml nix-lang-ref.xml style.css images
 
-manual.is-valid: $(SOURCES) version.txt
+manual.is-valid: $(MANUAL_SRCS) version.txt
 	$(XMLLINT) --xinclude $< | $(XMLLINT) --noout --valid -
 	touch $@
 
 version.txt:
 	echo -n $(VERSION) > version.txt
 
-man $(MANS): $(SOURCES) manual.is-valid
+man $(MANS): $(MANUAL_SRCS) manual.is-valid
 	$(XSLTPROC) --xinclude $(docbookxsl)/manpages/docbook.xsl manual.xml
 
-manual.html: $(SOURCES) manual.is-valid images
+manual.html: $(MANUAL_SRCS) manual.is-valid images
 	$(XSLTPROC) --xinclude --output manual.html $(docbookxsl)/html/docbook.xsl manual.xml
 
 all-local: manual.html
@@ -52,6 +52,6 @@ images:
 
 KEEP = manual.html manual.is-valid version.txt $(MANS)
 
-EXTRA_DIST = $(SOURCES) $(FIGURES) $(KEEP)
+EXTRA_DIST = $(MANUAL_SRCS) $(FIGURES) $(KEEP)
 
 DISTCLEANFILES = $(KEEP)
