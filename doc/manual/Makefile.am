@@ -6,28 +6,28 @@ XSLTPROC = $(ENV) $(xsltproc) $(xmlflags) --catalogs \
  --param section.label.includes.component.label 1 \
  --param html.stylesheet \'style.css\'
 
-SOURCES = book.xml introduction.xml installation.xml overview.xml \
+SOURCES = manual.xml introduction.xml installation.xml overview.xml \
  common-options.xml nix-store.xml nix-instantiate.xml \
  troubleshooting.xml bugs.xml \
  style.css
 
-book.is-valid: $(SOURCES)
-	$(XMLLINT) --noout --valid book.xml
+manual.is-valid: $(SOURCES)
+	$(XMLLINT) --noout --valid manual.xml
 	touch $@
 
 man1_MANS = nix-store.1 nix-instantiate.1
 
-man $(MANS): $(SOURCES) book.is-valid
-	$(XSLTPROC) $(docbookxsl)/manpages/docbook.xsl book.xml
+man $(MANS): $(SOURCES) manual.is-valid
+	$(XSLTPROC) $(docbookxsl)/manpages/docbook.xsl manual.xml
 
-book.html: $(SOURCES) book.is-valid images
-	$(XSLTPROC) --output book.html $(docbookxsl)/html/docbook.xsl book.xml
+manual.html: $(SOURCES) manual.is-valid images
+	$(XSLTPROC) --output manual.html $(docbookxsl)/html/docbook.xsl manual.xml
 
-all-local: book.html
+all-local: manual.html
 
-install-data-local: book.html
+install-data-local: manual.html
 	$(INSTALL) -d $(DESTDIR)$(datadir)/nix/manual
-	$(INSTALL_DATA) book.html $(DESTDIR)$(datadir)/nix/manual
+	$(INSTALL_DATA) manual.html $(DESTDIR)$(datadir)/nix/manual
 	$(INSTALL_DATA) style.css $(DESTDIR)$(datadir)/nix/manual
 	cp -r images $(DESTDIR)$(datadir)/nix/manual/images
 
@@ -38,6 +38,6 @@ images:
 	cp $(docbookxsl)/images/callouts/*.png images/callouts
 	chmod +w -R images
 
-EXTRA_DIST = $(SOURCES) book.html book.is-valid $(MANS) 
+EXTRA_DIST = $(SOURCES) manual.html manual.is-valid $(MANS) 
 
-DISTCLEANFILES = book.html book.is-valid $(MANS)
+DISTCLEANFILES = manual.html manual.is-valid $(MANS)
