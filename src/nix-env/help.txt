@@ -22,6 +22,16 @@ name `*' may be used to indicate all derivations.
   --version: output version information
   --help: display help
 
+Install / upgrade / uninstall flags:
+
+  --dry-run: show what would be done, but don't do it
+
+Upgrade flags:
+
+  --lt: upgrade unless the current version is older (default)
+  --leq: upgrade unless the current version is older or current
+  --always: upgrade regardless of current version
+
 Query types:
 
   --name: print derivation names (default)

@@ -16,6 +16,7 @@ struct Globals
     Path profile;
     Path nixExprPath;
     EvalState state;
+    bool dryRun;
 };
 
 
@@ -201,7 +202,8 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
 
 
 static void installDerivations(EvalState & state,
-    Path nePath, DrvNames & selectors, const Path & profile)
+    Path nePath, DrvNames & selectors, const Path & profile,
+    bool dryRun)
 {
     debug(format("installing derivations from `%1%'") % nePath);
 
@@ -239,6 +241,8 @@ static void installDerivations(EvalState & state,
     queryInstalled(state, installedDrvs, profile);
     selectedDrvs.insert(installedDrvs.begin(), installedDrvs.end());
 
+    if (dryRun) return;
+
     createUserEnv(state, selectedDrvs, profile);
 }
 
@@ -252,12 +256,16 @@ static void opInstall(Globals & globals,
     DrvNames drvNames = drvNamesFromArgs(opArgs);
     
     installDerivations(globals.state, globals.nixExprPath,
-        drvNames, globals.profile);
+        drvNames, globals.profile, globals.dryRun);
 }
 
 
+typedef enum { utLt, utLeq, utAlways } UpgradeType;
+
+
 static void upgradeDerivations(EvalState & state,
-    Path nePath, DrvNames & selectors, const Path & profile)
+    Path nePath, DrvNames & selectors, const Path & profile,
+    UpgradeType upgradeType, bool dryRun)
 {
     debug(format("upgrading derivations from `%1%'") % nePath);
 
@@ -293,30 +301,50 @@ static void upgradeDerivations(EvalState & state,
             }
         }
 
+        if (!upgrade) {
+            newDrvs.insert(*i);
+            continue;
+        }
+            
         /* If yes, find the derivation in the input Nix expression
-           with the same name and the highest version number. */
-        DrvInfos::iterator bestDrv = i;
-        DrvName bestName = drvName;
-        if (upgrade) {
-            for (DrvInfos::iterator j = availDrvs.begin();
-                 j != availDrvs.end(); ++j)
-            {
-                DrvName newName(j->second.name);
-                if (newName.name == bestName.name &&
-                    compareVersions(newName.version, bestName.version) > 0)
-                    bestDrv = j;
+           with the same name and satisfying the version constraints
+           specified by upgradeType.  If there are multiple matches,
+           take the one with highest version. */
+        DrvInfos::iterator bestDrv = availDrvs.end();
+        DrvName bestName;
+        for (DrvInfos::iterator j = availDrvs.begin();
+             j != availDrvs.end(); ++j)
+        {
+            DrvName newName(j->second.name);
+            if (newName.name == drvName.name) {
+                int d = compareVersions(drvName.version, newName.version);
+                if (upgradeType == utLt && d < 0 ||
+                    upgradeType == utLeq && d <= 0 ||
+                    upgradeType == utAlways)
+                {
+                    if (bestDrv == availDrvs.end() ||
+                        compareVersions(
+                            bestName.version, newName.version) < 0)
+                    {
+                        bestDrv = j;
+                        bestName = newName;
+                    }
+                }
             }
         }
 
-        if (bestDrv != i) {
+        if (bestDrv != availDrvs.end() &&
+            i->second.drvPath != bestDrv->second.drvPath)
+        {
             printMsg(lvlInfo,
                 format("upgrading `%1%' to `%2%'")
                 % i->second.name % bestDrv->second.name);
-        }
-        
-        newDrvs.insert(*bestDrv);
+            newDrvs.insert(*bestDrv);
+        } else newDrvs.insert(*i);
     }
     
+    if (dryRun) return;
+
     createUserEnv(state, newDrvs, profile);
 }
 
@@ -324,19 +352,23 @@ static void upgradeDerivations(EvalState & state,
 static void opUpgrade(Globals & globals,
     Strings opFlags, Strings opArgs)
 {
-    if (opFlags.size() > 0)
-        throw UsageError(format("unknown flags `%1%'") % opFlags.front());
-    if (opArgs.size() < 1) throw UsageError("Nix file expected");
+    UpgradeType upgradeType = utLt;
+    for (Strings::iterator i = opFlags.begin();
+         i != opFlags.end(); ++i)
+        if (*i == "--lt") upgradeType = utLt;
+        else if (*i == "--leq") upgradeType = utLeq;
+        else if (*i == "--always") upgradeType = utAlways;
+        else throw UsageError(format("unknown flag `%1%'") % *i);
 
     DrvNames drvNames = drvNamesFromArgs(opArgs);
     
     upgradeDerivations(globals.state, globals.nixExprPath,
-        drvNames, globals.profile);
+        drvNames, globals.profile, upgradeType, globals.dryRun);
 }
 
 
 static void uninstallDerivations(EvalState & state, DrvNames & selectors,
-    Path & profile)
+    Path & profile, bool dryRun)
 {
     DrvInfos installedDrvs;
     queryInstalled(state, installedDrvs, profile);
@@ -354,6 +386,8 @@ static void uninstallDerivations(EvalState & state, DrvNames & selectors,
             }
     }
 
+    if (dryRun) return;
+
     createUserEnv(state, installedDrvs, profile);
 }
 
@@ -366,7 +400,8 @@ static void opUninstall(Globals & globals,
 
     DrvNames drvNames = drvNamesFromArgs(opArgs);
 
-    uninstallDerivations(globals.state, drvNames, globals.profile);
+    uninstallDerivations(globals.state, drvNames,
+        globals.profile, globals.dryRun);
 }
 
 
@@ -575,6 +610,7 @@ void run(Strings args)
     
     Globals globals;
     globals.nixExprPath = getDefNixExprPath();
+    globals.dryRun = false;
 
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
         string arg = *i;
@@ -611,6 +647,10 @@ void run(Strings args)
             op = opRollback;
         else if (arg == "--list-generations")
             op = opListGenerations;
+        else if (arg == "--dry-run") {
+            printMsg(lvlInfo, "(dry run; not doing anything)");
+            globals.dryRun = true;
+        }
         else if (arg[0] == '-')
             opFlags.push_back(arg);
         else

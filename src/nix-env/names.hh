@@ -14,6 +14,7 @@ struct DrvName
     string version;
     unsigned int hits;
 
+    DrvName();
     DrvName(const string & s);
     bool matches(DrvName & n);
 };

@@ -1,6 +1,12 @@
 #include "names.hh"
 
 
+DrvName::DrvName()
+{
+    name = "";
+}
+
+
 /* Parse a derivation name.  The `name' part of a derivation name is
    everything up to but not including the first dash *not* followed by
    a letter.  The `version' part is the rest (excluding the separating
