@@ -822,9 +822,58 @@ set.</para>
 
 <simplesect><title>Functions</title>
 
-<para>TODO</para>
+<para>Functions have the following form:
 
-<para>Higher-order functions; map</para>
+<programlisting>
+{<replaceable>params</replaceable>}: <replaceable>body</replaceable></programlisting>
+
+This defines a function that must be called with an attribute set
+containing the attributes listed in <replaceable>params</replaceable>,
+which is a comma-separated list of attribute names.  Optionally, for
+each parameter a <emphasis>default value</emphasis> may be specified
+by writing <literal><replaceable>param</replaceable> ?
+<replaceable>e</replaceable></literal>, where
+<replaceable>e</replaceable> is an arbitrary expression.  If a
+parameter has a default, the corresponding attribute may be omitted in
+function calls.</para>
+
+<para>Note that functions do not have names.  If you want to give them
+a name, you can bind them to an attribute, e.g.,
+
+<programlisting>
+let {
+  concat = {x, y}: x + y;
+  body = concat {x = "foo"; y = "bar";};
+}</programlisting>
+
+</para>
+
+<para>It is also possible to define a function that takes a single
+argument and that does need to be called with an attribute set as
+argument.  The syntax is
+
+<programlisting>
+<replaceable>var</replaceable>: <replaceable>body</replaceable></programlisting>
+
+where <replaceable>var</replaceable> is the name of the argument.  It
+is not possible to define a default.  Example:
+
+<programlisting>
+let {
+  negate = x: !x;
+  concat = x: y: x + y;
+  body = if negate true then concat "foo" "bar" else "";
+}</programlisting>
+
+Note that <function>concat</function> is a function that takes one
+arguments and returns a function that takes another argument.  This
+allows partial parameterisation (i.e., only filling some of the
+arguments of a function); e.g.,
+
+<programlisting>
+  map (concat "foo") ["bar", "bla", "abc"]</programlisting>
+
+evaluates to <literal>["foobar" "foobla" "fooabc"]</literal>.</para>
 
 </simplesect>
 
@@ -1059,7 +1108,157 @@ weakest binding).</para>
 
 <simplesect><title>Derivations</title>
 
-<para>TODO</para>
+<para>The most important built-in function is
+<function>derivation</function>, which is used to describe a
+single derivation (a build action).  It takes as input an attribute
+set, the attributes of which specify the inputs of the build.</para>
+
+<itemizedlist>
+
+  <listitem><para>There must be an attribute named
+  <varname>system</varname> whose value must be a string specifying a
+  Nix platform identifier, such as <literal>"i686-linux"</literal> or
+  <literal>"powerpc-darwin"</literal><footnote><para>To figure out
+  your platform identifier, look at the line <quote>Checking for the
+  canonical Nix system name</quote> in the output of Nix's
+  <filename>configure</filename> script.</para></footnote> The build
+  can only be performed on a machine and operating system matching the
+  platform identifier.  (Nix can automatically forward builds for
+  other platforms by forwarding them to other machines; see <xref
+  linkend='sec-distributed-builds' />.)</para></listitem>
+
+  <listitem><para>There must be an attribute named
+  <varname>name</varname> whose value must be a string.  This is used
+  as a symbolic name for the component by <command>nix-env</command>,
+  and it is appended to the hash in the output path of the
+  derivation.</para></listitem>
+
+  <listitem><para>There must be an attribute named
+  <varname>builder</varname> that identifies the program that is
+  executed to perform the build.  It can be either a derivation or a
+  source (a local file reference, e.g.,
+  <filename>./builder.sh</filename>).</para></listitem>
+
+  <listitem><para>Every attribute is passed as an environment variable
+  to the builder.  Attribute values are translated to environment
+  variables as follows:
+
+    <itemizedlist>
+
+      <listitem><para>Strings, URIs, and integers are just passed
+      verbatim.</para></listitem>
+
+      <listitem><para>A <emphasis>path</emphasis> (e.g.,
+      <filename>../foo/sources.tar</filename>) causes the referenced
+      file to be copied to the store; its location in the store is put
+      in the environment variable.  The idea is that all sources
+      should reside in the Nix store, since all inputs to a derivation
+      should reside in the Nix store.</para></listitem>
+
+      <listitem><para>A <emphasis>derivation</emphasis> causes that
+      derivation to be built prior to the present derivation; the
+      output path is put in the environment
+      variable.</para></listitem>
+
+      <listitem><para>Lists of the previous types are also allowed.
+      They are simply concatenated, separated by
+      spaces.</para></listitem>
+
+    </itemizedlist>
+
+  </para></listitem>
+
+  <listitem><para>The optional argument <varname>args</varname>
+  specifies command-line arguments to be passed to the builder.  It
+  should be a list.</para></listitem>
+
+</itemizedlist>
+
+<para>(Note that <function>mkDerivation</function> in the standard
+environment is a wrapper around <function>derivation</function> that
+adds a default value for <varname>system</varname> and always uses
+Bash as the builder, to which the supplied builder is passed as a
+command-line argument.  See <xref linkend='sec-standard-environment'
+/>.)</para>
+
+<para>The builder is executed as follows:
+
+<itemizedlist>
+
+  <listitem><para>A temporary directory is created under the directory
+  specified by <envar>TMPDIR</envar> (default
+  <filename>/tmp</filename>) where the build will take place.  The
+  current directory is changed to this directory.</para></listitem>
+
+  <listitem><para>The environment is cleared and set to the derivation
+  attributes, as specified above.</para></listitem>
+
+  <listitem><para>In addition, the following variables are set:
+
+  <itemizedlist>
+
+    <listitem><para><envar>NIX_BUILD_TOP</envar> contains the path of
+    the temporary directory for this build.</para></listitem>
+
+    <listitem><para>Also, <envar>TMPDIR</envar>,
+    <envar>TEMPDIR</envar>, <envar>TMP</envar>, <envar>TEMP</envar>
+    are set to point to the temporary directory.  This is to prevent
+    the builder from accidentally writing temporary files anywhere
+    else.  Doing so might cause interference by other
+    processes.</para></listitem>
+
+    <listitem><para><envar>PATH</envar> is set to
+    <filename>/path-not-set</filename> to prevent shells from
+    initialising it to their built-in default value.</para></listitem>
+
+    <listitem><para><envar>HOME</envar> is set to
+    <filename>/homeless-shelter</filename> to prevent programs from
+    using <filename>/etc/passwd</filename> or the like to find the
+    user's home directory, which could cause impurity.  Usually, when
+    <envar>HOME</envar> is set, it is used as the location of the home
+    directory, even if it points to a non-existent
+    path.</para></listitem>
+
+    <listitem><para><envar>NIX_STORE</envar> is set to the path of the
+    top-level Nix store directory (typically,
+    <filename>/nix/store</filename>).</para></listitem>
+
+    <listitem><para><envar>out</envar> is set to point to the output
+    path of the derivation, which is a subdirectory of the Nix store.
+    The output path is a concatenation of the cryptographic hash of
+    all build inputs, and the <varname>name</varname>
+    attribute.</para></listitem>
+    
+  </itemizedlist>
+
+  </para></listitem>
+
+  <listitem><para>If the output path already exists, it is removed.
+  Also, locks are acquired to prevent multiple Nix instances from
+  performing the same build at the same time.</para></listitem>
+
+  <listitem><para>A log of the combined standard output and error is
+  written to <filename>/nix/var/log/nix</filename>.</para></listitem>
+
+  <listitem><para>The builder is executed with the arguments specified
+  by the attribute <varname>args</varname>.  If it exit with exit code
+  0, it is considered to have succeeded.</para></listitem>
+
+  <listitem><para>The temporary directory is removed (unless the
+  <option>-K</option> option was specified).</para></listitem>
+
+  <listitem><para>If the build was succesful, Nix scans the output for
+  references to the paths of the inputs.  These so-called
+  <emphasis>retained dependencies</emphasis> could be used when the
+  output of the derivation is used (e.g., when it's executed or used
+  as input to another derivation), so if we deploy the derivation, we
+  should copy the retained dependencies as well.  The scan is
+  performed by looking for the hash parts of file names of the
+  inputs.</para></listitem>
+
+</itemizedlist>
+
+</para>
 
 </simplesect>
 

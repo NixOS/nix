@@ -56,7 +56,7 @@ url='https://svn.cs.uu.nl:12443/repos/trace/release/trunk' />.</para>
 </section>
 
 
-<section><title>Setting up distributed builds</title>
+<section id='sec-distributed-builds'><title>Setting up distributed builds</title>
 
 <para>You can enable distributed builds by setting the environment
 variable <envar>NIX_BUILD_HOOK</envar> to point to a program that Nix
