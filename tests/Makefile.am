@@ -30,4 +30,4 @@ EXTRA_DIST = $(TESTS) \
   dependencies.nix.in dependencies.builder*.sh \
   locking.nix.in locking.builder.sh \
   parallel.nix.in parallel.builder.sh \
-  build-hook.nix.in
+  build-hook.nix.in build-hook.hook.sh

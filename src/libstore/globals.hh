@@ -32,5 +32,8 @@ extern bool keepFailed;
 /* Verbosity level for build output. */
 extern Verbosity buildVerbosity;
 
+/* Maximum number of parallel build jobs.  0 means unlimited. */
+extern unsigned int maxBuildJobs;
+
 
 #endif /* !__GLOBALS_H */

@@ -118,16 +118,29 @@ static void initAndRun(int argc, char * * argv)
             ++i;
             if (i == args.end()) throw UsageError("`--log-type' requires an argument");
             setLogType(*i);
-        } else if (arg == "--build-output" || arg == "-B")
+        }
+        else if (arg == "--build-output" || arg == "-B")
             buildVerbosity = lvlError; /* lowest */
         else if (arg == "--help") {
             printHelp();
             return;
-        } else if (arg == "--version") {
+        }
+        else if (arg == "--version") {
             cout << format("%1% (Nix) %2%") % programId % NIX_VERSION << endl;
             return;
-        } else if (arg == "--keep-failed" || arg == "-K")
+        }
+        else if (arg == "--keep-failed" || arg == "-K")
             keepFailed = true;
+        else if (arg == "--max-jobs" || arg == "-j") {
+            ++i;
+            if (i == args.end()) throw UsageError("`--max-jobs' requires an argument");
+            istringstream str(*i);
+            int n;
+            str >> n;
+            if (!str || !str.eof() || n < 0)
+                throw UsageError(format("`--max-jobs' requires a non-negative integer"));
+            maxBuildJobs = n;
+        }
         else remaining.push_back(arg);
     }
 

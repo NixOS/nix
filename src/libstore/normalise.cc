@@ -284,6 +284,9 @@ bool Normaliser::startBuild(Path nePath)
 {
     checkInterrupt();
 
+    if (maxBuildJobs > 0 && building.size() >= maxBuildJobs)
+        return false;
+
     Goals::iterator goalIt = goals.find(nePath);
     assert(goalIt != goals.end());
     Goal & goal(goalIt->second);
@@ -414,11 +417,6 @@ bool Normaliser::startBuild(Path nePath)
             format("build hook died with status %1%") % status);
     }
 
-    /* Right platform? */
-    if (goal.expr.derivation.platform != thisSystem)
-        throw Error(format("a `%1%' is required, but I am a `%2%'")
-		    % goal.expr.derivation.platform % thisSystem);
-
     /* Otherwise, start the build in a child process. */
     startBuildChild(goal);
 
@@ -428,6 +426,11 @@ bool Normaliser::startBuild(Path nePath)
 
 void Normaliser::startBuildChild(Goal & goal)
 {
+    /* Right platform? */
+    if (goal.expr.derivation.platform != thisSystem)
+        throw Error(format("a `%1%' is required, but I am a `%2%'")
+		    % goal.expr.derivation.platform % thisSystem);
+
     /* If any of the outputs already exist but are not registered,
        delete them. */
     for (PathSet::iterator i = goal.expr.derivation.outputs.begin(); 
