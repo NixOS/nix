@@ -16,6 +16,8 @@ name `*' may be used to indicate all derivations.
   --switch-generation / -G NUMBER: switch to specified generation of profile
   --rollback: switch to the previous generation
   --list-generations: list available generations of a profile
+  --delete-generations GENERATIONS...: deleted listed generations,
+      `old' for all non-current generations
   
   --import / -I FILE: set default Nix expression
 
@@ -49,3 +51,5 @@ Options:
   --file / -f FILE: use Nix expression FILE for installation, etc.
   --verbose / -v: verbose operation (may be repeated)
   --keep-failed / -K: keep temporary directories of failed builds
+  --preserve-installed: do not replace currently installed versions in `-i'
+  --system-filter SYSTEM: only use derivations for specified platform

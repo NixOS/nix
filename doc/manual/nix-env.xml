@@ -22,6 +22,11 @@
         </group>
         <replaceable>path</replaceable>
       </arg>
+      <arg><option>--preserve-installed</option></arg>
+      <arg>
+        <arg choice='plain'><option>--system-filter</option></arg>
+        <replaceable>system</replaceable>
+      </arg>
       <arg><option>--dry-run</option></arg>
       <arg choice='plain'><replaceable>operation</replaceable></arg>
       <arg rep='repeat'><replaceable>options</replaceable></arg>
@@ -117,6 +122,38 @@
             cause <command>nix-env</command> to print what
             <emphasis>would</emphasis> be done if this flag had not
             been specified, without actually doing it.
+          </para>
+        </listitem>
+      </varlistentry>
+      
+      <varlistentry>
+        <term><option>--preserve-installed</option></term>
+        <listitem>
+          <para>
+            By default, when you install a derivation with the
+            <option>--install</option> operation, it will replace
+            previously installed versions with the same derivation
+            name (regardless of the version number).  This option
+            causes those previously installed versions to be kept in
+            the new generation of the profile.  Note that this will
+            generally cause conflicts in the creation of the user
+            environment (since multiple versions of a package
+            typically contain the same programs).
+          </para>
+        </listitem>
+      </varlistentry>
+      
+      <varlistentry>
+        <term><option>--system-filter</option> <replaceable>system</replaceable></term>
+        <listitem>
+          <para>
+            By default, operations such as <option>--query
+            --available</option> only include derivations matching the
+            current platform.  This option allows you to use
+            derivations for the specified platform
+            <replaceable>system</replaceable>.  The special value
+            <literal>*</literal> causes derivations for any platform
+            to be included.
           </para>
         </listitem>
       </varlistentry>
@@ -712,6 +749,47 @@ $ nix-env --list-generations
   96   2004-02-06 11:49:01
   97   2004-02-06 16:22:45
   98   2004-02-06 16:24:33   (current)</screen>
+
+    </refsection>
+    
+  </refsection>
+
+
+  
+  <!--######################################################################-->
+
+  <refsection>
+    <title>Operation <option>--delete-generations</option></title>
+
+    <refsection>
+      <title>Synopsis</title>
+      <cmdsynopsis>
+        <command>nix-env</command>
+        <arg choice='req'><option>--delete-generations</option></arg>
+        <arg choice='plain' rep='repeat'><replaceable>generations</replaceable></arg>
+      </cmdsynopsis>
+    </refsection>
+
+    <refsection>
+      <title>Description</title>
+            
+      <para>
+        This operation deletes the specified generations of the
+        current profile.  The generations can be a list of generation
+        numbers, or the special value <literal>old</literal> to delete
+        all non-current generations.  Periodically deleting old
+        generations is important to make garbage collection effective.
+      </para>
+
+    </refsection>
+            
+    <refsection>
+      <title>Examples</title>
+
+      <screen>
+$ nix-env --delete-generations 3 4 8
+
+$ nix-env -p other_profile --delete-generations old</screen>
 
     </refsection>
     
