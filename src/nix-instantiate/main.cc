@@ -53,8 +53,8 @@ static void printNixExpr(EvalState & state, Expr e)
         }
     }
 
-    if (ATgetType(e) == AT_LIST) {
-        for (ATermIterator i((ATermList) e); i; ++i)
+    if (atMatch(m, e) >> "List" >> es) {
+        for (ATermIterator i(es); i; ++i)
             printNixExpr(state, evalExpr(state, *i));
         return;
     }

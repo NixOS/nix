@@ -1,9 +1,0 @@
-Function(["nar", "outPath"],
-  Package(
-    [ ("name", "unnar")
-    , ("outPath", Var("outPath"))
-    , ("build", Relative("nar/unnar.sh"))
-    , ("nar", Var("nar"))
-    ]
-  )
-)

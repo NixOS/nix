@@ -5,7 +5,7 @@ export PATH=/bin:/usr/bin
 echo "packing $path into $out..."
 mkdir $out || exit 1
 dst=$out/`basename $path`.nar.bz2
-@bindir@/nix --dump "$path" | bzip2 > $dst || exit 1
+@bindir@/nix-store --dump "$path" | bzip2 > $dst || exit 1
 
 md5=$(md5sum -b $dst | cut -c1-32)
 if test $? != 0; then exit 1; fi

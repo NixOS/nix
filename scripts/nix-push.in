@@ -7,14 +7,13 @@ my $tmpdir;
 do { $tmpdir = tmpnam(); }
 until mkdir $tmpdir, 0777;
 
-my $fixfile = "$tmpdir/create-nars.fix";
+my $nixfile = "$tmpdir/create-nars.nix";
 my $manifest = "$tmpdir/MANIFEST";
 
 END { unlink $manifest; unlink $fixfile; rmdir $tmpdir; }
 
-open FIX, ">$fixfile";
-print FIX "[";
-my $first = 1;
+open NIX, ">$nixfile";
+print NIX "[";
 
 my @paths;
 
@@ -24,10 +23,10 @@ foreach my $id (@ARGV) {
 
     # Get all paths referenced by the normalisation of the given 
     # Nix expression.
-    system "nix --install $id > /dev/null";
-    if ($?) { die "`nix --install' failed"; }
+    system "nix-store --realise $id > /dev/null";
+    die if ($?);
 
-    open PATHS, "nix --query --requisites --include-successors $id 2> /dev/null |" or die "nix -qr";
+    open PATHS, "nix-store --query --requisites --include-successors $id 2> /dev/null |" or die;
     while (<PATHS>) {
         chomp;
         die "bad: $_" unless /^\//;
@@ -35,34 +34,31 @@ foreach my $id (@ARGV) {
     }
     close PATHS;
 
-    # For each path, create a Fix expression that turns the path into
+    # For each path, create a Nix expression that turns the path into
     # a Nix archive.
     foreach my $path (@paths) {
 
-	die unless ($path =~ /\/[0-9a-z]{32}.*$/);
-	print "$path\n";
+        die unless ($path =~ /\/[0-9a-z]{32}.*$/);
+        print "$path\n";
 
-        # Construct a Fix expression that creates a Nix archive.
-        my $fixexpr = 
-          "Call(IncludeFix(\"nar/nar.fix\"), " .
-          "[ (\"path\", Closure([\"$path\"], [(\"$path\", [])]))" .
-          "])";
-	
-	print FIX "," unless ($first);
-	$first = 0;
-        print FIX $fixexpr;
-
+        # Construct a Nix expression that creates a Nix archive.
+        my $nixexpr = 
+            "((import @datadir@/nix/corepkgs/nar/nar.nix) " .
+            # !!! $path should be represented as a closure
+            "{path = \"$path\"; system = \"@host@\"}) ";
+        
+        print NIX $nixexpr;
     }
 }
 
-print FIX "]";
-close FIX;
+print NIX "]";
+close NIX;
 
 
-# Instantiate a Nix expression from the Fix expression.
+# Instantiate a store expression from the Nix expression.
 my @nids;
-print STDERR "running fix...\n";
-open NIDS, "fix $fixfile |" or die "cannot run fix";
+print STDERR "instantiating Nix expression...\n";
+open NIDS, "nix-instantiate $nixfile |" or die "cannot run nix-instantiate";
 while (<NIDS>) {
     chomp;
     die unless /^\//;
@@ -71,13 +67,13 @@ while (<NIDS>) {
 close NIDS;
 
 
-# Realise the Nix expression.
+# Realise the store expression.
 print STDERR "creating archives...\n";
-system "nix --install -v @nids > /dev/null";
-if ($?) { die "`nix --install' failed"; }
+system "nix-store --realise -v @nids > /dev/null";
+if ($?) { die "`nix --realise' failed"; }
 
 my @narpaths;
-open NIDS, "nix --query --list @nids |" or die "cannot run nix";
+open NIDS, "nix-store --query --list @nids |" or die "cannot run nix";
 while (<NIDS>) {
     chomp;
     die unless (/^\//);
@@ -120,13 +116,13 @@ for (my $n = 0; $n < scalar @paths; $n++) {
     print MANIFEST "  MD5: $hash\n";
 
     if ($storepath =~ /\.nix$/) {
-	open PREDS, "nix --query --predecessors $storepath |" or die "cannot run nix";
-	while (<PREDS>) {
-	    chomp;
-	    die unless (/^\//);
-	    print MANIFEST "  SuccOf: $_\n";
-	}
-	close PREDS;
+        open PREDS, "nix-store --query --predecessors $storepath |" or die "cannot run nix";
+        while (<PREDS>) {
+            chomp;
+            die unless (/^\//);
+            print MANIFEST "  SuccOf: $_\n";
+        }
+        close PREDS;
     }
 
     print MANIFEST "}\n";

@@ -1,8 +1,0 @@
-Function(["path"],
-  Package(
-    [ ("name", "nar")
-    , ("build", Relative("nar/nar.sh"))
-    , ("path", Var("path"))
-    ]
-  )
-)
