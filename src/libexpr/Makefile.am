@@ -2,7 +2,7 @@ noinst_LIBRARIES = libexpr.a
 
 libexpr_a_SOURCES = nixexpr.cc nixexpr.hh parser.cc parser.hh \
  eval.cc eval.hh primops.cc primops.hh \
- lexer-tab.c lexer-tab.h parser-tab.c parser-tab.h
+ lexer.l lexer-tab.c lexer-tab.h parser.y parser-tab.c parser-tab.h
 
 AM_CXXFLAGS = \
  -I.. -I../../externals/inst/include -I../libutil -I../libstore

@@ -85,6 +85,7 @@ expr_select
 
 expr_simple
   : ID { $$ = ATmake("Var(<term>)", $1); }
+  | INT { $$ = ATmake("Int(<term>)", $1); }
   | STR { $$ = ATmake("Str(<term>)", $1); }
   | PATH { $$ = ATmake("Path(<term>)", absParsedPath(data, $1)); }
   | URI { $$ = ATmake("Uri(<term>)", $1); }

@@ -58,7 +58,10 @@ rec         { return REC; }
 \-\>        { return IMPL; }
 
 {ID}        { yylval->t = ATmake("<str>", yytext); return ID; /* !!! alloc */ }
-{INT}       { return INT; }
+{INT}       { int n = atoi(yytext); /* !!! overflow */
+              yylval->t = ATmake("<int>", n);
+              return INT;
+            }
 {STR}       { int len = strlen(yytext);
               yytext[len - 1] = 0;
               yylval->t = ATmake("<str>", yytext + 1);
