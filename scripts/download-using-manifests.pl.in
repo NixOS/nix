@@ -193,7 +193,7 @@ while (scalar @path > 0) {
 
         # Apply the patch.
         print "  applying patch...\n";
-        system "bspatch /tmp/nar /tmp/nar2 $patchPath";
+        system "@libexecdir@/bspatch /tmp/nar /tmp/nar2 $patchPath";
         die "cannot apply patch `$patchPath' to /tmp/nar" if ($? != 0);
 
         # Unpack the resulting NAR archive into the target path.

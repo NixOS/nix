@@ -23,9 +23,9 @@ sub addPatch {
         }
     }
     
-    if (!$found) {
-        push @{$patchList}, $patch;
-    }
+    push @{$patchList}, $patch if !$found;
+
+    return !$found;
 }
 
 

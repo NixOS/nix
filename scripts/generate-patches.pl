@@ -1,4 +1,4 @@
-#! /usr/bin/perl -w -I.
+#! /usr/bin/perl -w -I/home/eelco/nix/scripts
 
 use strict;
 use POSIX qw(tmpnam);
@@ -110,6 +110,21 @@ sub getNarBz2 {
 }
 
 
+sub containsPatch {
+    my $patches = shift;
+    my $storePath = shift;
+    my $basePath = shift;
+    my $patchList = $$patches{$storePath};
+    return 0 if !defined $patchList;
+    my $found = 0;
+    foreach my $patch (@{$patchList}) {
+        # !!! baseHash might differ
+        return 1 if $patch->{basePath} eq $basePath;
+    }
+    return 0;
+}
+
+
 # For each output path in the destination, see if we need to / can
 # create a patch.
 
@@ -159,19 +174,14 @@ foreach my $p (keys %dstOutPaths) {
         print "  $p <- $closest\n";
 
         # If the patch already exists, skip it.
-        my $patchList = $dstPatches{$p};
-        if (defined $patchList) {
-            my $found = 0;
-            foreach my $patch (@{$patchList}) {
-                if ($patch->{basePath} eq $closest) {
-                    # !!! baseHash might differ
-                    print "    skipping, already exists\n";
-                    $found = 1;
-                    last;
-                }
-            }
-            next if $found;
+        if (containsPatch(\%srcPatches, $p, $closest) ||
+            containsPatch(\%dstPatches, $p, $closest))
+        {
+            print "    skipping, already exists\n";
+            next;
         }
+
+#        next;
         
         my $srcNarBz2 = getNarBz2 \%srcNarFiles, $closest;
         my $dstNarBz2 = getNarBz2 \%dstNarFiles, $p;
@@ -203,7 +213,7 @@ foreach my $p (keys %dstOutPaths) {
         }
     
         my $finalName =
-            "$narDiffHash-$name-$closestVersion-to-$version.nar-diff";
+            "$narDiffHash-$name-$closestVersion-to-$version.nar-bsdiff";
 
         if (-e "$patchesDir/$finalName") {
             print "    not copying, already exists\n";
@@ -226,5 +236,45 @@ foreach my $p (keys %dstOutPaths) {
     }
 }
 
+
+# Add in any potentially useful patches in the source (namely, those
+# patches that produce either paths in the destination or paths that
+# can be used as the base for other useful patches).
+
+my $changed;
+do {
+    # !!! we repeat this to reach the transitive closure; inefficient
+    $changed = 0;
+
+    foreach my $p (keys %srcPatches) {
+        my $patchList = $srcPatches{$p};
+
+        my $include = 0;
+
+        # Is path $p included in the destination?  If so, include
+        # patches that produce it.
+        $include = 1 if (defined $dstNarFiles{$p});
+
+        # Is path $p a path that serves as a base for paths in the
+        # destination?  If so, include patches that produce it.
+        foreach my $q (keys %dstPatches) {
+            foreach my $patch (@{$dstPatches{$q}}) {
+                # !!! check baseHash
+                $include = 1 if ($p eq $patch->{basePath});
+            }
+        }
+
+        if ($include) {
+            foreach my $patch (@{$patchList}) {
+                $changed = 1 if addPatch \%dstPatches, $p, $patch;
+            }
+        }            
+        
+    }
+    
+} while $changed;
+
+
+# Rewrite the manifest of the destination (with the new patches).
 writeManifest "$dstDir/MANIFEST",
     \%dstNarFiles, \%dstPatches, \%dstSuccessors;
