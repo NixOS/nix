@@ -1,6 +1,11 @@
 <chapter>
   <title>Introduction</title>
 
+  <epigraph>
+    <para><quote>The number of Nix installations in the world has grown to 4,
+        with more expected.</quote></para>
+  </epigraph>
+
   <para>
     Nix is a system for software deployment.  It supports the
     creation and distribution of software packages, as well as the installation

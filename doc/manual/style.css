@@ -202,3 +202,9 @@ td.varname, td.tagname, td.paramname
   font-weight: bold;
   vertical-align: top;
 }
+
+div.epigraph
+{
+    font-style: italic;
+    text-align: right;
+}
