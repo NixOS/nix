@@ -12,40 +12,52 @@ my $manifest = "$tmpdir/MANIFEST";
 
 END { unlink $manifest; unlink $nixfile; rmdir $tmpdir; }
 
-my @paths;
+my $curl = "curl --fail --silent";
 
-foreach my $id (@ARGV) {
-    die unless $id =~ /^\//;
+
+# Parse the command line.
+my $archives_put_url = shift @ARGV;
+my $archives_get_url = shift @ARGV;
+my $manifest_put_url = shift @ARGV;
+
+
+# From the given store expressions, determine the requisite store
+# paths.
+my %storepaths;
+
+foreach my $storeexpr (@ARGV) {
+    die unless $storeexpr =~ /^\//;
 
     # Get all paths referenced by the normalisation of the given 
     # Nix expression.
-    system "nix-store --realise $id > /dev/null";
+    system "nix-store --realise $storeexpr > /dev/null";
     die if ($?);
 
-    open PATHS, "nix-store --query --requisites --include-successors $id 2> /dev/null |" or die;
+    open PATHS, "nix-store --query --requisites --include-successors $storeexpr 2> /dev/null |" or die;
     while (<PATHS>) {
         chomp;
         die "bad: $_" unless /^\//;
-        push @paths, $_;
+        $storepaths{$_} = "";
     }
     close PATHS;
 }
+
+my @storepaths = keys %storepaths;
+
 
 # For each path, create a Nix expression that turns the path into
 # a Nix archive.
 open NIX, ">$nixfile";
 print NIX "[";
 
-foreach my $path (@paths) {
-
-    die unless ($path =~ /\/[0-9a-z]{32}.*$/);
-    print "$path\n";
+foreach my $storepath (@storepaths) {
+    die unless ($storepath =~ /\/[0-9a-z]{32}.*$/);
 
     # Construct a Nix expression that creates a Nix archive.
     my $nixexpr = 
         "((import @datadir@/nix/corepkgs/nar/nar.nix) " .
-        # !!! $path should be represented as a closure
-        "{path = \"$path\"; system = \"@system@\";}) ";
+        # !!! $storepath should be represented as a closure
+        "{path = \"$storepath\"; system = \"@system@\";}) ";
     
     print NIX $nixexpr;
 }
@@ -54,44 +66,51 @@ print NIX "]";
 close NIX;
 
 
-# Instantiate a store expression from the Nix expression.
-my @nids;
-print STDERR "instantiating Nix expression...\n";
-open NIDS, "nix-instantiate $nixfile |" or die "cannot run nix-instantiate";
-while (<NIDS>) {
+# Instantiate store expressions from the Nix expression.
+my @storeexprs;
+print STDERR "instantiating store expressions...\n";
+open STOREEXPRS, "nix-instantiate $nixfile |" or die "cannot run nix-instantiate";
+while (<STOREEXPRS>) {
     chomp;
     die unless /^\//;
-    push @nids, $_;
-    print "$_\n";
+    push @storeexprs, $_;
 }
-close NIDS;
+close STOREEXPRS;
 
 
-# Realise the store expression.
+# Realise the store expressions.
 print STDERR "creating archives...\n";
-system "nix-store --realise -v @nids > /dev/null";
-if ($?) { die "`nix-store --realise' failed"; }
 
 my @narpaths;
-open NIDS, "nix-store --query --list @nids |" or die "cannot run nix";
-while (<NIDS>) {
-    chomp;
-    die unless (/^\//);
-    push @narpaths, "$_";
-}
-close NIDS;
 
-    
+my @tmp = @storeexprs;
+while (scalar @tmp > 0) {
+    my $n = scalar @tmp;
+    if ($n > 256) { $n = 256 };
+    my @tmp2 = @tmp[0..$n - 1];
+    @tmp = @tmp[$n..scalar @tmp - 1];
+
+    system "nix-store --realise -B @tmp2 > /dev/null";
+    if ($?) { die "`nix-store --realise' failed"; }
+
+    open NARPATHS, "nix-store --query --list @tmp2 |" or die "cannot run nix";
+    while (<NARPATHS>) {
+        chomp;
+        die unless (/^\//);
+        push @narpaths, "$_";
+    }
+    close NARPATHS;
+}
+
+
 # Create the manifest.
 print STDERR "creating manifest...\n";
 
 open MANIFEST, ">$manifest";
 
-my @pushlist;
-push @pushlist, $manifest;
-
-for (my $n = 0; $n < scalar @paths; $n++) {
-    my $storepath = $paths[$n];
+my @nararchives;
+for (my $n = 0; $n < scalar @storepaths; $n++) {
+    my $storepath = $storepaths[$n];
     my $nardir = $narpaths[$n];
     
     $storepath =~ /\/([^\/]*)$/;
@@ -102,7 +121,7 @@ for (my $n = 0; $n < scalar @paths; $n++) {
 
     my $narfile = "$nardir/$narname";
     (-f $narfile) or die "narfile for $storepath not found";
-    push @pushlist, $narfile;
+    push @nararchives, $narfile;
 
     open MD5, "$nardir/md5" or die "cannot open hash";
     my $hash = <MD5>;
@@ -112,10 +131,10 @@ for (my $n = 0; $n < scalar @paths; $n++) {
 
     print MANIFEST "{\n";
     print MANIFEST "  StorePath: $storepath\n";
-    print MANIFEST "  NarName: $narname\n";
+    print MANIFEST "  NarURL: $archives_get_url/$narname\n";
     print MANIFEST "  MD5: $hash\n";
 
-    if ($storepath =~ /\.nix$/) {
+    if ($storepath =~ /\.store$/) {
         open PREDS, "nix-store --query --predecessors $storepath |" or die "cannot run nix";
         while (<PREDS>) {
             chomp;
@@ -131,8 +150,24 @@ for (my $n = 0; $n < scalar @paths; $n++) {
 close MANIFEST;
 
 
-# Push the prebuilts to the server. !!! FIXME
-print STDERR "pushing to server...\n";
-if (scalar @pushlist > 0) {
-    system "rsync -av -e ssh @pushlist eelco\@losser.st-lab.cs.uu.nl:/home/eelco/public_html/nix-dist/";
+# Upload the archives.
+print STDERR "uploading archives...\n";
+foreach my $nararchive (@nararchives) {
+
+    $nararchive =~ /\/([^\/]*)$/;
+    my $basename = $1;
+
+    if (system("$curl --head $archives_get_url/$basename > /dev/null") != 0) {
+        print STDERR "  $nararchive\n";
+        system("$curl  --show-error --upload-file " .
+               "'$nararchive' '$archives_put_url/$basename' > /dev/null") == 0 or
+            die "curl failed on $nararchive: $?";
+    }
 }
+
+
+# Upload the manifest.
+print STDERR "uploading manifest...\n";
+system("$curl  --show-error --upload-file " .
+       "'$manifest' '$manifest_put_url/' > /dev/null") == 0 or
+    die "curl failed on $manifest: $?";

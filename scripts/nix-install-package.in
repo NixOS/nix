@@ -12,26 +12,26 @@ until mkdir $tmpdir, 0777;
 
 # !!! remove tmpdir on exit
 
-print "unpacking $pkgfile in $tmpdir...\n";
+print "Unpacking $pkgfile in $tmpdir...\n";
 system "bunzip2 < $pkgfile | (cd $tmpdir && tar xf -)";
 die if $?;
 
-print "this package contains the following derivations:\n";
-system "nix-env -qsf $tmpdir/default.nix";
+print "This package contains the following derivations:\n";
+system "nix-env -qasf $tmpdir/default.nix";
 die if $?;
 
-print "do you wish to install them (y/n)? ";
+print "Do you wish to install these (Y/N)? ";
 my $reply = <STDIN>;
 chomp $reply;
 exit if (!($reply eq "y"));
 
-print "pulling caches...\n";
+print "Pulling caches...\n";
 system "nix-pull `cat $tmpdir/caches`";
 die if $?;
 
-print "installing package...\n";
-system "nix-env -i $tmpdir/default.nix '*'";
+print "Installing package...\n";
+system "nix-env -if $tmpdir/default.nix '*'";
 die if $?;
 
-print "installing succeeded! (enter to continue)\n";
+print "Installation succeeded! Press Enter to continue.\n";
 <STDIN>;
