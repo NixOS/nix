@@ -1,15 +1,11 @@
 #include <iostream>
-#include <fstream>
 #include <memory>
-#include <string>
-#include <sstream>
 #include <list>
 #include <vector>
 #include <set>
 #include <map>
 #include <cstdio>
 
-#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -18,10 +14,6 @@
 
 extern "C" {
 #include <aterm1.h>
-}
-
-extern "C" {
-#include "md5.h"
 }
 
 #include "util.hh"
@@ -33,16 +25,6 @@ using namespace std;
 static string dbRefs = "refs";
 static string dbInstPkgs = "pkginst";
 static string dbPrebuilts = "prebuilts";
-
-
-/* The canonical system name, as returned by config.guess. */ 
-static string thisSystem = SYSTEM;
-
-
-/* The prefix of the Nix installation, and the environment variable
-   that can be used to override the default. */
-static string nixHomeDir = "/nix";
-static string nixHomeDirEnvVar = "NIX";
 
 
 /* Wrapper classes that ensures that the database is closed upon
@@ -132,47 +114,6 @@ void enumDB(const string & dbname, DBPairs & contents)
 }
 
 
-string printHash(unsigned char * buf)
-{
-    ostringstream str;
-    for (int i = 0; i < 16; i++) {
-        str.fill('0');
-        str.width(2);
-        str << hex << (int) buf[i];
-    }
-    return str.str();
-}
-
-    
-/* Verify that a reference is valid (that is, is a MD5 hash code). */
-void checkHash(const string & s)
-{
-    string err = "invalid reference: " + s;
-    if (s.length() != 32)
-        throw BadRefError(err);
-    for (int i = 0; i < 32; i++) {
-        char c = s[i];
-        if (!((c >= '0' && c <= '9') ||
-              (c >= 'a' && c <= 'f')))
-            throw BadRefError(err);
-    }
-}
-
-
-/* Compute the MD5 hash of a file. */
-string hashFile(string filename)
-{
-    unsigned char hash[16];
-    FILE * file = fopen(filename.c_str(), "rb");
-    if (!file)
-        throw BadRefError("file `" + filename + "' does not exist");
-    int err = md5_stream(file, hash);
-    fclose(file);
-    if (err) throw BadRefError("cannot hash file");
-    return printHash(hash);
-}
-
-
 typedef map<string, string> Params;
 
 
@@ -212,7 +153,14 @@ void readPkgDescr(const string & hash,
             fileImports[name] = arg;
         } else if (ATmatch(value, "Str(<str>)", &arg))
             arguments[name] = arg;
-        else throw Error("invalid binding in " + pkgfile);
+        else if (ATmatch(value, "Bool(True)"))
+            arguments[name] = "1";
+        else if (ATmatch(value, "Bool(False)"))
+            arguments[name] = "";
+        else {
+            ATprintf("%t\n", value);
+            throw Error("invalid binding in " + pkgfile);
+        }
     }
 }
 
@@ -473,12 +421,15 @@ void exportPkgs(string outDir,
     Strings::iterator firstHash, 
     Strings::iterator lastHash)
 {
+    outDir = absPath(outDir);
+
     for (Strings::iterator it = firstHash; it != lastHash; it++) {
         string hash = *it;
         string pkgDir = getPkg(hash);
         string tmpFile = outDir + "/export_tmp";
 
-        int res = system(("cd " + pkgDir + " && tar cvfj " + tmpFile + " .").c_str()); // !!! escaping
+        string cmd = "cd " + pkgDir + " && tar cvfj " + tmpFile + " .";
+        int res = system(cmd.c_str()); // !!! escaping
         if (WEXITSTATUS(res) != 0)
             throw Error("cannot tar " + pkgDir);
 
@@ -497,19 +448,6 @@ void regPrebuilt(string pkgHash, string prebuiltHash)
     checkHash(pkgHash);
     checkHash(prebuiltHash);
     setDB(dbPrebuilts, pkgHash, prebuiltHash);
-}
-
-
-string absPath(string filename)
-{
-    if (filename[0] != '/') {
-        char buf[PATH_MAX];
-        if (!getcwd(buf, sizeof(buf)))
-            throw Error("cannot get cwd");
-        filename = string(buf) + "/" + filename;
-        /* !!! canonicalise */
-    }
-    return filename;
 }
 
 
