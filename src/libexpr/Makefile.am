@@ -5,7 +5,7 @@ libexpr_a_SOURCES = nixexpr.cc nixexpr.hh parser.cc parser.hh \
  lexer-tab.c lexer-tab.h parser-tab.c parser-tab.h \
  constructors.hh
 
-EXTRA_DIST = lexer.l parser.y constructors.cc
+EXTRA_DIST = lexer.l parser.y constructors.cc aterm-helper.pl
 
 AM_CXXFLAGS = \
  -I.. ${bdb_include} ${aterm_include} -I../libutil -I../libstore
