@@ -150,6 +150,30 @@ static Hash hashPackage(EvalState & state, FState fs)
 }
 
 
+static string processBinding(EvalState & state, Expr e, FState & fs)
+{
+    char * s1;
+
+    if (ATmatch(e, "FSId(<str>)", &s1)) {
+        FSId id = parseHash(s1);
+        Strings paths = fstatePathsCached(state, id);
+        if (paths.size() != 1) abort();
+        string path = *(paths.begin());
+        fs.derive.inputs.push_back(id);
+        return path;
+    }
+    
+    if (ATmatch(e, "<str>", &s1))
+        return s1;
+
+    if (ATmatch(e, "True")) return "1";
+    
+    if (ATmatch(e, "False")) return "";
+    
+    throw badTerm("invalid package binding", e);
+}
+
+
 static Expr evalExpr2(EvalState & state, Expr e)
 {
     char * s1;
@@ -274,30 +298,29 @@ static Expr evalExpr2(EvalState & state, Expr e)
             string key = it->first;
             ATerm value = it->second;
 
-            if (ATmatch(value, "FSId(<str>)", &s1)) {
-                FSId id = parseHash(s1);
-                Strings paths = fstatePathsCached(state, id);
-                if (paths.size() != 1) abort();
-                string path = *(paths.begin());
-                fs.derive.inputs.push_back(id);
-                fs.derive.env.push_back(StringPair(key, path));
-                if (key == "build") fs.derive.builder = path;
-            }
-            else if (ATmatch(value, "<str>", &s1)) {
-                if (key == "name") name = s1;
+            if (key == "args") {
+                ATermList args;
+                if (!ATmatch(value, "[<list>]", &args))
+                    throw badTerm("list expected", value);
+                
+                while (!ATisEmpty(args)) {
+                    Expr arg = evalExpr(state, ATgetFirst(args));
+                    fs.derive.args.push_back(processBinding(state, arg, fs));
+                    args = ATgetNext(args);
+                }
+            } 
+
+            else {
+                string s = processBinding(state, value, fs);
+                fs.derive.env.push_back(StringPair(key, s));
+
+                if (key == "build") fs.derive.builder = s;
+                if (key == "name") name = s;
                 if (key == "id") { 
-                    outId = parseHash(s1);
+                    outId = parseHash(s);
                     outIdGiven = true;
                 }
-                fs.derive.env.push_back(StringPair(key, s1));
             }
-            else if (ATmatch(value, "True")) {
-                fs.derive.env.push_back(StringPair(key, "1"));
-            }
-            else if (ATmatch(value, "False")) {
-                fs.derive.env.push_back(StringPair(key, ""));
-            }
-            else throw badTerm("invalid package argument", value);
 
             bnds = ATinsert(bnds, 
                 ATmake("(<str>, <term>)", key.c_str(), value));
