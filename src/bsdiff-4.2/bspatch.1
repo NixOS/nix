@@ -1,0 +1,32 @@
+.Dd May 18, 2003
+.Dt BSPATCH 1
+.Os FreeBSD
+.Sh NAME
+.Nm bspatch
+.Nd apply a patch built with bsdiff(1)
+.Sh SYNOPSIS
+.Nm
+.Ao Ar oldfile Ac Ao Ar newfile Ac Ao Ar patchfile Ac
+.Sh DESCRIPTION
+.Nm
+generates
+.Ao Ar newfile Ac
+from
+.Ao Ar oldfile Ac
+and
+.Ao Ar patchfile Ac
+where
+.Ao Ar patchfile Ac
+is a binary patch built by bsdiff(1).
+.Pp
+.Nm
+uses memory equal to the size of 
+.Ao Ar oldfile Ac
+plus the size of 
+.Ao Ar newfile Ac ,
+but can tolerate a very small working set without a dramatic loss
+of performance.
+.Sh SEE ALSO
+.Xr bsdiff 1
+.Sh AUTHORS
+.An Colin Percival Aq cperciva@daemonology.net
