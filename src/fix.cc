@@ -169,6 +169,18 @@ static string processBinding(EvalState & state, Expr e, FState & fs)
     if (ATmatch(e, "True")) return "1";
     
     if (ATmatch(e, "False")) return "";
+
+    ATermList l;
+    if (ATmatch(e, "[<list>]", &l)) {
+	string s;
+	bool first = true;
+        while (!ATisEmpty(l)) {
+	    if (!first) s = s + " "; else first = false;
+	    s += processBinding(state, evalExpr(state, ATgetFirst(l)), fs);
+            l = ATgetNext(l);
+        }
+	return s;
+    }
     
     throw badTerm("invalid package binding", e);
 }
