@@ -1,6 +1,8 @@
 #include "db.hh"
 #include "util.hh"
 
+#include <memory>
+
 #include <db_cxx.h>
 
 

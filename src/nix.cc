@@ -1,9 +1,9 @@
 #include <iostream>
-#include <memory>
 #include <list>
 #include <vector>
 #include <set>
 #include <map>
+#include <algorithm>
 #include <cstdio>
 
 #include <errno.h>
