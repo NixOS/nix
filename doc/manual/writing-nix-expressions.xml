@@ -441,7 +441,7 @@ Hello, world!</screen>
 <para>Generally, however, using <command>nix-env</command> is not the
 best way to test components, since you may not want to install them
 into your profile right away (they might not work properly, after
-all).  A better way is to write a short file containging the
+all).  A better way is to write a short file containing the
 following:
 
 <programlisting>
@@ -467,7 +467,7 @@ Hello, world!</screen>
 </para>
 
 <para>Nix has a transactional semantics.  Once a build finishes
-succesfully, Nix makes a note of this in its database: it registers
+successfully, Nix makes a note of this in its database: it registers
 that the path denoted by <envar>out</envar> is now
 <quote>valid</quote>.  If you try to build the derivation again, Nix
 will see that the path is already valid and finish immediately.  If a
