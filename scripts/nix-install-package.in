@@ -11,7 +11,7 @@ die unless defined $pkgFile;
 # from a web browser, the user gets to see us.
 if (!defined $ENV{"NIX_HAVE_TERMINAL"}) {
     $ENV{"NIX_HAVE_TERMINAL"} = "1";
-    exec("xterm", "-e", "@bindir@/nix-install-package", "$pkgFile");
+    exec("xterm", "-e", "@shell@", "-c", "@bindir@/nix-install-package '$pkgFile' || read");
     die "cannot execute `xterm'";
 }
 
