@@ -52,7 +52,7 @@ static void readSettings()
         string name, sep, value;
         is >> name >> sep >> value;
         if (sep != "=" || !is)
-            throw Error(format("illegal configuration line `%1%'") % line);
+            throw Error(format("illegal configuration line `%1%' in `%2%'") % line % settingsFile);
         
         settings[name] = value;
     };
@@ -66,4 +66,14 @@ string querySetting(const string & name, const string & def)
     if (!settingsRead) readSettings();
     map<string, string>::iterator i = settings.find(name);
     return i == settings.end() ? def : i->second;
+}
+
+
+bool queryBoolSetting(const string & name, bool def)
+{
+    string value = querySetting(name, def ? "true" : "false");
+    if (value == "true") return true;
+    else if (value == "false") return false;
+    else throw Error(format("configuration option `%1%' should be either `true' or `false', not `%2%'")
+        % name % value);
 }

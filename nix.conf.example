@@ -7,7 +7,7 @@
 # 
 # In general, outputs must be registered as roots separately.
 # However, even if the output of a derivation is registered as a root,
-# the collector will still delete store paths that are used only a
+# the collector will still delete store paths that are used only at
 # build time (e.g., the C compiler, or source tarballs downloaded from
 # the network).  To prevent it from doing so, set this option to
 # `true'.
@@ -28,3 +28,22 @@ gc-keep-outputs = false
 # turned on).
 gc-keep-derivations = true
 
+
+### Option `env-keep-derivations'
+#
+# If `false' (default), derivations are not stored in Nix user
+# environments.  That is, the derivation any build-time-only
+# dependencies may be garbage-collected.
+#
+# If `true', when you add a Nix derivation to a user environment, the
+# path of the derivation is stored in the user environment.  Thus, the
+# derivation will not be garbage-collected until the user environment
+# generation is deleted (`nix-env --delete-generations').  To prevent
+# build-time-only dependencies from being collected, you should also
+# turn on `gc-keep-outputs'.
+#
+# The difference between this option and `gc-keep-derivations' is that
+# this one is `sticky': it applies to any user environment created
+# while this option was enabled, while `gc-keep-derivations' only
+# applies at the moment the garbage collector is run.
+env-keep-derivations = false

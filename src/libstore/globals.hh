@@ -55,5 +55,7 @@ extern bool readOnlyMode;
 
 string querySetting(const string & name, const string & def);
 
+bool queryBoolSetting(const string & name, bool def);
+
 
 #endif /* !__GLOBALS_H */

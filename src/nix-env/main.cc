@@ -37,6 +37,7 @@ struct Globals
     EvalState state;
     bool dryRun;
     bool preserveInstalled;
+    bool keepDerivations;
 };
 
 
@@ -203,7 +204,7 @@ void queryInstalled(EvalState & state, DrvInfos & drvs,
 
 
 void createUserEnv(EvalState & state, const DrvInfos & drvs,
-    const Path & profile)
+    const Path & profile, bool keepDerivations)
 {
     /* Build the components in the user environment, if they don't
        exist already. */
@@ -227,27 +228,29 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
     for (DrvInfos::const_iterator i = drvs.begin(); 
          i != drvs.end(); ++i)
     {
-        ATerm t = makeAttrs(ATmakeList4(
+        Path drvPath = keepDerivations ? i->second.drvPath : "";
+        ATerm t = makeAttrs(ATmakeList5(
             makeBind(toATerm("type"),
                 makeStr(toATerm("derivation")), makeNoPos()),
             makeBind(toATerm("name"),
                 makeStr(toATerm(i->second.name)), makeNoPos()),
             makeBind(toATerm("system"),
                 makeStr(toATerm(i->second.system)), makeNoPos()),
+            makeBind(toATerm("drvPath"),
+                makePath(toATerm(drvPath)), makeNoPos()),
             makeBind(toATerm("outPath"),
                 makePath(toATerm(i->second.outPath)), makeNoPos())
             ));
         manifest = ATinsert(manifest, t);
         inputs = ATinsert(inputs, makeStr(toATerm(i->second.outPath)));
         references.insert(i->second.outPath);
+        if (drvPath != "") references.insert(drvPath);
     }
 
     /* Also write a copy of the list of inputs to the store; we need
        it for future modifications of the environment. */
     Path manifestFile = addTextToStore("env-manifest",
         atPrint(makeList(ATreverse(manifest))), references);
-
-    printMsg(lvlError, format("manifest is %1%") % manifestFile);
 
     Expr topLevel = makeCall(envBuilder, makeAttrs(ATmakeList3(
         makeBind(toATerm("system"),
@@ -281,15 +284,14 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
 }
 
 
-static void installDerivations(EvalState & state,
-    const InstallSourceInfo & instSource, DrvNames & selectors,
-    const Path & profile, bool dryRun, bool preserveInstalled)
+static void installDerivations(Globals & globals,
+    DrvNames & selectors, const Path & profile)
 {
     debug(format("installing derivations"));
 
     /* Fetch all derivations from the input file. */
     DrvInfos availDrvs;
-    queryInstSources(state, instSource, availDrvs);
+    queryInstSources(globals.state, globals.instSource, availDrvs);
 
     /* Filter out the ones we're not interested in. */
     DrvInfos selectedDrvs;
@@ -320,13 +322,13 @@ static void installDerivations(EvalState & state,
     
     /* Add in the already installed derivations. */
     DrvInfos installedDrvs;
-    queryInstalled(state, installedDrvs, profile);
+    queryInstalled(globals.state, installedDrvs, profile);
 
     for (DrvInfos::iterator i = installedDrvs.begin();
          i != installedDrvs.end(); ++i)
     {
         DrvName drvName(i->second.name);
-        if (!preserveInstalled &&
+        if (!globals.preserveInstalled &&
             selectedNames.find(drvName.name) != selectedNames.end())
             printMsg(lvlInfo,
                 format("uninstalling `%1%'") % i->second.name);
@@ -334,9 +336,10 @@ static void installDerivations(EvalState & state,
             selectedDrvs.insert(*i);
     }
 
-    if (dryRun) return;
+    if (globals.dryRun) return;
 
-    createUserEnv(state, selectedDrvs, profile);
+    createUserEnv(globals.state, selectedDrvs,
+        profile, globals.keepDerivations);
 }
 
 
@@ -348,18 +351,16 @@ static void opInstall(Globals & globals,
 
     DrvNames drvNames = drvNamesFromArgs(opArgs);
     
-    installDerivations(globals.state, globals.instSource,
-        drvNames, globals.profile, globals.dryRun,
-        globals.preserveInstalled);
+    installDerivations(globals, drvNames, globals.profile);
 }
 
 
 typedef enum { utLt, utLeq, utAlways } UpgradeType;
 
 
-static void upgradeDerivations(EvalState & state,
-    const InstallSourceInfo & instSource, DrvNames & selectors, const Path & profile,
-    UpgradeType upgradeType, bool dryRun)
+static void upgradeDerivations(Globals & globals,
+    DrvNames & selectors, const Path & profile,
+    UpgradeType upgradeType)
 {
     debug(format("upgrading derivations"));
 
@@ -370,11 +371,11 @@ static void upgradeDerivations(EvalState & state,
 
     /* Load the currently installed derivations. */
     DrvInfos installedDrvs;
-    queryInstalled(state, installedDrvs, profile);
+    queryInstalled(globals.state, installedDrvs, profile);
 
     /* Fetch all derivations from the input file. */
     DrvInfos availDrvs;
-    // xxx    loadDerivations(state, nePath, availDrvs, systemFilter);
+    queryInstSources(globals.state, globals.instSource, availDrvs);
 
     /* Go through all installed derivations. */
     DrvInfos newDrvs;
@@ -440,9 +441,10 @@ static void upgradeDerivations(EvalState & state,
         } else newDrvs.insert(*i);
     }
     
-    if (dryRun) return;
+    if (globals.dryRun) return;
 
-    createUserEnv(state, newDrvs, profile);
+    createUserEnv(globals.state, newDrvs,
+        profile, globals.keepDerivations);
 }
 
 
@@ -459,16 +461,15 @@ static void opUpgrade(Globals & globals,
 
     DrvNames drvNames = drvNamesFromArgs(opArgs);
     
-    upgradeDerivations(globals.state, globals.instSource,
-        drvNames, globals.profile, upgradeType, globals.dryRun);
+    upgradeDerivations(globals, drvNames, globals.profile, upgradeType);
 }
 
 
-static void uninstallDerivations(EvalState & state, DrvNames & selectors,
-    Path & profile, bool dryRun)
+static void uninstallDerivations(Globals & globals, DrvNames & selectors,
+    Path & profile)
 {
     DrvInfos installedDrvs;
-    queryInstalled(state, installedDrvs, profile);
+    queryInstalled(globals.state, installedDrvs, profile);
 
     for (DrvInfos::iterator i = installedDrvs.begin();
          i != installedDrvs.end(); ++i)
@@ -483,9 +484,10 @@ static void uninstallDerivations(EvalState & state, DrvNames & selectors,
             }
     }
 
-    if (dryRun) return;
+    if (globals.dryRun) return;
 
-    createUserEnv(state, installedDrvs, profile);
+    createUserEnv(globals.state, installedDrvs,
+        profile, globals.keepDerivations);
 }
 
 
@@ -497,8 +499,8 @@ static void opUninstall(Globals & globals,
 
     DrvNames drvNames = drvNamesFromArgs(opArgs);
 
-    uninstallDerivations(globals.state, drvNames,
-        globals.profile, globals.dryRun);
+    uninstallDerivations(globals, drvNames,
+        globals.profile);
 }
 
 
@@ -798,6 +800,7 @@ void run(Strings args)
     Operation op = 0;
     
     Globals globals;
+    
     globals.instSource.type = srcUnknown;
     globals.instSource.nixExprPath = getDefNixExprPath();
     globals.instSource.systemFilter = thisSystem;
@@ -805,6 +808,9 @@ void run(Strings args)
     globals.dryRun = false;
     globals.preserveInstalled = false;
 
+    globals.keepDerivations =
+        queryBoolSetting("env-keep-derivations", false);
+    
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
         string arg = *i;
 
