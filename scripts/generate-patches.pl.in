@@ -6,6 +6,8 @@ use readmanifest;
 
 die unless scalar @ARGV == 5;
 
+my $hashAlgo = "sha1";
+
 my $cacheDir = $ARGV[0];
 my $patchesDir = $ARGV[1];
 my $patchesURL = $ARGV[2];
@@ -285,13 +287,13 @@ foreach my $p (keys %dstOutPaths) {
         system("@libexecdir@/bsdiff $tmpdir/A $tmpdir/B $tmpdir/DIFF") == 0
             or die "cannot compute binary diff";
 
-        my $baseHash = `@bindir@/nix-hash --flat --type sha1 $tmpdir/A` or die;
+        my $baseHash = `@bindir@/nix-hash --flat --type $hashAlgo --base32 $tmpdir/A` or die;
         chomp $baseHash;
 
-        my $narHash = `@bindir@/nix-hash --flat --type sha1 $tmpdir/B` or die;
+        my $narHash = `@bindir@/nix-hash --flat --type $hashAlgo --base32 $tmpdir/B` or die;
         chomp $narHash;
 
-        my $narDiffHash = `@bindir@/nix-hash --flat --type sha1 $tmpdir/DIFF` or die;
+        my $narDiffHash = `@bindir@/nix-hash --flat --type $hashAlgo --base32 $tmpdir/DIFF` or die;
         chomp $narDiffHash;
 
         my $narDiffSize = (stat "$tmpdir/DIFF")[7];
@@ -303,7 +305,7 @@ foreach my $p (keys %dstOutPaths) {
         }
     
         my $finalName =
-            "$narDiffHash-$name-$closestVersion-to-$version.nar-bsdiff";
+            "$narDiffHash.nar-bsdiff";
 
         print "    size $narDiffSize; full size $dstNarBz2Size\n";
         
@@ -323,10 +325,9 @@ foreach my $p (keys %dstOutPaths) {
         
         # Add the patch to the manifest.
         addPatch \%dstPatches, $p,
-            { url => "$patchesURL/$finalName", hash => $narDiffHash
-            , size => $narDiffSize, hashAlgo => "sha1"
-            , basePath => $closest, baseHash => $baseHash
-            , narHash => $narHash, patchType => "nar-bsdiff"
+            { url => "$patchesURL/$finalName", hash => "$hashAlgo:$narDiffHash"
+            , size => $narDiffSize, basePath => $closest, baseHash => "$hashAlgo:$baseHash"
+            , narHash => "$hashAlgo:$narHash", patchType => "nar-bsdiff"
             };
     }
 }
