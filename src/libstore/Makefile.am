@@ -6,5 +6,5 @@ libstore_a_SOURCES = \
  globals.cc globals.hh db.cc db.hh \
  references.cc references.hh pathlocks.cc pathlocks.hh
 
-AM_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall \
+AM_CXXFLAGS = -Wall \
  -I.. -I../../externals/inst/include -I../libutil

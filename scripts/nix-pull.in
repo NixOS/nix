@@ -61,10 +61,10 @@ sub processURL {
                 # Nix archive from the network.
                 my $fetch =
                     "(import @datadir@/nix/corepkgs/fetchurl) " .
-                    "{url = $fullurl; md5 = \"$hash\"; system = \"@host@\"}";
+                    "{url = $fullurl; md5 = \"$hash\"; system = \"@system@\"}";
                 my $nixexpr =
                     "((import @datadir@/nix/corepkgs/nar/unnar.nix) " .
-                    "{narFile = ($fetch); outPath = \"$storepath\"; system = \"@host@\"}) ";
+                    "{narFile = ($fetch); outPath = \"$storepath\"; system = \"@system@\"}) ";
                 $fullexpr .= $nixexpr; # !!! O(n^2)?
 
                 push @srcpaths, $storepath;

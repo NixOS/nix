@@ -45,7 +45,7 @@ foreach my $id (@ARGV) {
         my $nixexpr = 
             "((import @datadir@/nix/corepkgs/nar/nar.nix) " .
             # !!! $path should be represented as a closure
-            "{path = \"$path\"; system = \"@host@\"}) ";
+            "{path = \"$path\"; system = \"@system@\"}) ";
         
         print NIX $nixexpr;
     }

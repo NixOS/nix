@@ -14,6 +14,14 @@ AC_PREFIX_DEFAULT(/nix)
 
 AC_CANONICAL_HOST
 
+# Construct a Nix system name (like "i686-linux").
+AC_MSG_CHECKING([for the canonical Nix system name])
+machine_name=`uname -m`
+sys_name=`uname -s | tr [A-Z] [a-z]`
+system="${machine_name}-${sys_name}"
+AC_MSG_RESULT($system)
+AC_SUBST(system)
+
 AC_PROG_CC
 AC_PROG_CXX
 AC_PROG_RANLIB

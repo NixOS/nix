@@ -5,7 +5,7 @@
 	 -e "s^@sysconfdir\@^$(sysconfdir)^g" \
 	 -e "s^@localstatedir\@^$(localstatedir)^g" \
 	 -e "s^@datadir\@^$(datadir)^g" \
-	 -e "s^@host\@^$(host_triplet)^g" \
+	 -e "s^@system\@^$(system)^g" \
 	 -e "s^@wget\@^$(wget)^g" \
 	 < $< > $@ || rm $@
 	chmod +x $@
