@@ -15,7 +15,7 @@ void copyFile(string src, string dst);
 void addToStore(string srcPath, string & dstPath, Hash & hash);
 
 /* Delete a value from the nixStore directory. */
-void deleteFromStore(Hash hash);
+void deleteFromStore(const string & path);
 
 /* !!! */
 string queryFromStore(Hash hash);

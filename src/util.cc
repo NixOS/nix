@@ -11,10 +11,15 @@
 string thisSystem = SYSTEM;
 
 
-SysError::SysError(string msg)
+Error::Error(const format & f)
 {
-    char * sysMsg = strerror(errno);
-    err = msg + ": " + sysMsg;
+    err = f.str();
+}
+
+
+SysError::SysError(const format & f)
+    : Error(format("%1%: %2%") % f.str() % strerror(errno))
+{
 }
 
 

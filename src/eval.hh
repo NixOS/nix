@@ -23,7 +23,7 @@ using namespace std;
    self-referential.  This prevents us from having to deal with
    cycles.
 
-     Derive : String * Path * [FState] * [Path] * [(String, String)] -> [FState]
+     Derive : String * Path * [FState] * Path * [(String, String)] -> FState
 
    Derive(platform, builder, ins, outs, env) specifies the creation of
    new file objects (in paths declared by `outs') by the execution of
@@ -61,7 +61,7 @@ typedef ATerm Content;
 
 
 /* Realise a $f$-normalised expression in the file system. */
-void realiseFState(FState fs);
+FState realiseFState(FState fs);
 
 /* Return a canonical textual representation of an expression. */
 string printTerm(ATerm t);

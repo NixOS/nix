@@ -127,16 +127,13 @@ string fetchURL(string url)
 #endif
 
 
-void deleteFromStore(Hash hash)
+void deleteFromStore(const string & path)
 {
-    string fn;
-    if (queryDB(nixDB, dbRefs, hash, fn)) {
-        string prefix = nixStore + "/";
-        if (string(fn, prefix.size()) != prefix)
-            throw Error("path " + fn + " is not in the store");
-        deletePath(fn);
-        delDB(nixDB, dbRefs, hash);
-    }
+    string prefix = nixStore + "/";
+    if (string(path, 0, prefix.size()) != prefix)
+        throw Error(format("path %1% is not in the store") % path);
+    deletePath(path);
+//     delDB(nixDB, dbRefs, hash);
 }
 
 

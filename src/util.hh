@@ -18,22 +18,21 @@ class Error : public exception
 protected:
     string err;
 public:
-    Error() { }
-    Error(format f) { err = f.str(); }
-    ~Error() throw () { }
+    Error(const format & f);
+    ~Error() throw () { };
     const char * what() const throw () { return err.c_str(); }
 };
 
 class SysError : public Error
 {
 public:
-    SysError(string msg);
+    SysError(const format & f);
 };
 
 class UsageError : public Error
 {
 public:
-    UsageError(string _err) : Error(_err) { };
+    UsageError(const format & f) : Error(f) { };
 };
 
 

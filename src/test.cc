@@ -13,7 +13,9 @@
 
 void realise(FState fs)
 {
-    realiseFState(fs);
+    cout << format("%1% => %2%\n")
+        % printTerm(fs)
+        % printTerm(realiseFState(fs));
 }
 
 
@@ -145,15 +147,25 @@ void runTests()
         "File(<str>, Hash(<str>), [])", 
         builder1fn.c_str(),
         ((string) builder1h).c_str());
-    realiseFState(fs1);
-    realiseFState(fs1);
+    realise(fs1);
+    realise(fs1);
 
     FState fs2 = ATmake(
         "File(<str>, Hash(<str>), [])", 
         (builder1fn + "_bla").c_str(),
         ((string) builder1h).c_str());
-    realiseFState(fs2);
-    realiseFState(fs2);
+    realise(fs2);
+    realise(fs2);
+
+    string out1fn = nixStore + "/hello.txt";
+    FState fs3 = ATmake(
+        "Derive(<str>, <str>, [<term>], <str>, [(\"out\", <str>)])",
+        thisSystem.c_str(),
+        builder1fn.c_str(),
+        fs1,
+        out1fn.c_str(),
+        out1fn.c_str());
+    realise(fs3);
 
 #if 0
     Expr e1 = ATmake("Exec(Str(<str>), Hash(<str>), [])",
