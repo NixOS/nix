@@ -163,6 +163,16 @@ static void initAndRun(int argc, char * * argv)
 }
 
 
+#if HAVE_SETRESUID
+#define _setuid(uid) setresuid(uid, uid, uid)
+#define _setgid(gid) setresgid(gid, gid, gid)
+#else
+/* Only works properly when run by root. */
+#define _setuid(uid) setuid(uid)
+#define _setgid(gid) setgid(gid)
+#endif
+
+
 void switchToNixUser()
 {
 #if SETUID_HACK
@@ -186,6 +196,13 @@ void switchToNixUser()
         exit(1);
     }
 
+    /* !!! Apparently it is unspecified whether getgroups() includes
+       the effective gid.  In that case the following test is always
+       true *if* the program is installed setgid (which we do when we
+       have setresuid()).  On Linux this doesn't appear to be the
+       case, but we should switch to the real gid before doing this
+       test, and then switch back to the saved gid. */ 
+
     /* Check that the current user is a member of the Nix group. */
     bool found = false;
     for (int i = 0; i < nrGids; ++i)
@@ -196,15 +213,15 @@ void switchToNixUser()
 
     if (!found) {
         /* Not in the Nix group - drop all root/Nix privileges. */
-        setgid(getgid());
-        setuid(getuid());
+        _setgid(getgid());
+        _setuid(getuid());
         return;
     }
 
     /* Set the real, effective and saved gids to gr->gr_gid.  Also
        make very sure that this succeeded.  We switch the gid first
        because we cannot do it after we have dropped root uid. */
-    if (setgid(gr->gr_gid) != 0 ||
+    if (_setgid(gr->gr_gid) != 0 ||
         getgid() != gr->gr_gid ||
         getegid() != gr->gr_gid)
     {
@@ -222,7 +239,7 @@ void switchToNixUser()
     /* This will drop all root privileges, setting the real, effective
        and saved uids to pw->pw_uid.  Also make very sure that this
        succeeded.*/
-    if (setuid(pw->pw_uid) != 0 ||
+    if (_setuid(pw->pw_uid) != 0 ||
         getuid() != pw->pw_uid ||
         geteuid() != pw->pw_uid)
     {
@@ -240,11 +257,7 @@ int main(int argc, char * * argv)
 {
     /* If we are setuid root, we have to get rid of the excess
        privileges ASAP. */
-    printMsg(lvlError, format("%1% %2% %3% %4%\n") % getuid() % geteuid()
-        % getgid() % getegid());
     switchToNixUser();
-    printMsg(lvlError, format("%1% %2% %3% %4%\n") % getuid() % geteuid()
-        % getgid() % getegid());
     
     /* ATerm setup. */
     ATerm bottomOfStack;

@@ -151,6 +151,12 @@ if test "$setuid_hack" = "yes"; then
     AC_DEFINE(SETUID_HACK, 1, [whether to install Nix setuid])
 fi
 
+AC_CHECK_FUNC(setresuid, [HAVE_SETRESUID=1], [HAVE_SETRESUID=])
+AM_CONDITIONAL(HAVE_SETRESUID, test "$HAVE_SETRESUID" = "1")
+if test "$HAVE_SETRESUID" = "1"; then
+    AC_DEFINE(HAVE_SETRESUID, 1, [whether we have setresuid()])
+fi
+
 AC_ARG_WITH(nix-user, AC_HELP_STRING([--with-nix-user=USER],
   [user for Nix setuid binaries]),
   NIX_USER=$withval, NIX_USER=nix)
