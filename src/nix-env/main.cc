@@ -516,6 +516,8 @@ static void opQuery(Globals & globals,
 
     enum { sInstalled, sAvailable } source = sInstalled;
 
+    readOnlyMode = true; /* makes evaluation a bit faster */
+
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
         if (*i == "--status" || *i == "-s") printStatus = true;
