@@ -1,34 +1,43 @@
 <appendix>
-  <title>Bugs</title>
+  <title>Bugs / To-Do</title>
 
   <itemizedlist>
 
     <listitem>
       <para>
-	Nix should automatically recover the Berkeley DB database.
+        Nix should automatically remove Berkeley DB logfiles.
       </para>
     </listitem>
 
     <listitem>
       <para>
-	Nix should automatically remove Berkeley DB logfiles.
+        Unify the concepts of successors and substitutes into a general notion
+        of <emphasis>equivalent expressions</emphasis>.  Expressions are
+        equivalent if they have the same target paths with the same
+        identifiers.  However, even though they are functionally equivalent,
+        they may differ stronly with respect to their <emphasis>performance
+          characteristics</emphasis>.  For example, realising a slice is more
+        efficient that realising the derivation from which that slice was
+        produced.  On the other hand, distributing sources may be more
+        efficient (storage- or bandwidth-wise) than distributing binaries.  So
+        we need to be able to attach weigths or priorities or performance
+        annotations to expressions; Nix can then choose the most efficient
+        expression dependent on the context.
       </para>
     </listitem>
 
     <listitem>
       <para>
-	Unify the concepts of successors and substitutes into a general notion
-	of <emphasis>equivalent expressions</emphasis>.  Expressions are
-	equivalent if they have the same target paths with the same
-	identifiers.  However, even though they are functionally equivalent,
-	they may differ stronly with respect to their <emphasis>performance
-	  characteristics</emphasis>.  For example, realising a slice is more
-	efficient that realising the derivation from which that slice was
-	produced.  On the other hand, distributing sources may be more
-	efficient (storage- or bandwidth-wise) than distributing binaries.  So
-	we need to be able to attach weigths or priorities or performance
-	annotations to expressions; Nix can then choose the most efficient
-	expression dependent on the context.
+        <emphasis>Build management.</emphasis>  In principle it is already
+        possible to do build management using Nix (by writing builders that
+        perform appropriate build steps), but the Nix expression language is
+        not yet powerful enough to make this pleasant (?).  The language should
+        be extended with features from the <ulink
+          url='http://www.cs.uu.nl/~eelco/maak/'>Maak build manager</ulink>.
+        Another interesting idea is to write a <command>make</command>
+        implementation that uses Nix as a back-end to support <ulink
+          url='http://www.research.att.com/~bs/bs_faq.html#legacy'>legacy</ulink> 
+        build files.
       </para>
     </listitem>
 

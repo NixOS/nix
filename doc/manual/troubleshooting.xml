@@ -2,27 +2,6 @@
   <title>Troubleshooting</title>
 
   <sect1>
-    <title>Database hangs</title>
-
-    <para>
-      If Nix or Fix appear to hang immediately after they are started, Nix's
-      database is probably <quote>wedged</quote>, i.e., some process died while
-      it held a lock on the database.  The solution is to ensure that no other
-      processes are accessing the database and then run the following command:
-    </para>
-
-    <screen>
-      $ db_recover -e -h <replaceable>prefix</replaceable>/var/nix/db</screen>
-
-    <para>
-      Here, <replaceable>prefix</replaceable> should be replaced by Nix's
-      installation prefix.
-    </para>
-
-  </sect1>
-
-
-  <sect1>
     <title>Database logfile removal</title>
 
     <para>

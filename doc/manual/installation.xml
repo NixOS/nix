@@ -2,72 +2,112 @@
   <title>Installation</title>
 
   <sect1>
-    <title>Prerequisites</title>
-
-    <para>
-      Nix uses Sleepycat's Berkeley DB and CWI's ATerm library.  However, these
-      are fetched automatically as part of the build process.
-    </para>
-
-    <para>
-      Other than that, you need a good C++ compiler.  GCC 2.95 does not appear
-      to work; please use GCC 3.x.
-    </para>
-  </sect1>
-
-  <sect1>
     <title>Obtaining Nix</title>
 
     <para>
-      Nix can be obtained from its <ulink
-        url='http://losser.st-lab.cs.uu.nl:12080/repos/trace/nix/trunk'>Subversion 
+      The easiest way to obtain Nix is to download a <ulink
+        url='http://www.cs.uu.nl/groups/ST/Trace/Nix'>source
+        distribution.</ulink>  
+    </para>
+
+    <para>
+      Alternatively, the most recent sources of Nix can be obtained from its
+      <ulink url='https://svn.cs.uu.nl:12443/repos/trace/nix/trunk'>Subversion 
         repository</ulink>.  For example, the following command will check out
       the latest revision into a directory called <filename>nix</filename>:
     </para>
 
     <screen>
-$ svn checkout http://losser.st-lab.cs.uu.nl:12080/repos/trace/nix/trunk nix</screen>
+$ svn checkout https://svn.cs.uu.nl:12443/repos/trace/nix/trunk nix</screen>
 
     <para>
       Likewise, specific releases can be obtained from the <ulink
-        url='http://losser.st-lab.cs.uu.nl:12080/repos/trace/nix/tags'>tags
+        url='https://svn.cs.uu.nl:12443/repos/trace/nix/tags'>tags
         directory</ulink> of the repository.  If you don't have Subversion, you
-      can download a <ulink
-        url='http://losser.st-lab.cs.uu.nl:12080/dist/trace/'>compressed
-        tar-file</ulink> of the latest revision of the repository.
+      can also download an automatically generated <ulink
+        url='https://svn.cs.uu.nl:12443/dist/trace/'>compressed
+        tar-file</ulink> of the head revision of the trunk.
     </para>
 
+  </sect1>
+
+  <sect1>
+    <title>Prerequisites</title>
+
+    <para>
+      A fairly recent version of GCC/G++ is required.  Version 2.95 and higher
+      should work.
+    </para>
+
+    <para>
+      To rebuild this manual and the man-pages you need the
+      <command>xmllint</command> and <command>xsltproc</command>, which are
+      part of the <literal>libxml2</literal> and <literal>libxslt</literal>
+      packages, respectively.  You also need the <ulink
+        url='http://docbook.sourceforge.net/projects/xsl/'>DocBook XSL
+        stylesheets</ulink> and optionally the <ulink
+        url='http://www.oasis-open.org/docbook/xml/4.2/docbook-xml-4.2.zip'>
+        DocBook XML 4.2 DTD</ulink>.  Note that these are only required if you
+      modify the manual sources or when you are building from the Subversion
+      repository.
+    </para>
+
+    <para>
+      Nix uses Sleepycat's Berkeley DB, CWI's ATerm library, and SDF parser
+      library.  These are included in the Nix source distribution.  If you
+      build from the Subversion repository, you must download them yourself and
+      place them in the <filename>externals/</filename> directory.  See
+      <filename>externals/Makefile.am</filename> for the precise URLs of these
+      packages.
+    </para>
   </sect1>
 
   <sect1>
     <title>Building Nix</title>
 
     <para>
-      To build Nix, do the following:
+      After unpacking or checking out the Nix sources, issue the following
+      commands:
     </para>
 
     <screen>
-$ autoreconf -i
 $ ./configure <replaceable>options...</replaceable>
 $ make
 $ make install</screen>
 
     <para>
-      Currently, the only useful switch for <command>configure</command> is
-      <option>--prefix=<replaceable>prefix</replaceable></option> to specify
-      where Nix is to be installed.  The default installation directory is
+      When building from the Subversion repository, these should be preceded by
+      the command:
+    </para>
+
+    <screen>
+$ autoreconf -i</screen>
+
+    <para>
+      The installation path can be specified by passing the
+      <option>--prefix=<replaceable>prefix</replaceable></option> to
+      <command>configure</command>.  The default installation directory is
       <filename>/nix</filename>.  You can change this to any location you like.
-      You should ensure that you have write permission to the installation
-      prefix. 
+      You must have write permission to the <replaceable>prefix</replaceable>
+      path.
     </para>
 
     <warning>
       <para>
         It is advisable <emphasis>not</emphasis> to change the installation
-        prefix, since doing so will in all likelihood make it impossible to use
-        derivates built on other systems.
+        prefix from its default, since doing so will in all likelihood make it
+        impossible to use derivations built on other systems.
       </para>
     </warning>
+
+    <para>
+      If you want to rebuilt the documentation, pass the full path to the
+      DocBook XML catalog file (<filename>docbook.cat</filename>) and to the
+      DocBook XSL stylesheets using the
+      <option>--with-docbook-catalog=<replaceable>path</replaceable></option>
+      and <option>--with-docbook-xsl=<replaceable>path</replaceable></option>
+      options.
+    </para>
 
   </sect1>
 
