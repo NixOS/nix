@@ -41,6 +41,7 @@ AC_CONFIG_FILES([Makefile
    corepkgs/Makefile
    corepkgs/fetchurl/Makefile
    corepkgs/nar/Makefile
+   corepkgs/buildenv/Makefile
    doc/Makefile
    doc/manual/Makefile
   ])

@@ -1,1 +1,1 @@
-SUBDIRS = fetchurl nar
+SUBDIRS = fetchurl nar buildenv

@@ -164,7 +164,7 @@ void switchLink(Path link, Path target)
 void createUserEnv(EvalState & state, const DrvInfos & drvs)
 {
     /* Get the environment builder expression. */
-    Expr envBuilder = parseExprFromFile("/home/eelco/nix/corepkgs/buildenv"); /* !!! */
+    Expr envBuilder = parseExprFromFile(nixDataDir + "/nix/corepkgs/buildenv"); /* !!! */
 
     /* Construct the whole top level derivation. */
     ATermList inputs = ATempty;
