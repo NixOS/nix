@@ -1,5 +1,5 @@
 SUBDIRS = externals src scripts corepkgs doc misc tests
-EXTRA_DIST = substitute.mk nix.spec nix.spec.in bootstrap.sh
+EXTRA_DIST = substitute.mk nix.spec nix.spec.in bootstrap.sh svn-revision
 
 include ./substitute.mk
 
@@ -33,3 +33,6 @@ init-state:
 else
 init-state:
 endif
+
+svn-revision:
+	svnversion . > svn-revision

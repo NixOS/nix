@@ -14,8 +14,6 @@ if test "$STABLE" != "1"; then
     elif REVISION=`cat $srcdir/svn-revision 2> /dev/null`; then
         VERSION="${VERSION}pre${REVISION}"
     fi
-    NIX_VERSION=$VERSION
-    AC_SUBST(NIX_VERSION)
 fi
 
 AC_PREFIX_DEFAULT(/nix)
