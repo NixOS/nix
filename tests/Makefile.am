@@ -11,11 +11,15 @@ TESTS_ENVIRONMENT = TEST_ROOT=$(TEST_ROOT) \
 
 simple.sh: simple.nix
 dependencies.sh: dependencies.nix
+locking.sh: locking.nix
 
-TESTS = init.sh simple.sh dependencies.sh
+TESTS = init.sh simple.sh dependencies.sh locking.sh
+
+XFAIL_TESTS =
 
 include ../substitute.mk
 
 EXTRA_DIST = $(TESTS) \
   simple.nix.in simple.builder.sh \
-  dependencies.nix.in dependencies.builder*.sh
+  dependencies.nix.in dependencies.builder*.sh \
+  locking.nix.in locking.builder.sh

@@ -1,0 +1,18 @@
+let {
+
+  mkDrv = text: inputs: derivation {
+    name = "locking";
+    system = "@system@";
+    builder = "@shell@";
+    args = ["-e" "-x" ./locking.builder.sh];
+    inherit text inputs;
+  };
+
+  a = mkDrv "a" [];
+  b = mkDrv "b" [a];
+  c = mkDrv "c" [a b];
+  d = mkDrv "d" [a];
+  e = mkDrv "e" [c d];
+
+  body = e;
+}
