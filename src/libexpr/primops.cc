@@ -100,7 +100,13 @@ static Path copyAtom(EvalState & state, const Path & srcPath)
 
     Path drvPath = writeTerm(unparseStoreExpr(ne), "c");
 
+    /* !!! can we get rid of drvRoots? */
     state.drvRoots[drvPath] = ne.closure.roots;
+
+    /* Optimisation, but required in read-only mode! because in that
+       case we don't actually write store expressions, so we can't
+       read them later. */
+    state.drvHashes[drvPath] = hashDerivationModulo(state, ne);
 
     printMsg(lvlChatty, format("copied `%1%' -> closure `%2%'")
         % srcPath % drvPath);
@@ -325,6 +331,11 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
 
     printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'")
         % drvName % drvPath);
+
+    /* Optimisation, but required in read-only mode! because in that
+       case we don't actually write store expressions, so we can't
+       read them later. */
+    state.drvHashes[drvPath] = hashDerivationModulo(state, ne);
 
     /* !!! assumes a single output */
     attrs.set("outPath", makeAttrRHS(makePath(toATerm(outPath)), makeNoPos()));
