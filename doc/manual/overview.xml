@@ -174,8 +174,8 @@ $ nix-env -if pkgs/system/i686-linux.nix pan</screen>
 
     <screen>
 $ nix-pull
-http://catamaran.labs.cs.uu.nl/~eelco/nix/nixpkgs-<replaceable>version</replaceable>/
-obtaining list of Nix archives at http://catamaran.labs.cs.uu.nl/~eelco/nix/nixpkgs-<replaceable>version</replaceable>...
+http://catamaran.labs.cs.uu.nl/dist/nix/nixpkgs-<replaceable>version</replaceable>/
+obtaining list of Nix archives at http://catamaran.labs.cs.uu.nl/dist/nix/nixpkgs-<replaceable>version</replaceable>...
 ...</screen>
 
     <para>

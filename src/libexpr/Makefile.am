@@ -12,11 +12,13 @@ AM_CFLAGS = \
 
 # Parser generation.
 
+parser.o: parser-tab.h lexer-tab.h
+
 parser-tab.c parser-tab.h: parser.y
-	../grammartest/inst/bin/bison -v -o parser-tab.c parser.y -d
+	$(bison) -v -o parser-tab.c parser.y -d
 
 lexer-tab.c lexer-tab.h: lexer.l
-	flex --outfile lexer-tab.c --header-file=lexer-tab.h lexer.l 
+	$(flex) --outfile lexer-tab.c --header-file=lexer-tab.h lexer.l 
 
 
 CLEANFILES =

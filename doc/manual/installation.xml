@@ -46,25 +46,42 @@ $ svn checkout https://svn.cs.uu.nl:12443/repos/trace/nix/trunk nix</screen>
     </para>
 
     <para>
-      To rebuild this manual and the man-pages you need the
-      <command>xmllint</command> and <command>xsltproc</command>, which are
-      part of the <literal>libxml2</literal> and <literal>libxslt</literal>
-      packages, respectively.  You also need the <ulink
-        url='http://docbook.sourceforge.net/projects/xsl/'>DocBook XSL
-        stylesheets</ulink> and optionally the <ulink
-        url='http://www.oasis-open.org/docbook/xml/4.2/docbook-xml-4.2.zip'>
-        DocBook XML 4.2 DTD</ulink>.  Note that these are only required if you
-      modify the manual sources or when you are building from the Subversion
-      repository.
+      To build this manual and the man-pages you need the
+      <command>xmllint</command> and <command>xsltproc</command>
+      programs, which are part of the <literal>libxml2</literal> and
+      <literal>libxslt</literal> packages, respectively.  You also
+      need the <ulink
+      url='http://docbook.sourceforge.net/projects/xsl/'>DocBook XSL
+      stylesheets</ulink> and optionally the <ulink
+      url='http://www.oasis-open.org/docbook/xml/4.2/docbook-xml-4.2.zip'>
+      DocBook XML 4.2 DTD</ulink>.  Note that these are only required
+      if you modify the manual sources or when you are building from
+      the Subversion repository.
     </para>
 
     <para>
-      Nix uses Sleepycat's Berkeley DB, CWI's ATerm library, and SDF parser
-      library.  These are included in the Nix source distribution.  If you
-      build from the Subversion repository, you must download them yourself and
-      place them in the <filename>externals/</filename> directory.  See
-      <filename>externals/Makefile.am</filename> for the precise URLs of these
-      packages.
+      To build the parser, very <emphasis>recent</emphasis> versions
+      of Bison and Flex are required.  (This is because Nix needs GLR
+      support in Bison and reentrancy support in Flex.)  For Bison,
+      you need version 1.875c or higher (1.875 does
+      <emphasis>not</emphasis> work), which can be obtained from the
+      <ulink url='ftp://alpha.gnu.org/pub/gnu/bison'>GNU FTP
+      server</ulink>.  For Flex, you need version 2.5.31, which is
+      available on <ulink
+      url='http://lex.sourceforge.net/'>SourceForge</ulink>.  Slightly
+      older versions may also work, but ancient versions like the
+      ubiquitous 2.5.4a won't.  Note that these are only required if
+      you modify the parser or when you are building from the
+      Subversion repository.
+    </para>
+
+    <para>
+      Nix uses Sleepycat's Berkeley DB and CWI's ATerm library.  These
+      are included in the Nix source distribution.  If you build from
+      the Subversion repository, you must download them yourself and
+      place them in the <filename>externals/</filename> directory.
+      See <filename>externals/Makefile.am</filename> for the precise
+      URLs of these packages.
     </para>
   </sect1>
 

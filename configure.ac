@@ -45,6 +45,8 @@ AC_LANG_POP(C++)
 AC_PATH_PROG(wget, wget)
 AC_PATH_PROG(xmllint, xmllint)
 AC_PATH_PROG(xsltproc, xsltproc)
+AC_PATH_PROG(flex, flex, false)
+AC_PATH_PROG(bison, bison, false)
 
 AC_ARG_WITH(docbook-catalog, AC_HELP_STRING([--with-docbook-catalog=PATH],
   [path of the DocBook XML DTD]),
