@@ -2,7 +2,7 @@
 
 <sect1><title>A simple Nix expression</title>
 
-<para>This section shows how to write simple Nix expressions&mdash;the
+<para>This section shows how to write simple Nix expressions — the
 things that describe how to build a package.</para>
 
 <example id='ex-hello-nix'><title>Nix expression for GNU Hello</title>
@@ -139,8 +139,8 @@ must not be null and it must have been built using the same instance
 of the <varname>expat</varname> library as was passed to the
 Subversion expression.  This is since the Subversion code is
 dynamically linked against the Apache code and they both use Expat,
-they must be linked against the same instance&mdash;otherwise a
-conflict might occur.</para>
+they must be linked against the same instance — otherwise a conflict
+might occur.</para>
 
 </sect1>
 

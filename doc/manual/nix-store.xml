@@ -171,10 +171,10 @@
               <quote>live</quote> store paths, which are all the store
               paths reachable from a set of <quote>root</quote> store
               expressions read from standard input.  Live paths should
-              never be deleted, since that would break consistency
-              &mdash; it would become possible that applications are
-              installed that reference things that are no longer
-              present in the store.
+              never be deleted, since that would break consistency —
+              it would become possible that applications are installed
+              that reference things that are no longer present in the
+              store.
             </para>
           </listitem>
         </varlistentry>

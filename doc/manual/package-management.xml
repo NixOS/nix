@@ -2,7 +2,7 @@
 
 <para>This chapter discusses how to do package management with Nix,
 i.e., how to obtain, install, upgrade, and erase components.  This is
-the <quote>user's</quote> perspective of the Nix system &mdash; people
+the <quote>user's</quote> perspective of the Nix system — people
 who want to <emphasis>create</emphasis> components should consult
 <xref linkend='chap-writing-nix-expressions' />.</para>
 
@@ -18,7 +18,7 @@ available for installation.</para>
 on the set of installed applications.  That is, there might be lots of
 applications present on the system (possibly in many different
 versions), but users can have a specific selection of those
-active &mdash; where <quote>active</quote> just means that it appears
+active — where <quote>active</quote> just means that it appears
 in a directory in the user's <envar>PATH</envar>.</para>
 
 <para>Such a view on the set of installed applications is called a
@@ -95,11 +95,11 @@ url='http://subversion.tigris.org/'>Subversion version management
 system</ulink>).</para>
 
 <para>When you do this for the first time, Nix will start building
-Subversion and all its dependencies.  This will take quite a while
-&mdash; typically an hour or two on modern machines.  Fortunately,
-there is a faster way (so just do a Ctrl-C on that install
-operation!): you just need to tell Nix that pre-built binaries of all
-those components are available somewhere.  This is done using the
+Subversion and all its dependencies.  This will take quite a while —
+typically an hour or two on modern machines.  Fortunately, there is a
+faster way (so just do a Ctrl-C on that install operation!): you just
+need to tell Nix that pre-built binaries of all those components are
+available somewhere.  This is done using the
 <command>nix-pull</command> command, which must be supplied with a URL
 containing a <emphasis>manifest</emphasis> describing what binaries
 are available.  This URL should correspond to the Nix Packages release
@@ -137,7 +137,7 @@ defined by some pretty much arbitrary rules regarding ordering of
 version numbers (which generally do what you'd expect of them).  To
 just unconditionally replace Subversion with whatever version is in
 the Nix expressions, use <parameter>-i</parameter> instead of
-<parameter>-u</parameter> &mdash; <parameter>-i</parameter> will
+<parameter>-u</parameter> — <parameter>-i</parameter> will
 remove whatever version is already installed.</para>
 
 <para>You can also upgrade all components for which there are newer
