@@ -110,6 +110,10 @@ more-or-less cracked.  We don't currently depend very much on the
 collision-resistance of MD5, but we will once we start sharing build
 results between users.</para></listitem>
 
+<listitem><para>It would be useful to have an option in
+<command>nix-env --delete-generations</command> to remove non-current
+generations older than a certain age.</para></listitem>
+
 </itemizedlist>
 
 </appendix>

@@ -41,11 +41,11 @@ during an upgrade in which part of the old version and part of the new
 version are simultaneously visible (which might well cause the
 component to fail).</para></listitem>
 
-<listitem><para>Likewise, it is possible to atomically roll-back after
+<listitem><para>Likewise, it is possible to atomically roll back after
 an install, upgrade, or uninstall action.  That is, in a fast (O(1))
-operation the previous configuration of the system will be
-restored.  This is because upgrade or uninstall actions doesn't
-actually remove components from the system.</para></listitem>
+operation the previous configuration of the system will be restored.
+This is because upgrade or uninstall actions doesn't actually remove
+components from the system.</para></listitem>
 
 <listitem><para>Unused components can be
 <emphasis>garbage-collected</emphasis> automatically and safely.
@@ -111,7 +111,7 @@ deployment of a complete web server with all its configuration files,
 static pages, software dependencies, and so on.  Nix's advantages for
 software deployment also apply here, for instance, the ability
 trivially to have multiple configurations at the same time, or the
-ability to do roll-backs.</para></listitem>
+ability to do rollbacks.</para></listitem>
 
 </itemizedlist>
 

@@ -332,7 +332,69 @@ This will <emphasis>not</emphasis> change the
 
 <sect1 id='sec-garbage-collection'><title>Garbage collection</title>
 
+<para><command>nix-env</command> operations such as upgrades
+(<option>-u</option>) and uninstall (<option>-e</option>) never
+actually delete components from the system.  All they do (as shown
+above) is to make a new user environment that no longer contains
+symlinks to the <quote>deleted</quote> components.</para>
+
+<para>Of course, since disk space is not infinite, unused components
+should be removed at some point.  You can do this by running the Nix
+garbage collector.  It will remove from the Nix store any component
+not used (directly or indirectly) by any generation of any
+profile.</para>
+
+<para>Note however that as long as old generations reference a
+component, it will not be deleted.  After all, we wouldn't be able to
+do a rollback otherwise.  So in order for garbage collection to be
+effective, you should also delete (some) old generations.  Of course,
+this should only be done if you are certain that you will not need to
+roll back.</para>
+
+<para>To delete all old (non-current) generations of your current
+profile:
+
+<screen>
+$ nix-env --delete-generations old</screen>
+
+Instead of <literal>old</literal> you can also specify a list of
+generations, e.g.,
+
+<screen>
+$ nix-env --delete-generations 10 11 14</screen>
+
+</para>
+
+<para>After removing appropriate old generations you can run the
+garbage collector as follows:
+
+<screen>
+$ nix-collect-garbage</screen>
+
+You can alo first view what files would be deleted:
+
+<screen>
+$ nix-collect-garbage --print-dead</screen>
+
+Likewise, the option <option>--print-live</option> will show the paths
+that <emphasis>won't</emphasis> be deleted.</para>
+
+<sect2><title>Garbage collector roots</title>
+
 <para>TODO</para>
+
+<para>The garbage collector uses as roots all store expressions
+mentioned in all files with extension <filename>.gcroot</filename> in
+the directory
+<filename><replaceable>prefix</replaceable>/var/nix/gcroots/</filename>,
+or in any file or directory symlinked to from that directory.  E.g.,
+by default,
+<filename><replaceable>prefix</replaceable>/var/nix/gcroots/</filename>
+contains a symlink to
+<filename><replaceable>prefix</replaceable>/var/nix/profiles/</filename>,
+so all generations of all profiles are also roots of the collector.</para>
+
+</sect2>
 
 </sect1>
 
