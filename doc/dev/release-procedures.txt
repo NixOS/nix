@@ -1,0 +1,30 @@
+To produce a `stable' release from the trunk:
+
+0. Make sure that the trunk builds in the release supervisor.
+
+1. Branch the trunk, e.g., `svn cp .../trunk
+   .../branches/0.5-release'.
+
+2. Switch to the branch, e.g., `svn switch .../branches/0.5-release'.
+
+3. In `configure.ac', change `STABLE=0' into `STABLE=1' and commit.
+
+4. In the release supervisor, add a one-time job to build
+   `.../branches/0.5-release'.
+
+5. Make sure that the release succeeds.
+
+6. Move the branch to a tag, e.g., `svn mv .../branches/0.5-release
+   .../tags/0.5'.
+
+   Note that the branch should not be used for maintenance; it should
+   be deleted after the release has been created.  A maintenance
+   branch (e.g., `.../branches/0.5') should be created from the
+   original revision of the trunk (since maintenance releases should
+   also be tested first; hence, we cannot have `STABLE=1').  The same
+   procedure can then be followed to produce maintenance release; just
+   substitute `.../branches/VERSION' for the trunk.
+
+7. Switch back to the trunk.
+
+8. Bump the version number in `configure.ac' (in AC_INIT).
