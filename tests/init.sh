@@ -30,7 +30,9 @@ mkdir -p "$NIX_LOCALSTATE_DIR"/log/nix
 mkdir $NIX_DATA_DIR/nix
 cp -prd $TOP/corepkgs $NIX_DATA_DIR/nix/
 # Bah, script has the prefix hard-coded.
-for i in $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh \
+for i in \
+    $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh \
+    $NIX_DATA_DIR/nix/corepkgs/fetchurl/builder.sh \
     $NIX_BIN_DIR/nix/download-using-manifests.pl \
     $NIX_BIN_DIR/nix-prefetch-url \
     $NIX_BIN_DIR/nix-collect-garbage \
