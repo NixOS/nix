@@ -94,7 +94,8 @@ Slice normaliseFState(FSId id, FSIdSet pending)
         try {
             expandId(i->second, i->first, "/", pending);
         } catch (Error & e) {
-            debug(format("fast build failed for %1%") % e.what());
+            debug(format("fast build failed for `%1%': %2%")
+		  % i->first % e.what());
             fastBuild = false;
             break;
         }
