@@ -197,7 +197,9 @@ static void createUserEnv(EvalState & state, const UserEnvElems & elems,
     PathSet drvsToBuild;
     for (UserEnvElems::const_iterator i = elems.begin(); 
          i != elems.end(); ++i)
-        if (i->second.drvPath != "")
+        /* Call to `isDerivation' is for compatibility with Nix <= 0.7
+           user environments. */
+        if (i->second.drvPath != "" && isDerivation(i->second.drvPath))
             drvsToBuild.insert(i->second.drvPath);
 
     debug(format("building user environment dependencies"));
