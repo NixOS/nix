@@ -23,6 +23,10 @@ my $stateDir = $ENV{"NIX_STATE_DIR"};
 $stateDir = "@localstatedir@/nix" unless defined $stateDir;
 
 
+# Prevent access problems in shared-stored installations.
+umask 0022;
+
+
 # Obtain URLs either from the command line or from a configuration file.
 my %narFiles;
 my %patches;
