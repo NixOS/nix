@@ -3,6 +3,7 @@
 use strict;
 use FileHandle;
 use File::Spec;
+use Digest::MD5;
 
 my $system = "@SYSTEM@";
 
@@ -34,6 +35,15 @@ sub fetchFile {
     }
 }
 
+sub hashFile {
+    my $file = shift;
+    open FILE, "< $file" or die "cannot open $file";
+    # !!! error checking
+    my $hash = Digest::MD5->new->addfile(*FILE)->hexdigest;
+    close FILE;
+    return $hash;
+}
+
 sub convert {
     my $descr = shift;
 
@@ -47,9 +57,9 @@ sub convert {
 
     my $IN = new FileHandle;
     my $OUT = new FileHandle;
-    my $outfile = "$outdir/$fn";
+    my $tmpfile = "$outdir/$fn-tmp";
     open $IN, "< $descr" or die "cannot open $descr";
-    open $OUT, "> $outfile" or die "cannot create $outfile";
+    open $OUT, "> $tmpfile" or die "cannot create $tmpfile";
 
     print $OUT "system : $system\n";
 
@@ -60,25 +70,27 @@ sub convert {
             my ($name, $loc) = ($1, $2);
             my $file = fetchFile($loc);
             $file = File::Spec->rel2abs($file, $dir);
-            my $out = `md5sum $file`;
-            die unless ($? == 0);
-            $out =~ /^([0-9a-f]+)\s/;
-            my $hash = $1;
+	    my $hash = hashFile($file);
             print $OUT "$name = $hash\n";
         } elsif (/^(\w+)\s*<-\s*([+\w\d\.\/-]+)\s*(\#.*)?$/) {
             my $name = $1;
             my $file = $2;
             $file = File::Spec->rel2abs($file, $dir);
             $file = convert($file);
-            my $out = `md5sum $file`;
-            die unless ($? == 0);
-            $out =~ /^([0-9a-f]+)\s/;
-            my $hash = $1;
+	    my $hash = hashFile($file);
             print $OUT "$name <- $hash\n";
         } else {
             print $OUT "$_\n";
         }
     }
+
+    close $OUT;
+    close $IN;
+
+    my $hash = hashFile($tmpfile);
+
+    my $outfile = "$outdir/$hash-$fn";
+    rename($tmpfile, $outfile) or die "cannot rename $tmpfile to $outfile";
 
     $donetmpls{$descr} = $outfile;
     return $outfile;
