@@ -271,6 +271,16 @@ Path createTempDir()
 }
 
 
+void createDirs(const Path & path)
+{
+    if (path == "") return;
+    createDirs(dirOf(path));
+    if (!pathExists(path))
+        if (mkdir(path.c_str(), 0777) == -1)
+            throw SysError(format("creating directory `%1%'") % path);
+}
+
+
 void writeStringToFile(const Path & path, const string & s)
 {
     AutoCloseFD fd(open(path.c_str(),

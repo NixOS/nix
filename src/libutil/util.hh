@@ -107,6 +107,9 @@ void makePathReadOnly(const Path & path);
 /* Create a temporary directory. */
 Path createTempDir();
 
+/* Create a directory and all its parents, if necessary. */
+void createDirs(const Path & path);
+
 /* Create a file and write the given text to it.  The file is written
    in binary mode (i.e., no end-of-line conversions).  The path should
    not already exist. */

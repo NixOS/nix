@@ -43,16 +43,6 @@ static int openGCLock(LockType lockType)
 }
 
 
-static void createDirs(const Path & path)
-{
-    if (path == "") return;
-    createDirs(dirOf(path));
-    if (!pathExists(path))
-        if (mkdir(path.c_str(), 0777) == -1)
-            throw SysError(format("creating directory `%1%'") % path);
-}
-
-
 void createSymlink(const Path & link, const Path & target, bool careful)
 {
     /* Create directories up to `gcRoot'. */
@@ -122,8 +112,11 @@ void addTempRoot(const Path & path)
     if (fdTempRoots == -1) {
 
         while (1) {
-            fnTempRoots = (format("%1%/%2%/%3%")
-                % nixStateDir % tempRootsDir % getpid()).str();
+            Path dir = (format("%1%/%2%") % nixStateDir % tempRootsDir).str();
+            createDirs(dir);
+            
+            fnTempRoots = (format("%1%/%2%")
+                % dir % getpid()).str();
 
             AutoCloseFD fdGCLock = openGCLock(ltRead);
             

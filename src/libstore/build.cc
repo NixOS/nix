@@ -1211,10 +1211,16 @@ void DerivationGoal::computeClosure()
 }
 
 
+static string drvsLogDir = "drvs";
+
+
 void DerivationGoal::openLogFile()
 {
     /* Create a log file. */
-    Path logFileName = nixLogDir + "/drvs/" + baseNameOf(drvPath);
+    Path dir = (format("%1%/%2%") % nixLogDir % drvsLogDir).str();
+    createDirs(dir);
+    
+    Path logFileName = (format("%1%/%2%") % dir % baseNameOf(drvPath)).str();
     fdLogFile = open(logFileName.c_str(),
         O_CREAT | O_WRONLY | O_TRUNC, 0666);
     if (fdLogFile == -1)
