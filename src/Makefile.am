@@ -20,7 +20,7 @@ test_LDADD = libshared.a libnix.a -ldb_cxx-4 -lATerm
 noinst_LIBRARIES = libnix.a libshared.a
 
 libnix_a_SOURCES = util.cc hash.cc archive.cc md5.c \
- fstate.cc store.cc globals.cc db.cc
+ fstate.cc store.cc globals.cc db.cc references.cc
 
 libshared_a_SOURCES = shared.cc
 

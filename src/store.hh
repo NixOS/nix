@@ -1,5 +1,5 @@
-#ifndef __VALUES_H
-#define __VALUES_H
+#ifndef __STORE_H
+#define __STORE_H
 
 #include <string>
 
@@ -37,4 +37,4 @@ void addToStore(string srcPath, string & dstPath, Hash & hash,
 void deleteFromStore(const string & path);
 
 
-#endif /* !__VALUES_H */
+#endif /* !__STORE_H */

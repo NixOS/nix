@@ -1,5 +1,5 @@
-#ifndef __EVAL_H
-#define __EVAL_H
+#ifndef __FSTATE_H
+#define __FSTATE_H
 
 #include <set>
 
@@ -97,4 +97,4 @@ Hash writeTerm(ATerm t, const string & suffix, string * p = 0);
 void registerSuccessor(const Hash & fsHash, const Hash & scHash);
 
 
-#endif /* !__EVAL_H */
+#endif /* !__FSTATE_H */

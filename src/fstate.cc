@@ -11,6 +11,7 @@
 #include "globals.hh"
 #include "store.hh"
 #include "db.hh"
+#include "references.hh"
 
 
 /* A Unix environment is a mapping from strings to strings. */
@@ -279,12 +280,15 @@ static FState realise(FState fs, StringSet & paths)
         checkPlatform(platform);
         
         /* Realise inputs. */
+        Strings inPaths;
         ATermList ins2 = ATempty;
         while (!ATisEmpty(ins)) {
-            ins2 = ATinsert(ins2, realise(ATgetFirst(ins), paths));
+            FState in = realise(ATgetFirst(ins), paths);
+            inPaths.push_back(fstatePath(in));
+            ins2 = ATinsert(ins2, in);
             ins = ATgetNext(ins);
         }
-        ins2 = ATreverse(ins2);
+        ins = ATreverse(ins2);
 
         /* Build the environment. */
         Environment env;
@@ -323,9 +327,34 @@ static FState realise(FState fs, StringSet & paths)
            values.cc. */
         registerPath(outPath, outHash);
 
+        /* Filter out inputs that are not referenced in the output. */
+        for (Strings::iterator i = inPaths.begin();
+             i != inPaths.end(); i++)
+            debug(format("in: %1%") % *i);
+
+        Strings outPaths = filterReferences(outPath, inPaths);
+
+        for (Strings::iterator i = outPaths.begin();
+             i != outPaths.end(); i++)
+            debug(format("out: %1%") % *i);
+
+        ins2 = ATempty;
+        while (!ATisEmpty(ins)) {
+            FState in = ATgetFirst(ins);
+            string path = fstatePath(in);
+            for (Strings::iterator i = outPaths.begin();
+                 i != outPaths.end(); i++)
+                if (path.find(*i) != string::npos) {
+                    debug(format("out2: %1%") % path);
+                    ins2 = ATinsert(ins2, in);
+                }
+            ins = ATgetNext(ins);
+        }
+        ins = ATreverse(ins2);
+        
         /* Register the normal form of fs. */
         FState nf = ATmake("Path(<str>, Hash(<str>), <term>)",
-            outPath.c_str(), ((string) outHash).c_str(), ins2);
+            outPath.c_str(), ((string) outHash).c_str(), ins);
         nf = storeSuccessor(fs, nf, paths);
 
         return nf;
