@@ -8,7 +8,7 @@ defined $url or die;
 
 print "fetching $url...\n";
 
-my $out = "@prefix@/store/nix-prefetch-url-$$";
+my $out = "@storedir@/nix-prefetch-url-$$";
 
 system "@wget@ --passive-ftp '$url' -O '$out'";
 $? == 0 or die "unable to fetch $url";
@@ -19,7 +19,7 @@ chomp $hash;
 
 print "file has hash $hash\n";
 
-my $out2 = "@prefix@/store/nix-prefetch-url-$hash";
+my $out2 = "@storedir@/nix-prefetch-url-$hash";
 rename $out, $out2;
 
 # Create a Nix expression.

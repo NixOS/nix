@@ -4,7 +4,7 @@ use strict;
 use IPC::Open2;
 
 my $linkdir = "@localstatedir@/nix/profiles";
-my $storedir = "@prefix@/store";
+my $storedir = "@storedir@";
 
 my %alive;
 
