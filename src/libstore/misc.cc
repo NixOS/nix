@@ -27,3 +27,12 @@ void computeFSClosure(const Path & storePath,
          i != references.end(); ++i)
         computeFSClosure(*i, paths, flipDirection);
 }
+
+
+ Path findOutput(const Derivation & drv, string id)
+{
+    for (DerivationOutputs::const_iterator i = drv.outputs.begin();
+         i != drv.outputs.end(); ++i)
+        if (i->first == id) return i->second.path;
+    throw Error(format("derivation has no output `%1%'") % id);
+}

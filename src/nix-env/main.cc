@@ -2,6 +2,7 @@
 #include "names.hh"
 #include "globals.hh"
 #include "build.hh"
+#include "gc.hh"
 #include "shared.hh"
 #include "parser.hh"
 #include "eval.hh"
@@ -226,6 +227,12 @@ static void createUserEnv(EvalState & state, const UserEnvElems & elems,
             ));
         manifest = ATinsert(manifest, t);
         inputs = ATinsert(inputs, makeStr(toATerm(i->second.outPath)));
+
+        /* This is only necessary when installing store paths, e.g.,
+           `nix-env -i /nix/store/abcd...-foo'. */
+        addTempRoot(i->second.outPath);
+        ensurePath(i->second.outPath);
+        
         references.insert(i->second.outPath);
         if (drvPath != "") references.insert(drvPath);
     }
@@ -270,7 +277,11 @@ static void queryInstSources(EvalState & state,
     const InstallSourceInfo & instSource, const Strings & args,
     UserEnvElems & elems)
 {
-    switch (instSource.type) {
+    InstallSourceType type = instSource.type;
+    if (type == srcUnknown && args.size() > 0 && args.front()[0] == '/')
+        type = srcStorePaths;
+    
+    switch (type) {
 
         /* Get the available user environment elements from the
            derivations specified in a Nix expression, including only
@@ -333,6 +344,32 @@ static void queryInstSources(EvalState & state,
             break;
 
         case srcStorePaths:
+
+            for (Strings::const_iterator i = args.begin();
+                 i != args.end(); ++i)
+            {
+                assertStorePath(*i);
+
+                UserEnvElem elem;
+                string name = baseNameOf(*i);
+                unsigned int dash = name.find('-');
+                if (dash != string::npos)
+                    name = string(name, dash + 1);
+
+                if (isDerivation(*i)) {
+                    elem.drvPath = *i;
+                    elem.outPath = findOutput(derivationFromPath(*i), "out");
+                    if (name.size() >= drvExtension.size() &&
+                        string(name, name.size() - drvExtension.size()) == drvExtension)
+                        name = string(name, 0, name.size() - drvExtension.size());
+                }
+                else elem.outPath = *i;
+
+                elem.name = name;
+
+                elems[elem.outPath] = elem;
+            }
+            
             break;
 
         case srcProfile:

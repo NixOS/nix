@@ -28,4 +28,9 @@ Derivation derivationFromPath(const Path & drvPath);
 void computeFSClosure(const Path & storePath,
     PathSet & paths, bool flipDirection = false);
 
+/* Return the path corresponding to the output identifier `id' in the
+   given derivation. */
+Path findOutput(const Derivation & drv, string id);
+    
+
 #endif /* !__BUILD_H */
