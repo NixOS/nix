@@ -18,6 +18,7 @@ init-state:
 	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix
 	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix/db
 	$(INSTALL) -d $(DESTDIR)$(localstatedir)/log/nix
+	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix/profiles
 	$(INSTALL) -d $(DESTDIR)$(prefix)/store
 #	$(bindir)/nix-store --init
 else

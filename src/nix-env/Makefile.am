@@ -14,6 +14,3 @@ main.o: help.txt.hh
 AM_CXXFLAGS = \
  -I.. ${bdb_include} ${aterm_include} -I../libutil -I../libstore \
  -I../libexpr -I../libmain
-
-install-data-local:
-	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix/profiles
