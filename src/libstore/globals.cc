@@ -8,6 +8,8 @@ string nixDBPath = "/UNINIT";
 
 bool keepFailed = false;
 
+bool keepGoing = false;
+
 Verbosity buildVerbosity = lvlDebug;
 
 unsigned int maxBuildJobs = 1;

@@ -1,5 +1,6 @@
 #include <map>
 #include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
 
 #include <sys/types.h>
@@ -26,13 +27,14 @@ class Worker;
 /* A pointer to a goal. */
 class Goal;
 typedef shared_ptr<Goal> GoalPtr;
+typedef weak_ptr<Goal> WeakGoalPtr;
 
-/* A set of goals. */
+/* Set of goals. */
 typedef set<GoalPtr> Goals;
+typedef set<WeakGoalPtr> WeakGoals;
 
 /* A map of paths to goals (and the other way around). */
-typedef map<Path, GoalPtr> GoalMap;
-typedef map<GoalPtr, Path> GoalMapRev;
+typedef map<Path, WeakGoalPtr> WeakGoalMap;
 
 
 
@@ -43,8 +45,12 @@ protected:
     /* Backlink to the worker. */
     Worker & worker;
 
-    /* Goals waiting for this one to finish. */
-    Goals waiters;
+    /* Goals that this goal is waiting for. */
+    Goals waitees;
+
+    /* Goals waiting for this one to finish.  Must use weak pointers
+       here to prevent cycles. */
+    WeakGoals waiters;
 
     /* Number of goals we are waiting for. */
     unsigned int nrWaitees;
@@ -75,20 +81,15 @@ protected:
 public:
     virtual void work() = 0;
 
-    virtual string name()
-    {
-        return "(noname)";
-    }
+    virtual string name() = 0;
 
-    void addWaiter(GoalPtr waiter);
+    void addWaitee(GoalPtr waitee);
 
-    virtual void waiteeDone(bool success);
+    virtual void waiteeDone(GoalPtr waitee, bool success);
 
+    void trace(const format & f);
+    
 protected:
-    virtual void waiteeFailed()
-    {
-    }
-
     void amDone(bool success = true);
 };
 
@@ -97,7 +98,7 @@ protected:
    belongs, and a file descriptor for receiving log data. */
 struct Child
 {
-    GoalPtr goal;
+    WeakGoalPtr goal;
     int fdOutput;
     bool inBuildSlot;
 };
@@ -110,14 +111,17 @@ class Worker
 {
 private:
 
-    /* The goals of the worker. */
-    Goals goals;
+    /* Note: the worker should only have strong pointers to the
+       top-level goals. */
+
+    /* The top-level goals of the worker. */
+    Goals topGoals;
 
     /* Goals that are ready to do some work. */
-    Goals awake;
+    WeakGoals awake;
 
     /* Goals waiting for a build slot. */
-    Goals wantingToBuild;
+    WeakGoals wantingToBuild;
 
     /* Child processes currently running. */
     Children children;
@@ -128,24 +132,21 @@ private:
 
     /* Maps used to prevent multiple instantiation of a goal for the
        same expression / path. */
-    GoalMap normalisationGoals;
-    GoalMapRev normalisationGoalsRev;
-    GoalMap realisationGoals;
-    GoalMapRev realisationGoalsRev;
-    GoalMap substitutionGoals;
-    GoalMapRev substitutionGoalsRev;
+    WeakGoalMap normalisationGoals;
+    WeakGoalMap realisationGoals;
+    WeakGoalMap substitutionGoals;
 
 public:
 
     Worker();
     ~Worker();
 
-    /* Add a goal. */
-    void addNormalisationGoal(const Path & nePath, GoalPtr waiter);
-    void addRealisationGoal(const Path & nePath, GoalPtr waiter);
-    void addSubstitutionGoal(const Path & storePath, GoalPtr waiter);
+    /* Make a goal (with caching). */
+    GoalPtr makeNormalisationGoal(const Path & nePath);
+    GoalPtr makeRealisationGoal(const Path & nePath);
+    GoalPtr makeSubstitutionGoal(const Path & storePath);
 
-    /* Remove a finished goal. */
+    /* Remove a dead goal. */
     void removeGoal(GoalPtr goal);
 
     /* Wake up a goal (i.e., there is something for it to do). */
@@ -162,8 +163,9 @@ public:
     /* Add a goal to the set of goals waiting for a build slot. */
     void waitForBuildSlot(GoalPtr goal);
     
-    /* Loop until all goals have been realised. */
-    void run();
+    /* Loop until the specified top-level goal has finished.  Returns
+       true if it has finished succesfully. */
+    bool run(GoalPtr topGoal);
 
     /* Wait for input to become available. */
     void waitForInput();
@@ -188,32 +190,41 @@ public:
 //////////////////////////////////////////////////////////////////////
 
 
-void Goal::addWaiter(GoalPtr waiter)
+void Goal::addWaitee(GoalPtr waitee)
 {
-    waiters.insert(waiter);
+    waitees.insert(waitee);
+    waitee->waiters.insert(shared_from_this());
 }
 
 
-void Goal::waiteeDone(bool success)
+void Goal::waiteeDone(GoalPtr waitee, bool success)
 {
+    assert(waitees.find(waitee) != waitees.end());
+    waitees.erase(waitee);
     assert(nrWaitees > 0);
-    /* Note: waiteeFailed should never call amDone()! */
-    if (!success) {
-        ++nrFailed;
-        waiteeFailed();
-    }
-    if (!--nrWaitees) worker.wakeUp(shared_from_this());
+    if (!success) ++nrFailed;
+    if (!--nrWaitees || (!success && !keepGoing))
+        worker.wakeUp(shared_from_this());
 }
 
 
 void Goal::amDone(bool success)
 {
-    printMsg(lvlVomit, "done");
+    trace("done");
     assert(!done);
     done = true;
-    for (Goals::iterator i = waiters.begin(); i != waiters.end(); ++i)
-        (*i)->waiteeDone(success);
+    for (WeakGoals::iterator i = waiters.begin(); i != waiters.end(); ++i) {
+        GoalPtr goal = i->lock();
+        if (goal) goal->waiteeDone(shared_from_this(), success);
+    }
+    waiters.clear();
     worker.removeGoal(shared_from_this());
+}
+
+
+void Goal::trace(const format & f)
+{
+    debug(format("%1%: %2%") % name() % f);
 }
 
 
@@ -356,12 +367,7 @@ private:
     /* Delete the temporary directory, if we have one. */
     void deleteTmpDir(bool force);
 
-    string name()
-    {
-        return nePath;
-    }
-
-    void trace(const format & f);
+    string name();
 };
 
 
@@ -375,6 +381,8 @@ NormalisationGoal::NormalisationGoal(const Path & _nePath, Worker & _worker)
 
 NormalisationGoal::~NormalisationGoal()
 {
+    if (pid != -1) worker.childTerminated(pid);
+    
     /* Careful: we should never ever throw an exception from a
        destructor. */
     try {
@@ -407,7 +415,7 @@ void NormalisationGoal::init()
        exists.  If it doesn't, it may be created through a
        substitute. */
     resetWaitees(1);
-    worker.addSubstitutionGoal(nePath, shared_from_this());
+    addWaitee(worker.makeSubstitutionGoal(nePath));
 
     state = &NormalisationGoal::haveStoreExpr;
 }
@@ -440,7 +448,7 @@ void NormalisationGoal::haveStoreExpr()
     /* Inputs must be normalised before we can build this goal. */
     for (PathSet::iterator i = expr.derivation.inputs.begin();
          i != expr.derivation.inputs.end(); ++i)
-        worker.addNormalisationGoal(*i, shared_from_this());
+        addWaitee(worker.makeNormalisationGoal(*i));
 
     resetWaitees(expr.derivation.inputs.size());
 
@@ -469,7 +477,7 @@ void NormalisationGoal::inputNormalised()
         if (querySuccessor(neInput, nfInput))
             neInput = nfInput;
         /* Otherwise the input must be a closure. */
-        worker.addRealisationGoal(neInput, shared_from_this());
+        addWaitee(worker.makeRealisationGoal(neInput));
     }
     
     resetWaitees(expr.derivation.inputs.size());
@@ -1153,9 +1161,9 @@ void NormalisationGoal::deleteTmpDir(bool force)
 }
 
 
-void NormalisationGoal::trace(const format & f)
+string NormalisationGoal::name()
 {
-    debug(format("normalisation of `%1%': %2%") % nePath % f);
+    return (format("normalisation of `%1%'") % nePath).str();
 }
 
 
@@ -1186,7 +1194,7 @@ public:
     void haveStoreExpr();
     void elemFinished();
 
-    void trace(const format & f);
+    string name();
 };
 
 
@@ -1217,7 +1225,7 @@ void RealisationGoal::init()
        exists.  If it doesn't, it may be created through a
        substitute. */
     resetWaitees(1);
-    worker.addSubstitutionGoal(nePath, shared_from_this());
+    addWaitee(worker.makeSubstitutionGoal(nePath));
 
     state = &RealisationGoal::haveStoreExpr;
 }
@@ -1248,7 +1256,7 @@ void RealisationGoal::haveStoreExpr()
        through a substitute. */
     for (ClosureElems::const_iterator i = expr.closure.elems.begin();
          i != expr.closure.elems.end(); ++i)
-        worker.addSubstitutionGoal(i->first, shared_from_this());
+        addWaitee(worker.makeSubstitutionGoal(i->first));
     
     resetWaitees(expr.closure.elems.size());
 
@@ -1274,9 +1282,9 @@ void RealisationGoal::elemFinished()
 }
 
 
-void RealisationGoal::trace(const format & f)
+string RealisationGoal::name()
 {
-    debug(format("realisation of `%1%': %2%") % nePath % f);
+    return (format("realisation of `%1%'") % nePath).str();
 }
 
 
@@ -1313,6 +1321,7 @@ private:
 
 public:
     SubstitutionGoal(const Path & _nePath, Worker & _worker);
+    ~SubstitutionGoal();
 
     void work();
 
@@ -1324,7 +1333,7 @@ public:
     void tryToRun();
     void finished();
 
-    void trace(const format & f);
+    string name();
 };
 
 
@@ -1333,6 +1342,12 @@ SubstitutionGoal::SubstitutionGoal(const Path & _storePath, Worker & _worker)
 {
     storePath = _storePath;
     state = &SubstitutionGoal::init;
+}
+
+
+SubstitutionGoal::~SubstitutionGoal()
+{
+    if (pid != -1) worker.childTerminated(pid);
 }
 
 
@@ -1377,7 +1392,7 @@ void SubstitutionGoal::tryNext()
     subs.pop_front();
 
     /* Normalise the substitute store expression. */
-    worker.addNormalisationGoal(sub.storeExpr, shared_from_this());
+    addWaitee(worker.makeNormalisationGoal(sub.storeExpr));
     resetWaitees(1);
 
     state = &SubstitutionGoal::exprNormalised;
@@ -1396,7 +1411,7 @@ void SubstitutionGoal::exprNormalised()
     /* Realise the substitute store expression. */
     if (!querySuccessor(sub.storeExpr, nfSub))
         nfSub = sub.storeExpr;
-    worker.addRealisationGoal(nfSub, shared_from_this());
+    addWaitee(worker.makeRealisationGoal(nfSub));
 
     resetWaitees(1);
 
@@ -1557,9 +1572,9 @@ void SubstitutionGoal::finished()
 }
 
 
-void SubstitutionGoal::trace(const format & f)
+string SubstitutionGoal::name()
 {
-    debug(format("substitution of `%1%': %2%") % storePath % f);
+    return (format("substitution of `%1%'") % storePath).str();
 }
 
 
@@ -1585,7 +1600,7 @@ public:
         abort();
     }
 
-    void waiteeDone(bool success)
+    void waiteeDone(GoalPtr waitee, bool success)
     {
         if (!success) this->success = false;
     }
@@ -1593,6 +1608,11 @@ public:
     bool isOkay()
     {
         return success;
+    }
+
+    string name()
+    {
+        return "pseudo-goal";
     }
 };
 
@@ -1616,71 +1636,67 @@ Worker::Worker()
 Worker::~Worker()
 {
     working = false;
+
+    /* Explicitly get rid of all strong pointers now.  After this all
+       goals that refer to this worker should be gone.  (Otherwise we
+       are in trouble, since goals may call childTerminated() etc. in
+       their destructors). */
+    topGoals.clear();
 }
 
 
 template<class T>
-static void addGoal(const Path & path, GoalPtr waiter,
-    Worker & worker, Goals & goals,
-    GoalMap & goalMap, GoalMapRev & goalMapRev)
+static GoalPtr addGoal(const Path & path,
+    Worker & worker, WeakGoalMap & goalMap)
 {
-    GoalPtr goal;
-    goal = goalMap[path];
+    GoalPtr goal = goalMap[path].lock();
     if (!goal) {
         goal = GoalPtr(new T(path, worker));
-        goals.insert(goal);
         goalMap[path] = goal;
-        goalMapRev[goal] = path;
         worker.wakeUp(goal);
     }
-    if (waiter) goal->addWaiter(waiter);
+    return goal;
 }
 
 
-void Worker::addNormalisationGoal(const Path & nePath, GoalPtr waiter)
+GoalPtr Worker::makeNormalisationGoal(const Path & nePath)
 {
-    addGoal<NormalisationGoal>(nePath, waiter, *this, goals,
-        normalisationGoals, normalisationGoalsRev);
+    return addGoal<NormalisationGoal>(nePath, *this, normalisationGoals);
 }
 
 
-void Worker::addRealisationGoal(const Path & nePath, GoalPtr waiter)
+GoalPtr Worker::makeRealisationGoal(const Path & nePath)
 {
-    addGoal<RealisationGoal>(nePath, waiter, *this, goals,
-        realisationGoals, realisationGoalsRev);
+    return addGoal<RealisationGoal>(nePath, *this, realisationGoals);
 }
 
 
-void Worker::addSubstitutionGoal(const Path & storePath, GoalPtr waiter)
+GoalPtr Worker::makeSubstitutionGoal(const Path & storePath)
 {
-    addGoal<SubstitutionGoal>(storePath, waiter, *this, goals,
-        substitutionGoals, substitutionGoalsRev);
+    return addGoal<SubstitutionGoal>(storePath, *this, substitutionGoals);
 }
 
 
-static void removeGoal(GoalPtr goal,
-    GoalMap & goalMap, GoalMapRev & goalMapRev)
+static void removeGoal(GoalPtr goal, WeakGoalMap & goalMap)
 {
-    GoalMapRev::iterator i = goalMapRev.find(goal);
-    if (i != goalMapRev.end()) {
-        goalMapRev.erase(i);
-        goalMap.erase(i->second);
-    }
+    /* !!! For now we just let dead goals accumulate.  We should
+       probably periodically sweep the goalMap to remove dead
+       goals. */
 }
 
 
 void Worker::removeGoal(GoalPtr goal)
 {
-    goals.erase(goal);
-    ::removeGoal(goal, normalisationGoals, normalisationGoalsRev);
-    ::removeGoal(goal, realisationGoals, realisationGoalsRev);
-    ::removeGoal(goal, substitutionGoals, substitutionGoalsRev);
+    topGoals.erase(goal);
+    ::removeGoal(goal, normalisationGoals);
+    ::removeGoal(goal, realisationGoals);
+    ::removeGoal(goal, substitutionGoals);
 }
 
 
 void Worker::wakeUp(GoalPtr goal)
 {
-    printMsg(lvlVomit, "wake up");
+    goal->trace("woken up");
     awake.insert(goal);
 }
 
@@ -1716,9 +1732,12 @@ void Worker::childTerminated(pid_t pid)
     children.erase(pid);
 
     /* Wake up goals waiting for a build slot. */
-    for (Goals::iterator i = wantingToBuild.begin();
+    for (WeakGoals::iterator i = wantingToBuild.begin();
          i != wantingToBuild.end(); ++i)
-        wakeUp(*i);
+    {
+        GoalPtr goal = i->lock();
+        if (goal) wakeUp(goal);
+    }
     wantingToBuild.clear();
 }
 
@@ -1733,8 +1752,18 @@ void Worker::waitForBuildSlot(GoalPtr goal)
 }
 
 
-void Worker::run()
+bool Worker::run(GoalPtr topGoal)
 {
+    assert(topGoal);
+    
+    /* Wrap the specified top-level goal in a pseudo-goal so that we
+       can check whether it succeeded. */
+    shared_ptr<PseudoGoal> pseudo(new PseudoGoal(*this));
+    pseudo->addWaitee(topGoal);
+    
+    /* For now, we have only one top-level goal. */
+    topGoals.insert(topGoal);
+    
     startNest(nest, lvlDebug, format("entered goal loop"));
 
     while (1) {
@@ -1743,18 +1772,16 @@ void Worker::run()
 
         /* Call every wake goal. */
         while (!awake.empty()) {
-            Goals awake2(awake); /* !!! why is this necessary? */
+            WeakGoals awake2(awake);
             awake.clear();
-            for (Goals::iterator i = awake2.begin(); i != awake2.end(); ++i) {
-                printMsg(lvlVomit,
-                    format("running goal (%1% left)") % goals.size());
+            for (WeakGoals::iterator i = awake2.begin(); i != awake2.end(); ++i) {
                 checkInterrupt();
-                GoalPtr goal = *i;
-                goal->work();
+                GoalPtr goal = i->lock();
+                if (goal) goal->work();
             }
         }
 
-        if (goals.empty()) break;
+        if (topGoals.empty()) break;
 
         /* !!! not when we're polling */
         assert(!children.empty());
@@ -1763,9 +1790,14 @@ void Worker::run()
         waitForInput();
     }
 
-    assert(awake.empty());
-    assert(wantingToBuild.empty());
-    assert(children.empty());
+    /* If --keep-going is not set, it's possible that the main goal
+       exited while some of its subgoals were still active.  But if
+       --keep-going *is* set, then they must all be finished now. */
+    assert(!keepGoing || awake.empty());
+    assert(!keepGoing || wantingToBuild.empty());
+    assert(!keepGoing || children.empty());
+
+    return pseudo->isOkay();
 }
 
 
@@ -1801,22 +1833,23 @@ void Worker::waitForInput()
          i != children.end(); ++i)
     {
         checkInterrupt();
-        GoalPtr goal = i->second.goal;
+        GoalPtr goal = i->second.goal.lock();
+        assert(goal);
         int fd = i->second.fdOutput;
         if (FD_ISSET(fd, &fds)) {
             unsigned char buffer[4096];
             ssize_t rd = read(fd, buffer, sizeof(buffer));
             if (rd == -1) {
                 if (errno != EINTR)
-                    throw SysError(format("reading from `%1%'")
+                    throw SysError(format("reading from %1%")
                         % goal->name());
             } else if (rd == 0) {
-                debug(format("EOF on `%1%'") % goal->name());
+                debug(format("%1%: got EOF") % goal->name());
                 wakeUp(goal);
             } else {
-                printMsg(lvlVomit, format("read %1% bytes from `%2%'")
-                    % rd % goal->name());
-//                 writeFull(goal.fdLogFile, buffer, rd);
+                printMsg(lvlVomit, format("%1%: read %2% bytes")
+                    % goal->name() % rd);
+//                 writeFull(goal.fdLogFile, buffer, rd); !!!
                 if (verbosity >= buildVerbosity)
                     writeFull(STDERR_FILENO, buffer, rd);
             }
@@ -1833,11 +1866,7 @@ Path normaliseStoreExpr(const Path & nePath)
     startNest(nest, lvlDebug, format("normalising `%1%'") % nePath);
 
     Worker worker;
-    shared_ptr<PseudoGoal> pseudo(new PseudoGoal(worker));
-    worker.addNormalisationGoal(nePath, pseudo);
-    worker.run();
-
-    if (!pseudo->isOkay())
+    if (!worker.run(worker.makeNormalisationGoal(nePath)))
         throw Error(format("normalisation of store expression `%1%' failed") % nePath);
 
     Path nfPath;
@@ -1851,11 +1880,7 @@ void realiseClosure(const Path & nePath)
     startNest(nest, lvlDebug, format("realising closure `%1%'") % nePath);
 
     Worker worker;
-    shared_ptr<PseudoGoal> pseudo(new PseudoGoal(worker));
-    worker.addRealisationGoal(nePath, pseudo);
-    worker.run();
-
-    if (!pseudo->isOkay())
+    if (!worker.run(worker.makeRealisationGoal(nePath)))
         throw Error(format("realisation of closure `%1%' failed") % nePath);
 }
 
@@ -1866,10 +1891,6 @@ void ensurePath(const Path & path)
     if (isValidPath(path)) return;
 
     Worker worker;
-    shared_ptr<PseudoGoal> pseudo(new PseudoGoal(worker));
-    worker.addSubstitutionGoal(path, pseudo);
-    worker.run();
-
-    if (!pseudo->isOkay())
+    if (!worker.run(worker.makeSubstitutionGoal(path)))
         throw Error(format("path `%1%' does not exist and cannot be created") % path);
 }

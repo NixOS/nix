@@ -492,20 +492,19 @@ void Pid::kill()
 {
     if (pid == -1) return;
     
-    printMsg(lvlError, format("killing child process %1%") % pid);
+    printMsg(lvlError, format("killing process %1%") % pid);
 
     /* Send a KILL signal to the child.  If it has its own process
        group, send the signal to every process in the child process
        group (which hopefully includes *all* its children). */
     if (::kill(separatePG ? -pid : pid, SIGKILL) != 0)
-        printMsg(lvlError, format("killing process %1%") % pid);
-    else {
-        /* Wait until the child dies, disregarding the exit status. */
-        int status;
-        while (waitpid(pid, &status, 0) == -1)
-            if (errno != EINTR) printMsg(lvlError,
-                format("waiting for process %1%") % pid);
-    }
+        printMsg(lvlError, (SysError(format("killing process %1%") % pid).msg()));
+
+    /* Wait until the child dies, disregarding the exit status. */
+    int status;
+    while (waitpid(pid, &status, 0) == -1)
+        if (errno != EINTR) printMsg(lvlError,
+            (SysError(format("waiting for process %1%") % pid).msg()));
 
     pid = -1;
 }

@@ -4,5 +4,14 @@
 <arg rep='repeat'><option>-v</option></arg>
 <arg><option>--build-output</option></arg>
 <arg><option>-B</option></arg>
+<arg>
+  <group choice='req'>
+    <arg choice='plain'><option>--max-jobs</option></arg>
+    <arg choice='plain'><option>-j</option></arg>
+  </group>
+  <replaceable>number</replaceable>
+</arg>
+<arg><option>--keep-going</option></arg>
+<arg><option>-k</option></arg>
 <arg><option>--keep-failed</option></arg>
 <arg><option>-K</option></arg>

@@ -21,9 +21,8 @@ substitutes.sh: substitutes.nix substituter.nix
 substitutes2.sh: substitutes2.nix substituter.nix substituter2.nix
 fall-back.sh: fall-back.nix
 
-#TESTS = init.sh simple.sh dependencies.sh locking.sh parallel.sh \
-#  build-hook.sh substitutes.sh substitutes2.sh
-TESTS = init.sh fall-back.sh
+TESTS = init.sh simple.sh dependencies.sh locking.sh parallel.sh \
+  build-hook.sh substitutes.sh substitutes2.sh
 
 XFAIL_TESTS =
 

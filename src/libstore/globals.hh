@@ -29,6 +29,10 @@ extern string nixDBPath;
 /* Whether to keep temporary directories of failed builds. */
 extern bool keepFailed;
 
+/* Whether to keep building subgoals when a sibling (another subgoal
+   of the same goal) fails. */
+extern bool keepGoing;
+
 /* Verbosity level for build output. */
 extern Verbosity buildVerbosity;
 
