@@ -68,6 +68,34 @@ AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
   storedir=$withval, storedir='${prefix}/store')
 AC_SUBST(storedir)
 
+AC_ARG_WITH(bdb, AC_HELP_STRING([--with-bdb=PATH],
+  [prefix of Berkeley DB]),
+  bdb=$withval, bdb=)
+AM_CONDITIONAL(HAVE_BDB, test -n "$bdb")
+if test -z "$bdb"; then
+  bdb_lib='-L${top_builddir}/externals/inst-bdb/lib -ldb_cxx'
+  bdb_include='-I${top_builddir}/externals/inst-bdb/include'
+else
+  bdb_lib="-L$bdb/lib -Wl,-rpath,$bdb/lib -ldb_cxx"
+  bdb_include="-I$bdb/include"
+fi
+AC_SUBST(bdb_lib)
+AC_SUBST(bdb_include)
+
+AC_ARG_WITH(aterm, AC_HELP_STRING([--with-aterm=PATH],
+  [prefix of CWI ATerm library]),
+  aterm=$withval, aterm=)
+AM_CONDITIONAL(HAVE_ATERM, test -n "$aterm")
+if test -z "$aterm"; then
+  aterm_lib='-L${top_builddir}/externals/inst-aterm/lib -lATerm'
+  aterm_include='-I${top_builddir}/externals/inst-aterm/include'
+else
+  aterm_lib="-L$aterm/lib -Wl,-rpath,$aterm/lib -lATerm"
+  aterm_include="-I$aterm/include"
+fi
+AC_SUBST(aterm_lib)
+AC_SUBST(aterm_include)
+
 AC_CHECK_LIB(pthread, pthread_mutex_init)
 
 AM_CONFIG_HEADER([config.h])

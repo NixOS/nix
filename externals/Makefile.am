@@ -16,16 +16,20 @@ have-db:
 	$(MAKE) $(DB)
 	touch have-db
 
+if HAVE_BDB
+build-db:
+else
 build-db: have-db
 	(pfx=`pwd` && \
 	cd $(DB)/build_unix && \
 	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" \
-	 ../dist/configure --prefix=$$pfx/inst \
+	 ../dist/configure --prefix=$$pfx/inst-bdb \
 	 --enable-cxx --disable-shared --disable-cryptography \
          --disable-replication --disable-verify && \
 	make && \
 	make install)
 	touch build-db
+endif
 
 
 # CWI ATerm
@@ -49,7 +53,7 @@ have-aterm:
 build-aterm: have-aterm
 	(pfx=`pwd` && \
 	cd $(ATERM) && \
-	CC="$(CC)" ./configure --prefix=$$pfx/inst \
+	CC="$(CC)" ./configure --prefix=$$pfx/inst-aterm \
      --with-cflags="-DNDEBUG -DXGC_VERBOSE -DXHASHPEM -DWITH_STATS $(CFLAGS)" && \
 	make && \
 	make install)

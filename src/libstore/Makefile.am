@@ -7,4 +7,4 @@ libstore_a_SOURCES = \
  references.cc references.hh pathlocks.cc pathlocks.hh
 
 AM_CXXFLAGS = -Wall \
- -I.. -I../../externals/inst/include -I../libutil
+ -I.. ${bdb_include} ${aterm_include} -I../libutil

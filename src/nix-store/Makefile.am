@@ -2,7 +2,7 @@ bin_PROGRAMS = nix-store
 
 nix_store_SOURCES = main.cc dotgraph.cc dotgraph.hh help.txt
 nix_store_LDADD = ../libmain/libmain.a ../libstore/libstore.a ../libutil/libutil.a \
- ../boost/format/libformat.a -L../../externals/inst/lib -ldb_cxx -lATerm
+ ../boost/format/libformat.a ${bdb_lib} ${aterm_lib}
 
 main.o: help.txt.hh
 
@@ -10,7 +10,7 @@ main.o: help.txt.hh
 	../bin2c/bin2c helpText < $< > $@ || (rm $@ && exit 1)
 
 AM_CXXFLAGS = \
- -I.. -I../../externals/inst/include -I../libutil -I../libstore -I../libmain
+ -I.. ${bdb_include} $(aterm_include) -I../libutil -I../libstore -I../libmain
 
 init-state-local:
 	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix

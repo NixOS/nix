@@ -4,8 +4,7 @@ nix_env_SOURCES = main.cc names.cc names.hh \
  profiles.cc profiles.hh help.txt
 nix_env_LDADD = ../libmain/libmain.a ../libexpr/libexpr.a \
  ../libstore/libstore.a ../libutil/libutil.a \
- ../boost/format/libformat.a -L../../externals/inst/lib -ldb_cxx \
- -lATerm
+ ../boost/format/libformat.a ${bdb_lib} ${aterm_lib}
 
 main.o: help.txt.hh
 
@@ -13,7 +12,7 @@ main.o: help.txt.hh
 	../bin2c/bin2c helpText < $< > $@ || (rm $@ && exit 1)
 
 AM_CXXFLAGS = \
- -I.. -I../../externals/inst/include -I../libutil -I../libstore \
+ -I.. ${bdb_include} ${aterm_include} -I../libutil -I../libstore \
  -I../libexpr -I../libmain
 
 install-data-local:

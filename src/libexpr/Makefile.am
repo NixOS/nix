@@ -7,9 +7,9 @@ libexpr_a_SOURCES = nixexpr.cc nixexpr.hh parser.cc parser.hh \
 EXTRA_DIST = lexer.l parser.y
 
 AM_CXXFLAGS = \
- -I.. -I../../externals/inst/include -I../libutil -I../libstore
+ -I.. ${bdb_include} ${aterm_include} -I../libutil -I../libstore
 AM_CFLAGS = \
- -I../../externals/inst/include
+ ${aterm_include}
 
 
 # Parser generation.
