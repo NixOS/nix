@@ -176,12 +176,18 @@ void copyPath(const Path & src, const Path & dst)
 }
 
 
-bool isStorePath(const Path & path)
+bool isInStore(const Path & path)
 {
     return path[0] == '/'
         && path.compare(0, nixStore.size(), nixStore) == 0
         && path.size() >= nixStore.size() + 2
-        && path[nixStore.size()] == '/'
+        && path[nixStore.size()] == '/';
+}
+
+
+bool isStorePath(const Path & path)
+{
+    return isInStore(path)
         && path.find('/', nixStore.size() + 1) == Path::npos;
 }
 
@@ -190,6 +196,18 @@ void assertStorePath(const Path & path)
 {
     if (!isStorePath(path))
         throw Error(format("path `%1%' is not in the Nix store") % path);
+}
+
+
+Path toStorePath(const Path & path)
+{
+    if (!isInStore(path))
+        throw Error(format("path `%1%' is not in the Nix store") % path);
+    unsigned int slash = path.find('/', nixStore.size() + 1);
+    if (slash == Path::npos)
+        return path;
+    else
+        return Path(path, 0, slash);
 }
 
 

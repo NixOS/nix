@@ -32,15 +32,15 @@ static Path findOutput(const Derivation & drv, string id)
 }
 
 
-static Path followSymlinks(Path & path)
+static Path fixPath(Path path)
 {
     path = absPath(path);
-    while (!isStorePath(path)) {
-        if (!isLink(path)) return path;
+    while (!isInStore(path)) {
+        if (!isLink(path)) break;
         string target = readLink(path);
         path = absPath(target, dirOf(path));
     }
-    return path;
+    return toStorePath(path);
 }
 
 
@@ -76,7 +76,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
 
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); i++)
-        *i = followSymlinks(*i);
+        *i = fixPath(*i);
             
     if (opArgs.size() > 1) {
         PathSet drvPaths;
@@ -162,19 +162,27 @@ static void printPathSet(const PathSet & paths)
 static void opQuery(Strings opFlags, Strings opArgs)
 {
     enum { qOutputs, qRequisites, qReferences, qReferers,
-           qReferersClosure, qDeriver, qGraph } query = qOutputs;
+           qReferersClosure, qDeriver, qBinding, qGraph } query = qOutputs;
     bool useOutput = false;
     bool includeOutputs = false;
     bool forceRealise = false;
+    string bindingName;
 
     for (Strings::iterator i = opFlags.begin();
-         i != opFlags.end(); i++)
+         i != opFlags.end(); ++i)
         if (*i == "--outputs") query = qOutputs;
         else if (*i == "--requisites" || *i == "-R") query = qRequisites;
         else if (*i == "--references") query = qReferences;
         else if (*i == "--referers") query = qReferers;
         else if (*i == "--referers-closure") query = qReferersClosure;
         else if (*i == "--deriver" || *i == "-d") query = qDeriver;
+        else if (*i == "--binding" || *i == "-b") {
+            if (opArgs.size() == 0)
+                throw UsageError("expected binding name");
+            bindingName = opArgs.front();
+            opArgs.pop_front();
+            query = qBinding;
+        }
         else if (*i == "--graph") query = qGraph;
         else if (*i == "--use-output" || *i == "-u") useOutput = true;
         else if (*i == "--force-realise" || *i == "-f") forceRealise = true;
@@ -187,7 +195,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                *i = followSymlinks(*i);
+                *i = fixPath(*i);
                 if (forceRealise) realisePath(*i);
                 Derivation drv = derivationFromPath(*i);
                 cout << format("%1%\n") % findOutput(drv, "out");
@@ -203,7 +211,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                *i = followSymlinks(*i);
+                *i = fixPath(*i);
                 Path path = maybeUseOutput(*i, useOutput, forceRealise);
                 if (query == qRequisites)
                     storePathRequisites(path, includeOutputs, paths);
@@ -219,13 +227,26 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                *i = followSymlinks(*i);
+                *i = fixPath(*i);
                 Path deriver = queryDeriver(noTxn, *i);
                 cout << format("%1%\n") %
                     (deriver == "" ? "unknown-deriver" : deriver);
             }
             break;
-                
+
+        case qBinding:
+            for (Strings::iterator i = opArgs.begin();
+                 i != opArgs.end(); i++)
+            {
+                *i = fixPath(*i);
+                Derivation drv = derivationFromPath(*i);
+                StringPairs::iterator j = drv.env.find(bindingName);
+                if (j == drv.env.end())
+                    throw Error(format("derivation `%1%' has no environment binding named `%2%'")
+                        % *i % bindingName);
+                cout << format("%1%\n") % j->second;
+            }
+            break;
 
 #if 0            
         case qGraph: {

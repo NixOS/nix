@@ -60,7 +60,7 @@ void createSymlink(const Path & link, const Path & target, bool careful)
 
     /* Remove the old symlink. */
     if (pathExists(link)) {
-        if (careful && (!isLink(link) || !isStorePath(readLink(link))))
+        if (careful && (!isLink(link) || !isInStore(readLink(link))))
             throw Error(format("cannot create symlink `%1%'; already exists") % link);
         unlink(link.c_str());
     }
@@ -250,10 +250,10 @@ static void findRoots(const Path & path, bool recurseSymlinks,
         string target = readLink(path);
         Path target2 = absPath(target, dirOf(path));
 
-        if (isStorePath(target2)) {
+        if (isInStore(target2)) {
             debug(format("found root `%1%' in `%2%'")
                 % target2 % path);
-            roots.insert(target2);
+            roots.insert(toStorePath(target2));
         }
 
         else if (recurseSymlinks) {
