@@ -297,11 +297,13 @@ const char * * strings2CharPtrs(const Strings & ss)
 /* Should only be called after an expression has been normalised. */
 Path queryNormalForm(const Path & nePath)
 {
-    StoreExpr ne = storeExprFromPath(nePath);
-    if (ne.type == StoreExpr::neClosure) return nePath;
     Path nfPath;
-    if (!querySuccessor(nePath, nfPath)) abort();
-    return nfPath;
+    if (querySuccessor(nePath, nfPath)) return nfPath;
+    /* If there is no successor, than nePath must be a normal form
+       itself. */
+    StoreExpr ne = storeExprFromPath(nePath);
+    if (ne.type != StoreExpr::neClosure) abort();
+    return nePath;
 }
 
 
