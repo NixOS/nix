@@ -3,10 +3,10 @@
 DB = db-4.0.14
 
 $(DB).tar.gz:
-	echo "Nix requires Berkeley DB to build."
-	echo "Please download version 4.0.14 from"
-	echo "  http://www.sleepycat.com/update/snapshot/db-4.0.14.tar.gz"
-	echo "and place it in the externals/ directory."
+	@echo "Nix requires Berkeley DB to build."
+	@echo "Please download version 4.0.14 from"
+	@echo "  http://www.sleepycat.com/update/snapshot/db-4.0.14.tar.gz"
+	@echo "and place it in the externals/ directory."
 	false
 
 $(DB): $(DB).tar.gz
@@ -31,10 +31,10 @@ build-db: have-db
 ATERM = aterm-2.0
 
 $(ATERM).tar.gz:
-	echo "Nix requires the CWI ATerm library to build."
-	echo "Please download version 2.0 from"
-	echo "  http://www.cwi.nl/projects/MetaEnv/aterm/aterm-2.0.tar.gz"
-	echo "and place it in the externals/ directory."
+	@echo "Nix requires the CWI ATerm library to build."
+	@echo "Please download version 2.0 from"
+	@echo "  http://www.cwi.nl/projects/MetaEnv/aterm/aterm-2.0.tar.gz"
+	@echo "and place it in the externals/ directory."
 	false
 
 $(ATERM): $(ATERM).tar.gz
