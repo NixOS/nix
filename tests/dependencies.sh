@@ -20,4 +20,7 @@ echo "$deps" | grep -q "$outPath"
 if echo "$deps" | grep -q "dependencies-input-1"; then exit 1; fi
 
 # Input-2 is retained.
-echo "$deps" | grep -q "dependencies-input-2"
+input2OutPath=$(echo "$deps" | grep "dependencies-input-2")
+
+# The referers closure of input-2 should include outPath.
+$TOP/src/nix-store/nix-store -q --referers-closure "$input2OutPath" | grep "$outPath"

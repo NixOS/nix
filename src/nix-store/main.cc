@@ -96,7 +96,8 @@ static void printPathSet(const PathSet & paths)
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qOutputs, qRequisites, qReferences, qReferers, qGraph } query = qOutputs;
+    enum { qOutputs, qRequisites, qReferences, qReferers,
+           qReferersClosure, qGraph } query = qOutputs;
     bool useOutput = false;
     bool includeOutputs = false;
     bool forceRealise = false;
@@ -107,6 +108,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--requisites" || *i == "-R") query = qRequisites;
         else if (*i == "--references") query = qReferences;
         else if (*i == "--referers") query = qReferers;
+        else if (*i == "--referers-closure") query = qReferersClosure;
         else if (*i == "--graph") query = qGraph;
         else if (*i == "--use-output" || *i == "-u") useOutput = true;
         else if (*i == "--force-realise" || *i == "-f") forceRealise = true;
@@ -128,7 +130,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qRequisites:
         case qReferences:
-        case qReferers: {
+        case qReferers:
+        case qReferersClosure: {
             PathSet paths;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
@@ -138,6 +141,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     storePathRequisites(path, includeOutputs, paths);
                 else if (query == qReferences) queryReferences(path, paths);
                 else if (query == qReferers) queryReferers(path,  paths);
+                else if (query == qReferersClosure) computeFSClosure(path, paths, true);
             }
             printPathSet(paths);
             break;

@@ -12,17 +12,20 @@ Derivation derivationFromPath(const Path & drvPath)
 
 
 void computeFSClosure(const Path & storePath,
-    PathSet & paths)
+    PathSet & paths, bool flipDirection)
 {
     if (paths.find(storePath) != paths.end()) return;
     paths.insert(storePath);
 
     PathSet references;
-    queryReferences(storePath, references);
+    if (flipDirection)
+        queryReferers(storePath, references);
+    else
+        queryReferences(storePath, references);
 
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)
-        computeFSClosure(*i, paths);
+        computeFSClosure(*i, paths, flipDirection);
 }
 
 

@@ -4,7 +4,8 @@ nix-store [OPTIONS...] [ARGUMENTS...]
 
 Operations:
 
-  --realise / -r: build a Nix derivation
+  --realise / -r: ensure path validity; if a derivation, ensure that
+      validity of the outputs
   --add / -A: copy a path to the Nix store
   --query / -q: query information
 
@@ -27,9 +28,16 @@ Query flags:
   --outputs: query the output paths of a Nix derivation (default)
   --requisites / -R: print all paths necessary to realise a path
   --references: print all paths referenced by the given path
-  --referers: print all paths refering to the given path
+  --referers: print all paths directly refering to the given path
+  --referers-closure: print all paths (in)directly refering to the given path
   --graph: print a dot graph rooted at given ids
 
+Query switches (not applicable to all queries):
+
+  --use-output: perform query on output of derivation, not derivation itself
+  --force-realise: realise the path before performing the query
+  --include-outputs: in `-R' on a derivation, include requisites of outputs
+  
 Options:
 
   --verbose / -v: verbose operation (may be repeated)
