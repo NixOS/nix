@@ -6,8 +6,8 @@
 #include "hash.hh"
 #include "archive.hh"
 #include "util.hh"
-#include "eval.hh"
-#include "values.hh"
+#include "fstate.hh"
+#include "store.hh"
 #include "globals.hh"
 
 
