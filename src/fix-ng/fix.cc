@@ -1,12 +1,11 @@
 #include <map>
 #include <iostream>
 
+#include "parser.hh"
 #include "globals.hh"
 #include "normalise.hh"
 #include "shared.hh"
 
-
-typedef ATerm Expr;
 
 typedef map<ATerm, ATerm> NormalForms;
 typedef map<Path, PathSet> PkgPaths;
@@ -406,9 +405,7 @@ static Expr evalFile(EvalState & state, const Path & relPath)
 {
     Path path = searchPath(state.searchDirs, relPath);
     Nest nest(lvlTalkative, format("evaluating file `%1%'") % path);
-    Expr e = ATreadFromNamedFile(path.c_str());
-    if (!e) 
-        throw Error(format("unable to read a term from `%1%'") % path);
+    Expr e = parseExprFromFile(path);
     return evalExpr(state, e);
 }
 

@@ -1,0 +1,163 @@
+definition
+
+module Main
+imports Fix
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Top level syntax.
+
+module Fix
+imports Fix-Exprs Fix-Layout
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Expressions.
+
+module Fix-Exprs
+imports Fix-Lexicals URI
+exports
+  sorts Expr Bind
+  context-free syntax
+
+    Id
+    -> Expr {cons("Var")}
+
+    Int
+    -> Expr {cons("Int")}
+
+    Str
+    -> Expr {cons("Str")}
+
+    Uri
+    -> Expr {cons("Uri")}
+
+    Path
+    -> Expr {cons("Path")}
+
+    "(" Expr ")"
+    -> Expr {bracket}
+
+    Expr Expr
+    -> Expr {cons("Call"), left}
+
+    "{" {Id ","}* "}" ":" Expr
+    -> Expr {cons("Function"), right}
+
+    "{" {Bind ","}+ "}"
+    -> Expr {cons("Attrs")}
+
+    Id "=" Expr
+    -> Bind {cons("Bind")}
+
+    "[" {Expr ","}* "]"
+    -> Expr {cons("List")}
+
+  context-free priorities
+
+    Expr Expr -> Expr
+  > "{" {Id ","}* "}" ":" Expr -> Expr
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Lexical syntax.
+
+module Fix-Lexicals
+exports
+  sorts Id Path
+  lexical syntax
+    [a-zA-Z\_][a-zA-Z0-9\_\']* -> Id
+    [0-9]+ -> Int
+    "\"" ~[\n\"]* "\"" -> Str
+    PathComp ("/" PathComp)+ -> Path
+    [a-zA-Z0-9\.\_\-]+ -> PathComp
+  lexical restrictions
+    Id -/- [a-zA-Z0-9\_\']
+    Int -/- [0-9]
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% URIs (RFC 2396, appendix A).
+
+module URI
+exports
+  sorts Uri
+  lexical syntax
+    Uscheme ":" (Uhierpath | Uopaquepath) -> Uri
+
+    (Unetpath | Uabspath) ("?" Uquery)? -> Uhierpath
+    Uuricnoslash Uuric* -> Uopaquepath
+
+    Uunreserved | Uescaped | [\;\?\:\@\&\=\+\$\,] -> Uuricnoslash
+
+    "//" Uauthority Uabspath? -> Unetpath
+    "/" Upathsegments -> Uabspath
+    Urelsegment Uabspath? -> Urelpath
+
+    (Uunreserved | Uescaped | [\;\@\&\=\+\$\,])+ -> Urelsegment
+
+    Ualpha (Ualpha | Udigit | [\+\-\.])* -> Uscheme
+
+    Userver | Uregname -> Uauthority
+
+    (Uunreserved | Uescaped | [\$\,\;\:\@\&\=\+])+ -> Uregname
+
+    ((Uuserinfo "@") Uhostport) -> Userver
+    (Uunreserved | Uescaped | [\;\:\&\=\+\$\,])* -> Uuserinfo
+
+    Uhost (":" Uport)? -> Uhostport
+    Uhostname | UIPv4address -> Uhost
+    (Udomainlabel ".")+ Utoplabel "."? -> Uhostname
+    Ualphanum | Ualphanum (Ualphanum | "-")* Ualphanum -> Udomainlabel
+    Ualpha | Ualpha (Ualphanum | "-")* Ualphanum -> Utoplabel
+    Udigit+ "." Udigit+ "." Udigit+ "." Udigit+ -> UIPv4address
+    Udigit* -> Uport
+
+    Uabspath | Uopaquepart -> Upath
+    Usegment ("/" Usegment)* -> Upathsegments
+    Upchar* (";" Uparam)* -> Usegment
+    Upchar* -> Uparam
+    Uunreserved | Uescaped | [\:\@\&\=\+\$\,] -> Upchar
+
+    Uuric* -> Uquery
+
+    Uuric* -> Ufragment
+
+    Ureserved | Uunreserved | Uescaped -> Uuric
+    [\;\/\?\:\@\&\=\+\$\,] -> Ureserved
+    Ualphanum | Umark -> Uunreserved
+    [\-\_\.\!\~\*\'\(\)] -> Umark
+
+    "%" Uhex Uhex -> Uescaped
+    Udigit | [A-Fa-f] -> Uhex
+
+    Ualpha | Udigit -> Ualphanum
+    Ulowalpha | Uupalpha -> Ualpha
+
+    [a-z] -> Ulowalpha
+    [A-Z] -> Uupalpha
+    [0-9] -> Udigit
+
+  lexical restrictions
+    Uri -/- [a-zA-Z0-9\-\_\.\!\~\*\'\(\)]
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Layout.
+
+module Fix-Layout
+exports
+  lexical syntax
+    [\ \t\n] -> LAYOUT
+    HashComment -> LAYOUT
+    Comment -> LAYOUT
+    "#" ~[\n]* [\n] -> HashComment
+    "//" ~[\n]* [\n] -> HashComment
+    "/*" ( ~[\*] | Asterisk )* "*/" -> Comment
+    [\*] -> Asterisk
+  lexical restrictions
+    Asterisk -/- [\/]
+  context-free restrictions
+    LAYOUT? -/- [\ \t\n] | [\#]
+  syntax
+    HashComment <START> -> <START>
