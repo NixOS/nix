@@ -6,6 +6,8 @@ my $tmpfile = "$prefix/var/nix/pull.tmp";
 
 my $conffile = "$etcdir/prebuilts.conf";
 
+my @subs;
+
 open CONFFILE, "<$conffile";
 
 while (<CONFFILE>) {
@@ -55,8 +57,9 @@ while (<CONFFILE>) {
 	    chomp $nhash;
 	    die unless $nhash =~ /^([0-9a-z]{32})$/;
 
-	    system "nix --substitute $hash $nhash";
-	    if ($?) { die "`nix --substitute' failed"; }
+	    push @subs, $hash;
+	    push @subs, $nhash;
+
 	}
 
 	close INDEX;
@@ -65,3 +68,6 @@ while (<CONFFILE>) {
     }
 
 }
+
+system "nix --substitute @subs";
+if ($?) { die "`nix --substitute' failed"; }
