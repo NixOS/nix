@@ -22,12 +22,14 @@ AC_CANONICAL_HOST
 
 # Construct a Nix system name (like "i686-linux").
 AC_MSG_CHECKING([for the canonical Nix system name])
-#machine_name=`uname -m`
-#sys_name=`uname -s | tr [A-Z] [a-z]`
-#system="${machine_name}-${sys_name}"
+machine_name=$(uname -p | tr 'A-Z ' 'a-z_')
+if test "$machine_name" = "unknown"; then
+    machine_name=$(uname -m | tr 'A-Z ' 'a-z_')
+fi
+sys_name=$(uname -s | tr 'A-Z ' 'a-z_')
 AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
   [platform identifier (e.g., `i686-linux')]),
-  system=$withval, system="$host_cpu-$host_os")
+  system=$withval, system="${machine_name}-${sys_name}")
 AC_MSG_RESULT($system)
 AC_SUBST(system)
 AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
@@ -56,7 +58,7 @@ AC_DEFUN([NEED_PROG],
 [
 AC_PATH_PROG($1, $2)
 if test -z "$$1"; then
-    AC_MSG_ERROR([$1 is required])
+    AC_MSG_ERROR([$2 is required])
 fi
 ])
 
