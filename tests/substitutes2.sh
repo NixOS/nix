@@ -1,5 +1,5 @@
 # Instantiate.
-storeExpr=$($TOP/src/nix-instantiate/nix-instantiate substitutes.nix)
+storeExpr=$($TOP/src/nix-instantiate/nix-instantiate substitutes2.nix)
 echo "store expr is $storeExpr"
 
 # Find the output path.
@@ -19,7 +19,7 @@ regSub() {
 }
 
 # Register a fake successor, and a substitute for it.
-suc=$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-s.store
+suc=$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab-s.store
 regSub $suc $subExpr
 $TOP/src/nix-store/nix-store --successor $storeExpr $suc
 

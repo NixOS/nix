@@ -153,6 +153,13 @@ public:
 };
 
 
+class SubstError : public Error
+{
+public:
+    SubstError(const format & f) : Error(f) { };
+};
+
+
 
 //////////////////////////////////////////////////////////////////////
 
@@ -209,6 +216,8 @@ void commonChildInit(Pipe & logPipe)
 }
 
 
+/* Convert a string list to an array of char pointers.  Careful: the
+   string list should outlive the array. */
 const char * * strings2CharPtrs(const Strings & ss)
 {
     const char * * arr = new const char * [ss.size() + 1];
@@ -1202,7 +1211,7 @@ private:
     Pid pid;
 
     /* Lock on the store path. */
-    PathLocks outputLock;
+    shared_ptr<PathLocks> outputLock;
     
     typedef void (SubstitutionGoal::*GoalState)();
     GoalState state;
@@ -1310,18 +1319,20 @@ void SubstitutionGoal::tryToRun()
     /* Acquire a lock on the output path. */
     PathSet lockPath;
     lockPath.insert(storePath);
-    outputLock.lockPaths(lockPath);
+    outputLock = shared_ptr<PathLocks>(new PathLocks);
+    outputLock->lockPaths(lockPath);
 
     /* Check again whether the path is invalid. */
     if (isValidPath(storePath)) {
         debug(format("store path `%1%' has become valid") % storePath);
-        outputLock.setDeletion(true);
+        outputLock->setDeletion(true);
         amDone();
         return;
     }
 
-    startNest(nest, lvlInfo,
-        format("substituting path `%1%'") % storePath);
+    printMsg(lvlInfo,
+        format("substituting path `%1%' using substituter `%2%'")
+        % storePath % sub.storeExpr);
     
     /* What's the substitute program? */
     StoreExpr expr = storeExprFromPath(nfSub);
@@ -1396,21 +1407,40 @@ void SubstitutionGoal::finished()
 
     debug(format("substitute for `%1%' finished") % storePath);
 
-    /* Check the exit status. */
-    if (!statusOk(status))
-        throw Error(format("builder for `%1%' %2%")
-            % storePath % statusToString(status));
+    /* Check the exit status and the build result. */
+    try {
+        
+        if (!statusOk(status))
+            throw SubstError(format("builder for `%1%' %2%")
+                % storePath % statusToString(status));
 
-    if (!pathExists(storePath))
-        throw Error(format("substitute did not produce path `%1%'") % storePath);
+        if (!pathExists(storePath))
+            throw SubstError(
+                format("substitute did not produce path `%1%'")
+                % storePath);
+        
+    } catch (SubstError & e) {
+
+        printMsg(lvlInfo,
+            format("substitution of path `%1%' using substituter `%2%' failed: %3%")
+            % storePath % sub.storeExpr % e.msg());
+        
+        /* Try the next substitute. */
+        state = &SubstitutionGoal::tryNext;
+        worker.wakeUp(shared_from_this());
+        return;
+    }
 
     Transaction txn;
     createStoreTransaction(txn);
     registerValidPath(txn, storePath);
     txn.commit();
 
-    outputLock.setDeletion(true);
+    outputLock->setDeletion(true);
     
+    printMsg(lvlChatty,
+        format("substitution of path `%1%' succeeded") % storePath);
+
     amDone();
 }
 
