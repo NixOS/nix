@@ -1,9 +1,0 @@
-Call(
-  Function(["x"],
-    Call(
-      Function(["y", "z"], Var("y")),
-      [ ("y", Var("x")) ]
-    )
-  ),
-  [ ("x", True) ]
-)

@@ -1,0 +1,1 @@
+List([Call(Function1("x",OpPlus(Var("x"),Str("bar")),Pos("(string)",1,7)),Str("foo")),Call(Function1("x",OpPlus(Var("x"),Str("bar")),Pos("(string)",1,7)),Str("bla")),Call(Function1("x",OpPlus(Var("x"),Str("bar")),Pos("(string)",1,7)),Str("xyzzy"))])

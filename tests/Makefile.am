@@ -11,7 +11,7 @@ TESTS_ENVIRONMENT = TEST_ROOT=$(TEST_ROOT) \
   NIX_BUILD_HOOK= \
   TOP=$(shell pwd)/.. \
   SHARED=$(extra1) \
-  $(SHELL) -e -x
+  $(SHELL) -e
 
 simple.sh: simple.nix
 dependencies.sh: dependencies.nix
@@ -22,10 +22,13 @@ substitutes.sh: substitutes.nix substituter.nix
 substitutes2.sh: substitutes2.nix substituter.nix substituter2.nix
 fallback.sh: fallback.nix
 
-TESTS = init.sh simple.sh dependencies.sh locking.sh parallel.sh \
+TESTS = init.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
   build-hook.sh substitutes.sh substitutes2.sh fallback.sh verify.sh
 
 XFAIL_TESTS =
+
+foo:
+	$(TESTS_ENVIRONMENT) ./lang.sh
 
 include ../substitute.mk
 
@@ -37,4 +40,5 @@ EXTRA_DIST = $(TESTS) \
   build-hook.nix.in build-hook.hook.sh \
   substitutes.nix.in substituter.nix.in substituter.builder.sh \
   substitutes2.nix.in substituter2.nix.in substituter2.builder.sh \
-  fallback.nix.in
+  fallback.nix.in \
+  $(wildcard lang/*.nix) $(wildcard lang/*.exp)

@@ -1,7 +1,0 @@
-Package(
-  [ ("name", "args")
-  , ("build", Relative("args/args-build.sh"))
-
-  , ("args", ["1", "2", "3", IncludeFix("slow2/slow.fix")])
-  ]
-)
