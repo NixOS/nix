@@ -1,0 +1,66 @@
+body
+{
+    font-family: sans-serif;
+    background: white;
+}
+
+
+blockquote.body
+{
+    padding: 6px 0px;
+    margin: 0px 1px;
+}
+
+
+table.x, tr.x
+{
+    border-collapse: separate;
+    border-spacing: 0pt;
+    margin: 0em 0em 0em 0em;
+    padding: 0em 0em 0em 0em;
+}
+
+
+tr.x > td.dummy
+{
+    vertical-align: top;
+    margin: 0em 0em 0em 0em;
+    padding: 0.5em 0em 0em 0em;
+    border-left: 3px solid #6185a0;
+}
+
+
+tr.x > td.dummy > div.dummy
+{
+    width: 1.5em;
+    height: 3px;
+    margin: 0em 0em 0em 0em;
+    border-top: 3px solid #6185a0;
+}
+
+
+table.y, tr.y
+{
+    border-collapse: separate;
+    border-spacing: 0pt;
+    margin: 0em 0em 0em 0em;
+    padding: 0em 0em 0em 0em;
+}
+
+
+tr.y > td.dummy
+{
+    vertical-align: top;
+    margin: 0em 0em 0em 0em;
+    padding: 0em 0em 0em 0em;
+}
+
+
+tr.y > td.dummy > div.dummy
+{
+    width: 1.5em;
+    height: 6px;
+    margin: 0em 0em 0em 0em;
+    border-left: 3px solid #6185a0;
+    border-bottom: 3px solid #6185a0;
+}
