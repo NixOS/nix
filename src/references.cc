@@ -1,3 +1,5 @@
+#include <map>
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -9,24 +11,24 @@
 
 
 static void search(const string & s,
-    Strings & refs, Strings & seen)
+    Strings & ids, Strings & seen)
 {
-    for (Strings::iterator i = refs.begin();
-         i != refs.end(); )
+    for (Strings::iterator i = ids.begin();
+         i != ids.end(); )
     {
         if (s.find(*i) == string::npos)
             i++;
         else {
             debug(format("found reference to `%1%'") % *i);
             seen.push_back(*i);
-            i = refs.erase(i);
+            i = ids.erase(i);
         }
     }
 }
 
 
 void checkPath(const string & path,
-    Strings & refs, Strings & seen)
+    Strings & ids, Strings & seen)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
@@ -39,8 +41,8 @@ void checkPath(const string & path,
         while (errno = 0, dirent = readdir(dir)) {
             string name = dirent->d_name;
             if (name == "." || name == "..") continue;
-            search(name, refs, seen);
-            checkPath(path + "/" + name, refs, seen);
+            search(name, ids, seen);
+            checkPath(path + "/" + name, ids, seen);
         }
 
         closedir(dir); /* !!! close on exception */
@@ -58,7 +60,7 @@ void checkPath(const string & path,
         if (read(fd, buf, st.st_size) != st.st_size)
             throw SysError(format("reading file %1%") % path);
 
-        search(string(buf, st.st_size), refs, seen);
+        search(string(buf, st.st_size), ids, seen);
         
         delete buf; /* !!! autodelete */
 
@@ -69,30 +71,40 @@ void checkPath(const string & path,
         char buf[st.st_size];
         if (readlink(path.c_str(), buf, st.st_size) != st.st_size)
             throw SysError(format("reading symbolic link `%1%'") % path);
-        search(string(buf, st.st_size), refs, seen);
+        search(string(buf, st.st_size), ids, seen);
     }
     
     else throw Error(format("unknown file type: %1%") % path);
 }
 
 
-Strings filterReferences(const string & path, const Strings & _refs)
+Strings filterReferences(const string & path, const Strings & paths)
 {
-    Strings refs;
+    map<string, string> backMap;
+    Strings ids;
     Strings seen;
 
     /* For efficiency (and a higher hit rate), just search for the
        hash part of the file name.  (This assumes that all references
        have the form `HASH-bla'). */
-    for (Strings::const_iterator i = _refs.begin();
-         i != _refs.end(); i++)
+    for (Strings::const_iterator i = paths.begin();
+         i != paths.end(); i++)
     {
         string s = string(baseNameOf(*i), 0, 32);
         parseHash(s);
-        refs.push_back(s);
+        ids.push_back(s);
+        backMap[s] = *i;
     }
 
-    checkPath(path, refs, seen);
+    checkPath(path, ids, seen);
 
-    return seen;
+    Strings found;
+    for (Strings::iterator i = seen.begin(); i != seen.end(); i++)
+    {
+        map<string, string>::iterator j;
+        if ((j = backMap.find(*i)) == backMap.end()) abort();
+        found.push_back(j->second);
+    }
+
+    return found;
 }

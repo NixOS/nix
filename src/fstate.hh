@@ -113,7 +113,7 @@ void registerSuccessor(const FSId & id1, const FSId & id2);
 Slice normaliseFState(FSId id);
 
 /* Realise a Slice in the file system. */
-void realiseSlice(Slice slice);
+void realiseSlice(const Slice & slice);
 
 
 #endif /* !__FSTATE_H */

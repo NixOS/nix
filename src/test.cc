@@ -137,8 +137,8 @@ void runTests()
     realise(fs2id);
     realise(fs2id);
 
-    string out1fn = nixStore + "/hello.txt";
     string out1id = hashString("foo"); /* !!! bad */
+    string out1fn = nixStore + "/" + (string) out1id + "-hello.txt";
     FState fs3 = ATmake(
         "Derive([(<str>, <str>)], [<str>], <str>, <str>, [(\"out\", <str>)])",
         out1fn.c_str(),
@@ -152,6 +152,38 @@ void runTests()
 
     realise(fs3id);
     realise(fs3id);
+
+
+    FSId builder4id;
+    string builder4fn;
+    addToStore("./test-builder-2.sh", builder4fn, builder4id);
+
+    FState fs4 = ATmake(
+        "Slice([<str>], [(<str>, <str>, [])])",
+        ((string) builder4id).c_str(),
+        builder4fn.c_str(),
+        ((string) builder4id).c_str());
+    FSId fs4id = writeTerm(fs4, "", 0);
+
+    realise(fs4id);
+
+    string out5id = hashString("bar"); /* !!! bad */
+    string out5fn = nixStore + "/" + (string) out5id + "-hello2";
+    FState fs5 = ATmake(
+        "Derive([(<str>, <str>)], [<str>], <str>, <str>, [(\"out\", <str>), (\"builder\", <str>)])",
+        out5fn.c_str(),
+        ((string) out5id).c_str(),
+        ((string) fs4id).c_str(),
+        ((string) builder4fn).c_str(),
+        thisSystem.c_str(),
+        out5fn.c_str(),
+        ((string) builder4fn).c_str());
+    debug(printTerm(fs5));
+    FSId fs5id = writeTerm(fs5, "", 0);
+
+    realise(fs5id);
+    realise(fs5id);
+
 
 #if 0
     FState fs2 = ATmake(

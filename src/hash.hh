@@ -22,6 +22,9 @@ struct Hash
     /* Check whether two hash are not equal. */
     bool operator != (Hash h2);
 
+    /* For sorting. */
+    bool operator < (const Hash & h) const;
+
     /* Convert a hash code into a hexadecimal representation. */
     operator string() const;
 };

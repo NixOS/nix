@@ -28,6 +28,16 @@ bool Hash::operator != (Hash h2)
 }
 
 
+bool Hash::operator < (const Hash & h) const
+{
+    for (unsigned int i = 0; i < hashSize; i++) {
+        if (hash[i] < h.hash[i]) return true;
+        if (hash[i] > h.hash[i]) return false;
+    }
+    return false;
+}
+
+
 Hash::operator string() const
 {
     ostringstream str;

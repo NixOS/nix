@@ -459,6 +459,37 @@ static Slice parseSlice(FState fs)
 }
 
 
+static ATermList unparseIds(const FSIds & ids)
+{
+    ATermList l = ATempty;
+    for (FSIds::const_iterator i = ids.begin();
+         i != ids.end(); i++)
+        l = ATinsert(l,
+            ATmake("<str>", ((string) *i).c_str()));
+    return ATreverse(l);
+}
+
+
+static FState unparseSlice(const Slice & slice)
+{
+    ATermList roots = unparseIds(slice.roots);
+    
+    ATermList elems = ATempty;
+    for (SliceElems::const_iterator i = slice.elems.begin();
+         i != slice.elems.end(); i++)
+        elems = ATinsert(elems,
+            ATmake("(<str>, <str>, <term>)",
+                i->path.c_str(),
+                ((string) i->id).c_str(),
+                unparseIds(i->refs)));
+
+    return ATmake("Slice(<term>, <term>)", roots, elems);
+}
+
+
+typedef set<FSId> FSIdSet;
+
+
 Slice normaliseFState(FSId id)
 {
     debug(format("normalising fstate"));
@@ -494,24 +525,23 @@ Slice normaliseFState(FSId id)
     /* Realise inputs (and remember all input paths). */
     FSIds inIds;
     parseIds(ins, inIds);
-    
-    SliceElems inElems; /* !!! duplicates */
-    StringSet inPathsSet;
+
+    typedef map<string, SliceElem> ElemMap;
+
+    ElemMap inMap;
+
     for (FSIds::iterator i = inIds.begin(); i != inIds.end(); i++) {
         Slice slice = normaliseFState(*i);
         realiseSlice(slice);
 
         for (SliceElems::iterator j = slice.elems.begin();
              j != slice.elems.end(); j++)
-        {
-            inElems.push_back(*j);
-            inPathsSet.insert(j->path);
-        }
+            inMap[j->path] = *j;
     }
 
     Strings inPaths;
-    copy(inPathsSet.begin(), inPathsSet.end(),
-        inserter(inPaths, inPaths.begin()));
+    for (ElemMap::iterator i = inMap.begin(); i != inMap.end(); i++)
+        inPaths.push_back(i->second.path);
 
     /* Build the environment. */
     Environment env;
@@ -533,6 +563,7 @@ Slice normaliseFState(FSId id)
         if (!ATmatch(t, "(<str>, <str>)", &s1, &s2))
             throw badTerm("string expected", t);
         outPaths.push_back(OutPath(s1, parseHash(s2)));
+        inPaths.push_back(s1);
         outs = ATgetNext(outs);
     }
 
@@ -548,6 +579,7 @@ Slice normaliseFState(FSId id)
 
     /* Check whether the output paths were created, and register each
        one. */
+    FSIdSet used;
     for (list<OutPath>::iterator i = outPaths.begin(); 
          i != outPaths.end(); i++)
     {
@@ -557,25 +589,81 @@ Slice normaliseFState(FSId id)
         registerPath(path, i->second);
         slice.roots.push_back(i->second);
 
-        Strings outPaths = filterReferences(path, inPaths);
+        Strings refs = filterReferences(path, inPaths);
+
+        SliceElem elem;
+        elem.path = path;
+        elem.id = i->second;
+
+        for (Strings::iterator j = refs.begin(); j != refs.end(); j++) {
+            ElemMap::iterator k;
+            if ((k = inMap.find(*j)) != inMap.end()) {
+                elem.refs.push_back(k->second.id);
+                used.insert(k->second.id);
+            } else abort(); /* fix! check in created paths */
+        }
+
+        slice.elems.push_back(elem);
     }
+
+    for (ElemMap::iterator i = inMap.begin();
+         i != inMap.end(); i++)
+    {
+        FSIdSet::iterator j = used.find(i->second.id);
+        if (j == used.end())
+            debug(format("NOT referenced: `%1%'") % i->second.path);
+        else {
+            debug(format("referenced: `%1%'") % i->second.path);
+            slice.elems.push_back(i->second);
+        }
+    }
+
+    FState nf = unparseSlice(slice);
+    debug(printTerm(nf));
+    storeSuccessor(id, nf);
 
     return slice;
 }
 
 
-void realiseSlice(Slice slice)
+static void checkSlice(const Slice & slice)
+{
+    if (slice.elems.size() == 0)
+        throw Error("empty slice");
+
+    FSIdSet decl;
+    for (SliceElems::const_iterator i = slice.elems.begin();
+         i != slice.elems.end(); i++)
+    {
+        debug((string) i->id);
+        decl.insert(i->id);
+    }
+    
+    for (FSIds::const_iterator i = slice.roots.begin();
+         i != slice.roots.end(); i++)
+        if (decl.find(*i) == decl.end())
+            throw Error(format("undefined id: %1%") % (string) *i);
+    
+    for (SliceElems::const_iterator i = slice.elems.begin();
+         i != slice.elems.end(); i++)
+        for (FSIds::const_iterator j = i->refs.begin();
+             j != i->refs.end(); j++)
+            if (decl.find(*j) == decl.end())
+                throw Error(format("undefined id: %1%") % (string) *j);
+}
+
+
+void realiseSlice(const Slice & slice)
 {
     debug(format("realising slice"));
     Nest nest(true);
 
-    if (slice.elems.size() == 0)
-        throw Error("empty slice");
+    checkSlice(slice);
 
     /* Perhaps all paths already contain the right id? */
 
     bool missing = false;
-    for (SliceElems::iterator i = slice.elems.begin();
+    for (SliceElems::const_iterator i = slice.elems.begin();
          i != slice.elems.end(); i++)
     {
         SliceElem elem = *i;
@@ -596,7 +684,7 @@ void realiseSlice(Slice slice)
     }
 
     /* For each element, expand its id at its path. */
-    for (SliceElems::iterator i = slice.elems.begin();
+    for (SliceElems::const_iterator i = slice.elems.begin();
          i != slice.elems.end(); i++)
     {
         SliceElem elem = *i;
