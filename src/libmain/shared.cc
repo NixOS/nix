@@ -64,17 +64,17 @@ int main(int argc, char * * argv)
     try {
         initAndRun(argc, argv);
     } catch (UsageError & e) {
-        msg(lvlError, 
+        printMsg(lvlError, 
             format(
                 "error: %1%\n"
                 "Try `%2% --help' for more information.")
             % e.what() % programId);
         return 1;
     } catch (Error & e) {
-        msg(lvlError, format("error: %1%") % e.msg());
+        printMsg(lvlError, format("error: %1%") % e.msg());
         return 1;
     } catch (exception & e) {
-        msg(lvlError, format("error: %1%") % e.what());
+        printMsg(lvlError, format("error: %1%") % e.what());
         return 1;
     }
 

@@ -202,7 +202,8 @@ void Database::open(const string & path)
                 setAccessorCount(fdAccessors, 1);
 
             if (n != 0) {
-                msg(lvlTalkative, format("accessor count is %1%, running recovery") % n);
+                printMsg(lvlTalkative,
+                    format("accessor count is %1%, running recovery") % n);
 
                 /* Open the environment after running recovery. */
                 openEnv(env, path, DB_RECOVER);

@@ -23,7 +23,6 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
     while (!ATisEmpty(formals)) {
         ATerm t = ATgetFirst(formals);
         Expr name, def;
-        debug(printTerm(t));
         if (ATmatch(t, "NoDefFormal(<term>)", &name))
             subs.set(name, undefined);
         else if (ATmatch(t, "DefFormal(<term>, <term>)", &name, &def))
@@ -234,7 +233,8 @@ Expr evalExpr2(EvalState & state, Expr e)
 
 Expr evalExpr(EvalState & state, Expr e)
 {
-    Nest nest(lvlVomit, format("evaluating expression: %1%") % printTerm(e));
+    startNest(nest, lvlVomit,
+        format("evaluating expression: %1%") % printTerm(e));
 
     state.nrEvaluated++;
 
@@ -258,7 +258,7 @@ Expr evalExpr(EvalState & state, Expr e)
 
 Expr evalFile(EvalState & state, const Path & path)
 {
-    Nest nest(lvlTalkative, format("evaluating file `%1%'") % path);
+    startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
     Expr e = parseExprFromFile(path);
     return evalExpr(state, e);
 }

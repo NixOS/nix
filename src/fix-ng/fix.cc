@@ -60,7 +60,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
 
 static Expr evalStdin(EvalState & state)
 {
-    Nest nest(lvlTalkative, format("evaluating standard input"));
+    startNest(nest, lvlTalkative, format("evaluating standard input"));
     Expr e = ATreadFromFile(stdin);
     if (!e) 
         throw Error(format("unable to read a term from stdin"));

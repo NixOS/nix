@@ -273,7 +273,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
         Path pkgPath = writeTerm(unparseNixExpr(ne), "");
         state.pkgHashes[pkgPath] = pkgHash;
 
-        msg(lvlChatty, format("copied `%1%' -> closure `%2%'")
+        printMsg(lvlChatty, format("copied `%1%' -> closure `%2%'")
             % srcPath % pkgPath);
 
         return ATmake("NixExpr(<str>)", pkgPath.c_str());
@@ -362,7 +362,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
         Path pkgPath = writeTerm(unparseNixExpr(ne), "-d-" + name);
         state.pkgHashes[pkgPath] = pkgHash;
 
-        msg(lvlChatty, format("instantiated `%1%' -> `%2%'")
+        printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'")
             % name % pkgPath);
 
         return ATmake("NixExpr(<str>)", pkgPath.c_str());
@@ -383,7 +383,8 @@ static Expr evalExpr2(EvalState & state, Expr e)
 
 static Expr evalExpr(EvalState & state, Expr e)
 {
-    Nest nest(lvlVomit, format("evaluating expression: %1%") % printTerm(e));
+    startNest(nest, lvlVomit,
+        format("evaluating expression: %1%") % printTerm(e));
 
     /* Consult the memo table to quickly get the normal form of
        previously evaluated expressions. */
@@ -405,7 +406,7 @@ static Expr evalExpr(EvalState & state, Expr e)
 static Expr evalFile(EvalState & state, const Path & relPath)
 {
     Path path = searchPath(state.searchDirs, relPath);
-    Nest nest(lvlTalkative, format("evaluating file `%1%'") % path);
+    startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
     Expr e = ATreadFromNamedFile(path.c_str());
     if (!e) 
         throw Error(format("unable to read a term from `%1%'") % path);
@@ -415,7 +416,7 @@ static Expr evalFile(EvalState & state, const Path & relPath)
 
 static Expr evalStdin(EvalState & state)
 {
-    Nest nest(lvlTalkative, format("evaluating standard input"));
+    startNest(nest, lvlTalkative, format("evaluating standard input"));
     Expr e = ATreadFromFile(stdin);
     if (!e) 
         throw Error(format("unable to read a term from stdin"));

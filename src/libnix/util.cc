@@ -110,7 +110,7 @@ bool pathExists(const Path & path)
 
 void deletePath(const Path & path)
 {
-    msg(lvlVomit, format("deleting path `%1%'") % path);
+    printMsg(lvlVomit, format("deleting path `%1%'") % path);
 
     struct stat st;
     if (lstat(path.c_str(), &st))
@@ -194,15 +194,9 @@ Verbosity verbosity = lvlError;
 static int nestingLevel = 0;
 
 
-Nest::Nest(Verbosity level, const format & f)
+Nest::Nest()
 {
-    if (level > verbosity)
-        nest = false;
-    else {
-        msg(level, f);
-        nest = true;
-        nestingLevel++;
-    }
+    nest = false;
 }
 
 
@@ -212,19 +206,23 @@ Nest::~Nest()
 }
 
 
-void msg(Verbosity level, const format & f)
+void Nest::open(Verbosity level, const format & f)
+{
+    if (level <= verbosity) {
+        printMsg_(level, f);
+        nest = true;
+        nestingLevel++;
+    }
+}
+
+
+void printMsg_(Verbosity level, const format & f)
 {
     if (level > verbosity) return;
     string spaces;
     for (int i = 0; i < nestingLevel; i++)
         spaces += "|   ";
     cerr << format("%1%%2%\n") % spaces % f.str();
-}
-
-
-void debug(const format & f)
-{
-    msg(lvlDebug, f);
 }
 
 

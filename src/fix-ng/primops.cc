@@ -58,7 +58,7 @@ static Path copyAtom(EvalState & state, const Path & srcPath)
     Path drvPath = writeTerm(unparseNixExpr(ne), "");
     state.drvHashes[drvPath] = drvHash;
 
-    msg(lvlChatty, format("copied `%1%' -> closure `%2%'")
+    printMsg(lvlChatty, format("copied `%1%' -> closure `%2%'")
         % srcPath % drvPath);
     return drvPath;
 }
@@ -107,7 +107,7 @@ static string processBinding(EvalState & state, Expr e, NixExpr & ne)
 	string s;
 	bool first = true;
         while (!ATisEmpty(es)) {
-            Nest nest(lvlVomit, format("processing list element"));
+            startNest(nest, lvlVomit, format("processing list element"));
 	    if (!first) s = s + " "; else first = false;
 	    s += processBinding(state, evalExpr(state, ATgetFirst(es)), ne);
             es = ATgetNext(es);
@@ -123,7 +123,7 @@ static string processBinding(EvalState & state, Expr e, NixExpr & ne)
 
 Expr primDerivation(EvalState & state, Expr args)
 {
-    Nest nest(lvlVomit, "evaluating derivation");
+    startNest(nest, lvlVomit, "evaluating derivation");
 
     ATermMap attrs;
     args = evalExpr(state, args);
@@ -143,7 +143,7 @@ Expr primDerivation(EvalState & state, Expr args)
     {
         string key = aterm2String(ATgetFirst(keys));
         Expr value = attrs.get(key);
-        Nest nest(lvlVomit, format("processing attribute `%1%'") % key);
+        startNest(nest, lvlVomit, format("processing attribute `%1%'") % key);
 
         /* The `args' attribute is special: it supplies the
            command-line arguments to the builder. */
@@ -199,7 +199,7 @@ Expr primDerivation(EvalState & state, Expr args)
     Path drvPath = writeTerm(unparseNixExpr(ne), "-d-" + drvName);
     state.drvHashes[drvPath] = drvHash;
 
-    msg(lvlChatty, format("instantiated `%1%' -> `%2%'")
+    printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'")
         % drvName % drvPath);
 
     attrs.set("outPath", ATmake("Path(<str>)", outPath.c_str()));

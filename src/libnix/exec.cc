@@ -110,7 +110,7 @@ void runProgram(const string & program,
     
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
 	if (keepFailed) {
-	    msg(lvlTalkative, 
+	    printMsg(lvlTalkative, 
 		format("program `%1%' failed; keeping build directory `%2%'")
                 % program % tmpDir);
 	    delTmpDir.cancel();

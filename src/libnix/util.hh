@@ -101,12 +101,27 @@ class Nest
 private:
     bool nest;
 public:
-    Nest(Verbosity level, const format & f);
+    Nest();
     ~Nest();
+    void open(Verbosity level, const format & f);
 };
 
-void msg(Verbosity level, const format & f);
-void debug(const format & f); /* short-hand for msg(lvlDebug, ...) */
+void printMsg_(Verbosity level, const format & f);
+
+#define startNest(varName, level, f) \
+    Nest varName; \
+    if (level <= verbosity) { \
+      varName.open(level, (f)); \
+    }
+
+#define printMsg(level, f) \
+    do { \
+        if (level <= verbosity) { \
+            printMsg_(level, (f)); \
+        } \
+    } while (0)
+
+#define debug(f) printMsg(lvlDebug, f)
 
 
 /* Wrappers arount read()/write() that read/write exactly the

@@ -20,7 +20,7 @@ static Path useSuccessor(const Path & path)
 
 Path normaliseNixExpr(const Path & _nePath, PathSet pending)
 {
-    Nest nest(lvlTalkative,
+    startNest(nest, lvlTalkative,
         format("normalising expression in `%1%'") % (string) _nePath);
 
     /* Try to substitute the expression by any known successors in
@@ -156,13 +156,13 @@ Path normaliseNixExpr(const Path & _nePath, PathSet pending)
         }
 
         /* Run the builder. */
-        msg(lvlChatty, format("building..."));
+        printMsg(lvlChatty, format("building..."));
         runProgram(ne.derivation.builder, ne.derivation.args, env,
             nixLogDir + "/" + baseNameOf(nePath));
-        msg(lvlChatty, format("build completed"));
+        printMsg(lvlChatty, format("build completed"));
         
     } else
-        msg(lvlChatty, format("fast build succesful"));
+        printMsg(lvlChatty, format("fast build succesful"));
 
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
@@ -239,7 +239,7 @@ Path normaliseNixExpr(const Path & _nePath, PathSet pending)
     /* Write the normal form.  This does not have to occur in the
        transaction below because writing terms is idem-potent. */
     ATerm nfTerm = unparseNixExpr(nf);
-    msg(lvlVomit, format("normal form: %1%") % printTerm(nfTerm));
+    printMsg(lvlVomit, format("normal form: %1%") % printTerm(nfTerm));
     Path nfPath = writeTerm(nfTerm, "-s");
 
     /* Register each outpat path, and register the normal form.  This
@@ -262,7 +262,7 @@ Path normaliseNixExpr(const Path & _nePath, PathSet pending)
 
 void realiseClosure(const Path & nePath, PathSet pending)
 {
-    Nest nest(lvlDebug, format("realising closure `%1%'") % nePath);
+    startNest(nest, lvlDebug, format("realising closure `%1%'") % nePath);
 
     NixExpr ne = exprFromPath(nePath, pending);
     if (ne.type != NixExpr::neClosure)
@@ -290,7 +290,7 @@ void ensurePath(const Path & path, PathSet pending)
             if (isValidPath(path)) return;
             throw Error(format("substitute failed to produce expected output path"));
         } catch (Error & e) {
-            msg(lvlTalkative, 
+            printMsg(lvlTalkative, 
                 format("building of substitute `%1%' for `%2%' failed: %3%")
                 % *i % path % e.what());
         }
