@@ -56,6 +56,8 @@ Major changes include the following:
 
   * Various new operators (e.g., string concatenation).
 
+* Expression evaluation is much faster.
+
 * An Emacs mode for editing Nix expressions (with syntax highlighting
   and indentation) has been added.
 

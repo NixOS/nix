@@ -66,7 +66,7 @@ while (<STDIN>) {
 
         print HEADER "#ifdef __cplusplus\n";
         print HEADER "static inline bool match$funname(ATerm e$formals2) {\n";
-        print HEADER "    if (ATgetAFun(e) != sym$funname) return false;\n";
+        print HEADER "    if (ATgetType(e) != AT_APPL || ATgetAFun(e) != sym$funname) return false;\n";
         print HEADER "$unpack";
         print HEADER "    return true;\n";
         print HEADER "}\n";
