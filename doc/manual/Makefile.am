@@ -10,7 +10,8 @@ man1_MANS = nix-env.1 nix-store.1 nix-instantiate.1 \
  nix-collect-garbage.1 nix-push.1 nix-pull.1 \
  nix-prefetch-url.1
 
-SOURCES = manual.xml introduction.xml installation.xml overview.xml \
+SOURCES = manual.xml introduction.xml installation.xml \
+ package-management.xml writing-nix-expressions.xml \
  $(man1_MANS:.1=.xml) \
  troubleshooting.xml bugs.xml opt-common.xml opt-common-syn.xml \
  quick-start.xml nix-lang-ref.xml style.css images

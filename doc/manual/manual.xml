@@ -9,7 +9,8 @@
 <!ENTITY introduction SYSTEM "introduction.xml">
 <!ENTITY quick-start SYSTEM "quick-start.xml">
 <!ENTITY installation SYSTEM "installation.xml">
-<!ENTITY overview SYSTEM "overview.xml">
+<!ENTITY package-management SYSTEM "package-management.xml">
+<!ENTITY writing-nix-expressions SYSTEM "writing-nix-expressions.xml">
 <!ENTITY opt-common SYSTEM "opt-common.xml">
 <!ENTITY opt-common-syn SYSTEM "opt-common-syn.xml">
 <!ENTITY nix-env SYSTEM "nix-env.xml">
@@ -44,7 +45,8 @@
   &introduction;
   &quick-start;
   &installation;
-  &overview;
+  &package-management;
+  &writing-nix-expressions;
 
   <appendix>
     <title>Command Reference</title>
