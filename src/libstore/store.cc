@@ -355,9 +355,41 @@ Substitutes querySubstitutes(const Path & srcPath)
 }
 
 
+static void unregisterPredecessors(const Path & path, Transaction & txn)
+{
+    /* Remove any successor mappings to this path (but not *from*
+       it). */
+    Paths revs;
+    nixDB.queryStrings(txn, dbSuccessorsRev, path, revs);
+    for (Paths::iterator i = revs.begin(); i != revs.end(); ++i)
+        nixDB.delPair(txn, dbSuccessors, *i);
+    nixDB.delPair(txn, dbSuccessorsRev, path);
+}
+ 
+
 void clearSubstitutes()
 {
+    Transaction txn(nixDB);
     
+    /* Iterate over all paths for which there are substitutes. */
+    Paths subKeys;
+    nixDB.enumTable(txn, dbSubstitutes, subKeys);
+    for (Paths::iterator i = subKeys.begin(); i != subKeys.end(); ++i) {
+
+        /* If this path has not become valid in the mean-while, delete
+           any successor mappings *to* it.  This is to preserve the
+           invariant the all successors are `usable' as opposed to
+           `valid' (i.e., the successor must be valid *or* have at
+           least one substitute). */
+        if (!isValidPath(*i)) {
+            unregisterPredecessors(*i, txn);
+        }
+        
+        /* Delete all substitutes for path *i. */
+        nixDB.delPair(txn, dbSubstitutes, *i);
+    }
+
+    txn.commit();
 }
 
 
@@ -375,14 +407,7 @@ static void invalidatePath(const Path & path, Transaction & txn)
     debug(format("unregistering path `%1%'") % path);
 
     nixDB.delPair(txn, dbValidPaths, path);
-
-    /* Remove any successor mappings to this path (but not *from*
-       it). */
-    Paths revs;
-    nixDB.queryStrings(txn, dbSuccessorsRev, path, revs);
-    for (Paths::iterator i = revs.begin(); i != revs.end(); ++i)
-        nixDB.delPair(txn, dbSuccessors, *i);
-    nixDB.delPair(txn, dbSuccessorsRev, path);
+    unregisterPredecessors(path, txn);
 }
 
 
@@ -511,6 +536,8 @@ void verifyStore()
         Substitutes subs = readSubstitutes(txn, *i);
 	if (subs.size() > 0)
 	    usablePaths.insert(*i);
+        else
+            nixDB.delPair(txn, dbSubstitutes, *i);
     }
 
     /* Check that the values of the successor mappings are usable
