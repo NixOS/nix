@@ -28,6 +28,7 @@ init-state:
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/db
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/log/nix
+	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/log/nix/drvs
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/profiles
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/gcroots
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/temproots

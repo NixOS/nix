@@ -1156,7 +1156,7 @@ void DerivationGoal::computeClosure()
 void DerivationGoal::openLogFile()
 {
     /* Create a log file. */
-    Path logFileName = nixLogDir + "/" + baseNameOf(drvPath);
+    Path logFileName = nixLogDir + "/drvs/" + baseNameOf(drvPath);
     fdLogFile = open(logFileName.c_str(),
         O_CREAT | O_WRONLY | O_TRUNC, 0666);
     if (fdLogFile == -1)
