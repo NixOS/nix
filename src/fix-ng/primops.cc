@@ -225,3 +225,16 @@ Expr primToString(EvalState & state, Expr arg)
         return ATmake("Str(<str>)", s);
     else throw badTerm("cannot coerce to string", arg);
 }
+
+
+Expr primNull(EvalState & state, Expr arg)
+{
+    return ATmake("Null");
+}
+
+
+Expr primIsNull(EvalState & state, Expr arg)
+{
+    arg = evalExpr(state, arg);
+    return makeBool(ATmatch(arg, "Null"));
+}

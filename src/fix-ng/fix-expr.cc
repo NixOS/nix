@@ -222,3 +222,9 @@ Expr substitute(const ATermMap & subs, Expr e)
 
     return e;
 }
+
+
+Expr makeBool(bool b)
+{
+    return b ? ATmake("Bool(True)") : ATmake("Bool(False)");
+}

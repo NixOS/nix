@@ -45,7 +45,6 @@ public:
 ATerm string2ATerm(const string & s);
 string aterm2String(ATerm t);
 
-
 /* Generic bottomup traversal over ATerms.  The traversal first
    recursively descends into subterms, and then applies the given term
    function to the resulting term. */
@@ -68,6 +67,9 @@ Expr makeAttrs(const ATermMap & attrs);
 
 /* Perform a set of substitutions on an expression. */
 Expr substitute(const ATermMap & subs, Expr e);
+
+/* Create an expression representing a boolean. */
+Expr makeBool(bool b);
 
 
 #endif /* !__FIXEXPR_H */

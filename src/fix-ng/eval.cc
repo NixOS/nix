@@ -13,11 +13,6 @@ EvalState::EvalState()
 }
 
 
-Expr getAttr(EvalState & state, Expr e, const string & name)
-{
-}
-
-
 /* Substitute an argument set into the body of a function. */
 static Expr substArgs(Expr body, ATermList formals, Expr arg)
 {
@@ -142,7 +137,8 @@ Expr evalExpr2(EvalState & state, Expr e)
         ATmatch(e, "Bool(<term>)", &e1) ||
         ATmatch(e, "Function([<list>], <term>)", &e1, &e2) ||
         ATmatch(e, "Attrs([<list>])", &e1) ||
-        ATmatch(e, "List([<list>])", &e1))
+        ATmatch(e, "List([<list>])", &e1) ||
+        ATmatch(e, "Null", &e1))
         return e;
 
     /* Any encountered variables must be undeclared or primops. */
@@ -163,6 +159,8 @@ Expr evalExpr2(EvalState & state, Expr e)
             if (primop == "derivation") return primDerivation(state, e2);
             if (primop == "toString") return primToString(state, e2);
             if (primop == "baseNameOf") return primBaseNameOf(state, e2);
+            if (primop == "null") return primNull(state, e2);
+            if (primop == "isNull") return primIsNull(state, e2);
             else throw badTerm("undefined variable/primop", e1);
         }
 
@@ -200,12 +198,35 @@ Expr evalExpr2(EvalState & state, Expr e)
             return evalExpr(state, e3);
     }
 
-    /* Equality.  Just strings for now. */
-    if (ATmatch(e, "OpEq(<term>, <term>)", &e1, &e2)) {
-        string s1 = evalString(state, e1);
-        string s2 = evalString(state, e2);
-        return s1 == s2 ? ATmake("Bool(True)") : ATmake("Bool(False)");
+    /* Assertions. */
+    if (ATmatch(e, "Assert(<term>, <term>)", &e1, &e2)) {
+        if (!evalBool(state, e1)) throw badTerm("guard failed", e);
+        return evalExpr(state, e2);
     }
+
+    /* Generic equality. */
+    if (ATmatch(e, "OpEq(<term>, <term>)", &e1, &e2))
+        return makeBool(evalExpr(state, e1) == evalExpr(state, e2));
+
+    /* Generic inequality. */
+    if (ATmatch(e, "OpNEq(<term>, <term>)", &e1, &e2))
+        return makeBool(evalExpr(state, e1) != evalExpr(state, e2));
+
+    /* Negation. */
+    if (ATmatch(e, "OpNot(<term>)", &e1))
+        return makeBool(!evalBool(state, e1));
+
+    /* Implication. */
+    if (ATmatch(e, "OpImpl(<term>, <term>)", &e1, &e2))
+        return makeBool(!evalBool(state, e1) || evalBool(state, e2));
+
+    /* Conjunction (logical AND). */
+    if (ATmatch(e, "OpAnd(<term>, <term>)", &e1, &e2))
+        return makeBool(evalBool(state, e1) && evalBool(state, e2));
+
+    /* Disjunction (logical OR). */
+    if (ATmatch(e, "OpOr(<term>, <term>)", &e1, &e2))
+        return makeBool(evalBool(state, e1) || evalBool(state, e2));
 
     /* Barf. */
     throw badTerm("invalid expression", e);

@@ -38,6 +38,8 @@ exports
     Id -> Formal {cons("NoDefFormal")}
     Id "?" Expr -> Formal {cons("DefFormal")}
 
+    "assert" Expr ";" Expr -> Expr {cons("Assert"), right}
+
     "rec" "{" Binds "}" -> Expr {cons("Rec")}
     "let" "{" Binds "}" -> Expr {cons("LetRec")}
     "{" Binds "}" -> Expr {cons("Attrs")}
@@ -55,7 +57,13 @@ exports
 
     "if" Expr "then" Expr "else" Expr -> Expr {cons("If")}
 
-    Expr "==" Expr -> Expr {cons("OpEq")}
+    Expr "==" Expr -> Expr {cons("OpEq"), non-assoc}
+    Expr "!=" Expr -> Expr {cons("OpNEq"), non-assoc}
+
+    "!" Expr -> Expr {cons("OpNot")}
+    Expr "&&" Expr -> Expr {cons("OpAnd"), right}
+    Expr "||" Expr -> Expr {cons("OpOr"), right}
+    Expr "->" Expr -> Expr {cons("OpImpl"), right}
 
     Bool -> Expr {cons("Bool")}
 
@@ -64,6 +72,13 @@ exports
     Expr "." Id -> Expr
   > Expr ExprList -> ExprList
   > Expr Expr -> Expr
+  > "!" Expr -> Expr
+  > Expr "==" Expr -> Expr
+  > Expr "!=" Expr -> Expr
+  > Expr "&&" Expr -> Expr
+  > Expr "||" Expr -> Expr
+  > Expr "->" Expr -> Expr
+  > "assert" Expr ";" Expr -> Expr
   > "{" {Formal ","}* "}" ":" Expr -> Expr
 
 
@@ -78,6 +93,7 @@ exports
     "rec" -> Id {reject}
     "true" -> Id {reject}
     "false" -> Id {reject}
+    "assert" -> Id {reject}
 
     [0-9]+ -> Int
 
