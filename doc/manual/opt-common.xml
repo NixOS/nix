@@ -171,3 +171,14 @@
   </listitem>
 </varlistentry>
 
+
+<varlistentry>
+  <term><option>--readonly-mode</option></term>
+  <listitem>
+    <para>
+      When this option is used, no attempt is made to open the Nix
+      database.  Most Nix operations do need database access, so those
+      operations will fail.
+    </para>
+  </listitem>
+</varlistentry>

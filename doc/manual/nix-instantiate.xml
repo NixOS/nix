@@ -8,6 +8,10 @@
     <cmdsynopsis>
       <command>nix-instantiate</command>
       &opt-common-syn;
+      <group choice='opt'>
+        <arg choice='plain'><option>--parse-only</option></arg>
+        <arg choice='plain'><option>--eval-only</option></arg>
+      </group>
       <arg choice='plain' rep='repeat'><replaceable>files</replaceable></arg>
     </cmdsynopsis>
   </refsynopsisdiv>
@@ -38,6 +42,27 @@
     <variablelist>
 
       &opt-common;
+
+      <varlistentry>
+        <term><option>--parse-only</option></term>
+        <listitem>
+          <para>
+            Just parse the input files, and print their abstract
+            syntax trees on standard output in ATerm format.
+          </para>
+        </listitem>
+      </varlistentry>
+      
+      <varlistentry>
+        <term><option>--eval-only</option></term>
+        <listitem>
+          <para>
+            Just parse and evaluate the input files, and print the
+            resulting values on standard output.  No instantiation of
+            store expressions takes place.
+          </para>
+        </listitem>
+      </varlistentry>
 
     </variablelist>
 

@@ -16,3 +16,4 @@
 <arg><option>--keep-failed</option></arg>
 <arg><option>-K</option></arg>
 <arg><option>--fallback</option></arg>
+<arg><option>--readonly-mode</option></arg>

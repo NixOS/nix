@@ -10,6 +10,7 @@ Options:
   --version: output version information
   --help: display help
 
-Options:
-
   --verbose / -v: verbose operation (may be repeated)
+
+  --eval-only: evaluate and print resulting term; do not instantiate
+  --parse-only: parse and print abstract syntax tree
