@@ -341,7 +341,8 @@ static void queryInstSources(EvalState & state,
            argument, e.g., if the file is `./foo.nix', then the
            argument `x: x.bar' is equivalent to `(x: x.bar)
            (import ./foo.nix)' = `(import ./foo.nix).bar'. */
-        case srcNixExprs:
+        case srcNixExprs: {
+                
 
             Expr e1 = parseExprFromFile(state,
                 absPath(instSource.nixExprPath));
@@ -355,8 +356,12 @@ static void queryInstSources(EvalState & state,
             }
             
             break;
-
-        case srcStorePaths:
+        }
+            
+        /* The available user environment elements are specified as a
+           list of store paths (which may or may not be
+           derivations). */
+        case srcStorePaths: {
 
             for (Strings::const_iterator i = args.begin();
                  i != args.end(); ++i)
@@ -384,11 +389,16 @@ static void queryInstSources(EvalState & state,
             }
             
             break;
-
-        case srcProfile:
+        }
+            
+        /* Get the available user environment elements from another
+           user environment.  These are then filtered as in the
+           `srcNixExprDrvs' case. */
+        case srcProfile: {
             elems = filterBySelector(
                 queryInstalled(state, instSource.profile), args);
             break;
+        }
     }
 }
 
