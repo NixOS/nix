@@ -54,17 +54,6 @@
 
     <listitem>
       <para>
-        The current garbage collector is a hack.  It should be
-        integrated into <command>nix-store</command>.  It should
-        delete derivations in an order determined by topologically
-        sorting derivations under the points-to relation.  This
-        ensures that no store paths ever exist that point to
-        non-existant store paths.
-      </para>
-    </listitem>
-
-    <listitem>
-      <para>
         There are race conditions between the garbage collector and
         other Nix tools.  For instance, when we run
         <command>nix-env</command> to build and install a derivation

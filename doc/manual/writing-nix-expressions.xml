@@ -44,7 +44,8 @@ need to do three things:
 
 <sect2><title>The Nix expression</title>
 
-<example id='ex-hello-nix'><title>Nix expression for GNU Hello</title>
+<example id='ex-hello-nix'><title>Nix expression for GNU Hello
+(<filename>default.nix</filename>)</title>
 <programlisting>
 {stdenv, fetchurl, perl}: <co id='ex-hello-nix-co-1' />
 
@@ -189,30 +190,311 @@ perl = perl;</programlisting>
 
 <sect2><title>The builder</title>
 
-<example id='ex-hello-builder'><title>Build script for GNU Hello</title>
+<example id='ex-hello-builder'><title>Build script for GNU Hello
+(<filename>builder.sh</filename>)</title>
 <programlisting>
-. $stdenv/setup
+. $stdenv/setup <co id='ex-hello-builder-co-1' />
 
-PATH=$perl/bin:$PATH
+PATH=$perl/bin:$PATH <co id='ex-hello-builder-co-2' />
 
-tar xvfz $src
+tar xvfz $src <co id='ex-hello-builder-co-3' />
 cd hello-*
-./configure --prefix=$out
-make
+./configure --prefix=$out <co id='ex-hello-builder-co-4' />
+make <co id='ex-hello-builder-co-5' />
 make install</programlisting>
 </example>
 
 <para><xref linkend='ex-hello-builder' /> shows the builder referenced
 from Hello's Nix expression (stored in
-<filename>pkgs/applications/misc/hello/ex-1/builder.sh</filename>).</para>
+<filename>pkgs/applications/misc/hello/ex-1/builder.sh</filename>).
+The builder can actually be made a lot shorter by using the
+<emphasis>generic builder</emphasis> functions provided by
+<varname>stdenv</varname>, but here we write out the build steps to
+elucidate what a builder does.  It performs the following
+steps:</para>
 
-<para>TODO</para>
+<calloutlist>
+
+  <callout arearefs='ex-hello-builder-co-1'>
+
+    <para>When Nix runs a builder, it initially completely clears the
+    environment.  For instance, the <envar>PATH</envar> variable is
+    empty<footnote><para>Actually, it's initialised to
+    <filename>/path-not-set</filename> to prevent Bash from setting it
+    to a default value.</para></footnote>.  This is done to prevent
+    undeclared inputs from being used in the build process.  If for
+    example the <envar>PATH</envar> contained
+    <filename>/usr/bin</filename>, then you might accidentally use
+    <filename>/usr/bin/gcc</filename>.</para>
+
+    <para>So the first step is to set up the environment.  This is
+    done by calling the <filename>setup</filename> script of the
+    standard environment.  The environment variable
+    <envar>stdenv</envar> points to the location of the standard
+    environment being used.  (It wasn't specified explicitly as an
+    attribute in <xref linkend='ex-hello-nix' />, but
+    <varname>mkDerivation</varname> adds it automatically.)</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-builder-co-2'>
+
+    <para>Since Hello needs Perl, we have to make sure that Perl is in
+    the <envar>PATH</envar>.  The <envar>perl</envar> environment
+    variable points to the location of the Perl component (since it
+    was passed in as an attribute to the derivation), so
+    <filename><replaceable>$perl</replaceable>/bin</filename> is the
+    directory containing the Perl interpreter.</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-builder-co-3'>
+
+    <para>Now we have to unpack the sources.  The
+    <varname>src</varname> attribute was bound to the result of
+    fetching the Hello source tarball from the network, so the
+    <envar>src</envar> environment variable points to the location in
+    the Nix store to which the tarball was downloaded.  After
+    unpacking, we <command>cd</command> to the resulting source
+    directory.</para>
+
+    <para>The whole build is performed in a temporary directory
+    created in <varname>/tmp</varname>, by the way.  This directory is
+    removed after the builder finishes, so there is no need to clean
+    up the sources afterwards.  Also, the temporary directory is
+    always newly created, so you don't have to worry about files from
+    previous builds interfering with the current build.</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-builder-co-4'>
+
+    <para>GNU Hello is a typical Autoconf-based package, so we first
+    have to run its <filename>configure</filename> script.  In Nix
+    every component is stored in a separate location in the Nix store,
+    for instance
+    <filename>/nix/store/9a54ba97fb71b65fda531012d0443ce2-hello-2.1.1</filename>.
+    Nix computes this path by cryptographically hashing all attributes
+    of the derivation.  The path is passed to the builder through the
+    <envar>out</envar> environment variable.  So here we give
+    <filename>configure</filename> the parameter
+    <literal>--prefix=$out</literal> to cause Hello to be installed in
+    the expected location.</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-builder-co-5'>
+
+    <para>Finally we build Hello (<literal>make</literal>) and install
+    it into the location specified by <envar>out</envar>
+    (<literal>make install</literal>).</para>
+
+  </callout>
+  
+</calloutlist>
 
 <para>If you are wondering about the absence of error checking on the
 result of various commands called in the builder: this is because the
 shell script is evaluated with Bash's <option>-e</option> option,
 which causes the script to be aborted if any command fails without an
 error check.</para>
+
+</sect2>
+
+
+<sect2><title>Composition</title>
+
+<example id='ex-hello-composition'><title>Composing GNU Hello
+(<filename>all-packages-generic.nix</filename>)</title>
+<programlisting>
+...
+
+rec { <co id='ex-hello-composition-co-1' />
+  
+  hello = (import ../applications/misc/hello/ex-1 <co id='ex-hello-composition-co-2' />) { <co id='ex-hello-composition-co-3' />
+    inherit fetchurl stdenv perl;
+  };
+
+  perl = (import ../development/interpreters/perl) { <co id='ex-hello-composition-co-4' />
+    inherit fetchurl stdenv;
+  };
+
+  fetchurl = (import ../build-support/fetchurl) { 
+    inherit stdenv; ...
+  };
+  
+  stdenv = ...;
+
+}
+</programlisting>
+</example>
+
+<para>The Nix expression in <xref linkend='ex-hello-nix' /> is a
+function; it is missing some arguments that have to be filled in
+somewhere.  In the Nix Packages collection this is done in the file
+<filename>pkgs/system/all-packages-generic.nix</filename>, where all
+Nix expressions for components are imported and called with the
+appropriate arguments.  <xref linkend='ex-hello-composition' /> shows
+some fragments of
+<filename>all-packages-generic.nix</filename>.</para>
+
+<calloutlist>
+
+  <callout arearefs='ex-hello-composition-co-1'>
+
+    <para>This file defines a set of attributes, all of which are
+    concrete derivations (i.e., not functions).  In fact, we define a
+    <emphasis>mutually recursive</emphasis> set of attributes.  That
+    is, the attributes can refer to each other.  This is precisely
+    what we want since we want to <quote>plug</quote> the
+    various components into each other.</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-composition-co-2'>
+
+    <para>Here we <emphasis>import</emphasis> the Nix expression for
+    GNU Hello.  The import operation just loads and returns the
+    specified Nix expression. In fact, we could just have put the
+    contents of <xref linkend='ex-hello-nix' /> in
+    <filename>all-packages-generic.nix</filename> at this point.  That
+    would be completely equivalent, but it would make the file rather
+    bulky.</para>
+
+    <para>Note that we refer to
+    <filename>../applications/misc/hello/ex-1</filename>, not
+    <filename>../applications/misc/hello/ex-1/default.nix</filename>.
+    When you try to import a directory, Nix automatically appends
+    <filename>/default.nix</filename> to the file name.</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-composition-co-3'>
+
+    <para>This is where the actual composition takes place.  Here we
+    <emphasis>call</emphasis> the function imported from
+    <filename>../applications/misc/hello/ex-1</filename> with an
+    attribute set containing the things that the function expects,
+    namely <varname>fetchurl</varname>, <varname>stdenv</varname>, and
+    <varname>perl</varname>.  We use inherit again to use the
+    attributes defined in the surrounding scope (we could also have
+    written <literal>fetchurl = fetchurl;</literal>, etc.).</para>
+
+    <para>The result of this function call is an actual derivation
+    that can be built by Nix (since when we fill in the arguments of
+    the function, what we get is its body, which is the call to
+    <varname>stdenv.mkDerivation</varname> in <xref
+    linkend='ex-hello-nix ' />).</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-composition-co-4'>
+
+    <para>Likewise, we have to instantiate Perl,
+    <varname>fetchurl</varname>, and the standard environment.</para>
+
+  </callout>
+
+</calloutlist>
+
+</sect2>
+
+
+<sect2><title>Testing</title>
+
+<para>You can now try to build Hello.  The simplest way to do that is
+by using <command>nix-env</command>:
+
+<screen>
+$ nix-env -f pkgs/system/i686-linux.nix -i hello
+installing `hello-2.1.1'
+building path `/nix/store/632d2b22514dcebe704887c3da15448d-hello-2.1.1'
+hello-2.1.1/
+hello-2.1.1/intl/
+hello-2.1.1/intl/ChangeLog
+<replaceable>...</replaceable>
+</screen>
+
+This will build Hello and install it into your profile.  The file
+<filename>i686-linux</filename> is just a simple Nix expression that
+imports <filename>all-packages-generic.nix</filename> and instantiates
+it for Linux on the x86 platform.</para>
+
+<para>Note that the <literal>hello</literal> argument here refers to
+the symbolic name given to the Hello derivation (the
+<varname>name</varname> attribute in <xref linkend='ex-hello-nix' />),
+<emphasis>not</emphasis> the <varname>hello</varname> attribute in
+<filename>all-packages-generic.nix</filename>.
+<command>nix-env</command> simply walks through all derivations
+defined in the latter file, looking for one with a
+<varname>name</varname> attribute matching the command-line
+argument.</para>
+
+<para>You can test whether it works:
+
+<screen>
+$ hello
+Hello, world!</screen>
+
+</para>
+
+<para>Generally, however, using <command>nix-env</command> is not the
+best way to test components, since you may not want to install them
+into your profile right away (they might not work properly, after
+all).  A better way is to write a short file containging the
+following:
+
+<programlisting>
+(import pkgs/system/i686-linux.nix).hello</programlisting>
+
+Call it <filename>test.nix</filename>.  Then you can build it without
+installing it using the command <command>nix-build</command>:
+
+<screen>
+$ nix-build ./test.nix
+...
+/nix/store/632d2b22514dcebe704887c3da15448d-hello-2.1.1</screen>
+
+<command>nix-build</command> will build the derivation and print the
+output path.  It also creates a symlink to the output path called
+<filename>result</filename> in the current directory.  This is
+convenient for testing the component:
+
+<screen>
+$ ./result/bin/hello
+Hello, world!</screen>
+
+</para>
+
+<para>Nix has a transactional semantics.  Once a build finishes
+succesfully, Nix makes a note of this in its database: it registers
+that the path denoted by <envar>out</envar> is now
+<quote>valid</quote>.  If you try to build the derivation again, Nix
+will see that the path is already valid and finish immediately.  If a
+build fails, either because it returns a non-zero exit code, because
+Nix or the builder are killed, or because the machine crashes, then
+the output path will not be registered as valid.  If you try to build
+the derivation again, Nix will remove the output path if it exists
+(e.g., because the builder died half-way through <literal>make
+install</literal>) and try again.  Note that there is no
+<quote>negative caching</quote>: Nix doesn't remember that a build
+failed, and so a failed build can always be repeated.  This is because
+Nix cannot distinguish between permanent failures (e.g., a compiler
+error due to a syntax error in the source) and transient failures
+(e.g., a disk full condition).</para>
+
+<para>Nix also performs locking.  If you run multiple Nix builds
+simultaneously, and they try to build the same derivation, the first
+Nix instance that gets there will perform the build, while the others
+block (or perform other derivations if available) until the build
+finishes.  So it is always safe to run multiple instances of Nix in
+parallel (contrary to, say, <command>make</command>).</para>
+
+<para>If you have a system with multiple CPUs, you may want to have
+Nix build different derivations in parallel (insofar as possible).
+Just pass the option <option>-j <replaceable>N</replaceable></option>,
+where <replaceable>N</replaceable> is the maximum number of jobs to be
+run in parallel.  Typically this should be the number of CPUs.</para>
 
 </sect2>
 
