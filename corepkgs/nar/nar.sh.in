@@ -1,5 +1,7 @@
 #! /bin/sh
 
+export PATH=/bin:/usr/bin
+
 echo "packing $path into $out..."
 mkdir $out || exit 1
 tmp=$out/tmp

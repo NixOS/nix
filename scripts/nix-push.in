@@ -52,7 +52,7 @@ foreach my $id (@ARGV) {
         # Construct a Fix expression that creates a Nix archive.
         my $fixexpr = 
           "App(IncludeFix(\"nar/nar.fix\"), " .
-          "[ (\"path\", Slice([\"$pathid\"], [(\"$path\", \"$pathid\", [])]))" .
+          "[ (\"path\", Slice([\"$path\"], [(\"$path\", \"$pathid\", [])]))" .
           "])";
 	
 	print FIX "," unless ($first);
