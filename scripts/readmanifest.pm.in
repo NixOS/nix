@@ -17,6 +17,7 @@ sub processURL {
     open MANIFEST, "<$manifest";
 
     my $inside = 0;
+    my $type;
 
     my $storePath;
     my $narurl;
@@ -29,23 +30,27 @@ sub processURL {
         next if (/^$/);
 
         if (!$inside) {
-            if (/^\{$/) { 
+            if (/^\s*(\w*)\s*\{$/) {
                 $inside = 1;
+                $type = $1;
+                $type = "narfile" if $type eq "";
                 undef $storePath;
                 undef $narurl;
                 undef $hash;
                 @preds = ();
 	    }
-            else { die "bad line: $_"; }
         } else {
             if (/^\}$/) {
                 $inside = 0;
 
-		$$storePaths2urls{$storePath} = $narurl;
-		$$urls2hashes{$narurl} = $hash;
+                if ($type eq "narfile") {
 
-                foreach my $p (@preds) {
-		    $$successors{$p} = $storePath;
+                    $$storePaths2urls{$storePath} = $narurl;
+                    $$urls2hashes{$narurl} = $hash;
+
+                    foreach my $p (@preds) {
+                        $$successors{$p} = $storePath;
+                    }
                 }
 
             }
@@ -61,7 +66,7 @@ sub processURL {
             elsif (/^\s*SuccOf:\s*(\/\S+)\s*$/) {
                 push @preds, $1;
             }
-            else { die "bad line: $_"; }
+
         }
     }
 
