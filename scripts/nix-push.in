@@ -1,20 +1,31 @@
 #! /usr/bin/perl -w
 
-my $fixfile = "/tmp/nix-push-tmp.fix";
+use strict;
+use POSIX qw(tmpnam);
+
+my $tmpdir;
+do { $tmpdir = tmpnam(); }
+until mkdir $tmpdir, 0777;
+
+my $fixfile = "$tmpdir/create-nars.fix";
+my $manifest = "$tmpdir/MANIFEST";
+
+END { unlink $manifest; unlink $fixfile; rmdir $tmpdir; }
+
 open FIX, ">$fixfile";
 print FIX "[";
 my $first = 1;
 
+my @paths;
+
 foreach my $id (@ARGV) {
 
-    die unless $id =~ /^([0-9a-z]{32})$/;
+    die unless $id =~ /^\//;
 
     # Get all paths referenced by the normalisation of the given 
     # Nix expression.
-    system "nix --install $id";
+    system "nix --install $id > /dev/null";
     if ($?) { die "`nix --install' failed"; }
-
-    my @paths;
 
     open PATHS, "nix --query --requisites --include-successors $id 2> /dev/null |" or die "nix -qr";
     while (<PATHS>) {
@@ -24,35 +35,17 @@ foreach my $id (@ARGV) {
     }
     close PATHS;
 
-    # Also add all normal forms that are contained in these paths.
-#    open PATHS, "nix --query --generators --path @paths |" or die "nix -qg";
-#    while (<PATHS>) {
-#	chomp;
-#        die "bad: $_" unless /^\//;
-#	push @paths, $_;
-#    }
-#    close PATHS;
-
     # For each path, create a Fix expression that turns the path into
     # a Nix archive.
     foreach my $path (@paths) {
 
-	next unless ($path =~ /\/([0-9a-z]{32})[^\/]*/);
+	die unless ($path =~ /\/[0-9a-z]{32}.*$/);
 	print "$path\n";
-	my $pathid = $1;
-
-        # Construct a name for the Nix archive.  If the file is an
-        # fstate successor, encode this into the name.
-        my $name = $pathid;
-        if ($path =~ /-s-([0-9a-z]{32}).nix$/) {
-            $name = "$name-s-$1";
-        }
-        $name = $name . ".nar.bz2";
 
         # Construct a Fix expression that creates a Nix archive.
         my $fixexpr = 
-          "App(IncludeFix(\"nar/nar.fix\"), " .
-          "[ (\"path\", Closure([\"$path\"], [(\"$path\", \"$pathid\", [])]))" .
+          "Call(IncludeFix(\"nar/nar.fix\"), " .
+          "[ (\"path\", Closure([\"$path\"], [(\"$path\", [])]))" .
           "])";
 	
 	print FIX "," unless ($first);
@@ -65,32 +58,85 @@ foreach my $id (@ARGV) {
 print FIX "]";
 close FIX;
 
+
 # Instantiate a Nix expression from the Fix expression.
 my @nids;
 print STDERR "running fix...\n";
 open NIDS, "fix $fixfile |" or die "cannot run fix";
 while (<NIDS>) {
     chomp;
-    die unless /^([0-9a-z]{32})$/;
-    push @nids, $1;
+    die unless /^\//;
+    push @nids, $_;
 }
+close NIDS;
 
 
 # Realise the Nix expression.
-my @pushlist;
 print STDERR "creating archives...\n";
-system "nix --install @nids > /dev/null";
+system "nix --install -v @nids > /dev/null";
 if ($?) { die "`nix --install' failed"; }
 
+my @narpaths;
 open NIDS, "nix --query --list @nids |" or die "cannot run nix";
 while (<NIDS>) {
     chomp;
     die unless (/^\//);
-    print "$_\n";
-    push @pushlist, "$_/*";
+    push @narpaths, "$_";
+}
+close NIDS;
+
+    
+# Create the manifest.
+print STDERR "creating manifest...\n";
+
+open MANIFEST, ">$manifest";
+
+my @pushlist;
+push @pushlist, $manifest;
+
+for (my $n = 0; $n < scalar @paths; $n++) {
+    my $storepath = $paths[$n];
+    my $nardir = $narpaths[$n];
+    
+    $storepath =~ /\/([^\/]*)$/;
+    my $basename = $1;
+    defined $basename or die;
+
+    my $narname = "$basename.nar.bz2";
+
+    my $narfile = "$nardir/$narname";
+    (-f $narfile) or die "narfile for $storepath not found";
+    push @pushlist, $narfile;
+
+    open MD5, "$nardir/md5" or die "cannot open hash";
+    my $hash = <MD5>;
+    chomp $hash;
+    $hash =~ /^[0-9a-z]{32}$/ or die "invalid hash";
+    close MD5;
+
+    print MANIFEST "{\n";
+    print MANIFEST "  StorePath: $storepath\n";
+    print MANIFEST "  NarPath: $basename\n";
+    print MANIFEST "  MD5: $hash\n";
+
+    if ($storepath =~ /\.nix$/) {
+	open PREDS, "nix --query --predecessors $storepath |" or die "cannot run nix";
+	while (<PREDS>) {
+	    chomp;
+	    die unless (/^\//);
+	    print MANIFEST "  SuccOf: $_\n";
+	}
+	close PREDS;
+    }
+
+    print MANIFEST "}\n";
 }
 
+close MANIFEST;
+
+
 # Push the prebuilts to the server. !!! FIXME
+print STDERR "pushing to server...\n";
 if (scalar @pushlist > 0) {
     system "rsync -av -e ssh @pushlist eelco\@losser.st-lab.cs.uu.nl:/home/eelco/public_html/nix-dist/";
 }
