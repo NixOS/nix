@@ -576,7 +576,7 @@ builder becomes even shorter:
 
 <programlisting>
 . $stdenv/setup
-genericBuilder></programlisting>
+genericBuilder</programlisting>
 
 In fact, <varname>mkDerivation</varname> provides a default builder
 that looks exactly like that, so it is actually possible to omit the
