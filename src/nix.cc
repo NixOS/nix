@@ -310,6 +310,9 @@ build:
                 env2[i] = (new string(it->first + "=" + it->second))->c_str();
             env2[i] = 0;
 
+	    /* Dup stderr to stdin. */
+	    dup2(STDERR_FILENO, STDOUT_FILENO);
+
             /* Execute the builder.  This should not return. */
             execle(builder.c_str(), builder.c_str(), 0, env2);
 
