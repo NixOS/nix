@@ -31,6 +31,7 @@ static Expr evalFile(EvalState & state, const Path & path);
 static Expr evalExpr(EvalState & state, Expr e);
 
 
+#if 0
 static Path searchPath(const Paths & searchDirs, const Path & relPath)
 {
     if (string(relPath, 0, 1) == "/") return relPath;
@@ -46,6 +47,7 @@ static Path searchPath(const Paths & searchDirs, const Path & relPath)
         format("path `%1%' not found in any of the search directories")
         % relPath);
 }
+#endif
 
 
 static Expr substExpr(string x, Expr rep, Expr e)
@@ -259,7 +261,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
 
     /* Relative files. */
     if (ATmatch(e, "Relative(<str>)", &s1)) {
-        Path srcPath = searchPath(state.searchDirs, s1);
+        Path srcPath = s1;
         Path dstPath = addToStore(srcPath);
 
         ClosureElem elem;
@@ -401,9 +403,8 @@ static Expr evalExpr(EvalState & state, Expr e)
 }
 
 
-static Expr evalFile(EvalState & state, const Path & relPath)
+static Expr evalFile(EvalState & state, const Path & path)
 {
-    Path path = searchPath(state.searchDirs, relPath);
     Nest nest(lvlTalkative, format("evaluating file `%1%'") % path);
     Expr e = parseExprFromFile(path);
     return evalExpr(state, e);
@@ -476,7 +477,7 @@ void run(Strings args)
     for (Strings::iterator it = files.begin();
          it != files.end(); it++)
     {
-        Expr e = evalFile(state, *it);
+        Expr e = evalFile(state, absPath(*it));
         printNixExpr(state, e);
     }
 }
