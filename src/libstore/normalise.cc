@@ -183,6 +183,47 @@ void Goal::amDone()
 //////////////////////////////////////////////////////////////////////
 
 
+/* Common initialisation performed in child processes. */
+void commonChildInit(Pipe & logPipe)
+{
+    /* Put the child in a separate process group so that it doesn't
+       receive terminal signals. */
+    if (setpgid(0, 0) == -1)
+        throw SysError(format("setting process group"));
+
+    /* Dup the write side of the logger pipe into stderr. */
+    if (dup2(logPipe.writeSide, STDERR_FILENO) == -1)
+        throw SysError("cannot pipe standard error into log file");
+    logPipe.readSide.close();
+            
+    /* Dup stderr to stdin. */
+    if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
+        throw SysError("cannot dup stderr into stdout");
+
+    /* Reroute stdin to /dev/null. */
+    int fdDevNull = open(pathNullDevice.c_str(), O_RDWR);
+    if (fdDevNull == -1)
+        throw SysError(format("cannot open `%1%'") % pathNullDevice);
+    if (dup2(fdDevNull, STDIN_FILENO) == -1)
+        throw SysError("cannot dup null device into stdin");
+}
+
+
+const char * * strings2CharPtrs(const Strings & ss)
+{
+    const char * * arr = new const char * [ss.size() + 1];
+    const char * * p = arr;
+    for (Strings::const_iterator i = ss.begin(); i != ss.end(); ++i)
+        *p++ = i->c_str();
+    *p = 0;
+    return arr;
+}
+
+
+
+//////////////////////////////////////////////////////////////////////
+
+
 class NormalisationGoal : public Goal
 {
 private:
@@ -816,25 +857,16 @@ void NormalisationGoal::startBuilder()
             initChild();
 
             /* Fill in the arguments. */
-            Strings & args(expr.derivation.args);
-            const char * argArr[args.size() + 2];
-            const char * * p = argArr;
-            string progName = baseNameOf(expr.derivation.builder);
-            *p++ = progName.c_str();
-            for (Strings::const_iterator i = args.begin();
-                 i != args.end(); i++)
-                *p++ = i->c_str();
-            *p = 0;
+            Strings args(expr.derivation.args);
+            args.push_front(baseNameOf(expr.derivation.builder));
+            const char * * argArr = strings2CharPtrs(args);
 
             /* Fill in the environment. */
             Strings envStrs;
-            const char * envArr[env.size() + 1];
-            p = envArr;
             for (Environment::const_iterator i = env.begin();
-                 i != env.end(); i++)
-                *p++ = envStrs.insert(envStrs.end(), 
-                    i->first + "=" + i->second)->c_str();
-            *p = 0;
+                 i != env.end(); ++i)
+                envStrs.push_back(i->first + "=" + i->second);
+            const char * * envArr = strings2CharPtrs(envStrs);
 
             /* Execute the program.  This should not return. */
             execve(expr.derivation.builder.c_str(),
@@ -987,29 +1019,10 @@ void NormalisationGoal::openLogFile()
 
 void NormalisationGoal::initChild()
 {
-    /* Put the child in a separate process group so that it doesn't
-       receive terminal signals. */
-    if (setpgid(0, 0) == -1)
-        throw SysError(format("setting process group"));
-
+    commonChildInit(logPipe);
+    
     if (chdir(tmpDir.c_str()) == -1)
         throw SysError(format("changing into to `%1%'") % tmpDir);
-
-    /* Dup the write side of the logger pipe into stderr. */
-    if (dup2(logPipe.writeSide, STDERR_FILENO) == -1)
-        throw SysError("cannot pipe standard error into log file");
-    logPipe.readSide.close();
-            
-    /* Dup stderr to stdin. */
-    if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
-        throw SysError("cannot dup stderr into stdout");
-
-    /* Reroute stdin to /dev/null. */
-    int fdDevNull = open(pathNullDevice.c_str(), O_RDWR);
-    if (fdDevNull == -1)
-        throw SysError(format("cannot open `%1%'") % pathNullDevice);
-    if (dup2(fdDevNull, STDIN_FILENO) == -1)
-        throw SysError("cannot dup null device into stdin");
 
     /* When running a hook, dup the communication pipes. */
     bool inHook = fromHook.writeSide.isOpen();
@@ -1311,39 +1324,13 @@ void SubstitutionGoal::tryToRun()
 
             /* !!! close other handles */
 
-            /* !!! this is cut & paste - fix */
+            commonChildInit(logPipe);
 
-            /* Put the child in a separate process group so that it
-               doesn't receive terminal signals. */
-            if (setpgid(0, 0) == -1)
-                throw SysError(format("setting process group"));
-            
-            /* Dup the write side of the logger pipe into stderr. */
-            if (dup2(logPipe.writeSide, STDERR_FILENO) == -1)
-                throw SysError("cannot pipe standard error into log file");
-            logPipe.readSide.close();
-            
-            /* Dup stderr to stdin. */
-            if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
-                throw SysError("cannot dup stderr into stdout");
-
-            /* Reroute stdin to /dev/null. */
-            int fdDevNull = open(pathNullDevice.c_str(), O_RDWR);
-            if (fdDevNull == -1)
-                throw SysError(format("cannot open `%1%'") % pathNullDevice);
-            if (dup2(fdDevNull, STDIN_FILENO) == -1)
-                throw SysError("cannot dup null device into stdin");
-
-            /* Fill in the arguments.  !!! cut & paste */
-            const char * argArr[sub.args.size() + 3];
-            const char * * p = argArr;
-            string progName = baseNameOf(program);
-            *p++ = progName.c_str();
-            *p++ = storePath.c_str();
-            for (Strings::const_iterator i = sub.args.begin();
-                 i != sub.args.end(); i++)
-                *p++ = i->c_str();
-            *p = 0;
+            /* Fill in the arguments. */
+            Strings args(sub.args);
+            args.push_front(storePath);
+            args.push_front(baseNameOf(program));
+            const char * * argArr = strings2CharPtrs(args);
 
             execv(program.c_str(), (char * *) argArr);
             
