@@ -17,7 +17,7 @@ my @channels;
 # Reads the list of channels from the file $channelsList;
 sub readChannels {
     return if (!-f $channelsList);
-    open CHANNELS, "<$channelsList" or die "cannot open `$channelsList'";
+    open CHANNELS, "<$channelsList" or die "cannot open `$channelsList': $!";
     while (<CHANNELS>) {
         chomp;
         push @channels, $_;
@@ -28,7 +28,7 @@ sub readChannels {
 
 # Writes the list of channels to the file $channelsList;
 sub writeChannels {
-    open CHANNELS, ">$channelsList" or die "cannot open `$channelsList'";
+    open CHANNELS, ">$channelsList" or die "cannot open `$channelsList': $!";
     foreach my $url (@channels) {
         print CHANNELS "$url\n";
     }
@@ -94,7 +94,7 @@ sub update {
     my $rootFile = "$rootsDir/$userName.gcroot";
     my $tmpRootFile = "$rootsDir/$userName-tmp.gcroot";
     
-    open ROOT, ">$tmpRootFile" or die "cannot create `$tmpRootFile'";
+    open ROOT, ">$tmpRootFile" or die "cannot create `$tmpRootFile': $!";
     print ROOT "$storeExpr";
     close ROOT;
 
@@ -107,7 +107,7 @@ sub update {
     system "@bindir@/nix-env --import '$outPath'";
     die "cannot pull set default Nix expression to `$outPath'" if ($? != 0);
 
-    rename $tmpRootFile, $rootFile or die "cannot rename `$tmpRootFile' to `$rootFile'";
+    rename $tmpRootFile, $rootFile or die "cannot rename `$tmpRootFile' to `$rootFile': $!";
 }
 
 
