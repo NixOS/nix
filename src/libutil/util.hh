@@ -216,4 +216,9 @@ void inline checkInterrupt()
 }
 
 
+/* String packing / unpacking. */
+string packStrings(const Strings & strings);
+Strings unpackStrings(const string & s);
+
+
 #endif /* !__UTIL_H */

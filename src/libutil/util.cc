@@ -446,3 +446,48 @@ void _interrupted()
         throw Error("interrupted by the user");
     }
 }
+
+
+string packStrings(const Strings & strings)
+{
+    string d;
+    for (Strings::const_iterator i = strings.begin();
+         i != strings.end(); ++i)
+    {
+        unsigned int len = i->size();
+        d += len & 0xff;
+        d += (len >> 8) & 0xff;
+        d += (len >> 16) & 0xff;
+        d += (len >> 24) & 0xff;
+        d += *i;
+    }
+    return d;
+}
+
+    
+Strings unpackStrings(const string & s)
+{
+    Strings strings;
+    
+    string::const_iterator i = s.begin();
+    
+    while (i != s.end()) {
+
+        if (i + 4 > s.end())
+            throw Error(format("short db entry: `%1%'") % s);
+        
+        unsigned int len;
+        len = (unsigned char) *i++;
+        len |= ((unsigned char) *i++) << 8;
+        len |= ((unsigned char) *i++) << 16;
+        len |= ((unsigned char) *i++) << 24;
+        
+        if (i + len > s.end())
+            throw Error(format("short db entry: `%1%'") % s);
+
+        strings.push_back(string(i, i + len));
+        i += len;
+    }
+    
+    return strings;
+}
