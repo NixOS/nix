@@ -400,7 +400,7 @@ void verifyStore()
     for (Paths::iterator i = paths.begin(); i != paths.end(); ++i) {
         Path path = *i;
         if (!pathExists(path)) {
-            debug(format("path `%1%' disappeared") % path);
+            printMsg(lvlError, format("path `%1%' disappeared") % path);
             invalidatePath(path, txn);
         } else
             validPaths.insert(path);
@@ -424,7 +424,8 @@ void verifyStore()
         nixDB.queryStrings(txn, dbSubstitutes, *i, subPaths);
         for (Paths::iterator j = subPaths.begin(); j != subPaths.end(); ++j)
             if (validPaths.find(*j) == validPaths.end())
-                debug(format("found substitute mapping to non-existent path `%1%'") % *j);
+                printMsg(lvlError,
+                    format("found substitute mapping to non-existent path `%1%'") % *j);
             else
                 subPaths2.push_back(*j);
         if (subPaths.size() != subPaths2.size())
@@ -439,7 +440,8 @@ void verifyStore()
     nixDB.enumTable(txn, dbSubstitutesRev, rsubs);
     for (Paths::iterator i = rsubs.begin(); i != rsubs.end(); ++i) {
         if (validPaths.find(*i) == validPaths.end()) {
-            debug(format("found reverse substitute mapping for non-existent path `%1%'") % *i);
+            printMsg(lvlError,
+                format("found reverse substitute mapping for non-existent path `%1%'") % *i);
             nixDB.delPair(txn, dbSubstitutesRev, *i);
         }
     }
@@ -455,7 +457,8 @@ void verifyStore()
         if (nixDB.queryString(txn, dbSuccessors, *i, sucPath) &&
             usablePaths.find(sucPath) == usablePaths.end())
         {
-            debug(format("found successor mapping to non-existent path `%1%'") % sucPath);
+            printMsg(lvlError,
+                format("found successor mapping to non-existent path `%1%'") % sucPath);
             nixDB.delPair(txn, dbSuccessors, *i);
         }
     }
@@ -466,7 +469,8 @@ void verifyStore()
     nixDB.enumTable(txn, dbSuccessorsRev, rsucs);
     for (Paths::iterator i = rsucs.begin(); i != rsucs.end(); ++i) {
         if (usablePaths.find(*i) == usablePaths.end()) {
-            debug(format("found reverse successor mapping for non-existent path `%1%'") % *i);
+            printMsg(lvlError,
+                format("found reverse successor mapping for non-existent path `%1%'") % *i);
             nixDB.delPair(txn, dbSuccessorsRev, *i);
         }
     }
