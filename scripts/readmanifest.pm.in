@@ -1,27 +1,24 @@
 use strict;
 
-sub processURL {
+sub readManifest {
     my $manifest = shift;
-    my $url = shift;
-    my $storePaths2urls = shift;
-    my $urls2hashes = shift;
+    my $narFiles = shift;
+    my $patches = shift;
     my $successors = shift;
 
-    $url =~ s/\/$//;
-    print "obtaining list of Nix archives at $url...\n";
-
-    system("@curl@ --fail --silent --show-error --location --max-redirs 20 " .
-           "'$url' > '$manifest'") == 0
-           or die "curl failed: $?";
-        
     open MANIFEST, "<$manifest";
 
     my $inside = 0;
+    my $type;
 
     my $storePath;
-    my $narurl;
+    my $url;
     my $hash;
+    my $size;
     my @preds;
+    my $basePath;
+    my $baseHash;
+    my $patchType;
 
     while (<MANIFEST>) {
         chomp;
@@ -29,38 +26,102 @@ sub processURL {
         next if (/^$/);
 
         if (!$inside) {
-            if (/^\{$/) { 
+            if (/^\{$/) {
+                $type = "narfile";
                 $inside = 1;
                 undef $storePath;
-                undef $narurl;
+                undef $url;
                 undef $hash;
+                $size = 999999999;
                 @preds = ();
 	    }
+            elsif (/^patch \{$/) {
+                $type = "patch";
+                $inside = 1;
+                undef $url;
+                undef $hash;
+                undef $size;
+                undef $basePath;
+                undef $baseHash;
+                undef $patchType;
+            }
             else { die "bad line: $_"; }
         } else {
+            
             if (/^\}$/) {
                 $inside = 0;
 
-		$$storePaths2urls{$storePath} = $narurl;
-		$$urls2hashes{$narurl} = $hash;
+                if ($type eq "narfile") {
 
-                foreach my $p (@preds) {
-		    $$successors{$p} = $storePath;
+                    $$narFiles{$storePath} = []
+                        unless defined $$narFiles{$storePath};
+
+                    my $narFileList = $$narFiles{$storePath};
+
+                    my $found = 0;
+                    foreach my $narFile (@{$narFileList}) {
+                        if ($narFile->{url} eq $url) {
+                            if ($narFile->{hash} eq $hash) {
+                                $found = 1;
+                            } else {
+                                die "conflicting hashes for URL $url, " .
+                                    "namely $narFile->{hash} and $hash";
+                            }
+                        }
+                    }
+                    if (!$found) {
+                        push @{$narFileList},
+                            {url => $url, hash => $hash, size => $size};
+                    }
+                
+                    foreach my $p (@preds) {
+                        $$successors{$p} = $storePath;
+                    }
+
+                }
+
+                elsif ($type eq "patch") {
+
+                    $$patches{$storePath} = []
+                        unless defined $$patches{$storePath};
+
+                    my $patchList = $$patches{$storePath};
+
+                    my $found = 0;
+                    foreach my $patch (@{$patchList}) {
+                        if ($patch->{url} eq $url) {
+                            if ($patch->{hash} eq $hash) {
+                                $found = 1 if ($patch->{basePath} eq $basePath);
+                            } else {
+                                die "conflicting hashes for URL $url, " .
+                                    "namely $patch->{hash} and $hash";
+                            }
+                        }
+                    }
+                    if (!$found) {
+                        push @{$patchList},
+                            { url => $url, hash => $hash, size => $size
+                            , basePath => $basePath, baseHash => $baseHash
+                            };
+                    }
+                    
                 }
 
             }
-            elsif (/^\s*StorePath:\s*(\/\S+)\s*$/) {
-                $storePath = $1;
-            }
-            elsif (/^\s*NarURL:\s*(\S+)\s*$/) {
-                $narurl = $1;
-	    }
-            elsif (/^\s*MD5:\s*(\S+)\s*$/) {
-                $hash = $1;
-            }
-            elsif (/^\s*SuccOf:\s*(\/\S+)\s*$/) {
-                push @preds, $1;
-            }
+            
+            elsif (/^\s*StorePath:\s*(\/\S+)\s*$/) { $storePath = $1; }
+            elsif (/^\s*Hash:\s*(\S+)\s*$/) { $hash = $1; }
+            elsif (/^\s*URL:\s*(\S+)\s*$/) { $url = $1; }
+            elsif (/^\s*Size:\s*(\d+)\s*$/) { $size = $1; }
+            elsif (/^\s*SuccOf:\s*(\/\S+)\s*$/) { push @preds, $1; }
+            elsif (/^\s*BasePath:\s*(\/\S+)\s*$/) { $basePath = $1; }
+            elsif (/^\s*BaseHash:\s*(\S+)\s*$/) { $baseHash = $1; }
+            elsif (/^\s*Type:\s*(\S+)\s*$/) { $patchType = $1; }
+
+            # Compatibility;
+            elsif (/^\s*NarURL:\s*(\S+)\s*$/) { $url = $1; }
+            elsif (/^\s*MD5:\s*(\S+)\s*$/) { $hash = $1; }
+            
             else { die "bad line: $_"; }
         }
     }

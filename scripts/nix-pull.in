@@ -19,14 +19,24 @@ my $confFile = "@sysconfdir@/nix/prebuilts.conf";
 my %storePaths2urls;
 my %urls2hashes;
 my %successors;
-sub doURL {
+
+sub processURL {
     my $url = shift;
-    processURL $manifest, $url, \%storePaths2urls, \%urls2hashes, \%successors;
+
+    $url =~ s/\/$//;
+    print "obtaining list of Nix archives at $url...\n";
+
+    system("@curl@ --fail --silent --show-error --location --max-redirs 20 " .
+           "'$url' > '$manifest'") == 0
+           or die "curl failed: $?";
+    
+    readManifest $manifest, \%storePaths2urls, \%urls2hashes, \%successors;
 }
+
 if (scalar @ARGV > 0) {
     while (@ARGV) {
         my $url = shift @ARGV;
-	doURL $url;
+	processURL $url;
     }
 } else {
     open CONFFILE, "<$confFile";
@@ -34,7 +44,7 @@ if (scalar @ARGV > 0) {
         chomp;
         if (/^\s*(\S+)\s*(\#.*)?$/) {
             my $url = $1;
-	    doURL $url;
+	    processURL $url;
         }
     }
     close CONFFILE;
