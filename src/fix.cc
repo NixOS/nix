@@ -226,8 +226,6 @@ string instantiateDescriptor(string filename,
     if (rename(tmpFilename.c_str(), outFilename.c_str()))
         throw Error("cannot rename " + tmpFilename + " to " + outFilename);
 
-    cout << outFilename << endl;
-
     /* Register it with Nix. */
     registerFile(outFilename);
 
@@ -245,7 +243,7 @@ void instantiateDescriptors(Strings filenames)
          it != filenames.end(); it++)
     {
         string filename = absPath(*it);
-        instantiateDescriptor(filename, done);
+        cout << instantiateDescriptor(filename, done) << endl;
     }
 }
 
