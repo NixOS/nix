@@ -116,7 +116,7 @@ for (my $n = 0; $n < scalar @paths; $n++) {
 
     print MANIFEST "{\n";
     print MANIFEST "  StorePath: $storepath\n";
-    print MANIFEST "  NarPath: $basename\n";
+    print MANIFEST "  NarName: $narname\n";
     print MANIFEST "  MD5: $hash\n";
 
     if ($storepath =~ /\.nix$/) {
