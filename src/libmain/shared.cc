@@ -177,6 +177,9 @@ void switchToNixUser()
 {
 #if SETUID_HACK
 
+    /* Don't do anything if this is not a setuid binary. */
+    if (getuid() == geteuid()) return;
+
     /* Here we set the uid and gid to the Nix user and group,
        respectively, IF the current (real) user is a member of the Nix
        group.  Otherwise we just drop all privileges. */
