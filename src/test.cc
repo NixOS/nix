@@ -11,10 +11,24 @@
 #include "globals.hh"
 
 
-void evalTest(Expr e)
+typedef Expr (* Normaliser) (Expr);
+
+
+void eval(Normaliser n, Expr e)
 {
-    e = evalValue(e);
+    e = n(e);
     cout << (string) hashExpr(e) << ": " << printExpr(e) << endl;
+}
+
+
+void evalFail(Normaliser n, Expr e)
+{
+    try {
+        e = n(e);
+        abort();
+    } catch (Error e) {
+        cout << "error (expected): " << e.what() << endl;
+    }
 }
 
 
@@ -90,19 +104,48 @@ void runTests()
 
     /* Expression evaluation. */
 
-    evalTest(ATmake("Str(\"Hello World\")"));
-    evalTest(ATmake("Bool(True)"));
-    evalTest(ATmake("Bool(False)"));
-    evalTest(ATmake("App(Lam(\"x\", Var(\"x\")), Str(\"Hello World\"))"));
-    evalTest(ATmake("App(App(Lam(\"x\", Lam(\"y\", Var(\"x\"))), Str(\"Hello World\")), Str(\"Hallo Wereld\"))"));
-    evalTest(ATmake("App(Lam(\"sys\", Lam(\"x\", [Var(\"x\"), Var(\"sys\")])), Str(\"i686-suse-linux\"))"));
+    eval(whNormalise,
+        ATmake("Str(\"Hello World\")"));
+    eval(whNormalise,
+        ATmake("Bool(True)"));
+    eval(whNormalise,
+        ATmake("Bool(False)"));
+    eval(whNormalise,
+        ATmake("App(Lam(\"x\", Var(\"x\")), Str(\"Hello World\"))"));
+    eval(whNormalise,
+        ATmake("App(App(Lam(\"x\", Lam(\"y\", Var(\"x\"))), Str(\"Hello World\")), Str(\"Hallo Wereld\"))"));
+    eval(whNormalise,
+        ATmake("App(Lam(\"sys\", Lam(\"x\", [Var(\"x\"), Var(\"sys\")])), Str(\"i686-suse-linux\"))"));
 
+    evalFail(whNormalise,
+        ATmake("Foo(123)"));
+
+    string builder1fn = absPath("./test-builder-1.sh");
+    Hash builder1h = hashFile(builder1fn);
+
+    string fn1 = nixValues + "/builder-1.sh";
+    Expr e1 = ATmake("File(<str>, ExtFile(<str>, <str>), [])", 
+        fn1.c_str(),
+        builder1h.c_str(),
+        builder1fn.c_str());
+    eval(fNormalise, e1);
+
+    string fn2 = nixValues + "/refer.txt";
+    Expr e2 = ATmake("File(<str>, Regular(<str>), [<term>])",
+        fn2.c_str(),
+        ("I refer to " + fn1).c_str(),
+        e1);
+    eval(fNormalise, e2);
+
+    realise(e2);
+
+#if 0
     Hash builder1 = addValue("./test-builder-1.sh");
 
     Expr e1 = ATmake("Exec(Str(<str>), Hash(<str>), [])",
         thisSystem.c_str(), ((string) builder1).c_str());
 
-    evalTest(e1);
+    eval(e1);
 
     Hash builder2 = addValue("./test-builder-2.sh");
 
@@ -110,14 +153,15 @@ void runTests()
         "Exec(Str(<str>), Hash(<str>), [Tup(Str(\"src\"), <term>)])",
         thisSystem.c_str(), ((string) builder2).c_str(), e1);
 
-    evalTest(e2);
+    eval(e2);
 
     Hash h3 = addValue("./test-expr-1.nix");
     Expr e3 = ATmake("Deref(Hash(<str>))", ((string) h3).c_str());
 
-    evalTest(e3);
+    eval(e3);
 
     deleteValue(h3);
+#endif
 }
 
 

@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "eval.hh"
 #include "globals.hh"
@@ -91,7 +92,7 @@ static Hash computeDerived(Hash sourceHash, string targetName,
                 }
 #endif
 
-            build:
+//             build:
 
                 /* Fill in the environment.  We don't bother freeing
                    the strings, since we'll exec or die soon
@@ -210,13 +211,14 @@ Hash hashExpr(Expr e)
 /* Evaluate an expression; the result must be a string. */
 static string evalString(Expr e)
 {
-    e = evalValue(e);
+    e = whNormalise(e);
     char * s;
     if (ATmatch(e, "Str(<str>)", &s)) return s;
     else throw badTerm("string value expected", e);
 }
 
 
+#if 0
 /* Evaluate an expression; the result must be a value reference. */
 static Hash evalHash(Expr e)
 {
@@ -225,8 +227,10 @@ static Hash evalHash(Expr e)
     if (ATmatch(e, "Hash(<str>)", &s)) return parseHash(s);
     else throw badTerm("value reference expected", e);
 }
+#endif
 
 
+#if 0
 /* Evaluate a list of arguments into normal form. */
 void evalArgs(ATermList args, ATermList & argsNF, Environment & env)
 {
@@ -255,6 +259,7 @@ void evalArgs(ATermList args, ATermList & argsNF, Environment & env)
 
     argsNF = ATreverse(argsNF);
 }
+#endif
 
 
 Expr substExpr(string x, Expr rep, Expr e)
@@ -302,18 +307,12 @@ Expr substExpr(string x, Expr rep, Expr e)
 }
 
 
+#if 0
 Expr evalValue(Expr e)
 {
     char * s;
     Expr eBuildPlatform, eProg, e2, e3, e4;
     ATermList args;
-
-    /* Normal forms. */
-    if (ATmatch(e, "Str(<str>)", &s) ||
-        ATmatch(e, "Bool(True)") || 
-        ATmatch(e, "Bool(False)") ||
-        ATmatch(e, "Lam(<str>, <term>)", &s, &e2))
-        return e;
 
     /* Value references. */
     if (ATmatch(e, "Hash(<str>)", &s)) {
@@ -327,14 +326,6 @@ Expr evalValue(Expr e)
         ATerm e3 = ATreadFromNamedFile(fn.c_str());
         if (!e3) throw Error("reading aterm from " + fn);
         return evalValue(e3);
-    }
-
-    /* Application. */
-    if (ATmatch(e, "App(<term>, <term>)", &e2, &e3)) {
-        e2 = evalValue(e2);
-        if (!ATmatch(e2, "Lam(<str>, <term>)", &s, &e4))
-            throw badTerm("expecting lambda", e2);
-        return evalValue(substExpr(s, e3, e4));
     }
 
     /* Execution primitive. */
@@ -375,4 +366,121 @@ Expr evalValue(Expr e)
 
     /* Barf. */
     throw badTerm("invalid expression", e);
+}
+#endif
+
+
+Expr whNormalise(Expr e)
+{
+    char * s;
+    Expr e2, e3, e4, e5;
+
+    /* Normal forms. */
+    if (ATmatch(e, "Str(<str>)", &s) ||
+        ATmatch(e, "Bool(True)") || 
+        ATmatch(e, "Bool(False)") ||
+        ATmatch(e, "Lam(<str>, <term>)", &s, &e2) ||
+        ATmatch(e, "File(<str>, <term>, <term>)", &s, &e2, &e3) ||
+        ATmatch(e, "Derive(<term>, <term>, <term>, <term>)", &e2, &e3, &e4, &e5))
+        return e;
+
+    /* Application. */
+    if (ATmatch(e, "App(<term>, <term>)", &e2, &e3)) {
+        e2 = whNormalise(e2);
+        if (!ATmatch(e2, "Lam(<str>, <term>)", &s, &e4))
+            throw badTerm("expecting lambda", e2);
+        return whNormalise(substExpr(s, e3, e4));
+    }
+
+    throw badTerm("invalid expression", e);
+}
+
+
+Expr dNormalise(Expr e)
+{
+    e = whNormalise(e);
+    /* !!! todo */
+    return e;
+}
+
+
+Expr fNormalise(Expr e)
+{
+    e = dNormalise(e);
+
+    char * s;
+    Expr e2, e3;
+
+    if (ATmatch(e, "File(<str>, <term>, [<list>])", &s, &e2, &e3)) {
+
+        ATermList refs = (ATermList) e3, refs2 = ATempty;
+        while (!ATisEmpty(refs)) {
+            ATerm ref = ATgetFirst(refs);
+            refs2 = ATinsert(refs2, fNormalise(ref));
+            refs = ATgetNext(refs);
+        }
+        refs2 = ATreverse(refs2);
+
+        return ATmake("File(<str>, <term>, <term>)", s, e2, refs2);
+
+    }
+
+    else return e;
+}
+
+
+void writeContent(string path, Content content)
+{
+    char * s;
+
+    if (ATmatch(content, "Regular(<str>)", &s)) {
+
+        int fd; /* !!! close on exception */
+        fd = open(path.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0666);
+        if (fd == -1)
+            throw SysError("creating file " + path);
+
+        int len = strlen(s);
+        if (write(fd, s, len) != len)
+            throw SysError("writing file " + path);
+
+        close(fd);
+    }
+    
+    else throw badTerm("ill-formed content", content);
+}
+
+
+struct RStatus
+{
+    /* !!! the comparator of this hash should match the semantics of
+       the file system */
+    map<string, Hash> paths;
+};
+
+
+static void realise2(RStatus & status, Expr e)
+{
+    char * s;
+    Content content;
+    ATermList refs;
+    
+    if (!ATmatch(e, "File(<str>, <term>, [<list>])", &s, &content, &refs))
+        throw badTerm("not f-normalised", e);
+
+    string path(s);
+
+    while (!ATisEmpty(refs)) {
+        realise2(status, ATgetFirst(refs));
+        refs = ATgetNext(refs);
+    }
+    
+    writeContent(path, content);
+}
+
+
+void realise(Expr e)
+{
+    RStatus status;
+    realise2(status, e);
 }
