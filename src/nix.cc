@@ -534,8 +534,7 @@ void listInstalledPkgs()
 
 void printInfo(Strings::iterator first, Strings::iterator last)
 {
-    for (Strings::iterator it = first; it != last; it++)
-    {
+    for (Strings::iterator it = first; it != last; it++) {
         try {
             cout << *it << " " << queryPkgId(*it) << endl;
         } catch (Error & e) { // !!! more specific
@@ -632,18 +631,18 @@ Subcommands:
   verify
     Remove stale entries from the database.
 
-  regfile FILENAME
-    Register FILENAME keyed by its hash.
+  regfile FILENAME...
+    Register each FILENAME keyed by its hash.
 
   reginst HASH PATH
     Register an installed package.
 
-  getpkg HASH
-    Ensure that the package referenced by HASH is installed. Print
-    out the path of the package on stdout.
+  getpkg HASH...
+    For each HASH, ensure that the package referenced by HASH is
+    installed. Print out the path of the installation on stdout.
 
-  delpkg HASH
-    Uninstall the package referenced by HASH, disregarding any
+  delpkg HASH...
+    Uninstall the package referenced by each HASH, disregarding any
     dependencies that other packages may have on HASH.
 
   listinst
@@ -652,7 +651,7 @@ Subcommands:
   run HASH ARGS...
     Run the descriptor referenced by HASH with the given arguments.
 
-  ensure HASH
+  ensure HASH...
     Like getpkg, but if HASH refers to a run descriptor, fetch only
     the dependencies.
 
@@ -707,18 +706,17 @@ void run(Strings::iterator argCur, Strings::iterator argEnd)
         if (argc != 0) throw argcError;
         verifyDB();
     } else if (cmd == "getpkg") {
-        if (argc != 1) throw argcError;
-        string path = getPkg(*argCur);
-        cout << path << endl;
+        for (Strings::iterator it = argCur; it != argEnd; it++) {
+            string path = getPkg(*it);
+            cout << path << endl;
+        }
     } else if (cmd == "delpkg") {
-        if (argc != 1) throw argcError;
-        delPkg(*argCur);
+        for_each(argCur, argEnd, delPkg);
     } else if (cmd == "run") {
         if (argc < 1) throw argcError;
         runPkg(*argCur, argCur + 1, argEnd);
     } else if (cmd == "ensure") {
-        if (argc != 1) throw argcError;
-        ensurePkg(*argCur);
+        for_each(argCur, argEnd, ensurePkg);
     } else if (cmd == "export") {
         if (argc < 1) throw argcError;
         exportPkgs(*argCur, argCur + 1, argEnd);
@@ -726,8 +724,7 @@ void run(Strings::iterator argCur, Strings::iterator argEnd)
         if (argc != 2) throw argcError;
         regPrebuilt(*argCur, argCur[1]);
     } else if (cmd == "regfile") {
-        if (argc != 1) throw argcError;
-        registerFile(*argCur);
+        for_each(argCur, argEnd, registerFile);
     } else if (cmd == "reginst") {
         if (argc != 2) throw argcError;
         registerInstalledPkg(*argCur, argCur[1]);
