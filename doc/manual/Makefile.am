@@ -7,7 +7,7 @@ XSLTPROC = $(ENV) $(xsltproc) $(xmlflags) --catalogs \
  --param html.stylesheet \'style.css\'
 
 SOURCES = manual.xml introduction.xml installation.xml overview.xml \
- nix-store.xml nix-instantiate.xml \
+ nix-env.xml nix-store.xml nix-instantiate.xml \
  troubleshooting.xml bugs.xml opt-verbose.xml \
  style.css images
 
@@ -18,7 +18,7 @@ manual.is-valid: $(SOURCES) version.xml
 version.xml:
 	echo -n $(VERSION) > version.xml
 
-man1_MANS = nix-store.1 nix-instantiate.1
+man1_MANS = nix-env.1 nix-store.1 nix-instantiate.1
 
 man $(MANS): $(SOURCES) manual.is-valid
 	$(XSLTPROC) $(docbookxsl)/manpages/docbook.xsl manual.xml

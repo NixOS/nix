@@ -20,19 +20,41 @@ h1,h2,h3
     text-align: left;
 }
 
-h1
+h1 /* title */
 {
-    font-size: 185%;
+    font-size: 200%;
 }
 
-h2
+h2 /* chapters, appendices, subtitle */
+{
+    font-size: 180%;
+}
+
+/* Extra space between chapters, appendices. */
+div.chapter > div.titlepage h2, div.appendix > div.titlepage h2 
+{ 
+    margin-top: 1.5em;
+/*    border-top: solid #005aa0; */
+}
+
+div.sect1 h2 /* sections */
 {
     font-size: 150%;
 }
 
-h3
+div.refnamediv h2, div.refsynopsisdiv h2, div.refsection h2 /* refentry parts */
 {
-    font-size: 120%;
+    font-size: 125%;
+}
+
+div.refsection h3
+{
+    font-size: 110%;
+}
+
+h3 /* subsections */
+{
+    font-size: 125%;
 }
 
 

@@ -7,6 +7,7 @@
 <!ENTITY installation SYSTEM "installation.xml">
 <!ENTITY overview SYSTEM "overview.xml">
 <!ENTITY opt-verbose SYSTEM "opt-verbose.xml">
+<!ENTITY nix-env SYSTEM "nix-env.xml">
 <!ENTITY nix-store SYSTEM "nix-store.xml">
 <!ENTITY nix-instantiate SYSTEM "nix-instantiate.xml">
 <!ENTITY troubleshooting SYSTEM "troubleshooting.xml">
@@ -36,6 +37,10 @@
 
   <appendix>
     <title>Command Reference</title>
+    <sect1>
+      <title>nix-env</title>
+      &nix-env;
+    </sect1>
     <sect1>
       <title>nix-store</title>
       &nix-store;

@@ -11,7 +11,7 @@
         <arg><option>--verbose</option></arg>
         <arg><option>-v</option></arg>
       </group>
-      <group choice='opt' rep='repeat'>
+      <group choice='opt'>
         <arg><option>--keep-failed</option></arg>
         <arg><option>-K</option></arg>
       </group>
@@ -32,18 +32,21 @@
 
     <para>
       <command>nix-store</command> takes exactly one
-      <emphasis>operation</emphasis> flag which indicated the
-      subcommand to be performed.  These are individually
-      documented below.
+      <emphasis>operation</emphasis> flag which indicates the
+      subcommand to be performed.  These are documented below.
     </para>
 
   </refsection>
+
+
+
+  <!--######################################################################-->
 
   <refsection>
     <title>Common options</title>
 
     <para>
-      This section lists the options that are common to all Nix
+      This section lists the options that are common to all
       operations.  These options are allowed for every subcommand,
       though they may not always have an effect.
     </para>
@@ -68,6 +71,9 @@
 
   </refsection>
 
+  
+
+  <!--######################################################################-->
 
   <refsection>
     <title>Environment variables</title>
@@ -221,10 +227,10 @@
       <title>Description</title>
             
       <para>
-        The operation <option>--query</option> displays various bits of
-        information about store expressions or store paths.  The queries
-        are described in <xref linkend='nixref-queries' />.  At most one query
-        can be specified.  The default query is <option>--list</option>.
+        The operation <option>--query</option> displays various bits
+        of information about store expressions or store paths.  The
+        queries are described below.  At most one query can be
+        specified.  The default query is <option>--list</option>.
       </para>
 
     </refsection>

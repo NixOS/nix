@@ -1,0 +1,166 @@
+<refentry>
+  <refnamediv>
+    <refname>nix-env</refname>
+    <refpurpose>manipulate or query Nix user environments</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>nix-env</command>
+      <group choice='opt' rep='repeat'>
+        <arg><option>--verbose</option></arg>
+        <arg><option>-v</option></arg>
+      </group>
+      <group choice='opt'>
+        <arg><option>--keep-failed</option></arg>
+        <arg><option>-K</option></arg>
+      </group>
+      <arg>
+        <group choice='opt'>
+          <arg><option>--file</option></arg>
+          <arg><option>-f</option></arg>
+        </group>
+        <replaceable>path</replaceable>
+      </arg>
+      <arg choice='plain'><replaceable>operation</replaceable></arg>
+      <arg rep='repeat'><replaceable>options</replaceable></arg>
+      <arg rep='repeat'><replaceable>arguments</replaceable></arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsection>
+    <title>Description</title>
+
+    <para>
+      The command <command>nix-env</command> is used to manipulate Nix
+      user environments.  User environments are sets of software
+      components available to a user at some point in time.  In other
+      words, they are a synthesised view of the programs available in
+      the Nix store.  There may be many user environments: different
+      users can have different environments, and individual users can
+      switch between different environments.
+    </para>
+
+<!--    <para>
+      Environments are manipulated by operations such as the
+      installation and removal of components (hereafter called
+      <emphasis>derivations</emphasis>).  These operations are not
+      destructive: rather than overwrite the current environment, they
+      create a new environment to which we can then atomically
+      <emphasis>switch</emphasis> by flipping a symlink.
+    </para> -->
+
+    <para>
+      <command>nix-env</command> takes exactly one
+      <emphasis>operation</emphasis> flag which indicates the
+      subcommand to be performed.  These are documented below.
+    </para>
+    
+  </refsection>
+
+
+
+  <!--######################################################################-->
+
+  <refsection>
+    <title>Common options</title>
+
+    <para>
+      This section lists the options that are common to all
+      operations.  These options are allowed for every subcommand,
+      though they may not always have an effect.
+    </para>
+
+    <variablelist>
+
+      &opt-verbose;
+
+      <varlistentry>
+        <term><option>--file</option></term>
+        <listitem>
+          <para>
+            Specifies the Nix expression used by the
+            <option>--install</option>, <option>--upgrade</option>,
+            and <option>--query --available</option> operations to
+            obtain derivations.  The default is
+            <filename>~/.nix-defexpr</filename>.
+          </para>
+        </listitem>
+      </varlistentry>
+      
+    </variablelist>
+
+  </refsection>
+
+  
+
+  <!--######################################################################-->
+
+  <refsection>
+    <title>Files</title>
+
+    <variablelist>
+
+      <varlistentry>
+        <term><filename>~/.nix-defexpr</filename></term>
+        <listitem>
+          <para>
+            The default Nix expression used by the
+            <option>--install</option>, <option>--upgrade</option>,
+            and <option>--query --available</option> operations to
+            obtain derivations.  It is generally a symbolic link to
+            some other location set using the
+            <option>--import</option> operation.  The
+            <option>--file</option> option may be used to override
+            this default.
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><filename>~/.nix-userenv</filename></term>
+        <listitem>
+          <para>
+            A symbolic link to the user's current user environment.
+            By default, it points to
+            <filename><replaceable>prefix</replaceable>/var/nix/links/current</filename>.
+            The <envar>PATH</envar> environment variable should
+            include <filename>~/.nix-userenv</filename> for the use
+            environments to be visible to the user.
+          </para>
+        </listitem>
+      </varlistentry>
+
+    </variablelist>
+        
+  </refsection>
+
+  
+
+  <!--######################################################################-->
+
+  <refsection>
+    <title>Operation <option>--install</option></title>
+
+    <refsection>
+      <title>Synopsis</title>
+      <cmdsynopsis>
+        <command>nix-env</command>
+        <group>
+          <arg><option>--install</option></arg>
+        </group>
+      </cmdsynopsis>
+    </refsection>
+
+    <refsection>
+      <title>Description</title>
+            
+      <para>
+      </para>
+
+    </refsection>
+            
+  </refsection>
+
+  
+</refentry>
