@@ -1,0 +1,25 @@
+#! /usr/bin/perl -w
+
+my $linkdir = "@localstatedir@/nix/links";
+my $storedir = "@prefix@/store";
+
+my %alive;
+
+open HASHES, "nix -qrh \$(cat $linkdir/*.hash) |" or die "in `nix -qrh'";
+while (<HASHES>) {
+	chomp;
+	$alive{$_} = 1;
+}
+close HASHES;
+
+opendir(DIR, $storedir) or die "cannot opendir $storedir: $!";
+my @names = readdir(DIR);
+closedir DIR;
+
+foreach my $name (@names) {
+    next if ($name eq "." || $name eq "..");
+    $name = "$storedir/$name";
+    if (!$alive{$name}) {
+        print "$name\n";
+    }
+}
