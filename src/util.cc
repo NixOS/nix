@@ -108,21 +108,28 @@ bool pathExists(const string & path)
 
 void deletePath(string path)
 {
+    msg(lvlVomit, format("deleting path `%1%'") % path);
+
     struct stat st;
     if (lstat(path.c_str(), &st))
         throw SysError(format("getting attributes of path %1%") % path);
 
     if (S_ISDIR(st.st_mode)) {
+	Strings names;
+
         DIR * dir = opendir(path.c_str());
 
         struct dirent * dirent;
         while (errno = 0, dirent = readdir(dir)) {
             string name = dirent->d_name;
             if (name == "." || name == "..") continue;
-            deletePath(path + "/" + name);
+	    names.push_back(name);
         }
 
         closedir(dir); /* !!! close on exception */
+
+	for (Strings::iterator i = names.begin(); i != names.end(); i++)
+            deletePath(path + "/" + *i);
     }
 
     if (remove(path.c_str()) == -1)
