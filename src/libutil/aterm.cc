@@ -81,6 +81,18 @@ ATMatcher & operator >> (ATMatcher & pos, const string & s)
 }
 
 
+ATMatcher & operator >> (ATMatcher & pos, int & n)
+{
+    n = 0;
+    ATerm t;
+    pos = pos >> t;
+    if (failed(pos)) return pos;
+    if (ATgetType(t) != AT_INT) return fail(pos);
+    n = ATgetInt((ATermInt) t);
+    return pos;
+}
+
+
 ATMatcher & operator >> (ATMatcher & pos, ATermList & out)
 {
     out = 0;

@@ -127,6 +127,7 @@ Expr evalExpr2(EvalState & state, Expr e)
     if (atMatch(m, e) >> "Str" ||
         atMatch(m, e) >> "Path" ||
         atMatch(m, e) >> "Uri" ||
+        atMatch(m, e) >> "Int" ||
         atMatch(m, e) >> "Bool" ||
         atMatch(m, e) >> "Function" ||
         atMatch(m, e) >> "Attrs" ||

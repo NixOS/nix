@@ -61,13 +61,17 @@ ATMatcher & atMatch(ATMatcher & pos, ATerm t);
 /* Get the next argument of an application. */
 ATMatcher & operator >> (ATMatcher & pos, ATerm & out);
 
-/* Get the name of the function symbol of an applicatin, or the next
+/* Get the name of the function symbol of an application, or the next
    argument of an application as a string. */
 ATMatcher & operator >> (ATMatcher & pos, string & out);
 
 /* Like the previous, but check that the string is equal to the given
    string. */
 ATMatcher & operator >> (ATMatcher & pos, const string & s);
+
+/* Get the next argument of an application, and verify that it is a
+   integer. */
+ATMatcher & operator >> (ATMatcher & pos, int & n);
 
 /* Get the next argument of an application, and verify that it is a
    list. */

@@ -89,6 +89,13 @@ static string processBinding(EvalState & state, Expr e, StoreExpr & ne)
     if (atMatch(m, e) >> "Bool" >> "True") return "1";
     if (atMatch(m, e) >> "Bool" >> "False") return "";
 
+    int n;
+    if (atMatch(m, e) >> "Int" >> n) {
+        ostringstream st;
+        st << n;
+        return st.str();
+    }
+
     if (atMatch(m, e) >> "Attrs" >> es) {
         Expr a = queryAttr(e, "type");
         if (a && evalString(state, a) == "derivation") {
