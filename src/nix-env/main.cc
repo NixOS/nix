@@ -108,7 +108,7 @@ void loadDerivations(EvalState & state, Path nePath, DrvInfos & drvs)
 {
     Expr e = parseExprFromFile(state, absPath(nePath));
     if (!parseDerivations(state, e, drvs))
-        throw badTerm("expected set of derivations", e);
+        throw Error("set of derivations expected");
 }
 
 
@@ -126,6 +126,21 @@ static Path getDefNixExprPath()
 }
 
 
+struct AddPos : TermFun
+{
+    ATerm operator () (ATerm e)
+    {
+        ATMatcher m;
+        ATerm x, y, z;
+        if (atMatch(m, e) >> "Bind" >> x >> y >> z)
+            return e;
+        if (atMatch(m, e) >> "Bind" >> x >> y)
+            return ATmake("Bind(<term>, <term>, NoPos)", x, y);
+        return e;
+    }
+};
+
+
 void queryInstalled(EvalState & state, DrvInfos & drvs,
     const Path & userEnv)
 {
@@ -136,8 +151,12 @@ void queryInstalled(EvalState & state, DrvInfos & drvs,
     Expr e = ATreadFromNamedFile(path.c_str());
     if (!e) throw Error(format("cannot read Nix expression from `%1%'") % path);
 
+    /* Compatibility: Bind(x, y) -> Bind(x, y, NoPos). */
+    AddPos addPos;
+    e = bottomupRewrite(addPos, e);
+
     if (!parseDerivations(state, e, drvs))
-        throw badTerm(format("expected set of derivations in `%1%'") % path, e);
+        throw badTerm(format("set of derivations expected in `%1%'") % path, e);
 }
 
 
@@ -155,11 +174,11 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
     {
         ATerm t = ATmake(
             "Attrs(["
-            "Bind(\"type\", Str(\"derivation\")), "
-            "Bind(\"name\", Str(<str>)), "
-            "Bind(\"drvPath\", Path(<str>)), "
-            "Bind(\"drvHash\", Str(<str>)), "
-            "Bind(\"outPath\", Path(<str>))"
+            "Bind(\"type\", Str(\"derivation\"), NoPos), "
+            "Bind(\"name\", Str(<str>), NoPos), "
+            "Bind(\"drvPath\", Path(<str>), NoPos), "
+            "Bind(\"drvHash\", Str(<str>), NoPos), "
+            "Bind(\"outPath\", Path(<str>), NoPos)"
             "])",
             i->second.name.c_str(),
             i->second.drvPath.c_str(),
@@ -176,9 +195,9 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
 
     Expr topLevel = ATmake(
         "Call(<term>, Attrs(["
-        "Bind(\"system\", Str(<str>)), "
-        "Bind(\"derivations\", <term>), " // !!! redundant
-        "Bind(\"manifest\", Path(<str>))"
+        "Bind(\"system\", Str(<str>), NoPos), "
+        "Bind(\"derivations\", <term>, NoPos), " // !!! redundant
+        "Bind(\"manifest\", Path(<str>), NoPos)"
         "]))",
         envBuilder, thisSystem.c_str(), inputs2, inputsFile.c_str());
 

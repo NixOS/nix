@@ -47,7 +47,7 @@ static void printNixExpr(EvalState & state, Expr e)
         return;
     }
 
-    throw badTerm("top level does not evaluate to one or more Nix expressions", e);
+    throw Error("expression does not evaluate to one or more derivations");
 }
 
 

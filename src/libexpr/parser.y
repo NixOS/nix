@@ -19,11 +19,20 @@ void setParseResult(void * data, ATerm t);
 void parseError(void * data, char * error, int line, int column);
 ATerm absParsedPath(void * data, ATerm t);
 ATerm fixAttrs(int recursive, ATermList as);
+const char * getPath(void * data);
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, void * data, char * s)
 {
     parseError(data, s, loc->first_line, loc->first_column);
 }
+
+ATerm makePos(YYLTYPE * loc, void * data)
+{
+    return ATmake("Pos(<str>, <int>, <int>)",
+        getPath(data), loc->first_line, loc->first_column);
+}
+
+#define CUR_POS makePos(yylocp, data)
  
 %}
 
@@ -55,15 +64,15 @@ expr: expr_function;
 
 expr_function
   : '{' formals '}' ':' expr_function
-    { $$ = ATmake("Function(<term>, <term>)", $2, $5); }
+    { $$ = ATmake("Function(<term>, <term>, <term>)", $2, $5, CUR_POS); }
   | ID ':' expr_function
-    { $$ = ATmake("Function1(<term>, <term>)", $1, $3); }
+    { $$ = ATmake("Function1(<term>, <term>, <term>)", $1, $3, CUR_POS); }
   | expr_assert
   ;
 
 expr_assert
   : ASSERT expr ';' expr_assert
-    { $$ = ATmake("Assert(<term>, <term>)", $2, $4); }
+    { $$ = ATmake("Assert(<term>, <term>, <term>)", $2, $4, CUR_POS); }
   | expr_if
   ;
 
@@ -123,9 +132,9 @@ binds
 
 bind
   : ID '=' expr ';'
-    { $$ = ATmake("Bind(<term>, <term>)", $1, $3); }
+    { $$ = ATmake("Bind(<term>, <term>, <term>)", $1, $3, CUR_POS); }
   | INHERIT inheritsrc ids ';'
-    { $$ = ATmake("Inherit(<term>, <term>)", $2, $3); }
+    { $$ = ATmake("Inherit(<term>, <term>, <term>)", $2, $3, CUR_POS); }
   ;
 
 inheritsrc

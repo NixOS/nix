@@ -8,7 +8,7 @@ Expr primImport(EvalState & state, Expr arg)
     ATMatcher m;
     string path;
     if (!(atMatch(m, arg) >> "Path" >> path))
-        throw badTerm("path expected", arg);
+        throw Error("path expected");
     return evalFile(state, path);
 }
 
@@ -102,18 +102,18 @@ static void processBinding(EvalState & state, Expr e, StoreExpr & ne,
         Expr a = queryAttr(e, "type");
         if (a && evalString(state, a) == "derivation") {
             a = queryAttr(e, "drvPath");
-            if (!a) throw badTerm("derivation name missing", e);
+            if (!a) throw Error("derivation name missing");
             Path drvPath = evalPath(state, a);
 
             a = queryAttr(e, "drvHash");
-            if (!a) throw badTerm("derivation hash missing", e);
+            if (!a) throw Error("derivation hash missing");
             Hash drvHash = parseHash(evalString(state, a));
 
             state.drvHashes[drvPath] = drvHash;
             
             ss.push_back(addInput(state, drvPath, ne));
         } else
-            throw badTerm("invalid derivation binding", e);
+            throw Error("invalid derivation attribute");
     }
 
     else if (atMatch(m, e) >> "Path" >> s) {
@@ -142,7 +142,7 @@ static void processBinding(EvalState & state, Expr e, StoreExpr & ne,
         ss.push_back(canonPath(ss2.front() + "/" + s));
     }
     
-    else throw badTerm("invalid derivation binding", e);
+    else throw Error("invalid derivation attribute");
 }
 
 
@@ -164,7 +164,7 @@ Expr primDerivation(EvalState & state, Expr args)
 
     ATermMap attrs;
     args = evalExpr(state, args);
-    queryAllAttrs(args, attrs);
+    queryAllAttrs(args, attrs, true);
 
     /* Build the derivation expression by processing the attributes. */
     StoreExpr ne;
@@ -177,15 +177,19 @@ Expr primDerivation(EvalState & state, Expr args)
 
     for (ATermIterator i(attrs.keys()); i; ++i) {
         string key = aterm2String(*i);
-        Expr value = attrs.get(key);
+        ATerm value;
+        Expr pos;
+        ATerm rhs = attrs.get(key);
+        ATMatcher m;
+        if (!(atMatch(m, rhs) >> "" >> value >> pos)) abort();
         startNest(nest, lvlVomit, format("processing attribute `%1%'") % key);
 
         Strings ss;
         try {
             processBinding(state, value, ne, ss);
         } catch (Error & e) {
-            throw Error(format("while processing derivation binding `%1%': %2%")
-                % key % e.msg());
+            throw Error(format("while processing derivation attribute `%1%' at %2%:\n%3%")
+                % key % showPos(pos) % e.msg());
         }
 
         /* The `args' attribute is special: it supplies the
@@ -213,11 +217,11 @@ Expr primDerivation(EvalState & state, Expr args)
     
     /* Do we have all required attributes? */
     if (ne.derivation.builder == "")
-        throw badTerm("required attribute `builder' missing", args);
+        throw Error("required attribute `builder' missing");
     if (ne.derivation.platform == "")
-        throw badTerm("required attribute `system' missing", args);
+        throw Error("required attribute `system' missing");
     if (drvName == "")
-        throw badTerm("required attribute `name' missing", args);
+        throw Error("required attribute `name' missing");
         
     /* Determine the output path. */
     if (!outHashGiven) outHash = hashDerivation(state, ne);
@@ -238,10 +242,10 @@ Expr primDerivation(EvalState & state, Expr args)
     printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'")
         % drvName % drvPath);
 
-    attrs.set("outPath", ATmake("Path(<str>)", outPath.c_str()));
-    attrs.set("drvPath", ATmake("Path(<str>)", drvPath.c_str()));
-    attrs.set("drvHash", ATmake("Str(<str>)", ((string) drvHash).c_str()));
-    attrs.set("type", ATmake("Str(\"derivation\")"));
+    attrs.set("outPath", ATmake("(Path(<str>), NoPos)", outPath.c_str()));
+    attrs.set("drvPath", ATmake("(Path(<str>), NoPos)", drvPath.c_str()));
+    attrs.set("drvHash", ATmake("(Str(<str>), NoPos)", ((string) drvHash).c_str()));
+    attrs.set("type", ATmake("(Str(\"derivation\"), NoPos)"));
 
     return makeAttrs(attrs);
 }
@@ -263,7 +267,7 @@ Expr primToString(EvalState & state, Expr arg)
         atMatch(m, arg) >> "Path" >> s ||
         atMatch(m, arg) >> "Uri" >> s)
         return ATmake("Str(<str>)", s.c_str());
-    else throw badTerm("cannot coerce to string", arg);
+    else throw Error("cannot coerce value to string");
 }
 
 

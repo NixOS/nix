@@ -12,8 +12,8 @@
 struct ParseData 
 {
     Expr result;
-    string basePath;
-    string location;
+    Path basePath;
+    Path path;
     string error;
 };
 
@@ -39,8 +39,8 @@ ATerm absParsedPath(ParseData * data, ATerm t)
     
 void parseError(ParseData * data, char * error, int line, int column)
 {
-    data->error = (format("%1%, at line %2%, column %3%, of %4%")
-        % error % line % column % data->location).str();
+    data->error = (format("%1%, at `%2%':%3%:%4%")
+        % error % data->path % line % column).str();
 }
         
 ATerm fixAttrs(int recursive, ATermList as)
@@ -51,13 +51,15 @@ ATerm fixAttrs(int recursive, ATermList as)
     for (ATermIterator i(as); i; ++i) {
         ATermList names;
         Expr src;
-        if (atMatch(m, *i) >> "Inherit" >> src >> names) {
+        ATerm pos;
+        if (atMatch(m, *i) >> "Inherit" >> src >> names >> pos) {
             bool fromScope = atMatch(m, src) >> "Scope";
             for (ATermIterator j(names); j; ++j) {
                 Expr rhs = fromScope
                     ? ATmake("Var(<term>)", *j)
                     : ATmake("Select(<term>, <term>)", src, *j);
-                *is = ATinsert(*is, ATmake("Bind(<term>, <term>)", *j, rhs));
+                *is = ATinsert(*is, ATmake("Bind(<term>, <term>, <term>)",
+                                   *j, rhs, pos));
             }
         } else bs = ATinsert(bs, *i);
     }
@@ -67,18 +69,23 @@ ATerm fixAttrs(int recursive, ATermList as)
         return ATmake("Attrs(<term>)", bs);
 }
 
+const char * getPath(ParseData * data)
+{
+    return data->path.c_str();
+}
+
 int yyparse(yyscan_t scanner, ParseData * data);
 }
 
 
 static Expr parse(EvalState & state,
-    const char * text, const string & location,
+    const char * text, const Path & path,
     const Path & basePath)
 {
     yyscan_t scanner;
     ParseData data;
     data.basePath = basePath;
-    data.location = location;
+    data.path = path;
 
     yylex_init(&scanner);
     yy_scan_string(text, scanner);
@@ -90,7 +97,7 @@ static Expr parse(EvalState & state,
     try {
         checkVarDefs(state.primOpsAll, data.result);
     } catch (Error & e) {
-        throw Error(format("%1%, in %2%") % e.msg() % location);
+        throw Error(format("%1%, in `%2%'") % e.msg() % path);
     }
 
     return data.result;
@@ -133,7 +140,7 @@ Expr parseExprFromFile(EvalState & state, Path path)
     readFull(fd, (unsigned char *) text, st.st_size);
     text[st.st_size] = 0;
 
-    return parse(state, text, "`" + path + "'", dirOf(path));
+    return parse(state, text, path, dirOf(path));
 }
 
 

@@ -77,16 +77,16 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
         Expr key = *i;
         Expr cur = subs.get(key);
         if (!cur)
-            throw badTerm(format("function has no formal argument `%1%'")
-                % aterm2String(key), arg);
+            throw Error(format("unexpected function argument `%1%'")
+                % aterm2String(key));
         subs.set(key, args.get(key));
     }
 
     /* Check that all arguments are defined. */
     for (ATermIterator i(subs.keys()); i; ++i)
         if (subs.get(*i) == undefined)
-            throw badTerm(format("formal argument `%1%' missing")
-                % aterm2String(*i), arg);
+            throw Error(format("required function argument `%1%' missing")
+                % aterm2String(*i));
     
     return substitute(subs, body);
 }
@@ -119,16 +119,18 @@ ATerm expandRec(ATerm e, ATermList rbnds, ATermList nrbnds)
     /* Create the non-recursive set. */
     ATermMap as;
     for (ATermIterator i(rbnds); i; ++i) {
-        if (!(atMatch(m, *i) >> "Bind" >> name >> e2))
+        ATerm pos;
+        if (!(atMatch(m, *i) >> "Bind" >> name >> e2 >> pos))
             abort(); /* can't happen */
-        as.set(name, substitute(subs, e2));
+        as.set(name, ATmake("(<term>, <term>)", substitute(subs, e2), pos));
     }
 
     /* Copy the non-recursive bindings.  !!! inefficient */
     for (ATermIterator i(nrbnds); i; ++i) {
-        if (!(atMatch(m, *i) >> "Bind" >> name >> e2))
+        ATerm pos;
+        if (!(atMatch(m, *i) >> "Bind" >> name >> e2 >> pos))
             abort(); /* can't happen */
-        as.set(name, e2);
+        as.set(name, ATmake("(<term>, <term>)", e2, pos));
     }
 
     return makeAttrs(as);
@@ -140,8 +142,8 @@ static Expr updateAttrs(Expr e1, Expr e2)
     /* Note: e1 and e2 should be in normal form. */
 
     ATermMap attrs;
-    queryAllAttrs(e1, attrs);
-    queryAllAttrs(e2, attrs);
+    queryAllAttrs(e1, attrs, true);
+    queryAllAttrs(e2, attrs, true);
 
     return makeAttrs(attrs);
 }
@@ -153,7 +155,7 @@ string evalString(EvalState & state, Expr e)
     ATMatcher m;
     string s;
     if (!(atMatch(m, e) >> "Str" >> s))
-        throw badTerm("string expected", e);
+        throw Error("string expected");
     return s;
 }
 
@@ -164,7 +166,7 @@ Path evalPath(EvalState & state, Expr e)
     ATMatcher m;
     string s;
     if (!(atMatch(m, e) >> "Path" >> s))
-        throw badTerm("path expected", e);
+        throw Error("path expected");
     return s;
 }
 
@@ -175,7 +177,7 @@ bool evalBool(EvalState & state, Expr e)
     ATMatcher m;
     if (atMatch(m, e) >> "Bool" >> "True") return true;
     else if (atMatch(m, e) >> "Bool" >> "False") return false;
-    else throw badTerm("expecting a boolean", e);
+    else throw Error("boolean expected");
 }
 
 
@@ -183,7 +185,7 @@ Expr evalExpr2(EvalState & state, Expr e)
 {
     ATMatcher m;
     Expr e1, e2, e3, e4;
-    ATerm name;
+    ATerm name, pos;
 
     /* Normal forms. */
     string cons;
@@ -219,6 +221,7 @@ Expr evalExpr2(EvalState & state, Expr e)
     if (atMatch(m, e) >> "Call" >> e1 >> e2) {
 
         ATermList formals;
+        ATerm pos;
         
         /* Evaluate the left-hand side. */
         e1 = evalExpr(state, e1);
@@ -229,25 +232,42 @@ Expr evalExpr2(EvalState & state, Expr e)
             if (primOp) return primOp(state, e2); else abort();
         }
 
-        else if (atMatch(m, e1) >> "Function" >> formals >> e4)
-            return evalExpr(state, 
-                substArgs(e4, formals, evalExpr(state, e2)));
-        
-        else if (atMatch(m, e1) >> "Function1" >> name >> e4) {
-            ATermMap subs;
-            subs.set(name, e2);
-            return evalExpr(state, substitute(subs, e4));
+        else if (atMatch(m, e1) >> "Function" >> formals >> e4 >> pos) {
+            e2 = evalExpr(state, e2);
+            try {
+                return evalExpr(state, substArgs(e4, formals, e2));
+            } catch (Error & e) {
+                throw Error(format("while evaluating function at %1%:\n%2%")
+                    % showPos(pos) % e.msg());
+            }
         }
         
-        else throw badTerm("expecting a function or primop", e1);
+        else if (atMatch(m, e1) >> "Function1" >> name >> e4 >> pos) {
+            try {
+                ATermMap subs;
+                subs.set(name, e2);
+                return evalExpr(state, substitute(subs, e4));
+            } catch (Error & e) {
+                throw Error(format("while evaluating function at %1%:\n%2%")
+                    % showPos(pos) % e.msg());
+            }
+        }
+        
+        else throw Error("function or primop expected in function call");
     }
 
     /* Attribute selection. */
     string s1;
     if (atMatch(m, e) >> "Select" >> e1 >> s1) {
-        Expr a = queryAttr(evalExpr(state, e1), s1);
-        if (!a) throw badTerm(format("missing attribute `%1%'") % s1, e);
-        return evalExpr(state, a);
+        ATerm pos;
+        Expr a = queryAttr(evalExpr(state, e1), s1, pos);
+        if (!a) throw Error(format("attribute `%1%' missing") % s1);
+        try {
+            return evalExpr(state, a);
+        } catch (Error & e) {
+            throw Error(format("while evaluating attribute `%1%' at %2%:\n%3%")
+                % s1 % showPos(pos) % e.msg());
+        }
     }
 
     /* Mutually recursive sets. */
@@ -264,8 +284,9 @@ Expr evalExpr2(EvalState & state, Expr e)
     }
 
     /* Assertions. */
-    if (atMatch(m, e) >> "Assert" >> e1 >> e2) {
-        if (!evalBool(state, e1)) throw badTerm("guard failed", e);
+    if (atMatch(m, e) >> "Assert" >> e1 >> e2 >> pos) {
+        if (!evalBool(state, e1))
+            throw Error(format("assertion failed at %1%") % showPos(pos));
         return evalExpr(state, e2);
     }
 
@@ -323,7 +344,7 @@ Expr evalExpr(EvalState & state, Expr e)
     Expr nf = state.normalForms.get(e);
     if (nf) {
         if (nf == state.blackHole)
-            throw badTerm("infinite recursion", e);
+            throw Error("infinite recursion encountered");
         state.nrCached++;
         return nf;
     }
@@ -340,7 +361,12 @@ Expr evalFile(EvalState & state, const Path & path)
 {
     startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
     Expr e = parseExprFromFile(state, path);
-    return evalExpr(state, e);
+    try {
+        return evalExpr(state, e);
+    } catch (Error & e) {
+        throw Error(format("while evaluating file `%1%':\n%2%")
+            % path % e.msg());
+    }
 }
 
 

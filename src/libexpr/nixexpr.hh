@@ -52,6 +52,9 @@ private:
 ATerm string2ATerm(const string & s);
 string aterm2String(ATerm t);
 
+/* Show a position. */
+string showPos(ATerm pos);
+
 /* Generic bottomup traversal over ATerms.  The traversal first
    recursively descends into subterms, and then applies the given term
    function to the resulting term. */
@@ -63,11 +66,12 @@ ATerm bottomupRewrite(TermFun & f, ATerm e);
 
 /* Query all attributes in an attribute set expression.  The
    expression must be in normal form. */
-void queryAllAttrs(Expr e, ATermMap & attrs);
+void queryAllAttrs(Expr e, ATermMap & attrs, bool withPos = false);
 
 /* Query a specific attribute from an attribute set expression.  The
    expression must be in normal form. */
 Expr queryAttr(Expr e, const string & name);
+Expr queryAttr(Expr e, const string & name, ATerm & pos);
 
 /* Create an attribute set expression from an Attrs value. */
 Expr makeAttrs(const ATermMap & attrs);

@@ -104,6 +104,19 @@ string aterm2String(ATerm t)
 {
     return ATgetName(ATgetAFun(t));
 }
+
+
+string showPos(ATerm pos)
+{
+    ATMatcher m;
+    Path path;
+    int line, column;
+    if (atMatch(m, pos) >> "NoPos")
+        return "undefined position";
+    if (!(atMatch(m, pos) >> "Pos" >> path >> line >> column))
+        throw badTerm("position expected", pos);
+    return (format("`%1%', line %2%") % path % line).str();
+}
     
 
 ATerm bottomupRewrite(TermFun & f, ATerm e)
@@ -135,37 +148,66 @@ ATerm bottomupRewrite(TermFun & f, ATerm e)
 }
 
 
-void queryAllAttrs(Expr e, ATermMap & attrs)
+void queryAllAttrs(Expr e, ATermMap & attrs, bool withPos)
 {
     ATMatcher m;
     ATermList bnds;
     if (!(atMatch(m, e) >> "Attrs" >> bnds))
-        throw badTerm("expected attribute set", e);
+        throw Error("attribute set expected");
 
     for (ATermIterator i(bnds); i; ++i) {
         string s;
         Expr e;
-        if (!(atMatch(m, *i) >> "Bind" >> s >> e))
+        ATerm pos;
+        if (!(atMatch(m, *i) >> "Bind" >> s >> e >> pos))
             abort(); /* can't happen */
-        attrs.set(s, e);
+        attrs.set(s, withPos ? ATmake("(<term>, <term>)", e, pos) : e);
     }
 }
 
 
 Expr queryAttr(Expr e, const string & name)
 {
-    ATermMap attrs;
-    queryAllAttrs(e, attrs);
-    return attrs.get(name);
+    ATerm dummy;
+    return queryAttr(e, name, dummy);
+}
+
+
+Expr queryAttr(Expr e, const string & name, ATerm & pos)
+{
+    ATMatcher m;
+    ATermList bnds;
+    if (!(atMatch(m, e) >> "Attrs" >> bnds))
+        throw Error("attribute set expected");
+
+    for (ATermIterator i(bnds); i; ++i) {
+        string s;
+        Expr e;
+        ATerm pos2;
+        if (!(atMatch(m, *i) >> "Bind" >> s >> e >> pos2))
+            abort(); /* can't happen */
+        if (s == name) {
+            pos = pos2;
+            return e;
+        }
+    }
+
+    return 0;
 }
 
 
 Expr makeAttrs(const ATermMap & attrs)
 {
+    ATMatcher m;
     ATermList bnds = ATempty;
-    for (ATermIterator i(attrs.keys()); i; ++i)
+    for (ATermIterator i(attrs.keys()); i; ++i) {
+        Expr e;
+        ATerm pos;
+        if (!(atMatch(m, attrs.get(*i)) >> "" >> e >> pos))
+            abort(); /* can't happen */
         bnds = ATinsert(bnds, 
-            ATmake("Bind(<term>, <term>)", *i, attrs.get(*i)));
+            ATmake("Bind(<term>, <term>, <term>)", *i, e, pos));
+    }
     return ATmake("Attrs(<term>)", ATreverse(bnds));
 }
 
@@ -175,7 +217,7 @@ Expr substitute(const ATermMap & subs, Expr e)
     checkInterrupt();
 
     ATMatcher m;
-    ATerm name;
+    ATerm name, pos;
 
     /* As an optimisation, don't substitute in subterms known to be
        closed. */
@@ -190,7 +232,7 @@ Expr substitute(const ATermMap & subs, Expr e)
        function. */
     ATermList formals;
     ATerm body;
-    if (atMatch(m, e) >> "Function" >> formals >> body) {
+    if (atMatch(m, e) >> "Function" >> formals >> body >> pos) {
         ATermMap subs2(subs);
         for (ATermIterator i(formals); i; ++i) {
             if (!(atMatch(m, *i) >> "NoDefFormal" >> name) &&
@@ -198,16 +240,16 @@ Expr substitute(const ATermMap & subs, Expr e)
                 abort();
             subs2.remove(name);
         }
-        return ATmake("Function(<term>, <term>)",
+        return ATmake("Function(<term>, <term>, <term>)",
             substitute(subs, (ATerm) formals),
-            substitute(subs2, body));
+            substitute(subs2, body), pos);
     }
 
-    if (atMatch(m, e) >> "Function1" >> name >> body) {
+    if (atMatch(m, e) >> "Function1" >> name >> body >> pos) {
         ATermMap subs2(subs);
         subs2.remove(name);
-        return ATmake("Function1(<term>, <term>)", name,
-            substitute(subs2, body));
+        return ATmake("Function1(<term>, <term>, <term>)", name,
+            substitute(subs2, body), pos);
     }
         
     /* Idem for a mutually recursive attribute set. */
