@@ -85,7 +85,7 @@ void runTests()
 
     evalTest(e2);
 
-    Hash h3 = addValue("./test-expr.nix");
+    Hash h3 = addValue("./test-expr-1.nix");
     Expr e3 = ATmake("Deref(Hash(<str>))", ((string) h3).c_str());
 
     evalTest(e3);
