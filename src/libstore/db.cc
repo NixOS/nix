@@ -165,11 +165,30 @@ void Database::open(const string & path)
         DbEnv * env = 0; /* !!! close on error */
         env = new DbEnv(0);
 
+        /* Smaller log files. */
         env->set_lg_bsize(32 * 1024); /* default */
         env->set_lg_max(256 * 1024); /* must be > 4 * lg_bsize */
-        env->set_lk_detect(DB_LOCK_DEFAULT);
+
+        /* Write the log, but don't sync.  This protects transactions
+           against application crashes, but if the system crashes,
+           some transactions may be undone.  An acceptable risk, I
+           think. */
         env->set_flags(DB_TXN_WRITE_NOSYNC | DB_LOG_AUTOREMOVE, 1);
-        
+
+        /* Increase the locking limits.  If you ever get `Dbc::get:
+           Cannot allocate memory' or similar, especially while
+           running `nix-store --verify', just increase the following
+           number, then run db_recover on the database to remove the
+           existing DB environment (since changes only take effect on
+           new environments). */
+        env->set_lk_max_locks(4000);
+        env->set_lk_max_lockers(4000);
+        env->set_lk_max_objects(4000);
+        env->set_lk_detect(DB_LOCK_DEFAULT);
+
+        /* Dangerous, probably, but from the docs it *seems* that BDB
+           shouldn't sync when DB_TXN_WRITE_NOSYNC is used, but it
+           still fsync()s sometimes. */
         db_env_set_func_fsync(my_fsync);
         
 
