@@ -5,13 +5,13 @@
 var idCounter = 0;
 
 
-function showTreeToggle(show,hide) {
+function showTreeToggle(isHidden) {
     if (document.getElementById) {
         var id = "toggle_" + idCounter;
         document.writeln(
             '<a href="javascript:toggleTree(\'' + id + '\')" class="toggle" id="' + id + '">' +
-            '<span class="showTree" style="display: none;">+</span>' +
-            '<span class="hideTree">-</span>' +
+            '<span class="showTree" ' + (isHidden ? '' : 'style="display: none;"') + '>+</span>' +
+            '<span class="hideTree" ' + (isHidden ? 'style="display: none;"' : '') + '>-</span>' +
             '</a>');
         idCounter = idCounter + 1;
     }

@@ -24,11 +24,25 @@
   </xsl:template>
 
   <xsl:template match="nest">
-    <script type='text/javascript'>showTreeToggle("show","hide")</script>
+
+    <!-- The tree should be collapsed by default if all children are
+         unimportant or if the header is unimportant. -->
+    <xsl:variable name="collapsed"
+                  select="count(.//line[not(@priority = 3)]) = 0 or ./head[@priority = 3]" />
+                  
+    <xsl:variable name="style"><xsl:if test="$collapsed">display: none;</xsl:if></xsl:variable>
+    <xsl:variable name="arg"><xsl:choose><xsl:when test="$collapsed">true</xsl:when><xsl:otherwise>false</xsl:otherwise></xsl:choose></xsl:variable>
+    
+    <script type='text/javascript'>showTreeToggle(<xsl:value-of select="$collapsed"/>)</script>
     <xsl:apply-templates select='head'/>
-    <ul class='nesting'>
+    
+    <ul class='nesting' style="{$style}">
       <xsl:for-each select='line|nest'>
-        <xsl:param name="class"><xsl:choose><xsl:when test="position() != last()">line</xsl:when><xsl:otherwise>lastline</xsl:otherwise></xsl:choose></xsl:param>
+
+        <!-- Is this the last line?  If so, mark it as such so that it
+             can be rendered differently. -->
+        <xsl:variable  name="class"><xsl:choose><xsl:when test="position() != last()">line</xsl:when><xsl:otherwise>lastline</xsl:otherwise></xsl:choose></xsl:variable>
+        
         <li class='{$class}'>
           <span class='lineconn' />
           <span class='linebody'>

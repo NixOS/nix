@@ -1,3 +1,4 @@
+#include <vector>
 #include <iostream>
 #include <cstdio>
 #include <string>
@@ -11,6 +12,9 @@ struct Decoder
     string line;
     bool inHeader;
     int level;
+    vector<int> args;
+    bool newNumber;
+    int priority;
 
     Decoder()
     {
@@ -18,6 +22,7 @@ struct Decoder
         line = "";
         inHeader = false;
         level = 0;
+        priority = 1;
     }
 
     void pushChar(char c);
@@ -39,9 +44,11 @@ void Decoder::pushChar(char c)
             break;
 
         case stEscape:
-            if (c == '[')
+            if (c == '[') {
                 state = stCSI;
-            else
+                args.clear();
+                newNumber = true;
+            } else
                 state = stTop; /* !!! wrong */
             break;
 
@@ -54,6 +61,7 @@ void Decoder::pushChar(char c)
                         level++;
                         inHeader = true;
                         cout << "<nest>" << endl;
+                        priority = args.size() >= 1 ? args[0] : 1;
                         break;
                     case 'q':
                         if (line.size()) finishLine();
@@ -63,7 +71,19 @@ void Decoder::pushChar(char c)
                         } else
                             cerr << "not enough nesting levels" << endl;
                         break;
+                    case 's':
+                        if (line.size()) finishLine();
+                        priority = args.size() >= 1 ? args[0] : 1;
+                        break;
                 }
+            } else if (c >= '0' && c <= '9') {
+                int n = 0;
+                if (!newNumber) {
+                    n = args.back() * 10;
+                    args.pop_back();
+                }
+                n += c - '0';
+                args.push_back(n);
             }
             break;
             
@@ -76,7 +96,9 @@ void Decoder::finishLine()
     string storeDir = "/nix/store/";
     int sz = storeDir.size();
     string tag = inHeader ? "head" : "line";
-    cout << "<" << tag << ">";
+    cout << "<" << tag;
+    if (priority != 1) cout << " priority='" << priority << "'";
+    cout << ">";
 
     for (int i = 0; i < line.size(); i++) {
 
@@ -113,6 +135,7 @@ void Decoder::finishLine()
     cout << "</" << tag << ">" << endl;
     line = "";
     inHeader = false;
+    priority = 1;
 }
 
 
