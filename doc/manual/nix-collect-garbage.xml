@@ -1,0 +1,75 @@
+<refentry>
+  <refnamediv>
+    <refname>nix-collect-garbage</refname>
+    <refpurpose>determine the set of unreachable store paths</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>nix-collect-garbage</command>
+      <arg><option>--invert</option></arg>
+      <arg><option>--no-successors</option></arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsection>
+    <title>Description</title>
+
+    <para>
+      The command <command>nix-collect-garbage</command> determines
+      the paths in the Nix store that are garbage, that is, not
+      reachable from outside of the store.  These paths can be safely
+      deleted without affecting the integrity of the system.
+    </para>
+
+  </refsection>
+
+  <refsection>
+    <title>Options</title>
+
+    <variablelist>
+
+      <varlistentry>
+        <term><option>--invert</option></term>
+        <listitem>
+          <para>
+            Causes the set of <emphasis>reachable</emphasis> paths to
+            be printed, rather than the unreachable paths.  These are
+            the paths that may <emphasis>not</emphasis> be deleted.
+          </para>
+        </listitem>
+      </varlistentry>
+      
+      <varlistentry>
+        <term><option>--no-successors</option></term>
+        <listitem>
+          <para>
+            Causes <command>nix-collect-garbage</command> not to
+            follow successor relations.  By default, if a derivation
+            store expression is reachable, its successor (i.e., a
+            closure store expression) is also considered to be
+            reachable.  This option is always safe, but garbage
+            collecting successors may cause undesirable rebuilds later
+            on.
+          </para>
+        </listitem>
+      </varlistentry>
+      
+    </variablelist>
+
+  </refsection>
+
+  <refsection>
+    <title>Examples</title>
+
+    <para>
+      To delete all unreachable paths, do the following:
+    
+      <screen>
+$ nix-collect-garbage | xargs nix-store --delete</screen>
+
+    </para>
+
+  </refsection>
+    
+</refentry>

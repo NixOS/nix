@@ -1,6 +1,6 @@
 nix-hash [OPTIONS...] [FILES...]
 
-`nix-hash computes and prints cryptographic hashes for the specified
+`nix-hash' computes and prints cryptographic hashes for the specified
 files.
 
   --flat: compute hash of regular file contents, not metadata

@@ -1,0 +1,138 @@
+<refentry>
+  <refnamediv>
+    <refname>nix-push</refname>
+    <refpurpose>push store paths onto a network cache</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>nix-push</command>
+      <arg choice='plain'><replaceable>archives-put-url</replaceable></arg>
+      <arg choice='plain'><replaceable>archives-get-url</replaceable></arg>
+      <arg choice='plain'><replaceable>manifest-put-url</replaceable></arg>
+      <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsection>
+    <title>Description</title>
+
+    <para>
+      The command <command>nix-push</command> builds a set of store
+      expressions (if necessary), and then packages and uploads all
+      store paths in the resulting closures to a server.  A network
+      cache thus populated can subsequently be used to speed up
+      software deployment on other machines using the
+      <command>nix-pull</command> command.
+    </para>
+
+    <para>
+      <command>nix-push</command> performs the following actions.
+      
+      <orderedlist>
+
+        <listitem>
+          <para>
+            The store expressions stored in
+            <replaceable>paths</replaceable> are realised (using
+            <literal>nix-store --realise</literal>).
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            All paths in the closure of the store expressions stored
+            in <replaceable>paths</replaceable> are determined (using
+            <literal>nix-store --query --requisites
+            --include-successors</literal>).  It should be noted that
+            since the <option>--include-successors</option> flag is
+            used, if you specify a derivation store expression, you
+            get a combined source/binary distribution.  If you only
+            want a binary distribution, you should specify the closure
+            store expression that result from realising these (see
+            below).
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            All store paths determined in the previous step are
+            packaged and compressed into a <command>bzip</command>ped
+            NAR archive (extension <filename>.nar.bz2</filename>).
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            A <emphasis>manifest</emphasis> is created that contains
+            information on the store paths, their eventual URLs in the
+            cache, and cryptographic hashes of the contents of the NAR
+            archives.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            Each store path is uploaded to the remote directory
+            specified by <replaceable>archives-put-url</replaceable>.
+            HTTP PUT requests are used to do this.  However, before a
+            file <varname>x</varname> is uploaded to
+            <literal><replaceable>archives-put-url</replaceable>/<varname>x</varname></literal>,
+            <command>nix-push</command> first determines whether this
+            upload is unnecessary by issuing a HTTP HEAD request on
+            <literal><replaceable>archives-get-url</replaceable>/<varname>x</varname></literal>.
+            This allows a cache to be shared between many partially
+            overlapping <command>nix-push</command> invocations.
+            (We use two URLs because the upload URL typically
+            refers to a CGI script, while the download URL just refers
+            to a file system directory on the server.)
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            The manifest is uploaded using an HTTP PUT request to
+            <replaceable>manifest-put-url</replaceable>.  The
+            corresponding URL to download the manifest can then be
+            used by <command>nix-pull</command>.
+          </para>
+        </listitem>
+        
+      </orderedlist>
+    </para>
+            
+  </refsection>
+
+  <refsection>
+    <title>Examples</title>
+
+    <para>
+      To upload files there typically is some CGI script on the server
+      side.  This script should be be protected with a password.  The
+      following example uploads the store paths resulting from
+      building the Nix expressions in <filename>foo.nix</filename>,
+      passing appropriate authentication information:
+    
+      <screen>
+$ nix-push \
+    http://foo@bar:server.domain/cgi-bin/upload.pl/cache \
+    http://server.domain/cache \
+    http://foo@bar:server.domain/cgi-bin/upload.pl/MANIFEST \
+    $(nix-instantiate foo.nix)</screen>
+
+    This will push both sources and binaries (and any build-time
+    dependencies used in the build, such as compilers).
+    </para>
+
+    <para>
+      If we just want to push binaries, not sources and build-time
+      dependencies, we can do:
+      
+      <screen>
+$ nix-push <replaceable>urls</replaceable> $(nix-instantiate $(nix-store -r foo.nix))</screen>
+    
+    </para>
+
+  </refsection>
+    
+</refentry>

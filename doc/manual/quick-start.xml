@@ -51,7 +51,7 @@ $ tar xfj nixpkgs-<replaceable>version</replaceable>.tar.bz2</screen>
         network, rather than built from source.
 
         <screen>
-$ nix-pull http://<replaceable>...</replaceable>/nix/nixpkgs-<replaceable>version</replaceable>/</screen>
+$ nix-pull http://<replaceable>...</replaceable>/nix/nixpkgs-<replaceable>version</replaceable>/MANIFEST</screen>
 
       </para>
 

@@ -1,0 +1,54 @@
+<refentry>
+  <refnamediv>
+    <refname>nix-prefetch-url</refname>
+    <refpurpose>copy a file from a URL into the store and print its MD5 hash</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>nix-prefetch-url</command>
+      <arg choice='plain'><replaceable>url</replaceable></arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsection>
+    <title>Description</title>
+
+    <para>
+      The command <command>nix-prefetch-url</command> downloads the
+      file referenced by the URL <replaceable>url</replaceable>,
+      prints its MD5 cryptographic hash code, and copies it into the
+      Nix store.  The file name in the store is
+      <filename><replaceable>hash</replaceable>-<replaceable>basename</replaceable></filename>,
+      where <replaceable>basename</replaceable> is everything
+      following the final slash in <replaceable>url</replaceable>.
+    </para>
+
+    <para>
+      This command is just a convenience to Nix expression writers.
+      Often a Nix expressions fetch some source distribution from the
+      network using the <literal>fetchurl</literal> expression
+      contained in <literal>nixpkgs</literal>.  However,
+      <literal>fetchurl</literal> requires an MD5 hash.  If you don't
+      know the hash, you would have to download the file first, and
+      then <literal>fetchurl</literal> would download it again when
+      you build your Nix expression.  Since
+      <literal>fetchurl</literal> uses the same name for the
+      downloaded file as <command>nix-prefetch-url</command>, the
+      redundant download can be avoided.
+    </para>
+
+  </refsection>
+
+  <refsection>
+    <title>Examples</title>
+
+    <screen>
+$ nix-prefetch-url ftp://ftp.nluug.nl/pub/gnu/make/make-3.80.tar.bz2
+...
+file has hash 0bbd1df101bc0294d440471e50feca71
+...</screen>
+
+  </refsection>
+    
+</refentry>

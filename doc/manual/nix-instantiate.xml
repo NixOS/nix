@@ -8,18 +8,58 @@
     <cmdsynopsis>
       <command>nix-instantiate</command>
       &opt-common-syn;
-      <arg rep='repeat'><replaceable>files</replaceable></arg>
+      <arg choice='plain' rep='repeat'><replaceable>files</replaceable></arg>
     </cmdsynopsis>
   </refsynopsisdiv>
 
-  <refsect1>
+  <refsection>
     <title>Description</title>
 
     <para>
       The command <command>nix-instantiate</command> generates
       (low-level) store expressions from (high-level) Nix expressions.
+      It loads and evaluates the Nix expressions in each of
+      <replaceable>files</replaceable>.  Each top-level expression
+      should evaluate to a derivation, a list of derivations, or a set
+      of derivations.  The paths of the resulting store expressions
+      are printed on standard output.
     </para>
 
-  </refsect1>
+    <para>
+      This command is generally used for testing Nix expression before
+      they are used with <command>nix-env</command>.
+    </para>
 
+  </refsection>
+
+  <refsection>
+    <title>Options</title>
+
+    <variablelist>
+
+      &opt-common;
+
+    </variablelist>
+
+  </refsection>
+
+  <refsection>
+    <title>Examples</title>
+
+    <screen>
+$ nix-instantiate gcc.nix <lineannotation>(instantiate)</lineannotation>
+/nix/store/468abdcb93aa22bb721142615b97698b-d-gcc-3.3.2.store
+
+$ nix-store -r $(nix-instantiate gcc.nix) <lineannotation>(build)</lineannotation>
+
+$ nix-store -r $(nix-instantiate gcc.nix) <lineannotation>(print output path)</lineannotation>
+/nix/store/9afa718cddfdfe94b5b9303d0430ceb1-gcc-3.3.2
+
+$ ls -l /nix/store/9afa718cddfdfe94b5b9303d0430ceb1-gcc-3.3.2
+dr-xr-xr-x    2 eelco    users         360 2003-12-01 16:12 bin
+dr-xr-xr-x    3 eelco    users          72 2003-12-01 16:12 include
+...</screen>
+
+  </refsection>
+    
 </refentry>

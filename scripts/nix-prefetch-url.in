@@ -25,7 +25,7 @@ rename $out, $out2;
 # Create a Nix expression.
 my $nixexpr =
     "(import @datadir@/nix/corepkgs/fetchurl) " .
-    "{url = $url; md5 = \"$hash\"; system = \"@system@\"}";
+    "{url = $url; md5 = \"$hash\"; system = \"@system@\";}";
 
 print "expr: $nixexpr\n";
 

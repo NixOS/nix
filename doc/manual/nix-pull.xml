@@ -1,0 +1,43 @@
+<refentry>
+  <refnamediv>
+    <refname>nix-pull</refname>
+    <refpurpose>pull substitutes from a network cache</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>nix-pull</command>
+      <arg choice='plain'><replaceable>url</replaceable></arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsection>
+    <title>Description</title>
+
+    <para>
+      The command <command>nix-pull</command> obtains a list of
+      pre-built store paths from the URL
+      <replaceable>url</replaceable>, and for each of these store
+      paths, registers a substitute derivation that downloads and
+      unpacks it into the Nix store.  This is used to speed up
+      installations: if you attempt to install something that has
+      already been built and stored into the network cache, Nix can
+      transparently re-use the pre-built store paths.
+    </para>
+
+    <para>
+      The file at <replaceable>url</replaceable> must be compatible
+      with the files created by <replaceable>nix-push</replaceable>.
+    </para>
+
+  </refsection>
+
+  <refsection>
+    <title>Examples</title>
+
+    <screen>
+$ nix-pull http://catamaran.labs.cs.uu.nl/dist/nix/nixpkgs-0.5pre753/MANIFEST</screen>
+
+  </refsection>
+    
+</refentry>

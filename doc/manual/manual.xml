@@ -12,6 +12,10 @@
 <!ENTITY nix-env SYSTEM "nix-env.xml">
 <!ENTITY nix-store SYSTEM "nix-store.xml">
 <!ENTITY nix-instantiate SYSTEM "nix-instantiate.xml">
+<!ENTITY nix-collect-garbage SYSTEM "nix-collect-garbage.xml">
+<!ENTITY nix-push SYSTEM "nix-push.xml">
+<!ENTITY nix-pull SYSTEM "nix-pull.xml">
+<!ENTITY nix-prefetch-url SYSTEM "nix-prefetch-url.xml">
 <!ENTITY troubleshooting SYSTEM "troubleshooting.xml">
 <!ENTITY bugs SYSTEM "bugs.xml">
 <!ENTITY version SYSTEM "version.xml">
@@ -51,6 +55,22 @@
     <sect1>
       <title>nix-instantiate</title>
       &nix-instantiate;
+    </sect1>
+    <sect1>
+      <title>nix-collect-garbage</title>
+      &nix-collect-garbage;
+    </sect1>
+    <sect1>
+      <title>nix-push</title>
+      &nix-push;
+    </sect1>
+    <sect1>
+      <title>nix-pull</title>
+      &nix-pull;
+    </sect1>
+    <sect1>
+      <title>nix-prefetch-url</title>
+      &nix-prefetch-url;
     </sect1>
   </appendix>
 
