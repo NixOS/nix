@@ -1,4 +1,4 @@
-#! @perl@ -w
+#! @perl@ -w -I@libexecdir@/nix
 
 use strict;
 use POSIX qw(tmpnam);
