@@ -32,7 +32,7 @@ my %successors;
 
 foreach my $manifest (@ARGV) {
     print STDERR "loading $manifest\n";
-    if (readManifest($manifest, \%narFiles, \%patches, \%successors) < 3) {
+    if (readManifest($manifest, \%narFiles, \%patches, \%successors, 1) < 3) {
 #        die "manifest `$manifest' is too old (i.e., for Nix <= 0.7)\n";
     }
 }

@@ -328,7 +328,7 @@ foreach my $p (keys %dstOutPaths) {
             { url => "$patchesURL/$finalName", hash => "$hashAlgo:$narDiffHash"
             , size => $narDiffSize, basePath => $closest, baseHash => "$hashAlgo:$baseHash"
             , narHash => "$hashAlgo:$narHash", patchType => "nar-bsdiff"
-            };
+            }, 0;
     }
 }
 
