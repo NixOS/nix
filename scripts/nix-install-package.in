@@ -17,7 +17,7 @@ system "bunzip2 < $pkgfile | (cd $tmpdir && tar xf -)";
 die if $?;
 
 print "This package contains the following derivations:\n";
-system "nix-env -qasf $tmpdir/default.nix";
+system "@bindir@/nix-env -qasf $tmpdir/default.nix";
 die if $?;
 
 print "Do you wish to install these (Y/N)? ";
@@ -26,11 +26,11 @@ chomp $reply;
 exit if (!($reply eq "y"));
 
 print "Pulling caches...\n";
-system "nix-pull `cat $tmpdir/caches`";
+system "@bindir@/nix-pull `cat $tmpdir/caches`";
 die if $?;
 
 print "Installing package...\n";
-system "nix-env -if $tmpdir/default.nix '*'";
+system "@bindir@/nix-env -if $tmpdir/default.nix '*'";
 die if $?;
 
 print "Installation succeeded! Press Enter to continue.\n";

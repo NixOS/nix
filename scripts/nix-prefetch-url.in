@@ -10,7 +10,7 @@ print "fetching $url...\n";
 
 my $out = "@storedir@/nix-prefetch-url-$$";
 
-system "@wget@ --passive-ftp '$url' -O '$out'";
+system "@curl@ --fail --location --max-redirs 20 \"$url\" > \"$out\"";
 $? == 0 or die "unable to fetch $url";
 
 my $hash=`@bindir@/nix-hash --flat $out`;
@@ -27,11 +27,12 @@ my $nixexpr =
     "(import @datadir@/nix/corepkgs/fetchurl) " .
     "{url = $url; md5 = \"$hash\"; system = \"@system@\";}";
 
-print "expr: $nixexpr\n";
+#print STDERR "expr: $nixexpr\n";
 
 # Instantiate a Nix expression.
-print STDERR "instantiating Nix expression...\n";
-my $pid = open2(\*READ, \*WRITE, "nix-instantiate -") or die "cannot run nix-instantiate";
+#print STDERR "instantiating Nix expression...\n";
+my $pid = open2(\*READ, \*WRITE, "@bindir@/nix-instantiate -")
+    or die "cannot run nix-instantiate";
 
 print WRITE $nixexpr;
 close WRITE;
@@ -43,8 +44,13 @@ waitpid $pid, 0;
 $? == 0 or die "nix-instantiate failed";
 
 # Run Nix.
-print STDERR "realising store expression $drvpath...\n";
-system "nix-store --realise $drvpath > /dev/null";
+#print STDERR "realising store expression $drvpath...\n";
+system "@bindir@/nix-store --realise $drvpath > /dev/null";
 $? == 0 or die "realisation failed";
+
+my $path = `@bindir@/nix-store -qn $drvpath`;
+$? == 0 or die "query failed";
+
+print "path is $path";
 
 unlink $out2;

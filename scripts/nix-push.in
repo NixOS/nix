@@ -12,7 +12,7 @@ my $manifest = "$tmpdir/MANIFEST";
 
 END { unlink $manifest; unlink $nixfile; rmdir $tmpdir; }
 
-my $curl = "curl --fail --silent";
+my $curl = "@curl@ --fail --silent";
 
 
 # Parse the command line.
@@ -30,10 +30,10 @@ foreach my $storeexpr (@ARGV) {
 
     # Get all paths referenced by the normalisation of the given 
     # Nix expression.
-    system "nix-store --realise $storeexpr > /dev/null";
+    system "@bindir@/nix-store --realise $storeexpr > /dev/null";
     die if ($?);
 
-    open PATHS, "nix-store --query --requisites --include-successors $storeexpr 2> /dev/null |" or die;
+    open PATHS, "@bindir@/nix-store --query --requisites --include-successors $storeexpr 2> /dev/null |" or die;
     while (<PATHS>) {
         chomp;
         die "bad: $_" unless /^\//;
@@ -69,7 +69,7 @@ close NIX;
 # Instantiate store expressions from the Nix expression.
 my @storeexprs;
 print STDERR "instantiating store expressions...\n";
-open STOREEXPRS, "nix-instantiate $nixfile |" or die "cannot run nix-instantiate";
+open STOREEXPRS, "@bindir@/nix-instantiate $nixfile |" or die "cannot run nix-instantiate";
 while (<STOREEXPRS>) {
     chomp;
     die unless /^\//;
@@ -90,10 +90,10 @@ while (scalar @tmp > 0) {
     my @tmp2 = @tmp[0..$n - 1];
     @tmp = @tmp[$n..scalar @tmp - 1];
 
-    system "nix-store --realise -B @tmp2 > /dev/null";
+    system "@bindir@/nix-store --realise -B @tmp2 > /dev/null";
     if ($?) { die "`nix-store --realise' failed"; }
 
-    open NARPATHS, "nix-store --query --list @tmp2 |" or die "cannot run nix";
+    open NARPATHS, "@bindir@/nix-store --query --list @tmp2 |" or die "cannot run nix";
     while (<NARPATHS>) {
         chomp;
         die unless (/^\//);
@@ -135,7 +135,7 @@ for (my $n = 0; $n < scalar @storepaths; $n++) {
     print MANIFEST "  MD5: $hash\n";
 
     if ($storepath =~ /\.store$/) {
-        open PREDS, "nix-store --query --predecessors $storepath |" or die "cannot run nix";
+        open PREDS, "@bindir@/nix-store --query --predecessors $storepath |" or die "cannot run nix";
         while (<PREDS>) {
             chomp;
             die unless (/^\//);

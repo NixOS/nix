@@ -1,6 +1,4 @@
-#! /bin/sh
-
-export PATH=/bin:/usr/bin
+#! @shell@ -e
 
 echo "unpacking $narFile to $out..."
-bunzip2 < $narFile | @bindir@/nix-store --restore "$out" || exit 1
+@bunzip2@ < $narFile | @bindir@/nix-store --restore "$out"

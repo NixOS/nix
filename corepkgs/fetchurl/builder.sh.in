@@ -1,15 +1,15 @@
-#! /bin/sh
+#! @shell@ -e
 
 export PATH=/bin:/usr/bin
 
-echo "downloading $url into $out..."
+echo "downloading $url into $out"
 
 prefetch=@prefix@/store/nix-prefetch-url-$md5
 if test -f "$prefetch"; then
     echo "using prefetched $prefetch";
-    mv $prefetch $out || exit 1
+    mv $prefetch $out
 else
-    @wget@ --passive-ftp "$url" -O "$out" || exit 1
+    @curl@ --fail --location --max-redirs 20 "$url" > "$out"
 fi
 
 actual=$(@bindir@/nix-hash --flat $out)

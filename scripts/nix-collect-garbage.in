@@ -34,7 +34,7 @@ foreach my $link (@links) {
 
 my $extraarg = "";
 if ($keepsuccessors) { $extraarg = "--include-successors"; };
-my $pid = open2(\*READ, \*WRITE, "nix-store --query --requisites $extraarg @roots") 
+my $pid = open2(\*READ, \*WRITE, "@bindir@/nix-store --query --requisites $extraarg @roots") 
     or die "determining live paths";
 close WRITE;
 while (<READ>) {
