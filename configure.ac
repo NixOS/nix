@@ -19,6 +19,23 @@ AC_PROG_CXX
 AC_PROG_RANLIB
 
 AC_PATH_PROG(wget, wget)
+AC_PATH_PROG(xmllint, xmllint)
+AC_PATH_PROG(xsltproc, xsltproc)
+
+AC_ARG_WITH(docbook-catalog, AC_HELP_STRING([--with-docbook-catalog=PATH],
+  [path of the DocBook XML DTD]),
+  docbookcatalog=$withval, docbookcatalog=/docbook-dtd-missing)
+AC_SUBST(docbookcatalog)
+
+AC_ARG_WITH(docbook-xsl, AC_HELP_STRING([--with-docbook-xsl=PATH],
+  [path of the DocBook XSL stylesheets]),
+  docbookxsl=$withval, docbookxsl=/docbook-xsl-missing)
+AC_SUBST(docbookxsl)
+
+AC_ARG_WITH(xml-flags, AC_HELP_STRING([--xml-flags=FLAGS],
+  [extra flags to be passed to xmllint and xsltproc]),
+  xmlflags=$withval, xmlflags=)
+AC_SUBST(xmlflags)
 
 AC_CHECK_LIB(pthread, pthread_mutex_init)
 

@@ -1,7 +1,7 @@
-ENV = SGML_CATALOG_FILES=$(DOCBOOK_DTD)/docbook.cat
+ENV = SGML_CATALOG_FILES=$(docbookcatalog)/docbook.cat
 
-XMLLINT = $(ENV) xmllint --catalogs --nonet
-XSLTPROC = $(ENV) xsltproc --catalogs --nonet
+XMLLINT = $(ENV) $(xmllint) $(xmlflags) --catalogs
+XSLTPROC = $(ENV) $(xsltproc) $(xmlflags) --catalogs
 
 SOURCES = book.xml introduction.xml installation.xml nix-reference.xml \
  troubleshooting.xml bugs.xml
@@ -13,10 +13,10 @@ book.is-valid: $(SOURCES)
 man1_MANS = nix.1 fix.1
 
 man nix.1 fix.1: $(SOURCES) book.is-valid
-	$(XSLTPROC) $(DOCBOOK_XSL)/manpages/docbook.xsl book.xml
+	$(XSLTPROC) $(docbookxsl)/manpages/docbook.xsl book.xml
 
 book.html: $(SOURCES) book.is-valid
-	$(XSLTPROC) --output book.html $(DOCBOOK_XSL)/html/docbook.xsl book.xml
+	$(XSLTPROC) --output book.html $(docbookxsl)/html/docbook.xsl book.xml
 
 all-local: book.html
 
