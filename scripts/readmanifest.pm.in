@@ -11,7 +11,7 @@ sub processURL {
     print "obtaining list of Nix archives at $url...\n";
 
     system("@curl@ --fail --silent --show-error --location --max-redirs 20 " .
-           "'$url' > '$manifest' 2> /dev/null") == 0
+           "'$url' > '$manifest'") == 0
            or die "curl failed: $?";
         
     open MANIFEST, "<$manifest";
