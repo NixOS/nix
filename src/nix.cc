@@ -4,6 +4,8 @@
 #include <string>
 #include <sstream>
 #include <list>
+#include <vector>
+#include <set>
 #include <map>
 #include <cstdio>
 
@@ -13,6 +15,10 @@
 #include <sys/wait.h>
 
 #include <db4/db_cxx.h>
+
+extern "C" {
+#include "md5.h"
+}
 
 using namespace std;
 
@@ -146,8 +152,20 @@ void enumDB(const string & dbname, DBPairs & contents)
 }
 
 
+string printHash(unsigned char * buf)
+{
+    ostringstream str;
+    for (int i = 0; i < 16; i++) {
+        str.fill('0');
+        str.width(2);
+        str << hex << (int) buf[i];
+    }
+    return str.str();
+}
+
+    
 /* Verify that a reference is valid (that is, is a MD5 hash code). */
-void checkRef(const string & s)
+void checkHash(const string & s)
 {
     string err = "invalid reference: " + s;
     if (s.length() != 32)
@@ -162,31 +180,36 @@ void checkRef(const string & s)
 
 
 /* Compute the MD5 hash of a file. */
-string makeRef(string filename)
+string hashFile(string filename)
 {
-    char hash[33];
-
-    FILE * pipe = popen(("md5sum " + filename + " 2> /dev/null").c_str(), "r");
-    if (!pipe) throw BadRefError("cannot execute md5sum");
-
-    if (fread(hash, 32, 1, pipe) != 1)
-        throw BadRefError("cannot read hash from md5sum of " + filename);
-    hash[32] = 0;
-
-    pclose(pipe);
-
-    checkRef(hash);
-    return hash;
+    unsigned char hash[16];
+    FILE * file = fopen(filename.c_str(), "rb");
+    if (!file)
+        throw BadRefError("file `" + filename + "' does not exist");
+    int err = md5_stream(file, hash);
+    fclose(file);
+    if (err) throw BadRefError("cannot hash file");
+    return printHash(hash);
 }
 
 
-typedef pair<string, string> Param;
-typedef list<Param> Params;
+typedef map<string, string> Params;
 
 
-void readPkgDescr(const string & pkgfile,
+void readPkgDescr(const string & hash,
     Params & pkgImports, Params & fileImports, Params & arguments)
 {
+    string pkgfile;
+
+    if (!queryDB(dbRefs, hash, pkgfile))
+        throw Error("unknown package " + hash);
+
+    //    cerr << "reading information about " + hash + " from " + pkgfile + "\n";
+
+    /* Verify that the file hasn't changed. !!! race */
+    if (hashFile(pkgfile) != hash)
+        throw Error("file " + pkgfile + " is stale");
+
     ifstream file;
     file.exceptions(ios::badbit);
     file.open(pkgfile.c_str());
@@ -206,13 +229,13 @@ void readPkgDescr(const string & pkgfile,
         str >> name >> op >> ref;
 
         if (op == "<-") {
-            checkRef(ref);
-            pkgImports.push_back(Param(name, ref));
+            checkHash(ref);
+            pkgImports[name] = ref;
         } else if (op == "=") {
-            checkRef(ref);
-            fileImports.push_back(Param(name, ref));
+            checkHash(ref);
+            fileImports[name] = ref;
         } else if (op == ":")
-            arguments.push_back(Param(name, ref));
+            arguments[name] = ref;
         else throw Error("invalid operator " + op);
     }
 }
@@ -226,20 +249,9 @@ typedef map<string, string> Environment;
 
 void fetchDeps(string hash, Environment & env)
 {
-    string pkgfile;
-
-    if (!queryDB(dbRefs, hash, pkgfile))
-        throw Error("unknown package " + hash);
-
-    cerr << "reading information about " + hash + " from " + pkgfile + "\n";
-
-    /* Verify that the file hasn't changed. !!! race */
-    if (makeRef(pkgfile) != hash)
-        throw Error("file " + pkgfile + " is stale");
-
     /* Read the package description file. */
     Params pkgImports, fileImports, arguments;
-    readPkgDescr(pkgfile, pkgImports, fileImports, arguments);
+    readPkgDescr(hash, pkgImports, fileImports, arguments);
 
     /* Recursively fetch all the dependencies, filling in the
        environment as we go along. */
@@ -264,7 +276,7 @@ void fetchDeps(string hash, Environment & env)
         if (!queryDB(dbRefs, it->second, file))
             throw Error("unknown file " + it->second);
 
-        if (makeRef(file) != it->second)
+        if (hashFile(file) != it->second)
             throw Error("file " + file + " is stale");
 
         env[it->first] = file;
@@ -374,7 +386,7 @@ void installPkg(string hash)
 string getPkg(string hash)
 {
     string path;
-    checkRef(hash);
+    checkHash(hash);
     while (!queryDB(dbInstPkgs, hash, path))
         installPkg(hash);
     return path;
@@ -434,6 +446,20 @@ void runPkg(string hash)
 }
 
 
+void ensurePkg(string hash)
+{
+    Params pkgImports, fileImports, arguments;
+    readPkgDescr(hash, pkgImports, fileImports, arguments);
+
+    if (fileImports.find("build") != fileImports.end())
+        getPkg(hash);
+    else if (fileImports.find("run") != fileImports.end()) {
+        Environment env;
+        fetchDeps(hash, env);
+    } else throw Error("invalid descriptor");
+}
+
+
 string absPath(string filename)
 {
     if (filename[0] != '/') {
@@ -450,14 +476,14 @@ string absPath(string filename)
 void registerFile(string filename)
 {
     filename = absPath(filename);
-    setDB(dbRefs, makeRef(filename), filename);
+    setDB(dbRefs, hashFile(filename), filename);
 }
 
 
 /* This is primarily used for bootstrapping. */
 void registerInstalledPkg(string hash, string path)
 {
-    checkRef(hash);
+    checkHash(hash);
     if (path == "")
         delDB(dbInstPkgs, hash);
     else
@@ -483,8 +509,10 @@ void verifyDB()
          it != fileRefs.end(); it++)
     {
         try {
-            if (makeRef(it->second) != it->first)
+            if (hashFile(it->second) != it->first) {
+                cerr << "file " << it->second << " has changed\n";
                 delDB(dbRefs, it->first);
+            }
         } catch (BadRefError e) { /* !!! better error check */ 
             cerr << "file " << it->second << " has disappeared\n";
             delDB(dbRefs, it->first);
@@ -519,48 +547,136 @@ void listInstalledPkgs()
 
     for (DBPairs::iterator it = instPkgs.begin();
          it != instPkgs.end(); it++)
+        cout << it->first << endl;
+}
+
+
+void printInfo(vector<string> hashes)
+{
+    for (vector<string>::iterator it = hashes.begin();
+         it != hashes.end(); it++)
     {
-        string descr;
-        if (!queryDB(dbRefs, it->first, descr))
-            descr = "descriptor missing";
-        cout << it->first << " " << descr << endl;
+        try {
+            Params pkgImports, fileImports, arguments;
+            readPkgDescr(*it, pkgImports, fileImports, arguments);
+            cout << *it << " " << getFromEnv(arguments, "id") << endl;
+        } catch (Error & e) {
+            cout << *it << " (descriptor missing)\n";
+        }
     }
 }
 
 
-void run(int argc, char * * argv)
+void computeClosure(const vector<string> & rootHashes, 
+    set<string> & result)
+{
+    list<string> workList(rootHashes.begin(), rootHashes.end());
+    set<string> doneSet;
+
+    while (!workList.empty()) {
+        string hash = workList.front();
+        workList.pop_front();
+        
+        if (doneSet.find(hash) == doneSet.end()) {
+            doneSet.insert(hash);
+    
+            Params pkgImports, fileImports, arguments;
+            readPkgDescr(hash, pkgImports, fileImports, arguments);
+
+            for (Params::iterator it = pkgImports.begin();
+                 it != pkgImports.end(); it++)
+                workList.push_back(it->second);
+        }
+    }
+
+    result = doneSet;
+}
+
+
+void printClosure(const vector<string> & rootHashes)
+{
+    set<string> allHashes;
+    computeClosure(rootHashes, allHashes);
+    for (set<string>::iterator it = allHashes.begin();
+         it != allHashes.end(); it++)
+        cout << *it << endl;
+}
+
+
+string dotQuote(const string & s)
+{
+    return "\"" + s + "\"";
+}
+
+
+void printGraph(vector<string> rootHashes)
+{
+    set<string> allHashes;
+    computeClosure(rootHashes, allHashes);
+
+    cout << "digraph G {\n";
+
+    for (set<string>::iterator it = allHashes.begin();
+         it != allHashes.end(); it++)
+    {
+        Params pkgImports, fileImports, arguments;
+        readPkgDescr(*it, pkgImports, fileImports, arguments);
+
+        cout << dotQuote(*it) << "[label = \"" 
+             << getFromEnv(arguments, "id")
+             << "\"];\n";
+
+        for (Params::iterator it2 = pkgImports.begin();
+             it2 != pkgImports.end(); it2++)
+            cout << dotQuote(it2->second) << " -> " 
+                 << dotQuote(*it) << ";\n";
+    }
+
+    cout << "}\n";
+}
+
+
+void run(vector<string> args)
 {
     UsageError argcError("wrong number of arguments");
     string cmd;
 
-    if (argc < 1)
-        throw UsageError("no command specified");
-
-    cmd = argv[0];
-    argc--, argv++;
+    if (args.size() < 1) throw UsageError("no command specified");
+    
+    cmd = args[0];
+    args.erase(args.begin()); // O(n)
 
     if (cmd == "init") {
-        if (argc != 0) throw argcError;
+        if (args.size() != 0) throw argcError;
         initDB();
     } else if (cmd == "verify") {
-        if (argc != 0) throw argcError;
+        if (args.size() != 0) throw argcError;
         verifyDB();
     } else if (cmd == "getpkg") {
-        if (argc != 1) throw argcError;
-        string path = getPkg(argv[0]);
+        if (args.size() != 1) throw argcError;
+        string path = getPkg(args[0]);
         cout << path << endl;
     } else if (cmd == "run") {
-        if (argc != 1) throw argcError;
-        runPkg(argv[0]);
+        if (args.size() != 1) throw argcError;
+        runPkg(args[0]);
+    } else if (cmd == "ensure") {
+        if (args.size() != 1) throw argcError;
+        ensurePkg(args[0]);
     } else if (cmd == "regfile") {
-        if (argc != 1) throw argcError;
-        registerFile(argv[0]);
+        if (args.size() != 1) throw argcError;
+        registerFile(args[0]);
     } else if (cmd == "reginst") {
-        if (argc != 2) throw argcError;
-        registerInstalledPkg(argv[0], argv[1]);
+        if (args.size() != 2) throw argcError;
+        registerInstalledPkg(args[0], args[1]);
     } else if (cmd == "listinst") {
-        if (argc != 0) throw argcError;
+        if (args.size() != 0) throw argcError;
         listInstalledPkgs();
+    } else if (cmd == "info") {
+        printInfo(args);
+    } else if (cmd == "closure") {
+        printClosure(args);
+    } else if (cmd == "graph") {
+        printGraph(args);
     } else
         throw UsageError("unknown command: " + string(cmd));
 }
@@ -594,6 +710,20 @@ Subcommands:
 
   run HASH
     Run the descriptor referenced by HASH.
+
+  ensure HASH
+    Like getpkg, but if HASH refers to a run descriptor, fetch only
+    the dependencies.
+
+  info HASH...
+    Print information about the specified descriptors.
+
+  closure HASH...
+    Determine the closure of the set of descriptors under the import
+    relation, starting at the given roots.
+
+  graph HASH...
+    Like closure, but print a dot graph specification.
 ";
 }
 
@@ -630,11 +760,13 @@ void main2(int argc, char * * argv)
         }
     }
 
-    argc -= optind, argv += optind;
-    run(argc, argv);
+    vector<string> args;
+    argc--, argv++;
+    while (argc--) args.push_back(*argv++);
+    run(args);
 }
 
-    
+
 int main(int argc, char * * argv)
 {
     prog = argv[0];

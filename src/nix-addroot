@@ -1,0 +1,18 @@
+#! /bin/sh
+
+ROOTLIST=~/.nixroots
+
+if ! test -f $ROOTLIST; then
+    touch $ROOTLIST
+fi
+
+for i in $*; do
+    if nix ensure $i > /dev/null; then
+	if grep -q $i $ROOTLIST; then
+	    echo $i already is a root
+        else
+            echo adding root $i
+	    echo $i >> $ROOTLIST
+	fi
+    fi
+done
