@@ -37,7 +37,8 @@ Upgrade flags:
 Query types:
 
   --name: print derivation names (default)
-  --expr: print derivation store expression
+  --drv-path: print path of derivation
+  --out-path: print path of derivation output
   --status / -s: print installed/present status
 
 Query sources:

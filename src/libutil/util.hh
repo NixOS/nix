@@ -112,6 +112,14 @@ Path createTempDir();
    not already exist. */
 void writeStringToFile(const Path & path, const string & s);
 
+template<class T, class A>
+T singleton(const A & a)
+{
+    T t;
+    t.insert(a);
+    return t;
+}
+
 
 /* Messages. */
 

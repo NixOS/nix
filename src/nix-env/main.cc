@@ -12,14 +12,31 @@
 #include <ctime>
 
 
+typedef enum {
+    srcNixExprDrvs,
+    srcNixExprs,
+    srcStorePaths,
+    srcProfile,
+    srcUnknown
+} InstallSourceType;
+
+
+struct InstallSourceInfo
+{
+    InstallSourceType type;
+    Path nixExprPath; /* for srcNixExprDrvs, srcNixExprs */
+    Path profile; /* for srcProfile */
+    string systemFilter; /* for srcNixExprDrvs */
+};
+
+
 struct Globals
 {
+    InstallSourceInfo instSource;
     Path profile;
-    Path nixExprPath;
     EvalState state;
     bool dryRun;
     bool preserveInstalled;
-    string systemFilter;
 };
 
 
@@ -64,8 +81,7 @@ bool parseDerivation(EvalState & state, Expr e, DrvInfo & drv)
         drv.system = evalString(state, a);
 
     a = queryAttr(e, "drvPath");
-    if (!a) throw badTerm("derivation path missing", e);
-    drv.drvPath = evalPath(state, a);
+    if (a) drv.drvPath = evalPath(state, a);
 
     a = queryAttr(e, "outPath");
     if (!a) throw badTerm("output path missing", e);
@@ -83,7 +99,7 @@ bool parseDerivations(EvalState & state, Expr e, DrvInfos & drvs)
     e = evalExpr(state, e);
 
     if (parseDerivation(state, e, drv)) 
-        drvs[drv.drvPath] = drv;
+        drvs[drv.outPath] = drv;
 
     else if (matchAttrs(e, es)) {
         ATermMap drvMap;
@@ -91,7 +107,7 @@ bool parseDerivations(EvalState & state, Expr e, DrvInfos & drvs)
         for (ATermIterator i(drvMap.keys()); i; ++i) {
             debug(format("evaluating attribute `%1%'") % *i);
             if (parseDerivation(state, drvMap.get(*i), drv))
-                drvs[drv.drvPath] = drv;
+                drvs[drv.outPath] = drv;
             else
                 parseDerivations(state, drvMap.get(*i), drvs);
         }
@@ -101,7 +117,7 @@ bool parseDerivations(EvalState & state, Expr e, DrvInfos & drvs)
         for (ATermIterator i(es); i; ++i) {
             debug(format("evaluating list element"));
             if (parseDerivation(state, *i, drv))
-                drvs[drv.drvPath] = drv;
+                drvs[drv.outPath] = drv;
             else
                 parseDerivations(state, *i, drvs);
         }
@@ -111,10 +127,10 @@ bool parseDerivations(EvalState & state, Expr e, DrvInfos & drvs)
 }
 
 
-void loadDerivations(EvalState & state, Path nePath, DrvInfos & drvs,
-    string systemFilter)
+static void loadDerivations(EvalState & state, Path nixExprPath,
+    string systemFilter, DrvInfos & drvs)
 {
-    Expr e = parseExprFromFile(state, absPath(nePath));
+    Expr e = parseExprFromFile(state, absPath(nixExprPath));
     if (!parseDerivations(state, e, drvs))
         throw Error("set of derivations expected");
 
@@ -124,6 +140,18 @@ void loadDerivations(EvalState & state, Path nePath, DrvInfos & drvs,
         j = i; j++;
         if (systemFilter != "*" && i->second.system != systemFilter)
             drvs.erase(i);
+    }
+}
+
+
+static void queryInstSources(EvalState & state,
+    const InstallSourceInfo & instSource, DrvInfos & drvs)
+{
+    switch (instSource.type) {
+        case srcUnknown:
+            loadDerivations(state, instSource.nixExprPath,
+                instSource.systemFilter, drvs);
+            break;
     }
 }
 
@@ -177,43 +205,62 @@ void queryInstalled(EvalState & state, DrvInfos & drvs,
 void createUserEnv(EvalState & state, const DrvInfos & drvs,
     const Path & profile)
 {
+    /* Build the components in the user environment, if they don't
+       exist already. */
+    PathSet drvsToBuild;
+    for (DrvInfos::const_iterator i = drvs.begin(); 
+         i != drvs.end(); ++i)
+        if (i->second.drvPath != "")
+            drvsToBuild.insert(i->second.drvPath);
+
+    debug(format("building user environment dependencies"));
+    buildDerivations(drvsToBuild);
+
     /* Get the environment builder expression. */
     Expr envBuilder = parseExprFromFile(state,
         nixDataDir + "/nix/corepkgs/buildenv"); /* !!! */
 
     /* Construct the whole top level derivation. */
+    PathSet references;
+    ATermList manifest = ATempty;
     ATermList inputs = ATempty;
     for (DrvInfos::const_iterator i = drvs.begin(); 
          i != drvs.end(); ++i)
     {
-        ATerm t = makeAttrs(ATmakeList5(
+        ATerm t = makeAttrs(ATmakeList4(
             makeBind(toATerm("type"),
                 makeStr(toATerm("derivation")), makeNoPos()),
             makeBind(toATerm("name"),
                 makeStr(toATerm(i->second.name)), makeNoPos()),
             makeBind(toATerm("system"),
                 makeStr(toATerm(i->second.system)), makeNoPos()),
-            makeBind(toATerm("drvPath"),
-                makePath(toATerm(i->second.drvPath)), makeNoPos()),
             makeBind(toATerm("outPath"),
                 makePath(toATerm(i->second.outPath)), makeNoPos())
             ));
-        inputs = ATinsert(inputs, t);
+        manifest = ATinsert(manifest, t);
+        inputs = ATinsert(inputs, makeStr(toATerm(i->second.outPath)));
+        references.insert(i->second.outPath);
     }
-
-    ATerm inputs2 = makeList(ATreverse(inputs));
 
     /* Also write a copy of the list of inputs to the store; we need
        it for future modifications of the environment. */
-    Path inputsFile = addTextToStore("env-inputs", atPrint(inputs2),
-        PathSet() /* !!! incorrect */);
+    Path manifestFile = addTextToStore("env-manifest",
+        atPrint(makeList(ATreverse(manifest))), references);
+
+    printMsg(lvlError, format("manifest is %1%") % manifestFile);
 
     Expr topLevel = makeCall(envBuilder, makeAttrs(ATmakeList3(
         makeBind(toATerm("system"),
             makeStr(toATerm(thisSystem)), makeNoPos()),
-        makeBind(toATerm("derivations"), inputs2, makeNoPos()),
+        makeBind(toATerm("derivations"),
+            makeList(ATreverse(inputs)), makeNoPos()),
         makeBind(toATerm("manifest"),
-            makePath(toATerm(inputsFile)), makeNoPos())
+            makeAttrs(ATmakeList2(
+                makeBind(toATerm("type"),
+                    makeStr(toATerm("storePath")), makeNoPos()),
+                makeBind(toATerm("outPath"),
+                    makePath(toATerm(manifestFile)), makeNoPos())
+                )), makeNoPos())
         )));
 
     /* Instantiate it. */
@@ -224,9 +271,7 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
     
     /* Realise the resulting store expression. */
     debug(format("building user environment"));
-    PathSet drvPaths;
-    drvPaths.insert(topLevelDrv.drvPath);
-    buildDerivations(drvPaths);
+    buildDerivations(singleton<PathSet>(topLevelDrv.drvPath));
 
     /* Switch the current user environment to the output path. */
     debug(format("switching to new user environment"));
@@ -237,14 +282,14 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
 
 
 static void installDerivations(EvalState & state,
-    Path nePath, DrvNames & selectors, const Path & profile,
-    bool dryRun, bool preserveInstalled, string systemFilter)
+    const InstallSourceInfo & instSource, DrvNames & selectors,
+    const Path & profile, bool dryRun, bool preserveInstalled)
 {
-    debug(format("installing derivations from `%1%'") % nePath);
+    debug(format("installing derivations"));
 
     /* Fetch all derivations from the input file. */
     DrvInfos availDrvs;
-    loadDerivations(state, nePath, availDrvs, systemFilter);
+    queryInstSources(state, instSource, availDrvs);
 
     /* Filter out the ones we're not interested in. */
     DrvInfos selectedDrvs;
@@ -303,9 +348,9 @@ static void opInstall(Globals & globals,
 
     DrvNames drvNames = drvNamesFromArgs(opArgs);
     
-    installDerivations(globals.state, globals.nixExprPath,
+    installDerivations(globals.state, globals.instSource,
         drvNames, globals.profile, globals.dryRun,
-        globals.preserveInstalled, globals.systemFilter);
+        globals.preserveInstalled);
 }
 
 
@@ -313,10 +358,10 @@ typedef enum { utLt, utLeq, utAlways } UpgradeType;
 
 
 static void upgradeDerivations(EvalState & state,
-    Path nePath, DrvNames & selectors, const Path & profile,
-    UpgradeType upgradeType, bool dryRun, string systemFilter)
+    const InstallSourceInfo & instSource, DrvNames & selectors, const Path & profile,
+    UpgradeType upgradeType, bool dryRun)
 {
-    debug(format("upgrading derivations from `%1%'") % nePath);
+    debug(format("upgrading derivations"));
 
     /* Upgrade works as follows: we take all currently installed
        derivations, and for any derivation matching any selector, look
@@ -329,7 +374,7 @@ static void upgradeDerivations(EvalState & state,
 
     /* Fetch all derivations from the input file. */
     DrvInfos availDrvs;
-    loadDerivations(state, nePath, availDrvs, systemFilter);
+    // xxx    loadDerivations(state, nePath, availDrvs, systemFilter);
 
     /* Go through all installed derivations. */
     DrvInfos newDrvs;
@@ -414,9 +459,8 @@ static void opUpgrade(Globals & globals,
 
     DrvNames drvNames = drvNamesFromArgs(opArgs);
     
-    upgradeDerivations(globals.state, globals.nixExprPath,
-        drvNames, globals.profile, upgradeType, globals.dryRun,
-        globals.systemFilter);
+    upgradeDerivations(globals.state, globals.instSource,
+        drvNames, globals.profile, upgradeType, globals.dryRun);
 }
 
 
@@ -511,6 +555,7 @@ static void opQuery(Globals & globals,
     bool printName = true;
     bool printSystem = false;
     bool printDrvPath = false;
+    bool printOutPath = false;
 
     enum { sInstalled, sAvailable } source = sInstalled;
 
@@ -521,7 +566,8 @@ static void opQuery(Globals & globals,
         if (*i == "--status" || *i == "-s") printStatus = true;
         else if (*i == "--no-name") printName = false;
         else if (*i == "--system") printSystem = true;
-        else if (*i == "--expr") printDrvPath = true;
+        else if (*i == "--drv-path") printDrvPath = true;
+        else if (*i == "--out-path") printOutPath = true;
         else if (*i == "--installed") source = sInstalled;
         else if (*i == "--available" || *i == "-a") source = sAvailable;
         else throw UsageError(format("unknown flag `%1%'") % *i);
@@ -536,8 +582,8 @@ static void opQuery(Globals & globals,
             break;
 
         case sAvailable: {
-            loadDerivations(globals.state, globals.nixExprPath,
-                drvs, globals.systemFilter);
+            loadDerivations(globals.state, globals.instSource.nixExprPath,
+                globals.instSource.systemFilter, drvs);
             break;
         }
 
@@ -554,16 +600,10 @@ static void opQuery(Globals & globals,
 
     /* We only need to know the installed paths when we are querying
        the status of the derivation. */
-    PathSet installedPaths; /* output paths of installed drvs */
+    DrvInfos installed; /* installed paths */
     
-    if (printStatus) {
-        DrvInfos installed;
+    if (printStatus)
         queryInstalled(globals.state, installed, globals.profile);
-        
-        for (DrvInfos::iterator i = installed.begin();
-             i != installed.end(); ++i)
-            installedPaths.insert(i->second.outPath);
-    }
             
     /* Print the desired columns. */
     Table table;
@@ -575,8 +615,8 @@ static void opQuery(Globals & globals,
         if (printStatus) {
             Substitutes subs = querySubstitutes(noTxn, i->drvPath);
             columns.push_back(
-                (string) (installedPaths.find(i->outPath)
-                    != installedPaths.end() ? "I" : "-")
+                (string) (installed.find(i->outPath)
+                    != installed.end() ? "I" : "-")
                 + (isValidPath(i->outPath) ? "P" : "-")
                 + (subs.size() > 0 ? "S" : "-"));
         }
@@ -585,7 +625,9 @@ static void opQuery(Globals & globals,
 
         if (printSystem) columns.push_back(i->system);
 
-        if (printDrvPath) columns.push_back(i->drvPath);
+        if (printDrvPath) columns.push_back(i->drvPath == "" ? "-" : i->drvPath);
+        
+        if (printOutPath) columns.push_back(i->outPath);
 
         table.push_back(columns);
     }
@@ -756,10 +798,12 @@ void run(Strings args)
     Operation op = 0;
     
     Globals globals;
-    globals.nixExprPath = getDefNixExprPath();
+    globals.instSource.type = srcUnknown;
+    globals.instSource.nixExprPath = getDefNixExprPath();
+    globals.instSource.systemFilter = thisSystem;
+    
     globals.dryRun = false;
     globals.preserveInstalled = false;
-    globals.systemFilter = thisSystem;
 
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
         string arg = *i;
@@ -786,7 +830,7 @@ void run(Strings args)
             ++i;
             if (i == args.end()) throw UsageError(
                 format("`%1%' requires an argument") % arg);
-            globals.nixExprPath = absPath(*i);
+            globals.instSource.nixExprPath = absPath(*i);
         }
         else if (arg == "--switch-profile" || arg == "-S")
             op = opSwitchProfile;
@@ -808,7 +852,7 @@ void run(Strings args)
             ++i;
             if (i == args.end()) throw UsageError(
                 format("`%1%' requires an argument") % arg);
-            globals.systemFilter = *i;
+            globals.instSource.systemFilter = *i;
         }
         else if (arg[0] == '-')
             opFlags.push_back(arg);

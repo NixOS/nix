@@ -94,6 +94,7 @@ static void processBinding(EvalState & state, Expr e, Derivation & drv,
 
     else if (matchAttrs(e, es)) {
         Expr a = queryAttr(e, "type");
+        
         if (a && evalString(state, a) == "derivation") {
             a = queryAttr(e, "drvPath");
             if (!a) throw Error("derivation name missing");
@@ -104,12 +105,22 @@ static void processBinding(EvalState & state, Expr e, Derivation & drv,
             /* !!! supports only single output path */
             Path outPath = evalPath(state, a);
 
-            StringSet ids;
-            ids.insert("out");
-            drv.inputDrvs[drvPath] = ids;
+            drv.inputDrvs[drvPath] = singleton<StringSet>("out");
             ss.push_back(outPath);
-        } else
-            throw Error("invalid derivation attribute");
+        }
+
+        else if (a && evalString(state, a) == "storePath") {
+
+            a = queryAttr(e, "outPath");
+            if (!a) throw Error("output path missing");
+            /* !!! supports only single output path */
+            Path outPath = evalPath(state, a);
+
+            drv.inputSrcs.insert(outPath);
+            ss.push_back(outPath);
+        }
+
+        else throw Error("invalid derivation attribute");
     }
 
     else if (matchPath(e, s)) {

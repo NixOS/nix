@@ -65,7 +65,7 @@ static void makeNames(const Path & profile, unsigned int num,
     Path & outLink, Path & drvLink)
 {
     Path prefix = (format("%1%-%2%") % profile % num).str();
-    outLink = prefix + "-output";
+    outLink = prefix + "-link";
     drvLink = prefix + "-drv";
 }
 
