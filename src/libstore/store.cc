@@ -546,7 +546,8 @@ void deleteFromStore(const Path & _path)
     assertStorePath(path);
 
     Transaction txn(nixDB);
-    invalidatePath(path, txn);
+    if (isValidPathTxn(txn, path))
+        invalidatePath(path, txn);
     txn.commit();
 
     deletePath(path);
