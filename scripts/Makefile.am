@@ -1,5 +1,6 @@
 bin_SCRIPTS = nix-collect-garbage \
- nix-pull nix-push nix-prefetch-url
+ nix-pull nix-push nix-prefetch-url \
+ nix-install-package
 
 noinst_SCRIPTS = nix-profile.sh
 
@@ -12,8 +13,8 @@ install-exec-local:
 
 include ../substitute.mk
 
-EXTRA_DIST = nix-switch.in nix-collect-garbage.in \
+EXTRA_DIST = nix-collect-garbage.in \
  nix-pull.in nix-push.in nix-profile.sh.in \
- nix-prefetch-url.in \
+ nix-prefetch-url.in nix-install-package.in \
  prebuilts.conf
 

@@ -1,0 +1,37 @@
+#! /usr/bin/perl -w
+
+use strict;
+use POSIX qw(tmpnam);
+
+my $pkgfile = $ARGV[0];
+die unless defined $pkgfile;
+
+my $tmpdir;
+do { $tmpdir = tmpnam(); }
+until mkdir $tmpdir, 0777;
+
+# !!! remove tmpdir on exit
+
+print "unpacking $pkgfile in $tmpdir...\n";
+system "bunzip2 < $pkgfile | (cd $tmpdir && tar xf -)";
+die if $?;
+
+print "this package contains the following derivations:\n";
+system "nix-env -qsf $tmpdir/default.nix";
+die if $?;
+
+print "do you wish to install them (y/n)? ";
+my $reply = <STDIN>;
+chomp $reply;
+exit if (!($reply eq "y"));
+
+print "pulling caches...\n";
+system "nix-pull `cat $tmpdir/caches`";
+die if $?;
+
+print "installing package...\n";
+system "nix-env -i $tmpdir/default.nix '*'";
+die if $?;
+
+print "installing succeeded! (enter to continue)\n";
+<STDIN>;

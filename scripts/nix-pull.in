@@ -19,86 +19,98 @@ my @sucs;
 
 my $fullexpr = "[";
 
-open CONFFILE, "<$conffile";
 
-while (<CONFFILE>) {
+sub processURL {
+    my $url = shift;
+    $url =~ s/\/$//;
+    print "obtaining list of Nix archives at $url...\n";
 
-    chomp;
-    if (/^\s*(\S+)\s*(\#.*)?$/) {
-        my $url = $1;
-        $url =~ s/\/$//;
-
-        print "obtaining list of Nix archives at $url...\n";
-
-        system "wget --cache=off '$url'/MANIFEST -O '$manifest' 2> /dev/null"; # !!! escape
-        if ($?) { die "`wget' failed"; }
+    system "wget --cache=off '$url'/MANIFEST -O '$manifest' 2> /dev/null"; # !!! escape
+    if ($?) { die "`wget' failed"; }
         
-        open MANIFEST, "<$manifest";
+    open MANIFEST, "<$manifest";
 
-        my $inside = 0;
+    my $inside = 0;
 
-        my $storepath;
-        my $narname;
-        my $hash;
-        my @preds;
+    my $storepath;
+    my $narname;
+    my $hash;
+    my @preds;
 
-        while (<MANIFEST>) {
-            chomp;
-            s/\#.*$//g;
-            next if (/^$/);
+    while (<MANIFEST>) {
+        chomp;
+        s/\#.*$//g;
+        next if (/^$/);
 
-            if (!$inside) {
-                if (/^\{$/) { 
-                    $inside = 1;
-                    undef $storepath;
-                    undef $narname;
-                    undef $hash;
-                    @preds = ();
+        if (!$inside) {
+            if (/^\{$/) { 
+                $inside = 1;
+                undef $storepath;
+                undef $narname;
+                undef $hash;
+                @preds = ();
                 }
-                else { die "bad line: $_"; }
-            } else {
-                if (/^\}$/) {
-                    $inside = 0;
-                    my $fullurl = "$url/$narname";
-                    print "$storepath\n";
+            else { die "bad line: $_"; }
+        } else {
+            if (/^\}$/) {
+                $inside = 0;
+                my $fullurl = "$url/$narname";
+#                print "$storepath\n";
 
-                    # Construct a Nix expression that fetches and unpacks a
-                    # Nix archive from the network.
-                    my $fetch =
-                        "(import @datadir@/nix/corepkgs/fetchurl) " .
-                        "{url = $fullurl; md5 = \"$hash\"; system = \"@host@\"}";
-                    my $nixexpr =
-                        "((import @datadir@/nix/corepkgs/nar/unnar.nix) " .
-                        "{narFile = ($fetch); outPath = \"$storepath\"; system = \"@host@\"}) ";
-                    $fullexpr .= $nixexpr; # !!! O(n^2)?
+                # Construct a Nix expression that fetches and unpacks a
+                # Nix archive from the network.
+                my $fetch =
+                    "(import @datadir@/nix/corepkgs/fetchurl) " .
+                    "{url = $fullurl; md5 = \"$hash\"; system = \"@host@\"}";
+                my $nixexpr =
+                    "((import @datadir@/nix/corepkgs/nar/unnar.nix) " .
+                    "{narFile = ($fetch); outPath = \"$storepath\"; system = \"@host@\"}) ";
+                $fullexpr .= $nixexpr; # !!! O(n^2)?
 
-                    push @srcpaths, $storepath;
+                push @srcpaths, $storepath;
 
-                    foreach my $p (@preds) {
-                        push @sucs, $p;
-                        push @sucs, $storepath;
-                    }
+                foreach my $p (@preds) {
+                    push @sucs, $p;
+                    push @sucs, $storepath;
+                }
 
-                }
-                elsif (/^\s*StorePath:\s*(\/\S+)\s*$/) {
-                    $storepath = $1;
-                }
-                elsif (/^\s*NarName:\s*(\S+)\s*$/) {
-                    $narname = $1;
-                }
-                elsif (/^\s*MD5:\s*(\S+)\s*$/) {
-                    $hash = $1;
-                }
-                elsif (/^\s*SuccOf:\s*(\/\S+)\s*$/) {
-                    push @preds, $1;
-                }
-                else { die "bad line: $_"; }
             }
+            elsif (/^\s*StorePath:\s*(\/\S+)\s*$/) {
+                $storepath = $1;
+            }
+            elsif (/^\s*NarName:\s*(\S+)\s*$/) {
+                $narname = $1;
+                }
+            elsif (/^\s*MD5:\s*(\S+)\s*$/) {
+                $hash = $1;
+            }
+            elsif (/^\s*SuccOf:\s*(\/\S+)\s*$/) {
+                push @preds, $1;
+            }
+            else { die "bad line: $_"; }
         }
-
-        close MANIFEST;
     }
 
+    close MANIFEST;
+}
+
+
+# Obtain URLs either from the command line or from a configuration file.
+if (scalar @ARGV > 0) {
+    while (@ARGV) {
+        my $url = shift @ARGV;
+            processURL $url;
+    }
+} else {
+    open CONFFILE, "<$conffile";
+    while (<CONFFILE>) {
+        chomp;
+        if (/^\s*(\S+)\s*(\#.*)?$/) {
+            my $url = $1;
+            processURL $url;
+        }
+    }
+    close CONFFILE;
 }
 
 $fullexpr .= "]";
