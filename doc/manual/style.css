@@ -219,3 +219,8 @@ div.epigraph
     font-style: italic;
     text-align: right;
 }
+
+table.productionset table.productionset
+{
+    font-family: monospace;
+}
