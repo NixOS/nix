@@ -112,10 +112,16 @@ div.note,div.warning
     font-style: italic;
 }
 
-div.note h3,div.warning h3
+div.warning h3
 {
     color: red;
-    text-decoration: underline;
+    font-size: 100%;
+}
+
+div.note h3
+{
+    color: blue;
+    font-size: 100%;
 }
 
 div.navfooter *

@@ -5,51 +5,123 @@ has grown to 5, with more expected.</quote></para></epigraph>
 
 <para>Nix is a system for the deployment of software.  Software
 deployment is concerned with the creation, distribution, and
-management of software components (<quote>packages</quote>).  There
-are many tools for this, but they tend to ignore some important
-requirements for deployment:
+management of software components (<quote>packages</quote>).  Its main
+features are:
 
 <itemizedlist>
 
-<listitem><para><emphasis>Correctness</emphasis>.  The basic goal of
-software deployment is to transfer software from one machine (e.g.,
-the developer's, where it presumably works) to another machine (e.g.,
-the end user's).  The software should work exactly the same on the
-target machine as on the source machine.  But this in practice turns
-out to be rather difficult due to <emphasis>dependencies between
-components</emphasis> and <emphasis>interference between
-components</emphasis>.  If we deploy a component that depends on other
-components, then we should deploy those dependencies as well.  If they
-are missing on the target system, the component probably won't work.
-If they <emphasis>are</emphasis> present but are not the right
-version, the component might not work.  And if even if they are the
-right version, they may have been built with different flags or
-options, which can cause incompatibilities.  Interference occurs when
-components <quote>collide</quote> with each other in the file system.
-For instance, different versions of the same package tend to overwrite
-each other, so they cannot be installed at the same time.  But always
-picking the latest version might break components that only work with
-some older version.</para></listitem>
+<listitem><para>It makes sure that dependency specifications are
+complete.  In general in a deployment system you have to specify for
+each component what its dependencies are, but there are no guarantees
+that this specification is complete.  If you forget a dependency, then
+the component will build and work correctly on
+<emphasis>your</emphasis> machine if you have the dependency
+installed, but not on the end user's machine if it's not
+there.</para></listitem>
 
-<listitem><para><emphasis>Variability</emphasis>.  Many package
-management tools have difficulty supporting the installation of
-multiple versions or variants of the same component.  This is bad
-because as ...</para></listitem>
+<listitem><para>It is possible to have <emphasis>multiple versions or
+variants</emphasis> of a component installed at the same time.  In
+contrast, in systems such as RPM different versions of the same
+package tend to install to the same location in the file system, so
+you installing one version will remove the other.  This is especially
+important if you want to have use applications that have conflicting
+requirements on different versions of a component (e.g., application A
+requires version 1.0 of library X, while application B requires a
+non-backwards compatible version 1.1).</para></listitem>
+
+<listitem><para>Users can have different <quote>views</quote>
+(<quote>profiles</quote> in Nix parlance) on the set of installed
+applications in a system.  For instance, one user can have version 1.0
+of some package visible, while another is using version 1.1, and a
+third doesn't use it at all.</para></listitem>
+
+<listitem><para>It is possible to atomically
+<emphasis>upgrade</emphasis> software.  I.e., there is no time window
+during an upgrade in which part of the old version and part of the new
+version are simultaneously visible (which might well cause the
+component to fail).</para></listitem>
+
+<listitem><para>Likewise, it is possible to atomically roll-back after
+an install, upgrade, or uninstall action.  That is, in a fast (O(1))
+operation the previous configuration of the system will be
+restored.  This is because upgrade or uninstall actions doesn't
+actually remove components from the system.</para></listitem>
+
+<listitem><para>Unused components can be
+<emphasis>garbage-collected</emphasis> automatically and safely.
+I.e., when you remove an application from a profile, its dependencies
+will be deleted by the garbage collector if there are no other active
+applications that are using it.</para></listitem>
+
+<listitem><para>Nix supports both source-based deployment models
+(where you distribute <emphasis>Nix expressions</emphasis> that tell
+Nix how to build software from source) and binary-based deployment
+models.  The latter is more-or-less transparent: installation of
+components is always based on Nix expressions, but if those
+expressions have been built before and Nix knows that the resulting
+binaries are available somewhere, it will use those
+instead.</para></listitem>
+
+<listitem><para>Nix is flexible in the deployment policies that it
+supports.  There is a clear separation between the tools that
+implement basic Nix <emphasis>mechanisms</emphasis> (e.g., building
+Nix expressions), and the tools that implement various deployment
+<emphasis>policies</emphasis>.  For instance, there is a concept of
+<quote>Nix channels</quote> that can be used to keep software
+installations up-to-date automatically from a network source.  This is
+a policy that is implemented by a fairly short Perl script, which can
+be adapted easily to achieve similar policies.</para></listitem>
+
+<listitem><para>Nix component builds aim to be <quote>pure</quote>;
+that is, unaffected by anything other than the declared dependencies.
+This means that if a component was built succesfully once, it can be
+rebuilt again on another machine and the result will be the same.  We
+cannot <emphasis>guarantee</emphasis> this (e.g., if the build depends
+on the time-of-day), but Nix (and the tools in the Nix Packages
+collection) takes special measures to help achieve
+this.</para></listitem>
+
+<listitem><para>Nix expressions (the things that tell Nix how to build
+components) are self-contained: they describe not just components but
+complete compositions.  In other words, Nix expressions also describe
+how to build all the dependencies.  This is contrast to component
+specification languages like RPM spec files, which might say that a
+component X depends on some other component Y, but since it does not
+describe <emphasis>exactly</emphasis> what Y is, the result of
+building or running X might be different on different machines.
+Combined with purity, self-containedness ensures that a component that
+<quote>works</quote> on one machine also works on another, when
+deployed using Nix.</para></listitem>
+
+<listitem><para>The Nix expression language makes it easy to describe
+variability in components (e.g., optional features or
+dependencies).</para></listitem>
+
+<listitem><para>Nix is ideal for building build farms that do
+continuous builds of software from a version management system, since
+it can take care of building all the dependencies as well.  Also, Nix
+only rebuilds components that have changed, so there are no
+unnecessary builds.  In addition, Nix can transparently distribute
+build jobs over different machines, including different
+platforms.</para></listitem>
+
+<listitem><para>Nix can be used not only for software deployment, but
+also for <emphasis>service deployment</emphasis>, such as the
+deployment of a complete web server with all its configuration files,
+static pages, software dependencies, and so on.  Nix's advantages for
+software deployment also apply here, for instance, the ability
+trivially to have multiple configurations at the same time, or the
+ability to do roll-backs.</para></listitem>
 
 </itemizedlist>
 
 </para>
 
-<para>Here are some of Nix's main features:
-
-<itemizedlist>
-
-<listitem><para>Nix can quite reliably figure out the dependencies
-between components.</para></listitem>
-
-</itemizedlist>
-
-</para>
+<para>This manual tells you how to install and use Nix and how to
+write Nix expressions for software not already in the Nix Packages
+collection.  It also discusses some advanced topics, such as setting
+up a Nix-based build farm, and doing service deployment using
+Nix.</para>
 
 <warning><para>This manual is a work in progress.  It's quite likely
 to be incomplete, inconsistent with the current implementation, or
@@ -62,85 +134,10 @@ a Memory Management Discipline on Software
 Deployment</citetitle></ulink> discusses the hashing mechanism used to
 ensure reliable dependency identification and non-interference between
 different versions and variants of packages.  The LISA 2004 paper
-<citetitle>Nix: A Safe and Policy-Free System for Software
-Deployment</citetitle> gives a more general discussion of Nix from a
-system-administration perspective.</para></note>
-
-  <para>
-    Nix solves some large problems that exist in most current deployment and
-    package management systems.  <emphasis>Dependency determination</emphasis>
-    is a big one: the correct installation of a software component requires
-    that all dependencies of that component (i.e., other components used by it)
-    are also installed.  Most systems have no way to verify that the specified
-    dependencies of a component are actually sufficient.
-  </para>
-
-  <para>
-    Another big problem is the lack of support for concurrent availability of
-    multiple <emphasis>variants</emphasis> of a component.  It must be possible
-    to have several versions of a component installed at the same time, or
-    several instances of the same version built with different parameters.
-    Unfortunately, components are in general not properly isolated from each
-    other.  For instance, upgrading a component that is a dependency for some
-    other component might break the latter.
-  </para>
-
-  <para>
-    Nix solves these problems by building and storing packages in paths that
-    are infeasible to predict in advance.  For example, the artifacts of a
-    package <literal>X</literal> might be stored in
-    <filename>/nix/store/d58a0606ed616820de291d594602665d-X</filename>, rather
-    than in, say, <filename>/usr/lib</filename>.  The path component
-    <filename>d58a...</filename> is actually a cryptographic hash of all the
-    inputs (i.e., sources, requisites, and build flags) used in building
-    <literal>X</literal>, and as such is very fragile: any change to the inputs
-    will change the hash.  Therefore it is not sensible to
-    <emphasis>hard-code</emphasis> such a path into the build scripts of a
-    package <literal>Y</literal> that uses <literal>X</literal> (as does happen
-    with <quote>fixed</quote> paths such as <filename>/usr/lib</filename>).
-    Rather, the build script of package <literal>Y</literal> is parameterised
-    with the actual location of <literal>X</literal>, which is supplied by the
-    Nix system.
-  </para>
-
-  <para>
-    As stated above, the path name of a file system object contain a
-    cryptographic hash of all inputs involved in building it.  A change to any
-    of the inputs will cause the hash to change--and by extension, the path
-    name.  These inputs include both sources (variation in time) and
-    configuration options (variation in space).  Therefore variants of the same
-    package don't clash---they can co-exist peacefully within the same file
-    system.
-  </para>
-
-  <para>
-    Other features:
-  </para>
-
-  <para>
-    <emphasis>Transparent source/binary deployment.</emphasis>
-  </para>
-
-  <para>
-    <emphasis>Unambiguous identification of configuration.</emphasis>
-  </para>
-
-  <para>
-    <emphasis>Automatic storage management.</emphasis>
-  </para>
-
-  <para>
-    <emphasis>Atomic upgrades and rollbacks.</emphasis>
-  </para>
-
-  <para>
-    <emphasis>Support for many simultaneous configurations.</emphasis>
-  </para>
-
-  <para>
-    <emphasis>Portability.</emphasis>  Nix is quite portable.  Contrary to
-    build systems like those in, e.g., Vesta and ClearCase, it does not rely on
-    operating system extensions.
-  </para>
+<ulink
+url='http://www.cs.uu.nl/~eelco/pubs/nspfssd-lisa2004-final.pdf'><citetitle>Nix:
+A Safe and Policy-Free System for Software
+Deployment</citetitle></ulink> gives a more general discussion of Nix
+from a system-administration perspective.</para></note>
 
 </chapter>
