@@ -87,6 +87,7 @@ Path toStorePath(const Path & path);
 void canonicalisePathMetaData(const Path & path);
 
 /* Checks whether a path is valid. */ 
+bool isValidPathTxn(const Transaction & txn, const Path & path);
 bool isValidPath(const Path & path);
 
 /* Queries the hash of a valid path. */ 

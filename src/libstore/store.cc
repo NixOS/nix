@@ -247,7 +247,7 @@ void canonicalisePathMetaData(const Path & path)
 }
 
 
-static bool isValidPathTxn(const Transaction & txn, const Path & path)
+bool isValidPathTxn(const Transaction & txn, const Path & path)
 {
     string s;
     return nixDB.queryString(txn, dbValidPaths, path, s);

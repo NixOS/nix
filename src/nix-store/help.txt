@@ -11,8 +11,8 @@ Operations:
 
   --substitute: register a substitute expression (dangerous!)
   --clear-substitutes: clear all substitutes
-  --validpath: register path validity (dangerous!)
-  --isvalid: check path validity
+  --register-validity: register path validity (dangerous!)
+  --check-validity: check path validity
 
   --dump: dump a path as a Nix archive
   --restore: restore a path from a Nix archive

@@ -355,8 +355,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 static void opSubstitute(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
-    if (!opArgs.empty())
-        throw UsageError("no arguments expected");
+    if (!opArgs.empty()) throw UsageError("no arguments expected");
 
     Transaction txn;
     createStoreTransaction(txn);
@@ -369,8 +368,7 @@ static void opSubstitute(Strings opFlags, Strings opArgs)
         if (cin.eof()) break;
         getline(cin, sub.deriver);
         getline(cin, sub.program);
-        string s;
-        int n;
+        string s; int n;
         getline(cin, s);
         if (!string2Int(s, n)) throw Error("number expected");
         while (n--) {
@@ -402,20 +400,38 @@ static void opClearSubstitutes(Strings opFlags, Strings opArgs)
 }
 
 
-static void opValidPath(Strings opFlags, Strings opArgs)
+static void opRegisterValidity(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
-    
+    if (!opArgs.empty()) throw UsageError("no arguments expected");
+
     Transaction txn;
     createStoreTransaction(txn);
-    for (Strings::iterator i = opArgs.begin();
-         i != opArgs.end(); ++i)
-        registerValidPath(txn, *i, hashPath(htSHA256, *i), PathSet(), "");
+
+    while (1) {
+        Path path;
+        Path deriver;
+        PathSet references;
+        getline(cin, path);
+        if (cin.eof()) break;
+        getline(cin, deriver);
+        string s; int n;
+        getline(cin, s);
+        if (!string2Int(s, n)) throw Error("number expected");
+        while (n--) {
+            getline(cin, s);
+            references.insert(s);
+        }
+        if (!cin || cin.eof()) throw Error("missing input");
+        if (!isValidPathTxn(txn, path))
+            registerValidPath(txn, path, hashPath(htSHA256, path), references, deriver);
+    }
+
     txn.commit();
 }
 
 
-static void opIsValid(Strings opFlags, Strings opArgs)
+static void opCheckValidity(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
@@ -545,10 +561,10 @@ void run(Strings args)
             op = opSubstitute;
         else if (arg == "--clear-substitutes")
             op = opClearSubstitutes;
-        else if (arg == "--validpath")
-            op = opValidPath;
-        else if (arg == "--isvalid")
-            op = opIsValid;
+        else if (arg == "--register-validity")
+            op = opRegisterValidity;
+        else if (arg == "--check-validity")
+            op = opCheckValidity;
         else if (arg == "--gc")
             op = opGC;
         else if (arg == "--dump")
