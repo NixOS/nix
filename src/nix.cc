@@ -393,7 +393,7 @@ string getPkg(string hash)
 }
 
 
-void runPkg(string hash)
+void runPkg(string hash, const vector<string> & args)
 {
     string src;
     string path;
@@ -424,8 +424,17 @@ void runPkg(string hash)
             putenv((char *) s->c_str());
         }
 
+        /* Create the list of arguments. */
+        const char * args2[env.size() + 2];
+        int i = 0;
+        args2[i++] = runner.c_str();
+        for (vector<string>::const_iterator it = args.begin();
+             it != args.end(); it++, i++)
+            args2[i] = it->c_str();
+        args2[i] = 0;
+
         /* Execute the runner.  This should not return. */
-        execl(runner.c_str(), runner.c_str(), 0);
+        execv(runner.c_str(), (char * *) args2);
 
         cout << strerror(errno) << endl;
 
@@ -657,8 +666,8 @@ void run(vector<string> args)
         string path = getPkg(args[0]);
         cout << path << endl;
     } else if (cmd == "run") {
-        if (args.size() != 1) throw argcError;
-        runPkg(args[0]);
+        if (args.size() < 1) throw argcError;
+        runPkg(args[0], vector<string>(args.begin() + 1, args.end()));
     } else if (cmd == "ensure") {
         if (args.size() != 1) throw argcError;
         ensurePkg(args[0]);
@@ -708,8 +717,8 @@ Subcommands:
   listinst
     Prints a list of installed packages.
 
-  run HASH
-    Run the descriptor referenced by HASH.
+  run HASH ARGS...
+    Run the descriptor referenced by HASH with the given arguments.
 
   ensure HASH
     Like getpkg, but if HASH refers to a run descriptor, fetch only
@@ -730,8 +739,6 @@ Subcommands:
 
 void main2(int argc, char * * argv)
 {
-    int c;
-
     umask(0022);
 
     if (getenv(PKGINFO_ENVVAR))
@@ -740,28 +747,23 @@ void main2(int argc, char * * argv)
     if (getenv(PKGHOME_ENVVAR))
         pkgHome = getenv(PKGHOME_ENVVAR);
 
-    opterr = 0;
-
-    while ((c = getopt(argc, argv, "hd:")) != EOF) {
-        
-        switch (c) {
-
-        case 'h':
+    /* Parse the global flags. */
+    while (argc) {
+        string arg(*argv);
+        cout << arg << endl;
+        if (arg == "-h" || arg == "--help") {
             printUsage();
             return;
-
-        case 'd':
+        } else if (arg == "-d") {
             dbfile = optarg;
-            break;
-
-        default:
-            throw UsageError("invalid option `" + string(1, optopt) + "'");
-            break;
-        }
+        } else if (arg[0] == '-') {
+            throw UsageError("invalid option `" + arg + "'");
+        } else break;
+        argv++, argc--;
     }
 
+    /* Put the remainder in a vector and pass it to run2(). */
     vector<string> args;
-    argc--, argv++;
     while (argc--) args.push_back(*argv++);
     run(args);
 }
@@ -769,7 +771,7 @@ void main2(int argc, char * * argv)
 
 int main(int argc, char * * argv)
 {
-    prog = argv[0];
+    prog = *argv++, argc--;
 
     try { 
         try {
