@@ -24,53 +24,25 @@ extern "C" {
 #include "md5.h"
 }
 
+#include "util.hh"
+
 using namespace std;
 
 
-#define PKGINFO_ENVVAR "NIX_DB"
-#define PKGINFO_PATH "/pkg/sys/var/pkginfo"
-
-#define PKGHOME_ENVVAR "NIX_PKGHOME"
-
-
+/* Database names. */
 static string dbRefs = "refs";
 static string dbInstPkgs = "pkginst";
 static string dbPrebuilts = "prebuilts";
 
 
-static string prog;
-static string dbfile = PKGINFO_PATH;
-
-
-static string pkgHome = "/pkg";
-
-
+/* The canonical system name, as returned by config.guess. */ 
 static string thisSystem = SYSTEM;
 
 
-class Error : public exception
-{
-    string err;
-public:
-    Error(string _err) { err = _err; }
-    ~Error() throw () { };
-    const char * what() const throw () { return err.c_str(); }
-};
-
-class UsageError : public Error
-{
-public:
-    UsageError(string _err) : Error(_err) { };
-};
-
-class BadRefError : public Error
-{
-public:
-    BadRefError(string _err) : Error(_err) { };
-};
-
-
-typedef vector<string> Strings;
+/* The prefix of the Nix installation, and the environment variable
+   that can be used to override the default. */
+static string nixHomeDir = "/nix";
+static string nixHomeDirEnvVar = "NIX";
 
 
 /* Wrapper classes that ensures that the database is closed upon
@@ -98,7 +70,7 @@ auto_ptr<Db2> openDB(const string & dbname, bool readonly)
 
     db = auto_ptr<Db2>(new Db2(0, 0));
 
-    db->open(dbfile.c_str(), dbname.c_str(),
+    db->open((nixHomeDir + "/var/nix/pkginfo.db").c_str(), dbname.c_str(),
         DB_HASH, readonly ? DB_RDONLY : DB_CREATE, 0666);
 
     return db;
@@ -336,7 +308,7 @@ void installPkg(string hash)
     string id = getFromEnv(env, "id");
 
     /* Construct a path for the installed package. */
-    path = pkgHome + "/" + id + "-" + hash;
+    path = nixHomeDir + "/pkg/" + id + "-" + hash;
 
     /* Create the path. */
     if (mkdir(path.c_str(), 0777))
@@ -767,11 +739,8 @@ void run(Strings::iterator argCur, Strings::iterator argEnd)
 {
     umask(0022);
 
-    if (getenv(PKGINFO_ENVVAR))
-        dbfile = getenv(PKGINFO_ENVVAR);
-
-    if (getenv(PKGHOME_ENVVAR))
-        pkgHome = getenv(PKGHOME_ENVVAR);
+    char * homeDir = getenv(nixHomeDirEnvVar.c_str());
+    if (homeDir) nixHomeDir = homeDir;
 
     /* Parse the global flags. */
     for ( ; argCur != argEnd; argCur++) {
@@ -779,8 +748,6 @@ void run(Strings::iterator argCur, Strings::iterator argEnd)
         if (arg == "-h" || arg == "--help") {
             printUsage();
             return;
-        } else if (arg == "-d") {
-            dbfile = optarg;
         } else if (arg[0] == '-') {
             throw UsageError("invalid option `" + arg + "'");
         } else break;
@@ -848,9 +815,9 @@ int main(int argc, char * * argv)
     while (argc--) args.push_back(*argv++);
     Strings::iterator argCur = args.begin(), argEnd = args.end();
 
-    prog = *argCur++;
+    argCur++;
 
-    try { 
+    try {
         try {
             run(argCur, argEnd);
         } catch (DbException e) {

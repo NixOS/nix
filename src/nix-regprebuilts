@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 
-my $dir = $ENV{"NIX"} . "/prebuilts";
+my $dir = $ARGV[0];
 
 foreach my $prebuilt (glob("$dir/*.tar.bz2")) {
 

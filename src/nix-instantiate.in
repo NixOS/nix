@@ -5,7 +5,7 @@ use FileHandle;
 use File::Spec;
 use Digest::MD5;
 
-my $system = "@SYSTEM@";
+my $system = "@host@";
 
 my $outdir = File::Spec->rel2abs($ARGV[0]);
 my $netdir = File::Spec->rel2abs($ARGV[1]);
