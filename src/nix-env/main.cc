@@ -91,7 +91,7 @@ static bool parseDerivation(EvalState & state, Expr e, UserEnvElem & elem)
 }
 
 
-static bool parseDerivations(EvalState & state, Expr e, UserEnvElems & elems)
+static void parseDerivations(EvalState & state, Expr e, UserEnvElems & elems)
 {
     ATermList es;
     UserEnvElem elem;
@@ -122,17 +122,14 @@ static bool parseDerivations(EvalState & state, Expr e, UserEnvElems & elems)
                 parseDerivations(state, *i, elems);
         }
     }
-
-    return true;
 }
 
 
 static void loadDerivations(EvalState & state, Path nixExprPath,
     string systemFilter, UserEnvElems & elems)
 {
-    Expr e = parseExprFromFile(state, absPath(nixExprPath));
-    if (!parseDerivations(state, e, elems))
-        throw Error("set of derivations expected");
+    parseDerivations(state,
+        parseExprFromFile(state, absPath(nixExprPath)), elems);
 
     /* Filter out all derivations not applicable to the current
        system. */
@@ -185,8 +182,7 @@ static void queryInstalled(EvalState & state, UserEnvElems & elems,
     AddPos addPos;
     e = bottomupRewrite(addPos, e);
 
-    if (!parseDerivations(state, e, elems))
-        throw badTerm(format("set of derivations expected in `%1%'") % path, e);
+    parseDerivations(state, e, elems);
 }
 
 
@@ -315,7 +311,25 @@ static void queryInstSources(EvalState & state,
             break;
         }
 
+        /* Get the available user environment elements from the Nix
+           expressions specified on the command line; these should be
+           functions that take the default Nix expression file as
+           argument, e.g., if the file is `./foo.nix', then the
+           argument `x: x.bar' is equivalent to `(x: x.bar)
+           (import ./foo.nix)' = `(import ./foo.nix).bar'. */
         case srcNixExprs:
+
+            Expr e1 = parseExprFromFile(state,
+                absPath(instSource.nixExprPath));
+
+            for (Strings::const_iterator i = args.begin();
+                 i != args.end(); ++i)
+            {
+                Expr e2 = parseExprFromString(state, *i, absPath("."));
+                Expr call = makeCall(e2, e1);
+                parseDerivations(state, call, elems);
+            }
+            
             break;
 
         case srcStorePaths:
