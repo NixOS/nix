@@ -96,7 +96,10 @@ static void opInstall(Strings opFlags, Strings opArgs)
 
     for (Strings::iterator it = opArgs.begin();
          it != opArgs.end(); it++)
-        realiseFState(termFromHash(argToHash(*it)));
+    {
+        StringSet paths;
+        realiseFState(termFromHash(argToHash(*it)), paths);
+    }
 }
 
 
@@ -160,8 +163,10 @@ static void opQuery(Strings opFlags, Strings opArgs)
             break;
 
         case qRefs: {
-            Strings refs = fstateRefs(realiseFState(termFromHash(hash)));
-            for (Strings::iterator j = refs.begin(); 
+            StringSet refs;
+            FState fs = ATmake("Include(<str>)", ((string) hash).c_str());
+            fstateRefs(realiseFState(fs, refs), refs);
+            for (StringSet::iterator j = refs.begin(); 
                  j != refs.end(); j++)
                 cout << format("%s\n") % *j;
             break;

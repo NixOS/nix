@@ -180,7 +180,7 @@ static Expr evalExpr(Expr e)
             SYSTEM, builder.c_str(), ins, out.c_str(), env);
 
         /* Write the resulting term into the Nix store directory. */
-        Hash eHash = writeTerm(e);
+        Hash eHash = writeTerm(e, "-d-" + name);
 
         return ATmake("Include(<str>)", ((string) eHash).c_str());
     }

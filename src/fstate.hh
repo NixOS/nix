@@ -1,6 +1,8 @@
 #ifndef __EVAL_H
 #define __EVAL_H
 
+#include <set>
+
 extern "C" {
 #include <aterm2.h>
 }
@@ -59,17 +61,19 @@ using namespace std;
 typedef ATerm FState;
 typedef ATerm Content;
 
+typedef set<string> StringSet;
+
 
 /* Realise an fstate expression in the file system.  This requires
    execution of all Derive() nodes. */
-FState realiseFState(FState fs);
+FState realiseFState(FState fs, StringSet & paths);
 
 /* Return the path of an fstate expression.  An empty string is
    returned if the term is not a valid fstate expression. (!!!) */
 string fstatePath(FState fs);
 
 /* Return the paths referenced by fstate expression. */
-Strings fstateRefs(FState fs);
+void fstateRefs(FState fs, StringSet & paths);
 
 /* Return a canonical textual representation of an expression. */
 string printTerm(ATerm t);
@@ -82,10 +86,10 @@ Error badTerm(const format & f, ATerm t);
 Hash hashTerm(ATerm t);
 
 /* Read an aterm from disk, given its hash. */
-ATerm termFromHash(const Hash & hash);
+ATerm termFromHash(const Hash & hash, string * p = 0);
 
 /* Write an aterm to the Nix store directory, and return its hash. */
-Hash writeTerm(ATerm t);
+Hash writeTerm(ATerm t, const string & suffix, string * p = 0);
 
 
 #endif /* !__EVAL_H */

@@ -1,5 +1,4 @@
 #include <map>
-#include <set>
 #include <iostream>
 
 #include <sys/types.h>
@@ -148,30 +147,50 @@ Hash hashTerm(ATerm t)
 }
 
 
-ATerm termFromHash(const Hash & hash)
+ATerm termFromHash(const Hash & hash, string * p)
 {
     string path = queryPathByHash(hash);
+    if (p) *p = path;
     ATerm t = ATreadFromNamedFile(path.c_str());
     if (!t) throw Error(format("cannot read aterm %1%") % path);
     return t;
 }
 
 
-Hash writeTerm(ATerm t)
+Hash writeTerm(ATerm t, const string & suffix, string * p)
 {
     string path = nixStore + "/tmp.nix"; /* !!! */
     if (!ATwriteToNamedTextFile(t, path.c_str()))
         throw Error(format("cannot write aterm %1%") % path);
     Hash hash = hashPath(path);
-    string path2 = canonPath(nixStore + "/" + (string) hash + ".nix");
+    string path2 = canonPath(nixStore + "/" + 
+        (string) hash + suffix + ".nix");
     if (rename(path.c_str(), path2.c_str()) == -1)
         throw SysError(format("renaming %1% to %2%") % path % path2);
     registerPath(path2, hash);
+    if (p) *p = path2;
     return hash;
 }
 
 
-static FState realise(FState fs)
+FState storeSuccessor(FState fs, FState sc, StringSet & paths)
+{
+    if (fs == sc) return sc;
+    
+    string path;
+    Hash fsHash = hashTerm(fs);
+    Hash scHash = writeTerm(sc, "-s-" + (string) fsHash, &path);
+    setDB(nixDB, dbSuccessors, fsHash, scHash);
+    paths.insert(path);
+
+#if 0
+    return ATmake("Include(<str>)", ((string) scHash).c_str());
+#endif
+    return sc;
+}
+
+
+static FState realise(FState fs, StringSet & paths)
 {
     char * s1, * s2, * s3;
     Content content;
@@ -183,7 +202,9 @@ static FState realise(FState fs)
         string fsHash, scHash;
         while (queryDB(nixDB, dbSuccessors, fsHash = hashTerm(fs), scHash)) {
             debug(format("successor %1% -> %2%") % (string) fsHash % scHash);
-            FState fs2 = termFromHash(parseHash(scHash));
+            string path;
+            FState fs2 = termFromHash(parseHash(scHash), &path);
+            paths.insert(path);
             if (fs == fs2) {
                 debug(format("successor cycle detected in %1%") % printTerm(fs));
                 break;
@@ -195,7 +216,10 @@ static FState realise(FState fs)
     /* Fall through. */
 
     if (ATmatch(fs, "Include(<str>)", &s1)) {
-        return realise(termFromHash(parseHash(s1)));
+        string path;
+        fs = termFromHash(parseHash(s1), &path);
+        paths.insert(path);
+        return realise(fs, paths);
     }
     
     else if (ATmatch(fs, "Path(<str>, <term>, [<list>])", &s1, &content, &refs)) {
@@ -210,7 +234,7 @@ static FState realise(FState fs)
         /* Realise referenced paths. */
         ATermList refs2 = ATempty;
         while (!ATisEmpty(refs)) {
-            refs2 = ATinsert(refs2, realise(ATgetFirst(refs)));
+            refs2 = ATinsert(refs2, realise(ATgetFirst(refs), paths));
             refs = ATgetNext(refs);
         }
         refs2 = ATreverse(refs2);
@@ -224,27 +248,26 @@ static FState realise(FState fs)
             path.c_str(), content, refs2);
 
         /* Register the normal form. */
-        if (fs != nf) {
-            Hash nfHash = writeTerm(nf);
-            setDB(nixDB, dbSuccessors, hashTerm(fs), nfHash);
-        }
-
+        nf = storeSuccessor(fs, nf, paths);
+        
         /* Perhaps the path already exists and has the right hash? */
         if (pathExists(path)) {
-            if (hash == hashPath(path)) {
-                debug(format("path %1% already has hash %2%")
+
+            if (hash != hashPath(path))
+                throw Error(format("path %1% exists, but does not have hash %2%")
                     % path % (string) hash);
-                return nf;
-            }
 
-            throw Error(format("path %1% exists, but does not have hash %2%")
+            debug(format("path %1% already has hash %2%")
                 % path % (string) hash);
+
+        } else {
+            
+            /* Do we know a path with that hash?  If so, copy it. */
+            string path2 = queryPathByHash(hash);
+            copyPath(path2, path);
+            
         }
-
-        /* Do we know a path with that hash?  If so, copy it. */
-        string path2 = queryPathByHash(hash);
-        copyPath(path2, path);
-
+        
         return nf;
     }
 
@@ -261,7 +284,7 @@ static FState realise(FState fs)
         /* Realise inputs. */
         ATermList ins2 = ATempty;
         while (!ATisEmpty(ins)) {
-            ins2 = ATinsert(ins2, realise(ATgetFirst(ins)));
+            ins2 = ATinsert(ins2, realise(ATgetFirst(ins), paths));
             ins = ATgetNext(ins);
         }
         ins2 = ATreverse(ins2);
@@ -306,8 +329,7 @@ static FState realise(FState fs)
         /* Register the normal form of fs. */
         FState nf = ATmake("Path(<str>, Hash(<str>), <term>)",
             outPath.c_str(), ((string) outHash).c_str(), ins2);
-        Hash nfHash = writeTerm(nf);
-        setDB(nixDB, dbSuccessors, hashTerm(fs), nfHash);
+        nf = storeSuccessor(fs, nf, paths);
 
         return nf;
     }
@@ -316,9 +338,9 @@ static FState realise(FState fs)
 }
 
 
-FState realiseFState(FState fs)
+FState realiseFState(FState fs, StringSet & paths)
 {
-    return realise(fs);
+    return realise(fs, paths);
 }
 
 
@@ -336,9 +358,6 @@ string fstatePath(FState fs)
     else
         return "";
 }
-
-
-typedef set<string> StringSet;
 
 
 void fstateRefs2(FState fs, StringSet & paths)
@@ -372,11 +391,7 @@ void fstateRefs2(FState fs, StringSet & paths)
 }
 
 
-Strings fstateRefs(FState fs)
+void fstateRefs(FState fs, StringSet & paths)
 {
-    StringSet paths;
     fstateRefs2(fs, paths);
-    Strings paths2(paths.size());
-    copy(paths.begin(), paths.end(), paths2.begin());
-    return paths2;
 }
