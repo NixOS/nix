@@ -26,7 +26,7 @@ mkdir -m 1777 $target/tmp
 pkgdb=$target/pkg/sys/var/pkginfo
 
 # Copy some programs and its libraries.
-utils="/usr/bin/vi /bin/sh /bin/mount /bin/umount /bin/ls /bin/ln /bin/cp /bin/mv /bin/rm /bin/cat /bin/df /bin/pwd /usr/bin/ld /usr/bin/as /bin/sed /bin/chmod /bin/chown /usr/bin/expr /bin/mkdir /bin/rmdir /usr/bin/sort /usr/bin/uniq /bin/uname /usr/bin/grep /bin/sleep /usr/bin/rsync /usr/bin/make /usr/bin/cmp /bin/date /usr/bin/tr /usr/bin/ar /usr/bin/ranlib /usr/bin/basename /usr/bin/less ../src/nix"
+utils="/usr/bin/vi /bin/sh /bin/mount /bin/umount /bin/ls /bin/ln /bin/cp /bin/mv /bin/rm /bin/cat /bin/df /bin/pwd /usr/bin/ld /usr/bin/as /bin/sed /bin/chmod /bin/chown /usr/bin/expr /bin/mkdir /bin/rmdir /usr/bin/sort /usr/bin/uniq /bin/uname /usr/bin/grep /bin/sleep /bin/gzip /usr/bin/make /usr/bin/cmp /bin/date /usr/bin/tr /usr/bin/ar /usr/bin/ranlib /usr/bin/basename /usr/bin/less /usr/bin/md5sum /bin/tar ../src/nix"
 bootlib=/pkg/prog-bootstrap/lib
 bootbin=/pkg/prog-bootstrap/bin
 mkdir -p $target/$bootlib
@@ -36,27 +36,27 @@ libs=`ldd $utils | awk '{ print $3 }' | sort | uniq`
 echo $libs
 cp -p $libs $target/$bootlib
 for i in libc.so.6 libdl.so.2 libpthread.so.0 librt.so.1 libresolv.so.2 ld-linux.so.2; do rm $target/$bootlib/$i; done
-../src/nix -d $pkgdb register-installed-pkg prog-bootstrap /pkg/prog-bootstrap
+../src/nix -d $pkgdb regpkg 5703121fe19cbeeaee7edd659cf4a25b /pkg/prog-bootstrap
 
 mv $target/$bootbin/nix $target/pkg/sys/bin
-../src/nix -d $pkgdb register-installed-pkg sys /pkg/sys
+../src/nix -d $pkgdb regpkg 36bcbb801f5052739af8220c6ea51434 /pkg/sys
 
 # Copy the bootstrap gcc.
 echo Copying gcc...
 rsync -a ../bootstrap/gcc/inst/pkg $target
-../src/nix -d $pkgdb register-installed-pkg gcc-bootstrap /pkg/gcc-bootstrap
+../src/nix -d $pkgdb regpkg 02212b3dc4e50349376975367d433929 /pkg/gcc-bootstrap
 
 # Copy the bootstrap glibc.
 echo Copying glibc...
 glibcdir=/pkg/glibc-bootstrap
 rsync -a ../bootstrap/glibc/inst/pkg $target
-../src/nix -d $pkgdb register-installed-pkg glibc-bootstrap $glibcdir
+../src/nix -d $pkgdb regpkg c0ce03ee0bab298babbe7e3b6159d36c $glibcdir
 
 # Copy the bootstrap kernel header files.
 echo Copying kernel headers...
 kerneldir=/pkg/kernel-bootstrap
 rsync -a ../bootstrap/kernel/inst/pkg $target
-../src/nix -d $pkgdb register-installed-pkg kernel-bootstrap $kerneldir
+../src/nix -d $pkgdb regpkg 3dc8333a2c2b4d627b892755417acf89 $kerneldir
 
 # Compatibility.
 rm -rf $target/lib
@@ -75,7 +75,7 @@ $target/$glibcdir/sbin/ldconfig -r $target
 
 # Source repository.
 rm -f $target/src
-ln -sf /mnt/host/`pwd`/../src $target/src
+ln -sf /mnt/host/`pwd`/../pkg $target/src
 
 # Copy boot script.
 cp -p ./start $target/pkg/sys/bin

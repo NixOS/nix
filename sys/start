@@ -4,7 +4,7 @@
 export PATH=/pkg/sys/bin
 
 # Add in the utilities needed for booting.
-export PATH=$PATH:`nix get-pkg prog-bootstrap`/bin
+export PATH=$PATH:`nix getpkg 5703121fe19cbeeaee7edd659cf4a25b`/bin
 
 echo
 echo Starting up...
@@ -14,17 +14,15 @@ mount -n -o remount,rw /dev/root /
 mount -n -t proc none /proc
 mount -n -t hostfs none /mnt/host 
 
-echo Registering available src packages...
-( cd /src
-  for i in *; do
-    if test -d $i; then
-      echo "  $i"
-      nix register-pkg $i /src/$i
-    fi
-  done
+echo Registering available sources...
+( if cd /src; then
+    for i in *; do
+      nix reg $i
+    done
+  fi
 )
 
-export PATH=`nix get-pkg coreutils-4.5.7`/bin:$PATH
+export PATH=`nix getpkg coreutils-4.5.7`/bin:$PATH
 
 echo
 echo "=== starting interactive shell ==="
