@@ -1,7 +1,14 @@
-AC_INIT(nix, 0.3)
+AC_INIT(nix, "0.3")
 AC_CONFIG_SRCDIR(src/nix.cc)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE
+
+# Put the revision number in the version.
+if REVISION=`svnversion $srcdir 2> /dev/null`; then
+   if test "$REVISION" != "exported"; then
+      VERSION="$VERSION-r$REVISION"
+   fi
+fi
 
 AC_PREFIX_DEFAULT(/nix)
 
