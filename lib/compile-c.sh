@@ -64,7 +64,9 @@ for ((n = 0; n < ${#localIncludes[*]}; n += 2)); do
 done
 
 # Create a symlink to the main file.
-ln -s $main $prefix$mainName
+if ! test "$(readlink $prefix$mainName)" = $main; then
+    ln -s $main $prefix$mainName
+fi
 
 mkdir $out
 test "$prefix" && cd $prefix
