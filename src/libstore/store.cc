@@ -270,7 +270,7 @@ void setReferences(const Transaction & txn, const Path & storePath,
             % storePath);
 
     Paths oldReferences;
-    nixDB.queryStrings(noTxn, dbReferences, storePath, oldReferences);
+    nixDB.queryStrings(txn, dbReferences, storePath, oldReferences);
     
     nixDB.setStrings(txn, dbReferences, storePath,
         Paths(references.begin(), references.end()));
