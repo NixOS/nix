@@ -1,20 +1,22 @@
 noinst_LIBRARIES = libexpr.a
 
 libexpr_a_SOURCES = nixexpr.cc nixexpr.hh parser.cc parser.hh \
- eval.cc eval.hh primops.cc primops.hh nix.sdf
+ eval.cc eval.hh primops.cc primops.hh \
+ lexer-tab.c lexer-tab.h parser-tab.c parser-tab.h
 
 AM_CXXFLAGS = \
  -I.. -I../../externals/inst/include -I../libutil -I../libstore
+AM_CFLAGS = \
+ -I../../externals/inst/include
 
 
-# Parse table generation.
+# Parser generation.
 
-parser.o: parse-table.h
+parser-tab.c parser-tab.h: parser.y
+	../grammartest/inst/bin/bison -v -o parser-tab.c parser.y -d
 
-parse-table.h: nix.tbl
-	../bin2c/bin2c nixParseTable < $< > $@ || (rm $@ && exit 1)
+lexer-tab.c lexer-tab.h: lexer.l
+	flex --outfile lexer-tab.c --header-file=lexer-tab.h lexer.l 
 
-%.tbl: %.sdf
-	../../externals/inst/bin/sdf2table -s -i $< -o $@
 
-CLEANFILES = parse-table.h nix.tbl
+CLEANFILES =

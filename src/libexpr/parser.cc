@@ -5,133 +5,63 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-extern "C" {
-#include <sglr.h>
-#include <asfix2.h>
-}
-
 #include "aterm.hh"
 #include "parser.hh"
-#include "parse-table.h"
 
 
-/* Cleanup cleans up an imploded parse tree into an actual abstract
-   syntax tree that we can evaluate.  It removes quotes around
-   strings, converts integer literals into actual integers, and
-   absolutises paths relative to the directory containing the input
-   file. */
-struct Cleanup : TermFun
+struct ParseData 
 {
+    Expr result;
     string basePath;
-
-    virtual ATerm operator () (ATerm e)
-    {
-        checkInterrupt();
-        
-        ATMatcher m;
-        string s;
-
-        if (atMatch(m, e) >> "Str" >> s)
-            return ATmake("Str(<str>)",
-                string(s, 1, s.size() - 2).c_str());
-
-        if (atMatch(m, e) >> "Path" >> s)
-            return ATmake("Path(<str>)", absPath(s, basePath).c_str());
-
-        if (atMatch(m, e) >> "Int" >> s) {
-            istringstream s2(s);
-            int n;
-            s2 >> n;
-            return ATmake("Int(<int>)", n);
-        }
-
-        if (atMatch(m, e) >> "Var" >> "true")
-            return ATmake("Bool(True)");
-        
-        if (atMatch(m, e) >> "Var" >> "false")
-            return ATmake("Bool(False)");
-
-        if (atMatch(m, e) >> "ExprNil")
-            return (ATerm) ATempty;
-
-        ATerm e1;
-        ATermList e2;
-        if (atMatch(m, e) >> "ExprCons" >> e1 >> e2)
-            return (ATerm) ATinsert(e2, e1);
-
-        return e;
-    }
+    string location;
+    string error;
 };
+
+extern "C" {
+
+#include "parser-tab.h"
+#include "lexer-tab.h"
+    
+    /* Callbacks for getting from C to C++.  Due to a (small) bug in the
+       GLR code of Bison we cannot currently compile the parser as C++
+       code. */
+   
+    void setParseResult(ParseData * data, ATerm t)
+    {
+        data->result = t;
+    }
+
+    ATerm absParsedPath(ParseData * data, ATerm t)
+    {
+        return string2ATerm(absPath(aterm2String(t), data->basePath).c_str());
+    }
+    
+    void parseError(ParseData * data, char * error, int line, int column)
+    {
+        data->error = (format("%1%, at line %2%, column %3%, of %4%")
+            % error % line % column % data->location).str();
+    }
+        
+    int yyparse(yyscan_t scanner, ParseData * data);
+}
 
 
 static Expr parse(const char * text, const string & location,
     const Path & basePath)
 {
-    /* Initialise the SDF libraries. */
-    static bool initialised = false;
-    static ATerm parseTable = 0;
-    static language lang = 0;
+    yyscan_t scanner;
+    ParseData data;
+    data.basePath = basePath;
+    data.location = location;
 
-    if (!initialised) {
-        PT_initMEPTApi();
-        PT_initAsFix2Api();
-        SGinitParser(ATfalse);
-
-        ATprotect(&parseTable);
-        parseTable = ATreadFromBinaryString(
-            (char *) nixParseTable, sizeof nixParseTable);
-        if (!parseTable)
-            throw Error(format("cannot construct parse table term"));
-
-        ATprotect(&lang);
-        lang = ATmake("Nix");
-        if (!SGopenLanguageFromTerm("nix-parse", lang, parseTable))
-            throw Error(format("cannot open language"));
-
-        SG_STARTSYMBOL_ON();
-        SG_OUTPUT_ON();
-        SG_ASFIX2ME_ON();
-        SG_AMBIGUITY_ERROR_ON();
-        SG_FILTER_OFF();
-
-        initialised = true;
-    }
-
-    /* Parse it. */
-    ATerm result = SGparseString(lang, "Expr", (char *) text);
-    if (!result)
-        throw SysError(format("parse failed in `%1%'") % location);
-    if (SGisParseError(result))
-        throw Error(format("parse error in `%1%': %2%")
-            % location % result);
-
-    /* Implode it. */
-    PT_ParseTree tree = PT_makeParseTreeFromTerm(result);
-    if (!tree)
-        throw Error(format("cannot create parse tree"));
+    yylex_init(&scanner);
+    yy_scan_string(text, scanner);
+    int res = yyparse(scanner, &data);
+    yylex_destroy(scanner);
     
-    ATerm imploded = PT_implodeParseTree(tree,
-        ATtrue,
-        ATtrue,
-        ATtrue,
-        ATtrue,
-        ATtrue,
-        ATtrue,
-        ATfalse,
-        ATtrue,
-        ATtrue,
-        ATtrue,
-        ATfalse);
-    if (!imploded)
-        throw Error(format("cannot implode parse tree"));
+    if (res) throw Error(data.error);
 
-    printMsg(lvlVomit, format("imploded parse tree of `%1%': %2%")
-        % location % imploded);
-
-    /* Finally, clean it up. */
-    Cleanup cleanup;
-    cleanup.basePath = basePath;
-    return bottomupRewrite(cleanup, imploded);
+    return data.result;
 }
 
 
@@ -171,7 +101,7 @@ Expr parseExprFromFile(Path path)
     readFull(fd, (unsigned char *) text, st.st_size);
     text[st.st_size] = 0;
 
-    return parse(text, path, dirOf(path));
+    return parse(text, "`" + path + "'", dirOf(path));
 }
 
 

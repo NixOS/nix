@@ -137,6 +137,8 @@ Expr evalExpr2(EvalState & state, Expr e)
     /* Any encountered variables must be undeclared or primops. */
     if (atMatch(m, e) >> "Var" >> s1) {
         if (s1 == "null") return primNull(state);
+        if (s1 == "true") return ATmake("Bool(True)");
+        if (s1 == "false") return ATmake("Bool(False)");
         return e;
     }
 
