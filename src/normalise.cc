@@ -9,7 +9,7 @@
 
 void registerSuccessor(const FSId & id1, const FSId & id2)
 {
-    setDB(nixDB, dbSuccessors, id1, id2);
+    nixDB.setString(noTxn, dbSuccessors, id1, id2);
 }
 
 
@@ -31,7 +31,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
     /* Try to substitute $id$ by any known successors in order to
        speed up the rewrite process. */
     string idSucc;
-    while (queryDB(nixDB, dbSuccessors, id, idSucc)) {
+    while (nixDB.queryString(noTxn, dbSuccessors, id, idSucc)) {
         debug(format("successor %1% -> %2%") % (string) id % idSucc);
         id = parseHash(idSucc);
     }
@@ -191,7 +191,7 @@ void realiseSlice(const FSId & id, FSIdSet pending)
     {
         SliceElem elem = *i;
         string id;
-        if (!queryDB(nixDB, dbPath2Id, elem.path, id)) {
+        if (!nixDB.queryString(noTxn, dbPath2Id, elem.path, id)) {
             if (pathExists(elem.path))
                 throw Error(format("path `%1%' obstructed") % elem.path);
             missing = true;
@@ -269,7 +269,7 @@ static void fstateRequisitesSet(const FSId & id,
 
     string idSucc;
     if (includeSuccessors &&
-        queryDB(nixDB, dbSuccessors, id, idSucc))
+        nixDB.queryString(noTxn, dbSuccessors, id, idSucc))
         fstateRequisitesSet(parseHash(idSucc), 
             includeExprs, includeSuccessors, paths);
 }
@@ -293,13 +293,13 @@ FSIds findGenerators(const FSIds & _ids)
        mappings, since we know that those are Nix expressions. */
 
     Strings sucs;
-    enumDB(nixDB, dbSuccessors, sucs);
+    nixDB.enumTable(noTxn, dbSuccessors, sucs);
 
     for (Strings::iterator i = sucs.begin();
          i != sucs.end(); i++)
     {
         string s;
-        if (!queryDB(nixDB, dbSuccessors, *i, s)) continue;
+        if (!nixDB.queryString(noTxn, dbSuccessors, *i, s)) continue;
         FSId id = parseHash(s);
 
         FState fs;

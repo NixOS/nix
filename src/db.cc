@@ -3,38 +3,24 @@
 
 #include <memory>
 
-#include <db_cxx.h>
 
-
-/* Wrapper classes that ensures that the database is closed upon
-   object destruction. */
-class Db2 : public Db 
+/* Wrapper class to ensure proper destruction. */
+class DestroyDb
 {
+    Db * db;
 public:
-    Db2(DbEnv *env, u_int32_t flags) : Db(env, flags) { }
-    ~Db2() { close(0); }
+    DestroyDb(Db * _db) : db(_db) { }
+    ~DestroyDb() { db->close(0); delete db; }
 };
 
 
-class DbcClose 
+class DestroyDbc 
 {
-    Dbc * cursor;
+    Dbc * dbc;
 public:
-    DbcClose(Dbc * c) : cursor(c) { }
-    ~DbcClose() { cursor->close(); }
+    DestroyDbc(Dbc * _dbc) : dbc(_dbc) { }
+    ~DestroyDbc() { dbc->close(); /* close() frees dbc */ }
 };
-
-
-static auto_ptr<Db2> openDB(const string & filename, const string & dbname,
-    bool readonly)
-{
-    auto_ptr<Db2> db(new Db2(0, 0));
-
-    db->open(filename.c_str(), dbname.c_str(),
-        DB_HASH, readonly ? DB_RDONLY : DB_CREATE, 0666);
-
-    return db;
-}
 
 
 static void rethrow(DbException & e)
@@ -43,26 +29,116 @@ static void rethrow(DbException & e)
 }
 
 
-void createDB(const string & filename, const string & dbname)
+Transaction::Transaction()
+    : txn(0)
+{
+}
+
+
+Transaction::Transaction(Database & db)
+{
+    db.requireEnv();
+    db.env->txn_begin(0, &txn, 0);
+}
+
+
+Transaction::~Transaction()
+{
+    if (txn) {
+        txn->abort();
+        txn = 0;
+    }
+}
+
+
+void Transaction::commit()
+{
+    if (!txn) throw Error("commit called on null transaction");
+    txn->commit(0);
+    txn = 0;
+}
+
+
+void Database::requireEnv()
+{
+    if (!env) throw Error("database environment not open");
+}
+
+
+Db * Database::openDB(const Transaction & txn,
+    const string & table, bool create)
+{
+    requireEnv();
+
+    Db * db = new Db(env, 0);
+
+    try {
+        // !!! fixme when switching to BDB 4.1: use txn.
+        db->open(table.c_str(), 0, 
+            DB_HASH, create ? DB_CREATE : 0, 0666);
+    } catch (...) {
+        delete db;
+        throw;
+    }
+
+    return db;
+}
+
+
+Database::Database()
+    : env(0)
+{
+}
+
+
+Database::~Database()
+{
+    if (env) {
+        env->close(0);
+        delete env;
+    }
+}
+
+
+void Database::open(const string & path)
 {
     try {
-        openDB(filename, dbname, false);
+        
+        if (env) throw Error(format("environment already open"));
+
+        env = new DbEnv(0);
+
+        debug("foo" + path);
+        env->open(path.c_str(), 
+            DB_INIT_LOCK | DB_INIT_LOG | DB_INIT_MPOOL | DB_INIT_TXN |
+            DB_CREATE,
+            0666);
+        
     } catch (DbException e) { rethrow(e); }
 }
 
 
-bool queryDB(const string & filename, const string & dbname,
+void Database::createTable(const string & table)
+{
+    try {
+        Db * db = openDB(noTxn, table, true);
+        DestroyDb destroyDb(db);
+    } catch (DbException e) { rethrow(e); }
+}
+
+
+bool Database::queryString(const Transaction & txn, const string & table, 
     const string & key, string & data)
 {
     try {
 
-        int err;
-        auto_ptr<Db2> db = openDB(filename, dbname, true);
+        Db * db = openDB(txn, table, false);
+        DestroyDb destroyDb(db);
 
         Dbt kt((void *) key.c_str(), key.length());
         Dbt dt;
 
-        err = db->get(0, &kt, &dt, 0);
+        int err = db->get(txn.txn, &kt, &dt, 0);
         if (err) return false;
 
         if (!dt.get_data())
@@ -76,12 +152,12 @@ bool queryDB(const string & filename, const string & dbname,
 }
 
 
-bool queryListDB(const string & filename, const string & dbname,
+bool Database::queryStrings(const Transaction & txn, const string & table, 
     const string & key, Strings & data)
 {
     string d;
 
-    if (!queryDB(filename, dbname, key, d))
+    if (!queryString(txn, table, key, d))
         return false;
 
     string::iterator it = d.begin();
@@ -110,19 +186,21 @@ bool queryListDB(const string & filename, const string & dbname,
 }
 
 
-void setDB(const string & filename, const string & dbname,
+void Database::setString(const Transaction & txn, const string & table,
     const string & key, const string & data)
 {
     try {
-        auto_ptr<Db2> db = openDB(filename, dbname, false);
+        Db * db = openDB(txn, table, false);
+        DestroyDb destroyDb(db);
+
         Dbt kt((void *) key.c_str(), key.length());
         Dbt dt((void *) data.c_str(), data.length());
-        db->put(0, &kt, &dt, 0);
+        db->put(txn.txn, &kt, &dt, 0);
     } catch (DbException e) { rethrow(e); }
 }
 
 
-void setListDB(const string & filename, const string & dbname,
+void Database::setStrings(const Transaction & txn, const string & table,
     const string & key, const Strings & data)
 {
     string d;
@@ -141,34 +219,36 @@ void setListDB(const string & filename, const string & dbname,
         d += s;
     }
 
-    setDB(filename, dbname, key, d);
+    setString(txn, table, key, d);
 }
 
 
-void delDB(const string & filename, const string & dbname,
+void Database::delPair(const Transaction & txn, const string & table,
     const string & key)
 {
     try {
-        auto_ptr<Db2> db = openDB(filename, dbname, false);
+        Db * db = openDB(txn, table, false);
+        DestroyDb destroyDb(db);
         Dbt kt((void *) key.c_str(), key.length());
-        db->del(0, &kt, 0);
+        db->del(txn.txn, &kt, 0);
     } catch (DbException e) { rethrow(e); }
 }
 
 
-void enumDB(const string & filename, const string & dbname,
+void Database::enumTable(const Transaction & txn, const string & table,
     Strings & keys)
 {
     try {
 
-        auto_ptr<Db2> db = openDB(filename, dbname, true);
+        Db * db = openDB(txn, table, false);
+        DestroyDb destroyDb(db);
 
-        Dbc * cursor;
-        db->cursor(0, &cursor, 0);
-        DbcClose cursorCloser(cursor);
+        Dbc * dbc;
+        db->cursor(0, &dbc, 0);
+        DestroyDbc destroyDbc(dbc);
 
         Dbt kt, dt;
-        while (cursor->get(&kt, &dt, DB_NEXT) != DB_NOTFOUND)
+        while (dbc->get(&kt, &dt, DB_NEXT) != DB_NOTFOUND)
             keys.push_back(
                 string((char *) kt.get_data(), kt.get_size()));
 

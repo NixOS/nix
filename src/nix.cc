@@ -335,6 +335,8 @@ static void opVerify(Strings opFlags, Strings opArgs)
    list. */
 void run(Strings args)
 {
+    openDB();
+
     Strings opFlags, opArgs;
     Operation op = 0;
 

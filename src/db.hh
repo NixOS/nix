@@ -4,28 +4,73 @@
 #include <string>
 #include <list>
 
+#include <db_cxx.h>
+
 #include "util.hh"
 
 using namespace std;
 
-void createDB(const string & filename, const string & dbname);
 
-bool queryDB(const string & filename, const string & dbname,
-    const string & key, string & data);
+class Database;
 
-bool queryListDB(const string & filename, const string & dbname,
-    const string & key, Strings & data);
 
-void setDB(const string & filename, const string & dbname,
-    const string & key, const string & data);
+class Transaction
+{
+    friend class Database;
 
-void setListDB(const string & filename, const string & dbname,
-    const string & key, const Strings & data);
+private:
+    DbTxn * txn;
+    
+public:
+    Transaction();
+    Transaction(Database & _db);
+    ~Transaction();
 
-void delDB(const string & filename, const string & dbname,
-    const string & key);
+    void commit();
+};
 
-void enumDB(const string & filename, const string & dbname,
-    Strings & keys);
+
+#define noTxn Transaction()
+
+
+class Database
+{
+    friend class Transaction;
+
+private:
+    DbEnv * env;
+
+    void requireEnv();
+
+    Db * openDB(const Transaction & txn,
+        const string & table, bool create);
+
+public:
+    Database();
+    ~Database();
+    
+    void open(const string & path);
+
+    void createTable(const string & table);
+
+    bool queryString(const Transaction & txn, const string & table, 
+        const string & key, string & data);
+
+    bool queryStrings(const Transaction & txn, const string & table, 
+        const string & key, Strings & data);
+
+    void setString(const Transaction & txn, const string & table,
+        const string & key, const string & data);
+
+    void setStrings(const Transaction & txn, const string & table,
+        const string & key, const Strings & data);
+
+    void delPair(const Transaction & txn, const string & table,
+        const string & key);
+
+    void enumTable(const Transaction & txn, const string & table,
+        Strings & keys);
+};
+
 
 #endif /* !__DB_H */

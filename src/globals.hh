@@ -3,10 +3,15 @@
 
 #include <string>
 
+#include "db.hh"
+
 using namespace std;
 
 
-/* Database names. */
+extern Database nixDB;
+
+
+/* Database tables. */
 
 /* dbPath2Id :: Path -> FSId
 
@@ -60,12 +65,14 @@ extern string nixDataDir; /* !!! fix */
 /* nixLogDir is the directory where we log various operations. */ 
 extern string nixLogDir;
 
-/* nixDB is the file name of the Berkeley DB database where we
-   maintain the dbXXX mappings. */
-extern string nixDB;
+/* nixDBPath is the path name of our Berkeley DB environment. */
+extern string nixDBPath;
 
 
-/* Initialize the databases. */
+/* Open the database environment. */
+void openDB();
+
+/* Create the required database tables. */
 void initDB();
 
 

@@ -301,6 +301,8 @@ static Expr evalFile(EvalState & state, string relPath)
 
 void run(Strings args)
 {
+    openDB();
+
     EvalState state;
     Strings files;
 

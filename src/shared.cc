@@ -19,7 +19,7 @@ static void initAndRun(int argc, char * * argv)
     nixStore = NIX_STORE_DIR;
     nixDataDir = NIX_DATA_DIR;
     nixLogDir = NIX_LOG_DIR;
-    nixDB = (string) NIX_STATE_DIR + "/nixstate.db";
+    nixDBPath = (string) NIX_STATE_DIR + "/db";
 
     /* Put the arguments in a vector. */
     Strings args;

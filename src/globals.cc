@@ -2,6 +2,9 @@
 #include "db.hh"
 
 
+Database nixDB;
+
+
 string dbPath2Id = "path2id";
 string dbId2Paths = "id2paths";
 string dbSuccessors = "successors";
@@ -11,13 +14,19 @@ string dbSubstitutes = "substitutes";
 string nixStore = "/UNINIT";
 string nixDataDir = "/UNINIT";
 string nixLogDir = "/UNINIT";
-string nixDB = "/UNINIT";
+string nixDBPath = "/UNINIT";
+
+
+void openDB()
+{
+    nixDB.open(nixDBPath);
+}
 
 
 void initDB()
 {
-    createDB(nixDB, dbPath2Id);
-    createDB(nixDB, dbId2Paths);
-    createDB(nixDB, dbSuccessors);
-    createDB(nixDB, dbSubstitutes);
+    nixDB.createTable(dbPath2Id);
+    nixDB.createTable(dbId2Paths);
+    nixDB.createTable(dbSuccessors);
+    nixDB.createTable(dbSubstitutes);
 }

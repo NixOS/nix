@@ -51,6 +51,8 @@ struct MySource : RestoreSource
 
 void runTests()
 {
+    verbosity = (Verbosity) 100;
+
     /* Hashing. */
     string s = "0b0ffd0538622bfe20b92c4aa57254d9";
     Hash h = parseHash(s);
@@ -94,14 +96,16 @@ void runTests()
     /* Set up the test environment. */
 
     mkdir("scratch", 0777);
+    mkdir("scratch/db", 0777);
 
     string testDir = absPath("scratch");
     cout << testDir << endl;
 
     nixStore = testDir;
     nixLogDir = testDir;
-    nixDB = testDir + "/db";
+    nixDBPath = testDir + "/db";
 
+    openDB();
     initDB();
 
     /* Expression evaluation. */
