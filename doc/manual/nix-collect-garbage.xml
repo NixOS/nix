@@ -11,6 +11,7 @@
         <arg choice='plain'><option>--print-live</option></arg>
         <arg choice='plain'><option>--print-dead</option></arg>
       </group>
+      <arg><option>--min-age</option> <replaceable>age</replaceable></arg>
     </cmdsynopsis>
   </refsynopsisdiv>
 
@@ -52,6 +53,16 @@
             garbage collector.  They correspond exactly with the
             sub-operations in <command>nix-store
             <option>--gc</option></command>.
+          </para>
+        </listitem>
+      </varlistentry>
+      
+      <varlistentry>
+        <term><option>--min-age</option> <replaceable>age</replaceable></term>
+        <listitem>
+          <para>
+            This option corresponds to the <option>--min-age</option>
+            option in <command>nix-store <option>--gc</option></command>.
           </para>
         </listitem>
       </varlistentry>

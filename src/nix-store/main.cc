@@ -212,17 +212,22 @@ static void opIsValid(Strings opFlags, Strings opArgs)
 
 static void opGC(Strings opFlags, Strings opArgs)
 {
-    if (opFlags.size() != 1) throw UsageError("missing flag");
-    if (!opArgs.empty())
-        throw UsageError("no arguments expected");
-
     /* Do what? */
-    string flag = opFlags.front();
     enum { soPrintLive, soPrintDead, soDelete } subOp;
-    if (flag == "--print-live") subOp = soPrintLive;
-    else if (flag == "--print-dead") subOp = soPrintDead;
-    else if (flag == "--delete") subOp = soDelete;
-    else throw UsageError(format("bad sub-operation `%1%' in GC") % flag);
+    time_t minAge = 0;
+    for (Strings::iterator i = opFlags.begin();
+         i != opFlags.end(); ++i)
+        if (*i == "--print-live") subOp = soPrintLive;
+        else if (*i == "--print-dead") subOp = soPrintDead;
+        else if (*i == "--delete") subOp = soDelete;
+        else if (*i == "--min-age") {
+            if (opArgs.size() == 0)
+                throw UsageError("`--min-age' requires an argument");
+            istringstream st(opArgs.front());
+            st >> minAge;
+            if (!st) throw Error("number expected");
+        }
+        else throw UsageError(format("bad sub-operation `%1%' in GC") % *i);
         
     Paths roots;
     while (1) {
@@ -240,7 +245,7 @@ static void opGC(Strings opFlags, Strings opArgs)
         return;
     }
 
-    PathSet dead = findDeadPaths(live);
+    PathSet dead = findDeadPaths(live, minAge * 3600);
 
     if (subOp == soPrintDead) {
         for (PathSet::iterator i = dead.begin(); i != dead.end(); ++i)

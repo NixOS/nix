@@ -147,6 +147,7 @@
           <arg choice='plain'><option>--print-dead</option></arg>
           <arg choice='plain'><option>--delete</option></arg>
         </group>
+        <arg><option>--min-age</option> <replaceable>age</replaceable></arg>
       </cmdsynopsis>
     </refsection>
 
@@ -205,6 +206,17 @@
       <para>
         The set of root store expressions is read from standard input.
         Each line should contain exactly one store path.
+      </para>
+
+      <para>
+        The option <option>--min-age</option> specifies a minimum time
+        in hours that an unreachable store path must not have been
+        used before it is considered dead.  The default is 0 (consider
+        all unreachable store paths dead).  Whether a store path has
+        been used is determined by looking at its access time
+        (<literal>atime</literal>), so this does not work if the store
+        is located on a file system that has the
+        <literal>noatime</literal> option set.
       </para>
 
       <warning>

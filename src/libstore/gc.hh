@@ -17,8 +17,10 @@ PathSet findLivePaths(const Paths & roots);
 
 /* Given a set of "live" store paths, determine the set of "dead"
    store paths (which are simply all store paths that are not in the
-   live set). */
-PathSet findDeadPaths(const PathSet & live);
+   live set).  The value `minAge' specifies the minimum age in seconds
+   for an unreachable file to be considered dead (0 meaning that any
+   unreachable file is dead). */
+PathSet findDeadPaths(const PathSet & live, time_t minAge);
 
 
 #endif /* !__GC_H */

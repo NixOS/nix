@@ -9,16 +9,24 @@ my $storeDir = "@storedir@";
 my %alive;
 
 my $gcOper = "--delete";
-my $keepSuccessors = 1;
+my $minAge = 0;
 
 my @roots = ();
 
 
 # Parse the command line.
-foreach my $arg (@ARGV) {
+for (my $i = 0; $i < scalar @ARGV; $i++) {
+    my $arg = $ARGV[$i];
     if ($arg eq "--delete" || $arg eq "--print-live" || $arg eq "--print-dead") {
         $gcOper = $arg;
-    } else { die "unknown argument `$arg'" };
+    }
+    elsif ($arg eq "--min-age") {
+        $i++;
+        $minAge = undef;
+        $minAge = $ARGV[$i];
+        die "invalid minimum age" unless defined $minAge && $minAge =~ /^\d*$/;
+    }
+    else { die "unknown argument `$arg'" };
 }
 
 
@@ -69,7 +77,7 @@ findRoots 1, $rootsDir;
 
 
 # Run the collector with the roots we found.
-my $pid = open2(">&1", \*WRITE, "@bindir@/nix-store --gc $gcOper")
+my $pid = open2(">&1", \*WRITE, "@bindir@/nix-store --gc $gcOper --min-age $minAge")
     or die "cannot run `nix-store --gc'";
 
 foreach my $root (@roots) {

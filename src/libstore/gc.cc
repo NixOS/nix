@@ -2,6 +2,11 @@
 #include "globals.hh"
 
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+
 void followLivePaths(Path nePath, PathSet & live)
 {
     /* Just to be sure, canonicalise the path.  It is important to do
@@ -62,16 +67,26 @@ PathSet findLivePaths(const Paths & roots)
 }
 
 
-PathSet findDeadPaths(const PathSet & live)
+PathSet findDeadPaths(const PathSet & live, time_t minAge)
 {
     PathSet dead;
 
     startNest(nest, lvlDebug, "finding dead paths");
 
+    time_t now = time(0);
+
     Strings storeNames = readDirectory(nixStore);
 
     for (Strings::iterator i = storeNames.begin(); i != storeNames.end(); ++i) {
         Path p = canonPath(nixStore + "/" + *i);
+
+        if (minAge > 0) {
+            struct stat st;
+            if (lstat(p.c_str(), &st) != 0)
+                throw SysError(format("obtaining information about `%1%'") % p);
+            if (st.st_atime + minAge >= now) continue;
+        }
+        
         if (live.find(p) == live.end()) {
             debug(format("dead path `%1%'") % p);
             dead.insert(p);
