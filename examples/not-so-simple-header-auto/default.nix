@@ -4,7 +4,7 @@ let {
 
   hello = link {programName = "hello"; objects = compileC {
     main = ./foo/hello.c;
-    localIncludes = import (findIncludes {main = toString ./foo/hello.c;});
+    localIncludes = "auto";
   };};
 
   body = [hello];
