@@ -1,3 +1,5 @@
+#include <cerrno>
+#include <algorithm>
 #include <vector>
 
 #include <sys/types.h>

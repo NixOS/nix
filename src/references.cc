@@ -1,3 +1,4 @@
+#include <cerrno>
 #include <map>
 
 #include <sys/types.h>

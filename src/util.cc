@@ -1,4 +1,6 @@
 #include <iostream>
+#include <cerrno>
+#include <cstdio>
 
 #include <sys/types.h>
 #include <sys/stat.h>

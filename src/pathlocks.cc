@@ -1,3 +1,5 @@
+#include <cerrno>
+
 #include <fcntl.h>
 
 #include "pathlocks.hh"
