@@ -3,7 +3,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#include "values.hh"
+#include "store.hh"
 #include "globals.hh"
 #include "db.hh"
 #include "archive.hh"
@@ -105,28 +105,6 @@ void addToStore(string srcPath, string & dstPath, Hash & hash)
 }
 
 
-#if 0
-/* Download object referenced by the given URL into the sources
-   directory.  Return the file name it was downloaded to. */
-string fetchURL(string url)
-{
-    string filename = baseNameOf(url);
-    string fullname = nixSourcesDir + "/" + filename;
-    struct stat st;
-    if (stat(fullname.c_str(), &st)) {
-        cerr << "fetching " << url << endl;
-        /* !!! quoting */
-        string shellCmd =
-            "cd " + nixSourcesDir + " && wget --quiet -N \"" + url + "\"";
-        int res = system(shellCmd.c_str());
-        if (WEXITSTATUS(res) != 0)
-            throw Error("cannot fetch " + url);
-    }
-    return fullname;
-}
-#endif
-
-
 void deleteFromStore(const string & path)
 {
     string prefix = nixStore + "/";
@@ -139,37 +117,16 @@ void deleteFromStore(const string & path)
 
 string queryFromStore(Hash hash)
 {
-    bool checkedNet = false;
+    string fn, url;
 
-    while (1) {
-
-        string fn, url;
-
-        if (queryDB(nixDB, dbRefs, hash, fn)) {
-
-            /* Verify that the file hasn't changed. !!! race !!! slow */
-            if (hashPath(fn) != hash)
-                throw Error("file " + fn + " is stale");
-
-            return fn;
-        }
-
-        throw Error("a file with hash " + (string) hash + " is required, "
-            "but it is not known to exist locally or on the network");
-#if 0
-        if (checkedNet)
-            throw Error("consistency problem: file fetched from " + url + 
-                " should have hash " + (string) hash + ", but it doesn't");
-
-        if (!queryDB(nixDB, dbNetSources, hash, url))
-            throw Error("a file with hash " + (string) hash + " is required, "
-                "but it is not known to exist locally or on the network");
-
-        checkedNet = true;
+    if (queryDB(nixDB, dbRefs, hash, fn)) {
         
-        fn = fetchURL(url);
-        
-        setDB(nixDB, dbRefs, hash, fn);
-#endif
+        /* Verify that the file hasn't changed. !!! race !!! slow */
+        if (hashPath(fn) != hash)
+            throw Error("file " + fn + " is stale");
+
+        return fn;
     }
+
+    throw Error(format("don't know a path with hash `%1%'") % (string) hash);
 }

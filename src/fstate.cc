@@ -7,9 +7,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "eval.hh"
+#include "fstate.hh"
 #include "globals.hh"
-#include "values.hh"
+#include "store.hh"
 #include "db.hh"
 
 

@@ -20,7 +20,7 @@ test_LDADD = libnix.a -ldb_cxx-4 -lATerm
 noinst_LIBRARIES = libnix.a
 
 libnix_a_SOURCES = util.cc hash.cc archive.cc md5.c \
- eval.cc values.cc globals.cc db.cc
+ fstate.cc store.cc globals.cc db.cc
 
 install-data-local:
 	$(INSTALL) -d $(localstatedir)/nix
