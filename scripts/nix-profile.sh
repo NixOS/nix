@@ -11,6 +11,7 @@ if test -z "$NIX_SET"; then
     export LIBRARY_PATH=$NIX_LINKS/lib:$LIBRARY_PATH
 
     export C_INCLUDE_PATH=$NIX_LINKS/include:$C_INCLUDE_PATH
+    export CPLUS_INCLUDE_PATH=$NIX_LINKS/include:$CPLUS_INCLUDE_PATH
 
     export PKG_CONFIG_PATH=$NIX_LINKS/lib/pkgconfig:$PKG_CONFIG_PATH
 
