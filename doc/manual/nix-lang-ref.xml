@@ -1,4 +1,4 @@
-<chapter>
+<appendix>
   <title>Nix Language Reference</title>
 
   <sect1>
@@ -274,4 +274,4 @@
   </sect1>
   
 
-</chapter>
+</appendix>
