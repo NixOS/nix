@@ -13,6 +13,10 @@ using namespace std;
 Hash addValue(string pathName);
 
 
+/* Delete a value from the nixValues directory. */
+void deleteValue(Hash hash);
+
+
 /* Obtain the path of a value with the given hash.  If a file with
    that hash is known to exist in the local file system (as indicated
    by the dbRefs database), we use that.  Otherwise, we attempt to

@@ -1,5 +1,10 @@
 #include <iostream>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <dirent.h>
+
 #include "util.hh"
 
 
@@ -46,6 +51,30 @@ string baseNameOf(string path)
     unsigned int pos = path.rfind('/');
     if (pos == string::npos) throw Error("invalid file name: " + path);
     return string(path, pos + 1);
+}
+
+
+void deletePath(string path)
+{
+    struct stat st;
+    if (lstat(path.c_str(), &st))
+        throw SysError("getting attributes of path " + path);
+
+    if (S_ISDIR(st.st_mode)) {
+        DIR * dir = opendir(path.c_str());
+
+        struct dirent * dirent;
+        while (errno = 0, dirent = readdir(dir)) {
+            string name = dirent->d_name;
+            if (name == "." || name == "..") continue;
+            deletePath(path + "/" + name);
+        }
+
+        closedir(dir); /* !!! close on exception */
+    }
+
+    if (remove(path.c_str()) == -1)
+        throw SysError("cannot unlink " + path);
 }
 
 

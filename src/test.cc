@@ -68,7 +68,7 @@ void runTests()
 #endif
 
     /* Restoring. */
-#if 1
+#if 0
     MySource source;
     restorePath("outdir", source);
     cout << (string) hashPath("outdir") << endl;
@@ -116,6 +116,8 @@ void runTests()
     Expr e3 = ATmake("Deref(Hash(<str>))", ((string) h3).c_str());
 
     evalTest(e3);
+
+    deleteValue(h3);
 }
 
 

@@ -135,6 +135,18 @@ string fetchURL(string url)
 #endif
 
 
+void deleteValue(Hash hash)
+{
+    string name;
+    if (queryDB(nixDB, dbRefs, hash, name)) {
+        string fn = absValuePath(name);
+        deletePath(fn);
+        delDB(nixDB, dbRefs, hash);
+    }
+}
+
+
+/* !!! bad name, "query" implies no side effect => getValuePath() */
 string queryValuePath(Hash hash)
 {
     bool checkedNet = false;

@@ -112,8 +112,20 @@ static void opEvaluate(Strings opFlags, Strings opArgs)
 static void opDelete(Strings opFlags, Strings opArgs)
 {
     getArgType(opFlags);
+    if (!opFlags.empty()) throw UsageError("unknown flag");
 
-    cerr << "delete!\n";
+    for (Strings::iterator it = opArgs.begin();
+         it != opArgs.end(); it++)
+    {
+        Hash hash;
+        if (argType == atpHash)
+            hash = parseHash(*it);
+        else if (argType == atpName)
+            throw Error("not implemented");
+        else
+            throw Error("invalid argument type");
+        deleteValue(hash);
+    }
 }
 
 

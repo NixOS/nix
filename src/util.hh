@@ -54,6 +54,11 @@ string dirOf(string path);
 string baseNameOf(string path);
 
 
+/* Delete a path; i.e., in the case of a directory, it is deleted
+   recursively.  Don't use this at home, kids. */
+void deletePath(string path);
+
+
 void debug(string s);
 
 
