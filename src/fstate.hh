@@ -101,7 +101,12 @@ Slice normaliseFState(FSId id);
 /* Realise a Slice in the file system. */
 void realiseSlice(const Slice & slice);
 
-Strings fstatePaths(FSId id, bool normalise);
+/* Get the list of root (output) paths of the given
+   fstate-expression. */
+Strings fstatePaths(const FSId & id, bool normalise);
+
+/* Get the list of paths referenced by the given fstate-expression. */
+StringSet fstateRefs(const FSId & id);
 
 
 #endif /* !__FSTATE_H */

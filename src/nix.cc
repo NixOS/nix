@@ -159,23 +159,19 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qPath: {
             Strings paths = fstatePaths(id, true);
-            for (Strings::iterator i = paths.begin(); 
-                 i != paths.end(); i++)
-                cout << format("%s\n") % *i;
+            for (Strings::iterator j = paths.begin(); 
+                 j != paths.end(); j++)
+                cout << format("%s\n") % *j;
             break;
         }
 
-#if 0
         case qRefs: {
-            StringSet refs;
-            FState fs = hash2fstate(hash);
-            fstateRefs(realiseFState(fs, refs), refs);
+            StringSet refs = fstateRefs(id);
             for (StringSet::iterator j = refs.begin(); 
                  j != refs.end(); j++)
                 cout << format("%s\n") % *j;
             break;
         }
-#endif
 
         default:
             abort();

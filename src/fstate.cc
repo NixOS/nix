@@ -186,9 +186,10 @@ void registerSuccessor(const FSId & id1, const FSId & id2)
 }
 
 
-static FSId storeSuccessor(const FSId & id1, FState sc)
+static FSId storeSuccessor(const FSId & id1, FState sc,
+    string * p)
 {
-    FSId id2 = writeTerm(sc, "-s-" + (string) id1, 0);
+    FSId id2 = writeTerm(sc, "-s-" + (string) id1, p);
     registerSuccessor(id1, id2);
     return id2;
 }
@@ -267,7 +268,7 @@ static FState unparseSlice(const Slice & slice)
 typedef set<FSId> FSIdSet;
 
 
-Slice normaliseFState(FSId id)
+static Slice normaliseFState2(FSId id, StringSet & usedPaths)
 {
     debug(format("normalising fstate"));
     Nest nest(true);
@@ -281,12 +282,16 @@ Slice normaliseFState(FSId id)
     }
 
     /* Get the fstate expression. */
-    FState fs = termFromId(id);
+    string fsPath;
+    FState fs = termFromId(id, &fsPath);
 
     /* Already in normal form (i.e., a slice)? */
     if (ATgetType(fs) == AT_APPL && 
         (string) ATgetName(ATgetAFun(fs)) == "Slice")
+    {
+        usedPaths.insert(fsPath);
         return parseSlice(fs);
+    }
     
     /* Then we it's a Derive node. */
     ATermList outs, ins, bnds;
@@ -402,9 +407,17 @@ Slice normaliseFState(FSId id)
 
     FState nf = unparseSlice(slice);
     debug(printTerm(nf));
-    storeSuccessor(id, nf);
+    storeSuccessor(id, nf, &fsPath);
+    usedPaths.insert(fsPath);
 
     return slice;
+}
+
+
+Slice normaliseFState(FSId id)
+{
+    StringSet dummy;
+    return normaliseFState2(id, dummy);
 }
 
 
@@ -475,7 +488,7 @@ void realiseSlice(const Slice & slice)
 }
 
 
-Strings fstatePaths(FSId id, bool normalise)
+Strings fstatePaths(const FSId & id, bool normalise)
 {
     Strings paths;
 
@@ -518,5 +531,16 @@ Strings fstatePaths(FSId id, bool normalise)
     
     else throw badTerm("in fstatePaths", fs);
 
+    return paths;
+}
+
+
+StringSet fstateRefs(const FSId & id)
+{
+    StringSet paths;
+    Slice slice = normaliseFState2(id, paths);
+    for (SliceElems::const_iterator i = slice.elems.begin();
+         i != slice.elems.end(); i++)
+        paths.insert(i->path);
     return paths;
 }
