@@ -262,7 +262,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
 
     /* Write the resulting term into the Nix store directory. */
     Hash drvHash = outHashGiven
-        ? hashString((string) outHash + outPath)
+        ? hashString((string) outHash + outPath, htMD5)
         : hashDerivation(state, ne);
     Path drvPath = writeTerm(unparseStoreExpr(ne), "-d-" + drvName);
 

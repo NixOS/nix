@@ -419,7 +419,7 @@ Path addToStore(const Path & _srcPath)
     Hash h(htMD5);
     {
         SwitchToOriginalUser sw;
-        h = hashPath(srcPath);
+        h = hashPath(srcPath, htMD5);
     }
 
     string baseName = baseNameOf(srcPath);

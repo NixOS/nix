@@ -47,15 +47,15 @@ Hash parseHash(const string & s);
 bool isHash(const string & s);
 
 /* Compute the hash of the given string. */
-Hash hashString(const string & s);
+Hash hashString(const string & s, HashType ht);
 
 /* Compute the hash of the given file. */
-Hash hashFile(const Path & path);
+Hash hashFile(const Path & path, HashType ht);
 
 /* Compute the hash of the given path.  The hash is defined as
    md5(dump(path)).
 */
-Hash hashPath(const Path & path);
+Hash hashPath(const Path & path, HashType ht);
 
 
 #endif /* !__HASH_H */

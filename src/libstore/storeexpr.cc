@@ -8,7 +8,7 @@
 
 Hash hashTerm(ATerm t)
 {
-    return hashString(atPrint(t));
+    return hashString(atPrint(t), htMD5);
 }
 
 
