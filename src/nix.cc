@@ -185,7 +185,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     
                     FState fs = parseFState(termFromId(id));
 
-                    string label;
+                    string label, shape;
                     
                     if (fs.type == FState::fsDerive) {
                         for (FSIds::iterator i = fs.derive.inputs.begin();
@@ -197,6 +197,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                         }
 
                         label = "derive";
+                        shape = "box";
                         for (StringPairs::iterator i = fs.derive.env.begin();
                              i != fs.derive.env.end(); i++)
                             if (i->first == "name") label = i->second;
@@ -204,12 +205,17 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
                     else if (fs.type == FState::fsSlice) {
                         label = baseNameOf((*fs.slice.elems.begin()).path);
+                        shape = "ellipse";
+                        if (isHash(string(label, 0, Hash::hashSize * 2)) && 
+                            label[Hash::hashSize * 2] == '-')
+                            label = string(label, Hash::hashSize * 2 + 1);
                     }
 
                     else abort();
 
                     cout << dotQuote(id) << "[label = "
                          << dotQuote(label)
+                         << ", shape = " << shape
                          << "];\n";
                 }
             }
