@@ -24,7 +24,8 @@ sub createLinks {
         my $dstFile = "$dstDir/$baseName";
         
 	if ($srcFile =~ /\/propagated-build-inputs$/ ||
-            $srcFile =~ /\/nix-support$/)
+            $srcFile =~ /\/nix-support$/ ||
+            $srcFile =~ /\/log$/)
         {
             # Do noting.
 	}
