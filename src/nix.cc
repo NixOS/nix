@@ -166,7 +166,7 @@ string makeRef(string filename)
     if (!pipe) throw BadRefError("cannot execute md5sum");
 
     if (fread(hash, 32, 1, pipe) != 1)
-        throw BadRefError("cannot read hash from md5sum");
+        throw BadRefError("cannot read hash from md5sum of " + filename);
     hash[32] = 0;
 
     pclose(pipe);
@@ -222,14 +222,14 @@ void readPkgDescr(const string & pkgfile,
 }
 
 
-string getPkg(string pkgref);
+string getPkg(string hash);
 
 
 typedef pair<string, string> EnvPair;
 typedef list<EnvPair> Environment;
 
 
-void installPkg(string pkgref)
+void installPkg(string hash)
 {
     string pkgfile;
     string src;
@@ -237,13 +237,13 @@ void installPkg(string pkgref)
     string cmd;
     string builder;
 
-    if (!queryDB(dbRefs, pkgref, pkgfile))
-        throw Error("unknown package " + pkgref);
+    if (!queryDB(dbRefs, hash, pkgfile))
+        throw Error("unknown package " + hash);
 
-    cerr << "installing package " + pkgref + " from " + pkgfile + "\n";
+    cerr << "installing package " + hash + " from " + pkgfile + "\n";
 
     /* Verify that the file hasn't changed. !!! race */
-    if (makeRef(pkgfile) != pkgref)
+    if (makeRef(pkgfile) != hash)
         throw Error("file " + pkgfile + " is stale");
 
     /* Read the package description file. */
@@ -288,7 +288,7 @@ void installPkg(string pkgref)
         throw Error("no builder specified");
 
     /* Construct a path for the installed package. */
-    path = pkgHome + "/" + pkgref;
+    path = pkgHome + "/" + hash;
 
     /* Create the path. */
     if (mkdir(path.c_str(), 0777))
@@ -326,8 +326,7 @@ void installPkg(string pkgref)
             cout << strerror(errno) << endl;
 
             cout << "unable to execute builder\n";
-            _exit(1);
-        }
+            _exit(1); }
 
         }
 
@@ -346,17 +345,115 @@ void installPkg(string pkgref)
         throw;
     }
 
-    setDB(dbInstPkgs, pkgref, path);
+    setDB(dbInstPkgs, hash, path);
 }
 
 
-string getPkg(string pkgref)
+string getPkg(string hash)
 {
     string path;
-    checkRef(pkgref);
-    while (!queryDB(dbInstPkgs, pkgref, path))
-        installPkg(pkgref);
+    checkRef(hash);
+    while (!queryDB(dbInstPkgs, hash, path))
+        installPkg(hash);
     return path;
+}
+
+
+void runPkg(string hash)
+{
+    string pkgfile;
+    string src;
+    string path;
+    string cmd;
+    string runner;
+
+    if (!queryDB(dbRefs, hash, pkgfile))
+        throw Error("unknown package " + hash);
+
+    cerr << "running package " + hash + " from " + pkgfile + "\n";
+
+    /* Verify that the file hasn't changed. !!! race */
+    if (makeRef(pkgfile) != hash)
+        throw Error("file " + pkgfile + " is stale");
+
+    /* Read the package description file. */
+    DepList pkgImports, fileImports;
+    readPkgDescr(pkgfile, pkgImports, fileImports);
+
+    /* Recursively fetch all the dependencies, filling in the
+       environment as we go along. */
+    Environment env;
+
+    for (DepList::iterator it = pkgImports.begin();
+         it != pkgImports.end(); it++)
+    {
+        cerr << "fetching package dependency "
+             << it->name << " <- " << it->ref
+             << endl;
+        env.push_back(EnvPair(it->name, getPkg(it->ref)));
+    }
+
+    for (DepList::iterator it = fileImports.begin();
+         it != fileImports.end(); it++)
+    {
+        cerr << "fetching file dependency "
+             << it->name << " = " << it->ref
+             << endl;
+
+        string file;
+
+        if (!queryDB(dbRefs, it->ref, file))
+            throw Error("unknown file " + it->ref);
+
+        if (makeRef(file) != it->ref)
+            throw Error("file " + file + " is stale");
+
+        if (it->name == "run")
+            runner = file;
+        else
+            env.push_back(EnvPair(it->name, file));
+    }
+
+    if (runner == "")
+        throw Error("no runner specified");
+
+    /* Fork a child to build the package. */
+    pid_t pid;
+    switch (pid = fork()) {
+            
+    case -1:
+        throw Error("unable to fork");
+
+    case 0: { /* child */
+
+        /* Fill in the environment.  We don't bother freeing the
+           strings, since we'll exec or die soon anyway. */
+        for (Environment::iterator it = env.begin();
+             it != env.end(); it++)
+        {
+            string * s = new string(it->first + "=" + it->second);
+            putenv((char *) s->c_str());
+        }
+
+        /* Execute the runner.  This should not return. */
+        execl(runner.c_str(), runner.c_str(), 0);
+
+        cout << strerror(errno) << endl;
+
+        cout << "unable to execute runner\n";
+        _exit(1); }
+
+    }
+
+    /* parent */
+
+    /* Wait for the child to finish. */
+    int status;
+    if (waitpid(pid, &status, 0) != pid)
+        throw Error("unable to wait for child");
+    
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+        throw Error("unable to run package");
 }
 
 
@@ -381,13 +478,13 @@ void registerFile(string filename)
 
 
 /* This is primarily used for bootstrapping. */
-void registerInstalledPkg(string pkgref, string path)
+void registerInstalledPkg(string hash, string path)
 {
-    checkRef(pkgref);
+    checkRef(hash);
     if (path == "")
-        delDB(dbInstPkgs, pkgref);
+        delDB(dbInstPkgs, hash);
     else
-        setDB(dbInstPkgs, pkgref, path);
+        setDB(dbInstPkgs, hash, path);
 }
 
 
@@ -475,6 +572,9 @@ void run(int argc, char * * argv)
         if (argc != 1) throw argcError;
         string path = getPkg(argv[0]);
         cout << path << endl;
+    } else if (cmd == "run") {
+        if (argc != 1) throw argcError;
+        runPkg(argv[0]);
     } else if (cmd == "regfile") {
         if (argc != 1) throw argcError;
         registerFile(argv[0]);
@@ -500,7 +600,7 @@ Subcommands:
     Initialize the database.
 
   verify
-    Removes stale entries from the database.
+    Remove stale entries from the database.
 
   regfile FILENAME
     Register FILENAME keyed by its hash.
@@ -511,6 +611,9 @@ Subcommands:
   getpkg HASH
     Ensure that the package referenced by HASH is installed. Prints
     out the path of the package on stdout.
+
+  run HASH
+    Run the descriptor referenced by HASH.
 ";
 }
 
