@@ -36,7 +36,7 @@ env-keep-derivations = false
 EOF
 
 mkdir $NIX_DATA_DIR/nix
-cp -prd $TOP/corepkgs $NIX_DATA_DIR/nix/
+cp -pr $TOP/corepkgs $NIX_DATA_DIR/nix/
 # Bah, script has the prefix hard-coded.  This is really messy stuff
 # (and likely to fail).
 for i in \
