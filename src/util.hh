@@ -21,6 +21,7 @@ public:
     Error(const format & f);
     ~Error() throw () { };
     const char * what() const throw () { return err.c_str(); }
+    const string & msg() const throw () { return err; }
 };
 
 class SysError : public Error
@@ -44,8 +45,12 @@ extern string thisSystem;
 
 
 /* Return an absolutized path, resolving paths relative to the
-   specified directory, or the current directory otherwise. */
+   specified directory, or the current directory otherwise.  The path
+   is also canonicalised. */
 string absPath(string path, string dir = "");
+
+/* Canonicalise a path (as in realpath(3)). */
+string canonPath(const string & path);
 
 /* Return the directory part of the given path, i.e., everything
    before the final `/'. */

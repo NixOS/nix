@@ -83,25 +83,89 @@ void copyPath(string src, string dst)
 }
 
 
+Hash registerPath(const string & _path, Hash hash)
+{
+    string path(canonPath(_path));
+
+    if (hash == Hash()) hash = hashPath(path);
+
+    Strings paths;
+    queryListDB(nixDB, dbRefs, hash, paths); /* non-existence = ok */
+
+    for (Strings::iterator it = paths.begin();
+         it != paths.end(); it++)
+        if (*it == path) goto exists;
+    
+    paths.push_back(path);
+    
+    setListDB(nixDB, dbRefs, hash, paths);
+    
+ exists:
+    return hash;
+}
+
+
+bool isInPrefix(const string & path, const string & _prefix)
+{
+    string prefix = canonPath(_prefix + "/");
+    return string(path, 0, prefix.size()) == prefix;
+}
+
+
+static string queryPathByHashPrefix(Hash hash, const string & prefix)
+{
+    Strings paths;
+
+    if (!queryListDB(nixDB, dbRefs, hash, paths))
+        throw Error(format("no paths known with hash `%1%'") % (string) hash);
+
+    /* Arbitrarily pick the first one that exists and still hash the
+       right hash. */
+
+    for (Strings::iterator it = paths.begin();
+         it != paths.end(); it++)
+    {
+        debug(*it);
+        string path = *it;
+        try {
+            debug(path);
+            debug(prefix);
+            if (isInPrefix(path, prefix) && hashPath(path) == hash)
+                return path;
+        } catch (Error & e) {
+            debug(format("checking hash: %1%") % e.msg());
+            /* try next one */
+        }
+    }
+    
+    throw Error(format("all paths with hash `%1%' are stale") % (string) hash);
+}
+
+
+string queryPathByHash(Hash hash)
+{
+    return queryPathByHashPrefix(hash, "/");
+}
+
+
 void addToStore(string srcPath, string & dstPath, Hash & hash)
 {
     srcPath = absPath(srcPath);
 
     hash = hashPath(srcPath);
 
-    string path;
-    if (queryDB(nixDB, dbRefs, hash, path)) {
-        debug((string) hash + " already known");
-        dstPath = path;
+    try {
+        dstPath = queryPathByHashPrefix(hash, nixStore);
         return;
+    } catch (...) {
     }
-
+    
     string baseName = baseNameOf(srcPath);
     dstPath = nixStore + "/" + (string) hash + "-" + baseName;
 
     copyPath(srcPath, dstPath);
 
-    setDB(nixDB, dbRefs, hash, dstPath);
+    registerPath(dstPath, hash);
 }
 
 
@@ -112,21 +176,4 @@ void deleteFromStore(const string & path)
         throw Error(format("path %1% is not in the store") % path);
     deletePath(path);
 //     delDB(nixDB, dbRefs, hash);
-}
-
-
-string queryFromStore(Hash hash)
-{
-    string fn, url;
-
-    if (queryDB(nixDB, dbRefs, hash, fn)) {
-        
-        /* Verify that the file hasn't changed. !!! race !!! slow */
-        if (hashPath(fn) != hash)
-            throw Error("file " + fn + " is stale");
-
-        return fn;
-    }
-
-    throw Error(format("don't know a path with hash `%1%'") % (string) hash);
 }

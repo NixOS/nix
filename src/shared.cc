@@ -54,6 +54,9 @@ int main(int argc, char * * argv)
             "Try `%2% --help' for more information.\n")
             % e.what() % programId;
         return 1;
+    } catch (Error & e) {
+        cerr << format("error: %1%\n") % e.msg();
+        return 1;
     } catch (exception & e) {
         cerr << format("error: %1%\n") % e.what();
         return 1;

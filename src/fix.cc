@@ -29,7 +29,7 @@ static bool isFState(Expr e, string & path)
     }
     else if (ATmatch(e, "Include(<str>)", &s1))
     {
-        string fn = queryFromStore(parseHash(s1));
+        string fn = queryPathByHash(parseHash(s1));
         return isFState(evalFile(fn), path);
     }
     else return false;

@@ -191,15 +191,10 @@ void runTests()
 }
 
 
-int main(int argc, char * * argv)
+void run(Strings args)
 {
-    ATerm bottomOfStack;
-    ATinit(argc, argv, &bottomOfStack);
-
-    try {
-        runTests();
-    } catch (exception & e) {
-        cerr << "error: " << e.what() << endl;
-        return 1;
-    }
+    runTests();
 }
+
+
+string programId = "test";

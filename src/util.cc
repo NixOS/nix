@@ -33,13 +33,18 @@ string absPath(string path, string dir)
             dir = buf;
         }
         path = dir + "/" + path;
-        /* !!! canonicalise */
-        char resolved[PATH_MAX];
-        if (!realpath(path.c_str(), resolved))
-            throw SysError(format("cannot canonicalise path %1%") % path);
-        path = resolved;
     }
-    return path;
+    return canonPath(path);
+}
+
+
+string canonPath(const string & path)
+{
+    char resolved[PATH_MAX];
+    if (!realpath(path.c_str(), resolved))
+        throw SysError(format("cannot canonicalise path `%1%'") % path);
+    /* !!! check that this removes trailing slashes */
+    return resolved;
 }
 
 

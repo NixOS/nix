@@ -167,7 +167,7 @@ struct RStatus
 
 static ATerm termFromHash(const Hash & hash)
 {
-    string path = queryFromStore(hash);
+    string path = queryPathByHash(hash);
     ATerm t = ATreadFromNamedFile(path.c_str());
     if (!t) throw Error(format("cannot read aterm %1%") % path);
     return t;
@@ -183,7 +183,7 @@ Hash writeTerm(ATerm t)
     string path2 = nixStore + "/" + (string) hash + ".nix";
     if (rename(path.c_str(), path2.c_str()) == -1)
         throw SysError(format("renaming %1% to %2%") % path % path2);
-    setDB(nixDB, dbRefs, hash, path2);
+    registerPath(path2, hash);
     return hash;
 }
 
@@ -259,7 +259,7 @@ static FState realise(RStatus & status, FState fs)
         }
 
         /* Do we know a path with that hash?  If so, copy it. */
-        string path2 = queryFromStore(hash);
+        string path2 = queryPathByHash(hash);
         copyPath(path2, path);
 
         return nf;
@@ -318,7 +318,7 @@ static FState realise(RStatus & status, FState fs)
 
         /* Register targetHash -> targetPath.  !!! this should be in
            values.cc. */
-        setDB(nixDB, dbRefs, outHash, outPath);
+        registerPath(outPath, outHash);
 
         /* Register the normal form of fs. */
         FState nf = ATmake("Path(<str>, Hash(<str>), <term>)",

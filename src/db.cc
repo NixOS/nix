@@ -73,6 +73,40 @@ bool queryDB(const string & filename, const string & dbname,
 }
 
 
+bool queryListDB(const string & filename, const string & dbname,
+    const string & key, Strings & data)
+{
+    string d;
+
+    if (!queryDB(filename, dbname, key, d))
+        return false;
+
+    string::iterator it = d.begin();
+    
+    while (it != d.end()) {
+
+        if (it + 4 > d.end())
+            throw Error(format("short db entry: `%1%'") % d);
+        
+        unsigned int len;
+        len = (unsigned char) *it++;
+        len |= ((unsigned char) *it++) << 8;
+        len |= ((unsigned char) *it++) << 16;
+        len |= ((unsigned char) *it++) << 24;
+        
+        if (it + len > d.end())
+            throw Error(format("short db entry: `%1%'") % d);
+
+        string s;
+        while (len--) s += *it++;
+
+        data.push_back(s);
+    }
+
+    return true;
+}
+
+
 void setDB(const string & filename, const string & dbname,
     const string & key, const string & data)
 {
@@ -82,6 +116,29 @@ void setDB(const string & filename, const string & dbname,
         Dbt dt((void *) data.c_str(), data.length());
         db->put(0, &kt, &dt, 0);
     } catch (DbException e) { rethrow(e); }
+}
+
+
+void setListDB(const string & filename, const string & dbname,
+    const string & key, const Strings & data)
+{
+    string d;
+    
+    for (Strings::const_iterator it = data.begin();
+         it != data.end(); it++)
+    {
+        string s = *it;
+        unsigned int len = s.size();
+
+        d += len & 0xff;
+        d += (len >> 8) & 0xff;
+        d += (len >> 16) & 0xff;
+        d += (len >> 24) & 0xff;
+        
+        d += s;
+    }
+
+    setDB(filename, dbname, key, d);
 }
 
 

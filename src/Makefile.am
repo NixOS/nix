@@ -14,7 +14,7 @@ fix_LDADD = libnix.a -ldb_cxx-4 -lATerm
 
 TESTS = test
 
-test_SOURCES = test.cc
+test_SOURCES = test.cc shared.cc
 test_LDADD = libnix.a -ldb_cxx-4 -lATerm
 
 noinst_LIBRARIES = libnix.a
