@@ -12,6 +12,7 @@
 #include "db.hh"
 #include "archive.hh"
 #include "pathlocks.hh"
+#include "gc.hh"
 
 
 /* Nix database. */
@@ -468,6 +469,8 @@ Path addToStore(const Path & _srcPath)
     string baseName = baseNameOf(srcPath);
     Path dstPath = makeStorePath("source", h, baseName);
 
+    addTempRoot(dstPath);
+
     if (!readOnlyMode && !isValidPath(dstPath)) { 
 
         /* The first check above is an optimisation to prevent
@@ -512,6 +515,8 @@ Path addTextToStore(const string & suffix, const string & s,
 
     Path dstPath = makeStorePath("text", hash, suffix);
     
+    addTempRoot(dstPath);
+
     if (!readOnlyMode && !isValidPath(dstPath)) {
 
         PathSet lockPaths;

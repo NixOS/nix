@@ -3,6 +3,7 @@
 
 #include "util.hh"
 
+
 /* Garbage collector operation. */
 typedef enum { gcReturnLive, gcReturnDead, gcDeleteDead } GCAction;
 
@@ -13,5 +14,10 @@ typedef enum { gcReturnLive, gcReturnDead, gcDeleteDead } GCAction;
    latter set. */
 void collectGarbage(const PathSet & roots, GCAction action,
     PathSet & result);
+
+/* Register a temporary GC root.  This root will automatically
+   disappear when this process exits. */
+void addTempRoot(const Path & path);
+
 
 #endif /* !__GC_H */

@@ -179,9 +179,10 @@ class AutoCloseFD
 public:
     AutoCloseFD();
     AutoCloseFD(int fd);
+    AutoCloseFD(const AutoCloseFD & fd);
     ~AutoCloseFD();
     void operator =(int fd);
-    operator int();
+    operator int() const;
     void close();
     bool isOpen();
     int borrow();

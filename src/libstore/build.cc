@@ -13,6 +13,7 @@
 #include "references.hh"
 #include "pathlocks.hh"
 #include "globals.hh"
+#include "gc.hh"
 
 
 /* !!! TODO derivationFromPath shouldn't be used here */
@@ -59,7 +60,6 @@ protected:
     /* Whether amDone() has been called. */
     bool done;
 
-    
     Goal(Worker & worker) : worker(worker)
     {
         done = false;
@@ -441,6 +441,10 @@ void DerivationGoal::haveStoreExpr()
 
     /* Get the derivation. */
     drv = derivationFromPath(drvPath);
+
+    for (DerivationOutputs::iterator i = drv.outputs.begin();
+         i != drv.outputs.end(); ++i)
+        addTempRoot(i->second.path);
 
     /* Check what outputs paths are not already valid. */
     PathSet invalidOutputs = checkPathValidity(false);
@@ -1308,6 +1312,8 @@ void SubstitutionGoal::init()
 {
     trace("init");
 
+    addTempRoot(storePath);
+    
     /* If the path already exists we're done. */
     if (isValidPath(storePath)) {
         amDone();

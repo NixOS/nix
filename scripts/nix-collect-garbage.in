@@ -9,6 +9,7 @@ my $storeDir = "@storedir@";
 my %alive;
 
 my $gcOper = "--delete";
+my $extraArgs = "";
 
 my @roots = ();
 
@@ -18,6 +19,9 @@ for (my $i = 0; $i < scalar @ARGV; $i++) {
     my $arg = $ARGV[$i];
     if ($arg eq "--delete" || $arg eq "--print-live" || $arg eq "--print-dead") {
         $gcOper = $arg;
+    }
+    elsif ($arg =~ /^-v+$/) {
+        $extraArgs = "$extraArgs $arg";
     }
     else { die "unknown argument `$arg'" };
 }
@@ -66,7 +70,7 @@ findRoots 1, $rootsDir;
 
 
 # Run the collector with the roots we found.
-my $pid = open2(">&1", \*WRITE, "@bindir@/nix-store --gc $gcOper")
+my $pid = open2(">&1", \*WRITE, "@bindir@/nix-store --gc $gcOper $extraArgs")
     or die "cannot run `nix-store --gc'";
 
 foreach my $root (@roots) {

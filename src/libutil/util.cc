@@ -234,8 +234,8 @@ Path createTempDir()
 
 void writeStringToFile(const Path & path, const string & s)
 {
-    AutoCloseFD fd = open(path.c_str(),
-        O_CREAT | O_EXCL | O_WRONLY, 0666);
+    AutoCloseFD fd(open(path.c_str(),
+        O_CREAT | O_EXCL | O_WRONLY, 0666));
     if (fd == -1)
         throw SysError(format("creating file `%1%'") % path);
     writeFull(fd, (unsigned char *) s.c_str(), s.size());
@@ -375,6 +375,12 @@ AutoCloseFD::AutoCloseFD(int fd)
 }
 
 
+AutoCloseFD::AutoCloseFD(const AutoCloseFD & fd)
+{
+    abort();
+}
+
+
 AutoCloseFD::~AutoCloseFD()
 {
     try {
@@ -392,7 +398,7 @@ void AutoCloseFD::operator =(int fd)
 }
 
 
-AutoCloseFD::operator int()
+AutoCloseFD::operator int() const
 {
     return fd;
 }
@@ -401,6 +407,7 @@ AutoCloseFD::operator int()
 void AutoCloseFD::close()
 {
     if (fd != -1) {
+        debug(format("closing fd %1%") % fd);
         if (::close(fd) == -1)
             /* This should never happen. */
             throw SysError("closing file descriptor");

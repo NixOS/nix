@@ -26,6 +26,7 @@ ln -s $TOP/scripts/readmanifest.pm $NIX_BIN_DIR/nix/
 mkdir -p "$NIX_LOCALSTATE_DIR"/nix/manifests
 mkdir -p "$NIX_LOCALSTATE_DIR"/nix/gcroots
 mkdir -p "$NIX_LOCALSTATE_DIR"/log/nix
+mkdir -p "$NIX_LOCALSTATE_DIR"/temproots
 
 mkdir $NIX_DATA_DIR/nix
 cp -prd $TOP/corepkgs $NIX_DATA_DIR/nix/
