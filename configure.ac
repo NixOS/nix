@@ -83,10 +83,10 @@ AC_PATH_PROG(bison, bison, false)
 NEED_PROG(perl, perl)
 NEED_PROG(tar, tar)
                 
-AC_PATH_PROG(mkdir, mkdir, false)
+NEED_PROG(cat, cat)
 AC_ARG_WITH(coreutils-bin, AC_HELP_STRING([--with-coreutils-bin=PATH],
-  [path of mkdir, etc.]),
-  coreutils=$withval, coreutils=$(dirname $mkdir))
+  [path of cat, mkdir, etc.]),
+  coreutils=$withval, coreutils=$(dirname $cat))
 AC_SUBST(coreutils)
 
 AC_ARG_WITH(docbook-catalog, AC_HELP_STRING([--with-docbook-catalog=PATH],
