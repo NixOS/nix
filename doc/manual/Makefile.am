@@ -9,7 +9,7 @@ XSLTPROC = $(ENV) $(xsltproc) $(xmlflags) --catalogs \
 SOURCES = manual.xml introduction.xml installation.xml overview.xml \
  nix-env.xml nix-store.xml nix-instantiate.xml \
  troubleshooting.xml bugs.xml opt-verbose.xml \
- style.css images
+ quick-start.xml style.css images
 
 manual.is-valid: $(SOURCES) version.xml
 	$(XMLLINT) --noout --valid manual.xml

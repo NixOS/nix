@@ -1,0 +1,136 @@
+<chapter>
+  <title>Quick Start</title>
+
+  <para>
+    This chapter is for impatient people who don't like reading
+    documentation.  For more in-depth information you are kindly
+    referred to <xref linkend='chap-installation' /> and <xref
+    linkend='chap-overview' />.
+  </para>
+
+  <orderedlist>
+
+    <listitem>
+      <para>
+        Download a source tarball or RPM from <ulink
+        url='http://www.cs.uu.nl/groups/ST/Trace/NixDeploymentSystem'/>.
+        Build source distributions using the regular sequence:
+        
+        <screen>
+$ tar xvfj nix-<replaceable>version</replaceable>.tar.bz2
+$ ./configure
+$ make
+$ make install <lineannotation>(as root)</lineannotation></screen>
+
+        This will install Nix in <filename>/nix</filename>.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        Get some Nix expressions for pre-built packages by downloading
+        the latest <literal>nixpkgs</literal> distribution (from the
+        same location), and unpack them.
+
+        <screen>
+$ wget http://<replaceable>...</replaceable>/nix/nixpkgs-<replaceable>version</replaceable>/nixpkgs-<replaceable>version</replaceable>.tar.bz2
+$ tar xfj nixpkgs-<replaceable>version</replaceable>.tar.bz2</screen>
+
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        Pull the Nix cache.  This ensures that when you install
+        packages they are downloaded in pre-built form from the
+        network, rather than built from source.
+
+        <screen>
+$ nix-pull http://<replaceable>...</replaceable>/nix/nixpkgs-<replaceable>version</replaceable>/</screen>
+
+      </para>
+
+      <para>
+        Note that currently we only pre-build for Linux on x86
+        platforms.
+      </para>
+        
+    </listitem>
+        
+    <listitem>
+      <para>
+        See what's available:
+
+        <screen>
+$ nix-env -qaf nixpkgs-<replaceable>version</replaceable>
+MozillaFirebird-0.7
+hello-2.1.1
+docbook-xml-4.2
+libxslt-1.1.0
+<replaceable>...</replaceable></screen>
+
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        Install some packages:
+        
+        <screen>
+$ nix-env -iBf nixpkgs-<replaceable>version</replaceable> hello MozillaFirebird <replaceable>...</replaceable> </screen>
+
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        Test that they work:
+
+        <screen>
+$ which hello
+/home/eelco/.nix-userenv/bin/hello
+$ hello
+Hello, world!
+$ MozillaFirebird
+<lineannotation>(read Slashdot or something)</lineannotation></screen>
+
+      </para>
+    </listitem>
+    
+    <listitem>
+      <para>
+        Uninstall a package:
+
+        <screen>
+$ nix-env -e hello</screen>
+
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        If a new release of <literal>nixpkgs</literal> comes along,
+        you can upgrade all installed packages to the latest versions
+        by downloading and unpacking the new release and doing:
+
+        <screen>
+$ nix-env -uBf nixpkgs-<replaceable>version</replaceable> '*'</screen>
+
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        You should periodically run the Nix garbage collector to get
+        rid of unused packages, since uninstalls or upgrades don't
+        actual delete them:
+
+        <screen>
+$ nix-collect-garbage | xargs nix-store --delete</screen>
+
+      </para>
+    </listitem>
+
+  </orderedlist>
+
+</chapter>

@@ -4,6 +4,7 @@
     "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd"
 [
 <!ENTITY introduction SYSTEM "introduction.xml">
+<!ENTITY quick-start SYSTEM "quick-start.xml">
 <!ENTITY installation SYSTEM "installation.xml">
 <!ENTITY overview SYSTEM "overview.xml">
 <!ENTITY opt-verbose SYSTEM "opt-verbose.xml">
@@ -26,12 +27,13 @@
       <surname>Dolstra</surname>
     </author>
     <copyright>
-      <year>2003</year>
+      <year>2004</year>
       <holder>Eelco Dolstra</holder>
     </copyright>
   </bookinfo>
 
   &introduction;
+  &quick-start;
   &installation;
   &overview;
 
