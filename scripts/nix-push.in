@@ -8,14 +8,25 @@ foreach my $id (@ARGV) {
 
     # Get all paths referenced by the normalisation of the given 
     # fstate expression.
-    system "nix -ih $id";
-    if ($?) { die "`nix -ih' failed"; }
+    system "nix --install $id";
+    if ($?) { die "`nix --install' failed"; }
+
     my @paths;
-    open PATHS, "nix -qrh $id 2> /dev/null |" or die "nix -qrh";
+
+    open PATHS, "nix --query --refs $id 2> /dev/null |" or die "nix -qr";
     while (<PATHS>) {
         chomp;
-        next unless /^\//;
+        die "bad: $_" unless /^\//;
         push @paths, $_;
+    }
+    close PATHS;
+
+    # Also add all normal forms that are contained in these paths.
+    open PATHS, "nix --query --generators --path @paths |" or die "nix -qg";
+    while (<PATHS>) {
+	chomp;
+        die "bad: $_" unless /^\//;
+	push @paths, $_;
     }
     close PATHS;
 
@@ -38,7 +49,6 @@ foreach my $id (@ARGV) {
         my $fixexpr = 
           "App(IncludeFix(\"nar/nar.fix\"), " .
           "[ (\"path\", Slice([\"$pathid\"], [(\"$path\", \"$pathid\", [])]))" .
-          ", (\"name\", \"$name\")" .
           "])";
 	
         my $fixfile = "/tmp/nix-push-tmp.fix";
@@ -53,13 +63,13 @@ foreach my $id (@ARGV) {
         die unless $nid =~ /^([0-9a-z]{32})$/;
 
         # Realise the Nix expression.
-	system "nix -ih $nid";
-	if ($?) { die "`nix -ih' failed"; }
-        my $npath = `nix -qph $nid 2> /dev/null`;
-        $? and die "creating Nix archive";
+	system "nix --install $nid";
+	if ($?) { die "`nix --install' failed"; }
+        my $npath = `nix --query --list $nid 2> /dev/null`;
+        $? and die "`nix --query --list' failed";
         chomp $npath;
 
-        push @pushlist, $npath;
+        push @pushlist, "$npath/*";
 
         print "$path -> $npath\n";
     }

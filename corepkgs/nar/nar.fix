@@ -1,6 +1,6 @@
-Function(["path", "name"],
+Function(["path"],
   Package(
-    [ ("name", Var("name"))
+    [ ("name", "nar")
     , ("build", Relative("nar/nar.sh"))
     , ("path", Var("path"))
     ]

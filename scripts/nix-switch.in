@@ -15,11 +15,11 @@ $hash || die "no package hash specified";
 my $linkdir = "@localstatedir@/nix/links";
 
 # Build the specified package, and all its dependencies.
-system "nix -ih $hash";
-if ($?) { die "`nix -ih' failed"; }
+system "nix --install $hash";
+if ($?) { die "`nix --install' failed"; }
 
-my $pkgdir = `nix -qph $hash`;
-if ($?) { die "`nix -qph' failed"; }
+my $pkgdir = `nix --query --list $hash`;
+if ($?) { die "`nix --query --list' failed"; }
 chomp $pkgdir;
 
 # Figure out a generation number.
