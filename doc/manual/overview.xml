@@ -14,10 +14,9 @@
       installed or available for installation, and so on.  These are operations
       on the <emphasis>user environment</emphasis>: the set of packages that a
       user <quote>sees</quote>.  In a command line Unix environment, this means
-      the set of programs that are available through the
-      <literal>PATH</literal> environment variable.  (In other environments it
-      might mean the set of programs available on the desktop, through the
-      start menu, and so on.)
+      the set of programs that are available through the <envar>PATH</envar>
+      environment variable.  (In other environments it might mean the set of
+      programs available on the desktop, through the start menu, and so on.)
     </para>
 
     <para>
@@ -183,8 +182,8 @@ obtaining list of Nix archives at http://losser.st-lab.cs.uu.nl/~eelco/nix-dist.
     <para>
       Assuming that the <literal>pan</literal> installation produced no errors,
       it can be used immediately, that is, it now appears in a directory in the
-      <literal>PATH</literal> environment variable.  Specifically,
-      <literal>PATH</literal> includes the entry
+      <envar>PATH</envar> environment variable.  Specifically,
+      <envar>PATH</envar> includes the entry
       <filename><replaceable>prefix</replaceable>/var/nix/links/current/bin</filename>, 
       where
       <filename><replaceable>prefix</replaceable>/var/nix/links/current</filename> 
@@ -238,6 +237,172 @@ lrwxrwxrwx  1 eelco ... svn -> /nix/store/3829...fb5d-subversion-0.32.1/bin/svn
 $ nix-env -u pan-0.14.2</screen>
 
   </sect1>
+
+
+  <sect1>
+    <title>Writing Nix expressions</title>
+
+    <sect2>
+      <title>A simple Nix expression</title>
+
+      <para>
+        This section shows how to write simple Nix expressions&mdash;the things
+        that describe how to build a package.
+      </para>
+
+      <example id='ex-hello-nix'>
+        <title>Nix expression for GNU Hello</title>
+        <programlisting>
+{stdenv, fetchurl, perl}: <co id='ex-hello-nix-co-1' />
+
+derivation { <co id='ex-hello-nix-co-2' />
+  name = "hello-2.1.1"; <co id='ex-hello-nix-co-3' />
+  system = stdenv.system; <co id='ex-hello-nix-co-4' />
+  builder = ./builder.sh; <co id='ex-hello-nix-co-5' />
+  src = fetchurl { <co id='ex-hello-nix-co-6' />
+    url = ftp://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz;
+    md5 = "70c9ccf9fac07f762c24f2df2290784d";
+  };
+  stdenv = stdenv; <co id='ex-hello-nix-co-7' />
+  perl = perl;
+}
+        </programlisting>
+      </example>
+
+      <para>
+        A simple Nix expression is shown in <xref linkend='ex-hello-nix' />. It
+        describes how to the build the <ulink
+          url='http://www.gnu.org/directory/GNU/hello.html'>GNU Hello
+          package</ulink>.  This package has several dependencies.  First, it
+        requires a number of other packages, such as a C compiler, standard
+        Unix shell tools, and Perl.  Rather than have this Nix expression refer
+        to and use specific versions of these packages, it should be generic;
+        that is, it should be a <emphasis>function</emphasis> that takes the
+        required packages as inputs and yield a build of the GNU Hello package
+        as a result.  This Nix expression defines a function with three
+        arguments <xref linkend='ex-hello-nix-co-1' />, namely:
+        <orderedlist>
+          <listitem><para><varname>stdenv</varname>, which should be a
+              <emphasis>standard environment package</emphasis>.  The standard
+              environment is a set of tools and other components that would be
+              expected in a fairly minimal Unix-like environment: a C compiler
+              and linker, Unix shell tools, and so on.</para>
+          </listitem>
+          <listitem><para><varname>fetchurl</varname>, which should be a
+              function that given parameters <varname>url</varname> and
+              <varname>md5</varname>, will fetch a file from the specified
+              location and check that this file has the given MD5 hash code.
+              The hash is required because build operations must be
+              <emphasis>pure</emphasis>: given the same inputs they should
+              always yield the same output.  Since network resources can change
+              at any time, we must in some way guarantee what the result will
+              be.</para>
+          </listitem>
+          <listitem><para><varname>perl</varname>, which should be a Perl
+              interpreter.</para>
+          </listitem>
+        </orderedlist>
+      </para>
+
+      <para>
+        The remainder of the file is the body of the function, which happens to
+        be a <emphasis>derivation</emphasis> <xref
+        linkend='ex-hello-nix-co-2' />, which is the built-in function
+        <varname>derivation</varname> applied to a set of attributes that
+        encode all the necessary information for building the GNU Hello
+        package. 
+      </para>
+
+      <example>
+        <title>Build script (<filename>builder.sh</filename>) for GNU
+          Hello</title>
+        <programlisting>
+#! /bin/sh
+
+buildinputs="$perl"
+. $stdenv/setup || exit 1
+
+tar xvfz $src || exit 1
+cd hello-* || exit 1
+./configure --prefix=$out || exit 1
+make || exit 1
+make install || exit 1
+        </programlisting>
+      </example>
+
+    </sect2>
+
+    <sect2>
+      <title>A more complex Nix expression</title>
+
+      <example id='ex-svn-nix'>
+        <title>Nix expression for Subversion</title>
+        <programlisting>
+{ localServer ? false <co id='ex-svn-nix-co-1' />
+, httpServer ? false
+, sslSupport ? false
+, swigBindings ? false
+, stdenv, fetchurl
+, openssl ? null, httpd ? null, db4 ? null, expat, swig ? null
+}:
+
+assert !isNull expat; <co id='ex-svn-nix-co-2' />
+assert localServer -> !isNull db4;
+assert httpServer -> !isNull httpd &amp;&amp; httpd.expat == expat; <co id='ex-svn-nix-co-3' />
+assert sslSupport -> !isNull openssl &amp;&amp; (httpServer -> httpd.openssl == openssl);
+assert swigBindings -> !isNull swig;
+
+derivation {
+  name = "subversion-0.32.1";
+  system = stdenv.system;
+
+  builder = ./builder.sh;
+  src = fetchurl {
+    url = http://svn.collab.net/tarballs/subversion-0.32.1.tar.gz;
+    md5 = "b06717a8ef50db4b5c4d380af00bd901";
+  };
+
+  localServer = localServer;
+  httpServer = httpServer;
+  sslSupport = sslSupport;
+  swigBindings = swigBindings;
+
+  stdenv = stdenv;
+  openssl = if sslSupport then openssl else null; <co id='ex-svn-nix-co-4' />
+  httpd = if httpServer then httpd else null;
+  expat = expat;
+  db4 = if localServer then db4 else null;
+  swig = if swigBindings then swig else null;
+}
+        </programlisting>
+      </example>
+
+      <para>
+        This example shows several features.  Default parameters <xref
+          linkend='ex-svn-nix-co-1'/> can be used to simplify call sites: if an
+        argument that has a default is omitted, its default value is used.
+      </para>
+
+      <para>
+        You can use <emphasis>assertions</emphasis> to test whether arguments
+        satisfy certain constraints.  The simple assertion <xref
+          linkend='ex-svn-nix-co-2'/> tests whether the
+        <varname>expat</varname> argument is not a null value.  The more
+        complex assertion <xref linkend='ex-svn-nix-co-3'/> says that if
+        Subversion is built with Apache support, then <varname>httpd</varname>
+        (the Apache package) must not be null and it must have been built using
+        the same instance of the <varname>expat</varname> library as was passed
+        to the Subversion expression.  This is since the Subversion code is
+        dynamically linked against the Apache code and they both use Expat,
+        they must be linked against the same instance&mdash;otherwise a
+        conflict might occur. 
+      </para>
+
+    </sect2>
+
+  </sect1>
+
+
 
 </chapter>
 

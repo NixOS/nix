@@ -117,7 +117,7 @@ $ autoreconf -i</screen>
 
     <para>
       To use Nix, some environment variables should be set.  In particular,
-      <literal>PATH</literal> should contain the directories
+      <envar>PATH</envar> should contain the directories
       <filename><replaceable>prefix</replaceable>/bin</filename> and
       <filename><replaceable>prefix</replaceable>/var/nix/links/current/bin</filename>. 
       The first directory contains the Nix tools themselves, while the second

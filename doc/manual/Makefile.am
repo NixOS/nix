@@ -1,7 +1,9 @@
 ENV = SGML_CATALOG_FILES=$(docbookcatalog)
 
 XMLLINT = $(ENV) $(xmllint) $(xmlflags) --catalogs
-XSLTPROC = $(ENV) $(xsltproc) $(xmlflags) --catalogs
+XSLTPROC = $(ENV) $(xsltproc) $(xmlflags) --catalogs \
+ --param section.autolabel 1 \
+ --param section.label.includes.component.label 1
 
 SOURCES = book.xml introduction.xml installation.xml \
  overview.xml \
