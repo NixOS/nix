@@ -64,6 +64,11 @@ AC_ARG_WITH(docbook-catalog, AC_HELP_STRING([--with-docbook-catalog=PATH],
   docbookcatalog=$withval, docbookcatalog=/docbook-dtd-missing)
 AC_SUBST(docbookcatalog)
 
+AC_ARG_WITH(docbook-ebnf-catalog, AC_HELP_STRING([--with-docbook-ebnf-catalog=PATH],
+  [path of the DocBook XML EBNF module DTD]),
+  docbookebnfcatalog=$withval, docbookcatalog=/docbook-ebnf-dtd-missing)
+AC_SUBST(docbookebnfcatalog)
+
 AC_ARG_WITH(docbook-xsl, AC_HELP_STRING([--with-docbook-xsl=PATH],
   [path of the DocBook XSL stylesheets]),
   docbookxsl=$withval, docbookxsl=/docbook-xsl-missing)

@@ -1,8 +1,11 @@
 <?xml version="1.0"?>
 <!DOCTYPE book
-    PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
-    "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd"
+    PUBLIC "-//OASIS//DTD DocBook EBNF Module V1.0//EN"
+    "http://www.oasis-open.org/docbook/xml/ebnf/1.0/dbebnf.dtd"
 [
+<!-- <!DOCTYPE book
+    PUBLIC "-//OASIS//DTD DocBook XML V4.3//EN"
+    "http://www.docbook.org/xml/4.3/docbook-xml-4.3.zip" -->
 <!ENTITY introduction SYSTEM "introduction.xml">
 <!ENTITY quick-start SYSTEM "quick-start.xml">
 <!ENTITY installation SYSTEM "installation.xml">
@@ -16,6 +19,7 @@
 <!ENTITY nix-push SYSTEM "nix-push.xml">
 <!ENTITY nix-pull SYSTEM "nix-pull.xml">
 <!ENTITY nix-prefetch-url SYSTEM "nix-prefetch-url.xml">
+<!ENTITY nix-lang-ref SYSTEM "nix-lang-ref.xml">
 <!ENTITY troubleshooting SYSTEM "troubleshooting.xml">
 <!ENTITY bugs SYSTEM "bugs.xml">
 <!ENTITY version SYSTEM "version.xml">
@@ -73,6 +77,8 @@
       &nix-prefetch-url;
     </sect1>
   </appendix>
+
+  &nix-lang-ref;
 
   &troubleshooting;
   &bugs;

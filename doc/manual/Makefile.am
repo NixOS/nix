@@ -1,4 +1,4 @@
-ENV = SGML_CATALOG_FILES=$(docbookcatalog)
+ENV = SGML_CATALOG_FILES=$(docbookcatalog):$(docbookebnfcatalog)
 
 XMLLINT = $(ENV) $(xmllint) $(xmlflags) --catalogs
 XSLTPROC = $(ENV) $(xsltproc) $(xmlflags) --catalogs \
@@ -13,7 +13,7 @@ man1_MANS = nix-env.1 nix-store.1 nix-instantiate.1 \
 SOURCES = manual.xml introduction.xml installation.xml overview.xml \
  $(man1_MANS:.1=.xml) \
  troubleshooting.xml bugs.xml opt-common.xml opt-common-syn.xml \
- quick-start.xml style.css images
+ quick-start.xml nix-lang-ref.xml style.css images
 
 manual.is-valid: $(SOURCES) version.xml
 	$(XMLLINT) --noout --valid manual.xml

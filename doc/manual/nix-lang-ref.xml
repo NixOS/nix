@@ -1,0 +1,183 @@
+<chapter>
+  <title>Nix Language Reference</title>
+
+  <sect1>
+    <title>Grammar</title>
+
+    <para>
+    </para>
+
+    <productionset>
+      <title>Expressions</title>
+      
+      <production id="nix.expr">
+        <lhs>Expr</lhs>
+        <rhs>
+          <nonterminal def="#nix.expr_function" />
+        </rhs>
+      </production>
+      
+      <production id="nix.expr_function">
+        <lhs>ExprFunction</lhs>
+        <rhs>
+          '{' <nonterminal def="#nix.formals" /> '}' ':' <nonterminal def="#nix.expr_function" />
+          <sbr />|
+          <nonterminal def="#nix.expr_assert" />
+        </rhs>
+      </production>
+      
+      <production id="nix.expr_assert">
+        <lhs>ExprAssert</lhs>
+        <rhs>
+          'assert' <nonterminal def="#nix.expr" /> ';' <nonterminal def="#nix.expr_assert" />
+          <sbr />|
+          <nonterminal def="#nix.expr_if" />
+        </rhs>
+      </production>
+      
+      <production id="nix.expr_if">
+        <lhs>ExprIf</lhs>
+        <rhs>
+          'if' <nonterminal def="#nix.expr" /> 'then' <nonterminal def="#nix.expr" />
+          'else' <nonterminal def="#nix.expr" />
+          <sbr />|
+          <nonterminal def="#nix.expr_op" />
+        </rhs>
+      </production>
+      
+      <production id="nix.expr_op">
+        <lhs>ExprOp</lhs>
+        <rhs>
+          '!' <nonterminal def="#nix.expr_op" />
+          <sbr />|
+          <nonterminal def="#nix.expr_op" /> '==' <nonterminal def="#nix.expr_op" />
+          <sbr />|
+          <nonterminal def="#nix.expr_op" /> '!=' <nonterminal def="#nix.expr_op" />
+          <sbr />|
+          <nonterminal def="#nix.expr_op" /> '&amp;&amp;' <nonterminal def="#nix.expr_op" />
+          <sbr />|
+          <nonterminal def="#nix.expr_op" /> '||' <nonterminal def="#nix.expr_op" />
+          <sbr />|
+          <nonterminal def="#nix.expr_op" /> '->' <nonterminal def="#nix.expr_op" />
+          <sbr />|
+          <nonterminal def="#nix.expr_op" /> '//' <nonterminal def="#nix.expr_op" />
+          <sbr />|
+          <nonterminal def="#nix.expr_op" /> '~' <nonterminal def="#nix.expr_op" />
+          <sbr />|
+          <nonterminal def="#nix.expr_op" /> '?' <nonterminal def="#nix.id" />
+          <sbr />|
+          <nonterminal def="#nix.expr_app" />
+        </rhs>
+      </production>
+      
+      <production id="nix.expr_app">
+        <lhs>ExprApp</lhs>
+        <rhs>
+          <nonterminal def="#nix.expr_app" /> '.' <nonterminal def="#nix.expr_select" />
+          <sbr />|
+          <nonterminal def="#nix.expr_select" />
+        </rhs>
+      </production>
+      
+      <production id="nix.expr_select">
+        <lhs>ExprSelect</lhs>
+        <rhs>
+          <nonterminal def="#nix.expr_select" /> <nonterminal def="#nix.id" />
+          <sbr />|
+          <nonterminal def="#nix.expr_simple" />
+        </rhs>
+      </production>
+      
+      <production id="nix.expr_simple">
+        <lhs>ExprSimple</lhs>
+        <rhs>
+          <nonterminal def="#nix.id" /> |
+          <nonterminal def="#nix.int" /> |
+          <nonterminal def="#nix.str" /> |
+          <nonterminal def="#nix.path" /> |
+          <nonterminal def="#nix.uri" />
+          <sbr />|
+          '(' <nonterminal def="#nix.expr" /> ')'
+          <sbr />|
+          '{' <nonterminal def="#nix.bind" />* '}'
+          <sbr />|
+          'let' '{' <nonterminal def="#nix.bind" />* '}'
+          <sbr />|
+          'rec' '{' <nonterminal def="#nix.bind" />* '}'
+          <sbr />|
+          '[' <nonterminal def="#nix.expr_select" />* ']'
+        </rhs>
+      </production>
+
+      <production id="nix.bind">
+        <lhs>Bind</lhs>
+        <rhs>
+          <nonterminal def="#nix.id" /> '=' <nonterminal def="#nix.expr" /> ';'
+          <sbr />|
+          'inherit' ('(' <nonterminal def="#nix.expr" /> ')')? <nonterminal def="#nix.id" />* ';'
+        </rhs>
+      </production>
+
+      <production id="nix.formals">
+        <lhs>Formals</lhs>
+        <rhs>
+          <nonterminal def="#nix.formal" /> ',' <nonterminal def="#nix.formals" />
+          | <nonterminal def="#nix.formal" />
+        </rhs>
+      </production>
+          
+      <production id="nix.formal">
+        <lhs>Formal</lhs>
+        <rhs>
+          <nonterminal def="#nix.id" />
+          <sbr />|
+          <nonterminal def="#nix.id" /> '?' <nonterminal def="#nix.expr" />
+        </rhs>
+      </production>
+          
+    </productionset>
+
+    <productionset>
+      <title>Terminals</title>
+
+      <production id="nix.id">
+        <lhs>Id</lhs>
+        <rhs>[a-zA-Z\_][a-zA-Z0-9\_\']*</rhs>
+      </production>
+    
+      <production id="nix.int">
+        <lhs>Int</lhs>
+        <rhs>[0-9]+</rhs>
+      </production>
+    
+      <production id="nix.str">
+        <lhs>Str</lhs>
+        <rhs>\"[^\n\"]*\"</rhs>
+      </production>
+
+      <production id="nix.path">
+        <lhs>Path</lhs>
+        <rhs>[a-zA-Z0-9\.\_\-\+]*(\/[a-zA-Z0-9\.\_\-\+]+)+</rhs>
+      </production>
+    
+      <production id="nix.uri">
+        <lhs>Uri</lhs>
+        <rhs>[a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&amp;\=\+\$\,\-\_\.\!\~\*\']+</rhs>
+      </production>
+
+      <production id="nix.ws">
+        <lhs>Whitespace</lhs>
+        <rhs>
+          [ \t\n]+
+          <sbr />|
+          \#[^\n]*
+          <sbr />|
+          \/\*(.|\n)*\*\/
+        </rhs>
+      </production>
+
+    </productionset>
+    
+  </sect1>
+  
+</chapter>
