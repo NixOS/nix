@@ -20,9 +20,11 @@ static int parseName(const string & profileName, const string & name)
     string s = string(name, profileName.size() + 1);
     int p = s.find("-link");
     if (p == string::npos) return -1;
-    istringstream str(string(s, 0, p));
-    unsigned int n;
-    if (str >> n && str.eof()) return n; else return -1;
+    int n;
+    if (string2Int(string(s, 0, p), n) && n >= 0)
+        return n;
+    else
+        return -1;
 }
 
 
@@ -59,6 +61,16 @@ Generations findGenerations(Path profile, int & curGen)
 }
 
 
+static void makeNames(const Path & profile, unsigned int num,
+    Path & generation, Path & gcrootDrv, Path & gcrootClr)
+{
+    Path prefix = (format("%1%-%2%") % profile % num).str();
+    generation = prefix + "-link";
+    gcrootDrv = prefix + "-drv.gcroot";
+    gcrootClr = prefix + "-clr.gcroot";
+}
+
+
 Path createGeneration(Path profile, Path outPath,
     Path drvPath, Path clrPath)
 {
@@ -72,10 +84,7 @@ Path createGeneration(Path profile, Path outPath,
     Path generation, gcrootDrv, gcrootClr;
 
     while (1) {
-        Path prefix = (format("%1%-%2%") % profile % num).str();
-        generation = prefix + "-link";
-        gcrootDrv = prefix + "-drv.gcroot";
-        gcrootClr = prefix + "-clr.gcroot";
+        makeNames(profile, num, generation, gcrootDrv, gcrootClr);
         if (symlink(outPath.c_str(), generation.c_str()) == 0) break;
         if (errno != EEXIST)
             throw SysError(format("creating symlink `%1%'") % generation);
@@ -87,6 +96,23 @@ Path createGeneration(Path profile, Path outPath,
     writeStringToFile(gcrootClr, clrPath);
 
     return generation;
+}
+
+
+static void removeFile(const Path & path)
+{
+    if (remove(path.c_str()) == -1)
+        throw SysError(format("cannot unlink `%1%'") % path);
+}
+
+
+void deleteGeneration(const Path & profile, unsigned int gen)
+{
+    Path generation, gcrootDrv, gcrootClr;
+    makeNames(profile, gen, generation, gcrootDrv, gcrootClr);
+    removeFile(generation);
+    if (pathExists(gcrootClr)) removeFile(gcrootClr);
+    if (pathExists(gcrootDrv)) removeFile(gcrootDrv);
 }
 
 

@@ -56,20 +56,10 @@ static string nextComponent(string::const_iterator & p,
 }
 
 
-#include <fstream>
-
-static bool parseInt(const string & s, int & n)
-{
-    istringstream st(s);
-    st >> n;
-    return !st.fail();
-}
-
-
 static bool componentsLT(const string & c1, const string & c2)
 {
     int n1, n2;
-    bool c1Num = parseInt(c1, n1), c2Num = parseInt(c2, n2);
+    bool c1Num = string2Int(c1, n1), c2Num = string2Int(c2, n2);
 
     if (c1Num && c2Num) return n1 < n2;
     else if (c1 == "" && c2Num) return true;

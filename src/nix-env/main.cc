@@ -643,10 +643,8 @@ static void opSwitchGeneration(Globals & globals,
     if (opArgs.size() != 1)
         throw UsageError(format("exactly one argument expected"));
 
-    istringstream str(opArgs.front());
     int dstGen;
-    str >> dstGen;
-    if (!str || !str.eof())
+    if (!string2Int(opArgs.front(), dstGen))
         throw UsageError(format("expected a generation number"));
 
     switchGeneration(globals, dstGen);
@@ -684,6 +682,49 @@ static void opListGenerations(Globals & globals,
             % (t.tm_year + 1900) % (t.tm_mon + 1) % t.tm_mday
             % t.tm_hour % t.tm_min % t.tm_sec
             % (i->number == curGen ? "(current)" : "");
+    }
+}
+
+
+static void deleteGeneration2(const Path & profile, unsigned int gen)
+{
+    printMsg(lvlInfo, format("removing generation %1%") % gen);
+    deleteGeneration(profile, gen);
+}
+
+
+static void opDeleteGenerations(Globals & globals,
+    Strings opFlags, Strings opArgs)
+{
+    if (opFlags.size() > 0)
+        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
+
+    int curGen;
+    Generations gens = findGenerations(globals.profile, curGen);
+
+    for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); ++i) {
+
+        if (*i == "old") {
+            for (Generations::iterator j = gens.begin(); j != gens.end(); ++j)
+                if (j->number != curGen)
+                    deleteGeneration2(globals.profile, j->number);
+        }
+
+        else {
+            int n;
+            if (!string2Int(*i, n) || n < 0)
+                throw UsageError(format("invalid generation specifier `%1%'")  % *i);
+            bool found = false;
+            for (Generations::iterator j = gens.begin(); j != gens.end(); ++j) {
+                if (j->number == n) {
+                    deleteGeneration2(globals.profile, j->number);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                printMsg(lvlError, format("generation %1% does not exist") % n);
+        }
     }
 }
 
@@ -750,6 +791,8 @@ void run(Strings args)
             op = opRollback;
         else if (arg == "--list-generations")
             op = opListGenerations;
+        else if (arg == "--delete-generations")
+            op = opDeleteGenerations;
         else if (arg == "--dry-run") {
             printMsg(lvlInfo, "(dry run; not doing anything)");
             globals.dryRun = true;

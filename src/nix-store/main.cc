@@ -1,5 +1,4 @@
 #include <iostream>
-#include <sstream>
 
 #include "globals.hh"
 #include "normalise.hh"
@@ -171,10 +170,8 @@ static void opSubstitute(Strings opFlags, Strings opArgs)
         getline(cin, sub.program);
         string s;
         getline(cin, s);
-        istringstream st(s);
         int n;
-        st >> n;
-        if (!st) throw Error("number expected");
+        if (!string2Int(s, n)) throw Error("number expected");
         while (n--) {
             getline(cin, s);
             sub.args.push_back(s);
@@ -224,11 +221,10 @@ static void opGC(Strings opFlags, Strings opArgs)
         else if (*i == "--print-dead") subOp = soPrintDead;
         else if (*i == "--delete") subOp = soDelete;
         else if (*i == "--min-age") {
-            if (opArgs.size() == 0)
-                throw UsageError("`--min-age' requires an argument");
-            istringstream st(opArgs.front());
-            st >> minAge;
-            if (!st) throw Error("number expected");
+            int n;
+            if (opArgs.size() == 0 || !string2Int(opArgs.front(), n))
+                throw UsageError("`--min-age' requires an integer argument");
+            minAge = n;
         }
         else throw UsageError(format("bad sub-operation `%1%' in GC") % *i);
         

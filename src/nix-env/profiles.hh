@@ -31,6 +31,8 @@ Generations findGenerations(Path profile, int & curGen);
 Path createGeneration(Path profile, Path outPath,
     Path drvPath, Path clrPath);
 
+void deleteGeneration(const Path & profile, unsigned int gen);
+
 void switchLink(Path link, Path target);
 
 

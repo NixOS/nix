@@ -246,6 +246,10 @@ string statusToString(int status);
 bool statusOk(int status);
 
 
+/* Parse a string into an integer. */
+bool string2Int(const string & s, int & n);
+
+
 /* !!! HACK HACK HACK - this should be in shared.hh, but it's to
    facilitate a quick hack - will remove this eventually (famous last
    words). */

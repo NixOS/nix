@@ -155,10 +155,8 @@ static void initAndRun(int argc, char * * argv)
         else if (arg == "--max-jobs" || arg == "-j") {
             ++i;
             if (i == args.end()) throw UsageError("`--max-jobs' requires an argument");
-            istringstream str(*i);
             int n;
-            str >> n;
-            if (!str || !str.eof() || n < 0)
+            if (!string2Int(*i, n) || n < 0)
                 throw UsageError(format("`--max-jobs' requires a non-negative integer"));
             maxBuildJobs = n;
         }
