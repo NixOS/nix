@@ -26,12 +26,15 @@ static void initAndRun(int argc, char * * argv)
     while (argc--) args.push_back(*argv++);
     args.erase(args.begin());
     
-    /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f'). */
+    /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f'), and
+       ignore options for the ATerm library. */
     for (Strings::iterator it = args.begin();
          it != args.end(); )
     {
         string arg = *it;
-        if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-') {
+        if (string(arg, 0, 4) == "-at-")
+            it = args.erase(it);
+        else if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-') {
             for (unsigned int i = 1; i < arg.length(); i++)
                 if (isalpha(arg[i]))
                     args.insert(it, (string) "-" + arg[i]);
