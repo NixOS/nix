@@ -16,21 +16,6 @@ static Expr primImport(EvalState & state, const ATermVector & args)
 }
 
 
-#if 0
-static PathSet storeExprRootsCached(EvalState & state, const Path & nePath)
-{
-    DrvRoots::iterator i = state.drvRoots.find(nePath);
-    if (i != state.drvRoots.end())
-        return i->second;
-    else {
-        PathSet paths = storeExprRoots(nePath);
-        state.drvRoots[nePath] = paths;
-        return paths;
-    }
-}
-#endif
-
-
 /* Returns the hash of a derivation modulo fixed-output
    subderivations.  A fixed-output derivation is a derivation with one
    output (`out') for which an expected hash and hash algorithm are
@@ -128,7 +113,10 @@ static void processBinding(EvalState & state, Expr e, Derivation & drv,
     }
 
     else if (matchPath(e, s)) {
-        Path srcPath(aterm2String(s));
+        Path srcPath(canonPath(aterm2String(s)));
+        if (isDerivation(srcPath))
+            throw Error(format("file names are not allowed to end in `%1%'")
+                % drvExtension);
         Path dstPath(addToStore(srcPath));
         printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
             % srcPath % dstPath);
@@ -271,6 +259,10 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
             throw Error(format("invalid character `%1%' in derivation name `%2%'")
                 % *i % drvName);
         }
+
+    if (isDerivation(drvName))
+        throw Error(format("derivation names are not allowed to end in `%1%'")
+            % drvExtension);
 
     /* !!! the name should not end in the derivation extension (.drv).
        Likewise for sources. */
