@@ -1,0 +1,30 @@
+### Option `gc-keep-outputs'
+#
+# If `true', the garbage collector will keep the outputs of
+# non-garbage derivations.  If `false' (default), outputs will be
+# deleted unless they are GC roots themselves (or reachable from other
+# roots).
+# 
+# In general, outputs must be registered as roots separately.
+# However, even if the output of a derivation is registered as a root,
+# the collector will still delete store paths that are used only a
+# build time (e.g., the C compiler, or source tarballs downloaded from
+# the network).  To prevent it from doing so, set this option to
+# `true'.
+gc-keep-outputs = false
+
+
+### Option `gc-keep-derivations'
+#
+# If `true' (default), the garbage collector will keep the derivations
+# from which non-garbage store paths were built.  If `false', they
+# will be deleted unless explicitly registered as a root (or reachable
+# from other roots).
+#
+# Keeping derivation around is useful for querying and traceability
+# (e.g., it allows you to ask with what dependencies or options a
+# store path was built), so by default this option is on.  Turn it off
+# to safe a bit of disk space (or a lot if `gc-keep-outputs' is also
+# turned on).
+gc-keep-derivations = true
+

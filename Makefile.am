@@ -1,5 +1,6 @@
 SUBDIRS = externals src scripts corepkgs doc misc tests
-EXTRA_DIST = substitute.mk nix.spec nix.spec.in bootstrap.sh svn-revision
+EXTRA_DIST = substitute.mk nix.spec nix.spec.in bootstrap.sh \
+  svn-revision nix.conf.example
 
 include ./substitute.mk
 
@@ -12,6 +13,11 @@ relname:
 	echo -n $(distdir) > relname
 
 install-data-local: init-state
+	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/nix
+	$(INSTALL_DATA) nix.conf.example $(DESTDIR)$(sysconfdir)/nix
+	if ! test -e $(DESTDIR)$(sysconfdir)/nix/nix.conf; then \
+		$(INSTALL_DATA) nix.conf.example $(DESTDIR)$(sysconfdir)/nix/nix.conf; \
+	fi
 
 if INIT_STATE
 if SETUID_HACK
