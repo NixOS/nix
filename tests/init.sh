@@ -29,7 +29,8 @@ mkdir -p "$NIX_LOCALSTATE_DIR"/log/nix
 
 mkdir $NIX_DATA_DIR/nix
 cp -prd $TOP/corepkgs $NIX_DATA_DIR/nix/
-# Bah, script has the prefix hard-coded.
+# Bah, script has the prefix hard-coded.  This is really messy stuff
+# (and likely to fail).
 for i in \
     $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh \
     $NIX_DATA_DIR/nix/corepkgs/fetchurl/builder.sh \
@@ -43,7 +44,7 @@ for i in \
         -e "s^$REAL_LIBEXEC_DIR^$NIX_LIBEXEC_DIR^" \
         -e "s^$REAL_LOCALSTATE_DIR^$NIX_LOCALSTATE_DIR^" \
         -e "s^$REAL_DATA_DIR^$NIX_DATA_DIR^" \
-        -e "s^$REAL_STORE_DIR^$NIX_STORE_DIR^"
+        -e "s^$REAL_STORE_DIR\([^/]\)^$NIX_STORE_DIR\1^"
     mv $i.tmp $i
     chmod +x $i
 done
