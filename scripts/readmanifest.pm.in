@@ -10,15 +10,16 @@ sub processURL {
     $url =~ s/\/$//;
     print "obtaining list of Nix archives at $url...\n";
 
-    system "wget --cache=off '$url'/MANIFEST -O '$manifest' 2> /dev/null"; # !!! escape
-    if ($?) { die "`wget' failed"; }
+    system("curl --fail --silent --show-error " .
+           "'$url/MANIFEST' > '$manifest' 2> /dev/null") == 0
+           or die "curl failed: $?";
         
     open MANIFEST, "<$manifest";
 
     my $inside = 0;
 
     my $storepath;
-    my $narname;
+    my $narurl;
     my $hash;
     my @preds;
 
@@ -31,7 +32,7 @@ sub processURL {
             if (/^\{$/) { 
                 $inside = 1;
                 undef $storepath;
-                undef $narname;
+                undef $narurl;
                 undef $hash;
                 @preds = ();
 	    }
@@ -39,10 +40,9 @@ sub processURL {
         } else {
             if (/^\}$/) {
                 $inside = 0;
-                my $fullurl = "$url/$narname";
 
-		$$storepaths2urls{$storepath} = $fullurl;
-		$$urls2hashes{$fullurl} = $hash;
+		$$storepaths2urls{$storepath} = $narurl;
+		$$urls2hashes{$narurl} = $hash;
 
                 foreach my $p (@preds) {
 		    $$successors{$p} = $storepath;
@@ -52,8 +52,8 @@ sub processURL {
             elsif (/^\s*StorePath:\s*(\/\S+)\s*$/) {
                 $storepath = $1;
             }
-            elsif (/^\s*NarName:\s*(\S+)\s*$/) {
-                $narname = $1;
+            elsif (/^\s*NarURL:\s*(\S+)\s*$/) {
+                $narurl = $1;
 	    }
             elsif (/^\s*MD5:\s*(\S+)\s*$/) {
                 $hash = $1;
