@@ -186,7 +186,6 @@ static Expr evalExpr(Expr e)
         /* Hash the normal form to produce a unique but deterministic
            path name for this package. */
         ATerm nf = ATmake("Package(<term>)", ATreverse(bnds));
-        debug(printTerm(nf));
         Hash hash = hashTerm(nf);
 
         if (builder == "")
@@ -202,7 +201,6 @@ static Expr evalExpr(Expr e)
         /* Construct the result. */
         e = ATmake("Derive(<str>, <str>, <term>, <str>, <term>)",
             SYSTEM, builder.c_str(), ins, out.c_str(), env);
-        debug(printTerm(e));
 
         /* Write the resulting term into the Nix store directory. */
         Hash eHash = writeTerm(e);
@@ -257,7 +255,7 @@ void run(Strings args)
         char * s;
         if (ATmatch(e, "Include(<str>)", &s)) {
             cout << format("%1%\n") % s;
-        } 
+        }
         else throw badTerm("top level is not a package", e);
     }
 }

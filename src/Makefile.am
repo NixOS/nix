@@ -1,10 +1,13 @@
-bin_PROGRAMS = nix fix
+bin_PROGRAMS = nix nix-hash fix
 check_PROGRAMS = test
 
 AM_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall -I..
 
 nix_SOURCES = nix.cc shared.cc
 nix_LDADD = libnix.a -ldb_cxx-4 -lATerm
+
+nix_hash_SOURCES = nix-hash.cc shared.cc
+nix_hash_LDADD = libnix.a -ldb_cxx-4 -lATerm
 
 fix_SOURCES = fix.cc shared.cc
 fix_LDADD = libnix.a -ldb_cxx-4 -lATerm
