@@ -3,35 +3,48 @@
 use strict;
 use POSIX qw(tmpnam);
 
-my $pkgfile = $ARGV[0];
-die unless defined $pkgfile;
+my $pkgFile = $ARGV[0];
+die unless defined $pkgFile;
 
-my $tmpdir;
-do { $tmpdir = tmpnam(); }
-until mkdir $tmpdir, 0777;
 
-# !!! remove tmpdir on exit
+# Re-execute in a terminal, if necessary, so that if we're executed
+# from a web browser, the user gets to see us.
+if (!defined $ENV{"NIX_HAVE_TERMINAL"}) {
+    $ENV{"NIX_HAVE_TERMINAL"} = "1";
+    exec("xterm", "-e", "@bindir@/nix-install-package", "$pkgFile");
+    die "cannot execute `xterm'";
+}
 
-print "Unpacking $pkgfile in $tmpdir...\n";
-system "bunzip2 < $pkgfile | (cd $tmpdir && tar xf -)";
-die if $?;
 
-print "This package contains the following derivations:\n";
-system "@bindir@/nix-env -qasf $tmpdir/default.nix";
-die if $?;
+# Read and parse the package file.
+open PKGFILE, "<$pkgFile" or die "cannot open `$pkgFile': $!";
+my $contents = <PKGFILE>;
+close PKGFILE;
 
-print "Do you wish to install these (Y/N)? ";
+$contents =~ /^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/ or die "invalid package contents";
+my $version = $1;
+my $manifestURL = $2;
+my $drvName = $3;
+my $system = $4;
+my $drvPath = $5;
+my $outPath = $6;
+
+die "invalid package version `$version'" unless $version eq "NIXPKG1";
+
+
+# Ask confirmation.
+print "Do you want to install `$drvName' (Y/N)? ";
 my $reply = <STDIN>;
 chomp $reply;
-exit if (!($reply eq "y"));
+exit if $reply ne "y" && $reply ne "Y";
 
-print "Pulling caches...\n";
-system "@bindir@/nix-pull `cat $tmpdir/caches`";
-die if $?;
+print "\nPulling manifests...\n";
+system "@bindir@/nix-pull '$manifestURL'";
+die if $? != 0;
 
-print "Installing package...\n";
-system "@bindir@/nix-env -if $tmpdir/default.nix '*'";
-die if $?;
+print "\nInstalling package...\n";
+system "@bindir@/nix-env -i '$drvPath'";
+die if $? != 0;
 
-print "Installation succeeded! Press Enter to continue.\n";
+print "\nInstallation succeeded! Press Enter to continue.\n";
 <STDIN>;
