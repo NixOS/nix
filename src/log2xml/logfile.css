@@ -23,7 +23,7 @@ ul.nesting li.line {
 }
 
 ul.nesting li.lastline {
-    padding-left: 1.2em;
+    padding-left: 1.2em; // for the 0.1em border-left in .lastline > .lineconn
 }
 
 li.line {
@@ -43,15 +43,13 @@ li.lastline > span.lineconn {
 }
 
 
-em.storeref
-{
+em.storeref {
     color: #500000;
     position: relative; 
     width: 100%;
 }
 
-em.storeref:hover
-{
+em.storeref:hover {
     background-color: #eeeeee;
 }
 
@@ -70,4 +68,14 @@ em.storeref:hover
 
 em.storeref:hover span.popup {
     display: inline;
+}
+
+
+.toggle {
+    text-decoration: none;
+}
+
+.showTree, .hideTree {
+    font-family: monospace;
+    font-size: larger;
 }

@@ -7,6 +7,7 @@
   <xsl:template match="logfile">
     <html>
       <head>
+        <script type="text/javascript" src="treebits.js" />
         <link rel="stylesheet" href="logfile.css" type="text/css" />
         <title>Log File</title>
       </head>
@@ -23,6 +24,7 @@
   </xsl:template>
 
   <xsl:template match="nest">
+    <script type='text/javascript'>showTreeToggle("show","hide")</script>
     <xsl:apply-templates select='head'/>
     <ul class='nesting'>
       <xsl:for-each select='line|nest'>
