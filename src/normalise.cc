@@ -202,7 +202,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 	/* For this output path, find the references to other paths contained
 	   in it. */
         Strings refPaths = filterReferences(path, 
-					    Strings(allPaths.begin(), allPaths.end()));
+            Strings(allPaths.begin(), allPaths.end()));
 
 	/* Construct a slice element for this output path. */
         SliceElem elem;
