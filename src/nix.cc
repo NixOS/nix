@@ -5,6 +5,7 @@
 #include "globals.hh"
 #include "values.hh"
 #include "eval.hh"
+#include "archive.hh"
 
 
 typedef void (* Operation) (Strings opFlags, Strings opArgs);

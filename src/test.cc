@@ -4,6 +4,7 @@
 #include <sys/types.h>
 
 #include "hash.hh"
+#include "archive.hh"
 #include "util.hh"
 #include "eval.hh"
 #include "values.hh"
