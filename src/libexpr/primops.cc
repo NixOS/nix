@@ -6,9 +6,35 @@
 Expr primImport(EvalState & state, Expr arg)
 {
     ATMatcher m;
-    string path;
-    if (!(atMatch(m, arg) >> "Path" >> path))
-        throw Error("path expected");
+    ATermList es;
+    Path path;
+
+    arg = evalExpr(state, arg);
+    
+    if (atMatch(m, arg) >> "Path" >> path)
+        ;
+
+    else if (atMatch(m, arg) >> "Attrs" >> es) {
+        Expr a = queryAttr(arg, "type");
+
+        /* If it is a derivation, we have to realise it and load the
+           Nix expression created at the derivation's output path. */
+        if (a && evalString(state, a) == "derivation") {
+            a = queryAttr(arg, "drvPath");
+            if (!a) throw Error("bad derivation in import");
+            Path drvPath = evalPath(state, a);
+
+            realiseStoreExpr(drvPath);
+ 
+            a = queryAttr(arg, "outPath");
+            if (!a) throw Error("bad derivation in import");
+            path = evalPath(state, a);
+        }
+    }
+
+    if (path == "")
+        throw Error("path or derivation expected in import");
+    
     return evalFile(state, path);
 }
 
@@ -267,7 +293,7 @@ Expr primToString(EvalState & state, Expr arg)
         atMatch(m, arg) >> "Path" >> s ||
         atMatch(m, arg) >> "Uri" >> s)
         return ATmake("Str(<str>)", s.c_str());
-    else throw Error("cannot coerce value to string");
+    throw Error("cannot coerce value to string");
 }
 
 
