@@ -109,7 +109,9 @@ while ($queueFront < scalar @queue) {
             if (isValidPath($patch->{basePath})) {
                 # !!! this should be cached
                 my ($baseHashAlgo, $baseHash) = parseHash $patch->{baseHash};
-                my $hash = `@bindir@/nix-hash --type '$baseHashAlgo' "$patch->{basePath}"`;
+                my $format = "--base32";
+                $format = "" if $baseHashAlgo eq "md5";
+                my $hash = `@bindir@/nix-hash --type '$baseHashAlgo' $format "$patch->{basePath}"`;
                 chomp $hash;
 #                print "  MY HASH is $hash\n";
                 if ($hash ne $baseHash) {
