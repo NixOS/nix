@@ -1,0 +1,48 @@
+#! /usr/bin/perl -w
+
+use strict;
+use IPC::Open2;
+
+my $url = shift @ARGV;
+defined $url or die;
+
+print "fetching $url...\n";
+
+my $out = "@prefix@/store/nix-prefetch-url-$$";
+
+system "@wget@ '$url' -O '$out'";
+$? == 0 or die "unable to fetch $url";
+
+my $hash=`@bindir@/nix-hash --flat $out`;
+$? == 0 or die "unable to hash $out";
+chomp $hash;
+
+print "file has hash $hash\n";
+
+my $out2 = "@prefix@/store/nix-prefetch-url-$hash";
+rename $out, $out2;
+
+# Create a Fix expression.
+my $fixexpr = 
+    "App(IncludeFix(\"fetchurl/fetchurl.fix\"), " .
+    "[(\"url\", \"$url\"), (\"md5\", \"$hash\")])";
+
+# Instantiate a Nix expression.
+print STDERR "running fix...\n";
+my $pid = open2(\*READ, \*WRITE, "fix -") or die "cannot run fix";
+
+print WRITE $fixexpr;
+close WRITE;
+
+my $id = <READ>;
+chomp $id;
+
+waitpid $pid, 0;
+$? == 0 or die "fix failed";
+
+# Run Nix.
+print STDERR "running nix...\n";
+system "nix --install $id > /dev/null";
+$? == 0 or die "`nix --install' failed";
+
+unlink $out2;

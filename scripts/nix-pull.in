@@ -1,5 +1,6 @@
 #! /usr/bin/perl -w
 
+use strict;
 use IPC::Open2;
 
 my $tmpfile = "@localstatedir@/nix/pull.tmp";
@@ -85,7 +86,7 @@ $fullexpr .= "]";
 
 # Instantiate Nix expressions from the Fix expressions we created above.
 print STDERR "running fix...\n";
-$pid = open2(\*READ, \*WRITE, "fix -") or die "cannot run fix";
+my $pid = open2(\*READ, \*WRITE, "fix -") or die "cannot run fix";
 
 print WRITE $fullexpr;
 close WRITE;
@@ -93,9 +94,9 @@ my $i = 0;
 while (<READ>) {
     chomp;
     die unless /^([0-9a-z]{32})$/;
-    $nid = $1;
+    my $nid = $1;
     die unless ($i < scalar @ids);
-    $id = $ids[$i++];
+    my $id = $ids[$i++];
     push @subs, $id;
     push @subs, $nid;
 }

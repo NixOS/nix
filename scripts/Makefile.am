@@ -1,5 +1,5 @@
 bin_SCRIPTS = nix-switch nix-collect-garbage \
- nix-pull nix-push
+ nix-pull nix-push nix-prefetch-url
 
 noinst_SCRIPTS = nix-profile.sh
 
@@ -14,5 +14,6 @@ include ../substitute.mk
 
 EXTRA_DIST = nix-switch.in nix-collect-garbage.in \
  nix-pull.in nix-push.in nix-profile.sh.in \
+ nix-prefetch-url.in \
  prebuilts.conf
 
