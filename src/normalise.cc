@@ -273,7 +273,7 @@ FSIds findGenerators(const FSIds & _ids)
          i != sucs.end(); i++)
     {
         string s;
-        queryDB(nixDB, dbSuccessors, *i, s);
+        if (!queryDB(nixDB, dbSuccessors, *i, s)) continue;
         FSId id = parseHash(s);
 
         FState fs;
