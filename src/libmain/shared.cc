@@ -82,6 +82,12 @@ static void initAndRun(int argc, char * * argv)
     if (sigaction(SIGINT, &act, &oact))
         throw SysError("installing handler for SIGINT");
 
+    /* Ignore SIGPIPE. */
+    act.sa_handler = SIG_IGN;
+    act.sa_flags = 0;
+    if (sigaction(SIGPIPE, &act, &oact))
+        throw SysError("ignoring SIGPIPE");
+
     /* Process the NIX_LOG_TYPE environment variable. */
     string lt = getEnv("NIX_LOG_TYPE");
     if (lt != "") setLogType(lt);

@@ -17,6 +17,61 @@
 static string pathNullDevice = "/dev/null";
 
 
+struct Pipe
+{
+    int readSide, writeSide;
+
+    Pipe();
+    ~Pipe();
+    void create();
+    void closeReadSide();
+    void closeWriteSide();
+};
+
+
+Pipe::Pipe()
+    : readSide(0), writeSide(0)
+{
+}
+
+
+Pipe::~Pipe()
+{
+    closeReadSide();
+    closeWriteSide();
+    
+}
+
+
+void Pipe::create()
+{
+    int fds[2];
+    if (pipe(fds) != 0) throw SysError("creating pipe");
+    readSide = fds[0];
+    writeSide = fds[1];
+}
+
+
+void Pipe::closeReadSide()
+{
+    if (readSide != 0) {
+        if (close(readSide) == -1)
+            printMsg(lvlError, format("cannot close read side of pipe"));
+        readSide = 0;
+    }
+}
+
+
+void Pipe::closeWriteSide()
+{
+    if (writeSide != 0) {
+        if (close(writeSide) == -1)
+            printMsg(lvlError, format("cannot close write side of pipe"));
+        writeSide = 0;
+    }
+}
+
+
 /* A goal is a store expression that still has to be normalised. */
 struct Goal
 {
@@ -55,7 +110,15 @@ struct Goal
     int fdLogFile;
 
     /* Pipe for the builder's standard output/error. */
-    int fdsLogger[2];
+    Pipe logPipe;
+
+    /* Pipes for talking to the build hook (if any). */
+    Pipe toHook;
+    Pipe fromHook;
+
+    /* !!! clean up */
+    PathSet fnord;
+    map<Path, Path> xyzzy;
 
     Goal();
     ~Goal();
@@ -69,8 +132,6 @@ Goal::Goal()
     , tmpDir("")
     , fdLogFile(0)
 {
-    fdsLogger[0] = 0;
-    fdsLogger[1] = 0;
 }
 
 
@@ -99,10 +160,6 @@ Goal::~Goal()
     }
 
     if (fdLogFile && (close(fdLogFile) != 0))
-        printMsg(lvlError, format("cannot close fd"));
-    if (fdsLogger[0] && close(fdsLogger[0]) != 0)
-        printMsg(lvlError, format("cannot close fd"));
-    if (fdsLogger[1] && close(fdsLogger[1]) != 0)
         printMsg(lvlError, format("cannot close fd"));
 
     try {
@@ -164,15 +221,34 @@ public:
     void run();
 
 private:
+
+    bool canBuildMore();
+    
     /* Start building a derivation.  Returns false if we decline to
        build it right now. */
     bool startBuild(Path nePath);
 
+    /* Acquires locks on the output paths and gathers information
+       about the build (e.g., the input closures).  During this
+       process its possible that we find out that the build is
+       unnecessary, in which case we return false (this is not an
+       error condition!). */
+    bool prepareBuild(Goal & goal);
+
     void startBuildChild(Goal & goal);
 
+    bool tryBuildHook(Goal & goal);
+
+    void openLogFile(Goal & goal);
+    
+    void initChild(Goal & goal);
+
+    void childStarted(Goal & goal, pid_t pid);
+
     /* Read from the logger pipes, and watch for child termination as
-       a side effect. */
-    void wait();
+       a side effect.  Return true when a child terminates, false
+       otherwise. */
+    bool waitForChildren();
 
     /* Wait for child processes to finish building a derivation. */
     void reapChild(Goal & goal);
@@ -256,7 +332,7 @@ void Normaliser::run()
 
     while (!goals.empty()) {
 
-        printMsg(lvlVomit, "loop");
+        printMsg(lvlVomit, "main loop");
         
         /* Start building as many buildable goals as possible. */
         bool madeProgress = false;
@@ -269,23 +345,29 @@ void Normaliser::run()
                 buildable.erase(*i);
             }
 
+        /* Wait until any child finishes (which may allow us to build
+           new goals). */
         if (building.empty())
             assert(madeProgress); /* shouldn't happen */
         else
-            wait();
-        
+            do {
+                printMsg(lvlVomit, "waiting for children");
+            } while (!waitForChildren());
     }
 
     assert(buildable.empty() && building.empty());
 }
 
 
+bool Normaliser::canBuildMore()
+{
+    return building.size() < maxBuildJobs;
+}
+
+
 bool Normaliser::startBuild(Path nePath)
 {
     checkInterrupt();
-
-    if (maxBuildJobs > 0 && building.size() >= maxBuildJobs)
-        return false;
 
     Goals::iterator goalIt = goals.find(nePath);
     assert(goalIt != goals.end());
@@ -295,6 +377,27 @@ bool Normaliser::startBuild(Path nePath)
     startNest(nest, lvlTalkative,
         format("starting normalisation of goal `%1%'") % nePath);
     
+    /* Is the build hook willing to accept this job? */
+    if (tryBuildHook(goal)) return true;
+
+    if (!canBuildMore()) {
+        debug("postponing build");
+        return false;
+    }
+    
+    /* Prepare the build, i.e., acquire locks and gather necessary
+       information. */
+    if (!prepareBuild(goal)) return true;
+    
+    /* Otherwise, start the build in a child process. */
+    startBuildChild(goal);
+
+    return true;
+}
+
+
+bool Normaliser::prepareBuild(Goal & goal)
+{
     /* The outputs are referenceable paths. */
     for (PathSet::iterator i = goal.expr.derivation.outputs.begin();
          i != goal.expr.derivation.outputs.end(); ++i)
@@ -317,25 +420,23 @@ bool Normaliser::startBuild(Path nePath)
        process can build this expression, so no further checks are
        necessary. */
     Path nfPath;
-    if (querySuccessor(nePath, nfPath)) {
+    if (querySuccessor(goal.nePath, nfPath)) {
         debug(format("skipping build of expression `%1%', someone beat us to it")
-            % nePath);
+            % goal.nePath);
         goal.outputLocks.setDeletion(true);
         removeGoal(goal);
-        return true;
+        return false;
     }
 
     /* Realise inputs (and remember all input paths). */
-    PathSet fnord;
-    map<Path, Path> xyzzy;
     for (PathSet::iterator i = goal.expr.derivation.inputs.begin();
          i != goal.expr.derivation.inputs.end(); ++i)
     {
         checkInterrupt();
         Path nfPath = useSuccessor(*i);
         realiseClosure(nfPath);
-        fnord.insert(nfPath);
-        if (nfPath != *i) xyzzy[*i] = nfPath;
+        goal.fnord.insert(nfPath);
+        if (nfPath != *i) goal.xyzzy[*i] = nfPath;
         /* !!! nfPath should be a root of the garbage collector while
            we are building */
         StoreExpr ne = storeExprFromPath(nfPath);
@@ -347,7 +448,6 @@ bool Normaliser::startBuild(Path nePath)
 	    goal.allPaths.insert(j->first);
 	}
     }
-
 
     /* We can skip running the builder if all output paths are already
        valid. */
@@ -364,61 +464,8 @@ bool Normaliser::startBuild(Path nePath)
     if (fastBuild) {
         printMsg(lvlChatty, format("skipping build; output paths already exist"));
         finishGoal(goal);
-        return true;
+        return false;
     }
-
-    /* !!! Hack */
-    Path buildHook = getEnv("NIX_BUILD_HOOK");
-    if (buildHook != "") {
-        printMsg(lvlChatty, format("using build hook `%1%'") % buildHook);
-
-        Path hookTmpDir = createTempDir();
-        Path inputListFN = hookTmpDir + "/inputs";
-        Path outputListFN = hookTmpDir + "/outputs";
-        Path successorsListFN = hookTmpDir + "/successors";
-
-        string s;
-        for (ClosureElems::iterator i = goal.inClosures.begin();
-             i != goal.inClosures.end(); ++i)
-            s += i->first + "\n";
-        for (PathSet::iterator i = fnord.begin();
-             i != fnord.end(); ++i)
-            s += *i + "\n";
-        writeStringToFile(inputListFN, s);
-        
-        s = "";
-        for (PathSet::iterator i = goal.expr.derivation.outputs.begin();
-             i != goal.expr.derivation.outputs.end(); ++i)
-            s += *i + "\n";
-        writeStringToFile(outputListFN, s);
-        
-        s = "";
-        for (map<Path, Path>::iterator i = xyzzy.begin();
-             i != xyzzy.end(); ++i)
-            s += i->first + " " + i->second + "\n";
-        writeStringToFile(successorsListFN, s);
-        
-        int status = system((format("%1% %2% %3% %4% %5% %6% 1>&2")
-            % buildHook % goal.nePath % inputListFN % outputListFN
-            % successorsListFN
-            % goal.expr.derivation.platform).str().c_str());
-        
-        if (WIFEXITED(status)) {
-            int code = WEXITSTATUS(status);
-            if (code == 100) { /* == accepted */
-                printMsg(lvlChatty,
-                    format("build hook succesfully realised output paths"));
-                finishGoal(goal);
-                return true;
-            } else if (code != 101) /* != declined */
-                throw Error(
-                    format("build hook returned exit code %1%") % code);
-        } else throw Error(
-            format("build hook died with status %1%") % status);
-    }
-
-    /* Otherwise, start the build in a child process. */
-    startBuildChild(goal);
 
     return true;
 }
@@ -488,23 +535,15 @@ void Normaliser::startBuildChild(Goal & goal)
     printMsg(lvlChatty, format("executing builder `%1%'") %
         goal.expr.derivation.builder);
 
-    /* Create a log file. */
-    Path logFileName = nixLogDir + "/" + baseNameOf(goal.nePath);
-    int fdLogFile = open(logFileName.c_str(),
-        O_CREAT | O_WRONLY | O_TRUNC, 0666);
-    if (fdLogFile == -1)
-        throw SysError(format("creating log file `%1%'") % logFileName);
-    goal.fdLogFile = fdLogFile;
-
-    /* Create a pipe to get the output of the child. */
-    if (pipe(goal.fdsLogger) != 0)
-        throw SysError("creating logger pipe");
-
+    /* Create the log file and pipe. */
+    openLogFile(goal);
+    
     /* Fork a child to build the package.  Note that while we
        currently use forks to run and wait for the children, it
        shouldn't be hard to use threads for this on systems where
        fork() is unavailable or inefficient. */
-    switch (goal.pid = fork()) {
+    pid_t pid;
+    switch (pid = fork()) {
 
     case -1:
         throw SysError("unable to fork");
@@ -516,13 +555,7 @@ void Normaliser::startBuildChild(Goal & goal)
 
         try { /* child */
 
-            /* Put the child in a separate process group so that it
-               doesn't receive terminal signals. */
-            if (setpgrp() == -1)
-                throw SysError(format("setting process group"));
-
-            if (chdir(goal.tmpDir.c_str()) == -1)
-                throw SysError(format("changing into to `%1%'") % goal.tmpDir);
+            initChild(goal);
 
             /* Fill in the arguments. */
             Strings & args(goal.expr.derivation.args);
@@ -545,59 +578,236 @@ void Normaliser::startBuildChild(Goal & goal)
                     i->first + "=" + i->second)->c_str();
             *p = 0;
 
-            /* Dup the write side of the logger pipe into stderr. */
-            if (dup2(goal.fdsLogger[1], STDERR_FILENO) == -1)
-                throw SysError("cannot pipe standard error into log file");
-            if (close(goal.fdsLogger[0]) != 0) /* close read side */
-                throw SysError("closing fd");
-            
-            /* Dup stderr to stdin. */
-            if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
-                throw SysError("cannot dup stderr into stdout");
-
-	    /* Reroute stdin to /dev/null. */
-	    int fdDevNull = open(pathNullDevice.c_str(), O_RDWR);
-	    if (fdDevNull == -1)
-		throw SysError(format("cannot open `%1%'") % pathNullDevice);
-	    if (dup2(fdDevNull, STDIN_FILENO) == -1)
-		throw SysError("cannot dup null device into stdin");
-
-            /* Close all other file descriptors. */
-            int maxFD = 0;
-            maxFD = sysconf(_SC_OPEN_MAX);
-            debug(format("closing fds up to %1%") % (int) maxFD);
-            for (int fd = 0; fd < maxFD; ++fd)
-                if (fd != STDIN_FILENO && fd != STDOUT_FILENO && fd != STDERR_FILENO)
-                    close(fd); /* ignore result */
-
             /* Execute the program.  This should not return. */
             execve(goal.expr.derivation.builder.c_str(),
                 (char * *) argArr, (char * *) envArr);
 
-            throw SysError(format("unable to execute %1%")
+            throw SysError(format("executing `%1%'")
                 % goal.expr.derivation.builder);
             
         } catch (exception & e) {
             cerr << format("build error: %1%\n") % e.what();
         }
         _exit(1);
-
     }
 
     /* parent */
 
-    building[goal.pid] = goal.nePath;
-
-    /* Close the write side of the logger pipe. */
-    if (close(goal.fdsLogger[1]) != 0)
-        throw SysError("closing fd");
-    goal.fdsLogger[1] = 0;
+    childStarted(goal, pid);
 }
 
 
-void Normaliser::wait()
+string readLine(int fd)
+{
+    string s;
+    while (1) {
+        char ch;
+        int rd = read(fd, &ch, 1);
+        if (rd == -1) {
+            if (errno != EINTR)
+                throw SysError("reading a line");
+        } else if (rd == 0)
+            throw Error("unexpected EOF reading a line");
+        else {
+            if (ch == '\n') return s;
+            s += ch;
+        }
+    }
+}
+
+
+bool Normaliser::tryBuildHook(Goal & goal)
+{
+    Path buildHook = getEnv("NIX_BUILD_HOOK");
+    if (buildHook == "") return false;
+    buildHook = absPath(buildHook);
+
+    /* Create a directory where we will store files used for
+       communication between us and the build hook. */
+    goal.tmpDir = createTempDir();
+    
+    /* Create the log file and pipe. */
+    openLogFile(goal);
+
+    /* Create the communication pipes. */
+    goal.toHook.create();
+    goal.fromHook.create();
+
+    /* Fork the hook. */
+    pid_t pid;
+    switch (pid = fork()) {
+        
+    case -1:
+        throw SysError("unable to fork");
+
+    case 0:
+        try { /* child */
+
+            initChild(goal);
+
+            execl(buildHook.c_str(), buildHook.c_str(),
+                (canBuildMore() ? (string) "1" : "0").c_str(),
+                thisSystem.c_str(),
+                goal.expr.derivation.platform.c_str(),
+                goal.nePath.c_str());
+            
+            throw SysError(format("executing `%1%'") % buildHook);
+            
+        } catch (exception & e) {
+            cerr << format("build error: %1%\n") % e.what();
+        }
+        _exit(1);
+    }
+    
+    /* parent */
+
+    childStarted(goal, pid);
+
+    goal.fromHook.closeWriteSide();
+    goal.toHook.closeReadSide();
+
+    /* Read the first line of input, which should be a word indicating
+       whether the hook wishes to perform the build.  !!! potential
+       for deadlock here: we should also read from the child's logger
+       pipe. */
+    string reply = readLine(goal.fromHook.readSide);
+
+    debug(format("hook reply is `%1%'") % reply);
+
+    if (reply == "decline" || reply == "postpone") {
+        /* Clean up the child.  !!! hacky / should verify */
+        /* !!! drain stdout of hook, wait for child process */
+        goal.pid = 0;
+        goal.fromHook.closeReadSide();
+        goal.toHook.closeWriteSide();
+        close(goal.fdLogFile);
+        goal.fdLogFile = 0;
+        goal.logPipe.closeReadSide();
+        building.erase(pid);
+        return reply == "postpone";
+    }
+
+    else if (reply == "accept") {
+
+        if (!prepareBuild(goal))
+            throw Error("NOT IMPLEMENTED: hook unnecessary");
+
+        Path inputListFN = goal.tmpDir + "/inputs";
+        Path outputListFN = goal.tmpDir + "/outputs";
+        Path successorsListFN = goal.tmpDir + "/successors";
+
+        string s;
+        for (ClosureElems::iterator i = goal.inClosures.begin();
+             i != goal.inClosures.end(); ++i)
+            s += i->first + "\n";
+        for (PathSet::iterator i = goal.fnord.begin();
+             i != goal.fnord.end(); ++i)
+            s += *i + "\n";
+        writeStringToFile(inputListFN, s);
+        
+        s = "";
+        for (PathSet::iterator i = goal.expr.derivation.outputs.begin();
+             i != goal.expr.derivation.outputs.end(); ++i)
+            s += *i + "\n";
+        writeStringToFile(outputListFN, s);
+        
+        s = "";
+        for (map<Path, Path>::iterator i = goal.xyzzy.begin();
+             i != goal.xyzzy.end(); ++i)
+            s += i->first + " " + i->second + "\n";
+        writeStringToFile(successorsListFN, s);
+
+        string okay = "okay\n";
+        writeFull(goal.toHook.writeSide,
+            (const unsigned char *) okay.c_str(), okay.size());
+
+        return true;
+    }
+
+    else throw Error(format("bad hook reply `%1%'") % reply);
+}
+
+
+void Normaliser::openLogFile(Goal & goal)
+{
+    /* Create a log file. */
+    Path logFileName = nixLogDir + "/" + baseNameOf(goal.nePath);
+    int fdLogFile = open(logFileName.c_str(),
+        O_CREAT | O_WRONLY | O_TRUNC, 0666);
+    if (fdLogFile == -1)
+        throw SysError(format("creating log file `%1%'") % logFileName);
+    goal.fdLogFile = fdLogFile;
+
+    /* Create a pipe to get the output of the child. */
+    goal.logPipe.create();
+}
+
+
+void Normaliser::initChild(Goal & goal)
+{
+    /* Put the child in a separate process group so that it doesn't
+       receive terminal signals. */
+    if (setpgrp() == -1)
+        throw SysError(format("setting process group"));
+
+    if (chdir(goal.tmpDir.c_str()) == -1)
+        throw SysError(format("changing into to `%1%'") % goal.tmpDir);
+
+    /* Dup the write side of the logger pipe into stderr. */
+    if (dup2(goal.logPipe.writeSide, STDERR_FILENO) == -1)
+        throw SysError("cannot pipe standard error into log file");
+    if (close(goal.logPipe.readSide) != 0) /* close read side */
+        throw SysError("closing fd");
+            
+    /* Dup stderr to stdin. */
+    if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
+        throw SysError("cannot dup stderr into stdout");
+
+    /* Reroute stdin to /dev/null. */
+    int fdDevNull = open(pathNullDevice.c_str(), O_RDWR);
+    if (fdDevNull == -1)
+        throw SysError(format("cannot open `%1%'") % pathNullDevice);
+    if (dup2(fdDevNull, STDIN_FILENO) == -1)
+        throw SysError("cannot dup null device into stdin");
+
+    /* When running a hook, dup the communication pipes. */
+    bool inHook = goal.fromHook.writeSide != 0;
+    if (inHook) {
+        goal.fromHook.closeReadSide();
+        if (dup2(goal.fromHook.writeSide, 3) == -1)
+            throw SysError("dup");
+
+        goal.toHook.closeWriteSide();
+        if (dup2(goal.toHook.readSide, 4) == -1)
+            throw SysError("dup");
+    }
+
+    /* Close all other file descriptors. */
+    int maxFD = 0;
+    maxFD = sysconf(_SC_OPEN_MAX);
+    for (int fd = 0; fd < maxFD; ++fd)
+        if (fd != STDIN_FILENO && fd != STDOUT_FILENO && fd != STDERR_FILENO
+            && (!inHook || (fd != 3 && fd != 4)))
+            close(fd); /* ignore result */
+}
+
+
+void Normaliser::childStarted(Goal & goal, pid_t pid)
+{
+    goal.pid = pid;
+    
+    building[goal.pid] = goal.nePath;
+
+    /* Close the write side of the logger pipe. */
+    goal.logPipe.closeWriteSide();
+}
+
+
+bool Normaliser::waitForChildren()
 {
     checkInterrupt();
+
+    bool terminated = false;
     
     /* Process log output from the children.  We also use this to
        detect child termination: if we get EOF on the logger pipe of a
@@ -613,13 +823,13 @@ void Normaliser::wait()
          i != building.end(); ++i)
     {
         Goal & goal(goals[i->second]);
-        int fd = goal.fdsLogger[0];
+        int fd = goal.logPipe.readSide;
         FD_SET(fd, &fds);
         if (fd >= fdMax) fdMax = fd + 1;
     }
 
     if (select(fdMax, &fds, 0, 0, 0) == -1) {
-        if (errno == EINTR) return;
+        if (errno == EINTR) return false;
         throw SysError("waiting for input");
     }
 
@@ -629,7 +839,7 @@ void Normaliser::wait()
     {
         checkInterrupt();
         Goal & goal(goals[i->second]);
-        int fd = goal.fdsLogger[0];
+        int fd = goal.logPipe.readSide;
         if (FD_ISSET(fd, &fds)) {
             unsigned char buffer[1024];
             ssize_t rd = read(fd, buffer, sizeof(buffer));
@@ -640,6 +850,7 @@ void Normaliser::wait()
             } else if (rd == 0) {
                 debug(format("EOF on `%1%'") % goal.nePath);
                 reapChild(goal);
+                terminated = true;
             } else {
                 printMsg(lvlVomit, format("read %1% bytes from `%2%'")
                     % rd % goal.nePath);
@@ -649,6 +860,8 @@ void Normaliser::wait()
             }
         }
     }
+
+    return terminated;
 }
 
 
@@ -660,7 +873,8 @@ void Normaliser::reapChild(Goal & goal)
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe --- just don't do that
        :-) */
-    if (waitpid(goal.pid, &status, WNOHANG) != goal.pid)
+    /* !!! this could block! */
+    if (waitpid(goal.pid, &status, 0) != goal.pid)
         throw SysError(format("builder for `%1%' should have terminated")
             % goal.nePath);
 
@@ -669,9 +883,7 @@ void Normaliser::reapChild(Goal & goal)
     goal.pid = 0;
 
     /* Close the read side of the logger pipe. */
-    if (close(goal.fdsLogger[0]) != 0)
-        throw SysError("closing fd");
-    goal.fdsLogger[0] = 0;
+    goal.logPipe.closeReadSide();
 
     /* Close the log file. */
     if (close(goal.fdLogFile) != 0)

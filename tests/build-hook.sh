@@ -1,4 +1,4 @@
-export NIX_BUILD_HOOK="sh build-hook.hook.sh"
+export NIX_BUILD_HOOK="build-hook.hook.sh"
 
 storeExpr=$($TOP/src/nix-instantiate/nix-instantiate build-hook.nix)
 

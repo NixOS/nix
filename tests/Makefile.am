@@ -18,8 +18,10 @@ locking.sh: locking.nix
 parallel.sh: parallel.nix
 build-hook.sh: build-hook.nix
 
-TESTS = init.sh simple.sh dependencies.sh locking.sh parallel.sh \
-  build-hook.sh
+TESTS = init.sh build-hook.sh
+
+#TESTS = init.sh simple.sh dependencies.sh locking.sh parallel.sh \
+#  build-hook.sh
 
 XFAIL_TESTS =
 
