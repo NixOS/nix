@@ -25,7 +25,7 @@ Expr primBaseNameOf(EvalState & state, Expr arg);
 Expr primToString(EvalState & state, Expr arg);
 
 /* Return the null value. */
-Expr primNull(EvalState & state, Expr arg);
+Expr primNull(EvalState & state);
 
 /* Determine whether the argument is the null value. */
 Expr primIsNull(EvalState & state, Expr arg);

@@ -137,12 +137,12 @@ Expr evalExpr2(EvalState & state, Expr e)
         ATmatch(e, "Bool(<term>)", &e1) ||
         ATmatch(e, "Function([<list>], <term>)", &e1, &e2) ||
         ATmatch(e, "Attrs([<list>])", &e1) ||
-        ATmatch(e, "List([<list>])", &e1) ||
-        ATmatch(e, "Null", &e1))
+        ATmatch(e, "List([<list>])", &e1))
         return e;
 
     /* Any encountered variables must be undeclared or primops. */
     if (ATmatch(e, "Var(<str>)", &s1)) {
+        if ((string) s1 == "null") return primNull(state);
         return e;
     }
 
@@ -159,7 +159,6 @@ Expr evalExpr2(EvalState & state, Expr e)
             if (primop == "derivation") return primDerivation(state, e2);
             if (primop == "toString") return primToString(state, e2);
             if (primop == "baseNameOf") return primBaseNameOf(state, e2);
-            if (primop == "null") return primNull(state, e2);
             if (primop == "isNull") return primIsNull(state, e2);
             else throw badTerm("undefined variable/primop", e1);
         }

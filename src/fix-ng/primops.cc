@@ -227,7 +227,7 @@ Expr primToString(EvalState & state, Expr arg)
 }
 
 
-Expr primNull(EvalState & state, Expr arg)
+Expr primNull(EvalState & state)
 {
     return ATmake("Null");
 }
