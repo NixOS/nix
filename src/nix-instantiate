@@ -1,23 +1,61 @@
 #! /usr/bin/perl -w
 
-my $descr = $ARGV[0];
+use strict;
+use FileHandle;
+use File::Spec;
 
-open DESCR, "< $descr";
+my $outdir = $ARGV[0];
 
-while (<DESCR>) {
-    chomp;
+my %donetmpls = ();
 
-    if (/^(\w+)\s*=\s*([\w\d\.\/-]+)\s*(\#.*)?$/) {
-	my $name = $1;
-	my $file = $2;
-	my $out = `md5sum $file`;
-	$out =~ /^([0-9a-f]+)\s/;
-	my $hash = $1;
-        print "$name = $hash\n";
-    } else {
-	print "$_\n";
+sub convert {
+    my $descr = shift;
+
+    if (defined $donetmpls{$descr}) {
+        return $donetmpls{$descr};
     }
 
+    my ($x, $dir, $fn) = File::Spec->splitpath($descr);
+
+    print "$descr\n";
+
+    my $IN = new FileHandle;
+    my $OUT = new FileHandle;
+    my $outfile = "$outdir/$fn";
+    open $IN, "< $descr" or die "cannot open $descr";
+    open $OUT, "> $outfile" or die "cannot create $outfile";
+
+    while (<$IN>) {
+        chomp;
+
+        if (/^(\w+)\s*=\s*([+\w\d\.\/-]+)\s*(\#.*)?$/) {
+            my $name = $1;
+            my $file = $2;
+            $file = File::Spec->rel2abs($file, $dir);
+            my $out = `md5sum $file`;
+            die unless ($? == 0);
+            $out =~ /^([0-9a-f]+)\s/;
+            my $hash = $1;
+            print $OUT "$name = $hash\n";
+        } elsif (/^(\w+)\s*<-\s*([+\w\d\.\/-]+)\s*(\#.*)?$/) {
+            my $name = $1;
+            my $file = $2;
+            $file = File::Spec->rel2abs($file, $dir);
+            $file = convert($file);
+            my $out = `md5sum $file`;
+            die unless ($? == 0);
+            $out =~ /^([0-9a-f]+)\s/;
+            my $hash = $1;
+            print $OUT "$name <- $hash\n";
+        } else {
+            print $OUT "$_\n";
+        }
+    }
+
+    $donetmpls{$descr} = $outfile;
+    return $outfile;
 }
 
-close DESCR;
+for (my $i = 1; $i < scalar @ARGV; $i++) {
+    convert(File::Spec->rel2abs($ARGV[$i]));
+}
