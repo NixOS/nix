@@ -448,6 +448,8 @@ Path addToStore(const Path & _srcPath)
             
             copyPath(srcPath, dstPath);
 
+            makePathReadOnly(dstPath);
+            
             Transaction txn(nixDB);
             registerValidPath(txn, dstPath);
             txn.commit();
@@ -476,6 +478,8 @@ void addTextToStore(const Path & dstPath, const string & s)
 
             writeStringToFile(dstPath, s);
 
+            makePathReadOnly(dstPath);
+            
             Transaction txn(nixDB);
             registerValidPath(txn, dstPath);
             txn.commit();
