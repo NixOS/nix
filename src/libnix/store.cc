@@ -302,16 +302,21 @@ void addTextToStore(const Path & dstPath, const string & s)
 {
     if (!isValidPath(dstPath)) {
 
-        /* !!! locking? -> parallel writes are probably idempotent */
+        PathSet lockPaths;
+        lockPaths.insert(dstPath);
+        PathLocks outputLock(lockPaths);
 
-        AutoCloseFD fd = open(dstPath.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0666);
-        if (fd == -1) throw SysError(format("creating store file `%1%'") % dstPath);
+        if (!isValidPath(dstPath)) {
 
-        writeFull(fd, (unsigned char *) s.c_str(), s.size());
+            AutoCloseFD fd = open(dstPath.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0666);
+            if (fd == -1) throw SysError(format("creating store file `%1%'") % dstPath);
 
-        Transaction txn(nixDB);
-        registerValidPath(txn, dstPath);
-        txn.commit();
+            writeFull(fd, (unsigned char *) s.c_str(), s.size());
+
+            Transaction txn(nixDB);
+            registerValidPath(txn, dstPath);
+            txn.commit();
+        }
     }
 }
 
