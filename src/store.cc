@@ -32,6 +32,8 @@ struct CopySource : RestoreSource
 
 void copyPath(string src, string dst)
 {
+    debug(format("copying `%1%' to `%2%'") % src % dst);
+
     /* Unfortunately C++ doesn't support coprocedures, so we have no
        nice way to chain CopySink and CopySource together.  Instead we
        fork off a child to run the sink.  (Fork-less platforms should
@@ -96,54 +98,69 @@ void registerSubstitute(const FSId & srcId, const FSId & subId)
     /* For now, accept only one substitute per id. */
     Strings subs;
     subs.push_back(subId);
-    nixDB.setStrings(noTxn, dbSubstitutes, srcId, subs);
+    
+    Transaction txn(nixDB);
+    nixDB.setStrings(txn, dbSubstitutes, srcId, subs);
+    txn.commit();
 }
 
 
 void registerPath(const string & _path, const FSId & id)
 {
     string path(canonPath(_path));
+    Transaction txn(nixDB);
 
-    nixDB.setString(noTxn, dbPath2Id, path, id);
+    debug(format("registering path `%1%' with id %2%")
+        % path % (string) id);
+
+    string oldId;
+    if (nixDB.queryString(txn, dbPath2Id, path, oldId)) {
+        txn.abort();
+        if (id != parseHash(oldId))
+            throw Error(format("path `%1%' already contains id %2%")
+                % path % oldId);
+        return;
+    }
+
+    nixDB.setString(txn, dbPath2Id, path, id);
 
     Strings paths;
-    nixDB.queryStrings(noTxn, dbId2Paths, id, paths); /* non-existence = ok */
-
-    for (Strings::iterator it = paths.begin();
-         it != paths.end(); it++)
-        if (*it == path) return;
+    nixDB.queryStrings(txn, dbId2Paths, id, paths); /* non-existence = ok */
     
     paths.push_back(path);
     
-    nixDB.setStrings(noTxn, dbId2Paths, id, paths);
+    nixDB.setStrings(txn, dbId2Paths, id, paths);
+
+    txn.commit();
 }
 
 
 void unregisterPath(const string & _path)
 {
     string path(canonPath(_path));
+    Transaction txn(nixDB);
+
+    debug(format("unregistering path `%1%'") % path);
 
     string _id;
-    if (!nixDB.queryString(noTxn, dbPath2Id, path, _id)) return;
+    if (!nixDB.queryString(txn, dbPath2Id, path, _id)) {
+        txn.abort();
+        return;
+    }
     FSId id(parseHash(_id));
 
-    nixDB.delPair(noTxn, dbPath2Id, path);
+    nixDB.delPair(txn, dbPath2Id, path);
 
-    /* begin transaction */
-    
     Strings paths, paths2;
-    nixDB.queryStrings(noTxn, dbId2Paths, id, paths); /* non-existence = ok */
+    nixDB.queryStrings(txn, dbId2Paths, id, paths); /* non-existence = ok */
 
-    bool changed = false;
     for (Strings::iterator it = paths.begin();
          it != paths.end(); it++)
-        if (*it != path) paths2.push_back(*it); else changed = true;
+        if (*it != path) paths2.push_back(*it);
 
-    if (changed)
-        nixDB.setStrings(noTxn, dbId2Paths, id, paths2);
+    nixDB.setStrings(txn, dbId2Paths, id, paths2);
 
-    /* end transaction */
-
+    txn.commit();
 }
 
 
@@ -230,6 +247,8 @@ string expandId(const FSId & id, const string & target,
 void addToStore(string srcPath, string & dstPath, FSId & id,
     bool deterministicName)
 {
+    debug(format("adding `%1%' to the store") % srcPath);
+
     srcPath = absPath(srcPath);
     id = hashPath(srcPath);
 

@@ -5,10 +5,10 @@
 Database nixDB;
 
 
-string dbPath2Id = "path2id";
-string dbId2Paths = "id2paths";
-string dbSuccessors = "successors";
-string dbSubstitutes = "substitutes";
+TableId dbPath2Id;
+TableId dbId2Paths;
+TableId dbSuccessors;
+TableId dbSubstitutes;
 
 
 string nixStore = "/UNINIT";
@@ -20,13 +20,13 @@ string nixDBPath = "/UNINIT";
 void openDB()
 {
     nixDB.open(nixDBPath);
+    dbPath2Id = nixDB.openTable("path2id");
+    dbId2Paths = nixDB.openTable("id2paths");
+    dbSuccessors = nixDB.openTable("successors");
+    dbSubstitutes = nixDB.openTable("substitutes");
 }
 
 
 void initDB()
 {
-    nixDB.createTable(dbPath2Id);
-    nixDB.createTable(dbId2Paths);
-    nixDB.createTable(dbSuccessors);
-    nixDB.createTable(dbSubstitutes);
 }

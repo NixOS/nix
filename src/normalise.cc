@@ -9,7 +9,9 @@
 
 void registerSuccessor(const FSId & id1, const FSId & id2)
 {
-    nixDB.setString(noTxn, dbSuccessors, id1, id2);
+    Transaction txn(nixDB);
+    nixDB.setString(txn, dbSuccessors, id1, id2);
+    txn.commit();
 }
 
 

@@ -3,6 +3,7 @@
 
 #include <string>
 #include <list>
+#include <map>
 
 #include <db_cxx.h>
 
@@ -26,11 +27,15 @@ public:
     Transaction(Database & _db);
     ~Transaction();
 
+    void abort();
     void commit();
 };
 
 
 #define noTxn Transaction()
+
+
+typedef unsigned int TableId; /* table handles */
 
 
 class Database
@@ -40,10 +45,12 @@ class Database
 private:
     DbEnv * env;
 
+    TableId nextId;
+    map<TableId, Db *> tables;
+
     void requireEnv();
 
-    Db * openDB(const Transaction & txn,
-        const string & table, bool create);
+    Db * getDb(TableId table);
 
 public:
     Database();
@@ -51,24 +58,24 @@ public:
     
     void open(const string & path);
 
-    void createTable(const string & table);
+    TableId openTable(const string & table);
 
-    bool queryString(const Transaction & txn, const string & table, 
+    bool queryString(const Transaction & txn, TableId table, 
         const string & key, string & data);
 
-    bool queryStrings(const Transaction & txn, const string & table, 
+    bool queryStrings(const Transaction & txn, TableId table, 
         const string & key, Strings & data);
 
-    void setString(const Transaction & txn, const string & table,
+    void setString(const Transaction & txn, TableId table,
         const string & key, const string & data);
 
-    void setStrings(const Transaction & txn, const string & table,
+    void setStrings(const Transaction & txn, TableId table,
         const string & key, const Strings & data);
 
-    void delPair(const Transaction & txn, const string & table,
+    void delPair(const Transaction & txn, TableId table,
         const string & key);
 
-    void enumTable(const Transaction & txn, const string & table,
+    void enumTable(const Transaction & txn, TableId table,
         Strings & keys);
 };
 

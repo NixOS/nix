@@ -17,13 +17,13 @@ extern Database nixDB;
 
    Each pair (p, id) records that path $p$ contains an expansion of
    $id$. */
-extern string dbPath2Id;
+extern TableId dbPath2Id;
 
 
 /* dbId2Paths :: FSId -> [Path]
 
    A mapping from ids to lists of paths. */
-extern string dbId2Paths;
+extern TableId dbId2Paths;
 
 
 /* dbSuccessors :: FSId -> FSId
@@ -35,7 +35,7 @@ extern string dbId2Paths;
    Note that a term $y$ is successor of $x$ iff there exists a
    sequence of rewrite steps that rewrites $x$ into $y$.
 */
-extern string dbSuccessors;
+extern TableId dbSuccessors;
 
 
 /* dbSubstitutes :: FSId -> [FSId]
@@ -51,7 +51,7 @@ extern string dbSuccessors;
    this case might be an fstate expression that fetches the Nix
    archive. 
 */
-extern string dbSubstitutes;
+extern TableId dbSubstitutes;
 
 
 /* Path names. */

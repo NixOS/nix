@@ -5,15 +5,6 @@
 
 
 /* Wrapper class to ensure proper destruction. */
-class DestroyDb
-{
-    Db * db;
-public:
-    DestroyDb(Db * _db) : db(_db) { }
-    ~DestroyDb() { db->close(0); delete db; }
-};
-
-
 class DestroyDbc 
 {
     Dbc * dbc;
@@ -38,24 +29,39 @@ Transaction::Transaction()
 Transaction::Transaction(Database & db)
 {
     db.requireEnv();
-    db.env->txn_begin(0, &txn, 0);
+    try {
+        db.env->txn_begin(0, &txn, 0);
+    } catch (DbException e) { rethrow(e); }
 }
 
 
 Transaction::~Transaction()
 {
-    if (txn) {
-        txn->abort();
-        txn = 0;
-    }
+    if (txn) abort();
 }
 
 
 void Transaction::commit()
 {
     if (!txn) throw Error("commit called on null transaction");
-    txn->commit(0);
+    debug(format("committing transaction %1%") % (void *) txn);
+    DbTxn * txn2 = txn;
     txn = 0;
+    try {
+        txn2->commit(0);
+    } catch (DbException e) { rethrow(e); }
+}
+
+
+void Transaction::abort()
+{
+    if (!txn) throw Error("abort called on null transaction");
+    debug(format("aborting transaction %1%") % (void *) txn);
+    DbTxn * txn2 = txn;
+    txn = 0;
+    try {
+        txn2->abort();
+    } catch (DbException e) { rethrow(e); }
 }
 
 
@@ -65,28 +71,18 @@ void Database::requireEnv()
 }
 
 
-Db * Database::openDB(const Transaction & txn,
-    const string & table, bool create)
+Db * Database::getDb(TableId table)
 {
-    requireEnv();
-
-    Db * db = new Db(env, 0);
-
-    try {
-        // !!! fixme when switching to BDB 4.1: use txn.
-        db->open(table.c_str(), 0, 
-            DB_HASH, create ? DB_CREATE : 0, 0666);
-    } catch (...) {
-        delete db;
-        throw;
-    }
-
-    return db;
+    map<TableId, Db *>::iterator i = tables.find(table);
+    if (i == tables.end())
+        throw Error("unknown table id");
+    return i->second;
 }
 
 
 Database::Database()
     : env(0)
+    , nextId(1)
 {
 }
 
@@ -95,8 +91,23 @@ Database::~Database()
 {
     if (env) {
         debug(format("closing database environment"));
-        env->txn_checkpoint(0, 0, 0);
-        env->close(0);
+
+        try {
+
+            for (map<TableId, Db *>::iterator i = tables.begin();
+                 i != tables.end(); i++)
+            {
+                debug(format("closing table %1%") % i->first);
+                Db * db = i->second;
+                db->close(0);
+                delete db;
+            }
+
+            env->txn_checkpoint(0, 0, 0);
+            env->close(0);
+
+        } catch (DbException e) { rethrow(e); }
+
         delete env;
     }
 }
@@ -112,8 +123,9 @@ void Database::open(const string & path)
 
         env->set_lg_bsize(32 * 1024); /* default */
         env->set_lg_max(256 * 1024); /* must be > 4 * lg_bsize */
+        env->set_lk_detect(DB_LOCK_DEFAULT);
         
-        env->open(path.c_str(), 
+        env->open(path.c_str(),
             DB_INIT_LOCK | DB_INIT_LOG | DB_INIT_MPOOL | DB_INIT_TXN |
             DB_CREATE,
             0666);
@@ -122,22 +134,36 @@ void Database::open(const string & path)
 }
 
 
-void Database::createTable(const string & table)
+TableId Database::openTable(const string & tableName)
 {
+    requireEnv();
+    TableId table = nextId++;
+
     try {
-        Db * db = openDB(noTxn, table, true);
-        DestroyDb destroyDb(db);
+
+        Db * db = new Db(env, 0);
+
+        try {
+            // !!! fixme when switching to BDB 4.1: use txn.
+            db->open(tableName.c_str(), 0, DB_HASH, DB_CREATE, 0666);
+        } catch (...) {
+            delete db;
+            throw;
+        }
+
+        tables[table] = db;
+
     } catch (DbException e) { rethrow(e); }
+
+    return table;
 }
 
 
-bool Database::queryString(const Transaction & txn, const string & table, 
+bool Database::queryString(const Transaction & txn, TableId table, 
     const string & key, string & data)
 {
     try {
-
-        Db * db = openDB(txn, table, false);
-        DestroyDb destroyDb(db);
+        Db * db = getDb(table);
 
         Dbt kt((void *) key.c_str(), key.length());
         Dbt dt;
@@ -156,7 +182,7 @@ bool Database::queryString(const Transaction & txn, const string & table,
 }
 
 
-bool Database::queryStrings(const Transaction & txn, const string & table, 
+bool Database::queryStrings(const Transaction & txn, TableId table, 
     const string & key, Strings & data)
 {
     string d;
@@ -190,13 +216,11 @@ bool Database::queryStrings(const Transaction & txn, const string & table,
 }
 
 
-void Database::setString(const Transaction & txn, const string & table,
+void Database::setString(const Transaction & txn, TableId table,
     const string & key, const string & data)
 {
     try {
-        Db * db = openDB(txn, table, false);
-        DestroyDb destroyDb(db);
-
+        Db * db = getDb(table);
         Dbt kt((void *) key.c_str(), key.length());
         Dbt dt((void *) data.c_str(), data.length());
         db->put(txn.txn, &kt, &dt, 0);
@@ -204,7 +228,7 @@ void Database::setString(const Transaction & txn, const string & table,
 }
 
 
-void Database::setStrings(const Transaction & txn, const string & table,
+void Database::setStrings(const Transaction & txn, TableId table,
     const string & key, const Strings & data)
 {
     string d;
@@ -227,28 +251,25 @@ void Database::setStrings(const Transaction & txn, const string & table,
 }
 
 
-void Database::delPair(const Transaction & txn, const string & table,
+void Database::delPair(const Transaction & txn, TableId table,
     const string & key)
 {
     try {
-        Db * db = openDB(txn, table, false);
-        DestroyDb destroyDb(db);
+        Db * db = getDb(table);
         Dbt kt((void *) key.c_str(), key.length());
         db->del(txn.txn, &kt, 0);
     } catch (DbException e) { rethrow(e); }
 }
 
 
-void Database::enumTable(const Transaction & txn, const string & table,
+void Database::enumTable(const Transaction & txn, TableId table,
     Strings & keys)
 {
     try {
-
-        Db * db = openDB(txn, table, false);
-        DestroyDb destroyDb(db);
+        Db * db = getDb(table);
 
         Dbc * dbc;
-        db->cursor(0, &dbc, 0);
+        db->cursor(txn.txn, &dbc, 0);
         DestroyDbc destroyDbc(dbc);
 
         Dbt kt, dt;
