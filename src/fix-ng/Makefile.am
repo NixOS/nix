@@ -1,12 +1,12 @@
 bin_PROGRAMS = fix-ng
 
 fix_ng_SOURCES = fix-expr.cc parser.cc eval.cc primops.cc fix.cc
-fix_ng_LDADD = ../libmain/libmain.a ../libnix/libnix.a ../libutil/libutil.a \
+fix_ng_LDADD = ../libmain/libmain.a ../libstore/libstore.a ../libutil/libutil.a \
  ../boost/format/libformat.a -L../../externals/inst/lib -ldb_cxx \
  -lsglr -lATB -lconversion -lasfix2 -lmept -lATerm
 
 AM_CXXFLAGS = \
- -I.. -I../../externals/inst/include -I../libutil -I../libnix -I../libmain
+ -I.. -I../../externals/inst/include -I../libutil -I../libstore -I../libmain
 
 
 # Parse table generation.

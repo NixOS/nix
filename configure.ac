@@ -29,7 +29,7 @@ AC_CONFIG_FILES([Makefile
    src/boost/Makefile
    src/boost/format/Makefile
    src/libutil/Makefile
-   src/libnix/Makefile
+   src/libstore/Makefile
    src/libmain/Makefile
    src/nix/Makefile
    src/nix-hash/Makefile

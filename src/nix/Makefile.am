@@ -1,7 +1,7 @@
 bin_PROGRAMS = nix
 
 nix_SOURCES = nix.cc dotgraph.cc
-nix_LDADD = ../libmain/libmain.a ../libnix/libnix.a ../libutil/libutil.a \
+nix_LDADD = ../libmain/libmain.a ../libstore/libstore.a ../libutil/libutil.a \
  ../boost/format/libformat.a -L../../externals/inst/lib -ldb_cxx -lATerm
 
 nix.o: nix-help.txt.hh
@@ -12,7 +12,7 @@ nix.o: nix-help.txt.hh
 	echo '"' >> $@
 
 AM_CXXFLAGS = \
- -I.. -I../../externals/inst/include -I../libutil -I../libnix -I../libmain
+ -I.. -I../../externals/inst/include -I../libutil -I../libstore -I../libmain
 
 install-data-local:
 	$(INSTALL) -d $(localstatedir)/nix
