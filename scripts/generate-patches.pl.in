@@ -134,11 +134,11 @@ print "creating patches...\n";
 foreach my $p (keys %dstOutPaths) {
 
     # If exactly the same path already exists in the source, skip it.
-    next if defined $srcOutPaths{$p};
+# !!!    next if defined $srcOutPaths{$p};
     
-#    print "  $p\n";
+    print "  $p\n";
 
-    # If not, then we should find the path in the source that is
+    # If not, then we should find the paths in the source that are
     # `most' likely to be present on a system that wants to install
     # this path.
 
@@ -153,6 +153,22 @@ foreach my $p (keys %dstOutPaths) {
     foreach my $q (keys %srcOutPaths) {
         (my $name2, my $version2) = getNameVersion $q;
         if ($name eq $name2) {
+
+            # If the sizes differ to much, then skip.  This
+            # disambiguates between, e.g., a real component and a
+            # wrapper component (cf. Firefox in Nixpkgs).
+            my $srcSize = @{$srcNarFiles{$q}}[0]->{size};
+            my $dstSize = @{$dstNarFiles{$p}}[0]->{size};
+            my $ratio = $srcSize / $dstSize;
+            $ratio = 1 / $ratio if $ratio < 1;
+            print "  $srcSize $dstSize $ratio $q\n";
+
+            if ($ratio >= 3) {
+                print "  SKIPPING $q due to size ratio $ratio\n";
+            }
+
+            # If there are multiple matching names, include the ones
+            # with the closest version numbers.
             my $dist = versionDiff $version, $version2;
             if ($dist > $minDist) {
                 $minDist = $dist;
@@ -173,6 +189,8 @@ foreach my $p (keys %dstOutPaths) {
 
         # Generate a patch between $closest and $p.
         print "  $p <- $closest\n";
+
+        next;
 
         # If the patch already exists, skip it.
         if (containsPatch(\%srcPatches, $p, $closest) ||
@@ -241,6 +259,8 @@ foreach my $p (keys %dstOutPaths) {
             };
     }
 }
+
+exit 0; # !!!
 
 
 # Add in any potentially useful patches in the source (namely, those

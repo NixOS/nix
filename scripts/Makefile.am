@@ -2,7 +2,7 @@ bin_SCRIPTS = nix-collect-garbage \
   nix-pull nix-push nix-prefetch-url \
   nix-install-package nix-channel nix-build
 
-noinst_SCRIPTS = nix-profile.sh
+noinst_SCRIPTS = nix-profile.sh generate-patches.pl
 
 nix-pull nix-push: readmanifest.pm download-using-manifests.pl
 
