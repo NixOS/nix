@@ -19,7 +19,7 @@ Nix is a software deployment system.
 %setup -q
 
 %build
-./configure --prefix=%{_prefix}
+./configure --prefix=%{_prefix} --with-system="i686-linux"
 make
 make check
 
