@@ -106,7 +106,7 @@ static void runProgram(const string & program, Environment env)
             
         } catch (exception & e) {
             cerr << format("build error: %1%\n") % e.what();
-         }
+        }
         _exit(1);
 
     }

@@ -1,11 +1,10 @@
 #include <iostream>
 
-#include "config.h"
-
 #include "globals.hh"
 #include "values.hh"
 #include "eval.hh"
 #include "archive.hh"
+#include "shared.hh"
 
 
 typedef void (* Operation) (Strings opFlags, Strings opArgs);
@@ -224,38 +223,13 @@ static void opInit(Strings opFlags, Strings opArgs)
 }
 
 
-/* Initialize, process arguments, and dispatch to the right
-   operation. */
-static void run(int argc, char * * argv)
+/* Scan the arguments; find the operation, set global flags, put all
+   other flags in a list, and put all other arguments in another
+   list. */
+void run(Strings args)
 {
-    /* Setup Nix paths. */
-    nixStore = NIX_STORE_DIR;
-    nixLogDir = NIX_LOG_DIR;
-    nixDB = (string) NIX_STATE_DIR + "/nixstate.db";
-
-    /* Put the arguments in a vector. */
-    Strings args;
-    while (argc--) args.push_back(*argv++);
-    args.erase(args.begin());
-    
-    /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f'). */
-    for (Strings::iterator it = args.begin();
-         it != args.end(); )
-    {
-        string arg = *it;
-        if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-') {
-            for (unsigned int i = 1; i < arg.length(); i++)
-                args.insert(it, (string) "-" + arg[i]);
-            it = args.erase(it);
-        } else it++;
-    }
-
     Strings opFlags, opArgs;
     Operation op = 0;
-
-    /* Scan the arguments; find the operation, set global flags, put
-       all other flags in a list, and put all other arguments in
-       another list. */
 
     for (Strings::iterator it = args.begin();
          it != args.end(); it++)
@@ -291,22 +265,4 @@ static void run(int argc, char * * argv)
 }
 
 
-int main(int argc, char * * argv)
-{
-    /* ATerm setup. */
-    ATerm bottomOfStack;
-    ATinit(argc, argv, &bottomOfStack);
-
-    try {
-        run(argc, argv);
-    } catch (UsageError & e) {
-        cerr << "error: " << e.what() << endl
-             << "Try `nix --help' for more information.\n";
-        return 1;
-    } catch (exception & e) {
-        cerr << "error: " << e.what() << endl;
-        return 1;
-    }
-
-    return 0;
-}
+string programId = "nix";

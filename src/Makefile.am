@@ -3,7 +3,7 @@ check_PROGRAMS = test
 
 AM_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall -I..
 
-nix_SOURCES = nix.cc
+nix_SOURCES = nix.cc shared.cc
 nix_LDADD = libnix.a -ldb_cxx-4 -lATerm
 
 TESTS = test
