@@ -332,7 +332,7 @@ void Normaliser::run()
 
     while (!goals.empty()) {
 
-        printMsg(lvlVomit, "main loop");
+        debug("main loop - starting jobs");
         
         /* Start building as many buildable goals as possible. */
         bool madeProgress = false;

@@ -7,9 +7,16 @@ my $localSystem = shift @ARGV;
 my $neededSystem = shift @ARGV;
 my $storeExpr = shift @ARGV;
 
+sub sendReply {
+    my $reply = shift;
+    open OUT, ">&3" or die;
+    print OUT "$reply\n";
+    close OUT;
+}
+
 # Decline if the local system can do the build.
 if ($amWilling && ($localSystem eq $neededSystem)) {
-    print "decline\n";
+    sendReply "decline";
     exit 0;
 }
 
@@ -45,11 +52,8 @@ while (<LOAD>) {
 }
 close LOAD;
 
-sub sendReply {
-    my $reply = shift;
-    open OUT, ">&3" or die;
-    print OUT "$reply\n";
-    close OUT;
+foreach my $cur (keys %machines) {
+    $curJobs{$cur} = 0 unless defined $curJobs{$cur};
 }
 
 # Find a suitable system.
@@ -58,8 +62,7 @@ my $machine;
 foreach my $cur (keys %machines) {
     if ($neededSystem eq $systemTypes{$cur}) {
         $rightType = 1;
-        if (!defined $curJobs{$cur} or
-            ($curJobs{$cur} < $maxJobs{$cur}))
+        if ($curJobs{$cur} < $maxJobs{$cur})
         {
             $machine = $cur;
             last;
@@ -85,6 +88,19 @@ print "got $x\n";
 close IN;
 
 print "BUILDING REMOTE: $storeExpr on $machine\n";
+
+$curJobs{$machine} = $curJobs{$machine} + 1;
+
+sub writeLoad {
+    open LOAD, "> /home/eelco/nix/distributed/current-load" or die;
+    foreach my $cur (keys %machines) {
+        print LOAD "$cur $curJobs{$cur}\n";
+    }
+    close LOAD;
+}
+
+writeLoad
+
 
 my $ssh = "ssh -i $sshKeys{$machine} -x";
 
@@ -117,3 +133,7 @@ foreach my $output (split '\n', $outputs) {
     system "rsync -a -e '$ssh' $machine:$output /nix/store";
     die "cannot rsync outputs from $machine" if ($? != 0);
 }
+
+$curJobs{$machine} = $curJobs{$machine} - 1;
+
+writeLoad
