@@ -259,13 +259,13 @@
             </para>
             <screen>
 nix-store --realise /nix/store/bla.store
-x=`nix-store --query --normalise /nix/store/bla.store
+x=`nix-store --query --normalise /nix/store/bla.store`
 <emphasis>(do something with the path $x</emphasis></screen>
             <para>
               which using this flag can be written as
             </para>
             <screen>
-x=`nix-store --query --normalise --force-realise /nix/store/bla.store
+x=`nix-store --query --normalise --force-realise /nix/store/bla.store`
 <emphasis>(do something with the path $x</emphasis></screen>
           </listitem>
         </varlistentry>
