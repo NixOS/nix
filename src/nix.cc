@@ -237,7 +237,7 @@ void installPkg(string pkgref)
     string cmd;
     string builder;
 
-    if (!queryDB("refs", pkgref, pkgfile))
+    if (!queryDB(dbRefs, pkgref, pkgfile))
         throw Error("unknown package " + pkgref);
 
     cerr << "installing package " + pkgref + " from " + pkgfile + "\n";
@@ -272,7 +272,7 @@ void installPkg(string pkgref)
 
         string file;
 
-        if (!queryDB("refs", it->ref, file))
+        if (!queryDB(dbRefs, it->ref, file))
             throw Error("unknown file " + it->ref);
 
         if (makeRef(file) != it->ref)
@@ -437,6 +437,23 @@ void verifyDB()
 }
 
 
+void listInstalledPkgs()
+{
+    DBPairs instPkgs;
+
+    enumDB(dbInstPkgs, instPkgs);
+
+    for (DBPairs::iterator it = instPkgs.begin();
+         it != instPkgs.end(); it++)
+    {
+        string descr;
+        if (!queryDB(dbRefs, it->first, descr))
+            descr = "descriptor missing";
+        cout << it->first << " " << descr << endl;
+    }
+}
+
+
 void run(int argc, char * * argv)
 {
     UsageError argcError("wrong number of arguments");
@@ -464,6 +481,9 @@ void run(int argc, char * * argv)
     } else if (cmd == "reginst") {
         if (argc != 2) throw argcError;
         registerInstalledPkg(argv[0], argv[1]);
+    } else if (cmd == "listinst") {
+        if (argc != 0) throw argcError;
+        listInstalledPkgs();
     } else
         throw UsageError("unknown command: " + string(cmd));
 }
