@@ -1,211 +1,173 @@
-<chapter id='chap-installation'>
-  <title>Installation</title>
+<chapter id='chap-installation'><title>Installation</title>
 
-  <sect1>
-    <title>Obtaining Nix</title>
 
-    <para>
-      The easiest way to obtain Nix is to download a <ulink
-      url='http://www.cs.uu.nl/groups/ST/Trace/Nix'>source
-      distribution</ulink>.  RPMs for SuSE and Red Hat are also
-      available.  These distributions are generated automatically.
-    </para>
+<sect1><title>Obtaining Nix</title>
 
-    <para>
-      Alternatively, the most recent sources of Nix can be obtained from its
-      <ulink url='https://svn.cs.uu.nl:12443/repos/trace/nix/trunk'>Subversion 
-        repository</ulink>.  For example, the following command will check out
-      the latest revision into a directory called <filename>nix</filename>:
-    </para>
+<para>The easiest way to obtain Nix is to download a <ulink
+url='http://www.cs.uu.nl/groups/ST/Trace/Nix'>source
+distribution</ulink>.  RPMs for Red Hat 9 are also available.  These
+distributions are generated automatically.</para>
 
-    <screen>
+<para>Alternatively, the most recent sources of Nix can be obtained
+from its <ulink
+url='https://svn.cs.uu.nl:12443/repos/trace/nix/trunk'>Subversion
+repository</ulink>.  For example, the following command will check out
+the latest revision into a directory called <filename>nix</filename>:</para>
+
+<screen>
 $ svn checkout https://svn.cs.uu.nl:12443/repos/trace/nix/trunk nix</screen>
 
-    <para>
-      Likewise, specific releases can be obtained from the <ulink
-        url='https://svn.cs.uu.nl:12443/repos/trace/nix/tags'>tags
-        directory</ulink> of the repository.  If you don't have Subversion, you
-      can also download an automatically generated <ulink
-        url='https://svn.cs.uu.nl:12443/dist/trace/'>compressed
-        tar-file</ulink> of the head revision of the trunk.
+<para>Likewise, specific releases can be obtained from the <ulink
+url='https://svn.cs.uu.nl:12443/repos/trace/nix/tags'>tags
+directory</ulink> of the repository.  If you don't have Subversion,
+you can also download an automatically generated <ulink
+url='https://svn.cs.uu.nl:12443/dist/trace/'>compressed
+tar-file</ulink> of the head revision of the trunk.</para>
+
+</sect1>
+
+
+<sect1><title>Prerequisites</title>
+
+<para>The following prerequisites only apply when you build from
+source.  Binary releases (e.g., RPMs) have no prerequisites.</para>
+
+<para>A fairly recent version of GCC/G++ is required.  Version 2.95
+and higher should work.</para>
+
+<para>To build this manual and the man-pages you need the
+<command>xmllint</command> and <command>xsltproc</command> programs,
+which are part of the <literal>libxml2</literal> and
+<literal>libxslt</literal> packages, respectively.  You also need the
+<ulink url='http://docbook.sourceforge.net/projects/xsl/'>DocBook XSL
+stylesheets</ulink> and optionally the <ulink
+url='http://www.oasis-open.org/docbook/xml/4.2/docbook-xml-4.2.zip'>
+DocBook XML 4.2 DTD</ulink>.  Note that these are only required if you
+modify the manual sources or when you are building from the Subversion
+repository.</para>
+
+<para>To build the parser, very <emphasis>recent</emphasis> versions
+of Bison and Flex are required.  (This is because Nix needs GLR
+support in Bison and reentrancy support in Flex.)  For Bison, you need
+version 1.875c or higher (1.875 does <emphasis>not</emphasis> work),
+which can be obtained from the <ulink
+url='ftp://alpha.gnu.org/pub/gnu/bison'>GNU FTP server</ulink>.  For
+Flex, you need version 2.5.31, which is available on <ulink
+url='http://lex.sourceforge.net/'>SourceForge</ulink>.  Slightly older
+versions may also work, but ancient versions like the ubiquitous
+2.5.4a won't.  Note that these are only required if you modify the
+parser or when you are building from the Subversion repository.</para>
+
+<para>Nix uses Sleepycat's Berkeley DB and CWI's ATerm library.  These
+are included in the Nix source distribution.  If you build from the
+Subversion repository, you must download them yourself and place them
+in the <filename>externals/</filename> directory.  See
+<filename>externals/Makefile.am</filename> for the precise URLs of
+these packages.</para>
+
+</sect1>
+
+
+<sect1><title>Building Nix from source</title>
+
+<para>After unpacking or checking out the Nix sources, issue the
+following commands:
     </para>
 
-  </sect1>
-
-  <sect1>
-    <title>Prerequisites</title>
-
-    <para>
-      The following prerequisites only apply when you build from
-      source.  Binary releases (e.g., RPMs) have no prerequisites.
-    </para>
-
-    <para>
-      A fairly recent version of GCC/G++ is required.  Version 2.95
-      and higher should work.
-    </para>
-
-    <para>
-      To build this manual and the man-pages you need the
-      <command>xmllint</command> and <command>xsltproc</command>
-      programs, which are part of the <literal>libxml2</literal> and
-      <literal>libxslt</literal> packages, respectively.  You also
-      need the <ulink
-      url='http://docbook.sourceforge.net/projects/xsl/'>DocBook XSL
-      stylesheets</ulink> and optionally the <ulink
-      url='http://www.oasis-open.org/docbook/xml/4.2/docbook-xml-4.2.zip'>
-      DocBook XML 4.2 DTD</ulink>.  Note that these are only required
-      if you modify the manual sources or when you are building from
-      the Subversion repository.
-    </para>
-
-    <para>
-      To build the parser, very <emphasis>recent</emphasis> versions
-      of Bison and Flex are required.  (This is because Nix needs GLR
-      support in Bison and reentrancy support in Flex.)  For Bison,
-      you need version 1.875c or higher (1.875 does
-      <emphasis>not</emphasis> work), which can be obtained from the
-      <ulink url='ftp://alpha.gnu.org/pub/gnu/bison'>GNU FTP
-      server</ulink>.  For Flex, you need version 2.5.31, which is
-      available on <ulink
-      url='http://lex.sourceforge.net/'>SourceForge</ulink>.  Slightly
-      older versions may also work, but ancient versions like the
-      ubiquitous 2.5.4a won't.  Note that these are only required if
-      you modify the parser or when you are building from the
-      Subversion repository.
-    </para>
-
-    <para>
-      Nix uses Sleepycat's Berkeley DB and CWI's ATerm library.  These
-      are included in the Nix source distribution.  If you build from
-      the Subversion repository, you must download them yourself and
-      place them in the <filename>externals/</filename> directory.
-      See <filename>externals/Makefile.am</filename> for the precise
-      URLs of these packages.
-    </para>
-  </sect1>
-
-  <sect1>
-    <title>Building Nix from source</title>
-
-    <para>
-      After unpacking or checking out the Nix sources, issue the following
-      commands:
-    </para>
-
-    <screen>
+<screen>
 $ ./configure <replaceable>options...</replaceable>
 $ make
 $ make install</screen>
 
-    <para>
-      When building from the Subversion repository, these should be preceded by
-      the command:
+<para>When building from the Subversion repository, these should be
+preceded by the command:
     </para>
 
-    <screen>
+<screen>
 $ autoreconf -i</screen>
 
-    <para>
-      The installation path can be specified by passing the
-      <option>--prefix=<replaceable>prefix</replaceable></option> to
-      <command>configure</command>.  The default installation directory is
-      <filename>/nix</filename>.  You can change this to any location you like.
-      You must have write permission to the <replaceable>prefix</replaceable>
-      path.
+<para>The installation path can be specified by passing the
+<option>--prefix=<replaceable>prefix</replaceable></option> to
+<command>configure</command>.  The default installation directory is
+<filename>/nix</filename>.  You can change this to any location you
+like.  You must have write permission to the
+<replaceable>prefix</replaceable> path.
     </para>
 
-    <warning>
-      <para>
-        It is advisable <emphasis>not</emphasis> to change the installation
-        prefix from its default, since doing so will in all likelihood make it
-        impossible to use derivations built on other systems.
-      </para>
-    </warning>
+<warning><para>It is advisable <emphasis>not</emphasis> to change the
+installation prefix from its default, since doing so will in all
+likelihood make it impossible to use derivations built on other
+systems.</para></warning>
 
-    <para>
-      If you want to rebuilt the documentation, pass the full path to the
-      DocBook XML catalog file (<filename>docbook.cat</filename>) and to the
-      DocBook XSL stylesheets using the
-      <option>--with-docbook-catalog=<replaceable>path</replaceable></option>
-      and <option>--with-docbook-xsl=<replaceable>path</replaceable></option>
-      options.
-    </para>
+<para>If you want to rebuilt the documentation, pass the full path to
+the DocBook XML catalog file (<filename>docbook.cat</filename>) and to
+the DocBook XSL stylesheets using the
+<option>--with-docbook-catalog=<replaceable>path</replaceable></option>
+and
+<option>--with-docbook-xsl=<replaceable>path</replaceable></option>
+options.</para>
 
-  </sect1>
+</sect1>
 
 
-  <sect1>
-    <title>Installing from RPMs</title>
+<sect1><title>Installing from RPMs</title>
 
-    <para>
-      RPM packages of Nix can be downloaded from <ulink
-      url='http://www.cs.uu.nl/groups/ST/Trace/Nix' />.  These RPMs
-      should work for most fairly recent releases of SuSE and Red Hat
-      Linux.  They have been known to work work on SuSE Linux 8.1 and
-      9.0, and Red Hat 9.0.  In fact, it should work on any RPM-based
-      Linux distribution based on <literal>glibc</literal> 2.3 or
-      later.
-    </para>
+<para>RPM packages of Nix can be downloaded from <ulink
+url='http://www.cs.uu.nl/groups/ST/Trace/Nix' />.  These RPMs should
+work for most fairly recent releases of SuSE and Red Hat Linux.  They
+have been known to work work on SuSE Linux 8.1 and 9.0, and Red Hat
+9.0.  In fact, it should work on any RPM-based Linux distribution
+based on <literal>glibc</literal> 2.3 or later.</para>
 
-    <para>
-      Once downloaded, the RPMs can be installed or upgraded using
-      <command>rpm -U</command>.  For example,
-    </para>
+<para>Once downloaded, the RPMs can be installed or upgraded using
+<command>rpm -U</command>.  For example,</para>
 
-    <screen>
+<screen>
 rpm -U nix-0.5pre664-1.i386.rpm</screen>
 
-    <para>
-      The RPMs install into the directory <filename>/nix</filename>.
-      Nix can be uninstalled using <command>rpm -e nix</command>.
-      After this it will be necessary to manually remove the Nix store
-      and other auxiliary data:
-    </para>
+<para>The RPMs install into the directory <filename>/nix</filename>.
+Nix can be uninstalled using <command>rpm -e nix</command>.  After
+this it will be necessary to manually remove the Nix store and other
+auxiliary data:</para>
 
-    <screen>
+<screen>
 rm -rf /nix/store
 rm -rf /nix/var</screen>
 
-  </sect1>
+</sect1>
 
-  <sect1>
-    <title>Permissions</title>
 
-    <para>
-      All Nix operations must be performed under the user ID that owns
-      the Nix store and database
-      (<filename><replaceable>prefix</replaceable>/store</filename>
-      and
-      <filename><replaceable>prefix</replaceable>/var/nix/db</filename>,
-      respectively).  When installed from the RPM packages, these
-      directories are owned by <systemitem
-      class='username'>root</systemitem>.
-    </para>
+<sect1><title>Permissions</title>
 
-  </sect1>
+<para>All Nix operations must be performed under the user ID that owns
+the Nix store and database
+(<filename><replaceable>prefix</replaceable>/store</filename> and
+<filename><replaceable>prefix</replaceable>/var/nix/db</filename>,
+respectively).  When installed from the RPM packages, these
+directories are owned by <systemitem
+class='username'>root</systemitem>.</para>
 
-  <sect1>
-    <title>Using Nix</title>
+</sect1>
 
-    <para>
-      To use Nix, some environment variables should be set.  In
-      particular, <envar>PATH</envar> should contain the directories
-      <filename><replaceable>prefix</replaceable>/bin</filename> and
-      <filename>~/.nix-profile/bin</filename>.  The first directory
-      contains the Nix tools themselves, while
-      <filename>~/.nix-profile</filename> is a symbolic link to the
-      current <emphasis>user environment</emphasis> (an automatically
-      generated package consisting of symlinks to installed packages).
-      The simplest way to set the required environment variables is to
-      include the file
-      <filename><replaceable>prefix</replaceable>/etc/profile.d/nix.sh</filename>
-      in your <filename>~/.bashrc</filename> (or similar), like this:
-    </para>
 
-    <screen>
+<sect1><title>Using Nix</title>
+
+<para>To use Nix, some environment variables should be set.  In
+particular, <envar>PATH</envar> should contain the directories
+<filename><replaceable>prefix</replaceable>/bin</filename> and
+<filename>~/.nix-profile/bin</filename>.  The first directory contains
+the Nix tools themselves, while <filename>~/.nix-profile</filename> is
+a symbolic link to the current <emphasis>user environment</emphasis>
+(an automatically generated package consisting of symlinks to
+installed packages).  The simplest way to set the required environment
+variables is to include the file
+<filename><replaceable>prefix</replaceable>/etc/profile.d/nix.sh</filename>
+in your <filename>~/.bashrc</filename> (or similar), like this:</para>
+
+<screen>
 . <replaceable>prefix</replaceable>/etc/profile.d/nix.sh</screen>
 
-  </sect1>
+</sect1>
+
 
 </chapter>
