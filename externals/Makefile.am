@@ -9,7 +9,11 @@ $(DB).tar.gz:
 $(DB): $(DB).tar.gz
 	gunzip < $(DB).tar.gz | tar xvf -
 
-build-db: $(DB)
+have-db:
+	$(MAKE) $(DB)
+	touch have-db
+
+build-db: have-db
 	(pfx=`pwd` && \
 	cd $(DB)/build_unix && \
 	CC=$(CC) CXX=$(CXX) ../dist/configure --prefix=$$pfx/inst --enable-cxx --disable-shared && \
@@ -29,7 +33,11 @@ $(ATERM).tar.gz:
 $(ATERM): $(ATERM).tar.gz
 	gunzip < $(ATERM).tar.gz | tar xvf -
 
-build-aterm: $(ATERM)
+have-aterm:
+	$(MAKE) $(ATERM)
+	touch have-aterm
+
+build-aterm: have-aterm
 	(pfx=`pwd` && \
 	cd $(ATERM) && \
 	./configure --prefix=$$pfx/inst && \
