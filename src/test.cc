@@ -117,7 +117,7 @@ void runTests()
         ((string) builder1id).c_str(),
         builder1fn.c_str(),
         ((string) builder1id).c_str());
-    FSId fs1id = writeTerm(fs1, "", 0);
+    FSId fs1id = writeTerm(fs1, "");
 
     realise(fs1id);
     realise(fs1id);
@@ -127,7 +127,7 @@ void runTests()
         ((string) builder1id).c_str(),
         (builder1fn + "_bla").c_str(),
         ((string) builder1id).c_str());
-    FSId fs2id = writeTerm(fs2, "", 0);
+    FSId fs2id = writeTerm(fs2, "");
 
     realise(fs2id);
     realise(fs2id);
@@ -143,7 +143,7 @@ void runTests()
         thisSystem.c_str(),
         out1fn.c_str());
     debug(printTerm(fs3));
-    FSId fs3id = writeTerm(fs3, "", 0);
+    FSId fs3id = writeTerm(fs3, "");
 
     realise(fs3id);
     realise(fs3id);
@@ -158,7 +158,7 @@ void runTests()
         ((string) builder4id).c_str(),
         builder4fn.c_str(),
         ((string) builder4id).c_str());
-    FSId fs4id = writeTerm(fs4, "", 0);
+    FSId fs4id = writeTerm(fs4, "");
 
     realise(fs4id);
 
@@ -174,7 +174,7 @@ void runTests()
         out5fn.c_str(),
         ((string) builder4fn).c_str());
     debug(printTerm(fs5));
-    FSId fs5id = writeTerm(fs5, "", 0);
+    FSId fs5id = writeTerm(fs5, "");
 
     realise(fs5id);
     realise(fs5id);

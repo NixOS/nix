@@ -8,15 +8,24 @@
 
 typedef ATerm Expr;
 
+typedef map<ATerm, ATerm> NormalForms;
 
-static Strings searchDirs;
+struct EvalState 
+{
+    Strings searchDirs;
+    NormalForms normalForms;
+};
 
 
-static string searchPath(string relPath)
+static Expr evalFile(EvalState & state, string fileName);
+static Expr evalExpr(EvalState & state, Expr e);
+
+
+static string searchPath(const Strings & searchDirs, string relPath)
 {
     if (string(relPath, 0, 1) == "/") return relPath;
 
-    for (Strings::iterator i = searchDirs.begin();
+    for (Strings::const_iterator i = searchDirs.begin();
          i != searchDirs.end(); i++)
     {
         string path = *i + "/" + relPath;
@@ -27,9 +36,6 @@ static string searchPath(string relPath)
         format("path `%1%' not found in any of the search directories")
         % relPath);
 }
-
-
-static Expr evalFile(string fileName);
 
 
 static Expr substExpr(string x, Expr rep, Expr e)
@@ -98,7 +104,7 @@ static Expr substExprMany(ATermList formals, ATermList args, Expr body)
 }
 
 
-static Expr evalExpr(Expr e)
+static Expr evalExpr2(EvalState & state, Expr e)
 {
     char * s1;
     Expr e1, e2, e3, e4;
@@ -119,21 +125,22 @@ static Expr evalExpr(Expr e)
 
     /* Application. */
     if (ATmatch(e, "App(<term>, [<list>])", &e1, &e2)) {
-        e1 = evalExpr(e1);
+        e1 = evalExpr(state, e1);
         if (!ATmatch(e1, "Function([<list>], <term>)", &e3, &e4))
             throw badTerm("expecting a function", e1);
-        return evalExpr(substExprMany((ATermList) e3, (ATermList) e2, e4));
+        return evalExpr(state,
+            substExprMany((ATermList) e3, (ATermList) e2, e4));
     }
 
     /* Fix inclusion. */
     if (ATmatch(e, "IncludeFix(<str>)", &s1)) {
         string fileName(s1);
-        return evalFile(s1);
+        return evalFile(state, s1);
     }
 
     /* Relative files. */
     if (ATmatch(e, "Relative(<str>)", &s1)) {
-        string srcPath = searchPath(s1);
+        string srcPath = searchPath(state.searchDirs, s1);
         string dstPath;
         FSId id;
         addToStore(srcPath, dstPath, id, true);
@@ -160,7 +167,7 @@ static Expr evalExpr(Expr e)
             ATerm bnd = ATgetFirst(bnds);
             if (!ATmatch(bnd, "(<str>, <term>)", &s1, &e1))
                 throw badTerm("binding expected", bnd);
-            bndMap[s1] = evalExpr(e1);
+            bndMap[s1] = evalExpr(state, e1);
             bnds = ATgetNext(bnds);
         }
 
@@ -218,7 +225,7 @@ static Expr evalExpr(Expr e)
 
     /* BaseName primitive function. */
     if (ATmatch(e, "BaseName(<term>)", &e1)) {
-        e1 = evalExpr(e1);
+        e1 = evalExpr(state, e1);
         if (!ATmatch(e1, "<str>", &s1)) 
             throw badTerm("string expected", e1);
         return ATmake("<str>", baseNameOf(s1).c_str());
@@ -229,22 +236,37 @@ static Expr evalExpr(Expr e)
 }
 
 
-static Expr evalFile(string relPath)
+static Expr evalExpr(EvalState & state, Expr e)
 {
-    string path = searchPath(relPath);
+    /* Consult the memo table to quickly get the normal form of
+       previously evaluated expressions. */
+    NormalForms::iterator i = state.normalForms.find(e);
+    if (i != state.normalForms.end()) return i->second;
+
+    /* Otherwise, evaluate and memoize. */
+    Expr nf = evalExpr2(state, e);
+    state.normalForms[e] = nf;
+    return nf;
+}
+
+
+static Expr evalFile(EvalState & state, string relPath)
+{
+    string path = searchPath(state.searchDirs, relPath);
     Expr e = ATreadFromNamedFile(path.c_str());
     if (!e) 
         throw Error(format("unable to read a term from `%1%'") % path);
-    return evalExpr(e);
+    return evalExpr(state, e);
 }
 
 
 void run(Strings args)
 {
+    EvalState state;
     Strings files;
 
-    searchDirs.push_back(".");
-    searchDirs.push_back(nixDataDir + "/fix");
+    state.searchDirs.push_back(".");
+    state.searchDirs.push_back(nixDataDir + "/fix");
     
     for (Strings::iterator it = args.begin();
          it != args.end(); )
@@ -254,7 +276,7 @@ void run(Strings args)
         if (arg == "--includedir" || arg == "-I") {
             if (it == args.end())
                 throw UsageError(format("argument required in `%1%'") % arg);
-            searchDirs.push_back(*it++);
+            state.searchDirs.push_back(*it++);
         }
         else if (arg[0] == '-')
             throw UsageError(format("unknown flag `%1%`") % arg);
@@ -267,7 +289,7 @@ void run(Strings args)
     for (Strings::iterator it = files.begin();
          it != files.end(); it++)
     {
-        Expr e = evalFile(*it);
+        Expr e = evalFile(state, *it);
         char * s;
         if (ATmatch(e, "FSId(<str>)", &s)) {
             cout << format("%1%\n") % s;
