@@ -1,1 +1,1 @@
-SUBDIRS = fetchurl nar buildenv channels nix-pull
+SUBDIRS = fetchurl nar buildenv channels

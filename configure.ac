@@ -195,7 +195,6 @@ AC_CONFIG_FILES([Makefile
    corepkgs/nar/Makefile
    corepkgs/buildenv/Makefile
    corepkgs/channels/Makefile
-   corepkgs/nix-pull/Makefile
    doc/Makefile
    doc/manual/Makefile
    misc/Makefile

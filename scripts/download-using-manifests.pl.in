@@ -1,9 +1,9 @@
-#! /usr/bin/perl -w -I/home/eelco/Dev/nix/scripts
+#! @perl@ -w -I@libexecdir@/nix
 
 use strict;
 use readmanifest;
 
-my $manifestDir = "/home/eelco/Dev/nix/patch/test";
+my $manifestDir = "@localstatedir@/nix/manifests";
 
 
 # Check the arguments.

@@ -19,6 +19,7 @@ sub readManifest {
     my $basePath;
     my $baseHash;
     my $patchType;
+    my $narHash;
 
     while (<MANIFEST>) {
         chomp;
@@ -34,6 +35,7 @@ sub readManifest {
                 undef $hash;
                 $size = 999999999;
                 @preds = ();
+                undef $narHash;
 	    }
             elsif (/^patch \{$/) {
                 $type = "patch";
@@ -44,6 +46,7 @@ sub readManifest {
                 undef $basePath;
                 undef $baseHash;
                 undef $patchType;
+                undef $narHash;
             }
             else { die "bad line: $_"; }
         } else {
@@ -71,7 +74,9 @@ sub readManifest {
                     }
                     if (!$found) {
                         push @{$narFileList},
-                            {url => $url, hash => $hash, size => $size};
+                            { url => $url, hash => $hash, size => $size
+                            , narHash => $narHash
+                            };
                     }
                 
                     foreach my $p (@preds) {
@@ -102,6 +107,7 @@ sub readManifest {
                         push @{$patchList},
                             { url => $url, hash => $hash, size => $size
                             , basePath => $basePath, baseHash => $baseHash
+                            , narHash => $narHash
                             };
                     }
                     
@@ -117,11 +123,12 @@ sub readManifest {
             elsif (/^\s*BasePath:\s*(\/\S+)\s*$/) { $basePath = $1; }
             elsif (/^\s*BaseHash:\s*(\S+)\s*$/) { $baseHash = $1; }
             elsif (/^\s*Type:\s*(\S+)\s*$/) { $patchType = $1; }
+            elsif (/^\s*NarHash:\s*(\S+)\s*$/) { $narHash = $1; }
 
             # Compatibility;
             elsif (/^\s*NarURL:\s*(\S+)\s*$/) { $url = $1; }
             elsif (/^\s*MD5:\s*(\S+)\s*$/) { $hash = $1; }
-            
+
             else { die "bad line: $_"; }
         }
     }

@@ -11,7 +11,7 @@ until mkdir $tmpdir, 0777;
 
 my $manifest = "$tmpdir/manifest";
 
-#END { unlink $manifest; rmdir $tmpdir; }
+END { unlink $manifest; rmdir $tmpdir; }
 
 
 # Obtain URLs either from the command line or from a configuration file.
@@ -28,8 +28,22 @@ sub processURL {
     system("@curl@ --fail --silent --show-error --location --max-redirs 20 " .
            "'$url' > '$manifest'") == 0
            or die "curl failed: $?";
-    
+
     readManifest $manifest, \%narFiles, \%patches, \%successors;
+
+    my $baseName = "unnamed";
+    if ($url =~ /\/([^\/]+)\/[^\/]+$/) { # get the forelast component
+        $baseName = $1;
+    }
+
+    my $hash = `@bindir@/nix-hash --flat '$manifest'`
+        or die "cannot hash `$manifest'";
+    chomp $hash;
+    
+    my $finalPath = "@localstatedir@/nix/manifests/$baseName-$hash.nixmanifest";
+    
+    system("mv '$manifest' '$finalPath'") == 0
+        or die "cannot move `$manifest' to `$finalPath";
 }
 
 while (@ARGV) {
@@ -40,18 +54,6 @@ while (@ARGV) {
 
 my $size = scalar (keys %narFiles);
 print "$size store paths in manifest\n";
-
-
-# Instantiate a store expression that builds the substitute program
-# (the program that fetches URLs and unpacks them into the store).
-my $nixExpr =
-    "(import @datadir@/nix/corepkgs/nix-pull) " .
-    "{system = \"@system@\";}";
-
-print STDERR "building downloader...\n";
-my $substProgram = `echo '$nixExpr' | @bindir@/nix-store -qnf \$(@bindir@/nix-instantiate -)`
-    or die "cannot instantiate Nix expression";
-chomp $substProgram;
 
 
 # Register all substitutes.
@@ -66,10 +68,8 @@ foreach my $storePath (keys %narFiles) {
     my $narFileList = $narFiles{$storePath};
     foreach my $narFile (@{$narFileList}) {
         print WRITE "$storePath\n";
-        print WRITE "$substProgram/fetch\n";
-        print WRITE "2\n";
-        print WRITE "$narFile->{url}\n";
-        print WRITE "$narFile->{hash}\n";
+        print WRITE "@libexecdir@/nix/download-using-manifests.pl\n";
+        print WRITE "0\n";
     }
 }
 
