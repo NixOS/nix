@@ -53,10 +53,7 @@ protected:
        here to prevent cycles. */
     WeakGoals waiters;
 
-    /* Number of goals we are waiting for. */
-    unsigned int nrWaitees;
-
-    /* Number of goals we were waiting for that have failed. */
+    /* Number of goals we are/were waiting for that have failed. */
     unsigned int nrFailed;
 
     /* Whether amDone() has been called. */
@@ -66,17 +63,12 @@ protected:
     Goal(Worker & _worker) : worker(_worker)
     {
         done = false;
+        nrFailed = 0;
     }
 
     virtual ~Goal()
     {
         printMsg(lvlVomit, "goal destroyed");
-    }
-
-    void resetWaitees(int nrWaitees)
-    {
-        this->nrWaitees = nrWaitees;
-        nrFailed = 0;
     }
 
 public:
@@ -210,8 +202,7 @@ void Goal::waiteeDone(GoalPtr waitee, bool success)
     
     if (!success) ++nrFailed;
     
-    assert(nrWaitees > 0);
-    if (!--nrWaitees || (!success && !keepGoing)) {
+    if (waitees.empty() || (!success && !keepGoing)) {
 
         /* If we failed and keepGoing is not set, we remove all
            remaining waitees. */
@@ -453,7 +444,6 @@ void NormalisationGoal::init()
     /* The first thing to do is to make sure that the store expression
        exists.  If it doesn't, it may be created through a
        substitute. */
-    resetWaitees(1);
     addWaitee(worker.makeSubstitutionGoal(nePath));
 
     state = &NormalisationGoal::haveStoreExpr;
@@ -489,8 +479,6 @@ void NormalisationGoal::haveStoreExpr()
          i != expr.derivation.inputs.end(); ++i)
         addWaitee(worker.makeNormalisationGoal(*i));
 
-    resetWaitees(expr.derivation.inputs.size());
-
     state = &NormalisationGoal::inputNormalised;
 }
 
@@ -513,8 +501,6 @@ void NormalisationGoal::inputNormalised()
          i != expr.derivation.inputs.end(); ++i)
         addWaitee(worker.makeRealisationGoal(queryNormalForm(*i)));
     
-    resetWaitees(expr.derivation.inputs.size());
-
     state = &NormalisationGoal::inputRealised;
 }
 
@@ -1284,7 +1270,6 @@ void RealisationGoal::init()
 
     /* First normalise the expression (which is a no-op if the
        expression is already a closure). */
-    resetWaitees(1);
     addWaitee(worker.makeNormalisationGoal(nePath));
 
     /* Since there is no successor right now, the normalisation goal
@@ -1310,7 +1295,6 @@ void RealisationGoal::isNormalised()
 
     /* Now make sure that the store expression exists.  If it doesn't,
        it may be created through a substitute. */
-    resetWaitees(1);
     addWaitee(worker.makeSubstitutionGoal(nfPath));
 
     state = &RealisationGoal::haveStoreExpr;
@@ -1341,8 +1325,6 @@ void RealisationGoal::haveStoreExpr()
          i != expr.closure.elems.end(); ++i)
         addWaitee(worker.makeSubstitutionGoal(i->first));
     
-    resetWaitees(expr.closure.elems.size());
-
     state = &RealisationGoal::elemFinished;
 }
 
@@ -1371,6 +1353,7 @@ void RealisationGoal::fallBack(const format & error)
             % error);
         tryFallback = false;
         unregisterSuccessor(nePath);
+        nrFailed = 0;
         init();
     } else {
         printMsg(lvlError, format("%1%; maybe `--fallback' will help") % error);
@@ -1492,8 +1475,8 @@ void SubstitutionGoal::tryNext()
     subs.pop_front();
 
     /* Normalise the substitute store expression. */
+    nrFailed = 0;
     addWaitee(worker.makeNormalisationGoal(sub.storeExpr));
-    resetWaitees(1);
 
     state = &SubstitutionGoal::exprNormalised;
 }
@@ -1511,8 +1494,6 @@ void SubstitutionGoal::exprNormalised()
     /* Realise the substitute store expression. */
     nfSub = queryNormalForm(sub.storeExpr);
     addWaitee(worker.makeRealisationGoal(nfSub));
-
-    resetWaitees(1);
 
     state = &SubstitutionGoal::exprRealised;
 }
