@@ -23,3 +23,5 @@ all-local: book.html
 install-data-local: book.html
 	$(INSTALL) -d $(datadir)/nix/manual
 	$(INSTALL_DATA) book.html $(datadir)/nix/manual
+
+EXTRA_DIST = $(SOURCES) book.html nix.1 book.is-valid
