@@ -101,7 +101,7 @@ void enumDB(const string & filename, const string & dbname,
 {
     try {
 
-        auto_ptr<Db2> db = openDB(filename, dbname, false);
+        auto_ptr<Db2> db = openDB(filename, dbname, true);
 
         Dbc * cursor;
         db->cursor(0, &cursor, 0);
