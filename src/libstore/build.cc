@@ -769,15 +769,20 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
         
         /* Write the information that the hook needs to perform the
            build, i.e., the set of input paths, the set of output
-           paths, and [!!!]. */
+           paths, and the references (pointer graph) in the input
+           paths. */
         
         Path inputListFN = tmpDir + "/inputs";
         Path outputListFN = tmpDir + "/outputs";
+        Path referencesFN = tmpDir + "/references";
 
         string s;
         for (PathSet::iterator i = inputPaths.begin();
              i != inputPaths.end(); ++i)
             s += *i + "\n";
+        for (DerivationInputs::iterator i = drv.inputDrvs.begin();
+             i != drv.inputDrvs.end(); ++i)
+            s += i->first + "\n";
         writeStringToFile(inputListFN, s);
         
         s = "";
@@ -785,7 +790,24 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
              i != drv.outputs.end(); ++i)
             s += i->second.path + "\n";
         writeStringToFile(outputListFN, s);
-        
+
+        s = "";
+        for (PathSet::iterator i = inputPaths.begin();
+             i != inputPaths.end(); ++i)
+        {
+            s += *i;
+            PathSet references;
+            queryReferences(*i, references);
+            for (PathSet::iterator j = references.begin();
+                 j != references.end(); ++j)
+            {
+                s += " ";
+                s += *j;
+            }
+            s += "\n";
+        }
+        writeStringToFile(referencesFN, s);
+
         /* Tell the hook to proceed. */ 
         writeLine(toHook.writeSide, "okay");
 

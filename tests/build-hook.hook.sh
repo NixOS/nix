@@ -1,12 +1,12 @@
 #! /bin/sh
 
-set -x
+#set -x
 
 drv=$4
 
 echo "HOOK for $drv" >&2
 
-outPath=$(sed 's/Derive(\[\"\([^\"]*\)\".*/\1/' $drv)
+outPath=$(sed 's/Derive(\[("out",\"\([^\"]*\)\".*/\1/' $drv)
 
 echo "output path is $outPath" >&2
 
