@@ -91,6 +91,10 @@ exports
   lexical syntax
     [a-zA-Z\_][a-zA-Z0-9\_\']* -> Id
     "rec" -> Id {reject}
+    "let" -> Id {reject}
+    "if" -> Id {reject}
+    "then" -> Id {reject}
+    "else" -> Id {reject}
     "true" -> Id {reject}
     "false" -> Id {reject}
     "assert" -> Id {reject}
@@ -108,6 +112,7 @@ exports
   lexical restrictions
     Id -/- [a-zA-Z0-9\_\']
     Int -/- [0-9]
+    Path -/- [a-zA-Z0-9\.\_\-\+\/]
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -126,6 +131,7 @@ exports
 
     "//" Uauthority Uabspath? -> Unetpath
     "/" Upathsegments -> Uabspath
+    "//" Uuric* -> Uabspath {reject}
     Urelsegment Uabspath? -> Urelpath
 
     (Uunreserved | Uescaped | [\;\@\&\=\+\$\,])+ -> Urelsegment

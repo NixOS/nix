@@ -109,6 +109,7 @@ Expr parseExprFromFile(Path path)
         SG_OUTPUT_ON();
         SG_ASFIX2ME_ON();
         SG_AMBIGUITY_ERROR_ON();
+        SG_FILTER_OFF();
 
         initialised = true;
     }
