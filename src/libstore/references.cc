@@ -36,14 +36,10 @@ void checkPath(const string & path,
         throw SysError(format("getting attributes of path `%1%'") % path);
 
     if (S_ISDIR(st.st_mode)) {
-        AutoCloseDir dir = opendir(path.c_str());
-
-        struct dirent * dirent;
-        while (errno = 0, dirent = readdir(dir)) {
-            string name = dirent->d_name;
-            if (name == "." || name == "..") continue;
-            search(name, ids, seen);
-            checkPath(path + "/" + name, ids, seen);
+        Strings names = readDirectory(path);
+	for (Strings::iterator i = names.begin(); i != names.end(); i++) {
+            search(*i, ids, seen);
+            checkPath(path + "/" + *i, ids, seen);
         }
     }
 

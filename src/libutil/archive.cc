@@ -51,23 +51,12 @@ static void dump(const string & path, DumpSink & sink);
 
 static void dumpEntries(const Path & path, DumpSink & sink)
 {
-    AutoCloseDir dir = opendir(path.c_str());
-    if (!dir) throw SysError("opening directory " + path);
+    Strings names = readDirectory(path);
+    vector<string> names2(names.begin(), names.end());
+    sort(names2.begin(), names2.end());
 
-    vector<string> names;
-
-    struct dirent * dirent;
-    while (errno = 0, dirent = readdir(dir)) {
-        string name = dirent->d_name;
-        if (name == "." || name == "..") continue;
-        names.push_back(name);
-    }
-    if (errno) throw SysError("reading directory " + path);
-
-    sort(names.begin(), names.end());
-
-    for (vector<string>::iterator it = names.begin();
-         it != names.end(); it++)
+    for (vector<string>::iterator it = names2.begin();
+         it != names2.end(); it++)
     {
         writeString("entry", sink);
         writeString("(", sink);

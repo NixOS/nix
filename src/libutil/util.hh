@@ -73,6 +73,10 @@ string baseNameOf(const Path & path);
 /* Return true iff the given path exists. */
 bool pathExists(const Path & path);
 
+/* Read the contents of a directory.  The entries `.' and `..' are
+   removed. */
+Strings readDirectory(const Path & path);
+
 /* Delete a path; i.e., in the case of a directory, it is deleted
    recursively.  Don't use this at home, kids. */
 void deletePath(const Path & path);

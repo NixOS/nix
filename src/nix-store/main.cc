@@ -251,9 +251,8 @@ void run(Strings args)
     Strings opFlags, opArgs;
     Operation op = 0;
 
-    for (Strings::iterator it = args.begin(); it != args.end(); )
-    {
-        string arg = *it++;
+    for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
+        string arg = *i;
 
         Operation oldOp = op;
 

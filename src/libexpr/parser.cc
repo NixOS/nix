@@ -68,6 +68,8 @@ struct Cleanup : TermFun
 
 Expr parseExprFromFile(Path path)
 {
+    assert(path[0] == '/');
+
 #if 0
     /* Perhaps this is already an imploded parse tree? */
     Expr e = ATreadFromNamedFile(path.c_str());

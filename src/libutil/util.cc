@@ -108,6 +108,25 @@ bool pathExists(const Path & path)
 }
 
 
+Strings readDirectory(const Path & path)
+{
+    Strings names;
+
+    AutoCloseDir dir = opendir(path.c_str());
+    if (!dir) throw SysError(format("opening directory `%1%'") % path);
+
+    struct dirent * dirent;
+    while (errno = 0, dirent = readdir(dir)) { /* sic */
+        string name = dirent->d_name;
+        if (name == "." || name == "..") continue;
+        names.push_back(name);
+    }
+    if (errno) throw SysError(format("reading directory `%1%'") % path);
+
+    return names;
+}
+
+
 void deletePath(const Path & path)
 {
     printMsg(lvlVomit, format("deleting path `%1%'") % path);
@@ -117,18 +136,7 @@ void deletePath(const Path & path)
 	throw SysError(format("getting attributes of path `%1%'") % path);
 
     if (S_ISDIR(st.st_mode)) {
-	Strings names;
-        
-        {
-            AutoCloseDir dir = opendir(path.c_str());
-
-            struct dirent * dirent;
-            while (errno = 0, dirent = readdir(dir)) {
-                string name = dirent->d_name;
-                if (name == "." || name == "..") continue;
-                names.push_back(name);
-            }
-        } /* scoped to ensure that dir is closed at this point */
+	Strings names = readDirectory(path);
 
 	/* Make the directory writable. */
 	if (!(st.st_mode & S_IWUSR)) {
@@ -136,7 +144,7 @@ void deletePath(const Path & path)
 		throw SysError(format("making `%1%' writable"));
 	}
 
-	for (Strings::iterator i = names.begin(); i != names.end(); i++)
+	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
             deletePath(path + "/" + *i);
     }
 
@@ -157,14 +165,9 @@ void makePathReadOnly(const Path & path)
     }
 
     if (S_ISDIR(st.st_mode)) {
-        AutoCloseDir dir = opendir(path.c_str());
-
-        struct dirent * dirent;
-        while (errno = 0, dirent = readdir(dir)) {
-            string name = dirent->d_name;
-            if (name == "." || name == "..") continue;
-	    makePathReadOnly(path + "/" + name);
-        }
+        Strings names = readDirectory(path);
+	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
+	    makePathReadOnly(path + "/" + *i);
     }
 }
 

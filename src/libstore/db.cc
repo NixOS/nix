@@ -166,7 +166,7 @@ void Database::open(const string & path)
         /* The following code provides automatic recovery of the
            database environment.  Recovery is necessary when a process
            dies while it has the database open.  To detect this,
-           processes atomically increment a counter when the open the
+           processes atomically increment a counter when they open the
            database, and decrement it when they close it.  If we see
            that counter is > 0 but no processes are accessing the
            database---determined by attempting to obtain a write lock
@@ -199,7 +199,7 @@ void Database::open(const string & path)
                other readers or writers. */
 
             int n = getAccessorCount(fdAccessors);
-                setAccessorCount(fdAccessors, 1);
+            setAccessorCount(fdAccessors, 1);
 
             if (n != 0) {
                 printMsg(lvlTalkative,
