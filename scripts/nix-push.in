@@ -8,6 +8,8 @@ foreach my $id (@ARGV) {
 
     # Get all paths referenced by the normalisation of the given 
     # fstate expression.
+    system "nix -ih $id";
+    if ($?) { die "`nix -ih' failed"; }
     my @paths;
     open PATHS, "nix -qrh $id 2> /dev/null |" or die "nix -qrh";
     while (<PATHS>) {
@@ -51,6 +53,8 @@ foreach my $id (@ARGV) {
         die unless $nid =~ /^([0-9a-z]{32})$/;
 
         # Realise the Nix expression.
+	system "nix -ih $nid";
+	if ($?) { die "`nix -ih' failed"; }
         my $npath = `nix -qph $nid 2> /dev/null`;
         $? and die "creating Nix archive";
         chomp $npath;
