@@ -181,7 +181,7 @@ bool isInPrefix(const string & path, const string & _prefix)
 
 
 string expandId(const FSId & id, const string & target,
-    const string & prefix, FSIdSet pending)
+    const string & prefix, FSIdSet pending, bool ignoreSubstitutes)
 {
     Nest nest(lvlDebug, format("expanding %1%") % (string) id);
 
@@ -221,23 +221,27 @@ string expandId(const FSId & id, const string & target,
         }
     }
 
-    if (pending.find(id) != pending.end())
-        throw Error(format("id %1% already being expanded") % (string) id);
-    pending.insert(id);
+    if (!ignoreSubstitutes) {
+        
+        if (pending.find(id) != pending.end())
+            throw Error(format("id %1% already being expanded") % (string) id);
+        pending.insert(id);
 
-    /* Try to realise the substitutes, but only if this id is not
-       already being realised by a substitute. */
-    Strings subs;
-    nixDB.queryStrings(noTxn, dbSubstitutes, id, subs); /* non-existence = ok */
+        /* Try to realise the substitutes, but only if this id is not
+           already being realised by a substitute. */
+        Strings subs;
+        nixDB.queryStrings(noTxn, dbSubstitutes, id, subs); /* non-existence = ok */
 
-    for (Strings::iterator it = subs.begin(); it != subs.end(); it++) {
-        FSId subId = parseHash(*it);
+        for (Strings::iterator it = subs.begin(); it != subs.end(); it++) {
+            FSId subId = parseHash(*it);
 
-        debug(format("trying substitute %1%") % (string) subId);
+            debug(format("trying substitute %1%") % (string) subId);
 
-        realiseSlice(normaliseFState(subId, pending), pending);
+            realiseSlice(normaliseFState(subId, pending), pending);
 
-        return expandId(id, target, prefix, pending);
+            return expandId(id, target, prefix, pending);
+        }
+
     }
     
     throw Error(format("cannot expand id `%1%'") % (string) id);
@@ -257,7 +261,8 @@ void addToStore(string srcPath, string & dstPath, FSId & id,
 
     try {
         /* !!! should not use the substitutes! */
-        dstPath = expandId(id, deterministicName ? dstPath : "", nixStore);
+        dstPath = expandId(id, deterministicName ? dstPath : "", 
+            nixStore, FSIdSet(), true);
         return;
     } catch (...) {
     }

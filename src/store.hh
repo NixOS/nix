@@ -35,7 +35,8 @@ bool queryPathId(const string & path, FSId & id);
    substitute (since when we build the substitute, we would first try
    to expand the id... kaboom!). */
 string expandId(const FSId & id, const string & target = "",
-    const string & prefix = "/", FSIdSet pending = FSIdSet());
+    const string & prefix = "/", FSIdSet pending = FSIdSet(),
+    bool ignoreSubstitutes = false);
 
 /* Copy a file to the nixStore directory and register it in dbRefs.
    Return the hash code of the value. */
