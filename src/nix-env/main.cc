@@ -230,14 +230,12 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
 }
 
 
-class DrvName
+struct DrvName
 {
     string fullName;
     string name;
     string version;
     unsigned int hits;
-
-public:
 
     /* Parse a derivation name.  The `name' part of a derivation name
        is everything up to but not including the first dash *not*
@@ -248,6 +246,7 @@ public:
     {
         name = fullName = s;
         for (unsigned int i = 0; i < s.size(); ++i) {
+            /* !!! isalpha/isdigit are affected by the locale. */
             if (s[i] == '-' && i + 1 < s.size() && !isalpha(s[i + 1])) {
                 name = string(s, 0, i);
                 version = string(s, i + 1);
@@ -262,22 +261,90 @@ public:
         if (version != "" && version != n.version) return false;
         return true;
     }
-
-    void hit()
-    {
-        hits++;
-    }
-
-    unsigned int getHits()
-    {
-        return hits;
-    }
-
-    string getFullName()
-    {
-        return fullName;
-    }
 };
+
+
+string nextComponent(string::const_iterator & p,
+    const string::const_iterator end)
+{
+    /* Skip any dots and dashes (component separators). */
+    while (p != end && (*p == '.' || *p == '-')) ++p;
+
+    if (p == end) return "";
+
+    /* If the first character is a digit, consume the longest sequence
+       of digits.  Otherwise, consume the longest sequence of
+       non-digit, non-separator characters. */
+    string s;
+    if (isdigit(*p))
+        while (p != end && isdigit(*p)) s += *p++;
+    else
+        while (p != end && (!isdigit(*p) && *p != '.' && *p != '-'))
+            s += *p++;
+    
+    return s;
+}
+
+
+#include <fstream>
+
+bool parseInt(const string & s, int & n)
+{
+    istringstream st(s);
+    st >> n;
+    return !st.fail();
+}
+
+
+static bool componentsLT(const string & c1, const string & c2)
+{
+    int n1, n2;
+    bool c1Num = parseInt(c1, n1), c2Num = parseInt(c2, n2);
+
+    if (c1Num && c2Num) return n1 < n2;
+    else if (c1 == "" && c2Num) return true;
+    else if (c1 == "pre" && c2 != "pre") return true;
+    else if (c2 == "pre") return false;
+    /* Assume that `2.3a' < `2.3.1'. */
+    else if (c2Num) return true;
+    else if (c1Num) return false;
+    else return c1 < c2;
+}
+
+
+static int compareVersions(const string & v1, const string & v2)
+{
+    string::const_iterator p1 = v1.begin();
+    string::const_iterator p2 = v2.begin();
+    
+    while (p1 != v1.end() || p2 != v2.end()) {
+        string c1 = nextComponent(p1, v1.end());
+        string c2 = nextComponent(p2, v2.end());
+        if (componentsLT(c1, c2)) return -1;
+        else if (componentsLT(c2, c1)) return 1;
+    }
+
+    return 0;
+}
+
+
+static void testCompareVersions()
+{
+#define TEST(v1, v2, n) assert( \
+    compareVersions(v1, v2) == n && compareVersions(v2, v1) == -n)
+    TEST("1.0", "2.3", -1);
+    TEST("2.1", "2.3", -1);
+    TEST("2.3", "2.3", 0);
+    TEST("2.5", "2.3", 1);
+    TEST("3.1", "2.3", 1);
+    TEST("2.3.1", "2.3", 1);
+    TEST("2.3.1", "2.3a", 1);
+    TEST("2.3pre1", "2.3", -1);
+    TEST("2.3pre3", "2.3pre12", -1);
+    TEST("2.3a", "2.3c", -1);
+    TEST("2.3pre1", "2.3c", -1);
+    TEST("2.3pre1", "2.3q", -1);
+}
 
 
 typedef list<DrvName> DrvNames;
@@ -293,7 +360,7 @@ static DrvNames drvNamesFromArgs(const Strings & opArgs)
 }
 
 
-void installDerivations(EvalState & state,
+static void installDerivations(EvalState & state,
     Path nePath, DrvNames & selectors, const Path & linkPath)
 {
     debug(format("installing derivations from `%1%'") % nePath);
@@ -312,7 +379,9 @@ void installDerivations(EvalState & state,
              j != selectors.end(); ++j)
         {
             if (j->matches(drvName)) {
-                j->hit();
+                printMsg(lvlInfo,
+                    format("installing `%1%'") % i->second.name);
+                j->hits++;
                 selectedDrvs.insert(*i);
             }
         }
@@ -321,9 +390,9 @@ void installDerivations(EvalState & state,
     /* Check that all selectors have been used. */
     for (DrvNames::iterator i = selectors.begin();
          i != selectors.end(); ++i)
-        if (i->getHits() == 0)
+        if (i->hits == 0)
             throw Error(format("selector `%1%' matches no derivations")
-                % i->getFullName());
+                % i->fullName);
     
     /* Add in the already installed derivations. */
     DrvInfos installedDrvs;
@@ -349,6 +418,69 @@ static void opInstall(Globals & globals,
 }
 
 
+static void upgradeDerivations(EvalState & state,
+    Path nePath, DrvNames & selectors, const Path & linkPath)
+{
+    debug(format("upgrading derivations from `%1%'") % nePath);
+
+    /* Upgrade works as follows: we take all currently installed
+       derivations, and for any derivation matching any selector, look
+       for a derivation in the input Nix expression that has the same
+       name and a higher version number. */
+
+    /* Load the currently installed derivations. */
+    DrvInfos installedDrvs;
+    queryInstalled(state, installedDrvs, linkPath);
+
+    /* Fetch all derivations from the input file. */
+    DrvInfos availDrvs;
+    loadDerivations(state, nePath, availDrvs);
+
+    /* Go through all installed derivations. */
+    for (DrvInfos::iterator i = installedDrvs.begin();
+         i != installedDrvs.end(); ++i)
+    {
+        DrvName drvName(i->second.name);
+
+        /* Do we want to upgrade this derivation? */
+        bool upgrade = false;
+        for (DrvNames::iterator j = selectors.begin();
+             j != selectors.end(); ++j)
+        {
+            if (j->matches(drvName)) {
+                j->hits++;
+                upgrade = true;
+                break;
+            }
+        }
+        if (!upgrade) continue;
+
+        /* If yes, find the derivation in the input Nix expression
+           with the same name and the highest version number. */
+        DrvInfos::iterator bestDrv = i;
+        DrvName bestName = drvName;
+        for (DrvInfos::iterator j = availDrvs.begin();
+             j != availDrvs.end(); ++j)
+        {
+            DrvName newName(j->second.name);
+            if (newName.name == bestName.name &&
+                compareVersions(newName.version, bestName.version) > 0)
+                bestDrv = j;
+        }
+
+        if (bestDrv != i) {
+            printMsg(lvlInfo,
+                format("upgrading `%1%' to `%2%'")
+                % i->second.name % bestDrv->second.name);
+            installedDrvs.erase(i);
+            installedDrvs.insert(*bestDrv);
+        }
+    }
+    
+    createUserEnv(state, installedDrvs, linkPath);
+}
+
+
 static void opUpgrade(Globals & globals,
     Strings opFlags, Strings opArgs)
 {
@@ -357,12 +489,14 @@ static void opUpgrade(Globals & globals,
     if (opArgs.size() < 1) throw UsageError("Nix file expected");
 
     Path nePath = opArgs.front();
-    opArgs.pop_front();
-
+    DrvNames drvNames = drvNamesFromArgs(
+        Strings(++opArgs.begin(), opArgs.end()));
+    
+    upgradeDerivations(globals.state, nePath, drvNames, globals.linkPath);
 }
 
 
-void uninstallDerivations(EvalState & state, DrvNames & selectors,
+static void uninstallDerivations(EvalState & state, DrvNames & selectors,
     Path & linkPath)
 {
     DrvInfos installedDrvs;
@@ -374,8 +508,11 @@ void uninstallDerivations(EvalState & state, DrvNames & selectors,
         DrvName drvName(i->second.name);
         for (DrvNames::iterator j = selectors.begin();
              j != selectors.end(); ++j)
-            if (j->matches(drvName))
+            if (j->matches(drvName)) {
+                printMsg(lvlInfo,
+                    format("uninstalling `%1%'") % i->second.name);
                 installedDrvs.erase(i);
+            }
     }
 
     createUserEnv(state, installedDrvs, linkPath);
@@ -466,6 +603,9 @@ static void opQuery(Globals & globals,
 
 void run(Strings args)
 {
+    /* Use a higher default verbosity (lvlInfo). */
+    verbosity = (Verbosity) ((int) verbosity + 1);
+
     Strings opFlags, opArgs;
     Operation op = 0;
     

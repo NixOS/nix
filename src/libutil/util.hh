@@ -96,7 +96,8 @@ void writeStringToFile(const Path & path, const string & s);
 /* Messages. */
 
 typedef enum { 
-    lvlError, 
+    lvlError,
+    lvlInfo,
     lvlTalkative,
     lvlChatty,
     lvlDebug,
