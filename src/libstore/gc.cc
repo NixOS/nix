@@ -306,7 +306,10 @@ void collectGarbage(GCAction action, PathSet & result)
 {
     result.clear();
 
-    bool gcKeepOutputs = queryBoolSetting("gc-keep-outputs", false);
+    bool gcKeepOutputs =
+        queryBoolSetting("gc-keep-outputs", false);
+    bool gcKeepDerivations =
+        queryBoolSetting("gc-keep-derivations", true);
 
     /* Acquire the global GC root.  This prevents
        a) New roots from being added.
@@ -329,6 +332,16 @@ void collectGarbage(GCAction action, PathSet & result)
     PathSet livePaths;
     for (PathSet::const_iterator i = roots.begin(); i != roots.end(); ++i)
         computeFSClosure(canonPath(*i), livePaths);
+
+    if (gcKeepDerivations) {
+        for (PathSet::iterator i = livePaths.begin();
+             i != livePaths.end(); ++i)
+        {
+            Path deriver = queryDeriver(noTxn, *i);
+            if (deriver != "")
+                computeFSClosure(deriver, livePaths);
+        }
+    }
 
     if (gcKeepOutputs) {
         /* Hmz, identical to storePathRequisites in nix-store. */
