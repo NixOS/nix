@@ -253,6 +253,14 @@ static bool isRealisablePath(const Transaction & txn, const Path & path)
 }
 
 
+static PathSet getReferers(const Transaction & txn, const Path & storePath)
+{
+    Paths referers;
+    nixDB.queryStrings(txn, dbReferers, storePath, referers);
+    return PathSet(referers.begin(), referers.end());
+}
+
+
 void setReferences(const Transaction & txn, const Path & storePath,
     const PathSet & references)
 {
@@ -260,6 +268,9 @@ void setReferences(const Transaction & txn, const Path & storePath,
         throw Error(
             format("cannot set references for path `%1%' which is invalid and has no substitutes")
             % storePath);
+
+    Paths oldReferences;
+    nixDB.queryStrings(noTxn, dbReferences, storePath, oldReferences);
     
     nixDB.setStrings(txn, dbReferences, storePath,
         Paths(references.begin(), references.end()));
@@ -268,13 +279,22 @@ void setReferences(const Transaction & txn, const Path & storePath,
     for (PathSet::const_iterator i = references.begin();
          i != references.end(); ++i)
     {
-        Paths referers;
-        nixDB.queryStrings(txn, dbReferers, *i, referers);
-        PathSet referers2(referers.begin(), referers.end());
-        referers2.insert(storePath);
+        PathSet referers = getReferers(txn, *i);
+        referers.insert(storePath);
         nixDB.setStrings(txn, dbReferers, *i,
-            Paths(referers2.begin(), referers2.end()));
+            Paths(referers.begin(), referers.end()));
     }
+
+    /* Remove referer mappings from paths that are no longer
+       references. */
+    for (Paths::iterator i = oldReferences.begin();
+         i != oldReferences.end(); ++i)
+        if (references.find(*i) == references.end()) {
+            PathSet referers = getReferers(txn, *i);
+            referers.erase(storePath);
+            nixDB.setStrings(txn, dbReferers, *i,
+                Paths(referers.begin(), referers.end()));
+        }
 }
 
 
@@ -410,14 +430,14 @@ static void invalidatePath(const Path & path, Transaction & txn)
 {
     debug(format("unregistering path `%1%'") % path);
 
-    nixDB.delPair(txn, dbValidPaths, path);
-
     /* Clear the `references' entry for this path, as well as the
        inverse `referers' entries; but only if there are no
        substitutes for this path.  This maintains the cleanup
        invariant. */
     if (querySubstitutes(txn, path).size() == 0)
         setReferences(txn, path, PathSet());
+    
+    nixDB.delPair(txn, dbValidPaths, path);
 }
 
 
