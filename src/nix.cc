@@ -60,7 +60,7 @@ static ArgType argType = atpUnknown;
 
 /* Parse the `-f' / `-h' / `-n' flags, i.e., the type of value
    arguments.  These flags are deleted from the referenced vector. */
-void getArgType(Strings & flags)
+static void getArgType(Strings & flags)
 {
     for (Strings::iterator it = flags.begin();
          it != flags.end(); )
@@ -215,7 +215,7 @@ static void opInit(Strings opFlags, Strings opArgs)
 
 /* Initialize, process arguments, and dispatch to the right
    operation. */
-void run(int argc, char * * argv)
+static void run(int argc, char * * argv)
 {
     /* Setup Nix paths. */
     nixValues = NIX_VALUES_DIR;
