@@ -42,19 +42,22 @@ AC_LANG_PUSH(C++)
 AC_CHECK_HEADERS([locale])
 AC_LANG_POP(C++)
 
-AC_PATH_PROG(curl, curl)
-AC_PATH_PROG(bzip2, bzip2)
-AC_PATH_PROG(bunzip2, bunzip2)
-AC_PATH_PROG(shell, sh)
-AC_PATH_PROG(xmllint, xmllint)
-AC_PATH_PROG(xsltproc, xsltproc)
+AC_DEFUN([NEED_PROG],
+[AC_PATH_PROG($1, $2)
+if test -z "$$1"; then
+    AC_MSG_ERROR([$1 is required])
+fi
+])
+
+NEED_PROG(curl, curl)
+NEED_PROG(bzip2, bzip2)
+NEED_PROG(bunzip2, bunzip2)
+NEED_PROG(shell, sh)
+AC_PATH_PROG(xmllint, xmllint, false)
+AC_PATH_PROG(xsltproc, xsltproc, false)
 AC_PATH_PROG(flex, flex, false)
 AC_PATH_PROG(bison, bison, false)
-AC_PATH_PROG(perl, perl)
-if test -z "$perl"; then
-  echo "Perl is required for Nix."
-  exit 1
-fi
+NEED_PROG(perl, perl)
 
 AC_ARG_WITH(docbook-catalog, AC_HELP_STRING([--with-docbook-catalog=PATH],
   [path of the DocBook XML DTD]),
