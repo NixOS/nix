@@ -181,7 +181,6 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
     ne.type = StoreExpr::neDerivation;
 
     string drvName;
-    Path outPath;
     Hash outHash;
     bool outHashGiven = false;
 
@@ -217,7 +216,6 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
             if (key == "builder") ne.derivation.builder = s;
             else if (key == "system") ne.derivation.platform = s;
             else if (key == "name") drvName = s;
-            else if (key == "outPath") outPath = s;
             else if (key == "id") { 
                 outHash = parseHash(s);
                 outHashGiven = true;
@@ -232,14 +230,27 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
         throw Error("required attribute `system' missing");
     if (drvName == "")
         throw Error("required attribute `name' missing");
+
+    /* Check the derivation name.  It shouldn't contain whitespace,
+       but we are conservative here: we check whether only
+       alphanumerics and some other characters appear. */
+    string validChars = "+-._?=";
+    for (string::iterator i = drvName.begin(); i != drvName.end(); ++i)
+        if (!((*i >= 'A' && *i <= 'Z') ||
+              (*i >= 'a' && *i <= 'z') ||
+              (*i >= '0' && *i <= '9') ||
+              validChars.find(*i) != string::npos))
+        {
+            throw Error(format("invalid character `%1%' in derivation name `%2%'")
+                % *i % drvName);
+        }
         
-    /* Determine the output path. */
+    /* Determine the output path by hashing the Nix expression with no
+       outputs to produce a unique but deterministic path name for
+       this derivation. */
     if (!outHashGiven) outHash = hashDerivation(state, ne);
-    if (outPath == "")
-        /* Hash the Nix expression with no outputs to produce a
-           unique but deterministic path name for this derivation. */
-        outPath = canonPath(nixStore + "/" + 
-            ((string) outHash).c_str() + "-" + drvName);
+    Path outPath = canonPath(nixStore + "/" + 
+        ((string) outHash).c_str() + "-" + drvName);
     ne.derivation.env["out"] = outPath;
     ne.derivation.outputs.insert(outPath);
 
