@@ -247,25 +247,72 @@ void evalArgs(ATermList args, ATermList & argsNF, Environment & env)
             env[name] = queryValuePath(parseHash(s));
         } else throw badTerm("invalid argument value", eVal);
 
-        argsNF = ATappend(argsNF,
+        argsNF = ATinsert(argsNF,
             ATmake("Tup(Str(<str>), <term>)", name.c_str(), eVal));
 
         args = ATgetNext(args);
     }
+
+    argsNF = ATreverse(argsNF);
 }
 
 
-/* Evaluate an expression. */
+Expr substExpr(string x, Expr rep, Expr e)
+{
+    char * s;
+    Expr e2;
+
+    if (ATmatch(e, "Var(<str>)", &s))
+        if (x == s)
+            return rep;
+        else
+            return e;
+
+    if (ATmatch(e, "Lam(<str>, <term>)", &s, &e2))
+        if (x == s)
+            return e;
+    /* !!! unfair substitutions */
+
+    /* Generically substitute in subterms. */
+
+    if (ATgetType(e) == AT_APPL) {
+        AFun fun = ATgetAFun(e);
+        int arity = ATgetArity(fun);
+        ATermList args = ATempty;
+
+        for (int i = arity - 1; i >= 0; i--)
+            args = ATinsert(args, substExpr(x, rep, ATgetArgument(e, i)));
+        
+        return (ATerm) ATmakeApplList(fun, args);
+    }
+
+    if (ATgetType(e) == AT_LIST) {
+        ATermList in = (ATermList) e;
+        ATermList out = ATempty;
+
+        while (!ATisEmpty(in)) {
+            out = ATinsert(out, substExpr(x, rep, ATgetFirst(in)));
+            in = ATgetNext(in);
+        }
+
+        return (ATerm) ATreverse(out);
+    }
+
+    throw badTerm("do not know how to substitute", e);
+}
+
+
 Expr evalValue(Expr e)
 {
     char * s;
-    Expr eBuildPlatform, eProg, e2;
+    Expr eBuildPlatform, eProg, e2, e3, e4;
     ATermList args;
 
     /* Normal forms. */
     if (ATmatch(e, "Str(<str>)", &s) ||
         ATmatch(e, "Bool(True)") || 
-        ATmatch(e, "Bool(False)"))
+        ATmatch(e, "Bool(False)") ||
+        ATmatch(e, "Lam(<str>, <term>)", &s, &e2))
         return e;
 
     /* Value references. */
@@ -280,6 +327,14 @@ Expr evalValue(Expr e)
         ATerm e3 = ATreadFromNamedFile(fn.c_str());
         if (!e3) throw Error("reading aterm from " + fn);
         return evalValue(e3);
+    }
+
+    /* Application. */
+    if (ATmatch(e, "App(<term>, <term>)", &e2, &e3)) {
+        e2 = evalValue(e2);
+        if (!ATmatch(e2, "Lam(<str>, <term>)", &s, &e4))
+            throw badTerm("expecting lambda", e2);
+        return evalValue(substExpr(s, e3, e4));
     }
 
     /* Execution primitive. */

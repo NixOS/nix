@@ -60,6 +60,12 @@ using namespace std;
    makeArg(Arg(Str(nm), (Bool(True), _))) => (nm, "1")
    makeArg(Arg(Str(nm), (Bool(False), _))) => (nm, undef)
 
+   subst(x, e1, e2) is defined as a generic topdown term
+   traversal of e2, replacing each `Var(x)' with e1, and not
+   descending into `Lam(x, _)'.
+
+   Note: all stored expressions must be closed. !!! ugly
+
    getFile :: Hash -> FileName
    loadExpr :: Hash -> FileName
    hashExpr :: Expr -> Hash 
@@ -75,6 +81,9 @@ Expr evalValue(Expr e);
 
 /* Return a canonical textual representation of an expression. */
 string printExpr(Expr e);
+
+/* Perform variable substitution. */
+Expr substExpr(string x, Expr rep, Expr e);
 
 /* Hash an expression. */
 Hash hashExpr(Expr e);

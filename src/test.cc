@@ -69,6 +69,9 @@ void runTests()
     evalTest(ATmake("Str(\"Hello World\")"));
     evalTest(ATmake("Bool(True)"));
     evalTest(ATmake("Bool(False)"));
+    evalTest(ATmake("App(Lam(\"x\", Var(\"x\")), Str(\"Hello World\"))"));
+    evalTest(ATmake("App(App(Lam(\"x\", Lam(\"y\", Var(\"x\"))), Str(\"Hello World\")), Str(\"Hallo Wereld\"))"));
+    evalTest(ATmake("App(Lam(\"sys\", Lam(\"x\", [Var(\"x\"), Var(\"sys\")])), Str(\"i686-suse-linux\"))"));
 
     Hash builder1 = addValue("./test-builder-1.sh");
 
