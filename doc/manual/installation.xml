@@ -204,7 +204,7 @@ variables is to include the file
 in your <filename>~/.bashrc</filename> (or similar), like this:</para>
 
 <screen>
-. <replaceable>prefix</replaceable>/etc/profile.d/nix.sh</screen>
+source <replaceable>prefix</replaceable>/etc/profile.d/nix.sh</screen>
 
 </sect1>
 

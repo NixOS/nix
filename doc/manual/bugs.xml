@@ -106,7 +106,7 @@ these files (and <filename>fetchurl.nix</filename> checks
 them).</para></listitem>
 
 <listitem><para>We should switch away from MD5, since it has been
-cracked.  We don't currently depend very much on the
+more-or-less cracked.  We don't currently depend very much on the
 collision-resistance of MD5, but we will once we start sharing build
 results between users.</para></listitem>
 
