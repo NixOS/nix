@@ -60,6 +60,9 @@ protected:
     /* Whether amDone() has been called. */
     bool done;
 
+    /* Name of this goal for debugging purposes. */
+    string name;
+
     Goal(Worker & worker) : worker(worker)
     {
         done = false;
@@ -68,13 +71,11 @@ protected:
 
     virtual ~Goal()
     {
-        printMsg(lvlVomit, "goal destroyed");
+        trace("goal destroyed");
     }
 
 public:
     virtual void work() = 0;
-
-    virtual string name() = 0;
 
     void addWaitee(GoalPtr waitee);
 
@@ -86,6 +87,11 @@ public:
     }
 
     void trace(const format & f);
+
+    string getName()
+    {
+        return name;
+    }
     
 protected:
     void amDone(bool success = true);
@@ -197,6 +203,9 @@ void Goal::waiteeDone(GoalPtr waitee, bool success)
 {
     assert(waitees.find(waitee) != waitees.end());
     waitees.erase(waitee);
+
+    trace(format("waitee `%1%' done; %2% left") %
+        waitee->name % waitees.size());
     
     if (!success) ++nrFailed;
     
@@ -236,7 +245,7 @@ void Goal::amDone(bool success)
 
 void Goal::trace(const format & f)
 {
-    debug(format("%1%: %2%") % name() % f);
+    debug(format("%1%: %2%") % name % f);
 }
 
 
@@ -379,8 +388,6 @@ private:
 
     /* Return the set of (in)valid paths. */
     PathSet checkPathValidity(bool returnValid);
-
-    string name();
 };
 
 
@@ -389,6 +396,8 @@ DerivationGoal::DerivationGoal(const Path & drvPath, Worker & worker)
 {
     this->drvPath = drvPath;
     state = &DerivationGoal::init;
+    name = (format("building of `%1%'") % drvPath).str();
+    trace("created");
 }
 
 
@@ -1232,12 +1241,6 @@ PathSet DerivationGoal::checkPathValidity(bool returnValid)
 }
 
 
-string DerivationGoal::name()
-{
-    return (format("building of `%1%'") % drvPath).str();
-}
-
-
 
 //////////////////////////////////////////////////////////////////////
 
@@ -1284,8 +1287,6 @@ public:
 
     /* Callback used by the worker to write to the log. */
     void writeLog(int fd, const unsigned char * buf, size_t count);
-
-    string name();
 };
 
 
@@ -1294,6 +1295,8 @@ SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker)
 {
     this->storePath = storePath;
     state = &SubstitutionGoal::init;
+    name = (format("substitution of `%1%'") % storePath).str();
+    trace("created");
 }
 
 
@@ -1524,12 +1527,6 @@ void SubstitutionGoal::writeLog(int fd,
 }
 
 
-string SubstitutionGoal::name()
-{
-    return (format("substitution of `%1%'") % storePath).str();
-}
-
-
 
 //////////////////////////////////////////////////////////////////////
 
@@ -1545,6 +1542,7 @@ public:
     PseudoGoal(Worker & worker) : Goal(worker)
     {
         success = true;
+        name = "pseudo-goal";
     }
 
     void work() 
@@ -1560,11 +1558,6 @@ public:
     bool isOkay()
     {
         return success;
-    }
-
-    string name()
-    {
-        return "pseudo-goal";
     }
 };
 
@@ -1625,9 +1618,15 @@ GoalPtr Worker::makeSubstitutionGoal(const Path & storePath)
 
 static void removeGoal(GoalPtr goal, WeakGoalMap & goalMap)
 {
-    /* !!! For now we just let dead goals accumulate.  We should
-       probably periodically sweep the goalMap to remove dead
-       goals. */
+    /* !!! inefficient */
+    for (WeakGoalMap::iterator i = goalMap.begin();
+         i != goalMap.end(); )
+        if (i->second.lock() == goal) {
+            WeakGoalMap::iterator j = i; ++j;
+            goalMap.erase(i);
+            i = j;
+        }
+        else ++i;
 }
 
 
@@ -1796,13 +1795,13 @@ void Worker::waitForInput()
             if (rd == -1) {
                 if (errno != EINTR)
                     throw SysError(format("reading from %1%")
-                        % goal->name());
+                        % goal->getName());
             } else if (rd == 0) {
-                debug(format("%1%: got EOF") % goal->name());
+                debug(format("%1%: got EOF") % goal->getName());
                 wakeUp(goal);
             } else {
                 printMsg(lvlVomit, format("%1%: read %2% bytes")
-                    % goal->name() % rd);
+                    % goal->getName() % rd);
                 goal->writeLog(fd, buffer, (size_t) rd);
                 if (verbosity >= buildVerbosity)
                     writeFull(STDERR_FILENO, buffer, rd);
