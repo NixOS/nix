@@ -181,7 +181,12 @@ Expr primDerivation(EvalState & state, Expr args)
         startNest(nest, lvlVomit, format("processing attribute `%1%'") % key);
 
         Strings ss;
-        processBinding(state, value, ne, ss);
+        try {
+            processBinding(state, value, ne, ss);
+        } catch (Error & e) {
+            throw Error(format("while processing derivation binding `%1%': %2%")
+                % key % e.msg());
+        }
 
         /* The `args' attribute is special: it supplies the
            command-line arguments to the builder. */
