@@ -48,16 +48,28 @@ protected:
 
     /* Number of goals we are waiting for. */
     unsigned int nrWaitees;
-    
 
+    /* Number of goals we were waiting for that have failed. */
+    unsigned int nrFailed;
+
+    /* Whether amDone() has been called. */
+    bool done;
+
+    
     Goal(Worker & _worker) : worker(_worker)
     {
-        nrWaitees = 0;
+        done = false;
     }
 
     virtual ~Goal()
     {
         printMsg(lvlVomit, "goal destroyed");
+    }
+
+    void resetWaitees(int nrWaitees)
+    {
+        this->nrWaitees = nrWaitees;
+        nrFailed = 0;
     }
 
 public:
@@ -70,9 +82,14 @@ public:
 
     void addWaiter(GoalPtr waiter);
 
-    void waiteeDone();
+    virtual void waiteeDone(bool success);
 
-    void amDone();
+protected:
+    virtual void waiteeFailed()
+    {
+    }
+
+    void amDone(bool success = true);
 };
 
 
@@ -160,6 +177,13 @@ public:
 };
 
 
+class BuildError : public Error
+{
+public:
+    BuildError(const format & f) : Error(f) { };
+};
+
+
 
 //////////////////////////////////////////////////////////////////////
 
@@ -170,18 +194,25 @@ void Goal::addWaiter(GoalPtr waiter)
 }
 
 
-void Goal::waiteeDone()
+void Goal::waiteeDone(bool success)
 {
     assert(nrWaitees > 0);
+    /* Note: waiteeFailed should never call amDone()! */
+    if (!success) {
+        ++nrFailed;
+        waiteeFailed();
+    }
     if (!--nrWaitees) worker.wakeUp(shared_from_this());
 }
 
 
-void Goal::amDone()
+void Goal::amDone(bool success)
 {
     printMsg(lvlVomit, "done");
+    assert(!done);
+    done = true;
     for (Goals::iterator i = waiters.begin(); i != waiters.end(); ++i)
-        (*i)->waiteeDone();
+        (*i)->waiteeDone(success);
     worker.removeGoal(shared_from_this());
 }
 
@@ -375,7 +406,7 @@ void NormalisationGoal::init()
     /* The first thing to do is to make sure that the store expression
        exists.  If it doesn't, it may be created through a
        substitute. */
-    nrWaitees = 1;
+    resetWaitees(1);
     worker.addSubstitutionGoal(nePath, shared_from_this());
 
     state = &NormalisationGoal::haveStoreExpr;
@@ -385,6 +416,14 @@ void NormalisationGoal::init()
 void NormalisationGoal::haveStoreExpr()
 {
     trace("loading store expression");
+
+    if (nrFailed != 0) {
+        printMsg(lvlError,
+            format("cannot normalise missing store expression `%1%'")
+            % nePath);
+        amDone(false);
+        return;
+    }
 
     assert(isValidPath(nePath));
 
@@ -403,7 +442,7 @@ void NormalisationGoal::haveStoreExpr()
          i != expr.derivation.inputs.end(); ++i)
         worker.addNormalisationGoal(*i, shared_from_this());
 
-    nrWaitees = expr.derivation.inputs.size();
+    resetWaitees(expr.derivation.inputs.size());
 
     state = &NormalisationGoal::inputNormalised;
 }
@@ -412,6 +451,15 @@ void NormalisationGoal::haveStoreExpr()
 void NormalisationGoal::inputNormalised()
 {
     trace("all inputs normalised");
+
+    if (nrFailed != 0) {
+        printMsg(lvlError,
+            format("cannot normalise derivation `%1%': "
+                "%2% closure element(s) could not be normalised")
+            % nePath % nrFailed);
+        amDone(false);
+        return;
+    }
 
     /* Inputs must also be realised before we can build this goal. */
     for (PathSet::iterator i = expr.derivation.inputs.begin();
@@ -424,7 +472,7 @@ void NormalisationGoal::inputNormalised()
         worker.addRealisationGoal(neInput, shared_from_this());
     }
     
-    nrWaitees = expr.derivation.inputs.size();
+    resetWaitees(expr.derivation.inputs.size());
 
     state = &NormalisationGoal::inputRealised;
 }
@@ -433,6 +481,15 @@ void NormalisationGoal::inputNormalised()
 void NormalisationGoal::inputRealised()
 {
     trace("all inputs realised");
+
+    if (nrFailed != 0) {
+        printMsg(lvlError,
+            format("cannot normalise derivation `%1%': "
+                "%2% closure element(s) could not be realised")
+            % nePath % nrFailed);
+        amDone(false);
+        return;
+    }
 
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
@@ -446,41 +503,49 @@ void NormalisationGoal::tryToBuild()
 {
     trace("trying to build");
 
-    /* Is the build hook willing to accept this job? */
-    switch (tryBuildHook()) {
-        case rpAccept:
-            /* Yes, it has started doing so.  Wait until we get
-               EOF from the hook. */
-            state = &NormalisationGoal::buildDone;
-            return;
-        case rpPostpone:
-            /* Not now; wait until at least one child finishes. */
+    try {
+
+        /* Is the build hook willing to accept this job? */
+        switch (tryBuildHook()) {
+            case rpAccept:
+                /* Yes, it has started doing so.  Wait until we get
+                   EOF from the hook. */
+                state = &NormalisationGoal::buildDone;
+                return;
+            case rpPostpone:
+                /* Not now; wait until at least one child finishes. */
+                worker.waitForBuildSlot(shared_from_this());
+                return;
+            case rpDecline:
+                /* We should do it ourselves. */
+                break;
+            case rpDone:
+                /* Somebody else did it (there is a successor now). */
+                amDone();
+                return;
+        }
+
+        /* Make sure that we are allowed to start a build. */
+        if (!worker.canBuildMore()) {
             worker.waitForBuildSlot(shared_from_this());
             return;
-        case rpDecline:
-            /* We should do it ourselves. */
-            break;
-        case rpDone:
-            /* Somebody else did it (there is a successor now). */
+        }
+
+        /* Acquire locks and such.  If we then see that there now is a
+           successor, we're done. */
+        if (!prepareBuild()) {
             amDone();
             return;
-    }
+        }
 
-    /* Make sure that we are allowed to start a build. */
-    if (!worker.canBuildMore()) {
-        worker.waitForBuildSlot(shared_from_this());
+        /* Okay, we have to build. */
+        startBuilder();
+
+    } catch (BuildError & e) {
+        printMsg(lvlError, e.msg());
+        amDone(false);
         return;
     }
-
-    /* Acquire locks and such.  If we then see that there now is a
-       successor, we're done. */
-    if (!prepareBuild()) {
-        amDone();
-        return;
-    }
-
-    /* Okay, we have to build. */
-    startBuilder();
 
     /* This state will be reached when we get EOF on the child's
        log pipe. */
@@ -514,15 +579,23 @@ void NormalisationGoal::buildDone()
     /* Check the exit status. */
     if (!statusOk(status)) {
         deleteTmpDir(false);
-        throw Error(format("builder for `%1%' %2%")
+        printMsg(lvlError, format("builder for `%1%' %2%")
             % nePath % statusToString(status));
+        amDone(false);
+        return;
     }
     
     deleteTmpDir(true);
 
     /* Compute a closure store expression, and register it as our
        successor. */
-    createClosure();
+    try {
+        createClosure();
+    } catch (BuildError & e) {
+        printMsg(lvlError, e.msg());
+        amDone(false);
+        return;
+    }
 
     amDone();
 }
@@ -791,8 +864,9 @@ void NormalisationGoal::startBuilder()
     
     /* Right platform? */
     if (expr.derivation.platform != thisSystem)
-        throw Error(format("a `%1%' is required, but I am a `%2%'")
-		    % expr.derivation.platform % thisSystem);
+        throw BuildError(
+            format("a `%1%' is required to build `%3%', but I am a `%2%'")
+            % expr.derivation.platform % thisSystem % nePath);
 
     /* If any of the outputs already exist but are not registered,
        delete them. */
@@ -923,8 +997,11 @@ void NormalisationGoal::createClosure()
          i != expr.derivation.outputs.end(); ++i)
     {
         Path path = *i;
-        if (!pathExists(path))
-            throw Error(format("output path `%1%' does not exist") % path);
+        if (!pathExists(path)) {
+            throw BuildError(
+                format("builder for `%1%' failed to produce output path `%1%'")
+                % nePath % path);
+        }
         nf.closure.roots.insert(path);
 
 	makePathReadOnly(path);
@@ -1038,18 +1115,18 @@ void NormalisationGoal::initChild()
     commonChildInit(logPipe);
     
     if (chdir(tmpDir.c_str()) == -1)
-        throw SysError(format("changing into to `%1%'") % tmpDir);
+        throw SysError(format("changing into `%1%'") % tmpDir);
 
     /* When running a hook, dup the communication pipes. */
     bool inHook = fromHook.writeSide.isOpen();
     if (inHook) {
         fromHook.readSide.close();
         if (dup2(fromHook.writeSide, 3) == -1)
-            throw SysError("dup1");
+            throw SysError("dupping from-hook write side");
 
         toHook.writeSide.close();
         if (dup2(toHook.readSide, 4) == -1)
-            throw SysError("dup2");
+            throw SysError("dupping to-hook read side");
     }
 
     /* Close all other file descriptors. */
@@ -1139,7 +1216,7 @@ void RealisationGoal::init()
     /* The first thing to do is to make sure that the store expression
        exists.  If it doesn't, it may be created through a
        substitute. */
-    nrWaitees = 1;
+    resetWaitees(1);
     worker.addSubstitutionGoal(nePath, shared_from_this());
 
     state = &RealisationGoal::haveStoreExpr;
@@ -1149,6 +1226,14 @@ void RealisationGoal::init()
 void RealisationGoal::haveStoreExpr()
 {
     trace("loading store expression");
+
+    if (nrFailed != 0) {
+        printMsg(lvlError,
+            format("cannot realise missing store expression `%1%'")
+            % nePath);
+        amDone(false);
+        return;
+    }
 
     assert(isValidPath(nePath));
 
@@ -1165,7 +1250,7 @@ void RealisationGoal::haveStoreExpr()
          i != expr.closure.elems.end(); ++i)
         worker.addSubstitutionGoal(i->first, shared_from_this());
     
-    nrWaitees = expr.closure.elems.size();
+    resetWaitees(expr.closure.elems.size());
 
     state = &RealisationGoal::elemFinished;
 }
@@ -1174,6 +1259,16 @@ void RealisationGoal::haveStoreExpr()
 void RealisationGoal::elemFinished()
 {
     trace("all closure elements present");
+
+    if (nrFailed != 0) {
+        printMsg(lvlError,
+            format("cannot realise closure `%1%': "
+                "%2% closure element(s) are not present "
+                "and could not be substituted")
+            % nePath % nrFailed);
+        amDone(false);
+        return;
+    }
 
     amDone();
 }
@@ -1269,15 +1364,21 @@ void SubstitutionGoal::tryNext()
 {
     trace("trying next substitute");
 
-    if (subs.size() == 0) throw Error(
-        format("path `%1%' is required, but it has no (remaining) substitutes")
+    if (subs.size() == 0) {
+        /* None left.  Terminate this goal and let someone else deal
+           with it. */
+        printMsg(lvlError,
+            format("path `%1%' is required, but it has no (remaining) substitutes")
             % storePath);
+        amDone(false);
+        return;
+    }
     sub = subs.front();
     subs.pop_front();
 
     /* Normalise the substitute store expression. */
     worker.addNormalisationGoal(sub.storeExpr, shared_from_this());
-    nrWaitees = 1;
+    resetWaitees(1);
 
     state = &SubstitutionGoal::exprNormalised;
 }
@@ -1287,11 +1388,17 @@ void SubstitutionGoal::exprNormalised()
 {
     trace("substitute store expression normalised");
 
+    if (nrFailed != 0) {
+        tryNext();
+        return;
+    }
+
     /* Realise the substitute store expression. */
     if (!querySuccessor(sub.storeExpr, nfSub))
         nfSub = sub.storeExpr;
     worker.addRealisationGoal(nfSub, shared_from_this());
-    nrWaitees = 1;
+
+    resetWaitees(1);
 
     state = &SubstitutionGoal::exprRealised;
 }
@@ -1300,6 +1407,11 @@ void SubstitutionGoal::exprNormalised()
 void SubstitutionGoal::exprRealised()
 {
     trace("substitute store expression realised");
+
+    if (nrFailed != 0) {
+        tryNext();
+        return;
+    }
 
     state = &SubstitutionGoal::tryToRun;
     worker.waitForBuildSlot(shared_from_this());
@@ -1449,6 +1561,40 @@ void SubstitutionGoal::trace(const format & f)
 {
     debug(format("substitution of `%1%': %2%") % storePath % f);
 }
+
+
+
+//////////////////////////////////////////////////////////////////////
+
+
+/* A fake goal used to receive notification of success or failure of
+   other goals. */
+class PseudoGoal : public Goal
+{
+private:
+    bool success;
+    
+public:
+    PseudoGoal(Worker & _worker) : Goal(_worker)
+    {
+        success = true;
+    }
+
+    void work() 
+    {
+        abort();
+    }
+
+    void waiteeDone(bool success)
+    {
+        if (!success) this->success = false;
+    }
+
+    bool isOkay()
+    {
+        return success;
+    }
+};
 
 
 
@@ -1687,13 +1833,15 @@ Path normaliseStoreExpr(const Path & nePath)
     startNest(nest, lvlDebug, format("normalising `%1%'") % nePath);
 
     Worker worker;
-    worker.addNormalisationGoal(nePath, GoalPtr());
+    shared_ptr<PseudoGoal> pseudo(new PseudoGoal(worker));
+    worker.addNormalisationGoal(nePath, pseudo);
     worker.run();
 
+    if (!pseudo->isOkay())
+        throw Error(format("normalisation of store expression `%1%' failed") % nePath);
+
     Path nfPath;
-    if (!querySuccessor(nePath, nfPath))
-        throw Error("there should be a successor");
-    
+    if (!querySuccessor(nePath, nfPath)) abort();
     return nfPath;
 }
 
@@ -1703,8 +1851,12 @@ void realiseClosure(const Path & nePath)
     startNest(nest, lvlDebug, format("realising closure `%1%'") % nePath);
 
     Worker worker;
-    worker.addRealisationGoal(nePath, GoalPtr());
+    shared_ptr<PseudoGoal> pseudo(new PseudoGoal(worker));
+    worker.addRealisationGoal(nePath, pseudo);
     worker.run();
+
+    if (!pseudo->isOkay())
+        throw Error(format("realisation of closure `%1%' failed") % nePath);
 }
 
 
@@ -1714,6 +1866,10 @@ void ensurePath(const Path & path)
     if (isValidPath(path)) return;
 
     Worker worker;
-    worker.addSubstitutionGoal(path, GoalPtr());
+    shared_ptr<PseudoGoal> pseudo(new PseudoGoal(worker));
+    worker.addSubstitutionGoal(path, pseudo);
     worker.run();
+
+    if (!pseudo->isOkay())
+        throw Error(format("path `%1%' does not exist and cannot be created") % path);
 }
