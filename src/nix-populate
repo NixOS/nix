@@ -40,6 +40,9 @@ sub createLinks {
 	    }
 	    -d $dstfile or die "$dstfile is not a directory";
 	    createLinks($srcfile, $dstfile);
+	} elsif (-l $dstfile) {
+	    my $target = readlink($dstfile);
+	    die "collission between $srcfile and $target";
 	} else {
 	    print "linking $dstfile to $srcfile\n";
 	    symlink($srcfile, $dstfile) or
