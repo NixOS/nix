@@ -12,7 +12,9 @@ my $manifest = "$tmpdir/MANIFEST";
 
 END { unlink $manifest; unlink $nixfile; rmdir $tmpdir; }
 
-my $curl = "@curl@ --fail --silent ${ENV{'CURL_FLAGS'}}";
+my $curl = "@curl@ --fail --silent";
+my $extraCurlFlags = ${ENV{'CURL_FLAGS'}};
+$curl = "$curl $extraCurlFlags" if defined $extraCurlFlags;
 
 
 # Parse the command line.

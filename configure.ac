@@ -140,6 +140,7 @@ AC_CONFIG_FILES([Makefile
    corepkgs/fetchurl/Makefile
    corepkgs/nar/Makefile
    corepkgs/buildenv/Makefile
+   corepkgs/channels/Makefile
    doc/Makefile
    doc/manual/Makefile
   ])

@@ -1,56 +1,37 @@
-#! @perl@ -w
+#! @shell@ -e
 
-use strict;
-use IPC::Open2;
+url=$1
 
-my $url = shift @ARGV;
-defined $url or die;
+if test -z "$url"; then
+    echo "syntax: nix-prefetch-url URL" >&2
+    exit 1
+fi
 
-print "fetching $url...\n";
+# !!! race? should be relatively safe, `svn export' barfs if $tmpPath exists.
+tmpPath1=@storedir@/nix-prefetch-url-$$
 
-my $out = "@storedir@/nix-prefetch-url-$$";
+# Perform the checkout.
+@curl@ --fail --location --max-redirs 20 "$url" > $tmpPath1
 
-system "@curl@ --fail --location --max-redirs 20 \"$url\" > \"$out\"";
-$? == 0 or die "unable to fetch $url";
+# Compute the hash.
+hash=$(@bindir@/nix-hash --flat $tmpPath1)
+echo "hash is $hash" >&2
 
-my $hash=`@bindir@/nix-hash --flat $out`;
-$? == 0 or die "unable to hash $out";
-chomp $hash;
+# Rename it so that the fetchsvn builder can find it.
+tmpPath2=@storedir@/nix-prefetch-url-$hash
+test -e $tmpPath2 || mv $tmpPath1 $tmpPath2 # !!! race
 
-print "file has hash $hash\n";
+# Create a Nix expression that does a fetchsvn.
+storeExpr=$( \
+  echo "(import @datadir@/nix/corepkgs/fetchurl) \
+        {url = $url; md5 = \"$hash\"; system = \"@system@\";}" \
+  | nix-instantiate -)
 
-my $out2 = "@storedir@/nix-prefetch-url-$hash";
-rename $out, $out2;
+# Realise it.
+finalPath=$(nix-store -qnB --force-realise $storeExpr)
 
-# Create a Nix expression.
-my $nixexpr =
-    "(import @datadir@/nix/corepkgs/fetchurl) " .
-    "{url = $url; md5 = \"$hash\"; system = \"@system@\";}";
+echo "path is $finalPath" >&2
 
-#print STDERR "expr: $nixexpr\n";
+rm -rf $tmpPath2 || true
 
-# Instantiate a Nix expression.
-#print STDERR "instantiating Nix expression...\n";
-my $pid = open2(\*READ, \*WRITE, "@bindir@/nix-instantiate -")
-    or die "cannot run nix-instantiate";
-
-print WRITE $nixexpr;
-close WRITE;
-
-my $drvpath = <READ>;
-chomp $drvpath;
-
-waitpid $pid, 0;
-$? == 0 or die "nix-instantiate failed";
-
-# Run Nix.
-#print STDERR "realising store expression $drvpath...\n";
-system "@bindir@/nix-store --realise $drvpath > /dev/null";
-$? == 0 or die "realisation failed";
-
-my $path = `@bindir@/nix-store -qn $drvpath`;
-$? == 0 or die "query failed";
-
-print "path is $path";
-
-unlink $out2;
+echo $hash

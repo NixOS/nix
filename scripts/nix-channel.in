@@ -1,0 +1,115 @@
+#! @perl@ -w
+
+use strict;
+
+
+# Figure out the name of the `.nix-channels' file to use.
+my $home = $ENV{"HOME"};
+die '$HOME not set' unless defined $home;
+my $channelsList = "$home/.nix-channels";
+    
+
+my @channels;
+
+
+# Reads the list of channels from the file $channelsList;
+sub readChannels {
+    return if (!-f $channelsList);
+    open CHANNELS, "<$channelsList" or die "cannot open `$channelsList'";
+    while (<CHANNELS>) {
+        chomp;
+        push @channels, $_;
+    }
+    close CHANNELS;
+}
+
+
+# Writes the list of channels to the file $channelsList;
+sub writeChannels {
+    open CHANNELS, ">$channelsList" or die "cannot open `$channelsList'";
+    foreach my $url (@channels) {
+        print CHANNELS "$url\n";
+    }
+    close CHANNELS;
+}
+
+
+# Adds a channel to the file $channelsList;
+sub addChannel {
+    my $url = shift;
+    readChannels;
+    foreach my $url2 (@channels) {
+        return if $url eq $url2;
+    }
+    push @channels, $url;
+    writeChannels;
+}
+
+
+# Fetch Nix expressions and pull cache manifests from the subscribed
+# channels.
+sub update {
+    readChannels;
+
+    # Pull cache manifests.
+    foreach my $url (@channels) {
+        print "pulling cache manifest from `$url'\n";
+        system "@bindir@/nix-pull '$url'/MANIFEST";
+        die "cannot pull cache manifest from `$url'" if ($? != 0);
+    }
+
+    # Create a Nix expression that fetches and unpacks the channel Nix
+    # expressions.
+
+    my $nixExpr = "[";
+    
+    foreach my $url (@channels) {
+        my $fullURL = "$url/nixexprs.tar.bz2";
+        my $hash = `@bindir@/nix-prefetch-url '$fullURL' 2> /dev/null`
+            or die "cannot fetch `$fullURL'";
+        chomp $hash;
+        # !!! escaping
+        $nixExpr .= "((import @datadir@/nix/corepkgs/fetchurl) " .
+            "{url = $fullURL; md5 = \"$hash\"; system = \"@system@\";}) "
+    }
+
+    $nixExpr .= "]";
+
+    $nixExpr =
+        "(import @datadir@/nix/corepkgs/channels/unpack.nix) " .
+        "{inputs = $nixExpr; system = \"@system@\";}";
+
+    # Instantiate and realise it.
+    my $storeExpr = `echo '$nixExpr' | @bindir@/nix-instantiate -`
+        or die "cannot instantiate Nix expression";
+    chomp $storeExpr;
+
+    my $outPath = `nix-store -qnfB '$storeExpr'`
+        or die "cannot realise store expression";
+    chomp $outPath;
+
+    # Make it the default Nix expression for `nix-env'.
+    system "@bindir@/nix-env --import '$outPath'";
+    die "cannot pull set default Nix expression to `$outPath'" if ($? != 0);
+}
+
+
+while (scalar @ARGV) {
+    my $arg = shift @ARGV;
+
+    if ($arg eq "--add") {
+        die "syntax: nix-channel --add URL" if (scalar @ARGV != 1);
+        addChannel (shift @ARGV);
+        last;
+    }
+
+    elsif ($arg eq "--update") {
+        die "syntax: nix-channel --update" if (scalar @ARGV != 0);
+        update;
+        last;
+    }
+
+    else {
+        die "unknown argument `$arg'";
+    }
+}
