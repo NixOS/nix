@@ -10,6 +10,10 @@ echo "output path is $outPath"
 subExpr=$($TOP/src/nix-instantiate/nix-instantiate substituter.nix)
 echo "store expr is $subExpr"
 
+# Instantiate the failing substitute program.
+subExpr2=$($TOP/src/nix-instantiate/nix-instantiate substituter2.nix)
+echo "store expr is $subExpr2"
+
 regSub() {
     (echo $1 && echo $2 && echo "/substituter" && echo 3 && echo $outPath && echo Hallo && echo Wereld) | $TOP/src/nix-store/nix-store --substitute
 }
@@ -19,11 +23,18 @@ suc=$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-s.store
 regSub $suc $subExpr
 $TOP/src/nix-store/nix-store --successor $storeExpr $suc
 
+# Register a failing substitute for it (it takes precedence).
+regSub $suc $subExpr2
+
 # Register a substitute for the output path.
 regSub $outPath $subExpr
+
+# Register another substitute for the output path.  This one will
+# produce other output. 
+regSub $outPath $subExpr2
 
 
 $TOP/src/nix-store/nix-store -rvvvvv "$storeExpr"
 
 text=$(cat "$outPath"/hello)
-if test "$text" != "Hallo Wereld"; then exit 1; fi
+if test "$text" != "Foo Hallo Wereld"; then exit 1; fi

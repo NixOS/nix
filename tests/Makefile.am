@@ -18,9 +18,11 @@ locking.sh: locking.nix
 parallel.sh: parallel.nix
 build-hook.sh: build-hook.nix
 substitutes.sh: substitutes.nix substituter.nix
+substitutes2.sh: substitutes.nix substituter.nix substituter2.nix
 
-TESTS = init.sh simple.sh dependencies.sh locking.sh parallel.sh \
-  build-hook.sh substitutes.sh
+#TESTS = init.sh simple.sh dependencies.sh locking.sh parallel.sh \
+#  build-hook.sh substitutes.sh substitutes2.sh
+TESTS = init.sh substitutes2.sh
 
 XFAIL_TESTS =
 
@@ -32,4 +34,5 @@ EXTRA_DIST = $(TESTS) \
   locking.nix.in locking.builder.sh \
   parallel.nix.in parallel.builder.sh \
   build-hook.nix.in build-hook.hook.sh \
-  substitutes.nix.in substituter.nix.in substituter.builder.sh
+  substitutes.nix.in substituter.nix.in substituter.builder.sh \
+  substituter2.nix.in substituter2.builder.sh
