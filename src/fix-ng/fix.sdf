@@ -53,9 +53,13 @@ exports
     "[" {Expr ","}* "]"
     -> Expr {cons("List")}
 
+    Expr "." Id
+    -> Expr {cons("Select")}
+
   context-free priorities
 
-    Expr Expr -> Expr
+    Expr "." Id -> Expr
+  > Expr Expr -> Expr
   > "{" {Id ","}* "}" ":" Expr -> Expr
 
 
