@@ -9,6 +9,7 @@ Source0: %{name}-@version@.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 %define _prefix /nix
 Prefix: %{_prefix}
+Requires: /usr/bin/perl
 
 %description
 
