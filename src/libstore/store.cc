@@ -508,24 +508,48 @@ Hash queryPathHash(const Path & path)
 
 
 void registerValidPath(const Transaction & txn,
-    const Path & _path, const Hash & hash, const PathSet & references,
+    const Path & path, const Hash & hash, const PathSet & references,
     const Path & deriver)
 {
-    Path path(canonPath(_path));
-    assertStorePath(path);
+    ValidPathInfo info;
+    info.path = path;
+    info.hash = hash;
+    info.references = references;
+    info.deriver = deriver;
+    ValidPathInfos infos;
+    infos.push_back(info);
+    registerValidPaths(txn, infos);
+}
 
-    debug(format("registering path `%1%'") % path);
-    setHash(txn, path, hash);
 
-    setReferences(txn, path, references);
+void registerValidPaths(const Transaction & txn,
+    const ValidPathInfos & infos)
+{
+    PathSet newPaths;
+    for (ValidPathInfos::const_iterator i = infos.begin();
+         i != infos.end(); ++i)
+        newPaths.insert(i->path);
+        
+    for (ValidPathInfos::const_iterator i = infos.begin();
+         i != infos.end(); ++i)
+    {
+        assertStorePath(i->path);
+
+        debug(format("registering path `%1%'") % i->path);
+        setHash(txn, i->path, i->hash);
+
+        setReferences(txn, i->path, i->references);
     
-    /* Check that all referenced paths are also valid. */
-    for (PathSet::iterator i = references.begin(); i != references.end(); ++i)
-        if (!isValidPathTxn(txn, *i))
-            throw Error(format("cannot register path `%1%' as valid, since its reference `%2%' is invalid")
-                % path % *i);
+        /* Check that all referenced paths are also valid (or about to
+           become valid). */
+        for (PathSet::iterator j = i->references.begin();
+             j != i->references.end(); ++j)
+            if (!isValidPathTxn(txn, *j) && newPaths.find(*j) == newPaths.end())
+                throw Error(format("cannot register path `%1%' as valid, since its reference `%2%' is invalid")
+                    % i->path % *j);
 
-    setDeriver(txn, path, deriver);
+        setDeriver(txn, i->path, i->deriver);
+    }
 }
 
 

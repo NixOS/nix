@@ -405,31 +405,32 @@ static void opRegisterValidity(Strings opFlags, Strings opArgs)
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
-    Transaction txn;
-    createStoreTransaction(txn);
-
+    ValidPathInfos infos;
+    
     while (1) {
-        Path path;
-        Path deriver;
-        PathSet references;
-        getline(cin, path);
+        ValidPathInfo info;
+        getline(cin, info.path);
         if (cin.eof()) break;
-        getline(cin, deriver);
+        getline(cin, info.deriver);
         string s; int n;
         getline(cin, s);
         if (!string2Int(s, n)) throw Error("number expected");
         while (n--) {
             getline(cin, s);
-            references.insert(s);
+            info.references.insert(s);
         }
         if (!cin || cin.eof()) throw Error("missing input");
-        if (!isValidPathTxn(txn, path)) {
+        if (!isValidPath(info.path)) {
             /* !!! races */
-            canonicalisePathMetaData(path);
-            registerValidPath(txn, path, hashPath(htSHA256, path), references, deriver);
+            canonicalisePathMetaData(info.path);
+            info.hash = hashPath(htSHA256, info.path);
+            infos.push_back(info);
         }
     }
 
+    Transaction txn;
+    createStoreTransaction(txn);
+    registerValidPaths(txn, infos);
     txn.commit();
 }
 

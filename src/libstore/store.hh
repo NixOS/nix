@@ -66,6 +66,19 @@ void registerValidPath(const Transaction & txn,
     const Path & path, const Hash & hash, const PathSet & references,
     const Path & deriver);
 
+struct ValidPathInfo 
+{
+    Path path;
+    Path deriver;
+    Hash hash;
+    PathSet references;
+};
+
+typedef list<ValidPathInfo> ValidPathInfos;
+
+void registerValidPaths(const Transaction & txn,
+    const ValidPathInfos & infos);
+
 /* Throw an exception if `path' is not directly in the Nix store. */
 void assertStorePath(const Path & path);
 
