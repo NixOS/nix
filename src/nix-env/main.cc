@@ -629,7 +629,7 @@ static void opSwitchProfile(Globals & globals,
         throw UsageError(format("`--profile' takes at most one argument"));
 
     Path linkPath = 
-        opArgs.size() == 0 ? globals.linkPath : opArgs.front();
+        absPath(opArgs.size() == 0 ? globals.linkPath : opArgs.front());
     Path linkPathFinal = getHomeDir() + "/.nix-userenv";
 
     switchLink(linkPathFinal, linkPath);
@@ -644,7 +644,7 @@ static void opDefaultExpr(Globals & globals,
     if (opArgs.size() != 1)
         throw UsageError(format("`--import' takes exactly one argument"));
 
-    Path defNixExpr = opArgs.front();
+    Path defNixExpr = absPath(opArgs.front());
     Path defNixExprLink = getDefNixExprPath();
     
     switchLink(defNixExprLink, defNixExpr);
