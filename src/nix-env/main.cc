@@ -169,12 +169,12 @@ struct AddPos : TermFun
 };
 
 
-static void queryInstalled(EvalState & state, UserEnvElems & elems,
-    const Path & userEnv)
+static UserEnvElems queryInstalled(EvalState & state, const Path & userEnv)
 {
     Path path = userEnv + "/manifest";
 
-    if (!pathExists(path)) return; /* not an error, assume nothing installed */
+    if (!pathExists(path))
+        return UserEnvElems(); /* not an error, assume nothing installed */
 
     Expr e = ATreadFromNamedFile(path.c_str());
     if (!e) throw Error(format("cannot read Nix expression from `%1%'") % path);
@@ -183,7 +183,9 @@ static void queryInstalled(EvalState & state, UserEnvElems & elems,
     AddPos addPos;
     e = bottomupRewrite(addPos, e);
 
+    UserEnvElems elems;
     parseDerivations(state, e, elems);
+    return elems;
 }
 
 
@@ -273,6 +275,39 @@ static void createUserEnv(EvalState & state, const UserEnvElems & elems,
 }
 
 
+static UserEnvElems filterBySelector(const UserEnvElems & allElems,
+    const Strings & args)
+{
+    DrvNames selectors = drvNamesFromArgs(args);
+
+    UserEnvElems elems;
+
+    /* Filter out the ones we're not interested in. */
+    for (UserEnvElems::const_iterator i = allElems.begin();
+         i != allElems.end(); ++i)
+    {
+        DrvName drvName(i->second.name);
+        for (DrvNames::iterator j = selectors.begin();
+             j != selectors.end(); ++j)
+        {
+            if (j->matches(drvName)) {
+                j->hits++;
+                elems.insert(*i);
+            }
+        }
+    }
+            
+    /* Check that all selectors have been used. */
+    for (DrvNames::iterator i = selectors.begin();
+         i != selectors.end(); ++i)
+        if (i->hits == 0)
+            throw Error(format("selector `%1%' matches no derivations")
+                % i->fullName);
+
+    return elems;
+}
+
+
 static void queryInstSources(EvalState & state,
     const InstallSourceInfo & instSource, const Strings & args,
     UserEnvElems & elems)
@@ -289,35 +324,13 @@ static void queryInstSources(EvalState & state,
         case srcUnknown:
         case srcNixExprDrvs: {
 
-            DrvNames selectors = drvNamesFromArgs(args);
-
             /* Load the derivations from the (default or specified)
                Nix expression. */
             UserEnvElems allElems;
             loadDerivations(state, instSource.nixExprPath,
                 instSource.systemFilter, allElems);
 
-            /* Filter out the ones we're not interested in. */
-            for (UserEnvElems::iterator i = allElems.begin();
-                 i != allElems.end(); ++i)
-            {
-                DrvName drvName(i->second.name);
-                for (DrvNames::iterator j = selectors.begin();
-                     j != selectors.end(); ++j)
-                {
-                    if (j->matches(drvName)) {
-                        j->hits++;
-                        elems.insert(*i);
-                    }
-                }
-            }
-            
-            /* Check that all selectors have been used. */
-            for (DrvNames::iterator i = selectors.begin();
-                 i != selectors.end(); ++i)
-                if (i->hits == 0)
-                    throw Error(format("selector `%1%' matches no derivations")
-                        % i->fullName);
+            elems = filterBySelector(allElems, args);
     
             break;
         }
@@ -373,6 +386,8 @@ static void queryInstSources(EvalState & state,
             break;
 
         case srcProfile:
+            elems = filterBySelector(
+                queryInstalled(state, instSource.profile), args);
             break;
     }
 }
@@ -396,8 +411,7 @@ static void installDerivations(Globals & globals,
 
     /* Add in the already installed derivations, unless they have the
        same name as a to-be-installed element. */
-    UserEnvElems installedElems;
-    queryInstalled(globals.state, installedElems, profile);
+    UserEnvElems installedElems = queryInstalled(globals.state, profile);
 
     for (UserEnvElems::iterator i = installedElems.begin();
          i != installedElems.end(); ++i)
@@ -443,8 +457,7 @@ static void upgradeDerivations(Globals & globals,
        name and a higher version number. */
 
     /* Load the currently installed derivations. */
-    UserEnvElems installedElems;
-    queryInstalled(globals.state, installedElems, profile);
+    UserEnvElems installedElems = queryInstalled(globals.state, profile);
 
     /* Fetch all derivations from the input file. */
     UserEnvElems availElems;
@@ -519,8 +532,7 @@ static void opUpgrade(Globals & globals,
 static void uninstallDerivations(Globals & globals, DrvNames & selectors,
     Path & profile)
 {
-    UserEnvElems installedElems;
-    queryInstalled(globals.state, installedElems, profile);
+    UserEnvElems installedElems = queryInstalled(globals.state, profile);
 
     for (UserEnvElems::iterator i = installedElems.begin();
          i != installedElems.end(); ++i)
@@ -631,7 +643,7 @@ static void opQuery(Globals & globals,
     switch (source) {
 
         case sInstalled:
-            queryInstalled(globals.state, elems, globals.profile);
+            elems = queryInstalled(globals.state, globals.profile);
             break;
 
         case sAvailable: {
@@ -656,7 +668,7 @@ static void opQuery(Globals & globals,
     UserEnvElems installed; /* installed paths */
     
     if (printStatus)
-        queryInstalled(globals.state, installed, globals.profile);
+        installed = queryInstalled(globals.state, globals.profile);
             
     /* Print the desired columns. */
     Table table;
