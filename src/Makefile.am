@@ -1,7 +1,8 @@
 bin_PROGRAMS = nix nix-hash fix
 check_PROGRAMS = test
 
-AM_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall -I..
+AM_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall -I.. -I../externals/inst/include $(CXXFLAGS)
+AM_LDFLAGS = -L../externals/inst/lib -ldb_cxx -lATerm $(LDFLAGS)
 
 nix_SOURCES = nix.cc
 nix_LDADD = libshared.a libnix.a -ldb_cxx -lATerm
@@ -29,7 +30,8 @@ libshared_a_CXXFLAGS = \
  -DNIX_STORE_DIR=\"$(prefix)/store\" \
  -DNIX_DATA_DIR=\"$(datadir)\" \
  -DNIX_STATE_DIR=\"$(localstatedir)/nix\" \
- -DNIX_LOG_DIR=\"$(localstatedir)/log/nix\"
+ -DNIX_LOG_DIR=\"$(localstatedir)/log/nix\" \
+ $(AM_CXXFLAGS)
 
 install-data-local:
 	$(INSTALL) -d $(localstatedir)/nix
@@ -37,3 +39,5 @@ install-data-local:
 	$(INSTALL) -d $(localstatedir)/log/nix
 	$(INSTALL) -d $(prefix)/store
 	$(bindir)/nix --init
+
+EXTRA_DIST = *.hh *.h

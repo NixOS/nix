@@ -6,3 +6,5 @@ install-exec-local:
 	$(INSTALL_DATA) fetchurl.sh $(datadir)/fix/fetchurl
 
 include ../../substitute.mk
+
+EXTRA_DIST = fetchurl.fix fetchurl.sh

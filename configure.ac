@@ -1,4 +1,4 @@
-AC_INIT(nix, 0.1)
+AC_INIT(nix, 0.2pre1)
 AC_CONFIG_SRCDIR(src/nix.cc)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE
@@ -12,7 +12,7 @@ AC_PROG_CXX
 AC_PROG_RANLIB
 
 AM_CONFIG_HEADER([config.h])
-AC_CONFIG_FILES([Makefile src/Makefile scripts/Makefile
+AC_CONFIG_FILES([Makefile externals/Makefile src/Makefile scripts/Makefile
 			  corepkgs/Makefile corepkgs/fetchurl/Makefile
 			  corepkgs/nar/Makefile])
 AC_OUTPUT

@@ -8,3 +8,5 @@ install-exec-local:
 	$(INSTALL_DATA) unnar.sh $(datadir)/fix/nar
 
 include ../../substitute.mk
+
+EXTRA_DIST = nar.fix nar.sh unnar.fix unnar.sh

@@ -11,3 +11,8 @@ install-exec-local:
 	$(INSTALL_DATA) prebuilts.conf $(sysconfdir)/nix/prebuilts.conf
 
 include ../substitute.mk
+
+EXTRA_DIST = nix-switch.in nix-collect-garbage.in \
+ nix-pull.in nix-push.in nix-profile.sh.in \
+ prebuilts.conf
+
