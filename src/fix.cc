@@ -53,7 +53,7 @@ static Expr substExpr(string x, Expr rep, Expr e)
         else
             return e;
 
-    if (ATmatch(e, "Lam(<str>, <term>)", &s, &e2))
+    if (ATmatch(e, "Function(<str>, <term>)", &s, &e2))
         if (x == s)
             return e;
     /* !!! unfair substitutions */
