@@ -114,6 +114,8 @@ static string processBinding(EvalState & state, Expr e, NixExpr & ne)
         }
 	return s;
     }
+
+    if (ATmatch(e, "Null")) return "";
     
     throw badTerm("invalid derivation binding", e);
 }
