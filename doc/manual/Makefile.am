@@ -1,7 +1,7 @@
 ENV = SGML_CATALOG_FILES=$(DOCBOOK_DTD)/docbook.cat
 
-XMLLINT = $(ENV) xmllint --catalogs
-XSLTPROC = $(ENV) xsltproc --catalogs
+XMLLINT = $(ENV) xmllint --catalogs --nonet
+XSLTPROC = $(ENV) xsltproc --catalogs --nonet
 
 SOURCES = book.xml introduction.xml installation.xml nix-reference.xml \
  troubleshooting.xml bugs.xml
