@@ -2,14 +2,14 @@
 
 my @pushlist;
 
-foreach my $hash (@ARGV) {
+foreach my $id (@ARGV) {
 
-    die unless $hash =~ /^([0-9a-z]{32})$/;
+    die unless $id =~ /^([0-9a-z]{32})$/;
 
     # Get all paths referenced by the normalisation of the given 
     # fstate expression.
     my @paths;
-    open PATHS, "nix -qrh $hash 2> /dev/null |" or die "nix -qrh";
+    open PATHS, "nix -qrh $id 2> /dev/null |" or die "nix -qrh";
     while (<PATHS>) {
         chomp;
         next unless /^\//;
@@ -21,15 +21,12 @@ foreach my $hash (@ARGV) {
     # a Nix archive.
     foreach my $path (@paths) {
 
-        # Hash the path.
-        my $phash = `nix-hash $path`;
-        $? and die "nix-hash";
-        chomp $phash;
-        die unless $phash =~ /^([0-9a-z]{32})$/;
+	next unless ($path =~ /\/([0-9a-z]{32})[^\/]*/);
+	my $pathid = $1;
 
         # Construct a name for the Nix archive.  If the file is an
         # fstate successor, encode this into the name.
-        my $name = $phash;
+        my $name = $pathid;
         if ($path =~ /-s-([0-9a-z]{32}).nix$/) {
             $name = "$name-s-$1";
         }
@@ -38,7 +35,7 @@ foreach my $hash (@ARGV) {
         # Construct a Fix expression that creates a Nix archive.
         my $fixexpr = 
           "App(IncludeFix(\"nar/nar.fix\"), " .
-          "[ (\"path\", Path(\"$path\", Hash(\"$phash\"), [Include(\"$hash\")]))" .
+          "[ (\"path\", Slice([\"$pathid\"], [(\"$path\", \"$pathid\", [])]))" .
           ", (\"name\", \"$name\")" .
           "])";
 	
@@ -48,13 +45,13 @@ foreach my $hash (@ARGV) {
         close FIX;
 
         # Instantiate a Nix expression from the Fix expression.
-        my $nhash = `fix $fixfile`;
+        my $nid = `fix $fixfile`;
         $? and die "instantiating Nix archive expression";
-        chomp $nhash;
-        die unless $nhash =~ /^([0-9a-z]{32})$/;
+        chomp $nid;
+        die unless $nid =~ /^([0-9a-z]{32})$/;
 
         # Realise the Nix expression.
-        my $npath = `nix -qph $nhash 2> /dev/null`;
+        my $npath = `nix -qph $nid 2> /dev/null`;
         $? and die "creating Nix archive";
         chomp $npath;
 

@@ -65,7 +65,10 @@ bool queryDB(const string & filename, const string & dbname,
         err = db->get(0, &kt, &dt, 0);
         if (err) return false;
 
-        data = string((char *) dt.get_data(), dt.get_size());
+        if (!dt.get_data())
+            data = "";
+        else
+            data = string((char *) dt.get_data(), dt.get_size());
     
     } catch (DbException e) { rethrow(e); }
 

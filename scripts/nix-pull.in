@@ -38,7 +38,7 @@ while (<CONFFILE>) {
             # Nix archive from the network.
             my $fetch =
               "App(IncludeFix(\"fetchurl/fetchurl.fix\"), " .
-              "[(\"url\", \"$url/$fn\"), (\"hash\", \"\")])";
+              "[(\"url\", \"$url/$fn\"), (\"md5\", \"ignore\")])";
             my $fixexpr = 
                 "App(IncludeFix(\"nar/unnar.fix\"), " .
                 "[ (\"nar\", $fetch)" .

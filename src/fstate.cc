@@ -21,15 +21,22 @@ typedef map<string, string> Environment;
 class AutoDelete
 {
     string path;
+    bool del;
 public:
 
     AutoDelete(const string & p) : path(p) 
     {
+        del = true;
     }
 
     ~AutoDelete()
     {
-        deletePath(path);
+        if (del) deletePath(path);
+    }
+
+    void cancel()
+    {
+        del = false;
     }
 };
 
@@ -114,8 +121,10 @@ static void runProgram(const string & program, Environment env)
     if (waitpid(pid, &status, 0) != pid)
         throw Error("unable to wait for child");
     
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        delTmpDir.cancel();
         throw Error("unable to build package");
+    }
 }
 
 
@@ -336,7 +345,7 @@ static Slice normaliseFState2(FSId id, StringSet & usedPaths)
         bnds = ATgetNext(bnds);
     }
 
-    /* Check that none of the output paths exist. */
+    /* Parse the outputs. */
     typedef map<string, FSId> OutPaths;
     OutPaths outPaths;
     while (!ATisEmpty(outs)) {
@@ -349,14 +358,36 @@ static Slice normaliseFState2(FSId id, StringSet & usedPaths)
         outs = ATgetNext(outs);
     }
 
+    /* We can skip running the builder if we can expand all output
+       paths from their ids. */
+    bool fastBuild = false;
+#if 0
     for (OutPaths::iterator i = outPaths.begin(); 
          i != outPaths.end(); i++)
-        if (pathExists(i->first))
-            throw Error(format("path `%1%' exists") % i->first);
+    {
+        try {
+            expandId(i->second, i->first);
+        } catch (...) {
+            fastBuild = false;
+            break;
+        }
+    }
+#endif
 
-    /* Run the builder. */
-    runProgram(builder, env);
+    if (!fastBuild) {
+
+        /* Check that none of the outputs exist. */
+        for (OutPaths::iterator i = outPaths.begin(); 
+             i != outPaths.end(); i++)
+            if (pathExists(i->first))
+                throw Error(format("path `%1%' exists") % i->first);
+
+        /* Run the builder. */
+        runProgram(builder, env);
         
+    } else
+        debug(format("skipping build"));
+
     Slice slice;
 
     /* Check whether the output paths were created, and register each

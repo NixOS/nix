@@ -86,6 +86,7 @@ void copyPath(string src, string dst)
 
 void registerSubstitute(const FSId & srcId, const FSId & subId)
 {
+#if 0
     Strings subs;
     queryListDB(nixDB, dbSubstitutes, srcId, subs); /* non-existence = ok */
 
@@ -94,6 +95,12 @@ void registerSubstitute(const FSId & srcId, const FSId & subId)
     
     subs.push_back(subId);
     
+    setListDB(nixDB, dbSubstitutes, srcId, subs);
+#endif
+
+    /* For now, accept only one substitute per id. */
+    Strings subs;
+    subs.push_back(subId);
     setListDB(nixDB, dbSubstitutes, srcId, subs);
 }
 
@@ -126,6 +133,8 @@ void unregisterPath(const string & _path)
         return;
     FSId id(parseHash(_id));
 
+    delDB(nixDB, dbPath2Id, path);
+
     /* begin transaction */
     
     Strings paths, paths2;
@@ -140,6 +149,7 @@ void unregisterPath(const string & _path)
         setListDB(nixDB, dbId2Paths, id, paths2);
 
     /* end transaction */
+
 }
 
 
@@ -189,32 +199,31 @@ string expandId(const FSId & id, const string & target,
         }
     }
 
-#if 0
     /* Try to realise the substitutes. */
 
     Strings subs;
     queryListDB(nixDB, dbSubstitutes, id, subs); /* non-existence = ok */
 
     for (Strings::iterator it = subs.begin(); it != subs.end(); it++) {
-        realiseSlice(normaliseFState(*it));
+        FSId subId = parseHash(*it);
+        Slice slice = normaliseFState(subId);
+        realiseSlice(slice);
         
-        FState nf = realiseFState(hash2fstate(parseHash(*it)), dummy);
-        string path = fstatePath(nf);
-
-        if (hashPath(path) != hash)
-            throw Error(format("bad substitute in `%1%'") % (string) path);
+        Strings paths = fstatePaths(subId, true);
+        if (paths.size() != 1) 
+            throw Error("substitute created more than 1 path");
+        string path = *(paths.begin());
 
         if (target.empty())
             return path; /* !!! prefix */
         else {
             if (path != target) {
                 copyPath(path, target);
-                registerPath(target, hash);
+                registerPath(target, id);
             }
             return target;
         }
     }
-#endif
     
     throw Error(format("cannot expand id `%1%'") % (string) id);
 }

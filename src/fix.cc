@@ -111,6 +111,14 @@ static Expr evalExpr(Expr e)
         ATmatch(e, "FSId(<str>)", &s1))
         return e;
 
+    if (ATgetType(e) == AT_APPL && 
+        ((string) ATgetName(ATgetAFun(e)) == "Slice" ||
+         (string) ATgetName(ATgetAFun(e)) == "Derive"))
+    {
+        return ATmake("FSId(<str>)", 
+            ((string) writeTerm(e, "", 0)).c_str());
+    }
+
     /* Application. */
     if (ATmatch(e, "App(<term>, [<list>])", &e1, &e2)) {
         e1 = evalExpr(e1);
