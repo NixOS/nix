@@ -2,6 +2,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 extern "C" {
@@ -16,6 +17,11 @@ extern "C" {
 #include "parse-table.h"
 
 
+/* Cleanup cleans up an imploded parse tree into an actual abstract
+   syntax tree that we can evaluate.  It removes quotes around
+   strings, converts integer literals into actual integers, and
+   absolutises paths relative to the directory containing the input
+   file. */
 struct Cleanup : TermFun
 {
     string basePath;
@@ -94,14 +100,28 @@ Expr parseExprFromFile(Path path)
         initialised = true;
     }
 
-    ATerm result = SGparseFile((char *) programId.c_str(), lang,
-        "Expr", (char *) path.c_str());
+    /* Read the input file.  We can't use SGparseFile() because it's
+       broken, so we read the input ourselves and call
+       SGparseString(). */
+    AutoCloseFD fd = open(path.c_str(), O_RDONLY);
+    if (fd == -1) throw SysError(format("opening `%1%'") % path);
+
+    if (fstat(fd, &st) == -1)
+        throw SysError(format("statting `%1%'") % path);
+
+    char text[st.st_size + 1];
+    readFull(fd, (unsigned char *) text, st.st_size);
+    text[st.st_size] = 0;
+
+    /* Parse it. */
+    ATerm result = SGparseString(lang, "Expr", text);
     if (!result)
         throw SysError(format("parse failed in `%1%'") % path);
     if (SGisParseError(result))
         throw Error(format("parse error in `%1%': %2%")
             % path % printTerm(result));
 
+    /* Implode it. */
     PT_ParseTree tree = PT_makeParseTreeFromTerm(result);
     if (!tree)
         throw Error(format("cannot create parse tree"));
@@ -121,6 +141,7 @@ Expr parseExprFromFile(Path path)
     if (!imploded)
         throw Error(format("cannot implode parse tree"));
 
+    /* Finally, clean it up. */
     Cleanup cleanup;
     cleanup.basePath = dirOf(path);
     return bottomupRewrite(cleanup, imploded);
