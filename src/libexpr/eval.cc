@@ -221,7 +221,7 @@ Expr evalExpr2(EvalState & state, Expr e)
                     (state, args2);
             } else
                 /* Need more arguments, so propagate the primop. */
-                return ATmake("PrimOp(<int>, <term>, <list>)",
+                return ATmake("PrimOp(<int>, <term>, <term>)",
                     arity, fun, args);
         }
 

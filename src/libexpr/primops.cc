@@ -314,8 +314,23 @@ Expr primIsNull(EvalState & state, const ATermVector & args)
 
 
 /* Apply a function to every element of a list. */
-Expr primMap(EvalState & state, Expr fun, Expr list)
+Expr primMap(EvalState & state, const ATermVector & args)
 {
+    Expr fun = evalExpr(state, args[0]);
+    Expr list = evalExpr(state, args[1]);
+
+    ATMatcher m;
+
+    ATermList list2;
+    if (!(atMatch(m, list) >> "List" >> list2))
+        throw Error("`map' expects a list as its second argument");
+
+    ATermList list3 = ATempty;
+    for (ATermIterator i(list2); i; ++i)
+        list3 = ATinsert(list3,
+            ATmake("Call(<term>, <term>)", fun, *i));
+
+    return ATmake("List(<term>)", ATreverse(list3));
 }
 
 
@@ -330,4 +345,6 @@ void EvalState::addPrimOps()
     addPrimOp("baseNameOf", 1, primBaseNameOf);
     addPrimOp("toString", 1, primToString);
     addPrimOp("isNull", 1, primIsNull);
+
+    addPrimOp("map", 2, primMap);
 }
