@@ -81,26 +81,50 @@ void copyPath(const Path & src, const Path & dst)
 }
 
 
+void registerSuccessor(const Transaction & txn,
+    const Path & path1, const Path & path2)
+{
+    Path known;
+    if (nixDB.queryString(txn, dbSuccessors, path1, known) &&
+        known != path2)
+    {
+        throw Error(format(
+            "the `impossible' happened: expression in path "
+            "`%1%' appears to have multiple successors "
+            "(known `%2%', new `%3%'")
+            % path1 % known % path2);
+    }
+
+    Paths revs;
+    nixDB.queryStrings(txn, dbSuccessorsRev, path2, revs);
+    revs.push_back(path1);
+
+    nixDB.setString(txn, dbSuccessors, path1, path2);
+    nixDB.setStrings(txn, dbSuccessorsRev, path2, revs);
+}
+
+
 void registerSubstitute(const Path & srcPath, const Path & subPath)
 {
-#if 0
-    Strings subs;
-    queryListDB(nixDB, dbSubstitutes, srcId, subs); /* non-existence = ok */
-
-    for (Strings::iterator it = subs.begin(); it != subs.end(); it++)
-        if (parseHash(*it) == subId) return;
-    
-    subs.push_back(subId);
-    
-    setListDB(nixDB, dbSubstitutes, srcId, subs);
-#endif
-
-    /* For now, accept only one substitute per id. */
-    Strings subs;
-    subs.push_back(subPath);
-    
     Transaction txn(nixDB);
+
+    Paths subs;
+    nixDB.queryStrings(txn, dbSubstitutes, srcPath, subs);
+
+    if (find(subs.begin(), subs.end(), subPath) != subs.end()) {
+        /* Nothing to do if the substitute is already known. */
+        txn.abort();
+        return;
+    }
+    subs.push_front(subPath); /* new substitutes take precedence */
+
+    Paths revs;
+    nixDB.queryStrings(txn, dbSubstitutesRev, subPath, revs);
+    revs.push_back(srcPath);
+    
     nixDB.setStrings(txn, dbSubstitutes, srcPath, subs);
+    nixDB.setStrings(txn, dbSubstitutesRev, subPath, revs);
+
     txn.commit();
 }
 

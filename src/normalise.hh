@@ -34,9 +34,5 @@ PathSet nixExprRequisites(const Path & nePath,
    output paths are completely contained in the set `outputs'. */
 PathSet findGenerators(const PathSet & outputs);
 
-/* Register a successor. */
-void registerSuccessor(const Transaction & txn,
-    const Path & path1, const Path & path2);
-
 
 #endif /* !__NORMALISE_H */

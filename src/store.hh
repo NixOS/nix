@@ -12,6 +12,16 @@ using namespace std;
 /* Copy a path recursively. */
 void copyPath(const Path & src, const Path & dst);
 
+/* Register a successor.  This function accepts a transaction handle
+   so that it can be enclosed in an atomic operation with calls to
+   registerValidPath().  This must be atomic, since if we register a
+   successor for a derivation without registering the paths built in
+   the derivation, we have a successor with dangling pointers, and if
+   we do it in reverse order, we can get an obstructed build (since to
+   rebuild the successor, the outputs paths must not exist). */
+void registerSuccessor(const Transaction & txn,
+    const Path & path1, const Path & path2);
+
 /* Register a substitute. */
 void registerSubstitute(const Path & srcPath, const Path & subPath);
 

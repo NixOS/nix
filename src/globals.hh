@@ -33,6 +33,13 @@ extern TableId dbValidPaths;
 extern TableId dbSuccessors;
 
 
+/* dbSuccessorsRev :: Path -> [Path]
+
+   The reverse mapping of dbSuccessors.
+*/
+extern TableId dbSuccessorsRev;
+
+
 /* dbSubstitutes :: Path -> [Path]
 
    Each pair $(p, [ps])$ tells Nix that it can realise any of the
@@ -45,6 +52,13 @@ extern TableId dbSuccessors;
    a Nix expression that fetches the Nix archive.
 */
 extern TableId dbSubstitutes;
+
+
+/* dbSubstitutesRev :: Path -> [Path]
+
+   The reverse mapping of dbSubstitutes.
+*/
+extern TableId dbSubstitutesRev;
 
 
 /* Path names. */

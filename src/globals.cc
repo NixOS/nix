@@ -7,7 +7,9 @@ Database nixDB;
 
 TableId dbValidPaths;
 TableId dbSuccessors;
+TableId dbSuccessorsRev;
 TableId dbSubstitutes;
+TableId dbSubstitutesRev;
 
 
 string nixStore = "/UNINIT";
@@ -24,7 +26,9 @@ void openDB()
     nixDB.open(nixDBPath);
     dbValidPaths = nixDB.openTable("validpaths");
     dbSuccessors = nixDB.openTable("successors");
+    dbSuccessorsRev = nixDB.openTable("successors-rev");
     dbSubstitutes = nixDB.openTable("substitutes");
+    dbSubstitutesRev = nixDB.openTable("substitutes-rev");
 }
 
 

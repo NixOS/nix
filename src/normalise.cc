@@ -8,13 +8,6 @@
 #include "globals.hh"
 
 
-void registerSuccessor(const Transaction & txn,
-    const Path & path1, const Path & path2)
-{
-    nixDB.setString(txn, dbSuccessors, path1, path2);
-}
-
-
 static Path useSuccessor(const Path & path)
 {
     string pathSucc;
