@@ -12,10 +12,8 @@
 
 void evalTest(Expr e)
 {
-    EvalResult r = evalValue(e);
-
-    char * s = ATwriteToString(r.e);
-    cout << (string) r.h << ": " << s << endl;
+    e = evalValue(e);
+    cout << (string) hashExpr(e) << ": " << printExpr(e) << endl;
 }
 
 

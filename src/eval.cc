@@ -186,30 +186,31 @@ static void checkPlatform(string platform)
 }
 
 
+string printExpr(Expr e)
+{
+    char * s = ATwriteToString(e);
+    return s;
+}
+
+
 /* Throw an exception with an error message containing the given
    aterm. */
 static Error badTerm(const string & msg, Expr e)
 {
-    char * s = ATwriteToString(e);
-    return Error(msg + ", in `" + s + "'");
+    return Error(msg + ", in `" + printExpr(e) + "'");
 }
 
 
-/* Hash an expression.  Hopefully the representation used by
-   ATwriteToString() won't change, otherwise all hashes will
-   change. */
-static Hash hashExpr(Expr e)
+Hash hashExpr(Expr e)
 {
-    char * s = ATwriteToString(e);
-    debug(s);
-    return hashString(s);
+    return hashString(printExpr(e));
 }
 
 
 /* Evaluate an expression; the result must be a string. */
 static string evalString(Expr e)
 {
-    e = evalValue(e).e;
+    e = evalValue(e);
     char * s;
     if (ATmatch(e, "Str(<str>)", &s)) return s;
     else throw badTerm("string value expected", e);
@@ -220,10 +221,10 @@ static string evalString(Expr e)
    non-expression reference. */
 static Hash evalExternal(Expr e)
 {
-    EvalResult r = evalValue(e);
+    e = evalValue(e);
     char * s;
-    if (ATmatch(r.e, "External(<str>)", &s)) return r.h;
-    else throw badTerm("external non-expression value expected", r.e);
+    if (ATmatch(e, "External(<str>)", &s)) return parseHash(s);
+    else throw badTerm("external non-expression value expected", e);
 }
 
 
@@ -238,7 +239,7 @@ void evalArgs(ATermList args, ATermList & argsNF, Environment & env)
             throw badTerm("invalid argument", arg);
 
         string name = evalString(eName);
-        eVal = evalValue(eVal).e;
+        eVal = evalValue(eVal);
 
         char * s;
         if (ATmatch(eVal, "Str(<str>)", &s)) {
@@ -256,9 +257,8 @@ void evalArgs(ATermList args, ATermList & argsNF, Environment & env)
 
 
 /* Evaluate an expression. */
-EvalResult evalValue(Expr e)
+Expr evalValue(Expr e)
 {
-    EvalResult r;
     char * s;
     Expr eBuildPlatform, eProg;
     ATermList args;
@@ -267,21 +267,19 @@ EvalResult evalValue(Expr e)
     if (ATmatch(e, "Str(<str>)", &s) ||
         ATmatch(e, "Bool(True)") || 
         ATmatch(e, "Bool(False)"))
-    {
-        r.e = e;
-    }
+        return e;
 
     /* External expressions. */
 
     /* External non-expressions. */
-    else if (ATmatch(e, "External(<str>)", &s)) {
-        r.e = e;
-        r.h = parseHash(s);
+    if (ATmatch(e, "External(<str>)", &s)) {
+        parseHash(s); /* i.e., throw exception if not valid */
+        return e;
     }
 
     /* Execution primitive. */
 
-    else if (ATmatch(e, "Exec(<term>, <term>, [<list>])",
+    if (ATmatch(e, "Exec(<term>, <term>, [<list>])",
                  &eBuildPlatform, &eProg, &args))
     {
         string buildPlatform = evalString(eBuildPlatform);
@@ -312,12 +310,9 @@ EvalResult evalValue(Expr e)
                 (string) sourceHash + "-nf", buildPlatform, prog, env);
         }
 
-        r.e = ATmake("External(<str>)", ((string) targetHash).c_str());
-        r.h = targetHash;
+        return ATmake("External(<str>)", ((string) targetHash).c_str());
     }
 
     /* Barf. */
-    else throw badTerm("invalid expression", e);
-
-    return r;
+    throw badTerm("invalid expression", e);
 }

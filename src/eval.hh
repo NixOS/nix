@@ -18,69 +18,63 @@ using namespace std;
       | Bool(b) -- boolean constant
       | App(e, e) -- application
       | Lam(x, e) -- lambda abstraction
-      | Exec(platform, e, [(s, e)])
+      | Exec(platform, e, [Arg(e, e)])
           -- primitive; execute e with args e* on platform
       ;
 
    Semantics
 
-   Each rules given as eval(e) => (e', h'), i.e., expression e has a
-   normal form e' with hash code h'.  evalE = fst . eval.  evalH = snd
-   . eval.
+   Each rule given as eval(e) => e', i.e., expression e has a normal
+   form e'.
 
    eval(Hash(h)) => eval(loadExpr(h))
 
-   eval(External(h)) => (External(h), h)
-
-   eval(Str(s)@e) => (e, 0) # idem for Bool
+   eval(External(h)) => External(h) # idem for Str, Bool
 
    eval(App(e1, e2)) => eval(App(e1', e2))
-     where e1' = evalE(e1)
+     where e1' = eval(e1)
 
-   eval(App(Lam(var, body), arg)@in) =>
-     eval(subst(var, arg, body))@out
-     [AND write out to storage, and dbNFs[hash(in)] = hash(out) ???]
+   eval(App(Lam(var, body), arg)) =>
+     eval(subst(var, arg, body))
 
-   eval(Exec(platform, prog, args)@e) =>
+   eval(Exec(platform, prog, args)) =>
      (External(h), h)
      where
-       hIn = hashExpr(e)
-
-       fn = ... form name involving hIn ...
-
+       fn = ... name of the output (random or by hashing expr) ...
        h =
-         if exec(evalE(platform) => Str(...)
-                , getFile(evalH(prog))
+         if exec( fn 
+                , eval(platform) => Str(...)
+                , getFile(eval(prog))
                 , map(makeArg . eval, args)
                 ) then
            hashExternal(fn)
          else
            undef
+       ... register ...
 
-   makeArg((argn, (External(h), h))) => (argn, getFile(h))
-   makeArg((argn, (Str(s), _))) => (argn, s)
-   makeArg((argn, (Bool(True), _))) => (argn, "1")
-   makeArg((argn, (Bool(False), _))) => (argn, undef)
+   makeArg(Arg(Str(nm), (External(h), h))) => (nm, getFile(h))
+   makeArg(Arg(Str(nm), (Str(s), _))) => (nm, s)
+   makeArg(Arg(Str(nm), (Bool(True), _))) => (nm, "1")
+   makeArg(Arg(Str(nm), (Bool(False), _))) => (nm, undef)
 
    getFile :: Hash -> FileName
    loadExpr :: Hash -> FileName
    hashExpr :: Expr -> Hash 
    hashExternal :: FileName -> Hash
-   exec :: Platform -> FileName -> [(String, String)] -> Status
+   exec :: FileName -> Platform -> FileName -> [(String, String)] -> Status
 */
 
 typedef ATerm Expr;
 
 
-struct EvalResult 
-{
-    Expr e;
-    Hash h;
-};
-
-
 /* Evaluate an expression. */
-EvalResult evalValue(Expr e);
+Expr evalValue(Expr e);
+
+/* Return a canonical textual representation of an expression. */
+string printExpr(Expr e);
+
+/* Hash an expression. */
+Hash hashExpr(Expr e);
 
 
 #endif /* !__EVAL_H */
