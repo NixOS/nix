@@ -5,6 +5,8 @@ use IPC::Open2;
 use POSIX qw(tmpnam);
 use readmanifest;
 
+my $hashAlgo = "sha256";
+
 my $tmpdir;
 do { $tmpdir = tmpnam(); }
 until mkdir $tmpdir, 0777;
@@ -90,7 +92,7 @@ foreach my $storePath (@storePaths) {
     # Construct a Nix expression that creates a Nix archive.
     my $nixexpr = 
         "((import $dataDir/nix/corepkgs/nar/nar.nix) " .
-        "{path = \"$storePath\"; system = \"@system@\";}) ";
+        "{path = \"$storePath\"; system = \"@system@\"; hashAlgo = \"$hashAlgo\";}) ";
     
     print NIX $nixexpr;
 }
@@ -102,13 +104,18 @@ close NIX;
 # Instantiate store expressions from the Nix expression.
 my @storeExprs;
 print STDERR "instantiating store expressions...\n";
-open STOREEXPRS, "$binDir/nix-instantiate $nixfile |" or die "cannot run nix-instantiate";
-while (<STOREEXPRS>) {
+my $pid = open2(\*READ, \*WRITE, "$binDir/nix-instantiate $nixfile")
+    or die "cannot run nix-instantiate";
+close WRITE;
+while (<READ>) {
     chomp;
     die unless /^\//;
     push @storeExprs, $_;
 }
-close STOREEXPRS;
+close READ;
+
+waitpid $pid, 0;
+$? == 0 or die "nix-instantiate failed";
 
 
 # Realise the store expressions.
@@ -123,13 +130,18 @@ while (scalar @tmp > 0) {
     my @tmp2 = @tmp[0..$n - 1];
     @tmp = @tmp[$n..scalar @tmp - 1];
 
-    open NARPATHS, "$binDir/nix-store --realise @tmp2 |" or die "cannot run nix-store";
-    while (<NARPATHS>) {
+    my $pid = open2(\*READ, \*WRITE, "$binDir/nix-store --realise @tmp2")
+        or die "cannot run nix-store";
+    close WRITE;
+    while (<READ>) {
         chomp;
         die unless (/^\//);
         push @narPaths, "$_";
     }
-    close NARPATHS;
+    close READ;
+
+    waitpid $pid, 0;
+    $? == 0 or die "nix-store failed";
 }
 
 
@@ -148,17 +160,17 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     my $basename = $1;
     defined $basename or die;
 
-    open SHA1, "$narDir/narbz2-hash" or die "cannot open narbz2-hash";
-    my $narbz2Hash = <SHA1>;
+    open HASH, "$narDir/narbz2-hash" or die "cannot open narbz2-hash";
+    my $narbz2Hash = <HASH>;
     chomp $narbz2Hash;
-    $narbz2Hash =~ /^[0-9a-z]{32}$/ or die "invalid hash";
-    close SHA1;
+    $narbz2Hash =~ /^[0-9a-z]+$/ or die "invalid hash";
+    close HASH;
 
-    open SHA1, "$narDir/nar-hash" or die "cannot open nar-hash";
-    my $narHash = <SHA1>;
+    open HASH, "$narDir/nar-hash" or die "cannot open nar-hash";
+    my $narHash = <HASH>;
     chomp $narHash;
-    $narHash =~ /^[0-9a-z]{32}$/ or die "invalid hash";
-    close SHA1;
+    $narHash =~ /^[0-9a-z]+$/ or die "invalid hash";
+    close HASH;
     
     my $narName = "$narbz2Hash.nar.bz2";
 
@@ -185,9 +197,9 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     }
     $narFiles{$storePath} = [
         { url => $url
-        , hash => "sha1:$narbz2Hash"
+        , hash => "$hashAlgo:$narbz2Hash"
         , size => $narbz2Size
-        , narHash => "sha1:$narHash"
+        , narHash => "$hashAlgo:$narHash"
         , references => $references
         , deriver => $deriver
         }

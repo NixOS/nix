@@ -10,8 +10,8 @@ dst=$out/tmp.nar.bz2
 
 @bzip2@ < tmp > $dst
 
-@bindir@/nix-hash -vvvvv --flat --type sha1 --base32 tmp > $out/nar-hash
+@bindir@/nix-hash -vvvvv --flat --type $hashAlgo --base32 tmp > $out/nar-hash
 
-@bindir@/nix-hash --flat --type sha1 --base32 $dst > $out/narbz2-hash
+@bindir@/nix-hash --flat --type $hashAlgo --base32 $dst > $out/narbz2-hash
 
 mv $out/tmp.nar.bz2 $out/$(cat $out/narbz2-hash).nar.bz2

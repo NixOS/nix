@@ -6,7 +6,7 @@ use readmanifest;
 
 die unless scalar @ARGV == 5;
 
-my $hashAlgo = "sha1";
+my $hashAlgo = "sha256";
 
 my $cacheDir = $ARGV[0];
 my $patchesDir = $ARGV[1];

@@ -1,6 +1,5 @@
-{system, path}: derivation {
+{system, path, hashAlgo}: derivation {
   name = "nar";
   builder = ./nar.sh;
-  system = system;
-  path = path;
+  inherit system path hashAlgo;
 }
