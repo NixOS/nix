@@ -63,7 +63,11 @@ are included in the Nix source distribution.  If you build from the
 Subversion repository, you must download them yourself and place them
 in the <filename>externals/</filename> directory.  See
 <filename>externals/Makefile.am</filename> for the precise URLs of
-these packages.</para>
+these packages.  Alternatively, if you already have them installed,
+you can use <command>configure</command>'s <option>--with-bdb</option>
+and <option>--with-aterm</option> options to point to their respective
+locations.  Note that Berkeley DB <emphasis>must</emphasis> be version
+4.2; other versions may not have compatible database formats.</para>
 
 </sect1>
 
@@ -91,8 +95,7 @@ $ autoreconf -i</screen>
 <command>configure</command>.  The default installation directory is
 <filename>/nix</filename>.  You can change this to any location you
 like.  You must have write permission to the
-<replaceable>prefix</replaceable> path.
-    </para>
+<replaceable>prefix</replaceable> path.</para>
 
 <warning><para>It is advisable <emphasis>not</emphasis> to change the
 installation prefix from its default, since doing so will in all
@@ -123,7 +126,7 @@ based on <literal>glibc</literal> 2.3 or later.</para>
 <command>rpm -U</command>.  For example,</para>
 
 <screen>
-rpm -U nix-0.5pre664-1.i386.rpm</screen>
+$ rpm -U nix-0.5pre664-1.i386.rpm</screen>
 
 <para>The RPMs install into the directory <filename>/nix</filename>.
 Nix can be uninstalled using <command>rpm -e nix</command>.  After
@@ -131,8 +134,8 @@ this it will be necessary to manually remove the Nix store and other
 auxiliary data:</para>
 
 <screen>
-rm -rf /nix/store
-rm -rf /nix/var</screen>
+$ rm -rf /nix/store
+$ rm -rf /nix/var</screen>
 
 </sect1>
 
@@ -146,6 +149,42 @@ the Nix store and database
 respectively).  When installed from the RPM packages, these
 directories are owned by <systemitem
 class='username'>root</systemitem>.</para>
+
+<sect2><title>Setuid installation</title>
+
+<para>As a somewhat <emphasis>ad hoc</emphasis> hack, you can also
+install the Nix binaries <quote>setuid</quote> so that a Nix store can
+be shared among several users.  To do this, configure Nix with the
+<emphasis>--enable-setuid</emphasis> option.  Nix will be installed as
+owned by a user and group specified by the
+<option>--with-nix-user=<parameter>user</parameter></option> and
+<option>--with-nix-group=<parameter>group</parameter></option>
+options.  E.g.,
+
+<screen>
+$ ./configure --enable-setuid --with-nix-user=my_nix_user --with-nix-group=my_nix_group</screen>
+
+The user and group default to <literal>nix</literal>.  You should make
+sure that both the user and the group exist.  Any <quote>real</quote>
+users that you want to allow access should be added to the Nix
+group.</para>
+
+<warning><para>A setuid installation should only by used if the users
+in the Nix group are mutually trusted, since any user in that group
+has the ability to change anything in the Nix store or database.  For
+instance, they could install a trojan horse in executables used by
+other users.</para></warning>
+
+<warning><para>On some platforms, the Nix binaries will be installed
+as setuid <literal>root</literal>.  They drop root privileges
+immediately after startup and switch to the Nix user.  The reason for
+this is that both the real and effective user must be set to the Nix
+user, and POSIX has no system call to do this.  This is not the case
+on systems that have the <function>setresuid()</function> system call
+(such as Linux and FreeBSD), so on those systems the binaries are
+simply owned by the Nix user.</para></warning>
+
+</sect2>
 
 </sect1>
 
