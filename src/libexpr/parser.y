@@ -32,7 +32,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, void * data, char * s)
   ATermList ts;
 }
 
-%type <t> start expr expr_function expr_assert expr_op
+%type <t> start expr expr_function expr_assert expr_if expr_op
 %type <t> expr_app expr_select expr_simple bind inheritsrc formal
 %type <ts> binds ids expr_list formals
 %token <t> ID INT STR PATH URI
@@ -60,6 +60,12 @@ expr_function
 expr_assert
   : ASSERT expr ';' expr_assert
     { $$ = ATmake("Assert(<term>, <term>)", $2, $4); }
+  | expr_if
+  ;
+
+expr_if
+  : IF expr THEN expr ELSE expr
+    { $$ = ATmake("If(<term>, <term>, <term>)", $2, $4, $6); }
   | expr_op
   ;
 
@@ -102,8 +108,6 @@ expr_simple
   | '{' binds '}'
     { $$ = fixAttrs(0, $2); }
   | '[' expr_list ']' { $$ = ATmake("List(<term>)", $2); }
-  | IF expr THEN expr ELSE expr
-    { $$ = ATmake("If(<term>, <term>, <term>)", $2, $4, $6); }
   ;
 
 binds
