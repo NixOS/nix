@@ -335,6 +335,7 @@ void ensurePath(const Path & path, PathSet pending)
 
 StoreExpr storeExprFromPath(const Path & path, PathSet pending)
 {
+    assertStorePath(path);
     ensurePath(path, pending);
     ATerm t = ATreadFromNamedFile(path.c_str());
     if (!t) throw Error(format("cannot read aterm from `%1%'") % path);

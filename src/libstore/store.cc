@@ -160,13 +160,14 @@ void copyPath(const Path & src, const Path & dst)
 static bool isInStore(const Path & path)
 {
     return path[0] == '/'
-        && Path(path, 0, nixStore.size()) == nixStore
-        && path.size() > nixStore.size() + 1
-        && path[nixStore.size()] == '/';
+        && path.compare(0, nixStore.size(), nixStore) == 0
+        && path.size() >= nixStore.size() + 2
+        && path[nixStore.size()] == '/'
+        && path.find('/', nixStore.size() + 1) == Path::npos;
 }
 
 
-static void assertStorePath(const Path & path)
+void assertStorePath(const Path & path)
 {
     if (!isInStore(path))
         throw Error(format("path `%1%' is not in the Nix store") % path);

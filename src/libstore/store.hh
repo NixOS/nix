@@ -48,6 +48,9 @@ Paths querySubstitutes(const Path & srcPath);
 /* Register the validity of a path. */
 void registerValidPath(const Transaction & txn, const Path & path);
 
+/* Throw an exception if `path' is not directly in the Nix store. */
+void assertStorePath(const Path & path);
+
 /* Checks whether a path is valid. */ 
 bool isValidPath(const Path & path);
 
