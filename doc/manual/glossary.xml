@@ -1,0 +1,79 @@
+<appendix><title>Glossary</title>
+
+<glosslist>
+
+
+<glossentry><glossterm>derivation</glossterm>
+
+  <glossdef><para>A description of a build action.  The result of a
+  derivation is a store object.</para></glossdef>
+
+</glossentry>
+
+
+<glossentry><glossterm>store</glossterm>
+
+  <glossdef><para>The location in the file system where store objects
+  live.  Typically <filename>/nix/store</filename>.</para></glossdef>
+
+</glossentry>
+
+
+<glossentry><glossterm>store path</glossterm>
+
+  <glossdef><para>The location in the file system of a store object,
+  i.e., an immediate child of the Nix store
+  directory.</para></glossdef>
+
+</glossentry>
+
+
+<glossentry><glossterm>store object</glossterm>
+
+  <glossdef><para>A file that is an immediate child of the Nix store
+  directory.  These can be regular files, but also entire directory
+  trees.  Store objects can be sources (objects copied from outside of
+  the store), derivation outputs (objects produced by running a build
+  action), or derivations (files describing a build
+  action).</para></glossdef>
+
+</glossentry>
+
+
+<glossentry><glossterm>substitute</glossterm>
+
+  <glossdef><para>A substitute is a command invocation stored in the
+  Nix database that describes how to build a store object, bypassing
+  normal the build mechanism (i.e., derivations).  Typically, the
+  substitute builds the store object by downloading a pre-built
+  version of the store object from some server.</para></glossdef>
+
+</glossentry>
+
+
+<glossentry><glossterm>purity</glossterm>
+
+  <glossdef><para>The assumption that equal Nix derivations when run
+  always produce the same output.  This cannot be guaranteed in
+  general (e.g., a builder can rely on external inputs such as the
+  network or the system time) but the Nix model assumes
+  it.</para></glossdef>
+
+</glossentry>
+
+
+<glossentry><glossterm>Nix expression</glossterm>
+
+  <glossdef><para>A high-level description of software components and
+  compositions thereof.  Deploying software using Nix entails writing
+  Nix expressions for your components.  Nix expressions are translated
+  to derivations that are stored in the Nix store.  These derivations
+  can then be built.</para></glossdef>
+
+</glossentry>
+
+
+</glosslist>
+
+
+</appendix>

@@ -69,5 +69,6 @@
 
   <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="troubleshooting.xml" />
   <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="bugs.xml" />
+  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="glossary.xml" />
 
 </book>
