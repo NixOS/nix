@@ -52,10 +52,10 @@ foreach my $storepath (keys %storepaths2urls) {
     my $hash = $urls2hashes{$url};
     my $fetch =
 	"(import @datadir@/nix/corepkgs/fetchurl) " .
-	"{url = $url; md5 = \"$hash\"; system = \"@system@\"}";
+	"{url = $url; md5 = \"$hash\"; system = \"@system@\";}";
     my $nixexpr =
 	"((import @datadir@/nix/corepkgs/nar/unnar.nix) " .
-	"{narFile = ($fetch); outPath = \"$storepath\"; system = \"@system@\"}) ";
+	"{narFile = ($fetch); outPath = \"$storepath\"; system = \"@system@\";}) ";
     $fullexpr .= $nixexpr; # !!! O(n^2)?
     push @storepaths, $storepath;
 }
@@ -104,6 +104,6 @@ while (scalar @sucs > 0) {
     if ($n > 256) { $n = 256 };
     my @sucs2 = @sucs[0..$n - 1];
     @sucs = @sucs[$n..scalar @sucs - 1];
-    system "nix-store --successor @sucs";
+    system "nix-store --successor @sucs2";
     if ($?) { die "`nix-store --successor' failed"; }
 }
