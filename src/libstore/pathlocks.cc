@@ -87,10 +87,12 @@ PathLocks::~PathLocks()
         close(*i);
 
     for (Paths::iterator i = paths.begin(); i != paths.end(); i++) {
-        if (deletePaths)
+        if (deletePaths) {
             /* This is not safe in general! */
-            if (unlink(i->c_str()) != 0)
-                throw SysError(format("removing lock file `%1%'") % *i);
+            unlink(i->c_str());
+            /* Note that the result of unlink() is ignored; removing
+               the lock file is an optimisation, not a necessity. */
+        }
         lockedPaths.erase(*i);
     }
 }
