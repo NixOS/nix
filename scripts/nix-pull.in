@@ -18,7 +18,6 @@ my @subs;
 my @sucs;
 
 my $fullexpr = "[";
-my $first = 1;
 
 open CONFFILE, "<$conffile";
 
@@ -63,20 +62,15 @@ while (<CONFFILE>) {
                     my $fullurl = "$url/$narname";
                     print "$storepath\n";
 
-                    # Construct a Fix expression that fetches and unpacks a
+                    # Construct a Nix expression that fetches and unpacks a
                     # Nix archive from the network.
                     my $fetch =
-                        "App(IncludeFix(\"fetchurl/fetchurl.fix\"), " .
-                        "[(\"url\", \"$fullurl\"), (\"md5\", \"$hash\")])";
-                    my $fixexpr = 
-                        "App(IncludeFix(\"nar/unnar.fix\"), " .
-                        "[ (\"nar\", $fetch)" .
-                        ", (\"outPath\", \"$storepath\")" .
-                        "])";
-                    
-                    if (!$first) { $fullexpr .= "," };
-                    $first = 0;
-                    $fullexpr .= $fixexpr; # !!! O(n^2)?
+                        "(import @datadir@/nix/corepkgs/fetchurl) " .
+                        "{url = $fullurl; md5 = \"$hash\"; system = \"@host@\"}";
+                    my $nixexpr =
+                        "((import @datadir@/nix/corepkgs/nar/unnar.nix) " .
+                        "{narFile = ($fetch); outPath = \"$storepath\"; system = \"@host@\"}) ";
+                    $fullexpr .= $nixexpr; # !!! O(n^2)?
 
                     push @srcpaths, $storepath;
 
@@ -110,9 +104,9 @@ while (<CONFFILE>) {
 $fullexpr .= "]";
 
 
-# Instantiate Nix expressions from the Fix expressions we created above.
-print STDERR "running fix...\n";
-my $pid = open2(\*READ, \*WRITE, "fix -") or die "cannot run fix";
+# Instantiate store expressions from the Nix expressions we created above.
+print STDERR "instantiating Nix expression...\n";
+my $pid = open2(\*READ, \*WRITE, "nix-instantiate -") or die "cannot run nix-instantiate";
 
 print WRITE $fullexpr;
 close WRITE;
@@ -128,16 +122,16 @@ while (<READ>) {
 }
 
 waitpid $pid, 0;
-$? == 0 or die "fix failed";
+$? == 0 or die "nix-instantiate failed";
 
 
 # Register all substitutes.
 print STDERR "registering substitutes...\n";
-system "nix --substitute @subs";
-if ($?) { die "`nix --substitute' failed"; }
+system "nix-store --substitute @subs";
+if ($?) { die "`nix-store --substitute' failed"; }
 
 
 # Register all successors.
 print STDERR "registering successors...\n";
-system "nix --successor @sucs";
-if ($?) { die "`nix --successor' failed"; }
+system "nix-store --successor @sucs";
+if ($?) { die "`nix-store --successor' failed"; }
