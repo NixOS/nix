@@ -14,6 +14,6 @@ if test -z "$NIX_SET"; then
 
     export PKG_CONFIG_PATH=$NIX_LINKS/lib/pkgconfig:$PKG_CONFIG_PATH
 
-    export MANPATH=$NIX_LINKS/man:$MANPATH
+#    export MANPATH=$NIX_LINKS/man:$MANPATH
 
 fi
