@@ -1,0 +1,17 @@
+#! /usr/bin/perl -w
+
+my $dir = $ENV{"NIX"} . "/prebuilts";
+
+foreach my $prebuilt (glob("$dir/*.tar.bz2")) {
+
+    $prebuilt =~ /-([a-z0-9]+)-([a-z0-9]+).tar.bz2$/
+	|| die "invalid file name: $prebuilt";
+
+    my $pkgHash = $1;
+    my $prebuiltHash = $2;
+
+    print "$pkgHash -> $prebuiltHash\n";
+
+    system "nix regprebuilt $pkgHash $prebuiltHash";
+    system "nix regfile $prebuilt";
+}
