@@ -20,7 +20,7 @@ man1_MANS = nix-store.1 nix-instantiate.1
 man $(MANS): $(SOURCES) book.is-valid
 	$(XSLTPROC) $(docbookxsl)/manpages/docbook.xsl book.xml
 
-book.html: $(SOURCES) book.is-valid
+book.html: $(SOURCES) book.is-valid images
 	$(XSLTPROC) --output book.html $(docbookxsl)/html/docbook.xsl book.xml
 
 all-local: book.html
@@ -29,6 +29,14 @@ install-data-local: book.html
 	$(INSTALL) -d $(DESTDIR)$(datadir)/nix/manual
 	$(INSTALL_DATA) book.html $(DESTDIR)$(datadir)/nix/manual
 	$(INSTALL_DATA) style.css $(DESTDIR)$(datadir)/nix/manual
+	cp -r images $(DESTDIR)$(datadir)/nix/manual/images
+
+images:
+	mkdir images
+	cp $(docbookxsl)/images/*.png images
+	mkdir images/callouts
+	cp $(docbookxsl)/images/callouts/*.png images/callouts
+	chmod +w -R images
 
 EXTRA_DIST = $(SOURCES) book.html book.is-valid $(MANS) 
 
