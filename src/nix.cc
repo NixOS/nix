@@ -168,7 +168,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             FSIds roots;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
-                roots.push_back(argToId(*i));
+                roots.push_back(maybeNormalise(argToId(*i), normalise));
 	    printDotGraph(roots);
             break;
         }
