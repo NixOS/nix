@@ -321,8 +321,12 @@ Strings fstatePaths(const FSId & id)
 
 
 static void fstateRequisitesSet(const FSId & id, 
-    bool includeExprs, bool includeSuccessors, StringSet & paths)
+    bool includeExprs, bool includeSuccessors, StringSet & paths,
+    FSIdSet & doneSet)
 {
+    if (doneSet.find(id) != doneSet.end()) return;
+    doneSet.insert(id);
+
     FState fs = parseFState(termFromId(id));
 
     if (fs.type == FState::fsSlice)
@@ -334,7 +338,7 @@ static void fstateRequisitesSet(const FSId & id,
         for (FSIdSet::iterator i = fs.derive.inputs.begin();
              i != fs.derive.inputs.end(); i++)
             fstateRequisitesSet(*i,
-                includeExprs, includeSuccessors, paths);
+                includeExprs, includeSuccessors, paths, doneSet);
 
     else abort();
 
@@ -345,7 +349,7 @@ static void fstateRequisitesSet(const FSId & id,
     if (includeSuccessors &&
         nixDB.queryString(noTxn, dbSuccessors, id, idSucc))
         fstateRequisitesSet(parseHash(idSucc), 
-            includeExprs, includeSuccessors, paths);
+            includeExprs, includeSuccessors, paths, doneSet);
 }
 
 
@@ -353,7 +357,8 @@ Strings fstateRequisites(const FSId & id,
     bool includeExprs, bool includeSuccessors)
 {
     StringSet paths;
-    fstateRequisitesSet(id, includeExprs, includeSuccessors, paths);
+    FSIdSet doneSet;
+    fstateRequisitesSet(id, includeExprs, includeSuccessors, paths, doneSet);
     return Strings(paths.begin(), paths.end());
 }
 
