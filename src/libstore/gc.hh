@@ -16,7 +16,9 @@ void collectGarbage(const PathSet & roots, GCAction action,
     PathSet & result);
 
 /* Register a temporary GC root.  This root will automatically
-   disappear when this process exits. */
+   disappear when this process exits.  WARNING: this function should
+   not be called inside a BDB transaction, otherwise we can
+   deadlock. */
 void addTempRoot(const Path & path);
 
 

@@ -194,9 +194,35 @@ void collectGarbage(const PathSet & roots, GCAction action,
         debug(format("dead path `%1%'") % path);
         result.insert(path);
 
+        AutoCloseFD fdLock;
+
         if (action == gcDeleteDead) {
             printMsg(lvlInfo, format("deleting `%1%'") % path);
+
+            /* Only delete a lock file if we can acquire a write lock
+               on it.  That means that it's either stale, or the
+               process that created it hasn't locked it yet.  In the
+               latter case the other process will detect that we
+               deleted the lock, and retry (see pathlocks.cc). */
+            if (path.size() >= 5 && string(path, path.size() - 5) == ".lock") {
+
+                fdLock = open(path.c_str(), O_RDWR);
+                if (fdLock == -1) {
+                    if (errno == ENOENT) continue;
+                    throw SysError(format("opening lock file `%1%'") % path);
+                }
+
+                if (!lockFile(fdLock, ltWrite, false)) {
+                    debug(format("skipping active lock `%1%'") % path);
+                    continue;
+                }
+            }
+            
             deleteFromStore(path);
+
+            if (fdLock != -1)
+                /* Write token to stale (deleted) lock file. */
+                writeFull(fdLock, (const unsigned char *) "d", 1);
         }
 
         /* Only delete lock files if the path is belongs to doesn't

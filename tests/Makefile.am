@@ -36,10 +36,10 @@ nix-pull.sh: dependencies.nix
 gc.sh: dependencies.nix
 gc-concurrent.sh: gc-concurrent.nix
 
-#TESTS = init.sh hash.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
-#  build-hook.sh substitutes.sh substitutes2.sh fallback.sh nix-push.sh gc.sh \
-#  gc-concurrent.sh verify.sh nix-pull.sh
-TESTS = init.sh gc-concurrent.sh 
+TESTS = init.sh hash.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
+  build-hook.sh substitutes.sh substitutes2.sh fallback.sh nix-push.sh gc.sh \
+  gc-concurrent.sh verify.sh nix-pull.sh
+#TESTS = init.sh gc-concurrent.sh 
 
 XFAIL_TESTS =
 
