@@ -126,6 +126,8 @@
   </refsect1>
 
 
+  <!--######################################################################-->
+
   <refsect1>
     <title>Operation <option>--install</option></title>
 
@@ -161,6 +163,8 @@
 	    
   </refsect1>
 
+
+  <!--######################################################################-->
 
   <refsect1>
     <title>Operation <option>--delete</option></title>
@@ -200,6 +204,216 @@
 
     </refsect2>
 	    
+  </refsect1>
+
+
+  <!--######################################################################-->
+
+  <refsect1>
+    <title>Operation <option>--query</option></title>
+
+    <refsect2>
+      <title>Synopsis</title>
+      <cmdsynopsis>
+	<command>nix</command>
+	<group>
+	  <arg><option>--query</option></arg>
+	  <arg><option>-q</option></arg>
+	</group>
+	<group>
+	  <group>
+	    <arg><option>--list</option></arg>
+	    <arg><option>-l</option></arg>
+	  </group>
+	  <group>
+	    <arg><option>--requisites</option></arg>
+	    <arg><option>-r</option></arg>
+	  </group>
+	  <group>
+	    <arg><option>--expansion</option></arg>
+	    <arg><option>-e</option></arg>
+	  </group>
+	  <group>
+	    <arg><option>--graph</option></arg>
+	    <arg><option>-g</option></arg>
+	  </group>
+	</group>
+	<arg choice='plain' rep='repeat'><replaceable>args</replaceable></arg>
+      </cmdsynopsis>
+    </refsect2>
+
+    <refsect2>
+      <title>Description</title>
+	    
+      <para>
+	The operation <option>--query</option> displays various bits of
+	information about Nix expressions or paths in the store.  The queries
+	are described in <xref linkend='nixref-queries' />.  At most one query
+	can be specified; the default query is <option>--list</option>.
+      </para>
+
+    </refsect2>
+
+    <refsect2 id='nixref-queries'>
+      <title>Queries</title>
+	    
+      <variablelist>
+
+	<varlistentry>
+	  <term><option>--list</option></term>
+	  <listitem>
+	    <para>
+	      Prints out the target paths of the Nix expressions indicated by
+	      the identifiers <replaceable>args</replaceable>.  In the case of
+	      a derivation expression, these are the paths that will be
+	      produced by the builder of the expression.  In the case of a
+	      slice expression, these are the root paths (which are generally
+	      the paths that were produced by the builder of the derivation
+	      expression of which the slice is a normal form).
+	    </para>
+
+	    <para>
+	      This query has one option:
+	    </para>
+
+	    <variablelist>
+
+	      <varlistentry>
+		<term><option>--normalise</option></term>
+		<listitem>
+		  <para>
+		    Causes the target paths of the <emphasis>normal
+		      forms</emphasis> of the expressions to be printed, rather
+		    than the target paths of the expressions themselves.
+		  </para>
+		</listitem>
+	      </varlistentry>
+
+	    </variablelist>
+	    
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>--requisites</option></term>
+	  <listitem>
+	    <para>
+	      Prints out the requisite paths of the Nix expressions indicated
+	      by the identifiers <replaceable>args</replaceable>.  The
+	      requisite paths of a Nix expression are the paths that need to be
+	      present in the system to be able to realise the expression.  That
+	      is, they form the <emphasis>closure</emphasis> of the expression
+	      in the file system (i.e., no path in the set of requisite paths
+	      points to anything outside the set of requisite paths).
+	    </para>
+
+	    <para>
+	      The notion of requisite paths is very useful when one wants to
+	      distribute Nix expressions.  Since they form a closure, they are
+	      the only paths one needs to distribute to another system to be
+	      able to realise the expression on the other system.
+	    </para>
+
+	    <para>
+	      This query is generally used to implement various kinds of
+	      distribution.  A <emphasis>source distribution</emphasis> is
+	      obtained by distributing the requisite paths of a derivation
+	      expression.  A <emphasis>binary distribution</emphasis> is
+	      obtained by distributing the requisite paths of a slice
+	      expression (i.e., the normal form of a derivation expression; you
+	      can directly specify the identifier of the slice expression, or
+	      use <option>--normalise</option> and specify the identifier of a
+	      derivation expression).  A <emphasis>cache
+		distribution</emphasis> is obtained by distributing the
+	      requisite paths of a derivation expression and specifying the
+	      option <option>--include-successors</option>.  This will include
+	      not just the paths of a source and binary distribution, but also
+	      all expressions and paths of subterms of the source.  This is
+	      useful if one wants to realise on the target system a Nix
+	      expression that is similar but not quite the same as the one
+	      being distributed, since any common subterms will be reused.
+	    </para>
+
+	    <para>
+	      This query has a number of options:
+	    </para> 
+
+	    <variablelist>
+
+	      <varlistentry>
+		<term><option>--normalise</option></term>
+		<listitem>
+		  <para>
+		    Causes the requisite paths of the <emphasis>normal
+		      forms</emphasis> of the expressions to be printed, rather
+		    than the requisite paths of the expressions themselves.
+		  </para>
+		</listitem>
+	      </varlistentry>
+
+	      <varlistentry>
+		<term><option>--exclude-exprs</option></term>
+		<listitem>
+		  <para>
+		    Excludes the paths of Nix expressions.  This causes the
+		    closure property to be lost, that is, the resulting set of
+		    paths is not enough to ensure realisibility.
+		  </para>
+		</listitem>
+	      </varlistentry>
+
+	      <varlistentry>
+		<term><option>--include-successors</option></term>
+		<listitem>
+		  <para>
+		    Also include the requisites of successors (normal forms).
+		    Only the requisites of <emphasis>known</emphasis>
+		    successors are included, i.e., the normal forms of
+		    derivation expressions that have never been normalised will
+		    not be included.
+		  </para>
+
+		  <para>
+		    Note that not just the successor of a derivation expression
+		    will be included, but also the successors of all input
+		    expressions of that derivation expression.  I.e., all
+		    normal forms of subterms involved in the normalisation of
+		    the top-level term are included.
+		  </para>
+		</listitem>
+	      </varlistentry>
+
+	    </variablelist>
+
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>--expansion</option></term>
+	  <listitem>
+	    <para>
+	      For each identifier in <replaceable>args</replaceable>, prints
+	      all expansions of that identifier, that is, all paths whose
+	      current content matches the identifier.
+	    </para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><option>--graph</option></term>
+	  <listitem>
+	    <para>
+	      Prints a graph of the closure of the expressions identified by
+	      <replaceable>args</replaceable> in the format of the
+	      <command>dot</command> tool of AT&amp;T's GraphViz package.
+	    </para>
+	  </listitem>
+	</varlistentry>
+
+      </variablelist>
+
+    </refsect2>
+
   </refsect1>
 
 

@@ -35,8 +35,7 @@
     </para>
 
     <screen>
-      $ rm `db_archive -a -h
-      <replaceable>prefix</replaceable>/var/nix/db`</screen>
+      $ rm `db_archive -a -h <replaceable>prefix</replaceable>/var/nix/db`</screen>
 
   </sect1>
 	

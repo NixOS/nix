@@ -15,6 +15,23 @@
       </para>
     </listitem>
 
+    <listitem>
+      <para>
+	Unify the concepts of successors and substitutes into a general notion
+	of <emphasis>equivalent expressions</emphasis>.  Expressions are
+	equivalent if they have the same target paths with the same
+	identifiers.  However, even though they are functionally equivalent,
+	they may differ stronly with respect to their <emphasis>performance
+	  characteristics</emphasis>.  For example, realising a slice is more
+	efficient that realising the derivation from which that slice was
+	produced.  On the other hand, distributing sources may be more
+	efficient (storage- or bandwidth-wise) than distributing binaries.  So
+	we need to be able to attach weigths or priorities or performance
+	annotations to expressions; Nix can then choose the most efficient
+	expression dependent on the context.
+      </para>
+    </listitem>
+
   </itemizedlist>
 
 </appendix>
