@@ -8,6 +8,7 @@ TESTS_ENVIRONMENT = TEST_ROOT=$(TEST_ROOT) \
   NIX_LOG_DIR=$(TEST_ROOT)/log \
   NIX_STATE_DIR=$(TEST_ROOT)/state \
   NIX_DB_DIR=$(TEST_ROOT)/db \
+  NIX_BUILD_HOOK= \
   TOP=$(shell pwd)/.. \
   SHARED=$(extra1) \
   $(SHELL) -e -x

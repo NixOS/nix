@@ -2,7 +2,7 @@ storeExpr=$($TOP/src/nix-instantiate/nix-instantiate locking.nix)
 
 echo "store expr is $storeExpr"
 
-for i in $(seq 1 5); do
+for i in 1 2 3 4 5; do
     echo "WORKER $i"
     $TOP/src/nix-store/nix-store -rvvvvvB "$storeExpr" &
 done
