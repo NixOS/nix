@@ -423,8 +423,11 @@ static void opRegisterValidity(Strings opFlags, Strings opArgs)
             references.insert(s);
         }
         if (!cin || cin.eof()) throw Error("missing input");
-        if (!isValidPathTxn(txn, path))
+        if (!isValidPathTxn(txn, path)) {
+            /* !!! races */
+            canonicalisePathMetaData(path);
             registerValidPath(txn, path, hashPath(htSHA256, path), references, deriver);
+        }
     }
 
     txn.commit();
