@@ -6,32 +6,34 @@ echo "store expr is $storeExpr"
 outPath=$($TOP/src/nix-store/nix-store -qvvvvv "$storeExpr")
 echo "output path is $outPath"
 
-# Instantiate the substitute program.
-subExpr=$($TOP/src/nix-instantiate/nix-instantiate substituter.nix)
-echo "store expr is $subExpr"
+# Build the substitute program.
+subProgram=$($TOP/src/nix-store/nix-store -qnf \
+    $($TOP/src/nix-instantiate/nix-instantiate substituter.nix))/substituter
+echo "substitute program is $subProgram"
 
-# Instantiate the failing substitute program.
-subExpr2=$($TOP/src/nix-instantiate/nix-instantiate substituter2.nix)
-echo "store expr is $subExpr2"
+# Build the failing substitute program.
+subProgram2=$($TOP/src/nix-store/nix-store -qnf \
+    $($TOP/src/nix-instantiate/nix-instantiate substituter2.nix))/substituter
+echo "failing substitute program is $subProgram2"
 
 regSub() {
-    (echo $1 && echo $2 && echo "/substituter" && echo 3 && echo $outPath && echo Hallo && echo Wereld) | $TOP/src/nix-store/nix-store --substitute
+    (echo $1 && echo $2 && echo 3 && echo $outPath && echo Hallo && echo Wereld) | $TOP/src/nix-store/nix-store --substitute
 }
 
 # Register a fake successor, and a substitute for it.
 suc=$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab-s.store
-regSub $suc $subExpr
+regSub $suc $subProgram
 $TOP/src/nix-store/nix-store --successor $storeExpr $suc
 
 # Register a failing substitute for it (it takes precedence).
-regSub $suc $subExpr2
+regSub $suc $subProgram2
 
 # Register a substitute for the output path.
-regSub $outPath $subExpr
+regSub $outPath $subProgram
 
 # Register another substitute for the output path.  This one will
 # produce other output. 
-regSub $outPath $subExpr2
+regSub $outPath $subProgram2
 
 
 $TOP/src/nix-store/nix-store -rvvvvv "$storeExpr"
