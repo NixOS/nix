@@ -160,7 +160,7 @@ void Database::open(const string & path)
         env->set_lg_bsize(32 * 1024); /* default */
         env->set_lg_max(256 * 1024); /* must be > 4 * lg_bsize */
         env->set_lk_detect(DB_LOCK_DEFAULT);
-        env->set_flags(DB_TXN_WRITE_NOSYNC, 1);
+        env->set_flags(DB_TXN_WRITE_NOSYNC | DB_LOG_AUTOREMOVE, 1);
         
 
         /* The following code provides automatic recovery of the

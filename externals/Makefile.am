@@ -1,11 +1,11 @@
 # Berkeley DB
 
-DB = db-4.1.25
+DB = db-4.2.52
 
 $(DB).tar.gz:
 	@echo "Nix requires Berkeley DB to build."
-	@echo "Please download version 4.1.25 from"
-	@echo "  http://www.sleepycat.com/update/snapshot/db-4.1.25.tar.gz"
+	@echo "Please download version 4.2.52 from"
+	@echo "  http://www.sleepycat.com/update/snapshot/db-4.2.52.tar.gz"
 	@echo "and place it in the externals/ directory."
 	false
 
@@ -20,8 +20,9 @@ build-db: have-db
 	(pfx=`pwd` && \
 	cd $(DB)/build_unix && \
 	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" \
-     ../dist/configure --prefix=$$pfx/inst \
-	 --enable-cxx --disable-shared && \
+	 ../dist/configure --prefix=$$pfx/inst \
+	 --enable-cxx --disable-shared --disable-cryptography \
+         --disable-replication --disable-verify && \
 	make && \
 	make install)
 	touch build-db
