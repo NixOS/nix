@@ -1069,7 +1069,7 @@ void NormalisationGoal::deleteTmpDir(bool force)
 
 void NormalisationGoal::trace(const format & f)
 {
-    debug(format("normalisation of `%1%': %2%") % f);
+    debug(format("normalisation of `%1%': %2%") % nePath % f);
 }
 
 
