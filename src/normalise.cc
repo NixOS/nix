@@ -101,7 +101,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
         if (id2 != id) {
             FState fs = parseFState(termFromId(id2));
             debug(format("skipping build of %1%, someone beat us to it")
-                % (string) id);
+		  % (string) id);
             if (fs.type != FState::fsSlice) abort();
             return id2;
         }
@@ -110,7 +110,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
     /* Right platform? */
     if (fs.derive.platform != thisSystem)
         throw Error(format("a `%1%' is required, but I am a `%2%'")
-            % fs.derive.platform % thisSystem);
+		    % fs.derive.platform % thisSystem);
         
     /* Realise inputs (and remember all input paths). */
     for (FSIds::iterator i = fs.derive.inputs.begin();
@@ -149,7 +149,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
             expandId(i->second, i->first, "/", pending);
         } catch (Error & e) {
             debug(format("fast build failed for `%1%': %2%")
-                % i->first % e.what());
+		  % i->first % e.what());
             fastBuild = false;
             break;
         }
@@ -189,7 +189,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
         string path = i->first;
         if (!pathExists(path))
             throw Error(format("path `%1%' does not exist") % path);
-        fs.slice.roots.push_back(i->second);
+        fs.slice.roots.push_back(path);
 
 	/* For this output path, find the references to other paths contained
 	   in it. */
@@ -201,7 +201,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
         elem.id = i->second;
 
 	/* For each path referenced by this output path, add its id to the
-	   slice element and add the id to the `used' set (so that the
+	   slice element and add the id to the `usedPaths' set (so that the
 	   elements referenced by *its* slice are added below). */
         for (Strings::iterator j = refPaths.begin();
 	     j != refPaths.end(); j++)
@@ -210,18 +210,12 @@ FSId normaliseFState(FSId id, FSIdSet pending)
             ElemMap::iterator k;
             OutPaths::iterator l;
 
-	    /* Is it an input path? */
-            if ((k = inMap.find(path)) != inMap.end()) {
-                elem.refs.push_back(k->second.id);
-                usedPaths.insert(k->second.path);
-            }
+	    elem.refs.push_back(path);
 
-	    /* Or an output path? */
-	    else if ((l = outPaths.find(path)) != outPaths.end())
-                elem.refs.push_back(l->second);
-            
-	    /* Can't happen. */ 
-	    else abort();
+            if ((k = inMap.find(path)) != inMap.end())
+                usedPaths.insert(k->second.path);
+	    else if ((l = outPaths.find(path)) == outPaths.end())
+		abort();
         }
 
         fs.slice.elems.push_back(elem);
@@ -229,40 +223,31 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 
     /* Close the slice.  That is, for any referenced path, add the paths
        referenced by it. */
-    FSIdSet donePaths;
+    StringSet donePaths;
 
     while (!usedPaths.empty()) {
 	StringSet::iterator i = usedPaths.begin();
 	string path = *i;
 	usedPaths.erase(i);
 
+	if (donePaths.find(path) != donePaths.end()) continue;
+	donePaths.insert(path);
+
 	ElemMap::iterator j = inMap.find(path);
 	if (j == inMap.end()) abort();
 
-	donePaths.insert(j->second.id);
-
 	fs.slice.elems.push_back(j->second);
 
-	for (FSIds::iterator k = j->second.refs.begin();
+	for (Strings::iterator k = j->second.refs.begin();
 	     k != j->second.refs.end(); k++)
-	    if (donePaths.find(*k) == donePaths.end()) {
-		/* !!! performance */
-		bool found = false;
-		for (ElemMap::iterator l = inMap.begin();
-		     l != inMap.end(); l++)
-		    if (l->second.id == *k) {
-			usedPaths.insert(l->first);
-			found = true;
-		    }
-		if (!found) abort();
-	    }
+	    usedPaths.insert(*k);
     }
 
     /* For debugging, print out the referenced and unreferenced paths. */
     for (ElemMap::iterator i = inMap.begin();
          i != inMap.end(); i++)
     {
-        FSIdSet::iterator j = donePaths.find(i->second.id);
+        StringSet::iterator j = donePaths.find(i->second.path);
         if (j == donePaths.end())
             debug(format("NOT referenced: `%1%'") % i->second.path);
         else
@@ -319,11 +304,11 @@ Strings fstatePaths(const FSId & id)
 
     if (fs.type == FState::fsSlice) {
         /* !!! fix complexity */
-        for (FSIds::const_iterator i = fs.slice.roots.begin();
+        for (Strings::const_iterator i = fs.slice.roots.begin();
              i != fs.slice.roots.end(); i++)
             for (SliceElems::const_iterator j = fs.slice.elems.begin();
                  j != fs.slice.elems.end(); j++)
-                if (*i == j->id) paths.push_back(j->path);
+                if (*i == j->path) paths.push_back(j->path);
     }
 
     else if (fs.type == FState::fsDerive) {

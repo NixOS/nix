@@ -268,7 +268,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
         elem.id = id;
         FState fs;
         fs.type = FState::fsSlice;
-        fs.slice.roots.push_back(id);
+        fs.slice.roots.push_back(dstPath);
         fs.slice.elems.push_back(elem);
 
         Hash pkgHash = hashPackage(state, fs);

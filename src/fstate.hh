@@ -16,14 +16,14 @@ struct SliceElem
 {
     string path;
     FSId id;
-    FSIds refs;
+    Strings refs;
 };
 
 typedef list<SliceElem> SliceElems;
 
 struct Slice
 {
-    FSIds roots;
+    Strings roots;
     SliceElems elems;
 };
 
