@@ -177,9 +177,13 @@ Expr substitute(const ATermMap & subs, Expr e)
     ATMatcher m;
     ATerm name;
 
+    /* As an optimisation, don't substitute in subterms known to be
+       closed. */
+    if (atMatch(m, e) >> "Closed") return e;
+
     if (atMatch(m, e) >> "Var" >> name) {
         Expr sub = subs.get(name);
-        return sub ? sub : e;
+        return sub ? ATmake("Closed(<term>)", sub) : e;
     }
 
     /* In case of a function, filter out all variables bound by this
@@ -199,7 +203,7 @@ Expr substitute(const ATermMap & subs, Expr e)
             substitute(subs2, body));
     }
 
-    if (atMatch(m, e) >> "Function" >> name >> body) {
+    if (atMatch(m, e) >> "Function1" >> name >> body) {
         ATermMap subs2(subs);
         subs2.remove(name);
         return ATmake("Function1(<term>, <term>)", name,

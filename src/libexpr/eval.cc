@@ -201,6 +201,11 @@ Expr evalExpr2(EvalState & state, Expr e)
          cons == "List"))
         return e;
 
+    /* The `Closed' constructor is just a way to prevent substitutions
+       into expressions not containing free variables. */
+    if (atMatch(m, e) >> "Closed" >> e1)
+        return evalExpr(state, e1);
+
     /* Any encountered variables must be undeclared or primops. */
     if (atMatch(m, e) >> "Var" >> name) {
         PrimOp0 primOp = (PrimOp0) lookupPrimOp(state.primOps0, name);
