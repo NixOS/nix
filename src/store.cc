@@ -281,8 +281,12 @@ void deleteFromStore(const string & path)
 
 void verifyStore()
 {
+    Transaction txn(nixDB);
+
+    /* !!! verify that the result is consistent */
+
     Strings paths;
-    nixDB.enumTable(noTxn, dbPath2Id, paths);
+    nixDB.enumTable(txn, dbPath2Id, paths);
 
     for (Strings::iterator i = paths.begin();
          i != paths.end(); i++)
@@ -296,10 +300,10 @@ void verifyStore()
 
         else {
             string id;
-            if (!nixDB.queryString(noTxn, dbPath2Id, path, id)) abort();
+            if (!nixDB.queryString(txn, dbPath2Id, path, id)) abort();
 
             Strings idPaths;
-            nixDB.queryStrings(noTxn, dbId2Paths, id, idPaths);
+            nixDB.queryStrings(txn, dbId2Paths, id, idPaths);
 
             bool found = false;
             for (Strings::iterator j = idPaths.begin();     
@@ -316,11 +320,11 @@ void verifyStore()
                 debug(format("reverse mapping for path `%1%' missing") % path);
         }
 
-        if (erase) nixDB.delPair(noTxn, dbPath2Id, path);
+        if (erase) nixDB.delPair(txn, dbPath2Id, path);
     }
 
     Strings ids;
-    nixDB.enumTable(noTxn, dbId2Paths, ids);
+    nixDB.enumTable(txn, dbId2Paths, ids);
 
     for (Strings::iterator i = ids.begin();
          i != ids.end(); i++)
@@ -328,13 +332,13 @@ void verifyStore()
         FSId id = parseHash(*i);
 
         Strings idPaths;
-        nixDB.queryStrings(noTxn, dbId2Paths, id, idPaths);
+        nixDB.queryStrings(txn, dbId2Paths, id, idPaths);
 
         for (Strings::iterator j = idPaths.begin();     
              j != idPaths.end(); )
         {
             string id2;
-            if (!nixDB.queryString(noTxn, dbPath2Id, *j, id2) || 
+            if (!nixDB.queryString(txn, dbPath2Id, *j, id2) || 
                 id != parseHash(id2)) {
                 debug(format("erasing path `%1%' from mapping for id %2%") 
                     % *j % (string) id);
@@ -342,12 +346,12 @@ void verifyStore()
             } else j++;
         }
 
-        nixDB.setStrings(noTxn, dbId2Paths, id, idPaths);
+        nixDB.setStrings(txn, dbId2Paths, id, idPaths);
     }
 
     
     Strings subs;
-    nixDB.enumTable(noTxn, dbSubstitutes, subs);
+    nixDB.enumTable(txn, dbSubstitutes, subs);
 
     for (Strings::iterator i = subs.begin();
          i != subs.end(); i++)
@@ -355,7 +359,7 @@ void verifyStore()
         FSId srcId = parseHash(*i);
 
         Strings subIds;
-        nixDB.queryStrings(noTxn, dbSubstitutes, srcId, subIds);
+        nixDB.queryStrings(txn, dbSubstitutes, srcId, subIds);
 
         for (Strings::iterator j = subIds.begin();     
              j != subIds.end(); )
@@ -363,7 +367,7 @@ void verifyStore()
             FSId subId = parseHash(*j);
             
             Strings subPaths;
-            nixDB.queryStrings(noTxn, dbId2Paths, subId, subPaths);
+            nixDB.queryStrings(txn, dbId2Paths, subId, subPaths);
             if (subPaths.size() == 0) {
                 debug(format("erasing substitute %1% for %2%") 
                     % (string) subId % (string) srcId);
@@ -371,11 +375,11 @@ void verifyStore()
             } else j++;
         }
 
-        nixDB.setStrings(noTxn, dbSubstitutes, srcId, subIds);
+        nixDB.setStrings(txn, dbSubstitutes, srcId, subIds);
     }
 
     Strings sucs;
-    nixDB.enumTable(noTxn, dbSuccessors, sucs);
+    nixDB.enumTable(txn, dbSuccessors, sucs);
 
     for (Strings::iterator i = sucs.begin();
          i != sucs.end(); i++)
@@ -383,18 +387,20 @@ void verifyStore()
         FSId id1 = parseHash(*i);
 
         string id2;
-        if (!nixDB.queryString(noTxn, dbSuccessors, id1, id2)) abort();
+        if (!nixDB.queryString(txn, dbSuccessors, id1, id2)) abort();
         
         Strings id2Paths;
-        nixDB.queryStrings(noTxn, dbId2Paths, id2, id2Paths);
+        nixDB.queryStrings(txn, dbId2Paths, id2, id2Paths);
         if (id2Paths.size() == 0) {
             Strings id2Subs;
-            nixDB.queryStrings(noTxn, dbSubstitutes, id2, id2Subs);
+            nixDB.queryStrings(txn, dbSubstitutes, id2, id2Subs);
             if (id2Subs.size() == 0) {
                 debug(format("successor %1% for %2% missing") 
                     % id2 % (string) id1);
-                nixDB.delPair(noTxn, dbSuccessors, (string) id1);
+                nixDB.delPair(txn, dbSuccessors, (string) id1);
             }
         }
     }
+
+    txn.commit();
 }
