@@ -219,6 +219,8 @@ foreach my $p (keys %dstOutPaths) {
             print "    not copying, already exists\n";
             next;
         }
+
+        print "    size $narDiffSize; full size $dstNarBz2Size\n";
         
         system("cp '$tmpdir/DIFF' '$patchesDir/$finalName.tmp'") == 0
             or die "cannot copy diff";

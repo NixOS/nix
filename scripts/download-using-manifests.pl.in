@@ -4,11 +4,16 @@ use strict;
 use readmanifest;
 
 my $manifestDir = "@localstatedir@/nix/manifests";
+my $logFile = "@localstatedir@/log/nix/downloads";
+
+open LOGFILE, ">>$logFile" or die "cannot open log file $logFile";
 
 
 # Check the arguments.
 die unless scalar @ARGV == 1;
 my $targetPath = $ARGV[0];
+
+print LOGFILE "$$ get $targetPath\n";
 
 
 # Load all manifests.
@@ -175,11 +180,14 @@ while (scalar @path > 0) {
 
     if ($edge->{type} eq "present") {
         print "using already present path `$v'\n";
+        print LOGFILE "$$ present $v\n";
     }
 
     elsif ($edge->{type} eq "patch") {
         my $patch = $edge->{info};
         print "applying patch `$patch->{url}' to `$u' to create `$v'\n";
+
+        print LOGFILE "$$ patch $patch->{url} $patch->{size} $patch->{baseHash} $u $v\n";
 
         # Download the patch.
         print "  downloading patch...\n";
@@ -206,6 +214,8 @@ while (scalar @path > 0) {
         my $narFile = $edge->{info};
         print "downloading `$narFile->{url}' into `$v'\n";
 
+        print LOGFILE "$$ narfile $narFile->{url} $narFile->{size} $v\n";
+        
         # Download the archive.
         print "  downloading archive...\n";
         my $narFilePath = downloadFile "$narFile->{url}", "$narFile->{hash}";
@@ -216,3 +226,7 @@ while (scalar @path > 0) {
         die "cannot unpack `$narFilePath' into `$targetPath'" if ($? != 0);
     }
 }
+
+
+print LOGFILE "$$ success\n";
+close LOGFILE;
