@@ -36,7 +36,6 @@ static void initAndRun(int argc, char * * argv)
     act.sa_flags = 0;
     if (sigaction(SIGINT, &act, &oact))
         throw SysError("installing handler for SIGINT");
-    printMsg(lvlError, "SIG HANDLER INSTALLED");
 
     /* Put the arguments in a vector. */
     Strings args, remaining;
