@@ -191,7 +191,6 @@ static void opSubstitute(Strings opFlags, Strings opArgs)
             sub.args.push_back(s);
         }
         if (!cin || cin.eof()) throw Error("missing input");
-        cerr << ".";
         registerSubstitute(txn, srcPath, sub);
     }
 
