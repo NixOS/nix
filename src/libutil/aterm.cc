@@ -91,3 +91,16 @@ ATMatcher & operator >> (ATMatcher & pos, ATermList & out)
     out = (ATermList) t;
     return pos;
 }
+
+
+Error badTerm(const format & f, ATerm t)
+{
+    char * s = ATwriteToString(t);
+    if (!s) throw Error("cannot print term");
+    if (strlen(s) > 1000) {
+        int len;
+        s = ATwriteToSharedString(t, &len);
+        if (!s) throw Error("cannot print term");
+    }
+    return Error(format("%1%, in `%2%'") % f.str() % (string) s);
+}

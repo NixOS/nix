@@ -52,7 +52,7 @@ string pathLabel(const Path & nePath, const string & elemPath)
 }
 
 
-void printClosure(const Path & nePath, const NixExpr & fs)
+void printClosure(const Path & nePath, const StoreExpr & fs)
 {
     PathSet workList(fs.closure.roots);
     PathSet doneSet;
@@ -100,11 +100,11 @@ void printDotGraph(const PathSet & roots)
 	if (doneSet.find(nePath) == doneSet.end()) {
 	    doneSet.insert(nePath);
 
-	    NixExpr ne = exprFromPath(nePath);
+	    StoreExpr ne = storeExprFromPath(nePath);
 
 	    string label, colour;
                     
-	    if (ne.type == NixExpr::neDerivation) {
+	    if (ne.type == StoreExpr::neDerivation) {
 		for (PathSet::iterator i = ne.derivation.inputs.begin();
 		     i != ne.derivation.inputs.end(); i++)
 		{
@@ -119,7 +119,7 @@ void printDotGraph(const PathSet & roots)
 		    if (i->first == "name") label = i->second;
 	    }
 
-	    else if (ne.type == NixExpr::neClosure) {
+	    else if (ne.type == StoreExpr::neClosure) {
 		label = "<closure>";
 		colour = "#00ffff";
 		printClosure(nePath, ne);

@@ -10,10 +10,10 @@ extern "C" {
 #include <asfix2.h>
 }
 
+#include "aterm.hh"
 #include "parser.hh"
 #include "shared.hh"
-#include "fix-expr.hh"
-#include "expr.hh"
+#include "fixexpr.hh"
 #include "parse-table.h"
 
 

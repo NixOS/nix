@@ -1,7 +1,7 @@
 #ifndef __PARSER_H
 #define __PARSER_H
 
-#include "fix-expr.hh"
+#include "fixexpr.hh"
 
 
 Expr parseExprFromFile(Path path);

@@ -74,4 +74,9 @@ ATMatcher & operator >> (ATMatcher & pos, const string & s);
 ATMatcher & operator >> (ATMatcher & pos, ATermList & out);
 
 
+/* Throw an exception with an error message containing the given
+   aterm. */
+Error badTerm(const format & f, ATerm t);
+
+
 #endif /* !__ATERM_H */

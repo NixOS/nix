@@ -2,7 +2,7 @@ nix [OPTIONS...] [ARGUMENTS...]
 
 Operations:
 
-  --install / -i: realise a Nix expression
+  --realise / -r: realise a Nix expression
   --delete / -d: delete paths from the Nix store
   --add / -A: copy a path to the Nix store
   --query / -q: query information
@@ -22,7 +22,7 @@ Operations:
 Query flags:
 
   --list / -l: query the output paths (roots) of a Nix expression (default)
-  --requisites / -r: print all paths necessary to realise expression
+  --requisites / -R: print all paths necessary to realise expression
   --predecessors: print predecessors of a Nix expression
   --graph: print a dot graph rooted at given ids
 

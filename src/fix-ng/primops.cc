@@ -13,22 +13,22 @@ Expr primImport(EvalState & state, Expr arg)
 }
 
 
-static PathSet nixExprRootsCached(EvalState & state, const Path & nePath)
+static PathSet storeExprRootsCached(EvalState & state, const Path & nePath)
 {
     DrvPaths::iterator i = state.drvPaths.find(nePath);
     if (i != state.drvPaths.end())
         return i->second;
     else {
-        PathSet paths = nixExprRoots(nePath);
+        PathSet paths = storeExprRoots(nePath);
         state.drvPaths[nePath] = paths;
         return paths;
     }
 }
 
 
-static Hash hashDerivation(EvalState & state, NixExpr ne)
+static Hash hashDerivation(EvalState & state, StoreExpr ne)
 {
-    if (ne.type == NixExpr::neDerivation) {
+    if (ne.type == StoreExpr::neDerivation) {
 	PathSet inputs2;
         for (PathSet::iterator i = ne.derivation.inputs.begin();
              i != ne.derivation.inputs.end(); i++)
@@ -40,7 +40,7 @@ static Hash hashDerivation(EvalState & state, NixExpr ne)
         }
 	ne.derivation.inputs = inputs2;
     }
-    return hashTerm(unparseNixExpr(ne));
+    return hashTerm(unparseStoreExpr(ne));
 }
 
 
@@ -50,13 +50,13 @@ static Path copyAtom(EvalState & state, const Path & srcPath)
     Path dstPath(addToStore(srcPath));
 
     ClosureElem elem;
-    NixExpr ne;
-    ne.type = NixExpr::neClosure;
+    StoreExpr ne;
+    ne.type = StoreExpr::neClosure;
     ne.closure.roots.insert(dstPath);
     ne.closure.elems[dstPath] = elem;
 
     Hash drvHash = hashDerivation(state, ne);
-    Path drvPath = writeTerm(unparseNixExpr(ne), "");
+    Path drvPath = writeTerm(unparseStoreExpr(ne), "");
     state.drvHashes[drvPath] = drvHash;
 
     printMsg(lvlChatty, format("copied `%1%' -> closure `%2%'")
@@ -66,9 +66,9 @@ static Path copyAtom(EvalState & state, const Path & srcPath)
 
 
 static string addInput(EvalState & state, 
-    Path & nePath, NixExpr & ne)
+    Path & nePath, StoreExpr & ne)
 {
-    PathSet paths = nixExprRootsCached(state, nePath);
+    PathSet paths = storeExprRootsCached(state, nePath);
     if (paths.size() != 1) abort();
     Path path = *(paths.begin());
     ne.derivation.inputs.insert(nePath);
@@ -76,7 +76,7 @@ static string addInput(EvalState & state,
 }
 
 
-static string processBinding(EvalState & state, Expr e, NixExpr & ne)
+static string processBinding(EvalState & state, Expr e, StoreExpr & ne)
 {
     e = evalExpr(state, e);
 
@@ -131,8 +131,8 @@ Expr primDerivation(EvalState & state, Expr args)
     queryAllAttrs(args, attrs);
 
     /* Build the derivation expression by processing the attributes. */
-    NixExpr ne;
-    ne.type = NixExpr::neDerivation;
+    StoreExpr ne;
+    ne.type = StoreExpr::neDerivation;
 
     string drvName;
     Path outPath;
@@ -198,7 +198,7 @@ Expr primDerivation(EvalState & state, Expr args)
     Hash drvHash = outHashGiven
         ? hashString((string) outHash + outPath)
         : hashDerivation(state, ne);
-    Path drvPath = writeTerm(unparseNixExpr(ne), "-d-" + drvName);
+    Path drvPath = writeTerm(unparseStoreExpr(ne), "-d-" + drvName);
     state.drvHashes[drvPath] = drvHash;
 
     printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'")

@@ -27,15 +27,15 @@ static Path checkPath(const Path & arg)
 }
 
 
-/* Realise (or install) paths from the given Nix expressions. */
-static void opInstall(Strings opFlags, Strings opArgs)
+/* Realise paths from the given store expressions. */
+static void opRealise(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); i++)
     {
-        Path nfPath = normaliseNixExpr(checkPath(*i));
+        Path nfPath = normaliseStoreExpr(checkPath(*i));
         realiseClosure(nfPath);
         cout << format("%1%\n") % (string) nfPath;
     }
@@ -66,7 +66,7 @@ static void opAdd(Strings opFlags, Strings opArgs)
 
 Path maybeNormalise(const Path & ne, bool normalise)
 {
-    return normalise ? normaliseNixExpr(ne) : ne;
+    return normalise ? normaliseStoreExpr(ne) : ne;
 }
 
 
@@ -82,7 +82,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); i++)
         if (*i == "--list" || *i == "-l") query = qList;
-        else if (*i == "--requisites" || *i == "-r") query = qRequisites;
+        else if (*i == "--requisites" || *i == "-R") query = qRequisites;
         else if (*i == "--predecessors") query = qPredecessors;
         else if (*i == "--graph") query = qGraph;
         else if (*i == "--normalise" || *i == "-n") normalise = true;
@@ -96,7 +96,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                StringSet paths = nixExprRoots(
+                StringSet paths = storeExprRoots(
                     maybeNormalise(checkPath(*i), normalise));
                 for (StringSet::iterator j = paths.begin(); 
                      j != paths.end(); j++)
@@ -110,7 +110,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                StringSet paths2 = nixExprRequisites(
+                StringSet paths2 = storeExprRequisites(
                     maybeNormalise(checkPath(*i), normalise),
                     includeExprs, includeSuccessors);
                 paths.insert(paths2.begin(), paths2.end());
@@ -258,8 +258,8 @@ void run(Strings args)
 
         Operation oldOp = op;
 
-        if (arg == "--install" || arg == "-i")
-            op = opInstall;
+        if (arg == "--realise" || arg == "-r")
+            op = opRealise;
         else if (arg == "--delete" || arg == "-d")
             op = opDelete;
         else if (arg == "--add" || arg == "-A")

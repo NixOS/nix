@@ -1,5 +1,5 @@
-#include "fix-expr.hh"
-#include "expr.hh"
+#include "fixexpr.hh"
+#include "storeexpr.hh"
 
 
 ATermMap::ATermMap(unsigned int initialSize, unsigned int maxLoadPct)

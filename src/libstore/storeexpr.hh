@@ -1,11 +1,11 @@
-#ifndef __FSTATE_H
-#define __FSTATE_H
+#ifndef __STOREEXPR_H
+#define __STOREEXPR_H
 
 #include "aterm.hh"
 #include "store.hh"
 
 
-/* Abstract syntax of Nix expressions. */
+/* Abstract syntax of store expressions. */
 
 struct ClosureElem
 {
@@ -25,14 +25,14 @@ typedef map<string, string> StringPairs;
 struct Derivation
 {
     PathSet outputs;
-    PathSet inputs; /* Nix expressions, not actual inputs */
+    PathSet inputs; /* Store expressions, not actual inputs */
     string platform;
     Path builder;
     Strings args;
     StringPairs env;
 };
 
-struct NixExpr
+struct StoreExpr
 {
     enum { neClosure, neDerivation } type;
     Closure closure;
@@ -40,21 +40,17 @@ struct NixExpr
 };
 
 
-/* Throw an exception with an error message containing the given
-   aterm. */
-Error badTerm(const format & f, ATerm t);
-
 /* Hash an aterm. */
 Hash hashTerm(ATerm t);
 
 /* Write an aterm to the Nix store directory, and return its path. */
 Path writeTerm(ATerm t, const string & suffix);
 
-/* Parse a Nix expression. */
-NixExpr parseNixExpr(ATerm t);
+/* Parse a store expression. */
+StoreExpr parseStoreExpr(ATerm t);
 
-/* Parse a Nix expression. */
-ATerm unparseNixExpr(const NixExpr & ne);
+/* Parse a store expression. */
+ATerm unparseStoreExpr(const StoreExpr & ne);
 
 
-#endif /* !__FSTATE_H */
+#endif /* !__STOREEXPR_H */

@@ -18,21 +18,21 @@ static Path useSuccessor(const Path & path)
 }
 
 
-Path normaliseNixExpr(const Path & _nePath, PathSet pending)
+Path normaliseStoreExpr(const Path & _nePath, PathSet pending)
 {
     startNest(nest, lvlTalkative,
-        format("normalising expression in `%1%'") % (string) _nePath);
+        format("normalising store expression in `%1%'") % (string) _nePath);
 
     /* Try to substitute the expression by any known successors in
        order to speed up the rewrite process. */
     Path nePath = useSuccessor(_nePath);
 
-    /* Get the Nix expression. */
-    NixExpr ne = exprFromPath(nePath, pending);
+    /* Get the store expression. */
+    StoreExpr ne = storeExprFromPath(nePath, pending);
 
     /* If this is a normal form (i.e., a closure) we are done. */
-    if (ne.type == NixExpr::neClosure) return nePath;
-    if (ne.type != NixExpr::neDerivation) abort();
+    if (ne.type == StoreExpr::neClosure) return nePath;
+    if (ne.type != StoreExpr::neDerivation) abort();
     
 
     /* Otherwise, it's a derivation expression, and we have to build it to
@@ -51,8 +51,8 @@ Path normaliseNixExpr(const Path & _nePath, PathSet pending)
     Environment env; 
 
     /* The result. */
-    NixExpr nf;
-    nf.type = NixExpr::neClosure;
+    StoreExpr nf;
+    nf.type = StoreExpr::neClosure;
 
 
     /* The outputs are referenceable paths. */
@@ -78,10 +78,10 @@ Path normaliseNixExpr(const Path & _nePath, PathSet pending)
     {
         Path nePath2 = useSuccessor(nePath);
         if (nePath != nePath2) {
-            NixExpr ne = exprFromPath(nePath2, pending);
+            StoreExpr ne = storeExprFromPath(nePath2, pending);
             debug(format("skipping build of expression `%1%', someone beat us to it")
 		  % (string) nePath);
-            if (ne.type != NixExpr::neClosure) abort();
+            if (ne.type != StoreExpr::neClosure) abort();
             return nePath2;
         }
     }
@@ -95,12 +95,12 @@ Path normaliseNixExpr(const Path & _nePath, PathSet pending)
     for (PathSet::iterator i = ne.derivation.inputs.begin();
          i != ne.derivation.inputs.end(); i++)
     {
-        Path nfPath = normaliseNixExpr(*i, pending);
+        Path nfPath = normaliseStoreExpr(*i, pending);
         realiseClosure(nfPath, pending);
         /* !!! nfPath should be a root of the garbage collector while
            we are building */
-        NixExpr ne = exprFromPath(nfPath, pending);
-        if (ne.type != NixExpr::neClosure) abort();
+        StoreExpr ne = storeExprFromPath(nfPath, pending);
+        if (ne.type != StoreExpr::neClosure) abort();
         for (ClosureElems::iterator j = ne.closure.elems.begin();
              j != ne.closure.elems.end(); j++)
 	{
@@ -238,7 +238,7 @@ Path normaliseNixExpr(const Path & _nePath, PathSet pending)
 
     /* Write the normal form.  This does not have to occur in the
        transaction below because writing terms is idem-potent. */
-    ATerm nfTerm = unparseNixExpr(nf);
+    ATerm nfTerm = unparseStoreExpr(nf);
     printMsg(lvlVomit, format("normal form: %1%") % atPrint(nfTerm));
     Path nfPath = writeTerm(nfTerm, "-s");
 
@@ -264,8 +264,8 @@ void realiseClosure(const Path & nePath, PathSet pending)
 {
     startNest(nest, lvlDebug, format("realising closure `%1%'") % nePath);
 
-    NixExpr ne = exprFromPath(nePath, pending);
-    if (ne.type != NixExpr::neClosure)
+    StoreExpr ne = storeExprFromPath(nePath, pending);
+    if (ne.type != StoreExpr::neClosure)
         throw Error(format("expected closure in `%1%'") % nePath);
     
     for (ClosureElems::const_iterator i = ne.closure.elems.begin();
@@ -286,7 +286,7 @@ void ensurePath(const Path & path, PathSet pending)
          i != subPaths.end(); i++)
     {
         try {
-            normaliseNixExpr(*i, pending);
+            normaliseStoreExpr(*i, pending);
             if (isValidPath(path)) return;
             throw Error(format("substitute failed to produce expected output path"));
         } catch (Error & e) {
@@ -301,24 +301,24 @@ void ensurePath(const Path & path, PathSet pending)
 }
 
 
-NixExpr exprFromPath(const Path & path, PathSet pending)
+StoreExpr storeExprFromPath(const Path & path, PathSet pending)
 {
     ensurePath(path, pending);
     ATerm t = ATreadFromNamedFile(path.c_str());
     if (!t) throw Error(format("cannot read aterm from `%1%'") % path);
-    return parseNixExpr(t);
+    return parseStoreExpr(t);
 }
 
 
-PathSet nixExprRoots(const Path & nePath)
+PathSet storeExprRoots(const Path & nePath)
 {
     PathSet paths;
 
-    NixExpr ne = exprFromPath(nePath);
+    StoreExpr ne = storeExprFromPath(nePath);
 
-    if (ne.type == NixExpr::neClosure)
+    if (ne.type == StoreExpr::neClosure)
         paths.insert(ne.closure.roots.begin(), ne.closure.roots.end());
-    else if (ne.type == NixExpr::neDerivation)
+    else if (ne.type == StoreExpr::neDerivation)
         paths.insert(ne.derivation.outputs.begin(),
             ne.derivation.outputs.end());
     else abort();
@@ -334,14 +334,14 @@ static void requisitesWorker(const Path & nePath,
     if (doneSet.find(nePath) != doneSet.end()) return;
     doneSet.insert(nePath);
 
-    NixExpr ne = exprFromPath(nePath);
+    StoreExpr ne = storeExprFromPath(nePath);
 
-    if (ne.type == NixExpr::neClosure)
+    if (ne.type == StoreExpr::neClosure)
         for (ClosureElems::iterator i = ne.closure.elems.begin();
              i != ne.closure.elems.end(); i++)
             paths.insert(i->first);
     
-    else if (ne.type == NixExpr::neDerivation)
+    else if (ne.type == StoreExpr::neDerivation)
         for (PathSet::iterator i = ne.derivation.inputs.begin();
              i != ne.derivation.inputs.end(); i++)
             requisitesWorker(*i,
@@ -358,7 +358,7 @@ static void requisitesWorker(const Path & nePath,
 }
 
 
-PathSet nixExprRequisites(const Path & nePath,
+PathSet storeExprRequisites(const Path & nePath,
     bool includeExprs, bool includeSuccessors)
 {
     PathSet paths;

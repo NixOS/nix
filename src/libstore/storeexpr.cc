@@ -1,19 +1,6 @@
-#include "expr.hh"
+#include "storeexpr.hh"
 #include "globals.hh"
 #include "store.hh"
-
-
-Error badTerm(const format & f, ATerm t)
-{
-    char * s = ATwriteToString(t);
-    if (!s) throw Error("cannot print term");
-    if (strlen(s) > 1000) {
-        int len;
-        s = ATwriteToSharedString(t, &len);
-        if (!s) throw Error("cannot print term");
-    }
-    return Error(format("%1%, in `%2%'") % f.str() % (string) s);
-}
 
 
 Hash hashTerm(ATerm t)
@@ -138,14 +125,14 @@ static bool parseDerivation(ATerm t, Derivation & derivation)
 }
 
 
-NixExpr parseNixExpr(ATerm t)
+StoreExpr parseStoreExpr(ATerm t)
 {
-    NixExpr ne;
+    StoreExpr ne;
     if (parseClosure(t, ne.closure))
-        ne.type = NixExpr::neClosure;
+        ne.type = StoreExpr::neClosure;
     else if (parseDerivation(t, ne.derivation))
-        ne.type = NixExpr::neDerivation;
-    else throw badTerm("not a Nix expression", t);
+        ne.type = StoreExpr::neDerivation;
+    else throw badTerm("not a store expression", t);
     return ne;
 }
 
@@ -200,11 +187,11 @@ static ATerm unparseDerivation(const Derivation & derivation)
 }
 
 
-ATerm unparseNixExpr(const NixExpr & ne)
+ATerm unparseStoreExpr(const StoreExpr & ne)
 {
-    if (ne.type == NixExpr::neClosure)
+    if (ne.type == StoreExpr::neClosure)
         return unparseClosure(ne.closure);
-    else if (ne.type == NixExpr::neDerivation)
+    else if (ne.type == StoreExpr::neDerivation)
         return unparseDerivation(ne.derivation);
     else abort();
 }

@@ -1,7 +1,7 @@
 noinst_LIBRARIES = libstore.a
 
 libstore_a_SOURCES = \
- store.cc expr.cc normalise.cc exec.cc \
+ store.cc storeexpr.cc normalise.cc exec.cc \
  globals.cc db.cc references.cc pathlocks.cc
 
 AM_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall \

@@ -3,8 +3,9 @@
 
 #include <map>
 
-#include "fix-expr.hh"
-#include "expr.hh"
+#include "aterm.hh"
+#include "hash.hh"
+#include "fixexpr.hh"
 
 
 typedef map<Path, PathSet> DrvPaths;
