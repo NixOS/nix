@@ -8,7 +8,7 @@
    derivation, a path containing an equivalent closure expression is
    returned.  This requires that the derivation is performed, unless a
    successor is known. */
-Path normaliseStoreExpr(const Path & nePath, PathSet pending = PathSet());
+Path normaliseStoreExpr(const Path & nePath);
 
 /* Realise a closure store expression in the file system. 
 
@@ -16,15 +16,15 @@ Path normaliseStoreExpr(const Path & nePath, PathSet pending = PathSet());
    prevents infinite recursion for paths realised through a substitute
    (since when we build the substitute, we would first try to realise
    its output paths through substitutes... kaboom!). */
-void realiseClosure(const Path & nePath, PathSet pending = PathSet());
+void realiseClosure(const Path & nePath);
 
 /* Ensure that a path exists, possibly by instantiating it by
    realising a substitute. */
-void ensurePath(const Path & path, PathSet pending = PathSet());
+void ensurePath(const Path & path);
 
 /* Read a store expression, after ensuring its existence through
    ensurePath(). */
-StoreExpr storeExprFromPath(const Path & path, PathSet pending = PathSet());
+StoreExpr storeExprFromPath(const Path & path);
 
 /* Get the list of root (output) paths of the given store
    expression. */

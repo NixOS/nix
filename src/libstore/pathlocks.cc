@@ -45,9 +45,24 @@ bool lockFile(int fd, LockType lockType, bool wait)
 static StringSet lockedPaths; /* !!! not thread-safe */
 
 
-PathLocks::PathLocks(const PathSet & _paths)
+PathLocks::PathLocks()
     : deletePaths(false)
 {
+}
+
+
+PathLocks::PathLocks(const PathSet & paths)
+    : deletePaths(false)
+{
+    lockPaths(paths);
+}
+
+
+void PathLocks::lockPaths(const PathSet & _paths)
+{
+    /* May be called only once! */
+    assert(this->paths.empty());
+    
     /* Note that `fds' is built incrementally so that the destructor
        will only release those locks that we have already acquired. */
 
@@ -80,6 +95,8 @@ PathLocks::PathLocks(const PathSet & _paths)
         /* Acquire an exclusive lock. */
         lockFile(fd, ltWrite, true);
 
+        debug(format("lock acquired on `%1%'") % lockPath);
+
         lockedPaths.insert(lockPath);
     }
 }
@@ -88,7 +105,7 @@ PathLocks::PathLocks(const PathSet & _paths)
 PathLocks::~PathLocks()
 {
     for (list<int>::iterator i = fds.begin(); i != fds.end(); i++)
-        close(*i);
+        if (close(*i) != 0) throw SysError("closing fd");
 
     for (Paths::iterator i = paths.begin(); i != paths.end(); i++) {
         checkInterrupt();
@@ -99,6 +116,7 @@ PathLocks::~PathLocks()
                the lock file is an optimisation, not a necessity. */
         }
         lockedPaths.erase(*i);
+        debug(format("lock released on `%1%'") % *i);
     }
 }
 

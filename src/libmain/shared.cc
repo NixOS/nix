@@ -15,9 +15,15 @@ extern "C" {
 #include "config.h"
 
 
+volatile sig_atomic_t blockInt = 0;
+
+
 void sigintHandler(int signo)
 {
-    _isInterrupted = 1;
+    if (!blockInt) {
+        _isInterrupted = 1;
+        blockInt = 1;
+    }
 }
 
 
@@ -150,7 +156,17 @@ int main(int argc, char * * argv)
 #endif
 
     try {
-        initAndRun(argc, argv);
+        try {
+            initAndRun(argc, argv);
+        } catch (...) {
+            /* Subtle: we have to make sure that any `interrupted'
+               condition is discharged before we reach printMsg()
+               below, since otherwise it will throw an (uncaught)
+               exception. */
+            blockInt = 1; /* ignore further SIGINTs */
+            _isInterrupted = 0;
+            throw;
+        }
     } catch (UsageError & e) {
         printMsg(lvlError, 
             format(

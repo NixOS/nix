@@ -11,8 +11,8 @@ let {
 
   a = mkDrv "a" [];
   b = mkDrv "b" [a];
-  c = mkDrv "c" [b];
-  d = mkDrv "d" [c];
+  c = mkDrv "c" [a];
+  d = mkDrv "d" [a];
   e = mkDrv "e" [b c d];
 
   body = e;

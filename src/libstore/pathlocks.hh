@@ -17,7 +17,9 @@ private:
     bool deletePaths;
 
 public:
-    PathLocks(const PathSet & _paths);
+    PathLocks();
+    PathLocks(const PathSet & paths);
+    void lockPaths(const PathSet & _paths);
     ~PathLocks();
     void setDeletion(bool deletePaths);
 };

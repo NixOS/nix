@@ -17,10 +17,9 @@ dependencies.sh: dependencies.nix
 locking.sh: locking.nix
 parallel.sh: parallel.nix
 
-TESTS = init.sh simple.sh dependencies.sh parallel.sh
-#locking.sh parallel.sh
+TESTS = init.sh simple.sh dependencies.sh locking.sh parallel.sh
 
-XFAIL_TESTS = parallel.sh
+XFAIL_TESTS =
 
 include ../substitute.mk
 

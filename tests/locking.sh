@@ -4,7 +4,7 @@ echo "store expr is $storeExpr"
 
 for i in $(seq 1 5); do
     echo "WORKER $i"
-    $TOP/src/nix-store/nix-store -rvvB "$storeExpr" &
+    $TOP/src/nix-store/nix-store -rvvvvvB "$storeExpr" &
 done
 
 sleep 5
