@@ -16,6 +16,7 @@ static Expr primImport(EvalState & state, const ATermVector & args)
 }
 
 
+#if 0
 static PathSet storeExprRootsCached(EvalState & state, const Path & nePath)
 {
     DrvRoots::iterator i = state.drvRoots.find(nePath);
@@ -27,6 +28,7 @@ static PathSet storeExprRootsCached(EvalState & state, const Path & nePath)
         return paths;
     }
 }
+#endif
 
 
 /* Returns the hash of a derivation modulo fixed-output
@@ -49,83 +51,42 @@ static PathSet storeExprRootsCached(EvalState & state, const Path & nePath)
    paths have been replaced by the result of a recursive call to this
    function, and that for fixed-output derivations we return
    (basically) its outputHash. */
-static Hash hashDerivationModulo(EvalState & state, StoreExpr ne)
+static Hash hashDerivationModulo(EvalState & state, Derivation drv)
 {
-    if (ne.type == StoreExpr::neDerivation) {
-
-        /* Return a fixed hash for fixed-output derivations. */
-        if (ne.derivation.outputs.size() == 1) {
-            DerivationOutputs::iterator i = ne.derivation.outputs.begin();
-            if (i->first == "out" &&
-                i->second.hash != "")
-            {
-                return hashString(htSHA256, "fixed:out:"
-                    + i->second.hashAlgo + ":"
-                    + i->second.hash + ":"
-                    + i->second.path);
-            }
-        }
-
-        /* For other derivations, replace the inputs paths with
-           recursive calls to this function.*/
-	PathSet inputs2;
-        for (PathSet::iterator i = ne.derivation.inputs.begin();
-             i != ne.derivation.inputs.end(); ++i)
+    /* Return a fixed hash for fixed-output derivations. */
+    if (drv.outputs.size() == 1) {
+        DerivationOutputs::const_iterator i = drv.outputs.begin();
+        if (i->first == "out" &&
+            i->second.hash != "")
         {
-            Hash h = state.drvHashes[*i];
-            if (h.type == htUnknown) {
-                StoreExpr ne2 = storeExprFromPath(*i);
-                h = hashDerivationModulo(state, ne2);
-                state.drvHashes[*i] = h;
-            }
-            inputs2.insert(printHash(h));
+            return hashString(htSHA256, "fixed:out:"
+                + i->second.hashAlgo + ":"
+                + i->second.hash + ":"
+                + i->second.path);
         }
-	ne.derivation.inputs = inputs2;
     }
+
+    /* For other derivations, replace the inputs paths with recursive
+       calls to this function.*/
+    PathSet inputs2;
+    for (PathSet::iterator i = drv.inputDrvs.begin();
+         i != drv.inputDrvs.end(); ++i)
+    {
+        Hash h = state.drvHashes[*i];
+        if (h.type == htUnknown) {
+            Derivation drv2 = derivationFromPath(*i);
+            h = hashDerivationModulo(state, drv2);
+            state.drvHashes[*i] = h;
+        }
+        inputs2.insert(printHash(h));
+    }
+    drv.inputDrvs = inputs2;
     
-    return hashTerm(unparseStoreExpr(ne));
+    return hashTerm(unparseDerivation(drv));
 }
 
 
-static Path copyAtom(EvalState & state, const Path & srcPath)
-{
-    /* !!! should be cached */
-    Path dstPath(addToStore(srcPath));
-
-    ClosureElem elem;
-    StoreExpr ne;
-    ne.type = StoreExpr::neClosure;
-    ne.closure.roots.insert(dstPath);
-    ne.closure.elems[dstPath] = elem;
-
-    Path drvPath = writeTerm(unparseStoreExpr(ne), "c");
-
-    /* !!! can we get rid of drvRoots? */
-    state.drvRoots[drvPath] = ne.closure.roots;
-
-    /* Optimisation, but required in read-only mode! because in that
-       case we don't actually write store expressions, so we can't
-       read them later. */
-    state.drvHashes[drvPath] = hashDerivationModulo(state, ne);
-
-    printMsg(lvlChatty, format("copied `%1%' -> closure `%2%'")
-        % srcPath % drvPath);
-    return drvPath;
-}
-
-
-static string addInput(EvalState & state, 
-    Path & nePath, StoreExpr & ne)
-{
-    PathSet paths = storeExprRootsCached(state, nePath);
-    if (paths.size() != 1) abort();
-    Path path = *(paths.begin());
-    ne.derivation.inputs.insert(nePath);
-    return path;
-}
-
-
-static void processBinding(EvalState & state, Expr e, StoreExpr & ne,
+static void processBinding(EvalState & state, Expr e, Derivation & drv,
     Strings & ss)
 {
     e = evalExpr(state, e);
@@ -155,25 +116,28 @@ static void processBinding(EvalState & state, Expr e, StoreExpr & ne,
 
             a = queryAttr(e, "outPath");
             if (!a) throw Error("output path missing");
-            PathSet drvRoots;
-            drvRoots.insert(evalPath(state, a));
-            
-            state.drvRoots[drvPath] = drvRoots;
+            /* !!! supports only single output path */
+            Path outPath = evalPath(state, a);
 
-            ss.push_back(addInput(state, drvPath, ne));
+            drv.inputDrvs.insert(drvPath);
+            ss.push_back(outPath);
         } else
             throw Error("invalid derivation attribute");
     }
 
     else if (matchPath(e, s)) {
-        Path drvPath = copyAtom(state, aterm2String(s));
-        ss.push_back(addInput(state, drvPath, ne));
+        Path srcPath(aterm2String(s));
+        Path dstPath(addToStore(srcPath));
+        printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
+            % srcPath % dstPath);
+        drv.inputSrcs.insert(dstPath);
+        ss.push_back(dstPath);
     }
     
     else if (matchList(e, es)) {
         for (ATermIterator i(es); i; ++i) {
             startNest(nest, lvlVomit, format("processing list element"));
-	    processBinding(state, evalExpr(state, *i), ne, ss);
+	    processBinding(state, evalExpr(state, *i), drv, ss);
         }
     }
 
@@ -181,7 +145,7 @@ static void processBinding(EvalState & state, Expr e, StoreExpr & ne,
 
     else if (matchSubPath(e, e1, e2)) {
         Strings ss2;
-        processBinding(state, evalExpr(state, e1), ne, ss2);
+        processBinding(state, evalExpr(state, e1), drv, ss2);
         if (ss2.size() != 1)
             throw Error("left-hand side of `~' operator cannot be a list");
         e2 = evalExpr(state, e2);
@@ -223,8 +187,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
     queryAllAttrs(args, attrs, true);
 
     /* Build the derivation expression by processing the attributes. */
-    StoreExpr ne;
-    ne.type = StoreExpr::neDerivation;
+    Derivation drv;
 
     string drvName;
     
@@ -241,7 +204,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
 
         Strings ss;
         try {
-            processBinding(state, value, ne, ss);
+            processBinding(state, value, drv, ss);
         } catch (Error & e) {
             throw Error(format("while processing the derivation attribute `%1%' at %2%:\n%3%")
                 % key % showPos(pos) % e.msg());
@@ -251,16 +214,16 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
            command-line arguments to the builder. */
         if (key == "args") {
             for (Strings::iterator i = ss.begin(); i != ss.end(); ++i)
-                ne.derivation.args.push_back(*i);
+                drv.args.push_back(*i);
         }
 
         /* All other attributes are passed to the builder through the
            environment. */
         else {
             string s = concatStrings(ss);
-            ne.derivation.env[key] = s;
-            if (key == "builder") ne.derivation.builder = s;
-            else if (key == "system") ne.derivation.platform = s;
+            drv.env[key] = s;
+            if (key == "builder") drv.builder = s;
+            else if (key == "system") drv.platform = s;
             else if (key == "name") drvName = s;
             else if (key == "outputHash") outputHash = s;
             else if (key == "outputHashAlgo") outputHashAlgo = s;
@@ -268,9 +231,9 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
     }
     
     /* Do we have all required attributes? */
-    if (ne.derivation.builder == "")
+    if (drv.builder == "")
         throw Error("required attribute `builder' missing");
-    if (ne.derivation.platform == "")
+    if (drv.platform == "")
         throw Error("required attribute `system' missing");
     if (drvName == "")
         throw Error("required attribute `name' missing");
@@ -312,22 +275,22 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
        paths are empty, and the corresponding environment variables
        have an empty value.  This ensures that changes in the set of
        output names do get reflected in the hash. */
-    ne.derivation.env["out"] = "";
-    ne.derivation.outputs["out"] =
+    drv.env["out"] = "";
+    drv.outputs["out"] =
         DerivationOutput("", outputHashAlgo, outputHash);
         
     /* Use the masked derivation expression to compute the output
        path. */
     Path outPath = makeStorePath("output:out",
-        hashDerivationModulo(state, ne), drvName);
+        hashDerivationModulo(state, drv), drvName);
 
     /* Construct the final derivation store expression. */
-    ne.derivation.env["out"] = outPath;
-    ne.derivation.outputs["out"] =
+    drv.env["out"] = outPath;
+    drv.outputs["out"] =
         DerivationOutput(outPath, outputHashAlgo, outputHash);
 
     /* Write the resulting term into the Nix store directory. */
-    Path drvPath = writeTerm(unparseStoreExpr(ne), "d-" + drvName);
+    Path drvPath = writeTerm(unparseDerivation(drv), "d-" + drvName);
 
     printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'")
         % drvName % drvPath);
@@ -335,7 +298,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store expressions, so we can't
        read them later. */
-    state.drvHashes[drvPath] = hashDerivationModulo(state, ne);
+    state.drvHashes[drvPath] = hashDerivationModulo(state, drv);
 
     /* !!! assumes a single output */
     attrs.set("outPath", makeAttrRHS(makePath(toATerm(outPath)), makeNoPos()));

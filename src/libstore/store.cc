@@ -23,23 +23,18 @@ static Database nixDB;
    is, produced by a succesful build). */
 static TableId dbValidPaths = 0;
 
-/* dbSuccessors :: Path -> Path
+/* dbReferences :: Path -> [Path]
 
-   Each pair $(p_1, p_2)$ in this mapping records the fact that the
-   Nix expression stored at path $p_1$ has a successor expression
-   stored at path $p_2$.
+   This table lists the outgoing file system references for each
+   output path that has been built by a Nix derivation.  These are
+   found by scanning the path for the hash components of input
+   paths. */
+static TableId dbReferences = 0;
 
-   Note that a term $y$ is a successor of $x$ iff there exists a
-   sequence of rewrite steps that rewrites $x$ into $y$.
-*/
-static TableId dbSuccessors = 0;
+/* dbReferers :: Path -> [Path]
 
-/* dbSuccessorsRev :: Path -> [Path]
-
-   The reverse mapping of dbSuccessors (i.e., it stores the
-   predecessors of a Nix expression).
-*/
-static TableId dbSuccessorsRev = 0;
+   This table is just the reverse mapping of dbReferences. */
+static TableId dbReferers = 0;
 
 /* dbSubstitutes :: Path -> [[Path]]
 
@@ -76,8 +71,8 @@ void openDB()
         return;
     }
     dbValidPaths = nixDB.openTable("validpaths");
-    dbSuccessors = nixDB.openTable("successors");
-    dbSuccessorsRev = nixDB.openTable("successors-rev");
+    dbReferences = nixDB.openTable("references");
+    dbReferers = nixDB.openTable("referers");
     dbSubstitutes = nixDB.openTable("substitutes");
 }
 
@@ -199,81 +194,31 @@ bool isValidPath(const Path & path)
 }
 
 
-static bool isUsablePathTxn(const Path & path, const Transaction & txn)
+void setReferences(const Transaction & txn, const Path & storePath,
+    const PathSet & references)
 {
-    if (isValidPathTxn(path, txn)) return true;
-    Paths subs;
-    nixDB.queryStrings(txn, dbSubstitutes, path, subs);
-    return subs.size() > 0;
-}
+    nixDB.setStrings(txn, dbReferences, storePath,
+        Paths(references.begin(), references.end()));
 
-
-void registerSuccessor(const Transaction & txn,
-    const Path & srcPath, const Path & sucPath)
-{
-    assertStorePath(srcPath);
-    assertStorePath(sucPath);
-    
-    if (!isUsablePathTxn(sucPath, txn))	throw Error(
-	format("path `%1%' cannot be a successor, since it is not usable")
-	% sucPath);
-
-    Path known;
-    if (nixDB.queryString(txn, dbSuccessors, srcPath, known) &&
-        known != sucPath)
+    /* Update the referers mappings of all referenced paths. */
+    for (PathSet::const_iterator i = references.begin();
+         i != references.end(); ++i)
     {
-        throw Error(format(
-            "the `impossible' happened: expression in path "
-            "`%1%' appears to have multiple successors "
-            "(known `%2%', new `%3%'")
-            % srcPath % known % sucPath);
+        Paths referers;
+        nixDB.queryStrings(txn, dbReferers, *i, referers);
+        PathSet referers2(referers.begin(), referers.end());
+        referers2.insert(storePath);
+        nixDB.setStrings(txn, dbReferers, *i,
+            Paths(referers2.begin(), referers2.end()));
     }
-
-    Paths revs;
-    nixDB.queryStrings(txn, dbSuccessorsRev, sucPath, revs);
-    if (find(revs.begin(), revs.end(), srcPath) == revs.end())
-        revs.push_back(srcPath);
-
-    nixDB.setString(txn, dbSuccessors, srcPath, sucPath);
-    nixDB.setStrings(txn, dbSuccessorsRev, sucPath, revs);
 }
 
 
-void unregisterSuccessor(const Path & srcPath)
+void queryReferences(const Path & storePath, PathSet & references)
 {
-    assertStorePath(srcPath);
-
-    Transaction txn(nixDB);
-
-    Path sucPath;
-    if (!nixDB.queryString(txn, dbSuccessors, srcPath, sucPath)) {
-        txn.abort();
-        return;
-    }
-    nixDB.delPair(txn, dbSuccessors, srcPath);
-
-    Paths revs;
-    nixDB.queryStrings(txn, dbSuccessorsRev, sucPath, revs);
-    Paths::iterator i = find(revs.begin(), revs.end(), srcPath);
-    assert(i != revs.end());
-    revs.erase(i);
-    nixDB.setStrings(txn, dbSuccessorsRev, sucPath, revs);
-
-    txn.commit();
-}
-
-
-bool querySuccessor(const Path & srcPath, Path & sucPath)
-{
-    return nixDB.queryString(noTxn, dbSuccessors, srcPath, sucPath);
-}
-
-
-Paths queryPredecessors(const Path & sucPath)
-{
-    Paths revs;
-    nixDB.queryStrings(noTxn, dbSuccessorsRev, sucPath, revs);
-    return revs;
+    Paths references2;
+    nixDB.queryStrings(noTxn, dbReferences, storePath, references2);
+    references.insert(references2.begin(), references2.end());
 }
 
 
@@ -355,18 +300,6 @@ Substitutes querySubstitutes(const Path & srcPath)
 }
 
 
-static void unregisterPredecessors(const Path & path, Transaction & txn)
-{
-    /* Remove any successor mappings to this path (but not *from*
-       it). */
-    Paths revs;
-    nixDB.queryStrings(txn, dbSuccessorsRev, path, revs);
-    for (Paths::iterator i = revs.begin(); i != revs.end(); ++i)
-        nixDB.delPair(txn, dbSuccessors, *i);
-    nixDB.delPair(txn, dbSuccessorsRev, path);
-}
- 
-
 void clearSubstitutes()
 {
     Transaction txn(nixDB);
@@ -375,16 +308,6 @@ void clearSubstitutes()
     Paths subKeys;
     nixDB.enumTable(txn, dbSubstitutes, subKeys);
     for (Paths::iterator i = subKeys.begin(); i != subKeys.end(); ++i) {
-
-        /* If this path has not become valid in the mean-while, delete
-           any successor mappings *to* it.  This is to preserve the
-           invariant the all successors are `usable' as opposed to
-           `valid' (i.e., the successor must be valid *or* have at
-           least one substitute). */
-        if (!isValidPath(*i)) {
-            unregisterPredecessors(*i, txn);
-        }
-        
         /* Delete all substitutes for path *i. */
         nixDB.delPair(txn, dbSubstitutes, *i);
     }
@@ -407,7 +330,6 @@ static void invalidatePath(const Path & path, Transaction & txn)
     debug(format("unregistering path `%1%'") % path);
 
     nixDB.delPair(txn, dbValidPaths, path);
-    unregisterPredecessors(path, txn);
 }
 
 
@@ -560,35 +482,6 @@ void verifyStore()
 	    usablePaths.insert(*i);
         else
             nixDB.delPair(txn, dbSubstitutes, *i);
-    }
-
-    /* Check that the values of the successor mappings are usable
-       paths. */ 
-    Paths sucKeys;
-    nixDB.enumTable(txn, dbSuccessors, sucKeys);
-    for (Paths::iterator i = sucKeys.begin(); i != sucKeys.end(); ++i) {
-        /* Note that *i itself does not have to be valid, just its
-           successor. */
-        Path sucPath;
-        if (nixDB.queryString(txn, dbSuccessors, *i, sucPath) &&
-            usablePaths.find(sucPath) == usablePaths.end())
-        {
-            printMsg(lvlError,
-                format("found successor mapping to non-existent path `%1%'") % sucPath);
-            nixDB.delPair(txn, dbSuccessors, *i);
-        }
-    }
-
-    /* Check that the keys of the reverse successor mappings are valid
-       paths. */ 
-    Paths rsucKeys;
-    nixDB.enumTable(txn, dbSuccessorsRev, rsucKeys);
-    for (Paths::iterator i = rsucKeys.begin(); i != rsucKeys.end(); ++i) {
-        if (usablePaths.find(*i) == usablePaths.end()) {
-            printMsg(lvlError,
-                format("found reverse successor mapping for non-existent path `%1%'") % *i);
-            nixDB.delPair(txn, dbSuccessorsRev, *i);
-        }
     }
 
     txn.commit();

@@ -14,11 +14,13 @@ struct ClosureElem
 
 typedef map<Path, ClosureElem> ClosureElems;
 
+/*
 struct Closure
 {
     PathSet roots;
     ClosureElems elems;
 };
+*/
 
 
 struct DerivationOutput
@@ -43,18 +45,12 @@ typedef map<string, string> StringPairs;
 struct Derivation
 {
     DerivationOutputs outputs; /* keyed on symbolic IDs */
-    PathSet inputs; /* store expressions, not actual inputs */
+    PathSet inputDrvs; /* inputs that are sub-derivations */
+    PathSet inputSrcs; /* inputs that are sources */
     string platform;
     Path builder;
     Strings args;
     StringPairs env;
-};
-
-struct StoreExpr
-{
-    enum { neClosure, neDerivation } type;
-    Closure closure;
-    Derivation derivation;
 };
 
 
@@ -65,10 +61,10 @@ Hash hashTerm(ATerm t);
 Path writeTerm(ATerm t, const string & suffix);
 
 /* Parse a store expression. */
-StoreExpr parseStoreExpr(ATerm t);
+Derivation parseDerivation(ATerm t);
 
 /* Parse a store expression. */
-ATerm unparseStoreExpr(const StoreExpr & ne);
+ATerm unparseDerivation(const Derivation & drv);
 
 
 #endif /* !__STOREEXPR_H */

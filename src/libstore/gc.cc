@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 
+#if 0
 void followLivePaths(Path nePath, PathSet & live)
 {
     /* Just to be sure, canonicalise the path.  It is important to do
@@ -96,3 +97,4 @@ PathSet findDeadPaths(const PathSet & live, time_t minAge)
     
     return dead;
 }
+#endif

@@ -62,7 +62,7 @@ protected:
     bool done;
 
     
-    Goal(Worker & _worker) : worker(_worker)
+    Goal(Worker & worker) : worker(worker)
     {
         done = false;
         nrFailed = 0;
@@ -130,10 +130,9 @@ private:
        (namely build hooks) count as occupied build slots. */
     unsigned int nrChildren;
 
-    /* Maps used to prevent multiple instantiation of a goal for the
+    /* Maps used to prevent multiple instantiations of a goal for the
        same expression / path. */
-    WeakGoalMap normalisationGoals;
-    WeakGoalMap realisationGoals;
+    WeakGoalMap derivationGoals;
     WeakGoalMap substitutionGoals;
 
 public:
@@ -142,8 +141,7 @@ public:
     ~Worker();
 
     /* Make a goal (with caching). */
-    GoalPtr makeNormalisationGoal(const Path & nePath);
-    GoalPtr makeRealisationGoal(const Path & nePath);
+    GoalPtr makeDerivationGoal(const Path & drvPath);
     GoalPtr makeSubstitutionGoal(const Path & storePath);
 
     /* Remove a dead goal. */
@@ -287,19 +285,6 @@ const char * * strings2CharPtrs(const Strings & ss)
 }
 
 
-/* Should only be called after an expression has been normalised. */
-Path queryNormalForm(const Path & nePath)
-{
-    Path nfPath;
-    if (querySuccessor(nePath, nfPath)) return nfPath;
-    /* If there is no successor, than nePath must be a normal form
-       itself. */
-    StoreExpr ne = storeExprFromPath(nePath);
-    if (ne.type != StoreExpr::neClosure) abort();
-    return nePath;
-}
-
-
 /* "Fix", or canonicalise, the meta-data of the files in a store path
    after it has been built.  In particular:
    - the last modification date on each file is set to 0 (i.e.,
@@ -358,31 +343,26 @@ void canonicalisePathMetaData(const Path & path)
 //////////////////////////////////////////////////////////////////////
 
 
-class NormalisationGoal : public Goal
+class DerivationGoal : public Goal
 {
 private:
     /* The path of the derivation store expression. */
-    Path nePath;
+    Path drvPath;
 
-    /* The store expression stored at nePath. */
-    StoreExpr expr;
+    /* The derivation store expression stored at drvPath. */
+    Derivation drv;
     
     /* The remainder is state held during the build. */
 
     /* Locks on the output paths. */
     PathLocks outputLocks;
 
-    /* Input paths, with their closure elements. */
-    ClosureElems inClosures; 
+    /* All input paths (that is, the union of FS closures of the
+       immediate input paths). */
+    PathSet inputPaths; 
 
     /* Referenceable paths (i.e., input and output paths). */
     PathSet allPaths;
-
-    /* The normal forms of the input store expressions. */
-    PathSet inputNFs;
-
-    /* The successor mappings for the input store expressions. */
-    map<Path, Path> inputSucs;
 
     /* The process ID of the builder. */
     Pid pid;
@@ -400,12 +380,12 @@ private:
     Pipe toHook;
     Pipe fromHook;
 
-    typedef void (NormalisationGoal::*GoalState)();
+    typedef void (DerivationGoal::*GoalState)();
     GoalState state;
     
 public:
-    NormalisationGoal(const Path & _nePath, Worker & _worker);
-    ~NormalisationGoal();
+    DerivationGoal(const Path & drvPath, Worker & worker);
+    ~DerivationGoal();
 
     void work();
 
@@ -413,7 +393,7 @@ private:
     /* The states. */
     void init();
     void haveStoreExpr();
-    void inputRealised();
+    void inputsRealised();
     void tryToBuild();
     void buildDone();
 
@@ -437,7 +417,7 @@ private:
     /* Must be called after the output paths have become valid (either
        due to a successful build or hook, or because they already
        were). */
-    void createClosure();
+    void computeClosure();
 
     /* Open a log file and a pipe to it. */
     void openLogFile();
@@ -452,19 +432,22 @@ private:
     /* Callback used by the worker to write to the log. */
     void writeLog(int fd, const unsigned char * buf, size_t count);
 
+    /* Return true iff all output paths are valid. */
+    bool allOutputsValid();
+
     string name();
 };
 
 
-NormalisationGoal::NormalisationGoal(const Path & _nePath, Worker & _worker)
-    : Goal(_worker)
+DerivationGoal::DerivationGoal(const Path & drvPath, Worker & worker)
+    : Goal(worker)
 {
-    nePath = _nePath;
-    state = &NormalisationGoal::init;
+    this->drvPath = drvPath;
+    state = &DerivationGoal::init;
 }
 
 
-NormalisationGoal::~NormalisationGoal()
+DerivationGoal::~DerivationGoal()
 {
     if (pid != -1) worker.childTerminated(pid);
     
@@ -478,75 +461,70 @@ NormalisationGoal::~NormalisationGoal()
 }
 
 
-void NormalisationGoal::work()
+void DerivationGoal::work()
 {
     (this->*state)();
 }
 
 
-void NormalisationGoal::init()
+void DerivationGoal::init()
 {
     trace("init");
-
-    /* If we already have a successor, then we are done already; don't
-       add the expression as a goal. */
-    Path nfPath;
-    if (querySuccessor(nePath, nfPath)) {
-        amDone();
-        return;
-    }
 
     /* The first thing to do is to make sure that the store expression
        exists.  If it doesn't, it may be created through a
        substitute. */
-    addWaitee(worker.makeSubstitutionGoal(nePath));
+    addWaitee(worker.makeSubstitutionGoal(drvPath));
 
-    state = &NormalisationGoal::haveStoreExpr;
+    state = &DerivationGoal::haveStoreExpr;
 }
 
 
-void NormalisationGoal::haveStoreExpr()
+void DerivationGoal::haveStoreExpr()
 {
-    trace("loading store expression");
+    trace("loading derivation");
 
     if (nrFailed != 0) {
         printMsg(lvlError,
-            format("cannot normalise missing store expression `%1%'")
-            % nePath);
+            format("cannot build missing derivation `%1%'")
+            % drvPath);
         amDone(false);
         return;
     }
 
-    assert(isValidPath(nePath));
+    assert(isValidPath(drvPath));
 
-    /* Get the store expression. */
-    expr = storeExprFromPath(nePath);
+    /* Get the derivation. */
+    drv = derivationFromPath(drvPath);
 
-    /* If this is a normal form (i.e., a closure) we are also done. */
-    if (expr.type == StoreExpr::neClosure) {
-        amDone();
+    /* If all the outputs already exist, then we're done. */
+    if (allOutputsValid()) {
+        amDone(true);
         return;
     }
-    assert(expr.type == StoreExpr::neDerivation);
 
-    /* Inputs must be realised before we can build this goal. */
-    for (PathSet::iterator i = expr.derivation.inputs.begin();
-         i != expr.derivation.inputs.end(); ++i)
-        addWaitee(worker.makeRealisationGoal(*i));
+    /* Inputs must be built before we can build this goal. */
+    for (PathSet::iterator i = drv.inputDrvs.begin();
+         i != drv.inputDrvs.end(); ++i)
+        addWaitee(worker.makeDerivationGoal(*i));
 
-    state = &NormalisationGoal::inputRealised;
+    for (PathSet::iterator i = drv.inputSrcs.begin();
+         i != drv.inputSrcs.end(); ++i)
+        addWaitee(worker.makeSubstitutionGoal(*i));
+
+    state = &DerivationGoal::inputsRealised;
 }
 
 
-void NormalisationGoal::inputRealised()
+void DerivationGoal::inputsRealised()
 {
     trace("all inputs realised");
 
     if (nrFailed != 0) {
         printMsg(lvlError,
-            format("cannot normalise derivation `%1%': "
-                "%2% closure element(s) could not be realised")
-            % nePath % nrFailed);
+            format("cannot build derivation `%1%': "
+                "%2% inputs could not be realised")
+            % drvPath % nrFailed);
         amDone(false);
         return;
     }
@@ -554,12 +532,12 @@ void NormalisationGoal::inputRealised()
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
        build hook. */
-    state = &NormalisationGoal::tryToBuild;
+    state = &DerivationGoal::tryToBuild;
     worker.wakeUp(shared_from_this());
 }
 
 
-void NormalisationGoal::tryToBuild()
+void DerivationGoal::tryToBuild()
 {
     trace("trying to build");
 
@@ -570,7 +548,7 @@ void NormalisationGoal::tryToBuild()
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
-                state = &NormalisationGoal::buildDone;
+                state = &DerivationGoal::buildDone;
                 return;
             case rpPostpone:
                 /* Not now; wait until at least one child finishes. */
@@ -580,7 +558,7 @@ void NormalisationGoal::tryToBuild()
                 /* We should do it ourselves. */
                 break;
             case rpDone:
-                /* Somebody else did it (there is a successor now). */
+                /* Somebody else did it. */
                 amDone();
                 return;
         }
@@ -591,8 +569,8 @@ void NormalisationGoal::tryToBuild()
             return;
         }
 
-        /* Acquire locks and such.  If we then see that there now is a
-           successor, we're done. */
+        /* Acquire locks and such.  If we then see that the build has
+           been done by somebody else, we're done. */
         if (!prepareBuild()) {
             amDone();
             return;
@@ -609,11 +587,11 @@ void NormalisationGoal::tryToBuild()
 
     /* This state will be reached when we get EOF on the child's
        log pipe. */
-    state = &NormalisationGoal::buildDone;
+    state = &DerivationGoal::buildDone;
 }
 
 
-void NormalisationGoal::buildDone()
+void DerivationGoal::buildDone()
 {
     trace("build done");
 
@@ -634,23 +612,23 @@ void NormalisationGoal::buildDone()
     /* Close the log file. */
     fdLogFile.close();
 
-    debug(format("builder process for `%1%' finished") % nePath);
+    debug(format("builder process for `%1%' finished") % drvPath);
 
     /* Check the exit status. */
     if (!statusOk(status)) {
         deleteTmpDir(false);
         printMsg(lvlError, format("builder for `%1%' %2%")
-            % nePath % statusToString(status));
+            % drvPath % statusToString(status));
         amDone(false);
         return;
     }
     
     deleteTmpDir(true);
 
-    /* Compute a closure store expression, and register it as our
-       successor. */
+    /* Compute the FS closure of the outputs and register them as
+       being valid. */
     try {
-        createClosure();
+        computeClosure();
     } catch (BuildError & e) {
         printMsg(lvlError, e.msg());
         amDone(false);
@@ -725,7 +703,7 @@ string showPaths(const PathSet & paths)
 }
 
 
-NormalisationGoal::HookReply NormalisationGoal::tryBuildHook()
+DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 {
     Path buildHook = getEnv("NIX_BUILD_HOOK");
     if (buildHook == "") return rpDecline;
@@ -757,8 +735,8 @@ NormalisationGoal::HookReply NormalisationGoal::tryBuildHook()
             execl(buildHook.c_str(), buildHook.c_str(),
                 (worker.canBuildMore() ? (string) "1" : "0").c_str(),
                 thisSystem.c_str(),
-                expr.derivation.platform.c_str(),
-                nePath.c_str(), 0);
+                drv.platform.c_str(),
+                drvPath.c_str(), 0);
             
             throw SysError(format("executing `%1%'") % buildHook);
             
@@ -799,8 +777,8 @@ NormalisationGoal::HookReply NormalisationGoal::tryBuildHook()
 
     else if (reply == "accept") {
 
-        /* Acquire locks and such.  If we then see that there now is a
-           successor, we're done. */
+        /* Acquire locks and such.  If we then see that the output
+           paths are now valid, we're done. */
         if (!prepareBuild()) {
             /* Tell the hook to exit. */
             writeLine(toHook.writeSide, "cancel");
@@ -808,39 +786,28 @@ NormalisationGoal::HookReply NormalisationGoal::tryBuildHook()
             return rpDone;
         }
 
-        printMsg(lvlInfo, format("running hook to build path `%1%'")
-            % showPaths(outputPaths(expr.derivation.outputs)));
+        printMsg(lvlInfo, format("running hook to build path(s) %1%")
+            % showPaths(outputPaths(drv.outputs)));
         
         /* Write the information that the hook needs to perform the
            build, i.e., the set of input paths (including closure
-           expressions), the set of output paths, and the successor
-           mappings for the input expressions. */
+           expressions), the set of output paths, and [!!!]. */
         
         Path inputListFN = tmpDir + "/inputs";
         Path outputListFN = tmpDir + "/outputs";
-        Path successorsListFN = tmpDir + "/successors";
 
         string s;
-        for (ClosureElems::iterator i = inClosures.begin();
-             i != inClosures.end(); ++i)
-            s += i->first + "\n";
-        for (PathSet::iterator i = inputNFs.begin();
-             i != inputNFs.end(); ++i)
+        for (PathSet::iterator i = inputPaths.begin();
+             i != inputPaths.end(); ++i)
             s += *i + "\n";
         writeStringToFile(inputListFN, s);
         
         s = "";
-        for (DerivationOutputs::iterator i = expr.derivation.outputs.begin();
-             i != expr.derivation.outputs.end(); ++i)
+        for (DerivationOutputs::iterator i = drv.outputs.begin();
+             i != drv.outputs.end(); ++i)
             s += i->second.path + "\n";
         writeStringToFile(outputListFN, s);
         
-        s = "";
-        for (map<Path, Path>::iterator i = inputSucs.begin();
-             i != inputSucs.end(); ++i)
-            s += i->first + " " + i->second + "\n";
-        writeStringToFile(successorsListFN, s);
-
         /* Tell the hook to proceed. */ 
         writeLine(toHook.writeSide, "okay");
 
@@ -851,7 +818,7 @@ NormalisationGoal::HookReply NormalisationGoal::tryBuildHook()
 }
 
 
-void NormalisationGoal::terminateBuildHook()
+void DerivationGoal::terminateBuildHook()
 {
     /* !!! drain stdout of hook */
     debug("terminating build hook");
@@ -866,25 +833,23 @@ void NormalisationGoal::terminateBuildHook()
 }
 
 
-bool NormalisationGoal::prepareBuild()
+bool DerivationGoal::prepareBuild()
 {
     /* Obtain locks on all output paths.  The locks are automatically
        released when we exit this function or Nix crashes. */
     /* !!! BUG: this could block, which is not allowed. */
-    outputLocks.lockPaths(outputPaths(expr.derivation.outputs));
+    outputLocks.lockPaths(outputPaths(drv.outputs));
 
-    /* Now check again whether there is a successor.  This is because
+    /* Now check again whether the outputs are valid.  This is because
        another process may have started building in parallel.  After
        it has finished and released the locks, we can (and should)
-       reuse its results.  (Strictly speaking the first successor
-       check can be omitted, but that would be less efficient.)  Note
-       that since we now hold the locks on the output paths, no other
-       process can build this expression, so no further checks are
-       necessary. */
-    Path nfPath;
-    if (querySuccessor(nePath, nfPath)) {
-        debug(format("skipping build of expression `%1%', someone beat us to it")
-            % nePath);
+       reuse its results.  (Strictly speaking the first check can be
+       omitted, but that would be less efficient.)  Note that since we
+       now hold the locks on the output paths, no other process can
+       build this expression, so no further checks are necessary. */
+    if (allOutputsValid()) {
+        debug(format("skipping build of derivation `%1%', someone beat us to it")
+            % drvPath);
         outputLocks.setDeletion(true);
         return false;
     }
@@ -893,39 +858,45 @@ bool NormalisationGoal::prepareBuild()
        running the build hook. */
     
     /* The outputs are referenceable paths. */
-    for (DerivationOutputs::iterator i = expr.derivation.outputs.begin();
-         i != expr.derivation.outputs.end(); ++i)
+    for (DerivationOutputs::iterator i = drv.outputs.begin();
+         i != drv.outputs.end(); ++i)
     {
         debug(format("building path `%1%'") % i->second.path);
         allPaths.insert(i->second.path);
     }
-    
-    /* Get information about the inputs (these all exist now). */
-    for (PathSet::iterator i = expr.derivation.inputs.begin();
-         i != expr.derivation.inputs.end(); ++i)
+
+    /* Determine the full set of input paths. */
+
+    /* First, the input derivations. */
+    for (PathSet::iterator i = drv.inputDrvs.begin();
+         i != drv.inputDrvs.end(); ++i)
     {
-        checkInterrupt();
-        Path nePath = *i;
-        Path nfPath = queryNormalForm(nePath);
-        inputNFs.insert(nfPath);
-        if (nfPath != nePath) inputSucs[nePath] = nfPath;
-        /* !!! nfPath should be a root of the garbage collector while
-           we are building */
-        StoreExpr ne = storeExprFromPath(nfPath);
-        if (ne.type != StoreExpr::neClosure) abort();
-        for (ClosureElems::iterator j = ne.closure.elems.begin();
-             j != ne.closure.elems.end(); ++j)
-	{
-            inClosures[j->first] = j->second;
-	    allPaths.insert(j->first);
-	}
+        /* Add all the output closures of the input derivation `*i' as
+           input paths.  !!!  there should be a way to indicate
+           specific outputs. */
+        /* !!! is `*i' present? */
+        assert(isValidPath(*i));
+        Derivation inDrv = derivationFromPath(*i);
+        for (DerivationOutputs::iterator j = inDrv.outputs.begin();
+             j != inDrv.outputs.end(); ++j)
+            computeFSClosure(j->second.path, inputPaths);
     }
+
+    for (PathSet::iterator i = inputPaths.begin(); i != inputPaths.end(); ++i)
+        debug(format("INPUT %1%") % *i);
+
+    allPaths.insert(inputPaths.begin(), inputPaths.end());
+
+    /* Second, the input sources. */
+    for (PathSet::iterator i = drv.inputSrcs.begin();
+         i != drv.inputSrcs.end(); ++i)
+        computeFSClosure(*i, inputPaths);
 
     /* We can skip running the builder if all output paths are already
        valid. */
     bool fastBuild = true;
-    for (DerivationOutputs::iterator i = expr.derivation.outputs.begin();
-         i != expr.derivation.outputs.end(); ++i)
+    for (DerivationOutputs::iterator i = drv.outputs.begin();
+         i != drv.outputs.end(); ++i)
         if (!isValidPath(i->second.path)) { 
             fastBuild = false;
             break;
@@ -933,7 +904,7 @@ bool NormalisationGoal::prepareBuild()
 
     if (fastBuild) {
         printMsg(lvlChatty, format("skipping build; output paths already exist"));
-        createClosure();
+        computeClosure();
         return false;
     }
 
@@ -941,21 +912,21 @@ bool NormalisationGoal::prepareBuild()
 }
 
 
-void NormalisationGoal::startBuilder()
+void DerivationGoal::startBuilder()
 {
     startNest(nest, lvlInfo,
-        format("building path `%1%'") % showPaths(outputPaths(expr.derivation.outputs)))
+        format("building path(s) `%1%'") % showPaths(outputPaths(drv.outputs)))
     
     /* Right platform? */
-    if (expr.derivation.platform != thisSystem)
+    if (drv.platform != thisSystem)
         throw BuildError(
             format("a `%1%' is required to build `%3%', but I am a `%2%'")
-            % expr.derivation.platform % thisSystem % nePath);
+            % drv.platform % thisSystem % drvPath);
 
     /* If any of the outputs already exist but are not registered,
        delete them. */
-    for (DerivationOutputs::iterator i = expr.derivation.outputs.begin(); 
-         i != expr.derivation.outputs.end(); ++i)
+    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
+         i != drv.outputs.end(); ++i)
     {
         Path path = i->second.path;
         if (isValidPath(path))
@@ -990,8 +961,8 @@ void NormalisationGoal::startBuilder()
     env["NIX_STORE"] = nixStore;
 
     /* Add all bindings specified in the derivation expression. */
-    for (StringPairs::iterator i = expr.derivation.env.begin();
-         i != expr.derivation.env.end(); ++i)
+    for (StringPairs::iterator i = drv.env.begin();
+         i != drv.env.end(); ++i)
         env[i->first] = i->second;
 
     /* Create a temporary directory where the build will take
@@ -1007,7 +978,7 @@ void NormalisationGoal::startBuilder()
 
     /* Run the builder. */
     printMsg(lvlChatty, format("executing builder `%1%'") %
-        expr.derivation.builder);
+        drv.builder);
 
     /* Create the log file and pipe. */
     openLogFile();
@@ -1032,8 +1003,8 @@ void NormalisationGoal::startBuilder()
             initChild();
 
             /* Fill in the arguments. */
-            Strings args(expr.derivation.args);
-            args.push_front(baseNameOf(expr.derivation.builder));
+            Strings args(drv.args);
+            args.push_front(baseNameOf(drv.builder));
             const char * * argArr = strings2CharPtrs(args);
 
             /* Fill in the environment. */
@@ -1044,11 +1015,11 @@ void NormalisationGoal::startBuilder()
             const char * * envArr = strings2CharPtrs(envStrs);
 
             /* Execute the program.  This should not return. */
-            execve(expr.derivation.builder.c_str(),
+            execve(drv.builder.c_str(),
                 (char * *) argArr, (char * *) envArr);
 
             throw SysError(format("executing `%1%'")
-                % expr.derivation.builder);
+                % drv.builder);
             
         } catch (exception & e) {
             cerr << format("build error: %1%\n") % e.what();
@@ -1064,29 +1035,25 @@ void NormalisationGoal::startBuilder()
 }
 
 
-void NormalisationGoal::createClosure()
+void DerivationGoal::computeClosure()
 {
-    /* The resulting closure expression. */
-    StoreExpr nf;
-    nf.type = StoreExpr::neClosure;
-    
     startNest(nest, lvlTalkative,
-        format("computing closure for `%1%'") % nePath);
+        format("determining closure for `%1%'") % drvPath);
+
+    map<Path, PathSet> allReferences;
     
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
        output paths read-only. */
-    PathSet usedPaths;
-    for (DerivationOutputs::iterator i = expr.derivation.outputs.begin(); 
-         i != expr.derivation.outputs.end(); ++i)
+    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
+         i != drv.outputs.end(); ++i)
     {
         Path path = i->second.path;
         if (!pathExists(path)) {
             throw BuildError(
                 format("builder for `%1%' failed to produce output path `%2%'")
-                % nePath % path);
+                % drvPath % path);
         }
-        nf.closure.roots.insert(path);
 
         /* Check that fixed-output derivations produced the right
            outputs (i.e., the content hash should match the specified
@@ -1117,101 +1084,67 @@ void NormalisationGoal::createClosure()
 
 	/* For this output path, find the references to other paths contained
 	   in it. */
-        startNest(nest2, lvlChatty,
-            format("scanning for store references in `%1%'") % path);
-        Strings refPaths;
+        PathSet references;
         if (!pathExists(path + "/nix-support/no-scan")) {
-            refPaths = filterReferences(path, 
-                Strings(allPaths.begin(), allPaths.end()));
-        }
-        nest2.close();
+            startNest(nest2, lvlChatty,
+                format("scanning for store references in `%1%'") % path);
+            Paths references2;
+            references2 = filterReferences(path, 
+                Paths(allPaths.begin(), allPaths.end()));
+            references = PathSet(references2.begin(), references2.end());
 
-	/* Construct a closure element for this output path. */
-        ClosureElem elem;
-
-	/* For each path referenced by this output path, add its id to the
-	   closure element and add the id to the `usedPaths' set (so that the
-	   elements referenced by *its* closure are added below). */
-        PathSet outputPaths = ::outputPaths(expr.derivation.outputs);
-        for (Paths::iterator j = refPaths.begin();
-	     j != refPaths.end(); ++j)
-	{
-            checkInterrupt();
-	    Path path = *j;
-	    elem.refs.insert(path);
-            if (inClosures.find(path) != inClosures.end())
-                usedPaths.insert(path);
-	    else if (outputPaths.find(path) == outputPaths.end())
-		abort();
+            /* For debugging, print out the referenced and
+               unreferenced paths. */
+            for (PathSet::iterator i = inputPaths.begin();
+                 i != inputPaths.end(); ++i)
+            {
+                PathSet::iterator j = references.find(*i);
+                if (j == references.end())
+                    debug(format("unreferenced input: `%1%'") % *i);
+                else
+                    debug(format("referenced input: `%1%'") % *i);
+            }
+            
+            nest2.close();
         }
 
-        nf.closure.elems[path] = elem;
+        allReferences[path] = references;
     }
 
-    /* Close the closure.  That is, for any referenced path, add the paths
-       referenced by it. */
-    PathSet donePaths;
+    /* Register each output path as valid, and register the sets of
+       paths referenced by each of them.  This is wrapped in one
+       database transaction to ensure that if we crash, either
+       everything is registered or nothing is.  This is for
+       recoverability: unregistered paths in the store can be deleted
+       arbitrarily, while registered paths can only be deleted by
+       running the garbage collector.
 
-    while (!usedPaths.empty()) {
-        checkInterrupt();
-	PathSet::iterator i = usedPaths.begin();
-	Path path = *i;
-	usedPaths.erase(i);
-
-	if (donePaths.find(path) != donePaths.end()) continue;
-	donePaths.insert(path);
-
-	ClosureElems::iterator j = inClosures.find(path);
-	if (j == inClosures.end()) abort();
-
-	nf.closure.elems[path] = j->second;
-
-	for (PathSet::iterator k = j->second.refs.begin();
-	     k != j->second.refs.end(); k++)
-	    usedPaths.insert(*k);
-    }
-
-    /* For debugging, print out the referenced and unreferenced paths. */
-    for (ClosureElems::iterator i = inClosures.begin();
-         i != inClosures.end(); ++i)
-    {
-        PathSet::iterator j = donePaths.find(i->first);
-        if (j == donePaths.end())
-            debug(format("unreferenced input: `%1%'") % i->first);
-        else
-            debug(format("referenced input: `%1%'") % i->first);
-    }
-
-    /* Write the normal form.  This does not have to occur in the
-       transaction below because writing terms is idem-potent. */
-    ATerm nfTerm = unparseStoreExpr(nf);
-    Path nfPath = writeTerm(nfTerm, "s");
-
-    /* Register each output path, and register the normal form.  This
-       is wrapped in one database transaction to ensure that if we
-       crash, either everything is registered or nothing is.  This is
-       for recoverability: unregistered paths in the store can be
-       deleted arbitrarily, while registered paths can only be deleted
-       by running the garbage collector. */
+       The reason that we do the transaction here and not on the fly
+       while we are scanning (above) is so that we don't hold database
+       locks for too long. */
     Transaction txn;
     createStoreTransaction(txn);
-    for (DerivationOutputs::iterator i = expr.derivation.outputs.begin(); 
-         i != expr.derivation.outputs.end(); ++i)
+    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
+         i != drv.outputs.end(); ++i)
+    {
         registerValidPath(txn, i->second.path);
-    registerSuccessor(txn, nePath, nfPath);
+        setReferences(txn, i->second.path,
+            allReferences[i->second.path]);
+    }
     txn.commit();
 
     /* It is now safe to delete the lock files, since all future
-       lockers will see the successor; they will not create new lock
-       files with the same names as the old (unlinked) lock files. */
+       lockers will see that the output paths are valid; they will not
+       create new lock files with the same names as the old (unlinked)
+       lock files. */
     outputLocks.setDeletion(true);
 }
 
 
-void NormalisationGoal::openLogFile()
+void DerivationGoal::openLogFile()
 {
     /* Create a log file. */
-    Path logFileName = nixLogDir + "/" + baseNameOf(nePath);
+    Path logFileName = nixLogDir + "/" + baseNameOf(drvPath);
     fdLogFile = open(logFileName.c_str(),
         O_CREAT | O_WRONLY | O_TRUNC, 0666);
     if (fdLogFile == -1)
@@ -1222,7 +1155,7 @@ void NormalisationGoal::openLogFile()
 }
 
 
-void NormalisationGoal::initChild()
+void DerivationGoal::initChild()
 {
     commonChildInit(logPipe);
     
@@ -1251,13 +1184,13 @@ void NormalisationGoal::initChild()
 }
 
 
-void NormalisationGoal::deleteTmpDir(bool force)
+void DerivationGoal::deleteTmpDir(bool force)
 {
     if (tmpDir != "") {
         if (keepFailed && !force)
 	    printMsg(lvlError, 
 		format("builder for `%1%' failed; keeping build directory `%2%'")
-                % nePath % tmpDir);
+                % drvPath % tmpDir);
         else
             deletePath(tmpDir);
         tmpDir = "";
@@ -1265,7 +1198,7 @@ void NormalisationGoal::deleteTmpDir(bool force)
 }
 
 
-void NormalisationGoal::writeLog(int fd,
+void DerivationGoal::writeLog(int fd,
     const unsigned char * buf, size_t count)
 {
     assert(fd == logPipe.readSide);
@@ -1273,179 +1206,27 @@ void NormalisationGoal::writeLog(int fd,
 }
 
 
-string NormalisationGoal::name()
+bool DerivationGoal::allOutputsValid()
 {
-    return (format("normalisation of `%1%'") % nePath).str();
-}
+    unsigned int nrValid = 0;
+    for (DerivationOutputs::iterator i = drv.outputs.begin();
+         i != drv.outputs.end(); ++i)
+        if (isValidPath(i->second.path)) nrValid++;
 
-
-
-//////////////////////////////////////////////////////////////////////
-
-
-class RealisationGoal : public Goal
-{
-private:
-    /* The path of the store expression. */
-    Path nePath;
-
-    /* The normal form. */
-    Path nfPath;
-
-    /* Whether we should try to delete a broken successor mapping. */
-    bool tryFallback;
-
-    /* The store expression stored at nePath. */
-    StoreExpr expr;
-    
-    typedef void (RealisationGoal::*GoalState)();
-    GoalState state;
-    
-public:
-    RealisationGoal(const Path & _nePath, Worker & _worker);
-    ~RealisationGoal();
-
-    void work();
-    
-    /* The states. */
-    void init();
-    void isNormalised();
-    void haveStoreExpr();
-    void elemFinished();
-
-    void fallBack(const format & error);
-    
-    string name();
-};
-
-
-RealisationGoal::RealisationGoal(const Path & _nePath, Worker & _worker)
-    : Goal(_worker)
-{
-    nePath = _nePath;
-    tryFallback = ::tryFallback;
-    state = &RealisationGoal::init;
-}
-
-
-RealisationGoal::~RealisationGoal()
-{
-}
-
-
-void RealisationGoal::work()
-{
-    (this->*state)();
-}
-
-
-void RealisationGoal::init()
-{
-    trace("init");
-
-    if (querySuccessor(nePath, nfPath)) {
-        nrFailed = 0;
-        isNormalised();
-        return;
+    if (nrValid != 0) {
+        if (nrValid == drv.outputs.size()) return true;
+        throw Error(
+            format("derivation `%1%' is blocked by its output paths")
+            % drvPath);
     }
 
-    /* First normalise the expression (which is a no-op if the
-       expression is already a closure). */
-    addWaitee(worker.makeNormalisationGoal(nePath));
-
-    /* Since there is no successor right now, the normalisation goal
-       will perform an actual build.  So there is no sense in trying a
-       fallback if the realisation of the closure fails (it can't
-       really fail). */
-    tryFallback = false;
-
-    state = &RealisationGoal::isNormalised;
+    return false;
 }
 
 
-void RealisationGoal::isNormalised()
+string DerivationGoal::name()
 {
-    trace("has been normalised");
-
-    if (nrFailed != 0) {
-        amDone(false);
-        return;
-    }
-
-    nfPath = queryNormalForm(nePath);
-
-    /* Now make sure that the store expression exists.  If it doesn't,
-       it may be created through a substitute. */
-    addWaitee(worker.makeSubstitutionGoal(nfPath));
-
-    state = &RealisationGoal::haveStoreExpr;
-}
-
-
-void RealisationGoal::haveStoreExpr()
-{
-    trace("loading store expression");
-
-    if (nrFailed != 0) {
-        fallBack(format("cannot realise closure `%1%' since that file is missing") % nfPath);
-        return;
-    }
-
-    assert(isValidPath(nfPath));
-
-    /* Get the store expression. */
-    expr = storeExprFromPath(nfPath);
-
-    /* If this is a normal form (i.e., a closure) we are also done. */
-    if (expr.type != StoreExpr::neClosure)
-        throw Error(format("expected closure in `%1%'") % nfPath);
-
-    /* Each path in the closure should exist, or should be creatable
-       through a substitute. */
-    for (ClosureElems::const_iterator i = expr.closure.elems.begin();
-         i != expr.closure.elems.end(); ++i)
-        addWaitee(worker.makeSubstitutionGoal(i->first));
-    
-    state = &RealisationGoal::elemFinished;
-}
-
-
-void RealisationGoal::elemFinished()
-{
-    trace("all closure elements present");
-
-    if (nrFailed != 0) {
-        fallBack(
-            format("cannot realise closure `%1%': "
-                "%2% closure element(s) are not present "
-                "and could not be substituted")
-            % nfPath % nrFailed);
-        return;
-    }
-
-    amDone();
-}
-
-
-void RealisationGoal::fallBack(const format & error)
-{
-    if (tryFallback && nePath != nfPath) {
-        printMsg(lvlError, format("%1%; trying to normalise derivation instead")
-            % error);
-        tryFallback = false;
-        unregisterSuccessor(nePath);
-        nrFailed = 0;
-        init();
-    } else {
-        printMsg(lvlError, format("%1%; maybe `--fallback' will help") % error);
-        amDone(false);
-    }
-}
-
-
-string RealisationGoal::name()
-{
-    return (format("realisation of `%1%'") % nePath).str();
+    return (format("building of `%1%'") % drvPath).str();
 }
 
 
@@ -1478,7 +1259,7 @@ private:
     GoalState state;
 
 public:
-    SubstitutionGoal(const Path & _nePath, Worker & _worker);
+    SubstitutionGoal(const Path & storePath, Worker & worker);
     ~SubstitutionGoal();
 
     void work();
@@ -1496,10 +1277,10 @@ public:
 };
 
 
-SubstitutionGoal::SubstitutionGoal(const Path & _storePath, Worker & _worker)
-    : Goal(_worker)
+SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker)
+    : Goal(worker)
 {
-    storePath = _storePath;
+    this->storePath = storePath;
     state = &SubstitutionGoal::init;
 }
 
@@ -1717,7 +1498,7 @@ private:
     bool success;
     
 public:
-    PseudoGoal(Worker & _worker) : Goal(_worker)
+    PseudoGoal(Worker & worker) : Goal(worker)
     {
         success = true;
     }
@@ -1786,15 +1567,9 @@ static GoalPtr addGoal(const Path & path,
 }
 
 
-GoalPtr Worker::makeNormalisationGoal(const Path & nePath)
+GoalPtr Worker::makeDerivationGoal(const Path & nePath)
 {
-    return addGoal<NormalisationGoal>(nePath, *this, normalisationGoals);
-}
-
-
-GoalPtr Worker::makeRealisationGoal(const Path & nePath)
-{
-    return addGoal<RealisationGoal>(nePath, *this, realisationGoals);
+    return addGoal<DerivationGoal>(nePath, *this, derivationGoals);
 }
 
 
@@ -1815,8 +1590,7 @@ static void removeGoal(GoalPtr goal, WeakGoalMap & goalMap)
 void Worker::removeGoal(GoalPtr goal)
 {
     topGoals.erase(goal);
-    ::removeGoal(goal, normalisationGoals);
-    ::removeGoal(goal, realisationGoals);
+    ::removeGoal(goal, derivationGoals);
     ::removeGoal(goal, substitutionGoals);
 }
 
@@ -1996,27 +1770,13 @@ void Worker::waitForInput()
 //////////////////////////////////////////////////////////////////////
 
 
-Path normaliseStoreExpr(const Path & nePath)
+void buildDerivation(const Path & drvPath)
 {
-    startNest(nest, lvlDebug, format("normalising `%1%'") % nePath);
+    startNest(nest, lvlDebug, format("building `%1%'") % drvPath);
 
     Worker worker;
-    if (!worker.run(worker.makeNormalisationGoal(nePath)))
-        throw Error(format("normalisation of store expression `%1%' failed") % nePath);
-
-    return queryNormalForm(nePath);
-}
-
-
-Path realiseStoreExpr(const Path & nePath)
-{
-    startNest(nest, lvlDebug, format("realising `%1%'") % nePath);
-
-    Worker worker;
-    if (!worker.run(worker.makeRealisationGoal(nePath)))
-        throw Error(format("realisation of store expression `%1%' failed") % nePath);
-
-    return queryNormalForm(nePath);
+    if (!worker.run(worker.makeDerivationGoal(drvPath)))
+        throw Error(format("build of derivation `%1%' failed") % drvPath);
 }
 
 

@@ -4,28 +4,31 @@
 #include "storeexpr.hh"
 
 
-/* Normalise a store expression.  That is, if the expression is a
-   derivation, a path containing an equivalent closure expression is
-   returned.  This requires that the derivation is performed, unless a
-   successor is known. */
-Path normaliseStoreExpr(const Path & nePath);
-
-/* Realise a store expression.  If the expression is a derivation, it
-   is first normalised into a closure.  The closure is then realised
-   in the file system (i.e., it is ensured that each path in the
-   closure exists in the file system, if necessary by using the
-   substitute mechanism).  Returns the normal form of the expression
-   (i.e., its closure expression). */
-Path realiseStoreExpr(const Path & nePath);
+/* Perform the specified derivation, if necessary.  That is, do
+   whatever is necessary to create the output paths of the
+   derivation.  If the output paths already exists, we're done.  If
+   they have substitutes, we can use those instead.  Otherwise, the
+   build action described by the derivation is performed, after
+   recursively building any sub-derivations. */
+void buildDerivation(const Path & drvPath);
 
 /* Ensure that a path exists, possibly by instantiating it by
    realising a substitute. */
-void ensurePath(const Path & path);
+void ensurePath(const Path & storePath);
 
-/* Read a store expression, after ensuring its existence through
-   ensurePath(). */
-StoreExpr storeExprFromPath(const Path & path);
+/* Read a derivation store expression, after ensuring its existence
+   through ensurePath(). */
+Derivation derivationFromPath(const Path & drvPath);
 
+
+/* Places in `paths' the set of all store paths in the file system
+   closure of `storePath'; that is, all paths than can be directly or
+   indirectly reached from it.  `paths' is not cleared. */
+void computeFSClosure(const Path & storePath,
+    PathSet & paths);
+
+
+#if 0
 /* Get the list of root (output) paths of the given store
    expression. */
 PathSet storeExprRoots(const Path & nePath);
@@ -39,6 +42,7 @@ PathSet storeExprRoots(const Path & nePath);
    successors. */
 PathSet storeExprRequisites(const Path & nePath,
     bool includeExprs, bool includeSuccessors);
+#endif
 
 
 #endif /* !__NORMALISE_H */

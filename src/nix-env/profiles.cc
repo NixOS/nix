@@ -18,7 +18,7 @@ static int parseName(const string & profileName, const string & name)
 {
     if (string(name, 0, profileName.size() + 1) != profileName + "-") return -1;
     string s = string(name, profileName.size() + 1);
-    int p = s.find("-link");
+    unsigned int p = s.find("-link");
     if (p == string::npos) return -1;
     int n;
     if (string2Int(string(s, 0, p), n) && n >= 0)
@@ -62,17 +62,15 @@ Generations findGenerations(Path profile, int & curGen)
 
 
 static void makeNames(const Path & profile, unsigned int num,
-    Path & generation, Path & gcrootDrv, Path & gcrootClr)
+    Path & generation, Path & gcrootDrv)
 {
     Path prefix = (format("%1%-%2%") % profile % num).str();
     generation = prefix + "-link";
     gcrootDrv = prefix + "-drv.gcroot";
-    gcrootClr = prefix + "-clr.gcroot";
 }
 
 
-Path createGeneration(Path profile, Path outPath,
-    Path drvPath, Path clrPath)
+Path createGeneration(Path profile, Path outPath, Path drvPath)
 {
     /* The new generation number should be higher than old the
        previous ones. */
@@ -81,10 +79,10 @@ Path createGeneration(Path profile, Path outPath,
     unsigned int num = gens.size() > 0 ? gens.front().number : 0;
         
     /* Create the new generation. */
-    Path generation, gcrootDrv, gcrootClr;
+    Path generation, gcrootDrv;
 
     while (1) {
-        makeNames(profile, num, generation, gcrootDrv, gcrootClr);
+        makeNames(profile, num, generation, gcrootDrv);
         if (symlink(outPath.c_str(), generation.c_str()) == 0) break;
         if (errno != EEXIST)
             throw SysError(format("creating symlink `%1%'") % generation);
@@ -93,7 +91,6 @@ Path createGeneration(Path profile, Path outPath,
     }
 
     writeStringToFile(gcrootDrv, drvPath);
-    writeStringToFile(gcrootClr, clrPath);
 
     return generation;
 }
@@ -108,10 +105,9 @@ static void removeFile(const Path & path)
 
 void deleteGeneration(const Path & profile, unsigned int gen)
 {
-    Path generation, gcrootDrv, gcrootClr;
-    makeNames(profile, gen, generation, gcrootDrv, gcrootClr);
+    Path generation, gcrootDrv;
+    makeNames(profile, gen, generation, gcrootDrv);
     removeFile(generation);
-    if (pathExists(gcrootClr)) removeFile(gcrootClr);
     if (pathExists(gcrootDrv)) removeFile(gcrootDrv);
 }
 

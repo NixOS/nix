@@ -2,6 +2,7 @@
 #include "normalise.hh"
 
 
+#if 0
 static string dotQuote(const string & s)
 {
     return "\"" + s + "\"";
@@ -133,3 +134,4 @@ void printDotGraph(const PathSet & roots)
 
     cout << "}\n";
 }
+#endif

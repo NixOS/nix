@@ -1,16 +1,32 @@
 #include "normalise.hh"
 
 
-StoreExpr storeExprFromPath(const Path & path)
+Derivation derivationFromPath(const Path & drvPath)
 {
-    assertStorePath(path);
-    ensurePath(path);
-    ATerm t = ATreadFromNamedFile(path.c_str());
-    if (!t) throw Error(format("cannot read aterm from `%1%'") % path);
-    return parseStoreExpr(t);
+    assertStorePath(drvPath);
+    ensurePath(drvPath);
+    ATerm t = ATreadFromNamedFile(drvPath.c_str());
+    if (!t) throw Error(format("cannot read aterm from `%1%'") % drvPath);
+    return parseDerivation(t);
 }
 
 
+void computeFSClosure(const Path & storePath,
+    PathSet & paths)
+{
+    if (paths.find(storePath) != paths.end()) return;
+    paths.insert(storePath);
+
+    PathSet references;
+    queryReferences(storePath, references);
+
+    for (PathSet::iterator i = references.begin();
+         i != references.end(); ++i)
+        computeFSClosure(*i, paths);
+}
+
+
+#if 0
 PathSet storeExprRoots(const Path & nePath)
 {
     PathSet paths;
@@ -71,3 +87,4 @@ PathSet storeExprRequisites(const Path & nePath,
         paths, doneSet);
     return paths;
 }
+#endif

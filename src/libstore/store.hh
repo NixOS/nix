@@ -40,27 +40,6 @@ void createStoreTransaction(Transaction & txn);
 /* Copy a path recursively. */
 void copyPath(const Path & src, const Path & dst);
 
-/* Register a successor.  This function accepts a transaction handle
-   so that it can be enclosed in an atomic operation with calls to
-   registerValidPath().  This must be atomic, since if we register a
-   successor for a derivation without registering the paths built in
-   the derivation, we have a successor with dangling pointers, and if
-   we do it in reverse order, we can get an obstructed build (since to
-   rebuild the successor, the outputs paths must not exist). */
-void registerSuccessor(const Transaction & txn,
-    const Path & srcPath, const Path & sucPath);
-
-/* Remove a successor mapping. */
-void unregisterSuccessor(const Path & srcPath);
-
-/* Return the predecessors of the Nix expression stored at the given
-   path. */
-bool querySuccessor(const Path & srcPath, Path & sucPath);
-
-/* Return the predecessors of the Nix expression stored at the given
-   path. */
-Paths queryPredecessors(const Path & sucPath);
-
 /* Register a substitute. */
 typedef list<pair<Path, Substitute> > SubstitutePairs;
 void registerSubstitutes(const Transaction & txn,
@@ -80,6 +59,14 @@ void assertStorePath(const Path & path);
 
 /* Checks whether a path is valid. */ 
 bool isValidPath(const Path & path);
+
+/* Sets the set of outgoing FS references for a store path. */
+void setReferences(const Transaction & txn, const Path & storePath,
+    const PathSet & references);
+
+/* Queries the set of outgoing FS references for a store path.  The
+   result is not cleared. */
+void queryReferences(const Path & storePath, PathSet & references);
 
 /* Constructs a unique store path name. */
 Path makeStorePath(const string & type,

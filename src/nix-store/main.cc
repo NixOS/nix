@@ -18,21 +18,18 @@ void printHelp()
 }
 
 
-/* Realise paths from the given store expressions. */
-static void opRealise(Strings opFlags, Strings opArgs)
+/* Build the given derivations. */
+static void opBuild(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); i++)
-    {
-        Path nfPath = realiseStoreExpr(*i);
-        cout << format("%1%\n") % (string) nfPath;
-    }
+        buildDerivation(*i);
 }
 
 
-/* Add paths to the Nix values directory and print the hashes of those
+/* Add files to the Nix values directory and print the resulting
    paths. */
 static void opAdd(Strings opFlags, Strings opArgs)
 {
@@ -43,6 +40,7 @@ static void opAdd(Strings opFlags, Strings opArgs)
 }
 
 
+#if 0
 Path maybeNormalise(const Path & ne, bool normalise, bool realise)
 {
     if (realise) {
@@ -131,24 +129,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             abort();
     }
 }
-
-
-static void opSuccessor(Strings opFlags, Strings opArgs)
-{
-    if (!opFlags.empty()) throw UsageError("unknown flag");
-    if (opArgs.size() % 2) throw UsageError("expecting even number of arguments");
-
-    Transaction txn;
-    createStoreTransaction(txn);
-    for (Strings::iterator i = opArgs.begin();
-         i != opArgs.end(); )
-    {
-        Path path1 = *i++;
-        Path path2 = *i++;
-        registerSuccessor(txn, path1, path2);
-    }
-    txn.commit();
-}
+#endif
 
 
 static void opSubstitute(Strings opFlags, Strings opArgs)
@@ -195,7 +176,6 @@ static void opClearSubstitutes(Strings opFlags, Strings opArgs)
 }
 
 
-
 static void opValidPath(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
@@ -222,6 +202,7 @@ static void opIsValid(Strings opFlags, Strings opArgs)
 
 static void opGC(Strings opFlags, Strings opArgs)
 {
+#if 0
     /* Do what? */
     enum { soPrintLive, soPrintDead, soDelete } subOp;
     time_t minAge = 0;
@@ -275,6 +256,7 @@ static void opGC(Strings opFlags, Strings opArgs)
             deleteFromStore(*i);
         }
     }
+#endif
 }
 
 
@@ -354,14 +336,12 @@ void run(Strings args)
 
         Operation oldOp = op;
 
-        if (arg == "--realise" || arg == "-r")
-            op = opRealise;
+        if (arg == "--build" || arg == "-b")
+            op = opBuild;
         else if (arg == "--add" || arg == "-A")
             op = opAdd;
-        else if (arg == "--query" || arg == "-q")
-            op = opQuery;
-        else if (arg == "--successor")
-            op = opSuccessor;
+        //        else if (arg == "--query" || arg == "-q")
+        //            op = opQuery;
         else if (arg == "--substitute")
             op = opSubstitute;
         else if (arg == "--clear-substitutes")
