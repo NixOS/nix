@@ -501,7 +501,7 @@ void NormalisationGoal::buildDone()
     debug(format("builder process for `%1%' finished") % nePath);
 
     /* Check the exit status. */
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+    if (!statusOk(status)) {
         deleteTmpDir(false);
         throw Error(format("builder for `%1%' %2%")
             % nePath % statusToString(status));
@@ -1371,7 +1371,7 @@ void SubstitutionGoal::finished()
     debug(format("substitute for `%1%' finished") % storePath);
 
     /* Check the exit status. */
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+    if (!statusOk(status))
         throw Error(format("builder for `%1%' %2%")
             % storePath % statusToString(status));
 

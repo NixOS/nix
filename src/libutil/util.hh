@@ -243,5 +243,7 @@ Strings unpackStrings(const string & s);
    error string. */
 string statusToString(int status);
 
+bool statusOk(int status);
+
 
 #endif /* !__UTIL_H */

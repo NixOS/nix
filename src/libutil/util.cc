@@ -611,3 +611,9 @@ string statusToString(int status)
             return "died abnormally";
     } else return "succeeded";
 }
+
+
+bool statusOk(int status)
+{
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}

@@ -161,7 +161,7 @@ void copyPath(const Path & src, const Path & dst)
 
     /* Wait for the child to finish. */
     int status = pid.wait(true);
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+    if (!statusOk(status))
         throw Error(format("cannot copy `%1% to `%2%': child %3%")
             % src % dst % statusToString(status));
 }
