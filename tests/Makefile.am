@@ -39,7 +39,7 @@ gc-concurrent.sh: gc-concurrent.nix gc-concurrent2.nix
 TESTS = init.sh hash.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
   build-hook.sh substitutes.sh substitutes2.sh fallback.sh nix-push.sh gc.sh \
   gc-concurrent.sh verify.sh nix-pull.sh
-#TESTS = init.sh gc-concurrent.sh 
+#TESTS = init.sh nix-push.sh nix-pull.sh
 
 XFAIL_TESTS =
 
@@ -57,5 +57,6 @@ EXTRA_DIST = $(TESTS) \
   substitutes.nix.in substituter.sh \
   substitutes2.nix.in substituter2.sh \
   gc-concurrent.nix.in gc-concurrent.builder.sh \
+  gc-concurrent2.nix.in gc-concurrent2.builder.sh \
   fallback.nix.in \
   $(wildcard lang/*.nix) $(wildcard lang/*.exp)

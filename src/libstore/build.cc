@@ -1329,7 +1329,8 @@ void SubstitutionGoal::init()
 
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)
-        addWaitee(worker.makeSubstitutionGoal(*i));
+        if (*i != storePath) /* ignore self-references */
+            addWaitee(worker.makeSubstitutionGoal(*i));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         referencesValid();
@@ -1347,7 +1348,8 @@ void SubstitutionGoal::referencesValid()
 
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)
-        assert(isValidPath(*i));
+        if (*i != storePath) /* ignore self-references */
+            assert(isValidPath(*i));
     
     tryNext();
 }
