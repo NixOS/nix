@@ -1,0 +1,25 @@
+let {
+
+  input1 = derivation {
+    name = "dependencies-input-1";
+    system = "@system@";
+    builder = "@shell@";
+    args = ["-e" "-x" ./dependencies.builder1.sh];
+  };
+
+  input2 = derivation {
+    name = "dependencies-input-2";
+    system = "@system@";
+    builder = "@shell@";
+    args = ["-e" "-x" ./dependencies.builder2.sh];
+  };
+
+  body = derivation {
+    name = "gc-concurrent";
+    system = "@system@";
+    builder = "@shell@";
+    args = ["-e" "-x" ./gc-concurrent.builder.sh];
+    inherit input1 input2;
+  };
+
+}
