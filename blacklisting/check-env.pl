@@ -1,7 +1,8 @@
-#! /usr/bin/perl -w
+#! /usr/bin/perl -w -I /home/eelco/.nix-profile/lib/site_perl
 
 use strict;
-use XML::Simple;
+use XML::LibXML;
+#use XML::Simple;
 
 my $blacklistFN = shift @ARGV;
 die unless defined $blacklistFN;
@@ -10,10 +11,10 @@ die unless defined $userEnv;
 
 
 # Read the blacklist.
-my $blacklist = XMLin($blacklistFN,
-    forcearray => [qw()],
-    keyattr => ['id'],
-    suppressempty => '');
+my $parser = XML::LibXML->new();
+my $blacklist = $parser->parse_file($blacklistFN)->getDocumentElement;
+
+#print $blacklist->toString() , "\n";
 
 
 # Get all the elements of the user environment.
@@ -30,10 +31,10 @@ sub evalCondition {
     my $storePaths = shift;
     my $condition = shift;
 
-    if (defined $condition->{'containsSource'}) {
-        my $c = $condition->{'containsSource'};
-        my $hash = $c->{'hash'};
-
+    my $name = $condition->getName;
+    
+    if ($name eq "containsSource") {
+        my $hash = $condition->attributes->getNamedItem("hash")->getValue;
         foreach my $path (keys %{$storePathHashes{$hash}}) {
             # !!! use a hash for $storePaths
             foreach my $path2 (@{$storePaths}) {
@@ -42,8 +43,43 @@ sub evalCondition {
         }
         return 0;
     }
+
+    elsif ($name eq "and") {
+        my $result = 1;
+        foreach my $node ($condition->getChildNodes) {
+            if ($node->nodeType == XML_ELEMENT_NODE) {
+                $result &= evalCondition($storePaths, $node);
+            }
+        }
+        return $result;
+    }
+
+    elsif ($name eq "true") {
+        return 1;
+    }
+
+    elsif ($name eq "false") {
+        return 0;
+    }
+
+    else {
+        die "unknown element `$name'";
+    }
+}
+
+
+sub evalOr {
+    my $storePaths = shift;
+    my $nodes = shift;
+
+    my $result = 0;
+    foreach my $node (@{$nodes}) {
+        if ($node->nodeType == XML_ELEMENT_NODE) {
+            $result |= evalCondition($storePaths, $node);
+        }
+    }
     
-    return 0;
+    return $result;
 }
 
 
@@ -83,20 +119,18 @@ foreach my $userEnvElem (@userEnvElems) {
 
 
     # Evaluate each blacklist item.
-    foreach my $itemId (sort (keys %{$blacklist->{'item'}})) {
-#        print "  CHECKING FOR $itemId\n";
+    foreach my $item ($blacklist->getChildrenByTagName("item")) {
+        my $itemId = $item->getAttributeNode("id")->getValue;
+        print "  CHECKING FOR $itemId\n";
 
-        my $item = $blacklist->{'item'}->{$itemId};
-        die unless defined $item;
-
-        my $condition = $item->{'condition'};
-        die unless defined $condition;
+        my $condition = ($item->getChildrenByTagName("condition"))[0];
+        die unless $condition;
 
         # Evaluate the condition.
-        if (evalCondition(\@requisites, $condition)) {
-
+        my @foo = $condition->getChildNodes();
+        if (evalOr(\@requisites, \@foo)) {
             # Oops, condition triggered.
-            my $reason = $item->{'reason'};
+            my $reason = ($item->getChildrenByTagName("reason"))[0]->getChildNodes->to_literal;
             $reason =~ s/\s+/ /g;
             $reason =~ s/^\s+//g;
 

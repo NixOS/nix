@@ -1,6 +1,7 @@
 <blacklist>
 
-  
+
+<!--
 <item id='openssl-0.9.7d-obsolete'>
   <condition>
     <containsSource
@@ -12,29 +13,20 @@
   </reason>
   <severity class="all" level="low" />
 </item>
+-->
 
 
-<item id='zlib-1.2.1-security'>
+<item id='zlib-1.2.1-security' type='security'>
   <condition>
     <containsSource
-        hash="sha256:0yp7z8ask4b8m2ia253apnnxdk0z0zrs70yr079m2rjd4297chgv"
-        origin="zlib-1.2.1.tar.gz" />
-<!--
-    <or>
-      <and>
-        <containsSource
-            hash="sha256:0yp7z8ask4b8m2ia253apnnxdk0z0zrs70yr079m2rjd4297chgv"
-            origin="zlib-1.2.1.tar.gz" />
-        <not>
-          <containsSource
-              hash="..."
-              origin="zlib-1.2.1-dos.patch" />
-        </not>
-      </and>
-      <containsOutput
-          name="/nix/store/gxbdsvlwz6ixin94jhdw7rwdbb5mxxq3-zlib-1.2.1" />
-    </or>
-    -->
+        hash="sha256:1xf1749gdfw9f50mxa5rsnmwiwrb5mi0kg4siw8a73jykdp2i6ii"
+        origin="openssl-0.9.7d.tar.gz" />
+<!--    <within>
+      <traverse>
+        <not><hasName name='*.tar.*' /></not>
+      </traverse>
+      <hasAttr name='md5' value='ef1cb003448b4a53517b8f25adb12452' />
+    </within> -->
   </condition>
   <reason>
     Zlib 1.2.1 is vulnerable to a denial-of-service condition.  See
@@ -45,6 +37,7 @@
 </item>
 
 
+<!--
 <item id='libpng-1.2.7-crash'>
   <condition>
     <containsName name="libpng" comparison="lte" version="1.2.7" />
@@ -55,6 +48,25 @@
   </reason>
   <severity class="client" level="low" />
 </item>
+-->
 
+
+<!--
+<item id='subversion-without-zlib' type='improvement'>
+
+  <condition>
+    <withinOutputClosure>
+      <not>
+        <containsName name='zlib' />
+      </not>
+    </withinOutputClosure>
+  </condition>
+
+  <reason>
+    Subversion can be compiled with Zlib compression support, which is a good thing.
+  </reason>
+
+</item>
+-->
 
 </blacklist>
