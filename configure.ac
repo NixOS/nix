@@ -9,6 +9,7 @@ AC_CANONICAL_HOST
 
 AC_PROG_CC
 AC_PROG_CXX
+AC_PROG_RANLIB
 
 # Unix shell scripting should die a slow and painful death.
 AC_DEFINE_UNQUOTED(NIX_VALUES_DIR, "$(eval echo $prefix/values)", Nix values directory.)
