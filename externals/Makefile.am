@@ -34,12 +34,12 @@ endif
 
 # CWI ATerm
 
-ATERM = aterm-2.2
+ATERM = aterm-2.3.1
 
 $(ATERM).tar.gz:
 	@echo "Nix requires the CWI ATerm library to build."
-	@echo "Please download version 2.2 from"
-	@echo "  http://www.cwi.nl/projects/MetaEnv/aterm/aterm-2.2.tar.gz"
+	@echo "Please download version 2.3.1 from"
+	@echo "  http://www.cwi.nl/projects/MetaEnv/aterm/aterm-2.3.1.tar.gz"
 	@echo "and place it in the externals/ directory."
 	false
 
