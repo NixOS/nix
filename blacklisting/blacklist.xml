@@ -1,0 +1,48 @@
+<blacklist>
+
+  
+<item id='openssl-0.9.7d-obsolete'>
+  <condition>
+    <containsSource
+        hash="sha256:1xf1749gdfw9f50mxa5rsnmwiwrb5mi0kg4siw8a73jykdp2i6ii"
+        origin="openssl-0.9.7d.tar.gz" />
+  </condition>
+  <reason>
+    Race condition in CRL checking code.  Upgrade to 0.9.7e.
+  </reason>
+  <severity class="all" level="low" />
+</item>
+
+
+<item id='zlib-1.2.1-security'>
+  <condition>
+    <or>
+      <containsSource
+          hash="sha256:0yp7z8ask4b8m2ia253apnnxdk0z0zrs70yr079m2rjd4297chgv"
+          origin="zlib-1.2.1.tar.gz" />
+      <containsOutput
+          name="/nix/store/gxbdsvlwz6ixin94jhdw7rwdbb5mxxq3-zlib-1.2.1" />
+    </or>
+  </condition>
+  <reason>
+    Zlib 1.2.1 is vulnerable to a denial-of-service condition.  See
+    http://www.kb.cert.org/vuls/id/238678.  Upgrade to 1.2.2.
+  </reason>
+  <severity class="server" level="critical" />
+  <severity class="client" level="medium" />
+</item>
+
+
+<item id='libpng-1.2.7-crash'>
+  <condition>
+    <containsName name="libpng" comparison="lte" version="1.2.7" />
+  </condition>
+  <reason>
+    libpng 1.2.7 is vulnerable to a crash bug.  See
+    http://www.libpng.org/pub/png/libpng.html.  Upgrade to 1.2.8.
+  </reason>
+  <severity class="client" level="low" />
+</item>
+
+
+</blacklist>
