@@ -45,10 +45,10 @@ struct Cleanup : TermFun
             return ATmake("Int(<int>)", n);
         }
 
-        if (atMatch(m, e) >> "Bool" >> "true")
+        if (atMatch(m, e) >> "Var" >> "true")
             return ATmake("Bool(True)");
         
-        if (atMatch(m, e) >> "Bool" >> "false")
+        if (atMatch(m, e) >> "Var" >> "false")
             return ATmake("Bool(False)");
 
         if (atMatch(m, e) >> "ExprNil")

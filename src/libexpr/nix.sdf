@@ -15,9 +15,9 @@ imports Fix-Exprs Fix-Layout
 %% Expressions.
 
 module Fix-Exprs
-imports Fix-Lexicals URI
+imports Fix-Lexicals
 exports
-  sorts Expr Formal Bind Binds BindSemi ExprList
+  sorts Expr Formal Bind Binds ExprList
   context-free syntax
 
     Id -> Expr {cons("Var")}
@@ -44,10 +44,8 @@ exports
     "let" "{" Binds "}" -> Expr {cons("LetRec")}
     "{" Binds "}" -> Expr {cons("Attrs")}
 
-    Id "=" Expr -> Bind {cons("Bind")}
-    {Bind ";"}* -> Binds
-    Bind ";" -> BindSemi 
-    BindSemi* -> Binds
+    Bind* -> Binds
+    Id "=" Expr ";" -> Bind {cons("Bind")}
 
     "[" ExprList "]" -> Expr {cons("List")}
     "" -> ExprList {cons("ExprNil")}
@@ -64,8 +62,6 @@ exports
     Expr "&&" Expr -> Expr {cons("OpAnd"), right}
     Expr "||" Expr -> Expr {cons("OpOr"), right}
     Expr "->" Expr -> Expr {cons("OpImpl"), right}
-
-    Bool -> Expr {cons("Bool")}
 
   context-free priorities
 
@@ -87,7 +83,7 @@ exports
 
 module Fix-Lexicals
 exports
-  sorts Id Int Str Path PathComp Bool
+  sorts Id Int Str Path PathComp Uri
   lexical syntax
     [a-zA-Z\_][a-zA-Z0-9\_\']* -> Id
     "rec" -> Id {reject}
@@ -95,97 +91,24 @@ exports
     "if" -> Id {reject}
     "then" -> Id {reject}
     "else" -> Id {reject}
-    "true" -> Id {reject}
-    "false" -> Id {reject}
     "assert" -> Id {reject}
 
     [0-9]+ -> Int
 
     "\"" ~[\n\"]* "\"" -> Str
 
-    PathComp ("/" PathComp)+ -> Path
+    "." ("/" PathComp)+ -> Path
+    ".." ("/" PathComp)+ -> Path
     ("/" PathComp)+ -> Path
     [a-zA-Z0-9\.\_\-\+]+ -> PathComp
 
-    "true" -> Bool
-    "false" -> Bool
+    [a-zA-Z] [a-zA-Z0-9\+\-\.]* ":" [a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*\']* -> Uri
 
   lexical restrictions
     Id -/- [a-zA-Z0-9\_\']
     Int -/- [0-9]
     Path -/- [a-zA-Z0-9\.\_\-\+\/]
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% URIs (RFC 2396, appendix A).
-
-module URI
-exports
-  sorts Uri Uhierpart Uopaquepart Uuricnoslash Unetpath Uabspath
-        Urelpath Urelsegment Uscheme Uauthority Uregname Userver
-        Uuserinfo Uhostport Uhost Uhostname Udomainlabel Utoplabel
-        UIPv4address Uport Upath Upathsegments Usegment Uparam
-        Upchar Uquery Ufragment Uuric Ureserved Uunreserved Umark
-        Uescaped Uhex Ualphanum Ualpha Ulowalpha Uupalpha Udigit
-  lexical syntax
-    Uscheme ":" (Uhierpart | Uopaquepart) -> Uri
-
-    (Unetpath | Uabspath) ("?" Uquery)? -> Uhierpart
-    Uuricnoslash Uuric* -> Uopaquepart
-
-    Uunreserved | Uescaped | [\;\?\:\@\&\=\+\$\,] -> Uuricnoslash
-
-    "//" Uauthority Uabspath? -> Unetpath
-    "/" Upathsegments -> Uabspath
-    "//" Uuric* -> Uabspath {reject}
-    Urelsegment Uabspath? -> Urelpath
-
-    (Uunreserved | Uescaped | [\;\@\&\=\+\$\,])+ -> Urelsegment
-
-    Ualpha (Ualpha | Udigit | [\+\-\.])* -> Uscheme
-
-    Userver | Uregname -> Uauthority
-
-    (Uunreserved | Uescaped | [\$\,\;\:\@\&\=\+])+ -> Uregname
-
-    ((Uuserinfo "@") Uhostport) -> Userver
-    (Uunreserved | Uescaped | [\;\:\&\=\+\$\,])* -> Uuserinfo
-
-    Uhost (":" Uport)? -> Uhostport
-    Uhostname | UIPv4address -> Uhost
-    (Udomainlabel ".")+ Utoplabel "."? -> Uhostname
-    Ualphanum | Ualphanum (Ualphanum | "-")* Ualphanum -> Udomainlabel
-    Ualpha | Ualpha (Ualphanum | "-")* Ualphanum -> Utoplabel
-    Udigit+ "." Udigit+ "." Udigit+ "." Udigit+ -> UIPv4address
-    Udigit* -> Uport
-
-    Uabspath | Uopaquepart -> Upath
-    Usegment ("/" Usegment)* -> Upathsegments
-    Upchar* (";" Uparam)* -> Usegment
-    Upchar* -> Uparam
-    Uunreserved | Uescaped | [\:\@\&\=\+\$\,] -> Upchar
-
-    Uuric* -> Uquery
-
-    Uuric* -> Ufragment
-
-    Ureserved | Uunreserved | Uescaped -> Uuric
-    [\;\/\?\:\@\&\=\+\$\,] -> Ureserved
-    Ualphanum | Umark -> Uunreserved
-    [\-\_\.\!\~\*\'\(\)] -> Umark
-
-    "%" Uhex Uhex -> Uescaped
-    Udigit | [A-Fa-f] -> Uhex
-
-    Ualpha | Udigit -> Ualphanum
-    Ulowalpha | Uupalpha -> Ualpha
-
-    [a-z] -> Ulowalpha
-    [A-Z] -> Uupalpha
-    [0-9] -> Udigit
-
-  lexical restrictions
-    Uri -/- [a-zA-Z0-9\-\_\.\!\~\*\'\(\)\/]
+    Uri -/- [a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*\']
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -193,18 +116,16 @@ exports
 
 module Fix-Layout
 exports
-  sorts HashComment Asterisk Comment EOF
+  sorts HashComment Asterisk Comment
   lexical syntax
     [\ \t\n] -> LAYOUT
     HashComment -> LAYOUT
     Comment -> LAYOUT
-    "#" ~[\n]* ([\n] | EOF) -> HashComment
-    "//" ~[\n]* ([\n] | EOF) -> HashComment
+    "#" ~[\n]* -> HashComment
     "/*" ( ~[\*] | Asterisk )* "*/" -> Comment
     [\*] -> Asterisk
-    "" -> EOF
   lexical restrictions
     Asterisk -/- [\/]
-    EOF -/- ~[]
+    HashComment -/- ~[\n]
   context-free restrictions
-    LAYOUT? -/- [\ \t\n] | [\#]
+    LAYOUT? -/- [\ \t\n]
