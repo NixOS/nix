@@ -4,7 +4,7 @@ export PATH=/bin:/usr/bin
 
 echo "downloading $url into $out"
 
-prefetch=@prefix@/store/nix-prefetch-url-$md5
+prefetch=@storedir@/nix-prefetch-url-$md5
 if test -f "$prefetch"; then
     echo "using prefetched $prefetch";
     mv $prefetch $out
