@@ -406,52 +406,29 @@ void runPkg(string hash, const vector<string> & args)
 
     runner = getFromEnv(env, "run");
     
-    /* Fork a child to build the package. */
-    pid_t pid;
-    switch (pid = fork()) {
-            
-    case -1:
-        throw Error("unable to fork");
-
-    case 0: { /* child */
-
-        /* Fill in the environment.  We don't bother freeing the
-           strings, since we'll exec or die soon anyway. */
-        for (Environment::iterator it = env.begin();
-             it != env.end(); it++)
-        {
-            string * s = new string(it->first + "=" + it->second);
-            putenv((char *) s->c_str());
-        }
-
-        /* Create the list of arguments. */
-        const char * args2[env.size() + 2];
-        int i = 0;
-        args2[i++] = runner.c_str();
-        for (vector<string>::const_iterator it = args.begin();
-             it != args.end(); it++, i++)
-            args2[i] = it->c_str();
-        args2[i] = 0;
-
-        /* Execute the runner.  This should not return. */
-        execv(runner.c_str(), (char * *) args2);
-
-        cout << strerror(errno) << endl;
-
-        cout << "unable to execute runner\n";
-        _exit(1); }
-
+    /* Fill in the environment.  We don't bother freeing the
+       strings, since we'll exec or die soon anyway. */
+    for (Environment::iterator it = env.begin();
+         it != env.end(); it++)
+    {
+        string * s = new string(it->first + "=" + it->second);
+        putenv((char *) s->c_str());
     }
 
-    /* parent */
+    /* Create the list of arguments. */
+    const char * args2[env.size() + 2];
+    int i = 0;
+    args2[i++] = runner.c_str();
+    for (vector<string>::const_iterator it = args.begin();
+         it != args.end(); it++, i++)
+        args2[i] = it->c_str();
+    args2[i] = 0;
 
-    /* Wait for the child to finish. */
-    int status;
-    if (waitpid(pid, &status, 0) != pid)
-        throw Error("unable to wait for child");
-    
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
-        throw Error("unable to run package");
+    /* Execute the runner.  This should not return. */
+    execv(runner.c_str(), (char * *) args2);
+
+    cout << strerror(errno) << endl;
+    throw Error("unable to execute runner");
 }
 
 
@@ -750,7 +727,6 @@ void main2(int argc, char * * argv)
     /* Parse the global flags. */
     while (argc) {
         string arg(*argv);
-        cout << arg << endl;
         if (arg == "-h" || arg == "--help") {
             printUsage();
             return;
