@@ -16,14 +16,14 @@ static string pathNullDevice = "/dev/null";
 
 /* Run a program. */
 void runProgram(const string & program, 
-    const Strings & args, const Environment & env)
+    const Strings & args, const Environment & env,
+    const string & logFileName)
 {
     /* Create a log file. */
-    string logFileName = nixLogDir + "/run.log";
     string logCommand = 
 	verbosity >= lvlDebug 
-	? "tee -a "  + logFileName + " >&2"
-	: "cat >> " + logFileName;
+	? "tee "  + logFileName + " >&2"
+	: "cat > " + logFileName;
     /* !!! auto-pclose on exit */
     FILE * logFile = popen(logCommand.c_str(), "w"); /* !!! escaping */
     if (!logFile)

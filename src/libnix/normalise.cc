@@ -164,7 +164,8 @@ Path normaliseNixExpr(const Path & _nePath, PathSet pending)
 
         /* Run the builder. */
         msg(lvlChatty, format("building..."));
-        runProgram(ne.derivation.builder, ne.derivation.args, env);
+        runProgram(ne.derivation.builder, ne.derivation.args, env,
+            nixLogDir + "/" + baseNameOf(nePath));
         msg(lvlChatty, format("build completed"));
         
     } else
