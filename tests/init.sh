@@ -10,7 +10,7 @@ mkdir "$TEST_ROOT"
 mkdir "$NIX_STORE_DIR"
 mkdir "$NIX_DATA_DIR"
 mkdir "$NIX_LOCALSTATE_DIR"
-mkdir -p "$NIX_LOG_DIR"
+mkdir -p "$NIX_LOG_DIR"/drvs
 mkdir "$NIX_STATE_DIR"
 mkdir "$NIX_DB_DIR"
 mkdir "$NIX_CONF_DIR"
