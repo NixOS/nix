@@ -31,7 +31,8 @@
 
     <para>
       This command is generally used for testing Nix expression before
-      they are used with <command>nix-env</command>.
+      they are used with <command>nix-env</command>.  See also <xref
+      linkend="sec-common-options" />.
     </para>
 
   </refsection>
@@ -40,8 +41,6 @@
     <title>Options</title>
 
     <variablelist>
-
-      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common.xml#xpointer(/nop/*)" />
 
       <varlistentry>
         <term><option>--parse-only</option></term>

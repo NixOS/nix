@@ -230,3 +230,8 @@ table.productionset table.productionset
 {
     font-family: monospace;
 }
+
+a[href] {
+    text-decoration: none;
+    border-bottom: 1px dotted #005aa0;
+}

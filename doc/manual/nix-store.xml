@@ -41,14 +41,9 @@
     <para>
       This section lists the options that are common to all
       operations.  These options are allowed for every subcommand,
-      though they may not always have an effect.
+      though they may not always have an effect.  See also <xref
+      linkend="sec-common-options" />.
     </para>
-
-    <variablelist>
-
-      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common.xml#xpointer(/nop/*)" />
-
-    </variablelist>
 
   </refsection>
 

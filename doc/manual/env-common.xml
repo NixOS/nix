@@ -1,0 +1,112 @@
+<sect1 id="sec-common-env"><title>Common environment variables</title>
+
+<para>Most Nix commands interpret the following environment variables:</para>
+
+<variablelist>
+
+  
+<varlistentry><term><envar>NIX_ROOT</envar></term>
+
+  <listitem><para>If <envar>NIX_ROOT</envar> is set, the Nix command
+  will on startup perform a <function>chroot()</function> to the
+  specified directory.  This is useful in certain bootstrapping
+  situations (e.g., when installing a Nix installation onto a hard
+  disk from CD-ROM).</para></listitem>
+
+</varlistentry>
+
+  
+<varlistentry><term><envar>NIX_IGNORE_SYMLINK_STORE</envar></term>
+
+  <listitem>
+
+  <para>Normally, the Nix store directory (typically
+  <filename>/nix/store</filename>) is not allowed to contain any
+  symlink components.  This is to prevent “impure” builds.  Builders
+  sometimes “canonicalise” paths by resolving all symlink components.
+  Thus, builds on different machines (with
+  <filename>/nix/store</filename> resolving to different locations)
+  could yield different results.  This is generally not a problem,
+  except when builds are deployed to machines where
+  <filename>/nix/store</filename> resolves differently.  If you are
+  sure that you’re not going to do that, you can set
+  <envar>NIX_IGNORE_SYMLINK_STORE</envar> to <envar>1</envar>.</para>
+
+  <para>Note that if you’re symlinking the Nix store so that you can
+  put it on another file system than the root file system, on Linux
+  you’re better off using <literal>bind</literal> mount points, e.g.,
+
+  <screen>
+$ mkdir /nix   
+$ mount -o bind /mnt/otherdisk/nix /nix</screen>
+
+  Consult the <citerefentry><refentrytitle>mount</refentrytitle>
+  <manvolnum>8</manvolnum></citerefentry> manual page for details.</para>
+
+  </listitem>
+
+</varlistentry>
+
+
+<varlistentry><term><envar>NIX_STORE_DIR</envar></term>
+
+  <listitem><para>Overrides the location of the Nix store (default
+  <filename><replaceable>prefix</replaceable>/store</filename>).</para></listitem>
+  
+</varlistentry>
+
+
+<varlistentry><term><envar>NIX_DATA_DIR</envar></term>
+
+  <listitem><para>Overrides the location of the Nix static data
+  directory (default
+  <filename><replaceable>prefix</replaceable>/share</filename>).</para></listitem>
+  
+</varlistentry>
+
+
+<varlistentry><term><envar>NIX_LOG_DIR</envar></term>
+
+  <listitem><para>Overrides the location of the Nix log directory
+  (default <filename><replaceable>prefix</replaceable>/log/nix</filename>).</para></listitem>
+  
+</varlistentry>
+
+
+<varlistentry><term><envar>NIX_STATE_DIR</envar></term>
+
+  <listitem><para>Overrides the location of the Nix state directory
+  (default <filename><replaceable>prefix</replaceable>/var/nix</filename>).</para></listitem>
+  
+</varlistentry>
+
+
+<varlistentry><term><envar>NIX_DB_DIR</envar></term>
+
+  <listitem><para>Overrides the location of the Nix database (default
+  <filename><replaceable>$NIX_STATE_DIR</replaceable>/db</filename>, i.e.,
+  <filename><replaceable>prefix</replaceable>/var/nix/db</filename>).</para></listitem>
+  
+</varlistentry>
+
+
+<varlistentry><term><envar>NIX_CONF_DIR</envar></term>
+
+  <listitem><para>Overrides the location of the Nix configuration
+  directory (default
+  <filename><replaceable>prefix</replaceable>/etc/nix</filename>).</para></listitem>
+  
+</varlistentry>
+
+
+<varlistentry><term><envar>NIX_LOG_TYPE</envar></term>
+
+  <listitem><para>Equivalent to the <link
+  linkend="opt-log-type"><option>--log-type</option>
+  option</link>.</para></listitem>
+
+</varlistentry>
+  
+</variablelist>
+
+</sect1>

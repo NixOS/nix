@@ -33,6 +33,8 @@
 
   <appendix>
     <title>Command Reference</title>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common.xml" />
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="env-common.xml" />
     <sect1>
       <title>nix-env</title>
       <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-env.xml" />
