@@ -1,0 +1,36 @@
+Overview
+========
+
+Nix is a package manager, deployment system, and component glue
+mechanism.
+
+
+Prerequisites
+=============
+
+* Berkeley DB 4.0.14
+* CWI ATerm 2.0
+
+
+Installation
+============
+
+* When building from the Subversion repository, first do:
+
+    autoreconf -i
+
+* To build, do:
+
+    ./configure
+    make
+    make install
+
+  Note that this will install to /nix, which is the default prefix.
+  You can specify another prefix, but this is not recommended if you
+  want to use prebuilt packages from other sources.
+
+
+Usage
+=====
+
+TODO
