@@ -1,0 +1,10 @@
+The Nix Emacs mode supports syntax highlighting, somewhat sensible
+indenting, and refilling of comments.
+
+To enable Nix mode in Emacs, add something like this to your ~/.emacs
+file:
+
+  (load "/nix/share/emacs/site-lisp/nix-mode.el")
+
+This automatically causes Nix mode to be activated for all files with
+extension `.nix'.
