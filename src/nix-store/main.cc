@@ -18,12 +18,6 @@ void printHelp()
 }
 
 
-static Path checkPath(const Path & arg)
-{
-    return arg; /* !!! check that arg is in the store */
-}
-
-
 /* Realise paths from the given store expressions. */
 static void opRealise(Strings opFlags, Strings opArgs)
 {
@@ -32,7 +26,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); i++)
     {
-        Path nfPath = normaliseStoreExpr(checkPath(*i));
+        Path nfPath = normaliseStoreExpr(*i);
         realiseClosure(nfPath);
         cout << format("%1%\n") % (string) nfPath;
     }
@@ -46,7 +40,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
 
     for (Strings::iterator it = opArgs.begin();
          it != opArgs.end(); it++)
-        deleteFromStore(checkPath(*it));
+        deleteFromStore(*it);
 }
 
 
@@ -101,7 +95,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                  i != opArgs.end(); i++)
             {
                 StringSet paths = storeExprRoots(
-                    maybeNormalise(checkPath(*i), normalise, realise));
+                    maybeNormalise(*i, normalise, realise));
                 for (StringSet::iterator j = paths.begin(); 
                      j != paths.end(); j++)
                     cout << format("%s\n") % *j;
@@ -115,7 +109,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                  i != opArgs.end(); i++)
             {
                 StringSet paths2 = storeExprRequisites(
-                    maybeNormalise(checkPath(*i), normalise, realise),
+                    maybeNormalise(*i, normalise, realise),
                     includeExprs, includeSuccessors);
                 paths.insert(paths2.begin(), paths2.end());
             }
@@ -129,7 +123,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                Paths preds = queryPredecessors(checkPath(*i));
+                Paths preds = queryPredecessors(*i);
                 for (Paths::iterator j = preds.begin();
                      j != preds.end(); j++)
                     cout << format("%s\n") % *j;
@@ -141,7 +135,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             PathSet roots;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
-                roots.insert(maybeNormalise(checkPath(*i), normalise, realise));
+                roots.insert(maybeNormalise(*i, normalise, realise));
 	    printDotGraph(roots);
             break;
         }
@@ -162,8 +156,8 @@ static void opSuccessor(Strings opFlags, Strings opArgs)
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); )
     {
-        Path path1 = checkPath(*i++);
-        Path path2 = checkPath(*i++);
+        Path path1 = *i++;
+        Path path2 = *i++;
         registerSuccessor(txn, path1, path2);
     }
     txn.commit();
@@ -173,14 +167,28 @@ static void opSuccessor(Strings opFlags, Strings opArgs)
 static void opSubstitute(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
-    if (opArgs.size() % 2) throw UsageError("expecting even number of arguments");
-    
-    for (Strings::iterator i = opArgs.begin();
-         i != opArgs.end(); )
-    {
-        Path src = checkPath(*i++);
-        Path sub = checkPath(*i++);
-        registerSubstitute(src, sub);
+    if (!opArgs.empty())
+        throw UsageError("no arguments expected");
+
+    while (1) {
+        Path srcPath;
+        Substitute sub;
+        getline(cin, srcPath);
+        if (cin.eof()) break;
+        getline(cin, sub.storeExpr);
+        getline(cin, sub.program);
+        string s;
+        getline(cin, s);
+        istringstream st(s);
+        int n;
+        st >> n;
+        if (!st) throw Error("number expected");
+        while (n--) {
+            getline(cin, s);
+            sub.args.push_back(s);
+        }
+        if (!cin || cin.eof()) throw Error("missing input");
+        registerSubstitute(srcPath, sub);
     }
 }
 
@@ -260,7 +268,7 @@ static void opInit(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (!opArgs.empty())
-        throw UsageError("--init does not have arguments");
+        throw UsageError("no arguments expected");
     initDB();
 }
 

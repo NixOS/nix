@@ -17,9 +17,10 @@ dependencies.sh: dependencies.nix
 locking.sh: locking.nix
 parallel.sh: parallel.nix
 build-hook.sh: build-hook.nix
+substitutes.sh: substitutes.nix substituter.nix
 
 TESTS = init.sh simple.sh dependencies.sh locking.sh parallel.sh \
-  build-hook.sh
+  build-hook.sh substitutes.sh
 
 XFAIL_TESTS =
 

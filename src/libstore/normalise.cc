@@ -160,6 +160,26 @@ public:
 //////////////////////////////////////////////////////////////////////
 
 
+void killChild(pid_t pid)
+{
+    /* Send a KILL signal to every process in the child process group
+       (which hopefully includes *all* its children). */
+    if (kill(-pid, SIGKILL) != 0)
+        printMsg(lvlError, format("killing process %1%") % pid);
+    else {
+        /* Wait until the child dies, disregarding the exit status. */
+        int status;
+        while (waitpid(pid, &status, 0) == -1)
+            if (errno != EINTR) printMsg(lvlError,
+                format("waiting for process %1%") % pid);
+    }
+}
+
+
+
+//////////////////////////////////////////////////////////////////////
+
+
 void Goal::addWaiter(GoalPtr waiter)
 {
     waiters.insert(waiter);
@@ -196,9 +216,6 @@ private:
     StoreExpr expr;
     
     /* The remainder is state held during the build. */
-
-    /* Whether it's being built by a hook or by ourselves. */
-    bool inHook;
 
     /* Locks on the output paths. */
     PathLocks outputLocks;
@@ -305,20 +322,7 @@ NormalisationGoal::~NormalisationGoal()
     if (pid != -1) {
         printMsg(lvlError, format("killing child process %1% (%2%)")
             % pid % nePath);
-
-        /* Send a KILL signal to every process in the child
-           process group (which hopefully includes *all* its
-           children). */
-        if (kill(-pid, SIGKILL) != 0)
-            printMsg(lvlError, format("killing process %1%") % pid);
-        else {
-            /* Wait until the child dies, disregarding the exit
-               status. */
-            int status;
-            while (waitpid(pid, &status, 0) == -1)
-                if (errno != EINTR) printMsg(lvlError,
-                    format("waiting for process %1%") % pid);
-        }
+        killChild(pid);
     }
 
     try {
@@ -488,7 +492,7 @@ void NormalisationGoal::buildDone()
     /* Close the log file. */
     fdLogFile.close();
 
-    debug(format("builder process %1% finished") % pid);
+    debug(format("builder process for `%1%' finished") % nePath);
 
     /* Check the exit status. */
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
@@ -501,8 +505,9 @@ void NormalisationGoal::buildDone()
                 % nePath % WTERMSIG(status));
         else
             throw Error(format("builder for `%1%' failed died abnormally") % nePath);
-    } else
-        deleteTmpDir(true);
+    }
+    
+    deleteTmpDir(true);
 
     /* Compute a closure store expression, and register it as our
        successor. */
@@ -629,6 +634,7 @@ NormalisationGoal::HookReply NormalisationGoal::tryBuildHook()
         /* Acquire locks and such.  If we then see that there now is a
            successor, we're done. */
         if (!prepareBuild()) {
+            /* Tell the hook to exit. */
             writeLine(toHook.writeSide, "cancel");
             terminateBuildHook();
             return rpDone;
@@ -664,10 +670,9 @@ NormalisationGoal::HookReply NormalisationGoal::tryBuildHook()
             s += i->first + " " + i->second + "\n";
         writeStringToFile(successorsListFN, s);
 
+        /* Tell the hook to proceed. */ 
         writeLine(toHook.writeSide, "okay");
 
-        inHook = true;
-    
         return rpAccept;
     }
 
@@ -1187,6 +1192,21 @@ private:
     /* The store path that should be realised through a substitute. */
     Path storePath;
 
+    /* The remaining substitutes for this path. */
+    Substitutes subs;
+
+    /* The current substitute. */
+    Substitute sub;
+
+    /* The normal form of the substitute store expression. */
+    Path nfSub;
+
+    /* Pipe for the substitute's standard output/error. */
+    Pipe logPipe;
+
+    /* The process ID of the builder. */
+    pid_t pid;
+
     typedef void (SubstitutionGoal::*GoalState)();
     GoalState state;
 
@@ -1198,6 +1218,10 @@ public:
 
     /* The states. */
     void init();
+    void tryNext();
+    void exprNormalised();
+    void exprRealised();
+    void finished();
 };
 
 
@@ -1205,12 +1229,19 @@ SubstitutionGoal::SubstitutionGoal(const Path & _storePath, Worker & _worker)
     : Goal(_worker)
 {
     storePath = _storePath;
+    pid = -1;
     state = &SubstitutionGoal::init;
 }
 
 
 SubstitutionGoal::~SubstitutionGoal()
 {
+    /* !!! turn this into a destructor for pids */
+    if (pid != -1) {
+        printMsg(lvlError, format("killing child process %1% (%2%)")
+            % pid % storePath);
+        killChild(pid);
+    }
 }
 
 
@@ -1230,7 +1261,171 @@ void SubstitutionGoal::init()
         return;
     }
 
-    abort();
+    /* Otherwise, get the substitutes. */
+    subs = querySubstitutes(storePath);
+
+    /* Try the first one. */
+    tryNext();
+}
+
+
+void SubstitutionGoal::tryNext()
+{
+    debug(format("trying next substitute of `%1%'") % storePath);
+
+    if (subs.size() == 0) throw Error(
+        format("path `%1%' is required, but it has no (remaining) substitutes")
+            % storePath);
+    sub = subs.front();
+    subs.pop_front();
+
+    /* Normalise the substitute store expression. */
+    worker.addNormalisationGoal(sub.storeExpr, shared_from_this());
+    nrWaitees = 1;
+
+    state = &SubstitutionGoal::exprNormalised;
+}
+
+
+void SubstitutionGoal::exprNormalised()
+{
+    debug(format("store expr normalised of `%1%'") % storePath);
+
+    /* Realise the substitute store expression. */
+    if (!querySuccessor(sub.storeExpr, nfSub))
+        nfSub = sub.storeExpr;
+    worker.addRealisationGoal(nfSub, shared_from_this());
+    nrWaitees = 1;
+
+    state = &SubstitutionGoal::exprRealised;
+}
+
+
+void SubstitutionGoal::exprRealised()
+{
+    debug(format("store expr realised of `%1%'") % storePath);
+
+    /* What's the substitute program? */
+    StoreExpr expr = storeExprFromPath(nfSub);
+    assert(expr.type == StoreExpr::neClosure);
+    assert(!expr.closure.roots.empty());
+    Path program =
+        canonPath(*expr.closure.roots.begin() + "/" + sub.program);
+
+    printMsg(lvlChatty, format("executing substitute `%1%'") % program);
+
+    logPipe.create();
+
+    /* Fork the substitute program. */
+    switch (pid = fork()) {
+        
+    case -1:
+        throw SysError("unable to fork");
+
+    case 0:
+        try { /* child */
+
+            logPipe.readSide.close();
+
+            /* !!! close other handles */
+
+            /* !!! this is cut & paste - fix */
+
+            /* Put the child in a separate process group so that it
+               doesn't receive terminal signals. */
+            if (setpgid(0, 0) == -1)
+                throw SysError(format("setting process group"));
+            
+            /* Dup the write side of the logger pipe into stderr. */
+            if (dup2(logPipe.writeSide, STDERR_FILENO) == -1)
+                throw SysError("cannot pipe standard error into log file");
+            logPipe.readSide.close();
+            
+            /* Dup stderr to stdin. */
+            if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
+                throw SysError("cannot dup stderr into stdout");
+
+            /* Reroute stdin to /dev/null. */
+            int fdDevNull = open(pathNullDevice.c_str(), O_RDWR);
+            if (fdDevNull == -1)
+                throw SysError(format("cannot open `%1%'") % pathNullDevice);
+            if (dup2(fdDevNull, STDIN_FILENO) == -1)
+                throw SysError("cannot dup null device into stdin");
+
+            /* Fill in the arguments.  !!! cut & paste */
+            const char * argArr[sub.args.size() + 3];
+            const char * * p = argArr;
+            string progName = baseNameOf(program);
+            *p++ = progName.c_str();
+            *p++ = storePath.c_str();
+            for (Strings::const_iterator i = sub.args.begin();
+                 i != sub.args.end(); i++)
+                *p++ = i->c_str();
+            *p = 0;
+
+            execv(program.c_str(), (char * *) argArr);
+            
+            throw SysError(format("executing `%1%'") % program);
+            
+        } catch (exception & e) {
+            cerr << format("substitute error: %1%\n") % e.what();
+        }
+        _exit(1);
+    }
+    
+    /* parent */
+    logPipe.writeSide.close();
+    worker.childStarted(shared_from_this(),
+        pid, logPipe.readSide, false);
+
+    state = &SubstitutionGoal::finished;
+}
+
+
+void SubstitutionGoal::finished()
+{
+    debug(format("substitute finished of `%1%'") % storePath);
+
+    int status;
+
+    /* Since we got an EOF on the logger pipe, the substitute is
+       presumed to have terminated.  */
+    /* !!! this could block! */
+    if (waitpid(pid, &status, 0) != pid)
+        throw SysError(format("substitute for `%1%' should have terminated")
+            % storePath);
+
+    /* So the child is gone now. */
+    worker.childTerminated(pid);
+    pid = -1;
+
+    /* Close the read side of the logger pipe. */
+    logPipe.readSide.close();
+
+    debug(format("substitute for `%1%' finished") % storePath);
+
+    /* Check the exit status. */
+    /* !!! cut & paste */
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        if (WIFEXITED(status))
+            throw Error(format("builder for `%1%' failed with exit code %2%")
+                % storePath % WEXITSTATUS(status));
+        else if (WIFSIGNALED(status))
+            throw Error(format("builder for `%1%' failed due to signal %2%")
+                % storePath % WTERMSIG(status));
+        else
+            throw Error(format("builder for `%1%' failed died abnormally") % storePath);
+    }
+
+    if (!pathExists(storePath))
+        throw Error(format("substitute did not produce path `%1%'") % storePath);
+
+    Transaction txn;
+    createStoreTransaction(txn);
+    registerValidPath(txn, storePath);
+    txn.commit();
+
+    amDone();
 }
 
 

@@ -9,6 +9,29 @@
 using namespace std;
 
 
+/* A substitute is a program invocation that constructs some store
+   path (typically by fetching it from somewhere, e.g., from the
+   network). */
+struct Substitute
+{
+    /* Store expression to be normalised and realised in order to
+       obtain `program'. */
+    Path storeExpr;
+
+    /* Program to be executed to create the store path.  Must be in
+       the output path of `storeExpr'. */
+    Path program;
+
+    /* Extra arguments to be passed to the program (the first argument
+       is the store path to be substituted). */
+    Strings args;
+
+    bool operator == (const Substitute & sub);
+};
+
+typedef list<Substitute> Substitutes;
+
+
 /* Open the database environment. */
 void openDB();
 
@@ -40,10 +63,11 @@ bool querySuccessor(const Path & srcPath, Path & sucPath);
 Paths queryPredecessors(const Path & sucPath);
 
 /* Register a substitute. */
-void registerSubstitute(const Path & srcPath, const Path & subPath);
+void registerSubstitute(const Path & srcPath,
+    const Substitute & sub);
 
 /* Return the substitutes expression for the given path. */
-Paths querySubstitutes(const Path & srcPath);
+Substitutes querySubstitutes(const Path & srcPath);
 
 /* Register the validity of a path. */
 void registerValidPath(const Transaction & txn, const Path & path);

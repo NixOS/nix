@@ -499,7 +499,7 @@ static void opQuery(Globals & globals,
                 installedPaths.insert(i->second.outPath);
             
             for (DrvInfoList::iterator i = drvs2.begin(); i != drvs2.end(); ++i) {
-                Paths subs = querySubstitutes(i->drvPath);
+                Substitutes subs = querySubstitutes(i->drvPath);
                 cout << format("%1%%2%%3% %4%\n")
                     % (installedPaths.find(i->outPath)
                         != installedPaths.end() ? 'I' : '-')
