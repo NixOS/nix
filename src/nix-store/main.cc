@@ -32,10 +32,11 @@ static void opBuild(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
+    buildDerivations(PathSet(opArgs.begin(), opArgs.end()));
+
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); i++)
     {
-        buildDerivation(*i);
         Derivation drv = derivationFromPath(*i);
         cout << format("%1%\n") % findOutput(drv, "out");
     }

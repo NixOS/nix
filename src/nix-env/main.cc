@@ -223,7 +223,9 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
     
     /* Realise the resulting store expression. */
     debug(format("building user environment"));
-    buildDerivation(topLevelDrv.drvPath);
+    PathSet drvPaths;
+    drvPaths.insert(topLevelDrv.drvPath);
+    buildDerivations(drvPaths);
 
     /* Switch the current user environment to the output path. */
     debug(format("switching to new user environment"));

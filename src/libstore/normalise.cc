@@ -163,7 +163,7 @@ public:
     
     /* Loop until the specified top-level goal has finished.  Returns
        true if it has finished succesfully. */
-    bool run(GoalPtr topGoal);
+    bool run(const Goals & topGoals);
 
     /* Wait for input to become available. */
     void waitForInput();
@@ -697,7 +697,7 @@ string showPaths(const PathSet & paths)
          i != paths.end(); ++i)
     {
         if (s.size() != 0) s += ", ";
-        s += *i;
+        s += "`" + *i + "'";
     }
     return s;
 }
@@ -915,7 +915,7 @@ bool DerivationGoal::prepareBuild()
 void DerivationGoal::startBuilder()
 {
     startNest(nest, lvlInfo,
-        format("building path(s) `%1%'") % showPaths(outputPaths(drv.outputs)))
+        format("building path(s) %1%") % showPaths(outputPaths(drv.outputs)))
     
     /* Right platform? */
     if (drv.platform != thisSystem)
@@ -1664,17 +1664,18 @@ void Worker::waitForBuildSlot(GoalPtr goal, bool reallyWait)
 }
 
 
-bool Worker::run(GoalPtr topGoal)
+bool Worker::run(const Goals & _topGoals)
 {
-    assert(topGoal);
-    
     /* Wrap the specified top-level goal in a pseudo-goal so that we
        can check whether it succeeded. */
     shared_ptr<PseudoGoal> pseudo(new PseudoGoal(*this));
-    pseudo->addWaitee(topGoal);
-    
-    /* For now, we have only one top-level goal. */
-    topGoals.insert(topGoal);
+    for (Goals::iterator i = _topGoals.begin();
+         i != _topGoals.end(); ++i)
+    {
+        assert(*i);
+        pseudo->addWaitee(*i);
+        topGoals.insert(*i);
+    }
     
     startNest(nest, lvlDebug, format("entered goal loop"));
 
@@ -1773,13 +1774,20 @@ void Worker::waitForInput()
 //////////////////////////////////////////////////////////////////////
 
 
-void buildDerivation(const Path & drvPath)
+void buildDerivations(const PathSet & drvPaths)
 {
-    startNest(nest, lvlDebug, format("building `%1%'") % drvPath);
+    startNest(nest, lvlDebug,
+        format("building %1%") % showPaths(drvPaths));
 
     Worker worker;
-    if (!worker.run(worker.makeDerivationGoal(drvPath)))
-        throw Error(format("build of derivation `%1%' failed") % drvPath);
+
+    Goals goals;
+    for (PathSet::const_iterator i = drvPaths.begin();
+         i != drvPaths.end(); ++i)
+        goals.insert(worker.makeDerivationGoal(*i));
+    
+    if (!worker.run(goals))
+        throw Error(format("build failed"));
 }
 
 
@@ -1789,6 +1797,8 @@ void ensurePath(const Path & path)
     if (isValidPath(path)) return;
 
     Worker worker;
-    if (!worker.run(worker.makeSubstitutionGoal(path)))
+    Goals goals;
+    goals.insert(worker.makeSubstitutionGoal(path));
+    if (!worker.run(goals))
         throw Error(format("path `%1%' does not exist and cannot be created") % path);
 }

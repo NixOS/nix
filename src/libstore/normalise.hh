@@ -3,13 +3,13 @@
 
 #include "storeexpr.hh"
 
-/* Perform the specified derivation, if necessary.  That is, do
-   whatever is necessary to create the output paths of the
-   derivation.  If the output paths already exists, we're done.  If
-   they have substitutes, we can use those instead.  Otherwise, the
-   build action described by the derivation is performed, after
-   recursively building any sub-derivations. */
-void buildDerivation(const Path & drvPath);
+/* Perform the specified derivations, if necessary.  That is, do
+   whatever is necessary to create the output paths of the derivation.
+   If the output paths already exists, we're done.  If they have
+   substitutes, we can use those instead.  Otherwise, the build action
+   described by the derivation is performed, after recursively
+   building any sub-derivations. */
+void buildDerivations(const PathSet & drvPaths);
 
 /* Ensure that a path exists, possibly by instantiating it by
    realising a substitute. */
