@@ -50,11 +50,16 @@ ATerm fixAttrs(int recursive, ATermList as)
     ATermList * is = recursive ? &cs : &bs;
     for (ATermIterator i(as); i; ++i) {
         ATermList names;
-        if (atMatch(m, *i) >> "Inherit" >> names)
-            for (ATermIterator j(names); j; ++j)
-                *is = ATinsert(*is,
-                    ATmake("Bind(<term>, Var(<term>))", *j, *j));
-        else bs = ATinsert(bs, *i);
+        Expr src;
+        if (atMatch(m, *i) >> "Inherit" >> src >> names) {
+            bool fromScope = atMatch(m, src) >> "Scope";
+            for (ATermIterator j(names); j; ++j) {
+                Expr rhs = fromScope
+                    ? ATmake("Var(<term>)", *j)
+                    : ATmake("Select(<term>, <term>)", src, *j);
+                *is = ATinsert(*is, ATmake("Bind(<term>, <term>)", *j, rhs));
+            }
+        } else bs = ATinsert(bs, *i);
     }
     if (recursive)
         return ATmake("Rec(<term>, <term>)", bs, cs);

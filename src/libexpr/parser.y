@@ -33,7 +33,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, void * data, char * s)
 }
 
 %type <t> start expr expr_function expr_assert expr_op
-%type <t> expr_app expr_select expr_simple bind formal
+%type <t> expr_app expr_select expr_simple bind inheritsrc formal
 %type <ts> binds ids expr_list formals
 %token <t> ID INT STR PATH URI
 %token IF THEN ELSE ASSERT LET REC INHERIT EQ NEQ AND OR IMPL
@@ -114,8 +114,13 @@ binds
 bind
   : ID '=' expr ';'
     { $$ = ATmake("Bind(<term>, <term>)", $1, $3); }
-  | INHERIT ids ';'
-    { $$ = ATmake("Inherit(<term>)", $2); }
+  | INHERIT inheritsrc ids ';'
+    { $$ = ATmake("Inherit(<term>, <term>)", $2, $3); }
+  ;
+
+inheritsrc
+  : '(' expr ')' { $$ = $2; }
+  | { $$ = ATmake("Scope"); }
   ;
 
 ids: ids ID { $$ = ATinsert($1, $2); } | { $$ = ATempty; };
