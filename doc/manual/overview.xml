@@ -156,7 +156,7 @@ $ nix-env -if pkgs/system/i686-linux.nix pan</screen>
 
     <para>
       While the substitute mechanism is a generic mechanism, Nix provides two
-      standard tools called <command>nix-push</command> and
+      standard tools called <command>nix-pull</command> and
       <command>nix-push</command> that maintain and use a shared cache of
       prebuilt derivations on some network site (reachable through HTTP).  If
       you attempt to install some package that someone else has previously
@@ -173,8 +173,9 @@ $ nix-env -if pkgs/system/i686-linux.nix pan</screen>
     </para>
 
     <screen>
-$ nix-pull http://losser.st-lab.cs.uu.nl/~eelco/nix-dist/
-obtaining list of Nix archives at http://losser.st-lab.cs.uu.nl/~eelco/nix-dist...
+$ nix-pull
+http://catamaran.labs.cs.uu.nl/~eelco/nix/nixpkgs-<replaceable>version</replaceable>/
+obtaining list of Nix archives at http://catamaran.labs.cs.uu.nl/~eelco/nix/nixpkgs-<replaceable>version</replaceable>...
 ...</screen>
 
     <para>
