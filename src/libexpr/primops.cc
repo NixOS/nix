@@ -96,7 +96,7 @@ static string processBinding(EvalState & state, Expr e, StoreExpr & ne)
         return st.str();
     }
 
-    if (atMatch(m, e) >> "Attrs" >> es) {
+    if (atMatch(m, e) >> "Attrs") {
         Expr a = queryAttr(e, "type");
         if (a && evalString(state, a) == "derivation") {
             a = queryAttr(e, "drvPath");

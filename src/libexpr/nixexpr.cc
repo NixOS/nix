@@ -181,16 +181,18 @@ Expr substitute(const ATermMap & subs, Expr e)
     }
 
     /* Idem for a mutually recursive attribute set. */
-    ATermList bindings;
-    if (atMatch(m, e) >> "Rec" >> bindings) {
+    ATermList rbnds, nrbnds;
+    if (atMatch(m, e) >> "Rec" >> rbnds >> nrbnds) {
         ATermMap subs2(subs);
-        for (ATermIterator i(bindings); i; ++i) {
+        for (ATermIterator i(rbnds); i; ++i) {
             Expr e;
             if (!(atMatch(m, *i) >> "Bind" >> s >> e))
                 abort(); /* can't happen */
             subs2.remove(s);
         }
-        return ATmake("Rec(<term>)", substitute(subs2, (ATerm) bindings));
+        return ATmake("Rec(<term>, <term>)",
+            substitute(subs2, (ATerm) rbnds),
+            substitute(subs, (ATerm) nrbnds));
     }
 
     if (ATgetType(e) == AT_APPL) {

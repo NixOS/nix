@@ -17,32 +17,52 @@ struct ParseData
     string error;
 };
 
+
 extern "C" {
 
 #include "parser-tab.h"
 #include "lexer-tab.h"
     
-    /* Callbacks for getting from C to C++.  Due to a (small) bug in the
-       GLR code of Bison we cannot currently compile the parser as C++
-       code. */
-   
-    void setParseResult(ParseData * data, ATerm t)
-    {
-        data->result = t;
-    }
+/* Callbacks for getting from C to C++.  Due to a (small) bug in the
+   GLR code of Bison we cannot currently compile the parser as C++
+   code. */
 
-    ATerm absParsedPath(ParseData * data, ATerm t)
-    {
-        return string2ATerm(absPath(aterm2String(t), data->basePath).c_str());
-    }
+void setParseResult(ParseData * data, ATerm t)
+{
+    data->result = t;
+}
+
+ATerm absParsedPath(ParseData * data, ATerm t)
+{
+    return string2ATerm(absPath(aterm2String(t), data->basePath).c_str());
+}
     
-    void parseError(ParseData * data, char * error, int line, int column)
-    {
-        data->error = (format("%1%, at line %2%, column %3%, of %4%")
-            % error % line % column % data->location).str();
-    }
+void parseError(ParseData * data, char * error, int line, int column)
+{
+    data->error = (format("%1%, at line %2%, column %3%, of %4%")
+        % error % line % column % data->location).str();
+}
         
-    int yyparse(yyscan_t scanner, ParseData * data);
+ATerm fixAttrs(int recursive, ATermList as)
+{
+    ATMatcher m;
+    ATermList bs = ATempty, cs = ATempty;
+    ATermList * is = recursive ? &cs : &bs;
+    for (ATermIterator i(as); i; ++i) {
+        ATermList names;
+        if (atMatch(m, *i) >> "Inherit" >> names)
+            for (ATermIterator j(names); j; ++j)
+                *is = ATinsert(*is,
+                    ATmake("Bind(<term>, Var(<term>))", *j, *j));
+        else bs = ATinsert(bs, *i);
+    }
+    if (recursive)
+        return ATmake("Rec(<term>, <term>)", bs, cs);
+    else
+        return ATmake("Attrs(<term>)", bs);
+}
+
+int yyparse(yyscan_t scanner, ParseData * data);
 }
 
 

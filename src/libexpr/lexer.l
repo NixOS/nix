@@ -50,6 +50,7 @@ else        { return ELSE; }
 assert      { return ASSERT; }
 let         { return LET; }
 rec         { return REC; }
+inherit     { return INHERIT; }
 
 \=\=        { return EQ; }
 \!\=        { return NEQ; }

@@ -55,15 +55,15 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
 /* Transform a mutually recursive set into a non-recursive set.  Each
    attribute is transformed into an expression that has all references
    to attributes substituted with selection expressions on the
-   original set.  E.g., e = `rec {x = f x y, y = x}' becomes `{x = f
-   (e.x) (e.y), y = e.x}'. */
-ATerm expandRec(ATerm e, ATermList bnds)
+   original set.  E.g., e = `rec {x = f x y; y = x;}' becomes `{x = f
+   (e.x) (e.y); y = e.x;}'. */
+ATerm expandRec(ATerm e, ATermList rbnds, ATermList nrbnds)
 {
     ATMatcher m;
 
     /* Create the substitution list. */
     ATermMap subs;
-    for (ATermIterator i(bnds); i; ++i) {
+    for (ATermIterator i(rbnds); i; ++i) {
         string s;
         Expr e2;
         if (!(atMatch(m, *i) >> "Bind" >> s >> e2))
@@ -73,12 +73,21 @@ ATerm expandRec(ATerm e, ATermList bnds)
 
     /* Create the non-recursive set. */
     ATermMap as;
-    for (ATermIterator i(bnds); i; ++i) {
+    for (ATermIterator i(rbnds); i; ++i) {
         string s;
         Expr e2;
         if (!(atMatch(m, *i) >> "Bind" >> s >> e2))
             abort(); /* can't happen */
         as.set(s, substitute(subs, e2));
+    }
+
+    /* Copy the non-recursive bindings.  !!! inefficient */
+    for (ATermIterator i(nrbnds); i; ++i) {
+        string s;
+        Expr e2;
+        if (!(atMatch(m, *i) >> "Bind" >> s >> e2))
+            abort(); /* can't happen */
+        as.set(s, e2);
     }
 
     return makeAttrs(as);
@@ -175,14 +184,9 @@ Expr evalExpr2(EvalState & state, Expr e)
     }
 
     /* Mutually recursive sets. */
-    ATermList bnds;
-    if (atMatch(m, e) >> "Rec" >> bnds)
-        return expandRec(e, bnds);
-
-    /* Let expressions `let {..., body = ...}' are just desugared
-       into `(rec {..., body = ...}).body'. */
-    if (atMatch(m, e) >> "LetRec" >> bnds)
-        return evalExpr(state, ATmake("Select(Rec(<term>), \"body\")", bnds));
+    ATermList rbnds, nrbnds;
+    if (atMatch(m, e) >> "Rec" >> rbnds >> nrbnds)
+        return expandRec(e, rbnds, nrbnds);
 
     /* Conditionals. */
     if (atMatch(m, e) >> "If" >> e1 >> e2 >> e3) {

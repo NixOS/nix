@@ -18,6 +18,7 @@
 void setParseResult(void * data, ATerm t);
 void parseError(void * data, char * error, int line, int column);
 ATerm absParsedPath(void * data, ATerm t);
+ATerm fixAttrs(int recursive, ATermList as);
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, void * data, char * s)
 {
@@ -33,9 +34,9 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, void * data, char * s)
 
 %type <t> start expr expr_function expr_assert expr_op
 %type <t> expr_app expr_select expr_simple bind formal
-%type <ts> binds expr_list formals
+%type <ts> binds ids expr_list formals
 %token <t> ID INT STR PATH URI
-%token IF THEN ELSE ASSERT LET REC EQ NEQ AND OR IMPL
+%token IF THEN ELSE ASSERT LET REC INHERIT EQ NEQ AND OR IMPL
 
 %nonassoc IMPL
 %left OR
@@ -90,9 +91,14 @@ expr_simple
   | PATH { $$ = ATmake("Path(<term>)", absParsedPath(data, $1)); }
   | URI { $$ = ATmake("Uri(<term>)", $1); }
   | '(' expr ')' { $$ = $2; }
-  | LET '{' binds '}' { $$ = ATmake("LetRec(<term>)", $3); }
-  | REC '{' binds '}' { $$ = ATmake("Rec(<term>)", $3); }
-  | '{' binds '}' { $$ = ATmake("Attrs(<term>)", $2); }
+  /* Let expressions `let {..., body = ...}' are just desugared
+     into `(rec {..., body = ...}).body'. */
+  | LET '{' binds '}'
+    { $$ = ATmake("Select(<term>, \"body\")", fixAttrs(1, $3)); }
+  | REC '{' binds '}'
+    { $$ = fixAttrs(1, $3); }
+  | '{' binds '}'
+    { $$ = fixAttrs(0, $2); }
   | '[' expr_list ']' { $$ = ATmake("List(<term>)", $2); }
   | IF expr THEN expr ELSE expr
     { $$ = ATmake("If(<term>, <term>, <term>)", $2, $4, $6); }
@@ -106,7 +112,11 @@ binds
 bind
   : ID '=' expr ';'
     { $$ = ATmake("Bind(<term>, <term>)", $1, $3); }
+  | INHERIT ids ';'
+    { $$ = ATmake("Inherit(<term>)", $2); }
   ;
+
+ids: ids ID { $$ = ATinsert($1, $2); } | { $$ = ATempty; };
 
 expr_list
   : expr_select expr_list { $$ = ATinsert($2, $1); }
