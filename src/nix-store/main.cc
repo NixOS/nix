@@ -158,6 +158,7 @@ static void opSubstitute(Strings opFlags, Strings opArgs)
     if (!opArgs.empty())
         throw UsageError("no arguments expected");
 
+    SubstitutePairs subPairs;
     Transaction txn;
     createStoreTransaction(txn);
 
@@ -179,9 +180,11 @@ static void opSubstitute(Strings opFlags, Strings opArgs)
             sub.args.push_back(s);
         }
         if (!cin || cin.eof()) throw Error("missing input");
-        registerSubstitute(txn, srcPath, sub);
+        subPairs.push_back(pair<Path, Substitute>(srcPath, sub));
     }
 
+    registerSubstitutes(txn, subPairs);
+    
     txn.commit();
 }
 

@@ -322,29 +322,44 @@ static void writeSubstitutes(const Transaction & txn,
 }
 
 
-void registerSubstitute(const Transaction & txn,
-    const Path & srcPath, const Substitute & sub)
+typedef map<Path, Paths> SubstitutesRev;
+
+
+void registerSubstitutes(const Transaction & txn,
+    const SubstitutePairs & subPairs)
 {
-    assertStorePath(srcPath);
-    assertStorePath(sub.storeExpr);
+    SubstitutesRev revMap;
     
-    Substitutes subs = readSubstitutes(txn, srcPath);
+    for (SubstitutePairs::const_iterator i = subPairs.begin();
+         i != subPairs.end(); ++i)
+    {
+        const Path & srcPath(i->first);
+        const Substitute & sub(i->second);
 
-    if (find(subs.begin(), subs.end(), sub) != subs.end()) {
-        /* Nothing to do if the substitute is already known. */
-        return;
+        assertStorePath(srcPath);
+        assertStorePath(sub.storeExpr);
+    
+        Substitutes subs = readSubstitutes(txn, srcPath);
+
+        /* New substitutes take precedence over old ones.  If the
+           substitute is already present, it's moved to the front. */
+        remove(subs.begin(), subs.end(), sub);
+        subs.push_front(sub);
+        
+        writeSubstitutes(txn, srcPath, subs);
+
+        Paths & revs = revMap[sub.storeExpr];
+        if (revs.empty())
+            nixDB.queryStrings(txn, dbSubstitutesRev, sub.storeExpr, revs);
+        if (find(revs.begin(), revs.end(), srcPath) == revs.end())
+            revs.push_back(srcPath);
     }
-    subs.push_front(sub); /* new substitutes take precedence */
 
-    writeSubstitutes(txn, srcPath, subs);
-    
-    Paths revs;
-    nixDB.queryStrings(txn, dbSubstitutesRev, sub.storeExpr, revs);
-    if (find(revs.begin(), revs.end(), srcPath) == revs.end())
-        revs.push_back(srcPath);
-
-    // !!! O(n^2) complexity in building this
-    //    nixDB.setStrings(txn, dbSubstitutesRev, sub.storeExpr, revs);
+    /* Re-write the reverse mapping in one go to prevent Theta(n^2)
+       performance.  (This would occur because the data fields of the
+       `substitutes-rev' table are lists). */
+    for (SubstitutesRev::iterator i = revMap.begin(); i != revMap.end(); ++i)
+        nixDB.setStrings(txn, dbSubstitutesRev, i->first, i->second);
 }
 
 

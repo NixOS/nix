@@ -66,8 +66,9 @@ bool querySuccessor(const Path & srcPath, Path & sucPath);
 Paths queryPredecessors(const Path & sucPath);
 
 /* Register a substitute. */
-void registerSubstitute(const Transaction & txn,
-    const Path & srcPath, const Substitute & sub);
+typedef list<pair<Path, Substitute> > SubstitutePairs;
+void registerSubstitutes(const Transaction & txn,
+    const SubstitutePairs & subPairs);
 
 /* Return the substitutes expression for the given path. */
 Substitutes querySubstitutes(const Path & srcPath);
