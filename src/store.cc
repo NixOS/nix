@@ -90,7 +90,7 @@ Hash registerPath(const string & _path, Hash hash)
     if (hash == Hash()) hash = hashPath(path);
 
     Strings paths;
-    queryListDB(nixDB, dbRefs, hash, paths); /* non-existence = ok */
+    queryListDB(nixDB, dbHash2Paths, hash, paths); /* non-existence = ok */
 
     for (Strings::iterator it = paths.begin();
          it != paths.end(); it++)
@@ -98,7 +98,7 @@ Hash registerPath(const string & _path, Hash hash)
     
     paths.push_back(path);
     
-    setListDB(nixDB, dbRefs, hash, paths);
+    setListDB(nixDB, dbHash2Paths, hash, paths);
     
  exists:
     return hash;
@@ -116,7 +116,7 @@ static string queryPathByHashPrefix(Hash hash, const string & prefix)
 {
     Strings paths;
 
-    if (!queryListDB(nixDB, dbRefs, hash, paths))
+    if (!queryListDB(nixDB, dbHash2Paths, hash, paths))
         throw Error(format("no paths known with hash `%1%'") % (string) hash);
 
     /* Arbitrarily pick the first one that exists and still hash the
@@ -172,5 +172,5 @@ void deleteFromStore(const string & path)
     if (string(path, 0, prefix.size()) != prefix)
         throw Error(format("path %1% is not in the store") % path);
     deletePath(path);
-//     delDB(nixDB, dbRefs, hash);
+//     delDB(nixDB, dbHash2Paths, hash);
 }

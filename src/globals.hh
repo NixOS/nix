@@ -8,11 +8,11 @@ using namespace std;
 
 /* Database names. */
 
-/* dbRefs :: Hash -> Path
+/* dbHash2Paths :: Hash -> [Path]
 
-   Maintains a mapping from hashes to paths.  This is what we use to
-   resolve CHash(hash) content descriptors. */
-extern string dbRefs;
+   Maintains a mapping from hashes to lists of paths.  This is what we
+   use to resolve Hash(hash) content descriptors. */
+extern string dbHash2Paths;
 
 /* dbSuccessors :: Hash -> Hash
 
@@ -29,17 +29,6 @@ extern string dbRefs;
    shared derivate caching over the network).
 */
 extern string dbSuccessors;
-
-/* dbNetSources :: Hash -> URL
-
-   Each pair (hash, url) in this mapping states that the value
-   identified by hash can be obtained by fetching the value pointed
-   to by url.
-
-   TODO: this should be Hash -> [URL]
-
-   TODO: factor this out into a separate tool? */
-extern string dbNetSources;
 
 
 /* Path names. */
