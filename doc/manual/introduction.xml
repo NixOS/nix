@@ -1,17 +1,70 @@
-<chapter>
-  <title>Introduction</title>
+<chapter><title>Introduction</title>
 
-  <epigraph>
-    <para><quote>The number of Nix installations in the world has grown to 5,
-        with more expected.</quote></para>
-  </epigraph>
+<epigraph><para><quote>The number of Nix installations in the world
+has grown to 5, with more expected.</quote></para></epigraph>
 
-  <para>
-    Nix is a system for software deployment.  It supports the
-    creation and distribution of software packages, as well as the installation
-    and subsequent management of these on target machines (i.e., it is also a
-    package manager).
-  </para>
+<para>Nix is a system for the deployment of software.  Software
+deployment is concerned with the creation, distribution, and
+management of software components (<quote>packages</quote>).  There
+are many tools for this, but they tend to ignore some important
+requirements for deployment:
+
+<itemizedlist>
+
+<listitem><para><emphasis>Correctness</emphasis>.  The basic goal of
+software deployment is to transfer software from one machine (e.g.,
+the developer's, where it presumably works) to another machine (e.g.,
+the end user's).  The software should work exactly the same on the
+target machine as on the source machine.  But this in practice turns
+out to be rather difficult due to <emphasis>dependencies between
+components</emphasis> and <emphasis>interference between
+components</emphasis>.  If we deploy a component that depends on other
+components, then we should deploy those dependencies as well.  If they
+are missing on the target system, the component probably won't work.
+If they <emphasis>are</emphasis> present but are not the right
+version, the component might not work.  And if even if they are the
+right version, they may have been built with different flags or
+options, which can cause incompatibilities.  Interference occurs when
+components <quote>collide</quote> with each other in the file system.
+For instance, different versions of the same package tend to overwrite
+each other, so they cannot be installed at the same time.  But always
+picking the latest version might break components that only work with
+some older version.</para></listitem>
+
+<listitem><para><emphasis>Variability</emphasis>.  Many package
+management tools have difficulty supporting the installation of
+multiple versions or variants of the same component.  This is bad
+because as ...</para></listitem>
+
+</itemizedlist>
+
+</para>
+
+<para>Here are some of Nix's main features:
+
+<itemizedlist>
+
+<listitem><para>Nix can quite reliably figure out the dependencies
+between components.</para></listitem>
+
+</itemizedlist>
+
+</para>
+
+<warning><para>This manual is a work in progress.  It's quite likely
+to be incomplete, inconsistent with the current implementation, or
+simply wrong.</para></warning>
+
+<note><para>Some background information on Nix can be found in two
+papers.  The ICSE 2004 paper <ulink
+url='http://www.cs.uu.nl/~eelco/pubs/immdsd-icse2004-final.pdf'><citetitle>Imposing
+a Memory Management Discipline on Software
+Deployment</citetitle></ulink> discusses the hashing mechanism used to
+ensure reliable dependency identification and non-interference between
+different versions and variants of packages.  The LISA 2004 paper
+<citetitle>Nix: A Safe and Policy-Free System for Software
+Deployment</citetitle> gives a more general discussion of Nix from a
+system-administration perspective.</para></note>
 
   <para>
     Nix solves some large problems that exist in most current deployment and

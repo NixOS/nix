@@ -1,7 +1,6 @@
-<appendix>
-  <title>Bugs / To-Do</title>
+<appendix><title>Bugs / To-Do</title>
 
-  <itemizedlist>
+<itemizedlist>
 
     <listitem>
       <para>
@@ -99,17 +98,18 @@ $ nix-store -r $(cat /nix/var/nix/roots/bla)</screen>
       </para>
     </listitem>
 
-    <listitem>
-      <para>
-        For security, <command>nix-push</command> manifests should be
-        digitally signed, and <command>nix-pull</command> should
-        verify the signatures.  The actual NAR archives in the cache
-        do not need to be signed, since the manifest contains
-        cryptographic hashes of these files (and
-        <filename>fetchurl.nix</filename> checks them).
-      </para>
-    </listitem>
+<listitem><para>For security, <command>nix-push</command> manifests
+should be digitally signed, and <command>nix-pull</command> should
+verify the signatures.  The actual NAR archives in the cache do not
+need to be signed, since the manifest contains cryptographic hashes of
+these files (and <filename>fetchurl.nix</filename> checks
+them).</para></listitem>
 
-  </itemizedlist>
+<listitem><para>We should switch away from MD5, since it has been
+cracked.  We don't currently depend very much on the
+collision-resistance of MD5, but we will once we start sharing build
+results between users.</para></listitem>
+
+</itemizedlist>
 
 </appendix>

@@ -169,9 +169,9 @@ static void initAndRun(int argc, char * * argv)
 }
 
 
-#if HAVE_SETRESUID
-#define _setuid(uid) setresuid(uid, uid, uid)
-#define _setgid(gid) setresgid(gid, gid, gid)
+#if HAVE_SETREUID
+#define _setuid(uid) setreuid(uid, uid)
+#define _setgid(gid) setregid(gid, gid)
 #else
 /* Only works properly when run by root. */
 #define _setuid(uid) setuid(uid)
@@ -208,7 +208,7 @@ void switchToNixUser()
     /* !!! Apparently it is unspecified whether getgroups() includes
        the effective gid.  In that case the following test is always
        true *if* the program is installed setgid (which we do when we
-       have setresuid()).  On Linux this doesn't appear to be the
+       have setreuid()).  On Linux this doesn't appear to be the
        case, but we should switch to the real gid before doing this
        test, and then switch back to the saved gid. */ 
 
