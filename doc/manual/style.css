@@ -81,19 +81,8 @@ pre.screen
 .note,.warning
 {
     border: 1px solid #6185a0;
-    padding: 0px 36px;
-    margin-left: 2em;
-    margin-right: 2em;
-
+    padding: 0px 1em;
     background: #fffff5;
-    background-image: url(images/note.png);
-    background-position: center left;
-    background-repeat: no-repeat;
-}
-
-.warning
-{
-    background-image: url(images/warning.png);
 }
 
 div.note,div.warning
