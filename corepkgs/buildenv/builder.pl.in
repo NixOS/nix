@@ -2,71 +2,92 @@
 
 use strict;
 use Cwd;
+use IO::Handle;
 
-my $selfdir = $ENV{"out"};
-mkdir "$selfdir", 0755 || die "error creating $selfdir";
+STDOUT->autoflush(1);
+
+my $out = $ENV{"out"};
+mkdir "$out", 0755 || die "error creating $out";
+
 
 # For each activated package, create symlinks.
 
 sub createLinks {
-    my $srcdir = shift;
-    my $dstdir = shift;
+    my $srcDir = shift;
+    my $dstDir = shift;
 
-    my @srcfiles = glob("$srcdir/*");
+    my @srcFiles = glob("$srcDir/*");
 
-    foreach my $srcfile (@srcfiles) {
-        my $basename = $srcfile;
-        $basename =~ s/^.*\///g; # strip directory
-        my $dstfile = "$dstdir/$basename";
-	if ($srcfile =~ /\/propagated-build-inputs$/) {
-	} elsif (-d $srcfile) {
-            # !!! hack for resolving name clashes
-            if (!-e $dstfile) {
-                mkdir $dstfile, 0755 || 
-                    die "error creating directory $dstfile";
+    foreach my $srcFile (@srcFiles) {
+        my $baseName = $srcFile;
+        $baseName =~ s/^.*\///g; # strip directory
+        my $dstFile = "$dstDir/$baseName";
+        
+	if ($srcFile =~ /\/propagated-build-inputs$/ ||
+            $srcFile =~ /\/nix-support$/)
+        {
+            # Do noting.
+	}
+
+        elsif (-d $srcFile) {
+
+            lstat $dstFile;
+            
+            if (-d _) {
+                createLinks($srcFile, $dstFile);
             }
-            -d $dstfile or die "$dstfile is not a directory";
-            createLinks($srcfile, $dstfile);
-        } elsif (-l $dstfile) {
-            my $target = readlink($dstfile);
-            die "collission between $srcfile and $target";
-        } else {
-#            print "linking $dstfile to $srcfile\n";
-            symlink($srcfile, $dstfile) ||
-                die "error creating link $dstfile";
+
+            elsif (-l _) {
+                my $target = readlink $dstFile or die;
+                if (!-d $target) {
+                    die "collission between directory `$srcFile' and non-directory `$target'";
+                }
+                unlink $dstFile or die "error unlinking `$dstFile': $!";
+                mkdir $dstFile, 0755 || 
+                    die "error creating directory `$dstFile': $!";
+                createLinks($target, $dstFile);
+                createLinks($srcFile, $dstFile);
+            }
+
+            else {
+                symlink($srcFile, $dstFile) ||
+                    die "error creating link `$dstFile': $!";
+            }
+        }
+
+        elsif (-l $dstFile) {
+            my $target = readlink $dstFile;
+            die "collission between `$srcFile' and `$target'";
+        }
+
+        else {
+#            print "linking $dstFile to $srcFile\n";
+            symlink($srcFile, $dstFile) ||
+                die "error creating link `$dstFile': $!";
         }
     }
 }
 
+
 my %done;
 
 sub addPkg {
-    my $pkgdir = shift;
+    my $pkgDir = shift;
 
-    return if (defined $done{$pkgdir});
-    $done{$pkgdir} = 1;
+    return if (defined $done{$pkgDir});
+    $done{$pkgDir} = 1;
 
-#    print "merging $pkgdir\n";
-
-    createLinks("$pkgdir", "$selfdir");
-
-#    if (-f "$pkgdir/envpkgs") {
-#	my $envpkgs = `cat $pkgdir/envpkgs`;
-#	chomp $envpkgs;
-#	my @envpkgs = split / +/, $envpkgs;
-#	foreach my $envpkg (@envpkgs) {
-#	    addPkg($envpkg);
-#	}
-#    }
+    createLinks("$pkgDir", "$out");
 }
+
 
 my @args = split ' ', $ENV{"derivations"};
 
 while (scalar @args > 0) {
-    my $drvpath = shift @args;
-    print "adding $drvpath\n";
-    addPkg($drvpath);
+    my $drvPath = shift @args;
+    print "adding $drvPath\n";
+    addPkg($drvPath);
 }
 
-symlink($ENV{"manifest"}, "$selfdir/manifest") or die "cannot create manifest";
 
+symlink($ENV{"manifest"}, "$out/manifest") or die "cannot create manifest";
