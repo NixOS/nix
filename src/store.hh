@@ -20,7 +20,7 @@ void copyPath(const Path & src, const Path & dst);
    we do it in reverse order, we can get an obstructed build (since to
    rebuild the successor, the outputs paths must not exist). */
 void registerSuccessor(const Transaction & txn,
-    const Path & path1, const Path & path2);
+    const Path & srcPath, const Path & sucPath);
 
 /* Register a substitute. */
 void registerSubstitute(const Path & srcPath, const Path & subPath);

@@ -82,25 +82,25 @@ void copyPath(const Path & src, const Path & dst)
 
 
 void registerSuccessor(const Transaction & txn,
-    const Path & path1, const Path & path2)
+    const Path & srcPath, const Path & sucPath)
 {
     Path known;
-    if (nixDB.queryString(txn, dbSuccessors, path1, known) &&
-        known != path2)
+    if (nixDB.queryString(txn, dbSuccessors, srcPath, known) &&
+        known != sucPath)
     {
         throw Error(format(
             "the `impossible' happened: expression in path "
             "`%1%' appears to have multiple successors "
             "(known `%2%', new `%3%'")
-            % path1 % known % path2);
+            % srcPath % known % sucPath);
     }
 
     Paths revs;
-    nixDB.queryStrings(txn, dbSuccessorsRev, path2, revs);
-    revs.push_back(path1);
+    nixDB.queryStrings(txn, dbSuccessorsRev, sucPath, revs);
+    revs.push_back(srcPath);
 
-    nixDB.setString(txn, dbSuccessors, path1, path2);
-    nixDB.setStrings(txn, dbSuccessorsRev, path2, revs);
+    nixDB.setString(txn, dbSuccessors, srcPath, sucPath);
+    nixDB.setStrings(txn, dbSuccessorsRev, sucPath, revs);
 }
 
 
@@ -213,74 +213,22 @@ void verifyStore()
 {
     Transaction txn(nixDB);
 
-    /* !!! verify that the result is consistent */
+    Paths paths;
+    nixDB.enumTable(txn, dbValidPaths, paths);
 
-#if 0
-    Strings paths;
-    nixDB.enumTable(txn, dbPath2Id, paths);
-
-    for (Strings::iterator i = paths.begin();
+    for (Paths::iterator i = paths.begin();
          i != paths.end(); i++)
     {
-        bool erase = true;
-        string path = *i;
-
+        Path path = *i;
         if (!pathExists(path)) {
             debug(format("path `%1%' disappeared") % path);
+            nixDB.delPair(txn, dbValidPaths, path);
+            nixDB.delPair(txn, dbSuccessorsRev, path);
+            nixDB.delPair(txn, dbSubstitutesRev, path);
         }
-
-        else {
-            string id;
-            if (!nixDB.queryString(txn, dbPath2Id, path, id)) abort();
-
-            Strings idPaths;
-            nixDB.queryStrings(txn, dbId2Paths, id, idPaths);
-
-            bool found = false;
-            for (Strings::iterator j = idPaths.begin();     
-                 j != idPaths.end(); j++)
-                if (path == *j) {
-                    found = true;
-                    break;
-                }
-
-            if (found)
-                erase = false;
-            else
-                /* !!! perhaps we should add path to idPaths? */
-                debug(format("reverse mapping for path `%1%' missing") % path);
-        }
-
-        if (erase) nixDB.delPair(txn, dbPath2Id, path);
     }
 
-    Strings ids;
-    nixDB.enumTable(txn, dbId2Paths, ids);
-
-    for (Strings::iterator i = ids.begin();
-         i != ids.end(); i++)
-    {
-        FSId id = parseHash(*i);
-
-        Strings idPaths;
-        nixDB.queryStrings(txn, dbId2Paths, id, idPaths);
-
-        for (Strings::iterator j = idPaths.begin();     
-             j != idPaths.end(); )
-        {
-            string id2;
-            if (!nixDB.queryString(txn, dbPath2Id, *j, id2) || 
-                id != parseHash(id2)) {
-                debug(format("erasing path `%1%' from mapping for id %2%") 
-                    % *j % (string) id);
-                j = idPaths.erase(j);
-            } else j++;
-        }
-
-        nixDB.setStrings(txn, dbId2Paths, id, idPaths);
-    }
-
-    
+#if 0    
     Strings subs;
     nixDB.enumTable(txn, dbSubstitutes, subs);
 
@@ -308,31 +256,27 @@ void verifyStore()
 
         nixDB.setStrings(txn, dbSubstitutes, srcId, subIds);
     }
+#endif
 
-    Strings sucs;
+    Paths sucs;
     nixDB.enumTable(txn, dbSuccessors, sucs);
 
-    for (Strings::iterator i = sucs.begin();
-         i != sucs.end(); i++)
-    {
-        FSId id1 = parseHash(*i);
+    for (Paths::iterator i = sucs.begin(); i != sucs.end(); i++) {
+        Path srcPath = *i;
 
-        string id2;
-        if (!nixDB.queryString(txn, dbSuccessors, id1, id2)) abort();
-        
-        Strings id2Paths;
-        nixDB.queryStrings(txn, dbId2Paths, id2, id2Paths);
-        if (id2Paths.size() == 0) {
-            Strings id2Subs;
-            nixDB.queryStrings(txn, dbSubstitutes, id2, id2Subs);
-            if (id2Subs.size() == 0) {
-                debug(format("successor %1% for %2% missing") 
-                    % id2 % (string) id1);
-                nixDB.delPair(txn, dbSuccessors, (string) id1);
-            }
+        Path sucPath;
+        if (!nixDB.queryString(txn, dbSuccessors, srcPath, sucPath)) abort();
+
+        Paths revs;
+        nixDB.queryStrings(txn, dbSuccessorsRev, sucPath, revs);
+
+        if (find(revs.begin(), revs.end(), srcPath) == revs.end()) {
+            debug(format("reverse successor mapping from `%1%' to `%2%' missing")
+                  % srcPath % sucPath);
+            revs.push_back(srcPath);
+            nixDB.setStrings(txn, dbSuccessorsRev, sucPath, revs);
         }
     }
-#endif
 
     txn.commit();
 }
