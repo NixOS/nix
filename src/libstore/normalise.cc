@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <utime.h>
 
 #include "normalise.hh"
 #include "references.hh"
@@ -295,6 +296,61 @@ Path queryNormalForm(const Path & nePath)
     StoreExpr ne = storeExprFromPath(nePath);
     if (ne.type != StoreExpr::neClosure) abort();
     return nePath;
+}
+
+
+/* "Fix", or canonicalise, the meta-data of the files in a store path
+   after it has been built.  In particular:
+   - the last modification date on each file is set to 0 (i.e.,
+     00:00:00 1/1/1970 UTC)
+   - the permissions are set of 444 or 555 (i.e., read-only with or
+     without execute permission; setuid bits etc. are cleared)
+   - the owner and group are set to the Nix user and group, if we're
+     in a setuid Nix installation
+*/
+void canonicalisePathMetaData(const Path & path)
+{
+    checkInterrupt();
+
+    struct stat st;
+    if (lstat(path.c_str(), &st))
+	throw SysError(format("getting attributes of path `%1%'") % path);
+
+    cerr << "foo!" << path << "\n";
+    
+    if (!S_ISLNK(st.st_mode)) {
+
+        /* Mask out all type related bits. */
+        mode_t mode = st.st_mode & ~S_IFMT;
+        
+        if (mode != 0444 && mode != 0555) {
+            mode = (st.st_mode & S_IFMT)
+                 | 0444
+                 | (st.st_mode & S_IXUSR ? 0111 : 0);
+            if (chmod(path.c_str(), mode) == -1)
+                throw SysError(format("changing mode of `%1%' to %2$o") % path % mode);
+        }
+
+        if (st.st_uid != getuid() || st.st_gid != getgid()) {
+            if (chown(path.c_str(), getuid(), getgid()) == -1)
+                throw SysError(format("changing owner/group of `%1%' to %2%/%3%")
+                    % path % getuid() % getgid());
+        }
+    }
+
+    if (st.st_mtime != 0) {
+        struct utimbuf utimbuf;
+        utimbuf.actime = st.st_atime;
+        utimbuf.modtime = 0;
+        if (utime(path.c_str(), &utimbuf) == -1) 
+            throw SysError(format("changing modification time of `%1%'") % path);
+    }
+
+    if (S_ISDIR(st.st_mode)) {
+        Strings names = readDirectory(path);
+	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
+	    canonicalisePathMetaData(path + "/" + *i);
+    }
 }
 
 
@@ -1009,7 +1065,7 @@ void NormalisationGoal::createClosure()
         }
         nf.closure.roots.insert(path);
 
-	makePathReadOnly(path);
+	canonicalisePathMetaData(path);
 
 	/* For this output path, find the references to other paths contained
 	   in it. */
@@ -1601,7 +1657,7 @@ void SubstitutionGoal::finished()
         return;
     }
 
-    makePathReadOnly(storePath);
+    canonicalisePathMetaData(storePath);
 
     Transaction txn;
     createStoreTransaction(txn);
