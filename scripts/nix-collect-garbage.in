@@ -10,7 +10,7 @@ my $invert = 0;
 
 foreach my $arg (@ARGV) {
     if ($arg eq "--keep-successors") { $keepsuccessors = 1; }
-    if ($arg eq "--invert") { $invert = 1; }
+    elsif ($arg eq "--invert") { $invert = 1; }
     else { die "unknown argument `$arg'" };
 }
 
