@@ -159,3 +159,26 @@ void debug(const format & f)
 {
     msg(format("debug: %1%") % f.str());
 }
+
+
+void readFull(int fd, unsigned char * buf, size_t count)
+{
+    while (count) {
+        ssize_t res = read(fd, (char *) buf, count);
+        if (res == -1) throw SysError("reading from file");
+        if (res == 0) throw Error("unexpected end-of-file");
+        count -= res;
+        buf += res;
+    }
+}
+
+
+void writeFull(int fd, const unsigned char * buf, size_t count)
+{
+    while (count) {
+        ssize_t res = write(fd, (char *) buf, count);
+        if (res == -1) throw SysError("writing to file");
+        count -= res;
+        buf += res;
+    }
+}

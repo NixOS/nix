@@ -15,8 +15,7 @@ struct CopySink : DumpSink
     int fd;
     virtual void operator () (const unsigned char * data, unsigned int len)
     {
-        if (write(fd, (char *) data, len) != (ssize_t) len)
-            throw SysError("writing to child");
+        writeFull(fd, data, len);
     }
 };
 
@@ -24,13 +23,9 @@ struct CopySink : DumpSink
 struct CopySource : RestoreSource
 {
     int fd;
-    virtual void operator () (const unsigned char * data, unsigned int len)
+    virtual void operator () (unsigned char * data, unsigned int len)
     {
-        ssize_t res = read(fd, (char *) data, len);
-        if (res == -1)
-            throw SysError("reading from parent");
-        if (res != (ssize_t) len)
-            throw Error("not enough data available on parent");
+        readFull(fd, data, len);
     }
 };
 

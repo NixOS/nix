@@ -15,6 +15,9 @@ $hash || die "no package hash specified";
 my $linkdir = "@localstatedir@/nix/links";
 
 # Build the specified package, and all its dependencies.
+system "nix -ih $hash";
+if ($?) { die "`nix -ih' failed"; }
+
 my $pkgdir = `nix -qph $hash`;
 if ($?) { die "`nix -qph' failed"; }
 chomp $pkgdir;

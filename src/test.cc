@@ -37,21 +37,16 @@ struct MySink : DumpSink
     virtual void operator () (const unsigned char * data, unsigned int len)
     {
         /* Don't use cout, it's slow as hell! */
-        if (write(STDOUT_FILENO, (char *) data, len) != (ssize_t) len)
-            throw SysError("writing to stdout");
+        writeFull(STDOUT_FILENO, data, len);
     }
 };
 
 
 struct MySource : RestoreSource
 {
-    virtual void operator () (const unsigned char * data, unsigned int len)
+    virtual void operator () (unsigned char * data, unsigned int len)
     {
-        ssize_t res = read(STDIN_FILENO, (char *) data, len);
-        if (res == -1)
-            throw SysError("reading from stdin");
-        if (res != (ssize_t) len)
-            throw Error("not enough data available on stdin");
+        readFull(STDIN_FILENO, data, len);
     }
 };
 

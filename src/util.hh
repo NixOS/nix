@@ -85,4 +85,10 @@ void msg(const format & f);
 void debug(const format & f);
 
 
+/* Wrappers arount read()/write() that read/write exactly the
+   requested number of bytes. */
+void readFull(int fd, unsigned char * buf, size_t count);
+void writeFull(int fd, const unsigned char * buf, size_t count);
+
+
 #endif /* !__UTIL_H */

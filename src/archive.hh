@@ -54,7 +54,7 @@ struct RestoreSource
        pointed to by data.  It should block if that much data is not
        yet available, or throw an error if it is not going to be
        available. */
-    virtual void operator () (const unsigned char * data, unsigned int len) = 0;
+    virtual void operator () (unsigned char * data, unsigned int len) = 0;
 };
 
 void restorePath(const string & path, RestoreSource & source);

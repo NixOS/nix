@@ -190,7 +190,7 @@ static string readString(RestoreSource & source)
 {
     unsigned int len = readInt(source);
     char buf[len];
-    source((const unsigned char *) buf, len);
+    source((unsigned char *) buf, len);
     readPadding(len, source);
     return string(buf, len);
 }

@@ -55,12 +55,11 @@ void checkPath(const string & path,
         int fd = open(path.c_str(), O_RDONLY);
         if (fd == -1) throw SysError(format("opening file `%1%'") % path);
 
-        char * buf = new char[st.st_size];
+        unsigned char * buf = new unsigned char[st.st_size];
 
-        if (read(fd, buf, st.st_size) != st.st_size)
-            throw SysError(format("reading file %1%") % path);
+        readFull(fd, buf, st.st_size);
 
-        search(string(buf, st.st_size), ids, seen);
+        search(string((char *) buf, st.st_size), ids, seen);
         
         delete buf; /* !!! autodelete */
 
