@@ -260,7 +260,6 @@ void addToStore(string srcPath, string & dstPath, FSId & id,
     dstPath = canonPath(nixStore + "/" + (string) id + "-" + baseName);
 
     try {
-        /* !!! should not use the substitutes! */
         dstPath = expandId(id, deterministicName ? dstPath : "", 
             nixStore, FSIdSet(), true);
         return;

@@ -4,6 +4,7 @@
 #include "references.hh"
 #include "db.hh"
 #include "exec.hh"
+#include "pathlocks.hh"
 #include "globals.hh"
 
 
@@ -23,7 +24,29 @@ static FSId storeSuccessor(const FSId & id1, ATerm sc)
 }
 
 
-typedef set<FSId> FSIdSet;
+static FSId useSuccessor(const FSId & id)
+{
+    string idSucc;
+    if (nixDB.queryString(noTxn, dbSuccessors, id, idSucc)) {
+        debug(format("successor %1% -> %2%") % (string) id % idSucc);
+        return parseHash(idSucc);
+    } else
+        return id;
+}
+
+
+typedef map<string, FSId> OutPaths;
+typedef map<string, SliceElem> ElemMap;
+
+
+Strings pathsFromOutPaths(const OutPaths & ps)
+{
+    Strings ss;
+    for (OutPaths::const_iterator i = ps.begin();
+         i != ps.end(); i++)
+        ss.push_back(i->first);
+    return ss;
+}
 
 
 FSId normaliseFState(FSId id, FSIdSet pending)
@@ -32,19 +55,66 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 
     /* Try to substitute $id$ by any known successors in order to
        speed up the rewrite process. */
-    string idSucc;
-    while (nixDB.queryString(noTxn, dbSuccessors, id, idSucc)) {
-        debug(format("successor %1% -> %2%") % (string) id % idSucc);
-        id = parseHash(idSucc);
-    }
+    id = useSuccessor(id);
 
     /* Get the fstate expression. */
     FState fs = parseFState(termFromId(id));
 
-    /* It this is a normal form (i.e., a slice) we are done. */
+    /* If this is a normal form (i.e., a slice) we are done. */
     if (fs.type == FState::fsSlice) return id;
+    if (fs.type != FState::fsDerive) abort();
     
-    /* Otherwise, it's a derivation. */
+
+    /* Otherwise, it's a derive expression, and we have to build it to
+       determine its normal form. */
+
+
+    /* Some variables. */
+
+    /* Output paths, with their ids. */
+    OutPaths outPaths;
+
+    /* Input paths, with their slice elements. */
+    ElemMap inMap; 
+
+    /* Referencable paths (i.e., input and output paths). */
+    Strings refPaths;
+
+    /* The environment to be passed to the builder. */
+    Environment env; 
+
+
+    /* Parse the outputs. */
+    for (DeriveOutputs::iterator i = fs.derive.outputs.begin();
+         i != fs.derive.outputs.end(); i++)
+    {
+        debug(format("building %1% in `%2%'") % (string) i->second % i->first);
+        outPaths[i->first] = i->second;
+        refPaths.push_back(i->first);
+    }
+
+    /* Obtain locks on all output paths.  The locks are automatically
+       released when we exit this function or Nix crashes. */
+    PathLocks outputLock(pathsFromOutPaths(outPaths));
+
+    /* Now check again whether there is a successor.  This is because
+       another process may have started building in parallel.  After
+       it has finished and released the locks, we can (and should)
+       reuse its results.  (Strictly speaking the first successor
+       check above can be omitted, but that would be less efficient.)
+       Note that since we now hold the locks on the output paths, no
+       other process can build this expression, so no further checks
+       are necessary. */
+    {
+        FSId id2 = useSuccessor(id);
+        if (id2 != id) {
+            FState fs = parseFState(termFromId(id2));
+            debug(format("skipping build of %1%, someone beat us to it")
+                % (string) id);
+            if (fs.type != FState::fsSlice) abort();
+            return id2;
+        }
+    }
 
     /* Right platform? */
     if (fs.derive.platform != thisSystem)
@@ -52,14 +122,12 @@ FSId normaliseFState(FSId id, FSIdSet pending)
             % fs.derive.platform % thisSystem);
         
     /* Realise inputs (and remember all input paths). */
-    typedef map<string, SliceElem> ElemMap;
-
-    ElemMap inMap;
-
     for (FSIds::iterator i = fs.derive.inputs.begin();
          i != fs.derive.inputs.end(); i++) {
         FSId nf = normaliseFState(*i, pending);
         realiseSlice(nf, pending);
+        /* !!! nf should be a root of the garbage collector while we
+           are building */
         FState fs = parseFState(termFromId(nf));
         if (fs.type != FState::fsSlice) abort();
         for (SliceElems::iterator j = fs.slice.elems.begin();
@@ -67,31 +135,18 @@ FSId normaliseFState(FSId id, FSIdSet pending)
             inMap[j->path] = *j;
     }
 
-    Strings inPaths;
     for (ElemMap::iterator i = inMap.begin(); i != inMap.end(); i++)
-        inPaths.push_back(i->second.path);
+        refPaths.push_back(i->second.path);
 
     /* Build the environment. */
-    Environment env;
     for (StringPairs::iterator i = fs.derive.env.begin();
          i != fs.derive.env.end(); i++)
         env[i->first] = i->second;
 
-    /* Parse the outputs. */
-    typedef map<string, FSId> OutPaths;
-    OutPaths outPaths;
-    for (DeriveOutputs::iterator i = fs.derive.outputs.begin();
-         i != fs.derive.outputs.end(); i++)
-    {
-        debug(format("building %1% in `%2%'") % (string) i->second % i->first);
-        outPaths[i->first] = i->second;
-        inPaths.push_back(i->first);
-    }
-
     /* We can skip running the builder if we can expand all output
        paths from their ids. */
     bool fastBuild = true;
-    for (OutPaths::iterator i = outPaths.begin(); 
+    for (OutPaths::iterator i = outPaths.begin();
          i != outPaths.end(); i++)
     {
         try {
@@ -132,7 +187,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
         registerPath(path, i->second);
         fs.slice.roots.push_back(i->second);
 
-        Strings refs = filterReferences(path, inPaths);
+        Strings refs = filterReferences(path, refPaths);
 
         SliceElem elem;
         elem.path = path;

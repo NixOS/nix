@@ -22,7 +22,7 @@ noinst_LIBRARIES = libnix.a libshared.a
 
 libnix_a_SOURCES = util.cc hash.cc archive.cc md5.c \
  store.cc fstate.cc normalise.cc exec.cc \
- globals.cc db.cc references.cc
+ globals.cc db.cc references.cc pathlocks.cc
 
 libshared_a_SOURCES = shared.cc
 
@@ -44,6 +44,7 @@ install-data-local:
 	$(INSTALL) -d $(localstatedir)/nix
 	$(INSTALL) -d $(localstatedir)/nix/db
 	$(INSTALL) -d $(localstatedir)/nix/links
+	rm -f $(prefix)/current
 	ln -sf $(localstatedir)/nix/links/current $(prefix)/current
 	$(INSTALL) -d $(localstatedir)/log/nix
 	$(INSTALL) -d $(prefix)/store
