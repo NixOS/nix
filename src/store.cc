@@ -1,7 +1,10 @@
 #include <iostream>
 
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "store.hh"
 #include "globals.hh"
@@ -9,6 +12,81 @@
 #include "archive.hh"
 #include "pathlocks.hh"
 
+
+/* Nix database. */
+static Database nixDB;
+
+
+/* Database tables. */
+
+/* dbValidPaths :: Path -> ()
+
+   The existence of a key $p$ indicates that path $p$ is valid (that
+   is, produced by a succesful build). */
+static TableId dbValidPaths;
+
+/* dbSuccessors :: Path -> Path
+
+   Each pair $(p_1, p_2)$ in this mapping records the fact that the
+   Nix expression stored at path $p_1$ has a successor expression
+   stored at path $p_2$.
+
+   Note that a term $y$ is a successor of $x$ iff there exists a
+   sequence of rewrite steps that rewrites $x$ into $y$.
+*/
+static TableId dbSuccessors;
+
+/* dbSuccessorsRev :: Path -> [Path]
+
+   The reverse mapping of dbSuccessors (i.e., it stores the
+   predecessors of a Nix expression).
+*/
+static TableId dbSuccessorsRev;
+
+/* dbSubstitutes :: Path -> [Path]
+
+   Each pair $(p, [ps])$ tells Nix that it can realise any of the
+   Nix expressions stored at paths $ps$ to produce a path $p$.
+
+   The main purpose of this is for distributed caching of derivates.
+   One system can compute a derivate and put it on a website (as a Nix
+   archive), for instance, and then another system can register a
+   substitute for that derivate.  The substitute in this case might be
+   a Nix expression that fetches the Nix archive.
+*/
+static TableId dbSubstitutes;
+
+/* dbSubstitutesRev :: Path -> [Path]
+
+   The reverse mapping of dbSubstitutes.
+*/
+static TableId dbSubstitutesRev;
+
+
+void openDB()
+{
+    nixDB.open(nixDBPath);
+    dbValidPaths = nixDB.openTable("validpaths");
+    dbSuccessors = nixDB.openTable("successors");
+    dbSuccessorsRev = nixDB.openTable("successors-rev");
+    dbSubstitutes = nixDB.openTable("substitutes");
+    dbSubstitutesRev = nixDB.openTable("substitutes-rev");
+}
+
+
+void initDB()
+{
+}
+
+
+void createStoreTransaction(Transaction & txn)
+{
+    Transaction txn2(nixDB);
+    txn2.moveTo(txn);
+}
+
+
+/* Path copying. */
 
 struct CopySink : DumpSink
 {
@@ -101,6 +179,12 @@ void registerSuccessor(const Transaction & txn,
 
     nixDB.setString(txn, dbSuccessors, srcPath, sucPath);
     nixDB.setStrings(txn, dbSuccessorsRev, sucPath, revs);
+}
+
+
+bool querySuccessor(const Path & srcPath, Path & sucPath)
+{
+    return nixDB.queryString(noTxn, dbSuccessors, srcPath, sucPath);
 }
 
 
@@ -201,6 +285,27 @@ Path addToStore(const Path & _srcPath)
     }
 
     return dstPath;
+}
+
+
+void addTextToStore(const Path & dstPath, const string & s)
+{
+    if (!isValidPath(dstPath)) {
+
+        /* !!! locking? -> parallel writes are probably idempotent */
+
+        int fd = open(dstPath.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0666);
+        if (fd == -1) throw SysError(format("creating store file `%1%'") % dstPath);
+
+        if (write(fd, s.c_str(), s.size()) != (ssize_t) s.size())
+            throw SysError(format("writing store file `%1%'") % dstPath);
+
+        close(fd); /* !!! close on exception */
+
+        Transaction txn(nixDB);
+        registerValidPath(txn, dstPath);
+        txn.commit();
+    }
 }
 
 

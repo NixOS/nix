@@ -73,7 +73,7 @@ Path maybeNormalise(const Path & ne, bool normalise)
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qList, qRequisites, qGenerators, qPredecessors, qGraph 
+    enum { qList, qRequisites, qPredecessors, qGraph 
     } query = qList;
     bool normalise = false;
     bool includeExprs = true;
@@ -83,7 +83,6 @@ static void opQuery(Strings opFlags, Strings opArgs)
          i != opFlags.end(); i++)
         if (*i == "--list" || *i == "-l") query = qList;
         else if (*i == "--requisites" || *i == "-r") query = qRequisites;
-        else if (*i == "--generators" || *i == "-g") query = qGenerators;
         else if (*i == "--predecessors") query = qPredecessors;
         else if (*i == "--graph") query = qGraph;
         else if (*i == "--normalise" || *i == "-n") normalise = true;
@@ -124,22 +123,6 @@ static void opQuery(Strings opFlags, Strings opArgs)
             break;
         }
 
-#if 0
-        case qGenerators: {
-            FSIds outIds;
-            for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); i++)
-                outIds.push_back(checkPath(*i));
-
-            FSIds genIds = findGenerators(outIds);
-
-            for (FSIds::iterator i = genIds.begin(); 
-                 i != genIds.end(); i++)
-                cout << format("%s\n") % expandId(*i);
-            break;
-        }
-#endif
-
         case qPredecessors: {
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
@@ -172,7 +155,8 @@ static void opSuccessor(Strings opFlags, Strings opArgs)
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (opArgs.size() % 2) throw UsageError("expecting even number of arguments");
 
-    Transaction txn(nixDB); /* !!! this could be a big transaction */ 
+    Transaction txn;
+    createStoreTransaction(txn);
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); )
     {

@@ -9,6 +9,15 @@
 using namespace std;
 
 
+/* Open the database environment. */
+void openDB();
+
+/* Create the required database tables. */
+void initDB();
+
+/* Get a transaction object. */
+void createStoreTransaction(Transaction & txn);
+
 /* Copy a path recursively. */
 void copyPath(const Path & src, const Path & dst);
 
@@ -21,6 +30,10 @@ void copyPath(const Path & src, const Path & dst);
    rebuild the successor, the outputs paths must not exist). */
 void registerSuccessor(const Transaction & txn,
     const Path & srcPath, const Path & sucPath);
+
+/* Return the predecessors of the Nix expression stored at the given
+   path. */
+bool querySuccessor(const Path & srcPath, Path & sucPath);
 
 /* Return the predecessors of the Nix expression stored at the given
    path. */
@@ -41,6 +54,11 @@ bool isValidPath(const Path & path);
 /* Copy the contents of a path to the store and register the validity
    the resulting path.  The resulting path is returned. */
 Path addToStore(const Path & srcPath);
+
+/* Like addToStore, but the path of the output is given, and the
+   contents written to the output path is a regular file containing
+   the given string. */
+void addTextToStore(const Path & dstPath, const string & s);
 
 /* Delete a value from the nixStore directory. */
 void deleteFromStore(const Path & path);

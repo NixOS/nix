@@ -39,14 +39,11 @@ Path writeTerm(ATerm t, const string & suffix)
         (string) h + suffix + ".nix");
 
     if (!isValidPath(path)) {
-        if (!ATwriteToNamedTextFile(t, path.c_str()))
-            throw Error(format("cannot write aterm %1%") % path);
-
-        Transaction txn(nixDB);
-        registerValidPath(txn, path);
-        txn.commit();
+        char * s = ATwriteToString(t);
+        if (!s) throw Error(format("cannot write aterm to `%1%'") % path);
+        addTextToStore(path, string(s));
     }
-
+    
     return path;
 }
 

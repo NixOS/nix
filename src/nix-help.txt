@@ -23,7 +23,6 @@ Query flags:
 
   --list / -l: query the output paths (roots) of a Nix expression (default)
   --requisites / -r: print all paths necessary to realise expression
-  --generators / -g: find expressions producing a subset of given ids
   --predecessors: print predecessors of a Nix expression
   --graph: print a dot graph rooted at given ids
 

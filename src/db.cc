@@ -70,6 +70,14 @@ void Transaction::abort()
 }
 
 
+void Transaction::moveTo(Transaction & t)
+{
+    if (t.txn) throw Error("target txn already exists");
+    t.txn = txn;
+    txn = 0;
+}
+
+
 void Database::requireEnv()
 {
     if (!env) throw Error("database environment not open");

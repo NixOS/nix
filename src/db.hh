@@ -29,6 +29,8 @@ public:
 
     void abort();
     void commit();
+
+    void moveTo(Transaction & t);
 };
 
 

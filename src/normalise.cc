@@ -2,7 +2,6 @@
 
 #include "normalise.hh"
 #include "references.hh"
-#include "db.hh"
 #include "exec.hh"
 #include "pathlocks.hh"
 #include "globals.hh"
@@ -11,7 +10,7 @@
 static Path useSuccessor(const Path & path)
 {
     string pathSucc;
-    if (nixDB.queryString(noTxn, dbSuccessors, path, pathSucc)) {
+    if (querySuccessor(path, pathSucc)) {
         debug(format("successor %1% -> %2%") % (string) path % pathSucc);
         return pathSucc;
     } else
@@ -349,7 +348,8 @@ Path normaliseNixExpr(const Path & _nePath, PathSet pending)
        for recoverability: unregistered paths in the store can be
        deleted arbitrarily, while registered paths can only be deleted
        by running the garbage collector. */
-    Transaction txn(nixDB);
+    Transaction txn;
+    createStoreTransaction(txn);
     for (PathSet::iterator i = ne.derivation.outputs.begin(); 
          i != ne.derivation.outputs.end(); i++)
         registerValidPath(txn, *i);
@@ -434,50 +434,3 @@ PathSet nixExprRequisites(const Path & nePath,
         paths, doneSet);
     return paths;
 }
-
-
-#if 0
-PathSet findGenerators(const PathSet & outputs)
-{
-    FSIdSet ids(_ids.begin(), _ids.end());
-    FSIds generators;
-
-    /* !!! hack; for performance, we just look at the rhs of successor
-       mappings, since we know that those are Nix expressions. */
-
-    Strings sucs;
-    nixDB.enumTable(noTxn, dbSuccessors, sucs);
-
-    for (Strings::iterator i = sucs.begin();
-         i != sucs.end(); i++)
-    {
-        string s;
-        if (!nixDB.queryString(noTxn, dbSuccessors, *i, s)) continue;
-        FSId id = parseHash(s);
-
-        NixExpr ne;
-        try {
-            /* !!! should substitutes be used? */
-            ne = parseNixExpr(termFromId(id));
-        } catch (...) { /* !!! only catch parse errors */
-            continue;
-        }
-
-        if (ne.type != NixExpr::neClosure) continue;
-        
-        bool okay = true;
-        for (ClosureElems::const_iterator i = ne.closure.elems.begin();
-             i != ne.closure.elems.end(); i++)
-            if (ids.find(i->second.id) == ids.end()) {
-                okay = false;
-                break;
-            }
-        
-        if (!okay) continue;
-        
-        generators.push_back(id);
-    }
-
-    return generators;
-}
-#endif
