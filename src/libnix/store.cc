@@ -307,8 +307,7 @@ void addTextToStore(const Path & dstPath, const string & s)
         AutoCloseFD fd = open(dstPath.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0666);
         if (fd == -1) throw SysError(format("creating store file `%1%'") % dstPath);
 
-        if (write(fd, s.c_str(), s.size()) != (ssize_t) s.size())
-            throw SysError(format("writing store file `%1%'") % dstPath);
+        writeFull(fd, (unsigned char *) s.c_str(), s.size());
 
         Transaction txn(nixDB);
         registerValidPath(txn, dstPath);
