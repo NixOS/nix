@@ -6,7 +6,12 @@ hash=$2
 hashType=$NIX_HASH_ALGO
 if test -z "$hashType"; then
     hashType=md5
-fi    
+fi
+
+hashFormat=
+if test "$hashType" = "sha1"; then
+    hashFormat=--base32
+fi
 
 if test -z "$url"; then
     echo "syntax: nix-prefetch-url URL" >&2
@@ -32,7 +37,7 @@ if test -z "$hash"; then
     @curl@ --fail --location --max-redirs 20 "$url" > $tmpPath1
 
     # Compute the hash.
-    hash=$(@bindir@/nix-hash --type "$hashType" --flat $tmpPath1)
+    hash=$(@bindir@/nix-hash --type "$hashType" $hashFormat --flat $tmpPath1)
     if ! test -n "$QUIET"; then echo "hash is $hash" >&2; fi
 
     # Rename it so that the fetchurl builder can find it.
