@@ -1,5 +1,6 @@
 %: %.in Makefile
 	sed \
+	 -e "s^@extra1\@^$(extra1)^g" \
 	 -e "s^@prefix\@^$(prefix)^g" \
 	 -e "s^@bindir\@^$(bindir)^g" \
 	 -e "s^@sysconfdir\@^$(sysconfdir)^g" \

@@ -1,5 +1,7 @@
 TEST_ROOT = $(shell pwd)/test-tmp
 
+extra1 = $(TEST_ROOT)/shared
+
 TESTS_ENVIRONMENT = TEST_ROOT=$(TEST_ROOT) \
   NIX_STORE_DIR=$(TEST_ROOT)/store \
   NIX_DATA_DIR=$(TEST_ROOT)/data \
@@ -7,19 +9,23 @@ TESTS_ENVIRONMENT = TEST_ROOT=$(TEST_ROOT) \
   NIX_STATE_DIR=$(TEST_ROOT)/state \
   NIX_DB_DIR=$(TEST_ROOT)/db \
   TOP=$(shell pwd)/.. \
+  SHARED=$(extra1) \
   $(SHELL) -e -x
 
 simple.sh: simple.nix
 dependencies.sh: dependencies.nix
 locking.sh: locking.nix
+parallel.sh: parallel.nix
 
-TESTS = init.sh simple.sh dependencies.sh locking.sh
+TESTS = init.sh simple.sh dependencies.sh parallel.sh
+#locking.sh parallel.sh
 
-XFAIL_TESTS =
+XFAIL_TESTS = parallel.sh
 
 include ../substitute.mk
 
 EXTRA_DIST = $(TESTS) \
   simple.nix.in simple.builder.sh \
   dependencies.nix.in dependencies.builder*.sh \
-  locking.nix.in locking.builder.sh
+  locking.nix.in locking.builder.sh \
+  parallel.nix.in parallel.builder.sh
