@@ -2,7 +2,7 @@ storeExpr=$($TOP/src/nix-instantiate/nix-instantiate parallel.nix)
 
 echo "store expr is $storeExpr"
 
-outPath=$($TOP/src/nix-store/nix-store -qnfvvvv -j10000 "$storeExpr")
+outPath=$($TOP/src/nix-store/nix-store -qfvv -j10000 "$storeExpr")
 
 echo "output path is $outPath"
 

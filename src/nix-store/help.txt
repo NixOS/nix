@@ -4,7 +4,7 @@ nix-store [OPTIONS...] [ARGUMENTS...]
 
 Operations:
 
-  --build / -b: build a Nix derivation
+  --realise / -r: build a Nix derivation
   --add / -A: copy a path to the Nix store
   --query / -q: query information
 

@@ -2,7 +2,7 @@ storeExpr=$($TOP/src/nix-instantiate/nix-instantiate simple.nix)
 
 echo "store expr is $storeExpr"
 
-outPath=$($TOP/src/nix-store/nix-store -bvv "$storeExpr")
+outPath=$($TOP/src/nix-store/nix-store -rvv "$storeExpr")
 
 echo "output path is $outPath"
 

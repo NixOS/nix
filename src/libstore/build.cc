@@ -337,6 +337,7 @@ private:
     /* The states. */
     void init();
     void haveStoreExpr();
+    void outputsSubstituted();
     void inputsRealised();
     void tryToBuild();
     void buildDone();
@@ -376,8 +377,8 @@ private:
     /* Callback used by the worker to write to the log. */
     void writeLog(int fd, const unsigned char * buf, size_t count);
 
-    /* Return true iff all output paths are valid. */
-    bool allOutputsValid();
+    /* Return the set of (in)valid paths. */
+    PathSet checkPathValidity(bool returnValid);
 
     string name();
 };
@@ -441,13 +442,45 @@ void DerivationGoal::haveStoreExpr()
     /* Get the derivation. */
     drv = derivationFromPath(drvPath);
 
-    /* If all the outputs already exist, then we're done. */
-    if (allOutputsValid()) {
+    /* Check what outputs paths are not already valid. */
+    PathSet invalidOutputs = checkPathValidity(false);
+
+    /* If they are all valid, then we're done. */
+    if (invalidOutputs.size() == 0) {
         amDone(true);
         return;
     }
 
-    /* Inputs must be built before we can build this goal. */
+    /* We are first going to try to create the invalid output paths
+       through substitutes.  If that doesn't work, we'll build
+       them. */
+    for (PathSet::iterator i = invalidOutputs.begin();
+         i != invalidOutputs.end(); ++i)
+        /* Don't bother creating a substitution goal if there are no
+           substitutes. */
+        if (querySubstitutes(*i).size() > 0)
+            addWaitee(worker.makeSubstitutionGoal(*i));
+
+    if (waitees.empty()) /* to prevent hang (no wake-up event) */
+        outputsSubstituted();
+    else
+        state = &DerivationGoal::outputsSubstituted;
+}
+
+
+void DerivationGoal::outputsSubstituted()
+{
+    trace("all outputs substituted (maybe)");
+
+    if (checkPathValidity(false).size() == 0) {
+        amDone(true);
+        return;
+    }
+
+    /* Otherwise, at least one of the output paths could not be
+       produced using a substitute.  So we have to build instead. */
+
+    /* The inputs must be built before we can build this goal. */
     /* !!! but if possible, only install the paths that we need */
     for (DerivationInputs::iterator i = drv.inputDrvs.begin();
          i != drv.inputDrvs.end(); ++i)
@@ -792,11 +825,19 @@ bool DerivationGoal::prepareBuild()
        omitted, but that would be less efficient.)  Note that since we
        now hold the locks on the output paths, no other process can
        build this derivation, so no further checks are necessary. */
-    if (allOutputsValid()) {
+    PathSet validPaths = checkPathValidity(true);
+    if (validPaths.size() == drv.outputs.size()) {
         debug(format("skipping build of derivation `%1%', someone beat us to it")
             % drvPath);
         outputLocks.setDeletion(true);
         return false;
+    }
+
+    if (validPaths.size() > 0) {
+        /* !!! fix this; try to delete valid paths */
+        throw Error(
+            format("derivation `%1%' is blocked by its output paths")
+            % drvPath);
     }
 
     /* Gather information necessary for computing the closure and/or
@@ -823,7 +864,7 @@ bool DerivationGoal::prepareBuild()
         assert(isValidPath(i->first));
         Derivation inDrv = derivationFromPath(i->first);
         for (StringSet::iterator j = i->second.begin();
-             j != i->second.begin(); ++j)
+             j != i->second.end(); ++j)
             if (inDrv.outputs.find(*j) != inDrv.outputs.end())
                 computeFSClosure(inDrv.outputs[*j].path, inputPaths);
             else
@@ -832,8 +873,7 @@ bool DerivationGoal::prepareBuild()
                     % drvPath % *j % i->first);
     }
 
-    for (PathSet::iterator i = inputPaths.begin(); i != inputPaths.end(); ++i)
-        debug(format("INPUT %1%") % *i);
+    debug(format("added input paths %1%") % showPaths(inputPaths));
 
     allPaths.insert(inputPaths.begin(), inputPaths.end());
 
@@ -841,22 +881,6 @@ bool DerivationGoal::prepareBuild()
     for (PathSet::iterator i = drv.inputSrcs.begin();
          i != drv.inputSrcs.end(); ++i)
         computeFSClosure(*i, inputPaths);
-
-    /* We can skip running the builder if all output paths are already
-       valid. */
-    bool fastBuild = true;
-    for (DerivationOutputs::iterator i = drv.outputs.begin();
-         i != drv.outputs.end(); ++i)
-        if (!isValidPath(i->second.path)) { 
-            fastBuild = false;
-            break;
-        }
-
-    if (fastBuild) {
-        printMsg(lvlChatty, format("skipping build; output paths already exist"));
-        computeClosure();
-        return false;
-    }
 
     return true;
 }
@@ -1164,21 +1188,17 @@ void DerivationGoal::writeLog(int fd,
 }
 
 
-bool DerivationGoal::allOutputsValid()
+PathSet DerivationGoal::checkPathValidity(bool returnValid)
 {
-    unsigned int nrValid = 0;
+    PathSet result;
     for (DerivationOutputs::iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
-        if (isValidPath(i->second.path)) nrValid++;
-
-    if (nrValid != 0) {
-        if (nrValid == drv.outputs.size()) return true;
-        throw Error(
-            format("derivation `%1%' is blocked by its output paths")
-            % drvPath);
-    }
-
-    return false;
+        if (isValidPath(i->second.path)) {
+            if (returnValid) result.insert(i->second.path);
+        } else {
+            if (!returnValid) result.insert(i->second.path);
+        }
+    return result;
 }
 
 

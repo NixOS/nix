@@ -2,16 +2,16 @@ storeExpr=$($TOP/src/nix-instantiate/nix-instantiate dependencies.nix)
 
 echo "store expr is $storeExpr"
 
-outPath=$($TOP/src/nix-store/nix-store -bvv "$storeExpr")
+outPath=$($TOP/src/nix-store/nix-store -rvv "$storeExpr")
 
 echo "output path is $outPath"
 
 text=$(cat "$outPath"/foobar)
 if test "$text" != "FOOBAR"; then exit 1; fi
 
-deps=$($TOP/src/nix-store/nix-store -qnR "$storeExpr")
+deps=$($TOP/src/nix-store/nix-store -quR "$storeExpr")
 
-echo "output closures are $deps"
+echo "output closure contains $deps"
 
 # The output path should be in the closure.
 echo "$deps" | grep -q "$outPath"

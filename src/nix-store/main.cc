@@ -27,19 +27,39 @@ static Path findOutput(const Derivation & drv, string id)
 }
 
 
-/* Build the given derivations. */
-static void opBuild(Strings opFlags, Strings opArgs)
+/* Realisation the given path.  For a derivation that means build it;
+   for other paths it means ensure their validity. */
+static Path realisePath(const Path & path)
+{
+    if (isDerivation(path)) {
+        PathSet paths;
+        paths.insert(path);
+        buildDerivations(paths);
+        return findOutput(derivationFromPath(path), "out");
+    } else {
+        ensurePath(path);
+        return path;
+    }
+}
+
+
+/* Realise the given paths. */
+static void opRealise(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
-    buildDerivations(PathSet(opArgs.begin(), opArgs.end()));
+    if (opArgs.size() > 1) {
+        PathSet drvPaths;
+        for (Strings::iterator i = opArgs.begin();
+             i != opArgs.end(); i++)
+            if (isDerivation(*i))
+                drvPaths.insert(*i);
+        buildDerivations(drvPaths);
+    }
 
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); i++)
-    {
-        Derivation drv = derivationFromPath(*i);
-        cout << format("%1%\n") % findOutput(drv, "out");
-    }
+        cout << format("%1%\n") % realisePath(*i);
 }
 
 
@@ -54,8 +74,9 @@ static void opAdd(Strings opFlags, Strings opArgs)
 }
 
 
-static Path maybeUseOutput(const Path & storePath, bool useOutput)
+static Path maybeUseOutput(const Path & storePath, bool useOutput, bool forceRealise)
 {
+    if (forceRealise) realisePath(storePath);
     if (useOutput && isDerivation(storePath)) {
         Derivation drv = derivationFromPath(storePath);
         return findOutput(drv, "out");
@@ -78,6 +99,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
     enum { qOutputs, qRequisites, qReferences, qReferers, qGraph } query = qOutputs;
     bool useOutput = false;
     bool includeOutputs = false;
+    bool forceRealise = false;
 
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); i++)
@@ -87,6 +109,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--referers") query = qReferers;
         else if (*i == "--graph") query = qGraph;
         else if (*i == "--use-output" || *i == "-u") useOutput = true;
+        else if (*i == "--force-realise" || *i == "-f") forceRealise = true;
         else if (*i == "--include-outputs") includeOutputs = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
@@ -96,6 +119,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
+                if (forceRealise) realisePath(*i);
                 Derivation drv = derivationFromPath(*i);
                 cout << format("%1%\n") % findOutput(drv, "out");
             }
@@ -109,7 +133,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                Path path = maybeUseOutput(*i, useOutput);
+                Path path = maybeUseOutput(*i, useOutput, forceRealise);
                 if (query == qRequisites)
                     storePathRequisites(path, includeOutputs, paths);
                 else if (query == qReferences) queryReferences(path, paths);
@@ -340,8 +364,8 @@ void run(Strings args)
 
         Operation oldOp = op;
 
-        if (arg == "--build" || arg == "-b")
-            op = opBuild;
+        if (arg == "--realise" || arg == "-r")
+            op = opRealise;
         else if (arg == "--add" || arg == "-A")
             op = opAdd;
         else if (arg == "--query" || arg == "-q")
