@@ -100,6 +100,13 @@ void writeStringToFile(const Path & path, const string & s);
 
 /* Messages. */
 
+
+typedef enum {
+    ltPretty,   /* nice, nested output */
+    ltEscapes,  /* nesting indicated using escape codes (for log2xml) */
+    ltFlat      /* no nesting */
+} LogType;
+
 typedef enum { 
     lvlError,
     lvlInfo,
@@ -109,7 +116,8 @@ typedef enum {
     lvlVomit
 } Verbosity;
 
-extern Verbosity verbosity; /* supress msgs > this */
+extern LogType logType;
+extern Verbosity verbosity; /* suppress msgs > this */
 
 class Nest
 {

@@ -18,6 +18,15 @@ void sigintHandler(int signo)
 }
 
 
+void setLogType(string lt)
+{
+    if (lt == "pretty") logType = ltPretty;
+    else if (lt == "escapes") logType = ltEscapes;
+    else if (lt == "flat") logType = ltFlat;
+    else throw UsageError("unknown log type");
+}
+
+
 /* Initialize and reorder arguments, then call the actual argument
    processor. */
 static void initAndRun(int argc, char * * argv)
@@ -43,6 +52,10 @@ static void initAndRun(int argc, char * * argv)
     act.sa_flags = 0;
     if (sigaction(SIGINT, &act, &oact))
         throw SysError("installing handler for SIGINT");
+
+    /* Process the NIX_LOG_TYPE environment variable. */
+    char * lt = getenv("NIX_LOG_TYPE");
+    if (lt) setLogType(lt);
 
     /* Put the arguments in a vector. */
     Strings args, remaining;
@@ -72,7 +85,11 @@ static void initAndRun(int argc, char * * argv)
         string arg = *i;
         if (arg == "--verbose" || arg == "-v")
             verbosity = (Verbosity) ((int) verbosity + 1);
-        else if (arg == "--build-output" || arg == "-B")
+        else if (arg == "--log-type") {
+            ++i;
+            if (i == args.end()) throw UsageError("`--log-type' requires an argument");
+            setLogType(*i);
+        } else if (arg == "--build-output" || arg == "-B")
             buildVerbosity = lvlError; /* lowest */
         else if (arg == "--help") {
             printHelp();

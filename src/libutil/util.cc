@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cerrno>
 #include <cstdio>
+#include <sstream>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -223,6 +224,7 @@ void writeStringToFile(const Path & path, const string & s)
 }
 
 
+LogType logType = ltPretty;
 Verbosity verbosity = lvlError;
 
 static int nestingLevel = 0;
@@ -236,13 +238,28 @@ Nest::Nest()
 
 Nest::~Nest()
 {
-    if (nest) nestingLevel--;
+    if (nest) {
+        nestingLevel--;
+        if (logType == ltEscapes)
+            cerr << "\033[q";
+    }
+}
+
+
+static string escVerbosity(Verbosity level)
+{
+    int l = (int) level;
+    ostringstream st;
+    st << l;
+    return st.str();
 }
 
 
 void Nest::open(Verbosity level, const format & f)
 {
     if (level <= verbosity) {
+        if (logType == ltEscapes)
+            cerr << "\033[" << escVerbosity(level) << "p";
         printMsg_(level, f);
         nest = true;
         nestingLevel++;
@@ -254,10 +271,13 @@ void printMsg_(Verbosity level, const format & f)
 {
     checkInterrupt();
     if (level > verbosity) return;
-    string spaces;
-    for (int i = 0; i < nestingLevel; i++)
-        spaces += "|   ";
-    cerr << format("%1%%2%\n") % spaces % f.str();
+    string prefix;
+    if (logType == ltPretty)
+        for (int i = 0; i < nestingLevel; i++)
+            prefix += "|   ";
+    else if (logType == ltEscapes && level != lvlInfo)
+        prefix = "\033[" + escVerbosity(level) + "s";
+    cerr << format("%1%%2%\n") % prefix % f.str();
 }
 
 
