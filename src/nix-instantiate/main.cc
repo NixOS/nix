@@ -30,6 +30,8 @@ static void printNixExpr(EvalState & state, Expr e)
     ATMatcher m;
     ATermList es;
 
+    /* !!! duplication w.r.t. parseDerivations in nix-env */
+
     if (atMatch(m, e) >> "Attrs" >> es) {
         Expr a = queryAttr(e, "type");
         if (a && evalString(state, a) == "derivation") {
@@ -38,6 +40,13 @@ static void printNixExpr(EvalState & state, Expr e)
                 cout << format("%1%\n") % evalPath(state, a);
                 return;
             }
+            throw Error("bad derivation");
+        } else {
+            ATermMap drvMap;
+            queryAllAttrs(e, drvMap);
+            for (ATermIterator i(drvMap.keys()); i; ++i)
+                printNixExpr(state, evalExpr(state, drvMap.get(*i)));
+            return;
         }
     }
 
