@@ -16,7 +16,8 @@ have-db:
 build-db: have-db
 	(pfx=`pwd` && \
 	cd $(DB)/build_unix && \
-	CC=$(CC) CXX=$(CXX) ../dist/configure --prefix=$$pfx/inst --enable-cxx --disable-shared && \
+	CC=$(CC) CXX=$(CXX) ../dist/configure --prefix=$$pfx/inst \
+	 --enable-cxx --disable-shared && \
 	make && \
 	make install)
 	touch build-db
