@@ -1601,6 +1601,8 @@ void SubstitutionGoal::finished()
         return;
     }
 
+    makePathReadOnly(storePath);
+
     Transaction txn;
     createStoreTransaction(txn);
     registerValidPath(txn, storePath);
