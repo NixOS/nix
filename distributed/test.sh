@@ -5,7 +5,7 @@ set -e
 rm -f current-load
 touch current-load
 
-storeExpr=$(nix-instantiate ~/nixpkgs/pkgs/system/test.nix)
+storeExpr=$(nix-instantiate ~/nixpkgs/pkgs/system/all.nix)
 
 export NIX_BUILD_HOOK="build-remote.pl"
 

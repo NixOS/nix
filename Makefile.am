@@ -1,4 +1,4 @@
-SUBDIRS = externals src scripts corepkgs doc tests
+SUBDIRS = externals src scripts corepkgs doc misc tests
 EXTRA_DIST = substitute.mk nix.spec nix.spec.in
 
 include ./substitute.mk
