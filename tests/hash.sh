@@ -1,6 +1,6 @@
 try () {
     echo -n "$2" > $TEST_ROOT/vector
-    hash=$($TOP/src/nix-hash/nix-hash --flat --type "$1" $TEST_ROOT/vector)
+    hash=$($TOP/src/nix-hash/nix-hash $EXTRA --flat --type "$1" $TEST_ROOT/vector)
     if test "$hash" != "$3"; then
         echo "hash $1, expected $3, got $hash"
         exit 1
@@ -21,6 +21,9 @@ try sha1 "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" "84983e441c3
 try sha256 "abc" "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 try sha256 "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"
 
+EXTRA=--base32
+try sha256 "abc" "1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s"
+EXTRA=
 
 try2 () {
     hash=$($TOP/src/nix-hash/nix-hash --type "$1" $TEST_ROOT/hash-path)
