@@ -50,6 +50,9 @@ have-aterm:
 	$(MAKE) $(ATERM)
 	touch have-aterm
 
+if HAVE_ATERM
+build-aterm:
+else
 build-aterm: have-aterm
 	(pfx=`pwd` && \
 	cd $(ATERM) && \
@@ -58,6 +61,7 @@ build-aterm: have-aterm
 	make && \
 	make install)
 	touch build-aterm
+endif
 
 
 all: build-db build-aterm
