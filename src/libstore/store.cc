@@ -311,10 +311,9 @@ void queryReferences(const Path & storePath, PathSet & references)
 
 void queryReferers(const Path & storePath, PathSet & referers)
 {
-    Paths referers2;
     if (!isRealisablePath(noTxn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
-    nixDB.queryStrings(noTxn, dbReferers, storePath, referers2);
+    PathSet referers2 = getReferers(noTxn, storePath);
     referers.insert(referers2.begin(), referers2.end());
 }
 
@@ -427,6 +426,8 @@ void registerValidPath(const Transaction & txn,
 }
 
 
+/* Invalidate a path.  The caller is responsible for checking that
+   there are no referers. */
 static void invalidatePath(const Path & path, Transaction & txn)
 {
     debug(format("unregistering path `%1%'") % path);
@@ -551,8 +552,11 @@ void deleteFromStore(const Path & _path)
     assertStorePath(path);
 
     Transaction txn(nixDB);
-    if (isValidPathTxn(txn, path))
+    if (isValidPathTxn(txn, path)) {
+        if (getReferers(txn, path).size() > 0)
+            throw Error(format("cannot delete path `%1%' because it is in use") % path);
         invalidatePath(path, txn);
+    }
     txn.commit();
 
     deletePath(path);

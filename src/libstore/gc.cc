@@ -110,7 +110,6 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
             throw SysError(format("statting `%1%'") % path);
         unsigned char buf[st.st_size]; /* !!! stack space */
         readFull(*fd, buf, st.st_size);
-        debug(format("FILE SIZE %1%") % st.st_size);
 
         /* Extract the roots. */
         string contents((char *) buf, st.st_size);
@@ -126,6 +125,37 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
 
         fds.push_back(fd); /* keep open */
     }
+}
+
+
+static void dfsVisit(const PathSet & paths, const Path & path,
+    PathSet & visited, Paths & sorted)
+{
+    if (visited.find(path) != visited.end()) return;
+    visited.insert(path);
+    
+    PathSet references;
+    if (isValidPath(path))
+        queryReferences(path, references);
+    
+    for (PathSet::iterator i = references.begin();
+         i != references.end(); ++i)
+        /* Don't traverse into paths that don't exist.  That can
+           happen due to substitutes for non-existent paths. */
+        if (*i != path && paths.find(*i) != paths.end())
+            dfsVisit(paths, *i, visited, sorted);
+
+    sorted.push_front(path);
+}
+
+
+static Paths topoSort(const PathSet & paths)
+{
+    Paths sorted;
+    PathSet visited;
+    for (PathSet::const_iterator i = paths.begin(); i != paths.end(); ++i)
+        dfsVisit(paths, *i, visited, sorted);
+    return sorted;
 }
 
 
@@ -160,74 +190,86 @@ void collectGarbage(const PathSet & roots, GCAction action,
     FDs fds;
     readTempRoots(tempRoots, fds);
 
-    for (FDs::iterator i = fds.begin(); i != fds.end(); ++i)
-        debug(format("FD %1%") % (int) **i);
+    /* Close the temporary roots.  Note that we *cannot* do this in
+       readTempRoots(), because there we may not have all locks yet,
+       meaning that an invalid path can become valid (and thus add to
+       the references graph) after we have added it to the closure
+       (and computeFSClosure() assumes that the presence of a path
+       means that it has already been closed). */
+    PathSet tempRootsClosed;
+    for (PathSet::iterator i = tempRoots.begin(); i != tempRoots.end(); ++i)
+        if (isValidPath(*i))
+            computeFSClosure(*i, tempRootsClosed);
+        else
+            tempRootsClosed.insert(*i);
+
+    /* After this point the set of roots or temporary roots cannot
+       increase, since we hold locks on everything.  So everything
+       that is not currently in in `livePaths' or `tempRootsClosed'
+       can be deleted. */
     
-    /* !!! TODO: Try to acquire (without blocking) exclusive locks on
-       the files in the `pending' directory.  Delete all files for
-       which we managed to acquire such a lock (since if we could get
-       such a lock, that means that the process that owned the file
-       has died). */
-
-    /* !!! TODO: Acquire shared locks on all files in the pending
-       directories.  This prevents the set of pending paths from
-       increasing while we are garbage-collecting.  Read the set of
-       pending paths from those files. */
-
     /* Read the Nix store directory to find all currently existing
        paths. */
-    Strings storeNames = readDirectory(nixStore);
+    Paths storePaths = readDirectory(nixStore);
+    PathSet storePaths2;
+    for (Paths::iterator i = storePaths.begin(); i != storePaths.end(); ++i)
+        storePaths2.insert(canonPath(nixStore + "/" + *i));
 
-    for (Strings::iterator i = storeNames.begin(); i != storeNames.end(); ++i) {
-        Path path = canonPath(nixStore + "/" + *i);
+    /* Topologically sort them under the `referers' relation.  That
+       is, a < b iff a is in referers(b).  This gives us the order in
+       which things can be deleted safely. */
+    /* !!! when we have multiple output paths per derivation, this
+       will not work anymore because we get cycles. */
+    storePaths = topoSort(storePaths2);
+    
+    for (Paths::iterator i = storePaths.begin(); i != storePaths.end(); ++i) {
 
-        if (livePaths.find(path) != livePaths.end()) {
-            debug(format("live path `%1%'") % path);
+        debug(format("considering deletion of `%1%'") % *i);
+        
+        if (livePaths.find(*i) != livePaths.end()) {
+            debug(format("live path `%1%'") % *i);
             continue;
         }
 
-        if (tempRoots.find(path) != tempRoots.end()) {
-            debug(format("temporary root `%1%'") % path);
+        if (tempRootsClosed.find(*i) != tempRootsClosed.end()) {
+            debug(format("temporary root `%1%'") % *i);
             continue;
         }
 
-        debug(format("dead path `%1%'") % path);
-        result.insert(path);
+        debug(format("dead path `%1%'") % *i);
+        result.insert(*i);
 
         AutoCloseFD fdLock;
 
         if (action == gcDeleteDead) {
-            printMsg(lvlInfo, format("deleting `%1%'") % path);
 
             /* Only delete a lock file if we can acquire a write lock
                on it.  That means that it's either stale, or the
                process that created it hasn't locked it yet.  In the
                latter case the other process will detect that we
                deleted the lock, and retry (see pathlocks.cc). */
-            if (path.size() >= 5 && string(path, path.size() - 5) == ".lock") {
+            if (i->size() >= 5 && string(*i, i->size() - 5) == ".lock") {
 
-                fdLock = open(path.c_str(), O_RDWR);
+                fdLock = open(i->c_str(), O_RDWR);
                 if (fdLock == -1) {
                     if (errno == ENOENT) continue;
-                    throw SysError(format("opening lock file `%1%'") % path);
+                    throw SysError(format("opening lock file `%1%'") % *i);
                 }
 
                 if (!lockFile(fdLock, ltWrite, false)) {
-                    debug(format("skipping active lock `%1%'") % path);
+                    debug(format("skipping active lock `%1%'") % *i);
                     continue;
                 }
             }
+
+            printMsg(lvlInfo, format("deleting `%1%'") % *i);
             
-            deleteFromStore(path);
+            /* Okay, it's safe to delete. */
+            deleteFromStore(*i);
 
             if (fdLock != -1)
                 /* Write token to stale (deleted) lock file. */
                 writeFull(fdLock, (const unsigned char *) "d", 1);
         }
-
-        /* Only delete lock files if the path is belongs to doesn't
-           exist and isn't a temporary root and we can acquire an
-           exclusive lock on it. */
-        /* !!! */
     }
 }

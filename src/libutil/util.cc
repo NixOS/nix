@@ -407,7 +407,6 @@ AutoCloseFD::operator int() const
 void AutoCloseFD::close()
 {
     if (fd != -1) {
-        debug(format("closing fd %1%") % fd);
         if (::close(fd) == -1)
             /* This should never happen. */
             throw SysError("closing file descriptor");
