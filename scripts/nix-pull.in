@@ -27,7 +27,7 @@ while (<CONFFILE>) {
     chomp;
     if (/^\s*(\S+)\s*(\#.*)?$/) {
         my $url = $1;
-	$url =~ s/\/$//;
+        $url =~ s/\/$//;
 
         print "obtaining list of Nix archives at $url...\n";
 
@@ -36,70 +36,70 @@ while (<CONFFILE>) {
         
         open MANIFEST, "<$manifest";
 
-	my $inside = 0;
+        my $inside = 0;
 
-	my $storepath;
-	my $narname;
-	my $hash;
-	my @preds;
+        my $storepath;
+        my $narname;
+        my $hash;
+        my @preds;
 
         while (<MANIFEST>) {
-	    chomp;
-	    s/\#.*$//g;
-	    next if (/^$/);
+            chomp;
+            s/\#.*$//g;
+            next if (/^$/);
 
-	    if (!$inside) {
-		if (/^\{$/) { 
-		    $inside = 1;
-		    undef $storepath;
-		    undef $narname;
-		    undef $hash;
-		    @preds = ();
-		}
-		else { die "bad line: $_"; }
-	    } else {
-		if (/^\}$/) {
-		    $inside = 0;
-		    my $fullurl = "$url/$narname";
-		    print "$storepath\n";
+            if (!$inside) {
+                if (/^\{$/) { 
+                    $inside = 1;
+                    undef $storepath;
+                    undef $narname;
+                    undef $hash;
+                    @preds = ();
+                }
+                else { die "bad line: $_"; }
+            } else {
+                if (/^\}$/) {
+                    $inside = 0;
+                    my $fullurl = "$url/$narname";
+                    print "$storepath\n";
 
-		    # Construct a Fix expression that fetches and unpacks a
-		    # Nix archive from the network.
-		    my $fetch =
-			"App(IncludeFix(\"fetchurl/fetchurl.fix\"), " .
-			"[(\"url\", \"$fullurl\"), (\"md5\", \"$hash\")])";
-		    my $fixexpr = 
-			"App(IncludeFix(\"nar/unnar.fix\"), " .
-			"[ (\"nar\", $fetch)" .
-			", (\"outPath\", \"$storepath\")" .
-			"])";
-		    
-		    if (!$first) { $fullexpr .= "," };
-		    $first = 0;
-		    $fullexpr .= $fixexpr; # !!! O(n^2)?
+                    # Construct a Fix expression that fetches and unpacks a
+                    # Nix archive from the network.
+                    my $fetch =
+                        "App(IncludeFix(\"fetchurl/fetchurl.fix\"), " .
+                        "[(\"url\", \"$fullurl\"), (\"md5\", \"$hash\")])";
+                    my $fixexpr = 
+                        "App(IncludeFix(\"nar/unnar.fix\"), " .
+                        "[ (\"nar\", $fetch)" .
+                        ", (\"outPath\", \"$storepath\")" .
+                        "])";
+                    
+                    if (!$first) { $fullexpr .= "," };
+                    $first = 0;
+                    $fullexpr .= $fixexpr; # !!! O(n^2)?
 
-		    push @srcpaths, $storepath;
+                    push @srcpaths, $storepath;
 
-		    foreach my $p (@preds) {
-			push @sucs, $p;
-			push @sucs, $storepath;
-		    }
+                    foreach my $p (@preds) {
+                        push @sucs, $p;
+                        push @sucs, $storepath;
+                    }
 
-		}
-		elsif (/^\s*StorePath:\s*(\/\S+)\s*$/) {
-		    $storepath = $1;
-		}
-		elsif (/^\s*NarName:\s*(\S+)\s*$/) {
-		    $narname = $1;
-		}
-		elsif (/^\s*MD5:\s*(\S+)\s*$/) {
-		    $hash = $1;
-		}
-		elsif (/^\s*SuccOf:\s*(\/\S+)\s*$/) {
-		    push @preds, $1;
-		}
-		else { die "bad line: $_"; }
-	    }
+                }
+                elsif (/^\s*StorePath:\s*(\/\S+)\s*$/) {
+                    $storepath = $1;
+                }
+                elsif (/^\s*NarName:\s*(\S+)\s*$/) {
+                    $narname = $1;
+                }
+                elsif (/^\s*MD5:\s*(\S+)\s*$/) {
+                    $hash = $1;
+                }
+                elsif (/^\s*SuccOf:\s*(\/\S+)\s*$/) {
+                    push @preds, $1;
+                }
+                else { die "bad line: $_"; }
+            }
         }
 
         close MANIFEST;
