@@ -40,7 +40,7 @@ struct Cleanup : TermFun
             string path(s);
             if (path[0] != '/')
                 path = basePath + "/" + path;
-            return ATmake("Str(<str>)", canonPath(path).c_str());
+            return ATmake("Path(<str>)", canonPath(path).c_str());
         }
 
         if (ATmatch(e, "Int(<str>)", &s)) {

@@ -44,6 +44,9 @@ exports
     "{" {Id ","}* "}" ":" Expr
     -> Expr {cons("Function"), right}
 
+    "rec" "{" {Bind ","}* "}"
+    -> Expr {cons("Rec")}
+
     "{" {Bind ","}* "}"
     -> Expr {cons("Attrs")}
 
@@ -71,6 +74,7 @@ exports
   sorts Id Path
   lexical syntax
     [a-zA-Z\_][a-zA-Z0-9\_\']* -> Id
+    "rec" -> Id {reject}
     [0-9]+ -> Int
     "\"" ~[\n\"]* "\"" -> Str
     PathComp ("/" PathComp)+ -> Path
