@@ -824,6 +824,7 @@ static void upgradeStore()
     PathSet validPaths(validPaths2.begin(), validPaths2.end());
 
     cerr << "hashing paths...";
+    int n = 0;
     for (PathSet::iterator i = validPaths.begin(); i != validPaths.end(); ++i) {
         checkInterrupt();
         string s;
@@ -832,10 +833,18 @@ static void upgradeStore()
             Hash hash = hashPath(htSHA256, *i);
             setHash(txn, *i, hash);
             cerr << ".";
+            if (++n % 1000 == 0) {
+                txn.commit();
+                txn.begin(nixDB);
+            }
         }
     }
     cerr << "\n";
 
+    txn.commit();
+
+    txn.begin(nixDB);
+    
     cerr << "processing closures...";
     for (PathSet::iterator i = validPaths.begin(); i != validPaths.end(); ++i) {
         checkInterrupt();

@@ -27,6 +27,7 @@ public:
     Transaction(Database & _db);
     ~Transaction();
 
+    void begin(Database & db);
     void abort();
     void commit();
 

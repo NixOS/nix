@@ -33,17 +33,25 @@ Transaction::Transaction()
 
 
 Transaction::Transaction(Database & db)
+    : txn(0)
 {
-    db.requireEnv();
-    try {
-        db.env->txn_begin(0, &txn, 0);
-    } catch (DbException e) { rethrow(e); }
+    begin(db);
 }
 
 
 Transaction::~Transaction()
 {
     if (txn) abort();
+}
+
+
+void Transaction::begin(Database & db)
+{
+    assert(txn == 0);
+    db.requireEnv();
+    try {
+        db.env->txn_begin(0, &txn, 0);
+    } catch (DbException e) { rethrow(e); }
 }
 
 
