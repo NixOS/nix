@@ -1,229 +1,190 @@
 <chapter id='chap-package-management'><title>Package Management</title>
 
-<para>Let's start from the perspective of an end user.  Common
-operations at this level are to install and remove packages, ask what
-packages are installed or available for installation, and so on.
-These are operations on the <emphasis>user environment</emphasis>: the
-set of packages that a user <quote>sees</quote>.  In a command line
-Unix environment, this means the set of programs that are available
-through the <envar>PATH</envar> environment variable.  (In other
-environments it might mean the set of programs available on the
-desktop, through the start menu, and so on.)</para>
+<para>This chapter discusses how to do package management with Nix,
+i.e., how to obtain, install, upgrade, and erase components.  This is
+the <quote>user's</quote> perspective of the Nix system &mdash; people
+who want to <emphasis>create</emphasis> components should consult
+<xref linkend='chap-writing-nix-expressions' />.</para>
 
-<para>The terms <quote>installation</quote> and
-<quote>uninstallation</quote> are used in this context to denote the
-act of adding or removing packages from the user environment.  In Nix,
-these operations are dissociated from the physical copying or deleting
-of files.  Installation requires that the files constituting the
-package are present, but they may be present beforehand.  Likewise,
-uninstallation does not actually delete any files; this is done
-automatically by running a garbage collector.</para>
 
-<para>User environments are manipulated through the
-<command>nix-env</command> command.  The query operation can be used
-to see what packages are currently installed.</para>
+<sect1><title>Basic package management</title>
+
+<para>The main command for package management is
+<command>nix-env</command>.  You can use it to install, upgrade, and
+erase components, and to query what components are installed or are
+available for installation.</para>
+
+<para>In Nix, different users can have different <quote>views</quote>
+on the set of installed applications.  That is, there might be lots of
+applications present on the system (possibly in many different
+versions), but users can have a specific selection of those
+active &mdash; where <quote>active</quote> just means that it appears
+in a directory in the user's <envar>PATH</envar>.</para>
+
+<para>Such a view on the set of installed applications is called a
+<emphasis>user environment</emphasis>, which is just a directory tree
+consisting of symlinks to the files of the active applications.  In
+Nix, operations such as upgrading or removing components never
+overwrite or remove the files of those components, and they don't even
+touch the user environments that point to them.  Rather, they cause a
+<emphasis>new</emphasis> user environment to be constructed based on
+the old one.</para>
+
+<para>Components are installed from a set of <emphasis>Nix
+expressions</emphasis> that tell Nix how to build those components,
+including, if necessary, their dependencies.  There is a collection of
+Nix expressions called the Nix Package collection that contains
+components ranging from basic development stuff such as GCC and Glibc,
+to end-user applications like Mozilla Firefox.  (Nix is however not
+tied to the Nix Package collection; you could write your own Nix
+expression based on that, or completely new.)  You can download the
+latest version from <ulink
+url='http://catamaran.labs.cs.uu.nl/dist/nix' />.  You probably want
+the latest unstable release; currently the stable releases tend to lag
+behind quite a bit.</para>
+
+<para>Assuming that you have downloaded and unpacked a release of Nix
+Packages, you can view the set of available components in the release:
 
 <screen>
-$ nix-env -q
-MozillaFirebird-0.7
-sylpheed-0.9.7
-pan-0.14.2</screen>
-
-<para>(<option>-q</option> is actually short for <option>--query
---installed</option>.)  The package names are symbolic: they don't
-have any particular significance to Nix (as they shouldn't, since they
-are not unique&mdash;there can be many derivations with the same
-name).  Note that these packages have many dependencies (e.g., Mozilla
-uses the <literal>gtk+</literal> package) but these have not been
-installed in the user environment, though they are present on the
-system.  Generally, there is no need to install such packages; only
-packages containing programs should be installed.</para>
-      
-<para>To install packages, a <emphasis>Nix expression</emphasis> is
-required that tells Nix how to build that package.  There is a <ulink
-url='https://svn.cs.uu.nl:12443/dist/trace/trace-nixpkgs-trunk.tar.bz2'>set
-of standard of Nix expressions</ulink> for many common packages.
-Assuming that you have downloaded and unpacked these, you can view the
-set of available packages:</para>
-
-<screen>
-$ nix-env -qaf pkgs/system/i686-linux.nix
-gettext-0.12.1
-sylpheed-0.9.7
-aterm-2.0
-gtk+-1.2.10
-apache-httpd-2.0.48
-pan-0.14.2
+$ nix-env -qaf nixpkgs-<replaceable>version</replaceable>
+ant-blackdown-1.4.2
+aterm-2.2
+bash-3.0
+binutils-2.15
+bison-1.875d
+blackdown-1.4.2
+bzip2-1.0.2
 ...</screen>
 
-<para>The Nix expression in the file
-<filename>i686-linux.nix</filename> yields the set of packages for a
-Linux system running on x86 hardware.  For other platforms, copy and
-modify this file for your platform as appropriate. [TODO: improve
-this]</para>
+where <literal>nixpkgs-<replaceable>version</replaceable></literal> is
+where you've unpacked the release.</para>
 
 <para>It is also possible to see the <emphasis>status</emphasis> of
-available packages, i.e., whether they are installed into the user
-environment and/or present in the system:</para>
+available component, i.e., whether they are installed into the user
+environment and/or present in the system:
 
 <screen>
-$ nix-env -qasf pkgs/system/i686-linux.nix
--P gettext-0.12.1
-IP sylpheed-0.9.7
--- aterm-2.0
--P gtk+-1.2.10</screen>
-
-<para>This reveals that the <literal>sylpheed</literal> package is
-already installed, or more precisely, that exactly the same
-instantiation of <literal>sylpheed</literal> is installed.  This
-guarantees that the available package is exactly the same as the
-installed package with regard to sources, dependencies, build flags,
-and so on.  Similarly, we see that the <literal>gettext</literal> and
-<literal>gtk+</literal> packages are present but not installed in the
-user environment, while the <literal>aterm</literal> package is not
-installed or present at all (so, if we were to install it, it would
-have to be built or downloaded first).</para>
-
-<para>The install operation is used install available packages from a
-Nix environment.  To install the <literal>pan</literal> package (a
-newsreader), you would do:</para>
-
-<screen>
-$ nix-env -if pkgs/system/i686-linux.nix pan</screen>
-
-<para>Since installation may take a long time, depending on whether
-any packages need to be built or downloaded, it's a good idea to make
-<command>nix-env</command> run verbosely by using the
-<option>-v</option> (<option>--verbose</option>) option.  This option
-may be repeated to increase the level of verbosity.  A good value is 3
-(<option>-vvv</option>).</para>
-
-<para>In fact, if you run this command verbosely you will observe that
-Nix starts to build many packages, including large and fundamental
-ones such as <literal>glibc</literal> and <literal>gcc</literal>.
-I.e., you are performing a source installation.  This is generally
-undesirable, since installation from sources may require large amounts
-of disk and CPU resources.  Therefore a <quote>binary</quote>
-installation is generally preferable.</para>
-
-<para>Rather than provide different mechanisms to create and perform
-the installation of binary packages, Nix supports binary deployment
-<emphasis>transparently</emphasis> through a generic mechanism of
-<emphasis>substitute expressions</emphasis>.  If an request is made to
-build some Nix expression, Nix will first try to build any substitutes
-for that expression.  These substitutes presumably perform an
-identical build operation with respect to the result, but require less
-resources.  For instance, a substitute that downloads a pre-built
-package from the network requires less CPU and disk resources, and
-possibly less time.</para>
-
-<para>Nix's use of cryptographic hashes makes this entirely safe.  It
-is not possible, for instance, to accidentally substitute a build of
-some package for a Solaris or Windows system for a build on a SuSE/x86
-system.</para>
-
-<para>While the substitute mechanism is a generic mechanism, Nix
-provides two standard tools called <command>nix-pull</command> and
-<command>nix-push</command> that maintain and use a shared cache of
-prebuilt derivations on some network site (reachable through HTTP).
-If you attempt to install some package that someone else has
-previously built and <quote>pushed</quote> into the cache, and you
-have done a <quote>pull</quote> to register substitutes that download
-these prebuilt packages, then the installation will automatically use
-these.</para>
-
-<para>For example, to pull from our <ulink
-url='http://losser.st-lab.cs.uu.nl/~eelco/nix-dist/'>cache</ulink> of
-prebuilt packages (at the time of writing, for SuSE Linux/x86), use
-the following command:</para>
-
-<screen>
-$ nix-pull http://catamaran.labs.cs.uu.nl/dist/nix/nixpkgs-<replaceable>version</replaceable>/MANIFEST
-obtaining list of Nix archives at http://catamaran.labs.cs.uu.nl/dist/nix/nixpkgs-<replaceable>version</replaceable>/MANIFEST...
-...</screen>
-
-<para>If <command>nix-pull</command> is run without any arguments, it
-will pull from the URLs specified in the file
-<filename><replaceable>prefix</replaceable>/etc/nix/prebuilts.conf</filename>.</para>
-
-<para>Assuming that the <literal>pan</literal> installation produced
-no errors, it can be used immediately, that is, it now appears in a
-directory in the <envar>PATH</envar> environment variable.
-Specifically, <envar>PATH</envar> includes the entry
-<filename><replaceable>prefix</replaceable>/var/nix/profiles/default/bin</filename>,
-where
-<filename><replaceable>prefix</replaceable>/var/nix/profiles/default</filename>
-is just a symlink to the current user environment:</para>
-
-<screen>
-$ ls -l /nix/var/nix/profiles/
+$ nix-env -qasf nixpkgs-<replaceable>version</replaceable>
 ...
-lrwxrwxrwx  1 eelco ... default-15-link -> /nix/store/1871...12b0-user-environment
-lrwxrwxrwx  1 eelco ... default-16-link -> /nix/store/59ba...df6b-user-environment
-lrwxrwxrwx  1 eelco ... default -> default-16-link</screen>
-
-<para>That is, <filename>default</filename> in this example is a link
-to <filename>default-16-link</filename>, which is the current user
-environment.  Before the installation, it pointed to
-<filename>default-15-link</filename>.  Note that this means that you
-can atomically roll-back to the previous user environment by pointing
-the symlink <filename>default</filename> at
-<filename>default-15-link</filename> again.  This also shows that
-operations such as installation are atomic in the Nix system: any
-arbitrarily complex set of installation, uninstallation, or upgrade
-actions eventually boil down to the single operation of pointing a
-symlink somewhere else (which can be implemented atomically in Unix).</para>
-
-<para>What's in a user environment? It's just a set of symlinks to the
-files that constitute the installed packages.  For instance:</para>
-
-<screen>
-$ ls -l /nix/var/nix/profiles/default-16-link/bin
-lrwxrwxrwx  1 eelco ... MozillaFirebird -> /nix/store/35f8...4ae6-MozillaFirebird-0.7/bin/MozillaFirebird
-lrwxrwxrwx  1 eelco ... svn -> /nix/store/3829...fb5d-subversion-0.32.1/bin/svn
+-PS bash-3.0
+--S binutils-2.15
+IPS bison-1.875d
 ...</screen>
 
-<para>Note that, e.g., <filename>svn</filename> =
-<filename>/nix/var/nix/profiles/default/bin/svn</filename> =
-<filename>/nix/var/nix/profiles/default-16-link/bin/svn</filename> =
-<filename>/nix/store/59ba...df6b-user-environment/bin/svn</filename> =
-<filename>/nix/store/3829...fb5d-subversion-0.32.1/bin/svn</filename>.</para>
+The first character (<literal>I</literal>) indicates whether the
+component is installed in your current user environment.  The second
+(<literal>P</literal>) indicates whether it is present on your system
+(in which case installing it into your user environment would be very
+quick).  The last one (<literal>S</literal>) indicates whether there
+is a so-called <emphasis>substitute</emphasis> for the component,
+which is Nix's mechanism for doing binary deployment.  It just means
+that Nix know that it can fetch a pre-built component from somewhere
+(typically a network server) instead of building it locally.</para>
 
-<para>Naturally, packages can also be uninstalled:</para>
+<para>So now that we have a set of Nix expressions we can build the
+components contained in them.  This is done using <literal>nix-env
+-i</literal>.  For instance,
 
 <screen>
-$ nix-env -e pan</screen>
+$ nix-env -f nixpkgs-<replaceable>version</replaceable> -i subversion</screen>
 
-<para>This means that the package is removed from the user
-environment.  It is <emphasis>not</emphasis> yet removed from the
-system.  When a package is uninstalled from a user environment, it may
-still be used by other packages, or may still be present in other user
-environments.  Deleting it under such conditions would break those
-other packages or user environments.  To prevent this, packages are
-only <quote>physically</quote> deleted by running the Nix garbage
-collector, which searches for all packages in the Nix store that are
-no longer <quote>reachable</quote> from outside the store.  Thus,
-uninstalling a package is always safe: it cannot break other
-packages.</para>
+will install the component called <literal>subversion</literal> (which
+is, of course, the <ulink
+url='http://subversion.tigris.org/'>Subversion version management
+system</ulink>).</para>
 
-<para>Upgrading packages is easy.  Given a Nix expression that
-contains newer versions of installed packages (that is, packages with
-the same package name, but a higher version number), <command>nix-env
--u</command> will replace the installed package in the user
-environment with the newer package.  For example,
-      
+<para>When you do this for the first time, Nix will start building
+Subversion and all its dependencies.  This will take quite a while
+&mdash; typically an hour or two on modern machines.  Fortunately,
+there is a faster way (so just do a Ctrl-C on that install
+operation!): you just need to tell Nix that pre-built binaries of all
+those components are available somewhere.  This is done using the
+<command>nix-pull</command> command, which must be supplied with a URL
+containing a <emphasis>manifest</emphasis> describing what binaries
+are available.  This URL should correspond to the Nix Packages release
+that you're using.  For instance, if you obtained a release from
+<ulink
+url='http://catamaran.labs.cs.uu.nl/dist/nix/nixpkgs-0.6pre1554/' />,
+then you should do:
+
 <screen>
-$ nix-env -uf pkgs/system/i686-linux.nix pan</screen>
+$ nix-pull http://catamaran.labs.cs.uu.nl/dist/nix/nixpkgs-0.6pre1554/MANIFEST</screen>
 
-looks for a newer version of Pan, and installs it if found.  Also
-useful is the ability to upgrade <emphasis>all</emphasis> packages:
-      
+If you then issue the installation command, it should start
+downloading binaries from <systemitem
+class='fqdomainname'>catamaran.labs.cs.uu.nl</systemitem>, instead of
+building them from source.  This might still take a while since all
+dependencies must be downloaded, but on a reasonably fast connection
+such as an ADSL line it's on the order of a few minutes.</para>
+
+<para>Naturally, packages can also be uninstalled:
+
 <screen>
-$ nix-env -uf pkgs/system/i686-linux.nix '*'</screen>
+$ nix-env -e subversion</screen>
 
-The asterisk matches all installed packages<footnote><para>No, we
-don't support arbitrary regular expressions</para></footnote>.  Note
-that <literal>*</literal> must be quoted to prevent shell
-globbing.</para>
+</para>
+
+<para>Upgrading to a new version is just as easy.  If you have a new
+release of Nix Packages, you can do:
+
+<screen>
+$ nix-env -f nixpkgs-<replaceable>version</replaceable> -u subversion</screen>
+
+This will <emphasis>only</emphasis> upgrade Subversion if there is a
+<quote>newer</quote> version in the new set of Nix expressions, as
+defined by some pretty much arbitrary rules regarding ordering of
+version numbers (which generally do what you'd expect of them).  To
+just unconditionally replace Subversion with whatever version is in
+the Nix expressions, use <parameter>-i</parameter> instead of
+<parameter>-u</parameter> &mdash; <parameter>-i</parameter> will
+remove whatever version is already installed.</para>
+
+<para>You can also upgrade all components for which there are newer
+versions:
+
+<screen>
+$ nix-env -f nixpkgs-<replaceable>version</replaceable> -u '*'</screen>
+
+</para>
+
+<para>If you grow tired of specifying the Nix expressions using
+<parameter>-f</parameter> all the time, you can set a default
+location:
+
+<screen>
+$ nix-env -I nixpkgs-<replaceable>version</replaceable></screen>
+
+After this you can just say, for instance, <literal>nix-env -u
+'*'</literal>.<footnote><para>Setting a default using
+<parameter>-I</parameter> currently clashes with using Nix channels,
+since <literal>nix-channel --update</literal> calls <literal>nix-env
+-I</literal> to set the default to the Nix expressions it downloaded
+from the channel, replacing whatever default you had
+set.</para></footnote></para>
+
+</sect1>
+
+
+<sect1><title>Profiles</title>
+
+<para>Bla</para>
+
+</sect1>
+
+
+<sect1><title>Garbage collection</title>
+
+<para>Bla</para>
+
+</sect1>
+
+
+<sect1><title>Channels</title>
+
+<para>Bla</para>
+
+</sect1>
+
 
 </chapter>
