@@ -11,6 +11,7 @@ Operations:
 
   --successor: register a successor expression (dangerous!)
   --substitute: register a substitute expression (dangerous!)
+  --clear-substitute: clear all substitutes
   --validpath: register path validity (dangerous!)
   --isvalid: check path validity
 

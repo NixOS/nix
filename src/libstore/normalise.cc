@@ -1416,9 +1416,6 @@ private:
     /* The current substitute. */
     Substitute sub;
 
-    /* The normal form of the substitute store expression. */
-    Path nfSub;
-
     /* Pipe for the substitute's standard output/error. */
     Pipe logPipe;
 
@@ -1440,8 +1437,6 @@ public:
     /* The states. */
     void init();
     void tryNext();
-    void exprNormalised();
-    void exprRealised();
     void tryToRun();
     void finished();
 
@@ -1506,26 +1501,7 @@ void SubstitutionGoal::tryNext()
     sub = subs.front();
     subs.pop_front();
 
-    /* Realise the substitute store expression. */
-    nrFailed = 0;
-    addWaitee(worker.makeRealisationGoal(sub.storeExpr));
-
-    state = &SubstitutionGoal::exprRealised;
-}
-
-
-void SubstitutionGoal::exprRealised()
-{
-    trace("substitute store expression realised");
-
-    if (nrFailed != 0) {
-        tryNext();
-        return;
-    }
-
-    /* !!! the storeExpr doesn't have to be a derivation, right? */
-    nfSub = queryNormalForm(sub.storeExpr);
-    
+    /* Wait until we can run the substitute program. */
     state = &SubstitutionGoal::tryToRun;
     worker.waitForBuildSlot(shared_from_this());
 }
@@ -1557,15 +1533,8 @@ void SubstitutionGoal::tryToRun()
 
     printMsg(lvlInfo,
         format("substituting path `%1%' using substituter `%2%'")
-        % storePath % sub.storeExpr);
+        % storePath % sub.program);
     
-    /* What's the substitute program? */
-    StoreExpr expr = storeExprFromPath(nfSub);
-    assert(expr.type == StoreExpr::neClosure);
-    assert(!expr.closure.roots.empty());
-    Path program =
-        canonPath(*expr.closure.roots.begin() + "/" + sub.program);
-
     logPipe.create();
 
     /* Remove the (stale) output path if it exists. */
@@ -1591,12 +1560,12 @@ void SubstitutionGoal::tryToRun()
             /* Fill in the arguments. */
             Strings args(sub.args);
             args.push_front(storePath);
-            args.push_front(baseNameOf(program));
+            args.push_front(baseNameOf(sub.program));
             const char * * argArr = strings2CharPtrs(args);
 
-            execv(program.c_str(), (char * *) argArr);
+            execv(sub.program.c_str(), (char * *) argArr);
             
-            throw SysError(format("executing `%1%'") % program);
+            throw SysError(format("executing `%1%'") % sub.program);
             
         } catch (exception & e) {
             cerr << format("substitute error: %1%\n") % e.what();
@@ -1648,7 +1617,7 @@ void SubstitutionGoal::finished()
 
         printMsg(lvlInfo,
             format("substitution of path `%1%' using substituter `%2%' failed: %3%")
-            % storePath % sub.storeExpr % e.msg());
+            % storePath % sub.program % e.msg());
         
         /* Try the next substitute. */
         state = &SubstitutionGoal::tryNext;

@@ -14,10 +14,6 @@ using namespace std;
    network). */
 struct Substitute
 {
-    /* Store expression to be normalised and realised in order to
-       obtain `program'. */
-    Path storeExpr;
-
     /* Program to be executed to create the store path.  Must be in
        the output path of `storeExpr'. */
     Path program;
@@ -72,6 +68,9 @@ void registerSubstitutes(const Transaction & txn,
 
 /* Return the substitutes expression for the given path. */
 Substitutes querySubstitutes(const Path & srcPath);
+
+/* Deregister all substitutes. */
+void clearSubstitutes();
 
 /* Register the validity of a path. */
 void registerValidPath(const Transaction & txn, const Path & path);

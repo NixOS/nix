@@ -166,7 +166,6 @@ static void opSubstitute(Strings opFlags, Strings opArgs)
         Substitute sub;
         getline(cin, srcPath);
         if (cin.eof()) break;
-        getline(cin, sub.storeExpr);
         getline(cin, sub.program);
         string s;
         getline(cin, s);
@@ -184,6 +183,17 @@ static void opSubstitute(Strings opFlags, Strings opArgs)
     
     txn.commit();
 }
+
+
+static void opClearSubstitutes(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty()) throw UsageError("unknown flag");
+    if (!opArgs.empty())
+        throw UsageError("no arguments expected");
+
+    clearSubstitutes();
+}
+
 
 
 static void opValidPath(Strings opFlags, Strings opArgs)
@@ -354,6 +364,8 @@ void run(Strings args)
             op = opSuccessor;
         else if (arg == "--substitute")
             op = opSubstitute;
+        else if (arg == "--clear-substitutes")
+            op = opClearSubstitutes;
         else if (arg == "--validpath")
             op = opValidPath;
         else if (arg == "--isvalid")

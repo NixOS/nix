@@ -41,12 +41,13 @@ static TableId dbSuccessors = 0;
 */
 static TableId dbSuccessorsRev = 0;
 
-/* dbSubstitutes :: Path -> [(Path, Path, [string])]
+/* dbSubstitutes :: Path -> [[Path]]
 
    Each pair $(p, subs)$ tells Nix that it can use any of the
-   substitutes in $subs$ to build path $p$.  Each substitute is a
-   tuple $(storeExpr, program, args)$ (see the type `Substitute' in
-   `store.hh').
+   substitutes in $subs$ to build path $p$.  Each substitute defines a
+   command-line invocation of a program (i.e., the first list element
+   is the full path to the program, the remaining elements are
+   arguments).
 
    The main purpose of this is for distributed caching of derivates.
    One system can compute a derivate and put it on a website (as a Nix
@@ -56,18 +57,10 @@ static TableId dbSuccessorsRev = 0;
 */
 static TableId dbSubstitutes = 0;
 
-/* dbSubstitutesRev :: Path -> [Path]
-
-   The reverse mapping of dbSubstitutes; it maps store expressions
-   back to the paths for which they are substitutes.
-*/
-static TableId dbSubstitutesRev = 0;
-
 
 bool Substitute::operator == (const Substitute & sub)
 {
-    return storeExpr == sub.storeExpr
-        && program == sub.program
+    return program == sub.program
         && args == sub.args;
 }
 
@@ -86,7 +79,6 @@ void openDB()
     dbSuccessors = nixDB.openTable("successors");
     dbSuccessorsRev = nixDB.openTable("successors-rev");
     dbSubstitutes = nixDB.openTable("substitutes");
-    dbSubstitutesRev = nixDB.openTable("substitutes-rev");
 }
 
 
@@ -300,10 +292,13 @@ static Substitutes readSubstitutes(const Transaction & txn,
             break;
         }
         Strings ss2 = unpackStrings(*i);
-        if (ss2.size() != 3) throw Error("malformed substitute");
+        if (ss2.size() == 3) {
+            /* Another old-style substitute. */
+            continue;
+        }
+        if (ss2.size() != 2) throw Error("malformed substitute");
         Strings::iterator j = ss2.begin();
         Substitute sub;
-        sub.storeExpr = *j++;
         sub.program = *j++;
         sub.args = unpackStrings(*j++);
         subs.push_back(sub);
@@ -322,7 +317,6 @@ static void writeSubstitutes(const Transaction & txn,
          i != subs.end(); ++i)
     {
         Strings ss2;
-        ss2.push_back(i->storeExpr);
         ss2.push_back(i->program);
         ss2.push_back(packStrings(i->args));
         ss.push_back(packStrings(ss2));
@@ -332,14 +326,9 @@ static void writeSubstitutes(const Transaction & txn,
 }
 
 
-typedef map<Path, Paths> SubstitutesRev;
-
-
 void registerSubstitutes(const Transaction & txn,
     const SubstitutePairs & subPairs)
 {
-    SubstitutesRev revMap;
-    
     for (SubstitutePairs::const_iterator i = subPairs.begin();
          i != subPairs.end(); ++i)
     {
@@ -347,7 +336,6 @@ void registerSubstitutes(const Transaction & txn,
         const Substitute & sub(i->second);
 
         assertStorePath(srcPath);
-        assertStorePath(sub.storeExpr);
     
         Substitutes subs = readSubstitutes(txn, srcPath);
 
@@ -357,25 +345,19 @@ void registerSubstitutes(const Transaction & txn,
         subs.push_front(sub);
         
         writeSubstitutes(txn, srcPath, subs);
-
-        Paths & revs = revMap[sub.storeExpr];
-        if (revs.empty())
-            nixDB.queryStrings(txn, dbSubstitutesRev, sub.storeExpr, revs);
-        if (find(revs.begin(), revs.end(), srcPath) == revs.end())
-            revs.push_back(srcPath);
     }
-
-    /* Re-write the reverse mapping in one go to prevent Theta(n^2)
-       performance.  (This would occur because the data fields of the
-       `substitutes-rev' table are lists). */
-    for (SubstitutesRev::iterator i = revMap.begin(); i != revMap.end(); ++i)
-        nixDB.setStrings(txn, dbSubstitutesRev, i->first, i->second);
 }
 
 
 Substitutes querySubstitutes(const Path & srcPath)
 {
     return readSubstitutes(noTxn, srcPath);
+}
+
+
+void clearSubstitutes()
+{
+    
 }
 
 
@@ -401,28 +383,6 @@ static void invalidatePath(const Path & path, Transaction & txn)
     for (Paths::iterator i = revs.begin(); i != revs.end(); ++i)
         nixDB.delPair(txn, dbSuccessors, *i);
     nixDB.delPair(txn, dbSuccessorsRev, path);
-
-    /* Remove any substitute mappings to this path. */
-    revs.clear();
-    nixDB.queryStrings(txn, dbSubstitutesRev, path, revs);
-    for (Paths::iterator i = revs.begin(); i != revs.end(); ++i) {
-        Substitutes subs = readSubstitutes(txn, *i), subs2;
-        bool found = false;
-        for (Substitutes::iterator j = subs.begin(); j != subs.end(); ++j)
-            if (j->storeExpr != path)
-                subs2.push_back(*j);
-            else
-                found = true;
-        // !!!        if (!found) throw Error("integrity error in substitutes mapping");
-        writeSubstitutes(txn, *i, subs);
-
-	/* If path *i now has no substitutes left, and is not valid,
-	   then it too should be invalidated.  This is because it may
-	   be a substitute or successor. */
-	if (subs.size() == 0 && !isValidPathTxn(*i, txn))
-	    invalidatePath(*i, txn);
-    }
-    nixDB.delPair(txn, dbSubstitutesRev, path);
 }
 
 
@@ -548,30 +508,9 @@ void verifyStore()
     Paths subKeys;
     nixDB.enumTable(txn, dbSubstitutes, subKeys);
     for (Paths::iterator i = subKeys.begin(); i != subKeys.end(); ++i) {
-        Substitutes subs = readSubstitutes(txn, *i), subs2;
-        for (Substitutes::iterator j = subs.begin(); j != subs.end(); ++j)
-            if (validPaths.find(j->storeExpr) == validPaths.end())
-                printMsg(lvlError,
-                    format("found substitute mapping to non-existent path `%1%'")
-                    % j->storeExpr);
-            else
-                subs2.push_back(*j);
-        if (subs.size() != subs2.size())
-            writeSubstitutes(txn, *i, subs2);
-	if (subs2.size() > 0)
+        Substitutes subs = readSubstitutes(txn, *i);
+	if (subs.size() > 0)
 	    usablePaths.insert(*i);
-    }
-
-    /* Check that the keys of the reverse substitute mappings are
-       valid paths. */ 
-    Paths rsubKeys;
-    nixDB.enumTable(txn, dbSubstitutesRev, rsubKeys);
-    for (Paths::iterator i = rsubKeys.begin(); i != rsubKeys.end(); ++i) {
-        if (validPaths.find(*i) == validPaths.end()) {
-            printMsg(lvlError,
-                format("found reverse substitute mapping for non-existent path `%1%'") % *i);
-            nixDB.delPair(txn, dbSubstitutesRev, *i);
-        }
     }
 
     /* Check that the values of the successor mappings are usable
