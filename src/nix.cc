@@ -106,18 +106,19 @@ static void opAdd(Strings opFlags, Strings opArgs)
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qPaths, qRefs, qGenerators, qUnknown } query = qPaths;
+    enum { qList, qRefs, qGenerators, qExpansion } query = qList;
 
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); i++)
-        if (*i == "--list" || *i == "-l") query = qPaths;
+        if (*i == "--list" || *i == "-l") query = qList;
         else if (*i == "--refs" || *i == "-r") query = qRefs;
         else if (*i == "--generators" || *i == "-g") query = qGenerators;
+        else if (*i == "--expansion" || *i == "-e") query = qExpansion;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
     switch (query) {
         
-        case qPaths: {
+        case qList: {
             StringSet paths;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
@@ -156,6 +157,15 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (FSIds::iterator i = genIds.begin(); 
                  i != genIds.end(); i++)
                 cout << format("%s\n") % expandId(*i);
+            break;
+        }
+
+        case qExpansion: {
+            for (Strings::iterator i = opArgs.begin();
+                 i != opArgs.end(); i++)
+                /* !!! should not use substitutes; this is a query,
+                   it should not have side-effects */
+                cout << format("%s\n") % expandId(parseHash(*i));
             break;
         }
 
