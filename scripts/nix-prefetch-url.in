@@ -9,7 +9,7 @@ if test -z "$hashType"; then
 fi
 
 hashFormat=
-if test "$hashType" = "sha1"; then
+if test "$hashType" != "md5"; then
     hashFormat=--base32
 fi
 
