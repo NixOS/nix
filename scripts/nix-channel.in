@@ -89,7 +89,7 @@ sub update {
         chomp $hash;
         # !!! escaping
         $nixExpr .= "((import @datadir@/nix/corepkgs/fetchurl) " .
-            "{url = $fullURL; sha1 = \"$hash\"; system = \"@system@\";}) "
+            "{url = $fullURL; md5 = \"$hash\"; system = \"@system@\";}) "
     }
 
     $nixExpr .= "]";
