@@ -26,6 +26,8 @@ static ArgType argType = atpUnknown;
      --add / -A: copy a path to the Nix store
      --query / -q: query information
 
+     --substitute: register a substitute expression
+
      --dump: dump a path as a Nix archive
      --restore: restore a path from a Nix archive
 
@@ -84,12 +86,6 @@ static Hash argToHash(const string & arg)
         return hash;
     }
     else abort();
-}
-
-
-static FState hash2fstate(Hash hash)
-{
-    return ATmake("Include(<str>)", ((string) hash).c_str());
 }
 
 
@@ -187,6 +183,21 @@ static void opQuery(Strings opFlags, Strings opArgs)
 }
 
 
+static void opSubstitute(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty()) throw UsageError("unknown flag");
+    if (opArgs.size() % 2) throw UsageError("expecting even number of arguments");
+    
+    for (Strings::iterator i = opArgs.begin();
+         i != opArgs.end(); )
+    {
+        Hash srcHash = parseHash(*i++);
+        Hash subHash = parseHash(*i++);
+        registerSubstitute(srcHash, subHash);
+    }
+}
+
+
 /* A sink that writes dump output to stdout. */
 struct StdoutSink : DumpSink
 {
@@ -277,6 +288,8 @@ void run(Strings args)
             op = opAdd;
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
+        else if (arg == "--substitute")
+            op = opSubstitute;
         else if (arg == "--dump")
             op = opDump;
         else if (arg == "--restore")

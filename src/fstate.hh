@@ -85,6 +85,8 @@ Error badTerm(const format & f, ATerm t);
 /* Hash an aterm. */
 Hash hashTerm(ATerm t);
 
+FState hash2fstate(Hash hash);
+
 /* Read an aterm from disk, given its hash. */
 ATerm termFromHash(const Hash & hash, string * p = 0);
 

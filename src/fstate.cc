@@ -147,6 +147,12 @@ Hash hashTerm(ATerm t)
 }
 
 
+FState hash2fstate(Hash hash)
+{
+    return ATmake("Include(<str>)", ((string) hash).c_str());
+}
+
+
 ATerm termFromHash(const Hash & hash, string * p)
 {
     string path = expandHash(hash);

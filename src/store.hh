@@ -8,7 +8,11 @@
 using namespace std;
 
 
+/* Copy a path recursively. */
 void copyPath(string src, string dst);
+
+/* Register a substitute. */
+void registerSubstitute(const Hash & srcHash, const Hash & subHash);
 
 /* Register a path keyed on its hash. */
 Hash registerPath(const string & path, Hash hash = Hash());

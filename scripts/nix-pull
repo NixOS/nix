@@ -1,2 +1,67 @@
 #! /usr/bin/perl -w
 
+my $prefix = $ENV{"NIX"} || "/tmp/nix"; # !!! use prefix
+my $etcdir = "$prefix/etc/nix";
+my $tmpfile = "$prefix/var/nix/pull.tmp";
+
+my $conffile = "$etcdir/prebuilts.conf";
+
+open CONFFILE, "<$conffile";
+
+while (<CONFFILE>) {
+
+    chomp;
+    if (/^\s*(\S+)\s*(\#.*)?$/) {
+        my $url = $1;
+
+        print "obtaining list of Nix archives at $url...\n";
+
+	system "wget '$url' -O '$tmpfile' 2> /dev/null"; # !!! escape
+	if ($?) { die "`wget' failed"; }
+	
+	open INDEX, "<$tmpfile";
+
+	while (<INDEX>) {
+	    # Get all links to prebuilts, that is, file names of the
+	    # form foo-HASH-HASH.tar.bz2.
+	    next unless (/HREF=\"([^\"]*)\"/);
+	    my $fn = $1;
+	    next if $fn =~ /\.\./;
+	    next if $fn =~ /\//;
+	    next unless $fn =~ /([0-9a-z]{32})-([0-9a-z]{32})\.nar/;
+	    my $hash = $2;
+
+	    print "registering $hash -> $url/$fn\n";
+
+	    # Construct a Fix expression that fetches and unpacks a
+	    # Nix archive from the network.
+	    my $fetch =
+              "App(IncludeFix(\"fetchurl/fetchurl.fix\"), " .
+              "[(\"url\", \"$url/$fn\"), (\"hash\", \"\")])";
+	    my $fixexpr = 
+		"App(IncludeFix(\"nar/unnar.fix\"), " .
+		"[ (\"nar\", $fetch)" .
+		", (\"name\", \"fetched-$hash\")" .
+		"])";
+	    
+	    my $fixfile = "/tmp/nix-pull-tmp.fix";
+	    open FIX, ">$fixfile";
+	    print FIX $fixexpr;
+	    close FIX;
+
+	    # Instantiate a Nix expression from the Fix expression.
+	    my $nhash = `fix $fixfile`;
+	    $? and die "instantiating Nix archive expression";
+	    chomp $nhash;
+	    die unless $nhash =~ /^([0-9a-z]{32})$/;
+
+	    system "nix --substitute $hash $nhash";
+	    if ($?) { die "`nix --substitute' failed"; }
+	}
+
+	close INDEX;
+
+	unlink $tmpfile;
+    }
+
+}

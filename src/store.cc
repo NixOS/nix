@@ -7,6 +7,7 @@
 #include "globals.hh"
 #include "db.hh"
 #include "archive.hh"
+#include "fstate.hh"
 
 
 struct CopySink : DumpSink
@@ -83,6 +84,20 @@ void copyPath(string src, string dst)
 }
 
 
+void registerSubstitute(const Hash & srcHash, const Hash & subHash)
+{
+    Strings subs;
+    queryListDB(nixDB, dbSubstitutes, srcHash, subs); /* non-existence = ok */
+
+    for (Strings::iterator it = subs.begin(); it != subs.end(); it++)
+        if (parseHash(*it) == subHash) return;
+    
+    subs.push_back(subHash);
+    
+    setListDB(nixDB, dbSubstitutes, srcHash, subs);
+}
+
+
 Hash registerPath(const string & _path, Hash hash)
 {
     string path(canonPath(_path));
@@ -139,8 +154,7 @@ string expandHash(const Hash & hash, const string & target,
     if (!target.empty() && !isInPrefix(target, prefix))
         abort();
 
-    if (!queryListDB(nixDB, dbHash2Paths, hash, paths))
-        throw Error(format("no paths known with hash `%1%'") % (string) hash);
+    queryListDB(nixDB, dbHash2Paths, hash, paths);
 
     /* !!! we shouldn't check for staleness by default --- too slow */
 
@@ -181,8 +195,32 @@ string expandHash(const Hash & hash, const string & target,
             /* try next one */
         }
     }
+
+    /* Try to realise the substitutes. */
+
+    Strings subs;
+    queryListDB(nixDB, dbSubstitutes, hash, subs); /* non-existence = ok */
+
+    for (Strings::iterator it = subs.begin(); it != subs.end(); it++) {
+        StringSet dummy;
+        FState nf = realiseFState(hash2fstate(parseHash(*it)), dummy);
+        string path = fstatePath(nf);
+
+        if (hashPath(path) != hash)
+            throw Error(format("bad substitute in `%1%'") % (string) path);
+
+        if (target.empty())
+            return path; /* !!! prefix */
+        else {
+            if (path != target) {
+                copyPath(path, target);
+                registerPath(target, hash);
+            }
+            return target;
+        }
+    }
     
-    throw Error(format("all paths with hash `%1%' are stale") % (string) hash);
+    throw Error(format("cannot expand hash `%1%'") % (string) hash);
 }
 
     
@@ -193,6 +231,7 @@ void addToStore(string srcPath, string & dstPath, Hash & hash)
     hash = hashPath(srcPath);
 
     try {
+        /* !!! should not use the substitutes! */
         dstPath = expandHash(hash, "", nixStore);
         return;
     } catch (...) {

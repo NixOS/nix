@@ -5,5 +5,5 @@ install-exec-local:
 	$(INSTALL) -d $(sysconfdir)/profile.d
 	$(INSTALL_PROGRAM) nix-profile.sh $(sysconfdir)/profile.d/nix.sh
 	$(INSTALL) -d $(sysconfdir)/nix
-    # !!! don't overwrite local modifications
-	$(INSTALL_PROGRAM) prebuilts.conf $(sysconfdir)/nix/prebuilts.conf
+# !!! don't overwrite local modifications
+	$(INSTALL_DATA) prebuilts.conf $(sysconfdir)/nix/prebuilts.conf

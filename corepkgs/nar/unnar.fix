@@ -1,0 +1,8 @@
+Function(["nar", "name"],
+  Package(
+    [ ("name", Var("name"))
+    , ("build", Relative("nar/unnar.sh"))
+    , ("nar", Var("nar"))
+    ]
+  )
+)
