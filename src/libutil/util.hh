@@ -181,6 +181,15 @@ public:
     ~AutoCloseFD();
     void operator =(int fd);
     operator int();
+    void close();
+    bool isOpen();
+};
+
+class Pipe
+{
+public:
+    AutoCloseFD readSide, writeSide;
+    void create();
 };
 
 class AutoCloseDir

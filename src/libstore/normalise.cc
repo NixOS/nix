@@ -17,61 +17,6 @@
 static string pathNullDevice = "/dev/null";
 
 
-struct Pipe
-{
-    int readSide, writeSide;
-
-    Pipe();
-    ~Pipe();
-    void create();
-    void closeReadSide();
-    void closeWriteSide();
-};
-
-
-Pipe::Pipe()
-    : readSide(0), writeSide(0)
-{
-}
-
-
-Pipe::~Pipe()
-{
-    closeReadSide();
-    closeWriteSide();
-    
-}
-
-
-void Pipe::create()
-{
-    int fds[2];
-    if (pipe(fds) != 0) throw SysError("creating pipe");
-    readSide = fds[0];
-    writeSide = fds[1];
-}
-
-
-void Pipe::closeReadSide()
-{
-    if (readSide != 0) {
-        if (close(readSide) == -1)
-            printMsg(lvlError, format("cannot close read side of pipe"));
-        readSide = 0;
-    }
-}
-
-
-void Pipe::closeWriteSide()
-{
-    if (writeSide != 0) {
-        if (close(writeSide) == -1)
-            printMsg(lvlError, format("cannot close write side of pipe"));
-        writeSide = 0;
-    }
-}
-
-
 /* A goal is a store expression that still has to be normalised. */
 struct Goal
 {
@@ -116,7 +61,7 @@ struct Goal
     Path tmpDir;
 
     /* File descriptor for the log file. */
-    int fdLogFile;
+    AutoCloseFD fdLogFile;
 
     /* Pipe for the builder's standard output/error. */
     Pipe logPipe;
@@ -135,7 +80,6 @@ struct Goal
 Goal::Goal()
     : pid(0)
     , tmpDir("")
-    , fdLogFile(0)
 {
 }
 
@@ -163,9 +107,6 @@ Goal::~Goal()
                     format("waiting for process %1%") % pid);
         }
     }
-
-    if (fdLogFile && (close(fdLogFile) != 0))
-        printMsg(lvlError, format("cannot close fd"));
 
     try {
         deleteTmpDir(false);
@@ -725,8 +666,8 @@ Normaliser::HookReply Normaliser::tryBuildHook(Goal & goal)
 
     childStarted(goal, pid);
 
-    goal.fromHook.closeWriteSide();
-    goal.toHook.closeReadSide();
+    goal.fromHook.writeSide.close();
+    goal.toHook.readSide.close();
 
     /* Read the first line of input, which should be a word indicating
        whether the hook wishes to perform the build.  !!! potential
@@ -807,11 +748,10 @@ void Normaliser::terminateBuildHook(Goal & goal)
     if (waitpid(goal.pid, &status, 0) != goal.pid)
         printMsg(lvlError, format("process `%1%' missing") % goal.pid);
     goal.pid = 0;
-    goal.fromHook.closeReadSide();
-    goal.toHook.closeWriteSide();
-    close(goal.fdLogFile);
-    goal.fdLogFile = 0;
-    goal.logPipe.closeReadSide();
+    goal.fromHook.readSide.close();
+    goal.toHook.writeSide.close();
+    goal.fdLogFile.close();
+    goal.logPipe.readSide.close();
     building.erase(pid);
 }
 
@@ -820,11 +760,10 @@ void Normaliser::openLogFile(Goal & goal)
 {
     /* Create a log file. */
     Path logFileName = nixLogDir + "/" + baseNameOf(goal.nePath);
-    int fdLogFile = open(logFileName.c_str(),
+    goal.fdLogFile = open(logFileName.c_str(),
         O_CREAT | O_WRONLY | O_TRUNC, 0666);
-    if (fdLogFile == -1)
+    if (goal.fdLogFile == -1)
         throw SysError(format("creating log file `%1%'") % logFileName);
-    goal.fdLogFile = fdLogFile;
 
     /* Create a pipe to get the output of the child. */
     goal.logPipe.create();
@@ -844,8 +783,7 @@ void Normaliser::initChild(Goal & goal)
     /* Dup the write side of the logger pipe into stderr. */
     if (dup2(goal.logPipe.writeSide, STDERR_FILENO) == -1)
         throw SysError("cannot pipe standard error into log file");
-    if (close(goal.logPipe.readSide) != 0) /* close read side */
-        throw SysError("closing fd");
+    goal.logPipe.readSide.close();
             
     /* Dup stderr to stdin. */
     if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
@@ -859,15 +797,15 @@ void Normaliser::initChild(Goal & goal)
         throw SysError("cannot dup null device into stdin");
 
     /* When running a hook, dup the communication pipes. */
-    bool inHook = goal.fromHook.writeSide != 0;
+    bool inHook = goal.fromHook.writeSide.isOpen();
     if (inHook) {
-        goal.fromHook.closeReadSide();
+        goal.fromHook.readSide.close();
         if (dup2(goal.fromHook.writeSide, 3) == -1)
-            throw SysError("dup");
+            throw SysError("dup1");
 
-        goal.toHook.closeWriteSide();
+        goal.toHook.writeSide.close();
         if (dup2(goal.toHook.readSide, 4) == -1)
-            throw SysError("dup");
+            throw SysError("dup2");
     }
 
     /* Close all other file descriptors. */
@@ -887,7 +825,7 @@ void Normaliser::childStarted(Goal & goal, pid_t pid)
     building[goal.pid] = goal.nePath;
 
     /* Close the write side of the logger pipe. */
-    goal.logPipe.closeWriteSide();
+    goal.logPipe.writeSide.close();
 }
 
 
@@ -971,12 +909,10 @@ void Normaliser::reapChild(Goal & goal)
     goal.pid = 0;
 
     /* Close the read side of the logger pipe. */
-    goal.logPipe.closeReadSide();
+    goal.logPipe.readSide.close();
 
     /* Close the log file. */
-    if (close(goal.fdLogFile) != 0)
-        throw SysError("closing fd");
-    goal.fdLogFile = 0;
+    goal.fdLogFile.close();
 
     debug(format("builder process %1% finished") % pid);
 

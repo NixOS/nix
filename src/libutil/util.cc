@@ -365,17 +365,46 @@ AutoCloseFD::AutoCloseFD(int fd)
 
 AutoCloseFD::~AutoCloseFD()
 {
-    if (fd != -1) close(fd);
+    try {
+        close();
+    } catch (Error & e) {
+        printMsg(lvlError, format("error (ignored): %1%") % e.msg());
+    }
 }
 
 void AutoCloseFD::operator =(int fd)
 {
+    if (this->fd != fd) close();
     this->fd = fd;
 }
 
 AutoCloseFD::operator int()
 {
     return fd;
+}
+
+void AutoCloseFD::close()
+{
+    if (fd != -1) {
+        if (::close(fd) == -1)
+            /* This should never happen. */
+            throw SysError("closing file descriptor");
+        fd = -1;
+    }
+}
+
+bool AutoCloseFD::isOpen()
+{
+    return fd != -1;
+}
+
+
+void Pipe::create()
+{
+    int fds[2];
+    if (pipe(fds) != 0) throw SysError("creating pipe");
+    readSide = fds[0];
+    writeSide = fds[1];
 }
 
 
