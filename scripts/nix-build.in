@@ -19,11 +19,11 @@ for i in "$@"; do
             extraArgs="$extraArgs $i"
             ;;
         *)
-            storeExprs=$(nix-instantiate "$i")
+            storeExprs=$(@bindir@/nix-instantiate "$i")
             for j in $storeExprs; do
                 echo "store expression is $j" >&2
             done
-            outPaths=$(nix-store -qnfv $extraArgs $storeExprs)
+            outPaths=$(@bindir@/nix-store -qnfv $extraArgs $storeExprs)
             for j in $outPaths; do
                 echo "$j"
                 if test -z "$noLink"; then
