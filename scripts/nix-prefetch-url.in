@@ -3,7 +3,10 @@
 url=$1
 hash=$2
 
-hashType="sha1"
+hashType=$NIX_HASH_ALGO
+if test -z "$hashType"; then
+    hashType=md5
+fi    
 
 if test -z "$url"; then
     echo "syntax: nix-prefetch-url URL" >&2

@@ -96,7 +96,7 @@ while ($queueFront < scalar @queue) {
         foreach my $patch (@{$patchList}) {
             if (isValidPath($patch->{basePath})) {
                 # !!! this should be cached
-                my $hash = `@bindir@/nix-hash "$patch->{basePath}"`;
+                my $hash = `@bindir@/nix-hash --type '$patch->{hashAlgo}' "$patch->{basePath}"`;
                 chomp $hash;
 #                print "  MY HASH is $hash\n";
                 if ($hash ne $patch->{baseHash}) {
@@ -175,8 +175,10 @@ my $maxStep = scalar @path;
 sub downloadFile {
     my $url = shift;
     my $hash = shift;
+    my $hashAlgo = shift;
     $ENV{"PRINT_PATH"} = 1;
     $ENV{"QUIET"} = 1;
+    $ENV{"NIX_HASH_ALGO"} = $hashAlgo;
     my ($hash2, $path) = `@bindir@/nix-prefetch-url '$url' '$hash'`;
     chomp $hash2;
     chomp $path;
@@ -205,7 +207,7 @@ while (scalar @path > 0) {
 
         # Download the patch.
         print "  downloading patch...\n";
-        my $patchPath = downloadFile "$patch->{url}", "$patch->{hash}";
+        my $patchPath = downloadFile "$patch->{url}", "$patch->{hash}", "$patch->{hashAlgo}";
 
         # Turn the base path into a NAR archive, to which we can
         # actually apply the patch.
@@ -232,7 +234,7 @@ while (scalar @path > 0) {
         
         # Download the archive.
         print "  downloading archive...\n";
-        my $narFilePath = downloadFile "$narFile->{url}", "$narFile->{hash}";
+        my $narFilePath = downloadFile "$narFile->{url}", "$narFile->{hash}", "$narFile->{hashAlgo}";
 
         # Unpack the archive into the target path.
         print "  unpacking archive...\n";

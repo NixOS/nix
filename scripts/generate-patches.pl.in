@@ -45,6 +45,7 @@ sub findOutputPaths {
 
         # Ignore store expressions.
         next if ($p =~ /\.store$/);
+        next if ($p =~ /\.drv$/);
         
         # Ignore builders (too much ambiguity -- they're all called
         # `builder.sh').
@@ -69,7 +70,7 @@ my %dstOutPaths = findOutputPaths \%dstNarFiles, \%dstSuccessors;
 
 sub getNameVersion {
     my $p = shift;
-    $p =~ /\/[0-9a-f]+((?:-[a-zA-Z][^\/-]*)+)([^\/]*)$/;
+    $p =~ /\/[0-9a-z]+((?:-[a-zA-Z][^\/-]*)+)([^\/]*)$/;
     my $name = $1;
     my $version = $2;
     $name =~ s/^-//;
@@ -192,16 +193,16 @@ foreach my $p (keys %dstOutPaths) {
         system("@bunzip2@ < $dstNarBz2 > $tmpdir/B") == 0
             or die "cannot unpack $dstNarBz2";
 
-        system("@libexecdir@/bspatch $tmpdir/A $tmpdir/B $tmpdir/DIFF") == 0
+        system("@libexecdir@/bsdiff $tmpdir/A $tmpdir/B $tmpdir/DIFF") == 0
             or die "cannot compute binary diff";
 
-        my $baseHash = `@bindir@/nix-hash --flat $tmpdir/A` or die;
+        my $baseHash = `@bindir@/nix-hash --flat --type sha1 $tmpdir/A` or die;
         chomp $baseHash;
 
-        my $narHash = `@bindir@/nix-hash --flat $tmpdir/B` or die;
+        my $narHash = `@bindir@/nix-hash --flat --type sha1 $tmpdir/B` or die;
         chomp $narHash;
 
-        my $narDiffHash = `@bindir@/nix-hash --flat $tmpdir/DIFF` or die;
+        my $narDiffHash = `@bindir@/nix-hash --flat --type sha1 $tmpdir/DIFF` or die;
         chomp $narDiffHash;
 
         my $narDiffSize = (stat "$tmpdir/DIFF")[7];
@@ -234,7 +235,7 @@ foreach my $p (keys %dstOutPaths) {
         # Add the patch to the manifest.
         addPatch \%dstPatches, $p,
             { url => "$patchesURL/$finalName", hash => $narDiffHash
-            , size => $narDiffSize
+            , size => $narDiffSize, hashAlgo => "sha1"
             , basePath => $closest, baseHash => $baseHash
             , narHash => $narHash, patchType => "nar-bsdiff"
             };
