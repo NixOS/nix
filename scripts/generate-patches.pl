@@ -198,9 +198,17 @@ foreach my $p (keys %dstOutPaths) {
     
         my $finalName =
             "$narBz2Hash-$name-$closestVersion-to-$version.nar-diff";
-    
-        system("cp '$tmpdir/DIFF' '$patchesDir/$finalName'") == 0
+
+        if (-e "$patchesDir/$finalName") {
+            print "    not copying, already exists\n";
+            next;
+        }
+        
+        system("cp '$tmpdir/DIFF' '$patchesDir/$finalName.tmp'") == 0
             or die "cannot copy diff";
+
+        rename("$patchesDir/$finalName.tmp", "$patchesDir/$finalName")
+            or die "cannot rename $patchesDir/$finalName.tmp";
         
         # Add the patch to the manifest.
         addPatch \%dstPatches, $p,

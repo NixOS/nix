@@ -146,7 +146,7 @@ sub writeManifest
     my $patches = shift;
     my $successors = shift;
 
-    open MANIFEST, ">$manifest";
+    open MANIFEST, ">$manifest.tmp"; # !!! check exclusive
 
     foreach my $storePath (keys %{$narFiles}) {
         my $narFileList = $$narFiles{$storePath};
@@ -184,6 +184,9 @@ sub writeManifest
     
     
     close MANIFEST;
+
+    rename("$manifest.tmp", $manifest)
+        or die "cannot rename $manifest.tmp: $!";
 }
 
 
