@@ -1,35 +1,41 @@
 #! @shell@ -e
 
 url=$1
+hash=$2
 
 if test -z "$url"; then
     echo "syntax: nix-prefetch-url URL" >&2
     exit 1
 fi
 
-# !!! race
-tmpPath1=@storedir@/nix-prefetch-url-$$
+# Determine the hash, unless it was given.
+if test -z "$hash"; then
 
-# Test whether we have write permission in the store.  If not, fetch
-# to /tmp and don't copy to the store.  This is a hack to make this
-# script at least work somewhat in setuid installations.
-if ! touch $tmpPath1 2> /dev/null; then
-    echo "(cannot write to the store, result won't be cached)" >&2
-    dummyMode=1
-    tmpPath1=/tmp/nix-prefetch-url-$$ # !!! security?
-fi
+    # !!! race
+    tmpPath1=@storedir@/nix-prefetch-url-$$
 
-# Perform the checkout.
-@curl@ --fail --location --max-redirs 20 "$url" > $tmpPath1
+    # Test whether we have write permission in the store.  If not,
+    # fetch to /tmp and don't copy to the store.  This is a hack to
+    # make this script at least work somewhat in setuid installations.
+    if ! touch $tmpPath1 2> /dev/null; then
+        echo "(cannot write to the store, result won't be cached)" >&2
+        dummyMode=1
+        tmpPath1=/tmp/nix-prefetch-url-$$ # !!! security?
+    fi
 
-# Compute the hash.
-hash=$(@bindir@/nix-hash --flat $tmpPath1)
-echo "hash is $hash" >&2
+    # Perform the checkout.
+    @curl@ --fail --location --max-redirs 20 "$url" > $tmpPath1
 
-# Rename it so that the fetchurl builder can find it.
-if test "$dummyMode" != 1; then
-    tmpPath2=@storedir@/nix-prefetch-url-$hash
-    test -e $tmpPath2 || mv $tmpPath1 $tmpPath2 # !!! race
+    # Compute the hash.
+    hash=$(@bindir@/nix-hash --flat $tmpPath1)
+    if ! test -n "$QUIET"; then echo "hash is $hash" >&2; fi
+
+    # Rename it so that the fetchurl builder can find it.
+    if test "$dummyMode" != 1; then
+        tmpPath2=@storedir@/nix-prefetch-url-$hash
+        test -e $tmpPath2 || mv $tmpPath1 $tmpPath2 # !!! race
+    fi
+
 fi
 
 # Create a Nix expression that does a fetchurl.
@@ -41,7 +47,7 @@ storeExpr=$( \
 # Realise it.
 finalPath=$(@bindir@/nix-store -qnB --force-realise $storeExpr)
     
-echo "path is $finalPath" >&2
+if ! test -n "$QUIET"; then echo "path is $finalPath" >&2; fi
 
 rm -rf $tmpPath1 $tmpPath2 || true
 
