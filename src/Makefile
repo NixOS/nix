@@ -1,2 +1,2 @@
-nix: nix.c
-	gcc -g -Wall -o nix nix.c -ldb-4
+nix: nix.cc
+	g++ -g -Wall -o nix nix.cc -ldb_cxx-4
