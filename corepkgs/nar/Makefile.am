@@ -9,4 +9,4 @@ install-exec-local:
 
 include ../../substitute.mk
 
-EXTRA_DIST = nar.fix nar.sh unnar.fix unnar.sh
+EXTRA_DIST = nar.fix nar.sh.in unnar.fix unnar.sh.in

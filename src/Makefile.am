@@ -52,4 +52,4 @@ install-data-local:
 	$(INSTALL) -d $(prefix)/store
 	$(bindir)/nix --init
 
-EXTRA_DIST = *.hh *.h
+EXTRA_DIST = *.hh *.h test-builder-*.sh

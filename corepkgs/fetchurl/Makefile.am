@@ -7,4 +7,4 @@ install-exec-local:
 
 include ../../substitute.mk
 
-EXTRA_DIST = fetchurl.fix fetchurl.sh
+EXTRA_DIST = fetchurl.fix fetchurl.sh.in
