@@ -42,7 +42,7 @@ void ATermMap::set(ATerm key, ATerm value)
 
 void ATermMap::set(const string & key, ATerm value)
 {
-    set(string2ATerm(key.c_str()), value);
+    set(toATerm(key), value);
 }
 
 
@@ -54,7 +54,7 @@ ATerm ATermMap::get(ATerm key) const
 
 ATerm ATermMap::get(const string & key) const
 {
-    return get(string2ATerm(key.c_str()));
+    return get(toATerm(key));
 }
 
 
@@ -66,7 +66,7 @@ void ATermMap::remove(ATerm key)
 
 void ATermMap::remove(const string & key)
 {
-    remove(string2ATerm(key.c_str()));
+    remove(toATerm(key));
 }
 
 

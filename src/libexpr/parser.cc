@@ -35,7 +35,7 @@ void setParseResult(ParseData * data, ATerm t)
 
 ATerm absParsedPath(ParseData * data, ATerm t)
 {
-    return string2ATerm(absPath(aterm2String(t), data->basePath).c_str());
+    return toATerm(absPath(aterm2String(t), data->basePath));
 }
     
 void parseError(ParseData * data, char * error, int line, int column)

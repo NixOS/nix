@@ -192,18 +192,18 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
          i != drvs.end(); ++i)
     {
         ATerm t = makeAttrs(ATmakeList6(
-            makeBind(string2ATerm("type"),
-                makeStr(string2ATerm("derivation")), makeNoPos()),
-            makeBind(string2ATerm("name"),
-                makeStr(string2ATerm(i->second.name.c_str())), makeNoPos()),
-            makeBind(string2ATerm("system"),
-                makeStr(string2ATerm(i->second.system.c_str())), makeNoPos()),
-            makeBind(string2ATerm("drvPath"),
-                makePath(string2ATerm(i->second.drvPath.c_str())), makeNoPos()),
-            makeBind(string2ATerm("drvHash"),
-                makeStr(string2ATerm(((string) i->second.drvHash).c_str())), makeNoPos()),
-            makeBind(string2ATerm("outPath"),
-                makePath(string2ATerm(i->second.outPath.c_str())), makeNoPos())
+            makeBind(toATerm("type"),
+                makeStr(toATerm("derivation")), makeNoPos()),
+            makeBind(toATerm("name"),
+                makeStr(toATerm(i->second.name)), makeNoPos()),
+            makeBind(toATerm("system"),
+                makeStr(toATerm(i->second.system)), makeNoPos()),
+            makeBind(toATerm("drvPath"),
+                makePath(toATerm(i->second.drvPath)), makeNoPos()),
+            makeBind(toATerm("drvHash"),
+                makeStr(toATerm((string) i->second.drvHash)), makeNoPos()),
+            makeBind(toATerm("outPath"),
+                makePath(toATerm(i->second.outPath)), makeNoPos())
             ));
         inputs = ATinsert(inputs, t);
     }
@@ -215,11 +215,11 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
     Path inputsFile = writeTerm(inputs2, "-env-inputs");
 
     Expr topLevel = makeCall(envBuilder, makeAttrs(ATmakeList3(
-        makeBind(string2ATerm("system"),
-            makeStr(string2ATerm(thisSystem.c_str())), makeNoPos()),
-        makeBind(string2ATerm("derivations"), inputs2, makeNoPos()),
-        makeBind(string2ATerm("manifest"),
-            makePath(string2ATerm(inputsFile.c_str())), makeNoPos())
+        makeBind(toATerm("system"),
+            makeStr(toATerm(thisSystem)), makeNoPos()),
+        makeBind(toATerm("derivations"), inputs2, makeNoPos()),
+        makeBind(toATerm("manifest"),
+            makePath(toATerm(inputsFile)), makeNoPos())
         )));
 
     /* Instantiate it. */

@@ -31,9 +31,14 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, void * data, char * s)
     parseError(data, s, loc->first_line, loc->first_column);
 }
 
+ATerm toATerm(const char * s)
+{
+    return (ATerm) ATmakeAppl0(ATmakeAFun((char *) s, 0, ATtrue));
+}
+
 static Pos makeCurPos(YYLTYPE * loc, void * data)
 {
-    return makePos(string2ATerm(getPath(data)),
+    return makePos(toATerm(getPath(data)),
         loc->first_line, loc->first_column);
 }
 
@@ -122,7 +127,7 @@ expr_simple
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { $$ = makeSelect(fixAttrs(1, $3), string2ATerm("body")); }
+    { $$ = makeSelect(fixAttrs(1, $3), toATerm("body")); }
   | REC '{' binds '}'
     { $$ = fixAttrs(1, $3); }
   | '{' binds '}'

@@ -130,10 +130,6 @@ while (<STDIN>) {
 
 print HEADER "void $initFun();\n\n";
 
-print HEADER "static inline ATerm string2ATerm(const char * s) {\n";
-print HEADER "    return (ATerm) ATmakeAppl0(ATmakeAFun((char *) s, 0, ATtrue));\n";
-print HEADER "}\n\n";
-
 print HEADER "static inline const char * aterm2String(ATerm t) {\n";
 print HEADER "    return (const char *) ATgetName(ATgetAFun(t));\n";
 print HEADER "}\n\n";

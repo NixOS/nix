@@ -41,4 +41,9 @@ public:
 Error badTerm(const format & f, ATerm t);
 
 
+/* Convert strings to ATerms. */
+ATerm toATerm(const char * s);
+ATerm toATerm(const string & s);
+
+
 #endif /* !__ATERM_H */

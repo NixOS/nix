@@ -269,11 +269,11 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
     printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'")
         % drvName % drvPath);
 
-    attrs.set("outPath", makeAttrRHS(makePath(string2ATerm(outPath.c_str())), makeNoPos()));
-    attrs.set("drvPath", makeAttrRHS(makePath(string2ATerm(drvPath.c_str())), makeNoPos()));
+    attrs.set("outPath", makeAttrRHS(makePath(toATerm(outPath)), makeNoPos()));
+    attrs.set("drvPath", makeAttrRHS(makePath(toATerm(drvPath)), makeNoPos()));
     attrs.set("drvHash",
-        makeAttrRHS(makeStr(string2ATerm(((string) drvHash).c_str())), makeNoPos()));
-    attrs.set("type", makeAttrRHS(makeStr(string2ATerm("derivation")), makeNoPos()));
+        makeAttrRHS(makeStr(toATerm((string) drvHash)), makeNoPos()));
+    attrs.set("type", makeAttrRHS(makeStr(toATerm("derivation")), makeNoPos()));
 
     return makeAttrs(attrs);
 }
@@ -283,7 +283,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
    following the last slash. */
 static Expr primBaseNameOf(EvalState & state, const ATermVector & args)
 {
-    return makeStr(string2ATerm(baseNameOf(evalString(state, args[0])).c_str()));
+    return makeStr(toATerm(baseNameOf(evalString(state, args[0]))));
 }
 
 

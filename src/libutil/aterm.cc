@@ -27,3 +27,15 @@ Error badTerm(const format & f, ATerm t)
     }
     return Error(format("%1%, in `%2%'") % f.str() % (string) s);
 }
+
+
+ATerm toATerm(const char * s)
+{
+    return (ATerm) ATmakeAppl0(ATmakeAFun((char *) s, 0, ATtrue));
+}
+
+
+ATerm toATerm(const string & s)
+{
+    return toATerm(s.c_str());
+}

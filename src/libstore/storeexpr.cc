@@ -142,7 +142,7 @@ static ATermList unparsePaths(const PathSet & paths)
     ATermList l = ATempty;
     for (PathSet::const_iterator i = paths.begin();
          i != paths.end(); i++)
-        l = ATinsert(l, string2ATerm(i->c_str()));
+        l = ATinsert(l, toATerm(*i));
     return ATreverse(l);
 }
 
@@ -156,7 +156,7 @@ static ATerm unparseClosure(const Closure & closure)
          i != closure.elems.end(); i++)
         elems = ATinsert(elems,
             makeClosureElem(
-                string2ATerm(i->first.c_str()),
+                toATerm(i->first),
                 unparsePaths(i->second.refs)));
 
     return makeClosure(roots, elems);
@@ -168,21 +168,21 @@ static ATerm unparseDerivation(const Derivation & derivation)
     ATermList args = ATempty;
     for (Strings::const_iterator i = derivation.args.begin();
          i != derivation.args.end(); i++)
-        args = ATinsert(args, string2ATerm(i->c_str()));
+        args = ATinsert(args, toATerm(*i));
 
     ATermList env = ATempty;
     for (StringPairs::const_iterator i = derivation.env.begin();
          i != derivation.env.end(); i++)
         env = ATinsert(env,
             makeEnvBinding(
-                string2ATerm(i->first.c_str()),
-                string2ATerm(i->second.c_str())));
+                toATerm(i->first),
+                toATerm(i->second)));
 
     return makeDerive(
         unparsePaths(derivation.outputs),
         unparsePaths(derivation.inputs),
-        string2ATerm(derivation.platform.c_str()),
-        string2ATerm(derivation.builder.c_str()),
+        toATerm(derivation.platform),
+        toATerm(derivation.builder),
         ATreverse(args),
         ATreverse(env));
 }

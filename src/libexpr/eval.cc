@@ -328,11 +328,11 @@ Expr evalExpr2(EvalState & state, Expr e)
         e2 = evalExpr(state, e2);
         ATerm s1, s2;
         if (matchStr(e1, s1) && matchStr(e2, s2))
-            return makeStr(string2ATerm((
-                (string) aterm2String(s1) + (string) aterm2String(s2)).c_str()));
+            return makeStr(toATerm(
+                (string) aterm2String(s1) + (string) aterm2String(s2)));
         else if (matchPath(e1, s1) && matchPath(e2, s2))
-            return makePath(string2ATerm(canonPath(
-                (string) aterm2String(s1) + "/" + (string) aterm2String(s2)).c_str()));
+            return makePath(toATerm(canonPath(
+                (string) aterm2String(s1) + "/" + (string) aterm2String(s2))));
         else throw Error("wrong argument types in `+' operator");
     }
 
