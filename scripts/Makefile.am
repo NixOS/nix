@@ -1,6 +1,6 @@
 bin_SCRIPTS = nix-collect-garbage \
- nix-pull nix-push nix-prefetch-url \
- nix-install-package nix-channel
+  nix-pull nix-push nix-prefetch-url \
+  nix-install-package nix-channel nix-build
 
 noinst_SCRIPTS = nix-profile.sh
 
@@ -18,7 +18,8 @@ install-exec-local: readmanifest.pm
 include ../substitute.mk
 
 EXTRA_DIST = nix-collect-garbage.in \
- nix-pull.in nix-push.in nix-profile.sh.in \
- nix-prefetch-url.in nix-install-package.in \
- nix-channel.in \
- prebuilts.conf readmanifest.pm.in
+  nix-pull.in nix-push.in nix-profile.sh.in \
+  nix-prefetch-url.in nix-install-package.in \
+  nix-channel.in \
+  prebuilts.conf readmanifest.pm.in \
+  nix-build.in

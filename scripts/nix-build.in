@@ -1,0 +1,23 @@
+#! @shell@ -e
+
+nixExpr=$1
+
+if test -z "$nixExpr"; then
+    echo "syntax: $0 NIX-EXPR..." >&2
+    exit 1
+fi
+
+extraArgs=
+
+for i in "$@"; do
+    case "$i" in
+        -*)
+            extraArgs="$extraArgs $i"
+            ;;
+        *)
+            storeExpr=$(nix-instantiate "$i")
+            echo "store expression is $storeExpr" >&2
+            nix-store -qnfv $extraArgs $storeExpr
+            ;;
+    esac
+done
