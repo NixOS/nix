@@ -1,8 +1,9 @@
-#! /usr/bin/perl -w
+#! /usr/bin/perl -w -I@libexecdir@/nix
 
 use strict;
 use IPC::Open2;
 use POSIX qw(tmpnam);
+use readmanifest;
 
 my $tmpdir;
 do { $tmpdir = tmpnam(); }
@@ -13,93 +14,19 @@ my $conffile = "@sysconfdir@/nix/prebuilts.conf";
 
 #END { unlink $manifest; rmdir $tmpdir; }
 
-my @srcpaths;
-my @subs;
-my @sucs;
-
-my $fullexpr = "[";
-
-
-sub processURL {
-    my $url = shift;
-    $url =~ s/\/$//;
-    print "obtaining list of Nix archives at $url...\n";
-
-    system "wget --cache=off '$url'/MANIFEST -O '$manifest' 2> /dev/null"; # !!! escape
-    if ($?) { die "`wget' failed"; }
-        
-    open MANIFEST, "<$manifest";
-
-    my $inside = 0;
-
-    my $storepath;
-    my $narname;
-    my $hash;
-    my @preds;
-
-    while (<MANIFEST>) {
-        chomp;
-        s/\#.*$//g;
-        next if (/^$/);
-
-        if (!$inside) {
-            if (/^\{$/) { 
-                $inside = 1;
-                undef $storepath;
-                undef $narname;
-                undef $hash;
-                @preds = ();
-                }
-            else { die "bad line: $_"; }
-        } else {
-            if (/^\}$/) {
-                $inside = 0;
-                my $fullurl = "$url/$narname";
-#                print "$storepath\n";
-
-                # Construct a Nix expression that fetches and unpacks a
-                # Nix archive from the network.
-                my $fetch =
-                    "(import @datadir@/nix/corepkgs/fetchurl) " .
-                    "{url = $fullurl; md5 = \"$hash\"; system = \"@system@\"}";
-                my $nixexpr =
-                    "((import @datadir@/nix/corepkgs/nar/unnar.nix) " .
-                    "{narFile = ($fetch); outPath = \"$storepath\"; system = \"@system@\"}) ";
-                $fullexpr .= $nixexpr; # !!! O(n^2)?
-
-                push @srcpaths, $storepath;
-
-                foreach my $p (@preds) {
-                    push @sucs, $p;
-                    push @sucs, $storepath;
-                }
-
-            }
-            elsif (/^\s*StorePath:\s*(\/\S+)\s*$/) {
-                $storepath = $1;
-            }
-            elsif (/^\s*NarName:\s*(\S+)\s*$/) {
-                $narname = $1;
-                }
-            elsif (/^\s*MD5:\s*(\S+)\s*$/) {
-                $hash = $1;
-            }
-            elsif (/^\s*SuccOf:\s*(\/\S+)\s*$/) {
-                push @preds, $1;
-            }
-            else { die "bad line: $_"; }
-        }
-    }
-
-    close MANIFEST;
-}
-
 
 # Obtain URLs either from the command line or from a configuration file.
+my %storepaths2urls;
+my %urls2hashes;
+my %successors;
+sub doURL {
+    my $url = shift;
+    processURL $manifest, $url, \%storepaths2urls, \%urls2hashes, \%successors;
+}
 if (scalar @ARGV > 0) {
     while (@ARGV) {
         my $url = shift @ARGV;
-        processURL $url;
+	doURL $url;
     }
 } else {
     open CONFFILE, "<$conffile";
@@ -107,10 +34,30 @@ if (scalar @ARGV > 0) {
         chomp;
         if (/^\s*(\S+)\s*(\#.*)?$/) {
             my $url = $1;
-            processURL $url;
+	    doURL $url;
         }
     }
     close CONFFILE;
+}
+
+
+# Create a Nix expression for the substitutes.
+my $fullexpr = "[";
+
+my @storepaths;
+foreach my $storepath (keys %storepaths2urls) {
+    # Construct a Nix expression that fetches and unpacks a
+    # Nix archive from the network.
+    my $url = $storepaths2urls{$storepath};
+    my $hash = $urls2hashes{$url};
+    my $fetch =
+	"(import @datadir@/nix/corepkgs/fetchurl) " .
+	"{url = $url; md5 = \"$hash\"; system = \"@system@\"}";
+    my $nixexpr =
+	"((import @datadir@/nix/corepkgs/nar/unnar.nix) " .
+	"{narFile = ($fetch); outPath = \"$storepath\"; system = \"@system@\"}) ";
+    $fullexpr .= $nixexpr; # !!! O(n^2)?
+    push @storepaths, $storepath;
 }
 
 $fullexpr .= "]";
@@ -123,14 +70,13 @@ my $pid = open2(\*READ, \*WRITE, "nix-instantiate -") or die "cannot run nix-ins
 print WRITE $fullexpr;
 close WRITE;
 my $i = 0;
+my %substitutes;
 while (<READ>) {
     chomp;
     die unless /^\//;
     my $subpath = $_;
-    die unless ($i < scalar @srcpaths);
-    my $srcpath = $srcpaths[$i++];
-    push @subs, $srcpath;
-    push @subs, $subpath;
+    die unless ($i < scalar @storepaths);
+    $substitutes{$storepaths[$i++]} = $subpath;
 }
 
 waitpid $pid, 0;
@@ -139,6 +85,7 @@ $? == 0 or die "nix-instantiate failed";
 
 # Register all substitutes.
 print STDERR "registering substitutes...\n";
+my @subs = %substitutes;
 while (scalar @subs > 0) {
     my $n = scalar @subs;
     if ($n > 256) { $n = 256 };
@@ -151,6 +98,7 @@ while (scalar @subs > 0) {
 
 # Register all successors.
 print STDERR "registering successors...\n";
+my @sucs = %successors;
 while (scalar @sucs > 0) {
     my $n = scalar @sucs;
     if ($n > 256) { $n = 256 };

@@ -1,0 +1,72 @@
+use strict;
+
+sub processURL {
+    my $manifest = shift;
+    my $url = shift;
+    my $storepaths2urls = shift;
+    my $urls2hashes = shift;
+    my $successors = shift;
+
+    $url =~ s/\/$//;
+    print "obtaining list of Nix archives at $url...\n";
+
+    system "wget --cache=off '$url'/MANIFEST -O '$manifest' 2> /dev/null"; # !!! escape
+    if ($?) { die "`wget' failed"; }
+        
+    open MANIFEST, "<$manifest";
+
+    my $inside = 0;
+
+    my $storepath;
+    my $narname;
+    my $hash;
+    my @preds;
+
+    while (<MANIFEST>) {
+        chomp;
+        s/\#.*$//g;
+        next if (/^$/);
+
+        if (!$inside) {
+            if (/^\{$/) { 
+                $inside = 1;
+                undef $storepath;
+                undef $narname;
+                undef $hash;
+                @preds = ();
+	    }
+            else { die "bad line: $_"; }
+        } else {
+            if (/^\}$/) {
+                $inside = 0;
+                my $fullurl = "$url/$narname";
+
+		$$storepaths2urls{$storepath} = $fullurl;
+		$$urls2hashes{$fullurl} = $hash;
+
+                foreach my $p (@preds) {
+		    $$successors{$p} = $storepath;
+                }
+
+            }
+            elsif (/^\s*StorePath:\s*(\/\S+)\s*$/) {
+                $storepath = $1;
+            }
+            elsif (/^\s*NarName:\s*(\S+)\s*$/) {
+                $narname = $1;
+	    }
+            elsif (/^\s*MD5:\s*(\S+)\s*$/) {
+                $hash = $1;
+            }
+            elsif (/^\s*SuccOf:\s*(\/\S+)\s*$/) {
+                push @preds, $1;
+            }
+            else { die "bad line: $_"; }
+        }
+    }
+
+    close MANIFEST;
+}
+
+
+return 1;
