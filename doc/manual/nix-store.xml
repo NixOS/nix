@@ -86,7 +86,7 @@
 
   <!--######################################################################-->
 
-  <refsection>
+  <refsection id='rsec-nix-store-realise'>
     <title>Operation <option>--realise</option></title>
 
     <refsection>
