@@ -64,7 +64,7 @@ $fullexpr .= "]";
 
 
 # Instantiate store expressions from the Nix expressions we created above.
-print STDERR "instantiating Nix expression...\n";
+print STDERR "instantiating store expressions...\n";
 my $pid = open2(\*READ, \*WRITE, "nix-instantiate -") or die "cannot run nix-instantiate";
 
 print WRITE $fullexpr;

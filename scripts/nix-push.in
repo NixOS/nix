@@ -159,7 +159,7 @@ foreach my $nararchive (@nararchives) {
 
     if (system("$curl --head $archives_get_url/$basename > /dev/null") != 0) {
         print STDERR "  $nararchive\n";
-        system("$curl  --show-error --upload-file " .
+        system("$curl --show-error --upload-file " .
                "'$nararchive' '$archives_put_url/$basename' > /dev/null") == 0 or
             die "curl failed on $nararchive: $?";
     }
