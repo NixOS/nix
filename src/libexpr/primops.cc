@@ -93,10 +93,16 @@ static string processBinding(EvalState & state, Expr e, StoreExpr & ne)
         Expr a = queryAttr(e, "type");
         if (a && evalString(state, a) == "derivation") {
             a = queryAttr(e, "drvPath");
-            if (a) {
-                Path drvPath = evalPath(state, a);
-                return addInput(state, drvPath, ne);
-            }
+            if (!a) throw badTerm("derivation name missing", e);
+            Path drvPath = evalPath(state, a);
+
+            a = queryAttr(e, "drvHash");
+            if (!a) throw badTerm("derivation hash missing", e);
+            Hash drvHash = parseHash(evalString(state, a));
+
+            state.drvHashes[drvPath] = drvHash;
+            
+            return addInput(state, drvPath, ne);
         }
     }
 
@@ -199,13 +205,13 @@ Expr primDerivation(EvalState & state, Expr args)
         ? hashString((string) outHash + outPath)
         : hashDerivation(state, ne);
     Path drvPath = writeTerm(unparseStoreExpr(ne), "-d-" + drvName);
-    state.drvHashes[drvPath] = drvHash;
 
     printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'")
         % drvName % drvPath);
 
     attrs.set("outPath", ATmake("Path(<str>)", outPath.c_str()));
     attrs.set("drvPath", ATmake("Path(<str>)", drvPath.c_str()));
+    attrs.set("drvHash", ATmake("Str(<str>)", ((string) drvHash).c_str()));
     attrs.set("type", ATmake("Str(\"derivation\")"));
 
     return makeAttrs(attrs);

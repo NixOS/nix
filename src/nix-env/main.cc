@@ -14,6 +14,7 @@ struct DrvInfo
     string name;
     Path drvPath;
     Path outPath;
+    Hash drvHash;
 };
 
 typedef map<Path, DrvInfo> DrvInfos;
@@ -35,6 +36,10 @@ bool parseDerivation(EvalState & state, Expr e, DrvInfo & drv)
     a = queryAttr(e, "drvPath");
     if (!a) throw badTerm("derivation path missing", e);
     drv.drvPath = evalPath(state, a);
+
+    a = queryAttr(e, "drvHash");
+    if (!a) throw badTerm("derivation hash missing", e);
+    drv.drvHash = parseHash(evalString(state, a));
 
     a = queryAttr(e, "outPath");
     if (!a) throw badTerm("output path missing", e);
@@ -169,10 +174,12 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs)
             "Bind(\"type\", Str(\"derivation\")), "
             "Bind(\"name\", Str(<str>)), "
             "Bind(\"drvPath\", Path(<str>)), "
+            "Bind(\"drvHash\", Str(<str>)), "
             "Bind(\"outPath\", Path(<str>))"
             "])",
             i->second.name.c_str(),
             i->second.drvPath.c_str(),
+            ((string) i->second.drvHash).c_str(),
             i->second.outPath.c_str());
         inputs = ATinsert(inputs, t);
     }
@@ -280,12 +287,10 @@ void uninstallDerivations(EvalState & state, Strings drvNames)
         if (j == nameMap.end())
             throw Error(format("unknown derivation `%1%'") % *i);
         else
-            installedDrvs.erase(j->first);
+            installedDrvs.erase(j->second);
     }
 
    createUserEnv(state, installedDrvs);
-#if 0
-#endif
 }
 
 
