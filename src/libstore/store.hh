@@ -45,7 +45,7 @@ void registerSubstitute(const Transaction & txn,
     const Path & srcPath, const Substitute & sub);
 
 /* Return the substitutes for the given path. */
-Substitutes querySubstitutes(const Path & srcPath);
+Substitutes querySubstitutes(const Transaction & txn, const Path & srcPath);
 
 /* Deregister all substitutes. */
 void clearSubstitutes();

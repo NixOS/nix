@@ -363,9 +363,9 @@ void registerSubstitute(const Transaction & txn,
 }
 
 
-Substitutes querySubstitutes(const Path & srcPath)
+Substitutes querySubstitutes(const Transaction & txn, const Path & srcPath)
 {
-    return readSubstitutes(noTxn, srcPath);
+    return readSubstitutes(txn, srcPath);
 }
 
 
@@ -411,6 +411,13 @@ static void invalidatePath(const Path & path, Transaction & txn)
     debug(format("unregistering path `%1%'") % path);
 
     nixDB.delPair(txn, dbValidPaths, path);
+
+    /* Clear the `references' entry for this path, as well as the
+       inverse `referers' entries; but only if there are no
+       substitutes for this path.  This maintains the cleanup
+       invariant. */
+    if (querySubstitutes(txn, path).size() == 0)
+        setReferences(txn, path, PathSet());
 }
 
 

@@ -9,7 +9,6 @@ my $storeDir = "@storedir@";
 my %alive;
 
 my $gcOper = "--delete";
-my $minAge = 0;
 
 my @roots = ();
 
@@ -20,33 +19,11 @@ for (my $i = 0; $i < scalar @ARGV; $i++) {
     if ($arg eq "--delete" || $arg eq "--print-live" || $arg eq "--print-dead") {
         $gcOper = $arg;
     }
-    elsif ($arg eq "--min-age") {
-        $i++;
-        $minAge = undef;
-        $minAge = $ARGV[$i];
-        die "invalid minimum age" unless defined $minAge && $minAge =~ /^\d*$/;
-    }
     else { die "unknown argument `$arg'" };
 }
 
 
-# Read all GC roots from the given file.
-sub readRoots {
-    my $fileName = shift;
-    open ROOT, "<$fileName" or die "cannot open `$fileName': $!";
-    while (<ROOT>) {
-        chomp;
-        foreach my $root (split ' ') {
-            die "bad root `$root' in file `$fileName'"
-                unless $root =~ /^\S+$/;
-            push @roots, $root;
-        }
-    }
-    close ROOT;
-}
-
-
-# Recursively finds all *.gcroot files in the given directory.
+# Recursively finds all symlinks to the store in the given directory.
 sub findRoots;
 sub findRoots {
     my $followSymlinks = shift;
@@ -58,14 +35,26 @@ sub findRoots {
 
     foreach my $name (@names) {
         next if $name eq "." || $name eq "..";
-        $name = $dir . "/" . $name;
-        if ($name =~ /.gcroot$/ && -f $name) {
-            readRoots $name;
-        }
-        elsif (-d $name) {
-            if ($followSymlinks || !-l $name) {
-                findRoots 0, $name;
+        my $path = $dir . "/" . $name;
+
+        if (-l $path) {
+            my $target = readlink $path
+                or die "cannot read symlink `$path': $!";
+            
+            if (substr($target, 0, length $storeDir) eq $storeDir) {
+                # We're only interested in the store-level part.
+                $target = substr($target, length $storeDir);
+                $target = "$storeDir/$target";
+                push @roots, $target;
             }
+
+            elsif ($followSymlinks && -d $path) {
+                findRoots 0, $path;
+            }
+        }
+        
+        elsif (-d $path) {
+            findRoots $followSymlinks, $path;
         }
     }
     
@@ -77,7 +66,7 @@ findRoots 1, $rootsDir;
 
 
 # Run the collector with the roots we found.
-my $pid = open2(">&1", \*WRITE, "@bindir@/nix-store --gc $gcOper --min-age $minAge")
+my $pid = open2(">&1", \*WRITE, "@bindir@/nix-store --gc $gcOper")
     or die "cannot run `nix-store --gc'";
 
 foreach my $root (@roots) {

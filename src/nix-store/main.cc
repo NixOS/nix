@@ -274,61 +274,32 @@ static void opIsValid(Strings opFlags, Strings opArgs)
 
 static void opGC(Strings opFlags, Strings opArgs)
 {
-#if 0
+    GCAction action;
+    
     /* Do what? */
-    enum { soPrintLive, soPrintDead, soDelete } subOp;
-    time_t minAge = 0;
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
-        if (*i == "--print-live") subOp = soPrintLive;
-        else if (*i == "--print-dead") subOp = soPrintDead;
-        else if (*i == "--delete") subOp = soDelete;
-        else if (*i == "--min-age") {
-            int n;
-            if (opArgs.size() == 0 || !string2Int(opArgs.front(), n))
-                throw UsageError("`--min-age' requires an integer argument");
-            minAge = n;
-        }
+        if (*i == "--print-live") action = gcReturnLive;
+        else if (*i == "--print-dead") action = gcReturnDead;
+        else if (*i == "--delete") action = gcDeleteDead;
         else throw UsageError(format("bad sub-operation `%1%' in GC") % *i);
-        
-    Paths roots;
+
+    /* Read the roots. */
+    PathSet roots;
     while (1) {
         Path root;
         getline(cin, root);
         if (cin.eof()) break;
-        roots.push_back(root);
+        roots.insert(root);
     }
 
-    PathSet live = findLivePaths(roots);
+    PathSet result;
+    collectGarbage(roots, action, result);
 
-    if (subOp == soPrintLive) {
-        for (PathSet::iterator i = live.begin(); i != live.end(); ++i)
+    if (action != gcDeleteDead) {
+        for (PathSet::iterator i = result.begin(); i != result.end(); ++i)
             cout << *i << endl;
-        return;
     }
-
-    PathSet dead = findDeadPaths(live, minAge * 3600);
-
-    if (subOp == soPrintDead) {
-        for (PathSet::iterator i = dead.begin(); i != dead.end(); ++i)
-            cout << *i << endl;
-        return;
-    }
-
-    if (subOp == soDelete) {
-
-        /* !!! What happens if the garbage collector run is aborted
-           halfway through?  In particular, dead paths can always
-           become live again (through re-instantiation), and might
-           then refer to deleted paths. => check instantiation
-           invariants */
-
-        for (PathSet::iterator i = dead.begin(); i != dead.end(); ++i) {
-            printMsg(lvlInfo, format("deleting `%1%'") % *i);
-            deleteFromStore(*i);
-        }
-    }
-#endif
 }
 
 

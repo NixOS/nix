@@ -62,11 +62,11 @@ Generations findGenerations(Path profile, int & curGen)
 
 
 static void makeNames(const Path & profile, unsigned int num,
-    Path & generation, Path & gcrootDrv)
+    Path & outLink, Path & drvLink)
 {
     Path prefix = (format("%1%-%2%") % profile % num).str();
-    generation = prefix + "-link";
-    gcrootDrv = prefix + "-drv.gcroot";
+    outLink = prefix + "-output";
+    drvLink = prefix + "-drv";
 }
 
 
@@ -79,20 +79,21 @@ Path createGeneration(Path profile, Path outPath, Path drvPath)
     unsigned int num = gens.size() > 0 ? gens.front().number : 0;
         
     /* Create the new generation. */
-    Path generation, gcrootDrv;
+    Path outLink, drvLink;
 
     while (1) {
-        makeNames(profile, num, generation, gcrootDrv);
-        if (symlink(outPath.c_str(), generation.c_str()) == 0) break;
+        makeNames(profile, num, outLink, drvLink);
+        if (symlink(outPath.c_str(), outLink.c_str()) == 0) break;
         if (errno != EEXIST)
-            throw SysError(format("creating symlink `%1%'") % generation);
+            throw SysError(format("creating symlink `%1%'") % outLink);
         /* Somebody beat us to it, retry with a higher number. */
         num++;
     }
 
-    writeStringToFile(gcrootDrv, drvPath);
+    if (symlink(drvPath.c_str(), drvLink.c_str()) != 0)
+        throw SysError(format("creating symlink `%1%'") % drvLink);
 
-    return generation;
+    return outLink;
 }
 
 

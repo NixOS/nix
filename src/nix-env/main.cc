@@ -573,7 +573,7 @@ static void opQuery(Globals & globals,
         Strings columns;
         
         if (printStatus) {
-            Substitutes subs = querySubstitutes(i->drvPath);
+            Substitutes subs = querySubstitutes(noTxn, i->drvPath);
             columns.push_back(
                 (string) (installedPaths.find(i->outPath)
                     != installedPaths.end() ? "I" : "-")

@@ -458,7 +458,7 @@ void DerivationGoal::haveStoreExpr()
          i != invalidOutputs.end(); ++i)
         /* Don't bother creating a substitution goal if there are no
            substitutes. */
-        if (querySubstitutes(*i).size() > 0)
+        if (querySubstitutes(noTxn, *i).size() > 0)
             addWaitee(worker.makeSubstitutionGoal(*i));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
@@ -1315,7 +1315,7 @@ void SubstitutionGoal::init()
     }
 
     /* Read the substitutes. */
-    subs = querySubstitutes(storePath);
+    subs = querySubstitutes(noTxn, storePath);
 
     /* To maintain the closure invairant, we first have to realise the
        paths referenced by this one. */

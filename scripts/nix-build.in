@@ -23,7 +23,7 @@ for i in "$@"; do
             for j in $storeExprs; do
                 echo "store expression is $j" >&2
             done
-            outPaths=$(@bindir@/nix-store -qnfv $extraArgs $storeExprs)
+            outPaths=$(@bindir@/nix-store -rv $extraArgs $storeExprs)
             for j in $outPaths; do
                 echo "$j"
                 if test -z "$noLink"; then
