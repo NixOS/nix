@@ -509,6 +509,14 @@ static Hash queryHash(const Transaction & txn, const Path & storePath)
 }
 
 
+Hash queryPathHash(const Path & path)
+{
+    if (!isValidPath(path))
+        throw Error(format("path `%1%' is not valid") % path);
+    return queryHash(noTxn, path);
+}
+
+
 void registerValidPath(const Transaction & txn,
     const Path & _path, const Hash & hash, const PathSet & references,
     const Path & deriver)

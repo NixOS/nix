@@ -228,8 +228,9 @@ static void printDrvTree(const Path & drvPath,
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qOutputs, qRequisites, qReferences, qReferers,
-           qReferersClosure, qDeriver, qBinding, qTree, qGraph } query = qOutputs;
+    enum { qOutputs, qRequisites, qReferences, qReferers
+         , qReferersClosure, qDeriver, qBinding, qHash
+         , qTree, qGraph } query = qOutputs;
     bool useOutput = false;
     bool includeOutputs = false;
     bool forceRealise = false;
@@ -250,6 +251,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             opArgs.pop_front();
             query = qBinding;
         }
+        else if (*i == "--hash") query = qHash;
         else if (*i == "--tree") query = qTree;
         else if (*i == "--graph") query = qGraph;
         else if (*i == "--use-output" || *i == "-u") useOutput = true;
@@ -279,8 +281,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                *i = fixPath(*i);
-                Path path = maybeUseOutput(*i, useOutput, forceRealise);
+                Path path = maybeUseOutput(fixPath(*i), useOutput, forceRealise);
                 if (query == qRequisites)
                     storePathRequisites(path, includeOutputs, paths);
                 else if (query == qReferences) queryReferences(noTxn, path, paths);
@@ -295,8 +296,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                *i = fixPath(*i);
-                Path deriver = queryDeriver(noTxn, *i);
+                Path deriver = queryDeriver(noTxn, fixPath(*i));
                 cout << format("%1%\n") %
                     (deriver == "" ? "unknown-deriver" : deriver);
             }
@@ -313,6 +313,17 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     throw Error(format("derivation `%1%' has no environment binding named `%2%'")
                         % *i % bindingName);
                 cout << format("%1%\n") % j->second;
+            }
+            break;
+
+        case qHash:
+            for (Strings::iterator i = opArgs.begin();
+                 i != opArgs.end(); i++)
+            {
+                Path path = maybeUseOutput(fixPath(*i), useOutput, forceRealise);
+                Hash hash = queryPathHash(path);
+                assert(hash.type == htSHA256);
+                cout << format("sha256:%1%\n") % printHash32(hash);
             }
             break;
 

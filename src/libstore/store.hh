@@ -89,6 +89,9 @@ void canonicalisePathMetaData(const Path & path);
 /* Checks whether a path is valid. */ 
 bool isValidPath(const Path & path);
 
+/* Queries the hash of a valid path. */ 
+Hash queryPathHash(const Path & path);
+
 /* Sets the set of outgoing FS references for a store path.  Use with
    care! */
 void setReferences(const Transaction & txn, const Path & storePath,
