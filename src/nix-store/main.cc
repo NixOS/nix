@@ -12,12 +12,10 @@
 typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
 
-static void printHelp()
+void printHelp()
 {
     cout << string((char *) helpText, sizeof helpText);
-    exit(0);
 }
-
 
 
 static Path checkPath(const Path & arg)
@@ -276,12 +274,6 @@ void run(Strings args)
             op = opInit;
         else if (arg == "--verify")
             op = opVerify;
-        else if (arg == "--verbose" || arg == "-v")
-            verbosity = (Verbosity) ((int) verbosity + 1);
-        else if (arg == "--keep-failed" || arg == "-K")
-            keepFailed = true;
-        else if (arg == "--help")
-            printHelp();
         else if (arg[0] == '-')
             opFlags.push_back(arg);
         else

@@ -2,6 +2,13 @@
 
 #include "hash.hh"
 #include "shared.hh"
+#include "help.txt.hh"
+
+
+void printHelp()
+{
+    cout << string((char *) helpText, sizeof helpText);
+}
 
 
 void run(Strings args)

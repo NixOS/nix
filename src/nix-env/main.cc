@@ -3,6 +3,7 @@
 #include "shared.hh"
 #include "parser.hh"
 #include "eval.hh"
+#include "help.txt.hh"
 
 
 typedef void (* Operation) (EvalState & state,
@@ -18,6 +19,12 @@ struct DrvInfo
 };
 
 typedef map<Path, DrvInfo> DrvInfos;
+
+
+void printHelp()
+{
+    cout << string((char *) helpText, sizeof helpText);
+}
 
 
 bool parseDerivation(EvalState & state, Expr e, DrvInfo & drv)
@@ -395,10 +402,6 @@ void run(Strings args)
             op = opUninstall;
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
-        else if (arg == "--verbose" || arg == "-v")
-            verbosity = (Verbosity) ((int) verbosity + 1);
-        else if (arg[0] == '-')
-            opFlags.push_back(arg);
         else
             opArgs.push_back(arg);
 

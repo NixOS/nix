@@ -1,0 +1,15 @@
+nix-instantiate [OPTIONS...] [FILES...]
+
+`nix-instantiate' turns Nix expressions into store expressions. 
+
+The argument `-' may be specified to read a Nix expression from
+standard input.
+
+Options:
+
+  --version: output version information
+  --help: display help
+
+Options:
+
+  --verbose / -v: verbose operation (may be repeated)

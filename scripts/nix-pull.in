@@ -99,7 +99,7 @@ sub processURL {
 if (scalar @ARGV > 0) {
     while (@ARGV) {
         my $url = shift @ARGV;
-            processURL $url;
+        processURL $url;
     }
 } else {
     open CONFFILE, "<$conffile";

@@ -6,7 +6,7 @@ nix_store_LDADD = ../libmain/libmain.a ../libstore/libstore.a ../libutil/libutil
 
 main.o: help.txt.hh
 
-%.hh: %
+%.txt.hh: %.txt
 	../bin2c/bin2c helpText < $< > $@ || (rm $@ && exit 1)
 
 AM_CXXFLAGS = \

@@ -23,31 +23,42 @@ static void initAndRun(int argc, char * * argv)
     nixDBPath = (string) NIX_STATE_DIR + "/db";
 
     /* Put the arguments in a vector. */
-    Strings args;
+    Strings args, remaining;
     while (argc--) args.push_back(*argv++);
     args.erase(args.begin());
     
     /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f'), and
        ignore options for the ATerm library. */
-    for (Strings::iterator it = args.begin();
-         it != args.end(); )
-    {
-        string arg = *it;
-        if (string(arg, 0, 4) == "-at-")
-            it = args.erase(it);
+    for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
+        string arg = *i;
+        if (string(arg, 0, 4) == "-at-") ;
         else if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-') {
-            for (unsigned int i = 1; i < arg.length(); i++)
-                if (isalpha(arg[i]))
-                    args.insert(it, (string) "-" + arg[i]);
+            for (unsigned int j = 1; j < arg.length(); j++)
+                if (isalpha(arg[j]))
+                    remaining.push_back((string) "-" + arg[j]);
                 else {
-                    args.insert(it, string(arg, i));
+                    remaining.push_back(string(arg, j));
                     break;
                 }
-            it = args.erase(it);
-        } else it++;
+        } else remaining.push_back(arg);
+    }
+    args = remaining;
+    remaining.clear();
+
+    /* Process default options. */
+    for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
+        string arg = *i;
+        if (arg == "--verbose" || arg == "-v")
+            verbosity = (Verbosity) ((int) verbosity + 1);
+        else if (arg == "--help") {
+            printHelp();
+            return;
+        } else if (arg == "--keep-failed" || arg == "-K")
+            keepFailed = true;
+        else remaining.push_back(arg);
     }
 
-    run(args);
+    run(remaining);
 }
 
 

@@ -6,6 +6,13 @@
 #include "shared.hh"
 #include "eval.hh"
 #include "parser.hh"
+#include "help.txt.hh"
+
+
+void printHelp()
+{
+    cout << string((char *) helpText, sizeof helpText);
+}
 
 
 #if 0
@@ -87,9 +94,7 @@ void run(Strings args)
         }
         else
 #endif
-        if (arg == "--verbose" || arg == "-v")
-            verbosity = (Verbosity) ((int) verbosity + 1);
-        else if (arg == "-")
+        if (arg == "-")
             readStdin = true;
         else if (arg[0] == '-')
             throw UsageError(format("unknown flag `%1%`") % arg);
