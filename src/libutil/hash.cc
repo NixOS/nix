@@ -8,14 +8,18 @@ extern "C" {
 #include "archive.hh"
 
 
-Hash::Hash()
+Hash::Hash(HashType type)
 {
-    memset(hash, 0, sizeof(hash));
+    this->type = type;
+    if (type == htMD5) hashSize = md5HashSize;
+    else if (type == htSHA1) hashSize = sha1HashSize;
+    memset(hash, 0, hashSize);
 }
 
 
 bool Hash::operator == (const Hash & h2) const
 {
+    if (hashSize != h2.hashSize) return false;
     for (unsigned int i = 0; i < hashSize; i++)
         if (hash[i] != h2.hash[i]) return false;
     return true;
@@ -52,10 +56,10 @@ Hash::operator string() const
     
 Hash parseHash(const string & s)
 {
-    Hash hash;
-    if (s.length() != Hash::hashSize * 2)
+    Hash hash(htMD5);
+    if (s.length() != hash.hashSize * 2)
         throw Error(format("invalid hash `%1%'") % s);
-    for (unsigned int i = 0; i < Hash::hashSize; i++) {
+    for (unsigned int i = 0; i < hash.hashSize; i++) {
         string s2(s, i * 2, 2);
         if (!isxdigit(s2[0]) || !isxdigit(s2[1])) 
             throw Error(format("invalid hash `%1%'") % s);
@@ -83,7 +87,7 @@ bool isHash(const string & s)
 
 Hash hashString(const string & s)
 {
-    Hash hash;
+    Hash hash(htMD5);
     md5_buffer(s.c_str(), s.length(), hash.hash);
     return hash;
 }
@@ -91,7 +95,7 @@ Hash hashString(const string & s)
 
 Hash hashFile(const Path & path)
 {
-    Hash hash;
+    Hash hash(htMD5);
     FILE * file = fopen(path.c_str(), "rb");
     if (!file)
         throw SysError(format("file `%1%' does not exist") % path);
@@ -115,7 +119,7 @@ struct HashSink : DumpSink
 
 Hash hashPath(const Path & path)
 {
-    Hash hash;
+    Hash hash(htMD5);
     HashSink sink;
     md5_init_ctx(&sink.ctx);
     dumpPath(path, sink);

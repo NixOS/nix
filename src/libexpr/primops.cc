@@ -60,7 +60,7 @@ static Path copyAtom(EvalState & state, const Path & srcPath)
 
     Hash drvHash = hashDerivation(state, ne);
     Path drvPath = writeTerm(unparseStoreExpr(ne), "");
-    state.drvHashes[drvPath] = drvHash;
+    state.drvHashes.insert(make_pair(drvPath, drvHash));
 
     state.drvRoots[drvPath] = ne.closure.roots;
 
@@ -118,7 +118,7 @@ static void processBinding(EvalState & state, Expr e, StoreExpr & ne,
             PathSet drvRoots;
             drvRoots.insert(evalPath(state, a));
             
-            state.drvHashes[drvPath] = drvHash;
+            state.drvHashes.insert(make_pair(drvPath, drvHash));
             state.drvRoots[drvPath] = drvRoots;
 
             ss.push_back(addInput(state, drvPath, ne));
@@ -188,7 +188,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
     ne.type = StoreExpr::neDerivation;
 
     string drvName;
-    Hash outHash;
+    Hash outHash(htMD5);
     bool outHashGiven = false;
 
     for (ATermIterator i(attrs.keys()); i; ++i) {

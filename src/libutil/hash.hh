@@ -8,13 +8,23 @@
 using namespace std;
 
 
+typedef enum { htMD5, htSHA1 } HashType;
+
+
+const int md5HashSize = 16;
+const int sha1HashSize = 20;
+
+
 struct Hash
 {
-    static const unsigned int hashSize = 16;
-    unsigned char hash[hashSize];
+    static const unsigned int maxHashSize = 20;
+    unsigned int hashSize;
+    unsigned char hash[maxHashSize];
+
+    HashType type;
 
     /* Create a zeroed hash object. */
-    Hash();
+    Hash(HashType type);
 
     /* Check whether two hash are equal. */
     bool operator == (const Hash & h2) const;

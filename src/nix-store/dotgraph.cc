@@ -39,9 +39,9 @@ static string makeNode(const string & id, const string & label,
 static string symbolicName(const string & path)
 {
     string p = baseNameOf(path);
-    if (isHash(string(p, 0, Hash::hashSize * 2)) && 
-	p[Hash::hashSize * 2] == '-')
-	p = string(p, Hash::hashSize * 2 + 1);
+    if (isHash(string(p, 0, md5HashSize * 2)) && 
+	p[md5HashSize * 2] == '-')
+	p = string(p, md5HashSize * 2 + 1);
     return p;
 }
 

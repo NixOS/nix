@@ -34,6 +34,10 @@ struct DrvInfo
     Path drvPath;
     Path outPath;
     Hash drvHash;
+
+    DrvInfo() : drvHash(htMD5)
+    {
+    }
 };
 
 typedef map<Path, DrvInfo> DrvInfos;

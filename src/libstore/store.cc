@@ -416,7 +416,7 @@ Path addToStore(const Path & _srcPath)
     Path srcPath(absPath(_srcPath));
     debug(format("adding `%1%' to the store") % srcPath);
 
-    Hash h;
+    Hash h(htMD5);
     {
         SwitchToOriginalUser sw;
         h = hashPath(srcPath);
