@@ -16,16 +16,15 @@ static string nixDescriptorDir;
 static string nixSourcesDir;
 
 
+static bool verbose = false;
+
+
 /* Mapping of Fix file names to the hashes of the resulting Nix
    descriptors. */
 typedef map<string, string> DescriptorMap;
 
 
 /* Forward declarations. */
-
-string instantiateDescriptor(string filename,
-    DescriptorMap & done);
-
 
 void registerFile(string filename)
 {
@@ -74,79 +73,136 @@ string fetchURL(string url)
 }
 
 
-/* Term evaluation functions. */
-
-string evaluateStr(ATerm e)
+Error badTerm(const string & msg, ATerm e)
 {
-    char * s;
-    if (ATmatch(e, "<str>", &s))
-        return s;
-    else throw Error("invalid string expression");
+    char * s = ATwriteToString(e);
+    return Error(msg + ", in `" + s + "'");
 }
 
 
-ATerm evaluateBool(ATerm e)
-{
-    if (ATmatch(e, "True") || ATmatch(e, "False"))
-        return e;
-    else throw Error("invalid boolean expression");
-}
-
-
-string evaluateFile(ATerm e, string dir)
-{
-    char * s;
-    ATerm t;
-    if (ATmatch(e, "<str>", &s)) {
-        checkHash(s);
-        return s;
-    } else if (ATmatch(e, "Url(<term>)", &t)) {
-        string url = evaluateStr(t);
-        string filename = fetchURL(url);
-        registerFile(filename);
-        return hashFile(filename);
-    } else if (ATmatch(e, "Local(<term>)", &t)) {
-        string filename = absPath(evaluateStr(t), dir); /* !!! */
-        string cmd = "cp -p " + filename + " " + nixSourcesDir;
-        int res = system(cmd.c_str());
-        if (WEXITSTATUS(res) != 0)
-            throw Error("cannot copy " + filename);
-        registerFile(nixSourcesDir + "/" + baseNameOf(filename));
-        return hashFile(filename);
-    } else throw Error("invalid file expression");
-}
-
-
-string evaluatePkg(ATerm e, string dir, DescriptorMap & done)
-{
-    char * s;
-    ATerm t;
-    if (ATmatch(e, "<str>", &s)) {
-        checkHash(s);
-        return s;
-    } else if (ATmatch(e, "Fix(<term>)", &t)) {
-        string filename = absPath(evaluateStr(t), dir); /* !!! */
-        return instantiateDescriptor(filename, done);
-    } else throw Error("invalid pkg expression");
-}
-
-
-ATerm evaluate(ATerm e, string dir, DescriptorMap & done)
-{
-    ATerm t;
-    if (ATmatch(e, "Str(<term>)", &t))
-        return ATmake("Str(<str>)", evaluateStr(t).c_str());
-    else if (ATmatch(e, "Bool(<term>)", &t))
-        return ATmake("Bool(<term>)", evaluateBool(t));
-    else if (ATmatch(e, "File(<term>)", &t))
-        return ATmake("File(<str>)", evaluateFile(t, dir).c_str());
-    else if (ATmatch(e, "Pkg(<term>)", &t))
-        return ATmake("Pkg(<str>)", evaluatePkg(t, dir, done).c_str());
-    else throw Error("invalid expression type");
-}
-
+/* Term evaluation. */
 
 typedef map<string, ATerm> BindingsMap;
+
+struct EvalContext
+{
+    string dir;
+    DescriptorMap * done;
+    BindingsMap * vars;
+};
+
+
+ATerm evaluate(ATerm e, EvalContext ctx);
+string instantiateDescriptor(string filename, EvalContext ctx);
+
+
+string evaluateStr(ATerm e, EvalContext ctx)
+{
+    e = evaluate(e, ctx);
+    char * s;
+    if (ATmatch(e, "Str(<str>)", &s))
+        return s;
+    else throw badTerm("string value expected", e);
+}
+
+
+bool evaluateBool(ATerm e, EvalContext ctx)
+{
+    e = evaluate(e, ctx);
+    if (ATmatch(e, "Bool(True)"))
+        return true;
+    else if (ATmatch(e, "Bool(False)"))
+        return false;
+    else throw badTerm("boolean value expected", e);
+}
+
+
+ATerm evaluate(ATerm e, EvalContext ctx)
+{
+    char * s;
+    ATerm e2;
+    ATerm eCond, eTrue, eFalse;
+
+    /* Check for normal forms first. */
+
+    if (ATmatch(e, "Str(<str>)", &s) ||
+        ATmatch(e, "Bool(True)") || ATmatch(e, "Bool(False)"))
+        return e;
+    
+    else if (
+        ATmatch(e, "Pkg(<str>)", &s) || 
+        ATmatch(e, "File(<str>)", &s))
+    {
+        checkHash(s);
+        return e;
+    }
+
+    /* Short-hands. */
+
+    else if (ATmatch(e, "<str>", &s))
+        return ATmake("Str(<str>)", s);
+
+    else if (ATmatch(e, "True", &s))
+        return ATmake("Bool(True)", s);
+
+    else if (ATmatch(e, "False", &s))
+        return ATmake("Bool(False)", s);
+
+    /* Functions. */
+
+    /* `Var' looks up a variable. */
+    else if (ATmatch(e, "Var(<str>)", &s)) {
+        string name(s);
+        ATerm e2 = (*ctx.vars)[name];
+        if (!e2) throw Error("undefined variable " + name);
+        return evaluate(e2, ctx); /* !!! update binding */
+    }
+
+    /* `Fix' recursively instantiates a Fix descriptor, returning the
+       hash of the generated Nix descriptor. */
+    else if (ATmatch(e, "Fix(<term>)", &e2)) {
+        string filename = absPath(evaluateStr(e2, ctx), ctx.dir); /* !!! */
+        return ATmake("Pkg(<str>)",
+            instantiateDescriptor(filename, ctx).c_str());
+    }
+
+    /* `Source' copies the specified file to nixSourcesDir, registers
+       it with Nix, and returns the hash of the file. */
+    else if (ATmatch(e, "Source(<term>)", &e2)) {
+        string source = absPath(evaluateStr(e2, ctx), ctx.dir); /* !!! */
+        string target = nixSourcesDir + "/" + baseNameOf(source);
+
+        // Don't copy if filename is already in nixSourcesDir.
+        if (source != target) {
+            if (verbose)
+                cerr << "copying source " << source << endl;
+            string cmd = "cp -p " + source + " " + target;
+            int res = system(cmd.c_str());
+            if (WEXITSTATUS(res) != 0)
+                throw Error("cannot copy " + source + " to " + target);
+        }
+        
+        registerFile(target);
+        return ATmake("File(<str>)", hashFile(target).c_str());
+    }
+
+    /* `Url' fetches a file from the network, caching it in
+       nixSourcesDir and returning the file name. */
+    else if (ATmatch(e, "Url(<term>)", &e2)) {
+        string url = evaluateStr(e2, ctx);
+        if (verbose)
+            cerr << "fetching " << url << endl;
+        string filename = fetchURL(url);
+        return ATmake("Str(<str>)", filename.c_str());
+    }
+
+    /* `If' provides conditional evaluation. */
+    else if (ATmatch(e, "If(<term>, <term>, <term>)", 
+                 &eCond, &eTrue, &eFalse)) 
+        return evaluate(evaluateBool(eCond, ctx) ? eTrue : eFalse, ctx);
+
+    else throw badTerm("invalid expression", e);
+}
 
 
 string getStringFromMap(BindingsMap & bindingsMap,
@@ -164,15 +220,14 @@ string getStringFromMap(BindingsMap & bindingsMap,
 
 /* Instantiate a Fix descriptors into a Nix descriptor, recursively
    instantiating referenced descriptors as well. */
-string instantiateDescriptor(string filename,
-    DescriptorMap & done)
+string instantiateDescriptor(string filename, EvalContext ctx)
 {
     /* Already done? */
-    DescriptorMap::iterator isInMap = done.find(filename);
-    if (isInMap != done.end()) return isInMap->second;
+    DescriptorMap::iterator isInMap = ctx.done->find(filename);
+    if (isInMap != ctx.done->end()) return isInMap->second;
 
     /* No. */
-    string dir = dirOf(filename);
+    ctx.dir = dirOf(filename);
 
     /* Read the Fix descriptor as an ATerm. */
     ATerm inTerm = ATreadFromNamedFile(filename.c_str());
@@ -184,6 +239,7 @@ string instantiateDescriptor(string filename,
     
     /* Iterate over the bindings and evaluate them to normal form. */
     BindingsMap bindingsMap; /* the normal forms */
+    ctx.vars = &bindingsMap;
 
     char * cname;
     ATerm value;
@@ -191,7 +247,7 @@ string instantiateDescriptor(string filename,
                &cname, &value, &bindings)) 
     {
         string name(cname);
-        ATerm e = evaluate(value, dir, done);
+        ATerm e = evaluate(value, ctx);
         bindingsMap[name] = e;
     }
 
@@ -229,7 +285,10 @@ string instantiateDescriptor(string filename,
     /* Register it with Nix. */
     registerFile(outFilename);
 
-    done[filename] = outHash;
+    if (verbose)
+        cerr << "instantiated " << outHash << " from " << filename << endl;
+
+    (*ctx.done)[filename] = outHash;
     return outHash;
 }
 
@@ -239,11 +298,14 @@ void instantiateDescriptors(Strings filenames)
 {
     DescriptorMap done;
 
+    EvalContext ctx;
+    ctx.done = &done;
+
     for (Strings::iterator it = filenames.begin();
          it != filenames.end(); it++)
     {
         string filename = absPath(*it);
-        cout << instantiateDescriptor(filename, done) << endl;
+        cout << instantiateDescriptor(filename, ctx) << endl;
     }
 }
 
@@ -274,7 +336,9 @@ void run(Strings::iterator argCur, Strings::iterator argEnd)
         if (arg == "-h" || arg == "--help") {
             printUsage();
             return;
-        } if (arg == "--instantiate" || arg == "-i") {
+        } else if (arg == "-v" || arg == "--verbose") {
+            verbose = true;
+        } else if (arg == "--instantiate" || arg == "-i") {
             command = cmdInstantiate;
         } else if (arg[0] == '-')
             throw UsageError("invalid option `" + arg + "'");
