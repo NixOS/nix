@@ -5,8 +5,8 @@
 
 <para>The easiest way to obtain Nix is to download a <ulink
 url='http://www.cs.uu.nl/groups/ST/Trace/Nix'>source
-distribution</ulink>.  RPMs for Red Hat 9 are also available.  These
-distributions are generated automatically.</para>
+distribution</ulink>.  RPMs for Red Hat, SuSE, and Fedore Core are
+also available.</para>
 
 <para>Alternatively, the most recent sources of Nix can be obtained
 from its <ulink

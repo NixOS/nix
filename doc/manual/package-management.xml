@@ -2,7 +2,7 @@
 
 <para>This chapter discusses how to do package management with Nix,
 i.e., how to obtain, install, upgrade, and erase components.  This is
-the <quote>user's</quote> perspective of the Nix system — people
+the <quote>user’s</quote> perspective of the Nix system — people
 who want to <emphasis>create</emphasis> components should consult
 <xref linkend='chap-writing-nix-expressions' />.</para>
 
@@ -19,7 +19,7 @@ on the set of installed applications.  That is, there might be lots of
 applications present on the system (possibly in many different
 versions), but users can have a specific selection of those active —
 where <quote>active</quote> just means that it appears in a directory
-in the user's <envar>PATH</envar>.  Such a view on the set of
+in the user’s <envar>PATH</envar>.  Such a view on the set of
 installed applications is called a <emphasis>user
 environment</emphasis>, which is just a directory tree consisting of
 symlinks to the files of the active applications.  </para>
@@ -52,7 +52,7 @@ bzip2-1.0.2
 ...</screen>
 
 where <literal>nixpkgs-<replaceable>version</replaceable></literal> is
-where you've unpacked the release.</para>
+where you’ve unpacked the release.</para>
 
 <para>It is also possible to see the <emphasis>status</emphasis> of
 available components, i.e., whether they are installed into the user
@@ -72,7 +72,7 @@ component is installed in your current user environment.  The second
 (in which case installing it into your user environment would be a
 very quick operation).  The last one (<literal>S</literal>) indicates
 whether there is a so-called <emphasis>substitute</emphasis> for the
-component, which is Nix's mechanism for doing binary deployment.  It
+component, which is Nix’s mechanism for doing binary deployment.  It
 just means that Nix know that it can fetch a pre-built component from
 somewhere (typically a network server) instead of building it
 locally.</para>
@@ -98,7 +98,7 @@ available somewhere.  This is done using the
 <command>nix-pull</command> command, which must be supplied with a URL
 containing a <emphasis>manifest</emphasis> describing what binaries
 are available.  This URL should correspond to the Nix Packages release
-that you're using.  For instance, if you obtained a release from
+that you’re using.  For instance, if you obtained a release from
 <ulink
 url='http://catamaran.labs.cs.uu.nl/dist/nix/nixpkgs-0.6pre1554/' />,
 then you should do:
@@ -111,7 +111,7 @@ downloading binaries from <systemitem
 class='fqdomainname'>catamaran.labs.cs.uu.nl</systemitem>, instead of
 building them from source.  This might still take a while since all
 dependencies must be downloaded, but on a reasonably fast connection
-such as an DSL line it's on the order of a few minutes.</para>
+such as an DSL line it’s on the order of a few minutes.</para>
 
 <para>Naturally, packages can also be uninstalled:
 
@@ -129,7 +129,7 @@ $ nix-env -f nixpkgs-<replaceable>version</replaceable> -u subversion</screen>
 This will <emphasis>only</emphasis> upgrade Subversion if there is a
 <quote>newer</quote> version in the new set of Nix expressions, as
 defined by some pretty arbitrary rules regarding ordering of version
-numbers (which generally do what you'd expect of them).  To just
+numbers (which generally do what you’d expect of them).  To just
 unconditionally replace Subversion with whatever version is in the Nix
 expressions, use <parameter>-i</parameter> instead of
 <parameter>-u</parameter>; <parameter>-i</parameter> will remove
@@ -143,7 +143,7 @@ $ nix-env -f nixpkgs-<replaceable>version</replaceable> -u '*'</screen>
 
 </para>
 
-<para>Sometimes it's useful to be able to ask what
+<para>Sometimes it’s useful to be able to ask what
 <command>nix-env</command> would do, without actually doing it.  For
 instance, to find out what packages would be upgraded by
 <literal>nix-env -u '*'</literal>, you can do
@@ -177,28 +177,26 @@ set.</para></footnote></para>
 
 <sect1><title>Profiles</title>
 
-<para>Profiles and user environments are Nix's mechanism for
+<para>Profiles and user environments are Nix’s mechanism for
 implementing the ability to allow differens users to have different
 configurations, and to do atomic upgrades and rollbacks.  To
-understand how they work, it's useful to know a bit about how Nix
+understand how they work, it’s useful to know a bit about how Nix
 works.  In Nix, components are stored in unique locations in the
 <emphasis>Nix store</emphasis> (typically,
 <filename>/nix/store</filename>).  For instance, a particular version
 of the Subversion component might be stored in a directory
-<filename>/nix/store/eeeeaf42e56b...-subversion-0.32.1/</filename>,
+<filename>/nix/store/dpmvp969yhdqs7lm2r1a3gng7pyq6vy4-subversion-1.1.3/</filename>,
 while another version might be stored in
-<filename>/nix/store/58823d558a6a...-subversion-0.34/</filename>.  The
-long hexadecimal numbers prefixed to the directory names are
-cryptographic hashes<footnote><para>160-bit truncations of SHA-256
-hashes, to be precise.</para></footnote> of <emphasis>all</emphasis>
-inputs involved in building the component — sources, dependencies,
-compiler flags, and so on.  So if two components differ in any way,
-they end up in different locations in the file system, so they don't
-interfere with each other.  <xref linkend='fig-user-environments'
-/><footnote><para>TODO: the figure isn't entirely up to date.  It
-should show multiple profiles and
-<filename>~/.nix-profile</filename>.</para></footnote> shows a part of
-a typical Nix store.</para>
+<filename>/nix/store/5mq2jcn36ldlmh93yj1n8s9c95pj7c5s-subversion-1.1.2</filename>.
+The long strings prefixed to the directory names are cryptographic
+hashes<footnote><para>160-bit truncations of SHA-256 hashes encoded in
+a base-32 notation, to be precise.</para></footnote> of
+<emphasis>all</emphasis> inputs involved in building the component —
+sources, dependencies, compiler flags, and so on.  So if two
+components differ in any way, they end up in different locations in
+the file system, so they don’t interfere with each other.  <xref
+linkend='fig-user-environments' /> shows a part of a typical Nix
+store.</para>
 
 <figure id='fig-user-environments'><title>User environments</title>
   <mediaobject>
@@ -208,41 +206,42 @@ a typical Nix store.</para>
   </mediaobject>
 </figure>
 
-<para>Of course, you wouldn't want to type
+<para>Of course, you wouldn’t want to type
 
 <screen>
-$ /nix/store/eeeeaf42e56b...-subversion-0.32.1/bin/svn</screen>
+$ /nix/store/dpmvp969yhdq...-subversion-1.1.3/bin/svn</screen>
 
 every time you want to run Subversion.  Of course we could set up the
 <envar>PATH</envar> environment variable to include the
 <filename>bin</filename> directory of every component we want to use,
 but this is not very convenient since changing <envar>PATH</envar>
-doesn't take effect for already existing processes.  The solution Nix
+doesn’t take effect for already existing processes.  The solution Nix
 uses is to create directory trees of symlinks to
 <emphasis>activated</emphasis> components.  These are called
 <emphasis>user environments</emphasis> and they are components
 themselves (though automatically generated by
 <command>nix-env</command>), so they too reside in the Nix store.  For
 instance, in <xref linkend='fig-user-environments' /> the user
-environment <filename>/nix/store/068150f63831...-user-env</filename>
-contains a symlink to just Subversion 0.32.1 (arrows in the figure
+environment <filename>/nix/store/5mq2jcn36ldl...-user-env</filename>
+contains a symlink to just Subversion 1.1.2 (arrows in the figure
 indicate symlinks).  This would be what we would obtain if we had done
 
 <screen>
 $ nix-env -i subversion</screen>
 
-on a set of Nix expressions that contained Subversion 0.32.1.</para>
+on a set of Nix expressions that contained Subversion 1.1.2.</para>
 
-<para>This doesn't in itself solve the problem, of course; you
-wouldn't want to type
-<filename>/nix/store/068150f63831...-user-env/bin/svn</filename>
-either.  Therefore there are symlinks outside of the store that point
+<para>This doesn’t in itself solve the problem, of course; you
+wouldn’t want to type
+<filename>/nix/store/0c1p5z4kda11...-user-env/bin/svn</filename>
+either.  That’s why there are symlinks outside of the store that point
 to the user environments in the store; for instance, the symlinks
-<filename>42</filename> and <filename>43</filename> in the example.
-These are called <emphasis>generations</emphasis> since every time you
-perform a <command>nix-env</command> operation, a new user environment
-is generated based on the current one.  For instance, generation 43
-was created from generation 42 when we did
+<filename>default-42-link</filename> and
+<filename>default-43-link</filename> in the example.  These are called
+<emphasis>generations</emphasis> since every time you perform a
+<command>nix-env</command> operation, a new user environment is
+generated based on the current one.  For instance, generation 43 was
+created from generation 42 when we did
 
 <screen>
 $ nix-env -i subversion mozilla</screen>
@@ -251,14 +250,14 @@ on a set of Nix expressions that contained Mozilla and a new version
 of Subversion.</para>
 
 <para>Generations are grouped together into
-<emphasis>profiles</emphasis> so that different users don't interfere
-with each other if they don't want to.  For example:
+<emphasis>profiles</emphasis> so that different users don’t interfere
+with each other if they don’t want to.  For example:
 
 <screen>
 $ ls -l /nix/var/nix/profiles/
 ...
-lrwxrwxrwx  1 eelco ... default-42-link -> /nix/store/068150f63831...-user-env
-lrwxrwxrwx  1 eelco ... default-43-link -> /nix/store/84c85f89ddbf...-user-env
+lrwxrwxrwx  1 eelco ... default-42-link -> /nix/store/0c1p5z4kda11...-user-env
+lrwxrwxrwx  1 eelco ... default-43-link -> /nix/store/3aw2pdyx2jfc...-user-env
 lrwxrwxrwx  1 eelco ... default -> default-43-link</screen>
 
 This shows a profile called <filename>default</filename>.  The file
@@ -268,7 +267,7 @@ operation, a new user environment and generation link are created
 based on the current one, and finally the <filename>default</filename>
 symlink is made to point at the new generation.  This last step is
 atomic on Unix, which explains how we can do atomic upgrades.  (Note
-that the building/installing of new components doesn't interfere in
+that the building/installing of new components doesn’t interfere in
 any way with old components, since they are stored in different
 locations in the Nix store.)</para>
 
@@ -293,13 +292,13 @@ can also see all available generations:
 $ nix-env --list-generations</screen></para>
 
 <para>Actually, there is another level of indirection not shown in the
-figure above.  You generally wouldn't have
+figure above.  You generally wouldn’t have
 <filename>/nix/var/nix/profiles/<replaceable>some-profile</replaceable>/bin</filename>
 in your <envar>PATH</envar>.  Rather, there is a symlink
 <filename>~/.nix-profile</filename> that points to your current
 profile.  This means that you should put
 <filename>~/.nix-profile/bin</filename> in your <envar>PATH</envar>
-(and indeed, that's what the initialisation script
+(and indeed, that’s what the initialisation script
 <filename>/nix/etc/profile.d/nix.sh</filename> does).  This makes it
 easier to switch to a different profile.  You can do that using the
 command <command>nix-env --switch-profile</command>:
@@ -310,7 +309,7 @@ $ nix-env --switch-profile /nix/var/nix/profiles/my-profile
 $ nix-env --switch-profile /nix/var/nix/profiles/default</screen>
 
 These commands switch to the <filename>my-profile</filename> and
-default profile, respectively.  If the profile doesn't exist, it will
+default profile, respectively.  If the profile doesn’t exist, it will
 be created automatically.  You should be careful about storing a
 profile in another location than the <filename>profiles</filename>
 directory, since otherwise it might not be used as a root of the
@@ -346,7 +345,7 @@ not used (directly or indirectly) by any generation of any
 profile.</para>
 
 <para>Note however that as long as old generations reference a
-component, it will not be deleted.  After all, we wouldn't be able to
+component, it will not be deleted.  After all, we wouldn’t be able to
 do a rollback otherwise.  So in order for garbage collection to be
 effective, you should also delete (some) old generations.  Of course,
 this should only be done if you are certain that you will not need to
@@ -378,7 +377,7 @@ You can alo first view what files would be deleted:
 $ nix-collect-garbage --print-dead</screen>
 
 Likewise, the option <option>--print-live</option> will show the paths
-that <emphasis>won't</emphasis> be deleted.</para>
+that <emphasis>won’t</emphasis> be deleted.</para>
 
 <sect2><title>Garbage collector roots</title>
 
@@ -402,11 +401,11 @@ so all generations of all profiles are also roots of the collector.</para>
 
 <sect1><title>Channels</title>
 
-<para>If you want to stay up to date with a set of packages, it's not
+<para>If you want to stay up to date with a set of packages, it’s not
 very convenient to manually download the latest set of Nix expressions
 for those packages, use <command>nix-pull</command> to register
 pre-built binaries (if available), and upgrade using
-<command>nix-env</command>.  Fortunately, there's a better way:
+<command>nix-env</command>.  Fortunately, there’s a better way:
 <emphasis>Nix channels</emphasis>.</para>
 
 <para>A Nix channel is just a URL that points to a place that contains
@@ -440,7 +439,7 @@ This downloads the Nix expressions in every channel (downloaded from
 and registers any available pre-built binaries in every channel
 (by <command>nix-pull</command>ing
 <literal><replaceable>url</replaceable>/MANIFEST</literal>).  It also
-makes the union of each channel's Nix expressions the default for
+makes the union of each channel’s Nix expressions the default for
 <command>nix-env</command> operations.  Consequently, you can then say
 
 <screen>
