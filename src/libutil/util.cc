@@ -171,7 +171,7 @@ static void _deletePath(const Path & path)
 	/* Make the directory writable. */
 	if (!(st.st_mode & S_IWUSR)) {
 	    if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
-		throw SysError(format("making `%1%' writable"));
+		throw SysError(format("making `%1%' writable") % path);
 	}
 
 	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
