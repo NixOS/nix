@@ -232,7 +232,7 @@ void installPkg(string hash)
     /* Create a log file. */
     string logFileName = nixLogDir + "/" + id + "-" + hash + ".log";
     /* !!! auto-pclose on exit */
-    FILE * logFile = popen(("tee " + logFileName).c_str(), "w"); /* !!! escaping */
+    FILE * logFile = popen(("tee " + logFileName + " >&2").c_str(), "w"); /* !!! escaping */
     if (!logFile)
         throw Error("unable to create log file " + logFileName);
 
@@ -331,7 +331,7 @@ void installPkg(string hash)
             throw Error("cannot remove write permission from " + path);
 
     } catch (exception &) {
-        system(("rm -rf " + path).c_str());
+//         system(("rm -rf " + path).c_str());
         throw;
     }
 
