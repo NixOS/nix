@@ -6,7 +6,7 @@
 
     export PATH=$NIX_LINKS/bin:@prefix@/bin:$PATH
 
-    export LD_LIBRARY_PATH=$NIX_LINKS/lib:$LD_LIBRARY_PATH
+#    export LD_LIBRARY_PATH=$NIX_LINKS/lib:$LD_LIBRARY_PATH
 
     export LIBRARY_PATH=$NIX_LINKS/lib:$LIBRARY_PATH
 
