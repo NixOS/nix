@@ -3,12 +3,52 @@
 #include "primops.hh"
 
 
+static void addPrimOp(ATermMap & map, const string & name, void * f)
+{
+    map.set(name, (ATerm) ATmakeBlob(0, f));
+}
+
+
+static void * lookupPrimOp(ATermMap & map, ATerm name)
+{
+    ATermBlob b = (ATermBlob) map.get(name);
+    if (!b) return 0;
+    return ATgetBlobData(b);
+}
+
+
 EvalState::EvalState()
-    : normalForms(32768, 75)
+    : normalForms(32768, 50)
 {
     blackHole = ATmake("BlackHole()");
     if (!blackHole) throw Error("cannot build black hole");
+    
     nrEvaluated = nrCached = 0;
+
+    addPrimOp0("true", primTrue);
+    addPrimOp0("false", primFalse);
+    addPrimOp0("null", primNull);
+
+    addPrimOp1("import", primImport);
+    addPrimOp1("derivation", primDerivation);
+    addPrimOp1("baseNameOf", primBaseNameOf);
+    addPrimOp1("toString", primToString);
+    addPrimOp1("isNull", primIsNull);
+
+    primOpsAll.add(primOps0);
+    primOpsAll.add(primOps1);
+}
+
+
+void EvalState::addPrimOp0(const string & name, PrimOp0 primOp)
+{
+    addPrimOp(primOps0, name, (void *) primOp);
+}
+
+
+void EvalState::addPrimOp1(const string & name, PrimOp1 primOp)
+{
+    addPrimOp(primOps1, name, (void *) primOp);
 }
 
 
@@ -130,7 +170,7 @@ Expr evalExpr2(EvalState & state, Expr e)
 {
     ATMatcher m;
     Expr e1, e2, e3, e4;
-    string s1;
+    ATerm name;
 
     /* Normal forms. */
     if (atMatch(m, e) >> "Str" ||
@@ -144,11 +184,12 @@ Expr evalExpr2(EvalState & state, Expr e)
         return e;
 
     /* Any encountered variables must be undeclared or primops. */
-    if (atMatch(m, e) >> "Var" >> s1) {
-        if (s1 == "null") return primNull(state);
-        if (s1 == "true") return ATmake("Bool(True)");
-        if (s1 == "false") return ATmake("Bool(False)");
-        return e;
+    if (atMatch(m, e) >> "Var" >> name) {
+        PrimOp0 primOp = (PrimOp0) lookupPrimOp(state.primOps0, name);
+        if (primOp)
+            return primOp(state);
+        else
+            return e;
     }
 
     /* Function application. */
@@ -160,13 +201,9 @@ Expr evalExpr2(EvalState & state, Expr e)
         e1 = evalExpr(state, e1);
 
         /* Is it a primop or a function? */
-        if (atMatch(m, e1) >> "Var" >> s1) {
-            if (s1 == "import") return primImport(state, e2);
-            if (s1 == "derivation") return primDerivation(state, e2);
-            if (s1 == "toString") return primToString(state, e2);
-            if (s1 == "baseNameOf") return primBaseNameOf(state, e2);
-            if (s1 == "isNull") return primIsNull(state, e2);
-            else throw badTerm("undefined variable/primop", e1);
+        if (atMatch(m, e1) >> "Var" >> name) {
+            PrimOp1 primOp = (PrimOp1) lookupPrimOp(state.primOps1, name);
+            if (primOp) return primOp(state, e2); else abort();
         }
 
         else if (atMatch(m, e1) >> "Function" >> formals >> e4)
@@ -177,6 +214,7 @@ Expr evalExpr2(EvalState & state, Expr e)
     }
 
     /* Attribute selection. */
+    string s1;
     if (atMatch(m, e) >> "Select" >> e1 >> s1) {
         Expr a = queryAttr(evalExpr(state, e1), s1);
         if (!a) throw badTerm(format("missing attribute `%1%'") % s1, e);
@@ -261,7 +299,7 @@ Expr evalExpr(EvalState & state, Expr e)
 Expr evalFile(EvalState & state, const Path & path)
 {
     startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
-    Expr e = parseExprFromFile(path);
+    Expr e = parseExprFromFile(state, path);
     return evalExpr(state, e);
 }
 

@@ -20,8 +20,7 @@ ATermMap::ATermMap(const ATermMap & map)
     table = ATtableCreate(ATgetLength(keys), maxLoadPct);
     if (!table) throw Error("cannot create ATerm table");
 
-    for (ATermIterator i(keys); i; ++i)
-        set(*i, map.get(*i));
+    add(map, keys);
 }
 
 
@@ -72,6 +71,26 @@ ATermList ATermMap::keys() const
     ATermList keys = ATtableKeys(table);
     if (!keys) throw Error("cannot query aterm map keys");
     return keys;
+}
+
+
+void ATermMap::add(const ATermMap & map)
+{
+    ATermList keys = map.keys();
+    add(map, keys);
+}
+
+
+void ATermMap::add(const ATermMap & map, ATermList & keys)
+{
+    for (ATermIterator i(keys); i; ++i)
+        set(*i, map.get(*i));
+}
+
+
+void ATermMap::reset()
+{
+    ATtableReset(table);
 }
 
 

@@ -245,6 +245,18 @@ Expr primToString(EvalState & state, Expr arg)
 }
 
 
+Expr primTrue(EvalState & state)
+{
+    return ATmake("Bool(True)");
+}
+
+
+Expr primFalse(EvalState & state)
+{
+    return ATmake("Bool(False)");
+}
+
+
 Expr primNull(EvalState & state)
 {
     return ATmake("Null");

@@ -15,31 +15,12 @@ void printHelp()
 }
 
 
-#if 0
-static Path searchPath(const Paths & searchDirs, const Path & relPath)
-{
-    if (string(relPath, 0, 1) == "/") return relPath;
-
-    for (Paths::const_iterator i = searchDirs.begin();
-         i != searchDirs.end(); i++)
-    {
-        Path path = *i + "/" + relPath;
-        if (pathExists(path)) return path;
-    }
-
-    throw Error(
-        format("path `%1%' not found in any of the search directories")
-        % relPath);
-}
-#endif
-
-
 static Expr evalStdin(EvalState & state)
 {
     startNest(nest, lvlTalkative, format("evaluating standard input"));
     string s, s2;
     while (getline(cin, s2)) s += s2 + "\n";
-    Expr e = parseExprFromString(s, absPath("."));
+    Expr e = parseExprFromString(state, s, absPath("."));
     return evalExpr(state, e);
 }
 
@@ -76,24 +57,11 @@ void run(Strings args)
     Strings files;
     bool readStdin = false;
 
-#if 0
-    state.searchDirs.push_back(".");
-    state.searchDirs.push_back(nixDataDir + "/nix");
-#endif
-    
     for (Strings::iterator it = args.begin();
          it != args.end(); )
     {
         string arg = *it++;
 
-#if 0
-        if (arg == "--includedir" || arg == "-I") {
-            if (it == args.end())
-                throw UsageError(format("argument required in `%1%'") % arg);
-            state.searchDirs.push_back(*it++);
-        }
-        else
-#endif
         if (arg == "-")
             readStdin = true;
         else if (arg[0] == '-')

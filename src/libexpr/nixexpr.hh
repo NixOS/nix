@@ -23,7 +23,7 @@ private:
     ATermTable table;
     
 public:
-    ATermMap(unsigned int initialSize = 16, unsigned int maxLoadPct = 75);
+    ATermMap(unsigned int initialSize = 64, unsigned int maxLoadPct = 75);
     ATermMap(const ATermMap & map);
     ~ATermMap();
 
@@ -37,6 +37,13 @@ public:
     void remove(const string & key);
 
     ATermList keys() const;
+
+    void add(const ATermMap & map);
+    
+    void reset();
+
+private:
+    void add(const ATermMap & map, ATermList & keys);
 };
 
 

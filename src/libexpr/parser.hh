@@ -1,15 +1,15 @@
 #ifndef __PARSER_H
 #define __PARSER_H
 
-#include "nixexpr.hh"
+#include "eval.hh"
 
 
 /* Parse a Nix expression from the specified file.  If `path' refers
    to a directory, the "/default.nix" is appended. */
-Expr parseExprFromFile(Path path);
+Expr parseExprFromFile(EvalState & state, Path path);
 
 /* Parse a Nix expression from the specified string. */
-Expr parseExprFromString(const string & s,
+Expr parseExprFromString(EvalState & state, const string & s,
     const Path & basePath);
 
 

@@ -66,7 +66,8 @@ int yyparse(yyscan_t scanner, ParseData * data);
 }
 
 
-static Expr parse(const char * text, const string & location,
+static Expr parse(EvalState & state,
+    const char * text, const string & location,
     const Path & basePath)
 {
     yyscan_t scanner;
@@ -81,18 +82,8 @@ static Expr parse(const char * text, const string & location,
     
     if (res) throw Error(data.error);
 
-    ATermMap primOps;
-    primOps.set("import", (ATerm) ATempty);
-    primOps.set("derivation", (ATerm) ATempty);
-    primOps.set("true", (ATerm) ATempty);
-    primOps.set("false", (ATerm) ATempty);
-    primOps.set("null", (ATerm) ATempty);
-    primOps.set("isNull", (ATerm) ATempty);
-    primOps.set("toString", (ATerm) ATempty);
-    primOps.set("baseNameOf", (ATerm) ATempty);
-
     try {
-        checkVarDefs(primOps, data.result);
+        checkVarDefs(state.primOpsAll, data.result);
     } catch (Error & e) {
         throw Error(format("%1%, in %2%") % e.msg() % location);
     }
@@ -101,7 +92,7 @@ static Expr parse(const char * text, const string & location,
 }
 
 
-Expr parseExprFromFile(Path path)
+Expr parseExprFromFile(EvalState & state, Path path)
 {
     assert(path[0] == '/');
 
@@ -137,11 +128,12 @@ Expr parseExprFromFile(Path path)
     readFull(fd, (unsigned char *) text, st.st_size);
     text[st.st_size] = 0;
 
-    return parse(text, "`" + path + "'", dirOf(path));
+    return parse(state, text, "`" + path + "'", dirOf(path));
 }
 
 
-Expr parseExprFromString(const string & s, const Path & basePath)
+Expr parseExprFromString(EvalState & state,
+    const string & s, const Path & basePath)
 {
-    return parse(s.c_str(), "(string)", basePath);
+    return parse(state, s.c_str(), "(string)", basePath);
 }

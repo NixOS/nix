@@ -102,7 +102,7 @@ bool parseDerivations(EvalState & state, Expr e, DrvInfos & drvs)
 
 void loadDerivations(EvalState & state, Path nePath, DrvInfos & drvs)
 {
-    Expr e = parseExprFromFile(absPath(nePath));
+    Expr e = parseExprFromFile(state, absPath(nePath));
     if (!parseDerivations(state, e, drvs))
         throw badTerm("expected set of derivations", e);
 }
@@ -193,7 +193,8 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
     const Path & linkPath)
 {
     /* Get the environment builder expression. */
-    Expr envBuilder = parseExprFromFile(nixDataDir + "/nix/corepkgs/buildenv"); /* !!! */
+    Expr envBuilder = parseExprFromFile(state,
+        nixDataDir + "/nix/corepkgs/buildenv"); /* !!! */
 
     /* Construct the whole top level derivation. */
     ATermList inputs = ATempty;

@@ -8,7 +8,7 @@
    argument. */ 
 Expr primImport(EvalState & state, Expr arg);
 
-/* Construct (as a unobservable) side effect) a Nix derivation
+/* Construct (as a unobservable side effect) a Nix derivation
    expression that performs the derivation described by the argument
    set.  Returns the original set extended with the following
    attributes: `outPath' containing the primary output path of the
@@ -23,6 +23,10 @@ Expr primBaseNameOf(EvalState & state, Expr arg);
 
 /* Convert the argument (which can be a path or a uri) to a string. */
 Expr primToString(EvalState & state, Expr arg);
+
+/* Boolean constructors. */
+Expr primTrue(EvalState & state);
+Expr primFalse(EvalState & state);
 
 /* Return the null value. */
 Expr primNull(EvalState & state);

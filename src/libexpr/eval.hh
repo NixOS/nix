@@ -11,9 +11,17 @@
 typedef map<Path, PathSet> DrvPaths;
 typedef map<Path, Hash> DrvHashes;
 
+struct EvalState;
+typedef Expr (* PrimOp0) (EvalState &);
+typedef Expr (* PrimOp1) (EvalState &, Expr arg);
+
+
 struct EvalState 
 {
     ATermMap normalForms;
+    ATermMap primOps0; /* nullary primops */
+    ATermMap primOps1; /* unary primops */
+    ATermMap primOpsAll;
     DrvPaths drvPaths;
     DrvHashes drvHashes; /* normalised derivation hashes */
     Expr blackHole;
@@ -22,6 +30,9 @@ struct EvalState
     unsigned int nrCached;
 
     EvalState();
+
+    void addPrimOp0(const string & name, PrimOp0 primOp);
+    void addPrimOp1(const string & name, PrimOp1 primOp);
 };
 
 

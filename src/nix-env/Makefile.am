@@ -4,7 +4,7 @@ nix_env_SOURCES = main.cc help.txt
 nix_env_LDADD = ../libmain/libmain.a ../libexpr/libexpr.a \
  ../libstore/libstore.a ../libutil/libutil.a \
  ../boost/format/libformat.a -L../../externals/inst/lib -ldb_cxx \
- -lsglr -lATB -lconversion -lasfix2 -lmept -lATerm
+ -lATerm
 
 main.o: help.txt.hh
 
