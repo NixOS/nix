@@ -130,6 +130,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
 
     /* Normal forms. */
     if (ATmatch(e, "<str>", &s1) ||
+        ATmatch(e, "[<list>]", &e1) ||
         ATmatch(e, "Function([<list>], <term>)", &e1, &e2) ||
         ATmatch(e, "FSId(<str>)", &s1))
         return e;
@@ -299,6 +300,23 @@ static Expr evalFile(EvalState & state, string relPath)
 }
 
 
+static void printFSId(EvalState & state, Expr e)
+{
+    ATermList es;
+    char * s;
+    if (ATmatch(e, "FSId(<str>)", &s)) {
+        cout << format("%1%\n") % s;
+    } 
+    else if (ATmatch(e, "[<list>]", &es)) {
+        while (!ATisEmpty(es)) {
+            printFSId(state, evalExpr(state, ATgetFirst(es)));
+            es = ATgetNext(es);
+        }
+    }
+    else throw badTerm("top level does not evaluate to a (list of) Nix expression(s)", e);
+}
+
+
 void run(Strings args)
 {
     openDB();
@@ -333,11 +351,7 @@ void run(Strings args)
          it != files.end(); it++)
     {
         Expr e = evalFile(state, *it);
-        char * s;
-        if (ATmatch(e, "FSId(<str>)", &s)) {
-            cout << format("%1%\n") % s;
-        }
-        else throw badTerm("top level is not a package", e);
+        printFSId(state, e);
     }
 }
 
