@@ -69,7 +69,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
     ElemMap inMap; 
 
     /* Referencable paths (i.e., input and output paths). */
-    Strings refPaths;
+    Strings allPaths;
 
     /* The environment to be passed to the builder. */
     Environment env; 
@@ -81,7 +81,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
     {
         debug(format("building %1% in `%2%'") % (string) i->second % i->first);
         outPaths[i->first] = i->second;
-        refPaths.push_back(i->first);
+        allPaths.push_back(i->first);
     }
 
     /* Obtain locks on all output paths.  The locks are automatically
@@ -127,7 +127,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
     }
 
     for (ElemMap::iterator i = inMap.begin(); i != inMap.end(); i++)
-        refPaths.push_back(i->second.path);
+        allPaths.push_back(i->second.path);
 
     /* Most shells initialise PATH to some default (/bin:/usr/bin:...) when
        PATH is not set.  We don't want this, so we fill it in with some dummy
@@ -182,7 +182,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references. */
-    FSIdSet used;
+    StringSet usedPaths;
     for (OutPaths::iterator i = outPaths.begin(); 
          i != outPaths.end(); i++)
     {
@@ -191,41 +191,82 @@ FSId normaliseFState(FSId id, FSIdSet pending)
             throw Error(format("path `%1%' does not exist") % path);
         fs.slice.roots.push_back(i->second);
 
-        Strings refs = filterReferences(path, refPaths);
+	/* For this output path, find the references to other paths contained
+	   in it. */
+        Strings refPaths = filterReferences(path, allPaths);
 
+	/* Construct a slice element for this output path. */
         SliceElem elem;
         elem.path = path;
         elem.id = i->second;
 
-        for (Strings::iterator j = refs.begin(); j != refs.end(); j++) {
+	/* For each path referenced by this output path, add its id to the
+	   slice element and add the id to the `used' set (so that the
+	   elements referenced by *its* slice are added below). */
+        for (Strings::iterator j = refPaths.begin();
+	     j != refPaths.end(); j++)
+	{
+	    string path = *j;
             ElemMap::iterator k;
             OutPaths::iterator l;
-            if ((k = inMap.find(*j)) != inMap.end()) {
+
+	    /* Is it an input path? */
+            if ((k = inMap.find(path)) != inMap.end()) {
                 elem.refs.push_back(k->second.id);
-                used.insert(k->second.id);
-                for (FSIds::iterator m = k->second.refs.begin();
-                     m != k->second.refs.end(); m++)
-                    used.insert(*m);
-            } else if ((l = outPaths.find(*j)) != outPaths.end()) {
+                usedPaths.insert(k->second.path);
+            }
+
+	    /* Or an output path? */
+	    else if ((l = outPaths.find(path)) != outPaths.end())
                 elem.refs.push_back(l->second);
-                used.insert(l->second);
-            } else 
-                throw Error(format("unknown referenced path `%1%'") % *j);
+            
+	    /* Can't happen. */ 
+	    else abort();
         }
 
         fs.slice.elems.push_back(elem);
     }
 
+    /* Close the slice.  That is, for any referenced path, add the paths
+       referenced by it. */
+    FSIdSet donePaths;
+
+    while (!usedPaths.empty()) {
+	StringSet::iterator i = usedPaths.begin();
+	string path = *i;
+	usedPaths.erase(i);
+
+	ElemMap::iterator j = inMap.find(path);
+	if (j == inMap.end()) abort();
+
+	donePaths.insert(j->second.id);
+
+	fs.slice.elems.push_back(j->second);
+
+	for (FSIds::iterator k = j->second.refs.begin();
+	     k != j->second.refs.end(); k++)
+	    if (donePaths.find(*k) == donePaths.end()) {
+		/* !!! performance */
+		bool found = false;
+		for (ElemMap::iterator l = inMap.begin();
+		     l != inMap.end(); l++)
+		    if (l->second.id == *k) {
+			usedPaths.insert(l->first);
+			found = true;
+		    }
+		if (!found) abort();
+	    }
+    }
+
+    /* For debugging, print out the referenced and unreferenced paths. */
     for (ElemMap::iterator i = inMap.begin();
          i != inMap.end(); i++)
     {
-        FSIdSet::iterator j = used.find(i->second.id);
-        if (j == used.end())
+        FSIdSet::iterator j = donePaths.find(i->second.id);
+        if (j == donePaths.end())
             debug(format("NOT referenced: `%1%'") % i->second.path);
-        else {
+        else
             debug(format("referenced: `%1%'") % i->second.path);
-            fs.slice.elems.push_back(i->second);
-        }
     }
 
     /* Write the normal form.  This does not have to occur in the
