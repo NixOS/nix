@@ -333,8 +333,11 @@ void collectGarbage(GCAction action, PathSet & result)
         for (PathSet::iterator i = livePaths.begin();
              i != livePaths.end(); ++i)
         {
+            /* Note that the deriver need not be valid (e.g., if we
+               previously ran the collector with `gcKeepDerivations'
+               turned off). */
             Path deriver = queryDeriver(noTxn, *i);
-            if (deriver != "")
+            if (deriver != "" && isValidPath(deriver))
                 computeFSClosure(deriver, livePaths);
         }
     }
