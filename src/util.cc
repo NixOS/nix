@@ -36,7 +36,7 @@ string absPath(string path, string dir)
         /* !!! canonicalise */
         char resolved[PATH_MAX];
         if (!realpath(path.c_str(), resolved))
-            throw SysError("cannot canonicalise path " + path);
+            throw SysError(format("cannot canonicalise path %1%") % path);
         path = resolved;
     }
     return path;
@@ -46,7 +46,8 @@ string absPath(string path, string dir)
 string dirOf(string path)
 {
     unsigned int pos = path.rfind('/');
-    if (pos == string::npos) throw Error("invalid file name: " + path);
+    if (pos == string::npos)
+        throw Error(format("invalid file name: %1%") % path);
     return string(path, 0, pos);
 }
 
@@ -54,7 +55,8 @@ string dirOf(string path)
 string baseNameOf(string path)
 {
     unsigned int pos = path.rfind('/');
-    if (pos == string::npos) throw Error("invalid file name: " + path);
+    if (pos == string::npos)
+        throw Error(format("invalid file name %1% ") % path);
     return string(path, pos + 1);
 }
 
@@ -63,7 +65,7 @@ void deletePath(string path)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError("getting attributes of path " + path);
+        throw SysError(format("getting attributes of path %1%") % path);
 
     if (S_ISDIR(st.st_mode)) {
         DIR * dir = opendir(path.c_str());
@@ -79,11 +81,36 @@ void deletePath(string path)
     }
 
     if (remove(path.c_str()) == -1)
-        throw SysError("cannot unlink " + path);
+        throw SysError(format("cannot unlink %1%") % path);
+}
+
+
+static int nestingLevel = 0;
+
+
+Nest::Nest(bool nest)
+{
+    this->nest = nest;
+    if (nest) nestingLevel++;
+}
+
+
+Nest::~Nest()
+{
+    if (nest) nestingLevel--;
+}
+
+
+void msg(const format & f)
+{
+    string spaces;
+    for (int i = 0; i < nestingLevel; i++)
+        spaces += "  ";
+    cerr << format("%1%%2%\n") % spaces % f.str();
 }
 
 
 void debug(const format & f)
 {
-    cerr << format("debug: %1%\n") % f.str();
+    msg(format("debug: %1%") % f.str());
 }

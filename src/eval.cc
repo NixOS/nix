@@ -25,7 +25,7 @@ bool pathExists(const string & path)
     res = stat(path.c_str(), &st);
     if (!res) return true;
     if (errno != ENOENT)
-        throw SysError("getting status of " + path);
+        throw SysError(format("getting status of %1%") % path);
     return false;
 }
 
@@ -105,7 +105,7 @@ static void runProgram(const string & program, Environment env)
             throw SysError(format("unable to execute %1%") % program);
             
         } catch (exception & e) {
-            cerr << "build error: " << e.what() << endl;
+            cerr << format("build error: %1%\n") % e.what();
         }
         _exit(1);
 
@@ -199,14 +199,61 @@ struct RStatus
 };
 
 
+static ATerm termFromHash(const Hash & hash)
+{
+    string path = queryFromStore(hash);
+    ATerm t = ATreadFromNamedFile(path.c_str());
+    if (!t) throw Error(format("cannot read aterm %1%") % path);
+    return t;
+}
+
+
+static Hash writeTerm(ATerm t)
+{
+    string path = nixStore + "/tmp.nix"; /* !!! */
+    if (!ATwriteToNamedTextFile(t, path.c_str()))
+        throw Error(format("cannot write aterm %1%") % path);
+    Hash hash = hashPath(path);
+    string path2 = nixStore + "/" + (string) hash + ".nix";
+    if (rename(path.c_str(), path2.c_str()) == -1)
+        throw SysError(format("renaming %1% to %2%") % path % path2);
+    setDB(nixDB, dbRefs, hash, path2);
+    return hash;
+}
+
+
 static FState realise(RStatus & status, FState fs)
 {
     char * s1, * s2, * s3;
     Content content;
-    ATermList refs, ins, outs, bnds;
+    ATermList refs, ins, bnds;
+
+    /* First repeatedly try to substitute $fs$ by any known successors
+       in order to speed up the rewrite process. */
+    {
+        string fsHash, scHash;
+        while (queryDB(nixDB, dbSuccessors, fsHash = hashTerm(fs), scHash)) {
+            debug(format("successor %1% -> %2%") % (string) fsHash % scHash);
+            FState fs2 = termFromHash(parseHash(scHash));
+            if (fs == fs2) {
+                debug(format("successor cycle detected in %1%") % printTerm(fs));
+                break;
+            }
+            fs = fs2;
+        }
+    }
+
+    /* Fall through. */
+
+    if (ATmatch(fs, "Include(<str>)", &s1)) {
+        return realise(status, termFromHash(parseHash(s1)));
+    }
     
-    if (ATmatch(fs, "File(<str>, <term>, [<list>])", &s1, &content, &refs)) {
+    else if (ATmatch(fs, "File(<str>, <term>, [<list>])", &s1, &content, &refs)) {
         string path(s1);
+
+        msg(format("realising atomic path %1%") % path);
+        Nest nest(true);
 
         if (path[0] != '/') throw Error("absolute path expected: " + path);
 
@@ -223,8 +270,14 @@ static FState realise(RStatus & status, FState fs)
         Hash hash = parseHash(s1);
 
         /* Normal form. */
-        ATerm nf = ATmake("File(<str>, <term>, <list>)",
+        ATerm nf = ATmake("File(<str>, <term>, <term>)",
             path.c_str(), content, refs2);
+
+        /* Register the normal form. */
+        if (fs != nf) {
+            Hash nfHash = writeTerm(nf);
+            setDB(nixDB, dbSuccessors, hashTerm(fs), nfHash);
+        }
 
         /* Perhaps the path already exists and has the right hash? */
         if (pathExists(path)) {
@@ -249,6 +302,9 @@ static FState realise(RStatus & status, FState fs)
                  &s1, &s2, &ins, &s3, &bnds)) 
     {
         string platform(s1), builder(s2), outPath(s3);
+
+        msg(format("realising derivate path %1%") % outPath);
+        Nest nest(true);
 
         checkPlatform(platform);
         
@@ -297,15 +353,13 @@ static FState realise(RStatus & status, FState fs)
            values.cc. */
         setDB(nixDB, dbRefs, outHash, outPath);
 
-#if 0
-        /* Register that targetHash was produced by evaluating
-           sourceHash; i.e., that targetHash is a normal form of
-           sourceHash. !!! this shouldn't be here */
-        setDB(nixDB, dbNFs, sourceHash, targetHash);
-#endif
-
-        return ATmake("File(<str>, Hash(<str>), <list>)",
+        /* Register the normal form of fs. */
+        FState nf = ATmake("File(<str>, Hash(<str>), <term>)",
             outPath.c_str(), ((string) outHash).c_str(), ins2);
+        Hash nfHash = writeTerm(nf);
+        setDB(nixDB, dbSuccessors, hashTerm(fs), nfHash);
+
+        return nf;
     }
 
     throw badTerm("bad file system state expression", fs);

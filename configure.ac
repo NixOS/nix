@@ -12,7 +12,7 @@ AC_PROG_CXX
 AC_PROG_RANLIB
 
 # Unix shell scripting should die a slow and painful death.
-AC_DEFINE_UNQUOTED(NIX_VALUES_DIR, "$(eval echo $prefix/values)", Nix values directory.)
+AC_DEFINE_UNQUOTED(NIX_STORE_DIR, "$(eval echo $prefix/store)", Nix store directory.)
 AC_DEFINE_UNQUOTED(NIX_STATE_DIR, "$(eval echo $localstatedir/nix)", Nix state directory.)
 AC_DEFINE_UNQUOTED(NIX_LOG_DIR, "$(eval echo $localstatedir/log/nix)", Nix log file directory.)
 

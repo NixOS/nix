@@ -22,7 +22,7 @@ static ArgType argType = atpUnknown;
 
    Operations:
 
-     --evaluate / -e: evaluate values
+     --realise / -r: realise values
      --delete / -d: delete values
      --query / -q: query stored values
      --add: add values
@@ -87,8 +87,8 @@ static void getArgType(Strings & flags)
 }
 
 
-/* Evaluate values. */
-static void opEvaluate(Strings opFlags, Strings opArgs)
+/* Realise values. */
+static void opRealise(Strings opFlags, Strings opArgs)
 {
     getArgType(opFlags);
     if (!opFlags.empty()) throw UsageError("unknown flag");
@@ -101,16 +101,19 @@ static void opEvaluate(Strings opFlags, Strings opArgs)
             hash = parseHash(*it);
         else if (argType == atpName)
             throw Error("not implemented");
-        else if (argType == atpPath)
-            hash = addValue(*it);
-        Expr e = ATmake("Deref(Hash(<str>))", ((string) hash).c_str());
-        cerr << printExpr(evalValue(e)) << endl;
+        else if (argType == atpPath) {
+            string path;
+            addToStore(*it, path, hash);
+        }
+        FState fs = ATmake("Include(<str>)", ((string) hash).c_str());
+        realiseFState(fs);
     }
 }
 
 
 static void opDelete(Strings opFlags, Strings opArgs)
 {
+#if 0
     getArgType(opFlags);
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
@@ -126,6 +129,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
             throw Error("invalid argument type");
         deleteValue(hash);
     }
+#endif
 }
 
 
@@ -138,7 +142,12 @@ static void opAdd(Strings opFlags, Strings opArgs)
 
     for (Strings::iterator it = opArgs.begin();
          it != opArgs.end(); it++)
-        cout << (string) addValue(*it) << endl;
+    {
+        string path;
+        Hash hash;
+        addToStore(*it, path, hash);
+        cout << format("%1% %2%\n") % (string) hash % path;
+    }
 }
 
 
@@ -158,6 +167,7 @@ struct StdoutSink : DumpSink
    output. */
 static void opDump(Strings opFlags, Strings opArgs)
 {
+#if 0
     getArgType(opFlags);
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (opArgs.size() != 1) throw UsageError("only one argument allowed");
@@ -174,6 +184,7 @@ static void opDump(Strings opFlags, Strings opArgs)
         path = arg;
 
     dumpPath(path, sink);
+#endif
 }
 
 
@@ -218,7 +229,7 @@ static void opInit(Strings opFlags, Strings opArgs)
 static void run(int argc, char * * argv)
 {
     /* Setup Nix paths. */
-    nixValues = NIX_VALUES_DIR;
+    nixStore = NIX_STORE_DIR;
     nixLogDir = NIX_LOG_DIR;
     nixDB = (string) NIX_STATE_DIR + "/nixstate.db";
 
@@ -253,8 +264,8 @@ static void run(int argc, char * * argv)
 
         Operation oldOp = op;
 
-        if (arg == "--evaluate" || arg == "-e")
-            op = opEvaluate;
+        if (arg == "--realise" || arg == "-r")
+            op = opRealise;
         else if (arg == "--delete" || arg == "-d")
             op = opDelete;
         else if (arg == "--add")

@@ -3,7 +3,7 @@
 
 
 string dbRefs = "refs";
-string dbNFs = "nfs";
+string dbSuccessors = "successors";
 string dbNetSources = "netsources";
 
 string nixStore = "/UNINIT";
@@ -14,6 +14,6 @@ string nixDB = "/UNINIT";
 void initDB()
 {
     createDB(nixDB, dbRefs);
-    createDB(nixDB, dbNFs);
+    createDB(nixDB, dbSuccessors);
     createDB(nixDB, dbNetSources);
 }

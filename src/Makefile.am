@@ -23,5 +23,5 @@ install-data-local:
 #	$(INSTALL) -d $(localstatedir)/nix/prebuilts/imports
 #	$(INSTALL) -d $(localstatedir)/nix/prebuilts/exports
 	$(INSTALL) -d $(localstatedir)/log/nix
-	$(INSTALL) -d $(prefix)/values
+	$(INSTALL) -d $(prefix)/store
 	$(bindir)/nix --init

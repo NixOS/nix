@@ -14,17 +14,15 @@ using namespace std;
    resolve CHash(hash) content descriptors. */
 extern string dbRefs;
 
-/* dbNFs :: Hash -> Hash
+/* dbSuccessors :: Hash -> Hash
 
-   Each pair (h1, h2) in this mapping records the fact that the normal
-   form of an expression with hash h1 is Hash(h2).
+   Each pair (h1, h2) in this mapping records the fact that a
+   successor of an fstate expression with hash h1 is stored in a file
+   with hash h2.
 
-   TODO: maybe this should be that the normal form of an expression
-   with hash h1 is an expression with hash h2; this would be more
-   general, but would require us to store lots of small expressions in
-   the file system just to support the caching mechanism.
-*/
-extern string dbNFs;
+   Note that a term $y$ is successor of $x$ iff there exists a
+   sequence of rewrite steps that rewrites $x$ into $y$. */
+extern string dbSuccessors;
 
 /* dbNetSources :: Hash -> URL
 

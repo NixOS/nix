@@ -61,6 +61,18 @@ string baseNameOf(string path);
 void deletePath(string path);
 
 
+/* Messages. */
+
+class Nest
+{
+private:
+    bool nest;
+public:
+    Nest(bool nest);
+    ~Nest();
+};
+
+void msg(const format & f);
 void debug(const format & f);
 
 
