@@ -301,6 +301,8 @@ void printUsage()
 /* Parse the command-line arguments, call the right operation. */
 void run(Strings::iterator argCur, Strings::iterator argEnd)
 {
+    umask(0022);
+
     Strings extraArgs;
     enum { cmdUnknown, cmdInstantiate } command = cmdUnknown;
 

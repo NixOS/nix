@@ -5,6 +5,8 @@ my $etcdir = "$prefix/etc/nix";
 my $exportdir = "$prefix/var/nix/prebuilts/exports";
 my $knowns = "$prefix/var/nix/known-prebuilts";
 
+umask 0022;
+
 # For performance, put the known hashes in an associative array.
 my %knowns = ();
 open KNOWNS, "<$knowns";

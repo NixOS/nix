@@ -7,6 +7,8 @@ my $tmpfile = "$prefix/var/nix/prebuilts.tmp";
 
 my $conffile = "$etcdir/prebuilts.conf";
 
+umask 0022;
+
 sub register {
     my $fn = shift;
     my $url = shift;
