@@ -42,6 +42,7 @@
 
 struct DumpSink 
 {
+    virtual ~DumpSink() { }
     virtual void operator () (const unsigned char * data, unsigned int len) = 0;
 };
 
@@ -50,6 +51,8 @@ void dumpPath(const Path & path, DumpSink & sink);
 
 struct RestoreSource
 {
+    virtual ~RestoreSource() { }
+    
     /* The callee should store exactly *len bytes in the buffer
        pointed to by data.  It should block if that much data is not
        yet available, or throw an error if it is not going to be

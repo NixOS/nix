@@ -1,7 +1,6 @@
 #include <iostream>
 #include <algorithm>
 
-#include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -126,20 +125,24 @@ void createStoreTransaction(Transaction & txn)
 
 struct CopySink : DumpSink
 {
-    int fd;
+    string s;
     virtual void operator () (const unsigned char * data, unsigned int len)
     {
-        writeFull(fd, data, len);
+        s.append((const char *) data, len);
     }
 };
 
 
 struct CopySource : RestoreSource
 {
-    int fd;
+    string & s;
+    unsigned int pos;
+    CopySource(string & _s) : s(_s), pos(0) { }
     virtual void operator () (unsigned char * data, unsigned int len)
     {
-        readFull(fd, data, len);
+        s.copy((char *) data, len, pos);
+        pos += len;
+        assert(pos <= s.size());
     }
 };
 
@@ -148,52 +151,19 @@ void copyPath(const Path & src, const Path & dst)
 {
     debug(format("copying `%1%' to `%2%'") % src % dst);
 
-    /* Unfortunately C++ doesn't support coprocedures, so we have no
-       nice way to chain CopySink and CopySource together.  Instead we
-       fork off a child to run the sink.  (Fork-less platforms should
-       use a thread). */
+    /* Dump an archive of the path `src' into a string buffer, then
+       restore the archive to `dst'.  This is not a very good method
+       for very large paths, but `copyPath' is mainly used for small
+       files. */ 
 
-    /* Create a pipe. */
-    Pipe pipe;
-    pipe.create();
-
-    /* Fork. */
-    Pid pid;
-    pid = fork();
-    switch (pid) {
-
-    case -1:
-        throw SysError("unable to fork");
-
-    case 0: /* child */
-        try {
-            pipe.writeSide.close();
-            CopySource source;
-            source.fd = pipe.readSide;
-            restorePath(dst, source);
-            _exit(0);
-        } catch (exception & e) {
-            cerr << "error: " << e.what() << endl;
-        }
-        _exit(1);        
-    }
-
-    /* Parent. */
-
-    pipe.readSide.close();
-    
     CopySink sink;
-    sink.fd = pipe.writeSide;
     {
         SwitchToOriginalUser sw;
         dumpPath(src, sink);
     }
 
-    /* Wait for the child to finish. */
-    int status = pid.wait(true);
-    if (!statusOk(status))
-        throw Error(format("cannot copy `%1% to `%2%': child %3%")
-            % src % dst % statusToString(status));
+    CopySource source(sink.s);
+    restorePath(dst, source);
 }
 
 
@@ -619,9 +589,6 @@ Path addToStore(const Path & _srcPath)
 
             if (pathExists(dstPath)) deletePath(dstPath);
 
-            /* !!! race: srcPath might change between hashPath() and
-               here! */
-            
             copyPath(srcPath, dstPath);
 
             Hash h2 = hashPath(htSHA256, dstPath);
