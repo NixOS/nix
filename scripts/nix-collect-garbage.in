@@ -1,5 +1,8 @@
 #! /usr/bin/perl -w
 
+use strict;
+use IPC::Open2;
+
 my $linkdir = "@localstatedir@/nix/links";
 my $storedir = "@prefix@/store";
 
@@ -16,13 +19,18 @@ foreach my $arg (@ARGV) {
 
 my $extraarg = "";
 if ($keepsuccessors) { $extraarg = "--include-successors"; };
-open HASHES, "nix --query --requisites $extraarg \$(cat $linkdir/*.id) |" or die "in `nix -qrh'";
-while (<HASHES>) {
+my $pid = open2(\*READ, \*WRITE, "nix --query --requisites $extraarg \$(cat $linkdir/*.id)") 
+    or die "determining live paths";
+close WRITE;
+while (<READ>) {
 	chomp;
 	$alive{$_} = 1;
 	if ($invert) { print "$_\n"; };
 }
-close HASHES;
+close READ;
+
+waitpid $pid, 0;
+$? == 0 or die "determining live paths";
 
 exit 0 if ($invert);
 
