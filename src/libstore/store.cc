@@ -411,19 +411,34 @@ static void invalidatePath(const Path & path, Transaction & txn)
 }
 
 
+Path makeStorePath(const string & type,
+    Hash & hash, const string & suffix)
+{
+    /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
+    string s = type + ":sha256:" + (string) hash + ":"
+        + nixStore + ":" + suffix;
+
+    Hash nameHash = hashString(s, htSHA256);
+
+    printMsg(lvlError, format("name input: %1% -> %2%") % s % (string) nameHash);
+
+    return nixStore + "/" + (string) nameHash + "-" + suffix;
+}
+
+
 Path addToStore(const Path & _srcPath)
 {
     Path srcPath(absPath(_srcPath));
     debug(format("adding `%1%' to the store") % srcPath);
 
-    Hash h(htMD5);
+    Hash h(htSHA256);
     {
         SwitchToOriginalUser sw;
-        h = hashPath(srcPath, htMD5);
+        h = hashPath(srcPath, htSHA256);
     }
 
     string baseName = baseNameOf(srcPath);
-    Path dstPath = canonPath(nixStore + "/" + (string) h + "-" + baseName);
+    Path dstPath = makeStorePath("source", h, baseName);
 
     if (!readOnlyMode && !isValidPath(dstPath)) { 
 
@@ -443,6 +458,11 @@ Path addToStore(const Path & _srcPath)
             
             copyPath(srcPath, dstPath);
 
+            Hash h2 = hashPath(dstPath, htSHA256);
+            if (h != h2)
+                throw Error(format("contents of `%1%' changed while copying it to `%2%' (%3% -> %4%)")
+                    % srcPath % dstPath % (string) h % (string) h2);
+
             makePathReadOnly(dstPath);
             
             Transaction txn(nixDB);
@@ -457,11 +477,13 @@ Path addToStore(const Path & _srcPath)
 }
 
 
-void addTextToStore(const Path & dstPath, const string & s)
+Path addTextToStore(const string & suffix, const string & s)
 {
-    assertStorePath(dstPath);
+    Hash hash = hashString(s, htSHA256);
+
+    Path dstPath = makeStorePath("text", hash, suffix);
     
-    if (!isValidPath(dstPath)) {
+    if (!readOnlyMode && !isValidPath(dstPath)) {
 
         PathSet lockPaths;
         lockPaths.insert(dstPath);
@@ -482,6 +504,8 @@ void addTextToStore(const Path & dstPath, const string & s)
 
         outputLock.setDeletion(true);
     }
+
+    return dstPath;
 }
 
 

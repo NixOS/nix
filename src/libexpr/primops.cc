@@ -59,7 +59,7 @@ static Path copyAtom(EvalState & state, const Path & srcPath)
     ne.closure.elems[dstPath] = elem;
 
     Hash drvHash = hashDerivation(state, ne);
-    Path drvPath = writeTerm(unparseStoreExpr(ne), "");
+    Path drvPath = writeTerm(unparseStoreExpr(ne), "c");
     state.drvHashes.insert(make_pair(drvPath, drvHash));
 
     state.drvRoots[drvPath] = ne.closure.roots;
@@ -250,21 +250,32 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
             throw Error(format("invalid character `%1%' in derivation name `%2%'")
                 % *i % drvName);
         }
+
+    /* Construct the "masked" derivation store expression, which is
+       the final one except that the list of output paths is set to
+       the set of output names, and the corresponding environment
+       variables have an empty value.  This ensures that changes in
+       the set of output names do get reflected in the hash. */
+    ne.derivation.env["out"] = "";
+    ne.derivation.outputs.insert("out");
         
     /* Determine the output path by hashing the Nix expression with no
        outputs to produce a unique but deterministic path name for
        this derivation. */
     if (!outHashGiven) outHash = hashDerivation(state, ne);
-    Path outPath = canonPath(nixStore + "/" + 
-        ((string) outHash).c_str() + "-" + drvName);
+    Path outPath = makeStorePath("output:out",
+        outHash, drvName);
+
+    /* Construct the final derivation store expression. */
     ne.derivation.env["out"] = outPath;
+    ne.derivation.outputs.clear();
     ne.derivation.outputs.insert(outPath);
 
     /* Write the resulting term into the Nix store directory. */
     Hash drvHash = outHashGiven
         ? hashString((string) outHash + outPath, htMD5)
         : hashDerivation(state, ne);
-    Path drvPath = writeTerm(unparseStoreExpr(ne), "-d-" + drvName);
+    Path drvPath = writeTerm(unparseStoreExpr(ne), "d-" + drvName);
 
     printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'")
         % drvName % drvPath);

@@ -22,6 +22,7 @@ Hash::Hash(HashType type)
     else if (type == htSHA1) hashSize = sha1HashSize;
     else if (type == htSHA256) hashSize = sha256HashSize;
     else throw Error("unknown hash type");
+    assert(hashSize <= maxHashSize);
     memset(hash, 0, hashSize);
 }
 

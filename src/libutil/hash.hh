@@ -18,7 +18,7 @@ const int sha256HashSize = 32;
 
 struct Hash
 {
-    static const unsigned int maxHashSize = 20;
+    static const unsigned int maxHashSize = 32;
     unsigned int hashSize;
     unsigned char hash[maxHashSize];
 

@@ -1137,7 +1137,7 @@ void NormalisationGoal::createClosure()
     /* Write the normal form.  This does not have to occur in the
        transaction below because writing terms is idem-potent. */
     ATerm nfTerm = unparseStoreExpr(nf);
-    Path nfPath = writeTerm(nfTerm, "-s");
+    Path nfPath = writeTerm(nfTerm, "s");
 
     /* Register each output path, and register the normal form.  This
        is wrapped in one database transaction to ensure that if we

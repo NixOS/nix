@@ -69,10 +69,10 @@ static void initAndRun(int argc, char * * argv)
     }
     
     /* Setup Nix paths. */
-    nixStore = getEnv("NIX_STORE_DIR", canonPath(NIX_STORE_DIR));
-    nixDataDir = getEnv("NIX_DATA_DIR", canonPath(NIX_DATA_DIR));
-    nixLogDir = getEnv("NIX_LOG_DIR", canonPath(NIX_LOG_DIR));
-    nixStateDir = getEnv("NIX_STATE_DIR", canonPath(NIX_STATE_DIR));
+    nixStore = canonPath(getEnv("NIX_STORE_DIR", NIX_STORE_DIR));
+    nixDataDir = canonPath(getEnv("NIX_DATA_DIR", NIX_DATA_DIR));
+    nixLogDir = canonPath(getEnv("NIX_LOG_DIR", NIX_LOG_DIR));
+    nixStateDir = canonPath(getEnv("NIX_STATE_DIR", NIX_STATE_DIR));
     nixDBPath = getEnv("NIX_DB_DIR", nixStateDir + "/db");
 
     /* Check that the store directory and its parent are not
