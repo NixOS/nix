@@ -13,6 +13,7 @@ extern "C" {
 }
 
 #include "globals.hh"
+#include "gc.hh"
 #include "shared.hh"
 
 #include "config.h"
@@ -53,6 +54,15 @@ void checkStoreNotSymlink(Path path)
         path = dirOf(path);
     }
 }
+
+
+struct RemoveTempRoots 
+{
+    ~RemoveTempRoots()
+    {
+        removeTempRoots();
+    }
+};
 
 
 void initDerivationsHelpers();
@@ -170,6 +180,10 @@ static void initAndRun(int argc, char * * argv)
             readOnlyMode = true;
         else remaining.push_back(arg);
     }
+
+    /* Automatically clean up the temporary roots file when we
+       exit. */
+    RemoveTempRoots removeTempRoots;
 
     run(remaining);
 }

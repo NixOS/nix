@@ -21,5 +21,10 @@ void collectGarbage(const PathSet & roots, GCAction action,
    deadlock. */
 void addTempRoot(const Path & path);
 
+/* Remove the temporary roots file for this process.  Any temporary
+   root becomes garbage after this point unless it has been registered
+   as a (permanent) root. */
+void removeTempRoots();
+
 
 #endif /* !__GC_H */

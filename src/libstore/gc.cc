@@ -63,6 +63,15 @@ void addTempRoot(const Path & path)
 }
 
 
+void removeTempRoots()
+{
+    if (fdTempRoots != -1) {
+        fdTempRoots.close();
+        unlink(fnTempRoots.c_str());
+    }
+}
+
+
 typedef shared_ptr<AutoCloseFD> FDPtr;
 typedef list<FDPtr> FDs;
 
@@ -94,7 +103,8 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
         if (lockFile(*fd, ltWrite, false)) {
             printMsg(lvlError, format("removing stale temporary roots file `%1%'")
                 % path);
-            /* !!! write token, unlink */
+            unlink(path.c_str());
+            writeFull(*fd, (const unsigned char *) "d", 1);
             continue;
         }
 
