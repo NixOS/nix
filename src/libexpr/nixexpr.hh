@@ -47,6 +47,12 @@ private:
 };
 
 
+/* A STL vector of ATerms.  Should be used with great care since it's
+   stored on the heap, and the elements are therefore not roots to the
+   ATerm garbage collector. */
+typedef vector<ATerm> ATermVector;
+
+
 /* Convert a string to an ATerm (i.e., a quoted nullary function
    applicaton). */
 ATerm string2ATerm(const string & s);

@@ -1,20 +1,5 @@
 #include "eval.hh"
 #include "parser.hh"
-#include "primops.hh"
-
-
-static void addPrimOp(ATermMap & map, const string & name, void * f)
-{
-    map.set(name, (ATerm) ATmakeBlob(0, f));
-}
-
-
-static void * lookupPrimOp(ATermMap & map, ATerm name)
-{
-    ATermBlob b = (ATermBlob) map.get(name);
-    if (!b) return 0;
-    return ATgetBlobData(b);
-}
 
 
 EvalState::EvalState()
@@ -25,30 +10,15 @@ EvalState::EvalState()
     
     nrEvaluated = nrCached = 0;
 
-    addPrimOp0("true", primTrue);
-    addPrimOp0("false", primFalse);
-    addPrimOp0("null", primNull);
-
-    addPrimOp1("import", primImport);
-    addPrimOp1("derivation", primDerivation);
-    addPrimOp1("baseNameOf", primBaseNameOf);
-    addPrimOp1("toString", primToString);
-    addPrimOp1("isNull", primIsNull);
-
-    primOpsAll.add(primOps0);
-    primOpsAll.add(primOps1);
+    addPrimOps();
 }
 
 
-void EvalState::addPrimOp0(const string & name, PrimOp0 primOp)
+void EvalState::addPrimOp(const string & name,
+    unsigned int arity, PrimOp primOp)
 {
-    addPrimOp(primOps0, name, (void *) primOp);
-}
-
-
-void EvalState::addPrimOp1(const string & name, PrimOp1 primOp)
-{
-    addPrimOp(primOps1, name, (void *) primOp);
+    primOps.set(name, ATmake("(<int>, <term>)",
+        arity, ATmakeBlob(0, (void *) primOp)));
 }
 
 
@@ -200,7 +170,8 @@ Expr evalExpr2(EvalState & state, Expr e)
          cons == "Function" ||
          cons == "Function1" ||
          cons == "Attrs" ||
-         cons == "List"))
+         cons == "List" ||
+         cons == "PrimOp"))
         return e;
 
     /* The `Closed' constructor is just a way to prevent substitutions
@@ -208,13 +179,21 @@ Expr evalExpr2(EvalState & state, Expr e)
     if (atMatch(m, e) >> "Closed" >> e1)
         return evalExpr(state, e1);
 
-    /* Any encountered variables must be undeclared or primops. */
+    /* Any encountered variables must be primops (since undefined
+       variables are detected after parsing). */
     if (atMatch(m, e) >> "Var" >> name) {
-        PrimOp0 primOp = (PrimOp0) lookupPrimOp(state.primOps0, name);
-        if (primOp)
-            return primOp(state);
+        ATerm primOp = state.primOps.get(name);
+        if (!primOp)
+            throw Error(format("impossible: undefined variable `%1%'") % name);
+        int arity;
+        ATerm fun;
+        if (!(atMatch(m, primOp) >> "" >> arity >> fun)) abort();
+        if (arity == 0)
+            return ((PrimOp) ATgetBlobData((ATermBlob) fun))
+                (state, ATermVector());
         else
-            return e;
+            return ATmake("PrimOp(<int>, <term>, <term>)",
+                arity, fun, ATempty);
     }
 
     /* Function application. */
@@ -227,9 +206,23 @@ Expr evalExpr2(EvalState & state, Expr e)
         e1 = evalExpr(state, e1);
 
         /* Is it a primop or a function? */
-        if (atMatch(m, e1) >> "Var" >> name) {
-            PrimOp1 primOp = (PrimOp1) lookupPrimOp(state.primOps1, name);
-            if (primOp) return primOp(state, e2); else abort();
+        int arity;
+        ATerm fun;
+        ATermList args;
+        if (atMatch(m, e1) >> "PrimOp" >> arity >> fun >> args) {
+            args = ATinsert(args, e2);
+            if (ATgetLength(args) == arity) {
+                /* Put the arguments in a vector in reverse (i.e.,
+                   actual) order. */
+                ATermVector args2(arity);
+                for (ATermIterator i(args); i; ++i)
+                    args2[--arity] = *i;
+                return ((PrimOp) ATgetBlobData((ATermBlob) fun))
+                    (state, args2);
+            } else
+                /* Need more arguments, so propagate the primop. */
+                return ATmake("PrimOp(<int>, <term>, <list>)",
+                    arity, fun, args);
         }
 
         else if (atMatch(m, e1) >> "Function" >> formals >> e4 >> pos) {

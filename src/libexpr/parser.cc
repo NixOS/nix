@@ -95,7 +95,7 @@ static Expr parse(EvalState & state,
     if (res) throw Error(data.error);
 
     try {
-        checkVarDefs(state.primOpsAll, data.result);
+        checkVarDefs(state.primOps, data.result);
     } catch (Error & e) {
         throw Error(format("%1%, in `%2%'") % e.msg() % path);
     }

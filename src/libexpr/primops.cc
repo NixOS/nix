@@ -1,13 +1,15 @@
-#include "primops.hh"
 #include "normalise.hh"
+#include "eval.hh"
 #include "globals.hh"
 
 
-Expr primImport(EvalState & state, Expr arg)
+/* Load and evaluate an expression from path specified by the
+   argument. */ 
+static Expr primImport(EvalState & state, const ATermVector & args)
 {
     ATMatcher m;
     string path;
-    if (!(atMatch(m, arg) >> "Path" >> path))
+    if (!(atMatch(m, args[0]) >> "Path" >> path))
         throw Error("path expected");
     return evalFile(state, path);
 }
@@ -158,11 +160,19 @@ static string concatStrings(const Strings & ss)
 }
 
 
-Expr primDerivation(EvalState & state, Expr args)
+/* Construct (as a unobservable side effect) a Nix derivation
+   expression that performs the derivation described by the argument
+   set.  Returns the original set extended with the following
+   attributes: `outPath' containing the primary output path of the
+   derivation; `drvPath' containing the path of the Nix expression;
+   and `type' set to `derivation' to indicate that this is a
+   derivation. */
+static Expr primDerivation(EvalState & state, const ATermVector & _args)
 {
     startNest(nest, lvlVomit, "evaluating derivation");
 
     ATermMap attrs;
+    Expr args = _args[0];
     args = evalExpr(state, args);
     queryAllAttrs(args, attrs, true);
 
@@ -251,16 +261,19 @@ Expr primDerivation(EvalState & state, Expr args)
 }
 
 
-Expr primBaseNameOf(EvalState & state, Expr arg)
+/* Return the base name of the given string, i.e., everything
+   following the last slash. */
+static Expr primBaseNameOf(EvalState & state, const ATermVector & args)
 {
-    string s = evalString(state, arg);
+    string s = evalString(state, args[0]);
     return ATmake("Str(<str>)", baseNameOf(s).c_str());
 }
 
 
-Expr primToString(EvalState & state, Expr arg)
+/* Convert the argument (which can be a path or a uri) to a string. */
+static Expr primToString(EvalState & state, const ATermVector & args)
 {
-    arg = evalExpr(state, arg);
+    Expr arg = evalExpr(state, args[0]);
     ATMatcher m;
     string s;
     if (atMatch(m, arg) >> "Str" >> s ||
@@ -271,27 +284,50 @@ Expr primToString(EvalState & state, Expr arg)
 }
 
 
-Expr primTrue(EvalState & state)
+/* Boolean constructors. */
+static Expr primTrue(EvalState & state, const ATermVector & args)
 {
     return ATmake("Bool(True)");
 }
 
 
-Expr primFalse(EvalState & state)
+static Expr primFalse(EvalState & state, const ATermVector & args)
 {
     return ATmake("Bool(False)");
 }
 
 
-Expr primNull(EvalState & state)
+/* Return the null value. */
+Expr primNull(EvalState & state, const ATermVector & args)
 {
     return ATmake("Null");
 }
 
 
-Expr primIsNull(EvalState & state, Expr arg)
+/* Determine whether the argument is the null value. */
+Expr primIsNull(EvalState & state, const ATermVector & args)
 {
-    arg = evalExpr(state, arg);
+    Expr arg = evalExpr(state, args[0]);
     ATMatcher m;
     return makeBool(atMatch(m, arg) >> "Null");
+}
+
+
+/* Apply a function to every element of a list. */
+Expr primMap(EvalState & state, Expr fun, Expr list)
+{
+}
+
+
+void EvalState::addPrimOps()
+{
+    addPrimOp("true", 0, primTrue);
+    addPrimOp("false", 0, primFalse);
+    addPrimOp("null", 0, primNull);
+
+    addPrimOp("import", 1, primImport);
+    addPrimOp("derivation", 1, primDerivation);
+    addPrimOp("baseNameOf", 1, primBaseNameOf);
+    addPrimOp("toString", 1, primToString);
+    addPrimOp("isNull", 1, primIsNull);
 }

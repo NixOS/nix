@@ -1,7 +1,7 @@
 noinst_LIBRARIES = libexpr.a
 
 libexpr_a_SOURCES = nixexpr.cc nixexpr.hh parser.cc parser.hh \
- eval.cc eval.hh primops.cc primops.hh \
+ eval.cc eval.hh primops.cc \
  lexer-tab.c lexer-tab.h parser-tab.c parser-tab.h
 
 EXTRA_DIST = lexer.l parser.y
