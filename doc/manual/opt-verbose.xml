@@ -1,5 +1,5 @@
 <varlistentry>
-  <term><option>--verbose</option></term>
+  <term><option>--verbose</option> / <option>-v</option></term>
   <listitem>
     <para>
       Increases the level of verbosity of diagnostic messages printed

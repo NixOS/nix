@@ -61,9 +61,14 @@ static void opAdd(Strings opFlags, Strings opArgs)
 }
 
 
-Path maybeNormalise(const Path & ne, bool normalise)
+Path maybeNormalise(const Path & ne, bool normalise, bool realise)
 {
-    return normalise ? normaliseStoreExpr(ne) : ne;
+    if (realise) {
+        Path ne2 = normaliseStoreExpr(ne);
+        realiseClosure(ne2);
+        return normalise ? ne2 : ne;
+    } else
+        return normalise ? normaliseStoreExpr(ne) : ne;
 }
 
 
@@ -73,6 +78,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
     enum { qList, qRequisites, qPredecessors, qGraph 
     } query = qList;
     bool normalise = false;
+    bool realise = false;
     bool includeExprs = true;
     bool includeSuccessors = false;
 
@@ -83,6 +89,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--predecessors") query = qPredecessors;
         else if (*i == "--graph") query = qGraph;
         else if (*i == "--normalise" || *i == "-n") normalise = true;
+        else if (*i == "--force-realise" || *i == "-f") realise = true;
         else if (*i == "--exclude-exprs") includeExprs = false;
         else if (*i == "--include-successors") includeSuccessors = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
@@ -94,7 +101,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                  i != opArgs.end(); i++)
             {
                 StringSet paths = storeExprRoots(
-                    maybeNormalise(checkPath(*i), normalise));
+                    maybeNormalise(checkPath(*i), normalise, realise));
                 for (StringSet::iterator j = paths.begin(); 
                      j != paths.end(); j++)
                     cout << format("%s\n") % *j;
@@ -108,7 +115,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                  i != opArgs.end(); i++)
             {
                 StringSet paths2 = storeExprRequisites(
-                    maybeNormalise(checkPath(*i), normalise),
+                    maybeNormalise(checkPath(*i), normalise, realise),
                     includeExprs, includeSuccessors);
                 paths.insert(paths2.begin(), paths2.end());
             }
@@ -134,7 +141,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             PathSet roots;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
-                roots.insert(maybeNormalise(checkPath(*i), normalise));
+                roots.insert(maybeNormalise(checkPath(*i), normalise, realise));
 	    printDotGraph(roots);
             break;
         }

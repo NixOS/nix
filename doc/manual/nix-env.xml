@@ -7,18 +7,14 @@
   <refsynopsisdiv>
     <cmdsynopsis>
       <command>nix-env</command>
-      <group choice='opt' rep='repeat'>
-        <arg><option>--verbose</option></arg>
-        <arg><option>-v</option></arg>
-      </group>
-      <group choice='opt'>
-        <arg><option>--keep-failed</option></arg>
-        <arg><option>-K</option></arg>
-      </group>
+      <arg rep='repeat'><option>--verbose</option></arg>
+      <arg rep='repeat'><option>-v</option></arg>
+      <arg><option>--keep-failed</option></arg>
+      <arg><option>-K</option></arg>
       <arg>
-        <group choice='opt'>
-          <arg><option>--file</option></arg>
-          <arg><option>-f</option></arg>
+        <group choice='req'>
+          <arg choice='plain'><option>--file</option></arg>
+          <arg choice='plain'><option>-f</option></arg>
         </group>
         <replaceable>path</replaceable>
       </arg>
@@ -76,7 +72,7 @@
       &opt-verbose;
 
       <varlistentry>
-        <term><option>--file</option></term>
+        <term><option>--file</option> / <option>-f</option></term>
         <listitem>
           <para>
             Specifies the Nix expression used by the
@@ -125,8 +121,8 @@
             By default, it points to
             <filename><replaceable>prefix</replaceable>/var/nix/links/current</filename>.
             The <envar>PATH</envar> environment variable should
-            include <filename>~/.nix-userenv</filename> for the use
-            environments to be visible to the user.
+            include <filename>~/.nix-userenv</filename> for the user
+            environment to be visible to the user.
           </para>
         </listitem>
       </varlistentry>
@@ -146,8 +142,9 @@
       <title>Synopsis</title>
       <cmdsynopsis>
         <command>nix-env</command>
-        <group>
-          <arg><option>--install</option></arg>
+        <group choice='req'>
+          <arg choice='plain'><option>--install</option></arg>
+          <arg choice='plain'><option>-i</option></arg>
         </group>
       </cmdsynopsis>
     </refsection>

@@ -7,14 +7,10 @@
   <refsynopsisdiv>
     <cmdsynopsis>
       <command>nix-store</command>
-      <group choice='opt' rep='repeat'>
-        <arg><option>--verbose</option></arg>
-        <arg><option>-v</option></arg>
-      </group>
-      <group choice='opt'>
-        <arg><option>--keep-failed</option></arg>
-        <arg><option>-K</option></arg>
-      </group>
+      <arg rep='repeat'><option>--verbose</option></arg>
+      <arg rep='repeat'><option>-v</option></arg>
+      <arg><option>--keep-failed</option></arg>
+      <arg><option>-K</option></arg>
       <arg choice='plain'><replaceable>operation</replaceable></arg>
       <arg rep='repeat'><replaceable>options</replaceable></arg>
       <arg rep='repeat'><replaceable>arguments</replaceable></arg>
@@ -56,7 +52,7 @@
       &opt-verbose;
 
       <varlistentry>
-        <term><option>--keep-failed</option></term>
+        <term><option>--keep-failed</option> / <option>-K</option></term>
         <listitem>
           <para>
             Specifies that in case of a build failure, the temporary directory
@@ -112,9 +108,9 @@
       <title>Synopsis</title>
       <cmdsynopsis>
         <command>nix-store</command>
-        <group>
-          <arg><option>--realise</option></arg>
-          <arg><option>-r</option></arg>
+        <group choice='req'>
+          <arg choice='plain'><option>--realise</option></arg>
+          <arg choice='plain'><option>-r</option></arg>
         </group>
         <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
       </cmdsynopsis>
@@ -160,9 +156,9 @@
       <title>Synopsis</title>
       <cmdsynopsis>
         <command>nix-store</command>
-        <group>
-          <arg><option>--delete</option></arg>
-          <arg><option>-d</option></arg>
+        <group choice='req'>
+          <arg choice='plain'><option>--delete</option></arg>
+          <arg choice='plain'><option>-d</option></arg>
         </group>
         <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
       </cmdsynopsis>
@@ -203,22 +199,22 @@
       <title>Synopsis</title>
       <cmdsynopsis>
         <command>nix-store</command>
-        <group>
-          <arg><option>--query</option></arg>
-          <arg><option>-q</option></arg>
+        <group choice='req'>
+          <arg choice='plain'><option>--query</option></arg>
+          <arg choice='plain'><option>-q</option></arg>
         </group>
-        <group>
-          <group>
-            <arg><option>--list</option></arg>
-            <arg><option>-l</option></arg>
-          </group>
-          <group>
-            <arg><option>--requisites</option></arg>
-            <arg><option>-R</option></arg>
-          </group>
-          <arg><option>--predecessors</option></arg>
-          <arg><option>--graph</option></arg>
+        <group choice='req'>
+          <arg choice='plain'><option>--list</option></arg>
+          <arg choice='plain'><option>-l</option></arg>
+          <arg choice='plain'><option>--requisites</option></arg>
+          <arg choice='plain'><option>-R</option></arg>
+          <arg choice='plain'><option>--predecessors</option></arg>
+          <arg choice='plain'><option>--graph</option></arg>
         </group>
+        <arg><option>--normalise</option></arg>
+        <arg><option>-n</option></arg>
+        <arg><option>--force-realise</option></arg>
+        <arg><option>-f</option></arg>
         <arg choice='plain' rep='repeat'><replaceable>args</replaceable></arg>
       </cmdsynopsis>
     </refsection>
@@ -235,13 +231,55 @@
 
     </refsection>
 
+
+    <refsection>
+      <title>Common query options</title>
+
+      <variablelist>
+
+        <varlistentry>
+          <term><option>--normalise</option> / <option>-n</option></term>
+          <listitem>
+            <para>
+              For those queries that take a Nix store expression, this
+              option causes those expressions to be normalised first.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><option>--force-realise</option> / <option>-f</option></term>
+          <listitem>
+            <para>
+              For those queries that take a Nix store expression, this
+              option causes those expressions to be realised first.
+              This is just a short-cut for the common idiom
+            </para>
+            <screen>
+nix-store --realise /nix/store/bla.store
+x=`nix-store --query --normalise /nix/store/bla.store
+<emphasis>(do something with the path $x</emphasis></screen>
+            <para>
+              which using this flag can be written as
+            </para>
+            <screen>
+x=`nix-store --query --normalise --force-realise /nix/store/bla.store
+<emphasis>(do something with the path $x</emphasis></screen>
+          </listitem>
+        </varlistentry>
+
+      </variablelist>
+        
+    </refsection>
+    
+
     <refsection id='nixref-queries'>
       <title>Queries</title>
             
       <variablelist>
 
         <varlistentry>
-          <term><option>--list</option></term>
+          <term><option>--list</option> / <option>-l</option></term>
           <listitem>
             <para>
               Prints out the <emphasis>output paths</emphasis> of the
@@ -257,7 +295,7 @@
         </varlistentry>
 
         <varlistentry>
-          <term><option>--requisites</option></term>
+          <term><option>--requisites</option> / <option>-R</option></term>
           <listitem>
             <para>
               Prints out the requisite paths of the store expressions
@@ -303,18 +341,6 @@
             </para> 
 
             <variablelist>
-
-              <varlistentry>
-                <term><option>--normalise</option></term>
-                <listitem>
-                  <para>
-                    Causes the requisite paths of the
-                    <emphasis>successor</emphasis> of the given store
-                    expressions to be printed, rather than the
-                    requisite paths of the expressions themselves.
-                  </para>
-                </listitem>
-              </varlistentry>
 
               <varlistentry>
                 <term><option>--exclude-exprs</option></term>
@@ -398,9 +424,7 @@
       <title>Synopsis</title>
       <cmdsynopsis>
         <command>nix-store</command>
-        <group>
-          <arg><option>--successor</option></arg>
-        </group>
+        <arg choice='req'><option>--successor</option></arg>
         <arg choice='plain'
         rep='repeat'><replaceable>srcpath</replaceable> <replaceable>sucpath</replaceable></arg>
       </cmdsynopsis>
@@ -432,9 +456,7 @@
       <title>Synopsis</title>
       <cmdsynopsis>
         <command>nix-store</command>
-        <group>
-          <arg><option>--substitute</option></arg>
-        </group>
+        <arg choice='req'><option>--substitute</option></arg>
         <arg choice='plain'
         rep='repeat'><replaceable>srcpath</replaceable> <replaceable>subpath</replaceable></arg>
       </cmdsynopsis>
@@ -466,9 +488,7 @@
       <title>Synopsis</title>
       <cmdsynopsis>
         <command>nix-store</command>
-        <group>
-          <arg><option>--verify</option></arg>
-        </group>
+        <arg choice='req'><option>--verify</option></arg>
       </cmdsynopsis>
     </refsection>
 
