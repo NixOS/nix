@@ -420,7 +420,17 @@ static void opInit(Strings opFlags, Strings opArgs)
 /* Verify the consistency of the Nix environment. */
 static void opVerify(Strings opFlags, Strings opArgs)
 {
-    verifyStore();
+    if (!opArgs.empty())
+        throw UsageError("no arguments expected");
+
+    bool checkContents = false;
+    
+    for (Strings::iterator i = opFlags.begin();
+         i != opFlags.end(); ++i)
+        if (*i == "--check-contents") checkContents = true;
+        else throw UsageError(format("unknown flag `%1%'") % *i);
+    
+    verifyStore(checkContents);
 }
 
 

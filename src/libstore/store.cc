@@ -623,7 +623,23 @@ void deleteFromStore(const Path & _path)
 }
 
 
-void verifyStore()
+static Hash queryHash(const Transaction & txn, const Path & storePath)
+{
+    string s;
+    nixDB.queryString(txn, dbValidPaths, storePath, s);
+    unsigned int colon = s.find(':');
+    if (colon == string::npos)
+        throw Error(format("corrupt hash `%1%' in valid-path entry for `%2%'")
+            % s % storePath);
+    HashType ht = parseHashType(string(s, 0, colon));
+    if (ht == htUnknown)
+        throw Error(format("unknown hash type `%1%' in valid-path entry for `%2%'")
+            % string(0, colon) % storePath);
+    return parseHash(ht, string(s, colon + 1));
+}
+
+
+void verifyStore(bool checkContents)
 {
     Transaction txn(nixDB);
 
@@ -633,14 +649,24 @@ void verifyStore()
 
     for (Paths::iterator i = paths.begin(); i != paths.end(); ++i) {
         Path path = *i;
-        if (!pathExists(path)) {
-            printMsg(lvlError, format("path `%1%' disappeared") % path);
-            invalidatePath(path, txn);
-        } else if (!isStorePath(path)) {
-            printMsg(lvlError, format("path `%1%' is not in the Nix store") % path);
-            invalidatePath(path, txn);
-        } else
-            validPaths.insert(path);
+        if (!pathExists(*i)) {
+            printMsg(lvlError, format("path `%1%' disappeared") % *i);
+            invalidatePath(*i, txn);
+        } else if (!isStorePath(*i)) {
+            printMsg(lvlError, format("path `%1%' is not in the Nix store") % *i);
+            invalidatePath(*i, txn);
+        } else {
+            if (checkContents) {
+                Hash expected = queryHash(txn, *i);
+                Hash current = hashPath(expected.type, *i);
+                if (current != expected) {
+                    printMsg(lvlError, format("path `%1%' was modified! "
+                                 "expected hash `%2%', got `%3%'")
+                        % *i % printHash(expected) % printHash(current));
+                }
+            }
+            validPaths.insert(*i);
+        }
     }
 
     /* "Usable" paths are those that are valid or have a

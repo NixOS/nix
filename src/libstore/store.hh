@@ -122,7 +122,7 @@ Path addTextToStore(const string & suffix, const string & s,
 /* Delete a value from the nixStore directory. */
 void deleteFromStore(const Path & path);
 
-void verifyStore();
+void verifyStore(bool checkContents);
 
 
 #endif /* !__STORE_H */
