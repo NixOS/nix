@@ -101,7 +101,7 @@ bool pathExists(const Path & path)
 {
     int res;
     struct stat st;
-    res = stat(path.c_str(), &st);
+    res = lstat(path.c_str(), &st);
     if (!res) return true;
     if (errno != ENOENT)
         throw SysError(format("getting status of %1%") % path);

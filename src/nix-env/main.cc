@@ -645,12 +645,11 @@ static void opSwitchProfile(Globals & globals,
 {
     if (opFlags.size() > 0)
         throw UsageError(format("unknown flags `%1%'") % opFlags.front());
-    if (opArgs.size() > 1)
-        throw UsageError(format("`--profile' takes at most one argument"));
+    if (opArgs.size() != 1)
+        throw UsageError(format("`--profile' takes exactly one argument"));
 
-    Path profile = 
-        absPath(opArgs.size() == 0 ? globals.profile : opArgs.front());
-    Path profileLink = getHomeDir() + "/.nix-userenv";
+    Path profile = opArgs.front();
+    Path profileLink = getHomeDir() + "/.nix-profile";
 
     switchLink(profileLink, profile);
 }
@@ -680,7 +679,6 @@ void run(Strings args)
     Operation op = 0;
     
     Globals globals;
-    globals.profile = canonPath(nixStateDir + "/profiles/default");
     globals.nixExprPath = getDefNixExprPath();
 
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
@@ -723,6 +721,13 @@ void run(Strings args)
 
     if (!op) throw UsageError("no operation specified");
 
+    if (globals.profile == "") {
+        Path profileLink = getHomeDir() + "/.nix-profile";
+        globals.profile = pathExists(profileLink)
+            ? absPath(readLink(profileLink), dirOf(profileLink))
+            : canonPath(nixStateDir + "/profiles/default");
+    }
+    
     openDB();
 
     op(globals, opFlags, opArgs);
