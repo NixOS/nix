@@ -25,7 +25,7 @@ if test -z "$hash"; then
         tmpPath1=/tmp/nix-prefetch-url-$$ # !!! security?
     fi
 
-    # Perform the checkout.
+    # Perform the download.
     @curl@ --fail --location --max-redirs 20 "$url" > $tmpPath1
 
     # Compute the hash.
@@ -47,7 +47,7 @@ storeExpr=$( \
     | @bindir@/nix-instantiate -)
 
 # Realise it.
-finalPath=$(@bindir@/nix-store -q --force-realise $storeExpr)
+finalPath=$(@bindir@/nix-store -r $storeExpr)
     
 if ! test -n "$QUIET"; then echo "path is $finalPath" >&2; fi
 

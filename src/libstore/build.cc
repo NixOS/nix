@@ -1082,25 +1082,37 @@ void DerivationGoal::computeClosure()
            outputs (i.e., the content hash should match the specified
            hash). */ 
         if (i->second.hash != "") {
-            HashType ht = parseHashType(i->second.hashAlgo);
+
+            bool recursive = false;
+            string algo = i->second.hashAlgo;
+            
+            if (string(algo, 0, 2) == "r:") {
+                recursive = true;
+                algo = string(algo, 2);
+            }
+
+            if (!recursive) {
+                /* The output path should be a regular file without
+                   execute permission. */
+                struct stat st;
+                if (lstat(path.c_str(), &st))
+                    throw SysError(format("getting attributes of path `%1%'") % path);
+                if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
+                    throw Error(
+                        format("output path `%1% should be a non-executable regular file")
+                        % path);
+            }
+
+            /* Check the hash. */
+            HashType ht = parseHashType(algo);
             if (ht == htUnknown)
-                throw Error(format("unknown hash algorithm `%1%'") % i->second.hashAlgo);
+                throw Error(format("unknown hash algorithm `%1%'") % algo);
             Hash h = parseHash(ht, i->second.hash);
-            Hash h2 = hashFile(ht, path);
+            Hash h2 = recursive ? hashPath(ht, path) : hashFile(ht, path);
             if (h != h2)
                 throw Error(
                     format("output path `%1% should have %2% hash `%3%', instead has `%4%'")
-                    % path % i->second.hashAlgo % printHash(h) % printHash(h2));
-
-            /* Also, the output path should be a regular file withouth
-               execute permission. */
-            struct stat st;
-            if (lstat(path.c_str(), &st))
-                throw SysError(format("getting attributes of path `%1%'") % path);
-            if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
-                throw Error(
-                    format("output path `%1% should be a non-executable regular file")
-                    % path);
+                    % path % algo % printHash(h) % printHash(h2));
         }
 
 	canonicalisePathMetaData(path);

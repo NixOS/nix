@@ -194,6 +194,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
     
     string outputHash;
     string outputHashAlgo;
+    bool outputHashRecursive = false;
 
     for (ATermIterator i(attrs.keys()); i; ++i) {
         string key = aterm2String(*i);
@@ -228,6 +229,11 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
             else if (key == "name") drvName = s;
             else if (key == "outputHash") outputHash = s;
             else if (key == "outputHashAlgo") outputHashAlgo = s;
+            else if (key == "outputHashMode") {
+                if (s == "recursive") outputHashRecursive = true; 
+                else if (s == "flat") outputHashRecursive = false;
+                else throw Error(format("invalid value `%1%' for `outputHashMode' attribute") % s);
+            }
         }
     }
     
@@ -255,6 +261,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
             h = parseHash32(ht, outputHash);
         string s = outputHash;
         outputHash = printHash(h);
+        if (outputHashRecursive) outputHashAlgo = "r:" + outputHashAlgo;
     }
 
     /* Check the derivation name.  It shouldn't contain whitespace,
