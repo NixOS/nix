@@ -439,6 +439,7 @@ static void upgradeDerivations(EvalState & state,
     loadDerivations(state, nePath, availDrvs);
 
     /* Go through all installed derivations. */
+    DrvInfos newDrvs;
     for (DrvInfos::iterator i = installedDrvs.begin();
          i != installedDrvs.end(); ++i)
     {
@@ -455,31 +456,32 @@ static void upgradeDerivations(EvalState & state,
                 break;
             }
         }
-        if (!upgrade) continue;
 
         /* If yes, find the derivation in the input Nix expression
            with the same name and the highest version number. */
         DrvInfos::iterator bestDrv = i;
         DrvName bestName = drvName;
-        for (DrvInfos::iterator j = availDrvs.begin();
-             j != availDrvs.end(); ++j)
-        {
-            DrvName newName(j->second.name);
-            if (newName.name == bestName.name &&
-                compareVersions(newName.version, bestName.version) > 0)
-                bestDrv = j;
+        if (upgrade) {
+            for (DrvInfos::iterator j = availDrvs.begin();
+                 j != availDrvs.end(); ++j)
+            {
+                DrvName newName(j->second.name);
+                if (newName.name == bestName.name &&
+                    compareVersions(newName.version, bestName.version) > 0)
+                    bestDrv = j;
+            }
         }
 
         if (bestDrv != i) {
             printMsg(lvlInfo,
                 format("upgrading `%1%' to `%2%'")
                 % i->second.name % bestDrv->second.name);
-            installedDrvs.erase(i);
-            installedDrvs.insert(*bestDrv);
         }
+        
+        newDrvs.insert(*bestDrv);
     }
     
-    createUserEnv(state, installedDrvs, linkPath);
+    createUserEnv(state, newDrvs, linkPath);
 }
 
 
