@@ -60,8 +60,16 @@ typedef ATerm FState;
 typedef ATerm Content;
 
 
-/* Realise a $f$-normalised expression in the file system. */
+/* Realise an fstate expression in the file system.  This requires
+   execution of all Derive() nodes. */
 FState realiseFState(FState fs);
+
+/* Return the path of an fstate expression.  An empty string is
+   returned if the term is not a valid fstate expression. (!!!) */
+string fstatePath(FState fs);
+
+/* Return the paths referenced by fstate expression. */
+Strings fstateRefs(FState fs);
 
 /* Return a canonical textual representation of an expression. */
 string printTerm(ATerm t);
@@ -72,6 +80,9 @@ Error badTerm(const format & f, ATerm t);
 
 /* Hash an aterm. */
 Hash hashTerm(ATerm t);
+
+/* Read an aterm from disk, given its hash. */
+ATerm termFromHash(const Hash & hash);
 
 /* Write an aterm to the Nix store directory, and return its hash. */
 Hash writeTerm(ATerm t);

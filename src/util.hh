@@ -60,6 +60,8 @@ string dirOf(string path);
    the final `/'. */
 string baseNameOf(string path);
 
+/* Return true iff the given path exists. */
+bool pathExists(const string & path);
 
 /* Delete a path; i.e., in the case of a directory, it is deleted
    recursively.  Don't use this at home, kids. */

@@ -13,29 +13,6 @@ typedef ATerm Expr;
 static Expr evalFile(string fileName);
 
 
-static bool isFState(Expr e, string & path)
-{
-    char * s1, * s2, * s3;
-    Expr e1, e2;
-    if (ATmatch(e, "Path(<str>, <term>, [<list>])", &s1, &e1, &e2)) {
-        path = s1;
-        return true;
-    }
-    else if (ATmatch(e, "Derive(<str>, <str>, [<list>], <str>, [<list>])",
-                   &s1, &s2, &e1, &s3, &e2))
-    {
-        path = s3;
-        return true;
-    }
-    else if (ATmatch(e, "Include(<str>)", &s1))
-    {
-        string fn = queryPathByHash(parseHash(s1));
-        return isFState(evalFile(fn), path);
-    }
-    else return false;
-}
-
-
 static Expr substExpr(string x, Expr rep, Expr e)
 {
     char * s;
@@ -113,8 +90,7 @@ static Expr evalExpr(Expr e)
         ATmatch(e, "Function([<list>], <term>)", &e1, &e2))
         return e;
 
-    string dummy;
-    if (isFState(e, dummy)) return e;
+    if (fstatePath(e) != "") return e; /* !!! hack */
 
     /* Application. */
     if (ATmatch(e, "App(<term>, [<list>])", &e1, &e2)) {
@@ -165,8 +141,8 @@ static Expr evalExpr(Expr e)
             string key = it->first;
             ATerm value = it->second;
 
-            string path;
-            if (isFState(value, path)) {
+            string path = fstatePath(value);
+            if (path != "") {
                 ins = ATinsert(ins, value);
                 env = ATinsert(env, ATmake("(<str>, <str>)",
                     key.c_str(), path.c_str()));

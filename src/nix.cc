@@ -21,9 +21,10 @@ static ArgType argType = atpUnknown;
 
    Operations:
 
-     --install / -i: realise a Nix expression
+     --install / -i: realise an fstate
      --delete / -d: delete paths from the Nix store
      --add / -A: copy a path to the Nix store
+     --query / -q: query information
 
      --dump: dump a path as a Nix archive
      --restore: restore a path from a Nix archive
@@ -38,6 +39,11 @@ static ArgType argType = atpUnknown;
 
      --file / -f: by file name
      --hash / -h: by hash
+
+   Query flags:
+
+     --path / -p: query the path of an fstate 
+     --refs / -r: query paths referenced by an fstate
 
    Options:
 
@@ -54,10 +60,8 @@ static void getArgType(Strings & flags)
     {
         string arg = *it;
         ArgType tp;
-        if (arg == "--hash" || arg == "-h")
-            tp = atpHash;
-        else if (arg == "--file" || arg == "-f")
-            tp = atpPath;
+        if (arg == "--hash" || arg == "-h") tp = atpHash;
+        else if (arg == "--file" || arg == "-f") tp = atpPath;
         else { it++; continue; }
         if (argType != atpUnknown)
             throw UsageError("only one argument type specified may be specified");
@@ -66,6 +70,20 @@ static void getArgType(Strings & flags)
     }
     if (argType == atpUnknown)
         throw UsageError("argument type not specified");
+}
+
+
+static Hash argToHash(const string & arg)
+{
+    if (argType == atpHash)
+        return parseHash(arg);
+    else if (argType == atpPath) {
+        string path;
+        Hash hash;
+        addToStore(arg, path, hash);
+        return hash;
+    }
+    else abort();
 }
 
 
@@ -78,20 +96,11 @@ static void opInstall(Strings opFlags, Strings opArgs)
 
     for (Strings::iterator it = opArgs.begin();
          it != opArgs.end(); it++)
-    {
-        Hash hash;
-        if (argType == atpHash)
-            hash = parseHash(*it);
-        else if (argType == atpPath) {
-            string path;
-            addToStore(*it, path, hash);
-        }
-        FState fs = ATmake("Include(<str>)", ((string) hash).c_str());
-        realiseFState(fs);
-    }
+        realiseFState(termFromHash(argToHash(*it)));
 }
 
 
+/* Delete a path in the Nix store directory. */
 static void opDelete(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
@@ -116,6 +125,51 @@ static void opAdd(Strings opFlags, Strings opArgs)
         Hash hash;
         addToStore(*it, path, hash);
         cout << format("%1% %2%\n") % (string) hash % path;
+    }
+}
+
+
+/* Perform various sorts of queries. */
+static void opQuery(Strings opFlags, Strings opArgs)
+{
+    enum { qPath, qRefs, qUnknown } query = qPath;
+
+    for (Strings::iterator it = opFlags.begin();
+         it != opFlags.end(); )
+    {
+        string arg = *it;
+        if (arg == "--path" || arg == "-p") query = qPath;
+        else if (arg == "--refs" || arg == "-r") query = qRefs;
+        else { it++; continue; }
+        it = opFlags.erase(it);
+    }
+
+    getArgType(opFlags);
+    if (!opFlags.empty()) throw UsageError("unknown flag");
+
+    for (Strings::iterator it = opArgs.begin();
+         it != opArgs.end(); it++)
+    {
+        Hash hash = argToHash(*it);
+
+        switch (query) {
+
+        case qPath:
+            cout << format("%s\n") % 
+                (string) fstatePath(termFromHash(hash));
+            break;
+
+        case qRefs: {
+            Strings refs = fstateRefs(termFromHash(hash));
+            for (Strings::iterator j = refs.begin(); 
+                 j != refs.end(); j++)
+                cout << format("%s\n") % *j;
+            break;
+        }
+
+        default:
+            abort();
+        }
     }
 }
 
@@ -208,8 +262,10 @@ void run(Strings args)
             op = opInstall;
         else if (arg == "--delete" || arg == "-d")
             op = opDelete;
-        else if (arg == "--add")
+        else if (arg == "--add" || arg == "-A")
             op = opAdd;
+        else if (arg == "--query" || arg == "-q")
+            op = opQuery;
         else if (arg == "--dump")
             op = opDump;
         else if (arg == "--restore")

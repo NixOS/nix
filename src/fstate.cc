@@ -1,4 +1,5 @@
 #include <map>
+#include <set>
 #include <iostream>
 
 #include <sys/types.h>
@@ -17,17 +18,20 @@
 typedef map<string, string> Environment;
 
 
-/* Return true iff the given path exists. */
-bool pathExists(const string & path)
+class AutoDelete
 {
-    int res;
-    struct stat st;
-    res = stat(path.c_str(), &st);
-    if (!res) return true;
-    if (errno != ENOENT)
-        throw SysError(format("getting status of %1%") % path);
-    return false;
-}
+    string path;
+public:
+
+    AutoDelete(const string & p) : path(p) 
+    {
+    }
+
+    ~AutoDelete()
+    {
+        deletePath(path);
+    }
+};
 
 
 /* Run a program. */
@@ -36,9 +40,19 @@ static void runProgram(const string & program, Environment env)
     /* Create a log file. */
     string logFileName = nixLogDir + "/run.log";
     /* !!! auto-pclose on exit */
-    FILE * logFile = popen(("tee " + logFileName + " >&2").c_str(), "w"); /* !!! escaping */
+    FILE * logFile = popen(("tee -a " + logFileName + " >&2").c_str(), "w"); /* !!! escaping */
     if (!logFile)
-        throw SysError(format("unable to create log file %1%") % logFileName);
+        throw SysError(format("creating log file `%1%'") % logFileName);
+
+    /* Create a temporary directory where the build will take
+       place. */
+    static int counter = 0;
+    string tmpDir = (format("/tmp/nix-%1%-%2%") % getpid() % counter++).str();
+
+    if (mkdir(tmpDir.c_str(), 0777) == -1)
+        throw SysError(format("creating directory `%1%'") % tmpDir);
+
+    AutoDelete delTmpDir(tmpDir);
 
     /* Fork a child to build the package. */
     pid_t pid;
@@ -51,31 +65,8 @@ static void runProgram(const string & program, Environment env)
 
         try { /* child */
 
-#if 0
-            /* Try to use a prebuilt. */
-            string prebuiltHashS, prebuiltFile;
-            if (queryDB(nixDB, dbPrebuilts, hash, prebuiltHashS)) {
-
-                try {
-                    prebuiltFile = getFile(parseHash(prebuiltHashS));
-                } catch (Error e) {
-                    cerr << "cannot obtain prebuilt (ignoring): " << e.what() << endl;
-                    goto build;
-                }
-                
-                cerr << "substituting prebuilt " << prebuiltFile << endl;
-
-                int res = system(("tar xfj " + prebuiltFile + " 1>&2").c_str()); // !!! escaping
-                if (WEXITSTATUS(res) != 0)
-                    /* This is a fatal error, because path may now
-                       have clobbered. */
-                    throw Error("cannot unpack " + prebuiltFile);
-
-                _exit(0);
-            }
-#endif
-
-            //             build:
+            if (chdir(tmpDir.c_str()) == -1)
+                throw SysError(format("changing into to `%1%'") % tmpDir);
 
             /* Fill in the environment.  We don't bother freeing
                the strings, since we'll exec or die soon
@@ -157,15 +148,7 @@ Hash hashTerm(ATerm t)
 }
 
 
-struct RStatus
-{
-    /* !!! the comparator of this hash should match the semantics of
-       the file system */
-//     map<string, Hash> paths;
-};
-
-
-static ATerm termFromHash(const Hash & hash)
+ATerm termFromHash(const Hash & hash)
 {
     string path = queryPathByHash(hash);
     ATerm t = ATreadFromNamedFile(path.c_str());
@@ -188,7 +171,7 @@ Hash writeTerm(ATerm t)
 }
 
 
-static FState realise(RStatus & status, FState fs)
+static FState realise(FState fs)
 {
     char * s1, * s2, * s3;
     Content content;
@@ -212,7 +195,7 @@ static FState realise(RStatus & status, FState fs)
     /* Fall through. */
 
     if (ATmatch(fs, "Include(<str>)", &s1)) {
-        return realise(status, termFromHash(parseHash(s1)));
+        return realise(termFromHash(parseHash(s1)));
     }
     
     else if (ATmatch(fs, "Path(<str>, <term>, [<list>])", &s1, &content, &refs)) {
@@ -227,7 +210,7 @@ static FState realise(RStatus & status, FState fs)
         /* Realise referenced paths. */
         ATermList refs2 = ATempty;
         while (!ATisEmpty(refs)) {
-            refs2 = ATinsert(refs2, realise(status, ATgetFirst(refs)));
+            refs2 = ATinsert(refs2, realise(ATgetFirst(refs)));
             refs = ATgetNext(refs);
         }
         refs2 = ATreverse(refs2);
@@ -278,7 +261,7 @@ static FState realise(RStatus & status, FState fs)
         /* Realise inputs. */
         ATermList ins2 = ATempty;
         while (!ATisEmpty(ins)) {
-            ins2 = ATinsert(ins2, realise(status, ATgetFirst(ins)));
+            ins2 = ATinsert(ins2, realise(ATgetFirst(ins)));
             ins = ATgetNext(ins);
         }
         ins2 = ATreverse(ins2);
@@ -335,6 +318,67 @@ static FState realise(RStatus & status, FState fs)
 
 FState realiseFState(FState fs)
 {
-    RStatus status;
-    return realise(status, fs);
+    return realise(fs);
+}
+
+
+string fstatePath(FState fs)
+{
+    char * s1, * s2, * s3;
+    FState e1, e2;
+    if (ATmatch(fs, "Path(<str>, <term>, [<list>])", &s1, &e1, &e2))
+        return s1;
+    else if (ATmatch(fs, "Derive(<str>, <str>, [<list>], <str>, [<list>])",
+                   &s1, &s2, &e1, &s3, &e2))
+        return s3;
+    else if (ATmatch(fs, "Include(<str>)", &s1))
+        return fstatePath(termFromHash(parseHash(s1)));
+    else
+        return "";
+}
+
+
+typedef set<string> StringSet;
+
+
+void fstateRefs2(FState fs, StringSet & paths)
+{
+    char * s1, * s2, * s3;
+    FState e1, e2;
+    ATermList refs, ins;
+
+    if (ATmatch(fs, "Path(<str>, <term>, [<list>])", &s1, &e1, &refs)) {
+        paths.insert(s1);
+
+        while (!ATisEmpty(refs)) {
+            fstateRefs2(ATgetFirst(refs), paths);
+            refs = ATgetNext(refs);
+        }
+    }
+
+    else if (ATmatch(fs, "Derive(<str>, <str>, [<list>], <str>, [<list>])", 
+            &s1, &s2, &ins, &s3, &e2))
+    {
+        paths.insert(s3);
+
+        while (!ATisEmpty(ins)) {
+            fstateRefs2(ATgetFirst(ins), paths);
+            ins = ATgetNext(ins);
+        }
+    }
+
+    else if (ATmatch(fs, "Include(<str>)", &s1))
+        fstateRefs2(termFromHash(parseHash(s1)), paths);
+
+    else throw badTerm("bad fstate expression", fs);
+}
+
+
+Strings fstateRefs(FState fs)
+{
+    StringSet paths;
+    fstateRefs2(fs, paths);
+    Strings paths2(paths.size());
+    copy(paths.begin(), paths.end(), paths2.begin());
+    return paths2;
 }
