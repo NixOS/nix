@@ -10,5 +10,6 @@ AC_CANONICAL_HOST
 AC_PROG_CC
 AC_PROG_CXX
 
-AC_CONFIG_FILES(Makefile src/Makefile src/nix-instantiate)
+AC_CONFIG_FILES([Makefile src/Makefile])
+AC_CONFIG_FILES([src/nix-instantiate], [chmod +x src/nix-instantiate])
 AC_OUTPUT
