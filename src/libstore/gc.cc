@@ -12,10 +12,24 @@
 #include <unistd.h>
 
 
+/* Acquire the global GC lock. */
+static AutoCloseFD openGCLock(LockType lockType)
+{
+#if 0
+    Path fnGCLock = (format("%1%/%2%/%3%")
+        % nixStateDir % tempRootsDir % getpid()).str();
+        
+    fdTempRoots = open(fnTempRoots.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
+    if (fdTempRoots == -1)
+        throw SysError(format("opening temporary roots file `%1%'") % fnTempRoots);
+#endif
+}
+
+
 static string tempRootsDir = "temproots";
 
 /* The file to which we write our temporary roots. */
-Path fnTempRoots;
+static Path fnTempRoots;
 static AutoCloseFD fdTempRoots;
 
 
@@ -213,6 +227,10 @@ void collectGarbage(const PathSet & roots, GCAction action,
         else
             tempRootsClosed.insert(*i);
 
+    /* For testing - see tests/gc-concurrent.sh. */
+    if (getenv("NIX_DEBUG_GC_WAIT"))
+        sleep(2);
+    
     /* After this point the set of roots or temporary roots cannot
        increase, since we hold locks on everything.  So everything
        that is not currently in in `livePaths' or `tempRootsClosed'
@@ -231,7 +249,7 @@ void collectGarbage(const PathSet & roots, GCAction action,
     /* !!! when we have multiple output paths per derivation, this
        will not work anymore because we get cycles. */
     storePaths = topoSort(storePaths2);
-    
+
     for (Paths::iterator i = storePaths.begin(); i != storePaths.end(); ++i) {
 
         debug(format("considering deletion of `%1%'") % *i);
