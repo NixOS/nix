@@ -12,7 +12,7 @@ class Db2 : public Db
 {
 public:
     Db2(DbEnv *env, u_int32_t flags) : Db(env, flags) { }
-    ~Db2() { close(0); }
+    ~Db2() { close(DB_NOSYNC); }
 };
 
 
