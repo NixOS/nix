@@ -4,9 +4,33 @@ use strict;
 use FileHandle;
 use File::Spec;
 
-my $outdir = $ARGV[0];
+my $outdir = File::Spec->rel2abs($ARGV[0]);
+my $netdir = File::Spec->rel2abs($ARGV[1]);
 
 my %donetmpls = ();
+
+sub fetchFile {
+    my $loc = shift;
+
+    if ($loc =~ /^([+\w\d\.\/-]+)$/) {
+	return $1;
+    } elsif ($loc =~ /^url\((.*)\)$/) {
+	my $url = $1;
+	$url =~ /\/([^\/]+)$/ || die "invalid url $url";
+	my $fn = "$netdir/$1";
+	if (! -f $fn) {
+	    print "fetching $url...\n";
+	    system "cd $netdir; wget --quiet -N $url";
+	    if ($? != 0) {
+		unlink($fn);
+		die;
+	    }
+	}
+	return $fn;
+    } else {
+	die "invalid file specified $loc";
+    }
+}
 
 sub convert {
     my $descr = shift;
@@ -28,9 +52,9 @@ sub convert {
     while (<$IN>) {
         chomp;
 
-        if (/^(\w+)\s*=\s*([+\w\d\.\/-]+)\s*(\#.*)?$/) {
-            my $name = $1;
-            my $file = $2;
+        if (/^(\w+)\s*=\s*([^\#\s]*)\s*(\#.*)?$/) {
+            my ($name, $loc) = ($1, $2);
+            my $file = fetchFile($loc);
             $file = File::Spec->rel2abs($file, $dir);
             my $out = `md5sum $file`;
             die unless ($? == 0);
@@ -56,6 +80,6 @@ sub convert {
     return $outfile;
 }
 
-for (my $i = 1; $i < scalar @ARGV; $i++) {
+for (my $i = 2; $i < scalar @ARGV; $i++) {
     convert(File::Spec->rel2abs($ARGV[$i]));
 }
