@@ -13,7 +13,7 @@ foreach my $id (@ARGV) {
 
     my @paths;
 
-    open PATHS, "nix --query --refs $id 2> /dev/null |" or die "nix -qr";
+    open PATHS, "nix --query --requisites --include-successors $id 2> /dev/null |" or die "nix -qr";
     while (<PATHS>) {
         chomp;
         die "bad: $_" unless /^\//;
@@ -22,13 +22,13 @@ foreach my $id (@ARGV) {
     close PATHS;
 
     # Also add all normal forms that are contained in these paths.
-    open PATHS, "nix --query --generators --path @paths |" or die "nix -qg";
-    while (<PATHS>) {
-	chomp;
-        die "bad: $_" unless /^\//;
-	push @paths, $_;
-    }
-    close PATHS;
+#    open PATHS, "nix --query --generators --path @paths |" or die "nix -qg";
+#    while (<PATHS>) {
+#	chomp;
+#        die "bad: $_" unless /^\//;
+#	push @paths, $_;
+#    }
+#    close PATHS;
 
     # For each path, create a Fix expression that turns the path into
     # a Nix archive.
