@@ -17,7 +17,7 @@ imports Fix-Exprs Fix-Layout
 module Fix-Exprs
 imports Fix-Lexicals URI
 exports
-  sorts Expr Bind
+  sorts Expr Bind Formal
   context-free syntax
 
     Id -> Expr {cons("Var")}
@@ -34,7 +34,9 @@ exports
 
     Expr Expr -> Expr {cons("Call"), left}
 
-    "{" {Id ","}* "}" ":" Expr -> Expr {cons("Function"), right}
+    "{" {Formal ","}* "}" ":" Expr -> Expr {cons("Function"), right}
+    Id -> Formal {cons("NoDefFormal")}
+    Id "?" Expr -> Formal {cons("DefFormal")}
 
     "rec" "{" Binds "}" -> Expr {cons("Rec")}
     "let" "{" Binds "}" -> Expr {cons("LetRec")}
@@ -62,7 +64,7 @@ exports
     Expr "." Id -> Expr
   > Expr ExprList -> ExprList
   > Expr Expr -> Expr
-  > "{" {Id ","}* "}" ":" Expr -> Expr
+  > "{" {Formal ","}* "}" ":" Expr -> Expr
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

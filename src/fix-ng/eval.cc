@@ -27,10 +27,13 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
     /* Get the formal arguments. */
     while (!ATisEmpty(formals)) {
         ATerm t = ATgetFirst(formals);
-        char * s;
-        if (!ATmatch(t, "<str>", &s))
-            abort(); /* can't happen */
-        subs.set(t, undefined);
+        Expr name, def;
+        debug(printTerm(t));
+        if (ATmatch(t, "NoDefFormal(<term>)", &name))
+            subs.set(name, undefined);
+        else if (ATmatch(t, "DefFormal(<term>, <term>)", &name, &def))
+            subs.set(name, def);
+        else abort(); /* can't happen */
         formals = ATgetNext(formals);
     }
 
@@ -44,7 +47,7 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
         Expr key = ATgetFirst(keys);
         Expr cur = subs.get(key);
         if (!cur)
-            throw badTerm(format("argument `%1%' not declared")
+            throw badTerm(format("function has no formal argument `%1%'")
                 % aterm2String(key), arg);
         subs.set(key, args.get(key));
     }

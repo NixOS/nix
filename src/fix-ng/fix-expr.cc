@@ -171,7 +171,10 @@ Expr substitute(const ATermMap & subs, Expr e)
         ATermMap subs2(subs);
         ATermList fs = formals;
         while (!ATisEmpty(fs)) {
-            if (!ATmatch(ATgetFirst(fs), "<str>", &s)) abort();
+            Expr def;
+            if (!ATmatch(ATgetFirst(fs), "NoDefFormal(<str>)", &s) &&
+                !ATmatch(ATgetFirst(fs), "DefFormal(<str>, <term>)", &s))
+                abort();
             subs2.remove(s);
             fs = ATgetNext(fs);
         }
