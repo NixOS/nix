@@ -8,10 +8,10 @@ rec {
     inherit main localIncludes;
   };
 
-  link = {objects}: stdenv.mkDerivation {
+  link = {objects, programName ? "program"}: stdenv.mkDerivation {
     name = "link";
     builder = ./link.sh;
-    inherit objects;
+    inherit objects programName;
   };
   
 }

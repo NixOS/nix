@@ -2,9 +2,11 @@
 
 objs=
 for i in "$objects"; do
-    obj=$i/*.o
+    obj=$(echo $i/*.o)
     objs="$objs $obj"
 done
 
+echo "linking object files into \`$programName'..."
+
 mkdir $out
-gcc -o $out/program $objs
+gcc -o $out/$programName $objs

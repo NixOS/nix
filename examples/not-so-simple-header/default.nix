@@ -2,7 +2,7 @@ let {
 
   inherit (import ../../lib) compileC link;
 
-  hello = link {objects = compileC {
+  hello = link {programName = "hello"; objects = compileC {
     main = ./foo/hello.c;
     localIncludes = [
       [./foo/fnord/indirect.h "fnord/indirect.h"]

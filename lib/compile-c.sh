@@ -2,7 +2,7 @@
 
 mainName=$(basename $main | cut -c34-)
 
-echo "compiling $mainName..."
+echo "compiling \`$mainName'..."
 
 # Turn $localIncludes into an array.
 localIncludes=($localIncludes)
@@ -67,4 +67,5 @@ done
 ln -s $main $prefix$mainName
 
 mkdir $out
-gcc -Wall -c $prefix$mainName -o $out/$mainName.o
+test "$prefix" && cd $prefix
+gcc -Wall -c $mainName -o $out/$mainName.o
