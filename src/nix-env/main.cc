@@ -18,6 +18,7 @@ struct Globals
     EvalState state;
     bool dryRun;
     bool preserveInstalled;
+    string systemFilter;
 };
 
 
@@ -116,11 +117,20 @@ bool parseDerivations(EvalState & state, Expr e, DrvInfos & drvs)
 }
 
 
-void loadDerivations(EvalState & state, Path nePath, DrvInfos & drvs)
+void loadDerivations(EvalState & state, Path nePath, DrvInfos & drvs,
+    string systemFilter)
 {
     Expr e = parseExprFromFile(state, absPath(nePath));
     if (!parseDerivations(state, e, drvs))
         throw Error("set of derivations expected");
+
+    /* Filter out all derivations not applicable to the current
+       system. */
+    for (DrvInfos::iterator i = drvs.begin(), j; i != drvs.end(); i = j) {
+        j = i; j++;
+        if (systemFilter != "*" && i->second.system != systemFilter)
+            drvs.erase(i);
+    }
 }
 
 
@@ -235,13 +245,13 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
 
 static void installDerivations(EvalState & state,
     Path nePath, DrvNames & selectors, const Path & profile,
-    bool dryRun, bool preserveInstalled)
+    bool dryRun, bool preserveInstalled, string systemFilter)
 {
     debug(format("installing derivations from `%1%'") % nePath);
 
     /* Fetch all derivations from the input file. */
     DrvInfos availDrvs;
-    loadDerivations(state, nePath, availDrvs);
+    loadDerivations(state, nePath, availDrvs, systemFilter);
 
     /* Filter out the ones we're not interested in. */
     DrvInfos selectedDrvs;
@@ -302,7 +312,7 @@ static void opInstall(Globals & globals,
     
     installDerivations(globals.state, globals.nixExprPath,
         drvNames, globals.profile, globals.dryRun,
-        globals.preserveInstalled);
+        globals.preserveInstalled, globals.systemFilter);
 }
 
 
@@ -311,7 +321,7 @@ typedef enum { utLt, utLeq, utAlways } UpgradeType;
 
 static void upgradeDerivations(EvalState & state,
     Path nePath, DrvNames & selectors, const Path & profile,
-    UpgradeType upgradeType, bool dryRun)
+    UpgradeType upgradeType, bool dryRun, string systemFilter)
 {
     debug(format("upgrading derivations from `%1%'") % nePath);
 
@@ -326,7 +336,7 @@ static void upgradeDerivations(EvalState & state,
 
     /* Fetch all derivations from the input file. */
     DrvInfos availDrvs;
-    loadDerivations(state, nePath, availDrvs);
+    loadDerivations(state, nePath, availDrvs, systemFilter);
 
     /* Go through all installed derivations. */
     DrvInfos newDrvs;
@@ -412,7 +422,8 @@ static void opUpgrade(Globals & globals,
     DrvNames drvNames = drvNamesFromArgs(opArgs);
     
     upgradeDerivations(globals.state, globals.nixExprPath,
-        drvNames, globals.profile, upgradeType, globals.dryRun);
+        drvNames, globals.profile, upgradeType, globals.dryRun,
+        globals.systemFilter);
 }
 
 
@@ -465,7 +476,7 @@ typedef list<Strings> Table;
 
 void printTable(Table & table)
 {
-    int nrColumns = table.front().size();
+    int nrColumns = table.size() > 0 ? table.front().size() : 0;
     
     vector<int> widths;
     widths.resize(nrColumns);
@@ -520,7 +531,8 @@ static void opQuery(Globals & globals,
             break;
 
         case sAvailable: {
-            loadDerivations(globals.state, globals.nixExprPath, drvs);
+            loadDerivations(globals.state, globals.nixExprPath,
+                drvs, globals.systemFilter);
             break;
         }
 
@@ -702,6 +714,7 @@ void run(Strings args)
     globals.nixExprPath = getDefNixExprPath();
     globals.dryRun = false;
     globals.preserveInstalled = false;
+    globals.systemFilter = thisSystem;
 
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
         string arg = *i;
@@ -744,6 +757,12 @@ void run(Strings args)
         }
         else if (arg == "--preserve-installed" || arg == "-P")
             globals.preserveInstalled = true;
+        else if (arg == "--system-filter") {
+            ++i;
+            if (i == args.end()) throw UsageError(
+                format("`%1%' requires an argument") % arg);
+            globals.systemFilter = *i;
+        }
         else if (arg[0] == '-')
             opFlags.push_back(arg);
         else
