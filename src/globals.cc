@@ -6,7 +6,7 @@ string dbRefs = "refs";
 string dbNFs = "nfs";
 string dbNetSources = "netsources";
 
-string nixValues = "/UNINIT";
+string nixStore = "/UNINIT";
 string nixLogDir = "/UNINIT";
 string nixDB = "/UNINIT";
 

@@ -7,7 +7,10 @@
 
 #include <unistd.h>
 
+#include <boost/format.hpp>
+
 using namespace std;
+using namespace boost;
 
 
 class Error : public exception
@@ -16,7 +19,7 @@ protected:
     string err;
 public:
     Error() { }
-    Error(string _err) { err = _err; }
+    Error(format f) { err = f.str(); }
     ~Error() throw () { }
     const char * what() const throw () { return err.c_str(); }
 };
@@ -59,7 +62,7 @@ string baseNameOf(string path);
 void deletePath(string path);
 
 
-void debug(string s);
+void debug(const format & f);
 
 
 #endif /* !__UTIL_H */

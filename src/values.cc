@@ -34,7 +34,7 @@ struct CopySource : RestoreSource
 };
 
 
-static void copyFile(string src, string dst)
+void copyFile(string src, string dst)
 {
     /* Unfortunately C++ doesn't support coprocedures, so we have no
        nice way to chain CopySink and CopySource together.  Instead we
@@ -83,33 +83,25 @@ static void copyFile(string src, string dst)
 }
 
 
-static string absValuePath(string s)
+void addToStore(string srcPath, string & dstPath, Hash & hash)
 {
-    return nixValues + "/" + s;
-}
+    srcPath = absPath(srcPath);
 
+    hash = hashPath(srcPath);
 
-Hash addValue(string path)
-{
-    path = absPath(path);
-
-    Hash hash = hashPath(path);
-
-    string name;
-    if (queryDB(nixDB, dbRefs, hash, name)) {
+    string path;
+    if (queryDB(nixDB, dbRefs, hash, path)) {
         debug((string) hash + " already known");
-        return hash;
+        dstPath = path;
+        return;
     }
 
-    string baseName = baseNameOf(path);
-    
-    string targetName = (string) hash + "-" + baseName;
+    string baseName = baseNameOf(srcPath);
+    dstPath = nixStore + "/" + (string) hash + "-" + baseName;
 
-    copyFile(path, absValuePath(targetName));
+    copyFile(srcPath, dstPath);
 
-    setDB(nixDB, dbRefs, hash, targetName);
-    
-    return hash;
+    setDB(nixDB, dbRefs, hash, dstPath);
 }
 
 
@@ -135,28 +127,28 @@ string fetchURL(string url)
 #endif
 
 
-void deleteValue(Hash hash)
+void deleteFromStore(Hash hash)
 {
-    string name;
-    if (queryDB(nixDB, dbRefs, hash, name)) {
-        string fn = absValuePath(name);
+    string fn;
+    if (queryDB(nixDB, dbRefs, hash, fn)) {
+        string prefix = nixStore + "/";
+        if (string(fn, prefix.size()) != prefix)
+            throw Error("path " + fn + " is not in the store");
         deletePath(fn);
         delDB(nixDB, dbRefs, hash);
     }
 }
 
 
-/* !!! bad name, "query" implies no side effect => getValuePath() */
-string queryValuePath(Hash hash)
+string queryFromStore(Hash hash)
 {
     bool checkedNet = false;
 
     while (1) {
 
-        string name, url;
+        string fn, url;
 
-        if (queryDB(nixDB, dbRefs, hash, name)) {
-            string fn = absValuePath(name);
+        if (queryDB(nixDB, dbRefs, hash, fn)) {
 
             /* Verify that the file hasn't changed. !!! race !!! slow */
             if (hashPath(fn) != hash)

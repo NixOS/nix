@@ -11,20 +11,16 @@
 #include "globals.hh"
 
 
-typedef Expr (* Normaliser) (Expr);
-
-
-void eval(Normaliser n, Expr e)
+void realise(FState fs)
 {
-    e = n(e);
-    cout << (string) hashExpr(e) << ": " << printExpr(e) << endl;
+    realiseFState(fs);
 }
 
 
-void evalFail(Normaliser n, Expr e)
+void realiseFail(FState fs)
 {
     try {
-        e = n(e);
+        realiseFState(fs);
         abort();
     } catch (Error e) {
         cout << "error (expected): " << e.what() << endl;
@@ -96,7 +92,7 @@ void runTests()
     string testDir = absPath("scratch");
     cout << testDir << endl;
 
-    nixValues = testDir;
+    nixStore = testDir;
     nixLogDir = testDir;
     nixDB = testDir + "/db";
 
@@ -104,6 +100,7 @@ void runTests()
 
     /* Expression evaluation. */
 
+#if 0
     eval(whNormalise,
         ATmake("Str(\"Hello World\")"));
     eval(whNormalise,
@@ -138,10 +135,27 @@ void runTests()
     eval(fNormalise, e2);
 
     realise(e2);
+#endif
+
+    Hash builder1h;
+    string builder1fn;
+    addToStore("./test-builder-1.sh", builder1fn, builder1h);
+
+    FState fs1 = ATmake(
+        "File(<str>, Hash(<str>), [])", 
+        builder1fn.c_str(),
+        ((string) builder1h).c_str());
+    realiseFState(fs1);
+    realiseFState(fs1);
+
+    FState fs2 = ATmake(
+        "File(<str>, Hash(<str>), [])", 
+        (builder1fn + "_bla").c_str(),
+        ((string) builder1h).c_str());
+    realiseFState(fs2);
+    realiseFState(fs2);
 
 #if 0
-    Hash builder1 = addValue("./test-builder-1.sh");
-
     Expr e1 = ATmake("Exec(Str(<str>), Hash(<str>), [])",
         thisSystem.c_str(), ((string) builder1).c_str());
 

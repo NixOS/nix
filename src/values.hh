@@ -8,21 +8,17 @@
 using namespace std;
 
 
-/* Copy a value to the nixValues directory and register it in dbRefs.
+void copyFile(string src, string dst);
+
+/* Copy a file to the nixStore directory and register it in dbRefs.
    Return the hash code of the value. */
-Hash addValue(string pathName);
+void addToStore(string srcPath, string & dstPath, Hash & hash);
 
+/* Delete a value from the nixStore directory. */
+void deleteFromStore(Hash hash);
 
-/* Delete a value from the nixValues directory. */
-void deleteValue(Hash hash);
-
-
-/* Obtain the path of a value with the given hash.  If a file with
-   that hash is known to exist in the local file system (as indicated
-   by the dbRefs database), we use that.  Otherwise, we attempt to
-   fetch it from the network (using dbNetSources).  We verify that the
-   file has the right hash. */
-string queryValuePath(Hash hash);
+/* !!! */
+string queryFromStore(Hash hash);
 
 
 #endif /* !__VALUES_H */

@@ -8,15 +8,10 @@ using namespace std;
 
 /* Database names. */
 
-/* dbRefs :: Hash -> FileName
+/* dbRefs :: Hash -> Path
 
-   Maintains a mapping from hashes to filenames within the NixValues
-   directory.  This mapping is for performance only; it can be
-   reconstructed unambiguously.  The reason is that names in this
-   directory are not printed hashes but also might carry some
-   descriptive element (e.g., "aterm-2.0-ae749a...").  Without this
-   mapping, looking up a value would take O(n) time because we would
-   need to read the entire directory. */
+   Maintains a mapping from hashes to paths.  This is what we use to
+   resolve CHash(hash) content descriptors. */
 extern string dbRefs;
 
 /* dbNFs :: Hash -> Hash
@@ -45,11 +40,11 @@ extern string dbNetSources;
 
 /* Path names. */
 
-/* nixValues is the directory where all Nix values (both files and
-   directories, and both normal and non-normal forms) live. */
-extern string nixValues;
+/* nixStore is the directory where we generally store atomic and
+   derived files. */
+extern string nixStore;
 
-/* nixLogDir is the directory where we log evaluations. */ 
+/* nixLogDir is the directory where we log various operations. */ 
 extern string nixLogDir;
 
 /* nixDB is the file name of the Berkeley DB database where we

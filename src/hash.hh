@@ -17,10 +17,10 @@ struct Hash
     Hash();
 
     /* Check whether two hash are equal. */
-    bool operator == (Hash & h2);
+    bool operator == (Hash h2);
 
     /* Check whether two hash are not equal. */
-    bool operator != (Hash & h2);
+    bool operator != (Hash h2);
 
     /* Convert a hash code into a hexadecimal representation. */
     operator string() const;

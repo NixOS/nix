@@ -78,7 +78,7 @@ void deletePath(string path)
 }
 
 
-void debug(string s)
+void debug(const format & f)
 {
-    cerr << "debug: " << s << endl;
+    cerr << format("debug: %1%\n") % f.str();
 }

@@ -30,6 +30,7 @@ bool pathExists(string path)
 }
 
 
+#if 0
 /* Compute a derived value by running a program. */
 static Hash computeDerived(Hash sourceHash, string targetName,
     string platform, Hash prog, Environment env)
@@ -175,6 +176,7 @@ static Hash computeDerived(Hash sourceHash, string targetName,
 
     return targetHash;
 }
+#endif
 
 
 /* Throw an exception if the given platform string is not supported by
@@ -182,52 +184,30 @@ static Hash computeDerived(Hash sourceHash, string targetName,
 static void checkPlatform(string platform)
 {
     if (platform != thisSystem)
-        throw Error("a `" + platform +
-            "' is required, but I am a `" + thisSystem + "'");
+        throw Error(format("a `%1%' is required, but I am a `%2%'")
+            % platform % thisSystem);
 }
 
 
-string printExpr(Expr e)
+string printTerm(ATerm t)
 {
-    char * s = ATwriteToString(e);
+    char * s = ATwriteToString(t);
     return s;
 }
 
 
 /* Throw an exception with an error message containing the given
    aterm. */
-static Error badTerm(const string & msg, Expr e)
+static Error badTerm(const format & f, ATerm t)
 {
-    return Error(msg + ", in `" + printExpr(e) + "'");
+    return Error(format("%1%, in `%2%'") % f.str() % printTerm(t));
 }
 
 
-Hash hashExpr(Expr e)
+Hash hashTerm(ATerm t)
 {
-    return hashString(printExpr(e));
+    return hashString(printTerm(t));
 }
-
-
-/* Evaluate an expression; the result must be a string. */
-static string evalString(Expr e)
-{
-    e = whNormalise(e);
-    char * s;
-    if (ATmatch(e, "Str(<str>)", &s)) return s;
-    else throw badTerm("string value expected", e);
-}
-
-
-#if 0
-/* Evaluate an expression; the result must be a value reference. */
-static Hash evalHash(Expr e)
-{
-    e = evalValue(e);
-    char * s;
-    if (ATmatch(e, "Hash(<str>)", &s)) return parseHash(s);
-    else throw badTerm("value reference expected", e);
-}
-#endif
 
 
 #if 0
@@ -262,225 +242,63 @@ void evalArgs(ATermList args, ATermList & argsNF, Environment & env)
 #endif
 
 
-Expr substExpr(string x, Expr rep, Expr e)
-{
-    char * s;
-    Expr e2;
-
-    if (ATmatch(e, "Var(<str>)", &s))
-        if (x == s)
-            return rep;
-        else
-            return e;
-
-    if (ATmatch(e, "Lam(<str>, <term>)", &s, &e2))
-        if (x == s)
-            return e;
-    /* !!! unfair substitutions */
-
-    /* Generically substitute in subterms. */
-
-    if (ATgetType(e) == AT_APPL) {
-        AFun fun = ATgetAFun(e);
-        int arity = ATgetArity(fun);
-        ATermList args = ATempty;
-
-        for (int i = arity - 1; i >= 0; i--)
-            args = ATinsert(args, substExpr(x, rep, ATgetArgument(e, i)));
-        
-        return (ATerm) ATmakeApplList(fun, args);
-    }
-
-    if (ATgetType(e) == AT_LIST) {
-        ATermList in = (ATermList) e;
-        ATermList out = ATempty;
-
-        while (!ATisEmpty(in)) {
-            out = ATinsert(out, substExpr(x, rep, ATgetFirst(in)));
-            in = ATgetNext(in);
-        }
-
-        return (ATerm) ATreverse(out);
-    }
-
-    throw badTerm("do not know how to substitute", e);
-}
-
-
-#if 0
-Expr evalValue(Expr e)
-{
-    char * s;
-    Expr eBuildPlatform, eProg, e2, e3, e4;
-    ATermList args;
-
-    /* Value references. */
-    if (ATmatch(e, "Hash(<str>)", &s)) {
-        parseHash(s); /* i.e., throw exception if not valid */
-        return e;
-    }
-
-    /* External expression. */
-    if (ATmatch(e, "Deref(<term>)", &e2)) {
-        string fn = queryValuePath(evalHash(e2));
-        ATerm e3 = ATreadFromNamedFile(fn.c_str());
-        if (!e3) throw Error("reading aterm from " + fn);
-        return evalValue(e3);
-    }
-
-    /* Execution primitive. */
-
-    if (ATmatch(e, "Exec(<term>, <term>, [<list>])",
-                 &eBuildPlatform, &eProg, &args))
-    {
-        string buildPlatform = evalString(eBuildPlatform);
-
-        checkPlatform(buildPlatform);
-
-        Hash prog = evalHash(eProg);
-
-        Environment env;
-        ATermList argsNF;
-        evalArgs(args, argsNF, env);
-
-        Hash sourceHash = hashExpr(
-            ATmake("Exec(Str(<str>), Hash(<str>), <term>)",
-                buildPlatform.c_str(), ((string) prog).c_str(), argsNF));
-
-        /* Do we know a normal form for sourceHash? */
-        Hash targetHash;
-        string targetHashS;
-        if (queryDB(nixDB, dbNFs, sourceHash, targetHashS)) {
-            /* Yes. */
-            targetHash = parseHash(targetHashS);
-            debug("already built: " + (string) sourceHash 
-                + " -> " + (string) targetHash);
-        } else {
-            /* No, so we compute one. */
-            targetHash = computeDerived(sourceHash, 
-                (string) sourceHash + "-nf", buildPlatform, prog, env);
-        }
-
-        return ATmake("Hash(<str>)", ((string) targetHash).c_str());
-    }
-
-    /* Barf. */
-    throw badTerm("invalid expression", e);
-}
-#endif
-
-
-Expr whNormalise(Expr e)
-{
-    char * s;
-    Expr e2, e3, e4, e5;
-
-    /* Normal forms. */
-    if (ATmatch(e, "Str(<str>)", &s) ||
-        ATmatch(e, "Bool(True)") || 
-        ATmatch(e, "Bool(False)") ||
-        ATmatch(e, "Lam(<str>, <term>)", &s, &e2) ||
-        ATmatch(e, "File(<str>, <term>, <term>)", &s, &e2, &e3) ||
-        ATmatch(e, "Derive(<term>, <term>, <term>, <term>)", &e2, &e3, &e4, &e5))
-        return e;
-
-    /* Application. */
-    if (ATmatch(e, "App(<term>, <term>)", &e2, &e3)) {
-        e2 = whNormalise(e2);
-        if (!ATmatch(e2, "Lam(<str>, <term>)", &s, &e4))
-            throw badTerm("expecting lambda", e2);
-        return whNormalise(substExpr(s, e3, e4));
-    }
-
-    throw badTerm("invalid expression", e);
-}
-
-
-Expr dNormalise(Expr e)
-{
-    e = whNormalise(e);
-    /* !!! todo */
-    return e;
-}
-
-
-Expr fNormalise(Expr e)
-{
-    e = dNormalise(e);
-
-    char * s;
-    Expr e2, e3;
-
-    if (ATmatch(e, "File(<str>, <term>, [<list>])", &s, &e2, &e3)) {
-
-        ATermList refs = (ATermList) e3, refs2 = ATempty;
-        while (!ATisEmpty(refs)) {
-            ATerm ref = ATgetFirst(refs);
-            refs2 = ATinsert(refs2, fNormalise(ref));
-            refs = ATgetNext(refs);
-        }
-        refs2 = ATreverse(refs2);
-
-        return ATmake("File(<str>, <term>, <term>)", s, e2, refs2);
-
-    }
-
-    else return e;
-}
-
-
-void writeContent(string path, Content content)
-{
-    char * s;
-
-    if (ATmatch(content, "Regular(<str>)", &s)) {
-
-        int fd; /* !!! close on exception */
-        fd = open(path.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0666);
-        if (fd == -1)
-            throw SysError("creating file " + path);
-
-        int len = strlen(s);
-        if (write(fd, s, len) != len)
-            throw SysError("writing file " + path);
-
-        close(fd);
-    }
-    
-    else throw badTerm("ill-formed content", content);
-}
-
-
 struct RStatus
 {
     /* !!! the comparator of this hash should match the semantics of
        the file system */
-    map<string, Hash> paths;
+//     map<string, Hash> paths;
 };
 
 
-static void realise2(RStatus & status, Expr e)
+static void realise(RStatus & status, FState fs)
 {
     char * s;
     Content content;
     ATermList refs;
     
-    if (!ATmatch(e, "File(<str>, <term>, [<list>])", &s, &content, &refs))
-        throw badTerm("not f-normalised", e);
+    if (ATmatch(fs, "File(<str>, <term>, [<list>])", &s, &content, &refs)) {
+        string path(s);
 
-    string path(s);
+        if (path[0] != '/') throw Error("absolute path expected: " + path);
 
-    while (!ATisEmpty(refs)) {
-        realise2(status, ATgetFirst(refs));
-        refs = ATgetNext(refs);
+        /* Realise referenced paths. */
+        while (!ATisEmpty(refs)) {
+            realise(status, ATgetFirst(refs));
+            refs = ATgetNext(refs);
+        }
+
+        if (!ATmatch(content, "Hash(<str>)", &s))
+            throw badTerm("hash expected", content);
+        Hash hash = parseHash(s);
+
+        /* Perhaps the path already exists and has the right hash? */
+        if (pathExists(path)) {
+            if (hash == hashPath(path)) {
+                debug(format("path %1% already has hash %2%")
+                    % path % (string) hash);
+                return;
+            }
+
+            throw Error(format("path %1% exists, but does not have hash %2%")
+                % path % (string) hash);
+        }
+
+        /* Do we know a path with that hash?  If so, copy it. */
+        string path2 = queryFromStore(hash);
+        copyFile(path2, path);
     }
-    
-    writeContent(path, content);
+
+    else if (ATmatch(fs, "Derive()")) {
+        
+        
+    }
+
+    else throw badTerm("bad file system state expression", fs);
 }
 
 
-void realise(Expr e)
+void realiseFState(FState fs)
 {
     RStatus status;
-    realise2(status, e);
+    realise(status, fs);
 }
