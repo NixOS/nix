@@ -105,6 +105,25 @@ Hash registerPath(const string & _path, Hash hash)
 }
 
 
+void unregisterPath(const string & _path)
+{
+    string path(canonPath(_path));
+
+    Hash hash = hashPath(path);
+    
+    Strings paths, paths2;
+    queryListDB(nixDB, dbHash2Paths, hash, paths); /* non-existence = ok */
+
+    bool changed = false;
+    for (Strings::iterator it = paths.begin();
+         it != paths.end(); it++)
+        if (*it != path) paths2.push_back(*it); else changed = true;
+
+    if (changed)
+        setListDB(nixDB, dbHash2Paths, hash, paths2);
+}
+
+
 bool isInPrefix(const string & path, const string & _prefix)
 {
     string prefix = canonPath(_prefix + "/");
@@ -171,6 +190,8 @@ void deleteFromStore(const string & path)
     string prefix = nixStore + "/";
     if (string(path, 0, prefix.size()) != prefix)
         throw Error(format("path %1% is not in the store") % path);
+
+    unregisterPath(path);
+
     deletePath(path);
-//     delDB(nixDB, dbHash2Paths, hash);
 }
