@@ -237,6 +237,30 @@ void registerSuccessor(const Transaction & txn,
 }
 
 
+void unregisterSuccessor(const Path & srcPath)
+{
+    assertStorePath(srcPath);
+
+    Transaction txn(nixDB);
+
+    Path sucPath;
+    if (!nixDB.queryString(txn, dbSuccessors, srcPath, sucPath)) {
+        txn.abort();
+        return;
+    }
+    nixDB.delPair(txn, dbSuccessors, srcPath);
+
+    Paths revs;
+    nixDB.queryStrings(txn, dbSuccessorsRev, sucPath, revs);
+    Paths::iterator i = find(revs.begin(), revs.end(), srcPath);
+    assert(i != revs.end());
+    revs.erase(i);
+    nixDB.setStrings(txn, dbSuccessorsRev, sucPath, revs);
+
+    txn.commit();
+}
+
+
 bool querySuccessor(const Path & srcPath, Path & sucPath)
 {
     return nixDB.queryString(noTxn, dbSuccessors, srcPath, sucPath);
@@ -294,10 +318,7 @@ static void writeSubstitutes(const Transaction & txn,
         ss.push_back(packStrings(ss2));
     }
 
-    if (ss.size() == 0)
-        nixDB.delPair(txn, dbSubstitutes, srcPath);
-    else
-        nixDB.setStrings(txn, dbSubstitutes, srcPath, ss);
+    nixDB.setStrings(txn, dbSubstitutes, srcPath, ss);
 }
 
 

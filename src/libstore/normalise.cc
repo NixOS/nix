@@ -201,10 +201,27 @@ void Goal::waiteeDone(GoalPtr waitee, bool success)
 {
     assert(waitees.find(waitee) != waitees.end());
     waitees.erase(waitee);
-    assert(nrWaitees > 0);
+    
     if (!success) ++nrFailed;
-    if (!--nrWaitees || (!success && !keepGoing))
+    
+    assert(nrWaitees > 0);
+    if (!--nrWaitees || (!success && !keepGoing)) {
+
+        /* If we failed and keepGoing is not set, we remove all
+           remaining waitees. */
+        for (Goals::iterator i = waitees.begin(); i != waitees.end(); ++i) {
+            GoalPtr goal = *i;
+            WeakGoals waiters2;
+            for (WeakGoals::iterator j = goal->waiters.begin();
+                 j != goal->waiters.end(); ++j)
+                if (j->lock() != shared_from_this())
+                    waiters2.insert(*j);
+            goal->waiters = waiters2;
+        }
+        waitees.clear();
+        
         worker.wakeUp(shared_from_this());
+    }
 }
 
 
@@ -268,6 +285,17 @@ const char * * strings2CharPtrs(const Strings & ss)
         *p++ = i->c_str();
     *p = 0;
     return arr;
+}
+
+
+/* Should only be called after an expression has been normalised. */
+Path queryNormalForm(const Path & nePath)
+{
+    StoreExpr ne = storeExprFromPath(nePath);
+    if (ne.type == StoreExpr::neClosure) return nePath;
+    Path nfPath;
+    if (!querySuccessor(nePath, nfPath)) abort();
+    return nfPath;
 }
 
 
@@ -472,13 +500,7 @@ void NormalisationGoal::inputNormalised()
     /* Inputs must also be realised before we can build this goal. */
     for (PathSet::iterator i = expr.derivation.inputs.begin();
          i != expr.derivation.inputs.end(); ++i)
-    {
-        Path neInput = *i, nfInput;
-        if (querySuccessor(neInput, nfInput))
-            neInput = nfInput;
-        /* Otherwise the input must be a closure. */
-        addWaitee(worker.makeRealisationGoal(neInput));
-    }
+        addWaitee(worker.makeRealisationGoal(queryNormalForm(*i)));
     
     resetWaitees(expr.derivation.inputs.size());
 
@@ -829,8 +851,8 @@ bool NormalisationGoal::prepareBuild()
          i != expr.derivation.inputs.end(); ++i)
     {
         checkInterrupt();
-        Path nePath = *i, nfPath;
-        if (!querySuccessor(nePath, nfPath)) nfPath = nePath;
+        Path nePath = *i;
+        Path nfPath = queryNormalForm(nePath);
         inputNFs.insert(nfPath);
         if (nfPath != nePath) inputSucs[nePath] = nfPath;
         /* !!! nfPath should be a root of the garbage collector while
@@ -1174,8 +1196,14 @@ string NormalisationGoal::name()
 class RealisationGoal : public Goal
 {
 private:
-    /* The path of the closure store expression. */
+    /* The path of the store expression. */
     Path nePath;
+
+    /* The normal form. */
+    Path nfPath;
+
+    /* Whether we should try to delete a broken successor mapping. */
+    bool tryFallback;
 
     /* The store expression stored at nePath. */
     StoreExpr expr;
@@ -1191,9 +1219,12 @@ public:
     
     /* The states. */
     void init();
+    void isNormalised();
     void haveStoreExpr();
     void elemFinished();
 
+    void fallBack(const format & error);
+    
     string name();
 };
 
@@ -1202,6 +1233,7 @@ RealisationGoal::RealisationGoal(const Path & _nePath, Worker & _worker)
     : Goal(_worker)
 {
     nePath = _nePath;
+    tryFallback = ::tryFallback;
     state = &RealisationGoal::init;
 }
 
@@ -1221,11 +1253,36 @@ void RealisationGoal::init()
 {
     trace("init");
 
-    /* The first thing to do is to make sure that the store expression
-       exists.  If it doesn't, it may be created through a
-       substitute. */
+    if (querySuccessor(nePath, nfPath)) {
+        isNormalised();
+        return;
+    }
+
+    /* First normalise the expression (which is a no-op if the
+       expression is already a closure). */
     resetWaitees(1);
-    addWaitee(worker.makeSubstitutionGoal(nePath));
+    addWaitee(worker.makeNormalisationGoal(nePath));
+
+    /* Since there is no successor right now, the normalisation goal
+       will perform an actual build.  So there is no sense in trying a
+       fallback if the realisation of the closure fails (it can't
+       really fail). */
+    tryFallback = false;
+
+    state = &RealisationGoal::isNormalised;
+}
+
+
+void RealisationGoal::isNormalised()
+{
+    trace("has been normalised");
+
+    nfPath = queryNormalForm(nePath);
+
+    /* Now make sure that the store expression exists.  If it doesn't,
+       it may be created through a substitute. */
+    resetWaitees(1);
+    addWaitee(worker.makeSubstitutionGoal(nfPath));
 
     state = &RealisationGoal::haveStoreExpr;
 }
@@ -1236,21 +1293,18 @@ void RealisationGoal::haveStoreExpr()
     trace("loading store expression");
 
     if (nrFailed != 0) {
-        printMsg(lvlError,
-            format("cannot realise missing store expression `%1%'")
-            % nePath);
-        amDone(false);
+        fallBack(format("cannot realise closure `%1%' since that file is missing") % nfPath);
         return;
     }
 
-    assert(isValidPath(nePath));
+    assert(isValidPath(nfPath));
 
     /* Get the store expression. */
-    expr = storeExprFromPath(nePath);
+    expr = storeExprFromPath(nfPath);
 
     /* If this is a normal form (i.e., a closure) we are also done. */
     if (expr.type != StoreExpr::neClosure)
-        throw Error(format("expected closure in `%1%'") % nePath);
+        throw Error(format("expected closure in `%1%'") % nfPath);
 
     /* Each path in the closure should exist, or should be creatable
        through a substitute. */
@@ -1269,16 +1323,30 @@ void RealisationGoal::elemFinished()
     trace("all closure elements present");
 
     if (nrFailed != 0) {
-        printMsg(lvlError,
+        fallBack(
             format("cannot realise closure `%1%': "
                 "%2% closure element(s) are not present "
                 "and could not be substituted")
-            % nePath % nrFailed);
-        amDone(false);
+            % nfPath % nrFailed);
         return;
     }
 
     amDone();
+}
+
+
+void RealisationGoal::fallBack(const format & error)
+{
+    if (tryFallback && nePath != nfPath) {
+        printMsg(lvlError, format("%1%; trying to normalise derivation instead")
+            % error);
+        tryFallback = false;
+        unregisterSuccessor(nePath);
+        init();
+    } else {
+        printMsg(lvlError, format("%1%; maybe `--fallback' will help") % error);
+        amDone(false);
+    }
 }
 
 
@@ -1409,8 +1477,7 @@ void SubstitutionGoal::exprNormalised()
     }
 
     /* Realise the substitute store expression. */
-    if (!querySuccessor(sub.storeExpr, nfSub))
-        nfSub = sub.storeExpr;
+    nfSub = queryNormalForm(sub.storeExpr);
     addWaitee(worker.makeRealisationGoal(nfSub));
 
     resetWaitees(1);
@@ -1869,19 +1936,19 @@ Path normaliseStoreExpr(const Path & nePath)
     if (!worker.run(worker.makeNormalisationGoal(nePath)))
         throw Error(format("normalisation of store expression `%1%' failed") % nePath);
 
-    Path nfPath;
-    if (!querySuccessor(nePath, nfPath)) abort();
-    return nfPath;
+    return queryNormalForm(nePath);
 }
 
 
-void realiseClosure(const Path & nePath)
+Path realiseStoreExpr(const Path & nePath)
 {
-    startNest(nest, lvlDebug, format("realising closure `%1%'") % nePath);
+    startNest(nest, lvlDebug, format("realising `%1%'") % nePath);
 
     Worker worker;
     if (!worker.run(worker.makeRealisationGoal(nePath)))
-        throw Error(format("realisation of closure `%1%' failed") % nePath);
+        throw Error(format("realisation of store expressions `%1%' failed") % nePath);
+
+    return queryNormalForm(nePath);
 }
 
 

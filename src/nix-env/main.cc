@@ -213,8 +213,7 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
     
     /* Realise the resulting store expression. */
     debug(format("realising user environment"));
-    Path nfPath = normaliseStoreExpr(topLevelDrv.drvPath);
-    realiseClosure(nfPath);
+    Path nfPath = realiseStoreExpr(topLevelDrv.drvPath);
 
     /* Switch the current user environment to the output path. */
     debug(format("switching to new user environment"));

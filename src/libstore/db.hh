@@ -76,7 +76,8 @@ public:
         const string & key, const string & data);
 
     void setStrings(const Transaction & txn, TableId table,
-        const string & key, const Strings & data);
+        const string & key, const Strings & data,
+        bool deleteEmpty = true);
 
     void delPair(const Transaction & txn, TableId table,
         const string & key);

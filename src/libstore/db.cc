@@ -366,9 +366,12 @@ void Database::setString(const Transaction & txn, TableId table,
 
 
 void Database::setStrings(const Transaction & txn, TableId table,
-    const string & key, const Strings & data)
+    const string & key, const Strings & data, bool deleteEmpty)
 {
-    setString(txn, table, key, packStrings(data));
+    if (deleteEmpty && data.size() == 0)
+        delPair(txn, table, key);
+    else
+        setString(txn, table, key, packStrings(data));
 }
 
 

@@ -10,13 +10,13 @@
    successor is known. */
 Path normaliseStoreExpr(const Path & nePath);
 
-/* Realise a closure store expression in the file system. 
-
-   The pending paths are those that are already being realised.  This
-   prevents infinite recursion for paths realised through a substitute
-   (since when we build the substitute, we would first try to realise
-   its output paths through substitutes... kaboom!). */
-void realiseClosure(const Path & nePath);
+/* Realise a store expression.  If the expression is a derivation, it
+   is first normalised into a closure.  The closure is then realised
+   in the file system (i.e., it is ensured that each path in the
+   closure exists in the file system, if necessary by using the
+   substitute mechanism).  Returns the normal form of the expression
+   (i.e., its closure expression). */
+Path realiseStoreExpr(const Path & nePath);
 
 /* Ensure that a path exists, possibly by instantiating it by
    realising a substitute. */

@@ -7,7 +7,7 @@ suc=$NIX_STORE_DIR/deadbeafdeadbeafdeadbeafdeadbeaf-s.store
 (echo $suc && echo $NIX_STORE_DIR/ffffffffffffffffffffffffffffffff.store && echo "/bla" && echo 0) | $TOP/src/nix-store/nix-store --substitute
 $TOP/src/nix-store/nix-store --successor $storeExpr $suc
 
-outPath=$($TOP/src/nix-store/nix-store -qnf "$storeExpr")
+outPath=$($TOP/src/nix-store/nix-store -qnf --fallback "$storeExpr")
 
 echo "output path is $outPath"
 

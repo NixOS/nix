@@ -26,8 +26,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); i++)
     {
-        Path nfPath = normaliseStoreExpr(*i);
-        realiseClosure(nfPath);
+        Path nfPath = realiseStoreExpr(*i);
         cout << format("%1%\n") % (string) nfPath;
     }
 }
@@ -58,8 +57,7 @@ static void opAdd(Strings opFlags, Strings opArgs)
 Path maybeNormalise(const Path & ne, bool normalise, bool realise)
 {
     if (realise) {
-        Path ne2 = normaliseStoreExpr(ne);
-        realiseClosure(ne2);
+        Path ne2 = realiseStoreExpr(ne);
         return normalise ? ne2 : ne;
     } else
         return normalise ? normaliseStoreExpr(ne) : ne;

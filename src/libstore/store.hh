@@ -54,6 +54,9 @@ void copyPath(const Path & src, const Path & dst);
 void registerSuccessor(const Transaction & txn,
     const Path & srcPath, const Path & sucPath);
 
+/* Remove a successor mapping. */
+void unregisterSuccessor(const Path & srcPath);
+
 /* Return the predecessors of the Nix expression stored at the given
    path. */
 bool querySuccessor(const Path & srcPath, Path & sucPath);

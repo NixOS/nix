@@ -15,3 +15,4 @@
 <arg><option>-k</option></arg>
 <arg><option>--keep-failed</option></arg>
 <arg><option>-K</option></arg>
+<arg><option>--fallback</option></arg>

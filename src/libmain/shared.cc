@@ -139,6 +139,8 @@ static void initAndRun(int argc, char * * argv)
             keepFailed = true;
         else if (arg == "--keep-going" || arg == "-k")
             keepGoing = true;
+        else if (arg == "--fallback")
+            tryFallback = true;
         else if (arg == "--max-jobs" || arg == "-j") {
             ++i;
             if (i == args.end()) throw UsageError("`--max-jobs' requires an argument");

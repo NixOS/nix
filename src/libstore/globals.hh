@@ -33,6 +33,10 @@ extern bool keepFailed;
    of the same goal) fails. */
 extern bool keepGoing;
 
+/* Whether, if we cannot realise the known closure corresponding to a
+   derivation, we should try to normalise the derivation instead. */
+extern bool tryFallback;
+
 /* Verbosity level for build output. */
 extern Verbosity buildVerbosity;
 
