@@ -4,7 +4,7 @@ check_PROGRAMS = test
 AM_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall -I.. -I../externals/inst/include $(CXXFLAGS)
 AM_LDFLAGS = -L../externals/inst/lib -ldb_cxx -lATerm $(LDFLAGS)
 
-nix_SOURCES = nix.cc
+nix_SOURCES = nix.cc dotgraph.cc
 nix_LDADD = libshared.a libnix.a -ldb_cxx -lATerm
 
 nix_hash_SOURCES = nix-hash.cc
