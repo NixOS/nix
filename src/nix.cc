@@ -21,7 +21,7 @@ static ArgType argType = atpUnknown;
 
    Operations:
 
-     --realise / -r: realise values
+     --install / -i: install (or `realise') values
      --delete / -d: delete values
      --query / -q: query stored values
      --add: add values
@@ -86,8 +86,8 @@ static void getArgType(Strings & flags)
 }
 
 
-/* Realise values. */
-static void opRealise(Strings opFlags, Strings opArgs)
+/* Install values. */
+static void opInstall(Strings opFlags, Strings opArgs)
 {
     getArgType(opFlags);
     if (!opFlags.empty()) throw UsageError("unknown flag");
@@ -238,8 +238,8 @@ void run(Strings args)
 
         Operation oldOp = op;
 
-        if (arg == "--realise" || arg == "-r")
-            op = opRealise;
+        if (arg == "--install" || arg == "-i")
+            op = opInstall;
         else if (arg == "--delete" || arg == "-d")
             op = opDelete;
         else if (arg == "--add")

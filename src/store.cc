@@ -125,11 +125,8 @@ static string queryPathByHashPrefix(Hash hash, const string & prefix)
     for (Strings::iterator it = paths.begin();
          it != paths.end(); it++)
     {
-        debug(*it);
         string path = *it;
         try {
-            debug(path);
-            debug(prefix);
             if (isInPrefix(path, prefix) && hashPath(path) == hash)
                 return path;
         } catch (Error & e) {
