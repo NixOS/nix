@@ -56,8 +56,7 @@ else
 build-aterm: have-aterm
 	(pfx=`pwd` && \
 	cd $(ATERM) && \
-	CC="$(CC)" ./configure --prefix=$$pfx/inst-aterm \
-     --with-cflags="-DNDEBUG -DXGC_VERBOSE -DXHASHPEM -DWITH_STATS $(CFLAGS)" && \
+	CC="$(CC)" ./configure --prefix=$$pfx/inst-aterm && \
 	make && \
 	make install)
 	touch build-aterm
