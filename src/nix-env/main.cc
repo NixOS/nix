@@ -230,20 +230,71 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
 }
 
 
-typedef map<string, Path> NameMap;
-
-
-NameMap mapByNames(DrvInfos & drvs)
+class DrvName
 {
-    NameMap nameMap;
-    for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i)
-        nameMap[i->second.name] = i->first;
-    return nameMap;
+    string fullName;
+    string name;
+    string version;
+    unsigned int hits;
+
+public:
+
+    /* Parse a derivation name.  The `name' part of a derivation name
+       is everything up to but not including the first dash *not*
+       followed by a letter.  The `version' part is the rest
+       (excluding the separating dash).  E.g., `apache-httpd-2.0.48'
+       is parsed to (`apache-httpd', '2.0.48'). */
+    DrvName(const string & s) : hits(0)
+    {
+        name = fullName = s;
+        for (unsigned int i = 0; i < s.size(); ++i) {
+            if (s[i] == '-' && i + 1 < s.size() && !isalpha(s[i + 1])) {
+                name = string(s, 0, i);
+                version = string(s, i + 1);
+                break;
+            }
+        }
+    }
+
+    bool matches(DrvName & n)
+    {
+        if (name != "*" && name != n.name) return false;
+        if (version != "" && version != n.version) return false;
+        return true;
+    }
+
+    void hit()
+    {
+        hits++;
+    }
+
+    unsigned int getHits()
+    {
+        return hits;
+    }
+
+    string getFullName()
+    {
+        return fullName;
+    }
+};
+
+
+typedef list<DrvName> DrvNames;
+
+
+static DrvNames drvNamesFromArgs(const Strings & opArgs)
+{
+    DrvNames result;
+    for (Strings::const_iterator i = opArgs.begin();
+         i != opArgs.end(); ++i)
+        result.push_back(DrvName(*i));
+    return result;
 }
 
 
 void installDerivations(EvalState & state,
-    Path nePath, Strings drvNames, const Path & linkPath)
+    Path nePath, DrvNames & selectors, const Path & linkPath)
 {
     debug(format("installing derivations from `%1%'") % nePath);
 
@@ -251,24 +302,29 @@ void installDerivations(EvalState & state,
     DrvInfos availDrvs;
     loadDerivations(state, nePath, availDrvs);
 
-    NameMap nameMap = mapByNames(availDrvs);
-
     /* Filter out the ones we're not interested in. */
     DrvInfos selectedDrvs;
-    if (drvNames.size() > 0 && drvNames.front() == "*") { /* !!! hack */
-        selectedDrvs = availDrvs;
-    } else {
-        for (Strings::iterator i = drvNames.begin();
-             i != drvNames.end(); ++i)
+    for (DrvInfos::iterator i = availDrvs.begin();
+         i != availDrvs.end(); ++i)
+    {
+        DrvName drvName(i->second.name);
+        for (DrvNames::iterator j = selectors.begin();
+             j != selectors.end(); ++j)
         {
-            NameMap::iterator j = nameMap.find(*i);
-            if (j == nameMap.end())
-                throw Error(format("unknown derivation `%1%'") % *i);
-            else
-                selectedDrvs[j->second] = availDrvs[j->second];
+            if (j->matches(drvName)) {
+                j->hit();
+                selectedDrvs.insert(*i);
+            }
         }
     }
 
+    /* Check that all selectors have been used. */
+    for (DrvNames::iterator i = selectors.begin();
+         i != selectors.end(); ++i)
+        if (i->getHits() == 0)
+            throw Error(format("selector `%1%' matches no derivations")
+                % i->getFullName());
+    
     /* Add in the already installed derivations. */
     DrvInfos installedDrvs;
     queryInstalled(state, installedDrvs, linkPath);
@@ -286,29 +342,40 @@ static void opInstall(Globals & globals,
     if (opArgs.size() < 1) throw UsageError("Nix file expected");
 
     Path nePath = opArgs.front();
-    opArgs.pop_front();
-
-    installDerivations(globals.state, nePath,
-        Strings(opArgs.begin(), opArgs.end()), globals.linkPath);
+    DrvNames drvNames = drvNamesFromArgs(
+        Strings(++opArgs.begin(), opArgs.end()));
+    
+    installDerivations(globals.state, nePath, drvNames, globals.linkPath);
 }
 
 
-void uninstallDerivations(EvalState & state, Strings drvNames,
+static void opUpgrade(Globals & globals,
+    Strings opFlags, Strings opArgs)
+{
+    if (opFlags.size() > 0)
+        throw UsageError(format("unknown flags `%1%'") % opFlags.front());
+    if (opArgs.size() < 1) throw UsageError("Nix file expected");
+
+    Path nePath = opArgs.front();
+    opArgs.pop_front();
+
+}
+
+
+void uninstallDerivations(EvalState & state, DrvNames & selectors,
     Path & linkPath)
 {
     DrvInfos installedDrvs;
     queryInstalled(state, installedDrvs, linkPath);
 
-    NameMap nameMap = mapByNames(installedDrvs);
-
-    for (Strings::iterator i = drvNames.begin();
-         i != drvNames.end(); ++i)
+    for (DrvInfos::iterator i = installedDrvs.begin();
+         i != installedDrvs.end(); ++i)
     {
-        NameMap::iterator j = nameMap.find(*i);
-        if (j == nameMap.end())
-            throw Error(format("unknown derivation `%1%'") % *i);
-        else
-            installedDrvs.erase(j->second);
+        DrvName drvName(i->second.name);
+        for (DrvNames::iterator j = selectors.begin();
+             j != selectors.end(); ++j)
+            if (j->matches(drvName))
+                installedDrvs.erase(i);
     }
 
     createUserEnv(state, installedDrvs, linkPath);
@@ -321,7 +388,9 @@ static void opUninstall(Globals & globals,
     if (opFlags.size() > 0)
         throw UsageError(format("unknown flags `%1%'") % opFlags.front());
 
-    uninstallDerivations(globals.state, opArgs, globals.linkPath);
+    DrvNames drvNames = drvNamesFromArgs(opArgs);
+
+    uninstallDerivations(globals.state, drvNames, globals.linkPath);
 }
 
 
@@ -412,6 +481,8 @@ void run(Strings args)
             op = opInstall;
         else if (arg == "--uninstall" || arg == "-e")
             op = opUninstall;
+        else if (arg == "--upgrade" || arg == "-u")
+            op = opUpgrade;
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
         else if (arg == "--link" || arg == "-l") {
