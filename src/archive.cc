@@ -87,7 +87,7 @@ static void dumpContents(const string & path, unsigned int size,
     writeInt(size, sink);
 
     int fd = open(path.c_str(), O_RDONLY);
-    if (!fd) throw SysError("opening file " + path);
+    if (fd == -1) throw SysError("opening file " + path);
     
     unsigned char buf[65536];
 
