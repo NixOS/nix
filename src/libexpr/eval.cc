@@ -186,14 +186,17 @@ Expr evalExpr2(EvalState & state, Expr e)
     ATerm name;
 
     /* Normal forms. */
-    if (atMatch(m, e) >> "Str" ||
-        atMatch(m, e) >> "Path" ||
-        atMatch(m, e) >> "Uri" ||
-        atMatch(m, e) >> "Int" ||
-        atMatch(m, e) >> "Bool" ||
-        atMatch(m, e) >> "Function" ||
-        atMatch(m, e) >> "Attrs" ||
-        atMatch(m, e) >> "List")
+    string cons;
+    if (atMatch(m, e) >> cons &&
+        (cons == "Str" ||
+         cons == "Path" ||
+         cons == "Uri" ||
+         cons == "Null" ||
+         cons == "Int" ||
+         cons == "Bool" ||
+         cons == "Function" ||
+         cons == "Attrs" ||
+         cons == "List"))
         return e;
 
     /* Any encountered variables must be undeclared or primops. */
