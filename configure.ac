@@ -151,5 +151,6 @@ AC_CONFIG_FILES([Makefile
    corepkgs/channels/Makefile
    doc/Makefile
    doc/manual/Makefile
+   tests/Makefile
   ])
 AC_OUTPUT

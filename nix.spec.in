@@ -21,6 +21,7 @@ Nix is a software deployment system.
 %build
 ./configure --prefix=%{_prefix}
 make
+make check
 
 %install
 rm -rf $RPM_BUILD_ROOT

@@ -46,27 +46,34 @@ void checkStoreNotSymlink(Path path)
 }
 
 
+static string getEnv(const string & key, const string & def = "")
+{
+    char * value = getenv(key.c_str());
+    return value ? string(value) : def;
+}
+
+
 /* Initialize and reorder arguments, then call the actual argument
    processor. */
 static void initAndRun(int argc, char * * argv)
 {
-    char * root = getenv("NIX_ROOT");
-
-    if (root) {
-        if (chroot(root) != 0)
+    string root = getEnv("NIX_ROOT");
+    if (root != "") {
+        if (chroot(root.c_str()) != 0)
             throw SysError(format("changing root to `%1%'") % root);
     }
     
     /* Setup Nix paths. */
-    nixStore = canonPath(NIX_STORE_DIR);
-    nixDataDir = canonPath(NIX_DATA_DIR);
-    nixLogDir = canonPath(NIX_LOG_DIR);
-    nixStateDir = canonPath(NIX_STATE_DIR);
-    nixDBPath = canonPath(NIX_STATE_DIR) + "/db";
+    nixStore = getEnv("NIX_STORE_DIR", canonPath(NIX_STORE_DIR));
+    nixDataDir = getEnv("NIX_DATA_DIR", canonPath(NIX_DATA_DIR));
+    nixLogDir = getEnv("NIX_LOG_DIR", canonPath(NIX_LOG_DIR));
+    nixStateDir = getEnv("NIX_STATE_DIR", canonPath(NIX_STATE_DIR));
+    nixDBPath = getEnv("NIX_DB_DIR", nixStateDir + "/db");
 
     /* Check that the store directory and its parent are not
        symlinks. */
-    checkStoreNotSymlink(nixStore);
+    if (getEnv("NIX_IGNORE_SYMLINK_STORE") != "1")
+        checkStoreNotSymlink(nixStore);
 
     /* Catch SIGINT. */
     struct sigaction act, oact;
@@ -77,8 +84,8 @@ static void initAndRun(int argc, char * * argv)
         throw SysError("installing handler for SIGINT");
 
     /* Process the NIX_LOG_TYPE environment variable. */
-    char * lt = getenv("NIX_LOG_TYPE");
-    if (lt) setLogType(lt);
+    string lt = getEnv("NIX_LOG_TYPE");
+    if (lt != "") setLogType(lt);
 
     /* Put the arguments in a vector. */
     Strings args, remaining;

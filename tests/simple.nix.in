@@ -1,0 +1,6 @@
+derivation {
+  name = "simple";
+  system = "@system@";
+  builder = "@shell@";
+  args = ["-e" "-x" ./simple.builder.sh];
+}
