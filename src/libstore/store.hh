@@ -84,6 +84,10 @@ void setReferences(const Transaction & txn, const Path & storePath,
    result is not cleared. */
 void queryReferences(const Path & storePath, PathSet & references);
 
+/* Queries the set of incoming FS references for a store path.  The
+   result is not cleared. */
+void queryReferers(const Path & storePath, PathSet & referers);
+
 /* Constructs a unique store path name. */
 Path makeStorePath(const string & type,
     const Hash & hash, const string & suffix);

@@ -272,6 +272,16 @@ void queryReferences(const Path & storePath, PathSet & references)
 }
 
 
+void queryReferers(const Path & storePath, PathSet & referers)
+{
+    Paths referers2;
+    if (!isValidPath(storePath))
+        throw Error(format("path `%1%' is not valid") % storePath);
+    nixDB.queryStrings(noTxn, dbReferers, storePath, referers2);
+    referers.insert(referers2.begin(), referers2.end());
+}
+
+
 static Substitutes readSubstitutes(const Transaction & txn,
     const Path & srcPath)
 {

@@ -64,10 +64,18 @@ static Path maybeUseOutput(const Path & storePath, bool useOutput)
 }
 
 
+static void printPathSet(const PathSet & paths)
+{
+    for (PathSet::iterator i = paths.begin(); 
+         i != paths.end(); i++)
+        cout << format("%s\n") % *i;
+}
+
+
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qOutputs, qRequisites, qPredecessors, qGraph } query = qOutputs;
+    enum { qOutputs, qRequisites, qReferences, qReferers, qGraph } query = qOutputs;
     bool useOutput = false;
     bool includeOutputs = false;
 
@@ -75,6 +83,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
          i != opFlags.end(); i++)
         if (*i == "--outputs") query = qOutputs;
         else if (*i == "--requisites" || *i == "-R") query = qRequisites;
+        else if (*i == "--references") query = qReferences;
+        else if (*i == "--referers") query = qReferers;
         else if (*i == "--graph") query = qGraph;
         else if (*i == "--use-output" || *i == "-u") useOutput = true;
         else if (*i == "--include-outputs") includeOutputs = true;
@@ -92,33 +102,24 @@ static void opQuery(Strings opFlags, Strings opArgs)
             break;
         }
 
-        case qRequisites: {
+        case qRequisites:
+        case qReferences:
+        case qReferers: {
             PathSet paths;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
                 Path path = maybeUseOutput(*i, useOutput);
-                storePathRequisites(path, includeOutputs, paths);
+                if (query == qRequisites)
+                    storePathRequisites(path, includeOutputs, paths);
+                else if (query == qReferences) queryReferences(path, paths);
+                else if (query == qReferers) queryReferers(path,  paths);
             }
-            for (PathSet::iterator i = paths.begin(); 
-                 i != paths.end(); i++)
-                cout << format("%s\n") % *i;
+            printPathSet(paths);
             break;
         }
 
 #if 0            
-        case qPredecessors: {
-            for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); i++)
-            {
-                Paths preds = queryPredecessors(*i);
-                for (Paths::iterator j = preds.begin();
-                     j != preds.end(); j++)
-                    cout << format("%s\n") % *j;
-            }
-            break;
-        }
-
         case qGraph: {
             PathSet roots;
             for (Strings::iterator i = opArgs.begin();
