@@ -12,11 +12,128 @@
   <chapter>
     <title>Introduction</title>
 
-    <para>
-      Nix is a system for the automatic creation and distribution of data, such
-      as computer programs and other software artifacts.
-    </para>
+    <sect1>
+      <title>The problem space</title>
 
+      <para>
+	Nix is a system for controlling the automatic creation and distribution
+	of data, such as computer programs and other software artifacts.  This
+	is a very general problem, and there are many applications that fall
+	under this description.
+      </para>
+
+      <sect2>
+	<title>Build management</title>
+
+	<para>
+	  Build management tools are used to perform <emphasis>software
+	    builds</emphasis>, that is, the construction of derived products
+	  such as executable programs from source code.  A commonly used build
+	  tool is Make, which is a standard tool on Unix systems. These tools
+	  have to deal with several issues:
+	  <itemizedlist>
+	    <listitem>
+	      <para>
+	      </para>
+	    </listitem>
+	  </itemizedlist>
+	</para>
+
+      </sect2>
+
+      <sect2>
+	<title>Package management</title>
+
+	<para>
+	  After software has been built, is must also be
+	  <emphasis>deployed</emphasis> in the intended target environment,
+	  e.g., the user's workstation.  Examples include the Red Hat package
+	  manager (RPM), Microsoft's MSI, and so on.  Here also we have to deal
+	  with several issues:
+	  <itemizedlist>
+	    <listitem>
+	      <para>
+		The <emphasis>creation</emphasis> of packages from some formal
+		description of what artifacts should be distributed in the
+		package.
+	      </para>
+	    </listitem>
+	    <listitem>
+	      <para>
+		The <emphasis>deployment</emphasis> of packages, that is, the
+		mechanism by which we get them onto the intended target
+		environment.  This can be as simple as copying a file, but
+		complexity comes from the wide range of possible installation
+		media (such as a network install), and the scalability of the
+		process (if a program must be installed on a thousand systems,
+		we do not want to visit each system and perform some manual
+		steps to install the program on that system; that is, the
+		complexity for the system administrator should be constant, not
+		linear).
+	      </para>
+	    </listitem>
+	  </itemizedlist>
+	</para>
+      </sect2>
+
+    </sect1>
+
+    <sect1>
+      <title>The Nix system</title>
+
+      <para>
+	...
+      </para>
+
+      <para>
+	Existing tools in this field generally both a underlying model (such as
+	the derivation graph of build tools, or the versioning scheme that
+	determines when two packages are <quote>compatible</quote> in a package
+	management system) and a formalism that allows ...
+      </para>
+
+      <para>
+	Following the principle of separation of mechanism and policy, the Nix
+	system separates the <emphasis>low-level aspect</emphasis> of file
+	system object management form the <emphasis>high-level
+	  aspect</emphasis> of the ...
+      </para>
+
+    </sect1>
+
+  </chapter>
+
+
+  <!--======================================================================-->
+
+  <chapter>
+    <title>A Guided Tour</title>
+
+    <para>
+      Bla bla
+    </para>
+  </chapter>
+
+
+  <!--======================================================================-->
+
+  <chapter>
+    <title>Fix Language Reference</title>
+
+    <para>
+      Bla bla
+    </para>
+  </chapter>
+
+
+  <!--======================================================================-->
+
+  <chapter>
+    <title>Nix Syntax and Semantics</title>
+
+    <para>
+      Bla bla
+    </para>
   </chapter>
 
 
@@ -98,5 +215,75 @@ $ make install</screen>
 
   </chapter>
 
+
+  <!--======================================================================-->
+
+  <appendix>
+    <title>Troubleshooting</title>
+
+    <sect1>
+      <title>Database hangs</title>
+
+      <para>
+	If Nix or Fix appear to hang immediately after they are started, Nix's
+	database is probably <quote>wedged</quote>, i.e., some process died
+	while it held a lock on the database.  The solution is to ensure that
+	no other processes are accessing the database and then run the
+	following command:
+      </para>
+
+      <screen>
+$ db_recover -e -h <replaceable>prefix</replaceable>/var/nix/db</screen>
+
+      <para>
+	Here, <replaceable>prefix</replaceable> should be replaced by Nix's
+	installation prefix.
+      </para>
+
+    </sect1>
+
+
+    <sect1>
+      <title>Database logfile removal</title>
+
+      <para>
+	Every time a Nix database transaction takes place, Nix writes a record
+	of this transaction to a <emphasis>log</emphasis> in its database
+	directory to ensure that the operation can be replayed in case of a
+	application or system crash.  However, without manual intervention,
+	the log grows indefinitely.  Hence, unused log files should be deleted
+	periodically.  This can be accomplished using the following command:
+      </para>
+
+      <screen>
+$ rm `db_archive -a -h <replaceable>prefix</replaceable>/var/nix/db`</screen>
+
+    </sect1>
+	
+
+  </appendix>
+
+
+  <!--======================================================================-->
+
+  <appendix>
+    <title>Known problems</title>
+
+    <itemizedlist>
+
+      <listitem>
+	<para>
+	  Nix should automatically recover the Berkeley DB database.
+	</para>
+      </listitem>
+
+      <listitem>
+	<para>
+	  Nix should automatically remove Berkeley DB logfiles.
+	</para>
+      </listitem>
+
+    </itemizedlist>
+  </appendix>
 
 </book>
