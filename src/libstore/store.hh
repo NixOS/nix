@@ -62,6 +62,8 @@ void registerValidPath(const Transaction & txn,
 /* Throw an exception if `path' is not directly in the Nix store. */
 void assertStorePath(const Path & path);
 
+bool isStorePath(const Path & path);
+
 /* "Fix", or canonicalise, the meta-data of the files in a store path
    after it has been built.  In particular:
    - the last modification date on each file is set to 0 (i.e.,

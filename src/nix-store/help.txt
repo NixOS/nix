@@ -42,3 +42,5 @@ Options:
 
   --verbose / -v: verbose operation (may be repeated)
   --keep-failed / -K: keep temporary directories of failed builds
+
+  --add-root: add garbage collector roots for the result

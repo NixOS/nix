@@ -1,6 +1,6 @@
 nix-instantiate [OPTIONS...] [FILES...]
 
-`nix-instantiate' turns Nix expressions into store expressions. 
+`nix-instantiate' turns Nix expressions into store derivations. 
 
 The argument `-' may be specified to read a Nix expression from
 standard input.
@@ -14,3 +14,5 @@ Options:
 
   --eval-only: evaluate and print resulting term; do not instantiate
   --parse-only: parse and print abstract syntax tree
+
+  --add-root: add garbage collector roots for the result

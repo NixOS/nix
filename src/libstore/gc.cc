@@ -39,6 +39,48 @@ static int openGCLock(LockType lockType)
 }
 
 
+static void createDirs(const Path & path)
+{
+    if (path == "") return;
+    createDirs(dirOf(path));
+    if (!pathExists(path))
+        if (mkdir(path.c_str(), 0777) == -1)
+            throw SysError(format("creating directory `%1%'") % path);
+}
+
+
+Path addPermRoot(const Path & _storePath, const Path & _gcRoot)
+{
+    Path storePath(canonPath(_storePath));
+    Path gcRoot(canonPath(_gcRoot));
+
+    Path rootsDir = canonPath((format("%1%/%2%") % nixStateDir % "gcroots").str());
+    
+    if (string(gcRoot, 0, rootsDir.size() + 1) != rootsDir + "/")
+        throw Error(format(
+            "path `%1%' is not a valid garbage collector root; "
+            "it's not in the `%1%' directory")
+            % gcRoot % rootsDir);
+
+    /* Grab the global GC root.  This prevents the set of permanent
+       roots from increasing while a GC is in progress. */
+    AutoCloseFD fdGCLock = openGCLock(ltRead);
+
+    /* Create directories up to `gcRoot'. */
+    createDirs(dirOf(gcRoot));
+
+    /* Remove the old symlink. */
+    unlink(gcRoot.c_str());
+
+    /* And create the new own. */
+    if (symlink(storePath.c_str(), gcRoot.c_str()) == -1)
+        throw SysError(format("symlinking `%1%' to `%2%'")
+            % gcRoot % storePath);
+
+    return gcRoot;
+}
+
+
 static string tempRootsDir = "temproots";
 
 /* The file to which we write our temporary roots. */
@@ -210,6 +252,9 @@ void collectGarbage(const PathSet & roots, GCAction action,
        b) Processes from creating new temporary root files. */
     AutoCloseFD fdGCLock = openGCLock(ltWrite);
 
+    /* !!! Find the roots here, after we've grabbed the GC lock, since
+       the set of permanent roots cannot increase now. */
+
     /* Determine the live paths which is just the closure of the
        roots under the `references' relation. */
     PathSet livePaths;
@@ -264,6 +309,7 @@ void collectGarbage(const PathSet & roots, GCAction action,
        will not work anymore because we get cycles. */
     storePaths = topoSort(storePaths2);
 
+    /* Try to delete store paths in the topologically sorted order. */
     for (Paths::iterator i = storePaths.begin(); i != storePaths.end(); ++i) {
 
         debug(format("considering deletion of `%1%'") % *i);

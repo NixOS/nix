@@ -1,5 +1,9 @@
 #include <iostream>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include "globals.hh"
 #include "build.hh"
 #include "gc.hh"
@@ -18,12 +22,32 @@ void printHelp()
 }
 
 
+static Path gcRoot;
+static int rootNr = 0;
+
+
 static Path findOutput(const Derivation & drv, string id)
 {
     for (DerivationOutputs::const_iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
         if (i->first == id) return i->second.path;
     throw Error(format("derivation has no output `%1%'") % id);
+}
+
+
+static Path followSymlinks(Path & path)
+{
+    while (!isStorePath(path)) {
+        struct stat st;
+        if (lstat(path.c_str(), &st))
+            throw SysError(format("getting status of `%1%'") % path);
+        if (!S_ISLNK(st.st_mode)) return path;
+        string target = readLink(path);
+        path = canonPath(string(target, 0, 1) == "/"
+            ? target
+            : path + "/" + target);
+    }
+    return path;
 }
 
 
@@ -35,7 +59,14 @@ static Path realisePath(const Path & path)
         PathSet paths;
         paths.insert(path);
         buildDerivations(paths);
-        return findOutput(derivationFromPath(path), "out");
+        Path outPath = findOutput(derivationFromPath(path), "out");
+        
+        if (gcRoot == "")
+            printGCWarning();
+        else
+            outPath = addPermRoot(outPath, makeRootName(gcRoot, rootNr));
+        
+        return outPath;
     } else {
         ensurePath(path);
         return path;
@@ -48,6 +79,10 @@ static void opRealise(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
+    for (Strings::iterator i = opArgs.begin();
+         i != opArgs.end(); i++)
+        *i = followSymlinks(*i);
+            
     if (opArgs.size() > 1) {
         PathSet drvPaths;
         for (Strings::iterator i = opArgs.begin();
@@ -374,8 +409,8 @@ void run(Strings args)
     Strings opFlags, opArgs;
     Operation op = 0;
 
-    for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
-        string arg = *i;
+    for (Strings::iterator i = args.begin(); i != args.end(); ) {
+        string arg = *i++;
 
         Operation oldOp = op;
 
@@ -403,6 +438,11 @@ void run(Strings args)
             op = opInit;
         else if (arg == "--verify")
             op = opVerify;
+        else if (arg == "--add-root") {
+            if (i == args.end())
+                throw UsageError("`--add-root requires an argument");
+            gcRoot = *i++;
+        }
         else if (arg[0] == '-')
             opFlags.push_back(arg);
         else

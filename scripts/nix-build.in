@@ -10,6 +10,9 @@ fi
 extraArgs=
 noLink=
 
+userName=$USER
+if test -z "$username"; then userName="unknown"; fi
+
 for i in "$@"; do
     case "$i" in
         --no-link)
@@ -19,11 +22,15 @@ for i in "$@"; do
             extraArgs="$extraArgs $i"
             ;;
         *)
-            storeExprs=$(@bindir@/nix-instantiate "$i")
+            storeExprs=$(@bindir@/nix-instantiate \
+                --add-root "@localstatedir@/nix/gcroots/nix-build/$userName-drv" \
+                "$i")
             for j in $storeExprs; do
                 echo "store expression is $j" >&2
             done
-            outPaths=$(@bindir@/nix-store -rv $extraArgs $storeExprs)
+            outPaths=$(@bindir@/nix-store \
+                --add-root "@localstatedir@/nix/gcroots/nix-build/$userName-out" \
+                -rv $extraArgs $storeExprs)
             for j in $outPaths; do
                 echo "$j"
                 if test -z "$noLink"; then

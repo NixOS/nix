@@ -31,6 +31,28 @@ void sigintHandler(int signo)
 }
 
 
+Path makeRootName(const Path & gcRoot, int & counter)
+{
+    counter++;
+    if (counter == 1)
+        return gcRoot;
+    else
+        return (format("%1%-%2%") % gcRoot % counter).str();
+}
+
+
+void printGCWarning()
+{
+    static bool warned = false;
+    if (!warned) {
+        printMsg(lvlInfo,
+            "warning: you did not specify `--add-root'; "
+            "the result might be removed by the garbage collector");
+        warned = true;
+    }
+}
+
+
 void setLogType(string lt)
 {
     if (lt == "pretty") logType = ltPretty;
@@ -183,7 +205,7 @@ static void initAndRun(int argc, char * * argv)
 
     /* Automatically clean up the temporary roots file when we
        exit. */
-    RemoveTempRoots removeTempRoots;
+    RemoveTempRoots removeTempRoots; /* unused variable - don't remove */
 
     run(remaining);
 }

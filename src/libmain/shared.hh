@@ -17,6 +17,10 @@ void run(Strings args);
 /* Should print a help message to stdout and return. */
 void printHelp();
 
+/* Ugh.  No better place to put this. */
+Path makeRootName(const Path & gcRoot, int & counter);
+void printGCWarning();
+
 
 extern string programId;
 

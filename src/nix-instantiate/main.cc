@@ -3,6 +3,7 @@
 
 #include "globals.hh"
 #include "build.hh"
+#include "gc.hh"
 #include "shared.hh"
 #include "eval.hh"
 #include "parser.hh"
@@ -26,6 +27,14 @@ static Expr evalStdin(EvalState & state, bool parseOnly)
 }
 
 
+static Path gcRoot;
+static int rootNr = 0;
+
+
+/* Print out the paths of the resulting derivation(s).  If the user
+   specified the `--add-root' flag, we register the derivation as a
+   garbage collection root and print out the path of the GC root
+   symlink instead. */
 static void printDrvPaths(EvalState & state, Expr e)
 {
     ATermList es;
@@ -37,7 +46,13 @@ static void printDrvPaths(EvalState & state, Expr e)
         if (a && evalString(state, a) == "derivation") {
             a = queryAttr(e, "drvPath");
             if (a) {
-                cout << format("%1%\n") % evalPath(state, a);
+                Path drvPath = evalPath(state, a);
+                if (gcRoot == "")
+                    printGCWarning();
+                else
+                    drvPath = addPermRoot(drvPath,
+                        makeRootName(gcRoot, rootNr));
+                cout << format("%1%\n") % drvPath;
                 return;
             }
             throw Error("bad derivation");
@@ -77,10 +92,10 @@ void run(Strings args)
     bool evalOnly = false;
     bool parseOnly = false;
 
-    for (Strings::iterator it = args.begin();
-         it != args.end(); )
+    for (Strings::iterator i = args.begin();
+         i != args.end(); )
     {
-        string arg = *it++;
+        string arg = *i++;
 
         if (arg == "-")
             readStdin = true;
@@ -91,6 +106,11 @@ void run(Strings args)
         else if (arg == "--parse-only") {
             readOnlyMode = true;
             parseOnly = evalOnly = true;
+        }
+        else if (arg == "--add-root") {
+            if (i == args.end())
+                throw UsageError("`--add-root requires an argument");
+            gcRoot = *i++;
         }
         else if (arg[0] == '-')
             throw UsageError(format("unknown flag `%1%`") % arg);
@@ -105,10 +125,10 @@ void run(Strings args)
         printResult(state, e, evalOnly);
     }
 
-    for (Strings::iterator it = files.begin();
-         it != files.end(); it++)
+    for (Strings::iterator i = files.begin();
+         i != files.end(); i++)
     {
-        Expr e = evalFile(state, absPath(*it));
+        Expr e = evalFile(state, absPath(*i));
         /* !!! parseOnly ignored */
         printResult(state, e, evalOnly);
     }
