@@ -2,6 +2,7 @@
 
 use strict;
 use POSIX qw(tmpnam);
+use readmanifest;
 
 my $tmpdir;
 do { $tmpdir = tmpnam(); }
@@ -25,7 +26,7 @@ my $manifest_put_url = shift @ARGV;
 
 # From the given store expressions, determine the requisite store
 # paths.
-my %storepaths;
+my %storePaths;
 
 foreach my $storeexpr (@ARGV) {
     die unless $storeexpr =~ /^\//;
@@ -39,12 +40,12 @@ foreach my $storeexpr (@ARGV) {
     while (<PATHS>) {
         chomp;
         die "bad: $_" unless /^\//;
-        $storepaths{$_} = "";
+        $storePaths{$_} = "";
     }
     close PATHS;
 }
 
-my @storepaths = keys %storepaths;
+my @storePaths = keys %storePaths;
 
 
 # For each path, create a Nix expression that turns the path into
@@ -52,14 +53,14 @@ my @storepaths = keys %storepaths;
 open NIX, ">$nixfile";
 print NIX "[";
 
-foreach my $storepath (@storepaths) {
-    die unless ($storepath =~ /\/[0-9a-z]{32}.*$/);
+foreach my $storePath (@storePaths) {
+    die unless ($storePath =~ /\/[0-9a-z]{32}.*$/);
 
     # Construct a Nix expression that creates a Nix archive.
     my $nixexpr = 
         "((import @datadir@/nix/corepkgs/nar/nar.nix) " .
-        # !!! $storepath should be represented as a closure
-        "{path = \"$storepath\"; system = \"@system@\";}) ";
+        # !!! $storePath should be represented as a closure
+        "{path = \"$storePath\"; system = \"@system@\";}) ";
     
     print NIX $nixexpr;
 }
@@ -108,21 +109,23 @@ while (scalar @tmp > 0) {
 # Create the manifest.
 print STDERR "creating manifest...\n";
 
-open MANIFEST, ">$manifest";
+my %narFiles;
+my %patches;
+my %successors;
 
 my @nararchives;
-for (my $n = 0; $n < scalar @storepaths; $n++) {
-    my $storepath = $storepaths[$n];
+for (my $n = 0; $n < scalar @storePaths; $n++) {
+    my $storePath = $storePaths[$n];
     my $nardir = $narpaths[$n];
     
-    $storepath =~ /\/([^\/]*)$/;
+    $storePath =~ /\/([^\/]*)$/;
     my $basename = $1;
     defined $basename or die;
 
     my $narname = "$basename.nar.bz2";
 
     my $narfile = "$nardir/$narname";
-    (-f $narfile) or die "narfile for $storepath not found";
+    (-f $narfile) or die "narfile for $storePath not found";
     push @nararchives, $narfile;
 
     open MD5, "$nardir/narbz2-hash" or die "cannot open narbz2-hash";
@@ -137,34 +140,34 @@ for (my $n = 0; $n < scalar @storepaths; $n++) {
     $narHash =~ /^[0-9a-z]{32}$/ or die "invalid hash";
     close MD5;
     
-    my $size = (stat $narfile)[7];
+    my $narbz2Size = (stat $narfile)[7];
 
-    print MANIFEST "{\n";
-    print MANIFEST "  StorePath: $storepath\n";
-    print MANIFEST "  NarURL: $archives_get_url/$narname\n";
-    print MANIFEST "  MD5: $narbz2Hash\n";
-    print MANIFEST "  NarHash: $narHash\n";
-    print MANIFEST "  Size: $size\n";
-
-    if ($storepath =~ /\.store$/) {
-        open PREDS, "@bindir@/nix-store --query --predecessors $storepath |" or die "cannot run nix";
+    $narFiles{$storePath} = [
+        { url => $archives_get_url/$narname
+        , hash => $narbz2Hash
+        , size => $narbz2Size
+        , narHash => $narHash
+        }
+    ];
+                            
+    if ($storePath =~ /\.store$/) {
+        open PREDS, "@bindir@/nix-store --query --predecessors $storePath |" or die "cannot run nix";
         while (<PREDS>) {
             chomp;
             die unless (/^\//);
             my $pred = $_;
             # Only include predecessors that are themselves being
             # pushed.
-            if (defined $storepaths{$pred}) {
-                print MANIFEST "  SuccOf: $pred\n";
+            if (defined $storePaths{$pred}) {
+                $successors{$pred} = $storePath;
             }
         }
         close PREDS;
     }
 
-    print MANIFEST "}\n";
 }
 
-close MANIFEST;
+writeManifest $manifest, \%narFiles, \%patches, \%successors;
 
 
 # Upload the archives.

@@ -1,5 +1,6 @@
 use strict;
 
+
 sub readManifest {
     my $manifest = shift;
     my $narFiles = shift;
@@ -27,28 +28,22 @@ sub readManifest {
         next if (/^$/);
 
         if (!$inside) {
-            if (/^\{$/) {
-                $type = "narfile";
+
+            if (/^\s*(\w*)\s*\{$/) {
+                $type = $1;
+                $type = "narfile" if $type eq "";
                 $inside = 1;
                 undef $storePath;
                 undef $url;
                 undef $hash;
-                $size = 999999999;
+                undef $size;
                 @preds = ();
                 undef $narHash;
-	    }
-            elsif (/^patch \{$/) {
-                $type = "patch";
-                $inside = 1;
-                undef $url;
-                undef $hash;
-                undef $size;
                 undef $basePath;
                 undef $baseHash;
                 undef $patchType;
-                undef $narHash;
-            }
-            else { die "bad line: $_"; }
+	    }
+
         } else {
             
             if (/^\}$/) {
@@ -107,7 +102,7 @@ sub readManifest {
                         push @{$patchList},
                             { url => $url, hash => $hash, size => $size
                             , basePath => $basePath, baseHash => $baseHash
-                            , narHash => $narHash
+                            , narHash => $narHash, type => $patchType
                             };
                     }
                     
@@ -129,10 +124,57 @@ sub readManifest {
             elsif (/^\s*NarURL:\s*(\S+)\s*$/) { $url = $1; }
             elsif (/^\s*MD5:\s*(\S+)\s*$/) { $hash = $1; }
 
-            else { die "bad line: $_"; }
         }
     }
 
+    close MANIFEST;
+}
+
+
+sub writeManifest
+{
+    my $manifest = shift;
+    my $narFiles = shift;
+    my $patches = shift;
+    my $successors = shift;
+
+    open MANIFEST, ">$manifest";
+
+    foreach my $storePath (keys %{$narFiles}) {
+        my $narFileList = $$narFiles{$storePath};
+        foreach my $narFile (@{$narFileList}) {
+            print MANIFEST "{\n";
+            print MANIFEST "  StorePath: $storePath\n";
+            print MANIFEST "  NarURL: $narFile->{url}\n";
+            print MANIFEST "  MD5: $narFile->{hash}\n";
+            print MANIFEST "  NarHash: $narFile->{narHash}\n";
+            print MANIFEST "  Size: $narFile->{size}\n";
+            foreach my $p (keys %{$successors}) { # !!! quadratic
+                if ($$successors{$p} eq $storePath) {
+                    print MANIFEST "  SuccOf: $p\n";
+                }
+            }
+            print MANIFEST "}\n";
+        }
+    }
+    
+    foreach my $storePath (keys %{$patches}) {
+        my $patchList = $$patches{$storePath};
+        foreach my $patch (@{$patchList}) {
+            print MANIFEST "patch {\n";
+            print MANIFEST "  StorePath: $storePath\n";
+            print MANIFEST "  NarURL: $patch->{url}\n";
+            print MANIFEST "  MD5: $patch->{hash}\n";
+            print MANIFEST "  NarHash: $patch->{narHash}\n";
+            print MANIFEST "  Size: $patch->{size}\n";
+            print MANIFEST "  BasePath: $patch->{basePath}\n";
+            print MANIFEST "  BaseHash: $patch->{baseHash}\n";
+            print MANIFEST "  Type: $patch->{patchType}\n";
+            print MANIFEST "}\n";
+        }
+    }
+    
+    
     close MANIFEST;
 }
 
