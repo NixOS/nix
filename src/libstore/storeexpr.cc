@@ -15,7 +15,7 @@ Path writeTerm(ATerm t, const string & suffix)
     Hash h = hashTerm(t);
 
     Path path = canonPath(nixStore + "/" + 
-        (string) h + suffix + ".nix");
+        (string) h + suffix + ".store");
 
     if (!isValidPath(path)) {
         char * s = ATwriteToString(t);
