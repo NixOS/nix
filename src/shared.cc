@@ -53,6 +53,10 @@ int main(int argc, char * * argv)
     ATerm bottomOfStack;
     ATinit(argc, argv, &bottomOfStack);
 
+    /* Turn on buffering for cerr. */
+    char buf[1024];
+    cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
+
     try {
         initAndRun(argc, argv);
     } catch (UsageError & e) {
