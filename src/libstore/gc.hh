@@ -27,7 +27,8 @@ void addTempRoot(const Path & path);
 void removeTempRoots();
 
 /* Register a permanent GC root. */
-Path addPermRoot(const Path & storePath, const Path & gcRoot);
+Path addPermRoot(const Path & storePath, const Path & gcRoot,
+    bool indirect);
 
 
 #endif /* !__GC_H */

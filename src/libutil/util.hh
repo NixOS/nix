@@ -84,6 +84,8 @@ bool pathExists(const Path & path);
    in any way canonicalised. */
 Path readLink(const Path & path);
 
+bool isLink(const Path & path);
+
 /* Read the contents of a directory.  The entries `.' and `..' are
    removed. */
 Strings readDirectory(const Path & path);

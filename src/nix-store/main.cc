@@ -1,9 +1,5 @@
 #include <iostream>
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
 #include "globals.hh"
 #include "build.hh"
 #include "gc.hh"
@@ -24,6 +20,7 @@ void printHelp()
 
 static Path gcRoot;
 static int rootNr = 0;
+static bool indirectRoot = false;
 
 
 static Path findOutput(const Derivation & drv, string id)
@@ -37,11 +34,9 @@ static Path findOutput(const Derivation & drv, string id)
 
 static Path followSymlinks(Path & path)
 {
+    path = absPath(path);
     while (!isStorePath(path)) {
-        struct stat st;
-        if (lstat(path.c_str(), &st))
-            throw SysError(format("getting status of `%1%'") % path);
-        if (!S_ISLNK(st.st_mode)) return path;
+        if (!isLink(path)) return path;
         string target = readLink(path);
         path = canonPath(string(target, 0, 1) == "/"
             ? target
@@ -64,7 +59,9 @@ static Path realisePath(const Path & path)
         if (gcRoot == "")
             printGCWarning();
         else
-            outPath = addPermRoot(outPath, makeRootName(gcRoot, rootNr));
+            outPath = addPermRoot(outPath,
+                makeRootName(gcRoot, rootNr),
+                indirectRoot);
         
         return outPath;
     } else {
@@ -191,6 +188,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
+                *i = followSymlinks(*i);
                 if (forceRealise) realisePath(*i);
                 Derivation drv = derivationFromPath(*i);
                 cout << format("%1%\n") % findOutput(drv, "out");
@@ -206,6 +204,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
+                *i = followSymlinks(*i);
                 Path path = maybeUseOutput(*i, useOutput, forceRealise);
                 if (query == qRequisites)
                     storePathRequisites(path, includeOutputs, paths);
@@ -441,8 +440,10 @@ void run(Strings args)
         else if (arg == "--add-root") {
             if (i == args.end())
                 throw UsageError("`--add-root requires an argument");
-            gcRoot = *i++;
+            gcRoot = absPath(*i++);
         }
+        else if (arg == "--indirect")
+            indirectRoot = true;
         else if (arg[0] == '-')
             opFlags.push_back(arg);
         else

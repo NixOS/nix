@@ -13,6 +13,8 @@
 
 
 static string gcLockName = "gc.lock";
+static string tempRootsDir = "temproots";
+static string gcRootsDir = "gcroots";
 
 
 /* Acquire the global GC lock.  This is used to prevent new Nix
@@ -49,39 +51,60 @@ static void createDirs(const Path & path)
 }
 
 
-Path addPermRoot(const Path & _storePath, const Path & _gcRoot)
+void createSymlink(const Path & link, const Path & target, bool careful)
+{
+    /* Create directories up to `gcRoot'. */
+    createDirs(dirOf(link));
+
+    /* Remove the old symlink. */
+    if (pathExists(link)) {
+        if (careful && (!isLink(link) || !isStorePath(readLink(link))))
+            throw Error(format("cannot create symlink `%1%'; already exists") % link);
+        unlink(link.c_str());
+    }
+
+    /* And create the new own. */
+    if (symlink(target.c_str(), link.c_str()) == -1)
+        throw SysError(format("symlinking `%1%' to `%2%'")
+            % link % target);
+}
+
+
+Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
+    bool indirect)
 {
     Path storePath(canonPath(_storePath));
     Path gcRoot(canonPath(_gcRoot));
-
-    Path rootsDir = canonPath((format("%1%/%2%") % nixStateDir % "gcroots").str());
-    
-    if (string(gcRoot, 0, rootsDir.size() + 1) != rootsDir + "/")
-        throw Error(format(
-            "path `%1%' is not a valid garbage collector root; "
-            "it's not in the `%1%' directory")
-            % gcRoot % rootsDir);
+    assertStorePath(storePath);
 
     /* Grab the global GC root.  This prevents the set of permanent
        roots from increasing while a GC is in progress. */
     AutoCloseFD fdGCLock = openGCLock(ltRead);
 
-    /* Create directories up to `gcRoot'. */
-    createDirs(dirOf(gcRoot));
+    if (indirect) {
+        string hash = printHash32(hashString(htSHA1, gcRoot));
+        Path realRoot = canonPath((format("%1%/%2%/auto/%3%")
+            % nixStateDir % gcRootsDir % hash).str());
 
-    /* Remove the old symlink. */
-    unlink(gcRoot.c_str());
+        createSymlink(gcRoot, storePath, true);
+        createSymlink(realRoot, gcRoot, false);
+    }
 
-    /* And create the new own. */
-    if (symlink(storePath.c_str(), gcRoot.c_str()) == -1)
-        throw SysError(format("symlinking `%1%' to `%2%'")
-            % gcRoot % storePath);
+    else {
+        Path rootsDir = canonPath((format("%1%/%2%") % nixStateDir % gcRootsDir).str());
+    
+        if (string(gcRoot, 0, rootsDir.size() + 1) != rootsDir + "/")
+            throw Error(format(
+                "path `%1%' is not a valid garbage collector root; "
+                "it's not in the directory `%2%'")
+                % gcRoot % rootsDir);
+
+        createSymlink(gcRoot, storePath, false);
+    }
 
     return gcRoot;
 }
 
-
-static string tempRootsDir = "temproots";
 
 /* The file to which we write our temporary roots. */
 static Path fnTempRoots;

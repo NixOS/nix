@@ -8,41 +8,52 @@ if test -z "$nixExpr"; then
 fi
 
 extraArgs=
-noLink=
+addDrvLink=0
+addOutLink=1
 
-userName=$USER
-if test -z "$username"; then userName="unknown"; fi
 
+trap 'rm -f ./.nix-build-tmp-*' EXIT
+
+
+# Process the arguments.
 for i in "$@"; do
     case "$i" in
-        --no-link)
-            noLink=1
+    
+        --add-drv-link)
+            addDrvLink=1
             ;;
+            
+        --no-link)
+            addOutLink=0
+            ;;
+            
         -*)
             extraArgs="$extraArgs $i"
             ;;
+            
         *)
+            # Instantiate the Nix expression.
+            prefix=
+            if test "$addDrvLink" = 0; then prefix=.nix-build-tmp-; fi
             storeExprs=$(@bindir@/nix-instantiate \
-                --add-root "@localstatedir@/nix/gcroots/nix-build/$userName-drv" \
+                --add-root ./${prefix}derivation --indirect \
                 "$i")
+                
             for j in $storeExprs; do
-                echo "store expression is $j" >&2
+                echo "store expression is $j $(readlink "$j")" >&2
             done
+
+            # Build the resulting store derivation.
+            prefix=
+            if test "$addOutLink" = 0; then prefix=.nix-build-tmp-; fi
             outPaths=$(@bindir@/nix-store \
-                --add-root "@localstatedir@/nix/gcroots/nix-build/$userName-out" \
+                --add-root ./${prefix}result --indirect \
                 -rv $extraArgs $storeExprs)
+                
             for j in $outPaths; do
-                echo "$j"
-                if test -z "$noLink"; then
-                    if test -L result; then
-                        rm result
-                    elif test -e result; then
-                        echo "cannot remove \`result' (not a symlink)"
-                        exit 1
-                    fi
-                    ln -s "$j" result
-                fi
+                echo "$j $(readlink "$j")"
             done
+            
             ;;
     esac
 done

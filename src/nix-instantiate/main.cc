@@ -29,6 +29,7 @@ static Expr evalStdin(EvalState & state, bool parseOnly)
 
 static Path gcRoot;
 static int rootNr = 0;
+static bool indirectRoot = false;
 
 
 /* Print out the paths of the resulting derivation(s).  If the user
@@ -51,7 +52,8 @@ static void printDrvPaths(EvalState & state, Expr e)
                     printGCWarning();
                 else
                     drvPath = addPermRoot(drvPath,
-                        makeRootName(gcRoot, rootNr));
+                        makeRootName(gcRoot, rootNr),
+                        indirectRoot);
                 cout << format("%1%\n") % drvPath;
                 return;
             }
@@ -110,8 +112,10 @@ void run(Strings args)
         else if (arg == "--add-root") {
             if (i == args.end())
                 throw UsageError("`--add-root requires an argument");
-            gcRoot = *i++;
+            gcRoot = absPath(*i++);
         }
+        else if (arg == "--indirect")
+            indirectRoot = true;
         else if (arg[0] == '-')
             throw UsageError(format("unknown flag `%1%`") % arg);
         else

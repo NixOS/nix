@@ -135,6 +135,15 @@ Path readLink(const Path & path)
 }
 
 
+bool isLink(const Path & path)
+{
+    struct stat st;
+    if (lstat(path.c_str(), &st))
+        throw SysError(format("getting status of `%1%'") % path);
+    return S_ISLNK(st.st_mode);
+}
+
+
 Strings readDirectory(const Path & path)
 {
     Strings names;
