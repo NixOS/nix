@@ -51,7 +51,7 @@ EXTRA_DIST = $(TESTS) \
   locking.nix.in locking.builder.sh \
   parallel.nix.in parallel.builder.sh \
   build-hook.nix.in build-hook.hook.sh \
-  substitutes.nix.in substituter.nix.in substituter.builder.sh \
-  substitutes2.nix.in substituter2.nix.in substituter2.builder.sh \
+  substitutes.nix.in substituter.builder.sh \
+  substitutes2.nix.in substituter2.builder.sh \
   fallback.nix.in \
   $(wildcard lang/*.nix) $(wildcard lang/*.exp)
