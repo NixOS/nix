@@ -25,6 +25,7 @@ sub createLinks {
         
 	if ($srcFile =~ /\/propagated-build-inputs$/ ||
             $srcFile =~ /\/nix-support$/ ||
+            $srcFile =~ /\/perllocal.pod$/ ||
             $srcFile =~ /\/log$/)
         {
             # Do nothing.
@@ -72,13 +73,27 @@ sub createLinks {
 
 my %done;
 
+sub addPkg;
 sub addPkg {
     my $pkgDir = shift;
 
     return if (defined $done{$pkgDir});
     $done{$pkgDir} = 1;
 
+    print "adding $pkgDir\n";
     createLinks("$pkgDir", "$out");
+
+    my $propagatedFN = "$pkgDir/nix-support/propagated-build-inputs";
+    if (-e $propagatedFN) {
+        open PROP, "<$propagatedFN" or die;
+        my $propagated = <PROP>;
+        close PROP;
+        my @propagated = split ' ', $propagated;
+        foreach my $p (@propagated) {
+            addPkg $p;
+        }
+    }
+        
 }
 
 
@@ -86,7 +101,6 @@ my @args = split ' ', $ENV{"derivations"};
 
 while (scalar @args > 0) {
     my $drvPath = shift @args;
-    print "adding $drvPath\n";
     addPkg($drvPath);
 }
 
