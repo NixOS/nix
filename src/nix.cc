@@ -93,17 +93,15 @@ static void opQuery(Strings opFlags, Strings opArgs)
     switch (query) {
         
         case qList: {
-            PathSet paths;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                StringSet paths2 = nixExprRoots(
+                StringSet paths = nixExprRoots(
                     maybeNormalise(checkPath(*i), normalise));
-                paths.insert(paths2.begin(), paths2.end());
+                for (StringSet::iterator j = paths.begin(); 
+                     j != paths.end(); j++)
+                    cout << format("%s\n") % *j;
             }
-            for (StringSet::iterator i = paths.begin(); 
-                 i != paths.end(); i++)
-                cout << format("%s\n") % *i;
             break;
         }
 
