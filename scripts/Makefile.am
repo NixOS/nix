@@ -20,5 +20,4 @@ include ../substitute.mk
 EXTRA_DIST = nix-collect-garbage.in \
  nix-pull.in nix-push.in nix-profile.sh.in \
  nix-prefetch-url.in nix-install-package.in \
- prebuilts.conf readmanifest.pm
-
+ prebuilts.conf readmanifest.pm.in
