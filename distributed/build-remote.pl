@@ -80,6 +80,21 @@ if (!defined $machine) {
     }
 }
 
+sub writeLoad {
+    system "echo A >> /tmp/blaaaa";
+    open LOAD, "> /home/eelco/nix/distributed/current-load" or die;
+    system "echo B >> /tmp/blaaaa";
+    foreach my $cur (keys %machines) {
+        system "echo $cur $curJobs{$cur} >> /tmp/blaaaa";
+        print LOAD "$cur $curJobs{$cur}\n";
+    }
+    system "echo C >> /tmp/blaaaa";
+    close LOAD;
+}
+
+$curJobs{$machine} = $curJobs{$machine} + 1;
+writeLoad;
+
 sendReply "accept";
 open IN, "<&4" or die;
 my $x = <IN>;
@@ -87,30 +102,27 @@ chomp $x;
 print "got $x\n";  
 close IN;
 
-print "BUILDING REMOTE: $storeExpr on $machine\n";
+system "echo $x >> /tmp/blaaaa";
+system "echo $curJobs{$machine} >> /tmp/blaaaa";
 
-$curJobs{$machine} = $curJobs{$machine} + 1;
-
-sub writeLoad {
-    open LOAD, "> /home/eelco/nix/distributed/current-load" or die;
-    foreach my $cur (keys %machines) {
-        print LOAD "$cur $curJobs{$cur}\n";
-    }
-    close LOAD;
+if ($x ne "okay") {
+    $curJobs{$machine} = $curJobs{$machine} - 1;
+    system "echo $curJobs{$machine} >> /tmp/blaaaa";
+    writeLoad;
+    exit 0;
 }
 
-writeLoad
-
+print "BUILDING REMOTE: $storeExpr on $machine\n";
 
 my $ssh = "ssh -i $sshKeys{$machine} -x";
 
-my $inputs = `cat inputs`;
+my $inputs = `cat inputs` or die;
 $inputs =~ s/\n/ /g;
 
-my $outputs = `cat outputs`;
+my $outputs = `cat outputs` or die;
 $outputs =~ s/\n/ /g;
 
-my $successors = `cat successors`;
+my $successors = `cat successors` or die;
 $successors =~ s/\n/ /g;
 
 system "rsync -a -e '$ssh' $storeExpr $inputs $machine:/nix/store";
@@ -136,4 +148,4 @@ foreach my $output (split '\n', $outputs) {
 
 $curJobs{$machine} = $curJobs{$machine} - 1;
 
-writeLoad
+writeLoad;
