@@ -6,6 +6,7 @@
 #include "shared.hh"
 #include "eval.hh"
 #include "parser.hh"
+#include "constructors.hh"
 #include "help.txt.hh"
 
 
@@ -32,7 +33,7 @@ static void printDrvPaths(EvalState & state, Expr e)
 
     /* !!! duplication w.r.t. parseDerivations in nix-env */
 
-    if (atMatch(m, e) >> "Attrs" >> es) {
+    if (matchAttrs(e, es)) {
         Expr a = queryAttr(e, "type");
         if (a && evalString(state, a) == "derivation") {
             a = queryAttr(e, "drvPath");
@@ -50,7 +51,7 @@ static void printDrvPaths(EvalState & state, Expr e)
         }
     }
 
-    if (atMatch(m, e) >> "List" >> es) {
+    if (matchList(e, es)) {
         for (ATermIterator i(es); i; ++i)
             printDrvPaths(state, evalExpr(state, *i));
         return;

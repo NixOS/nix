@@ -13,6 +13,8 @@
    normals forms efficiently. */
 typedef ATerm Expr;
 
+typedef ATerm Pos;
+
 
 /* Mappings from ATerms to ATerms.  This is just a wrapper around
    ATerm tables. */
@@ -52,11 +54,6 @@ private:
    ATerm garbage collector. */
 typedef vector<ATerm> ATermVector;
 
-
-/* Convert a string to an ATerm (i.e., a quoted nullary function
-   applicaton). */
-ATerm string2ATerm(const string & s);
-string aterm2String(ATerm t);
 
 /* Show a position. */
 string showPos(ATerm pos);

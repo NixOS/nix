@@ -1,18 +1,18 @@
 #include "normalise.hh"
 #include "eval.hh"
 #include "globals.hh"
+#include "constructors.hh"
 
 
 /* Load and evaluate an expression from path specified by the
    argument. */ 
 static Expr primImport(EvalState & state, const ATermVector & args)
 {
-    ATMatcher m;
-    string path;
+    ATerm path;
     Expr fn = evalExpr(state, args[0]);
-    if (!(atMatch(m, fn) >> "Path" >> path))
+    if (!matchPath(fn, path))
         throw Error("path expected");
-    return evalFile(state, path);
+    return evalFile(state, aterm2String(path));
 }
 
 
@@ -86,24 +86,23 @@ static void processBinding(EvalState & state, Expr e, StoreExpr & ne,
 {
     e = evalExpr(state, e);
 
-    ATMatcher m;
-    string s;
+    ATerm s;
     ATermList es;
     int n;
     Expr e1, e2;
 
-    if (atMatch(m, e) >> "Str" >> s) ss.push_back(s);
-    else if (atMatch(m, e) >> "Uri" >> s) ss.push_back(s);
-    else if (atMatch(m, e) >> "Bool" >> "True") ss.push_back("1");
-    else if (atMatch(m, e) >> "Bool" >> "False") ss.push_back("");
+    if (matchStr(e, s)) ss.push_back(aterm2String(s));
+    else if (matchUri(e, s)) ss.push_back(aterm2String(s));
+    else if (e == eTrue) ss.push_back("1");
+    else if (e == eFalse) ss.push_back("");
 
-    else if (atMatch(m, e) >> "Int" >> n) {
+    else if (matchInt(e, n)) {
         ostringstream st;
         st << n;
         ss.push_back(st.str());
     }
 
-    else if (atMatch(m, e) >> "Attrs") {
+    else if (matchAttrs(e, es)) {
         Expr a = queryAttr(e, "type");
         if (a && evalString(state, a) == "derivation") {
             a = queryAttr(e, "drvPath");
@@ -127,30 +126,29 @@ static void processBinding(EvalState & state, Expr e, StoreExpr & ne,
             throw Error("invalid derivation attribute");
     }
 
-    else if (atMatch(m, e) >> "Path" >> s) {
-        Path drvPath = copyAtom(state, s);
+    else if (matchPath(e, s)) {
+        Path drvPath = copyAtom(state, aterm2String(s));
         ss.push_back(addInput(state, drvPath, ne));
     }
     
-    else if (atMatch(m, e) >> "List" >> es) {
+    else if (matchList(e, es)) {
         for (ATermIterator i(es); i; ++i) {
             startNest(nest, lvlVomit, format("processing list element"));
 	    processBinding(state, evalExpr(state, *i), ne, ss);
         }
     }
 
-    else if (atMatch(m, e) >> "Null") ss.push_back("");
+    else if (matchNull(e)) ss.push_back("");
 
-    else if (atMatch(m, e) >> "SubPath" >> e1 >> e2) {
+    else if (matchSubPath(e, e1, e2)) {
         Strings ss2;
         processBinding(state, evalExpr(state, e1), ne, ss2);
         if (ss2.size() != 1)
             throw Error("left-hand side of `~' operator cannot be a list");
         e2 = evalExpr(state, e2);
-        if (!(atMatch(m, e2) >> "Str" >> s ||
-             (atMatch(m, e2) >> "Path" >> s)))
+        if (!(matchStr(e2, s) || matchPath(e2, s)))
             throw Error("right-hand side of `~' operator must be a path or string");
-        ss.push_back(canonPath(ss2.front() + "/" + s));
+        ss.push_back(canonPath(ss2.front() + "/" + aterm2String(s)));
     }
     
     else throw Error("invalid derivation attribute");
@@ -198,8 +196,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
         ATerm value;
         Expr pos;
         ATerm rhs = attrs.get(key);
-        ATMatcher m;
-        if (!(atMatch(m, rhs) >> "" >> value >> pos)) abort();
+        if (!matchAttrRHS(rhs, value, pos)) abort();
         startNest(nest, lvlVomit, format("processing attribute `%1%'") % key);
 
         Strings ss;
@@ -272,10 +269,11 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
     printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'")
         % drvName % drvPath);
 
-    attrs.set("outPath", ATmake("(Path(<str>), NoPos)", outPath.c_str()));
-    attrs.set("drvPath", ATmake("(Path(<str>), NoPos)", drvPath.c_str()));
-    attrs.set("drvHash", ATmake("(<term>, NoPos)", makeString(drvHash)));
-    attrs.set("type", ATmake("(<term>, NoPos)", makeString("derivation")));
+    attrs.set("outPath", makeAttrRHS(makePath(string2ATerm(outPath.c_str())), makeNoPos()));
+    attrs.set("drvPath", makeAttrRHS(makePath(string2ATerm(drvPath.c_str())), makeNoPos()));
+    attrs.set("drvHash",
+        makeAttrRHS(makeStr(string2ATerm(((string) drvHash).c_str())), makeNoPos()));
+    attrs.set("type", makeAttrRHS(makeStr(string2ATerm("derivation")), makeNoPos()));
 
     return makeAttrs(attrs);
 }
@@ -285,7 +283,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
    following the last slash. */
 static Expr primBaseNameOf(EvalState & state, const ATermVector & args)
 {
-    return makeString(baseNameOf(evalString(state, args[0])));
+    return makeStr(string2ATerm(baseNameOf(evalString(state, args[0])).c_str()));
 }
 
 
@@ -293,12 +291,9 @@ static Expr primBaseNameOf(EvalState & state, const ATermVector & args)
 static Expr primToString(EvalState & state, const ATermVector & args)
 {
     Expr arg = evalExpr(state, args[0]);
-    ATMatcher m;
-    string s;
-    if (atMatch(m, arg) >> "Str" >> s ||
-        atMatch(m, arg) >> "Path" >> s ||
-        atMatch(m, arg) >> "Uri" >> s)
-        return makeString(s);
+    ATerm s;
+    if (matchStr(arg, s) || matchPath(arg, s) || matchUri(arg, s))
+        return makeStr(s);
     else throw Error("cannot coerce value to string");
 }
 
@@ -306,29 +301,27 @@ static Expr primToString(EvalState & state, const ATermVector & args)
 /* Boolean constructors. */
 static Expr primTrue(EvalState & state, const ATermVector & args)
 {
-    return ATmake("Bool(True)");
+    return eTrue;
 }
 
 
 static Expr primFalse(EvalState & state, const ATermVector & args)
 {
-    return ATmake("Bool(False)");
+    return eFalse;
 }
 
 
 /* Return the null value. */
 Expr primNull(EvalState & state, const ATermVector & args)
 {
-    return ATmake("Null");
+    return makeNull();
 }
 
 
 /* Determine whether the argument is the null value. */
 Expr primIsNull(EvalState & state, const ATermVector & args)
 {
-    Expr arg = evalExpr(state, args[0]);
-    ATMatcher m;
-    return makeBool(atMatch(m, arg) >> "Null");
+    return makeBool(matchNull(evalExpr(state, args[0])));
 }
 
 
@@ -338,18 +331,15 @@ Expr primMap(EvalState & state, const ATermVector & args)
     Expr fun = evalExpr(state, args[0]);
     Expr list = evalExpr(state, args[1]);
 
-    ATMatcher m;
-
     ATermList list2;
-    if (!(atMatch(m, list) >> "List" >> list2))
+    if (!matchList(list, list2))
         throw Error("`map' expects a list as its second argument");
 
     ATermList list3 = ATempty;
     for (ATermIterator i(list2); i; ++i)
-        list3 = ATinsert(list3,
-            ATmake("Call(<term>, <term>)", fun, *i));
+        list3 = ATinsert(list3, makeCall(fun, *i));
 
-    return ATmake("List(<term>)", ATreverse(list3));
+    return makeList(ATreverse(list3));
 }
 
 

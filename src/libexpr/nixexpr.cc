@@ -2,6 +2,10 @@
 #include "storeexpr.hh"
 
 
+#include "constructors.hh"
+#include "constructors.cc"
+
+
 ATermMap::ATermMap(unsigned int initialSize, unsigned int maxLoadPct)
 {
     this->maxLoadPct = maxLoadPct;
@@ -38,7 +42,7 @@ void ATermMap::set(ATerm key, ATerm value)
 
 void ATermMap::set(const string & key, ATerm value)
 {
-    set(string2ATerm(key), value);
+    set(string2ATerm(key.c_str()), value);
 }
 
 
@@ -50,7 +54,7 @@ ATerm ATermMap::get(ATerm key) const
 
 ATerm ATermMap::get(const string & key) const
 {
-    return get(string2ATerm(key));
+    return get(string2ATerm(key.c_str()));
 }
 
 
@@ -62,7 +66,7 @@ void ATermMap::remove(ATerm key)
 
 void ATermMap::remove(const string & key)
 {
-    remove(string2ATerm(key));
+    remove(string2ATerm(key.c_str()));
 }
 
 
@@ -94,28 +98,14 @@ void ATermMap::reset()
 }
 
 
-ATerm string2ATerm(const string & s)
-{
-    return (ATerm) ATmakeAppl0(ATmakeAFun((char *) s.c_str(), 0, ATtrue));
-}
-
-
-string aterm2String(ATerm t)
-{
-    return ATgetName(ATgetAFun(t));
-}
-
-
 string showPos(ATerm pos)
 {
-    ATMatcher m;
-    Path path;
+    ATerm path;
     int line, column;
-    if (atMatch(m, pos) >> "NoPos")
-        return "undefined position";
-    if (!(atMatch(m, pos) >> "Pos" >> path >> line >> column))
+    if (matchNoPos(pos)) return "undefined position";
+    if (!matchPos(pos, path, line, column))
         throw badTerm("position expected", pos);
-    return (format("`%1%', line %2%") % path % line).str();
+    return (format("`%1%', line %2%") % aterm2String(path) % line).str();
 }
     
 
@@ -150,18 +140,16 @@ ATerm bottomupRewrite(TermFun & f, ATerm e)
 
 void queryAllAttrs(Expr e, ATermMap & attrs, bool withPos)
 {
-    ATMatcher m;
     ATermList bnds;
-    if (!(atMatch(m, e) >> "Attrs" >> bnds))
+    if (!matchAttrs(e, bnds))
         throw Error("attribute set expected");
 
     for (ATermIterator i(bnds); i; ++i) {
-        string s;
+        ATerm name;
         Expr e;
         ATerm pos;
-        if (!(atMatch(m, *i) >> "Bind" >> s >> e >> pos))
-            abort(); /* can't happen */
-        attrs.set(s, withPos ? ATmake("(<term>, <term>)", e, pos) : e);
+        if (!matchBind(*i, name, e, pos)) abort(); /* can't happen */
+        attrs.set(name, withPos ? makeAttrRHS(e, pos) : e);
     }
 }
 
@@ -175,18 +163,16 @@ Expr queryAttr(Expr e, const string & name)
 
 Expr queryAttr(Expr e, const string & name, ATerm & pos)
 {
-    ATMatcher m;
     ATermList bnds;
-    if (!(atMatch(m, e) >> "Attrs" >> bnds))
+    if (!matchAttrs(e, bnds))
         throw Error("attribute set expected");
 
     for (ATermIterator i(bnds); i; ++i) {
-        string s;
+        ATerm name2, pos2;
         Expr e;
-        ATerm pos2;
-        if (!(atMatch(m, *i) >> "Bind" >> s >> e >> pos2))
+        if (!matchBind(*i, name2, e, pos2))
             abort(); /* can't happen */
-        if (s == name) {
+        if (aterm2String(name2) == name) {
             pos = pos2;
             return e;
         }
@@ -198,17 +184,15 @@ Expr queryAttr(Expr e, const string & name, ATerm & pos)
 
 Expr makeAttrs(const ATermMap & attrs)
 {
-    ATMatcher m;
     ATermList bnds = ATempty;
     for (ATermIterator i(attrs.keys()); i; ++i) {
         Expr e;
         ATerm pos;
-        if (!(atMatch(m, attrs.get(*i)) >> "" >> e >> pos))
+        if (!matchAttrRHS(attrs.get(*i), e, pos))
             abort(); /* can't happen */
-        bnds = ATinsert(bnds, 
-            ATmake("Bind(<term>, <term>, <term>)", *i, e, pos));
+        bnds = ATinsert(bnds, makeBind(*i, e, pos));
     }
-    return ATmake("Attrs(<term>)", ATreverse(bnds));
+    return makeAttrs(ATreverse(bnds));
 }
 
 
@@ -216,57 +200,53 @@ Expr substitute(const ATermMap & subs, Expr e)
 {
     checkInterrupt();
 
-    ATMatcher m;
-    ATerm name, pos;
+    ATerm name, pos, e2;
 
     /* As an optimisation, don't substitute in subterms known to be
        closed. */
-    if (atMatch(m, e) >> "Closed") return e;
+    if (matchClosed(e, e2)) return e;
 
-    if (atMatch(m, e) >> "Var" >> name) {
+    if (matchVar(e, name)) {
         Expr sub = subs.get(name);
-        return sub ? ATmake("Closed(<term>)", sub) : e;
+        return sub ? makeClosed(sub) : e;
     }
 
     /* In case of a function, filter out all variables bound by this
        function. */
     ATermList formals;
-    ATerm body;
-    if (atMatch(m, e) >> "Function" >> formals >> body >> pos) {
+    ATerm body, def;
+    if (matchFunction(e, formals, body, pos)) {
         ATermMap subs2(subs);
         for (ATermIterator i(formals); i; ++i) {
-            if (!(atMatch(m, *i) >> "NoDefFormal" >> name) &&
-                !(atMatch(m, *i) >> "DefFormal" >> name))
+            if (!matchNoDefFormal(*i, name) &&
+                !matchDefFormal(*i, name, def))
                 abort();
             subs2.remove(name);
         }
-        return ATmake("Function(<term>, <term>, <term>)",
-            substitute(subs, (ATerm) formals),
+        return makeFunction(
+            (ATermList) substitute(subs, (ATerm) formals),
             substitute(subs2, body), pos);
     }
 
-    if (atMatch(m, e) >> "Function1" >> name >> body >> pos) {
+    if (matchFunction1(e, name, body, pos)) {
         ATermMap subs2(subs);
         subs2.remove(name);
-        return ATmake("Function1(<term>, <term>, <term>)", name,
-            substitute(subs2, body), pos);
+        return makeFunction1(name, substitute(subs2, body), pos);
     }
         
     /* Idem for a mutually recursive attribute set. */
     ATermList rbnds, nrbnds;
-    if (atMatch(m, e) >> "Rec" >> rbnds >> nrbnds) {
+    if (matchRec(e, rbnds, nrbnds)) {
         ATermMap subs2(subs);
         for (ATermIterator i(rbnds); i; ++i)
-            if (atMatch(m, *i) >> "Bind" >> name)
-                subs2.remove(name);
+            if (matchBind(*i, name, e2, pos)) subs2.remove(name);
             else abort(); /* can't happen */
         for (ATermIterator i(nrbnds); i; ++i)
-            if (atMatch(m, *i) >> "Bind" >> name)
-                subs2.remove(name);
+            if (matchBind(*i, name, e2, pos)) subs2.remove(name);
             else abort(); /* can't happen */
-        return ATmake("Rec(<term>, <term>)",
-            substitute(subs2, (ATerm) rbnds),
-            substitute(subs, (ATerm) nrbnds));
+        return makeRec(
+            (ATermList) substitute(subs2, (ATerm) rbnds),
+            (ATermList) substitute(subs, (ATerm) nrbnds));
     }
 
     if (ATgetType(e) == AT_APPL) {
@@ -293,24 +273,23 @@ Expr substitute(const ATermMap & subs, Expr e)
 
 void checkVarDefs(const ATermMap & defs, Expr e)
 {
-    ATMatcher m;
-    ATerm name;
+    ATerm name, pos, value;
     ATermList formals;
     ATerm with, body;
     ATermList rbnds, nrbnds;
 
-    if (atMatch(m, e) >> "Var" >> name) {
+    if (matchVar(e, name)) {
         if (!defs.get(name))
             throw Error(format("undefined variable `%1%'")
                 % aterm2String(name));
     }
 
-    else if (atMatch(m, e) >> "Function" >> formals >> body) {
+    else if (matchFunction(e, formals, body, pos)) {
         ATermMap defs2(defs);
         for (ATermIterator i(formals); i; ++i) {
             Expr deflt;
-            if (!(atMatch(m, *i) >> "NoDefFormal" >> name))
-                if (atMatch(m, *i) >> "DefFormal" >> name >> deflt)
+            if (!matchNoDefFormal(*i, name))
+                if (matchDefFormal(*i, name, deflt))
                     checkVarDefs(defs, deflt);
                 else
                     abort();
@@ -319,29 +298,27 @@ void checkVarDefs(const ATermMap & defs, Expr e)
         checkVarDefs(defs2, body);
     }
         
-    else if (atMatch(m, e) >> "Function1" >> name >> body) {
+    else if (matchFunction1(e, name, body, pos)) {
         ATermMap defs2(defs);
         defs2.set(name, (ATerm) ATempty);
         checkVarDefs(defs2, body);
     }
         
-    else if (atMatch(m, e) >> "Rec" >> rbnds >> nrbnds) {
+    else if (matchRec(e, rbnds, nrbnds)) {
         checkVarDefs(defs, (ATerm) nrbnds);
         ATermMap defs2(defs);
         for (ATermIterator i(rbnds); i; ++i) {
-            if (!(atMatch(m, *i) >> "Bind" >> name))
-                abort(); /* can't happen */
+            if (!matchBind(*i, name, value, pos)) abort(); /* can't happen */
             defs2.set(name, (ATerm) ATempty);
         }
         for (ATermIterator i(nrbnds); i; ++i) {
-            if (!(atMatch(m, *i) >> "Bind" >> name))
-                abort(); /* can't happen */
+            if (!matchBind(*i, name, value, pos)) abort(); /* can't happen */
             defs2.set(name, (ATerm) ATempty);
         }
         checkVarDefs(defs2, (ATerm) rbnds);
     }
 
-    else if (atMatch(m, e) >> "With" >> with >> body) {
+    else if (matchWith(e, with, body, pos)) {
         /* We can't check the body without evaluating the definitions
            (which is an arbitrary expression), so we don't do that
            here but only when actually evaluating the `with'. */
@@ -362,17 +339,5 @@ void checkVarDefs(const ATermMap & defs, Expr e)
 
 Expr makeBool(bool b)
 {
-    return b ? ATmake("Bool(True)") : ATmake("Bool(False)");
-}
-
-
-Expr makeString(const string & s)
-{
-    return ATmake("Str(<str>)", s.c_str());
-}
-
-
-Expr makePath(const Path & path)
-{
-    return ATmake("Path(<str>)", path.c_str());
+    return b ? eTrue : eFalse;
 }

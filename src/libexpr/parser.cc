@@ -7,6 +7,7 @@
 
 #include "aterm.hh"
 #include "parser.hh"
+#include "constructors.hh"
 
 
 struct ParseData 
@@ -45,28 +46,24 @@ void parseError(ParseData * data, char * error, int line, int column)
         
 ATerm fixAttrs(int recursive, ATermList as)
 {
-    ATMatcher m;
     ATermList bs = ATempty, cs = ATempty;
     ATermList * is = recursive ? &cs : &bs;
     for (ATermIterator i(as); i; ++i) {
         ATermList names;
         Expr src;
         ATerm pos;
-        if (atMatch(m, *i) >> "Inherit" >> src >> names >> pos) {
-            bool fromScope = atMatch(m, src) >> "Scope";
+        if (matchInherit(*i, src, names, pos)) {
+            bool fromScope = matchScope(src);
             for (ATermIterator j(names); j; ++j) {
-                Expr rhs = fromScope
-                    ? ATmake("Var(<term>)", *j)
-                    : ATmake("Select(<term>, <term>)", src, *j);
-                *is = ATinsert(*is, ATmake("Bind(<term>, <term>, <term>)",
-                                   *j, rhs, pos));
+                Expr rhs = fromScope ? makeVar(*j) : makeSelect(src, *j);
+                *is = ATinsert(*is, makeBind(*j, rhs, pos));
             }
         } else bs = ATinsert(bs, *i);
     }
     if (recursive)
-        return ATmake("Rec(<term>, <term>)", bs, cs);
+        return makeRec(bs, cs);
     else
-        return ATmake("Attrs(<term>)", bs);
+        return makeAttrs(bs);
 }
 
 const char * getPath(ParseData * data)

@@ -1,0 +1,53 @@
+Pos | string int int | Pos |
+NoPos | | Pos |
+
+Function | ATermList Expr Pos | Expr |
+Function1 | string Expr Pos | Expr |
+Assert | Expr Expr Pos | Expr |
+With | Expr Expr Pos | Expr |
+If | Expr Expr Expr | Expr |
+OpNot | Expr | Expr |
+OpEq | Expr Expr | Expr |
+OpNEq | Expr Expr | Expr |
+OpAnd | Expr Expr | Expr |
+OpOr | Expr Expr | Expr |
+OpImpl | Expr Expr | Expr |
+OpUpdate | Expr Expr | Expr |
+SubPath | Expr Expr | Expr |
+OpHasAttr | Expr string | Expr |
+OpPlus | Expr Expr | Expr |
+Call | Expr Expr | Expr |
+Select | Expr string | Expr |
+Var | string | Expr |
+Int | int | Expr |
+Str | string | Expr |
+Path | string | Expr |
+Uri | string | Expr |
+List | ATermList | Expr |
+BlackHole | | Expr |
+Undefined | | Expr |
+PrimOp | int ATermBlob ATermList | Expr |
+Attrs | ATermList | Expr |
+Closed | Expr | Expr |
+Rec | ATermList ATermList | Expr |
+Bool | ATerm | Expr |
+Null | | Expr |
+
+Bind | string Expr Pos | ATerm |
+Bind | string Expr | ATerm | Bind2
+Inherit | Expr ATermList Pos | ATerm |
+
+Scope | | Expr |
+
+NoDefFormal | string | ATerm |
+DefFormal | string Expr | ATerm |
+
+True | | ATerm |
+False | | ATerm |
+
+PrimOpDef | int ATermBlob | ATerm |
+
+AttrRHS | Expr Pos | ATerm |
+
+eTrue = makeBool(makeTrue())
+eFalse = makeBool(makeFalse())

@@ -15,6 +15,11 @@
 #include "parser-tab.h"
 #include "lexer-tab.h"
 
+typedef ATerm Expr;
+typedef ATerm Pos;
+    
+#include "constructors.hh"
+
 void setParseResult(void * data, ATerm t);
 void parseError(void * data, char * error, int line, int column);
 ATerm absParsedPath(void * data, ATerm t);
@@ -26,13 +31,13 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, void * data, char * s)
     parseError(data, s, loc->first_line, loc->first_column);
 }
 
-ATerm makePos(YYLTYPE * loc, void * data)
+static Pos makeCurPos(YYLTYPE * loc, void * data)
 {
-    return ATmake("Pos(<str>, <int>, <int>)",
-        getPath(data), loc->first_line, loc->first_column);
+    return makePos(string2ATerm(getPath(data)),
+        loc->first_line, loc->first_column);
 }
 
-#define CUR_POS makePos(yylocp, data)
+#define CUR_POS makeCurPos(yylocp, data)
  
 %}
 
@@ -65,64 +70,64 @@ expr: expr_function;
 
 expr_function
   : '{' formals '}' ':' expr_function
-    { $$ = ATmake("Function(<term>, <term>, <term>)", $2, $5, CUR_POS); }
+    { $$ = makeFunction($2, $5, CUR_POS); }
   | ID ':' expr_function
-    { $$ = ATmake("Function1(<term>, <term>, <term>)", $1, $3, CUR_POS); }
+    { $$ = makeFunction1($1, $3, CUR_POS); }
   | ASSERT expr ';' expr_function
-    { $$ = ATmake("Assert(<term>, <term>, <term>)", $2, $4, CUR_POS); }
+    { $$ = makeAssert($2, $4, CUR_POS); }
   | WITH expr ';' expr_function
-    { $$ = ATmake("With(<term>, <term>, <term>)", $2, $4, CUR_POS); }
+    { $$ = makeWith($2, $4, CUR_POS); }
   | expr_if
   ;
 
 expr_if
   : IF expr THEN expr ELSE expr
-    { $$ = ATmake("If(<term>, <term>, <term>)", $2, $4, $6); }
+    { $$ = makeIf($2, $4, $6); }
   | expr_op
   ;
 
 expr_op
-  : '!' expr_op %prec NEG { $$ = ATmake("OpNot(<term>)", $2); }
-  | expr_op EQ expr_op { $$ = ATmake("OpEq(<term>, <term>)", $1, $3); }
-  | expr_op NEQ expr_op { $$ = ATmake("OpNEq(<term>, <term>)", $1, $3); }
-  | expr_op AND expr_op { $$ = ATmake("OpAnd(<term>, <term>)", $1, $3); }
-  | expr_op OR expr_op { $$ = ATmake("OpOr(<term>, <term>)", $1, $3); }
-  | expr_op IMPL expr_op { $$ = ATmake("OpImpl(<term>, <term>)", $1, $3); }
-  | expr_op UPDATE expr_op { $$ = ATmake("OpUpdate(<term>, <term>)", $1, $3); }
-  | expr_op '~' expr_op { $$ = ATmake("SubPath(<term>, <term>)", $1, $3); }
-  | expr_op '?' ID { $$ = ATmake("OpHasAttr(<term>, <term>)", $1, $3); }
-  | expr_op '+' expr_op { $$ = ATmake("OpPlus(<term>, <term>)", $1, $3); }
+  : '!' expr_op %prec NEG { $$ = makeOpNot($2); }
+  | expr_op EQ expr_op { $$ = makeOpEq($1, $3); }
+  | expr_op NEQ expr_op { $$ = makeOpNEq($1, $3); }
+  | expr_op AND expr_op { $$ = makeOpAnd($1, $3); }
+  | expr_op OR expr_op { $$ = makeOpOr($1, $3); }
+  | expr_op IMPL expr_op { $$ = makeOpImpl($1, $3); }
+  | expr_op UPDATE expr_op { $$ = makeOpUpdate($1, $3); }
+  | expr_op '~' expr_op { $$ = makeSubPath($1, $3); }
+  | expr_op '?' ID { $$ = makeOpHasAttr($1, $3); }
+  | expr_op '+' expr_op { $$ = makeOpPlus($1, $3); }
   | expr_app
   ;
 
 expr_app
   : expr_app expr_select
-    { $$ = ATmake("Call(<term>, <term>)", $1, $2); }
+    { $$ = makeCall($1, $2); }
   | expr_select { $$ = $1; }
   ;
 
 expr_select
   : expr_select '.' ID
-    { $$ = ATmake("Select(<term>, <term>)", $1, $3); }
+    { $$ = makeSelect($1, $3); }
   | expr_simple { $$ = $1; }
   ;
 
 expr_simple
-  : ID { $$ = ATmake("Var(<term>)", $1); }
-  | INT { $$ = ATmake("Int(<term>)", $1); }
-  | STR { $$ = ATmake("Str(<term>)", $1); }
-  | PATH { $$ = ATmake("Path(<term>)", absParsedPath(data, $1)); }
-  | URI { $$ = ATmake("Uri(<term>)", $1); }
+  : ID { $$ = makeVar($1); }
+  | INT { $$ = makeInt(ATgetInt((ATermInt) $1)); }
+  | STR { $$ = makeStr($1); }
+  | PATH { $$ = makePath(absParsedPath(data, $1)); }
+  | URI { $$ = makeUri($1); }
   | '(' expr ')' { $$ = $2; }
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { $$ = ATmake("Select(<term>, \"body\")", fixAttrs(1, $3)); }
+    { $$ = makeSelect(fixAttrs(1, $3), string2ATerm("body")); }
   | REC '{' binds '}'
     { $$ = fixAttrs(1, $3); }
   | '{' binds '}'
     { $$ = fixAttrs(0, $2); }
-  | '[' expr_list ']' { $$ = ATmake("List(<term>)", $2); }
+  | '[' expr_list ']' { $$ = makeList($2); }
   ;
 
 binds
@@ -132,14 +137,14 @@ binds
 
 bind
   : ID '=' expr ';'
-    { $$ = ATmake("Bind(<term>, <term>, <term>)", $1, $3, CUR_POS); }
+    { $$ = makeBind($1, $3, CUR_POS); }
   | INHERIT inheritsrc ids ';'
-    { $$ = ATmake("Inherit(<term>, <term>, <term>)", $2, $3, CUR_POS); }
+    { $$ = makeInherit($2, $3, CUR_POS); }
   ;
 
 inheritsrc
   : '(' expr ')' { $$ = $2; }
-  | { $$ = ATmake("Scope"); }
+  | { $$ = makeScope(); }
   ;
 
 ids: ids ID { $$ = ATinsert($1, $2); } | { $$ = ATempty; };
@@ -158,8 +163,8 @@ formals
   ;
 
 formal
-  : ID { $$ = ATmake("NoDefFormal(<term>)", $1); }
-  | ID '?' expr { $$ = ATmake("DefFormal(<term>, <term>)", $1, $3); }
+  : ID { $$ = makeNoDefFormal($1); }
+  | ID '?' expr { $$ = makeDefFormal($1, $3); }
   ;
   
 %%

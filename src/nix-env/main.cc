@@ -6,6 +6,7 @@
 #include "parser.hh"
 #include "eval.hh"
 #include "help.txt.hh"
+#include "constructors.hh"
 
 #include <cerrno>
 #include <ctime>
@@ -47,10 +48,9 @@ void printHelp()
 
 bool parseDerivation(EvalState & state, Expr e, DrvInfo & drv)
 {
-    ATMatcher m;
-    
+    ATermList es;
     e = evalExpr(state, e);
-    if (!(atMatch(m, e) >> "Attrs")) return false;
+    if (!matchAttrs(e, es)) return false;
     Expr a = queryAttr(e, "type");
     if (!a || evalString(state, a) != "derivation") return false;
 
@@ -82,7 +82,6 @@ bool parseDerivation(EvalState & state, Expr e, DrvInfo & drv)
 
 bool parseDerivations(EvalState & state, Expr e, DrvInfos & drvs)
 {
-    ATMatcher m;
     ATermList es;
     DrvInfo drv;
 
@@ -91,7 +90,7 @@ bool parseDerivations(EvalState & state, Expr e, DrvInfos & drvs)
     if (parseDerivation(state, e, drv)) 
         drvs[drv.drvPath] = drv;
 
-    else if (atMatch(m, e) >> "Attrs") {
+    else if (matchAttrs(e, es)) {
         ATermMap drvMap;
         queryAllAttrs(e, drvMap);
         for (ATermIterator i(drvMap.keys()); i; ++i) {
@@ -103,7 +102,7 @@ bool parseDerivations(EvalState & state, Expr e, DrvInfos & drvs)
         }
     }
 
-    else if (atMatch(m, e) >> "List" >> es) {
+    else if (matchList(e, es)) {
         for (ATermIterator i(es); i; ++i) {
             debug(format("evaluating list element"));
             if (parseDerivation(state, *i, drv))
@@ -152,12 +151,10 @@ struct AddPos : TermFun
 {
     ATerm operator () (ATerm e)
     {
-        ATMatcher m;
         ATerm x, y, z;
-        if (atMatch(m, e) >> "Bind" >> x >> y >> z)
-            return e;
-        if (atMatch(m, e) >> "Bind" >> x >> y)
-            return ATmake("Bind(<term>, <term>, NoPos)", x, y);
+        if (matchBind(e, x, y, z)) return e;
+        if (matchBind2(e, x, y))
+            return makeBind(x, y, makeNoPos());
         return e;
     }
 };
@@ -194,36 +191,36 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
     for (DrvInfos::const_iterator i = drvs.begin(); 
          i != drvs.end(); ++i)
     {
-        ATerm t = ATmake(
-            "Attrs(["
-            "Bind(\"type\", Str(\"derivation\"), NoPos), "
-            "Bind(\"name\", Str(<str>), NoPos), "
-            "Bind(\"system\", Str(<str>), NoPos), "
-            "Bind(\"drvPath\", Path(<str>), NoPos), "
-            "Bind(\"drvHash\", Str(<str>), NoPos), "
-            "Bind(\"outPath\", Path(<str>), NoPos)"
-            "])",
-            i->second.name.c_str(),
-            i->second.system.c_str(),
-            i->second.drvPath.c_str(),
-            ((string) i->second.drvHash).c_str(),
-            i->second.outPath.c_str());
+        ATerm t = makeAttrs(ATmakeList6(
+            makeBind(string2ATerm("type"),
+                makeStr(string2ATerm("derivation")), makeNoPos()),
+            makeBind(string2ATerm("name"),
+                makeStr(string2ATerm(i->second.name.c_str())), makeNoPos()),
+            makeBind(string2ATerm("system"),
+                makeStr(string2ATerm(i->second.system.c_str())), makeNoPos()),
+            makeBind(string2ATerm("drvPath"),
+                makePath(string2ATerm(i->second.drvPath.c_str())), makeNoPos()),
+            makeBind(string2ATerm("drvHash"),
+                makeStr(string2ATerm(((string) i->second.drvHash).c_str())), makeNoPos()),
+            makeBind(string2ATerm("outPath"),
+                makePath(string2ATerm(i->second.outPath.c_str())), makeNoPos())
+            ));
         inputs = ATinsert(inputs, t);
     }
 
-    ATerm inputs2 = ATmake("List(<term>)", ATreverse(inputs));
+    ATerm inputs2 = makeList(ATreverse(inputs));
 
     /* Also write a copy of the list of inputs to the store; we need
        it for future modifications of the environment. */
     Path inputsFile = writeTerm(inputs2, "-env-inputs");
 
-    Expr topLevel = ATmake(
-        "Call(<term>, Attrs(["
-        "Bind(\"system\", Str(<str>), NoPos), "
-        "Bind(\"derivations\", <term>, NoPos), " // !!! redundant
-        "Bind(\"manifest\", Path(<str>), NoPos)"
-        "]))",
-        envBuilder, thisSystem.c_str(), inputs2, inputsFile.c_str());
+    Expr topLevel = makeCall(envBuilder, makeAttrs(ATmakeList3(
+        makeBind(string2ATerm("system"),
+            makeStr(string2ATerm(thisSystem.c_str())), makeNoPos()),
+        makeBind(string2ATerm("derivations"), inputs2, makeNoPos()),
+        makeBind(string2ATerm("manifest"),
+            makePath(string2ATerm(inputsFile.c_str())), makeNoPos())
+        )));
 
     /* Instantiate it. */
     debug(format("evaluating builder expression `%1%'") % topLevel);
