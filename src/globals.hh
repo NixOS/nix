@@ -35,7 +35,8 @@ extern TableId dbSuccessors;
 
 /* dbSuccessorsRev :: Path -> [Path]
 
-   The reverse mapping of dbSuccessors.
+   The reverse mapping of dbSuccessors (i.e., it stores the
+   predecessors of a Nix expression).
 */
 extern TableId dbSuccessorsRev;
 

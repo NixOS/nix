@@ -73,7 +73,7 @@ Path maybeNormalise(const Path & ne, bool normalise)
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qList, qRequisites, qGenerators, qGraph 
+    enum { qList, qRequisites, qGenerators, qPredecessors, qGraph 
     } query = qList;
     bool normalise = false;
     bool includeExprs = true;
@@ -84,6 +84,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         if (*i == "--list" || *i == "-l") query = qList;
         else if (*i == "--requisites" || *i == "-r") query = qRequisites;
         else if (*i == "--generators" || *i == "-g") query = qGenerators;
+        else if (*i == "--predecessors") query = qPredecessors;
         else if (*i == "--graph") query = qGraph;
         else if (*i == "--normalise" || *i == "-n") normalise = true;
         else if (*i == "--exclude-exprs") includeExprs = false;
@@ -138,6 +139,18 @@ static void opQuery(Strings opFlags, Strings opArgs)
             break;
         }
 #endif
+
+        case qPredecessors: {
+            for (Strings::iterator i = opArgs.begin();
+                 i != opArgs.end(); i++)
+            {
+                Paths preds = queryPredecessors(checkPath(*i));
+                for (Paths::iterator j = preds.begin();
+                     j != preds.end(); j++)
+                    cout << format("%s\n") % *j;
+            }
+            break;
+        }
 
         case qGraph: {
             PathSet roots;

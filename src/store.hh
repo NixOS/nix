@@ -22,6 +22,10 @@ void copyPath(const Path & src, const Path & dst);
 void registerSuccessor(const Transaction & txn,
     const Path & srcPath, const Path & sucPath);
 
+/* Return the predecessors of the Nix expression stored at the given
+   path. */
+Paths queryPredecessors(const Path & sucPath);
+
 /* Register a substitute. */
 void registerSubstitute(const Path & srcPath, const Path & subPath);
 

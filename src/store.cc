@@ -104,6 +104,14 @@ void registerSuccessor(const Transaction & txn,
 }
 
 
+Paths queryPredecessors(const Path & sucPath)
+{
+    Paths revs;
+    nixDB.queryStrings(noTxn, dbSuccessorsRev, sucPath, revs);
+    return revs;
+}
+
+
 void registerSubstitute(const Path & srcPath, const Path & subPath)
 {
     Transaction txn(nixDB);
