@@ -4,6 +4,7 @@
 #include <string>
 #include <sstream>
 #include <list>
+#include <map>
 #include <cstdio>
 
 #include <unistd.h>
@@ -225,22 +226,17 @@ void readPkgDescr(const string & pkgfile,
 string getPkg(string hash);
 
 
-typedef pair<string, string> EnvPair;
-typedef list<EnvPair> Environment;
+typedef map<string, string> Environment;
 
 
-void installPkg(string hash)
+void fetchDeps(string hash, Environment & env)
 {
     string pkgfile;
-    string src;
-    string path;
-    string cmd;
-    string builder;
 
     if (!queryDB(dbRefs, hash, pkgfile))
         throw Error("unknown package " + hash);
 
-    cerr << "installing package " + hash + " from " + pkgfile + "\n";
+    cerr << "reading information about " + hash + " from " + pkgfile + "\n";
 
     /* Verify that the file hasn't changed. !!! race */
     if (makeRef(pkgfile) != hash)
@@ -252,15 +248,13 @@ void installPkg(string hash)
 
     /* Recursively fetch all the dependencies, filling in the
        environment as we go along. */
-    Environment env;
-
     for (DepList::iterator it = pkgImports.begin();
          it != pkgImports.end(); it++)
     {
         cerr << "fetching package dependency "
              << it->name << " <- " << it->ref
              << endl;
-        env.push_back(EnvPair(it->name, getPkg(it->ref)));
+        env[it->name] = getPkg(it->ref);
     }
 
     for (DepList::iterator it = fileImports.begin();
@@ -278,15 +272,34 @@ void installPkg(string hash)
         if (makeRef(file) != it->ref)
             throw Error("file " + file + " is stale");
 
-        if (it->name == "build")
-            builder = file;
-        else
-            env.push_back(EnvPair(it->name, file));
+        env[it->name] = file;
     }
+}
 
-    if (builder == "")
-        throw Error("no builder specified");
 
+string getFromEnv(const Environment & env, const string & key)
+{
+    Environment::const_iterator it = env.find(key);
+    if (it == env.end())
+        throw Error("key " + key + " not found in the environment");
+    return it->second;
+}
+
+
+void installPkg(string hash)
+{
+    string pkgfile;
+    string src;
+    string path;
+    string cmd;
+    string builder;
+    Environment env;
+
+    /* Fetch dependencies. */
+    fetchDeps(hash, env);
+
+    builder = getFromEnv(env, "build");
+    
     /* Construct a path for the installed package. */
     path = pkgHome + "/" + hash;
 
@@ -361,62 +374,17 @@ string getPkg(string hash)
 
 void runPkg(string hash)
 {
-    string pkgfile;
     string src;
     string path;
     string cmd;
     string runner;
-
-    if (!queryDB(dbRefs, hash, pkgfile))
-        throw Error("unknown package " + hash);
-
-    cerr << "running package " + hash + " from " + pkgfile + "\n";
-
-    /* Verify that the file hasn't changed. !!! race */
-    if (makeRef(pkgfile) != hash)
-        throw Error("file " + pkgfile + " is stale");
-
-    /* Read the package description file. */
-    DepList pkgImports, fileImports;
-    readPkgDescr(pkgfile, pkgImports, fileImports);
-
-    /* Recursively fetch all the dependencies, filling in the
-       environment as we go along. */
     Environment env;
 
-    for (DepList::iterator it = pkgImports.begin();
-         it != pkgImports.end(); it++)
-    {
-        cerr << "fetching package dependency "
-             << it->name << " <- " << it->ref
-             << endl;
-        env.push_back(EnvPair(it->name, getPkg(it->ref)));
-    }
+    /* Fetch dependencies. */
+    fetchDeps(hash, env);
 
-    for (DepList::iterator it = fileImports.begin();
-         it != fileImports.end(); it++)
-    {
-        cerr << "fetching file dependency "
-             << it->name << " = " << it->ref
-             << endl;
-
-        string file;
-
-        if (!queryDB(dbRefs, it->ref, file))
-            throw Error("unknown file " + it->ref);
-
-        if (makeRef(file) != it->ref)
-            throw Error("file " + file + " is stale");
-
-        if (it->name == "run")
-            runner = file;
-        else
-            env.push_back(EnvPair(it->name, file));
-    }
-
-    if (runner == "")
-        throw Error("no runner specified");
-
+    runner = getFromEnv(env, "run");
+    
     /* Fork a child to build the package. */
     pid_t pid;
     switch (pid = fork()) {
@@ -611,6 +579,9 @@ Subcommands:
   getpkg HASH
     Ensure that the package referenced by HASH is installed. Prints
     out the path of the package on stdout.
+
+  listinst
+    Prints a list of installed packages.
 
   run HASH
     Run the descriptor referenced by HASH.
