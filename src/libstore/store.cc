@@ -504,7 +504,7 @@ static Hash queryHash(const Transaction & txn, const Path & storePath)
     HashType ht = parseHashType(string(s, 0, colon));
     if (ht == htUnknown)
         throw Error(format("unknown hash type `%1%' in valid-path entry for `%2%'")
-            % string(0, colon) % storePath);
+            % string(s, 0, colon) % storePath);
     return parseHash(ht, string(s, colon + 1));
 }
 
