@@ -156,7 +156,7 @@ static Expr evalExpr(Expr e)
 
         /* Gather information for building the Derive expression. */
         ATermList ins = ATempty, env = ATempty;
-        string builder, id;
+        string builder, name;
         bnds = ATempty;
 
         for (map<string, ATerm>::iterator it = bndMap.begin();
@@ -173,7 +173,7 @@ static Expr evalExpr(Expr e)
                 if (key == "build") builder = path;
             }
             else if (ATmatch(value, "<str>", &s1)) {
-                if (key == "id") id = s1;
+                if (key == "name") name = s1;
                 env = ATinsert(env, 
                     ATmake("(<str>, <str>)", key.c_str(), s1));
             }
@@ -191,10 +191,10 @@ static Expr evalExpr(Expr e)
         if (builder == "")
             throw badTerm("no builder specified", nf);
         
-        if (id == "")
-            throw badTerm("no package identifier specified", nf);
+        if (name == "")
+            throw badTerm("no package name specified", nf);
         
-        string out = nixStore + "/" + ((string) hash).c_str() + "-" + id;
+        string out = nixStore + "/" + ((string) hash).c_str() + "-" + name;
 
         env = ATinsert(env, ATmake("(<str>, <str>)", "out", out.c_str()));
 
