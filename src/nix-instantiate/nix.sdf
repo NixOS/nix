@@ -17,7 +17,7 @@ imports Fix-Exprs Fix-Layout
 module Fix-Exprs
 imports Fix-Lexicals URI
 exports
-  sorts Expr Bind Formal
+  sorts Expr Formal Bind Binds BindSemi ExprList
   context-free syntax
 
     Id -> Expr {cons("Var")}
@@ -34,11 +34,11 @@ exports
 
     Expr Expr -> Expr {cons("Call"), left}
 
-    "{" {Formal ","}* "}" ":" Expr -> Expr {cons("Function"), right}
+    "{" {Formal ","}* "}" ":" Expr -> Expr {cons("Function")}
     Id -> Formal {cons("NoDefFormal")}
     Id "?" Expr -> Formal {cons("DefFormal")}
 
-    "assert" Expr ";" Expr -> Expr {cons("Assert"), right}
+    "assert" Expr ";" Expr -> Expr {cons("Assert")}
 
     "rec" "{" Binds "}" -> Expr {cons("Rec")}
     "let" "{" Binds "}" -> Expr {cons("LetRec")}
@@ -87,7 +87,7 @@ exports
 
 module Fix-Lexicals
 exports
-  sorts Id Path
+  sorts Id Int Str Path PathComp Bool
   lexical syntax
     [a-zA-Z\_][a-zA-Z0-9\_\']* -> Id
     "rec" -> Id {reject}
@@ -120,12 +120,17 @@ exports
 
 module URI
 exports
-  sorts Uri
+  sorts Uri Uhierpart Uopaquepart Uuricnoslash Unetpath Uabspath
+        Urelpath Urelsegment Uscheme Uauthority Uregname Userver
+        Uuserinfo Uhostport Uhost Uhostname Udomainlabel Utoplabel
+        UIPv4address Uport Upath Upathsegments Usegment Uparam
+        Upchar Uquery Ufragment Uuric Ureserved Uunreserved Umark
+        Uescaped Uhex Ualphanum Ualpha Ulowalpha Uupalpha Udigit
   lexical syntax
-    Uscheme ":" (Uhierpath | Uopaquepath) -> Uri
+    Uscheme ":" (Uhierpart | Uopaquepart) -> Uri
 
-    (Unetpath | Uabspath) ("?" Uquery)? -> Uhierpath
-    Uuricnoslash Uuric* -> Uopaquepath
+    (Unetpath | Uabspath) ("?" Uquery)? -> Uhierpart
+    Uuricnoslash Uuric* -> Uopaquepart
 
     Uunreserved | Uescaped | [\;\?\:\@\&\=\+\$\,] -> Uuricnoslash
 
@@ -187,17 +192,18 @@ exports
 
 module Fix-Layout
 exports
+  sorts HashComment Asterisk Comment EOF
   lexical syntax
     [\ \t\n] -> LAYOUT
     HashComment -> LAYOUT
     Comment -> LAYOUT
-    "#" ~[\n]* [\n] -> HashComment
-    "//" ~[\n]* [\n] -> HashComment
+    "#" ~[\n]* ([\n] | EOF) -> HashComment
+    "//" ~[\n]* ([\n] | EOF) -> HashComment
     "/*" ( ~[\*] | Asterisk )* "*/" -> Comment
     [\*] -> Asterisk
+    "" -> EOF
   lexical restrictions
     Asterisk -/- [\/]
+    EOF -/- ~[]
   context-free restrictions
     LAYOUT? -/- [\ \t\n] | [\#]
-  syntax
-    HashComment <START> -> <START>

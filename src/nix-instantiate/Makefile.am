@@ -17,6 +17,6 @@ parse-table.h: nix.tbl
 	../bin2c/bin2c nixParseTable < $< > $@ || (rm $@ && exit 1)
 
 %.tbl: %.sdf
-	../../externals/inst/bin/sdf2table -i $< -o $@
+	../../externals/inst/bin/sdf2table -s -i $< -o $@
 
 CLEANFILES = parse-table.h nix.tbl
