@@ -267,8 +267,6 @@ void installPkg(string hash)
                 _exit(0);
             }
 
-            throw Error("no prebuilt available");
-
 build:
 
             /* Fill in the environment.  We don't bother freeing the
