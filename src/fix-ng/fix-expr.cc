@@ -4,8 +4,6 @@
 
 ATerm bottomupRewrite(TermFun & f, ATerm e)
 {
-    e = f(e);
-
     if (ATgetType(e) == AT_APPL) {
         AFun fun = ATgetAFun(e);
         int arity = ATgetArity(fun);
@@ -14,10 +12,10 @@ ATerm bottomupRewrite(TermFun & f, ATerm e)
         for (int i = arity - 1; i >= 0; i--)
             args = ATinsert(args, bottomupRewrite(f, ATgetArgument(e, i)));
         
-        return (ATerm) ATmakeApplList(fun, args);
+        e = (ATerm) ATmakeApplList(fun, args);
     }
 
-    if (ATgetType(e) == AT_LIST) {
+    else if (ATgetType(e) == AT_LIST) {
         ATermList in = (ATermList) e;
         ATermList out = ATempty;
 
@@ -26,10 +24,10 @@ ATerm bottomupRewrite(TermFun & f, ATerm e)
             in = ATgetNext(in);
         }
 
-        return (ATerm) ATreverse(out);
+        e = (ATerm) ATreverse(out);
     }
 
-    return e;
+    return f(e);
 }
 
 

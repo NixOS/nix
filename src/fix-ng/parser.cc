@@ -56,6 +56,13 @@ struct Cleanup : TermFun
         if (ATmatch(e, "Bool(\"false\")", &s))
             return ATmake("Bool(False)");
 
+        if (ATmatch(e, "ExprNil"))
+            return (ATerm) ATempty;
+
+        ATerm e1, e2;
+        if (ATmatch(e, "ExprCons(<term>, [<list>])", &e1, &e2))
+            return (ATerm) ATinsert((ATermList) e2, e1);
+
         return e;
     }
 };

@@ -45,7 +45,9 @@ exports
     Bind ";" -> BindSemi 
     BindSemi* -> Binds
 
-    "[" Expr* "]" -> Expr {cons("List")}
+    "[" ExprList "]" -> Expr {cons("List")}
+    "" -> ExprList {cons("ExprNil")}
+    Expr ExprList -> ExprList {cons("ExprCons")}
 
     Expr "." Id -> Expr {cons("Select")}
 
@@ -58,7 +60,7 @@ exports
   context-free priorities
 
     Expr "." Id -> Expr
-  > 
+  > Expr ExprList -> ExprList
   > Expr Expr -> Expr
   > "{" {Id ","}* "}" ":" Expr -> Expr
 
