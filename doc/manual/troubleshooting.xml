@@ -1,0 +1,49 @@
+<appendix>
+  <title>Troubleshooting</title>
+
+  <sect1>
+    <title>Database hangs</title>
+
+    <para>
+      If Nix or Fix appear to hang immediately after they are started, Nix's
+      database is probably <quote>wedged</quote>, i.e., some process died while
+      it held a lock on the database.  The solution is to ensure that no other
+      processes are accessing the database and then run the following command:
+    </para>
+
+    <screen>
+      $ db_recover -e -h <replaceable>prefix</replaceable>/var/nix/db</screen>
+
+    <para>
+      Here, <replaceable>prefix</replaceable> should be replaced by Nix's
+      installation prefix.
+    </para>
+
+  </sect1>
+
+
+  <sect1>
+    <title>Database logfile removal</title>
+
+    <para>
+      Every time a Nix database transaction takes place, Nix writes a record of
+      this transaction to a <emphasis>log</emphasis> in its database directory
+      to ensure that the operation can be replayed in case of a application or
+      system crash.  However, without manual intervention, the log grows
+      indefinitely.  Hence, unused log files should be deleted periodically.
+      This can be accomplished using the following command:
+    </para>
+
+    <screen>
+      $ rm `db_archive -a -h
+      <replaceable>prefix</replaceable>/var/nix/db`</screen>
+
+  </sect1>
+	
+</appendix>
+
+<!--
+local variables:
+sgml-parent-document: ("book.xml" "appendix")
+end:
+-->

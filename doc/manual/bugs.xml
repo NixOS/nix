@@ -1,0 +1,26 @@
+<appendix>
+  <title>Bugs</title>
+
+  <itemizedlist>
+
+    <listitem>
+      <para>
+	Nix should automatically recover the Berkeley DB database.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+	Nix should automatically remove Berkeley DB logfiles.
+      </para>
+    </listitem>
+
+  </itemizedlist>
+
+</appendix>
+
+<!--
+local variables:
+sgml-parent-document: ("book.xml" "appendix")
+end:
+-->
