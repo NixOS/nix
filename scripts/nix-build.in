@@ -40,7 +40,7 @@ for i in "$@"; do
                 "$i")
                 
             for j in $storeExprs; do
-                echo "store expression is $j $(readlink "$j")" >&2
+                echo "store expression is $(readlink "$j")" >&2
             done
 
             # Build the resulting store derivation.
@@ -51,7 +51,7 @@ for i in "$@"; do
                 -rv $extraArgs $storeExprs)
                 
             for j in $outPaths; do
-                echo "$j $(readlink "$j")"
+                echo "$(readlink "$j")"
             done
             
             ;;
