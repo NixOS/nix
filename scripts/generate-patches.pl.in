@@ -126,6 +126,64 @@ sub containsPatch {
 }
 
 
+# Compute the "weighted" number of uses of a path in the build graph.
+sub computeUses {
+    my $narFiles = shift;
+    my $path = shift;
+
+    # Find the deriver of $path.
+    return 1 unless defined $$narFiles{$path};
+    my $deriver = @{$$narFiles{$path}}[0]->{deriver};
+    return 1 unless defined $deriver && $deriver ne "";
+
+#    print "  DERIVER $deriver\n";
+
+    # Optimisation: build the referers graph from the references
+    # graph.
+    my %referers;
+    foreach my $q (keys %{$narFiles}) {
+        my @refs = split " ", @{$$narFiles{$q}}[0]->{references};
+        foreach my $r (@refs) {
+            $referers{$r} = [] unless defined $referers{$r};
+            push @{$referers{$r}}, $q;
+        }
+    }
+
+    # Determine the shortest path from $deriver to all other reachable
+    # paths in the `referers' graph.
+
+    my %dist;
+    $dist{$deriver} = 0;
+
+    my @queue = ($deriver);
+    my $pos = 0;
+    
+    while ($pos < scalar @queue) {
+        my $p = $queue[$pos];
+        $pos++;
+
+        foreach my $q (@{$referers{$p}}) {
+            if (!defined $dist{$q}) {
+                $dist{$q} = $dist{$p} + 1;
+#                print "    $q $dist{$q}\n";
+                push @queue, $q;
+            }
+        }
+    }
+
+    my $wuse = 1.0;
+    foreach my $user (keys %dist) {
+        next if $user eq $deriver;
+#        print "    $user $dist{$user}\n";
+        $wuse += 1.0 / 2.0**$dist{$user};
+    }
+
+#    print "    XXX $path $wuse\n";
+    
+    return $wuse;
+}
+
+
 # For each output path in the destination, see if we need to / can
 # create a patch.
 
@@ -134,7 +192,7 @@ print "creating patches...\n";
 foreach my $p (keys %dstOutPaths) {
 
     # If exactly the same path already exists in the source, skip it.
-# !!!    next if defined $srcOutPaths{$p};
+    next if defined $srcOutPaths{$p};
     
     print "  $p\n";
 
@@ -154,17 +212,32 @@ foreach my $p (keys %dstOutPaths) {
         (my $name2, my $version2) = getNameVersion $q;
         if ($name eq $name2) {
 
-            # If the sizes differ to much, then skip.  This
+            # If the sizes differ too much, then skip.  This
             # disambiguates between, e.g., a real component and a
             # wrapper component (cf. Firefox in Nixpkgs).
             my $srcSize = @{$srcNarFiles{$q}}[0]->{size};
             my $dstSize = @{$dstNarFiles{$p}}[0]->{size};
             my $ratio = $srcSize / $dstSize;
             $ratio = 1 / $ratio if $ratio < 1;
-            print "  $srcSize $dstSize $ratio $q\n";
+#            print "  SIZE $srcSize $dstSize $ratio $q\n";
 
             if ($ratio >= 3) {
-                print "  SKIPPING $q due to size ratio $ratio\n";
+                print "  SKIPPING $q due to size ratio $ratio ($srcSize $dstSize)\n";
+                next;
+            }
+
+            # If the numbers of weighted uses differ too much, then
+            # skip.  This disambiguates between, e.g., the bootstrap
+            # GCC and the final GCC in Nixpkgs.
+            my $srcUses = computeUses \%srcNarFiles, $q;
+            my $dstUses = computeUses \%dstNarFiles, $p;
+            $ratio = $srcUses / $dstUses;
+            $ratio = 1 / $ratio if $ratio < 1;
+            print "  USE $srcUses $dstUses $ratio $q\n";
+            
+            if ($ratio >= 2) {
+                print "  SKIPPING $q due to use ratio $ratio ($srcUses $dstUses)\n";
+                next;
             }
 
             # If there are multiple matching names, include the ones
@@ -189,8 +262,6 @@ foreach my $p (keys %dstOutPaths) {
 
         # Generate a patch between $closest and $p.
         print "  $p <- $closest\n";
-
-        next;
 
         # If the patch already exists, skip it.
         if (containsPatch(\%srcPatches, $p, $closest) ||
@@ -259,8 +330,6 @@ foreach my $p (keys %dstOutPaths) {
             };
     }
 }
-
-exit 0; # !!!
 
 
 # Add in any potentially useful patches in the source (namely, those
