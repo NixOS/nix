@@ -48,21 +48,29 @@ public:
     UsageError(string _err) : Error(_err) { };
 };
 
+class BadRefError : public Error
+{
+public:
+    BadRefError(string _err) : Error(_err) { };
+};
 
-/* Wrapper class that ensures that the database is closed upon
+
+/* Wrapper classes that ensures that the database is closed upon
    object destruction. */
 class Db2 : public Db 
 {
 public:
-    Db2(DbEnv *env, u_int32_t flags)
-        : Db(env, flags)
-    {
-    }
+    Db2(DbEnv *env, u_int32_t flags) : Db(env, flags) { }
+    ~Db2() { close(0); }
+};
 
-    ~Db2()
-    {
-        close(0);
-    }
+
+class DbcClose 
+{
+    Dbc * cursor;
+public:
+    DbcClose(Dbc * c) : cursor(c) { }
+    ~DbcClose() { cursor->close(); }
 };
 
 
@@ -113,17 +121,38 @@ void delDB(const string & dbname, const string & key)
 }
 
 
+typedef pair<string, string> DBPair;
+typedef list<DBPair> DBPairs;
+
+
+void enumDB(const string & dbname, DBPairs & contents)
+{
+    auto_ptr<Db2> db = openDB(dbname, false);
+
+    Dbc * cursor;
+    db->cursor(0, &cursor, 0);
+    DbcClose cursorCloser(cursor);
+
+    Dbt kt, dt;
+    while (cursor->get(&kt, &dt, DB_NEXT) != DB_NOTFOUND) {
+        string key((char *) kt.get_data(), kt.get_size());
+        string data((char *) dt.get_data(), dt.get_size());
+        contents.push_back(DBPair(key, data));
+    }
+}
+
+
 /* Verify that a reference is valid (that is, is a MD5 hash code). */
 void checkRef(const string & s)
 {
     string err = "invalid reference: " + s;
     if (s.length() != 32)
-        throw Error(err);
+        throw BadRefError(err);
     for (int i = 0; i < 32; i++) {
         char c = s[i];
         if (!((c >= '0' && c <= '9') ||
               (c >= 'a' && c <= 'f')))
-            throw Error(err);
+            throw BadRefError(err);
     }
 }
 
@@ -133,11 +162,11 @@ string makeRef(string filename)
 {
     char hash[33];
 
-    FILE * pipe = popen(("md5sum " + filename).c_str(), "r");
-    if (!pipe) throw Error("cannot execute md5sum");
+    FILE * pipe = popen(("md5sum " + filename + " 2> /dev/null").c_str(), "r");
+    if (!pipe) throw BadRefError("cannot execute md5sum");
 
     if (fread(hash, 32, 1, pipe) != 1)
-        throw Error("cannot read hash from md5sum");
+        throw BadRefError("cannot read hash from md5sum");
     hash[32] = 0;
 
     pclose(pipe);
@@ -369,8 +398,48 @@ void initDB()
 }
 
 
+void verifyDB()
+{
+    /* Check that all file references are still valid. */
+    DBPairs fileRefs;
+    
+    enumDB(dbRefs, fileRefs);
+
+    for (DBPairs::iterator it = fileRefs.begin();
+         it != fileRefs.end(); it++)
+    {
+        try {
+            if (makeRef(it->second) != it->first)
+                delDB(dbRefs, it->first);
+        } catch (BadRefError e) { /* !!! better error check */ 
+            cerr << "file " << it->second << " has disappeared\n";
+            delDB(dbRefs, it->first);
+        }
+    }
+
+    /* Check that all installed packages are still there. */
+    DBPairs instPkgs;
+
+    enumDB(dbInstPkgs, instPkgs);
+
+    for (DBPairs::iterator it = instPkgs.begin();
+         it != instPkgs.end(); it++)
+    {
+        struct stat st;
+        if (stat(it->second.c_str(), &st) == -1) {
+            cerr << "package " << it->first << " has disappeared\n";
+            delDB(dbInstPkgs, it->first);
+        }
+    }
+
+    /* TODO: check that all directories in pkgHome are installed
+       packages. */
+}
+
+
 void run(int argc, char * * argv)
 {
+    UsageError argcError("wrong number of arguments");
     string cmd;
 
     if (argc < 1)
@@ -380,21 +449,20 @@ void run(int argc, char * * argv)
     argc--, argv++;
 
     if (cmd == "init") {
-        if (argc != 0)
-            throw UsageError("wrong number of arguments");
+        if (argc != 0) throw argcError;
         initDB();
+    } else if (cmd == "verify") {
+        if (argc != 0) throw argcError;
+        verifyDB();
     } else if (cmd == "getpkg") {
-        if (argc != 1)
-            throw UsageError("wrong number of arguments");
+        if (argc != 1) throw argcError;
         string path = getPkg(argv[0]);
         cout << path << endl;
     } else if (cmd == "regfile") {
-        if (argc != 1)
-            throw UsageError("wrong number of arguments");
+        if (argc != 1) throw argcError;
         registerFile(argv[0]);
     } else if (cmd == "reginst") {
-        if (argc != 2)
-            throw UsageError("wrong number of arguments");
+        if (argc != 2) throw argcError;
         registerInstalledPkg(argv[0], argv[1]);
     } else
         throw UsageError("unknown command: " + string(cmd));
@@ -410,6 +478,9 @@ Subcommands:
 
   init
     Initialize the database.
+
+  verify
+    Removes stale entries from the database.
 
   regfile FILENAME
     Register FILENAME keyed by its hash.
