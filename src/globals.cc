@@ -2,7 +2,8 @@
 #include "db.hh"
 
 
-string dbHash2Paths = "hash2paths";
+string dbPath2Id = "path2id";
+string dbId2Paths = "id2paths";
 string dbSuccessors = "successors";
 string dbSubstitutes = "substitutes";
 
@@ -15,7 +16,8 @@ string nixDB = "/UNINIT";
 
 void initDB()
 {
-    createDB(nixDB, dbHash2Paths);
+    createDB(nixDB, dbPath2Id);
+    createDB(nixDB, dbId2Paths);
     createDB(nixDB, dbSuccessors);
     createDB(nixDB, dbSubstitutes);
 }

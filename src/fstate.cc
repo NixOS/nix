@@ -154,55 +154,47 @@ FState hash2fstate(Hash hash)
 }
 
 
-ATerm termFromHash(const Hash & hash, string * p)
+ATerm termFromId(const FSId & id, string * p)
 {
-    string path = expandHash(hash);
+    string path = expandId(id);
     if (p) *p = path;
     ATerm t = ATreadFromNamedFile(path.c_str());
-    if (!t) throw Error(format("cannot read aterm %1%") % path);
+    if (!t) throw Error(format("cannot read aterm from `%1%'") % path);
     return t;
 }
 
 
-Hash writeTerm(ATerm t, const string & suffix, string * p)
+FSId writeTerm(ATerm t, const string & suffix, string * p)
 {
-    string path = nixStore + "/tmp.nix"; /* !!! */
+    FSId id = hashTerm(t);
+
+    string path = canonPath(nixStore + "/" + 
+        (string) id + suffix + ".nix");
     if (!ATwriteToNamedTextFile(t, path.c_str()))
         throw Error(format("cannot write aterm %1%") % path);
-    Hash hash = hashPath(path);
-    string path2 = canonPath(nixStore + "/" + 
-        (string) hash + suffix + ".nix");
-    if (rename(path.c_str(), path2.c_str()) == -1)
-        throw SysError(format("renaming %1% to %2%") % path % path2);
-    registerPath(path2, hash);
-    if (p) *p = path2;
-    return hash;
+
+    registerPath(path, id);
+    if (p) *p = path;
+
+    return id;
 }
 
 
-void registerSuccessor(const Hash & fsHash, const Hash & scHash)
+void registerSuccessor(const FSId & id1, const FSId & id2)
 {
-    setDB(nixDB, dbSuccessors, fsHash, scHash);
+    setDB(nixDB, dbSuccessors, id1, id2);
 }
 
 
-FState storeSuccessor(FState fs, FState sc, StringSet & paths)
+static FSId storeSuccessor(const FSId & id1, FState sc)
 {
-    if (fs == sc) return sc;
-    
-    string path;
-    Hash fsHash = hashTerm(fs);
-    Hash scHash = writeTerm(sc, "-s-" + (string) fsHash, &path);
-    registerSuccessor(fsHash, scHash);
-    paths.insert(path);
+    FSId id2 = writeTerm(sc, "-s-" + (string) id1, 0);
+    registerSuccessor(id1, id2);
+    return id2;
+}
+
 
 #if 0
-    return ATmake("Include(<str>)", ((string) scHash).c_str());
-#endif
-    return sc;
-}
-
-
 static FState realise(FState fs, StringSet & paths)
 {
     char * s1, * s2, * s3;
@@ -420,4 +412,194 @@ void fstateRefs2(FState fs, StringSet & paths)
 void fstateRefs(FState fs, StringSet & paths)
 {
     fstateRefs2(fs, paths);
+}
+#endif
+
+
+static void parseIds(ATermList ids, FSIds & out)
+{
+    while (!ATisEmpty(ids)) {
+        char * s;
+        ATerm id = ATgetFirst(ids);
+        if (!ATmatch(id, "<str>", &s))
+            throw badTerm("not an id", id);
+        out.push_back(parseHash(s));
+        debug(s);
+        ids = ATgetNext(ids);
+    }
+}
+
+
+/* Parse a slice. */
+static Slice parseSlice(FState fs)
+{
+    Slice slice;
+    ATermList roots, elems;
+    
+    if (!ATmatch(fs, "Slice([<list>], [<list>])", &roots, &elems))
+        throw badTerm("not a slice", fs);
+
+    parseIds(roots, slice.roots);
+
+    while (!ATisEmpty(elems)) {
+        char * s1, * s2;
+        ATermList refs;
+        ATerm t = ATgetFirst(elems);
+        if (!ATmatch(t, "(<str>, <str>, [<list>])", &s1, &s2, &refs))
+            throw badTerm("not a slice element", t);
+        SliceElem elem;
+        elem.path = s1;
+        elem.id = parseHash(s2);
+        parseIds(refs, elem.refs);
+        slice.elems.push_back(elem);
+        elems = ATgetNext(elems);
+    }
+
+    return slice;
+}
+
+
+Slice normaliseFState(FSId id)
+{
+    debug(format("normalising fstate"));
+    Nest nest(true);
+
+    /* Try to substitute $id$ by any known successors in order to
+       speed up the rewrite process. */
+    string idSucc;
+    while (queryDB(nixDB, dbSuccessors, id, idSucc)) {
+        debug(format("successor %1% -> %2%") % (string) id % idSucc);
+        id = parseHash(idSucc);
+    }
+
+    /* Get the fstate expression. */
+    FState fs = termFromId(id);
+
+    /* Already in normal form (i.e., a slice)? */
+    if (ATgetType(fs) == AT_APPL && 
+        (string) ATgetName(ATgetAFun(fs)) == "Slice")
+        return parseSlice(fs);
+    
+    /* Then we it's a Derive node. */
+    ATermList outs, ins, bnds;
+    char * builder;
+    char * platform;
+    if (!ATmatch(fs, "Derive([<list>], [<list>], <str>, <str>, [<list>])",
+            &outs, &ins, &builder, &platform, &bnds))
+        throw badTerm("not a derive", fs);
+
+    /* Right platform? */
+    checkPlatform(platform);
+        
+    /* Realise inputs (and remember all input paths). */
+    FSIds inIds;
+    parseIds(ins, inIds);
+    
+    SliceElems inElems; /* !!! duplicates */
+    StringSet inPathsSet;
+    for (FSIds::iterator i = inIds.begin(); i != inIds.end(); i++) {
+        Slice slice = normaliseFState(*i);
+        realiseSlice(slice);
+
+        for (SliceElems::iterator j = slice.elems.begin();
+             j != slice.elems.end(); j++)
+        {
+            inElems.push_back(*j);
+            inPathsSet.insert(j->path);
+        }
+    }
+
+    Strings inPaths;
+    copy(inPathsSet.begin(), inPathsSet.end(),
+        inserter(inPaths, inPaths.begin()));
+
+    /* Build the environment. */
+    Environment env;
+    while (!ATisEmpty(bnds)) {
+        char * s1, * s2;
+        ATerm bnd = ATgetFirst(bnds);
+        if (!ATmatch(bnd, "(<str>, <str>)", &s1, &s2))
+            throw badTerm("tuple of strings expected", bnd);
+        env[s1] = s2;
+        bnds = ATgetNext(bnds);
+    }
+
+    /* Check that none of the output paths exist. */
+    typedef pair<string, FSId> OutPath;
+    list<OutPath> outPaths;
+    while (!ATisEmpty(outs)) {
+        ATerm t = ATgetFirst(outs);
+        char * s1, * s2;
+        if (!ATmatch(t, "(<str>, <str>)", &s1, &s2))
+            throw badTerm("string expected", t);
+        outPaths.push_back(OutPath(s1, parseHash(s2)));
+        outs = ATgetNext(outs);
+    }
+
+    for (list<OutPath>::iterator i = outPaths.begin(); 
+         i != outPaths.end(); i++)
+        if (pathExists(i->first))
+            throw Error(format("path `%1%' exists") % i->first);
+
+    /* Run the builder. */
+    runProgram(builder, env);
+        
+    Slice slice;
+
+    /* Check whether the output paths were created, and register each
+       one. */
+    for (list<OutPath>::iterator i = outPaths.begin(); 
+         i != outPaths.end(); i++)
+    {
+        string path = i->first;
+        if (!pathExists(path))
+            throw Error(format("path `%1%' does not exist") % path);
+        registerPath(path, i->second);
+        slice.roots.push_back(i->second);
+
+        Strings outPaths = filterReferences(path, inPaths);
+    }
+
+    return slice;
+}
+
+
+void realiseSlice(Slice slice)
+{
+    debug(format("realising slice"));
+    Nest nest(true);
+
+    if (slice.elems.size() == 0)
+        throw Error("empty slice");
+
+    /* Perhaps all paths already contain the right id? */
+
+    bool missing = false;
+    for (SliceElems::iterator i = slice.elems.begin();
+         i != slice.elems.end(); i++)
+    {
+        SliceElem elem = *i;
+        string id;
+        if (!queryDB(nixDB, dbPath2Id, elem.path, id)) {
+            if (pathExists(elem.path))
+                throw Error(format("path `%1%' obstructed") % elem.path);
+            missing = true;
+            break;
+        }
+        if (parseHash(id) != elem.id)
+            throw Error(format("path `%1%' obstructed") % elem.path);
+    }
+
+    if (!missing) {
+        debug(format("already installed"));
+        return;
+    }
+
+    /* For each element, expand its id at its path. */
+    for (SliceElems::iterator i = slice.elems.begin();
+         i != slice.elems.end(); i++)
+    {
+        SliceElem elem = *i;
+        expandId(elem.id, elem.path);
+    }
 }

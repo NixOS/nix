@@ -8,33 +8,36 @@ using namespace std;
 
 /* Database names. */
 
-/* dbHash2Paths :: Hash -> [Path]
+/* dbPath2Id :: Path -> FSId
 
-   Maintains a mapping from hashes to lists of paths.  This is what we
-   use to resolve Hash(hash) content descriptors. */
-extern string dbHash2Paths;
+   Each pair (p, id) records that path $p$ contains an expansion of
+   $id$. */
+extern string dbPath2Id;
 
-/* dbSuccessors :: Hash -> Hash
 
-   Each pair (h1, h2) in this mapping records the fact that a
-   successor of an fstate expression with hash h1 is stored in a file
-   with hash h2.
+/* dbId2Paths :: FSId -> [Path]
+
+   A mapping from ids to lists of paths. */
+extern string dbId2Paths;
+
+
+/* dbSuccessors :: FSId -> FSId
+
+   Each pair $(id_1, id_2)$ in this mapping records the fact that a
+   successor of an fstate expression stored in a file with identifier
+   $id_1$ is stored in a file with identifier $id_2$.
 
    Note that a term $y$ is successor of $x$ iff there exists a
    sequence of rewrite steps that rewrites $x$ into $y$.
-
-   Also note that instead of a successor, $y$ can be any term
-   equivalent to $x$, that is, reducing to the same result, as long as
-   $x$ is equal to or a successor of $y$.  (This is useful, e.g., for
-   shared derivate caching over the network).
 */
 extern string dbSuccessors;
 
-/* dbSubstitutes :: Hash -> [Hash]
 
-   Each pair $(h, [hs])$ tells Nix that it can realise any of the
-   fstate expressions referenced by the hashes in $hs$ to obtain a Nix
-   archive that, when unpacked, will produce a path with hash $h$.
+/* dbSubstitutes :: FSId -> [FSId]
+
+   Each pair $(id, [ids])$ tells Nix that it can realise any of the
+   fstate expressions referenced by the identifiers in $ids$ to
+   generate a path with identifier $id$.
 
    The main purpose of this is for distributed caching of derivates.
    One system can compute a derivate with hash $h$ and put it on a

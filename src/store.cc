@@ -84,39 +84,36 @@ void copyPath(string src, string dst)
 }
 
 
-void registerSubstitute(const Hash & srcHash, const Hash & subHash)
+void registerSubstitute(const FSId & srcId, const FSId & subId)
 {
     Strings subs;
-    queryListDB(nixDB, dbSubstitutes, srcHash, subs); /* non-existence = ok */
+    queryListDB(nixDB, dbSubstitutes, srcId, subs); /* non-existence = ok */
 
     for (Strings::iterator it = subs.begin(); it != subs.end(); it++)
-        if (parseHash(*it) == subHash) return;
+        if (parseHash(*it) == subId) return;
     
-    subs.push_back(subHash);
+    subs.push_back(subId);
     
-    setListDB(nixDB, dbSubstitutes, srcHash, subs);
+    setListDB(nixDB, dbSubstitutes, srcId, subs);
 }
 
 
-Hash registerPath(const string & _path, Hash hash)
+void registerPath(const string & _path, const FSId & id)
 {
     string path(canonPath(_path));
 
-    if (hash == Hash()) hash = hashPath(path);
+    setDB(nixDB, dbPath2Id, path, id);
 
     Strings paths;
-    queryListDB(nixDB, dbHash2Paths, hash, paths); /* non-existence = ok */
+    queryListDB(nixDB, dbId2Paths, id, paths); /* non-existence = ok */
 
     for (Strings::iterator it = paths.begin();
          it != paths.end(); it++)
-        if (*it == path) goto exists;
+        if (*it == path) return;
     
     paths.push_back(path);
     
-    setListDB(nixDB, dbHash2Paths, hash, paths);
-    
- exists:
-    return hash;
+    setListDB(nixDB, dbId2Paths, id, paths);
 }
 
 
@@ -124,10 +121,15 @@ void unregisterPath(const string & _path)
 {
     string path(canonPath(_path));
 
-    Hash hash = hashPath(path);
+    string _id;
+    if (!queryDB(nixDB, dbPath2Id, path, _id))
+        return;
+    FSId id(parseHash(_id));
+
+    /* begin transaction */
     
     Strings paths, paths2;
-    queryListDB(nixDB, dbHash2Paths, hash, paths); /* non-existence = ok */
+    queryListDB(nixDB, dbId2Paths, id, paths); /* non-existence = ok */
 
     bool changed = false;
     for (Strings::iterator it = paths.begin();
@@ -135,7 +137,9 @@ void unregisterPath(const string & _path)
         if (*it != path) paths2.push_back(*it); else changed = true;
 
     if (changed)
-        setListDB(nixDB, dbHash2Paths, hash, paths2);
+        setListDB(nixDB, dbId2Paths, id, paths2);
+
+    /* end transaction */
 }
 
 
@@ -146,7 +150,7 @@ bool isInPrefix(const string & path, const string & _prefix)
 }
 
 
-string expandHash(const Hash & hash, const string & target,
+string expandId(const FSId & id, const string & target,
     const string & prefix)
 {
     Strings paths;
@@ -154,9 +158,7 @@ string expandHash(const Hash & hash, const string & target,
     if (!target.empty() && !isInPrefix(target, prefix))
         abort();
 
-    queryListDB(nixDB, dbHash2Paths, hash, paths);
-
-    /* !!! we shouldn't check for staleness by default --- too slow */
+    queryListDB(nixDB, dbId2Paths, id, paths);
 
     /* Pick one equal to `target'. */
     if (!target.empty()) {
@@ -165,16 +167,8 @@ string expandHash(const Hash & hash, const string & target,
              i != paths.end(); i++)
         {
             string path = *i;
-            try {
-#if 0
-                if (path == target && hashPath(path) == hash)
-#endif
-                if (path == target && pathExists(path))
-                    return path;
-            } catch (Error & e) {
-                debug(format("stale path: %1%") % e.msg());
-                /* try next one */
-            }
+            if (path == target && pathExists(path))
+                return path;
         }
         
     }
@@ -184,28 +178,26 @@ string expandHash(const Hash & hash, const string & target,
          it != paths.end(); it++)
     {
         string path = *it;
-        try {
-            if (isInPrefix(path, prefix) && hashPath(path) == hash) {
-                if (target.empty())
-                    return path;
-                else {
-                    copyPath(path, target);
-                    return target;
-                }
+        if (isInPrefix(path, prefix) && pathExists(path)) {
+            if (target.empty())
+                return path;
+            else {
+                copyPath(path, target);
+                registerPath(target, id);
+                return target;
             }
-        } catch (Error & e) {
-            debug(format("stale path: %1%") % e.msg());
-            /* try next one */
         }
     }
 
+#if 0
     /* Try to realise the substitutes. */
 
     Strings subs;
-    queryListDB(nixDB, dbSubstitutes, hash, subs); /* non-existence = ok */
+    queryListDB(nixDB, dbSubstitutes, id, subs); /* non-existence = ok */
 
     for (Strings::iterator it = subs.begin(); it != subs.end(); it++) {
-        StringSet dummy;
+        realiseSlice(normaliseFState(*it));
+        
         FState nf = realiseFState(hash2fstate(parseHash(*it)), dummy);
         string path = fstatePath(nf);
 
@@ -222,29 +214,30 @@ string expandHash(const Hash & hash, const string & target,
             return target;
         }
     }
+#endif
     
-    throw Error(format("cannot expand hash `%1%'") % (string) hash);
+    throw Error(format("cannot expand id `%1%'") % (string) id);
 }
 
     
-void addToStore(string srcPath, string & dstPath, Hash & hash,
+void addToStore(string srcPath, string & dstPath, FSId & id,
     bool deterministicName)
 {
     srcPath = absPath(srcPath);
-    hash = hashPath(srcPath);
+    id = hashPath(srcPath);
 
     string baseName = baseNameOf(srcPath);
-    dstPath = canonPath(nixStore + "/" + (string) hash + "-" + baseName);
+    dstPath = canonPath(nixStore + "/" + (string) id + "-" + baseName);
 
     try {
         /* !!! should not use the substitutes! */
-        dstPath = expandHash(hash, deterministicName ? dstPath : "", nixStore);
+        dstPath = expandId(id, deterministicName ? dstPath : "", nixStore);
         return;
     } catch (...) {
     }
     
     copyPath(srcPath, dstPath);
-    registerPath(dstPath, hash);
+    registerPath(dstPath, id);
 }
 
 

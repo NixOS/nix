@@ -8,6 +8,7 @@ extern "C" {
 }
 
 #include "hash.hh"
+#include "store.hh"
 
 using namespace std;
 
@@ -17,32 +18,23 @@ using namespace std;
    A Nix file system state expression, or FState, describes a
    (partial) state of the file system.
 
-     Path : Path * Content * [FState] -> FState
+     Slice : [Id] * [(Path, Id, [Id])] -> FState
 
+   (update)
    Path(path, content, refs) specifies a file object (its full path
    and contents), along with all file objects referenced by it (that
    is, that it has pointers to).  We assume that all files are
    self-referential.  This prevents us from having to deal with
    cycles.
 
-     Derive : String * Path * [FState] * Path * [(String, String)] -> FState
+     Derive : [(Path, Id)] * [FStateId] * Path * [(String, String)] -> FState
 
+   (update)
    Derive(platform, builder, ins, outs, env) specifies the creation of
    new file objects (in paths declared by `outs') by the execution of
    a program `builder' on a platform `platform'.  This execution takes
    place in a file system state given by `ins'.  `env' specifies a
    mapping of strings to strings.
-
-     [ !!! NOT IMPLEMENTED 
-       Regular : String -> Content
-       Directory : [(String, Content)] -> Content
-       (this complicates unambiguous normalisation)
-     ]
-     CHash : Hash -> Content
-
-   File content, given either in situ, or through an external reference
-   to the file system or url-space decorated with a hash to preserve
-   purity.
 
    A FState expression is in {\em $f$-normal form} if all Derive nodes
    have been reduced to File nodes.
@@ -63,7 +55,26 @@ typedef ATerm Content;
 
 typedef set<string> StringSet;
 
+typedef list<FSId> FSIds;
 
+
+struct SliceElem
+{
+    string path;
+    FSId id;
+    FSIds refs;
+};
+
+typedef list<SliceElem> SliceElems;
+
+struct Slice
+{
+    FSIds roots;
+    SliceElems elems;
+};
+
+
+#if 0
 /* Realise an fstate expression in the file system.  This requires
    execution of all Derive() nodes. */
 FState realiseFState(FState fs, StringSet & paths);
@@ -74,6 +85,8 @@ string fstatePath(FState fs);
 
 /* Return the paths referenced by fstate expression. */
 void fstateRefs(FState fs, StringSet & paths);
+#endif
+
 
 /* Return a canonical textual representation of an expression. */
 string printTerm(ATerm t);
@@ -85,16 +98,22 @@ Error badTerm(const format & f, ATerm t);
 /* Hash an aterm. */
 Hash hashTerm(ATerm t);
 
-FState hash2fstate(Hash hash);
-
-/* Read an aterm from disk, given its hash. */
-ATerm termFromHash(const Hash & hash, string * p = 0);
+/* Read an aterm from disk, given its id. */
+ATerm termFromId(const FSId & id, string * p = 0);
 
 /* Write an aterm to the Nix store directory, and return its hash. */
-Hash writeTerm(ATerm t, const string & suffix, string * p = 0);
+FSId writeTerm(ATerm t, const string & suffix, string * p = 0);
 
 /* Register a successor. */
-void registerSuccessor(const Hash & fsHash, const Hash & scHash);
+void registerSuccessor(const FSId & id1, const FSId & id2);
+
+
+/* Normalise an fstate-expression, that is, return an equivalent
+   Slice. */
+Slice normaliseFState(FSId id);
+
+/* Realise a Slice in the file system. */
+void realiseSlice(Slice slice);
 
 
 #endif /* !__FSTATE_H */

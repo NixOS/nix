@@ -8,29 +8,28 @@
 using namespace std;
 
 
+typedef Hash FSId;
+
+
 /* Copy a path recursively. */
 void copyPath(string src, string dst);
 
 /* Register a substitute. */
-void registerSubstitute(const Hash & srcHash, const Hash & subHash);
+void registerSubstitute(const FSId & srcId, const FSId & subId);
 
-/* Register a path keyed on its hash. */
-Hash registerPath(const string & path, Hash hash = Hash());
+/* Register a path keyed on its id. */
+void registerPath(const string & path, const FSId & id);
 
 /* Return a path whose contents have the given hash.  If target is
    not empty, ensure that such a path is realised in target (if
    necessary by copying from another location).  If prefix is not
-   empty, only return a path that is an descendent of prefix. 
-
-   If no path with the given hash is known to exist in the file
-   system, 
-*/
-string expandHash(const Hash & hash, const string & target = "",
+   empty, only return a path that is an descendent of prefix. */
+string expandId(const FSId & id, const string & target = "",
     const string & prefix = "/");
 
 /* Copy a file to the nixStore directory and register it in dbRefs.
    Return the hash code of the value. */
-void addToStore(string srcPath, string & dstPath, Hash & hash,
+void addToStore(string srcPath, string & dstPath, FSId & id,
     bool deterministicName = false);
 
 /* Delete a value from the nixStore directory. */

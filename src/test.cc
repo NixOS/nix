@@ -11,14 +11,15 @@
 #include "globals.hh"
 
 
-void realise(FState fs)
+void realise(FSId id)
 {
-    cout << format("%1% => %2%\n")
-        % printTerm(fs)
-        % printTerm(realiseFState(fs));
+    cout << format("realising %1%\n") % (string) id;
+    Slice slice = normaliseFState(id);
+    realiseSlice(slice);
 }
 
 
+#if 0
 void realiseFail(FState fs)
 {
     try {
@@ -28,6 +29,7 @@ void realiseFail(FState fs)
         cout << "error (expected): " << e.what() << endl;
     }
 }
+#endif
 
 
 struct MySink : DumpSink
@@ -111,54 +113,47 @@ void runTests()
 
     /* Expression evaluation. */
 
-#if 0
-    eval(whNormalise,
-        ATmake("Str(\"Hello World\")"));
-    eval(whNormalise,
-        ATmake("Bool(True)"));
-    eval(whNormalise,
-        ATmake("Bool(False)"));
-    eval(whNormalise,
-        ATmake("App(Lam(\"x\", Var(\"x\")), Str(\"Hello World\"))"));
-    eval(whNormalise,
-        ATmake("App(App(Lam(\"x\", Lam(\"y\", Var(\"x\"))), Str(\"Hello World\")), Str(\"Hallo Wereld\"))"));
-    eval(whNormalise,
-        ATmake("App(Lam(\"sys\", Lam(\"x\", [Var(\"x\"), Var(\"sys\")])), Str(\"i686-suse-linux\"))"));
-
-    evalFail(whNormalise,
-        ATmake("Foo(123)"));
-
-    string builder1fn = absPath("./test-builder-1.sh");
-    Hash builder1h = hashPath(builder1fn);
-
-    string fn1 = nixValues + "/builder-1.sh";
-    Expr e1 = ATmake("Path(<str>, ExtFile(<str>, <str>), [])", 
-        fn1.c_str(),
-        builder1h.c_str(),
-        builder1fn.c_str());
-    eval(fNormalise, e1);
-
-    string fn2 = nixValues + "/refer.txt";
-    Expr e2 = ATmake("Path(<str>, Regular(<str>), [<term>])",
-        fn2.c_str(),
-        ("I refer to " + fn1).c_str(),
-        e1);
-    eval(fNormalise, e2);
-
-    realise(e2);
-#endif
-
-    Hash builder1h;
+    FSId builder1id;
     string builder1fn;
-    addToStore("./test-builder-1.sh", builder1fn, builder1h);
+    addToStore("./test-builder-1.sh", builder1fn, builder1id);
 
     FState fs1 = ATmake(
-        "Path(<str>, Hash(<str>), [])", 
+        "Slice([<str>], [(<str>, <str>, [])])",
+        ((string) builder1id).c_str(),
         builder1fn.c_str(),
-        ((string) builder1h).c_str());
-    realise(fs1);
-    realise(fs1);
+        ((string) builder1id).c_str());
+    FSId fs1id = writeTerm(fs1, "", 0);
 
+    realise(fs1id);
+    realise(fs1id);
+
+    FState fs2 = ATmake(
+        "Slice([<str>], [(<str>, <str>, [])])",
+        ((string) builder1id).c_str(),
+        (builder1fn + "_bla").c_str(),
+        ((string) builder1id).c_str());
+    FSId fs2id = writeTerm(fs2, "", 0);
+
+    realise(fs2id);
+    realise(fs2id);
+
+    string out1fn = nixStore + "/hello.txt";
+    string out1id = hashString("foo"); /* !!! bad */
+    FState fs3 = ATmake(
+        "Derive([(<str>, <str>)], [<str>], <str>, <str>, [(\"out\", <str>)])",
+        out1fn.c_str(),
+        ((string) out1id).c_str(),
+        ((string) fs1id).c_str(),
+        ((string) builder1fn).c_str(),
+        thisSystem.c_str(),
+        out1fn.c_str());
+    debug(printTerm(fs3));
+    FSId fs3id = writeTerm(fs3, "", 0);
+
+    realise(fs3id);
+    realise(fs3id);
+
+#if 0
     FState fs2 = ATmake(
         "Path(<str>, Hash(<str>), [])", 
         (builder1fn + "_bla").c_str(),
@@ -175,28 +170,8 @@ void runTests()
         out1fn.c_str(),
         out1fn.c_str());
     realise(fs3);
-
-#if 0
-    Expr e1 = ATmake("Exec(Str(<str>), Hash(<str>), [])",
-        thisSystem.c_str(), ((string) builder1).c_str());
-
-    eval(e1);
-
-    Hash builder2 = addValue("./test-builder-2.sh");
-
-    Expr e2 = ATmake(
-        "Exec(Str(<str>), Hash(<str>), [Tup(Str(\"src\"), <term>)])",
-        thisSystem.c_str(), ((string) builder2).c_str(), e1);
-
-    eval(e2);
-
-    Hash h3 = addValue("./test-expr-1.nix");
-    Expr e3 = ATmake("Deref(Hash(<str>))", ((string) h3).c_str());
-
-    eval(e3);
-
-    deleteValue(h3);
 #endif
+
 }
 
 
