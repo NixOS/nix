@@ -54,6 +54,8 @@ expr: expr_function;
 expr_function
   : '{' formals '}' ':' expr_function
     { $$ = ATmake("Function(<term>, <term>)", $2, $5); }
+  | ID ':' expr_function
+    { $$ = ATmake("Function1(<term>, <term>)", $1, $3); }
   | expr_assert
   ;
 

@@ -194,10 +194,18 @@ Expr substitute(const ATermMap & subs, Expr e)
                 abort();
             subs2.remove(name);
         }
-        return ATmake("Function(<term>, <term>)", formals,
+        return ATmake("Function(<term>, <term>)",
+            substitute(subs, (ATerm) formals),
             substitute(subs2, body));
     }
 
+    if (atMatch(m, e) >> "Function" >> name >> body) {
+        ATermMap subs2(subs);
+        subs2.remove(name);
+        return ATmake("Function1(<term>, <term>)", name,
+            substitute(subs2, body));
+    }
+        
     /* Idem for a mutually recursive attribute set. */
     ATermList rbnds, nrbnds;
     if (atMatch(m, e) >> "Rec" >> rbnds >> nrbnds) {
@@ -249,7 +257,6 @@ void checkVarDefs(const ATermMap & defs, Expr e)
         if (!defs.get(name))
             throw Error(format("undefined variable `%1%'")
                 % aterm2String(name));
-        return;
     }
 
     else if (atMatch(m, e) >> "Function" >> formals >> body) {
@@ -263,7 +270,13 @@ void checkVarDefs(const ATermMap & defs, Expr e)
                     abort();
             defs2.set(name, (ATerm) ATempty);
         }
-        return checkVarDefs(defs2, body);
+        checkVarDefs(defs2, body);
+    }
+        
+    else if (atMatch(m, e) >> "Function1" >> name >> body) {
+        ATermMap defs2(defs);
+        defs2.set(name, (ATerm) ATempty);
+        checkVarDefs(defs2, body);
     }
         
     else if (atMatch(m, e) >> "Rec" >> rbnds >> nrbnds) {

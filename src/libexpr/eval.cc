@@ -195,6 +195,7 @@ Expr evalExpr2(EvalState & state, Expr e)
          cons == "Int" ||
          cons == "Bool" ||
          cons == "Function" ||
+         cons == "Function1" ||
          cons == "Attrs" ||
          cons == "List"))
         return e;
@@ -225,6 +226,12 @@ Expr evalExpr2(EvalState & state, Expr e)
         else if (atMatch(m, e1) >> "Function" >> formals >> e4)
             return evalExpr(state, 
                 substArgs(e4, formals, evalExpr(state, e2)));
+        
+        else if (atMatch(m, e1) >> "Function1" >> name >> e4) {
+            ATermMap subs;
+            subs.set(name, e2);
+            return evalExpr(state, substitute(subs, e4));
+        }
         
         else throw badTerm("expecting a function or primop", e1);
     }

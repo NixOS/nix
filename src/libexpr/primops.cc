@@ -76,27 +76,28 @@ static string addInput(EvalState & state,
 }
 
 
-static string processBinding(EvalState & state, Expr e, StoreExpr & ne)
+static void processBinding(EvalState & state, Expr e, StoreExpr & ne,
+    Strings & ss)
 {
     e = evalExpr(state, e);
 
     ATMatcher m;
     string s;
     ATermList es;
-
-    if (atMatch(m, e) >> "Str" >> s) return s;
-    if (atMatch(m, e) >> "Uri" >> s) return s;
-    if (atMatch(m, e) >> "Bool" >> "True") return "1";
-    if (atMatch(m, e) >> "Bool" >> "False") return "";
-
     int n;
-    if (atMatch(m, e) >> "Int" >> n) {
+
+    if (atMatch(m, e) >> "Str" >> s) ss.push_back(s);
+    else if (atMatch(m, e) >> "Uri" >> s) ss.push_back(s);
+    else if (atMatch(m, e) >> "Bool" >> "True") ss.push_back("1");
+    else if (atMatch(m, e) >> "Bool" >> "False") ss.push_back("");
+
+    else if (atMatch(m, e) >> "Int" >> n) {
         ostringstream st;
         st << n;
-        return st.str();
+        ss.push_back(st.str());
     }
 
-    if (atMatch(m, e) >> "Attrs") {
+    else if (atMatch(m, e) >> "Attrs") {
         Expr a = queryAttr(e, "type");
         if (a && evalString(state, a) == "derivation") {
             a = queryAttr(e, "drvPath");
@@ -109,29 +110,38 @@ static string processBinding(EvalState & state, Expr e, StoreExpr & ne)
 
             state.drvHashes[drvPath] = drvHash;
             
-            return addInput(state, drvPath, ne);
-        }
+            ss.push_back(addInput(state, drvPath, ne));
+        } else
+            throw badTerm("invalid derivation binding", e);
     }
 
-    if (atMatch(m, e) >> "Path" >> s) {
+    else if (atMatch(m, e) >> "Path" >> s) {
         Path drvPath = copyAtom(state, s);
-        return addInput(state, drvPath, ne);
+        ss.push_back(addInput(state, drvPath, ne));
     }
     
-    if (atMatch(m, e) >> "List" >> es) {
-	string s;
-	bool first = true;
+    else if (atMatch(m, e) >> "List" >> es) {
         for (ATermIterator i(es); i; ++i) {
             startNest(nest, lvlVomit, format("processing list element"));
-	    if (!first) s = s + " "; else first = false;
-	    s += processBinding(state, evalExpr(state, *i), ne);
+	    processBinding(state, evalExpr(state, *i), ne, ss);
         }
-	return s;
     }
 
-    if (atMatch(m, e) >> "Null") return "";
+    else if (atMatch(m, e) >> "Null") ss.push_back("");
     
-    throw badTerm("invalid derivation binding", e);
+    else throw badTerm("invalid derivation binding", e);
+}
+
+
+static string concatStrings(const Strings & ss)
+{
+    string s;
+    bool first = true;
+    for (Strings::const_iterator i = ss.begin(); i != ss.end(); ++i) {
+        if (!first) s += " "; else first = false;
+        s += *i;
+    }
+    return s;
 }
 
 
@@ -157,26 +167,20 @@ Expr primDerivation(EvalState & state, Expr args)
         Expr value = attrs.get(key);
         startNest(nest, lvlVomit, format("processing attribute `%1%'") % key);
 
+        Strings ss;
+        processBinding(state, value, ne, ss);
+
         /* The `args' attribute is special: it supplies the
            command-line arguments to the builder. */
         if (key == "args") {
-            throw Error("args not implemented");
-#if 0
-            ATermList args;
-            if (!(ATmatch(value, "[<list>]", &args))
-                throw badTerm("list expected", value);
-            while (!ATisEmpty(args)) {
-                Expr arg = evalExpr(state, ATgetFirst(args));
-                ne.derivation.args.push_back(processBinding(state, arg, ne));
-                args = ATgetNext(args);
-            }
-#endif
+            for (Strings::iterator i = ss.begin(); i != ss.end(); ++i)
+                ne.derivation.args.push_back(*i);
         }
 
         /* All other attributes are passed to the builder through the
            environment. */
         else {
-            string s = processBinding(state, value, ne);
+            string s = concatStrings(ss);
             ne.derivation.env[key] = s;
             if (key == "builder") ne.derivation.builder = s;
             else if (key == "system") ne.derivation.platform = s;
