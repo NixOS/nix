@@ -357,7 +357,6 @@ private:
     /* The states. */
     void init();
     void haveStoreExpr();
-    void inputNormalised();
     void inputRealised();
     void tryToBuild();
     void buildDone();
@@ -474,33 +473,11 @@ void NormalisationGoal::haveStoreExpr()
     }
     assert(expr.type == StoreExpr::neDerivation);
 
-    /* Inputs must be normalised before we can build this goal. */
+    /* Inputs must be realised before we can build this goal. */
     for (PathSet::iterator i = expr.derivation.inputs.begin();
          i != expr.derivation.inputs.end(); ++i)
-        addWaitee(worker.makeNormalisationGoal(*i));
+        addWaitee(worker.makeRealisationGoal(*i));
 
-    state = &NormalisationGoal::inputNormalised;
-}
-
-
-void NormalisationGoal::inputNormalised()
-{
-    trace("all inputs normalised");
-
-    if (nrFailed != 0) {
-        printMsg(lvlError,
-            format("cannot normalise derivation `%1%': "
-                "%2% closure element(s) could not be normalised")
-            % nePath % nrFailed);
-        amDone(false);
-        return;
-    }
-
-    /* Inputs must also be realised before we can build this goal. */
-    for (PathSet::iterator i = expr.derivation.inputs.begin();
-         i != expr.derivation.inputs.end(); ++i)
-        addWaitee(worker.makeRealisationGoal(queryNormalForm(*i)));
-    
     state = &NormalisationGoal::inputRealised;
 }
 
@@ -1474,26 +1451,9 @@ void SubstitutionGoal::tryNext()
     sub = subs.front();
     subs.pop_front();
 
-    /* Normalise the substitute store expression. */
-    nrFailed = 0;
-    addWaitee(worker.makeNormalisationGoal(sub.storeExpr));
-
-    state = &SubstitutionGoal::exprNormalised;
-}
-
-
-void SubstitutionGoal::exprNormalised()
-{
-    trace("substitute store expression normalised");
-
-    if (nrFailed != 0) {
-        tryNext();
-        return;
-    }
-
     /* Realise the substitute store expression. */
-    nfSub = queryNormalForm(sub.storeExpr);
-    addWaitee(worker.makeRealisationGoal(nfSub));
+    nrFailed = 0;
+    addWaitee(worker.makeRealisationGoal(sub.storeExpr));
 
     state = &SubstitutionGoal::exprRealised;
 }
@@ -1508,6 +1468,9 @@ void SubstitutionGoal::exprRealised()
         return;
     }
 
+    /* !!! the storeExpr doesn't have to be a derivation, right? */
+    nfSub = queryNormalForm(sub.storeExpr);
+    
     state = &SubstitutionGoal::tryToRun;
     worker.waitForBuildSlot(shared_from_this());
 }
