@@ -1,146 +1,221 @@
 <chapter id='chap-writing-nix-expressions'><title>Writing Nix Expressions</title>
 
+<para>This chapter shows you how to write Nix expressions, which are
+the things that tell Nix how to build components.  It starts with a
+simple example (a Nix expression for GNU Hello), and then moves
+on to a more in-depth look at the Nix expression language.</para>
+
+
 <sect1><title>A simple Nix expression</title>
 
-<para>This section shows how to write simple Nix expressions — the
-things that describe how to build a package.</para>
+<para>This section shows how to add and test the <ulink
+url='http://www.gnu.org/software/hello/hello.html'>GNU Hello
+package</ulink> to the Nix Packages collection.  Hello is a program
+that prints out the text <quote>Hello, world!</quote>.</para>
+
+<para>To add a component to the Nix Packages collection, you generally
+need to do three things:
+
+<orderedlist>
+
+  <listitem><para>Write a Nix expression for the component.  This is a
+  file that describes all the inputs involved in building the
+  component, such as dependencies (other components required by the
+  component), sources, and so on.</para></listitem>
+
+  <listitem><para>Write a <emphasis>builder</emphasis>.  This is a
+  shell script<footnote><para>In fact, it can be written in any
+  language, but typically it's a <command>bash</command> shell
+  script.</para></footnote> that actually builds the component from
+  the inputs.</para></listitem>
+
+  <listitem><para>Add the component to the file
+  <filename>pkgs/system/all-packages-generic.nix</filename>.  The Nix
+  expression written in the first step is a
+  <emphasis>function</emphasis>; it requires other components in order
+  to build it.  In this step you put it all together, i.e., you call
+  the function with the right arguments to build the actual
+  component.</para></listitem>
+
+</orderedlist>
+
+</para>
+
+
+<sect2><title>The Nix expression</title>
 
 <example id='ex-hello-nix'><title>Nix expression for GNU Hello</title>
 <programlisting>
 {stdenv, fetchurl, perl}: <co id='ex-hello-nix-co-1' />
 
-derivation { <co id='ex-hello-nix-co-2' />
+stdenv.mkDerivation { <co id='ex-hello-nix-co-2' />
   name = "hello-2.1.1"; <co id='ex-hello-nix-co-3' />
-  system = stdenv.system; <co id='ex-hello-nix-co-4' />
-  builder = ./builder.sh; <co id='ex-hello-nix-co-5' />
-  src = fetchurl { <co id='ex-hello-nix-co-6' />
+  builder = ./builder.sh; <co id='ex-hello-nix-co-4' />
+  src = fetchurl { <co id='ex-hello-nix-co-5' />
     url = ftp://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz;
     md5 = "70c9ccf9fac07f762c24f2df2290784d";
   };
-  stdenv = stdenv; <co id='ex-hello-nix-co-7' />
-  perl = perl;
+  inherit perl; <co id='ex-hello-nix-co-6' />
 }</programlisting>
 </example>
 
-<para>A simple Nix expression is shown in <xref linkend='ex-hello-nix'
-/>. It describes how to the build the <ulink
-url='http://www.gnu.org/directory/GNU/hello.html'>GNU Hello
-package</ulink>.  This package has several dependencies.  First, it
-requires a number of other packages, such as a C compiler, standard
-Unix shell tools, and Perl.  Rather than have this Nix expression
-refer to and use specific versions of these packages, it should be
-generic; that is, it should be a <emphasis>function</emphasis> that
-takes the required packages as inputs and yield a build of the GNU
-Hello package as a result.  This Nix expression defines a function
-with three arguments <xref linkend='ex-hello-nix-co-1' />, namely:
+<para><xref linkend='ex-hello-nix' /> shows a Nix expression for GNU
+Hello.  It's actually already in the Nix Packages collection in
+<filename>pkgs/applications/misc/hello/ex-1/default.nix</filename>.
+It is customary to place each package in a separate directory and call
+the single Nix expression in that directory
+<filename>default.nix</filename>.  The file has the following elements
+(referenced from the figure by number):
 
-  <orderedlist>
-    <listitem><para><varname>stdenv</varname>, which should be a
-    <emphasis>standard environment package</emphasis>.  The standard
-    environment is a set of tools and other components that would be
-    expected in a fairly minimal Unix-like environment: a C compiler
-    and linker, Unix shell tools, and so on.</para></listitem>
+<calloutlist>
+
+  <callout arearefs='ex-hello-nix-co-1'>
+
+    <para>This states that the expression is a
+    <emphasis>function</emphasis> that expects to be called with three
+    arguments: <varname>stdenv</varname>, <varname>fetchurl</varname>,
+    and <varname>perl</varname>.  They are needed to build Hello, but
+    we don't know how to build them here; that's why they are function
+    arguments.  <varname>stdenv</varname> is a component that is used
+    by almost all Nix Packages components; it provides a
+    <quote>standard</quote> environment consisting of the things you
+    would expect in a basic Unix environment: a C/C++ compiler (GCC,
+    to be precise), the Bash shell, fundamental Unix tools such as
+    <command>cp</command>, <command>grep</command>,
+    <command>tar</command>, etc.  (See
+    <filename>pkgs/stdenv/nix/path.nix</filename> to see what's in
+    <command>stdenv</command>.)  <varname>fetchurl</varname> is a
+    function that downloads files.  <varname>perl</varname> is the
+    Perl interpreter.</para>
+
+    <para>Nix functions generally have the form <literal>{x, y, ...,
+    z}: e</literal> where <varname>x</varname>, <varname>y</varname>,
+    etc. are the names of the expected arguments, and where
+    <replaceable>e</replaceable> is the body of the function.  So
+    here, the entire remainder of the file is the body of the
+    function; when given the required arguments, the body should
+    describe how to build an instance of the Hello component.</para>
     
-    <listitem><para><varname>fetchurl</varname>, which should be a
-    function that given parameters <varname>url</varname> and
-    <varname>md5</varname>, will fetch a file from the specified
-    location and check that this file has the given MD5 hash code.
-    The hash is required because build operations must be
-    <emphasis>pure</emphasis>: given the same inputs they should
-    always yield the same output.  Since network resources can change
-    at any time, we must in some way guarantee what the result will
-    be.</para></listitem>
-    
-    <listitem><para><varname>perl</varname>, which should be a Perl
-    interpreter.</para></listitem>
-    
-  </orderedlist>
+  </callout>
+
+  <callout arearefs='ex-hello-nix-co-2'>
+
+    <para>So we have to build a component.  Building something from
+    other stuff is called a <emphasis>derivation</emphasis> in Nix (as
+    opposed to sources, which are built by humans instead of
+    computers).  We perform a derivation by calling
+    <varname>stdenv.mkDerivation</varname>.
+    <varname>mkDerivation</varname> is a function provided by
+    <varname>stdenv</varname> that builds a component from a set of
+    <emphasis>attributes</emphasis>.  An attribute set is just a list
+    of key/value pairs where the value is an arbitrary Nix expression.
+    They take the general form
+    <literal>{<replaceable>name1</replaceable> =
+    <replaceable>expr1</replaceable>; <replaceable>...</replaceable>
+    <replaceable>name1</replaceable> =
+    <replaceable>expr1</replaceable>;</literal>.</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-nix-co-3'>
+
+    <para>The attribute <varname>name</varname> specifies the symbolic
+    name and version of the component.  Nix doesn't really care about
+    these things, but they are used by for instance <command>nix-env
+    -q</command> to show a <quote>human-readable</quote> name for
+    components.  This attribute is required by
+    <varname>mkDerivation</varname>.</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-nix-co-4'>
+
+    <para>The attribute <varname>builder</varname> specifies the
+    builder.  This attribute can sometimes be omitted, in which case
+    <varname>mkDerivation</varname> will fill in a default builder
+    (which does a <literal>configure; make; make install</literal>, in
+    essence).  Hello is sufficiently simple that the default builder
+    would suffice, but in this case, we will show an actual builder
+    for educational purposes.  The value
+    <command>./builder.sh</command> refers to the shell script shown
+    in <xref linkend='ex-hello-builder' />, discussed below.</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-nix-co-5'>
+
+    <para>The builder has to know what the sources of the component
+    are.  Here, the attribute <varname>src</varname> is bound to the
+    result of a call to the <command>fetchurl</command> function.
+    Given a URL and a MD5 hash of the expected contents of the file at
+    that URL, this function actually builds a derivation that
+    downloads the file and checks its hash.  So the sources are a
+    dependency that like all other dependencies is built before Hello
+    itself is built.</para>
+
+    <para>Instead of <varname>src</varname> any other name could have
+    been used, and in fact there can be any number of sources (bound
+    to different attributes).  However, <varname>src</varname> is
+    customary, and it's also expected by the default builder (which we
+    don't use in this example).</para>
+
+  </callout>
+
+  <callout arearefs='ex-hello-nix-co-6'>
+
+    <para>Since the derivation requires Perl, we have to pass the
+    value of the <varname>perl</varname> function argument to the
+    builder.  All attributes in the set are actually passed as
+    environment variables to the builder, so declaring an attribute
+
+    <programlisting>
+perl = perl;</programlisting>
+
+    will do the trink: it binds an attribute <varname>perl</varname>
+    to the function argument which also happens to be called
+    <varname>perl</varname>.  However, it looks a bit silly, so there
+    is a shorter syntax.  The <literal>inherit</literal> keyword
+    causes the specified attributes to be bound to whatever variables
+    with the same name happen to be in scope.</para>
+
+  </callout>
+  
+</calloutlist>
+
 </para>
 
-<para>The remainder of the file is the body of the function, which
-happens to be a <emphasis>derivation</emphasis> <xref
-linkend='ex-hello-nix-co-2' />, which is the built-in function
-<varname>derivation</varname> applied to a set of attributes that
-encode all the necessary information for building the GNU Hello
-package.</para>
+</sect2>
 
-<example><title>Build script (<filename>builder.sh</filename>) for GNU
-Hello</title>
+
+<sect2><title>The builder</title>
+
+<example id='ex-hello-builder'><title>Build script for GNU Hello</title>
 <programlisting>
-#! /bin/sh
+. $stdenv/setup
 
-buildinputs="$perl"
-. $stdenv/setup || exit 1
+PATH=$perl/bin:$PATH
 
-tar xvfz $src || exit 1
-cd hello-* || exit 1
-./configure --prefix=$out || exit 1
-make || exit 1
-make install || exit 1</programlisting>
+tar xvfz $src
+cd hello-*
+./configure --prefix=$out
+make
+make install</programlisting>
 </example>
 
-</sect1>
+<para><xref linkend='ex-hello-builder' /> shows the builder referenced
+from Hello's Nix expression (stored in
+<filename>pkgs/applications/misc/hello/ex-1/builder.sh</filename>).</para>
 
+<para>TODO</para>
 
-<sect1><title>A more complex Nix expression</title>
+<para>If you are wondering about the absence of error checking on the
+result of various commands called in the builder: this is because the
+shell script is evaluated with Bash's <option>-e</option> option,
+which causes the script to be aborted if any command fails without an
+error check.</para>
 
-<example id='ex-svn-nix'><title>Nix expression for Subversion</title>
-<programlisting>
-{ localServer ? false <co id='ex-svn-nix-co-1' />
-, httpServer ? false
-, sslSupport ? false
-, swigBindings ? false
-, stdenv, fetchurl
-, openssl ? null, httpd ? null, db4 ? null, expat, swig ? null
-}:
+</sect2>
 
-assert !isNull expat; <co id='ex-svn-nix-co-2' />
-assert localServer -> !isNull db4;
-assert httpServer -> !isNull httpd &amp;&amp; httpd.expat == expat; <co id='ex-svn-nix-co-3' />
-assert sslSupport -> !isNull openssl &amp;&amp; (httpServer -> httpd.openssl == openssl);
-assert swigBindings -> !isNull swig;
-
-derivation {
-  name = "subversion-0.32.1";
-  system = stdenv.system;
-
-  builder = ./builder.sh;
-  src = fetchurl {
-    url = http://svn.collab.net/tarballs/subversion-0.32.1.tar.gz;
-    md5 = "b06717a8ef50db4b5c4d380af00bd901";
-  };
-
-  localServer = localServer;
-  httpServer = httpServer;
-  sslSupport = sslSupport;
-  swigBindings = swigBindings;
-
-  stdenv = stdenv;
-  openssl = if sslSupport then openssl else null; <co id='ex-svn-nix-co-4' />
-  httpd = if httpServer then httpd else null;
-  expat = expat;
-  db4 = if localServer then db4 else null;
-  swig = if swigBindings then swig else null;
-}</programlisting>
-</example>
-
-<para>This example shows several features.  Default parameters <xref
-linkend='ex-svn-nix-co-1'/> can be used to simplify call sites: if an
-argument that has a default is omitted, its default value is
-used.</para>
-
-<para>You can use <emphasis>assertions</emphasis> to test whether
-arguments satisfy certain constraints.  The simple assertion <xref
-linkend='ex-svn-nix-co-2'/> tests whether the <varname>expat</varname>
-argument is not a null value.  The more complex assertion <xref
-linkend='ex-svn-nix-co-3'/> says that if Subversion is built with
-Apache support, then <varname>httpd</varname> (the Apache package)
-must not be null and it must have been built using the same instance
-of the <varname>expat</varname> library as was passed to the
-Subversion expression.  This is since the Subversion code is
-dynamically linked against the Apache code and they both use Expat,
-they must be linked against the same instance — otherwise a conflict
-might occur.</para>
 
 </sect1>
 

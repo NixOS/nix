@@ -9,7 +9,7 @@ build farm, since:
   <listitem><para>Nix supports distributed builds: a local Nix
   installation can forward Nix builds to other machines over the
   network.  This allows multiple builds to be performed in parallel
-  (thus improving performce), but more in importantly, it allows Nix
+  (thus improving performance), but more in importantly, it allows Nix
   to perform multi-platform builds in a semi-transparent way.  For
   instance, if you perform a build for a
   <literal>powerpc-darwin</literal> on an
@@ -38,8 +38,8 @@ build farm, since:
   once.</para></listitem>
 
   <listitem><para>The results of a Nix build farm can be made
-  available through a channel, so that users can use succesfull builds
-  immediately.</para></listitem>
+  available through a channel, so successful builds can be deployed to
+  users immediately.</para></listitem>
 
 </itemizedlist>
 
