@@ -3,7 +3,7 @@
 use strict;
 
 my $keep = 0;
-my $sourceroot = 0;
+my $sourceroot = 1;
 my $name = "current";
 my $srcid;
 
@@ -11,7 +11,7 @@ my $argnr = 0;
 while ($argnr < scalar @ARGV) {
     my $arg = $ARGV[$argnr++];
     if ($arg eq "--keep") { $keep = 1; }
-    elsif ($arg eq "--source-root") { $sourceroot = 1; }
+    elsif ($arg eq "--no-source") { $sourceroot = 0; }
     elsif ($arg eq "--name") { $name = $ARGV[$argnr++]; }
     elsif ($arg =~ /^\//) { $srcid = $arg; }
     else { die "unknown argument `$arg'" };
