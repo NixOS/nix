@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
-#DIFF=/home/eelco/Dev/nix/zdelta-2.1/zdc
-DIFF=/home/eelco/Dev/nix/bsdiff-4.2/bsdiff
+#DIFF=zdc
+DIFF=bsdiff
 
 srcA=$1
 srcB=$2
@@ -15,26 +15,38 @@ fi
 
     if test -f "$srcA/$fn"; then
 
-	echo "FILE DELTA FOR $fn"
+        if ! test -f "$srcB/$fn"; then
+            echo "DELETE $fn"
+        else
 
-        TMPFILE=/tmp/__bsdiff
-	$DIFF "$srcA/$fn" "$srcB/$fn" $TMPFILE
-        cat $TMPFILE
+            if ! cmp "$srcA/$fn" "$srcB/$fn" > /dev/null; then
+                    
+                echo "FILE DELTA FOR $fn"
 
-        diffSize=$(stat -c '%s' $TMPFILE)
+                TMPFILE=/tmp/__bsdiff
+                $DIFF "$srcA/$fn" "$srcB/$fn" $TMPFILE
+                cat $TMPFILE
 
-        # For comparison.
-        bzipSize=$(bzip2 < "$srcB/$fn" | wc -m)
+                diffSize=$(stat -c '%s' $TMPFILE)
 
-        gain=$(echo "scale=2; ($diffSize - $bzipSize) / $bzipSize * 100" | bc)
+                # For comparison.
+                bzipSize=$(bzip2 < "$srcB/$fn" | wc -m)
 
-        ouch=$(if test "${gain:0:1}" != "-"; then echo "!"; fi)
+                gain=$(echo "scale=2; ($diffSize - $bzipSize) / $bzipSize * 100" | bc)
 
-        printf "%7.2f %1s %10d %10d %s\n" \
-            "$gain" "$ouch" "$diffSize" "$bzipSize" "$fn" >&2
+                ouch=$(if test "${gain:0:1}" != "-"; then echo "!"; fi)
+
+                printf "%7.2f %1s %10d %10d %s\n" \
+                    "$gain" "$ouch" "$diffSize" "$bzipSize" "$fn" >&2
 #        echo "$fn -> $diffSize $bzipSize ==> $gain  $ouch" >&2
 
-        rm $TMPFILE
+                rm $TMPFILE
+
+            fi
+
+        fi
+
+        # Note: be silent about unchanged files.
 
     else
 
