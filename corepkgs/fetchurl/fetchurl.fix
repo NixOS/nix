@@ -1,8 +1,8 @@
-Function(["url", "hash"],
+Function(["url", "md5"],
   Package(
     [ ("build", Relative("fetchurl/fetchurl.sh"))
     , ("url", Var("url"))
-    , ("hash", Var("hash"))
+    , ("md5", Var("md5"))
     , ("name", BaseName(Var("url")))
     ]
   )
