@@ -1,0 +1,23 @@
+#! /usr/bin/perl -w
+
+my $descr = $ARGV[0];
+
+open DESCR, "< $descr";
+
+while (<DESCR>) {
+    chomp;
+
+    if (/^(\w+)\s*=\s*([\w\d\.\/-]+)\s*(\#.*)?$/) {
+	my $name = $1;
+	my $file = $2;
+	my $out = `md5sum $file`;
+	$out =~ /^([0-9a-f]+)\s/;
+	my $hash = $1;
+        print "$name = $hash\n";
+    } else {
+	print "$_\n";
+    }
+
+}
+
+close DESCR;
