@@ -1,36 +1,14 @@
 #include <map>
 #include <iostream>
 
-#include "parser.hh"
 #include "globals.hh"
 #include "normalise.hh"
 #include "shared.hh"
+#include "expr.hh"
+#include "eval.hh"
 
 
-typedef map<ATerm, ATerm> NormalForms;
-typedef map<Path, PathSet> PkgPaths;
-typedef map<Path, Hash> PkgHashes;
-
-struct EvalState 
-{
-    Paths searchDirs;
-    NormalForms normalForms;
-    PkgPaths pkgPaths;
-    PkgHashes pkgHashes; /* normalised package hashes */
-    Expr blackHole;
-
-    EvalState()
-    {
-        blackHole = ATmake("BlackHole()");
-        if (!blackHole) throw Error("cannot build black hole");
-    }
-};
-
-
-static Expr evalFile(EvalState & state, const Path & path);
-static Expr evalExpr(EvalState & state, Expr e);
-
-
+#if 0
 #if 0
 static Path searchPath(const Paths & searchDirs, const Path & relPath)
 {
@@ -380,35 +358,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
     /* Barf. */
     throw badTerm("invalid expression", e);
 }
-
-
-static Expr evalExpr(EvalState & state, Expr e)
-{
-    Nest nest(lvlVomit, format("evaluating expression: %1%") % printTerm(e));
-
-    /* Consult the memo table to quickly get the normal form of
-       previously evaluated expressions. */
-    NormalForms::iterator i = state.normalForms.find(e);
-    if (i != state.normalForms.end()) {
-        if (i->second == state.blackHole)
-            throw badTerm("infinite recursion", e);
-        return i->second;
-    }
-
-    /* Otherwise, evaluate and memoize. */
-    state.normalForms[e] = state.blackHole;
-    Expr nf = evalExpr2(state, e);
-    state.normalForms[e] = nf;
-    return nf;
-}
-
-
-static Expr evalFile(EvalState & state, const Path & path)
-{
-    Nest nest(lvlTalkative, format("evaluating file `%1%'") % path);
-    Expr e = parseExprFromFile(path);
-    return evalExpr(state, e);
-}
+#endif
 
 
 static Expr evalStdin(EvalState & state)
@@ -444,20 +394,25 @@ void run(Strings args)
     Strings files;
     bool readStdin = false;
 
+#if 0
     state.searchDirs.push_back(".");
     state.searchDirs.push_back(nixDataDir + "/fix");
+#endif
     
     for (Strings::iterator it = args.begin();
          it != args.end(); )
     {
         string arg = *it++;
 
+#if 0
         if (arg == "--includedir" || arg == "-I") {
             if (it == args.end())
                 throw UsageError(format("argument required in `%1%'") % arg);
             state.searchDirs.push_back(*it++);
         }
-        else if (arg == "--verbose" || arg == "-v")
+        else
+#endif
+        if (arg == "--verbose" || arg == "-v")
             verbosity = (Verbosity) ((int) verbosity + 1);
         else if (arg == "-")
             readStdin = true;
