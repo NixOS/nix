@@ -100,7 +100,7 @@ exports
     "\"" ~[\n\"]* "\"" -> Str
 
     PathComp ("/" PathComp)+ -> Path
-    [a-zA-Z0-9\.\_\-]+ -> PathComp
+    [a-zA-Z0-9\.\_\-\+]+ -> PathComp
 
     "true" -> Bool
     "false" -> Bool
