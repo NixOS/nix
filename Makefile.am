@@ -14,16 +14,19 @@ relname:
 install-data-local: init-state
 
 if INIT_STATE
+if SETUID_HACK
+INIT_FLAGS = -g @NIX_GROUP@ -o @NIX_USER@
+endif
 init-state:
-	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix
-	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix/db
-	$(INSTALL) -d $(DESTDIR)$(localstatedir)/log/nix
-	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix/profiles
-	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix/gcroots
-	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix/gcroots/tmp
+	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix
+	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/db
+	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/log/nix
+	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/profiles
+	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/gcroots
+	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/gcroots/tmp
 	rm -f $(DESTDIR)$(localstatedir)/nix/gcroots/profiles
 	ln -s $(localstatedir)/nix/profiles $(DESTDIR)$(localstatedir)/nix/gcroots/profiles
-	$(INSTALL) -d $(DESTDIR)$(prefix)/store
+	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(prefix)/store
 #	$(bindir)/nix-store --init
 else
 init-state:

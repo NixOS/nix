@@ -5,6 +5,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <pwd.h>
+#include <grp.h>
+
 extern "C" {
 #include <aterm2.h>
 }
@@ -160,10 +163,89 @@ static void initAndRun(int argc, char * * argv)
 }
 
 
+void switchToNixUser()
+{
+#if SETUID_HACK
+
+    /* Here we set the uid and gid to the Nix user and group,
+       respectively, IF the current (real) user is a member of the Nix
+       group.  Otherwise we just drop all privileges. */
+    
+    /* Lookup the Nix gid. */
+    struct group * gr = getgrnam(NIX_GROUP);
+    if (!gr) {
+        cerr << format("missing group `%1%'\n") % NIX_GROUP;
+        exit(1);
+    }
+
+    /* Get the supplementary group IDs for the current user. */
+    int maxGids = 512, nrGids;
+    gid_t gids[maxGids];
+    if ((nrGids = getgroups(maxGids, gids)) == -1) {
+        cerr << format("unable to query gids\n");
+        exit(1);
+    }
+
+    /* Check that the current user is a member of the Nix group. */
+    bool found = false;
+    for (int i = 0; i < nrGids; ++i)
+        if (gids[i] == gr->gr_gid) {
+            found = true;
+            break;
+        }
+
+    if (!found) {
+        /* Not in the Nix group - drop all root/Nix privileges. */
+        setgid(getgid());
+        setuid(getuid());
+        return;
+    }
+
+    /* Set the real, effective and saved gids to gr->gr_gid.  Also
+       make very sure that this succeeded.  We switch the gid first
+       because we cannot do it after we have dropped root uid. */
+    if (setgid(gr->gr_gid) != 0 ||
+        getgid() != gr->gr_gid ||
+        getegid() != gr->gr_gid)
+    {
+        cerr << format("unable to set gid to `%1%'\n") % NIX_GROUP;
+        exit(1);
+    }
+
+    /* Lookup the Nix uid. */
+    struct passwd * pw = getpwnam(NIX_USER);
+    if (!pw) {
+        cerr << format("missing user `%1%'\n") % NIX_USER;
+        exit(1);
+    }
+
+    /* This will drop all root privileges, setting the real, effective
+       and saved uids to pw->pw_uid.  Also make very sure that this
+       succeeded.*/
+    if (setuid(pw->pw_uid) != 0 ||
+        getuid() != pw->pw_uid ||
+        geteuid() != pw->pw_uid)
+    {
+        cerr << format("unable to set uid to `%1%'\n") % NIX_USER;
+        exit(1);
+    }
+
+#endif
+}
+
+
 static char buf[1024];
 
 int main(int argc, char * * argv)
 {
+    /* If we are setuid root, we have to get rid of the excess
+       privileges ASAP. */
+    printMsg(lvlError, format("%1% %2% %3% %4%\n") % getuid() % geteuid()
+        % getgid() % getegid());
+    switchToNixUser();
+    printMsg(lvlError, format("%1% %2% %3% %4%\n") % getuid() % geteuid()
+        % getgid() % getegid());
+    
     /* ATerm setup. */
     ATerm bottomOfStack;
     ATinit(argc, argv, &bottomOfStack);

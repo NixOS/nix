@@ -92,7 +92,7 @@ while (scalar @tmp > 0) {
     my @tmp2 = @tmp[0..$n - 1];
     @tmp = @tmp[$n..scalar @tmp - 1];
 
-    system "@bindir@/nix-store --realise -B @tmp2 > /dev/null";
+    system "@bindir@/nix-store --realise @tmp2 > /dev/null";
     if ($?) { die "`nix-store --realise' failed"; }
 
     open NARPATHS, "@bindir@/nix-store --query --list @tmp2 |" or die "cannot run nix";
