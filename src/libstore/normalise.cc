@@ -1049,8 +1049,11 @@ void NormalisationGoal::createClosure()
 	   in it. */
         startNest(nest2, lvlChatty,
             format("scanning for store references in `%1%'") % path);
-        Strings refPaths = filterReferences(path, 
-            Strings(allPaths.begin(), allPaths.end()));
+        Strings refPaths;
+        if (!pathExists(path + "/nix-support/no-scan")) {
+            refPaths = filterReferences(path, 
+                Strings(allPaths.begin(), allPaths.end()));
+        }
         nest2.close();
 
 	/* Construct a closure element for this output path. */

@@ -115,7 +115,7 @@ bool pathExists(const Path & path)
     struct stat st;
     res = lstat(path.c_str(), &st);
     if (!res) return true;
-    if (errno != ENOENT)
+    if (errno != ENOENT && errno != ENOTDIR)
         throw SysError(format("getting status of %1%") % path);
     return false;
 }
