@@ -42,6 +42,9 @@ typedef map<Path, WeakGoalPtr> WeakGoalMap;
 
 class Goal : public enable_shared_from_this<Goal>
 {
+public:
+    typedef enum {ecBusy, ecSuccess, ecFailed} ExitCode;
+    
 protected:
     
     /* Backlink to the worker. */
@@ -57,16 +60,16 @@ protected:
     /* Number of goals we are/were waiting for that have failed. */
     unsigned int nrFailed;
 
-    /* Whether amDone() has been called. */
-    bool done;
-
     /* Name of this goal for debugging purposes. */
     string name;
 
+    /* Whether the goal is finished. */
+    ExitCode exitCode;
+
     Goal(Worker & worker) : worker(worker)
     {
-        done = false;
         nrFailed = 0;
+        exitCode = ecBusy;
     }
 
     virtual ~Goal()
@@ -91,6 +94,11 @@ public:
     string getName()
     {
         return name;
+    }
+    
+    ExitCode getExitCode()
+    {
+        return exitCode;
     }
     
 protected:
@@ -165,9 +173,8 @@ public:
     /* Add a goal to the set of goals waiting for a build slot. */
     void waitForBuildSlot(GoalPtr goal, bool reallyWait = false);
     
-    /* Loop until the specified top-level goal has finished.  Returns
-       true if it has finished succesfully. */
-    bool run(const Goals & topGoals);
+    /* Loop until the specified top-level goals have finished. */
+    void run(const Goals & topGoals);
 
     /* Wait for input to become available. */
     void waitForInput();
@@ -232,8 +239,8 @@ void Goal::waiteeDone(GoalPtr waitee, bool success)
 void Goal::amDone(bool success)
 {
     trace("done");
-    assert(!done);
-    done = true;
+    assert(exitCode == ecBusy);
+    exitCode = success ? ecSuccess : ecFailed;
     for (WeakGoals::iterator i = waiters.begin(); i != waiters.end(); ++i) {
         GoalPtr goal = i->lock();
         if (goal) goal->waiteeDone(shared_from_this(), success);
@@ -342,6 +349,11 @@ public:
 
     void work();
 
+    Path getDrvPath()
+    {
+        return drvPath;
+    }
+    
 private:
     /* The states. */
     void init();
@@ -1552,41 +1564,6 @@ void SubstitutionGoal::writeLog(int fd,
 //////////////////////////////////////////////////////////////////////
 
 
-/* A fake goal used to receive notification of success or failure of
-   other goals. */
-class PseudoGoal : public Goal
-{
-private:
-    bool success;
-    
-public:
-    PseudoGoal(Worker & worker) : Goal(worker)
-    {
-        success = true;
-        name = "pseudo-goal";
-    }
-
-    void work() 
-    {
-        abort();
-    }
-
-    void waiteeDone(GoalPtr waitee, bool success)
-    {
-        if (!success) this->success = false;
-    }
-
-    bool isOkay()
-    {
-        return success;
-    }
-};
-
-
-
-//////////////////////////////////////////////////////////////////////
-
-
 static bool working = false;
 
 
@@ -1653,9 +1630,15 @@ static void removeGoal(GoalPtr goal, WeakGoalMap & goalMap)
 
 void Worker::removeGoal(GoalPtr goal)
 {
-    topGoals.erase(goal);
     ::removeGoal(goal, derivationGoals);
     ::removeGoal(goal, substitutionGoals);
+    if (topGoals.find(goal) != topGoals.end()) {
+        topGoals.erase(goal);
+        /* If a top-level goal failed, then kill all other goals
+           (unless keepGoing was set). */
+        if (goal->getExitCode() == Goal::ecFailed && !keepGoing)
+            topGoals.clear();
+    }
 }
 
 
@@ -1725,18 +1708,11 @@ void Worker::waitForBuildSlot(GoalPtr goal, bool reallyWait)
 }
 
 
-bool Worker::run(const Goals & _topGoals)
+void Worker::run(const Goals & _topGoals)
 {
-    /* Wrap the specified top-level goal in a pseudo-goal so that we
-       can check whether it succeeded. */
-    shared_ptr<PseudoGoal> pseudo(new PseudoGoal(*this));
     for (Goals::iterator i = _topGoals.begin();
          i != _topGoals.end(); ++i)
-    {
-        assert(*i);
-        pseudo->addWaitee(*i);
         topGoals.insert(*i);
-    }
     
     startNest(nest, lvlDebug, format("entered goal loop"));
 
@@ -1745,13 +1721,14 @@ bool Worker::run(const Goals & _topGoals)
         checkInterrupt();
 
         /* Call every wake goal. */
-        while (!awake.empty()) {
+        while (!awake.empty() && !topGoals.empty()) {
             WeakGoals awake2(awake);
             awake.clear();
             for (WeakGoals::iterator i = awake2.begin(); i != awake2.end(); ++i) {
                 checkInterrupt();
                 GoalPtr goal = i->lock();
                 if (goal) goal->work();
+                if (topGoals.empty()) break;
             }
         }
 
@@ -1770,8 +1747,6 @@ bool Worker::run(const Goals & _topGoals)
     assert(!keepGoing || awake.empty());
     assert(!keepGoing || wantingToBuild.empty());
     assert(!keepGoing || children.empty());
-
-    return pseudo->isOkay();
 }
 
 
@@ -1846,9 +1821,19 @@ void buildDerivations(const PathSet & drvPaths)
     for (PathSet::const_iterator i = drvPaths.begin();
          i != drvPaths.end(); ++i)
         goals.insert(worker.makeDerivationGoal(*i));
-    
-    if (!worker.run(goals))
-        throw Error(format("build failed"));
+
+    worker.run(goals);
+
+    PathSet failed;
+    for (Goals::iterator i = goals.begin(); i != goals.end(); ++i)
+        if ((*i)->getExitCode() == Goal::ecFailed) {
+            DerivationGoal * i2 = dynamic_cast<DerivationGoal *>(i->get());
+            assert(i2);
+            failed.insert(i2->getDrvPath());
+        }
+            
+    if (!failed.empty())
+        throw Error(format("build of %1% failed") % showPaths(failed));
 }
 
 
@@ -1858,8 +1843,11 @@ void ensurePath(const Path & path)
     if (isValidPath(path)) return;
 
     Worker worker;
-    Goals goals;
-    goals.insert(worker.makeSubstitutionGoal(path));
-    if (!worker.run(goals))
+    GoalPtr goal = worker.makeSubstitutionGoal(path);
+    Goals goals = singleton<Goals>(goal);
+
+    worker.run(goals);
+
+    if (goal->getExitCode() != Goal::ecSuccess)
         throw Error(format("path `%1%' does not exist and cannot be created") % path);
 }
