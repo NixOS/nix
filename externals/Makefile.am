@@ -19,7 +19,8 @@ have-db:
 build-db: have-db
 	(pfx=`pwd` && \
 	cd $(DB)/build_unix && \
-	CC=$(CC) CXX=$(CXX) ../dist/configure --prefix=$$pfx/inst \
+	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" \
+     ../dist/configure --prefix=$$pfx/inst \
 	 --enable-cxx --disable-shared && \
 	make && \
 	make install)
@@ -47,7 +48,8 @@ have-aterm:
 build-aterm: have-aterm
 	(pfx=`pwd` && \
 	cd $(ATERM) && \
-	./configure --prefix=$$pfx/inst && \
+	CC="$(CC)" ./configure --prefix=$$pfx/inst \
+     --with-cflags="-DNDEBUG -DXGC_VERBOSE -DXHASHPEM -DWITH_STATS $(CFLAGS)" && \
 	make && \
 	make install)
 	touch build-aterm
@@ -74,7 +76,7 @@ have-sdf2:
 build-sdf2: have-sdf2
 	(pfx=`pwd` && \
 	cd $(SDF2) && \
-	./configure --prefix=$$pfx/inst && \
+	CC="$(CC) -pg" ./configure --prefix=$$pfx/inst --with-cflags="$(CFLAGS)" && \
 	make && \
 	make install)
 	touch build-sdf2
@@ -83,3 +85,7 @@ build-sdf2: have-sdf2
 all: build-db build-aterm build-sdf2
 
 EXTRA_DIST = $(DB).tar.gz $(ATERM).tar.gz $(SDF2).tar.gz
+
+ext-clean:
+	$(RM) -f have-db build-db have-aterm build-aterm have-sdf2 build-sdf2
+	$(RM) -rf $(DB) $(ATERM) $(SDF2)
