@@ -8,6 +8,6 @@ AM_CXXFLAGS = -DSYSTEM=\"@system@\" -Wall -I.. -I../../externals/inst/include
 check_PROGRAMS = test-aterm
 
 test_aterm_SOURCES = test-aterm.cc
-test_aterm_LDADD = libnix.a $(LDADD) ../boost/format/libformat.a \
+test_aterm_LDADD = ./libutil.a ../boost/format/libformat.a \
  -L../../externals/inst/lib -ldb_cxx -lATerm
 
