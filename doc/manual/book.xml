@@ -219,6 +219,71 @@ $ make install</screen>
   <!--======================================================================-->
 
   <appendix>
+    <title>Command Reference</title>
+
+    <refentry>
+      <refnamediv>
+	<refname>nix</refname>
+	<refpurpose>manipulate or query the Nix store</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<cmdsynopsis>
+	  <command>nix</command>
+	  <arg>--verbose</arg>
+	</cmdsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>
+	  The command <command>nix</command> provides access to the Nix store.
+	  This is the (set of) path(s) where Nix expressions and the file
+	  system objects built by them are stored.
+	</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Common Options</title>
+
+	<para>
+	  <command>nix</command> has many subcommands.  These are listed below.
+	  In this section the common options are listed.  These options are
+	  allowed for every subcommand (although they may not always have an
+	  effect).
+	</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Subcommand <command>--install</command></title>
+
+	<refsect2>
+	  <title>Synopsis</title>
+	  <cmdsynopsis>
+	    <command>nix --install</command>
+	    <arg rep='repeat'><replaceable>id</replaceable></arg>
+	  </cmdsynopsis>
+	</refsect2>
+
+	<refsect2>
+	  <title>Description</title>
+	    
+	  <para>
+	    <command>nix --install</command> realises the given Nix expressions
+	    in the file system.
+	  </para>
+	</refsect2>
+      </refsect1>
+
+    </refentry>
+
+  </appendix>
+
+
+  <!--======================================================================-->
+
+  <appendix>
     <title>Troubleshooting</title>
 
     <sect1>
@@ -267,7 +332,7 @@ $ rm `db_archive -a -h <replaceable>prefix</replaceable>/var/nix/db`</screen>
   <!--======================================================================-->
 
   <appendix>
-    <title>Known problems</title>
+    <title>Bugs</title>
 
     <itemizedlist>
 
