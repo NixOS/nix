@@ -1,7 +1,9 @@
 <?xml version="1.0"?>
 
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
-  
+
+  <xsl:output method='html' />
+
   <xsl:template match="logfile">
     <html>
       <head>
@@ -9,37 +11,30 @@
         <title>Log File</title>
       </head>
       <body>
-        <xsl:apply-templates/>
+        <ul class='toplevel'>
+          <xsl:for-each select='line|nest'>
+            <li>
+              <xsl:apply-templates select='.'/>
+            </li>
+          </xsl:for-each>
+        </ul>
       </body>
     </html>
   </xsl:template>
 
   <xsl:template match="nest">
-    <div class='nesting'>
-      <div class='head'>
-        <xsl:apply-templates select='head'/>
-      </div>
-      <blockquote class='body'>
-        <xsl:for-each select='line|nest'>
-          <xsl:if test="position() != last()">
-            <div class='line'>
-              <span class='lineconn' />
-              <span class='linebody'>
-                <xsl:apply-templates select='.'/>
-              </span>
-            </div>
-          </xsl:if>
-          <xsl:if test="position() = last()">
-            <div class='lastline'>
-              <span class='lineconn' />
-              <span class='linebody'>
-                <xsl:apply-templates select='.'/>
-              </span>
-            </div>
-          </xsl:if>
-        </xsl:for-each>
-      </blockquote>
-    </div>
+    <xsl:apply-templates select='head'/>
+    <ul class='nesting'>
+      <xsl:for-each select='line|nest'>
+        <xsl:param name="class"><xsl:choose><xsl:when test="position() != last()">line</xsl:when><xsl:otherwise>lastline</xsl:otherwise></xsl:choose></xsl:param>
+        <li class='{$class}'>
+          <span class='lineconn' />
+          <span class='linebody'>
+            <xsl:apply-templates select='.'/>
+          </span>
+        </li>
+      </xsl:for-each>
+    </ul>
   </xsl:template>
   
   <xsl:template match="head|line">
