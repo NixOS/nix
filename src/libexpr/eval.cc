@@ -348,7 +348,7 @@ Expr evalExpr2(EvalState & state, Expr e)
             return makeString(s1 + s2);
         else if (atMatch(m, e1) >> "Path" >> s1 &&
             atMatch(m, e2) >> "Path" >> s2)
-            return makeString(canonPath(s1 + "/" + s2));
+            return makePath(canonPath(s1 + "/" + s2));
         else throw Error("wrong argument types in `+' operator");
     }
 
