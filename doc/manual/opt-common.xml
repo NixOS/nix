@@ -1,4 +1,24 @@
 <varlistentry>
+  <term><option>--help</option></term>
+  <listitem>
+    <para>
+      Prints out a summary of the command syntax and exits.
+    </para>
+  </listitem>
+</varlistentry>
+
+
+<varlistentry>
+  <term><option>--version</option></term>
+  <listitem>
+    <para>
+      Prints out the Nix version number on standard output and exits.
+    </para>
+  </listitem>
+</varlistentry>
+
+
+<varlistentry>
   <term><option>--verbose</option> / <option>-v</option></term>
   <listitem>
     <para>
@@ -72,6 +92,7 @@
   </listitem>
 </varlistentry>
 
+
 <varlistentry>
   <term><option>--build-output</option> / <option>-B</option></term>
   <listitem>
@@ -85,3 +106,17 @@
     </para>
   </listitem>
 </varlistentry>
+
+
+<varlistentry>
+  <term><option>--keep-failed</option> / <option>-K</option></term>
+  <listitem>
+    <para>
+      Specifies that in case of a build failure, the temporary
+      directory (usually in <filename>/tmp</filename>) in which the
+      build takes place should not be deleted.  The path of the build
+      directory is printed as an informational message.
+    </para>
+  </listitem>
+</varlistentry>
+

@@ -29,6 +29,7 @@ struct DrvInfo
 };
 
 typedef map<Path, DrvInfo> DrvInfos;
+typedef vector<DrvInfo> DrvInfoList;
 
 
 void printHelp()
@@ -547,6 +548,12 @@ static void opUninstall(Globals & globals,
 }
 
 
+static bool cmpDrvByName(const DrvInfo & a, const DrvInfo & b)
+{
+    return a.name < b.name;
+}
+
+
 static void opQuery(Globals & globals,
     Strings opFlags, Strings opArgs)
 {
@@ -556,7 +563,7 @@ static void opQuery(Globals & globals,
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
         if (*i == "--name") query = qName;
-        else if (*i == "--expr" || *i == "-e") query = qDrvPath;
+        else if (*i == "--expr") query = qDrvPath;
         else if (*i == "--status" || *i == "-s") query = qStatus;
         else if (*i == "--installed") source = sInstalled;
         else if (*i == "--available" || *i == "-a") source = sAvailable;
@@ -580,19 +587,25 @@ static void opQuery(Globals & globals,
     }
 
     if (opArgs.size() != 0) throw UsageError("no arguments expected");
+
+    /* Sort them by name. */
+    DrvInfoList drvs2;
+    for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i)
+        drvs2.push_back(i->second);
+    sort(drvs2.begin(), drvs2.end(), cmpDrvByName);
     
     /* Perform the specified query on the derivations. */
     switch (query) {
 
         case qName: {
-            for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i)
-                cout << format("%1%\n") % i->second.name;
+            for (DrvInfoList::iterator i = drvs2.begin(); i != drvs2.end(); ++i)
+                cout << format("%1%\n") % i->name;
             break;
         }
         
         case qDrvPath: {
-            for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i)
-                cout << format("%1%\n") % i->second.drvPath;
+            for (DrvInfoList::iterator i = drvs2.begin(); i != drvs2.end(); ++i)
+                cout << format("%1%\n") % i->drvPath;
             break;
         }
         
@@ -605,14 +618,14 @@ static void opQuery(Globals & globals,
                  i != installed.end(); ++i)
                 installedPaths.insert(i->second.outPath);
             
-            for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i) {
-                Paths subs = querySubstitutes(i->second.drvPath);
+            for (DrvInfoList::iterator i = drvs2.begin(); i != drvs2.end(); ++i) {
+                Paths subs = querySubstitutes(i->drvPath);
                 cout << format("%1%%2%%3% %4%\n")
-                    % (installedPaths.find(i->second.outPath)
+                    % (installedPaths.find(i->outPath)
                         != installedPaths.end() ? 'I' : '-')
-                    % (isValidPath(i->second.outPath) ? 'P' : '-')
+                    % (isValidPath(i->outPath) ? 'P' : '-')
                     % (subs.size() > 0 ? 'S' : '-')
-                    % i->second.name;
+                    % i->name;
             }
             break;
         }

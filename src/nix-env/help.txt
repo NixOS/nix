@@ -21,7 +21,7 @@ name `*' may be used to indicate all derivations.
 Query types:
 
   --name: print derivation names (default)
-  --expr / -e: print derivation store expression
+  --expr: print derivation store expression
   --status / -s: print installed/present status
 
 Query sources:

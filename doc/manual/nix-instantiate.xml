@@ -1,16 +1,13 @@
 <refentry>
   <refnamediv>
     <refname>nix-instantiate</refname>
-    <refpurpose>generate Nix expressions from a high-level description</refpurpose>
+    <refpurpose>instantiate store expressions from Nix expressions</refpurpose>
   </refnamediv>
 
   <refsynopsisdiv>
     <cmdsynopsis>
-      <command>fix</command>
-      <group choice='opt' rep='repeat'>
-        <arg><option>--verbose</option></arg>
-        <arg><option>-v</option></arg>
-      </group>
+      <command>nix-instantiate</command>
+      &opt-common-syn;
       <arg rep='repeat'><replaceable>files</replaceable></arg>
     </cmdsynopsis>
   </refsynopsisdiv>
@@ -19,19 +16,10 @@
     <title>Description</title>
 
     <para>
-      The command <command>fix</command> generates Nix expressions from
-      expressions is Fix's own high-level language.  While Nix expressions are
-      very primitive and not intended to be written directly, Fix expressions
-      are quite easy to write.
+      The command <command>nix-instantiate</command> generates
+      (low-level) store expressions from (high-level) Nix expressions.
     </para>
 
   </refsect1>
 
 </refentry>
-
-
-<!--
-local variables:
-sgml-parent-document: ("book.xml" "refentry")
-end:
--->

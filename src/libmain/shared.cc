@@ -70,6 +70,9 @@ static void initAndRun(int argc, char * * argv)
         else if (arg == "--help") {
             printHelp();
             return;
+        } else if (arg == "--version") {
+            cout << format("%1% (Nix) %2%") % programId % NIX_VERSION << endl;
+            return;
         } else if (arg == "--keep-failed" || arg == "-K")
             keepFailed = true;
         else remaining.push_back(arg);
