@@ -18,7 +18,7 @@ sub createLinks {
         my $basename = $srcfile;
         $basename =~ s/^.*\///g; # strip directory
         my $dstfile = "$dstdir/$basename";
-	if ($srcfile =~ /\/envpkgs$/) {
+	if ($srcfile =~ /\/propagated-build-inputs$/) {
 	} elsif (-d $srcfile) {
             # !!! hack for resolving name clashes
             if (!-e $dstfile) {
