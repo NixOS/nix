@@ -3,41 +3,74 @@
 use strict;
 use IPC::Open2;
 
-my $linkdir = "@localstatedir@/nix/profiles";
-my $storedir = "@storedir@";
+my $rootsDir = "@localstatedir@/nix/gcroots";
+my $storeDir = "@storedir@";
 
 my %alive;
 
-my $keepsuccessors = 1;
+my $keepSuccessors = 1;
 my $invert = 0;
 
+my @roots = ();
+
+
+# Parse the command line.
 foreach my $arg (@ARGV) {
-    if ($arg eq "--no-successors") { $keepsuccessors = 0; }
+    if ($arg eq "--no-successors") { $keepSuccessors = 0; }
     elsif ($arg eq "--invert") { $invert = 1; }
     else { die "unknown argument `$arg'" };
 }
 
-opendir(DIR, $linkdir) or die "cannot open directory $linkdir: $!";
-my @links = readdir DIR or die "cannot read directory $linkdir: $!";
-closedir DIR;
 
-my @roots;
-foreach my $link (@links) {
-    $link = $linkdir . "/" . $link;
-    next if (!($link =~ /.gcroot$/));
-    open ROOT, "<$link" or die "cannot open $link: $!";
+# Read all GC roots from the given file.
+sub readRoots {
+    my $fileName = shift;
+    open ROOT, "<$fileName" or die "cannot open `$fileName': $!";
     while (<ROOT>) {
         chomp;
         foreach my $root (split ' ') {
-            die "bad root `$root' in file `$link'" unless $root =~ /^\S+$/;
+            die "bad root `$root' in file `$fileName'"
+                unless $root =~ /^\S+$/;
             push @roots, $root;
         }
     }
     close ROOT;
 }
 
+
+# Recursively finds all *.gcroot files in the given directory.
+sub findRoots;
+sub findRoots {
+    my $followSymlinks = shift;
+    my $dir = shift;
+
+    opendir(DIR, $dir) or die "cannot open directory `$dir': $!";
+    my @names = readdir DIR or die "cannot read directory `$dir': $!";
+    closedir DIR;
+
+    foreach my $name (@names) {
+        next if $name eq "." || $name eq "..";
+        $name = $dir . "/" . $name;
+        if ($name =~ /.gcroot$/ && -f $name) {
+            readRoots $name;
+        }
+        elsif (-d $name) {
+            if ($followSymlinks || !-l $name) {
+                findRoots 0, $name;
+            }
+        }
+    }
+    
+}
+
+
+# Find GC roots, starting at $rootsDir.
+findRoots 1, $rootsDir;
+
+
+# Determine all store paths reachable from the roots.
 my $extraarg = "";
-if ($keepsuccessors) { $extraarg = "--include-successors"; };
+if ($keepSuccessors) { $extraarg = "--include-successors"; };
 my $pid = open2(\*READ, \*WRITE, "@bindir@/nix-store --query --requisites $extraarg @roots") 
     or die "determining live paths";
 close WRITE;
@@ -53,14 +86,15 @@ $? == 0 or die "determining live paths";
 
 exit 0 if ($invert);
 
-opendir(DIR, $storedir) or die "cannot open directory $storedir: $!";
-my @names = readdir DIR;
-closedir DIR;
 
-foreach my $name (@names) {
+# Using that information, find all store paths *not* reachable from
+# the roots.
+opendir(DIR, $storeDir) or die "cannot open directory $storeDir: $!";
+foreach my $name (readdir DIR) {
     next if ($name eq "." || $name eq "..");
-    $name = "$storedir/$name";
+    $name = "$storeDir/$name";
     if (!$alive{$name}) {
         print "$name\n";
     }
 }
+closedir DIR;
