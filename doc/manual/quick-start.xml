@@ -13,7 +13,7 @@
     <listitem>
       <para>
         Download a source tarball or RPM from <ulink
-        url='http://www.cs.uu.nl/groups/ST/Trace/NixDeploymentSystem'/>.
+        url='http://www.cs.uu.nl/groups/ST/Trace/Nix'/>.
         Build source distributions using the regular sequence:
         
         <screen>
