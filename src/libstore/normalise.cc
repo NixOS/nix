@@ -87,6 +87,11 @@ public:
 
     virtual void waiteeDone(GoalPtr waitee, bool success);
 
+    virtual void writeLog(int fd, const unsigned char * buf, size_t count)
+    {
+        abort();
+    }
+
     void trace(const format & f);
     
 protected:
@@ -394,6 +399,9 @@ private:
     
     /* Delete the temporary directory, if we have one. */
     void deleteTmpDir(bool force);
+
+    /* Callback used by the worker to write to the log. */
+    void writeLog(int fd, const unsigned char * buf, size_t count);
 
     string name();
 };
@@ -1183,6 +1191,14 @@ void NormalisationGoal::deleteTmpDir(bool force)
 }
 
 
+void NormalisationGoal::writeLog(int fd,
+    const unsigned char * buf, size_t count)
+{
+    assert(fd == logPipe.readSide);
+    writeFull(fdLogFile, buf, count);
+}
+
+
 string NormalisationGoal::name()
 {
     return (format("normalisation of `%1%'") % nePath).str();
@@ -1406,6 +1422,9 @@ public:
     void exprRealised();
     void tryToRun();
     void finished();
+
+    /* Callback used by the worker to write to the log. */
+    void writeLog(int fd, const unsigned char * buf, size_t count);
 
     string name();
 };
@@ -1642,6 +1661,15 @@ void SubstitutionGoal::finished()
         format("substitution of path `%1%' succeeded") % storePath);
 
     amDone();
+}
+
+
+void SubstitutionGoal::writeLog(int fd,
+    const unsigned char * buf, size_t count)
+{
+    assert(fd == logPipe.readSide);
+    /* Don't write substitution output to a log file for now.  We
+       probably should, though. */
 }
 
 
@@ -1922,7 +1950,7 @@ void Worker::waitForInput()
             } else {
                 printMsg(lvlVomit, format("%1%: read %2% bytes")
                     % goal->name() % rd);
-//                 writeFull(goal.fdLogFile, buffer, rd); !!!
+                goal->writeLog(fd, buffer, (size_t) rd);
                 if (verbosity >= buildVerbosity)
                     writeFull(STDERR_FILENO, buffer, rd);
             }
