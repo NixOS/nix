@@ -23,15 +23,79 @@ using namespace std;
 
 
 /* Database names. */
+
+/* dbRefs :: Hash -> FileName
+
+   Maintains a mapping from hashes to filenames within the NixValues
+   directory.  This mapping is for performance only; it can be
+   reconstructed unambiguously from the nixValues directory.  The
+   reason is that names in this directory are not printed hashes but
+   also might carry some descriptive element (e.g.,
+   "aterm-2.0-ae749a...").  Without this mapping, looking up a value
+   would take O(n) time because we would need to read the entire
+   directory. */
 static string dbRefs = "refs";
-static string dbInstPkgs = "pkginst";
-static string dbPrebuilts = "prebuilts";
+
+/* dbNFs :: Hash -> Hash
+
+   Each pair (h1, h2) in this mapping records the fact that h2 is a
+   normal form obtained by evaluating the value h1.
+
+   We would really like to have h2 be the hash of the object
+   referenced by h2.  However, that gives a cyclic dependency: to
+   compute the hash (and thus the file name) of the object, we need to
+   compute the object, but to do that, we need the file name of the
+   object.
+
+   So for now we abandon the requirement that 
+
+     hashFile(dbRefs[h]) == h.
+
+   I.e., this property does not hold for computed normal forms.
+   Rather, we use h2 = hash(h1).  This allows dbNFs to be
+   reconstructed.  Perhaps using a pseudo random number would be
+   better to prevent the system from being subverted in some way.
+*/
+static string dbNFs = "nfs";
+
+/* dbNetSources :: Hash -> URL
+
+   Each pair (hash, url) in this mapping states that the object
+   identified by hash can be obtained by fetching the object pointed
+   to by url. 
+
+   TODO: this should be Hash -> [URL]
+
+   TODO: factor this out into a separate tool? */
 static string dbNetSources = "netsources";
 
 
-static string nixSourcesDir;
+/* Path names. */
+
+/* nixValues is the directory where all Nix values (both files and
+   directories, and both normal and non-normal forms) live. */
+static string nixValues;
+
+/* nixLogDir is the directory where we log evaluations. */ 
 static string nixLogDir;
+
+/* nixDB is the file name of the Berkeley DB database where we
+   maintain the dbXXX mappings. */
 static string nixDB;
+
+
+/* Abstract syntax of Nix values:
+
+   e := Hash(h) -- external reference
+      | Str(s) -- string constant
+      | Bool(b) -- boolean constant
+      | Name(e) -- "&" operator; pointer (file name) formation
+      | App(e, e) -- application
+      | Lam(x, e) -- lambda abstraction
+      | Exec(platform, e, e*)
+          -- primitive; execute e with args e* on platform
+      ;
+*/
 
 
 /* Download object referenced by the given URL into the sources
