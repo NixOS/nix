@@ -26,6 +26,8 @@ lexer-tab.c lexer-tab.h: lexer.l
 
 # ATerm helper function generation.
 
+nixexpr.cc eval.cc parser.cc primops.cc: nixexpr-ast.hh
+
 nixexpr-ast.cc nixexpr-ast.hh: ../aterm-helper.pl nixexpr-ast.def
 	$(perl) ../aterm-helper.pl nixexpr-ast.hh nixexpr-ast.cc < nixexpr-ast.def
 
