@@ -89,6 +89,8 @@ bool parseDerivations(EvalState & state, Expr e, DrvInfos & drvs)
             debug(format("evaluating attribute `%1%'") % *i);
             if (parseDerivation(state, drvMap.get(*i), drv))
                 drvs[drv.drvPath] = drv;
+            else
+                parseDerivations(state, drvMap.get(*i), drvs);
         }
     }
 
@@ -97,6 +99,8 @@ bool parseDerivations(EvalState & state, Expr e, DrvInfos & drvs)
             debug(format("evaluating list element"));
             if (parseDerivation(state, *i, drv))
                 drvs[drv.drvPath] = drv;
+            else
+                parseDerivations(state, *i, drvs);
         }
     }
 
