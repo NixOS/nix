@@ -415,14 +415,12 @@ Path makeStorePath(const string & type,
     Hash & hash, const string & suffix)
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
-    string s = type + ":sha256:" + (string) hash + ":"
+    string s = type + ":sha256:" + printHash(hash) + ":"
         + nixStore + ":" + suffix;
 
-    Hash nameHash = hashString(s, htSHA256);
-
-    printMsg(lvlError, format("name input: %1% -> %2%") % s % (string) nameHash);
-
-    return nixStore + "/" + (string) nameHash + "-" + suffix;
+    return nixStore + "/"
+        + printHash32(compressHash(hashString(s, htSHA256), 20))
+        + "-" + suffix;
 }
 
 
@@ -461,7 +459,7 @@ Path addToStore(const Path & _srcPath)
             Hash h2 = hashPath(dstPath, htSHA256);
             if (h != h2)
                 throw Error(format("contents of `%1%' changed while copying it to `%2%' (%3% -> %4%)")
-                    % srcPath % dstPath % (string) h % (string) h2);
+                    % srcPath % dstPath % printHash(h) % printHash(h2));
 
             makePathReadOnly(dstPath);
             

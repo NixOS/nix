@@ -29,8 +29,8 @@ void run(Strings args)
             else throw UsageError(format("unknown hash type `%1%'") % *i);
         }
         else
-            cout << format("%1%\n") % (string)
-                (flat ? hashFile(*i, ht) : hashPath(*i, ht));
+            cout << format("%1%\n") % printHash(
+                (flat ? hashFile(*i, ht) : hashPath(*i, ht)));
     }
 }
 

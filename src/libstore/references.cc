@@ -81,8 +81,12 @@ Strings filterReferences(const string & path, const Strings & paths)
     for (Strings::const_iterator i = paths.begin();
          i != paths.end(); i++)
     {
-        string s = string(baseNameOf(*i), 0, 32);
-        parseHash(s);
+        string baseName = baseNameOf(*i);
+        unsigned int pos = baseName.find('-');
+        if (pos == string::npos)
+            throw Error(format("bad reference `%1%'") % *i);
+        string s = string(baseName, 0, pos);
+        // parseHash(htSHA256, s);
         ids.push_back(s);
         backMap[s] = *i;
     }

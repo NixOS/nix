@@ -15,6 +15,14 @@ extern "C" {
 
 
 
+Hash::Hash()
+{
+    type = htUnknown;
+    hashSize = 0;
+    memset(hash, 0, maxHashSize);
+}
+
+
 Hash::Hash(HashType type)
 {
     this->type = type;
@@ -23,7 +31,7 @@ Hash::Hash(HashType type)
     else if (type == htSHA256) hashSize = sha256HashSize;
     else throw Error("unknown hash type");
     assert(hashSize <= maxHashSize);
-    memset(hash, 0, hashSize);
+    memset(hash, 0, maxHashSize);
 }
 
 
@@ -52,21 +60,21 @@ bool Hash::operator < (const Hash & h) const
 }
 
 
-Hash::operator string() const
+string printHash(const Hash & hash)
 {
     ostringstream str;
-    for (unsigned int i = 0; i < hashSize; i++) {
+    for (unsigned int i = 0; i < hash.hashSize; i++) {
         str.fill('0');
         str.width(2);
-        str << hex << (int) hash[i];
+        str << hex << (int) hash.hash[i];
     }
     return str.str();
 }
 
     
-Hash parseHash(const string & s)
+Hash parseHash(HashType ht, const string & s)
 {
-    Hash hash(htMD5);
+    Hash hash(ht);
     if (s.length() != hash.hashSize * 2)
         throw Error(format("invalid hash `%1%'") % s);
     for (unsigned int i = 0; i < hash.hashSize; i++) {
@@ -79,6 +87,48 @@ Hash parseHash(const string & s)
         hash.hash[i] = n;
     }
     return hash;
+}
+
+
+static unsigned short divMod(uint16_t * words, unsigned short y)
+{
+    unsigned int borrow = 0;
+
+    int pos = (Hash::maxHashSize / 2) - 1;
+    while (pos >= 0 && !words[pos]) --pos;
+
+    for ( ; pos >= 0; --pos) {
+        unsigned int s = words[pos] + (borrow << 16);
+        unsigned int d = s / y;
+        borrow = s % y;
+        words[pos] = d;
+    }
+
+    return borrow;
+}
+
+
+// omitted: E O U T
+char chars[] = "0123456789abcdfghijklmnpqrsvwxyz";
+
+
+string printHash32(const Hash & hash)
+{
+    Hash hash2(hash);
+    unsigned int len = (hash.hashSize * 8 - 1) / 5 + 1;
+    
+    string s(len, '0');
+
+    int pos = len - 1;
+    while (pos >= 0) {
+        unsigned short digit = divMod((uint16_t *) hash2.hash, 32);
+        s[pos--] = chars[digit];
+    }
+
+    for (unsigned int i = 0; i < hash2.maxHashSize; ++i)
+        assert(hash2.hash[i] == 0);
+
+    return s;
 }
 
 
@@ -185,4 +235,14 @@ Hash hashPath(const Path & path, HashType ht)
     dumpPath(path, sink);
     finish(ht, sink.ctx, hash.hash);
     return hash;
+}
+
+
+Hash compressHash(const Hash & hash, unsigned int newSize)
+{
+    Hash h;
+    h.hashSize = newSize;
+    for (unsigned int i = 0; i < hash.hashSize; ++i)
+        h.hash[i % newSize] ^= hash.hash[i];
+    return h;
 }

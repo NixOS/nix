@@ -39,7 +39,7 @@ static Hash hashDerivation(EvalState & state, StoreExpr ne)
             DrvHashes::iterator j = state.drvHashes.find(*i);
             if (j == state.drvHashes.end())
                 throw Error(format("don't know expression `%1%'") % (string) *i);
-            inputs2.insert(j->second);
+            inputs2.insert(printHash(j->second));
         }
 	ne.derivation.inputs = inputs2;
     }
@@ -60,7 +60,7 @@ static Path copyAtom(EvalState & state, const Path & srcPath)
 
     Hash drvHash = hashDerivation(state, ne);
     Path drvPath = writeTerm(unparseStoreExpr(ne), "c");
-    state.drvHashes.insert(make_pair(drvPath, drvHash));
+    state.drvHashes[drvPath] = drvHash;
 
     state.drvRoots[drvPath] = ne.closure.roots;
 
@@ -111,14 +111,14 @@ static void processBinding(EvalState & state, Expr e, StoreExpr & ne,
 
             a = queryAttr(e, "drvHash");
             if (!a) throw Error("derivation hash missing");
-            Hash drvHash = parseHash(evalString(state, a));
+            Hash drvHash = parseHash(htMD5, evalString(state, a));
 
             a = queryAttr(e, "outPath");
             if (!a) throw Error("output path missing");
             PathSet drvRoots;
             drvRoots.insert(evalPath(state, a));
             
-            state.drvHashes.insert(make_pair(drvPath, drvHash));
+            state.drvHashes[drvPath] = drvHash;
             state.drvRoots[drvPath] = drvRoots;
 
             ss.push_back(addInput(state, drvPath, ne));
@@ -188,7 +188,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
     ne.type = StoreExpr::neDerivation;
 
     string drvName;
-    Hash outHash(htMD5);
+    Hash outHash;
     bool outHashGiven = false;
 
     for (ATermIterator i(attrs.keys()); i; ++i) {
@@ -223,7 +223,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
             else if (key == "system") ne.derivation.platform = s;
             else if (key == "name") drvName = s;
             else if (key == "id") { 
-                outHash = parseHash(s);
+                outHash = parseHash(htMD5, s);
                 outHashGiven = true;
             }
         }
@@ -273,7 +273,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
 
     /* Write the resulting term into the Nix store directory. */
     Hash drvHash = outHashGiven
-        ? hashString((string) outHash + outPath, htMD5)
+        ? hashString(printHash(outHash) + outPath, htMD5)
         : hashDerivation(state, ne);
     Path drvPath = writeTerm(unparseStoreExpr(ne), "d-" + drvName);
 
@@ -283,7 +283,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
     attrs.set("outPath", makeAttrRHS(makePath(toATerm(outPath)), makeNoPos()));
     attrs.set("drvPath", makeAttrRHS(makePath(toATerm(drvPath)), makeNoPos()));
     attrs.set("drvHash",
-        makeAttrRHS(makeStr(toATerm((string) drvHash)), makeNoPos()));
+        makeAttrRHS(makeStr(toATerm(printHash(drvHash))), makeNoPos()));
     attrs.set("type", makeAttrRHS(makeStr(toATerm("derivation")), makeNoPos()));
 
     return makeAttrs(attrs);
