@@ -6,9 +6,8 @@ XSLTPROC = $(ENV) $(xsltproc) $(xmlflags) --catalogs \
  --param section.label.includes.component.label 1 \
  --param html.stylesheet \'style.css\'
 
-SOURCES = book.xml introduction.xml installation.xml \
- overview.xml \
- nix-store-reference.xml nix-instantiate-reference.xml \
+SOURCES = book.xml introduction.xml installation.xml overview.xml \
+ common-options.xml nix-store.xml nix-instantiate.xml \
  troubleshooting.xml bugs.xml \
  style.css
 

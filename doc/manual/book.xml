@@ -6,8 +6,9 @@
 <!ENTITY introduction SYSTEM "introduction.xml">
 <!ENTITY installation SYSTEM "installation.xml">
 <!ENTITY overview SYSTEM "overview.xml">
-<!ENTITY nix-store-reference SYSTEM "nix-store-reference.xml">
-<!ENTITY nix-instantiate-reference SYSTEM "nix-instantiate-reference.xml">
+<!ENTITY common-options SYSTEM "common-options.xml">
+<!ENTITY nix-store SYSTEM "nix-store.xml">
+<!ENTITY nix-instantiate SYSTEM "nix-instantiate.xml">
 <!ENTITY troubleshooting SYSTEM "troubleshooting.xml">
 <!ENTITY bugs SYSTEM "bugs.xml">
 ]>
@@ -32,8 +33,15 @@
 
   <appendix>
     <title>Command Reference</title>
-    &nix-store-reference;
-    &nix-instantiate-reference;
+    &common-options;
+    <sect1>
+      <title>nix-store</title>
+      &nix-store;
+    </sect1>
+    <sect1>
+      <title>nix-instantiate</title>
+      &nix-instantiate;
+    </sect1>
   </appendix>
 
   &troubleshooting;
