@@ -14,28 +14,25 @@ typedef list<FSId> FSIds;
 
 struct SliceElem
 {
-    string path;
     FSId id;
-    Strings refs;
+    StringSet refs;
 };
 
-typedef list<SliceElem> SliceElems;
+typedef map<string, SliceElem> SliceElems;
 
 struct Slice
 {
-    Strings roots;
+    StringSet roots;
     SliceElems elems;
 };
 
-typedef pair<string, FSId> DeriveOutput;
-typedef pair<string, string> StringPair;
-typedef list<DeriveOutput> DeriveOutputs;
-typedef list<StringPair> StringPairs;
+typedef map<string, FSId> DeriveOutputs;
+typedef map<string, string> StringPairs;
 
 struct Derive
 {
     DeriveOutputs outputs;
-    FSIds inputs;
+    FSIdSet inputs;
     string platform;
     string builder;
     Strings args;

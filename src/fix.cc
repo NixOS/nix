@@ -137,14 +137,16 @@ static Strings fstatePathsCached(EvalState & state, const FSId & id)
 static Hash hashPackage(EvalState & state, FState fs)
 {
     if (fs.type == FState::fsDerive) {
-        for (FSIds::iterator i = fs.derive.inputs.begin();
+	FSIdSet inputs2;
+        for (FSIdSet::iterator i = fs.derive.inputs.begin();
              i != fs.derive.inputs.end(); i++)
         {
             PkgHashes::iterator j = state.pkgHashes.find(*i);
             if (j == state.pkgHashes.end())
                 throw Error(format("unknown package id %1%") % (string) *i);
-            *i = j->second;
+            inputs2.insert(j->second);
         }
+	fs.derive.inputs = inputs2;
     }
     return hashTerm(unparseFState(fs));
 }
@@ -159,7 +161,7 @@ static string processBinding(EvalState & state, Expr e, FState & fs)
         Strings paths = fstatePathsCached(state, id);
         if (paths.size() != 1) abort();
         string path = *(paths.begin());
-        fs.derive.inputs.push_back(id);
+        fs.derive.inputs.insert(id);
         return path;
     }
     
@@ -264,12 +266,11 @@ static Expr evalExpr2(EvalState & state, Expr e)
         addToStore(srcPath, dstPath, id, true);
 
         SliceElem elem;
-        elem.path = dstPath;
         elem.id = id;
         FState fs;
         fs.type = FState::fsSlice;
-        fs.slice.roots.push_back(dstPath);
-        fs.slice.elems.push_back(elem);
+        fs.slice.roots.insert(dstPath);
+        fs.slice.elems[dstPath] = elem;
 
         Hash pkgHash = hashPackage(state, fs);
         FSId pkgId = writeTerm(unparseFState(fs), "");
@@ -324,7 +325,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
 
             else {
                 string s = processBinding(state, value, fs);
-                fs.derive.env.push_back(StringPair(key, s));
+                fs.derive.env[key] = s;
 
                 if (key == "build") fs.derive.builder = s;
                 if (key == "name") name = s;
@@ -349,8 +350,8 @@ static Expr evalExpr2(EvalState & state, Expr e)
         if (!outIdGiven) outId = hashPackage(state, fs);
         string outPath = 
             canonPath(nixStore + "/" + ((string) outId).c_str() + "-" + name);
-        fs.derive.env.push_back(StringPair("out", outPath));
-        fs.derive.outputs.push_back(DeriveOutput(outPath, outId));
+        fs.derive.env["out"] = outPath;
+        fs.derive.outputs[outPath] = outId;
 
         /* Write the resulting term into the Nix store directory. */
         Hash pkgHash = outIdGiven

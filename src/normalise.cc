@@ -26,14 +26,10 @@ static FSId useSuccessor(const FSId & id)
 }
 
 
-typedef map<string, FSId> OutPaths;
-typedef map<string, SliceElem> ElemMap;
-
-
-Strings pathsFromOutPaths(const OutPaths & ps)
+Strings pathsFromOutputs(const DeriveOutputs & ps)
 {
     Strings ss;
-    for (OutPaths::const_iterator i = ps.begin();
+    for (DeriveOutputs::const_iterator i = ps.begin();
          i != ps.end(); i++)
         ss.push_back(i->first);
     return ss;
@@ -62,17 +58,18 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 
     /* Some variables. */
 
-    /* Output paths, with their ids. */
-    OutPaths outPaths;
-
     /* Input paths, with their slice elements. */
-    ElemMap inMap; 
+    SliceElems inSlices; 
 
     /* Referencable paths (i.e., input and output paths). */
-    Strings allPaths;
+    StringSet allPaths;
 
     /* The environment to be passed to the builder. */
     Environment env; 
+
+    /* The result. */
+    FState nfFS;
+    nfFS.type = FState::fsSlice;
 
 
     /* Parse the outputs. */
@@ -80,13 +77,12 @@ FSId normaliseFState(FSId id, FSIdSet pending)
          i != fs.derive.outputs.end(); i++)
     {
         debug(format("building %1% in `%2%'") % (string) i->second % i->first);
-        outPaths[i->first] = i->second;
-        allPaths.push_back(i->first);
+        allPaths.insert(i->first);
     }
 
     /* Obtain locks on all output paths.  The locks are automatically
        released when we exit this function or Nix crashes. */
-    PathLocks outputLocks(pathsFromOutPaths(outPaths));
+    PathLocks outputLocks(pathsFromOutputs(fs.derive.outputs));
 
     /* Now check again whether there is a successor.  This is because
        another process may have started building in parallel.  After
@@ -113,8 +109,9 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 		    % fs.derive.platform % thisSystem);
         
     /* Realise inputs (and remember all input paths). */
-    for (FSIds::iterator i = fs.derive.inputs.begin();
-         i != fs.derive.inputs.end(); i++) {
+    for (FSIdSet::iterator i = fs.derive.inputs.begin();
+         i != fs.derive.inputs.end(); i++)
+    {
         FSId nf = normaliseFState(*i, pending);
         realiseSlice(nf, pending);
         /* !!! nf should be a root of the garbage collector while we
@@ -123,11 +120,11 @@ FSId normaliseFState(FSId id, FSIdSet pending)
         if (fs.type != FState::fsSlice) abort();
         for (SliceElems::iterator j = fs.slice.elems.begin();
              j != fs.slice.elems.end(); j++)
-            inMap[j->path] = *j;
+	{
+            inSlices[j->first] = j->second;
+	    allPaths.insert(j->first);
+	}
     }
-
-    for (ElemMap::iterator i = inMap.begin(); i != inMap.end(); i++)
-        allPaths.push_back(i->second.path);
 
     /* Most shells initialise PATH to some default (/bin:/usr/bin:...) when
        PATH is not set.  We don't want this, so we fill it in with some dummy
@@ -142,8 +139,8 @@ FSId normaliseFState(FSId id, FSIdSet pending)
     /* We can skip running the builder if we can expand all output
        paths from their ids. */
     bool fastBuild = true;
-    for (OutPaths::iterator i = outPaths.begin();
-         i != outPaths.end(); i++)
+    for (DeriveOutputs::iterator i = fs.derive.outputs.begin();
+         i != fs.derive.outputs.end(); i++)
     {
         try {
             expandId(i->second, i->first, "/", pending);
@@ -159,8 +156,8 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 
         /* If any of the outputs already exist but are not registered,
            delete them. */
-        for (OutPaths::iterator i = outPaths.begin(); 
-             i != outPaths.end(); i++)
+        for (DeriveOutputs::iterator i = fs.derive.outputs.begin(); 
+             i != fs.derive.outputs.end(); i++)
         {
             string path = i->first;
             FSId id;
@@ -183,21 +180,21 @@ FSId normaliseFState(FSId id, FSIdSet pending)
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references. */
     StringSet usedPaths;
-    for (OutPaths::iterator i = outPaths.begin(); 
-         i != outPaths.end(); i++)
+    for (DeriveOutputs::iterator i = fs.derive.outputs.begin(); 
+         i != fs.derive.outputs.end(); i++)
     {
         string path = i->first;
         if (!pathExists(path))
             throw Error(format("path `%1%' does not exist") % path);
-        fs.slice.roots.push_back(path);
+        nfFS.slice.roots.insert(path);
 
 	/* For this output path, find the references to other paths contained
 	   in it. */
-        Strings refPaths = filterReferences(path, allPaths);
+        Strings refPaths = filterReferences(path, 
+	    Strings(allPaths.begin(), allPaths.end()));
 
 	/* Construct a slice element for this output path. */
         SliceElem elem;
-        elem.path = path;
         elem.id = i->second;
 
 	/* For each path referenced by this output path, add its id to the
@@ -207,18 +204,14 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 	     j != refPaths.end(); j++)
 	{
 	    string path = *j;
-            ElemMap::iterator k;
-            OutPaths::iterator l;
-
-	    elem.refs.push_back(path);
-
-            if ((k = inMap.find(path)) != inMap.end())
-                usedPaths.insert(k->second.path);
-	    else if ((l = outPaths.find(path)) == outPaths.end())
+	    elem.refs.insert(path);
+            if (inSlices.find(path) != inSlices.end())
+                usedPaths.insert(path);
+	    else if (fs.derive.outputs.find(path) == fs.derive.outputs.end())
 		abort();
         }
 
-        fs.slice.elems.push_back(elem);
+        nfFS.slice.elems[path] = elem;
     }
 
     /* Close the slice.  That is, for any referenced path, add the paths
@@ -233,31 +226,30 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 	if (donePaths.find(path) != donePaths.end()) continue;
 	donePaths.insert(path);
 
-	ElemMap::iterator j = inMap.find(path);
-	if (j == inMap.end()) abort();
+	SliceElems::iterator j = inSlices.find(path);
+	if (j == inSlices.end()) abort();
 
-	fs.slice.elems.push_back(j->second);
+	nfFS.slice.elems[path] = j->second;
 
-	for (Strings::iterator k = j->second.refs.begin();
+	for (StringSet::iterator k = j->second.refs.begin();
 	     k != j->second.refs.end(); k++)
 	    usedPaths.insert(*k);
     }
 
     /* For debugging, print out the referenced and unreferenced paths. */
-    for (ElemMap::iterator i = inMap.begin();
-         i != inMap.end(); i++)
+    for (SliceElems::iterator i = inSlices.begin();
+         i != inSlices.end(); i++)
     {
-        StringSet::iterator j = donePaths.find(i->second.path);
+        StringSet::iterator j = donePaths.find(i->first);
         if (j == donePaths.end())
-            debug(format("NOT referenced: `%1%'") % i->second.path);
+            debug(format("NOT referenced: `%1%'") % i->first);
         else
-            debug(format("referenced: `%1%'") % i->second.path);
+            debug(format("referenced: `%1%'") % i->first);
     }
 
     /* Write the normal form.  This does not have to occur in the
        transaction below because writing terms is idem-potent. */
-    fs.type = FState::fsSlice;
-    ATerm nf = unparseFState(fs);
+    ATerm nf = unparseFState(nfFS);
     msg(lvlVomit, format("normal form: %1%") % printTerm(nf));
     FSId idNF = writeTerm(nf, "-s-" + (string) id);
 
@@ -268,8 +260,8 @@ FSId normaliseFState(FSId id, FSIdSet pending)
        deleted arbitrarily, while registered paths can only be deleted
        by running the garbage collector. */
     Transaction txn(nixDB);
-    for (OutPaths::iterator i = outPaths.begin(); 
-         i != outPaths.end(); i++)
+    for (DeriveOutputs::iterator i = fs.derive.outputs.begin(); 
+         i != fs.derive.outputs.end(); i++)
         registerPath(txn, i->first, i->second);
     registerSuccessor(txn, id, idNF);
     txn.commit();
@@ -289,10 +281,7 @@ void realiseSlice(const FSId & id, FSIdSet pending)
     
     for (SliceElems::const_iterator i = fs.slice.elems.begin();
          i != fs.slice.elems.end(); i++)
-    {
-        SliceElem elem = *i;
-        expandId(elem.id, elem.path, "/", pending);
-    }
+        expandId(i->second.id, i->first, "/", pending);
 }
 
 
@@ -303,12 +292,9 @@ Strings fstatePaths(const FSId & id)
     FState fs = parseFState(termFromId(id));
 
     if (fs.type == FState::fsSlice) {
-        /* !!! fix complexity */
-        for (Strings::const_iterator i = fs.slice.roots.begin();
+        for (StringSet::const_iterator i = fs.slice.roots.begin();
              i != fs.slice.roots.end(); i++)
-            for (SliceElems::const_iterator j = fs.slice.elems.begin();
-                 j != fs.slice.elems.end(); j++)
-                if (*i == j->path) paths.push_back(j->path);
+	    paths.push_back(*i);
     }
 
     else if (fs.type == FState::fsDerive) {
@@ -328,18 +314,16 @@ static void fstateRequisitesSet(const FSId & id,
 {
     FState fs = parseFState(termFromId(id));
 
-    if (fs.type == FState::fsSlice) {
+    if (fs.type == FState::fsSlice)
         for (SliceElems::iterator i = fs.slice.elems.begin();
              i != fs.slice.elems.end(); i++)
-            paths.insert(i->path);
-    }
+            paths.insert(i->first);
     
-    else if (fs.type == FState::fsDerive) {
-        for (FSIds::iterator i = fs.derive.inputs.begin();
+    else if (fs.type == FState::fsDerive)
+        for (FSIdSet::iterator i = fs.derive.inputs.begin();
              i != fs.derive.inputs.end(); i++)
             fstateRequisitesSet(*i,
                 includeExprs, includeSuccessors, paths);
-    }
 
     else abort();
 
@@ -394,7 +378,7 @@ FSIds findGenerators(const FSIds & _ids)
         bool okay = true;
         for (SliceElems::const_iterator i = fs.slice.elems.begin();
              i != fs.slice.elems.end(); i++)
-            if (ids.find(i->id) == ids.end()) {
+            if (ids.find(i->second.id) == ids.end()) {
                 okay = false;
                 break;
             }

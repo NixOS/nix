@@ -193,7 +193,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     string label, shape;
                     
                     if (fs.type == FState::fsDerive) {
-                        for (FSIds::iterator i = fs.derive.inputs.begin();
+                        for (FSIdSet::iterator i = fs.derive.inputs.begin();
                              i != fs.derive.inputs.end(); i++)
                         {
                             workList.push_back(*i);
@@ -209,7 +209,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     }
 
                     else if (fs.type == FState::fsSlice) {
-                        label = baseNameOf((*fs.slice.elems.begin()).path);
+                        label = baseNameOf((*fs.slice.elems.begin()).first);
                         shape = "ellipse";
                         if (isHash(string(label, 0, Hash::hashSize * 2)) && 
                             label[Hash::hashSize * 2] == '-')

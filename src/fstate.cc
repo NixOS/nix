@@ -52,14 +52,14 @@ FSId writeTerm(ATerm t, const string & suffix, FSId id)
 }
 
 
-static void parsePaths(ATermList paths, Strings & out)
+static void parsePaths(ATermList paths, StringSet & out)
 {
     while (!ATisEmpty(paths)) {
         char * s;
         ATerm t = ATgetFirst(paths);
         if (!ATmatch(t, "<str>", &s))
             throw badTerm("not a path", t);
-        out.push_back(s);
+        out.insert(s);
         paths = ATgetNext(paths);
     }
 }
@@ -73,21 +73,21 @@ static void checkSlice(const Slice & slice)
     StringSet decl;
     for (SliceElems::const_iterator i = slice.elems.begin();
          i != slice.elems.end(); i++)
-        decl.insert(i->path);
+        decl.insert(i->first);
     
-    for (Strings::const_iterator i = slice.roots.begin();
+    for (StringSet::const_iterator i = slice.roots.begin();
          i != slice.roots.end(); i++)
         if (decl.find(*i) == decl.end())
             throw Error(format("undefined root path `%1%'") % *i);
     
     for (SliceElems::const_iterator i = slice.elems.begin();
          i != slice.elems.end(); i++)
-        for (Strings::const_iterator j = i->refs.begin();
-             j != i->refs.end(); j++)
+        for (StringSet::const_iterator j = i->second.refs.begin();
+             j != i->second.refs.end(); j++)
             if (decl.find(*j) == decl.end())
                 throw Error(
 		    format("undefined path `%1%' referenced by `%2%'")
-		    % *j % i->path);
+		    % *j % i->first);
 }
 
 
@@ -108,10 +108,9 @@ static bool parseSlice(ATerm t, Slice & slice)
         if (!ATmatch(t, "(<str>, <str>, [<list>])", &s1, &s2, &refs))
             throw badTerm("not a slice element", t);
         SliceElem elem;
-        elem.path = s1;
         elem.id = parseHash(s2);
         parsePaths(refs, elem.refs);
-        slice.elems.push_back(elem);
+        slice.elems[s1] = elem;
         elems = ATgetNext(elems);
     }
 
@@ -141,7 +140,7 @@ static bool parseDerive(ATerm t, Derive & derive)
         ATerm t = ATgetFirst(outs);
         if (!ATmatch(t, "(<str>, <str>)", &s1, &s2))
             throw badTerm("not a derive output", t);
-        derive.outputs.push_back(DeriveOutput(s1, parseHash(s2)));
+        derive.outputs[s1] = parseHash(s2);
         outs = ATgetNext(outs);
     }
 
@@ -150,7 +149,7 @@ static bool parseDerive(ATerm t, Derive & derive)
         ATerm t = ATgetFirst(ins);
         if (!ATmatch(t, "<str>", &s))
             throw badTerm("not an id", t);
-        derive.inputs.push_back(parseHash(s));
+        derive.inputs.insert(parseHash(s));
         ins = ATgetNext(ins);
     }
 
@@ -171,7 +170,7 @@ static bool parseDerive(ATerm t, Derive & derive)
         ATerm bnd = ATgetFirst(bnds);
         if (!ATmatch(bnd, "(<str>, <str>)", &s1, &s2))
             throw badTerm("tuple of strings expected", bnd);
-        derive.env.push_back(StringPair(s1, s2));
+        derive.env[s1] = s2;
         bnds = ATgetNext(bnds);
     }
 
@@ -191,10 +190,10 @@ FState parseFState(ATerm t)
 }
 
 
-static ATermList unparsePaths(const Strings & paths)
+static ATermList unparsePaths(const StringSet & paths)
 {
     ATermList l = ATempty;
-    for (Strings::const_iterator i = paths.begin();
+    for (StringSet::const_iterator i = paths.begin();
          i != paths.end(); i++)
         l = ATinsert(l, ATmake("<str>", i->c_str()));
     return ATreverse(l);
@@ -210,9 +209,9 @@ static ATerm unparseSlice(const Slice & slice)
          i != slice.elems.end(); i++)
         elems = ATinsert(elems,
             ATmake("(<str>, <str>, <term>)",
-                i->path.c_str(),
-                ((string) i->id).c_str(),
-                unparsePaths(i->refs)));
+                i->first.c_str(),
+                ((string) i->second.id).c_str(),
+                unparsePaths(i->second.refs)));
 
     return ATmake("Slice(<term>, <term>)", roots, elems);
 }
@@ -228,7 +227,7 @@ static ATerm unparseDerive(const Derive & derive)
                 i->first.c_str(), ((string) i->second).c_str()));
     
     ATermList ins = ATempty;
-    for (FSIds::const_iterator i = derive.inputs.begin();
+    for (FSIdSet::const_iterator i = derive.inputs.begin();
          i != derive.inputs.end(); i++)
         ins = ATinsert(ins, ATmake("<str>", ((string) *i).c_str()));
 
