@@ -44,6 +44,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, void * data, char * s)
 %nonassoc EQ NEQ
 %right UPDATE
 %left NEG
+%nonassoc '~'
 
 %%
 
@@ -79,6 +80,7 @@ expr_op
   | expr_op OR expr_op { $$ = ATmake("OpOr(<term>, <term>)", $1, $3); }
   | expr_op IMPL expr_op { $$ = ATmake("OpImpl(<term>, <term>)", $1, $3); }
   | expr_op UPDATE expr_op { $$ = ATmake("OpUpdate(<term>, <term>)", $1, $3); }
+  | expr_op '~' expr_op { $$ = ATmake("SubPath(<term>, <term>)", $1, $3); }
   | expr_app
   ;
 

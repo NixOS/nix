@@ -190,6 +190,7 @@ Expr evalExpr2(EvalState & state, Expr e)
     if (atMatch(m, e) >> cons &&
         (cons == "Str" ||
          cons == "Path" ||
+         cons == "SubPath" ||
          cons == "Uri" ||
          cons == "Null" ||
          cons == "Int" ||

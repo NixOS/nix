@@ -85,6 +85,7 @@ static void processBinding(EvalState & state, Expr e, StoreExpr & ne,
     string s;
     ATermList es;
     int n;
+    Expr e1, e2;
 
     if (atMatch(m, e) >> "Str" >> s) ss.push_back(s);
     else if (atMatch(m, e) >> "Uri" >> s) ss.push_back(s);
@@ -128,6 +129,18 @@ static void processBinding(EvalState & state, Expr e, StoreExpr & ne,
     }
 
     else if (atMatch(m, e) >> "Null") ss.push_back("");
+
+    else if (atMatch(m, e) >> "SubPath" >> e1 >> e2) {
+        Strings ss2;
+        processBinding(state, evalExpr(state, e1), ne, ss2);
+        if (ss2.size() != 1)
+            throw Error("left-hand side of `~' operator cannot be a list");
+        e2 = evalExpr(state, e2);
+        if (!(atMatch(m, e2) >> "Str" >> s ||
+             (atMatch(m, e2) >> "Path" >> s)))
+            throw Error("right-hand side of `~' operator must be a path or string");
+        ss.push_back(canonPath(ss2.front() + "/" + s));
+    }
     
     else throw badTerm("invalid derivation binding", e);
 }
