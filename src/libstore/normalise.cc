@@ -1038,7 +1038,7 @@ void NormalisationGoal::createClosure()
         Path path = *i;
         if (!pathExists(path)) {
             throw BuildError(
-                format("builder for `%1%' failed to produce output path `%1%'")
+                format("builder for `%1%' failed to produce output path `%2%'")
                 % nePath % path);
         }
         nf.closure.roots.insert(path);
