@@ -6,7 +6,14 @@
 #include "help.txt.hh"
 
 
-typedef void (* Operation) (EvalState & state,
+struct Globals
+{
+    Path linkPath;
+    EvalState state;
+};
+
+
+typedef void (* Operation) (Globals & globals,
     Strings opFlags, Strings opArgs);
 
 
@@ -103,15 +110,10 @@ static Path getLinksDir()
 }
 
 
-static Path getCurrentPath()
+void queryInstalled(EvalState & state, DrvInfos & drvs,
+    const Path & userEnv)
 {
-    return getLinksDir() + "/current";
-}
-
-
-void queryInstalled(EvalState & state, DrvInfos & drvs)
-{
-    Path path = getCurrentPath() + "/manifest";
+    Path path = userEnv + "/manifest";
 
     if (!pathExists(path)) return; /* not an error, assume nothing installed */
 
@@ -123,7 +125,7 @@ void queryInstalled(EvalState & state, DrvInfos & drvs)
 }
 
 
-Path createLink(Path outPath, Path drvPath)
+Path createGeneration(Path outPath, Path drvPath)
 {
     Path linksDir = getLinksDir();
 
@@ -136,20 +138,20 @@ Path createLink(Path outPath, Path drvPath)
         if (s >> n && s.eof() && n >= num) num = n + 1;
     }
 
-    Path linkPath;
+    Path generation;
 
     while (1) {
-        linkPath = (format("%1%/%2%") % linksDir % num).str();
-        if (symlink(outPath.c_str(), linkPath.c_str()) == 0) break;
+        generation = (format("%1%/%2%") % linksDir % num).str();
+        if (symlink(outPath.c_str(), generation.c_str()) == 0) break;
         if (errno != EEXIST)
-            throw SysError(format("creating symlink `%1%'") % linkPath);
+            throw SysError(format("creating symlink `%1%'") % generation);
         /* Somebody beat us to it, retry with a higher number. */
         num++;
     }
 
-    writeStringToFile(linkPath + "-src.id", drvPath);
+    writeStringToFile(generation + "-src.id", drvPath);
 
-    return linkPath;
+    return generation;
 }
 
 
@@ -169,7 +171,8 @@ void switchLink(Path link, Path target)
 }
 
 
-void createUserEnv(EvalState & state, const DrvInfos & drvs)
+void createUserEnv(EvalState & state, const DrvInfos & drvs,
+    const Path & linkPath)
 {
     /* Get the environment builder expression. */
     Expr envBuilder = parseExprFromFile(nixDataDir + "/nix/corepkgs/buildenv"); /* !!! */
@@ -221,8 +224,9 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs)
 
     /* Switch the current user environment to the output path. */
     debug(format("switching to new user environment"));
-    Path linkPath = createLink(topLevelDrv.outPath, topLevelDrv.drvPath);
-    switchLink(getLinksDir() + "/current", linkPath);
+    Path generation = createGeneration(
+        topLevelDrv.outPath, topLevelDrv.drvPath);
+    switchLink(linkPath, generation);
 }
 
 
@@ -239,7 +243,7 @@ NameMap mapByNames(DrvInfos & drvs)
 
 
 void installDerivations(EvalState & state,
-    Path nePath, Strings drvNames)
+    Path nePath, Strings drvNames, const Path & linkPath)
 {
     debug(format("installing derivations from `%1%'") % nePath);
 
@@ -267,30 +271,33 @@ void installDerivations(EvalState & state,
 
     /* Add in the already installed derivations. */
     DrvInfos installedDrvs;
-    queryInstalled(state, installedDrvs);
+    queryInstalled(state, installedDrvs, linkPath);
     selectedDrvs.insert(installedDrvs.begin(), installedDrvs.end());
 
-    createUserEnv(state, selectedDrvs);
+    createUserEnv(state, selectedDrvs, linkPath);
 }
 
 
-static void opInstall(EvalState & state,
+static void opInstall(Globals & globals,
     Strings opFlags, Strings opArgs)
 {
+    if (opFlags.size() > 0)
+        throw UsageError(format("unknown flags `%1%'") % opFlags.front());
     if (opArgs.size() < 1) throw UsageError("Nix file expected");
 
     Path nePath = opArgs.front();
     opArgs.pop_front();
 
-    installDerivations(state, nePath,
-        Strings(opArgs.begin(), opArgs.end()));
+    installDerivations(globals.state, nePath,
+        Strings(opArgs.begin(), opArgs.end()), globals.linkPath);
 }
 
 
-void uninstallDerivations(EvalState & state, Strings drvNames)
+void uninstallDerivations(EvalState & state, Strings drvNames,
+    Path & linkPath)
 {
     DrvInfos installedDrvs;
-    queryInstalled(state, installedDrvs);
+    queryInstalled(state, installedDrvs, linkPath);
 
     NameMap nameMap = mapByNames(installedDrvs);
 
@@ -304,18 +311,21 @@ void uninstallDerivations(EvalState & state, Strings drvNames)
             installedDrvs.erase(j->second);
     }
 
-    createUserEnv(state, installedDrvs);
+    createUserEnv(state, installedDrvs, linkPath);
 }
 
 
-static void opUninstall(EvalState & state,
+static void opUninstall(Globals & globals,
     Strings opFlags, Strings opArgs)
 {
-    uninstallDerivations(state, opArgs);
+    if (opFlags.size() > 0)
+        throw UsageError(format("unknown flags `%1%'") % opFlags.front());
+
+    uninstallDerivations(globals.state, opArgs, globals.linkPath);
 }
 
 
-static void opQuery(EvalState & state,
+static void opQuery(Globals & globals,
     Strings opFlags, Strings opArgs)
 {
     enum { qName, qDrvPath, qStatus } query = qName;
@@ -336,14 +346,14 @@ static void opQuery(EvalState & state,
     switch (source) {
 
         case sInstalled:
-            queryInstalled(state, drvs);
+            queryInstalled(globals.state, drvs, globals.linkPath);
             break;
 
         case sAvailable: {
             if (opArgs.size() < 1) throw UsageError("Nix file expected");
             Path nePath = opArgs.front();
             opArgs.pop_front();
-            loadDerivations(state, nePath, drvs);
+            loadDerivations(globals.state, nePath, drvs);
             break;
         }
 
@@ -369,7 +379,7 @@ static void opQuery(EvalState & state,
         
         case qStatus: {
             DrvInfos installed;
-            queryInstalled(state, installed);
+            queryInstalled(globals.state, installed, globals.linkPath);
 
             for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i) {
                 cout << format("%1%%2% %3%\n")
@@ -387,9 +397,11 @@ static void opQuery(EvalState & state,
 
 void run(Strings args)
 {
-    EvalState state;
     Strings opFlags, opArgs;
     Operation op = 0;
+    
+    Globals globals;
+    globals.linkPath = getLinksDir() + "/current";
 
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
         string arg = *i;
@@ -398,10 +410,16 @@ void run(Strings args)
 
         if (arg == "--install" || arg == "-i")
             op = opInstall;
-        else if (arg == "--uninstall" || arg == "-u")
+        else if (arg == "--uninstall" || arg == "-e")
             op = opUninstall;
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
+        else if (arg == "--link" || arg == "-l") {
+            ++i;
+            if (i == args.end()) throw UsageError(
+                format("`%1%' requires an argument") % arg);
+            globals.linkPath = absPath(*i);
+        }
         else if (arg[0] == '-')
             opFlags.push_back(arg);
         else
@@ -415,9 +433,9 @@ void run(Strings args)
 
     openDB();
 
-    op(state, opFlags, opArgs);
+    op(globals, opFlags, opArgs);
 
-    printEvalStats(state);
+    printEvalStats(globals.state);
 }
 
 

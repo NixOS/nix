@@ -5,7 +5,7 @@ nix-env [OPTIONS...] [ARGUMENTS...]
 Operations:
 
   --install / -i FILE: add a derivation to the user environment
-  --uninstall / -u: remove a derivation to the user environment
+  --uninstall / -e: remove a derivation to the user environment
   --query / -q: perform a query on an environment or Nix expression
 
 The previous operations take a list of derivation names.  The special
@@ -27,5 +27,6 @@ Query sources:
 
 Options:
 
+  --link / -l LINK: use symlink LINK instead of (...)/current
   --verbose / -v: verbose operation (may be repeated)
   --keep-failed / -K: keep temporary directories of failed builds
