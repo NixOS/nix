@@ -74,6 +74,41 @@ static void opAdd(Strings opFlags, Strings opArgs)
 }
 
 
+/* Place in `paths' the set of paths that are required to `realise'
+   the given store path, i.e., all paths necessary for valid
+   deployment of the path.  For a derivation, this is the union of
+   requisites of the inputs, plus the derivation; for other store
+   paths, it is the set of paths in the FS closure of the path.  If
+   `includeOutputs' is true, include the requisites of the output
+   paths of derivations as well.
+
+   Note that this function can be used to implement three different
+   deployment policies:
+
+   - Source deployment (when called on a derivation).
+   - Binary deployment (when called on an output path).
+   - Source/binary deployment (when called on a derivation with
+     `includeOutputs' set to true).
+*/
+static void storePathRequisites(const Path & storePath,
+    bool includeOutputs, PathSet & paths)
+{
+    computeFSClosure(storePath, paths);
+
+    if (includeOutputs) {
+        for (PathSet::iterator i = paths.begin();
+             i != paths.end(); ++i)
+            if (isDerivation(*i)) {
+                Derivation drv = derivationFromPath(*i);
+                for (DerivationOutputs::iterator j = drv.outputs.begin();
+                     j != drv.outputs.end(); ++j)
+                    if (isValidPath(j->second.path))
+                        computeFSClosure(j->second.path, paths);
+            }
+    }
+}
+
+
 static Path maybeUseOutput(const Path & storePath, bool useOutput, bool forceRealise)
 {
     if (forceRealise) realisePath(storePath);
@@ -221,7 +256,7 @@ static void opValidPath(Strings opFlags, Strings opArgs)
     createStoreTransaction(txn);
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); ++i)
-        registerValidPath(txn, *i, hashPath(htSHA256, *i));
+        registerValidPath(txn, *i, hashPath(htSHA256, *i), PathSet());
     txn.commit();
 }
 

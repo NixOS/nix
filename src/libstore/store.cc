@@ -229,7 +229,7 @@ void canonicalisePathMetaData(const Path & path)
 }
 
 
-static bool isValidPathTxn(const Path & path, const Transaction & txn)
+static bool isValidPathTxn(const Transaction & txn, const Path & path)
 {
     string s;
     return nixDB.queryString(txn, dbValidPaths, path, s);
@@ -238,13 +238,29 @@ static bool isValidPathTxn(const Path & path, const Transaction & txn)
 
 bool isValidPath(const Path & path)
 {
-    return isValidPathTxn(path, noTxn);
+    return isValidPathTxn(noTxn, path);
+}
+
+
+static Substitutes readSubstitutes(const Transaction & txn,
+    const Path & srcPath);
+
+
+static bool isRealisablePath(const Transaction & txn, const Path & path)
+{
+    return isValidPathTxn(txn, path)
+        || readSubstitutes(txn, path).size() > 0;
 }
 
 
 void setReferences(const Transaction & txn, const Path & storePath,
     const PathSet & references)
 {
+    if (!isRealisablePath(txn, storePath))
+        throw Error(
+            format("cannot set references for path `%1%' which is invalid and has no substitutes")
+            % storePath);
+    
     nixDB.setStrings(txn, dbReferences, storePath,
         Paths(references.begin(), references.end()));
 
@@ -265,8 +281,8 @@ void setReferences(const Transaction & txn, const Path & storePath,
 void queryReferences(const Path & storePath, PathSet & references)
 {
     Paths references2;
-    //    if (!isValidPath(storePath))
-    //        throw Error(format("path `%1%' is not valid") % storePath);
+    if (!isRealisablePath(noTxn, storePath))
+        throw Error(format("path `%1%' is not valid") % storePath);
     nixDB.queryStrings(noTxn, dbReferences, storePath, references2);
     references.insert(references2.begin(), references2.end());
 }
@@ -275,8 +291,8 @@ void queryReferences(const Path & storePath, PathSet & references)
 void queryReferers(const Path & storePath, PathSet & referers)
 {
     Paths referers2;
-    //    if (!isValidPath(storePath))
-    //        throw Error(format("path `%1%' is not valid") % storePath);
+    if (!isRealisablePath(noTxn, storePath))
+        throw Error(format("path `%1%' is not valid") % storePath);
     nixDB.queryStrings(noTxn, dbReferers, storePath, referers2);
     referers.insert(referers2.begin(), referers2.end());
 }
@@ -370,7 +386,7 @@ void clearSubstitutes()
 
 
 void registerValidPath(const Transaction & txn,
-    const Path & _path, const Hash & hash)
+    const Path & _path, const Hash & hash, const PathSet & references)
 {
     Path path(canonPath(_path));
     assertStorePath(path);
@@ -380,11 +396,11 @@ void registerValidPath(const Transaction & txn,
     debug(format("registering path `%1%'") % path);
     nixDB.setString(txn, dbValidPaths, path, "sha256:" + printHash(hash));
 
+    setReferences(txn, path, references);
+    
     /* Check that all referenced paths are also valid. */
-    Paths references;
-    nixDB.queryStrings(txn, dbReferences, path, references);
-    for (Paths::iterator i = references.begin(); i != references.end(); ++i)
-        if (!isValidPathTxn(*i, txn))
+    for (PathSet::iterator i = references.begin(); i != references.end(); ++i)
+        if (!isValidPathTxn(txn, *i))
             throw Error(format("cannot register path `%1%' as valid, since its reference `%2%' is invalid")
                 % path % *i);
 }
@@ -451,7 +467,7 @@ Path addToStore(const Path & _srcPath)
             canonicalisePathMetaData(dstPath);
             
             Transaction txn(nixDB);
-            registerValidPath(txn, dstPath, h);
+            registerValidPath(txn, dstPath, h, PathSet());
             txn.commit();
         }
 
@@ -462,7 +478,8 @@ Path addToStore(const Path & _srcPath)
 }
 
 
-Path addTextToStore(const string & suffix, const string & s)
+Path addTextToStore(const string & suffix, const string & s,
+    const PathSet & references)
 {
     Hash hash = hashString(htSHA256, s);
 
@@ -483,7 +500,8 @@ Path addTextToStore(const string & suffix, const string & s)
             canonicalisePathMetaData(dstPath);
             
             Transaction txn(nixDB);
-            registerValidPath(txn, dstPath, hashPath(htSHA256, dstPath));
+            registerValidPath(txn, dstPath,
+                hashPath(htSHA256, dstPath), references);
             txn.commit();
         }
 

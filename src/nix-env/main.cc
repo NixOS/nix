@@ -205,7 +205,8 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
 
     /* Also write a copy of the list of inputs to the store; we need
        it for future modifications of the environment. */
-    Path inputsFile = addTextToStore("env-inputs", atPrint(inputs2));
+    Path inputsFile = addTextToStore("env-inputs", atPrint(inputs2),
+        PathSet() /* !!! incorrect */);
 
     Expr topLevel = makeCall(envBuilder, makeAttrs(ATmakeList3(
         makeBind(toATerm("system"),

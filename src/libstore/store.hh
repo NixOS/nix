@@ -57,7 +57,7 @@ void clearSubstitutes();
    of the file system contents of the path.  The hash must be a
    SHA-256 hash. */
 void registerValidPath(const Transaction & txn,
-    const Path & path, const Hash & hash);
+    const Path & path, const Hash & hash, const PathSet & references);
 
 /* Throw an exception if `path' is not directly in the Nix store. */
 void assertStorePath(const Path & path);
@@ -97,7 +97,8 @@ Path addToStore(const Path & srcPath);
 
 /* Like addToStore, but the contents written to the output path is a
    regular file containing the given string. */
-Path addTextToStore(const string & suffix, const string & s);
+Path addTextToStore(const string & suffix, const string & s,
+    const PathSet & references);
 
 /* Delete a value from the nixStore directory. */
 void deleteFromStore(const Path & path);
