@@ -103,6 +103,12 @@ struct Goal
     /* Referenceable paths (i.e., input and output paths). */
     PathSet allPaths;
 
+    /* The normal forms of the input store expressions. */
+    PathSet inputNFs;
+
+    /* The successor mappings for the input store expressions. */
+    map<Path, Path> inputSucs;
+
     /* The process ID of the builder. */
     pid_t pid;
 
@@ -118,10 +124,6 @@ struct Goal
     /* Pipes for talking to the build hook (if any). */
     Pipe toHook;
     Pipe fromHook;
-
-    /* !!! clean up */
-    PathSet fnord;
-    map<Path, Path> xyzzy;
 
     Goal();
     ~Goal();
@@ -473,8 +475,8 @@ bool Normaliser::prepareBuild(Goal & goal)
         checkInterrupt();
         Path nfPath = useSuccessor(*i);
         realiseClosure(nfPath);
-        goal.fnord.insert(nfPath);
-        if (nfPath != *i) goal.xyzzy[*i] = nfPath;
+        goal.inputNFs.insert(nfPath);
+        if (nfPath != *i) goal.inputSucs[*i] = nfPath;
         /* !!! nfPath should be a root of the garbage collector while
            we are building */
         StoreExpr ne = storeExprFromPath(nfPath);
@@ -755,6 +757,11 @@ Normaliser::HookReply Normaliser::tryBuildHook(Goal & goal)
             return rpAccept;
         }
 
+        /* Write the information that the hook needs to perform the
+           build, i.e., the set of input paths (including closure
+           expressions), the set of output paths, and the successor
+           mappings for the input expressions. */
+        
         Path inputListFN = goal.tmpDir + "/inputs";
         Path outputListFN = goal.tmpDir + "/outputs";
         Path successorsListFN = goal.tmpDir + "/successors";
@@ -763,8 +770,8 @@ Normaliser::HookReply Normaliser::tryBuildHook(Goal & goal)
         for (ClosureElems::iterator i = goal.inClosures.begin();
              i != goal.inClosures.end(); ++i)
             s += i->first + "\n";
-        for (PathSet::iterator i = goal.fnord.begin();
-             i != goal.fnord.end(); ++i)
+        for (PathSet::iterator i = goal.inputNFs.begin();
+             i != goal.inputNFs.end(); ++i)
             s += *i + "\n";
         writeStringToFile(inputListFN, s);
         
@@ -775,8 +782,8 @@ Normaliser::HookReply Normaliser::tryBuildHook(Goal & goal)
         writeStringToFile(outputListFN, s);
         
         s = "";
-        for (map<Path, Path>::iterator i = goal.xyzzy.begin();
-             i != goal.xyzzy.end(); ++i)
+        for (map<Path, Path>::iterator i = goal.inputSucs.begin();
+             i != goal.inputSucs.end(); ++i)
             s += i->first + " " + i->second + "\n";
         writeStringToFile(successorsListFN, s);
 
