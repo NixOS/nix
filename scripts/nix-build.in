@@ -8,27 +8,35 @@ if test -z "$nixExpr"; then
 fi
 
 extraArgs=
+noLink=
 
 for i in "$@"; do
     case "$i" in
+        --no-link)
+            noLink=1
+            ;;
         -*)
             extraArgs="$extraArgs $i"
             ;;
         *)
-            storeExpr=$(nix-instantiate "$i")
-            for j in $storeExpr; do
+            storeExprs=$(nix-instantiate "$i")
+            for j in $storeExprs; do
                 echo "store expression is $j" >&2
             done
-            outPath=$(nix-store -qnfv $extraArgs $storeExpr)
-            echo $outPath
-            if test -e result; then
-                if ! test -L result; then
-                    echo "cannot remove \`result\' (not a symlink)"
-                    exit 1
+            outPaths=$(nix-store -qnfv $extraArgs $storeExprs)
+            for j in $outPaths; do
+                echo "$j"
+                if test -z "$noLink"; then
+                    if test -e result; then
+                        if ! test -L result; then
+                            echo "cannot remove \`result\' (not a symlink)"
+                            exit 1
+                        fi
+                        rm result
+                    fi
+                    ln -s "$j" result
                 fi
-                rm result
-            fi
-            ln -s $outPath result
+            done
             ;;
     esac
 done
