@@ -172,7 +172,7 @@ void Goal::waiteeDone()
 
 void Goal::amDone()
 {
-    debug("done");
+    printMsg(lvlVomit, "done");
     for (Goals::iterator i = waiters.begin(); i != waiters.end(); ++i)
         (*i)->waiteeDone();
     worker.removeGoal(shared_from_this());
@@ -1099,6 +1099,8 @@ public:
     void init();
     void haveStoreExpr();
     void elemFinished();
+
+    void trace(const format & f);
 };
 
 
@@ -1123,7 +1125,7 @@ void RealisationGoal::work()
 
 void RealisationGoal::init()
 {
-    debug(format("init of realisation `%1%'") % nePath);
+    trace("init");
 
     /* The first thing to do is to make sure that the store expression
        exists.  If it doesn't, it may be created through a
@@ -1137,7 +1139,7 @@ void RealisationGoal::init()
 
 void RealisationGoal::haveStoreExpr()
 {
-    debug(format("loading store expr `%1%'") % nePath);
+    trace("loading store expression");
 
     assert(isValidPath(nePath));
 
@@ -1162,9 +1164,15 @@ void RealisationGoal::haveStoreExpr()
 
 void RealisationGoal::elemFinished()
 {
-    debug(format("all closure elements finished of `%1%'") % nePath);
+    trace("all closure elements present");
 
     amDone();
+}
+
+
+void RealisationGoal::trace(const format & f)
+{
+    debug(format("realisation of `%1%': %2%") % nePath % f);
 }
 
 
@@ -1211,6 +1219,8 @@ public:
     void exprRealised();
     void tryToRun();
     void finished();
+
+    void trace(const format & f);
 };
 
 
@@ -1230,7 +1240,7 @@ void SubstitutionGoal::work()
 
 void SubstitutionGoal::init()
 {
-    debug(format("init of subst `%1%'") % storePath);
+    trace("init");
 
     /* If the path already exists we're done. */
     if (isValidPath(storePath)) {
@@ -1248,7 +1258,7 @@ void SubstitutionGoal::init()
 
 void SubstitutionGoal::tryNext()
 {
-    debug(format("trying next substitute of `%1%'") % storePath);
+    trace("trying next substitute");
 
     if (subs.size() == 0) throw Error(
         format("path `%1%' is required, but it has no (remaining) substitutes")
@@ -1266,7 +1276,7 @@ void SubstitutionGoal::tryNext()
 
 void SubstitutionGoal::exprNormalised()
 {
-    debug(format("store expr normalised of `%1%'") % storePath);
+    trace("substitute store expression normalised");
 
     /* Realise the substitute store expression. */
     if (!querySuccessor(sub.storeExpr, nfSub))
@@ -1280,7 +1290,7 @@ void SubstitutionGoal::exprNormalised()
 
 void SubstitutionGoal::exprRealised()
 {
-    debug(format("store expr realised of `%1%'") % storePath);
+    trace("substitute store expression realised");
 
     state = &SubstitutionGoal::tryToRun;
     worker.waitForBuildSlot(shared_from_this());
@@ -1289,22 +1299,13 @@ void SubstitutionGoal::exprRealised()
 
 void SubstitutionGoal::tryToRun()
 {
+    trace("trying to run");
+
     /* Make sure that we are allowed to start a build. */
     if (!worker.canBuildMore()) {
         worker.waitForBuildSlot(shared_from_this());
         return;
     }
-
-    /* What's the substitute program? */
-    StoreExpr expr = storeExprFromPath(nfSub);
-    assert(expr.type == StoreExpr::neClosure);
-    assert(!expr.closure.roots.empty());
-    Path program =
-        canonPath(*expr.closure.roots.begin() + "/" + sub.program);
-
-    printMsg(lvlChatty, format("executing substitute `%1%'") % program);
-
-    logPipe.create();
 
     /* Acquire a lock on the output path. */
     PathSet lockPath;
@@ -1319,13 +1320,22 @@ void SubstitutionGoal::tryToRun()
         return;
     }
 
+    startNest(nest, lvlInfo,
+        format("substituting path `%1%'") % storePath);
+    
+    /* What's the substitute program? */
+    StoreExpr expr = storeExprFromPath(nfSub);
+    assert(expr.type == StoreExpr::neClosure);
+    assert(!expr.closure.roots.empty());
+    Path program =
+        canonPath(*expr.closure.roots.begin() + "/" + sub.program);
+
+    logPipe.create();
+
     /* Remove the (stale) output path if it exists. */
     if (pathExists(storePath))
         deletePath(storePath);
 
-    startNest(nest, lvlInfo,
-        format("substituting path `%1%'") % storePath);
-    
     /* Fork the substitute program. */
     pid = fork();
     switch (pid) {
@@ -1370,7 +1380,7 @@ void SubstitutionGoal::tryToRun()
 
 void SubstitutionGoal::finished()
 {
-    debug(format("substitute finished of `%1%'") % storePath);
+    trace("substitute finished");
 
     /* Since we got an EOF on the logger pipe, the substitute is
        presumed to have terminated.  */
@@ -1402,6 +1412,12 @@ void SubstitutionGoal::finished()
     outputLock.setDeletion(true);
     
     amDone();
+}
+
+
+void SubstitutionGoal::trace(const format & f)
+{
+    debug(format("substitution of `%1%': %2%") % nePath % f);
 }
 
 
