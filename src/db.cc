@@ -94,6 +94,8 @@ Database::Database()
 Database::~Database()
 {
     if (env) {
+        debug(format("closing database environment"));
+        env->txn_checkpoint(0, 0, 0);
         env->close(0);
         delete env;
     }
@@ -108,12 +110,14 @@ void Database::open(const string & path)
 
         env = new DbEnv(0);
 
-        debug("foo" + path);
+        env->set_lg_bsize(32 * 1024); /* default */
+        env->set_lg_max(256 * 1024); /* must be > 4 * lg_bsize */
+        
         env->open(path.c_str(), 
             DB_INIT_LOCK | DB_INIT_LOG | DB_INIT_MPOOL | DB_INIT_TXN |
             DB_CREATE,
             0666);
-        
+
     } catch (DbException e) { rethrow(e); }
 }
 
