@@ -279,6 +279,7 @@ void Nest::close()
         nestingLevel--;
         if (logType == ltEscapes)
             cerr << "\033[q";
+        nest = false;
     }
 }
 

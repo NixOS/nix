@@ -16,6 +16,7 @@ struct Decoder
     bool newNumber;
     int priority;
     bool ignoreLF;
+    int lineNo, charNo;
 
     Decoder()
     {
@@ -25,6 +26,8 @@ struct Decoder
         level = 0;
         priority = 1;
         ignoreLF = false;
+        lineNo = 1;
+        charNo = 0;
     }
 
     void pushChar(char c);
@@ -35,6 +38,11 @@ struct Decoder
 
 void Decoder::pushChar(char c)
 {
+    if (c == '\n') {
+        lineNo++;
+        charNo = 0;
+    } else charNo++;
+    
     switch (state) {
         
         case stTop:
@@ -71,7 +79,8 @@ void Decoder::pushChar(char c)
                             level--;
                             cout << "</nest>" << endl;
                         } else
-                            cerr << "not enough nesting levels" << endl;
+                            cerr << "not enough nesting levels at line "
+                                 << lineNo << ", character " << charNo  << endl;
                         break;
                     case 's':
                         if (line.size()) finishLine();
