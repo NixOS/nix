@@ -288,9 +288,16 @@ Expr evalExpr2(EvalState & state, Expr e)
     if (atMatch(m, e) >> "OpOr" >> e1 >> e2)
         return makeBool(evalBool(state, e1) || evalBool(state, e2));
 
-    /* Attribut set update (//). */
+    /* Attribute set update (//). */
     if (atMatch(m, e) >> "OpUpdate" >> e1 >> e2)
         return updateAttrs(evalExpr(state, e1), evalExpr(state, e2));
+
+    /* Attribute existence test (?). */
+    if (atMatch(m, e) >> "OpHasAttr" >> e1 >> name) {
+        ATermMap attrs;
+        queryAllAttrs(evalExpr(state, e1), attrs);
+        return makeBool(attrs.get(name) != 0);
+    }
 
     /* Barf. */
     throw badTerm("invalid expression", e);
