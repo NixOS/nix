@@ -123,8 +123,8 @@ static Hash computeDerived(Hash sourceHash, string targetName,
             
             } catch (exception & e) {
                 cerr << "build error: " << e.what() << endl;
-                _exit(1);
             }
+            _exit(1);
 
         }
 

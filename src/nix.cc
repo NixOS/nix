@@ -133,7 +133,8 @@ struct StdoutSink : DumpSink
         (const unsigned char * data, unsigned int len)
     {
         /* Don't use cout, it's slow as hell! */
-        write(STDOUT_FILENO, (char *) data, len);
+        if (write(STDOUT_FILENO, (char *) data, len) != len)
+            throw SysError("writing to stdout");
     }
 };
 

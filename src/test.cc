@@ -23,7 +23,21 @@ struct MySink : DumpSink
     virtual void operator () (const unsigned char * data, unsigned int len)
     {
         /* Don't use cout, it's slow as hell! */
-        write(STDOUT_FILENO, (char *) data, len);
+        if (write(STDOUT_FILENO, (char *) data, len) != (ssize_t) len)
+            throw SysError("writing to stdout");
+    }
+};
+
+
+struct MySource : RestoreSource
+{
+    virtual void operator () (const unsigned char * data, unsigned int len)
+    {
+        ssize_t res = read(STDIN_FILENO, (char *) data, len);
+        if (res == -1)
+            throw SysError("reading from stdin");
+        if (res != (ssize_t) len)
+            throw Error("not enough data available on stdin");
     }
 };
 
@@ -51,6 +65,14 @@ void runTests()
     MySink sink;
     dumpPath("scratch", sink);
     cout << (string) hashPath("scratch") << endl;
+#endif
+
+    /* Restoring. */
+#if 1
+    MySource source;
+    restorePath("outdir", source);
+    cout << (string) hashPath("outdir") << endl;
+    return;
 #endif
 
     /* Set up the test environment. */
