@@ -156,9 +156,35 @@ void copyPath(const Path & src, const Path & dst)
 }
 
 
+static bool isValidPathTxn(const Path & path, const Transaction & txn)
+{
+    string s;
+    return nixDB.queryString(txn, dbValidPaths, path, s);
+}
+
+
+bool isValidPath(const Path & path)
+{
+    return isValidPathTxn(path, noTxn);
+}
+
+
+static bool isUsablePathTxn(const Path & path, const Transaction & txn)
+{
+    if (isValidPathTxn(path, txn)) return true;
+    Paths subs;
+    nixDB.queryStrings(txn, dbSubstitutes, path, subs);
+    return subs.size() > 0;
+}
+
+
 void registerSuccessor(const Transaction & txn,
     const Path & srcPath, const Path & sucPath)
 {
+    if (!isUsablePathTxn(sucPath, txn))	throw Error(
+	format("path `%1%' cannot be a successor, since it is not usable")
+	% sucPath);
+
     Path known;
     if (nixDB.queryString(txn, dbSuccessors, srcPath, known) &&
         known != sucPath)
@@ -196,6 +222,10 @@ Paths queryPredecessors(const Path & sucPath)
 
 void registerSubstitute(const Path & srcPath, const Path & subPath)
 {
+    if (!isValidPathTxn(subPath, noTxn)) throw Error(
+	format("path `%1%' cannot be a substitute, since it is not valid")
+	% subPath);
+
     Transaction txn(nixDB);
 
     Paths subs;
@@ -236,13 +266,6 @@ void registerValidPath(const Transaction & txn, const Path & _path)
 }
 
 
-bool isValidPath(const Path & path)
-{
-    string s;
-    return nixDB.queryString(noTxn, dbValidPaths, path, s);
-}
-
-
 static void setOrClearStrings(Transaction & txn,
     TableId table, const string & key, const Strings & value)
 {
@@ -277,6 +300,12 @@ static void invalidatePath(const Path & path, Transaction & txn)
             throw Error("integrity error in substitutes mapping");
         subs.remove(path);
         setOrClearStrings(txn, dbSubstitutes, *i, subs);
+
+	/* If path *i now has no substitutes left, and is not valid,
+	   then it too should be invalidated.  This is because it may
+	   be a substitute or successor. */
+	if (subs.size() == 0 && !isValidPathTxn(*i, txn))
+	    invalidatePath(*i, txn);
     }
     nixDB.delPair(txn, dbSubstitutesRev, path);
 }
@@ -367,8 +396,7 @@ void verifyStore()
     PathSet validPaths;
     nixDB.enumTable(txn, dbValidPaths, paths);
 
-    for (Paths::iterator i = paths.begin(); i != paths.end(); ++i)
-    {
+    for (Paths::iterator i = paths.begin(); i != paths.end(); ++i) {
         Path path = *i;
         if (!pathExists(path)) {
             debug(format("path `%1%' disappeared") % path);
@@ -377,32 +405,14 @@ void verifyStore()
             validPaths.insert(path);
     }
 
-    /* Check that the values of the successor mappings are valid
-       paths. */ 
-    Paths sucs;
-    nixDB.enumTable(txn, dbSuccessors, sucs);
-    for (Paths::iterator i = sucs.begin(); i != sucs.end(); ++i) {
-        /* Note that *i itself does not have to be valid, just its
-           successor. */
-        Path sucPath;
-        if (nixDB.queryString(txn, dbSuccessors, *i, sucPath) &&
-            validPaths.find(sucPath) == validPaths.end())
-        {
-            debug(format("found successor mapping to non-existent path `%1%'") % sucPath);
-            nixDB.delPair(txn, dbSuccessors, *i);
-        }
-    }
+    /* !!! the code below does not allow transitive substitutes.
+       I.e., if B is a substitute of A, then B must be a valid path.
+       B cannot itself be invalid but have a substitute. */
 
-    /* Check that the keys of the reverse successor mappings are valid
-       paths. */ 
-    Paths rsucs;
-    nixDB.enumTable(txn, dbSuccessorsRev, rsucs);
-    for (Paths::iterator i = rsucs.begin(); i != rsucs.end(); ++i) {
-        if (validPaths.find(*i) == validPaths.end()) {
-            debug(format("found reverse successor mapping for non-existent path `%1%'") % *i);
-            nixDB.delPair(txn, dbSuccessorsRev, *i);
-        }
-    }
+    /* "Usable" paths are those that are valid or have a substitute.
+       These are the paths that are allowed to appear in the
+       right-hand side of a sute mapping. */
+    PathSet usablePaths(validPaths);
 
     /* Check that the values of the substitute mappings are valid
        paths. */ 
@@ -418,6 +428,8 @@ void verifyStore()
                 subPaths2.push_back(*j);
         if (subPaths.size() != subPaths2.size())
             setOrClearStrings(txn, dbSubstitutes, *i, subPaths2);
+	if (subPaths2.size() > 0)
+	    usablePaths.insert(*i);
     }
 
     /* Check that the keys of the reverse substitute mappings are
@@ -428,6 +440,33 @@ void verifyStore()
         if (validPaths.find(*i) == validPaths.end()) {
             debug(format("found reverse substitute mapping for non-existent path `%1%'") % *i);
             nixDB.delPair(txn, dbSubstitutesRev, *i);
+        }
+    }
+
+    /* Check that the values of the successor mappings are usable
+       paths. */ 
+    Paths sucs;
+    nixDB.enumTable(txn, dbSuccessors, sucs);
+    for (Paths::iterator i = sucs.begin(); i != sucs.end(); ++i) {
+        /* Note that *i itself does not have to be valid, just its
+           successor. */
+        Path sucPath;
+        if (nixDB.queryString(txn, dbSuccessors, *i, sucPath) &&
+            usablePaths.find(sucPath) == usablePaths.end())
+        {
+            debug(format("found successor mapping to non-existent path `%1%'") % sucPath);
+            nixDB.delPair(txn, dbSuccessors, *i);
+        }
+    }
+
+    /* Check that the keys of the reverse successor mappings are valid
+       paths. */ 
+    Paths rsucs;
+    nixDB.enumTable(txn, dbSuccessorsRev, rsucs);
+    for (Paths::iterator i = rsucs.begin(); i != rsucs.end(); ++i) {
+        if (usablePaths.find(*i) == usablePaths.end()) {
+            debug(format("found reverse successor mapping for non-existent path `%1%'") % *i);
+            nixDB.delPair(txn, dbSuccessorsRev, *i);
         }
     }
 
