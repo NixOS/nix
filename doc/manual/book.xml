@@ -4,6 +4,7 @@
 <!ENTITY introduction SYSTEM "introduction.xml">
 <!ENTITY installation SYSTEM "installation.xml">
 <!ENTITY nix-reference SYSTEM "nix-reference.xml">
+<!ENTITY fix-reference SYSTEM "fix-reference.xml">
 <!ENTITY troubleshooting SYSTEM "troubleshooting.xml">
 <!ENTITY bugs SYSTEM "bugs.xml">
 ]>
@@ -52,6 +53,7 @@
   <appendix>
     <title>Command Reference</title>
     &nix-reference;
+    &fix-reference;
   </appendix>
 
   &troubleshooting;

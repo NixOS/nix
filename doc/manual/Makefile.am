@@ -10,9 +10,9 @@ book.is-valid: $(SOURCES)
 	nsgmls -wxml -c $(XML) -c $(DOCBOOK_DTD)/docbook.cat -ges $<
 	touch $@
 
-man1_MANS = nix.1
+man1_MANS = nix.1 fix.1
 
-man nix.1: $(SOURCES) book.is-valid
+man nix.1 fix.1: $(SOURCES) book.is-valid
 	xsltproc $(DOCBOOK_XSL)/manpages/docbook.xsl book.xml
 
 book.html: $(SOURCES) book.is-valid
@@ -24,4 +24,4 @@ install-data-local: book.html
 	$(INSTALL) -d $(datadir)/nix/manual
 	$(INSTALL_DATA) book.html $(datadir)/nix/manual
 
-EXTRA_DIST = $(SOURCES) book.html nix.1 book.is-valid
+EXTRA_DIST = $(SOURCES) book.html nix.1 fix.1 book.is-valid

@@ -1,0 +1,37 @@
+<refentry>
+  <refnamediv>
+    <refname>fix</refname>
+    <refpurpose>generate Nix expressions from a high-level description</refpurpose>
+  </refnamediv>
+
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>fix</command>
+      <group choice='opt' rep='repeat'>
+	<arg><option>--verbose</option></arg>
+	<arg><option>-v</option></arg>
+      </group>
+      <arg rep='repeat'><replaceable>files</replaceable></arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsect1>
+    <title>Description</title>
+
+    <para>
+      The command <command>fix</command> generates Nix expressions from
+      expressions is Fix's own high-level language.  While Nix expressions are
+      very primitive and not intended to be written directly, Fix expressions
+      are quite easy to write.
+    </para>
+
+  </refsect1>
+
+</refentry>
+
+
+<!--
+local variables:
+sgml-parent-document: ("book.xml" "refentry")
+end:
+-->
