@@ -375,6 +375,16 @@ static Expr evalFile(EvalState & state, string relPath)
 }
 
 
+static Expr evalStdin(EvalState & state)
+{
+    Nest nest(lvlTalkative, format("evaluating standard input"));
+    Expr e = ATreadFromFile(stdin);
+    if (!e) 
+        throw Error(format("unable to read a term from stdin"));
+    return evalExpr(state, e);
+}
+
+
 static void printFSId(EvalState & state, Expr e)
 {
     ATermList es;
@@ -398,6 +408,7 @@ void run(Strings args)
 
     EvalState state;
     Strings files;
+    bool readStdin = false;
 
     state.searchDirs.push_back(".");
     state.searchDirs.push_back(nixDataDir + "/fix");
@@ -414,13 +425,18 @@ void run(Strings args)
         }
         else if (arg == "--verbose" || arg == "-v")
             verbosity = (Verbosity) ((int) verbosity + 1);
+        else if (arg == "-")
+            readStdin = true;
         else if (arg[0] == '-')
             throw UsageError(format("unknown flag `%1%`") % arg);
         else
             files.push_back(arg);
     }
 
-    if (files.empty()) throw UsageError("no files specified");
+    if (readStdin) {
+        Expr e = evalStdin(state);
+        printFSId(state, e);
+    }
 
     for (Strings::iterator it = files.begin();
          it != files.end(); it++)
