@@ -27,11 +27,19 @@ foreach my $hash (@ARGV) {
         chomp $phash;
         die unless $phash =~ /^([0-9a-z]{32})$/;
 
-        # Construct a Fix expression that creates a Nar archive.
+        # Construct a name for the Nix archive.  If the file is an
+        # fstate successor, encode this into the name.
+        my $name = $phash;
+        if ($path =~ /-s-([0-9a-z]{32}).nix$/) {
+            $name = "$name-s-$1";
+        }
+        $name = $name . ".nar";
+
+        # Construct a Fix expression that creates a Nix archive.
         my $fixexpr = 
           "App(IncludeFix(\"nar/nar.fix\"), " .
           "[ (\"path\", Path(\"$path\", Hash(\"$phash\"), [Include(\"$hash\")]))" .
-          ", (\"name\", \"$phash.nar\")" .
+          ", (\"name\", \"$name\")" .
           "])";
 	
         my $fixfile = "/tmp/nix-push-tmp.fix";
