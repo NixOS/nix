@@ -1,4 +1,6 @@
 #include <map>
+#include <boost/shared_ptr.hpp>
+#include <boost/enable_shared_from_this.hpp>
 
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -14,26 +16,173 @@
 #include "globals.hh"
 
 
+/* !!! TODO storeExprFromPath shouldn't be used here */
+
+
 static string pathNullDevice = "/dev/null";
 
 
-/* A goal is a store expression that still has to be normalised. */
-struct Goal
+/* Forward definition. */
+class Worker;
+
+
+/* A pointer to a goal. */
+class Goal;
+typedef shared_ptr<Goal> GoalPtr;
+
+/* A set of goals. */
+typedef set<GoalPtr> Goals;
+
+/* A map of paths to goals (and the other way around). */
+typedef map<Path, GoalPtr> GoalMap;
+typedef map<GoalPtr, Path> GoalMapRev;
+
+
+
+class Goal : public enable_shared_from_this<Goal>
 {
-    /* The path of the store expression. */
+protected:
+    
+    /* Backlink to the worker. */
+    Worker & worker;
+
+    /* Goals waiting for this one to finish. */
+    Goals waiters;
+
+    /* Number of goals we are waiting for. */
+    unsigned int nrWaitees;
+    
+
+    Goal(Worker & _worker) : worker(_worker)
+    {
+        nrWaitees = 0;
+    }
+
+    virtual ~Goal()
+    {
+        debug("goal destroyed");
+    }
+
+public:
+    virtual void work() = 0;
+
+    virtual string name()
+    {
+        return "(noname)";
+    }
+
+    void addWaiter(GoalPtr waiter);
+
+    void waiteeDone();
+
+    void amDone();
+};
+
+
+/* A mapping used to remember for each child process to what goal it
+   belongs, and a file descriptor for receiving log data. */
+typedef map<pid_t, pair<int, GoalPtr> > Children;
+
+
+/* The worker class. */
+class Worker
+{
+private:
+
+    /* The goals of the worker. */
+    Goals goals;
+
+    /* Goals that are ready to do some work. */
+    Goals awake;
+
+    /* Goals waiting for a build slot. */
+    Goals wantingToBuild;
+
+    /* Child processes currently running. */
+    Children children;
+
+    /* Maps used to prevent multiple instantiation of a goal for the
+       same expression / path. */
+    GoalMap normalisationGoals;
+    GoalMapRev normalisationGoalsRev;
+    GoalMap realisationGoals;
+    GoalMapRev realisationGoalsRev;
+    GoalMap substitutionGoals;
+    GoalMapRev substitutionGoalsRev;
+
+public:
+
+    Worker();
+    ~Worker();
+
+    /* Add a goal. */
+    void addNormalisationGoal(const Path & nePath, GoalPtr waiter);
+    void addRealisationGoal(const Path & nePath, GoalPtr waiter);
+    void addSubstitutionGoal(const Path & storePath, GoalPtr waiter);
+
+    /* Remove a finished goal. */
+    void removeGoal(GoalPtr goal);
+
+    /* Wake up a goal (i.e., there is something for it to do). */
+    void wakeUp(GoalPtr goal);
+
+    /* Can we start another child process? */
+    bool canBuildMore();
+
+    /* Registers / unregisters a running child process. */
+    void childStarted(GoalPtr goal, pid_t pid, int fdLogFile);
+    void childTerminated(pid_t pid);
+
+    /* Add a goal to the set of goals waiting for a build slot. */
+    void waitForBuildSlot(GoalPtr goal);
+    
+    /* Loop until all goals have been realised. */
+    void run();
+
+    /* Wait for input to become available. */
+    void waitForInput();
+};
+
+
+
+//////////////////////////////////////////////////////////////////////
+
+
+void Goal::addWaiter(GoalPtr waiter)
+{
+    waiters.insert(waiter);
+}
+
+
+void Goal::waiteeDone()
+{
+    assert(nrWaitees > 0);
+    if (!--nrWaitees) worker.wakeUp(shared_from_this());
+}
+
+
+void Goal::amDone()
+{
+    debug("done");
+    for (Goals::iterator i = waiters.begin(); i != waiters.end(); ++i)
+        (*i)->waiteeDone();
+    worker.removeGoal(shared_from_this());
+}
+
+
+
+//////////////////////////////////////////////////////////////////////
+
+
+class NormalisationGoal : public Goal
+{
+private:
+    /* The path of the derivation store expression. */
     Path nePath;
 
     /* The store expression stored at nePath. */
     StoreExpr expr;
     
-    /* The unfinished inputs are the input store expressions that
-       still have to be normalised. */
-    PathSet unfinishedInputs;
-
-    /* The waiters are the store expressions that have this one as an
-       unfinished input. */
-    PathSet waiters;
-
     /* The remainder is state held during the build. */
 
     /* Whether it's being built by a hook or by ourselves. */
@@ -70,26 +219,63 @@ struct Goal
     Pipe toHook;
     Pipe fromHook;
 
-    Goal();
-    ~Goal();
+    typedef void (NormalisationGoal::*GoalState)();
+    GoalState state;
+    
+public:
+    NormalisationGoal(const Path & _nePath, Worker & _worker);
+    ~NormalisationGoal();
 
+    void work();
+    
+    /* The states. */
+    void init();
+    void haveStoreExpr();
+    void inputNormalised();
+    void inputRealised();
+    void tryToBuild();
+    void buildDone();
+
+    /* Start building a derivation. */
+    void startBuilder();
+
+    /* Must be called after the output paths have become valid (either
+       due to a successful build or hook, or because they already
+       were). */
+    void createClosure();
+
+    /* Open a log file and a pipe to it. */
+    void openLogFile();
+
+    /* Common initialisation to be performed in child processes (i.e.,
+       both in builders and in build hooks. */
+    void initChild();
+    
+    /* Delete the temporary directory, if we have one. */
     void deleteTmpDir(bool force);
+
+    string name()
+    {
+        return nePath;
+    }
 };
 
 
-Goal::Goal()
-    : pid(0)
-    , tmpDir("")
+NormalisationGoal::NormalisationGoal(const Path & _nePath, Worker & _worker)
+    : Goal(_worker)
 {
+    nePath = _nePath;
+    pid = -1;
+    state = &NormalisationGoal::init;
 }
 
 
-Goal::~Goal()
+NormalisationGoal::~NormalisationGoal()
 {
     /* Careful: we should never ever throw an exception from a
        destructor. */
 
-    if (pid) {
+    if (pid != -1) {
         printMsg(lvlError, format("killing child process %1% (%2%)")
             % pid % nePath);
 
@@ -116,281 +302,106 @@ Goal::~Goal()
 }
 
 
-void Goal::deleteTmpDir(bool force)
+void NormalisationGoal::work()
 {
-    if (tmpDir != "") {
-        if (keepFailed && !force)
-	    printMsg(lvlTalkative, 
-		format("builder for `%1%' failed; keeping build directory `%2%'")
-                % nePath % tmpDir);
-        else
-            deletePath(tmpDir);
-        tmpDir = "";
-    }
+    (this->*state)();
 }
 
 
-/* A set of goals keyed on the path of the store expression. */
-typedef map<Path, Goal> Goals;
-
-
-/* A mapping used to remember for each child process what derivation
-   store expression it is building. */
-typedef map<pid_t, Path> Building;
-
-
-/* The normaliser class. */
-class Normaliser
+void NormalisationGoal::init()
 {
-private:
-    /* The goals of the normaliser.  This describes a dependency graph
-       of derivation expressions that have yet to be normalised. */
-    Goals goals;
-
-    /* Finished goals are removed in run() at top-level; they are not
-       deleted as soon as they are finished, since there may be
-       references hanging about. */
-    PathSet deadGoals;
-
-    /* The set of `buildable' goals, which are the ones with an empty
-       list of unfinished inputs. */
-    PathSet buildable;
-
-    /* Should be set whenever a goal is added to `buildable'. */
-    bool newBuildables;
-
-    /* Child processes currently running. */
-    Building building;
-
-public:
-    Normaliser();
-
-    /* Add the normalisation of a store expression of a goal.  Returns
-       true if the expression has been added; false if it's
-       unnecessary (the expression is a closure, or already has a
-       known successor). */
-    bool addGoal(Path nePath);
-
-    /* Perform build actions until all goals have been realised. */
-    void run();
-
-private:
-
-    bool canBuildMore();
-    
-    /* Start building a derivation.  Returns false if we decline to
-       build it right now. */
-    bool startBuild(Path nePath);
-
-    /* Acquires locks on the output paths and gathers information
-       about the build (e.g., the input closures).  During this
-       process its possible that we find out that the build is
-       unnecessary, in which case we return false (this is not an
-       error condition!). */
-    bool prepareBuild(Goal & goal);
-
-    void startBuildChild(Goal & goal);
-
-    typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
-    HookReply tryBuildHook(Goal & goal);
-
-    void terminateBuildHook(Goal & goal);
-    
-    void openLogFile(Goal & goal);
-    
-    void initChild(Goal & goal);
-
-    void childStarted(Goal & goal, pid_t pid);
-
-    /* Read from the logger pipes, and watch for child termination as
-       a side effect.  Return true when a child terminates, false
-       otherwise. */
-    bool waitForChildren();
-
-    /* Wait for child processes to finish building a derivation. */
-    void reapChild(Goal & goal);
-
-    /* Called when a build has finished succesfully. */
-    void finishGoal(Goal & goal);
-
-    /* Removes a goal from the graph and wakes up all waiters. */
-    void removeGoal(Goal & goal);
-};
-
-
-static Path useSuccessor(const Path & path)
-{
-    string pathSucc;
-    if (querySuccessor(path, pathSucc)) {
-        debug(format("successor %1% -> %2%") % (string) path % pathSucc);
-        return pathSucc;
-    } else
-        return path;
-}
-
-
-Normaliser::Normaliser()
-{
-}
-
-
-bool Normaliser::addGoal(Path nePath)
-{
-    checkInterrupt();
-
-    Goal goal;
-    goal.nePath = nePath;
-
-    /* If this already a goal, return. */
-    if (goals.find(nePath) != goals.end()) return true;
+    debug(format("init of norm `%1%'") % nePath);
 
     /* If we already have a successor, then we are done already; don't
        add the expression as a goal. */
     Path nfPath;
-    if (querySuccessor(nePath, nfPath)) return false;
+    if (querySuccessor(nePath, nfPath)) {
+        amDone();
+        return;
+    }
+
+    /* The first thing to do is to make sure that the store expression
+       exists.  If it doesn't, it may be created through a
+       substitute. */
+    nrWaitees = 1;
+    worker.addSubstitutionGoal(nePath, shared_from_this());
+
+    state = &NormalisationGoal::haveStoreExpr;
+}
+
+
+void NormalisationGoal::haveStoreExpr()
+{
+    debug(format("loading store expr `%1%'") % nePath);
+
+    assert(isValidPath(nePath));
 
     /* Get the store expression. */
-    goal.expr = storeExprFromPath(nePath);
+    expr = storeExprFromPath(nePath);
 
     /* If this is a normal form (i.e., a closure) we are also done. */
-    if (goal.expr.type == StoreExpr::neClosure) return false;
-    if (goal.expr.type != StoreExpr::neDerivation) abort();
-
-    /* Otherwise, it's a derivation expression for which the successor
-       is not known, and we have to build it to determine its normal
-       form.  So add it as a goal. */
-    startNest(nest, lvlChatty,
-        format("adding build goal `%1%'") % nePath);
-
-    /* Inputs may also need to be added as goals if they haven't been
-       normalised yet. */
-    for (PathSet::iterator i = goal.expr.derivation.inputs.begin();
-         i != goal.expr.derivation.inputs.end(); ++i)
-        if (addGoal(*i)) {
-            goal.unfinishedInputs.insert(*i);
-            goals[*i].waiters.insert(nePath);
-        }
-
-    /* Maintain the invariant that all goals with no unfinished inputs
-       are in the `buildable' set. */
-    if (goal.unfinishedInputs.empty()) {
-        buildable.insert(nePath);
-        newBuildables = true;
+    if (expr.type == StoreExpr::neClosure) {
+        amDone();
+        return;
     }
+    assert(expr.type == StoreExpr::neDerivation);
 
-    /* Add the goal to the goal graph. */
-    goals[nePath] = goal;
+    /* Inputs must be normalised before we can build this goal. */
+    for (PathSet::iterator i = expr.derivation.inputs.begin();
+         i != expr.derivation.inputs.end(); ++i)
+        worker.addNormalisationGoal(*i, shared_from_this());
 
-    return true;
+    nrWaitees = expr.derivation.inputs.size();
+
+    state = &NormalisationGoal::inputNormalised;
 }
 
 
-void Normaliser::run()
+void NormalisationGoal::inputNormalised()
 {
-    startNest(nest, lvlChatty, format("running normaliser"));
+    debug(format("all inputs normalised of `%1%'") % nePath);
 
-    while (!goals.empty()) {
-
-        debug("main loop - starting jobs");
-        
-        /* Start building as many buildable goals as possible. */
-        bool madeProgress = false;
-
-        do {
-            newBuildables = false;
-            for (PathSet::iterator i = buildable.begin();
-                 i != buildable.end(); ++i)
-                if (startBuild(*i)) {
-                    madeProgress = true;
-                    buildable.erase(*i);
-                }
-            /* Continue while `newBuildables' is true.  This happens
-               when startBuild() fast-builds a goal and wakes up
-               another goal. */
-        } while (newBuildables);
-
-        /* Wait until any child finishes (which may allow us to build
-           new goals). */
-        if (building.empty())
-            assert(madeProgress); /* shouldn't happen */
-        else
-            do {
-                printMsg(lvlVomit, "waiting for children");
-            } while (!waitForChildren());
-
-        /* Remove finished goals from the graph. */
-        for (PathSet::iterator i = deadGoals.begin();
-             i != deadGoals.end(); ++i)
-            goals.erase(*i);
-        deadGoals.clear();
-    }
-
-    assert(buildable.empty() && building.empty());
-}
-
-
-bool Normaliser::canBuildMore()
-{
-    /* !!! O(n) - not that it matters */
-    unsigned int localJobs = 0;
-    for (Building::iterator i = building.begin();
-         i != building.end(); ++i)
-        if (!goals[i->second].inHook) localJobs++;
-    return localJobs < maxBuildJobs;
-}
-
-
-bool Normaliser::startBuild(Path nePath)
-{
-    checkInterrupt();
-
-    Goals::iterator goalIt = goals.find(nePath);
-    assert(goalIt != goals.end());
-    Goal & goal(goalIt->second);
-    assert(goal.unfinishedInputs.empty());
-
-    startNest(nest, lvlTalkative,
-        format("starting normalisation of goal `%1%'") % nePath);
-    
-    /* Is the build hook willing to accept this job? */
-    switch (tryBuildHook(goal)) {
-        case rpAccept: return true;
-        case rpPostpone: return false;
-        case rpDecline: ;
-    }
-
-    if (!canBuildMore()) {
-        debug("postponing build");
-        return false;
-    }
-
-    goal.inHook = false;
-    
-    /* Prepare the build, i.e., acquire locks and gather necessary
-       information. */
-    if (!prepareBuild(goal)) return true;
-    
-    /* Otherwise, start the build in a child process. */
-    startBuildChild(goal);
-
-    return true;
-}
-
-
-bool Normaliser::prepareBuild(Goal & goal)
-{
-    /* The outputs are referenceable paths. */
-    for (PathSet::iterator i = goal.expr.derivation.outputs.begin();
-         i != goal.expr.derivation.outputs.end(); ++i)
+    /* Inputs must also be realised before we can build this goal. */
+    for (PathSet::iterator i = expr.derivation.inputs.begin();
+         i != expr.derivation.inputs.end(); ++i)
     {
-        debug(format("building path `%1%'") % *i);
-        goal.allPaths.insert(*i);
+        Path neInput = *i, nfInput;
+        if (querySuccessor(neInput, nfInput))
+            neInput = nfInput;
+        /* Otherwise the input must be a closure. */
+        worker.addRealisationGoal(neInput, shared_from_this());
+    }
+    
+    nrWaitees = expr.derivation.inputs.size();
+
+    state = &NormalisationGoal::inputRealised;
+}
+
+
+void NormalisationGoal::inputRealised()
+{
+    debug(format("all inputs realised of `%1%'") % nePath);
+
+    /* Now wait until a build slot becomes available. */
+    state = &NormalisationGoal::tryToBuild;
+    worker.waitForBuildSlot(shared_from_this());
+}
+
+
+void NormalisationGoal::tryToBuild()
+{
+    debug(format("trying to build `%1%'") % nePath);
+
+    /* Make sure that we are allowed to start a build. */
+    if (!worker.canBuildMore()) {
+        worker.waitForBuildSlot(shared_from_this());
+        return;
     }
 
     /* Obtain locks on all output paths.  The locks are automatically
        released when we exit this function or Nix crashes. */
     /* !!! BUG: this could block, which is not allowed. */
-    goal.outputLocks.lockPaths(goal.expr.derivation.outputs);
+    outputLocks.lockPaths(expr.derivation.outputs);
 
     /* Now check again whether there is a successor.  This is because
        another process may have started building in parallel.  After
@@ -401,23 +412,34 @@ bool Normaliser::prepareBuild(Goal & goal)
        process can build this expression, so no further checks are
        necessary. */
     Path nfPath;
-    if (querySuccessor(goal.nePath, nfPath)) {
+    if (querySuccessor(nePath, nfPath)) {
         debug(format("skipping build of expression `%1%', someone beat us to it")
-            % goal.nePath);
-        goal.outputLocks.setDeletion(true);
-        removeGoal(goal);
-        return false;
+            % nePath);
+        outputLocks.setDeletion(true);
+        amDone();
+        return;
     }
 
-    /* Realise inputs (and remember all input paths). */
-    for (PathSet::iterator i = goal.expr.derivation.inputs.begin();
-         i != goal.expr.derivation.inputs.end(); ++i)
+    /* Gather information necessary for computing the closure and/or
+       running the build hook. */
+    
+    /* The outputs are referenceable paths. */
+    for (PathSet::iterator i = expr.derivation.outputs.begin();
+         i != expr.derivation.outputs.end(); ++i)
+    {
+        debug(format("building path `%1%'") % *i);
+        allPaths.insert(*i);
+    }
+    
+    /* Get information about the inputs (these all exist now). */
+    for (PathSet::iterator i = expr.derivation.inputs.begin();
+         i != expr.derivation.inputs.end(); ++i)
     {
         checkInterrupt();
-        Path nfPath = useSuccessor(*i);
-        realiseClosure(nfPath);
-        goal.inputNFs.insert(nfPath);
-        if (nfPath != *i) goal.inputSucs[*i] = nfPath;
+        Path nePath = *i, nfPath;
+        if (!querySuccessor(nePath, nfPath)) nfPath = nePath;
+        inputNFs.insert(nfPath);
+        if (nfPath != nePath) inputSucs[nePath] = nfPath;
         /* !!! nfPath should be a root of the garbage collector while
            we are building */
         StoreExpr ne = storeExprFromPath(nfPath);
@@ -425,44 +447,97 @@ bool Normaliser::prepareBuild(Goal & goal)
         for (ClosureElems::iterator j = ne.closure.elems.begin();
              j != ne.closure.elems.end(); ++j)
 	{
-            goal.inClosures[j->first] = j->second;
-	    goal.allPaths.insert(j->first);
+            inClosures[j->first] = j->second;
+	    allPaths.insert(j->first);
 	}
     }
 
     /* We can skip running the builder if all output paths are already
        valid. */
     bool fastBuild = true;
-    for (PathSet::iterator i = goal.expr.derivation.outputs.begin();
-         i != goal.expr.derivation.outputs.end(); ++i)
-    {
+    for (PathSet::iterator i = expr.derivation.outputs.begin();
+         i != expr.derivation.outputs.end(); ++i)
         if (!isValidPath(*i)) { 
             fastBuild = false;
             break;
         }
-    }
 
     if (fastBuild) {
         printMsg(lvlChatty, format("skipping build; output paths already exist"));
-        finishGoal(goal);
-        return false;
+        createClosure();
+        amDone();
+        return;
     }
 
-    return true;
+    /* Okay, we have to build. */
+    startBuilder();
+
+    /* This state will be reached when we get EOF on the child's
+       log pipe. */
+    state = &NormalisationGoal::buildDone;
 }
 
 
-void Normaliser::startBuildChild(Goal & goal)
+void NormalisationGoal::buildDone()
+{
+    debug(format("build done for `%1%'") % nePath);
+
+    int status;
+
+    /* Since we got an EOF on the logger pipe, the builder is presumed
+       to have terminated.  In fact, the builder could also have
+       simply have closed its end of the pipe --- just don't do that
+       :-) */
+    /* !!! this could block! */
+    if (waitpid(pid, &status, 0) != pid)
+        throw SysError(format("builder for `%1%' should have terminated")
+            % nePath);
+
+    /* So the child is gone now. */
+    worker.childTerminated(pid);
+    pid = -1;
+
+    /* Close the read side of the logger pipe. */
+    logPipe.readSide.close();
+
+    /* Close the log file. */
+    fdLogFile.close();
+
+    debug(format("builder process %1% finished") % pid);
+
+    /* Check the exit status. */
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        deleteTmpDir(false);
+        if (WIFEXITED(status))
+            throw Error(format("builder for `%1%' failed with exit code %2%")
+                % nePath % WEXITSTATUS(status));
+        else if (WIFSIGNALED(status))
+            throw Error(format("builder for `%1%' failed due to signal %2%")
+                % nePath % WTERMSIG(status));
+        else
+            throw Error(format("builder for `%1%' failed died abnormally") % nePath);
+    } else
+        deleteTmpDir(true);
+
+    /* Compute a closure store expression, and register it as our
+       successor. */
+    createClosure();
+
+    amDone();
+}
+
+
+void NormalisationGoal::startBuilder()
 {
     /* Right platform? */
-    if (goal.expr.derivation.platform != thisSystem)
+    if (expr.derivation.platform != thisSystem)
         throw Error(format("a `%1%' is required, but I am a `%2%'")
-		    % goal.expr.derivation.platform % thisSystem);
+		    % expr.derivation.platform % thisSystem);
 
     /* If any of the outputs already exist but are not registered,
        delete them. */
-    for (PathSet::iterator i = goal.expr.derivation.outputs.begin(); 
-         i != goal.expr.derivation.outputs.end(); ++i)
+    for (PathSet::iterator i = expr.derivation.outputs.begin(); 
+         i != expr.derivation.outputs.end(); ++i)
     {
         Path path = *i;
         if (isValidPath(path))
@@ -497,33 +572,32 @@ void Normaliser::startBuildChild(Goal & goal)
     env["NIX_STORE"] = nixStore;
 
     /* Add all bindings specified in the derivation expression. */
-    for (StringPairs::iterator i = goal.expr.derivation.env.begin();
-         i != goal.expr.derivation.env.end(); ++i)
+    for (StringPairs::iterator i = expr.derivation.env.begin();
+         i != expr.derivation.env.end(); ++i)
         env[i->first] = i->second;
 
     /* Create a temporary directory where the build will take
        place. */
-    goal.tmpDir = createTempDir();
+    tmpDir = createTempDir();
 
     /* For convenience, set an environment pointing to the top build
        directory. */
-    env["NIX_BUILD_TOP"] = goal.tmpDir;
+    env["NIX_BUILD_TOP"] = tmpDir;
 
     /* Also set TMPDIR and variants to point to this directory. */
-    env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = goal.tmpDir;
+    env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDir;
 
     /* Run the builder. */
     printMsg(lvlChatty, format("executing builder `%1%'") %
-        goal.expr.derivation.builder);
+        expr.derivation.builder);
 
     /* Create the log file and pipe. */
-    openLogFile(goal);
+    openLogFile();
     
     /* Fork a child to build the package.  Note that while we
        currently use forks to run and wait for the children, it
        shouldn't be hard to use threads for this on systems where
        fork() is unavailable or inefficient. */
-    pid_t pid;
     switch (pid = fork()) {
 
     case -1:
@@ -536,13 +610,13 @@ void Normaliser::startBuildChild(Goal & goal)
 
         try { /* child */
 
-            initChild(goal);
+            initChild();
 
             /* Fill in the arguments. */
-            Strings & args(goal.expr.derivation.args);
+            Strings & args(expr.derivation.args);
             const char * argArr[args.size() + 2];
             const char * * p = argArr;
-            string progName = baseNameOf(goal.expr.derivation.builder);
+            string progName = baseNameOf(expr.derivation.builder);
             *p++ = progName.c_str();
             for (Strings::const_iterator i = args.begin();
                  i != args.end(); i++)
@@ -560,11 +634,11 @@ void Normaliser::startBuildChild(Goal & goal)
             *p = 0;
 
             /* Execute the program.  This should not return. */
-            execve(goal.expr.derivation.builder.c_str(),
+            execve(expr.derivation.builder.c_str(),
                 (char * *) argArr, (char * *) envArr);
 
             throw SysError(format("executing `%1%'")
-                % goal.expr.derivation.builder);
+                % expr.derivation.builder);
             
         } catch (exception & e) {
             cerr << format("build error: %1%\n") % e.what();
@@ -573,384 +647,26 @@ void Normaliser::startBuildChild(Goal & goal)
     }
 
     /* parent */
-
-    childStarted(goal, pid);
+    logPipe.writeSide.close();
+    worker.childStarted(shared_from_this(), pid, logPipe.readSide);
 }
 
 
-static string readLine(int fd)
-{
-    string s;
-    while (1) {
-        char ch;
-        ssize_t rd = read(fd, &ch, 1);
-        if (rd == -1) {
-            if (errno != EINTR)
-                throw SysError("reading a line");
-        } else if (rd == 0)
-            throw Error("unexpected EOF reading a line");
-        else {
-            if (ch == '\n') return s;
-            s += ch;
-        }
-    }
-}
-
-
-static void writeLine(int fd, string s)
-{
-    s += '\n';
-    writeFull(fd, (const unsigned char *) s.c_str(), s.size());
-}
-
-
-/* !!! ugly hack */
-static void drain(int fd)
-{
-    unsigned char buffer[1024];
-    while (1) {
-        ssize_t rd = read(fd, buffer, sizeof buffer);
-        if (rd == -1) {
-            if (errno != EINTR)
-                throw SysError("draining");
-        } else if (rd == 0) break;
-        else writeFull(STDERR_FILENO, buffer, rd);
-    }
-}
-
-
-Normaliser::HookReply Normaliser::tryBuildHook(Goal & goal)
-{
-    Path buildHook = getEnv("NIX_BUILD_HOOK");
-    if (buildHook == "") return rpDecline;
-    buildHook = absPath(buildHook);
-
-    /* Create a directory where we will store files used for
-       communication between us and the build hook. */
-    goal.tmpDir = createTempDir();
-    
-    /* Create the log file and pipe. */
-    openLogFile(goal);
-
-    /* Create the communication pipes. */
-    goal.toHook.create();
-    goal.fromHook.create();
-
-    /* Fork the hook. */
-    pid_t pid;
-    switch (pid = fork()) {
-        
-    case -1:
-        throw SysError("unable to fork");
-
-    case 0:
-        try { /* child */
-
-            initChild(goal);
-
-            execl(buildHook.c_str(), buildHook.c_str(),
-                (canBuildMore() ? (string) "1" : "0").c_str(),
-                thisSystem.c_str(),
-                goal.expr.derivation.platform.c_str(),
-                goal.nePath.c_str(), 0);
-            
-            throw SysError(format("executing `%1%'") % buildHook);
-            
-        } catch (exception & e) {
-            cerr << format("build error: %1%\n") % e.what();
-        }
-        _exit(1);
-    }
-    
-    /* parent */
-
-    childStarted(goal, pid);
-
-    goal.fromHook.writeSide.close();
-    goal.toHook.readSide.close();
-
-    /* Read the first line of input, which should be a word indicating
-       whether the hook wishes to perform the build.  !!! potential
-       for deadlock here: we should also read from the child's logger
-       pipe. */
-    string reply;
-    try {
-        reply = readLine(goal.fromHook.readSide);
-    } catch (Error & e) {
-        drain(goal.logPipe.readSide);
-        throw;
-    }
-
-    debug(format("hook reply is `%1%'") % reply);
-
-    if (reply == "decline" || reply == "postpone") {
-        /* Clean up the child.  !!! hacky / should verify */
-        drain(goal.logPipe.readSide);
-        terminateBuildHook(goal);
-        return reply == "decline" ? rpDecline : rpPostpone;
-    }
-
-    else if (reply == "accept") {
-
-        if (!prepareBuild(goal)) {
-            writeLine(goal.toHook.writeSide, "cancel");
-            terminateBuildHook(goal);
-            return rpAccept;
-        }
-
-        /* Write the information that the hook needs to perform the
-           build, i.e., the set of input paths (including closure
-           expressions), the set of output paths, and the successor
-           mappings for the input expressions. */
-        
-        Path inputListFN = goal.tmpDir + "/inputs";
-        Path outputListFN = goal.tmpDir + "/outputs";
-        Path successorsListFN = goal.tmpDir + "/successors";
-
-        string s;
-        for (ClosureElems::iterator i = goal.inClosures.begin();
-             i != goal.inClosures.end(); ++i)
-            s += i->first + "\n";
-        for (PathSet::iterator i = goal.inputNFs.begin();
-             i != goal.inputNFs.end(); ++i)
-            s += *i + "\n";
-        writeStringToFile(inputListFN, s);
-        
-        s = "";
-        for (PathSet::iterator i = goal.expr.derivation.outputs.begin();
-             i != goal.expr.derivation.outputs.end(); ++i)
-            s += *i + "\n";
-        writeStringToFile(outputListFN, s);
-        
-        s = "";
-        for (map<Path, Path>::iterator i = goal.inputSucs.begin();
-             i != goal.inputSucs.end(); ++i)
-            s += i->first + " " + i->second + "\n";
-        writeStringToFile(successorsListFN, s);
-
-        writeLine(goal.toHook.writeSide, "okay");
-
-        goal.inHook = true;
-    
-        return rpAccept;
-    }
-
-    else throw Error(format("bad hook reply `%1%'") % reply);
-}
-
-
-void Normaliser::terminateBuildHook(Goal & goal)
-{
-    /* !!! drain stdout of hook, wait for child process */
-    debug("terminating build hook");
-    pid_t pid = goal.pid;
-    int status;
-    if (waitpid(goal.pid, &status, 0) != goal.pid)
-        printMsg(lvlError, format("process `%1%' missing") % goal.pid);
-    goal.pid = 0;
-    goal.fromHook.readSide.close();
-    goal.toHook.writeSide.close();
-    goal.fdLogFile.close();
-    goal.logPipe.readSide.close();
-    building.erase(pid);
-}
-
-
-void Normaliser::openLogFile(Goal & goal)
-{
-    /* Create a log file. */
-    Path logFileName = nixLogDir + "/" + baseNameOf(goal.nePath);
-    goal.fdLogFile = open(logFileName.c_str(),
-        O_CREAT | O_WRONLY | O_TRUNC, 0666);
-    if (goal.fdLogFile == -1)
-        throw SysError(format("creating log file `%1%'") % logFileName);
-
-    /* Create a pipe to get the output of the child. */
-    goal.logPipe.create();
-}
-
-
-void Normaliser::initChild(Goal & goal)
-{
-    /* Put the child in a separate process group so that it doesn't
-       receive terminal signals. */
-    if (setpgid(0, 0) == -1)
-        throw SysError(format("setting process group"));
-
-    if (chdir(goal.tmpDir.c_str()) == -1)
-        throw SysError(format("changing into to `%1%'") % goal.tmpDir);
-
-    /* Dup the write side of the logger pipe into stderr. */
-    if (dup2(goal.logPipe.writeSide, STDERR_FILENO) == -1)
-        throw SysError("cannot pipe standard error into log file");
-    goal.logPipe.readSide.close();
-            
-    /* Dup stderr to stdin. */
-    if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
-        throw SysError("cannot dup stderr into stdout");
-
-    /* Reroute stdin to /dev/null. */
-    int fdDevNull = open(pathNullDevice.c_str(), O_RDWR);
-    if (fdDevNull == -1)
-        throw SysError(format("cannot open `%1%'") % pathNullDevice);
-    if (dup2(fdDevNull, STDIN_FILENO) == -1)
-        throw SysError("cannot dup null device into stdin");
-
-    /* When running a hook, dup the communication pipes. */
-    bool inHook = goal.fromHook.writeSide.isOpen();
-    if (inHook) {
-        goal.fromHook.readSide.close();
-        if (dup2(goal.fromHook.writeSide, 3) == -1)
-            throw SysError("dup1");
-
-        goal.toHook.writeSide.close();
-        if (dup2(goal.toHook.readSide, 4) == -1)
-            throw SysError("dup2");
-    }
-
-    /* Close all other file descriptors. */
-    int maxFD = 0;
-    maxFD = sysconf(_SC_OPEN_MAX);
-    for (int fd = 0; fd < maxFD; ++fd)
-        if (fd != STDIN_FILENO && fd != STDOUT_FILENO && fd != STDERR_FILENO
-            && (!inHook || (fd != 3 && fd != 4)))
-            close(fd); /* ignore result */
-}
-
-
-void Normaliser::childStarted(Goal & goal, pid_t pid)
-{
-    goal.pid = pid;
-    
-    building[goal.pid] = goal.nePath;
-
-    /* Close the write side of the logger pipe. */
-    goal.logPipe.writeSide.close();
-}
-
-
-bool Normaliser::waitForChildren()
-{
-    checkInterrupt();
-
-    bool terminated = false;
-    
-    /* Process log output from the children.  We also use this to
-       detect child termination: if we get EOF on the logger pipe of a
-       build, we assume that the builder has terminated. */
-
-    /* Use select() to wait for the input side of any logger pipe to
-       become `available'.  Note that `available' (i.e., non-blocking)
-       includes EOF. */
-    fd_set fds;
-    FD_ZERO(&fds);
-    int fdMax = 0;
-    for (Building::iterator i = building.begin();
-         i != building.end(); ++i)
-    {
-        Goal & goal(goals[i->second]);
-        int fd = goal.logPipe.readSide;
-        FD_SET(fd, &fds);
-        if (fd >= fdMax) fdMax = fd + 1;
-    }
-
-    if (select(fdMax, &fds, 0, 0, 0) == -1) {
-        if (errno == EINTR) return false;
-        throw SysError("waiting for input");
-    }
-
-    /* Process all available file descriptors. */
-    for (Building::iterator i = building.begin();
-         i != building.end(); ++i)
-    {
-        checkInterrupt();
-        Goal & goal(goals[i->second]);
-        int fd = goal.logPipe.readSide;
-        if (FD_ISSET(fd, &fds)) {
-            unsigned char buffer[4096];
-            ssize_t rd = read(fd, buffer, sizeof(buffer));
-            if (rd == -1) {
-                if (errno != EINTR)
-                    throw SysError(format("reading from `%1%'")
-                        % goal.nePath);
-            } else if (rd == 0) {
-                debug(format("EOF on `%1%'") % goal.nePath);
-                reapChild(goal);
-                terminated = true;
-            } else {
-                printMsg(lvlVomit, format("read %1% bytes from `%2%'")
-                    % rd % goal.nePath);
-                writeFull(goal.fdLogFile, buffer, rd);
-                if (verbosity >= buildVerbosity)
-                    writeFull(STDERR_FILENO, buffer, rd);
-            }
-        }
-    }
-
-    return terminated;
-}
-
-
-void Normaliser::reapChild(Goal & goal)
-{
-    int status;
-
-    /* Since we got an EOF on the logger pipe, the builder is presumed
-       to have terminated.  In fact, the builder could also have
-       simply have closed its end of the pipe --- just don't do that
-       :-) */
-    /* !!! this could block! */
-    if (waitpid(goal.pid, &status, 0) != goal.pid)
-        throw SysError(format("builder for `%1%' should have terminated")
-            % goal.nePath);
-
-    /* So the child is gone now. */
-    pid_t pid = goal.pid;
-    goal.pid = 0;
-
-    /* Close the read side of the logger pipe. */
-    goal.logPipe.readSide.close();
-
-    /* Close the log file. */
-    goal.fdLogFile.close();
-
-    debug(format("builder process %1% finished") % pid);
-
-    /* Check the exit status. */
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-        goal.deleteTmpDir(false);
-        if (WIFEXITED(status))
-            throw Error(format("builder for `%1%' failed with exit code %2%")
-                % goal.nePath % WEXITSTATUS(status));
-        else if (WIFSIGNALED(status))
-            throw Error(format("builder for `%1%' failed due to signal %2%")
-                % goal.nePath % WTERMSIG(status));
-        else
-            throw Error(format("builder for `%1%' failed died abnormally") % goal.nePath);
-    } else
-        goal.deleteTmpDir(true);
-
-    finishGoal(goal);
-    
-    building.erase(pid);
-}
-
-
-void Normaliser::finishGoal(Goal & goal)
+void NormalisationGoal::createClosure()
 {
     /* The resulting closure expression. */
     StoreExpr nf;
     nf.type = StoreExpr::neClosure;
     
     startNest(nest, lvlTalkative,
-        format("finishing normalisation of goal `%1%'") % goal.nePath);
+        format("finishing normalisation of goal `%1%'") % nePath);
     
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
        output paths read-only. */
     PathSet usedPaths;
-    for (PathSet::iterator i = goal.expr.derivation.outputs.begin(); 
-         i != goal.expr.derivation.outputs.end(); ++i)
+    for (PathSet::iterator i = expr.derivation.outputs.begin(); 
+         i != expr.derivation.outputs.end(); ++i)
     {
         Path path = *i;
         if (!pathExists(path))
@@ -964,7 +680,7 @@ void Normaliser::finishGoal(Goal & goal)
         startNest(nest2, lvlChatty,
             format("scanning for store references in `%1%'") % path);
         Strings refPaths = filterReferences(path, 
-            Strings(goal.allPaths.begin(), goal.allPaths.end()));
+            Strings(allPaths.begin(), allPaths.end()));
         nest2.close();
 
 	/* Construct a closure element for this output path. */
@@ -979,10 +695,10 @@ void Normaliser::finishGoal(Goal & goal)
             checkInterrupt();
 	    Path path = *j;
 	    elem.refs.insert(path);
-            if (goal.inClosures.find(path) != goal.inClosures.end())
+            if (inClosures.find(path) != inClosures.end())
                 usedPaths.insert(path);
-	    else if (goal.expr.derivation.outputs.find(path) ==
-                goal.expr.derivation.outputs.end())
+	    else if (expr.derivation.outputs.find(path) ==
+                expr.derivation.outputs.end())
 		abort();
         }
 
@@ -1002,8 +718,8 @@ void Normaliser::finishGoal(Goal & goal)
 	if (donePaths.find(path) != donePaths.end()) continue;
 	donePaths.insert(path);
 
-	ClosureElems::iterator j = goal.inClosures.find(path);
-	if (j == goal.inClosures.end()) abort();
+	ClosureElems::iterator j = inClosures.find(path);
+	if (j == inClosures.end()) abort();
 
 	nf.closure.elems[path] = j->second;
 
@@ -1013,8 +729,8 @@ void Normaliser::finishGoal(Goal & goal)
     }
 
     /* For debugging, print out the referenced and unreferenced paths. */
-    for (ClosureElems::iterator i = goal.inClosures.begin();
-         i != goal.inClosures.end(); ++i)
+    for (ClosureElems::iterator i = inClosures.begin();
+         i != inClosures.end(); ++i)
     {
         PathSet::iterator j = donePaths.find(i->first);
         if (j == donePaths.end())
@@ -1037,56 +753,476 @@ void Normaliser::finishGoal(Goal & goal)
        by running the garbage collector. */
     Transaction txn;
     createStoreTransaction(txn);
-    for (PathSet::iterator i = goal.expr.derivation.outputs.begin(); 
-         i != goal.expr.derivation.outputs.end(); ++i)
+    for (PathSet::iterator i = expr.derivation.outputs.begin(); 
+         i != expr.derivation.outputs.end(); ++i)
         registerValidPath(txn, *i);
-    registerSuccessor(txn, goal.nePath, nfPath);
+    registerSuccessor(txn, nePath, nfPath);
     txn.commit();
 
     /* It is now safe to delete the lock files, since all future
        lockers will see the successor; they will not create new lock
        files with the same names as the old (unlinked) lock files. */
-    goal.outputLocks.setDeletion(true);
-
-    removeGoal(goal);
+    outputLocks.setDeletion(true);
 }
 
 
-void Normaliser::removeGoal(Goal & goal)
+void NormalisationGoal::openLogFile()
 {
-    /* Remove this goal from those goals to which it is an input. */ 
-    for (PathSet::iterator i = goal.waiters.begin();
-         i != goal.waiters.end(); ++i)
-    {
-        Goal & waiter(goals[*i]);
-        PathSet::iterator j = waiter.unfinishedInputs.find(goal.nePath);
-        assert(j != waiter.unfinishedInputs.end());
-        waiter.unfinishedInputs.erase(j);
+    /* Create a log file. */
+    Path logFileName = nixLogDir + "/" + baseNameOf(nePath);
+    fdLogFile = open(logFileName.c_str(),
+        O_CREAT | O_WRONLY | O_TRUNC, 0666);
+    if (fdLogFile == -1)
+        throw SysError(format("creating log file `%1%'") % logFileName);
 
-        /* If there are not inputs left, the goal has become
-           buildable. */ 
-        if (waiter.unfinishedInputs.empty()) {
-            debug(format("waking up goal `%1%'") % waiter.nePath);
-            buildable.insert(waiter.nePath);
-            newBuildables = true;
-        }
+    /* Create a pipe to get the output of the child. */
+    logPipe.create();
+}
+
+
+void NormalisationGoal::initChild()
+{
+    /* Put the child in a separate process group so that it doesn't
+       receive terminal signals. */
+    if (setpgid(0, 0) == -1)
+        throw SysError(format("setting process group"));
+
+    if (chdir(tmpDir.c_str()) == -1)
+        throw SysError(format("changing into to `%1%'") % tmpDir);
+
+    /* Dup the write side of the logger pipe into stderr. */
+    if (dup2(logPipe.writeSide, STDERR_FILENO) == -1)
+        throw SysError("cannot pipe standard error into log file");
+    logPipe.readSide.close();
+            
+    /* Dup stderr to stdin. */
+    if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
+        throw SysError("cannot dup stderr into stdout");
+
+    /* Reroute stdin to /dev/null. */
+    int fdDevNull = open(pathNullDevice.c_str(), O_RDWR);
+    if (fdDevNull == -1)
+        throw SysError(format("cannot open `%1%'") % pathNullDevice);
+    if (dup2(fdDevNull, STDIN_FILENO) == -1)
+        throw SysError("cannot dup null device into stdin");
+
+    /* When running a hook, dup the communication pipes. */
+    bool inHook = fromHook.writeSide.isOpen();
+    if (inHook) {
+        fromHook.readSide.close();
+        if (dup2(fromHook.writeSide, 3) == -1)
+            throw SysError("dup1");
+
+        toHook.writeSide.close();
+        if (dup2(toHook.readSide, 4) == -1)
+            throw SysError("dup2");
     }
 
-    /* Lazily remove the goal from the graph (it will be actually
-       removed in run(); this is since callers may have references to
-       `goal'). */
-    deadGoals.insert(goal.nePath);
+    /* Close all other file descriptors. */
+    int maxFD = 0;
+    maxFD = sysconf(_SC_OPEN_MAX);
+    for (int fd = 0; fd < maxFD; ++fd)
+        if (fd != STDIN_FILENO && fd != STDOUT_FILENO && fd != STDERR_FILENO
+            && (!inHook || (fd != 3 && fd != 4)))
+            close(fd); /* ignore result */
 }
+
+
+void NormalisationGoal::deleteTmpDir(bool force)
+{
+    if (tmpDir != "") {
+        if (keepFailed && !force)
+	    printMsg(lvlTalkative, 
+		format("builder for `%1%' failed; keeping build directory `%2%'")
+                % nePath % tmpDir);
+        else
+            deletePath(tmpDir);
+        tmpDir = "";
+    }
+}
+
+
+
+//////////////////////////////////////////////////////////////////////
+
+
+class RealisationGoal : public Goal
+{
+private:
+    /* The path of the closure store expression. */
+    Path nePath;
+
+    /* The store expression stored at nePath. */
+    StoreExpr expr;
+    
+    typedef void (RealisationGoal::*GoalState)();
+    GoalState state;
+    
+public:
+    RealisationGoal(const Path & _nePath, Worker & _worker);
+    ~RealisationGoal();
+
+    void work();
+    
+    /* The states. */
+    void init();
+    void haveStoreExpr();
+    void elemFinished();
+};
+
+
+RealisationGoal::RealisationGoal(const Path & _nePath, Worker & _worker)
+    : Goal(_worker)
+{
+    nePath = _nePath;
+    state = &RealisationGoal::init;
+}
+
+
+RealisationGoal::~RealisationGoal()
+{
+}
+
+
+void RealisationGoal::work()
+{
+    (this->*state)();
+}
+
+
+void RealisationGoal::init()
+{
+    debug(format("init of realisation `%1%'") % nePath);
+
+    /* The first thing to do is to make sure that the store expression
+       exists.  If it doesn't, it may be created through a
+       substitute. */
+    nrWaitees = 1;
+    worker.addSubstitutionGoal(nePath, shared_from_this());
+
+    state = &RealisationGoal::haveStoreExpr;
+}
+
+
+void RealisationGoal::haveStoreExpr()
+{
+    debug(format("loading store expr `%1%'") % nePath);
+
+    assert(isValidPath(nePath));
+
+    /* Get the store expression. */
+    expr = storeExprFromPath(nePath);
+
+    /* If this is a normal form (i.e., a closure) we are also done. */
+    if (expr.type != StoreExpr::neClosure)
+        throw Error(format("expected closure in `%1%'") % nePath);
+
+    /* Each path in the closure should exist, or should be creatable
+       through a substitute. */
+    for (ClosureElems::const_iterator i = expr.closure.elems.begin();
+         i != expr.closure.elems.end(); ++i)
+        worker.addSubstitutionGoal(i->first, shared_from_this());
+    
+    nrWaitees = expr.closure.elems.size();
+
+    state = &RealisationGoal::elemFinished;
+}
+
+
+void RealisationGoal::elemFinished()
+{
+    debug(format("all closure elements finished of `%1%'") % nePath);
+
+    amDone();
+}
+
+
+
+//////////////////////////////////////////////////////////////////////
+
+
+class SubstitutionGoal : public Goal
+{
+private:
+    /* The store path that should be realised through a substitute. */
+    Path storePath;
+
+    typedef void (SubstitutionGoal::*GoalState)();
+    GoalState state;
+
+public:
+    SubstitutionGoal(const Path & _nePath, Worker & _worker);
+    ~SubstitutionGoal();
+
+    void work();
+
+    /* The states. */
+    void init();
+};
+
+
+SubstitutionGoal::SubstitutionGoal(const Path & _storePath, Worker & _worker)
+    : Goal(_worker)
+{
+    storePath = _storePath;
+    state = &SubstitutionGoal::init;
+}
+
+
+SubstitutionGoal::~SubstitutionGoal()
+{
+}
+
+
+void SubstitutionGoal::work()
+{
+    (this->*state)();
+}
+
+
+void SubstitutionGoal::init()
+{
+    debug(format("init of subst `%1%'") % storePath);
+
+    /* If the path already exists we're done. */
+    if (isValidPath(storePath)) {
+        amDone();
+        return;
+    }
+
+    abort();
+}
+
+
+
+//////////////////////////////////////////////////////////////////////
+
+
+static bool working = false;
+
+
+Worker::Worker()
+{
+    /* Debugging: prevent recursive workers. */ 
+    if (working) abort();
+    working = true;
+}
+
+
+Worker::~Worker()
+{
+    working = false;
+}
+
+
+template<class T>
+static void addGoal(const Path & path, GoalPtr waiter,
+    Worker & worker, Goals & goals,
+    GoalMap & goalMap, GoalMapRev & goalMapRev)
+{
+    GoalPtr goal;
+    goal = goalMap[path];
+    if (!goal) {
+        goal = GoalPtr(new T(path, worker));
+        goals.insert(goal);
+        goalMap[path] = goal;
+        goalMapRev[goal] = path;
+        worker.wakeUp(goal);
+    }
+    if (waiter) goal->addWaiter(waiter);
+}
+
+
+void Worker::addNormalisationGoal(const Path & nePath, GoalPtr waiter)
+{
+    addGoal<NormalisationGoal>(nePath, waiter, *this, goals,
+        normalisationGoals, normalisationGoalsRev);
+}
+
+
+void Worker::addRealisationGoal(const Path & nePath, GoalPtr waiter)
+{
+    addGoal<RealisationGoal>(nePath, waiter, *this, goals,
+        realisationGoals, realisationGoalsRev);
+}
+
+
+void Worker::addSubstitutionGoal(const Path & storePath, GoalPtr waiter)
+{
+    addGoal<SubstitutionGoal>(storePath, waiter, *this, goals,
+        substitutionGoals, substitutionGoalsRev);
+}
+
+
+static void removeGoal(GoalPtr goal,
+    GoalMap & goalMap, GoalMapRev & goalMapRev)
+{
+    GoalMapRev::iterator i = goalMapRev.find(goal);
+    if (i != goalMapRev.end()) {
+        goalMapRev.erase(i);
+        goalMap.erase(i->second);
+    }
+}
+
+
+void Worker::removeGoal(GoalPtr goal)
+{
+    goals.erase(goal);
+    ::removeGoal(goal, normalisationGoals, normalisationGoalsRev);
+    ::removeGoal(goal, realisationGoals, realisationGoalsRev);
+    ::removeGoal(goal, substitutionGoals, substitutionGoalsRev);
+}
+
+
+void Worker::wakeUp(GoalPtr goal)
+{
+    debug("wake up");
+    awake.insert(goal);
+}
+
+
+bool Worker::canBuildMore()
+{
+    return children.size() < maxBuildJobs;
+}
+
+
+void Worker::childStarted(GoalPtr goal, pid_t pid, int fdLogFile)
+{
+    children[pid] = pair<int, GoalPtr>(fdLogFile, goal);
+}
+
+
+void Worker::childTerminated(pid_t pid)
+{
+    assert(children.find(pid) != children.end());
+    children.erase(pid);
+
+    /* Wake up goals waiting for a build slot. */
+    for (Goals::iterator i = wantingToBuild.begin();
+         i != wantingToBuild.end(); ++i)
+        wakeUp(*i);
+    wantingToBuild.clear();
+}
+
+
+void Worker::waitForBuildSlot(GoalPtr goal)
+{
+    debug("wait for build slot");
+    if (canBuildMore())
+        wakeUp(goal); /* we can do it right away */
+    else
+        wantingToBuild.insert(goal);
+}
+
+
+void Worker::run()
+{
+    startNest(nest, lvlChatty, format("running normaliser"));
+
+    while (1) {
+
+        debug(format("main loop (%1% goals left)") % goals.size());
+
+        checkInterrupt();
+
+        /* Call every wake goal. */
+        while (!awake.empty()) {
+            Goals awake2(awake); /* !!! why is this necessary? */
+            awake.clear();
+            for (Goals::iterator i = awake2.begin(); i != awake2.end(); ++i) {
+                debug("goal");
+                checkInterrupt();
+                GoalPtr goal = *i;
+                goal->work();
+            }
+        }
+
+        if (goals.empty()) break;
+
+        /* !!! not when we're polling */
+        assert(!children.empty());
+        
+        /* Wait for input. */
+        waitForInput();
+    }
+
+    assert(awake.empty());
+    assert(wantingToBuild.empty());
+    assert(children.empty());
+}
+
+
+void Worker::waitForInput()
+{
+    printMsg(lvlVomit, "waiting for children");
+
+    /* Process log output from the children.  We also use this to
+       detect child termination: if we get EOF on the logger pipe of a
+       build, we assume that the builder has terminated. */
+
+    /* Use select() to wait for the input side of any logger pipe to
+       become `available'.  Note that `available' (i.e., non-blocking)
+       includes EOF. */
+    fd_set fds;
+    FD_ZERO(&fds);
+    int fdMax = 0;
+    for (Children::iterator i = children.begin();
+         i != children.end(); ++i)
+    {
+        int fd = i->second.first;
+        FD_SET(fd, &fds);
+        if (fd >= fdMax) fdMax = fd + 1;
+    }
+
+    if (select(fdMax, &fds, 0, 0, 0) == -1) {
+        if (errno == EINTR) return;
+        throw SysError("waiting for input");
+    }
+
+    /* Process all available file descriptors. */
+    for (Children::iterator i = children.begin();
+         i != children.end(); ++i)
+    {
+        checkInterrupt();
+        GoalPtr goal = i->second.second;
+        int fd = i->second.first;
+        if (FD_ISSET(fd, &fds)) {
+            unsigned char buffer[4096];
+            ssize_t rd = read(fd, buffer, sizeof(buffer));
+            if (rd == -1) {
+                if (errno != EINTR)
+                    throw SysError(format("reading from `%1%'")
+                        % goal->name());
+            } else if (rd == 0) {
+                debug(format("EOF on `%1%'") % goal->name());
+                wakeUp(goal);
+            } else {
+                printMsg(lvlVomit, format("read %1% bytes from `%2%'")
+                    % rd % goal->name());
+//                 writeFull(goal.fdLogFile, buffer, rd);
+                if (verbosity >= buildVerbosity)
+                    writeFull(STDERR_FILENO, buffer, rd);
+            }
+        }
+    }
+}
+
+
+//////////////////////////////////////////////////////////////////////
 
 
 Path normaliseStoreExpr(const Path & nePath)
 {
-    Normaliser normaliser;
-    normaliser.addGoal(nePath);
-    normaliser.run();
+    startNest(nest, lvlDebug, format("normalising `%1%'") % nePath);
+
+    Worker worker;
+    worker.addNormalisationGoal(nePath, GoalPtr());
+    worker.run();
 
     Path nfPath;
-    if (!querySuccessor(nePath, nfPath)) abort();
+    if (!querySuccessor(nePath, nfPath))
+        throw Error("there should be a successor");
     
     return nfPath;
 }
@@ -1096,13 +1232,9 @@ void realiseClosure(const Path & nePath)
 {
     startNest(nest, lvlDebug, format("realising closure `%1%'") % nePath);
 
-    StoreExpr ne = storeExprFromPath(nePath);
-    if (ne.type != StoreExpr::neClosure)
-        throw Error(format("expected closure in `%1%'") % nePath);
-    
-    for (ClosureElems::const_iterator i = ne.closure.elems.begin();
-         i != ne.closure.elems.end(); ++i)
-        ensurePath(i->first);
+    Worker worker;
+    worker.addRealisationGoal(nePath, GoalPtr());
+    worker.run();
 }
 
 
@@ -1111,104 +1243,5 @@ void ensurePath(const Path & path)
     /* If the path is already valid, we're done. */
     if (isValidPath(path)) return;
 
-#if 0
-    if (pending.find(path) != pending.end())
-      throw Error(format(
-          "path `%1%' already being realised (possible substitute cycle?)")
-	  % path);
-    pending.insert(path);
-    
-    /* Otherwise, try the substitutes. */
-    Paths subPaths = querySubstitutes(path);
-
-    for (Paths::iterator i = subPaths.begin(); 
-         i != subPaths.end(); ++i)
-    {
-        checkInterrupt();
-        try {
-            Path nf = normaliseStoreExpr(*i, pending);
-	    realiseClosure(nf, pending);
-            if (isValidPath(path)) return;
-            throw Error(format("substitute failed to produce expected output path"));
-        } catch (Error & e) {
-            printMsg(lvlTalkative, 
-                format("building of substitute `%1%' for `%2%' failed: %3%")
-                % *i % path % e.what());
-        }
-    }
-#endif
-
-    throw Error(format("path `%1%' is required, "
-        "but there are no (successful) substitutes") % path);
-}
-
-
-StoreExpr storeExprFromPath(const Path & path)
-{
-    assertStorePath(path);
-    ensurePath(path);
-    ATerm t = ATreadFromNamedFile(path.c_str());
-    if (!t) throw Error(format("cannot read aterm from `%1%'") % path);
-    return parseStoreExpr(t);
-}
-
-
-PathSet storeExprRoots(const Path & nePath)
-{
-    PathSet paths;
-
-    StoreExpr ne = storeExprFromPath(nePath);
-
-    if (ne.type == StoreExpr::neClosure)
-        paths.insert(ne.closure.roots.begin(), ne.closure.roots.end());
-    else if (ne.type == StoreExpr::neDerivation)
-        paths.insert(ne.derivation.outputs.begin(),
-            ne.derivation.outputs.end());
-    else abort();
-
-    return paths;
-}
-
-
-static void requisitesWorker(const Path & nePath,
-    bool includeExprs, bool includeSuccessors,
-    PathSet & paths, PathSet & doneSet)
-{
-    checkInterrupt();
-    
-    if (doneSet.find(nePath) != doneSet.end()) return;
-    doneSet.insert(nePath);
-
-    StoreExpr ne = storeExprFromPath(nePath);
-
-    if (ne.type == StoreExpr::neClosure)
-        for (ClosureElems::iterator i = ne.closure.elems.begin();
-             i != ne.closure.elems.end(); ++i)
-            paths.insert(i->first);
-    
-    else if (ne.type == StoreExpr::neDerivation)
-        for (PathSet::iterator i = ne.derivation.inputs.begin();
-             i != ne.derivation.inputs.end(); ++i)
-            requisitesWorker(*i,
-                includeExprs, includeSuccessors, paths, doneSet);
-
-    else abort();
-
-    if (includeExprs) paths.insert(nePath);
-
-    string nfPath;
-    if (includeSuccessors && (nfPath = useSuccessor(nePath)) != nePath)
-        requisitesWorker(nfPath, includeExprs, includeSuccessors,
-            paths, doneSet);
-}
-
-
-PathSet storeExprRequisites(const Path & nePath,
-    bool includeExprs, bool includeSuccessors)
-{
-    PathSet paths;
-    PathSet doneSet;
-    requisitesWorker(nePath, includeExprs, includeSuccessors,
-        paths, doneSet);
-    return paths;
+    /* !!! add realisation goal */
 }

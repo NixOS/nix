@@ -1,3 +1,5 @@
+echo "NIX_STORE_DIR=$NIX_STORE_DIR NIX_DB_DIR=$NIX_DB_DIR"
+
 test -n "$TEST_ROOT"
 if test -d "$TEST_ROOT"; then
     chmod -R u+w "$TEST_ROOT"
