@@ -401,7 +401,52 @@ so all generations of all profiles are also roots of the collector.</para>
 
 <sect1><title>Channels</title>
 
-<para>TODO</para>
+<para>If you want to stay up to date with a set of packages, it's not
+very convenient to manually download the latest set of Nix expressions
+for those packages, use <command>nix-pull</command> to register
+pre-built binaries (if available), and upgrade using
+<command>nix-env</command>.  Fortunately, there's a better way:
+<emphasis>Nix channels</emphasis>.</para>
+
+<para>A Nix channel is just a URL that points to a place that contains
+a set of Nix expressions and a manifest.  Using the command
+<command>nix-channel</command> you can automatically stay up to date
+with whatever is available at that URL.</para>
+
+<para>You can <quote>subscribe</quote> to a channel using
+<command>nix-channel --subscribe</command>, e.g.,
+
+<screen>
+$ nix-channel --subscribe http://catamaran.labs.cs.uu.nl/dist/nix/channels/nixpkgs-unstable</screen>
+
+subscribes you to a channel that always contains that latest version
+of the Nix Packages collection.  (Instead of
+<literal>nixpkgs-unstable</literal> you could also subscribe to
+<literal>nixpkgs-stable</literal>, which should have a higher level of
+stability, but right now is just outdated.)  Subscribing really just
+means that the URL is added to the file
+<filename>~/.nix-channels</filename>.  Right now there is no command
+to <quote>unsubscribe</quote>; you should just edit that file manually
+and delete the offending URL.</para>
+
+<para>To obtain the latest Nix expressions available in a channel, do
+
+<screen>
+$ nix-channel --update</screen>
+
+This downloads the Nix expressions in every channel (downloaded from
+<literal><replaceable>url</replaceable>/nixexprs.tar.bz2</literal>)
+and registers any available pre-built binaries in every channel
+(by <command>nix-pull</command>ing
+<literal><replaceable>url</replaceable>/MANIFEST</literal>).  It also
+makes the union of each channel's Nix expressions the default for
+<command>nix-env</command> operations.  Consequently, you can then say
+
+<screen>
+$ nix-env -u '*'</screen>
+
+to upgrade all components in your profile to the latest versions
+available in the channels.</para>
 
 </sect1>
 
