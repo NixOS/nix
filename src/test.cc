@@ -19,6 +19,15 @@ void evalTest(Expr e)
 }
 
 
+struct MySink : DumpSink
+{
+    virtual void operator () (const unsigned char * data, unsigned int len)
+    {
+        cout.write((char *) data, len);
+    }
+};
+
+
 void runTests()
 {
     /* Hashing. */
@@ -36,6 +45,13 @@ void runTests()
         abort();
     } catch (BadRefError err) { };
 
+    /* Dumping. */
+
+#if 0
+    MySink sink;
+    dumpPath("scratch", sink);
+    cout << (string) hashPath("scratch") << endl;
+#endif
 
     /* Set up the test environment. */
 

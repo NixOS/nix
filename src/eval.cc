@@ -148,10 +148,12 @@ static Hash computeDerived(Hash sourceHash, string targetName,
             throw Error("program " + progPath + 
                 " failed to create a result in " + targetPath);
 
+#if 0
         /* Remove write permission from the value. */
         int res = system(("chmod -R -w " + targetPath).c_str()); // !!! escaping
         if (WEXITSTATUS(res) != 0)
             throw Error("cannot remove write permission from " + targetPath);
+#endif
 
     } catch (exception &) {
 //         system(("rm -rf " + targetPath).c_str());
@@ -159,7 +161,7 @@ static Hash computeDerived(Hash sourceHash, string targetName,
     }
 
     /* Hash the result. */
-    Hash targetHash = hashFile(targetPath);
+    Hash targetHash = hashPath(targetPath);
 
     /* Register targetHash -> targetPath.  !!! this should be in
        values.cc. */

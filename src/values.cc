@@ -19,7 +19,7 @@ static string absValuePath(string s)
 
 Hash addValue(string path)
 {
-    Hash hash = hashFile(path);
+    Hash hash = hashPath(path);
 
     string name;
     if (queryDB(nixDB, dbRefs, hash, name)) {
@@ -72,8 +72,8 @@ string queryValuePath(Hash hash)
         if (queryDB(nixDB, dbRefs, hash, name)) {
             string fn = absValuePath(name);
 
-            /* Verify that the file hasn't changed. !!! race */
-            if (hashFile(fn) != hash)
+            /* Verify that the file hasn't changed. !!! race !!! slow */
+            if (hashPath(fn) != hash)
                 throw Error("file " + fn + " is stale");
 
             return fn;
