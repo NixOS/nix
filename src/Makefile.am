@@ -4,7 +4,7 @@ SUBDIRS = bin2c boost libutil libstore libmain nix-store nix-hash \
 SETUID_PROGS = nix-store nix-instantiate nix-env
 install-exec-hook:
 if SETUID_HACK
-if HAVE_SETREUID
+if HAVE_SETRESUID
 	cd $(DESTDIR)$(bindir) && chown @NIX_USER@ $(SETUID_PROGS) \
 	  && chgrp @NIX_GROUP@ $(SETUID_PROGS) && chmod ug+s $(SETUID_PROGS)
 else

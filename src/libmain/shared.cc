@@ -169,14 +169,50 @@ static void initAndRun(int argc, char * * argv)
 }
 
 
-#if HAVE_SETREUID
-#define _setuid(uid) setreuid(uid, uid)
-#define _setgid(gid) setregid(gid, gid)
+static bool haveSwitched;
+static uid_t savedUid, nixUid;
+static gid_t savedGid, nixGid;
+
+
+#if HAVE_SETRESUID
+#define _setuid(uid) setresuid(uid, uid, savedUid)
+#define _setgid(gid) setresgid(gid, gid, savedGid)
 #else
 /* Only works properly when run by root. */
 #define _setuid(uid) setuid(uid)
 #define _setgid(gid) setgid(gid)
 #endif
+
+
+SwitchToOriginalUser::SwitchToOriginalUser()
+{
+#if SETUID_HACK && HAVE_SETRESUID
+    /* Temporarily switch the effective uid/gid back to the saved
+       uid/gid (which is the uid/gid of the user that executed the Nix
+       program; it's *not* the real uid/gid, since we changed that to
+       the Nix user in switchToNixUser()). */
+    if (haveSwitched) {
+        if (setuid(savedUid) == -1)
+            throw SysError(format("temporarily restoring uid to `%1%'") % savedUid); 
+        if (setgid(savedGid) == -1)
+            throw SysError(format("temporarily restoring gid to `%1%'") % savedGid); 
+    }
+#endif
+}
+
+
+SwitchToOriginalUser::~SwitchToOriginalUser()
+{
+#if SETUID_HACK && HAVE_SETRESUID
+    /* Switch the effective uid/gid back to the Nix user. */
+    if (haveSwitched) {
+        if (setuid(nixUid) == -1)
+            throw SysError(format("restoring uid to `%1%'") % nixUid); 
+        if (setgid(nixGid) == -1)
+            throw SysError(format("restoring gid to `%1%'") % nixGid); 
+    }
+#endif
+}
 
 
 void switchToNixUser()
@@ -208,7 +244,7 @@ void switchToNixUser()
     /* !!! Apparently it is unspecified whether getgroups() includes
        the effective gid.  In that case the following test is always
        true *if* the program is installed setgid (which we do when we
-       have setreuid()).  On Linux this doesn't appear to be the
+       have setresuid()).  On Linux this doesn't appear to be the
        case, but we should switch to the real gid before doing this
        test, and then switch back to the saved gid. */ 
 
@@ -227,13 +263,14 @@ void switchToNixUser()
         return;
     }
 
+    savedUid = getuid();
+    savedGid = getgid();
+
     /* Set the real, effective and saved gids to gr->gr_gid.  Also
        make very sure that this succeeded.  We switch the gid first
        because we cannot do it after we have dropped root uid. */
-    if (_setgid(gr->gr_gid) != 0 ||
-        getgid() != gr->gr_gid ||
-        getegid() != gr->gr_gid)
-    {
+    nixGid = gr->gr_gid;
+    if (_setgid(nixGid) != 0 || getgid() != nixGid || getegid() != nixGid) {
         cerr << format("unable to set gid to `%1%'\n") % NIX_GROUP;
         exit(1);
     }
@@ -248,14 +285,14 @@ void switchToNixUser()
     /* This will drop all root privileges, setting the real, effective
        and saved uids to pw->pw_uid.  Also make very sure that this
        succeeded.*/
-    if (_setuid(pw->pw_uid) != 0 ||
-        getuid() != pw->pw_uid ||
-        geteuid() != pw->pw_uid)
-    {
+    nixUid = pw->pw_uid;
+    if (_setuid(nixUid) != 0 || getuid() != nixUid || geteuid() != nixUid) {
         cerr << format("unable to set uid to `%1%'\n") % NIX_USER;
         exit(1);
     }
 
+    haveSwitched = true;
+    
 #endif
 }
 

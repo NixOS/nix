@@ -246,4 +246,14 @@ string statusToString(int status);
 bool statusOk(int status);
 
 
+/* !!! HACK HACK HACK - this should be in shared.hh, but it's to
+   facilitate a quick hack - will remove this eventually (famous last
+   words). */
+struct SwitchToOriginalUser
+{
+    SwitchToOriginalUser();
+    ~SwitchToOriginalUser();
+};
+
+
 #endif /* !__UTIL_H */

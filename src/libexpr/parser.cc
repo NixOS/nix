@@ -106,6 +106,8 @@ static Expr parse(EvalState & state,
 
 Expr parseExprFromFile(EvalState & state, Path path)
 {
+    SwitchToOriginalUser sw;
+
     assert(path[0] == '/');
 
 #if 0

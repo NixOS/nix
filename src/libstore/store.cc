@@ -157,7 +157,10 @@ void copyPath(const Path & src, const Path & dst)
     
     CopySink sink;
     sink.fd = pipe.writeSide;
-    dumpPath(src, sink);
+    {
+        SwitchToOriginalUser sw;
+        dumpPath(src, sink);
+    }
 
     /* Wait for the child to finish. */
     int status = pid.wait(true);
@@ -421,7 +424,11 @@ Path addToStore(const Path & _srcPath)
     Path srcPath(absPath(_srcPath));
     debug(format("adding `%1%' to the store") % srcPath);
 
-    Hash h = hashPath(srcPath);
+    Hash h;
+    {
+        SwitchToOriginalUser sw;
+        h = hashPath(srcPath);
+    }
 
     string baseName = baseNameOf(srcPath);
     Path dstPath = canonPath(nixStore + "/" + (string) h + "-" + baseName);
