@@ -16,15 +16,72 @@
 
       <para>
 	Build management tools are used to perform <emphasis>software
-	  builds</emphasis>, that is, the construction of derived products such
-	as executable programs from source code.  A commonly used build tool is
-	Make, which is a standard tool on Unix systems. These tools have to
-	deal with several issues:
+	  builds</emphasis>, that is, the construction of derived products
+	(<emphasis>derivates)</emphasis>) such as executable programs from
+	source code.  A commonly used build tool is Make, which is a standard
+	tool on Unix systems. These tools have to deal with several issues:
 	<itemizedlist>
+
 	  <listitem>
 	    <para>
+	      <emphasis>Efficiency</emphasis>.  Since building large systems
+	      can take a substantial amount of time, it is desirable that build
+	      steps that have been performed in the past are not repeated
+	      unnecessarily, i.e., if a new build differs from a previous build
+	      only with respect to certain sources, then only the build steps
+	      that (directly or indirectly) <emphasis>depend</emphasis> on
+	      those sources should be redone.
 	    </para>
 	  </listitem>
+
+	  <listitem>
+	    <para>
+	      <emphasis>Correctness</emphasis> is this context means that the
+	      derivates produced by a build are always consistent with the
+	      sources, that is, they are equal to what we would get if we were
+	      to build the derivates from those sources.  This requirement is
+	      trivially met when we do a full, unconditional build, but is far
+	      from trivial under the requirement of efficiency, since it is not
+	      easy to determine which derivates are affected by a change to a
+	      source.
+	    </para>
+	  </listitem>
+
+	  <listitem>
+	    <para>
+	      <emphasis>Variability</emphasis> is the property that a software
+	      system can be built in a (potentially large) number of variants.
+	      Variation exists both in <emphasis>time</emphasis>---the
+	      evolution of different versions of an artifact---and in
+	      <emphasis>space</emphasis>---the artifact might have
+	      configuration options that lead to variants that differ in the
+	      features they support (for example, a system might be built with
+	      or without debugging information).
+	    </para>
+
+	    <para>
+	      Build managers historically have had good support for variation
+	      in time (rebuilding the system in an intelligent way when sources
+	      change is one of the primary reasons to use a build manager), but
+	      not always for variation in space.  For example,
+	      <command>make</command> will not automatically ensure that
+	      variant builds are properly isolated from each other (they will
+	      in fact overwrite each other unless special precautions are
+	      taken).
+	    </para>
+	  </listitem>
+
+	  <listitem>
+	    <para>
+	      <emphasis>High-level system modelling language</emphasis>.  The
+	      language in which one describes what and how derivates are to be
+	      produced should have sufficient abstraction facilities to make it
+	      easy to specify the derivation of even very large systems.  Also,
+	      the language should be <emphasis>modular</emphasis> to enable
+	      components from possible different sources to be easily combined.
+	    </para>
+	  </listitem>
+
 	</itemizedlist>
       </para>
 
@@ -37,8 +94,8 @@
 	After software has been built, is must also be
 	<emphasis>deployed</emphasis> in the intended target environment, e.g.,
 	the user's workstation.  Examples include the Red Hat package manager
-	(RPM), Microsoft's MSI, and so on.  Here also we have to deal with
-	several issues:
+	(RPM), Microsoft's MSI, and so on.  Here also we have several issues to
+	contend with:
 	<itemizedlist>
 	  <listitem>
 	    <para>
@@ -70,24 +127,66 @@
   <!--######################################################################-->
 
   <sect1>
-    <title>What Nix can do for you</title>
+    <title>What Nix provides</title>
 
     <para>
-      Here is a summary of what Nix provides:
+      Here is a summary of Nix's main features:
     </para>
 
     <itemizedlist>
 
       <listitem>
 	<para>
-	  <emphasis>Reliable dependencies.</emphasis>
+	  <emphasis>Reliable dependencies.</emphasis>  Builds of file system
+	  objects depend on other file system object, such as source files,
+	  tools, and so on.  We would like to ensure that a build does not
+	  refer to any objects that have not been declared as inputs for that
+	  build.  This is important for several reasons.  First, if any of the
+	  inputs change, we need to rebuild the things that depend on them to
+	  maintain consistency between sources and derivates.  Second, when we
+	  <emphasis>deploy</emphasis> file system objects (that is, copy them
+	  to a different system), we want to be certain that we copy everything
+	  that we need.
+	</para>
+
+	<para>
+	  Nix ensures this by building and storing file system objects in paths
+	  that are infeasible to predict in advance.  For example, the
+	  artifacts of a package <literal>X</literal> might be stored in
+	  <filename>/nix/store/d58a0606ed616820de291d594602665d-X</filename>,
+	  rather than in, say, <filename>/usr/lib</filename>.  The path
+	  component <filename>d58a...</filename> is actually a cryptographic
+	  hash of all the inputs (i.e., sources, requisites, and build flags)
+	  used in building <literal>X</literal>, and as such is very fragile:
+	  any change to the inputs will change the hash.  Therefore it is not
+	  sensible to <emphasis>hard-code</emphasis> such a path into the build
+	  scripts of a package <literal>Y</literal> that uses
+	  <literal>X</literal> (as does happen with <quote>fixed</quote> paths
+	  such as <filename>/usr/lib</filename>).  Rather, the build script of
+	  package <literal>Y</literal> is parameterised with the actual
+	  location of <literal>X</literal>, which is supplied by the Nix
+	  system.
 	</para>
       </listitem>
 
       <listitem>
 	<para>
-	  <emphasis>Support for variability.</emphasis>
+	  <emphasis>Support for variability.</emphasis>  
 	</para>
+	
+	<para>
+	  As stated above, the path name of a file system object contain a
+	  cryptographic hash of all inputs involved in building it.  A change to
+	  any of the inputs will cause the hash to change--and by extension,
+	  the path name.  These inputs include both sources (variation in time)
+	  and configuration options (variation in space).  Therefore variants
+	  of the same package don't clash---they can co-exist peacefully within
+	  the same file system.  So thanks to Nix's mechanism for reliably
+	  dealing with dependencies, we obtain management of variants for free
+	  (or, to quote Simon Peyton-Jone, it's not free, but it has already
+	  been paid for).
+	</para>
+
       </listitem>
 
       <listitem>
@@ -117,6 +216,14 @@
       <listitem>
 	<para>
 	  <emphasis>Support for many simultaneous configurations.</emphasis>
+	</para>
+      </listitem>
+
+      <listitem>
+	<para>
+	  <emphasis>Portability.</emphasis>  Nix is quite portable.  Contrary
+	  to build systems like those in, e.g., Vesta and ClearCase [sic?], it
+	  does not rely on operating system extensions.
 	</para>
       </listitem>
 
