@@ -70,4 +70,4 @@ fi
 
 mkdir $out
 test "$prefix" && cd $prefix
-gcc -Wall -c $mainName -o $out/$mainName.o
+gcc -Wall $cFlags -c $mainName -o $out/$mainName.o

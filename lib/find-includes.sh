@@ -5,7 +5,7 @@ echo "finding includes of \`$(basename $main)'..."
 makefile=$NIX_BUILD_TOP/makefile
 
 mainDir=$(dirname $main)
-(cd $mainDir && gcc -MM $(basename $main) -MF $makefile) || false
+(cd $mainDir && gcc $cFlags -MM $(basename $main) -MF $makefile) || false
 
 echo "[" >$out
 

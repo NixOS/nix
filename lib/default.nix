@@ -2,15 +2,19 @@ rec {
 
   inherit (import /home/eelco/nixpkgs/pkgs/system/i686-linux.nix) stdenv;
 
-  compileC = {main, localIncludes ? []}: stdenv.mkDerivation {
+  compileC = {main, localIncludes ? [], cFlags ? ""}: stdenv.mkDerivation {
     name = "compile-c";
     builder = ./compile-c.sh;
     localIncludes =
       if localIncludes == "auto" then
-        import (findIncludes {main = toString main; hack = curTime;})
+        import (findIncludes {
+          main = toString main;
+          hack = curTime;
+          inherit cFlags;
+        })
       else
         localIncludes;
-    inherit main;
+    inherit main cFlags;
   };
 
   /*
@@ -21,16 +25,22 @@ rec {
   };
   */
 
-  findIncludes = {main, hack}: stdenv.mkDerivation {
+  findIncludes = {main, hack, cFlags ? ""}: stdenv.mkDerivation {
     name = "find-includes";
     builder = ./find-includes.sh;
-    inherit main hack;
+    inherit main hack cFlags;
   };
   
-  link = {objects, programName ? "program"}: stdenv.mkDerivation {
+  link = {objects, programName ? "program", libraries ? []}: stdenv.mkDerivation {
     name = "link";
     builder = ./link.sh;
-    inherit objects programName;
+    inherit objects programName libraries;
+  };
+
+  makeLibrary = {objects, libraryName ? []}: stdenv.mkDerivation {
+    name = "library";
+    builder = ./make-library.sh;
+    inherit objects libraryName;
   };
 
 }
