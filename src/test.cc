@@ -13,21 +13,8 @@
 void realise(FSId id)
 {
     Nest nest(lvlDebug, format("TEST: realising %1%") % (string) id);
-    realiseSlice(normaliseFState(id));
+    realiseClosure(normaliseNixExpr(id));
 }
-
-
-#if 0
-void realiseFail(FState fs)
-{
-    try {
-        realiseFState(fs);
-        abort();
-    } catch (Error e) {
-        cout << "error (expected): " << e.what() << endl;
-    }
-}
-#endif
 
 
 struct MySink : DumpSink
@@ -115,8 +102,8 @@ void runTests()
     addToStore("./test-builder-1.sh", builder1fn, builder1id);
 
     ATerm fs1 = ATmake(
-        "Slice([<str>], [(<str>, <str>, [])])",
-        ((string) builder1id).c_str(),
+        "Closure([<str>], [(<str>, <str>, [])])",
+        builder1fn.c_str(),
         builder1fn.c_str(),
         ((string) builder1id).c_str());
     FSId fs1id = writeTerm(fs1, "");
@@ -125,8 +112,8 @@ void runTests()
     realise(fs1id);
 
     ATerm fs2 = ATmake(
-        "Slice([<str>], [(<str>, <str>, [])])",
-        ((string) builder1id).c_str(),
+        "Closure([<str>], [(<str>, <str>, [])])",
+        (builder1fn + "_bla").c_str(),
         (builder1fn + "_bla").c_str(),
         ((string) builder1id).c_str());
     FSId fs2id = writeTerm(fs2, "");
@@ -137,12 +124,12 @@ void runTests()
     string out1id = hashString("foo"); /* !!! bad */
     string out1fn = nixStore + "/" + (string) out1id + "-hello.txt";
     ATerm fs3 = ATmake(
-        "Derive([(<str>, <str>)], [<str>], <str>, <str>, [(\"out\", <str>)])",
+        "Derive([(<str>, <str>)], [<str>], <str>, <str>, [], [(\"out\", <str>)])",
         out1fn.c_str(),
         ((string) out1id).c_str(),
         ((string) fs1id).c_str(),
-        ((string) builder1fn).c_str(),
         thisSystem.c_str(),
+        ((string) builder1fn).c_str(),
         out1fn.c_str());
     debug(printTerm(fs3));
     FSId fs3id = writeTerm(fs3, "");
@@ -156,8 +143,8 @@ void runTests()
     addToStore("./test-builder-2.sh", builder4fn, builder4id);
 
     ATerm fs4 = ATmake(
-        "Slice([<str>], [(<str>, <str>, [])])",
-        ((string) builder4id).c_str(),
+        "Closure([<str>], [(<str>, <str>, [])])",
+        builder4fn.c_str(),
         builder4fn.c_str(),
         ((string) builder4id).c_str());
     FSId fs4id = writeTerm(fs4, "");
@@ -167,12 +154,12 @@ void runTests()
     string out5id = hashString("bar"); /* !!! bad */
     string out5fn = nixStore + "/" + (string) out5id + "-hello2";
     ATerm fs5 = ATmake(
-        "Derive([(<str>, <str>)], [<str>], <str>, <str>, [(\"out\", <str>), (\"builder\", <str>)])",
+        "Derive([(<str>, <str>)], [<str>], <str>, <str>, [], [(\"out\", <str>), (\"builder\", <str>)])",
         out5fn.c_str(),
         ((string) out5id).c_str(),
         ((string) fs4id).c_str(),
-        ((string) builder4fn).c_str(),
         thisSystem.c_str(),
+        ((string) builder4fn).c_str(),
         out5fn.c_str(),
         ((string) builder4fn).c_str());
     debug(printTerm(fs5));

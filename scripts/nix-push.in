@@ -10,7 +10,7 @@ foreach my $id (@ARGV) {
     die unless $id =~ /^([0-9a-z]{32})$/;
 
     # Get all paths referenced by the normalisation of the given 
-    # fstate expression.
+    # Nix expression.
     system "nix --install $id";
     if ($?) { die "`nix --install' failed"; }
 
@@ -52,7 +52,7 @@ foreach my $id (@ARGV) {
         # Construct a Fix expression that creates a Nix archive.
         my $fixexpr = 
           "App(IncludeFix(\"nar/nar.fix\"), " .
-          "[ (\"path\", Slice([\"$path\"], [(\"$path\", \"$pathid\", [])]))" .
+          "[ (\"path\", Closure([\"$path\"], [(\"$path\", \"$pathid\", [])]))" .
           "])";
 	
 	print FIX "," unless ($first);

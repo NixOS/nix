@@ -26,40 +26,41 @@ static FSId useSuccessor(const FSId & id)
 }
 
 
-Strings pathsFromOutputs(const DeriveOutputs & ps)
+Strings pathsFromOutputs(const DerivationOutputs & ps)
 {
     Strings ss;
-    for (DeriveOutputs::const_iterator i = ps.begin();
+    for (DerivationOutputs::const_iterator i = ps.begin();
          i != ps.end(); i++)
         ss.push_back(i->first);
     return ss;
 }
 
 
-FSId normaliseFState(FSId id, FSIdSet pending)
+FSId normaliseNixExpr(FSId id, FSIdSet pending)
 {
-    Nest nest(lvlTalkative, format("normalising fstate %1%") % (string) id);
+    Nest nest(lvlTalkative,
+        format("normalising nix expression %1%") % (string) id);
 
     /* Try to substitute $id$ by any known successors in order to
        speed up the rewrite process. */
     id = useSuccessor(id);
 
-    /* Get the fstate expression. */
-    FState fs = parseFState(termFromId(id));
+    /* Get the Nix expression. */
+    NixExpr ne = parseNixExpr(termFromId(id));
 
-    /* If this is a normal form (i.e., a slice) we are done. */
-    if (fs.type == FState::fsSlice) return id;
-    if (fs.type != FState::fsDerive) abort();
+    /* If this is a normal form (i.e., a closure) we are done. */
+    if (ne.type == NixExpr::neClosure) return id;
+    if (ne.type != NixExpr::neDerivation) abort();
     
 
-    /* Otherwise, it's a derive expression, and we have to build it to
+    /* Otherwise, it's a derivation expression, and we have to build it to
        determine its normal form. */
 
 
     /* Some variables. */
 
-    /* Input paths, with their slice elements. */
-    SliceElems inSlices; 
+    /* Input paths, with their closure elements. */
+    ClosureElems inClosures; 
 
     /* Referencable paths (i.e., input and output paths). */
     StringSet allPaths;
@@ -68,13 +69,13 @@ FSId normaliseFState(FSId id, FSIdSet pending)
     Environment env; 
 
     /* The result. */
-    FState nfFS;
-    nfFS.type = FState::fsSlice;
+    NixExpr nf;
+    nf.type = NixExpr::neClosure;
 
 
     /* Parse the outputs. */
-    for (DeriveOutputs::iterator i = fs.derive.outputs.begin();
-         i != fs.derive.outputs.end(); i++)
+    for (DerivationOutputs::iterator i = ne.derivation.outputs.begin();
+         i != ne.derivation.outputs.end(); i++)
     {
         debug(format("building %1% in `%2%'") % (string) i->second % i->first);
         allPaths.insert(i->first);
@@ -82,7 +83,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 
     /* Obtain locks on all output paths.  The locks are automatically
        released when we exit this function or Nix crashes. */
-    PathLocks outputLocks(pathsFromOutputs(fs.derive.outputs));
+    PathLocks outputLocks(pathsFromOutputs(ne.derivation.outputs));
 
     /* Now check again whether there is a successor.  This is because
        another process may have started building in parallel.  After
@@ -95,33 +96,33 @@ FSId normaliseFState(FSId id, FSIdSet pending)
     {
         FSId id2 = useSuccessor(id);
         if (id2 != id) {
-            FState fs = parseFState(termFromId(id2));
+            NixExpr ne = parseNixExpr(termFromId(id2));
             debug(format("skipping build of %1%, someone beat us to it")
 		  % (string) id);
-            if (fs.type != FState::fsSlice) abort();
+            if (ne.type != NixExpr::neClosure) abort();
             return id2;
         }
     }
 
     /* Right platform? */
-    if (fs.derive.platform != thisSystem)
+    if (ne.derivation.platform != thisSystem)
         throw Error(format("a `%1%' is required, but I am a `%2%'")
-		    % fs.derive.platform % thisSystem);
+		    % ne.derivation.platform % thisSystem);
         
     /* Realise inputs (and remember all input paths). */
-    for (FSIdSet::iterator i = fs.derive.inputs.begin();
-         i != fs.derive.inputs.end(); i++)
+    for (FSIdSet::iterator i = ne.derivation.inputs.begin();
+         i != ne.derivation.inputs.end(); i++)
     {
-        FSId nf = normaliseFState(*i, pending);
-        realiseSlice(nf, pending);
+        FSId nf = normaliseNixExpr(*i, pending);
+        realiseClosure(nf, pending);
         /* !!! nf should be a root of the garbage collector while we
            are building */
-        FState fs = parseFState(termFromId(nf));
-        if (fs.type != FState::fsSlice) abort();
-        for (SliceElems::iterator j = fs.slice.elems.begin();
-             j != fs.slice.elems.end(); j++)
+        NixExpr ne = parseNixExpr(termFromId(nf));
+        if (ne.type != NixExpr::neClosure) abort();
+        for (ClosureElems::iterator j = ne.closure.elems.begin();
+             j != ne.closure.elems.end(); j++)
 	{
-            inSlices[j->first] = j->second;
+            inClosures[j->first] = j->second;
 	    allPaths.insert(j->first);
 	}
     }
@@ -140,15 +141,15 @@ FSId normaliseFState(FSId id, FSIdSet pending)
     env["HOME"] = "/homeless-shelter";
 
     /* Build the environment. */
-    for (StringPairs::iterator i = fs.derive.env.begin();
-         i != fs.derive.env.end(); i++)
+    for (StringPairs::iterator i = ne.derivation.env.begin();
+         i != ne.derivation.env.end(); i++)
         env[i->first] = i->second;
 
     /* We can skip running the builder if we can expand all output
        paths from their ids. */
     bool fastBuild = true;
-    for (DeriveOutputs::iterator i = fs.derive.outputs.begin();
-         i != fs.derive.outputs.end(); i++)
+    for (DerivationOutputs::iterator i = ne.derivation.outputs.begin();
+         i != ne.derivation.outputs.end(); i++)
     {
         try {
             expandId(i->second, i->first, "/", pending);
@@ -164,8 +165,8 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 
         /* If any of the outputs already exist but are not registered,
            delete them. */
-        for (DeriveOutputs::iterator i = fs.derive.outputs.begin(); 
-             i != fs.derive.outputs.end(); i++)
+        for (DerivationOutputs::iterator i = ne.derivation.outputs.begin(); 
+             i != ne.derivation.outputs.end(); i++)
         {
             string path = i->first;
             FSId id;
@@ -179,7 +180,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 
         /* Run the builder. */
         msg(lvlChatty, format("building..."));
-        runProgram(fs.derive.builder, fs.derive.args, env);
+        runProgram(ne.derivation.builder, ne.derivation.args, env);
         msg(lvlChatty, format("build completed"));
         
     } else
@@ -189,13 +190,13 @@ FSId normaliseFState(FSId id, FSIdSet pending)
        output path to determine what other paths it references.  Also make all
        output paths read-only. */
     StringSet usedPaths;
-    for (DeriveOutputs::iterator i = fs.derive.outputs.begin(); 
-         i != fs.derive.outputs.end(); i++)
+    for (DerivationOutputs::iterator i = ne.derivation.outputs.begin(); 
+         i != ne.derivation.outputs.end(); i++)
     {
         string path = i->first;
         if (!pathExists(path))
             throw Error(format("path `%1%' does not exist") % path);
-        nfFS.slice.roots.insert(path);
+        nf.closure.roots.insert(path);
 
 	makePathReadOnly(path);
 
@@ -204,28 +205,28 @@ FSId normaliseFState(FSId id, FSIdSet pending)
         Strings refPaths = filterReferences(path, 
             Strings(allPaths.begin(), allPaths.end()));
 
-	/* Construct a slice element for this output path. */
-        SliceElem elem;
+	/* Construct a closure element for this output path. */
+        ClosureElem elem;
         elem.id = i->second;
 
 	/* For each path referenced by this output path, add its id to the
-	   slice element and add the id to the `usedPaths' set (so that the
-	   elements referenced by *its* slice are added below). */
+	   closure element and add the id to the `usedPaths' set (so that the
+	   elements referenced by *its* closure are added below). */
         for (Strings::iterator j = refPaths.begin();
 	     j != refPaths.end(); j++)
 	{
 	    string path = *j;
 	    elem.refs.insert(path);
-            if (inSlices.find(path) != inSlices.end())
+            if (inClosures.find(path) != inClosures.end())
                 usedPaths.insert(path);
-	    else if (fs.derive.outputs.find(path) == fs.derive.outputs.end())
+	    else if (ne.derivation.outputs.find(path) == ne.derivation.outputs.end())
 		abort();
         }
 
-        nfFS.slice.elems[path] = elem;
+        nf.closure.elems[path] = elem;
     }
 
-    /* Close the slice.  That is, for any referenced path, add the paths
+    /* Close the closure.  That is, for any referenced path, add the paths
        referenced by it. */
     StringSet donePaths;
 
@@ -237,10 +238,10 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 	if (donePaths.find(path) != donePaths.end()) continue;
 	donePaths.insert(path);
 
-	SliceElems::iterator j = inSlices.find(path);
-	if (j == inSlices.end()) abort();
+	ClosureElems::iterator j = inClosures.find(path);
+	if (j == inClosures.end()) abort();
 
-	nfFS.slice.elems[path] = j->second;
+	nf.closure.elems[path] = j->second;
 
 	for (StringSet::iterator k = j->second.refs.begin();
 	     k != j->second.refs.end(); k++)
@@ -248,8 +249,8 @@ FSId normaliseFState(FSId id, FSIdSet pending)
     }
 
     /* For debugging, print out the referenced and unreferenced paths. */
-    for (SliceElems::iterator i = inSlices.begin();
-         i != inSlices.end(); i++)
+    for (ClosureElems::iterator i = inClosures.begin();
+         i != inClosures.end(); i++)
     {
         StringSet::iterator j = donePaths.find(i->first);
         if (j == donePaths.end())
@@ -260,9 +261,9 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 
     /* Write the normal form.  This does not have to occur in the
        transaction below because writing terms is idem-potent. */
-    ATerm nf = unparseFState(nfFS);
-    msg(lvlVomit, format("normal form: %1%") % printTerm(nf));
-    FSId idNF = writeTerm(nf, "-s-" + (string) id);
+    ATerm nfTerm = unparseNixExpr(nf);
+    msg(lvlVomit, format("normal form: %1%") % printTerm(nfTerm));
+    FSId idNF = writeTerm(nfTerm, "-s-" + (string) id);
 
     /* Register each outpat path, and register the normal form.  This
        is wrapped in one database transaction to ensure that if we
@@ -271,8 +272,8 @@ FSId normaliseFState(FSId id, FSIdSet pending)
        deleted arbitrarily, while registered paths can only be deleted
        by running the garbage collector. */
     Transaction txn(nixDB);
-    for (DeriveOutputs::iterator i = fs.derive.outputs.begin(); 
-         i != fs.derive.outputs.end(); i++)
+    for (DerivationOutputs::iterator i = ne.derivation.outputs.begin(); 
+         i != ne.derivation.outputs.end(); i++)
         registerPath(txn, i->first, i->second);
     registerSuccessor(txn, id, idNF);
     txn.commit();
@@ -281,36 +282,36 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 }
 
 
-void realiseSlice(const FSId & id, FSIdSet pending)
+void realiseClosure(const FSId & id, FSIdSet pending)
 {
     Nest nest(lvlDebug, 
-        format("realising slice %1%") % (string) id);
+        format("realising closure %1%") % (string) id);
 
-    FState fs = parseFState(termFromId(id));
-    if (fs.type != FState::fsSlice)
-        throw Error(format("expected slice in %1%") % (string) id);
+    NixExpr ne = parseNixExpr(termFromId(id));
+    if (ne.type != NixExpr::neClosure)
+        throw Error(format("expected closure in %1%") % (string) id);
     
-    for (SliceElems::const_iterator i = fs.slice.elems.begin();
-         i != fs.slice.elems.end(); i++)
+    for (ClosureElems::const_iterator i = ne.closure.elems.begin();
+         i != ne.closure.elems.end(); i++)
         expandId(i->second.id, i->first, "/", pending);
 }
 
 
-Strings fstatePaths(const FSId & id)
+Strings nixExprPaths(const FSId & id)
 {
     Strings paths;
 
-    FState fs = parseFState(termFromId(id));
+    NixExpr ne = parseNixExpr(termFromId(id));
 
-    if (fs.type == FState::fsSlice) {
-        for (StringSet::const_iterator i = fs.slice.roots.begin();
-             i != fs.slice.roots.end(); i++)
+    if (ne.type == NixExpr::neClosure) {
+        for (StringSet::const_iterator i = ne.closure.roots.begin();
+             i != ne.closure.roots.end(); i++)
 	    paths.push_back(*i);
     }
 
-    else if (fs.type == FState::fsDerive) {
-        for (DeriveOutputs::iterator i = fs.derive.outputs.begin();
-             i != fs.derive.outputs.end(); i++)
+    else if (ne.type == NixExpr::neDerivation) {
+        for (DerivationOutputs::iterator i = ne.derivation.outputs.begin();
+             i != ne.derivation.outputs.end(); i++)
             paths.push_back(i->first);
     }
     
@@ -320,24 +321,24 @@ Strings fstatePaths(const FSId & id)
 }
 
 
-static void fstateRequisitesSet(const FSId & id, 
+static void nixExprRequisitesSet(const FSId & id, 
     bool includeExprs, bool includeSuccessors, StringSet & paths,
     FSIdSet & doneSet)
 {
     if (doneSet.find(id) != doneSet.end()) return;
     doneSet.insert(id);
 
-    FState fs = parseFState(termFromId(id));
+    NixExpr ne = parseNixExpr(termFromId(id));
 
-    if (fs.type == FState::fsSlice)
-        for (SliceElems::iterator i = fs.slice.elems.begin();
-             i != fs.slice.elems.end(); i++)
+    if (ne.type == NixExpr::neClosure)
+        for (ClosureElems::iterator i = ne.closure.elems.begin();
+             i != ne.closure.elems.end(); i++)
             paths.insert(i->first);
     
-    else if (fs.type == FState::fsDerive)
-        for (FSIdSet::iterator i = fs.derive.inputs.begin();
-             i != fs.derive.inputs.end(); i++)
-            fstateRequisitesSet(*i,
+    else if (ne.type == NixExpr::neDerivation)
+        for (FSIdSet::iterator i = ne.derivation.inputs.begin();
+             i != ne.derivation.inputs.end(); i++)
+            nixExprRequisitesSet(*i,
                 includeExprs, includeSuccessors, paths, doneSet);
 
     else abort();
@@ -348,17 +349,17 @@ static void fstateRequisitesSet(const FSId & id,
     string idSucc;
     if (includeSuccessors &&
         nixDB.queryString(noTxn, dbSuccessors, id, idSucc))
-        fstateRequisitesSet(parseHash(idSucc), 
+        nixExprRequisitesSet(parseHash(idSucc), 
             includeExprs, includeSuccessors, paths, doneSet);
 }
 
 
-Strings fstateRequisites(const FSId & id,
+Strings nixExprRequisites(const FSId & id,
     bool includeExprs, bool includeSuccessors)
 {
     StringSet paths;
     FSIdSet doneSet;
-    fstateRequisitesSet(id, includeExprs, includeSuccessors, paths, doneSet);
+    nixExprRequisitesSet(id, includeExprs, includeSuccessors, paths, doneSet);
     return Strings(paths.begin(), paths.end());
 }
 
@@ -381,19 +382,19 @@ FSIds findGenerators(const FSIds & _ids)
         if (!nixDB.queryString(noTxn, dbSuccessors, *i, s)) continue;
         FSId id = parseHash(s);
 
-        FState fs;
+        NixExpr ne;
         try {
             /* !!! should substitutes be used? */
-            fs = parseFState(termFromId(id));
+            ne = parseNixExpr(termFromId(id));
         } catch (...) { /* !!! only catch parse errors */
             continue;
         }
 
-        if (fs.type != FState::fsSlice) continue;
+        if (ne.type != NixExpr::neClosure) continue;
         
         bool okay = true;
-        for (SliceElems::const_iterator i = fs.slice.elems.begin();
-             i != fs.slice.elems.end(); i++)
+        for (ClosureElems::const_iterator i = ne.closure.elems.begin();
+             i != ne.closure.elems.end(); i++)
             if (ids.find(i->second.id) == ids.end()) {
                 okay = false;
                 break;

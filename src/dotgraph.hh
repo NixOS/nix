@@ -1,7 +1,7 @@
 #ifndef __DOTGRAPH_H
 #define __DOTGRAPH_H
 
-#include "fstate.hh"
+#include "expr.hh"
 
 void printDotGraph(const FSIds & roots);
 

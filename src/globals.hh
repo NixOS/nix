@@ -29,7 +29,7 @@ extern TableId dbId2Paths;
 /* dbSuccessors :: FSId -> FSId
 
    Each pair $(id_1, id_2)$ in this mapping records the fact that a
-   successor of an fstate expression stored in a file with identifier
+   successor of a Nix expression stored in a file with identifier
    $id_1$ is stored in a file with identifier $id_2$.
 
    Note that a term $y$ is successor of $x$ iff there exists a
@@ -41,15 +41,14 @@ extern TableId dbSuccessors;
 /* dbSubstitutes :: FSId -> [FSId]
 
    Each pair $(id, [ids])$ tells Nix that it can realise any of the
-   fstate expressions referenced by the identifiers in $ids$ to
+   Nix expressions referenced by the identifiers in $ids$ to
    generate a path with identifier $id$.
 
    The main purpose of this is for distributed caching of derivates.
    One system can compute a derivate with hash $h$ and put it on a
    website (as a Nix archive), for instance, and then another system
    can register a substitute for that derivate.  The substitute in
-   this case might be an fstate expression that fetches the Nix
-   archive. 
+   this case might be a Nix expression that fetches the Nix archive.
 */
 extern TableId dbSubstitutes;
 

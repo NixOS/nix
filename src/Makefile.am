@@ -23,7 +23,7 @@ test_LDADD = libshared.a libnix.a $(LDADD)
 noinst_LIBRARIES = libnix.a libshared.a
 
 libnix_a_SOURCES = util.cc hash.cc archive.cc md5.c \
- store.cc fstate.cc normalise.cc exec.cc \
+ store.cc expr.cc normalise.cc exec.cc \
  globals.cc db.cc references.cc pathlocks.cc
 
 libshared_a_SOURCES = shared.cc

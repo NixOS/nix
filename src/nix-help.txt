@@ -2,7 +2,7 @@ nix [OPTIONS...] [ARGUMENTS...]
 
 Operations:
 
-  --install / -i: realise an fstate
+  --install / -i: realise a Nix expression
   --delete / -d: delete paths from the Nix store
   --add / -A: copy a path to the Nix store
   --query / -q: query information
@@ -25,7 +25,7 @@ Source selection for --install, --dump:
 
 Query flags:
 
-  --list / -l: query the output paths (roots) of an fstate (default)
+  --list / -l: query the output paths (roots) of a Nix expression (default)
   --requisites / -r: print all paths necessary to realise expression
   --generators / -g: find expressions producing a subset of given ids
   --expansion / -e: print a path containing id

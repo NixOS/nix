@@ -8,30 +8,30 @@ extern "C" {
 #include "store.hh"
 
 
-/* Abstract syntax of fstate-expressions. */
+/* Abstract syntax of Nix expressions. */
 
 typedef list<FSId> FSIds;
 
-struct SliceElem
+struct ClosureElem
 {
     FSId id;
     StringSet refs;
 };
 
-typedef map<string, SliceElem> SliceElems;
+typedef map<string, ClosureElem> ClosureElems;
 
-struct Slice
+struct Closure
 {
     StringSet roots;
-    SliceElems elems;
+    ClosureElems elems;
 };
 
-typedef map<string, FSId> DeriveOutputs;
+typedef map<string, FSId> DerivationOutputs;
 typedef map<string, string> StringPairs;
 
-struct Derive
+struct Derivation
 {
-    DeriveOutputs outputs;
+    DerivationOutputs outputs;
     FSIdSet inputs;
     string platform;
     string builder;
@@ -39,11 +39,11 @@ struct Derive
     StringPairs env;
 };
 
-struct FState
+struct NixExpr
 {
-    enum { fsSlice, fsDerive } type;
-    Slice slice;
-    Derive derive;
+    enum { neClosure, neDerivation } type;
+    Closure closure;
+    Derivation derivation;
 };
 
 
@@ -63,11 +63,11 @@ ATerm termFromId(const FSId & id);
 /* Write an aterm to the Nix store directory, and return its hash. */
 FSId writeTerm(ATerm t, const string & suffix, FSId id = FSId());
 
-/* Parse an fstate-expression. */
-FState parseFState(ATerm t);
+/* Parse a Nix expression. */
+NixExpr parseNixExpr(ATerm t);
 
-/* Parse an fstate-expression. */
-ATerm unparseFState(const FState & fs);
+/* Parse a Nix expression. */
+ATerm unparseNixExpr(const NixExpr & ne);
 
 
 #endif /* !__FSTATE_H */

@@ -51,9 +51,9 @@ string pathLabel(const FSId & id, const string & path)
 }
 
 
-void printSlice(const FSId & id, const FState & fs)
+void printClosure(const FSId & id, const NixExpr & fs)
 {
-    Strings workList(fs.slice.roots.begin(), fs.slice.roots.end());
+    Strings workList(fs.closure.roots.begin(), fs.closure.roots.end());
     StringSet doneSet;
 
     for (Strings::iterator i = workList.begin(); i != workList.end(); i++) {
@@ -67,9 +67,9 @@ void printSlice(const FSId & id, const FState & fs)
 	if (doneSet.find(path) == doneSet.end()) {
 	    doneSet.insert(path);
 
-	    SliceElems::const_iterator elem = fs.slice.elems.find(path);
-	    if (elem == fs.slice.elems.end())
-		throw Error(format("bad slice, missing path `%1%'") % path);
+	    ClosureElems::const_iterator elem = fs.closure.elems.find(path);
+	    if (elem == fs.closure.elems.end())
+		throw Error(format("bad closure, missing path `%1%'") % path);
 
 	    for (StringSet::const_iterator i = elem->second.refs.begin();
 		 i != elem->second.refs.end(); i++)
@@ -99,29 +99,29 @@ void printDotGraph(const FSIds & roots)
 	if (doneSet.find(id) == doneSet.end()) {
 	    doneSet.insert(id);
                     
-	    FState fs = parseFState(termFromId(id));
+	    NixExpr ne = parseNixExpr(termFromId(id));
 
 	    string label, colour;
                     
-	    if (fs.type == FState::fsDerive) {
-		for (FSIdSet::iterator i = fs.derive.inputs.begin();
-		     i != fs.derive.inputs.end(); i++)
+	    if (ne.type == NixExpr::neDerivation) {
+		for (FSIdSet::iterator i = ne.derivation.inputs.begin();
+		     i != ne.derivation.inputs.end(); i++)
 		{
 		    workList.push_back(*i);
 		    cout << makeEdge(*i, id);
 		}
 
-		label = "derive";
+		label = "derivation";
 		colour = "#00ff00";
-		for (StringPairs::iterator i = fs.derive.env.begin();
-		     i != fs.derive.env.end(); i++)
+		for (StringPairs::iterator i = ne.derivation.env.begin();
+		     i != ne.derivation.env.end(); i++)
 		    if (i->first == "name") label = i->second;
 	    }
 
-	    else if (fs.type == FState::fsSlice) {
-		label = "<slice>";
+	    else if (ne.type == NixExpr::neClosure) {
+		label = "<closure>";
 		colour = "#00ffff";
-		printSlice(id, fs);
+		printClosure(id, ne);
 	    }
 
 	    else abort();

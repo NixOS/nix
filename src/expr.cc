@@ -1,4 +1,4 @@
-#include "fstate.hh"
+#include "expr.hh"
 #include "globals.hh"
 #include "store.hh"
 
@@ -65,23 +65,23 @@ static void parsePaths(ATermList paths, StringSet & out)
 }
 
 
-static void checkSlice(const Slice & slice)
+static void checkClosure(const Closure & closure)
 {
-    if (slice.elems.size() == 0)
-        throw Error("empty slice");
+    if (closure.elems.size() == 0)
+        throw Error("empty closure");
 
     StringSet decl;
-    for (SliceElems::const_iterator i = slice.elems.begin();
-         i != slice.elems.end(); i++)
+    for (ClosureElems::const_iterator i = closure.elems.begin();
+         i != closure.elems.end(); i++)
         decl.insert(i->first);
     
-    for (StringSet::const_iterator i = slice.roots.begin();
-         i != slice.roots.end(); i++)
+    for (StringSet::const_iterator i = closure.roots.begin();
+         i != closure.roots.end(); i++)
         if (decl.find(*i) == decl.end())
             throw Error(format("undefined root path `%1%'") % *i);
     
-    for (SliceElems::const_iterator i = slice.elems.begin();
-         i != slice.elems.end(); i++)
+    for (ClosureElems::const_iterator i = closure.elems.begin();
+         i != closure.elems.end(); i++)
         for (StringSet::const_iterator j = i->second.refs.begin();
              j != i->second.refs.end(); j++)
             if (decl.find(*j) == decl.end())
@@ -91,35 +91,35 @@ static void checkSlice(const Slice & slice)
 }
 
 
-/* Parse a slice. */
-static bool parseSlice(ATerm t, Slice & slice)
+/* Parse a closure. */
+static bool parseClosure(ATerm t, Closure & closure)
 {
     ATermList roots, elems;
     
-    if (!ATmatch(t, "Slice([<list>], [<list>])", &roots, &elems))
+    if (!ATmatch(t, "Closure([<list>], [<list>])", &roots, &elems))
         return false;
 
-    parsePaths(roots, slice.roots);
+    parsePaths(roots, closure.roots);
 
     while (!ATisEmpty(elems)) {
         char * s1, * s2;
         ATermList refs;
         ATerm t = ATgetFirst(elems);
         if (!ATmatch(t, "(<str>, <str>, [<list>])", &s1, &s2, &refs))
-            throw badTerm("not a slice element", t);
-        SliceElem elem;
+            throw badTerm("not a closure element", t);
+        ClosureElem elem;
         elem.id = parseHash(s2);
         parsePaths(refs, elem.refs);
-        slice.elems[s1] = elem;
+        closure.elems[s1] = elem;
         elems = ATgetNext(elems);
     }
 
-    checkSlice(slice);
+    checkClosure(closure);
     return true;
 }
 
 
-static bool parseDerive(ATerm t, Derive & derive)
+static bool parseDerivation(ATerm t, Derivation & derivation)
 {
     ATermList outs, ins, args, bnds;
     char * builder;
@@ -139,8 +139,8 @@ static bool parseDerive(ATerm t, Derive & derive)
         char * s1, * s2;
         ATerm t = ATgetFirst(outs);
         if (!ATmatch(t, "(<str>, <str>)", &s1, &s2))
-            throw badTerm("not a derive output", t);
-        derive.outputs[s1] = parseHash(s2);
+            throw badTerm("not a derivation output", t);
+        derivation.outputs[s1] = parseHash(s2);
         outs = ATgetNext(outs);
     }
 
@@ -149,19 +149,19 @@ static bool parseDerive(ATerm t, Derive & derive)
         ATerm t = ATgetFirst(ins);
         if (!ATmatch(t, "<str>", &s))
             throw badTerm("not an id", t);
-        derive.inputs.insert(parseHash(s));
+        derivation.inputs.insert(parseHash(s));
         ins = ATgetNext(ins);
     }
 
-    derive.builder = builder;
-    derive.platform = platform;
+    derivation.builder = builder;
+    derivation.platform = platform;
     
     while (!ATisEmpty(args)) {
         char * s;
         ATerm arg = ATgetFirst(args);
         if (!ATmatch(arg, "<str>", &s))
             throw badTerm("string expected", arg);
-        derive.args.push_back(s);
+        derivation.args.push_back(s);
         args = ATgetNext(args);
     }
 
@@ -170,7 +170,7 @@ static bool parseDerive(ATerm t, Derive & derive)
         ATerm bnd = ATgetFirst(bnds);
         if (!ATmatch(bnd, "(<str>, <str>)", &s1, &s2))
             throw badTerm("tuple of strings expected", bnd);
-        derive.env[s1] = s2;
+        derivation.env[s1] = s2;
         bnds = ATgetNext(bnds);
     }
 
@@ -178,15 +178,15 @@ static bool parseDerive(ATerm t, Derive & derive)
 }
 
 
-FState parseFState(ATerm t)
+NixExpr parseNixExpr(ATerm t)
 {
-    FState fs;
-    if (parseSlice(t, fs.slice))
-        fs.type = FState::fsSlice;
-    else if (parseDerive(t, fs.derive))
-        fs.type = FState::fsDerive;
-    else throw badTerm("not an fstate-expression", t);
-    return fs;
+    NixExpr ne;
+    if (parseClosure(t, ne.closure))
+        ne.type = NixExpr::neClosure;
+    else if (parseDerivation(t, ne.derivation))
+        ne.type = NixExpr::neDerivation;
+    else throw badTerm("not a Nix expression", t);
+    return ne;
 }
 
 
@@ -200,45 +200,45 @@ static ATermList unparsePaths(const StringSet & paths)
 }
 
 
-static ATerm unparseSlice(const Slice & slice)
+static ATerm unparseClosure(const Closure & closure)
 {
-    ATermList roots = unparsePaths(slice.roots);
+    ATermList roots = unparsePaths(closure.roots);
     
     ATermList elems = ATempty;
-    for (SliceElems::const_iterator i = slice.elems.begin();
-         i != slice.elems.end(); i++)
+    for (ClosureElems::const_iterator i = closure.elems.begin();
+         i != closure.elems.end(); i++)
         elems = ATinsert(elems,
             ATmake("(<str>, <str>, <term>)",
                 i->first.c_str(),
                 ((string) i->second.id).c_str(),
                 unparsePaths(i->second.refs)));
 
-    return ATmake("Slice(<term>, <term>)", roots, elems);
+    return ATmake("Closure(<term>, <term>)", roots, elems);
 }
 
 
-static ATerm unparseDerive(const Derive & derive)
+static ATerm unparseDerivation(const Derivation & derivation)
 {
     ATermList outs = ATempty;
-    for (DeriveOutputs::const_iterator i = derive.outputs.begin();
-         i != derive.outputs.end(); i++)
+    for (DerivationOutputs::const_iterator i = derivation.outputs.begin();
+         i != derivation.outputs.end(); i++)
         outs = ATinsert(outs,
             ATmake("(<str>, <str>)", 
                 i->first.c_str(), ((string) i->second).c_str()));
     
     ATermList ins = ATempty;
-    for (FSIdSet::const_iterator i = derive.inputs.begin();
-         i != derive.inputs.end(); i++)
+    for (FSIdSet::const_iterator i = derivation.inputs.begin();
+         i != derivation.inputs.end(); i++)
         ins = ATinsert(ins, ATmake("<str>", ((string) *i).c_str()));
 
     ATermList args = ATempty;
-    for (Strings::const_iterator i = derive.args.begin();
-         i != derive.args.end(); i++)
+    for (Strings::const_iterator i = derivation.args.begin();
+         i != derivation.args.end(); i++)
         args = ATinsert(args, ATmake("<str>", i->c_str()));
 
     ATermList env = ATempty;
-    for (StringPairs::const_iterator i = derive.env.begin();
-         i != derive.env.end(); i++)
+    for (StringPairs::const_iterator i = derivation.env.begin();
+         i != derivation.env.end(); i++)
         env = ATinsert(env,
             ATmake("(<str>, <str>)", 
                 i->first.c_str(), i->second.c_str()));
@@ -246,18 +246,18 @@ static ATerm unparseDerive(const Derive & derive)
     return ATmake("Derive(<term>, <term>, <str>, <str>, <term>, <term>)",
         ATreverse(outs),
         ATreverse(ins),
-        derive.platform.c_str(),
-        derive.builder.c_str(),
+        derivation.platform.c_str(),
+        derivation.builder.c_str(),
         ATreverse(args),
         ATreverse(env));
 }
 
 
-ATerm unparseFState(const FState & fs)
+ATerm unparseNixExpr(const NixExpr & ne)
 {
-    if (fs.type == FState::fsSlice)
-        return unparseSlice(fs.slice);
-    else if (fs.type == FState::fsDerive)
-        return unparseDerive(fs.derive);
+    if (ne.type == NixExpr::neClosure)
+        return unparseClosure(ne.closure);
+    else if (ne.type == NixExpr::neDerivation)
+        return unparseDerivation(ne.derivation);
     else abort();
 }

@@ -121,47 +121,47 @@ static Expr substExprMany(ATermList formals, ATermList args, Expr body)
 }
 
 
-static Strings fstatePathsCached(EvalState & state, const FSId & id)
+static Strings nixExprPathsCached(EvalState & state, const FSId & id)
 {
     PkgPaths::iterator i = state.pkgPaths.find(id);
     if (i != state.pkgPaths.end())
         return i->second;
     else {
-        Strings paths = fstatePaths(id);
+        Strings paths = nixExprPaths(id);
         state.pkgPaths[id] = paths;
         return paths;
     }
 }
 
 
-static Hash hashPackage(EvalState & state, FState fs)
+static Hash hashPackage(EvalState & state, NixExpr ne)
 {
-    if (fs.type == FState::fsDerive) {
+    if (ne.type == NixExpr::neDerivation) {
 	FSIdSet inputs2;
-        for (FSIdSet::iterator i = fs.derive.inputs.begin();
-             i != fs.derive.inputs.end(); i++)
+        for (FSIdSet::iterator i = ne.derivation.inputs.begin();
+             i != ne.derivation.inputs.end(); i++)
         {
             PkgHashes::iterator j = state.pkgHashes.find(*i);
             if (j == state.pkgHashes.end())
                 throw Error(format("unknown package id %1%") % (string) *i);
             inputs2.insert(j->second);
         }
-	fs.derive.inputs = inputs2;
+	ne.derivation.inputs = inputs2;
     }
-    return hashTerm(unparseFState(fs));
+    return hashTerm(unparseNixExpr(ne));
 }
 
 
-static string processBinding(EvalState & state, Expr e, FState & fs)
+static string processBinding(EvalState & state, Expr e, NixExpr & ne)
 {
     char * s1;
 
     if (ATmatch(e, "FSId(<str>)", &s1)) {
         FSId id = parseHash(s1);
-        Strings paths = fstatePathsCached(state, id);
+        Strings paths = nixExprPathsCached(state, id);
         if (paths.size() != 1) abort();
         string path = *(paths.begin());
-        fs.derive.inputs.insert(id);
+        ne.derivation.inputs.insert(id);
         return path;
     }
     
@@ -178,7 +178,7 @@ static string processBinding(EvalState & state, Expr e, FState & fs)
 	bool first = true;
         while (!ATisEmpty(l)) {
 	    if (!first) s = s + " "; else first = false;
-	    s += processBinding(state, evalExpr(state, ATgetFirst(l)), fs);
+	    s += processBinding(state, evalExpr(state, ATgetFirst(l)), ne);
             l = ATgetNext(l);
         }
 	return s;
@@ -204,7 +204,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
         return e;
 
     try {
-        Hash pkgHash = hashPackage(state, parseFState(e));
+        Hash pkgHash = hashPackage(state, parseNixExpr(e));
         FSId pkgId = writeTerm(e, "");
         state.pkgHashes[pkgId] = pkgHash;
         return ATmake("FSId(<str>)", ((string) pkgId).c_str());
@@ -265,15 +265,15 @@ static Expr evalExpr2(EvalState & state, Expr e)
         FSId id;
         addToStore(srcPath, dstPath, id, true);
 
-        SliceElem elem;
+        ClosureElem elem;
         elem.id = id;
-        FState fs;
-        fs.type = FState::fsSlice;
-        fs.slice.roots.insert(dstPath);
-        fs.slice.elems[dstPath] = elem;
+        NixExpr ne;
+        ne.type = NixExpr::neClosure;
+        ne.closure.roots.insert(dstPath);
+        ne.closure.elems[dstPath] = elem;
 
-        Hash pkgHash = hashPackage(state, fs);
-        FSId pkgId = writeTerm(unparseFState(fs), "");
+        Hash pkgHash = hashPackage(state, ne);
+        FSId pkgId = writeTerm(unparseNixExpr(ne), "");
         state.pkgHashes[pkgId] = pkgHash;
 
         msg(lvlChatty, format("copied `%1%' -> %2%")
@@ -282,7 +282,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
         return ATmake("FSId(<str>)", ((string) pkgId).c_str());
     }
 
-    /* Packages are transformed into Derive fstate expressions. */
+    /* Packages are transformed into Nix derivation expressions. */
     if (ATmatch(e, "Package([<list>])", &bnds)) {
 
         /* Evaluate the bindings and put them in a map. */
@@ -296,10 +296,11 @@ static Expr evalExpr2(EvalState & state, Expr e)
             bnds = ATgetNext(bnds);
         }
 
-        /* Gather information for building the Derive expression. */
-        FState fs;
-        fs.type = FState::fsDerive;
-        fs.derive.platform = SYSTEM;
+        /* Gather information for building the derivation
+           expression. */
+        NixExpr ne;
+        ne.type = NixExpr::neDerivation;
+        ne.derivation.platform = SYSTEM;
         string name;
         FSId outId;
         bool outIdGiven = false;
@@ -318,16 +319,16 @@ static Expr evalExpr2(EvalState & state, Expr e)
                 
                 while (!ATisEmpty(args)) {
                     Expr arg = evalExpr(state, ATgetFirst(args));
-                    fs.derive.args.push_back(processBinding(state, arg, fs));
+                    ne.derivation.args.push_back(processBinding(state, arg, ne));
                     args = ATgetNext(args);
                 }
             } 
 
             else {
-                string s = processBinding(state, value, fs);
-                fs.derive.env[key] = s;
+                string s = processBinding(state, value, ne);
+                ne.derivation.env[key] = s;
 
-                if (key == "build") fs.derive.builder = s;
+                if (key == "build") ne.derivation.builder = s;
                 if (key == "name") name = s;
                 if (key == "id") { 
                     outId = parseHash(s);
@@ -339,25 +340,25 @@ static Expr evalExpr2(EvalState & state, Expr e)
                 ATmake("(<str>, <term>)", key.c_str(), value));
         }
 
-        if (fs.derive.builder == "")
+        if (ne.derivation.builder == "")
             throw badTerm("no builder specified", e);
         
         if (name == "")
             throw badTerm("no package name specified", e);
         
-        /* Hash the fstate-expression with no outputs to produce a
+        /* Hash the Nix expression with no outputs to produce a
            unique but deterministic path name for this package. */
-        if (!outIdGiven) outId = hashPackage(state, fs);
+        if (!outIdGiven) outId = hashPackage(state, ne);
         string outPath = 
             canonPath(nixStore + "/" + ((string) outId).c_str() + "-" + name);
-        fs.derive.env["out"] = outPath;
-        fs.derive.outputs[outPath] = outId;
+        ne.derivation.env["out"] = outPath;
+        ne.derivation.outputs[outPath] = outId;
 
         /* Write the resulting term into the Nix store directory. */
         Hash pkgHash = outIdGiven
             ? hashString((string) outId + outPath)
-            : hashPackage(state, fs);
-        FSId pkgId = writeTerm(unparseFState(fs), "-d-" + name);
+            : hashPackage(state, ne);
+        FSId pkgId = writeTerm(unparseNixExpr(ne), "-d-" + name);
         state.pkgHashes[pkgId] = pkgHash;
 
         msg(lvlChatty, format("instantiated `%1%' -> %2%")

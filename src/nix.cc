@@ -37,8 +37,7 @@ static FSId argToId(const string & arg)
 }
 
 
-/* Realise (or install) paths from the given Nix fstate
-   expressions. */
+/* Realise (or install) paths from the given Nix expressions. */
 static void opInstall(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
@@ -46,8 +45,8 @@ static void opInstall(Strings opFlags, Strings opArgs)
     for (Strings::iterator it = opArgs.begin();
          it != opArgs.end(); it++)
     {
-        FSId id = normaliseFState(argToId(*it));
-        realiseSlice(id);
+        FSId id = normaliseNixExpr(argToId(*it));
+        realiseClosure(id);
         cout << format("%1%\n") % (string) id;
     }
 }
@@ -83,7 +82,7 @@ static void opAdd(Strings opFlags, Strings opArgs)
 
 FSId maybeNormalise(const FSId & id, bool normalise)
 {
-    return normalise ? normaliseFState(id) : id;
+    return normalise ? normaliseNixExpr(id) : id;
 }
 
 
@@ -115,7 +114,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                Strings paths2 = fstatePaths(
+                Strings paths2 = nixExprPaths(
                     maybeNormalise(argToId(*i), normalise));
                 paths.insert(paths2.begin(), paths2.end());
             }
@@ -130,7 +129,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                Strings paths2 = fstateRequisites(
+                Strings paths2 = nixExprRequisites(
                     maybeNormalise(argToId(*i), normalise),
                     includeExprs, includeSuccessors);
                 paths.insert(paths2.begin(), paths2.end());
