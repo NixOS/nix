@@ -26,10 +26,14 @@ foreach my $link (@links) {
     $link = $linkdir . "/" . $link;
     next if (!($link =~ /.gcroot$/));
     open ROOT, "<$link" or die "cannot open $link: $!";
-    my $root = <ROOT>;
-    chomp $root;
+    while (<ROOT>) {
+        chomp;
+        foreach my $root (split ' ') {
+            die "bad root `$root' in file `$link'" unless $root =~ /^\S+$/;
+            push @roots, $root;
+        }
+    }
     close ROOT;
-    push @roots, $root;
 }
 
 my $extraarg = "";
