@@ -8,19 +8,10 @@
 #include "globals.hh"
 
 
-void registerSuccessor(const FSId & id1, const FSId & id2)
+void registerSuccessor(const Transaction & txn,
+    const FSId & id1, const FSId & id2)
 {
-    Transaction txn(nixDB);
     nixDB.setString(txn, dbSuccessors, id1, id2);
-    txn.commit();
-}
-
-
-static FSId storeSuccessor(const FSId & id1, ATerm sc)
-{
-    FSId id2 = writeTerm(sc, "-s-" + (string) id1);
-    registerSuccessor(id1, id2);
-    return id2;
 }
 
 
@@ -153,7 +144,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
             expandId(i->second, i->first, "/", pending);
         } catch (Error & e) {
             debug(format("fast build failed for `%1%': %2%")
-		  % i->first % e.what());
+                % i->first % e.what());
             fastBuild = false;
             break;
         }
@@ -175,8 +166,8 @@ FSId normaliseFState(FSId id, FSIdSet pending)
     } else
         msg(lvlChatty, format("fast build succesful"));
 
-    /* Check whether the output paths were created, and register each
-       one. */
+    /* Check whether the output paths were created, and grep each
+       output path to determine what other paths it references. */
     FSIdSet used;
     for (OutPaths::iterator i = outPaths.begin(); 
          i != outPaths.end(); i++)
@@ -184,7 +175,6 @@ FSId normaliseFState(FSId id, FSIdSet pending)
         string path = i->first;
         if (!pathExists(path))
             throw Error(format("path `%1%' does not exist") % path);
-        registerPath(path, i->second);
         fs.slice.roots.push_back(i->second);
 
         Strings refs = filterReferences(path, refPaths);
@@ -224,10 +214,27 @@ FSId normaliseFState(FSId id, FSIdSet pending)
         }
     }
 
+    /* Write the normal form.  This does not have to occur in the
+       transaction below because writing terms is idem-potent. */
     fs.type = FState::fsSlice;
     ATerm nf = unparseFState(fs);
     msg(lvlVomit, format("normal form: %1%") % printTerm(nf));
-    return storeSuccessor(id, nf);
+    FSId idNF = writeTerm(nf, "-s-" + (string) id);
+
+    /* Register each outpat path, and register the normal form.  This
+       is wrapped in one database transaction to ensure that if we
+       crash, either everything is registered or nothing is.  This is
+       for recoverability: unregistered paths in the store can be
+       deleted arbitrarily, while registered paths can only be deleted
+       by running the garbage collector. */
+    Transaction txn(nixDB);
+    for (OutPaths::iterator i = outPaths.begin(); 
+         i != outPaths.end(); i++)
+        registerPath(txn, i->first, i->second);
+    registerSuccessor(txn, id, idNF);
+    txn.commit();
+
+    return idNF;
 }
 
 

@@ -4,6 +4,7 @@
 #include <string>
 
 #include "hash.hh"
+#include "db.hh"
 
 using namespace std;
 
@@ -20,7 +21,8 @@ void copyPath(string src, string dst);
 void registerSubstitute(const FSId & srcId, const FSId & subId);
 
 /* Register a path keyed on its id. */
-void registerPath(const string & path, const FSId & id);
+void registerPath(const Transaction & txn,
+    const string & path, const FSId & id);
 
 /* Query the id of a path. */
 bool queryPathId(const string & path, FSId & id);

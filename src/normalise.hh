@@ -29,7 +29,8 @@ Strings fstateRequisites(const FSId & id,
 FSIds findGenerators(const FSIds & ids);
 
 /* Register a successor. */
-void registerSuccessor(const FSId & id1, const FSId & id2);
+void registerSuccessor(const Transaction & txn,
+    const FSId & id1, const FSId & id2);
 
 
 #endif /* !__NORMALISE_H */

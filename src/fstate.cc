@@ -44,7 +44,10 @@ FSId writeTerm(ATerm t, const string & suffix, FSId id)
 //     debug(format("written term %1% = %2%") % (string) id %
 //         printTerm(t));
 
-    registerPath(path, id);
+    Transaction txn(nixDB);
+    registerPath(txn, path, id);
+    txn.commit();
+
     return id;
 }
 

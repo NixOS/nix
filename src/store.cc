@@ -105,17 +105,16 @@ void registerSubstitute(const FSId & srcId, const FSId & subId)
 }
 
 
-void registerPath(const string & _path, const FSId & id)
+void registerPath(const Transaction & txn,
+    const string & _path, const FSId & id)
 {
     string path(canonPath(_path));
-    Transaction txn(nixDB);
 
     debug(format("registering path `%1%' with id %2%")
         % path % (string) id);
 
     string oldId;
     if (nixDB.queryString(txn, dbPath2Id, path, oldId)) {
-        txn.abort();
         if (id != parseHash(oldId))
             throw Error(format("path `%1%' already contains id %2%")
                 % path % oldId);
@@ -130,8 +129,6 @@ void registerPath(const string & _path, const FSId & id)
     paths.push_back(path);
     
     nixDB.setStrings(txn, dbId2Paths, id, paths);
-
-    txn.commit();
 }
 
 
@@ -215,7 +212,9 @@ string expandId(const FSId & id, const string & target,
                 return path;
             else {
                 copyPath(path, target);
-                registerPath(target, id);
+                Transaction txn(nixDB);
+                registerPath(txn, target, id);
+                txn.commit();
                 return target;
             }
         }
@@ -267,7 +266,9 @@ void addToStore(string srcPath, string & dstPath, FSId & id,
     }
     
     copyPath(srcPath, dstPath);
-    registerPath(dstPath, id);
+    Transaction txn(nixDB);
+    registerPath(txn, dstPath, id);
+    txn.commit();
 }
 
 

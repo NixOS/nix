@@ -239,14 +239,16 @@ static void opSuccessor(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (opArgs.size() % 2) throw UsageError("expecting even number of arguments");
-    
+
+    Transaction txn(nixDB); /* !!! this could be a big transaction */ 
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); )
     {
         FSId id1 = parseHash(*i++);
         FSId id2 = parseHash(*i++);
-        registerSuccessor(id1, id2);
+        registerSuccessor(txn, id1, id2);
     }
+    txn.commit();
 }
 
 
