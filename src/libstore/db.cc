@@ -261,7 +261,9 @@ void Database::close()
             delete db;
         }
 
-//         env->txn_checkpoint(0, 0, 0);
+        /* Do a checkpoint every 128 kilobytes, or every 5 minutes. */
+        env->txn_checkpoint(128, 5, 0);
+        
         env->close(0);
 
     } catch (DbException e) { rethrow(e); }
