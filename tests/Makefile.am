@@ -15,5 +15,5 @@ TESTS = init.sh simple.sh
 
 include ../substitute.mk
 
-EXTRA_DIST = \
+EXTRA_DIST = $(TESTS) \
   simple.nix.in simple.builder.sh
