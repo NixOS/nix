@@ -71,6 +71,15 @@ void runTests()
         abort();
     } catch (BadRefError err) { };
 
+    /* Path canonicalisation. */
+    cout << canonPath("/./../././//") << endl;
+    cout << canonPath("/foo/bar") << endl;
+    cout << canonPath("///foo/////bar//") << endl;
+    cout << canonPath("/././/foo/////bar//.") << endl;
+    cout << canonPath("/foo////bar//..///x/") << endl;
+    cout << canonPath("/foo////bar//..//..//x/y/../z/") << endl;
+    cout << canonPath("/foo/bar/../../../..///") << endl;
+
     /* Dumping. */
 
 #if 0

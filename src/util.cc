@@ -40,11 +40,39 @@ string absPath(string path, string dir)
 
 string canonPath(const string & path)
 {
-    char resolved[PATH_MAX];
-    if (!realpath(path.c_str(), resolved))
-        throw SysError(format("cannot canonicalise path `%1%'") % path);
-    /* !!! check that this removes trailing slashes */
-    return resolved;
+    string s;
+
+    if (path[0] != '/')
+        throw Error(format("not an absolute path: `%1%'") % path);
+
+    string::const_iterator i = path.begin(), end = path.end();
+
+    while (1) {
+
+        /* Skip slashes. */
+        while (i != end && *i == '/') i++;
+        if (i == end) break;
+
+        /* Ignore `.'. */
+        if (*i == '.' && (i + 1 == end || i[1] == '/'))
+            i++;
+
+        /* If `..', delete the last component. */
+        else if (*i == '.' && i + 1 < end && i[1] == '.' && 
+            (i + 2 == end || i[2] == '/'))
+        {
+            if (!s.empty()) s.erase(s.rfind('/'));
+            i += 2;
+        }
+
+        /* Normal component; copy it. */
+        else {
+            s += '/';
+            while (i != end && *i != '/') s += *i++;
+        }
+    }
+
+    return s.empty() ? "/" : s;
 }
 
 
