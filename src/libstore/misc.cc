@@ -19,9 +19,9 @@ void computeFSClosure(const Path & storePath,
 
     PathSet references;
     if (flipDirection)
-        queryReferers(storePath, references);
+        queryReferers(noTxn, storePath, references);
     else
-        queryReferences(storePath, references);
+        queryReferences(noTxn, storePath, references);
 
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)

@@ -806,7 +806,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
         {
             s += *i;
             PathSet references;
-            queryReferences(*i, references);
+            queryReferences(noTxn, *i, references);
             for (PathSet::iterator j = references.begin();
                  j != references.end(); ++j)
             {
@@ -1326,7 +1326,7 @@ void SubstitutionGoal::init()
 
     /* To maintain the closure invairant, we first have to realise the
        paths referenced by this one. */
-    queryReferences(storePath, references);
+    queryReferences(noTxn, storePath, references);
 
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)

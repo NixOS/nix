@@ -215,8 +215,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 Path path = maybeUseOutput(*i, useOutput, forceRealise);
                 if (query == qRequisites)
                     storePathRequisites(path, includeOutputs, paths);
-                else if (query == qReferences) queryReferences(path, paths);
-                else if (query == qReferers) queryReferers(path,  paths);
+                else if (query == qReferences) queryReferences(noTxn, path, paths);
+                else if (query == qReferers) queryReferers(noTxn, path,  paths);
                 else if (query == qReferersClosure) computeFSClosure(path, paths, true);
             }
             printPathSet(paths);

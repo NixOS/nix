@@ -325,21 +325,23 @@ void setReferences(const Transaction & txn, const Path & storePath,
 }
 
 
-void queryReferences(const Path & storePath, PathSet & references)
+void queryReferences(const Transaction & txn,
+    const Path & storePath, PathSet & references)
 {
     Paths references2;
-    if (!isRealisablePath(noTxn, storePath))
+    if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
-    nixDB.queryStrings(noTxn, dbReferences, storePath, references2);
+    nixDB.queryStrings(txn, dbReferences, storePath, references2);
     references.insert(references2.begin(), references2.end());
 }
 
 
-void queryReferers(const Path & storePath, PathSet & referers)
+void queryReferers(const Transaction & txn,
+    const Path & storePath, PathSet & referers)
 {
-    if (!isRealisablePath(noTxn, storePath))
+    if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
-    PathSet referers2 = getReferers(noTxn, storePath);
+    PathSet referers2 = getReferers(txn, storePath);
     referers.insert(referers2.begin(), referers2.end());
 }
 
@@ -358,7 +360,7 @@ void setDeriver(const Transaction & txn, const Path & storePath,
 
 Path queryDeriver(const Transaction & txn, const Path & storePath)
 {
-    if (!isRealisablePath(noTxn, storePath))
+    if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
     Path deriver;
     if (nixDB.queryString(txn, dbDerivers, storePath, deriver))
@@ -641,13 +643,8 @@ void verifyStore()
             validPaths.insert(path);
     }
 
-    /* !!! the code below does not allow transitive substitutes.
-       I.e., if B is a substitute of A, then B must be a valid path.
-       B cannot itself be invalid but have a substitute. */
-
-    /* "Usable" paths are those that are valid or have a substitute.
-       These are the paths that are allowed to appear in the
-       right-hand side of a sute mapping. */
+    /* "Usable" paths are those that are valid or have a
+       substitute. */
     PathSet usablePaths(validPaths);
 
     /* Check that the values of the substitute mappings are valid
@@ -656,10 +653,91 @@ void verifyStore()
     nixDB.enumTable(txn, dbSubstitutes, subKeys);
     for (Paths::iterator i = subKeys.begin(); i != subKeys.end(); ++i) {
         Substitutes subs = readSubstitutes(txn, *i);
-	if (subs.size() > 0)
-	    usablePaths.insert(*i);
-        else
+        if (!isStorePath(*i)) {
+            printMsg(lvlError, format("found substitutes for non-store path `%1%'") % *i);
             nixDB.delPair(txn, dbSubstitutes, *i);
+        }
+        else if (subs.size() == 0)
+            nixDB.delPair(txn, dbSubstitutes, *i);
+        else
+	    usablePaths.insert(*i);
+    }
+
+    /* Check the cleanup invariant: only usable paths can have
+       `references', `referers', or `derivers' entries. */
+
+    /* Check the `derivers' table. */
+    Paths deriversKeys;
+    nixDB.enumTable(txn, dbDerivers, deriversKeys);
+    for (Paths::iterator i = deriversKeys.begin();
+         i != deriversKeys.end(); ++i)
+    {
+        if (usablePaths.find(*i) == usablePaths.end()) {
+            printMsg(lvlError, format("found deriver entry for unusable path `%1%'")
+                % *i);
+            nixDB.delPair(txn, dbDerivers, *i);
+        }
+        else {
+            Path deriver = queryDeriver(txn, *i);
+            if (!isStorePath(deriver)) {
+                printMsg(lvlError, format("found corrupt deriver `%1%' for `%2%'")
+                    % deriver % *i);
+                nixDB.delPair(txn, dbDerivers, *i);
+            }
+        }
+    }
+
+    /* Check the `references' table. */
+    Paths referencesKeys;
+    nixDB.enumTable(txn, dbReferences, referencesKeys);
+    for (Paths::iterator i = referencesKeys.begin();
+         i != referencesKeys.end(); ++i)
+    {
+        if (usablePaths.find(*i) == usablePaths.end()) {
+            printMsg(lvlError, format("found references entry for unusable path `%1%'")
+                % *i);
+            nixDB.delPair(txn, dbReferences, *i);
+        }
+        else {
+            PathSet references;
+            queryReferences(txn, *i, references);
+            for (PathSet::iterator j = references.begin();
+                 j != references.end(); ++j)
+            {
+                PathSet referers = getReferers(txn, *j);
+                if (referers.find(*i) == referers.end()) {
+                    printMsg(lvlError, format("missing referer mapping from `%1%' to `%2%'")
+                        % *j % *i);
+                }
+            }
+        }
+    }
+
+    /* Check the `referers' table. */
+    Paths referersKeys;
+    nixDB.enumTable(txn, dbReferers, referersKeys);
+    for (Paths::iterator i = referersKeys.begin();
+         i != referersKeys.end(); ++i)
+    {
+        if (usablePaths.find(*i) == usablePaths.end()) {
+            printMsg(lvlError, format("found referers entry for unusable path `%1%'")
+                % *i);
+            nixDB.delPair(txn, dbReferers, *i);
+        }
+        else {
+            PathSet referers;
+            queryReferers(txn, *i, referers);
+            for (PathSet::iterator j = referers.begin();
+                 j != referers.end(); ++j)
+            {
+                Paths references;
+                nixDB.queryStrings(txn, dbReferences, *j, references);
+                if (find(references.begin(), references.end(), *i) == references.end()) {
+                    printMsg(lvlError, format("missing reference mapping from `%1%' to `%2%'")
+                        % *j % *i);
+                }
+            }
+        }
     }
 
     txn.commit();

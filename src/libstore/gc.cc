@@ -279,7 +279,7 @@ static void dfsVisit(const PathSet & paths, const Path & path,
     
     PathSet references;
     if (isValidPath(path))
-        queryReferences(path, references);
+        queryReferences(noTxn, path, references);
     
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)
