@@ -1,4 +1,4 @@
-#! /usr/bin/perl -w -I/home/eelco/nix/scripts
+#! @perl@ -w -I@libexecdir@/nix
 
 use strict;
 use POSIX qw(tmpnam);
@@ -186,22 +186,22 @@ foreach my $p (keys %dstOutPaths) {
         my $srcNarBz2 = getNarBz2 \%srcNarFiles, $closest;
         my $dstNarBz2 = getNarBz2 \%dstNarFiles, $p;
         
-        system("bunzip2 < $srcNarBz2 > $tmpdir/A") == 0
+        system("@bunzip2@ < $srcNarBz2 > $tmpdir/A") == 0
             or die "cannot unpack $srcNarBz2";
 
-        system("bunzip2 < $dstNarBz2 > $tmpdir/B") == 0
+        system("@bunzip2@ < $dstNarBz2 > $tmpdir/B") == 0
             or die "cannot unpack $dstNarBz2";
 
-        system("bsdiff $tmpdir/A $tmpdir/B $tmpdir/DIFF") == 0
+        system("@libexecdir@/bspatch $tmpdir/A $tmpdir/B $tmpdir/DIFF") == 0
             or die "cannot compute binary diff";
 
-        my $baseHash = `nix-hash --flat $tmpdir/A` or die;
+        my $baseHash = `@bindir@/nix-hash --flat $tmpdir/A` or die;
         chomp $baseHash;
 
-        my $narHash = `nix-hash --flat $tmpdir/B` or die;
+        my $narHash = `@bindir@/nix-hash --flat $tmpdir/B` or die;
         chomp $narHash;
 
-        my $narDiffHash = `nix-hash --flat $tmpdir/DIFF` or die;
+        my $narDiffHash = `@bindir@/nix-hash --flat $tmpdir/DIFF` or die;
         chomp $narDiffHash;
 
         my $narDiffSize = (stat "$tmpdir/DIFF")[7];
