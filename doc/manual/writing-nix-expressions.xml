@@ -933,14 +933,126 @@ used in the Nix expression for Subversion.</para>
 
 <simplesect><title>With expressions</title>
 
-<para>TODO</para>
+<para>A <emphasis>with</emphasis> expression,
+
+<programlisting>
+with <replaceable>e1</replaceable>; <replaceable>e2</replaceable></programlisting>
+
+introduces the attribute set <replaceable>e1</replaceable> into the
+lexical scope of the expression <replaceable>e2</replaceable>.  For
+instance,
+
+<programlisting>
+let {
+  as = {x = "foo"; y = "bar";};
+
+  body = with as; x + y;
+}</programlisting>
+
+evaluates to <literal>"foobar"</literal> since the
+<literal>with</literal> adds the <varname>x</varname> and
+<varname>y</varname> attributes of <varname>as</varname> to the
+lexical scope in the expression <literal>x + y</literal>.  The most
+common use of <literal>with</literal> is in conjunction with the
+<function>import</function> function.  E.g.,
+
+<programlisting>
+with (import ./definitions.nix); ...</programlisting>
+
+makes all attributes defined in the file
+<filename>definitions.nix</filename> available as if they were defined
+locally in a <literal>rec</literal>-expression.</para>
 
 </simplesect>
 
 
 <simplesect><title>Operators</title>
 
-<para>TODO</para>
+<para><xref linkend='table-operators' /> lists the operators in the
+Nix expression language, in order of precedence (from strongest to
+weakest binding).</para>
+
+<table id='table-operators'>
+  <title>Operators</title>
+  <tgroup cols='3'>
+    <thead>
+      <row>
+        <entry>Syntax</entry>
+        <entry>Associativity</entry>
+        <entry>Description</entry>
+      </row>
+    </thead>
+    <tbody>
+      <row>
+        <entry><replaceable>e1</replaceable> ~ <replaceable>e2</replaceable></entry>
+        <entry>none</entry>
+        <entry>Construct a reference to a subpath of a derivation.
+        E.g., <literal>hello ~ "/bin/sh"</literal> refers to the
+        <filename>/bin/sh</filename> path within the Hello derivation.
+        Useful in specifying derivation attributes.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e</replaceable> ?
+        <replaceable>id</replaceable></entry>
+        <entry>none</entry>
+        <entry>Test whether attribute set <replaceable>e</replaceable>
+        contains an attribute named
+        <replaceable>id</replaceable>.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> + <replaceable>e2</replaceable></entry>
+        <entry>left</entry>
+        <entry>String or path concatenation.</entry>
+      </row>
+      <row>
+        <entry>! <replaceable>e</replaceable></entry>
+        <entry>left</entry>
+        <entry>Boolean negation.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> //
+        <replaceable>e2</replaceable></entry>
+        <entry>right</entry>
+        <entry>Return an attribute set consisting of the attributes in
+        <replaceable>e1</replaceable> and
+        <replaceable>e2</replaceable> (with the latter taking
+        precedence over the former in case of equally named attributes).</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> ==
+        <replaceable>e2</replaceable></entry>
+        <entry>none</entry>
+        <entry>Equality.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> !=
+        <replaceable>e2</replaceable></entry>
+        <entry>none</entry>
+        <entry>Inequality.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> &amp;&amp;
+        <replaceable>e2</replaceable></entry>
+        <entry>left</entry>
+        <entry>Logical AND.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> ||
+        <replaceable>e2</replaceable></entry>
+        <entry>left</entry>
+        <entry>Logical OR.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> ->
+        <replaceable>e2</replaceable></entry>
+        <entry>none</entry>
+        <entry>Logical implication (equivalent to
+        <literal>!<replaceable>e1</replaceable> ||
+        <replaceable>e2</replaceable></literal>).</entry>
+      </row>
+    </tbody>
+  </tgroup>
+</table>
 
 </simplesect>
 
@@ -955,6 +1067,15 @@ used in the Nix expression for Subversion.</para>
 <simplesect><title>Other built-in functions</title>
 
 <para>TODO</para>
+
+</simplesect>
+
+
+<simplesect><title>Comments</title>
+
+<para>Comments can be single-line, started with a <literal>#</literal>
+character, or inline/multi-line, enclosed within <literal>/*
+... */</literal>.</para>
 
 </simplesect>
 
