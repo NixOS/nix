@@ -17,6 +17,8 @@ my $date = `date`;
 chomp $date;
 print LOGFILE "$$ get $targetPath $date\n";
 
+print "\n*** Trying to download/patch `$targetPath'\n";
+
 
 # Load all manifests.
 my %narFiles;
@@ -24,7 +26,7 @@ my %patches;
 my %successors;
 
 for my $manifest (glob "$manifestDir/*.nixmanifest") {
-    print STDERR "reading $manifest\n";
+#    print STDERR "reading $manifest\n";
     readManifest $manifest, \%narFiles, \%patches, \%successors;
 }
 
@@ -77,7 +79,7 @@ sub isValidPath {
 
 while ($queueFront < scalar @queue) {
     my $u = $queue[$queueFront++];
-    print "$u\n";
+#    print "$u\n";
 
     addNode $u;
 
@@ -96,13 +98,13 @@ while ($queueFront < scalar @queue) {
                 # !!! this should be cached
                 my $hash = `nix-hash "$patch->{basePath}"`;
                 chomp $hash;
-                print "  MY HASH is $hash\n";
+#                print "  MY HASH is $hash\n";
                 if ($hash ne $patch->{baseHash}) {
-                    print "  REJECTING PATCH from $patch->{basePath}\n";
+                    print LOGFILE "$$ rejecting $patch->{basePath}\n";
                     next;
                 }
             }
-            print "  PATCH from $patch->{basePath}\n";
+#            print "  PATCH from $patch->{basePath}\n";
             addToQueue $patch->{basePath};
             addEdge $patch->{basePath}, $u, $patch->{size}, "patch", $patch;
         }
@@ -110,7 +112,7 @@ while ($queueFront < scalar @queue) {
         # Add NAR file edges to the start node.
         my $narFileList = $narFiles{$u};
         foreach my $narFile (@{$narFileList}) {
-            print "  NAR from $narFile->{url}\n";
+#            print "  NAR from $narFile->{url}\n";
             addEdge "start", $u, $narFile->{size}, "narfile", $narFile;
             if ($u eq $targetPath) {
                 print LOGFILE "$$ full-download-would-be $narFile->{size}\n";
@@ -139,7 +141,7 @@ while (scalar @todo > 0) {
 
     my $u_ = $graph{$u};
 
-    print "IN $u $u_->{d}\n";
+#    print "IN $u $u_->{d}\n";
 
     foreach my $edge (@{$u_->{edges}}) {
         my $v_ = $graph{$edge->{end}};
@@ -148,7 +150,7 @@ while (scalar @todo > 0) {
             # Store the edge; to edge->start is actually the
             # predecessor.
             $v_->{pred} = $edge; 
-            print "  RELAX $edge->{end} $v_->{d}\n";
+#            print "  RELAX $edge->{end} $v_->{d}\n";
         }
     }
 }
