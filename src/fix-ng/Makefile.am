@@ -1,6 +1,6 @@
 bin_PROGRAMS = fix-ng
 
-fix_ng_SOURCES = fix.cc parser.cc
+fix_ng_SOURCES = fix-expr.cc parser.cc fix.cc
 fix_ng_LDADD = ../libmain/libmain.a ../libnix/libnix.a ../boost/format/libformat.a \
  -L../../externals/inst/lib -ldb_cxx -lsglr -lATB -lconversion -lasfix2 -lmept -lATerm
 

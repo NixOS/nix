@@ -29,5 +29,5 @@ ATerm bottomupRewrite(TermFun & f, ATerm e)
         return (ATerm) ATreverse(out);
     }
 
-    throw badTerm("cannot rewrite", e);
+    return e;
 }

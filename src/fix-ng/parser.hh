@@ -1,15 +1,10 @@
 #ifndef __PARSER_H
 #define __PARSER_H
 
-#include <string>
-#include <aterm2.h>
-
-#include "util.hh"
+#include "fix-expr.hh"
 
 
-typedef ATerm Expr;
-
-Expr parseExprFromFile(const Path & path);
+Expr parseExprFromFile(Path path);
 
 
 #endif /* !__PARSER_H */
