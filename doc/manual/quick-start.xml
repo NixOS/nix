@@ -102,7 +102,7 @@ $ nix-env --rollback</screen>
 
 <listitem><para>You should periodically run the Nix garbage collector
 to get rid of unused packages, since uninstalls or upgrades don't
-actual delete them:
+actually delete them:
 
 <screen>
 $ nix-env --delete-generations old

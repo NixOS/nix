@@ -31,7 +31,7 @@ Nix expressions called the Nix Package collection that contains
 components ranging from basic development stuff such as GCC and Glibc,
 to end-user applications like Mozilla Firefox.  (Nix is however not
 tied to the Nix Package collection; you could write your own Nix
-expression based on that, or completely new.)  You can download the
+expression based on it, or completely new ones.)  You can download the
 latest version from <ulink
 url='http://catamaran.labs.cs.uu.nl/dist/nix' />.  You probably want
 the latest unstable release; currently the stable releases tend to lag
@@ -55,7 +55,7 @@ where <literal>nixpkgs-<replaceable>version</replaceable></literal> is
 where you've unpacked the release.</para>
 
 <para>It is also possible to see the <emphasis>status</emphasis> of
-available component, i.e., whether they are installed into the user
+available components, i.e., whether they are installed into the user
 environment and/or present in the system:
 
 <screen>
@@ -69,12 +69,13 @@ IPS bison-1.875d
 The first character (<literal>I</literal>) indicates whether the
 component is installed in your current user environment.  The second
 (<literal>P</literal>) indicates whether it is present on your system
-(in which case installing it into your user environment would be very
-quick).  The last one (<literal>S</literal>) indicates whether there
-is a so-called <emphasis>substitute</emphasis> for the component,
-which is Nix's mechanism for doing binary deployment.  It just means
-that Nix know that it can fetch a pre-built component from somewhere
-(typically a network server) instead of building it locally.</para>
+(in which case installing it into your user environment would be a
+very quick operation).  The last one (<literal>S</literal>) indicates
+whether there is a so-called <emphasis>substitute</emphasis> for the
+component, which is Nix's mechanism for doing binary deployment.  It
+just means that Nix know that it can fetch a pre-built component from
+somewhere (typically a network server) instead of building it
+locally.</para>
 
 <para>So now that we have a set of Nix expressions we can build the
 components contained in them.  This is done using <literal>nix-env
@@ -91,8 +92,8 @@ system</ulink>).</para>
 <para>When you do this for the first time, Nix will start building
 Subversion and all its dependencies.  This will take quite a while —
 typically an hour or two on modern machines.  Fortunately, there is a
-faster way (so just do a Ctrl-C on that install operation!): you just
-need to tell Nix that pre-built binaries of all those components are
+faster way (so do a Ctrl-C on that install operation!): you just need
+to tell Nix that pre-built binaries of all those components are
 available somewhere.  This is done using the
 <command>nix-pull</command> command, which must be supplied with a URL
 containing a <emphasis>manifest</emphasis> describing what binaries
@@ -110,7 +111,7 @@ downloading binaries from <systemitem
 class='fqdomainname'>catamaran.labs.cs.uu.nl</systemitem>, instead of
 building them from source.  This might still take a while since all
 dependencies must be downloaded, but on a reasonably fast connection
-such as an ADSL line it's on the order of a few minutes.</para>
+such as an DSL line it's on the order of a few minutes.</para>
 
 <para>Naturally, packages can also be uninstalled:
 
@@ -127,10 +128,10 @@ $ nix-env -f nixpkgs-<replaceable>version</replaceable> -u subversion</screen>
 
 This will <emphasis>only</emphasis> upgrade Subversion if there is a
 <quote>newer</quote> version in the new set of Nix expressions, as
-defined by some pretty much arbitrary rules regarding ordering of
-version numbers (which generally do what you'd expect of them).  To
-just unconditionally replace Subversion with whatever version is in
-the Nix expressions, use <parameter>-i</parameter> instead of
+defined by some pretty arbitrary rules regarding ordering of version
+numbers (which generally do what you'd expect of them).  To just
+unconditionally replace Subversion with whatever version is in the Nix
+expressions, use <parameter>-i</parameter> instead of
 <parameter>-u</parameter>; <parameter>-i</parameter> will remove
 whatever version is already installed.</para>
 
@@ -261,7 +262,7 @@ lrwxrwxrwx  1 eelco ... default-43-link -> /nix/store/84c85f89ddbf...-user-env
 lrwxrwxrwx  1 eelco ... default -> default-43-link</screen>
 
 This shows a profile called <filename>default</filename>.  The file
-<filename>default</filename> itself is actually a symlink that point
+<filename>default</filename> itself is actually a symlink that points
 to the current generation.  When we do a <command>nix-env</command>
 operation, a new user environment and generation link are created
 based on the current one, and finally the <filename>default</filename>
@@ -295,13 +296,13 @@ $ nix-env --list-generations</screen></para>
 figure above.  You generally wouldn't have
 <filename>/nix/var/nix/profiles/<replaceable>some-profile</replaceable>/bin</filename>
 in your <envar>PATH</envar>.  Rather, there is a symlink
-<filename>~/.nix-profile</filename> that point to your current
+<filename>~/.nix-profile</filename> that points to your current
 profile.  This means that you should put
 <filename>~/.nix-profile/bin</filename> in your <envar>PATH</envar>
 (and indeed, that's what the initialisation script
 <filename>/nix/etc/profile.d/nix.sh</filename> does).  This makes it
-easier to switch to a different profile, which is exactly what the
-command <command>nix-env --switch-profile</command> does:
+easier to switch to a different profile.  You can do that using the
+command <command>nix-env --switch-profile</command>:
 
 <screen>
 $ nix-env --switch-profile /nix/var/nix/profiles/my-profile
@@ -311,14 +312,14 @@ $ nix-env --switch-profile /nix/var/nix/profiles/default</screen>
 These commands switch to the <filename>my-profile</filename> and
 default profile, respectively.  If the profile doesn't exist, it will
 be created automatically.  You should be careful about storing a
-profile in another location that the <filename>profiles</filename>
-directory, since otherwise it might not be used as a root to the
-garbage collection (see section <xref linkend='sec-garbage-collection'
+profile in another location than the <filename>profiles</filename>
+directory, since otherwise it might not be used as a root of the
+garbage collector (see section <xref linkend='sec-garbage-collection'
 />).</para>
 
 <para>All <command>nix-env</command> operations work on the profile
 pointed to by <command>~/.nix-profile</command>, but you can override
-this on using the <option>--profile</option> option (abbreviation
+this using the <option>--profile</option> option (abbreviation
 <option>-p</option>):
 
 <screen>
@@ -335,7 +336,7 @@ This will <emphasis>not</emphasis> change the
 <para><command>nix-env</command> operations such as upgrades
 (<option>-u</option>) and uninstall (<option>-e</option>) never
 actually delete components from the system.  All they do (as shown
-above) is to make a new user environment that no longer contains
+above) is to create a new user environment that no longer contains
 symlinks to the <quote>deleted</quote> components.</para>
 
 <para>Of course, since disk space is not infinite, unused components
@@ -414,10 +415,10 @@ a set of Nix expressions and a manifest.  Using the command
 with whatever is available at that URL.</para>
 
 <para>You can <quote>subscribe</quote> to a channel using
-<command>nix-channel --subscribe</command>, e.g.,
+<command>nix-channel --add</command>, e.g.,
 
 <screen>
-$ nix-channel --subscribe http://catamaran.labs.cs.uu.nl/dist/nix/channels/nixpkgs-unstable</screen>
+$ nix-channel --add http://catamaran.labs.cs.uu.nl/dist/nix/channels/nixpkgs-unstable</screen>
 
 subscribes you to a channel that always contains that latest version
 of the Nix Packages collection.  (Instead of
@@ -446,7 +447,7 @@ makes the union of each channel's Nix expressions the default for
 $ nix-env -u '*'</screen>
 
 to upgrade all components in your profile to the latest versions
-available in the channels.</para>
+available in the subscribed channels.</para>
 
 </sect1>
 

@@ -12,11 +12,11 @@ features are:
 
 <itemizedlist>
 
-<listitem><para>It makes sure that dependency specifications are
-complete.  In general in a deployment system you have to specify for
-each component what its dependencies are, but there are no guarantees
-that this specification is complete.  If you forget a dependency, then
-the component will build and work correctly on
+<listitem><para>It helps you make sure that dependency specifications
+are complete.  In general in a deployment system you have to specify
+for each component what its dependencies are, but there are no
+guarantees that this specification is complete.  If you forget a
+dependency, then the component will build and work correctly on
 <emphasis>your</emphasis> machine if you have the dependency
 installed, but not on the end user's machine if it's not
 there.</para></listitem>
@@ -25,8 +25,8 @@ there.</para></listitem>
 variants</emphasis> of a component installed at the same time.  In
 contrast, in systems such as RPM different versions of the same
 package tend to install to the same location in the file system, so
-you installing one version will remove the other.  This is especially
-important if you want to have use applications that have conflicting
+installing one version will remove the other.  This is especially
+important if you want to use applications that have conflicting
 requirements on different versions of a component (e.g., application A
 requires version 1.0 of library X, while application B requires a
 non-backwards compatible version 1.1).</para></listitem>
@@ -45,24 +45,23 @@ component to fail).</para></listitem>
 
 <listitem><para>Likewise, it is possible to atomically roll back after
 an install, upgrade, or uninstall action.  That is, in a fast (O(1))
-operation the previous configuration of the system will be restored.
-This is because upgrade or uninstall actions doesn't actually remove
+operation the previous configuration of the system can be restored.
+This is because upgrade or uninstall actions don't actually remove
 components from the system.</para></listitem>
 
 <listitem><para>Unused components can be
-<emphasis>garbage-collected</emphasis> automatically and safely.
-I.e., when you remove an application from a profile, its dependencies
-will be deleted by the garbage collector if there are no other active
-applications that are using it.</para></listitem>
+<emphasis>garbage-collected</emphasis> automatically and safely: when
+you remove an application from a profile, its dependencies will be
+deleted by the garbage collector only if there are no other active
+applications using them.</para></listitem>
 
 <listitem><para>Nix supports both source-based deployment models
 (where you distribute <emphasis>Nix expressions</emphasis> that tell
 Nix how to build software from source) and binary-based deployment
 models.  The latter is more-or-less transparent: installation of
-components is always based on Nix expressions, but if those
-expressions have been built before and Nix knows that the resulting
-binaries are available somewhere, it will use those
-instead.</para></listitem>
+components is always based on Nix expressions, but if the expressions
+have been built before and Nix knows that the resulting binaries are
+available somewhere, it will use those instead.</para></listitem>
 
 <listitem><para>Nix is flexible in the deployment policies that it
 supports.  There is a clear separation between the tools that
@@ -80,13 +79,12 @@ This means that if a component was built succesfully once, it can be
 rebuilt again on another machine and the result will be the same.  We
 cannot <emphasis>guarantee</emphasis> this (e.g., if the build depends
 on the time-of-day), but Nix (and the tools in the Nix Packages
-collection) takes special measures to help achieve
-this.</para></listitem>
+collection) takes special care to help achieve this.</para></listitem>
 
 <listitem><para>Nix expressions (the things that tell Nix how to build
 components) are self-contained: they describe not just components but
 complete compositions.  In other words, Nix expressions also describe
-how to build all the dependencies.  This is contrast to component
+how to build all the dependencies.  This is in contrast to component
 specification languages like RPM spec files, which might say that a
 component X depends on some other component Y, but since it does not
 describe <emphasis>exactly</emphasis> what Y is, the result of
@@ -111,7 +109,7 @@ platforms.</para></listitem>
 also for <emphasis>service deployment</emphasis>, such as the
 deployment of a complete web server with all its configuration files,
 static pages, software dependencies, and so on.  Nix's advantages for
-software deployment also apply here, for instance, the ability
+software deployment also apply here: for instance, the ability
 trivially to have multiple configurations at the same time, or the
 ability to do rollbacks.</para></listitem>
 
