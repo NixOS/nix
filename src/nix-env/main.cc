@@ -139,6 +139,8 @@ Path createLink(Path outPath, Path drvPath)
         num++;
     }
 
+    writeStringToFile(linkPath + "-src.id", drvPath);
+
     return linkPath;
 }
 
@@ -290,7 +292,7 @@ void uninstallDerivations(EvalState & state, Strings drvNames)
             installedDrvs.erase(j->second);
     }
 
-   createUserEnv(state, installedDrvs);
+    createUserEnv(state, installedDrvs);
 }
 
 

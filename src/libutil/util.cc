@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <fcntl.h>
 
 #include "util.hh"
 
@@ -189,6 +190,16 @@ Path createTempDir()
 	if (errno != EEXIST)
 	    throw SysError(format("creating directory `%1%'") % tmpDir);
     }
+}
+
+
+void writeStringToFile(const Path & path, const string & s)
+{
+    AutoCloseFD fd = open(path.c_str(),
+        O_CREAT | O_EXCL | O_WRONLY, 0666);
+    if (fd == -1)
+        throw SysError(format("creating file `%1%'") % path);
+    writeFull(fd, (unsigned char *) s.c_str(), s.size());
 }
 
 

@@ -1,9 +1,6 @@
 #include <iostream>
 
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/wait.h>
-#include <fcntl.h>
 #include <unistd.h>
 
 #include "store.hh"
@@ -307,11 +304,7 @@ void addTextToStore(const Path & dstPath, const string & s)
         PathLocks outputLock(lockPaths);
 
         if (!isValidPath(dstPath)) {
-
-            AutoCloseFD fd = open(dstPath.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0666);
-            if (fd == -1) throw SysError(format("creating store file `%1%'") % dstPath);
-
-            writeFull(fd, (unsigned char *) s.c_str(), s.size());
+            writeStringToFile(dstPath, s);
 
             Transaction txn(nixDB);
             registerValidPath(txn, dstPath);

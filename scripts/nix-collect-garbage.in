@@ -17,9 +17,24 @@ foreach my $arg (@ARGV) {
     else { die "unknown argument `$arg'" };
 }
 
+opendir(DIR, $linkdir) or die "cannot open directory $linkdir: $!";
+my @links = readdir DIR or die "cannot read directory $linkdir: $!";
+closedir DIR;
+
+my @roots;
+foreach my $link (@links) {
+    $link = $linkdir . "/" . $link;
+    next if (!($link =~ /.id$/));
+    open ROOT, "<$link" or die "cannot open $link: $!";
+    my $root = <ROOT>;
+    chomp $root;
+    close ROOT;
+    push @roots, $root;
+}
+
 my $extraarg = "";
 if ($keepsuccessors) { $extraarg = "--include-successors"; };
-my $pid = open2(\*READ, \*WRITE, "nix --query --requisites $extraarg \$(cat $linkdir/*.id)") 
+my $pid = open2(\*READ, \*WRITE, "nix-store --query --requisites $extraarg @roots") 
     or die "determining live paths";
 close WRITE;
 while (<READ>) {
@@ -34,8 +49,8 @@ $? == 0 or die "determining live paths";
 
 exit 0 if ($invert);
 
-opendir(DIR, $storedir) or die "cannot opendir $storedir: $!";
-my @names = readdir(DIR);
+opendir(DIR, $storedir) or die "cannot open directory $storedir: $!";
+my @names = readdir DIR;
 closedir DIR;
 
 foreach my $name (@names) {
