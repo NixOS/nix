@@ -29,7 +29,7 @@ lexer-tab.c lexer-tab.h: lexer.l
 nixexpr-ast.cc nixexpr-ast.hh: ../aterm-helper.pl nixexpr-ast.def
 	$(perl) ../aterm-helper.pl nixexpr-ast.hh nixexpr-ast.cc < nixexpr-ast.def
 
-nixexpr.hh: nixexpr-ast.hh
+nixexpr.cc nixexpr.hh: nixexpr-ast.hh
 
 
 CLEANFILES =
