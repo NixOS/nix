@@ -8,11 +8,11 @@ my $storedir = "@prefix@/store";
 
 my %alive;
 
-my $keepsuccessors = 0;
+my $keepsuccessors = 1;
 my $invert = 0;
 
 foreach my $arg (@ARGV) {
-    if ($arg eq "--keep-successors") { $keepsuccessors = 1; }
+    if ($arg eq "--no-successors") { $keepsuccessors = 0; }
     elsif ($arg eq "--invert") { $invert = 1; }
     else { die "unknown argument `$arg'" };
 }
