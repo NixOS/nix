@@ -131,7 +131,7 @@ static Expr evalExpr(Expr e)
         string srcPath = searchPath(s1);
         string dstPath;
         Hash hash;
-        addToStore(srcPath, dstPath, hash);
+        addToStore(srcPath, dstPath, hash, true);
         return ATmake("Path(<str>, Hash(<str>), [])",
             dstPath.c_str(), ((string) hash).c_str());
     }

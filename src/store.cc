@@ -224,24 +224,23 @@ string expandHash(const Hash & hash, const string & target,
 }
 
     
-void addToStore(string srcPath, string & dstPath, Hash & hash)
+void addToStore(string srcPath, string & dstPath, Hash & hash,
+    bool deterministicName)
 {
     srcPath = absPath(srcPath);
-
     hash = hashPath(srcPath);
+
+    string baseName = baseNameOf(srcPath);
+    dstPath = canonPath(nixStore + "/" + (string) hash + "-" + baseName);
 
     try {
         /* !!! should not use the substitutes! */
-        dstPath = expandHash(hash, "", nixStore);
+        dstPath = expandHash(hash, deterministicName ? dstPath : "", nixStore);
         return;
     } catch (...) {
     }
     
-    string baseName = baseNameOf(srcPath);
-    dstPath = canonPath(nixStore + "/" + (string) hash + "-" + baseName);
-
     copyPath(srcPath, dstPath);
-
     registerPath(dstPath, hash);
 }
 

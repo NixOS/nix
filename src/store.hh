@@ -30,7 +30,8 @@ string expandHash(const Hash & hash, const string & target = "",
 
 /* Copy a file to the nixStore directory and register it in dbRefs.
    Return the hash code of the value. */
-void addToStore(string srcPath, string & dstPath, Hash & hash);
+void addToStore(string srcPath, string & dstPath, Hash & hash,
+    bool deterministicName = false);
 
 /* Delete a value from the nixStore directory. */
 void deleteFromStore(const string & path);
