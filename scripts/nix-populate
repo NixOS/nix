@@ -1,23 +1,16 @@
 #! /usr/bin/perl -w
 
 use strict;
+use Cwd;
 
-my $pkglist = $ENV{"NIX_ACTIVATIONS"};
-$pkglist or die "NIX_ACTIVATIONS not set";
-my $linkdir = $ENV{"NIX_LINKS"};
-$linkdir or die "NIX_LINKS not set";
+my $selfdir = cwd;
+
 my @dirs = ("bin", "sbin", "lib", "include");
 
-# Figure out a generation number.
-my $nr = 1;
-while (-e "$linkdir/$nr") { $nr++; }
-my $gendir = "$linkdir/$nr";
-print "populating $gendir\n";
-
 # Create the subdirectories.
-mkdir $gendir;
+mkdir $selfdir;
 foreach my $dir (@dirs) {
-    mkdir "$gendir/$dir";
+    mkdir "$selfdir/$dir";
 }
 
 # For each activated package, create symlinks.
@@ -51,39 +44,15 @@ sub createLinks {
     }
 }
 
+foreach my $name (keys %ENV) {
 
-open PKGS, "< $pkglist";
+    next unless ($name =~ /^act.*$/);
 
-while (<PKGS>) {
-    chomp;
-    my $hash = $_;
-    
-    my $pkgdir = `nix getpkg $hash`;
-    if ($?) { die "`nix getpkg' failed"; }
-    chomp $pkgdir;
+    my $pkgdir = $ENV{$name};
 
     print "merging $pkgdir\n";
 
     foreach my $dir (@dirs) {
-	createLinks("$pkgdir/$dir", "$gendir/$dir");
+	createLinks("$pkgdir/$dir", "$selfdir/$dir");
     }
 }
-
-close PKGS;
-
-# Make $gendir the current generation by pointing $linkdir/current to
-# it.  The rename() system call is supposed to be essentially atomic
-# on Unix.  That is, if we have links `current -> X' and `new_current
-# -> Y', and we rename new_current to current, a process accessing
-# current will see X or Y, but never a file-not-found or other error
-# condition.  This is sufficient to atomically switch the current link
-# tree.
-
-my $current = "$linkdir/current";
-
-print "switching $current to $gendir\n"; 
-
-my $tmplink = "$linkdir/new_current";
-symlink($gendir, $tmplink) or die "cannot create $tmplink";
-rename($tmplink, $current) or die "cannot rename $tmplink";
-

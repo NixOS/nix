@@ -12,5 +12,6 @@ install-data-local:
 	$(INSTALL) -d $(localstatedir)/nix
 	$(INSTALL) -d $(localstatedir)/nix/descriptors
 	$(INSTALL) -d $(localstatedir)/nix/sources
+	$(INSTALL) -d $(localstatedir)/nix/links
 	$(INSTALL) -d $(prefix)/pkg
 	$(bindir)/nix init

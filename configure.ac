@@ -10,5 +10,5 @@ AC_CANONICAL_HOST
 AC_PROG_CC
 AC_PROG_CXX
 
-AC_CONFIG_FILES([Makefile src/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile scripts/Makefile])
 AC_OUTPUT
