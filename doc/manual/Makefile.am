@@ -10,6 +10,8 @@ man1_MANS = nix-env.1 nix-store.1 nix-instantiate.1 \
  nix-collect-garbage.1 nix-push.1 nix-pull.1 \
  nix-prefetch-url.1
 
+FIGURES = figures/user-environments.png
+
 SOURCES = manual.xml introduction.xml installation.xml \
  package-management.xml writing-nix-expressions.xml \
  build-farm.xml \
@@ -37,6 +39,8 @@ install-data-local: manual.html
 	$(INSTALL_DATA) manual.html $(DESTDIR)$(datadir)/nix/manual
 	$(INSTALL_DATA) style.css $(DESTDIR)$(datadir)/nix/manual
 	cp -r images $(DESTDIR)$(datadir)/nix/manual/images
+	$(INSTALL) -d $(DESTDIR)$(datadir)/nix/manual/figures
+	$(INSTALL_DATA) $(FIGURES) $(DESTDIR)$(datadir)/nix/manual/figures
 
 images:
 	mkdir images
@@ -47,6 +51,6 @@ images:
 
 KEEP = manual.html manual.is-valid version.xml $(MANS)
 
-EXTRA_DIST = $(SOURCES) $(KEEP)
+EXTRA_DIST = $(SOURCES) $(FIGURES) $(KEEP)
 
 DISTCLEANFILES = $(KEEP)
