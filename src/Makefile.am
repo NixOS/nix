@@ -4,18 +4,18 @@ check_PROGRAMS = test
 AM_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall -I..
 
 nix_SOURCES = nix.cc
-nix_LDADD = libshared.a libnix.a -ldb_cxx-4 -lATerm
+nix_LDADD = libshared.a libnix.a -ldb_cxx -lATerm
 
 nix_hash_SOURCES = nix-hash.cc
-nix_hash_LDADD = libshared.a libnix.a -ldb_cxx-4 -lATerm
+nix_hash_LDADD = libshared.a libnix.a -ldb_cxx -lATerm
 
 fix_SOURCES = fix.cc
-fix_LDADD = libshared.a libnix.a -ldb_cxx-4 -lATerm
+fix_LDADD = libshared.a libnix.a -ldb_cxx -lATerm
 
 TESTS = test
 
 test_SOURCES = test.cc
-test_LDADD = libshared.a libnix.a -ldb_cxx-4 -lATerm
+test_LDADD = libshared.a libnix.a -ldb_cxx -lATerm
 
 noinst_LIBRARIES = libnix.a libshared.a
 
