@@ -1,3 +1,3 @@
 #! /bin/sh
 
-/tmp/nix/bin/nix --restore "$out" < $nar || exit 1
+bunzip2 < $nar | /tmp/nix/bin/nix --restore "$out" || exit 1

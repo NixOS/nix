@@ -31,7 +31,7 @@ while (<CONFFILE>) {
             my $fn = $1;
             next if $fn =~ /\.\./;
             next if $fn =~ /\//;
-            next unless $fn =~ /-([0-9a-z]{32})(-s-([0-9a-z]{32}))?\.nar/;
+            next unless $fn =~ /-([0-9a-z]{32})(-s-([0-9a-z]{32}))?\.nar.bz2$/;
             my $hash = $1;
             my $fshash = $3;
 
