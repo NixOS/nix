@@ -7,7 +7,7 @@
 #include "globals.hh"
 #include "db.hh"
 #include "archive.hh"
-#include "fstate.hh"
+#include "normalise.hh"
 
 
 struct CopySink : DumpSink

@@ -150,7 +150,7 @@ void msg(const format & f)
 {
     string spaces;
     for (int i = 0; i < nestingLevel; i++)
-        spaces += "  ";
+        spaces += "|   ";
     cerr << format("%1%%2%\n") % spaces % f.str();
 }
 

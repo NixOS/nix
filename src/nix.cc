@@ -1,8 +1,7 @@
 #include <iostream>
 
 #include "globals.hh"
-#include "store.hh"
-#include "fstate.hh"
+#include "normalise.hh"
 #include "archive.hh"
 #include "shared.hh"
 

@@ -2,8 +2,7 @@
 #include <iostream>
 
 #include "globals.hh"
-#include "fstate.hh"
-#include "store.hh"
+#include "normalise.hh"
 #include "shared.hh"
 
 
@@ -111,12 +110,11 @@ static Expr evalExpr(Expr e)
         ATmatch(e, "FSId(<str>)", &s1))
         return e;
 
-    if (ATgetType(e) == AT_APPL && 
-        ((string) ATgetName(ATgetAFun(e)) == "Slice" ||
-         (string) ATgetName(ATgetAFun(e)) == "Derive"))
-    {
+    try {
+        parseFState(e);
         return ATmake("FSId(<str>)", 
-            ((string) writeTerm(e, "", 0)).c_str());
+            ((string) writeTerm(e, "")).c_str());
+    } catch (...) { /* !!! catch parse errors only */
     }
 
     /* Application. */
@@ -139,10 +137,17 @@ static Expr evalExpr(Expr e)
         string dstPath;
         FSId id;
         addToStore(srcPath, dstPath, id, true);
-        FState fs = ATmake("Slice([<str>], [(<str>, <str>, [])])",
-            ((string) id).c_str(), dstPath.c_str(), ((string) id).c_str());
+
+        SliceElem elem;
+        elem.path = dstPath;
+        elem.id = id;
+        FState fs;
+        fs.type = FState::fsSlice;
+        fs.slice.roots.push_back(id);
+        fs.slice.elems.push_back(elem);
+
         return ATmake("FSId(<str>)", 
-            ((string) writeTerm(fs, "", 0)).c_str());
+            ((string) writeTerm(unparseFState(fs), "")).c_str());
     }
 
     /* Packages are transformed into Derive fstate expressions. */
@@ -160,8 +165,10 @@ static Expr evalExpr(Expr e)
         }
 
         /* Gather information for building the Derive expression. */
-        ATermList ins = ATempty, env = ATempty;
-        string builder, name;
+        FState fs;
+        fs.type = FState::fsDerive;
+        fs.derive.platform = SYSTEM;
+        string name;
         bnds = ATempty;
 
         for (map<string, ATerm>::iterator it = bndMap.begin();
@@ -169,21 +176,19 @@ static Expr evalExpr(Expr e)
         {
             string key = it->first;
             ATerm value = it->second;
-            char * id;
 
-            if (ATmatch(value, "FSId(<str>)", &id)) {
-                Strings paths = fstatePaths(parseHash(id), false);
+            if (ATmatch(value, "FSId(<str>)", &s1)) {
+                FSId id = parseHash(s1);
+                Strings paths = fstatePaths(id, false);
                 if (paths.size() != 1) abort();
                 string path = *(paths.begin());
-                ins = ATinsert(ins, ATmake("<str>", id));
-                env = ATinsert(env, ATmake("(<str>, <str>)",
-                    key.c_str(), path.c_str()));
-                if (key == "build") builder = path;
+                fs.derive.inputs.push_back(id);
+                fs.derive.env.push_back(StringPair(key, path));
+                if (key == "build") fs.derive.builder = path;
             }
             else if (ATmatch(value, "<str>", &s1)) {
                 if (key == "name") name = s1;
-                env = ATinsert(env, 
-                    ATmake("(<str>, <str>)", key.c_str(), s1));
+                fs.derive.env.push_back(StringPair(key, s1));
             }
             else throw badTerm("invalid package argument", value);
 
@@ -191,31 +196,24 @@ static Expr evalExpr(Expr e)
                 ATmake("(<str>, <term>)", key.c_str(), value));
         }
 
-        /* Hash the normal form to produce a unique but deterministic
-           path name for this package. */
-        ATerm nf = ATmake("Package(<term>)", ATreverse(bnds));
-        FSId outId = hashTerm(nf);
-
-        if (builder == "")
-            throw badTerm("no builder specified", nf);
+        if (fs.derive.builder == "")
+            throw badTerm("no builder specified", e);
         
         if (name == "")
-            throw badTerm("no package name specified", nf);
+            throw badTerm("no package name specified", e);
         
+        /* Hash the fstate-expression with no outputs to produce a
+           unique but deterministic path name for this package. */
+        Hash outId = hashTerm(unparseFState(fs));
         string outPath = 
             canonPath(nixStore + "/" + ((string) outId).c_str() + "-" + name);
-
-        env = ATinsert(env, ATmake("(<str>, <str>)", "out", outPath.c_str()));
-        
-        /* Construct the result. */
-        FState fs = 
-            ATmake("Derive([(<str>, <str>)], <term>, <str>, <str>, <term>)",
-                outPath.c_str(), ((string) outId).c_str(),
-                ins, builder.c_str(), SYSTEM, env);
+        fs.derive.env.push_back(StringPair("out", outPath));
+        fs.derive.outputs.push_back(DeriveOutput(outPath, outId));
+        debug(format("%1%: %2%") % (string) outId % name);
 
         /* Write the resulting term into the Nix store directory. */
         return ATmake("FSId(<str>)", 
-            ((string) writeTerm(fs, "-d-" + name, 0)).c_str());
+            ((string) writeTerm(unparseFState(fs), "-d-" + name)).c_str());
     }
 
     /* BaseName primitive function. */

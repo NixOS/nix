@@ -6,14 +6,14 @@
 #include "hash.hh"
 #include "archive.hh"
 #include "util.hh"
-#include "fstate.hh"
-#include "store.hh"
+#include "normalise.hh"
 #include "globals.hh"
 
 
 void realise(FSId id)
 {
-    cout << format("realising %1%\n") % (string) id;
+    debug(format("TEST: realising %1%") % (string) id);
+    Nest nest(true);
     Slice slice = normaliseFState(id);
     realiseSlice(slice);
 }
@@ -117,7 +117,7 @@ void runTests()
     string builder1fn;
     addToStore("./test-builder-1.sh", builder1fn, builder1id);
 
-    FState fs1 = ATmake(
+    ATerm fs1 = ATmake(
         "Slice([<str>], [(<str>, <str>, [])])",
         ((string) builder1id).c_str(),
         builder1fn.c_str(),
@@ -127,7 +127,7 @@ void runTests()
     realise(fs1id);
     realise(fs1id);
 
-    FState fs2 = ATmake(
+    ATerm fs2 = ATmake(
         "Slice([<str>], [(<str>, <str>, [])])",
         ((string) builder1id).c_str(),
         (builder1fn + "_bla").c_str(),
@@ -139,7 +139,7 @@ void runTests()
 
     string out1id = hashString("foo"); /* !!! bad */
     string out1fn = nixStore + "/" + (string) out1id + "-hello.txt";
-    FState fs3 = ATmake(
+    ATerm fs3 = ATmake(
         "Derive([(<str>, <str>)], [<str>], <str>, <str>, [(\"out\", <str>)])",
         out1fn.c_str(),
         ((string) out1id).c_str(),
@@ -158,7 +158,7 @@ void runTests()
     string builder4fn;
     addToStore("./test-builder-2.sh", builder4fn, builder4id);
 
-    FState fs4 = ATmake(
+    ATerm fs4 = ATmake(
         "Slice([<str>], [(<str>, <str>, [])])",
         ((string) builder4id).c_str(),
         builder4fn.c_str(),
@@ -169,7 +169,7 @@ void runTests()
 
     string out5id = hashString("bar"); /* !!! bad */
     string out5fn = nixStore + "/" + (string) out5id + "-hello2";
-    FState fs5 = ATmake(
+    ATerm fs5 = ATmake(
         "Derive([(<str>, <str>)], [<str>], <str>, <str>, [(\"out\", <str>), (\"builder\", <str>)])",
         out5fn.c_str(),
         ((string) out5id).c_str(),
@@ -183,27 +183,6 @@ void runTests()
 
     realise(fs5id);
     realise(fs5id);
-
-
-#if 0
-    FState fs2 = ATmake(
-        "Path(<str>, Hash(<str>), [])", 
-        (builder1fn + "_bla").c_str(),
-        ((string) builder1h).c_str());
-    realise(fs2);
-    realise(fs2);
-
-    string out1fn = nixStore + "/hello.txt";
-    FState fs3 = ATmake(
-        "Derive(<str>, <str>, [<term>], <str>, [(\"out\", <str>)])",
-        thisSystem.c_str(),
-        builder1fn.c_str(),
-        fs1,
-        out1fn.c_str(),
-        out1fn.c_str());
-    realise(fs3);
-#endif
-
 }
 
 

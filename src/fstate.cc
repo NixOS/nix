@@ -1,141 +1,6 @@
-#include <map>
-#include <iostream>
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <fcntl.h>
-
 #include "fstate.hh"
 #include "globals.hh"
 #include "store.hh"
-#include "db.hh"
-#include "references.hh"
-
-
-/* A Unix environment is a mapping from strings to strings. */
-typedef map<string, string> Environment;
-
-
-class AutoDelete
-{
-    string path;
-    bool del;
-public:
-
-    AutoDelete(const string & p) : path(p) 
-    {
-        del = true;
-    }
-
-    ~AutoDelete()
-    {
-        if (del) deletePath(path);
-    }
-
-    void cancel()
-    {
-        del = false;
-    }
-};
-
-
-/* Run a program. */
-static void runProgram(const string & program, Environment env)
-{
-    /* Create a log file. */
-    string logFileName = nixLogDir + "/run.log";
-    /* !!! auto-pclose on exit */
-    FILE * logFile = popen(("tee -a " + logFileName + " >&2").c_str(), "w"); /* !!! escaping */
-    if (!logFile)
-        throw SysError(format("creating log file `%1%'") % logFileName);
-
-    /* Create a temporary directory where the build will take
-       place. */
-    static int counter = 0;
-    string tmpDir = (format("/tmp/nix-%1%-%2%") % getpid() % counter++).str();
-
-    if (mkdir(tmpDir.c_str(), 0777) == -1)
-        throw SysError(format("creating directory `%1%'") % tmpDir);
-
-    AutoDelete delTmpDir(tmpDir);
-
-    /* Fork a child to build the package. */
-    pid_t pid;
-    switch (pid = fork()) {
-            
-    case -1:
-        throw SysError("unable to fork");
-
-    case 0: 
-
-        try { /* child */
-
-            if (chdir(tmpDir.c_str()) == -1)
-                throw SysError(format("changing into to `%1%'") % tmpDir);
-
-            /* Fill in the environment.  We don't bother freeing
-               the strings, since we'll exec or die soon
-               anyway. */
-            const char * env2[env.size() + 1];
-            int i = 0;
-            for (Environment::iterator it = env.begin();
-                 it != env.end(); it++, i++)
-                env2[i] = (new string(it->first + "=" + it->second))->c_str();
-            env2[i] = 0;
-
-            /* Dup the log handle into stderr. */
-            if (dup2(fileno(logFile), STDERR_FILENO) == -1)
-                throw SysError("cannot pipe standard error into log file");
-            
-            /* Dup stderr to stdin. */
-            if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
-                throw SysError("cannot dup stderr into stdout");
-
-            /* Make the program executable.  !!! hack. */
-            if (chmod(program.c_str(), 0755))
-                throw SysError("cannot make program executable");
-
-            /* Execute the program.  This should not return. */
-            execle(program.c_str(), baseNameOf(program).c_str(), 0, env2);
-
-            throw SysError(format("unable to execute %1%") % program);
-            
-        } catch (exception & e) {
-            cerr << format("build error: %1%\n") % e.what();
-        }
-        _exit(1);
-
-    }
-
-    /* parent */
-
-    /* Close the logging pipe.  Note that this should not cause
-       the logger to exit until builder exits (because the latter
-       has an open file handle to the former). */
-    pclose(logFile);
-    
-    /* Wait for the child to finish. */
-    int status;
-    if (waitpid(pid, &status, 0) != pid)
-        throw Error("unable to wait for child");
-    
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-        delTmpDir.cancel();
-        throw Error("unable to build package");
-    }
-}
-
-
-/* Throw an exception if the given platform string is not supported by
-   the platform we are executing on. */
-static void checkPlatform(const string & platform)
-{
-    if (platform != thisSystem)
-        throw Error(format("a `%1%' is required, but I am a `%2%'")
-            % platform % thisSystem);
-}
 
 
 string printTerm(ATerm t)
@@ -157,23 +22,16 @@ Hash hashTerm(ATerm t)
 }
 
 
-FState hash2fstate(Hash hash)
-{
-    return ATmake("Include(<str>)", ((string) hash).c_str());
-}
-
-
-ATerm termFromId(const FSId & id, string * p)
+ATerm termFromId(const FSId & id)
 {
     string path = expandId(id);
-    if (p) *p = path;
     ATerm t = ATreadFromNamedFile(path.c_str());
     if (!t) throw Error(format("cannot read aterm from `%1%'") % path);
     return t;
 }
 
 
-FSId writeTerm(ATerm t, const string & suffix, string * p)
+FSId writeTerm(ATerm t, const string & suffix)
 {
     FSId id = hashTerm(t);
 
@@ -182,25 +40,11 @@ FSId writeTerm(ATerm t, const string & suffix, string * p)
     if (!ATwriteToNamedTextFile(t, path.c_str()))
         throw Error(format("cannot write aterm %1%") % path);
 
+//     debug(format("written term %1% = %2%") % (string) id %
+//         printTerm(t));
+
     registerPath(path, id);
-    if (p) *p = path;
-
     return id;
-}
-
-
-void registerSuccessor(const FSId & id1, const FSId & id2)
-{
-    setDB(nixDB, dbSuccessors, id1, id2);
-}
-
-
-static FSId storeSuccessor(const FSId & id1, FState sc,
-    string * p)
-{
-    FSId id2 = writeTerm(sc, "-s-" + (string) id1, p);
-    registerSuccessor(id1, id2);
-    return id2;
 }
 
 
@@ -217,249 +61,7 @@ static void parseIds(ATermList ids, FSIds & out)
 }
 
 
-static void checkSlice(const Slice & slice);
-
-
-/* Parse a slice. */
-static Slice parseSlice(FState fs)
-{
-    Slice slice;
-    ATermList roots, elems;
-    
-    if (!ATmatch(fs, "Slice([<list>], [<list>])", &roots, &elems))
-        throw badTerm("not a slice", fs);
-
-    parseIds(roots, slice.roots);
-
-    while (!ATisEmpty(elems)) {
-        char * s1, * s2;
-        ATermList refs;
-        ATerm t = ATgetFirst(elems);
-        if (!ATmatch(t, "(<str>, <str>, [<list>])", &s1, &s2, &refs))
-            throw badTerm("not a slice element", t);
-        SliceElem elem;
-        elem.path = s1;
-        elem.id = parseHash(s2);
-        parseIds(refs, elem.refs);
-        slice.elems.push_back(elem);
-        elems = ATgetNext(elems);
-    }
-
-    checkSlice(slice);
-
-    return slice;
-}
-
-
-static ATermList unparseIds(const FSIds & ids)
-{
-    ATermList l = ATempty;
-    for (FSIds::const_iterator i = ids.begin();
-         i != ids.end(); i++)
-        l = ATinsert(l,
-            ATmake("<str>", ((string) *i).c_str()));
-    return ATreverse(l);
-}
-
-
-static FState unparseSlice(const Slice & slice)
-{
-    ATermList roots = unparseIds(slice.roots);
-    
-    ATermList elems = ATempty;
-    for (SliceElems::const_iterator i = slice.elems.begin();
-         i != slice.elems.end(); i++)
-        elems = ATinsert(elems,
-            ATmake("(<str>, <str>, <term>)",
-                i->path.c_str(),
-                ((string) i->id).c_str(),
-                unparseIds(i->refs)));
-
-    return ATmake("Slice(<term>, <term>)", roots, elems);
-}
-
-
 typedef set<FSId> FSIdSet;
-
-
-static Slice normaliseFState2(FSId id, StringSet & usedPaths)
-{
-    debug(format("normalising fstate"));
-    Nest nest(true);
-
-    /* Try to substitute $id$ by any known successors in order to
-       speed up the rewrite process. */
-    string idSucc;
-    while (queryDB(nixDB, dbSuccessors, id, idSucc)) {
-        debug(format("successor %1% -> %2%") % (string) id % idSucc);
-        id = parseHash(idSucc);
-    }
-
-    /* Get the fstate expression. */
-    string fsPath;
-    FState fs = termFromId(id, &fsPath);
-
-    /* Already in normal form (i.e., a slice)? */
-    if (ATgetType(fs) == AT_APPL && 
-        (string) ATgetName(ATgetAFun(fs)) == "Slice")
-    {
-        usedPaths.insert(fsPath);
-        return parseSlice(fs);
-    }
-    
-    /* Then we it's a Derive node. */
-    ATermList outs, ins, bnds;
-    char * builder;
-    char * platform;
-    if (!ATmatch(fs, "Derive([<list>], [<list>], <str>, <str>, [<list>])",
-            &outs, &ins, &builder, &platform, &bnds))
-        throw badTerm("not a derive", fs);
-
-    /* Right platform? */
-    checkPlatform(platform);
-        
-    /* Realise inputs (and remember all input paths). */
-    FSIds inIds;
-    parseIds(ins, inIds);
-
-    typedef map<string, SliceElem> ElemMap;
-
-    ElemMap inMap;
-
-    for (FSIds::iterator i = inIds.begin(); i != inIds.end(); i++) {
-        Slice slice = normaliseFState(*i);
-        realiseSlice(slice);
-
-        for (SliceElems::iterator j = slice.elems.begin();
-             j != slice.elems.end(); j++)
-            inMap[j->path] = *j;
-    }
-
-    Strings inPaths;
-    for (ElemMap::iterator i = inMap.begin(); i != inMap.end(); i++)
-        inPaths.push_back(i->second.path);
-
-    /* Build the environment. */
-    Environment env;
-    while (!ATisEmpty(bnds)) {
-        char * s1, * s2;
-        ATerm bnd = ATgetFirst(bnds);
-        if (!ATmatch(bnd, "(<str>, <str>)", &s1, &s2))
-            throw badTerm("tuple of strings expected", bnd);
-        env[s1] = s2;
-        bnds = ATgetNext(bnds);
-    }
-
-    /* Parse the outputs. */
-    typedef map<string, FSId> OutPaths;
-    OutPaths outPaths;
-    while (!ATisEmpty(outs)) {
-        ATerm t = ATgetFirst(outs);
-        char * s1, * s2;
-        if (!ATmatch(t, "(<str>, <str>)", &s1, &s2))
-            throw badTerm("string expected", t);
-        outPaths[s1] = parseHash(s2);
-        inPaths.push_back(s1);
-        outs = ATgetNext(outs);
-    }
-
-    /* We can skip running the builder if we can expand all output
-       paths from their ids. */
-    bool fastBuild = false;
-#if 0
-    for (OutPaths::iterator i = outPaths.begin(); 
-         i != outPaths.end(); i++)
-    {
-        try {
-            expandId(i->second, i->first);
-        } catch (...) {
-            fastBuild = false;
-            break;
-        }
-    }
-#endif
-
-    if (!fastBuild) {
-
-        /* Check that none of the outputs exist. */
-        for (OutPaths::iterator i = outPaths.begin(); 
-             i != outPaths.end(); i++)
-            if (pathExists(i->first))
-                throw Error(format("path `%1%' exists") % i->first);
-
-        /* Run the builder. */
-        runProgram(builder, env);
-        
-    } else
-        debug(format("skipping build"));
-
-    Slice slice;
-
-    /* Check whether the output paths were created, and register each
-       one. */
-    FSIdSet used;
-    for (OutPaths::iterator i = outPaths.begin(); 
-         i != outPaths.end(); i++)
-    {
-        string path = i->first;
-        if (!pathExists(path))
-            throw Error(format("path `%1%' does not exist") % path);
-        registerPath(path, i->second);
-        slice.roots.push_back(i->second);
-
-        Strings refs = filterReferences(path, inPaths);
-
-        SliceElem elem;
-        elem.path = path;
-        elem.id = i->second;
-
-        for (Strings::iterator j = refs.begin(); j != refs.end(); j++) {
-            ElemMap::iterator k;
-            OutPaths::iterator l;
-            if ((k = inMap.find(*j)) != inMap.end()) {
-                elem.refs.push_back(k->second.id);
-                used.insert(k->second.id);
-                for (FSIds::iterator m = k->second.refs.begin();
-                     m != k->second.refs.end(); m++)
-                    used.insert(*m);
-            } else if ((l = outPaths.find(*j)) != outPaths.end()) {
-                elem.refs.push_back(l->second);
-                used.insert(l->second);
-            } else 
-                throw Error(format("unknown referenced path `%1%'") % *j);
-        }
-
-        slice.elems.push_back(elem);
-    }
-
-    for (ElemMap::iterator i = inMap.begin();
-         i != inMap.end(); i++)
-    {
-        FSIdSet::iterator j = used.find(i->second.id);
-        if (j == used.end())
-            debug(format("NOT referenced: `%1%'") % i->second.path);
-        else {
-            debug(format("referenced: `%1%'") % i->second.path);
-            slice.elems.push_back(i->second);
-        }
-    }
-
-    FState nf = unparseSlice(slice);
-    debug(printTerm(nf));
-    storeSuccessor(id, nf, &fsPath);
-    usedPaths.insert(fsPath);
-
-    parseSlice(nf); /* check */
-
-    return slice;
-}
-
-
-Slice normaliseFState(FSId id)
-{
-    StringSet dummy;
-    return normaliseFState2(id, dummy);
-}
 
 
 static void checkSlice(const Slice & slice)
@@ -486,97 +88,142 @@ static void checkSlice(const Slice & slice)
 }
 
 
-void realiseSlice(const Slice & slice)
+/* Parse a slice. */
+static bool parseSlice(ATerm t, Slice & slice)
 {
-    debug(format("realising slice"));
-    Nest nest(true);
+    ATermList roots, elems;
+    
+    if (!ATmatch(t, "Slice([<list>], [<list>])", &roots, &elems))
+        return false;
 
-    /* Perhaps all paths already contain the right id? */
+    parseIds(roots, slice.roots);
 
-    bool missing = false;
-    for (SliceElems::const_iterator i = slice.elems.begin();
-         i != slice.elems.end(); i++)
-    {
-        SliceElem elem = *i;
-        string id;
-        if (!queryDB(nixDB, dbPath2Id, elem.path, id)) {
-            if (pathExists(elem.path))
-                throw Error(format("path `%1%' obstructed") % elem.path);
-            missing = true;
-            break;
-        }
-        if (parseHash(id) != elem.id)
-            throw Error(format("path `%1%' obstructed") % elem.path);
+    while (!ATisEmpty(elems)) {
+        char * s1, * s2;
+        ATermList refs;
+        ATerm t = ATgetFirst(elems);
+        if (!ATmatch(t, "(<str>, <str>, [<list>])", &s1, &s2, &refs))
+            throw badTerm("not a slice element", t);
+        SliceElem elem;
+        elem.path = s1;
+        elem.id = parseHash(s2);
+        parseIds(refs, elem.refs);
+        slice.elems.push_back(elem);
+        elems = ATgetNext(elems);
     }
 
-    if (!missing) {
-        debug(format("already installed"));
-        return;
-    }
-
-    /* For each element, expand its id at its path. */
-    for (SliceElems::const_iterator i = slice.elems.begin();
-         i != slice.elems.end(); i++)
-    {
-        SliceElem elem = *i;
-        expandId(elem.id, elem.path);
-    }
+    checkSlice(slice);
+    return true;
 }
 
 
-Strings fstatePaths(const FSId & id, bool normalise)
+static bool parseDerive(ATerm t, Derive & derive)
 {
-    Strings paths;
-
-    FState fs = termFromId(id);
-
     ATermList outs, ins, bnds;
     char * builder;
     char * platform;
 
-    if (normalise ||
-        (ATgetType(fs) == AT_APPL && 
-         (string) ATgetName(ATgetAFun(fs)) == "Slice"))
-    {
-        Slice slice;
-        if (normalise)
-            slice = normaliseFState(id);
-        else
-            slice = parseSlice(fs);
+    if (!ATmatch(t, "Derive([<list>], [<list>], <str>, <str>, [<list>])",
+            &outs, &ins, &builder, &platform, &bnds))
+        return false;
 
-        /* !!! fix complexity */
-        for (FSIds::const_iterator i = slice.roots.begin();
-             i != slice.roots.end(); i++)
-            for (SliceElems::const_iterator j = slice.elems.begin();
-                 j != slice.elems.end(); j++)
-                if (*i == j->id) paths.push_back(j->path);
+    while (!ATisEmpty(outs)) {
+        char * s1, * s2;
+        ATerm t = ATgetFirst(outs);
+        if (!ATmatch(t, "(<str>, <str>)", &s1, &s2))
+            throw badTerm("not a derive output", t);
+        derive.outputs.push_back(DeriveOutput(s1, parseHash(s2)));
+        outs = ATgetNext(outs);
     }
 
-    else if (ATmatch(fs, "Derive([<list>], [<list>], <str>, <str>, [<list>])",
-                 &outs, &ins, &builder, &platform, &bnds))
-    {
-        while (!ATisEmpty(outs)) {
-            ATerm t = ATgetFirst(outs);
-            char * s1, * s2;
-            if (!ATmatch(t, "(<str>, <str>)", &s1, &s2))
-                throw badTerm("string expected", t);
-            paths.push_back(s1);
-            outs = ATgetNext(outs);
-        }
-    }
+    parseIds(ins, derive.inputs);
+
+    derive.builder = builder;
+    derive.platform = platform;
     
-    else throw badTerm("in fstatePaths", fs);
+    while (!ATisEmpty(bnds)) {
+        char * s1, * s2;
+        ATerm bnd = ATgetFirst(bnds);
+        if (!ATmatch(bnd, "(<str>, <str>)", &s1, &s2))
+            throw badTerm("tuple of strings expected", bnd);
+        derive.env.push_back(StringPair(s1, s2));
+        bnds = ATgetNext(bnds);
+    }
 
-    return paths;
+    return true;
 }
 
 
-StringSet fstateRefs(const FSId & id)
+FState parseFState(ATerm t)
 {
-    StringSet paths;
-    Slice slice = normaliseFState2(id, paths);
+    FState fs;
+    if (parseSlice(t, fs.slice))
+        fs.type = FState::fsSlice;
+    else if (parseDerive(t, fs.derive))
+        fs.type = FState::fsDerive;
+    else throw badTerm("not an fstate-expression", t);
+    return fs;
+}
+
+
+static ATermList unparseIds(const FSIds & ids)
+{
+    ATermList l = ATempty;
+    for (FSIds::const_iterator i = ids.begin();
+         i != ids.end(); i++)
+        l = ATinsert(l,
+            ATmake("<str>", ((string) *i).c_str()));
+    return ATreverse(l);
+}
+
+
+static ATerm unparseSlice(const Slice & slice)
+{
+    ATermList roots = unparseIds(slice.roots);
+    
+    ATermList elems = ATempty;
     for (SliceElems::const_iterator i = slice.elems.begin();
          i != slice.elems.end(); i++)
-        paths.insert(i->path);
-    return paths;
+        elems = ATinsert(elems,
+            ATmake("(<str>, <str>, <term>)",
+                i->path.c_str(),
+                ((string) i->id).c_str(),
+                unparseIds(i->refs)));
+
+    return ATmake("Slice(<term>, <term>)", roots, elems);
+}
+
+
+static ATerm unparseDerive(const Derive & derive)
+{
+    ATermList outs = ATempty;
+    for (DeriveOutputs::const_iterator i = derive.outputs.begin();
+         i != derive.outputs.end(); i++)
+        outs = ATinsert(outs,
+            ATmake("(<str>, <str>)", 
+                i->first.c_str(), ((string) i->second).c_str()));
+    
+    ATermList env = ATempty;
+    for (StringPairs::const_iterator i = derive.env.begin();
+         i != derive.env.end(); i++)
+        env = ATinsert(env,
+            ATmake("(<str>, <str>)", 
+                i->first.c_str(), i->second.c_str()));
+
+    return ATmake("Derive(<term>, <term>, <str>, <str>, <term>)",
+        ATreverse(outs),
+        unparseIds(derive.inputs),
+        derive.builder.c_str(),
+        derive.platform.c_str(),
+        ATreverse(env));
+}
+
+
+ATerm unparseFState(const FState & fs)
+{
+    if (fs.type == FState::fsSlice)
+        return unparseSlice(fs.slice);
+    else if (fs.type == FState::fsDerive)
+        return unparseDerive(fs.derive);
+    else abort();
 }
