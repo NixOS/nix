@@ -18,10 +18,8 @@ ATermMap::ATermMap(const ATermMap & map)
     table = ATtableCreate(ATgetLength(keys), map.maxLoadPct);
     if (!table) throw Error("cannot create ATerm table");
 
-    for (; !ATisEmpty(keys); keys = ATgetNext(keys)) {
-        ATerm key = ATgetFirst(keys);
-        set(key, map.get(key));
-    }
+    for (ATermIterator i(keys); i; ++i)
+        set(*i, map.get(*i));
 }
 
 
@@ -104,10 +102,8 @@ ATerm bottomupRewrite(TermFun & f, ATerm e)
         ATermList in = (ATermList) e;
         ATermList out = ATempty;
 
-        while (!ATisEmpty(in)) {
-            out = ATinsert(out, bottomupRewrite(f, ATgetFirst(in)));
-            in = ATgetNext(in);
-        }
+        for (ATermIterator i(in); i; ++i)
+            out = ATinsert(out, bottomupRewrite(f, *i));
 
         e = (ATerm) ATreverse(out);
     }
@@ -123,13 +119,12 @@ void queryAllAttrs(Expr e, ATermMap & attrs)
     if (!(atMatch(m, e) >> "Attrs" >> bnds))
         throw badTerm("expected attribute set", e);
 
-    while (!ATisEmpty(bnds)) {
+    for (ATermIterator i(bnds); i; ++i) {
         string s;
         Expr e;
-        if (!(atMatch(m, ATgetFirst(bnds)) >> "Bind" >> s >> e))
+        if (!(atMatch(m, *i) >> "Bind" >> s >> e))
             abort(); /* can't happen */
         attrs.set(s, e);
-        bnds = ATgetNext(bnds);
     }
 }
 
@@ -144,13 +139,10 @@ Expr queryAttr(Expr e, const string & name)
 
 Expr makeAttrs(const ATermMap & attrs)
 {
-    ATermList bnds = ATempty, keys = attrs.keys();
-    while (!ATisEmpty(keys)) {
-        Expr key = ATgetFirst(keys);
+    ATermList bnds = ATempty;
+    for (ATermIterator i(attrs.keys()); i; ++i)
         bnds = ATinsert(bnds, 
-            ATmake("Bind(<term>, <term>)", key, attrs.get(key)));
-        keys = ATgetNext(keys);
-    }
+            ATmake("Bind(<term>, <term>)", *i, attrs.get(*i)));
     return ATmake("Attrs(<term>)", ATreverse(bnds));
 }
 
@@ -171,14 +163,12 @@ Expr substitute(const ATermMap & subs, Expr e)
     ATerm body;
     if (atMatch(m, e) >> "Function" >> formals >> body) {
         ATermMap subs2(subs);
-        ATermList fs = formals;
-        while (!ATisEmpty(fs)) {
+        for (ATermIterator i(formals); i; ++i) {
             Expr def;
-            if (!(atMatch(m, ATgetFirst(fs)) >> "NoDefFormal" >> s) &&
-                !(atMatch(m, ATgetFirst(fs)) >> "DefFormal" >> s >> def))
+            if (!(atMatch(m, *i) >> "NoDefFormal" >> s) &&
+                !(atMatch(m, *i) >> "DefFormal" >> s >> def))
                 abort();
             subs2.remove(s);
-            fs = ATgetNext(fs);
         }
         return ATmake("Function(<term>, <term>)", formals,
             substitute(subs2, body));
@@ -188,13 +178,11 @@ Expr substitute(const ATermMap & subs, Expr e)
     ATermList bindings;
     if (atMatch(m, e) >> "Rec" >> bindings) {
         ATermMap subs2(subs);
-        ATermList bnds = bindings;
-        while (!ATisEmpty(bnds)) {
+        for (ATermIterator i(bindings); i; ++i) {
             Expr e;
-            if (!(atMatch(m, ATgetFirst(bnds)) >> "Bind" >> s >> e))
+            if (!(atMatch(m, *i) >> "Bind" >> s >> e))
                 abort(); /* can't happen */
             subs2.remove(s);
-            bnds = ATgetNext(bnds);
         }
         return ATmake("Rec(<term>)", substitute(subs2, (ATerm) bindings));
     }
@@ -211,14 +199,9 @@ Expr substitute(const ATermMap & subs, Expr e)
     }
 
     if (ATgetType(e) == AT_LIST) {
-        ATermList in = (ATermList) e;
         ATermList out = ATempty;
-
-        while (!ATisEmpty(in)) {
-            out = ATinsert(out, substitute(subs, ATgetFirst(in)));
-            in = ATgetNext(in);
-        }
-
+        for (ATermIterator i((ATermList) e); i; ++i)
+            out = ATinsert(out, substitute(subs, *i));
         return (ATerm) ATreverse(out);
     }
 

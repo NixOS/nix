@@ -54,10 +54,8 @@ static void printNixExpr(EvalState & state, Expr e)
     }
 
     if (ATgetType(e) == AT_LIST) {
-        while (!ATisEmpty(es)) {
-            printNixExpr(state, evalExpr(state, ATgetFirst(es)));
-            es = ATgetNext(es);
-        }
+        for (ATermIterator i((ATermList) e); i; ++i)
+            printNixExpr(state, evalExpr(state, *i));
         return;
     }
 

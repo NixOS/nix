@@ -21,25 +21,21 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
     Expr undefined = ATmake("Undefined");
 
     /* Get the formal arguments. */
-    while (!ATisEmpty(formals)) {
-        ATerm t = ATgetFirst(formals);
+    for (ATermIterator i(formals); i; ++i) {
         Expr name, def;
-        if (atMatch(m, t) >> "NoDefFormal" >> name)
+        if (atMatch(m, *i) >> "NoDefFormal" >> name)
             subs.set(name, undefined);
-        else if (atMatch(m, t) >> "DefFormal" >> name >> def)
+        else if (atMatch(m, *i) >> "DefFormal" >> name >> def)
             subs.set(name, def);
         else abort(); /* can't happen */
-        formals = ATgetNext(formals);
     }
 
     /* Get the actual arguments, and check that they match with the
        formals. */
     ATermMap args;
     queryAllAttrs(arg, args);
-    for (ATermList keys = args.keys(); !ATisEmpty(keys); 
-         keys = ATgetNext(keys))
-    {
-        Expr key = ATgetFirst(keys);
+    for (ATermIterator i(args.keys()); i; ++i) {
+        Expr key = *i;
         Expr cur = subs.get(key);
         if (!cur)
             throw badTerm(format("function has no formal argument `%1%'")
@@ -48,14 +44,10 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
     }
 
     /* Check that all arguments are defined. */
-    for (ATermList keys = subs.keys(); !ATisEmpty(keys); 
-         keys = ATgetNext(keys))
-    {
-        Expr key = ATgetFirst(keys);
-        if (subs.get(key) == undefined)
+    for (ATermIterator i(subs.keys()); i; ++i)
+        if (subs.get(*i) == undefined)
             throw badTerm(format("formal argument `%1%' missing")
-                % aterm2String(key), arg);
-    }
+                % aterm2String(*i), arg);
     
     return substitute(subs, body);
 }
@@ -72,26 +64,22 @@ ATerm expandRec(ATerm e, ATermList bnds)
 
     /* Create the substitution list. */
     ATermMap subs;
-    ATermList bs = bnds;
-    while (!ATisEmpty(bs)) {
+    for (ATermIterator i(bnds); i; ++i) {
         string s;
         Expr e2;
-        if (!(atMatch(m, ATgetFirst(bs)) >> "Bind" >> s >> e2))
+        if (!(atMatch(m, *i) >> "Bind" >> s >> e2))
             abort(); /* can't happen */
         subs.set(s, ATmake("Select(<term>, <str>)", e, s.c_str()));
-        bs = ATgetNext(bs);
     }
 
     /* Create the non-recursive set. */
     ATermMap as;
-    bs = bnds;
-    while (!ATisEmpty(bs)) {
+    for (ATermIterator i(bnds); i; ++i) {
         string s;
         Expr e2;
-        if (!(atMatch(m, ATgetFirst(bs)) >> "Bind" >> s >> e2))
+        if (!(atMatch(m, *i) >> "Bind" >> s >> e2))
             abort(); /* can't happen */
         as.set(s, substitute(subs, e2));
-        bs = ATgetNext(bs);
     }
 
     return makeAttrs(as);

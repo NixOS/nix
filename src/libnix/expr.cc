@@ -43,13 +43,11 @@ Path writeTerm(ATerm t, const string & suffix)
 static void parsePaths(ATermList paths, PathSet & out)
 {
     ATMatcher m;
-    while (!ATisEmpty(paths)) {
+    for (ATermIterator i(paths); i; ++i) {
         string s;
-        ATerm t = ATgetFirst(paths);
-        if (!(atMatch(m, t) >> s))
-            throw badTerm("not a path", t);
+        if (!(atMatch(m, *i) >> s))
+            throw badTerm("not a path", *i);
         out.insert(s);
-        paths = ATgetNext(paths);
     }
 }
 
@@ -91,16 +89,14 @@ static bool parseClosure(ATerm t, Closure & closure)
 
     parsePaths(roots, closure.roots);
 
-    while (!ATisEmpty(elems)) {
+    for (ATermIterator i(elems); i; ++i) {
         string path;
         ATermList refs;
-        ATerm t = ATgetFirst(elems);
-        if (!(atMatch(m, t) >> "" >> path >> refs))
-            throw badTerm("not a closure element", t);
+        if (!(atMatch(m, *i) >> "" >> path >> refs))
+            throw badTerm("not a closure element", *i);
         ClosureElem elem;
         parsePaths(refs, elem.refs);
         closure.elems[path] = elem;
-        elems = ATgetNext(elems);
     }
 
     checkClosure(closure);
@@ -124,22 +120,18 @@ static bool parseDerivation(ATerm t, Derivation & derivation)
     derivation.builder = builder;
     derivation.platform = platform;
     
-    while (!ATisEmpty(args)) {
+    for (ATermIterator i(args); i; ++i) {
         string s;
-        ATerm arg = ATgetFirst(args);
-        if (!(atMatch(m, arg) >> s))
-            throw badTerm("string expected", arg);
+        if (!(atMatch(m, *i) >> s))
+            throw badTerm("string expected", *i);
         derivation.args.push_back(s);
-        args = ATgetNext(args);
     }
 
-    while (!ATisEmpty(bnds)) {
+    for (ATermIterator i(bnds); i; ++i) {
         string s1, s2;
-        ATerm bnd = ATgetFirst(bnds);
-        if (!(atMatch(m, bnd) >> "" >> s1 >> s2))
-            throw badTerm("tuple of strings expected", bnd);
+        if (!(atMatch(m, *i) >> "" >> s1 >> s2))
+            throw badTerm("tuple of strings expected", *i);
         derivation.env[s1] = s2;
-        bnds = ATgetNext(bnds);
     }
 
     return true;

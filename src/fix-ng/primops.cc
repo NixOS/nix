@@ -108,11 +108,10 @@ static string processBinding(EvalState & state, Expr e, NixExpr & ne)
     if (atMatch(m, e) >> "List" >> es) {
 	string s;
 	bool first = true;
-        while (!ATisEmpty(es)) {
+        for (ATermIterator i(es); i; ++i) {
             startNest(nest, lvlVomit, format("processing list element"));
 	    if (!first) s = s + " "; else first = false;
-	    s += processBinding(state, evalExpr(state, ATgetFirst(es)), ne);
-            es = ATgetNext(es);
+	    s += processBinding(state, evalExpr(state, *i), ne);
         }
 	return s;
     }
@@ -140,10 +139,8 @@ Expr primDerivation(EvalState & state, Expr args)
     Hash outHash;
     bool outHashGiven = false;
 
-    for (ATermList keys = attrs.keys(); !ATisEmpty(keys); 
-         keys = ATgetNext(keys))
-    {
-        string key = aterm2String(ATgetFirst(keys));
+    for (ATermIterator i(attrs.keys()); i; ++i) {
+        string key = aterm2String(*i);
         Expr value = attrs.get(key);
         startNest(nest, lvlVomit, format("processing attribute `%1%'") % key);
 
