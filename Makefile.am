@@ -29,6 +29,7 @@ init-state:
 	rm -f $(DESTDIR)$(localstatedir)/nix/gcroots/profiles
 	ln -s $(localstatedir)/nix/profiles $(DESTDIR)$(localstatedir)/nix/gcroots/profiles
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(prefix)/store
+	$(INSTALL) $(INIT_FLAGS) $(GROUP_WRITABLE) -d $(DESTDIR)$(localstatedir)/nix/manifests
 #	$(bindir)/nix-store --init
 else
 init-state:

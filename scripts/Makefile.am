@@ -12,8 +12,6 @@ install-exec-local: readmanifest.pm
 	$(INSTALL) -d $(DESTDIR)$(libexecdir)/nix
 	$(INSTALL_DATA) readmanifest.pm $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/nix
-# !!! don't overwrite local modifications
-	$(INSTALL_DATA) prebuilts.conf $(DESTDIR)$(sysconfdir)/nix/prebuilts.conf
 
 include ../substitute.mk
 
@@ -21,5 +19,5 @@ EXTRA_DIST = nix-collect-garbage.in \
   nix-pull.in nix-push.in nix-profile.sh.in \
   nix-prefetch-url.in nix-install-package.in \
   nix-channel.in \
-  prebuilts.conf readmanifest.pm.in \
+  readmanifest.pm.in \
   nix-build.in
