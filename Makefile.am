@@ -8,3 +8,6 @@ nix.spec: nix.spec.in
 
 rpm: nix.spec dist
 	rpm $(EXTRA_RPM_FLAGS) -ta $(distdir).tar.gz
+
+relname:
+	echo -n $(distdir) > relname
