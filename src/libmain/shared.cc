@@ -52,13 +52,6 @@ void checkStoreNotSymlink(Path path)
 }
 
 
-static string getEnv(const string & key, const string & def = "")
-{
-    char * value = getenv(key.c_str());
-    return value ? string(value) : def;
-}
-
-
 /* Initialize and reorder arguments, then call the actual argument
    processor. */
 static void initAndRun(int argc, char * * argv)

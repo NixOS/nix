@@ -29,6 +29,13 @@ SysError::SysError(const format & f)
 }
 
 
+string getEnv(const string & key, const string & def)
+{
+    char * value = getenv(key.c_str());
+    return value ? string(value) : def;
+}
+
+
 Path absPath(Path path, Path dir)
 {
     if (path[0] != '/') {
@@ -206,8 +213,7 @@ void makePathReadOnly(const Path & path)
 static Path tempName()
 {
     static int counter = 0;
-    char * s = getenv("TMPDIR");
-    Path tmpRoot = s ? canonPath(Path(s)) : "/tmp";
+    Path tmpRoot = canonPath(getEnv("TMPDIR", "/tmp"));
     return (format("%1%/nix-%2%-%3%") % tmpRoot % getpid() % counter++).str();
 }
 

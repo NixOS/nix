@@ -16,8 +16,10 @@ simple.sh: simple.nix
 dependencies.sh: dependencies.nix
 locking.sh: locking.nix
 parallel.sh: parallel.nix
+build-hook.sh: build-hook.nix
 
-TESTS = init.sh simple.sh dependencies.sh locking.sh parallel.sh
+TESTS = init.sh simple.sh dependencies.sh locking.sh parallel.sh \
+  build-hook.sh
 
 XFAIL_TESTS =
 
@@ -27,4 +29,5 @@ EXTRA_DIST = $(TESTS) \
   simple.nix.in simple.builder.sh \
   dependencies.nix.in dependencies.builder*.sh \
   locking.nix.in locking.builder.sh \
-  parallel.nix.in parallel.builder.sh
+  parallel.nix.in parallel.builder.sh \
+  build-hook.nix.in

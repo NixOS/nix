@@ -118,7 +118,7 @@ void loadDerivations(EvalState & state, Path nePath, DrvInfos & drvs)
 
 static Path getHomeDir()
 {
-    Path homeDir(getenv("HOME"));
+    Path homeDir(getEnv("HOME", ""));
     if (homeDir == "") throw Error("HOME environment variable not set");
     return homeDir;
 }

@@ -302,6 +302,7 @@ bool Normaliser::startBuild(Path nePath)
 
     /* Obtain locks on all output paths.  The locks are automatically
        released when we exit this function or Nix crashes. */
+    /* !!! BUG: this could block, which is not allowed. */
     goal.outputLocks.lockPaths(goal.expr.derivation.outputs);
 
     /* Now check again whether there is a successor.  This is because
@@ -362,6 +363,25 @@ bool Normaliser::startBuild(Path nePath)
         printMsg(lvlChatty, format("skipping build; output paths already exist"));
         finishGoal(goal);
         return true;
+    }
+
+    /* !!! Hack */
+    Path buildHook = getEnv("NIX_BUILD_HOOK");
+    if (buildHook != "") {
+        printMsg(lvlChatty, format("using build hook `%1%'") % buildHook);
+        int status = system((buildHook + " " + goal.nePath + " 1>&2").c_str());
+        if (WIFEXITED(status)) {
+            int code = WEXITSTATUS(status);
+            if (code == 100) { /* == accepted */
+                printMsg(lvlChatty,
+                    format("build hook succesfully realised output paths"));
+                finishGoal(goal);
+                return true;
+            } else if (code != 101) /* != declined */
+                throw Error(
+                    format("build hook returned exit code %1%") % code);
+        } else throw Error(
+            format("build hook died with status %1%") % status);
     }
 
     /* Otherwise, start the build in a child process. */
@@ -660,7 +680,7 @@ void Normaliser::finishGoal(Goal & goal)
     {
         Path path = *i;
         if (!pathExists(path))
-            throw Error(format("path `%1%' does not exist") % path);
+            throw Error(format("output path `%1%' does not exist") % path);
         nf.closure.roots.insert(path);
 
 	makePathReadOnly(path);

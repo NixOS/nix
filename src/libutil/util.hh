@@ -55,6 +55,9 @@ typedef set<Path> PathSet;
 extern string thisSystem;
 
 
+/* Return an environment variable. */
+string getEnv(const string & key, const string & def = "");
+
 /* Return an absolutized path, resolving paths relative to the
    specified directory, or the current directory otherwise.  The path
    is also canonicalised. */
