@@ -3,12 +3,14 @@ ENV = SGML_CATALOG_FILES=$(docbookcatalog)
 XMLLINT = $(ENV) $(xmllint) $(xmlflags) --catalogs
 XSLTPROC = $(ENV) $(xsltproc) $(xmlflags) --catalogs \
  --param section.autolabel 1 \
- --param section.label.includes.component.label 1
+ --param section.label.includes.component.label 1 \
+ --param html.stylesheet \'style.css\'
 
 SOURCES = book.xml introduction.xml installation.xml \
  overview.xml \
  nix-store-reference.xml nix-instantiate-reference.xml \
- troubleshooting.xml bugs.xml
+ troubleshooting.xml bugs.xml \
+ style.css
 
 book.is-valid: $(SOURCES)
 	$(XMLLINT) --noout --valid book.xml
@@ -27,6 +29,7 @@ all-local: book.html
 install-data-local: book.html
 	$(INSTALL) -d $(datadir)/nix/manual
 	$(INSTALL_DATA) book.html $(datadir)/nix/manual
+	$(INSTALL_DATA) style.css $(datadir)/nix/manual
 
 EXTRA_DIST = $(SOURCES) book.html book.is-valid $(MANS) 
 
