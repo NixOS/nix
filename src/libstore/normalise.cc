@@ -1218,6 +1218,7 @@ public:
     void tryNext();
     void exprNormalised();
     void exprRealised();
+    void tryToRun();
     void finished();
 };
 
@@ -1301,6 +1302,19 @@ void SubstitutionGoal::exprNormalised()
 void SubstitutionGoal::exprRealised()
 {
     debug(format("store expr realised of `%1%'") % storePath);
+
+    state = &SubstitutionGoal::tryToRun;
+    worker.waitForBuildSlot(shared_from_this());
+}
+
+
+void SubstitutionGoal::tryToRun()
+{
+    /* Make sure that we are allowed to start a build. */
+    if (!worker.canBuildMore()) {
+        worker.waitForBuildSlot(shared_from_this());
+        return;
+    }
 
     /* What's the substitute program? */
     StoreExpr expr = storeExprFromPath(nfSub);
@@ -1390,7 +1404,7 @@ void SubstitutionGoal::exprRealised()
     /* parent */
     logPipe.writeSide.close();
     worker.childStarted(shared_from_this(),
-        pid, logPipe.readSide, false);
+        pid, logPipe.readSide, true);
 
     state = &SubstitutionGoal::finished;
 }
