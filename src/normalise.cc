@@ -244,7 +244,8 @@ Strings fstatePaths(const FSId & id)
 }
 
 
-static void fstateRefsSet(const FSId & id, StringSet & paths)
+static void fstateRequisitesSet(const FSId & id, 
+    bool includeExprs, bool includeSuccessors, StringSet & paths)
 {
     FState fs = parseFState(termFromId(id));
 
@@ -257,17 +258,28 @@ static void fstateRefsSet(const FSId & id, StringSet & paths)
     else if (fs.type == FState::fsDerive) {
         for (FSIds::iterator i = fs.derive.inputs.begin();
              i != fs.derive.inputs.end(); i++)
-            fstateRefsSet(*i, paths);
+            fstateRequisitesSet(*i,
+                includeExprs, includeSuccessors, paths);
     }
 
     else abort();
+
+    if (includeExprs) 
+        paths.insert(expandId(id));
+
+    string idSucc;
+    if (includeSuccessors &&
+        queryDB(nixDB, dbSuccessors, id, idSucc))
+        fstateRequisitesSet(parseHash(idSucc), 
+            includeExprs, includeSuccessors, paths);
 }
 
 
-Strings fstateRefs(const FSId & id)
+Strings fstateRequisites(const FSId & id,
+    bool includeExprs, bool includeSuccessors)
 {
     StringSet paths;
-    fstateRefsSet(id, paths);
+    fstateRequisitesSet(id, includeExprs, includeSuccessors, paths);
     return Strings(paths.begin(), paths.end());
 }
 

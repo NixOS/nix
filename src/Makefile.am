@@ -43,6 +43,7 @@ nix.o: nix-help.txt.hh
 install-data-local:
 	$(INSTALL) -d $(localstatedir)/nix
 	$(INSTALL) -d $(localstatedir)/nix/links
+	ln -sf $(localstatedir)/nix/links/current $(prefix)/current
 	$(INSTALL) -d $(localstatedir)/log/nix
 	$(INSTALL) -d $(prefix)/store
 	$(bindir)/nix --init

@@ -5,12 +5,26 @@ my $storedir = "@prefix@/store";
 
 my %alive;
 
-open HASHES, "nix --query --refs \$(cat $linkdir/*.hash) |" or die "in `nix -qrh'";
+my $keepsuccessors = 0;
+my $invert = 0;
+
+foreach my $arg (@ARGV) {
+    if ($arg eq "--keep-successors") { $keepsuccessors = 1; }
+    if ($arg eq "--invert") { $invert = 1; }
+    else { die "unknown argument `$arg'" };
+}
+
+my $extraarg = "";
+if ($keepsuccessors) { $extraarg = "--include-successors"; };
+open HASHES, "nix --query --requisites $extraarg \$(cat $linkdir/*.id) |" or die "in `nix -qrh'";
 while (<HASHES>) {
 	chomp;
 	$alive{$_} = 1;
+	if ($invert) { print "$_\n"; };
 }
 close HASHES;
+
+exit 0 if ($invert);
 
 opendir(DIR, $storedir) or die "cannot opendir $storedir: $!";
 my @names = readdir(DIR);

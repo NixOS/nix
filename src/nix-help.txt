@@ -26,7 +26,7 @@ Source selection for --install, --dump:
 Query flags:
 
   --list / -l: query the output paths (roots) of an fstate (default)
-  --refs / -r: query paths referenced by an fstate
+  --requisites / -r: print all paths necessary to realise expression
   --generators / -g: find expressions producing a subset of given ids
   --expansion / -e: print a path containing id
   --graph: print a dot graph rooted at given ids

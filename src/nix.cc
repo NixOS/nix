@@ -95,18 +95,22 @@ FSId maybeNormalise(const FSId & id, bool normalise)
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qList, qRefs, qGenerators, qExpansion, qGraph 
+    enum { qList, qRequisites, qGenerators, qExpansion, qGraph 
     } query = qList;
     bool normalise = false;
+    bool includeExprs = true;
+    bool includeSuccessors = false;
 
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); i++)
         if (*i == "--list" || *i == "-l") query = qList;
-        else if (*i == "--refs" || *i == "-r") query = qRefs;
+        else if (*i == "--requisites" || *i == "-r") query = qRequisites;
         else if (*i == "--generators" || *i == "-g") query = qGenerators;
         else if (*i == "--expansion" || *i == "-e") query = qExpansion;
         else if (*i == "--graph") query = qGraph;
         else if (*i == "--normalise" || *i == "-n") normalise = true;
+        else if (*i == "--exclude-exprs") includeExprs = false;
+        else if (*i == "--include-successors") includeSuccessors = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
     switch (query) {
@@ -126,13 +130,14 @@ static void opQuery(Strings opFlags, Strings opArgs)
             break;
         }
 
-        case qRefs: {
+        case qRequisites: {
             StringSet paths;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                Strings paths2 = fstateRefs(
-                    maybeNormalise(argToId(*i), normalise));
+                Strings paths2 = fstateRequisites(
+                    maybeNormalise(argToId(*i), normalise),
+                    includeExprs, includeSuccessors);
                 paths.insert(paths2.begin(), paths2.end());
             }
             for (StringSet::iterator i = paths.begin(); 

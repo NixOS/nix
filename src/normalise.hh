@@ -15,8 +15,14 @@ void realiseSlice(const FSId & id, FSIdSet pending = FSIdSet());
    fstate-expression. */
 Strings fstatePaths(const FSId & id);
 
-/* Get the list of paths referenced by the given fstate-expression. */
-Strings fstateRefs(const FSId & id);
+/* Get the list of paths that are required to realise the given
+   expression.  For a derive expression, this is the union of
+   requisites of the inputs; for a slice expression, it is the path of
+   each element in the slice.  If `includeExprs' is true, include the
+   paths of the Nix expressions themselves.  If `includeSuccessors' is
+   true, include the requisites of successors. */
+Strings fstateRequisites(const FSId & id,
+    bool includeExprs, bool includeSuccessors);
 
 /* Return the list of the ids of all known fstate-expressions whose
    output ids are completely contained in `ids'. */

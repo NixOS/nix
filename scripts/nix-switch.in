@@ -3,39 +3,56 @@
 use strict;
 
 my $keep = 0;
+my $sourceroot = 0;
+my $srcid;
 
-if (scalar @ARGV > 0 && $ARGV[0] eq "--keep") {
-    shift @ARGV;
-    $keep = 1;
+foreach my $arg (@ARGV) {
+    if ($arg eq "--keep") { $keep = 1; }
+    elsif ($arg eq "--source-root") { $sourceroot = 1; }
+    elsif ($arg =~ /^([0-9a-z]{32})$/) { $srcid = $arg; }
+    else { die "unknown argument `$arg'" };
 }
-
-my $hash = $ARGV[0];
-$hash || die "no package hash specified";
 
 my $linkdir = "@localstatedir@/nix/links";
 
 # Build the specified package, and all its dependencies.
-system "nix --install $hash";
+my $nfid = `nix --install $srcid`;
 if ($?) { die "`nix --install' failed"; }
+chomp $nfid;
+die unless $nfid =~ /^([0-9a-z]{32})$/;
 
-my $pkgdir = `nix --query --list $hash`;
+my $pkgdir = `nix --query --list $nfid`;
 if ($?) { die "`nix --query --list' failed"; }
 chomp $pkgdir;
 
 # Figure out a generation number.
+opendir(DIR, $linkdir);
 my $nr = 0;
-while (-e "$linkdir/$nr") { $nr++; }
+foreach my $n (sort(readdir(DIR))) {
+    next if (!($n =~ /^\d+$/));
+    $nr = $n + 1 if ($n >= $nr);
+}
+closedir(DIR);
+
 my $link = "$linkdir/$nr";
 
 # Create a symlink from $link to $pkgdir.
 symlink($pkgdir, $link) or die "cannot create $link: $!";
 
-# Also store the hash of $pkgdir.  This is useful for garbage
+# Store the id of the normal form.  This is useful for garbage
 # collection and the like.
-my $hashfile = "$linkdir/$nr.hash";
-open HASH, "> $hashfile" or die "cannot create $hashfile";
-print HASH "$hash\n";
-close HASH;
+my $idfile = "$linkdir/$nr.id";
+open ID, "> $idfile" or die "cannot create $idfile";
+print ID "$nfid\n";
+close ID;
+
+# Optionally store the source id.
+if ($sourceroot) {
+    $idfile = "$linkdir/$nr-src.id";
+    open ID, "> $idfile" or die "cannot create $idfile";
+    print ID "$srcid\n";
+    close ID;
+}
 
 my $current = "$linkdir/current";
 
@@ -59,6 +76,7 @@ rename($tmplink, $current) or die "cannot rename $tmplink";
 
 if (!$keep && defined $oldlink) {
     print "deleting old $oldlink\n";
-    unlink($oldlink) == 1 || print "cannot delete $oldlink\n";
-    unlink("$oldlink.hash") == 1 || print "cannot delete $oldlink.hash\n";
+    unlink($oldlink) == 1 or print "cannot delete $oldlink\n";
+    unlink("$oldlink.id") == 1 or print "cannot delete $oldlink.id\n";
+    unlink("$oldlink-src.id");
 }
