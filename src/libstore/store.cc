@@ -774,7 +774,7 @@ void verifyStore(bool checkContents)
         if (usablePaths.find(*i) == usablePaths.end()) {
             printMsg(lvlError, format("found references entry for unusable path `%1%'")
                 % *i);
-            nixDB.delPair(txn, dbReferences, *i);
+            setReferences(txn, *i, PathSet());
         }
         else {
             bool isValid = validPaths.find(*i) != validPaths.end();
@@ -808,18 +808,28 @@ void verifyStore(bool checkContents)
             nixDB.delPair(txn, dbReferers, *i);
         }
         else {
-            PathSet referers;
+            PathSet referers, newReferers;
             queryReferers(txn, *i, referers);
             for (PathSet::iterator j = referers.begin();
                  j != referers.end(); ++j)
             {
                 Paths references;
-                nixDB.queryStrings(txn, dbReferences, *j, references);
-                if (find(references.begin(), references.end(), *i) == references.end()) {
-                    printMsg(lvlError, format("missing reference mapping from `%1%' to `%2%'")
-                        % *j % *i);
+                if (usablePaths.find(*j) == usablePaths.end()) {
+                    printMsg(lvlError, format("referer mapping from `%1%' to unusable `%2%'")
+                        % *i % *j);
+                } else {
+                    nixDB.queryStrings(txn, dbReferences, *j, references);
+                    if (find(references.begin(), references.end(), *i) == references.end()) {
+                        printMsg(lvlError, format("missing reference mapping from `%1%' to `%2%'")
+                            % *j % *i);
+                        /* !!! repair by inserting *i into references */
+                    }
+                    else newReferers.insert(*j);
                 }
             }
+            if (referers != newReferers)
+                nixDB.setStrings(txn, dbReferers, *i,
+                    Paths(newReferers.begin(), newReferers.end()));
         }
     }
 
