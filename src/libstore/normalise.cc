@@ -635,12 +635,12 @@ void Normaliser::startBuildChild(Goal & goal)
 }
 
 
-string readLine(int fd)
+static string readLine(int fd)
 {
     string s;
     while (1) {
         char ch;
-        int rd = read(fd, &ch, 1);
+        ssize_t rd = read(fd, &ch, 1);
         if (rd == -1) {
             if (errno != EINTR)
                 throw SysError("reading a line");
@@ -654,10 +654,25 @@ string readLine(int fd)
 }
 
 
-void writeLine(int fd, string s)
+static void writeLine(int fd, string s)
 {
     s += '\n';
     writeFull(fd, (const unsigned char *) s.c_str(), s.size());
+}
+
+
+/* !!! ugly hack */
+static void drain(int fd)
+{
+    unsigned char buffer[1024];
+    while (1) {
+        ssize_t rd = read(fd, buffer, sizeof buffer);
+        if (rd == -1) {
+            if (errno != EINTR)
+                throw SysError("draining");
+        } else if (rd == 0) break;
+        else writeFull(STDERR_FILENO, buffer, rd);
+    }
 }
 
 
@@ -715,12 +730,19 @@ Normaliser::HookReply Normaliser::tryBuildHook(Goal & goal)
        whether the hook wishes to perform the build.  !!! potential
        for deadlock here: we should also read from the child's logger
        pipe. */
-    string reply = readLine(goal.fromHook.readSide);
+    string reply;
+    try {
+        reply = readLine(goal.fromHook.readSide);
+    } catch (Error & e) {
+        drain(goal.logPipe.readSide);
+        throw;
+    }
 
     debug(format("hook reply is `%1%'") % reply);
 
     if (reply == "decline" || reply == "postpone") {
         /* Clean up the child.  !!! hacky / should verify */
+        drain(goal.logPipe.readSide);
         terminateBuildHook(goal);
         return reply == "decline" ? rpDecline : rpPostpone;
     }
