@@ -122,7 +122,11 @@ void runProgram(const string & program,
         throw Error("unable to wait for child");
     
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-        delTmpDir.cancel();
+	if (keepFailed) {
+	    msg(lvlTalkative, 
+		format("build failed; keeping build directory `%1%'") % tmpDir);
+	    delTmpDir.cancel();
+	}
         throw Error("unable to build package");
     }
 }

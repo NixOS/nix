@@ -17,6 +17,9 @@ string nixLogDir = "/UNINIT";
 string nixDBPath = "/UNINIT";
 
 
+bool keepFailed = false;
+
+
 void openDB()
 {
     nixDB.open(nixDBPath);

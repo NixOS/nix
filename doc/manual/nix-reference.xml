@@ -15,6 +15,10 @@
 	<arg><option>--verbose</option></arg>
 	<arg><option>-v</option></arg>
       </group>
+      <group choice='opt' rep='repeat'>
+	<arg><option>--keep-failed</option></arg>
+	<arg><option>-K</option></arg>
+      </group>
       <arg choice='plain'><replaceable>operation</replaceable></arg>
       <arg rep='repeat'><replaceable>options</replaceable></arg>
       <arg rep='repeat'><replaceable>arguments</replaceable></arg>
@@ -121,6 +125,19 @@
 
 	</listitem>
       </varlistentry>
+
+      <varlistentry>
+	<term><option>--keep-failed</option></term>
+	<listitem>
+	  <para>
+	    Specifies that in case of a build failure, the temporary directory
+            (usually in <filename>/tmp</filename>) in which the build takes
+            place should not be deleted.  The path of the build directory is
+            printed as an informational message.
+	  </para>
+	</listitem>
+      </varlistentry>
+
     </variablelist>
 
   </refsect1>

@@ -69,6 +69,12 @@ extern string nixLogDir;
 extern string nixDBPath;
 
 
+/* Misc. global flags. */
+
+/* Whether to keep temporary directories of failed builds. */
+extern bool keepFailed;
+
+
 /* Open the database environment. */
 void openDB();
 

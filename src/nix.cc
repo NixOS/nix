@@ -372,6 +372,8 @@ void run(Strings args)
             pathArgs = true;
         else if (arg == "--verbose" || arg == "-v")
             verbosity = (Verbosity) ((int) verbosity + 1);
+        else if (arg == "--keep-failed" || arg == "-K")
+            keepFailed = true;
         else if (arg == "--help")
             printHelp();
         else if (arg[0] == '-')
