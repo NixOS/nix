@@ -196,7 +196,7 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
     /* Switch the current user environment to the output path. */
     debug(format("switching to new user environment"));
     Path generation = createGeneration(profile,
-        topLevelDrv.outPath, topLevelDrv.drvPath);
+        topLevelDrv.outPath, topLevelDrv.drvPath, nfPath);
     switchLink(profile, generation);
 }
 

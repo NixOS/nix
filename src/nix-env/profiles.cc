@@ -58,7 +58,8 @@ Generations findGenerations(Path profile, int & curGen)
 }
 
 
-Path createGeneration(Path profile, Path outPath, Path drvPath)
+Path createGeneration(Path profile, Path outPath,
+    Path drvPath, Path clrPath)
 {
     /* The new generation number should be higher than old the
        previous ones. */
@@ -67,12 +68,13 @@ Path createGeneration(Path profile, Path outPath, Path drvPath)
     unsigned int num = gens.size() > 0 ? gens.front().number : 0;
         
     /* Create the new generation. */
-    Path generation, gcrootSrc;
+    Path generation, gcrootDrv, gcrootClr;
 
     while (1) {
         Path prefix = (format("%1%-%2%") % profile % num).str();
         generation = prefix + "-link";
-        gcrootSrc = prefix + "-src.gcroot";
+        gcrootDrv = prefix + "-drv.gcroot";
+        gcrootClr = prefix + "-clr.gcroot";
         if (symlink(outPath.c_str(), generation.c_str()) == 0) break;
         if (errno != EEXIST)
             throw SysError(format("creating symlink `%1%'") % generation);
@@ -80,7 +82,8 @@ Path createGeneration(Path profile, Path outPath, Path drvPath)
         num++;
     }
 
-    writeStringToFile(gcrootSrc, drvPath);
+    writeStringToFile(gcrootDrv, drvPath);
+    writeStringToFile(gcrootClr, clrPath);
 
     return generation;
 }
