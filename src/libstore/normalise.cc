@@ -81,7 +81,14 @@ public:
 
 /* A mapping used to remember for each child process to what goal it
    belongs, and a file descriptor for receiving log data. */
-typedef map<pid_t, pair<int, GoalPtr> > Children;
+struct Child
+{
+    GoalPtr goal;
+    int fdOutput;
+    bool inBuildSlot;
+};
+
+typedef map<pid_t, Child> Children;
 
 
 /* The worker class. */
@@ -100,6 +107,10 @@ private:
 
     /* Child processes currently running. */
     Children children;
+
+    /* Number of build slots occupied.  Not all child processes
+       (namely build hooks) count as occupied build slots. */
+    unsigned int nrChildren;
 
     /* Maps used to prevent multiple instantiation of a goal for the
        same expression / path. */
@@ -130,7 +141,8 @@ public:
     bool canBuildMore();
 
     /* Registers / unregisters a running child process. */
-    void childStarted(GoalPtr goal, pid_t pid, int fdLogFile);
+    void childStarted(GoalPtr goal, pid_t pid, int fdOutput,
+        bool inBuildSlot);
     void childTerminated(pid_t pid);
 
     /* Add a goal to the set of goals waiting for a build slot. */
@@ -227,7 +239,8 @@ public:
     ~NormalisationGoal();
 
     void work();
-    
+
+private:
     /* The states. */
     void init();
     void haveStoreExpr();
@@ -235,6 +248,20 @@ public:
     void inputRealised();
     void tryToBuild();
     void buildDone();
+
+    /* Is the build hook willing to perform the build? */
+    typedef enum {rpAccept, rpDecline, rpPostpone, rpDone} HookReply;
+    HookReply tryBuildHook();
+
+    /* Synchronously wait for a build hook to finish. */
+    void terminateBuildHook();
+
+    /* Acquires locks on the output paths and gathers information
+       about the build (e.g., the input closures).  During this
+       process its possible that we find out that the build is
+       unnecessary, in which case we return false (this is not an
+       error condition!). */
+    bool prepareBuild();
 
     /* Start building a derivation. */
     void startBuilder();
@@ -382,9 +409,11 @@ void NormalisationGoal::inputRealised()
 {
     debug(format("all inputs realised of `%1%'") % nePath);
 
-    /* Now wait until a build slot becomes available. */
+    /* Okay, try to build.  Note that here we don't wait for a build
+       slot to become available, since we don't need one if there is a
+       build hook. */
     state = &NormalisationGoal::tryToBuild;
-    worker.waitForBuildSlot(shared_from_this());
+    worker.wakeUp(shared_from_this());
 }
 
 
@@ -392,79 +421,35 @@ void NormalisationGoal::tryToBuild()
 {
     debug(format("trying to build `%1%'") % nePath);
 
+    /* Is the build hook willing to accept this job? */
+    switch (tryBuildHook()) {
+        case rpAccept:
+            /* Yes, it has started doing so.  Wait until we get
+               EOF from the hook. */
+            state = &NormalisationGoal::buildDone;
+            return;
+        case rpPostpone:
+            /* Not now; wait until at least one child finishes. */
+            worker.waitForBuildSlot(shared_from_this());
+            return;
+        case rpDecline:
+            /* We should do it ourselves. */
+            break;
+        case rpDone:
+            /* Somebody else did it (there is a successor now). */
+            amDone();
+            return;
+    }
+
     /* Make sure that we are allowed to start a build. */
     if (!worker.canBuildMore()) {
         worker.waitForBuildSlot(shared_from_this());
         return;
     }
 
-    /* Obtain locks on all output paths.  The locks are automatically
-       released when we exit this function or Nix crashes. */
-    /* !!! BUG: this could block, which is not allowed. */
-    outputLocks.lockPaths(expr.derivation.outputs);
-
-    /* Now check again whether there is a successor.  This is because
-       another process may have started building in parallel.  After
-       it has finished and released the locks, we can (and should)
-       reuse its results.  (Strictly speaking the first successor
-       check can be omitted, but that would be less efficient.)  Note
-       that since we now hold the locks on the output paths, no other
-       process can build this expression, so no further checks are
-       necessary. */
-    Path nfPath;
-    if (querySuccessor(nePath, nfPath)) {
-        debug(format("skipping build of expression `%1%', someone beat us to it")
-            % nePath);
-        outputLocks.setDeletion(true);
-        amDone();
-        return;
-    }
-
-    /* Gather information necessary for computing the closure and/or
-       running the build hook. */
-    
-    /* The outputs are referenceable paths. */
-    for (PathSet::iterator i = expr.derivation.outputs.begin();
-         i != expr.derivation.outputs.end(); ++i)
-    {
-        debug(format("building path `%1%'") % *i);
-        allPaths.insert(*i);
-    }
-    
-    /* Get information about the inputs (these all exist now). */
-    for (PathSet::iterator i = expr.derivation.inputs.begin();
-         i != expr.derivation.inputs.end(); ++i)
-    {
-        checkInterrupt();
-        Path nePath = *i, nfPath;
-        if (!querySuccessor(nePath, nfPath)) nfPath = nePath;
-        inputNFs.insert(nfPath);
-        if (nfPath != nePath) inputSucs[nePath] = nfPath;
-        /* !!! nfPath should be a root of the garbage collector while
-           we are building */
-        StoreExpr ne = storeExprFromPath(nfPath);
-        if (ne.type != StoreExpr::neClosure) abort();
-        for (ClosureElems::iterator j = ne.closure.elems.begin();
-             j != ne.closure.elems.end(); ++j)
-	{
-            inClosures[j->first] = j->second;
-	    allPaths.insert(j->first);
-	}
-    }
-
-    /* We can skip running the builder if all output paths are already
-       valid. */
-    bool fastBuild = true;
-    for (PathSet::iterator i = expr.derivation.outputs.begin();
-         i != expr.derivation.outputs.end(); ++i)
-        if (!isValidPath(*i)) { 
-            fastBuild = false;
-            break;
-        }
-
-    if (fastBuild) {
-        printMsg(lvlChatty, format("skipping build; output paths already exist"));
-        createClosure();
+    /* Acquire locks and such.  If we then see that there now is a
+       successor, we're done. */
+    if (!prepareBuild()) {
         amDone();
         return;
     }
@@ -524,6 +509,260 @@ void NormalisationGoal::buildDone()
     createClosure();
 
     amDone();
+}
+
+
+static string readLine(int fd)
+{
+    string s;
+    while (1) {
+        char ch;
+        ssize_t rd = read(fd, &ch, 1);
+        if (rd == -1) {
+            if (errno != EINTR)
+                throw SysError("reading a line");
+        } else if (rd == 0)
+            throw Error("unexpected EOF reading a line");
+        else {
+            if (ch == '\n') return s;
+            s += ch;
+        }
+    }
+}
+
+
+static void writeLine(int fd, string s)
+{
+    s += '\n';
+    writeFull(fd, (const unsigned char *) s.c_str(), s.size());
+}
+
+
+/* !!! ugly hack */
+static void drain(int fd)
+{
+    unsigned char buffer[1024];
+    while (1) {
+        ssize_t rd = read(fd, buffer, sizeof buffer);
+        if (rd == -1) {
+            if (errno != EINTR)
+                throw SysError("draining");
+        } else if (rd == 0) break;
+        else writeFull(STDERR_FILENO, buffer, rd);
+    }
+}
+
+
+NormalisationGoal::HookReply NormalisationGoal::tryBuildHook()
+{
+    Path buildHook = getEnv("NIX_BUILD_HOOK");
+    if (buildHook == "") return rpDecline;
+    buildHook = absPath(buildHook);
+
+    /* Create a directory where we will store files used for
+       communication between us and the build hook. */
+    tmpDir = createTempDir();
+    
+    /* Create the log file and pipe. */
+    openLogFile();
+
+    /* Create the communication pipes. */
+    toHook.create();
+    fromHook.create();
+
+    /* Fork the hook. */
+    switch (pid = fork()) {
+        
+    case -1:
+        throw SysError("unable to fork");
+
+    case 0:
+        try { /* child */
+
+            initChild();
+
+            execl(buildHook.c_str(), buildHook.c_str(),
+                (worker.canBuildMore() ? (string) "1" : "0").c_str(),
+                thisSystem.c_str(),
+                expr.derivation.platform.c_str(),
+                nePath.c_str(), 0);
+            
+            throw SysError(format("executing `%1%'") % buildHook);
+            
+        } catch (exception & e) {
+            cerr << format("build error: %1%\n") % e.what();
+        }
+        _exit(1);
+    }
+    
+    /* parent */
+    logPipe.writeSide.close();
+    worker.childStarted(shared_from_this(),
+        pid, logPipe.readSide, false);
+
+    fromHook.writeSide.close();
+    toHook.readSide.close();
+
+    /* Read the first line of input, which should be a word indicating
+       whether the hook wishes to perform the build.  !!! potential
+       for deadlock here: we should also read from the child's logger
+       pipe. */
+    string reply;
+    try {
+        reply = readLine(fromHook.readSide);
+    } catch (Error & e) {
+        drain(logPipe.readSide);
+        throw;
+    }
+
+    debug(format("hook reply is `%1%'") % reply);
+
+    if (reply == "decline" || reply == "postpone") {
+        /* Clean up the child.  !!! hacky / should verify */
+        drain(logPipe.readSide);
+        terminateBuildHook();
+        return reply == "decline" ? rpDecline : rpPostpone;
+    }
+
+    else if (reply == "accept") {
+
+        /* Acquire locks and such.  If we then see that there now is a
+           successor, we're done. */
+        if (!prepareBuild()) {
+            writeLine(toHook.writeSide, "cancel");
+            terminateBuildHook();
+            return rpDone;
+        }
+
+        /* Write the information that the hook needs to perform the
+           build, i.e., the set of input paths (including closure
+           expressions), the set of output paths, and the successor
+           mappings for the input expressions. */
+        
+        Path inputListFN = tmpDir + "/inputs";
+        Path outputListFN = tmpDir + "/outputs";
+        Path successorsListFN = tmpDir + "/successors";
+
+        string s;
+        for (ClosureElems::iterator i = inClosures.begin();
+             i != inClosures.end(); ++i)
+            s += i->first + "\n";
+        for (PathSet::iterator i = inputNFs.begin();
+             i != inputNFs.end(); ++i)
+            s += *i + "\n";
+        writeStringToFile(inputListFN, s);
+        
+        s = "";
+        for (PathSet::iterator i = expr.derivation.outputs.begin();
+             i != expr.derivation.outputs.end(); ++i)
+            s += *i + "\n";
+        writeStringToFile(outputListFN, s);
+        
+        s = "";
+        for (map<Path, Path>::iterator i = inputSucs.begin();
+             i != inputSucs.end(); ++i)
+            s += i->first + " " + i->second + "\n";
+        writeStringToFile(successorsListFN, s);
+
+        writeLine(toHook.writeSide, "okay");
+
+        inHook = true;
+    
+        return rpAccept;
+    }
+
+    else throw Error(format("bad hook reply `%1%'") % reply);
+}
+
+
+void NormalisationGoal::terminateBuildHook()
+{
+    /* !!! drain stdout of hook */
+    debug("terminating build hook");
+    int status;
+    if (waitpid(pid, &status, 0) != pid)
+        printMsg(lvlError, format("process `%1%' missing") % pid);
+    worker.childTerminated(pid);
+    pid = -1;
+    fromHook.readSide.close();
+    toHook.writeSide.close();
+    fdLogFile.close();
+    logPipe.readSide.close();
+}
+
+
+bool NormalisationGoal::prepareBuild()
+{
+    /* Obtain locks on all output paths.  The locks are automatically
+       released when we exit this function or Nix crashes. */
+    /* !!! BUG: this could block, which is not allowed. */
+    outputLocks.lockPaths(expr.derivation.outputs);
+
+    /* Now check again whether there is a successor.  This is because
+       another process may have started building in parallel.  After
+       it has finished and released the locks, we can (and should)
+       reuse its results.  (Strictly speaking the first successor
+       check can be omitted, but that would be less efficient.)  Note
+       that since we now hold the locks on the output paths, no other
+       process can build this expression, so no further checks are
+       necessary. */
+    Path nfPath;
+    if (querySuccessor(nePath, nfPath)) {
+        debug(format("skipping build of expression `%1%', someone beat us to it")
+            % nePath);
+        outputLocks.setDeletion(true);
+        return false;
+    }
+
+    /* Gather information necessary for computing the closure and/or
+       running the build hook. */
+    
+    /* The outputs are referenceable paths. */
+    for (PathSet::iterator i = expr.derivation.outputs.begin();
+         i != expr.derivation.outputs.end(); ++i)
+    {
+        debug(format("building path `%1%'") % *i);
+        allPaths.insert(*i);
+    }
+    
+    /* Get information about the inputs (these all exist now). */
+    for (PathSet::iterator i = expr.derivation.inputs.begin();
+         i != expr.derivation.inputs.end(); ++i)
+    {
+        checkInterrupt();
+        Path nePath = *i, nfPath;
+        if (!querySuccessor(nePath, nfPath)) nfPath = nePath;
+        inputNFs.insert(nfPath);
+        if (nfPath != nePath) inputSucs[nePath] = nfPath;
+        /* !!! nfPath should be a root of the garbage collector while
+           we are building */
+        StoreExpr ne = storeExprFromPath(nfPath);
+        if (ne.type != StoreExpr::neClosure) abort();
+        for (ClosureElems::iterator j = ne.closure.elems.begin();
+             j != ne.closure.elems.end(); ++j)
+	{
+            inClosures[j->first] = j->second;
+	    allPaths.insert(j->first);
+	}
+    }
+
+    /* We can skip running the builder if all output paths are already
+       valid. */
+    bool fastBuild = true;
+    for (PathSet::iterator i = expr.derivation.outputs.begin();
+         i != expr.derivation.outputs.end(); ++i)
+        if (!isValidPath(*i)) { 
+            fastBuild = false;
+            break;
+        }
+
+    if (fastBuild) {
+        printMsg(lvlChatty, format("skipping build; output paths already exist"));
+        createClosure();
+        return false;
+    }
+
+    return true;
 }
 
 
@@ -648,7 +887,8 @@ void NormalisationGoal::startBuilder()
 
     /* parent */
     logPipe.writeSide.close();
-    worker.childStarted(shared_from_this(), pid, logPipe.readSide);
+    worker.childStarted(shared_from_this(),
+        pid, logPipe.readSide, true);
 }
 
 
@@ -1083,19 +1323,32 @@ void Worker::wakeUp(GoalPtr goal)
 
 bool Worker::canBuildMore()
 {
-    return children.size() < maxBuildJobs;
+    return nrChildren < maxBuildJobs;
 }
 
 
-void Worker::childStarted(GoalPtr goal, pid_t pid, int fdLogFile)
+void Worker::childStarted(GoalPtr goal,
+    pid_t pid, int fdOutput, bool inBuildSlot)
 {
-    children[pid] = pair<int, GoalPtr>(fdLogFile, goal);
+    Child child;
+    child.goal = goal;
+    child.fdOutput = fdOutput;
+    child.inBuildSlot = inBuildSlot;
+    children[pid] = child;
+    if (inBuildSlot) nrChildren++;
 }
 
 
 void Worker::childTerminated(pid_t pid)
 {
-    assert(children.find(pid) != children.end());
+    Children::iterator i = children.find(pid);
+    assert(i != children.end());
+
+    if (i->second.inBuildSlot) {
+        assert(nrChildren > 0);
+        nrChildren--;
+    }
+
     children.erase(pid);
 
     /* Wake up goals waiting for a build slot. */
@@ -1170,7 +1423,7 @@ void Worker::waitForInput()
     for (Children::iterator i = children.begin();
          i != children.end(); ++i)
     {
-        int fd = i->second.first;
+        int fd = i->second.fdOutput;
         FD_SET(fd, &fds);
         if (fd >= fdMax) fdMax = fd + 1;
     }
@@ -1185,8 +1438,8 @@ void Worker::waitForInput()
          i != children.end(); ++i)
     {
         checkInterrupt();
-        GoalPtr goal = i->second.second;
-        int fd = i->second.first;
+        GoalPtr goal = i->second.goal;
+        int fd = i->second.fdOutput;
         if (FD_ISSET(fd, &fds)) {
             unsigned char buffer[4096];
             ssize_t rd = read(fd, buffer, sizeof(buffer));
