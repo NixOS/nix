@@ -2,8 +2,8 @@
 #include "storeexpr.hh"
 
 
-#include "constructors.hh"
-#include "constructors.cc"
+#include "nixexpr-ast.hh"
+#include "nixexpr-ast.cc"
 
 
 ATermMap::ATermMap(unsigned int initialSize, unsigned int maxLoadPct)

@@ -1,9 +1,41 @@
 #! /usr/bin/perl -w
 
+# This program generates C/C++ code for efficiently manipulating
+# ATerms.  It generates functions to build and match ATerms according
+# to a set of constructor definitions defined in a file read from
+# standard input.  A constructor is defined by a line with the
+# following format:
+#
+#   SYM | ARGS | TYPE | FUN?
+#
+# where SYM is the name of the constructor, ARGS is a
+# whitespace-separated list of argument types, TYPE is the type of the
+# resulting ATerm (which should be `ATerm' or a type synonym for
+# `ATerm'), and the optional FUN is used to construct the names of the
+# build and match functions (it defaults to SYM; overriding it is
+# useful if there are overloaded constructors, e.g., with different
+# arities).  Note that SYM may be empty.
+#
+# A line of the form
+#
+#   VAR = EXPR
+#
+# causes a ATerm variable to be generated that is initialised to the
+# value EXPR.
+#
+# Finally, a line of the form
+#
+#   init NAME
+#
+# causes the initialisation function to be called `NAME'.  This
+# function must be called before any of the build/match functions or
+# the generated variables are used.
+
 die if scalar @ARGV != 2;
 
 my $syms = "";
 my $init = "";
+my $initFun = "init";
 
 open HEADER, ">$ARGV[0]";
 open IMPL, ">$ARGV[1]";
@@ -11,7 +43,7 @@ open IMPL, ">$ARGV[1]";
 while (<STDIN>) {
     next if (/^\s*$/);
     
-    if (/^\s*(\w+)\s*\|([^\|]*)\|\s*(\w+)\s*\|\s*(\w+)?/) {
+    if (/^\s*(\w*)\s*\|([^\|]*)\|\s*(\w+)\s*\|\s*(\w+)?/) {
         my $const = $1;
         my @types = split ' ', $2;
         my $result = $3;
@@ -30,6 +62,8 @@ while (<STDIN>) {
 #                $type = "const char *";
                 $type = "ATerm";
                 $args .= "e$n";
+                # !!! in the matcher, we should check that the
+                # argument is a string (i.e., a nullary application).
             } elsif ($type eq "int") {
                 $args .= "(ATerm) ATmakeInt(e$n)";
             } elsif ($type eq "ATermList" || $type eq "ATermBlob") {
@@ -42,6 +76,7 @@ while (<STDIN>) {
             $formals2 .= ", ";
             $formals2 .= "$type & e$n";
             my $m = $n - 1;
+            # !!! more checks here
             if ($type eq "int") {
                 $unpack .= "    e$n = ATgetInt((ATermInt) ATgetArgument(e, $m));\n";
             } elsif ($type eq "ATermList") {
@@ -84,12 +119,16 @@ while (<STDIN>) {
         $init .= "    $name = $value;\n";
     }
 
+    elsif (/^\s*init\s+(\w+)\s*$/) {
+        $initFun = $1;
+    }
+
     else {
         die "bad line: `$_'";
     }
 }
 
-print HEADER "void initSyms();\n\n";
+print HEADER "void $initFun();\n\n";
 
 print HEADER "static inline ATerm string2ATerm(const char * s) {\n";
 print HEADER "    return (ATerm) ATmakeAppl0(ATmakeAFun((char *) s, 0, ATtrue));\n";
@@ -100,7 +139,7 @@ print HEADER "    return (const char *) ATgetName(ATgetAFun(t));\n";
 print HEADER "}\n\n";
 
 print IMPL "\n";
-print IMPL "void initSyms() {\n";
+print IMPL "void $initFun() {\n";
 print IMPL "$init";
 print IMPL "}\n";
 

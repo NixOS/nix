@@ -3,10 +3,9 @@ noinst_LIBRARIES = libexpr.a
 libexpr_a_SOURCES = nixexpr.cc nixexpr.hh parser.cc parser.hh \
  eval.cc eval.hh primops.cc \
  lexer-tab.c lexer-tab.h parser-tab.c parser-tab.h \
- constructors.hh
+ nixexpr-ast.hh
 
-EXTRA_DIST = lexer.l parser.y constructors.def constructors.cc \
- aterm-helper.pl
+EXTRA_DIST = lexer.l parser.y nixexpr-ast.def nixexpr-ast.cc
 
 AM_CXXFLAGS = \
  -I.. ${bdb_include} ${aterm_include} -I../libutil -I../libstore
@@ -27,10 +26,10 @@ lexer-tab.c lexer-tab.h: lexer.l
 
 # ATerm helper function generation.
 
-constructors.cc constructors.hh: aterm-helper.pl constructors.def
-	$(perl) aterm-helper.pl constructors.hh constructors.cc < constructors.def
+nixexpr-ast.cc nixexpr-ast.hh: ../aterm-helper.pl nixexpr-ast.def
+	$(perl) ../aterm-helper.pl nixexpr-ast.hh nixexpr-ast.cc < nixexpr-ast.def
 
-nixexpr.hh: constructors.hh
+nixexpr.hh: nixexpr-ast.hh
 
 
 CLEANFILES =

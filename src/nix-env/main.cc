@@ -6,7 +6,7 @@
 #include "parser.hh"
 #include "eval.hh"
 #include "help.txt.hh"
-#include "constructors.hh"
+#include "nixexpr-ast.hh"
 
 #include <cerrno>
 #include <ctime>
@@ -481,20 +481,22 @@ typedef list<Strings> Table;
 
 void printTable(Table & table)
 {
-    int nrColumns = table.size() > 0 ? table.front().size() : 0;
+    unsigned int nrColumns = table.size() > 0 ? table.front().size() : 0;
     
-    vector<int> widths;
+    vector<unsigned int> widths;
     widths.resize(nrColumns);
     
     for (Table::iterator i = table.begin(); i != table.end(); ++i) {
         assert(i->size() == nrColumns);
-        Strings::iterator j; int column;
+        Strings::iterator j;
+        unsigned int column;
         for (j = i->begin(), column = 0; j != i->end(); ++j, ++column)
             if (j->size() > widths[column]) widths[column] = j->size();
     }
 
     for (Table::iterator i = table.begin(); i != table.end(); ++i) { 
-        Strings::iterator j; int column;
+        Strings::iterator j;
+        unsigned int column;
         for (j = i->begin(), column = 0; j != i->end(); ++j, ++column)
         {
             cout << *j;

@@ -18,7 +18,7 @@
 typedef ATerm Expr;
 typedef ATerm Pos;
     
-#include "constructors.hh"
+#include "nixexpr-ast.hh"
 
 void setParseResult(void * data, ATerm t);
 void parseError(void * data, char * error, int line, int column);

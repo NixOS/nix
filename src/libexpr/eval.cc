@@ -1,6 +1,6 @@
 #include "eval.hh"
 #include "parser.hh"
-#include "constructors.hh"
+#include "nixexpr-ast.hh"
 
 
 EvalState::EvalState()
@@ -10,7 +10,7 @@ EvalState::EvalState()
     
     nrEvaluated = nrCached = 0;
 
-    initSyms();
+    initNixExprHelpers();
 
     addPrimOps();
 }

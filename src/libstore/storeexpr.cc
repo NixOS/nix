@@ -2,6 +2,9 @@
 #include "globals.hh"
 #include "store.hh"
 
+#include "storeexpr-ast.hh"
+#include "storeexpr-ast.cc"
+
 
 Hash hashTerm(ATerm t)
 {
@@ -29,10 +32,11 @@ Path writeTerm(ATerm t, const string & suffix)
 
 static void parsePaths(ATermList paths, PathSet & out)
 {
-    ATMatcher m;
     for (ATermIterator i(paths); i; ++i) {
-        string s;
-        if (!(atMatch(m, *i) >> s))
+        if (ATgetType(*i) != AT_APPL)
+            throw badTerm("not a path", *i);
+        string s = aterm2String(*i);
+        if (s.size() == 0 || s[0] != '/')
             throw badTerm("not a path", *i);
         out.insert(s);
     }
@@ -69,21 +73,20 @@ static void checkClosure(const Closure & closure)
 static bool parseClosure(ATerm t, Closure & closure)
 {
     ATermList roots, elems;
-    ATMatcher m;
 
-    if (!(atMatch(m, t) >> "Closure" >> roots >> elems))
+    if (!matchClosure(t, roots, elems))
         return false;
 
     parsePaths(roots, closure.roots);
 
     for (ATermIterator i(elems); i; ++i) {
-        string path;
+        ATerm path;
         ATermList refs;
-        if (!(atMatch(m, *i) >> "" >> path >> refs))
+        if (!matchClosureElem(*i, path, refs))
             throw badTerm("not a closure element", *i);
         ClosureElem elem;
         parsePaths(refs, elem.refs);
-        closure.elems[path] = elem;
+        closure.elems[aterm2String(path)] = elem;
     }
 
     checkClosure(closure);
@@ -93,32 +96,29 @@ static bool parseClosure(ATerm t, Closure & closure)
 
 static bool parseDerivation(ATerm t, Derivation & derivation)
 {
-    ATMatcher m;
     ATermList outs, ins, args, bnds;
-    string builder, platform;
+    ATerm builder, platform;
 
-    if (!(atMatch(m, t) >> "Derive" >> outs >> ins >> platform
-            >> builder >> args >> bnds))
+    if (!matchDerive(t, outs, ins, platform, builder, args, bnds))
         return false;
 
     parsePaths(outs, derivation.outputs);
     parsePaths(ins, derivation.inputs);
 
-    derivation.builder = builder;
-    derivation.platform = platform;
+    derivation.builder = aterm2String(builder);
+    derivation.platform = aterm2String(platform);
     
     for (ATermIterator i(args); i; ++i) {
-        string s;
-        if (!(atMatch(m, *i) >> s))
+        if (ATgetType(*i) != AT_APPL)
             throw badTerm("string expected", *i);
-        derivation.args.push_back(s);
+        derivation.args.push_back(aterm2String(*i));
     }
 
     for (ATermIterator i(bnds); i; ++i) {
-        string s1, s2;
-        if (!(atMatch(m, *i) >> "" >> s1 >> s2))
+        ATerm s1, s2;
+        if (!matchEnvBinding(*i, s1, s2))
             throw badTerm("tuple of strings expected", *i);
-        derivation.env[s1] = s2;
+        derivation.env[aterm2String(s1)] = aterm2String(s2);
     }
 
     return true;
@@ -142,7 +142,7 @@ static ATermList unparsePaths(const PathSet & paths)
     ATermList l = ATempty;
     for (PathSet::const_iterator i = paths.begin();
          i != paths.end(); i++)
-        l = ATinsert(l, ATmake("<str>", i->c_str()));
+        l = ATinsert(l, string2ATerm(i->c_str()));
     return ATreverse(l);
 }
 
@@ -155,11 +155,11 @@ static ATerm unparseClosure(const Closure & closure)
     for (ClosureElems::const_iterator i = closure.elems.begin();
          i != closure.elems.end(); i++)
         elems = ATinsert(elems,
-            ATmake("(<str>, <term>)",
-                i->first.c_str(),
+            makeClosureElem(
+                string2ATerm(i->first.c_str()),
                 unparsePaths(i->second.refs)));
 
-    return ATmake("Closure(<term>, <term>)", roots, elems);
+    return makeClosure(roots, elems);
 }
 
 
@@ -168,20 +168,21 @@ static ATerm unparseDerivation(const Derivation & derivation)
     ATermList args = ATempty;
     for (Strings::const_iterator i = derivation.args.begin();
          i != derivation.args.end(); i++)
-        args = ATinsert(args, ATmake("<str>", i->c_str()));
+        args = ATinsert(args, string2ATerm(i->c_str()));
 
     ATermList env = ATempty;
     for (StringPairs::const_iterator i = derivation.env.begin();
          i != derivation.env.end(); i++)
         env = ATinsert(env,
-            ATmake("(<str>, <str>)", 
-                i->first.c_str(), i->second.c_str()));
+            makeEnvBinding(
+                string2ATerm(i->first.c_str()),
+                string2ATerm(i->second.c_str())));
 
-    return ATmake("Derive(<term>, <term>, <str>, <str>, <term>, <term>)",
+    return makeDerive(
         unparsePaths(derivation.outputs),
         unparsePaths(derivation.inputs),
-        derivation.platform.c_str(),
-        derivation.builder.c_str(),
+        string2ATerm(derivation.platform.c_str()),
+        string2ATerm(derivation.builder.c_str()),
         ATreverse(args),
         ATreverse(env));
 }

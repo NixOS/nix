@@ -1,6 +1,8 @@
 SUBDIRS = bin2c boost libutil libstore libmain nix-store nix-hash \
  libexpr nix-instantiate nix-env log2xml
 
+EXTRA_DIST = aterm-helper.pl
+
 SETUID_PROGS = nix-store nix-instantiate nix-env
 install-exec-hook:
 if SETUID_HACK

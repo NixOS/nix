@@ -55,6 +55,9 @@ void checkStoreNotSymlink(Path path)
 }
 
 
+void initStoreExprHelpers();
+
+
 /* Initialize and reorder arguments, then call the actual argument
    processor. */
 static void initAndRun(int argc, char * * argv)
@@ -101,6 +104,9 @@ static void initAndRun(int argc, char * * argv)
     string lt = getEnv("NIX_LOG_TYPE");
     if (lt != "") setLogType(lt);
 
+    /* ATerm stuff.  !!! find a better place to put this */
+    initStoreExprHelpers();
+    
     /* Put the arguments in a vector. */
     Strings args, remaining;
     while (argc--) args.push_back(*argv++);

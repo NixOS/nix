@@ -6,7 +6,7 @@
 #include "shared.hh"
 #include "eval.hh"
 #include "parser.hh"
-#include "constructors.hh"
+#include "nixexpr-ast.hh"
 #include "help.txt.hh"
 
 
@@ -28,7 +28,6 @@ static Expr evalStdin(EvalState & state, bool parseOnly)
 
 static void printDrvPaths(EvalState & state, Expr e)
 {
-    ATMatcher m;
     ATermList es;
 
     /* !!! duplication w.r.t. parseDerivations in nix-env */
