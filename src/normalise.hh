@@ -13,7 +13,7 @@ void realiseSlice(const FSId & id, FSIdSet pending = FSIdSet());
 
 /* Get the list of root (output) paths of the given
    fstate-expression. */
-Strings fstatePaths(const FSId & id, bool normalise);
+Strings fstatePaths(const FSId & id);
 
 /* Get the list of paths referenced by the given fstate-expression. */
 Strings fstateRefs(const FSId & id);

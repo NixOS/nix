@@ -80,9 +80,15 @@ static void opAdd(Strings opFlags, Strings opArgs)
 }
 
 
-string dotQuote(const string & s)
+static string dotQuote(const string & s)
 {
     return "\"" + s + "\"";
+}
+
+
+FSId maybeNormalise(const FSId & id, bool normalise)
+{
+    return normalise ? normaliseFState(id) : id;
 }
 
 
@@ -91,6 +97,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 {
     enum { qList, qRefs, qGenerators, qExpansion, qGraph 
     } query = qList;
+    bool normalise = false;
 
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); i++)
@@ -99,6 +106,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--generators" || *i == "-g") query = qGenerators;
         else if (*i == "--expansion" || *i == "-e") query = qExpansion;
         else if (*i == "--graph") query = qGraph;
+        else if (*i == "--normalise" || *i == "-n") normalise = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
     switch (query) {
@@ -108,7 +116,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                Strings paths2 = fstatePaths(argToId(*i), true);
+                Strings paths2 = fstatePaths(
+                    maybeNormalise(argToId(*i), normalise));
                 paths.insert(paths2.begin(), paths2.end());
             }
             for (StringSet::iterator i = paths.begin(); 
@@ -122,7 +131,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                Strings paths2 = fstateRefs(argToId(*i));
+                Strings paths2 = fstateRefs(
+                    maybeNormalise(argToId(*i), normalise));
                 paths.insert(paths2.begin(), paths2.end());
             }
             for (StringSet::iterator i = paths.begin(); 

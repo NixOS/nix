@@ -217,12 +217,11 @@ void realiseSlice(const FSId & id, FSIdSet pending)
 }
 
 
-Strings fstatePaths(const FSId & id, bool normalise)
+Strings fstatePaths(const FSId & id)
 {
     Strings paths;
 
-    FState fs = parseFState(termFromId(
-        normalise ? normaliseFState(id) : id));
+    FState fs = parseFState(termFromId(id));
 
     if (fs.type == FState::fsSlice) {
         /* !!! fix complexity */
@@ -245,14 +244,31 @@ Strings fstatePaths(const FSId & id, bool normalise)
 }
 
 
+static void fstateRefsSet(const FSId & id, StringSet & paths)
+{
+    FState fs = parseFState(termFromId(id));
+
+    if (fs.type == FState::fsSlice) {
+        for (SliceElems::iterator i = fs.slice.elems.begin();
+             i != fs.slice.elems.end(); i++)
+            paths.insert(i->path);
+    }
+    
+    else if (fs.type == FState::fsDerive) {
+        for (FSIds::iterator i = fs.derive.inputs.begin();
+             i != fs.derive.inputs.end(); i++)
+            fstateRefsSet(*i, paths);
+    }
+
+    else abort();
+}
+
+
 Strings fstateRefs(const FSId & id)
 {
-    Strings paths;
-    FState fs = parseFState(termFromId(normaliseFState(id)));
-    for (SliceElems::const_iterator i = fs.slice.elems.begin();
-         i != fs.slice.elems.end(); i++)
-        paths.push_back(i->path);
-    return paths;
+    StringSet paths;
+    fstateRefsSet(id, paths);
+    return Strings(paths.begin(), paths.end());
 }
 
 

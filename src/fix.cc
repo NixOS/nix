@@ -213,7 +213,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
 
             if (ATmatch(value, "FSId(<str>)", &s1)) {
                 FSId id = parseHash(s1);
-                Strings paths = fstatePaths(id, false);
+                Strings paths = fstatePaths(id);
                 if (paths.size() != 1) abort();
                 string path = *(paths.begin());
                 fs.derive.inputs.push_back(id);
