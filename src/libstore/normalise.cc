@@ -1441,6 +1441,7 @@ Worker::Worker()
     /* Debugging: prevent recursive workers. */ 
     if (working) abort();
     working = true;
+    nrChildren = 0;
 }
 
 
