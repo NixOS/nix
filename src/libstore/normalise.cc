@@ -818,6 +818,7 @@ void NormalisationGoal::terminateBuildHook()
     toHook.writeSide.close();
     fdLogFile.close();
     logPipe.readSide.close();
+    deleteTmpDir(true); /* get rid of the hook's temporary directory */
 }
 
 
