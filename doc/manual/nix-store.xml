@@ -1,133 +1,150 @@
 <refentry>
-  <refnamediv>
-    <refname>nix-store</refname>
-    <refpurpose>manipulate or query the Nix store</refpurpose>
-  </refnamediv>
 
-  <refsynopsisdiv>
-    <cmdsynopsis>
-      <command>nix-store</command>
-      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common-syn.xml#xpointer(/nop/*)" />
-      <arg choice='plain'><replaceable>operation</replaceable></arg>
-      <arg rep='repeat'><replaceable>options</replaceable></arg>
-      <arg rep='repeat'><replaceable>arguments</replaceable></arg>
-    </cmdsynopsis>
-  </refsynopsisdiv>
+<refnamediv>
+  <refname>nix-store</refname>
+  <refpurpose>manipulate or query the Nix store</refpurpose>
+</refnamediv>
 
-  <refsection>
-    <title>Description</title>
-
-    <para>
-      The command <command>nix-store</command> performs primitive
-      operations on the Nix store.  You generally do not need to run
-      this command manually.
-    </para>
-
-    <para>
-      <command>nix-store</command> takes exactly one
-      <emphasis>operation</emphasis> flag which indicates the
-      subcommand to be performed.  These are documented below.
-    </para>
-
-  </refsection>
+<refsynopsisdiv>
+  <cmdsynopsis>
+    <command>nix-store</command>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common-syn.xml#xpointer(/nop/*)" />
+    <arg><option>--add-root</option> <replaceable>path</replaceable></arg>
+    <arg><option>--indirect</option></arg>
+    <arg choice='plain'><replaceable>operation</replaceable></arg>
+    <arg rep='repeat'><replaceable>options</replaceable></arg>
+    <arg rep='repeat'><replaceable>arguments</replaceable></arg>
+  </cmdsynopsis>
+</refsynopsisdiv>
 
 
+<refsection><title>Description</title>
 
-  <!--######################################################################-->
+<para>The command <command>nix-store</command> performs primitive
+operations on the Nix store.  You generally do not need to run this
+command manually.</para>
 
-  <refsection>
-    <title>Common options</title>
+<para><command>nix-store</command> takes exactly one
+<emphasis>operation</emphasis> flag which indicates the subcommand to
+be performed.  These are documented below.</para>
 
-    <para>
-      This section lists the options that are common to all
-      operations.  These options are allowed for every subcommand,
-      though they may not always have an effect.  See also <xref
-      linkend="sec-common-options" />.
-    </para>
+</refsection>
 
-  </refsection>
 
-  
 
-  <!--######################################################################-->
+<!--######################################################################-->
 
-  <refsection>
-    <title>Environment variables</title>
+<refsection><title>Common options</title>
 
-    <para>
-      The following environment variables affect the behaviour of
-      <command>nix-store</command>.
-    </para>
+<para>This section lists the options that are common to all
+operations.  These options are allowed for every subcommand, though
+they may not always have an effect.  See also <xref
+linkend="sec-common-options" />.</para>
+
+<variablelist>
+
+  <varlistentry><term><option>--add-root</option> <replaceable>path</replaceable></term>
+
+    <listitem><para>Causes the result of a build action
+    (<option>--realise</option> and <option>--force-realise</option>)
+    to be registered as a root of the garbage collector (see <xref
+    linkend="ssec-gc-roots" />).  The root is stored in
+    <replaceable>path</replaceable>, which must be inside a directory
+    that is scanned for roots by the garbage collector (i.e.,
+    typically in a subdirectory of
+    <filename>/nix/var/nix/gcroots/</filename>)
+    <emphasis>unless</emphasis> the <option>--indirect</option> flag
+    is used.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--indirect</option></term>
+
+    <listitem>
+
+    <para>In conjunction with <option>--add-root</option>, this option
+    allows roots to be stored <emphasis>outside</emphasis> of the GC
+    roots directory.  This is useful for commands such as
+    <command>nix-build</command> that place a symlink to the build
+    result in the current directory; such a build result should not be
+    garbage-collected unless the symlink is removed.</para>
+
+    <para>The <option>--indirect</option> flag causes a uniquely named
+    symlink to <replaceable>path</replaceable> to be stored in
+    <filename>/nix/var/nix/gcroots/auto/</filename>.  For instance,
+
+    <screen>
+$ nix-store --add-root /home/eelco/bla/result --indirect -r <replaceable>...</replaceable>
+
+$ ls -l /nix/var/nix/gcroots/auto
+lrwxrwxrwx    1 ... 2005-03-13 21:10 dn54lcypm8f8... -> /home/eelco/bla/result
+
+$ ls -l /home/eelco/bla/result
+lrwxrwxrwx    1 ... 2005-03-13 21:10 /home/eelco/bla/result -> /nix/store/1r11343n6qd4...-f-spot-0.0.10</screen>
+
+    Thus, when <filename>/home/eelco/bla/result</filename> is removed,
+    the GC root in the <filename>auto</filename> directory becomes a
+    dangling symlink and will be ignored by the collector.</para>
+
+    <warning><para>Note that it is not possible to move or rename
+    indirect GC roots, since the symlink in the
+    <filename>auto</filename> directory will still point to the old
+    location.</para></warning>
+
+    </listitem>
+
+  </varlistentry>
     
-    <variablelist>
+</variablelist>
 
-      <varlistentry>
-        <term><envar>TMPDIR</envar>=<replaceable>path</replaceable></term>
-        <listitem>
-          <para>
-            Use the directory <replaceable>path</replaceable> to store
-            temporary files.  In particular, this includes temporary
-            build directories; these can take up substantial amounts
-            of disk space.  The default is <filename>/tmp</filename>.
-          </para>
-        </listitem>
-      </varlistentry>
-
-    </variablelist>
-        
-  </refsection>
+</refsection>
 
   
 
-  <!--######################################################################-->
+<!--######################################################################-->
 
-  <refsection id='rsec-nix-store-realise'>
-    <title>Operation <option>--realise</option></title>
+<refsection id='rsec-nix-store-realise'><title>Operation
+<option>--realise</option></title>
 
-    <refsection>
-      <title>Synopsis</title>
-      <cmdsynopsis>
-        <command>nix-store</command>
-        <group choice='req'>
-          <arg choice='plain'><option>--realise</option></arg>
-          <arg choice='plain'><option>-r</option></arg>
-        </group>
-        <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
-      </cmdsynopsis>
-    </refsection>
+<refsection><title>Synopsis</title>
 
-    <refsection>
-      <title>Description</title>
+<cmdsynopsis>
+  <command>nix-store</command>
+  <group choice='req'>
+    <arg choice='plain'><option>--realise</option></arg>
+    <arg choice='plain'><option>-r</option></arg>
+  </group>
+  <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+</cmdsynopsis>
+
+</refsection>
+
+<refsection><title>Description</title>
             
-      <para>
-        The operation <option>--install</option> realises in the file
-        system the store expressions stored in
-        <replaceable>paths</replaceable>.  If these expressions are
-        derivation expressions, they are first
-        <emphasis>normalised</emphasis> into a closure expression.
-        This may happen in two ways.  First, the corresponding closure
-        expression (the <emphasis>successor</emphasis>) may already
-        known (either because the build has already been performed, or
-        because a successor was explicitly registered through the
-        <option>--successor</option> operation).  Otherwise, the build
-        action described by the derivation is performed, and a closure
-        expression is computed by scanning the result of the build for
-        references to other paths in the store.
-      </para>
+<para>The operation <option>--install</option> realises in the file
+system the store expressions stored in
+<replaceable>paths</replaceable>.  If these expressions are derivation
+expressions, they are first <emphasis>normalised</emphasis> into a
+closure expression.  This may happen in two ways.  First, the
+corresponding closure expression (the <emphasis>successor</emphasis>)
+may already known (either because the build has already been
+performed, or because a successor was explicitly registered through
+the <option>--successor</option> operation).  Otherwise, the build
+action described by the derivation is performed, and a closure
+expression is computed by scanning the result of the build for
+references to other paths in the store.</para>
 
-      <para>
-        The paths of the closure expression corresponding to each
-        expression in <replaceable>paths</replaceable> is printed on
-        standard output.
-      </para>
+<para>The paths of the closure expression corresponding to each
+expression in <replaceable>paths</replaceable> is printed on standard
+output.</para>
 
-    </refsection>
+</refsection>
             
-  </refsection>
+</refsection>
 
   
 
-  <!--######################################################################-->
+<!--######################################################################-->
 
   <refsection>
     <title>Operation <option>--gc</option></title>

@@ -107,6 +107,17 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
 </varlistentry>
   
+
+<varlistentry><term><envar>TMPDIR</envar></term>
+
+  <listitem><para>Use the specified directory to store temporary
+  files.  In particular, this includes temporary build directories;
+  these can take up substantial amounts of disk space.  The default is
+  <filename>/tmp</filename>.</para></listitem>
+  
+</varlistentry>
+
+
 </variablelist>
 
 </sect1>

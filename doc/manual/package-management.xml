@@ -379,7 +379,7 @@ $ nix-collect-garbage --print-dead</screen>
 Likewise, the option <option>--print-live</option> will show the paths
 that <emphasis>won’t</emphasis> be deleted.</para>
 
-<sect2><title>Garbage collector roots</title>
+<sect2 id="ssec-gc-roots"><title>Garbage collector roots</title>
 
 <para>TODO</para>
 

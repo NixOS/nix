@@ -154,7 +154,7 @@ a:hover { background: #ffffcd; }
                                Special elements:
  ***************************************************************************/
 
-tt
+tt, code
 {
     color: #400000;
 }
