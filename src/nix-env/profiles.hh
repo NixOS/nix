@@ -18,7 +18,7 @@ typedef list<Generation> Generations;
 
 /* Returns the list of currently present generations for the specified
    profile, sorted by generation number. */
-Generations findGenerations(Path profile);
+Generations findGenerations(Path profile, int & curGen);
     
 Path createGeneration(Path profile, Path outPath, Path drvPath);
 

@@ -11,7 +11,22 @@ static bool cmpGensByNumber(const Generation & a, const Generation & b)
 }
 
 
-Generations findGenerations(Path profile)
+/* Parse a generation name of the format
+   `<profilename>-<number>-link'. */
+static int parseName(const string & profileName, const string & name)
+{
+    if (string(name, 0, profileName.size() + 1) != profileName + "-") return -1;
+    string s = string(name, profileName.size() + 1);
+    int p = s.find("-link");
+    if (p == string::npos) return -1;
+    istringstream str(string(s, 0, p));
+    unsigned int n;
+    if (str >> n && str.eof()) return n; else return -1;
+}
+
+
+
+Generations findGenerations(Path profile, int & curGen)
 {
     Generations gens;
 
@@ -20,13 +35,8 @@ Generations findGenerations(Path profile)
     
     Strings names = readDirectory(profileDir);
     for (Strings::iterator i = names.begin(); i != names.end(); ++i) {
-        if (string(*i, 0, profileName.size() + 1) != profileName + "-") continue;
-        string s = string(*i, profileName.size() + 1);
-        int p = s.find("-link");
-        if (p == string::npos) continue;
-        istringstream str(string(s, 0, p));
-        unsigned int n;
-        if (str >> n && str.eof()) {
+        int n;
+        if ((n = parseName(profileName, *i)) != -1) {
             Generation gen;
             gen.path = profileDir + "/" + *i;
             gen.number = n;
@@ -40,6 +50,10 @@ Generations findGenerations(Path profile)
 
     gens.sort(cmpGensByNumber);
 
+    curGen = pathExists(profile)
+        ? parseName(profileName, readLink(profile))
+        : -1;
+
     return gens;
 }
 
@@ -48,7 +62,8 @@ Path createGeneration(Path profile, Path outPath, Path drvPath)
 {
     /* The new generation number should be higher than old the
        previous ones. */
-    Generations gens = findGenerations(profile);
+    int dummy;
+    Generations gens = findGenerations(profile, dummy);
     unsigned int num = gens.size() > 0 ? gens.front().number : 0;
         
     /* Create the new generation. */
