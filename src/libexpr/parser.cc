@@ -75,6 +75,65 @@ int yyparse(yyscan_t scanner, ParseData * data);
 }
 
 
+static void checkAttrs(ATermMap & names, ATermList bnds)
+{
+    for (ATermIterator i(bnds); i; ++i) {
+        ATerm name;
+        Expr e;
+        ATerm pos;
+        if (!matchBind(*i, name, e, pos)) abort(); /* can't happen */
+        if (names.get(name))
+            throw Error(format("duplicate attribute `%1%' at %2%")
+                % aterm2String(name) % showPos(pos));
+        names.set(name, name);
+    }
+}
+
+
+static void checkAttrSets(ATerm e)
+{
+    ATermList formals;
+    ATerm body, pos;
+    if (matchFunction(e, formals, body, pos)) {
+        ATermMap names;
+        for (ATermIterator i(formals); i; ++i) {
+            ATerm name;
+            Expr deflt;
+            if (!matchNoDefFormal(*i, name) &&
+                !matchDefFormal(*i, name, deflt))
+                abort();
+            if (names.get(name))
+                throw Error(format("duplicate formal function argument `%1%' at %2%")
+                    % aterm2String(name) % showPos(pos));
+            names.set(name, name);
+        }
+    }
+
+    ATermList bnds;
+    if (matchAttrs(e, bnds)) {
+        ATermMap names;
+        checkAttrs(names, bnds);
+    }
+    
+    ATermList rbnds, nrbnds;
+    if (matchRec(e, rbnds, nrbnds)) {
+        ATermMap names;
+        checkAttrs(names, rbnds);
+        checkAttrs(names, nrbnds);
+    }
+    
+    if (ATgetType(e) == AT_APPL) {
+        int arity = ATgetArity(ATgetAFun(e));
+        for (int i = 0; i < arity; ++i)
+            checkAttrSets(ATgetArgument(e, i));
+    }
+
+    else if (ATgetType(e) == AT_LIST)
+        for (ATermIterator i((ATermList) e); i; ++i)
+            checkAttrSets(*i);
+}
+
+
 static Expr parse(EvalState & state,
     const char * text, const Path & path,
     const Path & basePath)
@@ -96,6 +155,8 @@ static Expr parse(EvalState & state,
     } catch (Error & e) {
         throw Error(format("%1%, in `%2%'") % e.msg() % path);
     }
+    
+    checkAttrSets(data.result);
 
     return data.result;
 }

@@ -232,7 +232,7 @@ foreach my $userEnvElem (@userEnvElems) {
     # Evaluate each blacklist item.
     foreach my $item ($blacklist->getChildrenByTagName("item")) {
         my $itemId = $item->getAttributeNode("id")->getValue;
-        print "  CHECKING FOR $itemId\n";
+#        print "  CHECKING FOR $itemId\n";
 
         my $condition = ($item->getChildrenByTagName("condition"))[0];
         die unless $condition;
