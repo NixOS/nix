@@ -472,6 +472,12 @@ void DerivationGoal::outputsSubstituted()
 {
     trace("all outputs substituted (maybe)");
 
+    if (nrFailed > 0 && !tryFallback) {
+        throw Error(format("some substitutes for the outputs of derivation `%1%' failed; try `--fallback'") % drvPath);
+    }
+
+    nrFailed = 0;
+
     if (checkPathValidity(false).size() == 0) {
         amDone(true);
         return;

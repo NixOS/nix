@@ -8,12 +8,8 @@ cat > $out/substituter <<EOF
 echo \$*
 
 case \$* in
-    *aaaa*)
-        exit 1
-        ;;
     *)
-        mkdir \$1
-        echo Foo \$3 \$4 > \$1/hello
+        exit 1
         ;;
 esac        
 EOF

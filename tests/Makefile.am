@@ -19,8 +19,8 @@ dependencies.sh: dependencies.nix
 locking.sh: locking.nix
 parallel.sh: parallel.nix
 build-hook.sh: build-hook.nix
-substitutes.sh: substitutes.nix substituter.nix
-substitutes2.sh: substitutes2.nix substituter.nix substituter2.nix
+substitutes.sh: substitutes.nix
+substitutes2.sh: substitutes2.nix
 fallback.sh: fallback.nix
 
 TESTS = init.sh hash.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
