@@ -638,6 +638,10 @@ language.</para>
   <filename>/foo/bar/bla.nix</filename> refers to
   <filename>../xyzzy/fnord.nix</filename>, the absolutised path is
   <filename>/foo/xyzzy/fnord.nix</filename>.</para></listitem>
+
+  <listitem><para><emphasis>Booleans</emphasis> with values
+  <literal>true</literal> and
+  <literal>false</literal>.</para></listitem>
   
 </itemizedlist>
 
@@ -733,23 +737,85 @@ encountered</quote>).</para></footnote>.</para>
 
 </simplesect>
 
-<!--
-<para>It is often convenient to copy variables from the surrounding
-scope (e.g., when you want to propagate attributes).  This can be
-shortened using the <literal>inherit</literal> keyword.  For instance,
--->
-
 
 <simplesect><title>Let expressions</title>
 
-<para>TODO</para>
+<para>A <literal>let</literal> expression is a simple short-hand for a
+<literal>rec</literal> expression followed by an attribute selection:
+<literal>let { <replaceable>attrs</replaceable> }</literal> translates
+to <literal>rec { <replaceable>attrs</replaceable>
+}.body</literal>.</para>
+
+<para>For instance,
+
+<programlisting>
+let {
+  x = "foo";
+  y = "bar";
+  body = x + y;
+}</programlisting>
+
+is equivalent to
+
+<programlisting>
+rec {
+  x = "foo";
+  y = "bar";
+  body = x + y;
+}.body</programlisting>
+
+and evaluates to <literal>"foobar"</literal>.
+
+</para>
 
 </simplesect>
 
 
 <simplesect><title>Inheriting attributes</title>
 
-<para>TODO</para>
+<para>When defining an attribute set itt is often convenient to copy
+variables from the surrounding lexical scope (e.g., when you want to
+propagate attributes).  This can be shortened using the
+<literal>inherit</literal> keyword.  For instance,
+
+<programlisting>
+let {
+  x = 123;
+  body = {
+    inherit x;
+    y = 456;
+  };
+}</programlisting>
+
+evaluates to <literal>{x = 123; y = 456;}</literal>.  (Note that this
+works because <varname>x</varname> is added to the lexical scope by
+the <literal>let</literal> construct.)  It is also possible to inherit
+attributes from another attribute set.  For instance, in this fragment
+from <filename>all-packages-generic.nix</filename>,
+
+<programlisting>
+  graphviz = (import ../tools/graphics/graphviz) {
+    inherit fetchurl stdenv libpng libjpeg expat x11 yacc;
+    inherit (xlibs) libXaw;
+  };
+
+  xlibs = {
+    libX11 = ...;
+    libXaw = ...;
+    ...
+  }
+
+  libpng = ...;
+  libjpg = ...;
+  ...</programlisting>
+
+the attribute set used in the function call to the function defined in
+<filename>../tools/graphics/graphviz</filename> inherits a number of
+variables from the surrounding scope (<varname>fetchurl</varname>
+... <varname>yacc</varname>), but also inherits
+<varname>libXaw</varname> (the X Athena Widgets) from the
+<varname>xlibs</varname> (X11 client-side libraries) attribute
+set.</para>
 
 </simplesect>
 
@@ -765,9 +831,104 @@ shortened using the <literal>inherit</literal> keyword.  For instance,
 
 <simplesect><title>Conditionals</title>
 
-<para>TODO</para>
+<para>Conditionals look like this:
+
+<programlisting>
+if <replaceable>e1</replaceable> then <replaceable>e2</replaceable> else <replaceable>e3</replaceable></programlisting>
+
+where <replaceable>e1</replaceable> is an expression that should
+evaluate to a boolean value (<literal>true</literal> or
+<literal>false</literal>).</para>
 
 </simplesect>
+
+
+<simplesect><title>Assertions</title>
+
+<para>Assertions are generally used to check that certain requirements
+on or between features and dependencies hold.  They look like this:
+
+<programlisting>
+assert <replaceable>e1</replaceable>; <replaceable>e2</replaceable></programlisting>
+
+where <replaceable>e1</replaceable> is an expression that should
+evaluate to a boolean value.  If it evaluates to
+<literal>true</literal>, <replaceable>e2</replaceable> is returned;
+otherwise expression evaluation is aborted and a backtrace is printed.</para>
+
+<example id='ex-subversion-nix'><title>Nix expression for Subversion</title>
+<programlisting>
+{ localServer ? false
+, httpServer ? false
+, sslSupport ? false
+, pythonBindings ? false
+, javaSwigBindings ? false
+, javahlBindings ? false
+, stdenv, fetchurl
+, openssl ? null, httpd ? null, db4 ? null, expat, swig ? null, j2sdk ? null
+}:
+
+assert localServer -> db4 != null; <co id='ex-subversion-nix-co-1' />
+assert httpServer -> httpd != null &amp;&amp; httpd.expat == expat; <co id='ex-subversion-nix-co-2' />
+assert sslSupport -> openssl != null &amp;&amp; (httpServer -> httpd.openssl == openssl); <co id='ex-subversion-nix-co-3' />
+assert pythonBindings -> swig != null &amp;&amp; swig.pythonSupport;
+assert javaSwigBindings -> swig != null &amp;&amp; swig.javaSupport;
+assert javahlBindings -> j2sdk != null;
+
+stdenv.mkDerivation {
+  name = "subversion-1.1.1";
+  ...
+  openssl = if sslSupport then openssl else null; <co id='ex-subversion-nix-co-4' />
+  ...
+}</programlisting>
+</example>
+
+<para><xref linkend='ex-subversion-nix' /> show how assertions are
+used in the Nix expression for Subversion.</para>
+
+<calloutlist>
+
+  <callout arearefs='ex-subversion-nix-co-1'>
+    <para>This assertion states that if Subversion is to have support
+    for local repositories, then Berkeley DB is needed.  So if the
+    Subversion function is called with the
+    <varname>localServer</varname> argument set to
+    <literal>true</literal> but the <varname>db4</varname> argument
+    set to <literal>null</literal>, then the evaluation fails.</para>
+  </callout>
+
+  <callout arearefs='ex-subversion-nix-co-2'>
+    <para>This is a more subtle condition: if Subversion is built with
+    Apache (<literal>httpServer</literal>) support, then the Expat
+    library (an XML library) used by Subversion should be same as the
+    one used by Apache.  This is because in this configuration
+    Subversion code ends up being linked with Apache code, and if the
+    Expat libraries do not match, a build- or runtime link error or
+    incompatibility might occur.</para>
+  </callout>
+
+  <callout arearefs='ex-subversion-nix-co-2'>
+    <para>This assertion says that in order for Subversion to have SSL
+    support (so that it can access <literal>https</literal> URLs), an
+    OpenSSL library must be passed.  Additionally, it says
+    <emphasis>if</emphasis> Apache support is enabled, then Apache's
+    OpenSSL should much Subversion's.  (Note that if Apache support is
+    not enabled, we don't care about Apache's OpenSSL.)</para>
+  </callout>
+
+  <callout arearefs='ex-subversion-nix-co-4'>
+    <para>The conditional here is not really related to assertions,
+    but is worth pointing out: it ensures that if SSL support is
+    disabled, then the Subversion derivation is not dependent on
+    OpenSSL, even if a non-<literal>null</literal> value was passed.
+    This prevents an unnecessary rebuild of Subversion if OpenSSL
+    changes.</para>
+  </callout>
+
+</calloutlist>
+
+</simplesect>
+  
 
 
 <simplesect><title>With expressions</title>
@@ -791,7 +952,7 @@ shortened using the <literal>inherit</literal> keyword.  For instance,
 </simplesect>
 
 
-<simplesect><title>Miscelleneous built-in functions</title>
+<simplesect><title>Other built-in functions</title>
 
 <para>TODO</para>
 
