@@ -53,6 +53,33 @@ build-aterm: have-aterm
 	touch build-aterm
 
 
-all: build-db build-aterm
+# SDF bundle
 
-EXTRA_DIST = $(DB).tar.gz $(ATERM).tar.gz
+SDF2 = sdf2-bundle-1.6
+
+$(SDF2).tar.gz:
+	@echo "Nix requires the SDF2 bundle to build."
+	@echo "Please download version 1.6 from"
+	@echo "  ftp://ftp.stratego-language.org/pub/stratego/sdf2/sdf2-bundle-1.6.tar.gzP"
+	@echo "and place it in the externals/ directory."
+	false
+
+$(SDF2): $(SDF2).tar.gz
+	gunzip < $(SDF2).tar.gz | tar xvf -
+
+have-sdf2:
+	$(MAKE) $(SDF2)
+	touch have-sdf2
+
+build-sdf2: have-sdf2
+	(pfx=`pwd` && \
+	cd $(SDF2) && \
+	./configure --prefix=$$pfx/inst && \
+	make && \
+	make install)
+	touch build-sdf2
+
+
+all: build-db build-aterm build-sdf2
+
+EXTRA_DIST = $(DB).tar.gz $(ATERM).tar.gz $(SDF2).tar.gz
