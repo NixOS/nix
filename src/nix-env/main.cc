@@ -600,9 +600,15 @@ static void opQuery(Globals & globals,
             DrvInfos installed;
             queryInstalled(globals.state, installed, globals.linkPath);
 
+            PathSet installedPaths; /* output paths of installed drvs */
+            for (DrvInfos::iterator i = installed.begin();
+                 i != installed.end(); ++i)
+                installedPaths.insert(i->second.outPath);
+            
             for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i) {
                 cout << format("%1%%2% %3%\n")
-                    % (installed.find(i->first) != installed.end() ? 'I' : '-')
+                    % (installedPaths.find(i->second.outPath)
+                        != installedPaths.end() ? 'I' : '-')
                     % (isValidPath(i->second.outPath) ? 'P' : '-')
                     % i->second.name;
             }
