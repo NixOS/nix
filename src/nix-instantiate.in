@@ -59,37 +59,57 @@ sub convert {
     my $OUT = new FileHandle;
     my $tmpfile = "$outdir/$fn-tmp";
     open $IN, "< $descr" or die "cannot open $descr";
-    open $OUT, "> $tmpfile" or die "cannot create $tmpfile";
 
-    print $OUT "system : $system\n";
+# Descr([Bind("x", Str("y")), Bind("x", File("1234")), Bind("x", Pkg("1234"))])
+# bindings alphabetisch gesorteerd
+
+    my %bindings;
 
     while (<$IN>) {
         chomp;
+	s/\s*#.*$//;
+	next if (/^$/);
 
         if (/^(\w+)\s*=\s*([^\#\s]*)\s*(\#.*)?$/) {
             my ($name, $loc) = ($1, $2);
             my $file = fetchFile($loc);
             $file = File::Spec->rel2abs($file, $dir);
 	    my $hash = hashFile($file);
-            print $OUT "$name = $hash\n";
+            $bindings{$name} = "File(\"$hash\")";
         } elsif (/^(\w+)\s*<-\s*([+\w\d\.\/-]+)\s*(\#.*)?$/) {
             my $name = $1;
             my $file = $2;
             $file = File::Spec->rel2abs($file, $dir);
             $file = convert($file);
 	    my $hash = hashFile($file);
-            print $OUT "$name <- $hash\n";
+            $bindings{$name} = "Pkg(\"$hash\")";
+        } elsif (/^(\w+)\s*:\s*([+\w\d\.\/-]+)\s*(\#.*)?$/) {
+            my $name = $1;
+            my $value = $2;
+            $bindings{$name} = "Str(\"$value\")";
         } else {
-            print $OUT "$_\n";
+	    die "syntax error: $_";
         }
     }
 
-    close $OUT;
     close $IN;
+
+    $bindings{"system"} = "Str(\"$system\")";
+
+    open $OUT, "| baffle -wt > $tmpfile" or die "cannot create $tmpfile";
+    print $OUT "Descr([";
+    my $first = 1;
+    foreach my $name (sort (keys %bindings)) {
+	if (!$first) { print $OUT ","; };
+	print $OUT "Bind(\"$name\",$bindings{$name})";
+	$first = 0;
+    }
+    print $OUT "])";
+    close $OUT;
 
     my $hash = hashFile($tmpfile);
 
-    my $outfile = "$outdir/$hash-$fn";
+    my $outfile = "$outdir/$fn-$hash";
     rename($tmpfile, $outfile) or die "cannot rename $tmpfile to $outfile";
 
     $donetmpls{$descr} = $outfile;

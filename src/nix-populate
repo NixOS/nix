@@ -6,7 +6,7 @@ my $pkglist = $ENV{"NIX_ACTIVATIONS"};
 $pkglist or die "NIX_ACTIVATIONS not set";
 my $linkdir = $ENV{"NIX_LINKS"};
 $linkdir or die "NIX_LINKS not set";
-my @dirs = ("bin", "sbin", "lib");
+my @dirs = ("bin", "sbin", "lib", "include");
 
 # Figure out a generation number.
 my $nr = 1;

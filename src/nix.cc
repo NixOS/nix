@@ -17,6 +17,10 @@
 #include <db4/db_cxx.h>
 
 extern "C" {
+#include <aterm1.h>
+}
+
+extern "C" {
 #include "md5.h"
 }
 
@@ -210,33 +214,29 @@ void readPkgDescr(const string & hash,
     if (hashFile(pkgfile) != hash)
         throw Error("file " + pkgfile + " is stale");
 
-    ifstream file;
-    file.exceptions(ios::badbit);
-    file.open(pkgfile.c_str());
-    
-    while (!file.eof()) {
-        string line;
-        getline(file, line);
+    ATerm term = ATreadFromNamedFile(pkgfile.c_str());
+    if (!term) throw Error("cannot read aterm " + pkgfile);
 
-        int n = line.find('#');
-        if (n >= 0) line = line.erase(n);
+    ATerm bindings;
+    if (!ATmatch(term, "Descr(<term>)", &bindings))
+        throw Error("invalid term in " + pkgfile);
 
-        if ((int) line.find_first_not_of(" ") < 0) continue;
-        
-        istringstream str(line);
-
-        string name, op, ref;
-        str >> name >> op >> ref;
-
-        if (op == "<-") {
-            checkHash(ref);
-            pkgImports[name] = ref;
-        } else if (op == "=") {
-            checkHash(ref);
-            fileImports[name] = ref;
-        } else if (op == ":")
-            arguments[name] = ref;
-        else throw Error("invalid operator " + op);
+    char * cname;
+    ATerm value;
+    while (ATmatch(bindings, "[Bind(<str>, <term>), <list>]", 
+               &cname, &value, &bindings)) 
+    {
+        string name(cname);
+        char * arg;
+        if (ATmatch(value, "Pkg(<str>)", &arg)) {
+            checkHash(arg);
+            pkgImports[name] = arg;
+        } else if (ATmatch(value, "File(<str>)", &arg)) {
+            checkHash(arg);
+            fileImports[name] = arg;
+        } else if (ATmatch(value, "Str(<str>)", &arg))
+            arguments[name] = arg;
+        else throw Error("invalid binding in " + pkgfile);
     }
 }
 
@@ -747,6 +747,9 @@ void main2(int argc, char * * argv)
 
 int main(int argc, char * * argv)
 {
+    ATerm bottomOfStack;
+    ATinit(argc, argv, &bottomOfStack);
+
     prog = *argv++, argc--;
 
     try { 

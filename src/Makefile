@@ -3,7 +3,7 @@ all: nix nix-instantiate
 SYSTEM = $(shell ./config.guess)
 
 nix: nix.o md5.o
-	g++ -g -o $@ $^ -ldb_cxx-4
+	g++ -g -o $@ $^ -ldb_cxx-4 -lATerm
 
 %.o: %.cc
 	g++ -g -Wall -o $@ -c $< -DSYSTEM=\"$(SYSTEM)\"
