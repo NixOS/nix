@@ -24,7 +24,7 @@ make
 %install
 rm -rf $RPM_BUILD_ROOT
 make DESTDIR=$RPM_BUILD_ROOT install
-strip $RPM_BUILD_ROOT/%{_prefix}/bin/*
+strip $RPM_BUILD_ROOT/%{_prefix}/bin/* || true
 
 %clean
 rm -rf $RPM_BUILD_ROOT
