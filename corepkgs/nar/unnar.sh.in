@@ -2,5 +2,5 @@
 
 export PATH=/bin:/usr/bin
 
-echo "unpacking $nar to $out..."
-bunzip2 < $nar | @bindir@/nix-store --restore "$out" || exit 1
+echo "unpacking $narFile to $out..."
+bunzip2 < $narFile | @bindir@/nix-store --restore "$out" || exit 1
