@@ -1,6 +1,24 @@
 <blacklist>
 
 
+<item id='firefox-1.0.1-security'>
+  <condition>
+    <within>
+      <traverse><true /></traverse>
+      <hasAttr name='outputHash' value='ebaea974fea9460ab7050fff76b41cb1' />
+    </within>
+  </condition>
+  <reason>
+    Fixes several security bugs (see
+    http://www.mozilla.org/projects/security/known-vulnerabilities.html),
+    in particular MFSA 2005-30
+    (http://www.mozilla.org/security/announce/mfsa2005-30.html).
+    Upgrade to 1.0.2.
+  </reason>
+  <severity class="client" level="critical" />
+</item>
+
+
 <item id='openssl-0.9.7d-obsolete'>
   <condition>
     <within>
