@@ -383,7 +383,7 @@ some fragments of
     that can be built by Nix (since when we fill in the arguments of
     the function, what we get is its body, which is the call to
     <varname>stdenv.mkDerivation</varname> in <xref
-    linkend='ex-hello-nix ' />).</para>
+    linkend='ex-hello-nix' />).</para>
 
   </callout>
 

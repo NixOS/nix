@@ -7,7 +7,7 @@
   <refsynopsisdiv>
     <cmdsynopsis>
       <command>nix-instantiate</command>
-      &opt-common-syn;
+      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common-syn.xml#xpointer(/nop/*)" />
       <group choice='opt'>
         <arg choice='plain'><option>--parse-only</option></arg>
         <arg choice='plain'><option>--eval-only</option></arg>
@@ -41,7 +41,7 @@
 
     <variablelist>
 
-      &opt-common;
+      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common.xml#xpointer(/nop/*)" />
 
       <varlistentry>
         <term><option>--parse-only</option></term>

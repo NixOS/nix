@@ -1,3 +1,5 @@
+<nop>
+  
 <arg><option>--help</option></arg>
 <arg><option>--version</option></arg>
 <arg rep='repeat'><option>--verbose</option></arg>
@@ -17,3 +19,5 @@
 <arg><option>-K</option></arg>
 <arg><option>--fallback</option></arg>
 <arg><option>--readonly-mode</option></arg>
+
+</nop>

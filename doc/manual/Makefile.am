@@ -1,4 +1,4 @@
-ENV = SGML_CATALOG_FILES=$(docbookcatalog):$(docbookebnfcatalog)
+ENV = SGML_CATALOG_FILES=$(docbookcatalog)
 
 XMLLINT = $(ENV) $(xmllint) $(xmlflags) --catalogs
 XSLTPROC = $(ENV) $(xsltproc) $(xmlflags) --catalogs \
@@ -20,18 +20,18 @@ SOURCES = manual.xml introduction.xml installation.xml \
  troubleshooting.xml bugs.xml opt-common.xml opt-common-syn.xml \
  quick-start.xml nix-lang-ref.xml style.css images
 
-manual.is-valid: $(SOURCES) version.xml
-	$(XMLLINT) --noout --valid manual.xml
+manual.is-valid: $(SOURCES) version.txt
+	$(XMLLINT) --xinclude $< | $(XMLLINT) --noout --valid -
 	touch $@
 
-version.xml:
-	echo -n $(VERSION) > version.xml
+version.txt:
+	echo -n $(VERSION) > version.txt
 
 man $(MANS): $(SOURCES) manual.is-valid
-	$(XSLTPROC) $(docbookxsl)/manpages/docbook.xsl manual.xml
+	$(XSLTPROC) --xinclude $(docbookxsl)/manpages/docbook.xsl manual.xml
 
 manual.html: $(SOURCES) manual.is-valid images
-	$(XSLTPROC) --output manual.html $(docbookxsl)/html/docbook.xsl manual.xml
+	$(XSLTPROC) --xinclude --output manual.html $(docbookxsl)/html/docbook.xsl manual.xml
 
 all-local: manual.html
 
@@ -50,7 +50,7 @@ images:
 	cp $(docbookxsl)/images/callouts/*.png images/callouts
 	chmod +w -R images
 
-KEEP = manual.html manual.is-valid version.xml $(MANS)
+KEEP = manual.html manual.is-valid version.txt $(MANS)
 
 EXTRA_DIST = $(SOURCES) $(FIGURES) $(KEEP)
 

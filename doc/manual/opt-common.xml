@@ -1,3 +1,5 @@
+<nop>
+
 <varlistentry>
   <term><option>--help</option></term>
   <listitem>
@@ -182,3 +184,5 @@
     </para>
   </listitem>
 </varlistentry>
+
+</nop>

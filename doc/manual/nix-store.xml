@@ -7,7 +7,7 @@
   <refsynopsisdiv>
     <cmdsynopsis>
       <command>nix-store</command>
-      &opt-common-syn;
+      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common-syn.xml#xpointer(/nop/*)" />
       <arg choice='plain'><replaceable>operation</replaceable></arg>
       <arg rep='repeat'><replaceable>options</replaceable></arg>
       <arg rep='repeat'><replaceable>arguments</replaceable></arg>
@@ -46,7 +46,7 @@
 
     <variablelist>
 
-      &opt-common;
+      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common.xml#xpointer(/nop/*)" />
 
     </variablelist>
 
