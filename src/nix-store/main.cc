@@ -185,6 +185,30 @@ static void opSubstitute(Strings opFlags, Strings opArgs)
 }
 
 
+static void opValidPath(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty()) throw UsageError("unknown flag");
+    
+    Transaction txn;
+    createStoreTransaction(txn);
+    for (Strings::iterator i = opArgs.begin();
+         i != opArgs.end(); ++i)
+        registerValidPath(txn, *i);
+    txn.commit();
+}
+
+
+static void opIsValid(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty()) throw UsageError("unknown flag");
+
+    for (Strings::iterator i = opArgs.begin();
+         i != opArgs.end(); ++i)
+        if (!isValidPath(*i))
+            throw Error(format("path `%1%' is not valid") % *i);
+}
+
+
 /* A sink that writes dump output to stdout. */
 struct StdoutSink : DumpSink
 {
@@ -273,6 +297,10 @@ void run(Strings args)
             op = opSuccessor;
         else if (arg == "--substitute")
             op = opSubstitute;
+        else if (arg == "--validpath")
+            op = opValidPath;
+        else if (arg == "--isvalid")
+            op = opIsValid;
         else if (arg == "--dump")
             op = opDump;
         else if (arg == "--restore")
@@ -292,7 +320,8 @@ void run(Strings args)
 
     if (!op) throw UsageError("no operation specified");
 
-    openDB();
+    if (op != opDump && op != opRestore) /* !!! hack */
+        openDB();
 
     op(opFlags, opArgs);
 }

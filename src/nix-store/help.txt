@@ -9,8 +9,10 @@ Operations:
   --add / -A: copy a path to the Nix store
   --query / -q: query information
 
-  --successor: register a successor expression
-  --substitute: register a substitute expression
+  --successor: register a successor expression (dangerous!)
+  --substitute: register a substitute expression (dangerous!)
+  --validpath: register path validity (dangerous!)
+  --isvalid: check path validity
 
   --dump: dump a path as a Nix archive
   --restore: restore a path from a Nix archive

@@ -157,6 +157,22 @@ void copyPath(const Path & src, const Path & dst)
 }
 
 
+static bool isInStore(const Path & path)
+{
+    return path[0] == '/'
+        && Path(path, 0, nixStore.size()) == nixStore
+        && path.size() > nixStore.size() + 1
+        && path[nixStore.size()] == '/';
+}
+
+
+static void assertStorePath(const Path & path)
+{
+    if (!isInStore(path))
+        throw Error(format("path `%1%' is not in the Nix store") % path);
+}
+
+
 static bool isValidPathTxn(const Path & path, const Transaction & txn)
 {
     string s;
@@ -182,6 +198,9 @@ static bool isUsablePathTxn(const Path & path, const Transaction & txn)
 void registerSuccessor(const Transaction & txn,
     const Path & srcPath, const Path & sucPath)
 {
+    assertStorePath(srcPath);
+    assertStorePath(sucPath);
+    
     if (!isUsablePathTxn(sucPath, txn))	throw Error(
 	format("path `%1%' cannot be a successor, since it is not usable")
 	% sucPath);
@@ -223,6 +242,9 @@ Paths queryPredecessors(const Path & sucPath)
 
 void registerSubstitute(const Path & srcPath, const Path & subPath)
 {
+    assertStorePath(srcPath);
+    assertStorePath(subPath);
+    
     if (!isValidPathTxn(subPath, noTxn)) throw Error(
 	format("path `%1%' cannot be a substitute, since it is not valid")
 	% subPath);
@@ -262,6 +284,7 @@ Paths querySubstitutes(const Path & srcPath)
 void registerValidPath(const Transaction & txn, const Path & _path)
 {
     Path path(canonPath(_path));
+    assertStorePath(path);
     debug(format("registering path `%1%'") % path);
     nixDB.setString(txn, dbValidPaths, path, "");
 }
@@ -312,13 +335,6 @@ static void invalidatePath(const Path & path, Transaction & txn)
 }
 
 
-static bool isInPrefix(const string & path, const string & _prefix)
-{
-    string prefix = canonPath(_prefix + "/");
-    return string(path, 0, prefix.size()) == prefix;
-}
-
-
 Path addToStore(const Path & _srcPath)
 {
     Path srcPath(absPath(_srcPath));
@@ -355,6 +371,8 @@ Path addToStore(const Path & _srcPath)
 
 void addTextToStore(const Path & dstPath, const string & s)
 {
+    assertStorePath(dstPath);
+    
     if (!isValidPath(dstPath)) {
 
         PathSet lockPaths;
@@ -378,8 +396,7 @@ void deleteFromStore(const Path & _path)
 {
     Path path(canonPath(_path));
 
-    if (!isInPrefix(path, nixStore))
-        throw Error(format("path `%1%' is not in the store") % path);
+    assertStorePath(path);
 
     Transaction txn(nixDB);
     invalidatePath(path, txn);
@@ -401,6 +418,9 @@ void verifyStore()
         Path path = *i;
         if (!pathExists(path)) {
             printMsg(lvlError, format("path `%1%' disappeared") % path);
+            invalidatePath(path, txn);
+        } else if (!isInStore(path)) {
+            printMsg(lvlError, format("path `%1%' is not in the Nix store") % path);
             invalidatePath(path, txn);
         } else
             validPaths.insert(path);

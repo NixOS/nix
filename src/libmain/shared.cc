@@ -22,6 +22,13 @@ void sigintHandler(int signo)
    processor. */
 static void initAndRun(int argc, char * * argv)
 {
+    char * root = getenv("NIX_ROOT");
+
+    if (root) {
+        if (chroot(root) != 0)
+            throw SysError(format("changing root to `%1%'") % root);
+    }
+    
     /* Setup Nix paths. */
     nixStore = NIX_STORE_DIR;
     nixDataDir = NIX_DATA_DIR;
