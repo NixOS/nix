@@ -1,22 +1,9 @@
 <appendix>
   <title>Troubleshooting</title>
 
-  <sect1>
-    <title>Database logfile removal</title>
-
-    <para>
-      Every time a Nix database transaction takes place, Nix writes a record of
-      this transaction to a <emphasis>log</emphasis> in its database directory
-      to ensure that the operation can be replayed in case of a application or
-      system crash.  However, without manual intervention, the log grows
-      indefinitely.  Hence, unused log files should be deleted periodically.
-      This can be accomplished using the following command:
-    </para>
-
-    <screen>
-      $ rm `db_archive -a -h <replaceable>prefix</replaceable>/var/nix/db`</screen>
-
-  </sect1>
+  <para>
+    (Nothing.)
+  </para>
 	
 </appendix>
 

@@ -7,10 +7,6 @@
   <refsynopsisdiv>
     <cmdsynopsis>
       <command>nix-store</command>
-      <group choice='opt'>
-        <arg><option>--path</option></arg>
-        <arg><option>-p</option></arg>
-      </group>
       <group choice='opt' rep='repeat'>
         <arg><option>--verbose</option></arg>
         <arg><option>-v</option></arg>
@@ -25,106 +21,36 @@
     </cmdsynopsis>
   </refsynopsisdiv>
 
-  <refsect1>
+  <refsection>
     <title>Description</title>
 
     <para>
-      The command <command>nix</command> provides access to the Nix store. This
-      is the (set of) path(s) where Nix expressions and the file system objects
-      built by them are stored.
+      The command <command>nix-store</command> performs primitive
+      operations on the Nix store.  You generally do not need to run
+      this command manually.
     </para>
 
     <para>
-      <command>nix</command> has many subcommands called
-      <emphasis>operations</emphasis>.  These are individually documented
-      below.  Exactly one operation must always be provided.
+      <command>nix-store</command> takes exactly one
+      <emphasis>operation</emphasis> flag which indicated the
+      subcommand to be performed.  These are individually
+      documented below.
     </para>
 
-  </refsect1>
+  </refsection>
 
-  <refsect1>
-    <title>Common Options</title>
+  <refsection>
+    <title>Common options</title>
 
     <para>
-      In this section the options that are common to all Nix operations are
-      listed.  These options are allowed for every subcommand (although they
-      may not always have an effect).
+      This section lists the options that are common to all Nix
+      operations.  These options are allowed for every subcommand,
+      though they may not always have an effect.
     </para>
 
     <variablelist>
 
-      <varlistentry>
-        <term><option>--path</option></term>
-        <listitem>
-          <para>
-            Indicates that any identifier arguments to the operation are paths
-            in the store rather than identifiers.
-          </para>
-        </listitem>
-      </varlistentry>
-
-      <varlistentry>
-        <term><option>--verbose</option></term>
-        <listitem>
-          <para>
-            Increases the level of verbosity of diagnostic messages printed on
-            standard error.  For each Nix operation, the information printed on
-            standard output is well-defined and specified below in the
-            respective sections.  Any diagnostic information is printed on
-            standard error, never on standard output.
-          </para>
-
-          <para>
-            This option may be specified repeatedly.  Currently, the following
-            verbosity levels exist:
-          </para>
-
-          <variablelist>
-            <varlistentry>
-              <term>0</term>
-              <listitem>
-                <para>
-                  Print error messages only.
-                </para>
-              </listitem>
-            </varlistentry>
-            <varlistentry>
-              <term>1</term>
-              <listitem>
-                <para>
-                  Print informational messages.
-                </para>
-              </listitem>
-            </varlistentry>
-            <varlistentry>
-              <term>2</term>
-              <listitem>
-                <para>
-                  Print even more informational messages.
-                </para>
-              </listitem>
-            </varlistentry>
-            <varlistentry>
-              <term>3</term>
-              <listitem>
-                <para>
-                  Print messages that should only be useful for debugging.
-                </para>
-              </listitem>
-            </varlistentry>
-            <varlistentry>
-              <term>4</term>
-              <listitem>
-                <para>
-                  <quote>Vomit mode</quote>: print vast amounts of debug
-                  information.
-                </para>
-              </listitem>
-            </varlistentry>
-          </variablelist>
-
-        </listitem>
-      </varlistentry>
+      &opt-verbose;
 
       <varlistentry>
         <term><option>--keep-failed</option></term>
@@ -140,65 +66,103 @@
 
     </variablelist>
 
-  </refsect1>
+  </refsection>
 
+
+  <refsection>
+    <title>Environment variables</title>
+
+    <para>
+      The following environment variables affect the behaviour of
+      <command>nix-store</command>.
+    </para>
+    
+    <variablelist>
+
+      <varlistentry>
+        <term><envar>TMPDIR</envar>=<replaceable>path</replaceable></term>
+        <listitem>
+          <para>
+            Use the directory <replaceable>path</replaceable> to store
+            temporary files.  In particular, this includes temporary
+            build directories; these can take up substantial amounts
+            of disk space.  The default is <filename>/tmp</filename>.
+          </para>
+        </listitem>
+      </varlistentry>
+
+    </variablelist>
+        
+  </refsection>
+
+  
 
   <!--######################################################################-->
 
-  <refsect1>
-    <title>Operation <option>--install</option></title>
+  <refsection>
+    <title>Operation <option>--realise</option></title>
 
-    <refsect2>
+    <refsection>
       <title>Synopsis</title>
       <cmdsynopsis>
-        <command>nix</command>
+        <command>nix-store</command>
         <group>
-          <arg><option>--install</option></arg>
-          <arg><option>-i</option></arg>
+          <arg><option>--realise</option></arg>
+          <arg><option>-r</option></arg>
         </group>
-        <arg choice='plain' rep='repeat'><replaceable>ids</replaceable></arg>
+        <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
       </cmdsynopsis>
-    </refsect2>
+    </refsection>
 
-    <refsect2>
+    <refsection>
       <title>Description</title>
             
       <para>
-        The operation <option>--install</option> realises the Nix expressions
-        identified by <replaceable>ids</replaceable> in the file system.  If
-        these expressions are derivation expressions, they are first
-        normalised.  That is, their target paths are are built, unless a normal
-        form is already known.
+        The operation <option>--install</option> realises in the file
+        system the store expressions stored in
+        <replaceable>paths</replaceable>.  If these expressions are
+        derivation expressions, they are first
+        <emphasis>normalised</emphasis> into a closure expression.
+        This may happen in two ways.  First, the corresponding closure
+        expression (the <emphasis>successor</emphasis>) may already
+        known (either because the build has already been performed, or
+        because a successor was explicitly registered through the
+        <option>--successor</option> operation).  Otherwise, the build
+        action described by the derivation is performed, and a closure
+        expression is computed by scanning the result of the build for
+        references to other paths in the store.
       </para>
 
       <para>
-        The identifiers of the normal forms of the given Nix expressions are
-        printed on standard output.
+        The paths of the closure expression corresponding to each
+        expression in <replaceable>paths</replaceable> is printed on
+        standard output.
       </para>
 
-    </refsect2>
+    </refsection>
             
-  </refsect1>
+  </refsection>
 
+  
 
   <!--######################################################################-->
 
-  <refsect1>
+  <refsection>
     <title>Operation <option>--delete</option></title>
 
-    <refsect2>
+    <refsection>
       <title>Synopsis</title>
       <cmdsynopsis>
-        <command>nix</command>
+        <command>nix-store</command>
         <group>
           <arg><option>--delete</option></arg>
           <arg><option>-d</option></arg>
         </group>
         <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
       </cmdsynopsis>
-    </refsect2>
+    </refsection>
 
-    <refsect2>
+    <refsection>
       <title>Description</title>
             
       <para>
@@ -215,24 +179,24 @@
           inconsistent system. Deletion of paths in the store is done by the
           garbage collector (which uses <option>--delete</option> to delete
           unreferenced paths).
-          
         </para>
       </warning>
 
-    </refsect2>
+    </refsection>
             
-  </refsect1>
+  </refsection>
 
 
+  
   <!--######################################################################-->
 
-  <refsect1>
+  <refsection>
     <title>Operation <option>--query</option></title>
 
-    <refsect2>
+    <refsection>
       <title>Synopsis</title>
       <cmdsynopsis>
-        <command>nix</command>
+        <command>nix-store</command>
         <group>
           <arg><option>--query</option></arg>
           <arg><option>-q</option></arg>
@@ -244,34 +208,28 @@
           </group>
           <group>
             <arg><option>--requisites</option></arg>
-            <arg><option>-r</option></arg>
+            <arg><option>-R</option></arg>
           </group>
-          <group>
-            <arg><option>--expansion</option></arg>
-            <arg><option>-e</option></arg>
-          </group>
-          <group>
-            <arg><option>--graph</option></arg>
-            <arg><option>-g</option></arg>
-          </group>
+          <arg><option>--predecessors</option></arg>
+          <arg><option>--graph</option></arg>
         </group>
         <arg choice='plain' rep='repeat'><replaceable>args</replaceable></arg>
       </cmdsynopsis>
-    </refsect2>
+    </refsection>
 
-    <refsect2>
+    <refsection>
       <title>Description</title>
             
       <para>
         The operation <option>--query</option> displays various bits of
-        information about Nix expressions or paths in the store.  The queries
+        information about store expressions or store paths.  The queries
         are described in <xref linkend='nixref-queries' />.  At most one query
-        can be specified; the default query is <option>--list</option>.
+        can be specified.  The default query is <option>--list</option>.
       </para>
 
-    </refsect2>
+    </refsection>
 
-    <refsect2 id='nixref-queries'>
+    <refsection id='nixref-queries'>
       <title>Queries</title>
             
       <variablelist>
@@ -280,34 +238,15 @@
           <term><option>--list</option></term>
           <listitem>
             <para>
-              Prints out the target paths of the Nix expressions indicated by
-              the identifiers <replaceable>args</replaceable>.  In the case of
-              a derivation expression, these are the paths that will be
-              produced by the builder of the expression.  In the case of a
-              slice expression, these are the root paths (which are generally
-              the paths that were produced by the builder of the derivation
-              expression of which the slice is a normal form).
+              Prints out the <emphasis>output paths</emphasis> of the
+              store expressions indicated by the identifiers
+              <replaceable>args</replaceable>.  In the case of a
+              derivation expression, these are the paths that will be
+              produced when the derivation is realised.  In the case
+              of a closure expression, these are the paths that were
+              produced the derivation expression of which the closure
+              expression is a successor.
             </para>
-
-            <para>
-              This query has one option:
-            </para>
-
-            <variablelist>
-
-              <varlistentry>
-                <term><option>--normalise</option></term>
-                <listitem>
-                  <para>
-                    Causes the target paths of the <emphasis>normal
-                      forms</emphasis> of the expressions to be printed, rather
-                    than the target paths of the expressions themselves.
-                  </para>
-                </listitem>
-              </varlistentry>
-
-            </variablelist>
-            
           </listitem>
         </varlistentry>
 
@@ -315,40 +254,42 @@
           <term><option>--requisites</option></term>
           <listitem>
             <para>
-              Prints out the requisite paths of the Nix expressions indicated
-              by the identifiers <replaceable>args</replaceable>.  The
-              requisite paths of a Nix expression are the paths that need to be
-              present in the system to be able to realise the expression.  That
-              is, they form the <emphasis>closure</emphasis> of the expression
-              in the file system (i.e., no path in the set of requisite paths
-              points to anything outside the set of requisite paths).
+              Prints out the requisite paths of the store expressions
+              indicated by the identifiers
+              <replaceable>args</replaceable>.  The requisite paths of
+              a Nix expression are the paths that need to be present
+              in the system to be able to realise the expression.
+              That is, they form the <emphasis>closure</emphasis> of
+              the expression in the file system (i.e., no path in the
+              set of requisite paths points to anything outside the
+              set of requisite paths).
             </para>
 
             <para>
-              The notion of requisite paths is very useful when one wants to
-              distribute Nix expressions.  Since they form a closure, they are
-              the only paths one needs to distribute to another system to be
-              able to realise the expression on the other system.
+              The notion of requisite paths is very useful when one
+              wants to distribute store expressions.  Since they form a
+              closure, they are the only paths one needs to distribute
+              to another system to be able to realise the expression
+              on the other system.
             </para>
 
             <para>
-              This query is generally used to implement various kinds of
-              distribution.  A <emphasis>source distribution</emphasis> is
-              obtained by distributing the requisite paths of a derivation
-              expression.  A <emphasis>binary distribution</emphasis> is
-              obtained by distributing the requisite paths of a slice
-              expression (i.e., the normal form of a derivation expression; you
-              can directly specify the identifier of the slice expression, or
-              use <option>--normalise</option> and specify the identifier of a
-              derivation expression).  A <emphasis>cache
-                distribution</emphasis> is obtained by distributing the
-              requisite paths of a derivation expression and specifying the
-              option <option>--include-successors</option>.  This will include
-              not just the paths of a source and binary distribution, but also
-              all expressions and paths of subterms of the source.  This is
-              useful if one wants to realise on the target system a Nix
-              expression that is similar but not quite the same as the one
-              being distributed, since any common subterms will be reused.
+              This query is generally used to implement various kinds
+              of deployment.  A <emphasis>source deployment</emphasis>
+              is obtained by distributing the requisite paths of a
+              derivation expression.  A <emphasis>binary
+              deployment</emphasis> is obtained by distributing the
+              requisite paths of a closure expression.  A
+              <emphasis>cache deployment</emphasis> is obtained by
+              distributing the requisite paths of a derivation
+              expression and specifying the option
+              <option>--include-successors</option>.  This will
+              include not just the paths of a source and binary
+              deployment, but also all expressions and paths of
+              subterms of the source.  This is useful if one wants to
+              realise on the target system a Nix expression that is
+              similar but not quite the same as the one being
+              distributed, since any common subterms will be reused.
             </para>
 
             <para>
@@ -361,9 +302,10 @@
                 <term><option>--normalise</option></term>
                 <listitem>
                   <para>
-                    Causes the requisite paths of the <emphasis>normal
-                      forms</emphasis> of the expressions to be printed, rather
-                    than the requisite paths of the expressions themselves.
+                    Causes the requisite paths of the
+                    <emphasis>successor</emphasis> of the given store
+                    expressions to be printed, rather than the
+                    requisite paths of the expressions themselves.
                   </para>
                 </listitem>
               </varlistentry>
@@ -372,9 +314,10 @@
                 <term><option>--exclude-exprs</option></term>
                 <listitem>
                   <para>
-                    Excludes the paths of Nix expressions.  This causes the
-                    closure property to be lost, that is, the resulting set of
-                    paths is not enough to ensure realisibility.
+                    Excludes the paths of store expressions.  This
+                    causes the closure property to be lost, that is,
+                    the resulting set of paths is not enough to ensure
+                    realisibility.
                   </para>
                 </listitem>
               </varlistentry>
@@ -406,12 +349,16 @@
         </varlistentry>
 
         <varlistentry>
-          <term><option>--expansion</option></term>
+          <term><option>--predecessors</option></term>
           <listitem>
             <para>
-              For each identifier in <replaceable>args</replaceable>, prints
-              all expansions of that identifier, that is, all paths whose
-              current content matches the identifier.
+              For each store expression stored at paths
+              <replaceable>args</replaceable>, prints its
+              <emphasis>predecessors</emphasis>.  A derivation
+              expression <varname>p</varname> is a predecessor of a
+              store expression <varname>q</varname> iff
+              <varname>q</varname> is a successor of
+              <varname>p</varname>.
             </para>
           </listitem>
         </varlistentry>
@@ -420,18 +367,121 @@
           <term><option>--graph</option></term>
           <listitem>
             <para>
-              Prints a graph of the closure of the expressions identified by
-              <replaceable>args</replaceable> in the format of the
-              <command>dot</command> tool of AT&amp;T's GraphViz package.
+              Prints a graph of the closure of the store expressions
+              identified by <replaceable>args</replaceable> in the
+              format of the <command>dot</command> tool of AT&amp;T's
+              GraphViz package.
             </para>
           </listitem>
         </varlistentry>
 
       </variablelist>
 
-    </refsect2>
+    </refsection>
 
-  </refsect1>
+  </refsection>
+
+  
+
+  <!--######################################################################-->
+
+  <refsection>
+    <title>Operation <option>--successor</option></title>
+
+    <refsection>
+      <title>Synopsis</title>
+      <cmdsynopsis>
+        <command>nix-store</command>
+        <group>
+          <arg><option>--successor</option></arg>
+        </group>
+        <arg choice='plain'
+        rep='repeat'><replaceable>srcpath</replaceable> <replaceable>sucpath</replaceable></arg>
+      </cmdsynopsis>
+    </refsection>
+
+    <refsection>
+      <title>Description</title>
+            
+      <para>
+        The operation <option>--successor</option> registers that the
+        closure expression in <replaceable>sucpath</replaceable> is a
+        successor of the derivation expression in
+        <replaceable>srcpath</replaceable>.  This is used to implement
+        binary deployment.
+      </para>
+
+    </refsection>
+            
+  </refsection>
+
+
+
+  <!--######################################################################-->
+
+  <refsection>
+    <title>Operation <option>--substitute</option></title>
+
+    <refsection>
+      <title>Synopsis</title>
+      <cmdsynopsis>
+        <command>nix-store</command>
+        <group>
+          <arg><option>--substitute</option></arg>
+        </group>
+        <arg choice='plain'
+        rep='repeat'><replaceable>srcpath</replaceable> <replaceable>subpath</replaceable></arg>
+      </cmdsynopsis>
+    </refsection>
+
+    <refsection>
+      <title>Description</title>
+            
+      <para>
+        The operation <option>--substitute</option> registers that the
+        store path <replaceable>srcpath</replaceable> can be built by
+        realising the derivation expression in
+        <replaceable>subpath</replaceable>.  This is used to implement
+        binary deployment.
+      </para>
+
+    </refsection>
+            
+  </refsection>
+
+
+
+  <!--######################################################################-->
+
+  <refsection>
+    <title>Operation <option>--verify</option></title>
+
+    <refsection>
+      <title>Synopsis</title>
+      <cmdsynopsis>
+        <command>nix-store</command>
+        <group>
+          <arg><option>--verify</option></arg>
+        </group>
+      </cmdsynopsis>
+    </refsection>
+
+    <refsection>
+      <title>Description</title>
+            
+      <para>
+        The operation <option>--verify</option> verifies the internal
+        consistency of the Nix database, and the consistency between
+        the Nix database and the Nix store.  Any inconsistencies
+        encountered are automatically repaired.  Inconsistencies are
+        generally the result of the Nix store or database being
+        modified by non-Nix tools, or of bugs in Nix itself.
+      </para>
+
+    </refsection>
+            
+  </refsection>
+
 
 
 </refentry>

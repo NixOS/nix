@@ -7,8 +7,8 @@ XSLTPROC = $(ENV) $(xsltproc) $(xmlflags) --catalogs \
  --param html.stylesheet \'style.css\'
 
 SOURCES = manual.xml introduction.xml installation.xml overview.xml \
- common-options.xml nix-store.xml nix-instantiate.xml \
- troubleshooting.xml bugs.xml \
+ nix-store.xml nix-instantiate.xml \
+ troubleshooting.xml bugs.xml opt-verbose.xml \
  style.css images
 
 manual.is-valid: $(SOURCES) version.xml

@@ -6,7 +6,7 @@
 <!ENTITY introduction SYSTEM "introduction.xml">
 <!ENTITY installation SYSTEM "installation.xml">
 <!ENTITY overview SYSTEM "overview.xml">
-<!ENTITY common-options SYSTEM "common-options.xml">
+<!ENTITY opt-verbose SYSTEM "opt-verbose.xml">
 <!ENTITY nix-store SYSTEM "nix-store.xml">
 <!ENTITY nix-instantiate SYSTEM "nix-instantiate.xml">
 <!ENTITY troubleshooting SYSTEM "troubleshooting.xml">
@@ -36,7 +36,6 @@
 
   <appendix>
     <title>Command Reference</title>
-    &common-options;
     <sect1>
       <title>nix-store</title>
       &nix-store;

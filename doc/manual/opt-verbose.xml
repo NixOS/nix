@@ -1,0 +1,73 @@
+<varlistentry>
+  <term><option>--verbose</option></term>
+  <listitem>
+    <para>
+      Increases the level of verbosity of diagnostic messages printed
+      on standard error.  For each Nix operation, the information
+      printed on standard output is well-defined; any diagnostic
+      information is printed on standard error, never on standard
+      output.
+    </para>
+
+    <para>
+      This option may be specified repeatedly.  Currently, the
+      following verbosity levels exist:
+    </para>
+
+    <variablelist>
+      <varlistentry>
+        <term>0</term>
+        <listitem>
+          <para>
+            <quote>Errors only</quote>: only print messages explaining
+            why the Nix invocation failed.
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>1</term>
+        <listitem>
+          <para>
+            <quote>Informational</quote>: print
+            <emphasis>useful</emphasis> messages about what Nix is
+            doing.
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>2</term>
+        <listitem>
+          <para>
+            <quote>Talkative</quote>: print more informational messages.
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>3</term>
+        <listitem>
+          <para>
+            <quote>Chatty</quote>: print even more informational messages.
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>4</term>
+        <listitem>
+          <para>
+            <quote>Debug</quote>: print debug information:
+          </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>5</term>
+        <listitem>
+          <para>
+            <quote>Vomit</quote>: print vast amounts of debug
+            information.
+          </para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+
+  </listitem>
+</varlistentry>
