@@ -144,11 +144,11 @@ Strings readDirectory(const Path & path)
 }
 
 
-void deletePath(const Path & path)
+static void _deletePath(const Path & path)
 {
     checkInterrupt();
 
-    printMsg(lvlVomit, format("deleting path `%1%'") % path);
+    printMsg(lvlVomit, format("%1%") % path);
 
     struct stat st;
     if (lstat(path.c_str(), &st))
@@ -164,11 +164,19 @@ void deletePath(const Path & path)
 	}
 
 	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
-            deletePath(path + "/" + *i);
+            _deletePath(path + "/" + *i);
     }
 
     if (remove(path.c_str()) == -1)
         throw SysError(format("cannot unlink `%1%'") % path);
+}
+
+
+void deletePath(const Path & path)
+{
+    startNest(nest, lvlDebug,
+        format("recursively deleting path `%1%'") % path);
+    _deletePath(path);
 }
 
 
@@ -238,11 +246,7 @@ Nest::Nest()
 
 Nest::~Nest()
 {
-    if (nest) {
-        nestingLevel--;
-        if (logType == ltEscapes)
-            cerr << "\033[q";
-    }
+    close();
 }
 
 
@@ -259,10 +263,22 @@ void Nest::open(Verbosity level, const format & f)
 {
     if (level <= verbosity) {
         if (logType == ltEscapes)
-            cerr << "\033[" << escVerbosity(level) << "p";
-        printMsg_(level, f);
+            cerr << "\033[" << escVerbosity(level) << "p"
+                 << f.str() << "\n";
+        else
+            printMsg_(level, f);
         nest = true;
         nestingLevel++;
+    }
+}
+
+
+void Nest::close()
+{
+    if (nest) {
+        nestingLevel--;
+        if (logType == ltEscapes)
+            cerr << "\033[q";
     }
 }
 

@@ -164,14 +164,18 @@ Path normaliseStoreExpr(const Path & _nePath, PathSet pending)
         }
 
         /* Run the builder. */
-        printMsg(lvlChatty, format("building..."));
+        startNest(nest2, lvlChatty,
+            format("executing builder `%1%'") % ne.derivation.builder);
         runProgram(ne.derivation.builder, ne.derivation.args, env,
             nixLogDir + "/" + baseNameOf(nePath));
-        printMsg(lvlChatty, format("build completed"));
+        printMsg(lvlChatty, format("builder completed"));
+        nest2.close();
         
     } else
         printMsg(lvlChatty, format("fast build succesful"));
 
+    startNest(nest3, lvlChatty, format("determining closure value"));
+    
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
        output paths read-only. */
@@ -188,8 +192,11 @@ Path normaliseStoreExpr(const Path & _nePath, PathSet pending)
 
 	/* For this output path, find the references to other paths contained
 	   in it. */
+        startNest(nest2, lvlChatty,
+            format("scanning for store references in `%1%'") % ne.derivation.builder);
         Strings refPaths = filterReferences(path, 
             Strings(allPaths.begin(), allPaths.end()));
+        nest2.close();
 
 	/* Construct a closure element for this output path. */
         ClosureElem elem;
@@ -241,10 +248,12 @@ Path normaliseStoreExpr(const Path & _nePath, PathSet pending)
     {
         PathSet::iterator j = donePaths.find(i->first);
         if (j == donePaths.end())
-            debug(format("NOT referenced: `%1%'") % i->first);
+            debug(format("unreferenced input: `%1%'") % i->first);
         else
-            debug(format("referenced: `%1%'") % i->first);
+            debug(format("referenced input: `%1%'") % i->first);
     }
+
+    nest3.close();
 
     /* Write the normal form.  This does not have to occur in the
        transaction below because writing terms is idem-potent. */

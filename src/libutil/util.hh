@@ -127,6 +127,7 @@ public:
     Nest();
     ~Nest();
     void open(Verbosity level, const format & f);
+    void close();
 };
 
 void printMsg_(Verbosity level, const format & f);
