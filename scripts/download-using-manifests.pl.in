@@ -194,6 +194,7 @@ sub downloadFile {
     $ENV{"QUIET"} = 1;
     $ENV{"NIX_HASH_ALGO"} = $hashAlgo;
     my ($hash2, $path) = `@bindir@/nix-prefetch-url '$url' '$hash'`;
+    die "download of `$url' failed" unless $? == 0;
     chomp $hash2;
     chomp $path;
     die "hash mismatch, expected $hash, got $hash2" if $hash ne $hash2;
