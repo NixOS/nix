@@ -18,11 +18,13 @@ ln -s $TOP/src/nix-store/nix-store $NIX_BIN_DIR/
 ln -s $TOP/src/nix-instantiate/nix-instantiate $NIX_BIN_DIR/
 ln -s $TOP/src/nix-hash/nix-hash $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-prefetch-url $NIX_BIN_DIR/
+ln -s $TOP/scripts/nix-collect-garbage $NIX_BIN_DIR/
 mkdir $NIX_BIN_DIR/nix
 ln -s $TOP/scripts/download-using-manifests.pl $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/readmanifest.pm $NIX_BIN_DIR/nix/
 
 mkdir -p "$NIX_LOCALSTATE_DIR"/nix/manifests
+mkdir -p "$NIX_LOCALSTATE_DIR"/nix/gcroots
 mkdir -p "$NIX_LOCALSTATE_DIR"/log/nix
 
 mkdir $NIX_DATA_DIR/nix
@@ -31,6 +33,7 @@ cp -prd $TOP/corepkgs $NIX_DATA_DIR/nix/
 for i in $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh \
     $NIX_BIN_DIR/nix/download-using-manifests.pl \
     $NIX_BIN_DIR/nix-prefetch-url \
+    $NIX_BIN_DIR/nix-collect-garbage \
     ; do
     echo "$REAL_BIN_DIR"
     sed < $i > $i.tmp \

@@ -33,10 +33,11 @@ substitutes2.sh: substitutes2.nix
 fallback.sh: fallback.nix
 nix-push.sh: dependencies.nix
 nix-pull.sh: dependencies.nix
+gc.sh: dependencies.nix
 
 TESTS = init.sh hash.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
-  build-hook.sh substitutes.sh substitutes2.sh fallback.sh nix-push.sh verify.sh \
-  nix-pull.sh
+  build-hook.sh substitutes.sh substitutes2.sh fallback.sh nix-push.sh gc.sh \
+  verify.sh nix-pull.sh
 
 XFAIL_TESTS =
 
@@ -51,5 +52,7 @@ EXTRA_DIST = $(TESTS) \
   locking.nix.in locking.builder.sh \
   parallel.nix.in parallel.builder.sh \
   build-hook.nix.in build-hook.hook.sh \
-  substitutes.nix.in substitutes2.nix.in fallback.nix.in \
+  substitutes.nix.in substituter.sh \
+  substitutes2.nix.in substituter2.sh \
+  fallback.nix.in \
   $(wildcard lang/*.nix) $(wildcard lang/*.exp)
