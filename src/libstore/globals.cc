@@ -15,3 +15,5 @@ bool tryFallback = false;
 Verbosity buildVerbosity = lvlInfo;
 
 unsigned int maxBuildJobs = 1;
+
+bool readOnlyMode = false;

@@ -160,6 +160,8 @@ static void initAndRun(int argc, char * * argv)
                 throw UsageError(format("`--max-jobs' requires a non-negative integer"));
             maxBuildJobs = n;
         }
+        else if (arg == "--readonly-mode")
+            readOnlyMode = true;
         else remaining.push_back(arg);
     }
 

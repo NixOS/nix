@@ -87,4 +87,11 @@ public:
 };
 
 
+class DbNoPermission : public Error
+{
+public:
+    DbNoPermission(const format & f) : Error(f) { };
+};
+
+
 #endif /* !__DB_H */

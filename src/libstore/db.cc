@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include <memory>
 
@@ -81,12 +82,16 @@ void Transaction::moveTo(Transaction & t)
 void Database::requireEnv()
 {
     checkInterrupt();
-    if (!env) throw Error("database environment not open");
+    if (!env)throw Error("database environment is not open "
+        "(maybe you don't have sufficient permission?)");
 }
 
 
 Db * Database::getDb(TableId table)
 {
+    if (table == 0)
+        throw Error("database table is not open "
+            "(maybe you don't have sufficient permission?)");
     map<TableId, Db *>::iterator i = tables.find(table);
     if (i == tables.end())
         throw Error("unknown table id");
@@ -210,7 +215,11 @@ void Database::open(const string & path)
         string accessorsPath = path + "/accessor_count";
         fdAccessors = ::open(accessorsPath.c_str(), O_RDWR | O_CREAT, 0666);
         if (fdAccessors == -1)
-            throw SysError(format("opening file `%1%'") % accessorsPath);
+            if (errno == EACCES)
+                throw DbNoPermission(
+                    format("permission denied to database in `%1%'") % accessorsPath);
+            else
+                throw SysError(format("opening file `%1%'") % accessorsPath);
 
         /* Open the lock file. */
         string lockPath = path + "/access_lock";

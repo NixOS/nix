@@ -17,12 +17,12 @@ static Expr primImport(EvalState & state, const ATermVector & args)
 
 static PathSet storeExprRootsCached(EvalState & state, const Path & nePath)
 {
-    DrvPaths::iterator i = state.drvPaths.find(nePath);
-    if (i != state.drvPaths.end())
+    DrvRoots::iterator i = state.drvRoots.find(nePath);
+    if (i != state.drvRoots.end())
         return i->second;
     else {
         PathSet paths = storeExprRoots(nePath);
-        state.drvPaths[nePath] = paths;
+        state.drvRoots[nePath] = paths;
         return paths;
     }
 }
@@ -60,6 +60,8 @@ static Path copyAtom(EvalState & state, const Path & srcPath)
     Hash drvHash = hashDerivation(state, ne);
     Path drvPath = writeTerm(unparseStoreExpr(ne), "");
     state.drvHashes[drvPath] = drvHash;
+
+    state.drvRoots[drvPath] = ne.closure.roots;
 
     printMsg(lvlChatty, format("copied `%1%' -> closure `%2%'")
         % srcPath % drvPath);
@@ -111,8 +113,14 @@ static void processBinding(EvalState & state, Expr e, StoreExpr & ne,
             if (!a) throw Error("derivation hash missing");
             Hash drvHash = parseHash(evalString(state, a));
 
-            state.drvHashes[drvPath] = drvHash;
+            a = queryAttr(e, "outPath");
+            if (!a) throw Error("output path missing");
+            PathSet drvRoots;
+            drvRoots.insert(evalPath(state, a));
             
+            state.drvHashes[drvPath] = drvHash;
+            state.drvRoots[drvPath] = drvRoots;
+
             ss.push_back(addInput(state, drvPath, ne));
         } else
             throw Error("invalid derivation attribute");

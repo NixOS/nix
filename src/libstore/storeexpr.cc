@@ -17,7 +17,7 @@ Path writeTerm(ATerm t, const string & suffix)
     Path path = canonPath(nixStore + "/" + 
         (string) h + suffix + ".store");
 
-    if (!isValidPath(path)) {
+    if (!readOnlyMode && !isValidPath(path)) {
         char * s = ATwriteToString(t);
         if (!s) throw Error(format("cannot write aterm to `%1%'") % path);
         addTextToStore(path, string(s));

@@ -43,5 +43,9 @@ extern Verbosity buildVerbosity;
 /* Maximum number of parallel build jobs.  0 means unlimited. */
 extern unsigned int maxBuildJobs;
 
+/* Read-only mode.  Don't copy stuff to the store, don't change the
+   database. */
+extern bool readOnlyMode;
+
 
 #endif /* !__GLOBALS_H */

@@ -21,7 +21,7 @@ static Database nixDB;
 
    The existence of a key $p$ indicates that path $p$ is valid (that
    is, produced by a succesful build). */
-static TableId dbValidPaths;
+static TableId dbValidPaths = 0;
 
 /* dbSuccessors :: Path -> Path
 
@@ -32,14 +32,14 @@ static TableId dbValidPaths;
    Note that a term $y$ is a successor of $x$ iff there exists a
    sequence of rewrite steps that rewrites $x$ into $y$.
 */
-static TableId dbSuccessors;
+static TableId dbSuccessors = 0;
 
 /* dbSuccessorsRev :: Path -> [Path]
 
    The reverse mapping of dbSuccessors (i.e., it stores the
    predecessors of a Nix expression).
 */
-static TableId dbSuccessorsRev;
+static TableId dbSuccessorsRev = 0;
 
 /* dbSubstitutes :: Path -> [(Path, Path, [string])]
 
@@ -54,14 +54,14 @@ static TableId dbSuccessorsRev;
    substitute for that derivate.  The substitute in this case might be
    a Nix expression that fetches the Nix archive.
 */
-static TableId dbSubstitutes;
+static TableId dbSubstitutes = 0;
 
 /* dbSubstitutesRev :: Path -> [Path]
 
    The reverse mapping of dbSubstitutes; it maps store expressions
    back to the paths for which they are substitutes.
 */
-static TableId dbSubstitutesRev;
+static TableId dbSubstitutesRev = 0;
 
 
 bool Substitute::operator == (const Substitute & sub)
@@ -74,7 +74,14 @@ bool Substitute::operator == (const Substitute & sub)
 
 void openDB()
 {
-    nixDB.open(nixDBPath);
+    if (readOnlyMode) return;
+    try {
+        nixDB.open(nixDBPath);
+    } catch (DbNoPermission & e) {
+        printMsg(lvlTalkative, "cannot access Nix database; continuing anyway");
+        readOnlyMode = true;
+        return;
+    }
     dbValidPaths = nixDB.openTable("validpaths");
     dbSuccessors = nixDB.openTable("successors");
     dbSuccessorsRev = nixDB.openTable("successors-rev");
@@ -433,7 +440,7 @@ Path addToStore(const Path & _srcPath)
     string baseName = baseNameOf(srcPath);
     Path dstPath = canonPath(nixStore + "/" + (string) h + "-" + baseName);
 
-    if (!isValidPath(dstPath)) { 
+    if (!readOnlyMode && !isValidPath(dstPath)) { 
 
         /* The first check above is an optimisation to prevent
            unnecessary lock acquisition. */
@@ -445,6 +452,9 @@ Path addToStore(const Path & _srcPath)
         if (!isValidPath(dstPath)) {
 
             if (pathExists(dstPath)) deletePath(dstPath);
+
+            /* !!! race: srcPath might change between hashPath() and
+               here! */
             
             copyPath(srcPath, dstPath);
 

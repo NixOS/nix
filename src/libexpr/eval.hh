@@ -8,7 +8,7 @@
 #include "nixexpr.hh"
 
 
-typedef map<Path, PathSet> DrvPaths;
+typedef map<Path, PathSet> DrvRoots;
 typedef map<Path, Hash> DrvHashes;
 
 struct EvalState;
@@ -22,7 +22,7 @@ struct EvalState
 {
     ATermMap normalForms;
     ATermMap primOps;
-    DrvPaths drvPaths;
+    DrvRoots drvRoots;
     DrvHashes drvHashes; /* normalised derivation hashes */
     Expr blackHole;
 
