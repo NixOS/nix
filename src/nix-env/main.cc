@@ -465,9 +465,17 @@ static void opUninstall(Globals & globals,
 }
 
 
+static bool cmpChars(char a, char b)
+{
+    return toupper(a) < toupper(b);
+}
+
+
 static bool cmpDrvByName(const DrvInfo & a, const DrvInfo & b)
 {
-    return a.name < b.name;
+    return lexicographical_compare(
+        a.name.begin(), a.name.end(),
+        b.name.begin(), b.name.end(), cmpChars);
 }
 
 
