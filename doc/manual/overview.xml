@@ -63,7 +63,7 @@ pan-0.14.2</screen>
     </para>
 
     <screen>
-$ nix-env -qf pkgs/system/i686-suse-linux.nix
+$ nix-env -qf pkgs/system/i686-linux.nix
 gettext-0.12.1
 sylpheed-0.9.7
 aterm-2.0
@@ -73,10 +73,10 @@ pan-0.14.2
 ...</screen>
 
     <para>
-      The Nix expression in the file <filename>i686-suse-linux.nix</filename>
-      yields the set of packages for a SuSE Linux system running on x86
-      hardware.  For other platforms, copy and modify this file for your
-      platform as appropriate. [TODO: improve this]
+      The Nix expression in the file <filename>i686-linux.nix</filename> yields
+      the set of packages for a Linux system running on x86 hardware.  For
+      other platforms, copy and modify this file for your platform as
+      appropriate. [TODO: improve this]
     </para>
 
     <para>
@@ -86,7 +86,7 @@ pan-0.14.2
     </para>
 
     <screen>
-$ nix-env -qf pkgs/system/i686-suse-linux.nix
+$ nix-env -qsf pkgs/system/i686-linux.nix
 -P gettext-0.12.1
 IP sylpheed-0.9.7
 -- aterm-2.0
@@ -111,7 +111,7 @@ IP sylpheed-0.9.7
     </para>
 
     <screen>
-$ nix-env -i pkgs/system/i686-suse-linux.nix pan-0.14.2</screen>
+$ nix-env -i pkgs/system/i686-linux.nix pan-0.14.2</screen>
 
     <para>
       Since installation may take a long time, depending on whether any
