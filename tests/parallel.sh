@@ -1,8 +1,8 @@
-storeExpr=$($TOP/src/nix-instantiate/nix-instantiate parallel.nix)
+drvPath=$($TOP/src/nix-instantiate/nix-instantiate parallel.nix)
 
-echo "store expr is $storeExpr"
+echo "derivation is $drvPath"
 
-outPath=$($TOP/src/nix-store/nix-store -qfvv -j10000 "$storeExpr")
+outPath=$($TOP/src/nix-store/nix-store -qfvv -j10000 "$drvPath")
 
 echo "output path is $outPath"
 

@@ -1,8 +1,8 @@
-storeExpr=$($TOP/src/nix-instantiate/nix-instantiate simple.nix)
+drvPath=$($TOP/src/nix-instantiate/nix-instantiate simple.nix)
 
-echo "store expr is $storeExpr"
+echo "derivation is $drvPath"
 
-outPath=$($TOP/src/nix-store/nix-store -rvv "$storeExpr")
+outPath=$($TOP/src/nix-store/nix-store -rvv "$drvPath")
 
 echo "output path is $outPath"
 

@@ -391,6 +391,9 @@ Path queryDeriver(const Transaction & txn, const Path & storePath)
 }
 
 
+const int substituteVersion = 2;
+
+
 static Substitutes readSubstitutes(const Transaction & txn,
     const Path & srcPath)
 {
@@ -406,13 +409,15 @@ static Substitutes readSubstitutes(const Transaction & txn,
             break;
         }
         Strings ss2 = unpackStrings(*i);
-        if (ss2.size() == 3) {
-            /* Another old-style substitute. */
-            continue;
-        }
-        if (ss2.size() != 2) throw Error("malformed substitute");
+        if (ss2.size() == 0) continue;
+        int version;
+        if (!string2Int(ss2.front(), version)) continue;
+        if (version != substituteVersion) continue;
+        if (ss2.size() != 4) throw Error("malformed substitute");
         Strings::iterator j = ss2.begin();
+        j++;
         Substitute sub;
+        sub.deriver = *j++;
         sub.program = *j++;
         sub.args = unpackStrings(*j++);
         subs.push_back(sub);
@@ -431,6 +436,8 @@ static void writeSubstitutes(const Transaction & txn,
          i != subs.end(); ++i)
     {
         Strings ss2;
+        ss2.push_back((format("%1%") % substituteVersion).str());
+        ss2.push_back(i->deriver);
         ss2.push_back(i->program);
         ss2.push_back(packStrings(i->args));
         ss.push_back(packStrings(ss2));

@@ -1,5 +1,5 @@
-storeExpr=$($TOP/src/nix-instantiate/nix-instantiate dependencies.nix)
-outPath=$($TOP/src/nix-store/nix-store -rvv "$storeExpr")
+drvPath=$($TOP/src/nix-instantiate/nix-instantiate dependencies.nix)
+outPath=$($TOP/src/nix-store/nix-store -rvv "$drvPath")
 
 # Set a GC root.
 ln -s $outPath "$NIX_STATE_DIR"/gcroots/foo
@@ -11,4 +11,4 @@ cat $outPath/foobar
 cat $outPath/input-2/bar
 
 # Check that the derivation has been GC'd.
-if cat $storeExpr > /dev/null; then false; fi
+if cat $drvPath > /dev/null; then false; fi

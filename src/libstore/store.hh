@@ -16,7 +16,10 @@ const int nixSchemaVersion = 2;
    path (typically by fetching it from somewhere, e.g., from the
    network). */
 struct Substitute
-{
+{       
+    /* The derivation that built this store path (empty if none). */
+    Path deriver;
+    
     /* Program to be executed to create the store path.  Must be in
        the output path of `storeExpr'. */
     Path program;

@@ -1,15 +1,15 @@
-storeExpr=$($TOP/src/nix-instantiate/nix-instantiate dependencies.nix)
+drvPath=$($TOP/src/nix-instantiate/nix-instantiate dependencies.nix)
 
-echo "store expr is $storeExpr"
+echo "derivation is $drvPath"
 
-outPath=$($TOP/src/nix-store/nix-store -rvv "$storeExpr")
+outPath=$($TOP/src/nix-store/nix-store -rvv "$drvPath")
 
 echo "output path is $outPath"
 
 text=$(cat "$outPath"/foobar)
 if test "$text" != "FOOBAR"; then exit 1; fi
 
-deps=$($TOP/src/nix-store/nix-store -quR "$storeExpr")
+deps=$($TOP/src/nix-store/nix-store -quR "$drvPath")
 
 echo "output closure contains $deps"
 
@@ -24,3 +24,7 @@ input2OutPath=$(echo "$deps" | grep "dependencies-input-2")
 
 # The referers closure of input-2 should include outPath.
 $TOP/src/nix-store/nix-store -q --referers-closure "$input2OutPath" | grep "$outPath"
+
+# Check that the derivers are set properly.
+test $($TOP/src/nix-store/nix-store -q --deriver "$outPath") = "$drvPath"
+$TOP/src/nix-store/nix-store -q --deriver "$input2OutPath" | grep -q -- "-input-2.drv" 

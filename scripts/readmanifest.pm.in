@@ -51,6 +51,7 @@ sub readManifest {
     my $patchType;
     my $narHash;
     my $references;
+    my $deriver;
 
     while (<MANIFEST>) {
         chomp;
@@ -73,6 +74,7 @@ sub readManifest {
                 undef $baseHash;
                 undef $patchType;
                 $references = "";
+                $deriver = "";
 	    }
 
         } else {
@@ -102,6 +104,7 @@ sub readManifest {
                         push @{$narFileList},
                             { url => $url, hash => $hash, size => $size
                             , narHash => $narHash, references => $references
+                            , deriver => $deriver
                             };
                     }
                 
@@ -131,6 +134,7 @@ sub readManifest {
             elsif (/^\s*Type:\s*(\S+)\s*$/) { $patchType = $1; }
             elsif (/^\s*NarHash:\s*(\S+)\s*$/) { $narHash = $1; }
             elsif (/^\s*References:\s*(.*)\s*$/) { $references = $1; }
+            elsif (/^\s*Deriver:\s*(\S+)\s*$/) { $deriver = $1; }
 
             # Compatibility;
             elsif (/^\s*NarURL:\s*(\S+)\s*$/) { $url = $1; }
@@ -148,7 +152,6 @@ sub writeManifest
     my $manifest = shift;
     my $narFiles = shift;
     my $patches = shift;
-    my $successors = shift;
 
     open MANIFEST, ">$manifest.tmp"; # !!! check exclusive
 
@@ -164,11 +167,8 @@ sub writeManifest
             print MANIFEST "  Size: $narFile->{size}\n";
             print MANIFEST "  References: $narFile->{references}\n"
                 if defined $narFile->{references} && $narFile->{references} ne "";
-            foreach my $p (keys %{$successors}) { # !!! quadratic
-                if ($$successors{$p} eq $storePath) {
-                    print MANIFEST "  SuccOf: $p\n";
-                }
-            }
+            print MANIFEST "  Deriver: $narFile->{deriver}\n"
+                if defined $narFile->{deriver} && $narFile->{deriver} ne "";
             print MANIFEST "}\n";
         }
     }

@@ -1502,7 +1502,8 @@ void SubstitutionGoal::finished()
 
     Transaction txn;
     createStoreTransaction(txn);
-    registerValidPath(txn, storePath, contentHash, references, "");
+    registerValidPath(txn, storePath, contentHash,
+        references, sub.deriver);
     txn.commit();
 
     outputLock->setDeletion(true);

@@ -31,3 +31,7 @@ echo "building $drvPath using substitutes..."
 $TOP/src/nix-store/nix-store -r $drvPath
 
 cat $outPath/input-2/bar
+
+# Check that the derivers are set properly.
+test $($TOP/src/nix-store/nix-store -q --deriver "$outPath") = "$drvPath"
+$TOP/src/nix-store/nix-store -q --deriver $(readlink $outPath/input-2) | grep -q -- "-input-2.drv" 

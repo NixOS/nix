@@ -280,6 +280,7 @@ static void opSubstitute(Strings opFlags, Strings opArgs)
         PathSet references;
         getline(cin, srcPath);
         if (cin.eof()) break;
+        getline(cin, sub.deriver);
         getline(cin, sub.program);
         string s;
         int n;

@@ -81,6 +81,7 @@ foreach my $storePath (keys %narFiles) {
     my $narFileList = $narFiles{$storePath};
     foreach my $narFile (@{$narFileList}) {
         print WRITE "$storePath\n";
+        print WRITE "$narFile->{deriver}\n";
         print WRITE "$libexecDir/nix/download-using-manifests.pl\n";
         print WRITE "0\n";
         my @references = split " ", $narFile->{references};

@@ -1,17 +1,17 @@
-storeExpr1=$($TOP/src/nix-instantiate/nix-instantiate gc-concurrent.nix)
-outPath1=$($TOP/src/nix-store/nix-store -q $storeExpr1)
+drvPath1=$($TOP/src/nix-instantiate/nix-instantiate gc-concurrent.nix)
+outPath1=$($TOP/src/nix-store/nix-store -q $drvPath1)
 
-storeExpr2=$($TOP/src/nix-instantiate/nix-instantiate gc-concurrent2.nix)
-outPath2=$($TOP/src/nix-store/nix-store -q $storeExpr2)
+drvPath2=$($TOP/src/nix-instantiate/nix-instantiate gc-concurrent2.nix)
+outPath2=$($TOP/src/nix-store/nix-store -q $drvPath2)
 
-ln -s $storeExpr2 "$NIX_STATE_DIR"/gcroots/foo2
+ln -s $drvPath2 "$NIX_STATE_DIR"/gcroots/foo2
 
 # Start build #1 in the background.  It starts immediately.
-$TOP/src/nix-store/nix-store -rvv "$storeExpr1" &
+$TOP/src/nix-store/nix-store -rvv "$drvPath1" &
 pid1=$!
 
 # Start build #2 in the background after 3 seconds.
-(sleep 3 && $TOP/src/nix-store/nix-store -rvv "$storeExpr2") &
+(sleep 3 && $TOP/src/nix-store/nix-store -rvv "$drvPath2") &
 pid2=$!
 
 # Run the garbage collector while the build is running.  Note: the GC
