@@ -16,13 +16,25 @@
 
 <item id='zlib-1.2.1-security'>
   <condition>
+    <containsSource
+        hash="sha256:0yp7z8ask4b8m2ia253apnnxdk0z0zrs70yr079m2rjd4297chgv"
+        origin="zlib-1.2.1.tar.gz" />
+<!--
     <or>
-      <containsSource
-          hash="sha256:0yp7z8ask4b8m2ia253apnnxdk0z0zrs70yr079m2rjd4297chgv"
-          origin="zlib-1.2.1.tar.gz" />
+      <and>
+        <containsSource
+            hash="sha256:0yp7z8ask4b8m2ia253apnnxdk0z0zrs70yr079m2rjd4297chgv"
+            origin="zlib-1.2.1.tar.gz" />
+        <not>
+          <containsSource
+              hash="..."
+              origin="zlib-1.2.1-dos.patch" />
+        </not>
+      </and>
       <containsOutput
           name="/nix/store/gxbdsvlwz6ixin94jhdw7rwdbb5mxxq3-zlib-1.2.1" />
     </or>
+    -->
   </condition>
   <reason>
     Zlib 1.2.1 is vulnerable to a denial-of-service condition.  See
