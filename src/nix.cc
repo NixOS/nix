@@ -70,6 +70,9 @@ public:
 };
 
 
+typedef vector<string> Strings;
+
+
 /* Wrapper classes that ensures that the database is closed upon
    object destruction. */
 class Db2 : public Db 
@@ -427,7 +430,9 @@ string getPkg(string hash)
 }
 
 
-void runPkg(string hash, const vector<string> & args)
+void runPkg(string hash, 
+    Strings::iterator firstArg, 
+    Strings::iterator lastArg)
 {
     string src;
     string path;
@@ -453,8 +458,7 @@ void runPkg(string hash, const vector<string> & args)
     const char * args2[env.size() + 2];
     int i = 0;
     args2[i++] = runner.c_str();
-    for (vector<string>::const_iterator it = args.begin();
-         it != args.end(); it++, i++)
+    for (Strings::const_iterator it = firstArg; it != lastArg; it++, i++)
         args2[i] = it->c_str();
     args2[i] = 0;
 
@@ -493,11 +497,11 @@ void delPkg(string hash)
 }
 
 
-void exportPkgs(string outDir, vector<string> hashes)
+void exportPkgs(string outDir, 
+    Strings::iterator firstHash, 
+    Strings::iterator lastHash)
 {
-    for (vector<string>::iterator it = hashes.begin();
-         it != hashes.end(); it++)
-    {
+    for (Strings::iterator it = firstHash; it != lastHash; it++) {
         string hash = *it;
         string pkgDir = getPkg(hash);
         string tmpFile = outDir + "/export_tmp";
@@ -616,10 +620,9 @@ void listInstalledPkgs()
 }
 
 
-void printInfo(vector<string> hashes)
+void printInfo(Strings::iterator first, Strings::iterator last)
 {
-    for (vector<string>::iterator it = hashes.begin();
-         it != hashes.end(); it++)
+    for (Strings::iterator it = first; it != last; it++)
     {
         try {
             cout << *it << " " << queryPkgId(*it) << endl;
@@ -630,10 +633,10 @@ void printInfo(vector<string> hashes)
 }
 
 
-void computeClosure(const vector<string> & rootHashes, 
+void computeClosure(Strings::iterator first, Strings::iterator last, 
     set<string> & result)
 {
-    list<string> workList(rootHashes.begin(), rootHashes.end());
+    list<string> workList(first, last);
     set<string> doneSet;
 
     while (!workList.empty()) {
@@ -656,10 +659,10 @@ void computeClosure(const vector<string> & rootHashes,
 }
 
 
-void printClosure(const vector<string> & rootHashes)
+void printClosure(Strings::iterator first, Strings::iterator last)
 {
     set<string> allHashes;
-    computeClosure(rootHashes, allHashes);
+    computeClosure(first, last, allHashes);
     for (set<string>::iterator it = allHashes.begin();
          it != allHashes.end(); it++)
         cout << *it << endl;
@@ -672,10 +675,10 @@ string dotQuote(const string & s)
 }
 
 
-void printGraph(vector<string> rootHashes)
+void printGraph(Strings::iterator first, Strings::iterator last)
 {
     set<string> allHashes;
-    computeClosure(rootHashes, allHashes);
+    computeClosure(first, last, allHashes);
 
     cout << "digraph G {\n";
 
@@ -699,58 +702,8 @@ void printGraph(vector<string> rootHashes)
 }
 
 
-void run(vector<string> args)
+void run(Strings args)
 {
-    UsageError argcError("wrong number of arguments");
-    string cmd;
-
-    if (args.size() < 1) throw UsageError("no command specified");
-    
-    cmd = args[0];
-    args.erase(args.begin()); // O(n)
-
-    if (cmd == "init") {
-        if (args.size() != 0) throw argcError;
-        initDB();
-    } else if (cmd == "verify") {
-        if (args.size() != 0) throw argcError;
-        verifyDB();
-    } else if (cmd == "getpkg") {
-        if (args.size() != 1) throw argcError;
-        string path = getPkg(args[0]);
-        cout << path << endl;
-    } else if (cmd == "delpkg") {
-        if (args.size() != 1) throw argcError;
-        delPkg(args[0]);
-    } else if (cmd == "run") {
-        if (args.size() < 1) throw argcError;
-        runPkg(args[0], vector<string>(args.begin() + 1, args.end()));
-    } else if (cmd == "ensure") {
-        if (args.size() != 1) throw argcError;
-        ensurePkg(args[0]);
-    } else if (cmd == "export") {
-        if (args.size() < 1) throw argcError;
-        exportPkgs(args[0], vector<string>(args.begin() + 1, args.end()));
-    } else if (cmd == "regprebuilt") {
-        if (args.size() != 2) throw argcError;
-        regPrebuilt(args[0], args[1]);
-    } else if (cmd == "regfile") {
-        if (args.size() != 1) throw argcError;
-        registerFile(args[0]);
-    } else if (cmd == "reginst") {
-        if (args.size() != 2) throw argcError;
-        registerInstalledPkg(args[0], args[1]);
-    } else if (cmd == "listinst") {
-        if (args.size() != 0) throw argcError;
-        listInstalledPkgs();
-    } else if (cmd == "info") {
-        printInfo(args);
-    } else if (cmd == "closure") {
-        printClosure(args);
-    } else if (cmd == "graph") {
-        printGraph(args);
-    } else
-        throw UsageError("unknown command: " + string(cmd));
 }
 
 
@@ -810,7 +763,7 @@ Subcommands:
 }
 
 
-void main2(int argc, char * * argv)
+void run(Strings::iterator argCur, Strings::iterator argEnd)
 {
     umask(0022);
 
@@ -821,8 +774,8 @@ void main2(int argc, char * * argv)
         pkgHome = getenv(PKGHOME_ENVVAR);
 
     /* Parse the global flags. */
-    while (argc) {
-        string arg(*argv);
+    for ( ; argCur != argEnd; argCur++) {
+        string arg(*argCur);
         if (arg == "-h" || arg == "--help") {
             printUsage();
             return;
@@ -831,13 +784,57 @@ void main2(int argc, char * * argv)
         } else if (arg[0] == '-') {
             throw UsageError("invalid option `" + arg + "'");
         } else break;
-        argv++, argc--;
     }
 
-    /* Put the remainder in a vector and pass it to run2(). */
-    vector<string> args;
-    while (argc--) args.push_back(*argv++);
-    run(args);
+    UsageError argcError("wrong number of arguments");
+
+    /* Parse the command. */
+    if (argCur == argEnd) throw UsageError("no command specified");
+    string cmd = *argCur++;
+    int argc = argEnd - argCur;
+
+    if (cmd == "init") {
+        if (argc != 0) throw argcError;
+        initDB();
+    } else if (cmd == "verify") {
+        if (argc != 0) throw argcError;
+        verifyDB();
+    } else if (cmd == "getpkg") {
+        if (argc != 1) throw argcError;
+        string path = getPkg(*argCur);
+        cout << path << endl;
+    } else if (cmd == "delpkg") {
+        if (argc != 1) throw argcError;
+        delPkg(*argCur);
+    } else if (cmd == "run") {
+        if (argc < 1) throw argcError;
+        runPkg(*argCur, argCur + 1, argEnd);
+    } else if (cmd == "ensure") {
+        if (argc != 1) throw argcError;
+        ensurePkg(*argCur);
+    } else if (cmd == "export") {
+        if (argc < 1) throw argcError;
+        exportPkgs(*argCur, argCur + 1, argEnd);
+    } else if (cmd == "regprebuilt") {
+        if (argc != 2) throw argcError;
+        regPrebuilt(*argCur, argCur[1]);
+    } else if (cmd == "regfile") {
+        if (argc != 1) throw argcError;
+        registerFile(*argCur);
+    } else if (cmd == "reginst") {
+        if (argc != 2) throw argcError;
+        registerInstalledPkg(*argCur, argCur[1]);
+    } else if (cmd == "listinst") {
+        if (argc != 0) throw argcError;
+        listInstalledPkgs();
+    } else if (cmd == "info") {
+        printInfo(argCur, argEnd);
+    } else if (cmd == "closure") {
+        printClosure(argCur, argEnd);
+    } else if (cmd == "graph") {
+        printGraph(argCur, argEnd);
+    } else
+        throw UsageError("unknown command: " + string(cmd));
 }
 
 
@@ -846,17 +843,19 @@ int main(int argc, char * * argv)
     ATerm bottomOfStack;
     ATinit(argc, argv, &bottomOfStack);
 
-    prog = *argv++, argc--;
+    /* Put the arguments in a vector. */
+    Strings args;
+    while (argc--) args.push_back(*argv++);
+    Strings::iterator argCur = args.begin(), argEnd = args.end();
+
+    prog = *argCur++;
 
     try { 
         try {
-
-            main2(argc, argv);
-            
+            run(argCur, argEnd);
         } catch (DbException e) {
             throw Error(e.what());
         }
-        
     } catch (UsageError & e) {
         cerr << "error: " << e.what() << endl
              << "Try `nix -h' for more information.\n";
