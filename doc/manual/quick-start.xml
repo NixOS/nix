@@ -1,141 +1,119 @@
-<chapter>
-  <title>Quick Start</title>
+<chapter><title>Quick Start</title>
 
-  <para>
-    This chapter is for impatient people who don't like reading
-    documentation.  For more in-depth information you are kindly
-    referred to <xref linkend='chap-installation' /> and <xref
-    linkend='chap-overview' />.
-  </para>
+<para>This chapter is for impatient people who don't like reading
+documentation.  For more in-depth information you are kindly referred
+to <xref linkend='chap-installation' /> and <xref
+linkend='chap-overview' />.</para>
 
-  <orderedlist>
+<orderedlist>
 
-    <listitem>
-      <para>
-        Download a source tarball or RPM from <ulink
-        url='http://www.cs.uu.nl/groups/ST/Trace/Nix'/>.
-        Build source distributions using the regular sequence:
+<listitem><para>Download a source tarball or RPM from <ulink
+url='http://www.cs.uu.nl/groups/ST/Trace/Nix'/>.  Build source
+distributions using the regular sequence:
         
-        <screen>
+<screen>
 $ tar xvfj nix-<replaceable>version</replaceable>.tar.bz2
 $ ./configure
 $ make
 $ make install <lineannotation>(as root)</lineannotation></screen>
 
-        This will install Nix in <filename>/nix</filename>.  You
-        should also add <filename>/nix/etc/profile.d/nix.sh</filename>
-        to your <filename>~/.bashrc</filename> (or some other login
-        file).
-      </para>
-    </listitem>
+This will install Nix in <filename>/nix</filename>.  You shouldn't
+change the prefix if at all possible since that will make it
+impossible to use our pre-built components.  Alternatively, you could
+grab an RPM if you're on an RPM-based system.  You should also add
+<filename>/nix/etc/profile.d/nix.sh</filename> to your
+<filename>~/.bashrc</filename> (or some other login
+file).</para></listitem>
 
-    <listitem>
-      <para>
-        Get some Nix expressions for pre-built packages by downloading
-        the latest <literal>nixpkgs</literal> distribution (from the
-        same location), and unpack them.
+<listitem><para>Subscribe to the Nix Packages channel.
 
-        <screen>
-$ wget http://<replaceable>...</replaceable>/nix/nixpkgs-<replaceable>version</replaceable>/nixpkgs-<replaceable>version</replaceable>.tar.bz2
-$ tar xfj nixpkgs-<replaceable>version</replaceable>.tar.bz2</screen>
+<screen>
+$ nix-channel --add http://catamaran.labs.cs.uu.nl/dist/nix/channels/nixpkgs-unstable</screen>
 
-        This will unpack the distribution into a directory
-        <filename>nixpkgs-<replaceable>version</replaceable>/</filename>.
-      </para>
-    </listitem>
+</para></listitem>
 
-    <listitem>
-      <para>
-        Pull the Nix cache.  This ensures that when you install
-        packages they are downloaded in pre-built form from the
-        network, rather than built from source.
+<listitem><para>Download the latest Nix expressions available in the channel.
+<screen>
+$ nix-channel --update</screen>
 
-        <screen>
-$ nix-pull http://<replaceable>...</replaceable>/nix/nixpkgs-<replaceable>version</replaceable>/MANIFEST</screen>
+Note that this in itself doesn't download any components, it just
+downloads the Nix expressions that build them and stores them
+somewhere (under <filename>~/.nix-defexpr</filename>, in case you're
+curious).  Also, it registers the fact that pre-built binaries are
+available remotely.</para></listitem>
 
-      </para>
+<listitem><para>See what installable components are currently
+available in the channel:
 
-      <para>
-        Note that currently we only pre-build for Linux on x86
-        platforms.
-      </para>
-        
-    </listitem>
-        
-    <listitem>
-      <para>
-        See what's available:
-
-        <screen>
-$ nix-env -qaf nixpkgs-<replaceable>version</replaceable>/
-MozillaFirebird-0.7
-hello-2.1.1
+<screen>
+$ nix-env -qa
 docbook-xml-4.2
+firefox-1.0pre-PR-0.10.1
+hello-2.1.1
 libxslt-1.1.0
 <replaceable>...</replaceable></screen>
 
-      </para>
-    </listitem>
+</para></listitem>
 
-    <listitem>
-      <para>
-        Install some packages:
+<listitem><para>Install some components from the channel:
         
-        <screen>
-$ nix-env -iBf nixpkgs-<replaceable>version</replaceable>/ hello MozillaFirebird <replaceable>...</replaceable> </screen>
+<screen>
+$ nix-env -i hello firefox <replaceable>...</replaceable> </screen>
 
-      </para>
-    </listitem>
+This should download the pre-built components; it should not build
+them locally (if it does, something went wrong).</para></listitem>
 
-    <listitem>
-      <para>
-        Test that they work:
+<listitem><para>Test that they work:
 
-        <screen>
+<screen>
 $ which hello
 /home/eelco/.nix-profile/bin/hello
 $ hello
 Hello, world!
-$ MozillaFirebird
+$ firefox
 <lineannotation>(read Slashdot or something)</lineannotation></screen>
 
-      </para>
-    </listitem>
+</para></listitem>
     
-    <listitem>
-      <para>
-        Uninstall a package:
+<listitem><para>Uninstall a package:
 
-        <screen>
+<screen>
 $ nix-env -e hello</screen>
 
-      </para>
-    </listitem>
+</para></listitem>
 
-    <listitem>
-      <para>
-        If a new release of <literal>nixpkgs</literal> comes along,
-        you can upgrade all installed packages to the latest versions
-        by downloading and unpacking the new release and doing:
+<listitem><para>To keep up-to-date with the channel, do:
 
-        <screen>
-$ nix-env -uBf nixpkgs-<replaceable>version</replaceable>/ '*'</screen>
+<screen>
+$ nix-channel --update
+$ nix-env -u '*'</screen>
 
-      </para>
-    </listitem>
+The latter command will upgrade each installed component for which
+there is a <quote>newer</quote> version (as determined by comparing
+the version numbers).</para></listitem>
 
-    <listitem>
-      <para>
-        You should periodically run the Nix garbage collector to get
-        rid of unused packages, since uninstalls or upgrades don't
-        actual delete them:
+<listitem><para>If you're unhappy with the result of a
+<command>nix-env</command> action (e.g., an upgraded component turned
+out not to work properly), you can go back:
 
-        <screen>
+<screen>
+$ nix-env --rollback</screen>
+
+</para></listitem>
+
+<listitem><para>You should periodically run the Nix garbage collector
+to get rid of unused packages, since uninstalls or upgrades don't
+actual delete them:
+
+<screen>
+$ nix-env --delete-generations old
 $ nix-collect-garbage</screen>
 
-      </para>
-    </listitem>
+The first command deletes old <quote>generations</quote> of your
+profile (making rollbacks impossible, but also making the components
+in those old generations available for garbage collection), while the
+second command actually deletes them.</para></listitem>
 
-  </orderedlist>
+</orderedlist>
 
 </chapter>
