@@ -243,6 +243,16 @@ bool isValidPath(const Path & path)
 }
 
 
+static void setOrClearStrings(Transaction & txn,
+    TableId table, const string & key, const Strings & value)
+{
+    if (value.size() > 0)
+        nixDB.setStrings(txn, table, key, value);
+    else
+        nixDB.delPair(txn, table, key);
+}
+
+
 static void invalidatePath(const Path & path, Transaction & txn)
 {
     debug(format("unregistering path `%1%'") % path);
@@ -263,11 +273,10 @@ static void invalidatePath(const Path & path, Transaction & txn)
     for (Paths::iterator i = revs.begin(); i != revs.end(); ++i) {
         Paths subs;
         nixDB.queryStrings(txn, dbSubstitutes, *i, subs);
-        remove(subs.begin(), subs.end(), path);
-        if (subs.size() > 0)
-            nixDB.setStrings(txn, dbSubstitutes, *i, subs);
-        else
-            nixDB.delPair(txn, dbSubstitutes, *i);
+        if (find(subs.begin(), subs.end(), path) == subs.end())
+            throw Error("integrity error in substitutes mapping");
+        subs.remove(path);
+        setOrClearStrings(txn, dbSubstitutes, *i, subs);
     }
     nixDB.delPair(txn, dbSubstitutesRev, path);
 }
@@ -368,6 +377,8 @@ void verifyStore()
             validPaths.insert(path);
     }
 
+    /* Check that the values of the successor mappings are valid
+       paths. */ 
     Paths sucs;
     nixDB.enumTable(txn, dbSuccessors, sucs);
     for (Paths::iterator i = sucs.begin(); i != sucs.end(); ++i) {
@@ -382,6 +393,8 @@ void verifyStore()
         }
     }
 
+    /* Check that the keys of the reverse successor mappings are valid
+       paths. */ 
     Paths rsucs;
     nixDB.enumTable(txn, dbSuccessorsRev, rsucs);
     for (Paths::iterator i = rsucs.begin(); i != rsucs.end(); ++i) {
@@ -391,27 +404,32 @@ void verifyStore()
         }
     }
 
-#if 0
-    Paths sucs;
-    nixDB.enumTable(txn, dbSuccessors, sucs);
+    /* Check that the values of the substitute mappings are valid
+       paths. */ 
+    Paths subs;
+    nixDB.enumTable(txn, dbSubstitutes, subs);
+    for (Paths::iterator i = subs.begin(); i != subs.end(); ++i) {
+        Paths subPaths, subPaths2;
+        nixDB.queryStrings(txn, dbSubstitutes, *i, subPaths);
+        for (Paths::iterator j = subPaths.begin(); j != subPaths.end(); ++j)
+            if (validPaths.find(*j) == validPaths.end())
+                debug(format("found substitute mapping to non-existent path `%1%'") % *j);
+            else
+                subPaths2.push_back(*j);
+        if (subPaths.size() != subPaths2.size())
+            setOrClearStrings(txn, dbSubstitutes, *i, subPaths2);
+    }
 
-    for (Paths::iterator i = sucs.begin(); i != sucs.end(); i++) {
-        Path srcPath = *i;
-
-        Path sucPath;
-        if (!nixDB.queryString(txn, dbSuccessors, srcPath, sucPath)) abort();
-
-        Paths revs;
-        nixDB.queryStrings(txn, dbSuccessorsRev, sucPath, revs);
-
-        if (find(revs.begin(), revs.end(), srcPath) == revs.end()) {
-            debug(format("reverse successor mapping from `%1%' to `%2%' missing")
-                  % srcPath % sucPath);
-            revs.push_back(srcPath);
-            nixDB.setStrings(txn, dbSuccessorsRev, sucPath, revs);
+    /* Check that the keys of the reverse substitute mappings are
+       valid paths. */ 
+    Paths rsubs;
+    nixDB.enumTable(txn, dbSubstitutesRev, rsubs);
+    for (Paths::iterator i = rsubs.begin(); i != rsubs.end(); ++i) {
+        if (validPaths.find(*i) == validPaths.end()) {
+            debug(format("found reverse substitute mapping for non-existent path `%1%'") % *i);
+            nixDB.delPair(txn, dbSubstitutesRev, *i);
         }
     }
-#endif
 
     txn.commit();
 }
