@@ -10,6 +10,24 @@
 typedef ATerm Expr;
 
 
+static Strings searchDirs;
+
+
+static string searchPath(string relPath)
+{
+    for (Strings::iterator i = searchDirs.begin();
+         i != searchDirs.end(); i++)
+    {
+        string path = *i + "/" + relPath;
+        if (pathExists(path)) return path;
+    }
+
+    throw Error(
+        format("path `%1%' not found in any of the search directories")
+        % relPath);
+}
+
+
 static Expr evalFile(string fileName);
 
 
@@ -108,7 +126,7 @@ static Expr evalExpr(Expr e)
 
     /* Relative files. */
     if (ATmatch(e, "Relative(<str>)", &s1)) {
-        string srcPath = s1;
+        string srcPath = searchPath(s1);
         string dstPath;
         Hash hash;
         addToStore(srcPath, dstPath, hash);
@@ -198,13 +216,9 @@ static Expr evalExpr(Expr e)
 }
 
 
-static Strings searchPath;
-
-
-static Expr evalFile(string fileName)
+static Expr evalFile(string relPath)
 {
-    Expr e = ATreadFromNamedFile(fileName.c_str());
-    if (!e) throw Error(format("cannot read aterm `%1%'") % fileName);
+    Expr e = ATreadFromNamedFile(searchPath(relPath).c_str());
     return evalExpr(e);
 }
 
@@ -213,7 +227,7 @@ void run(Strings args)
 {
     Strings files;
 
-    searchPath.push_back(".");
+    searchDirs.push_back(".");
     
     for (Strings::iterator it = args.begin();
          it != args.end(); )
@@ -223,7 +237,7 @@ void run(Strings args)
         if (arg == "--includedir" || arg == "-I") {
             if (it == args.end())
                 throw UsageError(format("argument required in `%1%'") % arg);
-            searchPath.push_back(*it++);
+            searchDirs.push_back(*it++);
         }
         else if (arg[0] == '-')
             throw UsageError(format("unknown flag `%1%`") % arg);
