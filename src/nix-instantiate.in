@@ -4,6 +4,8 @@ use strict;
 use FileHandle;
 use File::Spec;
 
+my $system = "@SYSTEM@";
+
 my $outdir = File::Spec->rel2abs($ARGV[0]);
 my $netdir = File::Spec->rel2abs($ARGV[1]);
 
@@ -48,6 +50,8 @@ sub convert {
     my $outfile = "$outdir/$fn";
     open $IN, "< $descr" or die "cannot open $descr";
     open $OUT, "> $outfile" or die "cannot create $outfile";
+
+    print $OUT "system : $system\n";
 
     while (<$IN>) {
         chomp;

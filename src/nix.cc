@@ -34,6 +34,9 @@ static string dbfile = PKGINFO_PATH;
 static string pkgHome = "/pkg";
 
 
+static string thisSystem = SYSTEM;
+
+
 class Error : public exception
 {
     string err;
@@ -177,22 +180,12 @@ string makeRef(string filename)
 }
 
 
-struct Dep
-{
-    string name;
-    string ref;
-    Dep(string _name, string _ref)
-    {
-        name = _name;
-        ref = _ref;
-    }
-};
-
-typedef list<Dep> DepList;
+typedef pair<string, string> Param;
+typedef list<Param> Params;
 
 
 void readPkgDescr(const string & pkgfile,
-    DepList & pkgImports, DepList & fileImports)
+    Params & pkgImports, Params & fileImports, Params & arguments)
 {
     ifstream file;
     file.exceptions(ios::badbit);
@@ -212,12 +205,14 @@ void readPkgDescr(const string & pkgfile,
         string name, op, ref;
         str >> name >> op >> ref;
 
-        checkRef(ref);
-
-        if (op == "<-") 
-            pkgImports.push_back(Dep(name, ref));
-        else if (op == "=")
-            fileImports.push_back(Dep(name, ref));
+        if (op == "<-") {
+            checkRef(ref);
+            pkgImports.push_back(Param(name, ref));
+        } else if (op == "=") {
+            checkRef(ref);
+            fileImports.push_back(Param(name, ref));
+        } else if (op == ":")
+            arguments.push_back(Param(name, ref));
         else throw Error("invalid operator " + op);
     }
 }
@@ -243,37 +238,51 @@ void fetchDeps(string hash, Environment & env)
         throw Error("file " + pkgfile + " is stale");
 
     /* Read the package description file. */
-    DepList pkgImports, fileImports;
-    readPkgDescr(pkgfile, pkgImports, fileImports);
+    Params pkgImports, fileImports, arguments;
+    readPkgDescr(pkgfile, pkgImports, fileImports, arguments);
 
     /* Recursively fetch all the dependencies, filling in the
        environment as we go along. */
-    for (DepList::iterator it = pkgImports.begin();
+    for (Params::iterator it = pkgImports.begin();
          it != pkgImports.end(); it++)
     {
         cerr << "fetching package dependency "
-             << it->name << " <- " << it->ref
+             << it->first << " <- " << it->second
              << endl;
-        env[it->name] = getPkg(it->ref);
+        env[it->first] = getPkg(it->second);
     }
 
-    for (DepList::iterator it = fileImports.begin();
+    for (Params::iterator it = fileImports.begin();
          it != fileImports.end(); it++)
     {
         cerr << "fetching file dependency "
-             << it->name << " = " << it->ref
+             << it->first << " = " << it->second
              << endl;
 
         string file;
 
-        if (!queryDB(dbRefs, it->ref, file))
-            throw Error("unknown file " + it->ref);
+        if (!queryDB(dbRefs, it->second, file))
+            throw Error("unknown file " + it->second);
 
-        if (makeRef(file) != it->ref)
+        if (makeRef(file) != it->second)
             throw Error("file " + file + " is stale");
 
-        env[it->name] = file;
+        env[it->first] = file;
     }
+
+    string buildSystem;
+
+    for (Params::iterator it = arguments.begin();
+         it != arguments.end(); it++)
+    {
+        env[it->first] = it->second;
+        if (it->first == "system")
+            buildSystem = it->second;
+    }
+
+    if (buildSystem != thisSystem)
+        throw Error("descriptor requires a `" + buildSystem +
+            "' but I am a `" + thisSystem + "'");
 }
 
 
@@ -299,7 +308,7 @@ void installPkg(string hash)
     fetchDeps(hash, env);
 
     builder = getFromEnv(env, "build");
-    
+
     /* Construct a path for the installed package. */
     path = pkgHome + "/" + hash;
 
