@@ -3,8 +3,14 @@
 my $tmpfile = "@localstatedir@/nix/pull.tmp";
 my $conffile = "@sysconfdir@/nix/prebuilts.conf";
 
+my @ids;
 my @subs;
 my @sucs;
+
+my $fixfile = "/tmp/nix-pull-tmp.fix";
+open FIX, ">$fixfile";
+print FIX "[";
+my $first = 1;
 
 open CONFFILE, "<$conffile";
 
@@ -41,7 +47,7 @@ while (<CONFFILE>) {
                 $outname = "unnamed";
             }
 
-            print "registering $id -> $url/$fn\n";
+            print STDERR "$id ($outname)\n";
 
             # Construct a Fix expression that fetches and unpacks a
             # Nix archive from the network.
@@ -55,23 +61,14 @@ while (<CONFFILE>) {
                 ", (\"id\", \"$id\")" .
                 "])";
             
-            my $fixfile = "/tmp/nix-pull-tmp.fix";
-            open FIX, ">$fixfile";
-            print FIX $fixexpr;
-            close FIX;
+	    print FIX "," unless ($first);
+	    $first = 0;
+	    print FIX $fixexpr;
 
-            # Instantiate a Nix expression from the Fix expression.
-            my $nid = `fix $fixfile`;
-            $? and die "instantiating Nix archive expression";
-            chomp $nid;
-            die unless $nid =~ /^([0-9a-z]{32})$/;
-
-            push @subs, $id;
-            push @subs, $nid;
+	    push @ids, $id;
 
             # Does the name encode a successor relation?
             if (defined $fsid) {
-                print "NORMAL $fsid -> $id\n";
                 push @sucs, $fsid;
                 push @sucs, $id;
             }
@@ -84,8 +81,29 @@ while (<CONFFILE>) {
 
 }
 
+print FIX "]";
+close FIX;
+
+# Instantiate Nix expressions from the Fix expressions we created above.
+print STDERR "running fix...\n";
+open NIDS, "fix $fixfile |" or die "cannot run fix";
+my $i = 0;
+while (<NIDS>) {
+    chomp;
+    die unless /^([0-9a-z]{32})$/;
+    $nid = $1;
+    die unless ($i < scalar @ids);
+    $id = $ids[$i++];
+    push @subs, $id;
+    push @subs, $nid;
+}
+
+# Register all substitutes.
+print STDERR "registering substitutes...\n";
 system "nix --substitute @subs";
 if ($?) { die "`nix --substitute' failed"; }
 
+# Register all successors.
+print STDERR "registering successors...\n";
 system "nix --successor @sucs";
 if ($?) { die "`nix --successor' failed"; }
