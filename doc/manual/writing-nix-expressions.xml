@@ -499,6 +499,234 @@ run in parallel.  Typically this should be the number of CPUs.</para>
 </sect2>
 
 
+<sect2><title>The generic builder</title>
+
+<para>TODO</para>
+
+</sect2>
+
+
+</sect1>
+
+
+
+<sect1><title>The Nix expression language</title>
+
+<para>The Nix expression language is a pure, lazy, functional
+language.  Purity means that operations in the language don't have
+side-effects (for instance, there is no variable assignment).
+Laziness means that arguments to functions are evaluated only when
+they are needed.  Functional means that functions are
+<quote>normal</quote> values that can be passed around and
+manipulated in interesting ways.</para>
+
+<para>The language is not a full-featured, general purpose language.
+It's main job is to describe components, compositions of components,
+and the variability within components.  For this a functional language
+is perfectly suited.</para>
+
+<para>This section presents the various features of the
+language.</para>
+
+
+<simplesect><title>Simple values</title>
+
+<para>Nix has the following basic datatypes:
+
+<itemizedlist>
+
+  <listitem><para><emphasis>Strings</emphasis>, enclosed between
+  double quotes, e.g., <literal>"foo bar"</literal>.</para></listitem>
+
+  <listitem><para><emphasis>Integers</emphasis>, e.g.,
+  <literal>123</literal>.</para></listitem>
+
+  <listitem><para><emphasis>URIs</emphasis> as defined in appendix B
+  of <ulink url='http://www.ietf.org/rfc/rfc2396.txt'>RFC
+  2396</ulink>, e.g.,
+  <literal>https://svn.cs.uu.nl:12443/dist/trace/trace-nix-trunk.tar.bz2</literal>.</para></listitem>
+
+  <listitem><para><emphasis>Paths</emphasis>, e.g.,
+  <filename>/bin/sh</filename> or <filename>./builder.sh</filename>.
+  A path must contain at least one slash to be recognised as such; for
+  instance, <filename>builder.sh</filename> is not a
+  path<footnote><para>It's parsed as an expression that selects the
+  attribute <varname>sh</varname> from the variable
+  <varname>builder</varname>.</para></footnote>.  If the filename is
+  relative, i.e., if it does not begin with a slash, it is made
+  absolute at parse time relative to the directory of the Nix
+  expression that contained it.  For instance, if a Nix expression in
+  <filename>/foo/bar/bla.nix</filename> refers to
+  <filename>../xyzzy/fnord.nix</filename>, the absolutised path is
+  <filename>/foo/xyzzy/fnord.nix</filename>.</para></listitem>
+  
+</itemizedlist>
+
+</para>
+
+</simplesect>
+
+
+<simplesect><title>Lists</title>
+
+<para>Lists are formed by enclosing a whitespace-separated list of
+values between square bracktes.  For example,
+
+<programlisting>
+[ 123 ./foo.nix "abc" (f {x=y;}) ]</programlisting>
+
+defines a list of four elements, the last being the result of a call
+to the function <varname>f</varname>.  Note that function calls have
+to be enclosed in parentheses.  If they had been omitted, e.g.,
+
+<programlisting>
+[ 123 ./foo.nix "abc" f {x=y;} ]</programlisting>
+
+the result would be a list of five elements, the fourth one being a
+function and the fifth being an attribute set.</para>
+
+</simplesect>
+
+
+<simplesect><title>Attribute sets</title>
+
+<para>Attribute sets are really the core of the language, since
+ultimately it's all about creating derivations, which are really just
+sets of attributes to be passed to build scripts.</para>
+
+<para>Attribute sets are just a list of name/value pairs enclosed in
+curly brackets, where each value is an arbitrary expression terminated
+by a semicolon.  For example:
+
+<programlisting>
+{ x = 123;
+  text = "Hello";
+  y = f { bla = 456; };
+}</programlisting>
+
+This defines an attribute set with attributes named
+<varname>x</varname>, <varname>test</varname>, <varname>y</varname>.
+The order of the attributes is irrelevant.  An attribute name may only
+occur once.</para>
+
+<para>Attributes can be selected from an attribute set using the
+<literal>.</literal> operator.  For instance,
+
+<programlisting>
+{ a = "Foo"; b = "Bar"; }.a</programlisting>
+
+evaluates to <literal>"Foo"</literal>.</para>
+
+</simplesect>
+
+
+<simplesect><title>Recursive attribute sets</title>
+
+<para>Recursive attribute sets are just normal attribute sets, but the
+attributes can refer to each other.  For example,
+
+<programlisting>
+rec {
+  x = y;
+  y = 123;
+}.x
+</programlisting>
+
+evaluates to <literal>123</literal>.  Note that without
+<literal>rec</literal> the binding <literal>x = y;</literal> would
+refer to the variable <varname>y</varname> in the surrounding scope,
+if one exists, and would be invalid if no such variable exists.  That
+is, in a normal (non-recursive) attribute set, attributes are not
+added to the lexical scope; in a recursive set, they are.</para>
+
+<para>Recursive attribute sets of course introduce the danger of
+infinite recursion.  For example,
+
+<programlisting>
+rec {
+  x = y;
+  y = x;
+}.x</programlisting>
+
+does not terminate<footnote><para>Actually, Nix detects infinite
+recursion in this case and aborts (<quote>infinite recursion
+encountered</quote>).</para></footnote>.</para>
+
+</simplesect>
+
+<!--
+<para>It is often convenient to copy variables from the surrounding
+scope (e.g., when you want to propagate attributes).  This can be
+shortened using the <literal>inherit</literal> keyword.  For instance,
+-->
+
+
+<simplesect><title>Lets</title>
+
+<para>TODO</para>
+
+</simplesect>
+
+
+<simplesect><title>Inheriting attributes</title>
+
+<para>TODO</para>
+
+</simplesect>
+
+
+<simplesect><title>Functions</title>
+
+<para>TODO</para>
+
+<para>Higher-order functions; map</para>
+
+</simplesect>
+
+
+<simplesect><title>Conditionals</title>
+
+<para>TODO</para>
+
+</simplesect>
+
+
+<simplesect><title><quote>With</quote> expressions</title>
+
+<para>TODO</para>
+
+</simplesect>
+
+
+<simplesect><title>Operators</title>
+
+<para>TODO</para>
+
+</simplesect>
+
+
+<simplesect><title>Derivations</title>
+
+<para>TODO</para>
+
+</simplesect>
+
+
+<simplesect><title>Miscelleneous built-in functions</title>
+
+<para>TODO</para>
+
+</simplesect>
+
+
+</sect1>
+
+
+
+<sect1><title>The standard environment</title>
+
+<para>TODO</para>
+
 </sect1>
 
 
