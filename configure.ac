@@ -11,6 +11,8 @@ AC_PROG_CC
 AC_PROG_CXX
 AC_PROG_RANLIB
 
+AC_PATH_PROG(wget, wget)
+
 AC_CHECK_LIB(pthread, pthread_mutex_init)
 
 AM_CONFIG_HEADER([config.h])
