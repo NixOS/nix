@@ -12,7 +12,6 @@ extern "C" {
 
 #include "aterm.hh"
 #include "parser.hh"
-#include "shared.hh"
 #include "parse-table.h"
 
 
@@ -100,8 +99,7 @@ Expr parseExprFromFile(Path path)
 
         ATprotect(&lang);
         lang = ATmake("Nix");
-        if (!SGopenLanguageFromTerm(
-                (char *) programId.c_str(), lang, parseTable))
+        if (!SGopenLanguageFromTerm("nix-parse", lang, parseTable))
             throw Error(format("cannot open language"));
 
         SG_STARTSYMBOL_ON();
