@@ -10,15 +10,11 @@ until mkdir $tmpdir, 0777;
 my $nixfile = "$tmpdir/create-nars.nix";
 my $manifest = "$tmpdir/MANIFEST";
 
-END { unlink $manifest; unlink $fixfile; rmdir $tmpdir; }
-
-open NIX, ">$nixfile";
-print NIX "[";
+END { unlink $manifest; unlink $nixfile; rmdir $tmpdir; }
 
 my @paths;
 
 foreach my $id (@ARGV) {
-
     die unless $id =~ /^\//;
 
     # Get all paths referenced by the normalisation of the given 
@@ -33,22 +29,25 @@ foreach my $id (@ARGV) {
         push @paths, $_;
     }
     close PATHS;
+}
 
-    # For each path, create a Nix expression that turns the path into
-    # a Nix archive.
-    foreach my $path (@paths) {
+# For each path, create a Nix expression that turns the path into
+# a Nix archive.
+open NIX, ">$nixfile";
+print NIX "[";
 
-        die unless ($path =~ /\/[0-9a-z]{32}.*$/);
-        print "$path\n";
+foreach my $path (@paths) {
 
-        # Construct a Nix expression that creates a Nix archive.
-        my $nixexpr = 
-            "((import @datadir@/nix/corepkgs/nar/nar.nix) " .
-            # !!! $path should be represented as a closure
-            "{path = \"$path\"; system = \"@system@\"}) ";
-        
-        print NIX $nixexpr;
-    }
+    die unless ($path =~ /\/[0-9a-z]{32}.*$/);
+    print "$path\n";
+
+    # Construct a Nix expression that creates a Nix archive.
+    my $nixexpr = 
+        "((import @datadir@/nix/corepkgs/nar/nar.nix) " .
+        # !!! $path should be represented as a closure
+        "{path = \"$path\"; system = \"@system@\"}) ";
+    
+    print NIX $nixexpr;
 }
 
 print NIX "]";
@@ -63,6 +62,7 @@ while (<NIDS>) {
     chomp;
     die unless /^\//;
     push @nids, $_;
+    print "$_\n";
 }
 close NIDS;
 
@@ -70,7 +70,7 @@ close NIDS;
 # Realise the store expression.
 print STDERR "creating archives...\n";
 system "nix-store --realise -v @nids > /dev/null";
-if ($?) { die "`nix --realise' failed"; }
+if ($?) { die "`nix-store --realise' failed"; }
 
 my @narpaths;
 open NIDS, "nix-store --query --list @nids |" or die "cannot run nix";
