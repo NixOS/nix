@@ -1207,6 +1207,9 @@ private:
     /* The process ID of the builder. */
     pid_t pid;
 
+    /* Lock on the store path. */
+    PathLocks outputLock;
+    
     typedef void (SubstitutionGoal::*GoalState)();
     GoalState state;
 
@@ -1315,6 +1318,23 @@ void SubstitutionGoal::exprRealised()
     printMsg(lvlChatty, format("executing substitute `%1%'") % program);
 
     logPipe.create();
+
+    /* Acquire a lock on the output path. */
+    PathSet lockPath;
+    lockPath.insert(storePath);
+    outputLock.lockPaths(lockPath);
+
+    /* Check again whether the path is invalid. */
+    if (isValidPath(storePath)) {
+        debug(format("store path `%1%' has become valid") % storePath);
+        outputLock.setDeletion(true);
+        amDone();
+        return;
+    }
+
+    /* Remove the (stale) output path if it exists. */
+    if (pathExists(storePath))
+        deletePath(storePath);
 
     /* Fork the substitute program. */
     switch (pid = fork()) {
@@ -1425,6 +1445,8 @@ void SubstitutionGoal::finished()
     registerValidPath(txn, storePath);
     txn.commit();
 
+    outputLock.setDeletion(true);
+    
     amDone();
 }
 
