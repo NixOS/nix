@@ -19,4 +19,13 @@ Expr primImport(EvalState & state, Expr arg);
 Expr primDerivation(EvalState & state, Expr args);
 
 
+/* Return the base name of the given string, i.e., everything
+   following the last slash. */
+Expr primBaseNameOf(EvalState & state, Expr arg);
+
+
+/* Convert the argument (which can be a path or a uri) to a string. */
+Expr primToString(EvalState & state, Expr arg);
+
+
 #endif /* !__PRIMOPS_H */

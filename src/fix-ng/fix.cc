@@ -30,10 +30,6 @@ static Path searchPath(const Paths & searchDirs, const Path & relPath)
 #if 0
 static Expr evalExpr2(EvalState & state, Expr e)
 {
-    /* Conditional. */
-    if (ATmatch(e, "If(<term>, <term>, <term>)", &e1, &e2, &e3)) {
-    }
-
     /* Ad-hoc function for string matching. */
     if (ATmatch(e, "HasSubstr(<term>, <term>)", &e1, &e2)) {
         e1 = evalExpr(state, e1);

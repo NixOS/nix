@@ -204,3 +204,22 @@ Expr primDerivation(EvalState & state, Expr args)
 
     return makeAttrs(attrs);
 }
+
+
+Expr primBaseNameOf(EvalState & state, Expr arg)
+{
+    string s = evalString(state, arg);
+    return ATmake("Str(<str>)", baseNameOf(s).c_str());
+}
+
+
+Expr primToString(EvalState & state, Expr arg)
+{
+    arg = evalExpr(state, arg);
+    char * s;
+    if (ATmatch(arg, "Str(<str>)", &s) ||
+        ATmatch(arg, "Path(<str>)", &s) ||
+        ATmatch(arg, "Uri(<str>)", &s))
+        return ATmake("Str(<str>)", s);
+    else throw badTerm("cannot coerce to string", arg);
+}

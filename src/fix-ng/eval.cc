@@ -145,6 +145,8 @@ Expr evalExpr2(EvalState & state, Expr e)
             string primop(s1);
             if (primop == "import") return primImport(state, e2);
             if (primop == "derivation") return primDerivation(state, e2);
+            if (primop == "toString") return primToString(state, e2);
+            if (primop == "baseNameOf") return primBaseNameOf(state, e2);
             else throw badTerm("undefined variable/primop", e1);
         }
 
