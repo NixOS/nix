@@ -213,6 +213,9 @@ private:
        list of unfinished inputs. */
     PathSet buildable;
 
+    /* Should be set whenever a goal is added to `buildable'. */
+    bool newBuildables;
+
     /* Child processes currently running. */
     Building building;
 
@@ -327,8 +330,10 @@ bool Normaliser::addGoal(Path nePath)
 
     /* Maintain the invariant that all goals with no unfinished inputs
        are in the `buildable' set. */
-    if (goal.unfinishedInputs.empty())
+    if (goal.unfinishedInputs.empty()) {
         buildable.insert(nePath);
+        newBuildables = true;
+    }
 
     /* Add the goal to the goal graph. */
     goals[nePath] = goal;
@@ -347,14 +352,19 @@ void Normaliser::run()
         
         /* Start building as many buildable goals as possible. */
         bool madeProgress = false;
-        
-        for (PathSet::iterator i = buildable.begin();
-             i != buildable.end(); ++i)
-            
-            if (startBuild(*i)) {
-                madeProgress = true;
-                buildable.erase(*i);
-            }
+
+        do {
+            newBuildables = false;
+            for (PathSet::iterator i = buildable.begin();
+                 i != buildable.end(); ++i)
+                if (startBuild(*i)) {
+                    madeProgress = true;
+                    buildable.erase(*i);
+                }
+            /* Continue while `newBuildables' is true.  This happens
+               when startBuild() fast-builds a goal and wakes up
+               another goal. */
+        } while (newBuildables);
 
         /* Wait until any child finishes (which may allow us to build
            new goals). */
@@ -684,7 +694,7 @@ Normaliser::HookReply Normaliser::tryBuildHook(Goal & goal)
                 (canBuildMore() ? (string) "1" : "0").c_str(),
                 thisSystem.c_str(),
                 goal.expr.derivation.platform.c_str(),
-                goal.nePath.c_str());
+                goal.nePath.c_str(), 0);
             
             throw SysError(format("executing `%1%'") % buildHook);
             
@@ -1093,6 +1103,7 @@ void Normaliser::removeGoal(Goal & goal)
         if (waiter.unfinishedInputs.empty()) {
             debug(format("waking up goal `%1%'") % waiter.nePath);
             buildable.insert(waiter.nePath);
+            newBuildables = true;
         }
     }
 
