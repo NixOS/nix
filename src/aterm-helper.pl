@@ -100,7 +100,13 @@ while (<STDIN>) {
         print IMPL "AFun sym$funname = 0;\n";
         
         print HEADER "static inline $result make$funname($formals) {\n";
-        print HEADER "    return (ATerm) ATmakeAppl$arity(sym$funname$args);\n";
+        if ($arity <= 6) {
+            print HEADER "    return (ATerm) ATmakeAppl$arity(sym$funname$args);\n";
+        } else {
+            $args =~ s/^,//;
+            print HEADER "    ATerm array[$arity] = {$args};\n";
+            print HEADER "    return (ATerm) ATmakeApplArray(sym$funname, array);\n";
+        }
         print HEADER "}\n\n";
 
         print HEADER "#ifdef __cplusplus\n";
