@@ -250,6 +250,10 @@ static FState realise(FState fs, StringSet & paths)
         /* Register the normal form. */
         nf = storeSuccessor(fs, nf, paths);
         
+        /* Expand the hash into the target path. */
+        expandHash(hash, path);
+
+#if 0
         /* Perhaps the path already exists and has the right hash? */
         if (pathExists(path)) {
 
@@ -267,6 +271,7 @@ static FState realise(FState fs, StringSet & paths)
             copyPath(path2, path);
             
         }
+#endif
         
         return nf;
     }

@@ -158,6 +158,9 @@ static string queryPathByHashPrefix(Hash hash, const string & prefix)
 }
 
 
+string expandHash(const Hash & hash, const string & outPath = "")
+{
+    
 string queryPathByHash(Hash hash)
 {
     return queryPathByHashPrefix(hash, "/");
@@ -187,8 +190,8 @@ void addToStore(string srcPath, string & dstPath, Hash & hash)
 
 void deleteFromStore(const string & path)
 {
-    string prefix = nixStore + "/";
-    if (string(path, 0, prefix.size()) != prefix)
+    string prefix =  + "/";
+    if (!isInPrefix(path, nixStore))
         throw Error(format("path %1% is not in the store") % path);
 
     unregisterPath(path);

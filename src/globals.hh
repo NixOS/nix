@@ -30,6 +30,21 @@ extern string dbHash2Paths;
 */
 extern string dbSuccessors;
 
+/* dbSubstitutes :: Hash -> [Hash]
+
+   Each pair $(h, [hs])$ tells Nix that it can realise any of the
+   fstate expressions referenced by the hashes in $hs$ to obtain a Nix
+   archive that, when unpacked, will produce a path with hash $h$.
+
+   The main purpose of this is for distributed caching of derivates.
+   One system can compute a derivate with hash $h$ and put it on a
+   website (as a Nix archive), for instance, and then another system
+   can register a substitute for that derivate.  The substitute in
+   this case might be an fstate expression that fetches the Nix
+   archive. 
+*/
+extern string dbSubstitutes;
+
 
 /* Path names. */
 
