@@ -7,6 +7,7 @@
 #include "globals.hh"
 #include "db.hh"
 #include "archive.hh"
+#include "pathlocks.hh"
 #include "normalise.hh"
 
 
@@ -211,10 +212,19 @@ string expandId(const FSId & id, const string & target,
             if (target.empty())
                 return path;
             else {
+                /* Acquire a lock on the target path. */
+                Strings lockPaths;
+                lockPaths.push_back(target);
+                PathLocks outputLock(lockPaths);
+
+                /* Copy. */
                 copyPath(path, target);
+
+                /* Register the target path. */
                 Transaction txn(nixDB);
                 registerPath(txn, target, id);
                 txn.commit();
+
                 return target;
             }
         }
@@ -265,7 +275,12 @@ void addToStore(string srcPath, string & dstPath, FSId & id,
     } catch (...) {
     }
     
+    Strings lockPaths;
+    lockPaths.push_back(dstPath);
+    PathLocks outputLock(lockPaths);
+
     copyPath(srcPath, dstPath);
+
     Transaction txn(nixDB);
     registerPath(txn, dstPath, id);
     txn.commit();

@@ -86,7 +86,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 
     /* Obtain locks on all output paths.  The locks are automatically
        released when we exit this function or Nix crashes. */
-    PathLocks outputLock(pathsFromOutPaths(outPaths));
+    PathLocks outputLocks(pathsFromOutPaths(outPaths));
 
     /* Now check again whether there is a successor.  This is because
        another process may have started building in parallel.  After
