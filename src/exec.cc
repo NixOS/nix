@@ -43,8 +43,12 @@ void runProgram(const string & program,
 {
     /* Create a log file. */
     string logFileName = nixLogDir + "/run.log";
+    string logCommand = 
+	verbosity >= lvlDebug 
+	? "tee -a "  + logFileName + " >&2"
+	: "cat >> " + logFileName;
     /* !!! auto-pclose on exit */
-    FILE * logFile = popen(("tee -a " + logFileName + " >&2").c_str(), "w"); /* !!! escaping */
+    FILE * logFile = popen(logCommand.c_str(), "w"); /* !!! escaping */
     if (!logFile)
         throw SysError(format("creating log file `%1%'") % logFileName);
 
