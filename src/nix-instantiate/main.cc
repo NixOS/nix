@@ -15,17 +15,17 @@ void printHelp()
 }
 
 
-static Expr evalStdin(EvalState & state)
+static Expr evalStdin(EvalState & state, bool parseOnly)
 {
     startNest(nest, lvlTalkative, format("evaluating standard input"));
     string s, s2;
     while (getline(cin, s2)) s += s2 + "\n";
     Expr e = parseExprFromString(state, s, absPath("."));
-    return evalExpr(state, e);
+    return parseOnly ? e : evalExpr(state, e);
 }
 
 
-static void printNixExpr(EvalState & state, Expr e)
+static void printDrvPaths(EvalState & state, Expr e)
 {
     ATMatcher m;
     ATermList es;
@@ -45,18 +45,27 @@ static void printNixExpr(EvalState & state, Expr e)
             ATermMap drvMap;
             queryAllAttrs(e, drvMap);
             for (ATermIterator i(drvMap.keys()); i; ++i)
-                printNixExpr(state, evalExpr(state, drvMap.get(*i)));
+                printDrvPaths(state, evalExpr(state, drvMap.get(*i)));
             return;
         }
     }
 
     if (atMatch(m, e) >> "List" >> es) {
         for (ATermIterator i(es); i; ++i)
-            printNixExpr(state, evalExpr(state, *i));
+            printDrvPaths(state, evalExpr(state, *i));
         return;
     }
 
     throw Error("expression does not evaluate to one or more derivations");
+}
+
+
+static void printResult(EvalState & state, Expr e, bool evalOnly)
+{
+    if (evalOnly)
+        cout << format("%1%\n") % e;
+    else
+        printDrvPaths(state, e);
 }
 
 
@@ -65,6 +74,8 @@ void run(Strings args)
     EvalState state;
     Strings files;
     bool readStdin = false;
+    bool evalOnly = false;
+    bool parseOnly = false;
 
     for (Strings::iterator it = args.begin();
          it != args.end(); )
@@ -73,6 +84,14 @@ void run(Strings args)
 
         if (arg == "-")
             readStdin = true;
+        else if (arg == "--eval-only") {
+            readOnlyMode = true;
+            evalOnly = true;
+        }
+        else if (arg == "--parse-only") {
+            readOnlyMode = true;
+            parseOnly = evalOnly = true;
+        }
         else if (arg[0] == '-')
             throw UsageError(format("unknown flag `%1%`") % arg);
         else
@@ -82,15 +101,16 @@ void run(Strings args)
     openDB();
 
     if (readStdin) {
-        Expr e = evalStdin(state);
-        printNixExpr(state, e);
+        Expr e = evalStdin(state, parseOnly);
+        printResult(state, e, evalOnly);
     }
 
     for (Strings::iterator it = files.begin();
          it != files.end(); it++)
     {
         Expr e = evalFile(state, absPath(*it));
-        printNixExpr(state, e);
+        /* !!! parseOnly ignored */
+        printResult(state, e, evalOnly);
     }
 
     printEvalStats(state);
