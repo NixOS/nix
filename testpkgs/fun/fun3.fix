@@ -1,0 +1,9 @@
+Call(
+  Function(["x"],
+    Call(
+      Function(["x"], Var("x")),
+      [ ("x", False) ]
+    )
+  ),
+  [ ("x", True) ]
+)
