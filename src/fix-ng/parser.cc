@@ -147,6 +147,9 @@ Expr parseExprFromFile(Path path)
     if (!imploded)
         throw Error(format("cannot implode parse tree"));
 
+    debug(format("imploded parse tree of `%1%': %2%")
+        % path % printTerm(imploded));
+
     /* Finally, clean it up. */
     Cleanup cleanup;
     cleanup.basePath = dirOf(path);

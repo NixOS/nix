@@ -20,60 +20,45 @@ exports
   sorts Expr Bind
   context-free syntax
 
-    Id
-    -> Expr {cons("Var")}
+    Id -> Expr {cons("Var")}
 
-    Int
-    -> Expr {cons("Int")}
+    Int -> Expr {cons("Int")}
 
-    Str
-    -> Expr {cons("Str")}
+    Str -> Expr {cons("Str")}
 
-    Uri
-    -> Expr {cons("Uri")}
+    Uri -> Expr {cons("Uri")}
 
-    Path
-    -> Expr {cons("Path")}
+    Path -> Expr {cons("Path")}
 
-    "(" Expr ")"
-    -> Expr {bracket}
+    "(" Expr ")" -> Expr {bracket}
 
-    Expr Expr
-    -> Expr {cons("Call"), left}
+    Expr Expr -> Expr {cons("Call"), left}
 
-    "{" {Id ","}* "}" ":" Expr
-    -> Expr {cons("Function"), right}
+    "{" {Id ","}* "}" ":" Expr -> Expr {cons("Function"), right}
 
-    "rec" "{" {Bind ","}* "}"
-    -> Expr {cons("Rec")}
+    "rec" "{" Binds "}" -> Expr {cons("Rec")}
+    "let" "{" Binds "}" -> Expr {cons("LetRec")}
+    "{" Binds "}" -> Expr {cons("Attrs")}
 
-    "let" "{" {Bind ","}* "}"
-    -> Expr {cons("LetRec")}
+    Id "=" Expr -> Bind {cons("Bind")}
+    {Bind ";"}* -> Binds
+    Bind ";" -> BindSemi 
+    BindSemi* -> Binds
 
-    "{" {Bind ","}* "}"
-    -> Expr {cons("Attrs")}
+    "[" Expr* "]" -> Expr {cons("List")}
 
-    Id "=" Expr
-    -> Bind {cons("Bind")}
+    Expr "." Id -> Expr {cons("Select")}
 
-    "[" {Expr ","}* "]"
-    -> Expr {cons("List")}
+    "if" Expr "then" Expr "else" Expr -> Expr {cons("If")}
 
-    Expr "." Id
-    -> Expr {cons("Select")}
+    Expr "==" Expr -> Expr {cons("OpEq")}
 
-    "if" Expr "then" Expr "else" Expr
-    -> Expr {cons("If")}
-
-    Expr "==" Expr
-    -> Expr {cons("OpEq")}
-
-    Bool
-    -> Expr {cons("Bool")}
+    Bool -> Expr {cons("Bool")}
 
   context-free priorities
 
     Expr "." Id -> Expr
+  > 
   > Expr Expr -> Expr
   > "{" {Id ","}* "}" ":" Expr -> Expr
 
