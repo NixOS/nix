@@ -35,6 +35,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_prefix}/var
 %{_prefix}/share
 %{_prefix}/man
+%{_prefix}/store
 %config
 %{_prefix}/etc
 #%doc
