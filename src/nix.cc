@@ -16,6 +16,7 @@ extern "C" {
 }
 
 #include "util.hh"
+#include "hash.hh"
 #include "db.hh"
 
 using namespace std;
@@ -58,7 +59,7 @@ string fetchURL(string url)
    database), we use that.  Otherwise, we attempt to fetch it from the
    network (using dbNetSources).  We verify that the file has the
    right hash. */
-string getFile(string hash)
+string getFile(Hash hash)
 {
     bool checkedNet = false;
 
@@ -77,10 +78,10 @@ string getFile(string hash)
 
         if (checkedNet)
             throw Error("consistency problem: file fetched from " + url + 
-                " should have hash " + hash + ", but it doesn't");
+                " should have hash " + (string) hash + ", but it doesn't");
 
         if (!queryDB(nixDB, dbNetSources, hash, url))
-            throw Error("a file with hash " + hash + " is requested, "
+            throw Error("a file with hash " + (string) hash + " is requested, "
                 "but it is not known to exist locally or on the network");
 
         checkedNet = true;
@@ -95,7 +96,7 @@ string getFile(string hash)
 typedef map<string, string> Params;
 
 
-void readPkgDescr(const string & hash,
+void readPkgDescr(Hash hash,
     Params & pkgImports, Params & fileImports, Params & arguments)
 {
     string pkgfile;
@@ -112,15 +113,15 @@ void readPkgDescr(const string & hash,
     char * cname;
     ATerm value;
     while (ATmatch(bindings, "[Bind(<str>, <term>), <list>]", 
-               &cname, &value, &bindings)) 
+               &cname, &value, &bindings))
     {
         string name(cname);
         char * arg;
         if (ATmatch(value, "Pkg(<str>)", &arg)) {
-            checkHash(arg);
+            parseHash(arg);
             pkgImports[name] = arg;
         } else if (ATmatch(value, "File(<str>)", &arg)) {
-            checkHash(arg);
+            parseHash(arg);
             fileImports[name] = arg;
         } else if (ATmatch(value, "Str(<str>)", &arg))
             arguments[name] = arg;
@@ -136,13 +137,13 @@ void readPkgDescr(const string & hash,
 }
 
 
-string getPkg(string hash);
+string getPkg(Hash hash);
 
 
 typedef map<string, string> Environment;
 
 
-void fetchDeps(string hash, Environment & env)
+void fetchDeps(Hash hash, Environment & env)
 {
     /* Read the package description file. */
     Params pkgImports, fileImports, arguments;
@@ -156,7 +157,7 @@ void fetchDeps(string hash, Environment & env)
         cerr << "fetching package dependency "
              << it->first << " <- " << it->second
              << endl;
-        env[it->first] = getPkg(it->second);
+        env[it->first] = getPkg(parseHash(it->second));
     }
 
     for (Params::iterator it = fileImports.begin();
@@ -168,7 +169,7 @@ void fetchDeps(string hash, Environment & env)
 
         string file;
 
-        file = getFile(it->second);
+        file = getFile(parseHash(it->second));
 
         env[it->first] = file;
     }
@@ -198,7 +199,7 @@ string getFromEnv(const Environment & env, const string & key)
 }
 
 
-string queryPkgId(const string & hash)
+string queryPkgId(Hash hash)
 {
     Params pkgImports, fileImports, arguments;
     readPkgDescr(hash, pkgImports, fileImports, arguments);
@@ -206,7 +207,7 @@ string queryPkgId(const string & hash)
 }
 
 
-void installPkg(string hash)
+void installPkg(Hash hash)
 {
     string pkgfile;
     string src;
@@ -223,14 +224,15 @@ void installPkg(string hash)
     string id = getFromEnv(env, "id");
 
     /* Construct a path for the installed package. */
-    path = nixHomeDir + "/pkg/" + id + "-" + hash;
+    path = nixHomeDir + "/pkg/" + id + "-" + (string) hash;
 
     /* Create the path. */
     if (mkdir(path.c_str(), 0777))
         throw Error("unable to create directory " + path);
 
     /* Create a log file. */
-    string logFileName = nixLogDir + "/" + id + "-" + hash + ".log";
+    string logFileName = 
+        nixLogDir + "/" + id + "-" + (string) hash + ".log";
     /* !!! auto-pclose on exit */
     FILE * logFile = popen(("tee " + logFileName + " >&2").c_str(), "w"); /* !!! escaping */
     if (!logFile)
@@ -256,11 +258,11 @@ void installPkg(string hash)
                 }
 
                 /* Try to use a prebuilt. */
-                string prebuiltHash, prebuiltFile;
-                if (queryDB(nixDB, dbPrebuilts, hash, prebuiltHash)) {
+                string prebuiltHashS, prebuiltFile;
+                if (queryDB(nixDB, dbPrebuilts, hash, prebuiltHashS)) {
 
                     try {
-                        prebuiltFile = getFile(prebuiltHash);
+                        prebuiltFile = getFile(parseHash(prebuiltHashS));
                     } catch (Error e) {
                         cerr << "cannot obtain prebuilt (ignoring): " << e.what() << endl;
                         goto build;
@@ -339,17 +341,16 @@ void installPkg(string hash)
 }
 
 
-string getPkg(string hash)
+string getPkg(Hash hash)
 {
     string path;
-    checkHash(hash);
     while (!queryDB(nixDB, dbInstPkgs, hash, path))
         installPkg(hash);
     return path;
 }
 
 
-void runPkg(string hash, 
+void runPkg(Hash hash, 
     Strings::iterator firstArg, 
     Strings::iterator lastArg)
 {
@@ -389,7 +390,7 @@ void runPkg(string hash,
 }
 
 
-void ensurePkg(string hash)
+void ensurePkg(Hash hash)
 {
     Params pkgImports, fileImports, arguments;
     readPkgDescr(hash, pkgImports, fileImports, arguments);
@@ -403,10 +404,9 @@ void ensurePkg(string hash)
 }
 
 
-void delPkg(string hash)
+void delPkg(Hash hash)
 {
     string path;
-    checkHash(hash);
     if (queryDB(nixDB, dbInstPkgs, hash, path)) {
         int res = system(("chmod -R +w " + path + " && rm -rf " + path).c_str()); // !!! escaping
         delDB(nixDB, dbInstPkgs, hash); // not a bug ??? 
@@ -423,7 +423,7 @@ void exportPkgs(string outDir,
     outDir = absPath(outDir);
 
     for (Strings::iterator it = firstHash; it != lastHash; it++) {
-        string hash = *it;
+        Hash hash = parseHash(*it);
         string pkgDir = getPkg(hash);
         string tmpFile = outDir + "/export_tmp";
 
@@ -435,42 +435,38 @@ void exportPkgs(string outDir,
         string prebuiltHash = hashFile(tmpFile);
         string pkgId = queryPkgId(hash);
         string prebuiltFile = outDir + "/" +
-            pkgId + "-" + hash + "-" + prebuiltHash + ".tar.bz2";
+            pkgId + "-" + (string) hash + "-" + prebuiltHash + ".tar.bz2";
         
         rename(tmpFile.c_str(), prebuiltFile.c_str());
     }
 }
 
 
-void registerPrebuilt(string pkgHash, string prebuiltHash)
+void registerPrebuilt(Hash pkgHash, Hash prebuiltHash)
 {
-    checkHash(pkgHash);
-    checkHash(prebuiltHash);
     setDB(nixDB, dbPrebuilts, pkgHash, prebuiltHash);
 }
 
 
-string registerFile(string filename)
+Hash registerFile(string filename)
 {
     filename = absPath(filename);
-    string hash = hashFile(filename);
+    Hash hash = hashFile(filename);
     setDB(nixDB, dbRefs, hash, filename);
     return hash;
 }
 
 
-void registerURL(string hash, string url)
+void registerURL(Hash hash, string url)
 {
-    checkHash(hash);
     setDB(nixDB, dbNetSources, hash, url);
     /* !!! currently we allow only one network source per hash */
 }
 
 
 /* This is primarily used for bootstrapping. */
-void registerInstalledPkg(string hash, string path)
+void registerInstalledPkg(Hash hash, string path)
 {
-    checkHash(hash);
     if (path == "")
         delDB(nixDB, dbInstPkgs, hash);
     else
@@ -498,12 +494,13 @@ void verifyDB()
          it != fileRefs.end(); it++)
     {
         try {
-            if (hashFile(it->second) != it->first) {
+            Hash hash = parseHash(it->first);
+            if (hashFile(it->second) != hash) {
                 cerr << "file " << it->second << " has changed\n";
                 delDB(nixDB, dbRefs, it->first);
             }
-        } catch (BadRefError e) { /* !!! better error check */ 
-            cerr << "file " << it->second << " has disappeared\n";
+        } catch (Error e) { /* !!! better error check */ 
+            cerr << "error: " << e.what() << endl;
             delDB(nixDB, dbRefs, it->first);
         }
     }
@@ -544,7 +541,7 @@ void printInfo(Strings::iterator first, Strings::iterator last)
 {
     for (Strings::iterator it = first; it != last; it++) {
         try {
-            cout << *it << " " << queryPkgId(*it) << endl;
+            cout << *it << " " << queryPkgId(parseHash(*it)) << endl;
         } catch (Error & e) { // !!! more specific
             cout << *it << " (descriptor missing)\n";
         }
@@ -559,7 +556,7 @@ void computeClosure(Strings::iterator first, Strings::iterator last,
     set<string> doneSet;
 
     while (!workList.empty()) {
-        string hash = workList.front();
+        Hash hash = parseHash(workList.front());
         workList.pop_front();
         
         if (doneSet.find(hash) == doneSet.end()) {
@@ -605,7 +602,7 @@ void printGraph(Strings::iterator first, Strings::iterator last)
          it != allHashes.end(); it++)
     {
         Params pkgImports, fileImports, arguments;
-        readPkgDescr(*it, pkgImports, fileImports, arguments);
+        readPkgDescr(parseHash(*it), pkgImports, fileImports, arguments);
 
         cout << dotQuote(*it) << "[label = \"" 
              << getFromEnv(arguments, "id")
@@ -633,8 +630,8 @@ void fetch(string id)
     }
 
     /* Register it by hash. */
-    string hash = registerFile(fn);
-    cout << hash << endl;
+    Hash hash = registerFile(fn);
+    cout << (string) hash << endl;
 }
 
 
@@ -648,60 +645,60 @@ void fetch(Strings::iterator first, Strings::iterator last)
 void printUsage()
 {
     cerr <<
-"Usage: nix SUBCOMMAND OPTIONS...
-
-Subcommands:
-
-  init
-    Initialize the database.
-
-  verify
-    Remove stale entries from the database.
-
-  regfile FILENAME...
-    Register each FILENAME keyed by its hash.
-
-  reginst HASH PATH
-    Register an installed package.
-
-  getpkg HASH...
-    For each HASH, ensure that the package referenced by HASH is
-    installed. Print out the path of the installation on stdout.
-
-  delpkg HASH...
-    Uninstall the package referenced by each HASH, disregarding any
-    dependencies that other packages may have on HASH.
-
-  listinst
-    Prints a list of installed packages.
-
-  run HASH ARGS...
-    Run the descriptor referenced by HASH with the given arguments.
-
-  ensure HASH...
-    Like getpkg, but if HASH refers to a run descriptor, fetch only
-    the dependencies.
-
-  export DIR HASH...
-    Export installed packages to DIR.
-
-  regprebuilt HASH1 HASH2
-    Inform Nix that an export HASH2 can be used to fast-build HASH1.
-
-  info HASH...
-    Print information about the specified descriptors.
-
-  closure HASH...
-    Determine the closure of the set of descriptors under the import
-    relation, starting at the given roots.
-
-  graph HASH...
-    Like closure, but print a dot graph specification.
-
-  fetch ID...  
-    Fetch the objects identified by ID and place them in the Nix
-    sources directory.  ID can be a hash or URL.  Print out the hash
-    of the object.
+"Usage: nix SUBCOMMAND OPTIONS...\n\
+\n\
+Subcommands:\n\
+\n\
+  init\n\
+    Initialize the database.\n\
+\n\
+  verify\n\
+    Remove stale entries from the database.\n\
+\n\
+  regfile FILENAME...\n\
+    Register each FILENAME keyed by its hash.\n\
+\n\
+  reginst HASH PATH\n\
+    Register an installed package.\n\
+\n\
+  getpkg HASH...\n\
+    For each HASH, ensure that the package referenced by HASH is\n\
+    installed. Print out the path of the installation on stdout.\n\
+\n\
+  delpkg HASH...\n\
+    Uninstall the package referenced by each HASH, disregarding any\n\
+    dependencies that other packages may have on HASH.\n\
+\n\
+  listinst\n\
+    Prints a list of installed packages.\n\
+\n\
+  run HASH ARGS...\n\
+    Run the descriptor referenced by HASH with the given arguments.\n\
+\n\
+  ensure HASH...\n\
+    Like getpkg, but if HASH refers to a run descriptor, fetch only\n\
+    the dependencies.\n\
+\n\
+  export DIR HASH...\n\
+    Export installed packages to DIR.\n\
+\n\
+  regprebuilt HASH1 HASH2\n\
+    Inform Nix that an export HASH2 can be used to fast-build HASH1.\n\
+\n\
+  info HASH...\n\
+    Print information about the specified descriptors.\n\
+\n\
+  closure HASH...\n\
+    Determine the closure of the set of descriptors under the import\n\
+    relation, starting at the given roots.\n\
+\n\
+  graph HASH...\n\
+    Like closure, but print a dot graph specification.\n\
+\n\
+  fetch ID...\n\
+    Fetch the objects identified by ID and place them in the Nix\n\
+    sources directory.  ID can be a hash or URL.  Print out the hash\n\
+    of the object.\n\
 ";
 }
 
@@ -743,29 +740,31 @@ void run(Strings::iterator argCur, Strings::iterator argEnd)
         verifyDB();
     } else if (cmd == "getpkg") {
         for (Strings::iterator it = argCur; it != argEnd; it++) {
-            string path = getPkg(*it);
+            string path = getPkg(parseHash(*it));
             cout << path << endl;
         }
     } else if (cmd == "delpkg") {
-        for_each(argCur, argEnd, delPkg);
+        for (Strings::iterator it = argCur; it != argEnd; it++)
+            delPkg(parseHash(*it));
     } else if (cmd == "run") {
         if (argc < 1) throw argcError;
-        runPkg(*argCur, argCur + 1, argEnd);
+        runPkg(parseHash(*argCur), argCur + 1, argEnd);
     } else if (cmd == "ensure") {
-        for_each(argCur, argEnd, ensurePkg);
+        for (Strings::iterator it = argCur; it != argEnd; it++)
+            ensurePkg(parseHash(*it));
     } else if (cmd == "export") {
         if (argc < 1) throw argcError;
         exportPkgs(*argCur, argCur + 1, argEnd);
     } else if (cmd == "regprebuilt") {
         if (argc != 2) throw argcError;
-        registerPrebuilt(*argCur, argCur[1]);
+        registerPrebuilt(parseHash(argCur[0]), parseHash(argCur[1]));
     } else if (cmd == "regfile") {
         for_each(argCur, argEnd, registerFile);
     } else if (cmd == "regurl") {
-        registerURL(argCur[0], argCur[1]);
+        registerURL(parseHash(argCur[0]), argCur[1]);
     } else if (cmd == "reginst") {
         if (argc != 2) throw argcError;
-        registerInstalledPkg(*argCur, argCur[1]);
+        registerInstalledPkg(parseHash(argCur[0]), argCur[1]);
     } else if (cmd == "listinst") {
         if (argc != 0) throw argcError;
         listInstalledPkgs();

@@ -10,6 +10,7 @@ extern "C" {
 }
 
 #include "util.hh"
+#include "hash.hh"
 
 
 static string nixDescriptorDir;
@@ -20,7 +21,7 @@ static bool verbose = false;
 
 /* Mapping of Fix file names to the hashes of the resulting Nix
    descriptors. */
-typedef map<string, string> DescriptorMap;
+typedef map<string, Hash> DescriptorMap;
 
 
 void registerFile(string filename)
@@ -32,12 +33,13 @@ void registerFile(string filename)
 }
 
 
-void registerURL(string hash, string url)
+void registerURL(Hash hash, string url)
 {
-    int res = system(("nix regurl " + hash + " " + url).c_str());
+    int res = system(("nix regurl " + (string) hash + " " + url).c_str());
     /* !!! escape */
     if (WEXITSTATUS(res) != 0)
-        throw Error("cannot register " + hash + " -> " + url + " with Nix");
+        throw Error("cannot register " + 
+            (string) hash + " -> " + url + " with Nix");
 }
 
 
@@ -61,7 +63,7 @@ struct EvalContext
 
 
 ATerm evaluate(ATerm e, EvalContext ctx);
-string instantiateDescriptor(string filename, EvalContext ctx);
+Hash instantiateDescriptor(string filename, EvalContext ctx);
 
 
 string evaluateStr(ATerm e, EvalContext ctx)
@@ -101,7 +103,7 @@ ATerm evaluate(ATerm e, EvalContext ctx)
         ATmatch(e, "Pkg(<str>)", &s) || 
         ATmatch(e, "File(<str>)", &s))
     {
-        checkHash(s);
+        parseHash(s);
         return e;
     }
 
@@ -131,7 +133,7 @@ ATerm evaluate(ATerm e, EvalContext ctx)
     else if (ATmatch(e, "Fix(<term>)", &e2)) {
         string filename = absPath(evaluateStr(e2, ctx), ctx.dir); /* !!! */
         return ATmake("Pkg(<str>)",
-            instantiateDescriptor(filename, ctx).c_str());
+            ((string) instantiateDescriptor(filename, ctx)).c_str());
     }
 
 #if 0
@@ -160,19 +162,18 @@ ATerm evaluate(ATerm e, EvalContext ctx)
        hash. */
     else if (ATmatch(e, "Local(<term>)", &e2)) {
         string filename = absPath(evaluateStr(e2, ctx), ctx.dir); /* !!! */
-        string hash = hashFile(filename);
+        Hash hash = hashFile(filename);
         registerFile(filename); /* !!! */
-        return ATmake("File(<str>)", hash.c_str());
+        return ATmake("File(<str>)", ((string) hash).c_str());
     }
 
     /* `Url' registers a mapping from a hash to an url with Nix, and
        returns the hash. */
     else if (ATmatch(e, "Url(<term>, <term>)", &e2, &e3)) {
-        string hash = evaluateStr(e2, ctx);
-        checkHash(hash);
+        Hash hash = parseHash(evaluateStr(e2, ctx));
         string url = evaluateStr(e3, ctx);
         registerURL(hash, url);
-        return ATmake("File(<str>)", hash.c_str());
+        return ATmake("File(<str>)", ((string) hash).c_str());
     }
 
     /* `If' provides conditional evaluation. */
@@ -199,7 +200,7 @@ string getStringFromMap(BindingsMap & bindingsMap,
 
 /* Instantiate a Fix descriptors into a Nix descriptor, recursively
    instantiating referenced descriptors as well. */
-string instantiateDescriptor(string filename, EvalContext ctx)
+Hash instantiateDescriptor(string filename, EvalContext ctx)
 {
     /* Already done? */
     DescriptorMap::iterator isInMap = ctx.done->find(filename);
@@ -256,8 +257,9 @@ string instantiateDescriptor(string filename, EvalContext ctx)
     if (!ATwriteToNamedTextFile(outTerm, tmpFilename.c_str()))
         throw Error("cannot write aterm to " + tmpFilename);
 
-    string outHash = hashFile(tmpFilename);
-    string outFilename = nixDescriptorDir + "/" + id + "-" + outHash + ".nix";
+    Hash outHash = hashFile(tmpFilename);
+    string outFilename = nixDescriptorDir + "/" + 
+        id + "-" + (string) outHash + ".nix";
     if (rename(tmpFilename.c_str(), outFilename.c_str()))
         throw Error("cannot rename " + tmpFilename + " to " + outFilename);
 
@@ -265,7 +267,8 @@ string instantiateDescriptor(string filename, EvalContext ctx)
     registerFile(outFilename);
 
     if (verbose)
-        cerr << "instantiated " << outHash << " from " << filename << endl;
+        cerr << "instantiated " << (string) outHash 
+             << " from " << filename << endl;
 
     (*ctx.done)[filename] = outHash;
     return outHash;
@@ -284,7 +287,7 @@ void instantiateDescriptors(Strings filenames)
          it != filenames.end(); it++)
     {
         string filename = absPath(*it);
-        cout << instantiateDescriptor(filename, ctx) << endl;
+        cout << (string) instantiateDescriptor(filename, ctx) << endl;
     }
 }
 
@@ -293,7 +296,7 @@ void instantiateDescriptors(Strings filenames)
 void printUsage()
 {
     cerr <<
-"Usage: fix ...
+"Usage: fix ...\n\
 ";
 }
 

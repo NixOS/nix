@@ -27,53 +27,6 @@ string absPath(string filename, string dir)
 }
 
 
-static string printHash(unsigned char * buf)
-{
-    ostringstream str;
-    for (int i = 0; i < 16; i++) {
-        str.fill('0');
-        str.width(2);
-        str << hex << (int) buf[i];
-    }
-    return str.str();
-}
-
-    
-/* Verify that a reference is valid (that is, is a MD5 hash code). */
-bool isHash(const string & s)
-{
-    if (s.length() != 32) return false;
-    for (int i = 0; i < 32; i++) {
-        char c = s[i];
-        if (!((c >= '0' && c <= '9') ||
-              (c >= 'a' && c <= 'f')))
-            return false;
-    }
-    return true;
-}
-
-
-void checkHash(const string & s)
-{
-    if (!isHash(s)) throw BadRefError("invalid reference: " + s);
-}
-
-
-/* Compute the MD5 hash of a file. */
-string hashFile(string filename)
-{
-    unsigned char hash[16];
-    FILE * file = fopen(filename.c_str(), "rb");
-    if (!file)
-        throw BadRefError("file `" + filename + "' does not exist");
-    int err = md5_stream(file, hash);
-    fclose(file);
-    if (err) throw BadRefError("cannot hash file");
-    return printHash(hash);
-}
-
-
-
 /* Return the directory part of the given path, i.e., everything
    before the final `/'. */
 string dirOf(string s)

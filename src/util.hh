@@ -7,10 +7,6 @@
 
 #include <unistd.h>
 
-extern "C" {
-#include "md5.h"
-}
-
 using namespace std;
 
 
@@ -29,12 +25,6 @@ public:
     UsageError(string _err) : Error(_err) { };
 };
 
-class BadRefError : public Error
-{
-public:
-    BadRefError(string _err) : Error(_err) { };
-};
-
 
 typedef vector<string> Strings;
 
@@ -50,9 +40,6 @@ extern string nixHomeDirEnvVar;
 
 
 string absPath(string filename, string dir = "");
-bool isHash(const string & s);
-void checkHash(const string & s);
-string hashFile(string filename);
 string dirOf(string s);
 string baseNameOf(string s);
 

@@ -1,12 +1,15 @@
 bin_PROGRAMS = nix fix
+noinst_PROGRAMS = test
 
 AM_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall
 
-nix_SOURCES = nix.cc db.cc util.cc md5.c
+nix_SOURCES = nix.cc db.cc util.cc hash.cc md5.c
 nix_LDADD = -ldb_cxx-4 -lATerm
 
-fix_SOURCES = fix.cc util.cc md5.c
+fix_SOURCES = fix.cc util.cc hash.cc md5.c
 fix_LDADD = -lATerm
+
+test_SOURCES = test.cc util.cc hash.cc md5.c
 
 install-data-local:
 	$(INSTALL) -d $(localstatedir)/nix
