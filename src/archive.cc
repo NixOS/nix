@@ -1,3 +1,5 @@
+#include <vector>
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -44,7 +46,7 @@ static void dumpEntries(const string & path, DumpSink & sink)
     DIR * dir = opendir(path.c_str());
     if (!dir) throw SysError("opening directory " + path);
 
-    Strings names;
+    vector<string> names;
 
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir)) {
@@ -56,7 +58,7 @@ static void dumpEntries(const string & path, DumpSink & sink)
 
     sort(names.begin(), names.end());
 
-    for (Strings::iterator it = names.begin();
+    for (vector<string>::iterator it = names.begin();
          it != names.end(); it++)
     {
         writeString("entry", sink);
@@ -133,4 +135,9 @@ void dumpPath(const string & path, DumpSink & sink)
     else throw Error("unknown file type: " + path);
 
     writeString(")", sink);
+}
+
+
+void restorePath(const string & path, ReadSource & source)
+{
 }

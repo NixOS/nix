@@ -2,7 +2,7 @@
 #define __UTIL_H
 
 #include <string>
-#include <vector>
+#include <list>
 #include <sstream>
 
 #include <unistd.h>
@@ -34,7 +34,7 @@ public:
 };
 
 
-typedef vector<string> Strings;
+typedef list<string> Strings;
 
 
 /* The canonical system name, as returned by config.guess. */ 

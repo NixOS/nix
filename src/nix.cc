@@ -11,34 +11,94 @@
 typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
 
-/* Parse a supposed value argument.  This can be a hash (the simple
-   case), a symbolic name (in which case we do a lookup to obtain the
-   hash), or a file name (which we import to obtain the hash).  Note
-   that in order to disambiguate between symbolic names and file
-   names, a file name should contain at least one `/'. */
-Hash parseValueArg(string s)
-{
-    try {
-        return parseHash(s);
-    } catch (BadRefError e) { };
+typedef enum { atpHash, atpName, atpPath, atpUnknown } ArgType;
 
-    if (s.find('/') != string::npos) {
-        return addValue(s);
-    } else {
-        throw Error("not implemented");
+static ArgType argType = atpUnknown;
+
+
+/* Nix syntax:
+
+   nix [OPTIONS...] [ARGUMENTS...]
+
+   Operations:
+
+     --evaluate / -e: evaluate values
+     --delete / -d: delete values
+     --query / -q: query stored values
+     --add: add values
+     --verify: verify Nix structures
+     --dump: dump a file or value
+     --init: initialise the Nix database
+     --version: output version information
+     --help: display help
+
+   Source selection for operations that work on values:
+
+     --file / -f: by file name
+     --hash / -h: by hash
+     --name / -n: by symbolic name
+
+   Query suboptions:
+
+     Selection:
+
+     --all / -a: query all stored values, otherwise given values
+
+     Information:
+
+     --info / -i: general value information
+
+   Options:
+
+     --verbose / -v: verbose operation
+*/
+
+
+/* Parse the `-f' / `-h' / `-n' flags, i.e., the type of value
+   arguments.  These flags are deleted from the referenced vector. */
+void getArgType(Strings & flags)
+{
+    for (Strings::iterator it = flags.begin();
+         it != flags.end(); )
+    {
+        string arg = *it;
+        ArgType tp;
+        if (arg == "--hash" || arg == "-h")
+            tp = atpHash;
+        else if (arg == "--name" || arg == "-n")
+            tp = atpName;
+        else if (arg == "--file" || arg == "-f")
+            tp = atpPath;
+        else {
+            it++;
+            continue;
+        }
+        if (argType != atpUnknown)
+            throw UsageError("only one argument type specified may be specified");
+        argType = tp;
+        it = flags.erase(it);
     }
+    if (argType == atpUnknown)
+        throw UsageError("argument type not specified");
 }
 
 
 /* Evaluate values. */
 static void opEvaluate(Strings opFlags, Strings opArgs)
 {
+    getArgType(opFlags);
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
     for (Strings::iterator it = opArgs.begin();
          it != opArgs.end(); it++)
     {
-        Hash hash = parseValueArg(*it);
+        Hash hash;
+        if (argType == atpHash)
+            hash = parseHash(*it);
+        else if (argType == atpName)
+            throw Error("not implemented");
+        else if (argType == atpPath)
+            hash = addValue(*it);
         Expr e = ATmake("Deref(Hash(<str>))", ((string) hash).c_str());
         cerr << printExpr(evalValue(e)) << endl;
     }
@@ -47,6 +107,8 @@ static void opEvaluate(Strings opFlags, Strings opArgs)
 
 static void opDelete(Strings opFlags, Strings opArgs)
 {
+    getArgType(opFlags);
+
     cerr << "delete!\n";
 }
 
@@ -55,6 +117,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
    those values. */
 static void opAdd(Strings opFlags, Strings opArgs)
 {
+    getArgType(opFlags);
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
     for (Strings::iterator it = opArgs.begin();
@@ -78,11 +141,22 @@ struct StdoutSink : DumpSink
 /* Dump a value to standard output */
 static void opDump(Strings opFlags, Strings opArgs)
 {
+    getArgType(opFlags);
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (opArgs.size() != 1) throw UsageError("only one argument allowed");
 
     StdoutSink sink;
-    dumpPath(opArgs[0], sink);
+    string arg = *opArgs.begin();
+    string path;
+    
+    if (argType == atpHash)
+        path = queryValuePath(parseHash(arg));
+    else if (argType == atpName)
+        throw Error("not implemented");
+    else if (argType == atpPath)
+        path = arg;
+
+    dumpPath(*opArgs.begin(), sink);
 }
 
 
@@ -96,59 +170,43 @@ static void opInit(Strings opFlags, Strings opArgs)
 }
 
 
-/* Nix syntax:
-
-   nix [OPTIONS...] [ARGUMENTS...]
-
-   Operations:
-
-     --evaluate / -e: evaluate values
-     --delete / -d: delete values
-     --query / -q: query stored values
-     --add: add values
-     --verify: verify Nix structures
-     --dump: dump a file or value
-     --init: initialise the Nix database
-     --version: output version information
-     --help: display help
-
-   Operations that work on values accept the hash code of a value, the
-   symbolic name of a value, or a file name of a external value that
-   will be added prior to the operation.
-
-   Query suboptions:
-
-     Selection:
-
-     --all / -a: query all stored values, otherwise given values
-
-     Information:
-
-     --info / -i: general value information
-
-   Options:
-
-     --verbose / -v: verbose operation
-*/
-
 /* Initialize, process arguments, and dispatch to the right
    operation. */
-void run(Strings::iterator argCur, Strings::iterator argEnd)
+void run(int argc, char * * argv)
 {
-    Strings opFlags, opArgs;
-    Operation op = 0;
-
     /* Setup Nix paths. */
     nixValues = NIX_VALUES_DIR;
     nixLogDir = NIX_LOG_DIR;
     nixDB = (string) NIX_STATE_DIR + "/nixstate.db";
 
+    /* Put the arguments in a vector. */
+    Strings args;
+    while (argc--) args.push_back(*argv++);
+    args.erase(args.begin());
+    
+    /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f'). */
+    for (Strings::iterator it = args.begin();
+         it != args.end(); )
+    {
+        string arg = *it;
+        if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-') {
+            for (unsigned int i = 1; i < arg.length(); i++)
+                args.insert(it, (string) "-" + arg[i]);
+            it = args.erase(it);
+        } else it++;
+    }
+
+    Strings opFlags, opArgs;
+    Operation op = 0;
+
     /* Scan the arguments; find the operation, set global flags, put
        all other flags in a list, and put all other arguments in
        another list. */
 
-    while (argCur != argEnd) {
-        string arg = *argCur++;
+    for (Strings::iterator it = args.begin();
+         it != args.end(); it++)
+    {
+        string arg = *it;
 
         Operation oldOp = op;
 
@@ -184,9 +242,7 @@ int main(int argc, char * * argv)
     ATinit(argc, argv, &bottomOfStack);
 
     try {
-        Strings args;
-        while (argc--) args.push_back(*argv++);
-        run(args.begin() + 1, args.end());
+        run(argc, argv);
     } catch (UsageError & e) {
         cerr << "error: " << e.what() << endl
              << "Try `nix --help' for more information.\n";

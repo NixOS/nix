@@ -46,3 +46,13 @@ struct DumpSink
 };
 
 void dumpPath(const string & path, DumpSink & sink);
+
+
+struct ReadSource
+{
+    /* The callee should store exactly *len bytes in the buffer
+       pointed to by data.  It should block if that much data is not
+       yet available, or throw an error if it is not going to be
+       available. */
+    virtual void operator () (const unsigned char * data, unsigned int len) = 0;
+};
