@@ -20,10 +20,16 @@ chomp $id;
 my $nr = 0;
 while (-e "$linkdir/$id-$nr") { $nr++; }
 my $link = "$linkdir/$id-$nr";
-print "$pkgdir\n";
 
 # Create a symlink from $link to $pkgdir.
 symlink($pkgdir, $link) or die "cannot create $link";
+
+# Also store the hash of $pkgdir.  This is useful for garbage
+# collection and the like.
+my $hashfile = "$linkdir/$id-$nr.hash";
+open HASH, "> $hashfile" or die "cannot create $hashfile";
+print HASH "$hash\n";
+close HASH;
 
 # Make $link the current generation by pointing $linkdir/current to
 # it.  The rename() system call is supposed to be essentially atomic
