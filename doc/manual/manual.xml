@@ -11,11 +11,14 @@
 <!ENTITY nix-instantiate SYSTEM "nix-instantiate.xml">
 <!ENTITY troubleshooting SYSTEM "troubleshooting.xml">
 <!ENTITY bugs SYSTEM "bugs.xml">
+<!ENTITY version SYSTEM "version.xml">
 ]>
 
 <book>
   <title>Nix: A System for Software Deployment</title>
 
+  <subtitle>Draft (Version &version;)</subtitle>
+  
   <bookinfo>
     <author>
       <firstname>Eelco</firstname>

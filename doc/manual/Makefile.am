@@ -11,9 +11,12 @@ SOURCES = manual.xml introduction.xml installation.xml overview.xml \
  troubleshooting.xml bugs.xml \
  style.css images
 
-manual.is-valid: $(SOURCES)
+manual.is-valid: $(SOURCES) version.xml
 	$(XMLLINT) --noout --valid manual.xml
 	touch $@
+
+version.xml:
+	echo -n $(VERSION) > version.xml
 
 man1_MANS = nix-store.1 nix-instantiate.1
 
@@ -38,6 +41,8 @@ images:
 	cp $(docbookxsl)/images/callouts/*.png images/callouts
 	chmod +w -R images
 
-EXTRA_DIST = $(SOURCES) manual.html manual.is-valid $(MANS) 
+KEEP = manual.html manual.is-valid version.xml $(MANS)
 
-DISTCLEANFILES = manual.html manual.is-valid $(MANS)
+EXTRA_DIST = $(SOURCES) $(KEEP)
+
+DISTCLEANFILES = $(KEEP)
