@@ -111,9 +111,17 @@ void runProgram(const string & program,
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
 	if (keepFailed) {
 	    msg(lvlTalkative, 
-		format("build failed; keeping build directory `%1%'") % tmpDir);
+		format("program `%1%' failed; keeping build directory `%2%'")
+                % program % tmpDir);
 	    delTmpDir.cancel();
 	}
-        throw Error("unable to build package");
+        if (WIFEXITED(status))
+            throw Error(format("program `%1%' failed with exit code %2%")
+                % program % WEXITSTATUS(status));
+        else if (WIFSIGNALED(status))
+            throw Error(format("program `%1%' failed due to signal %2%")
+                % program % WTERMSIG(status));
+        else
+            throw Error(format("program `%1%' died abnormally") % program);
     }
 }

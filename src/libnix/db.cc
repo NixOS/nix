@@ -251,7 +251,6 @@ void Database::close()
         for (map<TableId, Db *>::iterator i = tables.begin();
              i != tables.end(); i++)
         {
-            debug(format("closing table %1%") % i->first);
             Db * db = i->second;
             db->close(DB_NOSYNC);
             delete db;
