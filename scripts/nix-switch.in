@@ -13,7 +13,7 @@ while ($argnr < scalar @ARGV) {
     if ($arg eq "--keep") { $keep = 1; }
     elsif ($arg eq "--source-root") { $sourceroot = 1; }
     elsif ($arg eq "--name") { $name = $ARGV[$argnr++]; }
-    elsif ($arg =~ /^([0-9a-z]{32})$/) { $srcid = $arg; }
+    elsif ($arg =~ /^\//) { $srcid = $arg; }
     else { die "unknown argument `$arg'" };
 }
 
@@ -23,7 +23,7 @@ my $linkdir = "@localstatedir@/nix/links";
 my $nfid = `nix --install $srcid`;
 if ($?) { die "`nix --install' failed"; }
 chomp $nfid;
-die unless $nfid =~ /^([0-9a-z]{32})$/;
+die unless $nfid =~ /^\//;
 
 my $pkgdir = `nix --query --list $nfid`;
 if ($?) { die "`nix --query --list' failed"; }
