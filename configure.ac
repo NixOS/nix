@@ -32,7 +32,7 @@ AC_ARG_WITH(docbook-xsl, AC_HELP_STRING([--with-docbook-xsl=PATH],
   docbookxsl=$withval, docbookxsl=/docbook-xsl-missing)
 AC_SUBST(docbookxsl)
 
-AC_ARG_WITH(xml-flags, AC_HELP_STRING([--xml-flags=FLAGS],
+AC_ARG_WITH(xml-flags, AC_HELP_STRING([--with-xml-flags=FLAGS],
   [extra flags to be passed to xmllint and xsltproc]),
   xmlflags=$withval, xmlflags=)
 AC_SUBST(xmlflags)
