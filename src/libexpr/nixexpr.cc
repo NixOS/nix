@@ -4,6 +4,7 @@
 
 ATermMap::ATermMap(unsigned int initialSize, unsigned int maxLoadPct)
 {
+    this->maxLoadPct = maxLoadPct;
     table = ATtableCreate(initialSize, maxLoadPct);
     if (!table) throw Error("cannot create ATerm table");
 }
@@ -15,7 +16,8 @@ ATermMap::ATermMap(const ATermMap & map)
     ATermList keys = map.keys();
 
     /* !!! adjust allocation for load pct */
-    table = ATtableCreate(ATgetLength(keys), map.maxLoadPct);
+    maxLoadPct = map.maxLoadPct;
+    table = ATtableCreate(ATgetLength(keys), maxLoadPct);
     if (!table) throw Error("cannot create ATerm table");
 
     for (ATermIterator i(keys); i; ++i)
