@@ -25,6 +25,7 @@ void run(Strings args)
             if (i == args.end()) throw UsageError("`--type' requires an argument");
             if (*i == "md5") ht = htMD5;
             else if (*i == "sha1") ht = htSHA1;
+            else if (*i == "sha256") ht = htSHA256;
             else throw UsageError(format("unknown hash type `%1%'") % *i);
         }
         else

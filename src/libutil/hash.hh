@@ -8,11 +8,12 @@
 using namespace std;
 
 
-typedef enum { htMD5, htSHA1 } HashType;
+typedef enum { htMD5, htSHA1, htSHA256 } HashType;
 
 
 const int md5HashSize = 16;
 const int sha1HashSize = 20;
+const int sha256HashSize = 32;
 
 
 struct Hash
@@ -53,8 +54,7 @@ Hash hashString(const string & s, HashType ht);
 Hash hashFile(const Path & path, HashType ht);
 
 /* Compute the hash of the given path.  The hash is defined as
-   md5(dump(path)).
-*/
+   md5(dump(path)). */
 Hash hashPath(const Path & path, HashType ht);
 
 

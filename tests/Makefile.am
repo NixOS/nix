@@ -23,7 +23,7 @@ substitutes.sh: substitutes.nix substituter.nix
 substitutes2.sh: substitutes2.nix substituter.nix substituter2.nix
 fallback.sh: fallback.nix
 
-TESTS = init.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
+TESTS = init.sh hash.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
   build-hook.sh substitutes.sh substitutes2.sh fallback.sh verify.sh
 
 XFAIL_TESTS =

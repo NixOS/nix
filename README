@@ -1,5 +1,9 @@
-                             *** Nix ***
-
 For installation and usage instructions, please read the manual, which
 can be found in `docs/manual/manual.html', and additionally at the Nix
 website at <http://www.cs.uu.nl/groups/ST/Trace/Nix>.
+
+
+Acknowledgments
+
+This product includes software developed by the OpenSSL Project for
+use in the OpenSSL Toolkit (http://www.OpenSSL.org/)

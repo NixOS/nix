@@ -3,6 +3,7 @@
 extern "C" {
 #include "md5.h"
 #include "sha1.h"
+#include "sha256.h"
 }
 
 #include "hash.hh"
@@ -19,6 +20,7 @@ Hash::Hash(HashType type)
     this->type = type;
     if (type == htMD5) hashSize = md5HashSize;
     else if (type == htSHA1) hashSize = sha1HashSize;
+    else if (type == htSHA256) hashSize = sha256HashSize;
     else throw Error("unknown hash type");
     memset(hash, 0, hashSize);
 }
@@ -96,6 +98,7 @@ struct Ctx
 {
     md5_ctx md5;
     sha_ctx sha1;
+    SHA256_CTX sha256;
 };
 
 
@@ -103,6 +106,7 @@ static void start(HashType ht, Ctx & ctx)
 {
     if (ht == htMD5) md5_init_ctx(&ctx.md5);
     else if (ht == htSHA1) sha_init(&ctx.sha1);
+    else if (ht == htSHA256) SHA256_Init(&ctx.sha256);
 }
 
 
@@ -111,6 +115,7 @@ static void update(HashType ht, Ctx & ctx,
 {
     if (ht == htMD5) md5_process_bytes(bytes, len, &ctx.md5);
     else if (ht == htSHA1) sha_update(&ctx.sha1, bytes, len);
+    else if (ht == htSHA256) SHA256_Update(&ctx.sha256, bytes, len);
 }
 
 
@@ -121,6 +126,7 @@ static void finish(HashType ht, Ctx & ctx, unsigned char * hash)
         sha_final(&ctx.sha1);
         sha_digest(&ctx.sha1, hash);
     }
+    else if (ht == htSHA256) SHA256_Final(hash, &ctx.sha256);
 }
 
 
