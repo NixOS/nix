@@ -1,20 +1,11 @@
-#if test -z "$NIX_SET"; then
+if test -n "$HOME"; then
+    NIX_LINK="$HOME/.nix-userenv"
 
-#    export NIX_SET=1
+    if ! test -a "$NIX_LINK"; then
+        echo "creating $NIX_LINK"
+        _NIX_DEF_LINK=@localstatedir@/nix/links/current
+        ln -s "$_NIX_DEF_LINK" "$NIX_LINK"
+    fi
 
-    NIX_LINKS=@localstatedir@/nix/links/current
-
-    export PATH=$NIX_LINKS/bin:@prefix@/bin:$PATH
-
-#    export LD_LIBRARY_PATH=$NIX_LINKS/lib:$LD_LIBRARY_PATH
-
-    export LIBRARY_PATH=$NIX_LINKS/lib:$LIBRARY_PATH
-
-    export C_INCLUDE_PATH=$NIX_LINKS/include:$C_INCLUDE_PATH
-    export CPLUS_INCLUDE_PATH=$NIX_LINKS/include:$CPLUS_INCLUDE_PATH
-
-    export PKG_CONFIG_PATH=$NIX_LINKS/lib/pkgconfig:$PKG_CONFIG_PATH
-
-#    export MANPATH=$NIX_LINKS/man:$MANPATH
-
-#fi
+    export PATH=$NIX_LINK/bin:@prefix@/bin:$PATH
+fi

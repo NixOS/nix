@@ -605,6 +605,26 @@ static void opQuery(Globals & globals,
 }
 
 
+static void opSwitchProfile(Globals & globals,
+    Strings opFlags, Strings opArgs)
+{
+    if (opFlags.size() > 0)
+        throw UsageError(format("unknown flags `%1%'") % opFlags.front());
+    if (opArgs.size() > 1)
+        throw UsageError(format("--profile takes at most one argument"));
+
+    string linkPath = 
+        opArgs.size() == 0 ? globals.linkPath : opArgs.front();
+
+    string homeDir(getenv("HOME"));
+    if (homeDir == "") throw Error("HOME environment variable not set");
+
+    string linkPathFinal = homeDir + "/.nix-userenv";
+    
+    switchLink(linkPathFinal, linkPath);
+}
+
+
 void run(Strings args)
 {
     /* Use a higher default verbosity (lvlInfo). */
@@ -635,6 +655,8 @@ void run(Strings args)
                 format("`%1%' requires an argument") % arg);
             globals.linkPath = absPath(*i);
         }
+        else if (arg == "--profile" || arg == "-p") 
+            op = opSwitchProfile;
         else if (arg[0] == '-')
             opFlags.push_back(arg);
         else

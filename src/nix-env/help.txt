@@ -12,6 +12,8 @@ Operations:
 The previous operations take a list of derivation names.  The special
 name `*' may be used to indicate all derivations.
 
+  --profile / -p [FILE]: switch to specified user environment 
+
   --version: output version information
   --help: display help
 
