@@ -903,14 +903,14 @@ bool DerivationGoal::prepareBuild()
                     % drvPath % *j % i->first);
     }
 
-    debug(format("added input paths %1%") % showPaths(inputPaths));
-
-    allPaths.insert(inputPaths.begin(), inputPaths.end());
-
     /* Second, the input sources. */
     for (PathSet::iterator i = drv.inputSrcs.begin();
          i != drv.inputSrcs.end(); ++i)
         computeFSClosure(*i, inputPaths);
+
+    debug(format("added input paths %1%") % showPaths(inputPaths));
+
+    allPaths.insert(inputPaths.begin(), inputPaths.end());
 
     return true;
 }

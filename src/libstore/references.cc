@@ -34,6 +34,8 @@ void checkPath(const string & path,
 {
     checkInterrupt();
     
+    debug(format("checking `%1%'") % path);
+
     struct stat st;
     if (lstat(path.c_str(), &st))
         throw SysError(format("getting attributes of path `%1%'") % path);
@@ -48,8 +50,6 @@ void checkPath(const string & path,
 
     else if (S_ISREG(st.st_mode)) {
         
-        debug(format("checking `%1%'") % path);
-
         AutoCloseFD fd = open(path.c_str(), O_RDONLY);
         if (fd == -1) throw SysError(format("opening file `%1%'") % path);
 
