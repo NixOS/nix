@@ -130,7 +130,6 @@ sub readManifest {
             }
             
             elsif (/^\s*StorePath:\s*(\/\S+)\s*$/) { $storePath = $1; }
-            elsif (/^\s*HashAlgo:\s*(\S+)\s*$/) { $hashAlgo = $1; }
             elsif (/^\s*Hash:\s*(\S+)\s*$/) { $hash = $1; }
             elsif (/^\s*URL:\s*(\S+)\s*$/) { $url = $1; }
             elsif (/^\s*Size:\s*(\d+)\s*$/) { $size = $1; }
@@ -145,7 +144,7 @@ sub readManifest {
 
             # Compatibility;
             elsif (/^\s*NarURL:\s*(\S+)\s*$/) { $url = $1; }
-            elsif (/^\s*MD5:\s*(\S+)\s*$/) { $hash = $1; }
+            elsif (/^\s*MD5:\s*(\S+)\s*$/) { $hash = "md5:$1"; }
 
         }
     }
@@ -173,13 +172,8 @@ sub writeManifest
         foreach my $narFile (@{$narFileList}) {
             print MANIFEST "{\n";
             print MANIFEST "  StorePath: $storePath\n";
-            print MANIFEST "  HashAlgo: $narFile->{hashAlgo}\n";
             print MANIFEST "  NarURL: $narFile->{url}\n";
-            if ($narFile->{hashAlgo} eq "md5") {
-                print MANIFEST "  MD5: $narFile->{hash}\n";
-            } else {
-                print MANIFEST "  Hash: $narFile->{hash}\n";
-            }
+            print MANIFEST "  Hash: $narFile->{hash}\n";
             print MANIFEST "  NarHash: $narFile->{narHash}\n";
             print MANIFEST "  Size: $narFile->{size}\n";
             print MANIFEST "  References: $narFile->{references}\n"
@@ -195,13 +189,8 @@ sub writeManifest
         foreach my $patch (@{$patchList}) {
             print MANIFEST "patch {\n";
             print MANIFEST "  StorePath: $storePath\n";
-            print MANIFEST "  HashAlgo: $patch->{hashAlgo}\n";
             print MANIFEST "  NarURL: $patch->{url}\n";
-            if ($patch->{hashAlgo} eq "md5") {
-                print MANIFEST "  MD5: $patch->{hash}\n";
-            } else {
-                print MANIFEST "  Hash: $patch->{hash}\n";
-            }
+            print MANIFEST "  Hash: $patch->{hash}\n";
             print MANIFEST "  NarHash: $patch->{narHash}\n";
             print MANIFEST "  Size: $patch->{size}\n";
             print MANIFEST "  BasePath: $patch->{basePath}\n";

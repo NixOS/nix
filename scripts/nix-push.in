@@ -148,12 +148,6 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     my $basename = $1;
     defined $basename or die;
 
-    my $narname = "$basename.nar.bz2";
-
-    my $narFile = "$narDir/$narname";
-    (-f $narFile) or die "narfile for $storePath not found";
-    push @narArchives, $narFile;
-
     open SHA1, "$narDir/narbz2-hash" or die "cannot open narbz2-hash";
     my $narbz2Hash = <SHA1>;
     chomp $narbz2Hash;
@@ -166,6 +160,12 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     $narHash =~ /^[0-9a-z]{32}$/ or die "invalid hash";
     close SHA1;
     
+    my $narName = "$narbz2Hash.nar.bz2";
+
+    my $narFile = "$narDir/$narName";
+    (-f $narFile) or die "narfile for $storePath not found";
+    push @narArchives, $narFile;
+
     my $narbz2Size = (stat $narFile)[7];
 
     my $references = `$binDir/nix-store --query --references '$storePath'`;
@@ -179,16 +179,15 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
 
     my $url;
     if ($localCopy) {
-        $url = "file://$localArchivesDir/$narname";
+        $url = "file://$localArchivesDir/$narName";
     } else {
-        $url = "$archivesGetURL/$narname";
+        $url = "$archivesGetURL/$narName";
     }
     $narFiles{$storePath} = [
         { url => $url
-        , hash => $narbz2Hash
+        , hash => "sha1:$narbz2Hash"
         , size => $narbz2Size
-        , narHash => $narHash
-        , hashAlgo => "sha1"
+        , narHash => "sha1:$narHash"
         , references => $references
         , deriver => $deriver
         }

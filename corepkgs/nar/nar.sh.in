@@ -5,7 +5,7 @@ export PATH=/bin:/usr/bin
 
 echo "packing $path into $out..."
 mkdir $out
-dst=$out/$(basename $path).nar.bz2
+dst=$out/tmp.nar.bz2
 @bindir@/nix-store --dump "$path" > tmp
 
 @bzip2@ < tmp > $dst
@@ -13,3 +13,5 @@ dst=$out/$(basename $path).nar.bz2
 @bindir@/nix-hash -vvvvv --flat --type sha1 --base32 tmp > $out/nar-hash
 
 @bindir@/nix-hash --flat --type sha1 --base32 $dst > $out/narbz2-hash
+
+mv $out/tmp.nar.bz2 $out/$(cat $out/narbz2-hash).nar.bz2
