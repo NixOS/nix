@@ -87,8 +87,11 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
         string hash = printHash32(hashString(htSHA1, gcRoot));
         Path realRoot = canonPath((format("%1%/%2%/auto/%3%")
             % nixStateDir % gcRootsDir % hash).str());
-
-        createSymlink(gcRoot, storePath, true);
+        
+        {
+            SwitchToOriginalUser sw;
+            createSymlink(gcRoot, storePath, true);
+        }
         createSymlink(realRoot, gcRoot, false);
     }
 

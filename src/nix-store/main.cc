@@ -25,6 +25,7 @@ static bool indirectRoot = false;
 
 static Path fixPath(Path path)
 {
+    SwitchToOriginalUser sw;
     path = absPath(path);
     while (!isInStore(path)) {
         if (!isLink(path)) break;
