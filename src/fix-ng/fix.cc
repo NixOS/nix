@@ -32,12 +32,6 @@ static Expr evalExpr2(EvalState & state, Expr e)
 {
     /* Conditional. */
     if (ATmatch(e, "If(<term>, <term>, <term>)", &e1, &e2, &e3)) {
-        e1 = evalExpr(state, e1);
-        Expr x;
-        if (ATmatch(e1, "True")) x = e2;
-        else if (ATmatch(e1, "False")) x = e3;
-        else throw badTerm("expecting a boolean", e1);
-        return evalExpr(state, x);
     }
 
     /* Ad-hoc function for string matching. */

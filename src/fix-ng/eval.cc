@@ -106,6 +106,15 @@ Path evalPath(EvalState & state, Expr e)
 }
 
 
+bool evalBool(EvalState & state, Expr e)
+{
+    e = evalExpr(state, e);
+    if (ATmatch(e, "True")) return true;
+    else if (ATmatch(e, "False")) return false;
+    else throw badTerm("expecting a boolean", e);
+}
+
+
 Expr evalExpr2(EvalState & state, Expr e)
 {
     Expr e1, e2, e3, e4;
@@ -164,6 +173,21 @@ Expr evalExpr2(EvalState & state, Expr e)
        into `(rec {..., body = ...}).body'. */
     if (ATmatch(e, "LetRec(<term>)", &e1))
         return evalExpr(state, ATmake("Select(Rec(<term>), \"body\")", e1));
+
+    /* Conditionals. */
+    if (ATmatch(e, "If(<term>, <term>, <term>)", &e1, &e2, &e3)) {
+        if (evalBool(state, e1))
+            return evalExpr(state, e2);
+        else
+            return evalExpr(state, e3);
+    }
+
+    /* Equality.  Just strings for now. */
+    if (ATmatch(e, "OpEq(<term>, <term>)", &e1, &e2)) {
+        string s1 = evalString(state, e1);
+        string s2 = evalString(state, e2);
+        return s1 == s2 ? ATmake("True") : ATmake("False");
+    }
 
     /* Barf. */
     throw badTerm("invalid expression", e);
