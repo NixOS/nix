@@ -9,9 +9,7 @@
 typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
 
-typedef enum { atpHash, atpPath, atpUnknown } ArgType;
-
-static ArgType argType = atpUnknown;
+static bool pathArgs = false;
 
 
 /* Nix syntax:
@@ -39,12 +37,11 @@ static ArgType argType = atpUnknown;
 
    Source selection for --install, --dump:
 
-     --file / -f: by file name  !!! -> path
-     --hash / -h: by hash (identifier)
+     --path / -p: by file name  !!! -> path
 
    Query flags:
 
-     --path / -p: query the path of an fstate 
+     --list / -l: query the output paths (roots) of an fstate 
      --refs / -r: query paths referenced by an fstate
 
    Options:
@@ -53,39 +50,16 @@ static ArgType argType = atpUnknown;
 */
 
 
-/* Parse the `-f' / `-h' / flags, i.e., the type of arguments.  These
-   flags are deleted from the referenced vector. */
-static void getArgType(Strings & flags)
-{
-    for (Strings::iterator it = flags.begin();
-         it != flags.end(); )
-    {
-        string arg = *it;
-        ArgType tp;
-        if (arg == "--hash" || arg == "-h") tp = atpHash;
-        else if (arg == "--file" || arg == "-f") tp = atpPath;
-        else { it++; continue; }
-        if (argType != atpUnknown)
-            throw UsageError("only one argument type specified may be specified");
-        argType = tp;
-        it = flags.erase(it);
-    }
-    if (argType == atpUnknown)
-        throw UsageError("argument type not specified");
-}
-
-
 static FSId argToId(const string & arg)
 {
-    if (argType == atpHash)
+    if (!pathArgs)
         return parseHash(arg);
-    else if (argType == atpPath) {
-        string path;
+    else {
         FSId id;
-        addToStore(arg, path, id);
+        if (!queryPathId(arg, id))
+            throw Error(format("don't know id of `%1%'") % arg);
         return id;
     }
-    else abort();
 }
 
 
@@ -93,7 +67,6 @@ static FSId argToId(const string & arg)
    expressions. */
 static void opInstall(Strings opFlags, Strings opArgs)
 {
-    getArgType(opFlags);
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
     for (Strings::iterator it = opArgs.begin();
@@ -117,7 +90,6 @@ static void opDelete(Strings opFlags, Strings opArgs)
    paths. */
 static void opAdd(Strings opFlags, Strings opArgs)
 {
-    getArgType(opFlags);
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
     for (Strings::iterator it = opArgs.begin();
@@ -134,47 +106,61 @@ static void opAdd(Strings opFlags, Strings opArgs)
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qPath, qRefs, qUnknown } query = qPath;
+    enum { qPaths, qRefs, qGenerators, qUnknown } query = qPaths;
 
-    for (Strings::iterator it = opFlags.begin();
-         it != opFlags.end(); )
-    {
-        string arg = *it;
-        if (arg == "--path" || arg == "-p") query = qPath;
-        else if (arg == "--refs" || arg == "-r") query = qRefs;
-        else { it++; continue; }
-        it = opFlags.erase(it);
-    }
+    for (Strings::iterator i = opFlags.begin();
+         i != opFlags.end(); i++)
+        if (*i == "--list" || *i == "-l") query = qPaths;
+        else if (*i == "--refs" || *i == "-r") query = qRefs;
+        else if (*i == "--generators" || *i == "-g") query = qGenerators;
+        else throw UsageError(format("unknown flag `%1%'") % *i);
 
-    getArgType(opFlags);
-    if (!opFlags.empty()) throw UsageError("unknown flag");
-
-    for (Strings::iterator it = opArgs.begin();
-         it != opArgs.end(); it++)
-    {
-        FSId id = argToId(*it);
-
-        switch (query) {
-
-        case qPath: {
-            Strings paths = fstatePaths(id, true);
-            for (Strings::iterator j = paths.begin(); 
-                 j != paths.end(); j++)
-                cout << format("%s\n") % *j;
+    switch (query) {
+        
+        case qPaths: {
+            StringSet paths;
+            for (Strings::iterator i = opArgs.begin();
+                 i != opArgs.end(); i++)
+            {
+                Strings paths2 = fstatePaths(argToId(*i), true);
+                paths.insert(paths2.begin(), paths2.end());
+            }
+            for (StringSet::iterator i = paths.begin(); 
+                 i != paths.end(); i++)
+                cout << format("%s\n") % *i;
             break;
         }
 
         case qRefs: {
-            StringSet refs = fstateRefs(id);
-            for (StringSet::iterator j = refs.begin(); 
-                 j != refs.end(); j++)
-                cout << format("%s\n") % *j;
+            StringSet paths;
+            for (Strings::iterator i = opArgs.begin();
+                 i != opArgs.end(); i++)
+            {
+                Strings paths2 = fstateRefs(argToId(*i));
+                paths.insert(paths2.begin(), paths2.end());
+            }
+            for (StringSet::iterator i = paths.begin(); 
+                 i != paths.end(); i++)
+                cout << format("%s\n") % *i;
+            break;
+        }
+
+        case qGenerators: {
+            FSIds outIds;
+            for (Strings::iterator i = opArgs.begin();
+                 i != opArgs.end(); i++)
+                outIds.push_back(argToId(*i));
+
+            FSIds genIds = findGenerators(outIds);
+
+            for (FSIds::iterator i = genIds.begin(); 
+                 i != genIds.end(); i++)
+                cout << format("%s\n") % (string) *i;
             break;
         }
 
         default:
             abort();
-        }
     }
 }
 
@@ -224,16 +210,12 @@ struct StdoutSink : DumpSink
    output. */
 static void opDump(Strings opFlags, Strings opArgs)
 {
-    getArgType(opFlags);
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (opArgs.size() != 1) throw UsageError("only one argument allowed");
 
     StdoutSink sink;
     string arg = *opArgs.begin();
-    string path;
-    
-    if (argType == atpHash) path = expandId(parseHash(arg));
-    else if (argType == atpPath) path = arg;
+    string path = pathArgs ? arg : expandId(parseHash(arg));
 
     dumpPath(path, sink);
 }
@@ -313,6 +295,8 @@ void run(Strings args)
             op = opInit;
         else if (arg == "--verify")
             op = opVerify;
+        else if (arg == "--path" || arg == "-p")
+            pathArgs = true;
         else if (arg[0] == '-')
             opFlags.push_back(arg);
         else

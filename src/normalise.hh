@@ -16,7 +16,11 @@ void realiseSlice(const Slice & slice);
 Strings fstatePaths(const FSId & id, bool normalise);
 
 /* Get the list of paths referenced by the given fstate-expression. */
-StringSet fstateRefs(const FSId & id);
+Strings fstateRefs(const FSId & id);
+
+/* Return the list of the ids of all known fstate-expressions whose
+   output ids are completely contained in `ids'. */
+FSIds findGenerators(const FSIds & ids);
 
 /* Register a successor. */
 void registerSuccessor(const FSId & id1, const FSId & id2);

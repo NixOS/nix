@@ -248,18 +248,57 @@ Strings fstatePaths(const FSId & id, bool normalise)
 }
 
 
-StringSet fstateRefs(const FSId & id)
+Strings fstateRefs(const FSId & id)
 {
-    StringSet paths;
+    Strings paths;
     Slice slice = normaliseFState(id);
     for (SliceElems::const_iterator i = slice.elems.begin();
          i != slice.elems.end(); i++)
-        paths.insert(i->path);
+        paths.push_back(i->path);
     return paths;
 }
 
 
-void findGenerators(const FSIds & ids)
+FSIds findGenerators(const FSIds & _ids)
 {
-    
+    FSIdSet ids(_ids.begin(), _ids.end());
+    FSIds generators;
+
+    /* !!! hack; for performance, we just look at the rhs of successor
+       mappings, since we know that those are Nix expressions. */
+
+    Strings sucs;
+    enumDB(nixDB, dbSuccessors, sucs);
+
+    for (Strings::iterator i = sucs.begin();
+         i != sucs.end(); i++)
+    {
+        string s;
+        queryDB(nixDB, dbSuccessors, *i, s);
+        FSId id = parseHash(s);
+
+        FState fs;
+        try {
+            /* !!! should substitutes be used? */
+            fs = parseFState(termFromId(id));
+        } catch (...) { /* !!! only catch parse errors */
+            continue;
+        }
+
+        if (fs.type != FState::fsSlice) continue;
+        
+        bool okay = true;
+        for (SliceElems::const_iterator i = fs.slice.elems.begin();
+             i != fs.slice.elems.end(); i++)
+            if (ids.find(i->id) == ids.end()) {
+                okay = false;
+                break;
+            }
+        
+        if (!okay) continue;
+        
+        generators.push_back(id);
+    }
+
+    return generators;
 }

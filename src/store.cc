@@ -148,6 +148,15 @@ void unregisterPath(const string & _path)
 }
 
 
+bool queryPathId(const string & path, FSId & id)
+{
+    string s;
+    if (!queryDB(nixDB, dbPath2Id, path, s)) return false;
+    id = parseHash(s);
+    return true;
+}
+
+
 bool isInPrefix(const string & path, const string & _prefix)
 {
     string prefix = canonPath(_prefix + "/");

@@ -20,6 +20,9 @@ void registerSubstitute(const FSId & srcId, const FSId & subId);
 /* Register a path keyed on its id. */
 void registerPath(const string & path, const FSId & id);
 
+/* Query the id of a path. */
+bool queryPathId(const string & path, FSId & id);
+
 /* Return a path whose contents have the given hash.  If target is
    not empty, ensure that such a path is realised in target (if
    necessary by copying from another location).  If prefix is not
