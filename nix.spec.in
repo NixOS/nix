@@ -1,12 +1,11 @@
-# This RPM accepts the following defininitions (which can be passed
-# using `--define' to rpmbuild, e.g., --define 'enable_setuid yes'):
-#   enable_setuid: if non-empty, pass `--enable-setuid' to configure
-#   nix_user: if set, pass as `--with-nix-user' to configure 
-#   nix_group: if set, pass as `--with-nix-group' to configure
+%define enable_setuid ""
+%define nix_user "nix"
+%define nix_group "nix"
 
-%{!?enable_setuid: %define enable_setuid ""}
-%{!?nix_user: %define nix_user ""}
-%{!?nix_group: %define nix_group ""}
+# If set, the Nix user and group will be created by the RPM
+# pre-install script.
+%define nix_user_uid ""
+%define nix_group_gid ""
 
 Summary: The Nix software deployment system
 Name: nix
@@ -51,8 +50,18 @@ strip $RPM_BUILD_ROOT/%{_prefix}/bin/* || true
 %clean
 rm -rf $RPM_BUILD_ROOT
 
+%pre
+if test -n "%{nix_group_gid}"; then
+    /usr/sbin/groupadd -g %{nix_group_gid} %{nix_group} || true
+fi
+if test -n "%{nix_user_uid}"; then
+    /usr/sbin/useradd -c "Nix" -u %{nix_user_uid} \
+        -s /sbin/nologin -r -d /var/empty %{nix_user} \
+        -g %{nix_group} || true
+fi
+
 %files
-%defattr(-,root,root)
+#%defattr(-,root,root)
 %{_prefix}/bin
 %{_prefix}/libexec
 %{_prefix}/var
