@@ -1285,7 +1285,256 @@ character, or inline/multi-line, enclosed within <literal>/*
 
 <sect1 id='sec-standard-environment'><title>The standard environment</title>
 
-<para>TODO</para>
+<para>The standard build environment in the Nix Packages collection
+provides a basic environment for building Unix packages.  It consists
+of the following components:
+
+<itemizedlist>
+
+  <listitem><para>The GNU C Compiler, configured with C and C++
+  support.  On Linux, the compiler has been patched to provide greater
+  <quote>purity</quote> assurance.  For instance, the compiler doesn't
+  search in locations such as <filename>/usr/include</filename>.  In
+  fact, attempts to add such directories through the
+  <option>-I</option> flag are filtered out.  Likewise, the linker
+  (from GNU binutils) doesn't search in standard locations such as
+  <filename>/usr/lib</filename>.  Programs built on Linux are linked
+  against a GNU C Library that likewise doesn't search in the default
+  system locations.</para></listitem>
+
+  <listitem><para>GNU coreutils (contains a few dozen standard Unix
+  commands).</para></listitem>
+
+  <listitem><para>GNU findutils (contains
+  <command>find</command>).</para></listitem>
+
+  <listitem><para>GNU diffutils (contains <command>diff</command>,
+  <command>cmp</command>).</para></listitem>
+
+  <listitem><para>GNU <command>sed</command>.</para></listitem>
+
+  <listitem><para>GNU <command>grep</command>.</para></listitem>
+
+  <listitem><para>GNU <command>awk</command>.</para></listitem>
+
+  <listitem><para>GNU <command>tar</command>.</para></listitem>
+
+  <listitem><para><command>gzip</command> and
+  <command>bzip2</command>.</para></listitem>
+
+  <listitem><para>GNU Make.  It has been patched to provide
+  <quote>nested</quote> output that can be fed into the
+  <command>log2xml</command> command and <command>log2html</command>
+  stylesheet to create a structured, readable output of the build
+  steps performed by Make.</para></listitem>
+
+  <listitem><para>Bash.  This is the shell used for all builders in
+  the Nix Packages collection.  Not using <command>/bin/sh</command>
+  removes a large source of portability problems.</para></listitem>
+
+  <listitem><para>Patch.</para></listitem>
+
+</itemizedlist>
+
+</para>
+
+<para>The standard environment is used by passing it as an input
+called <envar>stdenv</envar> to the derivation, and then doing
+
+<programlisting>
+. $stdenv/setup</programlisting>
+
+at the top of the builder.</para>
+
+<para>Apart from adding the aforementioned commands to the
+<envar>PATH</envar>, <filename>setup</filename> also does the
+following:
+
+<itemizedlist>
+
+  <listitem><para>All input components specified in the
+  <envar>buildInputs</envar> environment variable have their
+  <filename>/bin</filename> subdirectory added to <envar>PATH</envar>,
+  their <filename>/include</filename> subdirectory added to the C/C++
+  header file search path, and their <filename>/lib</filename>
+  subdirectory added to the linker search path.  This can be extended.
+  For instance, when the <command>pkgconfig</command> component is
+  used, the subdirectory <filename>/lib/pkgconfig</filename> of each
+  input is added to the <envar>PKG_CONFIG_PATH</envar> environment
+  variable.</para></listitem>
+
+  <listitem><para>The environment variable
+  <envar>NIX_CFLAGS_STRIP</envar> is set so that the compiler strips
+  debug information from object files.  This can be disabled by
+  setting <envar>NIX_STRIP_DEBUG</envar> to
+  <literal>0</literal>.</para></listitem>
+
+</itemizedlist>
+
+</para>
+
+<para>The <filename>setup</filename> script also exports a function
+called <function>genericBuilder</function> that knows how to build
+typical Autoconf-style components.  It can be customised to perform
+builds for any type of component.  It is advisable to use
+<function>genericBuild</function> since it provides facilities that
+are almost always useful such as unpacking of sources, patching of
+sources, nested logging, etc.</para>
+
+<para>The operation of the generic builder can be modified in many
+places by setting certain variables.  These <emphasis>hook
+variables</emphasis> are typically set to the name of some shell
+function defined by you.  For instance, to perform some additional
+steps after <command>make install</command> you would set the
+<varname>postInstall</varname> variable:
+
+<programlisting>
+postInstall=myPostInstall
+
+myPostInstall() {
+    mkdir $out/share/extra
+    cp extrafiles/* $out/share/extra
+}</programlisting>
+
+</para>
+
+<para>The generic builder has a number of <emphasis>phases</emphasis>,
+each of which can be override in its entirety by setting the indicated
+variable.  The phases are:
+
+<itemizedlist>
+
+  <listitem>
+
+    <para><function>unpackPhase</function>: unpacks the source files
+    listed in the <envar>src</envar> environment variable to the
+    current directory.  It supports <filename>tar</filename> files,
+    optionally compressed with <command>gzip</command> or
+    <command>bzip2</command>; Zip files (but note that the
+    <command>unzip</command> command is not a part of the standard
+    environment; you should add it as a build input yourself); and
+    unpacked source trees (i.e., directories; they are copied
+    verbatim).  You can add support for other file types by setting
+    the <varname>findUnpacker</varname> hook.  This hook should set an
+    the variable <varname>unpackCmd</varname> to contain the command
+    to be executed to unpack the file.</para>
+
+    <para>After unpacking all source files,
+    <function>unpackPhase</function> changes the current directory to
+    the directory created by unpacking the sources.  If there are
+    multiple source directories, you should set
+    <varname>sourceRoot</varname> to the name of the intended
+    directory.</para>
+
+    <para>It also calls the hook <varname>postUnpack</varname> after
+    unpacking.</para>
+
+  </listitem>
+
+  <listitem><para><function>patchPhase</function> calls the
+  <command>patch</command> command with the <option>-p1</option>
+  option for each patch file listed in the <envar>patches</envar>
+  variable.</para></listitem>
+
+  <listitem>
+
+    <para><function>configurePhase</function> runs the script called
+    <filename>configure</filename> in the current directory with a
+    <option>--prefix</option> set to the output path.  You can add
+    additional flag through the <varname>configureFlags</varname>
+    variable.  If <filename>configure</filename> does not exist,
+    nothing happens.</para>
+
+    <para>Before and after running <filename>configure</filename>, the
+    hooks <varname>preConfigure</varname> and
+    <varname>postConfigure</varname> are called, respectively.</para>
+
+  </listitem>
+
+  <listitem>
+
+    <para><function>buildPhase</function> calls
+    <command>make</command>.  You can set flags for
+    <command>make</command> through the <varname>makeFlags</varname>
+    variable.</para>
+
+    <para>Before and after running <command>make</command>, the hooks
+    <varname>preBuild</varname> and <varname>postBuild</varname> are
+    called, respectively.</para>
+    
+  </listitem>
+
+  <listitem><para><function>checkPhase</function> calls <command>make
+  check</command>, but only if the <varname>doCheck</varname> variable
+  is set to <literal>1</literal>.  Additional flags can be set through
+  the <varname>checkFlags</varname> variable.</para></listitem>
+
+  <listitem>
+
+    <para><function>installPhase</function> calls <command>make
+    install</command>.  Additional flags can be set through the
+    <varname>installFlags</varname> variable.  It also strips any
+    static libraries in the output path of debug information unless
+    <varname>dontStrip</varname> is set to
+    <literal>1</literal>.</para>
+
+    <para>Before and after running <command>make install</command>,
+    the hooks <varname>preInstall</varname> and
+    <varname>postInstall</varname> are called, respectively.</para>
+
+  </listitem>
+
+  <listitem>
+
+    <para><function>distPhase</function> calls <command>make
+    dist</command>, but only if the <varname>doDist</varname> variable
+    is set to <literal>1</literal>.  Additional flags can be set
+    through the <varname>distFlags</varname> variable.  The resulting
+    tarball is copied to the <filename>/tarballs</filename>
+    subdirectory of the output path.</para>
+
+    <para>Before and after running <command>make dist</command>, the
+    hooks <varname>preDist</varname> and <varname>postDist</varname>
+    are called, respectively.</para>
+    
+  </listitem>
+
+</itemizedlist>
+
+</para>
+
+<para>You can change the order in which phases are executed, or add
+new phases, by setting the <varname>phases</varname> variable.  The
+default is <literal>patchPhase configurePhase buildPhase checkPhase
+installPhase distPhase</literal>.</para>
+
+<para>At the beginning of each phase, the set of all shell variables
+is written to the file <filename>env-vars</filename> at the top-level
+build directory.  This is useful for debugging: it allows you to
+recreate the environment in which a build was performed.  For
+instance, if a build fails, then assuming you used the
+<option>-K</option> flag, you can go to the output directory and
+<quote>switch</quote> to the environment of the builder:
+
+<screen>
+$ nix-build -K ./foo.nix
+... fails, keeping build directory `/tmp/nix-1234-0'
+
+$ cd /tmp/nix-1234-0
+
+$ source env-vars
+
+<lineannotation>(edit some files...)</lineannotation>
+
+$ make
+
+<lineannotation>(execution continues with the same GCC, make, etc.)</lineannotation></screen>
+
+</para>
+
+<para>The definitive, up-to-date documentation of the generic builder
+is the source itself, which resides in
+<filename>pkgs/stdenv/generic/setup.sh</filename>.</para>
 
 </sect1>
 
