@@ -4,14 +4,12 @@ nix-store [OPTIONS...] [ARGUMENTS...]
 
 Operations:
 
-  --realise / -r: realise a Nix expression
-  --delete / -d: delete paths from the Nix store
+  --build / -b: build a Nix derivation
   --add / -A: copy a path to the Nix store
   --query / -q: query information
 
-  --successor: register a successor expression (dangerous!)
   --substitute: register a substitute expression (dangerous!)
-  --clear-substitute: clear all substitutes
+  --clear-substitutes: clear all substitutes
   --validpath: register path validity (dangerous!)
   --isvalid: check path validity
 
@@ -26,9 +24,10 @@ Operations:
 
 Query flags:
 
-  --list / -l: query the output paths (roots) of a Nix expression (default)
-  --requisites / -R: print all paths necessary to realise expression
-  --predecessors: print predecessors of a Nix expression
+  --outputs: query the output paths of a Nix derivation (default)
+  --requisites / -R: print all paths necessary to realise a path
+  --references: print all paths referenced by the given path
+  --referers: print all paths refering to the given path
   --graph: print a dot graph rooted at given ids
 
 Options:

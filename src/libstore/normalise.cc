@@ -1307,6 +1307,9 @@ void SubstitutionGoal::init()
         return;
     }
 
+    /* !!! build the outgoing references of this path first to
+       maintain the closure invariant! */
+
     /* Otherwise, get the substitutes. */
     subs = querySubstitutes(storePath);
 

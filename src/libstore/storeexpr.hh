@@ -5,23 +5,11 @@
 #include "store.hh"
 
 
-/* Abstract syntax of store expressions. */
+/* Extension of derivations in the Nix store. */
+const string drvExtension = ".drv";
 
-struct ClosureElem
-{
-    PathSet refs;
-};
 
-typedef map<Path, ClosureElem> ClosureElems;
-
-/*
-struct Closure
-{
-    PathSet roots;
-    ClosureElems elems;
-};
-*/
-
+/* Abstract syntax of derivations. */
 
 struct DerivationOutput
 {
@@ -57,14 +45,18 @@ struct Derivation
 /* Hash an aterm. */
 Hash hashTerm(ATerm t);
 
-/* Write an aterm to the Nix store directory, and return its path. */
-Path writeTerm(ATerm t, const string & suffix);
+/* Write a derivation to the Nix store, and return its path. */
+Path writeDerivation(const Derivation & drv, const string & name);
 
-/* Parse a store expression. */
+/* Parse a derivation. */
 Derivation parseDerivation(ATerm t);
 
-/* Parse a store expression. */
+/* Parse a derivation. */
 ATerm unparseDerivation(const Derivation & drv);
+
+/* Check whether a file name ends with the extensions for
+   derivations. */
+bool isDerivation(const string & fileName);
 
 
 #endif /* !__STOREEXPR_H */

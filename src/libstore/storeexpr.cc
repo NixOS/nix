@@ -12,11 +12,10 @@ Hash hashTerm(ATerm t)
 }
 
 
-Path writeTerm(ATerm t, const string & suffix)
+Path writeDerivation(const Derivation & drv, const string & name)
 {
-    char * s = ATwriteToString(t);
-    if (!s) throw Error("cannot print aterm");
-    return addTextToStore(suffix + ".store", string(s));
+    return addTextToStore(name + drvExtension,
+        atPrint(unparseDerivation(drv)));
 }
 
 
@@ -132,4 +131,12 @@ ATerm unparseDerivation(const Derivation & drv)
         toATerm(drv.builder),
         ATreverse(args),
         ATreverse(env));
+}
+
+
+bool isDerivation(const string & fileName)
+{
+    return
+        fileName.size() >= drvExtension.size() &&
+        string(fileName, fileName.size() - drvExtension.size()) == drvExtension;
 }

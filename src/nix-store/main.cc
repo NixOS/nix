@@ -18,6 +18,15 @@ void printHelp()
 }
 
 
+static Path findOutput(const Derivation & drv, string id)
+{
+    for (DerivationOutputs::const_iterator i = drv.outputs.begin();
+         i != drv.outputs.end(); ++i)
+        if (i->first == id) return i->second.path;
+    throw Error(format("derivation has no output `%1%'") % id);
+}
+
+
 /* Build the given derivations. */
 static void opBuild(Strings opFlags, Strings opArgs)
 {
@@ -25,7 +34,11 @@ static void opBuild(Strings opFlags, Strings opArgs)
 
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); i++)
+    {
         buildDerivation(*i);
+        Derivation drv = derivationFromPath(*i);
+        cout << format("%1%\n") % findOutput(drv, "out");
+    }
 }
 
 
@@ -40,70 +53,59 @@ static void opAdd(Strings opFlags, Strings opArgs)
 }
 
 
-#if 0
-Path maybeNormalise(const Path & ne, bool normalise, bool realise)
+static Path maybeUseOutput(const Path & storePath, bool useOutput)
 {
-    if (realise) {
-        Path ne2 = realiseStoreExpr(ne);
-        return normalise ? ne2 : ne;
-    } else
-        return normalise ? normaliseStoreExpr(ne) : ne;
+    if (useOutput && isDerivation(storePath)) {
+        Derivation drv = derivationFromPath(storePath);
+        return findOutput(drv, "out");
+    }
+    else return storePath;
 }
 
 
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qList, qRequisites, qPredecessors, qGraph 
-    } query = qList;
-    bool normalise = false;
-    bool realise = false;
-    bool includeExprs = true;
-    bool includeSuccessors = false;
+    enum { qOutputs, qRequisites, qPredecessors, qGraph } query = qOutputs;
+    bool useOutput = false;
+    bool includeOutputs = false;
 
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); i++)
-        if (*i == "--list" || *i == "-l") query = qList;
+        if (*i == "--outputs") query = qOutputs;
         else if (*i == "--requisites" || *i == "-R") query = qRequisites;
-        else if (*i == "--predecessors") query = qPredecessors;
         else if (*i == "--graph") query = qGraph;
-        else if (*i == "--normalise" || *i == "-n") normalise = true;
-        else if (*i == "--force-realise" || *i == "-f") realise = true;
-        else if (*i == "--exclude-exprs") includeExprs = false;
-        else if (*i == "--include-successors") includeSuccessors = true;
+        else if (*i == "--use-output" || *i == "-u") useOutput = true;
+        else if (*i == "--include-outputs") includeOutputs = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
     switch (query) {
         
-        case qList: {
+        case qOutputs: {
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                StringSet paths = storeExprRoots(
-                    maybeNormalise(*i, normalise, realise));
-                for (StringSet::iterator j = paths.begin(); 
-                     j != paths.end(); j++)
-                    cout << format("%s\n") % *j;
+                Derivation drv = derivationFromPath(*i);
+                cout << format("%1%\n") % findOutput(drv, "out");
             }
             break;
         }
 
         case qRequisites: {
-            StringSet paths;
+            PathSet paths;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
             {
-                StringSet paths2 = storeExprRequisites(
-                    maybeNormalise(*i, normalise, realise),
-                    includeExprs, includeSuccessors);
-                paths.insert(paths2.begin(), paths2.end());
+                Path path = maybeUseOutput(*i, useOutput);
+                storePathRequisites(path, includeOutputs, paths);
             }
-            for (StringSet::iterator i = paths.begin(); 
+            for (PathSet::iterator i = paths.begin(); 
                  i != paths.end(); i++)
                 cout << format("%s\n") % *i;
             break;
         }
 
+#if 0            
         case qPredecessors: {
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); i++)
@@ -124,12 +126,12 @@ static void opQuery(Strings opFlags, Strings opArgs)
 	    printDotGraph(roots);
             break;
         }
+#endif
 
         default:
             abort();
     }
 }
-#endif
 
 
 static void opSubstitute(Strings opFlags, Strings opArgs)
@@ -340,8 +342,8 @@ void run(Strings args)
             op = opBuild;
         else if (arg == "--add" || arg == "-A")
             op = opAdd;
-        //        else if (arg == "--query" || arg == "-q")
-        //            op = opQuery;
+        else if (arg == "--query" || arg == "-q")
+            op = opQuery;
         else if (arg == "--substitute")
             op = opSubstitute;
         else if (arg == "--clear-substitutes")

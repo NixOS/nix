@@ -3,7 +3,6 @@
 
 #include "storeexpr.hh"
 
-
 /* Perform the specified derivation, if necessary.  That is, do
    whatever is necessary to create the output paths of the
    derivation.  If the output paths already exists, we're done.  If
@@ -20,29 +19,29 @@ void ensurePath(const Path & storePath);
    through ensurePath(). */
 Derivation derivationFromPath(const Path & drvPath);
 
-
-/* Places in `paths' the set of all store paths in the file system
+/* Place in `paths' the set of all store paths in the file system
    closure of `storePath'; that is, all paths than can be directly or
    indirectly reached from it.  `paths' is not cleared. */
 void computeFSClosure(const Path & storePath,
     PathSet & paths);
 
+/* Place in `paths' the set of paths that are required to `realise'
+   the given store path, i.e., all paths necessary for valid
+   deployment of the path.  For a derivation, this is the union of
+   requisites of the inputs, plus the derivation; for other store
+   paths, it is the set of paths in the FS closure of the path.  If
+   `includeOutputs' is true, include the requisites of the output
+   paths of derivations as well.
 
-#if 0
-/* Get the list of root (output) paths of the given store
-   expression. */
-PathSet storeExprRoots(const Path & nePath);
+   Note that this function can be used to implement three different
+   deployment policies:
 
-/* Get the list of paths that are required to realise the given store
-   expression.  For a derive expression, this is the union of
-   requisites of the inputs; for a closure expression, it is the path
-   of each element in the closure.  If `includeExprs' is true, include
-   the paths of the store expressions themselves.  If
-   `includeSuccessors' is true, include the requisites of
-   successors. */
-PathSet storeExprRequisites(const Path & nePath,
-    bool includeExprs, bool includeSuccessors);
-#endif
-
+   - Source deployment (when called on a derivation).
+   - Binary deployment (when called on an output path).
+   - Source/binary deployment (when called on a derivation with
+     `includeOutputs' set to true).
+*/
+void storePathRequisites(const Path & storePath,
+    bool includeOutputs, PathSet & paths);
 
 #endif /* !__NORMALISE_H */

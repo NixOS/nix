@@ -270,6 +270,9 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
                 % *i % drvName);
         }
 
+    /* !!! the name should not end in the derivation extension (.drv).
+       Likewise for sources. */
+
     /* Construct the "masked" derivation store expression, which is
        the final one except that in the list of outputs, the output
        paths are empty, and the corresponding environment variables
@@ -290,7 +293,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
         DerivationOutput(outPath, outputHashAlgo, outputHash);
 
     /* Write the resulting term into the Nix store directory. */
-    Path drvPath = writeTerm(unparseDerivation(drv), "d-" + drvName);
+    Path drvPath = writeDerivation(drv, drvName);
 
     printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'")
         % drvName % drvPath);

@@ -26,65 +26,39 @@ void computeFSClosure(const Path & storePath,
 }
 
 
-#if 0
-PathSet storeExprRoots(const Path & nePath)
-{
-    PathSet paths;
-
-    StoreExpr ne = storeExprFromPath(nePath);
-
-    if (ne.type == StoreExpr::neClosure)
-        paths.insert(ne.closure.roots.begin(), ne.closure.roots.end());
-    else if (ne.type == StoreExpr::neDerivation)
-        for (DerivationOutputs::iterator i = ne.derivation.outputs.begin();
-             i != ne.derivation.outputs.end(); ++i)
-            paths.insert(i->second.path);
-    else abort();
-
-    return paths;
-}
-
-
-static void requisitesWorker(const Path & nePath,
-    bool includeExprs, bool includeSuccessors,
-    PathSet & paths, PathSet & doneSet)
+void storePathRequisites(const Path & storePath,
+    bool includeOutputs, PathSet & paths)
 {
     checkInterrupt();
     
-    if (doneSet.find(nePath) != doneSet.end()) return;
-    doneSet.insert(nePath);
+    if (paths.find(storePath) != paths.end()) return;
 
-    StoreExpr ne = storeExprFromPath(nePath);
+    if (isDerivation(storePath)) {
 
-    if (ne.type == StoreExpr::neClosure)
-        for (ClosureElems::iterator i = ne.closure.elems.begin();
-             i != ne.closure.elems.end(); ++i)
-            paths.insert(i->first);
-    
-    else if (ne.type == StoreExpr::neDerivation)
-        for (PathSet::iterator i = ne.derivation.inputs.begin();
-             i != ne.derivation.inputs.end(); ++i)
-            requisitesWorker(*i,
-                includeExprs, includeSuccessors, paths, doneSet);
+        paths.insert(storePath);
+        
+        Derivation drv = derivationFromPath(storePath);
 
-    else abort();
+        for (PathSet::iterator i = drv.inputDrvs.begin();
+             i != drv.inputDrvs.end(); ++i)
+            storePathRequisites(*i, includeOutputs, paths);
 
-    if (includeExprs) paths.insert(nePath);
+        for (PathSet::iterator i = drv.inputSrcs.begin();
+             i != drv.inputSrcs.end(); ++i)
+            storePathRequisites(*i, includeOutputs, paths);
 
-    Path nfPath;
-    if (includeSuccessors && querySuccessor(nePath, nfPath))
-        requisitesWorker(nfPath, includeExprs, includeSuccessors,
-            paths, doneSet);
+        if (includeOutputs) {
+
+            for (DerivationOutputs::iterator i = drv.outputs.begin();
+                 i != drv.outputs.end(); ++i)
+                if (isValidPath(i->second.path))
+                    storePathRequisites(i->second.path, includeOutputs, paths);
+
+        }
+        
+    }
+
+    else {
+        computeFSClosure(storePath, paths);
+    }
 }
-
-
-PathSet storeExprRequisites(const Path & nePath,
-    bool includeExprs, bool includeSuccessors)
-{
-    PathSet paths;
-    PathSet doneSet;
-    requisitesWorker(nePath, includeExprs, includeSuccessors,
-        paths, doneSet);
-    return paths;
-}
-#endif
