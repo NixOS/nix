@@ -13,11 +13,11 @@ AM_CXXFLAGS = \
  -I.. -I../../externals/inst/include -I../libutil -I../libstore -I../libmain
 
 install-data-local:
-	$(INSTALL) -d $(localstatedir)/nix
-	$(INSTALL) -d $(localstatedir)/nix/db
-	$(INSTALL) -d $(localstatedir)/nix/links
-	rm -f $(prefix)/current
-	ln -sf $(localstatedir)/nix/links/current $(prefix)/current
-	$(INSTALL) -d $(localstatedir)/log/nix
-	$(INSTALL) -d $(prefix)/store
-	$(bindir)/nix-store --init
+	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix
+	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix/db
+	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix/links
+	rm -f $(DESTDIR)$(prefix)/current
+	ln -sf $(localstatedir)/nix/links/current $(DESTDIR)$(prefix)/current
+	$(INSTALL) -d $(DESTDIR)$(localstatedir)/log/nix
+	$(INSTALL) -d $(DESTDIR)$(prefix)/store
+#	$(bindir)/nix-store --init

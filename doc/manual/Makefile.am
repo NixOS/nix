@@ -26,9 +26,9 @@ book.html: $(SOURCES) book.is-valid
 all-local: book.html
 
 install-data-local: book.html
-	$(INSTALL) -d $(datadir)/nix/manual
-	$(INSTALL_DATA) book.html $(datadir)/nix/manual
-	$(INSTALL_DATA) style.css $(datadir)/nix/manual
+	$(INSTALL) -d $(DESTDIR)$(datadir)/nix/manual
+	$(INSTALL_DATA) book.html $(DESTDIR)$(datadir)/nix/manual
+	$(INSTALL_DATA) style.css $(DESTDIR)$(datadir)/nix/manual
 
 EXTRA_DIST = $(SOURCES) book.html book.is-valid $(MANS) 
 
