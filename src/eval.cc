@@ -106,7 +106,7 @@ static void runProgram(const string & program, Environment env)
             
         } catch (exception & e) {
             cerr << format("build error: %1%\n") % e.what();
-        }
+         }
         _exit(1);
 
     }
@@ -157,38 +157,6 @@ Hash hashTerm(ATerm t)
 {
     return hashString(printTerm(t));
 }
-
-
-#if 0
-/* Evaluate a list of arguments into normal form. */
-void evalArgs(ATermList args, ATermList & argsNF, Environment & env)
-{
-    argsNF = ATempty;
-
-    while (!ATisEmpty(args)) {
-        ATerm eName, eVal, arg = ATgetFirst(args);
-        if (!ATmatch(arg, "Tup(<term>, <term>)", &eName, &eVal))
-            throw badTerm("invalid argument", arg);
-
-        string name = evalString(eName);
-        eVal = evalValue(eVal);
-
-        char * s;
-        if (ATmatch(eVal, "Str(<str>)", &s)) {
-            env[name] = s;
-        } else if (ATmatch(eVal, "Hash(<str>)", &s)) {
-            env[name] = queryValuePath(parseHash(s));
-        } else throw badTerm("invalid argument value", eVal);
-
-        argsNF = ATinsert(argsNF,
-            ATmake("Tup(Str(<str>), <term>)", name.c_str(), eVal));
-
-        args = ATgetNext(args);
-    }
-
-    argsNF = ATreverse(argsNF);
-}
-#endif
 
 
 struct RStatus
@@ -362,7 +330,7 @@ static FState realise(RStatus & status, FState fs)
         return nf;
     }
 
-    throw badTerm("bad file system state expression", fs);
+    throw badTerm("bad fstate expression", fs);
 }
 
 

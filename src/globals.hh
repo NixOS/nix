@@ -21,7 +21,13 @@ extern string dbRefs;
    with hash h2.
 
    Note that a term $y$ is successor of $x$ iff there exists a
-   sequence of rewrite steps that rewrites $x$ into $y$. */
+   sequence of rewrite steps that rewrites $x$ into $y$.
+
+   Also note that instead of a successor, $y$ can be any term
+   equivalent to $x$, that is, reducing to the same result, as long as
+   $x$ is equal to or a successor of $y$.  (This is useful, e.g., for
+   shared derivate caching over the network).
+*/
 extern string dbSuccessors;
 
 /* dbNetSources :: Hash -> URL
