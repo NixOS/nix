@@ -97,7 +97,20 @@ ATerm substitute(Subs & subs, ATerm e)
             substitute(subs2, body));
     }
 
-    /* !!! Rec(...) */
+    /* Idem for a mutually recursive attribute set. */
+    ATermList bindings;
+    if (ATmatch(e, "Rec([<list>])", &bindings)) {
+        Subs subs2(subs);
+        ATermList bnds = bindings;
+        while (!ATisEmpty(bnds)) {
+            Expr e;
+            if (!ATmatch(ATgetFirst(bnds), "Bind(<str>, <term>)", &s, &e))
+                abort(); /* can't happen */
+            subs2.erase(s);
+            bnds = ATgetNext(bnds);
+        }
+        return ATmake("Rec(<term>)", substitute(subs2, (ATerm) bindings));
+    }
 
     if (ATgetType(e) == AT_APPL) {
         AFun fun = ATgetAFun(e);
