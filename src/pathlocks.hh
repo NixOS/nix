@@ -8,6 +8,7 @@ class PathLocks
 {
 private:
     list<int> fds;
+    Strings paths;
 
 public:
     PathLocks(const Strings & _paths);

@@ -240,35 +240,10 @@ void realiseSlice(const FSId & id, FSIdSet pending)
     if (fs.type != FState::fsSlice)
         throw Error(format("expected slice in %1%") % (string) id);
     
-    /* Perhaps all paths already contain the right id? */
-
-    bool missing = false;
     for (SliceElems::const_iterator i = fs.slice.elems.begin();
          i != fs.slice.elems.end(); i++)
     {
         SliceElem elem = *i;
-        string id;
-        if (!nixDB.queryString(noTxn, dbPath2Id, elem.path, id)) {
-            if (pathExists(elem.path))
-                throw Error(format("path `%1%' obstructed") % elem.path);
-            missing = true;
-            break;
-        }
-        if (parseHash(id) != elem.id)
-            throw Error(format("path `%1%' obstructed") % elem.path);
-    }
-
-    if (!missing) {
-        debug(format("already installed"));
-        return;
-    }
-
-    /* For each element, expand its id at its path. */
-    for (SliceElems::const_iterator i = fs.slice.elems.begin();
-         i != fs.slice.elems.end(); i++)
-    {
-        SliceElem elem = *i;
-        debug(format("expanding %1% in `%2%'") % (string) elem.id % elem.path);
         expandId(elem.id, elem.path, "/", pending);
     }
 }
