@@ -34,11 +34,9 @@ fallback.sh: fallback.nix
 nix-push.sh: dependencies.nix
 nix-pull.sh: dependencies.nix
 
-#TESTS = init.sh hash.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
-#  build-hook.sh substitutes.sh substitutes2.sh fallback.sh nix-push.sh verify.sh \
-#  nix-pull.sh
-
-TESTS = init.sh nix-push.sh nix-pull.sh
+TESTS = init.sh hash.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
+  build-hook.sh substitutes.sh substitutes2.sh fallback.sh nix-push.sh verify.sh \
+  nix-pull.sh
 
 XFAIL_TESTS =
 

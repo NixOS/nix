@@ -5,7 +5,7 @@ outPath=$($TOP/src/nix-store/nix-store -q --fallback "$storeExpr")
 echo "output path is $outPath"
 
 # Register a non-existant substitute
-(echo $outPath && echo $TOP/no-such-program && echo 0) | $TOP/src/nix-store/nix-store --substitute
+(echo $outPath && echo $TOP/no-such-program && echo 0 && echo 0) | $TOP/src/nix-store/nix-store --substitute
 
 # Build the derivation
 $TOP/src/nix-store/nix-store -r --fallback "$storeExpr"
