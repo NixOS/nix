@@ -185,6 +185,15 @@ string readFile(const Path & path)
 }
 
 
+void writeFile(const Path & path, const string & s)
+{
+    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT, 0666);
+    if (fd == -1)
+        throw SysError(format("opening file `%1%'") % path);
+    writeFull(fd, (unsigned char *) s.c_str(), s.size());
+}
+
+
 static void _deletePath(const Path & path)
 {
     checkInterrupt();

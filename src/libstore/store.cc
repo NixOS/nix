@@ -71,9 +71,13 @@ bool Substitute::operator == (const Substitute & sub)
 }
 
 
+static void upgradeStore();
+
+
 void openDB()
 {
     if (readOnlyMode) return;
+
     try {
         nixDB.open(nixDBPath);
     } catch (DbNoPermission & e) {
@@ -86,6 +90,23 @@ void openDB()
     dbReferers = nixDB.openTable("referers");
     dbSubstitutes = nixDB.openTable("substitutes");
     dbDerivers = nixDB.openTable("derivers");
+
+    int curSchema = 0;
+    Path schemaFN = nixDBPath + "/schema";
+    if (pathExists(schemaFN)) {
+        string s = readFile(schemaFN);
+        if (!string2Int(s, curSchema))
+            throw Error(format("`%1%' is corrupt") % schemaFN);
+    }
+
+    if (curSchema > nixSchemaVersion)
+        throw Error(format("current Nix store schema is version %1%, but I only support %2%")
+            % curSchema % nixSchemaVersion);
+
+    if (curSchema < nixSchemaVersion) {
+        upgradeStore();
+        writeFile(schemaFN, (format("%1%") % nixSchemaVersion).str());
+    }
 }
 
 
@@ -457,6 +478,30 @@ void clearSubstitutes()
 }
 
 
+static void setHash(const Transaction & txn, const Path & storePath,
+    const Hash & hash)
+{
+    assert(hash.type == htSHA256);
+    nixDB.setString(txn, dbValidPaths, storePath, "sha256:" + printHash(hash));
+}
+
+
+static Hash queryHash(const Transaction & txn, const Path & storePath)
+{
+    string s;
+    nixDB.queryString(txn, dbValidPaths, storePath, s);
+    unsigned int colon = s.find(':');
+    if (colon == string::npos)
+        throw Error(format("corrupt hash `%1%' in valid-path entry for `%2%'")
+            % s % storePath);
+    HashType ht = parseHashType(string(s, 0, colon));
+    if (ht == htUnknown)
+        throw Error(format("unknown hash type `%1%' in valid-path entry for `%2%'")
+            % string(0, colon) % storePath);
+    return parseHash(ht, string(s, colon + 1));
+}
+
+
 void registerValidPath(const Transaction & txn,
     const Path & _path, const Hash & hash, const PathSet & references,
     const Path & deriver)
@@ -464,10 +509,8 @@ void registerValidPath(const Transaction & txn,
     Path path(canonPath(_path));
     assertStorePath(path);
 
-    assert(hash.type == htSHA256);
-    
     debug(format("registering path `%1%'") % path);
-    nixDB.setString(txn, dbValidPaths, path, "sha256:" + printHash(hash));
+    setHash(txn, path, hash);
 
     setReferences(txn, path, references);
     
@@ -623,22 +666,6 @@ void deleteFromStore(const Path & _path)
 }
 
 
-static Hash queryHash(const Transaction & txn, const Path & storePath)
-{
-    string s;
-    nixDB.queryString(txn, dbValidPaths, storePath, s);
-    unsigned int colon = s.find(':');
-    if (colon == string::npos)
-        throw Error(format("corrupt hash `%1%' in valid-path entry for `%2%'")
-            % s % storePath);
-    HashType ht = parseHashType(string(s, 0, colon));
-    if (ht == htUnknown)
-        throw Error(format("unknown hash type `%1%' in valid-path entry for `%2%'")
-            % string(0, colon) % storePath);
-    return parseHash(ht, string(s, colon + 1));
-}
-
-
 void verifyStore(bool checkContents)
 {
     Transaction txn(nixDB);
@@ -648,7 +675,6 @@ void verifyStore(bool checkContents)
     nixDB.enumTable(txn, dbValidPaths, paths);
 
     for (Paths::iterator i = paths.begin(); i != paths.end(); ++i) {
-        Path path = *i;
         if (!pathExists(*i)) {
             printMsg(lvlError, format("path `%1%' disappeared") % *i);
             invalidatePath(*i, txn);
@@ -725,6 +751,7 @@ void verifyStore(bool checkContents)
             nixDB.delPair(txn, dbReferences, *i);
         }
         else {
+            bool isValid = validPaths.find(*i) != validPaths.end();
             PathSet references;
             queryReferences(txn, *i, references);
             for (PathSet::iterator j = references.begin();
@@ -734,6 +761,10 @@ void verifyStore(bool checkContents)
                 if (referers.find(*i) == referers.end()) {
                     printMsg(lvlError, format("missing referer mapping from `%1%' to `%2%'")
                         % *j % *i);
+                }
+                if (isValid && validPaths.find(*j) == validPaths.end()) {
+                    printMsg(lvlError, format("incomplete closure: `%1%' needs missing `%2%'")
+                        % *i % *j);
                 }
             }
         }
@@ -766,5 +797,87 @@ void verifyStore(bool checkContents)
         }
     }
 
+    txn.commit();
+}
+
+
+#include "aterm.hh"
+#include "derivations-ast.hh"
+
+
+/* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */
+static void upgradeStore()
+{
+    printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
+
+    Transaction txn(nixDB);
+
+    Paths validPaths2;
+    nixDB.enumTable(txn, dbValidPaths, validPaths2);
+    PathSet validPaths(validPaths2.begin(), validPaths2.end());
+
+    cerr << "hashing paths...";
+    for (PathSet::iterator i = validPaths.begin(); i != validPaths.end(); ++i) {
+        checkInterrupt();
+        string s;
+        nixDB.queryString(txn, dbValidPaths, *i, s);
+        if (s == "") {
+            Hash hash = hashPath(htSHA256, *i);
+            setHash(txn, *i, hash);
+            cerr << ".";
+        }
+    }
+    cerr << "\n";
+
+    cerr << "processing closures...";
+    for (PathSet::iterator i = validPaths.begin(); i != validPaths.end(); ++i) {
+        checkInterrupt();
+        if (i->size() > 6 && string(*i, i->size() - 6) == ".store") {
+            ATerm t = ATreadFromNamedFile(i->c_str());
+            if (!t) throw Error(format("cannot read aterm from `%1%'") % *i);
+
+            ATermList roots, elems;
+            if (!matchOldClosure(t, roots, elems)) continue;
+
+            for (ATermIterator j(elems); j; ++j) {
+
+                ATerm path2;
+                ATermList references2;
+                if (!matchOldClosureElem(*j, path2, references2)) continue;
+
+                Path path = aterm2String(path2);
+                if (validPaths.find(path) == validPaths.end())
+                    /* Skip this path; it's invalid.  This is a normal
+                       condition (Nix <= 0.7 did not enforce closure
+                       on closure store expressions). */
+                    continue;
+
+                PathSet references;
+                for (ATermIterator k(references2); k; ++k) {
+                    Path reference = aterm2String(*k);
+                    if (validPaths.find(reference) == validPaths.end())
+                        /* Bad reference.  Set it anyway and let the
+                           user fix it. */
+                        printMsg(lvlError, format("closure `%1%' contains reference from `%2%' "
+                                     "to invalid path `%3%' (run `nix-store --verify')")
+                            % *i % path % reference);
+                    references.insert(reference);
+                }
+
+                PathSet prevReferences;
+                queryReferences(txn, path, prevReferences);
+                if (prevReferences.size() > 0 && references != prevReferences)
+                    printMsg(lvlError, format("warning: conflicting references for `%1%'") % path);
+
+                if (references != prevReferences)
+                    setReferences(txn, path, references);
+            }
+            
+            cerr << ".";
+        }
+    }
+    cerr << "\n";
+
+    /* !!! maybe this transaction is way too big */
     txn.commit();
 }

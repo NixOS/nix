@@ -9,6 +9,9 @@
 using namespace std;
 
 
+const int nixSchemaVersion = 2;
+
+
 /* A substitute is a program invocation that constructs some store
    path (typically by fetching it from somewhere, e.g., from the
    network). */

@@ -94,6 +94,9 @@ Strings readDirectory(const Path & path);
 string readFile(int fd);
 string readFile(const Path & path);
 
+/* Write a string to a file. */
+void writeFile(const Path & path, const string & s);
+
 /* Delete a path; i.e., in the case of a directory, it is deleted
    recursively.  Don't use this at home, kids. */
 void deletePath(const Path & path);

@@ -82,7 +82,7 @@ void Transaction::moveTo(Transaction & t)
 void Database::requireEnv()
 {
     checkInterrupt();
-    if (!env)throw Error("database environment is not open "
+    if (!env) throw Error("database environment is not open "
         "(maybe you don't have sufficient permission?)");
 }
 

@@ -15,4 +15,4 @@ AM_CXXFLAGS = -Wall \
 derivations-ast.cc derivations-ast.hh: ../aterm-helper.pl derivations-ast.def
 	$(perl) ../aterm-helper.pl derivations-ast.hh derivations-ast.cc < derivations-ast.def
 
-derivations.cc: derivations-ast.hh
+derivations.cc store.cc: derivations-ast.hh
