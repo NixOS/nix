@@ -21,6 +21,7 @@ sys_name=`uname -s | tr [A-Z] [a-z]`
 system="${machine_name}-${sys_name}"
 AC_MSG_RESULT($system)
 AC_SUBST(system)
+AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
 
 AC_PROG_CC
 AC_PROG_CXX
@@ -43,7 +44,8 @@ AC_CHECK_HEADERS([locale])
 AC_LANG_POP(C++)
 
 AC_DEFUN([NEED_PROG],
-[AC_PATH_PROG($1, $2)
+[
+AC_PATH_PROG($1, $2)
 if test -z "$$1"; then
     AC_MSG_ERROR([$1 is required])
 fi

@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <iostream>
 #include <cerrno>
 #include <cstdio>
