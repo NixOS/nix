@@ -5,9 +5,9 @@ AM_INIT_AUTOMAKE
 
 # Put the revision number in the version.
 if REVISION=`test -d $srcdir/.svn && svnversion $srcdir 2> /dev/null`; then
-   VERSION="$VERSION-r$REVISION"
+   VERSION="${VERSION}-pre${REVISION}"
 elif REVISION=`cat $srcdir/svn-revision 2> /dev/null`; then
-   VERSION="$VERSION-r$REVISION"
+   VERSION="${VERSION}-pre${REVISION}"
 fi
 
 AC_PREFIX_DEFAULT(/nix)

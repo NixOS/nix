@@ -1,11 +1,11 @@
 Summary: The Nix software deployment system
 Name: nix
-Version: 0.5
+Version: @version@
 Release: 1
 License: GPL
 Group: WeetNiet
 URL: http://www.cs.uu.nl/groups/ST/twiki/bin/view/Trace/NixDeploymentSystem
-Source0: %{name}-%{version}.tar.gz
+Source0: %{name}-@version@.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 %define _prefix /nix
 Prefix: %{_prefix}

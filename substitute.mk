@@ -8,5 +8,6 @@
 	 -e "s^@libexecdir\@^$(libexecdir)^g" \
 	 -e "s^@system\@^$(system)^g" \
 	 -e "s^@wget\@^$(wget)^g" \
+	 -e "s^@version\@^$(VERSION)^g" \
 	 < $< > $@ || rm $@
-	chmod +x $@
+	if test -x $<; then chmod +x $@; fi
