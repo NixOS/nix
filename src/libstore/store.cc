@@ -331,26 +331,19 @@ static void writeSubstitutes(const Transaction & txn,
 }
 
 
-void registerSubstitutes(const Transaction & txn,
-    const SubstitutePairs & subPairs)
+void registerSubstitute(const Transaction & txn,
+    const Path & srcPath, const Substitute & sub)
 {
-    for (SubstitutePairs::const_iterator i = subPairs.begin();
-         i != subPairs.end(); ++i)
-    {
-        const Path & srcPath(i->first);
-        const Substitute & sub(i->second);
-
-        assertStorePath(srcPath);
+    assertStorePath(srcPath);
     
-        Substitutes subs = readSubstitutes(txn, srcPath);
+    Substitutes subs = readSubstitutes(txn, srcPath);
 
-        /* New substitutes take precedence over old ones.  If the
-           substitute is already present, it's moved to the front. */
-        remove(subs.begin(), subs.end(), sub);
-        subs.push_front(sub);
+    /* New substitutes take precedence over old ones.  If the
+       substitute is already present, it's moved to the front. */
+    remove(subs.begin(), subs.end(), sub);
+    subs.push_front(sub);
         
-        writeSubstitutes(txn, srcPath, subs);
-    }
+    writeSubstitutes(txn, srcPath, subs);
 }
 
 

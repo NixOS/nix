@@ -887,7 +887,6 @@ bool DerivationGoal::prepareBuild()
         /* Add the relevant output closures of the input derivation
            `*i' as input paths.  Only add the closures of output paths
            that are specified as inputs. */
-        /* !!! is `*i' present? */
         assert(isValidPath(i->first));
         Derivation inDrv = derivationFromPath(i->first);
         for (StringSet::iterator j = i->second.begin();

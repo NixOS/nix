@@ -41,9 +41,8 @@ void createStoreTransaction(Transaction & txn);
 void copyPath(const Path & src, const Path & dst);
 
 /* Register a substitute. */
-typedef list<pair<Path, Substitute> > SubstitutePairs;
-void registerSubstitutes(const Transaction & txn,
-    const SubstitutePairs & subPairs);
+void registerSubstitute(const Transaction & txn,
+    const Path & srcPath, const Substitute & sub);
 
 /* Return the substitutes for the given path. */
 Substitutes querySubstitutes(const Path & srcPath);
