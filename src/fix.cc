@@ -1,6 +1,9 @@
 #include <iostream>
 #include <map>
 
+#include <sys/types.h>
+#include <sys/wait.h>
+
 extern "C" {
 #include <aterm2.h>
 }
@@ -23,13 +26,31 @@ void registerFile(string filename)
 }
 
 
+/* Return the directory part of the given path, i.e., everything
+   before the final `/'. */
+string dirOf(string s)
+{
+    unsigned int pos = s.rfind('/');
+    if (pos == string::npos) throw Error("invalid file name");
+    return string(s, 0, pos);
+}
+
+
+/* Return the base name of the given path, i.e., everything following
+   the final `/'. */
+string baseNameOf(string s)
+{
+    unsigned int pos = s.rfind('/');
+    if (pos == string::npos) throw Error("invalid file name");
+    return string(s, pos + 1);
+}
+
+
 /* Download object referenced by the given URL into the sources
    directory.  Return the file name it was downloaded to. */
 string fetchURL(string url)
 {
-    unsigned int pos = url.rfind('/');
-    if (pos == string::npos) throw Error("invalid url");
-    string filename(url, pos + 1);
+    string filename = baseNameOf(url);
     string fullname = nixSourcesDir + "/" + filename;
     /* !!! quoting */
     string shellCmd =
@@ -38,16 +59,6 @@ string fetchURL(string url)
     if (WEXITSTATUS(res) != 0)
         throw Error("cannot fetch " + url);
     return fullname;
-}
-
-
-/* Return the directory part of the given path, i.e., everything
-   before the final `/'. */
-string dirOf(string s)
-{
-    unsigned int pos = s.rfind('/');
-    if (pos == string::npos) throw Error("invalid file name");
-    return string(s, 0, pos);
 }
 
 
@@ -88,12 +99,13 @@ string evaluateFile(ATerm e, string dir)
         int res = system(cmd.c_str());
         if (WEXITSTATUS(res) != 0)
             throw Error("cannot copy " + filename);
+        registerFile(nixSourcesDir + "/" + baseNameOf(filename));
         return hashFile(filename);
     } else throw Error("invalid hash expression");
 }
 
 
-ATerm evaluatePkg(ATerm e, DescriptorMap & done)
+string evaluatePkg(ATerm e, DescriptorMap & done)
 {
     char * s;
     if (ATmatch(e, "<str>", &s)) {
@@ -113,7 +125,7 @@ ATerm evaluate(ATerm e, string dir, DescriptorMap & done)
     else if (ATmatch(e, "File(<term>)", &t))
         return ATmake("File(<str>)", evaluateFile(t, dir).c_str());
     else if (ATmatch(e, "Pkg(<term>)", &t))
-        return ATmake("Pkg(<term>)", evaluatePkg(t, done));
+        return ATmake("Pkg(<str>)", evaluatePkg(t, done).c_str());
     else throw Error("invalid expression type");
 }
 

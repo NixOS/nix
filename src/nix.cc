@@ -6,11 +6,12 @@
 #include <map>
 #include <cstdio>
 
+#include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#include <db4/db_cxx.h>
+#include <db_cxx.h>
 
 extern "C" {
 #include <aterm1.h>
@@ -48,9 +49,7 @@ public:
 
 auto_ptr<Db2> openDB(const string & dbname, bool readonly)
 {
-    auto_ptr<Db2> db;
-
-    db = auto_ptr<Db2>(new Db2(0, 0));
+    auto_ptr<Db2> db(new Db2(0, 0));
 
     db->open((nixHomeDir + "/var/nix/pkginfo.db").c_str(), dbname.c_str(),
         DB_HASH, readonly ? DB_RDONLY : DB_CREATE, 0666);
