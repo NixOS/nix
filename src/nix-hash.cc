@@ -6,9 +6,13 @@
 
 void run(Strings args)
 {
-    for (Strings::iterator it = args.begin();
-         it != args.end(); it++)
-        cout << format("%1%\n") % (string) hashPath(*it);
+    bool flat = false;
+    for (Strings::iterator i = args.begin();
+         i != args.end(); i++)
+        if (*i == "--flat") flat = true;
+        else
+            cout << format("%1%\n") % (string) 
+                (flat ? hashFile(*i) : hashPath(*i));
 }
 
 
