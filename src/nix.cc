@@ -26,9 +26,13 @@ static ArgType argType = atpUnknown;
      --delete / -d: delete values
      --query / -q: query stored values
      --add: add values
-     --verify: verify Nix structures
-     --dump: dump a file or value
+
+     --dump: dump a value as a Nix archive
+     --restore: restore a value from a Nix archive
+
      --init: initialise the Nix database
+     --verify: verify Nix structures
+
      --version: output version information
      --help: display help
 
@@ -132,14 +136,14 @@ struct StdoutSink : DumpSink
     virtual void operator ()
         (const unsigned char * data, unsigned int len)
     {
-        /* Don't use cout, it's slow as hell! */
-        if (write(STDOUT_FILENO, (char *) data, len) != len)
+        if (write(STDOUT_FILENO, (char *) data, len) != (ssize_t) len)
             throw SysError("writing to stdout");
     }
 };
 
 
-/* Dump a value to standard output */
+/* Dump a value as a Nix archive.  The archive is written to standard
+   output. */
 static void opDump(Strings opFlags, Strings opArgs)
 {
     getArgType(opFlags);
@@ -157,7 +161,33 @@ static void opDump(Strings opFlags, Strings opArgs)
     else if (argType == atpPath)
         path = arg;
 
-    dumpPath(*opArgs.begin(), sink);
+    dumpPath(path, sink);
+}
+
+
+/* A source that read restore intput to stdin. */
+struct StdinSource : RestoreSource
+{
+    virtual void operator () (const unsigned char * data, unsigned int len)
+    {
+        ssize_t res = read(STDIN_FILENO, (char *) data, len);
+        if (res == -1)
+            throw SysError("reading from stdin");
+        if (res != (ssize_t) len)
+            throw Error("not enough data available on stdin");
+    }
+};
+
+
+/* Restore a value from a Nix archive.  The archive is written to
+   standard input. */
+static void opRestore(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty()) throw UsageError("unknown flag");
+    if (opArgs.size() != 1) throw UsageError("only one argument allowed");
+
+    StdinSource source;
+    restorePath(*opArgs.begin(), source);
 }
 
 
@@ -219,6 +249,8 @@ void run(int argc, char * * argv)
             op = opAdd;
         else if (arg == "--dump")
             op = opDump;
+        else if (arg == "--restore")
+            op = opRestore;
         else if (arg == "--init")
             op = opInit;
         else if (arg[0] == '-')
