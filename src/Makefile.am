@@ -1,22 +1,24 @@
 bin_PROGRAMS = nix nix-hash fix
 check_PROGRAMS = test
 
+
 AM_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall -I.. -I../externals/inst/include $(CXXFLAGS)
-AM_LDFLAGS = -L../externals/inst/lib -ldb_cxx -lATerm $(LDFLAGS)
+LDADD = -L../externals/inst/lib -ldb_cxx -lATerm -L../boost/format -lformat
 
 nix_SOURCES = nix.cc dotgraph.cc
-nix_LDADD = libshared.a libnix.a -ldb_cxx -lATerm
+nix_LDADD = libshared.a libnix.a $(LDADD)
 
 nix_hash_SOURCES = nix-hash.cc
-nix_hash_LDADD = libshared.a libnix.a -ldb_cxx -lATerm
+nix_hash_LDADD = libshared.a libnix.a $(LDADD)
 
 fix_SOURCES = fix.cc
-fix_LDADD = libshared.a libnix.a -ldb_cxx -lATerm
+fix_LDADD = libshared.a libnix.a $(LDADD)
 
 TESTS = test
 
 test_SOURCES = test.cc
-test_LDADD = libshared.a libnix.a -ldb_cxx -lATerm
+test_LDADD = libshared.a libnix.a $(LDADD)
+
 
 noinst_LIBRARIES = libnix.a libshared.a
 

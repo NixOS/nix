@@ -45,8 +45,8 @@ struct group0
 
 template <class Ch, class Tr>
 inline
-BOOST_IO_STD basic_ostream<Ch, Tr>&
-operator << ( BOOST_IO_STD basic_ostream<Ch, Tr>& os,
+BOOST_IO_STD ostream&
+operator << ( BOOST_IO_STD ostream& os,
              const group0& )
 { 
    return os; 
@@ -63,8 +63,8 @@ struct group1
 
 template <class Ch, class Tr, class T1>
 inline
-BOOST_IO_STD basic_ostream<Ch, Tr>&
-operator << (BOOST_IO_STD basic_ostream<Ch, Tr>& os,
+BOOST_IO_STD ostream&
+operator << (BOOST_IO_STD ostream& os,
              const group1<T1>& x)
 { 
    os << x.a1_;  
@@ -86,8 +86,8 @@ struct group2
 
 template <class Ch, class Tr, class T1,class T2>
 inline
-BOOST_IO_STD basic_ostream<Ch, Tr>&
-operator << (BOOST_IO_STD basic_ostream<Ch, Tr>& os,
+BOOST_IO_STD ostream&
+operator << (BOOST_IO_STD ostream& os,
              const group2<T1,T2>& x)
 { 
    os << x.a1_<< x.a2_;  
@@ -107,8 +107,8 @@ struct group3
 
 template <class Ch, class Tr, class T1,class T2,class T3>
 inline
-BOOST_IO_STD basic_ostream<Ch, Tr>&
-operator << (BOOST_IO_STD basic_ostream<Ch, Tr>& os,
+BOOST_IO_STD ostream&
+operator << (BOOST_IO_STD ostream& os,
              const group3<T1,T2,T3>& x)
 { 
    os << x.a1_<< x.a2_<< x.a3_;  
@@ -129,8 +129,8 @@ struct group4
 
 template <class Ch, class Tr, class T1,class T2,class T3,class T4>
 inline
-BOOST_IO_STD basic_ostream<Ch, Tr>&
-operator << (BOOST_IO_STD basic_ostream<Ch, Tr>& os,
+BOOST_IO_STD ostream&
+operator << (BOOST_IO_STD ostream& os,
              const group4<T1,T2,T3,T4>& x)
 { 
    os << x.a1_<< x.a2_<< x.a3_<< x.a4_;  
@@ -152,8 +152,8 @@ struct group5
 
 template <class Ch, class Tr, class T1,class T2,class T3,class T4,class T5>
 inline
-BOOST_IO_STD basic_ostream<Ch, Tr>&
-operator << (BOOST_IO_STD basic_ostream<Ch, Tr>& os,
+BOOST_IO_STD ostream&
+operator << (BOOST_IO_STD ostream& os,
              const group5<T1,T2,T3,T4,T5>& x)
 { 
    os << x.a1_<< x.a2_<< x.a3_<< x.a4_<< x.a5_;  
@@ -176,8 +176,8 @@ struct group6
 
 template <class Ch, class Tr, class T1,class T2,class T3,class T4,class T5,class T6>
 inline
-BOOST_IO_STD basic_ostream<Ch, Tr>&
-operator << (BOOST_IO_STD basic_ostream<Ch, Tr>& os,
+BOOST_IO_STD ostream&
+operator << (BOOST_IO_STD ostream& os,
              const group6<T1,T2,T3,T4,T5,T6>& x)
 { 
    os << x.a1_<< x.a2_<< x.a3_<< x.a4_<< x.a5_<< x.a6_;  
@@ -201,8 +201,8 @@ struct group7
 
 template <class Ch, class Tr, class T1,class T2,class T3,class T4,class T5,class T6,class T7>
 inline
-BOOST_IO_STD basic_ostream<Ch, Tr>&
-operator << (BOOST_IO_STD basic_ostream<Ch, Tr>& os,
+BOOST_IO_STD ostream&
+operator << (BOOST_IO_STD ostream& os,
              const group7<T1,T2,T3,T4,T5,T6,T7>& x)
 { 
    os << x.a1_<< x.a2_<< x.a3_<< x.a4_<< x.a5_<< x.a6_<< x.a7_;  
@@ -227,8 +227,8 @@ struct group8
 
 template <class Ch, class Tr, class T1,class T2,class T3,class T4,class T5,class T6,class T7,class T8>
 inline
-BOOST_IO_STD basic_ostream<Ch, Tr>&
-operator << (BOOST_IO_STD basic_ostream<Ch, Tr>& os,
+BOOST_IO_STD ostream&
+operator << (BOOST_IO_STD ostream& os,
              const group8<T1,T2,T3,T4,T5,T6,T7,T8>& x)
 { 
    os << x.a1_<< x.a2_<< x.a3_<< x.a4_<< x.a5_<< x.a6_<< x.a7_<< x.a8_;  
@@ -254,8 +254,8 @@ struct group9
 
 template <class Ch, class Tr, class T1,class T2,class T3,class T4,class T5,class T6,class T7,class T8,class T9>
 inline
-BOOST_IO_STD basic_ostream<Ch, Tr>&
-operator << (BOOST_IO_STD basic_ostream<Ch, Tr>& os,
+BOOST_IO_STD ostream&
+operator << (BOOST_IO_STD ostream& os,
              const group9<T1,T2,T3,T4,T5,T6,T7,T8,T9>& x)
 { 
    os << x.a1_<< x.a2_<< x.a3_<< x.a4_<< x.a5_<< x.a6_<< x.a7_<< x.a8_<< x.a9_;  
@@ -282,8 +282,8 @@ struct group10
 
 template <class Ch, class Tr, class T1,class T2,class T3,class T4,class T5,class T6,class T7,class T8,class T9,class T10>
 inline
-BOOST_IO_STD basic_ostream<Ch, Tr>&
-operator << (BOOST_IO_STD basic_ostream<Ch, Tr>& os,
+BOOST_IO_STD ostream&
+operator << (BOOST_IO_STD ostream& os,
              const group10<T1,T2,T3,T4,T5,T6,T7,T8,T9,T10>& x)
 { 
    os << x.a1_<< x.a2_<< x.a3_<< x.a4_<< x.a5_<< x.a6_<< x.a7_<< x.a8_<< x.a9_<< x.a10_;  

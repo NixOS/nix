@@ -25,6 +25,9 @@
 #include <cassert>
 
 #include <locale>
+//#define BOOST_NO_STD_LOCALE
+//#define BOOST_NO_LOCALE_ISIDIGIT
+//#include <cctype>
 
 #include <boost/format/macros_default.hpp>
 
@@ -54,15 +57,15 @@ namespace boost
 #include <boost/format/exceptions.hpp>
 
 // **** Implementation -------------------------------------------
-#include <boost/format/format_implementation.hpp>   // member functions
+//#include <boost/format/format_implementation.hpp>   // member functions
 
 #include <boost/format/group.hpp>                   // class for grouping arguments
 
 #include <boost/format/feed_args.hpp>               // argument-feeding functions
-#include <boost/format/parsing.hpp>                 // format-string parsing (member-)functions
+//#include <boost/format/parsing.hpp>                 // format-string parsing (member-)functions
 
 // **** Implementation of the free functions ----------------------
-#include <boost/format/free_funcs.hpp>
+//#include <boost/format/free_funcs.hpp>
 
 
 #endif // BOOST_FORMAT_HPP

@@ -19,27 +19,26 @@
 #ifndef BOOST_FORMAT_FUNCS_HPP
 #define BOOST_FORMAT_FUNCS_HPP
 
-#include "boost/format/format_class.hpp"
+#include "boost/format.hpp"
 //#include "boost/throw_exception.hpp"
 
 namespace boost {
 
 namespace io {
-  template<class Ch, class Tr> inline 
-  std::basic_string<Ch, Tr> str(const basic_format<Ch, Tr>& f) 
+  inline 
+  std::string str(const basic_format& f) 
     // adds up all pieces of strings and converted items, and return the formatted string
   {
     return f.str();
   }
 }   // - namespace io
 
-template< class Ch, class Tr>
-BOOST_IO_STD basic_ostream<Ch, Tr>& 
-operator<<( BOOST_IO_STD basic_ostream<Ch, Tr>& os, 
-            const boost::basic_format<Ch, Tr>& f) 
+BOOST_IO_STD ostream& 
+operator<<( BOOST_IO_STD ostream& os, 
+            const boost::basic_format& f) 
   // effect: "return os << str(f);" but we can try to do it faster
 {
-  typedef boost::basic_format<Ch, Tr>   format_t;
+  typedef boost::basic_format   format_t;
   if(f.items_.size()==0) 
     os << f.prefix_;
   else {
@@ -53,7 +52,7 @@ operator<<( BOOST_IO_STD basic_ostream<Ch, Tr>& os,
       os << f.prefix_;
       for(unsigned long i=0; i<f.items_.size(); ++i) 
         {
-          const typename format_t::format_item_t& item = f.items_[i];
+          const format_t::format_item_t& item = f.items_[i];
           os << item.res_;
           os << item.appendix_;
 

@@ -33,22 +33,21 @@ namespace detail {
 // --------------
 // set of params that define the format state of a stream
 
-template<class Ch, class Tr> 
 struct stream_format_state 
 {
-  typedef BOOST_IO_STD basic_ios<Ch, Tr>   basic_ios;
+  typedef std::ios   basic_ios;
 
   std::streamsize width_;
   std::streamsize precision_;
-  Ch fill_; 
-  std::ios_base::fmtflags flags_;
+  char fill_; 
+  std::ios::fmtflags flags_;
 
-  stream_format_state()       : width_(-1), precision_(-1), fill_(0), flags_(std::ios_base::dec)  {}
+  stream_format_state()       : width_(-1), precision_(-1), fill_(0), flags_(std::ios::dec)  {}
   stream_format_state(basic_ios& os)                  {set_by_stream(os); }
 
   void apply_on(basic_ios & os) const;                //- applies format_state to the stream
   template<class T> void apply_manip(T manipulator)   //- modifies state by applying manipulator.
-       { apply_manip_body<Ch, Tr, T>( *this, manipulator) ; }
+       { apply_manip_body<T>( *this, manipulator) ; }
   void reset();                                       //- sets to default state.
   void set_by_stream(const basic_ios& os);            //- sets to os's state.
 };  
@@ -58,7 +57,6 @@ struct stream_format_state
 // --------------
 // format_item : stores all parameters that can be defined by directives in the format-string
 
-template<class Ch, class Tr>  
 struct format_item 
 {     
   enum pad_values { zeropad = 1, spacepad =2, centered=4, tabulation = 8 };
@@ -67,10 +65,10 @@ struct format_item
                     argN_tabulation = -2, // tabulation directive. (no argument read) 
                     argN_ignored    = -3  // ignored directive. (no argument read)
   };
-  typedef BOOST_IO_STD basic_ios<Ch, Tr>              basic_ios;
-  typedef detail::stream_format_state<Ch, Tr>         stream_format_state;
-  typedef std::basic_string<Ch, Tr>           string_t;
-  typedef BOOST_IO_STD basic_ostringstream<Ch, Tr>    internal_stream_t;
+  typedef BOOST_IO_STD ios              basic_ios;
+  typedef detail::stream_format_state         stream_format_state;
+  typedef std::string           string_t;
+  typedef BOOST_IO_STD ostringstream    internal_stream_t;
 
 
   int         argN_;           //- argument number (starts at 0,  eg : %1 => argN=0)
@@ -98,8 +96,8 @@ struct format_item
 // -----------------------------------------------------------
 
 // --- stream_format_state:: -------------------------------------------
-template<class Ch, class Tr> inline
-void stream_format_state<Ch,Tr> ::apply_on(basic_ios & os) const
+inline
+void stream_format_state::apply_on(basic_ios & os) const
   // set the state of this stream according to our params
 {
       if(width_ != -1)
@@ -111,8 +109,8 @@ void stream_format_state<Ch,Tr> ::apply_on(basic_ios & os) const
       os.flags(flags_);
 }
 
-template<class Ch, class Tr>      inline
-void stream_format_state<Ch,Tr> ::set_by_stream(const basic_ios& os) 
+inline
+void stream_format_state::set_by_stream(const basic_ios& os) 
   // set our params according to the state of this stream
 {
       flags_ = os.flags();
@@ -121,42 +119,42 @@ void stream_format_state<Ch,Tr> ::set_by_stream(const basic_ios& os)
       fill_ = os.fill();
 }
 
-template<class Ch, class Tr, class T>  inline
-void apply_manip_body( stream_format_state<Ch, Tr>& self,
+template<class T>  inline
+void apply_manip_body( stream_format_state& self,
                        T manipulator) 
   // modify our params according to the manipulator
 {
-      BOOST_IO_STD basic_stringstream<Ch, Tr>  ss;
+      BOOST_IO_STD stringstream  ss;
       self.apply_on( ss );
       ss << manipulator;
       self.set_by_stream( ss );
 }
 
-template<class Ch, class Tr> inline
-void stream_format_state<Ch,Tr> ::reset() 
+inline
+void stream_format_state::reset() 
   // set our params to standard's default state
 {
       width_=-1; precision_=-1; fill_=0; 
-      flags_ = std::ios_base::dec; 
+      flags_ = std::ios::dec; 
 }
 
 
 // --- format_items:: -------------------------------------------
-template<class Ch, class Tr> inline
-void format_item<Ch, Tr> ::compute_states() 
+inline
+void format_item::compute_states() 
   // reflect pad_scheme_   on  state_ and ref_state_ 
   //   because some pad_schemes has complex consequences on several state params.
 {
   if(pad_scheme_ & zeropad) 
   {
-    if(ref_state_.flags_ & std::ios_base::left) 
+    if(ref_state_.flags_ & std::ios::left) 
     {
       pad_scheme_ = pad_scheme_ & (~zeropad); // ignore zeropad in left alignment
     }
     else 
     { 
       ref_state_.fill_='0'; 
-      ref_state_.flags_ |= std::ios_base::internal;
+      ref_state_.flags_ |= std::ios::internal;
     }
   }
   state_ = ref_state_;

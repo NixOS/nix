@@ -16,8 +16,12 @@ AC_PATH_PROG(wget, wget)
 AC_CHECK_LIB(pthread, pthread_mutex_init)
 
 AM_CONFIG_HEADER([config.h])
-AC_CONFIG_FILES([Makefile externals/Makefile src/Makefile scripts/Makefile
-			  corepkgs/Makefile corepkgs/fetchurl/Makefile
-			  corepkgs/nar/Makefile
-			  doc/Makefile doc/manual/Makefile])
+AC_CONFIG_FILES([Makefile 
+   externals/Makefile
+   boost/Makefile boost/format/Makefile
+   src/Makefile
+   scripts/Makefile
+   corepkgs/Makefile corepkgs/fetchurl/Makefile corepkgs/nar/Makefile
+   doc/Makefile doc/manual/Makefile
+  ])
 AC_OUTPUT

@@ -22,13 +22,12 @@
 
 //#include <boost/throw_exception.hpp>
 //#include <boost/assert.hpp>
-#include <boost/format/format_class.hpp>
+#include <boost/format.hpp>
 
 namespace boost {
 
 // --------  format:: -------------------------------------------
-template< class Ch, class Tr>
-basic_format<Ch, Tr> ::basic_format(const Ch* str)
+basic_format::basic_format(const char* str)
     : style_(0), cur_arg_(0), num_args_(0), dumped_(false),
       items_(), oss_(), exceptions_(io::all_error_bits)
 {
@@ -39,8 +38,7 @@ basic_format<Ch, Tr> ::basic_format(const Ch* str)
 }
 
 #ifndef BOOST_NO_STD_LOCALE
-template< class Ch, class Tr>
-basic_format<Ch, Tr> ::basic_format(const Ch* str, const std::locale & loc)
+basic_format::basic_format(const char* str, const std::locale & loc)
     : style_(0), cur_arg_(0), num_args_(0), dumped_(false),
       items_(), oss_(), exceptions_(io::all_error_bits)
 {
@@ -51,8 +49,7 @@ basic_format<Ch, Tr> ::basic_format(const Ch* str, const std::locale & loc)
     parse( str );
 }
 
-template< class Ch, class Tr>
-basic_format<Ch, Tr> ::basic_format(const string_t& s, const std::locale & loc)
+basic_format::basic_format(const string_t& s, const std::locale & loc)
     : style_(0), cur_arg_(0), num_args_(0), dumped_(false),
       items_(),  oss_(), exceptions_(io::all_error_bits)
 {
@@ -62,8 +59,7 @@ basic_format<Ch, Tr> ::basic_format(const string_t& s, const std::locale & loc)
 }
 #endif //BOOST_NO_STD_LOCALE
 
-template< class Ch, class Tr>
-basic_format<Ch, Tr> ::basic_format(const string_t& s)
+basic_format::basic_format(const string_t& s)
     : style_(0), cur_arg_(0), num_args_(0), dumped_(false),
       items_(),  oss_(), exceptions_(io::all_error_bits)
 {
@@ -71,8 +67,7 @@ basic_format<Ch, Tr> ::basic_format(const string_t& s)
     parse(s);  
 }
 
-template< class Ch, class Tr>
-basic_format<Ch, Tr> :: basic_format(const basic_format& x)
+basic_format:: basic_format(const basic_format& x)
     : style_(x.style_), cur_arg_(x.cur_arg_), num_args_(x.num_args_), dumped_(false), 
       items_(x.items_), prefix_(x.prefix_), bound_(x.bound_), 
       oss_(),   // <- we obviously can't copy x.oss_
@@ -81,8 +76,7 @@ basic_format<Ch, Tr> :: basic_format(const basic_format& x)
     state0_.apply_on(oss_);
 } 
 
-template< class Ch, class Tr>
-basic_format<Ch, Tr>& basic_format<Ch, Tr> ::operator= (const basic_format& x)
+basic_format& basic_format::operator= (const basic_format& x)
 {
     if(this == &x)
       return *this;
@@ -102,14 +96,12 @@ basic_format<Ch, Tr>& basic_format<Ch, Tr> ::operator= (const basic_format& x)
 }
 
 
-template< class Ch, class Tr>
-unsigned char basic_format<Ch,Tr> ::exceptions() const 
+unsigned char basic_format::exceptions() const 
 {
   return exceptions_; 
 }
 
-template< class Ch, class Tr>
-unsigned char basic_format<Ch,Tr> ::exceptions(unsigned char newexcept) 
+unsigned char basic_format::exceptions(unsigned char newexcept) 
 { 
   unsigned char swp = exceptions_; 
   exceptions_ = newexcept; 
@@ -117,8 +109,7 @@ unsigned char basic_format<Ch,Tr> ::exceptions(unsigned char newexcept)
 }
 
 
-template< class Ch, class Tr>
-basic_format<Ch,Tr>& basic_format<Ch,Tr> ::clear()
+basic_format& basic_format ::clear()
   // empty the string buffers (except bound arguments, see clear_binds() )
   // and make the format object ready for formatting a new set of arguments
 {
@@ -138,8 +129,7 @@ basic_format<Ch,Tr>& basic_format<Ch,Tr> ::clear()
     return *this;
 }
 
-template< class Ch, class Tr>
-basic_format<Ch,Tr>& basic_format<Ch,Tr> ::clear_binds() 
+basic_format& basic_format ::clear_binds() 
   // cancel all bindings, and clear()
 {
     bound_.resize(0);
@@ -147,8 +137,7 @@ basic_format<Ch,Tr>& basic_format<Ch,Tr> ::clear_binds()
     return *this;
 }
 
-template< class Ch, class Tr>
-basic_format<Ch,Tr>& basic_format<Ch,Tr> ::clear_bind(int argN) 
+basic_format& basic_format::clear_bind(int argN) 
   // cancel the binding of ONE argument, and clear()
 {
     if(argN<1 || argN > num_args_ || bound_.size()==0 || !bound_[argN-1] ) 
@@ -164,8 +153,7 @@ basic_format<Ch,Tr>& basic_format<Ch,Tr> ::clear_bind(int argN)
 
 
 
-template< class Ch, class Tr>
-std::basic_string<Ch,Tr> basic_format<Ch,Tr> ::str() const
+std::string basic_format::str() const
 {
   dumped_=true;
   if(items_.size()==0)
@@ -201,8 +189,8 @@ std::basic_string<Ch,Tr> basic_format<Ch,Tr> ::str() const
 namespace io {
 namespace detail {
 
-template<class Ch, class Tr, class T> 
-basic_format<Ch, Tr>&  bind_arg_body( basic_format<Ch, Tr>& self, 
+template<class T>
+basic_format&  bind_arg_body( basic_format& self, 
                                       int argN, 
                                       const T& val)
   // bind one argument to a fixed value
@@ -239,8 +227,8 @@ basic_format<Ch, Tr>&  bind_arg_body( basic_format<Ch, Tr>& self,
     return self;
 }
 
-template<class Ch, class Tr, class T> 
-basic_format<Ch, Tr>&  modify_item_body( basic_format<Ch, Tr>& self,
+template<class T>
+basic_format&  modify_item_body( basic_format& self,
                                       int itemN, 
                                       const T& manipulator)
   // applies a manipulator to the format_item describing a given directive.

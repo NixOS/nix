@@ -24,13 +24,9 @@
 
 namespace boost {
 
-template<class charT, class Traits = BOOST_IO_STD char_traits<charT> > class basic_format;
+class basic_format;
 
-typedef basic_format<char >     format;
-
-#if !defined(BOOST_NO_STD_WSTRING) && !defined(BOOST_NO_STD_WSTREAMBUF)
-typedef basic_format<wchar_t >  wformat;
-#endif
+typedef basic_format    format;
 
 namespace io {
 enum format_error_bits { bad_format_string_bit = 1, 
@@ -39,15 +35,13 @@ enum format_error_bits { bad_format_string_bit = 1,
                          all_error_bits = 255, no_error_bits=0 };
                   
 // Convertion:  format   to   string
-template<class Ch, class Tr> 
-std::basic_string<Ch, Tr>     str(const basic_format<Ch, Tr>& ) ;
+std::string     str(const basic_format& ) ;
 
 } // namespace io
 
 
-template< class Ch, class Tr> 
-BOOST_IO_STD basic_ostream<Ch, Tr>& 
-operator<<( BOOST_IO_STD basic_ostream<Ch, Tr>&, const basic_format<Ch, Tr>&);
+BOOST_IO_STD ostream& 
+operator<<( BOOST_IO_STD ostream&, const basic_format&);
 
 
 } // namespace boost

@@ -31,17 +31,16 @@ namespace io {
 namespace detail {
 namespace  { 
 
-  template<class Tr, class Ch> inline
-  void empty_buf(BOOST_IO_STD basic_ostringstream<Ch,Tr> & os) { 
-    static const std::basic_string<Ch, Tr> emptyStr;
+  inline
+  void empty_buf(BOOST_IO_STD ostringstream & os) { 
+    static const std::string emptyStr;
     os.str(emptyStr); 
   }
 
-  template<class Ch, class Tr>
-  void do_pad( std::basic_string<Ch,Tr> & s, 
+  void do_pad( std::string & s, 
                 std::streamsize w, 
-                const Ch c, 
-                std::ios_base::fmtflags f, 
+                const char c, 
+                std::ios::fmtflags f, 
                 bool center) 
     // applies centered / left / right  padding  to the string s.
     // Effects : string s is padded.
@@ -59,7 +58,7 @@ namespace  {
       } 
     else 
       {
-        if(f & std::ios_base::left) {
+        if(f & std::ios::left) {
           s.append(n, c);
         }
         else {
@@ -69,32 +68,32 @@ namespace  {
   } // -do_pad(..) 
 
 
-  template< class Ch, class Tr, class T> inline
-  void put_head(BOOST_IO_STD basic_ostream<Ch, Tr>& , const T& ) {
+  template<class T> inline
+  void put_head(BOOST_IO_STD ostream& , const T& ) {
   }
 
-  template< class Ch, class Tr, class T> inline
-  void put_head( BOOST_IO_STD basic_ostream<Ch, Tr>& os, const group1<T>& x ) {
+  template<class T> inline
+  void put_head( BOOST_IO_STD ostream& os, const group1<T>& x ) {
     os << group_head(x.a1_); // send the first N-1 items, not the last
   }
 
-  template< class Ch, class Tr, class T> inline
-  void put_last( BOOST_IO_STD basic_ostream<Ch, Tr>& os, const T& x ) {
+  template<class T> inline
+  void put_last( BOOST_IO_STD ostream& os, const T& x ) {
     os << x ;
   }
 
-  template< class Ch, class Tr, class T> inline
-  void put_last( BOOST_IO_STD basic_ostream<Ch, Tr>& os, const group1<T>& x ) {
+  template<class T> inline
+  void put_last( BOOST_IO_STD ostream& os, const group1<T>& x ) {
     os << group_last(x.a1_); // this selects the last element
   }
 
 #ifndef BOOST_NO_OVERLOAD_FOR_NON_CONST 
-  template< class Ch, class Tr, class T> inline
-  void put_head( BOOST_IO_STD basic_ostream<Ch, Tr>& , T& ) {
+  template<class T> inline
+  void put_head( BOOST_IO_STD ostream& , T& ) {
   }
 
-  template< class Ch, class Tr, class T> inline
-  void put_last( BOOST_IO_STD basic_ostream<Ch, Tr>& os, T& x ) {
+  template<class T> inline
+  void put_last( BOOST_IO_STD ostream& os, T& x ) {
     os << x ;
   }
 #endif
@@ -102,19 +101,19 @@ namespace  {
 
 
   
-template< class Ch, class Tr, class T> 
+template<class T> 
 void put( T x, 
-          const format_item<Ch, Tr>& specs, 
-          std::basic_string<Ch, Tr> & res, 
-          BOOST_IO_STD basic_ostringstream<Ch, Tr>& oss_ )
+          const format_item& specs, 
+          std::string & res, 
+          BOOST_IO_STD ostringstream& oss_ )
 {
   // does the actual conversion of x, with given params, into a string
   // using the *supplied* strinstream. (the stream state is important)
 
-  typedef std::basic_string<Ch, Tr> string_t;
-  typedef format_item<Ch, Tr>  format_item_t;
+  typedef std::string string_t;
+  typedef format_item  format_item_t;
 
-  stream_format_state<Ch, Tr>   prev_state(oss_);
+  stream_format_state   prev_state(oss_);
     
   specs.state_.apply_on(oss_);
 
@@ -124,8 +123,8 @@ void put( T x,
   empty_buf( oss_);
 
   const std::streamsize w=oss_.width();
-  const std::ios_base::fmtflags fl=oss_.flags();
-  const bool internal = (fl & std::ios_base::internal) != 0;
+  const std::ios::fmtflags fl=oss_.flags();
+  const bool internal = (fl & std::ios::internal) != 0;
   const bool two_stepped_padding = internal
     &&  ! ( specs.pad_scheme_ & format_item_t::spacepad ) 
     && specs.truncate_ < 0 ;
@@ -203,8 +202,8 @@ void put( T x,
 
 
 
-template< class Ch, class Tr, class T> 
-void distribute(basic_format<Ch,Tr>& self, T x) 
+template<class T> 
+void distribute(basic_format& self, T x) 
   // call put(x, ..) on every occurence of the current argument :
 {
   if(self.cur_arg_ >= self.num_args_)
@@ -217,16 +216,16 @@ void distribute(basic_format<Ch,Tr>& self, T x)
     {
       if(self.items_[i].argN_ == self.cur_arg_)
         {
-          put<Ch, Tr, T> (x, self.items_[i], self.items_[i].res_, self.oss_ );
+          put<T> (x, self.items_[i], self.items_[i].res_, self.oss_ );
         }
     }
 }
 
-template<class Ch, class Tr, class T> 
-basic_format<Ch, Tr>&  feed(basic_format<Ch,Tr>& self, T x) 
+template<class T> 
+basic_format&  feed(basic_format& self, T x) 
 {
   if(self.dumped_) self.clear();
-  distribute<Ch, Tr, T> (self, x);
+  distribute<T> (self, x);
   ++self.cur_arg_;
   if(self.bound_.size() != 0)
     {

@@ -26,8 +26,8 @@ namespace boost {
 namespace io {
 
 namespace detail {
-  template<class Ch, class Tr> struct stream_format_state;
-  template<class Ch, class Tr> struct format_item;
+  struct stream_format_state;
+  struct format_item;
 }
 
 
@@ -37,24 +37,24 @@ namespace detail {
   // but MSVC have problems with template member functions :
 
   // defined in format_implementation.hpp :
-     template<class Ch, class Tr, class T> 
-     basic_format<Ch, Tr>&  modify_item_body( basic_format<Ch, Tr>& self, 
+     template<class T> 
+     basic_format&  modify_item_body( basic_format& self, 
                                           int itemN, const T& manipulator);
 
-     template<class Ch, class Tr, class T> 
-     basic_format<Ch, Tr>&  bind_arg_body( basic_format<Ch, Tr>& self,
+     template<class T> 
+     basic_format&  bind_arg_body( basic_format& self,
                                            int argN, const T& val);
 
-    template<class Ch, class Tr, class T> 
-    void apply_manip_body( stream_format_state<Ch, Tr>& self,
+    template<class T> 
+    void apply_manip_body( stream_format_state& self,
                            T manipulator);
 
   // argument feeding (defined in feed_args.hpp ) :
-     template<class Ch, class Tr, class T> 
-     void distribute(basic_format<Ch,Tr>& self, T x);
+     template<class T> 
+     void distribute(basic_format& self, T x);
 
-     template<class Ch, class Tr, class T> 
-     basic_format<Ch, Tr>& feed(basic_format<Ch,Tr>& self, T x);
+     template<class T> 
+     basic_format& feed(basic_format& self, T x);
  
 } // namespace detail
 

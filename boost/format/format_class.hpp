@@ -30,26 +30,21 @@
 
 namespace boost {
 
-template<class Ch, class Tr>
 class basic_format 
 {
 public:
-  typedef Ch  CharT;   // those 2 are necessary for borland compatibilty,
-  typedef Tr  Traits;  // in the body of the operator% template.
-
-
-  typedef std::basic_string<Ch, Tr>                string_t;
-  typedef BOOST_IO_STD basic_ostringstream<Ch, Tr> internal_stream_t;
+  typedef std::string                string_t;
+  typedef BOOST_IO_STD ostringstream internal_stream_t;
 private:
-  typedef BOOST_IO_STD basic_ostream<Ch, Tr>       stream_t;
-  typedef io::detail::stream_format_state<Ch, Tr>  stream_format_state;
-  typedef io::detail::format_item<Ch, Tr>          format_item_t;
+  typedef BOOST_IO_STD ostream       stream_t;
+  typedef io::detail::stream_format_state  stream_format_state;
+  typedef io::detail::format_item          format_item_t;
 
 public:
-  basic_format(const Ch* str);
+  basic_format(const char* str);
   basic_format(const string_t& s);
 #ifndef BOOST_NO_STD_LOCALE
-  basic_format(const Ch* str, const std::locale & loc);
+  basic_format(const char* str, const std::locale & loc);
   basic_format(const string_t& s, const std::locale & loc);
 #endif // no locale
   basic_format(const basic_format& x);
@@ -60,13 +55,13 @@ public:
   // pass arguments through those operators :
   template<class T>  basic_format&   operator%(const T& x) 
   { 
-    return io::detail::feed<CharT, Traits, const T&>(*this,x);
+    return io::detail::feed<const T&>(*this,x);
   }
 
 #ifndef BOOST_NO_OVERLOAD_FOR_NON_CONST
   template<class T>  basic_format&   operator%(T& x) 
   {
-    return io::detail::feed<CharT, Traits, T&>(*this,x);
+    return io::detail::feed<T&>(*this,x);
   }
 #endif
 
@@ -93,21 +88,21 @@ public:
 
   // final output
   string_t str() const;
-  friend BOOST_IO_STD basic_ostream<Ch, Tr>& 
-  operator<< <Ch, Tr> ( BOOST_IO_STD basic_ostream<Ch, Tr>& , const basic_format& ); 
+  friend BOOST_IO_STD ostream& 
+  operator<< ( BOOST_IO_STD ostream& , const basic_format& ); 
                       
 
-  template<class Ch2, class Tr2, class T>  friend basic_format<Ch2, Tr2>&  
-  io::detail::feed(basic_format<Ch2,Tr2>&, T);
+  template<class T>  friend basic_format&  
+  io::detail::feed(basic_format&, T);
     
-  template<class Ch2, class Tr2, class T>  friend   
-  void io::detail::distribute(basic_format<Ch2,Tr2>&, T);
+  template<class T>  friend   
+  void io::detail::distribute(basic_format&, T);
   
-  template<class Ch2, class Tr2, class T>  friend
-  basic_format<Ch2, Tr2>&  io::detail::modify_item_body(basic_format<Ch2, Tr2>&, int, const T&);
+  template<class T>  friend
+  basic_format&  io::detail::modify_item_body(basic_format&, int, const T&);
 
-  template<class Ch2, class Tr2, class T> friend
-  basic_format<Ch2, Tr2>&  io::detail::bind_arg_body(basic_format<Ch2, Tr2>&, int, const T&);
+  template<class T> friend
+  basic_format&  io::detail::bind_arg_body(basic_format&, int, const T&);
 
 // make the members private only if the friend templates are supported
 private:
