@@ -28,8 +28,10 @@ PathLocks::PathLocks(const Strings & _paths)
 
         debug(format("locking path `%1%'") % path);
 
-        if (lockedPaths.find(lockPath) != lockedPaths.end())
-            throw Error(format("already holding lock on `%1%'") % lockPath);
+        if (lockedPaths.find(lockPath) != lockedPaths.end()) {
+            debug(format("already holding lock on `%1%'") % lockPath);
+            continue;
+        }
         
         /* Open/create the lock file. */
         int fd = open(lockPath.c_str(), O_WRONLY | O_CREAT, 0666);
