@@ -130,11 +130,7 @@ collection.  It also discusses some advanced topics, such as setting
 up a Nix-based build farm, and doing service deployment using
 Nix.</para>
 
-<warning><para>This manual is a work in progress.  It's quite likely
-to be incomplete, inconsistent with the current implementation, or
-simply wrong.</para></warning>
-
-<note><para>Some background information on Nix can be found in two
+<note><para>Some background information on Nix can be found in three
 papers.  The ICSE 2004 paper <ulink
 url='http://www.cs.uu.nl/~eelco/pubs/immdsd-icse2004-final.pdf'><citetitle>Imposing
 a Memory Management Discipline on Software
@@ -145,6 +141,10 @@ different versions and variants of packages.  The LISA 2004 paper
 url='http://www.cs.uu.nl/~eelco/pubs/nspfssd-lisa2004-final.pdf'><citetitle>Nix:
 A Safe and Policy-Free System for Software
 Deployment</citetitle></ulink> gives a more general discussion of Nix
-from a system-administration perspective.</para></note>
+from a system-administration perspective.  The CBSE 2005 paper <ulink
+url='http://www.cs.uu.nl/~eelco/pubs/eupfcdm-cbse2005-final.pdf'><citetitle>Efficient
+Upgrading in a Purely Functional Component Deployment Model
+</citetitle></ulink> is about transparent patch deployment in
+Nix.</para></note>
 
 </chapter>

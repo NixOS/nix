@@ -20,25 +20,6 @@
 
     <listitem>
       <para>
-        Unify the concepts of successors and substitutes into a
-        general notion of <emphasis>equivalent expressions</emphasis>.
-        Expressions are equivalent if they have the same target paths
-        with the same identifiers.  However, even though they are
-        functionally equivalent, they may differ stronly with respect
-        to their <emphasis>performance characteristics</emphasis>.
-        For example, realising a closure expression is more efficient
-        that realising the derivation expression from which it was
-        produced.  On the other hand, distributing sources may be more
-        efficient (storage- or bandwidth-wise) than distributing
-        binaries.  So we need to be able to attach weigths or
-        priorities or performance annotations to expressions; Nix can
-        then choose the most efficient expression dependent on the
-        context.
-      </para>
-    </listitem>
-
-    <listitem>
-      <para>
         <emphasis>Build management.</emphasis>  In principle it is already
         possible to do build management using Nix (by writing builders that
         perform appropriate build steps), but the Nix expression language is
@@ -52,52 +33,12 @@
       </para>
     </listitem>
 
-    <listitem>
-      <para>
-        There are race conditions between the garbage collector and
-        other Nix tools.  For instance, when we run
-        <command>nix-env</command> to build and install a derivation
-        and run the garbage collector at the same time, the garbage
-        collector may kick in exactly between the build and
-        installation steps, i.e., before the newly built derivation
-        has become reachable from a root of the garbage collector.
-      </para>
-
-      <para>
-        One solution would be for these programs to properly register
-        temporary roots for the collector.  Another would be to use
-        stop-the-world garbage collection: if any tool is running, the
-        garbage collector blocks, and vice versa.  These solutions do
-        not solve the situation where multiple tools are involved,
-        e.g.,
-
-        <screen>
-$ nix-store -r $(nix-instantiate foo.nix)</screen>
-
-        since even if <command>nix-instantiate</command> where to
-        register a temporary root, it would be released by the time
-        <command>nix-store</command> is started.  A solution would be
-        to write the intermediate value to a file that is used as a
-        root to the collector, e.g.,
-        
-        <screen>
-$ nix-instantiate foo.nix > /nix/var/nix/roots/bla
-$ nix-store -r $(cat /nix/var/nix/roots/bla)</screen>
-
-      </para>
-    </listitem>
-
 <listitem><para>For security, <command>nix-push</command> manifests
 should be digitally signed, and <command>nix-pull</command> should
 verify the signatures.  The actual NAR archives in the cache do not
 need to be signed, since the manifest contains cryptographic hashes of
 these files (and <filename>fetchurl.nix</filename> checks
 them).</para></listitem>
-
-<listitem><para>We should switch away from MD5, since it has been
-more-or-less cracked.  We don't currently depend very much on the
-collision-resistance of MD5, but we will once we start sharing build
-results between users.</para></listitem>
 
 <listitem><para>It would be useful to have an option in
 <command>nix-env --delete-generations</command> to remove non-current

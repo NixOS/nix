@@ -189,12 +189,12 @@ of the Subversion component might be stored in a directory
 while another version might be stored in
 <filename>/nix/store/58823d558a6a...-subversion-0.34/</filename>.  The
 long hexadecimal numbers prefixed to the directory names are
-cryptographic hashes<footnote><para>128 bit MD5 hashes, to be
-precise.</para></footnote> of <emphasis>all</emphasis> inputs involved
-in building the component — sources, dependencies, compiler flags, and
-so on.  So if two components differ in any way, they end up in
-different locations in the file system, so they don't interfere with
-each other.  <xref linkend='fig-user-environments'
+cryptographic hashes<footnote><para>160-bit truncations of SHA-256
+hashes, to be precise.</para></footnote> of <emphasis>all</emphasis>
+inputs involved in building the component — sources, dependencies,
+compiler flags, and so on.  So if two components differ in any way,
+they end up in different locations in the file system, so they don't
+interfere with each other.  <xref linkend='fig-user-environments'
 /><footnote><para>TODO: the figure isn't entirely up to date.  It
 should show multiple profiles and
 <filename>~/.nix-profile</filename>.</para></footnote> shows a part of
