@@ -20,6 +20,9 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 Prefix: %{_prefix}
 Requires: /usr/bin/perl
 
+# Hack to make that shitty RPM scanning hack shut up.
+Provides: perl(readmanifest)
+                                                               
 %description
 
 Nix is a system for software deployment.
