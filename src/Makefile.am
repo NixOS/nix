@@ -1,6 +1,6 @@
 bin_PROGRAMS = nix fix
 
-CXXFLAGS = -DSYSTEM=\"@host@\" -Wall
+AM_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall
 
 nix_SOURCES = nix.cc db.cc util.cc md5.c
 nix_LDADD = -ldb_cxx-4 -lATerm
@@ -16,5 +16,6 @@ install-data-local:
 	$(INSTALL) -d $(localstatedir)/nix/prebuilts
 	$(INSTALL) -d $(localstatedir)/nix/prebuilts/imports
 	$(INSTALL) -d $(localstatedir)/nix/prebuilts/exports
+	$(INSTALL) -d $(localstatedir)/log/nix
 	$(INSTALL) -d $(prefix)/pkg
 	$(bindir)/nix init

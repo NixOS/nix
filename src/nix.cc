@@ -29,6 +29,7 @@ static string dbNetSources = "netsources";
 
 
 static string nixSourcesDir;
+static string nixLogDir;
 static string nixDB;
 
 
@@ -228,6 +229,13 @@ void installPkg(string hash)
     if (mkdir(path.c_str(), 0777))
         throw Error("unable to create directory " + path);
 
+    /* Create a log file. */
+    string logFileName = nixLogDir + "/" + id + "-" + hash + ".log";
+    /* !!! auto-pclose on exit */
+    FILE * logFile = popen(("tee " + logFileName).c_str(), "w"); /* !!! escaping */
+    if (!logFile)
+        throw Error("unable to create log file " + logFileName);
+
     try {
 
         /* Fork a child to build the package. */
@@ -237,62 +245,78 @@ void installPkg(string hash)
         case -1:
             throw Error("unable to fork");
 
-        case 0: { /* child */
+        case 0: 
 
-            /* Go to the build directory. */
-            if (chdir(path.c_str())) {
-                cerr << "unable to chdir to package directory\n";
+            try { /* child */
+
+                /* Go to the build directory. */
+                if (chdir(path.c_str())) {
+                    cerr << "unable to chdir to package directory\n";
+                    _exit(1);
+                }
+
+                /* Try to use a prebuilt. */
+                string prebuiltHash, prebuiltFile;
+                if (queryDB(nixDB, dbPrebuilts, hash, prebuiltHash)) {
+
+                    try {
+                        prebuiltFile = getFile(prebuiltHash);
+                    } catch (Error e) {
+                        cerr << "cannot obtain prebuilt (ignoring): " << e.what() << endl;
+                        goto build;
+                    }
+                
+                    cerr << "substituting prebuilt " << prebuiltFile << endl;
+
+                    int res = system(("tar xfj " + prebuiltFile + " 1>&2").c_str()); // !!! escaping
+                    if (WEXITSTATUS(res) != 0)
+                        /* This is a fatal error, because path may now
+                           have clobbered. */
+                        throw Error("cannot unpack " + prebuiltFile);
+
+                    _exit(0);
+                }
+
+            build:
+
+                /* Fill in the environment.  We don't bother freeing
+                   the strings, since we'll exec or die soon
+                   anyway. */
+                const char * env2[env.size() + 1];
+                int i = 0;
+                for (Environment::iterator it = env.begin();
+                     it != env.end(); it++, i++)
+                    env2[i] = (new string(it->first + "=" + it->second))->c_str();
+                env2[i] = 0;
+
+                /* Dup the log handle into stderr. */
+                if (dup2(fileno(logFile), STDERR_FILENO) == -1)
+                    throw Error("cannot pipe standard error into log file: " + string(strerror(errno)));
+            
+                /* Dup stderr to stdin. */
+                if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
+                    throw Error("cannot dup stderr into stdout");
+
+                /* Execute the builder.  This should not return. */
+                execle(builder.c_str(), builder.c_str(), 0, env2);
+
+                throw Error("unable to execute builder: " +
+                    string(strerror(errno)));
+            
+            } catch (exception & e) {
+                cerr << "build error: " << e.what() << endl;
                 _exit(1);
             }
-
-            /* Try to use a prebuilt. */
-            string prebuiltHash, prebuiltFile;
-            if (queryDB(nixDB, dbPrebuilts, hash, prebuiltHash)) {
-
-                try {
-                    prebuiltFile = getFile(prebuiltHash);
-                } catch (Error e) {
-                    cerr << "cannot obtain prebuilt (ignoring): " << e.what() << endl;
-                    goto build;
-                }
-                
-                cerr << "substituting prebuilt " << prebuiltFile << endl;
-
-                int res = system(("tar xfj " + prebuiltFile + " 1>&2").c_str()); // !!! escaping
-                if (WEXITSTATUS(res) != 0)
-                    /* This is a fatal error, because path may now
-                       have clobbered. */
-                    throw Error("cannot unpack " + prebuiltFile);
-
-                _exit(0);
-            }
-
-build:
-
-            /* Fill in the environment.  We don't bother freeing the
-               strings, since we'll exec or die soon anyway. */
-            const char * env2[env.size() + 1];
-            int i = 0;
-            for (Environment::iterator it = env.begin();
-                 it != env.end(); it++, i++)
-                env2[i] = (new string(it->first + "=" + it->second))->c_str();
-            env2[i] = 0;
-
-	    /* Dup stderr to stdin. */
-	    dup2(STDERR_FILENO, STDOUT_FILENO);
-
-            /* Execute the builder.  This should not return. */
-            execle(builder.c_str(), builder.c_str(), 0, env2);
-
-            cerr << strerror(errno) << endl;
-
-            cerr << "unable to execute builder\n";
-            _exit(1); }
 
         }
 
         /* parent */
 
+        /* Close the logging pipe.  Note that this should not cause
+           the logger to exit until builder exits (because the latter
+           has an open file handle to the former). */
+        pclose(logFile);
+    
         /* Wait for the child to finish. */
         int status;
         if (waitpid(pid, &status, 0) != pid)
@@ -305,7 +329,7 @@ build:
         int res = system(("chmod -R -w " + path).c_str()); // !!! escaping
         if (WEXITSTATUS(res) != 0)
             throw Error("cannot remove write permission from " + path);
-    
+
     } catch (exception &) {
         system(("rm -rf " + path).c_str());
         throw;
@@ -690,6 +714,7 @@ void run(Strings::iterator argCur, Strings::iterator argEnd)
     if (homeDir) nixHomeDir = homeDir;
 
     nixSourcesDir = nixHomeDir + "/var/nix/sources";
+    nixLogDir = nixHomeDir + "/var/log/nix";
     nixDB = nixHomeDir + "/var/nix/pkginfo.db";
 
     /* Parse the global flags. */
