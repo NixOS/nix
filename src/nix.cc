@@ -35,6 +35,7 @@ using namespace std;
 
 static string dbRefs = "refs";
 static string dbInstPkgs = "pkginst";
+static string dbPrebuilts = "prebuilts";
 
 
 static string prog;
@@ -307,6 +308,14 @@ string getFromEnv(const Environment & env, const string & key)
 }
 
 
+string queryPkgId(const string & hash)
+{
+    Params pkgImports, fileImports, arguments;
+    readPkgDescr(hash, pkgImports, fileImports, arguments);
+    return getFromEnv(arguments, "id");
+}
+
+
 void installPkg(string hash)
 {
     string pkgfile;
@@ -321,8 +330,10 @@ void installPkg(string hash)
 
     builder = getFromEnv(env, "build");
 
+    string id = getFromEnv(env, "id");
+
     /* Construct a path for the installed package. */
-    path = pkgHome + "/" + hash;
+    path = pkgHome + "/" + id + "-" + hash;
 
     /* Create the path. */
     if (mkdir(path.c_str(), 0777))
@@ -341,9 +352,32 @@ void installPkg(string hash)
 
             /* Go to the build directory. */
             if (chdir(path.c_str())) {
-                cout << "unable to chdir to package directory\n";
+                cerr << "unable to chdir to package directory\n";
                 _exit(1);
             }
+
+            /* Try to use a prebuilt. */
+            string prebuiltHash, prebuiltFile;
+            if (queryDB(dbPrebuilts, hash, prebuiltHash) &&
+                queryDB(dbRefs, prebuiltHash, prebuiltFile)) 
+            {
+                cerr << "substituting prebuilt " << prebuiltFile << endl;
+
+                if (hashFile(prebuiltFile) != prebuiltHash) {
+                    cerr << "prebuilt " + prebuiltFile + " is stale\n";
+                    goto build;
+                }
+
+                int res = system(("tar xvfj " + prebuiltFile).c_str()); // !!! escaping
+                if (WEXITSTATUS(res) != 0)
+                    /* This is a fatal error, because path may now
+                       have clobbered. */
+                    throw Error("cannot unpack " + prebuiltFile);
+
+                _exit(0);
+            }
+
+build:
 
             /* Fill in the environment.  We don't bother freeing the
                strings, since we'll exec or die soon anyway. */
@@ -357,9 +391,9 @@ void installPkg(string hash)
             /* Execute the builder.  This should not return. */
             execle(builder.c_str(), builder.c_str(), 0, env2);
 
-            cout << strerror(errno) << endl;
+            cerr << strerror(errno) << endl;
 
-            cout << "unable to execute builder\n";
+            cerr << "unable to execute builder\n";
             _exit(1); }
 
         }
@@ -427,7 +461,7 @@ void runPkg(string hash, const vector<string> & args)
     /* Execute the runner.  This should not return. */
     execv(runner.c_str(), (char * *) args2);
 
-    cout << strerror(errno) << endl;
+    cerr << strerror(errno) << endl;
     throw Error("unable to execute runner");
 }
 
@@ -443,6 +477,50 @@ void ensurePkg(string hash)
         Environment env;
         fetchDeps(hash, env);
     } else throw Error("invalid descriptor");
+}
+
+
+void delPkg(string hash)
+{
+    string path;
+    checkHash(hash);
+    if (queryDB(dbInstPkgs, hash, path)) {
+        int res = system(("rm -rf " + path).c_str()); // !!! escaping
+        delDB(dbInstPkgs, hash); // not a bug
+        if (WEXITSTATUS(res) != 0)
+            throw Error("cannot delete " + path);
+    }
+}
+
+
+void exportPkgs(string outDir, vector<string> hashes)
+{
+    for (vector<string>::iterator it = hashes.begin();
+         it != hashes.end(); it++)
+    {
+        string hash = *it;
+        string pkgDir = getPkg(hash);
+        string tmpFile = outDir + "/export_tmp";
+
+        int res = system(("cd " + pkgDir + " && tar cvfj " + tmpFile + " .").c_str()); // !!! escaping
+        if (WEXITSTATUS(res) != 0)
+            throw Error("cannot tar " + pkgDir);
+
+        string prebuiltHash = hashFile(tmpFile);
+        string pkgId = queryPkgId(hash);
+        string prebuiltFile = outDir + "/" +
+            pkgId + "-" + hash + "-" + prebuiltHash + ".tar.bz2";
+        
+        rename(tmpFile.c_str(), prebuiltFile.c_str());
+    }
+}
+
+
+void regPrebuilt(string pkgHash, string prebuiltHash)
+{
+    checkHash(pkgHash);
+    checkHash(prebuiltHash);
+    setDB(dbPrebuilts, pkgHash, prebuiltHash);
 }
 
 
@@ -481,6 +559,7 @@ void initDB()
 {
     openDB(dbRefs, false);
     openDB(dbInstPkgs, false);
+    openDB(dbPrebuilts, false);
 }
 
 
@@ -543,10 +622,8 @@ void printInfo(vector<string> hashes)
          it != hashes.end(); it++)
     {
         try {
-            Params pkgImports, fileImports, arguments;
-            readPkgDescr(*it, pkgImports, fileImports, arguments);
-            cout << *it << " " << getFromEnv(arguments, "id") << endl;
-        } catch (Error & e) {
+            cout << *it << " " << queryPkgId(*it) << endl;
+        } catch (Error & e) { // !!! more specific
             cout << *it << " (descriptor missing)\n";
         }
     }
@@ -642,12 +719,21 @@ void run(vector<string> args)
         if (args.size() != 1) throw argcError;
         string path = getPkg(args[0]);
         cout << path << endl;
+    } else if (cmd == "delpkg") {
+        if (args.size() != 1) throw argcError;
+        delPkg(args[0]);
     } else if (cmd == "run") {
         if (args.size() < 1) throw argcError;
         runPkg(args[0], vector<string>(args.begin() + 1, args.end()));
     } else if (cmd == "ensure") {
         if (args.size() != 1) throw argcError;
         ensurePkg(args[0]);
+    } else if (cmd == "export") {
+        if (args.size() < 1) throw argcError;
+        exportPkgs(args[0], vector<string>(args.begin() + 1, args.end()));
+    } else if (cmd == "regprebuilt") {
+        if (args.size() != 2) throw argcError;
+        regPrebuilt(args[0], args[1]);
     } else if (cmd == "regfile") {
         if (args.size() != 1) throw argcError;
         registerFile(args[0]);
@@ -688,8 +774,12 @@ Subcommands:
     Register an installed package.
 
   getpkg HASH
-    Ensure that the package referenced by HASH is installed. Prints
+    Ensure that the package referenced by HASH is installed. Print
     out the path of the package on stdout.
+
+  delpkg HASH
+    Uninstall the package referenced by HASH, disregarding any
+    dependencies that other packages may have on HASH.
 
   listinst
     Prints a list of installed packages.
@@ -700,6 +790,12 @@ Subcommands:
   ensure HASH
     Like getpkg, but if HASH refers to a run descriptor, fetch only
     the dependencies.
+
+  export DIR HASH...
+    Export installed packages to DIR.
+
+  regprebuilt HASH1 HASH2
+    Inform Nix that an export HASH2 can be used to fast-build HASH1.
 
   info HASH...
     Print information about the specified descriptors.
