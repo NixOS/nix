@@ -26,6 +26,7 @@ static ArgType argType = atpUnknown;
      --add / -A: copy a path to the Nix store
      --query / -q: query information
 
+     --successor: register a successor expression
      --substitute: register a substitute expression
 
      --dump: dump a path as a Nix archive
@@ -183,6 +184,21 @@ static void opQuery(Strings opFlags, Strings opArgs)
 }
 
 
+static void opSuccessor(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty()) throw UsageError("unknown flag");
+    if (opArgs.size() % 2) throw UsageError("expecting even number of arguments");
+    
+    for (Strings::iterator i = opArgs.begin();
+         i != opArgs.end(); )
+    {
+        Hash fsHash = parseHash(*i++);
+        Hash scHash = parseHash(*i++);
+        registerSuccessor(fsHash, scHash);
+    }
+}
+
+
 static void opSubstitute(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
@@ -288,6 +304,8 @@ void run(Strings args)
             op = opAdd;
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
+        else if (arg == "--successor")
+            op = opSuccessor;
         else if (arg == "--substitute")
             op = opSubstitute;
         else if (arg == "--dump")

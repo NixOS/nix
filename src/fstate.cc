@@ -179,6 +179,12 @@ Hash writeTerm(ATerm t, const string & suffix, string * p)
 }
 
 
+void registerSuccessor(const Hash & fsHash, const Hash & scHash)
+{
+    setDB(nixDB, dbSuccessors, fsHash, scHash);
+}
+
+
 FState storeSuccessor(FState fs, FState sc, StringSet & paths)
 {
     if (fs == sc) return sc;
@@ -186,7 +192,7 @@ FState storeSuccessor(FState fs, FState sc, StringSet & paths)
     string path;
     Hash fsHash = hashTerm(fs);
     Hash scHash = writeTerm(sc, "-s-" + (string) fsHash, &path);
-    setDB(nixDB, dbSuccessors, fsHash, scHash);
+    registerSuccessor(fsHash, scHash);
     paths.insert(path);
 
 #if 0

@@ -93,5 +93,8 @@ ATerm termFromHash(const Hash & hash, string * p = 0);
 /* Write an aterm to the Nix store directory, and return its hash. */
 Hash writeTerm(ATerm t, const string & suffix, string * p = 0);
 
+/* Register a successor. */
+void registerSuccessor(const Hash & fsHash, const Hash & scHash);
+
 
 #endif /* !__EVAL_H */
