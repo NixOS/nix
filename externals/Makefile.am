@@ -1,10 +1,13 @@
 # Berkeley DB
 
 DB = db-4.0.14
-DB_URL = http://www.sleepycat.com/update/snapshot/db-4.0.14.tar.gz
 
 $(DB).tar.gz:
-	wget $(DB_URL)
+	echo "Nix requires Berkeley DB to build."
+	echo "Please download version 4.0.14 from"
+	echo "  http://www.sleepycat.com/update/snapshot/db-4.0.14.tar.gz"
+	echo "and place it in the externals/ directory."
+	false
 
 $(DB): $(DB).tar.gz
 	gunzip < $(DB).tar.gz | tar xvf -
@@ -26,10 +29,13 @@ build-db: have-db
 # CWI ATerm
 
 ATERM = aterm-2.0
-ATERM_URL = http://www.cwi.nl/projects/MetaEnv/aterm/aterm-2.0.tar.gz
 
 $(ATERM).tar.gz:
-	wget $(ATERM_URL)
+	echo "Nix requires the CWI ATerm library to build."
+	echo "Please download version 2.0 from"
+	echo "  http://www.cwi.nl/projects/MetaEnv/aterm/aterm-2.0.tar.gz"
+	echo "and place it in the externals/ directory."
+	false
 
 $(ATERM): $(ATERM).tar.gz
 	gunzip < $(ATERM).tar.gz | tar xvf -
