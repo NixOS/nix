@@ -56,6 +56,13 @@ static TableId dbReferers = 0;
 */
 static TableId dbSubstitutes = 0;
 
+/* dbDerivers :: Path -> [Path]
+
+   This table lists the derivation used to build a path.  There can
+   only be multiple such paths for fixed-output derivations (i.e.,
+   derivations specifying an expected hash). */
+static TableId dbDerivers = 0;
+
 
 bool Substitute::operator == (const Substitute & sub)
 {
@@ -78,6 +85,7 @@ void openDB()
     dbReferences = nixDB.openTable("references");
     dbReferers = nixDB.openTable("referers");
     dbSubstitutes = nixDB.openTable("substitutes");
+    dbDerivers = nixDB.openTable("derivers");
 }
 
 
@@ -318,6 +326,30 @@ void queryReferers(const Path & storePath, PathSet & referers)
 }
 
 
+void setDeriver(const Transaction & txn, const Path & storePath,
+    const Path & deriver)
+{
+    assertStorePath(storePath);
+    if (deriver == "") return;
+    assertStorePath(deriver);
+    if (!isRealisablePath(txn, storePath))
+        throw Error(format("path `%1%' is not valid") % storePath);
+    nixDB.setString(txn, dbDerivers, storePath, deriver);
+}
+
+
+Path queryDeriver(const Transaction & txn, const Path & storePath)
+{
+    if (!isRealisablePath(noTxn, storePath))
+        throw Error(format("path `%1%' is not valid") % storePath);
+    Path deriver;
+    if (nixDB.queryString(txn, dbDerivers, storePath, deriver))
+        return deriver;
+    else
+        return "";
+}
+
+
 static Substitutes readSubstitutes(const Transaction & txn,
     const Path & srcPath)
 {
@@ -406,7 +438,8 @@ void clearSubstitutes()
 
 
 void registerValidPath(const Transaction & txn,
-    const Path & _path, const Hash & hash, const PathSet & references)
+    const Path & _path, const Hash & hash, const PathSet & references,
+    const Path & deriver)
 {
     Path path(canonPath(_path));
     assertStorePath(path);
@@ -423,6 +456,8 @@ void registerValidPath(const Transaction & txn,
         if (!isValidPathTxn(txn, *i))
             throw Error(format("cannot register path `%1%' as valid, since its reference `%2%' is invalid")
                 % path % *i);
+
+    setDeriver(txn, path, deriver);
 }
 
 
@@ -433,11 +468,13 @@ static void invalidatePath(const Path & path, Transaction & txn)
     debug(format("unregistering path `%1%'") % path);
 
     /* Clear the `references' entry for this path, as well as the
-       inverse `referers' entries; but only if there are no
-       substitutes for this path.  This maintains the cleanup
-       invariant. */
-    if (querySubstitutes(txn, path).size() == 0)
+       inverse `referers' entries, and the `derivers' entry; but only
+       if there are no substitutes for this path.  This maintains the
+       cleanup invariant. */
+    if (querySubstitutes(txn, path).size() == 0) {
         setReferences(txn, path, PathSet());
+        nixDB.delPair(txn, dbDerivers, path);
+    }
     
     nixDB.delPair(txn, dbValidPaths, path);
 }
@@ -498,7 +535,7 @@ Path addToStore(const Path & _srcPath)
             canonicalisePathMetaData(dstPath);
             
             Transaction txn(nixDB);
-            registerValidPath(txn, dstPath, h, PathSet());
+            registerValidPath(txn, dstPath, h, PathSet(), "");
             txn.commit();
         }
 
@@ -534,7 +571,7 @@ Path addTextToStore(const string & suffix, const string & s,
             
             Transaction txn(nixDB);
             registerValidPath(txn, dstPath,
-                hashPath(htSHA256, dstPath), references);
+                hashPath(htSHA256, dstPath), references, "");
             txn.commit();
         }
 

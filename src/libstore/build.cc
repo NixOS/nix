@@ -1140,7 +1140,8 @@ void DerivationGoal::computeClosure()
     {
         registerValidPath(txn, i->second.path,
             contentHashes[i->second.path],
-            allReferences[i->second.path]);
+            allReferences[i->second.path],
+            drvPath);
     }
     txn.commit();
 
@@ -1501,7 +1502,7 @@ void SubstitutionGoal::finished()
 
     Transaction txn;
     createStoreTransaction(txn);
-    registerValidPath(txn, storePath, contentHash, references);
+    registerValidPath(txn, storePath, contentHash, references, "");
     txn.commit();
 
     outputLock->setDeletion(true);

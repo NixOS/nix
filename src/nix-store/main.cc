@@ -162,7 +162,7 @@ static void printPathSet(const PathSet & paths)
 static void opQuery(Strings opFlags, Strings opArgs)
 {
     enum { qOutputs, qRequisites, qReferences, qReferers,
-           qReferersClosure, qGraph } query = qOutputs;
+           qReferersClosure, qDeriver, qGraph } query = qOutputs;
     bool useOutput = false;
     bool includeOutputs = false;
     bool forceRealise = false;
@@ -174,6 +174,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--references") query = qReferences;
         else if (*i == "--referers") query = qReferers;
         else if (*i == "--referers-closure") query = qReferersClosure;
+        else if (*i == "--deriver" || *i == "-d") query = qDeriver;
         else if (*i == "--graph") query = qGraph;
         else if (*i == "--use-output" || *i == "-u") useOutput = true;
         else if (*i == "--force-realise" || *i == "-f") forceRealise = true;
@@ -213,6 +214,18 @@ static void opQuery(Strings opFlags, Strings opArgs)
             printPathSet(paths);
             break;
         }
+
+        case qDeriver:
+            for (Strings::iterator i = opArgs.begin();
+                 i != opArgs.end(); i++)
+            {
+                *i = followSymlinks(*i);
+                Path deriver = queryDeriver(noTxn, *i);
+                cout << format("%1%\n") %
+                    (deriver == "" ? "unknown-deriver" : deriver);
+            }
+            break;
+                
 
 #if 0            
         case qGraph: {
@@ -288,7 +301,7 @@ static void opValidPath(Strings opFlags, Strings opArgs)
     createStoreTransaction(txn);
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); ++i)
-        registerValidPath(txn, *i, hashPath(htSHA256, *i), PathSet());
+        registerValidPath(txn, *i, hashPath(htSHA256, *i), PathSet(), "");
     txn.commit();
 }
 

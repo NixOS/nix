@@ -57,7 +57,8 @@ void clearSubstitutes();
    of the file system contents of the path.  The hash must be a
    SHA-256 hash. */
 void registerValidPath(const Transaction & txn,
-    const Path & path, const Hash & hash, const PathSet & references);
+    const Path & path, const Hash & hash, const PathSet & references,
+    const Path & deriver);
 
 /* Throw an exception if `path' is not directly in the Nix store. */
 void assertStorePath(const Path & path);
@@ -77,7 +78,8 @@ void canonicalisePathMetaData(const Path & path);
 /* Checks whether a path is valid. */ 
 bool isValidPath(const Path & path);
 
-/* Sets the set of outgoing FS references for a store path. */
+/* Sets the set of outgoing FS references for a store path.  Use with
+   care! */
 void setReferences(const Transaction & txn, const Path & storePath,
     const PathSet & references);
 
@@ -88,6 +90,14 @@ void queryReferences(const Path & storePath, PathSet & references);
 /* Queries the set of incoming FS references for a store path.  The
    result is not cleared. */
 void queryReferers(const Path & storePath, PathSet & referers);
+
+/* Sets the deriver of a store path.  Use with care! */
+void setDeriver(const Transaction & txn, const Path & storePath,
+    const Path & deriver);
+
+/* Query the deriver of a store path.  Return the empty string if no
+   deriver has been set. */
+Path queryDeriver(const Transaction & txn, const Path & storePath);
 
 /* Constructs a unique store path name. */
 Path makeStorePath(const string & type,
