@@ -23,6 +23,11 @@ extern string nixStateDir;
 /* nixDBPath is the path name of our Berkeley DB environment. */
 extern string nixDBPath;
 
+/* nixConfDir is the directory where configuration files are
+   stored. */
+extern string nixConfDir;
+
+
 
 /* Misc. global flags. */
 
@@ -46,6 +51,9 @@ extern unsigned int maxBuildJobs;
 /* Read-only mode.  Don't copy stuff to the store, don't change the
    database. */
 extern bool readOnlyMode;
+
+
+string querySetting(const string & name, const string & def);
 
 
 #endif /* !__GLOBALS_H */

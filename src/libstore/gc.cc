@@ -213,14 +213,9 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
         lockFile(*fd, ltRead, true);
 
         /* Read the entire file. */
-        struct stat st;
-        if (fstat(*fd, &st) == -1)
-            throw SysError(format("statting `%1%'") % path);
-        unsigned char buf[st.st_size]; /* !!! stack space */
-        readFull(*fd, buf, st.st_size);
+        string contents = readFile(*fd);
 
         /* Extract the roots. */
-        string contents((char *) buf, st.st_size);
         unsigned int pos = 0, end;
 
         while ((end = contents.find((char) 0, pos)) != string::npos) {
@@ -310,7 +305,9 @@ static Paths topoSort(const PathSet & paths)
 void collectGarbage(GCAction action, PathSet & result)
 {
     result.clear();
-    
+
+    string gcKeepOutputs = querySetting("gc-keep-outputs", "false");
+
     /* Acquire the global GC root.  This prevents
        a) New roots from being added.
        b) Processes from creating new temporary root files. */
@@ -332,6 +329,19 @@ void collectGarbage(GCAction action, PathSet & result)
     PathSet livePaths;
     for (PathSet::const_iterator i = roots.begin(); i != roots.end(); ++i)
         computeFSClosure(canonPath(*i), livePaths);
+
+    if (gcKeepOutputs == "true") {
+        /* Hmz, identical to storePathRequisites in nix-store. */
+        for (PathSet::iterator i = livePaths.begin();
+             i != livePaths.end(); ++i)
+            if (isDerivation(*i)) {
+                Derivation drv = derivationFromPath(*i);
+                for (DerivationOutputs::iterator j = drv.outputs.begin();
+                     j != drv.outputs.end(); ++j)
+                    if (isValidPath(j->second.path))
+                        computeFSClosure(j->second.path, livePaths);
+            }
+    }
 
     if (action == gcReturnLive) {
         result = livePaths;

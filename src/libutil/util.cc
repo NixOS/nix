@@ -164,6 +164,27 @@ Strings readDirectory(const Path & path)
 }
 
 
+string readFile(int fd)
+{
+    struct stat st;
+    if (fstat(fd, &st) == -1)
+        throw SysError("statting file");
+    unsigned char buf[st.st_size]; /* !!! stack space */
+    readFull(fd, buf, st.st_size);
+
+    return string((char *) buf, st.st_size);
+}
+
+
+string readFile(const Path & path)
+{
+    AutoCloseFD fd = open(path.c_str(), O_RDONLY);
+    if (fd == -1)
+        throw SysError(format("opening file `%1%'") % path);
+    return readFile(fd);
+}
+
+
 static void _deletePath(const Path & path)
 {
     checkInterrupt();

@@ -90,6 +90,10 @@ bool isLink(const Path & path);
    removed. */
 Strings readDirectory(const Path & path);
 
+/* Read the contents of a file into a string. */
+string readFile(int fd);
+string readFile(const Path & path);
+
 /* Delete a path; i.e., in the case of a directory, it is deleted
    recursively.  Don't use this at home, kids. */
 void deletePath(const Path & path);
