@@ -25,7 +25,7 @@ SysError::SysError(const format & f)
 }
 
 
-string absPath(string path, string dir)
+Path absPath(Path path, Path dir)
 {
     if (path[0] != '/') {
         if (dir == "") {
@@ -40,7 +40,7 @@ string absPath(string path, string dir)
 }
 
 
-string canonPath(const string & path)
+Path canonPath(const Path & path)
 {
     string s;
 
@@ -78,16 +78,16 @@ string canonPath(const string & path)
 }
 
 
-string dirOf(string path)
+Path dirOf(const Path & path)
 {
     unsigned int pos = path.rfind('/');
     if (pos == string::npos)
         throw Error(format("invalid file name: %1%") % path);
-    return string(path, 0, pos);
+    return Path(path, 0, pos);
 }
 
 
-string baseNameOf(string path)
+string baseNameOf(const Path & path)
 {
     unsigned int pos = path.rfind('/');
     if (pos == string::npos)
@@ -96,7 +96,7 @@ string baseNameOf(string path)
 }
 
 
-bool pathExists(const string & path)
+bool pathExists(const Path & path)
 {
     int res;
     struct stat st;
@@ -108,7 +108,7 @@ bool pathExists(const string & path)
 }
 
 
-void deletePath(const string & path)
+void deletePath(const Path & path)
 {
     msg(lvlVomit, format("deleting path `%1%'") % path);
 
@@ -145,7 +145,7 @@ void deletePath(const string & path)
 }
 
 
-void makePathReadOnly(const string & path)
+void makePathReadOnly(const Path & path)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
@@ -171,19 +171,19 @@ void makePathReadOnly(const string & path)
 }
 
 
-static string tempName()
+static Path tempName()
 {
     static int counter = 0;
     char * s = getenv("TMPDIR");
-    string tmpRoot = s ? canonPath(string(s)) : "/tmp";
+    Path tmpRoot = s ? canonPath(Path(s)) : "/tmp";
     return (format("%1%/nix-%2%-%3%") % tmpRoot % getpid() % counter++).str();
 }
 
 
-string createTempDir()
+Path createTempDir()
 {
     while (1) {
-	string tmpDir = tempName();
+	Path tmpDir = tempName();
 	if (mkdir(tmpDir.c_str(), 0777) == 0) return tmpDir;
 	if (errno != EEXIST)
 	    throw SysError(format("creating directory `%1%'") % tmpDir);

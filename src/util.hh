@@ -42,6 +42,12 @@ typedef list<string> Strings;
 typedef set<string> StringSet;
 
 
+/* Paths are just strings. */
+typedef string Path;
+typedef list<Path> Paths;
+typedef set<Path> PathSet;
+
+
 /* The canonical system name, as returned by config.guess. */ 
 extern string thisSystem;
 
@@ -49,31 +55,31 @@ extern string thisSystem;
 /* Return an absolutized path, resolving paths relative to the
    specified directory, or the current directory otherwise.  The path
    is also canonicalised. */
-string absPath(string path, string dir = "");
+Path absPath(Path path, Path dir = "");
 
 /* Canonicalise a path (as in realpath(3)). */
-string canonPath(const string & path);
+Path canonPath(const Path & path);
 
 /* Return the directory part of the given path, i.e., everything
    before the final `/'. */
-string dirOf(string path);
+Path dirOf(const Path & path);
 
 /* Return the base name of the given path, i.e., everything following
    the final `/'. */
-string baseNameOf(string path);
+string baseNameOf(const Path & path);
 
 /* Return true iff the given path exists. */
-bool pathExists(const string & path);
+bool pathExists(const Path & path);
 
 /* Delete a path; i.e., in the case of a directory, it is deleted
    recursively.  Don't use this at home, kids. */
-void deletePath(const string & path);
+void deletePath(const Path & path);
 
 /* Make a path read-only recursively. */
-void makePathReadOnly(const string & path);
+void makePathReadOnly(const Path & path);
 
 /* Create a temporary directory. */
-string createTempDir();
+Path createTempDir();
 
 
 /* Messages. */
