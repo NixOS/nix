@@ -1,6 +1,3 @@
-DOCBOOK_DTD = /nix/current/xml/dtd/docbook
-DOCBOOK_XSL = /nix/current/xml/xsl/docbook
-
 ENV = SGML_CATALOG_FILES=$(DOCBOOK_DTD)/docbook.cat
 
 XMLLINT = $(ENV) xmllint --catalogs
