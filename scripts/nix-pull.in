@@ -48,10 +48,10 @@ my $nixExpr =
     "(import @datadir@/nix/corepkgs/nix-pull) " .
     "{system = \"@system@\";}";
 
-print STDERR "instantiating store expression...\n";
-my $storeExpr = `echo '$nixExpr' | @bindir@/nix-instantiate -`
+print STDERR "building downloader...\n";
+my $substProgram = `echo '$nixExpr' | @bindir@/nix-store -qnf \$(@bindir@/nix-instantiate -)`
     or die "cannot instantiate Nix expression";
-chomp $storeExpr;
+chomp $substProgram;
 
 
 # Register all substitutes.
@@ -66,8 +66,7 @@ foreach my $storePath (keys %narFiles) {
     my $narFileList = $narFiles{$storePath};
     foreach my $narFile (@{$narFileList}) {
         print WRITE "$storePath\n";
-        print WRITE "$storeExpr\n";
-        print WRITE "/fetch\n";
+        print WRITE "$substProgram/fetch\n";
         print WRITE "2\n";
         print WRITE "$narFile->{url}\n";
         print WRITE "$narFile->{hash}\n";

@@ -49,7 +49,9 @@ finalPath=$(@bindir@/nix-store -qnB --force-realise $storeExpr)
     
 if ! test -n "$QUIET"; then echo "path is $finalPath" >&2; fi
 
-rm -rf $tmpPath1 $tmpPath2 || true
+if test -n "$tmpPath1" -o -n "$tmpPath2"; then
+    rm -rf $tmpPath1 $tmpPath2 || true
+fi
 
 echo $hash
 

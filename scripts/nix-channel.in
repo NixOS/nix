@@ -53,6 +53,10 @@ sub addChannel {
 sub update {
     readChannels;
 
+    # Get rid of all the old substitutes.
+    system "@bindir@/nix-store --clear-substitutes";
+    die "cannot clear substitutes" if ($? != 0);
+
     # Pull cache manifests.
     foreach my $url (@channels) {
         print "pulling cache manifest from `$url'\n";
