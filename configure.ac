@@ -12,5 +12,7 @@ AC_PROG_CXX
 AC_PROG_RANLIB
 
 AM_CONFIG_HEADER([config.h])
-AC_CONFIG_FILES([Makefile src/Makefile scripts/Makefile corepkgs/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile scripts/Makefile
+			  corepkgs/Makefile corepkgs/fetchurl/Makefile
+			  corepkgs/nar/Makefile])
 AC_OUTPUT

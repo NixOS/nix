@@ -10,10 +10,4 @@ install-exec-local:
 # !!! don't overwrite local modifications
 	$(INSTALL_DATA) prebuilts.conf $(sysconfdir)/nix/prebuilts.conf
 
-%: %.in Makefile
-	sed \
-	 -e s^@prefix\@^$(prefix)^g \
-	 -e s^@sysconfdir\@^$(sysconfdir)^g \
-	 -e s^@localstatedir\@^$(localstatedir)^g \
-	 < $< > $@ || rm $@
-	chmod +x $@
+include ../substitute.mk

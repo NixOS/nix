@@ -1,0 +1,5 @@
+#! /bin/sh
+
+echo "packing $path into $out..."
+@bindir@/nix --dump --file "$path" | bzip2 > $out || exit 1
+
