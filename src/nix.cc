@@ -10,7 +10,7 @@
 typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
 
-typedef enum { atpHash, atpName, atpPath, atpUnknown } ArgType;
+typedef enum { atpHash, atpPath, atpUnknown } ArgType;
 
 static ArgType argType = atpUnknown;
 
@@ -21,13 +21,12 @@ static ArgType argType = atpUnknown;
 
    Operations:
 
-     --install / -i: install (or `realise') values
-     --delete / -d: delete values
-     --query / -q: query stored values
-     --add: add values
+     --install / -i: realise a Nix expression
+     --delete / -d: delete paths from the Nix store
+     --add / -A: copy a path to the Nix store
 
-     --dump: dump a value as a Nix archive
-     --restore: restore a value from a Nix archive
+     --dump: dump a path as a Nix archive
+     --restore: restore a path from a Nix archive
 
      --init: initialise the Nix database
      --verify: verify Nix structures
@@ -35,21 +34,10 @@ static ArgType argType = atpUnknown;
      --version: output version information
      --help: display help
 
-   Source selection for operations that work on values:
+   Source selection for --install, --dump:
 
      --file / -f: by file name
      --hash / -h: by hash
-     --name / -n: by symbolic name
-
-   Query suboptions:
-
-     Selection:
-
-     --all / -a: query all stored values, otherwise given values
-
-     Information:
-
-     --info / -i: general value information
 
    Options:
 
@@ -57,8 +45,8 @@ static ArgType argType = atpUnknown;
 */
 
 
-/* Parse the `-f' / `-h' / `-n' flags, i.e., the type of value
-   arguments.  These flags are deleted from the referenced vector. */
+/* Parse the `-f' / `-h' / flags, i.e., the type of arguments.  These
+   flags are deleted from the referenced vector. */
 static void getArgType(Strings & flags)
 {
     for (Strings::iterator it = flags.begin();
@@ -68,14 +56,9 @@ static void getArgType(Strings & flags)
         ArgType tp;
         if (arg == "--hash" || arg == "-h")
             tp = atpHash;
-        else if (arg == "--name" || arg == "-n")
-            tp = atpName;
         else if (arg == "--file" || arg == "-f")
             tp = atpPath;
-        else {
-            it++;
-            continue;
-        }
+        else { it++; continue; }
         if (argType != atpUnknown)
             throw UsageError("only one argument type specified may be specified");
         argType = tp;
@@ -86,7 +69,8 @@ static void getArgType(Strings & flags)
 }
 
 
-/* Install values. */
+/* Realise (or install) paths from the given Nix fstate
+   expressions. */
 static void opInstall(Strings opFlags, Strings opArgs)
 {
     getArgType(opFlags);
@@ -98,8 +82,6 @@ static void opInstall(Strings opFlags, Strings opArgs)
         Hash hash;
         if (argType == atpHash)
             hash = parseHash(*it);
-        else if (argType == atpName)
-            throw Error("not implemented");
         else if (argType == atpPath) {
             string path;
             addToStore(*it, path, hash);
@@ -112,28 +94,16 @@ static void opInstall(Strings opFlags, Strings opArgs)
 
 static void opDelete(Strings opFlags, Strings opArgs)
 {
-#if 0
-    getArgType(opFlags);
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
     for (Strings::iterator it = opArgs.begin();
          it != opArgs.end(); it++)
-    {
-        Hash hash;
-        if (argType == atpHash)
-            hash = parseHash(*it);
-        else if (argType == atpName)
-            throw Error("not implemented");
-        else
-            throw Error("invalid argument type");
-        deleteValue(hash);
-    }
-#endif
+        deleteFromStore(absPath(*it));
 }
 
 
-/* Add values to the Nix values directory and print the hashes of
-   those values. */
+/* Add paths to the Nix values directory and print the hashes of those
+   paths. */
 static void opAdd(Strings opFlags, Strings opArgs)
 {
     getArgType(opFlags);
@@ -162,11 +132,10 @@ struct StdoutSink : DumpSink
 };
 
 
-/* Dump a value as a Nix archive.  The archive is written to standard
+/* Dump a path as a Nix archive.  The archive is written to standard
    output. */
 static void opDump(Strings opFlags, Strings opArgs)
 {
-#if 0
     getArgType(opFlags);
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (opArgs.size() != 1) throw UsageError("only one argument allowed");
@@ -176,14 +145,11 @@ static void opDump(Strings opFlags, Strings opArgs)
     string path;
     
     if (argType == atpHash)
-        path = queryValuePath(parseHash(arg));
-    else if (argType == atpName)
-        throw Error("not implemented");
+        path = queryPathByHash(parseHash(arg));
     else if (argType == atpPath)
         path = arg;
 
     dumpPath(path, sink);
-#endif
 }
 
 
