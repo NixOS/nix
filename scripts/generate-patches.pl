@@ -191,13 +191,19 @@ foreach my $p (keys %dstOutPaths) {
         my $narHash = `nix-hash --flat $tmpdir/B` or die;
         chomp $narHash;
 
-        my $narBz2Hash = `nix-hash --flat $tmpdir/DIFF` or die;
-        chomp $narBz2Hash;
+        my $narDiffHash = `nix-hash --flat $tmpdir/DIFF` or die;
+        chomp $narDiffHash;
 
-        my $narBz2Size = (stat "$tmpdir/DIFF")[7];
+        my $narDiffSize = (stat "$tmpdir/DIFF")[7];
+        my $dstNarBz2Size = (stat $dstNarBz2)[7];
+
+        if ($narDiffSize >= $dstNarBz2Size) {
+            print "    rejecting; patch bigger than full archive\n";
+            next;
+        }
     
         my $finalName =
-            "$narBz2Hash-$name-$closestVersion-to-$version.nar-diff";
+            "$narDiffHash-$name-$closestVersion-to-$version.nar-diff";
 
         if (-e "$patchesDir/$finalName") {
             print "    not copying, already exists\n";
@@ -212,8 +218,8 @@ foreach my $p (keys %dstOutPaths) {
         
         # Add the patch to the manifest.
         addPatch \%dstPatches, $p,
-            { url => "$patchesURL/$finalName", hash => $narBz2Hash
-            , size => $narBz2Size
+            { url => "$patchesURL/$finalName", hash => $narDiffHash
+            , size => $narDiffSize
             , basePath => $closest, baseHash => $baseHash
             , narHash => $narHash, patchType => "nar-bsdiff"
             };
