@@ -11,6 +11,7 @@ die unless defined $pkgFile;
 # from a web browser, the user gets to see us.
 if (!defined $ENV{"NIX_HAVE_TERMINAL"}) {
     $ENV{"NIX_HAVE_TERMINAL"} = "1";
+    $ENV{"LD_LIBRARY_PATH"} = "";
     exec("xterm", "-e", "@shell@", "-c", "@bindir@/nix-install-package '$pkgFile' || read");
     die "cannot execute `xterm'";
 }
@@ -43,7 +44,7 @@ system "@bindir@/nix-pull '$manifestURL'";
 die if $? != 0;
 
 print "\nInstalling package...\n";
-system "@bindir@/nix-env -i '$drvPath'";
+system "@bindir@/nix-env -i '$outPath'";
 die if $? != 0;
 
 print "\nInstallation succeeded! Press Enter to continue.\n";

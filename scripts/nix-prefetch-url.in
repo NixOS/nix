@@ -32,7 +32,7 @@ if test -z "$hash"; then
     @curl@ --fail --location --max-redirs 20 "$url" > $tmpPath1
 
     # Compute the hash.
-    hash=$(@bindir@/nix-hash --base32 --type "$hashType" --flat $tmpPath1)
+    hash=$(@bindir@/nix-hash --type "$hashType" --flat $tmpPath1)
     if ! test -n "$QUIET"; then echo "hash is $hash" >&2; fi
 
     # Rename it so that the fetchurl builder can find it.
