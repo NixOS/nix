@@ -1,0 +1,5 @@
+Package(
+  [ ("name", "slow")
+  , ("build", Relative("slow2/slow-build.sh"))
+  ]
+)
