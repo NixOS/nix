@@ -124,6 +124,12 @@ Path normaliseStoreExpr(const Path & _nePath, PathSet pending)
        non-existing path. */
     env["HOME"] = "/homeless-shelter";
 
+    /* Tell the builder where the Nix store is.  Usually they
+       shouldn't care, but this is useful for purity checking (e.g.,
+       the compiler or linker might only want to accept paths to files
+       in the store or in the build directory). */
+    env["NIX_STORE"] = nixStore;
+
     /* Build the environment. */
     for (StringPairs::iterator i = ne.derivation.env.begin();
          i != ne.derivation.env.end(); i++)

@@ -15,7 +15,7 @@ typedef map<string, string> Environment;
 
 /* Run a program. */
 void runProgram(const string & program, 
-    const Strings & args, const Environment & env,
+    const Strings & args, Environment env,
     const string & logFileName);
 
 

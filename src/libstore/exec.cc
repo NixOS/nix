@@ -17,7 +17,7 @@ static string pathNullDevice = "/dev/null";
 
 /* Run a program. */
 void runProgram(const string & program, 
-    const Strings & args, const Environment & env,
+    const Strings & args, Environment env,
     const string & logFileName)
 {
     /* Create a log file. */
@@ -32,9 +32,19 @@ void runProgram(const string & program,
 
     /* Create a temporary directory where the build will take
        place. */
-    string tmpDir = createTempDir();
+    Path tmpDir = createTempDir();
 
     AutoDelete delTmpDir(tmpDir);
+
+    /* For convenience, set an environment pointing to the top build
+       directory. */
+    env["NIX_BUILD_TOP"] = tmpDir;
+
+    /* Also set TMPDIR and variants to point to this directory. */
+    env["TMPDIR"] = tmpDir;
+    env["TEMPDIR"] = tmpDir;
+    env["TMP"] = tmpDir;
+    env["TEMP"] = tmpDir;
 
     /* Fork a child to build the package. */
     pid_t pid;
