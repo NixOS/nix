@@ -16,7 +16,10 @@
 using namespace std;
 
 
+#define PKGINFO_ENVVAR "NIX_DB"
 #define PKGINFO_PATH "/pkg/sys/var/pkginfo"
+
+#define PKGHOME_ENVVAR "NIX_PKGHOME"
 
 
 static string dbRefs = "refs";
@@ -25,6 +28,25 @@ static string dbInstPkgs = "pkginst";
 
 static string prog;
 static string dbfile = PKGINFO_PATH;
+
+
+static string pkgHome = "/pkg";
+
+
+class Error : public exception
+{
+    string err;
+public:
+    Error(string _err) { err = _err; }
+    ~Error() throw () { };
+    const char * what() const throw () { return err.c_str(); }
+};
+
+class UsageError : public Error
+{
+public:
+    UsageError(string _err) : Error(_err) { };
+};
 
 
 /* Wrapper class that ensures that the database is closed upon
@@ -96,12 +118,12 @@ void checkRef(const string & s)
 {
     string err = "invalid reference: " + s;
     if (s.length() != 32)
-        throw err;
+        throw Error(err);
     for (int i = 0; i < 32; i++) {
         char c = s[i];
         if (!((c >= '0' && c <= '9') ||
               (c >= 'a' && c <= 'f')))
-            throw err;
+            throw Error(err);
     }
 }
 
@@ -112,10 +134,10 @@ string makeRef(string filename)
     char hash[33];
 
     FILE * pipe = popen(("md5sum " + filename).c_str(), "r");
-    if (!pipe) throw string("cannot execute md5sum");
+    if (!pipe) throw Error("cannot execute md5sum");
 
     if (fread(hash, 32, 1, pipe) != 1)
-        throw string("cannot read hash from md5sum");
+        throw Error("cannot read hash from md5sum");
     hash[32] = 0;
 
     pclose(pipe);
@@ -166,7 +188,7 @@ void readPkgDescr(const string & pkgfile,
             pkgImports.push_back(Dep(name, ref));
         else if (op == "=")
             fileImports.push_back(Dep(name, ref));
-        else throw string("invalid operator " + op);
+        else throw Error("invalid operator " + op);
     }
 }
 
@@ -187,13 +209,13 @@ void installPkg(string pkgref)
     string builder;
 
     if (!queryDB("refs", pkgref, pkgfile))
-        throw string("unknown package " + pkgref);
+        throw Error("unknown package " + pkgref);
 
     cerr << "installing package " + pkgref + " from " + pkgfile + "\n";
 
     /* Verify that the file hasn't changed. !!! race */
     if (makeRef(pkgfile) != pkgref)
-        throw string("file " + pkgfile + " is stale");
+        throw Error("file " + pkgfile + " is stale");
 
     /* Read the package description file. */
     DepList pkgImports, fileImports;
@@ -222,10 +244,10 @@ void installPkg(string pkgref)
         string file;
 
         if (!queryDB("refs", it->ref, file))
-            throw string("unknown file " + it->ref);
+            throw Error("unknown file " + it->ref);
 
         if (makeRef(file) != it->ref)
-            throw string("file " + file + " is stale");
+            throw Error("file " + file + " is stale");
 
         if (it->name == "build")
             builder = file;
@@ -234,57 +256,66 @@ void installPkg(string pkgref)
     }
 
     if (builder == "")
-        throw string("no builder specified");
+        throw Error("no builder specified");
 
     /* Construct a path for the installed package. */
-    path = "/pkg/" + pkgref;
+    path = pkgHome + "/" + pkgref;
 
     /* Create the path. */
     if (mkdir(path.c_str(), 0777))
-        throw string("unable to create directory " + path);
+        throw Error("unable to create directory " + path);
 
-    /* Fork a child to build the package. */
-    pid_t pid;
-    switch (pid = fork()) {
+    try {
 
-    case -1:
-        throw string("unable to fork");
+        /* Fork a child to build the package. */
+        pid_t pid;
+        switch (pid = fork()) {
+            
+        case -1:
+            throw Error("unable to fork");
 
-    case 0: /* child */
+        case 0: { /* child */
 
-        /* Go to the build directory. */
-        if (chdir(path.c_str())) {
-            cout << "unable to chdir to package directory\n";
+            /* Go to the build directory. */
+            if (chdir(path.c_str())) {
+                cout << "unable to chdir to package directory\n";
+                _exit(1);
+            }
+
+            /* Fill in the environment.  We don't bother freeing the
+               strings, since we'll exec or die soon anyway. */
+            const char * env2[env.size() + 1];
+            int i = 0;
+            for (Environment::iterator it = env.begin();
+                 it != env.end(); it++, i++)
+                env2[i] = (new string(it->first + "=" + it->second))->c_str();
+            env2[i] = 0;
+
+            /* Execute the builder.  This should not return. */
+            execle(builder.c_str(), builder.c_str(), 0, env2);
+
+            cout << strerror(errno) << endl;
+
+            cout << "unable to execute builder\n";
             _exit(1);
         }
 
-        /* Fill in the environment.  We don't bother freeing the
-           strings, since we'll exec or die soon anyway. */
-        const char * env2[env.size() + 1];
-        int i = 0;
-        for (Environment::iterator it = env.begin();
-             it != env.end(); it++, i++)
-            env2[i] = (new string(it->first + "=" + it->second))->c_str();
-        env2[i] = 0;
+        }
 
-        /* Execute the builder.  This should not return. */
-        execle(builder.c_str(), builder.c_str(), 0, env2);
+        /* parent */
 
-        cout << strerror(errno) << endl;
-
-        cout << "unable to execute builder\n";
-        _exit(1);
-    }
-
-    /* parent */
-
-    /* Wait for the child to finish. */
-    int status;
-    if (waitpid(pid, &status, 0) != pid)
-        throw string("unable to wait for child");
+        /* Wait for the child to finish. */
+        int status;
+        if (waitpid(pid, &status, 0) != pid)
+            throw Error("unable to wait for child");
     
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
-        throw string("unable to build package");
+        if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+            throw Error("unable to build package");
+    
+    } catch (exception &) {
+        system(("rm -rf " + path).c_str());
+        throw;
+    }
 
     setDB(dbInstPkgs, pkgref, path);
 }
@@ -305,7 +336,7 @@ string absPath(string filename)
     if (filename[0] != '/') {
         char buf[PATH_MAX];
         if (!getcwd(buf, sizeof(buf)))
-            throw string("cannot get cwd");
+            throw Error("cannot get cwd");
         filename = string(buf) + "/" + filename;
         /* !!! canonicalise */
     }
@@ -343,69 +374,112 @@ void run(int argc, char * * argv)
     string cmd;
 
     if (argc < 1)
-        throw string("command not specified");
+        throw UsageError("no command specified");
 
     cmd = argv[0];
     argc--, argv++;
 
     if (cmd == "init") {
         if (argc != 0)
-            throw string("init doesn't have arguments");
+            throw UsageError("wrong number of arguments");
         initDB();
     } else if (cmd == "getpkg") {
         if (argc != 1)
-            throw string("arguments missing in getpkg");
+            throw UsageError("wrong number of arguments");
         string path = getPkg(argv[0]);
         cout << path << endl;
-    } else if (cmd == "reg") {
+    } else if (cmd == "regfile") {
         if (argc != 1)
-            throw string("arguments missing in reg");
+            throw UsageError("wrong number of arguments");
         registerFile(argv[0]);
-    } else if (cmd == "regpkg") {
+    } else if (cmd == "reginst") {
         if (argc != 2)
-            throw string("arguments missing in regpkg");
+            throw UsageError("wrong number of arguments");
         registerInstalledPkg(argv[0], argv[1]);
     } else
-        throw string("unknown command: " + string(cmd));
+        throw UsageError("unknown command: " + string(cmd));
 }
-    
-    
-int main(int argc, char * * argv)
+
+
+void printUsage()
+{
+    cerr <<
+"Usage: nix SUBCOMMAND OPTIONS...
+
+Subcommands:
+
+  init
+    Initialize the database.
+
+  regfile FILENAME
+    Register FILENAME keyed by its hash.
+
+  reginst HASH PATH
+    Register an installed package.
+
+  getpkg HASH
+    Ensure that the package referenced by HASH is installed. Prints
+    out the path of the package on stdout.
+";
+}
+
+
+void main2(int argc, char * * argv)
 {
     int c;
 
-    prog = argv[0];
-
     umask(0022);
 
-    try {
+    if (getenv(PKGINFO_ENVVAR))
+        dbfile = getenv(PKGINFO_ENVVAR);
 
-        while ((c = getopt(argc, argv, "d:")) != EOF) {
+    if (getenv(PKGHOME_ENVVAR))
+        pkgHome = getenv(PKGHOME_ENVVAR);
+
+    opterr = 0;
+
+    while ((c = getopt(argc, argv, "hd:")) != EOF) {
         
-            switch (c) {
+        switch (c) {
 
-            case 'd':
-                dbfile = optarg;
-                break;
+        case 'h':
+            printUsage();
+            return;
 
-            default:
-                throw string("unknown option");
-                break;
+        case 'd':
+            dbfile = optarg;
+            break;
 
-            }
+        default:
+            throw UsageError("invalid option `" + string(1, optopt) + "'");
+            break;
         }
+    }
 
-        argc -= optind, argv += optind;
-        run(argc, argv);
+    argc -= optind, argv += optind;
+    run(argc, argv);
+}
 
-    } catch (DbException e) {
-        cerr << "db exception: " << e.what() << endl;
+    
+int main(int argc, char * * argv)
+{
+    prog = argv[0];
+
+    try { 
+        try {
+
+            main2(argc, argv);
+            
+        } catch (DbException e) {
+            throw Error(e.what());
+        }
+        
+    } catch (UsageError & e) {
+        cerr << "error: " << e.what() << endl
+             << "Try `nix -h' for more information.\n";
         return 1;
-    } catch (exception e) {
-        cerr << e.what() << endl;
-        return 1;
-    } catch (string s) {
-        cerr << s << endl;
+    } catch (exception & e) {
+        cerr << "error: " << e.what() << endl;
         return 1;
     }
 
