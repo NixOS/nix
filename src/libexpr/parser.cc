@@ -29,16 +29,12 @@ struct Cleanup : TermFun
         ATMatcher m;
         string s;
 
-        if (atMatch(m, e) >> "Str" >> s) {
+        if (atMatch(m, e) >> "Str" >> s)
             return ATmake("Str(<str>)",
                 string(s, 1, s.size() - 2).c_str());
-        }
 
-        if (atMatch(m, e) >> "Path" >> s) {
-            if (s[0] != '/')
-                s = basePath + "/" + s;
-            return ATmake("Path(<str>)", canonPath(s).c_str());
-        }
+        if (atMatch(m, e) >> "Path" >> s)
+            return ATmake("Path(<str>)", absPath(s, basePath).c_str());
 
         if (atMatch(m, e) >> "Int" >> s) {
             istringstream s2(s);
@@ -147,8 +143,14 @@ Expr parseExprFromFile(Path path)
     if (e) return e;
 #endif
 
-    /* If `path' refers to a directory, append `/default.nix'. */
+    /* If `path' is a symlink, follow it.  This is so that relative
+       path references work. */
     struct stat st;
+    if (lstat(path.c_str(), &st))
+        throw SysError(format("getting status of `%1%'") % path);
+    if (S_ISLNK(st.st_mode)) path = absPath(readLink(path), dirOf(path));
+
+    /* If `path' refers to a directory, append `/default.nix'. */
     if (stat(path.c_str(), &st))
         throw SysError(format("getting status of `%1%'") % path);
     if (S_ISDIR(st.st_mode))

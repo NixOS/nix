@@ -109,6 +109,20 @@ bool pathExists(const Path & path)
 }
 
 
+Path readLink(const Path & path)
+{
+    struct stat st;
+    if (lstat(path.c_str(), &st))
+        throw SysError(format("getting status of `%1%'") % path);
+    if (!S_ISLNK(st.st_mode))
+        throw Error(format("`%1%' is not a symlink") % path);
+    char buf[st.st_size];
+    if (readlink(path.c_str(), buf, st.st_size) != st.st_size)
+        throw SysError(format("reading symbolic link `%1%'") % path);
+    return string(buf, st.st_size);
+}
+
+
 Strings readDirectory(const Path & path)
 {
     Strings names;

@@ -73,6 +73,10 @@ string baseNameOf(const Path & path);
 /* Return true iff the given path exists. */
 bool pathExists(const Path & path);
 
+/* Read the contents (target) of a symbolic link.  The result is not
+   in any way canonicalised. */
+Path readLink(const Path & path);
+
 /* Read the contents of a directory.  The entries `.' and `..' are
    removed. */
 Strings readDirectory(const Path & path);

@@ -11,6 +11,7 @@
 struct Globals
 {
     Path linkPath;
+    Path nixExprPath;
     EvalState state;
 };
 
@@ -106,9 +107,23 @@ void loadDerivations(EvalState & state, Path nePath, DrvInfos & drvs)
 }
 
 
+static Path getHomeDir()
+{
+    Path homeDir(getenv("HOME"));
+    if (homeDir == "") throw Error("HOME environment variable not set");
+    return homeDir;
+}
+
+
 static Path getLinksDir()
 {
     return canonPath(nixStateDir + "/links");
+}
+
+
+static Path getDefNixExprPath()
+{
+    return getHomeDir() + "/.nix-defexpr";
 }
 
 
@@ -410,13 +425,11 @@ static void opInstall(Globals & globals,
 {
     if (opFlags.size() > 0)
         throw UsageError(format("unknown flags `%1%'") % opFlags.front());
-    if (opArgs.size() < 1) throw UsageError("Nix file expected");
 
-    Path nePath = opArgs.front();
-    DrvNames drvNames = drvNamesFromArgs(
-        Strings(++opArgs.begin(), opArgs.end()));
+    DrvNames drvNames = drvNamesFromArgs(opArgs);
     
-    installDerivations(globals.state, nePath, drvNames, globals.linkPath);
+    installDerivations(globals.state, globals.nixExprPath,
+        drvNames, globals.linkPath);
 }
 
 
@@ -492,11 +505,10 @@ static void opUpgrade(Globals & globals,
         throw UsageError(format("unknown flags `%1%'") % opFlags.front());
     if (opArgs.size() < 1) throw UsageError("Nix file expected");
 
-    Path nePath = opArgs.front();
-    DrvNames drvNames = drvNamesFromArgs(
-        Strings(++opArgs.begin(), opArgs.end()));
+    DrvNames drvNames = drvNamesFromArgs(opArgs);
     
-    upgradeDerivations(globals.state, nePath, drvNames, globals.linkPath);
+    upgradeDerivations(globals.state, globals.nixExprPath,
+        drvNames, globals.linkPath);
 }
 
 
@@ -547,7 +559,7 @@ static void opQuery(Globals & globals,
         else if (*i == "--expr" || *i == "-e") query = qDrvPath;
         else if (*i == "--status" || *i == "-s") query = qStatus;
         else if (*i == "--installed") source = sInstalled;
-        else if (*i == "--available" || *i == "-f") source = sAvailable;
+        else if (*i == "--available" || *i == "-a") source = sAvailable;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
     /* Obtain derivation information from the specified source. */
@@ -560,10 +572,7 @@ static void opQuery(Globals & globals,
             break;
 
         case sAvailable: {
-            if (opArgs.size() < 1) throw UsageError("Nix file expected");
-            Path nePath = opArgs.front();
-            opArgs.pop_front();
-            loadDerivations(globals.state, nePath, drvs);
+            loadDerivations(globals.state, globals.nixExprPath, drvs);
             break;
         }
 
@@ -611,17 +620,28 @@ static void opSwitchProfile(Globals & globals,
     if (opFlags.size() > 0)
         throw UsageError(format("unknown flags `%1%'") % opFlags.front());
     if (opArgs.size() > 1)
-        throw UsageError(format("--profile takes at most one argument"));
+        throw UsageError(format("`--profile' takes at most one argument"));
 
-    string linkPath = 
+    Path linkPath = 
         opArgs.size() == 0 ? globals.linkPath : opArgs.front();
+    Path linkPathFinal = getHomeDir() + "/.nix-userenv";
 
-    string homeDir(getenv("HOME"));
-    if (homeDir == "") throw Error("HOME environment variable not set");
-
-    string linkPathFinal = homeDir + "/.nix-userenv";
-    
     switchLink(linkPathFinal, linkPath);
+}
+
+
+static void opDefaultExpr(Globals & globals,
+    Strings opFlags, Strings opArgs)
+{
+    if (opFlags.size() > 0)
+        throw UsageError(format("unknown flags `%1%'") % opFlags.front());
+    if (opArgs.size() != 1)
+        throw UsageError(format("`--import' takes exactly one argument"));
+
+    Path defNixExpr = opArgs.front();
+    Path defNixExprLink = getDefNixExprPath();
+    
+    switchLink(defNixExprLink, defNixExpr);
 }
 
 
@@ -635,6 +655,7 @@ void run(Strings args)
     
     Globals globals;
     globals.linkPath = getLinksDir() + "/current";
+    globals.nixExprPath = getDefNixExprPath();
 
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
         string arg = *i;
@@ -649,11 +670,19 @@ void run(Strings args)
             op = opUpgrade;
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
+        else if (arg == "--import" || arg == "-I") /* !!! bad name */
+            op = opDefaultExpr;
         else if (arg == "--link" || arg == "-l") {
             ++i;
             if (i == args.end()) throw UsageError(
                 format("`%1%' requires an argument") % arg);
             globals.linkPath = absPath(*i);
+        }
+        else if (arg == "--file" || arg == "-f") {
+            ++i;
+            if (i == args.end()) throw UsageError(
+                format("`%1%' requires an argument") % arg);
+            globals.nixExprPath = absPath(*i);
         }
         else if (arg == "--profile" || arg == "-p") 
             op = opSwitchProfile;

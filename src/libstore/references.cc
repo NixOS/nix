@@ -59,12 +59,8 @@ void checkPath(const string & path,
         delete buf; /* !!! autodelete */
     }
     
-    else if (S_ISLNK(st.st_mode)) {
-        char buf[st.st_size];
-        if (readlink(path.c_str(), buf, st.st_size) != st.st_size)
-            throw SysError(format("reading symbolic link `%1%'") % path);
-        search(string(buf, st.st_size), ids, seen);
-    }
+    else if (S_ISLNK(st.st_mode))
+        search(readLink(path), ids, seen);
     
     else throw Error(format("unknown file type: %1%") % path);
 }

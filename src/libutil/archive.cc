@@ -122,11 +122,8 @@ static void dump(const Path & path, DumpSink & sink)
     else if (S_ISLNK(st.st_mode)) {
         writeString("type", sink);
         writeString("symlink", sink);
-        char buf[st.st_size];
-        if (readlink(path.c_str(), buf, st.st_size) != st.st_size)
-            throw SysError("reading symbolic link " + path);
         writeString("target", sink);
-        writeString(string(buf, st.st_size), sink);
+        writeString(readLink(path), sink);
     }
 
     else throw Error("unknown file type: " + path);

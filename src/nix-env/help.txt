@@ -4,15 +4,16 @@ nix-env [OPTIONS...] [ARGUMENTS...]
 
 Operations:
 
-  --install / -i FILE: add derivations to the user environment
+  --install / -i: add derivations to the user environment
+  --upgrade / -u: upgrade derivation in the user environment
   --uninstall / -e: remove derivations from the user environment
-  --upgrade / -u FILE: upgrade derivation in the user environment
   --query / -q: perform a query on an environment or Nix expression
 
 The previous operations take a list of derivation names.  The special
 name `*' may be used to indicate all derivations.
 
-  --profile / -p [FILE]: switch to specified user environment 
+  --profile / -p [FILE]: switch to specified user environment
+  --import / -I FILE: set default Nix expression
 
   --version: output version information
   --help: display help
@@ -26,10 +27,11 @@ Query types:
 Query sources:
 
   --installed: use installed derivations (default)
-  --available / -f FILE: use derivations available in expression FILE
+  --available / -a: use derivations available in Nix expression
 
 Options:
 
   --link / -l LINK: use symlink LINK instead of (...)/current
+  --file / -f FILE: use Nix expression FILE for installation, etc.
   --verbose / -v: verbose operation (may be repeated)
   --keep-failed / -K: keep temporary directories of failed builds
