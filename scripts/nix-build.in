@@ -16,7 +16,9 @@ for i in "$@"; do
             ;;
         *)
             storeExpr=$(nix-instantiate "$i")
-            echo "store expression is $storeExpr" >&2
+            for j in $storeExpr; do
+                echo "store expression is $j" >&2
+            done
             nix-store -qnfv $extraArgs $storeExpr
             ;;
     esac
