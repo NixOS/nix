@@ -62,6 +62,29 @@ static void opAdd(Strings opFlags, Strings opArgs)
 }
 
 
+/* A sink that writes dump output to stdout. */
+struct StdoutSink : DumpSink
+{
+    virtual void operator ()
+        (const unsigned char * data, unsigned int len)
+    {
+        /* Don't use cout, it's slow as hell! */
+        write(STDOUT_FILENO, (char *) data, len);
+    }
+};
+
+
+/* Dump a value to standard output */
+static void opDump(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty()) throw UsageError("unknown flag");
+    if (opArgs.size() != 1) throw UsageError("only one argument allowed");
+
+    StdoutSink sink;
+    dumpPath(opArgs[0], sink);
+}
+
+
 /* Initialise the Nix databases. */
 static void opInit(Strings opFlags, Strings opArgs)
 {
@@ -83,7 +106,7 @@ static void opInit(Strings opFlags, Strings opArgs)
      --query / -q: query stored values
      --add: add values
      --verify: verify Nix structures
-     --dump: dump a value
+     --dump: dump a file or value
      --init: initialise the Nix database
      --version: output version information
      --help: display help
@@ -134,6 +157,8 @@ void run(Strings::iterator argCur, Strings::iterator argEnd)
             op = opDelete;
         else if (arg == "--add")
             op = opAdd;
+        else if (arg == "--dump")
+            op = opDump;
         else if (arg == "--init")
             op = opInit;
         else if (arg[0] == '-')
@@ -158,11 +183,9 @@ int main(int argc, char * * argv)
     ATinit(argc, argv, &bottomOfStack);
 
     try {
-
         Strings args;
         while (argc--) args.push_back(*argv++);
         run(args.begin() + 1, args.end());
-
     } catch (UsageError & e) {
         cerr << "error: " << e.what() << endl
              << "Try `nix --help' for more information.\n";

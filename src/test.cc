@@ -21,7 +21,8 @@ struct MySink : DumpSink
 {
     virtual void operator () (const unsigned char * data, unsigned int len)
     {
-        cout.write((char *) data, len);
+        /* Don't use cout, it's slow as hell! */
+        write(STDOUT_FILENO, (char *) data, len);
     }
 };
 
