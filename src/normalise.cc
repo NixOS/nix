@@ -152,11 +152,20 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 
     if (!fastBuild) {
 
-        /* Check that none of the outputs exist. */
+        /* If any of the outputs already exist but are not registered,
+           delete them. */
         for (OutPaths::iterator i = outPaths.begin(); 
              i != outPaths.end(); i++)
-            if (pathExists(i->first))
-                throw Error(format("path `%1%' exists") % i->first);
+        {
+            string path = i->first;
+            FSId id;
+            if (queryPathId(path, id))
+                throw Error(format("obstructed build: path `%1%' exists") % path);
+            if (pathExists(path)) {
+                debug(format("removing unregistered path `%1%'") % path);
+                deletePath(path);
+            }
+        }
 
         /* Run the builder. */
         msg(lvlChatty, format("building..."));
