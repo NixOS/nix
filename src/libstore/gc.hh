@@ -5,15 +5,21 @@
 
 
 /* Garbage collector operation. */
-typedef enum { gcReturnLive, gcReturnDead, gcDeleteDead } GCAction;
+typedef enum {
+    gcReturnRoots,
+    gcReturnLive,
+    gcReturnDead,
+    gcDeleteDead,
+} GCAction;
 
-/* If `action' is set to `soReturnLive', return the set of paths
-   reachable from (i.e. in the closure of) the specified roots.  If
-   `action' is `soReturnDead', return the set of paths not reachable
-   from the roots.  If `action' is `soDeleteDead', actually delete the
-   latter set. */
-void collectGarbage(const PathSet & roots, GCAction action,
-    PathSet & result);
+/* If `action' is set to `gcReturnRoots', find and return the set of
+   roots for the garbage collector.  These are the store paths
+   symlinked to in the `gcroots' directory.  If `action' is
+   `gcReturnLive', return the set of paths reachable from (i.e. in the
+   closure of) the roots.  If `action' is `gcReturnDead', return the
+   set of paths not reachable from the roots.  If `action' is
+   `gcDeleteDead', actually delete the latter set. */
+void collectGarbage(GCAction action, PathSet & result);
 
 /* Register a temporary GC root.  This root will automatically
    disappear when this process exits.  WARNING: this function should

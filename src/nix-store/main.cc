@@ -38,9 +38,7 @@ static Path followSymlinks(Path & path)
     while (!isStorePath(path)) {
         if (!isLink(path)) return path;
         string target = readLink(path);
-        path = canonPath(string(target, 0, 1) == "/"
-            ? target
-            : path + "/" + target);
+        path = absPath(target, dirOf(path));
     }
     return path;
 }
@@ -308,27 +306,19 @@ static void opIsValid(Strings opFlags, Strings opArgs)
 
 static void opGC(Strings opFlags, Strings opArgs)
 {
-    GCAction action;
+    GCAction action = gcDeleteDead;
     
     /* Do what? */
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
-        if (*i == "--print-live") action = gcReturnLive;
+        if (*i == "--print-roots") action = gcReturnRoots;
+        else if (*i == "--print-live") action = gcReturnLive;
         else if (*i == "--print-dead") action = gcReturnDead;
         else if (*i == "--delete") action = gcDeleteDead;
         else throw UsageError(format("bad sub-operation `%1%' in GC") % *i);
 
-    /* Read the roots. */
-    PathSet roots;
-    while (1) {
-        Path root;
-        getline(cin, root);
-        if (cin.eof()) break;
-        roots.insert(root);
-    }
-
     PathSet result;
-    collectGarbage(roots, action, result);
+    collectGarbage(action, result);
 
     if (action != gcDeleteDead) {
         for (PathSet::iterator i = result.begin(); i != result.end(); ++i)

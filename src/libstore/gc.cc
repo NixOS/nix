@@ -26,7 +26,9 @@ static int openGCLock(LockType lockType)
 {
     Path fnGCLock = (format("%1%/%2%")
         % nixStateDir % gcLockName).str();
-        
+         
+    debug(format("acquiring global GC lock `%1%'") % fnGCLock);
+    
     AutoCloseFD fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT, 0600);
     if (fdGCLock == -1)
         throw SysError(format("opening global GC lock `%1%'") % fnGCLock);
@@ -234,6 +236,46 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
 }
 
 
+static void findRoots(const Path & path, bool recurseSymlinks,
+    PathSet & roots)
+{
+    struct stat st;
+    if (lstat(path.c_str(), &st) == -1)
+        throw SysError(format("statting `%1%'") % path);
+
+    printMsg(lvlVomit, format("looking at `%1%'") % path);
+
+    if (S_ISDIR(st.st_mode)) {
+	Strings names = readDirectory(path);
+	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
+            findRoots(path + "/" + *i, recurseSymlinks, roots);
+    }
+
+    else if (S_ISLNK(st.st_mode)) {
+        string target = readLink(path);
+        Path target2 = absPath(target, dirOf(path));
+
+        if (isStorePath(target2)) {
+            debug(format("found root `%1%' in `%2%'")
+                % target2 % path);
+            roots.insert(target2);
+        }
+
+        else if (recurseSymlinks) {
+            if (pathExists(target2))
+                findRoots(target2, false, roots);
+            else {
+                printMsg(lvlInfo, format("removing stale link from `%1%' to `%2%'") % path % target2);
+                /* Note that we only delete when recursing, i.e., when
+                   we are still in the `gcroots' tree.  We never
+                   delete stuff outside that tree. */
+                unlink(path.c_str());
+            }
+        }
+    }
+}
+
+
 static void dfsVisit(const PathSet & paths, const Path & path,
     PathSet & visited, Paths & sorted)
 {
@@ -265,8 +307,7 @@ static Paths topoSort(const PathSet & paths)
 }
 
 
-void collectGarbage(const PathSet & roots, GCAction action,
-    PathSet & result)
+void collectGarbage(GCAction action, PathSet & result)
 {
     result.clear();
     
@@ -275,8 +316,16 @@ void collectGarbage(const PathSet & roots, GCAction action,
        b) Processes from creating new temporary root files. */
     AutoCloseFD fdGCLock = openGCLock(ltWrite);
 
-    /* !!! Find the roots here, after we've grabbed the GC lock, since
-       the set of permanent roots cannot increase now. */
+    /* Find the roots.  Since we've grabbed the GC lock, the set of
+       permanent roots cannot increase now. */
+    Path rootsDir = canonPath((format("%1%/%2%") % nixStateDir % gcRootsDir).str());
+    PathSet roots;
+    findRoots(rootsDir, true, roots);
+
+    if (action == gcReturnRoots) {
+        result = roots;
+        return;
+    }
 
     /* Determine the live paths which is just the closure of the
        roots under the `references' relation. */
