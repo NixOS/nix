@@ -806,7 +806,7 @@ void Normaliser::initChild(Goal & goal)
 {
     /* Put the child in a separate process group so that it doesn't
        receive terminal signals. */
-    if (setpgrp() == -1)
+    if (setpgid(0, 0) == -1)
         throw SysError(format("setting process group"));
 
     if (chdir(goal.tmpDir.c_str()) == -1)
