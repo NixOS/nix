@@ -1,0 +1,86 @@
+#! /bin/sh
+
+. ./settings
+
+if ! ./mountloop; then
+    exit 1
+fi
+
+# Cleanup.
+rm -rf $target/dev
+rm -rf $target/proc
+
+# Create the basic directory structure.
+mkdir $target
+mkdir $target/dev
+mkdir $target/proc
+mkdir $target/pkg
+mkdir $target/pkg/sys
+mkdir $target/pkg/sys/bin
+mkdir $target/pkg/sys/var
+mkdir $target/mnt
+mkdir $target/mnt/host
+mkdir -m 1777 $target/tmp
+
+# Make package registrations.
+pkgdb=$target/pkg/sys/var/pkginfo
+
+# Copy some programs and its libraries.
+utils="/usr/bin/vi /bin/sh /bin/mount /bin/umount /bin/ls /bin/ln /bin/cp /bin/mv /bin/rm /bin/cat /bin/df /bin/pwd /usr/bin/ld /usr/bin/as /bin/sed /bin/chmod /bin/chown /usr/bin/expr /bin/mkdir /bin/rmdir /usr/bin/sort /usr/bin/uniq /bin/uname /usr/bin/grep /bin/sleep /usr/bin/rsync /usr/bin/make /usr/bin/cmp /bin/date /usr/bin/tr /usr/bin/ar /usr/bin/ranlib /usr/bin/basename /usr/bin/less ../src/nix"
+bootlib=/pkg/prog-bootstrap/lib
+bootbin=/pkg/prog-bootstrap/bin
+mkdir -p $target/$bootlib
+mkdir -p $target/$bootbin
+cp -p $utils $target/$bootbin
+libs=`ldd $utils | awk '{ print $3 }' | sort | uniq`
+echo $libs
+cp -p $libs $target/$bootlib
+for i in libc.so.6 libdl.so.2 libpthread.so.0 librt.so.1 libresolv.so.2 ld-linux.so.2; do rm $target/$bootlib/$i; done
+../src/nix -d $pkgdb register-installed-pkg prog-bootstrap /pkg/prog-bootstrap
+
+mv $target/$bootbin/nix $target/pkg/sys/bin
+../src/nix -d $pkgdb register-installed-pkg sys /pkg/sys
+
+# Copy the bootstrap gcc.
+echo Copying gcc...
+rsync -a ../bootstrap/gcc/inst/pkg $target
+../src/nix -d $pkgdb register-installed-pkg gcc-bootstrap /pkg/gcc-bootstrap
+
+# Copy the bootstrap glibc.
+echo Copying glibc...
+glibcdir=/pkg/glibc-bootstrap
+rsync -a ../bootstrap/glibc/inst/pkg $target
+../src/nix -d $pkgdb register-installed-pkg glibc-bootstrap $glibcdir
+
+# Copy the bootstrap kernel header files.
+echo Copying kernel headers...
+kerneldir=/pkg/kernel-bootstrap
+rsync -a ../bootstrap/kernel/inst/pkg $target
+../src/nix -d $pkgdb register-installed-pkg kernel-bootstrap $kerneldir
+
+# Compatibility.
+rm -rf $target/lib
+mkdir $target/lib
+ln -sf $glibcdir/lib/ld-linux.so.2 $target/lib/ld-linux.so.2
+
+rm -rf $target/bin
+mkdir $target/bin
+ln -sf $bootbin/sh $target/bin/sh
+
+# Build ld.so.cache.
+ldsoconf=$target/$glibcdir/etc/ld.so.conf
+echo $glibcdir/lib > $ldsoconf
+echo $bootlib >> $ldsoconf
+$target/$glibcdir/sbin/ldconfig -r $target
+
+# Source repository.
+rm -f $target/src
+ln -sf /mnt/host/`pwd`/../src $target/src
+
+# Copy boot script.
+cp -p ./start $target/pkg/sys/bin
+
+# Done.
+echo Done!
+umount $target
+rmdir $target

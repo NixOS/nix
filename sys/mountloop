@@ -1,0 +1,8 @@
+#! /bin/sh
+
+. ./settings
+
+mkdir $target
+if ! mount -o loop -t ext3 $image $target; then
+    exit 1
+fi

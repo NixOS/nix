@@ -1,0 +1,5 @@
+#! /bin/sh
+
+. ./settings
+
+linux ubd0=$image init=/pkg/sys/bin/start

@@ -1,0 +1,40 @@
+#! /pkg/prog-bootstrap/bin/sh
+
+# This directory contains nix.
+export PATH=/pkg/sys/bin
+
+# Add in the utilities needed for booting.
+export PATH=$PATH:`nix get-pkg prog-bootstrap`/bin
+
+echo
+echo Starting up...
+
+echo Mounting file systems...
+mount -n -o remount,rw /dev/root /
+mount -n -t proc none /proc
+mount -n -t hostfs none /mnt/host 
+
+echo Registering available src packages...
+( cd /src
+  for i in *; do
+    if test -d $i; then
+      echo "  $i"
+      nix register-pkg $i /src/$i
+    fi
+  done
+)
+
+export PATH=`nix get-pkg coreutils-4.5.7`/bin:$PATH
+
+echo
+echo "=== starting interactive shell ==="
+
+sh
+
+echo
+echo Shutting down...
+
+umount /proc
+#sync
+mount -n -o remount,ro /dev/root /
+#sync

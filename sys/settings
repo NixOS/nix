@@ -1,0 +1,2 @@
+image=/var/tmp/nix.img
+target=./loop
