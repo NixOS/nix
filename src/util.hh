@@ -85,17 +85,22 @@ string printHash(unsigned char * buf)
 
     
 /* Verify that a reference is valid (that is, is a MD5 hash code). */
-void checkHash(const string & s)
+bool isHash(const string & s)
 {
-    string err = "invalid reference: " + s;
-    if (s.length() != 32)
-        throw BadRefError(err);
+    if (s.length() != 32) return false;
     for (int i = 0; i < 32; i++) {
         char c = s[i];
         if (!((c >= '0' && c <= '9') ||
               (c >= 'a' && c <= 'f')))
-            throw BadRefError(err);
+            return false;
     }
+    return true;
+}
+
+
+void checkHash(const string & s)
+{
+    if (!isHash(s)) throw BadRefError("invalid reference: " + s);
 }
 
 
@@ -110,6 +115,27 @@ string hashFile(string filename)
     fclose(file);
     if (err) throw BadRefError("cannot hash file");
     return printHash(hash);
+}
+
+
+
+/* Return the directory part of the given path, i.e., everything
+   before the final `/'. */
+string dirOf(string s)
+{
+    unsigned int pos = s.rfind('/');
+    if (pos == string::npos) throw Error("invalid file name");
+    return string(s, 0, pos);
+}
+
+
+/* Return the base name of the given path, i.e., everything following
+   the final `/'. */
+string baseNameOf(string s)
+{
+    unsigned int pos = s.rfind('/');
+    if (pos == string::npos) throw Error("invalid file name");
+    return string(s, pos + 1);
 }
 
 

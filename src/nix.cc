@@ -28,6 +28,9 @@ static string dbInstPkgs = "pkginst";
 static string dbPrebuilts = "prebuilts";
 
 
+static string nixSourcesDir;
+
+
 /* Wrapper classes that ensures that the database is closed upon
    object destruction. */
 class Db2 : public Db 
@@ -435,9 +438,9 @@ void exportPkgs(string outDir,
         string pkgDir = getPkg(hash);
         string tmpFile = outDir + "/export_tmp";
 
-        string cmd = "cd " + pkgDir + " && tar cvfj " + tmpFile + " .";
+        string cmd = "cd " + pkgDir + " && tar cfj " + tmpFile + " .";
         int res = system(cmd.c_str()); // !!! escaping
-        if (WEXITSTATUS(res) != 0)
+        if (!WIFEXITED(res) || WEXITSTATUS(res) != 0)
             throw Error("cannot tar " + pkgDir);
 
         string prebuiltHash = hashFile(tmpFile);
@@ -458,10 +461,12 @@ void regPrebuilt(string pkgHash, string prebuiltHash)
 }
 
 
-void registerFile(string filename)
+string registerFile(string filename)
 {
     filename = absPath(filename);
-    setDB(dbRefs, hashFile(filename), filename);
+    string hash = hashFile(filename);
+    setDB(dbRefs, hash, filename);
+    return hash;
 }
 
 
@@ -618,8 +623,46 @@ void printGraph(Strings::iterator first, Strings::iterator last)
 }
 
 
-void run(Strings args)
+/* Download object referenced by the given URL into the sources
+   directory.  Return the file name it was downloaded to. */
+string fetchURL(string url)
 {
+    string filename = baseNameOf(url);
+    string fullname = nixSourcesDir + "/" + filename;
+    struct stat st;
+    if (stat(fullname.c_str(), &st)) {
+        /* !!! quoting */
+        string shellCmd =
+            "cd " + nixSourcesDir + " && wget --quiet -N \"" + url + "\"";
+        int res = system(shellCmd.c_str());
+        if (WEXITSTATUS(res) != 0)
+            throw Error("cannot fetch " + url);
+    }
+    return fullname;
+}
+
+
+void fetch(string id)
+{
+    string fn;
+
+    /* Fetch the object referenced by id. */
+    if (isHash(id)) {
+        throw Error("not implemented");
+    } else {
+        fn = fetchURL(id);
+    }
+
+    /* Register it by hash. */
+    string hash = registerFile(fn);
+    cout << hash << endl;
+}
+
+
+void fetch(Strings::iterator first, Strings::iterator last)
+{
+    for (Strings::iterator it = first; it != last; it++)
+        fetch(*it);
 }
 
 
@@ -675,6 +718,11 @@ Subcommands:
 
   graph HASH...
     Like closure, but print a dot graph specification.
+
+  fetch ID...  
+    Fetch the objects identified by ID and place them in the Nix
+    sources directory.  ID can be a hash or URL.  Print out the hash
+    of the object.
 ";
 }
 
@@ -685,6 +733,8 @@ void run(Strings::iterator argCur, Strings::iterator argEnd)
 
     char * homeDir = getenv(nixHomeDirEnvVar.c_str());
     if (homeDir) nixHomeDir = homeDir;
+
+    nixSourcesDir = nixHomeDir + "/var/nix/sources";
 
     /* Parse the global flags. */
     for ( ; argCur != argEnd; argCur++) {
@@ -742,6 +792,8 @@ void run(Strings::iterator argCur, Strings::iterator argEnd)
         printClosure(argCur, argEnd);
     } else if (cmd == "graph") {
         printGraph(argCur, argEnd);
+    } else if (cmd == "fetch") {
+        fetch(argCur, argEnd);
     } else
         throw UsageError("unknown command: " + string(cmd));
 }

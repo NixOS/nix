@@ -13,7 +13,6 @@ extern "C" {
 
 
 static string nixDescriptorDir;
-static string nixSourcesDir;
 
 
 static bool verbose = false;
@@ -32,46 +31,6 @@ void registerFile(string filename)
     if (WEXITSTATUS(res) != 0)
         throw Error("cannot register " + filename + " with Nix");
 }
-
-
-/* Return the directory part of the given path, i.e., everything
-   before the final `/'. */
-string dirOf(string s)
-{
-    unsigned int pos = s.rfind('/');
-    if (pos == string::npos) throw Error("invalid file name");
-    return string(s, 0, pos);
-}
-
-
-/* Return the base name of the given path, i.e., everything following
-   the final `/'. */
-string baseNameOf(string s)
-{
-    unsigned int pos = s.rfind('/');
-    if (pos == string::npos) throw Error("invalid file name");
-    return string(s, pos + 1);
-}
-
-
-/* Download object referenced by the given URL into the sources
-   directory.  Return the file name it was downloaded to. */
-string fetchURL(string url)
-{
-    string filename = baseNameOf(url);
-    string fullname = nixSourcesDir + "/" + filename;
-    struct stat st;
-    if (stat(fullname.c_str(), &st)) {
-        /* !!! quoting */
-        string shellCmd =
-            "cd " + nixSourcesDir + " && wget --quiet -N \"" + url + "\"";
-        int res = system(shellCmd.c_str());
-        if (WEXITSTATUS(res) != 0)
-            throw Error("cannot fetch " + url);
-    }
-    return fullname;
-}
-
 
 Error badTerm(const string & msg, ATerm e)
 {
@@ -120,7 +79,7 @@ bool evaluateBool(ATerm e, EvalContext ctx)
 ATerm evaluate(ATerm e, EvalContext ctx)
 {
     char * s;
-    ATerm e2;
+    ATerm e2, e3;
     ATerm eCond, eTrue, eFalse;
 
     /* Check for normal forms first. */
@@ -166,6 +125,7 @@ ATerm evaluate(ATerm e, EvalContext ctx)
             instantiateDescriptor(filename, ctx).c_str());
     }
 
+#if 0
     /* `Source' copies the specified file to nixSourcesDir, registers
        it with Nix, and returns the hash of the file. */
     else if (ATmatch(e, "Source(<term>)", &e2)) {
@@ -185,15 +145,29 @@ ATerm evaluate(ATerm e, EvalContext ctx)
         registerFile(target);
         return ATmake("File(<str>)", hashFile(target).c_str());
     }
+#endif
 
-    /* `Url' fetches a file from the network, caching it in
-       nixSourcesDir and returning the file name. */
-    else if (ATmatch(e, "Url(<term>)", &e2)) {
-        string url = evaluateStr(e2, ctx);
+    /* `Local' registers a file with Nix, and returns the file's
+       hash. */
+    else if (ATmatch(e, "Local(<term>)", &e2)) {
+        string filename = absPath(evaluateStr(e2, ctx), ctx.dir); /* !!! */
+        string hash = hashFile(filename);
+        return ATmake("File(<str>)", hash.c_str());
+    }
+
+    /* `Url' registers a mapping from a hash to an url with Nix, and
+       returns the hash. */
+    else if (ATmatch(e, "Url(<term>, <term>)", &e2, &e3)) {
+        string hash = evaluateStr(e2, ctx);
+        checkHash(hash);
+        string url = evaluateStr(e3, ctx);
+#if 0
         if (verbose)
             cerr << "fetching " << url << endl;
         string filename = fetchURL(url);
-        return ATmake("Str(<str>)", filename.c_str());
+#endif
+        /* !!! register */
+        return ATmake("File(<str>)", hash.c_str());
     }
 
     /* `If' provides conditional evaluation. */
@@ -329,7 +303,6 @@ void run(Strings::iterator argCur, Strings::iterator argEnd)
     if (homeDir) nixHomeDir = homeDir;
 
     nixDescriptorDir = nixHomeDir + "/var/nix/descriptors";
-    nixSourcesDir = nixHomeDir + "/var/nix/sources";
 
     for ( ; argCur != argEnd; argCur++) {
         string arg(*argCur);

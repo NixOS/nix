@@ -1,0 +1,69 @@
+#! /usr/bin/perl -w
+
+my $prefix = $ENV{"NIX"} || "/nix"; # !!! use prefix
+my $etcdir = "$prefix/etc/nix";
+my $knowns = "$prefix/var/nix/known-prebuilts";
+my $tmpfile = "$prefix/var/nix/prebuilts.tmp";
+
+my $conffile = "$etcdir/prebuilts.conf";
+
+sub register {
+    my $fn = shift;
+    return unless $fn =~ /([^\/]*)-([0-9a-z]{32})-([0-9a-z]{32})\.tar\.bz2/;
+    my $id = $1;
+    my $pkghash = $2;
+    my $prebuilthash = $3;
+    print "$pkghash => $prebuilthash ($id)\n";
+    system "nix regprebuilt $pkghash $prebuilthash";
+    if ($?) { die "`nix regprebuilt' failed"; }
+    print KNOWNS "$pkghash\n";
+}
+
+open KNOWNS, ">$knowns";
+
+open CONFFILE, "<$conffile";
+
+while (<CONFFILE>) {
+    chomp;
+    if (/^\s*(\S+)\s*(\#.*)?$/) {
+        my $url = $1;
+
+        print "obtaining prebuilt list from $url...\n";
+
+        if ($url =~ /^\//) {
+
+            # It's a local path.
+
+            foreach my $fn (glob "$url/*") {
+                register $fn;
+            }
+
+        } else {
+
+            # It's a URL.
+
+            system "wget '$url' -O '$tmpfile' 2> /dev/null"; # !!! escape
+            if ($?) { die "`wget' failed"; }
+
+            open INDEX, "<$tmpfile";
+
+            while (<INDEX>) {
+                # Get all links to prebuilts, that is, file names of the
+                # form foo-HASH-HASH.tar.bz2.
+                next unless (/HREF=\"([^\"]*)\"/);
+                my $fn = $1;
+                next if $fn =~ /\.\./;
+                next if $fn =~ /\//;
+                register $fn;
+            }
+
+            close INDEX;
+
+            unlink $tmpfile;
+        }
+    }
+}
+
+close CONFFILE;
+
+close KNOWNS;
