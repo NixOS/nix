@@ -208,6 +208,14 @@ static Expr evalExpr(Expr e)
         return ATmake("Include(<str>)", ((string) eHash).c_str());
     }
 
+    /* BaseName primitive function. */
+    if (ATmatch(e, "BaseName(<term>)", &e1)) {
+        e1 = evalExpr(e1);
+        if (!ATmatch(e1, "<str>", &s1)) 
+            throw badTerm("string expected", e1);
+        return ATmake("<str>", baseNameOf(s1).c_str());
+    }
+
     /* Barf. */
     throw badTerm("invalid expression", e);
 }
