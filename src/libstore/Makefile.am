@@ -7,11 +7,4 @@ libstore_a_SOURCES = \
 AM_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall \
  -I.. -I../../externals/inst/include -I../libutil
 
-EXTRA_DIST = *.hh *.h test-builder-*.sh
-
-check_PROGRAMS = test-aterm
-
-test_aterm_SOURCES = test-aterm.cc
-test_aterm_LDADD = libstore.a $(LDADD) ../boost/format/libformat.a \
- -L../../externals/inst/lib -ldb_cxx -lATerm
-
+EXTRA_DIST = *.hh *.h test-builder-*.sh test.cc
