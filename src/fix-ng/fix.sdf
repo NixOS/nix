@@ -47,6 +47,9 @@ exports
     "rec" "{" {Bind ","}* "}"
     -> Expr {cons("Rec")}
 
+    "let" "{" {Bind ","}* "}"
+    -> Expr {cons("LetRec")}
+
     "{" {Bind ","}* "}"
     -> Expr {cons("Attrs")}
 
@@ -58,6 +61,12 @@ exports
 
     Expr "." Id
     -> Expr {cons("Select")}
+
+    "if" Expr "then" Expr "else" Expr
+    -> Expr {cons("If")}
+
+    Expr "==" Expr
+    -> Expr {cons("OpEq")}
 
   context-free priorities
 

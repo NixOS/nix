@@ -160,6 +160,11 @@ Expr evalExpr2(EvalState & state, Expr e)
     if (ATmatch(e, "Rec([<list>])", &bnds))
         return expandRec(e, (ATermList) bnds);
 
+    /* Let expressions `let {..., body = ...}' are just desugared
+       into `(rec {..., body = ...}).body'. */
+    if (ATmatch(e, "LetRec(<term>)", &e1))
+        return evalExpr(state, ATmake("Select(Rec(<term>), \"body\")", e1));
+
     /* Barf. */
     throw badTerm("invalid expression", e);
 }
