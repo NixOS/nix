@@ -9,12 +9,14 @@
 typedef ATerm Expr;
 
 typedef map<ATerm, ATerm> NormalForms;
+typedef map<FSId, Strings> PkgPaths;
 typedef map<FSId, Hash> PkgHashes;
 
 struct EvalState 
 {
     Strings searchDirs;
     NormalForms normalForms;
+    PkgPaths pkgPaths;
     PkgHashes pkgHashes; /* normalised package hashes */
 };
 
@@ -106,7 +108,20 @@ static Expr substExprMany(ATermList formals, ATermList args, Expr body)
 }
 
 
-Hash hashPackage(EvalState & state, FState fs)
+static Strings fstatePathsCached(EvalState & state, const FSId & id)
+{
+    PkgPaths::iterator i = state.pkgPaths.find(id);
+    if (i != state.pkgPaths.end())
+        return i->second;
+    else {
+        Strings paths = fstatePaths(id);
+        state.pkgPaths[id] = paths;
+        return paths;
+    }
+}
+
+
+static Hash hashPackage(EvalState & state, FState fs)
 {
     if (fs.type == FState::fsDerive) {
         for (FSIds::iterator i = fs.derive.inputs.begin();
@@ -214,7 +229,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
 
             if (ATmatch(value, "FSId(<str>)", &s1)) {
                 FSId id = parseHash(s1);
-                Strings paths = fstatePaths(id);
+                Strings paths = fstatePathsCached(state, id);
                 if (paths.size() != 1) abort();
                 string path = *(paths.begin());
                 fs.derive.inputs.push_back(id);
