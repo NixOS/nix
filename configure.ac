@@ -1,5 +1,5 @@
 AC_INIT(nix, "0.4")
-AC_CONFIG_SRCDIR(src/nix.cc)
+AC_CONFIG_SRCDIR(README)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE
 
@@ -23,12 +23,21 @@ AC_PATH_PROG(wget, wget)
 AC_CHECK_LIB(pthread, pthread_mutex_init)
 
 AM_CONFIG_HEADER([config.h])
-AC_CONFIG_FILES([Makefile 
+AC_CONFIG_FILES([Makefile
    externals/Makefile
-   boost/Makefile boost/format/Makefile
    src/Makefile
+   src/boost/Makefile
+   src/boost/format/Makefile
+   src/libnix/Makefile
+   src/libmain/Makefile
+   src/nix/Makefile
+   src/nix-hash/Makefile
+   src/fix/Makefile
    scripts/Makefile
-   corepkgs/Makefile corepkgs/fetchurl/Makefile corepkgs/nar/Makefile
-   doc/Makefile doc/manual/Makefile
+   corepkgs/Makefile
+   corepkgs/fetchurl/Makefile
+   corepkgs/nar/Makefile
+   doc/Makefile
+   doc/manual/Makefile
   ])
 AC_OUTPUT

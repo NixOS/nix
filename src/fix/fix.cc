@@ -249,7 +249,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
 
     /* Platform constant. */
     if (ATmatch(e, "Platform")) {
-        return ATmake("<str>", SYSTEM);
+        return ATmake("<str>", thisSystem.c_str());
     }
 
     /* Fix inclusion. */
@@ -284,7 +284,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
 
         /* Evaluate the bindings and put them in a map. */
         map<string, ATerm> bndMap;
-        bndMap["platform"] = ATmake("<str>", SYSTEM);
+        bndMap["platform"] = ATmake("<str>", thisSystem.c_str());
         while (!ATisEmpty(bnds)) {
             ATerm bnd = ATgetFirst(bnds);
             if (!ATmatch(bnd, "(<str>, <term>)", &s1, &e1))
@@ -297,7 +297,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
            expression. */
         NixExpr ne;
         ne.type = NixExpr::neDerivation;
-        ne.derivation.platform = SYSTEM;
+        ne.derivation.platform = thisSystem;
         string name;
         Path outPath;
         Hash outHash;
@@ -320,7 +320,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
                     ne.derivation.args.push_back(processBinding(state, arg, ne));
                     args = ATgetNext(args);
                 }
-            } 
+            }
 
             else {
                 string s = processBinding(state, value, ne);

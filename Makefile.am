@@ -1,3 +1,3 @@
-SUBDIRS = externals boost src scripts corepkgs doc
+SUBDIRS = externals src scripts corepkgs doc
 
 EXTRA_DIST = substitute.mk
