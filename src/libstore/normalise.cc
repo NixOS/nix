@@ -322,18 +322,17 @@ bool Normaliser::startBuild(Path nePath)
         return true;
     }
 
-    /* Right platform? */
-    if (goal.expr.derivation.platform != thisSystem)
-        throw Error(format("a `%1%' is required, but I am a `%2%'")
-		    % goal.expr.derivation.platform % thisSystem);
-
     /* Realise inputs (and remember all input paths). */
+    PathSet fnord;
+    map<Path, Path> xyzzy;
     for (PathSet::iterator i = goal.expr.derivation.inputs.begin();
          i != goal.expr.derivation.inputs.end(); ++i)
     {
         checkInterrupt();
         Path nfPath = useSuccessor(*i);
         realiseClosure(nfPath);
+        fnord.insert(nfPath);
+        if (nfPath != *i) xyzzy[*i] = nfPath;
         /* !!! nfPath should be a root of the garbage collector while
            we are building */
         StoreExpr ne = storeExprFromPath(nfPath);
@@ -369,7 +368,38 @@ bool Normaliser::startBuild(Path nePath)
     Path buildHook = getEnv("NIX_BUILD_HOOK");
     if (buildHook != "") {
         printMsg(lvlChatty, format("using build hook `%1%'") % buildHook);
-        int status = system((buildHook + " " + goal.nePath + " 1>&2").c_str());
+
+        Path hookTmpDir = createTempDir();
+        Path inputListFN = hookTmpDir + "/inputs";
+        Path outputListFN = hookTmpDir + "/outputs";
+        Path successorsListFN = hookTmpDir + "/successors";
+
+        string s;
+        for (ClosureElems::iterator i = goal.inClosures.begin();
+             i != goal.inClosures.end(); ++i)
+            s += i->first + "\n";
+        for (PathSet::iterator i = fnord.begin();
+             i != fnord.end(); ++i)
+            s += *i + "\n";
+        writeStringToFile(inputListFN, s);
+        
+        s = "";
+        for (PathSet::iterator i = goal.expr.derivation.outputs.begin();
+             i != goal.expr.derivation.outputs.end(); ++i)
+            s += *i + "\n";
+        writeStringToFile(outputListFN, s);
+        
+        s = "";
+        for (map<Path, Path>::iterator i = xyzzy.begin();
+             i != xyzzy.end(); ++i)
+            s += i->first + " " + i->second + "\n";
+        writeStringToFile(successorsListFN, s);
+        
+        int status = system((format("%1% %2% %3% %4% %5% %6% 1>&2")
+            % buildHook % goal.nePath % inputListFN % outputListFN
+            % successorsListFN
+            % goal.expr.derivation.platform).str().c_str());
+        
         if (WIFEXITED(status)) {
             int code = WEXITSTATUS(status);
             if (code == 100) { /* == accepted */
@@ -383,6 +413,11 @@ bool Normaliser::startBuild(Path nePath)
         } else throw Error(
             format("build hook died with status %1%") % status);
     }
+
+    /* Right platform? */
+    if (goal.expr.derivation.platform != thisSystem)
+        throw Error(format("a `%1%' is required, but I am a `%2%'")
+		    % goal.expr.derivation.platform % thisSystem);
 
     /* Otherwise, start the build in a child process. */
     startBuildChild(goal);
