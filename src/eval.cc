@@ -165,7 +165,7 @@ static Hash computeDerived(Hash sourceHash, string targetName,
 
     /* Register targetHash -> targetPath.  !!! this should be in
        values.cc. */
-    setDB(nixDB, dbNFs, sourceHash, targetName);
+    setDB(nixDB, dbRefs, targetHash, targetName);
 
     /* Register that targetHash was produced by evaluating
        sourceHash; i.e., that targetHash is a normal form of
@@ -227,6 +227,34 @@ static Hash evalExternal(Expr e)
 }
 
 
+/* Evaluate a list of arguments into normal form. */
+void evalArgs(ATermList args, ATermList & argsNF, Environment & env)
+{
+    argsNF = ATempty;
+
+    while (!ATisEmpty(args)) {
+        ATerm eName, eVal, arg = ATgetFirst(args);
+        if (!ATmatch(arg, "Tup(<term>, <term>)", &eName, &eVal))
+            throw badTerm("invalid argument", arg);
+
+        string name = evalString(eName);
+        eVal = evalValue(eVal).e;
+
+        char * s;
+        if (ATmatch(eVal, "Str(<str>)", &s)) {
+            env[name] = s;
+        } else if (ATmatch(eVal, "External(<str>)", &s)) {
+            env[name] = queryValuePath(parseHash(s));
+        } else throw badTerm("invalid argument value", eVal);
+
+        argsNF = ATappend(argsNF,
+            ATmake("Tup(Str(<str>), <term>)", name.c_str(), eVal));
+
+        args = ATgetNext(args);
+    }
+}
+
+
 /* Evaluate an expression. */
 EvalResult evalValue(Expr e)
 {
@@ -263,12 +291,8 @@ EvalResult evalValue(Expr e)
         Hash prog = evalExternal(eProg);
 
         Environment env;
-        while (!ATisEmpty(args)) {
-            debug("arg");
-            Expr arg = ATgetFirst(args);
-            throw badTerm("foo", arg);
-            args = ATgetNext(args);
-        }
+        ATermList argsNF;
+        evalArgs(args, argsNF, env);
 
         Hash sourceHash = hashExpr(
             ATmake("Exec(Str(<str>), External(<str>), [])",

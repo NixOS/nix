@@ -74,13 +74,18 @@ void runTests()
 
     Hash builder1 = addValue("./test-builder-1.sh");
 
-    evalTest(ATmake("Exec(Str(<str>), External(<str>), [])",
-        thisSystem.c_str(), ((string) builder1).c_str()));
+    Expr e1 = ATmake("Exec(Str(<str>), External(<str>), [])",
+        thisSystem.c_str(), ((string) builder1).c_str());
+
+    evalTest(e1);
 
     Hash builder2 = addValue("./test-builder-2.sh");
 
-    evalTest(ATmake("Exec(Str(<str>), External(<str>), [])",
-        thisSystem.c_str(), ((string) builder2).c_str()));
+    Expr e2 = ATmake(
+        "Exec(Str(<str>), External(<str>), [Tup(Str(\"src\"), <term>)])",
+        thisSystem.c_str(), ((string) builder2).c_str(), e1);
+
+    evalTest(e2);
 }
 
 
