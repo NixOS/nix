@@ -75,7 +75,7 @@ be adapted easily to achieve similar policies.</para></listitem>
 
 <listitem><para>Nix component builds aim to be <quote>pure</quote>;
 that is, unaffected by anything other than the declared dependencies.
-This means that if a component was built succesfully once, it can be
+This means that if a component was built successfully once, it can be
 rebuilt again on another machine and the result will be the same.  We
 cannot <emphasis>guarantee</emphasis> this (e.g., if the build depends
 on the time-of-day), but Nix (and the tools in the Nix Packages
@@ -112,6 +112,13 @@ static pages, software dependencies, and so on.  Nix's advantages for
 software deployment also apply here: for instance, the ability
 trivially to have multiple configurations at the same time, or the
 ability to do rollbacks.</para></listitem>
+
+<listitem><para>Nix can efficiently upgrade between different versions
+of a component through <emphasis>binary patching</emphasis>.  If
+patches are available on a server, and you try to install a new
+version of some component, Nix will automatically apply a patch (or
+sequence of patches), if available, to transform the installed
+component into the new version.</para></listitem> 
 
 </itemizedlist>
 
