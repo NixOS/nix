@@ -316,8 +316,6 @@ void canonicalisePathMetaData(const Path & path)
     if (lstat(path.c_str(), &st))
 	throw SysError(format("getting attributes of path `%1%'") % path);
 
-    cerr << "foo!" << path << "\n";
-    
     if (!S_ISLNK(st.st_mode)) {
 
         /* Mask out all type related bits. */
