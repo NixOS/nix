@@ -209,7 +209,7 @@ static void printDrvTree(const Path & drvPath,
          i != drv.inputDrvs.end(); ++i)
         inputs.insert(i->first);
 
-    /* Topologically sorted under the relation A < B iff A \in
+    /* Topologically sort under the relation A < B iff A \in
        closure(B).  That is, if derivation A is an (possibly indirect)
        input of B, then A is printed first.  This has the effect of
        flattening the tree, preventing deeply nested structures.  */

@@ -989,6 +989,15 @@ void DerivationGoal::startBuilder()
     /* Also set TMPDIR and variants to point to this directory. */
     env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDir;
 
+    /* Compatibility hack with Nix <= 0.7: if this is a fixed-output
+       derivation, tell the builder, so that for instance `fetchurl'
+       can skip checking the output.  On older Nixes, this environment
+       variable won't be set, so `fetchurl' will do the check. */
+    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
+         i != drv.outputs.end(); ++i)
+        if (i->second.hash != "")
+            env["NIX_OUTPUT_CHECKED"] = "1";
+
     /* Run the builder. */
     printMsg(lvlChatty, format("executing builder `%1%'") %
         drv.builder);
