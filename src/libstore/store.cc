@@ -302,19 +302,16 @@ static void writeSubstitutes(const Transaction & txn,
 }
 
 
-void registerSubstitute(const Path & srcPath,
-    const Substitute & sub)
+void registerSubstitute(const Transaction & txn,
+    const Path & srcPath, const Substitute & sub)
 {
     assertStorePath(srcPath);
     assertStorePath(sub.storeExpr);
     
-    Transaction txn(nixDB);
-
     Substitutes subs = readSubstitutes(txn, srcPath);
 
     if (find(subs.begin(), subs.end(), sub) != subs.end()) {
         /* Nothing to do if the substitute is already known. */
-        txn.abort();
         return;
     }
     subs.push_front(sub); /* new substitutes take precedence */
@@ -325,10 +322,9 @@ void registerSubstitute(const Path & srcPath,
     nixDB.queryStrings(txn, dbSubstitutesRev, sub.storeExpr, revs);
     if (find(revs.begin(), revs.end(), srcPath) == revs.end())
         revs.push_back(srcPath);
-    
-    nixDB.setStrings(txn, dbSubstitutesRev, sub.storeExpr, revs);
 
-    txn.commit();
+    // !!! O(n^2) complexity in building this
+    //    nixDB.setStrings(txn, dbSubstitutesRev, sub.storeExpr, revs);
 }
 
 
