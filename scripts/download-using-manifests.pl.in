@@ -67,6 +67,12 @@ sub addEdge {
 
 addToQueue $targetPath;
 
+sub isValidPath {
+    my $p = shift;
+    system "nix-store --isvalid '$p' 2> /dev/null";
+    return $? == 0;
+}
+
 while ($queueFront < scalar @queue) {
     my $u = $queue[$queueFront++];
     print "$u\n";
@@ -75,8 +81,7 @@ while ($queueFront < scalar @queue) {
 
     # If the path already exists, it has distance 0 from the "start"
     # node.
-    system "nix-store --isvalid '$u' 2> /dev/null";
-    if ($? == 0) {
+    if (isValidPath($u)) {
         addEdge "start", $u, 0, "present", undef;
     }
 
@@ -85,13 +90,15 @@ while ($queueFront < scalar @queue) {
         # Add patch edges.
         my $patchList = $patches{$u};
         foreach my $patch (@{$patchList}) {
-            # !!! this should be cached
-            my $hash = `nix-hash "$patch->{basePath}"`;
-            chomp $hash;
-            print "  MY HASH is $hash\n";
-            if ($hash ne $patch->{baseHash}) {
-                print "  REJECTING PATCH from $patch->{basePath}\n";
-                next;
+            if (isValidPath($patch->{basePath})) {
+                # !!! this should be cached
+                my $hash = `nix-hash "$patch->{basePath}"`;
+                chomp $hash;
+                print "  MY HASH is $hash\n";
+                if ($hash ne $patch->{baseHash}) {
+                    print "  REJECTING PATCH from $patch->{basePath}\n";
+                    next;
+                }
             }
             print "  PATCH from $patch->{basePath}\n";
             addToQueue $patch->{basePath};
@@ -206,8 +213,8 @@ while (scalar @path > 0) {
 
         # Unpack the resulting NAR archive into the target path.
         print "  unpacking patched archive...\n";
-        system "nix-store --restore $targetPath < /tmp/nar2";
-        die "cannot unpack /tmp/nar2 into `$targetPath'" if ($? != 0);
+        system "nix-store --restore $v < /tmp/nar2";
+        die "cannot unpack /tmp/nar2 into `$v'" if ($? != 0);
     }
 
     elsif ($edge->{type} eq "narfile") {
@@ -222,8 +229,8 @@ while (scalar @path > 0) {
 
         # Unpack the archive into the target path.
         print "  unpacking archive...\n";
-        system "bunzip2 < '$narFilePath' | nix-store --restore '$targetPath'";
-        die "cannot unpack `$narFilePath' into `$targetPath'" if ($? != 0);
+        system "bunzip2 < '$narFilePath' | nix-store --restore '$v'";
+        die "cannot unpack `$narFilePath' into `$v'" if ($? != 0);
     }
 }
 
