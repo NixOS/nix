@@ -2,7 +2,6 @@
 #include "build.hh"
 
 
-#if 0
 static string dotQuote(const string & s)
 {
     return "\"" + s + "\"";
@@ -40,10 +39,8 @@ static string makeNode(const string & id, const string & label,
 static string symbolicName(const string & path)
 {
     string p = baseNameOf(path);
-    if (isHash(string(p, 0, md5HashSize * 2)) && 
-	p[md5HashSize * 2] == '-')
-	p = string(p, md5HashSize * 2 + 1);
-    return p;
+    int dash = p.find('-');
+    return string(p, dash + 1);
 }
 
 
@@ -53,12 +50,13 @@ string pathLabel(const Path & nePath, const string & elemPath)
 }
 
 
+#if 0
 void printClosure(const Path & nePath, const StoreExpr & fs)
 {
     PathSet workList(fs.closure.roots);
     PathSet doneSet;
 
-    for (PathSet::iterator i = workList.begin(); i != workList.end(); i++) {
+    for (PathSet::iterator i = workList.begin(); i != workList.end(); ++i) {
 	cout << makeEdge(pathLabel(nePath, *i), nePath);
     }
 
@@ -74,7 +72,7 @@ void printClosure(const Path & nePath, const StoreExpr & fs)
 		throw Error(format("bad closure, missing path `%1%'") % path);
 
 	    for (StringSet::const_iterator i = elem->second.refs.begin();
-		 i != elem->second.refs.end(); i++)
+		 i != elem->second.refs.end(); ++i)
 	    {
 		workList.insert(*i);
 		cout << makeEdge(pathLabel(nePath, *i), pathLabel(nePath, path));
@@ -85,6 +83,7 @@ void printClosure(const Path & nePath, const StoreExpr & fs)
 	}
     }
 }
+#endif
 
 
 void printDotGraph(const PathSet & roots)
@@ -95,43 +94,56 @@ void printDotGraph(const PathSet & roots)
     cout << "digraph G {\n";
 
     while (!workList.empty()) {
-	Path nePath = *(workList.begin());
-	workList.erase(nePath);
+	Path path = *(workList.begin());
+	workList.erase(path);
 
-	if (doneSet.find(nePath) == doneSet.end()) {
-	    doneSet.insert(nePath);
+	if (doneSet.find(path) != doneSet.end()) continue;
+        doneSet.insert(path);
 
-	    StoreExpr ne = storeExprFromPath(nePath);
+        cout << makeNode(path, symbolicName(path), "#ff0000");
+        
+        PathSet references;
+        queryReferences(noTxn, path, references);
+
+        for (PathSet::iterator i = references.begin();
+             i != references.end(); ++i)
+        {
+            workList.insert(*i);
+            cout << makeEdge(*i, path);
+        }
+            
+
+#if 0        
+	    StoreExpr ne = storeExprFromPath(path);
 
 	    string label, colour;
                     
 	    if (ne.type == StoreExpr::neDerivation) {
 		for (PathSet::iterator i = ne.derivation.inputs.begin();
-		     i != ne.derivation.inputs.end(); i++)
+		     i != ne.derivation.inputs.end(); ++i)
 		{
 		    workList.insert(*i);
-		    cout << makeEdge(*i, nePath);
+		    cout << makeEdge(*i, path);
 		}
 
 		label = "derivation";
 		colour = "#00ff00";
 		for (StringPairs::iterator i = ne.derivation.env.begin();
-		     i != ne.derivation.env.end(); i++)
+		     i != ne.derivation.env.end(); ++i)
 		    if (i->first == "name") label = i->second;
 	    }
 
 	    else if (ne.type == StoreExpr::neClosure) {
 		label = "<closure>";
 		colour = "#00ffff";
-		printClosure(nePath, ne);
+		printClosure(path, ne);
 	    }
 
 	    else abort();
 
-	    cout << makeNode(nePath, label, colour);
-	}
+	    cout << makeNode(path, label, colour);
+#endif
     }
 
     cout << "}\n";
 }
-#endif

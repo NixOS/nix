@@ -67,20 +67,20 @@ static void opRealise(Strings opFlags, Strings opArgs)
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
     for (Strings::iterator i = opArgs.begin();
-         i != opArgs.end(); i++)
+         i != opArgs.end(); ++i)
         *i = fixPath(*i);
             
     if (opArgs.size() > 1) {
         PathSet drvPaths;
         for (Strings::iterator i = opArgs.begin();
-             i != opArgs.end(); i++)
+             i != opArgs.end(); ++i)
             if (isDerivation(*i))
                 drvPaths.insert(*i);
         buildDerivations(drvPaths);
     }
 
     for (Strings::iterator i = opArgs.begin();
-         i != opArgs.end(); i++)
+         i != opArgs.end(); ++i)
         cout << format("%1%\n") % realisePath(*i);
 }
 
@@ -91,7 +91,7 @@ static void opAdd(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
-    for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); i++)
+    for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); ++i)
         cout << format("%1%\n") % addToStore(*i);
 }
 
@@ -145,7 +145,7 @@ static Path maybeUseOutput(const Path & storePath, bool useOutput, bool forceRea
 static void printPathSet(const PathSet & paths)
 {
     for (PathSet::iterator i = paths.begin(); 
-         i != paths.end(); i++)
+         i != paths.end(); ++i)
         cout << format("%s\n") % *i;
 }
 
@@ -263,7 +263,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         
         case qOutputs: {
             for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); i++)
+                 i != opArgs.end(); ++i)
             {
                 *i = fixPath(*i);
                 if (forceRealise) realisePath(*i);
@@ -279,7 +279,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qReferersClosure: {
             PathSet paths;
             for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); i++)
+                 i != opArgs.end(); ++i)
             {
                 Path path = maybeUseOutput(fixPath(*i), useOutput, forceRealise);
                 if (query == qRequisites)
@@ -294,7 +294,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qDeriver:
             for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); i++)
+                 i != opArgs.end(); ++i)
             {
                 Path deriver = queryDeriver(noTxn, fixPath(*i));
                 cout << format("%1%\n") %
@@ -304,7 +304,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qBinding:
             for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); i++)
+                 i != opArgs.end(); ++i)
             {
                 *i = fixPath(*i);
                 Derivation drv = derivationFromPath(*i);
@@ -318,7 +318,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qHash:
             for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); i++)
+                 i != opArgs.end(); ++i)
             {
                 Path path = maybeUseOutput(fixPath(*i), useOutput, forceRealise);
                 Hash hash = queryPathHash(path);
@@ -330,21 +330,19 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qTree: {
             PathSet done;
             for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); i++)
+                 i != opArgs.end(); ++i)
                 printDrvTree(fixPath(*i), "", "", done);
             break;
         }
             
-#if 0            
         case qGraph: {
             PathSet roots;
             for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); i++)
-                roots.insert(maybeNormalise(*i, normalise, realise));
+                 i != opArgs.end(); ++i)
+                roots.insert(maybeUseOutput(fixPath(*i), useOutput, forceRealise));
 	    printDotGraph(roots);
             break;
         }
-#endif
 
         default:
             abort();
