@@ -161,7 +161,8 @@ static Expr evalExpr2(EvalState & state, Expr e)
     }
 
     /* Application. */
-    if (ATmatch(e, "App(<term>, [<list>])", &e1, &e2)) {
+    if (ATmatch(e, "Call(<term>, [<list>])", &e1, &e2) ||
+        ATmatch(e, "App(<term>, [<list>])", &e1, &e2)) {
         e1 = evalExpr(state, e1);
         if (!ATmatch(e1, "Function([<list>], <term>)", &e3, &e4))
             throw badTerm("expecting a function", e1);
@@ -276,6 +277,12 @@ static Expr evalExpr2(EvalState & state, Expr e)
                     outIdGiven = true;
                 }
                 fs.derive.env.push_back(StringPair(key, s1));
+            }
+            else if (ATmatch(value, "True")) {
+                fs.derive.env.push_back(StringPair(key, "1"));
+            }
+            else if (ATmatch(value, "False")) {
+                fs.derive.env.push_back(StringPair(key, ""));
             }
             else throw badTerm("invalid package argument", value);
 
