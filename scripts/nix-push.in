@@ -30,9 +30,9 @@ my $localCopy;
 my $localArchivesDir;
 my $localManifestFile;
 
-my $archives_put_url;
-my $archives_get_url;
-my $manifest_put_url;
+my $archivesPutURL;
+my $archivesGetURL;
+my $manifestPutURL;
 
 if ($ARGV[0] eq "--copy") {
     die "syntax: nix-push --copy ARCHIVES_DIR MANIFEST_FILE PATHS...\n" if scalar @ARGV < 3;
@@ -45,9 +45,9 @@ else {
     die "syntax: nix-push ARCHIVES_PUT_URL ARCHIVES_GET_URL " .
         "MANIFEST_PUT_URL PATHS...\n" if scalar @ARGV < 3;
     $localCopy = 0;
-    $archives_put_url = shift @ARGV;
-    $archives_get_url = shift @ARGV;
-    $manifest_put_url = shift @ARGV;
+    $archivesPutURL = shift @ARGV;
+    $archivesGetURL = shift @ARGV;
+    $manifestPutURL = shift @ARGV;
 }
 
 
@@ -100,13 +100,13 @@ close NIX;
 
 
 # Instantiate store expressions from the Nix expression.
-my @storeexprs;
+my @storeExprs;
 print STDERR "instantiating store expressions...\n";
 open STOREEXPRS, "$binDir/nix-instantiate $nixfile |" or die "cannot run nix-instantiate";
 while (<STOREEXPRS>) {
     chomp;
     die unless /^\//;
-    push @storeexprs, $_;
+    push @storeExprs, $_;
 }
 close STOREEXPRS;
 
@@ -114,9 +114,9 @@ close STOREEXPRS;
 # Realise the store expressions.
 print STDERR "creating archives...\n";
 
-my @narpaths;
+my @narPaths;
 
-my @tmp = @storeexprs;
+my @tmp = @storeExprs;
 while (scalar @tmp > 0) {
     my $n = scalar @tmp;
     if ($n > 256) { $n = 256 };
@@ -127,7 +127,7 @@ while (scalar @tmp > 0) {
     while (<NARPATHS>) {
         chomp;
         die unless (/^\//);
-        push @narpaths, "$_";
+        push @narPaths, "$_";
     }
     close NARPATHS;
 }
@@ -139,10 +139,10 @@ print STDERR "creating manifest...\n";
 my %narFiles;
 my %patches;
 
-my @nararchives;
+my @narArchives;
 for (my $n = 0; $n < scalar @storePaths; $n++) {
     my $storePath = $storePaths[$n];
-    my $nardir = $narpaths[$n];
+    my $narDir = $narPaths[$n];
     
     $storePath =~ /\/([^\/]*)$/;
     my $basename = $1;
@@ -150,23 +150,23 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
 
     my $narname = "$basename.nar.bz2";
 
-    my $narfile = "$nardir/$narname";
-    (-f $narfile) or die "narfile for $storePath not found";
-    push @nararchives, $narfile;
+    my $narFile = "$narDir/$narname";
+    (-f $narFile) or die "narfile for $storePath not found";
+    push @narArchives, $narFile;
 
-    open SHA1, "$nardir/narbz2-hash" or die "cannot open narbz2-hash";
+    open SHA1, "$narDir/narbz2-hash" or die "cannot open narbz2-hash";
     my $narbz2Hash = <SHA1>;
     chomp $narbz2Hash;
     $narbz2Hash =~ /^[0-9a-z]{32}$/ or die "invalid hash";
     close SHA1;
 
-    open SHA1, "$nardir/nar-hash" or die "cannot open nar-hash";
+    open SHA1, "$narDir/nar-hash" or die "cannot open nar-hash";
     my $narHash = <SHA1>;
     chomp $narHash;
     $narHash =~ /^[0-9a-z]{32}$/ or die "invalid hash";
     close SHA1;
     
-    my $narbz2Size = (stat $narfile)[7];
+    my $narbz2Size = (stat $narFile)[7];
 
     my $references = `$binDir/nix-store --query --references '$storePath'`;
     die "cannot query references for `$storePath'" if $? != 0;
@@ -181,7 +181,7 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     if ($localCopy) {
         $url = "file://$localArchivesDir/$narname";
     } else {
-        $url = "$archives_get_url/$narname";
+        $url = "$archivesGetURL/$narname";
     }
     $narFiles{$storePath} = [
         { url => $url
@@ -208,23 +208,30 @@ sub copyFile {
 
 # Upload the archives.
 print STDERR "uploading archives...\n";
-foreach my $nararchive (@nararchives) {
 
-    $nararchive =~ /\/([^\/]*)$/;
+sub archiveExists {
+    my $name = shift;
+    print STDERR "  HEAD on $archivesGetURL/$name\n";
+    return system("$curl --head $archivesGetURL/$name > /dev/null") == 0;
+}
+
+foreach my $narArchive (@narArchives) {
+
+    $narArchive =~ /\/([^\/]*)$/;
     my $basename = $1;
 
     if ($localCopy) {
         if (! -f "$localArchivesDir/$basename") {
-            print STDERR "  $nararchive\n";
-            copyFile $nararchive, "$localArchivesDir/$basename";
+            print STDERR "  $narArchive\n";
+            copyFile $narArchive, "$localArchivesDir/$basename";
         }
     }
     else {
-        if (system("$curl --head $archives_get_url/$basename > /dev/null") != 0) {
-            print STDERR "  $nararchive\n";
+        if (!archiveExists("$basename")) {
+            print STDERR "  $narArchive\n";
             system("$curl --show-error --upload-file " .
-                   "'$nararchive' '$archives_put_url/$basename' > /dev/null") == 0 or
-                   die "curl failed on $nararchive: $?";
+                   "'$narArchive' '$archivesPutURL/$basename' > /dev/null") == 0 or
+                   die "curl failed on $narArchive: $?";
         }
     }
 }
@@ -236,6 +243,6 @@ if ($localCopy) {
     copyFile $manifest, $localManifestFile;
 } else {
     system("$curl  --show-error --upload-file " .
-           "'$manifest' '$manifest_put_url' > /dev/null") == 0 or
+           "'$manifest' '$manifestPutURL' > /dev/null") == 0 or
            die "curl failed on $manifest: $?";
 }
