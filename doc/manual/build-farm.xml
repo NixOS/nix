@@ -14,10 +14,10 @@ build farm, since:
   instance, if you perform a build for a
   <literal>powerpc-darwin</literal> on an
   <literal>i686-linux</literal> machine, Nix can automatically forward
-  to build to a <literal>powerpc-darwin</literal> machine, if
+  the build to a <literal>powerpc-darwin</literal> machine, if
   available.</para></listitem>
 
-  <listitem><para>The Nix expression language is ideal for providing
+  <listitem><para>The Nix expression language is ideal for describing
   build jobs, plus all their dependencies.  For instance, if your
   package has some dependency, you don't have to manually install it
   on all the machines in the build farm; they will be built
@@ -26,9 +26,9 @@ build farm, since:
   <listitem><para>Proper release management requires that builds (if
   deployed) are traceable: it should be possible to figure out from
   exactly what sources they were built, in what configuration, etc.;
-  and it should be possible to reproduce the build, if necessary.
-  Nix's hashing scheme uniquely identifies builds, and Nix expressions
-  are self-contained.</para></listitem>
+  and it should be possible to reproduce the build, if necessary.  Nix
+  makes this possible since Nix's hashing scheme uniquely identifies
+  builds, and Nix expressions are self-contained.</para></listitem>
 
   <listitem><para>Nix will only rebuild things that have actually
   changed.  For instance, if the sources of a component haven't

@@ -83,9 +83,7 @@ the single Nix expression in that directory
     would expect in a basic Unix environment: a C/C++ compiler (GCC,
     to be precise), the Bash shell, fundamental Unix tools such as
     <command>cp</command>, <command>grep</command>,
-    <command>tar</command>, etc.  (See
-    <filename>pkgs/stdenv/nix/path.nix</filename> to see what's in
-    <command>stdenv</command>.)  <varname>fetchurl</varname> is a
+    <command>tar</command>, etc.  <varname>fetchurl</varname> is a
     function that downloads files.  <varname>perl</varname> is the
     Perl interpreter.</para>
 
@@ -109,12 +107,12 @@ the single Nix expression in that directory
     <varname>mkDerivation</varname> is a function provided by
     <varname>stdenv</varname> that builds a component from a set of
     <emphasis>attributes</emphasis>.  An attribute set is just a list
-    of key/value pairs where the value is an arbitrary Nix expression.
-    They take the general form
+    of key/value pairs where each value is an arbitrary Nix
+    expression.  They take the general form
     <literal>{<replaceable>name1</replaceable> =
     <replaceable>expr1</replaceable>; <replaceable>...</replaceable>
-    <replaceable>name1</replaceable> =
-    <replaceable>expr1</replaceable>;</literal>.</para>
+    <replaceable>nameN</replaceable> =
+    <replaceable>exprN</replaceable>;}</literal>.</para>
 
   </callout>
 
@@ -148,11 +146,11 @@ the single Nix expression in that directory
     <para>The builder has to know what the sources of the component
     are.  Here, the attribute <varname>src</varname> is bound to the
     result of a call to the <command>fetchurl</command> function.
-    Given a URL and a MD5 hash of the expected contents of the file at
-    that URL, this function actually builds a derivation that
-    downloads the file and checks its hash.  So the sources are a
-    dependency that like all other dependencies is built before Hello
-    itself is built.</para>
+    Given a URL and an MD5 hash of the expected contents of the file
+    at that URL, this function builds a derivation that downloads the
+    file and checks its hash.  So the sources are a dependency that
+    like all other dependencies is built before Hello itself is
+    built.</para>
 
     <para>Instead of <varname>src</varname> any other name could have
     been used, and in fact there can be any number of sources (bound
@@ -172,7 +170,7 @@ the single Nix expression in that directory
     <programlisting>
 perl = perl;</programlisting>
 
-    will do the trink: it binds an attribute <varname>perl</varname>
+    will do the trick: it binds an attribute <varname>perl</varname>
     to the function argument which also happens to be called
     <varname>perl</varname>.  However, it looks a bit silly, so there
     is a shorter syntax.  The <literal>inherit</literal> keyword
@@ -218,7 +216,8 @@ steps:</para>
   <callout arearefs='ex-hello-builder-co-1'>
 
     <para>When Nix runs a builder, it initially completely clears the
-    environment.  For instance, the <envar>PATH</envar> variable is
+    environment (except for the attributes declared in the
+    derivation).  For instance, the <envar>PATH</envar> variable is
     empty<footnote><para>Actually, it's initialised to
     <filename>/path-not-set</filename> to prevent Bash from setting it
     to a default value.</para></footnote>.  This is done to prevent
@@ -596,13 +595,11 @@ language.  Purity means that operations in the language don't have
 side-effects (for instance, there is no variable assignment).
 Laziness means that arguments to functions are evaluated only when
 they are needed.  Functional means that functions are
-<quote>normal</quote> values that can be passed around and
-manipulated in interesting ways.</para>
-
-<para>The language is not a full-featured, general purpose language.
-It's main job is to describe components, compositions of components,
-and the variability within components.  For this a functional language
-is perfectly suited.</para>
+<quote>normal</quote> values that can be passed around and manipulated
+in interesting ways.  The language is not a full-featured, general
+purpose language.  It's main job is to describe components,
+compositions of components, and the variability within
+components.</para>
 
 <para>This section presents the various features of the
 language.</para>
@@ -773,7 +770,7 @@ and evaluates to <literal>"foobar"</literal>.
 
 <simplesect><title>Inheriting attributes</title>
 
-<para>When defining an attribute set itt is often convenient to copy
+<para>When defining an attribute set it is often convenient to copy
 variables from the surrounding lexical scope (e.g., when you want to
 propagate attributes).  This can be shortened using the
 <literal>inherit</literal> keyword.  For instance,
@@ -849,7 +846,7 @@ let {
 </para>
 
 <para>It is also possible to define a function that takes a single
-argument and that does need to be called with an attribute set as
+argument and that does not need to be called with an attribute set as
 argument.  The syntax is
 
 <programlisting>
@@ -959,10 +956,10 @@ used in the Nix expression for Subversion.</para>
   <callout arearefs='ex-subversion-nix-co-2'>
     <para>This assertion says that in order for Subversion to have SSL
     support (so that it can access <literal>https</literal> URLs), an
-    OpenSSL library must be passed.  Additionally, it says
+    OpenSSL library must be passed.  Additionally, it says that
     <emphasis>if</emphasis> Apache support is enabled, then Apache's
-    OpenSSL should much Subversion's.  (Note that if Apache support is
-    not enabled, we don't care about Apache's OpenSSL.)</para>
+    OpenSSL should match Subversion's.  (Note that if Apache support
+    is not enabled, we don't care about Apache's OpenSSL.)</para>
   </callout>
 
   <callout arearefs='ex-subversion-nix-co-4'>
@@ -1241,14 +1238,14 @@ command-line argument.  See <xref linkend='sec-standard-environment'
   written to <filename>/nix/var/log/nix</filename>.</para></listitem>
 
   <listitem><para>The builder is executed with the arguments specified
-  by the attribute <varname>args</varname>.  If it exit with exit code
-  0, it is considered to have succeeded.</para></listitem>
+  by the attribute <varname>args</varname>.  If it exits with exit
+  code 0, it is considered to have succeeded.</para></listitem>
 
   <listitem><para>The temporary directory is removed (unless the
   <option>-K</option> option was specified).</para></listitem>
 
-  <listitem><para>If the build was succesful, Nix scans the output for
-  references to the paths of the inputs.  These so-called
+  <listitem><para>If the build was successful, Nix scans the output
+  for references to the paths of the inputs.  These so-called
   <emphasis>retained dependencies</emphasis> could be used when the
   output of the derivation is used (e.g., when it's executed or used
   as input to another derivation), so if we deploy the derivation, we
@@ -1406,7 +1403,7 @@ variable.  The phases are:
 
   <listitem>
 
-    <para><function>unpackPhase</function>: unpacks the source files
+    <para><function>unpackPhase</function> unpacks the source files
     listed in the <envar>src</envar> environment variable to the
     current directory.  It supports <filename>tar</filename> files,
     optionally compressed with <command>gzip</command> or
@@ -1415,7 +1412,7 @@ variable.  The phases are:
     environment; you should add it as a build input yourself); and
     unpacked source trees (i.e., directories; they are copied
     verbatim).  You can add support for other file types by setting
-    the <varname>findUnpacker</varname> hook.  This hook should set an
+    the <varname>findUnpacker</varname> hook.  This hook should set
     the variable <varname>unpackCmd</varname> to contain the command
     to be executed to unpack the file.</para>
 
@@ -1441,7 +1438,7 @@ variable.  The phases are:
     <para><function>configurePhase</function> runs the script called
     <filename>configure</filename> in the current directory with a
     <option>--prefix</option> set to the output path.  You can add
-    additional flag through the <varname>configureFlags</varname>
+    additional flags through the <varname>configureFlags</varname>
     variable.  If <filename>configure</filename> does not exist,
     nothing happens.</para>
 
