@@ -86,10 +86,6 @@ void runProgram(const string & program, Environment env)
             if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
                 throw SysError("cannot dup stderr into stdout");
 
-            /* Make the program executable.  !!! hack. */
-            if (chmod(program.c_str(), 0755))
-                throw SysError("cannot make program executable");
-
             /* Execute the program.  This should not return. */
             execle(program.c_str(), baseNameOf(program).c_str(), 0, env2);
 
