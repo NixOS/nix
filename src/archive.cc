@@ -119,6 +119,10 @@ static void dump(const string & path, DumpSink & sink)
     if (S_ISREG(st.st_mode)) {
         writeString("type", sink);
         writeString("regular", sink);
+        if (st.st_mode & S_IXUSR) {
+            writeString("executable", sink);
+            writeString("", sink);
+        }
         dumpContents(path, st.st_size, sink);
     } 
 
@@ -293,6 +297,15 @@ static void restore(const string & path, RestoreSource & source)
 
         else if (s == "contents" && type == tpRegular) {
             restoreContents(fd, path, source);
+        }
+
+        else if (s == "executable" && type == tpRegular) {
+            readString(source);
+            struct stat st;
+            if (fstat(fd, &st) == -1)
+                throw SysError("fstat");
+            if (fchmod(fd, st.st_mode | (S_IXUSR | S_IXGRP | S_IXOTH)) == -1)
+                throw SysError("fchmod");
         }
 
         else if (s == "entry" && type == tpDirectory) {
