@@ -16,7 +16,7 @@ struct DrvInfo
     Path outPath;
 };
 
-typedef map<string, DrvInfo> DrvInfos;
+typedef map<Path, DrvInfo> DrvInfos;
 
 
 bool parseDerivation(EvalState & state, Expr e, DrvInfo & drv)
@@ -46,16 +46,30 @@ bool parseDerivation(EvalState & state, Expr e, DrvInfo & drv)
 
 bool parseDerivations(EvalState & state, Expr e, DrvInfos & drvs)
 {
+    ATMatcher m;
+    ATermList es;
+
     e = evalExpr(state, e);
     
-    ATermMap drvMap;
-    queryAllAttrs(e, drvMap);
+    if (atMatch(m, e) >> "Attrs") {
+        ATermMap drvMap;
+        queryAllAttrs(e, drvMap);
 
-    for (ATermIterator i(drvMap.keys()); i; ++i) {
-        DrvInfo drv;
-        debug(format("evaluating attribute `%1%'") % *i);
-        if (parseDerivation(state, drvMap.get(*i), drv))
-            drvs[drv.name] = drv;
+        for (ATermIterator i(drvMap.keys()); i; ++i) {
+            DrvInfo drv;
+            debug(format("evaluating attribute `%1%'") % *i);
+            if (parseDerivation(state, drvMap.get(*i), drv))
+                drvs[drv.drvPath] = drv;
+        }
+    }
+
+    else if (atMatch(m, e) >> "List" >> es) {
+        for (ATermIterator i(es); i; ++i) {
+            DrvInfo drv;
+            debug(format("evaluating list element") % *i);
+            if (parseDerivation(state, *i, drv))
+                drvs[drv.drvPath] = drv;
+        }
     }
 
     return true;
@@ -76,6 +90,26 @@ static Path getLinksDir()
 }
 
 
+static Path getCurrentPath()
+{
+    return getLinksDir() + "/current";
+}
+
+
+void queryInstalled(EvalState & state, DrvInfos & drvs)
+{
+    Path path = getCurrentPath() + "/manifest";
+
+    if (!pathExists(path)) return; /* not an error, assume nothing installed */
+
+    Expr e = ATreadFromNamedFile(path.c_str());
+    if (!e) throw Error(format("cannot read Nix expression from `%1%'") % path);
+
+    if (!parseDerivations(state, e, drvs))
+        throw badTerm(format("expected set of derivations in `%1%'") % path, e);
+}
+
+
 Path createLink(Path outPath, Path drvPath)
 {
     Path linksDir = getLinksDir();
@@ -86,15 +120,37 @@ Path createLink(Path outPath, Path drvPath)
     for (Strings::iterator i = names.begin(); i != names.end(); ++i) {
         istringstream s(*i);
         unsigned int n; 
-        if (s >> n && s.eof() && n > num) num = n + 1;
+        if (s >> n && s.eof() && n >= num) num = n + 1;
     }
 
-    Path linkPath = (format("%1%/%2%") % linksDir % num).str();
+    Path linkPath;
 
-    if (symlink(outPath.c_str(), linkPath.c_str()) != 0)
-        throw SysError(format("creating symlink `%1%'") % linkPath);
+    while (1) {
+        linkPath = (format("%1%/%2%") % linksDir % num).str();
+        if (symlink(outPath.c_str(), linkPath.c_str()) == 0) break;
+        if (errno != EEXIST)
+            throw SysError(format("creating symlink `%1%'") % linkPath);
+        /* Somebody beat us to it, retry with a higher number. */
+        num++;
+    }
 
     return linkPath;
+}
+
+
+void switchLink(Path link, Path target)
+{
+    Path tmp = canonPath(dirOf(link) + "/.new_" + baseNameOf(link));
+    if (symlink(target.c_str(), tmp.c_str()) != 0)
+        throw SysError(format("creating symlink `%1%'") % tmp);
+    /* The rename() system call is supposed to be essentially atomic
+       on Unix.  That is, if we have links `current -> X' and
+       `new_current -> Y', and we rename new_current to current, a
+       process accessing current will see X or Y, but never a
+       file-not-found or other error condition.  This is sufficient to
+       atomically switch user environments. */
+    if (rename(tmp.c_str(), link.c_str()) != 0)
+        throw SysError(format("renaming `%1%' to `%2%'") % tmp % link);
 }
 
 
@@ -107,17 +163,29 @@ void installDerivations(EvalState & state,
     DrvInfos availDrvs;
     loadDerivations(state, nePath, availDrvs);
 
+    typedef map<string, Path> NameMap;
+    NameMap nameMap;
+    
+    for (DrvInfos::iterator i = availDrvs.begin();
+         i != availDrvs.end(); ++i)
+        nameMap[i->second.name] = i->first;
+
     /* Filter out the ones we're not interested in. */
     DrvInfos selectedDrvs;
     for (Strings::iterator i = drvNames.begin();
          i != drvNames.end(); ++i)
     {
-        DrvInfos::iterator j = availDrvs.find(*i);
-        if (j == availDrvs.end())
+        NameMap::iterator j = nameMap.find(*i);
+        if (j == nameMap.end())
             throw Error(format("unknown derivation `%1%'") % *i);
         else
-            selectedDrvs[j->first] = j->second;
+            selectedDrvs[j->second] = availDrvs[j->second];
     }
+
+    /* Add in the already installed derivations. */
+    DrvInfos installedDrvs;
+    queryInstalled(state, installedDrvs);
+    selectedDrvs.insert(installedDrvs.begin(), installedDrvs.end());
 
     /* Get the environment builder expression. */
     Expr envBuilder = parseExprFromFile("/home/eelco/nix/corepkgs/buildenv"); /* !!! */
@@ -168,14 +236,14 @@ void installDerivations(EvalState & state,
     /* Switch the current user environment to the output path. */
     debug(format("switching to new user environment"));
     Path linkPath = createLink(topLevelDrv.outPath, topLevelDrv.drvPath);
-//     switchLink(current"), link);
+    switchLink(getLinksDir() + "/current", linkPath);
 }
 
 
 static void opInstall(EvalState & state,
     Strings opFlags, Strings opArgs)
 {
-    if (opArgs.size() < 1) throw UsageError("Nix expression expected");
+    if (opArgs.size() < 1) throw UsageError("Nix file expected");
 
     Path nePath = opArgs.front();
     opArgs.pop_front();
@@ -188,12 +256,14 @@ static void opInstall(EvalState & state,
 static void opQuery(EvalState & state,
     Strings opFlags, Strings opArgs)
 {
-    enum { qName } query = qName;
+    enum { qName, qDrvPath, qStatus } query = qName;
     enum { sInstalled, sAvailable } source = sInstalled;
 
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
         if (*i == "--name") query = qName;
+        else if (*i == "--expr" || *i == "-e") query = qDrvPath;
+        else if (*i == "--status" || *i == "-s") query = qStatus;
         else if (*i == "--installed") source = sInstalled;
         else if (*i == "--available" || *i == "-f") source = sAvailable;
         else throw UsageError(format("unknown flag `%1%'") % *i);
@@ -204,9 +274,11 @@ static void opQuery(EvalState & state,
     switch (source) {
 
         case sInstalled:
+            queryInstalled(state, drvs);
             break;
 
         case sAvailable: {
+            if (opArgs.size() < 1) throw UsageError("Nix file expected");
             Path nePath = opArgs.front();
             opArgs.pop_front();
             loadDerivations(state, nePath, drvs);
@@ -216,13 +288,33 @@ static void opQuery(EvalState & state,
         default: abort();
     }
 
+    if (opArgs.size() != 0) throw UsageError("no arguments expected");
+    
     /* Perform the specified query on the derivations. */
     switch (query) {
 
         case qName: {
-            if (opArgs.size() != 0) throw UsageError("no arguments expected");
             for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i)
                 cout << format("%1%\n") % i->second.name;
+            break;
+        }
+        
+        case qDrvPath: {
+            for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i)
+                cout << format("%1%\n") % i->second.drvPath;
+            break;
+        }
+        
+        case qStatus: {
+            DrvInfos installed;
+            queryInstalled(state, installed);
+
+            for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i) {
+                cout << format("%1%%2% %3%\n")
+                    % (installed.find(i->first) != installed.end() ? 'I' : '-')
+                    % (isValidPath(i->second.outPath) ? 'P' : '-')
+                    % i->second.name;
+            }
             break;
         }
         
