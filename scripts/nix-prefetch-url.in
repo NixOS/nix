@@ -10,7 +10,7 @@ print "fetching $url...\n";
 
 my $out = "@prefix@/store/nix-prefetch-url-$$";
 
-system "@wget@ '$url' -O '$out'";
+system "@wget@ --passive-ftp '$url' -O '$out'";
 $? == 0 or die "unable to fetch $url";
 
 my $hash=`@bindir@/nix-hash --flat $out`;

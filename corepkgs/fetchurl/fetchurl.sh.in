@@ -9,7 +9,7 @@ if test -f "$prefetch"; then
     echo "using prefetched $prefetch";
     mv $prefetch $out || exit 1
 else
-    @wget@ "$url" -O "$out" || exit 1
+    @wget@ --passive-ftp "$url" -O "$out" || exit 1
 fi
 
 actual=$(@bindir@/nix-hash --flat $out)
