@@ -5,8 +5,8 @@
 [
 <!ENTITY introduction SYSTEM "introduction.xml">
 <!ENTITY installation SYSTEM "installation.xml">
-<!ENTITY nix-reference SYSTEM "nix-reference.xml">
-<!ENTITY fix-reference SYSTEM "fix-reference.xml">
+<!ENTITY nix-store-reference SYSTEM "nix-store-reference.xml">
+<!ENTITY nix-instantiate-reference SYSTEM "nix-instantiate-reference.xml">
 <!ENTITY troubleshooting SYSTEM "troubleshooting.xml">
 <!ENTITY bugs SYSTEM "bugs.xml">
 ]>
@@ -28,34 +28,10 @@
   &introduction;
   &installation;
 
-  <chapter>
-    <title>A Guided Tour</title>
-    <para>
-    </para>
-  </chapter>
-
-  <chapter>
-    <title>Nix Syntax and Semantics</title>
-    <para>
-    </para>
-  </chapter>
-
-  <chapter>
-    <title>Fix Language Reference</title>
-    <para>
-    </para>
-  </chapter>
-
-  <chapter>
-    <title>Writing Builders</title>
-    <para>
-    </para>
-  </chapter>
-
   <appendix>
     <title>Command Reference</title>
-    &nix-reference;
-    &fix-reference;
+    &nix-store-reference;
+    &nix-instantiate-reference;
   </appendix>
 
   &troubleshooting;

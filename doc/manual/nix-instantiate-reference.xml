@@ -1,6 +1,6 @@
 <refentry>
   <refnamediv>
-    <refname>fix</refname>
+    <refname>nix-instantiate</refname>
     <refpurpose>generate Nix expressions from a high-level description</refpurpose>
   </refnamediv>
 
@@ -8,8 +8,8 @@
     <cmdsynopsis>
       <command>fix</command>
       <group choice='opt' rep='repeat'>
-	<arg><option>--verbose</option></arg>
-	<arg><option>-v</option></arg>
+        <arg><option>--verbose</option></arg>
+        <arg><option>-v</option></arg>
       </group>
       <arg rep='repeat'><replaceable>files</replaceable></arg>
     </cmdsynopsis>
