@@ -528,6 +528,11 @@ static void switchGeneration(Globals & globals, int dstGen)
         else
             throw Error(format("generation %1% does not exist") % dstGen);
 
+    printMsg(lvlInfo, format("switching from generation %1% to %2%")
+        % curGen % dst.number);
+    
+    if (globals.dryRun) return;
+    
     switchLink(globals.profile, dst.path);
 }
 
