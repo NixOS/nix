@@ -448,9 +448,10 @@ void DerivationGoal::haveStoreExpr()
     }
 
     /* Inputs must be built before we can build this goal. */
-    for (PathSet::iterator i = drv.inputDrvs.begin();
+    /* !!! but if possible, only install the paths that we need */
+    for (DerivationInputs::iterator i = drv.inputDrvs.begin();
          i != drv.inputDrvs.end(); ++i)
-        addWaitee(worker.makeDerivationGoal(*i));
+        addWaitee(worker.makeDerivationGoal(i->first));
 
     for (PathSet::iterator i = drv.inputSrcs.begin();
          i != drv.inputSrcs.end(); ++i)
@@ -812,18 +813,23 @@ bool DerivationGoal::prepareBuild()
     /* Determine the full set of input paths. */
 
     /* First, the input derivations. */
-    for (PathSet::iterator i = drv.inputDrvs.begin();
+    for (DerivationInputs::iterator i = drv.inputDrvs.begin();
          i != drv.inputDrvs.end(); ++i)
     {
-        /* Add all the output closures of the input derivation `*i' as
-           input paths.  !!!  there should be a way to indicate
-           specific outputs. */
+        /* Add the relevant output closures of the input derivation
+           `*i' as input paths.  Only add the closures of output paths
+           that are specified as inputs. */
         /* !!! is `*i' present? */
-        assert(isValidPath(*i));
-        Derivation inDrv = derivationFromPath(*i);
-        for (DerivationOutputs::iterator j = inDrv.outputs.begin();
-             j != inDrv.outputs.end(); ++j)
-            computeFSClosure(j->second.path, inputPaths);
+        assert(isValidPath(i->first));
+        Derivation inDrv = derivationFromPath(i->first);
+        for (StringSet::iterator j = i->second.begin();
+             j != i->second.begin(); ++j)
+            if (inDrv.outputs.find(*j) != inDrv.outputs.end())
+                computeFSClosure(inDrv.outputs[*j].path, inputPaths);
+            else
+                throw Error(
+                    format("derivation `%1%' requires non-existent output `%2%' from input derivation `%3%'")
+                    % drvPath % *j % i->first);
     }
 
     for (PathSet::iterator i = inputPaths.begin(); i != inputPaths.end(); ++i)

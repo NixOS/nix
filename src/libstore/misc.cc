@@ -39,9 +39,12 @@ void storePathRequisites(const Path & storePath,
         
         Derivation drv = derivationFromPath(storePath);
 
-        for (PathSet::iterator i = drv.inputDrvs.begin();
+        for (DerivationInputs::iterator i = drv.inputDrvs.begin();
              i != drv.inputDrvs.end(); ++i)
-            storePathRequisites(*i, includeOutputs, paths);
+            /* !!! Maybe this is too strict, since it will include
+               *all* output paths of the input derivation, not just
+               the ones needed by this derivation. */
+            storePathRequisites(i->first, includeOutputs, paths);
 
         for (PathSet::iterator i = drv.inputSrcs.begin();
              i != drv.inputSrcs.end(); ++i)

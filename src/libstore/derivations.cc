@@ -26,13 +26,13 @@ static void checkPath(const string & s)
 }
     
 
-static void parsePaths(ATermList paths, PathSet & out)
+static void parseStrings(ATermList paths, StringSet & out, bool arePaths)
 {
     for (ATermIterator i(paths); i; ++i) {
         if (ATgetType(*i) != AT_APPL)
             throw badTerm("not a path", *i);
         string s = aterm2String(*i);
-        checkPath(s);
+        if (arePaths) checkPath(s);
         out.insert(s);
     }
 }
@@ -65,8 +65,19 @@ Derivation parseDerivation(ATerm t)
         drv.outputs[aterm2String(id)] = out;
     }
 
-    parsePaths(inDrvs, drv.inputDrvs);
-    parsePaths(inSrcs, drv.inputSrcs);
+    for (ATermIterator i(inDrvs); i; ++i) {
+        ATerm drvPath;
+        ATermList ids;
+        if (!matchDerivationInput(*i, drvPath, ids))
+            throwBadDrv(t);
+        Path drvPath2 = aterm2String(drvPath);
+        checkPath(drvPath2);
+        StringSet ids2;
+        parseStrings(ids, ids2, false);
+        drv.inputDrvs[drvPath2] = ids2;
+    }
+    
+    parseStrings(inSrcs, drv.inputSrcs, true);
 
     drv.builder = aterm2String(builder);
     drv.platform = aterm2String(platform);
@@ -88,11 +99,11 @@ Derivation parseDerivation(ATerm t)
 }
 
 
-static ATermList unparsePaths(const PathSet & paths)
+static ATermList unparseStrings(const StringSet & paths)
 {
     ATermList l = ATempty;
     for (PathSet::const_iterator i = paths.begin();
-         i != paths.end(); i++)
+         i != paths.end(); ++i)
         l = ATinsert(l, toATerm(*i));
     return ATreverse(l);
 }
@@ -102,7 +113,7 @@ ATerm unparseDerivation(const Derivation & drv)
 {
     ATermList outputs = ATempty;
     for (DerivationOutputs::const_iterator i = drv.outputs.begin();
-         i != drv.outputs.end(); i++)
+         i != drv.outputs.end(); ++i)
         outputs = ATinsert(outputs,
             makeDerivationOutput(
                 toATerm(i->first),
@@ -110,14 +121,22 @@ ATerm unparseDerivation(const Derivation & drv)
                 toATerm(i->second.hashAlgo),
                 toATerm(i->second.hash)));
 
+    ATermList inDrvs = ATempty;
+    for (DerivationInputs::const_iterator i = drv.inputDrvs.begin();
+         i != drv.inputDrvs.end(); ++i)
+        inDrvs = ATinsert(inDrvs,
+            makeDerivationInput(
+                toATerm(i->first),
+                unparseStrings(i->second)));
+    
     ATermList args = ATempty;
     for (Strings::const_iterator i = drv.args.begin();
-         i != drv.args.end(); i++)
+         i != drv.args.end(); ++i)
         args = ATinsert(args, toATerm(*i));
 
     ATermList env = ATempty;
     for (StringPairs::const_iterator i = drv.env.begin();
-         i != drv.env.end(); i++)
+         i != drv.env.end(); ++i)
         env = ATinsert(env,
             makeEnvBinding(
                 toATerm(i->first),
@@ -125,8 +144,8 @@ ATerm unparseDerivation(const Derivation & drv)
 
     return makeDerive(
         ATreverse(outputs),
-        unparsePaths(drv.inputDrvs),
-        unparsePaths(drv.inputSrcs),
+        ATreverse(inDrvs),
+        unparseStrings(drv.inputSrcs),
         toATerm(drv.platform),
         toATerm(drv.builder),
         ATreverse(args),

@@ -28,12 +28,17 @@ struct DerivationOutput
 };
 
 typedef map<string, DerivationOutput> DerivationOutputs;
+
+/* For inputs that are sub-derivations, we specify exactly which
+   output IDs we are interested in. */
+typedef map<Path, StringSet> DerivationInputs;
+
 typedef map<string, string> StringPairs;
 
 struct Derivation
 {
     DerivationOutputs outputs; /* keyed on symbolic IDs */
-    PathSet inputDrvs; /* inputs that are sub-derivations */
+    DerivationInputs inputDrvs; /* inputs that are sub-derivations */
     PathSet inputSrcs; /* inputs that are sources */
     string platform;
     Path builder;

@@ -3,4 +3,5 @@ init initDerivationsHelpers
 Derive | ATermList ATermList ATermList string string ATermList ATermList | ATerm |
 
 | string string | ATerm | EnvBinding |
+| string ATermList | ATerm | DerivationInput |
 | string string string string | ATerm | DerivationOutput |

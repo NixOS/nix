@@ -68,17 +68,17 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
 
     /* For other derivations, replace the inputs paths with recursive
        calls to this function.*/
-    PathSet inputs2;
-    for (PathSet::iterator i = drv.inputDrvs.begin();
+    DerivationInputs inputs2;
+    for (DerivationInputs::iterator i = drv.inputDrvs.begin();
          i != drv.inputDrvs.end(); ++i)
     {
-        Hash h = state.drvHashes[*i];
+        Hash h = state.drvHashes[i->first];
         if (h.type == htUnknown) {
-            Derivation drv2 = derivationFromPath(*i);
+            Derivation drv2 = derivationFromPath(i->first);
             h = hashDerivationModulo(state, drv2);
-            state.drvHashes[*i] = h;
+            state.drvHashes[i->first] = h;
         }
-        inputs2.insert(printHash(h));
+        inputs2[printHash(h)] = i->second;
     }
     drv.inputDrvs = inputs2;
     
@@ -119,7 +119,9 @@ static void processBinding(EvalState & state, Expr e, Derivation & drv,
             /* !!! supports only single output path */
             Path outPath = evalPath(state, a);
 
-            drv.inputDrvs.insert(drvPath);
+            StringSet ids;
+            ids.insert("out");
+            drv.inputDrvs[drvPath] = ids;
             ss.push_back(outPath);
         } else
             throw Error("invalid derivation attribute");

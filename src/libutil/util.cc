@@ -587,6 +587,8 @@ Strings unpackStrings(const string & s)
         len |= ((unsigned char) *i++) << 8;
         len |= ((unsigned char) *i++) << 16;
         len |= ((unsigned char) *i++) << 24;
+
+        if (len == 0xffffffff) return strings; /* explicit end-of-list */
         
         if (i + len > s.end())
             throw Error(format("short db entry: `%1%'") % s);
