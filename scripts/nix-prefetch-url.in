@@ -3,6 +3,8 @@
 url=$1
 hash=$2
 
+hashType="sha1"
+
 if test -z "$url"; then
     echo "syntax: nix-prefetch-url URL" >&2
     exit 1
@@ -27,7 +29,7 @@ if test -z "$hash"; then
     @curl@ --fail --location --max-redirs 20 "$url" > $tmpPath1
 
     # Compute the hash.
-    hash=$(@bindir@/nix-hash --flat $tmpPath1)
+    hash=$(@bindir@/nix-hash --base32 --type "$hashType" --flat $tmpPath1)
     if ! test -n "$QUIET"; then echo "hash is $hash" >&2; fi
 
     # Rename it so that the fetchurl builder can find it.
@@ -41,8 +43,10 @@ fi
 # Create a Nix expression that does a fetchurl.
 storeExpr=$( \
     echo "(import @datadir@/nix/corepkgs/fetchurl) \
-        {url = $url; md5 = \"$hash\"; system = \"@system@\";}" \
+        {url = $url; outputHashAlgo = \"$hashType\"; outputHash = \"$hash\"; system = \"@system@\";}" \
     | @bindir@/nix-instantiate -)
+
+echo "$storeExpr"    
 
 # Realise it.
 finalPath=$(@bindir@/nix-store -qnB --force-realise $storeExpr)

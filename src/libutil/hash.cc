@@ -132,6 +132,55 @@ string printHash32(const Hash & hash)
 }
 
 
+static bool mul(uint16_t * words, unsigned short y, int maxSize)
+{
+    unsigned short carry = 0;
+
+    for (int pos = 0; pos < maxSize; ++pos) {
+        unsigned int m = words[pos] * y + carry;
+        words[pos] = m & 0xffff;
+        carry = m >> 16;
+    }
+
+    return carry;
+}
+
+
+static bool add(uint16_t * words, unsigned short y, int maxSize)
+{
+    unsigned short carry = y;
+
+    for (int pos = 0; pos < maxSize; ++pos) {
+        unsigned int m = words[pos] + carry;
+        words[pos] = m & 0xffff;
+        carry = m >> 16;
+        if (carry == 0) break;
+    }
+
+    return carry;
+}
+
+
+Hash parseHash32(HashType ht, const string & s)
+{
+    Hash hash(ht);
+
+    for (unsigned int i = 0; i < s.length(); ++i) {
+        char c = s[i];
+        unsigned char digit;
+        for (digit = 0; digit < sizeof(chars); ++digit) /* !!! slow */
+            if (chars[digit] == c) break;
+        if (digit >= 32)
+            throw Error(format("invalid base-32 hash `%1%'") % s);
+        if (mul((uint16_t *) hash.hash, 32, hash.hashSize / 2) ||
+            add((uint16_t *) hash.hash, digit, hash.hashSize / 2))
+            throw Error(format("base-32 hash `%1%' is too large") % s);
+    }
+
+    return hash;
+}
+
+
 bool isHash(const string & s)
 {
     if (s.length() != 32) return false;
@@ -181,7 +230,7 @@ static void finish(HashType ht, Ctx & ctx, unsigned char * hash)
 }
 
 
-Hash hashString(const string & s, HashType ht)
+Hash hashString(HashType ht, const string & s)
 {
     Ctx ctx;
     Hash hash(ht);
@@ -192,7 +241,7 @@ Hash hashString(const string & s, HashType ht)
 }
 
 
-Hash hashFile(const Path & path, HashType ht)
+Hash hashFile(HashType ht, const Path & path)
 {
     Ctx ctx;
     Hash hash(ht);
@@ -226,7 +275,7 @@ struct HashSink : DumpSink
 };
 
 
-Hash hashPath(const Path & path, HashType ht)
+Hash hashPath(HashType ht, const Path & path)
 {
     HashSink sink;
     sink.ht = ht;
@@ -245,4 +294,13 @@ Hash compressHash(const Hash & hash, unsigned int newSize)
     for (unsigned int i = 0; i < hash.hashSize; ++i)
         h.hash[i % newSize] ^= hash.hash[i];
     return h;
+}
+
+
+HashType parseHashType(const string & s)
+{
+    if (s == "md5") return htMD5;
+    else if (s == "sha1") return htSHA1;
+    else if (s == "sha256") return htSHA256;
+    else return htUnknown;
 }

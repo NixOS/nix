@@ -56,6 +56,7 @@ while (<STDIN>) {
         my $unpack = "";
         my $n = 1;
         foreach my $type (@types) {
+            my $realType = $type;
             $args .= ", ";
             if ($type eq "string") {
 #                $args .= "(ATerm) ATmakeAppl0(ATmakeAFun((char *) e$n, 0, ATtrue))";
@@ -83,6 +84,9 @@ while (<STDIN>) {
                 $unpack .= "    e$n = (ATermList) ATgetArgument(e, $m);\n";
             } elsif ($type eq "ATermBlob") {
                 $unpack .= "    e$n = (ATermBlob) ATgetArgument(e, $m);\n";
+            } elsif ($realType eq "string") {
+                $unpack .= "    e$n = ATgetArgument(e, $m);\n";
+                $unpack .= "    if (ATgetType(e$n) != AT_APPL) return false;\n";
             } else {
                 $unpack .= "    e$n = ATgetArgument(e, $m);\n";
             }

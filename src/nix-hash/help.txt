@@ -4,3 +4,5 @@ nix-hash [OPTIONS...] [FILES...]
 files.
 
   --flat: compute hash of regular file contents, not metadata
+  --base32: print hash in base-32 instead of hexadecimal
+  --type HASH: use hash algorithm HASH ("md5" (default), "sha1", "sha256")

@@ -58,18 +58,21 @@ Hash parseHash32(HashType ht, const string & s);
 bool isHash(const string & s);
 
 /* Compute the hash of the given string. */
-Hash hashString(const string & s, HashType ht);
+Hash hashString(HashType ht, const string & s);
 
 /* Compute the hash of the given file. */
-Hash hashFile(const Path & path, HashType ht);
+Hash hashFile(HashType ht, const Path & path);
 
 /* Compute the hash of the given path.  The hash is defined as
    md5(dump(path)). */
-Hash hashPath(const Path & path, HashType ht);
+Hash hashPath(HashType ht, const Path & path);
 
 /* Compress a hash to the specified number of bytes by cyclically
    XORing bytes together. */
 Hash compressHash(const Hash & hash, unsigned int newSize);
+
+/* Parse a string representing a hash type. */
+HashType parseHashType(const string & s);
 
 
 #endif /* !__HASH_H */

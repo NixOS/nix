@@ -412,14 +412,14 @@ static void invalidatePath(const Path & path, Transaction & txn)
 
 
 Path makeStorePath(const string & type,
-    Hash & hash, const string & suffix)
+    const Hash & hash, const string & suffix)
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
     string s = type + ":sha256:" + printHash(hash) + ":"
         + nixStore + ":" + suffix;
 
     return nixStore + "/"
-        + printHash32(compressHash(hashString(s, htSHA256), 20))
+        + printHash32(compressHash(hashString(htSHA256, s), 20))
         + "-" + suffix;
 }
 
@@ -432,7 +432,7 @@ Path addToStore(const Path & _srcPath)
     Hash h(htSHA256);
     {
         SwitchToOriginalUser sw;
-        h = hashPath(srcPath, htSHA256);
+        h = hashPath(htSHA256, srcPath);
     }
 
     string baseName = baseNameOf(srcPath);
@@ -456,7 +456,7 @@ Path addToStore(const Path & _srcPath)
             
             copyPath(srcPath, dstPath);
 
-            Hash h2 = hashPath(dstPath, htSHA256);
+            Hash h2 = hashPath(htSHA256, dstPath);
             if (h != h2)
                 throw Error(format("contents of `%1%' changed while copying it to `%2%' (%3% -> %4%)")
                     % srcPath % dstPath % printHash(h) % printHash(h2));
@@ -477,7 +477,7 @@ Path addToStore(const Path & _srcPath)
 
 Path addTextToStore(const string & suffix, const string & s)
 {
-    Hash hash = hashString(s, htSHA256);
+    Hash hash = hashString(htSHA256, s);
 
     Path dstPath = makeStorePath("text", hash, suffix);
     

@@ -83,7 +83,7 @@ bool isValidPath(const Path & path);
 
 /* Constructs a unique store path name. */
 Path makeStorePath(const string & type,
-    Hash & hash, const string & suffix);
+    const Hash & hash, const string & suffix);
     
 /* Copy the contents of a path to the store and register the validity
    the resulting path.  The resulting path is returned. */

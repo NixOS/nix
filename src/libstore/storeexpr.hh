@@ -20,12 +20,30 @@ struct Closure
     ClosureElems elems;
 };
 
+
+struct DerivationOutput
+{
+    Path path;
+    string hashAlgo; /* hash used for expected hash computation */
+    string hash; /* expected hash, may be null */
+    DerivationOutput()
+    {
+    }
+    DerivationOutput(Path path, string hashAlgo, string hash)
+    {
+        this->path = path;
+        this->hashAlgo = hashAlgo;
+        this->hash = hash;
+    }
+};
+
+typedef map<string, DerivationOutput> DerivationOutputs;
 typedef map<string, string> StringPairs;
 
 struct Derivation
 {
-    PathSet outputs;
-    PathSet inputs; /* Store expressions, not actual inputs */
+    DerivationOutputs outputs; /* keyed on symbolic IDs */
+    PathSet inputs; /* store expressions, not actual inputs */
     string platform;
     Path builder;
     Strings args;

@@ -702,6 +702,29 @@ static void drain(int fd)
 }
 
 
+PathSet outputPaths(const DerivationOutputs & outputs)
+{
+    PathSet paths;
+    for (DerivationOutputs::const_iterator i = outputs.begin();
+         i != outputs.end(); ++i)
+        paths.insert(i->second.path);
+    return paths;
+}
+
+
+string showPaths(const PathSet & paths)
+{
+    string s;
+    for (PathSet::const_iterator i = paths.begin();
+         i != paths.end(); ++i)
+    {
+        if (s.size() != 0) s += ", ";
+        s += *i;
+    }
+    return s;
+}
+
+
 NormalisationGoal::HookReply NormalisationGoal::tryBuildHook()
 {
     Path buildHook = getEnv("NIX_BUILD_HOOK");
@@ -786,7 +809,7 @@ NormalisationGoal::HookReply NormalisationGoal::tryBuildHook()
         }
 
         printMsg(lvlInfo, format("running hook to build path `%1%'")
-            % *expr.derivation.outputs.begin());
+            % showPaths(outputPaths(expr.derivation.outputs)));
         
         /* Write the information that the hook needs to perform the
            build, i.e., the set of input paths (including closure
@@ -807,9 +830,9 @@ NormalisationGoal::HookReply NormalisationGoal::tryBuildHook()
         writeStringToFile(inputListFN, s);
         
         s = "";
-        for (PathSet::iterator i = expr.derivation.outputs.begin();
+        for (DerivationOutputs::iterator i = expr.derivation.outputs.begin();
              i != expr.derivation.outputs.end(); ++i)
-            s += *i + "\n";
+            s += i->second.path + "\n";
         writeStringToFile(outputListFN, s);
         
         s = "";
@@ -848,7 +871,7 @@ bool NormalisationGoal::prepareBuild()
     /* Obtain locks on all output paths.  The locks are automatically
        released when we exit this function or Nix crashes. */
     /* !!! BUG: this could block, which is not allowed. */
-    outputLocks.lockPaths(expr.derivation.outputs);
+    outputLocks.lockPaths(outputPaths(expr.derivation.outputs));
 
     /* Now check again whether there is a successor.  This is because
        another process may have started building in parallel.  After
@@ -870,11 +893,11 @@ bool NormalisationGoal::prepareBuild()
        running the build hook. */
     
     /* The outputs are referenceable paths. */
-    for (PathSet::iterator i = expr.derivation.outputs.begin();
+    for (DerivationOutputs::iterator i = expr.derivation.outputs.begin();
          i != expr.derivation.outputs.end(); ++i)
     {
-        debug(format("building path `%1%'") % *i);
-        allPaths.insert(*i);
+        debug(format("building path `%1%'") % i->second.path);
+        allPaths.insert(i->second.path);
     }
     
     /* Get information about the inputs (these all exist now). */
@@ -901,9 +924,9 @@ bool NormalisationGoal::prepareBuild()
     /* We can skip running the builder if all output paths are already
        valid. */
     bool fastBuild = true;
-    for (PathSet::iterator i = expr.derivation.outputs.begin();
+    for (DerivationOutputs::iterator i = expr.derivation.outputs.begin();
          i != expr.derivation.outputs.end(); ++i)
-        if (!isValidPath(*i)) { 
+        if (!isValidPath(i->second.path)) { 
             fastBuild = false;
             break;
         }
@@ -921,7 +944,7 @@ bool NormalisationGoal::prepareBuild()
 void NormalisationGoal::startBuilder()
 {
     startNest(nest, lvlInfo,
-        format("building path `%1%'") % *expr.derivation.outputs.begin());
+        format("building path `%1%'") % showPaths(outputPaths(expr.derivation.outputs)))
     
     /* Right platform? */
     if (expr.derivation.platform != thisSystem)
@@ -931,10 +954,10 @@ void NormalisationGoal::startBuilder()
 
     /* If any of the outputs already exist but are not registered,
        delete them. */
-    for (PathSet::iterator i = expr.derivation.outputs.begin(); 
+    for (DerivationOutputs::iterator i = expr.derivation.outputs.begin(); 
          i != expr.derivation.outputs.end(); ++i)
     {
-        Path path = *i;
+        Path path = i->second.path;
         if (isValidPath(path))
             throw Error(format("obstructed build: path `%1%' exists") % path);
         if (pathExists(path)) {
@@ -1054,10 +1077,10 @@ void NormalisationGoal::createClosure()
        output path to determine what other paths it references.  Also make all
        output paths read-only. */
     PathSet usedPaths;
-    for (PathSet::iterator i = expr.derivation.outputs.begin(); 
+    for (DerivationOutputs::iterator i = expr.derivation.outputs.begin(); 
          i != expr.derivation.outputs.end(); ++i)
     {
-        Path path = *i;
+        Path path = i->second.path;
         if (!pathExists(path)) {
             throw BuildError(
                 format("builder for `%1%' failed to produce output path `%2%'")
@@ -1084,6 +1107,7 @@ void NormalisationGoal::createClosure()
 	/* For each path referenced by this output path, add its id to the
 	   closure element and add the id to the `usedPaths' set (so that the
 	   elements referenced by *its* closure are added below). */
+        PathSet outputPaths = ::outputPaths(expr.derivation.outputs);
         for (Paths::iterator j = refPaths.begin();
 	     j != refPaths.end(); ++j)
 	{
@@ -1092,8 +1116,7 @@ void NormalisationGoal::createClosure()
 	    elem.refs.insert(path);
             if (inClosures.find(path) != inClosures.end())
                 usedPaths.insert(path);
-	    else if (expr.derivation.outputs.find(path) ==
-                expr.derivation.outputs.end())
+	    else if (outputPaths.find(path) == outputPaths.end())
 		abort();
         }
 
@@ -1147,9 +1170,9 @@ void NormalisationGoal::createClosure()
        by running the garbage collector. */
     Transaction txn;
     createStoreTransaction(txn);
-    for (PathSet::iterator i = expr.derivation.outputs.begin(); 
+    for (DerivationOutputs::iterator i = expr.derivation.outputs.begin(); 
          i != expr.derivation.outputs.end(); ++i)
-        registerValidPath(txn, *i);
+        registerValidPath(txn, i->second.path);
     registerSuccessor(txn, nePath, nfPath);
     txn.commit();
 

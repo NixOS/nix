@@ -20,8 +20,9 @@ PathSet storeExprRoots(const Path & nePath)
     if (ne.type == StoreExpr::neClosure)
         paths.insert(ne.closure.roots.begin(), ne.closure.roots.end());
     else if (ne.type == StoreExpr::neDerivation)
-        paths.insert(ne.derivation.outputs.begin(),
-            ne.derivation.outputs.end());
+        for (DerivationOutputs::iterator i = ne.derivation.outputs.begin();
+             i != ne.derivation.outputs.end(); ++i)
+            paths.insert(i->second.path);
     else abort();
 
     return paths;

@@ -29,20 +29,60 @@ static PathSet storeExprRootsCached(EvalState & state, const Path & nePath)
 }
 
 
-static Hash hashDerivation(EvalState & state, StoreExpr ne)
+/* Returns the hash of a derivation modulo fixed-output
+   subderivations.  A fixed-output derivation is a derivation with one
+   output (`out') for which an expected hash and hash algorithm are
+   specified (using the `outputHash' and `outputHashAlgo'
+   attributes).  We don't want changes to such derivations to
+   propagate upwards through the dependency graph, changing output
+   paths everywhere.
+
+   For instance, if we change the url in a call to the `fetchurl'
+   function, we do not want to rebuild everything depending on it
+   (after all, (the hash of) the file being downloaded is unchanged).
+   So the *output paths* should not change.  On the other hand, the
+   *derivation store expression paths* should change to reflect the
+   new dependency graph.
+
+   That's what this function does: it returns a hash which is just the
+   of the derivation ATerm, except that any input store expression
+   paths have been replaced by the result of a recursive call to this
+   function, and that for fixed-output derivations we return
+   (basically) its outputHash. */
+static Hash hashDerivationModulo(EvalState & state, StoreExpr ne)
 {
     if (ne.type == StoreExpr::neDerivation) {
+
+        /* Return a fixed hash for fixed-output derivations. */
+        if (ne.derivation.outputs.size() == 1) {
+            DerivationOutputs::iterator i = ne.derivation.outputs.begin();
+            if (i->first == "out" &&
+                i->second.hash != "")
+            {
+                return hashString(htSHA256, "fixed:out:"
+                    + i->second.hashAlgo + ":"
+                    + i->second.hash + ":"
+                    + i->second.path);
+            }
+        }
+
+        /* For other derivations, replace the inputs paths with
+           recursive calls to this function.*/
 	PathSet inputs2;
         for (PathSet::iterator i = ne.derivation.inputs.begin();
-             i != ne.derivation.inputs.end(); i++)
+             i != ne.derivation.inputs.end(); ++i)
         {
-            DrvHashes::iterator j = state.drvHashes.find(*i);
-            if (j == state.drvHashes.end())
-                throw Error(format("don't know expression `%1%'") % (string) *i);
-            inputs2.insert(printHash(j->second));
+            Hash h = state.drvHashes[*i];
+            if (h.type == htUnknown) {
+                StoreExpr ne2 = storeExprFromPath(*i);
+                h = hashDerivationModulo(state, ne2);
+                state.drvHashes[*i] = h;
+            }
+            inputs2.insert(printHash(h));
         }
 	ne.derivation.inputs = inputs2;
     }
+    
     return hashTerm(unparseStoreExpr(ne));
 }
 
@@ -58,9 +98,7 @@ static Path copyAtom(EvalState & state, const Path & srcPath)
     ne.closure.roots.insert(dstPath);
     ne.closure.elems[dstPath] = elem;
 
-    Hash drvHash = hashDerivation(state, ne);
     Path drvPath = writeTerm(unparseStoreExpr(ne), "c");
-    state.drvHashes[drvPath] = drvHash;
 
     state.drvRoots[drvPath] = ne.closure.roots;
 
@@ -109,16 +147,11 @@ static void processBinding(EvalState & state, Expr e, StoreExpr & ne,
             if (!a) throw Error("derivation name missing");
             Path drvPath = evalPath(state, a);
 
-            a = queryAttr(e, "drvHash");
-            if (!a) throw Error("derivation hash missing");
-            Hash drvHash = parseHash(htMD5, evalString(state, a));
-
             a = queryAttr(e, "outPath");
             if (!a) throw Error("output path missing");
             PathSet drvRoots;
             drvRoots.insert(evalPath(state, a));
             
-            state.drvHashes[drvPath] = drvHash;
             state.drvRoots[drvPath] = drvRoots;
 
             ss.push_back(addInput(state, drvPath, ne));
@@ -188,8 +221,9 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
     ne.type = StoreExpr::neDerivation;
 
     string drvName;
-    Hash outHash;
-    bool outHashGiven = false;
+    
+    string outputHash;
+    string outputHashAlgo;
 
     for (ATermIterator i(attrs.keys()); i; ++i) {
         string key = aterm2String(*i);
@@ -222,10 +256,8 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
             if (key == "builder") ne.derivation.builder = s;
             else if (key == "system") ne.derivation.platform = s;
             else if (key == "name") drvName = s;
-            else if (key == "id") { 
-                outHash = parseHash(htMD5, s);
-                outHashGiven = true;
-            }
+            else if (key == "outputHash") outputHash = s;
+            else if (key == "outputHashAlgo") outputHashAlgo = s;
         }
     }
     
@@ -236,6 +268,24 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
         throw Error("required attribute `system' missing");
     if (drvName == "")
         throw Error("required attribute `name' missing");
+
+    /* If an output hash was given, check it. */
+    if (outputHash == "")
+        outputHashAlgo = "";
+    else {
+        HashType ht = parseHashType(outputHashAlgo);
+        if (ht == htUnknown)
+            throw Error(format("unknown hash algorithm `%1%'") % outputHashAlgo);
+        Hash h;
+        if (outputHash.size() == Hash(ht).hashSize * 2)
+            /* hexadecimal representation */
+            h = parseHash(ht, outputHash);
+        else
+            /* base-32 representation */
+            h = parseHash32(ht, outputHash);
+        string s = outputHash;
+        outputHash = printHash(h);
+    }
 
     /* Check the derivation name.  It shouldn't contain whitespace,
        but we are conservative here: we check whether only
@@ -252,38 +302,33 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
         }
 
     /* Construct the "masked" derivation store expression, which is
-       the final one except that the list of output paths is set to
-       the set of output names, and the corresponding environment
-       variables have an empty value.  This ensures that changes in
-       the set of output names do get reflected in the hash. */
+       the final one except that in the list of outputs, the output
+       paths are empty, and the corresponding environment variables
+       have an empty value.  This ensures that changes in the set of
+       output names do get reflected in the hash. */
     ne.derivation.env["out"] = "";
-    ne.derivation.outputs.insert("out");
+    ne.derivation.outputs["out"] =
+        DerivationOutput("", outputHashAlgo, outputHash);
         
-    /* Determine the output path by hashing the Nix expression with no
-       outputs to produce a unique but deterministic path name for
-       this derivation. */
-    if (!outHashGiven) outHash = hashDerivation(state, ne);
+    /* Use the masked derivation expression to compute the output
+       path. */
     Path outPath = makeStorePath("output:out",
-        outHash, drvName);
+        hashDerivationModulo(state, ne), drvName);
 
     /* Construct the final derivation store expression. */
     ne.derivation.env["out"] = outPath;
-    ne.derivation.outputs.clear();
-    ne.derivation.outputs.insert(outPath);
+    ne.derivation.outputs["out"] =
+        DerivationOutput(outPath, outputHashAlgo, outputHash);
 
     /* Write the resulting term into the Nix store directory. */
-    Hash drvHash = outHashGiven
-        ? hashString(printHash(outHash) + outPath, htMD5)
-        : hashDerivation(state, ne);
     Path drvPath = writeTerm(unparseStoreExpr(ne), "d-" + drvName);
 
     printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'")
         % drvName % drvPath);
 
+    /* !!! assumes a single output */
     attrs.set("outPath", makeAttrRHS(makePath(toATerm(outPath)), makeNoPos()));
     attrs.set("drvPath", makeAttrRHS(makePath(toATerm(drvPath)), makeNoPos()));
-    attrs.set("drvHash",
-        makeAttrRHS(makeStr(toATerm(printHash(drvHash))), makeNoPos()));
     attrs.set("type", makeAttrRHS(makeStr(toATerm("derivation")), makeNoPos()));
 
     return makeAttrs(attrs);

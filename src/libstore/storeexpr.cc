@@ -8,7 +8,7 @@
 
 Hash hashTerm(ATerm t)
 {
-    return hashString(atPrint(t), htMD5);
+    return hashString(htSHA256, atPrint(t));
 }
 
 
@@ -20,14 +20,20 @@ Path writeTerm(ATerm t, const string & suffix)
 }
 
 
+void checkPath(const string & s)
+{
+    if (s.size() == 0 || s[0] != '/')
+        throw Error(format("bad path `%1%' in store expression") % s);
+}
+    
+
 static void parsePaths(ATermList paths, PathSet & out)
 {
     for (ATermIterator i(paths); i; ++i) {
         if (ATgetType(*i) != AT_APPL)
             throw badTerm("not a path", *i);
         string s = aterm2String(*i);
-        if (s.size() == 0 || s[0] != '/')
-            throw badTerm("not a path", *i);
+        checkPath(s);
         out.insert(s);
     }
 }
@@ -92,7 +98,18 @@ static bool parseDerivation(ATerm t, Derivation & derivation)
     if (!matchDerive(t, outs, ins, platform, builder, args, bnds))
         return false;
 
-    parsePaths(outs, derivation.outputs);
+    for (ATermIterator i(outs); i; ++i) {
+        ATerm id, path, hashAlgo, hash;
+        if (!matchDerivationOutput(*i, id, path, hashAlgo, hash))
+            return false;
+        DerivationOutput out;
+        out.path = aterm2String(path);
+        checkPath(out.path);
+        out.hashAlgo = aterm2String(hashAlgo);
+        out.hash = aterm2String(hash);
+        derivation.outputs[aterm2String(id)] = out;
+    }
+
     parsePaths(ins, derivation.inputs);
 
     derivation.builder = aterm2String(builder);
@@ -155,6 +172,16 @@ static ATerm unparseClosure(const Closure & closure)
 
 static ATerm unparseDerivation(const Derivation & derivation)
 {
+    ATermList outputs = ATempty;
+    for (DerivationOutputs::const_iterator i = derivation.outputs.begin();
+         i != derivation.outputs.end(); i++)
+        outputs = ATinsert(outputs,
+            makeDerivationOutput(
+                toATerm(i->first),
+                toATerm(i->second.path),
+                toATerm(i->second.hashAlgo),
+                toATerm(i->second.hash)));
+
     ATermList args = ATempty;
     for (Strings::const_iterator i = derivation.args.begin();
          i != derivation.args.end(); i++)
@@ -169,7 +196,7 @@ static ATerm unparseDerivation(const Derivation & derivation)
                 toATerm(i->second)));
 
     return makeDerive(
-        unparsePaths(derivation.outputs),
+        ATreverse(outputs),
         unparsePaths(derivation.inputs),
         toATerm(derivation.platform),
         toATerm(derivation.builder),

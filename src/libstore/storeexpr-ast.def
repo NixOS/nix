@@ -5,3 +5,4 @@ Derive | ATermList ATermList string string ATermList ATermList | ATerm |
 
 | string string | ATerm | EnvBinding |
 | string ATermList | ATerm | ClosureElem |
+| string string string string | ATerm | DerivationOutput |

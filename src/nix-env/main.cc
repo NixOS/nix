@@ -33,7 +33,6 @@ struct DrvInfo
     string system;
     Path drvPath;
     Path outPath;
-    Hash drvHash;
 };
 
 typedef map<Path, DrvInfo> DrvInfos;
@@ -67,10 +66,6 @@ bool parseDerivation(EvalState & state, Expr e, DrvInfo & drv)
     a = queryAttr(e, "drvPath");
     if (!a) throw badTerm("derivation path missing", e);
     drv.drvPath = evalPath(state, a);
-
-    a = queryAttr(e, "drvHash");
-    if (!a) throw badTerm("derivation hash missing", e);
-    drv.drvHash = parseHash(htMD5, evalString(state, a));
 
     a = queryAttr(e, "outPath");
     if (!a) throw badTerm("output path missing", e);
@@ -191,7 +186,7 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
     for (DrvInfos::const_iterator i = drvs.begin(); 
          i != drvs.end(); ++i)
     {
-        ATerm t = makeAttrs(ATmakeList6(
+        ATerm t = makeAttrs(ATmakeList5(
             makeBind(toATerm("type"),
                 makeStr(toATerm("derivation")), makeNoPos()),
             makeBind(toATerm("name"),
@@ -200,8 +195,6 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
                 makeStr(toATerm(i->second.system)), makeNoPos()),
             makeBind(toATerm("drvPath"),
                 makePath(toATerm(i->second.drvPath)), makeNoPos()),
-            makeBind(toATerm("drvHash"),
-                makeStr(toATerm(printHash(i->second.drvHash))), makeNoPos()),
             makeBind(toATerm("outPath"),
                 makePath(toATerm(i->second.outPath)), makeNoPos())
             ));
