@@ -250,11 +250,13 @@ struct StdinSource : RestoreSource
 {
     virtual void operator () (const unsigned char * data, unsigned int len)
     {
-        ssize_t res = read(STDIN_FILENO, (char *) data, len);
-        if (res == -1)
-            throw SysError("reading from stdin");
-        if (res != (ssize_t) len)
-            throw Error("not enough data available on stdin");
+        while (len) {
+            ssize_t res = read(STDIN_FILENO, (char *) data, len);
+            if (res == -1) throw SysError("reading from stdin");
+            if (res == 0) throw SysError("unexpected end-of-file on stdin");
+            len -= res;
+            data += res;
+        }
     }
 };
 
