@@ -6,10 +6,14 @@ export PATH=/bin:/usr/bin
 echo "packing $path into $out..."
 mkdir $out
 dst=$out/$(basename $path).nar.bz2
-@bindir@/nix-store --dump "$path" | @bzip2@ > $dst
+@bindir@/nix-store --dump "$path" > tmp
 
-if test "${PIPESTATUS[0]}" != "0"; then exit 1; fi
+@bzip2@ < tmp > $dst
 
-md5=$(md5sum -b $dst | cut -c1-32)
+narHash=$(md5sum -b tmp | cut -c1-32)
 if test $? != 0; then exit 1; fi
-echo $md5 > $out/md5
+echo $narHash > $out/nar-hash
+
+narbz2Hash=$(md5sum -b $dst | cut -c1-32)
+if test $? != 0; then exit 1; fi
+echo $narbz2Hash > $out/narbz2-hash

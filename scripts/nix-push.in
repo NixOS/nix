@@ -125,16 +125,26 @@ for (my $n = 0; $n < scalar @storepaths; $n++) {
     (-f $narfile) or die "narfile for $storepath not found";
     push @nararchives, $narfile;
 
-    open MD5, "$nardir/md5" or die "cannot open hash";
-    my $hash = <MD5>;
-    chomp $hash;
-    $hash =~ /^[0-9a-z]{32}$/ or die "invalid hash";
+    open MD5, "$nardir/narbz2-hash" or die "cannot open narbz2-hash";
+    my $narbz2Hash = <MD5>;
+    chomp $narbz2Hash;
+    $narbz2Hash =~ /^[0-9a-z]{32}$/ or die "invalid hash";
     close MD5;
+
+    open MD5, "$nardir/nar-hash" or die "cannot open nar-hash";
+    my $narHash = <MD5>;
+    chomp $narHash;
+    $narHash =~ /^[0-9a-z]{32}$/ or die "invalid hash";
+    close MD5;
+    
+    my $size = (stat $narfile)[7];
 
     print MANIFEST "{\n";
     print MANIFEST "  StorePath: $storepath\n";
     print MANIFEST "  NarURL: $archives_get_url/$narname\n";
-    print MANIFEST "  MD5: $hash\n";
+    print MANIFEST "  MD5: $narbz2Hash\n";
+    print MANIFEST "  NarHash: $narHash\n";
+    print MANIFEST "  Size: $size\n";
 
     if ($storepath =~ /\.store$/) {
         open PREDS, "@bindir@/nix-store --query --predecessors $storepath |" or die "cannot run nix";
