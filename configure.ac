@@ -22,9 +22,12 @@ AC_CANONICAL_HOST
 
 # Construct a Nix system name (like "i686-linux").
 AC_MSG_CHECKING([for the canonical Nix system name])
-machine_name=`uname -m`
-sys_name=`uname -s | tr [A-Z] [a-z]`
-system="${machine_name}-${sys_name}"
+#machine_name=`uname -m`
+#sys_name=`uname -s | tr [A-Z] [a-z]`
+#system="${machine_name}-${sys_name}"
+AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
+  [platform identifier (e.g., `i686-linux')]),
+  system=$withval, system="$host_cpu-$host_os")
 AC_MSG_RESULT($system)
 AC_SUBST(system)
 AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
