@@ -1,10 +1,11 @@
 noinst_LIBRARIES = libnix.a
 
-libnix_a_SOURCES = util.cc hash.cc archive.cc md5.c \
+libnix_a_SOURCES = \
  store.cc expr.cc normalise.cc exec.cc \
- globals.cc db.cc references.cc pathlocks.cc aterm.cc
+ globals.cc db.cc references.cc pathlocks.cc
 
-AM_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall -I.. -I../../externals/inst/include
+AM_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall \
+ -I.. -I../../externals/inst/include -I../libutil
 
 EXTRA_DIST = *.hh *.h test-builder-*.sh
 

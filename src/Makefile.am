@@ -1,1 +1,1 @@
-SUBDIRS = boost libnix libmain nix nix-hash fix fix-ng
+SUBDIRS = boost libutil libnix libmain nix nix-hash fix-ng
