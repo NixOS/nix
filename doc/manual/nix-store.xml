@@ -167,13 +167,27 @@ output.</para>
       <title>Description</title>
             
       <para>
-        The operation <option>--gc</option> performs a garbage
-        collection on the Nix store.  What it does specifically is
-        determined by the sub-operation, which is one of the
-        following:
+        Without additional flags, the operation <option>--gc</option>
+        performs a garbage collection on the Nix store.  That is, all
+        paths in the Nix store not reachable via file system
+        references from a set of <quote>roots</quote>, are deleted.
+      </para>
+
+      <para>
+	The following flags may be specified:
       </para>
 
       <variablelist>
+
+        <varlistentry>
+          <term><option>--print-roots</option></term>
+          <listitem>
+            <para>
+              This operation prints on standard output the set of
+	      roots used by the garbage collector.
+            </para>
+          </listitem>
+        </varlistentry>
 
         <varlistentry>
           <term><option>--print-live</option></term>
@@ -181,10 +195,9 @@ output.</para>
             <para>
               This operation prints on standard output the set of
               <quote>live</quote> store paths, which are all the store
-              paths reachable from a set of <quote>root</quote> store
-              expressions read from standard input.  Live paths should
-              never be deleted, since that would break consistency —
-              it would become possible that applications are installed
+              paths reachable from the roots.  Live paths should never
+              be deleted, since that would break consistency — it
+              would become possible that applications are installed
               that reference things that are no longer present in the
               store.
             </para>
@@ -215,32 +228,39 @@ output.</para>
 
       </variablelist>
 
-      <para>
-        The set of root store expressions is read from standard input.
-        Each line should contain exactly one store path.
-      </para>
-
-      <para>
-        The option <option>--min-age</option> specifies a minimum time
-        in hours that an unreachable store path must not have been
-        used before it is considered dead.  The default is 0 (consider
-        all unreachable store paths dead).  Whether a store path has
-        been used is determined by looking at its access time
-        (<literal>atime</literal>), so this does not work if the store
-        is located on a file system that has the
-        <literal>noatime</literal> option set.
-      </para>
-
-      <warning>
-        <para>
-          You generally will want to use the command
-          <command>nix-collect-garbage</command>, which figures out
-          the roots and then calls this command automatically.
-        </para>
-      </warning>
-
     </refsection>
             
+    <refsection>
+      <title>Roots</title>
+
+      <para>The roots of the garbage collector are all store paths to
+      which there are symlinks in the
+      directory <filename><replaceable>prefix</replaceable>/nix/var/nix/gcroots</filename>.
+      For instance, the following command makes the
+      path <filename>/nix/store/d718ef...-foo</filename> a root of
+      the collector:
+
+<screen>
+$ ln -s /nix/store/d718ef...-foo /nix/var/nix/gcroots/bar</screen>
+	
+      That is, after this command, the garbage collector will not
+      remove <filename>/nix/store/d718ef...-foo</filename> or any of
+      its dependencies.</para>
+
+      <para>Subdirectories
+      of <filename><replaceable>prefix</replaceable>/nix/var/nix/gcroots</filename>
+      are also searched for symlinks.  Symlinks to non-store paths are
+      followed and searched for roots, but TODO.</para>
+
+    </refsection>
+
+    <refsection>
+      <title>Configuration file</title>
+
+      <para>TODO</para>
+
+    </refsection>
+
   </refsection>
 
 
