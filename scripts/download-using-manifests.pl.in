@@ -80,6 +80,15 @@ sub isValidPath {
     return $? == 0;
 }
 
+sub parseHash {
+    my $hash = shift;
+    if ($hash =~ /^(.+):(.+)$/) {
+        return ($1, $2);
+    } else {
+        return ("md5", $hash);
+    }
+}
+
 while ($queueFront < scalar @queue) {
     my $u = $queue[$queueFront++];
 #    print "$u\n";
@@ -99,10 +108,11 @@ while ($queueFront < scalar @queue) {
         foreach my $patch (@{$patchList}) {
             if (isValidPath($patch->{basePath})) {
                 # !!! this should be cached
-                my $hash = `@bindir@/nix-hash --type '$patch->{hashAlgo}' "$patch->{basePath}"`;
+                my ($baseHashAlgo, $baseHash) = parseHash $patch->{baseHash};
+                my $hash = `@bindir@/nix-hash --type '$baseHashAlgo' "$patch->{basePath}"`;
                 chomp $hash;
 #                print "  MY HASH is $hash\n";
-                if ($hash ne $patch->{baseHash}) {
+                if ($hash ne $baseHash) {
                     print LOGFILE "$$ rejecting $patch->{basePath}\n";
                     next;
                 }
@@ -177,8 +187,7 @@ my $maxStep = scalar @path;
 
 sub downloadFile {
     my $url = shift;
-    my $hash = shift;
-    my $hashAlgo = shift;
+    my ($hashAlgo, $hash) = parseHash(shift);
     $ENV{"PRINT_PATH"} = 1;
     $ENV{"QUIET"} = 1;
     $ENV{"NIX_HASH_ALGO"} = $hashAlgo;
@@ -210,7 +219,7 @@ while (scalar @path > 0) {
 
         # Download the patch.
         print "  downloading patch...\n";
-        my $patchPath = downloadFile "$patch->{url}", "$patch->{hash}", "$patch->{hashAlgo}";
+        my $patchPath = downloadFile "$patch->{url}", "$patch->{hash}";
 
         # Turn the base path into a NAR archive, to which we can
         # actually apply the patch.
@@ -237,7 +246,7 @@ while (scalar @path > 0) {
         
         # Download the archive.
         print "  downloading archive...\n";
-        my $narFilePath = downloadFile "$narFile->{url}", "$narFile->{hash}", "$narFile->{hashAlgo}";
+        my $narFilePath = downloadFile "$narFile->{url}", "$narFile->{hash}";
 
         # Unpack the archive into the target path.
         print "  unpacking archive...\n";
