@@ -66,7 +66,7 @@ bool parseDerivations(EvalState & state, Expr e, DrvInfos & drvs)
     else if (atMatch(m, e) >> "List" >> es) {
         for (ATermIterator i(es); i; ++i) {
             DrvInfo drv;
-            debug(format("evaluating list element") % *i);
+            debug(format("evaluating list element"));
             if (parseDerivation(state, *i, drv))
                 drvs[drv.drvPath] = drv;
         }
@@ -154,46 +154,15 @@ void switchLink(Path link, Path target)
 }
 
 
-void installDerivations(EvalState & state,
-    Path nePath, Strings drvNames)
+void createUserEnv(EvalState & state, const DrvInfos & drvs)
 {
-    debug(format("installing derivations from `%1%'") % nePath);
-
-    /* Fetch all derivations from the input file. */
-    DrvInfos availDrvs;
-    loadDerivations(state, nePath, availDrvs);
-
-    typedef map<string, Path> NameMap;
-    NameMap nameMap;
-    
-    for (DrvInfos::iterator i = availDrvs.begin();
-         i != availDrvs.end(); ++i)
-        nameMap[i->second.name] = i->first;
-
-    /* Filter out the ones we're not interested in. */
-    DrvInfos selectedDrvs;
-    for (Strings::iterator i = drvNames.begin();
-         i != drvNames.end(); ++i)
-    {
-        NameMap::iterator j = nameMap.find(*i);
-        if (j == nameMap.end())
-            throw Error(format("unknown derivation `%1%'") % *i);
-        else
-            selectedDrvs[j->second] = availDrvs[j->second];
-    }
-
-    /* Add in the already installed derivations. */
-    DrvInfos installedDrvs;
-    queryInstalled(state, installedDrvs);
-    selectedDrvs.insert(installedDrvs.begin(), installedDrvs.end());
-
     /* Get the environment builder expression. */
     Expr envBuilder = parseExprFromFile("/home/eelco/nix/corepkgs/buildenv"); /* !!! */
 
     /* Construct the whole top level derivation. */
     ATermList inputs = ATempty;
-    for (DrvInfos::iterator i = selectedDrvs.begin();
-         i != selectedDrvs.end(); ++i)
+    for (DrvInfos::const_iterator i = drvs.begin(); 
+         i != drvs.end(); ++i)
     {
         ATerm t = ATmake(
             "Attrs(["
@@ -240,6 +209,50 @@ void installDerivations(EvalState & state,
 }
 
 
+typedef map<string, Path> NameMap;
+
+
+NameMap mapByNames(DrvInfos & drvs)
+{
+    NameMap nameMap;
+    for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i)
+        nameMap[i->second.name] = i->first;
+    return nameMap;
+}
+
+
+void installDerivations(EvalState & state,
+    Path nePath, Strings drvNames)
+{
+    debug(format("installing derivations from `%1%'") % nePath);
+
+    /* Fetch all derivations from the input file. */
+    DrvInfos availDrvs;
+    loadDerivations(state, nePath, availDrvs);
+
+    NameMap nameMap = mapByNames(availDrvs);
+
+    /* Filter out the ones we're not interested in. */
+    DrvInfos selectedDrvs;
+    for (Strings::iterator i = drvNames.begin();
+         i != drvNames.end(); ++i)
+    {
+        NameMap::iterator j = nameMap.find(*i);
+        if (j == nameMap.end())
+            throw Error(format("unknown derivation `%1%'") % *i);
+        else
+            selectedDrvs[j->second] = availDrvs[j->second];
+    }
+
+    /* Add in the already installed derivations. */
+    DrvInfos installedDrvs;
+    queryInstalled(state, installedDrvs);
+    selectedDrvs.insert(installedDrvs.begin(), installedDrvs.end());
+
+    createUserEnv(state, selectedDrvs);
+}
+
+
 static void opInstall(EvalState & state,
     Strings opFlags, Strings opArgs)
 {
@@ -250,6 +263,36 @@ static void opInstall(EvalState & state,
 
     installDerivations(state, nePath,
         Strings(opArgs.begin(), opArgs.end()));
+}
+
+
+void uninstallDerivations(EvalState & state, Strings drvNames)
+{
+    DrvInfos installedDrvs;
+    queryInstalled(state, installedDrvs);
+
+    NameMap nameMap = mapByNames(installedDrvs);
+
+    for (Strings::iterator i = drvNames.begin();
+         i != drvNames.end(); ++i)
+    {
+        NameMap::iterator j = nameMap.find(*i);
+        if (j == nameMap.end())
+            throw Error(format("unknown derivation `%1%'") % *i);
+        else
+            installedDrvs.erase(j->first);
+    }
+
+   createUserEnv(state, installedDrvs);
+#if 0
+#endif
+}
+
+
+static void opUninstall(EvalState & state,
+    Strings opFlags, Strings opArgs)
+{
+    uninstallDerivations(state, opArgs);
 }
 
 
@@ -336,7 +379,9 @@ void run(Strings args)
 
         if (arg == "--install" || arg == "-i")
             op = opInstall;
-        if (arg == "--query" || arg == "-q")
+        else if (arg == "--uninstall" || arg == "-u")
+            op = opUninstall;
+        else if (arg == "--query" || arg == "-q")
             op = opQuery;
         else if (arg == "--verbose" || arg == "-v")
             verbosity = (Verbosity) ((int) verbosity + 1);
