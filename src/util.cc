@@ -1,47 +1,55 @@
+#include <iostream>
+
 #include "util.hh"
 
 
 string thisSystem = SYSTEM;
-string nixHomeDir = "/nix";
-string nixHomeDirEnvVar = "NIX";
 
 
-
-string absPath(string filename, string dir)
+SysError::SysError(string msg)
 {
-    if (filename[0] != '/') {
+    char * sysMsg = strerror(errno);
+    err = msg + ": " + sysMsg;
+}
+
+
+string absPath(string path, string dir)
+{
+    if (path[0] != '/') {
         if (dir == "") {
             char buf[PATH_MAX];
             if (!getcwd(buf, sizeof(buf)))
-                throw Error("cannot get cwd");
+                throw SysError("cannot get cwd");
             dir = buf;
         }
-        filename = dir + "/" + filename;
+        path = dir + "/" + path;
         /* !!! canonicalise */
         char resolved[PATH_MAX];
-        if (!realpath(filename.c_str(), resolved))
-            throw Error("cannot canonicalise path " + filename);
-        filename = resolved;
+        if (!realpath(path.c_str(), resolved))
+            throw SysError("cannot canonicalise path " + path);
+        path = resolved;
     }
-    return filename;
+    return path;
 }
 
 
-/* Return the directory part of the given path, i.e., everything
-   before the final `/'. */
-string dirOf(string s)
+string dirOf(string path)
 {
-    unsigned int pos = s.rfind('/');
-    if (pos == string::npos) throw Error("invalid file name");
-    return string(s, 0, pos);
+    unsigned int pos = path.rfind('/');
+    if (pos == string::npos) throw Error("invalid file name: " + path);
+    return string(path, 0, pos);
 }
 
 
-/* Return the base name of the given path, i.e., everything following
-   the final `/'. */
-string baseNameOf(string s)
+string baseNameOf(string path)
 {
-    unsigned int pos = s.rfind('/');
-    if (pos == string::npos) throw Error("invalid file name");
-    return string(s, pos + 1);
+    unsigned int pos = path.rfind('/');
+    if (pos == string::npos) throw Error("invalid file name: " + path);
+    return string(path, pos + 1);
+}
+
+
+void debug(string s)
+{
+    cerr << "debug: " << s << endl;
 }

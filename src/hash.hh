@@ -29,6 +29,7 @@ public:
 
 Hash parseHash(const string & s);
 bool isHash(const string & s);
+Hash hashString(const string & s);
 Hash hashFile(const string & fileName);
 
 #endif /* !__HASH_H */

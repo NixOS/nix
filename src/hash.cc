@@ -46,6 +46,8 @@ Hash::operator string() const
 Hash parseHash(const string & s)
 {
     Hash hash;
+    if (s.length() != Hash::hashSize * 2)
+        throw BadRefError("invalid hash: " + s);
     for (unsigned int i = 0; i < Hash::hashSize; i++) {
         string s2(s, i * 2, 2);
         if (!isxdigit(s2[0]) || !isxdigit(s2[1])) 
@@ -74,14 +76,23 @@ bool isHash(const string & s)
 
 
 /* Compute the MD5 hash of a file. */
+Hash hashString(const string & s)
+{
+    Hash hash;
+    md5_buffer(s.c_str(), s.length(), hash.hash);
+    return hash;
+}
+
+
+/* Compute the MD5 hash of a file. */
 Hash hashFile(const string & fileName)
 {
     Hash hash;
     FILE * file = fopen(fileName.c_str(), "rb");
     if (!file)
-        throw Error("file `" + fileName + "' does not exist");
+        throw SysError("file `" + fileName + "' does not exist");
     int err = md5_stream(file, hash.hash);
     fclose(file);
-    if (err) throw Error("cannot hash file");
+    if (err) throw SysError("cannot hash file " + fileName);
     return hash;
 }

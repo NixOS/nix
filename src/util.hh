@@ -12,11 +12,19 @@ using namespace std;
 
 class Error : public exception
 {
+protected:
     string err;
 public:
+    Error() { }
     Error(string _err) { err = _err; }
-    ~Error() throw () { };
+    ~Error() throw () { }
     const char * what() const throw () { return err.c_str(); }
+};
+
+class SysError : public Error
+{
+public:
+    SysError(string msg);
 };
 
 class UsageError : public Error
@@ -33,15 +41,20 @@ typedef vector<string> Strings;
 extern string thisSystem;
 
 
-/* The prefix of the Nix installation, and the environment variable
-   that can be used to override the default. */
-extern string nixHomeDir;
-extern string nixHomeDirEnvVar;
+/* Return an absolutized path, resolving paths relative to the
+   specified directory, or the current directory otherwise. */
+string absPath(string path, string dir = "");
+
+/* Return the directory part of the given path, i.e., everything
+   before the final `/'. */
+string dirOf(string path);
+
+/* Return the base name of the given path, i.e., everything following
+   the final `/'. */
+string baseNameOf(string path);
 
 
-string absPath(string filename, string dir = "");
-string dirOf(string s);
-string baseNameOf(string s);
+void debug(string s);
 
 
 #endif /* !__UTIL_H */
