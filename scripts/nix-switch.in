@@ -4,11 +4,15 @@ use strict;
 
 my $keep = 0;
 my $sourceroot = 0;
+my $name = "current";
 my $srcid;
 
-foreach my $arg (@ARGV) {
+my $argnr = 0;
+while ($argnr < scalar @ARGV) {
+    my $arg = $ARGV[$argnr++];
     if ($arg eq "--keep") { $keep = 1; }
     elsif ($arg eq "--source-root") { $sourceroot = 1; }
+    elsif ($arg eq "--name") { $name = $ARGV[$argnr++]; }
     elsif ($arg =~ /^([0-9a-z]{32})$/) { $srcid = $arg; }
     else { die "unknown argument `$arg'" };
 }
@@ -54,7 +58,7 @@ if ($sourceroot) {
     close ID;
 }
 
-my $current = "$linkdir/current";
+my $current = "$linkdir/$name";
 
 # Read the current generation so that we can delete it (if --keep
 # wasn't specified).
@@ -70,7 +74,7 @@ my $oldlink = readlink($current);
 
 print "switching $current to $link\n";
 
-my $tmplink = "$linkdir/new_current";
+my $tmplink = "$linkdir/.new_$name";
 symlink($link, $tmplink) or die "cannot create $tmplink";
 rename($tmplink, $current) or die "cannot rename $tmplink";
 
