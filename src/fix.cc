@@ -146,6 +146,8 @@ static Expr evalExpr2(EvalState & state, Expr e)
     /* Normal forms. */
     if (ATmatch(e, "<str>", &s1) ||
         ATmatch(e, "[<list>]", &e1) ||
+        ATmatch(e, "True") ||
+        ATmatch(e, "False") ||
         ATmatch(e, "Function([<list>], <term>)", &e1, &e2) ||
         ATmatch(e, "FSId(<str>)", &s1))
         return e;
@@ -165,6 +167,37 @@ static Expr evalExpr2(EvalState & state, Expr e)
             throw badTerm("expecting a function", e1);
         return evalExpr(state,
             substExprMany((ATermList) e3, (ATermList) e2, e4));
+    }
+
+    /* Conditional. */
+    if (ATmatch(e, "If(<term>, <term>, <term>)", &e1, &e2, &e3)) {
+        e1 = evalExpr(state, e1);
+        Expr x;
+        if (ATmatch(e1, "True")) x = e2;
+        else if (ATmatch(e1, "False")) x = e3;
+        else throw badTerm("expecting a boolean", e1);
+        return evalExpr(state, x);
+    }
+
+    /* Ad-hoc function for string matching. */
+    if (ATmatch(e, "HasSubstr(<term>, <term>)", &e1, &e2)) {
+        e1 = evalExpr(state, e1);
+        e2 = evalExpr(state, e2);
+        
+        char * s1, * s2;
+        if (!ATmatch(e1, "<str>", &s1))
+            throw badTerm("expecting a string", e1);
+        if (!ATmatch(e2, "<str>", &s2))
+            throw badTerm("expecting a string", e2);
+        
+        return
+            string(s1).find(string(s2)) != string::npos ?
+            ATmake("True") : ATmake("False");
+    }
+
+    /* Platform constant. */
+    if (ATmatch(e, "Platform")) {
+        return ATmake("<str>", SYSTEM);
     }
 
     /* Fix inclusion. */
