@@ -130,13 +130,20 @@ void deletePath(string path)
 }
 
 
+Verbosity verbosity = lvlNormal;
+
 static int nestingLevel = 0;
 
 
-Nest::Nest(bool nest)
+Nest::Nest(Verbosity level, const format & f)
 {
-    this->nest = nest;
-    if (nest) nestingLevel++;
+    if (level > verbosity)
+        nest = false;
+    else {
+        msg(level, f);
+        nest = true;
+        nestingLevel++;
+    }
 }
 
 
@@ -146,8 +153,9 @@ Nest::~Nest()
 }
 
 
-void msg(const format & f)
+void msg(Verbosity level, const format & f)
 {
+    if (level > verbosity) return;
     string spaces;
     for (int i = 0; i < nestingLevel; i++)
         spaces += "|   ";
@@ -157,7 +165,7 @@ void msg(const format & f)
 
 void debug(const format & f)
 {
-    msg(format("debug: %1%") % f.str());
+    msg(lvlDebug, format("debug: %1%") % f.str());
 }
 
 

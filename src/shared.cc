@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cctype>
 
 extern "C" {
 #include <aterm2.h>
@@ -32,7 +33,12 @@ static void initAndRun(int argc, char * * argv)
         string arg = *it;
         if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-') {
             for (unsigned int i = 1; i < arg.length(); i++)
-                args.insert(it, (string) "-" + arg[i]);
+                if (isalpha(arg[i]))
+                    args.insert(it, (string) "-" + arg[i]);
+                else {
+                    args.insert(it, string(arg, i));
+                    break;
+                }
             it = args.erase(it);
         } else it++;
     }
@@ -50,18 +56,21 @@ int main(int argc, char * * argv)
     try {
         initAndRun(argc, argv);
     } catch (UsageError & e) {
-        cerr << format(
-            "error: %1%\n"
-            "Try `%2% --help' for more information.\n")
-            % e.what() % programId;
+        msg(lvlError, 
+            format(
+                "error: %1%\n"
+                "Try `%2% --help' for more information.")
+            % e.what() % programId);
         return 1;
     } catch (Error & e) {
-        cerr << format("error: %1%\n") % e.msg();
+        msg(lvlError, format("error: %1%") % e.msg());
         return 1;
     } catch (exception & e) {
-        cerr << format("error: %1%\n") % e.what();
+        msg(lvlError, format("error: %1%") % e.what());
         return 1;
     }
 
     return 0;
 }
+
+

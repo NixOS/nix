@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 
 #include "globals.hh"
 #include "normalise.hh"
@@ -278,10 +279,9 @@ void run(Strings args)
     Strings opFlags, opArgs;
     Operation op = 0;
 
-    for (Strings::iterator it = args.begin();
-         it != args.end(); it++)
+    for (Strings::iterator it = args.begin(); it != args.end(); )
     {
-        string arg = *it;
+        string arg = *it++;
 
         Operation oldOp = op;
 
@@ -307,6 +307,16 @@ void run(Strings args)
             op = opVerify;
         else if (arg == "--path" || arg == "-p")
             pathArgs = true;
+        else if (arg == "--verbose" || arg == "-v") {
+            if (it == args.end()) throw UsageError(
+                format("`%1%' requires an argument") % arg);
+            istringstream str(*it++);
+            int lvl;
+            str >> lvl;
+            if (str.fail()) throw UsageError(
+                format("`%1%' requires an integer argument") % arg);
+            verbosity = (Verbosity) lvl;
+        }
         else if (arg[0] == '-')
             opFlags.push_back(arg);
         else

@@ -26,8 +26,7 @@ typedef set<FSId> FSIdSet;
 
 Slice normaliseFState(FSId id, FSIdSet pending)
 {
-    debug(format("normalising fstate %1%") % (string) id);
-    Nest nest(true);
+    Nest nest(lvlDebug, format("normalising fstate %1%") % (string) id);
 
     /* Try to substitute $id$ by any known successors in order to
        speed up the rewrite process. */
@@ -177,8 +176,7 @@ Slice normaliseFState(FSId id, FSIdSet pending)
 
 void realiseSlice(const Slice & slice, FSIdSet pending)
 {
-    debug(format("realising slice"));
-    Nest nest(true);
+    Nest nest(lvlDebug, format("realising slice"));
 
     /* Perhaps all paths already contain the right id? */
 

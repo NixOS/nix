@@ -310,6 +310,16 @@ void run(Strings args)
                 throw UsageError(format("argument required in `%1%'") % arg);
             state.searchDirs.push_back(*it++);
         }
+        else if (arg == "--verbose" || arg == "-v") {
+            if (it == args.end()) throw UsageError(
+                format("`%1%' requires an argument") % arg);
+            istringstream str(*it++);
+            int lvl;
+            str >> lvl;
+            if (str.fail()) throw UsageError(
+                format("`%1%' requires an integer argument") % arg);
+            verbosity = (Verbosity) lvl;
+        }
         else if (arg[0] == '-')
             throw UsageError(format("unknown flag `%1%`") % arg);
         else

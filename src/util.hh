@@ -72,17 +72,26 @@ void deletePath(string path);
 
 /* Messages. */
 
+typedef enum { 
+    lvlError = 0, 
+    lvlNormal = 5,
+    lvlDebug = 10,
+    lvlDebugMore = 15
+} Verbosity;
+
+extern Verbosity verbosity; /* supress msgs > this */
+
 class Nest
 {
 private:
     bool nest;
 public:
-    Nest(bool nest);
+    Nest(Verbosity level, const format & f);
     ~Nest();
 };
 
-void msg(const format & f);
-void debug(const format & f);
+void msg(Verbosity level, const format & f);
+void debug(const format & f); /* shorthand */
 
 
 /* Wrappers arount read()/write() that read/write exactly the
