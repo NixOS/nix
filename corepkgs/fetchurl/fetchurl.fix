@@ -4,6 +4,7 @@ Function(["url", "md5"],
     , ("url", Var("url"))
     , ("md5", Var("md5"))
     , ("name", BaseName(Var("url")))
+    , ("id", Var("md5"))
     ]
   )
 )

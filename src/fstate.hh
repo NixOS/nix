@@ -63,7 +63,7 @@ Hash hashTerm(ATerm t);
 ATerm termFromId(const FSId & id);
 
 /* Write an aterm to the Nix store directory, and return its hash. */
-FSId writeTerm(ATerm t, const string & suffix);
+FSId writeTerm(ATerm t, const string & suffix, FSId id = FSId());
 
 /* Parse an fstate-expression. */
 FState parseFState(ATerm t);

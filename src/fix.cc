@@ -153,8 +153,10 @@ static Expr evalExpr2(EvalState & state, Expr e)
         fs.slice.roots.push_back(id);
         fs.slice.elems.push_back(elem);
 
-        return ATmake("FSId(<str>)", 
-            ((string) writeTerm(unparseFState(fs), "")).c_str());
+        FSId termId = hashString("producer-" + (string) id
+            + "-" + dstPath);
+        writeTerm(unparseFState(fs), "", termId);
+        return ATmake("FSId(<str>)", ((string) termId).c_str());
     }
 
     /* Packages are transformed into Derive fstate expressions. */
@@ -176,6 +178,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
         fs.type = FState::fsDerive;
         fs.derive.platform = SYSTEM;
         string name;
+        FSId outId;
         bnds = ATempty;
 
         for (map<string, ATerm>::iterator it = bndMap.begin();
@@ -195,6 +198,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
             }
             else if (ATmatch(value, "<str>", &s1)) {
                 if (key == "name") name = s1;
+                if (key == "id") outId = parseHash(s1);
                 fs.derive.env.push_back(StringPair(key, s1));
             }
             else throw badTerm("invalid package argument", value);
@@ -211,7 +215,8 @@ static Expr evalExpr2(EvalState & state, Expr e)
         
         /* Hash the fstate-expression with no outputs to produce a
            unique but deterministic path name for this package. */
-        Hash outId = hashTerm(unparseFState(fs));
+        if (outId == FSId())
+            outId = hashTerm(unparseFState(fs));
         string outPath = 
             canonPath(nixStore + "/" + ((string) outId).c_str() + "-" + name);
         fs.derive.env.push_back(StringPair("out", outPath));
@@ -219,8 +224,10 @@ static Expr evalExpr2(EvalState & state, Expr e)
         debug(format("%1%: %2%") % (string) outId % name);
 
         /* Write the resulting term into the Nix store directory. */
-        return ATmake("FSId(<str>)", 
-            ((string) writeTerm(unparseFState(fs), "-d-" + name)).c_str());
+        FSId termId = hashString("producer-" + (string) outId
+            + "-" + outPath);
+        writeTerm(unparseFState(fs), "-d-" + name, termId);
+        return ATmake("FSId(<str>)", ((string) termId).c_str());
     }
 
     /* BaseName primitive function. */

@@ -31,9 +31,10 @@ ATerm termFromId(const FSId & id)
 }
 
 
-FSId writeTerm(ATerm t, const string & suffix)
+FSId writeTerm(ATerm t, const string & suffix, FSId id)
 {
-    FSId id = hashTerm(t);
+    /* By default, the id of a term is its hash. */
+    if (id == FSId()) id = hashTerm(t);
 
     string path = canonPath(nixStore + "/" + 
         (string) id + suffix + ".nix");

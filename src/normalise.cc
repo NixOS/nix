@@ -88,19 +88,18 @@ Slice normaliseFState(FSId id)
 
     /* We can skip running the builder if we can expand all output
        paths from their ids. */
-    bool fastBuild = false;
-#if 0
+    bool fastBuild = true;
     for (OutPaths::iterator i = outPaths.begin(); 
          i != outPaths.end(); i++)
     {
         try {
             expandId(i->second, i->first);
-        } catch (...) {
+        } catch (Error & e) {
+            debug(format("fast build failed: %1%") % e.what());
             fastBuild = false;
             break;
         }
     }
-#endif
 
     if (!fastBuild) {
 
