@@ -320,6 +320,8 @@ private:
     {
         return nePath;
     }
+
+    void trace(const format & f);
 };
 
 
@@ -351,7 +353,7 @@ void NormalisationGoal::work()
 
 void NormalisationGoal::init()
 {
-    debug(format("init of norm `%1%'") % nePath);
+    trace("init");
 
     /* If we already have a successor, then we are done already; don't
        add the expression as a goal. */
@@ -373,7 +375,7 @@ void NormalisationGoal::init()
 
 void NormalisationGoal::haveStoreExpr()
 {
-    debug(format("loading store expr `%1%'") % nePath);
+    trace("loading store expression");
 
     assert(isValidPath(nePath));
 
@@ -400,7 +402,7 @@ void NormalisationGoal::haveStoreExpr()
 
 void NormalisationGoal::inputNormalised()
 {
-    debug(format("all inputs normalised of `%1%'") % nePath);
+    trace("all inputs normalised");
 
     /* Inputs must also be realised before we can build this goal. */
     for (PathSet::iterator i = expr.derivation.inputs.begin();
@@ -421,7 +423,7 @@ void NormalisationGoal::inputNormalised()
 
 void NormalisationGoal::inputRealised()
 {
-    debug(format("all inputs realised of `%1%'") % nePath);
+    trace("all inputs realised");
 
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
@@ -433,7 +435,7 @@ void NormalisationGoal::inputRealised()
 
 void NormalisationGoal::tryToBuild()
 {
-    debug(format("trying to build `%1%'") % nePath);
+    trace("trying to build");
 
     /* Is the build hook willing to accept this job? */
     switch (tryBuildHook()) {
@@ -479,7 +481,7 @@ void NormalisationGoal::tryToBuild()
 
 void NormalisationGoal::buildDone()
 {
-    debug(format("build done for `%1%'") % nePath);
+    trace("build done");
 
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
@@ -641,6 +643,9 @@ NormalisationGoal::HookReply NormalisationGoal::tryBuildHook()
             return rpDone;
         }
 
+        printMsg(lvlInfo, format("running hook to build path `%1%'")
+            % *expr.derivation.outputs.begin());
+        
         /* Write the information that the hook needs to perform the
            build, i.e., the set of input paths (including closure
            expressions), the set of output paths, and the successor
@@ -772,6 +777,9 @@ bool NormalisationGoal::prepareBuild()
 
 void NormalisationGoal::startBuilder()
 {
+    startNest(nest, lvlInfo,
+        format("building path `%1%'") % *expr.derivation.outputs.begin());
+    
     /* Right platform? */
     if (expr.derivation.platform != thisSystem)
         throw Error(format("a `%1%' is required, but I am a `%2%'")
@@ -896,7 +904,7 @@ void NormalisationGoal::createClosure()
     nf.type = StoreExpr::neClosure;
     
     startNest(nest, lvlTalkative,
-        format("finishing normalisation of goal `%1%'") % nePath);
+        format("computing closure for `%1%'") % nePath);
     
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
@@ -979,7 +987,6 @@ void NormalisationGoal::createClosure()
     /* Write the normal form.  This does not have to occur in the
        transaction below because writing terms is idem-potent. */
     ATerm nfTerm = unparseStoreExpr(nf);
-    printMsg(lvlVomit, format("normal form: %1%") % atPrint(nfTerm));
     Path nfPath = writeTerm(nfTerm, "-s");
 
     /* Register each output path, and register the normal form.  This
@@ -1050,13 +1057,19 @@ void NormalisationGoal::deleteTmpDir(bool force)
 {
     if (tmpDir != "") {
         if (keepFailed && !force)
-	    printMsg(lvlTalkative, 
+	    printMsg(lvlError, 
 		format("builder for `%1%' failed; keeping build directory `%2%'")
                 % nePath % tmpDir);
         else
             deletePath(tmpDir);
         tmpDir = "";
     }
+}
+
+
+void NormalisationGoal::trace(const format & f)
+{
+    debug(format("normalisation of `%1%': %2%") % f);
 }
 
 
@@ -1310,6 +1323,9 @@ void SubstitutionGoal::tryToRun()
     if (pathExists(storePath))
         deletePath(storePath);
 
+    startNest(nest, lvlInfo,
+        format("substituting path `%1%'") % storePath);
+    
     /* Fork the substitute program. */
     pid = fork();
     switch (pid) {
@@ -1527,7 +1543,7 @@ void Worker::waitForBuildSlot(GoalPtr goal)
 
 void Worker::run()
 {
-    startNest(nest, lvlChatty, format("running normaliser"));
+    startNest(nest, lvlDebug, format("entered goal loop"));
 
     while (1) {
 
