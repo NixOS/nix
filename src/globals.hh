@@ -21,9 +21,13 @@ extern string dbRefs;
 
 /* dbNFs :: Hash -> Hash
 
-   Each pair (h1, h2) in this mapping records the fact that the value
-   referenced by h2 is a normal form obtained by evaluating the value
-   referenced by value h1.
+   Each pair (h1, h2) in this mapping records the fact that the normal
+   form of an expression with hash h1 is Hash(h2).
+
+   TODO: maybe this should be that the normal form of an expression
+   with hash h1 is an expression with hash h2; this would be more
+   general, but would require us to store lots of small expressions in
+   the file system just to support the caching mechanism.
 */
 extern string dbNFs;
 

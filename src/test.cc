@@ -72,7 +72,7 @@ void runTests()
 
     Hash builder1 = addValue("./test-builder-1.sh");
 
-    Expr e1 = ATmake("Exec(Str(<str>), External(<str>), [])",
+    Expr e1 = ATmake("Exec(Str(<str>), Hash(<str>), [])",
         thisSystem.c_str(), ((string) builder1).c_str());
 
     evalTest(e1);
@@ -80,10 +80,15 @@ void runTests()
     Hash builder2 = addValue("./test-builder-2.sh");
 
     Expr e2 = ATmake(
-        "Exec(Str(<str>), External(<str>), [Tup(Str(\"src\"), <term>)])",
+        "Exec(Str(<str>), Hash(<str>), [Tup(Str(\"src\"), <term>)])",
         thisSystem.c_str(), ((string) builder2).c_str(), e1);
 
     evalTest(e2);
+
+    Hash h3 = addValue("./test-expr.nix");
+    Expr e3 = ATmake("Deref(Hash(<str>))", ((string) h3).c_str());
+
+    evalTest(e3);
 }
 
 

@@ -12,24 +12,28 @@ using namespace std;
 
 /* Abstract syntax of Nix values:
 
-   e := Hash(h) -- reference to expression value
-      | External(h) -- reference to non-expression value
+   e := Deref(e) -- external expression
+      | Hash(h) -- value reference
       | Str(s) -- string constant
       | Bool(b) -- boolean constant
+      | Var(x) -- variable
       | App(e, e) -- application
       | Lam(x, e) -- lambda abstraction
       | Exec(platform, e, [Arg(e, e)])
           -- primitive; execute e with args e* on platform
       ;
 
+   TODO: Deref(e) allows computed external expressions, which might be
+   too expressive; perhaps this should be Deref(h).
+
    Semantics
 
    Each rule given as eval(e) => e', i.e., expression e has a normal
    form e'.
 
-   eval(Hash(h)) => eval(loadExpr(h))
+   eval(Deref(Hash(h))) => eval(loadExpr(h))
 
-   eval(External(h)) => External(h) # idem for Str, Bool
+   eval(Hash(h)) => Hash(h) # idem for Str, Bool
 
    eval(App(e1, e2)) => eval(App(e1', e2))
      where e1' = eval(e1)
@@ -37,8 +41,7 @@ using namespace std;
    eval(App(Lam(var, body), arg)) =>
      eval(subst(var, arg, body))
 
-   eval(Exec(platform, prog, args)) =>
-     (External(h), h)
+   eval(Exec(platform, prog, args)) => Hash(h)
      where
        fn = ... name of the output (random or by hashing expr) ...
        h =
@@ -47,12 +50,12 @@ using namespace std;
                 , getFile(eval(prog))
                 , map(makeArg . eval, args)
                 ) then
-           hashExternal(fn)
+           hashPath(fn)
          else
            undef
        ... register ...
 
-   makeArg(Arg(Str(nm), (External(h), h))) => (nm, getFile(h))
+   makeArg(Arg(Str(nm), (Hash(h), h))) => (nm, getFile(h))
    makeArg(Arg(Str(nm), (Str(s), _))) => (nm, s)
    makeArg(Arg(Str(nm), (Bool(True), _))) => (nm, "1")
    makeArg(Arg(Str(nm), (Bool(False), _))) => (nm, undef)
@@ -60,7 +63,7 @@ using namespace std;
    getFile :: Hash -> FileName
    loadExpr :: Hash -> FileName
    hashExpr :: Expr -> Hash 
-   hashExternal :: FileName -> Hash
+   hashPath :: FileName -> Hash
    exec :: FileName -> Platform -> FileName -> [(String, String)] -> Status
 */
 

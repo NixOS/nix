@@ -217,14 +217,13 @@ static string evalString(Expr e)
 }
 
 
-/* Evaluate an expression; the result must be a external
-   non-expression reference. */
-static Hash evalExternal(Expr e)
+/* Evaluate an expression; the result must be a value reference. */
+static Hash evalHash(Expr e)
 {
     e = evalValue(e);
     char * s;
-    if (ATmatch(e, "External(<str>)", &s)) return parseHash(s);
-    else throw badTerm("external non-expression value expected", e);
+    if (ATmatch(e, "Hash(<str>)", &s)) return parseHash(s);
+    else throw badTerm("value reference expected", e);
 }
 
 
@@ -244,7 +243,7 @@ void evalArgs(ATermList args, ATermList & argsNF, Environment & env)
         char * s;
         if (ATmatch(eVal, "Str(<str>)", &s)) {
             env[name] = s;
-        } else if (ATmatch(eVal, "External(<str>)", &s)) {
+        } else if (ATmatch(eVal, "Hash(<str>)", &s)) {
             env[name] = queryValuePath(parseHash(s));
         } else throw badTerm("invalid argument value", eVal);
 
@@ -260,7 +259,7 @@ void evalArgs(ATermList args, ATermList & argsNF, Environment & env)
 Expr evalValue(Expr e)
 {
     char * s;
-    Expr eBuildPlatform, eProg;
+    Expr eBuildPlatform, eProg, e2;
     ATermList args;
 
     /* Normal forms. */
@@ -269,12 +268,18 @@ Expr evalValue(Expr e)
         ATmatch(e, "Bool(False)"))
         return e;
 
-    /* External expressions. */
-
-    /* External non-expressions. */
-    if (ATmatch(e, "External(<str>)", &s)) {
+    /* Value references. */
+    if (ATmatch(e, "Hash(<str>)", &s)) {
         parseHash(s); /* i.e., throw exception if not valid */
         return e;
+    }
+
+    /* External expression. */
+    if (ATmatch(e, "Deref(<term>)", &e2)) {
+        string fn = queryValuePath(evalHash(e2));
+        ATerm e3 = ATreadFromNamedFile(fn.c_str());
+        if (!e3) throw Error("reading aterm from " + fn);
+        return e3;
     }
 
     /* Execution primitive. */
@@ -286,14 +291,14 @@ Expr evalValue(Expr e)
 
         checkPlatform(buildPlatform);
 
-        Hash prog = evalExternal(eProg);
+        Hash prog = evalHash(eProg);
 
         Environment env;
         ATermList argsNF;
         evalArgs(args, argsNF, env);
 
         Hash sourceHash = hashExpr(
-            ATmake("Exec(Str(<str>), External(<str>), [])",
+            ATmake("Exec(Str(<str>), Hash(<str>), [])",
                 buildPlatform.c_str(), ((string) prog).c_str()));
 
         /* Do we know a normal form for sourceHash? */
@@ -310,7 +315,7 @@ Expr evalValue(Expr e)
                 (string) sourceHash + "-nf", buildPlatform, prog, env);
         }
 
-        return ATmake("External(<str>)", ((string) targetHash).c_str());
+        return ATmake("Hash(<str>)", ((string) targetHash).c_str());
     }
 
     /* Barf. */
