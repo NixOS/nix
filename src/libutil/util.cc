@@ -305,7 +305,10 @@ void readFull(int fd, unsigned char * buf, size_t count)
     while (count) {
         checkInterrupt();
         ssize_t res = read(fd, (char *) buf, count);
-        if (res == -1) throw SysError("reading from file");
+        if (res == -1) {
+            if (errno == EINTR) continue;
+            throw SysError("reading from file");
+        }
         if (res == 0) throw Error("unexpected end-of-file");
         count -= res;
         buf += res;
@@ -318,7 +321,10 @@ void writeFull(int fd, const unsigned char * buf, size_t count)
     while (count) {
         checkInterrupt();
         ssize_t res = write(fd, (char *) buf, count);
-        if (res == -1) throw SysError("writing to file");
+        if (res == -1) {
+            if (errno == EINTR) continue;
+            throw SysError("writing to file");
+        }
         count -= res;
         buf += res;
     }
@@ -397,6 +403,11 @@ volatile sig_atomic_t _isInterrupted = 0;
 
 void _interrupted()
 {
-    _isInterrupted = 0;
-    throw Error("interrupted by the user");
+    /* Block user interrupts while an exception is being handled.
+       Throwing an exception while another exception is being handled
+       kills the program! */
+    if (!uncaught_exception()) {
+        _isInterrupted = 0;
+        throw Error("interrupted by the user");
+    }
 }
