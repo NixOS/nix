@@ -127,21 +127,22 @@ void copyPath(const Path & src, const Path & dst)
        use a thread). */
 
     /* Create a pipe. */
-    int fds[2];
-    if (pipe(fds) == -1) throw SysError("creating pipe");
+    Pipe pipe;
+    pipe.create();
 
     /* Fork. */
-    pid_t pid;
-    switch (pid = fork()) {
+    Pid pid;
+    pid = fork();
+    switch (pid) {
 
     case -1:
         throw SysError("unable to fork");
 
     case 0: /* child */
         try {
-            close(fds[1]);
+            pipe.writeSide.close();
             CopySource source;
-            source.fd = fds[0];
+            source.fd = pipe.readSide;
             restorePath(dst, source);
             _exit(0);
         } catch (exception & e) {
@@ -150,19 +151,16 @@ void copyPath(const Path & src, const Path & dst)
         _exit(1);        
     }
 
-    close(fds[0]);
-    
     /* Parent. */
 
+    pipe.readSide.close();
+    
     CopySink sink;
-    sink.fd = fds[1];
+    sink.fd = pipe.writeSide;
     dumpPath(src, sink);
 
     /* Wait for the child to finish. */
-    int status;
-    if (waitpid(pid, &status, 0) != pid)
-        throw SysError("waiting for child");
-
+    int status = pid.wait(true);
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
         throw Error(format("cannot copy `%1% to `%2%': child %3%")
             % src % dst % statusToString(status));

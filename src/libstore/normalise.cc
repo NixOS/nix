@@ -3,11 +3,8 @@
 #include <boost/enable_shared_from_this.hpp>
 
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <sys/stat.h>
-#include <sys/time.h>
 #include <fcntl.h>
-#include <signal.h>
 #include <unistd.h>
 
 #include "normalise.hh"
@@ -60,7 +57,7 @@ protected:
 
     virtual ~Goal()
     {
-        debug("goal destroyed");
+        printMsg(lvlVomit, "goal destroyed");
     }
 
 public:
@@ -160,26 +157,6 @@ public:
 //////////////////////////////////////////////////////////////////////
 
 
-void killChild(pid_t pid)
-{
-    /* Send a KILL signal to every process in the child process group
-       (which hopefully includes *all* its children). */
-    if (kill(-pid, SIGKILL) != 0)
-        printMsg(lvlError, format("killing process %1%") % pid);
-    else {
-        /* Wait until the child dies, disregarding the exit status. */
-        int status;
-        while (waitpid(pid, &status, 0) == -1)
-            if (errno != EINTR) printMsg(lvlError,
-                format("waiting for process %1%") % pid);
-    }
-}
-
-
-
-//////////////////////////////////////////////////////////////////////
-
-
 void Goal::addWaiter(GoalPtr waiter)
 {
     waiters.insert(waiter);
@@ -233,7 +210,7 @@ private:
     map<Path, Path> inputSucs;
 
     /* The process ID of the builder. */
-    pid_t pid;
+    Pid pid;
 
     /* The temporary directory. */
     Path tmpDir;
@@ -309,7 +286,6 @@ NormalisationGoal::NormalisationGoal(const Path & _nePath, Worker & _worker)
     : Goal(_worker)
 {
     nePath = _nePath;
-    pid = -1;
     state = &NormalisationGoal::init;
 }
 
@@ -318,13 +294,6 @@ NormalisationGoal::~NormalisationGoal()
 {
     /* Careful: we should never ever throw an exception from a
        destructor. */
-
-    if (pid != -1) {
-        printMsg(lvlError, format("killing child process %1% (%2%)")
-            % pid % nePath);
-        killChild(pid);
-    }
-
     try {
         deleteTmpDir(false);
     } catch (Error & e) {
@@ -471,20 +440,16 @@ void NormalisationGoal::buildDone()
 {
     debug(format("build done for `%1%'") % nePath);
 
-    int status;
-
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe --- just don't do that
        :-) */
     /* !!! this could block! */
-    if (waitpid(pid, &status, 0) != pid)
-        throw SysError(format("builder for `%1%' should have terminated")
-            % nePath);
+    pid_t savedPid = pid;
+    int status = pid.wait(true);
 
     /* So the child is gone now. */
-    worker.childTerminated(pid);
-    pid = -1;
+    worker.childTerminated(savedPid);
 
     /* Close the read side of the logger pipe. */
     logPipe.readSide.close();
@@ -570,7 +535,8 @@ NormalisationGoal::HookReply NormalisationGoal::tryBuildHook()
     fromHook.create();
 
     /* Fork the hook. */
-    switch (pid = fork()) {
+    pid = fork();
+    switch (pid) {
         
     case -1:
         throw SysError("unable to fork");
@@ -678,11 +644,9 @@ void NormalisationGoal::terminateBuildHook()
 {
     /* !!! drain stdout of hook */
     debug("terminating build hook");
-    int status;
-    if (waitpid(pid, &status, 0) != pid)
-        printMsg(lvlError, format("process `%1%' missing") % pid);
-    worker.childTerminated(pid);
-    pid = -1;
+    pid_t savedPid = pid;
+    pid.wait(true);
+    worker.childTerminated(savedPid);
     fromHook.readSide.close();
     toHook.writeSide.close();
     fdLogFile.close();
@@ -836,7 +800,8 @@ void NormalisationGoal::startBuilder()
        currently use forks to run and wait for the children, it
        shouldn't be hard to use threads for this on systems where
        fork() is unavailable or inefficient. */
-    switch (pid = fork()) {
+    pid = fork();
+    switch (pid) {
 
     case -1:
         throw SysError("unable to fork");
@@ -885,6 +850,7 @@ void NormalisationGoal::startBuilder()
     }
 
     /* parent */
+    pid.setSeparatePG(true);
     logPipe.writeSide.close();
     worker.childStarted(shared_from_this(),
         pid, logPipe.readSide, true);
@@ -1199,7 +1165,7 @@ private:
     Pipe logPipe;
 
     /* The process ID of the builder. */
-    pid_t pid;
+    Pid pid;
 
     /* Lock on the store path. */
     PathLocks outputLock;
@@ -1209,7 +1175,6 @@ private:
 
 public:
     SubstitutionGoal(const Path & _nePath, Worker & _worker);
-    ~SubstitutionGoal();
 
     void work();
 
@@ -1227,19 +1192,7 @@ SubstitutionGoal::SubstitutionGoal(const Path & _storePath, Worker & _worker)
     : Goal(_worker)
 {
     storePath = _storePath;
-    pid = -1;
     state = &SubstitutionGoal::init;
-}
-
-
-SubstitutionGoal::~SubstitutionGoal()
-{
-    /* !!! turn this into a destructor for pids */
-    if (pid != -1) {
-        printMsg(lvlError, format("killing child process %1% (%2%)")
-            % pid % storePath);
-        killChild(pid);
-    }
 }
 
 
@@ -1345,7 +1298,8 @@ void SubstitutionGoal::tryToRun()
         deletePath(storePath);
 
     /* Fork the substitute program. */
-    switch (pid = fork()) {
+    pid = fork();
+    switch (pid) {
         
     case -1:
         throw SysError("unable to fork");
@@ -1402,6 +1356,7 @@ void SubstitutionGoal::tryToRun()
     }
     
     /* parent */
+    pid.setSeparatePG(true);
     logPipe.writeSide.close();
     worker.childStarted(shared_from_this(),
         pid, logPipe.readSide, true);
@@ -1414,18 +1369,14 @@ void SubstitutionGoal::finished()
 {
     debug(format("substitute finished of `%1%'") % storePath);
 
-    int status;
-
     /* Since we got an EOF on the logger pipe, the substitute is
        presumed to have terminated.  */
     /* !!! this could block! */
-    if (waitpid(pid, &status, 0) != pid)
-        throw SysError(format("substitute for `%1%' should have terminated")
-            % storePath);
+    pid_t savedPid = pid;
+    int status = pid.wait(true);
 
     /* So the child is gone now. */
-    worker.childTerminated(pid);
-    pid = -1;
+    worker.childTerminated(savedPid);
 
     /* Close the read side of the logger pipe. */
     logPipe.readSide.close();
@@ -1534,7 +1485,7 @@ void Worker::removeGoal(GoalPtr goal)
 
 void Worker::wakeUp(GoalPtr goal)
 {
-    debug("wake up");
+    printMsg(lvlVomit, "wake up");
     awake.insert(goal);
 }
 
@@ -1593,8 +1544,6 @@ void Worker::run()
 
     while (1) {
 
-        debug(format("main loop (%1% goals left)") % goals.size());
-
         checkInterrupt();
 
         /* Call every wake goal. */
@@ -1602,7 +1551,8 @@ void Worker::run()
             Goals awake2(awake); /* !!! why is this necessary? */
             awake.clear();
             for (Goals::iterator i = awake2.begin(); i != awake2.end(); ++i) {
-                debug("goal");
+                printMsg(lvlVomit,
+                    format("running goal (%1% left)") % goals.size());
                 checkInterrupt();
                 GoalPtr goal = *i;
                 goal->work();
@@ -1714,5 +1664,7 @@ void ensurePath(const Path & path)
     /* If the path is already valid, we're done. */
     if (isValidPath(path)) return;
 
-    /* !!! add realisation goal */
+    Worker worker;
+    worker.addSubstitutionGoal(path, GoalPtr());
+    worker.run();
 }

@@ -7,9 +7,11 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <signal.h>
 
 #include "util.hh"
 
@@ -337,6 +339,10 @@ void writeFull(int fd, const unsigned char * buf, size_t count)
 }
 
 
+
+//////////////////////////////////////////////////////////////////////
+
+
 AutoDelete::AutoDelete(const string & p) : path(p)
 {
     del = true;
@@ -353,15 +359,21 @@ void AutoDelete::cancel()
 }
 
 
+
+//////////////////////////////////////////////////////////////////////
+
+
 AutoCloseFD::AutoCloseFD()
 {
     fd = -1;
 }
 
+
 AutoCloseFD::AutoCloseFD(int fd)
 {
     this->fd = fd;
 }
+
 
 AutoCloseFD::~AutoCloseFD()
 {
@@ -372,16 +384,19 @@ AutoCloseFD::~AutoCloseFD()
     }
 }
 
+
 void AutoCloseFD::operator =(int fd)
 {
     if (this->fd != fd) close();
     this->fd = fd;
 }
 
+
 AutoCloseFD::operator int()
 {
     return fd;
 }
+
 
 void AutoCloseFD::close()
 {
@@ -392,6 +407,7 @@ void AutoCloseFD::close()
         fd = -1;
     }
 }
+
 
 bool AutoCloseFD::isOpen()
 {
@@ -408,30 +424,117 @@ void Pipe::create()
 }
 
 
+
+//////////////////////////////////////////////////////////////////////
+
+
 AutoCloseDir::AutoCloseDir()
 {
     dir = 0;
 }
+
 
 AutoCloseDir::AutoCloseDir(DIR * dir)
 {
     this->dir = dir;
 }
 
+
 AutoCloseDir::~AutoCloseDir()
 {
     if (dir) closedir(dir);
 }
+
 
 void AutoCloseDir::operator =(DIR * dir)
 {
     this->dir = dir;
 }
 
+
 AutoCloseDir::operator DIR *()
 {
     return dir;
 }
+
+
+
+//////////////////////////////////////////////////////////////////////
+
+
+Pid::Pid()
+{
+    pid = -1;
+    separatePG = false;
+}
+
+
+Pid::~Pid()
+{
+    kill();
+}
+
+
+void Pid::operator =(pid_t pid)
+{
+    if (this->pid != pid) kill();
+    this->pid = pid;
+}
+
+
+Pid::operator pid_t()
+{
+    return pid;
+}
+
+
+void Pid::kill()
+{
+    if (pid == -1) return;
+    
+    printMsg(lvlError, format("killing child process %1%") % pid);
+
+    /* Send a KILL signal to the child.  If it has its own process
+       group, send the signal to every process in the child process
+       group (which hopefully includes *all* its children). */
+    if (::kill(separatePG ? -pid : pid, SIGKILL) != 0)
+        printMsg(lvlError, format("killing process %1%") % pid);
+    else {
+        /* Wait until the child dies, disregarding the exit status. */
+        int status;
+        while (waitpid(pid, &status, 0) == -1)
+            if (errno != EINTR) printMsg(lvlError,
+                format("waiting for process %1%") % pid);
+    }
+
+    pid = -1;
+}
+
+
+int Pid::wait(bool block)
+{
+    while (1) {
+        int status;
+        int res = waitpid(pid, &status, block ? 0 : WNOHANG);
+        if (res == pid) {
+            pid = -1;
+            return status;
+        }
+        if (res == 0 && !block) return -1;
+        if (errno != EINTR)
+            throw SysError("cannot get child exit status");
+    }
+}
+
+
+void Pid::setSeparatePG(bool separatePG)
+{
+    this->separatePG = separatePG;
+}
+
+
+
+//////////////////////////////////////////////////////////////////////
 
 
 volatile sig_atomic_t _isInterrupted = 0;
@@ -446,6 +549,10 @@ void _interrupted()
         throw Error("interrupted by the user");
     }
 }
+
+
+
+//////////////////////////////////////////////////////////////////////
 
 
 string packStrings(const Strings & strings)

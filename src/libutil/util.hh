@@ -172,6 +172,7 @@ public:
     void cancel();
 };
 
+
 class AutoCloseFD
 {
     int fd;
@@ -185,12 +186,14 @@ public:
     bool isOpen();
 };
 
+
 class Pipe
 {
 public:
     AutoCloseFD readSide, writeSide;
     void create();
 };
+
 
 class AutoCloseDir
 {
@@ -201,6 +204,21 @@ public:
     ~AutoCloseDir();
     void operator =(DIR * dir);
     operator DIR *();
+};
+
+
+class Pid
+{
+    pid_t pid;
+    bool separatePG;
+public:
+    Pid();
+    ~Pid();
+    void operator =(pid_t pid);
+    operator pid_t();
+    void kill();
+    int wait(bool block);
+    void setSeparatePG(bool separatePG);
 };
 
 
