@@ -11,29 +11,6 @@
 #include "globals.hh"
 
 
-class AutoDelete
-{
-    string path;
-    bool del;
-public:
-
-    AutoDelete(const string & p) : path(p) 
-    {
-        del = true;
-    }
-
-    ~AutoDelete()
-    {
-        if (del) deletePath(path);
-    }
-
-    void cancel()
-    {
-        del = false;
-    }
-};
-
-
 static string pathNullDevice = "/dev/null";
 
 
@@ -140,5 +117,3 @@ void runProgram(const string & program,
         throw Error("unable to build package");
     }
 }
-
-

@@ -36,7 +36,7 @@ void checkPath(const string & path,
         throw SysError(format("getting attributes of path `%1%'") % path);
 
     if (S_ISDIR(st.st_mode)) {
-        DIR * dir = opendir(path.c_str());
+        AutoCloseDir dir = opendir(path.c_str());
 
         struct dirent * dirent;
         while (errno = 0, dirent = readdir(dir)) {
@@ -45,15 +45,13 @@ void checkPath(const string & path,
             search(name, ids, seen);
             checkPath(path + "/" + name, ids, seen);
         }
-
-        closedir(dir); /* !!! close on exception */
     }
 
     else if (S_ISREG(st.st_mode)) {
         
         debug(format("checking `%1%'") % path);
 
-        int fd = open(path.c_str(), O_RDONLY);
+        AutoCloseFD fd = open(path.c_str(), O_RDONLY);
         if (fd == -1) throw SysError(format("opening file `%1%'") % path);
 
         unsigned char * buf = new unsigned char[st.st_size];
@@ -63,8 +61,6 @@ void checkPath(const string & path,
         search(string((char *) buf, st.st_size), ids, seen);
         
         delete buf; /* !!! autodelete */
-
-        close(fd); /* !!! close on exception */
     }
     
     else if (S_ISLNK(st.st_mode)) {

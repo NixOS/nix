@@ -118,17 +118,17 @@ void deletePath(const Path & path)
 
     if (S_ISDIR(st.st_mode)) {
 	Strings names;
+        
+        {
+            AutoCloseDir dir = opendir(path.c_str());
 
-        DIR * dir = opendir(path.c_str());
-
-        struct dirent * dirent;
-        while (errno = 0, dirent = readdir(dir)) {
-            string name = dirent->d_name;
-            if (name == "." || name == "..") continue;
-	    names.push_back(name);
-        }
-
-        closedir(dir); /* !!! close on exception */
+            struct dirent * dirent;
+            while (errno = 0, dirent = readdir(dir)) {
+                string name = dirent->d_name;
+                if (name == "." || name == "..") continue;
+                names.push_back(name);
+            }
+        } /* scoped to ensure that dir is closed at this point */
 
 	/* Make the directory writable. */
 	if (!(st.st_mode & S_IWUSR)) {
@@ -157,7 +157,7 @@ void makePathReadOnly(const Path & path)
     }
 
     if (S_ISDIR(st.st_mode)) {
-        DIR * dir = opendir(path.c_str());
+        AutoCloseDir dir = opendir(path.c_str());
 
         struct dirent * dirent;
         while (errno = 0, dirent = readdir(dir)) {
@@ -165,8 +165,6 @@ void makePathReadOnly(const Path & path)
             if (name == "." || name == "..") continue;
 	    makePathReadOnly(path + "/" + name);
         }
-
-        closedir(dir); /* !!! close on exception */
     }
 }
 
@@ -251,3 +249,72 @@ void writeFull(int fd, const unsigned char * buf, size_t count)
         buf += res;
     }
 }
+
+
+AutoDelete::AutoDelete(const string & p) : path(p)
+{
+    del = true;
+}
+
+AutoDelete::~AutoDelete()
+{
+    if (del) deletePath(path);
+}
+
+void AutoDelete::cancel()
+{
+    del = false;
+}
+
+
+AutoCloseFD::AutoCloseFD()
+{
+    fd = -1;
+}
+
+AutoCloseFD::AutoCloseFD(int fd)
+{
+    this->fd = fd;
+}
+
+AutoCloseFD::~AutoCloseFD()
+{
+    if (fd != -1) close(fd);
+}
+
+void AutoCloseFD::operator =(int fd)
+{
+    this->fd = fd;
+}
+
+AutoCloseFD::operator int()
+{
+    return fd;
+}
+
+
+AutoCloseDir::AutoCloseDir()
+{
+    dir = 0;
+}
+
+AutoCloseDir::AutoCloseDir(DIR * dir)
+{
+    this->dir = dir;
+}
+
+AutoCloseDir::~AutoCloseDir()
+{
+    if (dir) closedir(dir);
+}
+
+void AutoCloseDir::operator =(DIR * dir)
+{
+    this->dir = dir;
+}
+
+AutoCloseDir::operator DIR *()
+{
+    return dir;
+}
+

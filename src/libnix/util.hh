@@ -6,6 +6,8 @@
 #include <set>
 #include <sstream>
 
+#include <sys/types.h>
+#include <dirent.h>
 #include <unistd.h>
 
 #include <boost/format.hpp>
@@ -111,6 +113,41 @@ void debug(const format & f); /* short-hand for msg(lvlDebug, ...) */
    requested number of bytes. */
 void readFull(int fd, unsigned char * buf, size_t count);
 void writeFull(int fd, const unsigned char * buf, size_t count);
+
+
+/* Automatic cleanup of resources. */
+
+class AutoDelete
+{
+    string path;
+    bool del;
+public:
+    AutoDelete(const string & p);
+    ~AutoDelete();
+    void cancel();
+};
+
+class AutoCloseFD
+{
+    int fd;
+public:
+    AutoCloseFD();
+    AutoCloseFD(int fd);
+    ~AutoCloseFD();
+    void operator =(int fd);
+    operator int();
+};
+
+class AutoCloseDir
+{
+    DIR * dir;
+public:
+    AutoCloseDir();
+    AutoCloseDir(DIR * dir);
+    ~AutoCloseDir();
+    void operator =(DIR * dir);
+    operator DIR *();
+};
 
 
 #endif /* !__UTIL_H */

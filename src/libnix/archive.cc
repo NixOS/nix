@@ -51,7 +51,7 @@ static void dump(const string & path, DumpSink & sink);
 
 static void dumpEntries(const Path & path, DumpSink & sink)
 {
-    DIR * dir = opendir(path.c_str());
+    AutoCloseDir dir = opendir(path.c_str());
     if (!dir) throw SysError("opening directory " + path);
 
     vector<string> names;
@@ -77,8 +77,6 @@ static void dumpEntries(const Path & path, DumpSink & sink)
         dump(path + "/" + *it, sink);
         writeString(")", sink);
     }
-    
-    closedir(dir); /* !!! close on exception */
 }
 
 
@@ -88,7 +86,7 @@ static void dumpContents(const Path & path, unsigned int size,
     writeString("contents", sink);
     writeInt(size, sink);
 
-    int fd = open(path.c_str(), O_RDONLY);
+    AutoCloseFD fd = open(path.c_str(), O_RDONLY);
     if (fd == -1) throw SysError(format("opening file `%1%'") % path);
     
     unsigned char buf[65536];
@@ -105,8 +103,6 @@ static void dumpContents(const Path & path, unsigned int size,
         throw SysError("file changed while reading it: " + path);
 
     writePadding(size, sink);
-
-    close(fd); /* !!! close on exception */
 }
 
 
@@ -262,7 +258,7 @@ static void restore(const Path & path, RestoreSource & source)
     if (s != "(") throw badArchive("expected open tag");
 
     enum { tpUnknown, tpRegular, tpDirectory, tpSymlink } type = tpUnknown;
-    int fd = -1; /* !!! close on exception */
+    AutoCloseFD fd;
 
     while (1) {
         s = readString(source);
@@ -326,8 +322,6 @@ static void restore(const Path & path, RestoreSource & source)
         }
         
     }
-
-    if (fd != -1) close(fd);
 }
 
 
