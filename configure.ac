@@ -34,7 +34,7 @@ AC_CONFIG_FILES([Makefile
    src/libmain/Makefile
    src/nix-store/Makefile
    src/nix-hash/Makefile
-   src/nix-instantiate/Makefile
+   src/libexpr/Makefile
    scripts/Makefile
    corepkgs/Makefile
    corepkgs/fetchurl/Makefile
