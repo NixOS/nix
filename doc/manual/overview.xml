@@ -189,30 +189,32 @@ obtaining list of Nix archives at http://catamaran.labs.cs.uu.nl/dist/nix/nixpkg
       it can be used immediately, that is, it now appears in a directory in the
       <envar>PATH</envar> environment variable.  Specifically,
       <envar>PATH</envar> includes the entry
-      <filename><replaceable>prefix</replaceable>/var/nix/links/current/bin</filename>, 
+      <filename><replaceable>prefix</replaceable>/var/nix/profiles/default/bin</filename>, 
       where
-      <filename><replaceable>prefix</replaceable>/var/nix/links/current</filename> 
+      <filename><replaceable>prefix</replaceable>/var/nix/profiles/default</filename> 
       is just a symlink to the current user environment:
     </para>
 
     <screen>
-$ ls -l /nix/var/nix/links/
+$ ls -l /nix/var/nix/profiles/
 ...
-lrwxrwxrwx  1 eelco ... 15 -> /nix/store/1871...12b0-user-environment
-lrwxrwxrwx  1 eelco ... 16 -> /nix/store/59ba...df6b-user-environment
-lrwxrwxrwx  1 eelco ... current -> /nix/var/nix/links/16</screen>
+lrwxrwxrwx  1 eelco ... default-15-link -> /nix/store/1871...12b0-user-environment
+lrwxrwxrwx  1 eelco ... default-16-link -> /nix/store/59ba...df6b-user-environment
+lrwxrwxrwx  1 eelco ... default -> default-16-link</screen>
 
     <para>
-      That is, <filename>current</filename> in this example is a link to
-      <filename>16</filename>, which is the current user environment.  Before
-      the installation, it pointed to <filename>15</filename>.  Note that this
-      means that you can atomically roll-back to the previous user environment
-      by pointing the symlink <filename>current</filename> at
-      <filename>15</filename> again.  This also shows that operations such as
-      installation are atomic in the Nix system: any arbitrarily complex
-      set of installation, uninstallation, or upgrade actions eventually boil
-      down to the single operation of pointing a symlink somewhere else (which
-      can be implemented atomically in Unix).
+      That is, <filename>default</filename> in this example is a link
+      to <filename>default-16-link</filename>, which is the current
+      user environment.  Before the installation, it pointed to
+      <filename>default-15-link</filename>.  Note that this means that
+      you can atomically roll-back to the previous user environment by
+      pointing the symlink <filename>default</filename> at
+      <filename>default-15-link</filename> again.  This also shows
+      that operations such as installation are atomic in the Nix
+      system: any arbitrarily complex set of installation,
+      uninstallation, or upgrade actions eventually boil down to the
+      single operation of pointing a symlink somewhere else (which can
+      be implemented atomically in Unix).
     </para>
 
     <para>
@@ -221,15 +223,15 @@ lrwxrwxrwx  1 eelco ... current -> /nix/var/nix/links/16</screen>
     </para>
 
     <screen>
-$ ls -l /nix/var/nix/links/16/bin
+$ ls -l /nix/var/nix/profiles/default-16-link/bin
 lrwxrwxrwx  1 eelco ... MozillaFirebird -> /nix/store/35f8...4ae6-MozillaFirebird-0.7/bin/MozillaFirebird
 lrwxrwxrwx  1 eelco ... svn -> /nix/store/3829...fb5d-subversion-0.32.1/bin/svn
 ...</screen>
 
     <para>
       Note that, e.g., <filename>svn</filename> =
-      <filename>/nix/var/nix/links/current/bin/svn</filename> =
-      <filename>/nix/var/nix/links/16/bin/svn</filename> =
+      <filename>/nix/var/nix/profiles/default/bin/svn</filename> =
+      <filename>/nix/var/nix/profiles/default-16-link/bin/svn</filename> =
       <filename>/nix/store/59ba...df6b-user-environment/bin/svn</filename> =
       <filename>/nix/store/3829...fb5d-subversion-0.32.1/bin/svn</filename>.
     </para>

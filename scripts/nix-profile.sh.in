@@ -1,9 +1,9 @@
 if test -n "$HOME"; then
-    NIX_LINK="$HOME/.nix-userenv"
+    NIX_LINK="$HOME/.nix-profile"
 
     if ! test -L "$NIX_LINK"; then
         echo "creating $NIX_LINK"
-        _NIX_DEF_LINK=@localstatedir@/nix/links/current
+        _NIX_DEF_LINK=@localstatedir@/nix/profiles/default
         ln -s "$_NIX_DEF_LINK" "$NIX_LINK"
     fi
 

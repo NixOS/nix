@@ -111,14 +111,14 @@
       </varlistentry>
 
       <varlistentry>
-        <term><filename>~/.nix-userenv</filename></term>
+        <term><filename>~/.nix-profile</filename></term>
         <listitem>
           <para>
-            A symbolic link to the user's current user environment.
-            By default, it points to
-            <filename><replaceable>prefix</replaceable>/var/nix/links/current</filename>.
+            A symbolic link to the user's current profile.  The
+            default profile is
+            <filename><replaceable>prefix</replaceable>/var/nix/profiles/default</filename>.
             The <envar>PATH</envar> environment variable should
-            include <filename>~/.nix-userenv</filename> for the user
+            include <filename>~/.nix-profile/bin</filename> for the user
             environment to be visible to the user.
           </para>
         </listitem>

@@ -10,7 +10,7 @@
 
 struct Globals
 {
-    Path linkPath;
+    Path profile;
     Path nixExprPath;
     EvalState state;
 };
@@ -116,12 +116,6 @@ static Path getHomeDir()
 }
 
 
-static Path getLinksDir()
-{
-    return canonPath(nixStateDir + "/links");
-}
-
-
 static Path getDefNixExprPath()
 {
     return getHomeDir() + "/.nix-defexpr";
@@ -143,23 +137,30 @@ void queryInstalled(EvalState & state, DrvInfos & drvs,
 }
 
 
-Path createGeneration(Path outPath, Path drvPath)
+Path createGeneration(Path profile, Path outPath, Path drvPath)
 {
-    Path linksDir = getLinksDir();
-
+    Path profileDir = dirOf(profile);
+    string profileName = baseNameOf(profile);
+    
     unsigned int num = 0;
     
-    Strings names = readDirectory(linksDir);
+    Strings names = readDirectory(profileDir);
     for (Strings::iterator i = names.begin(); i != names.end(); ++i) {
-        istringstream s(*i);
-        unsigned int n; 
-        if (s >> n && s.eof() && n >= num) num = n + 1;
+        if (string(*i, 0, profileName.size() + 1) != profileName + "-") continue;
+        string s = string(*i, profileName.size() + 1);
+        int p = s.find("-link");
+        if (p == string::npos) continue;
+        istringstream str(string(s, 0, p));
+        unsigned int n;
+        if (str >> n && str.eof() && n >= num) num = n + 1;
     }
 
-    Path generation;
+    Path generation, gcrootSrc;
 
     while (1) {
-        generation = (format("%1%/%2%") % linksDir % num).str();
+        Path prefix = (format("%1%-%2%") % profile % num).str();
+        generation = prefix + "-link";
+        gcrootSrc = prefix + "-src.gcroot";
         if (symlink(outPath.c_str(), generation.c_str()) == 0) break;
         if (errno != EEXIST)
             throw SysError(format("creating symlink `%1%'") % generation);
@@ -167,7 +168,7 @@ Path createGeneration(Path outPath, Path drvPath)
         num++;
     }
 
-    writeStringToFile(generation + "-src.id", drvPath);
+    writeStringToFile(gcrootSrc, drvPath);
 
     return generation;
 }
@@ -175,6 +176,9 @@ Path createGeneration(Path outPath, Path drvPath)
 
 void switchLink(Path link, Path target)
 {
+    /* Hacky. */
+    if (dirOf(target) == dirOf(link)) target = baseNameOf(target);
+    
     Path tmp = canonPath(dirOf(link) + "/.new_" + baseNameOf(link));
     if (symlink(target.c_str(), tmp.c_str()) != 0)
         throw SysError(format("creating symlink `%1%'") % tmp);
@@ -190,7 +194,7 @@ void switchLink(Path link, Path target)
 
 
 void createUserEnv(EvalState & state, const DrvInfos & drvs,
-    const Path & linkPath)
+    const Path & profile)
 {
     /* Get the environment builder expression. */
     Expr envBuilder = parseExprFromFile(state,
@@ -243,9 +247,9 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
 
     /* Switch the current user environment to the output path. */
     debug(format("switching to new user environment"));
-    Path generation = createGeneration(
+    Path generation = createGeneration(profile,
         topLevelDrv.outPath, topLevelDrv.drvPath);
-    switchLink(linkPath, generation);
+    switchLink(profile, generation);
 }
 
 
@@ -380,7 +384,7 @@ static DrvNames drvNamesFromArgs(const Strings & opArgs)
 
 
 static void installDerivations(EvalState & state,
-    Path nePath, DrvNames & selectors, const Path & linkPath)
+    Path nePath, DrvNames & selectors, const Path & profile)
 {
     debug(format("installing derivations from `%1%'") % nePath);
 
@@ -415,10 +419,10 @@ static void installDerivations(EvalState & state,
     
     /* Add in the already installed derivations. */
     DrvInfos installedDrvs;
-    queryInstalled(state, installedDrvs, linkPath);
+    queryInstalled(state, installedDrvs, profile);
     selectedDrvs.insert(installedDrvs.begin(), installedDrvs.end());
 
-    createUserEnv(state, selectedDrvs, linkPath);
+    createUserEnv(state, selectedDrvs, profile);
 }
 
 
@@ -431,12 +435,12 @@ static void opInstall(Globals & globals,
     DrvNames drvNames = drvNamesFromArgs(opArgs);
     
     installDerivations(globals.state, globals.nixExprPath,
-        drvNames, globals.linkPath);
+        drvNames, globals.profile);
 }
 
 
 static void upgradeDerivations(EvalState & state,
-    Path nePath, DrvNames & selectors, const Path & linkPath)
+    Path nePath, DrvNames & selectors, const Path & profile)
 {
     debug(format("upgrading derivations from `%1%'") % nePath);
 
@@ -447,7 +451,7 @@ static void upgradeDerivations(EvalState & state,
 
     /* Load the currently installed derivations. */
     DrvInfos installedDrvs;
-    queryInstalled(state, installedDrvs, linkPath);
+    queryInstalled(state, installedDrvs, profile);
 
     /* Fetch all derivations from the input file. */
     DrvInfos availDrvs;
@@ -496,7 +500,7 @@ static void upgradeDerivations(EvalState & state,
         newDrvs.insert(*bestDrv);
     }
     
-    createUserEnv(state, newDrvs, linkPath);
+    createUserEnv(state, newDrvs, profile);
 }
 
 
@@ -510,15 +514,15 @@ static void opUpgrade(Globals & globals,
     DrvNames drvNames = drvNamesFromArgs(opArgs);
     
     upgradeDerivations(globals.state, globals.nixExprPath,
-        drvNames, globals.linkPath);
+        drvNames, globals.profile);
 }
 
 
 static void uninstallDerivations(EvalState & state, DrvNames & selectors,
-    Path & linkPath)
+    Path & profile)
 {
     DrvInfos installedDrvs;
-    queryInstalled(state, installedDrvs, linkPath);
+    queryInstalled(state, installedDrvs, profile);
 
     for (DrvInfos::iterator i = installedDrvs.begin();
          i != installedDrvs.end(); ++i)
@@ -533,7 +537,7 @@ static void uninstallDerivations(EvalState & state, DrvNames & selectors,
             }
     }
 
-    createUserEnv(state, installedDrvs, linkPath);
+    createUserEnv(state, installedDrvs, profile);
 }
 
 
@@ -545,7 +549,7 @@ static void opUninstall(Globals & globals,
 
     DrvNames drvNames = drvNamesFromArgs(opArgs);
 
-    uninstallDerivations(globals.state, drvNames, globals.linkPath);
+    uninstallDerivations(globals.state, drvNames, globals.profile);
 }
 
 
@@ -576,7 +580,7 @@ static void opQuery(Globals & globals,
     switch (source) {
 
         case sInstalled:
-            queryInstalled(globals.state, drvs, globals.linkPath);
+            queryInstalled(globals.state, drvs, globals.profile);
             break;
 
         case sAvailable: {
@@ -612,7 +616,7 @@ static void opQuery(Globals & globals,
         
         case qStatus: {
             DrvInfos installed;
-            queryInstalled(globals.state, installed, globals.linkPath);
+            queryInstalled(globals.state, installed, globals.profile);
 
             PathSet installedPaths; /* output paths of installed drvs */
             for (DrvInfos::iterator i = installed.begin();
@@ -644,11 +648,11 @@ static void opSwitchProfile(Globals & globals,
     if (opArgs.size() > 1)
         throw UsageError(format("`--profile' takes at most one argument"));
 
-    Path linkPath = 
-        absPath(opArgs.size() == 0 ? globals.linkPath : opArgs.front());
-    Path linkPathFinal = getHomeDir() + "/.nix-userenv";
+    Path profile = 
+        absPath(opArgs.size() == 0 ? globals.profile : opArgs.front());
+    Path profileLink = getHomeDir() + "/.nix-userenv";
 
-    switchLink(linkPathFinal, linkPath);
+    switchLink(profileLink, profile);
 }
 
 
@@ -676,7 +680,7 @@ void run(Strings args)
     Operation op = 0;
     
     Globals globals;
-    globals.linkPath = getLinksDir() + "/current";
+    globals.profile = canonPath(nixStateDir + "/profiles/default");
     globals.nixExprPath = getDefNixExprPath();
 
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
@@ -694,11 +698,11 @@ void run(Strings args)
             op = opQuery;
         else if (arg == "--import" || arg == "-I") /* !!! bad name */
             op = opDefaultExpr;
-        else if (arg == "--link" || arg == "-l") {
+        else if (arg == "--profile" || arg == "-p") {
             ++i;
             if (i == args.end()) throw UsageError(
                 format("`%1%' requires an argument") % arg);
-            globals.linkPath = absPath(*i);
+            globals.profile = absPath(*i);
         }
         else if (arg == "--file" || arg == "-f") {
             ++i;
@@ -706,7 +710,7 @@ void run(Strings args)
                 format("`%1%' requires an argument") % arg);
             globals.nixExprPath = absPath(*i);
         }
-        else if (arg == "--profile" || arg == "-p") 
+        else if (arg == "--switch-profile" || arg == "-S")
             op = opSwitchProfile;
         else if (arg[0] == '-')
             opFlags.push_back(arg);

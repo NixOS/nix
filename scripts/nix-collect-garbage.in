@@ -3,7 +3,7 @@
 use strict;
 use IPC::Open2;
 
-my $linkdir = "@localstatedir@/nix/links";
+my $linkdir = "@localstatedir@/nix/profiles";
 my $storedir = "@prefix@/store";
 
 my %alive;
@@ -24,7 +24,7 @@ closedir DIR;
 my @roots;
 foreach my $link (@links) {
     $link = $linkdir . "/" . $link;
-    next if (!($link =~ /.id$/));
+    next if (!($link =~ /.gcroot$/));
     open ROOT, "<$link" or die "cannot open $link: $!";
     my $root = <ROOT>;
     chomp $root;

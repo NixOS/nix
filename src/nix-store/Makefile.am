@@ -15,9 +15,6 @@ AM_CXXFLAGS = \
 install-data-local:
 	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix
 	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix/db
-	$(INSTALL) -d $(DESTDIR)$(localstatedir)/nix/links
-	rm -f $(DESTDIR)$(prefix)/current
-	ln -sf $(localstatedir)/nix/links/current $(DESTDIR)$(prefix)/current
 	$(INSTALL) -d $(DESTDIR)$(localstatedir)/log/nix
 	$(INSTALL) -d $(DESTDIR)$(prefix)/store
 #	$(bindir)/nix-store --init

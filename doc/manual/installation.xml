@@ -192,9 +192,9 @@ rm -rf /nix/var</screen>
       To use Nix, some environment variables should be set.  In
       particular, <envar>PATH</envar> should contain the directories
       <filename><replaceable>prefix</replaceable>/bin</filename> and
-      <filename>~/.nix-userenv/bin</filename>.  The first directory
+      <filename>~/.nix-profile/bin</filename>.  The first directory
       contains the Nix tools themselves, while
-      <filename>~/.nix-userenv</filename> is a symbolic link to the
+      <filename>~/.nix-profile</filename> is a symbolic link to the
       current <emphasis>user environment</emphasis> (an automatically
       generated package consisting of symlinks to installed packages).
       The simplest way to set the required environment variables is to

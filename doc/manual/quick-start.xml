@@ -93,7 +93,7 @@ $ nix-env -iBf nixpkgs-<replaceable>version</replaceable>/ hello MozillaFirebird
 
         <screen>
 $ which hello
-/home/eelco/.nix-userenv/bin/hello
+/home/eelco/.nix-profile/bin/hello
 $ hello
 Hello, world!
 $ MozillaFirebird

@@ -12,7 +12,7 @@ Operations:
 The previous operations take a list of derivation names.  The special
 name `*' may be used to indicate all derivations.
 
-  --profile / -p [FILE]: switch to specified user environment
+  --switch-profile / -S [FILE]: switch to specified profile
   --import / -I FILE: set default Nix expression
 
   --version: output version information
@@ -31,7 +31,7 @@ Query sources:
 
 Options:
 
-  --link / -l LINK: use symlink LINK instead of (...)/current
+  --profile / -p LINK: use specified profile instead of target of ~/.nix-profile
   --file / -f FILE: use Nix expression FILE for installation, etc.
   --verbose / -v: verbose operation (may be repeated)
   --keep-failed / -K: keep temporary directories of failed builds
