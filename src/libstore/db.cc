@@ -155,6 +155,7 @@ void Database::open(const string & path)
 
 
         /* Create the database environment object. */
+        DbEnv * env = 0; /* !!! close on error */
         env = new DbEnv(0);
 
         env->set_lg_bsize(32 * 1024); /* default */
@@ -199,7 +200,6 @@ void Database::open(const string & path)
                other readers or writers. */
 
             int n = getAccessorCount(fdAccessors);
-            setAccessorCount(fdAccessors, 1);
 
             if (n != 0) {
                 printMsg(lvlTalkative,
@@ -212,6 +212,8 @@ void Database::open(const string & path)
             else 
                 /* Open the environment normally. */
                 openEnv(env, path, 0);
+
+            setAccessorCount(fdAccessors, 1);
 
             /* Downgrade to a read lock. */
             debug(format("downgrading to read lock on `%1%'") % lockPath);
@@ -236,6 +238,8 @@ void Database::open(const string & path)
             openEnv(env, path, 0);
         }
 
+        this->env = env;
+        
     } catch (DbException e) { rethrow(e); }
 }
 
