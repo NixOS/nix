@@ -1,32 +1,28 @@
 <blacklist>
 
 
-<!--
 <item id='openssl-0.9.7d-obsolete'>
   <condition>
-    <containsSource
-        hash="sha256:1xf1749gdfw9f50mxa5rsnmwiwrb5mi0kg4siw8a73jykdp2i6ii"
-        origin="openssl-0.9.7d.tar.gz" />
+    <within>
+      <traverse><true /></traverse>
+      <hasAttr name='outputHash' value='1b49e90fc8a75c3a507c0a624529aca5' />
+    </within>
   </condition>
   <reason>
     Race condition in CRL checking code.  Upgrade to 0.9.7e.
   </reason>
   <severity class="all" level="low" />
 </item>
--->
 
 
 <item id='zlib-1.2.1-security' type='security'>
   <condition>
-    <containsSource
-        hash="sha256:1xf1749gdfw9f50mxa5rsnmwiwrb5mi0kg4siw8a73jykdp2i6ii"
-        origin="openssl-0.9.7d.tar.gz" />
-<!--    <within>
+    <within>
       <traverse>
-        <not><hasName name='*.tar.*' /></not>
+        <not><hasAttr name='outputHash' value='.+' /></not>
       </traverse>
-      <hasAttr name='md5' value='ef1cb003448b4a53517b8f25adb12452' />
-    </within> -->
+      <hasAttr name='outputHash' value='ef1cb003448b4a53517b8f25adb12452' />
+    </within>
   </condition>
   <reason>
     Zlib 1.2.1 is vulnerable to a denial-of-service condition.  See
