@@ -1,0 +1,22 @@
+#! /usr/bin/perl -w
+
+my $prefix = $ENV{"NIX"} || "/nix"; # !!! use prefix
+my $linkdir = "$prefix/var/nix/links";
+
+my %alive;
+
+open HASHES, "nix closure \$(cat $linkdir/*.hash) |";
+while (<HASHES>) {
+	chomp;
+	$alive{$_} = 1;
+}
+close HASHES;
+
+open HASHES, "nix listinst |";
+while (<HASHES>) {
+	chomp;
+	if (!$alive{$_}) {
+	    print "$_\n";
+	}
+}
+close HASHES;
