@@ -127,24 +127,17 @@ Path normaliseNixExpr(const Path & _nePath, PathSet pending)
          i != ne.derivation.env.end(); i++)
         env[i->first] = i->second;
 
-    /* We can skip running the builder if we can expand all output
-       paths from their ids. */
-    bool fastBuild = false;
-#if 0
+    /* We can skip running the builder if all output paths are already
+       valid. */
     bool fastBuild = true;
     for (PathSet::iterator i = ne.derivation.outputs.begin();
          i != ne.derivation.outputs.end(); i++)
     {
-        try {
-            expandId(i->second, i->first, "/", pending);
-        } catch (Error & e) {
-            debug(format("fast build failed for `%1%': %2%")
-		  % i->first % e.what());
+        if (!isValidPath(*i)) { 
             fastBuild = false;
             break;
         }
     }
-#endif
 
     if (!fastBuild) {
 
