@@ -154,24 +154,30 @@ static void dumpEntries(const string & path, DumpSink & sink)
 {
     DIR * dir = opendir(path.c_str());
     if (!dir) throw SysError("opening directory " + path);
-    
+
+    Strings names;
+
     struct dirent * dirent;
-
-    /* !!! sort entries */
-
     while (errno = 0, dirent = readdir(dir)) {
         string name = dirent->d_name;
         if (name == "." || name == "..") continue;
+        names.push_back(name);
+    }
+    if (errno) throw SysError("reading directory " + path);
+
+    sort(names.begin(), names.end());
+
+    for (Strings::iterator it = names.begin();
+         it != names.end(); it++)
+    {
         writeString("entry", sink);
         writeString("(", sink);
         writeString("name", sink);
-        writeString(name, sink);
+        writeString(*it, sink);
         writeString("file", sink);
-        dumpPath(path + "/" + name, sink);
+        dumpPath(path + "/" + *it, sink);
         writeString(")", sink);
     }
-
-    if (errno) throw SysError("reading directory " + path);
     
     closedir(dir); /* !!! close on exception */
 }
