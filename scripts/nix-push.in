@@ -1,6 +1,7 @@
 #! @perl@ -w -I@libexecdir@/nix
 
 use strict;
+use IPC::Open2;
 use POSIX qw(tmpnam);
 use readmanifest;
 
@@ -17,32 +18,62 @@ my $curl = "@curl@ --fail --silent";
 my $extraCurlFlags = ${ENV{'CURL_FLAGS'}};
 $curl = "$curl $extraCurlFlags" if defined $extraCurlFlags;
 
+my $binDir = $ENV{"NIX_BIN_DIR"};
+$binDir = "@bindir@" unless defined $binDir;
+
+my $dataDir = $ENV{"NIX_DATA_DIR"};
+$dataDir = "@datadir@" unless defined $dataDir;
+
 
 # Parse the command line.
-my $archives_put_url = shift @ARGV;
-my $archives_get_url = shift @ARGV;
-my $manifest_put_url = shift @ARGV;
+my $localCopy;
+my $localArchivesDir;
+my $localManifestFile;
+
+my $archives_put_url;
+my $archives_get_url;
+my $manifest_put_url;
+
+if ($ARGV[0] eq "--copy") {
+    die "syntax: nix-push --copy ARCHIVES_DIR MANIFEST_FILE PATHS...\n" if scalar @ARGV < 3;
+    $localCopy = 1;
+    shift @ARGV;
+    $localArchivesDir = shift @ARGV;
+    $localManifestFile = shift @ARGV;
+}
+else {
+    die "syntax: nix-push ARCHIVES_PUT_URL ARCHIVES_GET_URL " .
+        "MANIFEST_PUT_URL PATHS...\n" if scalar @ARGV < 3;
+    $localCopy = 0;
+    $archives_put_url = shift @ARGV;
+    $archives_get_url = shift @ARGV;
+    $manifest_put_url = shift @ARGV;
+}
 
 
-# From the given store expressions, determine the requisite store
-# paths.
+# From the given store paths, determine the set of requisite store
+# paths, i.e, the paths required to realise them.
 my %storePaths;
 
-foreach my $storeexpr (@ARGV) {
-    die unless $storeexpr =~ /^\//;
+foreach my $path (@ARGV) {
+    die unless $path =~ /^\//;
 
     # Get all paths referenced by the normalisation of the given 
     # Nix expression.
-    system "@bindir@/nix-store --realise $storeexpr > /dev/null";
-    die if ($?);
-
-    open PATHS, "@bindir@/nix-store --query --requisites --include-successors $storeexpr 2> /dev/null |" or die;
-    while (<PATHS>) {
+    my $pid = open2(\*READ, \*WRITE,
+        "$binDir/nix-store --query --requisites --force-realise " .
+        "--include-outputs '$path'") or die;
+    close WRITE;
+    
+    while (<READ>) {
         chomp;
         die "bad: $_" unless /^\//;
         $storePaths{$_} = "";
     }
-    close PATHS;
+    close READ;
+    
+    waitpid $pid, 0;
+    $? == 0 or die "nix-store failed";
 }
 
 my @storePaths = keys %storePaths;
@@ -58,8 +89,7 @@ foreach my $storePath (@storePaths) {
 
     # Construct a Nix expression that creates a Nix archive.
     my $nixexpr = 
-        "((import @datadir@/nix/corepkgs/nar/nar.nix) " .
-        # !!! $storePath should be represented as a closure
+        "((import $dataDir/nix/corepkgs/nar/nar.nix) " .
         "{path = \"$storePath\"; system = \"@system@\";}) ";
     
     print NIX $nixexpr;
@@ -72,7 +102,7 @@ close NIX;
 # Instantiate store expressions from the Nix expression.
 my @storeexprs;
 print STDERR "instantiating store expressions...\n";
-open STOREEXPRS, "@bindir@/nix-instantiate $nixfile |" or die "cannot run nix-instantiate";
+open STOREEXPRS, "$binDir/nix-instantiate $nixfile |" or die "cannot run nix-instantiate";
 while (<STOREEXPRS>) {
     chomp;
     die unless /^\//;
@@ -93,10 +123,7 @@ while (scalar @tmp > 0) {
     my @tmp2 = @tmp[0..$n - 1];
     @tmp = @tmp[$n..scalar @tmp - 1];
 
-    system "@bindir@/nix-store --realise @tmp2 > /dev/null";
-    if ($?) { die "`nix-store --realise' failed"; }
-
-    open NARPATHS, "@bindir@/nix-store --query --list @tmp2 |" or die "cannot run nix";
+    open NARPATHS, "$binDir/nix-store --realise @tmp2 |" or die "cannot run nix-store";
     while (<NARPATHS>) {
         chomp;
         die unless (/^\//);
@@ -142,16 +169,26 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     
     my $narbz2Size = (stat $narfile)[7];
 
+    my $references = join(" ", split(" ", `$binDir/nix-store --query --references '$storePath'`));
+
+    my $url;
+    if ($localCopy) {
+        $url = "file://$localArchivesDir/$narname";
+    } else {
+        $url = "$archives_get_url/$narname";
+    }
     $narFiles{$storePath} = [
-        { url => $archives_get_url/$narname
+        { url => $url
         , hash => $narbz2Hash
         , size => $narbz2Size
         , narHash => $narHash
+        , hashAlgo => "sha1"
+        , references => $references
         }
     ];
                             
     if ($storePath =~ /\.store$/) {
-        open PREDS, "@bindir@/nix-store --query --predecessors $storePath |" or die "cannot run nix";
+        open PREDS, "$binDir/nix-store --query --predecessors $storePath |" or die "cannot run nix";
         while (<PREDS>) {
             chomp;
             die unless (/^\//);
@@ -170,6 +207,14 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
 writeManifest $manifest, \%narFiles, \%patches, \%successors;
 
 
+sub copyFile {
+    my $src = shift;
+    my $dst = shift;
+    system("cp '$src' '$dst.tmp'") == 0 or die "cannot copy file";
+    rename("$dst.tmp", "$dst") or die "cannot rename file";
+}
+
+
 # Upload the archives.
 print STDERR "uploading archives...\n";
 foreach my $nararchive (@nararchives) {
@@ -177,17 +222,29 @@ foreach my $nararchive (@nararchives) {
     $nararchive =~ /\/([^\/]*)$/;
     my $basename = $1;
 
-    if (system("$curl --head $archives_get_url/$basename > /dev/null") != 0) {
-        print STDERR "  $nararchive\n";
-        system("$curl --show-error --upload-file " .
-               "'$nararchive' '$archives_put_url/$basename' > /dev/null") == 0 or
-            die "curl failed on $nararchive: $?";
+    if ($localCopy) {
+        if (! -f "$localArchivesDir/$basename") {
+            print STDERR "  $nararchive\n";
+            copyFile $nararchive, "$localArchivesDir/$basename";
+        }
+    }
+    else {
+        if (system("$curl --head $archives_get_url/$basename > /dev/null") != 0) {
+            print STDERR "  $nararchive\n";
+            system("$curl --show-error --upload-file " .
+                   "'$nararchive' '$archives_put_url/$basename' > /dev/null") == 0 or
+                   die "curl failed on $nararchive: $?";
+        }
     }
 }
 
 
 # Upload the manifest.
 print STDERR "uploading manifest...\n";
-system("$curl  --show-error --upload-file " .
-       "'$manifest' '$manifest_put_url' > /dev/null") == 0 or
-    die "curl failed on $manifest: $?";
+if ($localCopy) {
+    copyFile $manifest, $localManifestFile;
+} else {
+    system("$curl  --show-error --upload-file " .
+           "'$manifest' '$manifest_put_url' > /dev/null") == 0 or
+           die "curl failed on $manifest: $?";
+}

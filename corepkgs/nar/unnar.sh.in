@@ -1,4 +1,0 @@
-#! @shell@ -e
-
-echo "unpacking $narFile to $out..."
-@bunzip2@ < $narFile | @bindir@/nix-store --restore "$out"

@@ -13,6 +13,15 @@ my $manifest = "$tmpdir/manifest";
 
 END { unlink $manifest; rmdir $tmpdir; }
 
+my $binDir = $ENV{"NIX_BIN_DIR"};
+$binDir = "@bindir@" unless defined $binDir;
+
+my $libexecDir = $ENV{"NIX_LIBEXEC_DIR"};
+$libexecDir = "@libexecdir@" unless defined $libexecDir;
+
+my $localStateDir = $ENV{"NIX_LOCALSTATE_DIR"};
+$localStateDir = "@localstatedir@" unless defined $localStateDir;
+
 
 # Obtain URLs either from the command line or from a configuration file.
 my %narFiles;
@@ -36,11 +45,11 @@ sub processURL {
         $baseName = $1;
     }
 
-    my $hash = `@bindir@/nix-hash --flat '$manifest'`
+    my $hash = `$binDir/nix-hash --flat '$manifest'`
         or die "cannot hash `$manifest'";
     chomp $hash;
     
-    my $finalPath = "@localstatedir@/nix/manifests/$baseName-$hash.nixmanifest";
+    my $finalPath = "$localStateDir/nix/manifests/$baseName-$hash.nixmanifest";
     
     system("mv '$manifest' '$finalPath'") == 0
         or die "cannot move `$manifest' to `$finalPath";
@@ -59,7 +68,7 @@ print "$size store paths in manifest\n";
 # Register all substitutes.
 print STDERR "registering substitutes...\n";
 
-my $pid = open2(\*READ, \*WRITE, "@bindir@/nix-store --substitute")
+my $pid = open2(\*READ, \*WRITE, "$binDir/nix-store --substitute")
     or die "cannot run nix-store";
 
 close READ;
@@ -68,8 +77,14 @@ foreach my $storePath (keys %narFiles) {
     my $narFileList = $narFiles{$storePath};
     foreach my $narFile (@{$narFileList}) {
         print WRITE "$storePath\n";
-        print WRITE "@libexecdir@/nix/download-using-manifests.pl\n";
+        print WRITE "$libexecDir/nix/download-using-manifests.pl\n";
         print WRITE "0\n";
+        my @references = split " ", $narFile->{references};
+        my $count = scalar @references;
+        print WRITE "$count\n";
+        foreach my $reference (@references) {
+            print WRITE "$reference\n";
+        }
     }
 }
 
@@ -77,16 +92,3 @@ close WRITE;
 
 waitpid $pid, 0;
 $? == 0 or die "nix-store failed";
-
-
-# Register all successors.
-print STDERR "registering successors...\n";
-my @sucs = %successors;
-while (scalar @sucs > 0) {
-    my $n = scalar @sucs;
-    if ($n > 256) { $n = 256 };
-    my @sucs2 = @sucs[0..$n - 1];
-    @sucs = @sucs[$n..scalar @sucs - 1];
-    system "@bindir@/nix-store --successor @sucs2";
-    if ($?) { die "`nix-store --successor' failed"; }
-}

@@ -265,8 +265,8 @@ void setReferences(const Transaction & txn, const Path & storePath,
 void queryReferences(const Path & storePath, PathSet & references)
 {
     Paths references2;
-    if (!isValidPath(storePath))
-        throw Error(format("path `%1%' is not valid") % storePath);
+    //    if (!isValidPath(storePath))
+    //        throw Error(format("path `%1%' is not valid") % storePath);
     nixDB.queryStrings(noTxn, dbReferences, storePath, references2);
     references.insert(references2.begin(), references2.end());
 }
@@ -275,8 +275,8 @@ void queryReferences(const Path & storePath, PathSet & references)
 void queryReferers(const Path & storePath, PathSet & referers)
 {
     Paths referers2;
-    if (!isValidPath(storePath))
-        throw Error(format("path `%1%' is not valid") % storePath);
+    //    if (!isValidPath(storePath))
+    //        throw Error(format("path `%1%' is not valid") % storePath);
     nixDB.queryStrings(noTxn, dbReferers, storePath, referers2);
     referers.insert(referers2.begin(), referers2.end());
 }

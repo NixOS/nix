@@ -472,9 +472,8 @@ void DerivationGoal::outputsSubstituted()
 {
     trace("all outputs substituted (maybe)");
 
-    if (nrFailed > 0 && !tryFallback) {
+    if (nrFailed > 0 && !tryFallback)
         throw Error(format("some substitutes for the outputs of derivation `%1%' failed; try `--fallback'") % drvPath);
-    }
 
     nrFailed = 0;
 
@@ -1252,6 +1251,9 @@ private:
     /* The current substitute. */
     Substitute sub;
 
+    /* Outgoing references for this path. */
+    PathSet references;
+
     /* Pipe for the substitute's standard output/error. */
     Pipe logPipe;
 
@@ -1272,6 +1274,7 @@ public:
 
     /* The states. */
     void init();
+    void referencesValid();
     void tryNext();
     void tryToRun();
     void finished();
@@ -1313,13 +1316,35 @@ void SubstitutionGoal::init()
         return;
     }
 
-    /* !!! build the outgoing references of this path first to
-       maintain the closure invariant! */
-
-    /* Otherwise, get the substitutes. */
+    /* Read the substitutes. */
     subs = querySubstitutes(storePath);
 
-    /* Try the first one. */
+    /* To maintain the closure invairant, we first have to realise the
+       paths referenced by this one. */
+    queryReferences(storePath, references);
+
+    for (PathSet::iterator i = references.begin();
+         i != references.end(); ++i)
+        addWaitee(worker.makeSubstitutionGoal(*i));
+
+    if (waitees.empty()) /* to prevent hang (no wake-up event) */
+        referencesValid();
+    else
+        state = &SubstitutionGoal::referencesValid;
+}
+
+
+void SubstitutionGoal::referencesValid()
+{
+    trace("all referenced realised");
+
+    if (nrFailed > 0)
+        throw Error(format("some references of path `%1%' could not be realised") % storePath);
+
+    for (PathSet::iterator i = references.begin();
+         i != references.end(); ++i)
+        assert(isValidPath(*i));
+    
     tryNext();
 }
 

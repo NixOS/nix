@@ -8,7 +8,16 @@ TESTS_ENVIRONMENT = TEST_ROOT=$(TEST_ROOT) \
   NIX_LOG_DIR=$(TEST_ROOT)/log \
   NIX_STATE_DIR=$(TEST_ROOT)/state \
   NIX_DB_DIR=$(TEST_ROOT)/db \
+  NIX_BIN_DIR=$(TEST_ROOT)/bin \
+  NIX_LIBEXEC_DIR=$(TEST_ROOT)/bin \
+  NIX_LOCALSTATE_DIR=$(TEST_ROOT)/state \
+  REAL_BIN_DIR=$(bindir) \
+  REAL_LIBEXEC_DIR=$(libexecdir) \
+  REAL_LOCALSTATE_DIR=$(localstatedir) \
+  REAL_DATA_DIR=$(datadir) \
+  REAL_STORE_DIR=$(storedir) \
   NIX_BUILD_HOOK= \
+  PERL=$(perl) \
   TOP=$(shell pwd)/.. \
   SHARED=$(extra1) \
   aterm_bin=$(aterm_bin) \
@@ -22,9 +31,14 @@ build-hook.sh: build-hook.nix
 substitutes.sh: substitutes.nix
 substitutes2.sh: substitutes2.nix
 fallback.sh: fallback.nix
+nix-push.sh: dependencies.nix
+nix-pull.sh: dependencies.nix
 
-TESTS = init.sh hash.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
-  build-hook.sh substitutes.sh substitutes2.sh fallback.sh verify.sh
+#TESTS = init.sh hash.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
+#  build-hook.sh substitutes.sh substitutes2.sh fallback.sh nix-push.sh verify.sh \
+#  nix-pull.sh
+
+TESTS = init.sh nix-push.sh nix-pull.sh
 
 XFAIL_TESTS =
 

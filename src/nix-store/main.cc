@@ -177,19 +177,27 @@ static void opSubstitute(Strings opFlags, Strings opArgs)
     while (1) {
         Path srcPath;
         Substitute sub;
+        PathSet references;
         getline(cin, srcPath);
         if (cin.eof()) break;
         getline(cin, sub.program);
         string s;
-        getline(cin, s);
         int n;
+        getline(cin, s);
         if (!string2Int(s, n)) throw Error("number expected");
         while (n--) {
             getline(cin, s);
             sub.args.push_back(s);
         }
+        getline(cin, s);
+        if (!string2Int(s, n)) throw Error("number expected");
+        while (n--) {
+            getline(cin, s);
+            references.insert(s);
+        }
         if (!cin || cin.eof()) throw Error("missing input");
         subPairs.push_back(pair<Path, Substitute>(srcPath, sub));
+        setReferences(txn, srcPath, references);
     }
 
     registerSubstitutes(txn, subPairs);

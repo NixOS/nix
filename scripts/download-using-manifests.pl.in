@@ -13,7 +13,7 @@ open LOGFILE, ">>$logFile" or die "cannot open log file $logFile";
 die unless scalar @ARGV == 1;
 my $targetPath = $ARGV[0];
 
-my $date = `date`;
+my $date = `date` or die;
 chomp $date;
 print LOGFILE "$$ get $targetPath $date\n";
 
@@ -180,7 +180,7 @@ sub downloadFile {
     my ($hash2, $path) = `@bindir@/nix-prefetch-url '$url' '$hash'`;
     chomp $hash2;
     chomp $path;
-    die "hash mismatch" if $hash ne $hash2;
+    die "hash mismatch, expected $hash, got $hash2" if $hash ne $hash2;
     return $path;
 }
 
@@ -236,7 +236,7 @@ while (scalar @path > 0) {
 
         # Unpack the archive into the target path.
         print "  unpacking archive...\n";
-        system "@bunzip2@ < '$narFilePath' | nix-store --restore '$v'";
+        system "@bunzip2@ < '$narFilePath' | @bindir@/nix-store --restore '$v'";
         die "cannot unpack `$narFilePath' into `$v'" if ($? != 0);
     }
 }

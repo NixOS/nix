@@ -49,6 +49,7 @@ sub readManifest {
     my $baseHash;
     my $patchType;
     my $narHash;
+    my $references;
 
     while (<MANIFEST>) {
         chomp;
@@ -70,6 +71,7 @@ sub readManifest {
                 undef $basePath;
                 undef $baseHash;
                 undef $patchType;
+                $references = "";
 	    }
 
         } else {
@@ -98,7 +100,7 @@ sub readManifest {
                     if (!$found) {
                         push @{$narFileList},
                             { url => $url, hash => $hash, size => $size
-                            , narHash => $narHash
+                            , narHash => $narHash, references => $references
                             };
                     }
                 
@@ -127,6 +129,7 @@ sub readManifest {
             elsif (/^\s*BaseHash:\s*(\S+)\s*$/) { $baseHash = $1; }
             elsif (/^\s*Type:\s*(\S+)\s*$/) { $patchType = $1; }
             elsif (/^\s*NarHash:\s*(\S+)\s*$/) { $narHash = $1; }
+            elsif (/^\s*References:\s*(.*)\s*$/) { $references = $1; }
 
             # Compatibility;
             elsif (/^\s*NarURL:\s*(\S+)\s*$/) { $url = $1; }
@@ -153,10 +156,13 @@ sub writeManifest
         foreach my $narFile (@{$narFileList}) {
             print MANIFEST "{\n";
             print MANIFEST "  StorePath: $storePath\n";
+            print MANIFEST "  HashAlgo: $narFile->{hashAlgo}\n";
             print MANIFEST "  NarURL: $narFile->{url}\n";
             print MANIFEST "  MD5: $narFile->{hash}\n";
             print MANIFEST "  NarHash: $narFile->{narHash}\n";
             print MANIFEST "  Size: $narFile->{size}\n";
+            print MANIFEST "  References: $narFile->{references}\n"
+                if defined $narFile->{references} && $narFile->{references} ne "";
             foreach my $p (keys %{$successors}) { # !!! quadratic
                 if ($$successors{$p} eq $storePath) {
                     print MANIFEST "  SuccOf: $p\n";
@@ -171,6 +177,7 @@ sub writeManifest
         foreach my $patch (@{$patchList}) {
             print MANIFEST "patch {\n";
             print MANIFEST "  StorePath: $storePath\n";
+            print MANIFEST "  HashAlgo: $patch->{hashAlgo}\n";
             print MANIFEST "  NarURL: $patch->{url}\n";
             print MANIFEST "  MD5: $patch->{hash}\n";
             print MANIFEST "  NarHash: $patch->{narHash}\n";

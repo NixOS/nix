@@ -46,10 +46,8 @@ storeExpr=$( \
         {url = $url; outputHashAlgo = \"$hashType\"; outputHash = \"$hash\"; system = \"@system@\";}" \
     | @bindir@/nix-instantiate -)
 
-echo "$storeExpr"    
-
 # Realise it.
-finalPath=$(@bindir@/nix-store -qnB --force-realise $storeExpr)
+finalPath=$(@bindir@/nix-store -q --force-realise $storeExpr)
     
 if ! test -n "$QUIET"; then echo "path is $finalPath" >&2; fi
 
