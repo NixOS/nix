@@ -279,7 +279,7 @@ Expr evalValue(Expr e)
         string fn = queryValuePath(evalHash(e2));
         ATerm e3 = ATreadFromNamedFile(fn.c_str());
         if (!e3) throw Error("reading aterm from " + fn);
-        return e3;
+        return evalValue(e3);
     }
 
     /* Execution primitive. */
@@ -298,8 +298,8 @@ Expr evalValue(Expr e)
         evalArgs(args, argsNF, env);
 
         Hash sourceHash = hashExpr(
-            ATmake("Exec(Str(<str>), Hash(<str>), [])",
-                buildPlatform.c_str(), ((string) prog).c_str()));
+            ATmake("Exec(Str(<str>), Hash(<str>), <term>)",
+                buildPlatform.c_str(), ((string) prog).c_str(), argsNF));
 
         /* Do we know a normal form for sourceHash? */
         Hash targetHash;

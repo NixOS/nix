@@ -19,6 +19,8 @@ static string absValuePath(string s)
 
 Hash addValue(string path)
 {
+    path = absPath(path);
+
     Hash hash = hashPath(path);
 
     string name;
@@ -79,7 +81,7 @@ string queryValuePath(Hash hash)
             return fn;
         }
 
-        throw Error("a file with hash " + (string) hash + " is requested, "
+        throw Error("a file with hash " + (string) hash + " is required, "
             "but it is not known to exist locally or on the network");
 #if 0
         if (checkedNet)
@@ -87,7 +89,7 @@ string queryValuePath(Hash hash)
                 " should have hash " + (string) hash + ", but it doesn't");
 
         if (!queryDB(nixDB, dbNetSources, hash, url))
-            throw Error("a file with hash " + (string) hash + " is requested, "
+            throw Error("a file with hash " + (string) hash + " is required, "
                 "but it is not known to exist locally or on the network");
 
         checkedNet = true;
