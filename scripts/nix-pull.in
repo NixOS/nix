@@ -1,4 +1,4 @@
-#! /usr/bin/perl -w -I@libexecdir@/nix
+#! @perl@ -w -I@libexecdir@/nix
 
 use strict;
 use IPC::Open2;

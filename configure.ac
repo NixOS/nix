@@ -47,6 +47,11 @@ AC_PATH_PROG(xmllint, xmllint)
 AC_PATH_PROG(xsltproc, xsltproc)
 AC_PATH_PROG(flex, flex, false)
 AC_PATH_PROG(bison, bison, false)
+AC_PATH_PROG(perl, perl)
+if test -z "$perl"; then
+  echo "Perl is required for Nix."
+  exit 1
+fi
 
 AC_ARG_WITH(docbook-catalog, AC_HELP_STRING([--with-docbook-catalog=PATH],
   [path of the DocBook XML DTD]),

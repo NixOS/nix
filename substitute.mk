@@ -9,6 +9,7 @@
 	 -e "s^@storedir\@^$(storedir)^g" \
 	 -e "s^@system\@^$(system)^g" \
 	 -e "s^@wget\@^$(wget)^g" \
+	 -e "s^@perl\@^$(perl)^g" \
 	 -e "s^@version\@^$(VERSION)^g" \
 	 < $< > $@ || rm $@
 	if test -x $<; then chmod +x $@; fi
