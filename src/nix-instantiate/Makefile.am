@@ -1,7 +1,7 @@
-bin_PROGRAMS = fix-ng
+bin_PROGRAMS = nix-instantiate
 
-fix_ng_SOURCES = fixexpr.cc parser.cc eval.cc primops.cc fix.cc
-fix_ng_LDADD = ../libmain/libmain.a ../libstore/libstore.a ../libutil/libutil.a \
+nix_instantiate_SOURCES = fixexpr.cc parser.cc eval.cc primops.cc fix.cc
+nix_instantiate_LDADD = ../libmain/libmain.a ../libstore/libstore.a ../libutil/libutil.a \
  ../boost/format/libformat.a -L../../externals/inst/lib -ldb_cxx \
  -lsglr -lATB -lconversion -lasfix2 -lmept -lATerm
 

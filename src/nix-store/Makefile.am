@@ -1,7 +1,7 @@
-bin_PROGRAMS = nix
+bin_PROGRAMS = nix-store
 
-nix_SOURCES = nix.cc dotgraph.cc
-nix_LDADD = ../libmain/libmain.a ../libstore/libstore.a ../libutil/libutil.a \
+nix_store_SOURCES = nix.cc dotgraph.cc
+nix_store_LDADD = ../libmain/libmain.a ../libstore/libstore.a ../libutil/libutil.a \
  ../boost/format/libformat.a -L../../externals/inst/lib -ldb_cxx -lATerm
 
 nix.o: nix-help.txt.hh
@@ -22,6 +22,6 @@ install-data-local:
 	ln -sf $(localstatedir)/nix/links/current $(prefix)/current
 	$(INSTALL) -d $(localstatedir)/log/nix
 	$(INSTALL) -d $(prefix)/store
-	$(bindir)/nix --init
+	$(bindir)/nix-store --init
 
 EXTRA_DIST = *.hh
