@@ -287,6 +287,12 @@ void ensurePath(const Path & path, PathSet pending)
 {
     /* If the path is already valid, we're done. */
     if (isValidPath(path)) return;
+
+    if (pending.find(path) != pending.end())
+      throw Error(format(
+          "path `%1%' already being realised (possible substitute cycle?)")
+	  % path);
+    pending.insert(path);
     
     /* Otherwise, try the substitutes. */
     Paths subPaths = querySubstitutes(path);
@@ -296,7 +302,8 @@ void ensurePath(const Path & path, PathSet pending)
     {
         checkInterrupt();
         try {
-            normaliseStoreExpr(*i, pending);
+            Path nf = normaliseStoreExpr(*i, pending);
+	    realiseClosure(nf, pending);
             if (isValidPath(path)) return;
             throw Error(format("substitute failed to produce expected output path"));
         } catch (Error & e) {
