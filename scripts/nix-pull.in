@@ -51,7 +51,7 @@ sub processURL {
     
     my $finalPath = "$stateDir/manifests/$baseName-$hash.nixmanifest";
     
-    system("mv '$manifest' '$finalPath'") == 0
+    system("mv -f '$manifest' '$finalPath'") == 0
         or die "cannot move `$manifest' to `$finalPath";
 }
 

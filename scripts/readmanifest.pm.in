@@ -35,7 +35,8 @@ sub readManifest {
     my $patches = shift;
     my $successors = shift;
 
-    open MANIFEST, "<$manifest";
+    open MANIFEST, "<$manifest"
+        or die "cannot open `$manifest': $!";
 
     my $inside = 0;
     my $type;
