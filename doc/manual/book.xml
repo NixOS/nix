@@ -11,27 +11,41 @@
 <book>
   <title>Nix: The Manual</title>
 
+  <bookinfo>
+    <author>
+      <firstname>Eelco</firstname>
+      <surname>Dolstra</surname>
+    </author>
+    <copyright>
+      <year>2003</year>
+      <holder>Eelco Dolstra</holder>
+    </copyright>
+  </bookinfo>
+
   &introduction;
   &installation;
 
   <chapter>
     <title>A Guided Tour</title>
     <para>
-      Bla bla
-    </para>
-  </chapter>
-
-  <chapter>
-    <title>Fix Language Reference</title>
-    <para>
-      Bla bla
     </para>
   </chapter>
 
   <chapter>
     <title>Nix Syntax and Semantics</title>
     <para>
-      Bla bla
+    </para>
+  </chapter>
+
+  <chapter>
+    <title>Fix Language Reference</title>
+    <para>
+    </para>
+  </chapter>
+
+  <chapter>
+    <title>Writing Builders</title>
+    <para>
     </para>
   </chapter>
 
