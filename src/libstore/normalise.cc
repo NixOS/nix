@@ -334,14 +334,15 @@ void canonicalisePathMetaData(const Path & path)
                 throw SysError(format("changing owner/group of `%1%' to %2%/%3%")
                     % path % getuid() % getgid());
         }
-    }
 
-    if (st.st_mtime != 0) {
-        struct utimbuf utimbuf;
-        utimbuf.actime = st.st_atime;
-        utimbuf.modtime = 0;
-        if (utime(path.c_str(), &utimbuf) == -1) 
-            throw SysError(format("changing modification time of `%1%'") % path);
+        if (st.st_mtime != 0) {
+            struct utimbuf utimbuf;
+            utimbuf.actime = st.st_atime;
+            utimbuf.modtime = 0;
+            if (utime(path.c_str(), &utimbuf) == -1) 
+                throw SysError(format("changing modification time of `%1%'") % path);
+        }
+
     }
 
     if (S_ISDIR(st.st_mode)) {
