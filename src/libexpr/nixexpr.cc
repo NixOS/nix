@@ -156,10 +156,10 @@ Expr substitute(const ATermMap & subs, Expr e)
     checkInterrupt();
 
     ATMatcher m;
-    string s;
+    ATerm name;
 
-    if (atMatch(m, e) >> "Var" >> s) {
-        Expr sub = subs.get(s);
+    if (atMatch(m, e) >> "Var" >> name) {
+        Expr sub = subs.get(name);
         return sub ? sub : e;
     }
 
@@ -170,11 +170,10 @@ Expr substitute(const ATermMap & subs, Expr e)
     if (atMatch(m, e) >> "Function" >> formals >> body) {
         ATermMap subs2(subs);
         for (ATermIterator i(formals); i; ++i) {
-            Expr def;
-            if (!(atMatch(m, *i) >> "NoDefFormal" >> s) &&
-                !(atMatch(m, *i) >> "DefFormal" >> s >> def))
+            if (!(atMatch(m, *i) >> "NoDefFormal" >> name) &&
+                !(atMatch(m, *i) >> "DefFormal" >> name))
                 abort();
-            subs2.remove(s);
+            subs2.remove(name);
         }
         return ATmake("Function(<term>, <term>)", formals,
             substitute(subs2, body));
@@ -184,12 +183,11 @@ Expr substitute(const ATermMap & subs, Expr e)
     ATermList rbnds, nrbnds;
     if (atMatch(m, e) >> "Rec" >> rbnds >> nrbnds) {
         ATermMap subs2(subs);
-        for (ATermIterator i(rbnds); i; ++i) {
-            Expr e;
-            if (!(atMatch(m, *i) >> "Bind" >> s >> e))
+        for (ATermIterator i(rbnds); i; ++i)
+            if (atMatch(m, *i) >> "Bind" >> name)
+                subs2.remove(name);
+            else
                 abort(); /* can't happen */
-            subs2.remove(s);
-        }
         return ATmake("Rec(<term>, <term>)",
             substitute(subs2, (ATerm) rbnds),
             substitute(subs, (ATerm) nrbnds));
@@ -214,6 +212,59 @@ Expr substitute(const ATermMap & subs, Expr e)
     }
 
     return e;
+}
+
+
+void checkVarDefs(const ATermMap & defs, Expr e)
+{
+    ATMatcher m;
+    ATerm name;
+    ATermList formals;
+    ATerm body;
+    ATermList rbnds, nrbnds;
+
+    if (atMatch(m, e) >> "Var" >> name) {
+        if (!defs.get(name))
+            throw Error(format("undefined variable `%1%'")
+                % aterm2String(name));
+        return;
+    }
+
+    else if (atMatch(m, e) >> "Function" >> formals >> body) {
+        ATermMap defs2(defs);
+        for (ATermIterator i(formals); i; ++i) {
+            Expr deflt;
+            if (!(atMatch(m, *i) >> "NoDefFormal" >> name))
+                if (atMatch(m, *i) >> "DefFormal" >> name >> deflt)
+                    checkVarDefs(defs, deflt);
+                else
+                    abort();
+            defs2.set(name, (ATerm) ATempty);
+        }
+        return checkVarDefs(defs2, body);
+    }
+        
+    else if (atMatch(m, e) >> "Rec" >> rbnds >> nrbnds) {
+        checkVarDefs(defs
+            , (ATerm) nrbnds);
+        ATermMap defs2(defs);
+        for (ATermIterator i(rbnds); i; ++i) {
+            if (!(atMatch(m, *i) >> "Bind" >> name))
+                abort(); /* can't happen */
+            defs2.set(name, (ATerm) ATempty);
+        }
+        checkVarDefs(defs2, (ATerm) rbnds);
+    }
+    
+    else if (ATgetType(e) == AT_APPL) {
+        int arity = ATgetArity(ATgetAFun(e));
+        for (int i = 0; i < arity; ++i)
+            checkVarDefs(defs, ATgetArgument(e, i));
+    }
+
+    else if (ATgetType(e) == AT_LIST)
+        for (ATermIterator i((ATermList) e); i; ++i)
+            checkVarDefs(defs, *i);
 }
 
 

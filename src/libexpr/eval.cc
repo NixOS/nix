@@ -64,30 +64,30 @@ ATerm expandRec(ATerm e, ATermList rbnds, ATermList nrbnds)
     /* Create the substitution list. */
     ATermMap subs;
     for (ATermIterator i(rbnds); i; ++i) {
-        string s;
+        ATerm name;
         Expr e2;
-        if (!(atMatch(m, *i) >> "Bind" >> s >> e2))
+        if (!(atMatch(m, *i) >> "Bind" >> name >> e2))
             abort(); /* can't happen */
-        subs.set(s, ATmake("Select(<term>, <str>)", e, s.c_str()));
+        subs.set(name, ATmake("Select(<term>, <term>)", e, name));
     }
 
     /* Create the non-recursive set. */
     ATermMap as;
     for (ATermIterator i(rbnds); i; ++i) {
-        string s;
+        ATerm name;
         Expr e2;
-        if (!(atMatch(m, *i) >> "Bind" >> s >> e2))
+        if (!(atMatch(m, *i) >> "Bind" >> name >> e2))
             abort(); /* can't happen */
-        as.set(s, substitute(subs, e2));
+        as.set(name, substitute(subs, e2));
     }
 
     /* Copy the non-recursive bindings.  !!! inefficient */
     for (ATermIterator i(nrbnds); i; ++i) {
-        string s;
+        ATerm name;
         Expr e2;
-        if (!(atMatch(m, *i) >> "Bind" >> s >> e2))
+        if (!(atMatch(m, *i) >> "Bind" >> name >> e2))
             abort(); /* can't happen */
-        as.set(s, e2);
+        as.set(name, e2);
     }
 
     return makeAttrs(as);

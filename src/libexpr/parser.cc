@@ -81,6 +81,22 @@ static Expr parse(const char * text, const string & location,
     
     if (res) throw Error(data.error);
 
+    ATermMap primOps;
+    primOps.set("import", (ATerm) ATempty);
+    primOps.set("derivation", (ATerm) ATempty);
+    primOps.set("true", (ATerm) ATempty);
+    primOps.set("false", (ATerm) ATempty);
+    primOps.set("null", (ATerm) ATempty);
+    primOps.set("isNull", (ATerm) ATempty);
+    primOps.set("toString", (ATerm) ATempty);
+    primOps.set("baseNameOf", (ATerm) ATempty);
+
+    try {
+        checkVarDefs(primOps, data.result);
+    } catch (Error & e) {
+        throw Error(format("%1%, in %2%") % e.msg() % location);
+    }
+
     return data.result;
 }
 

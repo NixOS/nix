@@ -68,6 +68,10 @@ Expr makeAttrs(const ATermMap & attrs);
 /* Perform a set of substitutions on an expression. */
 Expr substitute(const ATermMap & subs, Expr e);
 
+/* Check whether all variables are defined in the given expression.
+   Throw an exception if this isn't the case. */
+void checkVarDefs(const ATermMap & def, Expr e);
+
 /* Create an expression representing a boolean. */
 Expr makeBool(bool b);
 
