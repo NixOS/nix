@@ -5,6 +5,10 @@
     This chapter provides a guided tour of Nix.
   </para>
 
+
+  
+  <!--######################################################################-->
+
   <sect1>
     <title>Basic package management</title>
 
@@ -63,7 +67,7 @@ pan-0.14.2</screen>
     </para>
 
     <screen>
-$ nix-env -qf pkgs/system/i686-linux.nix
+$ nix-env -qaf pkgs/system/i686-linux.nix
 gettext-0.12.1
 sylpheed-0.9.7
 aterm-2.0
@@ -86,7 +90,7 @@ pan-0.14.2
     </para>
 
     <screen>
-$ nix-env -qsf pkgs/system/i686-linux.nix
+$ nix-env -qasf pkgs/system/i686-linux.nix
 -P gettext-0.12.1
 IP sylpheed-0.9.7
 -- aterm-2.0
@@ -111,7 +115,7 @@ IP sylpheed-0.9.7
     </para>
 
     <screen>
-$ nix-env -i pkgs/system/i686-linux.nix pan-0.14.2</screen>
+$ nix-env -if pkgs/system/i686-linux.nix pan</screen>
 
     <para>
       Since installation may take a long time, depending on whether any
@@ -234,10 +238,51 @@ lrwxrwxrwx  1 eelco ... svn -> /nix/store/3829...fb5d-subversion-0.32.1/bin/svn
     </para>
 
     <screen>
-$ nix-env -u pan-0.14.2</screen>
+$ nix-env -e pan</screen>
+
+    <para>
+      This means that the package is removed from the user
+      environment.  It is <emphasis>not</emphasis> yet removed from
+      the system.  When a package is uninstalled from a user
+      environment, it may still be used by other packages, or may
+      still be present in other user environments.  Deleting it under
+      such conditions would break those other packages or user
+      environments.  To prevent this, packages are only
+      <quote>physically</quote> deleted by running the Nix garbage
+      collector, which searches for all packages in the Nix store that
+      are no longer <quote>reachable</quote> from outside the store.
+      Thus, uninstalling a package is always safe: it cannot break
+      other packages.
+    </para>
+
+    <para>
+      Upgrading packages is easy.  Given a Nix expression that
+      contains newer versions of installed packages (that is, packages
+      with the same package name, but a higher version number),
+      <command>nix-env -u</command> will replace the installed package
+      in the user environment with the newer package.  For example,
+      
+      <screen>
+$ nix-env -uf pkgs/system/i686-linux.nix pan</screen>
+
+      looks for a newer version of Pan, and installs it if found.
+      Also useful is the ability to upgrade <emphasis>all</emphasis>
+      packages:
+      
+      <screen>
+$ nix-env -uf pkgs/system/i686-linux.nix '*'</screen>
+
+      The asterisk matches all installed packages<footnote><para>No,
+      we don't support arbitrary regular
+      expressions</para></footnote>.  Note that <literal>*</literal>
+      must be quoted to prevent shell globbing.
+    </para>
 
   </sect1>
 
+
+  
+  <!--######################################################################-->
 
   <sect1>
     <title>Writing Nix expressions</title>
@@ -400,11 +445,4 @@ derivation {
   </sect1>
 
 
-
 </chapter>
-
-<!--
-local variables:
-sgml-parent-document: ("book.xml" "chapter")
-end:
--->

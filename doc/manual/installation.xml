@@ -6,8 +6,9 @@
 
     <para>
       The easiest way to obtain Nix is to download a <ulink
-        url='http://www.cs.uu.nl/groups/ST/Trace/Nix'>source
-        distribution.</ulink>  
+      url='http://www.cs.uu.nl/groups/ST/Trace/Nix'>source
+      distribution</ulink>.  RPMs for SuSE and Red Hat are also
+      available.  These distributions are generated automatically.
     </para>
 
     <para>
@@ -35,8 +36,13 @@ $ svn checkout https://svn.cs.uu.nl:12443/repos/trace/nix/trunk nix</screen>
     <title>Prerequisites</title>
 
     <para>
-      A fairly recent version of GCC/G++ is required.  Version 2.95 and higher
-      should work.
+      The following prerequisites only apply when you build from
+      source.  Binary releases (e.g., RPMs) have no prerequisites.
+    </para>
+
+    <para>
+      A fairly recent version of GCC/G++ is required.  Version 2.95
+      and higher should work.
     </para>
 
     <para>
@@ -63,7 +69,7 @@ $ svn checkout https://svn.cs.uu.nl:12443/repos/trace/nix/trunk nix</screen>
   </sect1>
 
   <sect1>
-    <title>Building Nix</title>
+    <title>Building Nix from source</title>
 
     <para>
       After unpacking or checking out the Nix sources, issue the following
@@ -113,19 +119,70 @@ $ autoreconf -i</screen>
 
 
   <sect1>
+    <title>Installing from RPMs</title>
+
+    <para>
+      RPM packages of Nix can be downloaded from <ulink
+      url='http://www.cs.uu.nl/groups/ST/Trace/Nix' />.  These RPMs
+      should work for most fairly recent releases of SuSE and Red Hat
+      Linux.  They have been known to work work on SuSE Linux 8.1 and
+      9.0, and Red Hat 9.0.  In fact, it should work on any RPM-based
+      Linux distribution based on <literal>glibc</literal> 2.3 or
+      later.
+    </para>
+
+    <para>
+      Once downloaded, the RPMs can be installed or upgraded using
+      <command>rpm -U</command>.  For example,
+    </para>
+
+    <screen>
+rpm -U nix-0.5pre664-1.i386.rpm</screen>
+
+    <para>
+      The RPMs install into the directory <filename>/nix</filename>.
+      Nix can be uninstalled using <command>rpm -e nix</command>.
+      After this it will be necessary to manually remove the Nix store
+      and other auxiliary data:
+    </para>
+
+    <screen>
+rm -rf /nix/store
+rm -rf /nix/var</screen>
+
+  </sect1>
+
+  <sect1>
+    <title>Permissions</title>
+
+    <para>
+      All Nix operations must be performed under the user ID that owns
+      the Nix store and database
+      (<filename><replaceable>prefix</replaceable>/store</filename>
+      and
+      <filename><replaceable>prefix</replaceable>/var/nix/db</filename>,
+      respectively).  When installed from the RPM packages, these
+      directories are owned by <systemitem
+      class='username'>root</systemitem>.
+    </para>
+
+  </sect1>
+
+  <sect1>
     <title>Using Nix</title>
 
     <para>
-      To use Nix, some environment variables should be set.  In particular,
-      <envar>PATH</envar> should contain the directories
+      To use Nix, some environment variables should be set.  In
+      particular, <envar>PATH</envar> should contain the directories
       <filename><replaceable>prefix</replaceable>/bin</filename> and
-      <filename><replaceable>prefix</replaceable>/var/nix/links/current/bin</filename>. 
-      The first directory contains the Nix tools themselves, while the second
-      contains to the current <emphasis>user environment</emphasis> (an
-      automatically generated package consisting of symlinks to installed
-      packages).  The simplest way to set the required environment variables is
-      to include the file
-      <filename><replaceable>prefix</replaceable>/etc/profile.d/nix.sh</filename> 
+      <filename>~/.nix-userenv/bin</filename>.  The first directory
+      contains the Nix tools themselves, while
+      <filename>~/.nix-userenv</filename> is a symbolic link to the
+      current <emphasis>user environment</emphasis> (an automatically
+      generated package consisting of symlinks to installed packages).
+      The simplest way to set the required environment variables is to
+      include the file
+      <filename><replaceable>prefix</replaceable>/etc/profile.d/nix.sh</filename>
       in your <filename>~/.bashrc</filename> (or similar), like this:
     </para>
 
@@ -135,9 +192,3 @@ $ autoreconf -i</screen>
   </sect1>
 
 </chapter>
-
-<!--
-local variables:
-sgml-parent-document: ("book.xml" "chapter")
-end:
--->
