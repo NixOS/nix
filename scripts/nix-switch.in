@@ -12,29 +12,24 @@ if (scalar @ARGV > 0 && $ARGV[0] eq "--keep") {
 my $hash = $ARGV[0];
 $hash || die "no package hash specified";
 
-my $prefix = $ENV{"NIX"} || "/nix"; # !!! use prefix
-my $linkdir = "$prefix/var/nix/links";
+my $linkdir = "@localstatedir@/nix/links";
 
 # Build the specified package, and all its dependencies.
-my $pkgdir = `nix getpkg $hash`;
-if ($?) { die "`nix getpkg' failed"; }
+my $pkgdir = `nix -qph $hash`;
+if ($?) { die "`nix -qph' failed"; }
 chomp $pkgdir;
-
-my $id = `nix info $hash | cut -c 34-`;
-if ($?) { die "`nix info' failed"; }
-chomp $id;
 
 # Figure out a generation number.
 my $nr = 0;
-while (-e "$linkdir/$id-$nr") { $nr++; }
-my $link = "$linkdir/$id-$nr";
+while (-e "$linkdir/$nr") { $nr++; }
+my $link = "$linkdir/$nr";
 
 # Create a symlink from $link to $pkgdir.
 symlink($pkgdir, $link) or die "cannot create $link: $!";
 
 # Also store the hash of $pkgdir.  This is useful for garbage
 # collection and the like.
-my $hashfile = "$linkdir/$id-$nr.hash";
+my $hashfile = "$linkdir/$nr.hash";
 open HASH, "> $hashfile" or die "cannot create $hashfile";
 print HASH "$hash\n";
 close HASH;

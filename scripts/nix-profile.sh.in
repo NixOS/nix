@@ -1,10 +1,10 @@
-if test -z "$NIX_SET"; then
+#if test -z "$NIX_SET"; then
 
-    export NIX_SET=1
+#    export NIX_SET=1
 
-    NIX_LINKS=/nix/var/nix/links/current
+    NIX_LINKS=@localstatedir@/nix/links/current
 
-    export PATH=$NIX_LINKS/bin:/nix/bin:$PATH
+    export PATH=$NIX_LINKS/bin:@prefix@/bin:$PATH
 
     export LD_LIBRARY_PATH=$NIX_LINKS/lib:$LD_LIBRARY_PATH
 
@@ -17,4 +17,4 @@ if test -z "$NIX_SET"; then
 
 #    export MANPATH=$NIX_LINKS/man:$MANPATH
 
-fi
+#fi

@@ -25,9 +25,6 @@ libnix_a_SOURCES = util.cc hash.cc archive.cc md5.c \
 install-data-local:
 	$(INSTALL) -d $(localstatedir)/nix
 	$(INSTALL) -d $(localstatedir)/nix/links
-#	$(INSTALL) -d $(localstatedir)/nix/prebuilts
-#	$(INSTALL) -d $(localstatedir)/nix/prebuilts/imports
-#	$(INSTALL) -d $(localstatedir)/nix/prebuilts/exports
 	$(INSTALL) -d $(localstatedir)/log/nix
 	$(INSTALL) -d $(prefix)/store
 	$(bindir)/nix --init

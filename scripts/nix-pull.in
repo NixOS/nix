@@ -1,10 +1,7 @@
 #! /usr/bin/perl -w
 
-my $prefix = $ENV{"NIX"} || "/tmp/nix"; # !!! use prefix
-my $etcdir = "$prefix/etc/nix";
-my $tmpfile = "$prefix/var/nix/pull.tmp";
-
-my $conffile = "$etcdir/prebuilts.conf";
+my $tmpfile = "@localstatedir@/nix/pull.tmp";
+my $conffile = "@sysconfdir@/nix/prebuilts.conf";
 
 my @subs;
 my @sucs;
