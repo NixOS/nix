@@ -44,7 +44,7 @@ exports
     "{" {Id ","}* "}" ":" Expr
     -> Expr {cons("Function"), right}
 
-    "{" {Bind ","}+ "}"
+    "{" {Bind ","}* "}"
     -> Expr {cons("Attrs")}
 
     Id "=" Expr
