@@ -1,5 +1,5 @@
-#ifndef __VALUES_H
-#define __VALUES_H
+#ifndef __REFERENCES_H
+#define __REFERENCES_H
 
 #include "util.hh"
 
@@ -7,4 +7,4 @@
 Strings filterReferences(const Path & path, const Strings & refs);
 
 
-#endif /* !__VALUES_H */
+#endif /* !__REFERENCES_H */

@@ -384,7 +384,7 @@ static Expr evalExpr2(EvalState & state, Expr e)
 static Expr evalExpr(EvalState & state, Expr e)
 {
     startNest(nest, lvlVomit,
-        format("evaluating expression: %1%") % printTerm(e));
+        format("evaluating expression: %1%") % e);
 
     /* Consult the memo table to quickly get the normal form of
        previously evaluated expressions. */

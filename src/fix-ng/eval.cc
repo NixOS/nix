@@ -16,6 +16,7 @@ EvalState::EvalState()
 /* Substitute an argument set into the body of a function. */
 static Expr substArgs(Expr body, ATermList formals, Expr arg)
 {
+    ATMatcher m;
     ATermMap subs;
     Expr undefined = ATmake("Undefined");
 
@@ -23,9 +24,9 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
     while (!ATisEmpty(formals)) {
         ATerm t = ATgetFirst(formals);
         Expr name, def;
-        if (ATmatch(t, "NoDefFormal(<term>)", &name))
+        if (atMatch(m, t) >> "NoDefFormal" >> name)
             subs.set(name, undefined);
-        else if (ATmatch(t, "DefFormal(<term>, <term>)", &name, &def))
+        else if (atMatch(m, t) >> "DefFormal" >> name >> def)
             subs.set(name, def);
         else abort(); /* can't happen */
         formals = ATgetNext(formals);
@@ -67,15 +68,17 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
    (e.x) (e.y), y = e.x}'. */
 ATerm expandRec(ATerm e, ATermList bnds)
 {
+    ATMatcher m;
+
     /* Create the substitution list. */
     ATermMap subs;
     ATermList bs = bnds;
     while (!ATisEmpty(bs)) {
-        char * s;
+        string s;
         Expr e2;
-        if (!ATmatch(ATgetFirst(bs), "Bind(<str>, <term>)", &s, &e2))
+        if (!(atMatch(m, ATgetFirst(bs)) >> "Bind" >> s >> e2))
             abort(); /* can't happen */
-        subs.set(s, ATmake("Select(<term>, <str>)", e, s));
+        subs.set(s, ATmake("Select(<term>, <str>)", e, s.c_str()));
         bs = ATgetNext(bs);
     }
 
@@ -83,9 +86,9 @@ ATerm expandRec(ATerm e, ATermList bnds)
     ATermMap as;
     bs = bnds;
     while (!ATisEmpty(bs)) {
-        char * s;
+        string s;
         Expr e2;
-        if (!ATmatch(ATgetFirst(bs), "Bind(<str>, <term>)", &s, &e2))
+        if (!(atMatch(m, ATgetFirst(bs)) >> "Bind" >> s >> e2))
             abort(); /* can't happen */
         as.set(s, substitute(subs, e2));
         bs = ATgetNext(bs);
@@ -98,8 +101,9 @@ ATerm expandRec(ATerm e, ATermList bnds)
 string evalString(EvalState & state, Expr e)
 {
     e = evalExpr(state, e);
-    char * s;
-    if (!ATmatch(e, "Str(<str>)", &s))
+    ATMatcher m;
+    string s;
+    if (!(atMatch(m, e) >> "Str" >> s))
         throw badTerm("string expected", e);
     return s;
 }
@@ -108,8 +112,9 @@ string evalString(EvalState & state, Expr e)
 Path evalPath(EvalState & state, Expr e)
 {
     e = evalExpr(state, e);
-    char * s;
-    if (!ATmatch(e, "Path(<str>)", &s))
+    ATMatcher m;
+    string s;
+    if (!(atMatch(m, e) >> "Path" >> s))
         throw badTerm("path expected", e);
     return s;
 }
@@ -118,78 +123,79 @@ Path evalPath(EvalState & state, Expr e)
 bool evalBool(EvalState & state, Expr e)
 {
     e = evalExpr(state, e);
-    if (ATmatch(e, "Bool(True)")) return true;
-    else if (ATmatch(e, "Bool(False)")) return false;
+    ATMatcher m;
+    if (atMatch(m, e) >> "Bool" >> "True") return true;
+    else if (atMatch(m, e) >> "Bool" >> "False") return false;
     else throw badTerm("expecting a boolean", e);
 }
 
 
 Expr evalExpr2(EvalState & state, Expr e)
 {
+    ATMatcher m;
     Expr e1, e2, e3, e4;
-    char * s1;
+    string s1;
 
     /* Normal forms. */
-    if (ATmatch(e, "Str(<str>)", &s1) ||
-        ATmatch(e, "Path(<str>)", &s1) ||
-        ATmatch(e, "Uri(<str>)", &s1) ||
-        ATmatch(e, "Bool(<term>)", &e1) ||
-        ATmatch(e, "Function([<list>], <term>)", &e1, &e2) ||
-        ATmatch(e, "Attrs([<list>])", &e1) ||
-        ATmatch(e, "List([<list>])", &e1))
+    if (atMatch(m, e) >> "Str" ||
+        atMatch(m, e) >> "Path" ||
+        atMatch(m, e) >> "Uri" ||
+        atMatch(m, e) >> "Bool" ||
+        atMatch(m, e) >> "Function" ||
+        atMatch(m, e) >> "Attrs" ||
+        atMatch(m, e) >> "List")
         return e;
 
     /* Any encountered variables must be undeclared or primops. */
-    if (ATmatch(e, "Var(<str>)", &s1)) {
-        if ((string) s1 == "null") return primNull(state);
+    if (atMatch(m, e) >> "Var" >> s1) {
+        if (s1 == "null") return primNull(state);
         return e;
     }
 
     /* Function application. */
-    if (ATmatch(e, "Call(<term>, <term>)", &e1, &e2)) {
+    if (atMatch(m, e) >> "Call" >> e1 >> e2) {
+
+        ATermList formals;
         
         /* Evaluate the left-hand side. */
         e1 = evalExpr(state, e1);
 
         /* Is it a primop or a function? */
-        if (ATmatch(e1, "Var(<str>)", &s1)) {
-            string primop(s1);
-            if (primop == "import") return primImport(state, e2);
-            if (primop == "derivation") return primDerivation(state, e2);
-            if (primop == "toString") return primToString(state, e2);
-            if (primop == "baseNameOf") return primBaseNameOf(state, e2);
-            if (primop == "isNull") return primIsNull(state, e2);
+        if (atMatch(m, e1) >> "Var" >> s1) {
+            if (s1 == "import") return primImport(state, e2);
+            if (s1 == "derivation") return primDerivation(state, e2);
+            if (s1 == "toString") return primToString(state, e2);
+            if (s1 == "baseNameOf") return primBaseNameOf(state, e2);
+            if (s1 == "isNull") return primIsNull(state, e2);
             else throw badTerm("undefined variable/primop", e1);
         }
 
-        else if (ATmatch(e1, "Function([<list>], <term>)", &e3, &e4)) {
+        else if (atMatch(m, e1) >> "Function" >> formals >> e4)
             return evalExpr(state, 
-                substArgs(e4, (ATermList) e3, evalExpr(state, e2)));
-        }
+                substArgs(e4, formals, evalExpr(state, e2)));
         
         else throw badTerm("expecting a function or primop", e1);
     }
 
     /* Attribute selection. */
-    if (ATmatch(e, "Select(<term>, <str>)", &e1, &s1)) {
-        string name(s1);
-        Expr a = queryAttr(evalExpr(state, e1), name);
-        if (!a) throw badTerm(format("missing attribute `%1%'") % name, e);
+    if (atMatch(m, e) >> "Select" >> e1 >> s1) {
+        Expr a = queryAttr(evalExpr(state, e1), s1);
+        if (!a) throw badTerm(format("missing attribute `%1%'") % s1, e);
         return evalExpr(state, a);
     }
 
     /* Mutually recursive sets. */
     ATermList bnds;
-    if (ATmatch(e, "Rec([<list>])", &bnds))
-        return expandRec(e, (ATermList) bnds);
+    if (atMatch(m, e) >> "Rec" >> bnds)
+        return expandRec(e, bnds);
 
     /* Let expressions `let {..., body = ...}' are just desugared
        into `(rec {..., body = ...}).body'. */
-    if (ATmatch(e, "LetRec(<term>)", &e1))
-        return evalExpr(state, ATmake("Select(Rec(<term>), \"body\")", e1));
+    if (atMatch(m, e) >> "LetRec" >> bnds)
+        return evalExpr(state, ATmake("Select(Rec(<term>), \"body\")", bnds));
 
     /* Conditionals. */
-    if (ATmatch(e, "If(<term>, <term>, <term>)", &e1, &e2, &e3)) {
+    if (atMatch(m, e) >> "If" >> e1 >> e2 >> e3) {
         if (evalBool(state, e1))
             return evalExpr(state, e2);
         else
@@ -197,33 +203,33 @@ Expr evalExpr2(EvalState & state, Expr e)
     }
 
     /* Assertions. */
-    if (ATmatch(e, "Assert(<term>, <term>)", &e1, &e2)) {
+    if (atMatch(m, e) >> "Assert" >> e1 >> e2) {
         if (!evalBool(state, e1)) throw badTerm("guard failed", e);
         return evalExpr(state, e2);
     }
 
     /* Generic equality. */
-    if (ATmatch(e, "OpEq(<term>, <term>)", &e1, &e2))
+    if (atMatch(m, e) >> "OpEq" >> e1 >> e2)
         return makeBool(evalExpr(state, e1) == evalExpr(state, e2));
 
     /* Generic inequality. */
-    if (ATmatch(e, "OpNEq(<term>, <term>)", &e1, &e2))
+    if (atMatch(m, e) >> "OpNEq" >> e1 >> e2)
         return makeBool(evalExpr(state, e1) != evalExpr(state, e2));
 
     /* Negation. */
-    if (ATmatch(e, "OpNot(<term>)", &e1))
+    if (atMatch(m, e) >> "OpNot" >> e1)
         return makeBool(!evalBool(state, e1));
 
     /* Implication. */
-    if (ATmatch(e, "OpImpl(<term>, <term>)", &e1, &e2))
+    if (atMatch(m, e) >> "OpImpl" >> e1 >> e2)
         return makeBool(!evalBool(state, e1) || evalBool(state, e2));
 
     /* Conjunction (logical AND). */
-    if (ATmatch(e, "OpAnd(<term>, <term>)", &e1, &e2))
+    if (atMatch(m, e) >> "OpAnd" >> e1 >> e2)
         return makeBool(evalBool(state, e1) && evalBool(state, e2));
 
     /* Disjunction (logical OR). */
-    if (ATmatch(e, "OpOr(<term>, <term>)", &e1, &e2))
+    if (atMatch(m, e) >> "OpOr" >> e1 >> e2)
         return makeBool(evalBool(state, e1) || evalBool(state, e2));
 
     /* Barf. */
@@ -234,7 +240,7 @@ Expr evalExpr2(EvalState & state, Expr e)
 Expr evalExpr(EvalState & state, Expr e)
 {
     startNest(nest, lvlVomit,
-        format("evaluating expression: %1%") % printTerm(e));
+        format("evaluating expression: %1%") % e);
 
     state.nrEvaluated++;
 

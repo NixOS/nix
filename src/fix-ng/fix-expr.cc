@@ -118,14 +118,15 @@ ATerm bottomupRewrite(TermFun & f, ATerm e)
 
 void queryAllAttrs(Expr e, ATermMap & attrs)
 {
+    ATMatcher m;
     ATermList bnds;
-    if (!ATmatch(e, "Attrs([<list>])", &bnds))
+    if (!(atMatch(m, e) >> "Attrs" >> bnds))
         throw badTerm("expected attribute set", e);
 
     while (!ATisEmpty(bnds)) {
-        char * s;
+        string s;
         Expr e;
-        if (!ATmatch(ATgetFirst(bnds), "Bind(<str>, <term>)", &s, &e))
+        if (!(atMatch(m, ATgetFirst(bnds)) >> "Bind" >> s >> e))
             abort(); /* can't happen */
         attrs.set(s, e);
         bnds = ATgetNext(bnds);
@@ -156,9 +157,10 @@ Expr makeAttrs(const ATermMap & attrs)
 
 Expr substitute(const ATermMap & subs, Expr e)
 {
-    char * s;
+    ATMatcher m;
+    string s;
 
-    if (ATmatch(e, "Var(<str>)", &s)) {
+    if (atMatch(m, e) >> "Var" >> s) {
         Expr sub = subs.get(s);
         return sub ? sub : e;
     }
@@ -167,13 +169,13 @@ Expr substitute(const ATermMap & subs, Expr e)
        function. */
     ATermList formals;
     ATerm body;
-    if (ATmatch(e, "Function([<list>], <term>)", &formals, &body)) {
+    if (atMatch(m, e) >> "Function" >> formals >> body) {
         ATermMap subs2(subs);
         ATermList fs = formals;
         while (!ATisEmpty(fs)) {
             Expr def;
-            if (!ATmatch(ATgetFirst(fs), "NoDefFormal(<str>)", &s) &&
-                !ATmatch(ATgetFirst(fs), "DefFormal(<str>, <term>)", &s))
+            if (!(atMatch(m, ATgetFirst(fs)) >> "NoDefFormal" >> s) &&
+                !(atMatch(m, ATgetFirst(fs)) >> "DefFormal" >> s >> def))
                 abort();
             subs2.remove(s);
             fs = ATgetNext(fs);
@@ -184,12 +186,12 @@ Expr substitute(const ATermMap & subs, Expr e)
 
     /* Idem for a mutually recursive attribute set. */
     ATermList bindings;
-    if (ATmatch(e, "Rec([<list>])", &bindings)) {
+    if (atMatch(m, e) >> "Rec" >> bindings) {
         ATermMap subs2(subs);
         ATermList bnds = bindings;
         while (!ATisEmpty(bnds)) {
             Expr e;
-            if (!ATmatch(ATgetFirst(bnds), "Bind(<str>, <term>)", &s, &e))
+            if (!(atMatch(m, ATgetFirst(bnds)) >> "Bind" >> s >> e))
                 abort(); /* can't happen */
             subs2.remove(s);
             bnds = ATgetNext(bnds);

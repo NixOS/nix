@@ -27,37 +27,6 @@ static Path searchPath(const Paths & searchDirs, const Path & relPath)
 #endif
 
 
-#if 0
-static Expr evalExpr2(EvalState & state, Expr e)
-{
-    /* Ad-hoc function for string matching. */
-    if (ATmatch(e, "HasSubstr(<term>, <term>)", &e1, &e2)) {
-        e1 = evalExpr(state, e1);
-        e2 = evalExpr(state, e2);
-        
-        char * s1, * s2;
-        if (!ATmatch(e1, "<str>", &s1))
-            throw badTerm("expecting a string", e1);
-        if (!ATmatch(e2, "<str>", &s2))
-            throw badTerm("expecting a string", e2);
-        
-        return
-            string(s1).find(string(s2)) != string::npos ?
-            ATmake("True") : ATmake("False");
-    }
-
-    /* BaseName primitive function. */
-    if (ATmatch(e, "BaseName(<term>)", &e1)) {
-        e1 = evalExpr(state, e1);
-        if (!ATmatch(e1, "<str>", &s1)) 
-            throw badTerm("string expected", e1);
-        return ATmake("<str>", baseNameOf(s1).c_str());
-    }
-
-}
-#endif
-
-
 static Expr evalStdin(EvalState & state)
 {
     startNest(nest, lvlTalkative, format("evaluating standard input"));
@@ -70,9 +39,10 @@ static Expr evalStdin(EvalState & state)
 
 static void printNixExpr(EvalState & state, Expr e)
 {
+    ATMatcher m;
     ATermList es;
 
-    if (ATmatch(e, "Attrs([<list>])", &es)) {
+    if (atMatch(m, e) >> "Attrs" >> es) {
         Expr a = queryAttr(e, "type");
         if (a && evalString(state, a) == "derivation") {
             a = queryAttr(e, "drvPath");
@@ -83,7 +53,7 @@ static void printNixExpr(EvalState & state, Expr e)
         }
     }
 
-    if (ATmatch(e, "[<list>]", &es)) {
+    if (ATgetType(e) == AT_LIST) {
         while (!ATisEmpty(es)) {
             printNixExpr(state, evalExpr(state, ATgetFirst(es)));
             es = ATgetNext(es);

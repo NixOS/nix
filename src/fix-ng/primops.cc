@@ -5,8 +5,9 @@
 
 Expr primImport(EvalState & state, Expr arg)
 {
-    char * path;
-    if (!ATmatch(arg, "Path(<str>)", &path))
+    ATMatcher m;
+    string path;
+    if (!(atMatch(m, arg) >> "Path" >> path))
         throw badTerm("path expected", arg);
     return evalFile(state, path);
 }
@@ -79,15 +80,16 @@ static string processBinding(EvalState & state, Expr e, NixExpr & ne)
 {
     e = evalExpr(state, e);
 
-    char * s;
+    ATMatcher m;
+    string s;
     ATermList es;
 
-    if (ATmatch(e, "Str(<str>)", &s)) return s;
-    if (ATmatch(e, "Uri(<str>)", &s)) return s;
-    if (ATmatch(e, "Bool(True)")) return "1";
-    if (ATmatch(e, "Bool(False)")) return "";
+    if (atMatch(m, e) >> "Str" >> s) return s;
+    if (atMatch(m, e) >> "Uri" >> s) return s;
+    if (atMatch(m, e) >> "Bool" >> "True") return "1";
+    if (atMatch(m, e) >> "Bool" >> "False") return "";
 
-    if (ATmatch(e, "Attrs([<list>])", &es)) {
+    if (atMatch(m, e) >> "Attrs" >> es) {
         Expr a = queryAttr(e, "type");
         if (a && evalString(state, a) == "derivation") {
             a = queryAttr(e, "drvPath");
@@ -98,12 +100,12 @@ static string processBinding(EvalState & state, Expr e, NixExpr & ne)
         }
     }
 
-    if (ATmatch(e, "Path(<str>)", &s)) {
+    if (atMatch(m, e) >> "Path" >> s) {
         Path drvPath = copyAtom(state, s);
         return addInput(state, drvPath, ne);
     }
     
-    if (ATmatch(e, "List([<list>])", &es)) {
+    if (atMatch(m, e) >> "List" >> es) {
 	string s;
 	bool first = true;
         while (!ATisEmpty(es)) {
@@ -115,7 +117,7 @@ static string processBinding(EvalState & state, Expr e, NixExpr & ne)
 	return s;
     }
 
-    if (ATmatch(e, "Null")) return "";
+    if (atMatch(m, e) >> "Null") return "";
     
     throw badTerm("invalid derivation binding", e);
 }
@@ -148,14 +150,17 @@ Expr primDerivation(EvalState & state, Expr args)
         /* The `args' attribute is special: it supplies the
            command-line arguments to the builder. */
         if (key == "args") {
+            throw Error("args not implemented");
+#if 0
             ATermList args;
-            if (!ATmatch(value, "[<list>]", &args))
+            if (!(ATmatch(value, "[<list>]", &args))
                 throw badTerm("list expected", value);
             while (!ATisEmpty(args)) {
                 Expr arg = evalExpr(state, ATgetFirst(args));
                 ne.derivation.args.push_back(processBinding(state, arg, ne));
                 args = ATgetNext(args);
             }
+#endif
         }
 
         /* All other attributes are passed to the builder through the
@@ -220,11 +225,12 @@ Expr primBaseNameOf(EvalState & state, Expr arg)
 Expr primToString(EvalState & state, Expr arg)
 {
     arg = evalExpr(state, arg);
-    char * s;
-    if (ATmatch(arg, "Str(<str>)", &s) ||
-        ATmatch(arg, "Path(<str>)", &s) ||
-        ATmatch(arg, "Uri(<str>)", &s))
-        return ATmake("Str(<str>)", s);
+    ATMatcher m;
+    string s;
+    if (atMatch(m, arg) >> "Str" >> s ||
+        atMatch(m, arg) >> "Path" >> s ||
+        atMatch(m, arg) >> "Uri" >> s)
+        return ATmake("Str(<str>)", s.c_str());
     else throw badTerm("cannot coerce to string", arg);
 }
 
@@ -238,5 +244,6 @@ Expr primNull(EvalState & state)
 Expr primIsNull(EvalState & state, Expr arg)
 {
     arg = evalExpr(state, arg);
-    return makeBool(ATmatch(arg, "Null"));
+    ATMatcher m;
+    return makeBool(atMatch(m, arg) >> "Null");
 }

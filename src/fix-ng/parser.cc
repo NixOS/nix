@@ -28,40 +28,40 @@ struct Cleanup : TermFun
 
     virtual ATerm operator () (ATerm e)
     {
-        char * s;
+        ATMatcher m;
+        string s;
 
-        if (ATmatch(e, "Str(<str>)", &s)) {
-            string s2(s);
+        if (atMatch(m, e) >> "Str" >> s) {
             return ATmake("Str(<str>)",
-                string(s2, 1, s2.size() - 2).c_str());
+                string(s, 1, s.size() - 2).c_str());
         }
 
-        if (ATmatch(e, "Path(<str>)", &s)) {
-            string path(s);
-            if (path[0] != '/')
-                path = basePath + "/" + path;
-            return ATmake("Path(<str>)", canonPath(path).c_str());
+        if (atMatch(m, e) >> "Path" >> s) {
+            if (s[0] != '/')
+                s = basePath + "/" + s;
+            return ATmake("Path(<str>)", canonPath(s).c_str());
         }
 
-        if (ATmatch(e, "Int(<str>)", &s)) {
+        if (atMatch(m, e) >> "Int" >> s) {
             istringstream s2(s);
             int n;
             s2 >> n;
             return ATmake("Int(<int>)", n);
         }
 
-        if (ATmatch(e, "Bool(\"true\")", &s))
+        if (atMatch(m, e) >> "Bool" >> "true")
             return ATmake("Bool(True)");
         
-        if (ATmatch(e, "Bool(\"false\")", &s))
+        if (atMatch(m, e) >> "Bool" >> "false")
             return ATmake("Bool(False)");
 
-        if (ATmatch(e, "ExprNil"))
+        if (atMatch(m, e) >> "ExprNil")
             return (ATerm) ATempty;
 
-        ATerm e1, e2;
-        if (ATmatch(e, "ExprCons(<term>, [<list>])", &e1, &e2))
-            return (ATerm) ATinsert((ATermList) e2, e1);
+        ATerm e1;
+        ATermList e2;
+        if (atMatch(m, e) >> "ExprCons" >> e1 >> e2)
+            return (ATerm) ATinsert(e2, e1);
 
         return e;
     }
@@ -133,7 +133,7 @@ Expr parseExprFromFile(Path path)
         throw SysError(format("parse failed in `%1%'") % path);
     if (SGisParseError(result))
         throw Error(format("parse error in `%1%': %2%")
-            % path % printTerm(result));
+            % path % result);
 
     /* Implode it. */
     PT_ParseTree tree = PT_makeParseTreeFromTerm(result);
@@ -156,7 +156,7 @@ Expr parseExprFromFile(Path path)
         throw Error(format("cannot implode parse tree"));
 
     debug(format("imploded parse tree of `%1%': %2%")
-        % path % printTerm(imploded));
+        % path % imploded);
 
     /* Finally, clean it up. */
     Cleanup cleanup;

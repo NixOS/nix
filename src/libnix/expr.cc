@@ -3,14 +3,6 @@
 #include "store.hh"
 
 
-string printTerm(ATerm t)
-{
-    char * s = ATwriteToString(t);
-    if (!s) throw Error("cannot print term");
-    return s;
-}
-
-
 Error badTerm(const format & f, ATerm t)
 {
     char * s = ATwriteToString(t);
@@ -26,7 +18,7 @@ Error badTerm(const format & f, ATerm t)
 
 Hash hashTerm(ATerm t)
 {
-    return hashString(printTerm(t));
+    return hashString(atPrint(t));
 }
 
 
@@ -50,10 +42,11 @@ Path writeTerm(ATerm t, const string & suffix)
 
 static void parsePaths(ATermList paths, PathSet & out)
 {
+    ATMatcher m;
     while (!ATisEmpty(paths)) {
-        char * s;
+        string s;
         ATerm t = ATgetFirst(paths);
-        if (!ATmatch(t, "<str>", &s))
+        if (!(atMatch(m, t) >> s))
             throw badTerm("not a path", t);
         out.insert(s);
         paths = ATgetNext(paths);
@@ -91,21 +84,22 @@ static void checkClosure(const Closure & closure)
 static bool parseClosure(ATerm t, Closure & closure)
 {
     ATermList roots, elems;
-    
-    if (!ATmatch(t, "Closure([<list>], [<list>])", &roots, &elems))
+    ATMatcher m;
+
+    if (!(atMatch(m, t) >> "Closure" >> roots >> elems))
         return false;
 
     parsePaths(roots, closure.roots);
 
     while (!ATisEmpty(elems)) {
-        char * s1;
+        string path;
         ATermList refs;
         ATerm t = ATgetFirst(elems);
-        if (!ATmatch(t, "(<str>, [<list>])", &s1, &refs))
+        if (!(atMatch(m, t) >> "" >> path >> refs))
             throw badTerm("not a closure element", t);
         ClosureElem elem;
         parsePaths(refs, elem.refs);
-        closure.elems[s1] = elem;
+        closure.elems[path] = elem;
         elems = ATgetNext(elems);
     }
 
@@ -116,19 +110,13 @@ static bool parseClosure(ATerm t, Closure & closure)
 
 static bool parseDerivation(ATerm t, Derivation & derivation)
 {
+    ATMatcher m;
     ATermList outs, ins, args, bnds;
-    char * builder;
-    char * platform;
+    string builder, platform;
 
-    if (!ATmatch(t, "Derive([<list>], [<list>], <str>, <str>, [<list>], [<list>])",
-            &outs, &ins, &platform, &builder, &args, &bnds))
-    {
-        /* !!! compatibility -> remove eventually */
-        if (!ATmatch(t, "Derive([<list>], [<list>], <str>, <str>, [<list>])",
-                &outs, &ins, &builder, &platform, &bnds))
-            return false;
-        args = ATempty;
-    }
+    if (!(atMatch(m, t) >> "Derive" >> outs >> ins >> platform
+            >> builder >> args >> bnds))
+        return false;
 
     parsePaths(outs, derivation.outputs);
     parsePaths(ins, derivation.inputs);
@@ -137,18 +125,18 @@ static bool parseDerivation(ATerm t, Derivation & derivation)
     derivation.platform = platform;
     
     while (!ATisEmpty(args)) {
-        char * s;
+        string s;
         ATerm arg = ATgetFirst(args);
-        if (!ATmatch(arg, "<str>", &s))
+        if (!(atMatch(m, arg) >> s))
             throw badTerm("string expected", arg);
         derivation.args.push_back(s);
         args = ATgetNext(args);
     }
 
     while (!ATisEmpty(bnds)) {
-        char * s1, * s2;
+        string s1, s2;
         ATerm bnd = ATgetFirst(bnds);
-        if (!ATmatch(bnd, "(<str>, <str>)", &s1, &s2))
+        if (!(atMatch(m, bnd) >> "" >> s1 >> s2))
             throw badTerm("tuple of strings expected", bnd);
         derivation.env[s1] = s2;
         bnds = ATgetNext(bnds);

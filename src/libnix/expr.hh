@@ -1,10 +1,7 @@
 #ifndef __FSTATE_H
 #define __FSTATE_H
 
-extern "C" {
-#include <aterm2.h>
-}
-
+#include "aterm.hh"
 #include "store.hh"
 
 
@@ -42,9 +39,6 @@ struct NixExpr
     Derivation derivation;
 };
 
-
-/* Return a canonical textual representation of an expression. */
-string printTerm(ATerm t);
 
 /* Throw an exception with an error message containing the given
    aterm. */

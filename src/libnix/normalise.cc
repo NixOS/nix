@@ -239,7 +239,7 @@ Path normaliseNixExpr(const Path & _nePath, PathSet pending)
     /* Write the normal form.  This does not have to occur in the
        transaction below because writing terms is idem-potent. */
     ATerm nfTerm = unparseNixExpr(nf);
-    printMsg(lvlVomit, format("normal form: %1%") % printTerm(nfTerm));
+    printMsg(lvlVomit, format("normal form: %1%") % atPrint(nfTerm));
     Path nfPath = writeTerm(nfTerm, "-s");
 
     /* Register each outpat path, and register the normal form.  This
