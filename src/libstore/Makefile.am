@@ -1,10 +1,10 @@
 noinst_LIBRARIES = libstore.a
 
 libstore_a_SOURCES = \
- store.cc storeexpr.cc normalise.cc exec.cc \
- globals.cc db.cc references.cc pathlocks.cc
+ store.cc store.hh storeexpr.cc storeexpr.hh \
+ normalise.cc normalise.hh exec.cc exec.hh \
+ globals.cc globals.hh db.cc db.hh \
+ references.cc references.hh pathlocks.cc pathlocks.hh
 
 AM_CXXFLAGS = -DSYSTEM=\"@host@\" -Wall \
  -I.. -I../../externals/inst/include -I../libutil
-
-EXTRA_DIST = *.hh *.h test-builder-*.sh test.cc
