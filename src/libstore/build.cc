@@ -806,36 +806,52 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
         Path outputListFN = tmpDir + "/outputs";
         Path referencesFN = tmpDir + "/references";
 
-        string s;
-        for (PathSet::iterator i = inputPaths.begin();
-             i != inputPaths.end(); ++i)
-            s += *i + "\n";
-        for (DerivationInputs::iterator i = drv.inputDrvs.begin();
-             i != drv.inputDrvs.end(); ++i)
-            s += i->first + "\n";
-        writeStringToFile(inputListFN, s);
+        /* The `inputs' file lists all inputs that have to be copied
+           to the remote system.  This unfortunately has to contain
+           the entire derivation closure to ensure that the validity
+           invariant holds on the remote system.  (I.e., it's
+           unfortunate that we have to list it since the remote system
+           *probably* already has it.) */
+        PathSet allInputs;
+        allInputs.insert(inputPaths.begin(), inputPaths.end());
+        computeFSClosure(drvPath, allInputs);
         
+        string s;
+        for (PathSet::iterator i = allInputs.begin();
+             i != allInputs.end(); ++i)
+            s += *i + "\n";
+        
+        writeStringToFile(inputListFN, s);
+
+        /* The `outputs' file lists all outputs that have to be copied
+           from the remote system. */
         s = "";
         for (DerivationOutputs::iterator i = drv.outputs.begin();
              i != drv.outputs.end(); ++i)
             s += i->second.path + "\n";
         writeStringToFile(outputListFN, s);
 
+        /* The `references' file has exactly the format accepted by
+           `nix-store --register-validity'. */
         s = "";
-        for (PathSet::iterator i = inputPaths.begin();
-             i != inputPaths.end(); ++i)
+        for (PathSet::iterator i = allInputs.begin();
+             i != allInputs.end(); ++i)
         {
-            s += *i;
+            s += *i + "\n";
+            
+            Path deriver = queryDeriver(noTxn, *i);
+            s += deriver + "\n";
+
             PathSet references;
             queryReferences(noTxn, *i, references);
+
+            s += (format("%1%\n") % references.size()).str();
+            
             for (PathSet::iterator j = references.begin();
                  j != references.end(); ++j)
-            {
-                s += " ";
-                s += *j;
-            }
-            s += "\n";
+                s += *j + "\n";
         }
+        
         writeStringToFile(referencesFN, s);
 
         /* Tell the hook to proceed. */ 
