@@ -155,7 +155,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
             for (FSIds::iterator i = genIds.begin(); 
                  i != genIds.end(); i++)
-                cout << format("%s\n") % (string) *i;
+                cout << format("%s\n") % expandId(*i);
             break;
         }
 
