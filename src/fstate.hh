@@ -36,8 +36,9 @@ struct Derive
 {
     DeriveOutputs outputs;
     FSIds inputs;
-    string builder;
     string platform;
+    string builder;
+    Strings args;
     StringPairs env;
 };
 

@@ -35,7 +35,8 @@ public:
 
 
 /* Run a program. */
-void runProgram(const string & program, Environment env)
+void runProgram(const string & program, 
+    const Strings & args, const Environment & env)
 {
     /* Create a log file. */
     string logFileName = nixLogDir + "/run.log";
@@ -68,15 +69,25 @@ void runProgram(const string & program, Environment env)
             if (chdir(tmpDir.c_str()) == -1)
                 throw SysError(format("changing into to `%1%'") % tmpDir);
 
-            /* Fill in the environment.  We don't bother freeing
-               the strings, since we'll exec or die soon
-               anyway. */
-            const char * env2[env.size() + 1];
-            int i = 0;
-            for (Environment::iterator it = env.begin();
-                 it != env.end(); it++, i++)
-                env2[i] = (new string(it->first + "=" + it->second))->c_str();
-            env2[i] = 0;
+            /* Fill in the arguments. */
+            const char * argArr[args.size() + 2];
+            const char * * p = argArr;
+            string progName = baseNameOf(program);
+            *p++ = progName.c_str();
+            for (Strings::const_iterator i = args.begin();
+                 i != args.end(); i++)
+                *p++ = i->c_str();
+            *p = 0;
+
+            /* Fill in the environment. */
+            Strings envStrs;
+            const char * envArr[env.size() + 1];
+            p = envArr;
+            for (Environment::const_iterator i = env.begin();
+                 i != env.end(); i++)
+                *p++ = envStrs.insert(envStrs.end(), 
+                    i->first + "=" + i->second)->c_str();
+            *p = 0;
 
             /* Dup the log handle into stderr. */
             if (dup2(fileno(logFile), STDERR_FILENO) == -1)
@@ -87,7 +98,7 @@ void runProgram(const string & program, Environment env)
                 throw SysError("cannot dup stderr into stdout");
 
             /* Execute the program.  This should not return. */
-            execle(program.c_str(), baseNameOf(program).c_str(), 0, env2);
+            execve(program.c_str(), (char * *) argArr, (char * *) envArr);
 
             throw SysError(format("unable to execute %1%") % program);
             

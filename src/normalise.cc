@@ -169,7 +169,7 @@ FSId normaliseFState(FSId id, FSIdSet pending)
 
         /* Run the builder. */
         msg(lvlChatty, format("building..."));
-        runProgram(fs.derive.builder, env);
+        runProgram(fs.derive.builder, fs.derive.args, env);
         msg(lvlChatty, format("build completed"));
         
     } else

@@ -120,13 +120,19 @@ static bool parseSlice(ATerm t, Slice & slice)
 
 static bool parseDerive(ATerm t, Derive & derive)
 {
-    ATermList outs, ins, bnds;
+    ATermList outs, ins, args, bnds;
     char * builder;
     char * platform;
 
-    if (!ATmatch(t, "Derive([<list>], [<list>], <str>, <str>, [<list>])",
-            &outs, &ins, &builder, &platform, &bnds))
-        return false;
+    if (!ATmatch(t, "Derive([<list>], [<list>], <str>, <str>, [<list>], [<list>])",
+            &outs, &ins, &platform, &builder, &args, &bnds))
+    {
+        /* !!! compatibility -> remove eventually */
+        if (!ATmatch(t, "Derive([<list>], [<list>], <str>, <str>, [<list>])",
+                &outs, &ins, &builder, &platform, &bnds))
+            return false;
+        args = ATempty;
+    }
 
     while (!ATisEmpty(outs)) {
         char * s1, * s2;
@@ -142,6 +148,15 @@ static bool parseDerive(ATerm t, Derive & derive)
     derive.builder = builder;
     derive.platform = platform;
     
+    while (!ATisEmpty(args)) {
+        char * s;
+        ATerm arg = ATgetFirst(args);
+        if (!ATmatch(arg, "<str>", &s))
+            throw badTerm("string expected", arg);
+        derive.args.push_back(s);
+        args = ATgetNext(args);
+    }
+
     while (!ATisEmpty(bnds)) {
         char * s1, * s2;
         ATerm bnd = ATgetFirst(bnds);
@@ -204,6 +219,11 @@ static ATerm unparseDerive(const Derive & derive)
             ATmake("(<str>, <str>)", 
                 i->first.c_str(), ((string) i->second).c_str()));
     
+    ATermList args = ATempty;
+    for (Strings::const_iterator i = derive.args.begin();
+         i != derive.args.end(); i++)
+        args = ATinsert(args, ATmake("<str>", i->c_str()));
+
     ATermList env = ATempty;
     for (StringPairs::const_iterator i = derive.env.begin();
          i != derive.env.end(); i++)
@@ -211,11 +231,12 @@ static ATerm unparseDerive(const Derive & derive)
             ATmake("(<str>, <str>)", 
                 i->first.c_str(), i->second.c_str()));
 
-    return ATmake("Derive(<term>, <term>, <str>, <str>, <term>)",
+    return ATmake("Derive(<term>, <term>, <str>, <str>, <term>, <term>)",
         ATreverse(outs),
         unparseIds(derive.inputs),
-        derive.builder.c_str(),
         derive.platform.c_str(),
+        derive.builder.c_str(),
+        ATreverse(args),
         ATreverse(env));
 }
 

@@ -4,6 +4,8 @@
 #include <string>
 #include <map>
 
+#include "util.hh"
+
 using namespace std;
 
 
@@ -12,7 +14,8 @@ typedef map<string, string> Environment;
 
 
 /* Run a program. */
-void runProgram(const string & program, Environment env);
+void runProgram(const string & program, 
+    const Strings & args, const Environment & env);
 
 
 #endif /* !__EXEC_H */
