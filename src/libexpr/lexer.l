@@ -76,7 +76,7 @@ inherit     { return INHERIT; }
 
 [ \t\n]+    /* eat up whitespace */
 \#[^\n]*    /* single-line comments */
-\/\*(.|\n)*\*\/  /* long comments */
+\/\*([^*]|\*[^\/])*\*\/  /* long comments */
 
 .           return yytext[0];
 

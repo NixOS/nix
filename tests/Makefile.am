@@ -27,7 +27,7 @@ TESTS = init.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
 
 XFAIL_TESTS =
 
-foo:
+langtests:
 	$(TESTS_ENVIRONMENT) ./lang.sh
 
 include ../substitute.mk
