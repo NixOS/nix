@@ -139,11 +139,23 @@ $? == 0 or die "nix-instantiate failed";
 
 # Register all substitutes.
 print STDERR "registering substitutes...\n";
-system "nix-store --substitute @subs";
-if ($?) { die "`nix-store --substitute' failed"; }
+while (scalar @subs > 0) {
+    my $n = scalar @subs;
+    if ($n > 256) { $n = 256 };
+    my @subs2 = @subs[0..$n - 1];
+    @subs = @subs[$n..scalar @subs - 1];
+    system "nix-store --substitute @subs2";
+    if ($?) { die "`nix-store --substitute' failed"; }
+}
 
 
 # Register all successors.
 print STDERR "registering successors...\n";
-system "nix-store --successor @sucs";
-if ($?) { die "`nix-store --successor' failed"; }
+while (scalar @sucs > 0) {
+    my $n = scalar @sucs;
+    if ($n > 256) { $n = 256 };
+    my @sucs2 = @sucs[0..$n - 1];
+    @sucs = @sucs[$n..scalar @sucs - 1];
+    system "nix-store --successor @sucs";
+    if ($?) { die "`nix-store --successor' failed"; }
+}
