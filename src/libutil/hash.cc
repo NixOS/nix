@@ -90,18 +90,18 @@ Hash parseHash(HashType ht, const string & s)
 }
 
 
-static unsigned short divMod(uint16_t * words, unsigned short y)
+static unsigned char divMod(unsigned char * bytes, unsigned char y)
 {
     unsigned int borrow = 0;
 
-    int pos = (Hash::maxHashSize / 2) - 1;
-    while (pos >= 0 && !words[pos]) --pos;
+    int pos = Hash::maxHashSize - 1;
+    while (pos >= 0 && !bytes[pos]) --pos;
 
     for ( ; pos >= 0; --pos) {
-        unsigned int s = words[pos] + (borrow << 16);
+        unsigned int s = bytes[pos] + (borrow << 8);
         unsigned int d = s / y;
         borrow = s % y;
-        words[pos] = d;
+        bytes[pos] = d;
     }
 
     return borrow;
@@ -121,7 +121,7 @@ string printHash32(const Hash & hash)
 
     int pos = len - 1;
     while (pos >= 0) {
-        unsigned short digit = divMod((uint16_t *) hash2.hash, 32);
+        unsigned char digit = divMod(hash2.hash, 32);
         s[pos--] = chars[digit];
     }
 
@@ -132,28 +132,28 @@ string printHash32(const Hash & hash)
 }
 
 
-static bool mul(uint16_t * words, unsigned short y, int maxSize)
+static bool mul(unsigned char * bytes, unsigned char y, int maxSize)
 {
-    unsigned short carry = 0;
+    unsigned char carry = 0;
 
     for (int pos = 0; pos < maxSize; ++pos) {
-        unsigned int m = words[pos] * y + carry;
-        words[pos] = m & 0xffff;
-        carry = m >> 16;
+        unsigned int m = bytes[pos] * y + carry;
+        bytes[pos] = m & 0xff;
+        carry = m >> 8;
     }
 
     return carry;
 }
 
 
-static bool add(uint16_t * words, unsigned short y, int maxSize)
+static bool add(unsigned char * bytes, unsigned char y, int maxSize)
 {
-    unsigned short carry = y;
+    unsigned char carry = y;
 
     for (int pos = 0; pos < maxSize; ++pos) {
-        unsigned int m = words[pos] + carry;
-        words[pos] = m & 0xffff;
-        carry = m >> 16;
+        unsigned int m = bytes[pos] + carry;
+        bytes[pos] = m & 0xff;
+        carry = m >> 8;
         if (carry == 0) break;
     }
 
@@ -172,8 +172,8 @@ Hash parseHash32(HashType ht, const string & s)
             if (chars[digit] == c) break;
         if (digit >= 32)
             throw Error(format("invalid base-32 hash `%1%'") % s);
-        if (mul((uint16_t *) hash.hash, 32, hash.hashSize / 2) ||
-            add((uint16_t *) hash.hash, digit, hash.hashSize / 2))
+        if (mul(hash.hash, 32, hash.hashSize) ||
+            add(hash.hash, digit, hash.hashSize))
             throw Error(format("base-32 hash `%1%' is too large") % s);
     }
 
