@@ -15,6 +15,7 @@ struct Decoder
     vector<int> args;
     bool newNumber;
     int priority;
+    bool ignoreLF;
 
     Decoder()
     {
@@ -23,6 +24,7 @@ struct Decoder
         inHeader = false;
         level = 0;
         priority = 1;
+        ignoreLF = false;
     }
 
     void pushChar(char c);
@@ -38,7 +40,7 @@ void Decoder::pushChar(char c)
         case stTop:
             if (c == '\e') {
                 state = stEscape;
-            } else if (c == '\n') {
+            } else if (c == '\n' && !ignoreLF) {
                 finishLine();
             } else line += c;
             break;
@@ -74,6 +76,12 @@ void Decoder::pushChar(char c)
                     case 's':
                         if (line.size()) finishLine();
                         priority = args.size() >= 1 ? args[0] : 1;
+                        break;
+                    case 'a':
+                        ignoreLF = true;
+                        break;
+                    case 'b':
+                        ignoreLF = false;
                         break;
                 }
             } else if (c >= '0' && c <= '9') {
