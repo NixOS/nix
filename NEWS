@@ -7,6 +7,27 @@ changed, so you can still build from source.  Also, existing user
 environments continue to work.  Nix 0.8 will automatically upgrade the
 database schema of previous installations when it is first run.
 
+If you get the error message
+
+  you have an old-style manifest `/nix/var/nix/manifests/[...]';
+  please delete it
+
+you should delete previously downloaded manifests:
+
+  $ rm /nix/var/nix/manifests/*
+
+If `nix-channel' gives the error message
+
+  manifest `http://catamaran.labs.cs.uu.nl/dist/nix/channels/[channel]/MANIFEST'
+  is too old (i.e., for Nix <= 0.7)
+
+then you should unsubscribe from the offending channel (`nix-channel
+--remove URL'; leave out `/MANIFEST'), and subscribe to the same URL,
+with `channels' replaced by `channels-v3' (e.g.,
+http://catamaran.labs.cs.uu.nl/dist/nix/channels-v3/nixpkgs-unstable).
+
+Nix 0.8 has the following improvements:
+
 * The cryptographic hashes used in store paths are now 160 bits long,
   but encoded in base-32 so that they are still only 32 characters
   long (e.g., /nix/store/csw87wag8bqlqk7ipllbwypb14xainap-atk-1.9.0).
