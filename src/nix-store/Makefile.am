@@ -1,6 +1,6 @@
 bin_PROGRAMS = nix-store
 
-nix_store_SOURCES = main.cc dotgraph.cc dotgraph.hh help.txt.hh
+nix_store_SOURCES = main.cc dotgraph.cc dotgraph.hh help.txt
 nix_store_LDADD = ../libmain/libmain.a ../libstore/libstore.a ../libutil/libutil.a \
  ../boost/format/libformat.a -L../../externals/inst/lib -ldb_cxx -lATerm
 
