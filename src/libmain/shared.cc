@@ -91,6 +91,12 @@ static void initAndRun(int argc, char * * argv)
     if (sigaction(SIGPIPE, &act, &oact))
         throw SysError("ignoring SIGPIPE");
 
+    /* There is no privacy in the Nix system ;-)  At least not for
+       now.  In particular, store objects should be readable by
+       everybody.  This prevents nasty surprises when using a shared
+       store (with the setuid() hack). */
+    umask(0022);
+
     /* Process the NIX_LOG_TYPE environment variable. */
     string lt = getEnv("NIX_LOG_TYPE");
     if (lt != "") setLogType(lt);
