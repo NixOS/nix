@@ -222,7 +222,7 @@ static void opGC(Strings opFlags, Strings opArgs)
     if (flag == "--print-live") subOp = soPrintLive;
     else if (flag == "--print-dead") subOp = soPrintDead;
     else if (flag == "--delete") subOp = soDelete;
-    else throw UsageError(format("bad sub-operation `%1% in GC") % flag);
+    else throw UsageError(format("bad sub-operation `%1%' in GC") % flag);
         
     Paths roots;
     while (1) {

@@ -135,17 +135,18 @@
   <!--######################################################################-->
 
   <refsection>
-    <title>Operation <option>--delete</option></title>
+    <title>Operation <option>--gc</option></title>
 
     <refsection>
       <title>Synopsis</title>
       <cmdsynopsis>
         <command>nix-store</command>
+        <arg choice='plain'><option>--gc</option></arg>
         <group choice='req'>
+          <arg choice='plain'><option>--print-live</option></arg>
+          <arg choice='plain'><option>--print-dead</option></arg>
           <arg choice='plain'><option>--delete</option></arg>
-          <arg choice='plain'><option>-d</option></arg>
         </group>
-        <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
       </cmdsynopsis>
     </refsection>
 
@@ -153,19 +154,64 @@
       <title>Description</title>
             
       <para>
-        The operation <option>--delete</option> unconditionally deletes the
-        paths <replaceable>paths</replaceable> from the Nix store. It is an
-        error to attempt to delete paths outside of the store.
+        The operation <option>--gc</option> performs a garbage
+        collection on the Nix store.  What it does specifically is
+        determined by the sub-operation, which is one of the
+        following:
+      </para>
+
+      <variablelist>
+
+        <varlistentry>
+          <term><option>--print-live</option></term>
+          <listitem>
+            <para>
+              This operation prints on standard output the set of
+              <quote>live</quote> store paths, which are all the store
+              paths reachable from a set of <quote>root</quote> store
+              expressions read from standard input.  Live paths should
+              never be deleted, since that would break consistency
+              &mdash; it would become possible that applications are
+              installed that reference things that are no longer
+              present in the store.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><option>--print-dead</option></term>
+          <listitem>
+            <para>
+              This operation prints out on standard output the set of
+              <quote>dead</quote> store paths, which is just the
+              opposite of the set of live paths: any path in the store
+              that is not live (with respect to the roots) is dead.
+            </para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><option>--delete</option></term>
+          <listitem>
+            <para>
+              This operation performs an actual garbage collection.
+              All dead paths are removed from the store.
+            </para>
+          </listitem>
+        </varlistentry>
+
+      </variablelist>
+
+      <para>
+        The set of root store expressions is read from standard input.
+        Each line should contain exactly one store path.
       </para>
 
       <warning>
         <para>
-          This operation should almost never be called directly, since no
-          attempt is made to verify that no references exist to the paths to
-          be deleted.  Therefore, careless deletion can result in an
-          inconsistent system. Deletion of paths in the store is done by the
-          garbage collector (which uses <option>--delete</option> to delete
-          unreferenced paths).
+          You generally will want to use the command
+          <command>nix-collect-garbage</command>, which figures out
+          the roots and then calls this command automatically.
         </para>
       </warning>
 

@@ -8,17 +8,17 @@ my $storeDir = "@storedir@";
 
 my %alive;
 
+my $gcOper = "--delete";
 my $keepSuccessors = 1;
-my $invert = 0;
 
 my @roots = ();
 
 
 # Parse the command line.
 foreach my $arg (@ARGV) {
-    if ($arg eq "--no-successors") { $keepSuccessors = 0; }
-    elsif ($arg eq "--invert") { $invert = 1; }
-    else { die "unknown argument `$arg'" };
+    if ($arg eq "--delete" || $arg eq "--print-live" || $arg eq "--print-dead") {
+        $gcOper = $arg;
+    } else { die "unknown argument `$arg'" };
 }
 
 
@@ -68,33 +68,15 @@ sub findRoots {
 findRoots 1, $rootsDir;
 
 
-# Determine all store paths reachable from the roots.
-my $extraarg = "";
-if ($keepSuccessors) { $extraarg = "--include-successors"; };
-my $pid = open2(\*READ, \*WRITE, "@bindir@/nix-store --query --requisites $extraarg @roots") 
-    or die "determining live paths";
-close WRITE;
-while (<READ>) {
-	chomp;
-	$alive{$_} = 1;
-	if ($invert) { print "$_\n"; };
+# Run the collector with the roots we found.
+my $pid = open2(">&1", \*WRITE, "@bindir@/nix-store --gc $gcOper")
+    or die "cannot run `nix-store --gc'";
+
+foreach my $root (@roots) {
+    print WRITE "$root\n";
 }
-close READ;
+
+close WRITE;
 
 waitpid $pid, 0;
-$? == 0 or die "determining live paths";
-
-exit 0 if ($invert);
-
-
-# Using that information, find all store paths *not* reachable from
-# the roots.
-opendir(DIR, $storeDir) or die "cannot open directory $storeDir: $!";
-foreach my $name (readdir DIR) {
-    next if ($name eq "." || $name eq "..");
-    $name = "$storeDir/$name";
-    if (!$alive{$name}) {
-        print "$name\n";
-    }
-}
-closedir DIR;
+$? == 0 or die "`nix-store --gc' failed";

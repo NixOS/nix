@@ -131,7 +131,7 @@ $ nix-env -uBf nixpkgs-<replaceable>version</replaceable>/ '*'</screen>
         actual delete them:
 
         <screen>
-$ nix-collect-garbage | xargs nix-store --delete</screen>
+$ nix-collect-garbage</screen>
 
       </para>
     </listitem>
