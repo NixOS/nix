@@ -18,6 +18,13 @@ struct EvalState
     NormalForms normalForms;
     PkgPaths pkgPaths;
     PkgHashes pkgHashes; /* normalised package hashes */
+    Expr blackHole;
+
+    EvalState()
+    {
+        blackHole = ATmake("BlackHole()");
+        if (!blackHole) throw Error("cannot build black hole");
+    }
 };
 
 
@@ -63,8 +70,6 @@ static Expr substExpr(string x, Expr rep, Expr e)
             formals = ATgetNext(formals);
         }
     }
-
-    /* ??? unfair substitutions? */
 
     /* Generically substitute in subterms. */
 
@@ -345,9 +350,14 @@ static Expr evalExpr(EvalState & state, Expr e)
     /* Consult the memo table to quickly get the normal form of
        previously evaluated expressions. */
     NormalForms::iterator i = state.normalForms.find(e);
-    if (i != state.normalForms.end()) return i->second;
+    if (i != state.normalForms.end()) {
+        if (i->second == state.blackHole)
+            throw badTerm("infinite recursion", e);
+        return i->second;
+    }
 
     /* Otherwise, evaluate and memoize. */
+    state.normalForms[e] = state.blackHole;
     Expr nf = evalExpr2(state, e);
     state.normalForms[e] = nf;
     return nf;
