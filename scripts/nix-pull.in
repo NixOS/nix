@@ -31,7 +31,7 @@ while (<CONFFILE>) {
 
         print "obtaining list of Nix archives at $url...\n";
 
-        system "wget '$url'/MANIFEST -O '$manifest' 2> /dev/null"; # !!! escape
+        system "wget --cache=off '$url'/MANIFEST -O '$manifest' 2> /dev/null"; # !!! escape
         if ($?) { die "`wget' failed"; }
         
         open MANIFEST, "<$manifest";
