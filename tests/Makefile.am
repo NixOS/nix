@@ -10,10 +10,12 @@ TESTS_ENVIRONMENT = TEST_ROOT=$(TEST_ROOT) \
   $(SHELL) -e -x
 
 simple.sh: simple.nix
+dependencies.sh: dependencies.nix
 
-TESTS = init.sh simple.sh
+TESTS = init.sh simple.sh dependencies.sh
 
 include ../substitute.mk
 
 EXTRA_DIST = $(TESTS) \
-  simple.nix.in simple.builder.sh
+  simple.nix.in simple.builder.sh \
+  dependencies.nix.in dependencies.builder*.sh
