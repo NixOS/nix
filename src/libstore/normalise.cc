@@ -256,6 +256,11 @@ Path normaliseStoreExpr(const Path & _nePath, PathSet pending)
     registerSuccessor(txn, nePath, nfPath);
     txn.commit();
 
+    /* It is now safe to delete the lock files, since all future
+       lockers will see the successor; they will not create new lock
+       files with the same names as the old (unlinked) lock files. */
+    outputLocks.setDeletion(true);
+
     return nfPath;
 }
 

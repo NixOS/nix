@@ -14,10 +14,12 @@ class PathLocks
 private:
     list<int> fds;
     Paths paths;
+    bool deletePaths;
 
 public:
     PathLocks(const PathSet & _paths);
     ~PathLocks();
+    void setDeletion(bool deletePaths);
 };
 
 

@@ -43,6 +43,7 @@ static StringSet lockedPaths; /* !!! not thread-safe */
 
 
 PathLocks::PathLocks(const PathSet & _paths)
+    : deletePaths(false)
 {
     /* Note that `fds' is built incrementally so that the destructor
        will only release those locks that we have already acquired. */
@@ -85,6 +86,17 @@ PathLocks::~PathLocks()
     for (list<int>::iterator i = fds.begin(); i != fds.end(); i++)
         close(*i);
 
-    for (Paths::iterator i = paths.begin(); i != paths.end(); i++)
+    for (Paths::iterator i = paths.begin(); i != paths.end(); i++) {
+        if (deletePaths)
+            /* This is not safe in general! */
+            if (unlink(i->c_str()) != 0)
+                throw SysError(format("removing lock file `%1%'") % *i);
         lockedPaths.erase(*i);
+    }
+}
+
+
+void PathLocks::setDeletion(bool deletePaths)
+{
+    this->deletePaths = deletePaths;
 }
