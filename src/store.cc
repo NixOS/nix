@@ -260,3 +260,124 @@ void deleteFromStore(const string & path)
 
     deletePath(path);
 }
+
+
+void verifyStore()
+{
+    Strings paths;
+    enumDB(nixDB, dbPath2Id, paths);
+
+    for (Strings::iterator i = paths.begin();
+         i != paths.end(); i++)
+    {
+        bool erase = true;
+        string path = *i;
+
+        if (!pathExists(path)) {
+            debug(format("path `%1%' disappeared") % path);
+        }
+
+        else {
+            string id;
+            if (!queryDB(nixDB, dbPath2Id, path, id)) abort();
+
+            Strings idPaths;
+            queryListDB(nixDB, dbId2Paths, id, idPaths);
+
+            bool found = false;
+            for (Strings::iterator j = idPaths.begin();     
+                 j != idPaths.end(); j++)
+                if (path == *j) {
+                    found = true;
+                    break;
+                }
+
+            if (found)
+                erase = false;
+            else
+                /* !!! perhaps we should add path to idPaths? */
+                debug(format("reverse mapping for path `%1%' missing") % path);
+        }
+
+        if (erase) delDB(nixDB, dbPath2Id, path);
+    }
+
+    Strings ids;
+    enumDB(nixDB, dbId2Paths, ids);
+
+    for (Strings::iterator i = ids.begin();
+         i != ids.end(); i++)
+    {
+        FSId id = parseHash(*i);
+
+        Strings idPaths;
+        queryListDB(nixDB, dbId2Paths, id, idPaths);
+
+        for (Strings::iterator j = idPaths.begin();     
+             j != idPaths.end(); )
+        {
+            string id2;
+            if (!queryDB(nixDB, dbPath2Id, *j, id2) || 
+                id != parseHash(id2)) {
+                debug(format("erasing path `%1%' from mapping for id %2%") 
+                    % *j % (string) id);
+                j = idPaths.erase(j);
+            } else j++;
+        }
+
+        setListDB(nixDB, dbId2Paths, id, idPaths);
+    }
+
+    
+    Strings subs;
+    enumDB(nixDB, dbSubstitutes, subs);
+
+    for (Strings::iterator i = subs.begin();
+         i != subs.end(); i++)
+    {
+        FSId srcId = parseHash(*i);
+
+        Strings subIds;
+        queryListDB(nixDB, dbSubstitutes, srcId, subIds);
+
+        for (Strings::iterator j = subIds.begin();     
+             j != subIds.end(); )
+        {
+            FSId subId = parseHash(*j);
+            
+            Strings subPaths;
+            queryListDB(nixDB, dbId2Paths, subId, subPaths);
+            if (subPaths.size() == 0) {
+                debug(format("erasing substitute %1% for %2%") 
+                    % (string) subId % (string) srcId);
+                j = subIds.erase(j);
+            } else j++;
+        }
+
+        setListDB(nixDB, dbSubstitutes, srcId, subIds);
+    }
+
+    Strings sucs;
+    enumDB(nixDB, dbSuccessors, sucs);
+
+    for (Strings::iterator i = sucs.begin();
+         i != sucs.end(); i++)
+    {
+        FSId id1 = parseHash(*i);
+
+        string id2;
+        if (!queryDB(nixDB, dbSuccessors, id1, id2)) abort();
+        
+        Strings id2Paths;
+        queryListDB(nixDB, dbId2Paths, id2, id2Paths);
+        if (id2Paths.size() == 0) {
+            Strings id2Subs;
+            queryListDB(nixDB, dbSubstitutes, id2, id2Subs);
+            if (id2Subs.size() == 0) {
+                debug(format("successor %1% for %2% missing") 
+                    % id2 % (string) id1);
+                delDB(nixDB, dbSuccessors, (string) id1);
+            }
+        }
+    }
+}

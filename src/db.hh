@@ -8,9 +8,6 @@
 
 using namespace std;
 
-typedef pair<string, string> DBPair;
-typedef list<DBPair> DBPairs;
-
 void createDB(const string & filename, const string & dbname);
 
 bool queryDB(const string & filename, const string & dbname,
@@ -29,6 +26,6 @@ void delDB(const string & filename, const string & dbname,
     const string & key);
 
 void enumDB(const string & filename, const string & dbname,
-    DBPairs & contents);
+    Strings & keys);
 
 #endif /* !__DB_H */

@@ -1,8 +1,6 @@
 #ifndef __FSTATE_H
 #define __FSTATE_H
 
-#include <set>
-
 extern "C" {
 #include <aterm2.h>
 }
@@ -52,8 +50,6 @@ using namespace std;
 
 typedef ATerm FState;
 typedef ATerm Content;
-
-typedef set<string> StringSet;
 
 typedef list<FSId> FSIds;
 

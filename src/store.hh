@@ -35,5 +35,7 @@ void addToStore(string srcPath, string & dstPath, FSId & id,
 /* Delete a value from the nixStore directory. */
 void deleteFromStore(const string & path);
 
+void verifyStore();
+
 
 #endif /* !__STORE_H */

@@ -283,6 +283,13 @@ static void opInit(Strings opFlags, Strings opArgs)
 }
 
 
+/* Verify the consistency of the Nix environment. */
+static void opVerify(Strings opFlags, Strings opArgs)
+{
+    verifyStore();
+}
+
+
 /* Scan the arguments; find the operation, set global flags, put all
    other flags in a list, and put all other arguments in another
    list. */
@@ -316,6 +323,8 @@ void run(Strings args)
             op = opRestore;
         else if (arg == "--init")
             op = opInit;
+        else if (arg == "--verify")
+            op = opVerify;
         else if (arg[0] == '-')
             opFlags.push_back(arg);
         else

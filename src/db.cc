@@ -157,7 +157,7 @@ void delDB(const string & filename, const string & dbname,
 
 
 void enumDB(const string & filename, const string & dbname,
-    DBPairs & contents)
+    Strings & keys)
 {
     try {
 
@@ -168,11 +168,9 @@ void enumDB(const string & filename, const string & dbname,
         DbcClose cursorCloser(cursor);
 
         Dbt kt, dt;
-        while (cursor->get(&kt, &dt, DB_NEXT) != DB_NOTFOUND) {
-            string key((char *) kt.get_data(), kt.get_size());
-            string data((char *) dt.get_data(), dt.get_size());
-            contents.push_back(DBPair(key, data));
-        }
+        while (cursor->get(&kt, &dt, DB_NEXT) != DB_NOTFOUND)
+            keys.push_back(
+                string((char *) kt.get_data(), kt.get_size()));
 
     } catch (DbException e) { rethrow(e); }
 }

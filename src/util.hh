@@ -3,6 +3,7 @@
 
 #include <string>
 #include <list>
+#include <set>
 #include <sstream>
 
 #include <unistd.h>
@@ -38,6 +39,7 @@ public:
 
 
 typedef list<string> Strings;
+typedef set<string> StringSet;
 
 
 /* The canonical system name, as returned by config.guess. */ 
