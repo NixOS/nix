@@ -2,6 +2,7 @@
 #define __GLOBALS_H
 
 #include <string>
+#include "util.hh"
 
 using namespace std;
 
@@ -27,6 +28,9 @@ extern string nixDBPath;
 
 /* Whether to keep temporary directories of failed builds. */
 extern bool keepFailed;
+
+/* Verbosity level for build output. */
+extern Verbosity buildVerbosity;
 
 
 #endif /* !__GLOBALS_H */

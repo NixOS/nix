@@ -7,3 +7,5 @@ string nixStateDir = "/UNINIT";
 string nixDBPath = "/UNINIT";
 
 bool keepFailed = false;
+
+Verbosity buildVerbosity = lvlDebug;

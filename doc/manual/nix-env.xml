@@ -9,6 +9,8 @@
       <command>nix-env</command>
       <arg rep='repeat'><option>--verbose</option></arg>
       <arg rep='repeat'><option>-v</option></arg>
+      <arg><option>--build-output</option></arg>
+      <arg><option>-B</option></arg>
       <arg><option>--keep-failed</option></arg>
       <arg><option>-K</option></arg>
       <arg>

@@ -51,6 +51,8 @@ static void initAndRun(int argc, char * * argv)
         string arg = *i;
         if (arg == "--verbose" || arg == "-v")
             verbosity = (Verbosity) ((int) verbosity + 1);
+        else if (arg == "--build-output" || arg == "-B")
+            buildVerbosity = lvlError; /* lowest */
         else if (arg == "--help") {
             printHelp();
             return;

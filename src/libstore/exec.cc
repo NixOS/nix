@@ -22,7 +22,7 @@ void runProgram(const string & program,
 {
     /* Create a log file. */
     string logCommand = 
-	verbosity >= lvlDebug 
+	verbosity >= buildVerbosity 
 	? "tee "  + logFileName + " >&2"
 	: "cat > " + logFileName;
     /* !!! auto-pclose on exit */

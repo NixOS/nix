@@ -71,3 +71,17 @@
 
   </listitem>
 </varlistentry>
+
+<varlistentry>
+  <term><option>--build-output</option> / <option>-B</option></term>
+  <listitem>
+    <para>
+      Causes the output written by build actions to standard output
+      and standard error to be echoed to standard error, regardless of
+      verbosity level.  By default, it is only echoed at a verbosity
+      level of at least 4 (<quote>Debug</quote>), and is suppressed at
+      lower levels.  Note that it is always written to a log file in
+      <filename><replaceable>prefix</replaceable>/nix/var/log/nix</filename>.
+    </para>
+  </listitem>
+</varlistentry>
