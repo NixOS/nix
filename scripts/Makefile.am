@@ -22,4 +22,5 @@ EXTRA_DIST = nix-collect-garbage.in \
   nix-channel.in \
   readmanifest.pm.in \
   nix-build.in \
-  download-using-manifests.pl.in
+  download-using-manifests.pl.in \
+  generate-patches.in
