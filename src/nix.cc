@@ -157,14 +157,15 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         switch (query) {
 
-#if 0
         case qPath: {
-            StringSet refs;
-            cout << format("%s\n") % 
-                (string) fstatePath(realiseFState(termFromHash(hash), refs));
+            Strings paths = fstatePaths(id, true);
+            for (Strings::iterator i = paths.begin(); 
+                 i != paths.end(); i++)
+                cout << format("%s\n") % *i;
             break;
         }
 
+#if 0
         case qRefs: {
             StringSet refs;
             FState fs = hash2fstate(hash);

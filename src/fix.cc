@@ -164,7 +164,7 @@ static Expr evalExpr(Expr e)
             char * id;
 
             if (ATmatch(value, "FSId(<str>)", &id)) {
-                Strings paths = fstatePaths(parseHash(id));
+                Strings paths = fstatePaths(parseHash(id), false);
                 if (paths.size() != 1) abort();
                 string path = *(paths.begin());
                 ins = ATinsert(ins, ATmake("<str>", id));

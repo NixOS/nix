@@ -74,20 +74,6 @@ struct Slice
 };
 
 
-#if 0
-/* Realise an fstate expression in the file system.  This requires
-   execution of all Derive() nodes. */
-FState realiseFState(FState fs, StringSet & paths);
-
-/* Return the path of an fstate expression.  An empty string is
-   returned if the term is not a valid fstate expression. (!!!) */
-string fstatePath(FState fs);
-
-/* Return the paths referenced by fstate expression. */
-void fstateRefs(FState fs, StringSet & paths);
-#endif
-
-
 /* Return a canonical textual representation of an expression. */
 string printTerm(ATerm t);
 
@@ -115,7 +101,7 @@ Slice normaliseFState(FSId id);
 /* Realise a Slice in the file system. */
 void realiseSlice(const Slice & slice);
 
-Strings fstatePaths(FSId id);
+Strings fstatePaths(FSId id, bool normalise);
 
 
 #endif /* !__FSTATE_H */

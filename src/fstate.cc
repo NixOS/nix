@@ -332,19 +332,19 @@ Slice normaliseFState(FSId id)
     }
 
     /* Check that none of the output paths exist. */
-    typedef pair<string, FSId> OutPath;
-    list<OutPath> outPaths;
+    typedef map<string, FSId> OutPaths;
+    OutPaths outPaths;
     while (!ATisEmpty(outs)) {
         ATerm t = ATgetFirst(outs);
         char * s1, * s2;
         if (!ATmatch(t, "(<str>, <str>)", &s1, &s2))
             throw badTerm("string expected", t);
-        outPaths.push_back(OutPath(s1, parseHash(s2)));
+        outPaths[s1] = parseHash(s2);
         inPaths.push_back(s1);
         outs = ATgetNext(outs);
     }
 
-    for (list<OutPath>::iterator i = outPaths.begin(); 
+    for (OutPaths::iterator i = outPaths.begin(); 
          i != outPaths.end(); i++)
         if (pathExists(i->first))
             throw Error(format("path `%1%' exists") % i->first);
@@ -357,7 +357,7 @@ Slice normaliseFState(FSId id)
     /* Check whether the output paths were created, and register each
        one. */
     FSIdSet used;
-    for (list<OutPath>::iterator i = outPaths.begin(); 
+    for (OutPaths::iterator i = outPaths.begin(); 
          i != outPaths.end(); i++)
     {
         string path = i->first;
@@ -374,10 +374,15 @@ Slice normaliseFState(FSId id)
 
         for (Strings::iterator j = refs.begin(); j != refs.end(); j++) {
             ElemMap::iterator k;
+            OutPaths::iterator l;
             if ((k = inMap.find(*j)) != inMap.end()) {
                 elem.refs.push_back(k->second.id);
                 used.insert(k->second.id);
-            } else abort(); /* fix! check in created paths */
+            } else if ((l = outPaths.find(*j)) != outPaths.end()) {
+                elem.refs.push_back(l->second);
+                used.insert(l->second);
+            } else 
+                throw Error(format("unknown referenced path `%1%'") % *j);
         }
 
         slice.elems.push_back(elem);
@@ -470,7 +475,7 @@ void realiseSlice(const Slice & slice)
 }
 
 
-Strings fstatePaths(FSId id)
+Strings fstatePaths(FSId id, bool normalise)
 {
     Strings paths;
 
@@ -480,10 +485,15 @@ Strings fstatePaths(FSId id)
     char * builder;
     char * platform;
 
-    if (ATgetType(fs) == AT_APPL && 
-        (string) ATgetName(ATgetAFun(fs)) == "Slice")
+    if (normalise ||
+        (ATgetType(fs) == AT_APPL && 
+         (string) ATgetName(ATgetAFun(fs)) == "Slice"))
     {
-        Slice slice = parseSlice(fs);
+        Slice slice;
+        if (normalise)
+            slice = normaliseFState(id);
+        else
+            slice = parseSlice(fs);
 
         /* !!! fix complexity */
         for (FSIds::const_iterator i = slice.roots.begin();
