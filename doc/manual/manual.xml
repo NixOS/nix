@@ -11,6 +11,7 @@
 <!ENTITY installation SYSTEM "installation.xml">
 <!ENTITY package-management SYSTEM "package-management.xml">
 <!ENTITY writing-nix-expressions SYSTEM "writing-nix-expressions.xml">
+<!ENTITY build-farm SYSTEM "build-farm.xml">
 <!ENTITY opt-common SYSTEM "opt-common.xml">
 <!ENTITY opt-common-syn SYSTEM "opt-common-syn.xml">
 <!ENTITY nix-env SYSTEM "nix-env.xml">
@@ -47,6 +48,7 @@
   &installation;
   &package-management;
   &writing-nix-expressions;
+  &build-farm;
 
   <appendix>
     <title>Command Reference</title>

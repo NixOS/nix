@@ -1,0 +1,129 @@
+<chapter id='chap-build-farm'><title>Setting up a Build Farm</title>
+
+<para>This chapter provides some sketchy information on how to set up
+a Nix-based build farm.  Nix is particularly suited as a basis for a
+build farm, since:
+
+<itemizedlist>
+
+  <listitem><para>Nix supports distributed builds: a local Nix
+  installation can forward Nix builds to other machines over the
+  network.  This allows multiple builds to be performed in parallel
+  (thus improving performce), but more in importantly, it allows Nix
+  to perform multi-platform builds in a semi-transparent way.  For
+  instance, if you perform a build for a
+  <literal>powerpc-darwin</literal> on an
+  <literal>i686-linux</literal> machine, Nix can automatically forward
+  to build to a <literal>powerpc-darwin</literal> machine, if
+  available.</para></listitem>
+
+  <listitem><para>The Nix expression language is ideal for providing
+  build jobs, plus all their dependencies.  For instance, if your
+  package has some dependency, you don't have to manually install it
+  on all the machines in the build farm; they will be built
+  automatically.</para></listitem>
+
+  <listitem><para>Proper release management requires that builds (if
+  deployed) are traceable: it should be possible to figure out from
+  exactly what sources they were built, in what configuration, etc.;
+  and it should be possible to reproduce the build, if necessary.
+  Nix's hashing scheme uniquely identifies builds, and Nix expressions
+  are self-contained.</para></listitem>
+
+  <listitem><para>Nix will only rebuild things that have actually
+  changed.  For instance, if the sources of a component haven't
+  changed between runs of the build farm, the component won't be
+  rebuild (unless it was garbage-collected).  Also, dependencies
+  typically don't change very often, so they only need to be built
+  once.</para></listitem>
+
+  <listitem><para>The results of a Nix build farm can be made
+  available through a channel, so that users can use succesfull builds
+  immediately.</para></listitem>
+
+</itemizedlist>
+
+</para>
+
+
+<section><title>Overview</title>
+
+<para>TODO</para>
+
+<para>The sources of the Nix build farm are at <ulink
+url='https://svn.cs.uu.nl:12443/repos/trace/release/trunk' />.</para>
+
+</section>
+
+
+<section><title>Setting up distributed builds</title>
+
+<para>You can enable distributed builds by setting the environment
+variable <envar>NIX_BUILD_HOOK</envar> to point to a program that Nix
+will call whenever it wants to build a derivation.  The build hook
+(typically a shell or Perl script) can decline the build, in which Nix
+will perform it in the usual way if possible, or it can accept it, in
+which case it is responsible for somehow getting the inputs of the
+build to another machine, doing the build there, and getting the
+results back.</para>
+
+<example id='ex-remote-systems'><title>Remote machine configuration:
+<filename>remote-systems.conf</filename></title>
+<programlisting>
+nix@mcflurry.labs.cs.uu.nl  powerpc-darwin  /home/nix/.ssh/id_quarterpounder_auto  2
+nix@scratchy.labs.cs.uu.nl  i686-linux      /home/nix/.ssh/id_scratchy_auto        1
+</programlisting>
+</example>
+
+<para>An example build hook can be found in the Nix build farm
+sources: <ulink
+url='https://svn.cs.uu.nl:12443/repos/trace/release/trunk/common/distributed/build-remote.pl'
+/>.  It should be suitable for most purposes, with maybe some minor
+adjustments.  It uses <command>ssh</command> and
+<command>rsync</command> to copy the build inputs and outputs and
+perform the remote build.  You should define a list of available build
+machines and set the environment variable
+<envar>REMOTE_SYSTEMS</envar> to point to it.  An example
+configuration is shown in <xref linkend='ex-remote-systems' />.  Each
+line in the file specifies a machine, with the following bits of
+information:
+
+<orderedlist>
+  
+  <listitem><para>The name of the remote machine, with optionally the
+  user under which the remote build should be performed.  This is
+  actually passed as an argument to <command>ssh</command>, so it can
+  be an alias defined in your
+  <filename>~/.ssh/config</filename>.</para></listitem>
+
+  <listitem><para>The Nix platform type identifier, such as
+  <literal>powerpc-darwin</literal>.</para></listitem>
+
+  <listitem><para>The SSH private key to be used to log in to the
+  remote machine.  Since builds should be non-interactive, this key
+  should not have a passphrase!</para></listitem>
+
+  <listitem><para>The maximum <quote>load</quote> of the remote
+  machine.  This is just the maximum number of jobs that
+  <filename>build-remote.pl</filename> will execute in parallel on the
+  machine.  Typically this should be equal to the number of
+  CPUs.</para></listitem>
+
+</orderedlist>
+
+You should also set up the environment variable
+<envar>CURRENT_LOAD</envar> to point at a file that
+<filename>build-remote.pl</filename> uses to remember how many jobs it
+is currently executing remotely.  It doesn't look at the actual load
+on the remote machine, so if you have multiple instances of Nix
+running, they should use the same <envar>CURRENT_LOAD</envar>
+file<footnote><para>Although there are probably some race conditions
+in the script right now.</para></footnote>.  Maybe in the future
+<filename>build-remote.pl</filename> will look at the actual remote
+load.  The load file should exist, so you should just create it as an
+empty file initially.</para>
+  
+</section>
+
+
+</chapter>

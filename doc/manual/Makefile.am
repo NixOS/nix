@@ -12,6 +12,7 @@ man1_MANS = nix-env.1 nix-store.1 nix-instantiate.1 \
 
 SOURCES = manual.xml introduction.xml installation.xml \
  package-management.xml writing-nix-expressions.xml \
+ build-farm.xml \
  $(man1_MANS:.1=.xml) \
  troubleshooting.xml bugs.xml opt-common.xml opt-common-syn.xml \
  quick-start.xml nix-lang-ref.xml style.css images
