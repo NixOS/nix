@@ -150,11 +150,86 @@ static void printPathSet(const PathSet & paths)
 }
 
 
+/* Some code to print a tree representation of a derivation dependency
+   graph.  Topological sorting is used to keep the tree relatively
+   flat. */
+
+const string treeConn = "+---";
+const string treeLine = "|   ";
+const string treeNull = "    ";
+
+
+static void dfsVisit(const PathSet & paths, const Path & path,
+    PathSet & visited, Paths & sorted)
+{
+    if (visited.find(path) != visited.end()) return;
+    visited.insert(path);
+    
+    PathSet closure;
+    computeFSClosure(path, closure);
+    
+    for (PathSet::iterator i = closure.begin();
+         i != closure.end(); ++i)
+        if (*i != path && paths.find(*i) != paths.end())
+            dfsVisit(paths, *i, visited, sorted);
+
+    sorted.push_front(path);
+}
+
+
+static Paths topoSort(const PathSet & paths)
+{
+    Paths sorted;
+    PathSet visited;
+    for (PathSet::const_iterator i = paths.begin(); i != paths.end(); ++i)
+        dfsVisit(paths, *i, visited, sorted);
+    return sorted;
+}
+
+
+static void printDrvTree(const Path & drvPath,
+    const string & firstPad, const string & tailPad, PathSet & done)
+{
+    if (done.find(drvPath) != done.end()) {
+        cout << format("%1%%2% [...]\n") % firstPad % drvPath;
+        return;
+    }
+    done.insert(drvPath);
+
+    cout << format("%1%%2%\n") % firstPad % drvPath;
+    
+    Derivation drv = derivationFromPath(drvPath);
+    
+    for (PathSet::iterator i = drv.inputSrcs.begin();
+         i != drv.inputSrcs.end(); ++i)
+        cout << format("%1%%2%\n") % (tailPad + treeConn) % *i;
+
+    PathSet inputs;
+    for (DerivationInputs::iterator i = drv.inputDrvs.begin();
+         i != drv.inputDrvs.end(); ++i)
+        inputs.insert(i->first);
+
+    /* Topologically sorted under the relation A < B iff A \in
+       closure(B).  That is, if derivation A is an (possibly indirect)
+       input of B, then A is printed first.  This has the effect of
+       flattening the tree, preventing deeply nested structures.  */
+    Paths sorted = topoSort(inputs);
+    reverse(sorted.begin(), sorted.end());
+
+    for (Paths::iterator i = sorted.begin(); i != sorted.end(); ++i) {
+        Paths::iterator j = i; ++j;
+        printDrvTree(*i, tailPad + treeConn,
+            j == sorted.end() ? tailPad + treeNull : tailPad + treeLine,
+            done);
+    }
+}
+
+
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
     enum { qOutputs, qRequisites, qReferences, qReferers,
-           qReferersClosure, qDeriver, qBinding, qGraph } query = qOutputs;
+           qReferersClosure, qDeriver, qBinding, qTree, qGraph } query = qOutputs;
     bool useOutput = false;
     bool includeOutputs = false;
     bool forceRealise = false;
@@ -175,6 +250,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             opArgs.pop_front();
             query = qBinding;
         }
+        else if (*i == "--tree") query = qTree;
         else if (*i == "--graph") query = qGraph;
         else if (*i == "--use-output" || *i == "-u") useOutput = true;
         else if (*i == "--force-realise" || *i == "-f") forceRealise = true;
@@ -240,6 +316,14 @@ static void opQuery(Strings opFlags, Strings opArgs)
             }
             break;
 
+        case qTree: {
+            PathSet done;
+            for (Strings::iterator i = opArgs.begin();
+                 i != opArgs.end(); i++)
+                printDrvTree(fixPath(*i), "", "", done);
+            break;
+        }
+            
 #if 0            
         case qGraph: {
             PathSet roots;
