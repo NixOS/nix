@@ -332,6 +332,11 @@ build:
     
         if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
             throw Error("unable to build package");
+
+        /* Remove write permission from the build directory. */
+        int res = system(("chmod -R -w " + path).c_str()); // !!! escaping
+        if (WEXITSTATUS(res) != 0)
+            throw Error("cannot remove write permission from " + path);
     
     } catch (exception &) {
         system(("rm -rf " + path).c_str());
@@ -411,10 +416,10 @@ void delPkg(string hash)
     string path;
     checkHash(hash);
     if (queryDB(dbInstPkgs, hash, path)) {
-        int res = system(("rm -rf " + path).c_str()); // !!! escaping
-        delDB(dbInstPkgs, hash); // not a bug
+        int res = system(("chmod -R +w " + path + " && rm -rf " + path).c_str()); // !!! escaping
+        delDB(dbInstPkgs, hash); // not a bug ??? 
         if (WEXITSTATUS(res) != 0)
-            throw Error("cannot delete " + path);
+            cerr << "errors deleting " + path + ", ignoring" << endl;
     }
 }
 
