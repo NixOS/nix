@@ -22,7 +22,10 @@ $ ./configure
 $ make
 $ make install <lineannotation>(as root)</lineannotation></screen>
 
-        This will install Nix in <filename>/nix</filename>.
+        This will install Nix in <filename>/nix</filename>.  You
+        should also add <filename>/nix/etc/profile.d/nix.sh</filename>
+        to your <filename>~/.bashrc</filename> (or some other login
+        file).
       </para>
     </listitem>
 
@@ -36,6 +39,8 @@ $ make install <lineannotation>(as root)</lineannotation></screen>
 $ wget http://<replaceable>...</replaceable>/nix/nixpkgs-<replaceable>version</replaceable>/nixpkgs-<replaceable>version</replaceable>.tar.bz2
 $ tar xfj nixpkgs-<replaceable>version</replaceable>.tar.bz2</screen>
 
+        This will unpack the distribution into a directory
+        <filename>nixpkgs-<replaceable>version</replaceable>/</filename>.
       </para>
     </listitem>
 
@@ -62,7 +67,7 @@ $ nix-pull http://<replaceable>...</replaceable>/nix/nixpkgs-<replaceable>versio
         See what's available:
 
         <screen>
-$ nix-env -qaf nixpkgs-<replaceable>version</replaceable>
+$ nix-env -qaf nixpkgs-<replaceable>version</replaceable>/
 MozillaFirebird-0.7
 hello-2.1.1
 docbook-xml-4.2
@@ -77,7 +82,7 @@ libxslt-1.1.0
         Install some packages:
         
         <screen>
-$ nix-env -iBf nixpkgs-<replaceable>version</replaceable> hello MozillaFirebird <replaceable>...</replaceable> </screen>
+$ nix-env -iBf nixpkgs-<replaceable>version</replaceable>/ hello MozillaFirebird <replaceable>...</replaceable> </screen>
 
       </para>
     </listitem>
