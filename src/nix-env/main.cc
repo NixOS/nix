@@ -704,9 +704,6 @@ static void opDefaultExpr(Globals & globals,
 
 void run(Strings args)
 {
-    /* Use a higher default verbosity (lvlInfo). */
-    verbosity = (Verbosity) ((int) verbosity + 1);
-
     Strings opFlags, opArgs;
     Operation op = 0;
     

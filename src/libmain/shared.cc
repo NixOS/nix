@@ -126,7 +126,9 @@ static void initAndRun(int argc, char * * argv)
             setLogType(*i);
         }
         else if (arg == "--build-output" || arg == "-B")
-            buildVerbosity = lvlError; /* lowest */
+            ; /* !!! obsolete - remove eventually */
+        else if (arg == "--no-build-output" || arg == "-Q")
+            buildVerbosity = lvlVomit;
         else if (arg == "--help") {
             printHelp();
             return;

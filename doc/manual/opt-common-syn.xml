@@ -2,8 +2,8 @@
 <arg><option>--version</option></arg>
 <arg rep='repeat'><option>--verbose</option></arg>
 <arg rep='repeat'><option>-v</option></arg>
-<arg><option>--build-output</option></arg>
-<arg><option>-B</option></arg>
+<arg><option>--no-build-output</option></arg>
+<arg><option>-Q</option></arg>
 <arg>
   <group choice='req'>
     <arg choice='plain'><option>--max-jobs</option></arg>

@@ -12,6 +12,6 @@ bool keepGoing = false;
 
 bool tryFallback = false;
 
-Verbosity buildVerbosity = lvlDebug;
+Verbosity buildVerbosity = lvlInfo;
 
 unsigned int maxBuildJobs = 1;
