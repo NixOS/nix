@@ -267,8 +267,6 @@ static void opVerify(Strings opFlags, Strings opArgs)
    list. */
 void run(Strings args)
 {
-    openDB();
-
     Strings opFlags, opArgs;
     Operation op = 0;
 
@@ -314,6 +312,8 @@ void run(Strings args)
     }
 
     if (!op) throw UsageError("no operation specified");
+
+    openDB();
 
     op(opFlags, opArgs);
 }

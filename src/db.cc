@@ -1,7 +1,12 @@
-#include "db.hh"
-#include "util.hh"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <memory>
+
+#include "db.hh"
+#include "util.hh"
+#include "pathlocks.hh"
 
 
 /* Wrapper class to ensure proper destruction. */
@@ -89,48 +94,176 @@ Database::Database()
 
 Database::~Database()
 {
-    if (env) {
-        debug(format("closing database environment"));
+    close();
+}
 
-        try {
 
-            for (map<TableId, Db *>::iterator i = tables.begin();
-                 i != tables.end(); i++)
-            {
-                debug(format("closing table %1%") % i->first);
-                Db * db = i->second;
-                db->close(0);
-                delete db;
-            }
-
-            env->txn_checkpoint(0, 0, 0);
-            env->close(0);
-
-        } catch (DbException e) { rethrow(e); }
-
-        delete env;
+int getAccessorCount(int fd)
+{
+    if (lseek(fd, 0, SEEK_SET) == -1)
+        throw SysError("seeking accessor count");
+    char buf[128];
+    int len;
+    if ((len = read(fd, buf, sizeof(buf) - 1)) == -1)
+        throw SysError("reading accessor count");
+    buf[len] = 0;
+    int count;
+    if (sscanf(buf, "%d", &count) != 1) {
+        debug(format("accessor count is invalid: `%1%'") % buf);
+        return -1;
     }
+    return count;
+}
+
+
+void setAccessorCount(int fd, int n)
+{
+    if (lseek(fd, 0, SEEK_SET) == -1)
+        throw SysError("seeking accessor count");
+    string s = (format("%1%") % n).str();
+    const char * s2 = s.c_str();
+    if (write(fd, s2, strlen(s2)) != (ssize_t) strlen(s2) ||
+        ftruncate(fd, strlen(s2)) != 0)
+        throw SysError("writing accessor count");
+}
+
+
+void openEnv(DbEnv * env, const string & path, u_int32_t flags)
+{
+    env->open(path.c_str(),
+        DB_INIT_LOCK | DB_INIT_LOG | DB_INIT_MPOOL | DB_INIT_TXN |
+        DB_CREATE | flags,
+        0666);
 }
 
 
 void Database::open(const string & path)
 {
-    try {
-        
-        if (env) throw Error(format("environment already open"));
+    if (env) throw Error(format("environment already open"));
 
+    try {
+
+        debug(format("opening database environment"));
+
+
+        /* Create the database environment object. */
         env = new DbEnv(0);
 
         env->set_lg_bsize(32 * 1024); /* default */
         env->set_lg_max(256 * 1024); /* must be > 4 * lg_bsize */
         env->set_lk_detect(DB_LOCK_DEFAULT);
         
-        env->open(path.c_str(),
-            DB_INIT_LOCK | DB_INIT_LOG | DB_INIT_MPOOL | DB_INIT_TXN |
-            DB_CREATE,
-            0666);
+
+        /* The following code provides automatic recovery of the
+           database environment.  Recovery is necessary when a process
+           dies while it has the database open.  To detect this,
+           processes atomically increment a counter when the open the
+           database, and decrement it when they close it.  If we see
+           that counter is > 0 but no processes are accessing the
+           database---determined by attempting to obtain a write lock
+           on a lock file on which all accessors have a read lock---we
+           must run recovery.  Note that this also ensures that we
+           only run recovery when there are no other accessors (which
+           could cause database corruption). */
+
+        /* !!! close fdAccessors / fdLock on exception */
+
+        /* Open the accessor count file. */
+        string accessorsPath = path + "/accessor_count";
+        fdAccessors = ::open(accessorsPath.c_str(), O_RDWR | O_CREAT, 0666);
+        if (fdAccessors == -1)
+            throw SysError(format("opening file `%1%'") % accessorsPath);
+
+        /* Open the lock file. */
+        string lockPath = path + "/access_lock";
+        fdLock = ::open(lockPath.c_str(), O_RDWR | O_CREAT, 0666);
+        if (fdLock == -1)
+            throw SysError(format("opening lock file `%1%'") % lockPath);
+
+        /* Try to acquire a write lock. */
+        debug(format("attempting write lock on `%1%'") % lockPath);
+        if (lockFile(fdLock, ltWrite, false)) { /* don't wait */
+
+            debug(format("write lock granted"));
+
+            /* We have a write lock, which means that there are no
+               other readers or writers. */
+
+            int n = getAccessorCount(fdAccessors);
+                setAccessorCount(fdAccessors, 1);
+
+            if (n != 0) {
+                msg(lvlTalkative, format("accessor count is %1%, running recovery") % n);
+
+                /* Open the environment after running recovery. */
+                openEnv(env, path, DB_RECOVER);
+            }
+            
+            else 
+                /* Open the environment normally. */
+                openEnv(env, path, 0);
+
+            /* Downgrade to a read lock. */
+            debug(format("downgrading to read lock on `%1%'") % lockPath);
+            lockFile(fdLock, ltRead, true);
+
+        } else {
+            /* There are other accessors. */ 
+            debug(format("write lock refused"));
+
+            /* Acquire a read lock. */
+            debug(format("acquiring read lock on `%1%'") % lockPath);
+            lockFile(fdLock, ltRead, true); /* wait indefinitely */
+
+            /* Increment the accessor count. */
+            lockFile(fdAccessors, ltWrite, true);
+            int n = getAccessorCount(fdAccessors) + 1;
+            setAccessorCount(fdAccessors, n);
+            debug(format("incremented accessor count to %1%") % n);
+            lockFile(fdAccessors, ltNone, true);
+
+            /* Open the environment normally. */
+            openEnv(env, path, 0);
+        }
 
     } catch (DbException e) { rethrow(e); }
+}
+
+
+void Database::close()
+{
+    if (!env) return;
+
+    /* Close the database environment. */
+    debug(format("closing database environment"));
+
+    try {
+
+        for (map<TableId, Db *>::iterator i = tables.begin();
+             i != tables.end(); i++)
+        {
+            debug(format("closing table %1%") % i->first);
+            Db * db = i->second;
+            db->close(0);
+            delete db;
+        }
+
+        env->txn_checkpoint(0, 0, 0);
+        env->close(0);
+
+    } catch (DbException e) { rethrow(e); }
+
+    delete env;
+
+    /* Decrement the accessor count. */
+    lockFile(fdAccessors, ltWrite, true);
+    int n = getAccessorCount(fdAccessors) - 1;
+    setAccessorCount(fdAccessors, n);
+    debug(format("decremented accessor count to %1%") % n);
+    lockFile(fdAccessors, ltNone, true);
+
+    ::close(fdAccessors);
+    ::close(fdLock);
 }
 
 

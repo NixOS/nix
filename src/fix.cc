@@ -438,8 +438,6 @@ static void printNixExpr(EvalState & state, Expr e)
 
 void run(Strings args)
 {
-    openDB();
-
     EvalState state;
     Strings files;
     bool readStdin = false;
@@ -466,6 +464,8 @@ void run(Strings args)
         else
             files.push_back(arg);
     }
+
+    openDB();
 
     if (readStdin) {
         Expr e = evalStdin(state);

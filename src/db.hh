@@ -45,6 +45,9 @@ class Database
 private:
     DbEnv * env;
 
+    int fdLock;
+    int fdAccessors;
+
     TableId nextId;
     map<TableId, Db *> tables;
 
@@ -57,6 +60,7 @@ public:
     ~Database();
     
     void open(const string & path);
+    void close();
 
     TableId openTable(const string & table);
 

@@ -4,6 +4,11 @@
 #include "util.hh"
 
 
+typedef enum LockType { ltRead, ltWrite, ltNone };
+
+bool lockFile(int fd, LockType lockType, bool wait);
+
+
 class PathLocks 
 {
 private:

@@ -1,8 +1,37 @@
 #include <cerrno>
 
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 
 #include "pathlocks.hh"
+
+
+bool lockFile(int fd, LockType lockType, bool wait)
+{
+    struct flock lock;
+    if (lockType == ltRead) lock.l_type = F_RDLCK;
+    else if (lockType == ltWrite) lock.l_type = F_WRLCK;
+    else if (lockType == ltNone) lock.l_type = F_UNLCK;
+    else abort();
+    lock.l_whence = SEEK_SET;
+    lock.l_start = 0;
+    lock.l_len = 0; /* entire file */
+
+    if (wait) {
+        while (fcntl(fd, F_SETLKW, &lock) != 0)
+            if (errno != EINTR)
+                throw SysError(format("acquiring/releasing lock"));
+    } else {
+        while (fcntl(fd, F_SETLK, &lock) != 0) {
+            if (errno == EACCES || errno == EAGAIN) return false;
+            if (errno != EINTR) 
+                throw SysError(format("acquiring/releasing lock"));
+        }
+    }
+
+    return true;
+}
 
 
 /* This enables us to check whether are not already holding a lock on
@@ -43,16 +72,8 @@ PathLocks::PathLocks(const PathSet & _paths)
         fds.push_back(fd);
         this->paths.push_back(lockPath);
 
-        /* Lock it. */
-        struct flock lock;
-        lock.l_type = F_WRLCK; /* exclusive lock */
-        lock.l_whence = SEEK_SET;
-        lock.l_start = 0;
-        lock.l_len = 0; /* entire file */
-
-        while (fcntl(fd, F_SETLKW, &lock) == -1)
-            if (errno != EINTR)
-                throw SysError(format("acquiring lock on `%1%'") % lockPath);
+        /* Acquire an exclusive lock. */
+        lockFile(fd, ltWrite, true);
 
         lockedPaths.insert(lockPath);
     }
