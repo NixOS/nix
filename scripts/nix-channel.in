@@ -48,6 +48,19 @@ sub addChannel {
 }
 
 
+# Remove a channel from the file $channelsList;
+sub removeChannel {
+    my $url = shift;
+    my @left = ();
+    readChannels;
+    foreach my $url2 (@channels) {
+        push @left, $url2 if $url ne $url2;
+    }
+    @channels = @left;
+    writeChannels;
+}
+
+
 # Fetch Nix expressions and pull cache manifests from the subscribed
 # channels.
 sub update {
@@ -76,7 +89,7 @@ sub update {
         chomp $hash;
         # !!! escaping
         $nixExpr .= "((import @datadir@/nix/corepkgs/fetchurl) " .
-            "{url = $fullURL; md5 = \"$hash\"; system = \"@system@\";}) "
+            "{url = $fullURL; sha1 = \"$hash\"; system = \"@system@\";}) "
     }
 
     $nixExpr .= "]";
@@ -85,33 +98,39 @@ sub update {
         "(import @datadir@/nix/corepkgs/channels/unpack.nix) " .
         "{inputs = $nixExpr; system = \"@system@\";}";
 
-    # Instantiate the Nix expression.
-    my $storeExpr = `echo '$nixExpr' | @bindir@/nix-instantiate -`
-        or die "cannot instantiate Nix expression";
-    chomp $storeExpr;
-
-    # Register the store expression as a root of the garbage
-    # collector.
+    # Figure out a name for the GC root.
     my $userName = getpwuid($<);
     die "who ARE you? go away" unless defined $userName;
 
-    my $rootFile = "$rootsDir/$userName.gcroot";
-    my $tmpRootFile = "$rootsDir/$userName-tmp.gcroot";
+    my $rootFile = "$rootsDir/$userName";
     
-    open ROOT, ">$tmpRootFile" or die "cannot create `$tmpRootFile': $!";
-    print ROOT "$storeExpr";
-    close ROOT;
+    # Instantiate the Nix expression.
+    my $storeExpr = `echo '$nixExpr' | @bindir@/nix-instantiate --add-root '$rootFile'.tmp -`
+        or die "cannot instantiate Nix expression";
+    chomp $storeExpr;
 
-    # Realise the store expression.
-    my $outPath = `nix-store -qnf '$storeExpr'`
+    # Build the resulting derivation.
+    my $outPath = `nix-store --add-root '$rootFile' -r '$storeExpr'`
         or die "cannot realise store expression";
     chomp $outPath;
+
+    unlink "$rootFile.tmp";
 
     # Make it the default Nix expression for `nix-env'.
     system "@bindir@/nix-env --import '$outPath'";
     die "cannot pull set default Nix expression to `$outPath'" if ($? != 0);
+}
 
-    rename $tmpRootFile, $rootFile or die "cannot rename `$tmpRootFile' to `$rootFile': $!";
+
+sub usageError {
+    print STDERR <<EOF;
+Usage:
+  nix-channel --add URL
+  nix-channel --remove URL
+  nix-channel --list
+  nix-channel --update
+EOF
+    exit 1;
 }
 
 
@@ -119,18 +138,37 @@ while (scalar @ARGV) {
     my $arg = shift @ARGV;
 
     if ($arg eq "--add") {
-        die "syntax: nix-channel --add URL" if (scalar @ARGV != 1);
+        usageError if scalar @ARGV != 1;
         addChannel (shift @ARGV);
         last;
     }
 
-    elsif ($arg eq "--update") {
-        die "syntax: nix-channel --update" if (scalar @ARGV != 0);
-        update;
+    if ($arg eq "--remove") {
+        usageError if scalar @ARGV != 1;
+        removeChannel (shift @ARGV);
         last;
     }
 
+    if ($arg eq "--list") {
+        usageError if scalar @ARGV != 0;
+        readChannels;
+        foreach my $url (@channels) {
+            print "$url\n";
+        }
+        last;
+    }
+
+    elsif ($arg eq "--update") {
+        usageError if scalar @ARGV != 0;
+        update;
+        last;
+    }
+    
+    elsif ($arg eq "--help") {
+        usageError;
+    }
+
     else {
-        die "unknown argument `$arg'";
+        die "unknown argument `$arg'; try `--help'";
     }
 }
