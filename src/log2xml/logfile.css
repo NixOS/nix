@@ -5,6 +5,12 @@ body
 }
 
 
+td.line
+{
+    width: 100%;
+}
+
+
 blockquote.body
 {
     padding: 6px 0px;
@@ -69,6 +75,8 @@ tr.y > td.dummy > div.dummy
 em.storeref
 {
     color: #500000;
+    position: relative; 
+    width: 100%;
 }
 
 
@@ -92,17 +100,6 @@ em.storeref:hover
 }
 
 
-em.storeref {
-    position: static;
-}
-
-
-span.z {
-    position: absolute;
-    width: 100%;
-}
-
-
-em.storeref:hover > span.z > *.popup {
-    display: block;
+em.storeref:hover span.popup {
+    display: inline;
 }

@@ -27,7 +27,7 @@
                 <td class='dummy'>
                   <div class='dummy' />
                 </td>
-                <td>
+                <td class='line'>
                   <xsl:apply-templates select='.'/>
                 </td>
               </tr>
@@ -39,7 +39,7 @@
                 <td class='dummy'>
                   <div class='dummy' />
                 </td>
-                <td>
+                <td class='line'>
                   <xsl:apply-templates select='.'/>
                 </td>
               </tr>
@@ -58,8 +58,8 @@
 
   <xsl:template match="storeref">
     <em class='storeref'>
-      <span class='z'><span class='popup'><xsl:apply-templates/></span></span>
-      <span class='elided'>(...)</span><xsl:apply-templates select='name'/><xsl:apply-templates select='path'/>
+      <span class='popup'><xsl:apply-templates/></span>
+      <span class='elided'>/...</span><xsl:apply-templates select='name'/><xsl:apply-templates select='path'/>
     </em>
   </xsl:template>
   
