@@ -125,7 +125,6 @@ while (<READ>) {
     my $srcpath = $srcpaths[$i++];
     push @subs, $srcpath;
     push @subs, $subpath;
-    print "$srcpath $subpath\n";
 }
 
 waitpid $pid, 0;
@@ -134,13 +133,11 @@ $? == 0 or die "fix failed";
 
 # Register all substitutes.
 print STDERR "registering substitutes...\n";
-print "@subs\n";
 system "nix --substitute @subs";
 if ($?) { die "`nix --substitute' failed"; }
 
 
 # Register all successors.
 print STDERR "registering successors...\n";
-print "@sucs\n";
-system "nix --successor -vvvv @sucs";
+system "nix --successor @sucs";
 if ($?) { die "`nix --successor' failed"; }
