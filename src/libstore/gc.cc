@@ -12,17 +12,30 @@
 #include <unistd.h>
 
 
-/* Acquire the global GC lock. */
-static AutoCloseFD openGCLock(LockType lockType)
+static string gcLockName = "gc.lock";
+
+
+/* Acquire the global GC lock.  This is used to prevent new Nix
+   processes from starting after the temporary root files have been
+   read.  To be precise: when they try to create a new temporary root
+   file, they will block until the garbage collector has finished /
+   yielded the GC lock. */
+static int openGCLock(LockType lockType)
 {
-#if 0
-    Path fnGCLock = (format("%1%/%2%/%3%")
-        % nixStateDir % tempRootsDir % getpid()).str();
+    Path fnGCLock = (format("%1%/%2%")
+        % nixStateDir % gcLockName).str();
         
-    fdTempRoots = open(fnTempRoots.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
-    if (fdTempRoots == -1)
-        throw SysError(format("opening temporary roots file `%1%'") % fnTempRoots);
-#endif
+    AutoCloseFD fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT, 0600);
+    if (fdGCLock == -1)
+        throw SysError(format("opening global GC lock `%1%'") % fnGCLock);
+
+    lockFile(fdGCLock, lockType, true);
+
+    /* !!! Restrict read permission on the GC root.  Otherwise any
+       process that can open the file for reading can DoS the
+       collector. */
+    
+    return fdGCLock.borrow();
 }
 
 
@@ -41,11 +54,15 @@ void addTempRoot(const Path & path)
         while (1) {
             fnTempRoots = (format("%1%/%2%/%3%")
                 % nixStateDir % tempRootsDir % getpid()).str();
-        
+
+            AutoCloseFD fdGCLock = openGCLock(ltRead);
+            
             fdTempRoots = open(fnTempRoots.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
             if (fdTempRoots == -1)
                 throw SysError(format("opening temporary roots file `%1%'") % fnTempRoots);
 
+            fdGCLock.close();
+            
             debug(format("acquiring read lock on `%1%'") % fnTempRoots);
             lockFile(fdTempRoots, ltRead, true);
 
@@ -188,14 +205,11 @@ void collectGarbage(const PathSet & roots, GCAction action,
 {
     result.clear();
     
-    /* !!! TODO: Acquire the global GC root.  This prevents
+    /* Acquire the global GC root.  This prevents
        a) New roots from being added.
        b) Processes from creating new temporary root files. */
+    AutoCloseFD fdGCLock = openGCLock(ltWrite);
 
-    /* !!! Restrict read permission on the GC root.  Otherwise any
-       process that can open the file for reading can DoS the
-       collector. */
-    
     /* Determine the live paths which is just the closure of the
        roots under the `references' relation. */
     PathSet livePaths;

@@ -6,6 +6,8 @@ outPath2=$($TOP/src/nix-store/nix-store -q $storeExpr2)
 
 ls -l test-tmp/state/temproots
 
+ln -s $storeExpr2 "$NIX_LOCALSTATE_DIR"/nix/gcroots/foo2
+
 # Start build #1 in the background.  It starts immediately.
 $TOP/src/nix-store/nix-store -rvv "$storeExpr1" &
 pid1=$!
@@ -31,4 +33,5 @@ wait $pid2
 cat $outPath1/foobar
 cat $outPath1/input-2/bar
 
+# Build #2 should have failed because its derivation got garbage collected.
 cat $outPath2/foobar
