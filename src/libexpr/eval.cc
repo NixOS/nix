@@ -134,6 +134,18 @@ ATerm expandRec(ATerm e, ATermList rbnds, ATermList nrbnds)
 }
 
 
+static Expr updateAttrs(Expr e1, Expr e2)
+{
+    /* Note: e1 and e2 should be in normal form. */
+
+    ATermMap attrs;
+    queryAllAttrs(e1, attrs);
+    queryAllAttrs(e2, attrs);
+
+    return makeAttrs(attrs);
+}
+
+
 string evalString(EvalState & state, Expr e)
 {
     e = evalExpr(state, e);
@@ -263,6 +275,10 @@ Expr evalExpr2(EvalState & state, Expr e)
     /* Disjunction (logical OR). */
     if (atMatch(m, e) >> "OpOr" >> e1 >> e2)
         return makeBool(evalBool(state, e1) || evalBool(state, e2));
+
+    /* Attribut set update (//). */
+    if (atMatch(m, e) >> "OpUpdate" >> e1 >> e2)
+        return updateAttrs(evalExpr(state, e1), evalExpr(state, e2));
 
     /* Barf. */
     throw badTerm("invalid expression", e);
