@@ -27,12 +27,11 @@ for i in "$@"; do
             for j in $outPaths; do
                 echo "$j"
                 if test -z "$noLink"; then
-                    if test -e result; then
-                        if ! test -L result; then
-                            echo "cannot remove \`result\' (not a symlink)"
-                            exit 1
-                        fi
+                    if test -L result; then
                         rm result
+                    elif test -e result; then
+                        echo "cannot remove \`result' (not a symlink)"
+                        exit 1
                     fi
                     ln -s "$j" result
                 fi
