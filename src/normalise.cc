@@ -129,6 +129,11 @@ FSId normaliseFState(FSId id, FSIdSet pending)
     for (ElemMap::iterator i = inMap.begin(); i != inMap.end(); i++)
         refPaths.push_back(i->second.path);
 
+    /* Most shells initialise PATH to some default (/bin:/usr/bin:...) when
+       PATH is not set.  We don't want this, so we fill it in with some dummy
+       value. */
+    env["PATH"] = "/path-not-set";
+
     /* Build the environment. */
     for (StringPairs::iterator i = fs.derive.env.begin();
          i != fs.derive.env.end(); i++)
