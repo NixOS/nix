@@ -103,7 +103,7 @@ if test -z "$bdb"; then
   bdb_lib='-L${top_builddir}/externals/inst-bdb/lib -ldb_cxx'
   bdb_include='-I${top_builddir}/externals/inst-bdb/include'
 else
-  bdb_lib="-L$bdb/lib -Wl,-rpath,$bdb/lib -ldb_cxx"
+  bdb_lib="-L$bdb/lib -ldb_cxx"
   bdb_include="-I$bdb/include"
 fi
 AC_SUBST(bdb_lib)
@@ -117,7 +117,7 @@ if test -z "$aterm"; then
   aterm_lib='-L${top_builddir}/externals/inst-aterm/lib -lATerm'
   aterm_include='-I${top_builddir}/externals/inst-aterm/include'
 else
-  aterm_lib="-L$aterm/lib -Wl,-rpath,$aterm/lib -lATerm"
+  aterm_lib="-L$aterm/lib -lATerm"
   aterm_include="-I$aterm/include"
 fi
 AC_SUBST(aterm_lib)
