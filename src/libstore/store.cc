@@ -1,4 +1,5 @@
 #include <iostream>
+#include <algorithm>
 
 #include <sys/wait.h>
 #include <unistd.h>

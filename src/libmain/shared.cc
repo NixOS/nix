@@ -1,3 +1,4 @@
+
 #include <iostream>
 #include <cctype>
 
@@ -71,7 +72,9 @@ int main(int argc, char * * argv)
     ATinit(argc, argv, &bottomOfStack);
 
     /* Turn on buffering for cerr. */
+#if HAVE_PUBSETBUF
     cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
+#endif
 
     try {
         initAndRun(argc, argv);

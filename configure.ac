@@ -26,6 +26,22 @@ AC_PROG_CC
 AC_PROG_CXX
 AC_PROG_RANLIB
 
+# Check for pubsetbuf.
+AC_MSG_CHECKING([for pubsetbuf])
+AC_LANG_PUSH(C++)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <iostream>
+using namespace std;
+static char buf[1024];]],
+    [[cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));]])],
+    [AC_MSG_RESULT(yes) AC_DEFINE(HAVE_PUBSETBUF, 1, [whether pubsetbuf is available])],
+    AC_MSG_RESULT(no))
+AC_LANG_POP(C++)
+
+# Check for <locale>
+AC_LANG_PUSH(C++)
+AC_CHECK_HEADERS([locale])
+AC_LANG_POP(C++)
+
 AC_PATH_PROG(wget, wget)
 AC_PATH_PROG(xmllint, xmllint)
 AC_PATH_PROG(xsltproc, xsltproc)

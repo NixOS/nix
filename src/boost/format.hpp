@@ -24,10 +24,13 @@
 #include <sstream>
 #include <cassert>
 
+#if HAVE_LOCALE
 #include <locale>
-//#define BOOST_NO_STD_LOCALE
-//#define BOOST_NO_LOCALE_ISIDIGIT
-//#include <cctype>
+#else
+#define BOOST_NO_STD_LOCALE
+#define BOOST_NO_LOCALE_ISIDIGIT
+#include <cctype>
+#endif
 
 #include <boost/format/macros_default.hpp>
 

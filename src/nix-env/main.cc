@@ -1,3 +1,5 @@
+#include <cerrno>
+
 #include "globals.hh"
 #include "normalise.hh"
 #include "shared.hh"
