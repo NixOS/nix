@@ -33,6 +33,7 @@ AC_CONFIG_FILES([Makefile
    src/nix/Makefile
    src/nix-hash/Makefile
    src/fix/Makefile
+   src/fix-ng/Makefile
    scripts/Makefile
    corepkgs/Makefile
    corepkgs/fetchurl/Makefile
