@@ -1,4 +1,4 @@
-ENV = SGML_CATALOG_FILES=$(docbookcatalog)/docbook.cat
+ENV = SGML_CATALOG_FILES=$(docbookcatalog)
 
 XMLLINT = $(ENV) $(xmllint) $(xmlflags) --catalogs
 XSLTPROC = $(ENV) $(xsltproc) $(xmlflags) --catalogs
