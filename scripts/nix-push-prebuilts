@@ -17,7 +17,6 @@ close KNOWNS;
 # For each installed package, check whether a prebuilt is known.
 
 open PKGS, "nix listinst|";
-open KNOWNS, ">>$knowns";
 
 while (<PKGS>) {
     chomp;
@@ -28,13 +27,16 @@ while (<PKGS>) {
         print "exporting $pkghash...\n";
         system "nix export '$exportdir' $pkghash";
         if ($?) { die "`nix export' failed"; }
-        print KNOWNS "$pkghash\n";
     }
 }
 
-close KNOWNS;
 close PKGS;
 
 # Push the prebuilts to the server. !!! FIXME
 
-system "rsync -av -e ssh '$exportdir' losser:/home/eelco/public_html/nix-prebuilts/";
+system "rsync -av -e ssh '$exportdir'/ losser:/home/eelco/public_html/nix-prebuilts/";
+
+# Rerun `nix-pull-prebuilts' to rescan the prebuilt source locations.
+
+print "running nix-pull-prebuilts...";
+system "nix-pull-prebuilts";

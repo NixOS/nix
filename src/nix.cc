@@ -26,6 +26,7 @@ using namespace std;
 static string dbRefs = "refs";
 static string dbInstPkgs = "pkginst";
 static string dbPrebuilts = "prebuilts";
+static string dbNetSources = "netsources";
 
 
 static string nixSourcesDir;
@@ -116,6 +117,65 @@ void enumDB(const string & dbname, DBPairs & contents)
 }
 
 
+/* Download object referenced by the given URL into the sources
+   directory.  Return the file name it was downloaded to. */
+string fetchURL(string url)
+{
+    string filename = baseNameOf(url);
+    string fullname = nixSourcesDir + "/" + filename;
+    struct stat st;
+    if (stat(fullname.c_str(), &st)) {
+        cerr << "fetching " << url << endl;
+        /* !!! quoting */
+        string shellCmd =
+            "cd " + nixSourcesDir + " && wget --quiet -N \"" + url + "\"";
+        int res = system(shellCmd.c_str());
+        if (WEXITSTATUS(res) != 0)
+            throw Error("cannot fetch " + url);
+    }
+    return fullname;
+}
+
+
+/* Obtain an object with the given hash.  If a file with that hash is
+   known to exist in the local file system (as indicated by the dbRefs
+   database), we use that.  Otherwise, we attempt to fetch it from the
+   network (using dbNetSources).  We verify that the file has the
+   right hash. */
+string getFile(string hash)
+{
+    bool checkedNet = false;
+
+    while (1) {
+
+        string fn, url;
+
+        if (queryDB(dbRefs, hash, fn)) {
+
+            /* Verify that the file hasn't changed. !!! race */
+            if (hashFile(fn) != hash)
+                throw Error("file " + fn + " is stale");
+
+            return fn;
+        }
+
+        if (checkedNet)
+            throw Error("consistency problem: file fetched from " + url + 
+                " should have hash " + hash + ", but it doesn't");
+
+        if (!queryDB(dbNetSources, hash, url))
+            throw Error("a file with hash " + hash + " is requested, "
+                "but it is not known to exist locally or on the network");
+
+        checkedNet = true;
+        
+        fn = fetchURL(url);
+        
+        setDB(dbRefs, hash, fn);
+    }
+}
+
+
 typedef map<string, string> Params;
 
 
@@ -124,14 +184,7 @@ void readPkgDescr(const string & hash,
 {
     string pkgfile;
 
-    if (!queryDB(dbRefs, hash, pkgfile))
-        throw Error("unknown package " + hash);
-
-    //    cerr << "reading information about " + hash + " from " + pkgfile + "\n";
-
-    /* Verify that the file hasn't changed. !!! race */
-    if (hashFile(pkgfile) != hash)
-        throw Error("file " + pkgfile + " is stale");
+    pkgfile = getFile(hash);
 
     ATerm term = ATreadFromNamedFile(pkgfile.c_str());
     if (!term) throw Error("cannot read aterm " + pkgfile);
@@ -199,11 +252,7 @@ void fetchDeps(string hash, Environment & env)
 
         string file;
 
-        if (!queryDB(dbRefs, it->second, file))
-            throw Error("unknown file " + it->second);
-
-        if (hashFile(file) != it->second)
-            throw Error("file " + file + " is stale");
+        file = getFile(it->second);
 
         env[it->first] = file;
     }
@@ -283,17 +332,18 @@ void installPkg(string hash)
 
             /* Try to use a prebuilt. */
             string prebuiltHash, prebuiltFile;
-            if (queryDB(dbPrebuilts, hash, prebuiltHash) &&
-                queryDB(dbRefs, prebuiltHash, prebuiltFile)) 
-            {
-                cerr << "substituting prebuilt " << prebuiltFile << endl;
+            if (queryDB(dbPrebuilts, hash, prebuiltHash)) {
 
-                if (hashFile(prebuiltFile) != prebuiltHash) {
-                    cerr << "prebuilt " + prebuiltFile + " is stale\n";
+                try {
+                    prebuiltFile = getFile(prebuiltHash);
+                } catch (Error e) {
+                    cerr << "cannot obtain prebuilt (ignoring): " << e.what() << endl;
                     goto build;
                 }
+                
+                cerr << "substituting prebuilt " << prebuiltFile << endl;
 
-                int res = system(("tar xvfj " + prebuiltFile).c_str()); // !!! escaping
+                int res = system(("tar xfj " + prebuiltFile + " 1>&2").c_str()); // !!! escaping
                 if (WEXITSTATUS(res) != 0)
                     /* This is a fatal error, because path may now
                        have clobbered. */
@@ -301,6 +351,8 @@ void installPkg(string hash)
 
                 _exit(0);
             }
+
+            throw Error("no prebuilt available");
 
 build:
 
@@ -453,7 +505,7 @@ void exportPkgs(string outDir,
 }
 
 
-void regPrebuilt(string pkgHash, string prebuiltHash)
+void registerPrebuilt(string pkgHash, string prebuiltHash)
 {
     checkHash(pkgHash);
     checkHash(prebuiltHash);
@@ -467,6 +519,14 @@ string registerFile(string filename)
     string hash = hashFile(filename);
     setDB(dbRefs, hash, filename);
     return hash;
+}
+
+
+void registerURL(string hash, string url)
+{
+    checkHash(hash);
+    setDB(dbNetSources, hash, url);
+    /* !!! currently we allow only one network source per hash */
 }
 
 
@@ -486,6 +546,7 @@ void initDB()
     openDB(dbRefs, false);
     openDB(dbInstPkgs, false);
     openDB(dbPrebuilts, false);
+    openDB(dbNetSources, false);
 }
 
 
@@ -620,25 +681,6 @@ void printGraph(Strings::iterator first, Strings::iterator last)
     }
 
     cout << "}\n";
-}
-
-
-/* Download object referenced by the given URL into the sources
-   directory.  Return the file name it was downloaded to. */
-string fetchURL(string url)
-{
-    string filename = baseNameOf(url);
-    string fullname = nixSourcesDir + "/" + filename;
-    struct stat st;
-    if (stat(fullname.c_str(), &st)) {
-        /* !!! quoting */
-        string shellCmd =
-            "cd " + nixSourcesDir + " && wget --quiet -N \"" + url + "\"";
-        int res = system(shellCmd.c_str());
-        if (WEXITSTATUS(res) != 0)
-            throw Error("cannot fetch " + url);
-    }
-    return fullname;
 }
 
 
@@ -777,9 +819,11 @@ void run(Strings::iterator argCur, Strings::iterator argEnd)
         exportPkgs(*argCur, argCur + 1, argEnd);
     } else if (cmd == "regprebuilt") {
         if (argc != 2) throw argcError;
-        regPrebuilt(*argCur, argCur[1]);
+        registerPrebuilt(*argCur, argCur[1]);
     } else if (cmd == "regfile") {
         for_each(argCur, argEnd, registerFile);
+    } else if (cmd == "regurl") {
+        registerURL(argCur[0], argCur[1]);
     } else if (cmd == "reginst") {
         if (argc != 2) throw argcError;
         registerInstalledPkg(*argCur, argCur[1]);

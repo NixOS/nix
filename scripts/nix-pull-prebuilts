@@ -9,13 +9,25 @@ my $conffile = "$etcdir/prebuilts.conf";
 
 sub register {
     my $fn = shift;
+    my $url = shift;
     return unless $fn =~ /([^\/]*)-([0-9a-z]{32})-([0-9a-z]{32})\.tar\.bz2/;
     my $id = $1;
     my $pkghash = $2;
     my $prebuilthash = $3;
+
     print "$pkghash => $prebuilthash ($id)\n";
+
     system "nix regprebuilt $pkghash $prebuilthash";
     if ($?) { die "`nix regprebuilt' failed"; }
+
+    if ($url =~ /^\//) {
+	system "nix regfile $url";
+	if ($?) { die "`nix regfile' failed"; }
+    } else {
+	system "nix regurl $prebuilthash $url";
+	if ($?) { die "`nix regurl' failed"; }
+    }
+
     print KNOWNS "$pkghash\n";
 }
 
@@ -35,7 +47,7 @@ while (<CONFFILE>) {
             # It's a local path.
 
             foreach my $fn (glob "$url/*") {
-                register $fn;
+                register($fn, $fn);
             }
 
         } else {
@@ -54,7 +66,7 @@ while (<CONFFILE>) {
                 my $fn = $1;
                 next if $fn =~ /\.\./;
                 next if $fn =~ /\//;
-                register $fn;
+                register($fn, "$url/$fn");
             }
 
             close INDEX;

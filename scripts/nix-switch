@@ -30,7 +30,7 @@ while (-e "$linkdir/$id-$nr") { $nr++; }
 my $link = "$linkdir/$id-$nr";
 
 # Create a symlink from $link to $pkgdir.
-symlink($pkgdir, $link) or die "cannot create $link";
+symlink($pkgdir, $link) or die "cannot create $link: $!";
 
 # Also store the hash of $pkgdir.  This is useful for garbage
 # collection and the like.

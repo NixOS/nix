@@ -1,4 +1,4 @@
-bin_SCRIPTS = nix-generate-regscript nix-switch nix-collect-garbage \
+bin_SCRIPTS = nix-switch nix-collect-garbage \
  nix-pull-prebuilts nix-push-prebuilts
 
 install-exec-local:

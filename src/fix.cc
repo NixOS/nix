@@ -23,14 +23,23 @@ static bool verbose = false;
 typedef map<string, string> DescriptorMap;
 
 
-/* Forward declarations. */
-
 void registerFile(string filename)
 {
-    int res = system(("nix regfile " + filename).c_str());
+    int res = system(("nix regfile " + filename).c_str()); 
+    /* !!! escape */
     if (WEXITSTATUS(res) != 0)
         throw Error("cannot register " + filename + " with Nix");
 }
+
+
+void registerURL(string hash, string url)
+{
+    int res = system(("nix regurl " + hash + " " + url).c_str());
+    /* !!! escape */
+    if (WEXITSTATUS(res) != 0)
+        throw Error("cannot register " + hash + " -> " + url + " with Nix");
+}
+
 
 Error badTerm(const string & msg, ATerm e)
 {
@@ -152,6 +161,7 @@ ATerm evaluate(ATerm e, EvalContext ctx)
     else if (ATmatch(e, "Local(<term>)", &e2)) {
         string filename = absPath(evaluateStr(e2, ctx), ctx.dir); /* !!! */
         string hash = hashFile(filename);
+        registerFile(filename); /* !!! */
         return ATmake("File(<str>)", hash.c_str());
     }
 
@@ -161,12 +171,7 @@ ATerm evaluate(ATerm e, EvalContext ctx)
         string hash = evaluateStr(e2, ctx);
         checkHash(hash);
         string url = evaluateStr(e3, ctx);
-#if 0
-        if (verbose)
-            cerr << "fetching " << url << endl;
-        string filename = fetchURL(url);
-#endif
-        /* !!! register */
+        registerURL(hash, url);
         return ATmake("File(<str>)", hash.c_str());
     }
 
