@@ -183,6 +183,10 @@
           <arg choice='plain'><option>--install</option></arg>
           <arg choice='plain'><option>-i</option></arg>
         </group>
+        <group choice='opt'>
+          <arg choice='plain'><option>--preserve-installed</option></arg>
+          <arg choice='plain'><option>-P</option></arg>
+        </group>
         <arg choice='plain' rep='repeat'><replaceable>drvnames</replaceable></arg>
       </cmdsynopsis>
     </refsection>
@@ -197,6 +201,35 @@
         in the active Nix expression are added.
       </para>
 
+      <para>
+        Currently installed derivations with a name equal to the name
+        of a derivation being added are removed unless the option
+        <option>--preserve-installed</option> is specified.
+      </para>
+
+    </refsection>
+
+    <refsection>
+      <title>Flags</title>
+
+      <variablelist>
+
+        <varlistentry>
+          <term><option>--preserve-installed</option> / <option>-P</option></term>
+          <listitem>
+            <para>
+              Do not remove derivations with a name matching one of
+              the derivations being installed.  Usually, trying to
+              have two versions of the same package installed in the
+              same generation of a profile will lead to an error in
+              building the generation, due to file name clashes
+              between the two versions.  However, this is not the case
+              for all packages.
+            </para>
+          </listitem>
+        </varlistentry>
+
+      </variablelist>
     </refsection>
             
     <refsection>
@@ -204,7 +237,11 @@
 
       <screen>
 $ nix-env --install gcc-3.3.2 <lineannotation>(install specific version)</lineannotation>
+installing `gcc-3.3.2'
+uninstalling `gcc-3.1' <lineannotation>(previously installed version is removed)</lineannotation>
+
 $ nix-env --install gcc <lineannotation>(just pick any version)</lineannotation>
+
 $ nix-env -f ~/foo.nix -i '*' <lineannotation>(install everything in <filename>foo.nix</filename>)</lineannotation></screen>
 
     </refsection>

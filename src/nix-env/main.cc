@@ -17,6 +17,7 @@ struct Globals
     Path nixExprPath;
     EvalState state;
     bool dryRun;
+    bool preserveInstalled;
 };
 
 
@@ -225,7 +226,7 @@ void createUserEnv(EvalState & state, const DrvInfos & drvs,
 
 static void installDerivations(EvalState & state,
     Path nePath, DrvNames & selectors, const Path & profile,
-    bool dryRun)
+    bool dryRun, bool preserveInstalled)
 {
     debug(format("installing derivations from `%1%'") % nePath);
 
@@ -235,6 +236,7 @@ static void installDerivations(EvalState & state,
 
     /* Filter out the ones we're not interested in. */
     DrvInfos selectedDrvs;
+    StringSet selectedNames;
     for (DrvInfos::iterator i = availDrvs.begin();
          i != availDrvs.end(); ++i)
     {
@@ -247,6 +249,7 @@ static void installDerivations(EvalState & state,
                     format("installing `%1%'") % i->second.name);
                 j->hits++;
                 selectedDrvs.insert(*i);
+                selectedNames.insert(drvName.name);
             }
         }
     }
@@ -261,7 +264,18 @@ static void installDerivations(EvalState & state,
     /* Add in the already installed derivations. */
     DrvInfos installedDrvs;
     queryInstalled(state, installedDrvs, profile);
-    selectedDrvs.insert(installedDrvs.begin(), installedDrvs.end());
+
+    for (DrvInfos::iterator i = installedDrvs.begin();
+         i != installedDrvs.end(); ++i)
+    {
+        DrvName drvName(i->second.name);
+        if (!preserveInstalled &&
+            selectedNames.find(drvName.name) != selectedNames.end())
+            printMsg(lvlInfo,
+                format("uninstalling `%1%'") % i->second.name);
+        else
+            selectedDrvs.insert(*i);
+    }
 
     if (dryRun) return;
 
@@ -278,7 +292,8 @@ static void opInstall(Globals & globals,
     DrvNames drvNames = drvNamesFromArgs(opArgs);
     
     installDerivations(globals.state, globals.nixExprPath,
-        drvNames, globals.profile, globals.dryRun);
+        drvNames, globals.profile, globals.dryRun,
+        globals.preserveInstalled);
 }
 
 
@@ -641,6 +656,7 @@ void run(Strings args)
     Globals globals;
     globals.nixExprPath = getDefNixExprPath();
     globals.dryRun = false;
+    globals.preserveInstalled = false;
 
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
         string arg = *i;
@@ -681,6 +697,8 @@ void run(Strings args)
             printMsg(lvlInfo, "(dry run; not doing anything)");
             globals.dryRun = true;
         }
+        else if (arg == "--preserve-installed" || arg == "-P")
+            globals.preserveInstalled = true;
         else if (arg[0] == '-')
             opFlags.push_back(arg);
         else
