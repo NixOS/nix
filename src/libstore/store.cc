@@ -164,7 +164,8 @@ void copyPath(const Path & src, const Path & dst)
         throw SysError("waiting for child");
 
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
-        throw Error("cannot copy file: child died");
+        throw Error(format("cannot copy `%1% to `%2%': child %3%")
+            % src % dst % statusToString(status));
 }
 
 

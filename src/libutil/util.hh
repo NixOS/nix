@@ -221,4 +221,9 @@ string packStrings(const Strings & strings);
 Strings unpackStrings(const string & s);
 
 
+/* Convert the exit status of a child as returned by wait() into an
+   error string. */
+string statusToString(int status);
+
+
 #endif /* !__UTIL_H */

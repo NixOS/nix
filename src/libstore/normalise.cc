@@ -497,14 +497,8 @@ void NormalisationGoal::buildDone()
     /* Check the exit status. */
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         deleteTmpDir(false);
-        if (WIFEXITED(status))
-            throw Error(format("builder for `%1%' failed with exit code %2%")
-                % nePath % WEXITSTATUS(status));
-        else if (WIFSIGNALED(status))
-            throw Error(format("builder for `%1%' failed due to signal %2%")
-                % nePath % WTERMSIG(status));
-        else
-            throw Error(format("builder for `%1%' failed died abnormally") % nePath);
+        throw Error(format("builder for `%1%' %2%")
+            % nePath % statusToString(status));
     }
     
     deleteTmpDir(true);
@@ -1425,17 +1419,9 @@ void SubstitutionGoal::finished()
     debug(format("substitute for `%1%' finished") % storePath);
 
     /* Check the exit status. */
-    /* !!! cut & paste */
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-        if (WIFEXITED(status))
-            throw Error(format("builder for `%1%' failed with exit code %2%")
-                % storePath % WEXITSTATUS(status));
-        else if (WIFSIGNALED(status))
-            throw Error(format("builder for `%1%' failed due to signal %2%")
-                % storePath % WTERMSIG(status));
-        else
-            throw Error(format("builder for `%1%' failed died abnormally") % storePath);
-    }
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+        throw Error(format("builder for `%1%' %2%")
+            % storePath % statusToString(status));
 
     if (!pathExists(storePath))
         throw Error(format("substitute did not produce path `%1%'") % storePath);
