@@ -145,9 +145,7 @@ string printTerm(ATerm t)
 }
 
 
-/* Throw an exception with an error message containing the given
-   aterm. */
-static Error badTerm(const format & f, ATerm t)
+Error badTerm(const format & f, ATerm t)
 {
     return Error(format("%1%, in `%2%'") % f.str() % printTerm(t));
 }
@@ -176,7 +174,7 @@ static ATerm termFromHash(const Hash & hash)
 }
 
 
-static Hash writeTerm(ATerm t)
+Hash writeTerm(ATerm t)
 {
     string path = nixStore + "/tmp.nix"; /* !!! */
     if (!ATwriteToNamedTextFile(t, path.c_str()))
@@ -217,18 +215,19 @@ static FState realise(RStatus & status, FState fs)
         return realise(status, termFromHash(parseHash(s1)));
     }
     
-    else if (ATmatch(fs, "File(<str>, <term>, [<list>])", &s1, &content, &refs)) {
+    else if (ATmatch(fs, "Path(<str>, <term>, [<list>])", &s1, &content, &refs)) {
         string path(s1);
 
         msg(format("realising atomic path %1%") % path);
         Nest nest(true);
 
-        if (path[0] != '/') throw Error("absolute path expected: " + path);
+        if (path[0] != '/')
+            throw Error(format("path `%1% is not absolute") % path);
 
         /* Realise referenced paths. */
         ATermList refs2 = ATempty;
         while (!ATisEmpty(refs)) {
-            refs2 = ATappend(refs2, realise(status, ATgetFirst(refs)));
+            refs2 = ATinsert(refs2, realise(status, ATgetFirst(refs)));
             refs = ATgetNext(refs);
         }
         refs2 = ATreverse(refs2);
@@ -238,7 +237,7 @@ static FState realise(RStatus & status, FState fs)
         Hash hash = parseHash(s1);
 
         /* Normal form. */
-        ATerm nf = ATmake("File(<str>, <term>, <term>)",
+        ATerm nf = ATmake("Path(<str>, <term>, <term>)",
             path.c_str(), content, refs2);
 
         /* Register the normal form. */
@@ -261,7 +260,7 @@ static FState realise(RStatus & status, FState fs)
 
         /* Do we know a path with that hash?  If so, copy it. */
         string path2 = queryFromStore(hash);
-        copyFile(path2, path);
+        copyPath(path2, path);
 
         return nf;
     }
@@ -279,7 +278,7 @@ static FState realise(RStatus & status, FState fs)
         /* Realise inputs. */
         ATermList ins2 = ATempty;
         while (!ATisEmpty(ins)) {
-            ins2 = ATappend(ins2, realise(status, ATgetFirst(ins)));
+            ins2 = ATinsert(ins2, realise(status, ATgetFirst(ins)));
             ins = ATgetNext(ins);
         }
         ins2 = ATreverse(ins2);
@@ -289,7 +288,7 @@ static FState realise(RStatus & status, FState fs)
         while (!ATisEmpty(bnds)) {
             ATerm bnd = ATgetFirst(bnds);
             if (!ATmatch(bnd, "(<str>, <str>)", &s1, &s2))
-                throw badTerm("string expected", bnd);
+                throw badTerm("tuple of strings expected", bnd);
             env[s1] = s2;
             bnds = ATgetNext(bnds);
         }
@@ -322,7 +321,7 @@ static FState realise(RStatus & status, FState fs)
         setDB(nixDB, dbRefs, outHash, outPath);
 
         /* Register the normal form of fs. */
-        FState nf = ATmake("File(<str>, Hash(<str>), <term>)",
+        FState nf = ATmake("Path(<str>, Hash(<str>), <term>)",
             outPath.c_str(), ((string) outHash).c_str(), ins2);
         Hash nfHash = writeTerm(nf);
         setDB(nixDB, dbSuccessors, hashTerm(fs), nfHash);

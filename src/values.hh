@@ -8,7 +8,7 @@
 using namespace std;
 
 
-void copyFile(string src, string dst);
+void copyPath(string src, string dst);
 
 /* Copy a file to the nixStore directory and register it in dbRefs.
    Return the hash code of the value. */

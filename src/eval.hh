@@ -15,9 +15,9 @@ using namespace std;
    A Nix file system state expression, or FState, describes a
    (partial) state of the file system.
 
-     File : Path * Content * [FState] -> FState
+     Path : Path * Content * [FState] -> FState
 
-   File(path, content, refs) specifies a file object (its full path
+   Path(path, content, refs) specifies a file object (its full path
    and contents), along with all file objects referenced by it (that
    is, that it has pointers to).  We assume that all files are
    self-referential.  This prevents us from having to deal with
@@ -66,8 +66,15 @@ FState realiseFState(FState fs);
 /* Return a canonical textual representation of an expression. */
 string printTerm(ATerm t);
 
+/* Throw an exception with an error message containing the given
+   aterm. */
+Error badTerm(const format & f, ATerm t);
+
 /* Hash an aterm. */
 Hash hashTerm(ATerm t);
+
+/* Write an aterm to the Nix store directory, and return its hash. */
+Hash writeTerm(ATerm t);
 
 
 #endif /* !__EVAL_H */

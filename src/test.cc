@@ -120,17 +120,17 @@ void runTests()
         ATmake("Foo(123)"));
 
     string builder1fn = absPath("./test-builder-1.sh");
-    Hash builder1h = hashFile(builder1fn);
+    Hash builder1h = hashPath(builder1fn);
 
     string fn1 = nixValues + "/builder-1.sh";
-    Expr e1 = ATmake("File(<str>, ExtFile(<str>, <str>), [])", 
+    Expr e1 = ATmake("Path(<str>, ExtFile(<str>, <str>), [])", 
         fn1.c_str(),
         builder1h.c_str(),
         builder1fn.c_str());
     eval(fNormalise, e1);
 
     string fn2 = nixValues + "/refer.txt";
-    Expr e2 = ATmake("File(<str>, Regular(<str>), [<term>])",
+    Expr e2 = ATmake("Path(<str>, Regular(<str>), [<term>])",
         fn2.c_str(),
         ("I refer to " + fn1).c_str(),
         e1);
@@ -144,14 +144,14 @@ void runTests()
     addToStore("./test-builder-1.sh", builder1fn, builder1h);
 
     FState fs1 = ATmake(
-        "File(<str>, Hash(<str>), [])", 
+        "Path(<str>, Hash(<str>), [])", 
         builder1fn.c_str(),
         ((string) builder1h).c_str());
     realise(fs1);
     realise(fs1);
 
     FState fs2 = ATmake(
-        "File(<str>, Hash(<str>), [])", 
+        "Path(<str>, Hash(<str>), [])", 
         (builder1fn + "_bla").c_str(),
         ((string) builder1h).c_str());
     realise(fs2);

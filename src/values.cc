@@ -34,7 +34,7 @@ struct CopySource : RestoreSource
 };
 
 
-void copyFile(string src, string dst)
+void copyPath(string src, string dst)
 {
     /* Unfortunately C++ doesn't support coprocedures, so we have no
        nice way to chain CopySink and CopySource together.  Instead we
@@ -99,7 +99,7 @@ void addToStore(string srcPath, string & dstPath, Hash & hash)
     string baseName = baseNameOf(srcPath);
     dstPath = nixStore + "/" + (string) hash + "-" + baseName;
 
-    copyFile(srcPath, dstPath);
+    copyPath(srcPath, dstPath);
 
     setDB(nixDB, dbRefs, hash, dstPath);
 }
