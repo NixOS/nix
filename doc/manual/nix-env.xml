@@ -312,6 +312,9 @@ $ nix-env -f ~/foo.nix -i '*' <lineannotation>(install everything in <filename>f
 $ nix-env --upgrade gcc
 upgrading `gcc-3.3.1' to `gcc-3.4'
 
+$ nix-env -u gcc-3.3.2 --always <lineannotation>(switch to a specific version)</lineannotation>
+upgrading `gcc-3.4' to `gcc-3.3.2'
+
 $ nix-env --upgrade pan
 <lineannotation>(no upgrades available, so nothing happens)</lineannotation>
 

@@ -310,14 +310,16 @@ static void upgradeDerivations(EvalState & state,
          i != installedDrvs.end(); ++i)
     {
         DrvName drvName(i->second.name);
+        DrvName selector;
 
         /* Do we want to upgrade this derivation? */
         bool upgrade = false;
         for (DrvNames::iterator j = selectors.begin();
              j != selectors.end(); ++j)
         {
-            if (j->matches(drvName)) {
+            if (j->name == "*" || j->name == drvName.name) {
                 j->hits++;
+                selector = *j;
                 upgrade = true;
                 break;
             }
@@ -344,9 +346,10 @@ static void upgradeDerivations(EvalState & state,
                     upgradeType == utLeq && d <= 0 ||
                     upgradeType == utAlways)
                 {
-                    if (bestDrv == availDrvs.end() ||
-                        compareVersions(
-                            bestName.version, newName.version) < 0)
+                    if (selector.matches(newName) &&
+                        (bestDrv == availDrvs.end() ||
+                         compareVersions(
+                             bestName.version, newName.version) < 0))
                     {
                         bestDrv = j;
                         bestName = newName;
