@@ -22,17 +22,18 @@ MANUAL_SRCS = manual.xml introduction.xml installation.xml \
  style.css images
 
 manual.is-valid: $(MANUAL_SRCS) version.txt
-	$(XMLLINT) --xinclude $< | $(XMLLINT) --noout --valid -
+	$(XMLLINT) --xinclude $< | $(XMLLINT) --noout --nonet --valid -
 	touch $@
 
 version.txt:
 	echo -n $(VERSION) > version.txt
 
 man $(MANS): $(MANUAL_SRCS) manual.is-valid
-	$(XSLTPROC) --xinclude $(docbookxsl)/manpages/docbook.xsl manual.xml
+	$(XSLTPROC) --nonet --xinclude $(docbookxsl)/manpages/docbook.xsl manual.xml
 
 manual.html: $(MANUAL_SRCS) manual.is-valid images
-	$(XSLTPROC) --xinclude --output manual.html $(docbookxsl)/html/docbook.xsl manual.xml
+	$(XSLTPROC) --nonet --xinclude --output manual.html \
+	  $(docbookxsl)/html/docbook.xsl manual.xml
 
 all-local: manual.html
 
