@@ -146,6 +146,12 @@ void openEnv(DbEnv * env, const string & path, u_int32_t flags)
 }
 
 
+static int my_fsync(int fd)
+{
+    return 0;
+}
+
+
 void Database::open(const string & path)
 {
     if (env) throw Error(format("environment already open"));
@@ -163,6 +169,8 @@ void Database::open(const string & path)
         env->set_lg_max(256 * 1024); /* must be > 4 * lg_bsize */
         env->set_lk_detect(DB_LOCK_DEFAULT);
         env->set_flags(DB_TXN_WRITE_NOSYNC | DB_LOG_AUTOREMOVE, 1);
+        
+        db_env_set_func_fsync(my_fsync);
         
 
         /* The following code provides automatic recovery of the
