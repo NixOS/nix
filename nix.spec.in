@@ -1,10 +1,20 @@
+# This RPM accepts the following defininitions (which can be passed
+# using `--define' to rpmbuild, e.g., --define 'enable_setuid yes'):
+#   enable_setuid: if non-empty, pass `--enable-setuid' to configure
+#   nix_user: if set, pass as `--with-nix-user' to configure 
+#   nix_group: if set, pass as `--with-nix-group' to configure
+
+%{!?enable_setuid: %define enable_setuid ""}
+%{!?nix_user: %define nix_user ""}
+%{!?nix_group: %define nix_group ""}
+
 Summary: The Nix software deployment system
 Name: nix
 Version: @version@
 Release: 1
 License: GPL
-Group: WeetNiet
-URL: http://www.cs.uu.nl/groups/ST/twiki/bin/view/Trace/NixDeploymentSystem
+Group: Software Deployment
+URL: http://www.cs.uu.nl/groups/ST/Trace/Nix
 Source0: %{name}-@version@.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 %define _prefix /nix
@@ -13,13 +23,23 @@ Requires: /usr/bin/perl
 
 %description
 
-Nix is a software deployment system.
+Nix is a system for software deployment.
 
 %prep
 %setup -q
 
 %build
-./configure --prefix=%{_prefix}
+extraFlags=
+if test -n "%{enable_setuid}"; then
+    extraFlags="$extraFlags --enable-setuid"
+    if test -n "%{nix_user}"; then
+        extraFlags="$extraFlags --with-nix-user=%{nix_user}"
+    fi
+    if test -n "%{nix_group}"; then
+        extraFlags="$extraFlags --with-nix-group=%{nix_group}"
+    fi
+fi
+./configure --prefix=%{_prefix} $extraFlags
 make
 make check
 
