@@ -35,6 +35,7 @@ EvalState::EvalState()
     addPrimOp1("baseNameOf", primBaseNameOf);
     addPrimOp1("toString", primToString);
     addPrimOp1("isNull", primIsNull);
+    addPrimOp1("map", primMap);
 
     primOpsAll.add(primOps0);
     primOpsAll.add(primOps1);

@@ -39,5 +39,8 @@ Expr primIsNull(EvalState & state, Expr arg);
    value for a particular run of the program. */
 Expr primCurTime(EvalState & state);
 
+/* Apply a function to each element of a list. */
+Expr primMap(EvalState & state, Expr arg);
+
 
 #endif /* !__PRIMOPS_H */

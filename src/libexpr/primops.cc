@@ -329,3 +329,35 @@ Expr primCurTime(EvalState & state)
 {
     return ATmake("Int(<int>)", time(0));
 }
+
+
+Expr primMap(EvalState & state, Expr arg)
+{
+    arg = evalExpr(state, arg);
+
+    ATMatcher m;
+    ATermList es;
+    if (!(atMatch(m, arg) >> "Attrs" >> es))
+        throw Error("function `map' expects an attribute set");
+
+    Expr function = queryAttr(arg, "function");
+    if (!function)
+        throw Error("function `map' expects an attribute `function'");
+
+    Expr list = queryAttr(arg, "list");
+    if (!list)
+        throw Error("function `map' expects an attribute `list'");
+
+    list = evalExpr(state, list);
+
+    ATermList es2;
+    if (!(atMatch(m, list) >> "List" >> es2))
+        throw Error("attribute `list' in call to `map' must be a list");
+
+    ATermList res = ATempty;
+    for (ATermIterator i(es2); i; ++i)
+        res = ATinsert(res,
+            ATmake("Call(<term>, <term>)", function, *i));
+
+    return ATmake("List(<term>)", ATreverse(res));
+}
