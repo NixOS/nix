@@ -41,6 +41,8 @@ sub readManifest {
     my $inside = 0;
     my $type;
 
+    my $manifestVersion = 2;
+
     my $storePath;
     my $url;
     my $hash;
@@ -139,6 +141,7 @@ sub readManifest {
             elsif (/^\s*NarHash:\s*(\S+)\s*$/) { $narHash = $1; }
             elsif (/^\s*References:\s*(.*)\s*$/) { $references = $1; }
             elsif (/^\s*Deriver:\s*(\S+)\s*$/) { $deriver = $1; }
+            elsif (/^\s*ManifestVersion:\s*(\d+)\s*$/) { $manifestVersion = $1; }
 
             # Compatibility;
             elsif (/^\s*NarURL:\s*(\S+)\s*$/) { $url = $1; }
@@ -148,6 +151,8 @@ sub readManifest {
     }
 
     close MANIFEST;
+
+    return $manifestVersion;
 }
 
 
@@ -158,6 +163,10 @@ sub writeManifest
     my $patches = shift;
 
     open MANIFEST, ">$manifest.tmp"; # !!! check exclusive
+
+    print MANIFEST "version {\n";
+    print MANIFEST "  ManifestVersion: 3\n";
+    print MANIFEST "}\n";
 
     foreach my $storePath (keys %{$narFiles}) {
         my $narFileList = $$narFiles{$storePath};

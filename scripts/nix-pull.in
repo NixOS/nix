@@ -42,7 +42,9 @@ sub processURL {
            "'$url' > '$manifest'") == 0
            or die "curl failed: $?";
 
-    readManifest $manifest, \%narFiles, \%patches, \%successors;
+    if (readManifest($manifest, \%narFiles, \%patches, \%successors) < 3) {
+        die "manifest `$url' is too old (i.e., for Nix <= 0.7)\n";
+    }
 
     my $baseName = "unnamed";
     if ($url =~ /\/([^\/]+)\/[^\/]+$/) { # get the forelast component

@@ -27,7 +27,10 @@ my %successors;
 
 for my $manifest (glob "$manifestDir/*.nixmanifest") {
 #    print STDERR "reading $manifest\n";
-    readManifest $manifest, \%narFiles, \%patches, \%successors;
+    if (readManifest($manifest, \%narFiles, \%patches, \%successors) < 3) {
+        print STDERR "you have an old-style manifest `$manifest'; please delete it\n";
+        exit 1;
+    }
 }
 
 
