@@ -53,15 +53,17 @@ bool parseDerivations(EvalState & state, Expr e, DrvInfos & drvs)
 {
     ATMatcher m;
     ATermList es;
+    DrvInfo drv;
 
     e = evalExpr(state, e);
-    
-    if (atMatch(m, e) >> "Attrs") {
+
+    if (parseDerivation(state, e, drv)) 
+        drvs[drv.drvPath] = drv;
+
+    else if (atMatch(m, e) >> "Attrs") {
         ATermMap drvMap;
         queryAllAttrs(e, drvMap);
-
         for (ATermIterator i(drvMap.keys()); i; ++i) {
-            DrvInfo drv;
             debug(format("evaluating attribute `%1%'") % *i);
             if (parseDerivation(state, drvMap.get(*i), drv))
                 drvs[drv.drvPath] = drv;
@@ -70,7 +72,6 @@ bool parseDerivations(EvalState & state, Expr e, DrvInfos & drvs)
 
     else if (atMatch(m, e) >> "List" >> es) {
         for (ATermIterator i(es); i; ++i) {
-            DrvInfo drv;
             debug(format("evaluating list element"));
             if (parseDerivation(state, *i, drv))
                 drvs[drv.drvPath] = drv;
@@ -243,14 +244,18 @@ void installDerivations(EvalState & state,
 
     /* Filter out the ones we're not interested in. */
     DrvInfos selectedDrvs;
-    for (Strings::iterator i = drvNames.begin();
-         i != drvNames.end(); ++i)
-    {
-        NameMap::iterator j = nameMap.find(*i);
-        if (j == nameMap.end())
-            throw Error(format("unknown derivation `%1%'") % *i);
-        else
-            selectedDrvs[j->second] = availDrvs[j->second];
+    if (drvNames.size() > 0 && drvNames.front() == "*") { /* !!! hack */
+        selectedDrvs = availDrvs;
+    } else {
+        for (Strings::iterator i = drvNames.begin();
+             i != drvNames.end(); ++i)
+        {
+            NameMap::iterator j = nameMap.find(*i);
+            if (j == nameMap.end())
+                throw Error(format("unknown derivation `%1%'") % *i);
+            else
+                selectedDrvs[j->second] = availDrvs[j->second];
+        }
     }
 
     /* Add in the already installed derivations. */
