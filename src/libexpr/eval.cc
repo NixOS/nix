@@ -100,22 +100,25 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
 ATerm expandRec(ATerm e, ATermList rbnds, ATermList nrbnds)
 {
     ATMatcher m;
+    ATerm name;
+    Expr e2;
 
     /* Create the substitution list. */
     ATermMap subs;
     for (ATermIterator i(rbnds); i; ++i) {
-        ATerm name;
-        Expr e2;
         if (!(atMatch(m, *i) >> "Bind" >> name >> e2))
             abort(); /* can't happen */
         subs.set(name, ATmake("Select(<term>, <term>)", e, name));
+    }
+    for (ATermIterator i(nrbnds); i; ++i) {
+        if (!(atMatch(m, *i) >> "Bind" >> name >> e2))
+            abort(); /* can't happen */
+        subs.set(name, e2);
     }
 
     /* Create the non-recursive set. */
     ATermMap as;
     for (ATermIterator i(rbnds); i; ++i) {
-        ATerm name;
-        Expr e2;
         if (!(atMatch(m, *i) >> "Bind" >> name >> e2))
             abort(); /* can't happen */
         as.set(name, substitute(subs, e2));
@@ -123,8 +126,6 @@ ATerm expandRec(ATerm e, ATermList rbnds, ATermList nrbnds)
 
     /* Copy the non-recursive bindings.  !!! inefficient */
     for (ATermIterator i(nrbnds); i; ++i) {
-        ATerm name;
-        Expr e2;
         if (!(atMatch(m, *i) >> "Bind" >> name >> e2))
             abort(); /* can't happen */
         as.set(name, e2);

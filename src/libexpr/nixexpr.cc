@@ -205,8 +205,11 @@ Expr substitute(const ATermMap & subs, Expr e)
         for (ATermIterator i(rbnds); i; ++i)
             if (atMatch(m, *i) >> "Bind" >> name)
                 subs2.remove(name);
-            else
-                abort(); /* can't happen */
+            else abort(); /* can't happen */
+        for (ATermIterator i(nrbnds); i; ++i)
+            if (atMatch(m, *i) >> "Bind" >> name)
+                subs2.remove(name);
+            else abort(); /* can't happen */
         return ATmake("Rec(<term>, <term>)",
             substitute(subs2, (ATerm) rbnds),
             substitute(subs, (ATerm) nrbnds));
@@ -264,10 +267,14 @@ void checkVarDefs(const ATermMap & defs, Expr e)
     }
         
     else if (atMatch(m, e) >> "Rec" >> rbnds >> nrbnds) {
-        checkVarDefs(defs
-            , (ATerm) nrbnds);
+        checkVarDefs(defs, (ATerm) nrbnds);
         ATermMap defs2(defs);
         for (ATermIterator i(rbnds); i; ++i) {
+            if (!(atMatch(m, *i) >> "Bind" >> name))
+                abort(); /* can't happen */
+            defs2.set(name, (ATerm) ATempty);
+        }
+        for (ATermIterator i(nrbnds); i; ++i) {
             if (!(atMatch(m, *i) >> "Bind" >> name))
                 abort(); /* can't happen */
             defs2.set(name, (ATerm) ATempty);
