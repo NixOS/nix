@@ -67,7 +67,10 @@ bool pathExists(const string & path);
 
 /* Delete a path; i.e., in the case of a directory, it is deleted
    recursively.  Don't use this at home, kids. */
-void deletePath(string path);
+void deletePath(const string & path);
+
+/* Make a path read-only recursively. */
+void makePathReadOnly(const string & path);
 
 
 /* Messages. */

@@ -131,6 +131,14 @@ FSId normaliseFState(FSId id, FSIdSet pending)
        value. */
     env["PATH"] = "/path-not-set";
 
+    /* Set HOME to a non-existing path to prevent certain programs from using
+       /etc/passwd (or NIS, or whatever) to locate the home directory (for
+       example, wget looks for ~/.wgetrc).  I.e., these tools use /etc/passwd
+       if HOME is not set, but they will just assume that the settings file
+       they are looking for does not exist if HOME is set but points to some
+       non-existing path. */
+    env["HOME"] = "/homeless-shelter";
+
     /* Build the environment. */
     for (StringPairs::iterator i = fs.derive.env.begin();
          i != fs.derive.env.end(); i++)
@@ -178,7 +186,8 @@ FSId normaliseFState(FSId id, FSIdSet pending)
         msg(lvlChatty, format("fast build succesful"));
 
     /* Check whether the output paths were created, and grep each
-       output path to determine what other paths it references. */
+       output path to determine what other paths it references.  Also make all
+       output paths read-only. */
     StringSet usedPaths;
     for (DeriveOutputs::iterator i = fs.derive.outputs.begin(); 
          i != fs.derive.outputs.end(); i++)
@@ -188,10 +197,12 @@ FSId normaliseFState(FSId id, FSIdSet pending)
             throw Error(format("path `%1%' does not exist") % path);
         nfFS.slice.roots.insert(path);
 
+	makePathReadOnly(path);
+
 	/* For this output path, find the references to other paths contained
 	   in it. */
         Strings refPaths = filterReferences(path, 
-	    Strings(allPaths.begin(), allPaths.end()));
+					    Strings(allPaths.begin(), allPaths.end()));
 
 	/* Construct a slice element for this output path. */
         SliceElem elem;

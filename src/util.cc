@@ -106,13 +106,13 @@ bool pathExists(const string & path)
 }
 
 
-void deletePath(string path)
+void deletePath(const string & path)
 {
     msg(lvlVomit, format("deleting path `%1%'") % path);
 
     struct stat st;
     if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path %1%") % path);
+	throw SysError(format("getting attributes of path `%1%'") % path);
 
     if (S_ISDIR(st.st_mode)) {
 	Strings names;
@@ -128,12 +128,44 @@ void deletePath(string path)
 
         closedir(dir); /* !!! close on exception */
 
+	/* Make the directory writable. */
+	if (!(st.st_mode & S_IWUSR)) {
+	    if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
+		throw SysError(format("making `%1%' writable"));
+	}
+
 	for (Strings::iterator i = names.begin(); i != names.end(); i++)
             deletePath(path + "/" + *i);
     }
 
     if (remove(path.c_str()) == -1)
-        throw SysError(format("cannot unlink %1%") % path);
+        throw SysError(format("cannot unlink `%1%'") % path);
+}
+
+
+void makePathReadOnly(const string & path)
+{
+    struct stat st;
+    if (lstat(path.c_str(), &st))
+	throw SysError(format("getting attributes of path `%1%'") % path);
+
+    if (st.st_mode & S_IWUSR) {
+	if (chmod(path.c_str(), st.st_mode & ~S_IWUSR) == -1)
+	    throw SysError(format("making `%1%' read-only"));
+    }
+
+    if (S_ISDIR(st.st_mode)) {
+        DIR * dir = opendir(path.c_str());
+
+        struct dirent * dirent;
+        while (errno = 0, dirent = readdir(dir)) {
+            string name = dirent->d_name;
+            if (name == "." || name == "..") continue;
+	    makePathReadOnly(path + "/" + name);
+        }
+
+        closedir(dir); /* !!! close on exception */
+    }
 }
 
 
