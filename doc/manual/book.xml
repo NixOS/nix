@@ -230,7 +230,17 @@ $ make install</screen>
       <refsynopsisdiv>
 	<cmdsynopsis>
 	  <command>nix</command>
-	  <arg>--verbose</arg>
+	  <group choice='opt'>
+	    <arg><option>--path</option></arg>
+	    <arg><option>-p</option></arg>
+	  </group>
+	  <group choice='opt' rep='repeat'>
+	    <arg><option>--verbose</option></arg>
+	    <arg><option>-v</option></arg>
+	  </group>
+	  <arg choice='plain'><replaceable>operation</replaceable></arg>
+	  <arg rep='repeat'><replaceable>options</replaceable></arg>
+	  <arg rep='repeat'><replaceable>arguments</replaceable></arg>
 	</cmdsynopsis>
       </refsynopsisdiv>
 
@@ -242,27 +252,115 @@ $ make install</screen>
 	  This is the (set of) path(s) where Nix expressions and the file
 	  system objects built by them are stored.
 	</para>
+
+	<para>
+	  <command>nix</command> has many subcommands called
+	  <emphasis>operations</emphasis>.  These are individually documented
+	  below.  Exactly one operation must always be provided.
+	</para>
+
       </refsect1>
 
       <refsect1>
 	<title>Common Options</title>
 
 	<para>
-	  <command>nix</command> has many subcommands.  These are listed below.
-	  In this section the common options are listed.  These options are
-	  allowed for every subcommand (although they may not always have an
-	  effect).
+	  In this section the options that are common to all Nix operations are
+	  listed.  These options are allowed for every subcommand (although
+	  they may not always have an effect).
 	</para>
+
+	<variablelist>
+
+	  <varlistentry>
+	    <term><option>--path</option></term>
+	    <listitem>
+	      <para>
+		Indicates that any identifier arguments to the operation are
+		paths in the store rather than identifiers.
+	      </para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term><option>--verbose</option></term>
+	    <listitem>
+	      <para>
+		Increases the level of verbosity of diagnostic messages printed
+		on standard error.  For each Nix operation, the information
+		printed on standard output is well-defined and specified below
+		in the respective sections.  Any diagnostic information is
+		printed on standard error, never on standard output.
+	      </para>
+
+	      <para>
+		This option may be specified repeatedly.  Currently, the
+		following verbosity levels exist:
+	      </para>
+
+	      <variablelist>
+		<varlistentry>
+		  <term>0</term>
+		  <listitem>
+		    <para>
+		      Print error messages only.
+		    </para>
+		  </listitem>
+		</varlistentry>
+		<varlistentry>
+		  <term>1</term>
+		  <listitem>
+		    <para>
+		      Print informational messages.
+		    </para>
+		  </listitem>
+		</varlistentry>
+		<varlistentry>
+		  <term>2</term>
+		  <listitem>
+		    <para>
+		      Print even more informational messages.
+		    </para>
+		  </listitem>
+		</varlistentry>
+		<varlistentry>
+		  <term>3</term>
+		  <listitem>
+		    <para>
+		      Print messages that should only be useful for debugging.
+		    </para>
+		  </listitem>
+		</varlistentry>
+		<varlistentry>
+		  <term>4</term>
+		  <listitem>
+		    <para>
+		      <quote>Vomit mode</quote>: print vast amounts of debug
+		      information.
+		    </para>
+		  </listitem>
+		</varlistentry>
+	      </variablelist>
+
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+
       </refsect1>
 
+
       <refsect1>
-	<title>Subcommand <command>--install</command></title>
+	<title>Operation <option>--install</option></title>
 
 	<refsect2>
 	  <title>Synopsis</title>
 	  <cmdsynopsis>
-	    <command>nix --install</command>
-	    <arg rep='repeat'><replaceable>id</replaceable></arg>
+	    <command>nix</command>
+	    <group>
+	      <arg><option>--install</option></arg>
+	      <arg><option>-i</option></arg>
+	    </group>
+	    <arg choice='plain' rep='repeat'><replaceable>ids</replaceable></arg>
 	  </cmdsynopsis>
 	</refsect2>
 
@@ -270,11 +368,62 @@ $ make install</screen>
 	  <title>Description</title>
 	    
 	  <para>
-	    <command>nix --install</command> realises the given Nix expressions
-	    in the file system.
+	    The operation <option>--install</option> realises the Nix
+	    expressions identified by <replaceable>ids</replaceable> in the
+	    file system.  If these expressions are derivation expressions, they
+	    are first normalised.  That is, their target paths are are built,
+	    unless a normal form is already known.
 	  </para>
+
+	  <para>
+	    The identifiers of the normal forms of the given Nix expressions
+	    are printed on standard output.
+	  </para>
+
 	</refsect2>
+	    
       </refsect1>
+
+
+      <refsect1>
+	<title>Operation <option>--delete</option></title>
+
+	<refsect2>
+	  <title>Synopsis</title>
+	  <cmdsynopsis>
+	    <command>nix</command>
+	    <group>
+	      <arg><option>--delete</option></arg>
+	      <arg><option>-d</option></arg>
+	    </group>
+	    <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+	  </cmdsynopsis>
+	</refsect2>
+
+	<refsect2>
+	  <title>Description</title>
+	    
+	  <para>
+	    The operation <option>--delete</option> unconditionally deletes
+	    the paths <replaceable>paths</replaceable> from the Nix store.
+	    It is an error to attempt to delete paths outside of the store.
+	  </para>
+
+	  <warning>
+	    <para>
+	      This operation should almost never be called directly, since no
+	      attempt is made to check whether any references exist to the
+	      paths to be deleted.  Therefore, an inconsistent system could be
+	      the result.  Deletion of paths in the store is done by the
+	      garbage collector (which uses <option>--delete</option> to delete
+	      unreferenced paths).  
+	    </para>
+	  </warning>
+
+	</refsect2>
+	    
+      </refsect1>
+
 
     </refentry>
 
