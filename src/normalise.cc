@@ -24,7 +24,7 @@ static FSId storeSuccessor(const FSId & id1, ATerm sc)
 typedef set<FSId> FSIdSet;
 
 
-Slice normaliseFState(FSId id, FSIdSet pending)
+FSId normaliseFState(FSId id, FSIdSet pending)
 {
     Nest nest(lvlTalkative, format("normalising fstate %1%") % (string) id);
 
@@ -40,7 +40,7 @@ Slice normaliseFState(FSId id, FSIdSet pending)
     FState fs = parseFState(termFromId(id));
 
     /* It this is a normal form (i.e., a slice) we are done. */
-    if (fs.type == FState::fsSlice) return fs.slice;
+    if (fs.type == FState::fsSlice) return id;
     
     /* Otherwise, it's a derivation. */
 
@@ -56,11 +56,12 @@ Slice normaliseFState(FSId id, FSIdSet pending)
 
     for (FSIds::iterator i = fs.derive.inputs.begin();
          i != fs.derive.inputs.end(); i++) {
-        Slice slice = normaliseFState(*i, pending);
-        realiseSlice(slice, pending);
-
-        for (SliceElems::iterator j = slice.elems.begin();
-             j != slice.elems.end(); j++)
+        FSId nf = normaliseFState(*i, pending);
+        realiseSlice(nf, pending);
+        FState fs = parseFState(termFromId(nf));
+        if (fs.type != FState::fsSlice) abort();
+        for (SliceElems::iterator j = fs.slice.elems.begin();
+             j != fs.slice.elems.end(); j++)
             inMap[j->path] = *j;
     }
 
@@ -169,21 +170,24 @@ Slice normaliseFState(FSId id, FSIdSet pending)
     fs.type = FState::fsSlice;
     ATerm nf = unparseFState(fs);
     msg(lvlVomit, format("normal form: %1%") % printTerm(nf));
-    storeSuccessor(id, nf);
-
-    return fs.slice;
+    return storeSuccessor(id, nf);
 }
 
 
-void realiseSlice(const Slice & slice, FSIdSet pending)
+void realiseSlice(const FSId & id, FSIdSet pending)
 {
-    Nest nest(lvlDebug, format("realising slice"));
+    Nest nest(lvlDebug, 
+        format("realising slice %1%") % (string) id);
 
+    FState fs = parseFState(termFromId(id));
+    if (fs.type != FState::fsSlice)
+        throw Error(format("expected slice in %1%") % (string) id);
+    
     /* Perhaps all paths already contain the right id? */
 
     bool missing = false;
-    for (SliceElems::const_iterator i = slice.elems.begin();
-         i != slice.elems.end(); i++)
+    for (SliceElems::const_iterator i = fs.slice.elems.begin();
+         i != fs.slice.elems.end(); i++)
     {
         SliceElem elem = *i;
         string id;
@@ -203,8 +207,8 @@ void realiseSlice(const Slice & slice, FSIdSet pending)
     }
 
     /* For each element, expand its id at its path. */
-    for (SliceElems::const_iterator i = slice.elems.begin();
-         i != slice.elems.end(); i++)
+    for (SliceElems::const_iterator i = fs.slice.elems.begin();
+         i != fs.slice.elems.end(); i++)
     {
         SliceElem elem = *i;
         debug(format("expanding %1% in `%2%'") % (string) elem.id % elem.path);
@@ -217,13 +221,8 @@ Strings fstatePaths(const FSId & id, bool normalise)
 {
     Strings paths;
 
-    FState fs;
-
-    if (normalise) {
-        fs.slice = normaliseFState(id);
-        fs.type = FState::fsSlice;
-    } else
-        fs = parseFState(termFromId(id));
+    FState fs = parseFState(termFromId(
+        normalise ? normaliseFState(id) : id));
 
     if (fs.type == FState::fsSlice) {
         /* !!! fix complexity */
@@ -249,9 +248,9 @@ Strings fstatePaths(const FSId & id, bool normalise)
 Strings fstateRefs(const FSId & id)
 {
     Strings paths;
-    Slice slice = normaliseFState(id);
-    for (SliceElems::const_iterator i = slice.elems.begin();
-         i != slice.elems.end(); i++)
+    FState fs = parseFState(termFromId(normaliseFState(id)));
+    for (SliceElems::const_iterator i = fs.slice.elems.begin();
+         i != fs.slice.elems.end(); i++)
         paths.push_back(i->path);
     return paths;
 }

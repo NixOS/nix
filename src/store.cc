@@ -219,8 +219,7 @@ string expandId(const FSId & id, const string & target,
 
         debug(format("trying substitute %1%") % (string) subId);
 
-        Slice slice = normaliseFState(subId, pending);
-        realiseSlice(slice, pending);
+        realiseSlice(normaliseFState(subId, pending), pending);
 
         return expandId(id, target, prefix, pending);
     }

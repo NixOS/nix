@@ -44,7 +44,11 @@ static void opInstall(Strings opFlags, Strings opArgs)
 
     for (Strings::iterator it = opArgs.begin();
          it != opArgs.end(); it++)
-        realiseSlice(normaliseFState(argToId(*it)));
+    {
+        FSId id = normaliseFState(argToId(*it));
+        realiseSlice(id);
+        cout << format("%1%\n") % (string) id;
+    }
 }
 
 

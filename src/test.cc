@@ -13,8 +13,7 @@
 void realise(FSId id)
 {
     Nest nest(lvlDebug, format("TEST: realising %1%") % (string) id);
-    Slice slice = normaliseFState(id);
-    realiseSlice(slice);
+    realiseSlice(normaliseFState(id));
 }
 
 
