@@ -37,7 +37,7 @@ static ArgType argType = atpUnknown;
 
    Source selection for --install, --dump:
 
-     --file / -f: by file name
+     --file / -f: by file name  !!! -> path
      --hash / -h: by hash
 
    Query flags:
@@ -87,6 +87,12 @@ static Hash argToHash(const string & arg)
 }
 
 
+static FState hash2fstate(Hash hash)
+{
+    return ATmake("Include(<str>)", ((string) hash).c_str());
+}
+
+
 /* Realise (or install) paths from the given Nix fstate
    expressions. */
 static void opInstall(Strings opFlags, Strings opArgs)
@@ -98,7 +104,7 @@ static void opInstall(Strings opFlags, Strings opArgs)
          it != opArgs.end(); it++)
     {
         StringSet paths;
-        realiseFState(termFromHash(argToHash(*it)), paths);
+        realiseFState(hash2fstate(argToHash(*it)), paths);
     }
 }
 
@@ -157,14 +163,16 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         switch (query) {
 
-        case qPath:
+        case qPath: {
+            StringSet refs;
             cout << format("%s\n") % 
-                (string) fstatePath(termFromHash(hash));
+                (string) fstatePath(realiseFState(termFromHash(hash), refs));
             break;
+        }
 
         case qRefs: {
             StringSet refs;
-            FState fs = ATmake("Include(<str>)", ((string) hash).c_str());
+            FState fs = hash2fstate(hash);
             fstateRefs(realiseFState(fs, refs), refs);
             for (StringSet::iterator j = refs.begin(); 
                  j != refs.end(); j++)
@@ -203,10 +211,8 @@ static void opDump(Strings opFlags, Strings opArgs)
     string arg = *opArgs.begin();
     string path;
     
-    if (argType == atpHash)
-        path = queryPathByHash(parseHash(arg));
-    else if (argType == atpPath)
-        path = arg;
+    if (argType == atpHash) path = expandHash(parseHash(arg));
+    else if (argType == atpPath) path = arg;
 
     dumpPath(path, sink);
 }

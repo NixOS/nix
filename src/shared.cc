@@ -16,6 +16,7 @@ static void initAndRun(int argc, char * * argv)
 {
     /* Setup Nix paths. */
     nixStore = NIX_STORE_DIR;
+    nixDataDir = NIX_DATA_DIR;
     nixLogDir = NIX_LOG_DIR;
     nixDB = (string) NIX_STATE_DIR + "/nixstate.db";
 

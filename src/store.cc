@@ -131,25 +131,53 @@ bool isInPrefix(const string & path, const string & _prefix)
 }
 
 
-static string queryPathByHashPrefix(Hash hash, const string & prefix)
+string expandHash(const Hash & hash, const string & target,
+    const string & prefix)
 {
     Strings paths;
+
+    if (!target.empty() && !isInPrefix(target, prefix))
+        abort();
 
     if (!queryListDB(nixDB, dbHash2Paths, hash, paths))
         throw Error(format("no paths known with hash `%1%'") % (string) hash);
 
-    /* Arbitrarily pick the first one that exists and still hash the
-       right hash. */
+    /* !!! we shouldn't check for staleness by default --- too slow */
 
+    /* Pick one equal to `target'. */
+    if (!target.empty()) {
+
+        for (Strings::iterator i = paths.begin();
+             i != paths.end(); i++)
+        {
+            string path = *i;
+            try {
+                if (path == target && hashPath(path) == hash)
+                    return path;
+            } catch (Error & e) {
+                debug(format("stale path: %1%") % e.msg());
+                /* try next one */
+            }
+        }
+        
+    }
+
+    /* Arbitrarily pick the first one that exists and isn't stale. */
     for (Strings::iterator it = paths.begin();
          it != paths.end(); it++)
     {
         string path = *it;
         try {
-            if (isInPrefix(path, prefix) && hashPath(path) == hash)
-                return path;
+            if (isInPrefix(path, prefix) && hashPath(path) == hash) {
+                if (target.empty())
+                    return path;
+                else {
+                    copyPath(path, target);
+                    return target;
+                }
+            }
         } catch (Error & e) {
-            debug(format("checking hash: %1%") % e.msg());
+            debug(format("stale path: %1%") % e.msg());
             /* try next one */
         }
     }
@@ -157,16 +185,7 @@ static string queryPathByHashPrefix(Hash hash, const string & prefix)
     throw Error(format("all paths with hash `%1%' are stale") % (string) hash);
 }
 
-
-string expandHash(const Hash & hash, const string & outPath = "")
-{
     
-string queryPathByHash(Hash hash)
-{
-    return queryPathByHashPrefix(hash, "/");
-}
-
-
 void addToStore(string srcPath, string & dstPath, Hash & hash)
 {
     srcPath = absPath(srcPath);
@@ -174,7 +193,7 @@ void addToStore(string srcPath, string & dstPath, Hash & hash)
     hash = hashPath(srcPath);
 
     try {
-        dstPath = queryPathByHashPrefix(hash, nixStore);
+        dstPath = expandHash(hash, "", nixStore);
         return;
     } catch (...) {
     }

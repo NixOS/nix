@@ -1,5 +1,5 @@
 bin_SCRIPTS = nix-switch nix-collect-garbage \
- nix-pull-prebuilts nix-push-prebuilts
+ nix-pull nix-push
 
 install-exec-local:
 	$(INSTALL) -d $(sysconfdir)/profile.d

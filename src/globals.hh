@@ -52,6 +52,8 @@ extern string dbSubstitutes;
    derived files. */
 extern string nixStore;
 
+extern string nixDataDir; /* !!! fix */
+
 /* nixLogDir is the directory where we log various operations. */ 
 extern string nixLogDir;
 

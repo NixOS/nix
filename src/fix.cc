@@ -15,6 +15,8 @@ static Strings searchDirs;
 
 static string searchPath(string relPath)
 {
+    if (string(relPath, 0, 1) == "/") return relPath;
+
     for (Strings::iterator i = searchDirs.begin();
          i != searchDirs.end(); i++)
     {
@@ -218,7 +220,10 @@ static Expr evalExpr(Expr e)
 
 static Expr evalFile(string relPath)
 {
-    Expr e = ATreadFromNamedFile(searchPath(relPath).c_str());
+    string path = searchPath(relPath);
+    Expr e = ATreadFromNamedFile(path.c_str());
+    if (!e) 
+        throw Error(format("unable to read a term from `%1%'") % path);
     return evalExpr(e);
 }
 
@@ -228,6 +233,7 @@ void run(Strings args)
     Strings files;
 
     searchDirs.push_back(".");
+    searchDirs.push_back(nixDataDir + "/fix");
     
     for (Strings::iterator it = args.begin();
          it != args.end(); )

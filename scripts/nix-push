@@ -1,0 +1,60 @@
+#! /usr/bin/perl -w
+
+my @pushlist;
+
+foreach my $hash (@ARGV) {
+
+    die unless $hash =~ /^([0-9a-z]{32})$/;
+
+    # Get all paths referenced by the normalisation of the given 
+    # fstate expression.
+    my @paths;
+    open PATHS, "nix -qrh $hash 2> /dev/null |" or die "nix -qrh";
+    while (<PATHS>) {
+	chomp;
+	next unless /^\//;
+	push @paths, $_;
+    }
+    close PATHS;
+
+    # For each path, create a Fix expression that turns the path into
+    # a Nix archive.
+    foreach my $path (@paths) {
+
+	# Hash the path.
+	my $phash = `nix-hash $path`;
+	$? and die "nix-hash";
+	chomp $phash;
+	die unless $phash =~ /^([0-9a-z]{32})$/;
+
+	# Construct a Fix expression that creates a Nar archive.
+	my $fixexpr = 
+          "App(IncludeFix(\"nar/nar.fix\"), " .
+          "[ (\"path\", Path(\"$path\", Hash(\"$phash\"), [Include(\"$hash\")]))" .
+          ", (\"name\", \"$phash.nar\")" .
+          "])";
+	
+	my $fixfile = "/tmp/nix-push-tmp.fix";
+	open FIX, ">$fixfile";
+	print FIX $fixexpr;
+	close FIX;
+
+	# Instantiate a Nix expression from the Fix expression.
+	my $nhash = `fix $fixfile`;
+	$? and die "instantiating Nix archive expression";
+	chomp $nhash;
+	die unless $nhash =~ /^([0-9a-z]{32})$/;
+
+	# Realise the Nix expression.
+	my $npath = `nix -qph $nhash 2> /dev/null`;
+	$? and die "creating Nix archive";
+	chomp $npath;
+
+	push @pushlist, $npath;
+
+	print "$path -> $npath\n";
+    }
+}
+
+# Push the prebuilts to the server. !!! FIXME
+system "rsync -av -e ssh @pushlist eelco\@losser.st-lab.cs.uu.nl:/home/eelco/public_html/nix-dist/";

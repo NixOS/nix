@@ -149,7 +149,7 @@ Hash hashTerm(ATerm t)
 
 ATerm termFromHash(const Hash & hash, string * p)
 {
-    string path = queryPathByHash(hash);
+    string path = expandHash(hash);
     if (p) *p = path;
     ATerm t = ATreadFromNamedFile(path.c_str());
     if (!t) throw Error(format("cannot read aterm %1%") % path);
@@ -253,26 +253,6 @@ static FState realise(FState fs, StringSet & paths)
         /* Expand the hash into the target path. */
         expandHash(hash, path);
 
-#if 0
-        /* Perhaps the path already exists and has the right hash? */
-        if (pathExists(path)) {
-
-            if (hash != hashPath(path))
-                throw Error(format("path %1% exists, but does not have hash %2%")
-                    % path % (string) hash);
-
-            debug(format("path %1% already has hash %2%")
-                % path % (string) hash);
-
-        } else {
-            
-            /* Do we know a path with that hash?  If so, copy it. */
-            string path2 = queryPathByHash(hash);
-            copyPath(path2, path);
-            
-        }
-#endif
-        
         return nf;
     }
 
