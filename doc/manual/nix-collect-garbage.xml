@@ -1,77 +1,29 @@
 <refentry>
-  <refnamediv>
-    <refname>nix-collect-garbage</refname>
-    <refpurpose>remove unreachable store paths</refpurpose>
-  </refnamediv>
+  
+<refnamediv>
+  <refname>nix-collect-garbage</refname>
+  <refpurpose>delete unreachable store paths</refpurpose>
+</refnamediv>
 
-  <refsynopsisdiv>
-    <cmdsynopsis>
-      <command>nix-collect-garbage</command>
-      <group choice='opt'>
-        <arg choice='plain'><option>--print-live</option></arg>
-        <arg choice='plain'><option>--print-dead</option></arg>
-      </group>
-      <arg><option>--min-age</option> <replaceable>age</replaceable></arg>
-    </cmdsynopsis>
-  </refsynopsisdiv>
+<refsynopsisdiv>
+  <cmdsynopsis>
+    <command>nix-collect-garbage</command>
+    <group choice='opt'>
+      <arg choice='plain'><option>--print-roots</option></arg>
+      <arg choice='plain'><option>--print-live</option></arg>
+      <arg choice='plain'><option>--print-dead</option></arg>
+      <arg choice='plain'><option>--delete</option></arg>
+    </group>
+  </cmdsynopsis>
+</refsynopsisdiv>
 
-  <refsection>
-    <title>Description</title>
+<refsection><title>Description</title>
 
-    <para>
-      The command <command>nix-collect-garbage</command> performs a
-      garbage collection on the Nix store: any paths in the Nix store
-      that are garbage (not reachable from a set of root store
-      expressions) are deleted.
-    </para>
+<para>The command <command>nix-collect-garbage</command> is an
+obsolete wrapper around <link
+linkend="rsec-nix-store-gc"><command>nix-store
+--gc</command></link>.</para>
 
-    <para>
-      The roots of the garbage collector are the store expressions
-      mentioned in the files in the directory
-      <filename><replaceable>prefix</replaceable>/var/nix/gcroots</filename>.
-      By default, the roots are all user environments in
-      <filename><replaceable>prefix</replaceable>/var/nix/profiles</filename>.
-      You can register other store expressions as roots by writing the
-      full path of the store expression to an arbitrary file in the
-      <filename>gcroots</filename> directory (or a subdirectory
-      thereof).
-    </para>
+</refsection>
 
-  </refsection>
-
-  <refsection>
-    <title>Options</title>
-
-    <variablelist>
-
-      <varlistentry>
-        <term><option>--print-live</option> / <option>--print-dead</option></term>
-        <listitem>
-          <para>
-            These options cause the set of live or dead paths to be
-            printed, respectively, rather than performing an actual
-            garbage collector.  They correspond exactly with the
-            sub-operations in <command>nix-store
-            <option>--gc</option></command>.
-          </para>
-        </listitem>
-      </varlistentry>
-      
-    </variablelist>
-
-  </refsection>
-
-  <refsection>
-    <title>Examples</title>
-
-    <para>
-      To delete all unreachable paths, just do:
-    
-      <screen>
-$ nix-collect-garbage</screen>
-
-    </para>
-
-  </refsection>
-    
 </refentry>

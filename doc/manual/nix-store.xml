@@ -146,126 +146,121 @@ output.</para>
 
 <!--######################################################################-->
 
-  <refsection>
-    <title>Operation <option>--gc</option></title>
+<refsection id='rsec-nix-store-gc'><title>Operation <option>--gc</option></title>
 
-    <refsection>
-      <title>Synopsis</title>
-      <cmdsynopsis>
-        <command>nix-store</command>
-        <arg choice='plain'><option>--gc</option></arg>
-        <group choice='req'>
-          <arg choice='plain'><option>--print-live</option></arg>
-          <arg choice='plain'><option>--print-dead</option></arg>
-          <arg choice='plain'><option>--delete</option></arg>
-        </group>
-        <arg><option>--min-age</option> <replaceable>age</replaceable></arg>
-      </cmdsynopsis>
-    </refsection>
+<refsection><title>Synopsis</title>
 
-    <refsection>
-      <title>Description</title>
+<cmdsynopsis>
+  <command>nix-store</command>
+  <arg choice='plain'><option>--gc</option></arg>
+  <group choice='req'>
+    <arg choice='plain'><option>--print-roots</option></arg>
+    <arg choice='plain'><option>--print-live</option></arg>
+    <arg choice='plain'><option>--print-dead</option></arg>
+    <arg choice='plain'><option>--delete</option></arg>
+  </group>
+</cmdsynopsis>
+
+</refsection>
+
+<refsection><title>Description</title>
             
-      <para>
-        Without additional flags, the operation <option>--gc</option>
-        performs a garbage collection on the Nix store.  That is, all
-        paths in the Nix store not reachable via file system
-        references from a set of <quote>roots</quote>, are deleted.
-      </para>
+<para>Without additional flags, the operation <option>--gc</option>
+performs a garbage collection on the Nix store.  That is, all paths in
+the Nix store not reachable via file system references from a set of
+<quote>roots</quote>, are deleted.</para>
 
-      <para>
-	The following flags may be specified:
-      </para>
+<para>The following suboperations may be specified:</para>
 
-      <variablelist>
+<variablelist>
 
-        <varlistentry>
-          <term><option>--print-roots</option></term>
-          <listitem>
-            <para>
-              This operation prints on standard output the set of
-	      roots used by the garbage collector.
-            </para>
-          </listitem>
-        </varlistentry>
+  <varlistentry><term><option>--print-roots</option></term>
+  
+    <listitem><para>This operation prints on standard output the set
+    of roots used by the garbage collector.</para></listitem>
+    
+  </varlistentry>
 
-        <varlistentry>
-          <term><option>--print-live</option></term>
-          <listitem>
-            <para>
-              This operation prints on standard output the set of
-              <quote>live</quote> store paths, which are all the store
-              paths reachable from the roots.  Live paths should never
-              be deleted, since that would break consistency — it
-              would become possible that applications are installed
-              that reference things that are no longer present in the
-              store.
-            </para>
-          </listitem>
-        </varlistentry>
+  <varlistentry><term><option>--print-live</option></term>
+  
+    <listitem><para>This operation prints on standard output the set
+    of <quote>live</quote> store paths, which are all the store paths
+    reachable from the roots.  Live paths should never be deleted,
+    since that would break consistency — it would become possible that
+    applications are installed that reference things that are no
+    longer present in the store.</para></listitem>
+    
+  </varlistentry>
 
-        <varlistentry>
-          <term><option>--print-dead</option></term>
-          <listitem>
-            <para>
-              This operation prints out on standard output the set of
-              <quote>dead</quote> store paths, which is just the
-              opposite of the set of live paths: any path in the store
-              that is not live (with respect to the roots) is dead.
-            </para>
-          </listitem>
-        </varlistentry>
+  <varlistentry><term><option>--print-dead</option></term>
+  
+    <listitem><para>This operation prints out on standard output the
+    set of <quote>dead</quote> store paths, which is just the opposite
+    of the set of live paths: any path in the store that is not live
+    (with respect to the roots) is dead.</para></listitem>
+    
+  </varlistentry>
 
-        <varlistentry>
-          <term><option>--delete</option></term>
-          <listitem>
-            <para>
-              This operation performs an actual garbage collection.
-              All dead paths are removed from the store.
-            </para>
-          </listitem>
-        </varlistentry>
+  <varlistentry><term><option>--delete</option></term>
+  
+    <listitem><para>This operation performs an actual garbage
+    collection.  All dead paths are removed from the
+    store.  This is the default.</para></listitem>
+    
+  </varlistentry>
 
-      </variablelist>
+</variablelist>
 
-    </refsection>
-            
-    <refsection>
-      <title>Roots</title>
+</refsection>
 
-      <para>The roots of the garbage collector are all store paths to
-      which there are symlinks in the
-      directory <filename><replaceable>prefix</replaceable>/nix/var/nix/gcroots</filename>.
-      For instance, the following command makes the
-      path <filename>/nix/store/d718ef...-foo</filename> a root of
-      the collector:
+
+<refsection><title>Roots</title>
+
+<para>The roots of the garbage collector are all store paths to which
+there are symlinks in the directory
+<filename><replaceable>prefix</replaceable>/nix/var/nix/gcroots</filename>.
+For instance, the following command makes the path
+<filename>/nix/store/d718ef...-foo</filename> a root of the collector:
 
 <screen>
 $ ln -s /nix/store/d718ef...-foo /nix/var/nix/gcroots/bar</screen>
 	
-      That is, after this command, the garbage collector will not
-      remove <filename>/nix/store/d718ef...-foo</filename> or any of
-      its dependencies.</para>
+That is, after this command, the garbage collector will not remove
+<filename>/nix/store/d718ef...-foo</filename> or any of its
+dependencies.</para>
 
-      <para>Subdirectories
-      of <filename><replaceable>prefix</replaceable>/nix/var/nix/gcroots</filename>
-      are also searched for symlinks.  Symlinks to non-store paths are
-      followed and searched for roots, but TODO.</para>
+<para>Subdirectories of
+<filename><replaceable>prefix</replaceable>/nix/var/nix/gcroots</filename>
+are also searched for symlinks.  Symlinks to non-store paths are
+followed and searched for roots, but TODO.</para>
 
-    </refsection>
+</refsection>
 
-    <refsection>
-      <title>Configuration file</title>
 
-      <para>TODO</para>
+<refsection><title>Configuration file</title>
 
-    </refsection>
+<para>TODO</para>
 
-  </refsection>
+</refsection>
+
+
+<refsection><title>Examples</title>
+
+<para>To delete all unreachable paths, just do:
+    
+<screen>
+$ nix-store --gc</screen>
+
+</para>
+
+</refsection>
+
+
+</refsection>
 
 
   
-  <!--######################################################################-->
+<!--######################################################################-->
 
   <refsection>
     <title>Operation <option>--query</option></title>
@@ -586,10 +581,3 @@ x=`nix-store --query --normalise --force-realise /nix/store/bla.store`
 
 
 </refentry>
-
-
-<!--
-local variables:
-sgml-parent-document: ("book.xml" "refentry")
-end:
--->
