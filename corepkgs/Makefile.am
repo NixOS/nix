@@ -1,1 +1,1 @@
-SUBDIRS = fetchurl nar buildenv channels
+SUBDIRS = nar buildenv channels

@@ -81,17 +81,14 @@ sub update {
     # expressions.
 
     my $nixExpr = "[";
-    
     foreach my $url (@channels) {
         my $fullURL = "$url/nixexprs.tar.bz2";
-        my $hash = `@bindir@/nix-prefetch-url '$fullURL' 2> /dev/null`
-            or die "cannot fetch `$fullURL'";
-        chomp $hash;
-        # !!! escaping
-        $nixExpr .= "((import @datadir@/nix/corepkgs/fetchurl) " .
-            "{url = $fullURL; md5 = \"$hash\"; system = \"@system@\";}) "
+        $ENV{"PRINT_PATH"} = 1;
+        my ($hash, $path) = `@bindir@/nix-prefetch-url '$fullURL' 2> /dev/null`;
+        die "cannot fetch `$fullURL'" if $? != 0;
+        chomp $path;
+        $nixExpr .= $path . " ";
     }
-
     $nixExpr .= "]";
 
     $nixExpr =
@@ -132,6 +129,9 @@ Usage:
 EOF
     exit 1;
 }
+
+
+usageError if scalar @ARGV == 0;
 
 
 while (scalar @ARGV) {

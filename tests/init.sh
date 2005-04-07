@@ -41,7 +41,6 @@ cp -pr $TOP/corepkgs $NIX_DATA_DIR/nix/
 # (and likely to fail).
 for i in \
     $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh \
-    $NIX_DATA_DIR/nix/corepkgs/fetchurl/builder.sh \
     $NIX_BIN_DIR/nix/download-using-manifests.pl \
     $NIX_BIN_DIR/nix-prefetch-url \
     $NIX_BIN_DIR/nix-collect-garbage \
