@@ -132,9 +132,13 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     string hash = *i++;
     string name = *i++;
 
+    HashType ht(parseHashType(hashAlgo));
+    Hash h = hash.size() == Hash(ht).hashSize * 2
+        ? parseHash(ht, hash)
+        : parseHash32(ht, hash);
+    
     cout << format("%1%\n") %
-        makeFixedOutputPath(recursive, hashAlgo,
-            parseHash(parseHashType(hashAlgo), hash), name);
+        makeFixedOutputPath(recursive, hashAlgo, h, name);
 }
 
 
