@@ -85,6 +85,8 @@ void assertStorePath(const Path & path);
 bool isInStore(const Path & path);
 bool isStorePath(const Path & path);
 
+void checkStoreName(const string & name);
+
 /* Chop off the parts after the top-level store name, e.g.,
    /nix/store/abcd-foo/bar => /nix/store/abcd-foo. */
 Path toStorePath(const Path & path);
@@ -136,6 +138,13 @@ Path makeStorePath(const string & type,
 /* Copy the contents of a path to the store and register the validity
    the resulting path.  The resulting path is returned. */
 Path addToStore(const Path & srcPath);
+
+/* Like addToStore(), but for pre-adding the outputs of fixed-output
+   derivations. */
+Path addToStoreFixed(bool recursive, string hashAlgo, const Path & srcPath);
+
+Path makeFixedOutputPath(bool recursive,
+    string hashAlgo, Hash hash, string name);
 
 /* Like addToStore, but the contents written to the output path is a
    regular file containing the given string. */

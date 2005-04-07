@@ -1,4 +1,4 @@
-Version 0.8
+Version 0.8 
 
 NOTE: the hashing scheme in Nix 0.8 changed (as detailed below).  As a
 result, `nix-pull' manifests and channels built for Nix 0.7 and below
@@ -161,7 +161,7 @@ Nix 0.8 has the following improvements:
   all unsafe, really ;-)
 
   
-Version 0.7
+Version 0.7 (January 12, 2005)
 
 * Binary patching.  When upgrading components using pre-built binaries
   (through nix-pull / nix-channel), Nix can automatically download and
@@ -183,7 +183,7 @@ Version 0.7
   dependencies are revealed.
 
 
-Version 0.6
+Version 0.6 (November 14, 2004)
 
 Major changes include the following:
 

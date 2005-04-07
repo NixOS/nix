@@ -202,6 +202,21 @@ Path toStorePath(const Path & path)
 }
 
 
+void checkStoreName(const string & name)
+{
+    string validChars = "+-._?=";
+    for (string::const_iterator i = name.begin(); i != name.end(); ++i)
+        if (!((*i >= 'A' && *i <= 'Z') ||
+              (*i >= 'a' && *i <= 'z') ||
+              (*i >= '0' && *i <= '9') ||
+              validChars.find(*i) != string::npos))
+        {
+            throw Error(format("invalid character `%1%' in name `%2%'")
+                % *i % name);
+        }
+}
+
+
 void canonicalisePathMetaData(const Path & path)
 {
     checkInterrupt();
@@ -579,13 +594,28 @@ Path makeStorePath(const string & type,
     string s = type + ":sha256:" + printHash(hash) + ":"
         + nixStore + ":" + suffix;
 
+    checkStoreName(suffix);
+
     return nixStore + "/"
         + printHash32(compressHash(hashString(htSHA256, s), 20))
         + "-" + suffix;
 }
 
 
-Path addToStore(const Path & _srcPath)
+Path makeFixedOutputPath(bool recursive,
+    string hashAlgo, Hash hash, string name)
+{
+    /* !!! copy/paste from primops.cc */
+    Hash h = hashString(htSHA256, "fixed:out:"
+        + (recursive ? (string) "r:" : "") + hashAlgo + ":"
+        + printHash(hash) + ":"
+        + "");
+    return makeStorePath("output:out", h, name);
+}
+
+
+static Path _addToStore(bool fixed, bool recursive,
+    string hashAlgo, const Path & _srcPath)
 {
     Path srcPath(absPath(_srcPath));
     debug(format("adding `%1%' to the store") % srcPath);
@@ -597,7 +627,22 @@ Path addToStore(const Path & _srcPath)
     }
 
     string baseName = baseNameOf(srcPath);
-    Path dstPath = makeStorePath("source", h, baseName);
+
+    Path dstPath;
+    
+    if (fixed) {
+
+        HashType ht(parseHashType(hashAlgo));
+        Hash h2(ht);
+        {
+            SwitchToOriginalUser sw;
+            h2 = recursive ? hashPath(ht, srcPath) : hashFile(ht, srcPath);
+        }
+        
+        dstPath = makeFixedOutputPath(recursive, hashAlgo, h2, baseName);
+    }
+        
+    else dstPath = makeStorePath("source", h, baseName);
 
     addTempRoot(dstPath);
 
@@ -632,6 +677,18 @@ Path addToStore(const Path & _srcPath)
     }
 
     return dstPath;
+}
+
+
+Path addToStore(const Path & srcPath)
+{
+    return _addToStore(false, false, "", srcPath);
+}
+
+
+Path addToStoreFixed(bool recursive, string hashAlgo, const Path & srcPath)
+{
+    return _addToStore(true, recursive, hashAlgo, srcPath);
 }
 
 

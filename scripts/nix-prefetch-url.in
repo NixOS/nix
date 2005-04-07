@@ -1,7 +1,7 @@
 #! @shell@ -e
 
 url=$1
-hash=$2
+expHash=$2
 
 hashType=$NIX_HASH_ALGO
 if test -z "$hashType"; then
@@ -14,54 +14,53 @@ if test "$hashType" != "md5"; then
 fi
 
 if test -z "$url"; then
-    echo "syntax: nix-prefetch-url URL" >&2
+    echo "syntax: nix-prefetch-url URL [EXPECTED-HASH]" >&2
     exit 1
 fi
 
-# Determine the hash, unless it was given.
-if test -z "$hash"; then
+name=$(basename "$url")
+if test -z "$name"; then echo "invalid url"; exit 1; fi
 
-    # !!! race
-    tmpPath1=@storedir@/nix-prefetch-url-$$
 
-    # Test whether we have write permission in the store.  If not,
-    # fetch to /tmp and don't copy to the store.  This is a hack to
-    # make this script at least work somewhat in setuid installations.
-    if ! touch $tmpPath1 2> /dev/null; then
-        echo "(cannot write to the store, result won't be cached)" >&2
-        dummyMode=1
-        tmpPath1=/tmp/nix-prefetch-url-$$ # !!! security?
+# If the hash was given, a file with that hash may already be in the
+# store.
+if test -n "$expHash"; then
+    finalPath=$(@bindir@/nix-store --print-fixed-path "$hashType" "$expHash" "$name")
+    if ! @bindir@/nix-store --check-validity "$finalPath" 2> /dev/null; then
+        finalPath=
     fi
+    hash=$expHash
+fi
+
+
+# If we don't know the hash or a file with that hash doesn't exist,
+# download the file and add it to the store.
+if test -z "$finalPath"; then
+
+    tmpPath=/tmp/nix-prefetch-url-$$ # !!! security?
+    tmpFile=$tmpPath/$name
+    mkdir $tmpPath
 
     # Perform the download.
-    @curl@ --fail --location --max-redirs 20 "$url" > $tmpPath1
+    @curl@ --fail --location --max-redirs 20 "$url" > $tmpFile
 
     # Compute the hash.
-    hash=$(@bindir@/nix-hash --type "$hashType" $hashFormat --flat $tmpPath1)
+    hash=$(@bindir@/nix-hash --type "$hashType" $hashFormat --flat $tmpFile)
     if ! test -n "$QUIET"; then echo "hash is $hash" >&2; fi
 
-    # Rename it so that the fetchurl builder can find it.
-    if test "$dummyMode" != 1; then
-        tmpPath2=@storedir@/nix-prefetch-url-$hash
-        test -e $tmpPath2 || mv $tmpPath1 $tmpPath2 # !!! race
+    # Add the downloaded file to the Nix store.
+    finalPath=$(@bindir@/nix-store --add-fixed "$hashType" $tmpFile)
+
+    if test -n "$tmpPath"; then rm -rf $tmpPath || true; fi
+
+    if test -n "$expHash" -a "$expHash" != "$hash"; then
+        echo "hash mismatch for URL \`$url'"
+        exit 1
     fi
-
 fi
 
-# Create a Nix expression that does a fetchurl.
-storeExpr=$( \
-    echo "(import @datadir@/nix/corepkgs/fetchurl) \
-        {url = $url; outputHashAlgo = \"$hashType\"; outputHash = \"$hash\"; system = \"@system@\";}" \
-    | @bindir@/nix-instantiate -)
 
-# Realise it.
-finalPath=$(@bindir@/nix-store -r $storeExpr)
-    
 if ! test -n "$QUIET"; then echo "path is $finalPath" >&2; fi
-
-if test -n "$tmpPath1" -o -n "$tmpPath2"; then
-    rm -rf $tmpPath1 $tmpPath2 || true
-fi
 
 echo $hash
 

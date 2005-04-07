@@ -2,10 +2,4 @@
 
 echo "downloading $url into $out"
 
-prefetch=@storedir@/nix-prefetch-url-$outputHash
-if test -f "$prefetch"; then
-    echo "using prefetched $prefetch";
-    @coreutils@/mv $prefetch $out
-else
-    @curl@ --fail --location --max-redirs 20 "$url" > "$out"
-fi
+@curl@ --fail --location --max-redirs 20 "$url" > "$out"

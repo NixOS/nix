@@ -267,17 +267,7 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
     /* Check the derivation name.  It shouldn't contain whitespace,
        but we are conservative here: we check whether only
        alphanumerics and some other characters appear. */
-    string validChars = "+-._?=";
-    for (string::iterator i = drvName.begin(); i != drvName.end(); ++i)
-        if (!((*i >= 'A' && *i <= 'Z') ||
-              (*i >= 'a' && *i <= 'z') ||
-              (*i >= '0' && *i <= '9') ||
-              validChars.find(*i) != string::npos))
-        {
-            throw Error(format("invalid character `%1%' in derivation name `%2%'")
-                % *i % drvName);
-        }
-
+    checkStoreName(drvName);
     if (isDerivation(drvName))
         throw Error(format("derivation names are not allowed to end in `%1%'")
             % drvExtension);

@@ -85,14 +85,56 @@ static void opRealise(Strings opFlags, Strings opArgs)
 }
 
 
-/* Add files to the Nix values directory and print the resulting
-   paths. */
+/* Add files to the Nix store and print the resulting paths. */
 static void opAdd(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
     for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); ++i)
         cout << format("%1%\n") % addToStore(*i);
+}
+
+
+/* Preload the output of a fixed-output derivation into the Nix
+   store. */
+static void opAddFixed(Strings opFlags, Strings opArgs)
+{
+    bool recursive = false;
+    
+    for (Strings::iterator i = opFlags.begin();
+         i != opFlags.end(); ++i)
+        if (*i == "--recursive") recursive = true;
+        else throw UsageError(format("unknown flag `%1%'") % *i);
+
+    if (opArgs.empty())
+        throw UsageError("first argument must be hash algorithm");
+    
+    string hashAlgo = opArgs.front();
+    opArgs.pop_front();
+
+    for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); ++i)
+        cout << format("%1%\n") % addToStoreFixed(recursive, hashAlgo, *i);
+}
+
+
+/* Hack to support caching in `nix-prefetch-url'. */
+static void opPrintFixedPath(Strings opFlags, Strings opArgs)
+{
+    bool recursive = false;
+    
+    for (Strings::iterator i = opFlags.begin();
+         i != opFlags.end(); ++i)
+        if (*i == "--recursive") recursive = true;
+        else throw UsageError(format("unknown flag `%1%'") % *i);
+
+    Strings::iterator i = opArgs.begin();
+    string hashAlgo = *i++;
+    string hash = *i++;
+    string name = *i++;
+
+    cout << format("%1%\n") %
+        makeFixedOutputPath(recursive, hashAlgo,
+            parseHash(parseHashType(hashAlgo), hash), name);
 }
 
 
@@ -557,6 +599,10 @@ void run(Strings args)
             op = opRealise;
         else if (arg == "--add" || arg == "-A")
             op = opAdd;
+        else if (arg == "--add-fixed")
+            op = opAddFixed;
+        else if (arg == "--print-fixed-path")
+            op = opPrintFixedPath;
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
         else if (arg == "--substitute")
