@@ -5,9 +5,10 @@ XSLTPROC = $(ENV) $(xsltproc) $(xmlflags) --catalogs \
  --param section.autolabel 1 \
  --param section.label.includes.component.label 1 \
  --param html.stylesheet \'style.css\' \
- --param xref.with.number.and.title 0
+ --param xref.with.number.and.title 0 \
+ --param toc.section.depth 3
 
-man1_MANS = nix-env.1 nix-store.1 nix-instantiate.1 \
+man1_MANS = nix-env.1 nix-build.1 nix-store.1 nix-instantiate.1 \
  nix-collect-garbage.1 nix-push.1 nix-pull.1 \
  nix-prefetch-url.1
 

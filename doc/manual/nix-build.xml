@@ -1,0 +1,72 @@
+<refentry>
+  
+<refnamediv>
+  <refname>nix-build</refname>
+  <refpurpose>build a Nix expression</refpurpose>
+</refnamediv>
+
+<refsynopsisdiv>
+  <cmdsynopsis>
+    <command>nix-build</command>
+    <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+  </cmdsynopsis>
+</refsynopsisdiv>
+
+<refsection><title>Description</title>
+
+<para>The <command>nix-build</command> command builds the derivations
+described by the Nix expressions in <replaceable>paths</replaceable>.
+If the build succeeds, it places a symlink to the result in the
+current directory.  The symlink is called <filename>result</filename>.
+If there are multiple Nix expressions, or the Nix expressions evaluate
+to multiple derivations, multiple sequentially numbered symlinks are
+created (<filename>result</filename>, <filename>result-2</filename>,
+and so on).</para>
+
+<note><para><command>nix-build</command> is essentially a wrapper
+around <link
+linkend="sec-nix-instantiate"><command>nix-instantiate</command></link>
+(to translate a high-level Nix expression to a low-level store
+derivation) and <link
+linkend="rsec-nix-store-realise"><command>nix-store
+--realise</command></link> (to build the store
+derivation).</para></note>
+
+<warning><para>The result of the build is automatically registered as
+a root of the Nix garbage collector.  This root disappears
+automatically when the <filename>result</filename> symlink is deleted
+or renamed.  So don’t rename the symlink.</para></warning>
+
+</refsection>
+
+
+<refsection><title>Options</title>
+
+<variablelist>
+
+  <varlistentry><term><option>--add-drv-link</option></term>
+  
+    <listitem><para>Add a symlink in the current directory to the
+    store derivation produced by <command>nix-instantiate</command>.
+    The symlink is called <filename>derivation</filename> (which is
+    numbered in the case of multiple derivations).  The derivation is
+    a root of the garbage collector until the symlink is deleted or
+    renamed.</para></listitem>
+    
+  </varlistentry>
+
+  <varlistentry><term><option>--no-link</option></term>
+  
+    <listitem><para>Do not create a symlink to the output path.  Note
+    that as a result the output does not become a root of the garbage
+    collector, and so might be deleted by <command>nix-store
+    --gc</command>.</para></listitem>
+
+  </varlistentry>
+
+</variablelist>
+
+</refsection>
+
+
+</refentry>

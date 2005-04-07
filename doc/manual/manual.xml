@@ -39,11 +39,15 @@
       <title>nix-env</title>
       <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-env.xml" />
     </sect1>
+    <sect1 id="sec-nix-build">
+      <title>nix-build</title>
+      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-build.xml" />
+    </sect1>
     <sect1>
       <title>nix-store</title>
       <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-store.xml" />
     </sect1>
-    <sect1>
+    <sect1 id="sec-nix-instantiate">
       <title>nix-instantiate</title>
       <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-instantiate.xml" />
     </sect1>

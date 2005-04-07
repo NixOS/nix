@@ -447,7 +447,8 @@ following:
 (import pkgs/system/i686-linux.nix).hello</programlisting>
 
 Call it <filename>test.nix</filename>.  You can then build it without
-installing it using the command <command>nix-build</command>:
+installing it using the command <link
+linkend="sec-nix-build"><command>nix-build</command></link>:
 
 <screen>
 $ nix-build ./test.nix

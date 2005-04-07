@@ -46,7 +46,7 @@
 </glossentry>
 
 
-<glossentry><glossterm>substitute</glossterm>
+<glossentry id="gloss-substitute"><glossterm>substitute</glossterm>
 
   <glossdef><para>A substitute is a command invocation stored in the
   Nix database that describes how to build a store object, bypassing
@@ -90,6 +90,16 @@
   deploy whole closures, since otherwise at runtime files could be
   missing.  The command <command>nix-store -qR</command> prints out
   closures of store paths.</para></glossdef>
+
+</glossentry>
+
+
+<glossentry id="gloss-validity"><glossterm>validity</glossterm>
+
+  <glossdef><para>A store path is considered
+  <emphasis>valid</emphasis> if it exists in the file system, is
+  listed in the Nix database as being valid, and if all paths in its
+  closure are also valid.</para></glossdef>
 
 </glossentry>
 

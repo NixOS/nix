@@ -45,7 +45,7 @@ linkend="sec-common-options" /> for a list of common options.</para>
 
   <varlistentry id="opt-add-root"><term><option>--add-root</option> <replaceable>path</replaceable></term>
 
-    <listitem><para>Causes the result of a build action
+    <listitem><para>Causes the result of a realisation
     (<option>--realise</option> and <option>--force-realise</option>)
     to be registered as a root of the garbage collector (see <xref
     linkend="ssec-gc-roots" />).  The root is stored in
@@ -54,7 +54,12 @@ linkend="sec-common-options" /> for a list of common options.</para>
     typically in a subdirectory of
     <filename>/nix/var/nix/gcroots/</filename>)
     <emphasis>unless</emphasis> the <option>--indirect</option> flag
-    is used.</para></listitem>
+    is used.</para>
+
+    <para>If there are multiple results, then multiple symlinks will
+    be created by sequentially numbering symlinks beyond the first one
+    (e.g., <filename>foo</filename>, <filename>foo-2</filename>,
+    <filename>foo-3</filename>, and so on).</para></listitem>
 
   </varlistentry>
 
@@ -121,25 +126,56 @@ lrwxrwxrwx    1 ... 2005-03-13 21:10 /home/eelco/bla/result -> /nix/store/1r1134
 
 <refsection><title>Description</title>
             
-<para>The operation <option>--install</option> realises in the file
-system the store expressions stored in
-<replaceable>paths</replaceable>.  If these expressions are derivation
-expressions, they are first <emphasis>normalised</emphasis> into a
-closure expression.  This may happen in two ways.  First, the
-corresponding closure expression (the <emphasis>successor</emphasis>)
-may already known (either because the build has already been
-performed, or because a successor was explicitly registered through
-the <option>--successor</option> operation).  Otherwise, the build
-action described by the derivation is performed, and a closure
-expression is computed by scanning the result of the build for
-references to other paths in the store.</para>
+<para>The operation <option>--realise</option> essentially “builds”
+the specified store paths.  Realisation is a somewhat overloaded term:
 
-<para>The paths of the closure expression corresponding to each
-expression in <replaceable>paths</replaceable> is printed on standard
-output.</para>
+<itemizedlist>
+
+  <listitem><para>If the store path is a
+  <emphasis>derivation</emphasis>, realisation ensures that the output
+  paths of the derivation are <link
+  linkend="gloss-validity">valid</link> (i.e., the output path and its
+  closure exist in the file system).  This can be done in several
+  ways.  First, it is possible that the outputs are already valid, in
+  which case we are done immediately.  Otherwise, there may be <link
+  linkend="gloss-substitute">substitutes</link> that produce the
+  outputs (e.g., by downloading them).  Finally, the outputs can be
+  produced by performing the build action described by the
+  derivation.</para></listitem>
+
+  <listitem><para>If the store path is not a derivation, realisation
+  ensures that the specified path is valid (i.e., it and its closure
+  exist in the file system).  If the path is already valid, we are
+  done immediately.  Otherwise, the path and any missing paths in its
+  closure may be produced through substitutes.  If there are no
+  (succesful) subsitutes, realisation fails.</para></listitem>
+
+</itemizedlist>
+
+</para>
+
+<para>The output path of each derivation is printed on standard
+output.  (For non-derivations argument, the argument itself is
+printed.)</para>
 
 </refsection>
             
+
+<refsection><title>Examples</title>
+
+<para>This operation is typically used to build store derivations
+produced by <link
+linkend="sec-nix-instantiate"><command>nix-instantiate</command></link>:
+    
+<screen>
+$ nix-store -r $(nix-instantiate ./foo.nix)</screen>
+
+This is essentially what <link
+linkend="sec-nix-build"><command>nix-build</command></link> does.</para>
+
+</refsection>
+
+
 </refsection>
 
   
@@ -168,7 +204,7 @@ output.</para>
 <para>Without additional flags, the operation <option>--gc</option>
 performs a garbage collection on the Nix store.  That is, all paths in
 the Nix store not reachable via file system references from a set of
-<quote>roots</quote>, are deleted.</para>
+“roots”, are deleted.</para>
 
 <para>The following suboperations may be specified:</para>
 
@@ -184,9 +220,9 @@ the Nix store not reachable via file system references from a set of
   <varlistentry><term><option>--print-live</option></term>
   
     <listitem><para>This operation prints on standard output the set
-    of <quote>live</quote> store paths, which are all the store paths
-    reachable from the roots.  Live paths should never be deleted,
-    since that would break consistency — it would become possible that
+    of “live” store paths, which are all the store paths reachable
+    from the roots.  Live paths should never be deleted, since that
+    would break consistency — it would become possible that
     applications are installed that reference things that are no
     longer present in the store.</para></listitem>
     
@@ -195,9 +231,9 @@ the Nix store not reachable via file system references from a set of
   <varlistentry><term><option>--print-dead</option></term>
   
     <listitem><para>This operation prints out on standard output the
-    set of <quote>dead</quote> store paths, which is just the opposite
-    of the set of live paths: any path in the store that is not live
-    (with respect to the roots) is dead.</para></listitem>
+    set of “dead” store paths, which is just the opposite of the set
+    of live paths: any path in the store that is not live (with
+    respect to the roots) is dead.</para></listitem>
     
   </varlistentry>
 
