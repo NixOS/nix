@@ -1112,7 +1112,7 @@ set, the attributes of which specify the inputs of the build.</para>
 
 <itemizedlist>
 
-  <listitem><para>There must be an attribute named
+  <listitem id="attr-system"><para>There must be an attribute named
   <varname>system</varname> whose value must be a string specifying a
   Nix platform identifier, such as <literal>"i686-linux"</literal> or
   <literal>"powerpc-darwin"</literal><footnote><para>To figure out

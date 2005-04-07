@@ -84,7 +84,7 @@
 </varlistentry>
 
 
-<varlistentry><term><option>--max-jobs</option> / <option>-j</option></term>
+<varlistentry id="opt-max-jobs"><term><option>--max-jobs</option> / <option>-j</option></term>
 
   <listitem><para>Sets the maximum number of build jobs that Nix will
   perform in parallel to the specified number.  The default is 1.  A

@@ -118,6 +118,158 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
+<varlistentry id="envar-build-hook"><term><envar>NIX_BUILD_HOOK</envar></term>
+
+  <listitem>
+
+  <para>Specifies the location of the <emphasis>build hook</emphasis>,
+  which is a program (typically some script) that Nix will call
+  whenever it wants to build a derivation.  This is used to implement
+  distributed builds (see <xref linkend="sec-distributed-builds"
+  />).  The protocol by which the calling Nix process and the build
+  hook communicate is as follows.</para>
+
+  <para>The build hook is called with the following command-line
+  arguments:
+
+  <orderedlist>
+
+    <listitem><para>A boolean value <literal>0</literal> or
+    <literal>1</literal> specifying whether Nix can locally execute
+    more builds, as per the <link
+    linkend="opt-max-jobs"><option>--max-jobs</option> option</link>.
+    The purpose of this argument is to allow the hook to not have to
+    maintain bookkeeping for the local machine.</para></listitem>
+
+    <listitem><para>The Nix platform identifier for the local machine
+    (e.g., <literal>i686-linux</literal>).</para></listitem>
+
+    <listitem><para>The Nix platform identifier for the derivation,
+    i.e., its <link linkend="attr-system"><varname>system</varname>
+    attribute</link>.</para></listitem>
+
+    <listitem><para>The store path of the derivation.</para></listitem>
+
+  </orderedlist>
+
+  </para>
+
+  <para>On the basis of this information, and whatever persistent
+  state the build hook keeps about other machines and their current
+  load, it has to decide what to do with the build.  It should print
+  out on file descriptor 3 one of the following responses (terminated
+  by a newline, <literal>"\n"</literal>):
+
+  <variablelist>
+
+    <varlistentry><term><literal>decline</literal></term>
+
+      <listitem><para>The build hook is not willing or able to perform
+      the build; the calling Nix process should do the build itself,
+      if possible.</para></listitem>
+
+    </varlistentry>
+
+    <varlistentry><term><literal>postpone</literal></term>
+
+      <listitem><para>The build hook cannot perform the build now, but
+      can do so in the future (e.g., because all available build slots
+      on remote machines are in use).  The calling Nix process should
+      postpone this build until at least one currently running build
+      has terminated.</para></listitem>
+
+    </varlistentry>
+
+    <varlistentry><term><literal>accept</literal></term>
+
+      <listitem><para>The build hook has accepted the
+      build.</para></listitem>
+
+    </varlistentry>
+
+  </variablelist>
+
+  </para>
+
+  <para>If the build hook accepts the build, it is possible that it is
+  no longer necessary to do the build because some other process has
+  performed the build in the meantime.  To prevent races, the hook
+  must read from file descriptor 4 a single line that tells it whether
+  to continue:
+
+  <variablelist>
+
+    <varlistentry><term><literal>cancel</literal></term>
+
+      <listitem><para>The build has already been done, so the hook
+      should exit.</para></listitem>
+
+    </varlistentry>
+  
+    <varlistentry><term><literal>okay</literal></term>
+
+      <listitem><para>The hook should proceed with the build.  At this
+      point, the calling Nix process has acquired locks on the output
+      path, so no other Nix process will perform the
+      build.</para></listitem>
+
+    </varlistentry>
+
+  </variablelist>
+
+  </para>
+
+  <para>If the hook has been told to proceed, Nix will store in the
+  hook’s current directory a number of text files that contain
+  information about the derivation:
+
+  <variablelist>
+
+    <varlistentry><term><filename>inputs</filename></term>
+
+      <listitem><para>The set of store paths that are inputs to the
+      build process (one per line).  These have to be copied
+      <emphasis>to</emphasis> the remote machine (in addition to the
+      store derivation itself).</para></listitem>
+
+    </varlistentry>
+  
+    <varlistentry><term><filename>outputs</filename></term>
+
+      <listitem><para>The set of store paths that are outputs of the
+      derivation (one per line).  These have to be copied
+      <emphasis>from</emphasis> the remote machine if the build
+      succeeds.</para></listitem>
+
+    </varlistentry>
+
+    <varlistentry><term><filename>references</filename></term>
+
+      <listitem><para>The reference graph of the inputs, in the format
+      accepted by the command <link
+      linkend="rsec-nix-store-reg-val"><command>nix-store
+      --register-validity</command></link>.  It is necessary to run
+      this command on the remote machine after copying the inputs to
+      inform Nix on the remote machine that the inputs are valid
+      paths.</para></listitem>
+
+    </varlistentry>
+
+  </variablelist>
+
+  </para>
+
+  <para>The hook should copy the inputs to the remote machine,
+  register the validity of the inputs, perform the remote build, and
+  copy the outputs back to the local machine.  An exit code other than
+  <literal>0</literal> indicates that the hook has failed.</para>
+
+  </listitem>
+
+
+</varlistentry>
+
+
 </variablelist>
 
 </sect1>
