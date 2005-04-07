@@ -189,7 +189,7 @@ linkend="sec-nix-build"><command>nix-build</command></link> does.</para>
 <cmdsynopsis>
   <command>nix-store</command>
   <arg choice='plain'><option>--gc</option></arg>
-  <group choice='req'>
+  <group>
     <arg choice='plain'><option>--print-roots</option></arg>
     <arg choice='plain'><option>--print-live</option></arg>
     <arg choice='plain'><option>--print-dead</option></arg>
@@ -451,7 +451,7 @@ most one query can be specified.  The default query is
 
 <cmdsynopsis>
   <command>nix-store</command>
-  <arg choice='req'><option>--register-validity</option></arg>
+  <arg choice='plain'><option>--register-validity</option></arg>
 </cmdsynopsis>
 </refsection>
 
@@ -473,7 +473,7 @@ most one query can be specified.  The default query is
 
 <cmdsynopsis>
   <command>nix-store</command>
-  <arg choice='req'><option>--substitute</option></arg>
+  <arg choice='plain'><option>--substitute</option></arg>
   <arg choice='plain'
        rep='repeat'><replaceable>srcpath</replaceable> <replaceable>subpath</replaceable></arg>
 </cmdsynopsis>
@@ -501,7 +501,8 @@ deployment.</para>
   <title>Synopsis</title>
   <cmdsynopsis>
     <command>nix-store</command>
-    <arg choice='req'><option>--verify</option></arg>
+    <arg choice='plain'><option>--verify</option></arg>
+    <arg><option>--check-contents</option></arg>
   </cmdsynopsis>
 </refsection>
 
@@ -513,6 +514,25 @@ database and the Nix store.  Any inconsistencies encountered are
 automatically repaired.  Inconsistencies are generally the result of
 the Nix store or database being modified by non-Nix tools, or of bugs
 in Nix itself.</para>
+
+<para>There is one option:
+
+<variablelist>
+
+  <varlistentry><term><option>--check-contents</option></term>
+  
+    <listitem><para>Checks that the contents of every valid store path
+    has not been altered by computing a SHA-256 hash of the contents
+    and comparing it with the hash stored in the Nix database at build
+    time.  Paths that have been modified are printed out.  For large
+    stores, <option>--check-contents</option> is obviously quite
+    slow.</para></listitem>
+    
+  </varlistentry>
+  
+</variablelist>
+
+</para>
 
 </refsection>
             
