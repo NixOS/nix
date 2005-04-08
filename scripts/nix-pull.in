@@ -74,7 +74,7 @@ print "$size store paths in manifest\n";
 # Register all substitutes.
 print STDERR "registering substitutes...\n";
 
-my $pid = open2(\*READ, \*WRITE, "$binDir/nix-store --substitute")
+my $pid = open2(\*READ, \*WRITE, "$binDir/nix-store --register-substitutes")
     or die "cannot run nix-store";
 
 close READ;

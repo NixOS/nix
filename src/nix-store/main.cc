@@ -394,7 +394,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 }
 
 
-static void opSubstitute(Strings opFlags, Strings opArgs)
+static void opRegisterSubstitutes(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (!opArgs.empty()) throw UsageError("no arguments expected");
@@ -607,8 +607,8 @@ void run(Strings args)
             op = opPrintFixedPath;
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
-        else if (arg == "--substitute")
-            op = opSubstitute;
+        else if (arg == "--register-substitutes")
+            op = opRegisterSubstitutes;
         else if (arg == "--clear-substitutes")
             op = opClearSubstitutes;
         else if (arg == "--register-validity")

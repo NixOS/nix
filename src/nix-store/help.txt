@@ -9,7 +9,7 @@ Operations:
   --add / -A: copy a path to the Nix store
   --query / -q: query information
 
-  --substitute: register a substitute expression (dangerous!)
+  --register-substitutes: register a substitute expression (dangerous!)
   --clear-substitutes: clear all substitutes
   --register-validity: register path validity (dangerous!)
   --check-validity: check path validity

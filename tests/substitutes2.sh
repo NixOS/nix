@@ -7,7 +7,7 @@ outPath=$($TOP/src/nix-store/nix-store -qvvvvv "$drvPath")
 echo "output path is $outPath"
 
 regSub() {
-    (echo $1 && echo "" && echo $2 && echo 3 && echo $outPath && echo Hallo && echo Wereld && echo 0) | $TOP/src/nix-store/nix-store --substitute
+    (echo $1 && echo "" && echo $2 && echo 3 && echo $outPath && echo Hallo && echo Wereld && echo 0) | $TOP/src/nix-store/nix-store --register-substitutes
 }
 
 # Register a substitute for the output path.
