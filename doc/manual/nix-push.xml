@@ -10,14 +10,14 @@
     <command>nix-push</command>
     <group choice='req'>
       <arg choice='req'>
-        <arg choice='plain'><replaceable>archives-put-url</replaceable></arg>
-        <arg choice='plain'><replaceable>archives-get-url</replaceable></arg>
-        <arg choice='plain'><replaceable>manifest-put-url</replaceable></arg>
+        <arg choice='plain'><replaceable>archivesPutURL</replaceable></arg>
+        <arg choice='plain'><replaceable>archivesGetURL</replaceable></arg>
+        <arg choice='plain'><replaceable>manifestPutURL</replaceable></arg>
       </arg>
       <arg choice='req'>
         <arg choice='plain'><option>--copy</option></arg>
-        <arg choice='plain'><replaceable>archives-dir</replaceable></arg>
-        <arg choice='plain'><replaceable>manifest-file</replaceable></arg>
+        <arg choice='plain'><replaceable>archivesDir</replaceable></arg>
+        <arg choice='plain'><replaceable>manifestFile</replaceable></arg>
       </arg>
     </group>
     <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
@@ -59,20 +59,20 @@ machines using the <command>nix-pull</command> command.</para>
   archives.</para></listitem>
 
   <listitem><para>Each store path is uploaded to the remote directory
-  specified by <replaceable>archives-put-url</replaceable>.  HTTP PUT
+  specified by <replaceable>archivesPutURL</replaceable>.  HTTP PUT
   requests are used to do this.  However, before a file
   <varname>x</varname> is uploaded to
-  <literal><replaceable>archives-put-url</replaceable>/<varname>x</varname></literal>,
+  <literal><replaceable>archivesPutURL</replaceable>/<varname>x</varname></literal>,
   <command>nix-push</command> first determines whether this upload is
   unnecessary by issuing a HTTP HEAD request on
-  <literal><replaceable>archives-get-url</replaceable>/<varname>x</varname></literal>.
+  <literal><replaceable>archivesGetURL</replaceable>/<varname>x</varname></literal>.
   This allows a cache to be shared between many partially overlapping
   <command>nix-push</command> invocations.  (We use two URLs because
   the upload URL typically refers to a CGI script, while the download
   URL just refers to a file system directory on the server.)</para></listitem>
 
   <listitem><para>The manifest is uploaded using an HTTP PUT request
-  to <replaceable>manifest-put-url</replaceable>.  The corresponding
+  to <replaceable>manifestPutURL</replaceable>.  The corresponding
   URL to download the manifest can then be used by
   <command>nix-pull</command>.</para></listitem>
         

@@ -1,0 +1,82 @@
+<sect1 id="sec-conf-file"><title>Nix configuration file</title>
+
+<para>A number of persistent settings of Nix are stored in the file
+<filename><replaceable>prefix</replaceable>/etc/nix/nix.conf</filename>.
+This file is a list of <literal><replaceable>name</replaceable> =
+<replaceable>value</replaceable></literal> pairs, one per line.
+Comments start with a <literal>#</literal> character.  An example
+configuration file is shown in <xref linkend="ex-nix-conf" />.</para>
+
+<example id='ex-nix-conf'><title>Nix expression for GNU Hello</title>
+
+<programlisting>
+gc-keep-outputs = true       # Nice for developers
+gc-keep-derivations = true   # Idem
+env-keep-derivations = false
+</programlisting>
+</example>
+
+<para>The following variables are currently available: 
+
+<variablelist>
+
+  <varlistentry id="conf-gc-keep-outputs"><term><literal>gc-keep-outputs</literal></term>
+
+    <listitem><para>If <literal>true</literal>, the garbage collector
+    will keep the outputs of non-garbage derivations.  If
+    <literal>false</literal> (default), outputs will be deleted unless
+    they are GC roots themselves (or reachable from other roots).</para>
+ 
+    <para>In general, outputs must be registered as roots separately.
+    However, even if the output of a derivation is registered as a
+    root, the collector will still delete store paths that are used
+    only at build time (e.g., the C compiler, or source tarballs
+    downloaded from the network).  To prevent it from doing so, set
+    this option to <literal>true</literal>.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry id="conf-gc-keep-derivations"><term><literal>gc-keep-derivations</literal></term>
+
+    <listitem><para>If <literal>true</literal> (default), the garbage
+    collector will keep the derivations from which non-garbage store
+    paths were built.  If <literal>false</literal>, they will be
+    deleted unless explicitly registered as a root (or reachable from
+    other roots).</para>
+
+    <para>Keeping derivation around is useful for querying and
+    traceability (e.g., it allows you to ask with what dependencies or
+    options a store path was built), so by default this option is on.
+    Turn it off to safe a bit of disk space (or a lot if
+    <literal>gc-keep-outputs</literal> is also turned on).</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><literal>env-keep-derivations</literal></term>
+
+    <listitem><para>If <literal>false</literal> (default), derivations
+    are not stored in Nix user environments.  That is, the derivation
+    any build-time-only dependencies may be garbage-collected.</para>
+
+    <para>If <literal>true</literal>, when you add a Nix derivation to
+    a user environment, the path of the derivation is stored in the
+    user environment.  Thus, the derivation will not be
+    garbage-collected until the user environment generation is deleted
+    (<command>nix-env --delete-generations</command>).  To prevent
+    build-time-only dependencies from being collected, you should also
+    turn on <literal>gc-keep-outputs</literal>.</para>
+
+    <para>The difference between this option and
+    <literal>gc-keep-derivations</literal> is that this one is
+    “sticky”: it applies to any user environment created while this
+    option was enabled, while <literal>gc-keep-derivations</literal>
+    only applies at the moment the garbage collector is
+    run.</para></listitem>
+
+  </varlistentry>
+
+</variablelist>
+
+</para>
+
+</sect1>

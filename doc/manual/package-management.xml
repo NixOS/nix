@@ -369,30 +369,39 @@ $ nix-env --delete-generations 10 11 14</screen>
 garbage collector as follows:
 
 <screen>
-$ nix-collect-garbage</screen>
+$ nix-store --gc</screen>
 
-You can alo first view what files would be deleted:
+If you are feeling uncertain, you can also first view what files would
+be deleted:
 
 <screen>
-$ nix-collect-garbage --print-dead</screen>
+$ nix-store --gc --print-dead</screen>
 
 Likewise, the option <option>--print-live</option> will show the paths
 that <emphasis>won’t</emphasis> be deleted.</para>
 
+
 <sect2 id="ssec-gc-roots"><title>Garbage collector roots</title>
 
-<para>TODO</para>
+<para>The roots of the garbage collector are all store paths to which
+there are symlinks in the directory
+<filename><replaceable>prefix</replaceable>/nix/var/nix/gcroots</filename>.
+For instance, the following command makes the path
+<filename>/nix/store/d718ef...-foo</filename> a root of the collector:
 
-<para>The garbage collector uses as roots all store expressions
-mentioned in all files with extension <filename>.gcroot</filename> in
-the directory
-<filename><replaceable>prefix</replaceable>/var/nix/gcroots/</filename>,
-or in any file or directory symlinked to from that directory.  E.g.,
-by default,
-<filename><replaceable>prefix</replaceable>/var/nix/gcroots/</filename>
-contains a symlink to
-<filename><replaceable>prefix</replaceable>/var/nix/profiles/</filename>,
-so all generations of all profiles are also roots of the collector.</para>
+<screen>
+$ ln -s /nix/store/d718ef...-foo /nix/var/nix/gcroots/bar</screen>
+	
+That is, after this command, the garbage collector will not remove
+<filename>/nix/store/d718ef...-foo</filename> or any of its
+dependencies.</para>
+
+<para>Subdirectories of
+<filename><replaceable>prefix</replaceable>/nix/var/nix/gcroots</filename>
+are also searched for symlinks.  Symlinks to non-store paths are
+followed and searched for roots, but symlinks to non-store paths
+<emphasis>inside</emphasis> the paths reached in that way are not
+followed to prevent infinite recursion.</para>
 
 </sect2>
 

@@ -79,17 +79,47 @@
 </glossentry>
 
 
-<glossentry><glossterm>closure</glossterm>
+<glossentry id="gloss-reference"><glossterm>reference</glossterm>
+
+  <glossdef><para>A store path <varname>P</varname> is said to have a
+  reference to a store path <varname>Q</varname> if the store object
+  at <varname>P</varname> contains the path <varname>Q</varname>
+  somewhere.  This implies than an execution involving
+  <varname>P</varname> potentially needs <varname>Q</varname> to be
+  present.  The <emphasis>references</emphasis> of a store path are
+  the set of store paths to which it has a reference.</para></glossdef>
+
+</glossentry>
+
+
+<glossentry id="gloss-closure"><glossterm>closure</glossterm>
 
   <glossdef><para>The closure of a store path is the set of store
   paths that are directly or indirectly “reachable” from that store
-  path.  For instance, if the store object at path
-  <varname>P</varname> contains a reference to path
-  <varname>Q</varname>, then <varname>Q</varname> is in the closure of
-  <varname>P</varname>.  For correct deployment it is necessary to
-  deploy whole closures, since otherwise at runtime files could be
-  missing.  The command <command>nix-store -qR</command> prints out
-  closures of store paths.</para></glossdef>
+  path; that is, it’s the closure of the path under the <link
+  linkend="gloss-reference">references</link> relation.  For instance,
+  if the store object at path <varname>P</varname> contains a
+  reference to path <varname>Q</varname>, then <varname>Q</varname> is
+  in the closure of <varname>P</varname>.  For correct deployment it
+  is necessary to deploy whole closures, since otherwise at runtime
+  files could be missing.  The command <command>nix-store
+  -qR</command> prints out closures of store paths.</para></glossdef>
+
+</glossentry>
+
+
+<glossentry id="gloss-output-path"><glossterm>output path</glossterm>
+
+  <glossdef><para>A store path produced by a derivation.</para></glossdef>
+
+</glossentry>
+
+
+<glossentry id="gloss-deriver"><glossterm>deriver</glossterm>
+
+  <glossdef><para>The deriver of an <link
+  linkend="gloss-output-path">output path</link> is the store
+  derivation that built it.</para></glossdef>
 
 </glossentry>
 

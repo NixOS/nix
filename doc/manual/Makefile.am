@@ -20,6 +20,7 @@ MANUAL_SRCS = manual.xml introduction.xml installation.xml \
  $(man1_MANS:.1=.xml) \
  troubleshooting.xml bugs.xml opt-common.xml opt-common-syn.xml \
  env-common.xml quick-start.xml nix-lang-ref.xml glossary.xml \
+ conf-file.xml \
  style.css images
 
 manual.is-valid: $(MANUAL_SRCS) version.txt

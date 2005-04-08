@@ -35,33 +35,33 @@
   <variablelist>
     
     <varlistentry><term>0</term>
-    <listitem><para><quote>Errors only</quote>: only print messages
+    <listitem><para>“Errors only”: only print messages
     explaining why the Nix invocation failed.</para></listitem>
     </varlistentry>
       
     <varlistentry><term>1</term>
-    <listitem><para><quote>Informational</quote>: print
+    <listitem><para>“Informational”: print
     <emphasis>useful</emphasis> messages about what Nix is doing.
     This is the default.</para></listitem>
     </varlistentry>
       
     <varlistentry><term>2</term>
-    <listitem><para><quote>Talkative</quote>: print more informational
+    <listitem><para>“Talkative”: print more informational
     messages.</para></listitem>
     </varlistentry>
 
     <varlistentry><term>3</term>
-    <listitem><para><quote>Chatty</quote>: print even more
+    <listitem><para>“Chatty”: print even more
     informational messages.</para></listitem>
     </varlistentry>
 
     <varlistentry><term>4</term>
-    <listitem><para><quote>Debug</quote>: print debug
+    <listitem><para>“Debug”: print debug
     information.</para></listitem>
     </varlistentry>
 
     <varlistentry><term>5</term>
-    <listitem><para><quote>Vomit</quote>: print vast amounts of debug
+    <listitem><para>“Vomit”: print vast amounts of debug
     information.</para></listitem>
     </varlistentry>
     
@@ -120,19 +120,21 @@
 
   <listitem>
 
-  <para>Whenever Nix attempts to realise a derivation for which a
-  closure is already known, but this closure cannot be realised, fall
-  back on normalising the derivation.</para>
+  <para>Whenever Nix attempts to build a derivation for which
+  substitutes are known for each output path, but realising the output
+  paths through the substitutes fails, fall back on building the
+  derivation.</para>
 
   <para>The most common scenario in which this is useful is when we
   have registered substitutes in order to perform binary distribution
   from, say, a network repository.  If the repository is down, the
   realisation of the derivation will fail.  When this option is
-  specified, Nix will build the derivation instead.  Thus, binary
-  installation falls back on a source installation.  This option is
-  not the default since it is generally not desirable for a transient
-  failure in obtaining the substitutes to lead to a full build from
-  source (with the related consumption of resources).</para>
+  specified, Nix will build the derivation instead.  Thus,
+  installation from binaries falls back on nstallation from source.
+  This option is not the default since it is generally not desirable
+  for a transient failure in obtaining the substitutes to lead to a
+  full build from source (with the related consumption of
+  resources).</para>
 
   </listitem>
   

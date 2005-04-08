@@ -88,8 +88,8 @@ $ nix-channel --update
 $ nix-env -u '*'</screen>
 
 The latter command will upgrade each installed component for which
-there is a <quote>newer</quote> version (as determined by comparing
-the version numbers).</para></listitem>
+there is a “newer” version (as determined by comparing the version
+numbers).</para></listitem>
 
 <listitem><para>If you're unhappy with the result of a
 <command>nix-env</command> action (e.g., an upgraded component turned
@@ -106,12 +106,12 @@ actually delete them:
 
 <screen>
 $ nix-env --delete-generations old
-$ nix-collect-garbage</screen>
+$ nix-store --gc</screen>
 
-The first command deletes old <quote>generations</quote> of your
-profile (making rollbacks impossible, but also making the components
-in those old generations available for garbage collection), while the
-second command actually deletes them.</para></listitem>
+The first command deletes old “generations” of your profile (making
+rollbacks impossible, but also making the components in those old
+generations available for garbage collection), while the second
+command actually deletes them.</para></listitem>
 
 </orderedlist>
 

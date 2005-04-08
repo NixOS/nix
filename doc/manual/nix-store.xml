@@ -168,7 +168,8 @@ produced by <link
 linkend="sec-nix-instantiate"><command>nix-instantiate</command></link>:
     
 <screen>
-$ nix-store -r $(nix-instantiate ./foo.nix)</screen>
+$ nix-store -r $(nix-instantiate ./test.nix)
+/nix/store/31axcgrlbfsxzmfff1gyj1bf62hvkby2-aterm-2.3.1</screen>
 
 This is essentially what <link
 linkend="sec-nix-build"><command>nix-build</command></link> does.</para>
@@ -213,7 +214,9 @@ the Nix store not reachable via file system references from a set of
   <varlistentry><term><option>--print-roots</option></term>
   
     <listitem><para>This operation prints on standard output the set
-    of roots used by the garbage collector.</para></listitem>
+    of roots used by the garbage collector.  What constitutes a root
+    is described in <xref linkend="ssec-gc-roots"
+    />.</para></listitem>
     
   </varlistentry>
 
@@ -247,35 +250,11 @@ the Nix store not reachable via file system references from a set of
 
 </variablelist>
 
-</refsection>
-
-
-<refsection><title>Roots</title>
-
-<para>The roots of the garbage collector are all store paths to which
-there are symlinks in the directory
-<filename><replaceable>prefix</replaceable>/nix/var/nix/gcroots</filename>.
-For instance, the following command makes the path
-<filename>/nix/store/d718ef...-foo</filename> a root of the collector:
-
-<screen>
-$ ln -s /nix/store/d718ef...-foo /nix/var/nix/gcroots/bar</screen>
-	
-That is, after this command, the garbage collector will not remove
-<filename>/nix/store/d718ef...-foo</filename> or any of its
-dependencies.</para>
-
-<para>Subdirectories of
-<filename><replaceable>prefix</replaceable>/nix/var/nix/gcroots</filename>
-are also searched for symlinks.  Symlinks to non-store paths are
-followed and searched for roots, but TODO.</para>
-
-</refsection>
-
-
-<refsection><title>Configuration file</title>
-
-<para>TODO</para>
+<para>The behaviour of the collector is influenced by the <link
+linkend="conf-gc-keep-outputs"><literal>gc-keep-outputs</literal></link>
+and <link
+linkend="conf-gc-keep-derivations"><literal>gc-keep-derivations</literal></link>
+variables in the Nix configuration file.</para>
 
 </refsection>
 
@@ -309,18 +288,24 @@ $ nix-store --gc</screen>
     <arg choice='plain'><option>-q</option></arg>
   </group>
   <group choice='req'>
-    <arg choice='plain'><option>--list</option></arg>
-    <arg choice='plain'><option>-l</option></arg>
+    <arg choice='plain'><option>--outputs</option></arg>
     <arg choice='plain'><option>--requisites</option></arg>
     <arg choice='plain'><option>-R</option></arg>
-    <arg choice='plain'><option>--predecessors</option></arg>
+    <arg choice='plain'><option>--references</option></arg>
+    <arg choice='plain'><option>--referers</option></arg>
+    <arg choice='plain'><option>--referers-closure</option></arg>
+    <arg choice='plain'><option>--deriver</option></arg>
+    <arg choice='plain'><option>--deriver</option></arg>
     <arg choice='plain'><option>--graph</option></arg>
+    <arg choice='plain'><option>--tree</option></arg>
+    <arg choice='plain'><option>--binding</option> <replaceable>name</replaceable></arg>
+    <arg choice='plain'><option>--hash</option></arg>
   </group>
-  <arg><option>--normalise</option></arg>
-  <arg><option>-n</option></arg>
+  <arg><option>--use-output</option></arg>
+  <arg><option>-u</option></arg>
   <arg><option>--force-realise</option></arg>
   <arg><option>-f</option></arg>
-  <arg choice='plain' rep='repeat'><replaceable>args</replaceable></arg>
+  <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -329,9 +314,14 @@ $ nix-store --gc</screen>
 <refsection><title>Description</title>
             
 <para>The operation <option>--query</option> displays various bits of
-information about store paths.  The queries are described below.  At
+information about the store paths .  The queries are described below.  At
 most one query can be specified.  The default query is
-<option>--list</option>.</para>
+<option>--outputs</option>.</para>
+
+<para>The paths <replaceable>paths</replaceable> may also be symlinks
+from outside of the Nix store, to the Nix store.  In that case, the
+query is applied to the target of the symlink.</para>
+
 
 </refsection>
 
@@ -365,47 +355,21 @@ most one query can be specified.  The default query is
             
 <variablelist>
 
-  <varlistentry><term><option>--list</option> / <option>-l</option></term>
+  <varlistentry><term><option>--outputs</option></term>
 
-    <listitem><para>Prints out the <emphasis>output paths</emphasis>
-    of the store expressions indicated by the identifiers
-    <replaceable>args</replaceable>.  In the case of a derivation
-    expression, these are the paths that will be produced when the
-    derivation is realised.  In the case of a closure expression,
-    these are the paths that were produced the derivation expression
-    of which the closure expression is a successor.</para></listitem>
+    <listitem><para>Prints out the <link
+    linkend="gloss-output-path">output paths</link> of the store
+    derivations <replaceable>paths</replaceable>.  These are the paths
+    that will be produced when the derivation is
+    built.</para></listitem>
     
   </varlistentry>
 
   <varlistentry><term><option>--requisites</option> / <option>-R</option></term>
 
-    <listitem><para>Prints out the requisite paths of the store
-    expressions indicated by the identifiers
-    <replaceable>args</replaceable>.  The requisite paths of a Nix
-    expression are the paths that need to be present in the system to
-    be able to realise the expression.  That is, they form the
-    <emphasis>closure</emphasis> of the expression in the file system
-    (i.e., no path in the set of requisite paths points to anything
-    outside the set of requisite paths).</para>
-
-    <para>The notion of requisite paths is very useful when one wants
-    to distribute store expressions.  Since they form a closure, they
-    are the only paths one needs to distribute to another system to be
-    able to realise the expression on the other system.</para>
-
-    <para>This query is generally used to implement various kinds of
-    deployment.  A <emphasis>source deployment</emphasis> is obtained
-    by distributing the requisite paths of a derivation expression.  A
-    <emphasis>binary deployment</emphasis> is obtained by distributing
-    the requisite paths of a closure expression.  A <emphasis>cache
-    deployment</emphasis> is obtained by distributing the requisite
-    paths of a derivation expression and specifying the option
-    <option>--include-successors</option>.  This will include not just
-    the paths of a source and binary deployment, but also all
-    expressions and paths of subterms of the source.  This is useful
-    if one wants to realise on the target system a Nix expression that
-    is similar but not quite the same as the one being distributed,
-    since any common subterms will be reused.</para>
+    <listitem><para>Prints out the <link
+    linkend="gloss-closure">closure</link> of the store path
+    <replaceable>paths</replaceable>.</para>
 
     <para>This query has one option:</para>
 
@@ -420,21 +384,183 @@ most one query can be specified.  The default query is
 
     </variablelist>
 
+    <para>This query can be used to implement various kinds of
+    deployment.  A <emphasis>source deployment</emphasis> is obtained
+    by distributing the closure of a store derivation.  A
+    <emphasis>binary deployment</emphasis> is obtained by distributing
+    the closure of an output path.  A <emphasis>cache
+    deployment</emphasis> (combined source/binary deployment,
+    including binaries of build-time-only dependencies) is obtained by
+    distributing the closure of a store derivation and specifying the
+    option <option>--include-outputs</option>.</para>
+    
     </listitem>
 
   </varlistentry>
 
+  <varlistentry><term><option>--references</option></term>
+  
+    <listitem><para>Prints the set of <link
+    linkend="gloss-reference">references</link> of the store paths
+    <replaceable>paths</replaceable>, that is, their immediate
+    dependencies.  (For <emphasis>all</emphasis> dependencies, use
+    <option>--requisites</option>.)</para></listitem>
+
+  </varlistentry>
+  
+  <varlistentry><term><option>--referers</option></term>
+  
+    <listitem><para>Prints the set of <emphasis>referers</emphasis> of
+    the store paths <replaceable>paths</replaceable>, that is, the
+    store paths currently existing in the Nix store that refer to one
+    of <replaceable>paths</replaceable>.  Note that contrary to the
+    references, the set of referers is not constant; it can change as
+    store paths are added or removed.</para></listitem>
+
+  </varlistentry>
+  
+  <varlistentry><term><option>--referers-closure</option></term>
+  
+    <listitem><para>Prints the closure of the set of store paths
+    <replaceable>paths</replaceable> under the referers relation; that
+    is, all store paths that directly or indirectly refer to one of
+    <replaceable>paths</replaceable>.  These are all the path currently
+    in the Nix store that are dependent on
+    <replaceable>paths</replaceable>.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--deriver</option></term>
+  
+    <listitem><para>Prints the <link
+    linkend="gloss-deriver">deriver</link> of the store paths
+    <replaceable>paths</replaceable>.  If the path has no deriver
+    (e.g., if it is a source file), or if the deriver is not known
+    (e.g., in the case of a binary-only deployment), the string
+    <literal>unknown-deriver</literal> is printed.</para></listitem>
+
+  </varlistentry>
 
   <varlistentry><term><option>--graph</option></term>
   
-    <listitem><para>Prints a graph of the closure of the store
-    expressions identified by <replaceable>args</replaceable> in the
-    format of the <command>dot</command> tool of AT&amp;T's GraphViz
-    package.</para></listitem>
+    <listitem><para>Prints the references graph of the store paths
+    <replaceable>paths</replaceable> in the format of the
+    <command>dot</command> tool of AT&amp;T's <ulink
+    url="http://www.graphviz.org/">Graphviz package</ulink>.  This can
+    be used to visualise dependency graphs.  To obtain a build-time
+    dependency graph, apply this to a store derivation.  To obtain a
+    runtime dependency graph, apply it to an output
+    path.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--tree</option></term>
+  
+    <listitem><para>Prints the references graph of the store paths
+    <replaceable>paths</replaceable> as a nested ASCII tree.
+    References are ordered by descending closure size; this tends to
+    flatten the tree, making it more readable.  The query only
+    recurses into a store path when it is first encountered; this
+    prevents a blowup of the tree representation of the
+    graph.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--binding</option> <replaceable>name</replaceable></term>
+  
+    <listitem><para>Prints the value of the attribute
+    <replaceable>name</replaceable> (i.e., environment variable) of
+    the store derivations <replaceable>paths</replaceable>.  It is an
+    error for a derivation to not have the specified
+    attribute.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--hash</option></term>
+  
+    <listitem><para>Prints the SHA-256 hash of the contents of the
+    store path <replaceable>paths</replaceable>.  Since the hash is
+    stored in the Nix database, this is a fast
+    operation.</para></listitem>
 
   </varlistentry>
 
 </variablelist>
+
+</refsection>
+
+
+<refsection><title>Examples</title>
+
+<para>Print the closure (runtime dependencies) of the
+<command>svn</command> program in the current user environment:
+    
+<screen>
+$ nix-store -qR $(which svn)
+/nix/store/4mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
+/nix/store/8lz9yc6zgmc0vlqmn2ipcpkjlmbi51vv-glibc-2.3.4
+<replaceable>...</replaceable></screen>
+
+</para>
+
+<para>Print the build-time dependencies of <command>svn</command>:
+
+<screen>
+$ nix-store -qR $(nix-store -qd $(which svn))
+/nix/store/02iizgn86m42q905rddvg4ja975bk2i4-grep-2.5.1.tar.bz2.drv
+/nix/store/07a2bzxmzwz5hp58nf03pahrv2ygwgs3-gcc-wrapper.sh
+/nix/store/0ma7c9wsbaxahwwl04gbw3fcd806ski4-glibc-2.3.4.drv
+<replaceable>... lots of other paths ...</replaceable></screen>
+
+The difference with the previous example is that we ask the closure of
+the derivation (<option>-qd</option>), not the closure of the output
+path that contains <command>svn</command>.</para>
+
+<para>Show the build-time dependencies as a tree:
+
+<screen>
+$ nix-store -q --tree $(nix-store -qd $(which svn))
+/nix/store/7i5082kfb6yjbqdbiwdhhza0am2xvh6c-subversion-1.1.4.drv
++---/nix/store/d8afh10z72n8l1cr5w42366abiblgn54-builder.sh
++---/nix/store/fmzxmpjx2lh849ph0l36snfj9zdibw67-bash-3.0.drv
+|   +---/nix/store/570hmhmx3v57605cqg9yfvvyh0nnb8k8-bash
+|   +---/nix/store/p3srsbd8dx44v2pg6nbnszab5mcwx03v-builder.sh
+<replaceable>...</replaceable></screen>
+
+</para>
+
+<para>Show all paths that depend on the same OpenSSL library as
+<command>svn</command>:
+
+<screen>
+$ nix-store -q --referers $(nix-store -q --binding openssl $(nix-store -qd $(which svn)))
+/nix/store/23ny9l9wixx21632y2wi4p585qhva1q8-sylpheed-1.0.0
+/nix/store/4mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
+/nix/store/dpmvp969yhdqs7lm2r1a3gng7pyq6vy4-subversion-1.1.3
+/nix/store/l51240xqsgg8a7yrbqdx1rfzyv6l26fx-lynx-2.8.5</screen>
+
+</para>
+
+<para>Show all paths that directly or indirectly depend on the Glibc
+(C library) used by <command>svn</command>:
+
+<screen>
+$ nix-store -q --referers-closure $(ldd $(which svn) | grep /libc.so | awk '{print $3}')
+/nix/store/034a6h4vpz9kds5r6kzb9lhh81mscw43-libgnomeprintui-2.8.2
+/nix/store/05l3yi0d45prm7a82pcrknxdh6nzmxza-gawk-3.1.4
+<replaceable>...</replaceable></screen>
+
+Note that <command>ldd</command> is a command that prints out the
+dynamic libraries used by an ELF executable.</para>
+
+<para>Make a picture of the runtime dependency graph of the current
+user environment:
+
+<screen>
+$ nix-store -q --graph ~/.nix-profile | dot -Tps > graph.ps
+$ gv graph.ps</screen>
+
+</para>
 
 </refsection>
 

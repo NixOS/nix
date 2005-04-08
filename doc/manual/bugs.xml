@@ -2,36 +2,25 @@
 
 <itemizedlist>
 
-    <listitem>
-      <para>
-        The man-pages generated from the DocBook documentation are ugly.
-      </para>
-    </listitem>
+<listitem><para>The man-pages generated from the DocBook documentation
+are ugly.</para></listitem>
 
-    <listitem>
-      <para>
-        Generations properly form a tree.  E.g., if after switching to
-        generation 39, we perform an installation action, a generation
-        43 is created which is a descendant of 39, not 42.  So a
-        rollback from 43 ought to go back to 39.  This is not
-        currently implemented; generations form a linear sequence.
-      </para>
-    </listitem>
+<listitem><para>Generations properly form a tree.  E.g., if after
+switching to generation 39, we perform an installation action, a
+generation 43 is created which is a descendant of 39, not 42.  So a
+rollback from 43 ought to go back to 39.  This is not currently
+implemented; generations form a linear sequence.</para></listitem>
 
-    <listitem>
-      <para>
-        <emphasis>Build management.</emphasis>  In principle it is already
-        possible to do build management using Nix (by writing builders that
-        perform appropriate build steps), but the Nix expression language is
-        not yet powerful enough to make this pleasant (?).  The language should
-        be extended with features from the <ulink
-          url='http://www.cs.uu.nl/~eelco/maak/'>Maak build manager</ulink>.
-        Another interesting idea is to write a <command>make</command>
-        implementation that uses Nix as a back-end to support <ulink
-          url='http://www.research.att.com/~bs/bs_faq.html#legacy'>legacy</ulink> 
-        build files.
-      </para>
-    </listitem>
+<listitem><para><emphasis>Build management.</emphasis> In principle it
+is already possible to do build management using Nix (by writing
+builders that perform appropriate build steps), but the Nix expression
+language is not yet powerful enough to make this pleasant (?).  The
+language should be extended with features from the <ulink
+url='http://www.cs.uu.nl/~eelco/maak/'>Maak build manager</ulink>.
+Another interesting idea is to write a <command>make</command>
+implementation that uses Nix as a back-end to support <ulink
+url='http://www.research.att.com/~bs/bs_faq.html#legacy'>legacy</ulink>
+build files.</para></listitem>
 
 <listitem><para>For security, <command>nix-push</command> manifests
 should be digitally signed, and <command>nix-pull</command> should
@@ -43,6 +32,14 @@ them).</para></listitem>
 <listitem><para>It would be useful to have an option in
 <command>nix-env --delete-generations</command> to remove non-current
 generations older than a certain age.</para></listitem>
+
+<listitem><para>There should be a flexible way to change the user
+environment builder.  Currently, you have to replace
+<filename><replaceable>prefix</replaceable>/share/nix/corepkgs/buildenv/builder.pl</filename>,
+which is hard-coded into <command>nix-env</command>.  Also, the
+default builder should be more powerful.  For instance, there should
+be some way to specify priorities to resolve
+collisions.</para></listitem>
 
 </itemizedlist>
 

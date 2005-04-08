@@ -1,31 +1,71 @@
-<appendix>
-  <title>Troubleshooting</title>
+<appendix><title>Troubleshooting</title>
 
-  <para>This section provides solutions for some common problems.</para>
+<para>This section provides solutions for some common problems.</para>
 
-  <sect1><title>Berkeley DB: <quote>Cannot allocate memory</quote></title>
 
-  <para>Symptom: Nix operations (in particular the
-  <command>nix-store</command> operations <option>--gc</option>,
-  <option>--verify</option>, and <option>--clear-substitutes</option>
-  — the latter being called by <command>nix-channel
-  --update</command>) failing:
+<sect1><title>Berkeley DB: <quote>Cannot allocate memory</quote></title>
+
+<para>Symptom: Nix operations (in particular the
+<command>nix-store</command> operations <option>--gc</option>,
+<option>--verify</option>, and <option>--clear-substitutes</option> —
+the latter being called by <command>nix-channel --update</command>)
+failing:
 
 <screen>
 $ nix-store --verify
 error: Db::del: Cannot allocate memory</screen>
 
-   Possible solution: make sure that no Nix processes are running,
-   then do:
+</para>
+
+<para>Possible solution: make sure that no Nix processes are running,
+then do:
 
 <screen>
 $ cd /nix/var/nix/db
 $ rm __db.00*</screen>
 
-  </para>
+</para>
 
-  
-  </sect1>
-  
-	
+</sect1>
+
+
+<sect1><title>Collisions in <command>nix-env</command></title>
+
+<para>Symptom: when installing or upgrading, you get an error message such as
+
+<screen>
+$ nix-env -i docbook-xml
+...
+adding /nix/store/s5hyxgm62gk2...-docbook-xml-4.2
+collission between `/nix/store/s5hyxgm62gk2...-docbook-xml-4.2/xml/dtd/docbook/calstblx.dtd'
+  and `/nix/store/06h377hr4b33...-docbook-xml-4.3/xml/dtd/docbook/calstblx.dtd'
+  at /nix/store/...-builder.pl line 62.</screen>
+
+</para>
+
+<para>The cause is that two installed packages in the user environment
+have overlapping filenames (e.g.,
+<filename>xml/dtd/docbook/calstblx.dtd</filename>.  This usually
+happens when you accidentally try to install two versions of the same
+package.  For instance, in the example above, the Nix Packages
+collection contains two versions of <literal>docbook-xml</literal>, so
+<command>nix-env -i</command> will try to install both.  The default
+user environment builder has no way to way to resolve such conflicts,
+so it just gives up.</para>
+
+<para>Solution: remove one of the offending packages from the user
+environment (if already installed) using <command>nix-env
+-u</command>, or specify exactly which version should be installed
+(e.g., <literal>nix-env -i docbook-xml-4.2</literal>).</para>
+
+<para>Alternatively, you can modify the user environment builder
+script (in
+<filename><replaceable>prefix</replaceable>/share/nix/corepkgs/buildenv/builder.pl</filename>)
+to implement some conflict resolution policy.  E.g., the script could
+be modified to rename conflicting file names, or to pick one over the
+other.</para>
+
+</sect1>
+
+
 </appendix>
