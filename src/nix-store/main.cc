@@ -233,38 +233,36 @@ static Paths topoSort(const PathSet & paths)
 }
 
 
-static void printDrvTree(const Path & drvPath,
+static void printTree(const Path & path,
     const string & firstPad, const string & tailPad, PathSet & done)
 {
-    if (done.find(drvPath) != done.end()) {
-        cout << format("%1%%2% [...]\n") % firstPad % drvPath;
+    if (done.find(path) != done.end()) {
+        cout << format("%1%%2% [...]\n") % firstPad % path;
         return;
     }
-    done.insert(drvPath);
+    done.insert(path);
 
-    cout << format("%1%%2%\n") % firstPad % drvPath;
+    cout << format("%1%%2%\n") % firstPad % path;
+
+    PathSet references;
+    queryReferences(noTxn, path, references);
     
-    Derivation drv = derivationFromPath(drvPath);
-    
+#if 0     
     for (PathSet::iterator i = drv.inputSrcs.begin();
          i != drv.inputSrcs.end(); ++i)
         cout << format("%1%%2%\n") % (tailPad + treeConn) % *i;
-
-    PathSet inputs;
-    for (DerivationInputs::iterator i = drv.inputDrvs.begin();
-         i != drv.inputDrvs.end(); ++i)
-        inputs.insert(i->first);
+#endif    
 
     /* Topologically sort under the relation A < B iff A \in
        closure(B).  That is, if derivation A is an (possibly indirect)
        input of B, then A is printed first.  This has the effect of
        flattening the tree, preventing deeply nested structures.  */
-    Paths sorted = topoSort(inputs);
+    Paths sorted = topoSort(references);
     reverse(sorted.begin(), sorted.end());
 
     for (Paths::iterator i = sorted.begin(); i != sorted.end(); ++i) {
         Paths::iterator j = i; ++j;
-        printDrvTree(*i, tailPad + treeConn,
+        printTree(*i, tailPad + treeConn,
             j == sorted.end() ? tailPad + treeNull : tailPad + treeLine,
             done);
     }
@@ -377,7 +375,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             PathSet done;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
-                printDrvTree(fixPath(*i), "", "", done);
+                printTree(fixPath(*i), "", "", done);
             break;
         }
             
