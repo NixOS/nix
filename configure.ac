@@ -194,7 +194,6 @@ AC_CONFIG_FILES([Makefile
    src/bsdiff-4.2/Makefile
    scripts/Makefile
    corepkgs/Makefile
-   corepkgs/fetchurl/Makefile
    corepkgs/nar/Makefile
    corepkgs/buildenv/Makefile
    corepkgs/channels/Makefile
