@@ -77,9 +77,9 @@ Nix 0.8 has the following improvements:
 * One-click installation :-)  It is now possible to install any
   top-level component in Nixpkgs directly, through the web - see,
   e.g., http://catamaran.labs.cs.uu.nl/dist/nixpkgs-0.8/.  All you
-  have to do is associate `/nix/bin/nix-install-package' with
-  `application/nix-package' (or the extension `.nixpkg'), and clicking
-  on a package link will cause it to be installed, with all
+  have to do is associate `/nix/bin/nix-install-package' with the MIME
+  type `application/nix-package' (or the extension `.nixpkg'), and
+  clicking on a package link will cause it to be installed, with all
   appropriate dependencies.  If you just want to install some specific
   application, this is easier than subscribing to a channel.
 
@@ -156,9 +156,8 @@ Nix 0.8 has the following improvements:
 
 * New `nix-env' query flags `--drv-path' and `--out-path'.
 
-* `fetchurl' allows SHA-1 and SHA-256 in addition to MD5.  Just use
-  `sha1 = ' or `sha256 = ' instead of `md5 = '.  Of course, they're
-  all unsafe, really ;-)
+* `fetchurl' allows SHA-1 and SHA-256 in addition to MD5.  Just
+  specify the attribute `sha1' or `sha256' instead of `md5'.
 
   
 Version 0.7 (January 12, 2005)
