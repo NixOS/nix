@@ -408,7 +408,7 @@ followed to prevent infinite recursion.</para>
 </sect1>
 
 
-<sect1><title>Channels</title>
+<sect1 id="sec-channels"><title>Channels</title>
 
 <para>If you want to stay up to date with a set of packages, it’s not
 very convenient to manually download the latest set of Nix expressions
@@ -418,9 +418,10 @@ pre-built binaries (if available), and upgrade using
 <emphasis>Nix channels</emphasis>.</para>
 
 <para>A Nix channel is just a URL that points to a place that contains
-a set of Nix expressions and a manifest.  Using the command
-<command>nix-channel</command> you can automatically stay up to date
-with whatever is available at that URL.</para>
+a set of Nix expressions and a manifest.  Using the command <link
+linkend="sec-nix-channel"><command>nix-channel</command></link> you
+can automatically stay up to date with whatever is available at that
+URL.</para>
 
 <para>You can <quote>subscribe</quote> to a channel using
 <command>nix-channel --add</command>, e.g.,

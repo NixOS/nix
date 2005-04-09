@@ -7,7 +7,7 @@ This file is a list of <literal><replaceable>name</replaceable> =
 Comments start with a <literal>#</literal> character.  An example
 configuration file is shown in <xref linkend="ex-nix-conf" />.</para>
 
-<example id='ex-nix-conf'><title>Nix expression for GNU Hello</title>
+<example id='ex-nix-conf'><title>Nix configuration file</title>
 
 <programlisting>
 gc-keep-outputs = true       # Nice for developers

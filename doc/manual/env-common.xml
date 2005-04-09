@@ -246,11 +246,10 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
     <varlistentry><term><filename>references</filename></term>
 
       <listitem><para>The reference graph of the inputs, in the format
-      accepted by the command <link
-      linkend="rsec-nix-store-reg-val"><command>nix-store
-      --register-validity</command></link>.  It is necessary to run
-      this command on the remote machine after copying the inputs to
-      inform Nix on the remote machine that the inputs are valid
+      accepted by the command <command>nix-store
+      --register-validity</command>.  It is necessary to run this
+      command on the remote machine after copying the inputs to inform
+      Nix on the remote machine that the inputs are valid
       paths.</para></listitem>
 
     </varlistentry>

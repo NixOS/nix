@@ -1,0 +1,83 @@
+<refentry>
+  
+<refnamediv>
+  <refname>nix-channel</refname>
+  <refpurpose>manage Nix channels</refpurpose>
+</refnamediv>
+
+<refsynopsisdiv>
+  <cmdsynopsis>
+    <command>nix-channel</command>
+    <group choice='req'>
+      <arg choice='plain'><option>--add</option> <replaceable>url</replaceable></arg>
+      <arg choice='plain'><option>--remove</option> <replaceable>url</replaceable></arg>
+      <arg choice='plain'><option>--list</option></arg>
+      <arg choice='plain'><option>--update</option></arg>
+    </group>
+  </cmdsynopsis>
+</refsynopsisdiv>
+
+<refsection><title>Description</title>
+
+<para>A Nix channel is mechanism that allows you to automatically stay
+up-to-date with a set of pre-built Nix expressions.  A Nix channel is
+just a URL that points to a place that contains a set of Nix
+expressions, as well as a <command>nix-push</command> manifest.  See
+also <xref linkend="sec-channels" />.</para>
+
+<para>This command has the following operations:
+
+<variablelist>
+
+  <varlistentry><term><option>--add</option> <replaceable>url</replaceable></term>
+
+    <listitem><para>Adds <replaceable>url</replaceable> to the list of
+    subscribed channels.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--remove</option> <replaceable>url</replaceable></term>
+
+    <listitem><para>Removes <replaceable>url</replaceable> from the
+    list of subscribed channels.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--list</option></term>
+
+    <listitem><para>Prints the URLs of all subscribed channels on
+    standard output.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--update</option></term>
+
+    <listitem><para>Downloads the Nix expressions of all subscribed
+    channels, makes the conjunction of these the default for
+    <command>nix-env</command> operations (by calling <command>nix-env
+    -I</command>), and performs a <command>nix-pull</command> on the
+    manifests of all channels to make pre-built binaries
+    available.</para></listitem>
+
+  </varlistentry>
+
+</variablelist>
+
+</para>
+
+<para>Note that <option>--add</option> and <option>--remove</option>
+do not automatically perform an update.</para>
+
+<para>The list of subscribed channels is stored in
+<filename>~/.nix-channels</filename>.</para>
+
+<para>A channel consists of two elements: a bzipped Tar archive
+containing the Nix expressions, and a manifest created by
+<command>nix-push</command>.  These must be stored under
+<literal><replaceable>url</replaceable>/nixexprs.tar.bz2</literal> and
+<literal><replaceable>url</replaceable>/MANIFEST</literal>,
+respectively.</para>
+
+</refsection>
+
+</refentry>

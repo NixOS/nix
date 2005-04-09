@@ -571,13 +571,14 @@ $ gv graph.ps</screen>
 
 <!--######################################################################-->
 
-<refsection id="rsec-nix-store-reg-val"><title>Operation <option>--register-validity</option></title>
+<!--
+<refsection id="rsec-nix-store-reg-val"><title>Operation <option>-XXX-register-validity</option></title>
 
 <refsection><title>Synopsis</title>
 
 <cmdsynopsis>
   <command>nix-store</command>
-  <arg choice='plain'><option>--register-validity</option></arg>
+  <arg choice='plain'><option>-XXX-register-validity</option></arg>
 </cmdsynopsis>
 </refsection>
 
@@ -588,18 +589,20 @@ $ gv graph.ps</screen>
 </refsection>
             
 </refsection>
+-->
 
 
 
 <!--######################################################################-->
 
-<refsection><title>Operation <option>--substitute</option></title>
+<!--
+<refsection><title>Operation <option>-XXX-substitute</option></title>
 
 <refsection><title>Synopsis</title>
 
 <cmdsynopsis>
   <command>nix-store</command>
-  <arg choice='plain'><option>--substitute</option></arg>
+  <arg choice='plain'><option>-XXX-substitute</option></arg>
   <arg choice='plain'
        rep='repeat'><replaceable>srcpath</replaceable> <replaceable>subpath</replaceable></arg>
 </cmdsynopsis>
@@ -607,7 +610,7 @@ $ gv graph.ps</screen>
 
 <refsection><title>Description</title>
             
-<para>The operation <option>--substitute</option> registers that the
+<para>The operation <option>-XXX-substitute</option> registers that the
 store path <replaceable>srcpath</replaceable> can be built by
 realising the derivation expression in
 <replaceable>subpath</replaceable>.  This is used to implement binary
@@ -616,6 +619,7 @@ deployment.</para>
 </refsection>
             
 </refsection>
+-->
 
 
 

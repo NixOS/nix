@@ -56,6 +56,10 @@
       <title>nix-collect-garbage</title>
       <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-collect-garbage.xml" />
     </sect1>
+    <sect1 id="sec-nix-channel">
+      <title>nix-channel</title>
+      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-channel.xml" />
+    </sect1>
     <sect1>
       <title>nix-push</title>
       <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-push.xml" />
