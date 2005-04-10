@@ -357,21 +357,21 @@ static Expr primFalse(EvalState & state, const ATermVector & args)
 
 
 /* Return the null value. */
-Expr primNull(EvalState & state, const ATermVector & args)
+static Expr primNull(EvalState & state, const ATermVector & args)
 {
     return makeNull();
 }
 
 
 /* Determine whether the argument is the null value. */
-Expr primIsNull(EvalState & state, const ATermVector & args)
+static Expr primIsNull(EvalState & state, const ATermVector & args)
 {
     return makeBool(matchNull(evalExpr(state, args[0])));
 }
 
 
 /* Apply a function to every element of a list. */
-Expr primMap(EvalState & state, const ATermVector & args)
+static Expr primMap(EvalState & state, const ATermVector & args)
 {
     Expr fun = evalExpr(state, args[0]);
     Expr list = evalExpr(state, args[1]);
@@ -388,11 +388,22 @@ Expr primMap(EvalState & state, const ATermVector & args)
 }
 
 
+/* Return a string constant representing the current platform.  Note!
+   that differs between platforms, so Nix expressions using
+   `__currentSystem' can evaluate to different values on different
+   platforms. */
+static Expr primCurrentSystem(EvalState & state, const ATermVector & args)
+{
+    return makeStr(toATerm(thisSystem));
+}
+
+
 void EvalState::addPrimOps()
 {
     addPrimOp("true", 0, primTrue);
     addPrimOp("false", 0, primFalse);
     addPrimOp("null", 0, primNull);
+    addPrimOp("__currentSystem", 0, primCurrentSystem);
 
     addPrimOp("import", 1, primImport);
     addPrimOp("derivation", 1, primDerivation);
