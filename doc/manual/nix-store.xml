@@ -330,7 +330,8 @@ query is applied to the target of the symlink.</para>
 
 <variablelist>
 
-  <varlistentry><term><option>--use-output</option> / <option>-u</option></term>
+  <varlistentry><term><option>--use-output</option></term>
+    <term><option>-u</option></term>
   
     <listitem><para>For each argument to the query that is a store
     derivation, apply the query to the output path of the derivation
@@ -338,7 +339,8 @@ query is applied to the target of the symlink.</para>
     
   </varlistentry>
 
-  <varlistentry><term><option>--force-realise</option> / <option>-f</option></term>
+  <varlistentry><term><option>--force-realise</option></term>
+    <term><option>-f</option></term>
   
     <listitem><para>Realise each argument to the query first (see
     <link linkend="rsec-nix-store-realise"><command>nix-store
@@ -365,7 +367,8 @@ query is applied to the target of the symlink.</para>
     
   </varlistentry>
 
-  <varlistentry><term><option>--requisites</option> / <option>-R</option></term>
+  <varlistentry><term><option>--requisites</option></term>
+    <term><option>-R</option></term>
 
     <listitem><para>Prints out the <link
     linkend="gloss-closure">closure</link> of the store path

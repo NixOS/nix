@@ -102,6 +102,8 @@ pre.screen
 
 .note,.warning
 {
+    margin-top: 1em;
+    margin-bottom: 1em;
     border: 1px solid #6185a0;
     padding: 0px 1em;
     background: #fffff5;

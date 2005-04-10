@@ -2,23 +2,23 @@
 
 <para>This chapter discusses how to do package management with Nix,
 i.e., how to obtain, install, upgrade, and erase components.  This is
-the <quote>user’s</quote> perspective of the Nix system — people
+the “user’s” perspective of the Nix system — people
 who want to <emphasis>create</emphasis> components should consult
 <xref linkend='chap-writing-nix-expressions' />.</para>
 
 
 <sect1><title>Basic package management</title>
 
-<para>The main command for package management is
-<command>nix-env</command>.  You can use it to install, upgrade, and
-erase components, and to query what components are installed or are
-available for installation.</para>
+<para>The main command for package management is <link
+linkend="sec-nix-env"><command>nix-env</command></link>.  You can use
+it to install, upgrade, and erase components, and to query what
+components are installed or are available for installation.</para>
 
-<para>In Nix, different users can have different <quote>views</quote>
+<para>In Nix, different users can have different “views”
 on the set of installed applications.  That is, there might be lots of
 applications present on the system (possibly in many different
 versions), but users can have a specific selection of those active —
-where <quote>active</quote> just means that it appears in a directory
+where “active” just means that it appears in a directory
 in the user’s <envar>PATH</envar>.  Such a view on the set of
 installed applications is called a <emphasis>user
 environment</emphasis>, which is just a directory tree consisting of
@@ -31,11 +31,9 @@ Nix expressions called the Nix Package collection that contains
 components ranging from basic development stuff such as GCC and Glibc,
 to end-user applications like Mozilla Firefox.  (Nix is however not
 tied to the Nix Package collection; you could write your own Nix
-expression based on it, or completely new ones.)  You can download the
-latest version from <ulink
-url='http://catamaran.labs.cs.uu.nl/dist/nix' />.  You probably want
-the latest unstable release; currently the stable releases tend to lag
-behind quite a bit.</para>
+expressions based on it, or completely new ones.)  You can download
+the latest version from <ulink
+url='http://catamaran.labs.cs.uu.nl/dist/nix' />.</para>
 
 <para>Assuming that you have downloaded and unpacked a release of Nix
 Packages, you can view the set of available components in the release:
@@ -127,7 +125,7 @@ release of Nix Packages, you can do:
 $ nix-env -f nixpkgs-<replaceable>version</replaceable> -u subversion</screen>
 
 This will <emphasis>only</emphasis> upgrade Subversion if there is a
-<quote>newer</quote> version in the new set of Nix expressions, as
+“newer” version in the new set of Nix expressions, as
 defined by some pretty arbitrary rules regarding ordering of version
 numbers (which generally do what you’d expect of them).  To just
 unconditionally replace Subversion with whatever version is in the Nix
@@ -175,7 +173,7 @@ set.</para></footnote></para>
 </sect1>
 
 
-<sect1><title>Profiles</title>
+<sect1 id="sec-profiles"><title>Profiles</title>
 
 <para>Profiles and user environments are Nix’s mechanism for
 implementing the ability to allow differens users to have different
@@ -336,7 +334,7 @@ This will <emphasis>not</emphasis> change the
 (<option>-u</option>) and uninstall (<option>-e</option>) never
 actually delete components from the system.  All they do (as shown
 above) is to create a new user environment that no longer contains
-symlinks to the <quote>deleted</quote> components.</para>
+symlinks to the “deleted” components.</para>
 
 <para>Of course, since disk space is not infinite, unused components
 should be removed at some point.  You can do this by running the Nix
@@ -423,7 +421,7 @@ linkend="sec-nix-channel"><command>nix-channel</command></link> you
 can automatically stay up to date with whatever is available at that
 URL.</para>
 
-<para>You can <quote>subscribe</quote> to a channel using
+<para>You can “subscribe” to a channel using
 <command>nix-channel --add</command>, e.g.,
 
 <screen>
@@ -436,7 +434,7 @@ of the Nix Packages collection.  (Instead of
 stability, but right now is just outdated.)  Subscribing really just
 means that the URL is added to the file
 <filename>~/.nix-channels</filename>.  Right now there is no command
-to <quote>unsubscribe</quote>; you should just edit that file manually
+to “unsubscribe”; you should just edit that file manually
 and delete the offending URL.</para>
 
 <para>To obtain the latest Nix expressions available in a channel, do

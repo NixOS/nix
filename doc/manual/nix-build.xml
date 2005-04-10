@@ -8,6 +8,8 @@
 <refsynopsisdiv>
   <cmdsynopsis>
     <command>nix-build</command>
+    <arg><option>--add-drv-link</option></arg>
+    <arg><option>--no-link</option></arg>
     <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
   </cmdsynopsis>
 </refsynopsisdiv>

@@ -159,6 +159,8 @@ Nix 0.8 has the following improvements:
 * `fetchurl' allows SHA-1 and SHA-256 in addition to MD5.  Just
   specify the attribute `sha1' or `sha256' instead of `md5'.
 
+* Manual updates.
+
   
 Version 0.7 (January 12, 2005)
 

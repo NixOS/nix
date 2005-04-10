@@ -36,7 +36,7 @@
     <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common.xml" />
     <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="env-common.xml" />
     <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="conf-file.xml" />
-    <sect1>
+    <sect1 id="sec-nix-env">
       <title>nix-env</title>
       <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-env.xml" />
     </sect1>

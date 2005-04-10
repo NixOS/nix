@@ -134,6 +134,29 @@
 </glossentry>
 
 
+<glossentry id="gloss-user-env"><glossterm>user environment</glossterm>
+
+  <glossdef><para>An automatically generated store object that
+  consists of a set of symlinks to “active” applications, i.e., other
+  store paths.  These are generated automatically by <link
+  linkend="sec-nix-env"><command>nix-env</command></link>.  See <xref
+  linkend="sec-profiles" />.</para>
+
+  </glossdef>
+  
+</glossentry>
+
+
+<glossentry id="gloss-profile"><glossterm>profile</glossterm>
+
+  <glossdef><para>A symlink to the current <link
+  linkend="gloss-user-env">user environment</link> of a user, e.g.,
+  <filename>/nix/var/nix/profiles/default</filename>.</para></glossdef>
+
+</glossentry>
+
+
+
 </glosslist>
 
 

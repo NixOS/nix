@@ -818,7 +818,7 @@ set.</para>
 </simplesect>
 
 
-<simplesect><title>Functions</title>
+<simplesect id="ss-functions"><title>Functions</title>
 
 <para>Functions have the following form:
 
