@@ -5,7 +5,7 @@ AM_INIT_AUTOMAKE
 
 # Change to `1' to produce a `stable' release (i.e., the `preREVISION'
 # suffix is not added).
-STABLE=0
+STABLE=1
 
 # Put the revision number in the version.
 if test "$STABLE" != "1"; then
