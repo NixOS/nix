@@ -1,4 +1,4 @@
-Version 0.8 
+Version 0.8 (April 11, 2005)
 
 NOTE: the hashing scheme in Nix 0.8 changed (as detailed below).  As a
 result, `nix-pull' manifests and channels built for Nix 0.7 and below
