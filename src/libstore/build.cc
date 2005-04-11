@@ -1087,9 +1087,6 @@ void DerivationGoal::startBuilder()
 
 void DerivationGoal::computeClosure()
 {
-    startNest(nest, lvlTalkative,
-        format("determining closure for `%1%'") % drvPath);
-
     map<Path, PathSet> allReferences;
     map<Path, Hash> contentHashes;
     
@@ -1105,6 +1102,9 @@ void DerivationGoal::computeClosure()
                 format("builder for `%1%' failed to produce output path `%2%'")
                 % drvPath % path);
         }
+
+        startNest(nest, lvlTalkative,
+            format("scanning for references inside `%1%'") % path);
 
         /* Check that fixed-output derivations produced the right
            outputs (i.e., the content hash should match the specified
