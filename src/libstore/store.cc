@@ -737,10 +737,10 @@ void deleteFromStore(const Path & _path)
     Transaction txn(nixDB);
     if (isValidPathTxn(txn, path)) {
         PathSet referers = getReferers(txn, path);
-        if (referers.size() > 1 ||
-            (referers.size() == 1 &&
-                *referers.begin() != path))
-            throw Error(format("cannot delete path `%1%' because it is in use") % path);
+        for (PathSet::iterator i = referers.begin();
+             i != referers.end(); ++i)
+            if (*i != path && isValidPathTxn(txn, *i))
+                throw Error(format("cannot delete path `%1%' because it is in use by path `%2%'") % path % *i);
         invalidatePath(txn, path);
     }
     txn.commit();
