@@ -76,7 +76,7 @@ addToQueue $targetPath;
 
 sub isValidPath {
     my $p = shift;
-    system "@bindir@/nix-store --isvalid '$p' 2> /dev/null";
+    system "@bindir@/nix-store --check-validity '$p' 2> /dev/null";
     return $? == 0;
 }
 
