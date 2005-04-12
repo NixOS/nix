@@ -237,10 +237,10 @@ foreach my $p (keys %dstOutPaths) {
             $ratio = 1 / $ratio if $ratio < 1;
             print "  USE $srcUses $dstUses $ratio $q\n";
             
-            if ($ratio >= 2) {
-                print "  SKIPPING $q due to use ratio $ratio ($srcUses $dstUses)\n";
-                next;
-            }
+#            if ($ratio >= 2) {
+#                print "  SKIPPING $q due to use ratio $ratio ($srcUses $dstUses)\n";
+#                next;
+#            }
 
             # If there are multiple matching names, include the ones
             # with the closest version numbers.
