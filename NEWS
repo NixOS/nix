@@ -1,4 +1,14 @@
-Version 0.8 (April 11, 2005)
+Release 0.8.1 (April 13, 2005)
+
+This is a bug fix release.
+
+* Patch downloading was broken.
+
+* The garbage collector would not delete paths that had references
+  from invalid (but substitutable) paths.
+
+
+Release 0.8 (April 11, 2005)
 
 NOTE: the hashing scheme in Nix 0.8 changed (as detailed below).  As a
 result, `nix-pull' manifests and channels built for Nix 0.7 and below
@@ -162,7 +172,7 @@ Nix 0.8 has the following improvements:
 * Manual updates.
 
   
-Version 0.7 (January 12, 2005)
+Release 0.7 (January 12, 2005)
 
 * Binary patching.  When upgrading components using pre-built binaries
   (through nix-pull / nix-channel), Nix can automatically download and
@@ -184,7 +194,7 @@ Version 0.7 (January 12, 2005)
   dependencies are revealed.
 
 
-Version 0.6 (November 14, 2004)
+Release 0.6 (November 14, 2004)
 
 Major changes include the following:
 
@@ -250,6 +260,6 @@ Major changes include the following:
 * Many bug fixes.
 
 
-Version 0.5 and earlier
+Release 0.5 and earlier
 
 Please refer to the Subversion commit log messages.
