@@ -1149,8 +1149,6 @@ void DerivationGoal::computeClosure()
 	   in it. */
         PathSet references;
         if (!pathExists(path + "/nix-support/no-scan")) {
-            startNest(nest2, lvlChatty,
-                format("scanning for store references in `%1%'") % path);
             Paths references2;
             references2 = filterReferences(path, 
                 Paths(allPaths.begin(), allPaths.end()));
@@ -1167,8 +1165,6 @@ void DerivationGoal::computeClosure()
                 else
                     debug(format("referenced input: `%1%'") % *i);
             }
-            
-            nest2.close();
         }
 
         allReferences[path] = references;
