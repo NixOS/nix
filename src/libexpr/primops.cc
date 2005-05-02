@@ -8,11 +8,36 @@
    argument. */ 
 static Expr primImport(EvalState & state, const ATermVector & args)
 {
-    ATerm path;
-    Expr fn = evalExpr(state, args[0]);
-    if (!matchPath(fn, path))
-        throw Error("path expected");
-    return evalFile(state, aterm2String(path));
+    ATermList es;
+    Path path;
+
+    Expr arg = evalExpr(state, args[0]), arg2;
+    
+    if (matchPath(arg, arg2))
+        path = aterm2String(arg2);
+
+    else if (matchAttrs(arg, es)) {
+        Expr a = queryAttr(arg, "type");
+
+        /* If it is a derivation, we have to realise it and load the
+           Nix expression created at the derivation's output path. */
+        if (a && evalString(state, a) == "derivation") {
+            a = queryAttr(arg, "drvPath");
+            if (!a) throw Error("bad derivation in import");
+            Path drvPath = evalPath(state, a);
+
+            buildDerivations(singleton<PathSet>(drvPath));
+ 
+            a = queryAttr(arg, "outPath");
+            if (!a) throw Error("bad derivation in import");
+            path = evalPath(state, a);
+        }
+    }
+
+    if (path == "")
+        throw Error("path or derivation expected in import");
+    
+    return evalFile(state, path);
 }
 
 
@@ -339,7 +364,7 @@ static Expr primToString(EvalState & state, const ATermVector & args)
     ATerm s;
     if (matchStr(arg, s) || matchPath(arg, s) || matchUri(arg, s))
         return makeStr(s);
-    else throw Error("cannot coerce value to string");
+    throw Error("cannot coerce value to string");
 }
 
 
@@ -398,12 +423,19 @@ static Expr primCurrentSystem(EvalState & state, const ATermVector & args)
 }
 
 
+static Expr primCurrentTime(EvalState & state, const ATermVector & args)
+{
+    return ATmake("Int(<int>)", time(0));
+}
+
+
 void EvalState::addPrimOps()
 {
     addPrimOp("true", 0, primTrue);
     addPrimOp("false", 0, primFalse);
     addPrimOp("null", 0, primNull);
     addPrimOp("__currentSystem", 0, primCurrentSystem);
+    addPrimOp("__currentTime", 0, primCurrentTime);
 
     addPrimOp("import", 1, primImport);
     addPrimOp("derivation", 1, primDerivation);
@@ -413,3 +445,5 @@ void EvalState::addPrimOps()
 
     addPrimOp("map", 2, primMap);
 }
+
+
