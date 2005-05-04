@@ -154,7 +154,7 @@ public:
 // Tasteless as this may seem, making all members public allows member templates
 // to work in the absence of member template friends. (Matthew Langston)
 
-#ifndef BOOST_NO_MEMBER_TEMPLATE_FRIENDS
+#if 0
 
 private:
 
