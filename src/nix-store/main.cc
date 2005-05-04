@@ -1,4 +1,5 @@
 #include <iostream>
+#include <algorithm>
 
 #include "globals.hh"
 #include "build.hh"

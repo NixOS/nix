@@ -11,6 +11,7 @@
 
 #include <cerrno>
 #include <ctime>
+#include <algorithm>
 
 
 typedef enum {
@@ -871,7 +872,7 @@ static void opDefaultExpr(Globals & globals,
 
 
 static string needArg(Strings::iterator & i,
-    const Strings & args, const string & arg)
+    Strings & args, const string & arg)
 {
     ++i;
     if (i == args.end()) throw UsageError(

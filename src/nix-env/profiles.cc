@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
+#include <stdio.h>
 
 
 static bool cmpGensByNumber(const Generation & a, const Generation & b)
