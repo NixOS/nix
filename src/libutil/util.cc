@@ -688,5 +688,5 @@ bool string2Int(const string & s, int & n)
 {
     istringstream str(s);
     str >> n;
-    return str && str.eof();
+    return str && str.get() == EOF;
 }
