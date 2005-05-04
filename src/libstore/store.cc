@@ -63,7 +63,7 @@ static TableId dbSubstitutes = 0;
 static TableId dbDerivers = 0;
 
 
-bool Substitute::operator == (const Substitute & sub)
+bool Substitute::operator == (const Substitute & sub) const
 {
     return program == sub.program
         && args == sub.args;
@@ -170,7 +170,7 @@ void copyPath(const Path & src, const Path & dst)
 bool isInStore(const Path & path)
 {
     return path[0] == '/'
-        && path.compare(0, nixStore.size(), nixStore) == 0
+        && string(path, 0, nixStore.size()) == nixStore
         && path.size() >= nixStore.size() + 2
         && path[nixStore.size()] == '/';
 }
