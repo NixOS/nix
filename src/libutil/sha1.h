@@ -1,7 +1,7 @@
 #ifndef _SHA_H
 #define _SHA_H
 
-#include <stdint.h>
+#include <inttypes.h>
 
 /* The SHA block size and message digest sizes, in bytes */
 

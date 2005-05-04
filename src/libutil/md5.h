@@ -21,7 +21,7 @@
 #ifndef _MD5_H
 #define _MD5_H 1
 
-#include <stdint.h>
+#include <inttypes.h>
 typedef uint32_t md5_uint32;
 typedef uintptr_t md5_uintptr;
 
