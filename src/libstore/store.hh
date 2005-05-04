@@ -28,7 +28,7 @@ struct Substitute
        is the store path to be substituted). */
     Strings args;
 
-    bool operator == (const Substitute & sub);
+    bool operator == (const Substitute & sub) const;
 };
 
 typedef list<Substitute> Substitutes;
