@@ -26,8 +26,8 @@ build-db: have-db
 	 ../dist/configure --prefix=$$pfx/inst-bdb \
 	 --enable-cxx --disable-shared --disable-cryptography \
          --disable-replication --disable-verify && \
-	make && \
-	make install)
+	$(MAKE) && \
+	$(MAKE) install)
 	touch build-db
 endif
 
@@ -57,8 +57,8 @@ build-aterm: have-aterm
 	(pfx=`pwd` && \
 	cd $(ATERM) && \
 	CC="$(CC)" ./configure --prefix=$$pfx/inst-aterm && \
-	make && \
-	make install)
+	$(MAKE) && \
+	$(MAKE) install)
 	touch build-aterm
 endif
 
