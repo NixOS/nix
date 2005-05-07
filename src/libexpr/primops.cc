@@ -213,14 +213,12 @@ static string concatStrings(const Strings & ss)
    derivation; `drvPath' containing the path of the Nix expression;
    and `type' set to `derivation' to indicate that this is a
    derivation. */
-static Expr primDerivation(EvalState & state, const ATermVector & _args)
+static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
 {
     startNest(nest, lvlVomit, "evaluating derivation");
 
     ATermMap attrs;
-    Expr args = _args[0];
-    args = evalExpr(state, args);
-    queryAllAttrs(args, attrs, true);
+    queryAllAttrs(evalExpr(state, args[0]), attrs, true);
 
     /* Build the derivation expression by processing the attributes. */
     Derivation drv;
@@ -341,10 +339,27 @@ static Expr primDerivation(EvalState & state, const ATermVector & _args)
     state.drvHashes[drvPath] = hashDerivationModulo(state, drv);
 
     /* !!! assumes a single output */
-    attrs.set("outPath", makeAttrRHS(makePath(toATerm(outPath)), makeNoPos()));
-    attrs.set("drvPath", makeAttrRHS(makePath(toATerm(drvPath)), makeNoPos()));
+    ATermMap outAttrs;
+    outAttrs.set("outPath", makeAttrRHS(makePath(toATerm(outPath)), makeNoPos()));
+    outAttrs.set("drvPath", makeAttrRHS(makePath(toATerm(drvPath)), makeNoPos()));
+
+    return makeAttrs(outAttrs);
+}
+
+
+static Expr primDerivationLazy(EvalState & state, const ATermVector & args)
+{
+    Expr eAttrs = evalExpr(state, args[0]);
+    ATermMap attrs;
+    queryAllAttrs(eAttrs, attrs, true);
+
     attrs.set("type", makeAttrRHS(makeStr(toATerm("derivation")), makeNoPos()));
 
+    Expr drvStrict = makeCall(makeVar(toATerm("derivation!")), eAttrs);
+
+    attrs.set("outPath", makeAttrRHS(makeSelect(drvStrict, toATerm("outPath")), makeNoPos()));
+    attrs.set("drvPath", makeAttrRHS(makeSelect(drvStrict, toATerm("drvPath")), makeNoPos()));
+    
     return makeAttrs(attrs);
 }
 
@@ -438,7 +453,8 @@ void EvalState::addPrimOps()
     addPrimOp("__currentTime", 0, primCurrentTime);
 
     addPrimOp("import", 1, primImport);
-    addPrimOp("derivation", 1, primDerivation);
+    addPrimOp("derivation!", 1, primDerivationStrict);
+    addPrimOp("derivation", 1, primDerivationLazy);
     addPrimOp("baseNameOf", 1, primBaseNameOf);
     addPrimOp("toString", 1, primToString);
     addPrimOp("isNull", 1, primIsNull);
