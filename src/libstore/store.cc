@@ -644,7 +644,7 @@ static Path _addToStore(bool fixed, bool recursive,
         
     else dstPath = makeStorePath("source", h, baseName);
 
-    addTempRoot(dstPath);
+    if (!readOnlyMode) addTempRoot(dstPath);
 
     if (!readOnlyMode && !isValidPath(dstPath)) { 
 
@@ -699,7 +699,7 @@ Path addTextToStore(const string & suffix, const string & s,
 
     Path dstPath = makeStorePath("text", hash, suffix);
     
-    addTempRoot(dstPath);
+    if (!readOnlyMode) addTempRoot(dstPath);
 
     if (!readOnlyMode && !isValidPath(dstPath)) {
 
