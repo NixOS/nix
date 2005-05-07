@@ -1,7 +1,7 @@
 AC_INIT(nix, "0.9")
 AC_CONFIG_SRCDIR(README)
 AC_CONFIG_AUX_DIR(config)
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([dist-bzip2])
 
 # Change to `1' to produce a `stable' release (i.e., the `preREVISION'
 # suffix is not added).

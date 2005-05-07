@@ -14,7 +14,7 @@ Release: 1
 License: GPL
 Group: Software Deployment
 URL: http://www.cs.uu.nl/groups/ST/Trace/Nix
-Source0: %{name}-@version@.tar.gz
+Source0: %{name}-@version@.tar.bz2
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 %define _prefix /nix
 Prefix: %{_prefix}
