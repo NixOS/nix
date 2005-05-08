@@ -51,11 +51,24 @@ struct UserEnvElem
 {
     string name;
     string system;
-    Path drvPath;
-    Path outPath;
+
+    ATermMap attrs;
+
+    string queryDrvPath(EvalState & state) const 
+    {
+        Expr a = attrs.get("drvPath");
+        return a ? evalPath(state, a) : "";
+    }
+    
+    string queryOutPath(EvalState & state) const
+    {
+        Expr a = attrs.get("outPath");
+        if (!a) throw Error("output path missing");
+        return evalPath(state, a);
+    }
 };
 
-typedef map<Path, UserEnvElem> UserEnvElems;
+typedef map<unsigned int, UserEnvElem> UserEnvElems;
 
 
 void printHelp()
@@ -69,28 +82,30 @@ static bool parseDerivation(EvalState & state, Expr e, UserEnvElem & elem)
     ATermList es;
     e = evalExpr(state, e);
     if (!matchAttrs(e, es)) return false;
-    Expr a = queryAttr(e, "type");
+
+    ATermMap attrs;
+    queryAllAttrs(e, attrs, false);
+    
+    Expr a = attrs.get("type");
     if (!a || evalString(state, a) != "derivation") return false;
 
-    a = queryAttr(e, "name");
+    a = attrs.get("name");
     if (!a) throw badTerm("derivation name missing", e);
     elem.name = evalString(state, a);
 
-    a = queryAttr(e, "system");
+    a = attrs.get("system");
     if (!a)
         elem.system = "unknown";
     else
         elem.system = evalString(state, a);
 
-    a = queryAttr(e, "drvPath");
-    if (a) elem.drvPath = evalPath(state, a);
-
-    a = queryAttr(e, "outPath");
-    if (!a) throw badTerm("output path missing", e);
-    elem.outPath = evalPath(state, a);
+    elem.attrs = attrs;
 
     return true;
 }
+
+
+static unsigned int elemCounter = 0;
 
 
 static void parseDerivations(EvalState & state, Expr e, UserEnvElems & elems)
@@ -101,15 +116,15 @@ static void parseDerivations(EvalState & state, Expr e, UserEnvElems & elems)
     e = evalExpr(state, e);
 
     if (parseDerivation(state, e, elem)) 
-        elems[elem.outPath] = elem;
+        elems[elemCounter++] = elem;
 
     else if (matchAttrs(e, es)) {
         ATermMap drvMap;
         queryAllAttrs(e, drvMap);
         for (ATermIterator i(drvMap.keys()); i; ++i) {
-            debug(format("evaluating attribute `%1%'") % *i);
+            debug(format("evaluating attribute `%1%'") % aterm2String(*i));
             if (parseDerivation(state, drvMap.get(*i), elem))
-                elems[elem.outPath] = elem;
+                elems[elemCounter++] = elem;
             else
                 parseDerivations(state, drvMap.get(*i), elems);
         }
@@ -119,7 +134,7 @@ static void parseDerivations(EvalState & state, Expr e, UserEnvElems & elems)
         for (ATermIterator i(es); i; ++i) {
             debug(format("evaluating list element"));
             if (parseDerivation(state, *i, elem))
-                elems[elem.outPath] = elem;
+                elems[elemCounter++] = elem;
             else
                 parseDerivations(state, *i, elems);
         }
@@ -200,8 +215,9 @@ static void createUserEnv(EvalState & state, const UserEnvElems & elems,
          i != elems.end(); ++i)
         /* Call to `isDerivation' is for compatibility with Nix <= 0.7
            user environments. */
-        if (i->second.drvPath != "" && isDerivation(i->second.drvPath))
-            drvsToBuild.insert(i->second.drvPath);
+        if (i->second.queryDrvPath(state) != "" &&
+            isDerivation(i->second.queryDrvPath(state)))
+            drvsToBuild.insert(i->second.queryDrvPath(state));
 
     debug(format("building user environment dependencies"));
     buildDerivations(drvsToBuild);
@@ -217,7 +233,7 @@ static void createUserEnv(EvalState & state, const UserEnvElems & elems,
     for (UserEnvElems::const_iterator i = elems.begin(); 
          i != elems.end(); ++i)
     {
-        Path drvPath = keepDerivations ? i->second.drvPath : "";
+        Path drvPath = keepDerivations ? i->second.queryDrvPath(state) : "";
         ATerm t = makeAttrs(ATmakeList5(
             makeBind(toATerm("type"),
                 makeStr(toATerm("derivation")), makeNoPos()),
@@ -228,17 +244,17 @@ static void createUserEnv(EvalState & state, const UserEnvElems & elems,
             makeBind(toATerm("drvPath"),
                 makePath(toATerm(drvPath)), makeNoPos()),
             makeBind(toATerm("outPath"),
-                makePath(toATerm(i->second.outPath)), makeNoPos())
+                makePath(toATerm(i->second.queryOutPath(state))), makeNoPos())
             ));
         manifest = ATinsert(manifest, t);
-        inputs = ATinsert(inputs, makeStr(toATerm(i->second.outPath)));
+        inputs = ATinsert(inputs, makeStr(toATerm(i->second.queryOutPath(state))));
 
         /* This is only necessary when installing store paths, e.g.,
            `nix-env -i /nix/store/abcd...-foo'. */
-        addTempRoot(i->second.outPath);
-        ensurePath(i->second.outPath);
+        addTempRoot(i->second.queryOutPath(state));
+        ensurePath(i->second.queryOutPath(state));
         
-        references.insert(i->second.outPath);
+        references.insert(i->second.queryOutPath(state));
         if (drvPath != "") references.insert(drvPath);
     }
 
@@ -269,11 +285,11 @@ static void createUserEnv(EvalState & state, const UserEnvElems & elems,
     
     /* Realise the resulting store expression. */
     debug(format("building user environment"));
-    buildDerivations(singleton<PathSet>(topLevelDrv.drvPath));
+    buildDerivations(singleton<PathSet>(topLevelDrv.queryDrvPath(state)));
 
     /* Switch the current user environment to the output path. */
     debug(format("switching to new user environment"));
-    Path generation = createGeneration(profile, topLevelDrv.outPath);
+    Path generation = createGeneration(profile, topLevelDrv.queryOutPath(state));
     switchLink(profile, generation);
 }
 
@@ -378,17 +394,17 @@ static void queryInstSources(EvalState & state,
                     name = string(name, dash + 1);
 
                 if (isDerivation(*i)) {
-                    elem.drvPath = *i;
-                    elem.outPath = findOutput(derivationFromPath(*i), "out");
+                    elem.queryDrvPath(state) = *i;
+                    elem.queryOutPath(state) = findOutput(derivationFromPath(*i), "out");
                     if (name.size() >= drvExtension.size() &&
                         string(name, name.size() - drvExtension.size()) == drvExtension)
                         name = string(name, 0, name.size() - drvExtension.size());
                 }
-                else elem.outPath = *i;
+                else elem.queryOutPath(state) = *i;
 
                 elem.name = name;
 
-                elems[elem.outPath] = elem;
+                elems[elemCounter++] = elem;
             }
             
             break;
@@ -511,7 +527,8 @@ static void upgradeDerivations(Globals & globals,
         }
 
         if (bestElem != availElems.end() &&
-            i->second.outPath != bestElem->second.outPath)
+            i->second.queryOutPath(globals.state) !=
+                bestElem->second.queryOutPath(globals.state))
         {
             printMsg(lvlInfo,
                 format("upgrading `%1%' to `%2%'")
@@ -678,10 +695,15 @@ static void opQuery(Globals & globals,
 
     /* We only need to know the installed paths when we are querying
        the status of the derivation. */
-    UserEnvElems installed; /* installed paths */
+    PathSet installed; /* installed paths */
     
-    if (printStatus)
-        installed = queryInstalled(globals.state, globals.profile);
+    if (printStatus) {
+        UserEnvElems installedElems; 
+        installedElems = queryInstalled(globals.state, globals.profile);
+        for (UserEnvElems::iterator i = installedElems.begin();
+             i != installedElems.end(); ++i)
+            installed.insert(i->second.queryOutPath(globals.state));
+    }
             
     /* Print the desired columns. */
     Table table;
@@ -692,11 +714,11 @@ static void opQuery(Globals & globals,
         Strings columns;
         
         if (printStatus) {
-            Substitutes subs = querySubstitutes(noTxn, i->drvPath);
+            Substitutes subs = querySubstitutes(noTxn, i->queryDrvPath(globals.state));
             columns.push_back(
-                (string) (installed.find(i->outPath)
+                (string) (installed.find(i->queryOutPath(globals.state))
                     != installed.end() ? "I" : "-")
-                + (isValidPath(i->outPath) ? "P" : "-")
+                + (isValidPath(i->queryOutPath(globals.state)) ? "P" : "-")
                 + (subs.size() > 0 ? "S" : "-"));
         }
 
@@ -704,10 +726,11 @@ static void opQuery(Globals & globals,
 
         if (printSystem) columns.push_back(i->system);
 
-        if (printDrvPath) columns.push_back(i->drvPath == "" ? "-" : i->drvPath);
+        if (printDrvPath) columns.push_back(
+            i->queryDrvPath(globals.state) == ""
+            ? "-" : i->queryDrvPath(globals.state));
         
-        if (printOutPath) columns.push_back(i->outPath);
-
+        if (printOutPath) columns.push_back(i->queryOutPath(globals.state));
         table.push_back(columns);
     }
 
