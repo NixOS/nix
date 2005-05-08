@@ -7,6 +7,7 @@
 
 
 ATermMap::ATermMap(unsigned int initialSize, unsigned int maxLoadPct)
+    : table(0)
 {
     this->maxLoadPct = maxLoadPct;
     table = ATtableCreate(initialSize, maxLoadPct);
@@ -17,6 +18,36 @@ ATermMap::ATermMap(unsigned int initialSize, unsigned int maxLoadPct)
 ATermMap::ATermMap(const ATermMap & map)
     : table(0)
 {
+    copy(map);
+}
+
+
+ATermMap::~ATermMap()
+{
+    free();
+}
+
+
+ATermMap & ATermMap::operator = (const ATermMap & map)
+{
+    if (this == &map) return *this;
+    free();
+    copy(map);
+    return *this;
+}
+
+
+void ATermMap::free()
+{
+    if (table) {
+        ATtableDestroy(table);
+        table = 0;
+    }
+}
+
+
+void ATermMap::copy(const ATermMap & map)
+{
     ATermList keys = map.keys();
 
     /* !!! adjust allocation for load pct */
@@ -25,12 +56,6 @@ ATermMap::ATermMap(const ATermMap & map)
     if (!table) throw Error("cannot create ATerm table");
 
     add(map, keys);
-}
-
-
-ATermMap::~ATermMap()
-{
-    if (table) ATtableDestroy(table);
 }
 
 

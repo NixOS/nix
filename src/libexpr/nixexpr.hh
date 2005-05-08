@@ -29,6 +29,8 @@ public:
     ATermMap(const ATermMap & map);
     ~ATermMap();
 
+    ATermMap & ATermMap::operator = (const ATermMap & map);
+        
     void set(ATerm key, ATerm value);
     void set(const string & key, ATerm value);
 
@@ -46,6 +48,9 @@ public:
 
 private:
     void add(const ATermMap & map, ATermList & keys);
+
+    void free();
+    void copy(const ATermMap & map);
 };
 
 
