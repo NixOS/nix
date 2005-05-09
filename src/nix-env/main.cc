@@ -49,22 +49,43 @@ typedef void (* Operation) (Globals & globals,
 
 struct UserEnvElem
 {
+private:
+    string drvPath;
+    string outPath;
+    
+public:
     string name;
     string system;
 
     ATermMap attrs;
 
-    string queryDrvPath(EvalState & state) const 
+    string queryDrvPath(EvalState & state) const
     {
-        Expr a = attrs.get("drvPath");
-        return a ? evalPath(state, a) : "";
+        if (drvPath == "") {
+            Expr a = attrs.get("drvPath");
+            (string &) drvPath = a ? evalPath(state, a) : "";
+        }
+        return drvPath;
     }
     
     string queryOutPath(EvalState & state) const
     {
-        Expr a = attrs.get("outPath");
-        if (!a) throw Error("output path missing");
-        return evalPath(state, a);
+        if (outPath == "") {
+            Expr a = attrs.get("outPath");
+            if (!a) throw Error("output path missing");
+            (string &) outPath = evalPath(state, a);
+        }
+        return outPath;
+    }
+
+    void setDrvPath(const string & s)
+    {
+        drvPath = s;
+    }
+    
+    void setOutPath(const string & s)
+    {
+        outPath = s;
     }
 };
 
@@ -394,13 +415,13 @@ static void queryInstSources(EvalState & state,
                     name = string(name, dash + 1);
 
                 if (isDerivation(*i)) {
-                    elem.queryDrvPath(state) = *i;
-                    elem.queryOutPath(state) = findOutput(derivationFromPath(*i), "out");
+                    elem.setDrvPath(*i);
+                    elem.setOutPath(findOutput(derivationFromPath(*i), "out"));
                     if (name.size() >= drvExtension.size() &&
                         string(name, name.size() - drvExtension.size()) == drvExtension)
                         name = string(name, 0, name.size() - drvExtension.size());
                 }
-                else elem.queryOutPath(state) = *i;
+                else elem.setOutPath(*i);
 
                 elem.name = name;
 
