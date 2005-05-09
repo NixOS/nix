@@ -58,6 +58,8 @@ private:
 
     Db * getDb(TableId table);
 
+    void open2(const string & path, bool removeOldEnv);
+    
 public:
     Database();
     ~Database();

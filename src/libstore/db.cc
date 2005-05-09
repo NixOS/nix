@@ -165,127 +165,152 @@ static int my_fsync(int fd)
 }
 
 
-void Database::open(const string & path)
+void Database::open2(const string & path, bool removeOldEnv)
 {
     if (env) throw Error(format("environment already open"));
 
-    try {
-
-        debug(format("opening database environment"));
+    debug(format("opening database environment"));
 
 
-        /* Create the database environment object. */
-        DbEnv * env = 0; /* !!! close on error */
-        env = new DbEnv(0);
-
-        /* Smaller log files. */
-        env->set_lg_bsize(32 * 1024); /* default */
-        env->set_lg_max(256 * 1024); /* must be > 4 * lg_bsize */
-
-        /* Write the log, but don't sync.  This protects transactions
-           against application crashes, but if the system crashes,
-           some transactions may be undone.  An acceptable risk, I
-           think. */
-        env->set_flags(DB_TXN_WRITE_NOSYNC | DB_LOG_AUTOREMOVE, 1);
-
-        /* Increase the locking limits.  If you ever get `Dbc::get:
-           Cannot allocate memory' or similar, especially while
-           running `nix-store --verify', just increase the following
-           number, then run db_recover on the database to remove the
-           existing DB environment (since changes only take effect on
-           new environments). */
-        env->set_lk_max_locks(10000);
-        env->set_lk_max_lockers(10000);
-        env->set_lk_max_objects(10000);
-        env->set_lk_detect(DB_LOCK_DEFAULT);
-
-        /* Dangerous, probably, but from the docs it *seems* that BDB
-           shouldn't sync when DB_TXN_WRITE_NOSYNC is used, but it
-           still fsync()s sometimes. */
-        db_env_set_func_fsync(my_fsync);
+    /* Create the database environment object. */
+    DbEnv * env = 0; /* !!! close on error */
+    env = new DbEnv(0);
+    
+    /* Smaller log files. */
+    env->set_lg_bsize(32 * 1024); /* default */
+    env->set_lg_max(256 * 1024); /* must be > 4 * lg_bsize */
+    
+    /* Write the log, but don't sync.  This protects transactions
+       against application crashes, but if the system crashes, some
+       transactions may be undone.  An acceptable risk, I think. */
+    env->set_flags(DB_TXN_WRITE_NOSYNC | DB_LOG_AUTOREMOVE, 1);
+    
+    /* Increase the locking limits.  If you ever get `Dbc::get: Cannot
+       allocate memory' or similar, especially while running
+       `nix-store --verify', just increase the following number, then
+       run db_recover on the database to remove the existing DB
+       environment (since changes only take effect on new
+       environments). */
+    env->set_lk_max_locks(10000);
+    env->set_lk_max_lockers(10000);
+    env->set_lk_max_objects(10000);
+    env->set_lk_detect(DB_LOCK_DEFAULT);
+    
+    /* Dangerous, probably, but from the docs it *seems* that BDB
+       shouldn't sync when DB_TXN_WRITE_NOSYNC is used, but it still
+       fsync()s sometimes. */
+    db_env_set_func_fsync(my_fsync);
         
 
-        /* The following code provides automatic recovery of the
-           database environment.  Recovery is necessary when a process
-           dies while it has the database open.  To detect this,
-           processes atomically increment a counter when they open the
-           database, and decrement it when they close it.  If we see
-           that counter is > 0 but no processes are accessing the
-           database---determined by attempting to obtain a write lock
-           on a lock file on which all accessors have a read lock---we
-           must run recovery.  Note that this also ensures that we
-           only run recovery when there are no other accessors (which
-           could cause database corruption). */
+    /* The following code provides automatic recovery of the database
+       environment.  Recovery is necessary when a process dies while
+       it has the database open.  To detect this, processes atomically
+       increment a counter when they open the database, and decrement
+       it when they close it.  If we see that counter is > 0 but no
+       processes are accessing the database---determined by attempting
+       to obtain a write lock on a lock file on which all accessors
+       have a read lock---we must run recovery.  Note that this also
+       ensures that we only run recovery when there are no other
+       accessors (which could cause database corruption). */
 
-        /* !!! close fdAccessors / fdLock on exception */
+    /* !!! close fdAccessors / fdLock on exception */
 
-        /* Open the accessor count file. */
-        string accessorsPath = path + "/accessor_count";
-        fdAccessors = ::open(accessorsPath.c_str(), O_RDWR | O_CREAT, 0666);
-        if (fdAccessors == -1)
-            if (errno == EACCES)
-                throw DbNoPermission(
-                    format("permission denied to database in `%1%'") % accessorsPath);
-            else
-                throw SysError(format("opening file `%1%'") % accessorsPath);
-
-        /* Open the lock file. */
-        string lockPath = path + "/access_lock";
-        fdLock = ::open(lockPath.c_str(), O_RDWR | O_CREAT, 0666);
-        if (fdLock == -1)
-            throw SysError(format("opening lock file `%1%'") % lockPath);
-
-        /* Try to acquire a write lock. */
-        debug(format("attempting write lock on `%1%'") % lockPath);
-        if (lockFile(fdLock, ltWrite, false)) { /* don't wait */
-
-            debug(format("write lock granted"));
-
-            /* We have a write lock, which means that there are no
-               other readers or writers. */
-
-            int n = getAccessorCount(fdAccessors);
-
-            if (n != 0) {
-                printMsg(lvlTalkative,
-                    format("accessor count is %1%, running recovery") % n);
-
-                /* Open the environment after running recovery. */
-                openEnv(env, path, DB_RECOVER);
-            }
+    /* Open the accessor count file. */
+    string accessorsPath = path + "/accessor_count";
+    fdAccessors = ::open(accessorsPath.c_str(), O_RDWR | O_CREAT, 0666);
+    if (fdAccessors == -1)
+        if (errno == EACCES)
+            throw DbNoPermission(
+                format("permission denied to database in `%1%'") % accessorsPath);
+        else    
+            throw SysError(format("opening file `%1%'") % accessorsPath);
+    
+    /* Open the lock file. */
+    string lockPath = path + "/access_lock";
+    fdLock = ::open(lockPath.c_str(), O_RDWR | O_CREAT, 0666);
+    if (fdLock == -1)
+        throw SysError(format("opening lock file `%1%'") % lockPath);
+    
+    /* Try to acquire a write lock. */
+    debug(format("attempting write lock on `%1%'") % lockPath);
+    if (lockFile(fdLock, ltWrite, false)) { /* don't wait */
+        
+        debug(format("write lock granted"));
+        
+        /* We have a write lock, which means that there are no other
+           readers or writers. */
+        
+        if (removeOldEnv) {
+            printMsg(lvlError, "removing old Berkeley DB database environment...");
+            env->remove(path.c_str(), DB_FORCE);
+            return;
+        }
+        
+        int n = getAccessorCount(fdAccessors);
+        
+        if (n != 0) {
+            printMsg(lvlTalkative,
+                format("accessor count is %1%, running recovery") % n);
             
-            else 
-                /* Open the environment normally. */
-                openEnv(env, path, 0);
-
-            setAccessorCount(fdAccessors, 1);
-
-            /* Downgrade to a read lock. */
-            debug(format("downgrading to read lock on `%1%'") % lockPath);
-            lockFile(fdLock, ltRead, true);
-
-        } else {
-            /* There are other accessors. */ 
-            debug(format("write lock refused"));
-
-            /* Acquire a read lock. */
-            debug(format("acquiring read lock on `%1%'") % lockPath);
-            lockFile(fdLock, ltRead, true); /* wait indefinitely */
-
-            /* Increment the accessor count. */
-            lockFile(fdAccessors, ltWrite, true);
-            int n = getAccessorCount(fdAccessors) + 1;
-            setAccessorCount(fdAccessors, n);
-            debug(format("incremented accessor count to %1%") % n);
-            lockFile(fdAccessors, ltNone, true);
-
+            /* Open the environment after running recovery. */
+            openEnv(env, path, DB_RECOVER);
+        }
+            
+        else 
             /* Open the environment normally. */
             openEnv(env, path, 0);
-        }
 
-        this->env = env;
+        setAccessorCount(fdAccessors, 1);
+
+        /* Downgrade to a read lock. */
+        debug(format("downgrading to read lock on `%1%'") % lockPath);
+        lockFile(fdLock, ltRead, true);
+
+    } else {
+        /* There are other accessors. */ 
+        debug(format("write lock refused"));
+
+        /* Acquire a read lock. */
+        debug(format("acquiring read lock on `%1%'") % lockPath);
+        lockFile(fdLock, ltRead, true); /* wait indefinitely */
         
-    } catch (DbException e) { rethrow(e); }
+        /* Increment the accessor count. */
+        lockFile(fdAccessors, ltWrite, true);
+        int n = getAccessorCount(fdAccessors) + 1;
+        setAccessorCount(fdAccessors, n);
+        debug(format("incremented accessor count to %1%") % n);
+        lockFile(fdAccessors, ltNone, true);
+        
+        /* Open the environment normally. */
+        openEnv(env, path, 0);
+    }
+    
+    this->env = env;
+}       
+
+
+void Database::open(const string & path)
+{
+    try {
+
+        open2(path, false);
+        
+    } catch (DbException e) {
+        
+        if (e.get_errno() == DB_VERSION_MISMATCH) {
+            /* Remove the environment while we are holding the global
+               lock.  If things go wrong there, we bail out.  !!!
+               there is some leakage here op DbEnv and lock
+               handles. */
+            open2(path, true);
+
+            /* Try again. */
+            open2(path, false);
+        }
+        else
+            rethrow(e);
+    }
+    
 }
 
 
