@@ -500,8 +500,8 @@ query is applied to the target of the symlink.</para>
     
 <screen>
 $ nix-store -qR $(which svn)
-/nix/store/4mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
-/nix/store/8lz9yc6zgmc0vlqmn2ipcpkjlmbi51vv-glibc-2.3.4
+/nix/store/5mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
+/nix/store/9lz9yc6zgmc0vlqmn2ipcpkjlmbi51vv-glibc-2.3.4
 <replaceable>...</replaceable></screen>
 
 </para>
@@ -538,7 +538,7 @@ $ nix-store -q --tree $(nix-store -qd $(which svn))
 <screen>
 $ nix-store -q --referers $(nix-store -q --binding openssl $(nix-store -qd $(which svn)))
 /nix/store/23ny9l9wixx21632y2wi4p585qhva1q8-sylpheed-1.0.0
-/nix/store/4mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
+/nix/store/5mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
 /nix/store/dpmvp969yhdqs7lm2r1a3gng7pyq6vy4-subversion-1.1.3
 /nix/store/l51240xqsgg8a7yrbqdx1rfzyv6l26fx-lynx-2.8.5</screen>
 
@@ -550,7 +550,7 @@ $ nix-store -q --referers $(nix-store -q --binding openssl $(nix-store -qd $(whi
 <screen>
 $ nix-store -q --referers-closure $(ldd $(which svn) | grep /libc.so | awk '{print $3}')
 /nix/store/034a6h4vpz9kds5r6kzb9lhh81mscw43-libgnomeprintui-2.8.2
-/nix/store/05l3yi0d45prm7a82pcrknxdh6nzmxza-gawk-3.1.4
+/nix/store/15l3yi0d45prm7a82pcrknxdh6nzmxza-gawk-3.1.4
 <replaceable>...</replaceable></screen>
 
 Note that <command>ldd</command> is a command that prints out the

@@ -311,7 +311,7 @@ $ nix-env -i /nix/store/fibjb1bfbpm5mrsxc4mh2d8n37sxh91i-gcc-3.4.3.drv</screen>
 <para>To install a specific output path:
 
 <screen>
-$ nix-env -i /nix/store/x3cgx0xj1p4iv9x0pnnmdhr8iyg741vk-gcc-3.4.3</screen>
+$ nix-env -i /nix/store/y3cgx0xj1p4iv9x0pnnmdhr8iyg741vk-gcc-3.4.3</screen>
 
 </para>
 
