@@ -1139,7 +1139,7 @@ void DerivationGoal::computeClosure()
             Hash h2 = recursive ? hashPath(ht, path) : hashFile(ht, path);
             if (h != h2)
                 throw Error(
-                    format("output path `%1% should have %2% hash `%3%', instead has `%4%'")
+                    format("output path `%1%' should have %2% hash `%3%', instead has `%4%'")
                     % path % algo % printHash(h) % printHash(h2));
         }
 
