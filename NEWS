@@ -1,3 +1,9 @@
+Version 0.9
+
+* Unpacking of patch sequences is much faster now by not doing
+  redundant unpacking and repacking of intermediate paths.
+
+
 Version 0.8 (April 11, 2005)
 
 NOTE: the hashing scheme in Nix 0.8 changed (as detailed below).  As a

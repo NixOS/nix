@@ -207,11 +207,19 @@ while (scalar @path > 0) {
     my $v = $edge->{end};
 
     print "\n*** Step $curStep/$maxStep: ";
-    $curStep++;
 
     if ($edge->{type} eq "present") {
         print "using already present path `$v'\n";
         print LOGFILE "$$ present $v\n";
+
+        if ($curStep < $maxStep) {
+            # Since this is not the last step, the path will be used
+            # as a base to one or more patches.  So turn the base path
+            # into a NAR archive, to which we can apply the patch.
+            print "  packing base path...\n";
+            system "@bindir@/nix-store --dump $v > /tmp/nar";
+            die "cannot dump `$v'" if ($? != 0);
+        }
     }
 
     elsif ($edge->{type} eq "patch") {
@@ -224,21 +232,22 @@ while (scalar @path > 0) {
         print "  downloading patch...\n";
         my $patchPath = downloadFile "$patch->{url}", "$patch->{hash}";
 
-        # Turn the base path into a NAR archive, to which we can
-        # actually apply the patch.
-        print "  packing base path...\n";
-        system "@bindir@/nix-store --dump $patch->{basePath} > /tmp/nar";
-        die "cannot dump `$patch->{basePath}'" if ($? != 0);
-
-        # Apply the patch.
+        # Apply the patch to the NAR archive produced in step 1 (for
+        # the already present path) or a later step (for patch sequences).
         print "  applying patch...\n";
         system "@libexecdir@/bspatch /tmp/nar /tmp/nar2 $patchPath";
         die "cannot apply patch `$patchPath' to /tmp/nar" if ($? != 0);
 
-        # Unpack the resulting NAR archive into the target path.
-        print "  unpacking patched archive...\n";
-        system "@bindir@/nix-store --restore $v < /tmp/nar2";
-        die "cannot unpack /tmp/nar2 into `$v'" if ($? != 0);
+        if ($curStep < $maxStep) {
+            # The archive will be used as the base of the next patch.
+            rename "/tmp/nar2", "/tmp/nar" or die "cannot rename NAR archive: $!";
+        } else {
+            # This was the last patch.  Unpack the final NAR archive
+            # into the target path.
+            print "  unpacking patched archive...\n";
+            system "@bindir@/nix-store --restore $v < /tmp/nar2";
+            die "cannot unpack /tmp/nar2 into `$v'" if ($? != 0);
+        }
     }
 
     elsif ($edge->{type} eq "narfile") {
@@ -251,11 +260,18 @@ while (scalar @path > 0) {
         print "  downloading archive...\n";
         my $narFilePath = downloadFile "$narFile->{url}", "$narFile->{hash}";
 
-        # Unpack the archive into the target path.
-        print "  unpacking archive...\n";
-        system "@bunzip2@ < '$narFilePath' | @bindir@/nix-store --restore '$v'";
-        die "cannot unpack `$narFilePath' into `$v'" if ($? != 0);
+        if ($curStep < $maxStep) {
+            # The archive will be used a base to a patch.
+            system "@bunzip2@ < '$narFilePath' > /tmp/nar";
+        } else {
+            # Unpack the archive into the target path.
+            print "  unpacking archive...\n";
+            system "@bunzip2@ < '$narFilePath' | @bindir@/nix-store --restore '$v'";
+            die "cannot unpack `$narFilePath' into `$v'" if ($? != 0);
+        }
     }
+
+    $curStep++;
 }
 
 
