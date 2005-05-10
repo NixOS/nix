@@ -4,7 +4,7 @@ DB = db-4.3.28.NC
 
 $(DB).tar.gz:
 	@echo "Nix requires Berkeley DB to build."
-	@echo "Please download version 4.3.38 from"
+	@echo "Please download version 4.3.28 from"
 	@echo "  http://downloads.sleepycat.com/db-4.3.28.NC.tar.gz"
 	@echo "and place it in the externals/ directory."
 	false
