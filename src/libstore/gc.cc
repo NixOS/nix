@@ -249,7 +249,12 @@ static void findRoots(const Path & path, bool recurseSymlinks,
         if (isInStore(target2)) {
             debug(format("found root `%1%' in `%2%'")
                 % target2 % path);
-            roots.insert(toStorePath(target2));
+            Path target3 = toStorePath(target2);
+            if (isValidPath(target3)) 
+                roots.insert(target3);
+            else
+                printMsg(lvlInfo, format("skipping invalid root from `%1%' to `%2%'")
+                    % path % target3);
         }
 
         else if (recurseSymlinks) {
