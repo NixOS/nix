@@ -444,6 +444,23 @@ static Expr primCurrentTime(EvalState & state, const ATermVector & args)
 }
 
 
+static Expr primRemoveAttrs(EvalState & state, const ATermVector & args)
+{
+    ATermMap attrs;
+    queryAllAttrs(evalExpr(state, args[0]), attrs, true);
+    
+    ATermList list;
+    if (!matchList(evalExpr(state, args[1]), list))
+        throw Error("`removeAttrs' expects a list as its second argument");
+
+    for (ATermIterator i(list); i; ++i)
+        /* It's not an error for *i not to exist. */
+        attrs.remove(evalString(state, *i));
+
+    return makeAttrs(attrs);
+}
+
+
 void EvalState::addPrimOps()
 {
     addPrimOp("true", 0, primTrue);
@@ -460,6 +477,7 @@ void EvalState::addPrimOps()
     addPrimOp("isNull", 1, primIsNull);
 
     addPrimOp("map", 2, primMap);
+    addPrimOp("removeAttrs", 2, primRemoveAttrs);
 }
 
 
