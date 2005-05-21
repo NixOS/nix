@@ -35,14 +35,12 @@ bool PathHash::isNull() const
 
 bool PathHash::operator ==(const PathHash & hash2) const
 {
-    debug("foo");
     return rep == hash2.rep;
 }
 
 
 bool PathHash::operator <(const PathHash & hash2) const
 {
-    debug("bar");
     return rep < hash2.rep;
 }
 
@@ -71,7 +69,8 @@ struct CopySource : RestoreSource
 };
 
 
-string rewriteHashes(string s, const HashRewrites & rewrites)
+static string rewriteHashes(string s, const HashRewrites & rewrites,
+    vector<int> & positions)
 {
     for (HashRewrites::const_iterator i = rewrites.begin();
          i != rewrites.end(); ++i)
@@ -83,6 +82,7 @@ string rewriteHashes(string s, const HashRewrites & rewrites)
         unsigned int j = 0;
         while ((j = s.find(from, j)) != string::npos) {
             debug(format("rewriting @ %1%") % j);
+            positions.push_back(j);
             s.replace(j, to.size(), to);
         }
     }
@@ -93,14 +93,26 @@ string rewriteHashes(string s, const HashRewrites & rewrites)
 
 PathHash hashModulo(string s, const PathHash & modulus)
 {
+    vector<int> positions;
+    
     if (!modulus.isNull()) {
         /* Zero out occurences of `modulus'. */
         HashRewrites rewrites;
         rewrites[modulus] = PathHash(); /* = null hash */
-        s = rewriteHashes(s, rewrites);
+        s = rewriteHashes(s, rewrites, positions);
     }
 
-    return PathHash(hashString(htSHA256, s));
+    string positionPrefix;
+    
+    for (vector<int>::iterator i = positions.begin();
+         i != positions.end(); ++i)
+        positionPrefix += (format("|%1%") % *i).str();
+
+    positionPrefix += "||";
+
+    debug(format("positions %1%") % positionPrefix);
+    
+    return PathHash(hashString(htSHA256, positionPrefix + s));
 }
 
 
@@ -118,7 +130,8 @@ Path addToStore(const Path & srcPath, const PathHash & selfHash)
     if (!selfHash.isNull()) {
         HashRewrites rewrites;
         rewrites[selfHash] = newHash;
-        sink.s = rewriteHashes(sink.s, rewrites);
+        vector<int> positions;
+        sink.s = rewriteHashes(sink.s, rewrites, positions);
         PathHash newHash2 = hashModulo(sink.s, newHash);
         assert(newHash2 == newHash);
         debug(format("newHash2 %1%") % newHash2.toString());
@@ -137,7 +150,7 @@ int main(int argc, char * * argv)
 {
     verbosity = (Verbosity) ((int) 10);
     
-    Path p = addToStore("./bar", PathHash(parseHash32(htSHA256, "8myr6ajc52b5sky7iplgz8jv703ljc0q")));
+    Path p = addToStore("./foo", PathHash(parseHash32(htSHA256, "8myr6ajc52b5sky7iplgz8jv703ljc0q")));
 
     cout << p << endl;
     
