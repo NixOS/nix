@@ -45,6 +45,15 @@ bool PathHash::operator <(const PathHash & hash2) const
 }
 
 
+PathHash generateRandomPathHash()
+{
+    Hash hash(htSHA256);
+    for (unsigned int i = 0; i < hash.hashSize; ++i)
+        hash.hash[i] = rand() % 256; // !!! improve
+    return PathHash(hash);
+}
+
+
 struct CopySink : DumpSink
 {
     string s;
@@ -149,6 +158,12 @@ Path addToStore(const Path & srcPath, const PathHash & selfHash)
 int main(int argc, char * * argv)
 {
     verbosity = (Verbosity) ((int) 10);
+
+    srand(time(0));
+
+    debug(format("%1%") % generateRandomPathHash().toString());
+    debug(format("%1%") % generateRandomPathHash().toString());
+    debug(format("%1%") % generateRandomPathHash().toString());
     
     Path p = addToStore("./foo", PathHash(parseHash32(htSHA256, "8myr6ajc52b5sky7iplgz8jv703ljc0q")));
 
