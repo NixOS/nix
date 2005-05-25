@@ -139,6 +139,10 @@ static void initAndRun(int argc, char * * argv)
 
     /* ATerm stuff.  !!! find a better place to put this */
     initDerivationsHelpers();
+
+    /* Random number generator needed by makeRandomStorePath(); !!!
+       improve. */
+    srand(time(0));
     
     /* Put the arguments in a vector. */
     Strings args, remaining;

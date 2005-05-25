@@ -187,6 +187,10 @@ void queryReferences(const Transaction & txn,
 void queryReferers(const Transaction & txn,
     const Path & storePath, PathSet & referers);
 
+void addOutputEqMember(const Transaction & txn,
+    const OutputEqClass & eqClass, const TrustId & trustId,
+    const Path & path);
+
 void queryOutputEqMembers(const Transaction & txn,
     const OutputEqClass & eqClass, OutputEqMembers & members);
     

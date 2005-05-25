@@ -914,7 +914,7 @@ bool DerivationGoal::prepareBuild()
         rewrites[hashPartOf(i->second.eqClass)] = hashPartOf(tmpPath);
         tmpOutputs[i->second.eqClass] = tmpPath;
     }
-    
+
     /* Obtain locks on all output paths.  The locks are automatically
        released when we exit this function or Nix crashes. */
     /* !!! BUG: this could block, which is not allowed. */
@@ -959,6 +959,7 @@ bool DerivationGoal::prepareBuild()
         debug(format("building path `%1%'") % i->second.path);
         allPaths.insert(i->second.path);
     }
+#endif    
 
     /* Determine the full set of input paths. */
 
@@ -973,9 +974,25 @@ bool DerivationGoal::prepareBuild()
         Derivation inDrv = derivationFromPath(i->first);
         for (StringSet::iterator j = i->second.begin();
              j != i->second.end(); ++j)
-            if (inDrv.outputs.find(*j) != inDrv.outputs.end())
+            
+            if (inDrv.outputs.find(*j) != inDrv.outputs.end()) {
+                
+                OutputEqClass eqClass = inDrv.outputs[*j].eqClass;
+                OutputEqMembers members;
+                queryOutputEqMembers(noTxn, eqClass, members);
+
+                if (members.size() == 0)
+                    throw Error(format("output equivalence class `%1%' has no members!")
+                        % eqClass);
+
+                Path input = members.front().path;
+
+                rewrites[hashPartOf(eqClass)] = hashPartOf(input);
+                    
+#if 0                
                 computeFSClosure(inDrv.outputs[*j].path, inputPaths);
-            else
+#endif
+            } else
                 throw Error(
                     format("derivation `%1%' requires non-existent output `%2%' from input derivation `%3%'")
                     % drvPath % *j % i->first);
@@ -989,7 +1006,6 @@ bool DerivationGoal::prepareBuild()
     debug(format("added input paths %1%") % showPaths(inputPaths));
 
     allPaths.insert(inputPaths.begin(), inputPaths.end());
-#endif    
 
     return true;
 }
@@ -1144,6 +1160,15 @@ void DerivationGoal::computeClosure()
         Path finalPath = addToStore(i->second, hashPartOf(i->second),
             namePartOf(i->second));
         printMsg(lvlError, format("produced final path `%1%'") % finalPath);
+
+        /* Register the fact that this output path is a member of some
+           output path equivalence class (for a certain user, at
+           least).  This is how subsequent derivations will be able to
+           find it. */
+        Transaction txn;
+        createStoreTransaction(txn);
+        addOutputEqMember(txn, i->first, "root", finalPath);
+        txn.commit();
     }
     
 #if 0    

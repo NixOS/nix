@@ -448,10 +448,52 @@ void queryReferers(const Transaction & txn,
 }
 
 
+void addOutputEqMember(const Transaction & txn,
+    const OutputEqClass & eqClass, const TrustId & trustId,
+    const Path & path)
+{
+    OutputEqMembers members;
+    queryOutputEqMembers(txn, eqClass, members);
+
+    for (OutputEqMembers::iterator i = members.begin();
+         i != members.end(); ++i)
+        if (i->trustId == trustId && i->path == path) return;
+    
+    OutputEqMember member;
+    member.trustId = trustId;
+    member.path = path;
+    members.push_back(member);
+
+    Strings ss;
+    
+    for (OutputEqMembers::iterator i = members.begin();
+         i != members.end(); ++i)
+    {
+        Strings ss2;
+        ss2.push_back(i->trustId);
+        ss2.push_back(i->path);
+        ss.push_back(packStrings(ss2));
+    }
+
+    nixDB.setStrings(txn, dbEquivalences, eqClass, ss);
+}
+
+
 void queryOutputEqMembers(const Transaction & txn,
     const OutputEqClass & eqClass, OutputEqMembers & members)
 {
-    assert(0);
+    Strings ss;
+    nixDB.queryStrings(txn, dbEquivalences, eqClass, ss);
+
+    for (Strings::iterator i = ss.begin(); i != ss.end(); ++i) {
+        Strings ss2 = unpackStrings(*i);
+        if (ss2.size() != 2) continue;
+        Strings::iterator j = ss2.begin();
+        OutputEqMember member;
+        member.trustId = *j++;
+        member.path = *j++;
+        members.push_back(member);
+    }
 }
 
 
