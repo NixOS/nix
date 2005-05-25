@@ -314,6 +314,16 @@ private:
     
     /* The remainder is state held during the build. */
 
+    /* The map of output equivalence classes to temporary output
+       paths. */
+    typedef map<OutputEqClass, Path> OutputMap;
+    OutputMap tmpOutputs;
+
+    /* The hash rewrite map that rewrites output equivalences occuring
+       in the command-line arguments and environment variables to the
+       actual paths to be used. */
+    HashRewrites rewrites;
+
     /* Locks on the output paths. */
     PathLocks outputLocks;
 
@@ -463,6 +473,7 @@ void DerivationGoal::haveStoreExpr()
     /* Get the derivation. */
     drv = derivationFromPath(drvPath);
 
+#if 0    
     for (DerivationOutputs::iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
         addTempRoot(i->second.path);
@@ -485,6 +496,7 @@ void DerivationGoal::haveStoreExpr()
            substitutes. */
         if (querySubstitutes(noTxn, *i).size() > 0)
             addWaitee(worker.makeSubstitutionGoal(*i));
+#endif    
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         outputsSubstituted();
@@ -502,10 +514,12 @@ void DerivationGoal::outputsSubstituted()
 
     nrFailed = 0;
 
+#if 0    
     if (checkPathValidity(false).size() == 0) {
         amDone(true);
         return;
     }
+#endif    
 
     /* Otherwise, at least one of the output paths could not be
        produced using a substitute.  So we have to build instead. */
@@ -647,6 +661,7 @@ void DerivationGoal::buildDone()
 }
 
 
+#if 0
 static string readLine(int fd)
 {
     string s;
@@ -686,16 +701,20 @@ static void drain(int fd)
         else writeFull(STDERR_FILENO, buffer, rd);
     }
 }
+#endif
 
 
+#if 0
 PathSet outputPaths(const DerivationOutputs & outputs)
 {
     PathSet paths;
+    /* XXX */
     for (DerivationOutputs::const_iterator i = outputs.begin();
          i != outputs.end(); ++i)
         paths.insert(i->second.path);
     return paths;
 }
+#endif
 
 
 string showPaths(const PathSet & paths)
@@ -713,6 +732,9 @@ string showPaths(const PathSet & paths)
 
 DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 {
+    return rpDecline;
+    
+#if 0    
     Path buildHook = getEnv("NIX_BUILD_HOOK");
     if (buildHook == "") return rpDecline;
     buildHook = absPath(buildHook);
@@ -861,6 +883,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
     }
 
     else throw Error(format("bad hook reply `%1%'") % reply);
+#endif
 }
 
 
@@ -881,11 +904,27 @@ void DerivationGoal::terminateBuildHook()
 
 bool DerivationGoal::prepareBuild()
 {
+    for (DerivationOutputs::iterator i = drv.outputs.begin();
+         i != drv.outputs.end(); ++i)
+    {
+        Path tmpPath = makeRandomStorePath(namePartOf(i->second.eqClass));
+        printMsg(lvlError, format("mapping output id `%1%', class `%2%' to `%3%'")
+            % i->first % i->second.eqClass % tmpPath);
+        assert(i->second.eqClass.size() == tmpPath.size());
+        rewrites[hashPartOf(i->second.eqClass)] = hashPartOf(tmpPath);
+        tmpOutputs[i->second.eqClass] = tmpPath;
+    }
+    
     /* Obtain locks on all output paths.  The locks are automatically
        released when we exit this function or Nix crashes. */
     /* !!! BUG: this could block, which is not allowed. */
+#if 0
+    /* !!! acquire lock on the derivation or something? or on a
+       pseudo-path representing the output equivalence class? */
     outputLocks.lockPaths(outputPaths(drv.outputs));
+#endif
 
+#if 0    
     /* Now check again whether the outputs are valid.  This is because
        another process may have started building in parallel.  After
        it has finished and released the locks, we can (and should)
@@ -907,10 +946,12 @@ bool DerivationGoal::prepareBuild()
             format("derivation `%1%' is blocked by its output paths")
             % drvPath);
     }
+#endif    
 
     /* Gather information necessary for computing the closure and/or
        running the build hook. */
-    
+
+#if 0    
     /* The outputs are referenceable paths. */
     for (DerivationOutputs::iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
@@ -948,6 +989,7 @@ bool DerivationGoal::prepareBuild()
     debug(format("added input paths %1%") % showPaths(inputPaths));
 
     allPaths.insert(inputPaths.begin(), inputPaths.end());
+#endif    
 
     return true;
 }
@@ -956,7 +998,7 @@ bool DerivationGoal::prepareBuild()
 void DerivationGoal::startBuilder()
 {
     startNest(nest, lvlInfo,
-        format("building path(s) %1%") % showPaths(outputPaths(drv.outputs)))
+        format("building path(s) XXX") /* % showPaths(outputPaths(drv.outputs)) */)
     
     /* Right platform? */
     if (drv.platform != thisSystem)
@@ -966,6 +1008,7 @@ void DerivationGoal::startBuilder()
 
     /* If any of the outputs already exist but are not registered,
        delete them. */
+#if 0    
     for (DerivationOutputs::iterator i = drv.outputs.begin(); 
          i != drv.outputs.end(); ++i)
     {
@@ -977,6 +1020,7 @@ void DerivationGoal::startBuilder()
             deletePath(path);
         }
     }
+#endif
 
     /* Construct the environment passed to the builder. */
     typedef map<string, string> Environment;
@@ -1004,7 +1048,7 @@ void DerivationGoal::startBuilder()
     /* Add all bindings specified in the derivation. */
     for (StringPairs::iterator i = drv.env.begin();
          i != drv.env.end(); ++i)
-        env[i->first] = i->second;
+        env[i->first] = rewriteHashes(i->second, rewrites);
 
     /* Create a temporary directory where the build will take
        place. */
@@ -1061,7 +1105,8 @@ void DerivationGoal::startBuilder()
             Strings envStrs;
             for (Environment::const_iterator i = env.begin();
                  i != env.end(); ++i)
-                envStrs.push_back(i->first + "=" + i->second);
+                envStrs.push_back(i->first + "=" +
+                    rewriteHashes(i->second, rewrites));
             const char * * envArr = strings2CharPtrs(envStrs);
 
             /* Execute the program.  This should not return. */
@@ -1089,7 +1134,19 @@ void DerivationGoal::computeClosure()
 {
     map<Path, PathSet> allReferences;
     map<Path, Hash> contentHashes;
+
+    for (OutputMap::iterator i = tmpOutputs.begin();
+         i != tmpOutputs.end(); ++i)
+    {
+        /* Rewrite each output to a name matching its content hash.
+           I.e., enforce the hash invariant: the hash part of a store
+           path matches the contents at that path. */
+        Path finalPath = addToStore(i->second, hashPartOf(i->second),
+            namePartOf(i->second));
+        printMsg(lvlError, format("produced final path `%1%'") % finalPath);
+    }
     
+#if 0    
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
        output paths read-only. */
@@ -1175,7 +1232,9 @@ void DerivationGoal::computeClosure()
            if we could combine this with filterReferences(). */
         contentHashes[path] = hashPath(htSHA256, path);
     }
+#endif
 
+#if 0    
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  This is wrapped in one
        database transaction to ensure that if we crash, either
@@ -1198,7 +1257,8 @@ void DerivationGoal::computeClosure()
             drvPath);
     }
     txn.commit();
-
+#endif
+    
     /* It is now safe to delete the lock files, since all future
        lockers will see that the output paths are valid; they will not
        create new lock files with the same names as the old (unlinked)
@@ -1280,6 +1340,7 @@ void DerivationGoal::writeLog(int fd,
 
 PathSet DerivationGoal::checkPathValidity(bool returnValid)
 {
+#if 0    
     PathSet result;
     for (DerivationOutputs::iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
@@ -1289,6 +1350,7 @@ PathSet DerivationGoal::checkPathValidity(bool returnValid)
             if (!returnValid) result.insert(i->second.path);
         }
     return result;
+#endif
 }
 
 
@@ -1302,11 +1364,13 @@ private:
     /* The store path that should be realised through a substitute. */
     Path storePath;
 
+#if 0    
     /* The remaining substitutes for this path. */
     Substitutes subs;
 
     /* The current substitute. */
     Substitute sub;
+#endif    
 
     /* Outgoing references for this path. */
     PathSet references;
@@ -1375,10 +1439,12 @@ void SubstitutionGoal::init()
         return;
     }
 
+#if 0
     /* Read the substitutes. */
     subs = querySubstitutes(noTxn, storePath);
+#endif
 
-    /* To maintain the closure invairant, we first have to realise the
+    /* To maintain the closure invariant, we first have to realise the
        paths referenced by this one. */
     queryReferences(noTxn, storePath, references);
 
@@ -1414,7 +1480,7 @@ void SubstitutionGoal::tryNext()
 {
     trace("trying next substitute");
 
-    if (subs.size() == 0) {
+    if (true /* !!! subs.size() == 0 */) {
         /* None left.  Terminate this goal and let someone else deal
            with it. */
         printMsg(lvlError,
@@ -1423,8 +1489,10 @@ void SubstitutionGoal::tryNext()
         amDone(false);
         return;
     }
+#if 0    
     sub = subs.front();
     subs.pop_front();
+#endif
 
     /* Wait until we can run the substitute program. */
     state = &SubstitutionGoal::tryToRun;
@@ -1434,6 +1502,7 @@ void SubstitutionGoal::tryNext()
 
 void SubstitutionGoal::tryToRun()
 {
+#if 0
     trace("trying to run");
 
     /* Make sure that we are allowed to start a build. */
@@ -1505,11 +1574,13 @@ void SubstitutionGoal::tryToRun()
         pid, logPipe.readSide, true);
 
     state = &SubstitutionGoal::finished;
+#endif    
 }
 
 
 void SubstitutionGoal::finished()
 {
+#if 0    
     trace("substitute finished");
 
     /* Since we got an EOF on the logger pipe, the substitute is
@@ -1566,6 +1637,7 @@ void SubstitutionGoal::finished()
         format("substitution of path `%1%' succeeded") % storePath);
 
     amDone();
+#endif
 }
 
 

@@ -29,10 +29,13 @@ void computeFSClosure(const Path & storePath,
 }
 
 
- Path findOutput(const Derivation & drv, string id)
+Path findOutput(const Derivation & drv, string id)
 {
+    assert(0);
+#if 0    
     for (DerivationOutputs::const_iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
         if (i->first == id) return i->second.path;
     throw Error(format("derivation has no output `%1%'") % id);
+#endif    
 }

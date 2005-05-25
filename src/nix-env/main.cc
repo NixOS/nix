@@ -735,12 +735,14 @@ static void opQuery(Globals & globals,
         Strings columns;
         
         if (printStatus) {
+#if 0            
             Substitutes subs = querySubstitutes(noTxn, i->queryDrvPath(globals.state));
+#endif            
             columns.push_back(
                 (string) (installed.find(i->queryOutPath(globals.state))
                     != installed.end() ? "I" : "-")
                 + (isValidPath(i->queryOutPath(globals.state)) ? "P" : "-")
-                + (subs.size() > 0 ? "S" : "-"));
+                + (/* XXX subs.size() > 0 */ false ? "S" : "-"));
         }
 
         if (printName) columns.push_back(i->name);

@@ -140,6 +140,26 @@ void dumpPath(const Path & path, DumpSink & sink)
 }
 
 
+void makeSingletonArchive(const string & contents, DumpSink & sink)
+{
+    /* !!! hacky; have to keep this synchronised with dumpPath().  It
+       would be better to parameterise dumpPath() with a file system
+       "traverser". */
+    writeString(archiveVersion1, sink);
+    writeString("(", sink);
+    writeString("type", sink);
+    writeString("regular", sink);
+
+    unsigned int size = contents.size();
+    writeString("contents", sink);
+    writeInt(size, sink);
+    sink((const unsigned char *) contents.c_str(), size);
+    writePadding(size, sink);
+
+    writeString(")", sink);
+}
+
+
 static Error badArchive(string s)
 {
     return Error("bad archive: " + s);

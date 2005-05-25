@@ -338,12 +338,14 @@ void collectGarbage(GCAction action, PathSet & result)
         for (PathSet::iterator i = livePaths.begin();
              i != livePaths.end(); ++i)
         {
+#if 0            
             /* Note that the deriver need not be valid (e.g., if we
                previously ran the collector with `gcKeepDerivations'
                turned off). */
             Path deriver = queryDeriver(noTxn, *i);
             if (deriver != "" && isValidPath(deriver))
                 computeFSClosure(deriver, livePaths);
+#endif            
         }
     }
 
@@ -353,10 +355,13 @@ void collectGarbage(GCAction action, PathSet & result)
              i != livePaths.end(); ++i)
             if (isDerivation(*i)) {
                 Derivation drv = derivationFromPath(*i);
+                assert(0);
+#if 0                
                 for (DerivationOutputs::iterator j = drv.outputs.begin();
                      j != drv.outputs.end(); ++j)
                     if (isValidPath(j->second.path))
                         computeFSClosure(j->second.path, livePaths);
+#endif
             }
     }
 

@@ -16,10 +16,3 @@ derivations-ast.cc derivations-ast.hh: ../aterm-helper.pl derivations-ast.def
 	$(perl) ../aterm-helper.pl derivations-ast.hh derivations-ast.cc < derivations-ast.def
 
 derivations.cc store.cc: derivations-ast.hh
-
-
-bin_PROGRAMS = testprog
-
-testprog_SOURCES = store-new.cc
-testprog_LDADD = ../libutil/libutil.a \
- ../boost/format/libformat.a ${bdb_lib} ${aterm_lib}

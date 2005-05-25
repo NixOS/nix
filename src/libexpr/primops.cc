@@ -71,8 +71,8 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
         {
             return hashString(htSHA256, "fixed:out:"
                 + i->second.hashAlgo + ":"
-                + i->second.hash + ":"
-                + i->second.path);
+                + i->second.hash /* !!! + ":"
+                                    + i->second.path */);
         }
     }
 
@@ -319,8 +319,10 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
         
     /* Use the masked derivation expression to compute the output
        path. */
-    Path outPath = makeStorePath("output:out",
-        hashDerivationModulo(state, drv), drvName);
+    /* XXX */
+    Path outPath;
+    PathHash outPathHash;
+    makeStorePath(hashDerivationModulo(state, drv), drvName, outPath, outPathHash);
 
     /* Construct the final derivation store expression. */
     drv.env["out"] = outPath;

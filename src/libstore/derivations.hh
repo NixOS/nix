@@ -13,15 +13,15 @@ const string drvExtension = ".drv";
 
 struct DerivationOutput
 {
-    Path path;
+    OutputEqClass eqClass;
     string hashAlgo; /* hash used for expected hash computation */
     string hash; /* expected hash, may be null */
     DerivationOutput()
     {
     }
-    DerivationOutput(Path path, string hashAlgo, string hash)
+    DerivationOutput(OutputEqClass eqClass, string hashAlgo, string hash)
     {
-        this->path = path;
+        this->eqClass = eqClass;
         this->hashAlgo = hashAlgo;
         this->hash = hash;
     }

@@ -39,6 +39,19 @@ static TableId dbReferences = 0;
    This table is just the reverse mapping of dbReferences. */
 static TableId dbReferers = 0;
 
+/* dbEquivalences :: OutputEqClass -> [(TrustId, Path)]
+
+   Lists the output paths that have been produced for each extension
+   class; i.e., the extension of an extension class. */
+static TableId dbEquivalences = 0;
+
+/* dbEquivalenceClass :: Path -> OutputEqClass
+
+   Lists for each output path the extension class that it is in. */
+static TableId dbEquivalenceClass = 0;
+
+
+#if 0
 /* dbSubstitutes :: Path -> [[Path]]
 
    Each pair $(p, subs)$ tells Nix that it can use any of the
@@ -61,13 +74,16 @@ static TableId dbSubstitutes = 0;
    only be multiple such paths for fixed-output derivations (i.e.,
    derivations specifying an expected hash). */
 static TableId dbDerivers = 0;
+#endif
 
 
+#if 0
 bool Substitute::operator == (const Substitute & sub) const
 {
     return program == sub.program
         && args == sub.args;
 }
+#endif
 
 
 static void upgradeStore();
@@ -87,8 +103,12 @@ void openDB()
     dbValidPaths = nixDB.openTable("validpaths");
     dbReferences = nixDB.openTable("references");
     dbReferers = nixDB.openTable("referers");
+#if 0    
     dbSubstitutes = nixDB.openTable("substitutes");
     dbDerivers = nixDB.openTable("derivers");
+#endif
+    dbEquivalences = nixDB.openTable("equivalences");
+    dbEquivalenceClass = nixDB.openTable("equivalence-class");
 
     int curSchema = 0;
     Path schemaFN = nixDBPath + "/schema";
@@ -119,6 +139,60 @@ void createStoreTransaction(Transaction & txn)
     Transaction txn2(nixDB);
     txn2.moveTo(txn);
 }
+
+
+
+/* Path hashes. */
+
+const unsigned int pathHashLen = 32; /* characters */
+const string nullPathHashRef(pathHashLen, 0);
+
+
+PathHash::PathHash()
+{
+    rep = nullPathHashRef;
+}
+
+
+PathHash::PathHash(const Hash & h)
+{
+    assert(h.type == htSHA256);
+    rep = printHash32(compressHash(h, 20));
+}
+
+
+PathHash::PathHash(const string & h)
+{
+    /* !!! hacky; check whether this is a valid 160 bit hash */
+    assert(h.size() == pathHashLen);
+    parseHash32(htSHA1, h); 
+    rep = h;
+}
+
+
+string PathHash::toString() const
+{
+    return rep;
+}
+
+
+bool PathHash::isNull() const
+{
+    return rep == nullPathHashRef;
+}
+
+
+bool PathHash::operator ==(const PathHash & hash2) const
+{
+    return rep == hash2.rep;
+}
+
+
+bool PathHash::operator <(const PathHash & hash2) const
+{
+    return rep < hash2.rep;
+}
+
 
 
 /* Path copying. */
@@ -167,12 +241,14 @@ void copyPath(const Path & src, const Path & dst)
 }
 
 
+
 bool isInStore(const Path & path)
 {
     return path[0] == '/'
         && string(path, 0, nixStore.size()) == nixStore
         && path.size() >= nixStore.size() + 2
-        && path[nixStore.size()] == '/';
+        && path[nixStore.size()] == '/'
+        && path[nixStore.size() + 1 + pathHashLen] == '-';
 }
 
 
@@ -199,6 +275,20 @@ Path toStorePath(const Path & path)
         return path;
     else
         return Path(path, 0, slash);
+}
+
+
+PathHash hashPartOf(const Path & path)
+{
+    assertStorePath(path);
+    return PathHash(string(path, nixStore.size() + 1, pathHashLen));
+}
+
+
+string namePartOf(const Path & path)
+{
+    assertStorePath(path);
+    return string(path, nixStore.size() + 1 + pathHashLen + 1);
 }
 
 
@@ -275,14 +365,16 @@ bool isValidPath(const Path & path)
 }
 
 
+#if 0
 static Substitutes readSubstitutes(const Transaction & txn,
     const Path & srcPath);
+#endif
 
 
 static bool isRealisablePath(const Transaction & txn, const Path & path)
 {
     return isValidPathTxn(txn, path)
-        || readSubstitutes(txn, path).size() > 0;
+        /* !!! || readSubstitutes(txn, path).size() > 0 */;
 }
 
 
@@ -356,6 +448,14 @@ void queryReferers(const Transaction & txn,
 }
 
 
+void queryOutputEqMembers(const Transaction & txn,
+    const OutputEqClass & eqClass, OutputEqMembers & members)
+{
+    assert(0);
+}
+
+
+#if 0
 void setDeriver(const Transaction & txn, const Path & storePath,
     const Path & deriver)
 {
@@ -378,8 +478,10 @@ Path queryDeriver(const Transaction & txn, const Path & storePath)
     else
         return "";
 }
+#endif
 
 
+#if 0
 const int substituteVersion = 2;
 
 
@@ -488,6 +590,7 @@ void clearSubstitutes()
     
     txn.commit();
 }
+#endif
 
 
 static void setHash(const Transaction & txn, const Path & storePath,
@@ -563,7 +666,9 @@ void registerValidPaths(const Transaction & txn,
                 throw Error(format("cannot register path `%1%' as valid, since its reference `%2%' is invalid")
                     % i->path % *j);
 
+#if 0
         setDeriver(txn, i->path, i->deriver);
+#endif
     }
 }
 
@@ -578,30 +683,40 @@ static void invalidatePath(Transaction & txn, const Path & path)
        inverse `referers' entries, and the `derivers' entry; but only
        if there are no substitutes for this path.  This maintains the
        cleanup invariant. */
-    if (querySubstitutes(txn, path).size() == 0) {
+    if (1 /*querySubstitutes(txn, path).size() == 0 !!! */) {
         setReferences(txn, path, PathSet());
-        nixDB.delPair(txn, dbDerivers, path);
+        // !!!        nixDB.delPair(txn, dbDerivers, path);
     }
     
     nixDB.delPair(txn, dbValidPaths, path);
 }
 
 
-Path makeStorePath(const string & type,
-    const Hash & hash, const string & suffix)
+void makeStorePath(const Hash & contentHash, const string & suffix,
+    Path & path, PathHash & pathHash)
 {
-    /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
-    string s = type + ":sha256:" + printHash(hash) + ":"
-        + nixStore + ":" + suffix;
-
     checkStoreName(suffix);
 
-    return nixStore + "/"
-        + printHash32(compressHash(hashString(htSHA256, s), 20))
-        + "-" + suffix;
+    /* e.g., "sha256:1abc...:/nix/store:foo.tar.gz" */
+    string s = "sha256:" + printHash(contentHash) + ":"
+        + nixStore + ":" + suffix;
+
+    pathHash = PathHash(hashString(htSHA256, s));
+    
+    path = nixStore + "/" + pathHash.toString() + "-" + suffix;
 }
 
 
+Path makeRandomStorePath(const string & suffix)
+{
+    Hash hash(htSHA256);
+    for (unsigned int i = 0; i < hash.hashSize; ++i)
+        hash.hash[i] = rand() % 256; // !!! improve
+    return nixStore + "/" + PathHash(hash).toString() + "-" + suffix;
+}
+
+
+#if 0
 Path makeFixedOutputPath(bool recursive,
     string hashAlgo, Hash hash, string name)
 {
@@ -612,37 +727,88 @@ Path makeFixedOutputPath(bool recursive,
         + "");
     return makeStorePath("output:out", h, name);
 }
+#endif
 
 
-static Path _addToStore(bool fixed, bool recursive,
-    string hashAlgo, const Path & _srcPath)
+typedef map<PathHash, PathHash> HashRewrites;
+
+string rewriteHashes(string s, const HashRewrites & rewrites,
+    vector<int> & positions)
 {
-    Path srcPath(absPath(_srcPath));
-    debug(format("adding `%1%' to the store") % srcPath);
-
-    Hash h(htSHA256);
+    for (HashRewrites::const_iterator i = rewrites.begin();
+         i != rewrites.end(); ++i)
     {
-        SwitchToOriginalUser sw;
-        h = hashPath(htSHA256, srcPath);
-    }
+        string from = i->first.toString(), to = i->second.toString();
 
-    string baseName = baseNameOf(srcPath);
+        assert(from.size() == to.size());
 
-    Path dstPath;
-    
-    if (fixed) {
-
-        HashType ht(parseHashType(hashAlgo));
-        Hash h2(ht);
-        {
-            SwitchToOriginalUser sw;
-            h2 = recursive ? hashPath(ht, srcPath) : hashFile(ht, srcPath);
+        unsigned int j = 0;
+        while ((j = s.find(from, j)) != string::npos) {
+            debug(format("rewriting @ %1%") % j);
+            positions.push_back(j);
+            s.replace(j, to.size(), to);
         }
-        
-        dstPath = makeFixedOutputPath(recursive, hashAlgo, h2, baseName);
     }
-        
-    else dstPath = makeStorePath("source", h, baseName);
+
+    return s;
+}
+
+
+string rewriteHashes(const string & s, const HashRewrites & rewrites)
+{
+    vector<int> dummy;
+    return rewriteHashes(s, rewrites, dummy);
+}
+
+
+static Hash hashModulo(string s, const PathHash & modulus)
+{
+    vector<int> positions;
+    
+    if (!modulus.isNull()) {
+        /* Zero out occurences of `modulus'. */
+        HashRewrites rewrites;
+        rewrites[modulus] = PathHash(); /* = null hash */
+        s = rewriteHashes(s, rewrites, positions);
+    }
+
+    string positionPrefix;
+    
+    for (vector<int>::iterator i = positions.begin();
+         i != positions.end(); ++i)
+        positionPrefix += (format("|%1%") % *i).str();
+
+    positionPrefix += "||";
+
+    debug(format("positions %1%") % positionPrefix);
+    
+    return hashString(htSHA256, positionPrefix + s);
+}
+
+
+static Path _addToStore(const string & suffix, string dump,
+    const PathHash & selfHash, const PathSet & references)
+{
+    /* Hash the contents, modulo the previous hash reference (if it
+       had one). */
+    Hash contentHash = hashModulo(dump, selfHash);
+
+    /* Construct the new store path. */ 
+    Path dstPath;
+    PathHash pathHash;
+    makeStorePath(contentHash, suffix, dstPath, pathHash);
+
+    /* If the contents had a previous hash reference, rewrite those
+       references to the new hash. */
+    if (!selfHash.isNull()) {
+        HashRewrites rewrites;
+        rewrites[selfHash] = pathHash;
+        vector<int> positions;
+        dump = rewriteHashes(dump, rewrites, positions);
+        /* !!! debug code, remove */
+        PathHash contentHash2 = hashModulo(dump, pathHash);
+        assert(contentHash2 == contentHash);
+    }
 
     if (!readOnlyMode) addTempRoot(dstPath);
 
@@ -659,17 +825,13 @@ static Path _addToStore(bool fixed, bool recursive,
 
             if (pathExists(dstPath)) deletePath(dstPath);
 
-            copyPath(srcPath, dstPath);
-
-            Hash h2 = hashPath(htSHA256, dstPath);
-            if (h != h2)
-                throw Error(format("contents of `%1%' changed while copying it to `%2%' (%3% -> %4%)")
-                    % srcPath % dstPath % printHash(h) % printHash(h2));
+            CopySource source(dump);
+            restorePath(dstPath, source);
 
             canonicalisePathMetaData(dstPath);
             
             Transaction txn(nixDB);
-            registerValidPath(txn, dstPath, h, PathSet(), "");
+            registerValidPath(txn, dstPath, contentHash, references, "");
             txn.commit();
         }
 
@@ -680,51 +842,38 @@ static Path _addToStore(bool fixed, bool recursive,
 }
 
 
-Path addToStore(const Path & srcPath)
+Path addToStore(const Path & _srcPath, const PathHash & selfHash,
+    const string & suffix)
 {
-    return _addToStore(false, false, "", srcPath);
+    Path srcPath(absPath(_srcPath));
+    debug(format("adding `%1%' to the store") % srcPath);
+
+    CopySink sink;
+    {
+        SwitchToOriginalUser sw;
+        dumpPath(srcPath, sink);
+    }
+
+    return _addToStore(suffix == "" ? baseNameOf(srcPath) : suffix,
+        sink.s, selfHash, PathSet());
 }
 
 
+#if 0
 Path addToStoreFixed(bool recursive, string hashAlgo, const Path & srcPath)
 {
     return _addToStore(true, recursive, hashAlgo, srcPath);
 }
+#endif
 
 
 Path addTextToStore(const string & suffix, const string & s,
     const PathSet & references)
 {
-    Hash hash = hashString(htSHA256, s);
-
-    Path dstPath = makeStorePath("text", hash, suffix);
+    CopySink sink;
+    makeSingletonArchive(s, sink);
     
-    if (!readOnlyMode) addTempRoot(dstPath);
-
-    if (!readOnlyMode && !isValidPath(dstPath)) {
-
-        PathSet lockPaths;
-        lockPaths.insert(dstPath);
-        PathLocks outputLock(lockPaths);
-
-        if (!isValidPath(dstPath)) {
-
-            if (pathExists(dstPath)) deletePath(dstPath);
-
-            writeStringToFile(dstPath, s);
-
-            canonicalisePathMetaData(dstPath);
-            
-            Transaction txn(nixDB);
-            registerValidPath(txn, dstPath,
-                hashPath(htSHA256, dstPath), references, "");
-            txn.commit();
-        }
-
-        outputLock.setDeletion(true);
-    }
-
-    return dstPath;
+    return _addToStore(suffix, sink.s, PathHash(), references);
 }
 
 
@@ -751,6 +900,7 @@ void deleteFromStore(const Path & _path)
 
 void verifyStore(bool checkContents)
 {
+#if 0    
     Transaction txn(nixDB);
 
     Paths paths;
@@ -891,6 +1041,7 @@ void verifyStore(bool checkContents)
     }
 
     txn.commit();
+#endif    
 }
 
 
@@ -902,6 +1053,7 @@ void verifyStore(bool checkContents)
 static void upgradeStore()
 {
     printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
+#if 0    
 
     Transaction txn(nixDB);
 
@@ -982,4 +1134,5 @@ static void upgradeStore()
 
     /* !!! maybe this transaction is way too big */
     txn.commit();
+#endif    
 }

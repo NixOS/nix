@@ -48,6 +48,10 @@ struct DumpSink
 
 void dumpPath(const Path & path, DumpSink & sink);
 
+/* Make an archive consisting of a single non-executable regular
+   file, with specified string contents. */
+void makeSingletonArchive(const string & contents, DumpSink & sink);
+
 
 struct RestoreSource
 {

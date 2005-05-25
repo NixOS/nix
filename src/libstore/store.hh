@@ -12,6 +12,27 @@ using namespace std;
 const int nixSchemaVersion = 2;
 
 
+/* Path hashes are the hash components of store paths, e.g., the
+   `zvhgns772jpj68l40mq1jb74wpfsf0ma' in
+   `/nix/store/zvhgns772jpj68l40mq1jb74wpfsf0ma-glibc'.  These are
+   truncated SHA-256 hashes of the path contents,  */
+struct PathHash
+{
+private:
+    string rep;
+public:
+    PathHash();
+    PathHash(const Hash & h);
+    PathHash(const string & h);
+    string toString() const;
+    bool PathHash::isNull() const;
+    bool operator ==(const PathHash & hash2) const;
+    bool operator <(const PathHash & hash2) const;
+};
+
+
+
+#if 0
 /* A substitute is a program invocation that constructs some store
    path (typically by fetching it from somewhere, e.g., from the
    network). */
@@ -32,6 +53,37 @@ struct Substitute
 };
 
 typedef list<Substitute> Substitutes;
+#endif
+
+
+/* A trust identifier, which is a name of an entity involved in a
+   trust relation.  Right now this is just a user ID (e.g.,
+   `root'). */
+typedef string TrustId;
+
+
+/* An output path equivalence class.  They represent outputs of
+   derivations.  That is, a derivation can have several outputs (e.g.,
+   `out', `lib', `man', etc.), each of which maps to a output path
+   equivalence class.  They can map to a number of concrete paths,
+   depending on what users built the derivation.
+
+   Equivalence classes are actually "placeholder" store paths that
+   never get built.  They do occur in derivations however in
+   command-line arguments and environment variables, but get
+   substituted with concrete paths when we actually build. */
+typedef Path OutputEqClass;
+
+
+/* A member of an output path equivalence class, i.e., a store path
+   that has been produced by a certain derivation. */
+struct OutputEqMember
+{
+    TrustId trustId;
+    Path path;
+};
+
+typedef list<OutputEqMember> OutputEqMembers;
 
 
 /* Open the database environment. */
@@ -43,9 +95,12 @@ void initDB();
 /* Get a transaction object. */
 void createStoreTransaction(Transaction & txn);
 
+
 /* Copy a path recursively. */
 void copyPath(const Path & src, const Path & dst);
 
+
+#if 0
 /* Register a substitute. */
 void registerSubstitute(const Transaction & txn,
     const Path & srcPath, const Substitute & sub);
@@ -55,6 +110,8 @@ Substitutes querySubstitutes(const Transaction & txn, const Path & srcPath);
 
 /* Deregister all substitutes. */
 void clearSubstitutes();
+#endif
+
 
 /* Register the validity of a path, i.e., that `path' exists, that the
    paths referenced by it exists, and in the case of an output path of
@@ -79,6 +136,7 @@ typedef list<ValidPathInfo> ValidPathInfos;
 void registerValidPaths(const Transaction & txn,
     const ValidPathInfos & infos);
 
+
 /* Throw an exception if `path' is not directly in the Nix store. */
 void assertStorePath(const Path & path);
 
@@ -90,6 +148,11 @@ void checkStoreName(const string & name);
 /* Chop off the parts after the top-level store name, e.g.,
    /nix/store/abcd-foo/bar => /nix/store/abcd-foo. */
 Path toStorePath(const Path & path);
+
+PathHash hashPartOf(const Path & path);
+
+string namePartOf(const Path & path);
+
 
 /* "Fix", or canonicalise, the meta-data of the files in a store path
    after it has been built.  In particular:
@@ -104,6 +167,7 @@ void canonicalisePathMetaData(const Path & path);
 /* Checks whether a path is valid. */ 
 bool isValidPathTxn(const Transaction & txn, const Path & path);
 bool isValidPath(const Path & path);
+
 
 /* Queries the hash of a valid path. */ 
 Hash queryPathHash(const Path & path);
@@ -123,6 +187,10 @@ void queryReferences(const Transaction & txn,
 void queryReferers(const Transaction & txn,
     const Path & storePath, PathSet & referers);
 
+void queryOutputEqMembers(const Transaction & txn,
+    const OutputEqClass & eqClass, OutputEqMembers & members);
+    
+#if 0
 /* Sets the deriver of a store path.  Use with care! */
 void setDeriver(const Transaction & txn, const Path & storePath,
     const Path & deriver);
@@ -130,26 +198,46 @@ void setDeriver(const Transaction & txn, const Path & storePath,
 /* Query the deriver of a store path.  Return the empty string if no
    deriver has been set. */
 Path queryDeriver(const Transaction & txn, const Path & storePath);
+#endif
+
 
 /* Constructs a unique store path name. */
-Path makeStorePath(const string & type,
-    const Hash & hash, const string & suffix);
-    
+void makeStorePath(const Hash & contentHash, const string & suffix,
+    Path & path, PathHash & pathHash);
+
+/* Constructs a random store path name.  Only to be used for temporary
+   build outputs, since these will violate the hash invariant. */
+Path makeRandomStorePath(const string & suffix);
+
+
+/* Hash rewriting. */
+typedef map<PathHash, PathHash> HashRewrites;
+
+string rewriteHashes(string s, const HashRewrites & rewrites,
+    vector<int> & positions);
+
+string rewriteHashes(const string & s, const HashRewrites & rewrites);
+
+
 /* Copy the contents of a path to the store and register the validity
    the resulting path.  The resulting path is returned. */
-Path addToStore(const Path & srcPath);
+Path addToStore(const Path & srcPath, const PathHash & selfHash = PathHash(),
+    const string & suffix = "");
 
+#if 0
 /* Like addToStore(), but for pre-adding the outputs of fixed-output
    derivations. */
 Path addToStoreFixed(bool recursive, string hashAlgo, const Path & srcPath);
 
 Path makeFixedOutputPath(bool recursive,
     string hashAlgo, Hash hash, string name);
+#endif
 
 /* Like addToStore, but the contents written to the output path is a
    regular file containing the given string. */
 Path addTextToStore(const string & suffix, const string & s,
     const PathSet & references);
+
 
 /* Delete a value from the nixStore directory. */
 void deleteFromStore(const Path & path);

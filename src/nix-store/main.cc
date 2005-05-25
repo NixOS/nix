@@ -96,6 +96,7 @@ static void opAdd(Strings opFlags, Strings opArgs)
 }
 
 
+#if 0
 /* Preload the output of a fixed-output derivation into the Nix
    store. */
 static void opAddFixed(Strings opFlags, Strings opArgs)
@@ -141,8 +142,10 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     cout << format("%1%\n") %
         makeFixedOutputPath(recursive, hashAlgo, h, name);
 }
+#endif
 
 
+#if 0
 /* Place in `paths' the set of paths that are required to `realise'
    the given store path, i.e., all paths necessary for valid
    deployment of the path.  For a derivation, this is the union of
@@ -393,8 +396,10 @@ static void opQuery(Strings opFlags, Strings opArgs)
             abort();
     }
 }
+#endif
 
 
+#if 0
 static void opRegisterSubstitutes(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
@@ -441,6 +446,7 @@ static void opClearSubstitutes(Strings opFlags, Strings opArgs)
 
     clearSubstitutes();
 }
+#endif
 
 
 static void opRegisterValidity(Strings opFlags, Strings opArgs)
@@ -602,6 +608,7 @@ void run(Strings args)
             op = opRealise;
         else if (arg == "--add" || arg == "-A")
             op = opAdd;
+#if 0        
         else if (arg == "--add-fixed")
             op = opAddFixed;
         else if (arg == "--print-fixed-path")
@@ -612,6 +619,7 @@ void run(Strings args)
             op = opRegisterSubstitutes;
         else if (arg == "--clear-substitutes")
             op = opClearSubstitutes;
+#endif            
         else if (arg == "--register-validity")
             op = opRegisterValidity;
         else if (arg == "--check-validity")

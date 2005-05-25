@@ -62,12 +62,12 @@ Derivation parseDerivation(ATerm t)
         throwBadDrv(t);
 
     for (ATermIterator i(outs); i; ++i) {
-        ATerm id, path, hashAlgo, hash;
-        if (!matchDerivationOutput(*i, id, path, hashAlgo, hash))
+        ATerm id, eqClass, hashAlgo, hash;
+        if (!matchDerivationOutput(*i, id, eqClass, hashAlgo, hash))
             throwBadDrv(t);
         DerivationOutput out;
-        out.path = aterm2String(path);
-        checkPath(out.path);
+        out.eqClass = aterm2String(eqClass);
+        // !!!        checkPath(out.path);
         out.hashAlgo = aterm2String(hashAlgo);
         out.hash = aterm2String(hash);
         drv.outputs[aterm2String(id)] = out;
@@ -125,7 +125,7 @@ ATerm unparseDerivation(const Derivation & drv)
         outputs = ATinsert(outputs,
             makeDerivationOutput(
                 toATerm(i->first),
-                toATerm(i->second.path),
+                toATerm(i->second.eqClass),
                 toATerm(i->second.hashAlgo),
                 toATerm(i->second.hash)));
 
