@@ -4,6 +4,7 @@
 #include "globals.hh"
 #include "build.hh"
 #include "gc.hh"
+#include "misc.hh"
 #include "archive.hh"
 #include "shared.hh"
 #include "dotgraph.hh"
@@ -45,7 +46,8 @@ static Path realisePath(const Path & path)
         PathSet paths;
         paths.insert(path);
         buildDerivations(paths);
-        Path outPath = findOutput(derivationFromPath(path), "out");
+        Path outPath = findTrustedEqClassMember(
+            findOutputEqClass(derivationFromPath(path), "out"), currentTrustId);
         
         if (gcRoot == "")
             printGCWarning();

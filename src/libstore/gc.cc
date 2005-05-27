@@ -2,6 +2,7 @@
 #include "gc.hh"
 #include "build.hh"
 #include "pathlocks.hh"
+#include "misc.hh"
 
 #include <boost/shared_ptr.hpp>
 

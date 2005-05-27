@@ -226,7 +226,7 @@ string rewriteHashes(const string & s, const HashRewrites & rewrites);
 /* Copy the contents of a path to the store and register the validity
    the resulting path.  The resulting path is returned. */
 Path addToStore(const Path & srcPath, const PathHash & selfHash = PathHash(),
-    const string & suffix = "");
+    const string & suffix = "", const PathSet & references = PathSet());
 
 #if 0
 /* Like addToStore(), but for pre-adding the outputs of fixed-output

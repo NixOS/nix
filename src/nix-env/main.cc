@@ -3,6 +3,7 @@
 #include "globals.hh"
 #include "build.hh"
 #include "gc.hh"
+#include "misc.hh"
 #include "shared.hh"
 #include "parser.hh"
 #include "eval.hh"
@@ -383,7 +384,6 @@ static void queryInstSources(EvalState & state,
            (import ./foo.nix)' = `(import ./foo.nix).bar'. */
         case srcNixExprs: {
                 
-
             Expr e1 = parseExprFromFile(state,
                 absPath(instSource.nixExprPath));
 
@@ -416,7 +416,10 @@ static void queryInstSources(EvalState & state,
 
                 if (isDerivation(*i)) {
                     elem.setDrvPath(*i);
-                    elem.setOutPath(findOutput(derivationFromPath(*i), "out"));
+                    elem.setOutPath(
+                        /* XXX check this; may not give a result */
+                        findTrustedEqClassMember(
+                            findOutputEqClass(derivationFromPath(*i), "out"), currentTrustId));
                     if (name.size() >= drvExtension.size() &&
                         string(name, name.size() - drvExtension.size()) == drvExtension)
                         name = string(name, 0, name.size() - drvExtension.size());

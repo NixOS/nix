@@ -143,6 +143,17 @@ static void initAndRun(int argc, char * * argv)
     /* Random number generator needed by makeRandomStorePath(); !!!
        improve. */
     srand(time(0));
+
+    /* Set the trust ID to the user name. */
+    currentTrustId = getEnv("NIX_USER_ID"); /* !!! dangerous? */
+    if (currentTrustId == "") {
+        SwitchToOriginalUser sw;
+        uid_t uid = geteuid();
+        struct passwd * pw = getpwuid(uid);
+        if (!pw) throw Error(format("unknown user ID %1%, go away") % uid);
+        currentTrustId = pw->pw_name;
+    }
+    printMsg(lvlError, format("trust ID is `%1%'") % currentTrustId);
     
     /* Put the arguments in a vector. */
     Strings args, remaining;

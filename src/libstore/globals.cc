@@ -22,6 +22,8 @@ unsigned int maxBuildJobs = 1;
 
 bool readOnlyMode = false;
 
+string currentTrustId;
+
 
 static bool settingsRead = false;
 

@@ -52,6 +52,10 @@ extern unsigned int maxBuildJobs;
    database. */
 extern bool readOnlyMode;
 
+/* Current trust ID.  !!! Of course, this shouldn't be a global
+   variable. */
+extern string currentTrustId;
+
 
 string querySetting(const string & name, const string & def);
 

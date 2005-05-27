@@ -842,8 +842,8 @@ static Path _addToStore(const string & suffix, string dump,
 
     /* If the contents had a previous hash reference, rewrite those
        references to the new hash. */
+    HashRewrites rewrites;
     if (!selfHash.isNull()) {
-        HashRewrites rewrites;
         rewrites[selfHash] = pathHash;
         vector<int> positions;
         dump = rewriteHashes(dump, rewrites, positions);
@@ -871,9 +871,16 @@ static Path _addToStore(const string & suffix, string dump,
             restorePath(dstPath, source);
 
             canonicalisePathMetaData(dstPath);
+
+            /* Set the references for the new path.  Of course, any
+               hash rewrites have to be applied to the references,
+               too. */
+            PathSet references2;
+            for (PathSet::iterator i = references.begin(); i != references.end(); ++i)
+                references2.insert(rewriteHashes(*i, rewrites));
             
             Transaction txn(nixDB);
-            registerValidPath(txn, dstPath, contentHash, references, "");
+            registerValidPath(txn, dstPath, contentHash, references2, "");
             txn.commit();
         }
 
@@ -885,7 +892,7 @@ static Path _addToStore(const string & suffix, string dump,
 
 
 Path addToStore(const Path & _srcPath, const PathHash & selfHash,
-    const string & suffix)
+    const string & suffix, const PathSet & references)
 {
     Path srcPath(absPath(_srcPath));
     debug(format("adding `%1%' to the store") % srcPath);
@@ -897,7 +904,7 @@ Path addToStore(const Path & _srcPath, const PathHash & selfHash,
     }
 
     return _addToStore(suffix == "" ? baseNameOf(srcPath) : suffix,
-        sink.s, selfHash, PathSet());
+        sink.s, selfHash, references);
 }
 
 

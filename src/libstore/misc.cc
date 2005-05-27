@@ -29,13 +29,23 @@ void computeFSClosure(const Path & storePath,
 }
 
 
-Path findOutput(const Derivation & drv, string id)
+OutputEqClass findOutputEqClass(const Derivation & drv, const string & id)
 {
-    assert(0);
-#if 0    
-    for (DerivationOutputs::const_iterator i = drv.outputs.begin();
-         i != drv.outputs.end(); ++i)
-        if (i->first == id) return i->second.path;
-    throw Error(format("derivation has no output `%1%'") % id);
-#endif    
+    DerivationOutputs::const_iterator i = drv.outputs.find(id);
+    if (i == drv.outputs.end())
+        throw Error(format("derivation has no output `%1%'") % id);
+    return i->second.eqClass;
+}
+
+
+Path findTrustedEqClassMember(const OutputEqClass & eqClass,
+    const TrustId & trustId)
+{
+    OutputEqMembers members;
+    queryOutputEqMembers(noTxn, eqClass, members);
+
+    for (OutputEqMembers::iterator j = members.begin(); j != members.end(); ++j)
+        if (j->trustId == trustId || j->trustId == "root") return j->path;
+
+    return "";
 }

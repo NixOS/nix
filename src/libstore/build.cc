@@ -14,6 +14,7 @@
 #include "pathlocks.hh"
 #include "globals.hh"
 #include "gc.hh"
+#include "misc.hh"
 
 
 /* !!! TODO derivationFromPath shouldn't be used here */
@@ -409,7 +410,8 @@ private:
     void writeLog(int fd, const unsigned char * buf, size_t count);
 
     /* Return the set of (in)valid paths. */
-    PathSet checkPathValidity(bool returnValid);
+    typedef set<OutputEqClass> OutputEqClasses;
+    OutputEqClasses checkOutputValidity(bool returnValid);
 };
 
 
@@ -477,9 +479,11 @@ void DerivationGoal::haveStoreExpr()
     for (DerivationOutputs::iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
         addTempRoot(i->second.path);
+#endif    
 
-    /* Check what outputs paths are not already valid. */
-    PathSet invalidOutputs = checkPathValidity(false);
+    /* Check for what output path equivalence classes we do not
+       already have valid, trusted output paths. */
+    OutputEqClasses invalidOutputs = checkOutputValidity(false);
 
     /* If they are all valid, then we're done. */
     if (invalidOutputs.size() == 0) {
@@ -487,6 +491,7 @@ void DerivationGoal::haveStoreExpr()
         return;
     }
 
+#if 0    
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
@@ -514,12 +519,10 @@ void DerivationGoal::outputsSubstituted()
 
     nrFailed = 0;
 
-#if 0    
-    if (checkPathValidity(false).size() == 0) {
+    if (checkOutputValidity(false).size() == 0) {
         amDone(true);
         return;
     }
-#endif    
 
     /* Otherwise, at least one of the output paths could not be
        produced using a substitute.  So we have to build instead. */
@@ -904,6 +907,9 @@ void DerivationGoal::terminateBuildHook()
 
 bool DerivationGoal::prepareBuild()
 {
+    /* We direct each output of the derivation to a temporary location
+       in the Nix store.  Afterwards, we move the outputs to their
+       final, content-addressed location. */
     for (DerivationOutputs::iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
     {
@@ -911,8 +917,20 @@ bool DerivationGoal::prepareBuild()
         printMsg(lvlError, format("mapping output id `%1%', class `%2%' to `%3%'")
             % i->first % i->second.eqClass % tmpPath);
         assert(i->second.eqClass.size() == tmpPath.size());
-        rewrites[hashPartOf(i->second.eqClass)] = hashPartOf(tmpPath);
+
+        debug(format("building path `%1%'") % tmpPath);
+        
         tmpOutputs[i->second.eqClass] = tmpPath;
+
+        /* This is a referenceable path.  Make a note of that for when
+           we are scanning for references in the output. */
+        allPaths.insert(tmpPath);
+        
+        /* The environment variables and command-line arguments of the
+           builder refer to the output path equivalence class.  Cause
+           those references to be rewritten to the temporary
+           locations. */
+        rewrites[hashPartOf(i->second.eqClass)] = hashPartOf(tmpPath);
     }
 
     /* Obtain locks on all output paths.  The locks are automatically
@@ -948,19 +966,6 @@ bool DerivationGoal::prepareBuild()
     }
 #endif    
 
-    /* Gather information necessary for computing the closure and/or
-       running the build hook. */
-
-#if 0    
-    /* The outputs are referenceable paths. */
-    for (DerivationOutputs::iterator i = drv.outputs.begin();
-         i != drv.outputs.end(); ++i)
-    {
-        debug(format("building path `%1%'") % i->second.path);
-        allPaths.insert(i->second.path);
-    }
-#endif    
-
     /* Determine the full set of input paths. */
 
     /* First, the input derivations. */
@@ -972,30 +977,19 @@ bool DerivationGoal::prepareBuild()
            that are specified as inputs. */
         assert(isValidPath(i->first));
         Derivation inDrv = derivationFromPath(i->first);
+
         for (StringSet::iterator j = i->second.begin();
              j != i->second.end(); ++j)
-            
-            if (inDrv.outputs.find(*j) != inDrv.outputs.end()) {
-                
-                OutputEqClass eqClass = inDrv.outputs[*j].eqClass;
-                OutputEqMembers members;
-                queryOutputEqMembers(noTxn, eqClass, members);
+        {
+            OutputEqClass eqClass = findOutputEqClass(inDrv, *j);
+            Path input = findTrustedEqClassMember(eqClass, currentTrustId);
+            if (input == "")
+                throw Error(format("output `%1%' of derivation `%2%' is missing!")
+                    % *j % i->first);
+            rewrites[hashPartOf(eqClass)] = hashPartOf(input);
 
-                if (members.size() == 0)
-                    throw Error(format("output equivalence class `%1%' has no members!")
-                        % eqClass);
-
-                Path input = members.front().path;
-
-                rewrites[hashPartOf(eqClass)] = hashPartOf(input);
-                    
-#if 0                
-                computeFSClosure(inDrv.outputs[*j].path, inputPaths);
-#endif
-            } else
-                throw Error(
-                    format("derivation `%1%' requires non-existent output `%2%' from input derivation `%3%'")
-                    % drvPath % *j % i->first);
+            computeFSClosure(input, inputPaths);
+        }
     }
 
     /* Second, the input sources. */
@@ -1003,7 +997,7 @@ bool DerivationGoal::prepareBuild()
          i != drv.inputSrcs.end(); ++i)
         computeFSClosure(*i, inputPaths);
 
-    debug(format("added input paths %1%") % showPaths(inputPaths));
+    printMsg(lvlError, format("added input paths %1%") % showPaths(inputPaths)); /* !!! */
 
     allPaths.insert(inputPaths.begin(), inputPaths.end());
 
@@ -1014,7 +1008,7 @@ bool DerivationGoal::prepareBuild()
 void DerivationGoal::startBuilder()
 {
     startNest(nest, lvlInfo,
-        format("building path(s) XXX") /* % showPaths(outputPaths(drv.outputs)) */)
+        format("building derivation `%1%'") % drvPath)
     
     /* Right platform? */
     if (drv.platform != thisSystem)
@@ -1151,43 +1145,16 @@ void DerivationGoal::computeClosure()
     map<Path, PathSet> allReferences;
     map<Path, Hash> contentHashes;
 
-    for (OutputMap::iterator i = tmpOutputs.begin();
-         i != tmpOutputs.end(); ++i)
-    {
-        /* Rewrite each output to a name matching its content hash.
-           I.e., enforce the hash invariant: the hash part of a store
-           path matches the contents at that path. */
-        Path finalPath = addToStore(i->second, hashPartOf(i->second),
-            namePartOf(i->second));
-        printMsg(lvlError, format("produced final path `%1%'") % finalPath);
-
-        /* Register the fact that this output path is a member of some
-           output path equivalence class (for a certain user, at
-           least).  This is how subsequent derivations will be able to
-           find it. */
-        Transaction txn;
-        createStoreTransaction(txn);
-        addOutputEqMember(txn, i->first, "root", finalPath);
-        txn.commit();
-    }
-    
-#if 0    
-    /* Check whether the output paths were created, and grep each
-       output path to determine what other paths it references.  Also make all
-       output paths read-only. */
     for (DerivationOutputs::iterator i = drv.outputs.begin(); 
          i != drv.outputs.end(); ++i)
     {
-        Path path = i->second.path;
+        Path path = tmpOutputs[i->second.eqClass];
         if (!pathExists(path)) {
             throw BuildError(
                 format("builder for `%1%' failed to produce output path `%2%'")
                 % drvPath % path);
         }
-
-        startNest(nest, lvlTalkative,
-            format("scanning for references inside `%1%'") % path);
-
+        
         /* Check that fixed-output derivations produced the right
            outputs (i.e., the content hash should match the specified
            hash). */ 
@@ -1225,64 +1192,50 @@ void DerivationGoal::computeClosure()
                     % path % algo % printHash(h) % printHash(h2));
         }
 
-	canonicalisePathMetaData(path);
-
-	/* For this output path, find the references to other paths contained
-	   in it. */
-        PathSet references;
+	/* For this output path, find the references to other paths
+	   contained in it. */
+        PathSet referenced;
         if (!pathExists(path + "/nix-support/no-scan")) {
-            Paths references2;
-            references2 = filterReferences(path, 
+            Paths referenced2 = filterReferences(path, 
                 Paths(allPaths.begin(), allPaths.end()));
-            references = PathSet(references2.begin(), references2.end());
+            referenced = PathSet(referenced2.begin(), referenced2.end());
 
             /* For debugging, print out the referenced and
                unreferenced paths. */
-            for (PathSet::iterator i = inputPaths.begin();
-                 i != inputPaths.end(); ++i)
-            {
-                PathSet::iterator j = references.find(*i);
-                if (j == references.end())
-                    debug(format("unreferenced input: `%1%'") % *i);
-                else
-                    debug(format("referenced input: `%1%'") % *i);
-            }
+            PathSet unreferenced;
+            insert_iterator<PathSet> ins(unreferenced, unreferenced.begin());
+            set_difference(
+                inputPaths.begin(), inputPaths.end(),
+                referenced.begin(), referenced.end(), ins);
+            printMsg(lvlError, format("unreferenced inputs: %1%") % showPaths(unreferenced));
+            printMsg(lvlError, format("referenced inputs: %1%") % showPaths(referenced));
         }
 
-        allReferences[path] = references;
+        /* Rewrite each output to a name matching its content hash.
+           I.e., enforce the hash invariant: the hash part of a store
+           path matches the contents at that path.
 
-        /* Hash the contents of the path.  The hash is stored in the
-           database so that we can verify later on whether nobody has
-           messed with the store.  !!! inefficient: it would be nice
-           if we could combine this with filterReferences(). */
-        contentHashes[path] = hashPath(htSHA256, path);
+           This also registers the final output path as valid, and
+           sets it references. */
+        Path finalPath = addToStore(path,
+            hashPartOf(path), namePartOf(path),
+            referenced);
+        printMsg(lvlError, format("produced final path `%1%'") % finalPath);
+
+        /* Register the fact that this output path is a member of some
+           output path equivalence class (for a certain user, at
+           least).  This is how subsequent derivations will be able to
+           find it. */
+        Transaction txn;
+        createStoreTransaction(txn);
+        addOutputEqMember(txn, i->second.eqClass, currentTrustId, finalPath);
+        txn.commit();
+
+        /* Get rid of the temporary output.  !!! optimise all this by
+           *moving* the temporary output to the new location and
+           applying rewrites in situ. */
+        deletePath(path);
     }
-#endif
-
-#if 0    
-    /* Register each output path as valid, and register the sets of
-       paths referenced by each of them.  This is wrapped in one
-       database transaction to ensure that if we crash, either
-       everything is registered or nothing is.  This is for
-       recoverability: unregistered paths in the store can be deleted
-       arbitrarily, while registered paths can only be deleted by
-       running the garbage collector.
-
-       The reason that we do the transaction here and not on the fly
-       while we are scanning (above) is so that we don't hold database
-       locks for too long. */
-    Transaction txn;
-    createStoreTransaction(txn);
-    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
-         i != drv.outputs.end(); ++i)
-    {
-        registerValidPath(txn, i->second.path,
-            contentHashes[i->second.path],
-            allReferences[i->second.path],
-            drvPath);
-    }
-    txn.commit();
-#endif
     
     /* It is now safe to delete the lock files, since all future
        lockers will see that the output paths are valid; they will not
@@ -1363,19 +1316,21 @@ void DerivationGoal::writeLog(int fd,
 }
 
 
-PathSet DerivationGoal::checkPathValidity(bool returnValid)
+DerivationGoal::OutputEqClasses DerivationGoal::checkOutputValidity(bool returnValid)
 {
-#if 0    
-    PathSet result;
+    OutputEqClasses result;
     for (DerivationOutputs::iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
-        if (isValidPath(i->second.path)) {
-            if (returnValid) result.insert(i->second.path);
+    {
+        Path path = findTrustedEqClassMember(i->second.eqClass, currentTrustId);
+        if (path != "") {
+            assert(isValidPath(path));
+            if (returnValid) result.insert(i->second.eqClass);
         } else {
-            if (!returnValid) result.insert(i->second.path);
+            if (!returnValid) result.insert(i->second.eqClass);
         }
+    }
     return result;
-#endif
 }
 
 
