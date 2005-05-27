@@ -147,7 +147,6 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 #endif
 
 
-#if 0
 /* Place in `paths' the set of paths that are required to `realise'
    the given store path, i.e., all paths necessary for valid
    deployment of the path.  For a derivation, this is the union of
@@ -170,6 +169,8 @@ static void storePathRequisites(const Path & storePath,
     computeFSClosure(storePath, paths);
 
     if (includeOutputs) {
+        assert(0);
+#if 0        
         for (PathSet::iterator i = paths.begin();
              i != paths.end(); ++i)
             if (isDerivation(*i)) {
@@ -179,6 +180,7 @@ static void storePathRequisites(const Path & storePath,
                     if (isValidPath(j->second.path))
                         computeFSClosure(j->second.path, paths);
             }
+#endif        
     }
 }
 
@@ -188,7 +190,8 @@ static Path maybeUseOutput(const Path & storePath, bool useOutput, bool forceRea
     if (forceRealise) realisePath(storePath);
     if (useOutput && isDerivation(storePath)) {
         Derivation drv = derivationFromPath(storePath);
-        return findOutput(drv, "out");
+        return findTrustedEqClassMember(
+            findOutputEqClass(drv, "out"), currentTrustId);
     }
     else return storePath;
 }
@@ -318,7 +321,9 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 *i = fixPath(*i);
                 if (forceRealise) realisePath(*i);
                 Derivation drv = derivationFromPath(*i);
-                cout << format("%1%\n") % findOutput(drv, "out");
+                cout << format("%1%\n") % findTrustedEqClassMember(
+                    findOutputEqClass(drv, "out"),
+                    currentTrustId);
             }
             break;
         }
@@ -343,6 +348,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         }
 
         case qDeriver:
+#if 0            
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
             {
@@ -350,6 +356,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 cout << format("%1%\n") %
                     (deriver == "" ? "unknown-deriver" : deriver);
             }
+#endif
+            assert(0);
             break;
 
         case qBinding:
@@ -398,7 +406,6 @@ static void opQuery(Strings opFlags, Strings opArgs)
             abort();
     }
 }
-#endif
 
 
 #if 0
@@ -615,8 +622,10 @@ void run(Strings args)
             op = opAddFixed;
         else if (arg == "--print-fixed-path")
             op = opPrintFixedPath;
+#endif
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
+#if 0        
         else if (arg == "--register-substitutes")
             op = opRegisterSubstitutes;
         else if (arg == "--clear-substitutes")
