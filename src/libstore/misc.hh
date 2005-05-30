@@ -33,4 +33,7 @@ Path findTrustedEqClassMember(const OutputEqClass & eqClass,
     const TrustId & trustId);
 
 
+PathSet consolidatePaths(const PathSet & paths, bool checkOnly);
+
+
 #endif /* !__MISC_H */

@@ -74,6 +74,8 @@ typedef string TrustId;
    substituted with concrete paths when we actually build. */
 typedef Path OutputEqClass;
 
+typedef set<OutputEqClass> OutputEqClasses;
+
 
 /* A member of an output path equivalence class, i.e., a store path
    that has been produced by a certain derivation. */
@@ -193,7 +195,10 @@ void addOutputEqMember(const Transaction & txn,
 
 void queryOutputEqMembers(const Transaction & txn,
     const OutputEqClass & eqClass, OutputEqMembers & members);
-    
+
+void queryOutputEqClasses(const Transaction & txn,
+    const Path & path, OutputEqClasses & classes);
+
 #if 0
 /* Sets the deriver of a store path.  Use with care! */
 void setDeriver(const Transaction & txn, const Path & storePath,
@@ -226,7 +231,8 @@ string rewriteHashes(const string & s, const HashRewrites & rewrites);
 /* Copy the contents of a path to the store and register the validity
    the resulting path.  The resulting path is returned. */
 Path addToStore(const Path & srcPath, const PathHash & selfHash = PathHash(),
-    const string & suffix = "", const PathSet & references = PathSet());
+    const string & suffix = "", const PathSet & references = PathSet(),
+    const HashRewrites & rewrites = HashRewrites());
 
 #if 0
 /* Like addToStore(), but for pre-adding the outputs of fixed-output

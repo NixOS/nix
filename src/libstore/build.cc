@@ -720,19 +720,6 @@ PathSet outputPaths(const DerivationOutputs & outputs)
 #endif
 
 
-string showPaths(const PathSet & paths)
-{
-    string s;
-    for (PathSet::const_iterator i = paths.begin();
-         i != paths.end(); ++i)
-    {
-        if (s.size() != 0) s += ", ";
-        s += "`" + *i + "'";
-    }
-    return s;
-}
-
-
 DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 {
     return rpDecline;
@@ -997,6 +984,15 @@ bool DerivationGoal::prepareBuild()
          i != drv.inputSrcs.end(); ++i)
         computeFSClosure(*i, inputPaths);
 
+    /* There might be equivalence class collisions now.  That is,
+       different input closures might contain different paths from the
+       *same* output path equivalence class.  We should pick one from
+       each, and rewrite dependent paths. */
+    inputPaths = consolidatePaths(inputPaths, false);
+
+    /* !!! remove, debug only */
+    consolidatePaths(inputPaths, true);
+    
     printMsg(lvlError, format("added input paths %1%") % showPaths(inputPaths)); /* !!! */
 
     allPaths.insert(inputPaths.begin(), inputPaths.end());

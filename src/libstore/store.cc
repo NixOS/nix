@@ -45,10 +45,12 @@ static TableId dbReferers = 0;
    class; i.e., the extension of an extension class. */
 static TableId dbEquivalences = 0;
 
-/* dbEquivalenceClass :: Path -> OutputEqClass
+/* dbEquivalenceClasses :: Path -> [OutputEqClass]
 
-   Lists for each output path the extension class that it is in. */
-static TableId dbEquivalenceClass = 0;
+   !!! should be [(TrustId, OutputEqClass)] ?
+
+   Lists for each output path the extension classes that it is in. */
+static TableId dbEquivalenceClasses = 0;
 
 
 #if 0
@@ -108,7 +110,7 @@ void openDB()
     dbDerivers = nixDB.openTable("derivers");
 #endif
     dbEquivalences = nixDB.openTable("equivalences");
-    dbEquivalenceClass = nixDB.openTable("equivalence-class");
+    dbEquivalenceClasses = nixDB.openTable("equivalence-classes");
 
     int curSchema = 0;
     Path schemaFN = nixDBPath + "/schema";
@@ -476,6 +478,14 @@ void addOutputEqMember(const Transaction & txn,
     }
 
     nixDB.setStrings(txn, dbEquivalences, eqClass, ss);
+
+    OutputEqClasses classes;
+    queryOutputEqClasses(txn, path, classes);
+
+    classes.insert(eqClass);
+
+    nixDB.setStrings(txn, dbEquivalenceClasses, path,
+        Strings(classes.begin(), classes.end()));
 }
 
 
@@ -494,6 +504,15 @@ void queryOutputEqMembers(const Transaction & txn,
         member.path = *j++;
         members.push_back(member);
     }
+}
+
+
+void queryOutputEqClasses(const Transaction & txn,
+    const Path & path, OutputEqClasses & classes)
+{
+    Strings ss;
+    nixDB.queryStrings(txn, dbEquivalenceClasses, path, ss);
+    classes.insert(ss.begin(), ss.end());
 }
 
 
@@ -789,6 +808,7 @@ string rewriteHashes(string s, const HashRewrites & rewrites,
             debug(format("rewriting @ %1%") % j);
             positions.push_back(j);
             s.replace(j, to.size(), to);
+            j += to.size();
         }
     }
 
@@ -825,6 +845,16 @@ static Hash hashModulo(string s, const PathHash & modulus)
     debug(format("positions %1%") % positionPrefix);
     
     return hashString(htSHA256, positionPrefix + s);
+}
+
+
+static PathSet rewriteReferences(const PathSet & references,
+    const HashRewrites & rewrites)
+{
+    PathSet result;
+    for (PathSet::const_iterator i = references.begin(); i != references.end(); ++i)
+        result.insert(rewriteHashes(*i, rewrites));
+    return result;
 }
 
 
@@ -875,9 +905,7 @@ static Path _addToStore(const string & suffix, string dump,
             /* Set the references for the new path.  Of course, any
                hash rewrites have to be applied to the references,
                too. */
-            PathSet references2;
-            for (PathSet::iterator i = references.begin(); i != references.end(); ++i)
-                references2.insert(rewriteHashes(*i, rewrites));
+            PathSet references2 = rewriteReferences(references, rewrites);
             
             Transaction txn(nixDB);
             registerValidPath(txn, dstPath, contentHash, references2, "");
@@ -892,7 +920,7 @@ static Path _addToStore(const string & suffix, string dump,
 
 
 Path addToStore(const Path & _srcPath, const PathHash & selfHash,
-    const string & suffix, const PathSet & references)
+    const string & suffix, const PathSet & references, const HashRewrites & rewrites)
 {
     Path srcPath(absPath(_srcPath));
     debug(format("adding `%1%' to the store") % srcPath);
@@ -903,8 +931,11 @@ Path addToStore(const Path & _srcPath, const PathHash & selfHash,
         dumpPath(srcPath, sink);
     }
 
+    if (rewrites.size() != 0) sink.s = rewriteHashes(sink.s, rewrites);
+
     return _addToStore(suffix == "" ? baseNameOf(srcPath) : suffix,
-        sink.s, selfHash, references);
+        sink.s, selfHash,
+        rewriteReferences(references, rewrites));
 }
 
 

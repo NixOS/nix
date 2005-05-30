@@ -173,6 +173,8 @@ void printMsg_(Verbosity level, const format & f);
 
 #define debug(f) printMsg(lvlDebug, f)
 
+string showPaths(const PathSet & paths);
+
 
 /* Wrappers arount read()/write() that read/write exactly the
    requested number of bytes. */

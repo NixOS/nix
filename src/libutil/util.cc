@@ -357,6 +357,19 @@ void printMsg_(Verbosity level, const format & f)
 }
 
 
+string showPaths(const PathSet & paths)
+{
+    string s;
+    for (PathSet::const_iterator i = paths.begin();
+         i != paths.end(); ++i)
+    {
+        if (s.size() != 0) s += ", ";
+        s += "`" + *i + "'";
+    }
+    return s;
+}
+
+
 void readFull(int fd, unsigned char * buf, size_t count)
 {
     while (count) {
