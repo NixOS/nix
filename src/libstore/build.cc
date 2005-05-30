@@ -1095,8 +1095,8 @@ void DerivationGoal::startBuilder()
             env["NIX_OUTPUT_CHECKED"] = "1";
 
     /* Run the builder. */
-    printMsg(lvlChatty, format("executing builder `%1%'") %
-        drv.builder);
+    string builder = rewriteHashes(drv.builder, rewrites);
+    printMsg(lvlChatty, format("executing builder `%1%'") % builder);
 
     /* Create the log file and pipe. */
     openLogFile();
@@ -1122,7 +1122,7 @@ void DerivationGoal::startBuilder()
 
             /* Fill in the arguments. */
             Strings args(drv.args);
-            args.push_front(baseNameOf(drv.builder));
+            args.push_front(baseNameOf(builder));
             const char * * argArr = strings2CharPtrs(args);
 
             /* Fill in the environment. */
@@ -1134,11 +1134,10 @@ void DerivationGoal::startBuilder()
             const char * * envArr = strings2CharPtrs(envStrs);
 
             /* Execute the program.  This should not return. */
-            execve(drv.builder.c_str(),
+            execve(builder.c_str(),
                 (char * *) argArr, (char * *) envArr);
 
-            throw SysError(format("executing `%1%'")
-                % drv.builder);
+            throw SysError(format("executing `%1%'") % builder);
             
         } catch (exception & e) {
             cerr << format("build error: %1%\n") % e.what();
