@@ -80,8 +80,6 @@ static void findBestRewrite(const ClassMap::const_iterator & pos,
         return;
     }
 
-    //    printMsg(lvlError, format("selection %1%") % showPaths(selection));
-    
     PathSet badPaths;
     for (PathSet::iterator i = selection.begin();
          i != selection.end(); ++i)
@@ -104,7 +102,7 @@ static void findBestRewrite(const ClassMap::const_iterator & pos,
 
 
 static Path maybeRewrite(const Path & path, const PathSet & selection,
-    const FinalClassMap & finalClassMap,
+    const FinalClassMap & finalClassMap, const PathSet & sources,
     Replacements & replacements,
     unsigned int & nrRewrites)
 {
@@ -122,20 +120,20 @@ static Path maybeRewrite(const Path & path, const PathSet & selection,
     
     for (PathSet::iterator i = references.begin(); i != references.end(); ++i) {
 
-        OutputEqClasses classes;
-        queryOutputEqClasses(noTxn, *i, classes);
-
-        /* !!! hacky; ignore sources; they are not in any eq class */
-        if (*i == path || classes.size() == 0) {
+        if (*i == path || sources.find(*i) != sources.end()) {
             newReferences.insert(*i);
             continue; /* ignore self-references */
         }
+
+        OutputEqClasses classes;
+        queryOutputEqClasses(noTxn, *i, classes);
+        assert(classes.size() > 0);
 
         FinalClassMap::const_iterator j = finalClassMap.find(*(classes.begin()));
         assert(j != finalClassMap.end());
         
         Path newPath = maybeRewrite(j->second, selection,
-            finalClassMap, replacements, nrRewrites);
+            finalClassMap, sources, replacements, nrRewrites);
 
         if (*i != newPath)
             rewrites[hashPartOf(*i)] = hashPartOf(newPath);
@@ -170,17 +168,20 @@ PathSet consolidatePaths(const PathSet & paths, bool checkOnly,
     printMsg(lvlError, format("consolidating"));
     
     ClassMap classMap;
+    PathSet sources;
     
     for (PathSet::const_iterator i = paths.begin(); i != paths.end(); ++i) {
         OutputEqClasses classes;
         queryOutputEqClasses(noTxn, *i, classes);
 
-        /* !!! deal with sources */
-        
-        for (OutputEqClasses::iterator j = classes.begin(); j != classes.end(); ++j) {
-            classMap[*j].insert(*i);
-        }
+        if (classes.size() == 0)
+            sources.insert(*i);
+        else
+            for (OutputEqClasses::iterator j = classes.begin(); j != classes.end(); ++j)
+                classMap[*j].insert(*i);
     }
+
+    printMsg(lvlError, format("found %1% sources") % sources.size());
 
     bool conflict = false;
     for (ClassMap::iterator i = classMap.begin(); i != classMap.end(); ++i)
@@ -192,6 +193,7 @@ PathSet consolidatePaths(const PathSet & paths, bool checkOnly,
     if (!conflict) return paths;
     
     assert(!checkOnly);
+
     
     /* !!! exponential-time algorithm! */
     const unsigned int infinity = 1000000;
@@ -216,9 +218,14 @@ PathSet consolidatePaths(const PathSet & paths, bool checkOnly,
     replacements.clear();
     for (PathSet::iterator i = bestSelection.begin();
          i != bestSelection.end(); ++i)
-        newPaths.insert(maybeRewrite(*i, bestSelection, finalClassMap, replacements, nrRewrites));
+        newPaths.insert(maybeRewrite(*i, bestSelection, finalClassMap,
+                            sources, replacements, nrRewrites));
+
+    newPaths.insert(sources.begin(), sources.end());
 
     assert(nrRewrites == bestCost);
+
+    assert(newPaths.size() < paths.size());
 
     return newPaths;
 }
