@@ -105,8 +105,11 @@ static void findBestRewrite(const ClassMap::const_iterator & pos,
 
 static Path maybeRewrite(const Path & path, const PathSet & selection,
     const FinalClassMap & finalClassMap,
-    Replacements & replacements)
+    Replacements & replacements,
+    unsigned int & nrRewrites)
 {
+    startNest(nest, lvlError, format("considering rewriting `%1%'") % path);
+
     assert(selection.find(path) != selection.end());
 
     if (replacements.find(path) != replacements.end()) return replacements[path];
@@ -115,40 +118,43 @@ static Path maybeRewrite(const Path & path, const PathSet & selection,
     queryReferences(noTxn, path, references);
 
     HashRewrites rewrites;
+    PathSet newReferences;
     
-    bool okay = true;
     for (PathSet::iterator i = references.begin(); i != references.end(); ++i) {
-        if (*i == path) continue; /* ignore self-references */
-        if (selection.find(*i) == selection.end()) {
-            OutputEqClasses classes;
-            queryOutputEqClasses(noTxn, *i, classes);
-            
-            if (classes.size() > 0) /* !!! hacky; ignore sources; they
-                                       are not in any eq class */
-            {
-                printMsg(lvlError, format("in `%1%': missing `%2%'") % path % *i);
-                okay = false;
 
-                FinalClassMap::const_iterator j = finalClassMap.find(*(classes.begin()));
-                assert(j != finalClassMap.end());
+        OutputEqClasses classes;
+        queryOutputEqClasses(noTxn, *i, classes);
 
-                printMsg(lvlError, format("replacing with `%1%'") % j->second);
-                
-                Path newPath = maybeRewrite(j->second, selection,
-                    finalClassMap, replacements);
-                if (*i != newPath)
-                    rewrites[hashPartOf(*i)] = hashPartOf(newPath);
-            }
+        /* !!! hacky; ignore sources; they are not in any eq class */
+        if (*i == path || classes.size() == 0) {
+            newReferences.insert(*i);
+            continue; /* ignore self-references */
         }
+
+        FinalClassMap::const_iterator j = finalClassMap.find(*(classes.begin()));
+        assert(j != finalClassMap.end());
+        
+        Path newPath = maybeRewrite(j->second, selection,
+            finalClassMap, replacements, nrRewrites);
+
+        if (*i != newPath)
+            rewrites[hashPartOf(*i)] = hashPartOf(newPath);
+
+        references.insert(newPath);
     }
 
-    if (rewrites.size() == 0) return path;
+    if (rewrites.size() == 0) {
+        replacements[path] = path;
+        return path;
+    }
 
     printMsg(lvlError, format("rewriting `%1%'") % path);
 
     Path newPath = addToStore(path,
         hashPartOf(path), namePartOf(path),
         references, rewrites);
+
+    nrRewrites++;
 
     printMsg(lvlError, format("rewrote `%1%' to `%2%'") % path % newPath);
 
@@ -206,10 +212,13 @@ PathSet consolidatePaths(const PathSet & paths, bool checkOnly,
                 finalClassMap[i->first] = *j;
 
     PathSet newPaths;
+    unsigned int nrRewrites = 0;
     replacements.clear();
     for (PathSet::iterator i = bestSelection.begin();
          i != bestSelection.end(); ++i)
-        newPaths.insert(maybeRewrite(*i, bestSelection, finalClassMap, replacements));
-    
+        newPaths.insert(maybeRewrite(*i, bestSelection, finalClassMap, replacements, nrRewrites));
+
+    assert(nrRewrites == bestCost);
+
     return newPaths;
 }

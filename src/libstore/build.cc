@@ -995,8 +995,6 @@ bool DerivationGoal::prepareBuild()
     for (Replacements::iterator i = replacements.begin();
          i != replacements.end(); ++i)
     {
-        printMsg(lvlError, format("FOO %1% %2%")
-            % i->first % i->second);
         printMsg(lvlError, format("HASH REWRITE %1% %2%")
             % hashPartOf(i->first).toString() % hashPartOf(i->second).toString());
         rewrites2[hashPartOf(i->first)] = hashPartOf(i->second);
