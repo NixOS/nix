@@ -1,5 +1,6 @@
 #include "build.hh"
 #include "misc.hh"
+#include "globals.hh"
 
 
 Derivation derivationFromPath(const Path & drvPath)
@@ -39,16 +40,27 @@ OutputEqClass findOutputEqClass(const Derivation & drv, const string & id)
 }
 
 
-Path findTrustedEqClassMember(const OutputEqClass & eqClass,
+PathSet findTrustedEqClassMembers(const OutputEqClass & eqClass,
     const TrustId & trustId)
 {
     OutputEqMembers members;
     queryOutputEqMembers(noTxn, eqClass, members);
 
+    PathSet result;
     for (OutputEqMembers::iterator j = members.begin(); j != members.end(); ++j)
-        if (j->trustId == trustId || j->trustId == "root") return j->path;
+        if (j->trustId == trustId || j->trustId == "root") result.insert(j->path);
 
-    return "";
+    return result;
+}
+
+
+Path findTrustedEqClassMember(const OutputEqClass & eqClass,
+    const TrustId & trustId)
+{
+    PathSet paths = findTrustedEqClassMembers(eqClass, trustId);
+    if (paths.size() == 0)
+        throw Error(format("no output path in equivalence class `%1%' is known") % eqClass);
+    return *(paths.begin());
 }
 
 
@@ -152,6 +164,17 @@ static Path maybeRewrite(const Path & path, const PathSet & selection,
         hashPartOf(path), namePartOf(path),
         references, rewrites);
 
+    /* !!! we don't know which eqClass `path' is in!  That is to say,
+       we don't know which one is intended here. */
+    OutputEqClasses classes;
+    queryOutputEqClasses(noTxn, path, classes);
+    for (PathSet::iterator i = classes.begin(); i != classes.end(); ++i) {
+        Transaction txn;
+        createStoreTransaction(txn);
+        addOutputEqMember(txn, *i, currentTrustId, newPath);
+        txn.commit();
+    }
+
     nrRewrites++;
 
     printMsg(lvlError, format("rewrote `%1%' to `%2%'") % path % newPath);
@@ -181,7 +204,7 @@ PathSet consolidatePaths(const PathSet & paths, bool checkOnly,
                 classMap[*j].insert(*i);
     }
 
-    printMsg(lvlError, format("found %1% sources") % sources.size());
+    printMsg(lvlError, format("found %1% sources %2%") % sources.size() % showPaths(sources));
 
     bool conflict = false;
     for (ClassMap::iterator i = classMap.begin(); i != classMap.end(); ++i)

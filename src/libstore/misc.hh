@@ -26,9 +26,14 @@ OutputEqClass findOutputEqClass(const Derivation & drv,
     const string & id);
 
 
-/* Return any trusted path (wrt to the given trust ID) in the given
-   output path equivalence class, or "" if no such path currently
-   exists. */
+/* Return anll trusted path (wrt to the given trust ID) in the given
+   output path equivalence class, or an empty set if no such paths
+   currently exist. */
+PathSet findTrustedEqClassMembers(const OutputEqClass & eqClass,
+    const TrustId & trustId);
+
+/* Like `findTrustedEqClassMembers', but returns an arbitrary trusted
+   path, or throws an exception if no such path currently exists. */
 Path findTrustedEqClassMember(const OutputEqClass & eqClass,
     const TrustId & trustId);
 

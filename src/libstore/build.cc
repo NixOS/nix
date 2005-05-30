@@ -969,13 +969,16 @@ bool DerivationGoal::prepareBuild()
              j != i->second.end(); ++j)
         {
             OutputEqClass eqClass = findOutputEqClass(inDrv, *j);
-            Path input = findTrustedEqClassMember(eqClass, currentTrustId);
-            if (input == "")
+            PathSet inputs = findTrustedEqClassMembers(eqClass, currentTrustId);
+            if (inputs.size() == 0)
+                /* !!! shouldn't happen, except for garbage
+                   collection? */
                 throw Error(format("output `%1%' of derivation `%2%' is missing!")
                     % *j % i->first);
-            rewrites[hashPartOf(eqClass)] = hashPartOf(input);
-
-            computeFSClosure(input, inputPaths);
+            for (PathSet::iterator k = inputs.begin(); k != inputs.end(); ++k) {
+                rewrites[hashPartOf(eqClass)] = hashPartOf(*k);
+                computeFSClosure(*k, inputPaths);
+            }
         }
     }
 
@@ -1333,9 +1336,8 @@ DerivationGoal::OutputEqClasses DerivationGoal::checkOutputValidity(bool returnV
     for (DerivationOutputs::iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
     {
-        Path path = findTrustedEqClassMember(i->second.eqClass, currentTrustId);
-        if (path != "") {
-            assert(isValidPath(path));
+        PathSet paths = findTrustedEqClassMembers(i->second.eqClass, currentTrustId);
+        if (paths.size() > 0) {
             if (returnValid) result.insert(i->second.eqClass);
         } else {
             if (!returnValid) result.insert(i->second.eqClass);
