@@ -104,9 +104,12 @@ static void findBestRewrite(const ClassMap::const_iterator & pos,
 
 
 static Path maybeRewrite(const Path & path, const PathSet & selection,
-    const FinalClassMap & finalClassMap)
+    const FinalClassMap & finalClassMap,
+    Replacements & replacements)
 {
     assert(selection.find(path) != selection.end());
+
+    if (replacements.find(path) != replacements.end()) return replacements[path];
     
     PathSet references;
     queryReferences(noTxn, path, references);
@@ -131,7 +134,8 @@ static Path maybeRewrite(const Path & path, const PathSet & selection,
 
                 printMsg(lvlError, format("replacing with `%1%'") % j->second);
                 
-                Path newPath = maybeRewrite(j->second, selection, finalClassMap);
+                Path newPath = maybeRewrite(j->second, selection,
+                    finalClassMap, replacements);
                 if (*i != newPath)
                     rewrites[hashPartOf(*i)] = hashPartOf(newPath);
             }
@@ -148,11 +152,14 @@ static Path maybeRewrite(const Path & path, const PathSet & selection,
 
     printMsg(lvlError, format("rewrote `%1%' to `%2%'") % path % newPath);
 
+    replacements[path] = newPath;
+        
     return newPath;
 }
 
 
-PathSet consolidatePaths(const PathSet & paths, bool checkOnly)
+PathSet consolidatePaths(const PathSet & paths, bool checkOnly,
+    Replacements & replacements)
 {
     printMsg(lvlError, format("consolidating"));
     
@@ -199,9 +206,10 @@ PathSet consolidatePaths(const PathSet & paths, bool checkOnly)
                 finalClassMap[i->first] = *j;
 
     PathSet newPaths;
+    replacements.clear();
     for (PathSet::iterator i = bestSelection.begin();
          i != bestSelection.end(); ++i)
-        newPaths.insert(maybeRewrite(*i, bestSelection, finalClassMap));
+        newPaths.insert(maybeRewrite(*i, bestSelection, finalClassMap, replacements));
     
     return newPaths;
 }

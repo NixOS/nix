@@ -988,10 +988,27 @@ bool DerivationGoal::prepareBuild()
        different input closures might contain different paths from the
        *same* output path equivalence class.  We should pick one from
        each, and rewrite dependent paths. */
-    inputPaths = consolidatePaths(inputPaths, false);
+    Replacements replacements;
+    inputPaths = consolidatePaths(inputPaths, false, replacements);
 
+    HashRewrites rewrites2;
+    for (Replacements::iterator i = replacements.begin();
+         i != replacements.end(); ++i)
+    {
+        printMsg(lvlError, format("FOO %1% %2%")
+            % i->first % i->second);
+        printMsg(lvlError, format("HASH REWRITE %1% %2%")
+            % hashPartOf(i->first).toString() % hashPartOf(i->second).toString());
+        rewrites2[hashPartOf(i->first)] = hashPartOf(i->second);
+    }
+
+    for (HashRewrites::iterator i = rewrites.begin();
+         i != rewrites.end(); ++i)
+        rewrites[i->first] = PathHash(rewriteHashes(i->second.toString(), rewrites2));
+    
     /* !!! remove, debug only */
-    consolidatePaths(inputPaths, true);
+    Replacements dummy;
+    consolidatePaths(inputPaths, true, dummy);
     
     printMsg(lvlError, format("added input paths %1%") % showPaths(inputPaths)); /* !!! */
 

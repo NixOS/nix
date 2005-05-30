@@ -33,7 +33,10 @@ Path findTrustedEqClassMember(const OutputEqClass & eqClass,
     const TrustId & trustId);
 
 
-PathSet consolidatePaths(const PathSet & paths, bool checkOnly);
+typedef map<Path, Path> Replacements;
+
+PathSet consolidatePaths(const PathSet & paths, bool checkOnly,
+    Replacements & replacements);
 
 
 #endif /* !__MISC_H */
