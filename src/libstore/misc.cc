@@ -104,7 +104,7 @@ static void findBestRewrite(const ClassMap::const_iterator & pos,
                 badPaths.insert(*i);
     }
     
-    printMsg(lvlError, format("cost %1% %2%") % badPaths.size() % showPaths(badPaths));
+    //    printMsg(lvlError, format("cost %1% %2%") % badPaths.size() % showPaths(badPaths));
 
     if (badPaths.size() < bestCost) {
         bestCost = badPaths.size();
@@ -150,7 +150,7 @@ static Path maybeRewrite(const Path & path, const PathSet & selection,
         if (*i != newPath)
             rewrites[hashPartOf(*i)] = hashPartOf(newPath);
 
-        references.insert(newPath);
+        newReferences.insert(newPath);
     }
 
     if (rewrites.size() == 0) {
