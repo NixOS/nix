@@ -277,13 +277,25 @@ foreach my $p (keys %dstOutPaths) {
         
         my $srcNarBz2 = getNarBz2 \%srcNarFiles, $closest;
         my $dstNarBz2 = getNarBz2 \%dstNarFiles, $p;
-        
+
+        my $maxNarSize = 150 * 1024 * 1024;
+
         system("@bunzip2@ < $srcNarBz2 > $tmpdir/A") == 0
             or die "cannot unpack $srcNarBz2";
 
+        if ((stat "$tmpdir/A")[7] >= $maxNarSize) {
+            print "    skipping, source is too large\n";
+            next;
+        }
+        
         system("@bunzip2@ < $dstNarBz2 > $tmpdir/B") == 0
             or die "cannot unpack $dstNarBz2";
 
+        if ((stat "$tmpdir/B")[7] >= $maxNarSize) {
+            print "    skipping, destination is too large\n";
+            next;
+        }
+        
         system("@libexecdir@/bsdiff $tmpdir/A $tmpdir/B $tmpdir/DIFF") == 0
             or die "cannot compute binary diff";
 
