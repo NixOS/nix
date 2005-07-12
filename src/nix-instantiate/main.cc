@@ -73,6 +73,23 @@ static void printDrvPaths(EvalState & state, Expr e)
         return;
     }
 
+    ATermList formals;
+    ATerm body, pos;
+    if (matchFunction(e, formals, body, pos)) {
+        for (ATermIterator i(formals); i; ++i) {
+            Expr name, def;
+            if (matchNoDefFormal(*i, name))
+                throw Error(format("expression evaluates to a function with no-default arguments (`%1%')")
+                    % aterm2String(name));
+            else if (!matchDefFormal(*i, name, def))
+                abort(); /* can't happen */
+        }
+
+        printDrvPaths(state, evalExpr(state,
+            makeCall(e, makeAttrs(ATermMap()))));
+        return;
+    }
+
     throw Error("expression does not evaluate to one or more derivations");
 }
 
