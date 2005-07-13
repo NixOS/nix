@@ -2,11 +2,6 @@
 
 nixExpr=$1
 
-if test -z "$nixExpr"; then
-    echo "syntax: $0 NIX-EXPR..." >&2
-    exit 1
-fi
-
 extraArgs=
 addDrvLink=0
 addOutLink=1
@@ -16,9 +11,15 @@ trap 'rm -f ./.nix-build-tmp-*' EXIT
 
 
 # Process the arguments.
+exprs=
 for i in "$@"; do
     case "$i" in
-    
+
+        --help)
+            echo "syntax: $0 [NIX-EXPR...]" >&2
+            exit 0
+            ;;
+
         --add-drv-link)
             addDrvLink=1
             ;;
@@ -32,28 +33,37 @@ for i in "$@"; do
             ;;
             
         *)
-            # Instantiate the Nix expression.
-            prefix=
-            if test "$addDrvLink" = 0; then prefix=.nix-build-tmp-; fi
-            storeExprs=$(@bindir@/nix-instantiate \
-                --add-root ./${prefix}derivation --indirect \
-                "$i")
-                
-            for j in $storeExprs; do
-                echo "store expression is $(readlink "$j")" >&2
-            done
-
-            # Build the resulting store derivation.
-            prefix=
-            if test "$addOutLink" = 0; then prefix=.nix-build-tmp-; fi
-            outPaths=$(@bindir@/nix-store \
-                --add-root ./${prefix}result --indirect \
-                -rv $extraArgs $storeExprs)
-                
-            for j in $outPaths; do
-                echo "$(readlink "$j")"
-            done
-            
+            exprs="$exprs $i"
             ;;
     esac
 done
+
+if test -z "$exprs"; then
+    exprs="./default.nix"
+fi
+
+# Process the specified Nix expressions.
+for i in $exprs; do
+
+    # Instantiate the Nix expression.
+    prefix=
+    if test "$addDrvLink" = 0; then prefix=.nix-build-tmp-; fi
+    storeExprs=$(@bindir@/nix-instantiate \
+        --add-root ./${prefix}derivation --indirect \
+        "$i")
+                
+    for j in $storeExprs; do
+        echo "store expression is $(readlink "$j")" >&2
+    done
+
+    # Build the resulting store derivation.
+    prefix=
+    if test "$addOutLink" = 0; then prefix=.nix-build-tmp-; fi
+    outPaths=$(@bindir@/nix-store \
+        --add-root ./${prefix}result --indirect \
+        -rv $extraArgs $storeExprs)
+                
+    for j in $outPaths; do
+        echo "$(readlink "$j")"
+    done
+done            

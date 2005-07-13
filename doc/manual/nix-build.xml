@@ -25,6 +25,10 @@ to multiple derivations, multiple sequentially numbered symlinks are
 created (<filename>result</filename>, <filename>result-2</filename>,
 and so on).</para>
 
+<para>If no <replaceable>paths</replaceable> are specified, then
+<command>nix-build</command> will use <filename>default.nix</filename>
+in the current directory, if it exists.</para>
+
 <note><para><command>nix-build</command> is essentially a wrapper
 around <link
 linkend="sec-nix-instantiate"><command>nix-instantiate</command></link>

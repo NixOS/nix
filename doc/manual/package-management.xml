@@ -176,7 +176,7 @@ set.</para></footnote></para>
 <sect1 id="sec-profiles"><title>Profiles</title>
 
 <para>Profiles and user environments are Nix’s mechanism for
-implementing the ability to allow differens users to have different
+implementing the ability to allow different users to have different
 configurations, and to do atomic upgrades and rollbacks.  To
 understand how they work, it’s useful to know a bit about how Nix
 works.  In Nix, components are stored in unique locations in the
