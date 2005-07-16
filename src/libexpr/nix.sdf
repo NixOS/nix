@@ -93,7 +93,7 @@ exports
 
 module Nix-Lexicals
 exports
-  sorts Id Int Str Path PathComp Uri
+  sorts Id Int Str Path Uri
   lexical syntax
     [a-zA-Z\_][a-zA-Z0-9\_\']* -> Id
     "rec" | "let" | "if" | "then" | "else" | "assert" | "with" | "inherit" -> Id {reject}
@@ -102,10 +102,7 @@ exports
 
     "\"" ~[\n\"]* "\"" -> Str
 
-    "." ("/" PathComp)+ -> Path
-    ".." ("/" PathComp)+ -> Path
-    ("/" PathComp)+ -> Path
-    [a-zA-Z0-9\.\_\-\+]+ -> PathComp
+    [a-zA-Z0-9\.\_\-\+]* ("/"[a-zA-Z0-9\.\_\-\+]+)+ -> Path
 
     [a-zA-Z] [a-zA-Z0-9\+\-\.]* ":" [a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*\']* -> Uri
 
