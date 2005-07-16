@@ -33,3 +33,11 @@ nixexpr.cc nixexpr.hh: nixexpr-ast.hh
 
 
 CLEANFILES =
+
+
+# SDF stuff (not built by default).
+nix.tbl: nix.sdf
+	sdf2table -m Nix -s -i nix.sdf -o nix.tbl
+
+test.ast: test.nix nix.tbl
+	sglri -p nix.tbl -i test.nix -o test.ast
