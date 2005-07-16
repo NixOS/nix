@@ -96,13 +96,7 @@ exports
   sorts Id Int Str Path PathComp Uri
   lexical syntax
     [a-zA-Z\_][a-zA-Z0-9\_\']* -> Id
-    "rec" -> Id {reject}
-    "let" -> Id {reject}
-    "if" -> Id {reject}
-    "then" -> Id {reject}
-    "else" -> Id {reject}
-    "assert" -> Id {reject}
-    "inherit" -> Id {reject}
+    "rec" | "let" | "if" | "then" | "else" | "assert" | "with" | "inherit" -> Id {reject}
 
     [0-9]+ -> Int
 
@@ -120,6 +114,7 @@ exports
     Int -/- [0-9]
     Path -/- [a-zA-Z0-9\.\_\-\+\/]
     Uri -/- [a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*\']
+    "rec" "let" "if" "then" "else" "assert" "with" "inherit" -/- [A-Za-z0-9\_\']
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
