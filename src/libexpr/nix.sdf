@@ -14,15 +14,11 @@ imports Nix-Exprs Nix-Layout
 module Nix-Exprs
 imports Nix-Lexicals
 exports
-  sorts Expr Formal Bind Binds ExprList
+  sorts Expr Formal Bind ExprList
   context-free start-symbols Expr
   context-free syntax
 
-    Id -> Expr {cons("Var")}
-    Int -> Expr {cons("Int")}
-    Str -> Expr {cons("Str")}
-    Uri -> Expr {cons("Uri")}
-    Path -> Expr {cons("Path")}
+    Id | Int | Str | Uri | Path -> Expr {cons("Var")}
 
     "(" Expr ")" -> Expr {bracket}
 
@@ -37,11 +33,10 @@ exports
 
     "with" Expr ";" Expr -> Expr {cons("With")}
 
-    "rec" "{" Binds "}" -> Expr {cons("Rec")}
-    "let" "{" Binds "}" -> Expr {cons("LetRec")}
-    "{" Binds "}" -> Expr {cons("Attrs")}
+    "rec" "{" Bind* "}" -> Expr {cons("Rec")}
+    "let" "{" Bind* "}" -> Expr {cons("LetRec")}
+    "{" Bind* "}" -> Expr {cons("Attrs")}
 
-    Bind* -> Binds
     Id "=" Expr ";" -> Bind {cons("Bind")}
     "inherit" ("(" Expr ")")? Id* ";" -> Bind {cons("Inherit")}
 
