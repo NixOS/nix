@@ -81,6 +81,7 @@ exports
   > Expr "&&" Expr -> Expr
   > Expr "||" Expr -> Expr
   > Expr "->" Expr -> Expr
+  > "if" Expr "then" Expr "else" Expr -> Expr
   > "assert" Expr ";" Expr -> Expr
   > "with" Expr ";" Expr -> Expr
   > Id ":" Expr -> Expr
