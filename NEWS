@@ -1,7 +1,23 @@
 Version 0.9
 
+NOTE: this version of Nix used Berkeley DB 4.3 instead of 4.2.  The
+database is upgraded automatically, but you should be careful not to
+use old versions of Nix that still use Berkeley DB 4.2.  In
+particular, if you use a Nix installed through Nix, you should run
+
+  nix-store --clear-substitutes
+
+first.
+
 * Unpacking of patch sequences is much faster now by not doing
   redundant unpacking and repacking of intermediate paths.
+
+* Nix now uses Berkeley DB 4.3.
+
+* The `derivation' primitive is lazier.  Attributes of dependent
+  derivations can mutually refer to each other (as long as there are
+  no data dependencies on the `outPath' and `drvPath' attributes
+  computed by `derivation').
 
 
 Version 0.8 (April 11, 2005)
