@@ -233,7 +233,12 @@ Expr substitute(const ATermMap & subs, Expr e)
 
     if (matchVar(e, name)) {
         Expr sub = subs.get(name);
-        return sub ? makeClosed(sub) : e;
+        Expr wrapped;
+        /* Add a "closed" wrapper around terms that aren't already
+           closed.  The check is necessary to prevent repeated
+           wrapping, e.g., closed(closed(closed(...))), which kills
+           caching. */
+        return sub ? (matchClosed(sub, wrapped) ? sub : makeClosed(sub)) : e;
     }
 
     /* In case of a function, filter out all variables bound by this
