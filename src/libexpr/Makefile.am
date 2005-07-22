@@ -1,6 +1,6 @@
-noinst_LIBRARIES = libexpr.a
+lib_LTLIBRARIES = libexpr.la
 
-libexpr_a_SOURCES = nixexpr.cc nixexpr.hh parser.cc parser.hh \
+libexpr_la_SOURCES = nixexpr.cc nixexpr.hh parser.cc parser.hh \
  eval.cc eval.hh primops.cc \
  lexer-tab.c lexer-tab.h parser-tab.c parser-tab.h \
  nixexpr-ast.hh

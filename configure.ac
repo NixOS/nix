@@ -2,7 +2,7 @@ AC_INIT(nix, "0.9")
 AC_CONFIG_SRCDIR(README)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE([dist-bzip2])
-
+        
 # Change to `1' to produce a `stable' release (i.e., the `preREVISION'
 # suffix is not added).
 STABLE=0
@@ -47,6 +47,10 @@ AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
 AC_PROG_CC
 AC_PROG_CXX
 AC_PROG_RANLIB
+
+# We are going to use libtool.
+AC_DISABLE_STATIC
+AC_PROG_LIBTOOL
 
 # Check for pubsetbuf.
 AC_MSG_CHECKING([for pubsetbuf])

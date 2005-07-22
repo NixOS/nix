@@ -1,8 +1,8 @@
 bin_PROGRAMS = nix-hash
 
 nix_hash_SOURCES = nix-hash.cc help.txt
-nix_hash_LDADD = ../libmain/libmain.a ../libstore/libstore.a ../libutil/libutil.a \
- ../boost/format/libformat.a ${bdb_lib} ${aterm_lib}
+nix_hash_LDADD = ../libmain/libmain.la ../libstore/libstore.la ../libutil/libutil.la \
+ ../boost/format/libformat.la ${bdb_lib} ${aterm_lib}
 
 nix-hash.o: help.txt.hh
 

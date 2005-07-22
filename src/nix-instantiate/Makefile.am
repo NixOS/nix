@@ -1,9 +1,9 @@
 bin_PROGRAMS = nix-instantiate
 
 nix_instantiate_SOURCES = main.cc help.txt
-nix_instantiate_LDADD = ../libmain/libmain.a ../libexpr/libexpr.a \
- ../libstore/libstore.a ../libutil/libutil.a \
- ../boost/format/libformat.a ${bdb_lib} ${aterm_lib}
+nix_instantiate_LDADD = ../libmain/libmain.la ../libexpr/libexpr.la \
+ ../libstore/libstore.la ../libutil/libutil.la \
+ ../boost/format/libformat.la ${bdb_lib} ${aterm_lib}
 
 main.o: help.txt.hh
 

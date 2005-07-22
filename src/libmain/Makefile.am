@@ -1,6 +1,6 @@
-noinst_LIBRARIES = libmain.a
+lib_LTLIBRARIES = libmain.la
 
-libmain_a_SOURCES = shared.cc shared.hh
+libmain_la_SOURCES = shared.cc shared.hh
 
 AM_CXXFLAGS = \
  -DNIX_STORE_DIR=\"$(storedir)\" \

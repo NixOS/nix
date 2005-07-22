@@ -1,6 +1,6 @@
-noinst_LIBRARIES = libstore.a
+lib_LTLIBRARIES = libstore.la
 
-libstore_a_SOURCES = \
+libstore_la_SOURCES = \
  store.cc store.hh derivations.cc derivations.hh \
  build.cc misc.cc build.hh \
  globals.cc globals.hh db.cc db.hh \

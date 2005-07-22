@@ -1,8 +1,8 @@
 bin_PROGRAMS = nix-store
 
 nix_store_SOURCES = main.cc dotgraph.cc dotgraph.hh help.txt
-nix_store_LDADD = ../libmain/libmain.a ../libstore/libstore.a ../libutil/libutil.a \
- ../boost/format/libformat.a ${bdb_lib} ${aterm_lib}
+nix_store_LDADD = ../libmain/libmain.la ../libstore/libstore.la ../libutil/libutil.la \
+ ../boost/format/libformat.la ${bdb_lib} ${aterm_lib}
 
 main.o: help.txt.hh
 

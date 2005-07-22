@@ -2,9 +2,9 @@ bin_PROGRAMS = nix-env
 
 nix_env_SOURCES = main.cc names.cc names.hh \
  profiles.cc profiles.hh help.txt
-nix_env_LDADD = ../libmain/libmain.a ../libexpr/libexpr.a \
- ../libstore/libstore.a ../libutil/libutil.a \
- ../boost/format/libformat.a ${bdb_lib} ${aterm_lib}
+nix_env_LDADD = ../libmain/libmain.la ../libexpr/libexpr.la \
+ ../libstore/libstore.la ../libutil/libutil.la \
+ ../boost/format/libformat.la ${bdb_lib} ${aterm_lib}
 
 main.o: help.txt.hh
 
