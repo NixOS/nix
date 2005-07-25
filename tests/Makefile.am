@@ -40,7 +40,6 @@ gc-concurrent.sh: gc-concurrent.nix gc-concurrent2.nix
 TESTS = init.sh hash.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
   build-hook.sh substitutes.sh substitutes2.sh fallback.sh nix-push.sh gc.sh \
   gc-concurrent.sh verify.sh nix-pull.sh
-#TESTS = init.sh gc.sh
 
 XFAIL_TESTS =
 

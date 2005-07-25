@@ -56,6 +56,11 @@ for i in \
     chmod +x $i
 done
 
+# Another ugly hack.
+sed "s|^$|PATH=$PATH|" < $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh > tmp
+chmod +x tmp
+mv tmp $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh
+
 # Initialise the database.
 $TOP/src/nix-store/nix-store --init
 
