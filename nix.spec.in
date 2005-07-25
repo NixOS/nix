@@ -67,6 +67,7 @@ fi
 %files
 #%defattr(-,root,root)
 %{_prefix}/bin
+%{_prefix}/lib
 %{_prefix}/libexec
 %{_prefix}/var
 %{_prefix}/share
