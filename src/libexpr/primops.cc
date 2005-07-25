@@ -414,17 +414,13 @@ static Expr primIsNull(EvalState & state, const ATermVector & args)
 static Expr primMap(EvalState & state, const ATermVector & args)
 {
     Expr fun = evalExpr(state, args[0]);
-    Expr list = evalExpr(state, args[1]);
+    ATermList list = evalList(state, args[1]);
 
-    ATermList list2;
-    if (!matchList(list, list2))
-        throw Error("`map' expects a list as its second argument");
+    ATermList res = ATempty;
+    for (ATermIterator i(list); i; ++i)
+        res = ATinsert(res, makeCall(fun, *i));
 
-    ATermList list3 = ATempty;
-    for (ATermIterator i(list2); i; ++i)
-        list3 = ATinsert(list3, makeCall(fun, *i));
-
-    return makeList(ATreverse(list3));
+    return makeList(ATreverse(res));
 }
 
 
@@ -449,9 +445,7 @@ static Expr primRemoveAttrs(EvalState & state, const ATermVector & args)
     ATermMap attrs;
     queryAllAttrs(evalExpr(state, args[0]), attrs, true);
     
-    ATermList list;
-    if (!matchList(evalExpr(state, args[1]), list))
-        throw Error("`removeAttrs' expects a list as its second argument");
+    ATermList list = evalList(state, args[1]);
 
     for (ATermIterator i(list); i; ++i)
         /* It's not an error for *i not to exist. */

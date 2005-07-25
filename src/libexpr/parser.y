@@ -64,6 +64,7 @@ static Pos makeCurPos(YYLTYPE * loc, void * data)
 %right UPDATE
 %left NEG
 %left '+'
+%left CONCAT
 %nonassoc '?'
 %nonassoc '~'
 
@@ -102,6 +103,7 @@ expr_op
   | expr_op '~' expr_op { $$ = makeSubPath($1, $3); }
   | expr_op '?' ID { $$ = makeOpHasAttr($1, $3); }
   | expr_op '+' expr_op { $$ = makeOpPlus($1, $3); }
+  | expr_op CONCAT expr_op { $$ = makeOpConcat($1, $3); }
   | expr_app
   ;
 

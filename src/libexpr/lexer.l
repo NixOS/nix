@@ -59,6 +59,7 @@ inherit     { return INHERIT; }
 \|\|        { return OR; }
 \-\>        { return IMPL; }
 \/\/        { return UPDATE; }
+\+\+        { return CONCAT; }
 
 {ID}        { yylval->t = ATmake("<str>", yytext); return ID; /* !!! alloc */ }
 {INT}       { int n = atoi(yytext); /* !!! overflow */

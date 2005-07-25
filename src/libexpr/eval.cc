@@ -140,6 +140,15 @@ bool evalBool(EvalState & state, Expr e)
 }
 
 
+ATermList evalList(EvalState & state, Expr e)
+{
+    e = evalExpr(state, e);
+    ATermList list;
+    if (!matchList(e, list)) throw Error("list expected");
+    return list;
+}
+
+
 Expr evalExpr2(EvalState & state, Expr e)
 {
     Expr e1, e2, e3, e4;
@@ -334,6 +343,13 @@ Expr evalExpr2(EvalState & state, Expr e)
             return makePath(toATerm(canonPath(
                 (string) aterm2String(s1) + "/" + (string) aterm2String(s2))));
         else throw Error("wrong argument types in `+' operator");
+    }
+
+    /* List concatenation. */
+    if (matchOpConcat(e, e1, e2)) {
+        ATermList l1 = evalList(state, e1);
+        ATermList l2 = evalList(state, e2);
+        return makeList(ATconcat(l1, l2));
     }
 
     /* Barf. */

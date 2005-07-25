@@ -18,6 +18,7 @@ OpUpdate | Expr Expr | Expr |
 SubPath | Expr Expr | Expr |
 OpHasAttr | Expr string | Expr |
 OpPlus | Expr Expr | Expr |
+OpConcat | Expr Expr | Expr |
 Call | Expr Expr | Expr |
 Select | Expr string | Expr |
 Var | string | Expr |
