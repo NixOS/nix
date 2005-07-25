@@ -758,9 +758,8 @@ void makeStorePath(const Hash & contentHash, const string & suffix,
 {
     checkStoreName(suffix);
 
-    /* e.g., "sha256:1abc...:/nix/store:foo.tar.gz" */
-    string s = "sha256:" + printHash(contentHash) + ":"
-        + nixStore + ":" + suffix;
+    /* e.g., "sha256:1abc...:foo.tar.gz" */
+    string s = "sha256:" + printHash(contentHash) + ":" + suffix;
 
     pathHash = PathHash(hashString(htSHA256, s));
     
