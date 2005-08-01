@@ -32,8 +32,8 @@ components ranging from basic development stuff such as GCC and Glibc,
 to end-user applications like Mozilla Firefox.  (Nix is however not
 tied to the Nix Package collection; you could write your own Nix
 expressions based on it, or completely new ones.)  You can download
-the latest version from <ulink
-url='http://catamaran.labs.cs.uu.nl/dist/nix' />.</para>
+the latest version from <ulink url='http://nix.cs.uu.nl/dist/nix'
+/>.</para>
 
 <para>Assuming that you have downloaded and unpacked a release of Nix
 Packages, you can view the set of available components in the release:
@@ -97,16 +97,15 @@ available somewhere.  This is done using the
 containing a <emphasis>manifest</emphasis> describing what binaries
 are available.  This URL should correspond to the Nix Packages release
 that you’re using.  For instance, if you obtained a release from
-<ulink
-url='http://catamaran.labs.cs.uu.nl/dist/nix/nixpkgs-0.6pre1554/' />,
-then you should do:
+<ulink url='http://nix.cs.uu.nl/dist/nix/nixpkgs-0.6pre1554/' />, then
+you should do:
 
 <screen>
-$ nix-pull http://catamaran.labs.cs.uu.nl/dist/nix/nixpkgs-0.6pre1554/MANIFEST</screen>
+$ nix-pull http://nix.cs.uu.nl/dist/nix/nixpkgs-0.6pre1554/MANIFEST</screen>
 
 If you then issue the installation command, it should start
 downloading binaries from <systemitem
-class='fqdomainname'>catamaran.labs.cs.uu.nl</systemitem>, instead of
+class='fqdomainname'>nix.cs.uu.nl</systemitem>, instead of
 building them from source.  This might still take a while since all
 dependencies must be downloaded, but on a reasonably fast connection
 such as an DSL line it’s on the order of a few minutes.</para>
@@ -425,7 +424,7 @@ URL.</para>
 <command>nix-channel --add</command>, e.g.,
 
 <screen>
-$ nix-channel --add http://catamaran.labs.cs.uu.nl/dist/nix/channels/nixpkgs-unstable</screen>
+$ nix-channel --add http://nix.cs.uu.nl/dist/nix/channels-v3/nixpkgs-unstable</screen>
 
 subscribes you to a channel that always contains that latest version
 of the Nix Packages collection.  (Instead of

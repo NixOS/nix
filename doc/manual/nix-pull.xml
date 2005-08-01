@@ -36,7 +36,7 @@
     <title>Examples</title>
 
     <screen>
-$ nix-pull http://catamaran.labs.cs.uu.nl/dist/nix/nixpkgs-0.5pre753/MANIFEST</screen>
+$ nix-pull http://nix.cs.uu.nl/dist/nix/nixpkgs-0.5pre753/MANIFEST</screen>
 
   </refsection>
     

@@ -27,7 +27,7 @@ file).</para></listitem>
 <listitem><para>Subscribe to the Nix Packages channel.
 
 <screen>
-$ nix-channel --add http://catamaran.labs.cs.uu.nl/dist/nix/channels/nixpkgs-unstable</screen>
+$ nix-channel --add http://nix.cs.uu.nl/dist/nix/channels-v3/nixpkgs-unstable</screen>
 
 </para></listitem>
 
