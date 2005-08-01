@@ -117,10 +117,11 @@ void Decoder::finishLine()
     if (priority != 1) cout << " priority='" << priority << "'";
     cout << ">";
 
-    for (int i = 0; i < line.size(); i++) {
+    for (unsigned int i = 0; i < line.size(); i++) {
 
         if (line[i] == '<') cout << "&lt;";
         else if (line[i] == '&') cout << "&amp;";
+        else if (line[i] < 32 && line[i] != 9) cout << "&#xfffd;";
         else if (i + sz + 33 < line.size() &&
             string(line, i, sz) == storeDir &&
             line[i + sz + 32] == '-')
