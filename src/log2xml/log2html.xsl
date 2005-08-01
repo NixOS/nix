@@ -23,12 +23,14 @@
     </html>
   </xsl:template>
 
+  
   <xsl:template match="nest">
 
     <!-- The tree should be collapsed by default if all children are
          unimportant or if the header is unimportant. -->
-    <xsl:variable name="collapsed"
-                  select="count(.//line[not(@priority = 3)]) = 0 or ./head[@priority = 3]" />
+<!--    <xsl:variable name="collapsed"
+                  select="count(.//line[not(@priority = 3)]) = 0 or ./head[@priority = 3]" /> -->
+    <xsl:variable name="collapsed" select="count(.//*[@error]) = 0"/>
                   
     <xsl:variable name="style"><xsl:if test="$collapsed">display: none;</xsl:if></xsl:variable>
     <xsl:variable name="arg"><xsl:choose><xsl:when test="$collapsed">true</xsl:when><xsl:otherwise>false</xsl:otherwise></xsl:choose></xsl:variable>
@@ -52,13 +54,18 @@
       </xsl:for-each>
     </ul>
   </xsl:template>
+
   
   <xsl:template match="head|line">
     <code>
+      <xsl:if test="@error">
+        <xsl:attribute name="class">error</xsl:attribute>
+      </xsl:if>
       <xsl:apply-templates/>
     </code>
   </xsl:template>
 
+  
   <xsl:template match="storeref">
     <em class='storeref'>
       <span class='popup'><xsl:apply-templates/></span>

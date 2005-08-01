@@ -79,3 +79,8 @@ em.storeref:hover span.popup {
     font-family: monospace;
     font-size: larger;
 }
+
+.error {
+    color: #ff0000;
+    font-weight: bold;
+}
