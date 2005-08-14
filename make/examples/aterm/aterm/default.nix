@@ -19,11 +19,7 @@ rec {
     ./version.c
   ];
 
-  compile = fn: compileC {
-    main = fn;
-    localIncludes = "auto";
-    forSharedLib = sharedLib;
-  };
+  compile = main: compileC {inherit main sharedLib;};
 
   libATerm = makeLibrary {
     libraryName = "ATerm";

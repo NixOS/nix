@@ -8,7 +8,7 @@ rec {
   stdenv = pkgs.stdenv;
   
 
-  compileC = {main, localIncludes ? [], cFlags ? "", forSharedLib ? false}:
+  compileC = {main, localIncludes ? "auto", cFlags ? "", sharedLib ? false}:
   stdenv.mkDerivation {
     name = "compile-c";
     builder = ./compile-c.sh;
@@ -24,7 +24,7 @@ rec {
     inherit main;
     cFlags = [
       cFlags
-      (if forSharedLib then ["-fpic"] else [])
+      (if sharedLib then ["-fpic"] else [])
     ];
   };
 
