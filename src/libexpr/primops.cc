@@ -410,6 +410,117 @@ static Expr primIsNull(EvalState & state, const ATermVector & args)
 }
 
 
+static Path findDependency(Path start, string dep)
+{
+    if (dep[0] == '/') throw Error(
+        format("illegal absolute dependency `%1%'") % dep);
+
+    Path p = canonPath(dirOf(start) + "/" + dep);
+
+    if (pathExists(p))
+        return p;
+    else
+        return "";
+}
+
+
+/* Make path `p' relative to directory `pivot'.  E.g.,
+   relativise("/a/b/c", "a/b/x/y") => "../x/y".  Both input paths
+   should be in absolute canonical form. */
+static string relativise(Path pivot, Path p)
+{
+    assert(pivot.size() > 0 && pivot[0] == '/');
+    assert(p.size() > 0 && p[0] == '/');
+        
+    if (pivot == p) return ".";
+
+    /* `p' is in `pivot'? */
+    Path pivot2 = pivot + "/";
+    if (p.substr(0, pivot2.size()) == pivot2) {
+        return p.substr(pivot2.size());
+    }
+
+    /* Otherwise, `p' is in a parent of `pivot'.  Find up till which
+       path component `p' and `pivot' match, and add an appropriate
+       number of `..' components. */
+    unsigned int i = 1;
+    while (1) {
+        unsigned int j = pivot.find('/', i);
+        if (j == string::npos) break;
+        j++;
+        if (pivot.substr(0, j) != p.substr(0, j)) break;
+        i = j;
+    }
+
+    string prefix;
+    unsigned int slashes = count(pivot.begin() + i, pivot.end(), '/') + 1;
+    while (slashes--) {
+        prefix += "../";
+    }
+
+    return prefix + p.substr(i);
+}
+
+
+static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
+{
+    Expr attrs = evalExpr(state, args[0]);
+
+    Expr scanner = queryAttr(attrs, "scanner");
+    if (!scanner) throw Error("attribute `scanner' required");
+    
+    Expr startSet = queryAttr(attrs, "startSet");
+    if (!startSet) throw Error("attribute `startSet' required");
+    ATermList startSet2 = evalList(state, startSet);
+
+    Path pivot;
+    PathSet workSet;
+    for (ATermIterator i(startSet2); i; ++i) {
+        Path p = evalPath(state, *i);
+        workSet.insert(p);
+        pivot = dirOf(p);
+    }
+
+    /* Construct the dependency closure by querying the dependency of
+       each path in `workSet', adding the dependencies to
+       `workSet'. */
+    PathSet doneSet;
+    while (!workSet.empty()) {
+	Path path = *(workSet.begin());
+	workSet.erase(path);
+
+	if (doneSet.find(path) != doneSet.end()) continue;
+        doneSet.insert(path);
+
+        /* Call the `scanner' function with `path' as argument. */
+        printMsg(lvlError, format("finding dependencies in `%1%'") % path);
+        ATermList deps = evalList(state, makeCall(scanner, makePath(toATerm(path))));
+
+        /* Try to find the dependencies relative to the `path'. */
+        for (ATermIterator i(deps); i; ++i) {
+            Path dep = findDependency(path, evalString(state, *i));
+            if (dep == "")
+                printMsg(lvlError, format("did NOT find dependency `%1%'") % dep);
+            else {
+                printMsg(lvlError, format("found dependency `%1%'") % dep);
+                workSet.insert(dep);
+            }
+        }
+    }
+
+    /* Return a list of the dependencies we've just found. */
+    ATermList deps = ATempty;
+    for (PathSet::iterator i = doneSet.begin(); i != doneSet.end(); ++i) {
+        deps = ATinsert(deps, makeStr(toATerm(relativise(pivot, *i))));
+        deps = ATinsert(deps, makePath(toATerm(*i)));
+    }
+
+    printMsg(lvlError, format("RESULT is `%1%'") % makeList(deps));
+    
+    return makeList(deps);
+}
+
+
 /* Apply a function to every element of a list. */
 static Expr primMap(EvalState & state, const ATermVector & args)
 {
@@ -469,6 +580,7 @@ void EvalState::addPrimOps()
     addPrimOp("baseNameOf", 1, primBaseNameOf);
     addPrimOp("toString", 1, primToString);
     addPrimOp("isNull", 1, primIsNull);
+    addPrimOp("dependencyClosure", 1, primDependencyClosure);
 
     addPrimOp("map", 2, primMap);
     addPrimOp("removeAttrs", 2, primRemoveAttrs);

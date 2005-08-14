@@ -14,11 +14,13 @@ rec {
     builder = ./compile-c.sh;
     localIncludes =
       if localIncludes == "auto" then
-        import (findIncludes {
-          main = toString main;
-          hack = __currentTime;
-          inherit cFlags;
-        })
+        dependencyClosure {
+          scanner = main:
+            import (findIncludes {
+              inherit main;
+            });
+          startSet = [main];
+        }
       else
         localIncludes;
     inherit main;
@@ -36,10 +38,11 @@ rec {
   };
   */
 
-  findIncludes = {main, hack, cFlags ? ""}: stdenv.mkDerivation {
+  findIncludes = {main}: stdenv.mkDerivation {
     name = "find-includes";
-    builder = ./find-includes.sh;
-    inherit main hack cFlags;
+    realBuilder = pkgs.perl ~ "bin/perl";
+    args = [ ./find-includes.pl ];
+    inherit main;
   };
   
   link = {objects, programName ? "program", libraries ? []}: stdenv.mkDerivation {

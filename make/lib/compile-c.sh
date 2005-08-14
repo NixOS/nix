@@ -70,4 +70,5 @@ fi
 
 mkdir $out
 test "$prefix" && cd $prefix
+ls -l
 gcc -Wall $cFlags -c $mainName -o $out/$mainName.o
