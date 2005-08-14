@@ -16,12 +16,14 @@ void run(Strings args)
     HashType ht = htMD5;
     bool flat = false;
     bool base32 = false;
+    bool truncate = false;
     
     for (Strings::iterator i = args.begin();
          i != args.end(); i++)
     {
         if (*i == "--flat") flat = true;
         else if (*i == "--base32") base32 = true;
+        else if (*i == "--truncate") truncate = true;
         else if (*i == "--type") {
             ++i;
             if (i == args.end()) throw UsageError("`--type' requires an argument");
@@ -31,6 +33,7 @@ void run(Strings args)
         }
         else {
             Hash h = flat ? hashFile(ht, *i) : hashPath(ht, *i);
+            if (truncate && h.hashSize > 20) h = compressHash(h, 20);
             cout << format("%1%\n") %
                 (base32 ? printHash32(h) : printHash(h));
         }
