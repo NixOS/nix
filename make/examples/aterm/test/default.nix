@@ -4,7 +4,7 @@ let {
   inherit (import ../aterm {}) libATerm;
 
   compileTest = main: link {
-    objects = [(compileC {inherit main; cFlags = "-I../aterm";})];
+    objects = [(compileC {inherit main; localIncludePath = [ ../aterm ];})];
     libraries = libATerm;
   };
 

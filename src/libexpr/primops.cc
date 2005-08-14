@@ -372,6 +372,14 @@ static Expr primBaseNameOf(EvalState & state, const ATermVector & args)
 }
 
 
+/* Return the directory of the given path, i.e., everything before the
+   last slash. */
+static Expr primDirOf(EvalState & state, const ATermVector & args)
+{
+    return makePath(toATerm(dirOf(evalPath(state, args[0]))));
+}
+
+
 /* Convert the argument (which can be a path or a uri) to a string. */
 static Expr primToString(EvalState & state, const ATermVector & args)
 {
@@ -410,12 +418,12 @@ static Expr primIsNull(EvalState & state, const ATermVector & args)
 }
 
 
-static Path findDependency(Path start, string dep)
+static Path findDependency(Path dir, string dep)
 {
     if (dep[0] == '/') throw Error(
         format("illegal absolute dependency `%1%'") % dep);
 
-    Path p = canonPath(dirOf(start) + "/" + dep);
+    Path p = canonPath(dir + "/" + dep);
 
     if (pathExists(p))
         return p;
@@ -464,11 +472,11 @@ static string relativise(Path pivot, Path p)
 
 static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
 {
+    startNest(nest, lvlDebug, "finding dependencies");
+
     Expr attrs = evalExpr(state, args[0]);
 
-    Expr scanner = queryAttr(attrs, "scanner");
-    if (!scanner) throw Error("attribute `scanner' required");
-    
+    /* Get the start set. */
     Expr startSet = queryAttr(attrs, "startSet");
     if (!startSet) throw Error("attribute `startSet' required");
     ATermList startSet2 = evalList(state, startSet);
@@ -481,6 +489,20 @@ static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
         pivot = dirOf(p);
     }
 
+    /* Get the search path. */
+    PathSet searchPath;
+    Expr e = queryAttr(attrs, "searchPath");
+    if (e) {
+        ATermList list = evalList(state, e);
+        for (ATermIterator i(list); i; ++i) {
+            Path p = evalPath(state, *i);
+            searchPath.insert(p);
+        }
+    }
+
+    Expr scanner = queryAttr(attrs, "scanner");
+    if (!scanner) throw Error("attribute `scanner' required");
+    
     /* Construct the dependency closure by querying the dependency of
        each path in `workSet', adding the dependencies to
        `workSet'. */
@@ -492,19 +514,38 @@ static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
 	if (doneSet.find(path) != doneSet.end()) continue;
         doneSet.insert(path);
 
-        /* Call the `scanner' function with `path' as argument. */
-        printMsg(lvlError, format("finding dependencies in `%1%'") % path);
-        ATermList deps = evalList(state, makeCall(scanner, makePath(toATerm(path))));
+        try {
+            
+            /* Call the `scanner' function with `path' as argument. */
+            debug(format("finding dependencies in `%1%'") % path);
+            ATermList deps = evalList(state, makeCall(scanner, makePath(toATerm(path))));
 
-        /* Try to find the dependencies relative to the `path'. */
-        for (ATermIterator i(deps); i; ++i) {
-            Path dep = findDependency(path, evalString(state, *i));
-            if (dep == "")
-                printMsg(lvlError, format("did NOT find dependency `%1%'") % dep);
-            else {
-                printMsg(lvlError, format("found dependency `%1%'") % dep);
-                workSet.insert(dep);
+            /* Try to find the dependencies relative to the `path'. */
+            for (ATermIterator i(deps); i; ++i) {
+                string s = evalString(state, *i);
+                
+                Path dep = findDependency(dirOf(path), s);
+
+                if (dep == "") {
+                    for (PathSet::iterator j = searchPath.begin();
+                         j != searchPath.end(); ++j)
+                    {
+                        dep = findDependency(*j, s);
+                        if (dep != "") break;
+                    }
+                }
+                
+                if (dep == "")
+                    debug(format("did NOT find dependency `%1%'") % s);
+                else {
+                    debug(format("found dependency `%1%'") % dep);
+                    workSet.insert(dep);
+                }
             }
+
+        } catch (Error & e) {
+            throw Error(format("while finding dependencies in `%1%':\n%2%")
+                % path % e.msg());
         }
     }
 
@@ -515,7 +556,7 @@ static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
         deps = ATinsert(deps, makePath(toATerm(*i)));
     }
 
-    printMsg(lvlError, format("RESULT is `%1%'") % makeList(deps));
+    debug(format("dependency list is `%1%'") % makeList(deps));
     
     return makeList(deps);
 }
@@ -566,6 +607,14 @@ static Expr primRemoveAttrs(EvalState & state, const ATermVector & args)
 }
 
 
+static Expr primRelativise(EvalState & state, const ATermVector & args) 
+{
+    Path pivot = evalPath(state, args[0]);
+    Path path = evalPath(state, args[1]);
+    return makeStr(toATerm(relativise(pivot, path)));
+}
+
+
 void EvalState::addPrimOps()
 {
     addPrimOp("true", 0, primTrue);
@@ -578,12 +627,12 @@ void EvalState::addPrimOps()
     addPrimOp("derivation!", 1, primDerivationStrict);
     addPrimOp("derivation", 1, primDerivationLazy);
     addPrimOp("baseNameOf", 1, primBaseNameOf);
+    addPrimOp("dirOf", 1, primDirOf);
     addPrimOp("toString", 1, primToString);
     addPrimOp("isNull", 1, primIsNull);
     addPrimOp("dependencyClosure", 1, primDependencyClosure);
 
     addPrimOp("map", 2, primMap);
     addPrimOp("removeAttrs", 2, primRemoveAttrs);
+    addPrimOp("relativise", 2, primRelativise);
 }
-
-

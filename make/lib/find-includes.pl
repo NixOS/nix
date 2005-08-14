@@ -9,7 +9,9 @@ print OUT "[\n";
 open IN, "<$root" or die "$!";
 while (<IN>) {
     if (/^\#include\s+\"(.*)\"/) {
-        print "DEP $1\n";
+        print OUT "\"$1\"\n";
+    }
+    if (/^\#include\s+\<(.*)\>/) {
         print OUT "\"$1\"\n";
     }
 }
