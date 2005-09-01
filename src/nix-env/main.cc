@@ -584,23 +584,27 @@ static void uninstallDerivations(Globals & globals, DrvNames & selectors,
     Path & profile)
 {
     UserEnvElems installedElems = queryInstalled(globals.state, profile);
+    UserEnvElems newElems;
 
     for (UserEnvElems::iterator i = installedElems.begin();
          i != installedElems.end(); ++i)
     {
         DrvName drvName(i->second.name);
+        bool found = false;
         for (DrvNames::iterator j = selectors.begin();
              j != selectors.end(); ++j)
             if (j->matches(drvName)) {
                 printMsg(lvlInfo,
                     format("uninstalling `%1%'") % i->second.name);
-                installedElems.erase(i);
+                found = true;
+                break;
             }
+        if (!found) newElems.insert(*i);
     }
 
     if (globals.dryRun) return;
 
-    createUserEnv(globals.state, installedElems,
+    createUserEnv(globals.state, newElems,
         profile, globals.keepDerivations);
 }
 
