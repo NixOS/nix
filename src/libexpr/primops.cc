@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "build.hh"
 #include "eval.hh"
 #include "globals.hh"
