@@ -1,5 +1,7 @@
 export PATH=/bin:/usr/bin:$PATH
 
+env
+
 sleep 3
 
 touch $out
