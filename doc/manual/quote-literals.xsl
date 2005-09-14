@@ -17,12 +17,6 @@
     <screen><xsl:apply-templates select="str:split(., '&#xA;')" /></screen>
   </xsl:template>
 
-<!--  
-  <xsl:template match="section/title">
-    <title><xsl:text>FOO&#xA;BAR</xsl:text><xsl:value-of select="." /></title>
-  </xsl:template>
--->
- 
   <xsl:template match="section[following::section]">
     <section>
       <xsl:apply-templates />
