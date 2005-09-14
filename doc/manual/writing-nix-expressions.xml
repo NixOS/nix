@@ -1047,6 +1047,11 @@ weakest binding).</para>
         <replaceable>id</replaceable>.</entry>
       </row>
       <row>
+        <entry><replaceable>e1</replaceable> ++ <replaceable>e2</replaceable></entry>
+        <entry>right</entry>
+        <entry>List concatenation.</entry>
+      </row>
+      <row>
         <entry><replaceable>e1</replaceable> + <replaceable>e2</replaceable></entry>
         <entry>left</entry>
         <entry>String or path concatenation.</entry>

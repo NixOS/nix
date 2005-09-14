@@ -37,7 +37,24 @@ manual.html: $(MANUAL_SRCS) manual.is-valid images
 	$(XSLTPROC) --nonet --xinclude --output manual.html \
 	  $(docbookxsl)/html/docbook.xsl manual.xml
 
-all-local: manual.html
+
+NEWS_OPTS = \
+ --stringparam generate.toc "article nop" \
+ --stringparam section.autolabel.max.depth 0 \
+ --stringparam header.rule 0
+
+NEWS.html: release-notes.xml
+	$(XSLTPROC) --nonet --xinclude --output $@ $(NEWS_OPTS) \
+	  $(docbookxsl)/html/docbook.xsl release-notes.xml
+
+NEWS.txt: release-notes.xml
+	$(XSLTPROC) --nonet --xinclude quote-literals.xsl release-notes.xml | \
+	  $(XSLTPROC) --nonet --output $@.tmp.html $(NEWS_OPTS) \
+	  $(docbookxsl)/html/docbook.xsl -
+	w3m -dump $@.tmp.html > $@
+
+
+all-local: manual.html NEWS.html NEWS.txt
 
 install-data-local: manual.html
 	$(INSTALL) -d $(DESTDIR)$(datadir)/nix/manual
