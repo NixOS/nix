@@ -64,7 +64,7 @@ static Pos makeCurPos(YYLTYPE * loc, void * data)
 %right UPDATE
 %left NEG
 %left '+'
-%left CONCAT
+%right CONCAT
 %nonassoc '?'
 %nonassoc '~'
 
