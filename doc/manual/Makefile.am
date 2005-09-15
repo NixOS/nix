@@ -51,7 +51,7 @@ NEWS.txt: release-notes.xml
 	$(XSLTPROC) --nonet --xinclude quote-literals.xsl release-notes.xml | \
 	  $(XSLTPROC) --nonet --output $@.tmp.html $(NEWS_OPTS) \
 	  $(docbookxsl)/html/docbook.xsl -
-	$(w3m) -dump $@.tmp.html > $@
+	LANG=en_US $(w3m) -dump $@.tmp.html > $@
 	rm $@.tmp.html
 
 
