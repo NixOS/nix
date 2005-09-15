@@ -2,11 +2,23 @@
 
 use strict;
 use readmanifest;
+use POSIX qw(tmpnam);
 
 my $manifestDir = "@localstatedir@/nix/manifests";
 my $logFile = "@localstatedir@/log/nix/downloads";
 
 open LOGFILE, ">>$logFile" or die "cannot open log file $logFile";
+
+
+# Create a temporary directory.
+my $tmpDir;
+do { $tmpDir = tmpnam(); }
+until mkdir $tmpDir, 0700;
+
+my $tmpNar = "$tmpDir/nar";
+my $tmpNar2 = "$tmpDir/nar2";
+
+END { unlink $tmpNar; unlink $tmpNar2; rmdir $tmpDir; }
 
 
 # Check the arguments.
@@ -217,7 +229,7 @@ while (scalar @path > 0) {
             # as a base to one or more patches.  So turn the base path
             # into a NAR archive, to which we can apply the patch.
             print "  packing base path...\n";
-            system "@bindir@/nix-store --dump $v > /tmp/nar";
+            system "@bindir@/nix-store --dump $v > $tmpNar";
             die "cannot dump `$v'" if ($? != 0);
         }
     }
@@ -235,18 +247,18 @@ while (scalar @path > 0) {
         # Apply the patch to the NAR archive produced in step 1 (for
         # the already present path) or a later step (for patch sequences).
         print "  applying patch...\n";
-        system "@libexecdir@/bspatch /tmp/nar /tmp/nar2 $patchPath";
-        die "cannot apply patch `$patchPath' to /tmp/nar" if ($? != 0);
+        system "@libexecdir@/bspatch $tmpNar $tmpNar2 $patchPath";
+        die "cannot apply patch `$patchPath' to $tmpNar" if ($? != 0);
 
         if ($curStep < $maxStep) {
             # The archive will be used as the base of the next patch.
-            rename "/tmp/nar2", "/tmp/nar" or die "cannot rename NAR archive: $!";
+            rename "$tmpNar2", "$tmpNar" or die "cannot rename NAR archive: $!";
         } else {
             # This was the last patch.  Unpack the final NAR archive
             # into the target path.
             print "  unpacking patched archive...\n";
-            system "@bindir@/nix-store --restore $v < /tmp/nar2";
-            die "cannot unpack /tmp/nar2 into `$v'" if ($? != 0);
+            system "@bindir@/nix-store --restore $v < $tmpNar2";
+            die "cannot unpack $tmpNar2 into `$v'" if ($? != 0);
         }
     }
 
@@ -262,7 +274,7 @@ while (scalar @path > 0) {
 
         if ($curStep < $maxStep) {
             # The archive will be used a base to a patch.
-            system "@bunzip2@ < '$narFilePath' > /tmp/nar";
+            system "@bunzip2@ < '$narFilePath' > $tmpNar";
         } else {
             # Unpack the archive into the target path.
             print "  unpacking archive...\n";
