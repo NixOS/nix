@@ -51,7 +51,8 @@ NEWS.txt: release-notes.xml
 	$(XSLTPROC) --nonet --xinclude quote-literals.xsl release-notes.xml | \
 	  $(XSLTPROC) --nonet --output $@.tmp.html $(NEWS_OPTS) \
 	  $(docbookxsl)/html/docbook.xsl -
-	w3m -dump $@.tmp.html > $@
+	$(w3m) -dump $@.tmp.html > $@
+	rm $@.tmp.html
 
 
 all-local: manual.html NEWS.html NEWS.txt
@@ -71,7 +72,7 @@ images:
 	cp $(docbookxsl)/images/callouts/*.png images/callouts
 	chmod +w -R images
 
-KEEP = manual.html manual.is-valid version.txt $(MANS)
+KEEP = manual.html manual.is-valid version.txt $(MANS) NEWS.html NEWS.txt
 
 EXTRA_DIST = $(MANUAL_SRCS) $(FIGURES) $(KEEP)
 

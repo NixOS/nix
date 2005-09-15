@@ -1,6 +1,6 @@
 SUBDIRS = externals src scripts corepkgs doc misc tests
 EXTRA_DIST = substitute.mk nix.spec nix.spec.in bootstrap.sh \
-  svn-revision nix.conf.example
+  svn-revision nix.conf.example NEWS
 
 include ./substitute.mk
 
@@ -45,3 +45,8 @@ endif
 
 svn-revision:
 	svnversion . > svn-revision
+
+all-local: NEWS
+
+NEWS:
+	cp doc/manual/NEWS.txt NEWS
