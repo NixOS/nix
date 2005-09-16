@@ -80,4 +80,9 @@
   <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="bugs.xml" />
   <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="glossary.xml" />
 
+  <appendix>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="release-notes.xml"
+                xpointer="xpointer(article/*)" />
+  </appendix>
+    
 </book>
