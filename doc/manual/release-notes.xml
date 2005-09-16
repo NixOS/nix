@@ -8,7 +8,7 @@
 <article><title>Nix Release Notes</title>
 
 
-<section><title>Release 0.9</title>
+<section><title>Release 0.9 (September 16, 2005)</title>
 
 <para>NOTE: this version of Nix uses Berkeley DB 4.3 instead of 4.2.
 The database is upgraded automatically, but you should be careful not
@@ -96,6 +96,24 @@ svnService = derivation {
 
   <listitem><para>Various bug fixes and performance
   improvements.</para></listitem>
+
+</itemizedlist>
+
+</section>
+
+
+
+<section><title>Release 0.8.1 (April 13, 2005)</title>
+
+<para>This is a bug fix release.</para>
+
+<itemizedlist>
+
+  <listitem><para>Patch downloading was broken.</para></listitem>
+
+  <listitem><para>The garbage collector would not delete paths that
+  had references from invalid (but substitutable)
+  paths.</para></listitem>
 
 </itemizedlist>
 
