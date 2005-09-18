@@ -56,7 +56,8 @@ else
 build-aterm: have-aterm
 	(pfx=`pwd` && \
 	cd $(ATERM) && \
-	CC="$(CC)" ./configure --prefix=$$pfx/inst-aterm && \
+	CC="$(CC)" ./configure --prefix=$$pfx/inst-aterm \
+	  --disable-shared --enable-static CFLAGS=-O1 && \
 	$(MAKE) && \
 	$(MAKE) install)
 	touch build-aterm
