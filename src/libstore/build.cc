@@ -1378,7 +1378,7 @@ void SubstitutionGoal::init()
     /* Read the substitutes. */
     subs = querySubstitutes(noTxn, storePath);
 
-    /* To maintain the closure invairant, we first have to realise the
+    /* To maintain the closure invariant, we first have to realise the
        paths referenced by this one. */
     queryReferences(noTxn, storePath, references);
 
