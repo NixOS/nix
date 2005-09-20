@@ -8,6 +8,16 @@
 <article><title>Nix Release Notes</title>
 
 
+<section><title>Release 0.9.1 (September 20, 2005)</title>
+
+<para>This bug fix release addresses a problem with the ATerm library
+when the <option>--with-aterm</option> flag in
+<command>configure</command> was <emphasis>not</emphasis> used.</para>
+
+</section>
+
+
+
 <section><title>Release 0.9 (September 16, 2005)</title>
 
 <para>NOTE: this version of Nix uses Berkeley DB 4.3 instead of 4.2.
