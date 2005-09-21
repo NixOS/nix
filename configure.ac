@@ -180,6 +180,13 @@ AC_SUBST(NIX_GROUP)
 AC_DEFINE_UNQUOTED(NIX_GROUP, ["$NIX_GROUP"], [Nix group])
 
                                                                                                             
+# This is needed if either ATerm or Berkeley DB are static libraries,
+# and the Nix libraries are dynamic.
+if test "$(uname)" = "Darwin"; then
+   LDFLAGS="-all_load $LDFLAGS"
+fi
+
+
 AM_CONFIG_HEADER([config.h])
 AC_CONFIG_FILES([Makefile
    externals/Makefile
