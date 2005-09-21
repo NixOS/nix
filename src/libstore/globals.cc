@@ -11,16 +11,13 @@ string nixDBPath = "/UNINIT";
 string nixConfDir = "/UNINIT";
 
 bool keepFailed = false;
-
 bool keepGoing = false;
-
 bool tryFallback = false;
-
 Verbosity buildVerbosity = lvlInfo;
-
 unsigned int maxBuildJobs = 1;
-
 bool readOnlyMode = false;
+bool buildAllowRoot = true;
+list<string> buildUsers;
 
 
 static bool settingsRead = false;

@@ -2,6 +2,7 @@
 #define __GLOBALS_H
 
 #include <string>
+#include <set>
 #include "util.hh"
 
 using namespace std;
@@ -51,6 +52,15 @@ extern unsigned int maxBuildJobs;
 /* Read-only mode.  Don't copy stuff to the store, don't change the
    database. */
 extern bool readOnlyMode;
+
+/* Whether to allow builds by root.  Corresponds to the
+   `build-allow-root' configuration option. */
+extern bool buildAllowRoot;
+
+/* The list of users under which root-initiated builds can be
+   performed.  Correspons to the `build-users' configuration
+   option. */
+extern list<string> buildUsers;
 
 
 string querySetting(const string & name, const string & def);

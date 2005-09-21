@@ -47,3 +47,34 @@ gc-keep-derivations = true
 # while this option was enabled, while `gc-keep-derivations' only
 # applies at the moment the garbage collector is run.
 env-keep-derivations = false
+
+
+### Option `build-allow-root'
+#
+# This option controls Nix's behaviour when it is invoked under the
+# `root' user (or setuid-root).  If `true' (default), builds are
+# performed under the `root' user.  If `false', builds are performed
+# under one of the users listed in the `build-users' option (see
+# below).
+build-allow-root = true
+
+
+### Option `build-users'
+#
+# This option is only applicable if `build-allow-root' is `false' and
+# Nix is invoked under the `root' user (or setuid-root).  It contains
+# a list of user names under which Nix can execute builds.  Builds
+# cannot be performed by root since that would allow users to take
+# over the system by supplying specially crafted builders; and they
+# cannot be performed by the calling user since that would allow
+# him/her to influence the build result.
+#
+# Thus this list should contain a number of `special' user accounts
+# created specifically for Nix, e.g., `nix-builder-1',
+# `nix-builder-2', and so on.  The more users the better, since at
+# most a number of builds equal to the number of build users can be
+# started.
+#
+# Example:
+#   build-users = nix-builder-1 nix-builder-2 nix-builder-3
+build-users =
