@@ -1,7 +1,6 @@
 #! @perl@ -w -I@libexecdir@/nix
 
 use strict;
-use IPC::Open2;
 use POSIX qw(tmpnam);
 use readmanifest;
 
@@ -74,10 +73,8 @@ print "$size store paths in manifest\n";
 # Register all substitutes.
 print STDERR "registering substitutes...\n";
 
-my $pid = open2(\*READ, \*WRITE, "$binDir/nix-store --register-substitutes")
+my $pid = open(WRITE, "|$binDir/nix-store --register-substitutes")
     or die "cannot run nix-store";
-
-close READ;
 
 foreach my $storePath (keys %narFiles) {
     my $narFileList = $narFiles{$storePath};
@@ -95,7 +92,4 @@ foreach my $storePath (keys %narFiles) {
     }
 }
 
-close WRITE;
-
-waitpid $pid, 0;
-$? == 0 or die "nix-store failed";
+close WRITE or die "nix-store failed: $?";

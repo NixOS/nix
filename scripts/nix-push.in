@@ -1,7 +1,6 @@
 #! @perl@ -w -I@libexecdir@/nix
 
 use strict;
-use IPC::Open2;
 use POSIX qw(tmpnam);
 use readmanifest;
 
@@ -62,20 +61,17 @@ foreach my $path (@ARGV) {
 
     # Get all paths referenced by the normalisation of the given 
     # Nix expression.
-    my $pid = open2(\*READ, \*WRITE,
+    my $pid = open(READ,
         "$binDir/nix-store --query --requisites --force-realise " .
-        "--include-outputs '$path'") or die;
-    close WRITE;
+        "--include-outputs '$path'|") or die;
     
     while (<READ>) {
         chomp;
         die "bad: $_" unless /^\//;
         $storePaths{$_} = "";
     }
-    close READ;
-    
-    waitpid $pid, 0;
-    $? == 0 or die "nix-store failed";
+
+    close READ or die "nix-store failed: $?";
 }
 
 my @storePaths = keys %storePaths;
@@ -104,18 +100,14 @@ close NIX;
 # Instantiate store expressions from the Nix expression.
 my @storeExprs;
 print STDERR "instantiating store expressions...\n";
-my $pid = open2(\*READ, \*WRITE, "$binDir/nix-instantiate $nixfile")
+my $pid = open(READ, "$binDir/nix-instantiate $nixfile|")
     or die "cannot run nix-instantiate";
-close WRITE;
 while (<READ>) {
     chomp;
     die unless /^\//;
     push @storeExprs, $_;
 }
-close READ;
-
-waitpid $pid, 0;
-$? == 0 or die "nix-instantiate failed";
+close READ or die "nix-instantiate failed: $?";
 
 
 # Realise the store expressions.
@@ -130,18 +122,14 @@ while (scalar @tmp > 0) {
     my @tmp2 = @tmp[0..$n - 1];
     @tmp = @tmp[$n..scalar @tmp - 1];
 
-    my $pid = open2(\*READ, \*WRITE, "$binDir/nix-store --realise @tmp2")
+    my $pid = open(READ, "$binDir/nix-store --realise @tmp2|")
         or die "cannot run nix-store";
-    close WRITE;
     while (<READ>) {
         chomp;
         die unless (/^\//);
         push @narPaths, "$_";
     }
-    close READ;
-
-    waitpid $pid, 0;
-    $? == 0 or die "nix-store failed";
+    close READ or die "nix-store failed: $?";
 }
 
 
