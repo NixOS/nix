@@ -77,4 +77,4 @@ build-allow-root = true
 #
 # Example:
 #   build-users = nix-builder-1 nix-builder-2 nix-builder-3
-build-users =
+#build-users =
