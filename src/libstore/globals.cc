@@ -1,6 +1,7 @@
 #include "globals.hh"
 
 #include <map>
+#include <algorithm>
 
 
 string nixStore = "/UNINIT";
@@ -22,7 +23,15 @@ list<string> buildUsers;
 
 static bool settingsRead = false;
 
-static map<string, string> settings;
+static map<string, Strings> settings;
+
+
+template<class T, class A> A & genericAt(T & container, unsigned int n)
+{
+    class T::iterator i = container.begin();
+    advance(i, n);
+    return *i;
+}
 
 
 static void readSettings()
@@ -43,34 +52,44 @@ static void readSettings()
         if (hash != string::npos)
             line = string(line, 0, hash);
 
-        if (line.find_first_not_of(" ") == string::npos) continue;
+        Strings tokens = tokenizeString(line);
+        if (tokens.empty()) continue;
 
-        istringstream is(line);
-        string name, sep, value;
-        is >> name >> sep >> value;
-        if (sep != "=" || !is)
+        if (tokens.size() < 2 || genericAt<Strings, string>(tokens, 1) != "=")
             throw Error(format("illegal configuration line `%1%' in `%2%'") % line % settingsFile);
-        
-        settings[name] = value;
+
+        string name = genericAt<Strings, string>(tokens, 0);
+
+        Strings::iterator i = tokens.begin();
+        advance(i, 2);
+        settings[name] = Strings(i, tokens.end());
     };
     
     settingsRead = true;
 }
 
 
-string querySetting(const string & name, const string & def)
+Strings querySetting(const string & name, const Strings & def)
 {
     if (!settingsRead) readSettings();
-    map<string, string>::iterator i = settings.find(name);
+    map<string, Strings>::iterator i = settings.find(name);
     return i == settings.end() ? def : i->second;
 }
 
 
 bool queryBoolSetting(const string & name, bool def)
 {
-    string value = querySetting(name, def ? "true" : "false");
-    if (value == "true") return true;
-    else if (value == "false") return false;
+    Strings defs;
+    if (def) defs.push_back("true"); else defs.push_back("false");
+    
+    Strings value = querySetting(name, defs);
+    if (value.size() != 1)
+        throw Error(format("configuration option `%1%' should be either `true' or `false', not a list")
+            % name);
+    
+    string v = value.front();
+    if (v == "true") return true;
+    else if (v == "false") return false;
     else throw Error(format("configuration option `%1%' should be either `true' or `false', not `%2%'")
-        % name % value);
+        % name % v);
 }

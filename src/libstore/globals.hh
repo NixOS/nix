@@ -63,7 +63,7 @@ extern bool buildAllowRoot;
 extern list<string> buildUsers;
 
 
-string querySetting(const string & name, const string & def);
+Strings querySetting(const string & name, const Strings & def);
 
 bool queryBoolSetting(const string & name, bool def);
 

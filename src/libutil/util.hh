@@ -261,6 +261,10 @@ string packStrings(const Strings & strings);
 Strings unpackStrings(const string & s);
 
 
+/* String tokenizer. */
+Strings tokenizeString(const string & s, const string & separators = " \t\n\r");
+
+
 /* Convert the exit status of a child as returned by wait() into an
    error string. */
 string statusToString(int status);

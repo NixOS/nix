@@ -665,6 +665,21 @@ Strings unpackStrings(const string & s)
 }
 
 
+Strings tokenizeString(const string & s, const string & separators)
+{
+    Strings result;
+    string::size_type pos = s.find_first_not_of(separators, 0);
+    while (pos != string::npos) {
+        string::size_type end = s.find_first_of(separators, pos + 1);
+        if (end == string::npos) end = s.size();
+        string token(s, pos, end - pos);
+        result.push_back(token);
+        pos = s.find_first_not_of(separators, end);
+    }
+    return result;
+}
+
+
 string statusToString(int status)
 {
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
