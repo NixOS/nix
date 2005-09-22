@@ -8,6 +8,41 @@
 <article><title>Nix Release Notes</title>
 
 
+<section><title>Release 0.9.2 (September 21, 2005)</title>
+
+<para>This bug fix release fixes two problems on Mac OS X:
+
+<itemizedlist>
+
+  <listitem><para>If Nix was linked against statically linked versions
+  of the ATerm or Berkeley DB library, there would be dynamic link
+  errors at runtime.</para></listitem>
+
+  <listitem><para><command>nix-pull</command> and
+  <command>nix-push</command> intermittently failed due to race
+  conditions involving pipes and child processes with error messages
+  such as <literal>open2: open(GLOB(0x180b2e4), >&amp;=9) failed: Bad
+  file descriptor at /nix/bin/nix-pull line 77</literal> (issue
+  <literal>NIX-14</literal>).</para></listitem>
+
+</itemizedlist>
+
+</para>
+
+</section>
+
+
+
+<section><title>Release 0.9.1 (September 20, 2005)</title>
+
+<para>This bug fix release addresses a problem with the ATerm library
+when the <option>--with-aterm</option> flag in
+<command>configure</command> was <emphasis>not</emphasis> used.</para>
+
+</section>
+
+
+
 <section><title>Release 0.9 (September 16, 2005)</title>
 
 <para>NOTE: this version of Nix uses Berkeley DB 4.3 instead of 4.2.
