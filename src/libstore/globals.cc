@@ -26,9 +26,9 @@ static bool settingsRead = false;
 static map<string, Strings> settings;
 
 
-template<class T, class A> A & genericAt(T & container, unsigned int n)
+string & at(Strings & ss, unsigned int n)
 {
-    class T::iterator i = container.begin();
+    Strings::iterator i =ss.begin();
     advance(i, n);
     return *i;
 }
@@ -55,10 +55,10 @@ static void readSettings()
         Strings tokens = tokenizeString(line);
         if (tokens.empty()) continue;
 
-        if (tokens.size() < 2 || genericAt<Strings, string>(tokens, 1) != "=")
+        if (tokens.size() < 2 || at(tokens, 1) != "=")
             throw Error(format("illegal configuration line `%1%' in `%2%'") % line % settingsFile);
 
-        string name = genericAt<Strings, string>(tokens, 0);
+        string name = at(tokens, 0);
 
         Strings::iterator i = tokens.begin();
         advance(i, 2);
@@ -79,6 +79,8 @@ Strings querySetting(const string & name, const Strings & def)
 
 bool queryBoolSetting(const string & name, bool def)
 {
+    debug("X");
+    
     Strings defs;
     if (def) defs.push_back("true"); else defs.push_back("false");
     
