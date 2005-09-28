@@ -191,7 +191,7 @@ perl = perl;</programlisting>
 <example id='ex-hello-builder'><title>Build script for GNU Hello
 (<filename>builder.sh</filename>)</title>
 <programlisting>
-. $stdenv/setup <co id='ex-hello-builder-co-1' />
+source $stdenv/setup <co id='ex-hello-builder-co-1' />
 
 PATH=$perl/bin:$PATH <co id='ex-hello-builder-co-2' />
 
@@ -524,7 +524,7 @@ build functions</title>
 <programlisting>
 buildInputs="$perl" <co id='ex-hello-builder2-co-1' />
 
-. $stdenv/setup <co id='ex-hello-builder2-co-2' />
+source $stdenv/setup <co id='ex-hello-builder2-co-2' />
 
 genericBuild <co id='ex-hello-builder2-co-3' /></programlisting>
 </example>
@@ -575,7 +575,7 @@ The <varname>perl</varname> attribute can then be removed, and the
 builder becomes even shorter:
 
 <programlisting>
-. $stdenv/setup
+source $stdenv/setup
 genericBuild</programlisting>
 
 In fact, <varname>mkDerivation</varname> provides a default builder
@@ -1356,7 +1356,7 @@ of the following components:
 called <envar>stdenv</envar> to the derivation, and then doing
 
 <programlisting>
-. $stdenv/setup</programlisting>
+source $stdenv/setup</programlisting>
 
 at the top of the builder.</para>
 
