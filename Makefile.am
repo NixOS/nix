@@ -48,5 +48,5 @@ svn-revision:
 
 all-local: NEWS
 
-NEWS:
+NEWS: doc/manual/NEWS.txt
 	cp doc/manual/NEWS.txt NEWS
