@@ -202,7 +202,7 @@ AC_CONFIG_FILES([Makefile
    src/libexpr/Makefile
    src/nix-instantiate/Makefile
    src/nix-env/Makefile
-   src/log2xml/Makefile
+   src/nix-log2xml/Makefile
    src/bsdiff-4.2/Makefile
    scripts/Makefile
    corepkgs/Makefile
