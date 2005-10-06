@@ -534,10 +534,14 @@ $ nix-env -e '*' <lineannotation>(remove everything)</lineannotation></screen>
     <arg choice='plain'><option>-a</option></arg>
   </group>
   <group choice='req'>
-    <arg choice='plain'><option>--name</option></arg>
-    <arg choice='plain'><option>--expr</option></arg>
     <arg choice='plain'><option>--status</option></arg>
     <arg choice='plain'><option>-s</option></arg>
+    <arg choice='plain'><option>--no-name</option></arg>
+    <arg choice='plain'><option>--compare-versions</option></arg>
+    <arg choice='plain'><option>-c</option></arg>
+    <arg choice='plain'><option>--system</option></arg>
+    <arg choice='plain'><option>--drv-path</option></arg>
+    <arg choice='plain'><option>--out-path</option></arg>
   </group>
 </cmdsynopsis>
 
@@ -625,6 +629,51 @@ user environment elements, etc. -->
     
   </varlistentry>
 
+  <varlistentry><term><option>--compare-versions</option> /
+  <option>-c</option></term>
+  
+    <listitem><para>Compare installed versions to available versions,
+    or vice versa (if <option>--available</option> is given).  This is
+    useful for quickly seeing whether upgrades for installed
+    components are available in a Nix expression.  A column is added
+    with the following meaning:
+
+    <variablelist>
+
+      <varlistentry><term><literal>&lt;</literal> <replaceable>version</replaceable></term>
+
+        <listitem><para>A newer version of the component is available
+        or installed.</para></listitem>
+
+      </varlistentry>
+      
+      <varlistentry><term><literal>=</literal> <replaceable>version</replaceable></term>
+
+        <listitem><para>At most the same version of the component is
+        available or installed.</para></listitem>
+
+      </varlistentry>
+      
+      <varlistentry><term><literal>></literal> <replaceable>version</replaceable></term>
+
+        <listitem><para>Only older versions of the component are
+        available or installed.</para></listitem>
+
+      </varlistentry>
+      
+      <varlistentry><term><literal>- ?</literal></term>
+
+        <listitem><para>No version of the component is available or
+        installed.</para></listitem>
+
+      </varlistentry>
+
+    </variablelist>
+
+    </para></listitem>
+    
+  </varlistentry>
+
   <varlistentry><term><option>--system</option></term>
   
     <listitem><para>Print the <literal>system</literal> attribute of
@@ -655,27 +704,37 @@ user environment elements, etc. -->
 
 <screen>
 $ nix-env -q <lineannotation>(show installed derivations)</lineannotation>
-MozillaFirebird-0.7
 bison-1.875c
 docbook-xml-4.2
+firefox-1.0.4
+MPlayer-1.0pre7
+ORBit2-2.8.3
 ...
 
 $ nix-env -qa <lineannotation>(show available derivations)</lineannotation>
+firefox-1.0.7
 GConf-2.4.0.1
-MPlayer-1.0pre3
-MozillaFirebird-0.7
+MPlayer-1.0pre7
 ORBit2-2.8.3
 ...
 
 $ nix-env -qas <lineannotation>(show status of available derivations)</lineannotation>
--P- GConf-2.4.0.1 <lineannotation>(not installed but present)</lineannotation>
---S MPlayer-1.0pre3 <lineannotation>(not present, but there is a substitute for fast installation)</lineannotation>
---S MozillaFirebird-0.7 <lineannotation>(i.e., this is not the installed Firebird, even though the version is the same!)</lineannotation>
-IP- bison-1.875c <lineannotation>(installed and by definition present)</lineannotation>
+-P- firefox-1.0.7   <lineannotation>(not installed but present)</lineannotation>
+--S GConf-2.4.0.1   <lineannotation>(not present, but there is a substitute for fast installation)</lineannotation>
+--S MPlayer-1.0pre3 <lineannotation>(i.e., this is not the installed MPlayer, even though the version is the same!)</lineannotation>
+IP- ORBit2-2.8.3    <lineannotation>(installed and by definition present)</lineannotation>
 ...
 
 $ nix-env -f ./foo.nix -qa <lineannotation>(show available derivations in the Nix expression <filename>foo.nix</filename>)</lineannotation>
-foo-1.2.3</screen>
+foo-1.2.3
+
+$ nix-env -qc <lineannotation>(compare installed versions to what’s available)</lineannotation>
+<replaceable>...</replaceable>
+acrobat-reader-7.0 - ?      <lineannotation>(package is not available at all)</lineannotation>
+autoconf-2.59      = 2.59   <lineannotation>(same version)</lineannotation>
+firefox-1.0.4      &lt; 1.0.7  <lineannotation>(a more recent version is available)</lineannotation>
+<replaceable>...</replaceable>
+</screen>
 
 </refsection>
 
