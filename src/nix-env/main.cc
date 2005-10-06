@@ -668,6 +668,53 @@ void printTable(Table & table)
 }
 
 
+/* This function compares the version of a element against the
+   versions in the given set of elements.  `cvLess' means that only
+   lower versions are in the set, `cvEqual' means that at most an
+   equal version is in the set, and `cvGreater' means that there is at
+   least one element with a higher version in the set.  `cvUnavail'
+   means that there are no elements with the same name in the set. */
+
+typedef enum { cvLess, cvEqual, cvGreater, cvUnavail } VersionDiff;
+
+static VersionDiff compareVersionAgainstSet(
+    const UserEnvElem & elem, const UserEnvElems & elems, string & version)
+{
+    DrvName name(elem.name);
+    
+    VersionDiff diff = cvUnavail;
+    version = "?";
+    
+    for (UserEnvElems::const_iterator i = elems.begin(); i != elems.end(); ++i) {
+        DrvName name2(i->second.name);
+        if (name.name == name2.name) {
+            int d = compareVersions(name.version, name2.version);
+            if (d < 0) {
+                diff = cvGreater;
+                version = name2.version;
+            }
+            else if (diff != cvGreater && d == 0) {
+                diff = cvEqual;
+                version = name2.version;
+            }
+            else if (diff != cvGreater && diff != cvEqual && d > 0) {
+                diff = cvLess;
+                if (version == "" || compareVersions(version, name2.version) < 0)
+                    version = name2.version;
+            }
+        }
+    }
+
+    return diff;
+}
+
+
+static string colorString(const string & s)
+{
+    return "\e[1;31m" + s + "\e[0m";
+}
+
+
 static void opQuery(Globals & globals,
     Strings opFlags, Strings opArgs)
 {
@@ -676,6 +723,7 @@ static void opQuery(Globals & globals,
     bool printSystem = false;
     bool printDrvPath = false;
     bool printOutPath = false;
+    bool compareVersions = false;
 
     enum { sInstalled, sAvailable } source = sInstalled;
 
@@ -686,50 +734,50 @@ static void opQuery(Globals & globals,
         if (*i == "--status" || *i == "-s") printStatus = true;
         else if (*i == "--no-name") printName = false;
         else if (*i == "--system") printSystem = true;
+        else if (*i == "--compare-versions" || *i == "-c") compareVersions = true;
         else if (*i == "--drv-path") printDrvPath = true;
         else if (*i == "--out-path") printOutPath = true;
         else if (*i == "--installed") source = sInstalled;
         else if (*i == "--available" || *i == "-a") source = sAvailable;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
-    /* Obtain derivation information from the specified source. */
-    UserEnvElems elems;
-
-    switch (source) {
-
-        case sInstalled:
-            elems = queryInstalled(globals.state, globals.profile);
-            break;
-
-        case sAvailable: {
-            loadDerivations(globals.state, globals.instSource.nixExprPath,
-                globals.instSource.systemFilter, elems);
-            break;
-        }
-
-        default: abort();
-    }
-
     if (opArgs.size() != 0) throw UsageError("no arguments expected");
 
+    
+    /* Obtain derivation information from the specified source. */
+    UserEnvElems availElems, installedElems;
+
+    if (source == sInstalled || compareVersions) {
+        installedElems = queryInstalled(globals.state, globals.profile);
+    }
+
+    if (source == sAvailable || compareVersions) {
+        loadDerivations(globals.state, globals.instSource.nixExprPath,
+            globals.instSource.systemFilter, availElems);
+    }
+
+    UserEnvElems & elems(source == sInstalled ? installedElems : availElems);
+    UserEnvElems & otherElems(source == sInstalled ? availElems : installedElems);
+
+    
     /* Sort them by name. */
     vector<UserEnvElem> elems2;
     for (UserEnvElems::iterator i = elems.begin(); i != elems.end(); ++i)
         elems2.push_back(i->second);
     sort(elems2.begin(), elems2.end(), cmpElemByName);
 
+    
     /* We only need to know the installed paths when we are querying
        the status of the derivation. */
     PathSet installed; /* installed paths */
     
     if (printStatus) {
-        UserEnvElems installedElems; 
-        installedElems = queryInstalled(globals.state, globals.profile);
         for (UserEnvElems::iterator i = installedElems.begin();
              i != installedElems.end(); ++i)
             installed.insert(i->second.queryOutPath(globals.state));
     }
-            
+
+    
     /* Print the desired columns. */
     Table table;
     
@@ -750,6 +798,26 @@ static void opQuery(Globals & globals,
         if (printName) columns.push_back(i->name);
 
         if (printSystem) columns.push_back(i->system);
+
+        if (compareVersions) {
+            /* Compare this element against the versions of the same
+               named packages in either the set of available elements,
+               or the set of installed elements.  !!! This is O(N *
+               M), should be O(N * lg M). */
+            string version;
+            VersionDiff diff = compareVersionAgainstSet(*i, otherElems, version);
+            char ch;
+            switch (diff) {
+                case cvLess: ch = '>'; break;
+                case cvEqual: ch = '='; break;
+                case cvGreater: ch = '<'; break;
+                case cvUnavail: ch = '-'; break;
+                default: abort();
+            }
+            string column = (string) "" + ch + " " + version;
+            if (diff == cvGreater) column = colorString(column);
+            columns.push_back(column);
+        }
 
         if (printDrvPath) columns.push_back(
             i->queryDrvPath(globals.state) == ""

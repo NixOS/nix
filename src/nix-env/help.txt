@@ -36,10 +36,12 @@ Upgrade flags:
 
 Query types:
 
-  --name: print derivation names (default)
+  --status / -s: print installed/present status
+  --no-name: hide derivation names
+  --system: print the platform type of the derivation 
+  --compare-versions / -c: compare version to available or installed
   --drv-path: print path of derivation
   --out-path: print path of derivation output
-  --status / -s: print installed/present status
 
 Query sources:
 
