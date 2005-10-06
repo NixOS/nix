@@ -13,6 +13,8 @@
 #include <ctime>
 #include <algorithm>
 
+#include <unistd.h>
+
 
 typedef enum {
     srcNixExprDrvs,
@@ -711,6 +713,7 @@ static VersionDiff compareVersionAgainstSet(
 
 static string colorString(const string & s)
 {
+    if (!isatty(STDOUT_FILENO)) return s;
     return "\e[1;31m" + s + "\e[0m";
 }
 
