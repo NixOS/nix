@@ -800,8 +800,6 @@ static void opQuery(Globals & globals,
 
         if (printName) columns.push_back(i->name);
 
-        if (printSystem) columns.push_back(i->system);
-
         if (compareVersions) {
             /* Compare this element against the versions of the same
                named packages in either the set of available elements,
@@ -821,6 +819,8 @@ static void opQuery(Globals & globals,
             if (diff == cvGreater) column = colorString(column);
             columns.push_back(column);
         }
+
+        if (printSystem) columns.push_back(i->system);
 
         if (printDrvPath) columns.push_back(
             i->queryDrvPath(globals.state) == ""
