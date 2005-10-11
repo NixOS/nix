@@ -34,12 +34,12 @@ endif
 
 # CWI ATerm
 
-ATERM = aterm-2.4
+ATERM = aterm-2.4.2
 
 $(ATERM).tar.gz:
 	@echo "Nix requires the CWI ATerm library to build."
-	@echo "Please download version 2.4 from"
-	@echo "  http://www.cwi.nl/projects/MetaEnv/aterm/aterm-2.4.tar.gz"
+	@echo "Please download version 2.4.2 from"
+	@echo "  http://www.cwi.nl/projects/MetaEnv/aterm/aterm-2.4.2.tar.gz"
 	@echo "and place it in the externals/ directory."
 	false
 
@@ -57,7 +57,7 @@ build-aterm: have-aterm
 	(pfx=`pwd` && \
 	cd $(ATERM) && \
 	CC="$(CC)" ./configure --prefix=$$pfx/inst-aterm \
-	  --disable-shared --enable-static CFLAGS=-O1 && \
+	  --disable-shared --enable-static && \
 	$(MAKE) && \
 	$(MAKE) install)
 	touch build-aterm
