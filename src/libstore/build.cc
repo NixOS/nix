@@ -348,13 +348,6 @@ private:
     /* File descriptor for the log file. */
     AutoCloseFD fdLogFile;
 
-    /* File descriptor for the output creation fifo. */
-    AutoCloseFD fdCreateOutput;
-    AutoCloseFD fdOutputCreated;
-
-    Path pathCreateOutput;
-    Path pathOutputCreated;
-    
     /* Pipe for the builder's standard output/error. */
     Pipe logPipe;
 
@@ -1075,24 +1068,6 @@ void DerivationGoal::startBuilder()
             env["NIX_OUTPUT_CHECKED"] = "1";
 
 
-    /* Create the FIFOs through which the child can tell this process
-       to create the output path. */
-    pathCreateOutput = tmpDir + "/.create-output.fifo";
-    pathOutputCreated = tmpDir + "/.output-created.fifo";
-
-    if (mkfifo(pathCreateOutput.c_str(), 0622) == -1 ||
-        chmod(pathCreateOutput.c_str(), 0622) == -1)
-        throw SysError(format("cannot create FIFO `%1%'") % pathCreateOutput);
-    
-    if (mkfifo(pathOutputCreated.c_str(), 0700) == -1 ||
-        chmod(pathOutputCreated.c_str(), 0622) == -1)
-        throw SysError(format("cannot create FIFO `%1%'") % pathOutputCreated);
-    
-    fdCreateOutput = open(pathCreateOutput.c_str(), O_RDONLY | O_NONBLOCK);
-    if (fdCreateOutput == -1)
-        throw SysError(format("cannot open FIFO `%1%'") % pathCreateOutput);
-    
-    
     /* If we are running as root, and the `build-allow-root' setting
        is `false', then we have to build as one of the users listed in
        `build-users'. */
@@ -1104,6 +1079,21 @@ void DerivationGoal::startBuilder()
         /* Change ownership of the temporary build directory.  !!! gid */
         if (chown(tmpDir.c_str(), buildUser, (gid_t) -1) == -1)
             throw SysError(format("cannot change ownership of `%1%'") % tmpDir);
+
+        /* Check that the Nix store has the appropriate permissions,
+           i.e., owned by root and mode 1777 (sticky bit on so that
+           the builder can create its output but not mess with the
+           outputs of other processes). */
+        struct stat st;
+        if (stat(nixStore.c_str(), &st) == -1)
+            throw SysError(format("cannot stat `%1%'") % nixStore);
+        if (st.st_uid != rootUserId)
+            throw Error(format("`%1%' is not owned by root") % nixStore);
+        if (!(st.st_mode & S_ISVTX) ||
+            ((st.st_mode & S_IRWXO) != S_IRWXO))
+            throw Error(format(
+                "builder does not have write permission to `%1%'; "
+                "try `chmod 1777 %1%'") % nixStore);
     }
 
     
@@ -1181,10 +1171,8 @@ void DerivationGoal::startBuilder()
     /* parent */
     pid.setSeparatePG(true);
     logPipe.writeSide.close();
-    set<int> fds;
-    fds.insert(logPipe.readSide);
-    fds.insert(fdCreateOutput);
-    worker.childStarted(shared_from_this(), pid, fds, true);
+    worker.childStarted(shared_from_this(), pid,
+        singleton<set<int> >(logPipe.readSide), true);
 }
 
 
@@ -1379,45 +1367,6 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
         if (verbosity >= buildVerbosity)
             writeFull(STDERR_FILENO, (unsigned char *) data.c_str(), data.size());
         writeFull(fdLogFile, (unsigned char *) data.c_str(), data.size());
-    }
-
-    else if (fd == fdCreateOutput) {
-
-        /* The child sent us a command to create the output path. */
-        debug(format("got output creation command `%1%'") % data);
-
-        istringstream str(data);
-        string id, type;
-        str >> id >> type;
-
-        if (id != "out") throw Error("not supported!"); /* !!! */
-
-        Path path;
-        for (DerivationOutputs::const_iterator i = drv.outputs.begin();
-             i != drv.outputs.end(); ++i)
-            if (i->first == "out") path = i->second.path.c_str();
-
-        if (path.empty()) throw Error(format("unknown output ID `%1%'") % id);
-
-        if (type == "d") {
-            if (mkdir(path.c_str(), 0700) == -1)
-                throw SysError(format("creating directory `%1%'") % path);
-        } else if (type == "f") {
-            AutoCloseFD fd = open(path.c_str(), O_CREAT | O_EXCL | O_RDONLY, 0600);
-            if (fd == -1)
-                throw SysError(format("creating file `%1%'") % path);
-        } else
-            throw Error(format("bad output creation command `%1%'") % type);
-
-        if (chown(path.c_str(), buildUser, (gid_t) -1) == -1) /* !!! */
-            throw SysError(format("cannot change ownership of `%1%'") % path);
-        
-        /* The builder must open this FIFO for writing.  This will
-           block until we have opened it for reading.  Here we do
-           so, causing the builder to unblock and proceed. */
-        fdOutputCreated = open(pathOutputCreated.c_str(), O_RDONLY | O_NONBLOCK);
-        if (fdOutputCreated == -1)
-            throw SysError(format("cannot open FIFO `%1%'") % pathOutputCreated);
     }
 
     else abort();
