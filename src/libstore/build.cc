@@ -1,4 +1,5 @@
 #include <map>
+#include <sstream>
 #include <boost/shared_ptr.hpp>
 #include <boost/weak_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
@@ -8,6 +9,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+
+#include <pwd.h>
+#include <grp.h>
 
 #include "build.hh"
 #include "references.hh"
@@ -20,6 +24,9 @@
 
 
 static string pathNullDevice = "/dev/null";
+
+
+static const uid_t rootUserId = 0;
 
 
 /* Forward definition. */
@@ -84,7 +91,12 @@ public:
 
     virtual void waiteeDone(GoalPtr waitee, bool success);
 
-    virtual void writeLog(int fd, const unsigned char * buf, size_t count)
+    virtual void handleChildOutput(int fd, const string & data)
+    {
+        abort();
+    }
+
+    virtual void handleEOF(int fd)
     {
         abort();
     }
@@ -100,18 +112,19 @@ public:
     {
         return exitCode;
     }
-    
+
 protected:
     void amDone(bool success = true);
 };
 
 
 /* A mapping used to remember for each child process to what goal it
-   belongs, and a file descriptor for receiving log data. */
+   belongs, and file descriptors for receiving log data and output
+   path creation commands. */
 struct Child
 {
     WeakGoalPtr goal;
-    int fdOutput;
+    set<int> fds;
     bool inBuildSlot;
 };
 
@@ -166,8 +179,8 @@ public:
     bool canBuildMore();
 
     /* Registers / unregisters a running child process. */
-    void childStarted(GoalPtr goal, pid_t pid, int fdOutput,
-        bool inBuildSlot);
+    void childStarted(GoalPtr goal, pid_t pid,
+        const set<int> & fds, bool inBuildSlot);
     void childTerminated(pid_t pid, bool wakeSleepers = true);
 
     /* Add a goal to the set of goals waiting for a build slot. */
@@ -299,7 +312,6 @@ const char * * strings2CharPtrs(const Strings & ss)
 }
 
 
-
 //////////////////////////////////////////////////////////////////////
 
 
@@ -324,6 +336,9 @@ private:
     /* Referenceable paths (i.e., input and output paths). */
     PathSet allPaths;
 
+    /* User selected for running the builder. */
+    uid_t buildUser;
+
     /* The process ID of the builder. */
     Pid pid;
 
@@ -333,6 +348,13 @@ private:
     /* File descriptor for the log file. */
     AutoCloseFD fdLogFile;
 
+    /* File descriptor for the output creation fifo. */
+    AutoCloseFD fdCreateOutput;
+    AutoCloseFD fdOutputCreated;
+
+    Path pathCreateOutput;
+    Path pathOutputCreated;
+    
     /* Pipe for the builder's standard output/error. */
     Pipe logPipe;
 
@@ -396,7 +418,8 @@ private:
     void deleteTmpDir(bool force);
 
     /* Callback used by the worker to write to the log. */
-    void writeLog(int fd, const unsigned char * buf, size_t count);
+    void handleChildOutput(int fd, const string & data);
+    void handleEOF(int fd);
 
     /* Return the set of (in)valid paths. */
     PathSet checkPathValidity(bool returnValid);
@@ -408,6 +431,7 @@ DerivationGoal::DerivationGoal(const Path & drvPath, Worker & worker)
 {
     this->drvPath = drvPath;
     state = &DerivationGoal::init;
+    buildUser = 0;
     name = (format("building of `%1%'") % drvPath).str();
     trace("created");
 }
@@ -607,7 +631,8 @@ void DerivationGoal::buildDone()
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe --- just don't do that
        :-) */
-    /* !!! this could block! */
+    /* !!! this could block! security problem! solution: kill the
+       child */
     pid_t savedPid = pid;
     int status = pid.wait(true);
 
@@ -757,7 +782,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
     /* parent */
     logPipe.writeSide.close();
     worker.childStarted(shared_from_this(),
-        pid, logPipe.readSide, false);
+        pid, singleton<set<int> >(logPipe.readSide), false);
 
     fromHook.writeSide.close();
     toHook.readSide.close();
@@ -953,6 +978,29 @@ bool DerivationGoal::prepareBuild()
 }
 
 
+static uid_t allocBuildUser()
+{
+    Strings buildUsers = querySetting("build-users", Strings());
+
+    if (buildUsers.empty())
+        throw Error(
+            "cannot build as `root'; you must define "
+            "one or more users for building in `build-users' "
+            "in the Nix configuration file");
+
+    for (Strings::iterator i = buildUsers.begin(); i != buildUsers.end(); ++i) {
+        printMsg(lvlError, format("trying user `%1%'") % *i);
+
+        struct passwd * pw = getpwnam(i->c_str());
+        if (!pw)
+            throw Error(format("the user `%1%' listed in `build-users' does not exist") % *i);
+
+        return pw->pw_uid;
+    }
+    
+}
+
+
 void DerivationGoal::startBuilder()
 {
     startNest(nest, lvlInfo,
@@ -1026,6 +1074,39 @@ void DerivationGoal::startBuilder()
         if (i->second.hash != "")
             env["NIX_OUTPUT_CHECKED"] = "1";
 
+
+    /* Create the FIFOs through which the child can tell this process
+       to create the output path. */
+    pathCreateOutput = tmpDir + "/.create-output.fifo";
+    pathOutputCreated = tmpDir + "/.output-created.fifo";
+
+    if (mkfifo(pathCreateOutput.c_str(), 0622) == -1 ||
+        chmod(pathCreateOutput.c_str(), 0622) == -1)
+        throw SysError(format("cannot create FIFO `%1%'") % pathCreateOutput);
+    
+    if (mkfifo(pathOutputCreated.c_str(), 0700) == -1 ||
+        chmod(pathOutputCreated.c_str(), 0622) == -1)
+        throw SysError(format("cannot create FIFO `%1%'") % pathOutputCreated);
+    
+    fdCreateOutput = open(pathCreateOutput.c_str(), O_RDONLY | O_NONBLOCK);
+    if (fdCreateOutput == -1)
+        throw SysError(format("cannot open FIFO `%1%'") % pathCreateOutput);
+    
+    
+    /* If we are running as root, and the `build-allow-root' setting
+       is `false', then we have to build as one of the users listed in
+       `build-users'. */
+    if (!queryBoolSetting("build-allow-root", true) &&
+        getuid() == rootUserId)
+    {
+        buildUser = allocBuildUser();
+        
+        /* Change ownership of the temporary build directory.  !!! gid */
+        if (chown(tmpDir.c_str(), buildUser, (gid_t) -1) == -1)
+            throw SysError(format("cannot change ownership of `%1%'") % tmpDir);
+    }
+
+    
     /* Run the builder. */
     printMsg(lvlChatty, format("executing builder `%1%'") %
         drv.builder);
@@ -1064,6 +1145,25 @@ void DerivationGoal::startBuilder()
                 envStrs.push_back(i->first + "=" + i->second);
             const char * * envArr = strings2CharPtrs(envStrs);
 
+            /* If we are running as root and `build-allow-root' is
+               `false', then switch to the user we allocated above.
+               Make sure that we drop all root privileges.  Note that
+               initChild() above has closed all file descriptors
+               except std*, so that's safe.  Also note that setuid()
+               when run as root sets the real, effective and saved
+               UIDs. */
+            if (buildUser != 0) {
+                printMsg(lvlError, format("switching to uid `%1%'") % buildUser);
+                
+                /* !!! setgid also */
+                if (setgroups(0, 0) == -1)
+                    throw SysError("cannot clear the set of supplementary groups");
+                setuid(buildUser);
+                assert(getuid() == buildUser);
+                assert(geteuid() == buildUser);
+
+            }
+            
             /* Execute the program.  This should not return. */
             execve(drv.builder.c_str(),
                 (char * *) argArr, (char * *) envArr);
@@ -1077,11 +1177,14 @@ void DerivationGoal::startBuilder()
         _exit(1);
     }
 
+    
     /* parent */
     pid.setSeparatePG(true);
     logPipe.writeSide.close();
-    worker.childStarted(shared_from_this(),
-        pid, logPipe.readSide, true);
+    set<int> fds;
+    fds.insert(logPipe.readSide);
+    fds.insert(fdCreateOutput);
+    worker.childStarted(shared_from_this(), pid, fds, true);
 }
 
 
@@ -1270,11 +1373,60 @@ void DerivationGoal::deleteTmpDir(bool force)
 }
 
 
-void DerivationGoal::writeLog(int fd,
-    const unsigned char * buf, size_t count)
+void DerivationGoal::handleChildOutput(int fd, const string & data)
 {
-    assert(fd == logPipe.readSide);
-    writeFull(fdLogFile, buf, count);
+    if (fd == logPipe.readSide) {
+        if (verbosity >= buildVerbosity)
+            writeFull(STDERR_FILENO, (unsigned char *) data.c_str(), data.size());
+        writeFull(fdLogFile, (unsigned char *) data.c_str(), data.size());
+    }
+
+    else if (fd == fdCreateOutput) {
+
+        /* The child sent us a command to create the output path. */
+        debug(format("got output creation command `%1%'") % data);
+
+        istringstream str(data);
+        string id, type;
+        str >> id >> type;
+
+        if (id != "out") throw Error("not supported!"); /* !!! */
+
+        Path path;
+        for (DerivationOutputs::const_iterator i = drv.outputs.begin();
+             i != drv.outputs.end(); ++i)
+            if (i->first == "out") path = i->second.path.c_str();
+
+        if (path.empty()) throw Error(format("unknown output ID `%1%'") % id);
+
+        if (type == "d") {
+            if (mkdir(path.c_str(), 0700) == -1)
+                throw SysError(format("creating directory `%1%'") % path);
+        } else if (type == "f") {
+            AutoCloseFD fd = open(path.c_str(), O_CREAT | O_EXCL | O_RDONLY, 0600);
+            if (fd == -1)
+                throw SysError(format("creating file `%1%'") % path);
+        } else
+            throw Error(format("bad output creation command `%1%'") % type);
+
+        if (chown(path.c_str(), buildUser, (gid_t) -1) == -1) /* !!! */
+            throw SysError(format("cannot change ownership of `%1%'") % path);
+        
+        /* The builder must open this FIFO for writing.  This will
+           block until we have opened it for reading.  Here we do
+           so, causing the builder to unblock and proceed. */
+        fdOutputCreated = open(pathOutputCreated.c_str(), O_RDONLY | O_NONBLOCK);
+        if (fdOutputCreated == -1)
+            throw SysError(format("cannot open FIFO `%1%'") % pathOutputCreated);
+    }
+
+    else abort();
+}
+
+
+void DerivationGoal::handleEOF(int fd)
+{
+    if (fd == logPipe.readSide) worker.wakeUp(shared_from_this());
 }
 
 
@@ -1337,7 +1489,8 @@ public:
     void finished();
 
     /* Callback used by the worker to write to the log. */
-    void writeLog(int fd, const unsigned char * buf, size_t count);
+    void handleChildOutput(int fd, const string & data);
+    void handleEOF(int fd);
 };
 
 
@@ -1502,7 +1655,7 @@ void SubstitutionGoal::tryToRun()
     pid.setSeparatePG(true);
     logPipe.writeSide.close();
     worker.childStarted(shared_from_this(),
-        pid, logPipe.readSide, true);
+        pid, singleton<set<int> >(logPipe.readSide), true);
 
     state = &SubstitutionGoal::finished;
 }
@@ -1569,12 +1722,19 @@ void SubstitutionGoal::finished()
 }
 
 
-void SubstitutionGoal::writeLog(int fd,
-    const unsigned char * buf, size_t count)
+void SubstitutionGoal::handleChildOutput(int fd, const string & data)
 {
     assert(fd == logPipe.readSide);
+    if (verbosity >= buildVerbosity)
+        writeFull(STDERR_FILENO, (unsigned char *) data.c_str(), data.size());
     /* Don't write substitution output to a log file for now.  We
        probably should, though. */
+}
+
+
+void SubstitutionGoal::handleEOF(int fd)
+{
+    if (fd == logPipe.readSide) worker.wakeUp(shared_from_this());
 }
 
 
@@ -1674,11 +1834,11 @@ bool Worker::canBuildMore()
 
 
 void Worker::childStarted(GoalPtr goal,
-    pid_t pid, int fdOutput, bool inBuildSlot)
+    pid_t pid, const set<int> & fds, bool inBuildSlot)
 {
     Child child;
     child.goal = goal;
-    child.fdOutput = fdOutput;
+    child.fds = fds;
     child.inBuildSlot = inBuildSlot;
     children[pid] = child;
     if (inBuildSlot) nrChildren++;
@@ -1772,9 +1932,11 @@ void Worker::waitForInput()
 {
     printMsg(lvlVomit, "waiting for children");
 
-    /* Process log output from the children.  We also use this to
-       detect child termination: if we get EOF on the logger pipe of a
-       build, we assume that the builder has terminated. */
+    /* Process output from the file descriptors attached to the
+       children, namely log output and output path creation commands.
+       We also use this to detect child termination: if we get EOF on
+       the logger pipe of a build, we assume that the builder has
+       terminated. */
 
     /* Use select() to wait for the input side of any logger pipe to
        become `available'.  Note that `available' (i.e., non-blocking)
@@ -1785,9 +1947,12 @@ void Worker::waitForInput()
     for (Children::iterator i = children.begin();
          i != children.end(); ++i)
     {
-        int fd = i->second.fdOutput;
-        FD_SET(fd, &fds);
-        if (fd >= fdMax) fdMax = fd + 1;
+        for (set<int>::iterator j = i->second.fds.begin();
+             j != i->second.fds.end(); ++j)
+        {
+            FD_SET(*j, &fds);
+            if (*j >= fdMax) fdMax = *j + 1;
+        }
     }
 
     if (select(fdMax, &fds, 0, 0, 0) == -1) {
@@ -1802,27 +1967,31 @@ void Worker::waitForInput()
         checkInterrupt();
         GoalPtr goal = i->second.goal.lock();
         assert(goal);
-        int fd = i->second.fdOutput;
-        if (FD_ISSET(fd, &fds)) {
-            unsigned char buffer[4096];
-            ssize_t rd = read(fd, buffer, sizeof(buffer));
-            if (rd == -1) {
-                if (errno != EINTR)
-                    throw SysError(format("reading from %1%")
-                        % goal->getName());
-            } else if (rd == 0) {
-                debug(format("%1%: got EOF") % goal->getName());
-                wakeUp(goal);
-            } else {
-                printMsg(lvlVomit, format("%1%: read %2% bytes")
-                    % goal->getName() % rd);
-                goal->writeLog(fd, buffer, (size_t) rd);
-                if (verbosity >= buildVerbosity)
-                    writeFull(STDERR_FILENO, buffer, rd);
+        set<int> fds2(i->second.fds);
+        for (set<int>::iterator j = fds2.begin(); j != fds2.end(); ++j)
+        {
+            if (FD_ISSET(*j, &fds)) {
+                unsigned char buffer[4096];
+                ssize_t rd = read(*j, buffer, sizeof(buffer));
+                if (rd == -1) {
+                    if (errno != EINTR)
+                        throw SysError(format("reading from %1%")
+                            % goal->getName());
+                } else if (rd == 0) {
+                    debug(format("%1%: got EOF") % goal->getName());
+                    goal->handleEOF(*j);
+                    i->second.fds.erase(*j);
+                } else {
+                    printMsg(lvlVomit, format("%1%: read %2% bytes")
+                        % goal->getName() % rd);
+                    string data((char *) buffer, rd);
+                    goal->handleChildOutput(*j, data);
+                }
             }
         }
     }
 }
+
 
 
 //////////////////////////////////////////////////////////////////////

@@ -17,8 +17,6 @@ bool tryFallback = false;
 Verbosity buildVerbosity = lvlInfo;
 unsigned int maxBuildJobs = 1;
 bool readOnlyMode = false;
-bool buildAllowRoot = true;
-list<string> buildUsers;
 
 
 static bool settingsRead = false;
@@ -79,8 +77,6 @@ Strings querySetting(const string & name, const Strings & def)
 
 bool queryBoolSetting(const string & name, bool def)
 {
-    debug("X");
-    
     Strings defs;
     if (def) defs.push_back("true"); else defs.push_back("false");
     

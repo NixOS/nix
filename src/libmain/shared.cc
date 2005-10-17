@@ -334,6 +334,11 @@ void switchToNixUser()
         exit(1);
     }
 
+    /* !!! for setuid operation, we should: 1) wipe the environment;
+       2) verify file descriptors 0, 1, 2; 3) etc.
+       See: http://www.daemon-systems.org/man/setuid.7.html
+    */
+
     haveSwitched = true;
     
 #endif

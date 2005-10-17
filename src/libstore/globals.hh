@@ -53,15 +53,6 @@ extern unsigned int maxBuildJobs;
    database. */
 extern bool readOnlyMode;
 
-/* Whether to allow builds by root.  Corresponds to the
-   `build-allow-root' configuration option. */
-extern bool buildAllowRoot;
-
-/* The list of users under which root-initiated builds can be
-   performed.  Correspons to the `build-users' configuration
-   option. */
-extern list<string> buildUsers;
-
 
 Strings querySetting(const string & name, const Strings & def);
 
