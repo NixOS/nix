@@ -312,6 +312,50 @@ const char * * strings2CharPtrs(const Strings & ss)
 }
 
 
+static void killUser(uid_t uid)
+{
+    debug(format("killing all processes running under uid `%1%'") % uid);
+    
+    assert(uid != rootUserId); /* just to be safe... */
+
+    /* The system call kill(-1, sig) sends the signal `sig' to all
+       users to which the current process can send signals.  So we
+       fork a process, switch to uid, and send a mass kill. */
+
+    Pid pid;
+    pid = fork();
+    switch (pid) {
+
+    case -1:
+        throw SysError("unable to fork");
+
+    case 0:
+        try { /* child */
+
+            if (setuid(uid) == -1) abort();
+
+            if (kill(-1, SIGKILL) == -1)
+                throw SysError(format("cannot kill processes for UID `%1%'") % uid);
+        
+        } catch (exception & e) {
+            cerr << format("build error: %1%\n") % e.what();
+            _exit(1);
+        }
+        _exit(0);
+    }
+    
+    /* parent */
+    if (pid.wait(true) != 0)
+        throw Error(format("cannot kill processes for UID `%1%'") % uid);
+
+    /* !!! We should really do some check to make sure that there are
+       no processes left running under `uid', but there is no portable
+       way to do so (I think).  The most reliable way may be `ps -eo
+       uid | grep -q $uid'. */
+}
+
+
+
 //////////////////////////////////////////////////////////////////////
 
 
@@ -1075,6 +1119,10 @@ void DerivationGoal::startBuilder()
         getuid() == rootUserId)
     {
         buildUser = allocBuildUser();
+
+        /* Make sure that no other processes are executing under this
+           uid. */
+        killUser(buildUser);
         
         /* Change ownership of the temporary build directory.  !!! gid */
         if (chown(tmpDir.c_str(), buildUser, (gid_t) -1) == -1)
