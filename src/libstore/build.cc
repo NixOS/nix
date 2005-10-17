@@ -676,6 +676,14 @@ void DerivationGoal::buildDone()
     /* So the child is gone now. */
     worker.childTerminated(savedPid);
 
+    /* When running under a build user, make sure that all processes
+       running under that uid are gone.  This is to prevent a
+       malicious user from leaving behind a process that keeps files
+       open and modifies them after they have been chown'ed to
+       root. */
+    if (buildUser != 0)
+        killUser(buildUser);
+
     /* Close the read side of the logger pipe. */
     logPipe.readSide.close();
 
