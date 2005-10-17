@@ -1194,6 +1194,10 @@ void DerivationGoal::computeClosure()
                 % drvPath % path);
         }
 
+        struct stat st;
+        if (lstat(path.c_str(), &st))
+            throw SysError(format("getting attributes of path `%1%'") % path);
+            
         startNest(nest, lvlTalkative,
             format("scanning for references inside `%1%'") % path);
 
@@ -1214,8 +1218,6 @@ void DerivationGoal::computeClosure()
                 /* The output path should be a regular file without
                    execute permission. */
                 struct stat st;
-                if (lstat(path.c_str(), &st))
-                    throw SysError(format("getting attributes of path `%1%'") % path);
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw Error(
                         format("output path `%1% should be a non-executable regular file")
@@ -1234,6 +1236,15 @@ void DerivationGoal::computeClosure()
                     % path % algo % printHash(h) % printHash(h2));
         }
 
+        /* Check that the output is not group or world writable, as
+           that means that someone else can have interfered with the
+           build.  Also, the output should be owned by the build
+           user. */
+        if ((st.st_mode & (S_IWGRP | S_IWOTH)) ||
+            (buildUser != 0 && st.st_uid != buildUser))
+            throw Error(format("suspicious ownership or permission on `%1%'; rejecting this build output") % path);
+
+        /* Get rid of all weird permissions. */
 	canonicalisePathMetaData(path);
 
 	/* For this output path, find the references to other paths contained
