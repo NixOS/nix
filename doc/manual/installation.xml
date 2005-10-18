@@ -67,7 +67,7 @@ these packages.  Alternatively, if you already have them installed,
 you can use <command>configure</command>'s <option>--with-bdb</option>
 and <option>--with-aterm</option> options to point to their respective
 locations.  Note that Berkeley DB <emphasis>must</emphasis> be version
-4.2; other versions may not have compatible database formats.</para>
+4.3; other versions may not have compatible database formats.</para>
 
 </sect1>
 
