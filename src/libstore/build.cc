@@ -1273,7 +1273,6 @@ void DerivationGoal::computeClosure()
             if (!recursive) {
                 /* The output path should be a regular file without
                    execute permission. */
-                struct stat st;
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
                     throw Error(
                         format("output path `%1% should be a non-executable regular file")
