@@ -312,6 +312,110 @@ const char * * strings2CharPtrs(const Strings & ss)
 }
 
 
+
+//////////////////////////////////////////////////////////////////////
+
+
+class UserLock
+{
+private:
+    /* POSIX locks suck.  If we have a lock on a file, and we open and
+       close that file again (without closing the original file
+       descriptor), we lose the lock.  So we have to be *very* careful
+       not to open a lock file on which we are holding a lock. */
+    static PathSet lockedPaths; /* !!! not thread-safe */
+
+    Path fnUserLock;
+    AutoCloseFD fdUserLock;
+
+    uid_t uid;
+    
+public:
+    UserLock();
+    ~UserLock();
+
+    void acquire();
+    void release();
+
+    uid_t getUID();
+};
+
+
+PathSet UserLock::lockedPaths;
+
+
+UserLock::UserLock()
+{
+    uid = 0;
+}
+
+
+UserLock::~UserLock()
+{
+    release();
+}
+
+
+void UserLock::acquire()
+{
+    assert(uid == 0);
+    
+    Strings buildUsers = querySetting("build-users", Strings());
+
+    if (buildUsers.empty())
+        throw Error(
+            "cannot build as `root'; you must define "
+            "one or more users for building in `build-users' "
+            "in the Nix configuration file");
+
+    for (Strings::iterator i = buildUsers.begin(); i != buildUsers.end(); ++i) {
+        printMsg(lvlError, format("trying user `%1%'") % *i);
+
+        struct passwd * pw = getpwnam(i->c_str());
+        if (!pw)
+            throw Error(format("the user `%1%' listed in `build-users' does not exist") % *i);
+
+        fnUserLock = (format("%1%/userpool/%2%") % nixStateDir % pw->pw_uid).str();
+
+        if (lockedPaths.find(fnUserLock) != lockedPaths.end())
+            /* We already have a lock on this one. */
+            continue;
+        
+        AutoCloseFD fd = open(fnUserLock.c_str(), O_RDWR | O_CREAT, 0600);
+        if (fd == -1)
+            throw SysError(format("opening user lock `%1%'") % fnUserLock);
+
+        if (lockFile(fd, ltWrite, false)) {
+            fdUserLock = fd.borrow();
+            lockedPaths.insert(fnUserLock);
+            uid = pw->pw_uid;
+            return;
+        }
+    }
+
+    throw Error("all build users are currently in use; "
+        "consider expanding the `build-users' field "
+        "in the Nix configuration file");
+}
+
+
+void UserLock::release()
+{
+    if (uid == 0) return;
+    fdUserLock.close(); /* releases lock */
+    assert(lockedPaths.find(fnUserLock) != lockedPaths.end());
+    lockedPaths.erase(fnUserLock);
+    fnUserLock = "";
+    uid = 0;
+}
+
+
+uid_t UserLock::getUID()
+{
+    return uid;
+}
+
+
 static void killUser(uid_t uid)
 {
     debug(format("killing all processes running under uid `%1%'") % uid);
@@ -381,7 +485,7 @@ private:
     PathSet allPaths;
 
     /* User selected for running the builder. */
-    uid_t buildUser;
+    UserLock buildUser;
 
     /* The process ID of the builder. */
     Pid pid;
@@ -468,7 +572,6 @@ DerivationGoal::DerivationGoal(const Path & drvPath, Worker & worker)
 {
     this->drvPath = drvPath;
     state = &DerivationGoal::init;
-    buildUser = 0;
     name = (format("building of `%1%'") % drvPath).str();
     trace("created");
 }
@@ -681,8 +784,8 @@ void DerivationGoal::buildDone()
        malicious user from leaving behind a process that keeps files
        open and modifies them after they have been chown'ed to
        root. */
-    if (buildUser != 0)
-        killUser(buildUser);
+    if (buildUser.getUID() != 0)
+        killUser(buildUser.getUID());
 
     /* Close the read side of the logger pipe. */
     logPipe.readSide.close();
@@ -712,6 +815,9 @@ void DerivationGoal::buildDone()
         amDone(false);
         return;
     }
+
+    /* Release the build user, if applicable. */
+    buildUser.release();
 
     amDone();
 }
@@ -1023,29 +1129,6 @@ bool DerivationGoal::prepareBuild()
 }
 
 
-static uid_t allocBuildUser()
-{
-    Strings buildUsers = querySetting("build-users", Strings());
-
-    if (buildUsers.empty())
-        throw Error(
-            "cannot build as `root'; you must define "
-            "one or more users for building in `build-users' "
-            "in the Nix configuration file");
-
-    for (Strings::iterator i = buildUsers.begin(); i != buildUsers.end(); ++i) {
-        printMsg(lvlError, format("trying user `%1%'") % *i);
-
-        struct passwd * pw = getpwnam(i->c_str());
-        if (!pw)
-            throw Error(format("the user `%1%' listed in `build-users' does not exist") % *i);
-
-        return pw->pw_uid;
-    }
-    
-}
-
-
 void DerivationGoal::startBuilder()
 {
     startNest(nest, lvlInfo,
@@ -1126,14 +1209,15 @@ void DerivationGoal::startBuilder()
     if (!queryBoolSetting("build-allow-root", true) &&
         getuid() == rootUserId)
     {
-        buildUser = allocBuildUser();
+        buildUser.acquire();
+        assert(buildUser.getUID() != 0);
 
         /* Make sure that no other processes are executing under this
            uid. */
-        killUser(buildUser);
+        killUser(buildUser.getUID());
         
         /* Change ownership of the temporary build directory.  !!! gid */
-        if (chown(tmpDir.c_str(), buildUser, (gid_t) -1) == -1)
+        if (chown(tmpDir.c_str(), buildUser.getUID(), (gid_t) -1) == -1)
             throw SysError(format("cannot change ownership of `%1%'") % tmpDir);
 
         /* Check that the Nix store has the appropriate permissions,
@@ -1198,15 +1282,15 @@ void DerivationGoal::startBuilder()
                except std*, so that's safe.  Also note that setuid()
                when run as root sets the real, effective and saved
                UIDs. */
-            if (buildUser != 0) {
-                printMsg(lvlError, format("switching to uid `%1%'") % buildUser);
+            if (buildUser.getUID() != 0) {
+                printMsg(lvlError, format("switching to uid `%1%'") % buildUser.getUID());
                 
                 /* !!! setgid also */
                 if (setgroups(0, 0) == -1)
                     throw SysError("cannot clear the set of supplementary groups");
-                setuid(buildUser);
-                assert(getuid() == buildUser);
-                assert(geteuid() == buildUser);
+                setuid(buildUser.getUID());
+                assert(getuid() == buildUser.getUID());
+                assert(geteuid() == buildUser.getUID());
 
             }
             
@@ -1296,7 +1380,7 @@ void DerivationGoal::computeClosure()
            build.  Also, the output should be owned by the build
            user. */
         if ((st.st_mode & (S_IWGRP | S_IWOTH)) ||
-            (buildUser != 0 && st.st_uid != buildUser))
+            (buildUser.getUID() != 0 && st.st_uid != buildUser.getUID()))
             throw Error(format("suspicious ownership or permission on `%1%'; rejecting this build output") % path);
 
         /* Get rid of all weird permissions. */
