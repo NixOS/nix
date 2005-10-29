@@ -844,6 +844,9 @@ void verifyStore(bool checkContents)
                 if (referers.find(*i) == referers.end()) {
                     printMsg(lvlError, format("missing referer mapping from `%1%' to `%2%'")
                         % *j % *i);
+                    referers.insert(*i);
+                    nixDB.setStrings(txn, dbReferers, *j,
+                        Paths(referers.begin(), referers.end()));
                 }
                 if (isValid && validPaths.find(*j) == validPaths.end()) {
                     printMsg(lvlError, format("incomplete closure: `%1%' needs missing `%2%'")
