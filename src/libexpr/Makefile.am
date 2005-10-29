@@ -15,7 +15,7 @@ AM_CFLAGS = \
 
 # Parser generation.
 
-parser.o: parser-tab.h lexer-tab.h
+parser.cc: parser-tab.h lexer-tab.h
 
 parser-tab.c parser-tab.h: parser.y
 	$(bison) -v -o parser-tab.c parser.y -d
