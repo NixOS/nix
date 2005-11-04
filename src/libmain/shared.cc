@@ -120,6 +120,10 @@ static void initAndRun(int argc, char * * argv)
     act.sa_flags = 0;
     if (sigaction(SIGINT, &act, &oact))
         throw SysError("installing handler for SIGINT");
+    if (sigaction(SIGTERM, &act, &oact))
+        throw SysError("installing handler for SIGTERM");
+    if (sigaction(SIGHUP, &act, &oact))
+        throw SysError("installing handler for SIGHUP");
 
     /* Ignore SIGPIPE. */
     act.sa_handler = SIG_IGN;
