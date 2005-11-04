@@ -301,8 +301,16 @@ Expr substitute(const ATermMap & subs, Expr e)
 }
 
 
-void checkVarDefs(const ATermMap & defs, Expr e)
+/* We use memoisation to prevent exponential complexity on heavily
+   shared ATerms (remember, an ATerm is a graph, not a tree!).  Note
+   that using an STL set is fine here wrt to ATerm garbage collection
+   since all the ATerms in the set are already reachable from
+   somewhere else. */
+static void checkVarDefs2(set<Expr> & done, const ATermMap & defs, Expr e)
 {
+    if (done.find(e) != done.end()) return;
+    done.insert(e);
+    
     ATerm name, pos, value;
     ATermList formals;
     ATerm with, body;
@@ -320,22 +328,22 @@ void checkVarDefs(const ATermMap & defs, Expr e)
             Expr deflt;
             if (!matchNoDefFormal(*i, name))
                 if (matchDefFormal(*i, name, deflt))
-                    checkVarDefs(defs, deflt);
+                    checkVarDefs2(done, defs, deflt);
                 else
                     abort();
             defs2.set(name, (ATerm) ATempty);
         }
-        checkVarDefs(defs2, body);
+        checkVarDefs2(done, defs2, body);
     }
         
     else if (matchFunction1(e, name, body, pos)) {
         ATermMap defs2(defs);
         defs2.set(name, (ATerm) ATempty);
-        checkVarDefs(defs2, body);
+        checkVarDefs2(done, defs2, body);
     }
         
     else if (matchRec(e, rbnds, nrbnds)) {
-        checkVarDefs(defs, (ATerm) nrbnds);
+        checkVarDefs2(done, defs, (ATerm) nrbnds);
         ATermMap defs2(defs);
         for (ATermIterator i(rbnds); i; ++i) {
             if (!matchBind(*i, name, value, pos)) abort(); /* can't happen */
@@ -345,25 +353,32 @@ void checkVarDefs(const ATermMap & defs, Expr e)
             if (!matchBind(*i, name, value, pos)) abort(); /* can't happen */
             defs2.set(name, (ATerm) ATempty);
         }
-        checkVarDefs(defs2, (ATerm) rbnds);
+        checkVarDefs2(done, defs2, (ATerm) rbnds);
     }
 
     else if (matchWith(e, with, body, pos)) {
         /* We can't check the body without evaluating the definitions
            (which is an arbitrary expression), so we don't do that
            here but only when actually evaluating the `with'. */
-        checkVarDefs(defs, with);
+        checkVarDefs2(done, defs, with);
     }
     
     else if (ATgetType(e) == AT_APPL) {
         int arity = ATgetArity(ATgetAFun(e));
         for (int i = 0; i < arity; ++i)
-            checkVarDefs(defs, ATgetArgument(e, i));
+            checkVarDefs2(done, defs, ATgetArgument(e, i));
     }
 
     else if (ATgetType(e) == AT_LIST)
         for (ATermIterator i((ATermList) e); i; ++i)
-            checkVarDefs(defs, *i);
+            checkVarDefs2(done, defs, *i);
+}
+
+
+void checkVarDefs(const ATermMap & defs, Expr e)
+{
+    set<Expr> done;
+    checkVarDefs2(done, defs, e);
 }
 
 
