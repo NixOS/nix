@@ -15,6 +15,8 @@ const int md5HashSize = 16;
 const int sha1HashSize = 20;
 const int sha256HashSize = 32;
 
+extern const string base32Chars;
+
 
 struct Hash
 {

@@ -109,13 +109,15 @@ static unsigned char divMod(unsigned char * bytes, unsigned char y)
 
 
 // omitted: E O U T
-char chars[] = "0123456789abcdfghijklmnpqrsvwxyz";
+const string base32Chars = "0123456789abcdfghijklmnpqrsvwxyz";
 
 
 string printHash32(const Hash & hash)
 {
     Hash hash2(hash);
     unsigned int len = (hash.hashSize * 8 - 1) / 5 + 1;
+
+    const char * chars = base32Chars.c_str();
     
     string s(len, '0');
 
@@ -164,6 +166,8 @@ static bool add(unsigned char * bytes, unsigned char y, int maxSize)
 Hash parseHash32(HashType ht, const string & s)
 {
     Hash hash(ht);
+
+    const char * chars = base32Chars.c_str();
 
     for (unsigned int i = 0; i < s.length(); ++i) {
         char c = s[i];

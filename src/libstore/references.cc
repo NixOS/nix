@@ -11,26 +11,45 @@
 #include "hash.hh"
 
 
+static unsigned int refLength = 32; /* characters */
+
+
 static void search(const string & s,
-    Strings & ids, Strings & seen)
+    StringSet & ids, StringSet & seen)
 {
-    for (Strings::iterator i = ids.begin();
-         i != ids.end(); )
-    {
-        checkInterrupt();
-        if (s.find(*i) == string::npos)
-            i++;
-        else {
-            debug(format("found reference to `%1%'") % *i);
-            seen.push_back(*i);
-            i = ids.erase(i);
+    static bool initialised = false;
+    static bool isBase32[256];
+    if (!initialised) {
+        for (unsigned int i = 0; i < 256; ++i) isBase32[i] = false;
+        for (unsigned int i = 0; i < base32Chars.size(); ++i)
+            isBase32[(unsigned char) base32Chars[i]] = true;
+        initialised = true;
+    }
+    
+    for (unsigned int i = 0; i + refLength <= s.size(); ) {
+        int j;
+        bool match = true;
+        for (j = refLength - 1; j >= 0; --j)
+            if (!isBase32[(unsigned char) s[i + j]]) {
+                i += j + 1;
+                match = false;
+                break;
+            }
+        if (!match) continue;
+        string ref(s, i, refLength);
+        if (ids.find(ref) != ids.end()) {
+            debug(format("found reference to `%1%' at offset `%2%'")
+                  % ref % i);
+            seen.insert(ref);
+            ids.erase(ref);
         }
+        ++i;
     }
 }
 
 
 void checkPath(const string & path,
-    Strings & ids, Strings & seen)
+    StringSet & ids, StringSet & seen)
 {
     checkInterrupt();
     
@@ -69,36 +88,35 @@ void checkPath(const string & path,
 }
 
 
-Strings filterReferences(const string & path, const Strings & paths)
+PathSet scanForReferences(const string & path, const PathSet & paths)
 {
-    map<string, string> backMap;
-    Strings ids;
-    Strings seen;
+    map<string, Path> backMap;
+    StringSet ids;
+    StringSet seen;
 
     /* For efficiency (and a higher hit rate), just search for the
        hash part of the file name.  (This assumes that all references
        have the form `HASH-bla'). */
-    for (Strings::const_iterator i = paths.begin();
-         i != paths.end(); i++)
-    {
+    for (PathSet::const_iterator i = paths.begin(); i != paths.end(); i++) {
         string baseName = baseNameOf(*i);
         unsigned int pos = baseName.find('-');
         if (pos == string::npos)
             throw Error(format("bad reference `%1%'") % *i);
         string s = string(baseName, 0, pos);
+        assert(s.size() == refLength);
+        assert(backMap.find(s) == backMap.end());
         // parseHash(htSHA256, s);
-        ids.push_back(s);
+        ids.insert(s);
         backMap[s] = *i;
     }
 
     checkPath(path, ids, seen);
 
-    Strings found;
-    for (Strings::iterator i = seen.begin(); i != seen.end(); i++)
-    {
-        map<string, string>::iterator j;
+    PathSet found;
+    for (StringSet::iterator i = seen.begin(); i != seen.end(); i++) {
+        map<string, Path>::iterator j;
         if ((j = backMap.find(*i)) == backMap.end()) abort();
-        found.push_back(j->second);
+        found.insert(j->second);
     }
 
     return found;

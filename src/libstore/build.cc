@@ -1390,10 +1390,7 @@ void DerivationGoal::computeClosure()
 	   in it. */
         PathSet references;
         if (!pathExists(path + "/nix-support/no-scan")) {
-            Paths references2;
-            references2 = filterReferences(path, 
-                Paths(allPaths.begin(), allPaths.end()));
-            references = PathSet(references2.begin(), references2.end());
+            references = scanForReferences(path, allPaths);
 
             /* For debugging, print out the referenced and
                unreferenced paths. */

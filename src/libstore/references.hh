@@ -4,7 +4,7 @@
 #include "util.hh"
 
 
-Strings filterReferences(const Path & path, const Strings & refs);
+PathSet scanForReferences(const Path & path, const PathSet & refs);
 
 
 #endif /* !__REFERENCES_H */
