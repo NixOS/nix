@@ -132,7 +132,8 @@ while (scalar @tmp > 0) {
     # reference (see above).  Even if that is fixed, using a hook
     # probably wouldn't make that much sense; pumping lots of data
     # around just to compress them won't gain that much.
-    my $pid = open(READ, "NIX_BUILD_HOOK= $binDir/nix-store --realise @tmp2|")
+    $ENV{"NIX_BUILD_HOOK"} = "";
+    my $pid = open(READ, "$binDir/nix-store --realise @tmp2|")
         or die "cannot run nix-store";
     while (<READ>) {
         chomp;
