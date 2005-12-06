@@ -306,11 +306,13 @@ void Database::open(const string & path)
 
             /* Try again. */
             open2(path, false);
+
+            /* Force a checkpoint, as per the BDB docs. */
+            env->txn_checkpoint(DB_FORCE, 0, 0);
         }
         else
             rethrow(e);
     }
-    
 }
 
 
