@@ -11,6 +11,7 @@ $(DB).tar.gz:
 
 $(DB): $(DB).tar.gz
 	gunzip < $(DB).tar.gz | tar xvf -
+	cd $(DB) && patch -p1 < ../register.patch
 
 have-db:
 	$(MAKE) $(DB)
