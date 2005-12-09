@@ -20,6 +20,16 @@ public:
 };
 
 
+class DestroyDbEnv
+{
+    DbEnv * dbenv;
+public:
+    DestroyDbEnv(DbEnv * _dbenv) : dbenv(_dbenv) { }
+    ~DestroyDbEnv() { if (dbenv) { dbenv->close(0); delete dbenv; } }
+    void release() { dbenv = 0; };
+};
+
+
 static void rethrow(DbException & e)
 {
     throw Error(e.what());
@@ -150,18 +160,35 @@ void setAccessorCount(int fd, int n)
 }
 
 
-void openEnv(DbEnv * env, const string & path, u_int32_t flags)
+void openEnv(DbEnv * & env, const string & path, u_int32_t flags)
 {
-    env->open(path.c_str(),
-        DB_INIT_LOCK | DB_INIT_LOG | DB_INIT_MPOOL | DB_INIT_TXN |
-        DB_CREATE | flags,
-        0666);
+    try {
+        env->open(path.c_str(),
+            DB_INIT_LOCK | DB_INIT_LOG | DB_INIT_MPOOL | DB_INIT_TXN |
+            DB_CREATE | flags,
+            0666);
+    } catch (DbException & e) {
+        printMsg(lvlError, format("environment open failed: %1%") % e.what());
+        throw;
+    }
 }
 
 
 static int my_fsync(int fd)
 {
     return 0;
+}
+
+
+static void errorPrinter(const DbEnv * env, const char * errpfx, const char * msg)
+{
+    printMsg(lvlError, format("Berkeley DB error: %1%") % msg);
+}
+
+
+static void messagePrinter(const DbEnv * env, const char * msg)
+{
+    printMsg(lvlError, format("Berkeley DB message: %1%") % msg);
 }
 
 
@@ -173,8 +200,13 @@ void Database::open2(const string & path, bool removeOldEnv)
 
 
     /* Create the database environment object. */
-    DbEnv * env = 0; /* !!! close on error */
-    env = new DbEnv(0);
+    DbEnv * env = new DbEnv(0);
+    DestroyDbEnv deleteEnv(env);
+
+    env->set_errcall(errorPrinter);
+    env->set_msgcall(messagePrinter);
+    //env->set_verbose(DB_VERB_REGISTER, 1);
+    env->set_verbose(DB_VERB_RECOVERY, 1);
     
     /* Smaller log files. */
     env->set_lg_bsize(32 * 1024); /* default */
@@ -200,93 +232,19 @@ void Database::open2(const string & path, bool removeOldEnv)
        shouldn't sync when DB_TXN_WRITE_NOSYNC is used, but it still
        fsync()s sometimes. */
     db_env_set_func_fsync(my_fsync);
-        
 
-    /* The following code provides automatic recovery of the database
-       environment.  Recovery is necessary when a process dies while
-       it has the database open.  To detect this, processes atomically
-       increment a counter when they open the database, and decrement
-       it when they close it.  If we see that counter is > 0 but no
-       processes are accessing the database---determined by attempting
-       to obtain a write lock on a lock file on which all accessors
-       have a read lock---we must run recovery.  Note that this also
-       ensures that we only run recovery when there are no other
-       accessors (which could cause database corruption). */
-
-    /* !!! close fdAccessors / fdLock on exception */
-
-    /* Open the accessor count file. */
-    string accessorsPath = path + "/accessor_count";
-    fdAccessors = ::open(accessorsPath.c_str(), O_RDWR | O_CREAT, 0666);
-    if (fdAccessors == -1)
-        if (errno == EACCES)
-            throw DbNoPermission(
-                format("permission denied to database in `%1%'") % accessorsPath);
-        else    
-            throw SysError(format("opening file `%1%'") % accessorsPath);
     
-    /* Open the lock file. */
-    string lockPath = path + "/access_lock";
-    fdLock = ::open(lockPath.c_str(), O_RDWR | O_CREAT, 0666);
-    if (fdLock == -1)
-        throw SysError(format("opening lock file `%1%'") % lockPath);
-    
-    /* Try to acquire a write lock. */
-    debug(format("attempting write lock on `%1%'") % lockPath);
-    if (lockFile(fdLock, ltWrite, false)) { /* don't wait */
-        
-        debug(format("write lock granted"));
-        
-        /* We have a write lock, which means that there are no other
-           readers or writers. */
-        
-        if (removeOldEnv) {
-            printMsg(lvlError, "removing old Berkeley DB database environment...");
-            env->remove(path.c_str(), DB_FORCE);
-            return;
-        }
-        
-        int n = getAccessorCount(fdAccessors);
-        
-        if (n != 0) {
-            printMsg(lvlTalkative,
-                format("accessor count is %1%, running recovery") % n);
-            
-            /* Open the environment after running recovery. */
-            openEnv(env, path, DB_RECOVER);
-        }
-            
-        else 
-            /* Open the environment normally. */
-            openEnv(env, path, 0);
-
-        setAccessorCount(fdAccessors, 1);
-
-        /* Downgrade to a read lock. */
-        debug(format("downgrading to read lock on `%1%'") % lockPath);
-        lockFile(fdLock, ltRead, true);
-
-    } else {
-        /* There are other accessors. */ 
-        debug(format("write lock refused"));
-
-        /* Acquire a read lock. */
-        debug(format("acquiring read lock on `%1%'") % lockPath);
-        lockFile(fdLock, ltRead, true); /* wait indefinitely */
-        
-        /* Increment the accessor count. */
-        lockFile(fdAccessors, ltWrite, true);
-        int n = getAccessorCount(fdAccessors) + 1;
-        setAccessorCount(fdAccessors, n);
-        debug(format("incremented accessor count to %1%") % n);
-        lockFile(fdAccessors, ltNone, true);
-        
-        /* Open the environment normally. */
-        openEnv(env, path, 0);
+    if (removeOldEnv) {
+        printMsg(lvlError, "removing old Berkeley DB database environment...");
+        env->remove(path.c_str(), DB_FORCE);
+        return;
     }
-    
+
+    openEnv(env, path, DB_REGISTER | DB_RECOVER);
+
+    deleteEnv.release();
     this->env = env;
-}       
+}
 
 
 void Database::open(const string & path)
@@ -310,6 +268,15 @@ void Database::open(const string & path)
             /* Force a checkpoint, as per the BDB docs. */
             env->txn_checkpoint(DB_FORCE, 0, 0);
         }
+
+#if 0        
+        else if (e.get_errno() == DB_RUNRECOVERY) {
+            /* If recovery is needed, do it. */
+            printMsg(lvlError, "running recovery...");
+            open2(path, false, true);
+        }
+#endif        
+        
         else
             rethrow(e);
     }
@@ -341,16 +308,6 @@ void Database::close()
     } catch (DbException e) { rethrow(e); }
 
     delete env;
-
-    /* Decrement the accessor count. */
-    lockFile(fdAccessors, ltWrite, true);
-    int n = getAccessorCount(fdAccessors) - 1;
-    setAccessorCount(fdAccessors, n);
-    debug(format("decremented accessor count to %1%") % n);
-    lockFile(fdAccessors, ltNone, true);
-
-    ::close(fdAccessors);
-    ::close(fdLock);
 }
 
 

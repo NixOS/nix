@@ -48,9 +48,6 @@ class Database
 private:
     DbEnv * env;
 
-    int fdLock;
-    int fdAccessors;
-
     TableId nextId;
     map<TableId, Db *> tables;
 
