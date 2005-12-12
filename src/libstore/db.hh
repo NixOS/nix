@@ -65,6 +65,8 @@ public:
     void close();
 
     TableId openTable(const string & table, bool sorted = false);
+    void closeTable(TableId table);
+    void deleteTable(const string & table);
 
     bool queryString(const Transaction & txn, TableId table, 
         const string & key, string & data);

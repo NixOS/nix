@@ -292,11 +292,12 @@ void Database::close()
     try {
 
         for (map<TableId, Db *>::iterator i = tables.begin();
-             i != tables.end(); i++)
+             i != tables.end(); )
         {
-            Db * db = i->second;
-            db->close(DB_NOSYNC);
-            delete db;
+            map<TableId, Db *>::iterator j = i;
+            ++j;
+            closeTable(i->first);
+            i = j;
         }
 
         /* Do a checkpoint every 128 kilobytes, or every 5 minutes. */
@@ -333,6 +334,25 @@ TableId Database::openTable(const string & tableName, bool sorted)
     } catch (DbException e) { rethrow(e); }
 
     return table;
+}
+
+
+void Database::closeTable(TableId table)
+{
+    try {
+        Db * db = getDb(table);
+        db->close(DB_NOSYNC);
+        delete db;
+        tables.erase(table);
+    } catch (DbException e) { rethrow(e); }
+}
+
+
+void Database::deleteTable(const string & table)
+{
+    try {
+        env->dbremove(0, table.c_str(), 0, DB_AUTO_COMMIT);
+    } catch (DbException e) { rethrow(e); }
 }
 
 

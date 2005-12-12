@@ -1034,8 +1034,12 @@ static void upgradeStore09()
             nixDB.setString(txn, dbReferrers, addPrefix(*i, *j), "");
         cerr << ".";
     }
-    
+
     cerr << "\n";
 
     txn.commit();
+
+    nixDB.closeTable(dbReferers);
+
+    nixDB.deleteTable("referers");
 }
