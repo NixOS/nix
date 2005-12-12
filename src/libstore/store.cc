@@ -34,10 +34,12 @@ static TableId dbValidPaths = 0;
    paths. */
 static TableId dbReferences = 0;
 
-/* dbReferers :: Path -> [Path]
+/* dbReferrers :: Path -> Path
 
-   This table is just the reverse mapping of dbReferences. */
-static TableId dbReferers = 0;
+   This table is just the reverse mapping of dbReferences.  This table
+   can have duplicate keys, each corresponding value denoting a single
+   referrer. */
+static TableId dbReferrers = 0;
 
 /* dbSubstitutes :: Path -> [[Path]]
 
@@ -70,7 +72,8 @@ bool Substitute::operator == (const Substitute & sub) const
 }
 
 
-static void upgradeStore();
+static void upgradeStore07();
+static void upgradeStore09();
 
 
 void openDB()
@@ -86,7 +89,7 @@ void openDB()
     }
     dbValidPaths = nixDB.openTable("validpaths");
     dbReferences = nixDB.openTable("references");
-    dbReferers = nixDB.openTable("referers");
+    dbReferrers = nixDB.openTable("referrers", true); /* must be sorted */
     dbSubstitutes = nixDB.openTable("substitutes");
     dbDerivers = nixDB.openTable("derivers");
 
@@ -103,7 +106,10 @@ void openDB()
             % curSchema % nixSchemaVersion);
 
     if (curSchema < nixSchemaVersion) {
-        upgradeStore();
+        if (curSchema <= 1)
+            upgradeStore07();
+        if (curSchema == 2)
+            upgradeStore09();
         writeFile(schemaFN, (format("%1%") % nixSchemaVersion).str());
     }
 }
@@ -286,11 +292,31 @@ static bool isRealisablePath(const Transaction & txn, const Path & path)
 }
 
 
+static string addPrefix(const string & prefix, const string & s)
+{
+    return prefix + string(1, 0) + s;
+}
+
+
+static string stripPrefix(const string & prefix, const string & s)
+{
+    if (s.size() <= prefix.size() ||
+        s.compare(0, prefix.size(), prefix) != 0 ||
+        s[prefix.size()] != 0)
+        throw Error(format("string `%1%' is missing prefix `%2%'")
+            % s % prefix);
+    return string(s, prefix.size() + 1);
+}
+
+
 static PathSet getReferers(const Transaction & txn, const Path & storePath)
 {
-    Paths referers;
-    nixDB.queryStrings(txn, dbReferers, storePath, referers);
-    return PathSet(referers.begin(), referers.end());
+    PathSet referrers;
+    Strings keys;
+    nixDB.enumTable(txn, dbReferrers, keys, storePath + string(1, 0));
+    for (Strings::iterator i = keys.begin(); i != keys.end(); ++i)
+        referrers.insert(stripPrefix(storePath, *i));
+    return referrers;
 }
 
 
@@ -312,26 +338,18 @@ void setReferences(const Transaction & txn, const Path & storePath,
     nixDB.setStrings(txn, dbReferences, storePath,
         Paths(references.begin(), references.end()));
 
-    /* Update the referers mappings of all referenced paths. */
+    /* Update the referers mappings of all new referenced paths. */
     for (PathSet::const_iterator i = references.begin();
          i != references.end(); ++i)
-    {
-        PathSet referers = getReferers(txn, *i);
-        referers.insert(storePath);
-        nixDB.setStrings(txn, dbReferers, *i,
-            Paths(referers.begin(), referers.end()));
-    }
+        if (oldReferences2.find(*i) == oldReferences2.end())
+            nixDB.setString(txn, dbReferrers, addPrefix(*i, storePath), "");
 
     /* Remove referer mappings from paths that are no longer
        references. */
     for (Paths::iterator i = oldReferences.begin();
          i != oldReferences.end(); ++i)
-        if (references.find(*i) == references.end()) {
-            PathSet referers = getReferers(txn, *i);
-            referers.erase(storePath);
-            nixDB.setStrings(txn, dbReferers, *i,
-                Paths(referers.begin(), referers.end()));
-        }
+        if (references.find(*i) == references.end())
+            nixDB.delPair(txn, dbReferrers, addPrefix(*i, storePath));
 }
 
 
@@ -840,13 +858,11 @@ void verifyStore(bool checkContents)
             for (PathSet::iterator j = references.begin();
                  j != references.end(); ++j)
             {
-                PathSet referers = getReferers(txn, *j);
-                if (referers.find(*i) == referers.end()) {
+                string dummy;
+                if (!nixDB.queryString(txn, dbReferrers, addPrefix(*j, *i), dummy)) {
                     printMsg(lvlError, format("missing referer mapping from `%1%' to `%2%'")
                         % *j % *i);
-                    referers.insert(*i);
-                    nixDB.setStrings(txn, dbReferers, *j,
-                        Paths(referers.begin(), referers.end()));
+                    nixDB.setString(txn, dbReferrers, addPrefix(*j, *i), "");
                 }
                 if (isValid && validPaths.find(*j) == validPaths.end()) {
                     printMsg(lvlError, format("incomplete closure: `%1%' needs missing `%2%'")
@@ -856,6 +872,7 @@ void verifyStore(bool checkContents)
         }
     }
 
+#if 0 // !!!
     /* Check the `referers' table. */
     Paths referersKeys;
     nixDB.enumTable(txn, dbReferers, referersKeys);
@@ -892,6 +909,7 @@ void verifyStore(bool checkContents)
                     Paths(newReferers.begin(), newReferers.end()));
         }
     }
+#endif    
 
     txn.commit();
 }
@@ -902,7 +920,7 @@ void verifyStore(bool checkContents)
 
 
 /* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */
-static void upgradeStore()
+static void upgradeStore07()
 {
     printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
 
@@ -984,5 +1002,40 @@ static void upgradeStore()
     cerr << "\n";
 
     /* !!! maybe this transaction is way too big */
+    txn.commit();
+}
+
+
+/* Upgrade from schema 2 (0.8 <= Nix <= 0.9) to schema 3 (Nix >=
+   0.10).  The only thing to do here is to upgrade the old `referer'
+   table (which causes quadratic complexity in some cases) to the new
+   (and properly spelled) `referrer' table. */
+static void upgradeStore09() 
+{
+    printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
+
+    if (!pathExists(nixDBPath + "/referers")) return;
+
+    Transaction txn(nixDB);
+
+    cerr << "converting referers to referrers...";
+
+    TableId dbReferers = nixDB.openTable("referers"); /* sic! */
+
+    Paths referersKeys;
+    nixDB.enumTable(txn, dbReferers, referersKeys);
+    for (Paths::iterator i = referersKeys.begin();
+         i != referersKeys.end(); ++i)
+    {
+        Paths referers;
+        nixDB.queryStrings(txn, dbReferers, *i, referers);
+        for (Paths::iterator j = referers.begin();
+             j != referers.end(); ++j)
+            nixDB.setString(txn, dbReferrers, addPrefix(*i, *j), "");
+        cerr << ".";
+    }
+    
+    cerr << "\n";
+
     txn.commit();
 }

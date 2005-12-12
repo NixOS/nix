@@ -64,7 +64,7 @@ public:
     void open(const string & path);
     void close();
 
-    TableId openTable(const string & table);
+    TableId openTable(const string & table, bool sorted = false);
 
     bool queryString(const Transaction & txn, TableId table, 
         const string & key, string & data);
@@ -83,7 +83,7 @@ public:
         const string & key);
 
     void enumTable(const Transaction & txn, TableId table,
-        Strings & keys);
+        Strings & keys, const string & keyPrefix = "");
 };
 
 
