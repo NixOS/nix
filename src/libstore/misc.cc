@@ -19,7 +19,7 @@ void computeFSClosure(const Path & storePath,
 
     PathSet references;
     if (flipDirection)
-        queryReferers(noTxn, storePath, references);
+        queryReferrers(noTxn, storePath, references);
     else
         queryReferences(noTxn, storePath, references);
 

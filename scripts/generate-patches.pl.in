@@ -1,4 +1,4 @@
-#! @perl@ -w -I@libexecdir@/nix
+>#! @perl@ -w -I@libexecdir@/nix
 
 use strict;
 use POSIX qw(tmpnam);
@@ -140,19 +140,19 @@ sub computeUses {
 
 #    print "  DERIVER $deriver\n";
 
-    # Optimisation: build the referers graph from the references
+    # Optimisation: build the referrers graph from the references
     # graph.
-    my %referers;
+    my %referrers;
     foreach my $q (keys %{$narFiles}) {
         my @refs = split " ", @{$$narFiles{$q}}[0]->{references};
         foreach my $r (@refs) {
-            $referers{$r} = [] unless defined $referers{$r};
-            push @{$referers{$r}}, $q;
+            $referrers{$r} = [] unless defined $referrers{$r};
+            push @{$referrers{$r}}, $q;
         }
     }
 
     # Determine the shortest path from $deriver to all other reachable
-    # paths in the `referers' graph.
+    # paths in the `referrers' graph.
 
     my %dist;
     $dist{$deriver} = 0;
@@ -164,7 +164,7 @@ sub computeUses {
         my $p = $queue[$pos];
         $pos++;
 
-        foreach my $q (@{$referers{$p}}) {
+        foreach my $q (@{$referrers{$p}}) {
             if (!defined $dist{$q}) {
                 $dist{$q} = $dist{$p} + 1;
 #                print "    $q $dist{$q}\n";

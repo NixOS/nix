@@ -273,8 +273,8 @@ static void printTree(const Path & path,
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qOutputs, qRequisites, qReferences, qReferers
-         , qReferersClosure, qDeriver, qBinding, qHash
+    enum { qOutputs, qRequisites, qReferences, qReferrers
+         , qReferrersClosure, qDeriver, qBinding, qHash
          , qTree, qGraph } query = qOutputs;
     bool useOutput = false;
     bool includeOutputs = false;
@@ -286,8 +286,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
         if (*i == "--outputs") query = qOutputs;
         else if (*i == "--requisites" || *i == "-R") query = qRequisites;
         else if (*i == "--references") query = qReferences;
-        else if (*i == "--referers") query = qReferers;
-        else if (*i == "--referers-closure") query = qReferersClosure;
+        else if (*i == "--referrers" || *i == "--referers") query = qReferrers;
+        else if (*i == "--referrers-closure" || *i == "--referers-closure") query = qReferrersClosure;
         else if (*i == "--deriver" || *i == "-d") query = qDeriver;
         else if (*i == "--binding" || *i == "-b") {
             if (opArgs.size() == 0)
@@ -320,8 +320,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qRequisites:
         case qReferences:
-        case qReferers:
-        case qReferersClosure: {
+        case qReferrers:
+        case qReferrersClosure: {
             PathSet paths;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
@@ -330,8 +330,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 if (query == qRequisites)
                     storePathRequisites(path, includeOutputs, paths);
                 else if (query == qReferences) queryReferences(noTxn, path, paths);
-                else if (query == qReferers) queryReferers(noTxn, path,  paths);
-                else if (query == qReferersClosure) computeFSClosure(path, paths, true);
+                else if (query == qReferrers) queryReferrers(noTxn, path,  paths);
+                else if (query == qReferrersClosure) computeFSClosure(path, paths, true);
             }
             printPathSet(paths);
             break;

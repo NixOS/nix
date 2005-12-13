@@ -123,8 +123,8 @@ void queryReferences(const Transaction & txn,
 
 /* Queries the set of incoming FS references for a store path.  The
    result is not cleared. */
-void queryReferers(const Transaction & txn,
-    const Path & storePath, PathSet & referers);
+void queryReferrers(const Transaction & txn,
+    const Path & storePath, PathSet & referrers);
 
 /* Sets the deriver of a store path.  Use with care! */
 void setDeriver(const Transaction & txn, const Path & storePath,

@@ -236,7 +236,7 @@ $ nix-store -q --tree $(nix-store -qd $(which firefox))</screen>
   certain Glibc:
 
   <screen>
-$ nix-store -q --referers-closure \
+$ nix-store -q --referrers-closure \
     /nix/store/8lz9yc6zgmc0vlqmn2ipcpkjlmbi51vv-glibc-2.3.4</screen>
 
   </para>

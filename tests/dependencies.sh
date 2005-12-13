@@ -22,8 +22,8 @@ if echo "$deps" | grep -q "dependencies-input-1"; then exit 1; fi
 # Input-2 is retained.
 input2OutPath=$(echo "$deps" | grep "dependencies-input-2")
 
-# The referers closure of input-2 should include outPath.
-$TOP/src/nix-store/nix-store -q --referers-closure "$input2OutPath" | grep "$outPath"
+# The referrers closure of input-2 should include outPath.
+$TOP/src/nix-store/nix-store -q --referrers-closure "$input2OutPath" | grep "$outPath"
 
 # Check that the derivers are set properly.
 test $($TOP/src/nix-store/nix-store -q --deriver "$outPath") = "$drvPath"

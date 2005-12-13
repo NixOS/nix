@@ -401,8 +401,8 @@ void collectGarbage(GCAction action, PathSet & result)
     for (Paths::iterator i = storePaths.begin(); i != storePaths.end(); ++i)
         storePaths2.insert(canonPath(nixStore + "/" + *i));
 
-    /* Topologically sort them under the `referers' relation.  That
-       is, a < b iff a is in referers(b).  This gives us the order in
+    /* Topologically sort them under the `referrers' relation.  That
+       is, a < b iff a is in referrers(b).  This gives us the order in
        which things can be deleted safely. */
     /* !!! when we have multiple output paths per derivation, this
        will not work anymore because we get cycles. */

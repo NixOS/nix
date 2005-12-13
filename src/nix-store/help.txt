@@ -28,8 +28,8 @@ Query flags:
   --outputs: query the output paths of a Nix derivation (default)
   --requisites / -R: print all paths necessary to realise a path
   --references: print all paths referenced by the given path
-  --referers: print all paths directly refering to the given path
-  --referers-closure: print all paths (in)directly refering to the given path
+  --referrers: print all paths directly refering to the given path
+  --referrers-closure: print all paths (in)directly refering to the given path
   --tree: print a tree showing the dependency graph of the given paths
   --graph: print a dot graph rooted at given paths
 

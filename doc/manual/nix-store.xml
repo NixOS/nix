@@ -292,8 +292,8 @@ $ nix-store --gc</screen>
     <arg choice='plain'><option>--requisites</option></arg>
     <arg choice='plain'><option>-R</option></arg>
     <arg choice='plain'><option>--references</option></arg>
-    <arg choice='plain'><option>--referers</option></arg>
-    <arg choice='plain'><option>--referers-closure</option></arg>
+    <arg choice='plain'><option>--referrers</option></arg>
+    <arg choice='plain'><option>--referrers-closure</option></arg>
     <arg choice='plain'><option>--deriver</option></arg>
     <arg choice='plain'><option>--deriver</option></arg>
     <arg choice='plain'><option>--graph</option></arg>
@@ -411,21 +411,21 @@ query is applied to the target of the symlink.</para>
 
   </varlistentry>
   
-  <varlistentry><term><option>--referers</option></term>
+  <varlistentry><term><option>--referrers</option></term>
   
-    <listitem><para>Prints the set of <emphasis>referers</emphasis> of
+    <listitem><para>Prints the set of <emphasis>referrers</emphasis> of
     the store paths <replaceable>paths</replaceable>, that is, the
     store paths currently existing in the Nix store that refer to one
     of <replaceable>paths</replaceable>.  Note that contrary to the
-    references, the set of referers is not constant; it can change as
+    references, the set of referrers is not constant; it can change as
     store paths are added or removed.</para></listitem>
 
   </varlistentry>
   
-  <varlistentry><term><option>--referers-closure</option></term>
+  <varlistentry><term><option>--referrers-closure</option></term>
   
     <listitem><para>Prints the closure of the set of store paths
-    <replaceable>paths</replaceable> under the referers relation; that
+    <replaceable>paths</replaceable> under the referrers relation; that
     is, all store paths that directly or indirectly refer to one of
     <replaceable>paths</replaceable>.  These are all the path currently
     in the Nix store that are dependent on
@@ -536,7 +536,7 @@ $ nix-store -q --tree $(nix-store -qd $(which svn))
 <command>svn</command>:
 
 <screen>
-$ nix-store -q --referers $(nix-store -q --binding openssl $(nix-store -qd $(which svn)))
+$ nix-store -q --referrers $(nix-store -q --binding openssl $(nix-store -qd $(which svn)))
 /nix/store/23ny9l9wixx21632y2wi4p585qhva1q8-sylpheed-1.0.0
 /nix/store/5mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
 /nix/store/dpmvp969yhdqs7lm2r1a3gng7pyq6vy4-subversion-1.1.3
@@ -548,7 +548,7 @@ $ nix-store -q --referers $(nix-store -q --binding openssl $(nix-store -qd $(whi
 (C library) used by <command>svn</command>:
 
 <screen>
-$ nix-store -q --referers-closure $(ldd $(which svn) | grep /libc.so | awk '{print $3}')
+$ nix-store -q --referrers-closure $(ldd $(which svn) | grep /libc.so | awk '{print $3}')
 /nix/store/034a6h4vpz9kds5r6kzb9lhh81mscw43-libgnomeprintui-2.8.2
 /nix/store/15l3yi0d45prm7a82pcrknxdh6nzmxza-gawk-3.1.4
 <replaceable>...</replaceable></screen>

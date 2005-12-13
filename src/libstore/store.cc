@@ -309,7 +309,7 @@ static string stripPrefix(const string & prefix, const string & s)
 }
 
 
-static PathSet getReferers(const Transaction & txn, const Path & storePath)
+static PathSet getReferrers(const Transaction & txn, const Path & storePath)
 {
     PathSet referrers;
     Strings keys;
@@ -338,13 +338,13 @@ void setReferences(const Transaction & txn, const Path & storePath,
     nixDB.setStrings(txn, dbReferences, storePath,
         Paths(references.begin(), references.end()));
 
-    /* Update the referers mappings of all new referenced paths. */
+    /* Update the referrers mappings of all new referenced paths. */
     for (PathSet::const_iterator i = references.begin();
          i != references.end(); ++i)
         if (oldReferences2.find(*i) == oldReferences2.end())
             nixDB.setString(txn, dbReferrers, addPrefix(*i, storePath), "");
 
-    /* Remove referer mappings from paths that are no longer
+    /* Remove referrer mappings from paths that are no longer
        references. */
     for (Paths::iterator i = oldReferences.begin();
          i != oldReferences.end(); ++i)
@@ -364,13 +364,13 @@ void queryReferences(const Transaction & txn,
 }
 
 
-void queryReferers(const Transaction & txn,
-    const Path & storePath, PathSet & referers)
+void queryReferrers(const Transaction & txn,
+    const Path & storePath, PathSet & referrers)
 {
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
-    PathSet referers2 = getReferers(txn, storePath);
-    referers.insert(referers2.begin(), referers2.end());
+    PathSet referrers2 = getReferrers(txn, storePath);
+    referrers.insert(referrers2.begin(), referrers2.end());
 }
 
 
@@ -499,9 +499,9 @@ void clearSubstitutes()
             invalidatePath(txn, *i);
     }
 
-    /* !!! there should be no referers to any of the invalid
+    /* !!! there should be no referrers to any of the invalid
        substitutable paths.  This should be the case by construction
-       (the only referers can be other invalid substitutable paths,
+       (the only referrers can be other invalid substitutable paths,
        which have all been removed now). */
     
     txn.commit();
@@ -587,13 +587,13 @@ void registerValidPaths(const Transaction & txn,
 
 
 /* Invalidate a path.  The caller is responsible for checking that
-   there are no referers. */
+   there are no referrers. */
 static void invalidatePath(Transaction & txn, const Path & path)
 {
     debug(format("unregistering path `%1%'") % path);
 
     /* Clear the `references' entry for this path, as well as the
-       inverse `referers' entries, and the `derivers' entry; but only
+       inverse `referrers' entries, and the `derivers' entry; but only
        if there are no substitutes for this path.  This maintains the
        cleanup invariant. */
     if (querySubstitutes(txn, path).size() == 0) {
@@ -754,9 +754,9 @@ void deleteFromStore(const Path & _path)
 
     Transaction txn(nixDB);
     if (isValidPathTxn(txn, path)) {
-        PathSet referers = getReferers(txn, path);
-        for (PathSet::iterator i = referers.begin();
-             i != referers.end(); ++i)
+        PathSet referrers = getReferrers(txn, path);
+        for (PathSet::iterator i = referrers.begin();
+             i != referrers.end(); ++i)
             if (*i != path && isValidPathTxn(txn, *i))
                 throw Error(format("cannot delete path `%1%' because it is in use by path `%2%'") % path % *i);
         invalidatePath(txn, path);
@@ -817,7 +817,7 @@ void verifyStore(bool checkContents)
     }
 
     /* Check the cleanup invariant: only usable paths can have
-       `references', `referers', or `derivers' entries. */
+       `references', `referrers', or `derivers' entries. */
 
     /* Check the `derivers' table. */
     Paths deriversKeys;
@@ -860,7 +860,7 @@ void verifyStore(bool checkContents)
             {
                 string dummy;
                 if (!nixDB.queryString(txn, dbReferrers, addPrefix(*j, *i), dummy)) {
-                    printMsg(lvlError, format("missing referer mapping from `%1%' to `%2%'")
+                    printMsg(lvlError, format("missing referrer mapping from `%1%' to `%2%'")
                         % *j % *i);
                     nixDB.setString(txn, dbReferrers, addPrefix(*j, *i), "");
                 }
@@ -873,26 +873,26 @@ void verifyStore(bool checkContents)
     }
 
 #if 0 // !!!
-    /* Check the `referers' table. */
-    Paths referersKeys;
-    nixDB.enumTable(txn, dbReferers, referersKeys);
-    for (Paths::iterator i = referersKeys.begin();
-         i != referersKeys.end(); ++i)
+    /* Check the `referrers' table. */
+    Paths referrersKeys;
+    nixDB.enumTable(txn, dbReferrers, referrersKeys);
+    for (Paths::iterator i = referrersKeys.begin();
+         i != referrersKeys.end(); ++i)
     {
         if (usablePaths.find(*i) == usablePaths.end()) {
-            printMsg(lvlError, format("found referers entry for unusable path `%1%'")
+            printMsg(lvlError, format("found referrers entry for unusable path `%1%'")
                 % *i);
-            nixDB.delPair(txn, dbReferers, *i);
+            nixDB.delPair(txn, dbReferrers, *i);
         }
         else {
-            PathSet referers, newReferers;
-            queryReferers(txn, *i, referers);
-            for (PathSet::iterator j = referers.begin();
-                 j != referers.end(); ++j)
+            PathSet referrers, newReferrers;
+            queryReferrers(txn, *i, referrers);
+            for (PathSet::iterator j = referrers.begin();
+                 j != referrers.end(); ++j)
             {
                 Paths references;
                 if (usablePaths.find(*j) == usablePaths.end()) {
-                    printMsg(lvlError, format("referer mapping from `%1%' to unusable `%2%'")
+                    printMsg(lvlError, format("referrer mapping from `%1%' to unusable `%2%'")
                         % *i % *j);
                 } else {
                     nixDB.queryStrings(txn, dbReferences, *j, references);
@@ -901,12 +901,12 @@ void verifyStore(bool checkContents)
                             % *j % *i);
                         /* !!! repair by inserting *i into references */
                     }
-                    else newReferers.insert(*j);
+                    else newReferrers.insert(*j);
                 }
             }
-            if (referers != newReferers)
-                nixDB.setStrings(txn, dbReferers, *i,
-                    Paths(newReferers.begin(), newReferers.end()));
+            if (referrers != newReferrers)
+                nixDB.setStrings(txn, dbReferrers, *i,
+                    Paths(newReferrers.begin(), newReferrers.end()));
         }
     }
 #endif    
