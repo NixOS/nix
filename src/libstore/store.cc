@@ -1012,6 +1012,8 @@ static void upgradeStore07()
    (and properly spelled) `referrer' table. */
 static void upgradeStore09() 
 {
+    /* !!! we should disallow concurrent upgrades */
+    
     printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
 
     if (!pathExists(nixDBPath + "/referers")) return;
@@ -1024,6 +1026,8 @@ static void upgradeStore09()
 
     Paths referersKeys;
     nixDB.enumTable(txn, dbReferers, referersKeys);
+
+    int n = 0;
     for (Paths::iterator i = referersKeys.begin();
          i != referersKeys.end(); ++i)
     {
@@ -1032,12 +1036,17 @@ static void upgradeStore09()
         for (Paths::iterator j = referers.begin();
              j != referers.end(); ++j)
             nixDB.setString(txn, dbReferrers, addPrefix(*i, *j), "");
+        if (++n % 1000 == 0) {
+            txn.commit();
+            txn.begin(nixDB);
+            cerr << "|";
+        }
         cerr << ".";
     }
 
-    cerr << "\n";
-
     txn.commit();
+    
+    cerr << "\n";
 
     nixDB.closeTable(dbReferers);
 
