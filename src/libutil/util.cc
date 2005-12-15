@@ -194,7 +194,7 @@ void writeFile(const Path & path, const string & s)
 }
 
 
-static void _deletePath(const Path & path)
+static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 {
     checkInterrupt();
 
@@ -203,6 +203,8 @@ static void _deletePath(const Path & path)
     struct stat st;
     if (lstat(path.c_str(), &st))
 	throw SysError(format("getting attributes of path `%1%'") % path);
+
+    bytesFreed += st.st_size;
 
     if (S_ISDIR(st.st_mode)) {
 	Strings names = readDirectory(path);
@@ -214,7 +216,7 @@ static void _deletePath(const Path & path)
 	}
 
 	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
-            _deletePath(path + "/" + *i);
+            _deletePath(path + "/" + *i, bytesFreed);
     }
 
     if (remove(path.c_str()) == -1)
@@ -224,9 +226,17 @@ static void _deletePath(const Path & path)
 
 void deletePath(const Path & path)
 {
+    unsigned long long dummy;
+    deletePath(path, dummy);
+}
+
+
+void deletePath(const Path & path, unsigned long long & bytesFreed)
+{
     startNest(nest, lvlDebug,
         format("recursively deleting path `%1%'") % path);
-    _deletePath(path);
+    bytesFreed = 0;
+    _deletePath(path, bytesFreed);
 }
 
 

@@ -98,8 +98,11 @@ string readFile(const Path & path);
 void writeFile(const Path & path, const string & s);
 
 /* Delete a path; i.e., in the case of a directory, it is deleted
-   recursively.  Don't use this at home, kids. */
+   recursively.  Don't use this at home, kids.  The second variant
+   returns the number of bytes freed. */
 void deletePath(const Path & path);
+
+void deletePath(const Path & path, unsigned long long & bytesFreed);
 
 /* Make a path read-only recursively. */
 void makePathReadOnly(const Path & path);

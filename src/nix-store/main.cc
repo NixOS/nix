@@ -489,6 +489,20 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
 }
 
 
+struct PrintFreed 
+{
+    bool show;
+    unsigned long long bytesFreed;
+    PrintFreed(bool _show) : bytesFreed(0), show(_show) { }
+    ~PrintFreed() 
+    {
+        if (show)
+            cout << format("%d bytes freed (%.2f MiB)\n")
+                % bytesFreed % (bytesFreed / (1024.0 * 1024.0));
+    }
+};
+
+
 static void opGC(Strings opFlags, Strings opArgs)
 {
     GCAction action = gcDeleteDead;
@@ -503,7 +517,8 @@ static void opGC(Strings opFlags, Strings opArgs)
         else throw UsageError(format("bad sub-operation `%1%' in GC") % *i);
 
     PathSet result;
-    collectGarbage(action, result);
+    PrintFreed freed(action == gcDeleteDead);
+    collectGarbage(action, result, freed.bytesFreed);
 
     if (action != gcDeleteDead) {
         for (PathSet::iterator i = result.begin(); i != result.end(); ++i)

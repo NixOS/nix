@@ -303,9 +303,11 @@ static Paths topoSort(const PathSet & paths)
 }
 
 
-void collectGarbage(GCAction action, PathSet & result)
+void collectGarbage(GCAction action, PathSet & result,
+    unsigned long long & bytesFreed)
 {
     result.clear();
+    bytesFreed = 0;
 
     bool gcKeepOutputs =
         queryBoolSetting("gc-keep-outputs", false);
@@ -452,7 +454,9 @@ void collectGarbage(GCAction action, PathSet & result)
             printMsg(lvlInfo, format("deleting `%1%'") % *i);
             
             /* Okay, it's safe to delete. */
-            deleteFromStore(*i);
+            unsigned long long freed;
+            deleteFromStore(*i, freed);
+            bytesFreed += freed;
 
             if (fdLock != -1)
                 /* Write token to stale (deleted) lock file. */

@@ -155,7 +155,7 @@ Path addTextToStore(const string & suffix, const string & s,
     const PathSet & references);
 
 /* Delete a value from the nixStore directory. */
-void deleteFromStore(const Path & path);
+void deleteFromStore(const Path & path, unsigned long long & bytesFreed);
 
 void verifyStore(bool checkContents);
 

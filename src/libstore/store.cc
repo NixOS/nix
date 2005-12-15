@@ -746,8 +746,9 @@ Path addTextToStore(const string & suffix, const string & s,
 }
 
 
-void deleteFromStore(const Path & _path)
+void deleteFromStore(const Path & _path, unsigned long long & bytesFreed)
 {
+    bytesFreed = 0;
     Path path(canonPath(_path));
 
     assertStorePath(path);
@@ -763,7 +764,7 @@ void deleteFromStore(const Path & _path)
     }
     txn.commit();
 
-    deletePath(path);
+    deletePath(path, bytesFreed);
 }
 
 
