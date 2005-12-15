@@ -8,6 +8,56 @@
 <article><title>Nix Release Notes</title>
 
 
+<section><title>Release 0.10 (TBA)</title>
+
+<note><para>This version of Nix uses Berkeley DB 4.4 instead of 4.3.
+The database is upgraded automatically, but you should be careful not
+to use old versions of Nix that still use Berkeley DB 4.3.  In
+particular, if you use a Nix installed through Nix, you should run
+
+<screen>
+$ nix-store --clear-substitutes</screen>
+
+first.</para></note>
+
+<warning><para>Also, the database schema has changed slighted to fix a
+performance issue (see below).  When you run any Nix 0.10 command for
+the first time, the database will be upgraded automatically.  This is
+irreversible.</para></warning>
+
+<itemizedlist>
+
+  <listitem><para>An option <option>--compare-versions</option> (or
+  <option>-c</option>) has been added to <command>nix-env
+  --query</command> to allow you to compare installed versions of
+  packages to available versions, or vice versa.  An easy way to see
+  if you are up to date with what’s in the channel is <literal>nix-env
+  -qc</literal>.</para></listitem>
+
+  <listitem><para>TODO: shared stores.</para></listitem>
+
+  <listitem><para>A performance issue has been fixed with the
+  <literal>referer</literal> table, which stores the inverse of the
+  <literal>references</literal> table (i.e., it tells you what store
+  paths refer to a given path).  Maintaining this table could take a
+  quadratic amount of time, as well as a quadratic amount of Berkeley
+  DB log file space (in particular when running the garbage
+  collector).</para></listitem>
+
+  <listitem><para>Nix now catches the <literal>TERM</literal> and
+  <literal>HUP</literal> signals in addition to the
+  <literal>INT</literal> signal.  So you can now do a <literal>killall
+  nix-store</literal> without triggering a database
+  recovery.</para></listitem>
+
+  <listitem><para>Reference scanning (which happens after each build)
+  is much faster.</para></listitem>
+
+</itemizedlist>
+
+</section>
+
+
 <section><title>Release 0.9.2 (September 21, 2005)</title>
 
 <para>This bug fix release fixes two problems on Mac OS X:
