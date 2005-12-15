@@ -67,7 +67,7 @@ endif
 
 all: build-db build-aterm
 
-EXTRA_DIST = $(DB).tar.gz $(ATERM).tar.gz
+EXTRA_DIST = $(DB).tar.gz $(ATERM).tar.gz register.patch
 
 ext-clean:
 	$(RM) -f have-db build-db have-aterm build-aterm
