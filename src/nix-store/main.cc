@@ -518,12 +518,31 @@ static void opGC(Strings opFlags, Strings opArgs)
 
     PathSet result;
     PrintFreed freed(action == gcDeleteDead);
-    collectGarbage(action, result, freed.bytesFreed);
+    collectGarbage(action, PathSet(), result, freed.bytesFreed);
 
     if (action != gcDeleteDead) {
         for (PathSet::iterator i = result.begin(); i != result.end(); ++i)
             cout << *i << endl;
     }
+}
+
+
+/* Remove paths from the Nix store if possible (i.e., if they do not
+   have any remaining referrers and are not reachable from any GC
+   roots). */
+static void opDelete(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty()) throw UsageError("unknown flag");
+
+    PathSet pathsToDelete;
+    for (Strings::iterator i = opArgs.begin();
+         i != opArgs.end(); ++i)
+        pathsToDelete.insert(fixPath(*i));
+    
+    PathSet dummy;
+    PrintFreed freed(true);
+    collectGarbage(gcDeleteSpecific, pathsToDelete,
+        dummy, freed.bytesFreed);
 }
 
 
@@ -621,6 +640,8 @@ void run(Strings args)
             op = opAddFixed;
         else if (arg == "--print-fixed-path")
             op = opPrintFixedPath;
+        else if (arg == "--delete")
+            op = opDelete;
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
         else if (arg == "--register-substitutes")

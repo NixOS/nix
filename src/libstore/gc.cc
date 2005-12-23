@@ -303,8 +303,8 @@ static Paths topoSort(const PathSet & paths)
 }
 
 
-void collectGarbage(GCAction action, PathSet & result,
-    unsigned long long & bytesFreed)
+void collectGarbage(GCAction action, const PathSet & pathsToDelete,
+    PathSet & result, unsigned long long & bytesFreed)
 {
     result.clear();
     bytesFreed = 0;
@@ -398,17 +398,26 @@ void collectGarbage(GCAction action, PathSet & result,
     
     /* Read the Nix store directory to find all currently existing
        paths. */
-    Paths storePaths = readDirectory(nixStore);
-    PathSet storePaths2;
-    for (Paths::iterator i = storePaths.begin(); i != storePaths.end(); ++i)
-        storePaths2.insert(canonPath(nixStore + "/" + *i));
+    PathSet storePathSet;
+    if (action != gcDeleteSpecific) {
+        Paths entries = readDirectory(nixStore);
+        for (Paths::iterator i = entries.begin(); i != entries.end(); ++i)
+            storePathSet.insert(canonPath(nixStore + "/" + *i));
+    } else {
+        for (PathSet::iterator i = pathsToDelete.begin();
+             i != pathsToDelete.end(); ++i)
+        {
+            assertStorePath(*i);
+            storePathSet.insert(*i);
+        }
+    }
 
     /* Topologically sort them under the `referrers' relation.  That
        is, a < b iff a is in referrers(b).  This gives us the order in
        which things can be deleted safely. */
     /* !!! when we have multiple output paths per derivation, this
        will not work anymore because we get cycles. */
-    storePaths = topoSort(storePaths2);
+    Paths storePaths = topoSort(storePathSet);
 
     /* Try to delete store paths in the topologically sorted order. */
     for (Paths::iterator i = storePaths.begin(); i != storePaths.end(); ++i) {
@@ -416,6 +425,8 @@ void collectGarbage(GCAction action, PathSet & result,
         debug(format("considering deletion of `%1%'") % *i);
         
         if (livePaths.find(*i) != livePaths.end()) {
+            if (action == gcDeleteSpecific)
+                throw Error(format("cannot delete path `%1%' since it is still alive") % *i);
             debug(format("live path `%1%'") % *i);
             continue;
         }
@@ -430,7 +441,7 @@ void collectGarbage(GCAction action, PathSet & result,
 
         AutoCloseFD fdLock;
 
-        if (action == gcDeleteDead) {
+        if (action == gcDeleteDead || action == gcDeleteSpecific) {
 
             /* Only delete a lock file if we can acquire a write lock
                on it.  That means that it's either stale, or the

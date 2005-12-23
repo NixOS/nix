@@ -10,6 +10,7 @@ typedef enum {
     gcReturnLive,
     gcReturnDead,
     gcDeleteDead,
+    gcDeleteSpecific,
 } GCAction;
 
 /* If `action' is set to `gcReturnRoots', find and return the set of
@@ -19,8 +20,8 @@ typedef enum {
    closure of) the roots.  If `action' is `gcReturnDead', return the
    set of paths not reachable from the roots.  If `action' is
    `gcDeleteDead', actually delete the latter set. */
-void collectGarbage(GCAction action, PathSet & result,
-    unsigned long long & bytesFreed);
+void collectGarbage(GCAction action, const PathSet & pathsToDelete,
+    PathSet & result, unsigned long long & bytesFreed);
 
 /* Register a temporary GC root.  This root will automatically
    disappear when this process exits.  WARNING: this function should
