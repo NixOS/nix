@@ -304,7 +304,7 @@ static Paths topoSort(const PathSet & paths)
 
 
 void collectGarbage(GCAction action, const PathSet & pathsToDelete,
-    PathSet & result, unsigned long long & bytesFreed)
+    bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed)
 {
     result.clear();
     bytesFreed = 0;
@@ -323,7 +323,8 @@ void collectGarbage(GCAction action, const PathSet & pathsToDelete,
        permanent roots cannot increase now. */
     Path rootsDir = canonPath((format("%1%/%2%") % nixStateDir % gcRootsDir).str());
     PathSet roots;
-    findRoots(rootsDir, true, roots);
+    if (!ignoreLiveness)
+        findRoots(rootsDir, true, roots);
 
     if (action == gcReturnRoots) {
         result = roots;

@@ -21,7 +21,7 @@ typedef enum {
    set of paths not reachable from the roots.  If `action' is
    `gcDeleteDead', actually delete the latter set. */
 void collectGarbage(GCAction action, const PathSet & pathsToDelete,
-    PathSet & result, unsigned long long & bytesFreed);
+    bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed);
 
 /* Register a temporary GC root.  This root will automatically
    disappear when this process exits.  WARNING: this function should

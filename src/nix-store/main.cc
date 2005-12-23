@@ -518,7 +518,7 @@ static void opGC(Strings opFlags, Strings opArgs)
 
     PathSet result;
     PrintFreed freed(action == gcDeleteDead);
-    collectGarbage(action, PathSet(), result, freed.bytesFreed);
+    collectGarbage(action, PathSet(), false, result, freed.bytesFreed);
 
     if (action != gcDeleteDead) {
         for (PathSet::iterator i = result.begin(); i != result.end(); ++i)
@@ -532,7 +532,12 @@ static void opGC(Strings opFlags, Strings opArgs)
    roots). */
 static void opDelete(Strings opFlags, Strings opArgs)
 {
-    if (!opFlags.empty()) throw UsageError("unknown flag");
+    bool ignoreLiveness;
+    
+    for (Strings::iterator i = opFlags.begin();
+         i != opFlags.end(); ++i)
+        if (*i == "--ignore-liveness") ignoreLiveness = true;
+        else throw UsageError(format("unknown flag `%1%'") % *i);
 
     PathSet pathsToDelete;
     for (Strings::iterator i = opArgs.begin();
@@ -541,7 +546,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
     
     PathSet dummy;
     PrintFreed freed(true);
-    collectGarbage(gcDeleteSpecific, pathsToDelete,
+    collectGarbage(gcDeleteSpecific, pathsToDelete, ignoreLiveness,
         dummy, freed.bytesFreed);
 }
 
