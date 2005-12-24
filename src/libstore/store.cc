@@ -301,7 +301,7 @@ static string addPrefix(const string & prefix, const string & s)
 static string stripPrefix(const string & prefix, const string & s)
 {
     if (s.size() <= prefix.size() ||
-        s.compare(0, prefix.size(), prefix) != 0 ||
+        string(s, 0, prefix.size()) != prefix ||
         s[prefix.size()] != 0)
         throw Error(format("string `%1%' is missing prefix `%2%'")
             % s % prefix);
