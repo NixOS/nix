@@ -451,7 +451,7 @@ void Database::enumTable(const Transaction & txn, TableId table,
             checkInterrupt();
             string data((char *) kt.get_data(), kt.get_size());
             if (!keyPrefix.empty() &&
-                data.compare(0, keyPrefix.size(), keyPrefix) != 0)
+                string(data, 0, keyPrefix.size()) != keyPrefix)
                 break;
             keys.push_back(data);
             flags = DB_NEXT;
