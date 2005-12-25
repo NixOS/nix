@@ -294,7 +294,7 @@ static bool isRealisablePath(const Transaction & txn, const Path & path)
 
 static string addPrefix(const string & prefix, const string & s)
 {
-    return prefix + string(1, 0) + s;
+    return prefix + string(1, (char) 0) + s;
 }
 
 
@@ -313,7 +313,7 @@ static PathSet getReferrers(const Transaction & txn, const Path & storePath)
 {
     PathSet referrers;
     Strings keys;
-    nixDB.enumTable(txn, dbReferrers, keys, storePath + string(1, 0));
+    nixDB.enumTable(txn, dbReferrers, keys, storePath + string(1, (char) 0));
     for (Strings::iterator i = keys.begin(); i != keys.end(); ++i)
         referrers.insert(stripPrefix(storePath, *i));
     return referrers;
