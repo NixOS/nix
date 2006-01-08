@@ -53,7 +53,7 @@ Path absPath(Path path, Path dir)
 }
 
 
-Path canonPath(const Path & path)
+Path canonPath(const Path & path, bool resolveSymlinks)
 {
     string s;
 
@@ -61,6 +61,11 @@ Path canonPath(const Path & path)
         throw Error(format("not an absolute path: `%1%'") % path);
 
     string::const_iterator i = path.begin(), end = path.end();
+    string temp;
+
+    /* Count the number of times we follow a symlink and stop at some
+       arbitrary (but high) limit to prevent infinite loops. */
+    unsigned int followCount = 0, maxFollow = 1024;
 
     while (1) {
 
@@ -84,6 +89,20 @@ Path canonPath(const Path & path)
         else {
             s += '/';
             while (i != end && *i != '/') s += *i++;
+
+            /* If s points to a symlink, resolve it and restart (since
+               the symlink target might contain new symlinks). */
+            if (resolveSymlinks && isLink(s)) {
+                followCount++;
+                if (followCount >= maxFollow)
+                    throw Error(format("infinite symlink recursion in path `%1%'") % path);
+                temp = absPath(readLink(s), dirOf(s))
+                    + string(i, end);
+                i = temp.begin(); /* restart */
+                end = temp.end();
+                s = "";
+                /* !!! potential for infinite loop */
+            }
         }
     }
 
@@ -264,7 +283,7 @@ void makePathReadOnly(const Path & path)
 static Path tempName()
 {
     static int counter = 0;
-    Path tmpRoot = canonPath(getEnv("TMPDIR", "/tmp"));
+    Path tmpRoot = canonPath(getEnv("TMPDIR", "/tmp"), true);
     return (format("%1%/nix-%2%-%3%") % tmpRoot % getpid() % counter++).str();
 }
 

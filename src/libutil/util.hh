@@ -64,8 +64,10 @@ string getEnv(const string & key, const string & def = "");
 Path absPath(Path path, Path dir = "");
 
 /* Canonicalise a path by removing all `.' or `..' components and
-   double or trailing slashes. */
-Path canonPath(const Path & path);
+   double or trailing slashes.  Optionally resolves all symlink
+   components such that each component of the resulting path is *not*
+   a symbolic link. */
+Path canonPath(const Path & path, bool resolveSymlinks = false);
 
 /* Return the directory part of the given canonical path, i.e.,
    everything before the final `/'.  If the path is the root or an
