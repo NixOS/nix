@@ -115,7 +115,7 @@ Path dirOf(const Path & path)
     unsigned int pos = path.rfind('/');
     if (pos == string::npos)
         throw Error(format("invalid file name: %1%") % path);
-    return Path(path, 0, pos);
+    return pos == 0 ? "/" : Path(path, 0, pos);
 }
 
 
@@ -302,7 +302,7 @@ Path createTempDir()
 
 void createDirs(const Path & path)
 {
-    if (path == "") return;
+    if (path == "/") return;
     createDirs(dirOf(path));
     if (!pathExists(path))
         if (mkdir(path.c_str(), 0777) == -1)

@@ -65,7 +65,7 @@ void setLogType(string lt)
 void checkStoreNotSymlink(Path path)
 {
     struct stat st;
-    while (path.size()) {
+    while (path != "/") {
         if (lstat(path.c_str(), &st))
             throw SysError(format("getting status of `%1%'") % path);
         if (S_ISLNK(st.st_mode))
