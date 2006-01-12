@@ -1,0 +1,81 @@
+#! @perl@ -w
+
+# This tool unpacks the closures created by "nix-pack-closure" and
+# adds them to the Nix store.
+
+# TODO: make this program "streamy", i.e., don't use a temporary
+# directory.
+
+use strict;
+use POSIX qw(tmpnam);
+
+my $binDir = $ENV{"NIX_BIN_DIR"};
+$binDir = "@bindir@" unless defined $binDir;
+
+my $tmpDir;
+do { $tmpDir = tmpnam(); }
+until mkdir $tmpDir, 0777;
+END { system "rm -rf '$tmpDir'"; }
+
+
+# Unpack the NAR archive on standard input.
+system("nix-store --restore '$tmpDir/unpacked'") == 0
+    or die "nix-store --restore failed";
+
+
+open VALID, ">$tmpDir/validity" or die;
+
+
+# For each path in the closure that is not yet valid, add it to the
+# store.  TODO: use proper locking.  Or even better, let nix-store do
+# this.
+opendir(DIR, "$tmpDir/unpacked/contents") or die "cannot open directory: $!";
+
+foreach my $name (sort(readdir DIR)) {
+    next if $name eq "." or $name eq "..";
+
+    my $storePath = "/nix/store/$name"; # !!!
+
+    # !!! this really isn't a good validity check!
+    system "/nix/bin/nix-store --check-validity '$storePath' 2> /dev/null";
+    if ($? != 0) {
+        print STDERR "unpacking `$storePath'...\n";
+
+        # !!! race
+        system("rm -rf '$storePath'") == 0
+            or die "cannot remove `$storePath': $?";
+
+        system("$binDir/nix-store --restore '$storePath' < '$tmpDir/unpacked/contents/$name'") == 0
+            or die "nix-store --dump failed on `$storePath': $?";
+        
+        print VALID "$storePath\n";
+
+        open DRV, "<$tmpDir/unpacked/derivers/$name" or die;
+        my $deriver = <DRV>;
+        chomp $deriver;
+        $deriver = "" if $deriver eq "unknown-deriver";
+        close DRV;
+
+        my @refs;
+        open REFS, "<$tmpDir/unpacked/references/$name" or die;
+        while (<REFS>) {
+            chomp;
+            push @refs, $_;
+        }
+        close REFS;
+
+        print VALID "$deriver\n";
+        
+        print VALID (scalar @refs), "\n";
+        foreach my $ref (@refs) {
+            print VALID "$ref\n";
+        }
+    }
+}
+
+closedir(DIR) or die;
+
+
+# Register the invalid paths as valid.
+system("nix-store --register-validity <'$tmpDir/validity'") == 0
+    or die "nix-store --register-validity failed";

@@ -1,6 +1,7 @@
 bin_SCRIPTS = nix-collect-garbage \
   nix-pull nix-push nix-prefetch-url \
-  nix-install-package nix-channel nix-build
+  nix-install-package nix-channel nix-build \
+  nix-pack-closure nix-unpack-closure
 
 noinst_SCRIPTS = nix-profile.sh generate-patches.pl
 
@@ -23,4 +24,5 @@ EXTRA_DIST = nix-collect-garbage.in \
   readmanifest.pm.in \
   nix-build.in \
   download-using-manifests.pl.in \
-  generate-patches.pl.in
+  generate-patches.pl.in \
+  nix-pack-closure.in nix-unpack-closure.in

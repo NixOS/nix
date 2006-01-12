@@ -1,0 +1,67 @@
+#! @perl@ -w
+
+# This tool computes the closure of a path (using "nix-store --query
+# --requisites") and puts the contents of each path in the closure in
+# a big NAR archive that can be installed on another Nix installation
+# using "nix-unpack-closure".
+
+# TODO: make this program "streamy", i.e., don't use a temporary
+# directory.
+
+use strict;
+use POSIX qw(tmpnam);
+
+my $binDir = $ENV{"NIX_BIN_DIR"};
+$binDir = "@bindir@" unless defined $binDir;
+
+my $tmpDir;
+do { $tmpDir = tmpnam(); }
+until mkdir $tmpDir, 0777;
+END { system "rm -rf '$tmpDir'"; }
+mkdir "$tmpDir/contents", 0777 or die;
+mkdir "$tmpDir/references", 0777 or die;
+mkdir "$tmpDir/derivers", 0777 or die;
+
+
+
+my %storePaths;
+
+
+while (@ARGV) {
+    my $storePath = shift @ARGV;
+
+    # Get the closure of this path.
+    my $pid = open(READ,
+        "$binDir/nix-store --query --requisites " .
+        "--force-realise '$storePath'|") or die;
+    
+    while (<READ>) {
+        chomp;
+        die "bad: $_" unless /^\//;
+        $storePaths{$_} = "";
+    }
+
+    close READ or die "nix-store failed: $?";
+}
+
+
+foreach my $storePath (sort(keys %storePaths)) {
+    print STDERR "packing `$storePath'...\n";
+
+    $storePath =~ /\/([^\/]+)$/;
+    my $name = $1;
+
+    system("$binDir/nix-store --dump '$storePath' > $tmpDir/contents/$name") == 0
+        or die "nix-store --dump failed on `$storePath': $?";
+
+    system("$binDir/nix-store --query --references '$storePath' > $tmpDir/references/$name") == 0
+        or die "nix-store --query --references failed on `$storePath': $?";
+
+    system("$binDir/nix-store --query --deriver '$storePath' > $tmpDir/derivers/$name") == 0
+        or die "nix-store --query --deriver failed on `$storePath': $?";
+}
+
+
+# Write a NAR archive of everything to standard output.
+system("nix-store --dump '$tmpDir'") == 0
+    or die "nix-store --dump failed";
