@@ -108,8 +108,10 @@ void printDotGraph(const PathSet & roots)
         for (PathSet::iterator i = references.begin();
              i != references.end(); ++i)
         {
-            workList.insert(*i);
-            cout << makeEdge(*i, path);
+            if (*i != path) {
+                workList.insert(*i);
+                cout << makeEdge(*i, path);
+            }
         }
             
 
