@@ -750,7 +750,7 @@ static void opQuery(Globals & globals,
     /* Obtain derivation information from the specified source. */
     UserEnvElems availElems, installedElems;
 
-    if (source == sInstalled || compareVersions) {
+    if (source == sInstalled || compareVersions || printStatus) {
         installedElems = queryInstalled(globals.state, globals.profile);
     }
 
