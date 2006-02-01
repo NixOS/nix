@@ -11,8 +11,8 @@
 	 -e "s^@system\@^$(system)^g" \
 	 -e "s^@shell\@^$(shell)^g" \
 	 -e "s^@curl\@^$(curl)^g" \
-	 -e "s^@bzip2\@^$(bzip2)^g" \
-	 -e "s^@bunzip2\@^$(bunzip2)^g" \
+	 -e "s^@bzip2\@^$(bzip2_bin)/bzip2^g" \
+	 -e "s^@bunzip2\@^$(bzip2_bin)/bunzip2^g" \
 	 -e "s^@perl\@^$(perl)^g" \
 	 -e "s^@coreutils\@^$(coreutils)^g" \
 	 -e "s^@tar\@^$(tar)^g" \

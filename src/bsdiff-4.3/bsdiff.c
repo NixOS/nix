@@ -1,27 +1,46 @@
-/*
-  bsdiff.c -- Binary patch generator.
+/*-
+ * Copyright 2003-2005 Colin Percival
+ * All rights reserved
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted providing that the following conditions 
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
 
-  Copyright 2003 Colin Percival
-
-  For the terms under which this work may be distributed, please see
-  the adjoining file "LICENSE".
-*/
-
-#ifndef BZIP2
-#define BZIP2 "/usr/bin/bzip2"
+#if 0
+__FBSDID("$FreeBSD: src/usr.bin/bsdiff/bsdiff/bsdiff.c,v 1.1 2005/08/06 01:59:05 cperciva Exp $");
 #endif
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+#include <sys/types.h>
+
+#include <bzlib.h>
 #include <err.h>
-#include <unistd.h>
 #include <fcntl.h>
-#include <sys/wait.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #define MIN(x,y) (((x)<(y)) ? (x) : (y))
 
-void split(off_t *I,off_t *V,off_t start,off_t len,off_t h)
+static void split(off_t *I,off_t *V,off_t start,off_t len,off_t h)
 {
 	off_t i,j,k,x,tmp,jj,kk;
 
@@ -82,7 +101,7 @@ void split(off_t *I,off_t *V,off_t start,off_t len,off_t h)
 	if(start+len>kk) split(I,V,kk,start+len-kk,h);
 }
 
-void qsufsort(off_t *I,off_t *V,u_char *old,off_t oldsize)
+static void qsufsort(off_t *I,off_t *V,u_char *old,off_t oldsize)
 {
 	off_t buckets[256];
 	off_t i,h,len;
@@ -120,7 +139,7 @@ void qsufsort(off_t *I,off_t *V,u_char *old,off_t oldsize)
 	for(i=0;i<oldsize+1;i++) I[V[i]]=i;
 }
 
-off_t matchlen(u_char *old,off_t oldsize,u_char *new,off_t newsize)
+static off_t matchlen(u_char *old,off_t oldsize,u_char *new,off_t newsize)
 {
 	off_t i;
 
@@ -130,7 +149,7 @@ off_t matchlen(u_char *old,off_t oldsize,u_char *new,off_t newsize)
 	return i;
 }
 
-off_t search(off_t *I,u_char *old,off_t oldsize,
+static off_t search(off_t *I,u_char *old,off_t oldsize,
 		u_char *new,off_t newsize,off_t st,off_t en,off_t *pos)
 {
 	off_t x,y;
@@ -156,7 +175,7 @@ off_t search(off_t *I,u_char *old,off_t oldsize,
 	};
 }
 
-void offtout(off_t x,u_char *buf)
+static void offtout(off_t x,u_char *buf)
 {
 	off_t y;
 
@@ -176,25 +195,23 @@ void offtout(off_t x,u_char *buf)
 
 int main(int argc,char *argv[])
 {
-	int fd,p[2];
-	pid_t pid;
+	int fd;
 	u_char *old,*new;
 	off_t oldsize,newsize;
 	off_t *I,*V;
-
 	off_t scan,pos,len;
 	off_t lastscan,lastpos,lastoffset;
 	off_t oldscore,scsc;
-
 	off_t s,Sf,lenf,Sb,lenb;
 	off_t overlap,Ss,lens;
 	off_t i;
-
 	off_t dblen,eblen;
 	u_char *db,*eb;
-
 	u_char buf[8];
 	u_char header[32];
+	FILE * pf;
+	BZFILE * pfbz2;
+	int bz2err;
 
 	if(argc!=4) errx(1,"usage: %s oldfile newfile patchfile\n",argv[0]);
 
@@ -228,8 +245,9 @@ int main(int argc,char *argv[])
 	dblen=0;
 	eblen=0;
 
-	if((fd=open(argv[3],O_CREAT|O_TRUNC|O_WRONLY,0666))<0)
-		err(1,"%s",argv[3]);
+	/* Create the patch file */
+	if ((pf = fopen(argv[3], "w")) == NULL)
+		err(1, "%s", argv[3]);
 
 	/* Header is
 		0	8	 "BSDIFF40"
@@ -242,20 +260,15 @@ int main(int argc,char *argv[])
 		??	??	Bzip2ed diff block
 		??	??	Bzip2ed extra block */
 	memcpy(header,"BSDIFF40",8);
-	memset(header+8,0,24);
-	if(write(fd,header,32)!=32) err(1,"%s",argv[3]);
+	offtout(0, header + 8);
+	offtout(0, header + 16);
+	offtout(newsize, header + 24);
+	if (fwrite(header, 32, 1, pf) != 1)
+		err(1, "fwrite(%s)", argv[3]);
 
-	if((pipe(p)==-1) || ((pid=fork())==-1)) err(1,NULL);
-	if(pid==0) {
-		if((close(0)==-1) || (close(1)==-1) || (dup2(fd,1)==-1) ||
-			(dup2(p[0],0)==-1) || (close(fd)==-1) ||
-			(close(p[0])==-1) || (close(p[1])==-1))
-			err(1,NULL);
-		execl(BZIP2,BZIP2,"-zc",NULL);
-		err(1,"%s",BZIP2);
-	};
-	if(close(p[0])==-1) err(1,NULL);
-
+	/* Compute the differences, writing ctrl as we go */
+	if ((pfbz2 = BZ2_bzWriteOpen(&bz2err, pf, 9, 0, 0)) == NULL)
+		errx(1, "BZ2_bzWriteOpen, bz2err = %d", bz2err);
 	scan=0;len=0;
 	lastscan=0;lastpos=0;lastoffset=0;
 	while(scan<newsize) {
@@ -319,62 +332,68 @@ int main(int argc,char *argv[])
 			eblen+=(scan-lenb)-(lastscan+lenf);
 
 			offtout(lenf,buf);
-			if(write(p[1],buf,8)!=8) err(1,NULL);
+			BZ2_bzWrite(&bz2err, pfbz2, buf, 8);
+			if (bz2err != BZ_OK)
+				errx(1, "BZ2_bzWrite, bz2err = %d", bz2err);
+
 			offtout((scan-lenb)-(lastscan+lenf),buf);
-			if(write(p[1],buf,8)!=8) err(1,NULL);
+			BZ2_bzWrite(&bz2err, pfbz2, buf, 8);
+			if (bz2err != BZ_OK)
+				errx(1, "BZ2_bzWrite, bz2err = %d", bz2err);
+
 			offtout((pos-lenb)-(lastpos+lenf),buf);
-			if(write(p[1],buf,8)!=8) err(1,NULL);
+			BZ2_bzWrite(&bz2err, pfbz2, buf, 8);
+			if (bz2err != BZ_OK)
+				errx(1, "BZ2_bzWrite, bz2err = %d", bz2err);
 
 			lastscan=scan-lenb;
 			lastpos=pos-lenb;
 			lastoffset=pos-scan;
 		};
 	};
+	BZ2_bzWriteClose(&bz2err, pfbz2, 0, NULL, NULL);
+	if (bz2err != BZ_OK)
+		errx(1, "BZ2_bzWriteClose, bz2err = %d", bz2err);
 
-	if((close(p[1])==-1) || (waitpid(pid,NULL,0)!=pid)) err(1,NULL);
+	/* Compute size of compressed ctrl data */
+	if ((len = ftello(pf)) == -1)
+		err(1, "ftello");
+	offtout(len-32, header + 8);
 
-	if((len=lseek(fd,0,SEEK_END))==-1) err(1,"%s",argv[3]);
-	offtout(len-32,buf);
-	if((lseek(fd,8,SEEK_SET)!=8) || (write(fd,buf,8)!=8))
-		err(1,"%s",argv[3]);
-	offtout(newsize,buf);
-	if((lseek(fd,24,SEEK_SET)!=24) || (write(fd,buf,8)!=8))
-		err(1,"%s",argv[3]);
+	/* Write compressed diff data */
+	if ((pfbz2 = BZ2_bzWriteOpen(&bz2err, pf, 9, 0, 0)) == NULL)
+		errx(1, "BZ2_bzWriteOpen, bz2err = %d", bz2err);
+	BZ2_bzWrite(&bz2err, pfbz2, db, dblen);
+	if (bz2err != BZ_OK)
+		errx(1, "BZ2_bzWrite, bz2err = %d", bz2err);
+	BZ2_bzWriteClose(&bz2err, pfbz2, 0, NULL, NULL);
+	if (bz2err != BZ_OK)
+		errx(1, "BZ2_bzWriteClose, bz2err = %d", bz2err);
 
-	if(lseek(fd,0,SEEK_END)==-1) err(1,"%s",argv[3]);
-	if((pipe(p)==-1) || ((pid=fork())==-1)) err(1,NULL);
-	if(pid==0) {
-		if((close(0)==-1) || (close(1)==-1) || (dup2(fd,1)==-1) ||
-			(dup2(p[0],0)==-1) || (close(fd)==-1) ||
-			(close(p[0])==-1) || (close(p[1])==-1))
-			err(1,NULL);
-		execl(BZIP2,BZIP2,"-zc",NULL);
-		err(1,"%s",BZIP2);
-	};
-	if(close(p[0])==-1) err(1,NULL);
-	if(write(p[1],db,dblen)!=dblen) err(1,NULL);
-	if((close(p[1])==-1) || (waitpid(pid,NULL,0)!=pid)) err(1,NULL);
+	/* Compute size of compressed diff data */
+	if ((newsize = ftello(pf)) == -1)
+		err(1, "ftello");
+	offtout(newsize - len, header + 16);
 
-	if((newsize=lseek(fd,0,SEEK_END))==-1) err(1,"%s",argv[3]);
-	offtout(newsize-len,buf);
-	if((lseek(fd,16,SEEK_SET)!=16) || (write(fd,buf,8)!=8))
-		err(1,"%s",argv[3]);
+	/* Write compressed extra data */
+	if ((pfbz2 = BZ2_bzWriteOpen(&bz2err, pf, 9, 0, 0)) == NULL)
+		errx(1, "BZ2_bzWriteOpen, bz2err = %d", bz2err);
+	BZ2_bzWrite(&bz2err, pfbz2, eb, eblen);
+	if (bz2err != BZ_OK)
+		errx(1, "BZ2_bzWrite, bz2err = %d", bz2err);
+	BZ2_bzWriteClose(&bz2err, pfbz2, 0, NULL, NULL);
+	if (bz2err != BZ_OK)
+		errx(1, "BZ2_bzWriteClose, bz2err = %d", bz2err);
 
-	if(lseek(fd,0,SEEK_END)==-1) err(1,"%s",argv[3]);
-	if((pipe(p)==-1) || ((pid=fork())==-1)) err(1,NULL);
-	if(pid==0) {
-		if((close(0)==-1) || (close(1)==-1) || (dup2(fd,1)==-1) ||
-			(dup2(p[0],0)==-1) || (close(fd)==-1) ||
-			(close(p[0])==-1) || (close(p[1])==-1))
-			err(1,NULL);
-		execl(BZIP2,BZIP2,"-zc",NULL);
-		err(1,"%s",BZIP2);
-	};
-	if(close(p[0])==-1) err(1,NULL);
-	if(write(p[1],eb,eblen)!=eblen) err(1,NULL);
-	if((close(p[1])==-1) || (waitpid(pid,NULL,0)!=pid)) err(1,NULL);
-	if(close(fd)==-1) err(1,"%s",argv[3]);
+	/* Seek to the beginning, write the header, and close the file */
+	if (fseeko(pf, 0, SEEK_SET))
+		err(1, "fseeko");
+	if (fwrite(header, 32, 1, pf) != 1)
+		err(1, "fwrite(%s)", argv[3]);
+	if (fclose(pf))
+		err(1, "fclose");
 
+	/* Free the memory we used */
 	free(db);
 	free(eb);
 	free(I);

@@ -1,5 +1,5 @@
 SUBDIRS = bin2c boost libutil libstore libmain nix-store nix-hash \
- libexpr nix-instantiate nix-env nix-log2xml bsdiff-4.2
+ libexpr nix-instantiate nix-env nix-log2xml bsdiff-4.3
 
 EXTRA_DIST = aterm-helper.pl
 

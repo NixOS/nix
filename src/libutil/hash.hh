@@ -66,7 +66,7 @@ Hash hashString(HashType ht, const string & s);
 Hash hashFile(HashType ht, const Path & path);
 
 /* Compute the hash of the given path.  The hash is defined as
-   md5(dump(path)). */
+   (essentially) hashString(ht, dumpPath(path)). */
 Hash hashPath(HashType ht, const Path & path);
 
 /* Compress a hash to the specified number of bytes by cyclically

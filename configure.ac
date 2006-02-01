@@ -77,8 +77,6 @@ fi
 ])
 
 NEED_PROG(curl, curl)
-NEED_PROG(bzip2, bzip2)
-NEED_PROG(bunzip2, bunzip2)
 NEED_PROG(shell, sh)
 AC_PATH_PROG(xmllint, xmllint, false)
 AC_PATH_PROG(xsltproc, xsltproc, false)
@@ -145,6 +143,26 @@ AC_SUBST(aterm_lib)
 AC_SUBST(aterm_include)
 AC_SUBST(aterm_bin)
 
+AC_ARG_WITH(bzip2, AC_HELP_STRING([--with-bzip2=PATH],
+  [prefix of bzip2]),
+  bzip2=$withval, bzip2=)
+if test -z "$bzip2"; then
+   AC_CHECK_LIB(bz2, BZ2_bzWriteOpen,
+     [bzip2_lib="-lbz2"], [AC_MSG_ERROR([cannot find -lbz (bzip2)])])
+   AC_CHECK_HEADER(bzlib.h, 
+     [bzip2_include=""], [AC_MSG_ERROR([cannot find bzlib.h (bzip2)])])
+   AC_PATH_PROG(bzip2_prog, bzip2,
+     [AC_MSG_ERROR([cannot find bzip2])])
+   bzip2_bin=$(dirname $bzip2_prog)
+else
+   bzip2_lib="-L$bzip2/lib -lbz2"
+   bzip2_include="-I$bzip2/include"
+   bzip2_bin="$bzip2/bin"
+fi   
+AC_SUBST(bzip2_lib)
+AC_SUBST(bzip2_include)
+AC_SUBST(bzip2_bin)
+
 AC_CHECK_LIB(pthread, pthread_mutex_init)
 
 AC_ARG_ENABLE(init-state, AC_HELP_STRING([--disable-init-state],
@@ -203,7 +221,7 @@ AC_CONFIG_FILES([Makefile
    src/nix-instantiate/Makefile
    src/nix-env/Makefile
    src/nix-log2xml/Makefile
-   src/bsdiff-4.2/Makefile
+   src/bsdiff-4.3/Makefile
    scripts/Makefile
    corepkgs/Makefile
    corepkgs/nar/Makefile
