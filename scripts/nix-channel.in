@@ -107,7 +107,7 @@ sub update {
     chomp $storeExpr;
 
     # Build the resulting derivation.
-    my $outPath = `nix-store --add-root '$rootFile' -r '$storeExpr'`
+    my $outPath = `@bindir@/nix-store --add-root '$rootFile' -r '$storeExpr'`
         or die "cannot realise store expression";
     chomp $outPath;
 
