@@ -1,17 +1,16 @@
 # Berkeley DB
 
-DB = db-4.4.16.NC
+DB = db-4.4.20.NC
 
 $(DB).tar.gz:
 	@echo "Nix requires Berkeley DB to build."
-	@echo "Please download version 4.4.16 from"
-	@echo "  http://downloads.sleepycat.com/db-4.4.16.NC.tar.gz"
+	@echo "Please download version 4.4.20 from"
+	@echo "  http://downloads.sleepycat.com/db-4.4.20.NC.tar.gz"
 	@echo "and place it in the externals/ directory."
 	false
 
 $(DB): $(DB).tar.gz
 	gunzip < $(DB).tar.gz | tar xvf -
-	cd $(DB) && patch -p1 < ../register.patch
 
 have-db:
 	$(MAKE) $(DB)
