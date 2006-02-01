@@ -33,6 +33,7 @@ __FBSDID("$FreeBSD: src/usr.bin/bsdiff/bspatch/bspatch.c,v 1.1 2005/08/06 01:59:
 #include <stdio.h>
 #include <string.h>
 #include <err.h>
+#include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -53,6 +54,22 @@ static off_t offtin(u_char *buf)
 
 	return y;
 }
+
+
+void writeFull(const char * name, int fd,
+    const unsigned char * buf, size_t count)
+{
+    while (count) {
+        ssize_t res = write(fd, (char *) buf, count);
+        if (res == -1) {
+            if (errno == EINTR) continue;
+            err(1,"writing to %s",name);
+        }
+        count -= res;
+        buf += res;
+    }
+}
+
 
 int main(int argc,char * argv[])
 {
@@ -193,8 +210,10 @@ int main(int argc,char * argv[])
 		err(1, "fclose(%s)", argv[3]);
 
 	/* Write the new file */
-	if(((fd=open(argv[2],O_CREAT|O_TRUNC|O_WRONLY,0666))<0) ||
-		(write(fd,new,newsize)!=newsize) || (close(fd)==-1))
+	if((fd=open(argv[2],O_CREAT|O_TRUNC|O_WRONLY,0666))<0)
+                err(1,"%s",argv[2]);
+        writeFull(argv[2], fd, new, newsize);
+        if(close(fd)==-1)
 		err(1,"%s",argv[2]);
 
 	free(new);
