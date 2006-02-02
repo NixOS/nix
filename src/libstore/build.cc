@@ -931,6 +931,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
     }
     
     /* parent */
+    pid.setSeparatePG(true);
     logPipe.writeSide.close();
     worker.childStarted(shared_from_this(),
         pid, singleton<set<int> >(logPipe.readSide), false);
