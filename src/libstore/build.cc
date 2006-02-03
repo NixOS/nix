@@ -276,17 +276,19 @@ void Goal::trace(const format & f)
 /* Common initialisation performed in child processes. */
 void commonChildInit(Pipe & logPipe)
 {
-    /* Put the child in a separate process group so that it doesn't
-       receive terminal signals. */
-    if (setpgid(0, 0) == -1)
-        throw SysError(format("setting process group"));
-
+    /* Put the child in a separate session (and thus a separate
+       process group) so that it has no controlling terminal (meaning
+       that e.g. ssh cannot open /dev/tty) and it doesn't receive
+       terminal signals. */
+    if (setsid() == -1)
+        throw SysError(format("creating a new session"));
+    
     /* Dup the write side of the logger pipe into stderr. */
     if (dup2(logPipe.writeSide, STDERR_FILENO) == -1)
         throw SysError("cannot pipe standard error into log file");
     logPipe.readSide.close();
             
-    /* Dup stderr to stdin. */
+    /* Dup stderr to stdout. */
     if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
         throw SysError("cannot dup stderr into stdout");
 
