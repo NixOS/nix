@@ -8,6 +8,7 @@
 #include "eval.hh"
 #include "help.txt.hh"
 #include "nixexpr-ast.hh"
+#include "get-drvs.hh"
 
 #include <cerrno>
 #include <ctime>
@@ -49,133 +50,23 @@ typedef void (* Operation) (Globals & globals,
     Strings opFlags, Strings opArgs);
 
 
-struct UserEnvElem
-{
-private:
-    string drvPath;
-    string outPath;
-    
-public:
-    string name;
-    string system;
-
-    ATermMap attrs;
-
-    string queryDrvPath(EvalState & state) const
-    {
-        if (drvPath == "") {
-            Expr a = attrs.get("drvPath");
-            (string &) drvPath = a ? evalPath(state, a) : "";
-        }
-        return drvPath;
-    }
-    
-    string queryOutPath(EvalState & state) const
-    {
-        if (outPath == "") {
-            Expr a = attrs.get("outPath");
-            if (!a) throw Error("output path missing");
-            (string &) outPath = evalPath(state, a);
-        }
-        return outPath;
-    }
-
-    void setDrvPath(const string & s)
-    {
-        drvPath = s;
-    }
-    
-    void setOutPath(const string & s)
-    {
-        outPath = s;
-    }
-};
-
-typedef map<unsigned int, UserEnvElem> UserEnvElems;
-
-
 void printHelp()
 {
     cout << string((char *) helpText, sizeof helpText);
 }
 
 
-static bool parseDerivation(EvalState & state, Expr e, UserEnvElem & elem)
-{
-    ATermList es;
-    e = evalExpr(state, e);
-    if (!matchAttrs(e, es)) return false;
-
-    ATermMap attrs;
-    queryAllAttrs(e, attrs, false);
-    
-    Expr a = attrs.get("type");
-    if (!a || evalString(state, a) != "derivation") return false;
-
-    a = attrs.get("name");
-    if (!a) throw badTerm("derivation name missing", e);
-    elem.name = evalString(state, a);
-
-    a = attrs.get("system");
-    if (!a)
-        elem.system = "unknown";
-    else
-        elem.system = evalString(state, a);
-
-    elem.attrs = attrs;
-
-    return true;
-}
-
-
-static unsigned int elemCounter = 0;
-
-
-static void parseDerivations(EvalState & state, Expr e, UserEnvElems & elems)
-{
-    ATermList es;
-    UserEnvElem elem;
-
-    e = evalExpr(state, e);
-
-    if (parseDerivation(state, e, elem)) 
-        elems[elemCounter++] = elem;
-
-    else if (matchAttrs(e, es)) {
-        ATermMap drvMap;
-        queryAllAttrs(e, drvMap);
-        for (ATermIterator i(drvMap.keys()); i; ++i) {
-            debug(format("evaluating attribute `%1%'") % aterm2String(*i));
-            if (parseDerivation(state, drvMap.get(*i), elem))
-                elems[elemCounter++] = elem;
-            else
-                parseDerivations(state, drvMap.get(*i), elems);
-        }
-    }
-
-    else if (matchList(e, es)) {
-        for (ATermIterator i(es); i; ++i) {
-            debug(format("evaluating list element"));
-            if (parseDerivation(state, *i, elem))
-                elems[elemCounter++] = elem;
-            else
-                parseDerivations(state, *i, elems);
-        }
-    }
-}
-
-
 static void loadDerivations(EvalState & state, Path nixExprPath,
-    string systemFilter, UserEnvElems & elems)
+    string systemFilter, DrvInfos & elems)
 {
-    parseDerivations(state,
+    getDerivations(state,
         parseExprFromFile(state, absPath(nixExprPath)), elems);
 
     /* Filter out all derivations not applicable to the current
        system. */
-    for (UserEnvElems::iterator i = elems.begin(), j; i != elems.end(); i = j) {
+    for (DrvInfos::iterator i = elems.begin(), j; i != elems.end(); i = j) {
         j = i; j++;
-        if (systemFilter != "*" && i->second.system != systemFilter)
+        if (systemFilter != "*" && i->system != systemFilter)
             elems.erase(i);
     }
 }
@@ -208,12 +99,12 @@ struct AddPos : TermFun
 };
 
 
-static UserEnvElems queryInstalled(EvalState & state, const Path & userEnv)
+static DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
 {
     Path path = userEnv + "/manifest";
 
     if (!pathExists(path))
-        return UserEnvElems(); /* not an error, assume nothing installed */
+        return DrvInfos(); /* not an error, assume nothing installed */
 
     Expr e = ATreadFromNamedFile(path.c_str());
     if (!e) throw Error(format("cannot read Nix expression from `%1%'") % path);
@@ -222,25 +113,25 @@ static UserEnvElems queryInstalled(EvalState & state, const Path & userEnv)
     AddPos addPos;
     e = bottomupRewrite(addPos, e);
 
-    UserEnvElems elems;
-    parseDerivations(state, e, elems);
+    DrvInfos elems;
+    getDerivations(state, e, elems);
     return elems;
 }
 
 
-static void createUserEnv(EvalState & state, const UserEnvElems & elems,
+static void createUserEnv(EvalState & state, const DrvInfos & elems,
     const Path & profile, bool keepDerivations)
 {
     /* Build the components in the user environment, if they don't
        exist already. */
     PathSet drvsToBuild;
-    for (UserEnvElems::const_iterator i = elems.begin(); 
+    for (DrvInfos::const_iterator i = elems.begin(); 
          i != elems.end(); ++i)
         /* Call to `isDerivation' is for compatibility with Nix <= 0.7
            user environments. */
-        if (i->second.queryDrvPath(state) != "" &&
-            isDerivation(i->second.queryDrvPath(state)))
-            drvsToBuild.insert(i->second.queryDrvPath(state));
+        if (i->queryDrvPath(state) != "" &&
+            isDerivation(i->queryDrvPath(state)))
+            drvsToBuild.insert(i->queryDrvPath(state));
 
     debug(format("building user environment dependencies"));
     buildDerivations(drvsToBuild);
@@ -253,31 +144,31 @@ static void createUserEnv(EvalState & state, const UserEnvElems & elems,
     PathSet references;
     ATermList manifest = ATempty;
     ATermList inputs = ATempty;
-    for (UserEnvElems::const_iterator i = elems.begin(); 
+    for (DrvInfos::const_iterator i = elems.begin(); 
          i != elems.end(); ++i)
     {
-        Path drvPath = keepDerivations ? i->second.queryDrvPath(state) : "";
+        Path drvPath = keepDerivations ? i->queryDrvPath(state) : "";
         ATerm t = makeAttrs(ATmakeList5(
             makeBind(toATerm("type"),
                 makeStr(toATerm("derivation")), makeNoPos()),
             makeBind(toATerm("name"),
-                makeStr(toATerm(i->second.name)), makeNoPos()),
+                makeStr(toATerm(i->name)), makeNoPos()),
             makeBind(toATerm("system"),
-                makeStr(toATerm(i->second.system)), makeNoPos()),
+                makeStr(toATerm(i->system)), makeNoPos()),
             makeBind(toATerm("drvPath"),
                 makePath(toATerm(drvPath)), makeNoPos()),
             makeBind(toATerm("outPath"),
-                makePath(toATerm(i->second.queryOutPath(state))), makeNoPos())
+                makePath(toATerm(i->queryOutPath(state))), makeNoPos())
             ));
         manifest = ATinsert(manifest, t);
-        inputs = ATinsert(inputs, makeStr(toATerm(i->second.queryOutPath(state))));
+        inputs = ATinsert(inputs, makeStr(toATerm(i->queryOutPath(state))));
 
         /* This is only necessary when installing store paths, e.g.,
            `nix-env -i /nix/store/abcd...-foo'. */
-        addTempRoot(i->second.queryOutPath(state));
-        ensurePath(i->second.queryOutPath(state));
+        addTempRoot(i->queryOutPath(state));
+        ensurePath(i->queryOutPath(state));
         
-        references.insert(i->second.queryOutPath(state));
+        references.insert(i->queryOutPath(state));
         if (drvPath != "") references.insert(drvPath);
     }
 
@@ -302,8 +193,8 @@ static void createUserEnv(EvalState & state, const UserEnvElems & elems,
 
     /* Instantiate it. */
     debug(format("evaluating builder expression `%1%'") % topLevel);
-    UserEnvElem topLevelDrv;
-    if (!parseDerivation(state, topLevel, topLevelDrv))
+    DrvInfo topLevelDrv;
+    if (!getDerivation(state, topLevel, topLevelDrv))
         abort();
     
     /* Realise the resulting store expression. */
@@ -317,24 +208,24 @@ static void createUserEnv(EvalState & state, const UserEnvElems & elems,
 }
 
 
-static UserEnvElems filterBySelector(const UserEnvElems & allElems,
+static DrvInfos filterBySelector(const DrvInfos & allElems,
     const Strings & args)
 {
     DrvNames selectors = drvNamesFromArgs(args);
 
-    UserEnvElems elems;
+    DrvInfos elems;
 
     /* Filter out the ones we're not interested in. */
-    for (UserEnvElems::const_iterator i = allElems.begin();
+    for (DrvInfos::const_iterator i = allElems.begin();
          i != allElems.end(); ++i)
     {
-        DrvName drvName(i->second.name);
+        DrvName drvName(i->name);
         for (DrvNames::iterator j = selectors.begin();
              j != selectors.end(); ++j)
         {
             if (j->matches(drvName)) {
                 j->hits++;
-                elems.insert(*i);
+                elems.push_back(*i);
             }
         }
     }
@@ -352,7 +243,7 @@ static UserEnvElems filterBySelector(const UserEnvElems & allElems,
 
 static void queryInstSources(EvalState & state,
     const InstallSourceInfo & instSource, const Strings & args,
-    UserEnvElems & elems)
+    DrvInfos & elems)
 {
     InstallSourceType type = instSource.type;
     if (type == srcUnknown && args.size() > 0 && args.front()[0] == '/')
@@ -368,7 +259,7 @@ static void queryInstSources(EvalState & state,
 
             /* Load the derivations from the (default or specified)
                Nix expression. */
-            UserEnvElems allElems;
+            DrvInfos allElems;
             loadDerivations(state, instSource.nixExprPath,
                 instSource.systemFilter, allElems);
 
@@ -394,7 +285,7 @@ static void queryInstSources(EvalState & state,
             {
                 Expr e2 = parseExprFromString(state, *i, absPath("."));
                 Expr call = makeCall(e2, e1);
-                parseDerivations(state, call, elems);
+                getDerivations(state, call, elems);
             }
             
             break;
@@ -410,7 +301,7 @@ static void queryInstSources(EvalState & state,
             {
                 assertStorePath(*i);
 
-                UserEnvElem elem;
+                DrvInfo elem;
                 string name = baseNameOf(*i);
                 unsigned int dash = name.find('-');
                 if (dash != string::npos)
@@ -426,8 +317,6 @@ static void queryInstSources(EvalState & state,
                 else elem.setOutPath(*i);
 
                 elem.name = name;
-
-                elems[elemCounter++] = elem;
             }
             
             break;
@@ -451,30 +340,30 @@ static void installDerivations(Globals & globals,
     debug(format("installing derivations"));
 
     /* Get the set of user environment elements to be installed. */
-    UserEnvElems newElems;
+    DrvInfos newElems;
     queryInstSources(globals.state, globals.instSource, args, newElems);
 
     StringSet newNames;
-    for (UserEnvElems::iterator i = newElems.begin(); i != newElems.end(); ++i) {
+    for (DrvInfos::iterator i = newElems.begin(); i != newElems.end(); ++i) {
         printMsg(lvlInfo,
-            format("installing `%1%'") % i->second.name);
-        newNames.insert(DrvName(i->second.name).name);
+            format("installing `%1%'") % i->name);
+        newNames.insert(DrvName(i->name).name);
     }
 
     /* Add in the already installed derivations, unless they have the
        same name as a to-be-installed element. */
-    UserEnvElems installedElems = queryInstalled(globals.state, profile);
+    DrvInfos installedElems = queryInstalled(globals.state, profile);
 
-    for (UserEnvElems::iterator i = installedElems.begin();
+    for (DrvInfos::iterator i = installedElems.begin();
          i != installedElems.end(); ++i)
     {
-        DrvName drvName(i->second.name);
+        DrvName drvName(i->name);
         if (!globals.preserveInstalled &&
             newNames.find(drvName.name) != newNames.end())
             printMsg(lvlInfo,
-                format("uninstalling `%1%'") % i->second.name);
+                format("uninstalling `%1%'") % i->name);
         else
-            newElems.insert(*i);
+            newElems.push_back(*i);
     }
 
     if (globals.dryRun) return;
@@ -509,29 +398,29 @@ static void upgradeDerivations(Globals & globals,
        name and a higher version number. */
 
     /* Load the currently installed derivations. */
-    UserEnvElems installedElems = queryInstalled(globals.state, profile);
+    DrvInfos installedElems = queryInstalled(globals.state, profile);
 
     /* Fetch all derivations from the input file. */
-    UserEnvElems availElems;
+    DrvInfos availElems;
     queryInstSources(globals.state, globals.instSource, args, availElems);
 
     /* Go through all installed derivations. */
-    UserEnvElems newElems;
-    for (UserEnvElems::iterator i = installedElems.begin();
+    DrvInfos newElems;
+    for (DrvInfos::iterator i = installedElems.begin();
          i != installedElems.end(); ++i)
     {
-        DrvName drvName(i->second.name);
+        DrvName drvName(i->name);
 
         /* Find the derivation in the input Nix expression with the
            same name and satisfying the version constraints specified
            by upgradeType.  If there are multiple matches, take the
            one with highest version. */
-        UserEnvElems::iterator bestElem = availElems.end();
+        DrvInfos::iterator bestElem = availElems.end();
         DrvName bestName;
-        for (UserEnvElems::iterator j = availElems.begin();
+        for (DrvInfos::iterator j = availElems.begin();
              j != availElems.end(); ++j)
         {
-            DrvName newName(j->second.name);
+            DrvName newName(j->name);
             if (newName.name == drvName.name) {
                 int d = compareVersions(drvName.version, newName.version);
                 if (upgradeType == utLt && d < 0 ||
@@ -550,14 +439,14 @@ static void upgradeDerivations(Globals & globals,
         }
 
         if (bestElem != availElems.end() &&
-            i->second.queryOutPath(globals.state) !=
-                bestElem->second.queryOutPath(globals.state))
+            i->queryOutPath(globals.state) !=
+                bestElem->queryOutPath(globals.state))
         {
             printMsg(lvlInfo,
                 format("upgrading `%1%' to `%2%'")
-                % i->second.name % bestElem->second.name);
-            newElems.insert(*bestElem);
-        } else newElems.insert(*i);
+                % i->name % bestElem->name);
+            newElems.push_back(*bestElem);
+        } else newElems.push_back(*i);
     }
     
     if (globals.dryRun) return;
@@ -585,23 +474,23 @@ static void opUpgrade(Globals & globals,
 static void uninstallDerivations(Globals & globals, DrvNames & selectors,
     Path & profile)
 {
-    UserEnvElems installedElems = queryInstalled(globals.state, profile);
-    UserEnvElems newElems;
+    DrvInfos installedElems = queryInstalled(globals.state, profile);
+    DrvInfos newElems;
 
-    for (UserEnvElems::iterator i = installedElems.begin();
+    for (DrvInfos::iterator i = installedElems.begin();
          i != installedElems.end(); ++i)
     {
-        DrvName drvName(i->second.name);
+        DrvName drvName(i->name);
         bool found = false;
         for (DrvNames::iterator j = selectors.begin();
              j != selectors.end(); ++j)
             if (j->matches(drvName)) {
                 printMsg(lvlInfo,
-                    format("uninstalling `%1%'") % i->second.name);
+                    format("uninstalling `%1%'") % i->name);
                 found = true;
                 break;
             }
-        if (!found) newElems.insert(*i);
+        if (!found) newElems.push_back(*i);
     }
 
     if (globals.dryRun) return;
@@ -630,7 +519,7 @@ static bool cmpChars(char a, char b)
 }
 
 
-static bool cmpElemByName(const UserEnvElem & a, const UserEnvElem & b)
+static bool cmpElemByName(const DrvInfo & a, const DrvInfo & b)
 {
     return lexicographical_compare(
         a.name.begin(), a.name.end(),
@@ -680,15 +569,15 @@ void printTable(Table & table)
 typedef enum { cvLess, cvEqual, cvGreater, cvUnavail } VersionDiff;
 
 static VersionDiff compareVersionAgainstSet(
-    const UserEnvElem & elem, const UserEnvElems & elems, string & version)
+    const DrvInfo & elem, const DrvInfos & elems, string & version)
 {
     DrvName name(elem.name);
     
     VersionDiff diff = cvUnavail;
     version = "?";
     
-    for (UserEnvElems::const_iterator i = elems.begin(); i != elems.end(); ++i) {
-        DrvName name2(i->second.name);
+    for (DrvInfos::const_iterator i = elems.begin(); i != elems.end(); ++i) {
+        DrvName name2(i->name);
         if (name.name == name2.name) {
             int d = compareVersions(name.version, name2.version);
             if (d < 0) {
@@ -748,7 +637,7 @@ static void opQuery(Globals & globals,
 
     
     /* Obtain derivation information from the specified source. */
-    UserEnvElems availElems, installedElems;
+    DrvInfos availElems, installedElems;
 
     if (source == sInstalled || compareVersions || printStatus) {
         installedElems = queryInstalled(globals.state, globals.profile);
@@ -759,14 +648,15 @@ static void opQuery(Globals & globals,
             globals.instSource.systemFilter, availElems);
     }
 
-    UserEnvElems & elems(source == sInstalled ? installedElems : availElems);
-    UserEnvElems & otherElems(source == sInstalled ? availElems : installedElems);
+    DrvInfos & elems(source == sInstalled ? installedElems : availElems);
+    DrvInfos & otherElems(source == sInstalled ? availElems : installedElems);
 
     
     /* Sort them by name. */
-    vector<UserEnvElem> elems2;
-    for (UserEnvElems::iterator i = elems.begin(); i != elems.end(); ++i)
-        elems2.push_back(i->second);
+    /* !!! */
+    vector<DrvInfo> elems2;
+    for (DrvInfos::iterator i = elems.begin(); i != elems.end(); ++i)
+        elems2.push_back(*i);
     sort(elems2.begin(), elems2.end(), cmpElemByName);
 
     
@@ -775,16 +665,16 @@ static void opQuery(Globals & globals,
     PathSet installed; /* installed paths */
     
     if (printStatus) {
-        for (UserEnvElems::iterator i = installedElems.begin();
+        for (DrvInfos::iterator i = installedElems.begin();
              i != installedElems.end(); ++i)
-            installed.insert(i->second.queryOutPath(globals.state));
+            installed.insert(i->queryOutPath(globals.state));
     }
 
     
     /* Print the desired columns. */
     Table table;
     
-    for (vector<UserEnvElem>::iterator i = elems2.begin();
+    for (vector<DrvInfo>::iterator i = elems2.begin();
          i != elems2.end(); ++i)
     {
         Strings columns;
