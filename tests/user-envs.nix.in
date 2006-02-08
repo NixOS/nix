@@ -1,8 +1,14 @@
+# Some dummy arguments...
+{ system ? "@system@"
+, foo ? "foo"
+}:
+
+assert foo == "foo";
+
 let {
 
   makeDrv = name: progName: derivation {
-    inherit name progName;
-    system = "@system@";
+    inherit name progName system;
     builder = "@shell@";
     shell = "@shell@";
     args = ["-e" "-x" ./user-envs.builder.sh];
