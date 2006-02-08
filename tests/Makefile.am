@@ -36,10 +36,11 @@ nix-push.sh: dependencies.nix
 nix-pull.sh: dependencies.nix
 gc.sh: dependencies.nix
 gc-concurrent.sh: gc-concurrent.nix gc-concurrent2.nix
+user-envs.sh: user-envs.nix
 
 TESTS = init.sh hash.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
   build-hook.sh substitutes.sh substitutes2.sh fallback.sh nix-push.sh gc.sh \
-  gc-concurrent.sh verify.sh nix-pull.sh referrers.sh
+  gc-concurrent.sh verify.sh nix-pull.sh referrers.sh user-envs.sh
 
 XFAIL_TESTS =
 
