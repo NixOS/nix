@@ -317,6 +317,8 @@ static void queryInstSources(EvalState & state,
                 else elem.setOutPath(*i);
 
                 elem.name = name;
+
+                elems.push_back(elem);
             }
             
             break;
