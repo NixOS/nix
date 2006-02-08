@@ -37,10 +37,12 @@ void getDerivations(EvalState & state, Expr e, DrvInfos & drvs)
 
     e = evalExpr(state, e);
 
-    if (getDerivation(state, e, drv)) 
+    if (getDerivation(state, e, drv)) {
         drvs.push_back(drv);
+        return;
+    }
 
-    else if (matchAttrs(e, es)) {
+    if (matchAttrs(e, es)) {
         ATermMap drvMap;
         queryAllAttrs(e, drvMap);
         for (ATermIterator i(drvMap.keys()); i; ++i) {
@@ -51,9 +53,10 @@ void getDerivations(EvalState & state, Expr e, DrvInfos & drvs)
                 ;
                 //                parseDerivations(state, drvMap.get(*i), drvs);
         }
+        return;
     }
 
-    else if (matchList(e, es)) {
+    if (matchList(e, es)) {
         for (ATermIterator i(es); i; ++i) {
             debug(format("evaluating list element"));
             if (getDerivation(state, *i, drv))
@@ -61,7 +64,23 @@ void getDerivations(EvalState & state, Expr e, DrvInfos & drvs)
             else
                 getDerivations(state, *i, drvs);
         }
+        return;
     }
+
+    ATermList formals;
+    ATerm body, pos;
+    if (matchFunction(e, formals, body, pos)) {
+        for (ATermIterator i(formals); i; ++i) {
+            Expr name, def;
+            if (matchNoDefFormal(*i, name))
+                throw Error(format("expression evaluates to a function with no-default arguments (`%1%')")
+                    % aterm2String(name));
+            else if (!matchDefFormal(*i, name, def))
+                abort(); /* can't happen */
+        }
+        getDerivations(state, makeCall(e, makeAttrs(ATermMap())), drvs);
+        return;
+    }
+
+    throw Error("expression does not evaluate to a derivation (or a set or list of those)");
 }
-
-
