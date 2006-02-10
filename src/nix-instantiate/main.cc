@@ -8,6 +8,7 @@
 #include "eval.hh"
 #include "parser.hh"
 #include "nixexpr-ast.hh"
+#include "get-drvs.hh"
 #include "help.txt.hh"
 
 
@@ -32,74 +33,24 @@ static int rootNr = 0;
 static bool indirectRoot = false;
 
 
-/* Print out the paths of the resulting derivation(s).  If the user
-   specified the `--add-root' flag, we register the derivation as a
-   garbage collection root and print out the path of the GC root
-   symlink instead. */
-static void printDrvPaths(EvalState & state, Expr e)
-{
-    ATermList es;
-
-    /* !!! duplication w.r.t. parseDerivations in nix-env */
-
-    if (matchAttrs(e, es)) {
-        Expr a = queryAttr(e, "type");
-        if (a && evalString(state, a) == "derivation") {
-            a = queryAttr(e, "drvPath");
-            if (a) {
-                Path drvPath = evalPath(state, a);
-                if (gcRoot == "")
-                    printGCWarning();
-                else
-                    drvPath = addPermRoot(drvPath,
-                        makeRootName(gcRoot, rootNr),
-                        indirectRoot);
-                cout << format("%1%\n") % drvPath;
-                return;
-            }
-            throw Error("bad derivation");
-        } else {
-            ATermMap drvMap;
-            queryAllAttrs(e, drvMap);
-            for (ATermIterator i(drvMap.keys()); i; ++i)
-                printDrvPaths(state, evalExpr(state, drvMap.get(*i)));
-            return;
-        }
-    }
-
-    if (matchList(e, es)) {
-        for (ATermIterator i(es); i; ++i)
-            printDrvPaths(state, evalExpr(state, *i));
-        return;
-    }
-
-    ATermList formals;
-    ATerm body, pos;
-    if (matchFunction(e, formals, body, pos)) {
-        for (ATermIterator i(formals); i; ++i) {
-            Expr name, def;
-            if (matchNoDefFormal(*i, name))
-                throw Error(format("expression evaluates to a function with no-default arguments (`%1%')")
-                    % aterm2String(name));
-            else if (!matchDefFormal(*i, name, def))
-                abort(); /* can't happen */
-        }
-
-        printDrvPaths(state, evalExpr(state,
-            makeCall(e, makeAttrs(ATermMap()))));
-        return;
-    }
-
-    throw Error("expression does not evaluate to one or more derivations");
-}
-
-
 static void printResult(EvalState & state, Expr e, bool evalOnly)
 {
     if (evalOnly)
         cout << format("%1%\n") % e;
-    else
-        printDrvPaths(state, e);
+    else {
+        DrvInfos drvs;
+        getDerivations(state, e, drvs);
+        for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i) {
+            Path drvPath = i->queryDrvPath(state);
+            if (gcRoot == "")
+                printGCWarning();
+            else
+                drvPath = addPermRoot(drvPath,
+                    makeRootName(gcRoot, rootNr),
+                    indirectRoot);
+            cout << format("%1%\n") % drvPath;
+        }
+    }
 }
 
 
