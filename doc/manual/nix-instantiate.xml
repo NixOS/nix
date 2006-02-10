@@ -30,6 +30,10 @@ evaluate to a derivation, a list of derivations, or a set of
 derivations.  The paths of the resulting store derivations are printed
 on standard output.</para>
 
+<para>If <replaceable>files</replaceable> is the character
+<literal>-</literal>, then a Nix expression will be read from standard
+input.</para>
+
 <para>Most users and developers don’t need to use this command
 (<command>nix-env</command> and <command>nix-build</command> perform
 store derivation instantiation from Nix expressions automatically).
