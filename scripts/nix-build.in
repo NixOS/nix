@@ -3,6 +3,7 @@
 nixExpr=$1
 
 extraArgs=
+extraInstArgs=
 addDrvLink=0
 addOutLink=1
 
@@ -11,9 +12,11 @@ trap 'rm -f ./.nix-build-tmp-*' EXIT
 
 
 # Process the arguments.
-exprs=
-for i in "$@"; do
-    case "$i" in
+args=("$@")
+for ((i = 0; i < ${#args[*]}; )); do
+    arg=${args[$i]}
+    i=$((i + 1))
+    case "$arg" in
 
         --help)
             echo "syntax: $0 [NIX-EXPR...]" >&2
@@ -27,13 +30,19 @@ for i in "$@"; do
         --no-link)
             addOutLink=0
             ;;
+
+        --attr|-A)
+            arg2=${args[$i]}
+            i=$((i + 1))
+            extraInstArgs="$extraInstArgs $arg $arg2"
+            ;;
             
         -*)
-            extraArgs="$extraArgs $i"
+            extraArgs="$extraArgs $arg"
             ;;
             
         *)
-            exprs="$exprs $i"
+            exprs="$exprs $arg"
             ;;
     esac
 done
@@ -50,7 +59,7 @@ for i in $exprs; do
     if test "$addDrvLink" = 0; then prefix=.nix-build-tmp-; fi
     storeExprs=$(@bindir@/nix-instantiate \
         --add-root ./${prefix}derivation --indirect \
-        "$i")
+        $extraInstArgs "$i")
                 
     for j in $storeExprs; do
         echo "store expression is $(readlink "$j")" >&2

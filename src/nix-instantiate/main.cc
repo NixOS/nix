@@ -84,7 +84,7 @@ void run(Strings args)
                 throw UsageError("`--add-root requires an argument");
             gcRoot = absPath(*i++);
         }
-        else if (arg == "--attr") {
+        else if (arg == "--attr" || arg == "-A") {
             if (i == args.end())
                 throw UsageError("`--attr requires an argument");
             attrPath = *i++;
