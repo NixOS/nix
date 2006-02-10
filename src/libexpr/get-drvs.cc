@@ -53,37 +53,10 @@ bool getDerivation(EvalState & state, Expr e, DrvInfo & drv)
 
 
 static void getDerivations(EvalState & state, Expr e,
-    DrvInfos & drvs, Exprs & doneExprs)
+    DrvInfos & drvs, Exprs & doneExprs, const string & attrPath)
 {
-    ATermList es;
-    DrvInfo drv;
-
-    e = evalExpr(state, e);
-
-    if (getDerivation(state, e, drv)) {
-        drvs.push_back(drv);
-        return;
-    }
-
-    if (matchAttrs(e, es)) {
-        ATermMap drvMap;
-        queryAllAttrs(e, drvMap);
-        for (ATermIterator i(drvMap.keys()); i; ++i) {
-            debug(format("evaluating attribute `%1%'") % aterm2String(*i));
-            getDerivation(state, drvMap.get(*i), drvs, doneExprs);
-        }
-        return;
-    }
-
-    if (matchList(e, es)) {
-        for (ATermIterator i(es); i; ++i) {
-            debug(format("evaluating list element"));
-            if (!getDerivation(state, *i, drvs, doneExprs))
-                getDerivations(state, *i, drvs, doneExprs);
-        }
-        return;
-    }
-
+    /* Automatically call functions that have defaults for all
+       arguments. */
     ATermList formals;
     ATerm body, pos;
     if (matchFunction(e, formals, body, pos)) {
@@ -95,7 +68,81 @@ static void getDerivations(EvalState & state, Expr e,
             else if (!matchDefFormal(*i, name, def))
                 abort(); /* can't happen */
         }
-        getDerivations(state, makeCall(e, makeAttrs(ATermMap())), drvs, doneExprs);
+        getDerivations(state,
+            makeCall(e, makeAttrs(ATermMap())),
+            drvs, doneExprs, attrPath);
+        return;
+    }
+
+    /* Parse the start of attrPath. */
+    enum { apNone, apAttr, apIndex } apType;
+    string attrPathRest;
+    string attr;
+    int attrIndex;
+    Error attrError =
+        Error(format("attribute selection path `%1%' does not match expression") % attrPath);
+
+    if (attrPath.empty())
+        apType = apNone;
+    else {
+        string::size_type dot = attrPath.find(".");
+        if (dot == string::npos) {
+            attrPathRest = "";
+            attr = attrPath;
+        } else {
+            attrPathRest = string(attrPath, dot + 1);
+            attr = string(attrPath, 0, dot);
+        }
+        apType = apAttr;
+        if (string2Int(attr, attrIndex)) apType = apIndex;
+    }
+
+    /* Process the expression. */
+    ATermList es;
+    DrvInfo drv;
+
+    e = evalExpr(state, e);
+
+    if (getDerivation(state, e, drvs, doneExprs)) {
+        if (apType != apNone) throw attrError;
+        return;
+    }
+
+    if (matchAttrs(e, es)) {
+        if (apType != apNone && apType != apAttr) throw attrError;
+        ATermMap drvMap;
+        queryAllAttrs(e, drvMap);
+        if (apType == apNone) {
+            for (ATermIterator i(drvMap.keys()); i; ++i) {
+                debug(format("evaluating attribute `%1%'") % aterm2String(*i));
+                getDerivation(state, drvMap.get(*i), drvs, doneExprs);
+            }
+        } else {
+            Expr e2 = drvMap.get(attr);
+            if (!e2) throw Error(format("attribute `%1%' in selection path not found") % attr);
+            debug(format("evaluating attribute `%1%'") % attr);
+            getDerivation(state, e2, drvs, doneExprs);
+            if (!attrPath.empty())
+                getDerivations(state, e2, drvs, doneExprs, attrPathRest);
+        }
+        return;
+    }
+
+    if (matchList(e, es)) {
+        if (apType != apNone && apType != apIndex) throw attrError;
+        if (apType == apNone) {
+            for (ATermIterator i(es); i; ++i) {
+                debug(format("evaluating list element"));
+                if (!getDerivation(state, *i, drvs, doneExprs))
+                    getDerivations(state, *i, drvs, doneExprs, attrPathRest);
+            }
+        } else {
+            Expr e2 = ATelementAt(es, attrIndex);
+            if (!e2) throw Error(format("list index %1% in selection path not found") % attrIndex);
+            debug(format("evaluating list element"));
+            if (!getDerivation(state, e2, drvs, doneExprs))
+                getDerivations(state, e2, drvs, doneExprs, attrPathRest);
+        }
         return;
     }
 
@@ -103,8 +150,9 @@ static void getDerivations(EvalState & state, Expr e,
 }
 
 
-void getDerivations(EvalState & state, Expr e, DrvInfos & drvs)
+void getDerivations(EvalState & state, Expr e, DrvInfos & drvs,
+    const string & attrPath)
 {
     Exprs doneExprs;
-    getDerivations(state, e, drvs, doneExprs);
+    getDerivations(state, e, drvs, doneExprs, attrPath);
 }

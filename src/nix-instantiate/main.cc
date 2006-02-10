@@ -33,13 +33,14 @@ static int rootNr = 0;
 static bool indirectRoot = false;
 
 
-static void printResult(EvalState & state, Expr e, bool evalOnly)
+static void printResult(EvalState & state, Expr e, bool evalOnly,
+    const string & attrPath)
 {
     if (evalOnly)
         cout << format("%1%\n") % e;
     else {
         DrvInfos drvs;
-        getDerivations(state, e, drvs);
+        getDerivations(state, e, drvs, attrPath);
         for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i) {
             Path drvPath = i->queryDrvPath(state);
             if (gcRoot == "")
@@ -61,6 +62,7 @@ void run(Strings args)
     bool readStdin = false;
     bool evalOnly = false;
     bool parseOnly = false;
+    string attrPath;
 
     for (Strings::iterator i = args.begin();
          i != args.end(); )
@@ -82,6 +84,11 @@ void run(Strings args)
                 throw UsageError("`--add-root requires an argument");
             gcRoot = absPath(*i++);
         }
+        else if (arg == "--attr") {
+            if (i == args.end())
+                throw UsageError("`--attr requires an argument");
+            attrPath = *i++;
+        }
         else if (arg == "--indirect")
             indirectRoot = true;
         else if (arg[0] == '-')
@@ -94,7 +101,7 @@ void run(Strings args)
 
     if (readStdin) {
         Expr e = evalStdin(state, parseOnly);
-        printResult(state, e, evalOnly);
+        printResult(state, e, evalOnly, attrPath);
     }
 
     for (Strings::iterator i = files.begin();
@@ -104,7 +111,7 @@ void run(Strings args)
         Expr e = parseOnly
             ? parseExprFromFile(state, path)
             : evalFile(state, path);
-        printResult(state, e, evalOnly);
+        printResult(state, e, evalOnly, attrPath);
     }
 
     printEvalStats(state);
