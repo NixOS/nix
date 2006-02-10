@@ -100,8 +100,10 @@ void run(Strings args)
     for (Strings::iterator i = files.begin();
          i != files.end(); i++)
     {
-        Expr e = evalFile(state, absPath(*i));
-        /* !!! parseOnly ignored */
+        Path path = absPath(*i);
+        Expr e = parseOnly
+            ? parseExprFromFile(state, path)
+            : evalFile(state, path);
         printResult(state, e, evalOnly);
     }
 
