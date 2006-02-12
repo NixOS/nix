@@ -60,4 +60,5 @@ EXTRA_DIST = $(TESTS) \
   gc-concurrent.nix.in gc-concurrent.builder.sh \
   gc-concurrent2.nix.in gc-concurrent2.builder.sh \
   fallback.nix.in \
+  user-envs.nix.in user-envs.builder.sh \
   $(wildcard lang/*.nix) $(wildcard lang/*.exp)
