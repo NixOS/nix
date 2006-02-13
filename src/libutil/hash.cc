@@ -14,7 +14,6 @@ extern "C" {
 #include <fcntl.h>
 
 
-
 Hash::Hash()
 {
     type = htUnknown;
@@ -198,7 +197,7 @@ bool isHash(const string & s)
 }
 
 
-struct Ctx
+union Ctx
 {
     md5_ctx md5;
     sha_ctx sha1;
