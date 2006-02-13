@@ -1,10 +1,17 @@
+#include "config.h"
+
 #include <iostream>
 
+#ifdef HAVE_OPENSSL
+#include <openssl/md5.h>
+#include <openssl/sha.h>
+#else
 extern "C" {
 #include "md5.h"
 #include "sha1.h"
 #include "sha256.h"
 }
+#endif
 
 #include "hash.hh"
 #include "archive.hh"
@@ -199,16 +206,16 @@ bool isHash(const string & s)
 
 union Ctx
 {
-    md5_ctx md5;
-    sha_ctx sha1;
+    MD5_CTX md5;
+    SHA_CTX sha1;
     SHA256_CTX sha256;
 };
 
 
 static void start(HashType ht, Ctx & ctx)
 {
-    if (ht == htMD5) md5_init_ctx(&ctx.md5);
-    else if (ht == htSHA1) sha_init(&ctx.sha1);
+    if (ht == htMD5) MD5_Init(&ctx.md5);
+    else if (ht == htSHA1) SHA1_Init(&ctx.sha1);
     else if (ht == htSHA256) SHA256_Init(&ctx.sha256);
 }
 
@@ -216,19 +223,16 @@ static void start(HashType ht, Ctx & ctx)
 static void update(HashType ht, Ctx & ctx,
     const unsigned char * bytes, unsigned int len)
 {
-    if (ht == htMD5) md5_process_bytes(bytes, len, &ctx.md5);
-    else if (ht == htSHA1) sha_update(&ctx.sha1, bytes, len);
+    if (ht == htMD5) MD5_Update(&ctx.md5, bytes, len);
+    else if (ht == htSHA1) SHA1_Update(&ctx.sha1, bytes, len);
     else if (ht == htSHA256) SHA256_Update(&ctx.sha256, bytes, len);
 }
 
 
 static void finish(HashType ht, Ctx & ctx, unsigned char * hash)
 {
-    if (ht == htMD5) md5_finish_ctx(&ctx.md5, hash);
-    else if (ht == htSHA1) {
-        sha_final(&ctx.sha1);
-        sha_digest(&ctx.sha1, hash);
-    }
+    if (ht == htMD5) MD5_Final(hash, &ctx.md5);
+    else if (ht == htSHA1) SHA1_Final(hash, &ctx.sha1);
     else if (ht == htSHA256) SHA256_Final(hash, &ctx.sha256);
 }
 

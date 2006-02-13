@@ -11,18 +11,18 @@
 #define SHA_DIGESTLEN    5
 /* The structure for storing SHA info */
 
-struct sha_ctx {
+struct SHA_CTX {
   uint32_t digest[SHA_DIGESTLEN];  /* Message digest */
   uint32_t count_l, count_h;       /* 64-bit block count */
   uint8_t block[SHA_DATASIZE];     /* SHA data buffer */
   unsigned int index;            /* index into buffer */
 };
 
-void sha_init(struct sha_ctx *ctx);
-void sha_update(struct sha_ctx *ctx, const unsigned char *buffer, uint32_t len);
-void sha_final(struct sha_ctx *ctx);
-void sha_digest(struct sha_ctx *ctx, unsigned char *s);
-void sha_copy(struct sha_ctx *dest, struct sha_ctx *src);
+void SHA1_Init(struct SHA_CTX *ctx);
+void SHA1_Update(struct SHA_CTX *ctx, const unsigned char *buffer, uint32_t len);
+void SHA1_Final(unsigned char *s, struct SHA_CTX *ctx);
+void sha_digest(struct SHA_CTX *ctx, unsigned char *s);
+void sha_copy(struct SHA_CTX *dest, struct SHA_CTX *src);
 
 
 #endif /* !_SHA_H */

@@ -143,6 +143,17 @@ AC_SUBST(aterm_lib)
 AC_SUBST(aterm_include)
 AC_SUBST(aterm_bin)
 
+AC_ARG_WITH(openssl, AC_HELP_STRING([--with-openssl=PATH],
+  [prefix of the OpenSSL library]),
+  openssl=$withval, openssl=)
+AM_CONDITIONAL(HAVE_OPENSSL, test -n "$openssl")
+if test -n "$openssl"; then
+  LDFLAGS="-L$openssl/lib -lcrypto $LDFLAGS"
+  CFLAGS="-I$openssl/include $CFLAGS"
+  CXXFLAGS="-I$openssl/include $CXXFLAGS"
+  AC_DEFINE(HAVE_OPENSSL, 1, [whether to use OpenSSL])
+fi
+
 AC_ARG_WITH(bzip2, AC_HELP_STRING([--with-bzip2=PATH],
   [prefix of bzip2]),
   bzip2=$withval, bzip2=)

@@ -56,8 +56,8 @@ static const unsigned char fillbuf[64] = { 0x80, 0 /* , 0, 0, ...  */ };
 /* Initialize structure containing state of computation.
    (RFC 1321, 3.3: Step 3)  */
 void
-md5_init_ctx (ctx)
-     struct md5_ctx *ctx;
+MD5_Init (ctx)
+     struct MD5_CTX *ctx;
 {
   ctx->A = 0x67452301;
   ctx->B = 0xefcdab89;
@@ -75,7 +75,7 @@ md5_init_ctx (ctx)
    aligned for a 32 bits value.  */
 void *
 md5_read_ctx (ctx, resbuf)
-     const struct md5_ctx *ctx;
+     const struct MD5_CTX *ctx;
      void *resbuf;
 {
   ((md5_uint32 *) resbuf)[0] = SWAP (ctx->A);
@@ -92,9 +92,9 @@ md5_read_ctx (ctx, resbuf)
    IMPORTANT: On some systems it is required that RESBUF is correctly
    aligned for a 32 bits value.  */
 void *
-md5_finish_ctx (ctx, resbuf)
-     struct md5_ctx *ctx;
+MD5_Final (resbuf, ctx)
      void *resbuf;
+     struct MD5_CTX *ctx;
 {
   /* Take yet unprocessed bytes into account.  */
   md5_uint32 bytes = ctx->buflen;
@@ -120,10 +120,10 @@ md5_finish_ctx (ctx, resbuf)
 }
 
 void
-md5_process_bytes (buffer, len, ctx)
+MD5_Update (ctx, buffer, len)
+     struct MD5_CTX *ctx;
      const void *buffer;
      size_t len;
-     struct md5_ctx *ctx;
 {
   /* When we already have some bits in our internal buffer concatenate
      both inputs first.  */
@@ -210,7 +210,7 @@ void
 md5_process_block (buffer, len, ctx)
      const void *buffer;
      size_t len;
-     struct md5_ctx *ctx;
+     struct MD5_CTX *ctx;
 {
   md5_uint32 correct_words[16];
   const md5_uint32 *words = buffer;

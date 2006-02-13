@@ -37,7 +37,7 @@ effort (for example the reengineering of a great many Capstone chips).
 
 #include <string.h>
 
-void sha_copy(struct sha_ctx *dest, struct sha_ctx *src)
+void sha_copy(struct SHA_CTX *dest, struct SHA_CTX *src)
 {
   unsigned int i;
 
@@ -118,7 +118,7 @@ void sha_copy(struct sha_ctx *dest, struct sha_ctx *src)
 
 /* Initialize the SHA values */
 
-void sha_init(struct sha_ctx *ctx)
+void SHA1_Init(struct SHA_CTX *ctx)
 {
   /* Set the h-vars to their initial values */
   ctx->digest[ 0 ] = h0init;
@@ -141,7 +141,7 @@ void sha_init(struct sha_ctx *ctx)
 
    Note that this function destroys the data area */
 
-static void sha_transform(struct sha_ctx *ctx, uint32_t *data )
+static void sha_transform(struct SHA_CTX *ctx, uint32_t *data )
 {
   uint32_t A, B, C, D, E;     /* Local vars */
 
@@ -267,7 +267,7 @@ uint32_t STRING2INT(unsigned char *s)
 }
 #endif
 
-static void sha_block(struct sha_ctx *ctx, const unsigned char *block)
+static void sha_block(struct SHA_CTX *ctx, const unsigned char *block)
 {
   uint32_t data[SHA_DATALEN];
   unsigned int i;
@@ -283,7 +283,7 @@ static void sha_block(struct sha_ctx *ctx, const unsigned char *block)
   sha_transform(ctx, data);
 }
 
-void sha_update(struct sha_ctx *ctx, const unsigned char *buffer, uint32_t len)
+void SHA1_Update(struct SHA_CTX *ctx, const unsigned char *buffer, uint32_t len)
 {
   if (ctx->index)
     { /* Try to fill partial block */
@@ -316,7 +316,7 @@ void sha_update(struct sha_ctx *ctx, const unsigned char *buffer, uint32_t len)
 /* Final wrapup - pad to SHA_DATASIZE-byte boundary with the bit pattern
    1 0* (64-bit count of bits processed, MSB-first) */
 
-void sha_final(struct sha_ctx *ctx)
+void SHA1_Final(unsigned char *s, struct SHA_CTX *ctx)
 {
   uint32_t data[SHA_DATALEN];
   unsigned int i;
@@ -352,9 +352,10 @@ void sha_final(struct sha_ctx *ctx)
   data[SHA_DATALEN-2] = (ctx->count_h << 9) | (ctx->count_l >> 23);
   data[SHA_DATALEN-1] = (ctx->count_l << 9) | (ctx->index << 3);
   sha_transform(ctx, data);
+  sha_digest(ctx, s);
 }
 
-void sha_digest(struct sha_ctx *ctx, unsigned char *s)
+void sha_digest(struct SHA_CTX *ctx, unsigned char *s)
 {
   unsigned int i;
 
