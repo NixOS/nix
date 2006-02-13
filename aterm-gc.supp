@@ -1,0 +1,130 @@
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Cond
+   fun:mark_memory_young
+   fun:mark_phase_young
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Cond
+   fun:AT_isValidSymbol
+   fun:mark_memory_young
+   fun:mark_phase_young
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Value4
+   fun:AT_isValidSymbol
+   fun:mark_memory_young
+   fun:mark_phase_young
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Value4
+   fun:mark_memory_young
+   fun:mark_phase_young
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Value4
+   fun:AT_isInsideValidTerm
+   fun:mark_memory_young
+   fun:mark_phase_young
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Cond
+   fun:AT_isInsideValidTerm
+   fun:mark_memory_young
+   fun:mark_phase_young
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Value4
+   fun:mark_memory_young
+   fun:mark_phase_young
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Value4
+   fun:AT_markTerm_young
+   fun:mark_memory_young
+   fun:mark_phase_young
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Cond
+   fun:AT_markTerm_young
+   fun:mark_memory_young
+   fun:mark_phase_young
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Cond
+   fun:mark_memory
+   fun:mark_phase
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Value4
+   fun:mark_memory
+   fun:mark_phase
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Cond
+   fun:AT_isValidSymbol
+   fun:mark_memory
+   fun:mark_phase
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Value4
+   fun:AT_isValidSymbol
+   fun:mark_memory
+   fun:mark_phase
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Value4
+   fun:AT_isInsideValidTerm
+   fun:mark_memory
+   fun:mark_phase
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Cond
+   fun:AT_isInsideValidTerm
+   fun:mark_memory
+   fun:mark_phase
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Cond
+   fun:AT_markTerm
+   fun:mark_memory
+   fun:mark_phase
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Value4
+   fun:AT_markTerm
+   fun:mark_memory
+   fun:mark_phase
+}
