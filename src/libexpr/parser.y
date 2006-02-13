@@ -43,6 +43,26 @@ static Pos makeCurPos(YYLTYPE * loc, void * data)
 }
 
 #define CUR_POS makeCurPos(yylocp, data)
+
+
+/* Make sure that the parse stack is scanned by the ATerm garbage
+   collector. */
+static void * mallocAndProtect(size_t size)
+{
+    void * p = malloc(size);
+    if (p) ATprotectMemory(p, size);
+    return p;
+}
+
+static void freeAndUnprotect(void * p)
+{
+    ATunprotectMemory(p);
+    free(p);
+}
+
+#define YYMALLOC mallocAndProtect
+#define YYFREE freeAndUnprotect
+
  
 %}
 
