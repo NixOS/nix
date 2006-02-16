@@ -11,7 +11,7 @@
 # build time (e.g., the C compiler, or source tarballs downloaded from
 # the network).  To prevent it from doing so, set this option to
 # `true'.
-gc-keep-outputs = false
+#gc-keep-outputs = false
 
 
 ### Option `gc-keep-derivations'
@@ -26,7 +26,26 @@ gc-keep-outputs = false
 # store path was built), so by default this option is on.  Turn it off
 # to safe a bit of disk space (or a lot if `gc-keep-outputs' is also
 # turned on).
-gc-keep-derivations = true
+#gc-keep-derivations = true
+
+
+### Option `gc-reserved-space'
+#
+# This option specifies how much space should be reserved in normal
+# use so that the garbage collector can run succesfully.  Since the
+# garbage collector must perform Berkeley DB transactions, it needs
+# some disk space for itself.  However, when the disk is full, this
+# space is not available, so the collector would not be able to run
+# precisely when it is most needed.
+#
+# For this reason, when Nix is run, it allocates a file
+# /nix/var/nix/db/reserved of the size specified by this option.  When
+# the garbage collector is run, this file is deleted before the
+# Berkeley DB environment is opened.  This should give it enough room
+# to proceed.
+#
+# The default is "1048576" (1 MiB).
+#gc-reserved-space = 1048576
 
 
 ### Option `env-keep-derivations'
@@ -46,7 +65,7 @@ gc-keep-derivations = true
 # this one is `sticky': it applies to any user environment created
 # while this option was enabled, while `gc-keep-derivations' only
 # applies at the moment the garbage collector is run.
-env-keep-derivations = false
+#env-keep-derivations = false
 
 
 ### Option `build-allow-root'
@@ -56,7 +75,7 @@ env-keep-derivations = false
 # performed under the `root' user.  If `false', builds are performed
 # under one of the users listed in the `build-users' option (see
 # below).
-build-allow-root = true
+#build-allow-root = true
 
 
 ### Option `build-users'
@@ -77,4 +96,4 @@ build-allow-root = true
 #
 # Example:
 #   build-users = nix-builder-1 nix-builder-2 nix-builder-3
-build-users =
+#build-users =

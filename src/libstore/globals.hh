@@ -56,6 +56,8 @@ extern bool readOnlyMode;
 
 Strings querySetting(const string & name, const Strings & def);
 
+string querySetting(const string & name, const string & def);
+
 bool queryBoolSetting(const string & name, bool def);
 
 

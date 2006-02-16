@@ -75,17 +75,22 @@ Strings querySetting(const string & name, const Strings & def)
 }
 
 
-bool queryBoolSetting(const string & name, bool def)
+string querySetting(const string & name, const string & def)
 {
     Strings defs;
-    if (def) defs.push_back("true"); else defs.push_back("false");
-    
+    defs.push_back(def);
+
     Strings value = querySetting(name, defs);
     if (value.size() != 1)
-        throw Error(format("configuration option `%1%' should be either `true' or `false', not a list")
-            % name);
-    
-    string v = value.front();
+        throw Error(format("configuration option `%1%' should not be a list") % name);
+
+    return value.front();
+}
+
+
+bool queryBoolSetting(const string & name, bool def)
+{
+    string v = querySetting(name, def ? "true" : "false");
     if (v == "true") return true;
     else if (v == "false") return false;
     else throw Error(format("configuration option `%1%' should be either `true' or `false', not `%2%'")

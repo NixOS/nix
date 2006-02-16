@@ -82,12 +82,14 @@ void openDB(bool reserveSpace)
 
     try {
         Path reservedPath = nixDBPath + "/reserved";
-        off_t reservedSize = 1024 * 1024;
+        string s = querySetting("gc-reserved-space", "");
+        int reservedSize;
+        if (!string2Int(s, reservedSize)) reservedSize = 1024 * 1024;
         if (reserveSpace) {
             struct stat st;
             if (stat(reservedPath.c_str(), &st) == -1 ||
                 st.st_size != reservedSize)
-                writeFile(reservedPath, string(1024 * 1024, 'X'));
+                writeFile(reservedPath, string(reservedSize, 'X'));
         }
         else
             deletePath(reservedPath);
