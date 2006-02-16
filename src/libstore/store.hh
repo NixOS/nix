@@ -37,8 +37,14 @@ struct Substitute
 typedef list<Substitute> Substitutes;
 
 
-/* Open the database environment. */
-void openDB();
+/* Open the database environment.  If `reserveSpace' is true, make
+   sure that a big empty file exists in /nix/var/nix/db/reserved.  If
+   `reserveSpace' is false, delete this file if it exists.  The idea
+   is that on normal operation, the file exists; but when we run the
+   garbage collector, it is deleted.  This is to ensure that the
+   garbage collector has a small amount of disk space available, which
+   is required to open the Berkeley DB environment. */
+void openDB(bool reserveSpace = true);
 
 /* Create the required database tables. */
 void initDB();

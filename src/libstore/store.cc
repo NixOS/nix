@@ -76,9 +76,23 @@ static void upgradeStore07();
 static void upgradeStore09();
 
 
-void openDB()
+void openDB(bool reserveSpace)
 {
     if (readOnlyMode) return;
+
+    try {
+        Path reservedPath = nixDBPath + "/reserved";
+        off_t reservedSize = 1024 * 1024;
+        if (reserveSpace) {
+            struct stat st;
+            if (stat(reservedPath.c_str(), &st) == -1 ||
+                st.st_size != reservedSize)
+                writeFile(reservedPath, string(1024 * 1024, 'X'));
+        }
+        else
+            deletePath(reservedPath);
+    } catch (SysError & e) { /* don't care about errors */
+    }
 
     try {
         nixDB.open(nixDBPath);

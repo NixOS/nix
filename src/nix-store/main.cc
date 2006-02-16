@@ -686,7 +686,7 @@ void run(Strings args)
     if (!op) throw UsageError("no operation specified");
 
     if (op != opDump && op != opRestore) /* !!! hack */
-        openDB();
+        openDB(op != opGC);
 
     op(opFlags, opArgs);
 }
