@@ -208,13 +208,16 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
 }
 
 
-static DrvInfos filterBySelector(const DrvInfos & allElems,
-    const Strings & args)
+static DrvInfos filterBySelector(EvalState & state,
+    const DrvInfos & allElems,
+    const Strings & args, bool newestOnly)
 {
     DrvNames selectors = drvNamesFromArgs(args);
 
     DrvInfos elems;
+    PathSet done;
 
+#if 0    
     /* Filter out the ones we're not interested in. */
     for (DrvInfos::const_iterator i = allElems.begin();
          i != allElems.end(); ++i)
@@ -228,6 +231,56 @@ static DrvInfos filterBySelector(const DrvInfos & allElems,
                 elems.push_back(*i);
             }
         }
+    }
+#endif
+
+    for (DrvNames::iterator i = selectors.begin();
+         i != selectors.end(); ++i)
+    {
+        DrvInfos matches;
+        for (DrvInfos::const_iterator j = allElems.begin();
+             j != allElems.end(); ++j)
+        {
+            DrvName drvName(j->name);
+            if (i->matches(drvName)) {
+                i->hits++;
+                matches.push_back(*j);
+            }
+        }
+
+        if (newestOnly) {
+
+            /* Map from package names to derivations. */
+            map<string, DrvInfo> newest;
+
+            for (DrvInfos::const_iterator j = matches.begin();
+                 j != matches.end(); ++j)
+            {
+                DrvName drvName(j->name);
+                map<string, DrvInfo>::iterator k = newest.find(drvName.name);
+                if (k != newest.end())
+                    if (compareVersions(drvName.version, DrvName(k->second.name).version) > 0)
+                        newest[drvName.name] = *j;
+                    else
+                        ;
+                else
+                    newest[drvName.name] = *j;
+            }
+
+            matches.clear();
+            for (map<string, DrvInfo>::iterator j = newest.begin();
+                 j != newest.end(); ++j)
+                matches.push_back(j->second);
+        }
+
+        /* Insert only those elements in the final list that we
+           haven't inserted before. */
+        for (DrvInfos::const_iterator j = matches.begin();
+             j != matches.end(); ++j)
+            if (done.find(j->queryOutPath(state)) == done.end()) {
+                done.insert(j->queryOutPath(state));
+                elems.push_back(*j);
+            }
     }
             
     /* Check that all selectors have been used. */
@@ -243,7 +296,7 @@ static DrvInfos filterBySelector(const DrvInfos & allElems,
 
 static void queryInstSources(EvalState & state,
     const InstallSourceInfo & instSource, const Strings & args,
-    DrvInfos & elems)
+    DrvInfos & elems, bool newestOnly)
 {
     InstallSourceType type = instSource.type;
     if (type == srcUnknown && args.size() > 0 && args.front()[0] == '/')
@@ -263,7 +316,7 @@ static void queryInstSources(EvalState & state,
             loadDerivations(state, instSource.nixExprPath,
                 instSource.systemFilter, allElems);
 
-            elems = filterBySelector(allElems, args);
+            elems = filterBySelector(state, allElems, args, newestOnly);
     
             break;
         }
@@ -328,8 +381,9 @@ static void queryInstSources(EvalState & state,
            user environment.  These are then filtered as in the
            `srcNixExprDrvs' case. */
         case srcProfile: {
-            elems = filterBySelector(
-                queryInstalled(state, instSource.profile), args);
+            elems = filterBySelector(state,
+                queryInstalled(state, instSource.profile),
+                args, newestOnly);
             break;
         }
     }
@@ -343,7 +397,7 @@ static void installDerivations(Globals & globals,
 
     /* Get the set of user environment elements to be installed. */
     DrvInfos newElems;
-    queryInstSources(globals.state, globals.instSource, args, newElems);
+    queryInstSources(globals.state, globals.instSource, args, newElems, true);
 
     StringSet newNames;
     for (DrvInfos::iterator i = newElems.begin(); i != newElems.end(); ++i)
@@ -406,7 +460,7 @@ static void upgradeDerivations(Globals & globals,
 
     /* Fetch all derivations from the input file. */
     DrvInfos availElems;
-    queryInstSources(globals.state, globals.instSource, args, availElems);
+    queryInstSources(globals.state, globals.instSource, args, availElems, false);
 
     /* Go through all installed derivations. */
     DrvInfos newElems;
