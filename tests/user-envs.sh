@@ -75,3 +75,19 @@ $nixenv -p $profiles/test --delete-generations old
 $NIX_BIN_DIR/nix-collect-garbage
 test -e "$outPath10"
 if test -e "$outPath20"; then false; fi
+
+# Uninstall everything
+$nixenv -p $profiles/test -f ./user-envs.nix -e '*'
+test "$($nixenv -p $profiles/test -q | wc -l)" -eq 0
+
+# Installing "foo" should only install the newest foo.
+$nixenv -p $profiles/test -f ./user-envs.nix -i foo
+test "$($nixenv -p $profiles/test -q | grep foo- | wc)" -eq 1
+$nixenv -p $profiles/test -q | grep -q foo-2.0
+
+# Installing "*" should install one foo and one bar.
+$nixenv -p $profiles/test -f ./user-envs.nix -e '*'
+$nixenv -p $profiles/test -f ./user-envs.nix -i '*'
+test "$($nixenv -p $profiles/test -q | wc)" -eq 2
+$nixenv -p $profiles/test -q | grep -q foo-2.0
+$nixenv -p $profiles/test -q | grep -q bar-0.1.1
