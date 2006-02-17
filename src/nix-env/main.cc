@@ -217,23 +217,6 @@ static DrvInfos filterBySelector(EvalState & state,
     DrvInfos elems;
     PathSet done;
 
-#if 0    
-    /* Filter out the ones we're not interested in. */
-    for (DrvInfos::const_iterator i = allElems.begin();
-         i != allElems.end(); ++i)
-    {
-        DrvName drvName(i->name);
-        for (DrvNames::iterator j = selectors.begin();
-             j != selectors.end(); ++j)
-        {
-            if (j->matches(drvName)) {
-                j->hits++;
-                elems.push_back(*i);
-            }
-        }
-    }
-#endif
-
     for (DrvNames::iterator i = selectors.begin();
          i != selectors.end(); ++i)
     {
@@ -248,29 +231,38 @@ static DrvInfos filterBySelector(EvalState & state,
             }
         }
 
+        /* If `newestOnly', if a selector matches multiple derivations
+           with the same name, pick the one with the highest version.
+           If there are multiple derivations with the same name *and*
+           version, then pick the first one. */
         if (newestOnly) {
 
             /* Map from package names to derivations. */
             map<string, DrvInfo> newest;
+            StringSet multiple;
 
             for (DrvInfos::const_iterator j = matches.begin();
                  j != matches.end(); ++j)
             {
                 DrvName drvName(j->name);
                 map<string, DrvInfo>::iterator k = newest.find(drvName.name);
-                if (k != newest.end())
-                    if (compareVersions(drvName.version, DrvName(k->second.name).version) > 0)
-                        newest[drvName.name] = *j;
-                    else
-                        ;
-                else
+                if (k != newest.end()) {
+                    int d = compareVersions(drvName.version, DrvName(k->second.name).version);
+                    if (d > 0) newest[drvName.name] = *j;
+                    else if (d == 0) multiple.insert(j->name);
+                } else
                     newest[drvName.name] = *j;
             }
 
             matches.clear();
             for (map<string, DrvInfo>::iterator j = newest.begin();
-                 j != newest.end(); ++j)
+                 j != newest.end(); ++j) {
+                if (multiple.find(j->second.name) != multiple.end())
+                    printMsg(lvlInfo,
+                        format("warning: there are multiple derivations named `%1%'; using the first one")
+                        % j->second.name);
                 matches.push_back(j->second);
+            }
         }
 
         /* Insert only those elements in the final list that we
