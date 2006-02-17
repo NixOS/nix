@@ -85,6 +85,11 @@ $nixenv -p $profiles/test -f ./user-envs.nix -i foo
 test "$($nixenv -p $profiles/test -q | grep foo- | wc)" -eq 1
 $nixenv -p $profiles/test -q | grep -q foo-2.0
 
+# On the other hand, this should install both (and should fail due to
+# a collision).
+$nixenv -p $profiles/test -f ./user-envs.nix -e '*'
+if $nixenv -p $profiles/test -f ./user-envs.nix -i foo-1.0 foo-2.0; then false; fi
+
 # Installing "*" should install one foo and one bar.
 $nixenv -p $profiles/test -f ./user-envs.nix -e '*'
 $nixenv -p $profiles/test -f ./user-envs.nix -i '*'
