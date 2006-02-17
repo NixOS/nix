@@ -346,16 +346,14 @@ static void installDerivations(Globals & globals,
     queryInstSources(globals.state, globals.instSource, args, newElems);
 
     StringSet newNames;
-    for (DrvInfos::iterator i = newElems.begin(); i != newElems.end(); ++i) {
-        printMsg(lvlInfo,
-            format("installing `%1%'") % i->name);
+    for (DrvInfos::iterator i = newElems.begin(); i != newElems.end(); ++i)
         newNames.insert(DrvName(i->name).name);
-    }
 
     /* Add in the already installed derivations, unless they have the
        same name as a to-be-installed element. */
     DrvInfos installedElems = queryInstalled(globals.state, profile);
 
+    DrvInfos allElems(newElems);
     for (DrvInfos::iterator i = installedElems.begin();
          i != installedElems.end(); ++i)
     {
@@ -363,14 +361,18 @@ static void installDerivations(Globals & globals,
         if (!globals.preserveInstalled &&
             newNames.find(drvName.name) != newNames.end())
             printMsg(lvlInfo,
-                format("uninstalling `%1%'") % i->name);
+                format("replacing old `%1%'") % i->name);
         else
-            newElems.push_back(*i);
+            allElems.push_back(*i);
     }
 
+    for (DrvInfos::iterator i = newElems.begin(); i != newElems.end(); ++i)
+        printMsg(lvlInfo,
+            format("installing `%1%'") % i->name);
+        
     if (globals.dryRun) return;
 
-    createUserEnv(globals.state, newElems,
+    createUserEnv(globals.state, allElems,
         profile, globals.keepDerivations);
 }
 
