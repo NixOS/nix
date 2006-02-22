@@ -1,0 +1,2 @@
+./gc-releases.pl /data/webserver/dist/*/*/MANIFEST > dead
+cat dead | xargs mv --target-directory=/data/webserver/trash/
