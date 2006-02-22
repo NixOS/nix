@@ -22,6 +22,7 @@ TESTS_ENVIRONMENT = TEST_ROOT=$(TEST_ROOT) \
   TOP=$(shell pwd)/.. \
   SHARED=$(extra1) \
   aterm_bin=$(aterm_bin) \
+  dot=$(dot) \
   $(SHELL) -e
 
 simple.sh: simple.nix
@@ -40,7 +41,7 @@ user-envs.sh: user-envs.nix
 
 TESTS = init.sh hash.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
   build-hook.sh substitutes.sh substitutes2.sh fallback.sh nix-push.sh gc.sh \
-  gc-concurrent.sh verify.sh nix-pull.sh referrers.sh user-envs.sh
+  gc-concurrent.sh verify.sh nix-pull.sh referrers.sh user-envs.sh misc.sh
 
 XFAIL_TESTS =
 
