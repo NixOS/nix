@@ -1,4 +1,4 @@
-#! /usr/bin/perl -w
+#! /usr/bin/perl -w -I.
 
 use strict;
 use readmanifest;
@@ -19,8 +19,9 @@ sub readDir {
     closedir DIR;
 }
 
-readDir "/mnt/scratchy/eelco/public_html/nix-cache";
-readDir "/mnt/scratchy/eelco/public_html/patches";
+readDir "/data/webserver/dist/nix-cache";
+readDir "/data/webserver/dist/test";
+readDir "/data/webserver/dist/patches";
 
 print STDERR scalar @archives, "\n";
 
@@ -48,7 +49,7 @@ foreach my $narFile (keys %narFiles) {
         die unless defined $basename;
 #        print $basename, "\n";
         $usedFiles{$basename} = 1;
-        die "missing archive `$basename'"
+        print STDERR "missing archive `$basename'\n"
             unless defined $archives{$basename};
     }
 }
