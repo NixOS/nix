@@ -1,29 +1,11 @@
-#! /usr/bin/perl -w -I.
+#! /usr/bin/perl -w -I. -I..
 
 use strict;
 use readmanifest;
+use readcache;
 
 
-# Read the archive directories.
-my @archives = ();
-my %archives;
-
-sub readDir {
-    my $dir = shift;
-    opendir(DIR, "$dir") or die "cannot open `$dir': $!";
-    my @as = readdir DIR;
-    foreach my $archive (@as) {
-        push @archives, $archive;
-        $archives{$archive} = "$dir/$archive";
-    }
-    closedir DIR;
-}
-
-readDir "/data/webserver/dist/nix-cache";
-readDir "/data/webserver/dist/test";
-readDir "/data/webserver/dist/patches";
-
-print STDERR scalar @archives, "\n";
+print STDERR scalar (keys %readcache::archives), "\n";
 
 
 # Read the manifests.
@@ -50,7 +32,7 @@ foreach my $narFile (keys %narFiles) {
 #        print $basename, "\n";
         $usedFiles{$basename} = 1;
         print STDERR "missing archive `$basename'\n"
-            unless defined $archives{$basename};
+            unless defined $readcache::archives{$basename};
     }
 }
 
@@ -62,15 +44,15 @@ foreach my $patch (keys %patches) {
 #        print $basename, "\n";
         $usedFiles{$basename} = 1;
         die "missing archive `$basename'"
-            unless defined $archives{$basename};
+            unless defined $readcache::archives{$basename};
     }
 }
 
 
 # Print out the dead archives.
-foreach my $archive (@archives) {
+foreach my $archive (keys %readcache::archives) {
     next if $archive eq "." || $archive eq "..";
     if (!defined $usedFiles{$archive}) {
-        print $archives{$archive}, "\n";
+        print $readcache::archives{$archive}, "\n";
     }
 }
