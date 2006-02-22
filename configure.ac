@@ -85,6 +85,7 @@ AC_PATH_PROG(flex, flex, false)
 AC_PATH_PROG(bison, bison, false)
 NEED_PROG(perl, perl)
 NEED_PROG(tar, tar)
+AC_PATH_PROG(dot, dot)
                 
 NEED_PROG(cat, cat)
 AC_ARG_WITH(coreutils-bin, AC_HELP_STRING([--with-coreutils-bin=PATH],
