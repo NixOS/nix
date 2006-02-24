@@ -5,9 +5,6 @@ use readmanifest;
 use readcache;
 
 
-print STDERR scalar (keys %readcache::archives), "\n";
-
-
 # Read the manifests.
 my %narFiles;
 my %patches;
