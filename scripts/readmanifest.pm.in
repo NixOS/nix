@@ -172,7 +172,7 @@ sub writeManifest
     print MANIFEST "  ManifestVersion: 3\n";
     print MANIFEST "}\n";
 
-    foreach my $storePath (keys %{$narFiles}) {
+    foreach my $storePath (sort (keys %{$narFiles})) {
         my $narFileList = $$narFiles{$storePath};
         foreach my $narFile (@{$narFileList}) {
             print MANIFEST "{\n";
@@ -189,7 +189,7 @@ sub writeManifest
         }
     }
     
-    foreach my $storePath (keys %{$patches}) {
+    foreach my $storePath (sort (keys %{$patches})) {
         my $patchList = $$patches{$storePath};
         foreach my $patch (@{$patchList}) {
             print MANIFEST "patch {\n";
