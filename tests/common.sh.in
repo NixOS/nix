@@ -27,6 +27,7 @@ export xmlflags="@xmlflags@"
 export xsltproc="@xsltproc@"
 
 export version=@version@
+export system=@system@
 
 export nixinstantiate=$TOP/src/nix-instantiate/nix-instantiate
 export nixstore=$TOP/src/nix-store/nix-store

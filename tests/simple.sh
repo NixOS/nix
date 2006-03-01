@@ -2,6 +2,8 @@ source common.sh
 
 drvPath=$($nixinstantiate simple.nix)
 
+test "$($nixstore -q --binding system "$drvPath")" = "$system"
+
 echo "derivation is $drvPath"
 
 outPath=$($nixstore -rvv "$drvPath")
