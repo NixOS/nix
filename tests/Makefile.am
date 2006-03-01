@@ -1,5 +1,7 @@
 TESTS_ENVIRONMENT = $(SHELL) -e
 
+extra1 = $(shell pwd)/test-tmp/shared
+
 simple.sh: simple.nix
 dependencies.sh: dependencies.nix
 locking.sh: locking.nix

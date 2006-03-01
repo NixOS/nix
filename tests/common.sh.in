@@ -24,3 +24,8 @@ export aterm_bin=@aterm_bin@
 export dot=@dot@
 
 export version=@version@
+
+export nixinstantiate=$TOP/src/nix-instantiate/nix-instantiate
+export nixstore=$TOP/src/nix-store/nix-store
+export nixenv=$TOP/src/nix-env/nix-env
+export nixhash=$TOP/src/nix-hash/nix-hash

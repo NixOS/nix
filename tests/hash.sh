@@ -2,7 +2,7 @@ source common.sh
 
 try () {
     echo -n "$2" > $TEST_ROOT/vector
-    hash=$($TOP/src/nix-hash/nix-hash $EXTRA --flat --type "$1" $TEST_ROOT/vector)
+    hash=$($nixhash $EXTRA --flat --type "$1" $TEST_ROOT/vector)
     if test "$hash" != "$3"; then
         echo "hash $1, expected $3, got $hash"
         exit 1
@@ -28,7 +28,7 @@ try sha256 "abc" "1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s"
 EXTRA=
 
 try2 () {
-    hash=$($TOP/src/nix-hash/nix-hash --type "$1" $TEST_ROOT/hash-path)
+    hash=$($nixhash --type "$1" $TEST_ROOT/hash-path)
     if test "$hash" != "$2"; then
         echo "hash $1, expected $2, got $hash"
         exit 1

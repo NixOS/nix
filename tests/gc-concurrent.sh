@@ -1,19 +1,19 @@
 source common.sh
 
-drvPath1=$($TOP/src/nix-instantiate/nix-instantiate gc-concurrent.nix)
-outPath1=$($TOP/src/nix-store/nix-store -q $drvPath1)
+drvPath1=$($nixinstantiate gc-concurrent.nix)
+outPath1=$($nixstore -q $drvPath1)
 
-drvPath2=$($TOP/src/nix-instantiate/nix-instantiate gc-concurrent2.nix)
-outPath2=$($TOP/src/nix-store/nix-store -q $drvPath2)
+drvPath2=$($nixinstantiate gc-concurrent2.nix)
+outPath2=$($nixstore -q $drvPath2)
 
 ln -s $drvPath2 "$NIX_STATE_DIR"/gcroots/foo2
 
 # Start build #1 in the background.  It starts immediately.
-$TOP/src/nix-store/nix-store -rvv "$drvPath1" &
+$nixstore -rvv "$drvPath1" &
 pid1=$!
 
 # Start build #2 in the background after 3 seconds.
-(sleep 3 && $TOP/src/nix-store/nix-store -rvv "$drvPath2") &
+(sleep 3 && $nixstore -rvv "$drvPath2") &
 pid2=$!
 
 # Run the garbage collector while the build is running.  Note: the GC

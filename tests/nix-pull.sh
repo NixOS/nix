@@ -7,7 +7,7 @@ clearStore () {
     mkdir "$NIX_STORE_DIR"
     rm -rf "$NIX_DB_DIR"
     mkdir "$NIX_DB_DIR"
-    $TOP/src/nix-store/nix-store --init
+    $nixstore --init
 }
 
 pullCache () {
@@ -18,11 +18,11 @@ pullCache () {
 clearStore
 pullCache
 
-drvPath=$($TOP/src/nix-instantiate/nix-instantiate dependencies.nix)
-outPath=$($TOP/src/nix-store/nix-store -q $drvPath)
+drvPath=$($nixinstantiate dependencies.nix)
+outPath=$($nixstore -q $drvPath)
 
 echo "building $outPath using substitutes..."
-$TOP/src/nix-store/nix-store -r $outPath
+$nixstore -r $outPath
 
 cat $outPath/input-2/bar
 
@@ -30,10 +30,10 @@ clearStore
 pullCache
 
 echo "building $drvPath using substitutes..."
-$TOP/src/nix-store/nix-store -r $drvPath
+$nixstore -r $drvPath
 
 cat $outPath/input-2/bar
 
 # Check that the derivers are set properly.
-test $($TOP/src/nix-store/nix-store -q --deriver "$outPath") = "$drvPath"
-$TOP/src/nix-store/nix-store -q --deriver $(/bin/ls -l $outPath/input-2 | sed 's/.*->\ //') | grep -q -- "-input-2.drv" 
+test $($nixstore -q --deriver "$outPath") = "$drvPath"
+$nixstore -q --deriver $(/bin/ls -l $outPath/input-2 | sed 's/.*->\ //') | grep -q -- "-input-2.drv" 

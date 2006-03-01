@@ -5,7 +5,7 @@ fail=0
 for i in lang/parse-fail-*.nix; do
     echo "parsing $i (should fail)";
     i=$(basename $i .nix)
-    if $TOP/src/nix-instantiate/nix-instantiate --parse-only - < lang/$i.nix; then
+    if $nixinstantiate --parse-only - < lang/$i.nix; then
         echo "FAIL: $i shouldn't parse"
         fail=1
     fi
@@ -14,7 +14,7 @@ done
 for i in lang/parse-okay-*.nix; do
     echo "parsing $i (should succeed)";
     i=$(basename $i .nix)
-    if ! $TOP/src/nix-instantiate/nix-instantiate --parse-only - < lang/$i.nix > lang/$i.ast; then
+    if ! $nixinstantiate --parse-only - < lang/$i.nix > lang/$i.ast; then
         echo "FAIL: $i should parse"
         fail=1
     fi
@@ -27,7 +27,7 @@ done
 for i in lang/eval-fail-*.nix; do
     echo "evaluating $i (should fail)";
     i=$(basename $i .nix)
-    if $TOP/src/nix-instantiate/nix-instantiate --eval-only - < lang/$i.nix; then
+    if $nixinstantiate --eval-only - < lang/$i.nix; then
         echo "FAIL: $i shouldn't evaluate"
         fail=1
     fi
@@ -36,7 +36,7 @@ done
 for i in lang/eval-okay-*.nix; do
     echo "evaluating $i (should succeed)";
     i=$(basename $i .nix)
-    if ! $TOP/src/nix-instantiate/nix-instantiate --eval-only - < lang/$i.nix > lang/$i.out; then
+    if ! $nixinstantiate --eval-only - < lang/$i.nix > lang/$i.out; then
         echo "FAIL: $i should evaluate"
         fail=1
     fi

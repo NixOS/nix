@@ -18,9 +18,9 @@ mkdir "$NIX_DB_DIR"
 mkdir "$NIX_CONF_DIR"
 
 mkdir $NIX_BIN_DIR
-ln -s $TOP/src/nix-store/nix-store $NIX_BIN_DIR/
-ln -s $TOP/src/nix-instantiate/nix-instantiate $NIX_BIN_DIR/
-ln -s $TOP/src/nix-hash/nix-hash $NIX_BIN_DIR/
+ln -s $nixstore $NIX_BIN_DIR/
+ln -s $nixinstantiate $NIX_BIN_DIR/
+ln -s $nixhash $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-prefetch-url $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-collect-garbage $NIX_BIN_DIR/
 mkdir $NIX_BIN_DIR/nix
@@ -66,7 +66,7 @@ chmod +x tmp
 mv tmp $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh
 
 # Initialise the database.
-$TOP/src/nix-store/nix-store --init
+$nixstore --init
 
 # Did anything happen?
 test -e "$NIX_DB_DIR"/validpaths

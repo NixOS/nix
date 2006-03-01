@@ -1,17 +1,17 @@
 source common.sh
 
-drvPath=$($TOP/src/nix-instantiate/nix-instantiate locking.nix)
+drvPath=$($nixinstantiate locking.nix)
 
 echo "derivation is $drvPath"
 
 for i in 1 2 3 4 5; do
     echo "WORKER $i"
-    $TOP/src/nix-store/nix-store -rvv "$drvPath" &
+    $nixstore -rvv "$drvPath" &
 done
 
 sleep 5
 
-outPath=$($TOP/src/nix-store/nix-store -qvvf "$drvPath")
+outPath=$($nixstore -qvvf "$drvPath")
 
 echo "output path is $outPath"
 

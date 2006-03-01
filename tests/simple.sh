@@ -1,10 +1,10 @@
 source common.sh
 
-drvPath=$($TOP/src/nix-instantiate/nix-instantiate simple.nix)
+drvPath=$($nixinstantiate simple.nix)
 
 echo "derivation is $drvPath"
 
-outPath=$($TOP/src/nix-store/nix-store -rvv "$drvPath")
+outPath=$($nixstore -rvv "$drvPath")
 
 echo "output path is $outPath"
 

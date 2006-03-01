@@ -1,7 +1,7 @@
 source common.sh
 
-drvPath=$($TOP/src/nix-instantiate/nix-instantiate dependencies.nix)
-outPath=$($TOP/src/nix-store/nix-store -rvv "$drvPath")
+drvPath=$($nixinstantiate dependencies.nix)
+outPath=$($nixstore -rvv "$drvPath")
 
 # Set a GC root.
 ln -s $outPath "$NIX_STATE_DIR"/gcroots/foo
