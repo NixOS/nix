@@ -35,6 +35,7 @@ try2 () {
     fi
 }
 
+rm -rf $TEST_ROOT/hash-path
 mkdir $TEST_ROOT/hash-path
 echo "Hello World" > $TEST_ROOT/hash-path/hello
 
@@ -53,3 +54,9 @@ try2 md5 "20f3ffe011d4cfa7d72bfabef7882836"
 rm $TEST_ROOT/hash-path/hello
 ln -s x $TEST_ROOT/hash-path/hello
 try2 md5 "f78b733a68f5edbdf9413899339eaa4a"
+
+# Conversion.
+test $($nixhash --type sha256 --to-base32 "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad") = "1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s"
+test $($nixhash --type sha256 --to-base16 "1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s") = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+test $($nixhash --type sha1 --to-base32 "800d59cfcd3c05e900cb4e214be48f6b886a08df") = "vw46m23bizj4n8afrc0fj19wrp7mj3c0"
+test $($nixhash --type sha1 --to-base16 "vw46m23bizj4n8afrc0fj19wrp7mj3c0") = "800d59cfcd3c05e900cb4e214be48f6b886a08df"
