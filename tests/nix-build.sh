@@ -6,7 +6,9 @@ $nixstore --gc
 test "$(cat $TEST_ROOT/result/foobar)" = FOOBAR
 
 # The result should be retained by a GC.
-target=$(ls -l $TEST_ROOT/result | sed 's/.*->\ //')
+echo A
+target=$(readLink $TEST_ROOT/result)
+echo B
 echo target is $target
 $nixstore --gc
 test -e $target/foobar

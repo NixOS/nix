@@ -36,6 +36,6 @@ cat $outPath/input-2/bar
 
 # Check that the derivers are set properly.
 test $($nixstore -q --deriver "$outPath") = "$drvPath"
-$nixstore -q --deriver $(ls -l $outPath/input-2 | sed 's/.*->\ //') | grep -q -- "-input-2.drv" 
+$nixstore -q --deriver $(readLink $outPath/input-2) | grep -q -- "-input-2.drv" 
 
 $nixstore --clear-substitutes

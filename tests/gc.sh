@@ -12,6 +12,15 @@ $nixstore --gc --print-live | grep $outPath
 $nixstore --gc --print-dead | grep $drvPath
 if $nixstore --gc --print-dead | grep $outPath; then false; fi
 
+$nixstore --gc --print-dead
+
+inUse=$(readLink $outPath/input-2)
+if $nixstore --delete $inUse; then false; fi
+test -e $inUse
+
+if $nixstore --delete $outPath; then false; fi
+test -e $outPath
+
 $NIX_BIN_DIR/nix-collect-garbage
 
 # Check that the root and its dependencies haven't been deleted.
