@@ -2,7 +2,9 @@
 
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
 
-  <xsl:output method='html' />
+  <xsl:output method='html' encoding="UTF-8"
+              doctype-public="-//W3C//DTD HTML 4.01//EN"
+              doctype-system="http://www.w3.org/TR/html4/strict.dtd" />
 
   <xsl:template match="logfile">
     <html>
@@ -37,22 +39,27 @@
     
     <script type='text/javascript'>showTreeToggle(<xsl:value-of select="$collapsed"/>)</script>
     <xsl:apply-templates select='head'/>
-    
-    <ul class='nesting' style="{$style}">
-      <xsl:for-each select='line|nest'>
 
-        <!-- Is this the last line?  If so, mark it as such so that it
-             can be rendered differently. -->
-        <xsl:variable  name="class"><xsl:choose><xsl:when test="position() != last()">line</xsl:when><xsl:otherwise>lastline</xsl:otherwise></xsl:choose></xsl:variable>
+    <!-- Be careful to only generate <ul>s if there are <li>s, otherwise it’s malformed. -->
+    <xsl:if test="line|nest">
+      
+      <ul class='nesting' style="{$style}">
+        <xsl:for-each select='line|nest'>
+
+          <!-- Is this the last line?  If so, mark it as such so that it
+               can be rendered differently. -->
+          <xsl:variable  name="class"><xsl:choose><xsl:when test="position() != last()">line</xsl:when><xsl:otherwise>lastline</xsl:otherwise></xsl:choose></xsl:variable>
         
-        <li class='{$class}'>
-          <span class='lineconn' />
-          <span class='linebody'>
-            <xsl:apply-templates select='.'/>
-          </span>
-        </li>
-      </xsl:for-each>
-    </ul>
+          <li class='{$class}'>
+            <span class='lineconn' />
+            <span class='linebody'>
+              <xsl:apply-templates select='.'/>
+            </span>
+          </li>
+        </xsl:for-each>
+      </ul>
+    </xsl:if>
+    
   </xsl:template>
 
   
