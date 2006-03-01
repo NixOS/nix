@@ -5,11 +5,15 @@
 #include <list>
 #include <map>
 
-#include <db_cxx.h>
-
 #include "util.hh"
 
 using namespace std;
+
+
+/* Defined externally. */
+class DbTxn;
+class DbEnv;
+class Db;
 
 
 class Database;

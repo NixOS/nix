@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "dotgraph.hh"
 #include "build.hh"
 

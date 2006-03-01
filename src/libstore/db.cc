@@ -5,6 +5,8 @@
 
 #include <memory>
 
+#include <db_cxx.h>
+
 #include "db.hh"
 #include "util.hh"
 #include "pathlocks.hh"

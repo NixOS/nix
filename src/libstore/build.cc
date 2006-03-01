@@ -1,4 +1,5 @@
 #include <map>
+#include <iostream>
 #include <sstream>
 #include <boost/shared_ptr.hpp>
 #include <boost/weak_ptr.hpp>
@@ -922,7 +923,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
                 (worker.canBuildMore() ? (string) "1" : "0").c_str(),
                 thisSystem.c_str(),
                 drv.platform.c_str(),
-                drvPath.c_str(), 0);
+                drvPath.c_str(), NULL);
             
             throw SysError(format("executing `%1%'") % buildHook);
             
