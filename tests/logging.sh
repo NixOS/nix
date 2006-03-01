@@ -9,12 +9,12 @@ $nixstore --log-type escapes -r -vv $($nixinstantiate dependencies.nix) 2> $TEST
 $TOP/src/nix-log2xml/nix-log2xml < $TEST_ROOT/log.esc > $TEST_ROOT/log.xml
 
 # Is this well-formed XML?
-if test -n "$xmllint"; then
+if test "$xmllint" != "false"; then
     $xmllint $xmlflags --noout $TEST_ROOT/log.xml
 fi
 
 # Convert to HTML.
-if test -n "$xsltproc"; then
+if test "$xsltproc" != "false"; then
     (cd $TOP/src/nix-log2xml && $xsltproc mark-errors.xsl - | $xsltproc log2html.xsl -) < $TEST_ROOT/log.xml > $TEST_ROOT/log.html
     # Ideally we would check that the generated HTML is valid...
 
