@@ -136,6 +136,13 @@ void initDB()
 }
 
 
+void closeDB()
+{
+    /* If the database isn't open, this is a NOP. */
+    nixDB.close();
+}
+
+
 void createStoreTransaction(Transaction & txn)
 {
     Transaction txn2(nixDB);

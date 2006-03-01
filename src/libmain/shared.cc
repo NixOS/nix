@@ -14,6 +14,7 @@ extern "C" {
 
 #include "globals.hh"
 #include "gc.hh"
+#include "store.hh"
 #include "shared.hh"
 
 #include "config.h"
@@ -213,6 +214,8 @@ static void initAndRun(int argc, char * * argv)
     RemoveTempRoots removeTempRoots; /* unused variable - don't remove */
 
     run(remaining);
+
+    closeDB(); /* it's fine if the DB isn't actually open */
 }
 
 

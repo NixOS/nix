@@ -49,6 +49,9 @@ void openDB(bool reserveSpace = true);
 /* Create the required database tables. */
 void initDB();
 
+/* Close the database. */
+void closeDB();
+
 /* Get a transaction object. */
 void createStoreTransaction(Transaction & txn);
 

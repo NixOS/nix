@@ -278,6 +278,8 @@ void Database::close()
     } catch (DbException e) { rethrow(e); }
 
     delete env;
+
+    env = 0;
 }
 
 
