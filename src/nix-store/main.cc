@@ -532,7 +532,7 @@ static void opGC(Strings opFlags, Strings opArgs)
    roots). */
 static void opDelete(Strings opFlags, Strings opArgs)
 {
-    bool ignoreLiveness;
+    bool ignoreLiveness = false;
     
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
