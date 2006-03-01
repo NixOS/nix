@@ -1,3 +1,5 @@
+source common.sh
+
 drvPath1=$($TOP/src/nix-instantiate/nix-instantiate gc-concurrent.nix)
 outPath1=$($TOP/src/nix-store/nix-store -q $drvPath1)
 

@@ -1,3 +1,5 @@
+source common.sh
+
 max=5000
 
 reference=$NIX_STORE_DIR/abcdef

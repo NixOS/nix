@@ -1,3 +1,5 @@
+source common.sh
+
 # Instantiate.
 drvPath=$($TOP/src/nix-instantiate/nix-instantiate substitutes2.nix)
 echo "derivation is $drvPath"

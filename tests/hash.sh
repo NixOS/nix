@@ -1,3 +1,5 @@
+source common.sh
+
 try () {
     echo -n "$2" > $TEST_ROOT/vector
     hash=$($TOP/src/nix-hash/nix-hash $EXTRA --flat --type "$1" $TEST_ROOT/vector)

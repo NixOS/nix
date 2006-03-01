@@ -16,6 +16,8 @@
 	 -e "s^@perl\@^$(perl)^g" \
 	 -e "s^@coreutils\@^$(coreutils)^g" \
 	 -e "s^@tar\@^$(tar)^g" \
+	 -e "s^@dot\@^$(dot)^g" \
+	 -e "s^@aterm_bin\@^$(aterm_bin)^g" \
 	 -e "s^@version\@^$(VERSION)^g" \
 	 < $< > $@ || rm $@
 	if test -x $<; then chmod +x $@; fi

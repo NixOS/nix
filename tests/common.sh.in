@@ -1,0 +1,26 @@
+set -e
+
+export TEST_ROOT=$(pwd)/test-tmp
+export NIX_STORE_DIR=$TEST_ROOT/store
+export NIX_DATA_DIR=$TEST_ROOT/data
+export NIX_LOCALSTATE_DIR=$TEST_ROOT/var
+export NIX_LOG_DIR=$TEST_ROOT/var/log/nix
+export NIX_STATE_DIR=$TEST_ROOT/var/nix
+export NIX_DB_DIR=$TEST_ROOT/db
+export NIX_CONF_DIR=$TEST_ROOT/etc
+export NIX_BIN_DIR=$TEST_ROOT/bin
+export NIX_LIBEXEC_DIR=$TEST_ROOT/bin
+export SHARED=$TEST_ROOT/shared
+
+export REAL_BIN_DIR=@bindir@
+export REAL_LIBEXEC_DIR=@libexecdir@
+export REAL_LOCALSTATE_DIR=@localstatedir@
+export REAL_DATA_DIR=@datadir@
+export REAL_STORE_DIR=@storedir@
+export NIX_BUILD_HOOK=
+export PERL=perl
+export TOP=$(pwd)/..
+export aterm_bin=@aterm_bin@
+export dot=@dot@
+
+export version=@version@

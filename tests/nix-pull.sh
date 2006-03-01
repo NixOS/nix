@@ -1,3 +1,5 @@
+source common.sh
+
 clearStore () {
     echo "clearing store..."
     chmod -R +w "$NIX_STORE_DIR"

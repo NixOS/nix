@@ -1,3 +1,5 @@
+source common.sh
+
 nixenv=$TOP/src/nix-env/nix-env
 profiles="$NIX_STATE_DIR"/profiles
 

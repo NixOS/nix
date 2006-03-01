@@ -1,3 +1,5 @@
+source common.sh
+
 fail=0
 
 for i in lang/parse-fail-*.nix; do
