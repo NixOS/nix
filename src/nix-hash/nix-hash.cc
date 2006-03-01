@@ -17,7 +17,10 @@ void run(Strings args)
     bool flat = false;
     bool base32 = false;
     bool truncate = false;
-    
+    enum { opHash, opTo32, opTo16 } op = opHash;
+
+    Strings ss;
+
     for (Strings::iterator i = args.begin();
          i != args.end(); i++)
     {
@@ -31,11 +34,25 @@ void run(Strings args)
             if (ht == htUnknown)
                 throw UsageError(format("unknown hash type `%1%'") % *i);
         }
-        else {
+        else if (*i == "--to-base16") op = opTo16;
+        else if (*i == "--to-base32") op = opTo32;
+        else ss.push_back(*i);
+    }
+
+    if (op == opHash) {
+        for (Strings::iterator i = ss.begin(); i != ss.end(); ++i) {
             Hash h = flat ? hashFile(ht, *i) : hashPath(ht, *i);
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
             cout << format("%1%\n") %
                 (base32 ? printHash32(h) : printHash(h));
+        }
+    }
+
+    else {
+        for (Strings::iterator i = ss.begin(); i != ss.end(); ++i) {
+            Hash h = op == opTo16 ? parseHash32(ht, *i) : parseHash(ht, *i);
+            cout << format("%1%\n") %
+                (op == opTo16 ? printHash(h) : printHash32(h));
         }
     }
 }
