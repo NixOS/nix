@@ -13,10 +13,10 @@ fallback.sh: fallback.nix
 gc-concurrent.sh: gc-concurrent.nix gc-concurrent2.nix
 user-envs.sh: user-envs.nix
 
-TESTS = init.sh hash.sh lang.sh simple.sh dependencies.sh locking.sh parallel.sh \
-  build-hook.sh substitutes.sh substitutes2.sh fallback.sh nix-push.sh gc.sh \
-  gc-concurrent.sh verify.sh nix-pull.sh referrers.sh user-envs.sh \
-  logging.sh nix-build.sh misc.sh
+TESTS = init.sh hash.sh lang.sh add.sh simple.sh dependencies.sh \
+  locking.sh parallel.sh build-hook.sh substitutes.sh substitutes2.sh \
+  fallback.sh nix-push.sh gc.sh gc-concurrent.sh verify.sh nix-pull.sh \
+  referrers.sh user-envs.sh logging.sh nix-build.sh misc.sh
 
 XFAIL_TESTS =
 
