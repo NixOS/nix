@@ -178,7 +178,7 @@ Hash parseHash32(HashType ht, const string & s)
     for (unsigned int i = 0; i < s.length(); ++i) {
         char c = s[i];
         unsigned char digit;
-        for (digit = 0; digit < sizeof(chars); ++digit) /* !!! slow */
+        for (digit = 0; digit < base32Chars.size(); ++digit) /* !!! slow */
             if (chars[digit] == c) break;
         if (digit >= 32)
             throw Error(format("invalid base-32 hash `%1%'") % s);
