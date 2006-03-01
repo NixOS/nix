@@ -23,6 +23,7 @@ ln -s $nixinstantiate $NIX_BIN_DIR/
 ln -s $nixhash $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-prefetch-url $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-collect-garbage $NIX_BIN_DIR/
+ln -s $TOP/scripts/nix-build $NIX_BIN_DIR/
 mkdir $NIX_BIN_DIR/nix
 ln -s $TOP/scripts/download-using-manifests.pl $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/readmanifest.pm $NIX_BIN_DIR/nix/
@@ -48,6 +49,7 @@ for i in \
     $NIX_BIN_DIR/nix/download-using-manifests.pl \
     $NIX_BIN_DIR/nix-prefetch-url \
     $NIX_BIN_DIR/nix-collect-garbage \
+    $NIX_BIN_DIR/nix-build \
     ; do
     echo "$REAL_BIN_DIR"
     sed < $i > $i.tmp \

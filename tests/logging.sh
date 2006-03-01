@@ -1,7 +1,6 @@
 source common.sh
 
 $nixstore --gc
-$nixstore --clear-substitutes
 
 # Produce an escaped log file.
 $nixstore --log-type escapes -r -vv $($nixinstantiate dependencies.nix) 2> $TEST_ROOT/log.esc
