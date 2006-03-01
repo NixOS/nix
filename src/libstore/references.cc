@@ -78,7 +78,7 @@ void checkPath(const string & path,
 
         search(string((char *) buf, st.st_size), ids, seen);
         
-        delete buf; /* !!! autodelete */
+        delete[] buf; /* !!! autodelete */
     }
     
     else if (S_ISLNK(st.st_mode))
