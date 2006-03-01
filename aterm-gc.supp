@@ -128,3 +128,57 @@
    fun:mark_memory
    fun:mark_phase
 }
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Value4
+   fun:AT_markTerm
+   fun:mark_memory
+   fun:mark_phase
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Cond
+   fun:mark_phase_young
+   fun:AT_collect_minor
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Value4
+   fun:mark_phase_young
+   fun:AT_collect_minor
+}
+
+{
+   <insert a suppression name here>
+   Memcheck:Cond
+   fun:AT_isValidSymbol
+   fun:mark_phase_young
+   fun:AT_collect_minor
+}
+
+{
+   <insert a suppression name here>
+   Memcheck:Value4
+   fun:AT_isValidSymbol
+   fun:mark_phase_young
+   fun:AT_collect_minor
+}
+
+{
+   <insert a suppression name here>
+   Memcheck:Value4
+   fun:AT_isInsideValidTerm
+   fun:mark_phase_young
+   fun:AT_collect_minor
+}
+
+{
+   <insert a suppression name here>
+   Memcheck:Cond
+   fun:AT_isInsideValidTerm
+   fun:mark_phase_young
+   fun:AT_collect_minor
+}
