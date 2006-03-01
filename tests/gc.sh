@@ -4,7 +4,8 @@ drvPath=$($nixinstantiate dependencies.nix)
 outPath=$($nixstore -rvv "$drvPath")
 
 # Set a GC root.
-ln -s $outPath "$NIX_STATE_DIR"/gcroots/foo
+rm -f "$NIX_STATE_DIR"/gcroots/foo
+ln -sf $outPath "$NIX_STATE_DIR"/gcroots/foo
 
 $NIX_BIN_DIR/nix-collect-garbage
 
@@ -14,3 +15,5 @@ cat $outPath/input-2/bar
 
 # Check that the derivation has been GC'd.
 if cat $drvPath > /dev/null; then false; fi
+
+rm "$NIX_STATE_DIR"/gcroots/foo

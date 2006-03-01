@@ -6,7 +6,8 @@ outPath1=$($nixstore -q $drvPath1)
 drvPath2=$($nixinstantiate gc-concurrent2.nix)
 outPath2=$($nixstore -q $drvPath2)
 
-ln -s $drvPath2 "$NIX_STATE_DIR"/gcroots/foo2
+rm -f "$NIX_STATE_DIR"/gcroots/foo
+ln -s $drvPath2 "$NIX_STATE_DIR"/gcroots/foo
 
 # Start build #1 in the background.  It starts immediately.
 $nixstore -rvv "$drvPath1" &
@@ -35,3 +36,5 @@ cat $outPath1/input-2/bar
 
 # Build #2 should have failed because its derivation got garbage collected.
 cat $outPath2/foobar
+
+rm "$NIX_STATE_DIR"/gcroots/foo

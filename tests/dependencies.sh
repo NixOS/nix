@@ -4,7 +4,7 @@ drvPath=$($nixinstantiate dependencies.nix)
 
 echo "derivation is $drvPath"
 
-$TOP/src/nix-store/nix-store -q --tree "$drvPath" | grep '   +---.*builder1.sh'
+$nixstore -q --tree "$drvPath" | grep '   +---.*builder1.sh'
 
 # Test Graphviz graph generation.
 $nixstore -q --graph "$drvPath" > $TEST_ROOT/graph
