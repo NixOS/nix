@@ -10,4 +10,4 @@ hash=$($nixstore -q --hash $path)
 
 echo $hash
 
-test "$hash" = "sha256:$(nix-hash --type sha256 --base32 $file)"
+test "$hash" = "sha256:$($nixhash --type sha256 --base32 $file)"
