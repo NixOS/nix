@@ -130,36 +130,6 @@ Database::~Database()
 }
 
 
-int getAccessorCount(int fd)
-{
-    if (lseek(fd, 0, SEEK_SET) == -1)
-        throw SysError("seeking accessor count");
-    char buf[128];
-    int len;
-    if ((len = read(fd, buf, sizeof(buf) - 1)) == -1)
-        throw SysError("reading accessor count");
-    buf[len] = 0;
-    int count;
-    if (sscanf(buf, "%d", &count) != 1) {
-        debug(format("accessor count is invalid: `%1%'") % buf);
-        return -1;
-    }
-    return count;
-}
-
-
-void setAccessorCount(int fd, int n)
-{
-    if (lseek(fd, 0, SEEK_SET) == -1)
-        throw SysError("seeking accessor count");
-    string s = (format("%1%") % n).str();
-    const char * s2 = s.c_str();
-    if (write(fd, s2, strlen(s2)) != (ssize_t) strlen(s2) ||
-        ftruncate(fd, strlen(s2)) != 0)
-        throw SysError("writing accessor count");
-}
-
-
 void openEnv(DbEnv * & env, const string & path, u_int32_t flags)
 {
     try {
