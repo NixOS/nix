@@ -22,7 +22,8 @@ export PERL=perl
 export TOP=$(pwd)/..
 export aterm_bin=@aterm_bin@
 export dot=@dot@
-export xmllint="@xmllint@ @xmlflags@"
+export xmllint="@xmllint@"
+export xmlflags="@xmlflags@"
 export xsltproc="@xsltproc@"
 
 export version=@version@

@@ -10,7 +10,7 @@ $TOP/src/nix-log2xml/nix-log2xml < $TEST_ROOT/log.esc > $TEST_ROOT/log.xml
 
 # Is this well-formed XML?
 if test -n "$xmllint"; then
-    $xmllint --noout $TEST_ROOT/log.xml
+    $xmllint $xmlflags --noout $TEST_ROOT/log.xml
 fi
 
 # Convert to HTML.
