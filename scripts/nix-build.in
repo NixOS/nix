@@ -28,8 +28,22 @@ for (my $n = 0; $n < scalar @ARGV; $n++) {
     my $arg = $ARGV[$n];
 
     if ($arg eq "--help") {
-        print STDERR "Usage: nix-build [OPTION]... [FILE]...\n";
+        print STDERR <<EOF;
+Usage: nix-build [OPTION]... [FILE]...
+
+`nix-build' builds the given Nix expressions (which
+default to ./default.nix if none are given).  A symlink called
+`result' is placed in the current directory.
+
+Flags:
+  --add-drv-link: create a symlink `derivation' to the store derivation
+  --no-out-link: do not create the `result' symlink
+  --attr ATTR: select a specific attribution from the Nix expression
+
+Any additional flags are passed to `nix-store'.
+EOF
         exit 0;
+        # ' hack
     }
 
     elsif ($arg eq "--add-drv-link") {
