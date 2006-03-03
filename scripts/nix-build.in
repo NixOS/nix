@@ -1,78 +1,87 @@
-#! @shell@ -e
+#! @perl@ -w -I@libexecdir@/nix
 
-nixExpr=$1
-
-extraArgs=
-extraInstArgs=
-addDrvLink=0
-addOutLink=1
+use strict;
 
 
-trap 'rm -f ./.nix-build-tmp-*' EXIT
+my $addDrvLink = 0;
+my $addOutLink = 1;
+
+my @instArgs = ();
+my @buildArgs = ();
+my @exprs = ();
 
 
-# Process the arguments.
-args=("$@")
-for ((i = 0; i < ${#args[*]}; )); do
-    arg=${args[$i]}
-    i=$((i + 1))
-    case "$arg" in
+END {
+    foreach my $fn (glob ".nix-build-tmp-*") {
+        unlink $fn;
+    }
+}
 
-        --help)
-            echo "syntax: $0 [NIX-EXPR...]" >&2
-            exit 0
-            ;;
+sub intHandler {
+    exit 1;
+}
 
-        --add-drv-link)
-            addDrvLink=1
-            ;;
-            
-        --no-link)
-            addOutLink=0
-            ;;
+$SIG{'INT'} = 'intHandler';
 
-        --attr|-A)
-            arg2=${args[$i]}
-            i=$((i + 1))
-            extraInstArgs="$extraInstArgs $arg $arg2"
-            ;;
-            
-        -*)
-            extraArgs="$extraArgs $arg"
-            ;;
-            
-        *)
-            exprs="$exprs $arg"
-            ;;
-    esac
-done
 
-if test -z "$exprs"; then
-    exprs="./default.nix"
-fi
+for (my $n = 0; $n < scalar @ARGV; $n++) {
+    my $arg = $ARGV[$n];
 
-# Process the specified Nix expressions.
-for i in $exprs; do
+    if ($arg eq "--help") {
+        print STDERR "Usage: nix-build [OPTION]... [FILE]...\n";
+        exit 0;
+    }
 
-    # Instantiate the Nix expression.
-    prefix=
-    if test "$addDrvLink" = 0; then prefix=.nix-build-tmp-; fi
-    storeExprs=$(@bindir@/nix-instantiate \
-        --add-root ./${prefix}derivation --indirect \
-        $extraInstArgs "$i")
-                
-    for j in $storeExprs; do
-        echo "store expression is $(readlink "$j")" >&2
-    done
+    elsif ($arg eq "--add-drv-link") {
+        $addDrvLink = 1;
+    }
 
-    # Build the resulting store derivation.
-    prefix=
-    if test "$addOutLink" = 0; then prefix=.nix-build-tmp-; fi
-    outPaths=$(@bindir@/nix-store \
-        --add-root ./${prefix}result --indirect \
-        -rv $extraArgs $storeExprs)
-                
-    for j in $outPaths; do
-        echo "$(readlink "$j")"
-    done
-done            
+    elsif ($arg eq "--no-out-link" or $arg eq "--no-link") {
+        $addOutLink = 1;
+    }
+
+    elsif ($arg eq "--attr" or $arg eq "-A") {
+        $n++;
+        die "$0: `--attr' requires an argument\n" unless $n < scalar @ARGV;
+        push @instArgs, ("--attr", $ARGV[$n]);
+    }
+
+    elsif (substr($arg, 0, 1) eq "-") {
+        push @buildArgs, $arg;
+    }
+
+    else {
+        push @exprs, $arg;
+    }
+}
+
+@exprs = ("./default.nix") if scalar @exprs == 0;
+
+
+foreach my $expr (@exprs) {
+
+    # Instantiate.
+    my $prefix = "";
+    $prefix = ".nix-build-tmp-" if !$addDrvLink;
+
+    my $drvPaths = `@bindir@/nix-instantiate --add-root ./${prefix}derivation --indirect @instArgs "$expr"`;
+    my @drvPaths = split ' ', $drvPaths;
+
+    foreach my $drvPath (@drvPaths) {
+        my $target = readlink $drvPath;
+        print STDERR "store derivation is $target\n";
+    }
+
+    # Build.
+    $prefix = "";
+    $prefix = ".nix-build-tmp-" if !$addOutLink;
+
+    my $outPaths = `@bindir@/nix-store --add-root ./${prefix}result --indirect -rv @buildArgs @drvPaths`;
+    my @outPaths = split ' ', $outPaths;
+    
+    foreach my $outPath (@outPaths) {
+        my $target = readlink $outPath;
+        print "$target\n";
+    }
+
+}
