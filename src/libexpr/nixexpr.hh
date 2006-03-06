@@ -29,7 +29,7 @@ public:
     ATermMap(const ATermMap & map);
     ~ATermMap();
 
-    ATermMap & ATermMap::operator = (const ATermMap & map);
+    ATermMap & operator = (const ATermMap & map);
         
     void set(ATerm key, ATerm value);
     void set(const string & key, ATerm value);
