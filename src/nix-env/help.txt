@@ -1,4 +1,4 @@
-nix-env [OPTIONS...] [ARGUMENTS...]
+Usage: nix-env [OPTIONS...] [ARGUMENTS...]
 
 `nix-env' is a tool to manipulate Nix user environments.
 

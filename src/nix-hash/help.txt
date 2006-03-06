@@ -1,4 +1,4 @@
-nix-hash [OPTIONS...] [FILES...]
+Usage: nix-hash [OPTIONS...] [FILES...]
 
 `nix-hash' computes and prints cryptographic hashes for the specified
 files.

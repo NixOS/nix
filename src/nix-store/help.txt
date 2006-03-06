@@ -1,4 +1,4 @@
-nix-store [OPTIONS...] [ARGUMENTS...]
+Usage: nix-store [OPTIONS...] [ARGUMENTS...]
 
 `nix-store' is a tool to manipulate the Nix store.
 

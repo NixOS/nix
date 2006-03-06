@@ -1,4 +1,4 @@
-nix-instantiate [OPTIONS...] [FILES...]
+Usage: nix-instantiate [OPTIONS...] [FILES...]
 
 `nix-instantiate' turns Nix expressions into store derivations. 
 
