@@ -17,6 +17,7 @@
 #include "build.hh"
 #include "references.hh"
 #include "pathlocks.hh"
+#include "misc.hh"
 #include "globals.hh"
 #include "gc.hh"
 

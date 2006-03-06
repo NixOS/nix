@@ -1,6 +1,6 @@
 #include "globals.hh"
 #include "gc.hh"
-#include "build.hh"
+#include "misc.hh"
 #include "pathlocks.hh"
 
 #include <boost/shared_ptr.hpp>

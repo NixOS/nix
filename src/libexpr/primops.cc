@@ -1,6 +1,7 @@
 #include <algorithm>
 
 #include "build.hh"
+#include "misc.hh"
 #include "eval.hh"
 #include "globals.hh"
 #include "nixexpr-ast.hh"

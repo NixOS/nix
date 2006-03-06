@@ -2,7 +2,8 @@ lib_LTLIBRARIES = libstore.la
 
 libstore_la_SOURCES = \
  store.cc store.hh derivations.cc derivations.hh \
- build.cc misc.cc build.hh \
+ build.cc build.hh \
+ misc.cc misc.hh \
  globals.cc globals.hh db.cc db.hh \
  references.cc references.hh pathlocks.cc pathlocks.hh \
  gc.cc gc.hh derivations-ast.hh

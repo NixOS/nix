@@ -2,6 +2,7 @@
 #include "names.hh"
 #include "globals.hh"
 #include "build.hh"
+#include "misc.hh"
 #include "gc.hh"
 #include "shared.hh"
 #include "parser.hh"
@@ -383,6 +384,33 @@ static void queryInstSources(EvalState & state,
 }
 
 
+static void printMissing(EvalState & state, const DrvInfos & elems)
+{
+    PathSet targets, willBuild, willSubstitute;
+    for (DrvInfos::const_iterator i = elems.begin(); i != elems.end(); ++i) {
+        Path drvPath = i->queryDrvPath(state);
+        if (drvPath != "")
+            targets.insert(drvPath);
+        else
+            targets.insert(i->queryOutPath(state));
+    }
+
+    queryMissing(targets, willBuild, willSubstitute);
+
+    if (!willBuild.empty()) {
+        printMsg(lvlInfo, format("the following derivations will be built:"));
+        for (PathSet::iterator i = willBuild.begin(); i != willBuild.end(); ++i)
+            printMsg(lvlInfo, format("  %1%") % *i);
+    }
+
+    if (!willSubstitute.empty()) {
+        printMsg(lvlInfo, format("the following paths will be substituted:"));
+        for (PathSet::iterator i = willSubstitute.begin(); i != willSubstitute.end(); ++i)
+            printMsg(lvlInfo, format("  %1%") % *i);
+    }
+}
+
+
 static void installDerivations(Globals & globals,
     const Strings & args, const Path & profile)
 {
@@ -417,7 +445,10 @@ static void installDerivations(Globals & globals,
         printMsg(lvlInfo,
             format("installing `%1%'") % i->name);
         
-    if (globals.dryRun) return;
+    if (globals.dryRun) {
+        printMissing(globals.state, newElems);
+        return;
+    }
 
     createUserEnv(globals.state, allElems,
         profile, globals.keepDerivations);
@@ -500,7 +531,10 @@ static void upgradeDerivations(Globals & globals,
         } else newElems.push_back(*i);
     }
     
-    if (globals.dryRun) return;
+    if (globals.dryRun) {
+        printMissing(globals.state, newElems);
+        return;
+    }
 
     createUserEnv(globals.state, newElems,
         profile, globals.keepDerivations);

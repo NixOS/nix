@@ -3,6 +3,7 @@
 
 #include "globals.hh"
 #include "build.hh"
+#include "misc.hh"
 #include "gc.hh"
 #include "archive.hh"
 #include "shared.hh"
