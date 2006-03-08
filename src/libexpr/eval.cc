@@ -383,7 +383,13 @@ Expr evalExpr(EvalState & state, Expr e)
 
     /* Otherwise, evaluate and memoize. */
     state.normalForms.set(e, state.blackHole);
-    nf = evalExpr2(state, e);
+    try {
+        nf = evalExpr2(state, e);
+    } catch (Error & err) {
+        debug("removing black hole");
+        state.normalForms.remove(e);
+        throw;
+    }
     state.normalForms.set(e, nf);
     return nf;
 }

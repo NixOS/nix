@@ -762,47 +762,53 @@ static void opQuery(Globals & globals,
     for (vector<DrvInfo>::iterator i = elems2.begin();
          i != elems2.end(); ++i)
     {
-        Strings columns;
+        try {
+            
+            Strings columns;
         
-        if (printStatus) {
-            Substitutes subs = querySubstitutes(noTxn, i->queryOutPath(globals.state));
-            columns.push_back(
-                (string) (installed.find(i->queryOutPath(globals.state))
-                    != installed.end() ? "I" : "-")
-                + (isValidPath(i->queryOutPath(globals.state)) ? "P" : "-")
-                + (subs.size() > 0 ? "S" : "-"));
-        }
-
-        if (printName) columns.push_back(i->name);
-
-        if (compareVersions) {
-            /* Compare this element against the versions of the same
-               named packages in either the set of available elements,
-               or the set of installed elements.  !!! This is O(N *
-               M), should be O(N * lg M). */
-            string version;
-            VersionDiff diff = compareVersionAgainstSet(*i, otherElems, version);
-            char ch;
-            switch (diff) {
-                case cvLess: ch = '>'; break;
-                case cvEqual: ch = '='; break;
-                case cvGreater: ch = '<'; break;
-                case cvUnavail: ch = '-'; break;
-                default: abort();
+            if (printStatus) {
+                Substitutes subs = querySubstitutes(noTxn, i->queryOutPath(globals.state));
+                columns.push_back(
+                    (string) (installed.find(i->queryOutPath(globals.state))
+                        != installed.end() ? "I" : "-")
+                    + (isValidPath(i->queryOutPath(globals.state)) ? "P" : "-")
+                    + (subs.size() > 0 ? "S" : "-"));
             }
-            string column = (string) "" + ch + " " + version;
-            if (diff == cvGreater) column = colorString(column);
-            columns.push_back(column);
-        }
 
-        if (printSystem) columns.push_back(i->system);
+            if (printName) columns.push_back(i->name);
 
-        if (printDrvPath) columns.push_back(
-            i->queryDrvPath(globals.state) == ""
-            ? "-" : i->queryDrvPath(globals.state));
+            if (compareVersions) {
+                /* Compare this element against the versions of the
+                   same named packages in either the set of available
+                   elements, or the set of installed elements.  !!!
+                   This is O(N * M), should be O(N * lg M). */
+                string version;
+                VersionDiff diff = compareVersionAgainstSet(*i, otherElems, version);
+                char ch;
+                switch (diff) {
+                    case cvLess: ch = '>'; break;
+                    case cvEqual: ch = '='; break;
+                    case cvGreater: ch = '<'; break;
+                    case cvUnavail: ch = '-'; break;
+                    default: abort();
+                }
+                string column = (string) "" + ch + " " + version;
+                if (diff == cvGreater) column = colorString(column);
+                columns.push_back(column);
+            }
+
+            if (printSystem) columns.push_back(i->system);
+
+            if (printDrvPath) columns.push_back(
+                i->queryDrvPath(globals.state) == ""
+                ? "-" : i->queryDrvPath(globals.state));
         
-        if (printOutPath) columns.push_back(i->queryOutPath(globals.state));
-        table.push_back(columns);
+            if (printOutPath) columns.push_back(i->queryOutPath(globals.state));
+            
+            table.push_back(columns);
+        }
+        catch (AssertionError & e) {
+        }
     }
 
     printTable(table);

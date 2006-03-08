@@ -5,40 +5,51 @@
 typedef set<Expr> Exprs;
 
 
+/* Evaluate expression `e'.  If it evaluates to an attribute set of
+   type `derivation', then put information about it in `drvs' (unless
+   it's already in `doneExprs').  The result boolean indicates whether
+   it makes sense for the caller to recursively search for derivations
+   in `e'. */
 static bool getDerivation(EvalState & state, Expr e,
     DrvInfos & drvs, Exprs & doneExprs)
 {
-    ATermList es;
-    e = evalExpr(state, e);
-    if (!matchAttrs(e, es)) return false;
+    try {
+        
+        ATermList es;
+        e = evalExpr(state, e);
+        if (!matchAttrs(e, es)) return true;
 
-    ATermMap attrs;
-    queryAllAttrs(e, attrs, false);
+        ATermMap attrs;
+        queryAllAttrs(e, attrs, false);
     
-    Expr a = attrs.get("type");
-    if (!a || evalString(state, a) != "derivation") return false;
+        Expr a = attrs.get("type");
+        if (!a || evalString(state, a) != "derivation") return true;
 
-    /* Remove spurious duplicates (e.g., an attribute set like `rec {
-       x = derivation {...}; y = x;}'. */
-    if (doneExprs.find(e) != doneExprs.end()) return true;
-    doneExprs.insert(e);
+        /* Remove spurious duplicates (e.g., an attribute set like
+           `rec { x = derivation {...}; y = x;}'. */
+        if (doneExprs.find(e) != doneExprs.end()) return false;
+        doneExprs.insert(e);
 
-    DrvInfo drv;
+        DrvInfo drv;
     
-    a = attrs.get("name");
-    if (!a) throw badTerm("derivation name missing", e);
-    drv.name = evalString(state, a);
+        a = attrs.get("name");
+        if (!a) throw badTerm("derivation name missing", e);
+        drv.name = evalString(state, a);
 
-    a = attrs.get("system");
-    if (!a)
-        drv.system = "unknown";
-    else
-        drv.system = evalString(state, a);
+        a = attrs.get("system");
+        if (!a)
+            drv.system = "unknown";
+        else
+            drv.system = evalString(state, a);
 
-    drv.attrs = attrs;
+        drv.attrs = attrs;
 
-    drvs.push_back(drv);
-    return true;
+        drvs.push_back(drv);
+        return false;
+    
+    } catch (AssertionError & e) {
+        return false;
+    }
 }
 
 
@@ -46,9 +57,10 @@ bool getDerivation(EvalState & state, Expr e, DrvInfo & drv)
 {
     Exprs doneExprs;
     DrvInfos drvs;
-    bool result = getDerivation(state, e, drvs, doneExprs);
-    if (result) drv = drvs.front();
-    return result;
+    getDerivation(state, e, drvs, doneExprs);
+    if (drvs.size() != 1) return false;
+    drv = drvs.front();
+    return true;
 }
 
 
@@ -101,12 +113,12 @@ static void getDerivations(EvalState & state, Expr e,
     ATermList es;
     DrvInfo drv;
 
-    e = evalExpr(state, e);
-
-    if (getDerivation(state, e, drvs, doneExprs)) {
+    if (!getDerivation(state, e, drvs, doneExprs)) {
         if (apType != apNone) throw attrError;
         return;
     }
+
+    e = evalExpr(state, e);
 
     if (matchAttrs(e, es)) {
         if (apType != apNone && apType != apAttr) throw attrError;
@@ -114,13 +126,15 @@ static void getDerivations(EvalState & state, Expr e,
         queryAllAttrs(e, drvMap);
         if (apType == apNone) {
             for (ATermIterator i(drvMap.keys()); i; ++i) {
-                debug(format("evaluating attribute `%1%'") % aterm2String(*i));
+                startNest(nest, lvlDebug,
+                    format("evaluating attribute `%1%'") % aterm2String(*i));
                 getDerivation(state, drvMap.get(*i), drvs, doneExprs);
             }
         } else {
             Expr e2 = drvMap.get(attr);
             if (!e2) throw Error(format("attribute `%1%' in selection path not found") % attr);
-            debug(format("evaluating attribute `%1%'") % attr);
+            startNest(nest, lvlDebug,
+                format("evaluating attribute `%1%'") % attr);
             getDerivation(state, e2, drvs, doneExprs);
             if (!attrPath.empty())
                 getDerivations(state, e2, drvs, doneExprs, attrPathRest);
@@ -132,14 +146,16 @@ static void getDerivations(EvalState & state, Expr e,
         if (apType != apNone && apType != apIndex) throw attrError;
         if (apType == apNone) {
             for (ATermIterator i(es); i; ++i) {
-                debug(format("evaluating list element"));
+                startNest(nest, lvlDebug,
+                    format("evaluating list element"));
                 if (!getDerivation(state, *i, drvs, doneExprs))
                     getDerivations(state, *i, drvs, doneExprs, attrPathRest);
             }
         } else {
             Expr e2 = ATelementAt(es, attrIndex);
             if (!e2) throw Error(format("list index %1% in selection path not found") % attrIndex);
-            debug(format("evaluating list element"));
+            startNest(nest, lvlDebug,
+                format("evaluating list element"));
             if (!getDerivation(state, e2, drvs, doneExprs))
                 getDerivations(state, e2, drvs, doneExprs, attrPathRest);
         }
