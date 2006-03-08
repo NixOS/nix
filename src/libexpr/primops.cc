@@ -244,8 +244,9 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
         try {
             processBinding(state, value, drv, ss);
         } catch (Error & e) {
-            throw Error(format("while processing the derivation attribute `%1%' at %2%:\n%3%")
-                % key % showPos(pos) % e.msg());
+            e.addPrefix(format("while processing the derivation attribute `%1%' at %2%:\n")
+                % key % showPos(pos));
+            throw;
         }
 
         /* The `args' attribute is special: it supplies the
@@ -547,8 +548,9 @@ static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
             }
 
         } catch (Error & e) {
-            throw Error(format("while finding dependencies in `%1%':\n%2%")
-                % path % e.msg());
+            e.addPrefix(format("while finding dependencies in `%1%':\n")
+                % path);
+            throw;
         }
     }
 

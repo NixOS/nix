@@ -25,6 +25,13 @@ Error::Error(const format & f)
 }
 
 
+Error & Error::addPrefix(const format & f)
+{
+    err = f.str() + err;
+    return *this;
+}
+
+
 SysError::SysError(const format & f)
     : Error(format("%1%: %2%") % f.str() % strerror(errno))
 {

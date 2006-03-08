@@ -26,6 +26,7 @@ public:
     ~Error() throw () { };
     const char * what() const throw () { return err.c_str(); }
     const string & msg() const throw () { return err; }
+    Error & addPrefix(const format & f);
 };
 
 class SysError : public Error
@@ -34,11 +35,14 @@ public:
     SysError(const format & f);
 };
 
-class UsageError : public Error
-{
-public:
-    UsageError(const format & f) : Error(f) { };
-};
+#define MakeError(newClass, superClass) \
+    class newClass : public superClass                  \
+    {                                                   \
+    public:                                             \
+        newClass(const format & f) : superClass(f) { }; \
+    };
+
+MakeError(UsageError, Error)
 
 
 typedef list<string> Strings;

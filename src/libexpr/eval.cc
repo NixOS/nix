@@ -223,8 +223,9 @@ Expr evalExpr2(EvalState & state, Expr e)
             try {
                 return evalExpr(state, substArgs(e4, formals, e2));
             } catch (Error & e) {
-                throw Error(format("while evaluating the function at %1%:\n%2%")
-                    % showPos(pos) % e.msg());
+                e.addPrefix(format("while evaluating the function at %1%:\n")
+                    % showPos(pos));
+                throw;
             }
         }
         
@@ -234,8 +235,9 @@ Expr evalExpr2(EvalState & state, Expr e)
                 subs.set(name, e2);
                 return evalExpr(state, substitute(subs, e4));
             } catch (Error & e) {
-                throw Error(format("while evaluating the function at %1%:\n%2%")
-                    % showPos(pos) % e.msg());
+                e.addPrefix(format("while evaluating the function at %1%:\n")
+                    % showPos(pos));
+                throw;
             }
         }
         
@@ -251,8 +253,9 @@ Expr evalExpr2(EvalState & state, Expr e)
         try {
             return evalExpr(state, a);
         } catch (Error & e) {
-            throw Error(format("while evaluating the attribute `%1%' at %2%:\n%3%")
-                % s1 % showPos(pos) % e.msg());
+            e.addPrefix(format("while evaluating the attribute `%1%' at %2%:\n")
+                % s1 % showPos(pos));
+            throw;
         }
     }
 
@@ -272,7 +275,7 @@ Expr evalExpr2(EvalState & state, Expr e)
     /* Assertions. */
     if (matchAssert(e, e1, e2, pos)) {
         if (!evalBool(state, e1))
-            throw Error(format("assertion failed at %1%") % showPos(pos));
+            throw AssertionError(format("assertion failed at %1%") % showPos(pos));
         return evalExpr(state, e2);
     }
 
@@ -283,16 +286,18 @@ Expr evalExpr2(EvalState & state, Expr e)
             e1 = evalExpr(state, e1);
             queryAllAttrs(e1, attrs);
         } catch (Error & e) {
-            throw Error(format("while evaluating the `with' definitions at %1%:\n%2%")
-                % showPos(pos) % e.msg());
+            e.addPrefix(format("while evaluating the `with' definitions at %1%:\n")
+                % showPos(pos));
+            throw;
         }
         try {
             e2 = substitute(attrs, e2);
             checkVarDefs(state.primOps, e2);
             return evalExpr(state, e2);
         } catch (Error & e) {
-            throw Error(format("while evaluating the `with' body at %1%:\n%2%")
-                % showPos(pos) % e.msg());
+            e.addPrefix(format("while evaluating the `with' body at %1%:\n")
+                % showPos(pos));
+            throw;
         } 
     }
 
@@ -391,8 +396,9 @@ Expr evalFile(EvalState & state, const Path & path)
     try {
         return evalExpr(state, e);
     } catch (Error & e) {
-        throw Error(format("while evaluating the file `%1%':\n%2%")
-            % path % e.msg());
+        e.addPrefix(format("while evaluating the file `%1%':\n")
+            % path);
+        throw;
     }
 }
 
