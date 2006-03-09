@@ -148,7 +148,7 @@ static void getDerivations(EvalState & state, Expr e,
             for (ATermIterator i(es); i; ++i) {
                 startNest(nest, lvlDebug,
                     format("evaluating list element"));
-                if (!getDerivation(state, *i, drvs, doneExprs))
+                if (getDerivation(state, *i, drvs, doneExprs))
                     getDerivations(state, *i, drvs, doneExprs, attrPathRest);
             }
         } else {
@@ -156,7 +156,7 @@ static void getDerivations(EvalState & state, Expr e,
             if (!e2) throw Error(format("list index %1% in selection path not found") % attrIndex);
             startNest(nest, lvlDebug,
                 format("evaluating list element"));
-            if (!getDerivation(state, e2, drvs, doneExprs))
+            if (getDerivation(state, e2, drvs, doneExprs))
                 getDerivations(state, e2, drvs, doneExprs, attrPathRest);
         }
         return;
