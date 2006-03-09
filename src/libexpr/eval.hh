@@ -11,6 +11,10 @@
 typedef map<Path, PathSet> DrvRoots;
 typedef map<Path, Hash> DrvHashes;
 
+/* Cache for calls to addToStore(); maps source paths to the store
+   paths. */
+typedef map<Path, Path> SrcToStore;
+
 struct EvalState;
 
 /* Note: using a ATermVector is safe here, since when we call a primop
@@ -24,6 +28,7 @@ struct EvalState
     ATermMap primOps;
     DrvRoots drvRoots;
     DrvHashes drvHashes; /* normalised derivation hashes */
+    SrcToStore srcToStore; 
     Expr blackHole;
 
     unsigned int nrEvaluated;

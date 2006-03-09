@@ -165,9 +165,15 @@ static void processBinding(EvalState & state, Expr e, Derivation & drv,
             if (isDerivation(srcPath))
                 throw Error(format("file names are not allowed to end in `%1%'")
                     % drvExtension);
-            Path dstPath(addToStore(srcPath));
-            printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
-                % srcPath % dstPath);
+            Path dstPath;
+            if (state.srcToStore[srcPath] != "")
+                dstPath = state.srcToStore[srcPath];
+            else {
+                dstPath = addToStore(srcPath);
+                state.srcToStore[srcPath] = dstPath;
+                printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
+                    % srcPath % dstPath);
+            }
             drv.inputSrcs.insert(dstPath);
             ss.push_back(dstPath);
         }
