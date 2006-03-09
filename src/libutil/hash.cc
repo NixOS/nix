@@ -66,15 +66,17 @@ bool Hash::operator < (const Hash & h) const
 }
 
 
+const string base16Chars = "0123456789abcdef";
+
+
 string printHash(const Hash & hash)
 {
-    ostringstream str;
+    char buf[hash.hashSize * 2];
     for (unsigned int i = 0; i < hash.hashSize; i++) {
-        str.fill('0');
-        str.width(2);
-        str << hex << (int) hash.hash[i];
+        buf[i * 2] = base16Chars[hash.hash[i] >> 4];
+        buf[i * 2 + 1] = base16Chars[hash.hash[i] & 0x0f];
     }
-    return str.str();
+    return string(buf, hash.hashSize * 2);
 }
 
     
