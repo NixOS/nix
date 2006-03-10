@@ -217,19 +217,21 @@ static DrvInfos filterBySelector(EvalState & state,
     DrvNames selectors = drvNamesFromArgs(args);
 
     DrvInfos elems;
-    PathSet done;
+    set<unsigned int> done;
 
     for (DrvNames::iterator i = selectors.begin();
          i != selectors.end(); ++i)
     {
-        DrvInfos matches;
+        typedef list<pair<DrvInfo, unsigned int> > Matches;
+        Matches matches;
+        unsigned int n = 0;
         for (DrvInfos::const_iterator j = allElems.begin();
-             j != allElems.end(); ++j)
+             j != allElems.end(); ++j, ++n)
         {
             DrvName drvName(j->name);
             if (i->matches(drvName)) {
                 i->hits++;
-                matches.push_back(*j);
+                matches.push_back(pair<DrvInfo, unsigned int>(*j, n));
             }
         }
 
@@ -240,40 +242,37 @@ static DrvInfos filterBySelector(EvalState & state,
         if (newestOnly) {
 
             /* Map from package names to derivations. */
-            map<string, DrvInfo> newest;
+            typedef map<string, pair<DrvInfo, unsigned int> > Newest;
+            Newest newest;
             StringSet multiple;
 
-            for (DrvInfos::const_iterator j = matches.begin();
-                 j != matches.end(); ++j)
-            {
-                DrvName drvName(j->name);
-                map<string, DrvInfo>::iterator k = newest.find(drvName.name);
+            for (Matches::iterator j = matches.begin(); j != matches.end(); ++j) {
+                DrvName drvName(j->first.name);
+                Newest::iterator k = newest.find(drvName.name);
                 if (k != newest.end()) {
-                    int d = compareVersions(drvName.version, DrvName(k->second.name).version);
+                    int d = compareVersions(drvName.version, DrvName(k->second.first.name).version);
                     if (d > 0) newest[drvName.name] = *j;
-                    else if (d == 0) multiple.insert(j->name);
+                    else if (d == 0) multiple.insert(j->first.name);
                 } else
                     newest[drvName.name] = *j;
             }
 
             matches.clear();
-            for (map<string, DrvInfo>::iterator j = newest.begin();
-                 j != newest.end(); ++j) {
-                if (multiple.find(j->second.name) != multiple.end())
+            for (Newest::iterator j = newest.begin(); j != newest.end(); ++j) {
+                if (multiple.find(j->second.first.name) != multiple.end())
                     printMsg(lvlInfo,
                         format("warning: there are multiple derivations named `%1%'; using the first one")
-                        % j->second.name);
+                        % j->second.first.name);
                 matches.push_back(j->second);
             }
         }
 
         /* Insert only those elements in the final list that we
            haven't inserted before. */
-        for (DrvInfos::const_iterator j = matches.begin();
-             j != matches.end(); ++j)
-            if (done.find(j->queryOutPath(state)) == done.end()) {
-                done.insert(j->queryOutPath(state));
-                elems.push_back(*j);
+        for (Matches::iterator j = matches.begin(); j != matches.end(); ++j)
+            if (done.find(j->second) == done.end()) {
+                done.insert(j->second);
+                elems.push_back(j->first);
             }
     }
             
@@ -718,7 +717,9 @@ static void opQuery(Globals & globals,
         else if (*i == "--available" || *i == "-a") source = sAvailable;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
-    if (opArgs.size() != 0) throw UsageError("no arguments expected");
+    if (opArgs.size() == 0) {
+        printMsg(lvlInfo, "warning: you probably meant to specify the argument '*' to show all packages");
+    }
 
     
     /* Obtain derivation information from the specified source. */
@@ -733,7 +734,10 @@ static void opQuery(Globals & globals,
             globals.instSource.systemFilter, availElems);
     }
 
-    DrvInfos & elems(source == sInstalled ? installedElems : availElems);
+    DrvInfos elems = filterBySelector(globals.state,
+        source == sInstalled ? installedElems : availElems,
+        opArgs, false);
+    
     DrvInfos & otherElems(source == sInstalled ? availElems : installedElems);
 
     
