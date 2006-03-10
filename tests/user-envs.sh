@@ -1,12 +1,16 @@
 source common.sh
 
 profiles="$NIX_STATE_DIR"/profiles
+rm -f $profiles/*
 
 # Query installed: should be empty.
 test "$($nixenv -p $profiles/test -q '*' | wc -l)" -eq 0
 
 # Query available: should contain several.
 test "$($nixenv -p $profiles/test -f ./user-envs.nix -qa '*' | wc -l)" -eq 5
+
+# Query descriptions.
+$nixenv -p $profiles/test -f ./user-envs.nix -qa '*' --description | grep silly
 
 # Install "foo-1.0".
 $nixenv -p $profiles/test -f ./user-envs.nix -i foo-1.0

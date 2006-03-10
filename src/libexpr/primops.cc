@@ -390,14 +390,21 @@ static Expr primDirOf(EvalState & state, const ATermVector & args)
 }
 
 
+ATerm coerceToString(Expr e)
+{
+    ATerm s;
+    if (matchStr(e, s) || matchPath(e, s) || matchUri(e, s))
+        return s;
+    return 0;
+}
+
+
 /* Convert the argument (which can be a path or a uri) to a string. */
 static Expr primToString(EvalState & state, const ATermVector & args)
 {
-    Expr arg = evalExpr(state, args[0]);
-    ATerm s;
-    if (matchStr(arg, s) || matchPath(arg, s) || matchUri(arg, s))
-        return makeStr(s);
-    throw Error("cannot coerce value to string");
+    ATerm s = coerceToString(evalExpr(state, args[0]));
+    if (!s) throw Error("cannot coerce value to string");
+    return makeStr(s);
 }
 
 

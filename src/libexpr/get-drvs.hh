@@ -7,6 +7,9 @@
 #include "eval.hh"
 
 
+typedef map<string, string> MetaInfo;
+
+
 struct DrvInfo
 {
 private:
@@ -19,24 +22,9 @@ public:
 
     ATermMap attrs;
 
-    string queryDrvPath(EvalState & state) const
-    {
-        if (drvPath == "") {
-            Expr a = attrs.get("drvPath");
-            (string &) drvPath = a ? evalPath(state, a) : "";
-        }
-        return drvPath;
-    }
-    
-    string queryOutPath(EvalState & state) const
-    {
-        if (outPath == "") {
-            Expr a = attrs.get("outPath");
-            if (!a) throw Error("output path missing");
-            (string &) outPath = evalPath(state, a);
-        }
-        return outPath;
-    }
+    string queryDrvPath(EvalState & state) const;
+    string queryOutPath(EvalState & state) const;
+    MetaInfo queryMetaInfo(EvalState & state) const;
 
     void setDrvPath(const string & s)
     {

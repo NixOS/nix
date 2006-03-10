@@ -7,12 +7,16 @@ assert foo == "foo";
 
 let {
 
-  makeDrv = name: progName: derivation {
+  makeDrv = name: progName: (derivation {
     inherit name progName system;
     builder = "@shell@";
     shell = "@shell@";
     args = ["-e" "-x" ./user-envs.builder.sh];
-  };
+  } // {
+    meta = {
+      description = "A silly test package";
+    };
+  });
 
   body = [
     (makeDrv "foo-1.0" "foo")

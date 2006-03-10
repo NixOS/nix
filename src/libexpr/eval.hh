@@ -56,6 +56,7 @@ Expr evalFile(EvalState & state, const Path & path);
 string evalString(EvalState & state, Expr e);
 Path evalPath(EvalState & state, Expr e);
 ATermList evalList(EvalState & state, Expr e);
+ATerm coerceToString(Expr e);
 
 /* Print statistics. */
 void printEvalStats(EvalState & state);

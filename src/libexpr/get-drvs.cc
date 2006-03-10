@@ -2,6 +2,49 @@
 #include "nixexpr-ast.hh"
 
 
+string DrvInfo::queryDrvPath(EvalState & state) const
+{
+    if (drvPath == "") {
+        Expr a = attrs.get("drvPath");
+        (string &) drvPath = a ? evalPath(state, a) : "";
+    }
+    return drvPath;
+}
+
+
+string DrvInfo::queryOutPath(EvalState & state) const
+{
+    if (outPath == "") {
+        Expr a = attrs.get("outPath");
+        if (!a) throw Error("output path missing");
+        (string &) outPath = evalPath(state, a);
+    }
+    return outPath;
+}
+
+
+MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
+{
+    MetaInfo meta;
+    
+    Expr a = attrs.get("meta");
+    if (!a) return meta; /* fine, empty meta information */
+
+    ATermMap attrs2;
+    queryAllAttrs(evalExpr(state, a), attrs2);
+
+    for (ATermIterator i(attrs2.keys()); i; ++i) {
+        ATerm s = coerceToString(evalExpr(state, attrs2.get(*i)));
+        if (s)
+            meta[aterm2String(*i)] = aterm2String(s);
+        /* For future compatibility, ignore attribute values that are
+           not strings. */
+    }
+
+    return meta;
+}
+
+
 typedef set<Expr> Exprs;
 
 

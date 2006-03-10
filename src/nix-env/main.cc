@@ -699,6 +699,7 @@ static void opQuery(Globals & globals,
     bool printSystem = false;
     bool printDrvPath = false;
     bool printOutPath = false;
+    bool printDescription = false;
     bool compareVersions = false;
 
     enum { sInstalled, sAvailable } source = sInstalled;
@@ -710,6 +711,7 @@ static void opQuery(Globals & globals,
         if (*i == "--status" || *i == "-s") printStatus = true;
         else if (*i == "--no-name") printName = false;
         else if (*i == "--system") printSystem = true;
+        else if (*i == "--description") printDescription = true;
         else if (*i == "--compare-versions" || *i == "-c") compareVersions = true;
         else if (*i == "--drv-path") printDrvPath = true;
         else if (*i == "--out-path") printOutPath = true;
@@ -808,6 +810,11 @@ static void opQuery(Globals & globals,
                 ? "-" : i->queryDrvPath(globals.state));
         
             if (printOutPath) columns.push_back(i->queryOutPath(globals.state));
+
+            if (printDescription) {
+                MetaInfo meta = i->queryMetaInfo(globals.state);
+                columns.push_back(meta["description"]);
+            }
             
             table.push_back(columns);
         }
