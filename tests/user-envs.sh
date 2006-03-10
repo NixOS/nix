@@ -3,7 +3,7 @@ source common.sh
 profiles="$NIX_STATE_DIR"/profiles
 
 # Query installed: should be empty.
-test "$($nixenv -p $profiles/test -q | wc -l)" -eq 0
+test "$($nixenv -p $profiles/test -q '*' | wc -l)" -eq 0
 
 # Query available: should contain several.
 test "$($nixenv -p $profiles/test -f ./user-envs.nix -qa '*' | wc -l)" -eq 5
