@@ -23,7 +23,7 @@ extern "C" {
 volatile sig_atomic_t blockInt = 0;
 
 
-void sigintHandler(int signo)
+static void sigintHandler(int signo)
 {
     if (!blockInt) {
         _isInterrupted = 1;
@@ -54,28 +54,12 @@ void printGCWarning()
 }
 
 
-void setLogType(string lt)
+static void setLogType(string lt)
 {
     if (lt == "pretty") logType = ltPretty;
     else if (lt == "escapes") logType = ltEscapes;
     else if (lt == "flat") logType = ltFlat;
     else throw UsageError("unknown log type");
-}
-
-
-void checkStoreNotSymlink(Path path)
-{
-    struct stat st;
-    while (path != "/") {
-        if (lstat(path.c_str(), &st))
-            throw SysError(format("getting status of `%1%'") % path);
-        if (S_ISLNK(st.st_mode))
-            throw Error(format(
-                "the path `%1%' is a symlink; "
-                "this is not allowed for the Nix store and its parent directories")
-                % path);
-        path = dirOf(path);
-    }
 }
 
 
@@ -108,11 +92,6 @@ static void initAndRun(int argc, char * * argv)
     nixStateDir = canonPath(getEnv("NIX_STATE_DIR", NIX_STATE_DIR));
     nixDBPath = getEnv("NIX_DB_DIR", nixStateDir + "/db");
     nixConfDir = canonPath(getEnv("NIX_CONF_DIR", NIX_CONF_DIR));
-
-    /* Check that the store directory and its parent are not
-       symlinks. */
-    if (getEnv("NIX_IGNORE_SYMLINK_STORE") != "1")
-        checkStoreNotSymlink(nixStore);
 
     /* Catch SIGINT. */
     struct sigaction act, oact;

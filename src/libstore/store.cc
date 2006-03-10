@@ -76,9 +76,29 @@ static void upgradeStore07();
 static void upgradeStore09();
 
 
+void checkStoreNotSymlink()
+{
+    if (getEnv("NIX_IGNORE_SYMLINK_STORE") == "1") return;
+    Path path = nixStore;
+    struct stat st;
+    while (path != "/") {
+        if (lstat(path.c_str(), &st))
+            throw SysError(format("getting status of `%1%'") % path);
+        if (S_ISLNK(st.st_mode))
+            throw Error(format(
+                "the path `%1%' is a symlink; "
+                "this is not allowed for the Nix store and its parent directories")
+                % path);
+        path = dirOf(path);
+    }
+}
+
+
 void openDB(bool reserveSpace)
 {
     if (readOnlyMode) return;
+
+    checkStoreNotSymlink();
 
     try {
         Path reservedPath = nixDBPath + "/reserved";

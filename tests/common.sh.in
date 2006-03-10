@@ -1,5 +1,8 @@
 set -e
 
+# Maybe the build directory is symlinked.
+export NIX_IGNORE_SYMLINK_STORE=1
+
 export TEST_ROOT=$(pwd)/test-tmp
 export NIX_STORE_DIR=$TEST_ROOT/store
 export NIX_DATA_DIR=$TEST_ROOT/data
