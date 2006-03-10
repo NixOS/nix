@@ -26,7 +26,7 @@ void EvalState::addPrimOp(const string & name,
 /* Substitute an argument set into the body of a function. */
 static Expr substArgs(Expr body, ATermList formals, Expr arg)
 {
-    ATermMap subs;
+    ATermMap subs(ATgetLength(formals) * 2);
     Expr undefined = makeUndefined();
 
     /* Get the formal arguments. */

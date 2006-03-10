@@ -50,9 +50,10 @@ void ATermMap::copy(const ATermMap & map)
 {
     ATermList keys = map.keys();
 
-    /* !!! adjust allocation for load pct */
+    /* !!! We adjust for the maximum load pct by allocating twice as
+       much.  Probably a bit too much. */
     maxLoadPct = map.maxLoadPct;
-    table = ATtableCreate(ATgetLength(keys), maxLoadPct);
+    table = ATtableCreate(ATgetLength(keys) * 2, maxLoadPct);
     if (!table) throw Error("cannot create ATerm table");
 
     add(map, keys);
