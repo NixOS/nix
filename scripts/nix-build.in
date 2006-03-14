@@ -6,6 +6,9 @@ use strict;
 my $addDrvLink = 0;
 my $addOutLink = 1;
 
+my $outLink;
+my $drvLink;
+
 my @instArgs = ();
 my @buildArgs = ();
 my @exprs = ();
@@ -37,13 +40,15 @@ default to ./default.nix if none are given).  A symlink called
 
 Flags:
   --add-drv-link: create a symlink `derivation' to the store derivation
+  --drv-link NAME: create symlink NAME instead of `derivation'
   --no-out-link: do not create the `result' symlink
+  --out-link / -o NAME: create symlink NAME instead of `result'
   --attr ATTR: select a specific attribution from the Nix expression
 
 Any additional flags are passed to `nix-store'.
 EOF
         exit 0;
-        # ' hack
+        # '` hack
     }
 
     elsif ($arg eq "--add-drv-link") {
@@ -52,6 +57,18 @@ EOF
 
     elsif ($arg eq "--no-out-link" or $arg eq "--no-link") {
         $addOutLink = 1;
+    }
+
+    elsif ($arg eq "--drv-link") {
+        $n++;
+        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        $drvLink = $ARGV[$n];
+    }
+
+    elsif ($arg eq "--out-link" or $arg eq "-o") {
+        $n++;
+        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        $outLink = $ARGV[$n];
     }
 
     elsif ($arg eq "--attr" or $arg eq "-A") {
@@ -72,13 +89,21 @@ EOF
 @exprs = ("./default.nix") if scalar @exprs == 0;
 
 
+if (!defined $drvLink) {
+    $drvLink = "derivation";
+    $drvLink = ".nix-build-tmp-" . $drvLink if !$addDrvLink;
+}
+
+if (!defined $outLink) {
+    $outLink = "result";
+    $outLink = ".nix-build-tmp-" . $outLink if !$addOutLink;
+}
+
+
 foreach my $expr (@exprs) {
 
     # Instantiate.
-    my $prefix = "";
-    $prefix = ".nix-build-tmp-" if !$addDrvLink;
-
-    my $drvPaths = `@bindir@/nix-instantiate --add-root ./${prefix}derivation --indirect @instArgs "$expr"`;
+    my $drvPaths = `@bindir@/nix-instantiate --add-root "$drvLink" --indirect @instArgs "$expr"`;
     my @drvPaths = split ' ', $drvPaths;
 
     foreach my $drvPath (@drvPaths) {
@@ -87,10 +112,7 @@ foreach my $expr (@exprs) {
     }
 
     # Build.
-    $prefix = "";
-    $prefix = ".nix-build-tmp-" if !$addOutLink;
-
-    my $outPaths = `@bindir@/nix-store --add-root ./${prefix}result --indirect -rv @buildArgs @drvPaths`;
+    my $outPaths = `@bindir@/nix-store --add-root "$outLink" --indirect -rv @buildArgs @drvPaths`;
     my @outPaths = split ' ', $outPaths;
     
     foreach my $outPath (@outPaths) {
