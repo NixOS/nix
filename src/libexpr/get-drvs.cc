@@ -171,7 +171,21 @@ static void getDerivations(EvalState & state, Expr e,
             for (ATermIterator i(drvMap.keys()); i; ++i) {
                 startNest(nest, lvlDebug,
                     format("evaluating attribute `%1%'") % aterm2String(*i));
-                getDerivation(state, drvMap.get(*i), drvs, doneExprs);
+                if (getDerivation(state, drvMap.get(*i), drvs, doneExprs)) {
+                    /* If the value of this attribute is itself an
+                       attribute self, should we recurse into it?
+                       => Only if it has a `recurseForDerivations = true'
+                       attribute. */
+                    ATermList es;
+                    Expr e = evalExpr(state, drvMap.get(*i));
+                    if (matchAttrs(e, es)) {
+                        ATermMap attrs;
+                        queryAllAttrs(e, attrs, false);
+                        if (attrs.get("recurseForDerivations") &&
+                            evalBool(state, attrs.get("recurseForDerivations")))
+                            getDerivations(state, e, drvs, doneExprs, attrPathRest);
+                    }
+                }
             }
         } else {
             Expr e2 = drvMap.get(attr);
