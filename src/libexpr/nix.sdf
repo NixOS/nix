@@ -121,9 +121,8 @@ exports
     Comment -> LAYOUT
     "#" ~[\n]* -> HashComment
     "/*" ( ~[\*] | Asterisk )* "*/" -> Comment
-    [\*] -> Asterisk
+    [\*] ~[\/] -> Asterisk
   lexical restrictions
-    Asterisk -/- [\/]
     HashComment -/- ~[\n]
   context-free restrictions
     LAYOUT? -/- [\ \t\n]
