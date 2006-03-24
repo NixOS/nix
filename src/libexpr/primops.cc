@@ -229,10 +229,16 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
     ATermMap attrs;
     queryAllAttrs(evalExpr(state, args[0]), attrs, true);
 
+    /* Figure out the name already (for stack backtraces). */
+    Expr eDrvName = attrs.get("name");
+    if (!eDrvName)
+        throw Error("required attribute `name' missing");
+    ATerm posDrvName;
+    if (!matchAttrRHS(eDrvName, eDrvName, posDrvName)) abort();
+    string drvName = evalString(state, eDrvName);
+
     /* Build the derivation expression by processing the attributes. */
     Derivation drv;
-
-    string drvName;
     
     string outputHash;
     string outputHashAlgo;
@@ -252,6 +258,8 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
         } catch (Error & e) {
             e.addPrefix(format("while processing the derivation attribute `%1%' at %2%:\n")
                 % key % showPos(pos));
+            e.addPrefix(format("while instantiating the derivation named `%1%' at %2%:\n")
+                % drvName % showPos(posDrvName));
             throw;
         }
 
@@ -285,8 +293,6 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
         throw Error("required attribute `builder' missing");
     if (drv.platform == "")
         throw Error("required attribute `system' missing");
-    if (drvName == "")
-        throw Error("required attribute `name' missing");
 
     /* If an output hash was given, check it. */
     if (outputHash == "")
