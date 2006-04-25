@@ -64,10 +64,43 @@ build-aterm: have-aterm
 endif
 
 
-all: build-db build-aterm
+# bzip2
 
-EXTRA_DIST = $(DB).tar.gz $(ATERM).tar.gz
+BZIP2 = bzip2-1.0.3
+
+$(BZIP2).tar.gz:
+	@echo "Nix requires bzip2 to build."
+	@echo "Please download version 1.0.3 from"
+	@echo "  http://www.bzip.org/1.0.3/bzip2-1.0.3.tar.gz"
+	@echo "and place it in the externals/ directory."
+	false
+
+$(BZIP2): $(BZIP2).tar.gz
+	gunzip < $(BZIP2).tar.gz | tar xvf -
+
+have-bzip2:
+	$(MAKE) $(BZIP2)
+	touch have-bzip2
+
+if HAVE_BZIP2
+build-bzip2:
+else
+build-bzip2: have-bzip2
+	(pfx=`pwd` && \
+	cd $(BZIP2) && \
+	$(MAKE) && \
+	$(MAKE) install PREFIX=$$pfx/inst-bzip2)
+	touch build-bzip2
+
+install:
+	cp $(bzip2_bin_test)/bzip2 $(bzip2_bin_test)/bunzip2 ${bzip2_bin}
+endif
+
+
+all: build-db build-aterm build-bzip2
+
+EXTRA_DIST = $(DB).tar.gz $(ATERM).tar.gz $(BZIp2).tar.gz
 
 ext-clean:
 	$(RM) -f have-db build-db have-aterm build-aterm
-	$(RM) -rf $(DB) $(ATERM)
+	$(RM) -rf $(DB) $(ATERM) $(BZIP2)

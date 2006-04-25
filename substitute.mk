@@ -13,6 +13,7 @@
 	 -e "s^@curl\@^$(curl)^g" \
 	 -e "s^@bzip2\@^$(bzip2_bin)/bzip2^g" \
 	 -e "s^@bunzip2\@^$(bzip2_bin)/bunzip2^g" \
+	 -e "s^@bzip2_bin_test\@^$(bzip2_bin_test)^g" \
 	 -e "s^@perl\@^$(perl)^g" \
 	 -e "s^@coreutils\@^$(coreutils)^g" \
 	 -e "s^@tar\@^$(tar)^g" \

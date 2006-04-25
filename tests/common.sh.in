@@ -24,6 +24,10 @@ export NIX_BUILD_HOOK=
 export PERL=perl
 export TOP=$(pwd)/..
 export aterm_bin=@aterm_bin@
+export bzip2_bin_test="@bzip2_bin_test@"
+if test "${bzip2_bin_test:0:1}" != "/"; then
+    bzip2_bin_test=`pwd`/${bzip2_bin_test}
+fi
 export dot=@dot@
 export xmllint="@xmllint@"
 export xmlflags="@xmlflags@"

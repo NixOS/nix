@@ -160,22 +160,26 @@ fi
 AC_ARG_WITH(bzip2, AC_HELP_STRING([--with-bzip2=PATH],
   [prefix of bzip2]),
   bzip2=$withval, bzip2=)
+AM_CONDITIONAL(HAVE_BZIP2, test -n "$bzip2")
 if test -z "$bzip2"; then
-   AC_CHECK_LIB(bz2, BZ2_bzWriteOpen,
-     [bzip2_lib="-lbz2"], [AC_MSG_ERROR([cannot find -lbz (bzip2)])])
-   AC_CHECK_HEADER(bzlib.h, 
-     [bzip2_include=""], [AC_MSG_ERROR([cannot find bzlib.h (bzip2)])])
-   AC_PATH_PROG(bzip2_prog, bzip2,
-     [AC_MSG_ERROR([cannot find bzip2])])
-   bzip2_bin=$(dirname $bzip2_prog)
+  # Headers and libraries will be used from the temporary installation
+  # in externals/inst-bzip2.
+  bzip2_lib='-L${top_builddir}/externals/inst-bzip2/lib -lbz2'
+  bzip2_include='-I${top_builddir}/externals/inst-bzip2/include'
+  # The binary will be copied to $libexecdir.
+  bzip2_bin='${libexecdir}'
+  # But for testing, we have to use the temporary copy :-(
+  bzip2_bin_test='${top_builddir}/externals/inst-bzip2/bin'
 else
-   bzip2_lib="-L$bzip2/lib -lbz2"
-   bzip2_include="-I$bzip2/include"
-   bzip2_bin="$bzip2/bin"
+  bzip2_lib="-L$bzip2/lib -lbz2"
+  bzip2_include="-I$bzip2/include"
+  bzip2_bin="$bzip2/bin"
+  bzip2_bin_test="$bzip2/bin"
 fi   
 AC_SUBST(bzip2_lib)
 AC_SUBST(bzip2_include)
 AC_SUBST(bzip2_bin)
+AC_SUBST(bzip2_bin_test)
 
 AC_CHECK_LIB(pthread, pthread_mutex_init)
 
@@ -212,7 +216,7 @@ AC_SUBST(NIX_GROUP)
 AC_DEFINE_UNQUOTED(NIX_GROUP, ["$NIX_GROUP"], [Nix group])
 
                                                                                                             
-# This is needed if either ATerm or Berkeley DB are static libraries,
+# This is needed if ATerm, Berkeley DB or bzip2 are static libraries,
 # and the Nix libraries are dynamic.
 if test "$(uname)" = "Darwin"; then
    LDFLAGS="-all_load $LDFLAGS"
