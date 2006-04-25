@@ -93,7 +93,8 @@ build-bzip2: have-bzip2
 	touch build-bzip2
 
 install:
-	cp $(bzip2_bin_test)/bzip2 $(bzip2_bin_test)/bunzip2 ${bzip2_bin}
+	mkdir -p ${bzip2_bin}
+	$(INSTALL_PROGRAM) $(bzip2_bin_test)/bzip2 $(bzip2_bin_test)/bunzip2 ${bzip2_bin}
 endif
 
 
