@@ -27,7 +27,7 @@ build-db: have-db
 	 --enable-cxx --disable-shared --disable-cryptography \
          --disable-replication --disable-verify && \
 	$(MAKE) && \
-	$(MAKE) install)
+	$(MAKE) install_include install_lib)
 	touch build-db
 endif
 
