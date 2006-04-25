@@ -99,7 +99,7 @@ endif
 
 all: build-db build-aterm build-bzip2
 
-EXTRA_DIST = $(DB).tar.gz $(ATERM).tar.gz $(BZIp2).tar.gz
+EXTRA_DIST = $(DB).tar.gz $(ATERM).tar.gz $(BZIP2).tar.gz
 
 ext-clean:
 	$(RM) -f have-db build-db have-aterm build-aterm
