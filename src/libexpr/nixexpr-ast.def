@@ -35,6 +35,7 @@ Closed | Expr | Expr |
 Rec | ATermList ATermList | Expr |
 Bool | ATerm | Expr |
 Null | | Expr |
+Context | ATermList Expr | Expr |
 
 Bind | string Expr Pos | ATerm |
 Bind | string Expr | ATerm | Bind2

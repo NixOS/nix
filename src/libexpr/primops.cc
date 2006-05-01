@@ -109,6 +109,14 @@ static void processBinding(EvalState & state, Expr e, Derivation & drv,
     int n;
     Expr e1, e2;
 
+    if (matchContext(e, es, e2)) {
+        e = e2;
+        for (ATermIterator i(es); i; ++i) {
+            Strings dummy;
+            processBinding(state, *i, drv, dummy);
+        }
+    }
+
     if (matchStr(e, s)) ss.push_back(aterm2String(s));
     else if (matchUri(e, s)) ss.push_back(aterm2String(s));
     else if (e == eTrue) ss.push_back("1");
@@ -408,9 +416,10 @@ ATerm coerceToString(Expr e)
 /* Convert the argument (which can be a path or a uri) to a string. */
 static Expr primToString(EvalState & state, const ATermVector & args)
 {
-    ATerm s = coerceToString(evalExpr(state, args[0]));
-    if (!s) throw Error("cannot coerce value to string");
-    return makeStr(s);
+    ATermList context = ATempty;
+    bool dummy;
+    string s = coerceToStringWithContext(state, context, args[0], dummy);
+    return wrapInContext(context, makeStr(toATerm(s)));
 }
 
 

@@ -149,6 +149,103 @@ ATermList evalList(EvalState & state, Expr e)
 }
 
 
+/* String concatenation and context nodes: in order to allow users to
+   write things like
+
+     "--with-freetype2-library=" + freetype + "/lib"
+
+   where `freetype' is a derivation, we automatically coerce
+   derivations into their output path (e.g.,
+   /nix/store/hashcode-freetype) in concatenations.  However, if we do
+   this naively, we could introduce an undeclared dependency: when the
+   string is used in another derivation, that derivation would not
+   have an explicitly dependency on `freetype' in its inputDrvs
+   field.  Thus `freetype' would not necessarily be built.
+
+   To prevent this, we wrap the string resulting from the
+   concatenation in a *context node*, like this:
+
+     Context([freetype],
+       Str("--with-freetype2-library=/nix/store/hashcode-freetype/lib"))
+
+   Thus the context is the list of all derivations used in the
+   computation of a value.  These contexts are propagated through
+   further concatenations.  In processBinding() in primops.cc, context
+   nodes are unwrapped and added to inputDrvs.
+
+   !!! Should the ordering of the context list have a canonical form?
+
+   !!! Contexts are not currently recognised in most places in the
+   evaluator. */
+
+
+/* Coerce a value to a string, keeping track of contexts. */
+string coerceToStringWithContext(EvalState & state,
+    ATermList & context, Expr e, bool & isPath)
+{
+    isPath = false;
+    
+    e = evalExpr(state, e);
+
+    ATermList es;
+    ATerm e2;
+    if (matchContext(e, es, e2)) {
+        e = e2;
+        context = ATconcat(es, context);
+    }
+    
+    ATerm s;
+    if (matchStr(e, s) || matchUri(e, s))
+        return aterm2String(s);
+    
+    if (matchPath(e, s)) {
+        isPath = true;
+        return aterm2String(s);
+    }
+
+    if (matchAttrs(e, es)) {
+        ATermMap attrs;
+        queryAllAttrs(e, attrs, false);
+
+        Expr a = attrs.get("type");
+        if (a && evalString(state, a) == "derivation") {
+            a = attrs.get("outPath");
+            if (!a) throw Error("output path missing from derivation");
+            context = ATinsert(context, e);
+            return evalPath(state, a);
+        }
+    }
+    
+    throw Error("cannot coerce value to string");
+}
+
+
+/* Wrap an expression in a context if the context is not empty. */
+Expr wrapInContext(ATermList context, Expr e)
+{
+    return context == ATempty ? e : makeContext(context, e);
+}
+
+
+static ATerm concatStrings(EvalState & state, const ATermVector & args)
+{
+    ATermList context = ATempty;
+    ostringstream s;
+    bool isPath;
+
+    for (ATermVector::const_iterator i = args.begin(); i != args.end(); ++i) {
+        bool isPath2;
+        s << coerceToStringWithContext(state, context, *i, isPath2);
+        if (i == args.begin()) isPath = isPath2;
+    }
+
+    Expr result = isPath
+        ? makePath(toATerm(canonPath(s.str())))
+        : makeStr(toATerm(s.str()));
+    return wrapInContext(context, result);
+}
+
+
 Expr evalExpr2(EvalState & state, Expr e)
 {
     Expr e1, e2, e3, e4;
@@ -167,7 +264,8 @@ Expr evalExpr2(EvalState & state, Expr e)
         sym == symFunction1 ||
         sym == symAttrs ||
         sym == symList ||
-        sym == symPrimOp)
+        sym == symPrimOp ||
+        sym == symContext)
         return e;
     
     /* The `Closed' constructor is just a way to prevent substitutions
@@ -338,16 +436,10 @@ Expr evalExpr2(EvalState & state, Expr e)
 
     /* String or path concatenation. */
     if (matchOpPlus(e, e1, e2)) {
-        e1 = evalExpr(state, e1);
-        e2 = evalExpr(state, e2);
-        ATerm s1, s2;
-        if (matchStr(e1, s1) && matchStr(e2, s2))
-            return makeStr(toATerm(
-                (string) aterm2String(s1) + (string) aterm2String(s2)));
-        else if (matchPath(e1, s1) && matchPath(e2, s2))
-            return makePath(toATerm(canonPath(
-                (string) aterm2String(s1) + "/" + (string) aterm2String(s2))));
-        else throw Error("wrong argument types in `+' operator");
+        ATermVector args;
+        args.push_back(e1);
+        args.push_back(e2);
+        return concatStrings(state, args);
     }
 
     /* List concatenation. */

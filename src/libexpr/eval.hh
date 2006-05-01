@@ -59,6 +59,11 @@ bool evalBool(EvalState & state, Expr e);
 ATermList evalList(EvalState & state, Expr e);
 ATerm coerceToString(Expr e);
 
+/* Contexts. */
+string coerceToStringWithContext(EvalState & state,
+    ATermList & context, Expr e, bool & isPath);
+Expr wrapInContext(ATermList context, Expr e);
+
 /* Print statistics. */
 void printEvalStats(EvalState & state);
 

@@ -45,6 +45,10 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
 }
 
 
+/* Cache for already evaluated derivations.  Usually putting ATerms in
+   a STL container is unsafe (they're not scanning for GC roots), but
+   here it doesn't matter; everything in this set is reachable from
+   the stack as well. */
 typedef set<Expr> Exprs;
 
 

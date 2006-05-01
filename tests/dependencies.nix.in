@@ -18,8 +18,9 @@ let {
     name = "dependencies";
     system = "@system@";
     builder = "@shell@";
-    args = ["-e" "-x" ./dependencies.builder0.sh];
-    inherit input1 input2;
+    args = ["-e" "-x" (./dependencies.builder0.sh  + "/FOOBAR/../.")];
+    input1 = input1 + "/.";
+    inherit input2;
   };
 
 }
