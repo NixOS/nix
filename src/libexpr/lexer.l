@@ -73,10 +73,7 @@ inherit     { return INHERIT; }
             }
 
 \"          { BEGIN(STRING); return '"'; }
-<STRING>([^\$\"\\]|\\.|\$[^\{\$])+ {
-/* Note: a dollar *is* allowed as-is in a string, as long as it's
-   not followed by a open brace.  This should probably be disallowed
-   eventually. */
+<STRING>([^\$\"\\]|\\.)+ {
               yylval->t = unescapeStr(yytext); /* !!! alloc */ 
               return STR;
             }
