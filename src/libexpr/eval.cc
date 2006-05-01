@@ -231,7 +231,7 @@ static ATerm concatStrings(EvalState & state, const ATermVector & args)
 {
     ATermList context = ATempty;
     ostringstream s;
-    bool isPath;
+    bool isPath = false;
 
     for (ATermVector::const_iterator i = args.begin(); i != args.end(); ++i) {
         bool isPath2;
@@ -447,6 +447,14 @@ Expr evalExpr2(EvalState & state, Expr e)
         ATermList l1 = evalList(state, e1);
         ATermList l2 = evalList(state, e2);
         return makeList(ATconcat(l1, l2));
+    }
+
+    /* String concatenation. */
+    ATermList es;
+    if (matchConcatStrings(e, es)) {
+        ATermVector args;
+        for (ATermIterator i(es); i; ++i) args.push_back(*i);
+        return concatStrings(state, args);
     }
 
     /* Barf. */

@@ -71,8 +71,28 @@ const char * getPath(ParseData * data)
     return data->path.c_str();
 }
 
-int yyparse(yyscan_t scanner, ParseData * data);
+Expr unescapeStr(const char * s)
+{
+    string t;
+    char c;
+    while (c = *s++) {
+        if (c == '\\') {
+            assert(*s);
+            c = *s++;
+            if (c == 'n') t += "\n";
+            else if (c == 'r') t += "\r";
+            else if (c == 't') t += "\t";
+            else t += c;
+        }
+        else t += c;
+    }
+    return makeStr(toATerm(t));
 }
+
+int yyparse(yyscan_t scanner, ParseData * data);
+
+
+} /* end of C functions */
 
 
 static void checkAttrs(ATermMap & names, ATermList bnds)

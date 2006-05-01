@@ -25,6 +25,7 @@ void parseError(void * data, char * error, int line, int column);
 ATerm absParsedPath(void * data, ATerm t);
 ATerm fixAttrs(int recursive, ATermList as);
 const char * getPath(void * data);
+void backToString(yyscan_t scanner);
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, void * data, char * s)
 {
@@ -73,9 +74,10 @@ static void freeAndUnprotect(void * p)
 
 %type <t> start expr expr_function expr_if expr_op
 %type <t> expr_app expr_select expr_simple bind inheritsrc formal
-%type <ts> binds ids expr_list formals
+%type <ts> binds ids expr_list formals string_parts
 %token <t> ID INT STR PATH URI
 %token IF THEN ELSE ASSERT WITH LET REC INHERIT EQ NEQ AND OR IMPL
+%token DOLLAR_CURLY /* == ${ */
 
 %nonassoc IMPL
 %left OR
@@ -142,7 +144,12 @@ expr_select
 expr_simple
   : ID { $$ = makeVar($1); }
   | INT { $$ = makeInt(ATgetInt((ATermInt) $1)); }
-  | STR { $$ = makeStr($1); }
+  | '"' string_parts '"' {
+      /* For efficiency, and to simplify parse trees a bit. */
+      if ($2 == ATempty) $$ = makeStr(toATerm(""));
+      else if (ATgetNext($2) == ATempty) $$ = ATgetFirst($2);
+      else $$ = makeConcatStrings(ATreverse($2));
+  }
   | PATH { $$ = makePath(absParsedPath(data, $1)); }
   | URI { $$ = makeUri($1); }
   | '(' expr ')' { $$ = $2; }
@@ -155,6 +162,12 @@ expr_simple
   | '{' binds '}'
     { $$ = fixAttrs(0, $2); }
   | '[' expr_list ']' { $$ = makeList($2); }
+  ;
+
+string_parts
+  : string_parts STR { $$ = ATinsert($1, $2); }
+  | string_parts DOLLAR_CURLY expr '}' { backToString(scanner); $$ = ATinsert($1, $3); }
+  | { $$ = ATempty; }
   ;
 
 binds
