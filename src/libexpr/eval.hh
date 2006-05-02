@@ -29,7 +29,6 @@ struct EvalState
     DrvRoots drvRoots;
     DrvHashes drvHashes; /* normalised derivation hashes */
     SrcToStore srcToStore; 
-    Expr blackHole;
 
     unsigned int nrEvaluated;
     unsigned int nrCached;

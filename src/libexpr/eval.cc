@@ -6,8 +6,6 @@
 EvalState::EvalState()
     : normalForms(32768, 50)
 {
-    blackHole = makeBlackHole();
-    
     nrEvaluated = nrCached = 0;
 
     initNixExprHelpers();
@@ -490,14 +488,14 @@ Expr evalExpr(EvalState & state, Expr e)
        previously evaluated expressions. */
     Expr nf = state.normalForms.get(e);
     if (nf) {
-        if (nf == state.blackHole)
+        if (nf == makeBlackHole())
             throw Error("infinite recursion encountered");
         state.nrCached++;
         return nf;
     }
 
     /* Otherwise, evaluate and memoize. */
-    state.normalForms.set(e, state.blackHole);
+    state.normalForms.set(e, makeBlackHole());
     try {
         nf = evalExpr2(state, e);
     } catch (Error & err) {
@@ -536,5 +534,4 @@ void printEvalStats(EvalState & state)
         % state.nrEvaluated % state.nrCached
         % ((float) state.nrCached / (float) state.nrEvaluated * 100)
         % AT_calcAllocatedSize());
-    sleep(100);
 }

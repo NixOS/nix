@@ -99,8 +99,17 @@ while (<STDIN>) {
         
         print IMPL "AFun sym$funname = 0;\n";
         
+        if ($arity == 0) {
+            print HEADER "extern ATerm const$funname;\n\n";
+            print IMPL "ATerm const$funname = 0;\n";
+        }
+        
+        print HEADER "static inline $result make$funname($formals) __attribute__ ((pure, nothrow));\n";
         print HEADER "static inline $result make$funname($formals) {\n";
-        if ($arity <= 6) {
+        if ($arity == 0) {
+            print HEADER "    return const$funname;\n";
+        }
+        elsif ($arity <= 6) {
             print HEADER "    return (ATerm) ATmakeAppl$arity(sym$funname$args);\n";
         } else {
             $args =~ s/^,//;
@@ -119,6 +128,10 @@ while (<STDIN>) {
 
         $init .= "    sym$funname = ATmakeAFun(\"$const\", $arity, ATfalse);\n";
         $init .= "    ATprotectAFun(sym$funname);\n";
+        if ($arity == 0) {
+            $init .= "    const$funname = (ATerm) ATmakeAppl0(sym$funname);\n";
+            $init .= "    ATprotect(&const$funname);\n";
+        }
     }
 
     elsif (/^\s*(\w+)\s*=\s*(.*)$/) {
