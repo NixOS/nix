@@ -4,6 +4,8 @@
 #include <string>
 #include <map>
 
+#include <boost/shared_ptr.hpp>
+
 #include "eval.hh"
 
 
@@ -20,7 +22,7 @@ public:
     string name;
     string system;
 
-    ATermMap attrs;
+    shared_ptr<ATermMap> attrs;
 
     string queryDrvPath(EvalState & state) const;
     string queryOutPath(EvalState & state) const;

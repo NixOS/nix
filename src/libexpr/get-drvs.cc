@@ -5,7 +5,7 @@
 string DrvInfo::queryDrvPath(EvalState & state) const
 {
     if (drvPath == "") {
-        Expr a = attrs.get("drvPath");
+        Expr a = attrs->get("drvPath");
         (string &) drvPath = a ? evalPath(state, a) : "";
     }
     return drvPath;
@@ -15,7 +15,7 @@ string DrvInfo::queryDrvPath(EvalState & state) const
 string DrvInfo::queryOutPath(EvalState & state) const
 {
     if (outPath == "") {
-        Expr a = attrs.get("outPath");
+        Expr a = attrs->get("outPath");
         if (!a) throw Error("output path missing");
         (string &) outPath = evalPath(state, a);
     }
@@ -27,7 +27,7 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
 {
     MetaInfo meta;
     
-    Expr a = attrs.get("meta");
+    Expr a = attrs->get("meta");
     if (!a) return meta; /* fine, empty meta information */
 
     ATermMap attrs2;
@@ -66,10 +66,10 @@ static bool getDerivation(EvalState & state, Expr e,
         e = evalExpr(state, e);
         if (!matchAttrs(e, es)) return true;
 
-        ATermMap attrs;
-        queryAllAttrs(e, attrs, false);
+        shared_ptr<ATermMap> attrs(new ATermMap());
+        queryAllAttrs(e, *attrs, false);
     
-        Expr a = attrs.get("type");
+        Expr a = attrs->get("type");
         if (!a || evalString(state, a) != "derivation") return true;
 
         /* Remove spurious duplicates (e.g., an attribute set like
@@ -79,11 +79,11 @@ static bool getDerivation(EvalState & state, Expr e,
 
         DrvInfo drv;
     
-        a = attrs.get("name");
+        a = attrs->get("name");
         if (!a) throw badTerm("derivation name missing", e);
         drv.name = evalString(state, a);
 
-        a = attrs.get("system");
+        a = attrs->get("system");
         if (!a)
             drv.system = "unknown";
         else
