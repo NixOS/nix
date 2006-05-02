@@ -177,7 +177,7 @@ static void getDerivations(EvalState & state, Expr e,
                     format("evaluating attribute `%1%'") % aterm2String(*i));
                 if (getDerivation(state, drvMap.get(*i), drvs, doneExprs)) {
                     /* If the value of this attribute is itself an
-                       attribute self, should we recurse into it?
+                       attribute set, should we recurse into it?
                        => Only if it has a `recurseForDerivations = true'
                        attribute. */
                     ATermList es;

@@ -29,6 +29,19 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
     ATermMap subs(ATgetLength(formals) * 2);
     Expr undefined = makeUndefined();
 
+    /* ({x ? E1; y ? E2, z}: E3) {x = E4; z = E5;}
+
+       => let {x = E4; y = E2; z = E5; body = E3; }
+
+       => subst(E3, s)
+          s = {
+            R = rec {x = E4; y = E2; z = E5}
+            x -> R.x
+            y -> R.y
+            z -> R.z
+          }
+    */
+    
     /* Get the formal arguments. */
     for (ATermIterator i(formals); i; ++i) {
         Expr name, def;
@@ -278,7 +291,7 @@ Expr evalExpr2(EvalState & state, Expr e)
     if (matchVar(e, name)) {
         ATerm primOp = state.primOps.get(name);
         if (!primOp)
-            throw Error(format("impossible: undefined variable `%1%'") % name);
+            throw Error(format("impossible: undefined variable `%1%'") % aterm2String(name));
         int arity;
         ATermBlob fun;
         if (!matchPrimOpDef(primOp, arity, fun)) abort();
@@ -509,9 +522,16 @@ Expr evalFile(EvalState & state, const Path & path)
 }
 
 
+/* Yes, this is a really bad idea... */
+extern "C" {
+    unsigned long AT_calcAllocatedSize();
+}
+
 void printEvalStats(EvalState & state)
 {
-    debug(format("evaluated %1% expressions, %2% cache hits, %3%%% efficiency")
+    printMsg(lvlInfo,
+        format("evaluated %1% expressions, %2% cache hits, %3%%% efficiency, used %4% ATerm bytes")
         % state.nrEvaluated % state.nrCached
-        % ((float) state.nrCached / (float) state.nrEvaluated * 100));
+        % ((float) state.nrCached / (float) state.nrEvaluated * 100)
+        % AT_calcAllocatedSize());
 }

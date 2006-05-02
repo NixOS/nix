@@ -226,6 +226,8 @@ Expr substitute(const ATermMap & subs, Expr e)
 {
     checkInterrupt();
 
+    //if (subs.size() == 0) return e;
+
     ATerm name, pos, e2;
 
     /* As an optimisation, don't substitute in subterms known to be
@@ -255,7 +257,7 @@ Expr substitute(const ATermMap & subs, Expr e)
             subs2.remove(name);
         }
         return makeFunction(
-            (ATermList) substitute(subs, (ATerm) formals),
+            (ATermList) substitute(subs2, (ATerm) formals),
             substitute(subs2, body), pos);
     }
 
@@ -327,12 +329,15 @@ static void checkVarDefs2(set<Expr> & done, const ATermMap & defs, Expr e)
         ATermMap defs2(defs);
         for (ATermIterator i(formals); i; ++i) {
             Expr deflt;
-            if (!matchNoDefFormal(*i, name))
-                if (matchDefFormal(*i, name, deflt))
-                    checkVarDefs2(done, defs, deflt);
-                else
-                    abort();
+            if (!matchNoDefFormal(*i, name) &&
+                !matchDefFormal(*i, name, deflt))
+                abort();
             defs2.set(name, (ATerm) ATempty);
+        }
+        for (ATermIterator i(formals); i; ++i) {
+            Expr deflt;
+            if (matchDefFormal(*i, name, deflt))
+                checkVarDefs2(done, defs2, deflt);
         }
         checkVarDefs2(done, defs2, body);
     }
