@@ -60,6 +60,31 @@ private:
 typedef vector<ATerm> ATermVector;
 
 
+/* A substitution is a linked list of ATermMaps that map names to
+   identifiers.  We use a list of ATermMaps rather than a single to
+   make it easy to grow or shrink a substitution when entering a
+   scope. */
+struct Substitution
+{
+    ATermMap * map;
+    const Substitution * prev;
+
+    Substitution(const Substitution * prev, ATermMap * map)
+    {
+        this->prev = prev;
+        this->map = map;
+    }
+    
+    Expr lookup(Expr name) const
+    {
+        Expr x;
+        for (const Substitution * s(this); s; s = s->prev)
+            if (x = s->map->get(name)) return x;
+        return 0;
+    }
+};
+
+
 /* Show a position. */
 string showPos(ATerm pos);
 
@@ -85,7 +110,7 @@ Expr queryAttr(Expr e, const string & name, ATerm & pos);
 Expr makeAttrs(const ATermMap & attrs);
 
 /* Perform a set of substitutions on an expression. */
-Expr substitute(const ATermMap & subs, Expr e);
+Expr substitute(const Substitution & subs, Expr e);
 
 /* Check whether all variables are defined in the given expression.
    Throw an exception if this isn't the case. */

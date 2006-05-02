@@ -222,7 +222,7 @@ Expr makeAttrs(const ATermMap & attrs)
 }
 
 
-Expr substitute(const ATermMap & subs, Expr e)
+Expr substitute(const Substitution & subs, Expr e)
 {
     checkInterrupt();
 
@@ -235,7 +235,8 @@ Expr substitute(const ATermMap & subs, Expr e)
     if (matchClosed(e, e2)) return e;
 
     if (matchVar(e, name)) {
-        Expr sub = subs.get(name);
+        Expr sub = subs.lookup(name);
+        if (sub == makeRemoved()) sub = 0;
         Expr wrapped;
         /* Add a "closed" wrapper around terms that aren't already
            closed.  The check is necessary to prevent repeated
@@ -249,36 +250,37 @@ Expr substitute(const ATermMap & subs, Expr e)
     ATermList formals;
     ATerm body, def;
     if (matchFunction(e, formals, body, pos)) {
-        ATermMap subs2(subs);
+        ATermMap map;
         for (ATermIterator i(formals); i; ++i) {
             if (!matchNoDefFormal(*i, name) &&
                 !matchDefFormal(*i, name, def))
                 abort();
-            subs2.remove(name);
+            map.set(name, makeRemoved());
         }
+        Substitution subs2(&subs, &map);
         return makeFunction(
             (ATermList) substitute(subs2, (ATerm) formals),
             substitute(subs2, body), pos);
     }
 
     if (matchFunction1(e, name, body, pos)) {
-        ATermMap subs2(subs);
-        subs2.remove(name);
-        return makeFunction1(name, substitute(subs2, body), pos);
+        ATermMap map;
+        map.set(name, makeRemoved());
+        return makeFunction1(name, substitute(Substitution(&subs, &map), body), pos);
     }
         
     /* Idem for a mutually recursive attribute set. */
     ATermList rbnds, nrbnds;
     if (matchRec(e, rbnds, nrbnds)) {
-        ATermMap subs2(subs);
+        ATermMap map;
         for (ATermIterator i(rbnds); i; ++i)
-            if (matchBind(*i, name, e2, pos)) subs2.remove(name);
+            if (matchBind(*i, name, e2, pos)) map.set(name, makeRemoved());
             else abort(); /* can't happen */
         for (ATermIterator i(nrbnds); i; ++i)
-            if (matchBind(*i, name, e2, pos)) subs2.remove(name);
+            if (matchBind(*i, name, e2, pos)) map.set(name, makeRemoved());
             else abort(); /* can't happen */
         return makeRec(
-            (ATermList) substitute(subs2, (ATerm) rbnds),
+            (ATermList) substitute(Substitution(&subs, &map), (ATerm) rbnds),
             (ATermList) substitute(subs, (ATerm) nrbnds));
     }
 
@@ -286,11 +288,15 @@ Expr substitute(const ATermMap & subs, Expr e)
         AFun fun = ATgetAFun(e);
         int arity = ATgetArity(fun);
         ATerm args[arity];
+        bool changed = false;
 
-        for (int i = 0; i < arity; ++i)
-            args[i] = substitute(subs, ATgetArgument(e, i));
+        for (int i = 0; i < arity; ++i) {
+            ATerm arg = ATgetArgument(e, i);
+            args[i] = substitute(subs, arg);
+            if (args[i] != arg) changed = true;
+        }
         
-        return (ATerm) ATmakeApplArray(fun, args);
+        return changed ? (ATerm) ATmakeApplArray(fun, args) : e;
     }
 
     if (ATgetType(e) == AT_LIST) {

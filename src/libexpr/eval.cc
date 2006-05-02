@@ -71,7 +71,7 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
             throw Error(format("required function argument `%1%' missing")
                 % aterm2String(*i));
     
-    return substitute(subs, body);
+    return substitute(Substitution(0, &subs), body);
 }
 
 
@@ -97,11 +97,13 @@ ATerm expandRec(ATerm e, ATermList rbnds, ATermList nrbnds)
         subs.set(name, e2);
     }
 
+    Substitution subs_(0, &subs);
+
     /* Create the non-recursive set. */
     ATermMap as;
     for (ATermIterator i(rbnds); i; ++i) {
         if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
-        as.set(name, makeAttrRHS(substitute(subs, e2), pos));
+        as.set(name, makeAttrRHS(substitute(subs_, e2), pos));
     }
 
     /* Copy the non-recursive bindings.  !!! inefficient */
@@ -344,7 +346,7 @@ Expr evalExpr2(EvalState & state, Expr e)
             try {
                 ATermMap subs;
                 subs.set(name, e2);
-                return evalExpr(state, substitute(subs, e4));
+                return evalExpr(state, substitute(Substitution(0, &subs), e4));
             } catch (Error & e) {
                 e.addPrefix(format("while evaluating the function at %1%:\n")
                     % showPos(pos));
@@ -402,7 +404,7 @@ Expr evalExpr2(EvalState & state, Expr e)
             throw;
         }
         try {
-            e2 = substitute(attrs, e2);
+            e2 = substitute(Substitution(0, &attrs), e2);
             checkVarDefs(state.primOps, e2);
             return evalExpr(state, e2);
         } catch (Error & e) {
@@ -534,4 +536,5 @@ void printEvalStats(EvalState & state)
         % state.nrEvaluated % state.nrCached
         % ((float) state.nrCached / (float) state.nrEvaluated * 100)
         % AT_calcAllocatedSize());
+    sleep(100);
 }

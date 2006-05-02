@@ -30,6 +30,7 @@ Uri | string | Expr |
 List | ATermList | Expr |
 BlackHole | | Expr |
 Undefined | | Expr |
+Removed | | Expr |
 PrimOp | int ATermBlob ATermList | Expr |
 Attrs | ATermList | Expr |
 Closed | Expr | Expr |
