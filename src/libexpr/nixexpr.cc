@@ -142,12 +142,12 @@ ATerm bottomupRewrite(TermFun & f, ATerm e)
     if (ATgetType(e) == AT_APPL) {
         AFun fun = ATgetAFun(e);
         int arity = ATgetArity(fun);
-        ATermList args = ATempty;
+        ATerm args[arity];
 
-        for (int i = arity - 1; i >= 0; i--)
-            args = ATinsert(args, bottomupRewrite(f, ATgetArgument(e, i)));
+        for (int i = 0; i < arity; ++i)
+            args[i] = bottomupRewrite(f, ATgetArgument(e, i));
         
-        e = (ATerm) ATmakeApplList(fun, args);
+        e = (ATerm) ATmakeApplArray(fun, args);
     }
 
     else if (ATgetType(e) == AT_LIST) {
@@ -285,19 +285,24 @@ Expr substitute(const ATermMap & subs, Expr e)
     if (ATgetType(e) == AT_APPL) {
         AFun fun = ATgetAFun(e);
         int arity = ATgetArity(fun);
-        ATermList args = ATempty;
+        ATerm args[arity];
 
-        for (int i = arity - 1; i >= 0; i--)
-            args = ATinsert(args, substitute(subs, ATgetArgument(e, i)));
+        for (int i = 0; i < arity; ++i)
+            args[i] = substitute(subs, ATgetArgument(e, i));
         
-        return (ATerm) ATmakeApplList(fun, args);
+        return (ATerm) ATmakeApplArray(fun, args);
     }
 
     if (ATgetType(e) == AT_LIST) {
+        unsigned int len = ATgetLength((ATermList) e);
+        ATerm es[len];
+        ATermIterator i((ATermList) e);
+        for (unsigned int j = 0; i; ++i, ++j)
+            es[j] = substitute(subs, *i);
         ATermList out = ATempty;
-        for (ATermIterator i((ATermList) e); i; ++i)
-            out = ATinsert(out, substitute(subs, *i));
-        return (ATerm) ATreverse(out);
+        for (unsigned int j = len; j; --j)
+            out = ATinsert(out, es[j - 1]);
+        return (ATerm) out;
     }
 
     return e;
