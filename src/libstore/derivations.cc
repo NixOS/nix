@@ -46,7 +46,10 @@ static void parseStrings(ATermList paths, StringSet & out, bool arePaths)
 }
 
 
-void throwBadDrv(ATerm t)
+/* Shut up warnings. */
+void throwBadDrv(ATerm t) __attribute__ ((noreturn));
+
+void throwBadDrv(ATerm t) 
 {
     throw badTerm("not a valid derivation", t);
 }
@@ -110,18 +113,18 @@ Derivation parseDerivation(ATerm t)
 static ATermList unparseStrings(const StringSet & paths)
 {
     ATermList l = ATempty;
-    for (PathSet::const_iterator i = paths.begin();
-         i != paths.end(); ++i)
+    for (PathSet::const_reverse_iterator i = paths.rbegin();
+         i != paths.rend(); ++i)
         l = ATinsert(l, toATerm(*i));
-    return ATreverse(l);
+    return l;
 }
 
 
 ATerm unparseDerivation(const Derivation & drv)
 {
     ATermList outputs = ATempty;
-    for (DerivationOutputs::const_iterator i = drv.outputs.begin();
-         i != drv.outputs.end(); ++i)
+    for (DerivationOutputs::const_reverse_iterator i = drv.outputs.rbegin();
+         i != drv.outputs.rend(); ++i)
         outputs = ATinsert(outputs,
             makeDerivationOutput(
                 toATerm(i->first),
@@ -130,34 +133,34 @@ ATerm unparseDerivation(const Derivation & drv)
                 toATerm(i->second.hash)));
 
     ATermList inDrvs = ATempty;
-    for (DerivationInputs::const_iterator i = drv.inputDrvs.begin();
-         i != drv.inputDrvs.end(); ++i)
+    for (DerivationInputs::const_reverse_iterator i = drv.inputDrvs.rbegin();
+         i != drv.inputDrvs.rend(); ++i)
         inDrvs = ATinsert(inDrvs,
             makeDerivationInput(
                 toATerm(i->first),
                 unparseStrings(i->second)));
     
     ATermList args = ATempty;
-    for (Strings::const_iterator i = drv.args.begin();
-         i != drv.args.end(); ++i)
+    for (Strings::const_reverse_iterator i = drv.args.rbegin();
+         i != drv.args.rend(); ++i)
         args = ATinsert(args, toATerm(*i));
 
     ATermList env = ATempty;
-    for (StringPairs::const_iterator i = drv.env.begin();
-         i != drv.env.end(); ++i)
+    for (StringPairs::const_reverse_iterator i = drv.env.rbegin();
+         i != drv.env.rend(); ++i)
         env = ATinsert(env,
             makeEnvBinding(
                 toATerm(i->first),
                 toATerm(i->second)));
 
     return makeDerive(
-        ATreverse(outputs),
-        ATreverse(inDrvs),
+        outputs,
+        inDrvs,
         unparseStrings(drv.inputSrcs),
         toATerm(drv.platform),
         toATerm(drv.builder),
-        ATreverse(args),
-        ATreverse(env));
+        args,
+        env);
 }
 
 

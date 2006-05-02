@@ -218,7 +218,7 @@ Expr makeAttrs(const ATermMap & attrs)
             abort(); /* can't happen */
         bnds = ATinsert(bnds, makeBind(*i, e, pos));
     }
-    return makeAttrs(ATreverse(bnds));
+    return makeAttrs(bnds);
 }
 
 
