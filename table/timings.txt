@@ -1,0 +1,19 @@
+[eelco@tyros:~/Dev/nix/table]$ time ./a.out
+testing...
+SET: 3000000 3400626 1.13354 10
+GET: 10000000 13034450 1.30344
+
+real    0m1.981s
+user    0m1.972s
+sys     0m0.008s
+
+
+# Floating point -> fixed point
+[eelco@tyros:~/Dev/nix/table]$ time ./a.out
+testing...
+SET: 3000000 3400506 1.1335 9
+GET: 10000000 13032311 1.30323
+
+real    0m0.956s
+user    0m0.928s
+sys     0m0.024s
