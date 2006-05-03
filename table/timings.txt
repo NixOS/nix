@@ -17,3 +17,14 @@ GET: 10000000 13032311 1.30323
 real    0m0.956s
 user    0m0.928s
 sys     0m0.024s
+
+
+[eelco@tyros:~/Dev/nix/table]$ time ./a.out
+testing...
+RESIZES: 0
+SET: 30000000 35420570 1.18069
+GET: 40000000 49507966 1.2377
+
+real    0m3.796s
+user    0m3.700s
+sys     0m0.016s
