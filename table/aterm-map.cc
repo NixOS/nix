@@ -23,7 +23,7 @@ private:
     KeyValue * hashTable;
 
     /* Current size of the hash table. */
-    unsigned int size;
+    unsigned int capacity;
 
     /* Number of elements in the hash table. */
     unsigned int count;
@@ -49,6 +49,8 @@ public:
 
     void remove(ATerm key);
 
+    unsigned int size();
+
 private:
     void init(unsigned int expectedCount);
 
@@ -56,7 +58,7 @@ private:
 
     void resizeTable(unsigned int expectedCount);
 
-    void copy(KeyValue * elements, unsigned int size);
+    void copy(KeyValue * elements, unsigned int capacity);
     
     inline unsigned int hash1(ATerm key) const;
     inline unsigned int hash2(ATerm key) const;
@@ -72,7 +74,7 @@ ATermMap::ATermMap(unsigned int expectedCount)
 ATermMap::ATermMap(const ATermMap & map)
 {
     init(map.maxCount);
-    copy(map.hashTable, map.size);
+    copy(map.hashTable, map.capacity);
 }
 
 
@@ -81,7 +83,7 @@ ATermMap & ATermMap::operator = (const ATermMap & map)
     if (this == &map) return *this;
     free();
     init(map.maxCount);
-    copy(map.hashTable, map.size);
+    copy(map.hashTable, map.capacity);
     return *this;
 }
 
@@ -95,7 +97,7 @@ ATermMap::~ATermMap()
 void ATermMap::init(unsigned int expectedCount)
 {
     assert(sizeof(ATerm) * 2 == sizeof(KeyValue));
-    size = 0;
+    capacity = 0;
     count = 0;
     maxCount = 0;
     hashTable = 0;
@@ -133,20 +135,20 @@ void ATermMap::resizeTable(unsigned int expectedCount)
 //     cout << maxCount << " " << size << endl;
 //     cout << (double) size / maxCount << endl;
 
-    unsigned int oldSize = size;
+    unsigned int oldCapacity = capacity;
     KeyValue * oldHashTable = hashTable;
 
     maxCount = expectedCount;
-    size = roundToPowerOf2(maxCount * maxLoadFactor);
-    hashTable = (KeyValue *) calloc(sizeof(KeyValue), size);
-    ATprotectArray((ATerm *) hashTable, size * 2);
+    capacity = roundToPowerOf2(maxCount * maxLoadFactor);
+    hashTable = (KeyValue *) calloc(sizeof(KeyValue), capacity);
+    ATprotectArray((ATerm *) hashTable, capacity * 2);
     
-//     cout << size << endl;
+//     cout << capacity << endl;
 
     /* Re-hash the elements in the old table. */
-    if (oldSize != 0) {
+    if (oldCapacity != 0) {
         count = 0;
-        copy(oldHashTable, oldSize);
+        copy(oldHashTable, oldCapacity);
         ATunprotectArray((ATerm *) oldHashTable);
         ::free(oldHashTable);
         nrResizes++;
@@ -154,9 +156,9 @@ void ATermMap::resizeTable(unsigned int expectedCount)
 }
 
 
-void ATermMap::copy(KeyValue * elements, unsigned int size)
+void ATermMap::copy(KeyValue * elements, unsigned int capacity)
 {
-    for (unsigned int i = 0; i < size; ++i)
+    for (unsigned int i = 0; i < capacity; ++i)
         if (elements[i].value) /* i.e., non-empty, non-deleted element */
             set(elements[i].key, elements[i].value);
 }
@@ -174,10 +176,10 @@ unsigned int ATermMap::hash1(ATerm key) const
 
     /* Approximately equal to:
     double d = key2 * 0.6180339887;
-    unsigned int h = (int) (size * (d - floor(d)));
+    unsigned int h = (int) (capacity * (d - floor(d)));
     */
  
-    unsigned int h = (size * ((key2 * knuth) & ((1 << shift) - 1))) >> shift;
+    unsigned int h = (capacity * ((key2 * knuth) & ((1 << shift) - 1))) >> shift;
 
     return h;
 }
@@ -186,9 +188,10 @@ unsigned int ATermMap::hash1(ATerm key) const
 unsigned int ATermMap::hash2(ATerm key) const
 {
     unsigned int key2 = ((unsigned int) key) >> 2;
-    /* Note: the result must be relatively prime to `size' (which is a
-       power of 2), so we make sure that the result is always odd. */
-    unsigned int h = ((key2 * 134217689) & (size - 1)) | 1;
+    /* Note: the result must be relatively prime to `capacity' (which
+       is a power of 2), so we make sure that the result is always
+       odd. */
+    unsigned int h = ((key2 * 134217689) & (capacity - 1)) | 1;
     return h;
 }
 
@@ -199,21 +202,21 @@ static unsigned int nrSetProbes = 0;
 
 void ATermMap::set(ATerm key, ATerm value)
 {
-    if (count == maxCount) resizeTable(size * 2 / maxLoadFactor);
+    if (count == maxCount) resizeTable(capacity * 2 / maxLoadFactor);
     
     nrItemsSet++;
-    for (unsigned int i = 0, h = hash1(key); i < size;
-         ++i, h = (h + hash2(key)) & (size - 1))
+    for (unsigned int i = 0, h = hash1(key); i < capacity;
+         ++i, h = (h + hash2(key)) & (capacity - 1))
     {
-        // assert(h < size);
+        // assert(h < capacity);
         nrSetProbes++;
         /* Note: to see whether a slot is free, we check
            hashTable[h].value, not hashTable[h].key, since we use
            value == 0 to mark deleted slots. */
         if (hashTable[h].value == 0 || hashTable[h].key == key) {
+            if (hashTable[h].value == 0) count++;
             hashTable[h].key = key;
             hashTable[h].value = value;
-            count++;
             return;
         }
     }
@@ -229,8 +232,8 @@ static unsigned int nrGetProbes = 0;
 ATerm ATermMap::get(ATerm key) const
 {
     nrItemsGet++;
-    for (unsigned int i = 0, h = hash1(key); i < size;
-         ++i, h = (h + hash2(key)) & (size - 1))
+    for (unsigned int i = 0, h = hash1(key); i < capacity;
+         ++i, h = (h + hash2(key)) & (capacity - 1))
     {
         nrGetProbes++;
         if (hashTable[h].key == 0) return 0;
@@ -242,15 +245,24 @@ ATerm ATermMap::get(ATerm key) const
 
 void ATermMap::remove(ATerm key)
 {
-    for (unsigned int i = 0, h = hash1(key); i < size;
-         ++i, h = (h + hash2(key)) & (size - 1))
+    for (unsigned int i = 0, h = hash1(key); i < capacity;
+         ++i, h = (h + hash2(key)) & (capacity - 1))
     {
         if (hashTable[h].key == 0) return;
         if (hashTable[h].key == key) {
-            hashTable[h].value = 0;
+            if (hashTable[h].value != 0) {
+                hashTable[h].value = 0;
+                count--;
+            }
             return;
         }
     }
+}
+
+
+unsigned int ATermMap::size()
+{
+    return count; /* STL nomenclature */
 }
 
 
@@ -295,8 +307,11 @@ int main(int argc, char * * argv)
             map.set(keys[i], values[i]);
             // cerr << "INSERT: " << keys[i] << " " << values[i] << endl;
         }
+        unsigned int size = map.size();
+        assert(size <= n);
         values[n - 1] = 0;
         map.remove(keys[n - 1]);
+        assert(map.size() == size - 1);
         for (unsigned int i = 0; i < n; ++i) {
             if (map.get(keys[i]) != values[i]) {
                 for (unsigned int j = i + 1; j < n; ++j)
