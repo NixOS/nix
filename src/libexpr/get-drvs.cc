@@ -5,7 +5,7 @@
 string DrvInfo::queryDrvPath(EvalState & state) const
 {
     if (drvPath == "") {
-        Expr a = attrs->get("drvPath");
+        Expr a = attrs->get(toATerm("drvPath"));
         (string &) drvPath = a ? evalPath(state, a) : "";
     }
     return drvPath;
@@ -15,7 +15,7 @@ string DrvInfo::queryDrvPath(EvalState & state) const
 string DrvInfo::queryOutPath(EvalState & state) const
 {
     if (outPath == "") {
-        Expr a = attrs->get("outPath");
+        Expr a = attrs->get(toATerm("outPath"));
         if (!a) throw Error("output path missing");
         (string &) outPath = evalPath(state, a);
     }
@@ -27,16 +27,16 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
 {
     MetaInfo meta;
     
-    Expr a = attrs->get("meta");
+    Expr a = attrs->get(toATerm("meta"));
     if (!a) return meta; /* fine, empty meta information */
 
-    ATermMap attrs2;
+    ATermMap attrs2(16); /* !!! */
     queryAllAttrs(evalExpr(state, a), attrs2);
 
-    for (ATermIterator i(attrs2.keys()); i; ++i) {
-        ATerm s = coerceToString(evalExpr(state, attrs2.get(*i)));
+    for (ATermMap::const_iterator i = attrs2.begin(); i != attrs2.end(); ++i) {
+        ATerm s = coerceToString(evalExpr(state, i->value));
         if (s)
-            meta[aterm2String(*i)] = aterm2String(s);
+            meta[aterm2String(i->key)] = aterm2String(s);
         /* For future compatibility, ignore attribute values that are
            not strings. */
     }
@@ -66,10 +66,10 @@ static bool getDerivation(EvalState & state, Expr e,
         e = evalExpr(state, e);
         if (!matchAttrs(e, es)) return true;
 
-        shared_ptr<ATermMap> attrs(new ATermMap());
+        shared_ptr<ATermMap> attrs(new ATermMap(32)); /* !!! */
         queryAllAttrs(e, *attrs, false);
     
-        Expr a = attrs->get("type");
+        Expr a = attrs->get(toATerm("type"));
         if (!a || evalString(state, a) != "derivation") return true;
 
         /* Remove spurious duplicates (e.g., an attribute set like
@@ -79,11 +79,11 @@ static bool getDerivation(EvalState & state, Expr e,
 
         DrvInfo drv;
     
-        a = attrs->get("name");
+        a = attrs->get(toATerm("name"));
         if (!a) throw badTerm("derivation name missing", e);
         drv.name = evalString(state, a);
 
-        a = attrs->get("system");
+        a = attrs->get(toATerm("system"));
         if (!a)
             drv.system = "unknown";
         else
@@ -128,7 +128,7 @@ static void getDerivations(EvalState & state, Expr e,
                 abort(); /* can't happen */
         }
         getDerivations(state,
-            makeCall(e, makeAttrs(ATermMap())),
+            makeCall(e, makeAttrs(ATermMap(0))),
             drvs, doneExprs, attrPath);
         return;
     }
@@ -169,30 +169,30 @@ static void getDerivations(EvalState & state, Expr e,
 
     if (matchAttrs(e, es)) {
         if (apType != apNone && apType != apAttr) throw attrError;
-        ATermMap drvMap;
+        ATermMap drvMap(ATgetLength(es));
         queryAllAttrs(e, drvMap);
         if (apType == apNone) {
-            for (ATermIterator i(drvMap.keys()); i; ++i) {
+            for (ATermMap::const_iterator i = drvMap.begin(); i != drvMap.end(); ++i) {
                 startNest(nest, lvlDebug,
-                    format("evaluating attribute `%1%'") % aterm2String(*i));
-                if (getDerivation(state, drvMap.get(*i), drvs, doneExprs)) {
+                    format("evaluating attribute `%1%'") % aterm2String(i->key));
+                if (getDerivation(state, i->value, drvs, doneExprs)) {
                     /* If the value of this attribute is itself an
                        attribute set, should we recurse into it?
                        => Only if it has a `recurseForDerivations = true'
                        attribute. */
                     ATermList es;
-                    Expr e = evalExpr(state, drvMap.get(*i));
+                    Expr e = evalExpr(state, i->value);
                     if (matchAttrs(e, es)) {
-                        ATermMap attrs;
+                        ATermMap attrs(ATgetLength(es));
                         queryAllAttrs(e, attrs, false);
-                        if (attrs.get("recurseForDerivations") &&
-                            evalBool(state, attrs.get("recurseForDerivations")))
+                        Expr e2 = attrs.get(toATerm("recurseForDerivations"));
+                        if (e2 && evalBool(state, e2))
                             getDerivations(state, e, drvs, doneExprs, attrPathRest);
                     }
                 }
             }
         } else {
-            Expr e2 = drvMap.get(attr);
+            Expr e2 = drvMap.get(toATerm(attr));
             if (!e2) throw Error(format("attribute `%1%' in selection path not found") % attr);
             startNest(nest, lvlDebug,
                 format("evaluating attribute `%1%'") % attr);

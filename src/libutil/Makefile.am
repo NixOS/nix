@@ -1,7 +1,8 @@
 lib_LTLIBRARIES = libutil.la
 
 libutil_la_SOURCES = util.cc util.hh hash.cc hash.hh \
- archive.cc archive.hh aterm.cc aterm.hh
+ archive.cc archive.hh aterm.cc aterm.hh \
+ aterm-map.cc aterm-map.hh
 
 if !HAVE_OPENSSL
 libutil_la_SOURCES += \

@@ -4,7 +4,7 @@
 
 
 EvalState::EvalState()
-    : normalForms(32768, 50)
+    : normalForms(32768), primOps(128)
 {
     nrEvaluated = nrCached = 0;
 
@@ -17,7 +17,7 @@ EvalState::EvalState()
 void EvalState::addPrimOp(const string & name,
     unsigned int arity, PrimOp primOp)
 {
-    primOps.set(name, makePrimOpDef(arity, ATmakeBlob(0, (void *) primOp)));
+    primOps.set(toATerm(name), makePrimOpDef(arity, ATmakeBlob(0, (void *) primOp)));
 }
 
 
@@ -25,7 +25,6 @@ void EvalState::addPrimOp(const string & name,
 static Expr substArgs(Expr body, ATermList formals, Expr arg)
 {
     ATermMap subs(ATgetLength(formals) * 2);
-    Expr undefined = makeUndefined();
 
     /* ({x ? E1; y ? E2, z}: E3) {x = E4; z = E5;}
 
@@ -44,7 +43,7 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
     for (ATermIterator i(formals); i; ++i) {
         Expr name, def;
         if (matchNoDefFormal(*i, name))
-            subs.set(name, undefined);
+            subs.set(name, makeUndefined());
         else if (matchDefFormal(*i, name, def))
             subs.set(name, def);
         else abort(); /* can't happen */
@@ -52,22 +51,21 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
 
     /* Get the actual arguments, and check that they match with the
        formals. */
-    ATermMap args;
+    ATermMap args(128); /* !!! fix */
     queryAllAttrs(arg, args);
-    for (ATermIterator i(args.keys()); i; ++i) {
-        Expr key = *i;
-        Expr cur = subs.get(key);
-        if (!cur)
+    for (ATermMap::const_iterator i = args.begin(); i != args.end(); ++i) {
+        Expr cur = subs.get(i->key);
+        if (!subs.get(i->key))
             throw Error(format("unexpected function argument `%1%'")
-                % aterm2String(key));
-        subs.set(key, args.get(key));
+                % aterm2String(i->key));
+        subs.set(i->key, i->value);
     }
 
     /* Check that all arguments are defined. */
-    for (ATermIterator i(subs.keys()); i; ++i)
-        if (subs.get(*i) == undefined)
+    for (ATermMap::const_iterator i = subs.begin(); i != subs.end(); ++i)
+        if (i->value == makeUndefined())
             throw Error(format("required function argument `%1%' missing")
-                % aterm2String(*i));
+                % aterm2String(i->key));
     
     return substitute(Substitution(0, &subs), body);
 }
@@ -85,7 +83,7 @@ ATerm expandRec(ATerm e, ATermList rbnds, ATermList nrbnds)
     Pos pos;
 
     /* Create the substitution list. */
-    ATermMap subs;
+    ATermMap subs(ATgetLength(rbnds) + ATgetLength(nrbnds));
     for (ATermIterator i(rbnds); i; ++i) {
         if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
         subs.set(name, makeSelect(e, name));
@@ -98,7 +96,7 @@ ATerm expandRec(ATerm e, ATermList rbnds, ATermList nrbnds)
     Substitution subs_(0, &subs);
 
     /* Create the non-recursive set. */
-    ATermMap as;
+    ATermMap as(ATgetLength(rbnds) + ATgetLength(nrbnds));
     for (ATermIterator i(rbnds); i; ++i) {
         if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
         as.set(name, makeAttrRHS(substitute(subs_, e2), pos));
@@ -118,7 +116,7 @@ static Expr updateAttrs(Expr e1, Expr e2)
 {
     /* Note: e1 and e2 should be in normal form. */
 
-    ATermMap attrs;
+    ATermMap attrs(128); /* !!! */
     queryAllAttrs(e1, attrs, true);
     queryAllAttrs(e2, attrs, true);
 
@@ -217,12 +215,12 @@ string coerceToStringWithContext(EvalState & state,
     }
 
     if (matchAttrs(e, es)) {
-        ATermMap attrs;
+        ATermMap attrs(128); /* !!! */
         queryAllAttrs(e, attrs, false);
 
-        Expr a = attrs.get("type");
+        Expr a = attrs.get(toATerm("type"));
         if (a && evalString(state, a) == "derivation") {
-            a = attrs.get("outPath");
+            a = attrs.get(toATerm("outPath"));
             if (!a) throw Error("output path missing from derivation");
             context = ATinsert(context, e);
             return evalPath(state, a);
@@ -342,7 +340,7 @@ Expr evalExpr2(EvalState & state, Expr e)
         
         else if (matchFunction1(e1, name, e4, pos)) {
             try {
-                ATermMap subs;
+                ATermMap subs(1);
                 subs.set(name, e2);
                 return evalExpr(state, substitute(Substitution(0, &subs), e4));
             } catch (Error & e) {
@@ -392,7 +390,7 @@ Expr evalExpr2(EvalState & state, Expr e)
 
     /* Withs. */
     if (matchWith(e, e1, e2, pos)) {
-        ATermMap attrs;
+        ATermMap attrs(128); /* !!! */
         try {
             e1 = evalExpr(state, e1);
             queryAllAttrs(e1, attrs);
@@ -442,7 +440,7 @@ Expr evalExpr2(EvalState & state, Expr e)
 
     /* Attribute existence test (?). */
     if (matchOpHasAttr(e, e1, name)) {
-        ATermMap attrs;
+        ATermMap attrs(128); /* !!! */
         queryAllAttrs(evalExpr(state, e1), attrs);
         return makeBool(attrs.get(name) != 0);
     }

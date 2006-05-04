@@ -5,6 +5,7 @@
 
 #include <aterm2.h>
 
+#include "aterm-map.hh"
 #include "util.hh"
 
 
@@ -14,44 +15,6 @@
 typedef ATerm Expr;
 
 typedef ATerm Pos;
-
-
-/* Mappings from ATerms to ATerms.  This is just a wrapper around
-   ATerm tables. */
-class ATermMap
-{
-private:
-    unsigned int maxLoadPct;
-    ATermTable table;
-    
-public:
-    ATermMap(unsigned int initialSize = 64, unsigned int maxLoadPct = 75);
-    ATermMap(const ATermMap & map);
-    ~ATermMap();
-
-    ATermMap & operator = (const ATermMap & map);
-        
-    void set(ATerm key, ATerm value);
-    void set(const string & key, ATerm value);
-
-    ATerm get(ATerm key) const;
-    ATerm get(const string & key) const;
-
-    void remove(ATerm key);
-    void remove(const string & key);
-
-    ATermList keys() const;
-
-    void add(const ATermMap & map);
-    
-    void reset();
-
-private:
-    void add(const ATermMap & map, ATermList & keys);
-
-    void free();
-    void copy(const ATermMap & map);
-};
 
 
 /* A STL vector of ATerms.  Should be used with great care since it's

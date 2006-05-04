@@ -6,124 +6,6 @@
 #include "nixexpr-ast.cc"
 
 
-ATermMap::ATermMap(unsigned int initialSize, unsigned int maxLoadPct)
-    : table(0)
-{
-    this->maxLoadPct = maxLoadPct;
-    table = ATtableCreate(initialSize, maxLoadPct);
-    if (!table) throw Error("cannot create ATerm table");
-}
-
-
-ATermMap::ATermMap(const ATermMap & map)
-    : table(0)
-{
-    copy(map);
-}
-
-
-ATermMap::~ATermMap()
-{
-    free();
-}
-
-
-ATermMap & ATermMap::operator = (const ATermMap & map)
-{
-    if (this == &map) return *this;
-    free();
-    copy(map);
-    return *this;
-}
-
-
-void ATermMap::free()
-{
-    if (table) {
-        ATtableDestroy(table);
-        table = 0;
-    }
-}
-
-
-void ATermMap::copy(const ATermMap & map)
-{
-    ATermList keys = map.keys();
-
-    /* !!! We adjust for the maximum load pct by allocating twice as
-       much.  Probably a bit too much. */
-    maxLoadPct = map.maxLoadPct;
-    table = ATtableCreate(ATgetLength(keys) * 2, maxLoadPct);
-    if (!table) throw Error("cannot create ATerm table");
-
-    add(map, keys);
-}
-
-
-void ATermMap::set(ATerm key, ATerm value)
-{
-    return ATtablePut(table, key, value);
-}
-
-
-void ATermMap::set(const string & key, ATerm value)
-{
-    set(toATerm(key), value);
-}
-
-
-ATerm ATermMap::get(ATerm key) const
-{
-    return ATtableGet(table, key);
-}
-
-
-ATerm ATermMap::get(const string & key) const
-{
-    return get(toATerm(key));
-}
-
-
-void ATermMap::remove(ATerm key)
-{
-    ATtableRemove(table, key);
-}
-
-
-void ATermMap::remove(const string & key)
-{
-    remove(toATerm(key));
-}
-
-
-ATermList ATermMap::keys() const
-{
-    ATermList keys = ATtableKeys(table);
-    if (!keys) throw Error("cannot query aterm map keys");
-    return keys;
-}
-
-
-void ATermMap::add(const ATermMap & map)
-{
-    ATermList keys = map.keys();
-    add(map, keys);
-}
-
-
-void ATermMap::add(const ATermMap & map, ATermList & keys)
-{
-    for (ATermIterator i(keys); i; ++i)
-        set(*i, map.get(*i));
-}
-
-
-void ATermMap::reset()
-{
-    ATtableReset(table);
-}
-
-
 string showPos(ATerm pos)
 {
     ATerm path;
@@ -211,12 +93,12 @@ Expr queryAttr(Expr e, const string & name, ATerm & pos)
 Expr makeAttrs(const ATermMap & attrs)
 {
     ATermList bnds = ATempty;
-    for (ATermIterator i(attrs.keys()); i; ++i) {
+    for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
         Expr e;
         ATerm pos;
-        if (!matchAttrRHS(attrs.get(*i), e, pos))
+        if (!matchAttrRHS(i->value, e, pos))
             abort(); /* can't happen */
-        bnds = ATinsert(bnds, makeBind(*i, e, pos));
+        bnds = ATinsert(bnds, makeBind(i->key, e, pos));
     }
     return makeAttrs(bnds);
 }
@@ -250,7 +132,7 @@ Expr substitute(const Substitution & subs, Expr e)
     ATermList formals;
     ATerm body, def;
     if (matchFunction(e, formals, body, pos)) {
-        ATermMap map;
+        ATermMap map(ATgetLength(formals));
         for (ATermIterator i(formals); i; ++i) {
             if (!matchNoDefFormal(*i, name) &&
                 !matchDefFormal(*i, name, def))
@@ -264,7 +146,7 @@ Expr substitute(const Substitution & subs, Expr e)
     }
 
     if (matchFunction1(e, name, body, pos)) {
-        ATermMap map;
+        ATermMap map(1);
         map.set(name, makeRemoved());
         return makeFunction1(name, substitute(Substitution(&subs, &map), body), pos);
     }
@@ -272,7 +154,7 @@ Expr substitute(const Substitution & subs, Expr e)
     /* Idem for a mutually recursive attribute set. */
     ATermList rbnds, nrbnds;
     if (matchRec(e, rbnds, nrbnds)) {
-        ATermMap map;
+        ATermMap map(ATgetLength(rbnds) + ATgetLength(nrbnds));
         for (ATermIterator i(rbnds); i; ++i)
             if (matchBind(*i, name, e2, pos)) map.set(name, makeRemoved());
             else abort(); /* can't happen */

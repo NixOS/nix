@@ -234,11 +234,11 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
 {
     startNest(nest, lvlVomit, "evaluating derivation");
 
-    ATermMap attrs;
+    ATermMap attrs(128); /* !!! */
     queryAllAttrs(evalExpr(state, args[0]), attrs, true);
 
     /* Figure out the name already (for stack backtraces). */
-    Expr eDrvName = attrs.get("name");
+    Expr eDrvName = attrs.get(toATerm("name"));
     if (!eDrvName)
         throw Error("required attribute `name' missing");
     ATerm posDrvName;
@@ -252,11 +252,11 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
     string outputHashAlgo;
     bool outputHashRecursive = false;
 
-    for (ATermIterator i(attrs.keys()); i; ++i) {
-        string key = aterm2String(*i);
+    for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
+        string key = aterm2String(i->key);
         ATerm value;
         Expr pos;
-        ATerm rhs = attrs.get(key);
+        ATerm rhs = i->value;
         if (!matchAttrRHS(rhs, value, pos)) abort();
         startNest(nest, lvlVomit, format("processing attribute `%1%'") % key);
 
@@ -363,9 +363,11 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
     state.drvHashes[drvPath] = hashDerivationModulo(state, drv);
 
     /* !!! assumes a single output */
-    ATermMap outAttrs;
-    outAttrs.set("outPath", makeAttrRHS(makePath(toATerm(outPath)), makeNoPos()));
-    outAttrs.set("drvPath", makeAttrRHS(makePath(toATerm(drvPath)), makeNoPos()));
+    ATermMap outAttrs(2);
+    outAttrs.set(toATerm("outPath"),
+        makeAttrRHS(makePath(toATerm(outPath)), makeNoPos()));
+    outAttrs.set(toATerm("drvPath"),
+        makeAttrRHS(makePath(toATerm(drvPath)), makeNoPos()));
 
     return makeAttrs(outAttrs);
 }
@@ -374,15 +376,18 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
 static Expr primDerivationLazy(EvalState & state, const ATermVector & args)
 {
     Expr eAttrs = evalExpr(state, args[0]);
-    ATermMap attrs;
+    ATermMap attrs(128); /* !!! */
     queryAllAttrs(eAttrs, attrs, true);
 
-    attrs.set("type", makeAttrRHS(makeStr(toATerm("derivation")), makeNoPos()));
+    attrs.set(toATerm("type"),
+        makeAttrRHS(makeStr(toATerm("derivation")), makeNoPos()));
 
     Expr drvStrict = makeCall(makeVar(toATerm("derivation!")), eAttrs);
 
-    attrs.set("outPath", makeAttrRHS(makeSelect(drvStrict, toATerm("outPath")), makeNoPos()));
-    attrs.set("drvPath", makeAttrRHS(makeSelect(drvStrict, toATerm("drvPath")), makeNoPos()));
+    attrs.set(toATerm("outPath"),
+        makeAttrRHS(makeSelect(drvStrict, toATerm("outPath")), makeNoPos()));
+    attrs.set(toATerm("drvPath"),
+        makeAttrRHS(makeSelect(drvStrict, toATerm("drvPath")), makeNoPos()));
     
     return makeAttrs(attrs);
 }
@@ -627,14 +632,14 @@ static Expr primCurrentTime(EvalState & state, const ATermVector & args)
 
 static Expr primRemoveAttrs(EvalState & state, const ATermVector & args)
 {
-    ATermMap attrs;
+    ATermMap attrs(128); /* !!! */
     queryAllAttrs(evalExpr(state, args[0]), attrs, true);
     
     ATermList list = evalList(state, args[1]);
 
     for (ATermIterator i(list); i; ++i)
         /* It's not an error for *i not to exist. */
-        attrs.remove(evalString(state, *i));
+        attrs.remove(toATerm(evalString(state, *i)));
 
     return makeAttrs(attrs);
 }

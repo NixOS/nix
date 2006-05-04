@@ -115,7 +115,7 @@ static void checkAttrSets(ATerm e)
     ATermList formals;
     ATerm body, pos;
     if (matchFunction(e, formals, body, pos)) {
-        ATermMap names;
+        ATermMap names(ATgetLength(formals));
         for (ATermIterator i(formals); i; ++i) {
             ATerm name;
             Expr deflt;
@@ -131,13 +131,13 @@ static void checkAttrSets(ATerm e)
 
     ATermList bnds;
     if (matchAttrs(e, bnds)) {
-        ATermMap names;
+        ATermMap names(ATgetLength(bnds));
         checkAttrs(names, bnds);
     }
     
     ATermList rbnds, nrbnds;
     if (matchRec(e, rbnds, nrbnds)) {
-        ATermMap names;
+        ATermMap names(ATgetLength(rbnds) + ATgetLength(nrbnds));
         checkAttrs(names, rbnds);
         checkAttrs(names, nrbnds);
     }
