@@ -65,6 +65,13 @@ private:
 };
 
 
+static const unsigned int maxLoadFactor = /* 1 / */ 3;
+static unsigned int nrResizes = 0;
+static unsigned int sizeTotalAlloc = 0;
+static unsigned int sizeCurAlloc = 0;
+static unsigned int sizeMaxAlloc = 0;
+
+
 ATermMap::ATermMap(unsigned int expectedCount)
 {
     init(expectedCount * 10 / 9); /* slight adjustment */
@@ -110,6 +117,7 @@ void ATermMap::free()
     if (hashTable) {
         ATunprotectArray((ATerm *) hashTable);
         ::free(hashTable);
+        sizeCurAlloc -= sizeof(KeyValue) * capacity;
         hashTable = 0;
     }
 }
@@ -122,10 +130,6 @@ static unsigned int roundToPowerOf2(unsigned int x)
     x++;
     return x;
 }
-
-
-static const unsigned int maxLoadFactor = /* 1 / */ 3;
-static unsigned int nrResizes = 0;
 
 
 void ATermMap::resizeTable(unsigned int expectedCount)
@@ -141,6 +145,9 @@ void ATermMap::resizeTable(unsigned int expectedCount)
     maxCount = expectedCount;
     capacity = roundToPowerOf2(maxCount * maxLoadFactor);
     hashTable = (KeyValue *) calloc(sizeof(KeyValue), capacity);
+    sizeTotalAlloc += sizeof(KeyValue) * capacity;
+    sizeCurAlloc += sizeof(KeyValue) * capacity;
+    if (sizeCurAlloc > sizeMaxAlloc) sizeMaxAlloc = sizeCurAlloc;
     ATprotectArray((ATerm *) hashTable, capacity * 2);
     
 //     cout << capacity << endl;
@@ -151,6 +158,7 @@ void ATermMap::resizeTable(unsigned int expectedCount)
         copy(oldHashTable, oldCapacity);
         ATunprotectArray((ATerm *) oldHashTable);
         ::free(oldHashTable);
+        sizeCurAlloc -= sizeof(KeyValue) * oldCapacity;
         nrResizes++;
     }
 }
@@ -325,7 +333,10 @@ int main(int argc, char * * argv)
             map.get(someTerm());
     }
 
-    cout << "RESIZES: " << nrResizes << endl;
+    cout << "RESIZES: " << nrResizes << " "
+         << sizeTotalAlloc << " "
+         << sizeCurAlloc << " "
+         << sizeMaxAlloc << endl;
         
     cout << "SET: "
          << nrItemsSet << " "
