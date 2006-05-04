@@ -9,13 +9,15 @@ using namespace std;
 
 class ATermMap
 {
-private:
+public:
 
     struct KeyValue
     {
         ATerm key;
         ATerm value;
     };
+
+private:
 
     /* Hash table for the map.  We use open addressing, i.e., all
        key/value pairs are stored directly in the table, and there are
@@ -33,6 +35,7 @@ private:
     unsigned int maxCount;
     
 public:
+
     /* Create a map.  `expectedCount' is the number of elements the
        map is expected to hold. */
     ATermMap(unsigned int expectedCount);
@@ -51,7 +54,50 @@ public:
 
     unsigned int size();
 
+    struct const_iterator
+    {
+        const ATermMap & map;
+        unsigned int pos;
+        const_iterator(const ATermMap & map, int pos) : map(map)
+        {
+            this->pos = pos;
+        }
+        bool operator !=(const const_iterator & i)
+        {
+            return pos != i.pos;
+        }
+        void operator ++()
+        {
+            if (pos == map.capacity) return;
+            do { ++pos; 
+            } while (pos < map.capacity && map.hashTable[pos].value == 0);
+        }
+        const KeyValue & operator *()
+        {
+            assert(pos < map.capacity);
+            return map.hashTable[pos];
+        }
+        const KeyValue * operator ->()
+        {
+            assert(pos < map.capacity);
+            return &map.hashTable[pos];
+        }
+    };
+
+    const_iterator begin() const
+    {
+        unsigned int i = 0;
+        while (i < capacity && hashTable[i].value == 0) ++i;
+        return const_iterator(*this, i);
+    }
+    
+    const_iterator end() const
+    {
+        return const_iterator(*this, capacity);
+    }
+
 private:
+    
     void init(unsigned int expectedCount);
 
     void free();
@@ -305,7 +351,7 @@ int main(int argc, char * * argv)
 
 
     for (int test = 0; test < 100000; ++test) {
-        // cerr << test << endl;
+        //cerr << test << endl;
         unsigned int n = 300;
         ATermMap map(300);
         ATerm keys[n], values[n];
@@ -313,24 +359,45 @@ int main(int argc, char * * argv)
             keys[i] = someTerm();
             values[i] = someTerm();
             map.set(keys[i], values[i]);
-            // cerr << "INSERT: " << keys[i] << " " << values[i] << endl;
+            //cerr << "INSERT: " << keys[i] << " " << values[i] << endl;
         }
+
         unsigned int size = map.size();
         assert(size <= n);
         values[n - 1] = 0;
         map.remove(keys[n - 1]);
         assert(map.size() == size - 1);
+
+        unsigned int checksum;
+        unsigned int count = 0;
+        for (ATermMap::const_iterator i = map.begin(); i != map.end(); ++i, ++count) {
+            assert(i->key);
+            assert(i->value);
+            checksum += (unsigned int) (*i).key;
+            checksum += (unsigned int) (*i).value;
+            // cout << (*i).key << " " << (*i).value << endl;
+        }
+        assert(count == size - 1);
+
         for (unsigned int i = 0; i < n; ++i) {
+            for (unsigned int j = i + 1; j < n; ++j)
+                if (keys[i] == keys[j]) goto x;
             if (map.get(keys[i]) != values[i]) {
-                for (unsigned int j = i + 1; j < n; ++j)
-                    if (keys[i] == keys[j]) goto x;
                 cerr << "MISMATCH: " << keys[i] << " " << values[i] << " " << map.get(keys[i]) << " " << i << endl;
                 abort();
-            x: ;
             }
+            if (values[i] != 0) {
+                checksum -= (unsigned int) keys[i];
+                checksum -= (unsigned int) values[i];
+            }
+        x:  ;
         }
+
+        assert(checksum == 0);
+        
         for (unsigned int i = 0; i < 100; ++i)
             map.get(someTerm());
+        
     }
 
     cout << "RESIZES: " << nrResizes << " "
