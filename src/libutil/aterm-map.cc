@@ -217,17 +217,17 @@ unsigned int ATermMap::size()
 
 void printATermMapStats()
 {
-    cout << "RESIZES: " << nrResizes << " "
+    cerr << "RESIZES: " << nrResizes << " "
          << sizeTotalAlloc << " "
          << sizeCurAlloc << " "
          << sizeMaxAlloc << endl;
         
-    cout << "SET: "
+    cerr << "SET: "
          << nrItemsSet << " "
          << nrSetProbes << " "
          << (double) nrSetProbes / nrItemsSet << endl;
 
-    cout << "GET: "
+    cerr << "GET: "
          << nrItemsGet << " "
          << nrGetProbes << " "
          << (double) nrGetProbes / nrItemsGet << endl;

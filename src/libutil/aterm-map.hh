@@ -50,6 +50,11 @@ public:
 
     ATerm get(ATerm key) const;
 
+    ATerm operator [](ATerm key) const
+    {
+        return get(key);
+    }
+
     void remove(ATerm key);
 
     unsigned int size();

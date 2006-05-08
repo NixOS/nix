@@ -24,49 +24,54 @@ void EvalState::addPrimOp(const string & name,
 /* Substitute an argument set into the body of a function. */
 static Expr substArgs(Expr body, ATermList formals, Expr arg)
 {
-    ATermMap subs(ATgetLength(formals) * 2);
+    unsigned int nrFormals = ATgetLength(formals);
+    ATermMap subs(nrFormals);
 
-    /* ({x ? E1; y ? E2, z}: E3) {x = E4; z = E5;}
-
-       => let {x = E4; y = E2; z = E5; body = E3; }
-
-       => subst(E3, s)
-          s = {
-            R = rec {x = E4; y = E2; z = E5}
-            x -> R.x
-            y -> R.y
-            z -> R.z
-          }
-    */
-    
-    /* Get the formal arguments. */
-    for (ATermIterator i(formals); i; ++i) {
-        Expr name, def;
-        if (matchNoDefFormal(*i, name))
-            subs.set(name, makeUndefined());
-        else if (matchDefFormal(*i, name, def))
-            subs.set(name, def);
-        else abort(); /* can't happen */
-    }
-
-    /* Get the actual arguments, and check that they match with the
-       formals. */
+    /* Get the actual arguments and put them in the substitution. */
     ATermMap args(128); /* !!! fix */
     queryAllAttrs(arg, args);
-    for (ATermMap::const_iterator i = args.begin(); i != args.end(); ++i) {
-        Expr cur = subs.get(i->key);
-        if (!subs.get(i->key))
-            throw Error(format("unexpected function argument `%1%'")
-                % aterm2String(i->key));
+    for (ATermMap::const_iterator i = args.begin(); i != args.end(); ++i)
         subs.set(i->key, i->value);
+    
+    /* Get the formal arguments. */
+    ATermVector defsUsed;
+    ATermList recAttrs = ATempty;
+    for (ATermIterator i(formals); i; ++i) {
+        Expr name, def = 0;
+        if (!matchNoDefFormal(*i, name) && !matchDefFormal(*i, name, def))
+            abort(); /* can't happen */
+        if (subs[name] == 0) {
+            if (def == 0) throw Error(format("required function argument `%1%' missing")
+                % aterm2String(name));
+            defsUsed.push_back(name);
+            recAttrs = ATinsert(recAttrs, makeBind(name, def, makeNoPos()));
+        }
     }
 
-    /* Check that all arguments are defined. */
-    for (ATermMap::const_iterator i = subs.begin(); i != subs.end(); ++i)
-        if (i->value == makeUndefined())
-            throw Error(format("required function argument `%1%' missing")
-                % aterm2String(i->key));
+    /* Make a recursive attribute set out of the (argument-name,
+       value) tuples.  This is so that we can support default
+       parameters that refer to each other, e.g.  ({x, y ? x + x}: y)
+       {x = "foo";} evaluates to "foofoo". */
+    if (defsUsed.size() != 0) {
+        for (ATermMap::const_iterator i = args.begin(); i != args.end(); ++i)
+            recAttrs = ATinsert(recAttrs, makeBind(i->key, i->value, makeNoPos()));
+        Expr rec = makeRec(recAttrs, ATempty);
+        for (ATermVector::iterator i = defsUsed.begin(); i != defsUsed.end(); ++i)
+            subs.set(*i, makeSelect(rec, *i));
+    }
     
+    if (subs.size() != nrFormals) {
+        /* One or more actual arguments were not declared as formal
+           arguments.  Find out which. */
+        for (ATermIterator i(formals); i; ++i) {
+            Expr name, def;
+            matchNoDefFormal(*i, name) || matchDefFormal(*i, name, def);
+            subs.remove(name);
+        }
+        throw Error(format("unexpected function argument `%1%'")
+            % aterm2String(subs.begin()->key));
+    }
+
     return substitute(Substitution(0, &subs), body);
 }
 
