@@ -55,7 +55,7 @@ so it just gives up.</para>
 
 <para>Solution: remove one of the offending packages from the user
 environment (if already installed) using <command>nix-env
--u</command>, or specify exactly which version should be installed
+-e</command>, or specify exactly which version should be installed
 (e.g., <literal>nix-env -i docbook-xml-4.2</literal>).</para>
 
 <para>Alternatively, you can modify the user environment builder

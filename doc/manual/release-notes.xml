@@ -53,6 +53,14 @@ irreversible.</para></warning>
   <listitem><para>Reference scanning (which happens after each build)
   is much faster.</para></listitem>
 
+  <listitem><para>TODO: string interpolation</para></listitem>
+
+  <listitem><para>TODO: string concatenations involving
+  derivations</para></listitem>
+
+  <listitem><para>TODO: function argument default values can refer to
+  other function arguments</para></listitem>
+
 </itemizedlist>
 
 </section>
