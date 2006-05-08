@@ -89,6 +89,8 @@ public:
         }
     };
 
+    friend class ATermMap::const_iterator;
+    
     const_iterator begin() const
     {
         unsigned int i = 0;
