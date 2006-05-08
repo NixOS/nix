@@ -111,4 +111,8 @@ private:
 };
 
 
+/* Hack. */
+void printATermMapStats();
+
+
 #endif /* !__ATERM_MAP_H */

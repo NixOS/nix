@@ -213,6 +213,27 @@ unsigned int ATermMap::size()
 }
 
 
+#include <iostream>
+
+void printATermMapStats()
+{
+    cout << "RESIZES: " << nrResizes << " "
+         << sizeTotalAlloc << " "
+         << sizeCurAlloc << " "
+         << sizeMaxAlloc << endl;
+        
+    cout << "SET: "
+         << nrItemsSet << " "
+         << nrSetProbes << " "
+         << (double) nrSetProbes / nrItemsSet << endl;
+
+    cout << "GET: "
+         << nrItemsGet << " "
+         << nrGetProbes << " "
+         << (double) nrGetProbes / nrItemsGet << endl;
+}
+
+
 #if 0
 int main(int argc, char * * argv)
 {
@@ -294,19 +315,6 @@ int main(int argc, char * * argv)
         
     }
 
-    cout << "RESIZES: " << nrResizes << " "
-         << sizeTotalAlloc << " "
-         << sizeCurAlloc << " "
-         << sizeMaxAlloc << endl;
-        
-    cout << "SET: "
-         << nrItemsSet << " "
-         << nrSetProbes << " "
-         << (double) nrSetProbes / nrItemsSet << endl;
-
-    cout << "GET: "
-         << nrItemsGet << " "
-         << nrGetProbes << " "
-         << (double) nrGetProbes / nrItemsGet << endl;
+    printATermMapStats();
 }
 #endif

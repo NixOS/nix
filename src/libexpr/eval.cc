@@ -527,9 +527,12 @@ extern "C" {
 
 void printEvalStats(EvalState & state)
 {
-    printMsg(lvlInfo,
+    bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
+    printMsg(showStats ? lvlInfo : lvlDebug,
         format("evaluated %1% expressions, %2% cache hits, %3%%% efficiency, used %4% ATerm bytes")
         % state.nrEvaluated % state.nrCached
         % ((float) state.nrCached / (float) state.nrEvaluated * 100)
         % AT_calcAllocatedSize());
+    if (showStats)
+        printATermMapStats();
 }
