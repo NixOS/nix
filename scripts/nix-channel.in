@@ -4,6 +4,9 @@ use strict;
 
 my $rootsDir = "@localstatedir@/nix/gcroots/channels";
 
+my $stateDir = $ENV{"NIX_STATE_DIR"};
+$stateDir = "@localstatedir@/nix" unless defined $stateDir;
+
 
 # Figure out the name of the `.nix-channels' file to use.
 my $home = $ENV{"HOME"};
@@ -69,6 +72,11 @@ sub update {
     # Get rid of all the old substitutes.
     system "@bindir@/nix-store --clear-substitutes";
     die "cannot clear substitutes" if ($? != 0);
+
+    # Remove all the old manifests.
+    for my $manifest (glob "$stateDir/manifests/*.nixmanifest") {
+        unlink $manifest or die "cannot remove `$manifest': $!";
+    }
 
     # Pull cache manifests.
     foreach my $url (@channels) {
