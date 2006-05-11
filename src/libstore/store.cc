@@ -243,7 +243,7 @@ Path toStorePath(const Path & path)
 {
     if (!isInStore(path))
         throw Error(format("path `%1%' is not in the Nix store") % path);
-    unsigned int slash = path.find('/', nixStore.size() + 1);
+    Path::size_type slash = path.find('/', nixStore.size() + 1);
     if (slash == Path::npos)
         return path;
     else
@@ -563,7 +563,7 @@ static Hash queryHash(const Transaction & txn, const Path & storePath)
 {
     string s;
     nixDB.queryString(txn, dbValidPaths, storePath, s);
-    unsigned int colon = s.find(':');
+    string::size_type colon = s.find(':');
     if (colon == string::npos)
         throw Error(format("corrupt hash `%1%' in valid-path entry for `%2%'")
             % s % storePath);

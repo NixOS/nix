@@ -99,7 +99,7 @@ PathSet scanForReferences(const string & path, const PathSet & paths)
        have the form `HASH-bla'). */
     for (PathSet::const_iterator i = paths.begin(); i != paths.end(); i++) {
         string baseName = baseNameOf(*i);
-        unsigned int pos = baseName.find('-');
+        string::size_type pos = baseName.find('-');
         if (pos == string::npos)
             throw Error(format("bad reference `%1%'") % *i);
         string s = string(baseName, 0, pos);

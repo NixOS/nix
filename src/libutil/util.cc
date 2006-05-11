@@ -119,7 +119,7 @@ Path canonPath(const Path & path, bool resolveSymlinks)
 
 Path dirOf(const Path & path)
 {
-    unsigned int pos = path.rfind('/');
+    Path::size_type pos = path.rfind('/');
     if (pos == string::npos)
         throw Error(format("invalid file name: %1%") % path);
     return pos == 0 ? "/" : Path(path, 0, pos);
@@ -128,7 +128,7 @@ Path dirOf(const Path & path)
 
 string baseNameOf(const Path & path)
 {
-    unsigned int pos = path.rfind('/');
+    Path::size_type pos = path.rfind('/');
     if (pos == string::npos)
         throw Error(format("invalid file name %1% ") % path);
     return string(path, pos + 1);

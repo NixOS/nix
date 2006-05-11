@@ -212,7 +212,7 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
         string contents = readFile(*fd);
 
         /* Extract the roots. */
-        unsigned int pos = 0, end;
+        string::size_type pos = 0, end;
 
         while ((end = contents.find((char) 0, pos)) != string::npos) {
             Path root(contents, pos, end - pos);

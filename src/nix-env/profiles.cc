@@ -19,7 +19,7 @@ static int parseName(const string & profileName, const string & name)
 {
     if (string(name, 0, profileName.size() + 1) != profileName + "-") return -1;
     string s = string(name, profileName.size() + 1);
-    unsigned int p = s.find("-link");
+    string::size_type p = s.find("-link");
     if (p == string::npos) return -1;
     int n;
     if (string2Int(string(s, 0, p), n) && n >= 0)

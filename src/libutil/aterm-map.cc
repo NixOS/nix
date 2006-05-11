@@ -111,34 +111,35 @@ void ATermMap::copy(KeyValue * elements, unsigned int capacity)
 }
 
 
+/* !!! use a bigger shift for 64-bit platforms? */
 static const unsigned int shift = 16;
-static const unsigned int knuth = (unsigned int) (0.6180339887 * (1 << shift));
+static const unsigned long knuth = (unsigned long) (0.6180339887 * (1 << shift));
 
 
-unsigned int ATermMap::hash1(ATerm key) const
+unsigned long ATermMap::hash1(ATerm key) const
 {
     /* Don't care about the least significant bits of the ATerm
        pointer since they're always 0. */
-    unsigned int key2 = ((unsigned int) key) >> 2;
+    unsigned long key2 = ((unsigned long) key) >> 2;
 
     /* Approximately equal to:
     double d = key2 * 0.6180339887;
     unsigned int h = (int) (capacity * (d - floor(d)));
     */
  
-    unsigned int h = (capacity * ((key2 * knuth) & ((1 << shift) - 1))) >> shift;
+    unsigned long h = (capacity * ((key2 * knuth) & ((1 << shift) - 1))) >> shift;
 
     return h;
 }
 
 
-unsigned int ATermMap::hash2(ATerm key) const
+unsigned long ATermMap::hash2(ATerm key) const
 {
-    unsigned int key2 = ((unsigned int) key) >> 2;
+    unsigned long key2 = ((unsigned long) key) >> 2;
     /* Note: the result must be relatively prime to `capacity' (which
        is a power of 2), so we make sure that the result is always
        odd. */
-    unsigned int h = ((key2 * 134217689) & (capacity - 1)) | 1;
+    unsigned long h = ((key2 * 134217689) & (capacity - 1)) | 1;
     return h;
 }
 

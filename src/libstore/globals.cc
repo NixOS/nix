@@ -46,7 +46,7 @@ static void readSettings()
             line += contents[pos++];
         pos++;
 
-        unsigned int hash = line.find('#');
+        string::size_type hash = line.find('#');
         if (hash != string::npos)
             line = string(line, 0, hash);
 

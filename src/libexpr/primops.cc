@@ -488,9 +488,9 @@ static string relativise(Path pivot, Path p)
     /* Otherwise, `p' is in a parent of `pivot'.  Find up till which
        path component `p' and `pivot' match, and add an appropriate
        number of `..' components. */
-    unsigned int i = 1;
+    string::size_type i = 1;
     while (1) {
-        unsigned int j = pivot.find('/', i);
+        string::size_type j = pivot.find('/', i);
         if (j == string::npos) break;
         j++;
         if (pivot.substr(0, j) != p.substr(0, j)) break;

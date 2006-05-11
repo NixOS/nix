@@ -350,7 +350,7 @@ static void queryInstSources(EvalState & state,
                 DrvInfo elem;
                 elem.attrs = shared_ptr<ATermMap>(new ATermMap(0)); /* ugh... */
                 string name = baseNameOf(*i);
-                unsigned int dash = name.find('-');
+                string::size_type dash = name.find('-');
                 if (dash != string::npos)
                     name = string(name, dash + 1);
 

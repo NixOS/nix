@@ -113,8 +113,8 @@ private:
 
     void copy(KeyValue * elements, unsigned int capacity);
     
-    inline unsigned int hash1(ATerm key) const;
-    inline unsigned int hash2(ATerm key) const;
+    inline unsigned long hash1(ATerm key) const;
+    inline unsigned long hash2(ATerm key) const;
 };
 
 
