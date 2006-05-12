@@ -9,4 +9,5 @@ AM_CXXFLAGS = \
  -DNIX_LOG_DIR=\"$(localstatedir)/log/nix\" \
  -DNIX_CONF_DIR=\"$(sysconfdir)/nix\" \
  -DNIX_VERSION=\"$(VERSION)\" \
- -I.. ${aterm_include} -I../libutil -I../libstore
+ -I$(srcdir)/.. ${aterm_include} -I$(srcdir)/../libutil \
+ -I$(srcdir)/../libstore

@@ -9,4 +9,4 @@ libutil_la_SOURCES += \
  md5.c md5.h sha1.c sha1.h sha256.c sha256.h md32_common.h
 endif
 
-AM_CXXFLAGS = -Wall -I.. ${aterm_include}
+AM_CXXFLAGS = -Wall -I$(srcdir)/.. ${aterm_include}

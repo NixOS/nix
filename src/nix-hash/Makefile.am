@@ -10,4 +10,4 @@ nix-hash.o: help.txt.hh
 	../bin2c/bin2c helpText < $< > $@ || (rm $@ && exit 1)
 
 AM_CXXFLAGS = \
- -I.. -I../../externals/inst/include -I../libutil -I../libstore -I../libmain
+ -I$(srcdir)/.. -I$(srcdir)/../libutil -I$(srcdir)/../libstore -I$(srcdir)/../libmain

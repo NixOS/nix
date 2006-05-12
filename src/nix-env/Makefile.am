@@ -12,5 +12,6 @@ main.o: help.txt.hh
 	../bin2c/bin2c helpText < $< > $@ || (rm $@ && exit 1)
 
 AM_CXXFLAGS = \
- -I.. ${bdb_include} ${aterm_include} -I../libutil -I../libstore \
- -I../libexpr -I../libmain
+ -I$(srcdir)/.. ${bdb_include} ${aterm_include} \
+ -I$(srcdir)/../libutil -I$(srcdir)/../libstore \
+ -I$(srcdir)/../libexpr -I$(srcdir)/../libmain -I../libexpr

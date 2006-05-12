@@ -5,4 +5,4 @@ libformat_la_SOURCES = format_implementation.cc free_funcs.cc \
  format_fwd.hpp group.hpp internals.hpp internals_fwd.hpp \
  macros_default.hpp
 
-AM_CXXFLAGS = -Wall -I../..
+AM_CXXFLAGS = -Wall -I$(srcdir)/../..

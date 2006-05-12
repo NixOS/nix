@@ -10,7 +10,7 @@ $(DB).tar.gz:
 	false
 
 $(DB): $(DB).tar.gz
-	gunzip < $(DB).tar.gz | tar xvf -
+	gunzip < $(srcdir)/$(DB).tar.gz | tar xvf -
 
 have-db:
 	$(MAKE) $(DB)
@@ -44,7 +44,7 @@ $(ATERM).tar.gz:
 	false
 
 $(ATERM): $(ATERM).tar.gz
-	gunzip < $(ATERM).tar.gz | tar xvf -
+	gunzip < $(srcdir)/$(ATERM).tar.gz | tar xvf -
 
 have-aterm:
 	$(MAKE) $(ATERM)
@@ -76,7 +76,7 @@ $(BZIP2).tar.gz:
 	false
 
 $(BZIP2): $(BZIP2).tar.gz
-	gunzip < $(BZIP2).tar.gz | tar xvf -
+	gunzip < $(srcdir)/$(BZIP2).tar.gz | tar xvf -
 
 have-bzip2:
 	$(MAKE) $(BZIP2)

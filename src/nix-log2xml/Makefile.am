@@ -8,7 +8,7 @@ nix_log2xml_SOURCES = log2xml.cc
 %.html: %.xml mark-errors.xsl log2html.xsl
 	$(xsltproc) mark-errors.xsl $< | $(xsltproc) log2html.xsl - > $@
 
-LOG2HTML = mark-errors.xsl log2html.xsl treebits.js
+LOG2HTML = $(srcdir)/mark-errors.xsl $(srcdir)/log2html.xsl $(srcdir)/treebits.js
 
 EXTRA_DIST = $(LOG2HTML)
 

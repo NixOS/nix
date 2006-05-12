@@ -14,9 +14,9 @@ relname:
 
 install-data-local: init-state
 	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/nix
-	$(INSTALL_DATA) nix.conf.example $(DESTDIR)$(sysconfdir)/nix
+	$(INSTALL_DATA) $(srcdir)/nix.conf.example $(DESTDIR)$(sysconfdir)/nix
 	if ! test -e $(DESTDIR)$(sysconfdir)/nix/nix.conf; then \
-		$(INSTALL_DATA) nix.conf.example $(DESTDIR)$(sysconfdir)/nix/nix.conf; \
+		$(INSTALL_DATA) $(srcdir)/nix.conf.example $(DESTDIR)$(sysconfdir)/nix/nix.conf; \
 	fi
 
 if INIT_STATE
@@ -50,4 +50,4 @@ svn-revision:
 all-local: NEWS
 
 NEWS: doc/manual/NEWS.txt
-	cp doc/manual/NEWS.txt NEWS
+	cp $(srcdir)/doc/manual/NEWS.txt NEWS
