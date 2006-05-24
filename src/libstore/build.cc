@@ -5,6 +5,7 @@
 #include <boost/weak_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
 
+#include <sys/select.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
