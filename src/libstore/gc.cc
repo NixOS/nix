@@ -108,6 +108,10 @@ static AutoCloseFD fdTempRoots;
 
 void addTempRoot(const Path & path)
 {
+#ifdef __CYGWIN__
+    return;
+#endif	
+    
     /* Create the temporary roots file for this process. */
     if (fdTempRoots == -1) {
 
@@ -172,6 +176,10 @@ typedef list<FDPtr> FDs;
 
 static void readTempRoots(PathSet & tempRoots, FDs & fds)
 {
+#ifdef __CYGWIN__
+    return;
+#endif
+    
     /* Read the `temproots' directory for per-process temporary root
        files. */
     Strings tempRootFiles = readDirectory(
