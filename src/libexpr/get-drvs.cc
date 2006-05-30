@@ -80,7 +80,8 @@ static bool getDerivation(EvalState & state, Expr e,
         DrvInfo drv;
     
         a = attrs->get(toATerm("name"));
-        if (!a) throw badTerm("derivation name missing", e);
+        /* !!! We really would like to have a decent back trace here. */
+        if (!a) throw Error("derivation name missing");
         drv.name = evalString(state, a);
 
         a = attrs->get(toATerm("system"));
