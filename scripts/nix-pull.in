@@ -26,7 +26,7 @@ $stateDir = "@localstatedir@/nix" unless defined $stateDir;
 umask 0022;
 
 
-# Obtain URLs either from the command line or from a configuration file.
+# Process the URLs specified on the command line.
 my %narFiles;
 my %patches;
 my %successors;
