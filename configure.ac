@@ -22,6 +22,7 @@ AC_PREFIX_DEFAULT(/nix)
 
 AC_CANONICAL_HOST
 
+
 # Construct a Nix system name (like "i686-linux").
 AC_MSG_CHECKING([for the canonical Nix system name])
 cpu_name=$(uname -p | tr 'A-Z ' 'a-z_')
@@ -39,6 +40,13 @@ case $machine_name in
 esac
 
 sys_name=$(uname -s | tr 'A-Z ' 'a-z_')
+
+case $sys_name in
+    cygwin*)
+        sys_name=cygwin
+        ;;
+esac
+
 AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
   [platform identifier (e.g., `i686-linux')]),
   system=$withval, system="${machine_name}-${sys_name}")
@@ -46,13 +54,26 @@ AC_MSG_RESULT($system)
 AC_SUBST(system)
 AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
 
+
+# Windows-specific stuff.
+if test "$sys_name" = "cygwin"; then
+    # We cannot delete open files.
+    AC_DEFINE(CANNOT_DELETE_OPEN_FILES, 1, [Whether it is impossible to delete open files.])
+
+    # Shared libraries don't work, currently.
+    AC_DISABLE_SHARED
+    AC_ENABLE_STATIC
+fi
+
+
 AC_PROG_CC
 AC_PROG_CXX
-AC_PROG_RANLIB
+
 
 # We are going to use libtool.
 AC_DISABLE_STATIC
 AC_PROG_LIBTOOL
+
 
 # Check for pubsetbuf.
 AC_MSG_CHECKING([for pubsetbuf])
@@ -65,10 +86,12 @@ static char buf[1024];]],
     AC_MSG_RESULT(no))
 AC_LANG_POP(C++)
 
+
 # Check for <locale>
 AC_LANG_PUSH(C++)
 AC_CHECK_HEADERS([locale])
 AC_LANG_POP(C++)
+
 
 AC_DEFUN([NEED_PROG],
 [
@@ -181,7 +204,9 @@ AC_SUBST(bzip2_include)
 AC_SUBST(bzip2_bin)
 AC_SUBST(bzip2_bin_test)
 
+
 AC_CHECK_LIB(pthread, pthread_mutex_init)
+
 
 AC_ARG_ENABLE(init-state, AC_HELP_STRING([--disable-init-state],
   [do not initialise DB etc. in `make install']),
@@ -189,6 +214,7 @@ AC_ARG_ENABLE(init-state, AC_HELP_STRING([--disable-init-state],
 AM_CONDITIONAL(INIT_STATE, test "$init_state" = "yes")
 
 
+# Setuid installations.
 AC_ARG_ENABLE(setuid, AC_HELP_STRING([--enable-setuid],
   [install Nix setuid]),
   setuid_hack=$enableval, setuid_hack=no)
@@ -219,7 +245,7 @@ AC_DEFINE_UNQUOTED(NIX_GROUP, ["$NIX_GROUP"], [Nix group])
 # This is needed if ATerm, Berkeley DB or bzip2 are static libraries,
 # and the Nix libraries are dynamic.
 if test "$(uname)" = "Darwin"; then
-   LDFLAGS="-all_load $LDFLAGS"
+    LDFLAGS="-all_load $LDFLAGS"
 fi
 
 
