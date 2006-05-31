@@ -61,6 +61,8 @@ irreversible.</para></warning>
   <listitem><para>TODO: function argument default values can refer to
   other function arguments</para></listitem>
 
+  <listitem><para>TODO: proxy support.</para></listitem>
+
 </itemizedlist>
 
 </section>

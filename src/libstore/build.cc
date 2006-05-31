@@ -1203,12 +1203,29 @@ void DerivationGoal::startBuilder()
        derivation, tell the builder, so that for instance `fetchurl'
        can skip checking the output.  On older Nixes, this environment
        variable won't be set, so `fetchurl' will do the check. */
+    bool fixedOutput = true;
     for (DerivationOutputs::iterator i = drv.outputs.begin(); 
          i != drv.outputs.end(); ++i)
-        if (i->second.hash != "")
-            env["NIX_OUTPUT_CHECKED"] = "1";
+        if (i->second.hash == "") fixedOutput = false;
+    if (fixedOutput) 
+        env["NIX_OUTPUT_CHECKED"] = "1";
 
+    /* *Only* if this is a fixed-output derivation, propagate the
+       values of the environment variables specified in the
+       `impureEnvVars' attribute to the builder.  This allows for
+       instance environment variables for proxy configuration such as
+       `http_proxy' to be easily passed to downloaders like
+       `fetchurl'.  Passing such environment variables from the caller
+       to the builder is generally impure, but the output of
+       fixed-output derivations is by definition pure (since we
+       already know the cryptographic hash of the output). */
+    if (fixedOutput) {
+        Strings varNames = tokenizeString(drv.env["impureEnvVars"]);
+        for (Strings::iterator i = varNames.begin(); i != varNames.end(); ++i)
+            env[*i] = getEnv(*i);
+    }
 
+    
     /* If we are running as root, and the `build-allow-root' setting
        is `false', then we have to build as one of the users listed in
        `build-users'. */
