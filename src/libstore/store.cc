@@ -707,14 +707,12 @@ static Path _addToStore(bool fixed, bool recursive,
 
     if (!readOnlyMode) addTempRoot(dstPath);
 
-    if (!readOnlyMode && !isValidPath(dstPath)) { 
+    if (!readOnlyMode && !isValidPath(dstPath)) {
 
         /* The first check above is an optimisation to prevent
            unnecessary lock acquisition. */
 
-        PathSet lockPaths;
-        lockPaths.insert(dstPath);
-        PathLocks outputLock(lockPaths);
+        PathLocks outputLock(singleton<PathSet, Path>(dstPath));
 
         if (!isValidPath(dstPath)) {
 
@@ -764,9 +762,7 @@ Path addTextToStore(const string & suffix, const string & s,
 
     if (!readOnlyMode && !isValidPath(dstPath)) {
 
-        PathSet lockPaths;
-        lockPaths.insert(dstPath);
-        PathLocks outputLock(lockPaths);
+        PathLocks outputLock(singleton<PathSet, Path>(dstPath));
 
         if (!isValidPath(dstPath)) {
 
