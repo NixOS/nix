@@ -11,6 +11,7 @@ $(DB).tar.gz:
 
 $(DB): $(DB).tar.gz
 	gunzip < $(srcdir)/$(DB).tar.gz | tar xvf -
+	cd $(DB) && patch -p1 < $(srcdir)/bdb-cygwin.patch
 
 have-db:
 	$(MAKE) $(DB)
@@ -100,7 +101,7 @@ endif
 
 all: build-db build-aterm build-bzip2
 
-EXTRA_DIST = $(DB).tar.gz $(ATERM).tar.gz $(BZIP2).tar.gz
+EXTRA_DIST = $(DB).tar.gz $(ATERM).tar.gz $(BZIP2).tar.gz bdb-cygwin.patch
 
 ext-clean:
 	$(RM) -f have-db build-db have-aterm build-aterm
