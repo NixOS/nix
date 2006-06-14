@@ -63,6 +63,9 @@ irreversible.</para></warning>
 
   <listitem><para>TODO: proxy support.</para></listitem>
 
+  <listitem><para>TODO: nix-pack-closure and
+  nix-unpack-closure.</para></listitem>
+
 </itemizedlist>
 
 </section>
