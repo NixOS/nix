@@ -300,7 +300,19 @@ Path createTempDir()
     while (1) {
         checkInterrupt();
 	Path tmpDir = tempName();
-	if (mkdir(tmpDir.c_str(), 0777) == 0) return tmpDir;
+	if (mkdir(tmpDir.c_str(), 0777) == 0) {
+	    /* Explicitly set the group of the directory.  This is to
+	       work around around problems caused by BSD's group
+	       ownership semantics (directories inherit the group of
+	       the parent).  For instance, the group of /tmp on
+	       FreeBSD is "wheel", so all directories created in /tmp
+	       will be owned by "wheel"; but if the user is not in
+	       "wheel", then "tar" will fail to unpack archives that
+	       have the setgid bit set on directories. */
+	    if (chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
+		throw SysError(format("setting group of directory `%1%'") % tmpDir);
+	    return tmpDir;
+	}
 	if (errno != EEXIST)
 	    throw SysError(format("creating directory `%1%'") % tmpDir);
     }
