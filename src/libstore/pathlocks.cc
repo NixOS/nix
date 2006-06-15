@@ -51,14 +51,14 @@ PathLocks::PathLocks()
 }
 
 
-PathLocks::PathLocks(const PathSet & paths)
+PathLocks::PathLocks(const PathSet & paths, const string & waitMsg)
     : deletePaths(false)
 {
-    lockPaths(paths);
+    lockPaths(paths, waitMsg);
 }
 
 
-void PathLocks::lockPaths(const PathSet & _paths)
+void PathLocks::lockPaths(const PathSet & _paths, const string & waitMsg)
 {
     /* May be called only once! */
     assert(fds.empty());
@@ -94,7 +94,10 @@ void PathLocks::lockPaths(const PathSet & _paths)
                 throw SysError(format("opening lock file `%1%'") % lockPath);
 
             /* Acquire an exclusive lock. */
-            lockFile(fd, ltWrite, true);
+            if (!lockFile(fd, ltWrite, false)) {
+                if (waitMsg != "") printMsg(lvlError, waitMsg);
+                lockFile(fd, ltWrite, true);
+            }
 
             debug(format("lock acquired on `%1%'") % lockPath);
 

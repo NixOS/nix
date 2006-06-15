@@ -10,6 +10,7 @@
 #include "help.txt.hh"
 #include "nixexpr-ast.hh"
 #include "get-drvs.hh"
+#include "pathlocks.hh"
 
 #include <cerrno>
 #include <ctime>
@@ -411,6 +412,14 @@ static void printMissing(EvalState & state, const DrvInfos & elems)
 }
 
 
+static void lockProfile(PathLocks & lock, const Path & profile)
+{
+    lock.lockPaths(singleton<PathSet>(profile),
+        (format("waiting for lock on profile `%1%'") % profile).str());
+    lock.setDeletion(true);
+}
+
+
 static void installDerivations(Globals & globals,
     const Strings & args, const Path & profile)
 {
@@ -426,6 +435,8 @@ static void installDerivations(Globals & globals,
 
     /* Add in the already installed derivations, unless they have the
        same name as a to-be-installed element. */
+    PathLocks lock;
+    lockProfile(lock, profile);
     DrvInfos installedElems = queryInstalled(globals.state, profile);
 
     DrvInfos allElems(newElems);
@@ -480,6 +491,8 @@ static void upgradeDerivations(Globals & globals,
        name and a higher version number. */
 
     /* Load the currently installed derivations. */
+    PathLocks lock;
+    lockProfile(lock, profile);
     DrvInfos installedElems = queryInstalled(globals.state, profile);
 
     /* Fetch all derivations from the input file. */
@@ -559,6 +572,8 @@ static void opUpgrade(Globals & globals,
 static void uninstallDerivations(Globals & globals, DrvNames & selectors,
     Path & profile)
 {
+    PathLocks lock;
+    lockProfile(lock, profile);
     DrvInfos installedElems = queryInstalled(globals.state, profile);
     DrvInfos newElems;
 

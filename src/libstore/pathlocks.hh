@@ -18,8 +18,10 @@ private:
 
 public:
     PathLocks();
-    PathLocks(const PathSet & paths);
-    void lockPaths(const PathSet & _paths);
+    PathLocks(const PathSet & paths,
+        const string & waitMsg = "");
+    void lockPaths(const PathSet & _paths,
+        const string & waitMsg = "");
     ~PathLocks();
     void setDeletion(bool deletePaths);
 };
