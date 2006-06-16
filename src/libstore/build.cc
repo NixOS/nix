@@ -1066,7 +1066,8 @@ bool DerivationGoal::prepareBuild()
     /* Obtain locks on all output paths.  The locks are automatically
        released when we exit this function or Nix crashes. */
     /* !!! BUG: this could block, which is not allowed. */
-    outputLocks.lockPaths(outputPaths(drv.outputs));
+    outputLocks.lockPaths(outputPaths(drv.outputs),
+        (format("waiting for lock on %1%") % showPaths(outputPaths(drv.outputs))).str());
 
     /* Now check again whether the outputs are valid.  This is because
        another process may have started building in parallel.  After
@@ -1715,10 +1716,9 @@ void SubstitutionGoal::tryToRun()
     }
 
     /* Acquire a lock on the output path. */
-    PathSet lockPath;
-    lockPath.insert(storePath);
     outputLock = shared_ptr<PathLocks>(new PathLocks);
-    outputLock->lockPaths(lockPath);
+    outputLock->lockPaths(singleton<PathSet>(storePath),
+        (format("waiting for lock on `%1%'") % storePath).str());
 
     /* Check again whether the path is invalid. */
     if (isValidPath(storePath)) {
