@@ -12,6 +12,10 @@
 #include <unistd.h>
 #include <errno.h>
 
+#ifdef __CYGWIN__
+#include <windows.h>
+#endif
+
 #include <pwd.h>
 #include <grp.h>
 
@@ -315,6 +319,13 @@ const char * * strings2CharPtrs(const Strings & ss)
     *p = 0;
     return arr;
 }
+
+
+/* Hack for Cygwin: _exit() doesn't seem to work quite right, since
+   some Berkeley DB code appears to be called when a child exits
+   through _exit() (e.g., because execve() failed).  So call the
+   Windows API directly. */
+#define _exit(n) ExitProcess(n)
 
 
 
