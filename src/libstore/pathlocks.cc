@@ -6,6 +6,11 @@
 
 #include "pathlocks.hh"
 
+#ifdef __CYGWIN__
+#include <windows.h>
+#include <sys/cygwin.h>
+#endif
+
 
 bool lockFile(int fd, LockType lockType, bool wait)
 {
@@ -87,11 +92,28 @@ void PathLocks::lockPaths(const PathSet & _paths, const string & waitMsg)
         AutoCloseFD fd;
         
         while (1) {
-        
+
             /* Open/create the lock file. */
+#ifdef __CYGWIN__
+	    char win32Path[MAX_PATH];
+	    cygwin_conv_to_full_win32_path(lockPath.c_str(), win32Path);
+
+	    SECURITY_ATTRIBUTES sa;
+	    sa.nLength = sizeof sa;
+	    sa.lpSecurityDescriptor = 0;
+	    sa.bInheritHandle = TRUE;
+	    HANDLE h = CreateFile(win32Path, GENERIC_READ, 
+	        FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_ALWAYS, 
+                FILE_ATTRIBUTE_NORMAL, 0);
+	    if (h == INVALID_HANDLE_VALUE)
+		throw Error(format("opening lock file `%1%'") % lockPath);
+
+	    fd = cygwin_attach_handle_to_fd((char *) lockPath.c_str(), -1, h, 1, O_RDWR);
+#else        
             fd = open(lockPath.c_str(), O_WRONLY | O_CREAT, 0666);
             if (fd == -1)
                 throw SysError(format("opening lock file `%1%'") % lockPath);
+#endif
 
             /* Acquire an exclusive lock. */
             if (!lockFile(fd, ltWrite, false)) {
@@ -126,19 +148,40 @@ void PathLocks::lockPaths(const PathSet & _paths, const string & waitMsg)
 PathLocks::~PathLocks()
 {
     for (list<FDPair>::iterator i = fds.begin(); i != fds.end(); i++) {
+#ifndef __CYGWIN__
         if (deletePaths) {
-            /* Write a (meaningless) token to the file to indicate to
-               other processes waiting on this lock that the lock is
-               stale (deleted). */
+	    /* Get rid of the lock file.  Have to be careful not to
+	       introduce races. */
+            /* On Unix, write a (meaningless) token to the file to
+               indicate to other processes waiting on this lock that
+               the lock is stale (deleted). */
             unlink(i->second.c_str());
             writeFull(i->first, (const unsigned char *) "d", 1);
             /* Note that the result of unlink() is ignored; removing
                the lock file is an optimisation, not a necessity. */
         }
+#endif
         lockedPaths.erase(i->second);
         if (close(i->first) == -1)
             printMsg(lvlError,
                 format("error (ignored): cannot close lock file on `%1%'") % i->second);
+#ifdef __CYGWIN__
+	if (deletePaths) {
+	    /* On Windows, just try to delete the lock file.  This
+	       will fail if anybody still has the file open.  We
+	       cannot use unlink() here, because Cygwin emulates Unix
+	       semantics of allowing an open file to be deleted (but
+	       fakes it - the file isn't actually deleted until later,
+	       so a file with the same name cannot be created in the
+	       meantime). */
+	    char win32Path[MAX_PATH];
+	    cygwin_conv_to_full_win32_path(i->second.c_str(), win32Path);
+	    if (DeleteFile(win32Path))
+		debug(format("delete of `%1%' succeeded") % i->second.c_str());
+	    else
+		debug(format("delete of `%1%' failed: %2%") % i->second.c_str() % GetLastError());
+	}
+#endif
         debug(format("lock released on `%1%'") % i->second);
     }
 }
