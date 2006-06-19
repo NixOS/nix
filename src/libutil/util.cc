@@ -401,7 +401,8 @@ void printMsg_(Verbosity level, const format & f)
             prefix += "|   ";
     else if (logType == ltEscapes && level != lvlInfo)
         prefix = "\033[" + escVerbosity(level) + "s";
-    cerr << format("%1%%2%\n") % prefix % f.str();
+    string s = (format("%1%%2%\n") % prefix % f.str()).str();
+    writeFull(STDERR_FILENO, (const unsigned char *) s.c_str(), s.size());
 }
 
 
