@@ -325,8 +325,9 @@ const char * * strings2CharPtrs(const Strings & ss)
    some Berkeley DB code appears to be called when a child exits
    through _exit() (e.g., because execve() failed).  So call the
    Windows API directly. */
+#ifdef __CYGWIN__
 #define _exit(n) ExitProcess(n)
-
+#endif
 
 
 //////////////////////////////////////////////////////////////////////
