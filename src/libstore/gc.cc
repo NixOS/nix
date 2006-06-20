@@ -11,6 +11,11 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#ifdef __CYGWIN__
+#include <windows.h>
+#include <sys/cygwin.h>
+#endif
+
 
 static string gcLockName = "gc.lock";
 static string tempRootsDir = "temproots";
@@ -108,10 +113,6 @@ static AutoCloseFD fdTempRoots;
 
 void addTempRoot(const Path & path)
 {
-#ifdef __CYGWIN__
-    return;
-#endif	
-    
     /* Create the temporary roots file for this process. */
     if (fdTempRoots == -1) {
 
@@ -124,12 +125,24 @@ void addTempRoot(const Path & path)
 
             AutoCloseFD fdGCLock = openGCLock(ltRead);
             
-            fdTempRoots = open(fnTempRoots.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
-            if (fdTempRoots == -1)
-                throw SysError(format("opening temporary roots file `%1%'") % fnTempRoots);
+            if (pathExists(fnTempRoots))
+                /* It *must* be stale, since there can be no two
+                   processes with the same pid. */
+                deletePath(fnTempRoots);
+
+	    fdTempRoots = openLockFile(fnTempRoots, true);
 
             fdGCLock.close();
-            
+      
+	    /* Note that on Cygwin a lot of the following complexity
+	       is unnecessary, since we cannot delete open lock
+	       files.  If we have the lock file open, then it's valid;
+	       if we can delete it, then it wasn't in use any more. 
+
+	       Also note that on Cygwin we cannot "upgrade" a lock
+	       from a read lock to a write lock. */
+
+#ifndef __CYGWIN__
             debug(format("acquiring read lock on `%1%'") % fnTempRoots);
             lockFile(fdTempRoots, ltRead, true);
 
@@ -143,6 +156,10 @@ void addTempRoot(const Path & path)
             /* The garbage collector deleted this file before we could
                get a lock.  (It won't delete the file after we get a
                lock.)  Try again. */
+
+#else
+            break;
+#endif
         }
 
     }
@@ -155,9 +172,14 @@ void addTempRoot(const Path & path)
     string s = path + '\0';
     writeFull(fdTempRoots, (const unsigned char *) s.c_str(), s.size());
 
+#ifndef __CYGWIN__
     /* Downgrade to a read lock. */
     debug(format("downgrading to read lock on `%1%'") % fnTempRoots);
     lockFile(fdTempRoots, ltRead, true);
+#else
+    debug(format("releasing write lock on `%1%'") % fnTempRoots);
+    lockFile(fdTempRoots, ltNone, true);
+#endif
 }
 
 
@@ -176,10 +198,6 @@ typedef list<FDPtr> FDs;
 
 static void readTempRoots(PathSet & tempRoots, FDs & fds)
 {
-#ifdef __CYGWIN__
-    return;
-#endif
-    
     /* Read the `temproots' directory for per-process temporary root
        files. */
     Strings tempRootFiles = readDirectory(
@@ -191,7 +209,19 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
         Path path = (format("%1%/%2%/%3%") % nixStateDir % tempRootsDir % *i).str();
 
         debug(format("reading temporary root file `%1%'") % path);
-            
+
+#ifdef __CYGWIN__
+	/* On Cygwin we just try to delete the lock file. */
+	char win32Path[MAX_PATH];
+	cygwin_conv_to_full_win32_path(path.c_str(), win32Path);
+	if (DeleteFile(win32Path)) {
+            printMsg(lvlError, format("removed stale temporary roots file `%1%'")
+                % path);
+            continue;
+        } else
+            debug(format("delete of `%1%' failed: %2%") % path % GetLastError());
+#endif
+
         FDPtr fd(new AutoCloseFD(open(path.c_str(), O_RDWR, 0666)));
         if (*fd == -1) {
             /* It's okay if the file has disappeared. */
@@ -199,6 +229,11 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
             throw SysError(format("opening temporary roots file `%1%'") % path);
         }
 
+        /* This should work, but doesn't, for some reason. */
+        //FDPtr fd(new AutoCloseFD(openLockFile(path, false)));
+        //if (*fd == -1) continue;
+
+#ifndef __CYGWIN__
         /* Try to acquire a write lock without blocking.  This can
            only succeed if the owning process has died.  In that case
            we don't care about its temporary roots. */
@@ -209,6 +244,7 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
             writeFull(*fd, (const unsigned char *) "d", 1);
             continue;
         }
+#endif
 
         /* Acquire a read lock.  This will prevent the owning process
            from upgrading to a write lock, therefore it will block in
@@ -448,9 +484,10 @@ void collectGarbage(GCAction action, const PathSet & pathsToDelete,
         debug(format("dead path `%1%'") % *i);
         result.insert(*i);
 
-        AutoCloseFD fdLock;
-
         if (action == gcDeleteDead || action == gcDeleteSpecific) {
+
+#ifndef __CYGWIN__
+            AutoCloseFD fdLock;
 
             /* Only delete a lock file if we can acquire a write lock
                on it.  That means that it's either stale, or the
@@ -458,18 +495,13 @@ void collectGarbage(GCAction action, const PathSet & pathsToDelete,
                latter case the other process will detect that we
                deleted the lock, and retry (see pathlocks.cc). */
             if (i->size() >= 5 && string(*i, i->size() - 5) == ".lock") {
-
-                fdLock = open(i->c_str(), O_RDWR);
-                if (fdLock == -1) {
-                    if (errno == ENOENT) continue;
-                    throw SysError(format("opening lock file `%1%'") % *i);
-                }
-
-                if (!lockFile(fdLock, ltWrite, false)) {
+                fdLock = openLockFile(*i, false);
+                if (fdLock != -1 && !lockFile(fdLock, ltWrite, false)) {
                     debug(format("skipping active lock `%1%'") % *i);
                     continue;
                 }
             }
+#endif
 
             printMsg(lvlInfo, format("deleting `%1%'") % *i);
             
@@ -478,9 +510,11 @@ void collectGarbage(GCAction action, const PathSet & pathsToDelete,
             deleteFromStore(*i, freed);
             bytesFreed += freed;
 
+#ifndef __CYGWIN__
             if (fdLock != -1)
                 /* Write token to stale (deleted) lock file. */
                 writeFull(fdLock, (const unsigned char *) "d", 1);
+#endif
         }
     }
 }

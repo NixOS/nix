@@ -4,6 +4,16 @@
 #include "util.hh"
 
 
+/* Open (possibly create) a lock file and return the file descriptor.
+   -1 is returned if create is false and the lock could not be opened
+   because it doesn't exist.  Any other error throws an exception. */
+int openLockFile(const Path & path, bool create);
+
+/* Delete an open lock file.  Both must be called to be fully portable
+   between Unix and Windows. */
+void deleteLockFilePreClose(const Path & path, int fd);
+void deleteLockFilePostClose(const Path & path);
+
 typedef enum LockType { ltRead, ltWrite, ltNone };
 
 bool lockFile(int fd, LockType lockType, bool wait);
