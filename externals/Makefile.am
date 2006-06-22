@@ -46,6 +46,7 @@ $(ATERM).tar.gz:
 
 $(ATERM): $(ATERM).tar.gz
 	gunzip < $(srcdir)/$(ATERM).tar.gz | tar xvf -
+	(cd $(ATERM) && patch -p1) < $(srcdir)/aterm-aliasing.patch
 
 have-aterm:
 	$(MAKE) $(ATERM)
@@ -101,7 +102,7 @@ endif
 
 all: build-db build-aterm build-bzip2
 
-EXTRA_DIST = $(DB).tar.gz $(ATERM).tar.gz $(BZIP2).tar.gz bdb-cygwin.patch
+EXTRA_DIST = $(DB).tar.gz $(ATERM).tar.gz $(BZIP2).tar.gz bdb-cygwin.patch aterm-aliasing.patch
 
 ext-clean:
 	$(RM) -f have-db build-db have-aterm build-aterm
