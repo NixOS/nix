@@ -31,7 +31,8 @@ Install / upgrade / uninstall flags:
 Upgrade flags:
 
   --lt: upgrade if the current version is older (default)
-  --leq: upgrade if the current version is older or current
+  --leq: upgrade if the current version is older or equal
+  --eq: "upgrade" if the current version is equal
   --always: upgrade regardless of current version
 
 Query types:

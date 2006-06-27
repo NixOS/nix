@@ -476,7 +476,7 @@ static void opInstall(Globals & globals,
 }
 
 
-typedef enum { utLt, utLeq, utAlways } UpgradeType;
+typedef enum { utLt, utLeq, utEq, utAlways } UpgradeType;
 
 
 static void upgradeDerivations(Globals & globals,
@@ -520,6 +520,7 @@ static void upgradeDerivations(Globals & globals,
                 int d = compareVersions(drvName.version, newName.version);
                 if (upgradeType == utLt && d < 0 ||
                     upgradeType == utLeq && d <= 0 ||
+                    upgradeType == utEq && d == 0 ||
                     upgradeType == utAlways)
                 {
                     if ((bestElem == availElems.end() ||
@@ -562,6 +563,7 @@ static void opUpgrade(Globals & globals,
          i != opFlags.end(); ++i)
         if (*i == "--lt") upgradeType = utLt;
         else if (*i == "--leq") upgradeType = utLeq;
+        else if (*i == "--eq") upgradeType = utEq;
         else if (*i == "--always") upgradeType = utAlways;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
