@@ -17,6 +17,7 @@ bool tryFallback = false;
 Verbosity buildVerbosity = lvlInfo;
 unsigned int maxBuildJobs = 1;
 bool readOnlyMode = false;
+string thisSystem = "unset";
 
 
 static bool settingsRead = false;
@@ -26,7 +27,7 @@ static map<string, Strings> settings;
 
 string & at(Strings & ss, unsigned int n)
 {
-    Strings::iterator i =ss.begin();
+    Strings::iterator i = ss.begin();
     advance(i, n);
     return *i;
 }

@@ -55,10 +55,6 @@ typedef list<Path> Paths;
 typedef set<Path> PathSet;
 
 
-/* The canonical system name, as returned by config.guess. */ 
-extern string thisSystem;
-
-
 /* Return an environment variable. */
 string getEnv(const string & key, const string & def = "");
 

@@ -93,6 +93,8 @@ static void initAndRun(int argc, char * * argv)
     nixDBPath = getEnv("NIX_DB_DIR", nixStateDir + "/db");
     nixConfDir = canonPath(getEnv("NIX_CONF_DIR", NIX_CONF_DIR));
 
+    thisSystem = querySetting("system", SYSTEM);
+
     /* Catch SIGINT. */
     struct sigaction act, oact;
     act.sa_handler = sigintHandler;

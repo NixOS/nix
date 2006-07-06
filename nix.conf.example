@@ -97,3 +97,23 @@
 # Example:
 #   build-users = nix-builder-1 nix-builder-2 nix-builder-3
 #build-users =
+
+
+### Option `system'
+#
+# This option specifies the canonical Nix system name of the current
+# installation, such as `i686-linux' or `powerpc-darwin'.  Nix can
+# only build derivations whose `system' attribute equals the value
+# specified here.  In general, it never makes sense to modify this
+# value from its default, since you can use it to `lie' about the
+# platform you are building on (e.g., perform a Mac OS build on a
+# Linux machine; the result would obviously be wrong).  It only makes
+# sense if the Nix binaries can run on multiple platforms, e.g.,
+# `universal binaries' that run on `powerpc-darwin' and `i686-darwin'.
+#
+# It defaults to the canonical Nix system name detected by `configure'
+# at build time.
+#
+# Example:
+#   system = i686-darwin
+#system =

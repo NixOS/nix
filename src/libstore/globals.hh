@@ -53,6 +53,9 @@ extern unsigned int maxBuildJobs;
    database. */
 extern bool readOnlyMode;
 
+/* The canonical system name, as returned by config.guess. */ 
+extern string thisSystem;
+
 
 Strings querySetting(const string & name, const Strings & def);
 

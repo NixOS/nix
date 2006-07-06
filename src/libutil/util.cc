@@ -16,9 +16,6 @@
 #include "util.hh"
 
 
-string thisSystem = SYSTEM;
-
-
 Error::Error(const format & f)
 {
     err = f.str();
