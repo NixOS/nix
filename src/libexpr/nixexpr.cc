@@ -229,16 +229,19 @@ static void checkVarDefs2(set<Expr> & done, const ATermMap & defs, Expr e)
         }
         for (ATermIterator i(formals); i; ++i) {
             Expr deflt;
+            set<Expr> done2;
             if (matchDefFormal(*i, name, deflt))
-                checkVarDefs2(done, defs2, deflt);
+                checkVarDefs2(done2, defs2, deflt);
         }
-        checkVarDefs2(done, defs2, body);
+        set<Expr> done2;
+        checkVarDefs2(done2, defs2, body);
     }
         
     else if (matchFunction1(e, name, body, pos)) {
         ATermMap defs2(defs);
         defs2.set(name, (ATerm) ATempty);
-        checkVarDefs2(done, defs2, body);
+        set<Expr> done2;
+        checkVarDefs2(done2, defs2, body);
     }
         
     else if (matchRec(e, rbnds, nrbnds)) {
@@ -252,7 +255,8 @@ static void checkVarDefs2(set<Expr> & done, const ATermMap & defs, Expr e)
             if (!matchBind(*i, name, value, pos)) abort(); /* can't happen */
             defs2.set(name, (ATerm) ATempty);
         }
-        checkVarDefs2(done, defs2, (ATerm) rbnds);
+        set<Expr> done2;
+        checkVarDefs2(done2, defs2, (ATerm) rbnds);
     }
 
     else if (matchWith(e, with, body, pos)) {
