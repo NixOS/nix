@@ -27,6 +27,7 @@ $(TESTS): common.sh
 
 EXTRA_DIST = $(TESTS) \
   simple.nix.in simple.builder.sh \
+  hash-check.nix.in \
   dependencies.nix.in dependencies.builder*.sh \
   locking.nix.in locking.builder.sh \
   parallel.nix.in parallel.builder.sh \
