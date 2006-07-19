@@ -41,7 +41,7 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
         if (!matchNoDefFormal(*i, name) && !matchDefFormal(*i, name, def))
             abort(); /* can't happen */
         if (subs[name] == 0) {
-            if (def == 0) throw Error(format("required function argument `%1%' missing")
+            if (def == 0) throw TypeError(format("the argument named `%1%' required by the function is missing")
                 % aterm2String(name));
             defsUsed.push_back(name);
             recAttrs = ATinsert(recAttrs, makeBind(name, def, makeNoPos()));
@@ -68,7 +68,7 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
             matchNoDefFormal(*i, name) || matchDefFormal(*i, name, def);
             subs.remove(name);
         }
-        throw Error(format("unexpected function argument `%1%'")
+        throw TypeError(format("the function does not expect an argument named `%1%'")
             % aterm2String(subs.begin()->key));
     }
 
@@ -133,7 +133,8 @@ string evalString(EvalState & state, Expr e)
 {
     e = evalExpr(state, e);
     ATerm s;
-    if (!matchStr(e, s)) throw Error("string expected");
+    if (!matchStr(e, s))
+        throw TypeError(format("value is %1% while a string was expected") % showType(e));
     return aterm2String(s);
 }
 
@@ -142,7 +143,8 @@ Path evalPath(EvalState & state, Expr e)
 {
     e = evalExpr(state, e);
     ATerm s;
-    if (!matchPath(e, s)) throw Error("path expected");
+    if (!matchPath(e, s))
+        throw TypeError(format("value is %1% while a path was expected") % showType(e));
     return aterm2String(s);
 }
 
@@ -152,7 +154,7 @@ bool evalBool(EvalState & state, Expr e)
     e = evalExpr(state, e);
     if (e == eTrue) return true;
     else if (e == eFalse) return false;
-    else throw Error("boolean expected");
+    else throw TypeError(format("value is %1% while a boolean was expected") % showType(e));
 }
 
 
@@ -160,7 +162,8 @@ ATermList evalList(EvalState & state, Expr e)
 {
     e = evalExpr(state, e);
     ATermList list;
-    if (!matchList(e, list)) throw Error("list expected");
+    if (!matchList(e, list))
+        throw TypeError(format("value is %1% while a list was expected") % showType(e));
     return list;
 }
 
@@ -226,13 +229,13 @@ string coerceToStringWithContext(EvalState & state,
         Expr a = attrs.get(toATerm("type"));
         if (a && evalString(state, a) == "derivation") {
             a = attrs.get(toATerm("outPath"));
-            if (!a) throw Error("output path missing from derivation");
+            if (!a) throw TypeError("output path missing from derivation");
             context = ATinsert(context, e);
             return evalPath(state, a);
         }
     }
     
-    throw Error("cannot coerce value to string");
+    throw TypeError(format("cannot coerce %1% to a string") % showType(e));
 }
 
 
@@ -294,7 +297,7 @@ Expr evalExpr2(EvalState & state, Expr e)
     if (matchVar(e, name)) {
         ATerm primOp = state.primOps.get(name);
         if (!primOp)
-            throw Error(format("impossible: undefined variable `%1%'") % aterm2String(name));
+            throw EvalError(format("impossible: undefined variable `%1%'") % aterm2String(name));
         int arity;
         ATermBlob fun;
         if (!matchPrimOpDef(primOp, arity, fun)) abort();
@@ -355,7 +358,7 @@ Expr evalExpr2(EvalState & state, Expr e)
             }
         }
         
-        else throw Error("function or primop expected in function call");
+        else throw TypeError("the left-hand side of the function call is neither a function nor a primop (built-in operation)");
     }
 
     /* Attribute selection. */
@@ -363,7 +366,7 @@ Expr evalExpr2(EvalState & state, Expr e)
         ATerm pos;
         string s1 = aterm2String(name);
         Expr a = queryAttr(evalExpr(state, e1), s1, pos);
-        if (!a) throw Error(format("attribute `%1%' missing") % s1);
+        if (!a) throw EvalError(format("attribute `%1%' missing") % s1);
         try {
             return evalExpr(state, a);
         } catch (Error & e) {
@@ -451,26 +454,33 @@ Expr evalExpr2(EvalState & state, Expr e)
     }
 
     /* String or path concatenation. */
-    if (matchOpPlus(e, e1, e2)) {
+    ATermList es;
+    if (matchOpPlus(e, e1, e2) || matchConcatStrings(e, es)) {
         ATermVector args;
-        args.push_back(e1);
-        args.push_back(e2);
-        return concatStrings(state, args);
+        if (matchOpPlus(e, e1, e2)) {
+            args.push_back(e1);
+            args.push_back(e2);
+        } else
+            for (ATermIterator i(es); i; ++i) args.push_back(*i);
+        
+        try {
+            return concatStrings(state, args);
+        } catch (Error & e) {
+            e.addPrefix(format("in a string concatenation: "));
+            throw;
+        }
     }
 
     /* List concatenation. */
     if (matchOpConcat(e, e1, e2)) {
-        ATermList l1 = evalList(state, e1);
-        ATermList l2 = evalList(state, e2);
-        return makeList(ATconcat(l1, l2));
-    }
-
-    /* String concatenation. */
-    ATermList es;
-    if (matchConcatStrings(e, es)) {
-        ATermVector args;
-        for (ATermIterator i(es); i; ++i) args.push_back(*i);
-        return concatStrings(state, args);
+        try {
+            ATermList l1 = evalList(state, e1);
+            ATermList l2 = evalList(state, e2);
+            return makeList(ATconcat(l1, l2));
+        } catch (Error & e) {
+            e.addPrefix(format("in a list concatenation: "));
+            throw;
+        }
     }
 
     /* Barf. */
@@ -492,7 +502,7 @@ Expr evalExpr(EvalState & state, Expr e)
     Expr nf = state.normalForms.get(e);
     if (nf) {
         if (nf == makeBlackHole())
-            throw Error("infinite recursion encountered");
+            throw EvalError("infinite recursion encountered");
         state.nrCached++;
         return nf;
     }

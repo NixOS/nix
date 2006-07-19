@@ -50,7 +50,7 @@ void queryAllAttrs(Expr e, ATermMap & attrs, bool withPos)
 {
     ATermList bnds;
     if (!matchAttrs(e, bnds))
-        throw Error("attribute set expected");
+        throw TypeError("attribute set expected");
 
     for (ATermIterator i(bnds); i; ++i) {
         ATerm name;
@@ -73,7 +73,7 @@ Expr queryAttr(Expr e, const string & name, ATerm & pos)
 {
     ATermList bnds;
     if (!matchAttrs(e, bnds))
-        throw Error("attribute set expected");
+        throw TypeError("attribute set expected");
 
     for (ATermIterator i(bnds); i; ++i) {
         ATerm name2, pos2;
@@ -214,7 +214,7 @@ static void checkVarDefs2(set<Expr> & done, const ATermMap & defs, Expr e)
 
     if (matchVar(e, name)) {
         if (!defs.get(name))
-            throw Error(format("undefined variable `%1%'")
+            throw EvalError(format("undefined variable `%1%'")
                 % aterm2String(name));
     }
 
@@ -289,3 +289,24 @@ Expr makeBool(bool b)
 {
     return b ? eTrue : eFalse;
 }
+
+
+string showType(Expr e)
+{
+    ATerm t1, t2, t3;
+    ATermList l1;
+    int i1;
+    if (matchStr(e, t1)) return "a string";
+    if (matchPath(e, t1)) return "a path";
+    if (matchUri(e, t1)) return "a path";
+    if (matchNull(e)) return "null";
+    if (matchInt(e, i1)) return "an integer";
+    if (matchBool(e, t1)) return "a boolean";
+    if (matchFunction(e, l1, t1, t2)) return "a function";
+    if (matchFunction1(e, t1, t2, t3)) return "a function";
+    if (matchAttrs(e, l1)) return "an attribute set";
+    if (matchList(e, l1)) return "a list";
+    if (matchContext(e, l1, t1)) return "a context containing " + showType(t1);
+    return "an unknown type";
+}
+

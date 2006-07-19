@@ -41,10 +41,6 @@ struct EvalState
 };
 
 
-MakeError(EvalError, Error)
-MakeError(AssertionError, EvalError)
-
-
 /* Evaluate an expression to normal form. */
 Expr evalExpr(EvalState & state, Expr e);
 

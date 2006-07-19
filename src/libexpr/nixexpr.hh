@@ -9,6 +9,11 @@
 #include "util.hh"
 
 
+MakeError(EvalError, Error)
+MakeError(AssertionError, EvalError)
+MakeError(TypeError, EvalError)
+
+
 /* Nix expressions are represented as ATerms.  The maximal sharing
    property of the ATerm library allows us to implement caching of
    normals forms efficiently. */
@@ -81,6 +86,8 @@ void checkVarDefs(const ATermMap & def, Expr e);
 
 /* Create an expression representing a boolean. */
 Expr makeBool(bool b);
+
+string showType(Expr e);
 
 
 #endif /* !__NIXEXPR_H */

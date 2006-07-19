@@ -26,19 +26,19 @@ static Expr primImport(EvalState & state, const ATermVector & args)
            Nix expression created at the derivation's output path. */
         if (a && evalString(state, a) == "derivation") {
             a = queryAttr(arg, "drvPath");
-            if (!a) throw Error("bad derivation in import");
+            if (!a) throw EvalError("bad derivation in import");
             Path drvPath = evalPath(state, a);
 
             buildDerivations(singleton<PathSet>(drvPath));
  
             a = queryAttr(arg, "outPath");
-            if (!a) throw Error("bad derivation in import");
+            if (!a) throw EvalError("bad derivation in import");
             path = evalPath(state, a);
         }
     }
 
     if (path == "")
-        throw Error("path or derivation expected in import");
+        throw TypeError("`import' requires a path or derivation as its argument");
     
     return evalFile(state, path);
 }
@@ -133,11 +133,11 @@ static void processBinding(EvalState & state, Expr e, Derivation & drv,
         
         if (a && evalString(state, a) == "derivation") {
             a = queryAttr(e, "drvPath");
-            if (!a) throw Error("derivation name missing");
+            if (!a) throw EvalError("derivation name missing");
             Path drvPath = evalPath(state, a);
 
             a = queryAttr(e, "outPath");
-            if (!a) throw Error("output path missing");
+            if (!a) throw EvalError("output path missing");
             /* !!! supports only single output path */
             Path outPath = evalPath(state, a);
 
@@ -148,7 +148,7 @@ static void processBinding(EvalState & state, Expr e, Derivation & drv,
         else if (a && evalString(state, a) == "storePath") {
 
             a = queryAttr(e, "outPath");
-            if (!a) throw Error("output path missing");
+            if (!a) throw EvalError("output path missing");
             /* !!! supports only single output path */
             Path outPath = evalPath(state, a);
 
@@ -156,7 +156,7 @@ static void processBinding(EvalState & state, Expr e, Derivation & drv,
             ss.push_back(outPath);
         }
 
-        else throw Error("invalid derivation attribute");
+        else throw TypeError("attribute sets in derivations must either be derivations or store paths");
     }
 
     else if (matchPath(e, s)) {
@@ -171,7 +171,7 @@ static void processBinding(EvalState & state, Expr e, Derivation & drv,
 
         else {
             if (isDerivation(srcPath))
-                throw Error(format("file names are not allowed to end in `%1%'")
+                throw EvalError(format("file names are not allowed to end in `%1%'")
                     % drvExtension);
             Path dstPath;
             if (state.srcToStore[srcPath] != "")
@@ -200,14 +200,14 @@ static void processBinding(EvalState & state, Expr e, Derivation & drv,
         Strings ss2;
         processBinding(state, evalExpr(state, e1), drv, ss2);
         if (ss2.size() != 1)
-            throw Error("left-hand side of `~' operator cannot be a list");
+            throw TypeError("left-hand side of `~' operator cannot be a list");
         e2 = evalExpr(state, e2);
         if (!(matchStr(e2, s) || matchPath(e2, s)))
-            throw Error("right-hand side of `~' operator must be a path or string");
+            throw TypeError("right-hand side of `~' operator must be a path or string");
         ss.push_back(canonPath(ss2.front() + "/" + aterm2String(s)));
     }
     
-    else throw Error("invalid derivation attribute");
+    else throw TypeError(format("%1% is not allowed as a derivation argument") % showType(e));
 }
 
 
@@ -240,7 +240,7 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
     /* Figure out the name already (for stack backtraces). */
     Expr eDrvName = attrs.get(toATerm("name"));
     if (!eDrvName)
-        throw Error("required attribute `name' missing");
+        throw EvalError("required attribute `name' missing");
     ATerm posDrvName;
     if (!matchAttrRHS(eDrvName, eDrvName, posDrvName)) abort();
     string drvName = evalString(state, eDrvName);
@@ -291,16 +291,16 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
             else if (key == "outputHashMode") {
                 if (s == "recursive") outputHashRecursive = true; 
                 else if (s == "flat") outputHashRecursive = false;
-                else throw Error(format("invalid value `%1%' for `outputHashMode' attribute") % s);
+                else throw EvalError(format("invalid value `%1%' for `outputHashMode' attribute") % s);
             }
         }
     }
     
     /* Do we have all required attributes? */
     if (drv.builder == "")
-        throw Error("required attribute `builder' missing");
+        throw EvalError("required attribute `builder' missing");
     if (drv.platform == "")
-        throw Error("required attribute `system' missing");
+        throw EvalError("required attribute `system' missing");
 
     /* If an output hash was given, check it. */
     if (outputHash == "")
@@ -308,7 +308,7 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
     else {
         HashType ht = parseHashType(outputHashAlgo);
         if (ht == htUnknown)
-            throw Error(format("unknown hash algorithm `%1%'") % outputHashAlgo);
+            throw EvalError(format("unknown hash algorithm `%1%'") % outputHashAlgo);
         Hash h;
         if (outputHash.size() == Hash(ht).hashSize * 2)
             /* hexadecimal representation */
@@ -326,7 +326,7 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
        alphanumerics and some other characters appear. */
     checkStoreName(drvName);
     if (isDerivation(drvName))
-        throw Error(format("derivation names are not allowed to end in `%1%'")
+        throw EvalError(format("derivation names are not allowed to end in `%1%'")
             % drvExtension);
 
     /* !!! the name should not end in the derivation extension (.drv).
@@ -457,7 +457,7 @@ static Expr primIsNull(EvalState & state, const ATermVector & args)
 
 static Path findDependency(Path dir, string dep)
 {
-    if (dep[0] == '/') throw Error(
+    if (dep[0] == '/') throw EvalError(
         format("illegal absolute dependency `%1%'") % dep);
 
     Path p = canonPath(dir + "/" + dep);
@@ -515,7 +515,7 @@ static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
 
     /* Get the start set. */
     Expr startSet = queryAttr(attrs, "startSet");
-    if (!startSet) throw Error("attribute `startSet' required");
+    if (!startSet) throw EvalError("attribute `startSet' required");
     ATermList startSet2 = evalList(state, startSet);
 
     Path pivot;
@@ -538,7 +538,7 @@ static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
     }
 
     Expr scanner = queryAttr(attrs, "scanner");
-    if (!scanner) throw Error("attribute `scanner' required");
+    if (!scanner) throw EvalError("attribute `scanner' required");
     
     /* Construct the dependency closure by querying the dependency of
        each path in `workSet', adding the dependencies to

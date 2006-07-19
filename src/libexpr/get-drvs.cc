@@ -16,7 +16,7 @@ string DrvInfo::queryOutPath(EvalState & state) const
 {
     if (outPath == "") {
         Expr a = attrs->get(toATerm("outPath"));
-        if (!a) throw Error("output path missing");
+        if (!a) throw TypeError("output path missing");
         (string &) outPath = evalPath(state, a);
     }
     return outPath;
@@ -81,7 +81,7 @@ static bool getDerivation(EvalState & state, Expr e,
     
         a = attrs->get(toATerm("name"));
         /* !!! We really would like to have a decent back trace here. */
-        if (!a) throw Error("derivation name missing");
+        if (!a) throw TypeError("derivation name missing");
         drv.name = evalString(state, a);
 
         a = attrs->get(toATerm("system"));
@@ -123,7 +123,7 @@ static void getDerivations(EvalState & state, Expr e,
         for (ATermIterator i(formals); i; ++i) {
             Expr name, def;
             if (matchNoDefFormal(*i, name))
-                throw Error(format("expression evaluates to a function with no-default arguments (`%1%')")
+                throw TypeError(format("cannot auto-call a function that has an argument without a default value (`%1%')")
                     % aterm2String(name));
             else if (!matchDefFormal(*i, name, def))
                 abort(); /* can't happen */
@@ -224,7 +224,7 @@ static void getDerivations(EvalState & state, Expr e,
         return;
     }
 
-    throw Error("expression does not evaluate to a derivation (or a set or list of those)");
+    throw TypeError("expression does not evaluate to a derivation (or a set or list of those)");
 }
 
 

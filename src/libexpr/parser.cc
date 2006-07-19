@@ -103,7 +103,7 @@ static void checkAttrs(ATermMap & names, ATermList bnds)
         ATerm pos;
         if (!matchBind(*i, name, e, pos)) abort(); /* can't happen */
         if (names.get(name))
-            throw Error(format("duplicate attribute `%1%' at %2%")
+            throw EvalError(format("duplicate attribute `%1%' at %2%")
                 % aterm2String(name) % showPos(pos));
         names.set(name, name);
     }
@@ -123,7 +123,7 @@ static void checkAttrSets(ATerm e)
                 !matchDefFormal(*i, name, deflt))
                 abort();
             if (names.get(name))
-                throw Error(format("duplicate formal function argument `%1%' at %2%")
+                throw EvalError(format("duplicate formal function argument `%1%' at %2%")
                     % aterm2String(name) % showPos(pos));
             names.set(name, name);
         }
@@ -168,12 +168,12 @@ static Expr parse(EvalState & state,
     int res = yyparse(scanner, &data);
     yylex_destroy(scanner);
     
-    if (res) throw Error(data.error);
+    if (res) throw EvalError(data.error);
 
     try {
         checkVarDefs(state.primOps, data.result);
     } catch (Error & e) {
-        throw Error(format("%1%, in `%2%'") % e.msg() % path);
+        throw EvalError(format("%1%, in `%2%'") % e.msg() % path);
     }
     
     checkAttrSets(data.result);
