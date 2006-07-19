@@ -1,0 +1,58 @@
+#! @perl@ -w
+
+use strict;
+
+my $procDir = "/proc";
+
+
+sub readProc {
+    return unless -d $procDir;
+
+    opendir DIR, $procDir or return;
+    
+    foreach my $name (readdir DIR) {
+        next unless $name =~ /^\d+$/;
+
+        my $process = "$procDir/$name";
+
+        #print STDERR "=== $process\n";
+        
+        my $target;
+        print "$target\n" if $target = readlink "$process/exe";
+        print "$target\n" if $target = readlink "$process/cwd";
+
+        if (opendir FDS, "$process/fd") {
+            foreach my $name (readdir FDS) {
+                $target = readlink "$process/fd/$name";
+                print "$target\n" if $target && substr($target, 0, 1) eq "/";
+            }
+            closedir FDS;
+        }
+
+        if (open MAP, "<$process/maps") {
+            while (<MAP>) {
+                next unless /^ \s* \S+ \s+ \S+ \s+ \S+ \s+ \S+ \s+ \S+ \s+ (\/\S+) \s* $/x;
+                print "$1\n";
+            }
+            close MAP;
+        }
+    }
+
+    closedir DIR;
+}
+
+
+sub lsof {
+    return unless open LSOF, "lsof -b -w -F n |";
+
+    while (<LSOF>) {
+        next unless /^n (\/ .*)$/x;
+        print $1, "\n";
+    }
+
+    close LSOF;
+}
+
+
+readProc;
+lsof;
