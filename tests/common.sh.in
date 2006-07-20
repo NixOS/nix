@@ -13,6 +13,7 @@ export NIX_DB_DIR=$TEST_ROOT/db
 export NIX_CONF_DIR=$TEST_ROOT/etc
 export NIX_BIN_DIR=$TEST_ROOT/bin
 export NIX_LIBEXEC_DIR=$TEST_ROOT/bin
+export NIX_ROOT_FINDER=
 export SHARED=$TEST_ROOT/shared
 
 export REAL_BIN_DIR=@bindir@

@@ -66,6 +66,9 @@ irreversible.</para></warning>
   <listitem><para>TODO: nix-pack-closure and
   nix-unpack-closure.</para></listitem>
 
+  <listitem><para>TODO: open files etc. are now used as roots of the
+  garbage collector.</para></listitem>
+
 </itemizedlist>
 
 </section>

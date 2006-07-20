@@ -12,10 +12,6 @@
 #include <unistd.h>
 #include <errno.h>
 
-#ifdef __CYGWIN__
-#include <windows.h>
-#endif
-
 #include <pwd.h>
 #include <grp.h>
 
@@ -321,13 +317,6 @@ const char * * strings2CharPtrs(const Strings & ss)
 }
 
 
-/* Hack for Cygwin: _exit() doesn't seem to work quite right, since
-   some Berkeley DB code appears to be called when a child exits
-   through _exit() (e.g., because execve() failed).  So call the
-   Windows API directly. */
-#ifdef __CYGWIN__
-#define _exit(n) ExitProcess(n)
-#endif
 
 
 //////////////////////////////////////////////////////////////////////
@@ -460,9 +449,9 @@ static void killUser(uid_t uid)
         
         } catch (exception & e) {
             cerr << format("build error: %1%\n") % e.what();
-            _exit(1);
+            quickExit(1);
         }
-        _exit(0);
+        quickExit(0);
     }
     
     /* parent */
@@ -944,7 +933,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
         } catch (exception & e) {
             cerr << format("build error: %1%\n") % e.what();
         }
-        _exit(1);
+        quickExit(1);
     }
     
     /* parent */
@@ -1340,7 +1329,7 @@ void DerivationGoal::startBuilder()
         } catch (exception & e) {
             cerr << format("build error: %1%\n") % e.what();
         }
-        _exit(1);
+        quickExit(1);
     }
 
     
@@ -1779,7 +1768,7 @@ void SubstitutionGoal::tryToRun()
         } catch (exception & e) {
             cerr << format("substitute error: %1%\n") % e.what();
         }
-        _exit(1);
+        quickExit(1);
     }
     
     /* parent */

@@ -316,6 +316,31 @@ static void findRoots(const Path & path, bool recurseSymlinks,
 }
 
 
+static void addAdditionalRoots(PathSet & roots)
+{
+    Path rootFinder = getEnv("NIX_ROOT_FINDER",
+        "/nix/libexec/nix/find-runtime-roots.pl"); /* !!! */
+
+    if (rootFinder.empty()) return;
+    
+    printMsg(lvlDebug, format("executing `%1%' to find additional roots") % rootFinder);
+
+    string result = runProgram(rootFinder);
+
+    Strings paths = tokenizeString(result, "\n");
+    
+    for (Strings::iterator i = paths.begin(); i != paths.end(); ++i) {
+        if (isInStore(*i)) {
+            Path path = toStorePath(*i);
+            if (roots.find(path) == roots.end()) {
+                debug(format("found additional root `%1%'") % path);
+                roots.insert(path);
+            }
+        }
+    }
+}
+
+
 static void dfsVisit(const PathSet & paths, const Path & path,
     PathSet & visited, Paths & sorted)
 {
@@ -369,6 +394,12 @@ void collectGarbage(GCAction action, const PathSet & pathsToDelete,
     PathSet roots;
     if (!ignoreLiveness)
         findRoots(rootsDir, true, roots);
+
+    /* Add additional roots returned by the program specified by the
+       NIX_ROOT_FINDER environment variable.  This is typically used
+       to add running programs to the set of roots (to prevent them
+       from being garbage collected). */
+    addAdditionalRoots(roots);
 
     if (action == gcReturnRoots) {
         result = roots;

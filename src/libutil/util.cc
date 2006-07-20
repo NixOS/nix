@@ -13,6 +13,10 @@
 #include <fcntl.h>
 #include <signal.h>
 
+#ifdef __CYGWIN__
+#include <windows.h>
+#endif
+
 #include "util.hh"
 
 
@@ -434,6 +438,23 @@ void writeFull(int fd, const unsigned char * buf, size_t count)
 }
 
 
+string drainFD(int fd)
+{
+    string result;
+    unsigned char buffer[4096];
+    while (1) {
+        ssize_t rd = read(fd, buffer, sizeof buffer);
+        if (rd == -1) {
+            if (errno != EINTR)
+                throw SysError("reading from file");
+        }
+        else if (rd == 0) break;
+        else result.append((char *) buffer, rd);
+    }
+    return result;
+}
+
+
 
 //////////////////////////////////////////////////////////////////////
 
@@ -641,6 +662,69 @@ void Pid::setSeparatePG(bool separatePG)
     this->separatePG = separatePG;
 }
 
+
+
+//////////////////////////////////////////////////////////////////////
+
+
+string runProgram(Path program)
+{
+    /* Create a pipe. */
+    Pipe pipe;
+    pipe.create();
+
+    /* Fork. */
+    Pid pid;
+    pid = fork();
+    switch (pid) {
+
+    case -1:
+        throw SysError("unable to fork");
+
+    case 0: /* child */
+        try {
+            pipe.readSide.close();
+
+            if (dup2(pipe.writeSide, STDOUT_FILENO) == -1)
+                throw SysError("dupping from-hook write side");
+            
+            execl(program.c_str(), program.c_str(), (char *) 0);
+            throw SysError(format("executing `%1%'") % program);
+            
+        } catch (exception & e) {
+            cerr << "error: " << e.what() << endl;
+        }
+        quickExit(1);
+    }
+
+    /* Parent. */
+
+    pipe.writeSide.close();
+
+    string result = drainFD(pipe.readSide);
+
+    /* Wait for the child to finish. */
+    int status = pid.wait(true);
+    if (!statusOk(status))
+        throw Error(format("program `%1% %2%")
+            % program % statusToString(status));
+
+    return result;
+}
+
+
+void quickExit(int status)
+{
+#ifdef __CYGWIN__
+    /* Hack for Cygwin: _exit() doesn't seem to work quite right,
+       since some Berkeley DB code appears to be called when a child
+       exits through _exit() (e.g., because execve() failed).  So call
+       the Windows API directly. */
+    ExitProcess(status);
+#else
+    _exit(status);
+#endif
+}
 
 
 //////////////////////////////////////////////////////////////////////

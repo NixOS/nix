@@ -185,6 +185,11 @@ void readFull(int fd, unsigned char * buf, size_t count);
 void writeFull(int fd, const unsigned char * buf, size_t count);
 
 
+/* Read a file descriptor until EOF occurs. */
+string drainFD(int fd);
+
+
+
 /* Automatic cleanup of resources. */
 
 class AutoDelete
@@ -247,6 +252,15 @@ public:
     int wait(bool block);
     void setSeparatePG(bool separatePG);
 };
+
+
+/* Run a program and return its stdout in a string (i.e., like the
+   shell backtick operator). */
+string runProgram(Path program);
+
+/* Wrapper around _exit() on Unix and ExitProcess() on Windows.  (On
+   Cygwin, _exit() doesn't seem to do the right thing.) */
+void quickExit(int status);
 
 
 /* User interruption. */
