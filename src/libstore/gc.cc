@@ -323,7 +323,7 @@ static void addAdditionalRoots(PathSet & roots)
 
     if (rootFinder.empty()) return;
     
-    printMsg(lvlDebug, format("executing `%1%' to find additional roots") % rootFinder);
+    debug(format("executing `%1%' to find additional roots") % rootFinder);
 
     string result = runProgram(rootFinder);
 
