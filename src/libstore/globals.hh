@@ -28,6 +28,10 @@ extern string nixDBPath;
    stored. */
 extern string nixConfDir;
 
+/* nixLibexecDir is the directory where internal helper programs are
+   stored. */
+extern string nixLibexecDir;
+
 
 
 /* Misc. global flags. */

@@ -319,7 +319,7 @@ static void findRoots(const Path & path, bool recurseSymlinks,
 static void addAdditionalRoots(PathSet & roots)
 {
     Path rootFinder = getEnv("NIX_ROOT_FINDER",
-        "/nix/libexec/nix/find-runtime-roots.pl"); /* !!! */
+        nixLibexecDir + "/nix/find-runtime-roots.pl");
 
     if (rootFinder.empty()) return;
     

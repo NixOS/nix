@@ -10,6 +10,7 @@ string nixLogDir = "/UNINIT";
 string nixStateDir = "/UNINIT";
 string nixDBPath = "/UNINIT";
 string nixConfDir = "/UNINIT";
+string nixLibexecDir = "/UNINIT";
 
 bool keepFailed = false;
 bool keepGoing = false;
