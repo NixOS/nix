@@ -1,10 +1,12 @@
 set -e
 
-# Maybe the build directory is symlinked.
-export NIX_IGNORE_SYMLINK_STORE=1
-
 export TEST_ROOT=$(pwd)/test-tmp
-export NIX_STORE_DIR=$TEST_ROOT/store
+export NIX_STORE_DIR
+if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store); then
+    # Maybe the build directory is symlinked.
+    export NIX_IGNORE_SYMLINK_STORE=1
+    NIX_STORE_DIR=$TEST_ROOT/store
+fi
 export NIX_DATA_DIR=$TEST_ROOT/data
 export NIX_LOCALSTATE_DIR=$TEST_ROOT/var
 export NIX_LOG_DIR=$TEST_ROOT/var/log/nix
