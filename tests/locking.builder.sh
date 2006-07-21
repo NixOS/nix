@@ -1,5 +1,3 @@
-export PATH=/bin:/usr/bin:$PATH
-
 sleep 3
 
 touch $out

@@ -12,6 +12,7 @@ let {
     builder = "@shell@";
     shell = "@shell@";
     args = ["-e" "-x" ./user-envs.builder.sh];
+    PATH = "@testPath@";
   } // {
     meta = {
       description = "A silly test package";

@@ -23,5 +23,6 @@
 	 -e "s^@xsltproc\@^$(xsltproc)^g" \
 	 -e "s^@aterm_bin\@^$(aterm_bin)^g" \
 	 -e "s^@version\@^$(VERSION)^g" \
+	 -e "s^@testPath\@^$(coreutils):$$(dirname $$(type -P expr))^g" \
 	 < $< > $@ || rm $@
 	if test -x $<; then chmod +x $@; fi

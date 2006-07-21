@@ -5,6 +5,7 @@ let {
     system = "@system@";
     builder = "@shell@";
     args = ["-e" "-x" ./parallel.builder.sh];
+    PATH = "@testPath@";
     shared = "@extra1@";
     inherit text inputs;
   };

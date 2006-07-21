@@ -4,7 +4,7 @@ echo "PATH=$PATH"
 if mkdir foo; then exit 1; fi
 
 # Set a PATH (!!! impure).
-export PATH=/bin:/usr/bin:$PATH
+export PATH=$goodPath
 
 mkdir $out
 

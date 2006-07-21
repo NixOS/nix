@@ -1,9 +1,6 @@
 echo "DOING $text"
 
 
-export PATH=/bin:/usr/bin:$PATH
-
-
 # increase counter
 while ! ln -s x $shared.lock; do
     sleep 1

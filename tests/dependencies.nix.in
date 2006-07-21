@@ -5,6 +5,7 @@ let {
     system = "@system@";
     builder = "@shell@";
     args = ["-e" "-x" ./dependencies.builder1.sh];
+    PATH = "@testPath@";
   };
 
   input2 = derivation {
@@ -12,6 +13,7 @@ let {
     system = "@system@";
     builder = "@shell@";
     args = ["-e" "-x" ./dependencies.builder2.sh];
+    PATH = "@testPath@";
   };
 
   body = derivation {
@@ -19,6 +21,7 @@ let {
     system = "@system@";
     builder = "@shell@";
     args = ["-e" "-x" (./dependencies.builder0.sh  + "/FOOBAR/../.")];
+    PATH = "@testPath@";
     input1 = input1 + "/.";
     inherit input2;
   };

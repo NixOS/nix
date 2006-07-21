@@ -5,6 +5,7 @@ let {
     system = "@system@";
     builder = "@shell@";
     args = ["-e" "-x" ./locking.builder.sh];
+    PATH = "@testPath@";
     inherit text inputs;
   };
 

@@ -1,5 +1,3 @@
-export PATH=/bin:/usr/bin:$PATH
-
 mkdir $out
 echo $(cat $input1/foo)$(cat $input2/bar) > $out/foobar
 

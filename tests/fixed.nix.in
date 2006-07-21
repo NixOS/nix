@@ -8,6 +8,7 @@ rec {
     outputHashMode = mode;
     outputHashAlgo = algo;
     outputHash = hash;
+    PATH = "@testPath@";
   };
 
   good = [

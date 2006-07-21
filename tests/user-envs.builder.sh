@@ -1,5 +1,3 @@
-export PATH=/bin:/usr/bin:$PATH
-
 mkdir $out
 mkdir $out/bin
 echo "#! $shell" > $out/bin/$progName
