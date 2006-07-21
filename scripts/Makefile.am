@@ -3,7 +3,7 @@ bin_SCRIPTS = nix-collect-garbage \
   nix-install-package nix-channel nix-build \
   nix-pack-closure nix-unpack-closure
 
-noinst_SCRIPTS = nix-profile.sh generate-patches.pl
+noinst_SCRIPTS = nix-profile.sh generate-patches.pl find-runtime-roots.pl
 
 nix-pull nix-push: readmanifest.pm readconfig.pm download-using-manifests.pl
 
