@@ -118,10 +118,8 @@ static void checkAttrSets(ATerm e)
         ATermMap names(ATgetLength(formals));
         for (ATermIterator i(formals); i; ++i) {
             ATerm name;
-            Expr deflt;
-            if (!matchNoDefFormal(*i, name) &&
-                !matchDefFormal(*i, name, deflt))
-                abort();
+            ATerm d1, d2;
+            if (!matchFormal(*i, name, d1, d2)) abort();
             if (names.get(name))
                 throw EvalError(format("duplicate formal function argument `%1%' at %2%")
                     % aterm2String(name) % showPos(pos));

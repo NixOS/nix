@@ -19,6 +19,9 @@ MakeError(TypeError, EvalError)
    normals forms efficiently. */
 typedef ATerm Expr;
 
+typedef ATerm DefaultValue;
+typedef ATerm ValidValues;
+
 typedef ATerm Pos;
 
 

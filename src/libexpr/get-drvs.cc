@@ -121,12 +121,11 @@ static void getDerivations(EvalState & state, Expr e,
     ATerm body, pos;
     if (matchFunction(e, formals, body, pos)) {
         for (ATermIterator i(formals); i; ++i) {
-            Expr name, def;
-            if (matchNoDefFormal(*i, name))
+            Expr name, def; ATerm values, def2;
+            if (!matchFormal(*i, name, values, def2)) abort();
+            if (!matchDefaultValue(def2, def)) 
                 throw TypeError(format("cannot auto-call a function that has an argument without a default value (`%1%')")
                     % aterm2String(name));
-            else if (!matchDefFormal(*i, name, def))
-                abort(); /* can't happen */
         }
         getDerivations(state,
             makeCall(e, makeAttrs(ATermMap(0))),

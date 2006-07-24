@@ -134,9 +134,8 @@ Expr substitute(const Substitution & subs, Expr e)
     if (matchFunction(e, formals, body, pos)) {
         ATermMap map(ATgetLength(formals));
         for (ATermIterator i(formals); i; ++i) {
-            if (!matchNoDefFormal(*i, name) &&
-                !matchDefFormal(*i, name, def))
-                abort();
+            ATerm d1, d2;
+            if (!matchFormal(*i, name, d1, d2)) abort();
             map.set(name, makeRemoved());
         }
         Substitution subs2(&subs, &map);
@@ -221,16 +220,14 @@ static void checkVarDefs2(set<Expr> & done, const ATermMap & defs, Expr e)
     else if (matchFunction(e, formals, body, pos)) {
         ATermMap defs2(defs);
         for (ATermIterator i(formals); i; ++i) {
-            Expr deflt;
-            if (!matchNoDefFormal(*i, name) &&
-                !matchDefFormal(*i, name, deflt))
-                abort();
+            Expr d1, d2;
+            if (!matchFormal(*i, name, d1, d2)) abort();
             defs2.set(name, (ATerm) ATempty);
         }
         for (ATermIterator i(formals); i; ++i) {
-            Expr deflt;
+            Expr dummy, deflt;
             set<Expr> done2;
-            if (matchDefFormal(*i, name, deflt))
+            if (matchFormal(*i, name, dummy, deflt)) /* !!! check dummy */
                 checkVarDefs2(done2, defs2, deflt);
         }
         set<Expr> done2;

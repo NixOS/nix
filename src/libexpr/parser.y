@@ -16,6 +16,8 @@
 #include "lexer-tab.h"
 
 typedef ATerm Expr;
+typedef ATerm ValidValues;
+typedef ATerm DefaultValue;
 typedef ATerm Pos;
     
 #include "nixexpr-ast.hh"
@@ -203,8 +205,9 @@ formals
   ;
 
 formal
-  : ID { $$ = makeNoDefFormal($1); }
-  | ID '?' expr { $$ = makeDefFormal($1, $3); }
+  : ID { $$ = makeFormal($1, makeUnrestrictedValues(), makeNoDefaultValue()); }
+//  | ID ':' '[' expr_list ']' { $$ = makeDefFormal($1, $3); }
+  | ID '?' expr { $$ = makeFormal($1, makeUnrestrictedValues(), makeDefaultValue($3)); }
   ;
   
 %%

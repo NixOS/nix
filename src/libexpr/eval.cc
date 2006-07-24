@@ -37,15 +37,17 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
     ATermVector defsUsed;
     ATermList recAttrs = ATempty;
     for (ATermIterator i(formals); i; ++i) {
-        Expr name, def = 0;
-        if (!matchNoDefFormal(*i, name) && !matchDefFormal(*i, name, def))
-            abort(); /* can't happen */
+        Expr name, def; DefaultValue def2; ATerm dummy;
+        if (!matchFormal(*i, name, dummy, def2)) abort(); /* can't happen */
+        if (!matchDefaultValue(def2, def)) def = 0;
         if (subs[name] == 0) {
             if (def == 0) throw TypeError(format("the argument named `%1%' required by the function is missing")
                 % aterm2String(name));
             defsUsed.push_back(name);
             recAttrs = ATinsert(recAttrs, makeBind(name, def, makeNoPos()));
         }
+        /* !!! check that the argument are in the valid values list,
+           if present */
     }
 
     /* Make a recursive attribute set out of the (argument-name,
@@ -64,8 +66,8 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
         /* One or more actual arguments were not declared as formal
            arguments.  Find out which. */
         for (ATermIterator i(formals); i; ++i) {
-            Expr name, def;
-            matchNoDefFormal(*i, name) || matchDefFormal(*i, name, def);
+            Expr name; ATerm d1, d2;
+            matchFormal(*i, name, d1, d2);
             subs.remove(name);
         }
         throw TypeError(format("the function does not expect an argument named `%1%'")

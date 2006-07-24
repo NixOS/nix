@@ -1,1 +1,1 @@
-Function([NoDefFormal("x"),NoDefFormal("y"),NoDefFormal("z")],OpPlus(OpPlus(Var("x"),Var("y")),Var("z")),Pos("(string)",1,2))
+Function([Formal("x",UnrestrictedValues,NoDefaultValue),Formal("y",UnrestrictedValues,NoDefaultValue),Formal("z",UnrestrictedValues,NoDefaultValue)],OpPlus(OpPlus(Var("x"),Var("y")),Var("z")),Pos("(string)",1,2))
