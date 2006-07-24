@@ -56,6 +56,7 @@ static Expr substArgs(EvalState & state,
 
         ATermList valids;
         if (matchValidValues(valids2, valids)) {
+            value = evalExpr(state, value);
             bool found = false;
             for (ATermIterator j(valids); j; ++j) {
                 Expr v = evalExpr(state, *j);
