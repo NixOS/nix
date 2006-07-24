@@ -206,7 +206,7 @@ formals
 
 formal
   : ID { $$ = makeFormal($1, makeUnrestrictedValues(), makeNoDefaultValue()); }
-//  | ID ':' '[' expr_list ']' { $$ = makeDefFormal($1, $3); }
+  | ID ':' '[' expr_list ']' { $$ = makeFormal($1, makeValidValues($4), makeNoDefaultValue()); }
   | ID '?' expr { $$ = makeFormal($1, makeUnrestrictedValues(), makeDefaultValue($3)); }
   ;
   

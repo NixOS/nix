@@ -22,7 +22,8 @@ void EvalState::addPrimOp(const string & name,
 
 
 /* Substitute an argument set into the body of a function. */
-static Expr substArgs(Expr body, ATermList formals, Expr arg)
+static Expr substArgs(EvalState & state,
+    Expr body, ATermList formals, Expr arg)
 {
     unsigned int nrFormals = ATgetLength(formals);
     ATermMap subs(nrFormals);
@@ -37,17 +38,35 @@ static Expr substArgs(Expr body, ATermList formals, Expr arg)
     ATermVector defsUsed;
     ATermList recAttrs = ATempty;
     for (ATermIterator i(formals); i; ++i) {
-        Expr name, def; DefaultValue def2; ATerm dummy;
-        if (!matchFormal(*i, name, dummy, def2)) abort(); /* can't happen */
-        if (!matchDefaultValue(def2, def)) def = 0;
-        if (subs[name] == 0) {
+        Expr name, def;
+        ValidValues valids2;
+        DefaultValue def2;
+        if (!matchFormal(*i, name, valids2, def2)) abort(); /* can't happen */
+
+        Expr value = subs[name];
+        
+        if (value == 0) {
+            if (!matchDefaultValue(def2, def)) def = 0;
             if (def == 0) throw TypeError(format("the argument named `%1%' required by the function is missing")
                 % aterm2String(name));
+            value = def;
             defsUsed.push_back(name);
             recAttrs = ATinsert(recAttrs, makeBind(name, def, makeNoPos()));
         }
-        /* !!! check that the argument are in the valid values list,
-           if present */
+
+        ATermList valids;
+        if (matchValidValues(valids2, valids)) {
+            bool found = false;
+            for (ATermIterator j(valids); j; ++j) {
+                Expr v = evalExpr(state, *j);
+                if (value == v) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) throw TypeError(format("the argument named `%1%' has an illegal value")
+                % aterm2String(name));            
+        }
     }
 
     /* Make a recursive attribute set out of the (argument-name,
@@ -340,7 +359,7 @@ Expr evalExpr2(EvalState & state, Expr e)
         else if (matchFunction(e1, formals, e4, pos)) {
             e2 = evalExpr(state, e2);
             try {
-                return evalExpr(state, substArgs(e4, formals, e2));
+                return evalExpr(state, substArgs(state, e4, formals, e2));
             } catch (Error & e) {
                 e.addPrefix(format("while evaluating the function at %1%:\n")
                     % showPos(pos));

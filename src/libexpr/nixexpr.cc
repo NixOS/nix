@@ -220,15 +220,16 @@ static void checkVarDefs2(set<Expr> & done, const ATermMap & defs, Expr e)
     else if (matchFunction(e, formals, body, pos)) {
         ATermMap defs2(defs);
         for (ATermIterator i(formals); i; ++i) {
-            Expr d1, d2;
+            ATerm d1, d2;
             if (!matchFormal(*i, name, d1, d2)) abort();
             defs2.set(name, (ATerm) ATempty);
         }
         for (ATermIterator i(formals); i; ++i) {
-            Expr dummy, deflt;
+            ATerm valids, deflt;
             set<Expr> done2;
-            if (matchFormal(*i, name, dummy, deflt)) /* !!! check dummy */
-                checkVarDefs2(done2, defs2, deflt);
+            matchFormal(*i, name, valids, deflt);
+            checkVarDefs2(done, defs, valids);
+            checkVarDefs2(done2, defs2, deflt);
         }
         set<Expr> done2;
         checkVarDefs2(done2, defs2, body);
