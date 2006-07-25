@@ -25,6 +25,7 @@ typedef enum {
     srcNixExprs,
     srcStorePaths,
     srcProfile,
+    srcAttrPath,
     srcUnknown
 } InstallSourceType;
 
@@ -35,6 +36,7 @@ struct InstallSourceInfo
     Path nixExprPath; /* for srcNixExprDrvs, srcNixExprs */
     Path profile; /* for srcProfile */
     string systemFilter; /* for srcNixExprDrvs */
+    string attrPath; /* srcAttrPath */
 };
 
 
@@ -381,6 +383,14 @@ static void queryInstSources(EvalState & state,
                 args, newestOnly);
             break;
         }
+
+        case srcAttrPath: {
+            for (Strings::const_iterator i = args.begin();
+                 i != args.end(); ++i)
+                getDerivations(state,
+                    parseExprFromFile(state, instSource.nixExprPath), elems, *i);
+            break;
+        }
     }
 }
 
@@ -470,7 +480,7 @@ static void opInstall(Globals & globals,
     Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flags `%1%'") % opFlags.front());
+        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
 
     installDerivations(globals, opArgs, globals.profile);
 }
@@ -606,7 +616,7 @@ static void opUninstall(Globals & globals,
     Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flags `%1%'") % opFlags.front());
+        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
 
     DrvNames drvNames = drvNamesFromArgs(opArgs);
 
@@ -988,7 +998,7 @@ static void opDefaultExpr(Globals & globals,
     Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
-        throw UsageError(format("unknown flags `%1%'") % opFlags.front());
+        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
     if (opArgs.size() != 1)
         throw UsageError(format("exactly one argument expected"));
 
@@ -1040,6 +1050,8 @@ void run(Strings args)
             globals.instSource.type = srcProfile;
             globals.instSource.profile = needArg(i, args, arg);
         }
+        else if (arg == "--attr" || arg == "-A")
+            globals.instSource.type = srcAttrPath;
         else if (arg == "--uninstall" || arg == "-e")
             op = opUninstall;
         else if (arg == "--upgrade" || arg == "-u")

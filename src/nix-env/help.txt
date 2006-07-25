@@ -28,6 +28,15 @@ Install / upgrade / uninstall flags:
 
   --dry-run: show what would be done, but don't do it
 
+Installation sources:
+
+  --from-expression / -E EXPR...: evaluate expressions specified on
+      the command line; expressions should be functions that take the
+      default Nix expression as an argument
+  --from-profile PROFILE NAMES...: copy named packages from PROFILE
+  --attr / -A ATTRS...: select attributes by name from the default Nix
+      expression
+
 Upgrade flags:
 
   --lt: upgrade if the current version is older (default)
