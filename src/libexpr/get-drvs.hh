@@ -20,6 +20,7 @@ private:
     
 public:
     string name;
+    string attrPath; /* path towards the derivation */
     string system;
 
     shared_ptr<ATermMap> attrs;

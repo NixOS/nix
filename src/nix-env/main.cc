@@ -724,6 +724,7 @@ static void opQuery(Globals & globals,
 {
     bool printStatus = false;
     bool printName = true;
+    bool printAttrPath = false;
     bool printSystem = false;
     bool printDrvPath = false;
     bool printOutPath = false;
@@ -746,6 +747,8 @@ static void opQuery(Globals & globals,
         else if (*i == "--installed") source = sInstalled;
         else if (*i == "--available" || *i == "-a") source = sAvailable;
         else throw UsageError(format("unknown flag `%1%'") % *i);
+
+    if (globals.instSource.type == srcAttrPath) printAttrPath = true; /* hack */
 
     if (opArgs.size() == 0) {
         printMsg(lvlInfo, "warning: you probably meant to specify the argument '*' to show all packages");
@@ -808,6 +811,8 @@ static void opQuery(Globals & globals,
                     + (isValidPath(i->queryOutPath(globals.state)) ? "P" : "-")
                     + (subs.size() > 0 ? "S" : "-"));
             }
+
+            if (printAttrPath) columns.push_back(i->attrPath);
 
             if (printName) columns.push_back(i->name);
 
