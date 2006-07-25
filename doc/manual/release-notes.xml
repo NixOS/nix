@@ -70,7 +70,7 @@ irreversible.</para></warning>
   garbage collector.</para></listitem>
 
   <listitem><para>TODO: --attr / -a flags in
-  nix-env/nix-instantiate/nix-build.</para</listitem>
+  nix-env/nix-instantiate/nix-build.</para></listitem>
 
 </itemizedlist>
 
