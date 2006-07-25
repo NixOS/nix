@@ -124,15 +124,15 @@ static void getDerivations(EvalState & state, Expr e,
     DrvInfos & drvs, Exprs & doneExprs, const string & attrPath,
     const string & pathTaken)
 {
-    /* Automatically call functions that have defaults for all
-       arguments. */
+    /* Automatically call functions for which each argument has a
+       default value. */
     ATermList formals;
     ATerm body, pos;
     if (matchFunction(e, formals, body, pos)) {
         for (ATermIterator i(formals); i; ++i) {
             Expr name, def; ATerm values, def2;
             if (!matchFormal(*i, name, values, def2)) abort();
-            if (!matchDefaultValue(def2, def)) 
+            if (!matchDefaultValue(def2, def))
                 throw TypeError(format("cannot auto-call a function that has an argument without a default value (`%1%')")
                     % aterm2String(name));
         }

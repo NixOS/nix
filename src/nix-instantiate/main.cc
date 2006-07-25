@@ -33,11 +33,25 @@ static int rootNr = 0;
 static bool indirectRoot = false;
 
 
-static void printResult(EvalState & state, Expr e, bool evalOnly,
-    const string & attrPath)
+static void printResult(EvalState & state, Expr e,
+    bool evalOnly, bool printArgs, const string & attrPath)
 {
     if (evalOnly)
         cout << format("%1%\n") % e;
+    
+    else if (printArgs) {
+        ATermList formals;
+        ATerm body, pos;
+        if (matchFunction(e, formals, body, pos)) {
+            for (ATermIterator i(formals); i; ++i) {
+                Expr name; ATerm d1, d2;
+                if (!matchFormal(*i, name, d1, d2)) abort();
+                cout << format("%1%\n") % aterm2String(name);
+            }
+        } else
+            printMsg(lvlError, "warning: expression does not evaluate to a function");
+    }
+    
     else {
         DrvInfos drvs;
         getDerivations(state, e, drvs, attrPath);
@@ -62,6 +76,7 @@ void run(Strings args)
     bool readStdin = false;
     bool evalOnly = false;
     bool parseOnly = false;
+    bool printArgs = false;
     string attrPath;
 
     for (Strings::iterator i = args.begin();
@@ -78,6 +93,10 @@ void run(Strings args)
         else if (arg == "--parse-only") {
             readOnlyMode = true;
             parseOnly = evalOnly = true;
+        }
+        else if (arg == "--print-args") {
+            readOnlyMode = true;
+            printArgs = true;
         }
         else if (arg == "--add-root") {
             if (i == args.end())
@@ -101,7 +120,7 @@ void run(Strings args)
 
     if (readStdin) {
         Expr e = evalStdin(state, parseOnly);
-        printResult(state, e, evalOnly, attrPath);
+        printResult(state, e, evalOnly, printArgs, attrPath);
     }
 
     for (Strings::iterator i = files.begin();
@@ -111,7 +130,7 @@ void run(Strings args)
         Expr e = parseOnly
             ? parseExprFromFile(state, path)
             : evalFile(state, path);
-        printResult(state, e, evalOnly, attrPath);
+        printResult(state, e, evalOnly, printArgs, attrPath);
     }
 
     printEvalStats(state);

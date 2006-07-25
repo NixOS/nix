@@ -15,4 +15,6 @@ Options:
   --eval-only: evaluate and print resulting term; do not instantiate
   --parse-only: parse and print abstract syntax tree
 
+  --attr / -A PATH: select an attribute from the top-level expression
+
   --add-root: add garbage collector roots for the result
