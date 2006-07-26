@@ -59,6 +59,11 @@ string coerceToStringWithContext(EvalState & state,
     ATermList & context, Expr e, bool & isPath);
 Expr wrapInContext(ATermList context, Expr e);
 
+/* Automatically call a function for which each argument has a default
+   value.  Note: result is a call, not a normal form; it should be
+   evaluated by calling evalExpr(). */
+Expr autoCallFunction(Expr e);
+
 /* Print statistics. */
 void printEvalStats(EvalState & state);
 

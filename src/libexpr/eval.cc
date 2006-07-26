@@ -287,6 +287,24 @@ static ATerm concatStrings(EvalState & state, const ATermVector & args)
 }
 
 
+Expr autoCallFunction(Expr e)
+{
+    ATermList formals;
+    ATerm body, pos;
+    if (matchFunction(e, formals, body, pos)) {
+        for (ATermIterator i(formals); i; ++i) {
+            Expr name, def; ATerm values, def2;
+            if (!matchFormal(*i, name, values, def2)) abort();
+            if (!matchDefaultValue(def2, def))
+                throw TypeError(format("cannot auto-call a function that has an argument without a default value (`%1%')")
+                    % aterm2String(name));
+        }
+        e = makeCall(e, makeAttrs(ATermMap(0)));
+    }
+    return e;
+}
+
+
 Expr evalExpr2(EvalState & state, Expr e)
 {
     Expr e1, e2, e3, e4;
@@ -380,7 +398,9 @@ Expr evalExpr2(EvalState & state, Expr e)
             }
         }
         
-        else throw TypeError("the left-hand side of the function call is neither a function nor a primop (built-in operation)");
+        else throw TypeError(
+            format("the left-hand side of the function call is neither a function nor a primop (built-in operation) but %1%")
+            % showType(e1));
     }
 
     /* Attribute selection. */

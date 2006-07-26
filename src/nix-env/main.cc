@@ -10,6 +10,7 @@
 #include "help.txt.hh"
 #include "nixexpr-ast.hh"
 #include "get-drvs.hh"
+#include "attr-path.hh"
 #include "pathlocks.hh"
 
 #include <cerrno>
@@ -36,7 +37,6 @@ struct InstallSourceInfo
     Path nixExprPath; /* for srcNixExprDrvs, srcNixExprs */
     Path profile; /* for srcProfile */
     string systemFilter; /* for srcNixExprDrvs */
-    string attrPath; /* srcAttrPath */
 };
 
 
@@ -65,7 +65,7 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
     string systemFilter, DrvInfos & elems)
 {
     getDerivations(state,
-        parseExprFromFile(state, absPath(nixExprPath)), elems);
+        parseExprFromFile(state, absPath(nixExprPath)), "", elems);
 
     /* Filter out all derivations not applicable to the current
        system. */
@@ -119,7 +119,7 @@ static DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
     e = bottomupRewrite(addPos, e);
 
     DrvInfos elems;
-    getDerivations(state, e, elems);
+    getDerivations(state, e, "", elems);
     return elems;
 }
 
@@ -334,7 +334,7 @@ static void queryInstSources(EvalState & state,
             {
                 Expr e2 = parseExprFromString(state, *i, absPath("."));
                 Expr call = makeCall(e2, e1);
-                getDerivations(state, call, elems);
+                getDerivations(state, call, "", elems);
             }
             
             break;
@@ -388,7 +388,9 @@ static void queryInstSources(EvalState & state,
             for (Strings::const_iterator i = args.begin();
                  i != args.end(); ++i)
                 getDerivations(state,
-                    parseExprFromFile(state, instSource.nixExprPath), elems, *i);
+                    findAlongAttrPath(state, *i, 
+                        parseExprFromFile(state, instSource.nixExprPath)),
+                    "", elems);
             break;
         }
     }

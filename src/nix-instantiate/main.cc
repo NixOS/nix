@@ -9,6 +9,7 @@
 #include "parser.hh"
 #include "nixexpr-ast.hh"
 #include "get-drvs.hh"
+#include "attr-path.hh"
 #include "help.txt.hh"
 
 
@@ -18,13 +19,12 @@ void printHelp()
 }
 
 
-static Expr evalStdin(EvalState & state, bool parseOnly)
+static Expr parseStdin(EvalState & state)
 {
-    startNest(nest, lvlTalkative, format("evaluating standard input"));
+    startNest(nest, lvlTalkative, format("parsing standard input"));
     string s, s2;
     while (getline(cin, s2)) s += s2 + "\n";
-    Expr e = parseExprFromString(state, s, absPath("."));
-    return parseOnly ? e : evalExpr(state, e);
+    return parseExprFromString(state, s, absPath("."));
 }
 
 
@@ -34,7 +34,7 @@ static bool indirectRoot = false;
 
 
 static void printResult(EvalState & state, Expr e,
-    bool evalOnly, bool printArgs, const string & attrPath)
+    bool evalOnly, bool printArgs)
 {
     if (evalOnly)
         cout << format("%1%\n") % e;
@@ -54,7 +54,7 @@ static void printResult(EvalState & state, Expr e,
     
     else {
         DrvInfos drvs;
-        getDerivations(state, e, drvs, attrPath);
+        getDerivations(state, e, "", drvs);
         for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i) {
             Path drvPath = i->queryDrvPath(state);
             if (gcRoot == "")
@@ -119,18 +119,19 @@ void run(Strings args)
     openDB();
 
     if (readStdin) {
-        Expr e = evalStdin(state, parseOnly);
-        printResult(state, e, evalOnly, printArgs, attrPath);
+        Expr e = findAlongAttrPath(state, attrPath, parseStdin(state));
+        if (!parseOnly) e = evalExpr(state, e);
+        printResult(state, e, evalOnly, printArgs);
     }
 
     for (Strings::iterator i = files.begin();
          i != files.end(); i++)
     {
         Path path = absPath(*i);
-        Expr e = parseOnly
-            ? parseExprFromFile(state, path)
-            : evalFile(state, path);
-        printResult(state, e, evalOnly, printArgs, attrPath);
+        Expr e = findAlongAttrPath(state, attrPath,
+            parseExprFromFile(state, path));
+        if (!parseOnly) e = evalExpr(state, e);
+        printResult(state, e, evalOnly, printArgs);
     }
 
     printEvalStats(state);

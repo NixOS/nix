@@ -49,8 +49,8 @@ typedef list<DrvInfo> DrvInfos;
    Otherwise, return false. */
 bool getDerivation(EvalState & state, Expr e, DrvInfo & drv);
 
-void getDerivations(EvalState & state, Expr e, DrvInfos & drvs,
-    const string & attrPath = "");
+void getDerivations(EvalState & state, Expr e, const string & pathPrefix,
+    DrvInfos & drvs);
 
 
 #endif /* !__GET_DRVS_H */

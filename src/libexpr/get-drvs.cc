@@ -58,7 +58,7 @@ typedef set<Expr> Exprs;
    it makes sense for the caller to recursively search for derivations
    in `e'. */
 static bool getDerivation(EvalState & state, Expr e,
-    DrvInfos & drvs, Exprs & doneExprs, string attributeName)
+    const string & attrPath, DrvInfos & drvs, Exprs & doneExprs)
 {
     try {
         
@@ -92,7 +92,7 @@ static bool getDerivation(EvalState & state, Expr e,
 
         drv.attrs = attrs;
 
-        drv.attrPath = attributeName;
+        drv.attrPath = attrPath;
 
         drvs.push_back(drv);
         return false;
@@ -107,7 +107,7 @@ bool getDerivation(EvalState & state, Expr e, DrvInfo & drv)
 {
     Exprs doneExprs;
     DrvInfos drvs;
-    getDerivation(state, e, drvs, doneExprs, "");
+    getDerivation(state, e, "", drvs, doneExprs);
     if (drvs.size() != 1) return false;
     drv = drvs.front();
     return true;
@@ -121,118 +121,53 @@ static string addToPath(const string & s1, const string & s2)
 
 
 static void getDerivations(EvalState & state, Expr e,
-    DrvInfos & drvs, Exprs & doneExprs, const string & attrPath,
-    const string & pathTaken)
+    const string & pathPrefix, DrvInfos & drvs, Exprs & doneExprs)
 {
-    /* Automatically call functions for which each argument has a
-       default value. */
-    ATermList formals;
-    ATerm body, pos;
-    if (matchFunction(e, formals, body, pos)) {
-        for (ATermIterator i(formals); i; ++i) {
-            Expr name, def; ATerm values, def2;
-            if (!matchFormal(*i, name, values, def2)) abort();
-            if (!matchDefaultValue(def2, def))
-                throw TypeError(format("cannot auto-call a function that has an argument without a default value (`%1%')")
-                    % aterm2String(name));
-        }
-        getDerivations(state,
-            makeCall(e, makeAttrs(ATermMap(0))),
-            drvs, doneExprs, attrPath, pathTaken);
-        return;
-    }
-
-    /* Parse the start of attrPath. */
-    enum { apNone, apAttr, apIndex } apType;
-    string attrPathRest;
-    string attr;
-    int attrIndex;
-    Error attrError =
-        Error(format("attribute selection path `%1%' does not match expression") % attrPath);
-
-    if (attrPath.empty())
-        apType = apNone;
-    else {
-        string::size_type dot = attrPath.find(".");
-        if (dot == string::npos) {
-            attrPathRest = "";
-            attr = attrPath;
-        } else {
-            attrPathRest = string(attrPath, dot + 1);
-            attr = string(attrPath, 0, dot);
-        }
-        apType = apAttr;
-        if (string2Int(attr, attrIndex)) apType = apIndex;
-    }
+    e = evalExpr(state, autoCallFunction(evalExpr(state, e)));
 
     /* Process the expression. */
     ATermList es;
     DrvInfo drv;
 
-    if (!getDerivation(state, e, drvs, doneExprs, pathTaken)) {
-        if (apType != apNone) throw attrError;
+    if (!getDerivation(state, e, pathPrefix, drvs, doneExprs))
         return;
-    }
-
-    e = evalExpr(state, e);
 
     if (matchAttrs(e, es)) {
-        if (apType != apNone && apType != apAttr) throw attrError;
         ATermMap drvMap(ATgetLength(es));
         queryAllAttrs(e, drvMap);
-        if (apType == apNone) {
-            for (ATermMap::const_iterator i = drvMap.begin(); i != drvMap.end(); ++i) {
-                startNest(nest, lvlDebug,
-                    format("evaluating attribute `%1%'") % aterm2String(i->key));
-                string pathTaken2 = addToPath(pathTaken, aterm2String(i->key));
-                if (getDerivation(state, i->value, drvs, doneExprs, pathTaken2)) {
-                    /* If the value of this attribute is itself an
-                       attribute set, should we recurse into it?
-                       => Only if it has a `recurseForDerivations = true'
-                       attribute. */
-                    ATermList es;
-                    Expr e = evalExpr(state, i->value);
-                    if (matchAttrs(e, es)) {
-                        ATermMap attrs(ATgetLength(es));
-                        queryAllAttrs(e, attrs, false);
-                        Expr e2 = attrs.get(toATerm("recurseForDerivations"));
-                        if (e2 && evalBool(state, e2))
-                            getDerivations(state, e, drvs, doneExprs, attrPathRest, pathTaken2);
-                    }
+        
+        for (ATermMap::const_iterator i = drvMap.begin(); i != drvMap.end(); ++i) {
+            startNest(nest, lvlDebug,
+                format("evaluating attribute `%1%'") % aterm2String(i->key));
+            string pathPrefix2 = addToPath(pathPrefix, aterm2String(i->key));
+            if (getDerivation(state, i->value, pathPrefix2, drvs, doneExprs)) {
+                /* If the value of this attribute is itself an
+                   attribute set, should we recurse into it?  => Only
+                   if it has a `recurseForDerivations = true'
+                   attribute. */
+                ATermList es;
+                Expr e = evalExpr(state, i->value);
+                if (matchAttrs(e, es)) {
+                    ATermMap attrs(ATgetLength(es));
+                    queryAllAttrs(e, attrs, false);
+                    Expr e2 = attrs.get(toATerm("recurseForDerivations"));
+                    if (e2 && evalBool(state, e2))
+                        getDerivations(state, e, pathPrefix2, drvs, doneExprs);
                 }
             }
-        } else {
-            Expr e2 = drvMap.get(toATerm(attr));
-            if (!e2) throw Error(format("attribute `%1%' in selection path not found") % attr);
-            startNest(nest, lvlDebug,
-                format("evaluating attribute `%1%'") % attr);
-            string pathTaken2 = addToPath(pathTaken, attr);
-            getDerivation(state, e2, drvs, doneExprs, pathTaken2);
-            if (!attrPath.empty())
-                getDerivations(state, e2, drvs, doneExprs, attrPathRest, pathTaken2);
         }
+        
         return;
     }
 
     if (matchList(e, es)) {
-        if (apType != apNone && apType != apIndex) throw attrError;
-        if (apType == apNone) {
-            int n = 0;
-            for (ATermIterator i(es); i; ++i, ++n) {
-                startNest(nest, lvlDebug,
-                    format("evaluating list element"));
-                string pathTaken2 = addToPath(pathTaken, (format("%1%") % n).str());
-                if (getDerivation(state, *i, drvs, doneExprs, pathTaken2))
-                    getDerivations(state, *i, drvs, doneExprs, attrPathRest, pathTaken2);
-            }
-        } else {
-            Expr e2 = ATelementAt(es, attrIndex);
-            if (!e2) throw Error(format("list index %1% in selection path not found") % attrIndex);
+        int n = 0;
+        for (ATermIterator i(es); i; ++i, ++n) {
             startNest(nest, lvlDebug,
                 format("evaluating list element"));
-            string pathTaken2 = addToPath(pathTaken, (format("%1%") % attrIndex).str());
-            if (getDerivation(state, e2, drvs, doneExprs, pathTaken2))
-                getDerivations(state, e2, drvs, doneExprs, attrPathRest, pathTaken2);
+            string pathPrefix2 = addToPath(pathPrefix, (format("%1%") % n).str());
+            if (getDerivation(state, *i, pathPrefix2, drvs, doneExprs))
+                getDerivations(state, *i, pathPrefix2, drvs, doneExprs);
         }
         return;
     }
@@ -241,9 +176,9 @@ static void getDerivations(EvalState & state, Expr e,
 }
 
 
-void getDerivations(EvalState & state, Expr e, DrvInfos & drvs,
-    const string & attrPath)
+void getDerivations(EvalState & state, Expr e, const string & pathPrefix,
+    DrvInfos & drvs)
 {
     Exprs doneExprs;
-    getDerivations(state, e, drvs, doneExprs, attrPath, "");
+    getDerivations(state, e, pathPrefix, drvs, doneExprs);
 }

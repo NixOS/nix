@@ -3,7 +3,8 @@ lib_LTLIBRARIES = libexpr.la
 libexpr_la_SOURCES = nixexpr.cc nixexpr.hh parser.cc parser.hh \
  eval.cc eval.hh primops.cc \
  lexer-tab.c lexer-tab.h parser-tab.c parser-tab.h \
- get-drvs.cc get-drvs.hh
+ get-drvs.cc get-drvs.hh \
+ attr-path.cc attr-path.hh
 
 BUILT_SOURCES = nixexpr-ast.cc nixexpr-ast.hh \
  parser-tab.h lexer-tab.h parser-tab.c lexer-tab.c
