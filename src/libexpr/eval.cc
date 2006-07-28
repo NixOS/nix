@@ -287,20 +287,27 @@ static ATerm concatStrings(EvalState & state, const ATermVector & args)
 }
 
 
-Expr autoCallFunction(Expr e)
+Expr autoCallFunction(Expr e, const ATermMap & args)
 {
     ATermList formals;
     ATerm body, pos;
+    
     if (matchFunction(e, formals, body, pos)) {
+        ATermMap actualArgs(128);
+        
         for (ATermIterator i(formals); i; ++i) {
-            Expr name, def; ATerm values, def2;
+            Expr name, def, value; ATerm values, def2;
             if (!matchFormal(*i, name, values, def2)) abort();
-            if (!matchDefaultValue(def2, def))
+            if ((value = args.get(name)))
+                actualArgs.set(name, makeAttrRHS(value, makeNoPos()));
+            else if (!matchDefaultValue(def2, def))
                 throw TypeError(format("cannot auto-call a function that has an argument without a default value (`%1%')")
                     % aterm2String(name));
         }
-        e = makeCall(e, makeAttrs(ATermMap(0)));
+        
+        e = makeCall(e, makeAttrs(actualArgs));
     }
+    
     return e;
 }
 

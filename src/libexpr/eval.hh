@@ -60,9 +60,9 @@ string coerceToStringWithContext(EvalState & state,
 Expr wrapInContext(ATermList context, Expr e);
 
 /* Automatically call a function for which each argument has a default
-   value.  Note: result is a call, not a normal form; it should be
-   evaluated by calling evalExpr(). */
-Expr autoCallFunction(Expr e);
+   value or has a binding in the `args' map.  Note: result is a call,
+   not a normal form; it should be evaluated by calling evalExpr(). */
+Expr autoCallFunction(Expr e, const ATermMap & args);
 
 /* Print statistics. */
 void printEvalStats(EvalState & state);

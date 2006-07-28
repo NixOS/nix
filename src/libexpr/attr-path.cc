@@ -33,7 +33,7 @@ Expr findAlongAttrPath(EvalState & state, const string & attrPath, Expr e)
         if (string2Int(attr, attrIndex)) apType = apIndex;
 
         /* Evaluate the expression. */
-        e = evalExpr(state, autoCallFunction(evalExpr(state, e)));
+        e = evalExpr(state, autoCallFunction(evalExpr(state, e), ATermMap(1)));
 
         /* It should evaluate to either an attribute set or an
            expression, according to what is specified in the

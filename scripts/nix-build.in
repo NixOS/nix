@@ -77,6 +77,12 @@ EOF
         push @instArgs, ("--attr", $ARGV[$n]);
     }
 
+    elsif ($arg eq "--arg") {
+        die "$0: `--arg' requires two arguments\n" unless $n + 2 < scalar @ARGV;
+        push @instArgs, ("--arg", $ARGV[$n + 1], $ARGV[$n + 2]);
+        $n += 2;
+    }
+
     elsif (substr($arg, 0, 1) eq "-") {
         push @buildArgs, $arg;
     }
@@ -103,8 +109,10 @@ if (!defined $outLink) {
 foreach my $expr (@exprs) {
 
     # Instantiate.
-    my $drvPaths = `@bindir@/nix-instantiate --add-root "$drvLink" --indirect @instArgs "$expr"`;
-    my @drvPaths = split ' ', $drvPaths;
+    my @drvPaths;
+    open DRVPATHS, "-|", "@bindir@/nix-instantiate", "--add-root", $drvLink, "--indirect", @instArgs, $expr;
+    while (<DRVPATHS>) {chomp; push @drvPaths, $_;}
+    close DRVPATHS;
 
     foreach my $drvPath (@drvPaths) {
         my $target = readlink $drvPath;

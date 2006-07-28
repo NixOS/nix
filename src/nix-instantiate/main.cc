@@ -34,7 +34,7 @@ static bool indirectRoot = false;
 
 
 static void printResult(EvalState & state, Expr e,
-    bool evalOnly, bool printArgs)
+    bool evalOnly, bool printArgs, const ATermMap & autoArgs)
 {
     if (evalOnly)
         cout << format("%1%\n") % e;
@@ -62,7 +62,7 @@ static void printResult(EvalState & state, Expr e,
     
     else {
         DrvInfos drvs;
-        getDerivations(state, e, "", drvs);
+        getDerivations(state, e, "", autoArgs, drvs);
         for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i) {
             Path drvPath = i->queryDrvPath(state);
             if (gcRoot == "")
@@ -86,6 +86,7 @@ void run(Strings args)
     bool parseOnly = false;
     bool printArgs = false;
     string attrPath;
+    ATermMap autoArgs(128);
 
     for (Strings::iterator i = args.begin();
          i != args.end(); )
@@ -106,20 +107,29 @@ void run(Strings args)
             readOnlyMode = true;
             printArgs = true;
         }
-        else if (arg == "--add-root") {
-            if (i == args.end())
-                throw UsageError("`--add-root requires an argument");
-            gcRoot = absPath(*i++);
-        }
         else if (arg == "--attr" || arg == "-A") {
             if (i == args.end())
-                throw UsageError("`--attr requires an argument");
+                throw UsageError("`--attr' requires an argument");
             attrPath = *i++;
+        }
+        else if (arg == "--arg") {
+            if (i == args.end())
+                throw UsageError("`--arg' requires two arguments");
+            string name = *i++;
+            if (i == args.end())
+                throw UsageError("`--arg' requires two arguments");
+            Expr value = parseExprFromString(state, *i++, absPath("."));
+            autoArgs.set(toATerm(name), value);
+        }
+        else if (arg == "--add-root") {
+            if (i == args.end())
+                throw UsageError("`--add-root' requires an argument");
+            gcRoot = absPath(*i++);
         }
         else if (arg == "--indirect")
             indirectRoot = true;
         else if (arg[0] == '-')
-            throw UsageError(format("unknown flag `%1%`") % arg);
+            throw UsageError(format("unknown flag `%1%'") % arg);
         else
             files.push_back(arg);
     }
@@ -129,7 +139,7 @@ void run(Strings args)
     if (readStdin) {
         Expr e = findAlongAttrPath(state, attrPath, parseStdin(state));
         if (!parseOnly) e = evalExpr(state, e);
-        printResult(state, e, evalOnly, printArgs);
+        printResult(state, e, evalOnly, printArgs, autoArgs);
     }
 
     for (Strings::iterator i = files.begin();
@@ -139,7 +149,7 @@ void run(Strings args)
         Expr e = findAlongAttrPath(state, attrPath,
             parseExprFromFile(state, path));
         if (!parseOnly) e = evalExpr(state, e);
-        printResult(state, e, evalOnly, printArgs);
+        printResult(state, e, evalOnly, printArgs, autoArgs);
     }
 
     printEvalStats(state);

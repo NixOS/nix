@@ -65,7 +65,7 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
     string systemFilter, DrvInfos & elems)
 {
     getDerivations(state,
-        parseExprFromFile(state, absPath(nixExprPath)), "", elems);
+        parseExprFromFile(state, absPath(nixExprPath)), "", ATermMap(1), elems);
 
     /* Filter out all derivations not applicable to the current
        system. */
@@ -119,7 +119,7 @@ static DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
     e = bottomupRewrite(addPos, e);
 
     DrvInfos elems;
-    getDerivations(state, e, "", elems);
+    getDerivations(state, e, "", ATermMap(1), elems);
     return elems;
 }
 
@@ -334,7 +334,7 @@ static void queryInstSources(EvalState & state,
             {
                 Expr e2 = parseExprFromString(state, *i, absPath("."));
                 Expr call = makeCall(e2, e1);
-                getDerivations(state, call, "", elems);
+                getDerivations(state, call, "", ATermMap(1), elems);
             }
             
             break;
@@ -390,7 +390,7 @@ static void queryInstSources(EvalState & state,
                 getDerivations(state,
                     findAlongAttrPath(state, *i, 
                         parseExprFromFile(state, instSource.nixExprPath)),
-                    "", elems);
+                    "", ATermMap(1), elems);
             break;
         }
     }

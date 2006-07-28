@@ -121,9 +121,10 @@ static string addToPath(const string & s1, const string & s2)
 
 
 static void getDerivations(EvalState & state, Expr e,
-    const string & pathPrefix, DrvInfos & drvs, Exprs & doneExprs)
+    const string & pathPrefix, const ATermMap & autoArgs,
+    DrvInfos & drvs, Exprs & doneExprs)
 {
-    e = evalExpr(state, autoCallFunction(evalExpr(state, e)));
+    e = evalExpr(state, autoCallFunction(evalExpr(state, e), autoArgs));
 
     /* Process the expression. */
     ATermList es;
@@ -152,7 +153,7 @@ static void getDerivations(EvalState & state, Expr e,
                     queryAllAttrs(e, attrs, false);
                     Expr e2 = attrs.get(toATerm("recurseForDerivations"));
                     if (e2 && evalBool(state, e2))
-                        getDerivations(state, e, pathPrefix2, drvs, doneExprs);
+                        getDerivations(state, e, pathPrefix2, autoArgs, drvs, doneExprs);
                 }
             }
         }
@@ -167,7 +168,7 @@ static void getDerivations(EvalState & state, Expr e,
                 format("evaluating list element"));
             string pathPrefix2 = addToPath(pathPrefix, (format("%1%") % n).str());
             if (getDerivation(state, *i, pathPrefix2, drvs, doneExprs))
-                getDerivations(state, *i, pathPrefix2, drvs, doneExprs);
+                getDerivations(state, *i, pathPrefix2, autoArgs, drvs, doneExprs);
         }
         return;
     }
@@ -177,8 +178,8 @@ static void getDerivations(EvalState & state, Expr e,
 
 
 void getDerivations(EvalState & state, Expr e, const string & pathPrefix,
-    DrvInfos & drvs)
+    const ATermMap & autoArgs, DrvInfos & drvs)
 {
     Exprs doneExprs;
-    getDerivations(state, e, pathPrefix, drvs, doneExprs);
+    getDerivations(state, e, pathPrefix, autoArgs, drvs, doneExprs);
 }
