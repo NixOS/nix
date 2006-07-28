@@ -92,5 +92,7 @@ Expr makeBool(bool b);
 
 string showType(Expr e);
 
+string showValue(Expr e);
+
 
 #endif /* !__NIXEXPR_H */

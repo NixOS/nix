@@ -44,9 +44,17 @@ static void printResult(EvalState & state, Expr e,
         ATerm body, pos;
         if (matchFunction(e, formals, body, pos)) {
             for (ATermIterator i(formals); i; ++i) {
-                Expr name; ATerm d1, d2;
-                if (!matchFormal(*i, name, d1, d2)) abort();
-                cout << format("%1%\n") % aterm2String(name);
+                Expr name; ValidValues valids; ATerm dummy;
+                if (!matchFormal(*i, name, valids, dummy)) abort();
+                cout << format("%1%: ") % aterm2String(name);
+                ATermList valids2;
+                if (matchValidValues(valids, valids2)) {
+                    for (ATermIterator j(valids2); j; ++j) {
+                        Expr e = evalExpr(state, *j);
+                        cout << format("%1% ") % showValue(e);
+                    }
+                }
+                cout << format("\n");
             }
         } else
             printMsg(lvlError, "warning: expression does not evaluate to a function");

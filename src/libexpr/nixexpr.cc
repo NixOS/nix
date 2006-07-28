@@ -308,3 +308,27 @@ string showType(Expr e)
     return "an unknown type";
 }
 
+
+string showValue(Expr e)
+{
+    ATerm s;
+    int i;
+    if (matchStr(e, s)) {
+        string t = aterm2String(s), u;
+        for (string::iterator i = t.begin(); i != t.end(); ++i)
+            if (*i == '\"' || *i == '\\') u += "\\" + *i;
+            else if (*i == '\n') u += "\\n";
+            else if (*i == '\r') u += "\\r";
+            else if (*i == '\t') u += "\\t";
+            else u += *i;
+        return "\"" + u + "\"";
+    }
+    if (matchPath(e, s)) return aterm2String(s);
+    if (matchUri(e, s)) return aterm2String(s);
+    if (matchNull(e)) return "null";
+    if (matchInt(e, i)) return (format("%1%") % i).str();
+    if (e == eTrue) return "true";
+    if (e == eFalse) return "false";
+    /* !!! incomplete */
+    return "<unknown>";
+}
