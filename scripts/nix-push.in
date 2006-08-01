@@ -31,6 +31,8 @@ my $localCopy;
 my $localArchivesDir;
 my $localManifestFile;
 
+my $targetArchivesDir;
+
 my $archivesPutURL;
 my $archivesGetURL;
 my $manifestPutURL;
@@ -41,6 +43,13 @@ if ($ARGV[0] eq "--copy") {
     shift @ARGV;
     $localArchivesDir = shift @ARGV;
     $localManifestFile = shift @ARGV;
+    if ($ARGV[0] eq "--target") {
+       shift @ARGV;
+       $targetArchivesDir = shift @ARGV;
+    }
+    else {
+       $targetArchivesDir = $localArchivesDir;
+    }
 }
 else {
     die "syntax: nix-push ARCHIVES_PUT_URL ARCHIVES_GET_URL " .
