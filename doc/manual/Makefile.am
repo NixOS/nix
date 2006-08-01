@@ -70,7 +70,7 @@ images:
 	cp $(docbookxsl)/images/*.png images
 	mkdir images/callouts
 	cp $(docbookxsl)/images/callouts/*.png images/callouts
-	chmod +w -R images
+	chmod -R +w images
 
 KEEP = manual.html manual.is-valid version.txt $(MANS) NEWS.html NEWS.txt
 
