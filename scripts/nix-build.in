@@ -110,9 +110,9 @@ foreach my $expr (@exprs) {
 
     # Instantiate.
     my @drvPaths;
-    open DRVPATHS, "-|", "@bindir@/nix-instantiate", "--add-root", $drvLink, "--indirect", @instArgs, $expr;
+    my $pid = open DRVPATHS, "-|", "@bindir@/nix-instantiate", "--add-root", $drvLink, "--indirect", @instArgs, $expr;
     while (<DRVPATHS>) {chomp; push @drvPaths, $_;}
-    close DRVPATHS;
+    close DRVPATHS or die;
 
     foreach my $drvPath (@drvPaths) {
         my $target = readlink $drvPath;
