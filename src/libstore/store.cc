@@ -824,6 +824,7 @@ void verifyStore(bool checkContents)
             invalidatePath(txn, *i);
         } else {
             if (checkContents) {
+                debug(format("checking contents of `%1%'") % *i);
                 Hash expected = queryHash(txn, *i);
                 Hash current = hashPath(expected.type, *i);
                 if (current != expected) {
