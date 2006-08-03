@@ -199,7 +199,7 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
 
     my $url;
     if ($localCopy) {
-        $url = "file://$localArchivesDir/$narName";
+        $url = "file://$targetArchivesDir/$narName";
     } else {
         $url = "$archivesGetURL/$narName";
     }
