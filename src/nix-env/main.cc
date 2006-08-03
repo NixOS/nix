@@ -12,11 +12,13 @@
 #include "get-drvs.hh"
 #include "attr-path.hh"
 #include "pathlocks.hh"
+#include "xml-writer.hh"
 
 #include <cerrno>
 #include <ctime>
 #include <algorithm>
 #include <iostream>
+#include <sstream>
 
 #include <unistd.h>
 
@@ -724,6 +726,8 @@ static string colorString(const string & s)
 static void opQuery(Globals & globals,
     Strings opFlags, Strings opArgs)
 {
+    typedef vector< map<string, string> > ResultSet;
+        
     bool printStatus = false;
     bool printName = true;
     bool printAttrPath = false;
@@ -732,6 +736,7 @@ static void opQuery(Globals & globals,
     bool printOutPath = false;
     bool printDescription = false;
     bool compareVersions = false;
+    bool xmlOutput = false;
 
     enum { sInstalled, sAvailable } source = sInstalled;
 
@@ -748,6 +753,7 @@ static void opQuery(Globals & globals,
         else if (*i == "--out-path") printOutPath = true;
         else if (*i == "--installed") source = sInstalled;
         else if (*i == "--available" || *i == "-a") source = sAvailable;
+        else if (*i == "--xml") xmlOutput = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
     if (globals.instSource.type == srcAttrPath) printAttrPath = true; /* hack */
@@ -795,28 +801,47 @@ static void opQuery(Globals & globals,
     }
 
     
-    /* Print the desired columns. */
+    /* Print the desired columns, or XML output. */
     Table table;
+    ostringstream dummy;
+    XMLWriter xml(xmlOutput ? cout : dummy);
+    XMLOpenElement xmlRoot(xml, "items");
     
     for (vector<DrvInfo>::iterator i = elems2.begin();
          i != elems2.end(); ++i)
     {
         try {
-            
+
+            /* For table output. */
             Strings columns;
+
+            /* For XML output. */
+            XMLAttrs attrs;
         
             if (printStatus) {
                 Substitutes subs = querySubstitutes(noTxn, i->queryOutPath(globals.state));
-                columns.push_back(
-                    (string) (installed.find(i->queryOutPath(globals.state))
-                        != installed.end() ? "I" : "-")
-                    + (isValidPath(i->queryOutPath(globals.state)) ? "P" : "-")
-                    + (subs.size() > 0 ? "S" : "-"));
+                bool isInstalled = installed.find(i->queryOutPath(globals.state)) != installed.end();
+                bool isValid = isValidPath(i->queryOutPath(globals.state));
+                if (xmlOutput) {
+                    attrs["installed"] = isInstalled ? "1" : "0";
+                    attrs["valid"] = isValid ? "1" : "0";
+                    attrs["substitutable"] = !subs.empty() ? "1" : "0";
+                } else
+                    columns.push_back(
+                        (string) (isInstalled ? "I" : "-")
+                        + (isValid ? "P" : "-")
+                        + (!subs.empty() ? "S" : "-"));
             }
 
-            if (printAttrPath) columns.push_back(i->attrPath);
+            if (xmlOutput)
+                attrs["attrPath"] = i->attrPath;
+            else if (printAttrPath)
+                columns.push_back(i->attrPath);
 
-            if (printName) columns.push_back(i->name);
+            if (xmlOutput)
+                attrs["name"] = i->name;
+            else if (printName)
+                columns.push_back(i->name);
 
             if (compareVersions) {
                 /* Compare this element against the versions of the
@@ -825,6 +850,7 @@ static void opQuery(Globals & globals,
                    This is O(N * M), should be O(N * lg M). */
                 string version;
                 VersionDiff diff = compareVersionAgainstSet(*i, otherElems, version);
+
                 char ch;
                 switch (diff) {
                     case cvLess: ch = '>'; break;
@@ -833,31 +859,62 @@ static void opQuery(Globals & globals,
                     case cvUnavail: ch = '-'; break;
                     default: abort();
                 }
-                string column = (string) "" + ch + " " + version;
-                if (diff == cvGreater) column = colorString(column);
-                columns.push_back(column);
+
+                if (xmlOutput) {
+                    if (diff != cvUnavail) {
+                        attrs["versionDiff"] = ch;
+                        attrs["maxComparedVersion"] = version;
+                    }
+                } else {
+                    string column = (string) "" + ch + " " + version;
+                    if (diff == cvGreater) column = colorString(column);
+                    columns.push_back(column);
+                }
             }
 
-            if (printSystem) columns.push_back(i->system);
+            if (xmlOutput) {
+                if (i->system != "") attrs["system"] = i->system;
+            }
+            else if (printSystem) 
+                columns.push_back(i->system);
 
-            if (printDrvPath) columns.push_back(
-                i->queryDrvPath(globals.state) == ""
-                ? "-" : i->queryDrvPath(globals.state));
+            if (printDrvPath) {
+                string drvPath = i->queryDrvPath(globals.state);
+                if (xmlOutput) {
+                    if (drvPath != "") attrs["drvPath"] = drvPath;
+                } else
+                    columns.push_back(drvPath == "" ? "-" : drvPath);
+            }
         
-            if (printOutPath) columns.push_back(i->queryOutPath(globals.state));
+            if (printOutPath) {
+                string outPath = i->queryOutPath(globals.state);
+                if (xmlOutput) {
+                    if (outPath != "") attrs["outPath"] = outPath;
+                } else
+                    columns.push_back(outPath);
+            }
 
             if (printDescription) {
                 MetaInfo meta = i->queryMetaInfo(globals.state);
-                columns.push_back(meta["description"]);
+                string descr = meta["description"];
+                if (xmlOutput) {
+                    if (descr != "") attrs["description"] = descr;
+                } else
+                    columns.push_back(descr);
             }
-            
-            table.push_back(columns);
-        }
-        catch (AssertionError & e) {
+
+            if (xmlOutput) {
+                xml.writeEmptyElement("item", attrs);
+                xml.writeCharData("\n");
+            } else
+                table.push_back(columns);
+
+        } catch (AssertionError & e) {
+            /* !!! hm, maybe we should give some sort of warning here? */
         }
     }
 
-    printTable(table);
+    if (!xmlOutput) printTable(table);
 }
 
 

@@ -45,7 +45,7 @@ void XMLWriter::closeElement()
 }
 
 
-void XMLWriter::writeShortElement(const string & name,
+void XMLWriter::writeEmptyElement(const string & name,
     const XMLAttrs & attrs)
 {
     assert(!closed);

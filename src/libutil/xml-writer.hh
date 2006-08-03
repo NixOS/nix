@@ -33,7 +33,7 @@ public:
         const XMLAttrs & attrs = XMLAttrs());
     void closeElement();
 
-    void writeShortElement(const string & name,
+    void writeEmptyElement(const string & name,
         const XMLAttrs & attrs = XMLAttrs());
     
     void writeCharData(const string & data);
