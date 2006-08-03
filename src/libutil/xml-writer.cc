@@ -1,61 +1,6 @@
-#include <iostream>
-#include <string>
-#include <list>
-#include <map>
 #include <assert.h>
-using namespace std;
 
-
-typedef map<string, string> XMLAttrs;
-
-
-class XMLWriter
-{
-private:
-    
-    ostream & output;
-
-    bool closed;
-
-    list<string> pendingElems;
-
-public:
-
-    XMLWriter(ostream & output);
-    ~XMLWriter();
-
-    void close();
-
-    void openElement(const string & name,
-        const XMLAttrs & attrs = XMLAttrs());
-    void closeElement();
-
-    void writeShortElement(const string & name,
-        const XMLAttrs & attrs = XMLAttrs());
-    
-    void writeCharData(const string & data);
-
-private:
-    void writeAttrs(const XMLAttrs & attrs);
-};
-
-
-class XMLOpenElement
-{
-private:
-    XMLWriter & writer;
-public:
-    XMLOpenElement(XMLWriter & writer, const string & name,
-        const XMLAttrs & attrs = XMLAttrs())
-        : writer(writer)
-    {
-        writer.openElement(name, attrs);
-    }
-    ~XMLOpenElement()
-    {
-        writer.closeElement();
-    }
-};
+#include "xml-writer.hh"
 
 
 XMLWriter::XMLWriter(ostream & output)
@@ -138,6 +83,7 @@ void XMLWriter::writeAttrs(const XMLAttrs & attrs)
 }
 
 
+#if 0
 int main(int argc, char * * argv)
 {
     XMLWriter doc(cout);
@@ -159,3 +105,4 @@ int main(int argc, char * * argv)
 
     return 0;
 }
+#endif

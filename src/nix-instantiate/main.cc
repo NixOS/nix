@@ -10,6 +10,7 @@
 #include "nixexpr-ast.hh"
 #include "get-drvs.hh"
 #include "attr-path.hh"
+#include "xml-writer.hh"
 #include "help.txt.hh"
 
 
@@ -40,21 +41,29 @@ static void printResult(EvalState & state, Expr e,
         cout << format("%1%\n") % e;
     
     else if (printArgs) {
+        XMLWriter doc(cout);
+        XMLOpenElement root(doc, "args");
+            
         ATermList formals;
         ATerm body, pos;
+        
         if (matchFunction(e, formals, body, pos)) {
             for (ATermIterator i(formals); i; ++i) {
                 Expr name; ValidValues valids; ATerm dummy;
                 if (!matchFormal(*i, name, valids, dummy)) abort();
-                cout << format("%1%: ") % aterm2String(name);
+
+                XMLAttrs attrs;
+                attrs["name"] = aterm2String(name);
+                XMLOpenElement elem(doc, "arg", attrs);
+
                 ATermList valids2;
                 if (matchValidValues(valids, valids2)) {
                     for (ATermIterator j(valids2); j; ++j) {
                         Expr e = evalExpr(state, *j);
-                        cout << format("%1% ") % showValue(e);
+                        XMLOpenElement elem(doc, "value");
+                        doc.writeCharData(showValue(e));
                     }
                 }
-                cout << format("\n");
             }
         } else
             printMsg(lvlError, "warning: expression does not evaluate to a function");
