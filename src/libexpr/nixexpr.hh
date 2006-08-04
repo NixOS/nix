@@ -50,7 +50,7 @@ struct Substitution
     {
         Expr x;
         for (const Substitution * s(this); s; s = s->prev)
-            if (x = s->map->get(name)) return x;
+            if ((x = s->map->get(name))) return x;
         return 0;
     }
 };

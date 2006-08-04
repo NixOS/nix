@@ -87,7 +87,7 @@ static Expr substArgs(EvalState & state,
            arguments.  Find out which. */
         for (ATermIterator i(formals); i; ++i) {
             Expr name; ATerm d1, d2;
-            matchFormal(*i, name, d1, d2);
+            if (!matchFormal(*i, name, d1, d2)) abort();
             subs.remove(name);
         }
         throw TypeError(format("the function does not expect an argument named `%1%'")

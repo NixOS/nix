@@ -75,7 +75,7 @@ Expr unescapeStr(const char * s)
 {
     string t;
     char c;
-    while (c = *s++) {
+    while ((c = *s++)) {
         if (c == '\\') {
             assert(*s);
             c = *s++;

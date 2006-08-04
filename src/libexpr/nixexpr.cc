@@ -130,7 +130,7 @@ Expr substitute(const Substitution & subs, Expr e)
     /* In case of a function, filter out all variables bound by this
        function. */
     ATermList formals;
-    ATerm body, def;
+    ATerm body;
     if (matchFunction(e, formals, body, pos)) {
         ATermMap map(ATgetLength(formals));
         for (ATermIterator i(formals); i; ++i) {
@@ -227,7 +227,7 @@ static void checkVarDefs2(set<Expr> & done, const ATermMap & defs, Expr e)
         for (ATermIterator i(formals); i; ++i) {
             ATerm valids, deflt;
             set<Expr> done2;
-            matchFormal(*i, name, valids, deflt);
+            if (!matchFormal(*i, name, valids, deflt)) abort();
             checkVarDefs2(done, defs, valids);
             checkVarDefs2(done2, defs2, deflt);
         }
