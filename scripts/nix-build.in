@@ -110,9 +110,10 @@ foreach my $expr (@exprs) {
 
     # Instantiate.
     my @drvPaths;
-    my $pid = open DRVPATHS, "-|", "@bindir@/nix-instantiate", "--add-root", $drvLink, "--indirect", @instArgs, $expr;
+    # !!! would prefer the perl 5.8.0 pipe open feature here.
+    my $pid = open(DRVPATHS, "-|") || exec "@bindir@/nix-instantiate", "--add-root", $drvLink, "--indirect", @instArgs, $expr;
     while (<DRVPATHS>) {chomp; push @drvPaths, $_;}
-    close DRVPATHS or die;
+    close DRVPATHS or exit 1;
 
     foreach my $drvPath (@drvPaths) {
         my $target = readlink $drvPath;
