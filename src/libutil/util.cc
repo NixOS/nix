@@ -1,5 +1,9 @@
 #include "config.h"
 
+#ifdef __CYGWIN__
+#include <windows.h>
+#endif
+
 #include <iostream>
 #include <cerrno>
 #include <cstdio>
@@ -12,10 +16,6 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <signal.h>
-
-#ifdef __CYGWIN__
-#include <windows.h>
-#endif
 
 #include "util.hh"
 
