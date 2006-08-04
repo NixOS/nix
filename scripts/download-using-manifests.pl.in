@@ -2,7 +2,7 @@
 
 use strict;
 use readmanifest;
-use POSIX qw(tmpnam);
+use POSIX qw(tmpnam strftime);
 
 my $manifestDir = "@localstatedir@/nix/manifests";
 my $logFile = "@localstatedir@/log/nix/downloads";
@@ -27,8 +27,7 @@ END { unlink $tmpNar; unlink $tmpNar2; rmdir $tmpDir; }
 die unless scalar @ARGV == 1;
 my $targetPath = $ARGV[0];
 
-my $date = `date` or die;
-chomp $date;
+my $date = strftime ("%F %H:%M:%S UTC", gmtime (time));
 print LOGFILE "$$ get $targetPath $date\n";
 
 print "\n*** Trying to download/patch `$targetPath'\n";
