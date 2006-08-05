@@ -6,6 +6,9 @@ expHash=$2
 # to prevent doing more than 1 chroot
 unset NIX_ROOT
 
+# needed to make it work on NixOS
+export PATH=$PATH:@coreutils@
+
 hashType=$NIX_HASH_ALGO
 if test -z "$hashType"; then
     hashType=md5
