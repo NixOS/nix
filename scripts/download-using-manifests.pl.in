@@ -9,6 +9,7 @@ my $logFile = "@localstatedir@/log/nix/downloads";
 
 open LOGFILE, ">>$logFile" or die "cannot open log file $logFile";
 
+delete $ENV{"NIX_ROOT"};
 
 # Create a temporary directory.
 my $tmpDir;

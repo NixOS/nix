@@ -3,6 +3,9 @@
 url=$1
 expHash=$2
 
+# to prevent doing more than 1 chroot
+unset NIX_ROOT
+
 hashType=$NIX_HASH_ALGO
 if test -z "$hashType"; then
     hashType=md5
