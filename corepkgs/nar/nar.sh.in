@@ -1,9 +1,9 @@
 #! @shell@ -e
 
-echo "packing $path into $out..."
+echo "packing $storePath into $out..."
 @coreutils@/mkdir $out
 dst=$out/tmp.nar.bz2
-@bindir@/nix-store --dump "$path" > tmp
+@bindir@/nix-store --dump "$storePath" > tmp
 
 @bzip2@ < tmp > $dst
 

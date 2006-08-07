@@ -103,7 +103,7 @@ foreach my $storePath (@storePaths) {
     # expression.
     my $nixexpr = 
         "((import $dataDir/nix/corepkgs/nar/nar.nix) " .
-        "{path = \"$storePath\"; system = \"@system@\"; hashAlgo = \"$hashAlgo\";}) ";
+        "{storePath = \"$storePath\"; system = \"@system@\"; hashAlgo = \"$hashAlgo\";}) ";
     
     print NIX $nixexpr;
 }
