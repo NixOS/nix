@@ -804,7 +804,7 @@ static void opQuery(Globals & globals,
     /* Print the desired columns, or XML output. */
     Table table;
     ostringstream dummy;
-    XMLWriter xml(xmlOutput ? cout : dummy);
+    XMLWriter xml(*(xmlOutput ? &cout : &dummy));
     XMLOpenElement xmlRoot(xml, "items");
     
     for (vector<DrvInfo>::iterator i = elems2.begin();
