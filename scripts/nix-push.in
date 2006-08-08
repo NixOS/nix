@@ -31,7 +31,7 @@ my $localCopy;
 my $localArchivesDir;
 my $localManifestFile;
 
-my $targetArchivesDir;
+my $targetArchivesUrl;
 
 my $archivesPutURL;
 my $archivesGetURL;
@@ -45,10 +45,10 @@ if ($ARGV[0] eq "--copy") {
     $localManifestFile = shift @ARGV;
     if ($ARGV[0] eq "--target") {
        shift @ARGV;
-       $targetArchivesDir = shift @ARGV;
+       $targetArchivesUrl = shift @ARGV;
     }
     else {
-       $targetArchivesDir = $localArchivesDir;
+       $targetArchivesUrl = "file:/$localArchivesDir";
     }
 }
 else {
@@ -199,7 +199,7 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
 
     my $url;
     if ($localCopy) {
-        $url = "file://$targetArchivesDir/$narName";
+        $url = "$targetArchivesUrl/$narName";
     } else {
         $url = "$archivesGetURL/$narName";
     }
