@@ -48,7 +48,7 @@ if ($ARGV[0] eq "--copy") {
        $targetArchivesUrl = shift @ARGV;
     }
     else {
-       $targetArchivesUrl = "file:/$localArchivesDir";
+       $targetArchivesUrl = "file://$localArchivesDir";
     }
 }
 else {
