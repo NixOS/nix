@@ -197,6 +197,11 @@ static void processBinding(EvalState & state, Expr e, Derivation & drv,
     else if (matchNull(e)) ss.push_back("");
 
     else if (matchSubPath(e, e1, e2)) {
+        static bool warn = false;
+        if (!warn) {
+            printMsg(lvlError, "warning: the subpath operator (~) is deprecated, use string concatenation (+) instead");
+            warn = true;
+        }
         Strings ss2;
         processBinding(state, evalExpr(state, e1), drv, ss2);
         if (ss2.size() != 1)
