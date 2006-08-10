@@ -68,6 +68,16 @@
 #env-keep-derivations = false
 
 
+### Option `build-max-jobs'
+#
+# This option defines the maximum number of jobs that Nix will try to
+# build in parallel.  The default is 1.  You should generally set it
+# to the number of CPUs in your system (e.g., 2 on a Athlon 64 X2).
+# It can be overriden using the `--max-jobs' / `-j' command line
+# switch.
+#build-max-jobs = 1
+
+
 ### Option `build-allow-root'
 #
 # This option controls Nix's behaviour when it is invoked under the

@@ -94,7 +94,14 @@ static void initAndRun(int argc, char * * argv)
     nixConfDir = canonPath(getEnv("NIX_CONF_DIR", NIX_CONF_DIR));
     nixLibexecDir = canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR));
 
+    /* Get some settings from the configuration file. */
     thisSystem = querySetting("system", SYSTEM);
+    {
+        int n;
+        if (!string2Int(querySetting("build-max-jobs", "1"), n) || n < 0)
+            throw Error("invalid value for configuration setting `build-max-jobs'");
+        maxBuildJobs = n;
+    }
 
     /* Catch SIGINT. */
     struct sigaction act, oact;
