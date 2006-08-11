@@ -332,7 +332,7 @@ static void addAdditionalRoots(PathSet & roots)
     for (Strings::iterator i = paths.begin(); i != paths.end(); ++i) {
         if (isInStore(*i)) {
             Path path = toStorePath(*i);
-            if (roots.find(path) == roots.end()) {
+            if (roots.find(path) == roots.end() && isValidPath(path)) {
                 debug(format("found additional root `%1%'") % path);
                 roots.insert(path);
             }
