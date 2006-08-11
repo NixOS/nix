@@ -515,6 +515,15 @@ void collectGarbage(GCAction action, const PathSet & pathsToDelete,
         debug(format("dead path `%1%'") % *i);
         result.insert(*i);
 
+        /* If just returning the set of dead paths, we also return the
+           space that would be freed if we deleted them. */
+        if (action == gcReturnDead) {
+            struct stat st;
+            if (lstat(i->c_str(), &st) == -1)
+                st.st_size = 0;
+            bytesFreed += st.st_size;
+        }
+
         if (action == gcDeleteDead || action == gcDeleteSpecific) {
 
 #ifndef __CYGWIN__

@@ -492,13 +492,17 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
 
 struct PrintFreed 
 {
-    bool show;
+    bool show, dryRun;
     unsigned long long bytesFreed;
-    PrintFreed(bool _show) : bytesFreed(0), show(_show) { }
+    PrintFreed(bool show, bool dryRun)
+        : bytesFreed(0), show(show), dryRun(dryRun) { }
     ~PrintFreed() 
     {
         if (show)
-            cout << format("%d bytes freed (%.2f MiB)\n")
+            cout << format(
+                (dryRun
+                    ? "%d bytes would be freed (%.2f MiB)\n"
+                    : "%d bytes freed (%.2f MiB)\n"))
                 % bytesFreed % (bytesFreed / (1024.0 * 1024.0));
     }
 };
@@ -518,7 +522,8 @@ static void opGC(Strings opFlags, Strings opArgs)
         else throw UsageError(format("bad sub-operation `%1%' in GC") % *i);
 
     PathSet result;
-    PrintFreed freed(action == gcDeleteDead);
+    PrintFreed freed(action == gcDeleteDead || action == gcReturnDead,
+        action == gcReturnDead);
     collectGarbage(action, PathSet(), false, result, freed.bytesFreed);
 
     if (action != gcDeleteDead) {
@@ -546,7 +551,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
         pathsToDelete.insert(fixPath(*i));
     
     PathSet dummy;
-    PrintFreed freed(true);
+    PrintFreed freed(true, false);
     collectGarbage(gcDeleteSpecific, pathsToDelete, ignoreLiveness,
         dummy, freed.bytesFreed);
 }
