@@ -60,8 +60,9 @@ static void printResult(EvalState & state, Expr e,
                 if (matchValidValues(valids, valids2)) {
                     for (ATermIterator j(valids2); j; ++j) {
                         Expr e = evalExpr(state, *j);
-                        XMLOpenElement elem(doc, "value");
-                        doc.writeCharData(showValue(e));
+                        XMLAttrs attrs;
+                        attrs["value"] = showValue(e);
+                        XMLOpenElement elem(doc, "value", attrs);
                     }
                 }
             }
