@@ -1400,6 +1400,7 @@ void DerivationGoal::computeClosure()
                     % path % algo % printHash(h) % printHash(h2));
         }
 
+#ifndef __CYGWIN__
         /* Check that the output is not group or world writable, as
            that means that someone else can have interfered with the
            build.  Also, the output should be owned by the build
@@ -1407,6 +1408,7 @@ void DerivationGoal::computeClosure()
         if ((st.st_mode & (S_IWGRP | S_IWOTH)) ||
             (buildUser.getUID() != 0 && st.st_uid != buildUser.getUID()))
             throw Error(format("suspicious ownership or permission on `%1%'; rejecting this build output") % path);
+#endif
 
         /* Get rid of all weird permissions. */
 	canonicalisePathMetaData(path);
