@@ -8,8 +8,8 @@ rec {
   
   y = 123;
 
-  # CR or CR/LF in strings should be translated to LF (but not
-  # explicit \r's).
+  # CR or CR/LF (but not explicit \r's) in strings should be
+  # translated to LF.
   foo = "multiline
   string
   test\r";
