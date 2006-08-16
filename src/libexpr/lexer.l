@@ -21,6 +21,10 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 {
     while (len--) {
        switch (*s++) {
+       case '\r':
+           if (*s == '\n') /* cr/lf */
+               s++;
+           /* fall through */
        case '\n': 
            ++loc->first_line;
            loc->first_column = 1;
@@ -85,8 +89,8 @@ inherit     { return INHERIT; }
 {PATH}      { yylval->t = toATerm(yytext); return PATH; /* !!! alloc */ }
 {URI}       { yylval->t = toATerm(yytext); return URI; /* !!! alloc */ }
 
-[ \t\n]+    /* eat up whitespace */
-\#[^\n]*    /* single-line comments */
+[ \t\r\n]+    /* eat up whitespace */
+\#[^\r\n]*    /* single-line comments */
 \/\*([^*]|\*[^\/])*\*\/  /* long comments */
 
 .           return yytext[0];
