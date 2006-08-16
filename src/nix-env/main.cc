@@ -804,7 +804,7 @@ static void opQuery(Globals & globals,
     /* Print the desired columns, or XML output. */
     Table table;
     ostringstream dummy;
-    XMLWriter xml(*(xmlOutput ? &cout : &dummy));
+    XMLWriter xml(true, *(xmlOutput ? &cout : &dummy));
     XMLOpenElement xmlRoot(xml, "items");
     
     for (vector<DrvInfo>::iterator i = elems2.begin();
@@ -903,10 +903,9 @@ static void opQuery(Globals & globals,
                     columns.push_back(descr);
             }
 
-            if (xmlOutput) {
+            if (xmlOutput)
                 xml.writeEmptyElement("item", attrs);
-                xml.writeCharData("\n");
-            } else
+            else
                 table.push_back(columns);
 
         } catch (AssertionError & e) {

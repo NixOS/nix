@@ -18,13 +18,14 @@ private:
     
     ostream & output;
 
+    bool indent;
     bool closed;
 
     list<string> pendingElems;
 
 public:
 
-    XMLWriter(ostream & output);
+    XMLWriter(bool indent, ostream & output);
     ~XMLWriter();
 
     void close();
@@ -40,6 +41,8 @@ public:
 
 private:
     void writeAttrs(const XMLAttrs & attrs);
+
+    void indent_(unsigned int depth);
 };
 
 

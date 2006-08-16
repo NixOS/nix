@@ -34,14 +34,65 @@ static int rootNr = 0;
 static bool indirectRoot = false;
 
 
+static XMLAttrs singletonAttrs(const string & name, const string & value)
+{
+    XMLAttrs attrs;
+    attrs[name] = value;
+    return attrs;
+}
+
+
+static void printTermAsXML(EvalState & state, Expr e, XMLWriter & doc)
+{
+    XMLAttrs attrs;
+    ATerm s;
+    int i;
+    ATermList as;
+    
+    if (matchStr(e, s))
+        doc.writeEmptyElement("string", singletonAttrs("value", aterm2String(s)));
+
+    else if (matchPath(e, s))
+        doc.writeEmptyElement("path", singletonAttrs("value", aterm2String(s)));
+
+    else if (matchUri(e, s))
+        doc.writeEmptyElement("uri", singletonAttrs("value", aterm2String(s)));
+
+    else if (matchNull(e))
+        doc.writeEmptyElement("null");
+
+    else if (matchInt(e, i))
+        doc.writeEmptyElement("int",singletonAttrs("value", (format("%1%") % i).str()));
+
+    else if (matchAttrs(e, as)) {
+        XMLOpenElement _(doc, "attrs");
+        ATermMap attrs(128);
+        queryAllAttrs(e, attrs);
+        for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
+            XMLOpenElement _(doc, "attr", singletonAttrs("name", aterm2String(i->key)));
+            printTermAsXML(state, i->value, doc);
+        }
+    }
+
+    else
+        doc.writeEmptyElement("unknown");
+}
+
+
 static void printResult(EvalState & state, Expr e,
-    bool evalOnly, bool printArgs, const ATermMap & autoArgs)
+    bool evalOnly, bool printArgs, bool xmlOutput,
+    const ATermMap & autoArgs)
 {
     if (evalOnly)
-        cout << format("%1%\n") % e;
+        if (xmlOutput) {
+            XMLWriter doc(true, cout);
+            XMLOpenElement root(doc, "expr");
+            printTermAsXML(state, e, doc);
+        } else
+            cout << format("%1%\n") % e;
     
     else if (printArgs) {
-        XMLWriter doc(cout);
+        XMLWriter doc(true, cout);
         XMLOpenElement root(doc, "args");
             
         ATermList formals;
@@ -95,6 +146,7 @@ void run(Strings args)
     bool evalOnly = false;
     bool parseOnly = false;
     bool printArgs = false;
+    bool xmlOutput = false;
     string attrPath;
     ATermMap autoArgs(128);
 
@@ -138,6 +190,8 @@ void run(Strings args)
         }
         else if (arg == "--indirect")
             indirectRoot = true;
+        else if (arg == "--xml")
+            xmlOutput = true;
         else if (arg[0] == '-')
             throw UsageError(format("unknown flag `%1%'") % arg);
         else
@@ -149,7 +203,7 @@ void run(Strings args)
     if (readStdin) {
         Expr e = findAlongAttrPath(state, attrPath, parseStdin(state));
         if (!parseOnly) e = evalExpr(state, e);
-        printResult(state, e, evalOnly, printArgs, autoArgs);
+        printResult(state, e, evalOnly, printArgs, xmlOutput, autoArgs);
     }
 
     for (Strings::iterator i = files.begin();
@@ -159,7 +213,7 @@ void run(Strings args)
         Expr e = findAlongAttrPath(state, attrPath,
             parseExprFromFile(state, path));
         if (!parseOnly) e = evalExpr(state, e);
-        printResult(state, e, evalOnly, printArgs, autoArgs);
+        printResult(state, e, evalOnly, printArgs, xmlOutput, autoArgs);
     }
 
     printEvalStats(state);

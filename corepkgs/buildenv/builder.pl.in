@@ -91,7 +91,7 @@ sub addPkg {
         close PROP;
         my @propagated = split ' ', $propagated;
         foreach my $p (@propagated) {
-            addPkg $p;
+#            addPkg $p;
         }
     }
         
