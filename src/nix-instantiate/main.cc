@@ -42,13 +42,14 @@ static XMLAttrs singletonAttrs(const string & name, const string & value)
 }
 
 
-static void printTermAsXML(EvalState & state, Expr e, XMLWriter & doc)
+static void printTermAsXML(Expr e, XMLWriter & doc)
 {
     XMLAttrs attrs;
     ATerm s;
     int i;
-    ATermList as;
-    
+    ATermList as, formals;
+    ATerm body, pos;
+
     if (matchStr(e, s))
         doc.writeEmptyElement("string", singletonAttrs("value", aterm2String(s)));
 
@@ -62,7 +63,13 @@ static void printTermAsXML(EvalState & state, Expr e, XMLWriter & doc)
         doc.writeEmptyElement("null");
 
     else if (matchInt(e, i))
-        doc.writeEmptyElement("int",singletonAttrs("value", (format("%1%") % i).str()));
+        doc.writeEmptyElement("int", singletonAttrs("value", (format("%1%") % i).str()));
+
+    else if (e == eTrue)
+        doc.writeEmptyElement("bool", singletonAttrs("value", "true"));
+
+    else if (e == eFalse)
+        doc.writeEmptyElement("bool", singletonAttrs("value", "false"));
 
     else if (matchAttrs(e, as)) {
         XMLOpenElement _(doc, "attrs");
@@ -70,56 +77,43 @@ static void printTermAsXML(EvalState & state, Expr e, XMLWriter & doc)
         queryAllAttrs(e, attrs);
         for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
             XMLOpenElement _(doc, "attr", singletonAttrs("name", aterm2String(i->key)));
-            printTermAsXML(state, i->value, doc);
+            printTermAsXML(i->value, doc);
+        }
+    }
+
+    else if (matchFunction(e, formals, body, pos)) {
+        XMLOpenElement _(doc, "function");
+        
+        for (ATermIterator i(formals); i; ++i) {
+            Expr name; ValidValues valids; ATerm dummy;
+            if (!matchFormal(*i, name, valids, dummy)) abort();
+            XMLOpenElement _(doc, "arg", singletonAttrs("name", aterm2String(name)));
+
+            ATermList valids2;
+            if (matchValidValues(valids, valids2)) {
+                for (ATermIterator j(valids2); j; ++j) {
+                    XMLOpenElement _(doc, "value");
+                    printTermAsXML(*j, doc);
+                }
+            }
         }
     }
 
     else
-        doc.writeEmptyElement("unknown");
+        doc.writeEmptyElement("unevaluated");
 }
 
 
 static void printResult(EvalState & state, Expr e,
-    bool evalOnly, bool printArgs, bool xmlOutput,
-    const ATermMap & autoArgs)
+    bool evalOnly, bool xmlOutput, const ATermMap & autoArgs)
 {
     if (evalOnly)
         if (xmlOutput) {
             XMLWriter doc(true, cout);
             XMLOpenElement root(doc, "expr");
-            printTermAsXML(state, e, doc);
+            printTermAsXML(e, doc);
         } else
             cout << format("%1%\n") % e;
-    
-    else if (printArgs) {
-        XMLWriter doc(true, cout);
-        XMLOpenElement root(doc, "args");
-            
-        ATermList formals;
-        ATerm body, pos;
-        
-        if (matchFunction(e, formals, body, pos)) {
-            for (ATermIterator i(formals); i; ++i) {
-                Expr name; ValidValues valids; ATerm dummy;
-                if (!matchFormal(*i, name, valids, dummy)) abort();
-
-                XMLAttrs attrs;
-                attrs["name"] = aterm2String(name);
-                XMLOpenElement elem(doc, "arg", attrs);
-
-                ATermList valids2;
-                if (matchValidValues(valids, valids2)) {
-                    for (ATermIterator j(valids2); j; ++j) {
-                        Expr e = evalExpr(state, *j);
-                        XMLAttrs attrs;
-                        attrs["value"] = showValue(e);
-                        XMLOpenElement elem(doc, "value", attrs);
-                    }
-                }
-            }
-        } else
-            printMsg(lvlError, "warning: expression does not evaluate to a function");
-    }
     
     else {
         DrvInfos drvs;
@@ -138,6 +132,49 @@ static void printResult(EvalState & state, Expr e,
 }
 
 
+Expr strictEval(EvalState & state, Expr e)
+{
+    e = evalExpr(state, e);
+
+    ATermList as;
+
+    if (matchAttrs(e, as)) {
+        ATermList as2 = ATempty;
+        for (ATermIterator i(as); i; ++i) {
+            ATerm name; Expr e; ATerm pos;
+            if (!matchBind(*i, name, e, pos)) abort(); /* can't happen */
+            as2 = ATinsert(as2, makeBind(name, strictEval(state, e), pos));
+        }
+        return makeAttrs(ATreverse(as2));
+    }
+
+    ATermList formals;
+    ATerm body, pos;
+
+    if (matchFunction(e, formals, body, pos)) {
+        ATermList formals2 = ATempty;
+        
+        for (ATermIterator i(formals); i; ++i) {
+            Expr name; ValidValues valids; ATerm dummy;
+            if (!matchFormal(*i, name, valids, dummy)) abort();
+
+            ATermList valids2;
+            if (matchValidValues(valids, valids2)) {
+                ATermList valids3 = ATempty;
+                for (ATermIterator j(valids2); j; ++j)
+                    valids3 = ATinsert(valids3, strictEval(state, *j));
+                valids = makeValidValues(ATreverse(valids3));
+            }
+
+            formals2 = ATinsert(formals2, makeFormal(name, valids, dummy));
+        }
+        return makeFunction(ATreverse(formals2), body, pos);
+    }
+    
+    return e;
+}
+
+
 void run(Strings args)
 {
     EvalState state;
@@ -145,8 +182,8 @@ void run(Strings args)
     bool readStdin = false;
     bool evalOnly = false;
     bool parseOnly = false;
-    bool printArgs = false;
     bool xmlOutput = false;
+    bool strict = false;
     string attrPath;
     ATermMap autoArgs(128);
 
@@ -164,10 +201,6 @@ void run(Strings args)
         else if (arg == "--parse-only") {
             readOnlyMode = true;
             parseOnly = evalOnly = true;
-        }
-        else if (arg == "--print-args") {
-            readOnlyMode = true;
-            printArgs = true;
         }
         else if (arg == "--attr" || arg == "-A") {
             if (i == args.end())
@@ -192,6 +225,8 @@ void run(Strings args)
             indirectRoot = true;
         else if (arg == "--xml")
             xmlOutput = true;
+        else if (arg == "--strict")
+            strict = true;
         else if (arg[0] == '-')
             throw UsageError(format("unknown flag `%1%'") % arg);
         else
@@ -203,7 +238,7 @@ void run(Strings args)
     if (readStdin) {
         Expr e = findAlongAttrPath(state, attrPath, parseStdin(state));
         if (!parseOnly) e = evalExpr(state, e);
-        printResult(state, e, evalOnly, printArgs, xmlOutput, autoArgs);
+        printResult(state, e, evalOnly, xmlOutput, autoArgs);
     }
 
     for (Strings::iterator i = files.begin();
@@ -213,7 +248,8 @@ void run(Strings args)
         Expr e = findAlongAttrPath(state, attrPath,
             parseExprFromFile(state, path));
         if (!parseOnly) e = evalExpr(state, e);
-        printResult(state, e, evalOnly, printArgs, xmlOutput, autoArgs);
+        if (strict) e = strictEval(state, e);
+        printResult(state, e, evalOnly, xmlOutput, autoArgs);
     }
 
     printEvalStats(state);

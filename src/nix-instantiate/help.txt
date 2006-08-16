@@ -18,3 +18,12 @@ Options:
   --attr / -A PATH: select an attribute from the top-level expression
 
   --add-root: add garbage collector roots for the result
+
+For --eval-only / --parse-only:
+
+  --xml: print an XML representation of the abstract syntax tree
+
+For --eval-only:
+
+  --strict: compute attributes and list elements, rather than being
+    lazy
