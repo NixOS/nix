@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='utf-8'?>
+<expr>
+  <attrs>
+    <attr name="a">
+      <string value="foo" />
+    </attr>
+    <attr name="b">
+      <string value="bar" />
+    </attr>
+    <attr name="c">
+      <string value="foobar" />
+    </attr>
+    <attr name="f">
+      <function>
+        <arg name="z">
+        </arg>
+        <arg name="x">
+          <value>
+            <string value="a" />
+          </value>
+          <value>
+            <string value="b" />
+          </value>
+          <value>
+            <string value="cd" />
+          </value>
+        </arg>
+        <arg name="y">
+          <value>
+            <bool value="true" />
+          </value>
+          <value>
+            <bool value="false" />
+          </value>
+        </arg>
+      </function>
+    </attr>
+    <attr name="x">
+      <int value="123" />
+    </attr>
+  </attrs>
+</expr>
