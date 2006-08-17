@@ -75,9 +75,12 @@ static void printTermAsXML(Expr e, XMLWriter & doc)
         XMLOpenElement _(doc, "attrs");
         ATermMap attrs(128);
         queryAllAttrs(e, attrs);
-        for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
-            XMLOpenElement _(doc, "attr", singletonAttrs("name", aterm2String(i->key)));
-            printTermAsXML(i->value, doc);
+        StringSet names;
+        for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i)
+            names.insert(aterm2String(i->key));
+        for (StringSet::iterator i = names.begin(); i != names.end(); ++i) {
+            XMLOpenElement _(doc, "attr", singletonAttrs("name", *i));
+            printTermAsXML(attrs.get(toATerm(*i)), doc);
         }
     }
 
@@ -175,6 +178,18 @@ Expr strictEval(EvalState & state, Expr e)
 }
 
 
+Expr doEval(EvalState & state, string attrPath, bool parseOnly, bool strict, Expr e)
+{
+    e = findAlongAttrPath(state, attrPath, e);
+    if (!parseOnly)
+        if (strict)
+            e = strictEval(state, e);
+        else
+            e = evalExpr(state, e);
+    return e;
+}
+
+
 void run(Strings args)
 {
     EvalState state;
@@ -236,8 +251,8 @@ void run(Strings args)
     openDB();
 
     if (readStdin) {
-        Expr e = findAlongAttrPath(state, attrPath, parseStdin(state));
-        if (!parseOnly) e = evalExpr(state, e);
+        Expr e = parseStdin(state);
+        e = doEval(state, attrPath, parseOnly, strict, e);
         printResult(state, e, evalOnly, xmlOutput, autoArgs);
     }
 
@@ -245,10 +260,8 @@ void run(Strings args)
          i != files.end(); i++)
     {
         Path path = absPath(*i);
-        Expr e = findAlongAttrPath(state, attrPath,
-            parseExprFromFile(state, path));
-        if (!parseOnly) e = evalExpr(state, e);
-        if (strict) e = strictEval(state, e);
+        Expr e = parseExprFromFile(state, path);
+        e = doEval(state, attrPath, parseOnly, strict, e);
         printResult(state, e, evalOnly, xmlOutput, autoArgs);
     }
 
