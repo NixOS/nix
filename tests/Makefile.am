@@ -42,5 +42,5 @@ EXTRA_DIST = $(TESTS) \
   user-envs.nix.in user-envs.builder.sh \
   fixed.nix.in fixed.builder1.sh fixed.builder2.sh \
   gc-runtime.nix.in gc-runtime.builder.sh \
-  $(wildcard lang/*.nix) $(wildcard lang/*.exp) \
+  $(wildcard lang/*.nix) $(wildcard lang/*.exp) $(wildcard lang/*.exp.xml) \
   common.sh.in
