@@ -1,11 +1,6 @@
-<?xml version="1.0"?>
-<!DOCTYPE book
-    PUBLIC "-//OASIS//DTD DocBook XML V4.3//EN"
-    "http://www.docbook.org/xml/4.3/docbook-xml-4.3.zip"
-[
-]>
+<article xmlns="http://docbook.org/ns/docbook">
 
-<article><title>Nix Release Notes</title>
+<title>Nix Release Notes</title>
 
 
 <section><title>Release 0.10 (TBA)</title>
@@ -32,9 +27,16 @@ irreversible.</para></warning>
   --query</command> to allow you to compare installed versions of
   packages to available versions, or vice versa.  An easy way to see
   if you are up to date with what’s in the channel is <literal>nix-env
-  -qc</literal>.</para></listitem>
+  -qc \*</literal>.</para></listitem>
 
-  <listitem><para>TODO: shared stores.</para></listitem>
+  <listitem><para><literal>nix-env --query</literal> now takes as
+  arguments a list of package names about which to show information,
+  just like <option>--install</option>, etc.: for example,
+  <literal>nix-env -q gcc</literal>.  Note that to show all
+  derivations, you need to specify
+  <literal>\*</literal>.</para></listitem>
+
+  <!--  <listitem><para>TODO: shared stores.</para></listitem> -->
 
   <listitem><para>A performance issue has been fixed with the
   <literal>referer</literal> table, which stores the inverse of the

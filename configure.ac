@@ -105,6 +105,7 @@ NEED_PROG(curl, curl)
 NEED_PROG(shell, sh)
 AC_PATH_PROG(xmllint, xmllint, false)
 AC_PATH_PROG(xsltproc, xsltproc, false)
+AC_PATH_PROG(jing, jing, false) # needed because xmllint --relaxng seems broken
 AC_PATH_PROG(w3m, w3m, false)
 AC_PATH_PROG(flex, flex, false)
 AC_PATH_PROG(bison, bison, false)
@@ -118,10 +119,10 @@ AC_ARG_WITH(coreutils-bin, AC_HELP_STRING([--with-coreutils-bin=PATH],
   coreutils=$withval, coreutils=$(dirname $cat))
 AC_SUBST(coreutils)
 
-AC_ARG_WITH(docbook-catalog, AC_HELP_STRING([--with-docbook-catalog=PATH],
-  [path of the DocBook XML DTD]),
-  docbookcatalog=$withval, docbookcatalog=/docbook-dtd-missing)
-AC_SUBST(docbookcatalog)
+AC_ARG_WITH(docbook-rng, AC_HELP_STRING([--with-docbook-rng=PATH],
+  [path of the DocBook RelaxNG schema]),
+  docbookrng=$withval, docbookrng=/docbook-rng-missing)
+AC_SUBST(docbookrng)
 
 AC_ARG_WITH(docbook-xsl, AC_HELP_STRING([--with-docbook-xsl=PATH],
   [path of the DocBook XSL stylesheets]),

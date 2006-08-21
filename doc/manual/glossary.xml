@@ -1,9 +1,13 @@
-<appendix><title>Glossary</title>
+<appendix xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink">
+
+<title>Glossary</title>
+
 
 <glosslist>
 
 
-<glossentry id="gloss-derivation"><glossterm>derivation</glossterm>
+<glossentry xml:id="gloss-derivation"><glossterm>derivation</glossterm>
 
   <glossdef><para>A description of a build action.  The result of a
   derivation is a store object.  Derivations are typically specified
@@ -46,7 +50,7 @@
 </glossentry>
 
 
-<glossentry id="gloss-substitute"><glossterm>substitute</glossterm>
+<glossentry xml:id="gloss-substitute"><glossterm>substitute</glossterm>
 
   <glossdef><para>A substitute is a command invocation stored in the
   Nix database that describes how to build a store object, bypassing
@@ -79,7 +83,7 @@
 </glossentry>
 
 
-<glossentry id="gloss-reference"><glossterm>reference</glossterm>
+<glossentry xml:id="gloss-reference"><glossterm>reference</glossterm>
 
   <glossdef><para>A store path <varname>P</varname> is said to have a
   reference to a store path <varname>Q</varname> if the store object
@@ -92,7 +96,7 @@
 </glossentry>
 
 
-<glossentry id="gloss-closure"><glossterm>closure</glossterm>
+<glossentry xml:id="gloss-closure"><glossterm>closure</glossterm>
 
   <glossdef><para>The closure of a store path is the set of store
   paths that are directly or indirectly “reachable” from that store
@@ -108,14 +112,14 @@
 </glossentry>
 
 
-<glossentry id="gloss-output-path"><glossterm>output path</glossterm>
+<glossentry xml:id="gloss-output-path"><glossterm>output path</glossterm>
 
   <glossdef><para>A store path produced by a derivation.</para></glossdef>
 
 </glossentry>
 
 
-<glossentry id="gloss-deriver"><glossterm>deriver</glossterm>
+<glossentry xml:id="gloss-deriver"><glossterm>deriver</glossterm>
 
   <glossdef><para>The deriver of an <link
   linkend="gloss-output-path">output path</link> is the store
@@ -124,7 +128,7 @@
 </glossentry>
 
 
-<glossentry id="gloss-validity"><glossterm>validity</glossterm>
+<glossentry xml:id="gloss-validity"><glossterm>validity</glossterm>
 
   <glossdef><para>A store path is considered
   <emphasis>valid</emphasis> if it exists in the file system, is
@@ -134,7 +138,7 @@
 </glossentry>
 
 
-<glossentry id="gloss-user-env"><glossterm>user environment</glossterm>
+<glossentry xml:id="gloss-user-env"><glossterm>user environment</glossterm>
 
   <glossdef><para>An automatically generated store object that
   consists of a set of symlinks to “active” applications, i.e., other
@@ -147,7 +151,7 @@
 </glossentry>
 
 
-<glossentry id="gloss-profile"><glossterm>profile</glossterm>
+<glossentry xml:id="gloss-profile"><glossterm>profile</glossterm>
 
   <glossdef><para>A symlink to the current <link
   linkend="gloss-user-env">user environment</link> of a user, e.g.,

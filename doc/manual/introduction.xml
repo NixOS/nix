@@ -1,4 +1,7 @@
-<chapter><title>Introduction</title>
+<chapter xmlns="http://docbook.org/ns/docbook"
+         xmlns:xlink="http://www.w3.org/1999/xlink">
+
+<title>Introduction</title>
 
 <!--
 <epigraph><para><quote>The number of Nix installations in the world
@@ -131,23 +134,22 @@ up a Nix-based build farm, and doing service deployment using
 Nix.</para>
 
 <note><para>Some background information on Nix can be found in a
-number of papers.  The ICSE 2004 paper <ulink
-url='http://www.cs.uu.nl/~eelco/pubs/immdsd-icse2004-final.pdf'><citetitle>Imposing
-a Memory Management Discipline on Software
-Deployment</citetitle></ulink> discusses the hashing mechanism used to
-ensure reliable dependency identification and non-interference between
-different versions and variants of packages.  The LISA 2004 paper
-<ulink
-url='http://www.cs.uu.nl/~eelco/pubs/nspfssd-lisa2004-final.pdf'><citetitle>Nix:
-A Safe and Policy-Free System for Software
-Deployment</citetitle></ulink> gives a more general discussion of Nix
-from a system-administration perspective.  The CBSE 2005 paper <ulink
-url='http://www.cs.uu.nl/~eelco/pubs/eupfcdm-cbse2005-final.pdf'><citetitle>Efficient
+number of papers.  The ICSE 2004 paper <citetitle
+xlink:href='http://www.cs.uu.nl/~eelco/pubs/immdsd-icse2004-final.pdf'>Imposing
+a Memory Management Discipline on Software Deployment</citetitle>
+discusses the hashing mechanism used to ensure reliable dependency
+identification and non-interference between different versions and
+variants of packages.  The LISA 2004 paper <citetitle
+xlink:href='http://www.cs.uu.nl/~eelco/pubs/nspfssd-lisa2004-final.pdf'>Nix:
+A Safe and Policy-Free System for Software Deployment</citetitle>
+gives a more general discussion of Nix from a system-administration
+perspective.  The CBSE 2005 paper <citetitle
+xlink:href='http://www.cs.uu.nl/~eelco/pubs/eupfcdm-cbse2005-final.pdf'>Efficient
 Upgrading in a Purely Functional Component Deployment Model
-</citetitle></ulink> is about transparent patch deployment in Nix.
-Finally, the SCM-12 paper <ulink
-url='http://www.cs.uu.nl/~eelco/pubs/servicecm-scm12-final.pdf'>
-Service Configuration Management</ulink> shows how services (e.g., web
-servers) can be deployed and managed through Nix.</para></note>
+</citetitle> is about transparent patch deployment in Nix.  Finally,
+the SCM-12 paper <citetitle
+xlink:href='http://www.cs.uu.nl/~eelco/pubs/servicecm-scm12-final.pdf'>
+Service Configuration Management</citetitle> shows how services (e.g.,
+web servers) can be deployed and managed through Nix.</para></note>
 
 </chapter>

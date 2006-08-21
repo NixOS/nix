@@ -1,4 +1,5 @@
-<refentry>
+<refentry xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink">
   
 <refnamediv>
   <refname>nix-env</refname>
@@ -172,7 +173,7 @@ linkend="sec-common-options" />.</para>
 
 <!--######################################################################-->
 
-<refsection id="rsec-nix-env-install"><title>Operation <option>--install</option></title>
+<refsection xml:id="rsec-nix-env-install"><title>Operation <option>--install</option></title>
 
 <refsection><title>Synopsis</title>
 
@@ -725,7 +726,7 @@ $ nix-env -qas <lineannotation>(show status of available derivations)</lineannot
 IP- ORBit2-2.8.3    <lineannotation>(installed and by definition present)</lineannotation>
 ...
 
-$ nix-env -f ./foo.nix -qa <lineannotation>(show available derivations in the Nix expression <filename>foo.nix</filename>)</lineannotation>
+$ nix-env -f ./foo.nix -qa <lineannotation>(show available derivations in the Nix expression <!-- !!! <filename>-->foo.nix<!-- </filename> -->)</lineannotation>
 foo-1.2.3
 
 $ nix-env -qc <lineannotation>(compare installed versions to what’s available)</lineannotation>

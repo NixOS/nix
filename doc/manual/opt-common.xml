@@ -1,4 +1,7 @@
-<sect1 id="sec-common-options"><title>Common options</title>
+<section xmlns="http://docbook.org/ns/docbook" xml:id="sec-common-options">
+
+<title>Common options</title>
+
 
 <para>Most Nix commands accept the following command-line options:</para>
 
@@ -86,7 +89,7 @@
 </varlistentry>
 
 
-<varlistentry id="opt-max-jobs"><term><option>--max-jobs</option></term>
+<varlistentry xml:id="opt-max-jobs"><term><option>--max-jobs</option></term>
   <term><option>-j</option></term>
 
   <listitem><para>Sets the maximum number of build jobs that Nix will
@@ -155,7 +158,7 @@
 </varlistentry>
 
 
-<varlistentry id="opt-log-type"><term><option>--log-type</option>
+<varlistentry xml:id="opt-log-type"><term><option>--log-type</option>
 <replaceable>type</replaceable></term>
 
   <listitem>
@@ -213,4 +216,4 @@
 </variablelist>
 
 
-</sect1>
+</section>

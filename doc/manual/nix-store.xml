@@ -1,4 +1,5 @@
-<refentry>
+<refentry xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink">
 
 <refnamediv>
   <refname>nix-store</refname>
@@ -43,7 +44,7 @@ linkend="sec-common-options" /> for a list of common options.</para>
 
 <variablelist>
 
-  <varlistentry id="opt-add-root"><term><option>--add-root</option> <replaceable>path</replaceable></term>
+  <varlistentry xml:id="opt-add-root"><term><option>--add-root</option> <replaceable>path</replaceable></term>
 
     <listitem><para>Causes the result of a realisation
     (<option>--realise</option> and <option>--force-realise</option>)
@@ -108,7 +109,7 @@ lrwxrwxrwx    1 ... 2005-03-13 21:10 /home/eelco/bla/result -> /nix/store/1r1134
 
 <!--######################################################################-->
 
-<refsection id='rsec-nix-store-realise'><title>Operation
+<refsection xml:id='rsec-nix-store-realise'><title>Operation
 <option>--realise</option></title>
 
 <refsection><title>Synopsis</title>
@@ -183,7 +184,7 @@ linkend="sec-nix-build"><command>nix-build</command></link> does.</para>
 
 <!--######################################################################-->
 
-<refsection id='rsec-nix-store-gc'><title>Operation <option>--gc</option></title>
+<refsection xml:id='rsec-nix-store-gc'><title>Operation <option>--gc</option></title>
 
 <refsection><title>Synopsis</title>
 
@@ -353,7 +354,7 @@ query is applied to the target of the symlink.</para>
 </refsection>
     
 
-<refsection id='nixref-queries'><title>Queries</title>
+<refsection xml:id='nixref-queries'><title>Queries</title>
             
 <variablelist>
 
@@ -448,11 +449,11 @@ query is applied to the target of the symlink.</para>
   
     <listitem><para>Prints the references graph of the store paths
     <replaceable>paths</replaceable> in the format of the
-    <command>dot</command> tool of AT&amp;T's <ulink
-    url="http://www.graphviz.org/">Graphviz package</ulink>.  This can
-    be used to visualise dependency graphs.  To obtain a build-time
-    dependency graph, apply this to a store derivation.  To obtain a
-    runtime dependency graph, apply it to an output
+    <command>dot</command> tool of AT&amp;T's <link
+    xlink:href="http://www.graphviz.org/">Graphviz package</link>.
+    This can be used to visualise dependency graphs.  To obtain a
+    build-time dependency graph, apply this to a store derivation.  To
+    obtain a runtime dependency graph, apply it to an output
     path.</para></listitem>
 
   </varlistentry>
@@ -575,7 +576,7 @@ $ gv graph.ps</screen>
 <!--######################################################################-->
 
 <!--
-<refsection id="rsec-nix-store-reg-val"><title>Operation <option>-XXX-register-validity</option></title>
+<refsection xml:id="rsec-nix-store-reg-val"><title>Operation <option>-XXX-register-validity</option></title>
 
 <refsection><title>Synopsis</title>
 

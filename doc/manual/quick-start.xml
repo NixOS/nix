@@ -1,4 +1,8 @@
-<chapter><title>Quick Start</title>
+<chapter xmlns="http://docbook.org/ns/docbook"
+         xmlns:xlink="http://www.w3.org/1999/xlink">
+
+<title>Quick Start</title>
+
 
 <para>This chapter is for impatient people who don't like reading
 documentation.  For more in-depth information you are kindly referred
@@ -6,8 +10,8 @@ to the following chapters.</para>
 
 <orderedlist>
 
-<listitem><para>Download a source tarball or RPM from <ulink
-url='http://www.cs.uu.nl/groups/ST/Trace/Nix'/>.  Build source
+<listitem><para>Download a source tarball or RPM from <link
+xlink:href='http://www.cs.uu.nl/groups/ST/Trace/Nix'/>.  Build source
 distributions using the regular sequence:
         
 <screen>

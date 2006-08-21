@@ -1,4 +1,9 @@
-<chapter id='chap-writing-nix-expressions'><title>Writing Nix Expressions</title>
+<chapter xmlns="http://docbook.org/ns/docbook"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xml:id='chap-writing-nix-expressions'>
+
+<title>Writing Nix Expressions</title>
+
 
 <para>This chapter shows you how to write Nix expressions, which are
 the things that tell Nix how to build components.  It starts with a
@@ -8,9 +13,9 @@ on to a more in-depth look at the Nix expression language.</para>
 
 <sect1><title>A simple Nix expression</title>
 
-<para>This section shows how to add and test the <ulink
-url='http://www.gnu.org/software/hello/hello.html'>GNU Hello
-package</ulink> to the Nix Packages collection.  Hello is a program
+<para>This section shows how to add and test the <link
+xlink:href='http://www.gnu.org/software/hello/hello.html'>GNU Hello
+package</link> to the Nix Packages collection.  Hello is a program
 that prints out the text <quote>Hello, world!</quote>.</para>
 
 <para>To add a component to the Nix Packages collection, you generally
@@ -44,19 +49,19 @@ need to do three things:
 
 <sect2><title>The Nix expression</title>
 
-<example id='ex-hello-nix'><title>Nix expression for GNU Hello
+<example xml:id='ex-hello-nix'><title>Nix expression for GNU Hello
 (<filename>default.nix</filename>)</title>
 <programlisting>
-{stdenv, fetchurl, perl}: <co id='ex-hello-nix-co-1' />
+{stdenv, fetchurl, perl}: <co xml:id='ex-hello-nix-co-1' />
 
-stdenv.mkDerivation { <co id='ex-hello-nix-co-2' />
-  name = "hello-2.1.1"; <co id='ex-hello-nix-co-3' />
-  builder = ./builder.sh; <co id='ex-hello-nix-co-4' />
-  src = fetchurl { <co id='ex-hello-nix-co-5' />
+stdenv.mkDerivation { <co xml:id='ex-hello-nix-co-2' />
+  name = "hello-2.1.1"; <co xml:id='ex-hello-nix-co-3' />
+  builder = ./builder.sh; <co xml:id='ex-hello-nix-co-4' />
+  src = fetchurl { <co xml:id='ex-hello-nix-co-5' />
     url = ftp://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz;
     md5 = "70c9ccf9fac07f762c24f2df2290784d";
   };
-  inherit perl; <co id='ex-hello-nix-co-6' />
+  inherit perl; <co xml:id='ex-hello-nix-co-6' />
 }</programlisting>
 </example>
 
@@ -188,17 +193,17 @@ perl = perl;</programlisting>
 
 <sect2><title>The builder</title>
 
-<example id='ex-hello-builder'><title>Build script for GNU Hello
+<example xml:id='ex-hello-builder'><title>Build script for GNU Hello
 (<filename>builder.sh</filename>)</title>
 <programlisting>
-source $stdenv/setup <co id='ex-hello-builder-co-1' />
+source $stdenv/setup <co xml:id='ex-hello-builder-co-1' />
 
-PATH=$perl/bin:$PATH <co id='ex-hello-builder-co-2' />
+PATH=$perl/bin:$PATH <co xml:id='ex-hello-builder-co-2' />
 
-tar xvfz $src <co id='ex-hello-builder-co-3' />
+tar xvfz $src <co xml:id='ex-hello-builder-co-3' />
 cd hello-*
-./configure --prefix=$out <co id='ex-hello-builder-co-4' />
-make <co id='ex-hello-builder-co-5' />
+./configure --prefix=$out <co xml:id='ex-hello-builder-co-4' />
+make <co xml:id='ex-hello-builder-co-5' />
 make install</programlisting>
 </example>
 
@@ -303,18 +308,18 @@ error check.</para>
 
 <sect2><title>Composition</title>
 
-<example id='ex-hello-composition'><title>Composing GNU Hello
+<example xml:id='ex-hello-composition'><title>Composing GNU Hello
 (<filename>all-packages-generic.nix</filename>)</title>
 <programlisting>
 ...
 
-rec { <co id='ex-hello-composition-co-1' />
+rec { <co xml:id='ex-hello-composition-co-1' />
   
-  hello = (import ../applications/misc/hello/ex-1 <co id='ex-hello-composition-co-2' />) { <co id='ex-hello-composition-co-3' />
+  hello = (import ../applications/misc/hello/ex-1 <co xml:id='ex-hello-composition-co-2' />) { <co xml:id='ex-hello-composition-co-3' />
     inherit fetchurl stdenv perl;
   };
 
-  perl = (import ../development/interpreters/perl) { <co id='ex-hello-composition-co-4' />
+  perl = (import ../development/interpreters/perl) { <co xml:id='ex-hello-composition-co-4' />
     inherit fetchurl stdenv;
   };
 
@@ -519,14 +524,14 @@ functions that automate the build process.  A builder using the
 generic build facilities in shown in <xref linkend='ex-hello-builder2'
 />.</para>
 
-<example id='ex-hello-builder2'><title>Build script using the generic
+<example xml:id='ex-hello-builder2'><title>Build script using the generic
 build functions</title>
 <programlisting>
-buildInputs="$perl" <co id='ex-hello-builder2-co-1' />
+buildInputs="$perl" <co xml:id='ex-hello-builder2-co-1' />
 
-source $stdenv/setup <co id='ex-hello-builder2-co-2' />
+source $stdenv/setup <co xml:id='ex-hello-builder2-co-2' />
 
-genericBuild <co id='ex-hello-builder2-co-3' /></programlisting>
+genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
 </example>
 
 <calloutlist>
@@ -619,8 +624,8 @@ language.</para>
   <literal>123</literal>.</para></listitem>
 
   <listitem><para><emphasis>URIs</emphasis> as defined in appendix B
-  of <ulink url='http://www.ietf.org/rfc/rfc2396.txt'>RFC
-  2396</ulink>, e.g.,
+  of <link xlink:href='http://www.ietf.org/rfc/rfc2396.txt'>RFC
+  2396</link>, e.g.,
   <literal>https://svn.cs.uu.nl:12443/dist/trace/trace-nix-trunk.tar.bz2</literal>.</para></listitem>
 
   <listitem><para><emphasis>Paths</emphasis>, e.g.,
@@ -818,7 +823,7 @@ set.</para>
 </simplesect>
 
 
-<simplesect id="ss-functions"><title>Functions</title>
+<simplesect xml:id="ss-functions"><title>Functions</title>
 
 <para>Functions have the following form:
 
@@ -903,7 +908,7 @@ evaluate to a boolean value.  If it evaluates to
 <literal>true</literal>, <replaceable>e2</replaceable> is returned;
 otherwise expression evaluation is aborted and a backtrace is printed.</para>
 
-<example id='ex-subversion-nix'><title>Nix expression for Subversion</title>
+<example xml:id='ex-subversion-nix'><title>Nix expression for Subversion</title>
 <programlisting>
 { localServer ? false
 , httpServer ? false
@@ -915,9 +920,9 @@ otherwise expression evaluation is aborted and a backtrace is printed.</para>
 , openssl ? null, httpd ? null, db4 ? null, expat, swig ? null, j2sdk ? null
 }:
 
-assert localServer -> db4 != null; <co id='ex-subversion-nix-co-1' />
-assert httpServer -> httpd != null &amp;&amp; httpd.expat == expat; <co id='ex-subversion-nix-co-2' />
-assert sslSupport -> openssl != null &amp;&amp; (httpServer -> httpd.openssl == openssl); <co id='ex-subversion-nix-co-3' />
+assert localServer -> db4 != null; <co xml:id='ex-subversion-nix-co-1' />
+assert httpServer -> httpd != null &amp;&amp; httpd.expat == expat; <co xml:id='ex-subversion-nix-co-2' />
+assert sslSupport -> openssl != null &amp;&amp; (httpServer -> httpd.openssl == openssl); <co xml:id='ex-subversion-nix-co-3' />
 assert pythonBindings -> swig != null &amp;&amp; swig.pythonSupport;
 assert javaSwigBindings -> swig != null &amp;&amp; swig.javaSupport;
 assert javahlBindings -> j2sdk != null;
@@ -925,7 +930,7 @@ assert javahlBindings -> j2sdk != null;
 stdenv.mkDerivation {
   name = "subversion-1.1.1";
   ...
-  openssl = if sslSupport then openssl else null; <co id='ex-subversion-nix-co-4' />
+  openssl = if sslSupport then openssl else null; <co xml:id='ex-subversion-nix-co-4' />
   ...
 }</programlisting>
 </example>
@@ -1019,7 +1024,7 @@ locally in a <literal>rec</literal>-expression.</para>
 Nix expression language, in order of precedence (from strongest to
 weakest binding).</para>
 
-<table id='table-operators'>
+<table xml:id='table-operators'>
   <title>Operators</title>
   <tgroup cols='3'>
     <thead>
@@ -1109,7 +1114,7 @@ weakest binding).</para>
 </simplesect>
 
 
-<simplesect id="ssec-derivation"><title>Derivations</title>
+<simplesect xml:id="ssec-derivation"><title>Derivations</title>
 
 <para>The most important built-in function is
 <function>derivation</function>, which is used to describe a
@@ -1118,7 +1123,7 @@ set, the attributes of which specify the inputs of the build.</para>
 
 <itemizedlist>
 
-  <listitem id="attr-system"><para>There must be an attribute named
+  <listitem xml:id="attr-system"><para>There must be an attribute named
   <varname>system</varname> whose value must be a string specifying a
   Nix platform identifier, such as <literal>"i686-linux"</literal> or
   <literal>"powerpc-darwin"</literal><footnote><para>To figure out
@@ -1297,7 +1302,7 @@ character, or inline/multi-line, enclosed within <literal>/*
 
 
 
-<sect1 id='sec-standard-environment'><title>The standard environment</title>
+<sect1 xml:id='sec-standard-environment'><title>The standard environment</title>
 
 <para>The standard build environment in the Nix Packages collection
 provides a basic environment for building Unix packages.  It consists

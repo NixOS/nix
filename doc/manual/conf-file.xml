@@ -1,4 +1,9 @@
-<sect1 id="sec-conf-file"><title>Nix configuration file</title>
+<section xmlns="http://docbook.org/ns/docbook"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xml:id="sec-conf-file">
+
+<title>Nix configuration file</title>
+
 
 <para>A number of persistent settings of Nix are stored in the file
 <filename><replaceable>prefix</replaceable>/etc/nix/nix.conf</filename>.
@@ -7,7 +12,7 @@ This file is a list of <literal><replaceable>name</replaceable> =
 Comments start with a <literal>#</literal> character.  An example
 configuration file is shown in <xref linkend="ex-nix-conf" />.</para>
 
-<example id='ex-nix-conf'><title>Nix configuration file</title>
+<example xml:id='ex-nix-conf'><title>Nix configuration file</title>
 
 <programlisting>
 gc-keep-outputs = true       # Nice for developers
@@ -20,7 +25,7 @@ env-keep-derivations = false
 
 <variablelist>
 
-  <varlistentry id="conf-gc-keep-outputs"><term><literal>gc-keep-outputs</literal></term>
+  <varlistentry xml:id="conf-gc-keep-outputs"><term><literal>gc-keep-outputs</literal></term>
 
     <listitem><para>If <literal>true</literal>, the garbage collector
     will keep the outputs of non-garbage derivations.  If
@@ -36,7 +41,7 @@ env-keep-derivations = false
 
   </varlistentry>
 
-  <varlistentry id="conf-gc-keep-derivations"><term><literal>gc-keep-derivations</literal></term>
+  <varlistentry xml:id="conf-gc-keep-derivations"><term><literal>gc-keep-derivations</literal></term>
 
     <listitem><para>If <literal>true</literal> (default), the garbage
     collector will keep the derivations from which non-garbage store
@@ -52,7 +57,7 @@ env-keep-derivations = false
 
   </varlistentry>
 
-  <varlistentry id="conf-gc-reserved-space"><term><literal>gc-reserved-space</literal></term>
+  <varlistentry xml:id="conf-gc-reserved-space"><term><literal>gc-reserved-space</literal></term>
 
     <listitem><para>This option specifies how much space should be
     reserved in normal use so that the garbage collector can run
@@ -99,4 +104,5 @@ env-keep-derivations = false
 
 </para>
 
-</sect1>
+
+</section>

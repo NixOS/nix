@@ -1,4 +1,9 @@
-<chapter id='chap-package-management'><title>Package Management</title>
+<chapter xmlns="http://docbook.org/ns/docbook"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xml:id='chap-package-management'>
+
+<title>Package Management</title>
+
 
 <para>This chapter discusses how to do package management with Nix,
 i.e., how to obtain, install, upgrade, and erase components.  This is
@@ -7,7 +12,7 @@ who want to <emphasis>create</emphasis> components should consult
 <xref linkend='chap-writing-nix-expressions' />.</para>
 
 
-<sect1><title>Basic package management</title>
+<section><title>Basic package management</title>
 
 <para>The main command for package management is <link
 linkend="sec-nix-env"><command>nix-env</command></link>.  You can use
@@ -32,8 +37,8 @@ components ranging from basic development stuff such as GCC and Glibc,
 to end-user applications like Mozilla Firefox.  (Nix is however not
 tied to the Nix Package collection; you could write your own Nix
 expressions based on it, or completely new ones.)  You can download
-the latest version from <ulink url='http://nix.cs.uu.nl/dist/nix'
-/>.</para>
+the latest version from <link
+xlink:href='http://nix.cs.uu.nl/dist/nix' />.</para>
 
 <para>Assuming that you have downloaded and unpacked a release of Nix
 Packages, you can view the set of available components in the release:
@@ -83,9 +88,9 @@ components contained in them.  This is done using <literal>nix-env
 $ nix-env -f nixpkgs-<replaceable>version</replaceable> -i subversion</screen>
 
 will install the component called <literal>subversion</literal> (which
-is, of course, the <ulink
-url='http://subversion.tigris.org/'>Subversion version management
-system</ulink>).</para>
+is, of course, the <link
+xlink:href='http://subversion.tigris.org/'>Subversion version
+management system</link>).</para>
 
 <para>When you do this for the first time, Nix will start building
 Subversion and all its dependencies.  This will take quite a while —
@@ -96,8 +101,8 @@ available somewhere.  This is done using the
 <command>nix-pull</command> command, which must be supplied with a URL
 containing a <emphasis>manifest</emphasis> describing what binaries
 are available.  This URL should correspond to the Nix Packages release
-that you’re using.  For instance, if you obtained a release from
-<ulink url='http://nix.cs.uu.nl/dist/nix/nixpkgs-0.6pre1554/' />, then
+that you’re using.  For instance, if you obtained a release from <link
+xlink:href='http://nix.cs.uu.nl/dist/nix/nixpkgs-0.6pre1554/' />, then
 you should do:
 
 <screen>
@@ -105,8 +110,8 @@ $ nix-pull http://nix.cs.uu.nl/dist/nix/nixpkgs-0.6pre1554/MANIFEST</screen>
 
 If you then issue the installation command, it should start
 downloading binaries from <systemitem
-class='fqdomainname'>nix.cs.uu.nl</systemitem>, instead of
-building them from source.  This might still take a while since all
+class='fqdomainname'>nix.cs.uu.nl</systemitem>, instead of building
+them from source.  This might still take a while since all
 dependencies must be downloaded, but on a reasonably fast connection
 such as an DSL line it’s on the order of a few minutes.</para>
 
@@ -169,10 +174,10 @@ since <literal>nix-channel --update</literal> calls <literal>nix-env
 from the channel, replacing whatever default you had
 set.</para></footnote></para>
 
-</sect1>
+</section>
 
 
-<sect1 id="sec-profiles"><title>Profiles</title>
+<section xml:id="sec-profiles"><title>Profiles</title>
 
 <para>Profiles and user environments are Nix’s mechanism for
 implementing the ability to allow different users to have different
@@ -195,7 +200,7 @@ the file system, so they don’t interfere with each other.  <xref
 linkend='fig-user-environments' /> shows a part of a typical Nix
 store.</para>
 
-<figure id='fig-user-environments'><title>User environments</title>
+<figure xml:id='fig-user-environments'><title>User environments</title>
   <mediaobject>
     <imageobject>
       <imagedata fileref='figures/user-environments.png' format='PNG' />
@@ -324,10 +329,10 @@ $ nix-env -p /nix/var/nix/profiles/other-profile -i subversion</screen>
 This will <emphasis>not</emphasis> change the
 <command>~/.nix-profile</command> symlink.</para>
 
-</sect1>
+</section>
 
 
-<sect1 id='sec-garbage-collection'><title>Garbage collection</title>
+<section xml:id='sec-garbage-collection'><title>Garbage collection</title>
 
 <para><command>nix-env</command> operations such as upgrades
 (<option>-u</option>) and uninstall (<option>-e</option>) never
@@ -378,7 +383,7 @@ Likewise, the option <option>--print-live</option> will show the paths
 that <emphasis>won’t</emphasis> be deleted.</para>
 
 
-<sect2 id="ssec-gc-roots"><title>Garbage collector roots</title>
+<section xml:id="ssec-gc-roots"><title>Garbage collector roots</title>
 
 <para>The roots of the garbage collector are all store paths to which
 there are symlinks in the directory
@@ -400,12 +405,12 @@ followed and searched for roots, but symlinks to non-store paths
 <emphasis>inside</emphasis> the paths reached in that way are not
 followed to prevent infinite recursion.</para>
 
-</sect2>
+</section>
 
-</sect1>
+</section>
 
 
-<sect1 id="sec-channels"><title>Channels</title>
+<section xml:id="sec-channels"><title>Channels</title>
 
 <para>If you want to stay up to date with a set of packages, it’s not
 very convenient to manually download the latest set of Nix expressions
@@ -455,7 +460,7 @@ $ nix-env -u '*'</screen>
 to upgrade all components in your profile to the latest versions
 available in the subscribed channels.</para>
 
-</sect1>
+</section>
 
 
 </chapter>

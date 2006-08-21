@@ -1,4 +1,8 @@
-<appendix><title>Bugs / To-Do</title>
+<appendix xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink">
+
+<title>Bugs / To-Do</title>
+
 
 <itemizedlist>
 
@@ -15,11 +19,12 @@ implemented; generations form a linear sequence.</para></listitem>
 is already possible to do build management using Nix (by writing
 builders that perform appropriate build steps), but the Nix expression
 language is not yet powerful enough to make this pleasant (?).  The
-language should be extended with features from the <ulink
-url='http://www.cs.uu.nl/~eelco/maak/'>Maak build manager</ulink>.
-Another interesting idea is to write a <command>make</command>
-implementation that uses Nix as a back-end to support <ulink
-url='http://www.research.att.com/~bs/bs_faq.html#legacy'>legacy</ulink>
+language should be extended with features from the <link
+xlink:href='http://www.cs.uu.nl/~eelco/maak/'>Maak build
+manager</link>.  Another interesting idea is to write a
+<command>make</command> implementation that uses Nix as a back-end to
+support <link
+xlink:href='http://www.research.att.com/~bs/bs_faq.html#legacy'>legacy</link>
 build files.</para></listitem>
 
 <listitem><para>For security, <command>nix-push</command> manifests

@@ -1,89 +1,89 @@
-<?xml version="1.0"?>
-<!DOCTYPE book
-    PUBLIC "-//OASIS//DTD DocBook XML V4.3//EN"
-    "http://www.docbook.org/xml/4.3/docbook-xml-4.3.zip"
-[
-]>
+<book xmlns="http://docbook.org/ns/docbook"
+      xmlns:xi="http://www.w3.org/2001/XInclude">
 
-<book>
-  <title>Nix User's Guide</title>
+  <info>
 
-  <subtitle>Draft (Version <xi:include
-  xmlns:xi="http://www.w3.org/2001/XInclude"
-  href="version.txt" parse="text" />)</subtitle>
-  
-  <bookinfo>
+    <title>Nix User's Guide</title>
+
+    <subtitle>Draft (Version <xi:include href="version.txt"
+    parse="text" />)</subtitle>
+
     <author>
-      <firstname>Eelco</firstname>
-      <surname>Dolstra</surname>
+      <personname>
+        <firstname>Eelco</firstname>
+        <surname>Dolstra</surname>
+      </personname>
     </author>
+
     <copyright>
       <year>2004</year>
       <year>2005</year>
       <year>2006</year>
       <holder>Eelco Dolstra</holder>
     </copyright>
-  </bookinfo>
+    
+  </info>
+
   
-  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="introduction.xml" />
-  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="quick-start.xml" />
-  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="installation.xml" />
-  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="package-management.xml" />
-  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="writing-nix-expressions.xml" />
-  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="build-farm.xml" />
+  <xi:include href="introduction.xml" />
+  <xi:include href="quick-start.xml" />
+  <xi:include href="installation.xml" />
+  <xi:include href="package-management.xml" />
+  <xi:include href="writing-nix-expressions.xml" />
+  <xi:include href="build-farm.xml" />
+
 
   <appendix>
     <title>Command Reference</title>
-    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common.xml" />
-    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="env-common.xml" />
-    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="conf-file.xml" />
-    <sect1 id="sec-nix-env">
+    <xi:include href="opt-common.xml" />
+    <xi:include href="env-common.xml" />
+    <xi:include href="conf-file.xml" />
+    <section xml:id="sec-nix-env">
       <title>nix-env</title>
-      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-env.xml" />
-    </sect1>
-    <sect1 id="sec-nix-build">
+      <xi:include href="nix-env.xml" />
+    </section>
+    <section xml:id="sec-nix-build">
       <title>nix-build</title>
-      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-build.xml" />
-    </sect1>
-    <sect1>
+      <xi:include href="nix-build.xml" />
+    </section>
+    <section>
       <title>nix-store</title>
-      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-store.xml" />
-    </sect1>
-    <sect1 id="sec-nix-instantiate">
+      <xi:include href="nix-store.xml" />
+    </section>
+    <section xml:id="sec-nix-instantiate">
       <title>nix-instantiate</title>
-      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-instantiate.xml" />
-    </sect1>
-    <sect1>
+      <xi:include href="nix-instantiate.xml" />
+    </section>
+    <section>
       <title>nix-collect-garbage</title>
-      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-collect-garbage.xml" />
-    </sect1>
-    <sect1 id="sec-nix-channel">
+      <xi:include href="nix-collect-garbage.xml" />
+    </section>
+    <section xml:id="sec-nix-channel">
       <title>nix-channel</title>
-      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-channel.xml" />
-    </sect1>
-    <sect1>
+      <xi:include href="nix-channel.xml" />
+    </section>
+    <section>
       <title>nix-push</title>
-      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-push.xml" />
-    </sect1>
-    <sect1>
+      <xi:include href="nix-push.xml" />
+    </section>
+    <section>
       <title>nix-pull</title>
-      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-pull.xml" />
-    </sect1>
-    <sect1>
+      <xi:include href="nix-pull.xml" />
+    </section>
+    <section>
       <title>nix-prefetch-url</title>
-      <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="nix-prefetch-url.xml" />
-    </sect1>
+      <xi:include href="nix-prefetch-url.xml" />
+    </section>
   </appendix>
 
-  <!--  &nix-lang-ref; -->
-
-  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="troubleshooting.xml" />
-  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="bugs.xml" />
-  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="glossary.xml" />
+  <xi:include href="troubleshooting.xml" />
+  <xi:include href="bugs.xml" />
+  <xi:include href="glossary.xml" />
 
   <appendix>
-    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="release-notes.xml"
-                xpointer="xpointer(article/*)" />
+    <title>Nix Release Notes</title>
+    <xi:include href="release-notes.xml"
+                xpointer="xmlns(x=http://docbook.org/ns/docbook)xpointer(x:article/x:section)" />
   </appendix>
     
 </book>

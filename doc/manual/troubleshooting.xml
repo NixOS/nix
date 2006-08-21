@@ -1,4 +1,8 @@
-<appendix><title>Troubleshooting</title>
+<appendix xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink">
+
+<title>Troubleshooting</title>
+
 
 <para>This section provides solutions for some common problems.</para>
 

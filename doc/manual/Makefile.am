@@ -1,7 +1,5 @@
-ENV = SGML_CATALOG_FILES=$(docbookcatalog)
-
-XMLLINT = $(ENV) $(xmllint) $(xmlflags) --catalogs
-XSLTPROC = $(ENV) $(xsltproc) $(xmlflags) --catalogs \
+XMLLINT = $(xmllint) $(xmlflags)
+XSLTPROC = $(xsltproc) $(xmlflags) \
  --param section.autolabel 1 \
  --param section.label.includes.component.label 1 \
  --param html.stylesheet \'style.css\' \
@@ -24,7 +22,12 @@ MANUAL_SRCS = manual.xml introduction.xml installation.xml \
  style.css images
 
 manual.is-valid: $(MANUAL_SRCS) version.txt
-	$(XMLLINT) --xinclude $< | $(XMLLINT) --noout --nonet --valid -
+#	$(XMLLINT) --xinclude $< | $(XMLLINT) --noout --nonet --relaxng $(docbookrng)/docbook.rng -
+	if test "$(jing)" != "false"; then \
+		$(XMLLINT) --xinclude $< | $(jing) $(docbookrng)/docbook.rng /dev/stdin; \
+	else \
+		echo "Not validating."; \
+	fi
 	touch $@
 
 version.txt:

@@ -1,4 +1,9 @@
-<sect1 id="sec-common-env"><title>Common environment variables</title>
+<section xmlns="http://docbook.org/ns/docbook"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xml:id="sec-common-env">
+
+<title>Common environment variables</title>
+
 
 <para>Most Nix commands interpret the following environment variables:</para>
 
@@ -118,7 +123,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
-<varlistentry id="envar-build-hook"><term><envar>NIX_BUILD_HOOK</envar></term>
+<varlistentry xml:id="envar-build-hook"><term><envar>NIX_BUILD_HOOK</envar></term>
 
   <listitem>
 
@@ -271,4 +276,5 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
 </variablelist>
 
-</sect1>
+
+</section>

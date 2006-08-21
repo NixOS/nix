@@ -1,4 +1,5 @@
-<refentry>
+<refentry xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink">
 
 <refnamediv>
   <refname>nix-push</refname>
@@ -62,14 +63,15 @@ machines using the <command>nix-pull</command> command.</para>
   specified by <replaceable>archivesPutURL</replaceable>.  HTTP PUT
   requests are used to do this.  However, before a file
   <varname>x</varname> is uploaded to
-  <literal><replaceable>archivesPutURL</replaceable>/<varname>x</varname></literal>,
+  <literal><replaceable>archivesPutURL</replaceable>/</literal><varname>x</varname>,
   <command>nix-push</command> first determines whether this upload is
   unnecessary by issuing a HTTP HEAD request on
-  <literal><replaceable>archivesGetURL</replaceable>/<varname>x</varname></literal>.
+  <literal><replaceable>archivesGetURL</replaceable>/</literal><varname>x</varname>.
   This allows a cache to be shared between many partially overlapping
   <command>nix-push</command> invocations.  (We use two URLs because
   the upload URL typically refers to a CGI script, while the download
-  URL just refers to a file system directory on the server.)</para></listitem>
+  URL just refers to a file system directory on the
+  server.)</para></listitem>
 
   <listitem><para>The manifest is uploaded using an HTTP PUT request
   to <replaceable>manifestPutURL</replaceable>.  The corresponding

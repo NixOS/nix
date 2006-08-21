@@ -1,33 +1,38 @@
-<chapter id='chap-installation'><title>Installation</title>
+<?xml version="1.0" encoding="utf-8"?>
+<chapter xmlns="http://docbook.org/ns/docbook"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xml:id="chap-installation">
+
+<title>Installation</title>
 
 
-<sect1><title>Obtaining Nix</title>
+<section><info><title>Obtaining Nix</title></info>
 
-<para>The easiest way to obtain Nix is to download a <ulink
-url='http://www.cs.uu.nl/groups/ST/Trace/Nix'>source
-distribution</ulink>.  RPMs for Red Hat, SuSE, and Fedore Core are
+<para>The easiest way to obtain Nix is to download a <link xlink:href="http://www.cs.uu.nl/groups/ST/Trace/Nix">source
+distribution</link>.  RPMs for Red Hat, SuSE, and Fedore Core are
 also available.</para>
 
 <para>Alternatively, the most recent sources of Nix can be obtained
-from its <ulink
-url='https://svn.cs.uu.nl:12443/repos/trace/nix/trunk'>Subversion
-repository</ulink>.  For example, the following command will check out
-the latest revision into a directory called <filename>nix</filename>:</para>
+from its <link
+xlink:href="https://svn.cs.uu.nl:12443/repos/trace/nix/trunk">Subversion
+repository</link>.  For example, the following command will check out
+the latest revision into a directory called
+<filename>nix</filename>:</para>
 
 <screen>
 $ svn checkout https://svn.cs.uu.nl:12443/repos/trace/nix/trunk nix</screen>
 
-<para>Likewise, specific releases can be obtained from the <ulink
-url='https://svn.cs.uu.nl:12443/repos/trace/nix/tags'>tags
-directory</ulink> of the repository.  If you don't have Subversion,
-you can also download an automatically generated <ulink
-url='https://svn.cs.uu.nl:12443/dist/trace/'>compressed
-tar-file</ulink> of the head revision of the trunk.</para>
+<para>Likewise, specific releases can be obtained from the <link
+xlink:href="https://svn.cs.uu.nl:12443/repos/trace/nix/tags">tags
+directory</link> of the repository.  If you don't have Subversion, you
+can also download an automatically generated <link
+xlink:href="https://svn.cs.uu.nl:12443/dist/trace/">compressed
+tar-file</link> of the head revision of the trunk.</para>
 
-</sect1>
+</section>
 
 
-<sect1><title>Prerequisites</title>
+<section><info><title>Prerequisites</title></info>
 
 <para>The following prerequisites only apply when you build from
 source.  Binary releases (e.g., RPMs) have no prerequisites.</para>
@@ -39,10 +44,11 @@ and higher should work.</para>
 <command>xmllint</command> and <command>xsltproc</command> programs,
 which are part of the <literal>libxml2</literal> and
 <literal>libxslt</literal> packages, respectively.  You also need the
-<ulink url='http://docbook.sourceforge.net/projects/xsl/'>DocBook XSL
-stylesheets</ulink> and optionally the <ulink
-url='http://www.oasis-open.org/docbook/xml/4.2/docbook-xml-4.2.zip'>
-DocBook XML 4.2 DTD</ulink>.  Note that these are only required if you
+<link
+xlink:href="http://docbook.sourceforge.net/projects/xsl/">DocBook XSL
+stylesheets</link> and optionally the <link
+xlink:href="http://www.oasis-open.org/docbook/xml/4.2/docbook-xml-4.2.zip">
+DocBook XML 4.2 DTD</link>.  Note that these are only required if you
 modify the manual sources or when you are building from the Subversion
 repository.</para>
 
@@ -50,11 +56,11 @@ repository.</para>
 of Bison and Flex are required.  (This is because Nix needs GLR
 support in Bison and reentrancy support in Flex.)  For Bison, you need
 version 1.875c or higher (1.875 does <emphasis>not</emphasis> work),
-which can be obtained from the <ulink
-url='ftp://alpha.gnu.org/pub/gnu/bison'>GNU FTP server</ulink>.  For
-Flex, you need version 2.5.31, which is available on <ulink
-url='http://lex.sourceforge.net/'>SourceForge</ulink>.  Slightly older
-versions may also work, but ancient versions like the ubiquitous
+which can be obtained from the <link
+xlink:href="ftp://alpha.gnu.org/pub/gnu/bison">GNU FTP server</link>.
+For Flex, you need version 2.5.31, which is available on <link
+xlink:href="http://lex.sourceforge.net/">SourceForge</link>.  Slightly
+older versions may also work, but ancient versions like the ubiquitous
 2.5.4a won't.  Note that these are only required if you modify the
 parser or when you are building from the Subversion repository.</para>
 
@@ -69,10 +75,10 @@ and <option>--with-aterm</option> options to point to their respective
 locations.  Note that Berkeley DB <emphasis>must</emphasis> be version
 4.4; other versions may not have compatible database formats.</para>
 
-</sect1>
+</section>
 
 
-<sect1><title>Building Nix from source</title>
+<section><info><title>Building Nix from source</title></info>
 
 <para>After unpacking or checking out the Nix sources, issue the
 following commands:
@@ -110,17 +116,17 @@ and
 <option>--with-docbook-xsl=<replaceable>path</replaceable></option>
 options.</para>
 
-</sect1>
+</section>
 
 
-<sect1><title>Installing from RPMs</title>
+<section><info><title>Installing from RPMs</title></info>
 
-<para>RPM packages of Nix can be downloaded from <ulink
-url='http://www.cs.uu.nl/groups/ST/Trace/Nix' />.  These RPMs should
-work for most fairly recent releases of SuSE and Red Hat Linux.  They
-have been known to work work on SuSE Linux 8.1 and 9.0, and Red Hat
-9.0.  In fact, it should work on any RPM-based Linux distribution
-based on <literal>glibc</literal> 2.3 or later.</para>
+<para>RPM packages of Nix can be downloaded from <uri
+xlink:href="http://www.cs.uu.nl/groups/ST/Trace/Nix">http://www.cs.uu.nl/groups/ST/Trace/Nix</uri>.
+These RPMs should work for most fairly recent releases of SuSE and Red
+Hat Linux.  They have been known to work work on SuSE Linux 8.1 and
+9.0, and Red Hat 9.0.  In fact, it should work on any RPM-based Linux
+distribution based on <literal>glibc</literal> 2.3 or later.</para>
 
 <para>Once downloaded, the RPMs can be installed or upgraded using
 <command>rpm -U</command>.  For example,</para>
@@ -137,28 +143,27 @@ auxiliary data:</para>
 $ rm -rf /nix/store
 $ rm -rf /nix/var</screen>
 
-</sect1>
+</section>
 
 
-<sect1><title>Permissions</title>
+<section><info><title>Permissions</title></info>
 
 <para>All Nix operations must be performed under the user ID that owns
 the Nix store and database
 (<filename><replaceable>prefix</replaceable>/store</filename> and
 <filename><replaceable>prefix</replaceable>/var/nix/db</filename>,
 respectively).  When installed from the RPM packages, these
-directories are owned by <systemitem
-class='username'>root</systemitem>.</para>
+directories are owned by <systemitem class="username">root</systemitem>.</para>
 
-<sect2><title>Setuid installation</title>
+<section><info><title>Setuid installation</title></info>
 
 <para>As a somewhat <emphasis>ad hoc</emphasis> hack, you can also
 install the Nix binaries <quote>setuid</quote> so that a Nix store can
 be shared among several users.  To do this, configure Nix with the
 <emphasis>--enable-setuid</emphasis> option.  Nix will be installed as
 owned by a user and group specified by the
-<option>--with-nix-user=<parameter>user</parameter></option> and
-<option>--with-nix-group=<parameter>group</parameter></option>
+<option>--with-nix-user=</option><parameter>user</parameter> and
+<option>--with-nix-group=</option><parameter>group</parameter>
 options.  E.g.,
 
 <screen>
@@ -184,12 +189,12 @@ on systems that have the <function>setresuid()</function> system call
 (such as Linux and FreeBSD), so on those systems the binaries are
 simply owned by the Nix user.</para></warning>
 
-</sect2>
+</section>
 
-</sect1>
+</section>
 
 
-<sect1><title>Using Nix</title>
+<section><info><title>Using Nix</title></info>
 
 <para>To use Nix, some environment variables should be set.  In
 particular, <envar>PATH</envar> should contain the directories
@@ -206,7 +211,7 @@ in your <filename>~/.bashrc</filename> (or similar), like this:</para>
 <screen>
 source <replaceable>prefix</replaceable>/etc/profile.d/nix.sh</screen>
 
-</sect1>
+</section>
 
 
 </chapter>

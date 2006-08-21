@@ -1,4 +1,9 @@
-<chapter id='chap-build-farm'><title>Setting up a Build Farm</title>
+<chapter xmlns="http://docbook.org/ns/docbook"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xml:id='chap-build-farm'>
+
+<title>Setting up a Build Farm</title>
+
 
 <para>This chapter provides some sketchy information on how to set up
 a Nix-based build farm.  Nix is particularly suited as a basis for a
@@ -50,13 +55,13 @@ build farm, since:
 
 <para>TODO</para>
 
-<para>The sources of the Nix build farm are at <ulink
-url='https://svn.cs.uu.nl:12443/repos/trace/release/trunk' />.</para>
+<para>The sources of the Nix build farm are at <link
+xlink:href='https://svn.cs.uu.nl:12443/repos/trace/release/trunk'/>.</para>
 
 </section>
 
 
-<section id='sec-distributed-builds'><title>Setting up distributed builds</title>
+<section xml:id='sec-distributed-builds'><title>Setting up distributed builds</title>
 
 <para>You can enable distributed builds by setting the environment
 variable <envar>NIX_BUILD_HOOK</envar> to point to a program that Nix
@@ -70,7 +75,7 @@ the documentation of the <link
 linkend="envar-build-hook"><envar>NIX_BUILD_HOOK</envar>
 variable</link>.</para>
 
-<example id='ex-remote-systems'><title>Remote machine configuration:
+<example xml:id='ex-remote-systems'><title>Remote machine configuration:
 <filename>remote-systems.conf</filename></title>
 <programlisting>
 nix@mcflurry.labs.cs.uu.nl  powerpc-darwin  /home/nix/.ssh/id_quarterpounder_auto  2
@@ -79,8 +84,8 @@ nix@scratchy.labs.cs.uu.nl  i686-linux      /home/nix/.ssh/id_scratchy_auto     
 </example>
 
 <para>An example build hook can be found in the Nix build farm
-sources: <ulink
-url='https://svn.cs.uu.nl:12443/repos/trace/release/trunk/common/distributed/build-remote.pl'
+sources: <link
+xlink:href='https://svn.cs.uu.nl:12443/repos/trace/release/trunk/common/distributed/build-remote.pl'
 />.  It should be suitable for most purposes, with maybe some minor
 adjustments.  It uses <command>ssh</command> and
 <command>rsync</command> to copy the build inputs and outputs and
