@@ -1,4 +1,5 @@
-<article xmlns="http://docbook.org/ns/docbook">
+<article xmlns="http://docbook.org/ns/docbook"
+         xmlns:xlink="http://www.w3.org/1999/xlink">
 
 <title>Nix Release Notes</title>
 
@@ -36,6 +37,9 @@ irreversible.</para></warning>
   derivations, you need to specify
   <literal>\*</literal>.</para></listitem>
 
+  <listitem><para>Berkeley DB 4.4’s process registry feature is used
+  to recover from crashed Nix processes.</para></listitem>
+
   <!--  <listitem><para>TODO: shared stores.</para></listitem> -->
 
   <listitem><para>A performance issue has been fixed with the
@@ -52,27 +56,142 @@ irreversible.</para></warning>
   nix-store</literal> without triggering a database
   recovery.</para></listitem>
 
-  <listitem><para>Reference scanning (which happens after each build)
-  is much faster.</para></listitem>
 
-  <listitem><para>TODO: string interpolation</para></listitem>
+  <listitem><para>New language features:
 
-  <listitem><para>TODO: string concatenations involving
-  derivations</para></listitem>
+    <itemizedlist>
 
-  <listitem><para>TODO: function argument default values can refer to
-  other function arguments</para></listitem>
+      <listitem><para>Reference scanning (which happens after each
+      build) is much faster.</para></listitem>
+
+      <listitem><para>String interpolation.  Expressions like
+
+<programlisting>
+"--with-freetype2-library=" + freetype + "/lib"</programlisting>
+
+      can now be written as
+
+<programlisting>
+"--with-freetype2-library=${freetype}/lib"</programlisting>
+
+      You can write arbitrary expressions within
+      <literal>${<replaceable>...</replaceable>}</literal>, not just
+      identifiers.</para></listitem>
+      
+      <listitem><para>Multi-line string literals.</para></listitem>
+
+      <listitem><para>TODO: string concatenations involving
+      derivations.  Consequently, the subpath operator
+      (<literal>~</literal>) has been deprecated.</para></listitem>
+
+      <listitem><para>TODO: function argument default values can refer
+      to other function arguments</para></listitem>
+
+      <listitem><para>TODO: domain checks (r5895).</para></listitem>
+
+    </itemizedlist>
+
+  </para></listitem>
+    
+
+  <listitem><para>If the top-level Nix expression used by
+  <command>nix-env</command>, <command>nix-instantiate</command> or
+  <command>nix-build</command> evaluates to a function whose arguments
+  all have default values, the function will be called automatically.
+  Also, the new command-line switch <option>--arg
+  <replaceable>name</replaceable>
+  <replaceable>value</replaceable></option> can be used to specify
+  function arguments on the command line.</para></listitem>
 
   <listitem><para>TODO: proxy support.</para></listitem>
 
-  <listitem><para>TODO: nix-pack-closure and
-  nix-unpack-closure.</para></listitem>
+  <listitem><para>New commands <command>nix-pack-closure</command> and
+  <command>nix-unpack-closure</command> than can be used to easily
+  transfer a stire path with all its dependencies to another machine.
+  Very convenient whenever you have some package on your machine and
+  you want to copy it somewhere else.</para></listitem>
+
+  <listitem><para><command>bsdiff</command> updated
+  4.3.</para></listitem>
 
   <listitem><para>TODO: open files etc. are now used as roots of the
-  garbage collector.</para></listitem>
+  garbage collector (r5796).</para></listitem>
 
-  <listitem><para>TODO: --attr / -a flags in
-  nix-env/nix-instantiate/nix-build.</para></listitem>
+  <listitem><para>TODO: --attr / -A flags in
+  nix-env/nix-instantiate/nix-build.  Also nix-env -qa
+  --attr.</para></listitem>
+
+  <listitem><para><literal>nix-build -o
+  <replaceable>symlink</replaceable></literal> allows the symlink to
+  the build result to be named something other than
+  <literal>result</literal>.</para></listitem>
+
+  <listitem><para><literal>nix-store --gc</literal>
+  (a.k.a. <command>nix-collect-garbage</command>) prints out the
+  number of bytes freed on standard output.  <literal>nix-store --gc
+  --print-dead</literal> shows how many bytes would be freed by an
+  actual garbage collection.</para></listitem>
+
+  <listitem><para>New command <literal>nix-store --delete</literal> to
+  delete specific paths from the Nix store.  It won’t delete reachable
+  (non-garbage) paths unless <option>--ignore-liveness</option> is
+  specified.</para></listitem>
+
+  <listitem><para>Substantial performance improvements in expression
+  evaluation and <literal>nix-env -qa</literal>, all thanks to <link
+  xlink:href="http://valgrind.org/">Valgrind</link>.  Memory use has
+  been reduced by a factor 8 or so.  Big speedup by memoisation of
+  path hashing.</para></listitem>
+
+  <listitem><para>Lots of bug fixes, notably:
+
+    <itemizedlist>
+
+      <listitem><para>Make sure that the garbage collector can run
+      succesfully when the disk is full.</para></listitem>
+
+    </itemizedlist>
+
+  </para></listitem>
+
+  <listitem><para>TODO: XML support in <literal>nix-env -q
+  --xml</literal> and <literal>nix-instantiate --eval-only
+  --xml</literal>.</para></listitem>
+
+  <listitem><para><literal>nix-env -i
+  <replaceable>pkgname</replaceable></literal> will now install the
+  highest available version of <replaceable>pkgname</replaceable>,
+  rather than installing all available versions (which would probably
+  give collisions).</para></listitem>
+
+  <listitem><para><literal>nix-env (-i|-u) --dry-run</literal> now
+  shows exactly which missing paths will be built or
+  substituted.</para></listitem>
+
+  <listitem><para><literal>nix-env -qa --description</literal> shows
+  human-readable descriptions of packages, provided that they have a
+  <literal>meta.description</literal> attribute (which most packages
+  in Nixpkgs don’t have yet).</para></listitem>
+
+  <listitem><para>Nix source distributions are a lot smaller now since
+  we no longer include a full copy of the Berkeley DB source
+  distribution (but only the bits we need).</para></listitem>
+
+  <listitem><para>Support for 64-bit platforms, provided <link
+  xlink:href="http://bugzilla.sen.cwi.nl:8080/show_bug.cgi?id=606">suitably
+  patched ATerm library</link> is used.</para></listitem>
+
+  <listitem><para>Added support for Cygwin (Windows,
+  <literal>i686-cygwin</literal>) and Mac OS X on Intel
+  (<literal>i686-darwin</literal>).</para></listitem>
+
+  <listitem><para><command>nix-env</command> now locks the profile to
+  prevent races between concurrent <command>nix-env</command>
+  operations on the same profile
+  (<literal>NIX-7</literal>).</para></listitem>
+
+  <listitem><para>TODO: <literal>nix-push
+  --target</literal>.</para></listitem>
 
 </itemizedlist>
 
