@@ -36,13 +36,16 @@ done
 for i in lang/eval-okay-*.nix; do
     echo "evaluating $i (should succeed)";
     i=$(basename $i .nix)
-    if ! $nixinstantiate --eval-only - < lang/$i.nix > lang/$i.out; then
-        echo "FAIL: $i should evaluate"
-        fail=1
-    fi
-    if ! $aterm_bin/atdiff lang/$i.out lang/$i.exp; then
-        echo "FAIL: evaluation result of $i not as expected"
-        fail=1
+
+    if test -e lang/$i.exp; then
+        if ! $nixinstantiate --eval-only - < lang/$i.nix > lang/$i.out; then
+            echo "FAIL: $i should evaluate"
+            fail=1
+        fi
+        if ! $aterm_bin/atdiff lang/$i.out lang/$i.exp; then
+            echo "FAIL: evaluation result of $i not as expected"
+            fail=1
+        fi
     fi
     
     if test -e lang/$i.exp.xml; then
