@@ -11,6 +11,7 @@
 
 MakeError(EvalError, Error)
 MakeError(AssertionError, EvalError)
+MakeError(Abort, EvalError)
 MakeError(TypeError, EvalError)
 
 

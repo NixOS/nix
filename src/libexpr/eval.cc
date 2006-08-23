@@ -515,7 +515,7 @@ Expr evalExpr2(EvalState & state, Expr e)
         try {
             return concatStrings(state, args);
         } catch (Error & e) {
-            e.addPrefix(format("in a string concatenation: "));
+            e.addPrefix(format("in a string concatenation:\n"));
             throw;
         }
     }
@@ -527,7 +527,7 @@ Expr evalExpr2(EvalState & state, Expr e)
             ATermList l2 = evalList(state, e2);
             return makeList(ATconcat(l1, l2));
         } catch (Error & e) {
-            e.addPrefix(format("in a list concatenation: "));
+            e.addPrefix(format("in a list concatenation:\n"));
             throw;
         }
     }

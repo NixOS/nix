@@ -629,6 +629,13 @@ static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
 }
 
 
+static Expr primAbort(EvalState & state, const ATermVector & args)
+{
+    throw Abort(format("evaluation aborted with the following error message: %1%") %
+        evalString(state, args[0]));
+}
+
+
 /* Apply a function to every element of a list. */
 static Expr primMap(EvalState & state, const ATermVector & args)
 {
@@ -700,6 +707,7 @@ void EvalState::addPrimOps()
     addPrimOp("toString", 1, primToString);
     addPrimOp("isNull", 1, primIsNull);
     addPrimOp("dependencyClosure", 1, primDependencyClosure);
+    addPrimOp("abort", 1, primAbort);
 
     addPrimOp("map", 2, primMap);
     addPrimOp("removeAttrs", 2, primRemoveAttrs);
