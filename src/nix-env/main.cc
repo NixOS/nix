@@ -39,6 +39,8 @@ struct InstallSourceInfo
     Path nixExprPath; /* for srcNixExprDrvs, srcNixExprs */
     Path profile; /* for srcProfile */
     string systemFilter; /* for srcNixExprDrvs */
+    ATermMap autoArgs;
+    InstallSourceInfo() : autoArgs(128) { };
 };
 
 
@@ -64,10 +66,10 @@ void printHelp()
 
 
 static void loadDerivations(EvalState & state, Path nixExprPath,
-    string systemFilter, DrvInfos & elems)
+    string systemFilter, const ATermMap & autoArgs, DrvInfos & elems)
 {
     getDerivations(state,
-        parseExprFromFile(state, absPath(nixExprPath)), "", ATermMap(1), elems);
+        parseExprFromFile(state, absPath(nixExprPath)), "", autoArgs, elems);
 
     /* Filter out all derivations not applicable to the current
        system. */
@@ -312,7 +314,7 @@ static void queryInstSources(EvalState & state,
                Nix expression. */
             DrvInfos allElems;
             loadDerivations(state, instSource.nixExprPath,
-                instSource.systemFilter, allElems);
+                instSource.systemFilter, instSource.autoArgs, allElems);
 
             elems = filterBySelector(state, allElems, args, newestOnly);
     
@@ -336,7 +338,7 @@ static void queryInstSources(EvalState & state,
             {
                 Expr e2 = parseExprFromString(state, *i, absPath("."));
                 Expr call = makeCall(e2, e1);
-                getDerivations(state, call, "", ATermMap(1), elems);
+                getDerivations(state, call, "", instSource.autoArgs, elems);
             }
             
             break;
@@ -390,9 +392,9 @@ static void queryInstSources(EvalState & state,
             for (Strings::const_iterator i = args.begin();
                  i != args.end(); ++i)
                 getDerivations(state,
-                    findAlongAttrPath(state, *i, 
+                    findAlongAttrPath(state, *i, instSource.autoArgs,
                         parseExprFromFile(state, instSource.nixExprPath)),
-                    "", ATermMap(1), elems);
+                    "", instSource.autoArgs, elems);
             break;
         }
     }
@@ -772,7 +774,8 @@ static void opQuery(Globals & globals,
 
     if (source == sAvailable || compareVersions) {
         loadDerivations(globals.state, globals.instSource.nixExprPath,
-            globals.instSource.systemFilter, availElems);
+            globals.instSource.systemFilter, globals.instSource.autoArgs,
+            availElems);
     }
 
     DrvInfos elems = filterBySelector(globals.state,
@@ -1115,6 +1118,16 @@ void run(Strings args)
         }
         else if (arg == "--attr" || arg == "-A")
             globals.instSource.type = srcAttrPath;
+        else if (arg == "--arg") { /* !!! code duplication from nix-instantiate */
+            i++;
+            if (i == args.end())
+                throw UsageError("`--arg' requires two arguments");
+            string name = *i++;
+            if (i == args.end())
+                throw UsageError("`--arg' requires two arguments");
+            Expr value = parseExprFromString(globals.state, *i, absPath("."));
+            globals.instSource.autoArgs.set(toATerm(name), value);
+        }
         else if (arg == "--uninstall" || arg == "-e")
             op = opUninstall;
         else if (arg == "--upgrade" || arg == "-u")

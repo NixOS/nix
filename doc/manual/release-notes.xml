@@ -47,8 +47,8 @@ irreversible.</para></warning>
   <literal>references</literal> table (i.e., it tells you what store
   paths refer to a given path).  Maintaining this table could take a
   quadratic amount of time, as well as a quadratic amount of Berkeley
-  DB log file space (in particular when running the garbage
-  collector).</para></listitem>
+  DB log file space (in particular when running the garbage collector)
+  (<literal>NIX-23</literal>).</para></listitem>
 
   <listitem><para>Nix now catches the <literal>TERM</literal> and
   <literal>HUP</literal> signals in addition to the
@@ -85,7 +85,8 @@ irreversible.</para></warning>
       (<literal>~</literal>) has been deprecated.</para></listitem>
 
       <listitem><para>TODO: function argument default values can refer
-      to other function arguments</para></listitem>
+      to other function arguments
+      (<literal>NIX-45</literal>)</para></listitem>
 
       <listitem><para>TODO: domain checks (r5895).</para></listitem>
 
@@ -148,7 +149,18 @@ irreversible.</para></warning>
     <itemizedlist>
 
       <listitem><para>Make sure that the garbage collector can run
-      succesfully when the disk is full.</para></listitem>
+      succesfully when the disk is full
+      (<literal>NIX-18</literal>).</para></listitem>
+
+      <listitem><para><command>nix-env</command> now locks the profile
+      to prevent races between concurrent <command>nix-env</command>
+      operations on the same profile
+      (<literal>NIX-7</literal>).</para></listitem>
+
+      <listitem><para>Removed misleading messages from
+      <literal>nix-env -i</literal> (e.g., <literal>installing
+      `foo'</literal> followed by <literal>uninstalling
+      `foo'</literal>) (<literal>NIX-17</literal>).</para></listitem>
 
     </itemizedlist>
 
@@ -162,7 +174,7 @@ irreversible.</para></warning>
   <replaceable>pkgname</replaceable></literal> will now install the
   highest available version of <replaceable>pkgname</replaceable>,
   rather than installing all available versions (which would probably
-  give collisions).</para></listitem>
+  give collisions) (<literal>NIX-31</literal>).</para></listitem>
 
   <listitem><para><literal>nix-env (-i|-u) --dry-run</literal> now
   shows exactly which missing paths will be built or
@@ -184,11 +196,6 @@ irreversible.</para></warning>
   <listitem><para>Added support for Cygwin (Windows,
   <literal>i686-cygwin</literal>) and Mac OS X on Intel
   (<literal>i686-darwin</literal>).</para></listitem>
-
-  <listitem><para><command>nix-env</command> now locks the profile to
-  prevent races between concurrent <command>nix-env</command>
-  operations on the same profile
-  (<literal>NIX-7</literal>).</para></listitem>
 
   <listitem><para>TODO: <literal>nix-push
   --target</literal>.</para></listitem>
