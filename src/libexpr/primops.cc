@@ -7,6 +7,30 @@
 #include "nixexpr-ast.hh"
 
 
+static Expr primBuiltins(EvalState & state, const ATermVector & args)
+{
+    /* Return an attribute set containing all primops.  This allows
+       Nix expressions to test for new primops and take appropriate
+       action if they're not available.  For instance, rather than
+       calling a primop `foo' directly, they could say `if builtins ?
+       foo then builtins.foo ... else ...'. */
+
+    ATermMap builtins(128);
+
+    for (ATermMap::const_iterator i = state.primOps.begin();
+         i != state.primOps.end(); ++i)
+    {
+        string name = aterm2String(i->key);
+        if (string(name, 0, 2) == "__")
+            name = string(name, 2);
+        /* !!! should use makePrimOp here, I guess. */
+        builtins.set(toATerm(name), makeAttrRHS(makeVar(i->key), makeNoPos()));
+    }
+
+    return makeAttrs(builtins);
+}
+
+
 /* Load and evaluate an expression from path specified by the
    argument. */ 
 static Expr primImport(EvalState & state, const ATermVector & args)
@@ -660,6 +684,8 @@ static Expr primRelativise(EvalState & state, const ATermVector & args)
 
 void EvalState::addPrimOps()
 {
+    addPrimOp("builtins", 0, primBuiltins);
+        
     addPrimOp("true", 0, primTrue);
     addPrimOp("false", 0, primFalse);
     addPrimOp("null", 0, primNull);
