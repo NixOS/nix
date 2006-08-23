@@ -631,7 +631,7 @@ static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
 
 static Expr primAbort(EvalState & state, const ATermVector & args)
 {
-    throw Abort(format("evaluation aborted with the following error message: %1%") %
+    throw Abort(format("evaluation aborted with the following error message: `%1%'") %
         evalString(state, args[0]));
 }
 
