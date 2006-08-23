@@ -178,9 +178,10 @@ Expr strictEval(EvalState & state, Expr e)
 }
 
 
-Expr doEval(EvalState & state, string attrPath, bool parseOnly, bool strict, Expr e)
+Expr doEval(EvalState & state, string attrPath, bool parseOnly, bool strict,
+    const ATermMap & autoArgs, Expr e)
 {
-    e = findAlongAttrPath(state, attrPath, e);
+    e = findAlongAttrPath(state, attrPath, autoArgs, e);
     if (!parseOnly)
         if (strict)
             e = strictEval(state, e);
@@ -229,6 +230,7 @@ void run(Strings args)
             if (i == args.end())
                 throw UsageError("`--arg' requires two arguments");
             Expr value = parseExprFromString(state, *i++, absPath("."));
+            printMsg(lvlError, format("X %1% Y %2%") % name % value);
             autoArgs.set(toATerm(name), value);
         }
         else if (arg == "--add-root") {
@@ -252,7 +254,7 @@ void run(Strings args)
 
     if (readStdin) {
         Expr e = parseStdin(state);
-        e = doEval(state, attrPath, parseOnly, strict, e);
+        e = doEval(state, attrPath, parseOnly, strict, autoArgs, e);
         printResult(state, e, evalOnly, xmlOutput, autoArgs);
     }
 
@@ -261,7 +263,7 @@ void run(Strings args)
     {
         Path path = absPath(*i);
         Expr e = parseExprFromFile(state, path);
-        e = doEval(state, attrPath, parseOnly, strict, e);
+        e = doEval(state, attrPath, parseOnly, strict, autoArgs, e);
         printResult(state, e, evalOnly, xmlOutput, autoArgs);
     }
 

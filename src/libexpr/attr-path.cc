@@ -12,7 +12,8 @@ bool isAttrs(EvalState & state, Expr e, ATermMap & attrs)
 }
 
 
-Expr findAlongAttrPath(EvalState & state, const string & attrPath, Expr e)
+Expr findAlongAttrPath(EvalState & state, const string & attrPath,
+    const ATermMap & autoArgs, Expr e)
 {
     Strings tokens = tokenizeString(attrPath, ".");
 
@@ -33,7 +34,7 @@ Expr findAlongAttrPath(EvalState & state, const string & attrPath, Expr e)
         if (string2Int(attr, attrIndex)) apType = apIndex;
 
         /* Evaluate the expression. */
-        e = evalExpr(state, autoCallFunction(evalExpr(state, e), ATermMap(1)));
+        e = evalExpr(state, autoCallFunction(evalExpr(state, e), autoArgs));
 
         /* It should evaluate to either an attribute set or an
            expression, according to what is specified in the
