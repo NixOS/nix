@@ -584,6 +584,49 @@ Expr evalFile(EvalState & state, const Path & path)
 }
 
 
+Expr strictEvalExpr(EvalState & state, Expr e)
+{
+    e = evalExpr(state, e);
+
+    ATermList as;
+
+    if (matchAttrs(e, as)) {
+        ATermList as2 = ATempty;
+        for (ATermIterator i(as); i; ++i) {
+            ATerm name; Expr e; ATerm pos;
+            if (!matchBind(*i, name, e, pos)) abort(); /* can't happen */
+            as2 = ATinsert(as2, makeBind(name, strictEvalExpr(state, e), pos));
+        }
+        return makeAttrs(ATreverse(as2));
+    }
+
+    ATermList formals;
+    ATerm body, pos;
+
+    if (matchFunction(e, formals, body, pos)) {
+        ATermList formals2 = ATempty;
+        
+        for (ATermIterator i(formals); i; ++i) {
+            Expr name; ValidValues valids; ATerm dummy;
+            if (!matchFormal(*i, name, valids, dummy)) abort();
+
+            ATermList valids2;
+            if (matchValidValues(valids, valids2)) {
+                ATermList valids3 = ATempty;
+                for (ATermIterator j(valids2); j; ++j)
+                    valids3 = ATinsert(valids3, strictEvalExpr(state, *j));
+                valids = makeValidValues(ATreverse(valids3));
+            }
+
+            formals2 = ATinsert(formals2, makeFormal(name, valids, dummy));
+        }
+        return makeFunction(ATreverse(formals2), body, pos);
+    }
+    
+    return e;
+}
+
+
 /* Yes, this is a really bad idea... */
 extern "C" {
     unsigned long AT_calcAllocatedSize();

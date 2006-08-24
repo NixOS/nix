@@ -47,6 +47,10 @@ Expr evalExpr(EvalState & state, Expr e);
 /* Evaluate an expression read from the given file to normal form. */
 Expr evalFile(EvalState & state, const Path & path);
 
+/* Evaluate an expression, and recursively evaluate list elements and
+   attributes. */
+Expr strictEvalExpr(EvalState & state, Expr e);
+
 /* Specific results. */
 string evalString(EvalState & state, Expr e);
 Path evalPath(EvalState & state, Expr e);
