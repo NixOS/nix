@@ -5,6 +5,7 @@
 #include "eval.hh"
 #include "globals.hh"
 #include "nixexpr-ast.hh"
+#include "expr-to-xml.hh"
 
 
 static Expr primBuiltins(EvalState & state, const ATermVector & args)
@@ -457,6 +458,14 @@ static Expr primToString(EvalState & state, const ATermVector & args)
 }
 
 
+static Expr primToXML(EvalState & state, const ATermVector & args)
+{
+    ostringstream out;
+    printTermAsXML(strictEvalExpr(state, args[0]), out);
+    return makeStr(toATerm(out.str()));
+}
+
+
 /* Boolean constructors. */
 static Expr primTrue(EvalState & state, const ATermVector & args)
 {
@@ -705,6 +714,7 @@ void EvalState::addPrimOps()
     addPrimOp("baseNameOf", 1, primBaseNameOf);
     addPrimOp("dirOf", 1, primDirOf);
     addPrimOp("toString", 1, primToString);
+    addPrimOp("__toXML", 1, primToXML);
     addPrimOp("isNull", 1, primIsNull);
     addPrimOp("dependencyClosure", 1, primDependencyClosure);
     addPrimOp("abort", 1, primAbort);
