@@ -47,7 +47,7 @@ static void printTermAsXML(Expr e, XMLWriter & doc)
     XMLAttrs attrs;
     ATerm s;
     int i;
-    ATermList as, formals;
+    ATermList as, es, formals;
     ATerm body, pos;
 
     if (matchStr(e, s))
@@ -82,6 +82,12 @@ static void printTermAsXML(Expr e, XMLWriter & doc)
             XMLOpenElement _(doc, "attr", singletonAttrs("name", *i));
             printTermAsXML(attrs.get(toATerm(*i)), doc);
         }
+    }
+
+    else if (matchList(e, es)) {
+        XMLOpenElement _(doc, "list");
+        for (ATermIterator i(es); i; ++i)
+            printTermAsXML(*i, doc);
     }
 
     else if (matchFunction(e, formals, body, pos)) {

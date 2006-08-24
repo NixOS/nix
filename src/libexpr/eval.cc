@@ -589,7 +589,6 @@ Expr strictEvalExpr(EvalState & state, Expr e)
     e = evalExpr(state, e);
 
     ATermList as;
-
     if (matchAttrs(e, as)) {
         ATermList as2 = ATempty;
         for (ATermIterator i(as); i; ++i) {
@@ -599,10 +598,17 @@ Expr strictEvalExpr(EvalState & state, Expr e)
         }
         return makeAttrs(ATreverse(as2));
     }
-
+    
+    ATermList es;
+    if (matchList(e, es)) {
+        ATermList es2 = ATempty;
+        for (ATermIterator i(es); i; ++i)
+            es2 = ATinsert(es2, strictEvalExpr(state, *i));
+        return makeList(ATreverse(es2));
+    }
+    
     ATermList formals;
     ATerm body, pos;
-
     if (matchFunction(e, formals, body, pos)) {
         ATermList formals2 = ATempty;
         
