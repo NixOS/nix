@@ -96,7 +96,7 @@ build-bzip2: have-bzip2
 
 install:
 	mkdir -p ${bzip2_bin}
-	$(INSTALL_PROGRAM) $(bzip2_bin_test)/bzip2 $(bzip2_bin_test)/bunzip2 ${bzip2_bin}
+	$(INSTALL_PROGRAM) $(bzip2_bin_test)/bzip2 $(bzip2_bin_test)/bunzip2 $(DESTDIR)${bzip2_bin}
 endif
 
 
