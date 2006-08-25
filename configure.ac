@@ -32,6 +32,9 @@ case $machine_name in
     i*86)
         machine_name=i686
         ;;
+    ppc)
+        machine_name=powerpc
+        ;;
     *)
         if test "$cpu_name" != "unknown"; then
             machine_name=$cpu_name
