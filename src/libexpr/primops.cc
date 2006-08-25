@@ -170,18 +170,7 @@ static void processBinding(EvalState & state, Expr e, Derivation & drv,
             ss.push_back(outPath);
         }
 
-        else if (a && evalString(state, a) == "storePath") {
-
-            a = queryAttr(e, "outPath");
-            if (!a) throw EvalError("output path missing");
-            /* !!! supports only single output path */
-            Path outPath = evalPath(state, a);
-
-            drv.inputSrcs.insert(outPath);
-            ss.push_back(outPath);
-        }
-
-        else throw TypeError("attribute sets in derivations must either be derivations or store paths");
+        else throw TypeError("attribute sets in derivations must be derivations");
     }
 
     else if (matchPath(e, s)) {

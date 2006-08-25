@@ -192,12 +192,7 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
         makeBind(toATerm("derivations"),
             makeList(ATreverse(inputs)), makeNoPos()),
         makeBind(toATerm("manifest"),
-            makeAttrs(ATmakeList2(
-                makeBind(toATerm("type"),
-                    makeStr(toATerm("storePath")), makeNoPos()),
-                makeBind(toATerm("outPath"),
-                    makePath(toATerm(manifestFile)), makeNoPos())
-                )), makeNoPos())
+            makePath(toATerm(manifestFile)), makeNoPos())
         )));
 
     /* Instantiate it. */
