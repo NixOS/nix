@@ -146,12 +146,7 @@ static void processBinding(EvalState & state, Expr e, Derivation & drv,
     else if (matchUri(e, s)) ss.push_back(aterm2String(s));
     else if (e == eTrue) ss.push_back("1");
     else if (e == eFalse) ss.push_back("");
-
-    else if (matchInt(e, n)) {
-        ostringstream st;
-        st << n;
-        ss.push_back(st.str());
-    }
+    else if (matchInt(e, n)) ss.push_back(int2String(n));
 
     else if (matchAttrs(e, es)) {
         Expr a = queryAttr(e, "type");

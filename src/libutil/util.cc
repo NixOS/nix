@@ -360,10 +360,7 @@ Nest::~Nest()
 
 static string escVerbosity(Verbosity level)
 {
-    int l = (int) level;
-    ostringstream st;
-    st << l;
-    return st.str();
+    return int2String((int) level);
 }
 
 
@@ -826,6 +823,14 @@ string statusToString(int status)
 bool statusOk(int status)
 {
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+
+string int2String(int n)
+{
+    ostringstream str;
+    str << n;
+    return str.str();
 }
 
 

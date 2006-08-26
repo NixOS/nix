@@ -292,6 +292,7 @@ bool statusOk(int status);
 
 
 /* Parse a string into an integer. */
+string int2String(int n);
 bool string2Int(const string & s, int & n);
 
 
