@@ -69,6 +69,26 @@ static Expr primImport(EvalState & state, const ATermVector & args)
 }
 
 
+static void flattenList(EvalState & state, Expr e, ATermList & result)
+{
+    ATermList es;
+    e = evalExpr(state, e);
+    if (matchList(e, es))
+        for (ATermIterator i(es); i; ++i)
+            flattenList(state, *i, result);
+    else
+        result = ATinsert(result, e);
+}
+
+
+ATermList flattenList(EvalState & state, Expr e)
+{
+    ATermList result = ATempty;
+    flattenList(state, e, result);
+    return ATreverse(result);
+}
+
+
 void toString(EvalState & state, Expr e,
     ATermList & context, string & result)
 {
@@ -135,6 +155,7 @@ void toString(EvalState & state, Expr e,
     }
     
     else if (matchList(e, es)) {
+        es = flattenList(state, e);
         bool first = true;
         for (ATermIterator i(es); i; ++i) {
             if (!first) result += " "; else first = false;
