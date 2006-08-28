@@ -321,7 +321,7 @@ Expr evalExpr2(EvalState & state, Expr e)
     /* Normal forms. */
     if (sym == symStr ||
         sym == symPath ||
-        sym == symSubPath ||
+        sym == symSubPath || /* !!! evaluate */
         sym == symUri ||
         sym == symNull ||
         sym == symInt ||

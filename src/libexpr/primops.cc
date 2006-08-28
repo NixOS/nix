@@ -69,6 +69,84 @@ static Expr primImport(EvalState & state, const ATermVector & args)
 }
 
 
+void toString(EvalState & state, Expr e,
+    ATermList & context, string & result)
+{
+    e = evalExpr(state, e);
+
+    ATerm s;
+    ATermList es;
+    int n;
+    Expr e2;
+
+    while (matchContext(e, es, e2)) {
+        e = e2;
+        for (ATermIterator i(es); i; ++i)
+            context = ATinsert(context, *i);
+    }
+
+    /* Note that `false' is represented as an empty string for shell
+       scripting convenience, just like `null'. */
+    
+    if (matchStr(e, s)) result += aterm2String(s);
+    else if (matchUri(e, s)) result += aterm2String(s);
+    else if (e == eTrue) result += "1";
+    else if (e == eFalse) ; 
+    else if (matchInt(e, n)) result += int2String(n);
+    else if (matchNull(e)) ;
+    
+    else if (matchAttrs(e, es)) {
+        Expr a = queryAttr(e, "type");
+        
+        if (a && evalString(state, a) == "derivation") {
+            Expr a2 = queryAttr(e, "outPath");
+            if (!a2) throw EvalError("output path missing");
+            result += evalPath(state, a2);
+            context = ATinsert(context, e);
+        }
+
+        else throw TypeError("cannot convert an attribute set to a string");
+    }
+
+    else if (matchPath(e, s)) {
+        Path path(canonPath(aterm2String(s)));
+
+        if (!isStorePath(path)) {
+
+            if (isDerivation(path))
+                throw EvalError(format("file names are not allowed to end in `%1%'")
+                    % drvExtension);
+
+            Path dstPath;
+            if (state.srcToStore[path] != "")
+                dstPath = state.srcToStore[path];
+            else {
+                dstPath = addToStore(path);
+                state.srcToStore[path] = dstPath;
+                printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
+                    % path % dstPath);
+            }
+
+            path = dstPath;
+        }
+
+        result += path;
+        context = ATinsert(context, makePath(toATerm(path)));
+    }
+    
+    else if (matchList(e, es)) {
+        bool first = true;
+        for (ATermIterator i(es); i; ++i) {
+            if (!first) result += " "; else first = false;
+            toString(state, *i, context, result);
+        }
+    }
+
+    else throw TypeError(format("%1% is not allowed as a derivation argument") % showType(e));
+    
+}
+
+
 /* Returns the hash of a derivation modulo fixed-output
    subderivations.  A fixed-output derivation is a derivation with one
    output (`out') for which an expected hash and hash algorithm are
@@ -124,119 +202,6 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
 }
 
 
-static void processBinding(EvalState & state, Expr e, Derivation & drv,
-    Strings & ss)
-{
-    e = evalExpr(state, e);
-
-    ATerm s;
-    ATermList es;
-    int n;
-    Expr e1, e2;
-
-    if (matchContext(e, es, e2)) {
-        e = e2;
-        for (ATermIterator i(es); i; ++i) {
-            Strings dummy;
-            processBinding(state, *i, drv, dummy);
-        }
-    }
-
-    if (matchStr(e, s)) ss.push_back(aterm2String(s));
-    else if (matchUri(e, s)) ss.push_back(aterm2String(s));
-    else if (e == eTrue) ss.push_back("1");
-    else if (e == eFalse) ss.push_back("");
-    else if (matchInt(e, n)) ss.push_back(int2String(n));
-
-    else if (matchAttrs(e, es)) {
-        Expr a = queryAttr(e, "type");
-        
-        if (a && evalString(state, a) == "derivation") {
-            a = queryAttr(e, "drvPath");
-            if (!a) throw EvalError("derivation name missing");
-            Path drvPath = evalPath(state, a);
-
-            a = queryAttr(e, "outPath");
-            if (!a) throw EvalError("output path missing");
-            /* !!! supports only single output path */
-            Path outPath = evalPath(state, a);
-
-            drv.inputDrvs[drvPath] = singleton<StringSet>("out");
-            ss.push_back(outPath);
-        }
-
-        else throw TypeError("attribute sets in derivations must be derivations");
-    }
-
-    else if (matchPath(e, s)) {
-        Path srcPath(canonPath(aterm2String(s)));
-
-        if (isStorePath(srcPath)) {
-            printMsg(lvlChatty, format("using store path `%1%' as source")
-                % srcPath);
-            drv.inputSrcs.insert(srcPath);
-            ss.push_back(srcPath);
-        }
-
-        else {
-            if (isDerivation(srcPath))
-                throw EvalError(format("file names are not allowed to end in `%1%'")
-                    % drvExtension);
-            Path dstPath;
-            if (state.srcToStore[srcPath] != "")
-                dstPath = state.srcToStore[srcPath];
-            else {
-                dstPath = addToStore(srcPath);
-                state.srcToStore[srcPath] = dstPath;
-                printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
-                    % srcPath % dstPath);
-            }
-            drv.inputSrcs.insert(dstPath);
-            ss.push_back(dstPath);
-        }
-    }
-    
-    else if (matchList(e, es)) {
-        for (ATermIterator i(es); i; ++i) {
-            startNest(nest, lvlVomit, format("processing list element"));
-	    processBinding(state, evalExpr(state, *i), drv, ss);
-        }
-    }
-
-    else if (matchNull(e)) ss.push_back("");
-
-    else if (matchSubPath(e, e1, e2)) {
-        static bool warn = false;
-        if (!warn) {
-            printMsg(lvlError, "warning: the subpath operator (~) is deprecated, use string concatenation (+) instead");
-            warn = true;
-        }
-        Strings ss2;
-        processBinding(state, evalExpr(state, e1), drv, ss2);
-        if (ss2.size() != 1)
-            throw TypeError("left-hand side of `~' operator cannot be a list");
-        e2 = evalExpr(state, e2);
-        if (!(matchStr(e2, s) || matchPath(e2, s)))
-            throw TypeError("right-hand side of `~' operator must be a path or string");
-        ss.push_back(canonPath(ss2.front() + "/" + aterm2String(s)));
-    }
-    
-    else throw TypeError(format("%1% is not allowed as a derivation argument") % showType(e));
-}
-
-
-static string concatStrings(const Strings & ss)
-{
-    string s;
-    bool first = true;
-    for (Strings::const_iterator i = ss.begin(); i != ss.end(); ++i) {
-        if (!first) s += " "; else first = false;
-        s += *i;
-    }
-    return s;
-}
-
-
 /* Construct (as a unobservable side effect) a Nix derivation
    expression that performs the derivation described by the argument
    set.  Returns the original set extended with the following
@@ -274,9 +239,67 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
         if (!matchAttrRHS(rhs, value, pos)) abort();
         startNest(nest, lvlVomit, format("processing attribute `%1%'") % key);
 
-        Strings ss;
         try {
-            processBinding(state, value, drv, ss);
+
+            ATermList context = ATempty;
+
+            /* The `args' attribute is special: it supplies the
+               command-line arguments to the builder. */
+            if (key == "args") {
+                ATermList es;
+                value = evalExpr(state, value);
+                if (!matchList(value, es)) throw Error(format("`args' should be a list %1%") % value);
+                for (ATermIterator i(es); i; ++i) {
+                    string s;
+                    toString(state, *i, context, s);
+                    drv.args.push_back(s);
+                }
+            }
+
+            /* All other attributes are passed to the builder through
+               the environment. */
+            else {
+                string s;
+                toString(state, value, context, s);
+                drv.env[key] = s;
+                if (key == "builder") drv.builder = s;
+                else if (key == "system") drv.platform = s;
+                else if (key == "name") drvName = s;
+                else if (key == "outputHash") outputHash = s;
+                else if (key == "outputHashAlgo") outputHashAlgo = s;
+                else if (key == "outputHashMode") {
+                    if (s == "recursive") outputHashRecursive = true; 
+                    else if (s == "flat") outputHashRecursive = false;
+                    else throw EvalError(format("invalid value `%1%' for `outputHashMode' attribute") % s);
+                }
+            }
+
+            /* Everything in the context of the expression should be
+               added as dependencies of the resulting derivation. */
+
+            for (ATermIterator i(context); i; ++i) {
+
+                ATerm s;
+                ATermList as;
+                
+                if (matchPath(*i, s)) {
+                    assert(isStorePath(aterm2String(s)));
+                    drv.inputSrcs.insert(aterm2String(s));
+                }
+
+                else if (matchAttrs(*i, as)) {
+                    Expr a = queryAttr(*i, "type");
+                    assert(a && evalString(state, a) == "derivation");
+
+                    Expr a2 = queryAttr(*i, "drvPath");
+                    if (!a2) throw EvalError("derivation path missing");
+
+                    drv.inputDrvs[evalPath(state, a2)] = singleton<StringSet>("out");
+                }
+
+                else abort();
+            }
+            
         } catch (Error & e) {
             e.addPrefix(format("while processing the derivation attribute `%1%' at %2%:\n")
                 % key % showPos(pos));
@@ -285,29 +308,6 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
             throw;
         }
 
-        /* The `args' attribute is special: it supplies the
-           command-line arguments to the builder. */
-        if (key == "args") {
-            for (Strings::iterator i = ss.begin(); i != ss.end(); ++i)
-                drv.args.push_back(*i);
-        }
-
-        /* All other attributes are passed to the builder through the
-           environment. */
-        else {
-            string s = concatStrings(ss);
-            drv.env[key] = s;
-            if (key == "builder") drv.builder = s;
-            else if (key == "system") drv.platform = s;
-            else if (key == "name") drvName = s;
-            else if (key == "outputHash") outputHash = s;
-            else if (key == "outputHashAlgo") outputHashAlgo = s;
-            else if (key == "outputHashMode") {
-                if (s == "recursive") outputHashRecursive = true; 
-                else if (s == "flat") outputHashRecursive = false;
-                else throw EvalError(format("invalid value `%1%' for `outputHashMode' attribute") % s);
-            }
-        }
     }
     
     /* Do we have all required attributes? */
