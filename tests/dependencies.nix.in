@@ -12,7 +12,7 @@ let {
     name = "dependencies-input-2";
     system = "@system@";
     builder = "@shell@";
-    args = ["-e" "-x" ./dependencies.builder2.sh];
+    args = ["-e" "-x" (./. ~ "dependencies.builder2.sh")];
     PATH = "@testPath@";
   };
 
