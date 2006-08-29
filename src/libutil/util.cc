@@ -404,6 +404,15 @@ void printMsg_(Verbosity level, const format & f)
 }
 
 
+void warnOnce(bool & haveWarned, const format & f)
+{
+    if (!haveWarned) {
+        printMsg(lvlError, format("warning: %1%") % f.str());
+        haveWarned = true;
+    }
+}
+
+
 void readFull(int fd, unsigned char * buf, size_t count)
 {
     while (count) {

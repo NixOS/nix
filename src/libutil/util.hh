@@ -178,6 +178,8 @@ void printMsg_(Verbosity level, const format & f);
 
 #define debug(f) printMsg(lvlDebug, f)
 
+void warnOnce(bool & haveWarned, const format & f);
+
 
 /* Wrappers arount read()/write() that read/write exactly the
    requested number of bytes. */

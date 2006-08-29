@@ -163,7 +163,7 @@ void toString(EvalState & state, Expr e,
         }
     }
 
-    else throw TypeError(format("%1% is not allowed as a derivation argument") % showType(e));
+    else throw TypeError(format("cannot convert %1% to a string") % showType(e));
     
 }
 

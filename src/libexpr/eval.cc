@@ -321,7 +321,6 @@ Expr evalExpr2(EvalState & state, Expr e)
     /* Normal forms. */
     if (sym == symStr ||
         sym == symPath ||
-        sym == symSubPath || /* !!! evaluate */
         sym == symUri ||
         sym == symNull ||
         sym == symInt ||
@@ -503,7 +502,7 @@ Expr evalExpr2(EvalState & state, Expr e)
     }
 
     /* String or path concatenation. */
-    ATermList es;
+    ATermList es = ATempty;
     if (matchOpPlus(e, e1, e2) || matchConcatStrings(e, es)) {
         ATermVector args;
         if (matchOpPlus(e, e1, e2)) {
@@ -518,6 +517,17 @@ Expr evalExpr2(EvalState & state, Expr e)
             e.addPrefix(format("in a string concatenation:\n"));
             throw;
         }
+    }
+
+    /* Backwards compatability: subpath operator (~). */
+    if (matchSubPath(e, e1, e2)) {
+        static bool haveWarned;
+        warnOnce(haveWarned, "the subpath operator (~) is deprecated, use string concatenation (+) instead");
+        ATermList context = ATempty;
+        bool dummy;
+        string s1 = coerceToStringWithContext(state, context, e1, dummy);
+        string s2 = coerceToStringWithContext(state, context, e2, dummy);
+        return wrapInContext(context, makePath(toATerm(canonPath(s1 + "/" + s2))));
     }
 
     /* List concatenation. */
