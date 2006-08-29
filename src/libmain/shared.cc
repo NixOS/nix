@@ -44,13 +44,10 @@ Path makeRootName(const Path & gcRoot, int & counter)
 
 void printGCWarning()
 {
-    static bool warned = false;
-    if (!warned) {
-        printMsg(lvlInfo,
-            "warning: you did not specify `--add-root'; "
-            "the result might be removed by the garbage collector");
-        warned = true;
-    }
+    static bool haveWarned = false;
+    warnOnce(haveWarned, 
+        "warning: you did not specify `--add-root'; "
+        "the result might be removed by the garbage collector");
 }
 
 

@@ -269,7 +269,11 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
             if (key == "args") {
                 ATermList es;
                 value = evalExpr(state, value);
-                if (!matchList(value, es)) throw Error(format("`args' should be a list %1%") % value);
+                if (!matchList(value, es)) {
+                    static bool haveWarned = false;
+                    warnOnce(haveWarned, "the `args' attribute should evaluate to a list");
+                    es = flattenList(state, value);
+                }
                 for (ATermIterator i(es); i; ++i) {
                     string s;
                     toString(state, *i, context, s);
