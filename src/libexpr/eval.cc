@@ -466,11 +466,15 @@ Expr evalExpr2(EvalState & state, Expr e)
         } 
     }
 
-    /* Generic equality. */
+    /* Generic equality/inequality.  Note that the behaviour on
+       composite data (lists, attribute sets) and functions is
+       undefined, since the subterms of those terms are not evaluated.
+       However, we don't want to make (==) strict, because that would
+       make operations like `big_derivation == null' very slow (unless
+       we were to evaluate them side-by-side). */
     if (matchOpEq(e, e1, e2))
         return makeBool(evalExpr(state, e1) == evalExpr(state, e2));
 
-    /* Generic inequality. */
     if (matchOpNEq(e, e1, e2))
         return makeBool(evalExpr(state, e1) != evalExpr(state, e2));
 
@@ -594,7 +598,7 @@ Expr evalFile(EvalState & state, const Path & path)
 }
 
 
-Expr strictEvalExpr(EvalState & state, Expr e)
+Expr strictEvalExpr(EvalState & state, Expr e, bool canonicalise)
 {
     e = evalExpr(state, e);
 
@@ -604,8 +608,10 @@ Expr strictEvalExpr(EvalState & state, Expr e)
         for (ATermIterator i(as); i; ++i) {
             ATerm name; Expr e; ATerm pos;
             if (!matchBind(*i, name, e, pos)) abort(); /* can't happen */
-            as2 = ATinsert(as2, makeBind(name, strictEvalExpr(state, e), pos));
+            as2 = ATinsert(as2, makeBind(name, strictEvalExpr(state, e, canonicalise),
+                               canonicalise ? makeNoPos() : pos));
         }
+        /* !!! sort attributes if canonicalise == true */
         return makeAttrs(ATreverse(as2));
     }
     
@@ -613,7 +619,7 @@ Expr strictEvalExpr(EvalState & state, Expr e)
     if (matchList(e, es)) {
         ATermList es2 = ATempty;
         for (ATermIterator i(es); i; ++i)
-            es2 = ATinsert(es2, strictEvalExpr(state, *i));
+            es2 = ATinsert(es2, strictEvalExpr(state, *i, canonicalise));
         return makeList(ATreverse(es2));
     }
     
@@ -630,13 +636,14 @@ Expr strictEvalExpr(EvalState & state, Expr e)
             if (matchValidValues(valids, valids2)) {
                 ATermList valids3 = ATempty;
                 for (ATermIterator j(valids2); j; ++j)
-                    valids3 = ATinsert(valids3, strictEvalExpr(state, *j));
+                    valids3 = ATinsert(valids3, strictEvalExpr(state, *j, canonicalise));
                 valids = makeValidValues(ATreverse(valids3));
             }
 
             formals2 = ATinsert(formals2, makeFormal(name, valids, dummy));
         }
-        return makeFunction(ATreverse(formals2), body, pos);
+        return makeFunction(ATreverse(formals2), body,
+            canonicalise ? makeNoPos() : pos);
     }
     
     return e;
