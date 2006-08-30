@@ -521,7 +521,7 @@ Expr evalExpr2(EvalState & state, Expr e)
 
     /* Backwards compatability: subpath operator (~). */
     if (matchSubPath(e, e1, e2)) {
-        static bool haveWarned;
+        static bool haveWarned = false;
         warnOnce(haveWarned, "the subpath operator (~) is deprecated, use string concatenation (+) instead");
         ATermList context = ATempty;
         bool dummy;
