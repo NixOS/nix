@@ -79,18 +79,14 @@ static void dumpContents(const Path & path, unsigned int size,
     if (fd == -1) throw SysError(format("opening file `%1%'") % path);
     
     unsigned char buf[65536];
+    unsigned int left = size;
 
-    unsigned int total = 0;
-    ssize_t n;
-    while ((n = read(fd, buf, sizeof(buf)))) {
-        checkInterrupt();
-        if (n == -1) throw SysError("reading file " + path);
-        total += n;
+    while (left >= 0) {
+        size_t n = left > sizeof(buf) ? sizeof(buf) : left;
+        readFull(fd, buf, n);
+        left -= n;
         sink(buf, n);
     }
-
-    if (total != size)
-        throw SysError("file changed while reading it: " + path);
 
     writePadding(size, sink);
 }
@@ -231,8 +227,7 @@ static void restoreContents(int fd, const Path & path, RestoreSource & source)
         unsigned int n = sizeof(buf);
         if (n > left) n = left;
         source(buf, n);
-        if (write(fd, buf, n) != (ssize_t) n)
-            throw SysError("writing file " + path);
+        writeFull(fd, buf, n);
         left -= n;
     }
 
