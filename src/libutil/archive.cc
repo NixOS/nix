@@ -81,7 +81,7 @@ static void dumpContents(const Path & path, unsigned int size,
     unsigned char buf[65536];
     unsigned int left = size;
 
-    while (left >= 0) {
+    while (left > 0) {
         size_t n = left > sizeof(buf) ? sizeof(buf) : left;
         readFull(fd, buf, n);
         left -= n;
