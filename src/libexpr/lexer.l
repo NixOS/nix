@@ -77,7 +77,11 @@ inherit     { return INHERIT; }
             }
 
 \"          { BEGIN(STRING); return '"'; }
-<STRING>([^\$\"\\]|\\.)+ {
+<STRING>([^\$\"\\]|\$[^\{\"]|\\.)+ {
+/* !!! Not quite right: we want a follow restriction on "$", it
+   shouldn't be followed by a "{".  Right now "$\"" will be consumed
+   as part of a string, rather than a "$" followed by the string
+   terminator.  Disallow "$\"" for now. */
               yylval->t = unescapeStr(yytext); /* !!! alloc */ 
               return STR;
             }
