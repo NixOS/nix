@@ -19,6 +19,7 @@ echo $outPath
 
 echo "backgrounding program..."
 $profiles/test/program &
+sleep 2 # hack - wait for the program to get started
 child=$!
 echo PID=$child
 
