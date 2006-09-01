@@ -467,11 +467,24 @@ static Expr primToString(EvalState & state, const ATermVector & args)
 }
 
 
+/* Convert the argument (which can be any Nix expression) to an XML
+   representation returned in a string.  Not all Nix expressions can
+   be sensibly or completely represented (e.g., functions). */
 static Expr primToXML(EvalState & state, const ATermVector & args)
 {
     ostringstream out;
     printTermAsXML(strictEvalExpr(state, args[0]), out);
     return makeStr(toATerm(out.str()));
+}
+
+
+/* Store a string in the Nix store as a source file that can be used
+   as an input by derivations. */
+static Expr primToFile(EvalState & state, const ATermVector & args)
+{
+    string s = evalString(state, args[0]);
+    Path storePath = addTextToStore("", s, PathSet());
+    return makePath(toATerm(storePath));
 }
 
 
@@ -724,6 +737,7 @@ void EvalState::addPrimOps()
     addPrimOp("dirOf", 1, primDirOf);
     addPrimOp("toString", 1, primToString);
     addPrimOp("__toXML", 1, primToXML);
+    addPrimOp("__toFile", 1, primToFile);
     addPrimOp("isNull", 1, primIsNull);
     addPrimOp("dependencyClosure", 1, primDependencyClosure);
     addPrimOp("abort", 1, primAbort);

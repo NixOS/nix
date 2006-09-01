@@ -1,7 +1,23 @@
-derivation {
-  name = "gc-runtime";
-  system = "@system@";
-  builder = "@shell@";
-  args = ["-e" "-x" ./gc-runtime.builder.sh];
-  PATH = "@testPath@";
+let {
+
+  # Test inline source file definitions.
+  builder = builtins.toFile "
+mkdir $out
+
+cat > $out/program <<EOF
+#! $SHELL
+sleep 10000
+EOF
+
+chmod +x $out/program
+";
+
+  body = derivation {
+    name = "gc-runtime";
+    system = "@system@";
+    builder = "@shell@";
+    args = ["-e" "-x" builder];
+    PATH = "@testPath@";
+  };
+
 }
