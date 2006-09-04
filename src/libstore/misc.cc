@@ -3,6 +3,8 @@
 #include "build.hh"
 #include "db.hh"
 
+#include <aterm2.h>
+
 
 namespace nix {
 

@@ -11,14 +11,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <aterm2.h>
-
-#include "parser-tab.hh"
-#include "lexer-tab.hh"
 
 #include "aterm.hh"
 #include "util.hh"
     
+#include "parser-tab.hh"
+#include "lexer-tab.hh"
+
 #include "nixexpr.hh"
 #include "nixexpr-ast.hh"
 
@@ -38,7 +37,7 @@ struct ParseData
 };
 
 
-static ATerm fixAttrs(int recursive, ATermList as)
+static Expr fixAttrs(int recursive, ATermList as)
 {
     ATermList bs = ATempty, cs = ATempty;
     ATermList * is = recursive ? &cs : &bs;

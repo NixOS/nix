@@ -1,5 +1,6 @@
 #include "derivations.hh"
 #include "store.hh"
+#include "aterm.hh"
 
 #include "derivations-ast.hh"
 #include "derivations-ast.cc"

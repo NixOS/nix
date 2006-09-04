@@ -5,6 +5,8 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include <aterm2.h>
+
 
 namespace nix {
 

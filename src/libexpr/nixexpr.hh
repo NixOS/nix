@@ -3,8 +3,6 @@
 
 #include <map>
 
-#include <aterm2.h>
-
 #include "aterm-map.hh"
 #include "types.hh"
 

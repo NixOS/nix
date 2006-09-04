@@ -1,7 +1,8 @@
 #ifndef __DERIVATIONS_H
 #define __DERIVATIONS_H
 
-#include "aterm.hh"
+typedef struct _ATerm * ATerm;
+
 #include "hash.hh"
 
 #include <map>
