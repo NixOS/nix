@@ -246,14 +246,14 @@ string int2String(int n);
 bool string2Int(const string & s, int & n);
 
 
-/* !!! HACK HACK HACK - this should be in shared.hh, but it's to
-   facilitate a quick hack - will remove this eventually (famous last
-   words). */
+/* Setuid support. */
 struct SwitchToOriginalUser
 {
     SwitchToOriginalUser();
     ~SwitchToOriginalUser();
 };
+
+void switchToNixUser();
 
  
 }
