@@ -16,9 +16,7 @@
 #include <pwd.h>
 #include <grp.h>
 
-extern "C" {
 #include <aterm2.h>
-}
 
 
 namespace nix {

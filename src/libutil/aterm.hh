@@ -1,9 +1,7 @@
 #ifndef __ATERM_H
 #define __ATERM_H
 
-extern "C" {
 #include <aterm2.h>
-}
 
 #include "types.hh"
 
