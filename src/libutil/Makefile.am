@@ -1,10 +1,10 @@
 pkglib_LTLIBRARIES = libutil.la
 
-libutil_la_SOURCES = util.cc util.hh hash.cc hash.hh \
- archive.cc archive.hh aterm.cc aterm.hh \
- aterm-map.cc aterm-map.hh \
- xml-writer.cc xml-writer.hh \
- types.hh
+libutil_la_SOURCES = util.cc hash.cc archive.cc aterm.cc aterm-map.cc xml-writer.cc
+
+libutil_la_LIBADD = ../boost/format/libformat.la
+
+pkginclude_HEADERS = util.hh hash.hh archive.hh aterm.hh aterm-map.hh xml-writer.hh types.hh
 
 if !HAVE_OPENSSL
 libutil_la_SOURCES += \

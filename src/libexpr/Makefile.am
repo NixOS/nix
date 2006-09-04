@@ -5,7 +5,10 @@ libexpr_la_SOURCES = nixexpr.cc nixexpr.hh \
  lexer-tab.cc lexer-tab.hh parser-tab.cc parser-tab.hh \
  get-drvs.cc get-drvs.hh \
  attr-path.cc attr-path.hh \
- expr-to-xml.cc expr-to-xml.hh 
+ expr-to-xml.cc expr-to-xml.hh
+
+libexpr_la_LIBADD = ../libutil/libutil.la ../libstore/libstore.la \
+ ../boost/format/libformat.la
 
 BUILT_SOURCES = nixexpr-ast.cc nixexpr-ast.hh \
  parser-tab.hh lexer-tab.hh parser-tab.cc lexer-tab.cc
