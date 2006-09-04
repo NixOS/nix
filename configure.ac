@@ -75,6 +75,7 @@ AC_PROG_CXX
 
 # We are going to use libtool.
 AC_DISABLE_STATIC
+AC_ENABLE_SHARED
 AC_PROG_LIBTOOL
 
 

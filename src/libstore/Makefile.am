@@ -1,4 +1,4 @@
-lib_LTLIBRARIES = libstore.la
+pkglib_LTLIBRARIES = libstore.la
 
 libstore_la_SOURCES = \
  store.cc store.hh derivations.cc derivations.hh \

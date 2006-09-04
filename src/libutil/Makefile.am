@@ -1,4 +1,4 @@
-lib_LTLIBRARIES = libutil.la
+pkglib_LTLIBRARIES = libutil.la
 
 libutil_la_SOURCES = util.cc util.hh hash.cc hash.hh \
  archive.cc archive.hh aterm.cc aterm.hh \

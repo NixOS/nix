@@ -1,4 +1,4 @@
-lib_LTLIBRARIES = libexpr.la
+pkglib_LTLIBRARIES = libexpr.la
 
 libexpr_la_SOURCES = nixexpr.cc nixexpr.hh parser.cc parser.hh \
  eval.cc eval.hh primops.cc \

@@ -1,4 +1,4 @@
-lib_LTLIBRARIES = libmain.la
+pkglib_LTLIBRARIES = libmain.la
 
 libmain_la_SOURCES = shared.cc shared.hh
 
