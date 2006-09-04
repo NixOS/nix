@@ -1,7 +1,10 @@
 #ifndef __GC_H
 #define __GC_H
 
-#include "util.hh"
+#include "types.hh"
+
+
+namespace nix {
 
 
 /* Garbage collector operation. */
@@ -37,6 +40,9 @@ void removeTempRoots();
 /* Register a permanent GC root. */
 Path addPermRoot(const Path & storePath, const Path & gcRoot,
     bool indirect);
+
+
+}
 
 
 #endif /* !__GC_H */

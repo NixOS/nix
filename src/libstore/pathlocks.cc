@@ -1,15 +1,19 @@
+#include "pathlocks.hh"
+#include "util.hh"
+
 #include <cerrno>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "pathlocks.hh"
-
 #ifdef __CYGWIN__
 #include <windows.h>
 #include <sys/cygwin.h>
 #endif
+
+
+namespace nix {
 
 
 int openLockFile(const Path & path, bool create)
@@ -219,4 +223,7 @@ PathLocks::~PathLocks()
 void PathLocks::setDeletion(bool deletePaths)
 {
     this->deletePaths = deletePaths;
+}
+
+ 
 }

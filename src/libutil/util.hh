@@ -1,58 +1,15 @@
 #ifndef __UTIL_H
 #define __UTIL_H
 
-#include <string>
-#include <list>
-#include <set>
-#include <sstream>
+#include "types.hh"
 
 #include <sys/types.h>
 #include <dirent.h>
 #include <unistd.h>
 #include <signal.h>
 
-#include <boost/format.hpp>
 
-using namespace std;
-using namespace boost;
-
-
-class Error : public exception
-{
-protected:
-    string err;
-public:
-    Error(const format & f);
-    ~Error() throw () { };
-    const char * what() const throw () { return err.c_str(); }
-    const string & msg() const throw () { return err; }
-    Error & addPrefix(const format & f);
-};
-
-class SysError : public Error
-{
-public:
-    SysError(const format & f);
-};
-
-#define MakeError(newClass, superClass) \
-    class newClass : public superClass                  \
-    {                                                   \
-    public:                                             \
-        newClass(const format & f) : superClass(f) { }; \
-    };
-
-MakeError(UsageError, Error)
-
-
-typedef list<string> Strings;
-typedef set<string> StringSet;
-
-
-/* Paths are just strings. */
-typedef string Path;
-typedef list<Path> Paths;
-typedef set<Path> PathSet;
+namespace nix {
 
 
 /* Return an environment variable. */
@@ -137,15 +94,6 @@ typedef enum {
     ltEscapes,  /* nesting indicated using escape codes (for log2xml) */
     ltFlat      /* no nesting */
 } LogType;
-
-typedef enum { 
-    lvlError,
-    lvlInfo,
-    lvlTalkative,
-    lvlChatty,
-    lvlDebug,
-    lvlVomit
-} Verbosity;
 
 extern LogType logType;
 extern Verbosity verbosity; /* suppress msgs > this */
@@ -306,6 +254,9 @@ struct SwitchToOriginalUser
     SwitchToOriginalUser();
     ~SwitchToOriginalUser();
 };
+
+ 
+}
 
 
 #endif /* !__UTIL_H */

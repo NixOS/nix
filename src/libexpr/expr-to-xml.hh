@@ -6,8 +6,10 @@
 
 #include "nixexpr.hh"
 
+namespace nix {
 
-void printTermAsXML(Expr e, ostream & out);
-
+void printTermAsXML(Expr e, std::ostream & out);
+    
+}
 
 #endif /* !__EXPR_TO_XML_H */

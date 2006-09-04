@@ -3,7 +3,8 @@ pkglib_LTLIBRARIES = libutil.la
 libutil_la_SOURCES = util.cc util.hh hash.cc hash.hh \
  archive.cc archive.hh aterm.cc aterm.hh \
  aterm-map.cc aterm-map.hh \
- xml-writer.cc xml-writer.hh
+ xml-writer.cc xml-writer.hh \
+ types.hh
 
 if !HAVE_OPENSSL
 libutil_la_SOURCES += \

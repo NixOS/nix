@@ -1,11 +1,10 @@
 #ifndef __HASH_H
 #define __HASH_H
 
-#include <string>
+#include "types.hh"
 
-#include "util.hh"
 
-using namespace std;
+namespace nix {
 
 
 typedef enum { htUnknown, htMD5, htSHA1, htSHA256 } HashType;
@@ -76,5 +75,8 @@ Hash compressHash(const Hash & hash, unsigned int newSize);
 /* Parse a string representing a hash type. */
 HashType parseHashType(const string & s);
 
+ 
+}
 
+    
 #endif /* !__HASH_H */

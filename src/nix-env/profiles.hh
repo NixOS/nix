@@ -1,9 +1,10 @@
 #ifndef __PROFILES_H
 #define __PROFILES_H
 
-#include <string>
+#include "types.hh"
 
-#include "util.hh"
+
+namespace nix {
 
 
 struct Generation
@@ -33,6 +34,9 @@ Path createGeneration(Path profile, Path outPath);
 void deleteGeneration(const Path & profile, unsigned int gen);
 
 void switchLink(Path link, Path target);
+
+
+}
 
 
 #endif /* !__PROFILES_H */

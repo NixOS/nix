@@ -1,8 +1,13 @@
 #ifndef __BUILD_H
 #define __BUILD_H
 
-#include "derivations.hh"
 
+#include "types.hh"
+
+
+namespace nix {
+
+    
 /* Ensure that the output paths of the derivation are valid.  If they
    are already valid, this is a no-op.  Otherwise, validity can
    be reached in two ways.  First, if the output paths have
@@ -16,5 +21,7 @@ void buildDerivations(const PathSet & drvPaths);
 void ensurePath(const Path & storePath);
 
     
+}
+
 
 #endif /* !__BUILD_H */

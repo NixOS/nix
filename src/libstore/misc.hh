@@ -4,6 +4,9 @@
 #include "derivations.hh"
 
 
+namespace nix {
+
+
 /* Read a derivation, after ensuring its existence through
    ensurePath(). */
 Derivation derivationFromPath(const Path & drvPath);
@@ -27,6 +30,9 @@ Path findOutput(const Derivation & drv, string id);
    will be substituted. */
 void queryMissing(const PathSet & targets,
     PathSet & willBuild, PathSet & willSubstitute);
+
+
+}
 
 
 #endif /* !__MISC_H */

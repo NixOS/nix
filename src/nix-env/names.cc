@@ -1,4 +1,8 @@
 #include "names.hh"
+#include "util.hh"
+
+
+namespace nix {
 
 
 DrvName::DrvName()
@@ -114,4 +118,7 @@ DrvNames drvNamesFromArgs(const Strings & opArgs)
          i != opArgs.end(); ++i)
         result.push_back(DrvName(*i));
     return result;
+}
+
+ 
 }

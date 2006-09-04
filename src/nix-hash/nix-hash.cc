@@ -5,9 +5,12 @@
 #include "help.txt.hh"
 
 
+using namespace nix;
+
+
 void printHelp()
 {
-    cout << string((char *) helpText, sizeof helpText);
+    std::cout << string((char *) helpText, sizeof helpText);
 }
 
 
@@ -43,7 +46,7 @@ void run(Strings args)
         for (Strings::iterator i = ss.begin(); i != ss.end(); ++i) {
             Hash h = flat ? hashFile(ht, *i) : hashPath(ht, *i);
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
-            cout << format("%1%\n") %
+            std::cout << format("%1%\n") %
                 (base32 ? printHash32(h) : printHash(h));
         }
     }
@@ -51,7 +54,7 @@ void run(Strings args)
     else {
         for (Strings::iterator i = ss.begin(); i != ss.end(); ++i) {
             Hash h = op == opTo16 ? parseHash32(ht, *i) : parseHash(ht, *i);
-            cout << format("%1%\n") %
+            std::cout << format("%1%\n") %
                 (op == opTo16 ? printHash(h) : printHash32(h));
         }
     }

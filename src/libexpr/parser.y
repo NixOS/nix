@@ -3,7 +3,7 @@
 %locations
 %error-verbose
 %parse-param { yyscan_t scanner }
-%parse-param { void * data }
+%parse-param { ParseData * data }
 %lex-param { yyscan_t scanner }
 
 %{
@@ -12,34 +12,47 @@
 #include <string.h>
 #include <aterm2.h>
 
-#include "parser-tab.h"
+#include "parser-tab.hh"
+extern "C" {
 #include "lexer-tab.h"
+}
 
-typedef ATerm Expr;
-typedef ATerm ValidValues;
-typedef ATerm DefaultValue;
-typedef ATerm Pos;
+#include "aterm.hh"
     
+#include "nixexpr.hh"
 #include "nixexpr-ast.hh"
 
-void setParseResult(void * data, ATerm t);
-void parseError(void * data, char * error, int line, int column);
-ATerm absParsedPath(void * data, ATerm t);
-ATerm fixAttrs(int recursive, ATermList as);
-const char * getPath(void * data);
-void backToString(yyscan_t scanner);
+using namespace nix;
 
-void yyerror(YYLTYPE * loc, yyscan_t scanner, void * data, char * s)
+namespace nix {
+ 
+struct ParseData 
+{
+    Expr result;
+    Path basePath;
+    Path path;
+    string error;
+};
+
+void setParseResult(ParseData * data, ATerm t);
+void parseError(ParseData * data, char * error, int line, int column);
+ATerm absParsedPath(ParseData * data, ATerm t);
+ATerm fixAttrs(int recursive, ATermList as);
+const char * getPath(ParseData * data);
+Expr unescapeStr(const char * s);
+ 
+extern "C" {
+    void backToString(yyscan_t scanner);
+}
+ 
+}
+
+void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, char * s)
 {
     parseError(data, s, loc->first_line, loc->first_column);
 }
 
-ATerm toATerm(const char * s)
-{
-    return (ATerm) ATmakeAppl0(ATmakeAFun((char *) s, 0, ATtrue));
-}
-
-static Pos makeCurPos(YYLTYPE * loc, void * data)
+static Pos makeCurPos(YYLTYPE * loc, ParseData * data)
 {
     return makePos(toATerm(getPath(data)),
         loc->first_line, loc->first_column);

@@ -12,6 +12,9 @@
 #include "util.hh"
 
 
+namespace nix {
+
+
 static string archiveVersion1 = "nix-archive-1";
 
 
@@ -319,3 +322,5 @@ void restorePath(const Path & path, RestoreSource & source)
     restore(path, source);
 }
 
+ 
+}

@@ -1,9 +1,11 @@
 #include "derivations.hh"
-#include "globals.hh"
 #include "store.hh"
 
 #include "derivations-ast.hh"
 #include "derivations-ast.cc"
+
+
+namespace nix {
 
 
 Hash hashTerm(ATerm t)
@@ -169,4 +171,7 @@ bool isDerivation(const string & fileName)
     return
         fileName.size() >= drvExtension.size() &&
         string(fileName, fileName.size() - drvExtension.size()) == drvExtension;
+}
+
+ 
 }

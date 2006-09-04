@@ -1,7 +1,12 @@
 #include "eval.hh"
 #include "parser.hh"
+#include "hash.hh"
+#include "util.hh"
 #include "nixexpr-ast.hh"
 
+
+namespace nix {
+    
 
 EvalState::EvalState()
     : normalForms(32768), primOps(128)
@@ -271,7 +276,7 @@ Expr wrapInContext(ATermList context, Expr e)
 static ATerm concatStrings(EvalState & state, const ATermVector & args)
 {
     ATermList context = ATempty;
-    ostringstream s;
+    std::ostringstream s;
     bool isPath = false;
 
     for (ATermVector::const_iterator i = args.begin(); i != args.end(); ++i) {
@@ -665,4 +670,7 @@ void printEvalStats(EvalState & state)
         % AT_calcAllocatedSize());
     if (showStats)
         printATermMapStats();
+}
+
+ 
 }

@@ -4,9 +4,12 @@
 #include <string>
 
 #include "hash.hh"
-#include "db.hh"
 
-using namespace std;
+
+namespace nix {
+
+
+class Transaction;
 
 
 /* Nix store and database schema version.  Version 1 (or 0) was Nix <=
@@ -167,6 +170,9 @@ Path addTextToStore(const string & suffix, const string & s,
 void deleteFromStore(const Path & path, unsigned long long & bytesFreed);
 
 void verifyStore(bool checkContents);
+
+ 
+}
 
 
 #endif /* !__STORE_H */

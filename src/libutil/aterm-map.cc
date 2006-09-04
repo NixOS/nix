@@ -1,7 +1,12 @@
 #include "aterm-map.hh"
 
+#include <iostream>
+
 #include <assert.h>
 #include <stdlib.h>
+
+
+namespace nix {
 
 
 static const unsigned int maxLoadFactor = /* 1 / */ 3;
@@ -214,10 +219,11 @@ unsigned int ATermMap::size()
 }
 
 
-#include <iostream>
-
 void printATermMapStats()
 {
+    using std::cerr;
+    using std::endl;
+    
     cerr << "RESIZES: " << nrResizes << " "
          << sizeTotalAlloc << " "
          << sizeCurAlloc << " "
@@ -319,3 +325,6 @@ int main(int argc, char * * argv)
     printATermMapStats();
 }
 #endif
+
+ 
+}

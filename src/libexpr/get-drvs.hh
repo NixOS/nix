@@ -9,7 +9,10 @@
 #include "eval.hh"
 
 
-typedef map<string, string> MetaInfo;
+namespace nix {
+
+
+typedef std::map<string, string> MetaInfo;
 
 
 struct DrvInfo
@@ -23,7 +26,7 @@ public:
     string attrPath; /* path towards the derivation */
     string system;
 
-    shared_ptr<ATermMap> attrs;
+    boost::shared_ptr<ATermMap> attrs;
 
     string queryDrvPath(EvalState & state) const;
     string queryOutPath(EvalState & state) const;
@@ -51,6 +54,9 @@ bool getDerivation(EvalState & state, Expr e, DrvInfo & drv);
 
 void getDerivations(EvalState & state, Expr e, const string & pathPrefix,
     const ATermMap & autoArgs, DrvInfos & drvs);
+
+ 
+}
 
 
 #endif /* !__GET_DRVS_H */

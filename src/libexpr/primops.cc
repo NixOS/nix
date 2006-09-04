@@ -1,11 +1,16 @@
-#include <algorithm>
-
 #include "build.hh"
 #include "misc.hh"
 #include "eval.hh"
 #include "globals.hh"
-#include "nixexpr-ast.hh"
+#include "store.hh"
+#include "util.hh"
 #include "expr-to-xml.hh"
+#include "nixexpr-ast.hh"
+
+#include <algorithm>
+
+
+namespace nix {
 
 
 static Expr primBuiltins(EvalState & state, const ATermVector & args)
@@ -472,7 +477,7 @@ static Expr primToString(EvalState & state, const ATermVector & args)
    be sensibly or completely represented (e.g., functions). */
 static Expr primToXML(EvalState & state, const ATermVector & args)
 {
-    ostringstream out;
+    std::ostringstream out;
     printTermAsXML(strictEvalExpr(state, args[0]), out);
     return makeStr(toATerm(out.str()));
 }
@@ -745,4 +750,7 @@ void EvalState::addPrimOps()
     addPrimOp("map", 2, primMap);
     addPrimOp("removeAttrs", 2, primRemoveAttrs);
     addPrimOp("relativise", 2, primRelativise);
+}
+
+ 
 }

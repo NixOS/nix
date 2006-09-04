@@ -10,12 +10,17 @@
 #include "get-drvs.hh"
 #include "attr-path.hh"
 #include "expr-to-xml.hh"
+#include "util.hh"
+#include "store.hh"
 #include "help.txt.hh"
+
+
+using namespace nix;
 
 
 void printHelp()
 {
-    cout << string((char *) helpText, sizeof helpText);
+    std::cout << string((char *) helpText, sizeof helpText);
 }
 
 
@@ -23,7 +28,7 @@ static Expr parseStdin(EvalState & state)
 {
     startNest(nest, lvlTalkative, format("parsing standard input"));
     string s, s2;
-    while (getline(cin, s2)) s += s2 + "\n";
+    while (getline(std::cin, s2)) s += s2 + "\n";
     return parseExprFromString(state, s, absPath("."));
 }
 
@@ -38,9 +43,9 @@ static void printResult(EvalState & state, Expr e,
 {
     if (evalOnly)
         if (xmlOutput)
-            printTermAsXML(e, cout);
+            printTermAsXML(e, std::cout);
         else
-            cout << format("%1%\n") % e;
+            std::cout << format("%1%\n") % e;
     
     else {
         DrvInfos drvs;
@@ -53,7 +58,7 @@ static void printResult(EvalState & state, Expr e,
                 drvPath = addPermRoot(drvPath,
                     makeRootName(gcRoot, rootNr),
                     indirectRoot);
-            cout << format("%1%\n") % drvPath;
+            std::cout << format("%1%\n") % drvPath;
         }
     }
 }

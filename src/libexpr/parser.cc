@@ -1,3 +1,8 @@
+#include "parser.hh"
+#include "aterm.hh"
+#include "util.hh"
+#include "nixexpr-ast.hh"
+    
 #include <sstream>
 
 #include <sys/types.h>
@@ -5,9 +10,15 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "aterm.hh"
-#include "parser.hh"
-#include "nixexpr-ast.hh"
+
+extern "C" {
+
+#include "parser-tab.hh"
+#include "lexer-tab.h"
+    
+}
+
+namespace nix {
 
 
 struct ParseData 
@@ -17,16 +28,15 @@ struct ParseData
     Path path;
     string error;
 };
+ 
+}
 
 
-extern "C" {
+int yyparse(yyscan_t scanner, nix::ParseData * data);
 
-#include "parser-tab.h"
-#include "lexer-tab.h"
-    
-/* Callbacks for getting from C to C++.  Due to a (small) bug in the
-   GLR code of Bison we cannot currently compile the parser as C++
-   code. */
+
+namespace nix {
+
 
 void setParseResult(ParseData * data, ATerm t)
 {
@@ -71,6 +81,7 @@ const char * getPath(ParseData * data)
     return data->path.c_str();
 }
 
+extern "C" {
 Expr unescapeStr(const char * s)
 {
     string t;
@@ -93,11 +104,7 @@ Expr unescapeStr(const char * s)
     }
     return makeStr(toATerm(t));
 }
-
-int yyparse(yyscan_t scanner, ParseData * data);
-
-
-} /* end of C functions */
+}
 
 
 static void checkAttrs(ATermMap & names, ATermList bnds)
@@ -231,4 +238,7 @@ Expr parseExprFromString(EvalState & state,
     const string & s, const Path & basePath)
 {
     return parse(state, s.c_str(), "(string)", basePath);
+}
+
+ 
 }

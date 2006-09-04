@@ -1,19 +1,18 @@
 #ifndef __DB_H
 #define __DB_H
 
-#include <string>
-#include <list>
+#include "types.hh"
+
 #include <map>
-
-#include "util.hh"
-
-using namespace std;
 
 
 /* Defined externally. */
 class DbTxn;
 class DbEnv;
 class Db;
+
+
+namespace nix {
 
 
 class Database;
@@ -53,7 +52,7 @@ private:
     DbEnv * env;
 
     TableId nextId;
-    map<TableId, Db *> tables;
+    std::map<TableId, Db *> tables;
 
     void requireEnv();
 
@@ -98,6 +97,9 @@ class DbNoPermission : public Error
 public:
     DbNoPermission(const format & f) : Error(f) { };
 };
+
+ 
+}
 
 
 #endif /* !__DB_H */

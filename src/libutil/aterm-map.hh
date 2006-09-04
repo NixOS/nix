@@ -4,7 +4,8 @@
 #include <aterm2.h>
 #include <assert.h>
 
-using namespace std;
+
+namespace nix {
 
 
 class ATermMap
@@ -120,6 +121,9 @@ private:
 
 /* Hack. */
 void printATermMapStats();
+
+ 
+}
 
 
 #endif /* !__ATERM_MAP_H */

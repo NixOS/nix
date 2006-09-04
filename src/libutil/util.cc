@@ -9,15 +9,14 @@
 #include <cstdio>
 #include <sstream>
 
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-#include <unistd.h>
-#include <dirent.h>
 #include <fcntl.h>
-#include <signal.h>
 
 #include "util.hh"
+
+
+namespace nix {
 
 
 Error::Error(const format & f)
@@ -368,8 +367,8 @@ void Nest::open(Verbosity level, const format & f)
 {
     if (level <= verbosity) {
         if (logType == ltEscapes)
-            cerr << "\033[" << escVerbosity(level) << "p"
-                 << f.str() << "\n";
+            std::cerr << "\033[" << escVerbosity(level) << "p"
+                      << f.str() << "\n";
         else
             printMsg_(level, f);
         nest = true;
@@ -383,7 +382,7 @@ void Nest::close()
     if (nest) {
         nestingLevel--;
         if (logType == ltEscapes)
-            cerr << "\033[q";
+            std::cerr << "\033[q";
         nest = false;
     }
 }
@@ -697,8 +696,8 @@ string runProgram(Path program)
             execl(program.c_str(), program.c_str(), (char *) 0);
             throw SysError(format("executing `%1%'") % program);
             
-        } catch (exception & e) {
-            cerr << "error: " << e.what() << endl;
+        } catch (std::exception & e) {
+            std::cerr << "error: " << e.what() << std::endl;
         }
         quickExit(1);
     }
@@ -743,7 +742,7 @@ void _interrupted()
     /* Block user interrupts while an exception is being handled.
        Throwing an exception while another exception is being handled
        kills the program! */
-    if (!uncaught_exception()) {
+    if (!std::uncaught_exception()) {
         _isInterrupted = 0;
         throw Error("interrupted by the user");
     }
@@ -837,7 +836,7 @@ bool statusOk(int status)
 
 string int2String(int n)
 {
-    ostringstream str;
+    std::ostringstream str;
     str << n;
     return str.str();
 }
@@ -845,7 +844,10 @@ string int2String(int n)
 
 bool string2Int(const string & s, int & n)
 {
-    istringstream str(s);
+    std::istringstream str(s);
     str >> n;
     return str && str.get() == EOF;
+}
+
+ 
 }

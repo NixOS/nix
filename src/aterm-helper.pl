@@ -40,6 +40,11 @@ my $initFun = "init";
 open HEADER, ">$ARGV[0]";
 open IMPL, ">$ARGV[1]";
 
+print HEADER "#ifdef __cplusplus\n";
+print HEADER "namespace nix {\n";
+print HEADER "#endif\n\n\n";
+print IMPL "namespace nix {\n";
+
 while (<STDIN>) {
     next if (/^\s*$/);
     
@@ -160,6 +165,11 @@ print HEADER "}\n\n";
 print IMPL "\n";
 print IMPL "void $initFun() {\n";
 print IMPL "$init";
+print IMPL "}\n";
+
+print HEADER "#ifdef __cplusplus\n";
+print HEADER "}\n";
+print HEADER "#endif\n\n\n";
 print IMPL "}\n";
 
 close HEADER;

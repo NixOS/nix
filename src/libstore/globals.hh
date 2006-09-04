@@ -1,11 +1,11 @@
 #ifndef __GLOBALS_H
 #define __GLOBALS_H
 
-#include <string>
-#include <set>
-#include "util.hh"
+#include "types.hh"
 
-using namespace std;
+
+namespace nix {
+
 
 /* Path names. */
 
@@ -66,6 +66,9 @@ Strings querySetting(const string & name, const Strings & def);
 string querySetting(const string & name, const string & def);
 
 bool queryBoolSetting(const string & name, bool def);
+
+    
+}
 
 
 #endif /* !__GLOBALS_H */

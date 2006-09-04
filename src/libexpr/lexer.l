@@ -9,7 +9,7 @@
 %{
 #include <string.h>
 #include <aterm2.h>
-#include "parser-tab.h"
+#include "parser-tab.hh"
 
 static void initLoc(YYLTYPE * loc)
 {
@@ -35,7 +35,11 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
     }
 }
 
-ATerm toATerm(const char * s);
+ATerm toATerm(const char * s)
+{
+    return (ATerm) ATmakeAppl0(ATmakeAFun((char *) s, 0, ATtrue));
+}
+
 ATerm unescapeStr(const char * s);
 
 #define YY_USER_INIT initLoc(yylloc)

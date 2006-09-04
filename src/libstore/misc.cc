@@ -1,4 +1,10 @@
+#include "misc.hh"
+#include "store.hh"
 #include "build.hh"
+#include "db.hh"
+
+
+namespace nix {
 
 
 Derivation derivationFromPath(const Path & drvPath)
@@ -80,4 +86,7 @@ void queryMissing(const PathSet & targets,
             queryReferences(noTxn, p, todo);
         }
     }
+}
+
+ 
 }

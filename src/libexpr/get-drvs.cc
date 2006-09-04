@@ -1,5 +1,9 @@
 #include "get-drvs.hh"
 #include "nixexpr-ast.hh"
+#include "util.hh"
+
+
+namespace nix {
 
 
 string DrvInfo::queryDrvPath(EvalState & state) const
@@ -66,7 +70,7 @@ static bool getDerivation(EvalState & state, Expr e,
         e = evalExpr(state, e);
         if (!matchAttrs(e, es)) return true;
 
-        shared_ptr<ATermMap> attrs(new ATermMap(32)); /* !!! */
+        boost::shared_ptr<ATermMap> attrs(new ATermMap(32)); /* !!! */
         queryAllAttrs(e, *attrs, false);
     
         Expr a = attrs->get(toATerm("type"));
@@ -182,4 +186,7 @@ void getDerivations(EvalState & state, Expr e, const string & pathPrefix,
 {
     Exprs doneExprs;
     getDerivations(state, e, pathPrefix, autoArgs, drvs, doneExprs);
+}
+
+ 
 }

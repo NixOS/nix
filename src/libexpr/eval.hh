@@ -4,16 +4,21 @@
 #include <map>
 
 #include "aterm.hh"
-#include "hash.hh"
 #include "nixexpr.hh"
 
 
-typedef map<Path, PathSet> DrvRoots;
-typedef map<Path, Hash> DrvHashes;
+namespace nix {
+
+
+class Hash;
+    
+
+typedef std::map<Path, PathSet> DrvRoots;
+typedef std::map<Path, Hash> DrvHashes;
 
 /* Cache for calls to addToStore(); maps source paths to the store
    paths. */
-typedef map<Path, Path> SrcToStore;
+typedef std::map<Path, Path> SrcToStore;
 
 struct EvalState;
 
@@ -73,6 +78,9 @@ Expr autoCallFunction(Expr e, const ATermMap & args);
 
 /* Print statistics. */
 void printEvalStats(EvalState & state);
+
+ 
+}
 
 
 #endif /* !__EVAL_H */

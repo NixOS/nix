@@ -1,7 +1,9 @@
 #include "aterm.hh"
 
+using std::string;
 
-string atPrint(ATerm t)
+
+string nix::atPrint(ATerm t)
 {
     if (!t) throw Error("attempt to print null aterm");
     char * s = ATwriteToString(t);
@@ -10,13 +12,13 @@ string atPrint(ATerm t)
 }
 
 
-ostream & operator << (ostream & stream, ATerm e)
+std::ostream & operator << (std::ostream & stream, ATerm e)
 {
-    return stream << atPrint(e);
+    return stream << nix::atPrint(e);
 }
 
 
-Error badTerm(const format & f, ATerm t)
+nix::Error nix::badTerm(const format & f, ATerm t)
 {
     char * s = ATwriteToString(t);
     if (!s) throw Error("cannot print term");
@@ -29,13 +31,13 @@ Error badTerm(const format & f, ATerm t)
 }
 
 
-ATerm toATerm(const char * s)
+ATerm nix::toATerm(const char * s)
 {
     return (ATerm) ATmakeAppl0(ATmakeAFun((char *) s, 0, ATtrue));
 }
 
 
-ATerm toATerm(const string & s)
+ATerm nix::toATerm(const string & s)
 {
     return toATerm(s.c_str());
 }

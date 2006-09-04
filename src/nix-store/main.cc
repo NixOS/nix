@@ -8,7 +8,15 @@
 #include "archive.hh"
 #include "shared.hh"
 #include "dotgraph.hh"
+#include "store.hh"
+#include "db.hh"
+#include "util.hh"
 #include "help.txt.hh"
+
+
+using namespace nix;
+using std::cin;
+using std::cout;
 
 
 typedef void (* Operation) (Strings opFlags, Strings opArgs);
@@ -528,7 +536,7 @@ static void opGC(Strings opFlags, Strings opArgs)
 
     if (action != gcDeleteDead) {
         for (PathSet::iterator i = result.begin(); i != result.end(); ++i)
-            cout << *i << endl;
+            cout << *i << std::endl;
     }
 }
 

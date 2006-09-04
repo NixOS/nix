@@ -1,10 +1,12 @@
 #include "expr-to-xml.hh"
-
 #include "xml-writer.hh"
 #include "nixexpr-ast.hh"
 #include "aterm.hh"
 
 
+namespace nix {
+
+    
 static XMLAttrs singletonAttrs(const string & name, const string & value)
 {
     XMLAttrs attrs;
@@ -84,9 +86,12 @@ static void printTermAsXML(Expr e, XMLWriter & doc)
 }
 
 
-void printTermAsXML(Expr e, ostream & out)
+void printTermAsXML(Expr e, std::ostream & out)
 {
     XMLWriter doc(true, out);
     XMLOpenElement root(doc, "expr");
     printTermAsXML(e, doc);
+}
+
+ 
 }

@@ -2,7 +2,12 @@
 #define __DERIVATIONS_H
 
 #include "aterm.hh"
-#include "store.hh"
+#include "hash.hh"
+
+#include <map>
+
+
+namespace nix {
 
 
 /* Extension of derivations in the Nix store. */
@@ -27,13 +32,13 @@ struct DerivationOutput
     }
 };
 
-typedef map<string, DerivationOutput> DerivationOutputs;
+typedef std::map<string, DerivationOutput> DerivationOutputs;
 
 /* For inputs that are sub-derivations, we specify exactly which
    output IDs we are interested in. */
-typedef map<Path, StringSet> DerivationInputs;
+typedef std::map<Path, StringSet> DerivationInputs;
 
-typedef map<string, string> StringPairs;
+typedef std::map<string, string> StringPairs;
 
 struct Derivation
 {
@@ -62,6 +67,9 @@ ATerm unparseDerivation(const Derivation & drv);
 /* Check whether a file name ends with the extensions for
    derivations. */
 bool isDerivation(const string & fileName);
+
+ 
+}
 
 
 #endif /* !__DERIVATIONS_H */

@@ -1,3 +1,13 @@
+#include "store.hh"
+#include "util.hh"
+#include "globals.hh"
+#include "db.hh"
+#include "archive.hh"
+#include "pathlocks.hh"
+#include "gc.hh"
+#include "aterm.hh"
+#include "derivations-ast.hh"
+    
 #include <iostream>
 #include <algorithm>
 
@@ -6,14 +16,9 @@
 #include <unistd.h>
 #include <utime.h>
 
-#include "store.hh"
-#include "globals.hh"
-#include "db.hh"
-#include "archive.hh"
-#include "pathlocks.hh"
-#include "gc.hh"
+namespace nix {
 
-
+    
 /* Nix database. */
 static Database nixDB;
 
@@ -956,10 +961,6 @@ void verifyStore(bool checkContents)
 }
 
 
-#include "aterm.hh"
-#include "derivations-ast.hh"
-
-
 /* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */
 static void upgradeStore07()
 {
@@ -971,7 +972,7 @@ static void upgradeStore07()
     nixDB.enumTable(txn, dbValidPaths, validPaths2);
     PathSet validPaths(validPaths2.begin(), validPaths2.end());
 
-    cerr << "hashing paths...";
+    std::cerr << "hashing paths...";
     int n = 0;
     for (PathSet::iterator i = validPaths.begin(); i != validPaths.end(); ++i) {
         checkInterrupt();
@@ -980,20 +981,20 @@ static void upgradeStore07()
         if (s == "") {
             Hash hash = hashPath(htSHA256, *i);
             setHash(txn, *i, hash);
-            cerr << ".";
+            std::cerr << ".";
             if (++n % 1000 == 0) {
                 txn.commit();
                 txn.begin(nixDB);
             }
         }
     }
-    cerr << "\n";
+    std::cerr << std::endl;
 
     txn.commit();
 
     txn.begin(nixDB);
     
-    cerr << "processing closures...";
+    std::cerr << "processing closures...";
     for (PathSet::iterator i = validPaths.begin(); i != validPaths.end(); ++i) {
         checkInterrupt();
         if (i->size() > 6 && string(*i, i->size() - 6) == ".store") {
@@ -1037,10 +1038,10 @@ static void upgradeStore07()
                     setReferences(txn, path, references);
             }
             
-            cerr << ".";
+            std::cerr << ".";
         }
     }
-    cerr << "\n";
+    std::cerr << std::endl;
 
     /* !!! maybe this transaction is way too big */
     txn.commit();
@@ -1061,7 +1062,7 @@ static void upgradeStore09()
 
     Transaction txn(nixDB);
 
-    cerr << "converting referers to referrers...";
+    std::cerr << "converting referers to referrers...";
 
     TableId dbReferers = nixDB.openTable("referers"); /* sic! */
 
@@ -1080,16 +1081,19 @@ static void upgradeStore09()
         if (++n % 1000 == 0) {
             txn.commit();
             txn.begin(nixDB);
-            cerr << "|";
+            std::cerr << "|";
         }
-        cerr << ".";
+        std::cerr << ".";
     }
 
     txn.commit();
     
-    cerr << "\n";
+    std::cerr << std::endl;
 
     nixDB.closeTable(dbReferers);
 
     nixDB.deleteTable("referers");
+}
+
+ 
 }

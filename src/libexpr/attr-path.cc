@@ -1,5 +1,9 @@
 #include "attr-path.hh"
 #include "nixexpr-ast.hh"
+#include "util.hh"
+
+
+namespace nix {
 
 
 bool isAttrs(EvalState & state, Expr e, ATermMap & attrs)
@@ -72,4 +76,7 @@ Expr findAlongAttrPath(EvalState & state, const string & attrPath,
     }
     
     return e;
+}
+
+ 
 }

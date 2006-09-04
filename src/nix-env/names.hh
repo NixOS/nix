@@ -1,10 +1,10 @@
 #ifndef __NAMES_H
 #define __NAMES_H
 
-#include <string>
-#include <list>
+#include "types.hh"
 
-#include "util.hh"
+
+namespace nix {
 
 
 struct DrvName
@@ -25,6 +25,9 @@ typedef list<DrvName> DrvNames;
 
 int compareVersions(const string & v1, const string & v2);
 DrvNames drvNamesFromArgs(const Strings & opArgs);
+
+
+}
 
 
 #endif /* !__NAMES_H */

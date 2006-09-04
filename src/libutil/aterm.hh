@@ -5,14 +5,14 @@ extern "C" {
 #include <aterm2.h>
 }
 
-#include "util.hh"
+#include "types.hh"
+
+
+namespace nix {
 
 
 /* Print an ATerm. */
 string atPrint(ATerm t);
-
-/* Write an ATerm to an output stream. */
-ostream & operator << (ostream & stream, ATerm e);
 
 class ATermIterator
 {
@@ -44,6 +44,13 @@ Error badTerm(const format & f, ATerm t);
 /* Convert strings to ATerms. */
 ATerm toATerm(const char * s);
 ATerm toATerm(const string & s);
+
+ 
+}
+
+
+/* Write an ATerm to an output stream. */
+std::ostream & operator << (std::ostream & stream, ATerm e);
 
 
 #endif /* !__ATERM_H */

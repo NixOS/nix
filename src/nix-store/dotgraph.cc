@@ -1,7 +1,14 @@
+#include "dotgraph.hh"
+#include "util.hh"
+#include "store.hh"
+#include "db.hh"
+
 #include <iostream>
 
-#include "dotgraph.hh"
-#include "build.hh"
+
+using std::cout;
+
+namespace nix {
 
 
 static string dotQuote(const string & s)
@@ -150,4 +157,7 @@ void printDotGraph(const PathSet & roots)
     }
 
     cout << "}\n";
+}
+
+ 
 }

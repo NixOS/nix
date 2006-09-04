@@ -1,7 +1,11 @@
 #include "globals.hh"
+#include "util.hh"
 
 #include <map>
 #include <algorithm>
+
+
+namespace nix {
 
 
 string nixStore = "/UNINIT";
@@ -23,7 +27,7 @@ string thisSystem = "unset";
 
 static bool settingsRead = false;
 
-static map<string, Strings> settings;
+static std::map<string, Strings> settings;
 
 
 string & at(Strings & ss, unsigned int n)
@@ -72,7 +76,7 @@ static void readSettings()
 Strings querySetting(const string & name, const Strings & def)
 {
     if (!settingsRead) readSettings();
-    map<string, Strings>::iterator i = settings.find(name);
+    std::map<string, Strings>::iterator i = settings.find(name);
     return i == settings.end() ? def : i->second;
 }
 
@@ -97,4 +101,7 @@ bool queryBoolSetting(const string & name, bool def)
     else if (v == "false") return false;
     else throw Error(format("configuration option `%1%' should be either `true' or `false', not `%2%'")
         % name % v);
+}
+
+ 
 }

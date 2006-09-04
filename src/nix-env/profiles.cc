@@ -1,10 +1,14 @@
 #include "profiles.hh"
+#include "util.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
+
+
+namespace nix {
 
 
 static bool cmpGensByNumber(const Generation & a, const Generation & b)
@@ -126,3 +130,7 @@ void switchLink(Path link, Path target)
     if (rename(tmp.c_str(), link.c_str()) != 0)
         throw SysError(format("renaming `%1%' to `%2%'") % tmp % link);
 }
+
+ 
+}
+

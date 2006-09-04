@@ -13,6 +13,9 @@
 #include "attr-path.hh"
 #include "pathlocks.hh"
 #include "xml-writer.hh"
+#include "store.hh"
+#include "db.hh"
+#include "util.hh"
 
 #include <cerrno>
 #include <ctime>
@@ -21,6 +24,10 @@
 #include <sstream>
 
 #include <unistd.h>
+
+
+using namespace nix;
+using std::cout;
 
 
 typedef enum {
@@ -224,7 +231,7 @@ static DrvInfos filterBySelector(EvalState & state,
     for (DrvNames::iterator i = selectors.begin();
          i != selectors.end(); ++i)
     {
-        typedef list<pair<DrvInfo, unsigned int> > Matches;
+        typedef list<std::pair<DrvInfo, unsigned int> > Matches;
         Matches matches;
         unsigned int n = 0;
         for (DrvInfos::const_iterator j = allElems.begin();
@@ -233,7 +240,7 @@ static DrvInfos filterBySelector(EvalState & state,
             DrvName drvName(j->name);
             if (i->matches(drvName)) {
                 i->hits++;
-                matches.push_back(pair<DrvInfo, unsigned int>(*j, n));
+                matches.push_back(std::pair<DrvInfo, unsigned int>(*j, n));
             }
         }
 
@@ -244,7 +251,7 @@ static DrvInfos filterBySelector(EvalState & state,
         if (newestOnly) {
 
             /* Map from package names to derivations. */
-            typedef map<string, pair<DrvInfo, unsigned int> > Newest;
+            typedef map<string, std::pair<DrvInfo, unsigned int> > Newest;
             Newest newest;
             StringSet multiple;
 
@@ -350,7 +357,7 @@ static void queryInstSources(EvalState & state,
                 assertStorePath(*i);
 
                 DrvInfo elem;
-                elem.attrs = shared_ptr<ATermMap>(new ATermMap(0)); /* ugh... */
+                elem.attrs = boost::shared_ptr<ATermMap>(new ATermMap(0)); /* ugh... */
                 string name = baseNameOf(*i);
                 string::size_type dash = name.find('-');
                 if (dash != string::npos)
@@ -667,7 +674,7 @@ void printTable(Table & table)
             if (column < nrColumns - 1)
                 cout << string(widths[column] - j->size() + 2, ' ');
         }
-        cout << endl;
+        cout << std::endl;
     }
 }
 
@@ -801,7 +808,7 @@ static void opQuery(Globals & globals,
     
     /* Print the desired columns, or XML output. */
     Table table;
-    ostringstream dummy;
+    std::ostringstream dummy;
     XMLWriter xml(true, *(xmlOutput ? &cout : &dummy));
     XMLOpenElement xmlRoot(xml, "items");
     

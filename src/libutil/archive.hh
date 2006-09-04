@@ -1,6 +1,10 @@
-#include <string>
+#ifndef __ARCHIVE_H
+#define __ARCHIVE_H
 
-#include "util.hh"
+#include "types.hh"
+
+
+namespace nix {
 
 
 /* dumpPath creates a Nix archive of the specified path.  The format
@@ -61,3 +65,9 @@ struct RestoreSource
 };
 
 void restorePath(const Path & path, RestoreSource & source);
+
+ 
+}
+
+
+#endif /* !__ARCHIVE_H */

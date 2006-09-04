@@ -6,7 +6,10 @@
 #include <aterm2.h>
 
 #include "aterm-map.hh"
-#include "util.hh"
+#include "types.hh"
+
+
+namespace nix {
 
 
 MakeError(EvalError, Error)
@@ -94,6 +97,9 @@ Expr makeBool(bool b);
 string showType(Expr e);
 
 string showValue(Expr e);
+
+ 
+}
 
 
 #endif /* !__NIXEXPR_H */

@@ -1,3 +1,13 @@
+#include "build.hh"
+#include "references.hh"
+#include "pathlocks.hh"
+#include "misc.hh"
+#include "globals.hh"
+#include "gc.hh"
+#include "store.hh"
+#include "db.hh"
+#include "util.hh"
+
 #include <map>
 #include <iostream>
 #include <sstream>
@@ -15,13 +25,11 @@
 #include <pwd.h>
 #include <grp.h>
 
-#include "build.hh"
-#include "references.hh"
-#include "pathlocks.hh"
-#include "misc.hh"
-#include "globals.hh"
-#include "gc.hh"
 
+namespace nix {
+
+using std::map;
+    
 
 /* !!! TODO derivationFromPath shouldn't be used here */
 
@@ -38,8 +46,8 @@ class Worker;
 
 /* A pointer to a goal. */
 class Goal;
-typedef shared_ptr<Goal> GoalPtr;
-typedef weak_ptr<Goal> WeakGoalPtr;
+typedef boost::shared_ptr<Goal> GoalPtr;
+typedef boost::weak_ptr<Goal> WeakGoalPtr;
 
 /* Set of goals. */
 typedef set<GoalPtr> Goals;
@@ -50,7 +58,7 @@ typedef map<Path, WeakGoalPtr> WeakGoalMap;
 
 
 
-class Goal : public enable_shared_from_this<Goal>
+class Goal : public boost::enable_shared_from_this<Goal>
 {
 public:
     typedef enum {ecBusy, ecSuccess, ecFailed} ExitCode;
@@ -447,8 +455,8 @@ static void killUser(uid_t uid)
             if (kill(-1, SIGKILL) == -1)
                 throw SysError(format("cannot kill processes for UID `%1%'") % uid);
         
-        } catch (exception & e) {
-            cerr << format("build error: %1%\n") % e.what();
+        } catch (std::exception & e) {
+            std::cerr << format("build error: %1%\n") % e.what();
             quickExit(1);
         }
         quickExit(0);
@@ -930,8 +938,8 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
             
             throw SysError(format("executing `%1%'") % buildHook);
             
-        } catch (exception & e) {
-            cerr << format("build error: %1%\n") % e.what();
+        } catch (std::exception & e) {
+            std::cerr << format("build error: %1%\n") % e.what();
         }
         quickExit(1);
     }
@@ -1326,8 +1334,8 @@ void DerivationGoal::startBuilder()
             throw SysError(format("executing `%1%'")
                 % drv.builder);
             
-        } catch (exception & e) {
-            cerr << format("build error: %1%\n") % e.what();
+        } catch (std::exception & e) {
+            std::cerr << format("build error: %1%\n") % e.what();
         }
         quickExit(1);
     }
@@ -1593,7 +1601,7 @@ private:
     Pid pid;
 
     /* Lock on the store path. */
-    shared_ptr<PathLocks> outputLock;
+    boost::shared_ptr<PathLocks> outputLock;
     
     typedef void (SubstitutionGoal::*GoalState)();
     GoalState state;
@@ -1719,7 +1727,7 @@ void SubstitutionGoal::tryToRun()
     }
 
     /* Acquire a lock on the output path. */
-    outputLock = shared_ptr<PathLocks>(new PathLocks);
+    outputLock = boost::shared_ptr<PathLocks>(new PathLocks);
     outputLock->lockPaths(singleton<PathSet>(storePath),
         (format("waiting for lock on `%1%'") % storePath).str());
 
@@ -1767,8 +1775,8 @@ void SubstitutionGoal::tryToRun()
             
             throw SysError(format("executing `%1%'") % sub.program);
             
-        } catch (exception & e) {
-            cerr << format("substitute error: %1%\n") % e.what();
+        } catch (std::exception & e) {
+            std::cerr << format("substitute error: %1%\n") % e.what();
         }
         quickExit(1);
     }
@@ -1930,8 +1938,8 @@ static void removeGoal(GoalPtr goal, WeakGoalMap & goalMap)
 
 void Worker::removeGoal(GoalPtr goal)
 {
-    ::removeGoal(goal, derivationGoals);
-    ::removeGoal(goal, substitutionGoals);
+    nix::removeGoal(goal, derivationGoals);
+    nix::removeGoal(goal, substitutionGoals);
     if (topGoals.find(goal) != topGoals.end()) {
         topGoals.erase(goal);
         /* If a top-level goal failed, then kill all other goals
@@ -2159,4 +2167,7 @@ void ensurePath(const Path & path)
 
     if (goal->getExitCode() != Goal::ecSuccess)
         throw Error(format("path `%1%' does not exist and cannot be created") % path);
+}
+
+ 
 }

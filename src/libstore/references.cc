@@ -1,3 +1,7 @@
+#include "references.hh"
+#include "hash.hh"
+#include "util.hh"
+
 #include <cerrno>
 #include <map>
 
@@ -7,8 +11,8 @@
 #include <dirent.h>
 #include <fcntl.h>
 
-#include "references.hh"
-#include "hash.hh"
+
+namespace nix {
 
 
 static unsigned int refLength = 32; /* characters */
@@ -90,7 +94,7 @@ void checkPath(const string & path,
 
 PathSet scanForReferences(const string & path, const PathSet & paths)
 {
-    map<string, Path> backMap;
+    std::map<string, Path> backMap;
     StringSet ids;
     StringSet seen;
 
@@ -114,10 +118,13 @@ PathSet scanForReferences(const string & path, const PathSet & paths)
 
     PathSet found;
     for (StringSet::iterator i = seen.begin(); i != seen.end(); i++) {
-        map<string, Path>::iterator j;
+        std::map<string, Path>::iterator j;
         if ((j = backMap.find(*i)) == backMap.end()) abort();
         found.insert(j->second);
     }
 
     return found;
+}
+
+ 
 }

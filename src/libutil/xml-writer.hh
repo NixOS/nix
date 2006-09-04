@@ -6,7 +6,12 @@
 #include <list>
 #include <map>
 
-using namespace std;
+
+namespace nix {
+
+using std::string;
+using std::map;
+using std::list;
 
 
 typedef map<string, string> XMLAttrs;
@@ -16,7 +21,7 @@ class XMLWriter
 {
 private:
     
-    ostream & output;
+    std::ostream & output;
 
     bool indent;
     bool closed;
@@ -25,7 +30,7 @@ private:
 
 public:
 
-    XMLWriter(bool indent, ostream & output);
+    XMLWriter(bool indent, std::ostream & output);
     ~XMLWriter();
 
     void close();
@@ -62,6 +67,9 @@ public:
         writer.closeElement();
     }
 };
+
+ 
+}
 
 
 #endif /* !__XML_WRITER_H */

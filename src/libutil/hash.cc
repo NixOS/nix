@@ -15,10 +15,14 @@ extern "C" {
 
 #include "hash.hh"
 #include "archive.hh"
+#include "util.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
+
+namespace nix {
 
 
 Hash::Hash()
@@ -89,9 +93,9 @@ Hash parseHash(HashType ht, const string & s)
         string s2(s, i * 2, 2);
         if (!isxdigit(s2[0]) || !isxdigit(s2[1])) 
             throw Error(format("invalid hash `%1%'") % s);
-        istringstream str(s2);
+        std::istringstream str(s2);
         int n;
-        str >> hex >> n;
+        str >> std::hex >> n;
         hash.hash[i] = n;
     }
     return hash;
@@ -312,4 +316,7 @@ HashType parseHashType(const string & s)
     else if (s == "sha1") return htSHA1;
     else if (s == "sha256") return htSHA256;
     else return htUnknown;
+}
+
+ 
 }

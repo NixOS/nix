@@ -1,3 +1,11 @@
+#include "shared.hh"
+#include "globals.hh"
+#include "gc.hh"
+#include "store.hh"
+#include "util.hh"
+
+#include "config.h"
+
 #include <iostream>
 #include <cctype>
 
@@ -12,12 +20,8 @@ extern "C" {
 #include <aterm2.h>
 }
 
-#include "globals.hh"
-#include "gc.hh"
-#include "store.hh"
-#include "shared.hh"
 
-#include "config.h"
+namespace nix {
 
 
 volatile sig_atomic_t blockInt = 0;
@@ -173,7 +177,7 @@ static void initAndRun(int argc, char * * argv)
             return;
         }
         else if (arg == "--version") {
-            cout << format("%1% (Nix) %2%") % programId % NIX_VERSION << endl;
+            std::cout << format("%1% (Nix) %2%") % programId % NIX_VERSION << std::endl;
             return;
         }
         else if (arg == "--keep-failed" || arg == "-K")
@@ -338,10 +342,15 @@ void switchToNixUser()
 }
 
 
+}
+
+
 static char buf[1024];
 
 int main(int argc, char * * argv)
 {
+    using namespace nix;
+    
     /* If we are setuid root, we have to get rid of the excess
        privileges ASAP. */
     switchToNixUser();
@@ -352,7 +361,7 @@ int main(int argc, char * * argv)
 
     /* Turn on buffering for cerr. */
 #if HAVE_PUBSETBUF
-    cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
+    std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
     try {
@@ -377,10 +386,12 @@ int main(int argc, char * * argv)
     } catch (Error & e) {
         printMsg(lvlError, format("error: %1%") % e.msg());
         return 1;
-    } catch (exception & e) {
+    } catch (std::exception & e) {
         printMsg(lvlError, format("error: %1%") % e.what());
         return 1;
     }
 
     return 0;
 }
+
+ 

@@ -1,7 +1,10 @@
-#include "globals.hh"
 #include "gc.hh"
+#include "globals.hh"
 #include "misc.hh"
 #include "pathlocks.hh"
+#include "store.hh"
+#include "db.hh"
+#include "util.hh"
 
 #include <boost/shared_ptr.hpp>
 
@@ -15,6 +18,9 @@
 #include <windows.h>
 #include <sys/cygwin.h>
 #endif
+
+
+namespace nix {
 
 
 static string gcLockName = "gc.lock";
@@ -192,7 +198,7 @@ void removeTempRoots()
 }
 
 
-typedef shared_ptr<AutoCloseFD> FDPtr;
+typedef boost::shared_ptr<AutoCloseFD> FDPtr;
 typedef list<FDPtr> FDs;
 
 
@@ -557,4 +563,7 @@ void collectGarbage(GCAction action, const PathSet & pathsToDelete,
 #endif
         }
     }
+}
+
+ 
 }

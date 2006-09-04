@@ -1,10 +1,13 @@
 #include "nixexpr.hh"
 #include "derivations.hh"
-
+#include "util.hh"
 
 #include "nixexpr-ast.hh"
 #include "nixexpr-ast.cc"
 
+
+namespace nix {
+    
 
 string showPos(ATerm pos)
 {
@@ -331,4 +334,7 @@ string showValue(Expr e)
     if (e == eFalse) return "false";
     /* !!! incomplete */
     return "<unknown>";
+}
+
+ 
 }

@@ -1,3 +1,7 @@
+#include "db.hh"
+#include "util.hh"
+#include "pathlocks.hh"
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -7,9 +11,8 @@
 
 #include <db_cxx.h>
 
-#include "db.hh"
-#include "util.hh"
-#include "pathlocks.hh"
+
+namespace nix {
 
 
 /* Wrapper class to ensure proper destruction. */
@@ -112,7 +115,7 @@ Db * Database::getDb(TableId table)
     if (table == 0)
         throw Error("database table is not open "
             "(maybe you don't have sufficient permission?)");
-    map<TableId, Db *>::iterator i = tables.find(table);
+    std::map<TableId, Db *>::iterator i = tables.find(table);
     if (i == tables.end())
         throw Error("unknown table id");
     return i->second;
@@ -263,10 +266,10 @@ void Database::close()
 
     try {
 
-        for (map<TableId, Db *>::iterator i = tables.begin();
+        for (std::map<TableId, Db *>::iterator i = tables.begin();
              i != tables.end(); )
         {
-            map<TableId, Db *>::iterator j = i;
+            std::map<TableId, Db *>::iterator j = i;
             ++j;
             closeTable(i->first);
             i = j;
@@ -432,4 +435,7 @@ void Database::enumTable(const Transaction & txn, TableId table,
         }
 
     } catch (DbException e) { rethrow(e); }
+}
+
+ 
 }

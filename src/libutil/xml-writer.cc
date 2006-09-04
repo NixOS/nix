@@ -3,7 +3,10 @@
 #include "xml-writer.hh"
 
 
-XMLWriter::XMLWriter(bool indent, ostream & output)
+namespace nix {
+    
+
+XMLWriter::XMLWriter(bool indent, std::ostream & output)
     : output(output), indent(indent)
 {
     output << "<?xml version='1.0' encoding='utf-8'?>\n";
@@ -122,3 +125,6 @@ int main(int argc, char * * argv)
     return 0;
 }
 #endif
+
+ 
+}

@@ -1,7 +1,10 @@
 #ifndef __PATHLOCKS_H
 #define __PATHLOCKS_H
 
-#include "util.hh"
+#include "types.hh"
+
+
+namespace nix {
 
 
 /* Open (possibly create) a lock file and return the file descriptor.
@@ -22,7 +25,7 @@ bool lockFile(int fd, LockType lockType, bool wait);
 class PathLocks 
 {
 private:
-    typedef pair<int, Path> FDPair;
+    typedef std::pair<int, Path> FDPair;
     list<FDPair> fds;
     bool deletePaths;
 
@@ -35,6 +38,9 @@ public:
     ~PathLocks();
     void setDeletion(bool deletePaths);
 };
+
+
+}
 
 
 #endif /* !__PATHLOCKS_H */
