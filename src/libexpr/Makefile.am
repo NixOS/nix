@@ -1,14 +1,14 @@
 pkglib_LTLIBRARIES = libexpr.la
 
-libexpr_la_SOURCES = nixexpr.cc nixexpr.hh parser.cc parser.hh \
+libexpr_la_SOURCES = nixexpr.cc nixexpr.hh \
  eval.cc eval.hh primops.cc \
- lexer-tab.c lexer-tab.h parser-tab.cc parser-tab.hh \
+ lexer-tab.cc lexer-tab.hh parser-tab.cc parser-tab.hh \
  get-drvs.cc get-drvs.hh \
  attr-path.cc attr-path.hh \
  expr-to-xml.cc expr-to-xml.hh 
 
 BUILT_SOURCES = nixexpr-ast.cc nixexpr-ast.hh \
- parser-tab.hh lexer-tab.h parser-tab.cc lexer-tab.c
+ parser-tab.hh lexer-tab.hh parser-tab.cc lexer-tab.cc
 
 EXTRA_DIST = lexer.l parser.y nixexpr-ast.def nixexpr-ast.cc
 
@@ -24,8 +24,8 @@ AM_CFLAGS = \
 parser-tab.cc parser-tab.hh: parser.y
 	$(bison) -v -o parser-tab.cc $(srcdir)/parser.y -d
 
-lexer-tab.c lexer-tab.h: lexer.l
-	$(flex) --outfile lexer-tab.c --header-file=lexer-tab.h $(srcdir)/lexer.l 
+lexer-tab.cc lexer-tab.hh: lexer.l
+	$(flex) --outfile lexer-tab.cc --header-file=lexer-tab.hh $(srcdir)/lexer.l 
 
 
 # ATerm helper function generation.

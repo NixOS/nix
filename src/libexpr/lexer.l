@@ -7,16 +7,23 @@
 
 
 %{
-#include <string.h>
-#include <aterm2.h>
+#include "aterm.hh"
+#include "nixexpr.hh"
+#include "nixexpr-ast.hh"
 #include "parser-tab.hh"
 
+using namespace nix;
+
+namespace nix {
+
+    
 static void initLoc(YYLTYPE * loc)
 {
     loc->first_line = 1;
     loc->first_column = 1;
 }
 
+    
 static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 {
     while (len--) {
@@ -35,12 +42,32 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
     }
 }
 
-ATerm toATerm(const char * s)
+
+static Expr unescapeStr(const char * s)
 {
-    return (ATerm) ATmakeAppl0(ATmakeAFun((char *) s, 0, ATtrue));
+    string t;
+    char c;
+    while ((c = *s++)) {
+        if (c == '\\') {
+            assert(*s);
+            c = *s++;
+            if (c == 'n') t += '\n';
+            else if (c == 'r') t += '\r';
+            else if (c == 't') t += '\t';
+            else t += c;
+        }
+        else if (c == '\r') {
+            /* Normalise CR and CR/LF into LF. */
+            t += '\n';
+            if (*s == '\n') s++; /* cr/lf */
+        }
+        else t += c;
+    }
+    return makeStr(toATerm(t));
 }
 
-ATerm unescapeStr(const char * s);
+ 
+}
 
 #define YY_USER_INIT initLoc(yylloc)
 #define YY_USER_ACTION adjustLoc(yylloc, yytext, yyleng);
@@ -106,12 +133,17 @@ inherit     { return INHERIT; }
 
 %%
 
+
+namespace nix {
+    
 /* Horrible, disgusting hack: allow the parser to set the scanner
    start condition back to STRING.  Necessary in interpolations like
    "foo${expr}bar"; after the close brace we have to go back to the
    STRING state. */
 void backToString(yyscan_t scanner)
 {
-    struct yyguts_t * yyg = (struct yyguts_t*) scanner;
+    struct yyguts_t * yyg = (struct yyguts_t *) scanner;
     BEGIN(STRING);
+}
+
 }
