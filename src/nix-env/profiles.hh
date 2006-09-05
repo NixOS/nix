@@ -3,6 +3,8 @@
 
 #include "types.hh"
 
+#include <time.h>
+
 
 namespace nix {
 
