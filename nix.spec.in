@@ -70,6 +70,7 @@ fi
 %{_prefix}/bin
 %{_prefix}/lib
 %{_prefix}/libexec
+%{_prefix}/include
 %{_prefix}/var
 %{_prefix}/share
 %{_prefix}/man
