@@ -503,7 +503,7 @@ struct PrintFreed
     bool show, dryRun;
     unsigned long long bytesFreed;
     PrintFreed(bool show, bool dryRun)
-        : bytesFreed(0), show(show), dryRun(dryRun) { }
+        : show(show), dryRun(dryRun), bytesFreed(0) { }
     ~PrintFreed() 
     {
         if (show)

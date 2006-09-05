@@ -40,6 +40,7 @@ my $initFun = "init";
 open HEADER, ">$ARGV[0]";
 open IMPL, ">$ARGV[1]";
 
+print HEADER "#include <aterm2.h>\n";
 print HEADER "#ifdef __cplusplus\n";
 print HEADER "namespace nix {\n";
 print HEADER "#endif\n\n\n";

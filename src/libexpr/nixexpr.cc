@@ -1,6 +1,7 @@
 #include "nixexpr.hh"
 #include "derivations.hh"
 #include "util.hh"
+#include "aterm.hh"
 
 #include "nixexpr-ast.hh"
 #include "nixexpr-ast.cc"
