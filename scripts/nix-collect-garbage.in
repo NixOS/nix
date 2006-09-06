@@ -1,2 +1,42 @@
-#! @shell@ -e
-exec @bindir@/nix-store --gc "$@"
+#! @perl@ -w
+
+use strict;
+
+my $profilesDir = "@localstatedir@/nix/profiles";
+
+
+# Process the command line arguments.
+my @args = ();
+my $removeOld = 0;
+
+for my $arg (@ARGV) {
+    if ($arg eq "--delete-old" || $arg eq "-d") {
+        $removeOld = 1;
+    } else {
+        push @args, $arg;
+    }
+}
+
+
+# If `-d' was specified, remove all old generations of all profiles.
+# Of course, this makes rollbacks to before this point in time
+# impossible.
+if ($removeOld) {
+
+    opendir DIR, $profilesDir or die;
+
+    foreach my $name (sort (readdir DIR)) {
+        $name = $profilesDir . "/" . $name;
+        if (-l $name && (readlink($name) =~ /link/)) {
+            print STDERR "removing old generations of profile $name\n";
+            system "@bindir@/nix-env", "-p", $name, "--delete-generations", "old";
+        }
+    }
+    
+    closedir DIR or die;
+    
+}
+
+
+# Run the actual garbage collector.
+exec "@bindir@/nix-store", "--gc", @args;
