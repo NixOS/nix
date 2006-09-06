@@ -115,9 +115,6 @@ irreversible.</para></warning>
   <listitem><para><command>bsdiff</command> updated
   4.3.</para></listitem>
 
-  <listitem><para>TODO: open files etc. are now used as roots of the
-  garbage collector (r5796).</para></listitem>
-
   <listitem><para>TODO: --attr / -A flags in
   nix-env/nix-instantiate/nix-build.  Also nix-env -qa
   --attr.</para></listitem>
@@ -127,11 +124,35 @@ irreversible.</para></warning>
   the build result to be named something other than
   <literal>result</literal>.</para></listitem>
 
-  <listitem><para><literal>nix-store --gc</literal>
-  (a.k.a. <command>nix-collect-garbage</command>) prints out the
-  number of bytes freed on standard output.  <literal>nix-store --gc
-  --print-dead</literal> shows how many bytes would be freed by an
-  actual garbage collection.</para></listitem>
+  <listitem><para>Garbage collector improvements:
+
+    <itemizedlist>
+
+      <listitem><para>Open files (such as running programs) are now
+      used as roots of the garbage collector.  This prevents programs
+      that have been uninstalled from being garbage collected while
+      they are still running.  The script that detects these
+      additional runtime roots
+      (<filename>find-runtime-roots.pl</filename>) is inherently
+      system-specific, but it should work on Linux and on all
+      platforms that have the <command>lsof</command>
+      utility.</para></listitem>
+
+      <listitem><para><literal>nix-store --gc</literal>
+      (a.k.a. <command>nix-collect-garbage</command>) prints out the
+      number of bytes freed on standard output.  <literal>nix-store
+      --gc --print-dead</literal> shows how many bytes would be freed
+      by an actual garbage collection.</para></listitem>
+
+      <listitem><para><literal>nix-collect-garbage -d</literal>
+      removes all old generations of <emphasis>all</emphasis> profiles
+      before calling the actual garbage collector (<literal>nix-store
+      --gc</literal>).  This is an easy way to get rid of all old
+      packages in the Nix store.</para></listitem>
+
+    </itemizedlist>
+
+  </para></listitem>
 
   <listitem><para>New command <literal>nix-store --delete</literal> to
   delete specific paths from the Nix store.  It won’t delete reachable
