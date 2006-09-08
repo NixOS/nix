@@ -116,7 +116,6 @@ void run(Strings args)
             if (i == args.end())
                 throw UsageError("`--arg' requires two arguments");
             Expr value = parseExprFromString(state, *i++, absPath("."));
-            printMsg(lvlError, format("X %1% Y %2%") % name % value);
             autoArgs.set(toATerm(name), value);
         }
         else if (arg == "--add-root") {
