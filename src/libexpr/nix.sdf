@@ -18,7 +18,11 @@ exports
   context-free start-symbols Expr
   context-free syntax
 
-    Id | Int | Str | Uri | Path -> Expr {cons("Var")}
+    Id -> Expr {cons("Var")}
+    Int -> Expr {cons("Int")}
+    Str -> Expr {cons("Str")}
+    Uri -> Expr {cons("Uri")}
+    Path -> Expr {cons("Path")}
 
     "(" Expr ")" -> Expr {bracket}
 
@@ -41,7 +45,7 @@ exports
     "inherit" ("(" Expr ")")? Id* ";" -> Bind {cons("Inherit")}
 
     "[" ExprList "]" -> Expr {cons("List")}
-    "" -> ExprList {cons("ExprNil")}
+    -> ExprList {cons("ExprNil")}
     Expr ExprList -> ExprList {cons("ExprCons")}
 
     Expr "." Id -> Expr {cons("Select")}
@@ -60,6 +64,7 @@ exports
     Expr "~" Expr -> Expr {cons("SubPath"), non-assoc}
     Expr "?" Id -> Expr {cons("OpHasAttr")}
     Expr "+" Expr -> Expr {cons("OpPlus"), left}
+    Expr "++" Expr -> Expr {cons("OpConcat"), right}
 
   context-free priorities
 
@@ -68,11 +73,13 @@ exports
   > Expr Expr -> Expr
   > Expr "~" Expr -> Expr
   > Expr "?" Id -> Expr
+  > Expr "++" Expr -> Expr
   > Expr "+" Expr -> Expr
   > "!" Expr -> Expr
   > Expr "//" Expr -> Expr
-  > Expr "==" Expr -> Expr
-  > Expr "!=" Expr -> Expr
+  > { Expr "==" Expr -> Expr
+      Expr "!=" Expr -> Expr
+    }
   > Expr "&&" Expr -> Expr
   > Expr "||" Expr -> Expr
   > Expr "->" Expr -> Expr
@@ -99,7 +106,7 @@ exports
 
     [a-zA-Z0-9\.\_\-\+]* ("/"[a-zA-Z0-9\.\_\-\+]+)+ -> Path
 
-    [a-zA-Z] [a-zA-Z0-9\+\-\.]* ":" [a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*\']* -> Uri
+    [a-zA-Z] [a-zA-Z0-9\+\-\.]* ":" [a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*\']+ -> Uri
 
   lexical restrictions
     Id -/- [a-zA-Z0-9\_\']
@@ -125,4 +132,5 @@ exports
   lexical restrictions
     HashComment -/- ~[\n]
   context-free restrictions
-    LAYOUT? -/- [\ \t\n]
+    LAYOUT? -/- [\ \t\n\#]
+    LAYOUT? -/- [\/].[\*]
