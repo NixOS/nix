@@ -72,4 +72,44 @@ other.</para>
 </sect1>
 
 
+<sect1><title><quote>Too many links</quote> error in the Nix
+store</title>
+
+
+<para>Symptom: when building something, you get an error message such as
+
+<screen>
+...
+<literal>mkdir: cannot create directory `/nix/store/<replaceable>name</replaceable>': Too many links</literal></screen>
+
+</para>
+
+<para>This is usually because you have more than 32,000 subdirectories
+in <filename>/nix/store</filename>, as can be seen using <command>ls
+-l</command>:
+
+<screen>
+$ ls -l /nix/store
+drwxrwxrwt 32000 nix nix 4620288 Sep 8 15:08 store</screen>
+
+The <literal>ext2</literal> file system is limited to a inode link
+count of 32,000 (each subdirectory increasing the count by one).
+Furthermore, the <literal>st_nlink</literal> field of the
+<function>stat</function> system call is a 16-bit value.</para>
+
+<para>This only happens on very large Nix installations (such as build
+machines).</para>
+
+<para>Quick solution: run the garbage collector.</para>
+
+<para>Real solution: put the Nix store on a file system that supports
+more than 32,000 subdirectories per directory, such as ReiserFS.
+(This doesn’t solve the <literal>st_nlink</literal> limit, but
+ReiserFS lies to the kernel by reporting a link count of 1 if it
+exceeds the limit.)</para>
+
+</sect1>
+  
+
+
 </appendix>
