@@ -943,6 +943,9 @@ static const int prevGen = -2;
 
 static void switchGeneration(Globals & globals, int dstGen)
 {
+    PathLocks lock;
+    lockProfile(lock, globals.profile);
+    
     int curGen;
     Generations gens = findGenerations(globals.profile, curGen);
 
@@ -1004,6 +1007,9 @@ static void opListGenerations(Globals & globals,
     if (opArgs.size() != 0)
         throw UsageError(format("no arguments expected"));
 
+    PathLocks lock;
+    lockProfile(lock, globals.profile);
+    
     int curGen;
     Generations gens = findGenerations(globals.profile, curGen);
 
@@ -1032,6 +1038,9 @@ static void opDeleteGenerations(Globals & globals,
     if (opFlags.size() > 0)
         throw UsageError(format("unknown flag `%1%'") % opFlags.front());
 
+    PathLocks lock;
+    lockProfile(lock, globals.profile);
+    
     int curGen;
     Generations gens = findGenerations(globals.profile, curGen);
 
