@@ -81,8 +81,8 @@ Path createGeneration(Path profile, Path outPath)
        previous ones. */
     int dummy;
     Generations gens = findGenerations(profile, dummy);
-    unsigned int num = gens.size() > 0 ? gens.front().number : 0;
-        
+    unsigned int num = gens.size() > 0 ? gens.back().number : 0;
+
     /* Create the new generation.  Note that addPermRoot() blocks if
        the garbage collector is running to prevent the stuff we've
        build from moving from the temporary roots (which the GC knows)
