@@ -39,7 +39,7 @@ void removeTempRoots();
 
 /* Register a permanent GC root. */
 Path addPermRoot(const Path & storePath, const Path & gcRoot,
-    bool indirect);
+    bool indirect, bool allowOutsideRootsDir = false);
 
 
 }

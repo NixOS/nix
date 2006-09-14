@@ -44,7 +44,10 @@ static int openGCLock(LockType lockType)
     if (fdGCLock == -1)
         throw SysError(format("opening global GC lock `%1%'") % fnGCLock);
 
-    lockFile(fdGCLock, lockType, true);
+    if (!lockFile(fdGCLock, lockType, false)) {
+        printMsg(lvlError, format("waiting for the big garbage collector lock..."));
+        lockFile(fdGCLock, lockType, true);
+    }
 
     /* !!! Restrict read permission on the GC root.  Otherwise any
        process that can open the file for reading can DoS the
@@ -74,7 +77,7 @@ void createSymlink(const Path & link, const Path & target, bool careful)
 
 
 Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
-    bool indirect)
+    bool indirect, bool allowOutsideRootsDir)
 {
     Path storePath(canonPath(_storePath));
     Path gcRoot(canonPath(_gcRoot));
@@ -97,14 +100,16 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
     }
 
     else {
-        Path rootsDir = canonPath((format("%1%/%2%") % nixStateDir % gcRootsDir).str());
+        if (!allowOutsideRootsDir) {
+            Path rootsDir = canonPath((format("%1%/%2%") % nixStateDir % gcRootsDir).str());
     
-        if (string(gcRoot, 0, rootsDir.size() + 1) != rootsDir + "/")
-            throw Error(format(
-                "path `%1%' is not a valid garbage collector root; "
-                "it's not in the directory `%2%'")
-                % gcRoot % rootsDir);
-
+            if (string(gcRoot, 0, rootsDir.size() + 1) != rootsDir + "/")
+                throw Error(format(
+                    "path `%1%' is not a valid garbage collector root; "
+                    "it's not in the directory `%2%'")
+                    % gcRoot % rootsDir);
+        }
+            
         createSymlink(gcRoot, storePath, false);
     }
 

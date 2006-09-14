@@ -1,5 +1,6 @@
 #include "profiles.hh"
 #include "util.hh"
+#include "gc.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -82,19 +83,17 @@ Path createGeneration(Path profile, Path outPath)
     Generations gens = findGenerations(profile, dummy);
     unsigned int num = gens.size() > 0 ? gens.front().number : 0;
         
-    /* Create the new generation. */
-    Path outLink;
+    /* Create the new generation.  Note that addPermRoot() blocks if
+       the garbage collector is running to prevent the stuff we've
+       build from moving from the temporary roots (which the GC knows)
+       to the permanent roots (of which the GC would have a stale
+       view).  If we didn't do it this way, the GC might remove the
+       user environment etc. we've just built. */
+    Path generation;
+    makeName(profile, num + 1, generation);
+    addPermRoot(outPath, generation, false, true);
 
-    while (1) {
-        makeName(profile, num, outLink);
-        if (symlink(outPath.c_str(), outLink.c_str()) == 0) break;
-        if (errno != EEXIST)
-            throw SysError(format("creating symlink `%1%'") % outLink);
-        /* Somebody beat us to it, retry with a higher number. */
-        num++;
-    }
-
-    return outLink;
+    return generation;
 }
 
 
