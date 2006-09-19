@@ -4,8 +4,7 @@ use strict;
 use File::Basename;
 
 
-#my @paths = ("/nix/store");
-my @paths = ("test");
+my @paths = ("/nix/store");
 
 
 print "hashing...\n";
