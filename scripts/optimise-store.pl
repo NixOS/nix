@@ -7,7 +7,6 @@ use strict;
   select $ofh;
 }
 
-#my @paths = ("/nix/store/caef3a49150506d233f474322a824e50-glibc-2.3.3", "/nix/store/a8a9d585d1ad4b1bc911be7743b3b996-glibc-2.3.3");
 my @paths = ("/nix/store");
 
 my $tmpfile = "/tmp/nix-optimise-hash-list";
