@@ -4,7 +4,8 @@ use strict;
 use File::Basename;
 
 
-my @paths = ("/nix/store");
+#my @paths = ("/nix/store");
+my @paths = ("test");
 
 
 print "hashing...\n";
@@ -37,6 +38,7 @@ sub atomicLink {
     rename $tmpNew, $new or die "cannot rename `$tmpNew' to `$new': $!";
 
     chmod ($st[2], $dir) or die "cannot restore permission on `$dir': $!";
+    utime ($st[8], $st[9], $dir) or die "cannot restore timestamp on `$dir': $!";
 }
 
 
@@ -47,6 +49,7 @@ open LIST, "<$hashList.sorted" or die;
 my $prevFile;
 my $prevHash;
 my $prevInode;
+my $prevExec;
 
 my $totalSpace = 0;
 my $savedSpace = 0;
@@ -61,8 +64,11 @@ while (<LIST>) {
 
     my $fileSize = $st[7];
     $totalSpace += $fileSize;
+    my $isExec = ($st[2] & 0111) == 0111;
 
-    if (defined $prevHash && $curHash eq $prevHash) {
+    if (defined $prevHash && $curHash eq $prevHash
+        && $prevExec == $isExec)
+    {
         
         if ($st[1] != $prevInode) {
             print "$curFile = $prevFile\n";
@@ -74,6 +80,7 @@ while (<LIST>) {
         $prevFile = $curFile;
         $prevHash = $curHash;
         $prevInode = $st[1];
+        $prevExec = ($st[2] & 0111) == 0111;
     }
 }
 
