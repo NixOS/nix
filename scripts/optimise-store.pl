@@ -2,23 +2,23 @@
 
 use strict;
 
-{ my $ofh = select STDOUT;
-  $| = 1;
-  select $ofh;
-}
+#{ my $ofh = select STDOUT;
+#  $| = 1;
+#  select $ofh;
+#}
 
+#my @paths = ("/nix/store/d49mc94xwwd7wf1xzfh4ch4cypn0ajjr-glibc-2.3.6", "/nix/store/1mgfgy3ga4m9z60747s0yzxl0g6w5kxz-glibc-2.3.6");
 my @paths = ("/nix/store");
 
-my $tmpfile = "/tmp/nix-optimise-hash-list";
-#my $tmpfile = "/data/nix-optimise-hash-list";
+my $hashList = "/tmp/nix-optimise-hash-list";
 
-system("find @paths -type f -print0 | xargs -0 md5sum -- > $tmpfile") == 0
+system("find @paths -type f -print0 | xargs -0 md5sum -- > $hashList") == 0
     or die "cannot hash store files";
 
-system("sort $tmpfile > $tmpfile.sorted") == 0
+system("sort $hashList > $hashList.sorted") == 0
     or die "cannot sort list";
 
-open LIST, "<$tmpfile.sorted" or die;
+open LIST, "<$hashList.sorted" or die;
 
 my $prevFile;
 my $prevHash;
@@ -29,20 +29,16 @@ my $savedSpace = 0;
 my $files = 0;
 
 while (<LIST>) {
-#    print "D";
     /^([0-9a-f]*)\s+(.*)$/ or die;
     my $curFile = $2;
     my $curHash = $1;
 
-#    print "A";
     my $fileSize = (stat $curFile)[7];
-#    print "B";
-#    my $fileSize = 1;
     $totalSpace += $fileSize;
 
     if (defined $prevHash && $curHash eq $prevHash) {
         
-#        print "$curFile = $prevFile\n";
+        print "$curFile = $prevFile\n";
 
         $savedSpace += $fileSize;
         
@@ -51,13 +47,10 @@ while (<LIST>) {
         $prevHash = $curHash;
     }
 
-    print "." if ($files++ % 100 == 0);
-    #print ".";
-
-#    print "C";
+#    print "." if ($files++ % 100 == 0);
 }
 
-print "\n";
+#print "\n";
 
 print "total space = $totalSpace\n";
 print "saved space = $savedSpace\n";
