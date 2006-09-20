@@ -66,6 +66,7 @@ string showPos(ATerm pos);
    function to the resulting term. */
 struct TermFun
 {
+    virtual ~TermFun() { }
     virtual ATerm operator () (ATerm e) = 0;
 };
 ATerm bottomupRewrite(TermFun & f, ATerm e);
