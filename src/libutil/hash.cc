@@ -120,6 +120,12 @@ static unsigned char divMod(unsigned char * bytes, unsigned char y)
 }
 
 
+unsigned int hashLength32(const Hash & hash)
+{
+    return (hash.hashSize * 8 - 1) / 5 + 1;
+}
+
+
 // omitted: E O U T
 const string base32Chars = "0123456789abcdfghijklmnpqrsvwxyz";
 
@@ -127,7 +133,7 @@ const string base32Chars = "0123456789abcdfghijklmnpqrsvwxyz";
 string printHash32(const Hash & hash)
 {
     Hash hash2(hash);
-    unsigned int len = (hash.hashSize * 8 - 1) / 5 + 1;
+    unsigned int len = hashLength32(hash);
 
     const char * chars = base32Chars.c_str();
     

@@ -353,13 +353,16 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
         HashType ht = parseHashType(outputHashAlgo);
         if (ht == htUnknown)
             throw EvalError(format("unknown hash algorithm `%1%'") % outputHashAlgo);
-        Hash h;
-        if (outputHash.size() == Hash(ht).hashSize * 2)
+        Hash h(ht);
+        if (outputHash.size() == h.hashSize * 2)
             /* hexadecimal representation */
             h = parseHash(ht, outputHash);
-        else
+        else if (outputHash.size() == hashLength32(h))
             /* base-32 representation */
             h = parseHash32(ht, outputHash);
+        else
+            throw Error(format("hash `%1%' has wrong length for hash type `%2%'")
+                % outputHash % outputHashAlgo);
         string s = outputHash;
         outputHash = printHash(h);
         if (outputHashRecursive) outputHashAlgo = "r:" + outputHashAlgo;
