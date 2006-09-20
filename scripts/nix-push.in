@@ -37,8 +37,22 @@ my $archivesPutURL;
 my $archivesGetURL;
 my $manifestPutURL;
 
+sub showSyntax {
+    print STDERR <<EOF
+Usage: nix-push --copy ARCHIVES_DIR MANIFEST_FILE PATHS...
+   or: nix-push ARCHIVES_PUT_URL ARCHIVES_GET_URL MANIFEST_PUT_URL PATHS...
+
+`nix-push' copies or uploads the closure of PATHS to the given
+destination.
+EOF
+    ; # `
+    exit 1;
+}
+
+showSyntax if scalar @ARGV < 1;
+
 if ($ARGV[0] eq "--copy") {
-    die "syntax: nix-push --copy ARCHIVES_DIR MANIFEST_FILE PATHS...\n" if scalar @ARGV < 3;
+    showSyntax if scalar @ARGV < 3;
     $localCopy = 1;
     shift @ARGV;
     $localArchivesDir = shift @ARGV;
@@ -52,8 +66,7 @@ if ($ARGV[0] eq "--copy") {
     }
 }
 else {
-    die "syntax: nix-push ARCHIVES_PUT_URL ARCHIVES_GET_URL " .
-        "MANIFEST_PUT_URL PATHS...\n" if scalar @ARGV < 3;
+    showSyntax if scalar @ARGV < 3;
     $localCopy = 0;
     $archivesPutURL = shift @ARGV;
     $archivesGetURL = shift @ARGV;
@@ -95,15 +108,9 @@ foreach my $storePath (@storePaths) {
     die unless ($storePath =~ /\/[0-9a-z]{32}.*$/);
 
     # Construct a Nix expression that creates a Nix archive.
-    # !!! the string reference to `$storePath' is impure!  We could
-    # also pass it as a normal input, but that would cause it to be
-    # copied, and its name would be expanded (e.g.,
-    # /nix/store/HASH1-HASH2-symname).  nix-instantiate should be
-    # smart enough to add store paths as direct references of the Nix
-    # expression.
     my $nixexpr = 
         "((import $dataDir/nix/corepkgs/nar/nar.nix) " .
-        "{storePath = \"$storePath\"; system = \"@system@\"; hashAlgo = \"$hashAlgo\";}) ";
+        "{storePath = $storePath; system = \"@system@\"; hashAlgo = \"$hashAlgo\";}) ";
     
     print NIX $nixexpr;
 }
