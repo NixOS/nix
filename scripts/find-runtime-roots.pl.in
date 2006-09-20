@@ -43,7 +43,7 @@ sub readProc {
 
 
 sub lsof {
-    return unless open LSOF, "lsof -n -w -F n |";
+    return unless open LSOF, "lsof -n -w -F n 2> /dev/null |";
 
     while (<LSOF>) {
         next unless /^n (\/ .*)$/x;
