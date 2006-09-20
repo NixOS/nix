@@ -11,7 +11,7 @@ $(DB).tar.gz:
 
 $(DB): $(DB).tar.gz
 	gunzip < $(srcdir)/$(DB).tar.gz | tar xvf -
-	(cd $(DB) && patch -p1) < $(srcdir)/bdb-cygwin.patch
+	(cd $(DB) && $(patch) -p1) < $(srcdir)/bdb-cygwin.patch
 
 have-db:
 	$(MAKE) $(DB)
@@ -46,7 +46,7 @@ $(ATERM).tar.gz:
 
 $(ATERM): $(ATERM).tar.gz
 	gunzip < $(srcdir)/$(ATERM).tar.gz | tar xvf -
-	(cd $(ATERM) && patch -p1) < $(srcdir)/aterm-aliasing.patch
+	(cd $(ATERM) && $(patch) -p1) < $(srcdir)/aterm-aliasing.patch
 
 have-aterm:
 	$(MAKE) $(ATERM)
