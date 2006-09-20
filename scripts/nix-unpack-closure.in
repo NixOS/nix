@@ -15,7 +15,7 @@ $binDir = "@bindir@" unless defined $binDir;
 my $tmpDir;
 do { $tmpDir = tmpnam(); }
 until mkdir $tmpDir, 0777;
-END { system "rm -rf '$tmpDir'"; }
+END { system "@coreutils@/rm -rf '$tmpDir'"; }
 
 
 # Unpack the NAR archive on standard input.
@@ -34,15 +34,15 @@ opendir(DIR, "$tmpDir/unpacked/contents") or die "cannot open directory: $!";
 foreach my $name (sort(readdir DIR)) {
     next if $name eq "." or $name eq "..";
 
-    my $storePath = "/nix/store/$name"; # !!!
+    my $storePath = "@storedir@/$name"; # !!!
 
     # !!! this really isn't a good validity check!
-    system "/nix/bin/nix-store --check-validity '$storePath' 2> /dev/null";
+    system "$binDir/nix-store --check-validity '$storePath' 2> /dev/null";
     if ($? != 0) {
         print STDERR "unpacking `$storePath'...\n";
 
         # !!! race
-        system("rm -rf '$storePath'") == 0
+        system("@coreutils@/rm -rf '$storePath'") == 0
             or die "cannot remove `$storePath': $?";
 
         system("$binDir/nix-store --restore '$storePath' < '$tmpDir/unpacked/contents/$name'") == 0
