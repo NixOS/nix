@@ -15,6 +15,8 @@ Operations:
   --register-validity: register path validity (dangerous!)
   --check-validity: check path validity
 
+  --gc: run the garbage collector
+
   --dump: dump a path as a Nix archive
   --restore: restore a path from a Nix archive
 
@@ -39,7 +41,14 @@ Query switches (not applicable to all queries):
   --use-output: perform query on output of derivation, not derivation itself
   --force-realise: realise the path before performing the query
   --include-outputs: in `-R' on a derivation, include requisites of outputs
-  
+
+Garbage collector options:
+
+  --print-roots: print GC roots and exit
+  --print-live: print live paths and exit
+  --print-dead: print dead paths and exit
+  --delete: delete dead paths (default)
+    
 Options:
 
   --verbose / -v: verbose operation (may be repeated)
