@@ -1,7 +1,6 @@
 source common.sh
 
-profiles="$NIX_STATE_DIR"/profiles
-rm -f $profiles/*
+clearProfiles
 
 # Query installed: should be empty.
 test "$($nixenv -p $profiles/test -q '*' | wc -l)" -eq 0

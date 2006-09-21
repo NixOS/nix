@@ -1,15 +1,5 @@
 source common.sh
 
-clearStore () {
-    echo "clearing store..."
-    chmod -R +w "$NIX_STORE_DIR"
-    rm -rf "$NIX_STORE_DIR"
-    mkdir "$NIX_STORE_DIR"
-    rm -rf "$NIX_DB_DIR"
-    mkdir "$NIX_DB_DIR"
-    $nixstore --init
-}
-
 pullCache () {
     echo "pulling cache..."
     $PERL -w -I$TOP/scripts $TOP/scripts/nix-pull file://$TEST_ROOT/manifest

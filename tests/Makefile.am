@@ -3,7 +3,7 @@ TESTS_ENVIRONMENT = $(SHELL) -e
 extra1 = $(shell pwd)/test-tmp/shared
 
 simple.sh: simple.nix
-dependencies.sh gc.sh nix-push.sh nix-pull.in logging.sh nix-build.sh: dependencies.nix
+dependencies.sh gc.sh nix-push.sh nix-pull.in logging.sh nix-build.sh install-package.sh: dependencies.nix
 locking.sh: locking.nix
 parallel.sh: parallel.nix
 build-hook.sh: build-hook.nix
@@ -19,7 +19,7 @@ TESTS = init.sh hash.sh lang.sh add.sh simple.sh dependencies.sh \
   locking.sh parallel.sh build-hook.sh substitutes.sh substitutes2.sh \
   fallback.sh nix-push.sh gc.sh gc-concurrent.sh verify.sh nix-pull.sh \
   referrers.sh user-envs.sh logging.sh nix-build.sh misc.sh fixed.sh \
-  gc-runtime.sh
+  gc-runtime.sh install-package.sh
 
 XFAIL_TESTS =
 

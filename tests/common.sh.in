@@ -47,3 +47,18 @@ export nixhash=$TOP/src/nix-hash/nix-hash
 readLink() {
     ls -l "$1" | sed 's/.*->\ //'
 }
+
+clearStore() {
+    echo "clearing store..."
+    chmod -R +w "$NIX_STORE_DIR"
+    rm -rf "$NIX_STORE_DIR"
+    mkdir "$NIX_STORE_DIR"
+    rm -rf "$NIX_DB_DIR"
+    mkdir "$NIX_DB_DIR"
+    $nixstore --init
+}
+
+clearProfiles() {
+    profiles="$NIX_STATE_DIR"/profiles
+    rm -f $profiles/*
+}

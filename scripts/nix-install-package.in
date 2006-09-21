@@ -3,28 +3,107 @@
 use strict;
 use POSIX qw(tmpnam);
 
-my $pkgFile = $ARGV[0];
-die unless defined $pkgFile;
+
+sub usageError {
+    print STDERR <<EOF;
+Usage: nix-install-package (FILE | --url URL)
+
+Install a Nix Package (.nixpkg) either directly from FILE or by
+downloading it from URL.
+
+Flags:
+  --profile / -p LINK: install into the specified profile
+  --non-interactive: don't run inside a new terminal XXX
+EOF
+    ; # '
+    exit 1;
+}
+
+
+# Parse the command line arguments.
+my @args = @ARGV;
+usageError if scalar @args == 0;
+
+my $source;
+my $fromURL = 0;
+my @extraNixEnvArgs = ();
+my $interactive = 1;
+
+while (scalar @args) {
+    my $arg = shift @args;
+    if ($arg eq "--help") {
+        usageError;
+    }
+    elsif ($arg eq "--url") {
+        $fromURL = 1;
+    }
+    elsif ($arg eq "--profile" || $arg eq "-p") {
+        my $profile = shift @args;
+        usageError if !defined $profile;
+        push @extraNixEnvArgs, "-p", $profile;
+    }
+    elsif ($arg eq "--non-interactive") {
+        $interactive = 0;
+    }
+    else {
+        $source = $arg;
+    }
+}
+
+usageError unless defined $source;
 
 
 # Re-execute in a terminal, if necessary, so that if we're executed
 # from a web browser, the user gets to see us.
-if (!defined $ENV{"NIX_HAVE_TERMINAL"}) {
+if ($interactive && !defined $ENV{"NIX_HAVE_TERMINAL"}) {
     $ENV{"NIX_HAVE_TERMINAL"} = "1";
     $ENV{"LD_LIBRARY_PATH"} = "";
-    foreach my $term ("konsole", "gnome-terminal", "xterm") {
-        exec($term, "-e", "@shell@", "-c", "@bindir@/nix-install-package '$pkgFile' || read");
+    foreach my $term ("xterm", "konsole", "gnome-terminal", "xterm") {
+        exec($term, "-e", "@bindir@/nix-install-package", @ARGV);
     }
     die "cannot execute `xterm'";
 }
 
 
+my $tmpDir;
+do { $tmpDir = tmpnam(); }
+until mkdir $tmpDir, 0777;
+END { if (defined $tmpDir) { my $x = $?; system ("@coreutils@/rm", "-rf", $tmpDir); $? = $x; } }
+
+
+sub barf {
+    my $msg = shift;
+    print "$msg\n";
+    <STDIN> if $interactive;
+    exit 1;
+}
+
+
+# Download the package description, if necessary.
+my $pkgFile = $source;
+if ($fromURL) {
+    $pkgFile = "$tmpDir/tmp.nixpkg";
+    system ("@curl@", "--silent", $source, "-o", $pkgFile) == 0
+        or barf "curl failed: $?";
+}
+
+
 # Read and parse the package file.
-open PKGFILE, "<$pkgFile" or die "cannot open `$pkgFile': $!";
+open PKGFILE, "<$pkgFile" or barf "cannot open `$pkgFile': $!";
 my $contents = <PKGFILE>;
 close PKGFILE;
 
-$contents =~ /^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/ or die "invalid package contents";
+my $urlRE = "(?: [a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*\']+ )";
+my $nameRE = "(?: [A-Za-z0-9\+\-\.\_\?\=]+ )"; # see checkStoreName()
+my $systemRE = "(?: [A-Za-z0-9\+\-\_]+ )";
+my $pathRE = "(?: \/ [\/A-Za-z0-9\+\-\.\_\?\=]* )";
+
+# Note: $pathRE doesn't check that whether we're looking at a valid
+# store path.  We'll let nix-env do that.
+
+$contents =~
+    / ^ \s* (\S+) \s+ ($urlRE) \s+ ($nameRE) \s+ ($systemRE) \s+ ($pathRE) \s+ ($pathRE) /x
+    or barf "invalid package contents";
 my $version = $1;
 my $manifestURL = $2;
 my $drvName = $3;
@@ -32,22 +111,29 @@ my $system = $4;
 my $drvPath = $5;
 my $outPath = $6;
 
-die "invalid package version `$version'" unless $version eq "NIXPKG1";
+barf "invalid package version `$version'" unless $version eq "NIXPKG1";
 
 
-# Ask confirmation.
-print "Do you want to install `$drvName' (Y/N)? ";
-my $reply = <STDIN>;
-chomp $reply;
-exit if $reply ne "y" && $reply ne "Y";
+if ($interactive) {
+    # Ask confirmation.
+    print "Do you want to install `$drvName' (Y/N)? ";
+    my $reply = <STDIN>;
+    chomp $reply;
+    exit if $reply ne "y" && $reply ne "Y";
+}
+
 
 print "\nPulling manifests...\n";
-system "@bindir@/nix-pull '$manifestURL'";
-die if $? != 0;
+system ("@bindir@/nix-pull", $manifestURL) == 0
+    or barf "nix-pull failed: $?";
+
 
 print "\nInstalling package...\n";
-system "@bindir@/nix-env -i '$outPath'";
-die if $? != 0;
+system ("@bindir@/nix-env", "--install", $outPath, @extraNixEnvArgs) == 0
+    or barf "nix-env failed: $?";
 
-print "\nInstallation succeeded! Press Enter to continue.\n";
-<STDIN>;
+
+if ($interactive) {
+    print "\nInstallation succeeded! Press Enter to continue.\n";
+    <STDIN>;
+}
