@@ -368,9 +368,7 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
         if (outputHashRecursive) outputHashAlgo = "r:" + outputHashAlgo;
     }
 
-    /* Check the derivation name.  It shouldn't contain whitespace,
-       but we are conservative here: we check whether only
-       alphanumerics and some other characters appear. */
+    /* Check whether the derivation name is valid. */
     checkStoreName(drvName);
     if (isDerivation(drvName))
         throw EvalError(format("derivation names are not allowed to end in `%1%'")
