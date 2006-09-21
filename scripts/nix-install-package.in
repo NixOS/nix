@@ -12,7 +12,9 @@ die unless defined $pkgFile;
 if (!defined $ENV{"NIX_HAVE_TERMINAL"}) {
     $ENV{"NIX_HAVE_TERMINAL"} = "1";
     $ENV{"LD_LIBRARY_PATH"} = "";
-    exec("xterm", "-e", "@shell@", "-c", "@bindir@/nix-install-package '$pkgFile' || read");
+    foreach my $term ("konsole", "gnome-terminal", "xterm") {
+        exec($term, "-e", "@shell@", "-c", "@bindir@/nix-install-package '$pkgFile' || read");
+    }
     die "cannot execute `xterm'";
 }
 
