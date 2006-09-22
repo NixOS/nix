@@ -521,6 +521,14 @@ static Expr primIsNull(EvalState & state, const ATermVector & args)
 }
 
 
+/* Determine whether the argument is a list. */
+static Expr primIsList(EvalState & state, const ATermVector & args)
+{
+    ATermList list;
+    return makeBool(matchList(evalExpr(state, args[0]), list));
+}
+
+
 static Path findDependency(Path dir, string dep)
 {
     if (dep[0] == '/') throw EvalError(
@@ -782,6 +790,7 @@ void EvalState::addPrimOps()
     addPrimOp("__toXML", 1, primToXML);
     addPrimOp("__toFile", 1, primToFile);
     addPrimOp("isNull", 1, primIsNull);
+    addPrimOp("__isList", 1, primIsList);
     addPrimOp("dependencyClosure", 1, primDependencyClosure);
     addPrimOp("abort", 1, primAbort);
     addPrimOp("__head", 1, primHead);
