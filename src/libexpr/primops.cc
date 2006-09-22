@@ -703,6 +703,20 @@ static Expr primCurrentTime(EvalState & state, const ATermVector & args)
 }
 
 
+static Expr primGetAttr(EvalState & state, const ATermVector & args)
+{
+    string attr = evalString(state, args[0]);
+    return evalExpr(state, makeSelect(args[1], toATerm(attr)));
+}
+
+
+static Expr primHasAttr(EvalState & state, const ATermVector & args)
+{
+    string attr = evalString(state, args[0]);
+    return evalExpr(state, makeOpHasAttr(args[1], toATerm(attr)));
+}
+
+
 static Expr primRemoveAttrs(EvalState & state, const ATermVector & args)
 {
     ATermMap attrs(128); /* !!! */
@@ -749,6 +763,8 @@ void EvalState::addPrimOps()
     addPrimOp("abort", 1, primAbort);
 
     addPrimOp("map", 2, primMap);
+    addPrimOp("__getAttr", 2, primGetAttr);
+    addPrimOp("__hasAttr", 2, primHasAttr);
     addPrimOp("removeAttrs", 2, primRemoveAttrs);
     addPrimOp("relativise", 2, primRelativise);
 }
