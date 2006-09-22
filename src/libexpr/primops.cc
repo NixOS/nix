@@ -673,6 +673,27 @@ static Expr primAbort(EvalState & state, const ATermVector & args)
 }
 
 
+/* Return the first element of a list. */
+static Expr primHead(EvalState & state, const ATermVector & args)
+{
+    ATermList list = evalList(state, args[0]);
+    if (ATisEmpty(list))
+        throw Error("`head' called on an empty list");
+    return evalExpr(state, ATgetFirst(list));
+}
+
+
+/* Return a list consisting of everything but the the first element of
+   a list. */
+static Expr primTail(EvalState & state, const ATermVector & args)
+{
+    ATermList list = evalList(state, args[0]);
+    if (ATisEmpty(list))
+        throw Error("`tail' called on an empty list");
+    return makeList(ATgetNext(list));
+}
+
+
 /* Apply a function to every element of a list. */
 static Expr primMap(EvalState & state, const ATermVector & args)
 {
@@ -703,6 +724,7 @@ static Expr primCurrentTime(EvalState & state, const ATermVector & args)
 }
 
 
+/* Dynamic version of the `.' operator. */
 static Expr primGetAttr(EvalState & state, const ATermVector & args)
 {
     string attr = evalString(state, args[0]);
@@ -710,6 +732,7 @@ static Expr primGetAttr(EvalState & state, const ATermVector & args)
 }
 
 
+/* Dynamic version of the `?' operator. */
 static Expr primHasAttr(EvalState & state, const ATermVector & args)
 {
     string attr = evalString(state, args[0]);
@@ -761,6 +784,8 @@ void EvalState::addPrimOps()
     addPrimOp("isNull", 1, primIsNull);
     addPrimOp("dependencyClosure", 1, primDependencyClosure);
     addPrimOp("abort", 1, primAbort);
+    addPrimOp("__head", 1, primHead);
+    addPrimOp("__tail", 1, primTail);
 
     addPrimOp("map", 2, primMap);
     addPrimOp("__getAttr", 2, primGetAttr);
