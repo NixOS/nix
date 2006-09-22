@@ -22,7 +22,7 @@ namespace nix {
 static unsigned int refLength = 32; /* characters */
 
 
-static void search(const string & s,
+static void search(size_t len, const unsigned char * s,
     StringSet & ids, StringSet & seen)
 {
     static bool initialised = false;
@@ -34,7 +34,7 @@ static void search(const string & s,
         initialised = true;
     }
     
-    for (unsigned int i = 0; i + refLength <= s.size(); ) {
+    for (unsigned int i = 0; i + refLength <= len; ) {
         int j;
         bool match = true;
         for (j = refLength - 1; j >= 0; --j)
@@ -44,7 +44,7 @@ static void search(const string & s,
                 break;
             }
         if (!match) continue;
-        string ref(s, i, refLength);
+        string ref((const char *) s + i, refLength);
         if (ids.find(ref) != ids.end()) {
             debug(format("found reference to `%1%' at offset `%2%'")
                   % ref % i);
@@ -70,7 +70,7 @@ void checkPath(const string & path,
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectory(path);
 	for (Strings::iterator i = names.begin(); i != names.end(); i++) {
-            search(*i, ids, seen);
+            search(i->size(), (const unsigned char *) i->c_str(), ids, seen);
             checkPath(path + "/" + *i, ids, seen);
         }
     }
@@ -87,13 +87,15 @@ void checkPath(const string & path,
 
         readFull(fd, buf, st.st_size);
 
-        search(string((char *) buf, st.st_size), ids, seen);
+        search(st.st_size, buf, ids, seen);
         
         delete[] buf; /* !!! autodelete */
     }
     
-    else if (S_ISLNK(st.st_mode))
-        search(readLink(path), ids, seen);
+    else if (S_ISLNK(st.st_mode)) {
+        string target = readLink(path);
+        search(target.size(), (const unsigned char *) target.c_str(), ids, seen);
+    }
     
     else throw Error(format("unknown file type: %1%") % path);
 }
