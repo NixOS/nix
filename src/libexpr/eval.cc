@@ -176,6 +176,16 @@ Path evalPath(EvalState & state, Expr e)
 }
 
 
+int evalInt(EvalState & state, Expr e)
+{
+    e = evalExpr(state, e);
+    int i;
+    if (!matchInt(e, i))
+        throw TypeError(format("value is %1% while an integer was expected") % showType(e));
+    return i;
+}
+
+
 bool evalBool(EvalState & state, Expr e)
 {
     e = evalExpr(state, e);

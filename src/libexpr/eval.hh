@@ -62,6 +62,7 @@ Expr strictEvalExpr(EvalState & state, Expr e,
 /* Specific results. */
 string evalString(EvalState & state, Expr e);
 Path evalPath(EvalState & state, Expr e);
+int evalInt(EvalState & state, Expr e);
 bool evalBool(EvalState & state, Expr e);
 ATermList evalList(EvalState & state, Expr e);
 ATerm coerceToString(Expr e);

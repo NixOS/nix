@@ -27,7 +27,7 @@ done
 for i in lang/eval-fail-*.nix; do
     echo "evaluating $i (should fail)";
     i=$(basename $i .nix)
-    if $nixinstantiate --eval-only - < lang/$i.nix; then
+    if $nixinstantiate --eval-only lang/$i.nix; then
         echo "FAIL: $i shouldn't evaluate"
         fail=1
     fi
@@ -38,7 +38,7 @@ for i in lang/eval-okay-*.nix; do
     i=$(basename $i .nix)
 
     if test -e lang/$i.exp; then
-        if ! $nixinstantiate --eval-only - < lang/$i.nix > lang/$i.out; then
+        if ! $nixinstantiate --eval-only lang/$i.nix > lang/$i.out; then
             echo "FAIL: $i should evaluate"
             fail=1
         fi
@@ -49,7 +49,7 @@ for i in lang/eval-okay-*.nix; do
     fi
     
     if test -e lang/$i.exp.xml; then
-        if ! $nixinstantiate --eval-only --xml --strict - < lang/$i.nix > lang/$i.out.xml; then
+        if ! $nixinstantiate --eval-only --xml --strict lang/$i.nix > lang/$i.out.xml; then
             echo "FAIL: $i should evaluate"
             fail=1
         fi

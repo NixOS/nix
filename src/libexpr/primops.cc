@@ -771,6 +771,14 @@ static Expr primRelativise(EvalState & state, const ATermVector & args)
 }
 
 
+static Expr primAdd(EvalState & state, const ATermVector & args)
+{
+    int i1 = evalInt(state, args[0]);
+    int i2 = evalInt(state, args[1]);
+    return makeInt(i1 + i2);
+}
+
+
 void EvalState::addPrimOps()
 {
     addPrimOp("builtins", 0, primBuiltins);
@@ -801,6 +809,7 @@ void EvalState::addPrimOps()
     addPrimOp("__hasAttr", 2, primHasAttr);
     addPrimOp("removeAttrs", 2, primRemoveAttrs);
     addPrimOp("relativise", 2, primRelativise);
+    addPrimOp("__add", 2, primAdd);
 }
 
  
