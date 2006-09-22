@@ -79,6 +79,11 @@ AC_ENABLE_SHARED
 AC_PROG_LIBTOOL
 
 
+# Use 64-bit file system calls so that we can support files > 2 GiB.
+CFLAGS="-D_FILE_OFFSET_BITS=64 $CFLAGS"
+CXXFLAGS="-D_FILE_OFFSET_BITS=64 $CXXFLAGS"
+
+
 # Check for pubsetbuf.
 AC_MSG_CHECKING([for pubsetbuf])
 AC_LANG_PUSH(C++)
