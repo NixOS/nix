@@ -1,3 +1,5 @@
+#define __STDC_LIMIT_MACROS
+
 #include "references.hh"
 #include "hash.hh"
 #include "util.hh"
@@ -10,6 +12,8 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <fcntl.h>
+
+#include <stdint.h>
 
 
 namespace nix {
@@ -75,6 +79,9 @@ void checkPath(const string & path,
         
         AutoCloseFD fd = open(path.c_str(), O_RDONLY);
         if (fd == -1) throw SysError(format("opening file `%1%'") % path);
+
+        if (st.st_size >= SIZE_MAX)
+            throw Error(format("cannot allocate %1% bytes") % st.st_size);
 
         unsigned char * buf = new unsigned char[st.st_size];
 
