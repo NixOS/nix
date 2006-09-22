@@ -1,5 +1,3 @@
-#define __STDC_LIMIT_MACROS
-
 #include "references.hh"
 #include "hash.hh"
 #include "util.hh"
@@ -12,8 +10,6 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <fcntl.h>
-
-#include <stdint.h>
 
 
 namespace nix {
@@ -80,14 +76,35 @@ void checkPath(const string & path,
         AutoCloseFD fd = open(path.c_str(), O_RDONLY);
         if (fd == -1) throw SysError(format("opening file `%1%'") % path);
 
-        if (st.st_size >= SIZE_MAX)
-            throw Error(format("cannot allocate %1% bytes") % st.st_size);
+        size_t bufSize = 1024 * 1024;
+        assert(refLength <= bufSize);
+        unsigned char * buf = new unsigned char[bufSize];
 
-        unsigned char * buf = new unsigned char[st.st_size];
+        size_t left = st.st_size;
+        bool firstBlock = true;
+        
+        while (left > 0) {
+            checkInterrupt();
+            
+            size_t read = left > bufSize ? bufSize : left;
+            size_t copiedBytes = 0;
 
-        readFull(fd, buf, st.st_size);
+            if (!firstBlock) {
+                /* Move the last (refLength - 1) bytes from the last
+                   block to the start of the buffer to deal with
+                   references that cross block boundaries. */
+                copiedBytes = refLength - 1;
+                if (read + copiedBytes > bufSize)
+                    read -= copiedBytes;
+                memcpy(buf, buf + (bufSize - copiedBytes), copiedBytes);
+            }
+            firstBlock = false;
 
-        search(st.st_size, buf, ids, seen);
+            readFull(fd, buf + copiedBytes, read);
+            left -= read;
+
+            search(copiedBytes + read, buf, ids, seen);
+        }
         
         delete[] buf; /* !!! autodelete */
     }
