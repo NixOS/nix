@@ -779,6 +779,14 @@ static Expr primAdd(EvalState & state, const ATermVector & args)
 }
 
 
+static Expr primLessThan(EvalState & state, const ATermVector & args)
+{
+    int i1 = evalInt(state, args[0]);
+    int i2 = evalInt(state, args[1]);
+    return makeBool(i1 < i2);
+}
+
+
 void EvalState::addPrimOps()
 {
     addPrimOp("builtins", 0, primBuiltins);
@@ -810,6 +818,7 @@ void EvalState::addPrimOps()
     addPrimOp("removeAttrs", 2, primRemoveAttrs);
     addPrimOp("relativise", 2, primRelativise);
     addPrimOp("__add", 2, primAdd);
+    addPrimOp("__lessThan", 2, primLessThan);
 }
 
  
