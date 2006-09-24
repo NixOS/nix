@@ -49,13 +49,6 @@ static Expr primImport(EvalState & state, const ATermVector & args)
     if (matchPath(arg, arg2))
         path = aterm2String(arg2);
 
-    else if (matchStr(arg, arg2)) {
-        path = aterm2String(arg2);
-        if (path == "" || path[0] != '/')
-            throw EvalError("`import' requires an absolute path name");
-        path = canonPath(path);
-    }
-
     else if (matchAttrs(arg, es)) {
         Expr a = queryAttr(arg, "type");
 
@@ -77,6 +70,17 @@ static Expr primImport(EvalState & state, const ATermVector & args)
     else throw TypeError("`import' requires a path or derivation as its argument");
 
     return evalFile(state, path);
+}
+
+
+static Expr primPathExists(EvalState & state, const ATermVector & args)
+{
+    Expr arg = evalExpr(state, args[0]), arg2;
+    
+    if (!matchPath(arg, arg2))
+        throw TypeError("`pathExists' requires a path as its argument");
+
+    return makeBool(pathExists(aterm2String(arg2)));
 }
 
 
@@ -476,6 +480,19 @@ static Expr primToString(EvalState & state, const ATermVector & args)
 }
 
 
+/* Convert the argument to a path. */
+static Expr primToPath(EvalState & state, const ATermVector & args)
+{
+    Expr e = evalExpr(state, args[0]);
+    ATerm t = coerceToString(e);
+    if (!t) throw TypeError(format("cannot coerce %1% to a path in `toPath'") % showType(e));
+    Path path = aterm2String(t);
+    if (path == "" || path[0] != '/')
+        throw EvalError("string doesn't represent an absolute path in `toPath'");
+    return makePath(toATerm(canonPath(path)));
+}
+
+
 /* Convert the argument (which can be any Nix expression) to an XML
    representation returned in a string.  Not all Nix expressions can
    be sensibly or completely represented (e.g., functions). */
@@ -809,11 +826,13 @@ void EvalState::addPrimOps()
     addPrimOp("__currentTime", 0, primCurrentTime);
 
     addPrimOp("import", 1, primImport);
+    addPrimOp("__pathExists", 1, primPathExists);
     addPrimOp("derivation!", 1, primDerivationStrict);
     addPrimOp("derivation", 1, primDerivationLazy);
     addPrimOp("baseNameOf", 1, primBaseNameOf);
     addPrimOp("dirOf", 1, primDirOf);
     addPrimOp("toString", 1, primToString);
+    addPrimOp("__toPath", 1, primToPath);
     addPrimOp("__toXML", 1, primToXML);
     addPrimOp("__toFile", 1, primToFile);
     addPrimOp("isNull", 1, primIsNull);
