@@ -49,6 +49,13 @@ static Expr primImport(EvalState & state, const ATermVector & args)
     if (matchPath(arg, arg2))
         path = aterm2String(arg2);
 
+    else if (matchStr(arg, arg2)) {
+        path = aterm2String(arg2);
+        if (path == "" || path[0] != '/')
+            throw EvalError("`import' requires an absolute path name");
+        path = canonPath(path);
+    }
+
     else if (matchAttrs(arg, es)) {
         Expr a = queryAttr(arg, "type");
 
@@ -67,9 +74,8 @@ static Expr primImport(EvalState & state, const ATermVector & args)
         }
     }
 
-    if (path == "")
-        throw TypeError("`import' requires a path or derivation as its argument");
-    
+    else throw TypeError("`import' requires a path or derivation as its argument");
+
     return evalFile(state, path);
 }
 
@@ -373,9 +379,6 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
     if (isDerivation(drvName))
         throw EvalError(format("derivation names are not allowed to end in `%1%'")
             % drvExtension);
-
-    /* !!! the name should not end in the derivation extension (.drv).
-       Likewise for sources. */
 
     /* Construct the "masked" derivation store expression, which is
        the final one except that in the list of outputs, the output
@@ -702,6 +705,14 @@ static Expr primTail(EvalState & state, const ATermVector & args)
 }
 
 
+/* Return an environment variable.  Use with care. */
+static Expr primGetEnv(EvalState & state, const ATermVector & args)
+{
+    string name = evalString(state, args[0]);
+    return makeStr(toATerm(getEnv(name)));
+}
+
+
 /* Apply a function to every element of a list. */
 static Expr primMap(EvalState & state, const ATermVector & args)
 {
@@ -811,6 +822,7 @@ void EvalState::addPrimOps()
     addPrimOp("abort", 1, primAbort);
     addPrimOp("__head", 1, primHead);
     addPrimOp("__tail", 1, primTail);
+    addPrimOp("__getEnv", 1, primGetEnv);
 
     addPrimOp("map", 2, primMap);
     addPrimOp("__getAttr", 2, primGetAttr);

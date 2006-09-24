@@ -1,5 +1,7 @@
 source common.sh
 
+export TEST_VAR=foo # for eval-okay-getenv.nix
+
 fail=0
 
 for i in lang/parse-fail-*.nix; do
