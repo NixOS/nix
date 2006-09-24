@@ -267,6 +267,7 @@ string coerceToStringWithContext(EvalState & state,
         if (a && evalString(state, a) == "derivation") {
             a = attrs.get(toATerm("outPath"));
             if (!a) throw TypeError("output path missing from derivation");
+            isPath = true;
             context = ATinsert(context, e);
             return evalPath(state, a);
         }

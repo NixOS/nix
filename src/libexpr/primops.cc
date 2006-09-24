@@ -114,7 +114,9 @@ void toString(EvalState & state, Expr e,
     int n;
     Expr e2;
 
+    bool isWrapped = false;
     while (matchContext(e, es, e2)) {
+        isWrapped = true;
         e = e2;
         for (ATermIterator i(es); i; ++i)
             context = ATinsert(context, *i);
@@ -146,7 +148,7 @@ void toString(EvalState & state, Expr e,
     else if (matchPath(e, s)) {
         Path path(canonPath(aterm2String(s)));
 
-        if (!isStorePath(path)) {
+        if (!isInStore(path)) {
 
             if (isDerivation(path))
                 throw EvalError(format("file names are not allowed to end in `%1%'")
@@ -162,11 +164,17 @@ void toString(EvalState & state, Expr e,
                     % path % dstPath);
             }
 
-            path = dstPath;
+            result += dstPath;
+            context = ATinsert(context, makePath(toATerm(dstPath)));
         }
 
-        result += path;
-        context = ATinsert(context, makePath(toATerm(path)));
+        else {
+            result += path;
+            /* !!! smells hacky.  Check whether this is the Right
+               Thing To Do. */
+            if (!isWrapped)
+                context = ATinsert(context, makePath(toATerm(toStorePath(path))));
+        }
     }
     
     else if (matchList(e, es)) {
