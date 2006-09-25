@@ -29,7 +29,7 @@ if ($removeOld) {
         $name = $profilesDir . "/" . $name;
         if (-l $name && (readlink($name) =~ /link/)) {
             print STDERR "removing old generations of profile $name\n";
-            system "@bindir@/nix-env", "-p", $name, "--delete-generations", "old";
+            system("@bindir@/nix-env", "-p", $name, "--delete-generations", "old");
         }
     }
     

@@ -68,7 +68,7 @@ if ($interactive && !defined $ENV{"NIX_HAVE_TERMINAL"}) {
 my $tmpDir;
 do { $tmpDir = tmpnam(); }
 until mkdir $tmpDir, 0777;
-END { if (defined $tmpDir) { my $x = $?; system ("@coreutils@/rm", "-rf", $tmpDir); $? = $x; } }
+END { if (defined $tmpDir) { my $x = $?; system("@coreutils@/rm", "-rf", $tmpDir); $? = $x; } }
 
 
 sub barf {
@@ -83,7 +83,7 @@ sub barf {
 my $pkgFile = $source;
 if ($fromURL) {
     $pkgFile = "$tmpDir/tmp.nixpkg";
-    system ("@curl@", "--silent", $source, "-o", $pkgFile) == 0
+    system("@curl@", "--silent", $source, "-o", $pkgFile) == 0
         or barf "curl failed: $?";
 }
 
@@ -124,12 +124,12 @@ if ($interactive) {
 
 
 print "\nPulling manifests...\n";
-system ("@bindir@/nix-pull", $manifestURL) == 0
+system("@bindir@/nix-pull", $manifestURL) == 0
     or barf "nix-pull failed: $?";
 
 
 print "\nInstalling package...\n";
-system ("@bindir@/nix-env", "--install", $outPath, @extraNixEnvArgs) == 0
+system("@bindir@/nix-env", "--install", $outPath, @extraNixEnvArgs) == 0
     or barf "nix-env failed: $?";
 
 

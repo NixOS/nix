@@ -17,7 +17,7 @@ $binDir = "@bindir@" unless defined $binDir;
 my $tmpDir;
 do { $tmpDir = tmpnam(); }
 until mkdir $tmpDir, 0777;
-END { my $x = $?; system ("@coreutils@/rm", "-rf", $tmpDir); $? = $x; }
+END { my $x = $?; system("@coreutils@/rm", "-rf", $tmpDir); $? = $x; }
 mkdir "$tmpDir/contents", 0777 or die;
 mkdir "$tmpDir/references", 0777 or die;
 mkdir "$tmpDir/derivers", 0777 or die;

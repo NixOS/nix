@@ -70,8 +70,8 @@ sub update {
     readChannels;
 
     # Get rid of all the old substitutes.
-    system "@bindir@/nix-store --clear-substitutes";
-    die "cannot clear substitutes" if ($? != 0);
+    system("@bindir@/nix-store", "--clear-substitutes") == 0
+        or die "cannot clear substitutes";
 
     # Remove all the old manifests.
     for my $manifest (glob "$stateDir/manifests/*.nixmanifest") {
@@ -81,8 +81,8 @@ sub update {
     # Pull cache manifests.
     foreach my $url (@channels) {
         print "pulling cache manifest from `$url'\n";
-        system "@bindir@/nix-pull '$url'/MANIFEST";
-        die "cannot pull cache manifest from `$url'" if ($? != 0);
+        system("@bindir@/nix-pull", "$url/MANIFEST") == 0
+            or die "cannot pull cache manifest from `$url'";
     }
 
     # Create a Nix expression that fetches and unpacks the channel Nix
@@ -122,8 +122,8 @@ sub update {
     unlink "$rootFile.tmp";
 
     # Make it the default Nix expression for `nix-env'.
-    system "@bindir@/nix-env --import '$outPath'";
-    die "cannot pull set default Nix expression to `$outPath'" if ($? != 0);
+    system("@bindir@/nix-env", "--import", "$outPath") == 0
+         or die "cannot pull set default Nix expression to `$outPath'";
 }
 
 

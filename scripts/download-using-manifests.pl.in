@@ -90,8 +90,7 @@ addToQueue $targetPath;
 
 sub isValidPath {
     my $p = shift;
-    system "@bindir@/nix-store --check-validity '$p' 2> /dev/null";
-    return $? == 0;
+    return system("@bindir@/nix-store --check-validity '$p' 2> /dev/null") == 0;
 }
 
 sub parseHash {
@@ -231,8 +230,8 @@ while (scalar @path > 0) {
             # as a base to one or more patches.  So turn the base path
             # into a NAR archive, to which we can apply the patch.
             print "  packing base path...\n";
-            system "@bindir@/nix-store --dump $v > $tmpNar";
-            die "cannot dump `$v'" if ($? != 0);
+            system("@bindir@/nix-store --dump $v > $tmpNar") == 0
+                or die "cannot dump `$v'";
         }
     }
 
@@ -249,8 +248,8 @@ while (scalar @path > 0) {
         # Apply the patch to the NAR archive produced in step 1 (for
         # the already present path) or a later step (for patch sequences).
         print "  applying patch...\n";
-        system "@libexecdir@/bspatch $tmpNar $tmpNar2 $patchPath";
-        die "cannot apply patch `$patchPath' to $tmpNar" if ($? != 0);
+        system("@libexecdir@/bspatch $tmpNar $tmpNar2 $patchPath") == 0
+            or die "cannot apply patch `$patchPath' to $tmpNar";
 
         if ($curStep < $maxStep) {
             # The archive will be used as the base of the next patch.
@@ -259,8 +258,8 @@ while (scalar @path > 0) {
             # This was the last patch.  Unpack the final NAR archive
             # into the target path.
             print "  unpacking patched archive...\n";
-            system "@bindir@/nix-store --restore $v < $tmpNar2";
-            die "cannot unpack $tmpNar2 into `$v'" if ($? != 0);
+            system("@bindir@/nix-store --restore $v < $tmpNar2") == 0
+                or die "cannot unpack $tmpNar2 into `$v'";
         }
     }
 
@@ -276,12 +275,13 @@ while (scalar @path > 0) {
 
         if ($curStep < $maxStep) {
             # The archive will be used a base to a patch.
-            system "@bunzip2@ < '$narFilePath' > $tmpNar";
+            system("@bunzip2@ < '$narFilePath' > $tmpNar") == 0
+                or die "cannot unpack `$narFilePath' into `$v'";
         } else {
             # Unpack the archive into the target path.
             print "  unpacking archive...\n";
-            system "@bunzip2@ < '$narFilePath' | @bindir@/nix-store --restore '$v'";
-            die "cannot unpack `$narFilePath' into `$v'" if ($? != 0);
+            system("@bunzip2@ < '$narFilePath' | @bindir@/nix-store --restore '$v'") == 0
+                or die "cannot unpack `$narFilePath' into `$v'";
         }
     }
 

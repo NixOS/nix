@@ -227,7 +227,7 @@ writeManifest $manifest, \%narFiles, \%patches;
 sub copyFile {
     my $src = shift;
     my $dst = shift;
-    system("cp '$src' '$dst.tmp'") == 0 or die "cannot copy file";
+    system("@coreutils@/cp", $src, "$dst.tmp") == 0 or die "cannot copy file";
     rename("$dst.tmp", "$dst") or die "cannot rename file";
 }
 
