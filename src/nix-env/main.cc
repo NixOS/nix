@@ -59,6 +59,7 @@ struct Globals
     bool dryRun;
     bool preserveInstalled;
     bool keepDerivations;
+    string forceName;
 };
 
 
@@ -448,8 +449,15 @@ static void installDerivations(Globals & globals,
     queryInstSources(globals.state, globals.instSource, args, newElems, true);
 
     StringSet newNames;
-    for (DrvInfos::iterator i = newElems.begin(); i != newElems.end(); ++i)
+    for (DrvInfos::iterator i = newElems.begin(); i != newElems.end(); ++i) {
+        /* `forceName' is a hack to get package names right in some
+           one-click installs, namely those where the name used in the
+           path is not the one we want (e.g., `java-front' versus
+           `java-front-0.9pre15899'). */
+        if (globals.forceName != "")
+            i->name = globals.forceName;
         newNames.insert(DrvName(i->name).name);
+    }
 
     /* Add in the already installed derivations, unless they have the
        same name as a to-be-installed element. */
@@ -1139,6 +1147,8 @@ void run(Strings args)
             Expr value = parseExprFromString(globals.state, *i, absPath("."));
             globals.instSource.autoArgs.set(toATerm(name), value);
         }
+        else if (arg == "--force-name") // undocumented flag for nix-install-package
+            globals.forceName = needArg(i, args, arg);
         else if (arg == "--uninstall" || arg == "-e")
             op = opUninstall;
         else if (arg == "--upgrade" || arg == "-u")

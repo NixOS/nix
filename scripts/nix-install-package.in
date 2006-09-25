@@ -129,7 +129,7 @@ system("@bindir@/nix-pull", $manifestURL) == 0
 
 
 print "\nInstalling package...\n";
-system("@bindir@/nix-env", "--install", $outPath, @extraNixEnvArgs) == 0
+system("@bindir@/nix-env", "--install", $outPath, "--force-name", $drvName, @extraNixEnvArgs) == 0
     or barf "nix-env failed: $?";
 
 
