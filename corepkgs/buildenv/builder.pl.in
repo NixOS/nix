@@ -10,11 +10,15 @@ my $out = $ENV{"out"};
 mkdir "$out", 0755 || die "error creating $out";
 
 
+my $symlinks = 0;
+
+
 # For each activated package, create symlinks.
 
 sub createLinks {
     my $srcDir = shift;
     my $dstDir = shift;
+    my $ignoreCollisions = shift;
 
     my @srcFiles = glob("$srcDir/*");
 
@@ -22,7 +26,8 @@ sub createLinks {
         my $baseName = $srcFile;
         $baseName =~ s/^.*\///g; # strip directory
         my $dstFile = "$dstDir/$baseName";
-        
+
+        # Urgh, hacky...
 	if ($srcFile =~ /\/propagated-build-inputs$/ ||
             $srcFile =~ /\/nix-support$/ ||
             $srcFile =~ /\/perllocal.pod$/ ||
@@ -37,7 +42,7 @@ sub createLinks {
             lstat $dstFile;
             
             if (-d _) {
-                createLinks($srcFile, $dstFile);
+                createLinks($srcFile, $dstFile, $ignoreCollisions);
             }
 
             elsif (-l _) {
@@ -48,41 +53,46 @@ sub createLinks {
                 unlink $dstFile or die "error unlinking `$dstFile': $!";
                 mkdir $dstFile, 0755 || 
                     die "error creating directory `$dstFile': $!";
-                createLinks($target, $dstFile);
-                createLinks($srcFile, $dstFile);
+                createLinks($target, $dstFile, $ignoreCollisions);
+                createLinks($srcFile, $dstFile, $ignoreCollisions);
             }
 
             else {
                 symlink($srcFile, $dstFile) ||
                     die "error creating link `$dstFile': $!";
+                $symlinks++;
             }
         }
 
         elsif (-l $dstFile) {
-            my $target = readlink $dstFile;
-            die "collission between `$srcFile' and `$target'";
+            if (!$ignoreCollisions) {
+                my $target = readlink $dstFile;
+                die "collission between `$srcFile' and `$target'";
+            }
         }
 
         else {
-#            print "linking $dstFile to $srcFile\n";
             symlink($srcFile, $dstFile) ||
                 die "error creating link `$dstFile': $!";
+            $symlinks++;
         }
     }
 }
 
 
 my %done;
+my %postponed;
 
 sub addPkg;
 sub addPkg {
     my $pkgDir = shift;
+    my $ignoreCollisions = shift;
 
     return if (defined $done{$pkgDir});
     $done{$pkgDir} = 1;
 
-    print "adding $pkgDir\n";
-    createLinks("$pkgDir", "$out");
+#    print "symlinking $pkgDir\n";
+    createLinks("$pkgDir", "$out", $ignoreCollisions);
 
     my $propagatedFN = "$pkgDir/nix-support/propagated-build-inputs";
     if (-e $propagatedFN) {
@@ -91,19 +101,34 @@ sub addPkg {
         close PROP;
         my @propagated = split ' ', $propagated;
         foreach my $p (@propagated) {
-            addPkg $p;
+            $postponed{$p} = 1 unless defined $done{$p};
         }
     }
-        
 }
 
 
+# Symlink to the packages that have been installed explicitly by the user.
 my @args = split ' ', $ENV{"derivations"};
 
-while (scalar @args > 0) {
-    my $drvPath = shift @args;
-    addPkg($drvPath);
+foreach my $pkgDir (sort @args) {
+    addPkg($pkgDir, 0);
 }
+
+
+# Symlink to the packages that have been "propagated" by packages
+# installed by the user (i.e., package X declares that it want Y
+# installed as well).  We do these later because they have a lower
+# priority in case of collisions.
+while (scalar(keys %postponed) > 0) {
+    my @pkgDirs = keys %postponed;
+    %postponed = ();
+    foreach my $pkgDir (sort @pkgDirs) {
+        addPkg($pkgDir, 1);
+    }
+}
+
+
+print STDERR "created $symlinks symlinks in user environment\n";
 
 
 symlink($ENV{"manifest"}, "$out/manifest") or die "cannot create manifest";
