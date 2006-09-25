@@ -21,6 +21,9 @@ $libexecDir = "@libexecdir@" unless defined $libexecDir;
 my $stateDir = $ENV{"NIX_STATE_DIR"};
 $stateDir = "@localstatedir@/nix" unless defined $stateDir;
 
+my $storeDir = $ENV{"NIX_STORE_DIR"};
+$storeDir = "@storedir@" unless defined $storeDir;
+
 
 # Prevent access problems in shared-stored installations.
 umask 0022;
@@ -30,6 +33,8 @@ umask 0022;
 my %narFiles;
 my %patches;
 my %successors;
+
+my $skipWrongStore = 0;
 
 sub processURL {
     my $url = shift;
@@ -43,6 +48,15 @@ sub processURL {
 
     if (readManifest($manifest, \%narFiles, \%patches, \%successors) < 3) {
         die "manifest `$url' is too old (i.e., for Nix <= 0.7)\n";
+    }
+
+    if ($skipWrongStore) {
+        foreach my $path (keys %narFiles) {
+            if (substr($path, 0, length($storeDir) + 1) ne "$storeDir/") {
+                print STDERR "warning: manifest `$url' assumes a Nix store at a different location than $storeDir, skipping...\n";
+                exit 0;
+            }
+        }
     }
 
     my $baseName = "unnamed";
@@ -62,7 +76,11 @@ sub processURL {
 
 while (@ARGV) {
     my $url = shift @ARGV;
-    processURL $url;
+    if ($url eq "--skip-wrong-store") {
+        $skipWrongStore = 1;
+    } else {
+        processURL $url;
+    }
 }
 
 

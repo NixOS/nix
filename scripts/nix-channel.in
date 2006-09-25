@@ -23,6 +23,7 @@ sub readChannels {
     open CHANNELS, "<$channelsList" or die "cannot open `$channelsList': $!";
     while (<CHANNELS>) {
         chomp;
+        next if /^\s*\#/;
         push @channels, $_;
     }
     close CHANNELS;
@@ -81,7 +82,7 @@ sub update {
     # Pull cache manifests.
     foreach my $url (@channels) {
         print "pulling cache manifest from `$url'\n";
-        system("@bindir@/nix-pull", "$url/MANIFEST") == 0
+        system("@bindir@/nix-pull", "--skip-wrong-store", "$url/MANIFEST") == 0
             or die "cannot pull cache manifest from `$url'";
     }
 
