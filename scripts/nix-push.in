@@ -105,12 +105,12 @@ open NIX, ">$nixfile";
 print NIX "[";
 
 foreach my $storePath (@storePaths) {
-    die unless ($storePath =~ /\/[0-9a-z]{32}.*$/);
+    die unless ($storePath =~ /\/[0-9a-z]{32}[^\"\\\$]*$/);
 
     # Construct a Nix expression that creates a Nix archive.
     my $nixexpr = 
         "((import $dataDir/nix/corepkgs/nar/nar.nix) " .
-        "{storePath = $storePath; system = \"@system@\"; hashAlgo = \"$hashAlgo\";}) ";
+        "{storePath = builtins.toPath \"$storePath\"; system = \"@system@\"; hashAlgo = \"$hashAlgo\";}) ";
     
     print NIX $nixexpr;
 }
