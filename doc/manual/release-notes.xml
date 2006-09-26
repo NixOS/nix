@@ -212,7 +212,8 @@ irreversible.</para></warning>
 
   <listitem><para>Support for 64-bit platforms, provided <link
   xlink:href="http://bugzilla.sen.cwi.nl:8080/show_bug.cgi?id=606">suitably
-  patched ATerm library</link> is used.</para></listitem>
+  patched ATerm library</link> is used.  Also, files larger than 2 GiB
+  are now supported.</para></listitem>
 
   <listitem><para>Added support for Cygwin (Windows,
   <literal>i686-cygwin</literal>) and Mac OS X on Intel
