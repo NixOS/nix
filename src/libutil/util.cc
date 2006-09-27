@@ -13,6 +13,10 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 
+#include <sys/types.h>
+#include <pwd.h>
+#include <grp.h>
+
 #include "util.hh"
 
 
@@ -913,7 +917,7 @@ void switchToNixUser()
     /* Lookup the Nix gid. */
     struct group * gr = getgrnam(NIX_GROUP);
     if (!gr) {
-        cerr << format("missing group `%1%'\n") % NIX_GROUP;
+        std::cerr << format("missing group `%1%'\n") % NIX_GROUP;
         exit(1);
     }
 
@@ -921,7 +925,7 @@ void switchToNixUser()
     int maxGids = 512, nrGids;
     gid_t gids[maxGids];
     if ((nrGids = getgroups(maxGids, gids)) == -1) {
-        cerr << format("unable to query gids\n");
+        std::cerr << format("unable to query gids\n");
         exit(1);
     }
 
@@ -955,14 +959,14 @@ void switchToNixUser()
        because we cannot do it after we have dropped root uid. */
     nixGid = gr->gr_gid;
     if (_setgid(nixGid) != 0 || getgid() != nixGid || getegid() != nixGid) {
-        cerr << format("unable to set gid to `%1%'\n") % NIX_GROUP;
+        std::cerr << format("unable to set gid to `%1%'\n") % NIX_GROUP;
         exit(1);
     }
 
     /* Lookup the Nix uid. */
     struct passwd * pw = getpwnam(NIX_USER);
     if (!pw) {
-        cerr << format("missing user `%1%'\n") % NIX_USER;
+        std::cerr << format("missing user `%1%'\n") % NIX_USER;
         exit(1);
     }
 
@@ -971,7 +975,7 @@ void switchToNixUser()
        succeeded.*/
     nixUid = pw->pw_uid;
     if (_setuid(nixUid) != 0 || getuid() != nixUid || geteuid() != nixUid) {
-        cerr << format("unable to set uid to `%1%'\n") % NIX_USER;
+        std::cerr << format("unable to set uid to `%1%'\n") % NIX_USER;
         exit(1);
     }
 
