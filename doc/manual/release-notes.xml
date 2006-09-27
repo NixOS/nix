@@ -26,7 +26,10 @@ irreversible.</para></warning>
 
 <itemizedlist>
 
+  
+  <!-- Usability / features -->
 
+  
   <listitem><para><command>nix-env</command> usability improvements:
 
     <itemizedlist>
@@ -66,26 +69,6 @@ irreversible.</para></warning>
   </para></listitem>
   
 
-  <listitem><para>Berkeley DB 4.4’s process registry feature is used
-  to recover from crashed Nix processes.</para></listitem>
-
-  <!--  <listitem><para>TODO: shared stores.</para></listitem> -->
-
-  <listitem><para>A performance issue has been fixed with the
-  <literal>referer</literal> table, which stores the inverse of the
-  <literal>references</literal> table (i.e., it tells you what store
-  paths refer to a given path).  Maintaining this table could take a
-  quadratic amount of time, as well as a quadratic amount of Berkeley
-  DB log file space (in particular when running the garbage collector)
-  (<literal>NIX-23</literal>).</para></listitem>
-
-  <listitem><para>Nix now catches the <literal>TERM</literal> and
-  <literal>HUP</literal> signals in addition to the
-  <literal>INT</literal> signal.  So you can now do a <literal>killall
-  nix-store</literal> without triggering a database
-  recovery.</para></listitem>
-
-
   <listitem><para>New language features:
 
     <itemizedlist>
@@ -111,13 +94,13 @@ irreversible.</para></warning>
       <listitem><para>Multi-line string literals.</para></listitem>
 
       <listitem><para>String concatenations can now involve
-      derivations, as in the example above —
-      <code>"--with-freetype2-library=" + freetype + "/lib"</code>.
-      This was not previously possible because we need to register
-      that a derivation that uses such a string is dependent on
-      <literal>freetype</literal>.  The evaluator now properly
-      propagates this information.  Consequently, the subpath operator
-      (<literal>~</literal>) has been deprecated.</para></listitem>
+      derivations, as in the example <code>"--with-freetype2-library="
+      + freetype + "/lib"</code>.  This was not previously possible
+      because we need to register that a derivation that uses such a
+      string is dependent on <literal>freetype</literal>.  The
+      evaluator now properly propagates this information.
+      Consequently, the subpath operator (<literal>~</literal>) has
+      been deprecated.</para></listitem>
 
       <listitem><para>Default values of function arguments can now
       refer to other function arguments; that is, all arguments are in
@@ -128,10 +111,62 @@ irreversible.</para></warning>
       <listitem><para>TODO: domain checks (r5895).</para></listitem>
       -->
 
+      <listitem><para>Lots of new builtin primitives, such as
+      functions for list manipulation and integer arithmetic.  See the
+      manual for a complete list.  All primops are now available in
+      the set <varname>builtins</varname>, allowing one to test for
+      the availability of primop in a backwards-compatible
+      way.</para></listitem>
+
     </itemizedlist>
 
   </para></listitem>
-    
+
+
+  <listitem><para>New commands <command>nix-pack-closure</command> and
+  <command>nix-unpack-closure</command> than can be used to easily
+  transfer a store path with all its dependencies to another machine.
+  Very convenient whenever you have some package on your machine and
+  you want to copy it somewhere else.</para></listitem>
+
+  
+  <listitem><para>XML support:
+
+    <itemizedlist>
+
+      <listitem><para><literal>nix-env -q --xml</literal> prints the
+      installed or available packages in an XML representation for
+      easy processing by other tools.</para></listitem>
+
+      <listitem><para><literal>nix-instantiate --eval-only
+      --xml</literal> prints an XML representation of the resulting
+      term.  (The new flag <option>--strict</option> forces ‘deep’
+      evaluation of the result, i.e., list elements and attributes are
+      evaluated recursively.)</para></listitem>
+
+      <listitem><para>In Nix expressions, the primop
+      <function>builtins.toXML</function> converts a term to an XML
+      representation.  This is primarily useful for passing structured
+      information to builders.</para></listitem>
+
+    </itemizedlist>
+
+  </para></listitem>
+  
+
+  <listitem><para>You can now unambigously specify which derivation to
+  build or install in <command>nix-env</command>,
+  <command>nix-instantiate</command> and <command>nix-build</command>
+  using the <option>--attr</option> / <option>-A</option> flags, which
+  takes an attribute name as argument.  (Unlike symbolic package names
+  such as <literal>subversion-1.4.0</literal>, attribute names in an
+  attribute set are unique.)  For instance, a quick way to perform a
+  test build of a package in Nixpkgs is <literal>nix-build
+  pkgs/top-level/all-packages.nix -A
+  <replaceable>foo</replaceable></literal>.  <literal>nix-env -q
+  --attr</literal> shows the attribute names corresponding to each
+  derivation.</para></listitem>
+  
 
   <listitem><para>If the top-level Nix expression used by
   <command>nix-env</command>, <command>nix-instantiate</command> or
@@ -142,26 +177,53 @@ irreversible.</para></warning>
   <replaceable>value</replaceable></option> can be used to specify
   function arguments on the command line.</para></listitem>
 
-  <listitem><para>TODO: proxy support.</para></listitem>
+  
+  <listitem><para><literal>nix-install-package --url
+  <replaceable>URL</replaceable></literal> allows a package to be
+  installed directly from the given URL.</para></listitem>
 
-  <listitem><para>New commands <command>nix-pack-closure</command> and
-  <command>nix-unpack-closure</command> than can be used to easily
-  transfer a store path with all its dependencies to another machine.
-  Very convenient whenever you have some package on your machine and
-  you want to copy it somewhere else.</para></listitem>
 
-  <listitem><para><command>bsdiff</command> updated
-  4.3.</para></listitem>
+  <listitem><para>Nix now works behind an HTTP proxy server; just set
+  the standard environment variables <envar>http_proxy</envar>,
+  <envar>https_proxy</envar>, <envar>ftp_proxy</envar> or
+  <envar>all_proxy</envar> appropriately.  Functions such as
+  <function>fetchurl</function> in Nixpkgs also respect these
+  variables.</para></listitem>
 
-  <listitem><para>TODO: --attr / -A flags in
-  nix-env/nix-instantiate/nix-build.  Also nix-env -qa
-  --attr.</para></listitem>
 
   <listitem><para><literal>nix-build -o
   <replaceable>symlink</replaceable></literal> allows the symlink to
   the build result to be named something other than
   <literal>result</literal>.</para></listitem>
 
+
+  <!-- Stability / performance / etc. -->
+
+
+  <listitem><para>Platform support:
+
+    <itemizedlist>
+
+      <listitem><para>Support for 64-bit platforms, provided a <link
+      xlink:href="http://bugzilla.sen.cwi.nl:8080/show_bug.cgi?id=606">suitably
+      patched ATerm library</link> is used.  Also, files larger than 2
+      GiB are now supported.</para></listitem>
+
+      <listitem><para>Added support for Cygwin (Windows,
+      <literal>i686-cygwin</literal>), Mac OS X on Intel
+      (<literal>i686-darwin</literal>) and Linux on PowerPC
+      (<literal>powerpc-linux</literal>).</para></listitem>
+
+      <listitem><para>Users of SMP and multicore machines will
+      appreciate that the number of builds to be performed in parallel
+      can now be specified in the configuration file in the
+      <literal>build-max-jobs</literal> setting.</para></listitem>
+
+    </itemizedlist>
+
+  </para></listitem>
+
+  
   <listitem><para>Garbage collector improvements:
 
     <itemizedlist>
@@ -188,14 +250,38 @@ irreversible.</para></warning>
       --gc</literal>).  This is an easy way to get rid of all old
       packages in the Nix store.</para></listitem>
 
+      <listitem><para><command>nix-store</command> now has an
+      operation <option>--delete</option> to delete specific paths
+      from the Nix store.  It won’t delete reachable (non-garbage)
+      paths unless <option>--ignore-liveness</option> is
+      specified.</para></listitem>
+      
     </itemizedlist>
 
   </para></listitem>
 
-  <listitem><para>New command <literal>nix-store --delete</literal> to
-  delete specific paths from the Nix store.  It won’t delete reachable
-  (non-garbage) paths unless <option>--ignore-liveness</option> is
-  specified.</para></listitem>
+  
+  <listitem><para>Berkeley DB 4.4’s process registry feature is used
+  to recover from crashed Nix processes.</para></listitem>
+
+  <!--  <listitem><para>TODO: shared stores.</para></listitem> -->
+
+  <listitem><para>A performance issue has been fixed with the
+  <literal>referer</literal> table, which stores the inverse of the
+  <literal>references</literal> table (i.e., it tells you what store
+  paths refer to a given path).  Maintaining this table could take a
+  quadratic amount of time, as well as a quadratic amount of Berkeley
+  DB log file space (in particular when running the garbage collector)
+  (<literal>NIX-23</literal>).</para></listitem>
+
+  <listitem><para>Nix now catches the <literal>TERM</literal> and
+  <literal>HUP</literal> signals in addition to the
+  <literal>INT</literal> signal.  So you can now do a <literal>killall
+  nix-store</literal> without triggering a database
+  recovery.</para></listitem>
+
+  <listitem><para><command>bsdiff</command> updated
+  4.3.</para></listitem>
 
   <listitem><para>Substantial performance improvements in expression
   evaluation and <literal>nix-env -qa</literal>, all thanks to <link
@@ -225,51 +311,12 @@ irreversible.</para></warning>
 
   </para></listitem>
 
-  
-  <listitem><para>XML support:
-
-    <itemizedlist>
-
-      <listitem><para><literal>nix-env -q --xml</literal> prints the
-      installed or available packages in an XML representation for
-      easy processing by other tools.</para></listitem>
-
-      <listitem><para><literal>nix-instantiate --eval-only
-      --xml</literal> prints an XML representation of the resulting
-      term.  (The new flag <option>--strict</option> forces ‘deep’
-      evaluation of the result, i.e., list elements and attributes are
-      evaluated recursively.)</para></listitem>
-
-      <listitem><para>In Nix expressions, the primop
-      <function>builtins.toXML</function> converts a term to an XML
-      representation.  This is primarily useful for passing structured
-      information to builders.</para></listitem>
-
-    </itemizedlist>
-
-  </para></listitem>
-  
-
   <listitem><para>Nix source distributions are a lot smaller now since
   we no longer include a full copy of the Berkeley DB source
   distribution (but only the bits we need).</para></listitem>
 
-  <listitem><para>Support for 64-bit platforms, provided <link
-  xlink:href="http://bugzilla.sen.cwi.nl:8080/show_bug.cgi?id=606">suitably
-  patched ATerm library</link> is used.  Also, files larger than 2 GiB
-  are now supported.</para></listitem>
-
-  <listitem><para>Users of SMP and multicore machines will appreciate
-  that the number of builds to be performed in parallel can now be
-  specified in the configuration file in the
-  <literal>build-max-jobs</literal> setting.</para></listitem>
-
-  <listitem><para>Added support for Cygwin (Windows,
-  <literal>i686-cygwin</literal>) and Mac OS X on Intel
-  (<literal>i686-darwin</literal>).</para></listitem>
-
-  <listitem><para>TODO: <literal>nix-push
-  --target</literal>.</para></listitem>
+  <listitem><para>Header files are now installed so that external
+  programs can use the Nix libraries.</para></listitem>
 
 </itemizedlist>
 
