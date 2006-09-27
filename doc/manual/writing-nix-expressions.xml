@@ -1036,14 +1036,6 @@ weakest binding).</para>
     </thead>
     <tbody>
       <row>
-        <entry><replaceable>e1</replaceable> ~ <replaceable>e2</replaceable></entry>
-        <entry>none</entry>
-        <entry>Construct a reference to a subpath of a derivation.
-        E.g., <literal>hello ~ "/bin/sh"</literal> refers to the
-        <filename>/bin/sh</filename> path within the Hello derivation.
-        Useful in specifying derivation attributes.</entry>
-      </row>
-      <row>
         <entry><replaceable>e</replaceable> ?
         <replaceable>id</replaceable></entry>
         <entry>none</entry>

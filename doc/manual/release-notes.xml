@@ -4,6 +4,9 @@
 <title>Nix Release Notes</title>
 
 
+
+<!--==================================================================-->
+
 <section><title>Release 0.10 (TBA)</title>
 
 <note><para>This version of Nix uses Berkeley DB 4.4 instead of 4.3.
@@ -23,19 +26,45 @@ irreversible.</para></warning>
 
 <itemizedlist>
 
-  <listitem><para>An option <option>--compare-versions</option> (or
-  <option>-c</option>) has been added to <command>nix-env
-  --query</command> to allow you to compare installed versions of
-  packages to available versions, or vice versa.  An easy way to see
-  if you are up to date with what’s in the channel is <literal>nix-env
-  -qc \*</literal>.</para></listitem>
 
-  <listitem><para><literal>nix-env --query</literal> now takes as
-  arguments a list of package names about which to show information,
-  just like <option>--install</option>, etc.: for example,
-  <literal>nix-env -q gcc</literal>.  Note that to show all
-  derivations, you need to specify
-  <literal>\*</literal>.</para></listitem>
+  <listitem><para><command>nix-env</command> usability improvements:
+
+    <itemizedlist>
+
+      <listitem><para>An option <option>--compare-versions</option>
+      (or <option>-c</option>) has been added to <command>nix-env
+      --query</command> to allow you to compare installed versions of
+      packages to available versions, or vice versa.  An easy way to
+      see if you are up to date with what’s in the channel is
+      <literal>nix-env -qc \*</literal>.</para></listitem>
+
+      <listitem><para><literal>nix-env --query</literal> now takes as
+      arguments a list of package names about which to show
+      information, just like <option>--install</option>, etc.: for
+      example, <literal>nix-env -q gcc</literal>.  Note that to show
+      all derivations, you need to specify
+      <literal>\*</literal>.</para></listitem>
+
+      <listitem><para><literal>nix-env -i
+      <replaceable>pkgname</replaceable></literal> will now install
+      the highest available version of
+      <replaceable>pkgname</replaceable>, rather than installing all
+      available versions (which would probably give collisions)
+      (<literal>NIX-31</literal>).</para></listitem>
+
+      <listitem><para><literal>nix-env (-i|-u) --dry-run</literal> now
+      shows exactly which missing paths will be built or
+      substituted.</para></listitem>
+
+      <listitem><para><literal>nix-env -qa --description</literal>
+      shows human-readable descriptions of packages, provided that
+      they have a <literal>meta.description</literal> attribute (which
+      most packages in Nixpkgs don’t have yet).</para></listitem>
+
+    </itemizedlist>
+  
+  </para></listitem>
+  
 
   <listitem><para>Berkeley DB 4.4’s process registry feature is used
   to recover from crashed Nix processes.</para></listitem>
@@ -62,7 +91,8 @@ irreversible.</para></warning>
     <itemizedlist>
 
       <listitem><para>Reference scanning (which happens after each
-      build) is much faster.</para></listitem>
+      build) is much faster and takes a constant amount of
+      memory.</para></listitem>
 
       <listitem><para>String interpolation.  Expressions like
 
@@ -80,15 +110,23 @@ irreversible.</para></warning>
       
       <listitem><para>Multi-line string literals.</para></listitem>
 
-      <listitem><para>TODO: string concatenations involving
-      derivations.  Consequently, the subpath operator
+      <listitem><para>String concatenations can now involve
+      derivations, as in the example above —
+      <code>"--with-freetype2-library=" + freetype + "/lib"</code>.
+      This was not previously possible because we need to register
+      that a derivation that uses such a string is dependent on
+      <literal>freetype</literal>.  The evaluator now properly
+      propagates this information.  Consequently, the subpath operator
       (<literal>~</literal>) has been deprecated.</para></listitem>
 
-      <listitem><para>TODO: function argument default values can refer
-      to other function arguments
-      (<literal>NIX-45</literal>)</para></listitem>
+      <listitem><para>Default values of function arguments can now
+      refer to other function arguments; that is, all arguments are in
+      scope in the default values
+      (<literal>NIX-45</literal>).</para></listitem>
 
+      <!--
       <listitem><para>TODO: domain checks (r5895).</para></listitem>
+      -->
 
     </itemizedlist>
 
@@ -108,7 +146,7 @@ irreversible.</para></warning>
 
   <listitem><para>New commands <command>nix-pack-closure</command> and
   <command>nix-unpack-closure</command> than can be used to easily
-  transfer a stire path with all its dependencies to another machine.
+  transfer a store path with all its dependencies to another machine.
   Very convenient whenever you have some package on your machine and
   you want to copy it somewhere else.</para></listitem>
 
@@ -187,24 +225,30 @@ irreversible.</para></warning>
 
   </para></listitem>
 
-  <listitem><para>TODO: XML support in <literal>nix-env -q
-  --xml</literal> and <literal>nix-instantiate --eval-only
-  --xml</literal>.</para></listitem>
+  
+  <listitem><para>XML support:
 
-  <listitem><para><literal>nix-env -i
-  <replaceable>pkgname</replaceable></literal> will now install the
-  highest available version of <replaceable>pkgname</replaceable>,
-  rather than installing all available versions (which would probably
-  give collisions) (<literal>NIX-31</literal>).</para></listitem>
+    <itemizedlist>
 
-  <listitem><para><literal>nix-env (-i|-u) --dry-run</literal> now
-  shows exactly which missing paths will be built or
-  substituted.</para></listitem>
+      <listitem><para><literal>nix-env -q --xml</literal> prints the
+      installed or available packages in an XML representation for
+      easy processing by other tools.</para></listitem>
 
-  <listitem><para><literal>nix-env -qa --description</literal> shows
-  human-readable descriptions of packages, provided that they have a
-  <literal>meta.description</literal> attribute (which most packages
-  in Nixpkgs don’t have yet).</para></listitem>
+      <listitem><para><literal>nix-instantiate --eval-only
+      --xml</literal> prints an XML representation of the resulting
+      term.  (The new flag <option>--strict</option> forces ‘deep’
+      evaluation of the result, i.e., list elements and attributes are
+      evaluated recursively.)</para></listitem>
+
+      <listitem><para>In Nix expressions, the primop
+      <function>builtins.toXML</function> converts a term to an XML
+      representation.  This is primarily useful for passing structured
+      information to builders.</para></listitem>
+
+    </itemizedlist>
+
+  </para></listitem>
+  
 
   <listitem><para>Nix source distributions are a lot smaller now since
   we no longer include a full copy of the Berkeley DB source
@@ -214,6 +258,11 @@ irreversible.</para></warning>
   xlink:href="http://bugzilla.sen.cwi.nl:8080/show_bug.cgi?id=606">suitably
   patched ATerm library</link> is used.  Also, files larger than 2 GiB
   are now supported.</para></listitem>
+
+  <listitem><para>Users of SMP and multicore machines will appreciate
+  that the number of builds to be performed in parallel can now be
+  specified in the configuration file in the
+  <literal>build-max-jobs</literal> setting.</para></listitem>
 
   <listitem><para>Added support for Cygwin (Windows,
   <literal>i686-cygwin</literal>) and Mac OS X on Intel
@@ -226,6 +275,9 @@ irreversible.</para></warning>
 
 </section>
 
+
+
+<!--==================================================================-->
 
 <section><title>Release 0.9.2 (September 21, 2005)</title>
 
@@ -252,6 +304,8 @@ irreversible.</para></warning>
 
 
 
+<!--==================================================================-->
+
 <section><title>Release 0.9.1 (September 20, 2005)</title>
 
 <para>This bug fix release addresses a problem with the ATerm library
@@ -261,6 +315,8 @@ when the <option>--with-aterm</option> flag in
 </section>
 
 
+
+<!--==================================================================-->
 
 <section><title>Release 0.9 (September 16, 2005)</title>
 
@@ -357,6 +413,8 @@ svnService = derivation {
 
 
 
+<!--==================================================================-->
+
 <section><title>Release 0.8.1 (April 13, 2005)</title>
 
 <para>This is a bug fix release.</para>
@@ -374,6 +432,8 @@ svnService = derivation {
 </section>
 
 
+
+<!--==================================================================-->
 
 <section><title>Release 0.8 (April 11, 2005)</title>
 
@@ -615,6 +675,8 @@ $ nix-env -f .../i686-linux.nix -i -E 'x: x.firefoxWrapper'</screen>
 
 
 
+<!--==================================================================-->
+
 <section><title>Release 0.7 (January 12, 2005)</title>
 
 <itemizedlist>
@@ -646,6 +708,8 @@ $ nix-env -f .../i686-linux.nix -i -E 'x: x.firefoxWrapper'</screen>
 </section>
 
 
+
+<!--==================================================================-->
 
 <section><title>Release 0.6 (November 14, 2004)</title>
 
@@ -765,6 +829,8 @@ $ nix-env -f .../i686-linux.nix -i -E 'x: x.firefoxWrapper'</screen>
 </section>
 
 
+
+<!--==================================================================-->
 
 <section><title>Release 0.5 and earlier</title>
 
