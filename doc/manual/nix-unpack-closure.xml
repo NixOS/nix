@@ -1,0 +1,28 @@
+<refentry xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink">
+
+<refnamediv>
+  <refname>nix-unpack-closure</refname>
+  <refpurpose>unpack the closure of a store path created by <command>nix-pack-closure</command> into the Nix store</refpurpose>
+</refnamediv>
+
+<refsynopsisdiv>
+  <cmdsynopsis>
+    <command>nix-unpack-closure</command>
+  </cmdsynopsis>
+</refsynopsisdiv>
+
+
+<refsection><title>Description</title>
+
+<para>The command <command>nix-unpack-closure</command> unpacks the
+closure of a set of store paths created by
+<command>nix-pack-closure</command> into the local Nix store.  The
+closure is a single file read from standard input.  See the
+description of <command>nix-pack-closure</command> for details and
+examples.</para>
+
+</refsection>
+
+
+</refentry>

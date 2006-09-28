@@ -74,6 +74,14 @@
       <title>nix-prefetch-url</title>
       <xi:include href="nix-prefetch-url.xml" />
     </section>
+    <section>
+      <title>nix-pack-closure</title>
+      <xi:include href="nix-pack-closure.xml" />
+    </section>
+    <section>
+      <title>nix-unpack-closure</title>
+      <xi:include href="nix-unpack-closure.xml" />
+    </section>
   </appendix>
 
   <xi:include href="troubleshooting.xml" />

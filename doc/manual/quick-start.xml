@@ -31,7 +31,8 @@ file).</para></listitem>
 <listitem><para>Subscribe to the Nix Packages channel.
 
 <screen>
-$ nix-channel --add http://nix.cs.uu.nl/dist/nix/channels-v3/nixpkgs-unstable</screen>
+$ nix-channel --add \
+    http://nix.cs.uu.nl/dist/nix/channels-v3/nixpkgs-unstable</screen>
 
 </para></listitem>
 
@@ -49,7 +50,7 @@ available remotely.</para></listitem>
 available in the channel:
 
 <screen>
-$ nix-env -qa
+$ nix-env -qa ’*’ <lineannotation>(mind the quotes!)</lineannotation>
 docbook-xml-4.2
 firefox-1.0pre-PR-0.10.1
 hello-2.1.1
@@ -109,13 +110,15 @@ to get rid of unused packages, since uninstalls or upgrades don't
 actually delete them:
 
 <screen>
-$ nix-env --delete-generations old
-$ nix-store --gc</screen>
+$ nix-collect-garbage -d</screen>
 
+<!--
 The first command deletes old “generations” of your profile (making
 rollbacks impossible, but also making the components in those old
 generations available for garbage collection), while the second
-command actually deletes them.</para></listitem>
+command actually deletes them.-->
+
+</para></listitem>
 
 </orderedlist>
 

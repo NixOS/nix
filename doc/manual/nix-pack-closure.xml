@@ -1,0 +1,64 @@
+<refentry xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink">
+
+<refnamediv>
+  <refname>nix-pack-closure</refname>
+  <refpurpose>pack the closure of a store path into a single file that
+  can be unpacked with
+  <command>nix-unpack-closure</command></refpurpose>
+</refnamediv>
+
+<refsynopsisdiv>
+  <cmdsynopsis>
+    <command>nix-pack-closure</command>
+    <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+  </cmdsynopsis>
+</refsynopsisdiv>
+
+
+<refsection><title>Description</title>
+
+<para>The command <command>nix-pack-closure</command> packs the
+contents of the store paths <replaceable>paths</replaceable> and
+<emphasis>all their dependencies</emphasis> into a single file, which
+is written to standard output.  (That is, it
+<emphasis>serialises</emphasis> <replaceable>paths</replaceable>.)
+The output can then be unpacked into the Nix store of another machine
+using <command>nix-unpack-closure</command>.</para>
+
+<para>Together, <command>nix-pack-closure</command> and
+<command>nix-unpack-closure</command> provide a quick and easy way to
+deploy a package to a different machine.  However, as the output of
+<command>nix-pack-closure</command> tends to be rather large (since it
+contains all dependencies), it’s not very efficient.
+<command>nix-push</command> and <command>nix-pull</command> are more
+efficient, but are also a bit more cumbersome to use.</para>
+
+</refsection>
+
+
+<refsection><title>Examples</title>
+
+<para>To copy some instance of Subversion with all its dependencies to
+another machine:
+
+<screen>
+$ nix-pack-closure /nix/store/hj232g1r...-subversion-1.3.0 > svn.closure
+
+<lineannotation>Copy <!-- !!! <filename> --> svn.closure to the remote machine, then on the remote machine do:</lineannotation>
+$ nix-unpack-closure &lt; svn.closure</screen>
+
+</para>
+
+<para>Copy the program <command>azureus</command> with all its
+dependencies to the machine <literal>scratchy</literal>:
+
+<screen>
+$ nix-pack-closure $(which azureus) | ssh scratchy nix-unpack-closure</screen>
+    
+</para>
+
+</refsection>
+
+
+</refentry>
