@@ -45,7 +45,7 @@ another machine:
 <screen>
 $ nix-pack-closure /nix/store/hj232g1r...-subversion-1.3.0 > svn.closure
 
-<lineannotation>Copy <!-- !!! <filename> --> svn.closure to the remote machine, then on the remote machine do:</lineannotation>
+<lineannotation>Copy <!-- !!! <filename> -->svn.closure to the remote machine, then on the remote machine do:</lineannotation>
 $ nix-unpack-closure &lt; svn.closure</screen>
 
 </para>

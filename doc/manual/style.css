@@ -10,7 +10,6 @@ body
 {
     font-family: sans-serif;
     background: white;
-  
     margin: 2em 1em 2em 1em;
 }
 
@@ -34,12 +33,17 @@ h2 /* chapters, appendices, subtitle */
 div.chapter > div.titlepage h2, div.appendix > div.titlepage h2 
 { 
     margin-top: 1.5em;
-/*    border-top: solid #005aa0; */
 }
 
 div.sect1 h2 /* sections */
 {
     font-size: 150%;
+}
+
+/* Extra space between sections. */
+div.section > div.titlepage h2
+{ 
+    margin-top: 1.2em;
 }
 
 div.refnamediv h2, div.refsynopsisdiv h2, div.refsection h2 /* refentry parts */
@@ -67,8 +71,8 @@ div.example
 {
     border: 1px solid #6185a0;
     padding: 6px 6px;
-    margin-left: 3em;
-    margin-right: 3em;
+    margin-left: 0em;
+    margin-right: 0em;
     background: #eeeeee;
 }
 
@@ -86,9 +90,9 @@ pre.programlisting
 pre.screen
 {
     border: 1px solid #6185a0;
-    padding: 6px 6px;
-    margin-left: 3em;
-    margin-right: 3em;
+    padding: 3px 3px;
+    margin-left: 1.5em;
+    margin-right: 1.5em;
     color: #600000;
     background: #eeeeee;
     font-family: monospace;
@@ -100,24 +104,39 @@ pre.screen
                                Notes, warnings etc:
  ***************************************************************************/
 
-.note,.warning
+.note, .warning
 {
-    margin-top: 1em;
-    margin-bottom: 1em;
     border: 1px solid #6185a0;
-    padding: 0px 1em;
+    padding: 3px 3px;
+    margin-left: 1.5em;
+    margin-right: 1.5em;
+    margin-bottom: 1em;
+    padding: 0.3em 0.3em 0.3em 0.3em;
     background: #fffff5;
 }
 
-div.note,div.warning
+div.note, div.warning
 {
     font-style: italic;
 }
 
-div.warning h3
+div.note h3, div.warning h3
 {
     color: red;
     font-size: 100%;
+//    margin: 0 0 0 0;
+    padding-right: 0.5em;
+    display: inline;
+}
+
+div.note p, div.warning p
+{
+    margin-bottom: 0em;
+}
+
+div.note h3 + p, div.warning h3 + p
+{
+    display: inline;
 }
 
 div.note h3

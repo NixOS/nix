@@ -11,7 +11,7 @@ simple example (a Nix expression for GNU Hello), and then moves
 on to a more in-depth look at the Nix expression language.</para>
 
 
-<sect1><title>A simple Nix expression</title>
+<section><title>A simple Nix expression</title>
 
 <para>This section shows how to add and test the <link
 xlink:href='http://www.gnu.org/software/hello/hello.html'>GNU Hello
@@ -47,7 +47,7 @@ need to do three things:
 </para>
 
 
-<sect2><title>The Nix expression</title>
+<section><title>The Nix expression</title>
 
 <example xml:id='ex-hello-nix'><title>Nix expression for GNU Hello
 (<filename>default.nix</filename>)</title>
@@ -188,10 +188,10 @@ perl = perl;</programlisting>
 
 </para>
 
-</sect2>
+</section>
 
 
-<sect2><title>The builder</title>
+<section><title>The builder</title>
 
 <example xml:id='ex-hello-builder'><title>Build script for GNU Hello
 (<filename>builder.sh</filename>)</title>
@@ -303,10 +303,10 @@ shell script is evaluated with Bash's <option>-e</option> option,
 which causes the script to be aborted if any command fails without an
 error check.</para>
 
-</sect2>
+</section>
 
 
-<sect2><title>Composition</title>
+<section><title>Composition</title>
 
 <example xml:id='ex-hello-composition'><title>Composing GNU Hello
 (<filename>all-packages-generic.nix</filename>)</title>
@@ -401,10 +401,10 @@ some fragments of
 
 </calloutlist>
 
-</sect2>
+</section>
 
 
-<sect2><title>Testing</title>
+<section><title>Testing</title>
 
 <para>You can now try to build Hello.  The simplest way to do that is
 by using <command>nix-env</command>:
@@ -501,10 +501,10 @@ Just pass the option <option>-j <replaceable>N</replaceable></option>,
 where <replaceable>N</replaceable> is the maximum number of jobs to be
 run in parallel.  Typically this should be the number of CPUs.</para>
 
-</sect2>
+</section>
 
 
-<sect2><title>The generic builder</title>
+<section><title>The generic builder</title>
 
 <para>Recall from <xref linkend='ex-hello-builder' /> that the builder
 looked something like this:
@@ -587,14 +587,14 @@ In fact, <varname>mkDerivation</varname> provides a default builder
 that looks exactly like that, so it is actually possible to omit the
 builder for Hello entirely.</para>
 
-</sect2>
+</section>
 
 
-</sect1>
+</section>
 
 
 
-<sect1><title>The Nix expression language</title>
+<section><title>The Nix expression language</title>
 
 <para>The Nix expression language is a pure, lazy, functional
 language.  Purity means that operations in the language don't have
@@ -1290,11 +1290,11 @@ character, or inline/multi-line, enclosed within <literal>/*
 </simplesect>
 
 
-</sect1>
+</section>
 
 
 
-<sect1 xml:id='sec-standard-environment'><title>The standard environment</title>
+<section xml:id='sec-standard-environment'><title>The standard environment</title>
 
 <para>The standard build environment in the Nix Packages collection
 provides a basic environment for building Unix packages.  It consists
@@ -1547,7 +1547,7 @@ $ make
 is the source itself, which resides in
 <filename>pkgs/stdenv/generic/setup.sh</filename>.</para>
 
-</sect1>
+</section>
 
 
 </chapter>

@@ -4,7 +4,8 @@ XSLTPROC = $(xsltproc) $(xmlflags) \
  --param section.label.includes.component.label 1 \
  --param html.stylesheet \'style.css\' \
  --param xref.with.number.and.title 1 \
- --param toc.section.depth 3
+ --param toc.section.depth 3 \
+ --param admon.style \'\'
 
 man1_MANS = nix-env.1 nix-build.1 nix-store.1 nix-instantiate.1 \
  nix-collect-garbage.1 nix-push.1 nix-pull.1 \

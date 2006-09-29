@@ -8,9 +8,10 @@
 
 <section><info><title>Obtaining Nix</title></info>
 
-<para>The easiest way to obtain Nix is to download a <link xlink:href="http://www.cs.uu.nl/groups/ST/Trace/Nix">source
-distribution</link>.  RPMs for Red Hat, SuSE, and Fedore Core are
-also available.</para>
+<para>The easiest way to obtain Nix is to download a <link
+xlink:href="http://www.cs.uu.nl/groups/ST/Trace/Nix">source
+distribution</link>.  RPMs for Red Hat, SuSE, and Fedora Core are also
+available.</para>
 
 <para>Alternatively, the most recent sources of Nix can be obtained
 from its <link
@@ -34,8 +35,9 @@ tar-file</link> of the head revision of the trunk.</para>
 
 <section><info><title>Prerequisites</title></info>
 
-<para>The following prerequisites only apply when you build from
-source.  Binary releases (e.g., RPMs) have no prerequisites.</para>
+<para><emphasis>The following prerequisites only apply when you build
+from source</emphasis>.  Binary releases (e.g., RPMs) have no
+prerequisites.</para>
 
 <para>A fairly recent version of GCC/G++ is required.  Version 2.95
 and higher should work.</para>
@@ -47,9 +49,9 @@ which are part of the <literal>libxml2</literal> and
 <link
 xlink:href="http://docbook.sourceforge.net/projects/xsl/">DocBook XSL
 stylesheets</link> and optionally the <link
-xlink:href="http://www.oasis-open.org/docbook/xml/4.2/docbook-xml-4.2.zip">
-DocBook XML 4.2 DTD</link>.  Note that these are only required if you
-modify the manual sources or when you are building from the Subversion
+xlink:href="http://www.docbook.org/schemas/5x"> DocBook 5.0 RELAX NG
+schemas</link>.  Note that these are only required if you modify the
+manual sources or when you are building from the Subversion
 repository.</para>
 
 <para>To build the parser, very <emphasis>recent</emphasis> versions
@@ -103,15 +105,15 @@ $ autoreconf -i</screen>
 like.  You must have write permission to the
 <replaceable>prefix</replaceable> path.</para>
 
-<warning><para>It is advisable <emphasis>not</emphasis> to change the
-installation prefix from its default, since doing so will in all
-likelihood make it impossible to use derivations built on other
-systems.</para></warning>
+<warning><para>It is best <emphasis>not</emphasis> to change the
+installation prefix from its default, since doing so makes it
+impossible to use pre-built binaries from the standard Nixpkgs
+channels.</para></warning>
 
 <para>If you want to rebuilt the documentation, pass the full path to
-the DocBook XML catalog file (<filename>docbook.cat</filename>) and to
-the DocBook XSL stylesheets using the
-<option>--with-docbook-catalog=<replaceable>path</replaceable></option>
+the DocBook RELAX NG schemas and to the DocBook XSL stylesheets using
+the
+<option>--with-docbook-rng=<replaceable>path</replaceable></option>
 and
 <option>--with-docbook-xsl=<replaceable>path</replaceable></option>
 options.</para>

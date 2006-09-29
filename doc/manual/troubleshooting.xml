@@ -7,7 +7,7 @@
 <para>This section provides solutions for some common problems.</para>
 
 
-<sect1><title>Berkeley DB: <quote>Cannot allocate memory</quote></title>
+<section><title>Berkeley DB: <quote>Cannot allocate memory</quote></title>
 
 <para>Symptom: Nix operations (in particular the
 <command>nix-store</command> operations <option>--gc</option>,
@@ -30,10 +30,10 @@ $ rm __db.00*</screen>
 
 </para>
 
-</sect1>
+</section>
 
 
-<sect1><title>Collisions in <command>nix-env</command></title>
+<section><title>Collisions in <command>nix-env</command></title>
 
 <para>Symptom: when installing or upgrading, you get an error message such as
 
@@ -69,10 +69,10 @@ to implement some conflict resolution policy.  E.g., the script could
 be modified to rename conflicting file names, or to pick one over the
 other.</para>
 
-</sect1>
+</section>
 
 
-<sect1><title><quote>Too many links</quote> error in the Nix
+<section><title><quote>Too many links</quote> error in the Nix
 store</title>
 
 
@@ -108,7 +108,7 @@ more than 32,000 subdirectories per directory, such as ReiserFS.
 ReiserFS lies to the kernel by reporting a link count of 1 if it
 exceeds the limit.)</para>
 
-</sect1>
+</section>
   
 
 
