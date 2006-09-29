@@ -44,7 +44,7 @@ xlink:href='http://nix.cs.uu.nl/dist/nix' />.</para>
 Packages, you can view the set of available components in the release:
 
 <screen>
-$ nix-env -qaf nixpkgs-<replaceable>version</replaceable>
+$ nix-env -qaf nixpkgs-<replaceable>version</replaceable> '*'
 ant-blackdown-1.4.2
 aterm-2.2
 bash-3.0
@@ -62,7 +62,7 @@ available components, i.e., whether they are installed into the user
 environment and/or present in the system:
 
 <screen>
-$ nix-env -qasf nixpkgs-<replaceable>version</replaceable>
+$ nix-env -qasf nixpkgs-<replaceable>version</replaceable> '*'
 ...
 -PS bash-3.0
 --S binutils-2.15
@@ -382,6 +382,19 @@ $ nix-store --gc --print-dead</screen>
 Likewise, the option <option>--print-live</option> will show the paths
 that <emphasis>won’t</emphasis> be deleted.</para>
 
+<para>There is also a convenient little utility
+<command>nix-collect-garbage</command>, which when invoked with the
+<option>-d</option> (<option>--delete-old</option>) switch deletes all
+old generations of all profiles in
+<filename>/nix/var/nix/profiles</filename>.  So
+
+<screen>
+$ nix-collect-garbage -d</screen>
+
+is a quick and easy way to clean up your system.</para>
+
+
+
 
 <section xml:id="ssec-gc-roots"><title>Garbage collector roots</title>
 
@@ -459,6 +472,13 @@ $ nix-env -u '*'</screen>
 
 to upgrade all components in your profile to the latest versions
 available in the subscribed channels.</para>
+
+</section>
+
+
+<section xml:id="sec-one-click"><title>One-click installations</title>
+
+<para>TODO</para>
 
 </section>
 

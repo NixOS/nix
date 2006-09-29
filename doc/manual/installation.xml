@@ -148,6 +148,20 @@ $ rm -rf /nix/var</screen>
 </section>
 
 
+<section><info><title>Upgrading Nix through Nix</title></info>
+
+<para>You can install the latest stable version of Nix through Nix
+itself by subscribing to the channel <link
+xlink:href="http://nix.cs.uu.nl/dist/nix/channels-v3/nix-stable" /> ,
+or the latest unstable version by subscribing to the channel<link
+xlink:href="http://nix.cs.uu.nl/dist/nix/channels-v3/nix-unstable" />.
+You can also do a <link linkend="sec-one-click">one-click
+installation</link> by clicking on the package links at <link
+xlink:href="http://nix.cs.uu.nl/dist/nix/" />.</para>
+
+</section>
+
+
 <section><info><title>Permissions</title></info>
 
 <para>All Nix operations must be performed under the user ID that owns

@@ -96,6 +96,16 @@ The latter command will upgrade each installed component for which
 there is a “newer” version (as determined by comparing the version
 numbers).</para></listitem>
 
+<listitem><para>You can also install specific packages directly from
+your web browser.  For instance, you can go to <link
+xlink:href="http://nix.cs.uu.nl/dist/nix/nixpkgs-unstable-latest/" />
+and click on any link for the individual packages for your platform.
+Associate <literal>application/nix-package</literal> with the program
+<filename>/nix/bin/nix-install-package</filename>.  A window should
+appear asking you whether it’s okay to install the package.  Say
+<literal>Y</literal>.  The package and all its dependencies will be
+installed.</para></listitem>
+
 <listitem><para>If you're unhappy with the result of a
 <command>nix-env</command> action (e.g., an upgraded component turned
 out not to work properly), you can go back:

@@ -9,6 +9,8 @@
 <refsynopsisdiv>
   <cmdsynopsis>
     <command>nix-collect-garbage</command>
+    <arg><option>--delete-old</option></arg>
+    <arg><option>-d</option></arg>
     <group choice='opt'>
       <arg choice='plain'><option>--print-roots</option></arg>
       <arg choice='plain'><option>--print-live</option></arg>
@@ -20,10 +22,28 @@
 
 <refsection><title>Description</title>
 
-<para>The command <command>nix-collect-garbage</command> is an
-obsolete wrapper around <link
-linkend="rsec-nix-store-gc"><command>nix-store
---gc</command></link>.</para>
+<para>The command <command>nix-collect-garbage</command> is mostly an
+alias of <link linkend="rsec-nix-store-gc"><command>nix-store
+--gc</command></link>, that is, it deletes all unreachable paths in
+the Nix store to clean up your system.  However, it provides an
+additional option <option>-d</option> (<option>--delete-old</option>)
+that deletes all old generations of all profiles in
+<filename>/nix/var/nix/profiles</filename> by invoking
+<literal>nix-env --delete-generations old</literal> on all profiles.
+Of course, this makes rollbacks to previous configurations
+impossible.</para>
+
+</refsection>
+
+<refsection><title>Example</title>
+
+<para>To delete from the Nix store everything that is not used by the
+current generations of each profile, do
+
+<screen>
+$ nix-collect-garbage -d</screen>
+
+</para>
 
 </refsection>
 
