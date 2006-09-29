@@ -478,7 +478,37 @@ available in the subscribed channels.</para>
 
 <section xml:id="sec-one-click"><title>One-click installs</title>
 
-<para>TODO</para>
+<para>Often, when you want to install a specific package (e.g., from
+the <link
+xlink:href="http://nix.cs.uu.nl/dist/nix/nixpkgs-unstable-latest/">Nix
+Packages collection</link> or from our <link
+xlink:href='http://nix.cs.uu.nl/dist/'>release server</link>),
+subscribing to a channel is a bit cumbersome.  And channels don’t help
+you at all if you want to install an older version of a package than
+the one provided by the current contents of the channel, or a package
+that has been removed from the channel.  That’s when
+<emphasis>one-click installs</emphasis> come in handy: you can just go
+to the web page that contains the package, click on it, and it will be
+installed with all the necessary dependencies.</para>
+
+<para>For instance, you can go to <link
+xlink:href="http://nix.cs.uu.nl/dist/nix/nixpkgs-unstable-latest/" />
+— or to any older release of Nix Packages — and click on any link for
+the individual packages for your platform (say, <link
+xlink:href='http://nix.cs.uu.nl/dist/nix/nixpkgs-0.10pre6622/pkgs/subversion-1.4.0-i686-linux.nixpkg'><literal>subversion-1.4.0</literal>
+for <literal>i686-linux</literal></link>).  The first time you do
+this, your browser will ask what to do with
+<literal>application/nix-package</literal> files.  You should open
+them with <filename>/nix/bin/nix-install-package</filename>.  This
+will open a window that asks you to confirm that you want to install
+the package.  When you answer <literal>Y</literal>, the package and
+all its dependencies will be installed.  This is a binary deployment
+mechanism — you get packages pre-compiled for the selected platform
+type.</para>
+
+<para>You can also install <literal>application/nix-package</literal>
+files from the command line directly.  See <xref
+linkend='sec-nix-install-package' /> for details.</para>
 
 </section>
 
