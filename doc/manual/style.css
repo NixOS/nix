@@ -35,19 +35,15 @@ div.chapter > div.titlepage h2, div.appendix > div.titlepage h2
     margin-top: 1.5em;
 }
 
-div.sect1 h2 /* sections */
+div.section > div.titlepage h2 /* sections */
 {
     font-size: 150%;
-}
-
-/* Extra space between sections. */
-div.section > div.titlepage h2
-{ 
-    margin-top: 1.2em;
+    margin-top: 1.5em;
 }
 
 div.refnamediv h2, div.refsynopsisdiv h2, div.refsection h2 /* refentry parts */
 {
+    margin-top: 1.4em;
     font-size: 125%;
 }
 
@@ -73,7 +69,7 @@ div.example
     padding: 6px 6px;
     margin-left: 0em;
     margin-right: 0em;
-    background: #eeeeee;
+    background: #f4f4f8;
 }
 
 pre.programlisting
@@ -94,7 +90,7 @@ pre.screen
     margin-left: 1.5em;
     margin-right: 1.5em;
     color: #600000;
-    background: #eeeeee;
+    background: #f4f4f8;
     font-family: monospace;
     /* font-size: 90%; */
 }
@@ -186,9 +182,14 @@ tt, code
     
 }
 
+div.variablelist dd p
+{
+    margin-top: 0em;
+}
+
 div.variablelist dd
 {
-    margin-bottom: 1em;
+    margin-left: 1.5em;
 }
 
 .default
@@ -250,4 +251,12 @@ div.epigraph
 table.productionset table.productionset
 {
     font-family: monospace;
+}
+
+strong.command
+{
+//    font-family: monospace;
+//    font-style: italic;
+//    font-weight: normal;
+    color: #400000;
 }

@@ -10,7 +10,8 @@ XSLTPROC = $(xsltproc) $(xmlflags) \
 man1_MANS = nix-env.1 nix-build.1 nix-store.1 nix-instantiate.1 \
  nix-collect-garbage.1 nix-push.1 nix-pull.1 \
  nix-prefetch-url.1 nix-channel.1 \
- nix-pack-closure.1 nix-unpack-closure.1
+ nix-pack-closure.1 nix-unpack-closure.1 \
+ nix-install-package.1
 
 FIGURES = figures/user-environments.png
 

@@ -1,0 +1,192 @@
+<refentry xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink">
+  
+<refnamediv>
+  <refname>nix-install-package</refname>
+  <refpurpose>install a Nix Package file</refpurpose>
+</refnamediv>
+
+<refsynopsisdiv>
+  <cmdsynopsis>
+    <command>nix-install-package</command>
+    <arg><option>--non-interactive</option></arg>
+    <arg>
+      <group choice='req'>
+        <arg choice='plain'><option>--profile</option></arg>
+        <arg choice='plain'><option>-p</option></arg>
+      </group>
+      <replaceable>path</replaceable>
+    </arg>
+    <sbr />
+    <group choice='req'>
+      <arg choice='req'>
+        <option>--url</option>
+        <arg choice='plain'><replaceable>url</replaceable></arg>
+      </arg>
+      <arg choice='req'>
+        <arg choice='plain'><replaceable>file</replaceable></arg>
+      </arg>
+    </group>
+  </cmdsynopsis>
+</refsynopsisdiv>
+
+
+<refsection><title>Description</title>
+
+<para>The command <command>nix-install-package</command> interactively
+installs a Nix Package file (<filename>*.nixpkg</filename>), which is
+a small file that contains a store path to be installed along with the
+URL of a <link linkend="sec-nix-push"><command>nix-push</command>
+manifest</link>.  The Nix Package file is either
+<replaceable>file</replaceable>, or automatically downloaded from
+<replaceable>url</replaceable> if the <option>--url</option> switch is
+used.</para>
+
+<para><command>nix-install-package</command> is used in <link
+linkend="sec-one-click">one-click installs</link> to download and
+install pre-built binary packages with all necessary dependencies.
+<command>nix-install-package</command> is intended to be associated
+with the MIME type <literal>application/nix-package</literal> in a web
+browser so that it is invoked automatically when you click on
+<filename>*.nixpkg</filename> files.  When invoked, it restarts itself
+in a terminal window (since otherwise it would be invisible when run
+from a browser), asks the user to confirm whether to install the
+package, and if so downloads and installs the package into the user’s
+current profile.</para>
+
+<para>To obtain a window, <command>nix-install-package</command> tries
+to restart itself with <command>xterm</command>,
+<command>konsole</command> and
+<command>gnome-terminal</command>.</para>
+
+</refsection>
+
+
+<refsection><title>Options</title>
+
+<variablelist>
+  
+  <varlistentry><term><option>--non-interactive</option></term>
+
+    <listitem><para>Do not open a new terminal window and do not ask
+    for confirmation.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--profile</option></term>
+    <term><option>-p</option></term>
+
+    <listitem><para>Install the package into the specified profile
+    rather than the user’s current profile.</para></listitem>
+
+  </varlistentry>
+
+</variablelist>
+
+</refsection>
+
+
+
+<refsection><title>Examples</title>
+
+<para></para>
+
+<para>To install <filename>subversion-1.4.0.nixpkg</filename> into the
+user’s current profile, without any prompting:
+
+<screen>
+$ nix-install-package --non-interactive subversion-1.4.0.nixpkg</screen>
+
+</para>
+
+<para>To install the same package from some URL into a different
+profile:
+
+<screen>
+$ nix-install-package --non-interactive -p /nix/var/nix/profiles/eelco \
+    --url http://nix.cs.uu.nl/dist/nix/nixpkgs-0.10pre6622/pkgs/subversion-1.4.0-i686-linux.nixpkg</screen>
+
+</para>
+
+</refsection>
+
+
+<refsection><title>Format of <literal>nixpkg</literal> files</title>
+
+<para>A Nix Package file consists of a single line with the following
+format:
+
+<screen>
+NIXPKG1 <replaceable>manifestURL</replaceable> <replaceable>name</replaceable> <replaceable>system</replaceable> <replaceable>drvPath</replaceable> <replaceable>outPath</replaceable></screen>
+
+The elemens are as follows:
+
+<variablelist>
+
+  <varlistentry><term><literal>NIXPKG1</literal></term>
+  
+    <listitem><para>The version of the Nix Package
+    file.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><replaceable>manifestURL</replaceable></term>
+  
+    <listitem><para>The manifest to be pulled by
+    <command>nix-pull</command>.  The manifest must contain
+    <replaceable>outPath</replaceable>.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><replaceable>name</replaceable></term>
+  
+    <listitem><para>The symbolic name and version of the
+    package.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><replaceable>system</replaceable></term>
+  
+    <listitem><para>The platform identifier of the platform for which
+    this binary package is intended.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><replaceable>drvPath</replaceable></term>
+  
+    <listitem><para>The path in the Nix store of the derivation from
+    which <replaceable>outPath</replaceable> was built.  Not currently
+    used.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><replaceable>outPath</replaceable></term>
+  
+    <listitem><para>The path in the Nix store of the package.  After
+    <command>nix-install-package</command> has obtained the manifest
+    from <replaceable>manifestURL</replaceable>, it performs a
+    <literal>nix-env -i</literal> <replaceable>outPath</replaceable>
+    to install the binary package.</para></listitem>
+
+  </varlistentry>
+
+</variablelist>
+  
+</para>
+
+<para>An example follows:
+
+<screen>
+NIXPKG1 http://.../nixpkgs-0.10pre6622/MANIFEST subversion-1.4.0 i686-darwin \
+  /nix/store/4kh60jkp...-subversion-1.4.0.drv \
+  /nix/store/nkw7wpgb...-subversion-1.4.0</screen>
+
+(The line breaks (<literal>\</literal>) are for presentation purposes
+and not part of the actual file.)
+
+</para>
+
+</refsection>
+
+
+</refentry>
