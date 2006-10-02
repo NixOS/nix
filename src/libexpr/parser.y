@@ -123,7 +123,7 @@ static void freeAndUnprotect(void * p)
 %type <t> expr_app expr_select expr_simple bind inheritsrc formal
 %type <ts> binds ids expr_list formals string_parts
 %token <t> ID INT STR PATH URI
-%token IF THEN ELSE ASSERT WITH LET REC INHERIT EQ NEQ AND OR IMPL
+%token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL
 %token DOLLAR_CURLY /* == ${ */
 
 %nonassoc IMPL
@@ -152,6 +152,8 @@ expr_function
     { $$ = makeAssert($2, $4, CUR_POS); }
   | WITH expr ';' expr_function
     { $$ = makeWith($2, $4, CUR_POS); }
+  | LET binds IN expr_function
+    { $$ = makeSelect(fixAttrs(1, ATinsert($2, makeBind(toATerm("<let-body>"), $4, CUR_POS))), toATerm("<let-body>")); }
   | expr_if
   ;
 

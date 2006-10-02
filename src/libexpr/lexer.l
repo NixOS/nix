@@ -91,6 +91,7 @@ else        { return ELSE; }
 assert      { return ASSERT; }
 with        { return WITH; }
 let         { return LET; }
+in          { return IN; }
 rec         { return REC; }
 inherit     { return INHERIT; }
 
