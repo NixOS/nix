@@ -55,7 +55,23 @@ bzip2-1.0.2
 ...</screen>
 
 where <literal>nixpkgs-<replaceable>version</replaceable></literal> is
-where you’ve unpacked the release.</para>
+where you’ve unpacked the release.  The flag <option>-q</option>
+specifies a query operation; <option>-a</option> means that you want
+to show the “available” (i.e., installable) packages, as opposed to
+the installed packages; and <option>-f</option>
+<filename>nixpkgs-<replaceable>version</replaceable></filename>
+specifies the source of the packages.  The argument
+<literal>'*'</literal> shows all installable packages. (The quotes are
+necessary to prevent shell expansion.)  You can also select specific
+packages by name:
+
+<screen>
+$ nix-env -qaf nixpkgs-<replaceable>version</replaceable> gcc
+gcc-3.4.6
+gcc-4.0.3
+gcc-4.1.1</screen>
+
+</para>
 
 <para>It is also possible to see the <emphasis>status</emphasis> of
 available components, i.e., whether they are installed into the user
