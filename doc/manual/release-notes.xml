@@ -118,6 +118,9 @@ irreversible.</para></warning>
       the availability of primop in a backwards-compatible
       way.</para></listitem>
 
+      <listitem><para>Real let-expressions: <literal>let x = ...;
+      ... z = ...; in ...</literal>.</para></listitem>
+
     </itemizedlist>
 
   </para></listitem>

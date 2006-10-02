@@ -716,35 +716,26 @@ encountered</quote>).</para></footnote>.</para>
 </simplesect>
 
 
-<simplesect><title>Let expressions</title>
+<simplesect><title>Let-expressions</title>
 
-<para>A <literal>let</literal> expression is a simple short-hand for a
-<literal>rec</literal> expression followed by an attribute selection:
-<literal>let { <replaceable>attrs</replaceable> }</literal> translates
-to <literal>rec { <replaceable>attrs</replaceable>
-}.body</literal>.</para>
-
-<para>For instance,
+<para>A let-expression allows you define local
+variables for an expression.  For instance,
 
 <programlisting>
-let {
+let
   x = "foo";
   y = "bar";
-  body = x + y;
-}</programlisting>
+in x + y</programlisting>
 
-is equivalent to
-
-<programlisting>
-rec {
-  x = "foo";
-  y = "bar";
-  body = x + y;
-}.body</programlisting>
-
-and evaluates to <literal>"foobar"</literal>.
+evaluates to <literal>"foobar"</literal>.
 
 </para>
+
+<note><para>There is also an obsolete form of let-expression,
+<literal>let { <replaceable>attrs</replaceable> }</literal>, which is
+translated to <literal>rec { <replaceable>attrs</replaceable>
+}.body</literal>.  That is, the body of the let-expression is the
+<literal>body</literal> attribute of the attribute set.</para></note>
 
 </simplesect>
 
@@ -757,13 +748,13 @@ propagate attributes).  This can be shortened using the
 <literal>inherit</literal> keyword.  For instance,
 
 <programlisting>
-let {
+let
   x = 123;
-  body = {
+in 
+  {
     inherit x;
     y = 456;
-  };
-}</programlisting>
+  }</programlisting>
 
 evaluates to <literal>{x = 123; y = 456;}</literal>.  (Note that this
 works because <varname>x</varname> is added to the lexical scope by
@@ -819,10 +810,8 @@ function calls.</para>
 a name, you can bind them to an attribute, e.g.,
 
 <programlisting>
-let {
-  concat = {x, y}: x + y;
-  body = concat {x = "foo"; y = "bar";};
-}</programlisting>
+let concat = {x, y}: x + y;
+in concat {x = "foo"; y = "bar";}</programlisting>
 
 </para>
 
@@ -837,11 +826,9 @@ where <replaceable>var</replaceable> is the name of the argument.  It
 is not possible to define a default.  Example:
 
 <programlisting>
-let {
-  negate = x: !x;
-  concat = x: y: x + y;
-  body = if negate true then concat "foo" "bar" else "";
-}</programlisting>
+let negate = x: !x;
+    concat = x: y: x + y;
+in if negate true then concat "foo" "bar" else ""</programlisting>
 
 Note that <function>concat</function> is a function that takes one
 arguments and returns a function that takes another argument.  This
@@ -849,7 +836,7 @@ allows partial parameterisation (i.e., only filling some of the
 arguments of a function); e.g.,
 
 <programlisting>
-  map (concat "foo") ["bar", "bla", "abc"]</programlisting>
+map (concat "foo") ["bar", "bla", "abc"]</programlisting>
 
 evaluates to <literal>["foobar" "foobla" "fooabc"]</literal>.</para>
 
@@ -958,9 +945,9 @@ used in the Nix expression for Subversion.</para>
   
 
 
-<simplesect><title>With expressions</title>
+<simplesect><title>With-expressions</title>
 
-<para>A <emphasis>with</emphasis> expression,
+<para>A <emphasis>with-expression</emphasis>,
 
 <programlisting>
 with <replaceable>e1</replaceable>; <replaceable>e2</replaceable></programlisting>
@@ -970,11 +957,8 @@ lexical scope of the expression <replaceable>e2</replaceable>.  For
 instance,
 
 <programlisting>
-let {
-  as = {x = "foo"; y = "bar";};
-
-  body = with as; x + y;
-}</programlisting>
+let as = {x = "foo"; y = "bar";};
+in with as; x + y</programlisting>
 
 evaluates to <literal>"foobar"</literal> since the
 <literal>with</literal> adds the <varname>x</varname> and
