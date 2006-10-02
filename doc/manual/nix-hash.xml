@@ -1,0 +1,153 @@
+<refentry xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink">
+  
+<refnamediv>
+  <refname>nix-hash</refname>
+  <refpurpose>compute the cryptographic hash of a path</refpurpose>
+</refnamediv>
+
+<refsynopsisdiv>
+  <cmdsynopsis>
+    <command>nix-hash</command>
+    <arg><option>--flat</option></arg>
+    <arg><option>--base32</option></arg>
+    <arg><option>--truncate</option></arg>
+    <arg><option>--type</option> <replaceable>hashAlgo</replaceable></arg>
+    <arg choice='plain' rep='repeat'><replaceable>path</replaceable></arg>
+  </cmdsynopsis>
+  <cmdsynopsis>
+    <command>nix-hash</command>
+    <arg choice='plain'><option>--to-base16</option></arg>
+    <arg choice='plain' rep='repeat'><replaceable>hash</replaceable></arg>
+  </cmdsynopsis>
+  <cmdsynopsis>
+    <command>nix-hash</command>
+    <arg choice='plain'><option>--to-base32</option></arg>
+    <arg choice='plain' rep='repeat'><replaceable>hash</replaceable></arg>
+  </cmdsynopsis>
+</refsynopsisdiv>
+
+
+<refsection><title>Description</title>
+
+<para>The command <command>nix-hash</command> computes the
+cryptographic hash of the contents of each
+<replaceable>path</replaceable> and prints it on standard output.  By
+default, it computes an MD5 hash, but other hash algorithms are
+available as well.  The hash is printed in hexadecimal.</para>
+
+<para>The hash is computed over a <emphasis>serialisation</emphasis>
+of each path: a dump of the file system tree rooted at the path.  This
+allows directories and symlinks to be hashed as well as regular files.
+The dump is in the <emphasis>NAR format</emphasis> produced by
+<command>nix-store</command> <option>--dump</option>.  Thus,
+<literal>nix-hash <replaceable>path</replaceable></literal> yields the
+same cryptographic hash as <literal>nix-store --dump
+<replaceable>path</replaceable> | md5sum</literal>.</para>
+
+</refsection>
+
+
+<refsection><title>Options</title>
+
+<variablelist>
+  
+  <varlistentry><term><option>--flat</option></term>
+
+    <listitem><para>Print the cryptographic hash of the contents of
+    each regular file <replaceable>path</replaceable>.  That is, do
+    not compute the hash over the dump of
+    <replaceable>path</replaceable>.  The result is identical to that
+    produced by the GNU commands <command>md5sum</command> and
+    <command>sha1sum</command>.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--base32</option></term>
+
+    <listitem><para>Print the hash in a base-32 representation rather
+    than hexadecimal.  This base-32 representation is more compact and
+    can be used in Nix expressions (such as in calls to
+    <function>fetchurl</function>).</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--truncate</option></term>
+
+    <listitem><para>Truncate hashes longer than 160 bits (such as
+    SHA-256) to 160 bits.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--type</option> <replaceable>hashAlgo</replaceable></term>
+
+    <listitem><para>Specify a cryptographic hash, which can be one of
+    <literal>md5</literal>, <literal>sha1</literal>, and
+    <literal>sha256</literal>.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--to-base16</option></term>
+
+    <listitem><para>Don’t hash anything, but convert the base-32 hash
+    representation <replaceable>hash</replaceable> to
+    hexadecimal.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--to-base32</option></term>
+
+    <listitem><para>Don’t hash anything, but convert the hexadecimal
+    hash representation <replaceable>hash</replaceable> to
+    base-32.</para></listitem>
+
+  </varlistentry>
+
+</variablelist>
+
+</refsection>
+
+
+<refsection><title>Examples</title>
+
+<para>Computing hashes:
+
+<screen>
+$ mkdir test
+$ echo "hello" > test/world
+
+$ nix-hash test/ <lineannotation>(MD5 hash; default)</lineannotation>
+8179d3caeff1869b5ba1744e5a245c04
+
+$ nix-store --dump test/ | md5sum <lineannotation>(for comparison)</lineannotation>
+8179d3caeff1869b5ba1744e5a245c04  -
+
+$ nix-hash --type sha1 test/
+e4fd8ba5f7bbeaea5ace89fe10255536cd60dab6
+
+$ nix-hash --type sha1 --base32 test/
+nvd61k9nalji1zl9rrdfmsmvyyjqpzg4
+
+$ nix-hash --type sha256 --flat test/
+error: reading file `test/': Is a directory
+
+$ nix-hash --type sha256 --flat test/world
+5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03</screen>
+
+</para>
+
+<para>Converting between hexadecimal and base-32:
+
+<screen>
+$ nix-hash --type sha1 --to-base32 e4fd8ba5f7bbeaea5ace89fe10255536cd60dab6
+nvd61k9nalji1zl9rrdfmsmvyyjqpzg4
+
+$ nix-hash --type sha1 --to-base16 nvd61k9nalji1zl9rrdfmsmvyyjqpzg4
+e4fd8ba5f7bbeaea5ace89fe10255536cd60dab6</screen>
+
+</para>
+
+</refsection>
+
+
+</refentry>

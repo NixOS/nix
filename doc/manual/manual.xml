@@ -69,6 +69,10 @@
         <title>nix-collect-garbage</title>
         <xi:include href="nix-collect-garbage.xml" />
       </section>
+      <section xml:id="sec-nix-hash">
+        <title>nix-hash</title>
+        <xi:include href="nix-hash.xml" />
+      </section>
       <section xml:id="sec-nix-install-package">
         <title>nix-install-package</title>
         <xi:include href="nix-install-package.xml" />

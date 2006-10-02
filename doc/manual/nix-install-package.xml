@@ -86,10 +86,7 @@ to restart itself with <command>xterm</command>,
 </refsection>
 
 
-
 <refsection><title>Examples</title>
-
-<para></para>
 
 <para>To install <filename>subversion-1.4.0.nixpkg</filename> into the
 user’s current profile, without any prompting:
