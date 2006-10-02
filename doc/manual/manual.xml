@@ -38,54 +38,63 @@
     <xi:include href="opt-common.xml" />
     <xi:include href="env-common.xml" />
     <xi:include href="conf-file.xml" />
-    <section xml:id="sec-nix-build">
-      <title>nix-build</title>
-      <xi:include href="nix-build.xml" />
-    </section>
-    <section xml:id="sec-nix-channel">
-      <title>nix-channel</title>
-      <xi:include href="nix-channel.xml" />
-    </section>
+    
     <section>
-      <title>nix-collect-garbage</title>
-      <xi:include href="nix-collect-garbage.xml" />
+      <title>Main commands</title>
+      <section xml:id="sec-nix-env">
+        <title>nix-env</title>
+        <xi:include href="nix-env.xml" />
+      </section>
+      <section xml:id="sec-nix-instantiate">
+        <title>nix-instantiate</title>
+        <xi:include href="nix-instantiate.xml" />
+      </section>
+      <section>
+        <title>nix-store</title>
+        <xi:include href="nix-store.xml" />
+      </section>
     </section>
-    <section xml:id="sec-nix-env">
-      <title>nix-env</title>
-      <xi:include href="nix-env.xml" />
-    </section>
-    <section xml:id="sec-nix-install-package">
-      <title>nix-install-package</title>
-      <xi:include href="nix-install-package.xml" />
-    </section>
-    <section xml:id="sec-nix-instantiate">
-      <title>nix-instantiate</title>
-      <xi:include href="nix-instantiate.xml" />
-    </section>
+    
     <section>
-      <title>nix-pack-closure</title>
-      <xi:include href="nix-pack-closure.xml" />
+      <title>Utilities</title>
+      <section xml:id="sec-nix-build">
+        <title>nix-build</title>
+        <xi:include href="nix-build.xml" />
+      </section>
+      <section xml:id="sec-nix-channel">
+        <title>nix-channel</title>
+        <xi:include href="nix-channel.xml" />
+      </section>
+      <section>
+        <title>nix-collect-garbage</title>
+        <xi:include href="nix-collect-garbage.xml" />
+      </section>
+      <section xml:id="sec-nix-install-package">
+        <title>nix-install-package</title>
+        <xi:include href="nix-install-package.xml" />
+      </section>
+      <section>
+        <title>nix-pack-closure</title>
+        <xi:include href="nix-pack-closure.xml" />
+      </section>
+      <section>
+        <title>nix-prefetch-url</title>
+        <xi:include href="nix-prefetch-url.xml" />
+      </section>
+      <section>
+        <title>nix-pull</title>
+        <xi:include href="nix-pull.xml" />
+      </section>
+      <section xml:id="sec-nix-push">
+        <title>nix-push</title>
+        <xi:include href="nix-push.xml" />
+      </section>
+      <section>
+        <title>nix-unpack-closure</title>
+        <xi:include href="nix-unpack-closure.xml" />
+      </section>
     </section>
-    <section>
-      <title>nix-prefetch-url</title>
-      <xi:include href="nix-prefetch-url.xml" />
-    </section>
-    <section>
-      <title>nix-pull</title>
-      <xi:include href="nix-pull.xml" />
-    </section>
-    <section xml:id="sec-nix-push">
-      <title>nix-push</title>
-      <xi:include href="nix-push.xml" />
-    </section>
-    <section>
-      <title>nix-store</title>
-      <xi:include href="nix-store.xml" />
-    </section>
-    <section>
-      <title>nix-unpack-closure</title>
-      <xi:include href="nix-unpack-closure.xml" />
-    </section>
+    
   </appendix>
 
   <xi:include href="troubleshooting.xml" />
