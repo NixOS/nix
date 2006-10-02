@@ -514,8 +514,9 @@ then you should unsubscribe from the offending channel
 <replaceable>URL</replaceable></command>; leave out
 <literal>/MANIFEST</literal>), and subscribe to the same URL, with
 <literal>channels</literal> replaced by <literal>channels-v3</literal>
-(e.g.,
-http://catamaran.labs.cs.uu.nl/dist/nix/channels-v3/nixpkgs-unstable).</para>
+(e.g., <link
+xlink:href='http://catamaran.labs.cs.uu.nl/dist/nix/channels-v3/nixpkgs-unstable'
+/>).</para>
 
 <para>Nix 0.8 has the following improvements:
 
@@ -524,8 +525,9 @@ http://catamaran.labs.cs.uu.nl/dist/nix/channels-v3/nixpkgs-unstable).</para>
   <listitem><para>The cryptographic hashes used in store paths are now
   160 bits long, but encoded in base-32 so that they are still only 32
   characters long (e.g.,
-  /nix/store/csw87wag8bqlqk7ipllbwypb14xainap-atk-1.9.0).  (This is
-  actually a 160 bit truncation of a SHA-256 hash.)</para></listitem>
+  <filename>/nix/store/csw87wag8bqlqk7ipllbwypb14xainap-atk-1.9.0</filename>).
+  (This is actually a 160 bit truncation of a SHA-256
+  hash.)</para></listitem>
 
   <listitem><para>Big cleanups and simplifications of the basic store
   semantics.  The notion of "closure store expressions" is gone (and
@@ -583,8 +585,9 @@ $ nix-store -q --referrers-closure \
 
   <listitem><para>One-click installation :-) It is now possible to
   install any top-level component in Nixpkgs directly, through the web
-  - see, e.g., http://catamaran.labs.cs.uu.nl/dist/nixpkgs-0.8/.  All
-  you have to do is associate
+  - see, e.g., <link
+  xlink:href='http://catamaran.labs.cs.uu.nl/dist/nixpkgs-0.8/' />.
+  All you have to do is associate
   <filename>/nix/bin/nix-install-package</filename> with the MIME type
   <literal>application/nix-package</literal> (or the extension
   <filename>.nixpkg</filename>), and clicking on a package link will
@@ -740,7 +743,7 @@ $ nix-env -f .../i686-linux.nix -i -E 'x: x.firefoxWrapper'</screen>
   mechanism.</para></listitem>
 
   <listitem><para>Nix-pull now stores downloaded manifests in
-  /nix/var/nix/manifests.</para></listitem>
+  <filename>/nix/var/nix/manifests</filename>.</para></listitem>
 
   <listitem><para>Metadata on files in the Nix store is canonicalised
   after builds: the last-modified timestamp is set to 0 (00:00:00

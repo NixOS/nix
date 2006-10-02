@@ -25,6 +25,7 @@ env-keep-derivations = false
 
 <variablelist>
 
+  
   <varlistentry xml:id="conf-gc-keep-outputs"><term><literal>gc-keep-outputs</literal></term>
 
     <listitem><para>If <literal>true</literal>, the garbage collector
@@ -40,6 +41,7 @@ env-keep-derivations = false
     this option to <literal>true</literal>.</para></listitem>
 
   </varlistentry>
+  
 
   <varlistentry xml:id="conf-gc-keep-derivations"><term><literal>gc-keep-derivations</literal></term>
 
@@ -57,6 +59,7 @@ env-keep-derivations = false
 
   </varlistentry>
 
+  
   <varlistentry xml:id="conf-gc-reserved-space"><term><literal>gc-reserved-space</literal></term>
 
     <listitem><para>This option specifies how much space should be
@@ -77,6 +80,7 @@ env-keep-derivations = false
 
   </varlistentry>
 
+  
   <varlistentry><term><literal>env-keep-derivations</literal></term>
 
     <listitem><para>If <literal>false</literal> (default), derivations
@@ -100,6 +104,21 @@ env-keep-derivations = false
 
   </varlistentry>
 
+  
+  <varlistentry xml:id="conf-build-max-jobs"><term><literal>build-max-jobs</literal></term>
+
+    <listitem><para>This option defines the maximum number of jobs
+    that Nix will try to build in parallel.  The default is
+    <literal>1</literal>.  You should generally set it to the number
+    of CPUs in your system (e.g., <literal>2</literal> on a Athlon 64
+    X2).  It can be overriden using the <option
+    linkend='opt-max-jobs'>--max-jobs</option> (<option>-j</option>)
+    command line switch.</para></listitem>
+
+  </varlistentry>
+
+
+    
 </variablelist>
 
 </para>

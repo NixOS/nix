@@ -35,7 +35,7 @@ need to do three things:
   the inputs.</para></listitem>
 
   <listitem><para>Add the component to the file
-  <filename>pkgs/system/all-packages-generic.nix</filename>.  The Nix
+  <filename>pkgs/top-level/all-packages.nix</filename>.  The Nix
   expression written in the first step is a
   <emphasis>function</emphasis>; it requires other components in order
   to build it.  In this step you put it all together, i.e., you call
@@ -309,7 +309,7 @@ error check.</para>
 <section><title>Composition</title>
 
 <example xml:id='ex-hello-composition'><title>Composing GNU Hello
-(<filename>all-packages-generic.nix</filename>)</title>
+(<filename>all-packages.nix</filename>)</title>
 <programlisting>
 ...
 
@@ -336,11 +336,11 @@ rec { <co xml:id='ex-hello-composition-co-1' />
 <para>The Nix expression in <xref linkend='ex-hello-nix' /> is a
 function; it is missing some arguments that have to be filled in
 somewhere.  In the Nix Packages collection this is done in the file
-<filename>pkgs/system/all-packages-generic.nix</filename>, where all
+<filename>pkgs/top-level/all-packages.nix</filename>, where all
 Nix expressions for components are imported and called with the
 appropriate arguments.  <xref linkend='ex-hello-composition' /> shows
 some fragments of
-<filename>all-packages-generic.nix</filename>.</para>
+<filename>all-packages.nix</filename>.</para>
 
 <calloutlist>
 
@@ -361,7 +361,7 @@ some fragments of
     GNU Hello.  The import operation just loads and returns the
     specified Nix expression. In fact, we could just have put the
     contents of <xref linkend='ex-hello-nix' /> in
-    <filename>all-packages-generic.nix</filename> at this point.  That
+    <filename>all-packages.nix</filename> at this point.  That
     would be completely equivalent, but it would make the file rather
     bulky.</para>
 
@@ -406,70 +406,37 @@ some fragments of
 
 <section><title>Testing</title>
 
-<para>You can now try to build Hello.  The simplest way to do that is
-by using <command>nix-env</command>:
+<para>You can now try to build Hello.  Of course, you could do
+<literal>nix-env -f pkgs/top-level/all-packages.nix -i hello</literal>,
+but you may not want to install a possibly broken package just yet.
+The best way to test the package is by using the command <command
+linkend="sec-nix-build">nix-build</command>, which builds a Nix
+expression and creates a symlink named <filename>result</filename> in
+the current directory:
 
 <screen>
-$ nix-env -f pkgs/system/i686-linux.nix -i hello
-installing `hello-2.1.1'
-building path `/nix/store/632d2b22514dcebe704887c3da15448d-hello-2.1.1'
+$ nix-build pkgs/top-level/all-packages.nix -A hello
+building path `/nix/store/632d2b22514d...-hello-2.1.1'
 hello-2.1.1/
 hello-2.1.1/intl/
 hello-2.1.1/intl/ChangeLog
 <replaceable>...</replaceable>
-</screen>
 
-This will build Hello and install it into your profile.  The file
-<filename>i686-linux</filename> is just a simple Nix expression that
-imports <filename>all-packages-generic.nix</filename> and instantiates
-it for Linux on the x86 platform.</para>
+$ ls -l result
+lrwxrwxrwx ... 2006-09-29 10:43 result -> /nix/store/632d2b22514d...-hello-2.1.1
 
-<para>Note that the <literal>hello</literal> argument here refers to
-the symbolic name given to the Hello derivation (the
-<varname>name</varname> attribute in <xref linkend='ex-hello-nix' />),
-<emphasis>not</emphasis> the <varname>hello</varname> attribute in
-<filename>all-packages-generic.nix</filename>.
-<command>nix-env</command> simply walks through all derivations
-defined in the latter file, looking for one with a
-<varname>name</varname> attribute matching the command-line
-argument.</para>
-
-<para>You can test whether it works:
-
-<screen>
-$ hello
-Hello, world!</screen>
-
-</para>
-
-<para>Generally, however, using <command>nix-env</command> is not the
-best way to test components, since you may not want to install them
-into your profile right away (they might not work properly, after
-all).  A better way is to write a short file containing the
-following:
-
-<programlisting>
-(import pkgs/system/i686-linux.nix).hello</programlisting>
-
-Call it <filename>test.nix</filename>.  You can then build it without
-installing it using the command <link
-linkend="sec-nix-build"><command>nix-build</command></link>:
-
-<screen>
-$ nix-build ./test.nix
-...
-/nix/store/632d2b22514dcebe704887c3da15448d-hello-2.1.1</screen>
-
-<command>nix-build</command> will build the derivation and print the
-output path.  It also creates a symlink to the output path called
-<filename>result</filename> in the current directory.  This is
-convenient for testing the component:
-
-<screen>
 $ ./result/bin/hello
 Hello, world!</screen>
 
 </para>
+
+<para><command>nix-build</command> registers the
+<filename>./result</filename> symlink as a garbage collection root, so
+unless and until you delete the <filename>./result</filename> symlink,
+the output of the build will be safely kept on your system.  You can
+use <command>nix-build</command>’s <option
+linkend='opt-out-link'>-o</option> switch to give the symlink another
+name.</para>
 
 <para>Nix has a transactional semantics.  Once a build finishes
 successfully, Nix makes a note of this in its database: it registers
@@ -492,14 +459,22 @@ error due to a syntax error in the source) and transient failures
 simultaneously, and they try to build the same derivation, the first
 Nix instance that gets there will perform the build, while the others
 block (or perform other derivations if available) until the build
-finishes.  So it is always safe to run multiple instances of Nix in
-parallel (contrary to, say, <command>make</command>).</para>
+finishes:
+
+<screen>
+$ nix-build pkgs/top-level/all-packages.nix -A hello
+waiting for lock on `/nix/store/0h5b7hp8d4hqfrw8igvx97x1xawrjnac-hello-2.1.1x'</screen>
+
+So it is always safe to run multiple instances of Nix in parallel
+(which isn’t the case with, say, <command>make</command>).</para>
 
 <para>If you have a system with multiple CPUs, you may want to have
 Nix build different derivations in parallel (insofar as possible).
-Just pass the option <option>-j <replaceable>N</replaceable></option>,
-where <replaceable>N</replaceable> is the maximum number of jobs to be
-run in parallel.  Typically this should be the number of CPUs.</para>
+Just pass the option <option linkend='opt-max-jobs'>-j
+<replaceable>N</replaceable></option>, where
+<replaceable>N</replaceable> is the maximum number of jobs to be run
+in parallel, or set.  Typically this should be the number of
+CPUs.</para>
 
 </section>
 
@@ -794,7 +769,7 @@ evaluates to <literal>{x = 123; y = 456;}</literal>.  (Note that this
 works because <varname>x</varname> is added to the lexical scope by
 the <literal>let</literal> construct.)  It is also possible to inherit
 attributes from another attribute set.  For instance, in this fragment
-from <filename>all-packages-generic.nix</filename>,
+from <filename>all-packages.nix</filename>,
 
 <programlisting>
   graphviz = (import ../tools/graphics/graphviz) {
@@ -1392,6 +1367,13 @@ builds for any type of component.  It is advisable to use
 are almost always useful such as unpacking of sources, patching of
 sources, nested logging, etc.</para>
 
+<para>The definitive, up-to-date documentation of the generic builder
+is the source itself, which resides in
+<filename>pkgs/stdenv/generic/setup.sh</filename>.</para>
+
+
+<section><title>Customising the generic builder</title>
+
 <para>The operation of the generic builder can be modified in many
 places by setting certain variables.  These <emphasis>hook
 variables</emphasis> are typically set to the name of some shell
@@ -1519,6 +1501,11 @@ new phases, by setting the <varname>phases</varname> variable.  The
 default is <literal>patchPhase configurePhase buildPhase checkPhase
 installPhase distPhase</literal>.</para>
 
+</section>
+
+
+<section><title>Debugging failed builds</title>
+
 <para>At the beginning of each phase, the set of all shell variables
 is written to the file <filename>env-vars</filename> at the top-level
 build directory.  This is useful for debugging: it allows you to
@@ -1543,9 +1530,8 @@ $ make
 
 </para>
 
-<para>The definitive, up-to-date documentation of the generic builder
-is the source itself, which resides in
-<filename>pkgs/stdenv/generic/setup.sh</filename>.</para>
+</section>
+
 
 </section>
 

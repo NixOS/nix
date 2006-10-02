@@ -10,7 +10,15 @@
   <cmdsynopsis>
     <command>nix-build</command>
     <arg><option>--add-drv-link</option></arg>
-    <arg><option>--no-link</option></arg>
+    <arg><option>--drv-link </option><replaceable>drvlink</replaceable></arg>
+    <arg><option>--no-out-link</option></arg>
+    <arg>
+      <group choice='req'>
+        <arg choice='plain'><option>--out-link</option></arg>
+        <arg choice='plain'><option>-o</option></arg>
+      </group>
+      <replaceable>outlink</replaceable>
+    </arg>
     <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
@@ -30,14 +38,13 @@ and so on).</para>
 <command>nix-build</command> will use <filename>default.nix</filename>
 in the current directory, if it exists.</para>
 
-<note><para><command>nix-build</command> is essentially a wrapper
-around <link
+<para><command>nix-build</command> is essentially a wrapper around
+<link
 linkend="sec-nix-instantiate"><command>nix-instantiate</command></link>
 (to translate a high-level Nix expression to a low-level store
 derivation) and <link
 linkend="rsec-nix-store-realise"><command>nix-store
---realise</command></link> (to build the store
-derivation).</para></note>
+--realise</command></link> (to build the store derivation).</para>
 
 <warning><para>The result of the build is automatically registered as
 a root of the Nix garbage collector.  This root disappears
@@ -62,12 +69,31 @@ or renamed.  So don’t rename the symlink.</para></warning>
     
   </varlistentry>
 
-  <varlistentry><term><option>--no-link</option></term>
+  <varlistentry><term><option>--drv-link</option> <replaceable>drvlink</replaceable></term>
+  
+    <listitem><para>Change the name of the symlink to the derivation
+    created when <option>--add-drv-link</option> is used from
+    <filename>derivation</filename> to
+    <replaceable>drvlink</replaceable>.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--no-out-link</option></term>
   
     <listitem><para>Do not create a symlink to the output path.  Note
     that as a result the output does not become a root of the garbage
     collector, and so might be deleted by <command>nix-store
     --gc</command>.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry xml:id='opt-out-link'><term><option>--out-link</option> /
+  <option>-o</option> <replaceable>outlink</replaceable></term>
+  
+    <listitem><para>Change the name of the symlink to the output path
+    created unless <option>--no-out-link</option> is used from
+    <filename>result</filename> to
+    <replaceable>outlink</replaceable>.</para></listitem>
 
   </varlistentry>
 

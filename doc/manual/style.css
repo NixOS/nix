@@ -83,7 +83,7 @@ pre.programlisting
                             Screen dumps:
  ***************************************************************************/
 
-pre.screen
+pre.screen, pre.programlisting
 {
     border: 1px solid #6185a0;
     padding: 3px 3px;
@@ -259,4 +259,9 @@ strong.command
 //    font-style: italic;
 //    font-weight: normal;
     color: #400000;
+}
+
+div.calloutlist td
+{
+    padding-bottom: 1em;
 }
