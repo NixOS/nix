@@ -2,12 +2,20 @@
 %pure-parser
 %locations
 %error-verbose
+%defines
+%no-lines
 %parse-param { yyscan_t scanner }
 %parse-param { ParseData * data }
 %lex-param { yyscan_t scanner }
 
 
 %{
+/* Newer versions of Bison copy the declarations below to
+   parser-tab.hh, which sucks bigtime since lexer.l doesn't want that
+   stuff.  So allow it to be excluded. */
+#ifndef BISON_HEADER_HACK
+#define BISON_HEADER_HACK
+    
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -75,7 +83,7 @@ static Pos makeCurPos(YYLTYPE * loc, ParseData * data)
 }
 
 
-void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, char * error)
+void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * error)
 {
     data->error = (format("%1%, at `%2%':%3%:%4%")
         % error % data->path % loc->first_line % loc->first_column).str();
@@ -100,7 +108,10 @@ static void freeAndUnprotect(void * p)
 #define YYMALLOC mallocAndProtect
 #define YYFREE freeAndUnprotect
 
- 
+
+#endif
+
+
 %}
 
 %union {

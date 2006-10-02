@@ -10,6 +10,7 @@
 #include "aterm.hh"
 #include "nixexpr.hh"
 #include "nixexpr-ast.hh"
+#define BISON_HEADER_HACK
 #include "parser-tab.hh"
 
 using namespace nix;
