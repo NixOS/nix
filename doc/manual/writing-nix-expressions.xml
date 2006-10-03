@@ -1288,8 +1288,9 @@ command-line argument.  See <xref linkend='sec-standard-environment'
   <varlistentry><term><function>builtins.add</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
-    <listitem><para>Add integers <replaceable>e1</replaceable> and
-    <replaceable>e2</replaceable>..</para></listitem>
+    <listitem><para>Return the sum of the integers
+    <replaceable>e1</replaceable> and
+    <replaceable>e2</replaceable>.</para></listitem>
 
   </varlistentry>
 
@@ -1710,7 +1711,79 @@ in foo</programlisting>
     of <replaceable>e</replaceable>.  The main application for
     <function>toXML</function> is to communicate information with the
     builder in a more structured format than plain environment
-    variables.</para></listitem>
+    variables.</para>
+
+    <example xml:id='ex-toxml'><title>Passing information to a builder
+    using <function>toXML</function></title>
+    
+<programlisting>
+<![CDATA[
+{stdenv, fetchurl, libxslt, jira, uberwiki}:
+
+stdenv.mkDerivation (rec {
+  name = "web-server";
+
+  buildInputs = [libxslt];
+  
+  builder = builtins.toFile "builder.sh" "
+    source $stdenv/setup
+    mkdir $out
+    echo $servlets | xsltproc ${stylesheet} - > $out/server-conf.xml
+  ";
+
+  stylesheet = builtins.toFile "stylesheet.xsl" "<?xml version='1.0' encoding='UTF-8'?>
+    <xsl:stylesheet xmlns:xsl='http://www.w3.org/1999/XSL/Transform' version='1.0'>
+      <xsl:template match='/'>
+        <Configure>
+          <xsl:for-each select='/expr/list/attrs'>
+            <Call name='addWebApplication'>
+              <Arg><xsl:value-of select=\"attr[@name = 'path']/string/@value\" /></Arg>
+              <Arg><xsl:value-of select=\"attr[@name = 'war']/path/@value\" /></Arg>
+            </Call>
+          </xsl:for-each>
+        </Configure>
+      </xsl:template>
+    </xsl:stylesheet>
+  ";
+
+  servlets = builtins.toXML [
+    { path = "/bugtracker"; war = jira + "/lib/atlassian-jira.war"; }
+    { path = "/wiki"; war = uberwiki + "/uberwiki.war"; }
+  ];
+})]]></programlisting>
+
+    </example>
+
+    <para>The string in the attribute <varname>servlets</varname>
+    evaluates to something like this:
+
+<programlisting>
+<![CDATA[
+<?xml version='1.0' encoding='utf-8'?>
+<expr>
+  <list>
+    <attrs>
+      <attr name="path">
+        <string value="/bugtracker" />
+      </attr>
+      <attr name="war">
+        <path value="/nix/store/d1jh9pasa7k2...-jira/lib/atlassian-jira.war" />
+      </attr>
+    </attrs>
+    <attrs>
+      <attr name="path">
+        <string value="/wiki" />
+      </attr>
+      <attr name="war">
+        <path value="/nix/store/y6423b1yi4sx...-uberwiki/uberwiki.war" />
+      </attr>
+    </attrs>
+  </list>
+</expr>]]></programlisting>
+
+    </para>
+
+    </listitem>
 
   </varlistentry>
 
