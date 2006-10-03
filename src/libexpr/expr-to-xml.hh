@@ -5,10 +5,11 @@
 #include <map>
 
 #include "nixexpr.hh"
+#include "aterm.hh"
 
 namespace nix {
 
-void printTermAsXML(Expr e, std::ostream & out);
+void printTermAsXML(Expr e, std::ostream & out, ATermList & context);
     
 }
 

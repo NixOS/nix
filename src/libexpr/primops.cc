@@ -507,8 +507,9 @@ static Expr primToPath(EvalState & state, const ATermVector & args)
 static Expr primToXML(EvalState & state, const ATermVector & args)
 {
     std::ostringstream out;
-    printTermAsXML(strictEvalExpr(state, args[0]), out);
-    return makeStr(toATerm(out.str()));
+    ATermList context = ATempty;
+    printTermAsXML(strictEvalExpr(state, args[0]), out, context);
+    return wrapInContext(context, makeStr(toATerm(out.str())));
 }
 
 

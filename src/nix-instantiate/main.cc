@@ -41,9 +41,11 @@ static bool indirectRoot = false;
 static void printResult(EvalState & state, Expr e,
     bool evalOnly, bool xmlOutput, const ATermMap & autoArgs)
 {
+    ATermList context;
+    
     if (evalOnly)
         if (xmlOutput)
-            printTermAsXML(e, std::cout);
+            printTermAsXML(e, std::cout, context);
         else
             std::cout << format("%1%\n") % e;
     

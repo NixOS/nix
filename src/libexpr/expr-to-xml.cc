@@ -15,13 +15,20 @@ static XMLAttrs singletonAttrs(const string & name, const string & value)
 }
 
 
-static void printTermAsXML(Expr e, XMLWriter & doc)
+static void printTermAsXML(Expr e, XMLWriter & doc, ATermList & context)
 {
     XMLAttrs attrs;
     ATerm s;
     int i;
+    Expr e2;
     ATermList as, es, formals;
     ATerm body, pos;
+
+    while (matchContext(e, es, e2)) {
+        e = e2;
+        for (ATermIterator i(es); i; ++i)
+            context = ATinsert(context, *i);
+    }
 
     if (matchStr(e, s))
         doc.writeEmptyElement("string", singletonAttrs("value", aterm2String(s)));
@@ -53,14 +60,14 @@ static void printTermAsXML(Expr e, XMLWriter & doc)
             names.insert(aterm2String(i->key));
         for (StringSet::iterator i = names.begin(); i != names.end(); ++i) {
             XMLOpenElement _(doc, "attr", singletonAttrs("name", *i));
-            printTermAsXML(attrs.get(toATerm(*i)), doc);
+            printTermAsXML(attrs.get(toATerm(*i)), doc, context);
         }
     }
 
     else if (matchList(e, es)) {
         XMLOpenElement _(doc, "list");
         for (ATermIterator i(es); i; ++i)
-            printTermAsXML(*i, doc);
+            printTermAsXML(*i, doc, context);
     }
 
     else if (matchFunction(e, formals, body, pos)) {
@@ -75,7 +82,7 @@ static void printTermAsXML(Expr e, XMLWriter & doc)
             if (matchValidValues(valids, valids2)) {
                 for (ATermIterator j(valids2); j; ++j) {
                     XMLOpenElement _(doc, "value");
-                    printTermAsXML(*j, doc);
+                    printTermAsXML(*j, doc, context);
                 }
             }
         }
@@ -86,11 +93,11 @@ static void printTermAsXML(Expr e, XMLWriter & doc)
 }
 
 
-void printTermAsXML(Expr e, std::ostream & out)
+void printTermAsXML(Expr e, std::ostream & out, ATermList & context)
 {
     XMLWriter doc(true, out);
     XMLOpenElement root(doc, "expr");
-    printTermAsXML(e, doc);
+    printTermAsXML(e, doc, context);
 }
 
  
