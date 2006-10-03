@@ -586,14 +586,18 @@ components.</para>
 language.</para>
 
 
+<section xml:id='ssec-values'><title>Values</title>
+
+
 <simplesect><title>Simple values</title>
 
 <para>Nix has the following basic datatypes:
 
 <itemizedlist>
 
-  <listitem><para><emphasis>Strings</emphasis>, enclosed between
-  double quotes, e.g., <literal>"foo bar"</literal>.</para></listitem>
+  <listitem><para><emphasis>Strings</emphasis>,
+  enclosed between double quotes, e.g., <literal>"foo bar"</literal>.
+  TODO: antiquotations, escaping.</para></listitem>
 
   <listitem><para><emphasis>Integers</emphasis>, e.g.,
   <literal>123</literal>.</para></listitem>
@@ -679,6 +683,12 @@ occur once.</para>
 evaluates to <literal>"Foo"</literal>.</para>
 
 </simplesect>
+
+
+</section>
+
+
+<section><title>Language constructs</title>
 
 
 <simplesect><title>Recursive attribute sets</title>
@@ -836,7 +846,7 @@ allows partial parameterisation (i.e., only filling some of the
 arguments of a function); e.g.,
 
 <programlisting>
-map (concat "foo") ["bar", "bla", "abc"]</programlisting>
+map (concat "foo") ["bar" "bla" "abc"]</programlisting>
 
 evaluates to <literal>["foobar" "foobla" "fooabc"]</literal>.</para>
 
@@ -977,7 +987,19 @@ locally in a <literal>rec</literal>-expression.</para>
 </simplesect>
 
 
-<simplesect><title>Operators</title>
+<simplesect><title>Comments</title>
+
+<para>Comments can be single-line, started with a <literal>#</literal>
+character, or inline/multi-line, enclosed within <literal>/*
+... */</literal>.</para>
+
+</simplesect>
+
+
+</section>
+
+
+<section><title>Operators</title>
 
 <para><xref linkend='table-operators' /> lists the operators in the
 Nix expression language, in order of precedence (from strongest to
@@ -995,12 +1017,27 @@ weakest binding).</para>
     </thead>
     <tbody>
       <row>
+        <entry><replaceable>e</replaceable> .
+        <replaceable>id</replaceable></entry>
+        <entry>none</entry>
+        <entry>Select attribute named <replaceable>id</replaceable>
+        from attribute set <replaceable>e</replaceable>.  Abort
+        evaluation if the attribute doesn’t exist.</entry>
+      </row>
+      <row>
+        <entry><replaceable>e1</replaceable> <replaceable>e2</replaceable></entry>
+        <entry>left</entry>
+        <entry>Call function <replaceable>e1</replaceable> with
+        argument <replaceable>e2</replaceable>.</entry>
+      </row>
+      <row>
         <entry><replaceable>e</replaceable> ?
         <replaceable>id</replaceable></entry>
         <entry>none</entry>
         <entry>Test whether attribute set <replaceable>e</replaceable>
-        contains an attribute named
-        <replaceable>id</replaceable>.</entry>
+        contains an attribute named <replaceable>id</replaceable>;
+        return <literal>true</literal> or
+        <literal>false</literal>.</entry>
       </row>
       <row>
         <entry><replaceable>e1</replaceable> ++ <replaceable>e2</replaceable></entry>
@@ -1062,10 +1099,10 @@ weakest binding).</para>
   </tgroup>
 </table>
 
-</simplesect>
+</section>
 
 
-<simplesect xml:id="ssec-derivation"><title>Derivations</title>
+<section xml:id="ssec-derivation"><title>Derivations</title>
 
 <para>The most important built-in function is
 <function>derivation</function>, which is used to describe a
@@ -1230,23 +1267,457 @@ command-line argument.  See <xref linkend='sec-standard-environment'
 
 </para>
 
-</simplesect>
+</section>
 
 
-<simplesect><title>Other built-in functions</title>
+<section><title>Built-in functions</title>
 
 <para>TODO</para>
 
-</simplesect>
+<variablelist>
+
+  
+  <varlistentry><term><function>abort</function> <replaceable>s</replaceable></term>
+
+    <listitem><para>Abort Nix expression evaluation, print error
+    message <replaceable>s</replaceable>.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.add</function>
+  <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+
+    <listitem><para>Add integers <replaceable>e1</replaceable> and
+    <replaceable>e2</replaceable>..</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>baseNameOf</function> <replaceable>s</replaceable></term>
+
+    <listitem><para>Return the <emphasis>base name</emphasis> of the
+    string <replaceable>s</replaceable>, that is, everything following
+    the final slash in the string.  This is similar to the GNU
+    <command>basename</command> command.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><varname>builtins</varname></term>
+
+    <listitem><para>The attribute set <varname>builtins</varname>
+    contains all the built-in functions and values.  You can use
+    <varname>builtins</varname> to test for the availability of
+    features in the Nix installation, e.g.,
+
+<programlisting>
+if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
+
+    This allows a Nix expression to fall back gracefully on older Nix
+    installations that don’t have the desired built-in function.
+    However, in that case you should not write
+
+<programlisting>
+if builtins ? getEnv then __getEnv "PATH" else ""</programlisting>
+
+    This Nix expression will trigger an “undefined variable” error on
+    older Nix versions since <function>__getEnv</function> doesn’t
+    exist.  <literal>builtins.getEnv</literal>, on the other hand, is
+    safe since <literal>builtins</literal> always exists and attribute
+    selection is lazy, so it’s only performed if the test
+    succeeds.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><varname>currentSystem</varname></term>
+
+    <listitem><para>The built-in value <varname>currentSystem</varname>
+    evaluates to the Nix platform identifier for the Nix installation
+    on which the expression is being evaluated, such as
+    <literal>"i686-linux"</literal> or
+    <literal>"powerpc-darwin"</literal>.</para></listitem>
+
+  </varlistentry>
 
 
-<simplesect><title>Comments</title>
+  <!--
+  <varlistentry><term><function>currentTime</function></term>
 
-<para>Comments can be single-line, started with a <literal>#</literal>
-character, or inline/multi-line, enclosed within <literal>/*
-... */</literal>.</para>
+    <listitem><para>The built-in value <varname>currentTime</varname>
+    returns the current system time in seconds since 00:00:00 1/1/1970
+    UTC.  Due to the evaluation model of Nix expressions
+    (<emphasis>maximal laziness</emphasis>), it always yields the same
+    value within an execution of Nix.</para></listitem>
 
-</simplesect>
+  </varlistentry>
+  -->
+
+  
+  <!--
+  <varlistentry><term><function>dependencyClosure</function></term>
+
+    <listitem><para>TODO</para></listitem>
+
+  </varlistentry>
+  -->
+
+  
+  <varlistentry><term><function>derivation</function>
+  <replaceable>attrs</replaceable></term>
+
+    <listitem><para><function>derivation</function> is described in
+    <xref linkend='ssec-derivation' />.</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><function>dirOf</function> <replaceable>s</replaceable></term>
+
+    <listitem><para>Return the directory part of the string
+    <replaceable>s</replaceable>, that is, everything before the final
+    slash in the string.  This is similar to the GNU
+    <command>dirname</command> command.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.getAttr</function>
+  <replaceable>s</replaceable> <replaceable>attrs</replaceable></term>
+
+    <listitem><para><function>getAttr</function> returns the attribute
+    named <replaceable>s</replaceable> from the attribute set
+    <replaceable>attrs</replaceable>.  Evaluation aborts if the
+    attribute doesn’t exist.  This is a dynamic version of the
+    <literal>.</literal> operator, since <replaceable>s</replaceable>
+    is an expression rather than an identifier.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.getEnv</function>
+  <replaceable>s</replaceable></term>
+
+    <listitem><para><function>getEnv</function> returns the value of
+    the environment variable <replaceable>s</replaceable>, or an empty
+    string if the variable doesn’t exist.  This function should be
+    used with care, as it can introduce all sorts of nasty environment
+    dependencies in your Nix expression.</para>
+
+    <para><function>getEnv</function> is used in Nix Packages to
+    locate the file <filename>~/.nixpkgs/config.nix</filename>, which
+    contains user-local settings for Nix Packages.  (That is, it does
+    a <literal>getEnv "HOME"</literal> to locate the user’s home
+    directory.)</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.hasAttr</function>
+  <replaceable>s</replaceable> <replaceable>attrs</replaceable></term>
+
+    <listitem><para><function>hasAttr</function> returns
+    <literal>true</literal> if the attribute set
+    <replaceable>attrs</replaceable> has an attribute named
+    <replaceable>s</replaceable>, and <literal>false</literal>
+    otherwise.  This is a dynamic version of the <literal>?</literal>
+    operator, since <replaceable>s</replaceable> is an expression
+    rather than an identifier.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.head</function>
+  <replaceable>list</replaceable></term>
+
+    <listitem><para>Return the first element of a list; abort
+    evaluation if the argument isn’t a list or is an empty list.  You
+    can test whether a list is empty by comparing it with
+    <literal>[]</literal>.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>import</function>
+  <replaceable>path</replaceable></term>
+
+    <listitem><para>Load, parse and return the Nix expression in the
+    file <replaceable>path</replaceable>.  Evaluation aborts if the
+    file doesn’t exist or contains an incorrect Nix
+    expression.  <function>import</function> implements Nix’s module
+    system: you can put any Nix expression (such as an attribute set
+    or a function) in a separate file, and use it from Nix expressions
+    in other files.</para>
+
+    <para>A Nix expression loaded by <function>import</function> must
+    not contain any <emphasis>free variables</emphasis> (identifiers
+    that are not defined in the Nix expression itself and are not
+    built-in).  Therefore, it cannot refer to variables that are in
+    scope at the call site.  For instance, if you have a calling
+    expression
+    
+<programlisting>
+rec {
+  x = 123;
+  y = import ./foo.nix;
+}</programlisting>
+
+    then the following <filename>foo.nix</filename> will give an
+    error:
+
+<programlisting>
+x + 456</programlisting>
+
+    since <varname>x</varname> is not in scope in
+    <filename>foo.nix</filename>.  If you want <varname>x</varname>
+    to be available in <filename>foo.nix</filename>, you should pass
+    it as a function argument:
+
+<programlisting>
+rec {
+  x = 123;
+  y = import ./foo.nix x;
+}</programlisting>
+
+    and
+
+<programlisting>
+x: x + 456</programlisting>
+
+    (The function argument doesn’t have to be called
+    <varname>x</varname> in <filename>foo.nix</filename>; any name
+    would work.)</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.isList</function>
+  <replaceable>e</replaceable></term>
+
+    <listitem><para>Return <literal>true</literal> if
+    <replaceable>e</replaceable> evaluates to a list, and
+    <literal>false</literal> otherwise.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>isNull</function>
+  <replaceable>e</replaceable></term>
+
+    <listitem><para>Return <literal>true</literal> if
+    <replaceable>e</replaceable> evaluates to <literal>null</literal>,
+    and <literal>false</literal> otherwise.</para>
+
+    <warning><para>This function is <emphasis>deprecated</emphasis>;
+    just write <literal>e == null</literal> instead.</para></warning>
+    
+    </listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.lessThan</function>
+  <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+
+    <listitem><para>Return <literal>true</literal> if the integer
+    <replaceable>e1</replaceable> is less than the integer
+    <replaceable>e2</replaceable>, and <literal>false</literal>
+    otherwise.  Evaluation aborts if either
+    <replaceable>e1</replaceable> or <replaceable>e2</replaceable>
+    does not evaluate to an integer.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>map</function>
+  <replaceable>f</replaceable> <replaceable>list</replaceable></term>
+
+    <listitem><para>Apply the function <replaceable>f</replaceable> to
+    each element in the list <replaceable>list</replaceable>.  For
+    example,
+
+<programlisting>
+map (x: "foo" + x) ["bar" "bla" "abc"]</programlisting>
+
+    evaluates to <literal>["foobar" "foobla"
+    "fooabc"]</literal>.</para></listitem>
+    
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.pathExists</function>
+  <replaceable>path</replaceable></term>
+
+    <listitem><para>Return <literal>true</literal> if the path
+    <replaceable>path</replaceable> exists, and
+    <literal>false</literal> otherwise.  One application of this
+    function is to conditionally include a Nix expression containing
+    user configuration:
+
+<programlisting>
+let
+  fileName = builtins.getEnv "CONFIG_FILE";
+  config =
+    if fileName != "" &amp;&amp; builtins.pathExists (builtins.toPath fileName)
+    then import (builtins.toPath fileName)
+    else { someSetting = false; }; <lineannotation># default configuration</lineannotation>
+in config.someSetting</programlisting>
+
+    (Note that <envar>CONFIG_FILE</envar> must be an absolute path for
+    this to work.)</para></listitem>
+
+  </varlistentry>
+
+
+  <!--
+  <varlistentry><term><function>relativise</function></term>
+
+    <listitem><para>TODO</para></listitem>
+
+  </varlistentry>
+  -->
+
+  
+  <varlistentry><term><function>removeAttrs</function>
+  <replaceable>attrs</replaceable> <replaceable>list</replaceable></term>
+
+    <listitem><para>Remove the attributes listed in
+    <replaceable>list</replaceable> from the attribute set
+    <replaceable>attrs</replaceable>.  The attributes don’t have to
+    exist in <replaceable>attrs</replaceable>. For instance,
+
+<screen>
+removeAttrs { x = 1; y = 2; z = 3; } ["a" "x" "z"]</screen>
+
+    evaluates to <literal>{y = 2;}</literal>.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.tail</function>
+  <replaceable>list</replaceable></term>
+
+    <listitem><para>Return the second to last elements of a list;
+    abort evaluation if the argument isn’t a list or is an empty
+    list.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.toFile</function>
+  <replaceable>name</replaceable> <replaceable>s</replaceable></term>
+
+    <listitem><para>Store the string <replaceable>s</replaceable> in a
+    file in the Nix store and return its path.  The file has suffix
+    <replaceable>name</replaceable>.  This file can be used as an
+    input to derivations.  One application is to write builders
+    “inline”.  For instance, the following Nix expression combines
+    <xref linkend='ex-hello-nix' /> and <xref
+    linkend='ex-hello-builder' /> into one file:
+
+<programlisting>
+{stdenv, fetchurl, perl}:
+
+stdenv.mkDerivation {
+  name = "hello-2.1.1";
+  
+  builder = builtins.toFile "builder.sh" "
+    source $stdenv/setup
+
+    PATH=$perl/bin:$PATH
+
+    tar xvfz $src
+    cd hello-*
+    ./configure --prefix=$out
+    make
+    make install
+  ";
+
+  src = fetchurl {
+    url = http://nix.cs.uu.nl/dist/tarballs/hello-2.1.1.tar.gz;
+    md5 = "70c9ccf9fac07f762c24f2df2290784d";
+  };
+  inherit perl;
+}</programlisting>
+  
+    </para>
+
+    <para>It is even possible for one file to refer to another, e.g.,
+
+<programlisting>
+  builder = let
+    configFile = builtins.toFile "foo.conf" "
+      # This is some dummy configuration file.
+      <replaceable>...</replaceable>
+    ";
+  in builtins.toFile "builder.sh" "
+    source $stdenv/setup
+    <replaceable>...</replaceable>
+    cp ${configFile} $out/etc/foo.conf
+  ";</programlisting>
+
+    Note that <literal>${configFile}</literal> is an antiquotation
+    (see <xref linkend='ssec-values' />), so the result of the
+    expression <literal>configFile</literal> (i.e., a path like
+    <filename>/nix/store/m7p7jfny445k...-foo.conf</filename>) will be
+    spliced into the resulting string.</para>
+
+    <para>It is however <emphasis>not</emphasis> allowed to have files
+    mutually referring to each other, like so:
+
+<programlisting>
+let
+  foo = builtins.toFile "foo" "...${bar}...";
+  bar = builtins.toFile "bar" "...${foo}...";
+in foo</programlisting>
+
+    This is not allowed because it would cause a cyclic dependency in
+    the computation of the cryptographic hashes for
+    <varname>foo</varname> and <varname>bar</varname>.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.toPath</function> <replaceable>s</replaceable></term>
+
+    <listitem><para>Convert the string value
+    <replaceable>s</replaceable> into a path value.  The string
+    <replaceable>s</replaceable> must represent an absolute path
+    (i.e., must start with <literal>/</literal>).  The path need not
+    exist.  The resulting path is canonicalised, e.g.,
+    <literal>builtins.toPath "//foo/xyzzy/../bar/"</literal> returns
+    <literal>/foo/bar</literal>.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>toString</function> <replaceable>e</replaceable></term>
+
+    <listitem><para>Convert the expression
+    <replaceable>e</replaceable> to a string.
+    <replaceable>e</replaceable> can be a string (in which case
+    <function>toString</function> is a no-op) or a path (e.g.,
+    <literal>toString /foo/bar</literal> yields
+    <literal>"/foo/bar"</literal>.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.toXML</function> <replaceable>e</replaceable></term>
+
+    <listitem><para>Return a string containing an XML representation
+    of <replaceable>e</replaceable>.  The main application for
+    <function>toXML</function> is to communicate information with the
+    builder in a more structured format than plain environment
+    variables.</para></listitem>
+
+  </varlistentry>
+
+  
+</variablelist>
+
+</section>
 
 
 </section>
@@ -1294,9 +1765,10 @@ of the following components:
 
   <listitem><para>GNU Make.  It has been patched to provide
   <quote>nested</quote> output that can be fed into the
-  <command>log2xml</command> command and <command>log2html</command>
-  stylesheet to create a structured, readable output of the build
-  steps performed by Make.</para></listitem>
+  <command>nix-log2xml</command> command and
+  <command>log2html</command> stylesheet to create a structured,
+  readable output of the build steps performed by
+  Make.</para></listitem>
 
   <listitem><para>Bash.  This is the shell used for all builders in
   the Nix Packages collection.  Not using <command>/bin/sh</command>

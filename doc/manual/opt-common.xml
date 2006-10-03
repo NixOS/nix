@@ -190,9 +190,9 @@
     <varlistentry><term><literal>escapes</literal></term>
 
       <listitem><para>Indicate nesting using escape codes that can be
-      interpreted by the <command>log2xml</command> tool in the Nix
-      source distribution.  The resulting XML file can be fed into the
-      <command>log2html.xsl</command> stylesheet to create an HTML
+      interpreted by the <command>nix-log2xml</command> tool in the
+      Nix source distribution.  The resulting XML file can be fed into
+      the <command>log2html.xsl</command> stylesheet to create an HTML
       file that can be browsed interactively, using Javascript to
       expand and collapse parts of the output.</para></listitem>
 

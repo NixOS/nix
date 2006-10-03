@@ -41,17 +41,6 @@ div.section > div.titlepage h2 /* sections */
     margin-top: 1.5em;
 }
 
-div.refnamediv h2, div.refsynopsisdiv h2, div.refsection h2 /* refentry parts */
-{
-    margin-top: 1.4em;
-    font-size: 125%;
-}
-
-div.refsection h3
-{
-    font-size: 110%;
-}
-
 h3 /* subsections */
 {
     font-size: 125%;
@@ -63,6 +52,16 @@ div.appendix h3
     margin-top: 1.5em;
 }
 
+div.refnamediv h2, div.refsynopsisdiv h2, div.refsection h2 /* refentry parts */
+{
+    margin-top: 1.4em;
+    font-size: 125%;
+}
+
+div.refsection h3
+{
+    font-size: 110%;
+}
 
 
 /***************************************************************************
