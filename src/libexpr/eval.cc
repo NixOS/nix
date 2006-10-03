@@ -2,6 +2,7 @@
 #include "parser.hh"
 #include "hash.hh"
 #include "util.hh"
+#include "store.hh"
 #include "nixexpr-ast.hh"
 
 
@@ -256,7 +257,11 @@ string coerceToStringWithContext(EvalState & state,
     
     if (matchPath(e, s)) {
         isPath = true;
-        return aterm2String(s);
+        Path path = aterm2String(s);
+        if (isInStore(path)) {
+            context = ATinsert(context, makePath(toATerm(toStorePath(path))));
+        }
+        return path;
     }
 
     if (matchAttrs(e, es)) {

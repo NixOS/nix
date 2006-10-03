@@ -1,7 +1,7 @@
 let {
 
   # Test inline source file definitions.
-  builder = builtins.toFile "
+  builder = builtins.toFile "builder.sh" "
 mkdir $out
 
 cat > $out/program <<EOF

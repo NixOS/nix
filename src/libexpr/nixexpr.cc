@@ -297,6 +297,7 @@ string showType(Expr e)
 {
     ATerm t1, t2, t3;
     ATermList l1;
+    ATermBlob b1;
     int i1;
     if (matchStr(e, t1)) return "a string";
     if (matchPath(e, t1)) return "a path";
@@ -308,6 +309,7 @@ string showType(Expr e)
     if (matchFunction1(e, t1, t2, t3)) return "a function";
     if (matchAttrs(e, l1)) return "an attribute set";
     if (matchList(e, l1)) return "a list";
+    if (matchPrimOp(e, i1, b1, l1)) return "a partially applied built-in function";
     if (matchContext(e, l1, t1)) return "a context containing " + showType(t1);
     return "an unknown type";
 }

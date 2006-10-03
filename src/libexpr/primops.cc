@@ -512,12 +512,41 @@ static Expr primToXML(EvalState & state, const ATermVector & args)
 }
 
 
+static Expr unwrapContext(EvalState & state, Expr e, ATermList & context)
+{
+    context = ATempty;
+    e = evalExpr(state, e);
+    if (matchContext(e, context, e))
+        e = evalExpr(state, e);
+    return e;
+}
+
+
 /* Store a string in the Nix store as a source file that can be used
    as an input by derivations. */
 static Expr primToFile(EvalState & state, const ATermVector & args)
 {
-    string s = evalString(state, args[0]);
-    Path storePath = addTextToStore("", s, PathSet());
+    ATermList context;
+    string name = evalString(state, args[0]);
+    string contents = evalString(state,
+        unwrapContext(state, args[1], context));
+
+    PathSet refs;
+
+    for (ATermIterator i(context); i; ++i) {
+        ATerm s;
+        if (matchPath(*i, s)) {
+            assert(isStorePath(aterm2String(s)));
+            refs.insert(aterm2String(s));
+        }
+        else throw EvalError("in `toFile': the file cannot contain references to derivation outputs");
+    }
+    
+    Path storePath = addTextToStore(name, contents, refs);
+
+    /* Note: we don't need to wrap the result in a context, since
+       `storePath' itself has references to the paths used in
+       args[1]. */
     return makePath(toATerm(storePath));
 }
 
@@ -842,7 +871,6 @@ void EvalState::addPrimOps()
     addPrimOp("toString", 1, primToString);
     addPrimOp("__toPath", 1, primToPath);
     addPrimOp("__toXML", 1, primToXML);
-    addPrimOp("__toFile", 1, primToFile);
     addPrimOp("isNull", 1, primIsNull);
     addPrimOp("__isList", 1, primIsList);
     addPrimOp("dependencyClosure", 1, primDependencyClosure);
@@ -858,6 +886,7 @@ void EvalState::addPrimOps()
     addPrimOp("relativise", 2, primRelativise);
     addPrimOp("__add", 2, primAdd);
     addPrimOp("__lessThan", 2, primLessThan);
+    addPrimOp("__toFile", 2, primToFile);
 }
 
  
