@@ -6,7 +6,7 @@
 <title>Installation</title>
 
 
-<section><info><title>Obtaining Nix</title></info>
+<section><title>Obtaining Nix</title>
 
 <para>The easiest way to obtain Nix is to download a <link
 xlink:href="http://www.cs.uu.nl/groups/ST/Trace/Nix">source
@@ -33,7 +33,7 @@ tar-file</link> of the head revision of the trunk.</para>
 </section>
 
 
-<section><info><title>Prerequisites</title></info>
+<section><title>Prerequisites</title>
 
 <para><emphasis>The following prerequisites only apply when you build
 from source</emphasis>.  Binary releases (e.g., RPMs) have no
@@ -80,7 +80,7 @@ locations.  Note that Berkeley DB <emphasis>must</emphasis> be version
 </section>
 
 
-<section><info><title>Building Nix from source</title></info>
+<section><title>Building Nix from source</title>
 
 <para>After unpacking or checking out the Nix sources, issue the
 following commands:
@@ -121,7 +121,7 @@ options.</para>
 </section>
 
 
-<section><info><title>Installing from RPMs</title></info>
+<section><title>Installing from RPMs</title>
 
 <para>RPM packages of Nix can be downloaded from <uri
 xlink:href="http://www.cs.uu.nl/groups/ST/Trace/Nix">http://www.cs.uu.nl/groups/ST/Trace/Nix</uri>.
@@ -148,7 +148,7 @@ $ rm -rf /nix/var</screen>
 </section>
 
 
-<section><info><title>Upgrading Nix through Nix</title></info>
+<section><title>Upgrading Nix through Nix</title>
 
 <para>You can install the latest stable version of Nix through Nix
 itself by subscribing to the channel <link
@@ -162,7 +162,7 @@ xlink:href="http://nix.cs.uu.nl/dist/nix/" />.</para>
 </section>
 
 
-<section><info><title>Permissions</title></info>
+<section><title>Permissions</title>
 
 <para>All Nix operations must be performed under the user ID that owns
 the Nix store and database
@@ -171,7 +171,7 @@ the Nix store and database
 respectively).  When installed from the RPM packages, these
 directories are owned by <systemitem class="username">root</systemitem>.</para>
 
-<section><info><title>Setuid installation</title></info>
+<section><title>Setuid installation</title>
 
 <para>As a somewhat <emphasis>ad hoc</emphasis> hack, you can also
 install the Nix binaries <quote>setuid</quote> so that a Nix store can
@@ -210,7 +210,7 @@ simply owned by the Nix user.</para></warning>
 </section>
 
 
-<section><info><title>Using Nix</title></info>
+<section><title>Using Nix</title>
 
 <para>To use Nix, some environment variables should be set.  In
 particular, <envar>PATH</envar> should contain the directories
