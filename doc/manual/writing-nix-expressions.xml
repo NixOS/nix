@@ -595,9 +595,54 @@ language.</para>
 
 <itemizedlist>
 
-  <listitem><para><emphasis>Strings</emphasis>,
-  enclosed between double quotes, e.g., <literal>"foo bar"</literal>.
-  TODO: antiquotations, escaping.</para></listitem>
+  <listitem>
+
+    <para><emphasis>Strings</emphasis> are enclosed between double
+    quotes, e.g., <literal>"foo bar"</literal>.  Strings can span
+    multiple lines.  The special characters <literal>"</literal> and
+    <literal>\</literal> and the character sequence
+    <literal>${</literal> must be escaped by prefixing them with a
+    backslash (<literal>\</literal>).  Newlines, carriage returns and
+    tabs can be written as <literal>\n</literal>,
+    <literal>\r</literal> and <literal>\t</literal>,
+    respectively.</para>
+
+    <para>You can include the result of an expression into a string by
+    enclosing it in
+    <literal>${<replaceable>...</replaceable>}</literal>, a feature
+    known as <emphasis>antiquotation</emphasis>.  The enclosed
+    expression must evaluate to something that can be coerced into a
+    string (meaning that it must be a string, a path, or a
+    derivation).  For instance, rather than writing
+
+<programlisting>
+"--with-freetype2-library=" + freetype + "/lib"</programlisting>
+
+    (where <varname>freetype</varname> is a derivation), you can
+    instead write the more natural
+
+<programlisting>
+"--with-freetype2-library=${freetype}/lib"</programlisting>
+
+    The latter is automatically translated to the former.  A more
+    complicated example (from the Nix expression for <link
+    xlink:href='http://www.trolltech.com/products/qt'>Qt</link>):
+
+<programlisting>    
+configureFlags = "
+  -system-zlib -system-libpng -system-libjpeg
+  ${if openglSupport then "-dlopen-opengl
+    -L${mesa}/lib -I${mesa}/include
+    -L${libXmu}/lib -I${libXmu}/include" else ""}
+  ${if threadSupport then "-thread" else "-no-thread"}</programlisting>
+
+    Note that Nix expressions and strings can be arbitrarily nested;
+    in this case the outer string contains various antiquotations that
+    themselves contain strings (e.g., <literal>"-thread"</literal>),
+    some of which in turn contain expressions (e.g.,
+    <literal>${mesa}</literal>).</para>
+
+  </listitem>
 
   <listitem><para><emphasis>Integers</emphasis>, e.g.,
   <literal>123</literal>.</para></listitem>
@@ -1272,7 +1317,17 @@ command-line argument.  See <xref linkend='sec-standard-environment'
 
 <section><title>Built-in functions</title>
 
-<para>TODO</para>
+<para>This section lists the functions and constants built into the
+Nix expression evaluator.  (The built-in function
+<function>derivation</function> is discussed above.)  Some built-ins,
+such as <function>derivation</function>, are always in scope of every
+Nix expression; you can just access them right away.  But to prevent
+polluting the namespace too much, most built-ins are not in scope.
+Instead, you can access them through the <varname>builtins</varname>
+built-in value, which is an attribute set that contains all built-in
+functions and values.  For instance, <function>derivation</function>
+is also available as <function>builtins.derivation</function>.</para>
+
 
 <variablelist>
 
