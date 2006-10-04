@@ -65,22 +65,21 @@ div.refsection h3
 
 
 /***************************************************************************
-                               Program listings:
+                               Examples:
  ***************************************************************************/
 
 div.example
 {
     border: 1px solid #6185a0;
     padding: 6px 6px;
-    margin-left: 0em;
-    margin-right: 0em;
+    margin-left: 1.5em;
+    margin-right: 1.5em;
     background: #f4f4f8;
 }
 
-pre.programlisting
+div.example p.title
 {
-    color: #600000;
-    font-family: monospace;
+    margin-top: 0em;
 }
 
 
@@ -98,6 +97,13 @@ pre.screen, pre.programlisting
     background: #f4f4f8;
     font-family: monospace;
     /* font-size: 90%; */
+}
+
+div.example pre.programlisting
+{
+    border: 0px;
+    padding: 0 0;
+    margin: 0 0 0 0;
 }
 
 
