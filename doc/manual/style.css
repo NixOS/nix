@@ -193,14 +193,19 @@ tt, code
     
 }
 
-div.variablelist dd p
+div.variablelist dd p, div.glosslist dd p
 {
     margin-top: 0em;
 }
 
-div.variablelist dd
+div.variablelist dd, div.glosslist dd
 {
     margin-left: 1.5em;
+}
+
+div.glosslist dt
+{
+    font-style: italic;
 }
 
 .default
