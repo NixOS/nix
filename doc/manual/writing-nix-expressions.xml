@@ -1716,8 +1716,7 @@ in foo</programlisting>
     <example xml:id='ex-toxml'><title>Passing information to a builder
     using <function>toXML</function></title>
     
-<programlisting>
-<![CDATA[
+<programlisting><![CDATA[
 {stdenv, fetchurl, libxslt, jira, uberwiki}:
 
 stdenv.mkDerivation (rec {
@@ -1757,9 +1756,7 @@ stdenv.mkDerivation (rec {
     <para>The string in the attribute <varname>servlets</varname>
     evaluates to something like this:
 
-<programlisting>
-<![CDATA[
-<?xml version='1.0' encoding='utf-8'?>
+<programlisting><![CDATA[<?xml version='1.0' encoding='utf-8'?>
 <expr>
   <list>
     <attrs>
