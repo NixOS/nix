@@ -5,7 +5,11 @@ XSLTPROC = $(xsltproc) $(xmlflags) \
  --param html.stylesheet \'style.css\' \
  --param xref.with.number.and.title 1 \
  --param toc.section.depth 3 \
- --param admon.style \'\'
+ --param admon.style \'\' \
+ --param callout.graphics.extension \'.gif\'
+
+# Note: we use GIF for now, since the PNGs shipped with Docbook aren't
+# transparent.
 
 man1_MANS = nix-env.1 nix-build.1 nix-store.1 nix-instantiate.1 \
  nix-collect-garbage.1 nix-push.1 nix-pull.1 \
@@ -73,9 +77,9 @@ install-data-local: manual.html
 
 images:
 	mkdir images
-	cp $(docbookxsl)/images/*.png images
+#	cp $(docbookxsl)/images/*.gif images
 	mkdir images/callouts
-	cp $(docbookxsl)/images/callouts/*.png images/callouts
+	cp $(docbookxsl)/images/callouts/*.gif images/callouts
 	chmod -R +w images
 
 KEEP = manual.html manual.is-valid version.txt $(MANS) NEWS.html NEWS.txt
