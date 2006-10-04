@@ -1606,7 +1606,8 @@ removeAttrs { x = 1; y = 2; z = 3; } ["a" "x" "z"]</screen>
   </varlistentry>
 
   
-  <varlistentry><term><function>builtins.toFile</function>
+  <varlistentry
+  xml:id='builtin-toFile'><term><function>builtins.toFile</function>
   <replaceable>name</replaceable> <replaceable>s</replaceable></term>
 
     <listitem><para>Store the string <replaceable>s</replaceable> in a
@@ -1713,6 +1714,40 @@ in foo</programlisting>
     builder in a more structured format than plain environment
     variables.</para>
 
+    <!-- TODO: more formally describe the schema of the XML
+    representation -->
+
+    <para><xref linkend='ex-toxml' /> shows an example where this is
+    the case.  The builder is supposed to generate the configuration
+    file for a <link xlink:href='http://jetty.mortbay.org/'>Jetty
+    servlet container</link>.  A servlet container contains a number
+    of servlets (<filename>*.war</filename> files) each exported under
+    a specific URI prefix.  So the servlet configuration is a list of
+    attribute sets containing the <varname>path</varname> and
+    <varname>war</varname> of the servlet (<xref
+    linkend='ex-toxml-co-servlets' />).  This kind of information is
+    difficult to communicate with the normal method of passing
+    information through an environment variable, which just
+    concatenates everything together into a string (which might just
+    work in this case, but wouldn’t work if fields are optional or
+    contain lists themselves).  Instead the Nix expression is
+    converted to an XML representation with
+    <function>toXML</function>, which is unambiguous and can easily be
+    processed with the appropriate tools.  For instance, in the
+    example an XSLT stylesheet (<xref linkend='ex-toxml-co-stylesheet'
+    />) is applied to it (<xref linkend='ex-toxml-co-apply' />) to
+    generate the XML configuration file for the Jetty server.  The XML
+    representation produced from <xref linkend='ex-toxml-co-servlets'
+    /> by <function>toXML</function> is shown in <xref
+    linkend='ex-toxml-result' />.</para>
+
+    <para>Note that <xref linkend='ex-toxml' /> uses the <function
+    linkend='builtin-toFile'>toFile</function> built-in to write the
+    builder and the stylesheet “inline” in the Nix expression.  The
+    path of the stylesheet is spliced into the builder at
+    <literal>xsltproc ${stylesheet}
+    <replaceable>...</replaceable></literal>.</para>
+
     <example xml:id='ex-toxml'><title>Passing information to a builder
     using <function>toXML</function></title>
     
@@ -1727,10 +1762,11 @@ stdenv.mkDerivation (rec {
   builder = builtins.toFile "builder.sh" "
     source $stdenv/setup
     mkdir $out
-    echo $servlets | xsltproc ${stylesheet} - > $out/server-conf.xml
+    echo $servlets | xsltproc ${stylesheet} - > $out/server-conf.xml]]> <co xml:id='ex-toxml-co-apply' /> <![CDATA[
   ";
 
-  stylesheet = builtins.toFile "stylesheet.xsl" "<?xml version='1.0' encoding='UTF-8'?>
+  stylesheet = builtins.toFile "stylesheet.xsl"]]> <co xml:id='ex-toxml-co-stylesheet' /> <![CDATA[
+   "<?xml version='1.0' encoding='UTF-8'?>
     <xsl:stylesheet xmlns:xsl='http://www.w3.org/1999/XSL/Transform' version='1.0'>
       <xsl:template match='/'>
         <Configure>
@@ -1745,7 +1781,7 @@ stdenv.mkDerivation (rec {
     </xsl:stylesheet>
   ";
 
-  servlets = builtins.toXML [
+  servlets = builtins.toXML []]> <co xml:id='ex-toxml-co-servlets' /> <![CDATA[
     { path = "/bugtracker"; war = jira + "/lib/atlassian-jira.war"; }
     { path = "/wiki"; war = uberwiki + "/uberwiki.war"; }
   ];
@@ -1753,9 +1789,9 @@ stdenv.mkDerivation (rec {
 
     </example>
 
-    <para>The string in the attribute <varname>servlets</varname>
-    evaluates to something like this:
-
+    <example xml:id='ex-toxml-result'><title>XML representation produced by
+    <function>toXML</function></title>
+    
 <programlisting><![CDATA[<?xml version='1.0' encoding='utf-8'?>
 <expr>
   <list>
@@ -1778,7 +1814,7 @@ stdenv.mkDerivation (rec {
   </list>
 </expr>]]></programlisting>
 
-    </para>
+    </example>
 
     </listitem>
 
