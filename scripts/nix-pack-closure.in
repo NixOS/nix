@@ -9,15 +9,14 @@
 # directory.
 
 use strict;
-use POSIX qw(tmpnam);
+use File::Temp qw(tempdir);
 
 my $binDir = $ENV{"NIX_BIN_DIR"};
 $binDir = "@bindir@" unless defined $binDir;
 
-my $tmpDir;
-do { $tmpDir = tmpnam(); }
-until mkdir $tmpDir, 0777;
-END { my $x = $?; system("@coreutils@/rm", "-rf", $tmpDir); $? = $x; }
+my $tmpDir = tempdir("nix-pack-closure.XXXXXX", CLEANUP => 1, TMPDIR => 1)
+    or die "cannot create a temporary directory";
+
 mkdir "$tmpDir/contents", 0777 or die;
 mkdir "$tmpDir/references", 0777 or die;
 mkdir "$tmpDir/derivers", 0777 or die;

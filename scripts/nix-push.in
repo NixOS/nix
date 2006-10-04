@@ -1,19 +1,16 @@
 #! @perl@ -w -I@libexecdir@/nix
 
 use strict;
-use POSIX qw(tmpnam);
+use File::Temp qw(tempdir);
 use readmanifest;
 
 my $hashAlgo = "sha256";
 
-my $tmpdir;
-do { $tmpdir = tmpnam(); }
-until mkdir $tmpdir, 0777;
+my $tmpDir = tempdir("nix-push.XXXXXX", CLEANUP => 1, TMPDIR => 1)
+    or die "cannot create a temporary directory";
 
-my $nixfile = "$tmpdir/create-nars.nix";
-my $manifest = "$tmpdir/MANIFEST";
-
-END { unlink $manifest; unlink $nixfile; rmdir $tmpdir; }
+my $nixExpr = "$tmpDir/create-nars.nix";
+my $manifest = "$tmpDir/MANIFEST";
 
 my $curl = "@curl@ --fail --silent";
 my $extraCurlFlags = ${ENV{'CURL_FLAGS'}};
@@ -101,7 +98,7 @@ my @storePaths = keys %storePaths;
 
 # For each path, create a Nix expression that turns the path into
 # a Nix archive.
-open NIX, ">$nixfile";
+open NIX, ">$nixExpr";
 print NIX "[";
 
 foreach my $storePath (@storePaths) {
@@ -122,7 +119,7 @@ close NIX;
 # Instantiate store expressions from the Nix expression.
 my @storeExprs;
 print STDERR "instantiating store expressions...\n";
-my $pid = open(READ, "$binDir/nix-instantiate $nixfile|")
+my $pid = open(READ, "$binDir/nix-instantiate $nixExpr|")
     or die "cannot run nix-instantiate";
 while (<READ>) {
     chomp;

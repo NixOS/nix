@@ -1,7 +1,7 @@
->#! @perl@ -w -I@libexecdir@/nix
+#! @perl@ -w -I@libexecdir@/nix
 
 use strict;
-use POSIX qw(tmpnam);
+use File::Temp qw(tempdir);
 use readmanifest;
 
 die unless scalar @ARGV == 5;
@@ -14,13 +14,12 @@ my $patchesURL = $ARGV[2];
 my $srcDir = $ARGV[3];
 my $dstDir = $ARGV[4];
 
-my $tmpdir;
-do { $tmpdir = tmpnam(); }
-until mkdir $tmpdir, 0777;
+my $tmpDir = tempdir("nix-generate-patches.XXXXXX", CLEANUP => 1, TMPDIR => 1)
+    or die "cannot create a temporary directory";
 
-print "TEMP = $tmpdir\n";
+print "TEMP = $tmpDir\n";
 
-#END { rmdir $tmpdir; }
+#END { rmdir $tmpDir; }
 
 my %srcNarFiles;
 my %srcPatches;
@@ -280,35 +279,35 @@ foreach my $p (keys %dstOutPaths) {
 
         my $maxNarSize = 150 * 1024 * 1024;
 
-        system("@bunzip2@ < $srcNarBz2 > $tmpdir/A") == 0
+        system("@bunzip2@ < $srcNarBz2 > $tmpDir/A") == 0
             or die "cannot unpack $srcNarBz2";
 
-        if ((stat "$tmpdir/A")[7] >= $maxNarSize) {
+        if ((stat "$tmpDir/A")[7] >= $maxNarSize) {
             print "    skipping, source is too large\n";
             next;
         }
         
-        system("@bunzip2@ < $dstNarBz2 > $tmpdir/B") == 0
+        system("@bunzip2@ < $dstNarBz2 > $tmpDir/B") == 0
             or die "cannot unpack $dstNarBz2";
 
-        if ((stat "$tmpdir/B")[7] >= $maxNarSize) {
+        if ((stat "$tmpDir/B")[7] >= $maxNarSize) {
             print "    skipping, destination is too large\n";
             next;
         }
         
-        system("@libexecdir@/bsdiff $tmpdir/A $tmpdir/B $tmpdir/DIFF") == 0
+        system("@libexecdir@/bsdiff $tmpDir/A $tmpDir/B $tmpDir/DIFF") == 0
             or die "cannot compute binary diff";
 
-        my $baseHash = `@bindir@/nix-hash --flat --type $hashAlgo --base32 $tmpdir/A` or die;
+        my $baseHash = `@bindir@/nix-hash --flat --type $hashAlgo --base32 $tmpDir/A` or die;
         chomp $baseHash;
 
-        my $narHash = `@bindir@/nix-hash --flat --type $hashAlgo --base32 $tmpdir/B` or die;
+        my $narHash = `@bindir@/nix-hash --flat --type $hashAlgo --base32 $tmpDir/B` or die;
         chomp $narHash;
 
-        my $narDiffHash = `@bindir@/nix-hash --flat --type $hashAlgo --base32 $tmpdir/DIFF` or die;
+        my $narDiffHash = `@bindir@/nix-hash --flat --type $hashAlgo --base32 $tmpDir/DIFF` or die;
         chomp $narDiffHash;
 
-        my $narDiffSize = (stat "$tmpdir/DIFF")[7];
+        my $narDiffSize = (stat "$tmpDir/DIFF")[7];
         my $dstNarBz2Size = (stat $dstNarBz2)[7];
 
         if ($narDiffSize >= $dstNarBz2Size) {
@@ -327,7 +326,7 @@ foreach my $p (keys %dstOutPaths) {
 
         else {
 
-            system("cp '$tmpdir/DIFF' '$patchesDir/$finalName.tmp'") == 0
+            system("cp '$tmpDir/DIFF' '$patchesDir/$finalName.tmp'") == 0
                 or die "cannot copy diff";
             
             rename("$patchesDir/$finalName.tmp", "$patchesDir/$finalName")

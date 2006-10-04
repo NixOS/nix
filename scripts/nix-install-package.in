@@ -1,7 +1,7 @@
 #! @perl@ -w
 
 use strict;
-use POSIX qw(tmpnam);
+use File::Temp qw(tempdir);
 
 
 sub usageError {
@@ -65,10 +65,8 @@ if ($interactive && !defined $ENV{"NIX_HAVE_TERMINAL"}) {
 }
 
 
-my $tmpDir;
-do { $tmpDir = tmpnam(); }
-until mkdir $tmpDir, 0777;
-END { if (defined $tmpDir) { my $x = $?; system("@coreutils@/rm", "-rf", $tmpDir); $? = $x; } }
+my $tmpDir = tempdir("nix-install-package.XXXXXX", CLEANUP => 1, TMPDIR => 1)
+    or die "cannot create a temporary directory";
 
 
 sub barf {

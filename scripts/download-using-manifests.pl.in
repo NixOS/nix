@@ -2,7 +2,8 @@
 
 use strict;
 use readmanifest;
-use POSIX qw(tmpnam strftime);
+use POSIX qw(strftime);
+use File::Temp qw(tempdir);
 
 my $manifestDir = "@localstatedir@/nix/manifests";
 my $logFile = "@localstatedir@/log/nix/downloads";
@@ -12,9 +13,8 @@ open LOGFILE, ">>$logFile" or die "cannot open log file $logFile";
 delete $ENV{"NIX_ROOT"};
 
 # Create a temporary directory.
-my $tmpDir;
-do { $tmpDir = tmpnam(); }
-until mkdir $tmpDir, 0700;
+my $tmpDir = tempdir("nix-download.XXXXXX", CLEANUP => 1, TMPDIR => 1)
+    or die "cannot create a temporary directory";
 
 chdir $tmpDir or die "cannot change to `$tmpDir': $!";
 

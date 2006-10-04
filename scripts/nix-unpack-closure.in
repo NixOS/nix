@@ -7,15 +7,13 @@
 # directory.
 
 use strict;
-use POSIX qw(tmpnam);
+use File::Temp qw(tempdir);
 
 my $binDir = $ENV{"NIX_BIN_DIR"};
 $binDir = "@bindir@" unless defined $binDir;
 
-my $tmpDir;
-do { $tmpDir = tmpnam(); }
-until mkdir $tmpDir, 0777;
-END { my $x = $?; system("@coreutils@/rm", "-rf", $tmpDir); $? = $x; }
+my $tmpDir = tempdir("nix-unpack-closure.XXXXXX", CLEANUP => 1, TMPDIR => 1)
+    or die "cannot create a temporary directory";
 
 
 # Unpack the NAR archive on standard input.

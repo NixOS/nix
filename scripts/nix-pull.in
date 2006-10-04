@@ -1,16 +1,13 @@
 #! @perl@ -w -I@libexecdir@/nix
 
 use strict;
-use POSIX qw(tmpnam);
+use File::Temp qw(tempdir);
 use readmanifest;
 
-my $tmpdir;
-do { $tmpdir = tmpnam(); }
-until mkdir $tmpdir, 0777;
+my $tmpDir = tempdir("nix-pull.XXXXXX", CLEANUP => 1, TMPDIR => 1)
+    or die "cannot create a temporary directory";
 
-my $manifest = "$tmpdir/manifest";
-
-END { unlink $manifest; rmdir $tmpdir; }
+my $manifest = "$tmpDir/manifest";
 
 my $binDir = $ENV{"NIX_BIN_DIR"};
 $binDir = "@bindir@" unless defined $binDir;
