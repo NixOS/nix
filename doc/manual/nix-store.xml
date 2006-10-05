@@ -109,8 +109,7 @@ lrwxrwxrwx    1 ... 2005-03-13 21:10 /home/eelco/bla/result -> /nix/store/1r1134
 
 <!--######################################################################-->
 
-<refsection xml:id='rsec-nix-store-realise'><title>Operation
-<option>--realise</option></title>
+<refsection xml:id='rsec-nix-store-realise'><title>Operation <option>--realise</option></title>
 
 <refsection><title>Synopsis</title>
 
