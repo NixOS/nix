@@ -93,8 +93,12 @@
   <term><option>-j</option></term>
 
   <listitem><para>Sets the maximum number of build jobs that Nix will
-  perform in parallel to the specified number.  The default is 1.  A
-  higher value is useful on SMP systems or to exploit I/O latency.</para></listitem>
+  perform in parallel to the specified number.  The default is
+  specified by the <link
+  linkend='conf-build-max-jobs'><literal>build-max-jobs</literal></link>
+  configuration setting, which itself defaults to
+  <literal>1</literal>.  A higher value is useful on SMP systems or to
+  exploit I/O latency.  </para></listitem>
   
 </varlistentry>
 

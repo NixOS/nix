@@ -118,6 +118,26 @@ env-keep-derivations = false
   </varlistentry>
 
 
+  <varlistentry><term><literal>system</literal></term>
+
+    <listitem><para>This option specifies the canonical Nix system
+    name of the current installation, such as
+    <literal>i686-linux</literal> or
+    <literal>powerpc-darwin</literal>.  Nix can only build derivations
+    whose <literal>system</literal> attribute equals the value
+    specified here.  In general, it never makes sense to modify this
+    value from its default, since you can use it to ‘lie’ about the
+    platform you are building on (e.g., perform a Mac OS build on a
+    Linux machine; the result would obviously be wrong).  It only
+    makes sense if the Nix binaries can run on multiple platforms,
+    e.g., ‘universal binaries’ that run on <literal>powerpc-darwin</literal> and
+    <literal>i686-darwin</literal>.</para>
+
+    <para>It defaults to the canonical Nix system name detected by
+    <filename>configure</filename> at build time.</para></listitem>
+
+  </varlistentry>
+  
     
 </variablelist>
 
