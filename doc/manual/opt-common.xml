@@ -224,8 +224,8 @@
   <command>nix-build</command>.  When evaluating Nix expressions, the
   expression evaluator will automatically try to call functions that
   it encounters.  It can automatically call functions for which every
-  argument has a default value (e.g.,
-  <literal>{<replaceable>argName</replaceable> ?
+  argument has a <link linkend='ss-functions'>default value</link>
+  (e.g., <literal>{<replaceable>argName</replaceable> ?
   <replaceable>defaultValue</replaceable>}:
   <replaceable>...</replaceable></literal>).  With
   <option>--arg</option>, you can also call functions that have
@@ -253,6 +253,32 @@
   <replaceable>pkgname</replaceable> --arg system
   \"i686-freebsd\"</literal>.  (Note that since the argument is a Nix
   string literal, you have to escape the quotes.)</para></listitem>
+
+</varlistentry>
+
+
+<varlistentry xml:id="opt-attr"><term><option>--attr</option> / <option>-A</option>
+<replaceable>attrPath</replaceable></term>
+
+  <listitem><para>In <command>nix-env</command>,
+  <command>nix-instantiate</command> and <command>nix-build</command>,
+  <option>--attr</option> allows you to select an attribute from the
+  top-level Nix expression being evaluated.  The <emphasis>attribute
+  path</emphasis> <replaceable>attrPath</replaceable> is a sequence of
+  attribute names separated by dots.  For instance, given a top-level
+  Nix expression <replaceable>e</replaceable>, the attribute path
+  <literal>xorg.xorgserver</literal> would cause the expression
+  <literal><replaceable>e</replaceable>.xorg.xorgserver</literal> to
+  be used.  See <link
+  linkend='refsec-nix-env-install-examples'><command>nix-env
+  --install</command></link> for some concrete examples.</para>
+
+  <para>In addition to attribute names, you can also specify array
+  indices.  For instance, the attribute path
+  <literal>foo.3.bar</literal> selects the <literal>bar</literal>
+  attribute of the fourth element of the array in the
+  <literal>foo</literal> attribute of the top-level
+  expression.</para></listitem>
 
 </varlistentry>
 

@@ -13,6 +13,13 @@
     <arg><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
     <arg>
       <group choice='req'>
+        <arg choice='plain'><option>--attr</option></arg>
+        <arg choice='plain'><option>-A</option></arg>
+      </group>
+      <replaceable>attrPath</replaceable>
+    </arg>
+    <arg>
+      <group choice='req'>
         <arg choice='plain'><option>--file</option></arg>
         <arg choice='plain'><option>-f</option></arg>
       </group>
@@ -252,7 +259,7 @@ number of possible ways:
 </refsection>
             
 
-<refsection><title>Examples</title>
+<refsection xml:id='refsec-nix-env-install-examples'><title>Examples</title>
 
 <para>To install a specific version of <command>gcc</command> from the
 active Nix expression:

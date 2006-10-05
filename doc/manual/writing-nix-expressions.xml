@@ -428,7 +428,14 @@ lrwxrwxrwx ... 2006-09-29 10:43 result -> /nix/store/632d2b22514d...-hello-2.1.1
 $ ./result/bin/hello
 Hello, world!</screen>
 
-</para>
+The <link linkend='opt-attr'><option>-A</option></link> option selects
+the <literal>hello</literal> attribute from
+<filename>all-packages.nix</filename>.  This is faster than using the
+symbolic package name specified by the <literal>name</literal>
+attribute (which also happens to be <literal>hello</literal>) and is
+unambiguous (there can be multiple packages with the symbolic name
+<literal>hello</literal>, but there can be only one attribute in a set
+named <literal>hello</literal>).</para>
 
 <para><command>nix-build</command> registers the
 <filename>./result</filename> symlink as a garbage collection root, so
@@ -470,8 +477,8 @@ So it is always safe to run multiple instances of Nix in parallel
 
 <para>If you have a system with multiple CPUs, you may want to have
 Nix build different derivations in parallel (insofar as possible).
-Just pass the option <option linkend='opt-max-jobs'>-j
-<replaceable>N</replaceable></option>, where
+Just pass the option <link linkend='opt-max-jobs'><option>-j
+<replaceable>N</replaceable></option></link>, where
 <replaceable>N</replaceable> is the maximum number of jobs to be run
 in parallel, or set.  Typically this should be the number of
 CPUs.</para>
