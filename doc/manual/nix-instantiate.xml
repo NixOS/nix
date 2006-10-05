@@ -10,6 +10,7 @@
   <cmdsynopsis>
     <command>nix-instantiate</command>
     <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common-syn.xml#xpointer(/nop/*)" />
+    <arg><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
     <arg><option>--add-root</option> <replaceable>path</replaceable></arg>
     <arg><option>--indirect</option></arg>
     <group choice='opt'>

@@ -20,5 +20,6 @@
 <arg><option>--fallback</option></arg>
 <arg><option>--readonly-mode</option></arg>
 <arg><option>--log-type</option> <replaceable>type</replaceable></arg>
+<sbr />
 
 </nop>

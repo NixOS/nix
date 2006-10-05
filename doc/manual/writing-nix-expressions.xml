@@ -1387,7 +1387,8 @@ if builtins ? getEnv then __getEnv "PATH" else ""</programlisting>
   </varlistentry>
 
   
-  <varlistentry><term><varname>currentSystem</varname></term>
+  <varlistentry
+  xml:id='builtin-currentSystem'><term><varname>builtins.currentSystem</varname></term>
 
     <listitem><para>The built-in value <varname>currentSystem</varname>
     evaluates to the Nix platform identifier for the Nix installation

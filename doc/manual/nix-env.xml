@@ -10,6 +10,7 @@
   <cmdsynopsis>
     <command>nix-env</command>
     <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common-syn.xml#xpointer(/nop/*)" />
+    <arg><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
     <arg>
       <group choice='req'>
         <arg choice='plain'><option>--file</option></arg>
@@ -24,7 +25,6 @@
       </group>
       <replaceable>path</replaceable>
     </arg>
-    <arg><option>--preserve-installed</option></arg>
     <arg>
       <arg choice='plain'><option>--system-filter</option></arg>
       <replaceable>system</replaceable>
@@ -103,19 +103,6 @@ linkend="sec-common-options" />.</para>
     <command>nix-env</command> to print what
     <emphasis>would</emphasis> be done if this flag had not been
     specified, without actually doing it.</para></listitem>
-    
-  </varlistentry>
-      
-  <varlistentry><term><option>--preserve-installed</option></term>
-  
-    <listitem><para>By default, when you install a derivation with the
-    <option>--install</option> operation, it will replace previously
-    installed versions with the same derivation name (regardless of
-    the version number).  This option causes those previously
-    installed versions to be kept in the new generation of the
-    profile.  Note that this will generally cause conflicts in the
-    creation of the user environment (since multiple versions of a
-    package typically contain the same programs).</para></listitem>
     
   </varlistentry>
       

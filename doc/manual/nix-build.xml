@@ -9,6 +9,8 @@
 <refsynopsisdiv>
   <cmdsynopsis>
     <command>nix-build</command>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common-syn.xml#xpointer(/nop/*)" />
+    <arg><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
     <arg><option>--add-drv-link</option></arg>
     <arg><option>--drv-link </option><replaceable>drvlink</replaceable></arg>
     <arg><option>--no-out-link</option></arg>
@@ -55,6 +57,12 @@ or renamed.  So don’t rename the symlink.</para></warning>
 
 
 <refsection><title>Options</title>
+
+<para>See also <xref linkend="sec-common-options" />.  All options not
+listed here are passed to <command>nix-store --realise</command>,
+except for <option>--arg</option> and <option>--attr</option> /
+<option>-A</option> which are passed to
+<command>nix-instantiate</command>.</para>
 
 <variablelist>
 
