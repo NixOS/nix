@@ -109,8 +109,13 @@ linkend="sec-common-options" />.</para>
     <option>--rollback</option> operations, this flag will cause
     <command>nix-env</command> to print what
     <emphasis>would</emphasis> be done if this flag had not been
-    specified, without actually doing it.</para></listitem>
-    
+    specified, without actually doing it.</para>
+
+    <para><option>--dry-run</option> also prints out which paths will
+    be <link linkend="gloss-substitute">substituted</link> (i.e.,
+    downloaded) and which paths will be built from source (because no
+    substitute is available).</para></listitem>
+
   </varlistentry>
       
   <varlistentry><term><option>--system-filter</option> <replaceable>system</replaceable></term>
@@ -205,6 +210,14 @@ number of possible ways:
   <option>--preserve-installed</option> is
   specified.</para></listitem>
 
+  <listitem><para>If <link
+  linkend='opt-attr'><option>--attr</option></link>
+  (<option>-A</option>) is specified, the arguments are
+  <emphasis>attribute paths</emphasis> that select attributes from the
+  top-level Nix expression.  This is faster than using derivation
+  names and unambiguous.  To find out the attribute paths of available
+  packages, use <literal>nix-env -qaA '*'</literal>.</para></listitem>
+
   <listitem><para>If <option>--from-profile</option>
   <replaceable>path</replaceable> is given,
   <replaceable>args</replaceable> is a set of names denoting installed
@@ -280,6 +293,14 @@ installing `gcc-3.3.2'</screen>
 
 </para>
 
+<para>To install using a specific attribute:
+
+<screen>
+$ nix-env -i -A gcc40mips
+$ nix-env -i -A xorg.xorgserver</screen>
+
+</para>
+
 <para>To install all derivations in the Nix expression <filename>foo.nix</filename>:
 
 <screen>
@@ -322,6 +343,25 @@ selecting the <literal>subversionWithJava</literal> attribute from the
 attribute set returned by calling the function defined in
 <filename>./foo.nix</filename>.</para>
 
+<para>A dry-run tells you which paths will be downloaded or built from
+source:
+
+<screen>
+$ nix-env -f pkgs/top-level/all-packages.nix -i f-spot --dry-run
+(dry run; not doing anything)
+installing `f-spot-0.0.10'
+the following derivations will be built:
+  /nix/store/0g63jv9aagwbgci4nnzs2dkxqz84kdja-libgnomeprintui-2.12.1.tar.bz2.drv
+  /nix/store/0gfarvxq6sannsdw8a1ir40j1ys2mqb4-ORBit2-2.14.2.tar.bz2.drv
+  /nix/store/0i9gs5zc04668qiy60ga2rc16abkj7g8-sqlite-2.8.17.drv
+  <replaceable>...</replaceable>
+the following paths will be substituted:
+  /nix/store/8zbipvm4gp9jfqh9nnk1n3bary1a37gs-perl-XML-Parser-2.34
+  /nix/store/b8a2bg7gnyvvvjjibp4axg9x1hzkw36c-mono-1.1.4
+  <replaceable>...</replaceable></screen>
+  
+</para>
+
 </refsection>
     
 </refsection>
@@ -343,6 +383,7 @@ attribute set returned by calling the function defined in
   <group choice='opt'>
     <arg choice='plain'><option>--lt</option></arg>
     <arg choice='plain'><option>--leq</option></arg>
+    <arg choice='plain'><option>--eq</option></arg>
     <arg choice='plain'><option>--always</option></arg>
   </group>
   <arg choice='plain' rep='repeat'><replaceable>args</replaceable></arg>
@@ -388,6 +429,17 @@ installed.</para>
     derivations that have the same version.  This flag may be useful
     to force “synchronisation” between the installed and available
     derivations.</para></listitem>
+    
+  </varlistentry>
+
+  <varlistentry><term><option>--eq</option></term>
+  
+    <listitem><para><emphasis>Only</emphasis> “upgrade” to derivations
+    that have the same version.  This may not seem very useful, but it
+    actually is, e.g., when there is a new release of Nixpkgs and you
+    want to replace installed applications with the same versions
+    built against newer dependencies (to reduce the number of
+    dependencies floating around on your system).</para></listitem>
     
   </varlistentry>
 
@@ -523,21 +575,37 @@ $ nix-env -e '*' <lineannotation>(remove everything)</lineannotation></screen>
     <arg choice='plain'><option>--query</option></arg>
     <arg choice='plain'><option>-q</option></arg>
   </group>
+  <arg><option>--xml</option></arg>
   <group choice='opt'>
     <arg choice='plain'><option>--installed</option></arg>
     <arg choice='plain'><option>--available</option></arg>
     <arg choice='plain'><option>-a</option></arg>
   </group>
-  <group choice='req'>
-    <arg choice='plain'><option>--status</option></arg>
-    <arg choice='plain'><option>-s</option></arg>
-    <arg choice='plain'><option>--no-name</option></arg>
-    <arg choice='plain'><option>--compare-versions</option></arg>
-    <arg choice='plain'><option>-c</option></arg>
-    <arg choice='plain'><option>--system</option></arg>
-    <arg choice='plain'><option>--drv-path</option></arg>
-    <arg choice='plain'><option>--out-path</option></arg>
-  </group>
+  <sbr />
+  <arg>
+    <group choice='req'>
+      <arg choice='plain'><option>--status</option></arg>
+      <arg choice='plain'><option>-s</option></arg>
+    </group>
+  </arg>
+  <arg>
+    <group choice='req'>
+      <arg choice='plain'><option>--attr</option></arg>
+      <arg choice='plain'><option>-A</option></arg>
+    </group>
+  </arg>
+  <arg><option>--no-name</option></arg>
+  <arg>
+    <group choice='req'>
+      <arg choice='plain'><option>--compare-versions</option></arg>
+      <arg choice='plain'><option>-c</option></arg>
+    </group>
+  </arg>
+  <arg><option>--system</option></arg>
+  <arg><option>--drv-path</option></arg>
+  <arg><option>--out-path</option></arg>
+  <arg><option>--description</option></arg>
+  <arg choice='plain' rep='repeat'><replaceable>names</replaceable></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -549,7 +617,10 @@ $ nix-env -e '*' <lineannotation>(remove everything)</lineannotation></screen>
 paths that are installed in the current generation of the active
 profile (<option>--installed</option>), or the derivations that are
 available for installation in the active Nix expression
-(<option>--available</option>).</para>
+(<option>--available</option>).  It only prints information about
+derivations whose symbolic name matches one of
+<replaceable>names</replaceable>.  The wildcard <literal>*</literal>
+shows all derivations.</para>
 
 <para>The derivations are sorted by their <literal>name</literal>
 attributes.</para>
@@ -598,6 +669,18 @@ user environment elements, etc. -->
 
 <variablelist>
 
+  <varlistentry><term><option>--xml</option></term>
+
+    <listitem><para>Print the result in an XML representation suitable
+    for automatic processing by other tools.  The root element is
+    called <literal>items</literal>, which contains a
+    <literal>item</literal> element for each available or installed
+    derivation.  The fields discussed below are all stored in
+    attributes of the <literal>item</literal>
+    elements.</para></listitem>
+
+  </varlistentry>
+
   <varlistentry><term><option>--status</option></term>
     <term><option>-s</option></term>
   
@@ -617,6 +700,17 @@ user environment elements, etc. -->
     
   </varlistentry>
 
+  <varlistentry><term><option>--attr</option></term>
+    <term><option>-a</option></term>
+
+    <listitem><para>Print the <emphasis>attribute path</emphasis> of
+    the derivation, which can be used to unambiguously select it using
+    the <link linkend="opt-attr"><option>--attr</option> option</link>
+    available in commands that install derivations like
+    <literal>nix-env --install</literal>.</para></listitem>
+
+  </varlistentry>
+  
   <varlistentry><term><option>--no-name</option></term>
   
     <listitem><para>Suppress printing of the <literal>name</literal>
@@ -690,6 +784,15 @@ user environment elements, etc. -->
     
   </varlistentry>
 
+  <varlistentry><term><option>--description</option></term>
+  
+    <listitem><para>Print a short (one-line) description of the
+    derivation, if available.  The description is taken from the
+    <literal>meta.description</literal> attribute of the
+    derivation.</para></listitem>
+    
+  </varlistentry>
+
 </variablelist>
 
 </refsection>
@@ -698,7 +801,7 @@ user environment elements, etc. -->
 <refsection><title>Examples</title>
 
 <screen>
-$ nix-env -q <lineannotation>(show installed derivations)</lineannotation>
+$ nix-env -q '*' <lineannotation>(show installed derivations)</lineannotation>
 bison-1.875c
 docbook-xml-4.2
 firefox-1.0.4
@@ -706,30 +809,39 @@ MPlayer-1.0pre7
 ORBit2-2.8.3
 ...
 
-$ nix-env -qa <lineannotation>(show available derivations)</lineannotation>
+$ nix-env -qa '*' <lineannotation>(show available derivations)</lineannotation>
 firefox-1.0.7
 GConf-2.4.0.1
 MPlayer-1.0pre7
 ORBit2-2.8.3
 ...
 
-$ nix-env -qas <lineannotation>(show status of available derivations)</lineannotation>
+$ nix-env -qas '*' <lineannotation>(show status of available derivations)</lineannotation>
 -P- firefox-1.0.7   <lineannotation>(not installed but present)</lineannotation>
 --S GConf-2.4.0.1   <lineannotation>(not present, but there is a substitute for fast installation)</lineannotation>
 --S MPlayer-1.0pre3 <lineannotation>(i.e., this is not the installed MPlayer, even though the version is the same!)</lineannotation>
 IP- ORBit2-2.8.3    <lineannotation>(installed and by definition present)</lineannotation>
 ...
 
-$ nix-env -f ./foo.nix -qa <lineannotation>(show available derivations in the Nix expression <!-- !!! <filename>-->foo.nix<!-- </filename> -->)</lineannotation>
+<lineannotation>(show available derivations in the Nix expression <!-- !!! <filename>-->foo.nix<!-- </filename> -->)</lineannotation>
+$ nix-env -f ./foo.nix -qa '*' 
 foo-1.2.3
 
-$ nix-env -qc <lineannotation>(compare installed versions to what’s available)</lineannotation>
+$ nix-env -qc '*' <lineannotation>(compare installed versions to what’s available)</lineannotation>
 <replaceable>...</replaceable>
 acrobat-reader-7.0 - ?      <lineannotation>(package is not available at all)</lineannotation>
 autoconf-2.59      = 2.59   <lineannotation>(same version)</lineannotation>
 firefox-1.0.4      &lt; 1.0.7  <lineannotation>(a more recent version is available)</lineannotation>
 <replaceable>...</replaceable>
-</screen>
+
+<lineannotation>(show info about a specific package, in XML)</lineannotation>
+$ nix-env -qa --xml --description firefox 
+<![CDATA[<?xml version='1.0' encoding='utf-8'?>
+<items>
+  <item attrPath="0.0.firefoxWrapper"
+    description="Mozilla Firefox - the browser, reloaded (with various plugins)"
+    name="firefox-1.5.0.7" system="i686-linux" />
+</items>]]></screen>
 
 </refsection>
 
