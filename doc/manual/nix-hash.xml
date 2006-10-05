@@ -39,10 +39,11 @@ available as well.  The hash is printed in hexadecimal.</para>
 <para>The hash is computed over a <emphasis>serialisation</emphasis>
 of each path: a dump of the file system tree rooted at the path.  This
 allows directories and symlinks to be hashed as well as regular files.
-The dump is in the <emphasis>NAR format</emphasis> produced by
-<command>nix-store</command> <option>--dump</option>.  Thus,
-<literal>nix-hash <replaceable>path</replaceable></literal> yields the
-same cryptographic hash as <literal>nix-store --dump
+The dump is in the <emphasis>NAR format</emphasis> produced by <link
+linkend="refsec-nix-store-dump"><command>nix-store</command>
+<option>--dump</option></link>.  Thus, <literal>nix-hash
+<replaceable>path</replaceable></literal> yields the same
+cryptographic hash as <literal>nix-store --dump
 <replaceable>path</replaceable> | md5sum</literal>.</para>
 
 </refsection>

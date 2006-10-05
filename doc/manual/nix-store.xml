@@ -256,6 +256,11 @@ and <link
 linkend="conf-gc-keep-derivations"><literal>gc-keep-derivations</literal></link>
 variables in the Nix configuration file.</para>
 
+<para>With <option>--delete</option>, the collector prints the total
+number of freed bytes when it finishes (or when it is interrupted).
+With <option>--print-dead</option>, it prints the number of bytes that
+would be freed.</para>
+
 </refsection>
 
 
@@ -264,7 +269,10 @@ variables in the Nix configuration file.</para>
 <para>To delete all unreachable paths, just do:
     
 <screen>
-$ nix-store --gc</screen>
+$ nix-store --gc
+deleting `/nix/store/kq82idx6g0nyzsp2s14gfsc38npai7lf-cairo-1.0.4.tar.gz.drv'
+<replaceable>...</replaceable>
+8825586 bytes freed (8.42 MiB)</screen>
 
 </para>
 
@@ -275,6 +283,51 @@ $ nix-store --gc</screen>
 
 
   
+<!--######################################################################-->
+
+<refsection><title>Operation <option>--delete</option></title>
+
+<refsection><title>Synopsis</title>
+
+<cmdsynopsis>
+  <command>nix-store</command>
+  <arg choice='plain'><option>--gc</option></arg>
+  <arg><option>--ignore-liveness</option></arg>
+  <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+</cmdsynopsis>
+
+</refsection>
+
+<refsection><title>Description</title>
+
+<para>The operation <option>--delete</option> deletes the store paths
+<replaceable>paths</replaceable> from the Nix store, but only if it is
+safe to do so; that is, when the path is not reachable from a root of
+the garbage collector.  This means that you can only delete paths that
+would also be deleted by <literal>nix-store --gc</literal>.  Thus,
+<literal>--delete</literal> is a more targeted version of
+<literal>--gc</literal>.</para>
+
+<para>With the option <option>--ignore-liveness</option>, reachability
+from the roots is ignored.  However, the path still won’t be deleted
+if there are other paths in the store that refer to it (i.e., depend
+on it).</para>
+
+</refsection>
+
+<refsection><title>Example</title>
+
+<screen>
+$ nix-store --delete /nix/store/zq0h41l75vlb4z45kzgjjmsjxvcv1qk7-mesa-6.4
+0 bytes freed (0.00 MiB)
+error: cannot delete path `/nix/store/zq0h41l75vlb4z45kzgjjmsjxvcv1qk7-mesa-6.4' since it is still alive</screen>
+
+</refsection>
+
+</refsection>
+
+
+
 <!--######################################################################-->
 
 <refsection xml:id='refsec-nix-store-query'><title>Operation <option>--query</option></title>
@@ -675,7 +728,7 @@ in Nix itself.</para>
 
 <!--######################################################################-->
 
-<refsection><title>Operation <option>--dump</option></title>
+<refsection xml:id='refsec-nix-store-dump'><title>Operation <option>--dump</option></title>
 
 <refsection>
   <title>Synopsis</title>
