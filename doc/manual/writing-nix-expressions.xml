@@ -1769,7 +1769,7 @@ in foo</programlisting>
   </varlistentry>
 
   
-  <varlistentry><term><function>builtins.toXML</function> <replaceable>e</replaceable></term>
+  <varlistentry xml:id='builtin-toXML'><term><function>builtins.toXML</function> <replaceable>e</replaceable></term>
 
     <listitem><para>Return a string containing an XML representation
     of <replaceable>e</replaceable>.  The main application for

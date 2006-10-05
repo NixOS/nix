@@ -20,10 +20,16 @@
     </arg>
     <arg><option>--add-root</option> <replaceable>path</replaceable></arg>
     <arg><option>--indirect</option></arg>
-    <group choice='opt'>
-      <arg choice='plain'><option>--parse-only</option></arg>
-      <arg choice='plain'><option>--eval-only</option></arg>
-    </group>
+    <arg>
+      <group choice='req'>
+        <arg choice='plain'><option>--parse-only</option></arg>
+        <arg choice='plain'>
+          <option>--eval-only</option>
+          <arg><option>--strict</option></arg>
+        </arg>
+      </group>
+      <arg><option>--xml</option></arg>
+    </arg>
     <arg choice='plain' rep='repeat'><replaceable>files</replaceable></arg>
   </cmdsynopsis>
 </refsynopsisdiv>
@@ -85,12 +91,40 @@ common options.</para>
     
   </varlistentry>
 
+  <varlistentry><term><option>--xml</option></term>
+
+    <listitem><para>When used with <option>--parse-only</option> and
+    <option>--eval-only</option>, print the resulting expression as an
+    XML representation of the abstract syntax tree rather than as an
+    ATerm.  The schema is the same as that used by the <link
+    linkend="builtin-toXML"><function>toXML</function>
+    built-in</link>.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--strict</option></term>
+
+    <listitem><para>When used with <option>--eval-only</option>,
+    recursively evaluate list elements and attributes.  Normally, such
+    sub-expressions are left unevaluated (since the Nix expression
+    language is lazy).</para>
+
+    <warning><para>This option can cause non-termination, because lazy
+    data structures can be infinitely large.</para></warning>
+
+    </listitem>
+
+  </varlistentry>
+
 </variablelist>
 
 </refsection>
 
 
 <refsection><title>Examples</title>
+
+<para>Instantiating store derivations from a Nix expression, and
+building them using <command>nix-store</command>:
 
 <screen>
 $ nix-instantiate test.nix <lineannotation>(instantiate)</lineannotation>
@@ -103,6 +137,54 @@ $ nix-store -r $(nix-instantiate test.nix) <lineannotation>(build)</lineannotati
 $ ls -l /nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26
 dr-xr-xr-x    2 eelco    users        4096 1970-01-01 01:00 lib
 ...</screen>
+
+</para>
+
+<para>Parsing and evaluating Nix expressions:
+
+<screen>
+$ echo '"foo" + "bar"' | nix-instantiate --parse-only -
+OpPlus(Str("foo"),Str("bar"))
+
+$ echo '"foo" + "bar"' | nix-instantiate --eval-only -
+Str("foobar")
+
+$ echo '"foo" + "bar"' | nix-instantiate --eval-only --xml -
+<![CDATA[<?xml version='1.0' encoding='utf-8'?>
+<expr>
+  <string value="foobar" />
+</expr>]]></screen>
+
+</para>
+
+<para>The difference between non-strict and strict evaluation:
+
+<screen>
+$ echo 'rec { x = "foo"; y = x; }' | nix-instantiate --eval-only --xml -
+<replaceable>...</replaceable><![CDATA[
+    <attr name="x">
+      <string value="foo" />
+    </attr>
+    <attr name="y">
+      <unevaluated />
+    </attr>]]>
+<replaceable>...</replaceable></screen>
+
+Note that <varname>y</varname> is left unevaluated (the XML
+representation doesn’t attempt to show non-normal forms).
+
+<screen>
+$ echo 'rec { x = "foo"; y = x; }' | nix-instantiate --eval-only --xml --strict -
+<replaceable>...</replaceable><![CDATA[
+    <attr name="x">
+      <string value="foo" />
+    </attr>
+    <attr name="y">
+      <string value="foo" />
+    </attr>]]>
+<replaceable>...</replaceable></screen>
+
+</para>
 
 </refsection>
 

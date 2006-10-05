@@ -117,4 +117,20 @@ except for <option>--arg</option> and <option>--attr</option> /
 </refsection>
 
 
+<refsection><title>Examples</title>
+
+<screen>
+$ nix-build pkgs/top-level/all-packages.nix -A firefox
+store derivation is /nix/store/qybprl8sz2lc...-firefox-1.5.0.7.drv
+/nix/store/d18hyl92g30l...-firefox-1.5.0.7
+
+$ ls -l result
+lrwxrwxrwx  <replaceable>...</replaceable>  result -> /nix/store/d18hyl92g30l...-firefox-1.5.0.7
+
+$ ls ./result/bin/
+firefox  firefox-config</screen>
+
+</refsection>
+
+
 </refentry>
