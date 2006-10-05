@@ -599,7 +599,7 @@ struct StdinSource : RestoreSource
 };
 
 
-/* Restore a value from a Nix archive.  The archive is written to
+/* Restore a value from a Nix archive.  The archive is read from
    standard input. */
 static void opRestore(Strings opFlags, Strings opArgs)
 {

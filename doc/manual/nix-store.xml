@@ -278,7 +278,7 @@ $ nix-store --gc</screen>
   
 <!--######################################################################-->
 
-<refsection><title>Operation <option>--query</option></title>
+<refsection xml:id='refsec-nix-store-query'><title>Operation <option>--query</option></title>
 
 <refsection><title>Synopsis</title>
 
@@ -674,7 +674,79 @@ in Nix itself.</para>
 </refsection>
 
 
-<!-- TODO: dump / restore -->
+<!--######################################################################-->
+
+<refsection><title>Operation <option>--dump</option></title>
+
+<refsection>
+  <title>Synopsis</title>
+  <cmdsynopsis>
+    <command>nix-store</command>
+    <arg choice='plain'><option>--dump</option></arg>
+    <arg choice='plain'><replaceable>path</replaceable></arg>
+  </cmdsynopsis>
+</refsection>
+
+<refsection><title>Description</title>
+            
+<para>The operation <option>--dump</option> produces a NAR (Nix
+ARchive) file containing the contents of the file system tree rooted
+at <replaceable>path</replaceable>.  The archive is written to
+standard output.</para>
+
+<para>A NAR archive is like a TAR or Zip archive, but it contains only
+the information that Nix considers important.  For instance,
+timestamps are elided because all files in the Nix store have their
+timestamp set to 0 anyway.  Likewise, all permissions are left out
+except for the execute bit, because all files in the Nix store have
+644 or 755 permission.</para>
+
+<para>Also, a NAR archive is <emphasis>canonical</emphasis>, meaning
+that “equal” paths always produce the same NAR archive.  For instance,
+directory entries are always sorted so that the actual on-disk order
+doesn’t influence the result.  This means that the cryptographic hash
+of a NAR dump of a path is usable as a fingerprint of the contents of
+the path.  Indeed, the hashes of store paths stored in Nix’s database
+(see <link linkend="refsec-nix-store-query"><literal>nix-store -q
+--hash</literal></link>) are SHA-256 hashes of the NAR dump of each
+store path.</para>
+
+<para>NAR archives support filenames of unlimited length and 64-bit
+file sizes.  They can contain regular files, directories, and symbolic
+links, but not other types of files (such as device nodes).</para>
+
+<para>A Nix archive can be unpacked using <literal>nix-store
+--restore</literal>.</para>
+
+</refsection>
+            
+
+</refsection>
+
+
+<!--######################################################################-->
+
+<refsection><title>Operation <option>--restore</option></title>
+
+<refsection>
+  <title>Synopsis</title>
+  <cmdsynopsis>
+    <command>nix-store</command>
+    <arg choice='plain'><option>--restore</option></arg>
+    <arg choice='plain'><replaceable>path</replaceable></arg>
+  </cmdsynopsis>
+</refsection>
+
+<refsection><title>Description</title>
+            
+<para>The operation <option>--restore</option> unpacks a NAR archive
+to <replaceable>path</replaceable>, which must not already exist.  The
+archive is read from standard input.</para>
+
+</refsection>
+            
+
+</refsection>
 
 
 </refentry>
