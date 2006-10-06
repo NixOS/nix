@@ -7,7 +7,7 @@
 
 <!--==================================================================-->
 
-<section><title>Release 0.10 (TBA)</title>
+<section><title>Release 0.10 (October 6, 2006)</title>
 
 <note><para>This version of Nix uses Berkeley DB 4.4 instead of 4.3.
 The database is upgraded automatically, but you should be careful not
@@ -38,8 +38,8 @@ irreversible.</para></warning>
       (or <option>-c</option>) has been added to <command>nix-env
       --query</command> to allow you to compare installed versions of
       packages to available versions, or vice versa.  An easy way to
-      see if you are up to date with what’s in the channel is
-      <literal>nix-env -qc \*</literal>.</para></listitem>
+      see if you are up to date with what’s in your subscribed
+      channels is <literal>nix-env -qc \*</literal>.</para></listitem>
 
       <listitem><para><literal>nix-env --query</literal> now takes as
       arguments a list of package names about which to show
@@ -111,7 +111,7 @@ irreversible.</para></warning>
       <listitem><para>TODO: domain checks (r5895).</para></listitem>
       -->
 
-      <listitem><para>Lots of new builtin primitives, such as
+      <listitem><para>Lots of new built-in primitives, such as
       functions for list manipulation and integer arithmetic.  See the
       manual for a complete list.  All primops are now available in
       the set <varname>builtins</varname>, allowing one to test for
@@ -283,7 +283,7 @@ irreversible.</para></warning>
   nix-store</literal> without triggering a database
   recovery.</para></listitem>
 
-  <listitem><para><command>bsdiff</command> updated
+  <listitem><para><command>bsdiff</command> updated to version
   4.3.</para></listitem>
 
   <listitem><para>Substantial performance improvements in expression

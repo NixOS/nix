@@ -208,7 +208,16 @@ number of possible ways:
   installed.  Currently installed derivations with a name equal to the
   name of a derivation being added are removed unless the option
   <option>--preserve-installed</option> is
-  specified.</para></listitem>
+  specified.</para>
+
+  <para>If there are multiple derivations matching a name in
+  <replaceable>args</replaceable> that have the same name (e.g.,
+  <literal>gcc-3.3.6</literal> and <literal>gcc-4.1.1</literal>), then
+  only the highest version will be installed.  You can force the
+  installation of multiple derivations with the same name by being
+  specific about the versions.  For instance, <literal>nix-env -i
+  gcc-3.3.6 gcc-4.1.1</literal> will install both version of GCC (and
+  will probably cause a user environment conflict!).</para></listitem>
 
   <listitem><para>If <link
   linkend='opt-attr'><option>--attr</option></link>
