@@ -533,8 +533,8 @@ xlink:href='http://catamaran.labs.cs.uu.nl/dist/nix/channels-v3/nixpkgs-unstable
   hash.)</para></listitem>
 
   <listitem><para>Big cleanups and simplifications of the basic store
-  semantics.  The notion of "closure store expressions" is gone (and
-  so is the notion of "successors"); the file system references of a
+  semantics.  The notion of “closure store expressions” is gone (and
+  so is the notion of “successors”); the file system references of a
   store path are now just stored in the database.</para>
 
   <para>For instance, given any store path, you can query its closure:
@@ -544,7 +544,7 @@ $ nix-store -qR $(which firefox)
 ... lots of paths ...</screen>
 
   Also, Nix now remembers for each store path the derivation that
-  built it (the "deriver"):
+  built it (the “deriver”):
 
   <screen>
 $ nix-store -qR $(which firefox)
@@ -588,7 +588,7 @@ $ nix-store -q --referrers-closure \
 
   <listitem><para>One-click installation :-) It is now possible to
   install any top-level component in Nixpkgs directly, through the web
-  - see, e.g., <link
+  — see, e.g., <link
   xlink:href='http://catamaran.labs.cs.uu.nl/dist/nixpkgs-0.8/' />.
   All you have to do is associate
   <filename>/nix/bin/nix-install-package</filename> with the MIME type
@@ -670,10 +670,10 @@ $ nix-env -f .../i686-linux.nix -i -E 'x: x.firefoxWrapper'</screen>
   </listitem>
 
   <listitem><para>The garbage collector now finally deletes paths in
-  the right order (i.e., topologically sorted under the
-  <quote>references</quote> relation), thus making it safe to
-  interrupt the collector without risking a store that violates the
-  closure invariant.</para></listitem>
+  the right order (i.e., topologically sorted under the “references”
+  relation), thus making it safe to interrupt the collector without
+  risking a store that violates the closure
+  invariant.</para></listitem>
 
   <listitem><para>Likewise, the substitute mechanism now downloads
   files in the right order, thus preserving the closure invariant at
@@ -737,10 +737,10 @@ $ nix-env -f .../i686-linux.nix -i -E 'x: x.firefoxWrapper'</screen>
   <listitem><para>Binary patching.  When upgrading components using
   pre-built binaries (through nix-pull / nix-channel), Nix can
   automatically download and apply binary patches to already installed
-  components instead of full downloads.  Patching is "smart": if there
-  is a *sequence* of patches to an installed component, Nix will use
-  it.  Patches are currently generated automatically between Nixpkgs
-  (pre-)releases.</para></listitem>
+  components instead of full downloads.  Patching is “smart”: if there
+  is a <emphasis>sequence</emphasis> of patches to an installed
+  component, Nix will use it.  Patches are currently generated
+  automatically between Nixpkgs (pre-)releases.</para></listitem>
 
   <listitem><para>Simplifications to the substitute
   mechanism.</para></listitem>
