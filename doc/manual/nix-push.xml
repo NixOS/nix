@@ -82,7 +82,9 @@ machines using the <command>nix-pull</command> command.</para>
 
 </para>
 
-<para>TODO: <option>--copy</option></para>
+<!--
+<para>TODO:  <option>- -copy</option></para>
+-->
             
 </refsection>
 
