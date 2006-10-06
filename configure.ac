@@ -1,4 +1,4 @@
-AC_INIT(nix, 0.10)
+AC_INIT(nix, 0.11)
 AC_CONFIG_SRCDIR(README)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE([dist-bzip2 foreign])

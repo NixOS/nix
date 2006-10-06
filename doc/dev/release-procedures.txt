@@ -1,5 +1,8 @@
 To produce a `stable' release from the trunk:
 
+-1. Update the release notes; make sure that the release date is
+    correct.
+
 0. Make sure that the trunk builds in the release supervisor.
 
 1. Branch the trunk, e.g., `svn cp .../trunk
@@ -22,8 +25,8 @@ To produce a `stable' release from the trunk:
    branch (e.g., `.../branches/0.5') should be created from the
    original revision of the trunk (since maintenance releases should
    also be tested first; hence, we cannot have `STABLE=1').  The same
-   procedure can then be followed to produce maintenance release; just
-   substitute `.../branches/VERSION' for the trunk.
+   procedure can then be followed to produce maintenance releases;
+   just substitute `.../branches/VERSION' for the trunk.
 
 7. Switch back to the trunk.
 
