@@ -13,6 +13,16 @@
 namespace nix {
 
 
+static Expr unwrapContext(EvalState & state, Expr e, ATermList & context)
+{
+    context = ATempty;
+    e = evalExpr(state, e);
+    if (matchContext(e, context, e))
+        e = evalExpr(state, e);
+    return e;
+}
+
+
 static Expr primBuiltins(EvalState & state, const ATermVector & args)
 {
     /* Return an attribute set containing all primops.  This allows
@@ -43,8 +53,9 @@ static Expr primImport(EvalState & state, const ATermVector & args)
 {
     ATermList es;
     Path path;
-
-    Expr arg = evalExpr(state, args[0]), arg2;
+    ATermList context; /* don't care the context */
+    
+    Expr arg = unwrapContext(state, args[0], context), arg2;
     
     if (matchPath(arg, arg2))
         path = aterm2String(arg2);
@@ -67,7 +78,7 @@ static Expr primImport(EvalState & state, const ATermVector & args)
         }
     }
 
-    else throw TypeError("`import' requires a path or derivation as its argument");
+    else throw TypeError(format("argument of `import' is %1% while a path or derivation is required") % showType(arg));
 
     return evalFile(state, path);
 }
@@ -510,16 +521,6 @@ static Expr primToXML(EvalState & state, const ATermVector & args)
     ATermList context = ATempty;
     printTermAsXML(strictEvalExpr(state, args[0]), out, context);
     return wrapInContext(context, makeStr(toATerm(out.str())));
-}
-
-
-static Expr unwrapContext(EvalState & state, Expr e, ATermList & context)
-{
-    context = ATempty;
-    e = evalExpr(state, e);
-    if (matchContext(e, context, e))
-        e = evalExpr(state, e);
-    return e;
 }
 
 
