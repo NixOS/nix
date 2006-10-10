@@ -244,9 +244,11 @@ string coerceToStringWithContext(EvalState & state,
     
     e = evalExpr(state, e);
 
+    bool isWrapped = false;
     ATermList es;
     ATerm e2;
     if (matchContext(e, es, e2)) {
+        isWrapped = true;
         e = e2;
         context = ATconcat(es, context);
     }
@@ -258,7 +260,7 @@ string coerceToStringWithContext(EvalState & state,
     if (matchPath(e, s)) {
         isPath = true;
         Path path = aterm2String(s);
-        if (isInStore(path)) {
+        if (isInStore(path) && !isWrapped) {
             context = ATinsert(context, makePath(toATerm(toStorePath(path))));
         }
         return path;
@@ -295,16 +297,18 @@ static ATerm concatStrings(EvalState & state, const ATermVector & args)
     std::ostringstream s;
     bool isPath = false;
 
+    /* Note that if the first argument in the concatenation is a path,
+       then the result is also a path. */
+
     for (ATermVector::const_iterator i = args.begin(); i != args.end(); ++i) {
         bool isPath2;
         s << coerceToStringWithContext(state, context, *i, isPath2);
         if (i == args.begin()) isPath = isPath2;
     }
 
-    Expr result = isPath
+    return wrapInContext(context, isPath
         ? makePath(toATerm(canonPath(s.str())))
-        : makeStr(toATerm(s.str()));
-    return wrapInContext(context, result);
+        : makeStr(toATerm(s.str())));
 }
 
 
