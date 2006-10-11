@@ -137,7 +137,6 @@ void toString(EvalState & state, Expr e,
        scripting convenience, just like `null'. */
     
     if (matchStr(e, s)) result += aterm2String(s);
-    else if (matchUri(e, s)) result += aterm2String(s);
     else if (e == eTrue) result += "1";
     else if (e == eFalse) ; 
     else if (matchInt(e, n)) result += int2String(n);
@@ -482,7 +481,7 @@ static Expr primDirOf(EvalState & state, const ATermVector & args)
 ATerm coerceToString(Expr e)
 {
     ATerm s;
-    if (matchStr(e, s) || matchPath(e, s) || matchUri(e, s))
+    if (matchStr(e, s) || matchPath(e, s))
         return s;
     return 0;
 }

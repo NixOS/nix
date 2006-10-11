@@ -254,8 +254,7 @@ string coerceToStringWithContext(EvalState & state,
     }
     
     ATerm s;
-    if (matchStr(e, s) || matchUri(e, s))
-        return aterm2String(s);
+    if (matchStr(e, s)) return aterm2String(s);
     
     if (matchPath(e, s)) {
         isPath = true;
@@ -346,7 +345,6 @@ Expr evalExpr2(EvalState & state, Expr e)
     /* Normal forms. */
     if (sym == symStr ||
         sym == symPath ||
-        sym == symUri ||
         sym == symNull ||
         sym == symInt ||
         sym == symBool ||

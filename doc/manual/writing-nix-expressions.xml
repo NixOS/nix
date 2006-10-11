@@ -649,15 +649,19 @@ configureFlags = "
     some of which in turn contain expressions (e.g.,
     <literal>${mesa}</literal>).</para>
 
+    <para>As a convenience, <emphasis>URIs</emphasis> as defined in
+    appendix B of <link
+    xlink:href='http://www.ietf.org/rfc/rfc2396.txt'>RFC 2396</link>
+    can be written <emphasis>as is</emphasis>, without quotes.  For
+    instance, the string
+    <literal>"https://svn.cs.uu.nl:12443/dist/trace/trace-nix-trunk.tar.bz2"</literal>
+    can also be written as
+    <literal>https://svn.cs.uu.nl:12443/dist/trace/trace-nix-trunk.tar.bz2</literal>.</para>
+
   </listitem>
 
   <listitem><para><emphasis>Integers</emphasis>, e.g.,
   <literal>123</literal>.</para></listitem>
-
-  <listitem><para><emphasis>URIs</emphasis> as defined in appendix B
-  of <link xlink:href='http://www.ietf.org/rfc/rfc2396.txt'>RFC
-  2396</link>, e.g.,
-  <literal>https://svn.cs.uu.nl:12443/dist/trace/trace-nix-trunk.tar.bz2</literal>.</para></listitem>
 
   <listitem><para><emphasis>Paths</emphasis>, e.g.,
   <filename>/bin/sh</filename> or <filename>./builder.sh</filename>.

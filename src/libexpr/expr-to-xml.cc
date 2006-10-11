@@ -36,9 +36,6 @@ static void printTermAsXML(Expr e, XMLWriter & doc, ATermList & context)
     else if (matchPath(e, s))
         doc.writeEmptyElement("path", singletonAttrs("value", aterm2String(s)));
 
-    else if (matchUri(e, s))
-        doc.writeEmptyElement("uri", singletonAttrs("value", aterm2String(s)));
-
     else if (matchNull(e))
         doc.writeEmptyElement("null");
 

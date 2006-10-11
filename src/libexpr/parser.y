@@ -3,7 +3,7 @@
 %locations
 %error-verbose
 %defines
-%no-lines
+/* %no-lines */
 %parse-param { yyscan_t scanner }
 %parse-param { ParseData * data }
 %lex-param { yyscan_t scanner }
@@ -200,7 +200,7 @@ expr_simple
       else $$ = makeConcatStrings(ATreverse($2));
   }
   | PATH { $$ = makePath(toATerm(absPath(aterm2String($1), data->basePath))); }
-  | URI { $$ = makeUri($1); }
+  | URI { $$ = makeStr($1); }
   | '(' expr ')' { $$ = $2; }
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */

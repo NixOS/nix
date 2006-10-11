@@ -301,7 +301,6 @@ string showType(Expr e)
     int i1;
     if (matchStr(e, t1)) return "a string";
     if (matchPath(e, t1)) return "a path";
-    if (matchUri(e, t1)) return "a path";
     if (matchNull(e)) return "null";
     if (matchInt(e, i1)) return "an integer";
     if (matchBool(e, t1)) return "a boolean";
@@ -330,7 +329,6 @@ string showValue(Expr e)
         return "\"" + u + "\"";
     }
     if (matchPath(e, s)) return aterm2String(s);
-    if (matchUri(e, s)) return aterm2String(s);
     if (matchNull(e)) return "null";
     if (matchInt(e, i)) return (format("%1%") % i).str();
     if (e == eTrue) return "true";

@@ -26,7 +26,6 @@ Var | string | Expr |
 Int | int | Expr |
 Str | string | Expr |
 Path | string | Expr |
-Uri | string | Expr |
 List | ATermList | Expr |
 BlackHole | | Expr |
 Undefined | | Expr |
