@@ -159,8 +159,15 @@ void toString(EvalState & state, Expr e,
     else if (matchPath(e, s)) {
         Path path(canonPath(aterm2String(s)));
 
-        if (!isInStore(path)) {
+        if (isStorePath(path) || (isWrapped && isInStore(path))) {
+            result += path;
+            /* !!! smells hacky.  Check whether this is the Right
+               Thing To Do. */
+            if (!isWrapped)
+                context = ATinsert(context, makePath(toATerm(toStorePath(path))));
+        }
 
+        else {
             if (isDerivation(path))
                 throw EvalError(format("file names are not allowed to end in `%1%'")
                     % drvExtension);
@@ -177,14 +184,6 @@ void toString(EvalState & state, Expr e,
 
             result += dstPath;
             context = ATinsert(context, makePath(toATerm(dstPath)));
-        }
-
-        else {
-            result += path;
-            /* !!! smells hacky.  Check whether this is the Right
-               Thing To Do. */
-            if (!isWrapped)
-                context = ATinsert(context, makePath(toATerm(toStorePath(path))));
         }
     }
     
