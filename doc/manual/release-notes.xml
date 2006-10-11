@@ -7,6 +7,18 @@
 
 <!--==================================================================-->
 
+<section><title>Release 0.10.1 (October 11, 2006)</title>
+
+<para>This release fixes two somewhat obscure bugs that occur when
+evaluating Nix expressions that are stored inside the Nix store
+(<literal>NIX-67</literal>).  These do not affect most users.</para>
+
+</section>
+
+
+
+<!--==================================================================-->
+
 <section><title>Release 0.10 (October 6, 2006)</title>
 
 <note><para>This version of Nix uses Berkeley DB 4.4 instead of 4.3.
