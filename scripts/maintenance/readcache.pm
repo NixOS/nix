@@ -15,7 +15,7 @@ sub readDir {
 }
 
 readDir "/data/webserver/dist/nix-cache";
-readDir "/data/webserver/dist/test";
+readDir "/data/webserver/dist/test-cache";
 readDir "/data/webserver/dist/patches";
 
 print STDERR scalar (keys %archives), "\n";

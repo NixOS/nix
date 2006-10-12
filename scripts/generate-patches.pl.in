@@ -277,7 +277,7 @@ foreach my $p (keys %dstOutPaths) {
         my $srcNarBz2 = getNarBz2 \%srcNarFiles, $closest;
         my $dstNarBz2 = getNarBz2 \%dstNarFiles, $p;
 
-        my $maxNarSize = 150 * 1024 * 1024;
+        my $maxNarSize = 100 * 1024 * 1024;
 
         system("@bunzip2@ < $srcNarBz2 > $tmpDir/A") == 0
             or die "cannot unpack $srcNarBz2";
