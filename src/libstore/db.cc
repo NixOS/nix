@@ -246,6 +246,8 @@ void Database::open(const string & path)
 
             /* Force a checkpoint, as per the BDB docs. */
             env->txn_checkpoint(DB_FORCE, 0, 0);
+
+            printMsg(lvlError, "database succesfully upgraded to new version");
         }
 
 #if 0        
