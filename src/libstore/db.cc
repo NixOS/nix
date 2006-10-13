@@ -30,7 +30,12 @@ class DestroyDbEnv
     DbEnv * dbenv;
 public:
     DestroyDbEnv(DbEnv * _dbenv) : dbenv(_dbenv) { }
-    ~DestroyDbEnv() { if (dbenv) { dbenv->close(0); delete dbenv; } }
+    ~DestroyDbEnv() {
+        if (dbenv) {
+            if (dbenv->get_DB_ENV()) dbenv->close(0);
+            delete dbenv;
+        }
+    }
     void release() { dbenv = 0; };
 };
 
