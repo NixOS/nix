@@ -1,11 +1,11 @@
 # Berkeley DB
 
-DB = db-4.4.20.NC
+DB = db-4.5.20
 
 $(DB).tar.gz:
 	@echo "Nix requires Berkeley DB to build."
 	@echo "Please download version 4.4.20 from"
-	@echo "  http://downloads.sleepycat.com/db-4.4.20.NC.tar.gz"
+	@echo "  http://download-east.oracle.com/berkeley-db/db-4.5.20.tar.gz"
 	@echo "and place it in the externals/ directory."
 	false
 
