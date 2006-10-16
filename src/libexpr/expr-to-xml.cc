@@ -15,26 +15,20 @@ static XMLAttrs singletonAttrs(const string & name, const string & value)
 }
 
 
-static void printTermAsXML(Expr e, XMLWriter & doc, ATermList & context)
+static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context)
 {
     XMLAttrs attrs;
-    ATerm s;
+    string s;
+    ATerm s2;
     int i;
-    Expr e2;
     ATermList as, es, formals;
     ATerm body, pos;
 
-    while (matchContext(e, es, e2)) {
-        e = e2;
-        for (ATermIterator i(es); i; ++i)
-            context = ATinsert(context, *i);
-    }
+    if (matchStr(e, s, context)) /* !!! show the context? */
+        doc.writeEmptyElement("string", singletonAttrs("value", s));
 
-    if (matchStr(e, s))
-        doc.writeEmptyElement("string", singletonAttrs("value", aterm2String(s)));
-
-    else if (matchPath(e, s))
-        doc.writeEmptyElement("path", singletonAttrs("value", aterm2String(s)));
+    else if (matchPath(e, s2))
+        doc.writeEmptyElement("path", singletonAttrs("value", aterm2String(s2)));
 
     else if (matchNull(e))
         doc.writeEmptyElement("null");
@@ -90,7 +84,7 @@ static void printTermAsXML(Expr e, XMLWriter & doc, ATermList & context)
 }
 
 
-void printTermAsXML(Expr e, std::ostream & out, ATermList & context)
+void printTermAsXML(Expr e, std::ostream & out, PathSet & context)
 {
     XMLWriter doc(true, out);
     XMLOpenElement root(doc, "expr");

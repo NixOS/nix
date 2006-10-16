@@ -47,6 +47,7 @@ print HEADER "#endif\n\n\n";
 print IMPL "namespace nix {\n";
 
 while (<STDIN>) {
+    s/\#.*//;
     next if (/^\s*$/);
     
     if (/^\s*(\w*)\s*\|([^\|]*)\|\s*(\w+)\s*\|\s*(\w+)?/) {

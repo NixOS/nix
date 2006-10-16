@@ -167,18 +167,18 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
         Path drvPath = keepDerivations ? i->queryDrvPath(state) : "";
         ATerm t = makeAttrs(ATmakeList5(
             makeBind(toATerm("type"),
-                makeStr(toATerm("derivation")), makeNoPos()),
+                makeStr("derivation"), makeNoPos()),
             makeBind(toATerm("name"),
-                makeStr(toATerm(i->name)), makeNoPos()),
+                makeStr(i->name), makeNoPos()),
             makeBind(toATerm("system"),
-                makeStr(toATerm(i->system)), makeNoPos()),
+                makeStr(i->system), makeNoPos()),
             makeBind(toATerm("drvPath"),
-                makePath(toATerm(drvPath)), makeNoPos()),
+                makeStr(drvPath), makeNoPos()),
             makeBind(toATerm("outPath"),
-                makePath(toATerm(i->queryOutPath(state))), makeNoPos())
+                makeStr(i->queryOutPath(state)), makeNoPos())
             ));
         manifest = ATinsert(manifest, t);
-        inputs = ATinsert(inputs, makeStr(toATerm(i->queryOutPath(state))));
+        inputs = ATinsert(inputs, makeStr(i->queryOutPath(state)));
 
         /* This is only necessary when installing store paths, e.g.,
            `nix-env -i /nix/store/abcd...-foo'. */
@@ -196,11 +196,11 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
 
     Expr topLevel = makeCall(envBuilder, makeAttrs(ATmakeList3(
         makeBind(toATerm("system"),
-            makeStr(toATerm(thisSystem)), makeNoPos()),
+            makeStr(thisSystem), makeNoPos()),
         makeBind(toATerm("derivations"),
             makeList(ATreverse(inputs)), makeNoPos()),
         makeBind(toATerm("manifest"),
-            makePath(toATerm(manifestFile)), makeNoPos())
+            makeStr(manifestFile), makeNoPos())
         )));
 
     /* Instantiate it. */

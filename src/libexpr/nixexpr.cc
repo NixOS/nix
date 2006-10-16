@@ -293,13 +293,35 @@ Expr makeBool(bool b)
 }
 
 
+bool matchStr(Expr e, string & s, PathSet & context)
+{
+    ATermList l;
+    ATerm s_;
+
+    if (!matchStr(e, s_, l)) return false;
+
+    s = aterm2String(s_);
+
+    for (ATermIterator i(l); i; ++i)
+        context.insert(aterm2String(*i));
+
+    return true;
+}
+
+
+Expr makeStr(const string & s, const PathSet & context)
+{
+    return makeStr(toATerm(s), toATermList(context));
+}
+
+
 string showType(Expr e)
 {
     ATerm t1, t2, t3;
     ATermList l1;
     ATermBlob b1;
     int i1;
-    if (matchStr(e, t1)) return "a string";
+    if (matchStr(e, t1, l1)) return "a string";
     if (matchPath(e, t1)) return "a path";
     if (matchNull(e)) return "null";
     if (matchInt(e, i1)) return "an integer";
@@ -309,18 +331,19 @@ string showType(Expr e)
     if (matchAttrs(e, l1)) return "an attribute set";
     if (matchList(e, l1)) return "a list";
     if (matchPrimOp(e, i1, b1, l1)) return "a partially applied built-in function";
-    if (matchContext(e, l1, t1)) return "a context containing " + showType(t1);
     return "an unknown type";
 }
 
 
 string showValue(Expr e)
 {
-    ATerm s;
+    PathSet context;
+    string s;
+    ATerm s2;
     int i;
-    if (matchStr(e, s)) {
-        string t = aterm2String(s), u;
-        for (string::iterator i = t.begin(); i != t.end(); ++i)
+    if (matchStr(e, s, context)) {
+        string u;
+        for (string::iterator i = s.begin(); i != s.end(); ++i)
             if (*i == '\"' || *i == '\\') u += "\\" + *i;
             else if (*i == '\n') u += "\\n";
             else if (*i == '\r') u += "\\r";
@@ -328,7 +351,7 @@ string showValue(Expr e)
             else u += *i;
         return "\"" + u + "\"";
     }
-    if (matchPath(e, s)) return aterm2String(s);
+    if (matchPath(e, s2)) return aterm2String(s2);
     if (matchNull(e)) return "null";
     if (matchInt(e, i)) return (format("%1%") % i).str();
     if (e == eTrue) return "true";

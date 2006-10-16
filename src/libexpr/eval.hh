@@ -60,17 +60,26 @@ Expr strictEvalExpr(EvalState & state, Expr e,
     bool canonicalise = false);
 
 /* Specific results. */
-string evalString(EvalState & state, Expr e);
-Path evalPath(EvalState & state, Expr e);
+string evalString(EvalState & state, Expr e, PathSet & context);
+string evalStringNoCtx(EvalState & state, Expr e);
 int evalInt(EvalState & state, Expr e);
 bool evalBool(EvalState & state, Expr e);
 ATermList evalList(EvalState & state, Expr e);
-ATerm coerceToString(Expr e);
 
-/* Contexts. */
-string coerceToStringWithContext(EvalState & state,
-    ATermList & context, Expr e, bool & isPath);
-Expr wrapInContext(ATermList context, Expr e);
+/* Flatten nested lists into a single list (or expand a singleton into
+   a list). */
+ATermList flattenList(EvalState & state, Expr e);
+
+/* String coercion.  Converts strings, paths and derivations to a
+   string.  If `coerceMore' is set, also converts nulls, integers,
+   booleans and lists to a string. */
+string coerceToString(EvalState & state, Expr e, PathSet & context,
+    bool coerceMore = false, bool copyToStore = true);
+
+/* Path coercion.  Converts strings, paths and derivations to a path.
+   The result is guaranteed to be an canonicalised, absolute path.
+   Nothing is copied to the store. */
+Path coerceToPath(EvalState & state, Expr e, PathSet & context);
 
 /* Automatically call a function for which each argument has a default
    value or has a binding in the `args' map.  Note: result is a call,

@@ -71,6 +71,7 @@ struct TermFun
 };
 ATerm bottomupRewrite(TermFun & f, ATerm e);
 
+
 /* Query all attributes in an attribute set expression.  The
    expression must be in normal form. */
 void queryAllAttrs(Expr e, ATermMap & attrs, bool withPos = false);
@@ -83,16 +84,28 @@ Expr queryAttr(Expr e, const string & name, ATerm & pos);
 /* Create an attribute set expression from an Attrs value. */
 Expr makeAttrs(const ATermMap & attrs);
 
+
 /* Perform a set of substitutions on an expression. */
 Expr substitute(const Substitution & subs, Expr e);
+
 
 /* Check whether all variables are defined in the given expression.
    Throw an exception if this isn't the case. */
 void checkVarDefs(const ATermMap & def, Expr e);
 
+
 /* Create an expression representing a boolean. */
 Expr makeBool(bool b);
 
+
+/* Manipulation of Str() nodes.  Note: matchStr() does not clear
+   context!  */
+bool matchStr(Expr e, string & s, PathSet & context);
+
+Expr makeStr(const string & s, const PathSet & context = PathSet());
+
+
+/* Showing types, values. */
 string showType(Expr e);
 
 string showValue(Expr e);

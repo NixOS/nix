@@ -10,7 +10,8 @@ string DrvInfo::queryDrvPath(EvalState & state) const
 {
     if (drvPath == "") {
         Expr a = attrs->get(toATerm("drvPath"));
-        (string &) drvPath = a ? evalPath(state, a) : "";
+        PathSet context;
+        (string &) drvPath = a ? coerceToPath(state, a, context) : "";
     }
     return drvPath;
 }
@@ -21,7 +22,8 @@ string DrvInfo::queryOutPath(EvalState & state) const
     if (outPath == "") {
         Expr a = attrs->get(toATerm("outPath"));
         if (!a) throw TypeError("output path missing");
-        (string &) outPath = evalPath(state, a);
+        PathSet context;
+        (string &) outPath = coerceToPath(state, a, context);
     }
     return outPath;
 }
@@ -38,9 +40,11 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
     queryAllAttrs(evalExpr(state, a), attrs2);
 
     for (ATermMap::const_iterator i = attrs2.begin(); i != attrs2.end(); ++i) {
-        ATerm s = coerceToString(evalExpr(state, i->value));
-        if (s)
-            meta[aterm2String(i->key)] = aterm2String(s);
+        Expr e = evalExpr(state, i->value);
+        string s;
+        PathSet context;
+        if (matchStr(e, s, context))
+            meta[aterm2String(i->key)] = s;
         /* For future compatibility, ignore attribute values that are
            not strings. */
     }
@@ -74,7 +78,7 @@ static bool getDerivation(EvalState & state, Expr e,
         queryAllAttrs(e, *attrs, false);
     
         Expr a = attrs->get(toATerm("type"));
-        if (!a || evalString(state, a) != "derivation") return true;
+        if (!a || evalStringNoCtx(state, a) != "derivation") return true;
 
         /* Remove spurious duplicates (e.g., an attribute set like
            `rec { x = derivation {...}; y = x;}'. */
@@ -86,13 +90,13 @@ static bool getDerivation(EvalState & state, Expr e,
         a = attrs->get(toATerm("name"));
         /* !!! We really would like to have a decent back trace here. */
         if (!a) throw TypeError("derivation name missing");
-        drv.name = evalString(state, a);
+        drv.name = evalStringNoCtx(state, a);
 
         a = attrs->get(toATerm("system"));
         if (!a)
             drv.system = "unknown";
         else
-            drv.system = evalString(state, a);
+            drv.system = evalStringNoCtx(state, a);
 
         drv.attrs = attrs;
 

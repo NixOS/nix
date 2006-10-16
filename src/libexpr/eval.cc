@@ -3,6 +3,7 @@
 #include "hash.hh"
 #include "util.hh"
 #include "store.hh"
+#include "derivations.hh"
 #include "nixexpr-ast.hh"
 
 
@@ -157,23 +158,24 @@ static Expr updateAttrs(Expr e1, Expr e2)
 }
 
 
-string evalString(EvalState & state, Expr e)
+string evalString(EvalState & state, Expr e, PathSet & context)
 {
     e = evalExpr(state, e);
-    ATerm s;
-    if (!matchStr(e, s))
+    string s;
+    if (!matchStr(e, s, context))
         throw TypeError(format("value is %1% while a string was expected") % showType(e));
-    return aterm2String(s);
+    return s;
 }
 
 
-Path evalPath(EvalState & state, Expr e)
+string evalStringNoCtx(EvalState & state, Expr e)
 {
-    e = evalExpr(state, e);
-    ATerm s;
-    if (!matchPath(e, s))
-        throw TypeError(format("value is %1% while a path was expected") % showType(e));
-    return aterm2String(s);
+    PathSet context;
+    string s = evalString(state, e, context);
+    if (!context.empty())
+        throw EvalError(format("the string `%1%' is not allowed to refer to a store path (such as `%2%')")
+            % s % *(context.begin()));
+    return s;
 }
 
 
@@ -206,76 +208,84 @@ ATermList evalList(EvalState & state, Expr e)
 }
 
 
-/* String concatenation and context nodes: in order to allow users to
-   write things like
-
-     "--with-freetype2-library=" + freetype + "/lib"
-
-   where `freetype' is a derivation, we automatically coerce
-   derivations into their output path (e.g.,
-   /nix/store/hashcode-freetype) in concatenations.  However, if we do
-   this naively, we could introduce an undeclared dependency: when the
-   string is used in another derivation, that derivation would not
-   have an explicitly dependency on `freetype' in its inputDrvs
-   field.  Thus `freetype' would not necessarily be built.
-
-   To prevent this, we wrap the string resulting from the
-   concatenation in a *context node*, like this:
-
-     Context([freetype],
-       Str("--with-freetype2-library=/nix/store/hashcode-freetype/lib"))
-
-   Thus the context is the list of all derivations used in the
-   computation of a value.  These contexts are propagated through
-   further concatenations.  In processBinding() in primops.cc, context
-   nodes are unwrapped and added to inputDrvs.
-
-   !!! Should the ordering of the context list have a canonical form?
-
-   !!! Contexts are not currently recognised in most places in the
-   evaluator. */
-
-
-/* Coerce a value to a string, keeping track of contexts. */
-string coerceToStringWithContext(EvalState & state,
-    ATermList & context, Expr e, bool & isPath)
+static void flattenList(EvalState & state, Expr e, ATermList & result)
 {
-    isPath = false;
-    
+    ATermList es;
+    e = evalExpr(state, e);
+    if (matchList(e, es))
+        for (ATermIterator i(es); i; ++i)
+            flattenList(state, *i, result);
+    else
+        result = ATinsert(result, e);
+}
+
+
+ATermList flattenList(EvalState & state, Expr e)
+{
+    ATermList result = ATempty;
+    flattenList(state, e, result);
+    return ATreverse(result);
+}
+
+
+string coerceToString(EvalState & state, Expr e, PathSet & context,
+    bool coerceMore, bool copyToStore)
+{
     e = evalExpr(state, e);
 
-    bool isWrapped = false;
-    ATermList es;
-    ATerm e2;
-    if (matchContext(e, es, e2)) {
-        isWrapped = true;
-        e = e2;
-        context = ATconcat(es, context);
-    }
-    
-    ATerm s;
-    if (matchStr(e, s)) return aterm2String(s);
-    
-    if (matchPath(e, s)) {
-        isPath = true;
-        Path path = aterm2String(s);
-        if (isInStore(path) && !isWrapped) {
-            context = ATinsert(context, makePath(toATerm(toStorePath(path))));
+    string s;
+
+    if (matchStr(e, s, context)) return s;
+
+    ATerm s2;
+    if (matchPath(e, s2)) {
+        Path path(canonPath(aterm2String(s2)));
+
+        if (!copyToStore) return path;
+        
+        if (isDerivation(path))
+            throw EvalError(format("file names are not allowed to end in `%1%'")
+                % drvExtension);
+
+        Path dstPath;
+        if (state.srcToStore[path] != "")
+            dstPath = state.srcToStore[path];
+        else {
+            dstPath = addToStore(path);
+            state.srcToStore[path] = dstPath;
+            printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
+                % path % dstPath);
         }
-        return path;
+
+        context.insert(dstPath);
+        return dstPath;
     }
+        
+    ATermList es;
+    if (matchAttrs(e, es))
+        return coerceToString(state, makeSelect(e, toATerm("outPath")),
+            context, coerceMore, copyToStore);
 
-    if (matchAttrs(e, es)) {
-        ATermMap attrs(128); /* !!! */
-        queryAllAttrs(e, attrs, false);
+    if (coerceMore) {
 
-        Expr a = attrs.get(toATerm("type"));
-        if (a && evalString(state, a) == "derivation") {
-            a = attrs.get(toATerm("outPath"));
-            if (!a) throw TypeError("output path missing from derivation");
-            isPath = true;
-            context = ATinsert(context, e);
-            return evalPath(state, a);
+        /* Note that `false' is represented as an empty string for
+           shell scripting convenience, just like `null'. */
+        if (e == eTrue) return "1";
+        if (e == eFalse) return "";
+        int n;
+        if (matchInt(e, n)) return int2String(n);
+        if (matchNull(e)) return "";
+
+        if (matchList(e, es)) {
+            string result;
+            es = flattenList(state, e);
+            bool first = true;
+            for (ATermIterator i(es); i; ++i) {
+                if (!first) result += " "; else first = false;
+                result += coerceToString(state, *i,
+                    context, coerceMore, copyToStore);
+            }
+            return result;
         }
     }
     
@@ -283,31 +293,41 @@ string coerceToStringWithContext(EvalState & state,
 }
 
 
-/* Wrap an expression in a context if the context is not empty. */
-Expr wrapInContext(ATermList context, Expr e)
+/* Common implementation of `+', ConcatStrings and `~'. */
+static ATerm concatStrings(EvalState & state, const ATermVector & args,
+    string separator = "")
 {
-    return context == ATempty ? e : makeContext(context, e);
+    PathSet context;
+    std::ostringstream s;
+
+    /* If the first element is a path, then the result will also be a
+       path, we don't copy anything (yet - that's done later, since
+       paths are copied when they are used in a derivation), and none
+       of the strings are allowed to have contexts. */
+    ATerm dummy;
+    bool isPath = !args.empty() && matchPath(args.front(), dummy);
+
+    for (ATermVector::const_iterator i = args.begin(); i != args.end(); ++i) {
+        if (i != args.begin()) s << separator;
+        s << coerceToString(state, *i, context, false, !isPath);
+    }
+
+    if (isPath && !context.empty())
+        throw EvalError(format("a string that refers to a store path cannot be appended to a path, in `%1%'")
+            % s.str());
+    
+    return isPath
+        ? makePath(toATerm(s.str()))
+        : makeStr(s.str(), context);
 }
 
 
-static ATerm concatStrings(EvalState & state, const ATermVector & args)
+Path coerceToPath(EvalState & state, Expr e, PathSet & context)
 {
-    ATermList context = ATempty;
-    std::ostringstream s;
-    bool isPath = false;
-
-    /* Note that if the first argument in the concatenation is a path,
-       then the result is also a path. */
-
-    for (ATermVector::const_iterator i = args.begin(); i != args.end(); ++i) {
-        bool isPath2;
-        s << coerceToStringWithContext(state, context, *i, isPath2);
-        if (i == args.begin()) isPath = isPath2;
-    }
-
-    return wrapInContext(context, isPath
-        ? makePath(toATerm(canonPath(s.str())))
-        : makeStr(toATerm(s.str())));
+    string path = coerceToString(state, e, context, false, false);
+    if (path == "" || path[0] != '/')
+        throw EvalError(format("string `%1%' doesn't represent an absolute path") % path);
+    return path;
 }
 
 
@@ -352,8 +372,7 @@ Expr evalExpr2(EvalState & state, Expr e)
         sym == symFunction1 ||
         sym == symAttrs ||
         sym == symList ||
-        sym == symPrimOp ||
-        sym == symContext)
+        sym == symPrimOp)
         return e;
     
     /* The `Closed' constructor is just a way to prevent substitutions
@@ -371,6 +390,7 @@ Expr evalExpr2(EvalState & state, Expr e)
         ATermBlob fun;
         if (!matchPrimOpDef(primOp, arity, fun)) abort();
         if (arity == 0)
+            /* !!! backtrace for primop call */
             return ((PrimOp) ATgetBlobData(fun)) (state, ATermVector());
         else
             return makePrimOp(arity, fun, ATempty);
@@ -397,6 +417,7 @@ Expr evalExpr2(EvalState & state, Expr e)
                 ATermVector args2(arity);
                 for (ATermIterator i(args); i; ++i)
                     args2[--arity] = *i;
+                /* !!! backtrace for primop call */
                 return ((PrimOp) ATgetBlobData((ATermBlob) fun))
                     (state, args2);
             } else
@@ -550,11 +571,10 @@ Expr evalExpr2(EvalState & state, Expr e)
     if (matchSubPath(e, e1, e2)) {
         static bool haveWarned = false;
         warnOnce(haveWarned, "the subpath operator (~) is deprecated, use string concatenation (+) instead");
-        ATermList context = ATempty;
-        bool dummy;
-        string s1 = coerceToStringWithContext(state, context, e1, dummy);
-        string s2 = coerceToStringWithContext(state, context, e2, dummy);
-        return wrapInContext(context, makePath(toATerm(canonPath(s1 + "/" + s2))));
+        ATermVector args;
+        args.push_back(e1);
+        args.push_back(e2);
+        return concatStrings(state, args, "/");
     }
 
     /* List concatenation. */

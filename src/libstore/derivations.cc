@@ -113,16 +113,6 @@ Derivation parseDerivation(ATerm t)
 }
 
 
-static ATermList unparseStrings(const StringSet & paths)
-{
-    ATermList l = ATempty;
-    for (PathSet::const_reverse_iterator i = paths.rbegin();
-         i != paths.rend(); ++i)
-        l = ATinsert(l, toATerm(*i));
-    return l;
-}
-
-
 ATerm unparseDerivation(const Derivation & drv)
 {
     ATermList outputs = ATempty;
@@ -141,7 +131,7 @@ ATerm unparseDerivation(const Derivation & drv)
         inDrvs = ATinsert(inDrvs,
             makeDerivationInput(
                 toATerm(i->first),
-                unparseStrings(i->second)));
+                toATermList(i->second)));
     
     ATermList args = ATempty;
     for (Strings::const_reverse_iterator i = drv.args.rbegin();
@@ -159,7 +149,7 @@ ATerm unparseDerivation(const Derivation & drv)
     return makeDerive(
         outputs,
         inDrvs,
-        unparseStrings(drv.inputSrcs),
+        toATermList(drv.inputSrcs),
         toATerm(drv.platform),
         toATerm(drv.builder),
         args,

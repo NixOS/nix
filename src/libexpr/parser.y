@@ -195,12 +195,12 @@ expr_simple
   | INT { $$ = makeInt(ATgetInt((ATermInt) $1)); }
   | '"' string_parts '"' {
       /* For efficiency, and to simplify parse trees a bit. */
-      if ($2 == ATempty) $$ = makeStr(toATerm(""));
+      if ($2 == ATempty) $$ = makeStr(toATerm(""), ATempty);
       else if (ATgetNext($2) == ATempty) $$ = ATgetFirst($2);
       else $$ = makeConcatStrings(ATreverse($2));
   }
   | PATH { $$ = makePath(toATerm(absPath(aterm2String($1), data->basePath))); }
-  | URI { $$ = makeStr($1); }
+  | URI { $$ = makeStr($1, ATempty); }
   | '(' expr ')' { $$ = $2; }
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */

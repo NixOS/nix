@@ -43,6 +43,7 @@ Error badTerm(const format & f, ATerm t);
 ATerm toATerm(const char * s);
 ATerm toATerm(const string & s);
 
+ATermList toATermList(const StringSet & ss);
  
 }
 

@@ -64,7 +64,7 @@ static Expr unescapeStr(const char * s)
         }
         else t += c;
     }
-    return makeStr(toATerm(t));
+    return makeStr(toATerm(t), ATempty);
 }
 
  

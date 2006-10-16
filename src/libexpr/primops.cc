@@ -13,16 +13,6 @@
 namespace nix {
 
 
-static Expr unwrapContext(EvalState & state, Expr e, ATermList & context)
-{
-    context = ATempty;
-    e = evalExpr(state, e);
-    if (matchContext(e, context, e))
-        e = evalExpr(state, e);
-    return e;
-}
-
-
 static Expr primBuiltins(EvalState & state, const ATermVector & args)
 {
     /* Return an attribute set containing all primops.  This allows
@@ -51,34 +41,10 @@ static Expr primBuiltins(EvalState & state, const ATermVector & args)
    argument. */ 
 static Expr primImport(EvalState & state, const ATermVector & args)
 {
-    ATermList es;
-    Path path;
-    ATermList context; /* don't care the context */
+    PathSet context;
+    Path path = coerceToPath(state, args[0], context);
     
-    Expr arg = unwrapContext(state, args[0], context), arg2;
-    
-    if (matchPath(arg, arg2))
-        path = aterm2String(arg2);
-
-    else if (matchAttrs(arg, es)) {
-        Expr a = queryAttr(arg, "type");
-
-        /* If it is a derivation, we have to realise it and load the
-           Nix expression created at the derivation's output path. */
-        if (a && evalString(state, a) == "derivation") {
-            a = queryAttr(arg, "drvPath");
-            if (!a) throw EvalError("bad derivation in import");
-            Path drvPath = evalPath(state, a);
-
-            buildDerivations(singleton<PathSet>(drvPath));
- 
-            a = queryAttr(arg, "outPath");
-            if (!a) throw EvalError("bad derivation in import");
-            path = evalPath(state, a);
-        }
-    }
-
-    else throw TypeError(format("argument of `import' is %1% while a path or derivation is required") % showType(arg));
+    /* !!! build the derivations in context */
 
     return evalFile(state, path);
 }
@@ -86,117 +52,11 @@ static Expr primImport(EvalState & state, const ATermVector & args)
 
 static Expr primPathExists(EvalState & state, const ATermVector & args)
 {
-    Expr arg = evalExpr(state, args[0]), arg2;
-    
-    if (!matchPath(arg, arg2))
-        throw TypeError("`pathExists' requires a path as its argument");
-
-    return makeBool(pathExists(aterm2String(arg2)));
-}
-
-
-static void flattenList(EvalState & state, Expr e, ATermList & result)
-{
-    ATermList es;
-    e = evalExpr(state, e);
-    if (matchList(e, es))
-        for (ATermIterator i(es); i; ++i)
-            flattenList(state, *i, result);
-    else
-        result = ATinsert(result, e);
-}
-
-
-ATermList flattenList(EvalState & state, Expr e)
-{
-    ATermList result = ATempty;
-    flattenList(state, e, result);
-    return ATreverse(result);
-}
-
-
-void toString(EvalState & state, Expr e,
-    ATermList & context, string & result)
-{
-    e = evalExpr(state, e);
-
-    ATerm s;
-    ATermList es;
-    int n;
-    Expr e2;
-
-    bool isWrapped = false;
-    while (matchContext(e, es, e2)) {
-        isWrapped = true;
-        e = e2;
-        for (ATermIterator i(es); i; ++i)
-            context = ATinsert(context, *i);
-    }
-
-    /* Note that `false' is represented as an empty string for shell
-       scripting convenience, just like `null'. */
-    
-    if (matchStr(e, s)) result += aterm2String(s);
-    else if (e == eTrue) result += "1";
-    else if (e == eFalse) ; 
-    else if (matchInt(e, n)) result += int2String(n);
-    else if (matchNull(e)) ;
-    
-    else if (matchAttrs(e, es)) {
-        Expr a = queryAttr(e, "type");
-        
-        if (a && evalString(state, a) == "derivation") {
-            Expr a2 = queryAttr(e, "outPath");
-            if (!a2) throw EvalError("output path missing");
-            result += evalPath(state, a2);
-            context = ATinsert(context, e);
-        }
-
-        else throw TypeError("cannot convert an attribute set to a string");
-    }
-
-    else if (matchPath(e, s)) {
-        Path path(canonPath(aterm2String(s)));
-
-        if (isStorePath(path) || (isWrapped && isInStore(path))) {
-            result += path;
-            /* !!! smells hacky.  Check whether this is the Right
-               Thing To Do. */
-            if (!isWrapped)
-                context = ATinsert(context, makePath(toATerm(toStorePath(path))));
-        }
-
-        else {
-            if (isDerivation(path))
-                throw EvalError(format("file names are not allowed to end in `%1%'")
-                    % drvExtension);
-
-            Path dstPath;
-            if (state.srcToStore[path] != "")
-                dstPath = state.srcToStore[path];
-            else {
-                dstPath = addToStore(path);
-                state.srcToStore[path] = dstPath;
-                printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
-                    % path % dstPath);
-            }
-
-            result += dstPath;
-            context = ATinsert(context, makePath(toATerm(dstPath)));
-        }
-    }
-    
-    else if (matchList(e, es)) {
-        es = flattenList(state, e);
-        bool first = true;
-        for (ATermIterator i(es); i; ++i) {
-            if (!first) result += " "; else first = false;
-            toString(state, *i, context, result);
-        }
-    }
-
-    else throw TypeError(format("cannot convert %1% to a string") % showType(e));
-    
+    PathSet context;
+    Path path = coerceToPath(state, args[0], context);
+    if (!context.empty())
+        throw EvalError(format("string `%1%' cannot refer to other paths") % path);
+    return makeBool(pathExists(path));
 }
 
 
@@ -275,11 +135,13 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
         throw EvalError("required attribute `name' missing");
     ATerm posDrvName;
     if (!matchAttrRHS(eDrvName, eDrvName, posDrvName)) abort();
-    string drvName = evalString(state, eDrvName);
+    string drvName = evalStringNoCtx(state, eDrvName);
 
     /* Build the derivation expression by processing the attributes. */
     Derivation drv;
     
+    PathSet context;
+
     string outputHash;
     string outputHashAlgo;
     bool outputHashRecursive = false;
@@ -294,8 +156,6 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
 
         try {
 
-            ATermList context = ATempty;
-
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
             if (key == "args") {
@@ -307,8 +167,7 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
                     es = flattenList(state, value);
                 }
                 for (ATermIterator i(es); i; ++i) {
-                    string s;
-                    toString(state, *i, context, s);
+                    string s = coerceToString(state, *i, context, true);
                     drv.args.push_back(s);
                 }
             }
@@ -316,8 +175,7 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
             /* All other attributes are passed to the builder through
                the environment. */
             else {
-                string s;
-                toString(state, value, context, s);
+                string s = coerceToString(state, value, context, true);
                 drv.env[key] = s;
                 if (key == "builder") drv.builder = s;
                 else if (key == "system") drv.platform = s;
@@ -331,32 +189,6 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
                 }
             }
 
-            /* Everything in the context of the expression should be
-               added as dependencies of the resulting derivation. */
-
-            for (ATermIterator i(context); i; ++i) {
-
-                ATerm s;
-                ATermList as;
-                
-                if (matchPath(*i, s)) {
-                    assert(isStorePath(aterm2String(s)));
-                    drv.inputSrcs.insert(aterm2String(s));
-                }
-
-                else if (matchAttrs(*i, as)) {
-                    Expr a = queryAttr(*i, "type");
-                    assert(a && evalString(state, a) == "derivation");
-
-                    Expr a2 = queryAttr(*i, "drvPath");
-                    if (!a2) throw EvalError("derivation path missing");
-
-                    drv.inputDrvs[evalPath(state, a2)] = singleton<StringSet>("out");
-                }
-
-                else abort();
-            }
-            
         } catch (Error & e) {
             e.addPrefix(format("while processing the derivation attribute `%1%' at %2%:\n")
                 % key % showPos(pos));
@@ -367,6 +199,18 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
 
     }
     
+    /* Everything in the context of the strings in the derivation
+       attributes should be added as dependencies of the resulting
+       derivation. */
+    for (PathSet::iterator i = context.begin(); i != context.end(); ++i) {
+        debug(format("derivation uses `%1%'") % *i);
+        assert(isStorePath(*i));
+        if (isDerivation(*i))
+            drv.inputDrvs[*i] = singleton<StringSet>("out");
+        else
+            drv.inputSrcs.insert(*i);
+    }
+            
     /* Do we have all required attributes? */
     if (drv.builder == "")
         throw EvalError("required attribute `builder' missing");
@@ -434,9 +278,9 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
     /* !!! assumes a single output */
     ATermMap outAttrs(2);
     outAttrs.set(toATerm("outPath"),
-        makeAttrRHS(makePath(toATerm(outPath)), makeNoPos()));
+        makeAttrRHS(makeStr(outPath, singleton<PathSet>(drvPath)), makeNoPos()));
     outAttrs.set(toATerm("drvPath"),
-        makeAttrRHS(makePath(toATerm(drvPath)), makeNoPos()));
+        makeAttrRHS(makeStr(drvPath, singleton<PathSet>(drvPath)), makeNoPos()));
 
     return makeAttrs(outAttrs);
 }
@@ -449,7 +293,7 @@ static Expr primDerivationLazy(EvalState & state, const ATermVector & args)
     queryAllAttrs(eAttrs, attrs, true);
 
     attrs.set(toATerm("type"),
-        makeAttrRHS(makeStr(toATerm("derivation")), makeNoPos()));
+        makeAttrRHS(makeStr("derivation"), makeNoPos()));
 
     Expr drvStrict = makeCall(makeVar(toATerm("derivation!")), eAttrs);
 
@@ -466,7 +310,8 @@ static Expr primDerivationLazy(EvalState & state, const ATermVector & args)
    following the last slash. */
 static Expr primBaseNameOf(EvalState & state, const ATermVector & args)
 {
-    return makeStr(toATerm(baseNameOf(evalString(state, args[0]))));
+    PathSet context;
+    return makeStr(baseNameOf(coerceToPath(state, args[0], context)), context);
 }
 
 
@@ -474,39 +319,29 @@ static Expr primBaseNameOf(EvalState & state, const ATermVector & args)
    last slash. */
 static Expr primDirOf(EvalState & state, const ATermVector & args)
 {
-    return makePath(toATerm(dirOf(evalPath(state, args[0]))));
+    PathSet context;
+    return makeStr(dirOf(coerceToPath(state, args[0], context)), context);
 }
 
 
-ATerm coerceToString(Expr e)
-{
-    ATerm s;
-    if (matchStr(e, s) || matchPath(e, s))
-        return s;
-    return 0;
-}
-
-
-/* Convert the argument (which can be a path or a uri) to a string. */
+/* Convert the argument to a string. */
 static Expr primToString(EvalState & state, const ATermVector & args)
 {
-    ATermList context = ATempty;
-    bool dummy;
-    string s = coerceToStringWithContext(state, context, args[0], dummy);
-    return wrapInContext(context, makeStr(toATerm(s)));
+    PathSet context;
+    string s = coerceToString(state, args[0], context);
+    /* !!! do lists etc */
+    return makeStr(s, context);
 }
 
 
-/* Convert the argument to a path. */
+/* Convert the argument to a path.  !!! obsolete? */
 static Expr primToPath(EvalState & state, const ATermVector & args)
 {
-    Expr e = evalExpr(state, args[0]);
-    ATerm t = coerceToString(e);
-    if (!t) throw TypeError(format("cannot coerce %1% to a path in `toPath'") % showType(e));
-    Path path = aterm2String(t);
+    PathSet context;
+    string path = evalString(state, args[0], context);
     if (path == "" || path[0] != '/')
         throw EvalError("string doesn't represent an absolute path in `toPath'");
-    return makePath(toATerm(canonPath(path)));
+    return makeStr(canonPath(path), context);
 }
 
 
@@ -516,9 +351,9 @@ static Expr primToPath(EvalState & state, const ATermVector & args)
 static Expr primToXML(EvalState & state, const ATermVector & args)
 {
     std::ostringstream out;
-    ATermList context = ATempty;
+    PathSet context;
     printTermAsXML(strictEvalExpr(state, args[0]), out, context);
-    return wrapInContext(context, makeStr(toATerm(out.str())));
+    return makeStr(out.str(), context);
 }
 
 
@@ -526,13 +361,14 @@ static Expr primToXML(EvalState & state, const ATermVector & args)
    as an input by derivations. */
 static Expr primToFile(EvalState & state, const ATermVector & args)
 {
-    ATermList context;
-    string name = evalString(state, args[0]);
-    string contents = evalString(state,
-        unwrapContext(state, args[1], context));
+    PathSet context;
+    string name = evalStringNoCtx(state, args[0]);
+    string contents = evalString(state, args[1], context);
 
     PathSet refs;
 
+#if 0
+    /* !!! */
     for (ATermIterator i(context); i; ++i) {
         ATerm s;
         if (matchPath(*i, s)) {
@@ -541,13 +377,15 @@ static Expr primToFile(EvalState & state, const ATermVector & args)
         }
         else throw EvalError("in `toFile': the file cannot contain references to derivation outputs");
     }
+#endif    
     
     Path storePath = addTextToStore(name, contents, refs);
 
-    /* Note: we don't need to wrap the result in a context, since
-       `storePath' itself has references to the paths used in
-       args[1]. */
-    return makePath(toATerm(storePath));
+    /* Note: we don't need to add `context' to the context of the
+       result, since `storePath' itself has references to the paths
+       used in args[1]. */
+    
+    return makeStr(storePath, singleton<PathSet>(storePath));
 }
 
 
@@ -652,7 +490,8 @@ static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
     Path pivot;
     PathSet workSet;
     for (ATermIterator i(startSet2); i; ++i) {
-        Path p = evalPath(state, *i);
+        PathSet context; /* !!! what to do? */
+        Path p = coerceToPath(state, *i, context);
         workSet.insert(p);
         pivot = dirOf(p);
     }
@@ -663,7 +502,8 @@ static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
     if (e) {
         ATermList list = evalList(state, e);
         for (ATermIterator i(list); i; ++i) {
-            Path p = evalPath(state, *i);
+            PathSet context; /* !!! what to do? */
+            Path p = coerceToPath(state, *i, context);
             searchPath.insert(p);
         }
     }
@@ -686,11 +526,11 @@ static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
             
             /* Call the `scanner' function with `path' as argument. */
             debug(format("finding dependencies in `%1%'") % path);
-            ATermList deps = evalList(state, makeCall(scanner, makePath(toATerm(path))));
+            ATermList deps = evalList(state, makeCall(scanner, makeStr(path)));
 
             /* Try to find the dependencies relative to the `path'. */
             for (ATermIterator i(deps); i; ++i) {
-                string s = evalString(state, *i);
+                string s = evalStringNoCtx(state, *i);
                 
                 Path dep = findDependency(dirOf(path), s);
 
@@ -721,8 +561,8 @@ static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
     /* Return a list of the dependencies we've just found. */
     ATermList deps = ATempty;
     for (PathSet::iterator i = doneSet.begin(); i != doneSet.end(); ++i) {
-        deps = ATinsert(deps, makeStr(toATerm(relativise(pivot, *i))));
-        deps = ATinsert(deps, makePath(toATerm(*i)));
+        deps = ATinsert(deps, makeStr(relativise(pivot, *i)));
+        deps = ATinsert(deps, makeStr(*i));
     }
 
     debug(format("dependency list is `%1%'") % makeList(deps));
@@ -733,8 +573,9 @@ static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
 
 static Expr primAbort(EvalState & state, const ATermVector & args)
 {
+    PathSet context;
     throw Abort(format("evaluation aborted with the following error message: `%1%'") %
-        evalString(state, args[0]));
+        evalString(state, args[0], context));
 }
 
 
@@ -762,8 +603,8 @@ static Expr primTail(EvalState & state, const ATermVector & args)
 /* Return an environment variable.  Use with care. */
 static Expr primGetEnv(EvalState & state, const ATermVector & args)
 {
-    string name = evalString(state, args[0]);
-    return makeStr(toATerm(getEnv(name)));
+    string name = evalStringNoCtx(state, args[0]);
+    return makeStr(getEnv(name));
 }
 
 
@@ -787,7 +628,7 @@ static Expr primMap(EvalState & state, const ATermVector & args)
    platforms. */
 static Expr primCurrentSystem(EvalState & state, const ATermVector & args)
 {
-    return makeStr(toATerm(thisSystem));
+    return makeStr(thisSystem);
 }
 
 
@@ -800,7 +641,7 @@ static Expr primCurrentTime(EvalState & state, const ATermVector & args)
 /* Dynamic version of the `.' operator. */
 static Expr primGetAttr(EvalState & state, const ATermVector & args)
 {
-    string attr = evalString(state, args[0]);
+    string attr = evalStringNoCtx(state, args[0]);
     return evalExpr(state, makeSelect(args[1], toATerm(attr)));
 }
 
@@ -808,7 +649,7 @@ static Expr primGetAttr(EvalState & state, const ATermVector & args)
 /* Dynamic version of the `?' operator. */
 static Expr primHasAttr(EvalState & state, const ATermVector & args)
 {
-    string attr = evalString(state, args[0]);
+    string attr = evalStringNoCtx(state, args[0]);
     return evalExpr(state, makeOpHasAttr(args[1], toATerm(attr)));
 }
 
@@ -822,17 +663,18 @@ static Expr primRemoveAttrs(EvalState & state, const ATermVector & args)
 
     for (ATermIterator i(list); i; ++i)
         /* It's not an error for *i not to exist. */
-        attrs.remove(toATerm(evalString(state, *i)));
+        attrs.remove(toATerm(evalStringNoCtx(state, *i)));
 
     return makeAttrs(attrs);
 }
 
 
-static Expr primRelativise(EvalState & state, const ATermVector & args) 
+static Expr primRelativise(EvalState & state, const ATermVector & args)
 {
-    Path pivot = evalPath(state, args[0]);
-    Path path = evalPath(state, args[1]);
-    return makeStr(toATerm(relativise(pivot, path)));
+    PathSet context; /* !!! what to do? */
+    Path pivot = coerceToPath(state, args[0], context);
+    Path path = coerceToPath(state, args[1], context);
+    return makeStr(relativise(pivot, path));
 }
 
 

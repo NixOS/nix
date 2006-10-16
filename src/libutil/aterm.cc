@@ -41,3 +41,13 @@ ATerm nix::toATerm(const string & s)
 {
     return toATerm(s.c_str());
 }
+
+
+ATermList nix::toATermList(const StringSet & ss)
+{
+    ATermList l = ATempty;
+    for (StringSet::const_reverse_iterator i = ss.rbegin();
+         i != ss.rend(); ++i)
+        l = ATinsert(l, toATerm(*i));
+    return l;
+}
