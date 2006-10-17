@@ -165,19 +165,19 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
          i != elems.end(); ++i)
     {
         Path drvPath = keepDerivations ? i->queryDrvPath(state) : "";
-        ATerm t = makeAttrs(ATmakeList5(
+        ATermList as = ATmakeList4(
             makeBind(toATerm("type"),
                 makeStr("derivation"), makeNoPos()),
             makeBind(toATerm("name"),
                 makeStr(i->name), makeNoPos()),
             makeBind(toATerm("system"),
                 makeStr(i->system), makeNoPos()),
-            makeBind(toATerm("drvPath"),
-                makeStr(drvPath), makeNoPos()),
             makeBind(toATerm("outPath"),
-                makeStr(i->queryOutPath(state)), makeNoPos())
-            ));
-        manifest = ATinsert(manifest, t);
+                makeStr(i->queryOutPath(state)), makeNoPos()));
+        if (drvPath != "") as = ATinsert(as, 
+            makeBind(toATerm("drvPath"),
+                makeStr(drvPath), makeNoPos()));
+        manifest = ATinsert(manifest, makeAttrs(as));
         inputs = ATinsert(inputs, makeStr(i->queryOutPath(state)));
 
         /* This is only necessary when installing store paths, e.g.,
