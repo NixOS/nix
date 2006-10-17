@@ -316,11 +316,15 @@ static Expr primBaseNameOf(EvalState & state, const ATermVector & args)
 
 
 /* Return the directory of the given path, i.e., everything before the
-   last slash. */
+   last slash.  Return either a path or a string depending on the type
+   of the argument. */
 static Expr primDirOf(EvalState & state, const ATermVector & args)
 {
     PathSet context;
-    return makeStr(dirOf(coerceToPath(state, args[0], context)), context);
+    Expr e = evalExpr(state, args[0]); ATerm dummy;
+    bool isPath = matchPath(e, dummy);
+    Path dir = dirOf(coerceToPath(state, e, context));
+    return isPath ? makePath(toATerm(dir)) : makeStr(dir, context);
 }
 
 
