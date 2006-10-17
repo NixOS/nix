@@ -557,6 +557,30 @@ Expr evalExpr2(EvalState & state, Expr e)
     if (matchOpPlus(e, e1, e2) || matchConcatStrings(e, es)) {
         ATermVector args;
         if (matchOpPlus(e, e1, e2)) {
+
+            /* !!! Awful compatibility hack for `drv + /path'.
+               According to regular concatenation, /path should be
+               copied to the store and its store path should be
+               appended to the string.  However, in Nix <= 0.10, /path
+               was concatenated.  So handle that case separately, but
+               do print out a warning.  This code can go in Nix 0.12,
+               maybe. */
+            e1 = evalExpr(state, e1);
+            e2 = evalExpr(state, e2);
+
+            ATermList as;
+            ATerm p;
+            if (matchAttrs(e1, as) && matchPath(e2, p)) {
+                static bool haveWarned = false;
+                warnOnce(haveWarned,
+                    "concatenation of a derivation and a path is deprecated, "
+                    "you should write `drv + \"/path\"' instead of `drv + /path'");
+                PathSet context;
+                return makeStr(
+                    coerceToString(state, makeSelect(e1, toATerm("outPath")), context)
+                    + aterm2String(p), context);
+            }
+
             args.push_back(e1);
             args.push_back(e2);
         } else
