@@ -200,7 +200,7 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
         makeBind(toATerm("derivations"),
             makeList(ATreverse(inputs)), makeNoPos()),
         makeBind(toATerm("manifest"),
-            makeStr(manifestFile), makeNoPos())
+            makeStr(manifestFile, singleton<PathSet>(manifestFile)), makeNoPos())
         )));
 
     /* Instantiate it. */
