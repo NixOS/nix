@@ -294,9 +294,11 @@ string coerceToString(EvalState & state, Expr e, PathSet & context,
 
 
 /* Common implementation of `+', ConcatStrings and `~'. */
-static ATerm concatStrings(EvalState & state, const ATermVector & args,
+static ATerm concatStrings(EvalState & state, ATermVector & args,
     string separator = "")
 {
+    if (args.empty()) return makeStr("", PathSet());
+    
     PathSet context;
     std::ostringstream s;
 
@@ -305,7 +307,8 @@ static ATerm concatStrings(EvalState & state, const ATermVector & args,
        paths are copied when they are used in a derivation), and none
        of the strings are allowed to have contexts. */
     ATerm dummy;
-    bool isPath = !args.empty() && matchPath(args.front(), dummy);
+    args.front() = evalExpr(state, args.front());
+    bool isPath = matchPath(args.front(), dummy);
 
     for (ATermVector::const_iterator i = args.begin(); i != args.end(); ++i) {
         if (i != args.begin()) s << separator;
