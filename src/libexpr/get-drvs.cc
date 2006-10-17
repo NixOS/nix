@@ -10,6 +10,13 @@ string DrvInfo::queryDrvPath(EvalState & state) const
 {
     if (drvPath == "") {
         Expr a = attrs->get(toATerm("drvPath"));
+
+        /* Backwards compatibility hack with user environments made by
+           Nix <= 0.10: these contain illegal Path("") expressions. */
+        ATerm t;
+        if (a && matchPath(evalExpr(state, a), t))
+            return aterm2String(t);
+        
         PathSet context;
         (string &) drvPath = a ? coerceToPath(state, a, context) : "";
     }
