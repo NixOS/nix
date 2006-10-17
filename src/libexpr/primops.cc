@@ -324,12 +324,13 @@ static Expr primDirOf(EvalState & state, const ATermVector & args)
 }
 
 
-/* Convert the argument to a string. */
+/* Convert the argument to a string.  Paths are *not* copied to the
+   store, so `toString /foo/bar' yields `"/foo/bar"', not
+   `"/nix/store/whatever..."'. */
 static Expr primToString(EvalState & state, const ATermVector & args)
 {
     PathSet context;
-    string s = coerceToString(state, args[0], context);
-    /* !!! do lists etc */
+    string s = coerceToString(state, args[0], context, true, false);
     return makeStr(s, context);
 }
 
