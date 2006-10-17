@@ -311,7 +311,7 @@ static Expr primDerivationLazy(EvalState & state, const ATermVector & args)
 static Expr primBaseNameOf(EvalState & state, const ATermVector & args)
 {
     PathSet context;
-    return makeStr(baseNameOf(coerceToPath(state, args[0], context)), context);
+    return makeStr(baseNameOf(coerceToString(state, args[0], context)), context);
 }
 
 
