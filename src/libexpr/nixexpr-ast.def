@@ -44,6 +44,7 @@ Int | int | Expr |
 #
 # For canonicity, the store paths should be in sorted order.
 Str | string ATermList | Expr |
+Str | string | Expr | ObsoleteStr
 
 # A path is a reference to a file system object that is to be copied
 # to the Nix store when used as a derivation attribute.  When it is
@@ -67,7 +68,7 @@ Bool | ATerm | Expr |
 Null | | Expr |
 
 Bind | string Expr Pos | ATerm |
-Bind | string Expr | ATerm | Bind2
+Bind | string Expr | ATerm | ObsoleteBind
 Inherit | Expr ATermList Pos | ATerm |
 
 Scope | | Expr |

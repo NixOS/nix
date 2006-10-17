@@ -107,10 +107,11 @@ struct AddPos : TermFun
 {
     ATerm operator () (ATerm e)
     {
-        ATerm x, y, z;
-        if (matchBind(e, x, y, z)) return e;
-        if (matchBind2(e, x, y))
+        ATerm x, y;
+        if (matchObsoleteBind(e, x, y))
             return makeBind(x, y, makeNoPos());
+        if (matchObsoleteStr(e, x))
+            return makeStr(x, ATempty);
         return e;
     }
 };
@@ -920,6 +921,8 @@ static void opQuery(Globals & globals,
                 xml.writeEmptyElement("item", attrs);
             else
                 table.push_back(columns);
+
+            cout.flush();
 
         } catch (AssertionError & e) {
             /* !!! hm, maybe we should give some sort of warning here? */
