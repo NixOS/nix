@@ -343,9 +343,7 @@ static Expr primToString(EvalState & state, const ATermVector & args)
 static Expr primToPath(EvalState & state, const ATermVector & args)
 {
     PathSet context;
-    string path = evalString(state, args[0], context);
-    if (path == "" || path[0] != '/')
-        throw EvalError("string doesn't represent an absolute path in `toPath'");
+    string path = coerceToPath(state, args[0], context);
     return makeStr(canonPath(path), context);
 }
 
