@@ -572,9 +572,10 @@ Expr evalExpr2(EvalState & state, Expr e)
             ATerm p;
             if (matchAttrs(e1, as) && matchPath(e2, p)) {
                 static bool haveWarned = false;
-                warnOnce(haveWarned,
+                warnOnce(haveWarned, format(
                     "concatenation of a derivation and a path is deprecated, "
-                    "you should write `drv + \"/path\"' instead of `drv + /path'");
+                    "you should write `drv + \"%1%\"' instead of `drv + %1%'")
+                    % aterm2String(p));
                 PathSet context;
                 return makeStr(
                     coerceToString(state, makeSelect(e1, toATerm("outPath")), context)
