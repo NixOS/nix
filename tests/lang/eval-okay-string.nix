@@ -1,7 +1,7 @@
 "foo" + "bar"
   + toString (/a/b + /c/d)
-  + (/foo/bar + "/../xyzzy/." + "/foo.txt")
-  + ("/../foo" + /x/y)
+  + toString (/foo/bar + "/../xyzzy/." + "/foo.txt")
+  + ("/../foo" + toString /x/y)
   + "escape: \"quote\" \n \\"
   + "end
 of

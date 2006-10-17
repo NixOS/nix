@@ -43,8 +43,7 @@ for i in lang/eval-okay-*.nix; do
         if ! $nixinstantiate --eval-only lang/$i.nix > lang/$i.out; then
             echo "FAIL: $i should evaluate"
             fail=1
-        fi
-        if ! $aterm_bin/atdiff lang/$i.out lang/$i.exp; then
+        elif ! $aterm_bin/atdiff lang/$i.out lang/$i.exp; then
             echo "FAIL: evaluation result of $i not as expected"
             fail=1
         fi
@@ -54,8 +53,7 @@ for i in lang/eval-okay-*.nix; do
         if ! $nixinstantiate --eval-only --xml --strict lang/$i.nix > lang/$i.out.xml; then
             echo "FAIL: $i should evaluate"
             fail=1
-        fi
-        if ! cmp -s lang/$i.out.xml lang/$i.exp.xml; then
+        elif ! cmp -s lang/$i.out.xml lang/$i.exp.xml; then
             echo "FAIL: XML evaluation result of $i not as expected"
             fail=1
         fi
