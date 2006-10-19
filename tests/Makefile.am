@@ -3,7 +3,7 @@ TESTS_ENVIRONMENT = $(SHELL) -e
 extra1 = $(shell pwd)/test-tmp/shared
 
 simple.sh: simple.nix
-dependencies.sh gc.sh nix-push.sh nix-pull.in logging.sh nix-build.sh install-package.sh: dependencies.nix
+dependencies.sh gc.sh nix-push.sh nix-pull.in logging.sh nix-build.sh install-package.sh check-refs.sh: dependencies.nix
 locking.sh: locking.nix
 parallel.sh: parallel.nix
 build-hook.sh: build-hook.nix
@@ -14,12 +14,13 @@ gc-concurrent.sh: gc-concurrent.nix gc-concurrent2.nix
 user-envs.sh: user-envs.nix
 fixed.sh: fixed.nix
 gc-runtime.sh: gc-runtime.nix
+check-refs.sh: check-refs.nix
 
 TESTS = init.sh hash.sh lang.sh add.sh simple.sh dependencies.sh \
   locking.sh parallel.sh build-hook.sh substitutes.sh substitutes2.sh \
   fallback.sh nix-push.sh gc.sh gc-concurrent.sh verify.sh nix-pull.sh \
   referrers.sh user-envs.sh logging.sh nix-build.sh misc.sh fixed.sh \
-  gc-runtime.sh install-package.sh
+  gc-runtime.sh install-package.sh check-refs.sh
 
 XFAIL_TESTS =
 
@@ -42,5 +43,6 @@ EXTRA_DIST = $(TESTS) \
   user-envs.nix.in user-envs.builder.sh \
   fixed.nix.in fixed.builder1.sh fixed.builder2.sh \
   gc-runtime.nix.in gc-runtime.builder.sh \
+  check-refs.nix.in \
   $(wildcard lang/*.nix) $(wildcard lang/*.exp) $(wildcard lang/*.exp.xml) \
   common.sh.in

@@ -43,6 +43,7 @@ export nixinstantiate=$TOP/src/nix-instantiate/nix-instantiate
 export nixstore=$TOP/src/nix-store/nix-store
 export nixenv=$TOP/src/nix-env/nix-env
 export nixhash=$TOP/src/nix-hash/nix-hash
+export nixbuild=$NIX_BIN_DIR/nix-build
 
 readLink() {
     ls -l "$1" | sed 's/.*->\ //'
