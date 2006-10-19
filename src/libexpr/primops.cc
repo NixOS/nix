@@ -372,7 +372,7 @@ static Expr primToFile(EvalState & state, const ATermVector & args)
 
     for (PathSet::iterator i = context.begin(); i != context.end(); ++i) {
         if (isDerivation(*i))
-            throw EvalError("in `toFile': the file cannot refer to derivation outputs");
+            throw EvalError(format("in `toFile': the file `%1%' cannot refer to derivation outputs") % name);
         refs.insert(*i);
     }
     
