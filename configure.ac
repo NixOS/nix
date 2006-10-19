@@ -122,7 +122,15 @@ AC_PATH_PROG(bison, bison, false)
 NEED_PROG(perl, perl)
 NEED_PROG(tar, tar)
 AC_PATH_PROG(dot, dot)
-                
+
+# Test that Perl has the open/fork feature (Perl 5.8.0 and beyond).
+AC_MSG_CHECKING([whether Perl is recent enough])
+if ! $perl -e 'open(FOO, "-|", "true"); while (<FOO>) { print; }; close FOO or die;'; then
+    AC_MSG_RESULT(no)
+    AC_MSG_ERROR([Your Perl version is too old.  Nix requires Perl 5.8.0 or newer.])
+fi
+AC_MSG_RESULT(yes)
+
 NEED_PROG(cat, cat)
 AC_ARG_WITH(coreutils-bin, AC_HELP_STRING([--with-coreutils-bin=PATH],
   [path of cat, mkdir, etc.]),
