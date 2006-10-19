@@ -1349,6 +1349,26 @@ void DerivationGoal::startBuilder()
 }
 
 
+/* Parse a list of reference specifiers.  Each element must either be
+   a store path, or the symbolic name of the output of the derivation
+   (such as `out'). */
+PathSet parseReferenceSpecifiers(const Derivation & drv, string attr)
+{
+    PathSet result;
+    Paths paths = tokenizeString(attr);
+    for (Strings::iterator i = paths.begin(); i != paths.end(); ++i) {
+        if (isStorePath(*i))
+            result.insert(*i);
+        else if (drv.outputs.find(*i) != drv.outputs.end())
+            result.insert(drv.outputs.find(*i)->second.path);
+        else throw Error(
+            format("derivation contains an illegal reference specifier `%1%'")
+            % *i);
+    }
+    return result;
+}
+
+
 void DerivationGoal::computeClosure()
 {
     map<Path, PathSet> allReferences;
@@ -1442,6 +1462,17 @@ void DerivationGoal::computeClosure()
 
         allReferences[path] = references;
 
+        /* If the derivation specifies an `allowedReferences'
+           attribute (containing a list of paths that the output may
+           refer to), check that all references are in that list.  !!!
+           allowedReferences should really be per-output. */
+        if (drv.env.find("allowedReferences") != drv.env.end()) {
+            PathSet allowed = parseReferenceSpecifiers(drv, drv.env["allowedReferences"]);
+            for (PathSet::iterator i = references.begin(); i != references.end(); ++i)
+                if (allowed.find(*i) == allowed.end())
+                    throw Error(format("output is not allowed to refer to path `%1%'") % *i);
+        }
+        
         /* Hash the contents of the path.  The hash is stored in the
            database so that we can verify later on whether nobody has
            messed with the store.  !!! inefficient: it would be nice
