@@ -121,12 +121,14 @@ foreach my $expr (@exprs) {
     }
 
     # Build.
-    my $outPaths = `@bindir@/nix-store --add-root "$outLink" --indirect -rv @buildArgs @drvPaths`;
-    my @outPaths = split ' ', $outPaths;
-    
+    my @outPaths;
+    $pid = open(OUTPATHS, "-|") || exec "@bindir@/nix-store", "--add-root", $outLink, "--indirect", "-rv",
+        @buildArgs, @drvPaths;
+    while (<OUTPATHS>) {chomp; push @outPaths, $_;}
+    close OUTPATHS or exit 1;
+
     foreach my $outPath (@outPaths) {
         my $target = readlink $outPath;
         print "$target\n";
     }
-
 }
