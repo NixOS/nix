@@ -370,17 +370,11 @@ static Expr primToFile(EvalState & state, const ATermVector & args)
 
     PathSet refs;
 
-#if 0
-    /* !!! */
-    for (ATermIterator i(context); i; ++i) {
-        ATerm s;
-        if (matchPath(*i, s)) {
-            assert(isStorePath(aterm2String(s)));
-            refs.insert(aterm2String(s));
-        }
-        else throw EvalError("in `toFile': the file cannot contain references to derivation outputs");
+    for (PathSet::iterator i = context.begin(); i != context.end(); ++i) {
+        if (isDerivation(*i))
+            throw EvalError("in `toFile': the file cannot refer to derivation outputs");
+        refs.insert(*i);
     }
-#endif    
     
     Path storePath = addTextToStore(name, contents, refs);
 
