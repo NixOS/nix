@@ -54,7 +54,7 @@ void queryAllAttrs(Expr e, ATermMap & attrs, bool withPos)
 {
     ATermList bnds;
     if (!matchAttrs(e, bnds))
-        throw TypeError("attribute set expected");
+        throw TypeError(format("value is %1% while an attribute set was expected") % showType(e));
 
     for (ATermIterator i(bnds); i; ++i) {
         ATerm name;
@@ -77,7 +77,7 @@ Expr queryAttr(Expr e, const string & name, ATerm & pos)
 {
     ATermList bnds;
     if (!matchAttrs(e, bnds))
-        throw TypeError("attribute set expected");
+        throw TypeError(format("value is %1% while an attribute set was expected") % showType(e));
 
     for (ATermIterator i(bnds); i; ++i) {
         ATerm name2, pos2;

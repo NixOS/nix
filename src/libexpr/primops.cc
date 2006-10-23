@@ -130,12 +130,19 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
     queryAllAttrs(evalExpr(state, args[0]), attrs, true);
 
     /* Figure out the name already (for stack backtraces). */
+    ATerm posDrvName;
     Expr eDrvName = attrs.get(toATerm("name"));
     if (!eDrvName)
         throw EvalError("required attribute `name' missing");
-    ATerm posDrvName;
     if (!matchAttrRHS(eDrvName, eDrvName, posDrvName)) abort();
-    string drvName = evalStringNoCtx(state, eDrvName);
+    string drvName;
+    try {        
+        drvName = evalStringNoCtx(state, eDrvName);
+    } catch (Error & e) {
+        e.addPrefix(format("while evaluating the derivation attribute `name' at %1%:\n")
+            % showPos(posDrvName));
+        throw;
+    }
 
     /* Build the derivation expression by processing the attributes. */
     Derivation drv;
@@ -190,7 +197,7 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
             }
 
         } catch (Error & e) {
-            e.addPrefix(format("while processing the derivation attribute `%1%' at %2%:\n")
+            e.addPrefix(format("while evaluating the derivation attribute `%1%' at %2%:\n")
                 % key % showPos(pos));
             e.addPrefix(format("while instantiating the derivation named `%1%' at %2%:\n")
                 % drvName % showPos(posDrvName));
