@@ -635,13 +635,14 @@ language.</para>
     complicated example (from the Nix expression for <link
     xlink:href='http://www.trolltech.com/products/qt'>Qt</link>):
 
-<programlisting>    
+<programlisting>
 configureFlags = "
   -system-zlib -system-libpng -system-libjpeg
   ${if openglSupport then "-dlopen-opengl
     -L${mesa}/lib -I${mesa}/include
     -L${libXmu}/lib -I${libXmu}/include" else ""}
-  ${if threadSupport then "-thread" else "-no-thread"}</programlisting>
+  ${if threadSupport then "-thread" else "-no-thread"}
+";</programlisting>
 
     Note that Nix expressions and strings can be arbitrarily nested;
     in this case the outer string contains various antiquotations that

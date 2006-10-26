@@ -92,7 +92,7 @@ component is installed in your current user environment.  The second
 very quick operation).  The last one (<literal>S</literal>) indicates
 whether there is a so-called <emphasis>substitute</emphasis> for the
 component, which is Nix’s mechanism for doing binary deployment.  It
-just means that Nix know that it can fetch a pre-built component from
+just means that Nix knows that it can fetch a pre-built component from
 somewhere (typically a network server) instead of building it
 locally.</para>
 
