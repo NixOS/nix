@@ -1511,7 +1511,7 @@ void DerivationGoal::computeClosure()
 }
 
 
-static string drvsLogDir = "drvs";
+string drvsLogDir = "drvs";
 
 
 void DerivationGoal::openLogFile()

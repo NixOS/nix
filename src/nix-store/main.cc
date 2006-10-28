@@ -46,6 +46,17 @@ static Path fixPath(Path path)
 }
 
 
+static Path useDeriver(Path path)
+{       
+    if (!isDerivation(path)) {
+        path = queryDeriver(noTxn, path);
+        if (path == "")
+            throw Error(format("deriver of path `%1%' is not known") % path);
+    }
+    return path;
+}
+
+
 /* Realisation the given path.  For a derivation that means build it;
    for other paths it means ensure their validity. */
 static Path realisePath(const Path & path)
@@ -360,12 +371,12 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
             {
-                *i = fixPath(*i);
-                Derivation drv = derivationFromPath(*i);
+                Path path = useDeriver(fixPath(*i));
+                Derivation drv = derivationFromPath(path);
                 StringPairs::iterator j = drv.env.find(bindingName);
                 if (j == drv.env.end())
                     throw Error(format("derivation `%1%' has no environment binding named `%2%'")
-                        % *i % bindingName);
+                        % path % bindingName);
                 cout << format("%1%\n") % j->second;
             }
             break;
@@ -400,6 +411,28 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         default:
             abort();
+    }
+}
+
+
+static void opReadLog(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty()) throw UsageError("unknown flag");
+
+    for (Strings::iterator i = opArgs.begin();
+         i != opArgs.end(); ++i)
+    {
+        Path path = useDeriver(fixPath(*i));
+        
+        Path logPath = (format("%1%/%2%/%3%") %
+            nixLogDir % drvsLogDir % baseNameOf(path)).str();
+
+        if (!pathExists(logPath))
+            throw Error(format("build log of derivation `%1%' is not available") % path);
+
+        /* !!! Make this run in O(1) memory. */
+        string log = readFile(logPath);
+        writeFull(STDOUT_FILENO, (const unsigned char *) log.c_str(), log.size());
     }
 }
 
@@ -663,6 +696,8 @@ void run(Strings args)
             op = opDelete;
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
+        else if (arg == "--read-log" || arg == "-l")
+            op = opReadLog;
         else if (arg == "--register-substitutes")
             op = opRegisterSubstitutes;
         else if (arg == "--clear-substitutes")

@@ -9,6 +9,7 @@ Operations:
   --add / -A: copy a path to the Nix store
   --delete: safely delete paths from the Nix store
   --query / -q: query information
+  --read-log / -l: print build log of given store paths
 
   --register-substitutes: register a substitute expression (dangerous!)
   --clear-substitutes: clear all substitutes

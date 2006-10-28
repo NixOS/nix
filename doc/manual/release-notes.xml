@@ -7,6 +7,23 @@
 
 <!--==================================================================-->
 
+<section><title>Release 0.11 (TBA)</title>
+
+<itemizedlist>
+
+  <listitem><para><command>nix-store</command> has a new operation
+  <option>--read-log</option> (<option>-l</option>)
+  <parameter>paths</parameter> that shows the build log of the given
+  paths.</para></listitem>
+
+</itemizedlist>
+
+</section>
+
+
+
+<!--==================================================================-->
+
 <section><title>Release 0.10.1 (October 11, 2006)</title>
 
 <para>This release fixes two somewhat obscure bugs that occur when

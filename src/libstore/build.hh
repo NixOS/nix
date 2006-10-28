@@ -8,6 +8,9 @@
 namespace nix {
 
     
+extern string drvsLogDir;
+
+
 /* Ensure that the output paths of the derivation are valid.  If they
    are already valid, this is a no-op.  Otherwise, validity can
    be reached in two ways.  First, if the output paths have
