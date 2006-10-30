@@ -11,10 +11,24 @@
 
 <itemizedlist>
 
+  
   <listitem><para><command>nix-store</command> has a new operation
   <option>--read-log</option> (<option>-l</option>)
   <parameter>paths</parameter> that shows the build log of the given
   paths.</para></listitem>
+
+  
+  <listitem><para>TODO: <varname>allowedReferences</varname> for
+  checking the set of references in the output of a
+  derivation.</para></listitem>
+
+
+  <listitem><para>TODO: semantic cleanups of string concatenation
+  etc. (mostly in r6740).</para></listitem>
+
+
+  <listitem><para>TODO: now using Berkeley DB 4.5.</para></listitem>
+    
 
 </itemizedlist>
 
