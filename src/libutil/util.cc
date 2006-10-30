@@ -194,12 +194,26 @@ Strings readDirectory(const Path & path)
 }
 
 
+template <class T>
+struct AutoDeleteArray
+{
+    T * p;
+    AutoDeleteArray(T * p) : p(p) { }
+    ~AutoDeleteArray() 
+    {
+        delete [] p;
+    }
+};
+
+
 string readFile(int fd)
 {
     struct stat st;
     if (fstat(fd, &st) == -1)
         throw SysError("statting file");
-    unsigned char buf[st.st_size]; /* !!! stack space */
+    
+    unsigned char * buf = new unsigned char[st.st_size];
+    AutoDeleteArray<unsigned char> d(buf);
     readFull(fd, buf, st.st_size);
 
     return string((char *) buf, st.st_size);
