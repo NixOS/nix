@@ -56,7 +56,7 @@ EOF
     }
 
     elsif ($arg eq "--no-out-link" or $arg eq "--no-link") {
-        $addOutLink = 1;
+        $addOutLink = 0;
     }
 
     elsif ($arg eq "--drv-link") {
