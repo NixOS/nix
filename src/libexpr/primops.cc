@@ -43,8 +43,15 @@ static Expr primImport(EvalState & state, const ATermVector & args)
 {
     PathSet context;
     Path path = coerceToPath(state, args[0], context);
-    
-    /* !!! build the derivations in context */
+
+    for (PathSet::iterator i = context.begin(); i != context.end(); ++i) {
+        assert(isStorePath(*i));
+        if (!isValidPath(*i))
+            throw EvalError(format("cannot import `%1%', since path `%2%' is not valid")
+                % path % *i);
+        if (isDerivation(*i))
+            buildDerivations(singleton<PathSet>(*i));
+    }
 
     return evalFile(state, path);
 }
