@@ -32,6 +32,9 @@ case $machine_name in
     i*86)
         machine_name=i686
         ;;
+    x86_64)
+        machine_name=x86_64
+        ;;
     ppc)
         machine_name=powerpc
         ;;
