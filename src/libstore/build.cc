@@ -901,6 +901,34 @@ string showPaths(const PathSet & paths)
 }
 
 
+/* Return a string accepted by `nix-store --register-validity' that
+   registers the specified paths as valid.  Note: it's the
+   responsibility of the caller to provide a closure. */
+static string makeValidityRegistration(const PathSet & paths,
+    bool showDerivers)
+{
+    string s = "";
+    
+    for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i) {
+        s += *i + "\n";
+
+        Path deriver = showDerivers ? queryDeriver(noTxn, *i) : "";
+        s += deriver + "\n";
+
+        PathSet references;
+        queryReferences(noTxn, *i, references);
+
+        s += (format("%1%\n") % references.size()).str();
+            
+        for (PathSet::iterator j = references.begin();
+             j != references.end(); ++j)
+            s += *j + "\n";
+    }
+
+    return s;
+}
+
+
 DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 {
     Path buildHook = getEnv("NIX_BUILD_HOOK");
@@ -1024,26 +1052,8 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 
         /* The `references' file has exactly the format accepted by
            `nix-store --register-validity'. */
-        s = "";
-        for (PathSet::iterator i = allInputs.begin();
-             i != allInputs.end(); ++i)
-        {
-            s += *i + "\n";
-            
-            Path deriver = queryDeriver(noTxn, *i);
-            s += deriver + "\n";
-
-            PathSet references;
-            queryReferences(noTxn, *i, references);
-
-            s += (format("%1%\n") % references.size()).str();
-            
-            for (PathSet::iterator j = references.begin();
-                 j != references.end(); ++j)
-                s += *j + "\n";
-        }
-        
-        writeStringToFile(referencesFN, s);
+        writeStringToFile(referencesFN,
+            makeValidityRegistration(allInputs, true));
 
         /* Tell the hook to proceed. */ 
         writeLine(toHook.writeSide, "okay");
@@ -1233,6 +1243,32 @@ void DerivationGoal::startBuilder()
         Strings varNames = tokenizeString(drv.env["impureEnvVars"]);
         for (Strings::iterator i = varNames.begin(); i != varNames.end(); ++i)
             env[*i] = getEnv(*i);
+    }
+
+    /* The `exportReferencesGraph' feature allows the references graph
+       to be passed to a builder.  This attribute should be a list of
+       pairs [name1 path1 name2 path2 ...].  The references graph of
+       each `pathN' will be stored in a text file `nameN' in the
+       temporary build directory.  The text files have the format used
+       by `nix-store --register-validity'.  However, the deriver
+       fields are left empty. */
+    string s = drv.env["exportReferencesGraph"];
+    Strings ss = tokenizeString(s);
+    if (ss.size() % 2 != 0)
+        throw Error(format("odd number of tokens in `exportReferencesGraph': `%1%'") % s);
+    for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
+        string fileName = *i++;
+        Path storePath = *i++;
+        if (!isValidPath(storePath))
+            throw Error(format("`exportReferencesGraph' refers to an invalid path `%1%'")
+                % storePath);
+        checkStoreName(fileName); /* !!! abuse of this function */
+        PathSet refs;
+        computeFSClosure(storePath, refs);
+        /* !!! in secure Nix, the writing should be done on the
+           build uid for security (maybe). */
+        writeStringToFile(tmpDir + "/" + fileName,
+            makeValidityRegistration(refs, false));
     }
 
     

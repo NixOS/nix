@@ -259,6 +259,10 @@ Path toStorePath(const Path & path)
 void checkStoreName(const string & name)
 {
     string validChars = "+-._?=";
+    /* Disallow names starting with a dot for possible security
+       reasons (e.g., "." and ".."). */
+    if (string(name, 0, 1) == ".")
+        throw Error(format("illegal name: `%1%'") % name);
     for (string::const_iterator i = name.begin(); i != name.end(); ++i)
         if (!((*i >= 'A' && *i <= 'Z') ||
               (*i >= 'a' && *i <= 'z') ||

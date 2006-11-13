@@ -30,8 +30,12 @@
   <listitem><para>TODO: now using Berkeley DB 4.5.</para></listitem>
 
 
-  <listitem><para>Option <option>--reregister</option> in
+  <listitem><para>TODO: option <option>--reregister</option> in
   <command>nix-store --register-validity</command>.</para></listitem>
+
+
+  <listitem><para>TODO: magic <varname>exportReferencesGraph</varname>
+  attribute.</para></listitem>
     
 
 </itemizedlist>
