@@ -1479,21 +1479,18 @@ void DerivationGoal::computeClosure()
 
 	/* For this output path, find the references to other paths contained
 	   in it. */
-        PathSet references;
-        if (!pathExists(path + "/nix-support/no-scan")) {
-            references = scanForReferences(path, allPaths);
+        PathSet references = scanForReferences(path, allPaths);
 
-            /* For debugging, print out the referenced and
-               unreferenced paths. */
-            for (PathSet::iterator i = inputPaths.begin();
-                 i != inputPaths.end(); ++i)
-            {
-                PathSet::iterator j = references.find(*i);
-                if (j == references.end())
-                    debug(format("unreferenced input: `%1%'") % *i);
-                else
-                    debug(format("referenced input: `%1%'") % *i);
-            }
+        /* For debugging, print out the referenced and unreferenced
+           paths. */
+        for (PathSet::iterator i = inputPaths.begin();
+             i != inputPaths.end(); ++i)
+        {
+            PathSet::iterator j = references.find(*i);
+            if (j == references.end())
+                debug(format("unreferenced input: `%1%'") % *i);
+            else
+                debug(format("referenced input: `%1%'") % *i);
         }
 
         allReferences[path] = references;
