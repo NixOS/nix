@@ -28,6 +28,10 @@
 
 
   <listitem><para>TODO: now using Berkeley DB 4.5.</para></listitem>
+
+
+  <listitem><para>Option <option>--reregister</option> in
+  <command>nix-store --register-validity</command>.</para></listitem>
     
 
 </itemizedlist>

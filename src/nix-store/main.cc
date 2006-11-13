@@ -138,6 +138,14 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
 }
 
 
+static Hash parseHash16or32(HashType ht, const string & s)
+{
+    return s.size() == Hash(ht).hashSize * 2
+        ? parseHash(ht, s)
+        : parseHash32(ht, s);
+}
+
+
 /* Hack to support caching in `nix-prefetch-url'. */
 static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 {
@@ -153,13 +161,9 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     string hash = *i++;
     string name = *i++;
 
-    HashType ht(parseHashType(hashAlgo));
-    Hash h = hash.size() == Hash(ht).hashSize * 2
-        ? parseHash(ht, hash)
-        : parseHash32(ht, hash);
-    
     cout << format("%1%\n") %
-        makeFixedOutputPath(recursive, hashAlgo, h, name);
+        makeFixedOutputPath(recursive, hashAlgo,
+            parseHash16or32(parseHashType(hashAlgo), hash), name);
 }
 
 
@@ -487,7 +491,13 @@ static void opClearSubstitutes(Strings opFlags, Strings opArgs)
 
 static void opRegisterValidity(Strings opFlags, Strings opArgs)
 {
-    if (!opFlags.empty()) throw UsageError("unknown flag");
+    bool reregister = false; // !!! maybe this should be the default
+        
+    for (Strings::iterator i = opFlags.begin();
+         i != opFlags.end(); ++i)
+        if (*i == "--reregister") reregister = true;
+        else throw UsageError(format("unknown flag `%1%'") % *i);
+
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
     ValidPathInfos infos;
@@ -505,7 +515,7 @@ static void opRegisterValidity(Strings opFlags, Strings opArgs)
             info.references.insert(s);
         }
         if (!cin || cin.eof()) throw Error("missing input");
-        if (!isValidPath(info.path)) {
+        if (!isValidPath(info.path) || reregister) {
             /* !!! races */
             canonicalisePathMetaData(info.path);
             info.hash = hashPath(htSHA256, info.path);
