@@ -101,7 +101,7 @@ endif
 
 all: build-db build-aterm build-bzip2
 
-EXTRA_DIST = $(DB).tar.gz $(ATERM).tar.gz $(BZIP2).tar.gz \
+EXTRA_DIST = $(DB).tar.gz $(ATERM).tar.bz2 $(BZIP2).tar.gz \
   bdb-cygwin.patch aterm-aliasing.patch aterm-64-bit.patch
 
 ext-clean:
