@@ -35,19 +35,17 @@ endif
 
 # CWI ATerm
 
-ATERM = aterm-2.4.2
+ATERM = aterm-2.4.2-fixes
 
 $(ATERM).tar.gz:
 	@echo "Nix requires the CWI ATerm library to build."
-	@echo "Please download version 2.4.2 from"
-	@echo "  http://www.cwi.nl/projects/MetaEnv/aterm/aterm-2.4.2.tar.gz"
+	@echo "Please download version 2.4.2-fixes from"
+	@echo "  http://losser.st-lab.cs.uu.nl/~eelco/dist/aterm-2.4.2-fixes.tar.bz2"
 	@echo "and place it in the externals/ directory."
 	false
 
-$(ATERM): $(ATERM).tar.gz
-	gunzip < $(srcdir)/$(ATERM).tar.gz | tar xvf -
-	(cd $(ATERM) && $(patch) -p1) < $(srcdir)/aterm-aliasing.patch
-#	(cd $(ATERM) && $(patch) -p1) < $(srcdir)/aterm-64-bit.patch
+$(ATERM): $(ATERM).tar.bz2
+	bunzip2 < $(srcdir)/$(ATERM).tar.bz2 | tar xvf -
 
 have-aterm:
 	$(MAKE) $(ATERM)
