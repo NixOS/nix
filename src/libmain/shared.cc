@@ -225,6 +225,8 @@ int main(int argc, char * * argv)
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
+    std::ios::sync_with_stdio(false);
+
     try {
         try {
             initAndRun(argc, argv);

@@ -632,7 +632,7 @@ static void opDump(Strings opFlags, Strings opArgs)
 }
 
 
-/* A source that read restore intput to stdin. */
+/* A source that reads restore input from stdin. */
 struct StdinSource : RestoreSource
 {
     virtual void operator () (unsigned char * data, unsigned int len)
