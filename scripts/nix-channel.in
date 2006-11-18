@@ -81,7 +81,7 @@ sub update {
 
     # Pull cache manifests.
     foreach my $url (@channels) {
-        print "pulling cache manifest from `$url'\n";
+        #print "pulling cache manifest from `$url'\n";
         system("@bindir@/nix-pull", "--skip-wrong-store", "$url/MANIFEST") == 0
             or die "cannot pull cache manifest from `$url'";
     }
@@ -92,6 +92,7 @@ sub update {
     my $nixExpr = "[";
     foreach my $url (@channels) {
         my $fullURL = "$url/nixexprs.tar.bz2";
+        print "downloading Nix expressions from `$fullURL'...\n";
         $ENV{"PRINT_PATH"} = 1;
         my ($hash, $path) = `@bindir@/nix-prefetch-url '$fullURL' 2> /dev/null`;
         die "cannot fetch `$fullURL'" if $? != 0;
@@ -111,6 +112,7 @@ sub update {
     my $rootFile = "$rootsDir/$userName";
     
     # Instantiate the Nix expression.
+    print "unpacking channel Nix expressions...\n";
     my $storeExpr = `echo '$nixExpr' | @bindir@/nix-instantiate --add-root '$rootFile'.tmp -`
         or die "cannot instantiate Nix expression";
     chomp $storeExpr;
