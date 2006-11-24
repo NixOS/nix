@@ -56,6 +56,9 @@ string readFile(const Path & path);
 /* Write a string to a file. */
 void writeFile(const Path & path, const string & s);
 
+/* Compute the sum of the sizes of all files in `path'. */
+unsigned long long computePathSize(const Path & path);
+
 /* Delete a path; i.e., in the case of a directory, it is deleted
    recursively.  Don't use this at home, kids.  The second variant
    returns the number of bytes freed. */

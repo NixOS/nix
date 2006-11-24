@@ -238,6 +238,29 @@ void writeFile(const Path & path, const string & s)
 }
 
 
+unsigned long long computePathSize(const Path & path)
+{
+    unsigned long long size = 0;
+    
+    checkInterrupt();
+
+    struct stat st;
+    if (lstat(path.c_str(), &st))
+	throw SysError(format("getting attributes of path `%1%'") % path);
+
+    size += st.st_size;
+
+    if (S_ISDIR(st.st_mode)) {
+	Strings names = readDirectory(path);
+
+	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
+            size += computePathSize(path + "/" + *i);
+    }
+
+    return size;
+}
+
+
 static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 {
     checkInterrupt();
