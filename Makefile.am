@@ -20,10 +20,11 @@ install-data-local: init-state
 	fi
 
 if INIT_STATE
-if SETUID_HACK
-INIT_FLAGS = -g @NIX_GROUP@ -o @NIX_USER@
-GROUP_WRITABLE = -m 775
-endif
+
+# For setuid operation, you can enable the following:
+# INIT_FLAGS = -g @NIX_GROUP@ -o @NIX_USER@
+# GROUP_WRITABLE = -m 775
+
 init-state:
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/db
@@ -40,6 +41,7 @@ init-state:
 	$(INSTALL) $(INIT_FLAGS) -m 1777 -d $(DESTDIR)$(prefix)/store
 	$(INSTALL) $(INIT_FLAGS) $(GROUP_WRITABLE) -d $(DESTDIR)$(localstatedir)/nix/manifests
 #	$(bindir)/nix-store --init
+
 else
 init-state:
 endif

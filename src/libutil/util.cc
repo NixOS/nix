@@ -911,7 +911,7 @@ static gid_t savedGid, nixGid;
 
 SwitchToOriginalUser::SwitchToOriginalUser()
 {
-#if SETUID_HACK && HAVE_SETRESUID
+#if HAVE_SETRESUID
     /* Temporarily switch the effective uid/gid back to the saved
        uid/gid (which is the uid/gid of the user that executed the Nix
        program; it's *not* the real uid/gid, since we changed that to
@@ -928,7 +928,7 @@ SwitchToOriginalUser::SwitchToOriginalUser()
 
 SwitchToOriginalUser::~SwitchToOriginalUser()
 {
-#if SETUID_HACK && HAVE_SETRESUID
+#if HAVE_SETRESUID
     /* Switch the effective uid/gid back to the Nix user. */
     if (haveSwitched) {
         if (setuid(nixUid) == -1)
@@ -942,21 +942,43 @@ SwitchToOriginalUser::~SwitchToOriginalUser()
 
 void switchToNixUser()
 {
-#if SETUID_HACK
+    fprintf(stderr, "real = %d/%d, effective = %d/%d\n",
+        getuid(), geteuid(), getgid(), getegid());
 
+    /* Note: we require setresuid for now since I don't want to think
+       to deeply about whether this works on systems that don't have
+       setresuid.  It's already hard enough. */
+      
+#if HAVE_SETRESUID
+
+    /* Setuid Nix operation works as follows:
+
+       - The Nix binaries are owned by a Nix user and group, e.g.,
+         nix.nix, and must setuid and setgid, e.g.,
+
+         rwsrwsr-x nix.nix
+
+       - Users (say alice.users) are only allowed to run (most) Nix
+         operations if they are in the Nix group.  If they aren't,
+         some read-only operations (like nix-env -qa) may still work.
+         
+       - We run mostly under the Nix user/group, but we switch back to
+         the calling user/group for some work, like reading Nix
+         expressions.
+
+    */
+    
+    
     /* Don't do anything if this is not a setuid binary. */
     if (getuid() == geteuid() && getgid() == getegid()) return;
 
     /* Here we set the uid and gid to the Nix user and group,
        respectively, IF the current (real) user is a member of the Nix
-       group.  Otherwise we just drop all privileges. */
-    
-    /* Lookup the Nix gid. */
-    struct group * gr = getgrnam(NIX_GROUP);
-    if (!gr) {
-        std::cerr << format("missing group `%1%'\n") % NIX_GROUP;
-        exit(1);
-    }
+       group.  (The Nix group is the group of the current executable,
+       i.e., the current effective gid.)  Otherwise we just drop all
+       privileges. */
+
+    nixGid = geteuid();
 
     /* Get the supplementary group IDs for the current user. */
     int maxGids = 512, nrGids;
@@ -976,7 +998,7 @@ void switchToNixUser()
     /* Check that the current user is a member of the Nix group. */
     bool found = false;
     for (int i = 0; i < nrGids; ++i)
-        if (gids[i] == gr->gr_gid) {
+        if (gids[i] == nixGid) {
             found = true;
             break;
         }
@@ -988,31 +1010,29 @@ void switchToNixUser()
         return;
     }
 
+    /* Save the uid/gid of the caller so the we can switch back to
+       that uid/gid for temporary work, like accessing files, in
+       SwitchToOriginaluser. */
     savedUid = getuid();
     savedGid = getgid();
 
-    /* Set the real, effective and saved gids to gr->gr_gid.  Also
-       make very sure that this succeeded.  We switch the gid first
-       because we cannot do it after we have dropped root uid. */
-    nixGid = gr->gr_gid;
+    /* Set the real and effective gids to nixGid.  Also make very sure
+       that this succeeded.  We switch the gid first because we cannot
+       do it after we have dropped root uid. */
     if (_setgid(nixGid) != 0 || getgid() != nixGid || getegid() != nixGid) {
-        std::cerr << format("unable to set gid to `%1%'\n") % NIX_GROUP;
+        std::cerr << format("unable to set gid to `%1%'\n") % nixGid;
         exit(1);
     }
 
-    /* Lookup the Nix uid. */
-    struct passwd * pw = getpwnam(NIX_USER);
-    if (!pw) {
-        std::cerr << format("missing user `%1%'\n") % NIX_USER;
-        exit(1);
-    }
+    /* The Nix uid is the effective uid of the owner of the current
+       executable, i.e., the current effective uid. */
+    nixUid = geteuid();
 
     /* This will drop all root privileges, setting the real, effective
        and saved uids to pw->pw_uid.  Also make very sure that this
        succeeded.*/
-    nixUid = pw->pw_uid;
     if (_setuid(nixUid) != 0 || getuid() != nixUid || geteuid() != nixUid) {
-        std::cerr << format("unable to set uid to `%1%'\n") % NIX_USER;
+        std::cerr << format("unable to set uid to `%1%'\n") % nixUid;
         exit(1);
     }
 
@@ -1022,7 +1042,6 @@ void switchToNixUser()
     */
 
     haveSwitched = true;
-    
 #endif
 }
 

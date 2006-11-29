@@ -237,33 +237,13 @@ AM_CONDITIONAL(INIT_STATE, test "$init_state" = "yes")
 
 
 # Setuid installations.
-AC_ARG_ENABLE(setuid, AC_HELP_STRING([--enable-setuid],
-  [install Nix setuid]),
-  setuid_hack=$enableval, setuid_hack=no)
-AM_CONDITIONAL(SETUID_HACK, test "$setuid_hack" = "yes")
-if test "$setuid_hack" = "yes"; then
-    AC_DEFINE(SETUID_HACK, 1, [whether to install Nix setuid])
-fi
-
 AC_CHECK_FUNC(setresuid, [HAVE_SETRESUID=1], [HAVE_SETRESUID=])
 AM_CONDITIONAL(HAVE_SETRESUID, test "$HAVE_SETRESUID" = "1")
 if test "$HAVE_SETRESUID" = "1"; then
     AC_DEFINE(HAVE_SETRESUID, 1, [whether we have setresuid()])
 fi
 
-AC_ARG_WITH(nix-user, AC_HELP_STRING([--with-nix-user=USER],
-  [user for Nix setuid binaries]),
-  NIX_USER=$withval, NIX_USER=nix)
-AC_SUBST(NIX_USER)
-AC_DEFINE_UNQUOTED(NIX_USER, ["$NIX_USER"], [Nix user])
-                                                      
-AC_ARG_WITH(nix-group, AC_HELP_STRING([--with-nix-group=USER],
-  [group for Nix setuid binaries]),
-  NIX_GROUP=$withval, NIX_GROUP=nix)
-AC_SUBST(NIX_GROUP)
-AC_DEFINE_UNQUOTED(NIX_GROUP, ["$NIX_GROUP"], [Nix group])
 
-                                                                                                            
 # This is needed if ATerm, Berkeley DB or bzip2 are static libraries,
 # and the Nix libraries are dynamic.
 if test "$(uname)" = "Darwin"; then
