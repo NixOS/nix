@@ -1,0 +1,9 @@
+#! /bin/sh
+if test -z "$prefix"; then prefix=/nix; fi
+chown -Rf nix.nix $prefix/bin $prefix/etc $prefix/include $prefix/lib \
+  $prefix/libexec $prefix/man $prefix/share $prefix/var
+chown nix.nix $prefix/store
+chmod 6755 $prefix/bin/nix-env $prefix/bin/nix-instantiate $prefix/bin/nix-store
+chmod 775 $prefix/var/nix/manifests
+chmod 775 $prefix/var/nix/gcroots/tmp
+chmod 775 $prefix/var/nix/gcroots/channels

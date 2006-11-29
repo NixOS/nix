@@ -943,7 +943,7 @@ SwitchToOriginalUser::~SwitchToOriginalUser()
 void switchToNixUser()
 {
     fprintf(stderr, "real = %d/%d, effective = %d/%d\n",
-        getuid(), geteuid(), getgid(), getegid());
+        getuid(), getgid(), geteuid(), getegid());
 
     /* Note: we require setresuid for now since I don't want to think
        to deeply about whether this works on systems that don't have
