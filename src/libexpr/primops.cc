@@ -1,4 +1,3 @@
-#include "build.hh"
 #include "misc.hh"
 #include "eval.hh"
 #include "globals.hh"
@@ -50,7 +49,7 @@ static Expr primImport(EvalState & state, const ATermVector & args)
             throw EvalError(format("cannot import `%1%', since path `%2%' is not valid")
                 % path % *i);
         if (isDerivation(*i))
-            buildDerivations(singleton<PathSet>(*i));
+            store->buildDerivations(singleton<PathSet>(*i));
     }
 
     return evalFile(state, path);

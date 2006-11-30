@@ -18,6 +18,9 @@ class Transaction;
 const int nixSchemaVersion = 3;
 
 
+extern string drvsLogDir;
+
+
 class LocalStore : public StoreAPI
 {
 public:
@@ -55,6 +58,10 @@ public:
 
     Path addTextToStore(const string & suffix, const string & s,
         const PathSet & references);
+
+    void buildDerivations(const PathSet & drvPaths);
+
+    void ensurePath(const Path & storePath);
 
 private:
     Path _addToStore(bool fixed, bool recursive,

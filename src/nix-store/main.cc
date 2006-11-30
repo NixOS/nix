@@ -2,7 +2,6 @@
 #include <algorithm>
 
 #include "globals.hh"
-#include "build.hh"
 #include "misc.hh"
 #include "gc.hh"
 #include "archive.hh"
@@ -64,7 +63,7 @@ static Path realisePath(const Path & path)
     if (isDerivation(path)) {
         PathSet paths;
         paths.insert(path);
-        buildDerivations(paths);
+        store->buildDerivations(paths);
         Path outPath = findOutput(derivationFromPath(path), "out");
         
         if (gcRoot == "")
@@ -76,7 +75,7 @@ static Path realisePath(const Path & path)
         
         return outPath;
     } else {
-        ensurePath(path);
+        store->ensurePath(path);
         return path;
     }
 }
@@ -97,7 +96,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
              i != opArgs.end(); ++i)
             if (isDerivation(*i))
                 drvPaths.insert(*i);
-        buildDerivations(drvPaths);
+        store->buildDerivations(drvPaths);
     }
 
     for (Strings::iterator i = opArgs.begin();

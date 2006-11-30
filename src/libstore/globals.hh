@@ -33,7 +33,6 @@ extern string nixConfDir;
 extern string nixLibexecDir;
 
 
-
 /* Misc. global flags. */
 
 /* Whether to keep temporary directories of failed builds. */

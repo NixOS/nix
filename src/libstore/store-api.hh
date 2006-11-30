@@ -72,6 +72,19 @@ public:
        a regular file containing the given string. */
     virtual Path addTextToStore(const string & suffix, const string & s,
         const PathSet & references) = 0;
+
+    /* Ensure that the output paths of the derivation are valid.  If
+       they are already valid, this is a no-op.  Otherwise, validity
+       can be reached in two ways.  First, if the output paths have
+       substitutes, then those can be used.  Second, the output paths
+       can be created by running the builder, after recursively
+       building any sub-derivations. */
+    virtual void buildDerivations(const PathSet & drvPaths) = 0;
+
+    /* Ensure that a path is valid.  If it is not currently valid, it
+       may be made valid by running a substitute (if defined for the
+       path). */
+    virtual void ensurePath(const Path & storePath) = 0;
 };
 
 

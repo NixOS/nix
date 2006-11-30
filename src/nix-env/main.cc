@@ -1,7 +1,6 @@
 #include "profiles.hh"
 #include "names.hh"
 #include "globals.hh"
-#include "build.hh"
 #include "misc.hh"
 #include "gc.hh"
 #include "shared.hh"
@@ -152,7 +151,7 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
             drvsToBuild.insert(i->queryDrvPath(state));
 
     debug(format("building user environment dependencies"));
-    buildDerivations(drvsToBuild);
+    store->buildDerivations(drvsToBuild);
 
     /* Get the environment builder expression. */
     Expr envBuilder = parseExprFromFile(state,
@@ -184,7 +183,7 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
         /* This is only necessary when installing store paths, e.g.,
            `nix-env -i /nix/store/abcd...-foo'. */
         addTempRoot(i->queryOutPath(state));
-        ensurePath(i->queryOutPath(state));
+        store->ensurePath(i->queryOutPath(state));
         
         references.insert(i->queryOutPath(state));
         if (drvPath != "") references.insert(drvPath);
@@ -212,7 +211,7 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
     
     /* Realise the resulting store expression. */
     debug(format("building user environment"));
-    buildDerivations(singleton<PathSet>(topLevelDrv.queryDrvPath(state)));
+    store->buildDerivations(singleton<PathSet>(topLevelDrv.queryDrvPath(state)));
 
     /* Switch the current user environment to the output path. */
     debug(format("switching to new user environment"));

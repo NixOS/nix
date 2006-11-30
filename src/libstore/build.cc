@@ -1,4 +1,3 @@
-#include "build.hh"
 #include "references.hh"
 #include "pathlocks.hh"
 #include "misc.hh"
@@ -2195,7 +2194,7 @@ void Worker::waitForInput()
 //////////////////////////////////////////////////////////////////////
 
 
-void buildDerivations(const PathSet & drvPaths)
+void LocalStore::buildDerivations(const PathSet & drvPaths)
 {
     startNest(nest, lvlDebug,
         format("building %1%") % showPaths(drvPaths));
@@ -2222,7 +2221,7 @@ void buildDerivations(const PathSet & drvPaths)
 }
 
 
-void ensurePath(const Path & path)
+void LocalStore::ensurePath(const Path & path)
 {
     /* If the path is already valid, we're done. */
     if (store->isValidPath(path)) return;

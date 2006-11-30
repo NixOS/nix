@@ -5,7 +5,7 @@ libstore_la_SOURCES = \
  db.cc references.cc pathlocks.cc gc.cc 
 
 pkginclude_HEADERS = \
- store-api.hh local-store.cc derivations.hh build.hh misc.hh globals.hh \
+ store-api.hh local-store.cc derivations.hh misc.hh globals.hh \
  db.hh references.hh pathlocks.hh gc.hh 
 
 libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la
