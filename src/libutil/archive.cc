@@ -18,41 +18,10 @@ namespace nix {
 static string archiveVersion1 = "nix-archive-1";
 
 
-static void writePadding(unsigned int len, DumpSink & sink)
-{
-    if (len % 8) {
-        unsigned char zero[8];
-        memset(zero, 0, sizeof(zero));
-        sink(zero, 8 - (len % 8));
-    }
-}
+static void dump(const string & path, Sink & sink);
 
 
-static void writeInt(unsigned int n, DumpSink & sink)
-{
-    unsigned char buf[8];
-    memset(buf, 0, sizeof(buf));
-    buf[0] = n & 0xff;
-    buf[1] = (n >> 8) & 0xff;
-    buf[2] = (n >> 16) & 0xff;
-    buf[3] = (n >> 24) & 0xff;
-    sink(buf, sizeof(buf));
-}
-
-
-static void writeString(const string & s, DumpSink & sink)
-{
-    unsigned int len = s.length();
-    writeInt(len, sink);
-    sink((const unsigned char *) s.c_str(), len);
-    writePadding(len, sink);
-}
-
-
-static void dump(const string & path, DumpSink & sink);
-
-
-static void dumpEntries(const Path & path, DumpSink & sink)
+static void dumpEntries(const Path & path, Sink & sink)
 {
     Strings names = readDirectory(path);
     vector<string> names2(names.begin(), names.end());
@@ -73,7 +42,7 @@ static void dumpEntries(const Path & path, DumpSink & sink)
 
 
 static void dumpContents(const Path & path, unsigned int size, 
-    DumpSink & sink)
+    Sink & sink)
 {
     writeString("contents", sink);
     writeInt(size, sink);
@@ -95,7 +64,7 @@ static void dumpContents(const Path & path, unsigned int size,
 }
 
 
-static void dump(const Path & path, DumpSink & sink)
+static void dump(const Path & path, Sink & sink)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
@@ -132,7 +101,7 @@ static void dump(const Path & path, DumpSink & sink)
 }
 
 
-void dumpPath(const Path & path, DumpSink & sink)
+void dumpPath(const Path & path, Sink & sink)
 {
     writeString(archiveVersion1, sink);
     dump(path, sink);
@@ -145,42 +114,7 @@ static Error badArchive(string s)
 }
 
 
-static void readPadding(unsigned int len, RestoreSource & source)
-{
-    if (len % 8) {
-        unsigned char zero[8];
-        unsigned int n = 8 - (len % 8);
-        source(zero, n);
-        for (unsigned int i = 0; i < n; i++)
-            if (zero[i]) throw badArchive("non-zero padding");
-    }
-}
-
-static unsigned int readInt(RestoreSource & source)
-{
-    unsigned char buf[8];
-    source(buf, sizeof(buf));
-    if (buf[4] || buf[5] || buf[6] || buf[7])
-        throw Error("implementation cannot deal with > 32-bit integers");
-    return
-        buf[0] |
-        (buf[1] << 8) |
-        (buf[2] << 16) |
-        (buf[3] << 24);
-}
-
-
-static string readString(RestoreSource & source)
-{
-    unsigned int len = readInt(source);
-    char buf[len];
-    source((unsigned char *) buf, len);
-    readPadding(len, source);
-    return string(buf, len);
-}
-
-
-static void skipGeneric(RestoreSource & source)
+static void skipGeneric(Source & source)
 {
     if (readString(source) == "(") {
         while (readString(source) != ")")
@@ -189,10 +123,10 @@ static void skipGeneric(RestoreSource & source)
 }
 
 
-static void restore(const Path & path, RestoreSource & source);
+static void restore(const Path & path, Source & source);
 
 
-static void restoreEntry(const Path & path, RestoreSource & source)
+static void restoreEntry(const Path & path, Source & source)
 {
     string s, name;
 
@@ -219,7 +153,7 @@ static void restoreEntry(const Path & path, RestoreSource & source)
 }
 
 
-static void restoreContents(int fd, const Path & path, RestoreSource & source)
+static void restoreContents(int fd, const Path & path, Source & source)
 {
     unsigned int size = readInt(source);
     unsigned int left = size;
@@ -238,7 +172,7 @@ static void restoreContents(int fd, const Path & path, RestoreSource & source)
 }
 
 
-static void restore(const Path & path, RestoreSource & source)
+static void restore(const Path & path, Source & source)
 {
     string s;
 
@@ -315,7 +249,7 @@ static void restore(const Path & path, RestoreSource & source)
 }
 
 
-void restorePath(const Path & path, RestoreSource & source)
+void restorePath(const Path & path, Source & source)
 {
     if (readString(source) != archiveVersion1)
         throw badArchive("expected Nix archive");

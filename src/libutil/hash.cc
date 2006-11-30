@@ -282,7 +282,7 @@ Hash hashFile(HashType ht, const Path & path)
 }
 
 
-struct HashSink : DumpSink
+struct HashSink : Sink
 {
     HashType ht;
     Ctx ctx;

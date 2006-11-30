@@ -2,6 +2,7 @@
 #define __ARCHIVE_H
 
 #include "types.hh"
+#include "serialise.hh"
 
 
 namespace nix {
@@ -44,27 +45,9 @@ namespace nix {
 
      `+' denotes string concatenation. */
 
-struct DumpSink 
-{
-    virtual ~DumpSink() { }
-    virtual void operator () (const unsigned char * data, unsigned int len) = 0;
-};
+void dumpPath(const Path & path, Sink & sink);
 
-void dumpPath(const Path & path, DumpSink & sink);
-
-
-struct RestoreSource
-{
-    virtual ~RestoreSource() { }
-    
-    /* The callee should store exactly *len bytes in the buffer
-       pointed to by data.  It should block if that much data is not
-       yet available, or throw an error if it is not going to be
-       available. */
-    virtual void operator () (unsigned char * data, unsigned int len) = 0;
-};
-
-void restorePath(const Path & path, RestoreSource & source);
+void restorePath(const Path & path, Source & source);
 
  
 }

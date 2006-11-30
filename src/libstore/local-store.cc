@@ -173,7 +173,7 @@ void createStoreTransaction(Transaction & txn)
 
 /* Path copying. */
 
-struct CopySink : DumpSink
+struct CopySink : Sink
 {
     string s;
     virtual void operator () (const unsigned char * data, unsigned int len)
@@ -183,7 +183,7 @@ struct CopySink : DumpSink
 };
 
 
-struct CopySource : RestoreSource
+struct CopySource : Source
 {
     string & s;
     unsigned int pos;

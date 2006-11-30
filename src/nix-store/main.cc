@@ -607,17 +607,6 @@ static void opDelete(Strings opFlags, Strings opArgs)
 }
 
 
-/* A sink that writes dump output to stdout. */
-struct StdoutSink : DumpSink
-{
-    virtual void operator ()
-        (const unsigned char * data, unsigned int len)
-    {
-        writeFull(STDOUT_FILENO, data, len);
-    }
-};
-
-
 /* Dump a path as a Nix archive.  The archive is written to standard
    output. */
 static void opDump(Strings opFlags, Strings opArgs)
@@ -625,20 +614,10 @@ static void opDump(Strings opFlags, Strings opArgs)
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (opArgs.size() != 1) throw UsageError("only one argument allowed");
 
-    StdoutSink sink;
+    FdSink sink(STDOUT_FILENO);
     string path = *opArgs.begin();
     dumpPath(path, sink);
 }
-
-
-/* A source that reads restore input from stdin. */
-struct StdinSource : RestoreSource
-{
-    virtual void operator () (unsigned char * data, unsigned int len)
-    {
-        readFull(STDIN_FILENO, data, len);
-    }
-};
 
 
 /* Restore a value from a Nix archive.  The archive is read from
@@ -648,7 +627,7 @@ static void opRestore(Strings opFlags, Strings opArgs)
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (opArgs.size() != 1) throw UsageError("only one argument allowed");
 
-    StdinSource source;
+    FdSource source(STDIN_FILENO);
     restorePath(*opArgs.begin(), source);
 }
 
