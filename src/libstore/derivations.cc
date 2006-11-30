@@ -1,5 +1,5 @@
 #include "derivations.hh"
-#include "store.hh"
+#include "store-api.hh"
 #include "aterm.hh"
 
 #include "derivations-ast.hh"
@@ -25,7 +25,7 @@ Path writeDerivation(const Derivation & drv, const string & name)
     /* Note that the outputs of a derivation are *not* references
        (that can be missing (of course) and should not necessarily be
        held during a garbage collection). */
-    return addTextToStore(name + drvExtension,
+    return store->addTextToStore(name + drvExtension,
         atPrint(unparseDerivation(drv)), references);
 }
 

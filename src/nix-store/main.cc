@@ -8,7 +8,7 @@
 #include "archive.hh"
 #include "shared.hh"
 #include "dotgraph.hh"
-#include "store.hh"
+#include "local-store.hh"
 #include "db.hh"
 #include "util.hh"
 #include "help.txt.hh"
@@ -112,7 +112,7 @@ static void opAdd(Strings opFlags, Strings opArgs)
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
     for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); ++i)
-        cout << format("%1%\n") % addToStore(*i);
+        cout << format("%1%\n") % store->addToStore(*i);
 }
 
 
@@ -134,7 +134,7 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     opArgs.pop_front();
 
     for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); ++i)
-        cout << format("%1%\n") % addToStoreFixed(recursive, hashAlgo, *i);
+        cout << format("%1%\n") % store->addToStoreFixed(recursive, hashAlgo, *i);
 }
 
 
@@ -195,7 +195,7 @@ static void storePathRequisites(const Path & storePath,
                 Derivation drv = derivationFromPath(*i);
                 for (DerivationOutputs::iterator j = drv.outputs.begin();
                      j != drv.outputs.end(); ++j)
-                    if (isValidPath(j->second.path))
+                    if (store->isValidPath(j->second.path))
                         computeFSClosure(j->second.path, paths);
             }
     }
@@ -270,7 +270,7 @@ static void printTree(const Path & path,
     cout << format("%1%%2%\n") % firstPad % path;
 
     PathSet references;
-    queryReferences(noTxn, path, references);
+    store->queryReferences(path, references);
     
 #if 0     
     for (PathSet::iterator i = drv.inputSrcs.begin();
@@ -353,8 +353,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 Path path = maybeUseOutput(fixPath(*i), useOutput, forceRealise);
                 if (query == qRequisites)
                     storePathRequisites(path, includeOutputs, paths);
-                else if (query == qReferences) queryReferences(noTxn, path, paths);
-                else if (query == qReferrers) queryReferrers(noTxn, path,  paths);
+                else if (query == qReferences) store->queryReferences(path, paths);
+                else if (query == qReferrers) store->queryReferrers(path,  paths);
                 else if (query == qReferrersClosure) computeFSClosure(path, paths, true);
             }
             printPathSet(paths);
@@ -390,7 +390,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                  i != opArgs.end(); ++i)
             {
                 Path path = maybeUseOutput(fixPath(*i), useOutput, forceRealise);
-                Hash hash = queryPathHash(path);
+                Hash hash = store->queryPathHash(path);
                 assert(hash.type == htSHA256);
                 cout << format("sha256:%1%\n") % printHash32(hash);
             }
@@ -515,7 +515,7 @@ static void opRegisterValidity(Strings opFlags, Strings opArgs)
             info.references.insert(s);
         }
         if (!cin || cin.eof()) throw Error("missing input");
-        if (!isValidPath(info.path) || reregister) {
+        if (!store->isValidPath(info.path) || reregister) {
             /* !!! races */
             canonicalisePathMetaData(info.path);
             info.hash = hashPath(htSHA256, info.path);
@@ -536,7 +536,7 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
 
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); ++i)
-        if (!isValidPath(*i))
+        if (!store->isValidPath(*i))
             throw Error(format("path `%1%' is not valid") % *i);
 }
 
@@ -660,7 +660,8 @@ static void opInit(Strings opFlags, Strings opArgs)
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (!opArgs.empty())
         throw UsageError("no arguments expected");
-    initDB();
+    /* Doesn't do anything right now; database tables are initialised
+       automatically. */
 }
 
 
@@ -745,7 +746,7 @@ void run(Strings args)
     if (!op) throw UsageError("no operation specified");
 
     if (op != opDump && op != opRestore) /* !!! hack */
-        openDB(op != opGC);
+        store = openStore(op != opGC);
 
     op(opFlags, opArgs);
 }

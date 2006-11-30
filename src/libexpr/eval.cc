@@ -2,7 +2,7 @@
 #include "parser.hh"
 #include "hash.hh"
 #include "util.hh"
-#include "store.hh"
+#include "store-api.hh"
 #include "derivations.hh"
 #include "nixexpr-ast.hh"
 
@@ -251,7 +251,7 @@ string coerceToString(EvalState & state, Expr e, PathSet & context,
         if (state.srcToStore[path] != "")
             dstPath = state.srcToStore[path];
         else {
-            dstPath = addToStore(path);
+            dstPath = store->addToStore(path);
             state.srcToStore[path] = dstPath;
             printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
                 % path % dstPath);

@@ -1,6 +1,6 @@
 #include "dotgraph.hh"
 #include "util.hh"
-#include "store.hh"
+#include "store-api.hh"
 #include "db.hh"
 
 #include <iostream>
@@ -112,7 +112,7 @@ void printDotGraph(const PathSet & roots)
         cout << makeNode(path, symbolicName(path), "#ff0000");
         
         PathSet references;
-        queryReferences(noTxn, path, references);
+        store->queryReferences(path, references);
 
         for (PathSet::iterator i = references.begin();
              i != references.end(); ++i)

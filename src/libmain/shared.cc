@@ -1,7 +1,7 @@
 #include "shared.hh"
 #include "globals.hh"
 #include "gc.hh"
-#include "store.hh"
+#include "store-api.hh"
 #include "util.hh"
 
 #include "config.h"
@@ -199,7 +199,8 @@ static void initAndRun(int argc, char * * argv)
 
     run(remaining);
 
-    closeDB(); /* it's fine if the DB isn't actually open */
+    /* Close the Nix database. */
+    store.reset((StoreAPI *) 0);
 }
 
 

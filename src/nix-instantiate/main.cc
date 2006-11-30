@@ -11,7 +11,7 @@
 #include "attr-path.hh"
 #include "expr-to-xml.hh"
 #include "util.hh"
-#include "store.hh"
+#include "store-api.hh"
 #include "help.txt.hh"
 
 
@@ -137,7 +137,7 @@ void run(Strings args)
             files.push_back(arg);
     }
 
-    openDB();
+    store = openStore();
 
     if (readStdin) {
         Expr e = parseStdin(state);

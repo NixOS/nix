@@ -2,7 +2,7 @@
 #include "globals.hh"
 #include "misc.hh"
 #include "pathlocks.hh"
-#include "store.hh"
+#include "local-store.hh"
 #include "db.hh"
 #include "util.hh"
 
@@ -305,7 +305,7 @@ static void findRoots(const Path & path, bool recurseSymlinks,
             debug(format("found root `%1%' in `%2%'")
                 % target2 % path);
             Path target3 = toStorePath(target2);
-            if (isValidPath(target3)) 
+            if (store->isValidPath(target3)) 
                 roots.insert(target3);
             else
                 printMsg(lvlInfo, format("skipping invalid root from `%1%' to `%2%'")
@@ -343,7 +343,7 @@ static void addAdditionalRoots(PathSet & roots)
     for (Strings::iterator i = paths.begin(); i != paths.end(); ++i) {
         if (isInStore(*i)) {
             Path path = toStorePath(*i);
-            if (roots.find(path) == roots.end() && isValidPath(path)) {
+            if (roots.find(path) == roots.end() && store->isValidPath(path)) {
                 debug(format("found additional root `%1%'") % path);
                 roots.insert(path);
             }
@@ -359,8 +359,8 @@ static void dfsVisit(const PathSet & paths, const Path & path,
     visited.insert(path);
     
     PathSet references;
-    if (isValidPath(path))
-        queryReferences(noTxn, path, references);
+    if (store->isValidPath(path))
+        store->queryReferences(path, references);
     
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)
@@ -431,7 +431,7 @@ void collectGarbage(GCAction action, const PathSet & pathsToDelete,
                previously ran the collector with `gcKeepDerivations'
                turned off). */
             Path deriver = queryDeriver(noTxn, *i);
-            if (deriver != "" && isValidPath(deriver))
+            if (deriver != "" && store->isValidPath(deriver))
                 computeFSClosure(deriver, livePaths);
         }
     }
@@ -444,7 +444,7 @@ void collectGarbage(GCAction action, const PathSet & pathsToDelete,
                 Derivation drv = derivationFromPath(*i);
                 for (DerivationOutputs::iterator j = drv.outputs.begin();
                      j != drv.outputs.end(); ++j)
-                    if (isValidPath(j->second.path))
+                    if (store->isValidPath(j->second.path))
                         computeFSClosure(j->second.path, livePaths);
             }
     }
@@ -469,7 +469,7 @@ void collectGarbage(GCAction action, const PathSet & pathsToDelete,
        means that it has already been closed). */
     PathSet tempRootsClosed;
     for (PathSet::iterator i = tempRoots.begin(); i != tempRoots.end(); ++i)
-        if (isValidPath(*i))
+        if (store->isValidPath(*i))
             computeFSClosure(*i, tempRootsClosed);
         else
             tempRootsClosed.insert(*i);

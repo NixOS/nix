@@ -1,5 +1,5 @@
 #include "misc.hh"
-#include "store.hh"
+#include "store-api.hh"
 #include "build.hh"
 #include "db.hh"
 
@@ -27,9 +27,9 @@ void computeFSClosure(const Path & storePath,
 
     PathSet references;
     if (flipDirection)
-        queryReferrers(noTxn, storePath, references);
+        store->queryReferrers(storePath, references);
     else
-        queryReferences(noTxn, storePath, references);
+        store->queryReferences(storePath, references);
 
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)
@@ -58,14 +58,14 @@ void queryMissing(const PathSet & targets,
         done.insert(p);
 
         if (isDerivation(p)) {
-            if (!isValidPath(p)) continue;
+            if (!store->isValidPath(p)) continue;
             Derivation drv = derivationFromPath(p);
 
             bool mustBuild = false;
             for (DerivationOutputs::iterator i = drv.outputs.begin();
                  i != drv.outputs.end(); ++i)
-                if (!isValidPath(i->second.path) &&
-                    querySubstitutes(noTxn, i->second.path).size() == 0)
+                if (!store->isValidPath(i->second.path) &&
+                    store->querySubstitutes(i->second.path).size() == 0)
                     mustBuild = true;
 
             if (mustBuild) {
@@ -81,11 +81,11 @@ void queryMissing(const PathSet & targets,
         }
 
         else {
-            if (isValidPath(p)) continue;
-            if (querySubstitutes(noTxn, p).size() > 0)
+            if (store->isValidPath(p)) continue;
+            if (store->querySubstitutes(p).size() > 0)
                 willSubstitute.insert(p);
             PathSet refs;
-            queryReferences(noTxn, p, todo);
+            store->queryReferences(p, todo);
         }
     }
 }

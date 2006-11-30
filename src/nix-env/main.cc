@@ -13,7 +13,7 @@
 #include "attr-path.hh"
 #include "pathlocks.hh"
 #include "xml-writer.hh"
-#include "store.hh"
+#include "store-api.hh"
 #include "db.hh"
 #include "util.hh"
 
@@ -192,7 +192,7 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
 
     /* Also write a copy of the list of inputs to the store; we need
        it for future modifications of the environment. */
-    Path manifestFile = addTextToStore("env-manifest",
+    Path manifestFile = store->addTextToStore("env-manifest",
         atPrint(makeList(ATreverse(manifest))), references);
 
     Expr topLevel = makeCall(envBuilder, makeAttrs(ATmakeList3(
@@ -833,9 +833,9 @@ static void opQuery(Globals & globals,
             XMLAttrs attrs;
         
             if (printStatus) {
-                Substitutes subs = querySubstitutes(noTxn, i->queryOutPath(globals.state));
+                Substitutes subs = store->querySubstitutes(i->queryOutPath(globals.state));
                 bool isInstalled = installed.find(i->queryOutPath(globals.state)) != installed.end();
-                bool isValid = isValidPath(i->queryOutPath(globals.state));
+                bool isValid = store->isValidPath(i->queryOutPath(globals.state));
                 if (xmlOutput) {
                     attrs["installed"] = isInstalled ? "1" : "0";
                     attrs["valid"] = isValid ? "1" : "0";
@@ -1204,7 +1204,7 @@ void run(Strings args)
             : canonPath(nixStateDir + "/profiles/default");
     }
     
-    openDB();
+    store = openStore();
 
     op(globals, opFlags, opArgs);
 

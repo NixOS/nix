@@ -2,7 +2,7 @@
 #include "misc.hh"
 #include "eval.hh"
 #include "globals.hh"
-#include "store.hh"
+#include "store-api.hh"
 #include "util.hh"
 #include "expr-to-xml.hh"
 #include "nixexpr-ast.hh"
@@ -46,7 +46,7 @@ static Expr primImport(EvalState & state, const ATermVector & args)
 
     for (PathSet::iterator i = context.begin(); i != context.end(); ++i) {
         assert(isStorePath(*i));
-        if (!isValidPath(*i))
+        if (!store->isValidPath(*i))
             throw EvalError(format("cannot import `%1%', since path `%2%' is not valid")
                 % path % *i);
         if (isDerivation(*i))
@@ -390,7 +390,7 @@ static Expr primToFile(EvalState & state, const ATermVector & args)
         refs.insert(*i);
     }
     
-    Path storePath = addTextToStore(name, contents, refs);
+    Path storePath = store->addTextToStore(name, contents, refs);
 
     /* Note: we don't need to add `context' to the context of the
        result, since `storePath' itself has references to the paths

@@ -4,7 +4,7 @@
 #include "misc.hh"
 #include "globals.hh"
 #include "gc.hh"
-#include "store.hh"
+#include "local-store.hh"
 #include "db.hh"
 #include "util.hh"
 
@@ -636,7 +636,7 @@ void DerivationGoal::haveStoreExpr()
         return;
     }
 
-    assert(isValidPath(drvPath));
+    assert(store->isValidPath(drvPath));
 
     /* Get the derivation. */
     drv = derivationFromPath(drvPath);
@@ -661,7 +661,7 @@ void DerivationGoal::haveStoreExpr()
          i != invalidOutputs.end(); ++i)
         /* Don't bother creating a substitution goal if there are no
            substitutes. */
-        if (querySubstitutes(noTxn, *i).size() > 0)
+        if (store->querySubstitutes(*i).size() > 0)
             addWaitee(worker.makeSubstitutionGoal(*i));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
@@ -916,7 +916,7 @@ static string makeValidityRegistration(const PathSet & paths,
         s += deriver + "\n";
 
         PathSet references;
-        queryReferences(noTxn, *i, references);
+        store->queryReferences(*i, references);
 
         s += (format("%1%\n") % references.size()).str();
             
@@ -1130,7 +1130,7 @@ bool DerivationGoal::prepareBuild()
         /* Add the relevant output closures of the input derivation
            `*i' as input paths.  Only add the closures of output paths
            that are specified as inputs. */
-        assert(isValidPath(i->first));
+        assert(store->isValidPath(i->first));
         Derivation inDrv = derivationFromPath(i->first);
         for (StringSet::iterator j = i->second.begin();
              j != i->second.end(); ++j)
@@ -1172,7 +1172,7 @@ void DerivationGoal::startBuilder()
          i != drv.outputs.end(); ++i)
     {
         Path path = i->second.path;
-        if (isValidPath(path))
+        if (store->isValidPath(path))
             throw Error(format("obstructed build: path `%1%' exists") % path);
         if (pathExists(path)) {
             debug(format("removing unregistered path `%1%'") % path);
@@ -1259,7 +1259,7 @@ void DerivationGoal::startBuilder()
     for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
         string fileName = *i++;
         Path storePath = *i++;
-        if (!isValidPath(storePath))
+        if (!store->isValidPath(storePath))
             throw Error(format("`exportReferencesGraph' refers to an invalid path `%1%'")
                 % storePath);
         checkStoreName(fileName); /* !!! abuse of this function */
@@ -1630,7 +1630,7 @@ PathSet DerivationGoal::checkPathValidity(bool returnValid)
     PathSet result;
     for (DerivationOutputs::iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
-        if (isValidPath(i->second.path)) {
+        if (store->isValidPath(i->second.path)) {
             if (returnValid) result.insert(i->second.path);
         } else {
             if (!returnValid) result.insert(i->second.path);
@@ -1718,17 +1718,21 @@ void SubstitutionGoal::init()
     addTempRoot(storePath);
     
     /* If the path already exists we're done. */
-    if (isValidPath(storePath)) {
+    if (store->isValidPath(storePath)) {
         amDone();
         return;
     }
 
+    /* !!! race condition; should get the substitutes and the
+       references in a transaction (in case a clearSubstitutes() is
+       done simultaneously). */
+
     /* Read the substitutes. */
-    subs = querySubstitutes(noTxn, storePath);
+    subs = store->querySubstitutes(storePath);
 
     /* To maintain the closure invariant, we first have to realise the
        paths referenced by this one. */
-    queryReferences(noTxn, storePath, references);
+    store->queryReferences(storePath, references);
 
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)
@@ -1752,7 +1756,7 @@ void SubstitutionGoal::referencesValid()
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)
         if (*i != storePath) /* ignore self-references */
-            assert(isValidPath(*i));
+            assert(store->isValidPath(*i));
     
     tryNext();
 }
@@ -1796,7 +1800,7 @@ void SubstitutionGoal::tryToRun()
         (format("waiting for lock on `%1%'") % storePath).str());
 
     /* Check again whether the path is invalid. */
-    if (isValidPath(storePath)) {
+    if (store->isValidPath(storePath)) {
         debug(format("store path `%1%' has become valid") % storePath);
         outputLock->setDeletion(true);
         amDone();
@@ -2221,7 +2225,7 @@ void buildDerivations(const PathSet & drvPaths)
 void ensurePath(const Path & path)
 {
     /* If the path is already valid, we're done. */
-    if (isValidPath(path)) return;
+    if (store->isValidPath(path)) return;
 
     Worker worker;
     GoalPtr goal = worker.makeSubstitutionGoal(path);

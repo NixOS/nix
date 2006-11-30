@@ -1,12 +1,12 @@
 pkglib_LTLIBRARIES = libstore.la
 
 libstore_la_SOURCES = \
- store.cc derivations.cc build.cc misc.cc globals.cc db.cc \
- references.cc pathlocks.cc gc.cc 
+ store-api.cc local-store.cc derivations.cc build.cc misc.cc globals.cc \
+ db.cc references.cc pathlocks.cc gc.cc 
 
 pkginclude_HEADERS = \
- store.hh derivations.hh build.hh misc.hh globals.hh db.hh \
- references.hh pathlocks.hh gc.hh 
+ store-api.hh local-store.cc derivations.hh build.hh misc.hh globals.hh \
+ db.hh references.hh pathlocks.hh gc.hh 
 
 libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la
 
