@@ -1,35 +1,21 @@
 #include "shared.hh"
 #include "local-store.hh"
 #include "util.hh"
+#include "serialise.hh"
 
 using namespace nix;
 
 
-/* !!! Mostly cut&pasted from util/archive.hh */
-/* Use buffered reads. */
-static unsigned int readInt(int fd)
+void processConnection(Source & from, Sink & to)
 {
-    unsigned char buf[8];
-    readFull(fd, buf, sizeof(buf));
-    if (buf[4] || buf[5] || buf[6] || buf[7])
-        throw Error("implementation cannot deal with > 32-bit integers");
-    return
-        buf[0] |
-        (buf[1] << 8) |
-        (buf[2] << 16) |
-        (buf[3] << 24);
-}
+    store = boost::shared_ptr<StoreAPI>(new LocalStore(true));
 
-
-void processConnection(int fdFrom, int fdTo)
-{
-    store = openStore();
-
-    unsigned int magic = readInt(fdFrom);
+    unsigned int magic = readInt(from);
     if (magic != 0x6e697864) throw Error("protocol mismatch");
 
-    
-    
+    writeInt(0x6478696e, to);
+
+    debug("greeting exchanged");
 }
 
 
@@ -43,8 +29,11 @@ void run(Strings args)
         if (arg == "--slave") slave = true;
     }
 
-    if (slave)
-        processConnection(STDIN_FILENO, STDOUT_FILENO);
+    if (slave) {
+        FdSource source(STDIN_FILENO);
+        FdSink sink(STDOUT_FILENO);
+        processConnection(source, sink);
+    }
 
     else if (daemon)
         throw Error("daemon mode not implemented");

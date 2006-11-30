@@ -91,6 +91,7 @@ Path makeFixedOutputPath(bool recursive,
 
 
 #include "local-store.hh"
+#include "serialise.hh"
 #include "remote-store.hh"
 
 

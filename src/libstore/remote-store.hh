@@ -9,6 +9,12 @@
 namespace nix {
 
 
+class Pipe;
+class Pid;
+struct FdSink;
+struct FdSource;
+
+
 class RemoteStore : public StoreAPI
 {
 public:
@@ -44,6 +50,11 @@ public:
     void ensurePath(const Path & storePath);
 
 private:
+    Pipe toChild;
+    Pipe fromChild;
+    FdSink to;
+    FdSource from;
+    Pid child;
 };
 
 

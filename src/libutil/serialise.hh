@@ -33,6 +33,11 @@ struct FdSink : Sink
 {
     int fd;
 
+    FdSink()
+    {
+        fd = 0;
+    }
+    
     FdSink(int fd) 
     {
         this->fd = fd;
@@ -47,6 +52,11 @@ struct FdSource : Source
 {
     int fd;
 
+    FdSource()
+    {
+        fd = 0;
+    }
+    
     FdSource(int fd) 
     {
         this->fd = fd;
