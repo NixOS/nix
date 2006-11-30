@@ -85,7 +85,7 @@ Path createGeneration(Path profile, Path outPath)
 
     /* Create the new generation.  Note that addPermRoot() blocks if
        the garbage collector is running to prevent the stuff we've
-       build from moving from the temporary roots (which the GC knows)
+       built from moving from the temporary roots (which the GC knows)
        to the permanent roots (of which the GC would have a stale
        view).  If we didn't do it this way, the GC might remove the
        user environment etc. we've just built. */

@@ -1,5 +1,6 @@
 #include "store-api.hh"
 #include "globals.hh"
+#include "util.hh"
 
 
 namespace nix {
@@ -90,6 +91,7 @@ Path makeFixedOutputPath(bool recursive,
 
 
 #include "local-store.hh"
+#include "remote-store.hh"
 
 
 namespace nix {
@@ -100,7 +102,12 @@ boost::shared_ptr<StoreAPI> store;
 
 boost::shared_ptr<StoreAPI> openStore(bool reserveSpace)
 {
-    return boost::shared_ptr<StoreAPI>(new LocalStore(reserveSpace));
+    string mode = getEnv("NIX_REMOTE");
+    if (mode == "")
+        return boost::shared_ptr<StoreAPI>(new LocalStore(reserveSpace));
+    else if (mode == "slave")
+        return boost::shared_ptr<StoreAPI>(new RemoteStore());
+    else throw Error(format("invalid setting for NIX_REMOTE, `%1%'") % mode);
 }
 
 
