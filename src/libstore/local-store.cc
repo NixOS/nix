@@ -481,15 +481,15 @@ void registerSubstitute(const Transaction & txn,
 }
 
 
-Substitutes querySubstitutes(const Transaction & txn, const Path & srcPath)
+Substitutes querySubstitutes(const Transaction & txn, const Path & path)
 {
-    return readSubstitutes(txn, srcPath);
+    return readSubstitutes(txn, path);
 }
 
 
-Substitutes LocalStore::querySubstitutes(const Path & srcPath)
+Substitutes LocalStore::querySubstitutes(const Path & path)
 {
-    return nix::querySubstitutes(noTxn, srcPath);
+    return nix::querySubstitutes(noTxn, path);
 }
 
 

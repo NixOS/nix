@@ -8,6 +8,23 @@
 using namespace nix;
 
 
+Path readStorePath(Source & from)
+{
+    Path path = readString(from);
+    assertStorePath(path);
+    return path;
+}
+
+
+PathSet readStorePaths(Source & from)
+{
+    PathSet paths = readStringSet(from);
+    for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
+        assertStorePath(*i);
+    return paths;
+}
+
+
 void processConnection(Source & from, Sink & to)
 {
     store = boost::shared_ptr<StoreAPI>(new LocalStore(true));
@@ -35,9 +52,26 @@ void processConnection(Source & from, Sink & to)
             break;
 
         case wopIsValidPath: {
-            Path path = readString(from);
-            assertStorePath(path);
+            Path path = readStorePath(from);
             writeInt(store->isValidPath(path), to);
+            break;
+        }
+
+        case wopHasSubstitutes: {
+            Path path = readStorePath(from);
+            writeInt(store->hasSubstitutes(path), to);
+            break;
+        }
+
+        case wopQueryReferences:
+        case wopQueryReferrers: {
+            Path path = readStorePath(from);
+            PathSet paths;
+            if (op == wopQueryReferences)
+                store->queryReferences(path, paths);
+            else
+                store->queryReferrers(path, paths);
+            writeStringSet(paths, to);
             break;
         }
 
@@ -55,14 +89,22 @@ void processConnection(Source & from, Sink & to)
         case wopAddTextToStore: {
             string suffix = readString(from);
             string s = readString(from);
-            unsigned int refCount = readInt(from);
-            PathSet refs;
-            while (refCount--) {
-                Path ref = readString(from);
-                assertStorePath(ref);
-                refs.insert(ref);
-            }
+            PathSet refs = readStorePaths(from);
             writeString(store->addTextToStore(suffix, s, refs), to);
+            break;
+        }
+
+        case wopBuildDerivations: {
+            PathSet drvs = readStorePaths(from);
+            store->buildDerivations(drvs);
+            writeInt(1, to);
+            break;
+        }
+
+        case wopEnsurePath: {
+            Path path = readStorePath(from);
+            store->ensurePath(path);
+            writeInt(1, to);
             break;
         }
 

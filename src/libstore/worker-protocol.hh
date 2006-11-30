@@ -10,8 +10,15 @@ typedef enum {
     wopQuit,
     wopIsValidPath,
     wopQuerySubstitutes,
+    wopHasSubstitutes,
+    wopQueryPathHash,
+    wopQueryReferences,
+    wopQueryReferrers,
     wopAddToStore,
+    wopAddToStoreFixed,
     wopAddTextToStore,
+    wopBuildDerivations,
+    wopEnsurePath,
 } WorkerOp;
 
 

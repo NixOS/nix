@@ -6,6 +6,12 @@
 namespace nix {
 
 
+bool StoreAPI::hasSubstitutes(const Path & path)
+{
+    return !querySubstitutes(path).empty();
+}
+
+
 bool isInStore(const Path & path)
 {
     return path[0] == '/'

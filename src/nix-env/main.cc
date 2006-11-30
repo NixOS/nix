@@ -832,18 +832,18 @@ static void opQuery(Globals & globals,
             XMLAttrs attrs;
         
             if (printStatus) {
-                Substitutes subs = store->querySubstitutes(i->queryOutPath(globals.state));
+                bool hasSubs = store->hasSubstitutes(i->queryOutPath(globals.state));
                 bool isInstalled = installed.find(i->queryOutPath(globals.state)) != installed.end();
                 bool isValid = store->isValidPath(i->queryOutPath(globals.state));
                 if (xmlOutput) {
                     attrs["installed"] = isInstalled ? "1" : "0";
                     attrs["valid"] = isValid ? "1" : "0";
-                    attrs["substitutable"] = !subs.empty() ? "1" : "0";
+                    attrs["substitutable"] = hasSubs ? "1" : "0";
                 } else
                     columns.push_back(
                         (string) (isInstalled ? "I" : "-")
                         + (isValid ? "P" : "-")
-                        + (!subs.empty() ? "S" : "-"));
+                        + (hasSubs ? "S" : "-"));
             }
 
             if (xmlOutput)

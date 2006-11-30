@@ -27,15 +27,15 @@ public:
     
     bool isValidPath(const Path & path);
 
-    Substitutes querySubstitutes(const Path & srcPath);
+    Substitutes querySubstitutes(const Path & path);
 
+    bool hasSubstitutes(const Path & path);
+    
     Hash queryPathHash(const Path & path);
 
-    void queryReferences(const Path & storePath,
-        PathSet & references);
+    void queryReferences(const Path & path, PathSet & references);
 
-    void queryReferrers(const Path & storePath,
-        PathSet & referrers);
+    void queryReferrers(const Path & path, PathSet & referrers);
 
     Path addToStore(const Path & srcPath);
 
@@ -47,7 +47,7 @@ public:
 
     void buildDerivations(const PathSet & drvPaths);
 
-    void ensurePath(const Path & storePath);
+    void ensurePath(const Path & path);
 
 private:
     Pipe toChild;

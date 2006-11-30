@@ -39,7 +39,7 @@ RemoteStore::RemoteStore()
                 throw SysError("dupping read side");
 
             execlp(worker.c_str(), worker.c_str(),
-                "-vvv", "--slave", NULL);
+                "--slave", NULL);
             
             throw SysError(format("executing `%1%'") % worker);
             
@@ -81,32 +81,44 @@ bool RemoteStore::isValidPath(const Path & path)
 }
 
 
-Substitutes RemoteStore::querySubstitutes(const Path & srcPath)
+Substitutes RemoteStore::querySubstitutes(const Path & path)
 {
-    //    writeInt(wopQuerySubstitutes);
-    
-    // throw Error("not implemented 2");
-    return Substitutes();
+    throw Error("not implemented 2");
+}
+
+
+bool RemoteStore::hasSubstitutes(const Path & path)
+{
+    writeInt(wopHasSubstitutes, to);
+    writeString(path, to);
+    unsigned int reply = readInt(from);
+    return reply != 0;
 }
 
 
 Hash RemoteStore::queryPathHash(const Path & path)
 {
-    throw Error("not implemented");
+    throw Error("not implemented 3");
 }
 
 
-void RemoteStore::queryReferences(const Path & storePath,
+void RemoteStore::queryReferences(const Path & path,
     PathSet & references)
 {
-    throw Error("not implemented");
+    writeInt(wopQueryReferences, to);
+    writeString(path, to);
+    PathSet references2 = readStringSet(from);
+    references.insert(references2.begin(), references2.end());
 }
 
 
-void RemoteStore::queryReferrers(const Path & storePath,
+void RemoteStore::queryReferrers(const Path & path,
     PathSet & referrers)
 {
-    throw Error("not implemented");
+    writeInt(wopQueryReferrers, to);
+    writeString(path, to);
+    PathSet referrers2 = readStringSet(from);
+    referrers.insert(referrers2.begin(), referrers2.end());
 }
 
 
@@ -123,7 +135,7 @@ Path RemoteStore::addToStore(const Path & srcPath)
 Path RemoteStore::addToStoreFixed(bool recursive, string hashAlgo,
     const Path & srcPath)
 {
-    throw Error("not implemented 4");
+    throw Error("not implemented 6");
 }
 
 
@@ -133,9 +145,7 @@ Path RemoteStore::addTextToStore(const string & suffix, const string & s,
     writeInt(wopAddTextToStore, to);
     writeString(suffix, to);
     writeString(s, to);
-    writeInt(references.size(), to);
-    for (PathSet::iterator i = references.begin(); i != references.end(); ++i)
-        writeString(*i, to);
+    writeStringSet(references, to);
     
     Path path = readString(from);
     return path;
@@ -144,13 +154,17 @@ Path RemoteStore::addTextToStore(const string & suffix, const string & s,
 
 void RemoteStore::buildDerivations(const PathSet & drvPaths)
 {
-    throw Error("not implemented 6");
+    writeInt(wopBuildDerivations, to);
+    writeStringSet(drvPaths, to);
+    readInt(from);
 }
 
 
-void RemoteStore::ensurePath(const Path & storePath)
+void RemoteStore::ensurePath(const Path & path)
 {
-    throw Error("not implemented 7");
+    writeInt(wopEnsurePath, to);
+    writeString(path, to);
+    readInt(from);
 }
 
 

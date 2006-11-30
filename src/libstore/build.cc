@@ -660,7 +660,7 @@ void DerivationGoal::haveStoreExpr()
          i != invalidOutputs.end(); ++i)
         /* Don't bother creating a substitution goal if there are no
            substitutes. */
-        if (store->querySubstitutes(*i).size() > 0)
+        if (store->hasSubstitutes(*i))
             addWaitee(worker.makeSubstitutionGoal(*i));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */

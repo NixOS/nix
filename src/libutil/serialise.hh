@@ -69,12 +69,14 @@ struct FdSource : Source
 void writePadding(unsigned int len, Sink & sink);
 void writeInt(unsigned int n, Sink & sink);
 void writeString(const string & s, Sink & sink);
+void writeStringSet(const StringSet & ss, Sink & sink);
 
 void readPadding(unsigned int len, Source & source);
 unsigned int readInt(Source & source);
 string readString(Source & source);
+StringSet readStringSet(Source & source);
 
- 
+
 }
 
 

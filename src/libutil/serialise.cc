@@ -48,6 +48,14 @@ void writeString(const string & s, Sink & sink)
 }
 
 
+void writeStringSet(const StringSet & ss, Sink & sink)
+{
+    writeInt(ss.size(), sink);
+    for (StringSet::iterator i = ss.begin(); i != ss.end(); ++i)
+        writeString(*i, sink);
+}
+
+
 void readPadding(unsigned int len, Source & source)
 {
     if (len % 8) {
@@ -84,4 +92,14 @@ string readString(Source & source)
 }
 
  
+StringSet readStringSet(Source & source)
+{
+    unsigned int count = readInt(source);
+    StringSet ss;
+    while (count--)
+        ss.insert(readString(source));
+    return ss;
+}
+
+
 }

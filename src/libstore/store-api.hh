@@ -43,7 +43,11 @@ public:
     virtual bool isValidPath(const Path & path) = 0;
 
     /* Return the substitutes for the given path. */
-    virtual Substitutes querySubstitutes(const Path & srcPath) = 0;
+    virtual Substitutes querySubstitutes(const Path & path) = 0;
+
+    /* More efficient variant if we just want to know if a path has
+       substitutes. */
+    virtual bool hasSubstitutes(const Path & path);
 
     /* Queries the hash of a valid path. */ 
     virtual Hash queryPathHash(const Path & path) = 0;
@@ -119,7 +123,6 @@ extern boost::shared_ptr<StoreAPI> store;
 /* Factory method: open the Nix database, either through the local or
    remote implementation. */
 boost::shared_ptr<StoreAPI> openStore(bool reserveSpace = true);
-
 
 
 }
