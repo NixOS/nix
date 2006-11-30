@@ -2,6 +2,7 @@
 #include "local-store.hh"
 #include "util.hh"
 #include "serialise.hh"
+#include "worker-protocol.hh"
 
 using namespace nix;
 
@@ -11,11 +12,39 @@ void processConnection(Source & from, Sink & to)
     store = boost::shared_ptr<StoreAPI>(new LocalStore(true));
 
     unsigned int magic = readInt(from);
-    if (magic != 0x6e697864) throw Error("protocol mismatch");
+    if (magic != WORKER_MAGIC_1) throw Error("protocol mismatch");
 
-    writeInt(0x6478696e, to);
+    writeInt(WORKER_MAGIC_2, to);
 
     debug("greeting exchanged");
+
+    bool quit = false;
+    
+    do {
+        
+        WorkerOp op = (WorkerOp) readInt(from);
+
+        switch (op) {
+
+        case wopQuit:
+            /* Close the database. */
+            store.reset((StoreAPI *) 0);
+            writeInt(1, to);
+            quit = true;
+            break;
+
+        case wopIsValidPath: {
+            Path path = readString(from);
+            assertStorePath(path);
+            writeInt(store->isValidPath(path), to);
+            break;
+        }
+
+        default:
+            throw Error("invalid operation");
+        }
+        
+    } while (!quit);
 }
 
 

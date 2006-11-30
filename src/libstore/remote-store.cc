@@ -1,6 +1,7 @@
 #include "serialise.hh"
 #include "util.hh"
 #include "remote-store.hh"
+#include "worker-protocol.hh"
 
 #include <iostream>
 #include <unistd.h>
@@ -55,27 +56,36 @@ RemoteStore::RemoteStore()
 
     
     /* Send the magic greeting, check for the reply. */
-    writeInt(0x6e697864, to);
+    writeInt(WORKER_MAGIC_1, to);
     
     unsigned int magic = readInt(from);
-    if (magic != 0x6478696e) throw Error("protocol mismatch");
+    if (magic != WORKER_MAGIC_2) throw Error("protocol mismatch");
 }
 
 
 RemoteStore::~RemoteStore()
 {
+    writeInt(wopQuit, to);
+    readInt(from);
+    child.wait(true);
 }
 
 
 bool RemoteStore::isValidPath(const Path & path)
 {
-    throw Error("not implemented");
+    writeInt(wopIsValidPath, to);
+    writeString(path, to);
+    unsigned int reply = readInt(from);
+    return reply != 0;
 }
 
 
 Substitutes RemoteStore::querySubstitutes(const Path & srcPath)
 {
-    throw Error("not implemented");
+    //    writeInt(wopQuerySubstitutes);
+    
+    // throw Error("not implemented 2");
+    return Substitutes();
 }
 
 
