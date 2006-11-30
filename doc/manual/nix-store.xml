@@ -681,7 +681,7 @@ deployment.</para>
 
 <!--######################################################################-->
 
-<refsection><title>Operation <option>--verify</option></title>
+<refsection xml:id='refsec-nix-store-verify'><title>Operation <option>--verify</option></title>
 
 <refsection>
   <title>Synopsis</title>

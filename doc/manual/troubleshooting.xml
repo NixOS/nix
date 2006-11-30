@@ -33,6 +33,50 @@ $ rm __db.00*</screen>
 </section>
 
 
+<section><title>Berkeley DB gives weird error messages</title>
+
+<para>Symptom: you get error messages such as
+
+<screen>
+Berkeley DB message: Finding last valid log LSN: file: 1 offset 28
+Berkeley DB error: file validpaths (meta pgno = 0) has LSN [483][34721].
+Berkeley DB error: end of log is [1][28]
+Berkeley DB error: /nix/var/nix/db/validpaths: unexpected file type or format</screen>
+
+or other weird Berkeley DB errors, and they don’t away (i.e.,
+automatic recovery doesn’t work).  This may be the case after a system crash.</para>
+
+<para>Solution: first try to run <command>db_recover</command> and
+then <link linkend='refsec-nix-store-verify'><command>nix-store
+--verify</command></link>:
+
+<screen>
+$ db_recover -h /nix/var/nix/db
+$ nix-store --verify</screen>
+
+(Make sure that you have the right version of
+<command>db_recover</command>, namely, Berkeley DB 4.4 for Nix 0.10,
+and 4.5 for Nix 0.11.)</para>
+
+<para>If that doesn’t work, it’s time to bring out the big guns:
+
+<screen>
+$ cd /nix/var/nix
+$ cp -pr db db-backup  <lineannotation>(making a backup just in case)</lineannotation>
+$ cd db
+$ rm __db.* log*  <lineannotation>(removing the Berkeley DB environment)</lineannotation>
+$ mkdir tmp
+$ for i in *; do db_dump $i | (cd tmp &amp;&amp; db_load $i); done 
+<lineannotation>(ignore error messages about non-database files like “reserved”)</lineannotation>
+$ mv tmp/* .
+$ nix-store --verify</screen>
+
+</para>
+
+</section>
+
+
+
 <section><title>Collisions in <command>nix-env</command></title>
 
 <para>Symptom: when installing or upgrading, you get an error message such as
