@@ -5,7 +5,7 @@ libstore_la_SOURCES = \
  globals.cc db.cc references.cc pathlocks.cc gc.cc 
 
 pkginclude_HEADERS = \
- store-api.hh local-store.cc remote-store.cc derivations.hh misc.hh \
+ store-api.hh local-store.hh remote-store.hh derivations.hh misc.hh \
  globals.hh db.hh references.hh pathlocks.hh gc.hh  \
  worker-protocol.hh
 
