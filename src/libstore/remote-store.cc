@@ -2,6 +2,7 @@
 #include "util.hh"
 #include "remote-store.hh"
 #include "worker-protocol.hh"
+#include "archive.hh"
 
 #include <iostream>
 #include <unistd.h>
@@ -111,33 +112,45 @@ void RemoteStore::queryReferrers(const Path & storePath,
 
 Path RemoteStore::addToStore(const Path & srcPath)
 {
-    throw Error("not implemented");
+    writeInt(wopAddToStore, to);
+    writeString(baseNameOf(srcPath), to);
+    dumpPath(srcPath, to);
+    Path path = readString(from);
+    return path;
 }
 
 
 Path RemoteStore::addToStoreFixed(bool recursive, string hashAlgo,
     const Path & srcPath)
 {
-    throw Error("not implemented");
+    throw Error("not implemented 4");
 }
 
 
 Path RemoteStore::addTextToStore(const string & suffix, const string & s,
     const PathSet & references)
 {
-    throw Error("not implemented");
+    writeInt(wopAddTextToStore, to);
+    writeString(suffix, to);
+    writeString(s, to);
+    writeInt(references.size(), to);
+    for (PathSet::iterator i = references.begin(); i != references.end(); ++i)
+        writeString(*i, to);
+    
+    Path path = readString(from);
+    return path;
 }
 
 
 void RemoteStore::buildDerivations(const PathSet & drvPaths)
 {
-    throw Error("not implemented");
+    throw Error("not implemented 6");
 }
 
 
 void RemoteStore::ensurePath(const Path & storePath)
 {
-    throw Error("not implemented");
+    throw Error("not implemented 7");
 }
 
 

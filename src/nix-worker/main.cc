@@ -3,6 +3,7 @@
 #include "util.hh"
 #include "serialise.hh"
 #include "worker-protocol.hh"
+#include "archive.hh"
 
 using namespace nix;
 
@@ -40,8 +41,33 @@ void processConnection(Source & from, Sink & to)
             break;
         }
 
+        case wopAddToStore: {
+            /* !!! uberquick hack */
+            string baseName = readString(from);
+            Path tmp = createTempDir();
+            Path tmp2 = tmp + "/" + baseName;
+            restorePath(tmp2, from);
+            writeString(store->addToStore(tmp2), to);
+            deletePath(tmp);
+            break;
+        }
+
+        case wopAddTextToStore: {
+            string suffix = readString(from);
+            string s = readString(from);
+            unsigned int refCount = readInt(from);
+            PathSet refs;
+            while (refCount--) {
+                Path ref = readString(from);
+                assertStorePath(ref);
+                refs.insert(ref);
+            }
+            writeString(store->addTextToStore(suffix, s, refs), to);
+            break;
+        }
+
         default:
-            throw Error("invalid operation");
+            throw Error(format("invalid operation %1%") % op);
         }
         
     } while (!quit);

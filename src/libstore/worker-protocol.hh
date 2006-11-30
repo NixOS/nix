@@ -7,9 +7,11 @@
 
 
 typedef enum {
-    wopQuit = 0,
-    wopIsValidPath = 1,
-    wopQuerySubstitutes = 2,
+    wopQuit,
+    wopIsValidPath,
+    wopQuerySubstitutes,
+    wopAddToStore,
+    wopAddTextToStore,
 } WorkerOp;
 
 
