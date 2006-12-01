@@ -625,29 +625,10 @@ Path LocalStore::_addToStore(bool fixed, bool recursive,
     Path srcPath(absPath(_srcPath));
     debug(format("adding `%1%' to the store") % srcPath);
 
-    Hash h(htSHA256);
-    {
-        SwitchToOriginalUser sw;
-        h = hashPath(htSHA256, srcPath);
-    }
-
-    string baseName = baseNameOf(srcPath);
-
-    Path dstPath;
-    
-    if (fixed) {
-
-        HashType ht(parseHashType(hashAlgo));
-        Hash h2(ht);
-        {
-            SwitchToOriginalUser sw;
-            h2 = recursive ? hashPath(ht, srcPath) : hashFile(ht, srcPath);
-        }
-        
-        dstPath = makeFixedOutputPath(recursive, hashAlgo, h2, baseName);
-    }
-        
-    else dstPath = makeStorePath("source", h, baseName);
+    std::pair<Path, Hash> pr =
+        computeStorePathForPath(fixed, recursive, hashAlgo, srcPath);
+    Path & dstPath(pr.first);
+    Hash & h(pr.second);
 
     if (!readOnlyMode) addTempRoot(dstPath);
 
@@ -698,9 +679,7 @@ Path LocalStore::addToStoreFixed(bool recursive, string hashAlgo, const Path & s
 Path LocalStore::addTextToStore(const string & suffix, const string & s,
     const PathSet & references)
 {
-    Hash hash = hashString(htSHA256, s);
-
-    Path dstPath = makeStorePath("text", hash, suffix);
+    Path dstPath = computeStorePathForText(suffix, s);
     
     if (!readOnlyMode) addTempRoot(dstPath);
 

@@ -37,10 +37,14 @@ void processConnection(Source & from, Sink & to)
     debug("greeting exchanged");
 
     bool quit = false;
+
+    unsigned int opCount = 0;
     
     do {
         
         WorkerOp op = (WorkerOp) readInt(from);
+
+        opCount++;
 
         switch (op) {
 
@@ -75,13 +79,26 @@ void processConnection(Source & from, Sink & to)
             break;
         }
 
-        case wopAddToStore: {
+        case wopAddToStore:
+        case wopAddToStoreFixed: {
             /* !!! uberquick hack */
             string baseName = readString(from);
+            bool recursive = false;
+            string hashAlgo;
+            if (op == wopAddToStoreFixed) {
+                recursive = readInt(from) == 1;
+                hashAlgo = readString(from);
+            }
+
             Path tmp = createTempDir();
             Path tmp2 = tmp + "/" + baseName;
             restorePath(tmp2, from);
-            writeString(store->addToStore(tmp2), to);
+
+            if (op == wopAddToStoreFixed)
+                writeString(store->addToStoreFixed(recursive, hashAlgo, tmp2), to);
+            else
+                writeString(store->addToStore(tmp2), to);
+            
             deletePath(tmp);
             break;
         }
@@ -113,6 +130,8 @@ void processConnection(Source & from, Sink & to)
         }
         
     } while (!quit);
+
+    printMsg(lvlError, format("%1% worker operations") % opCount);
 }
 
 

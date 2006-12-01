@@ -54,12 +54,12 @@ public:
 
     /* Queries the set of outgoing FS references for a store path.
        The result is not cleared. */
-    virtual void queryReferences(const Path & storePath,
+    virtual void queryReferences(const Path & path,
         PathSet & references) = 0;
 
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
-    virtual void queryReferrers(const Path & storePath,
+    virtual void queryReferrers(const Path & path,
         PathSet & referrers) = 0;
 
     /* Copy the contents of a path to the store and register the
@@ -88,7 +88,7 @@ public:
     /* Ensure that a path is valid.  If it is not currently valid, it
        may be made valid by running a substitute (if defined for the
        path). */
-    virtual void ensurePath(const Path & storePath) = 0;
+    virtual void ensurePath(const Path & path) = 0;
 };
 
 
@@ -113,6 +113,30 @@ Path makeStorePath(const string & type,
     
 Path makeFixedOutputPath(bool recursive,
     string hashAlgo, Hash hash, string name);
+
+
+/* This is the preparatory part of addToStore() and addToStoreFixed();
+   it computes the store path to which srcPath is to be copied.
+   Returns the store path and the cryptographic hash of the
+   contents of srcPath. */
+std::pair<Path, Hash> computeStorePathForPath(bool fixed, bool recursive,
+    string hashAlgo, const Path & srcPath);
+
+/* Preparatory part of addTextToStore().
+
+   !!! Computation of the path should take the references given to
+   addTextToStore() into account, otherwise we have a (relatively
+   minor) security hole: a caller can register a source file with
+   bogus references.  If there are too many references, the path may
+   not be garbage collected when it has to be (not really a problem,
+   the caller could create a root anyway), or it may be garbage
+   collected when it shouldn't be (more serious).
+
+   Hashing the references would solve this (bogus references would
+   simply yield a different store path, so other users wouldn't be
+   affected), but it has some backwards compatibility issues (the
+   hashing scheme changes), so I'm not doing that for now. */
+Path computeStorePathForText(const string & suffix, const string & s);
 
 
 /* For now, there is a single global store API object, but we'll

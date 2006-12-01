@@ -92,7 +92,45 @@ Path makeFixedOutputPath(bool recursive,
     return makeStorePath("output:out", h, name);
 }
 
- 
+
+std::pair<Path, Hash> computeStorePathForPath(bool fixed, bool recursive,
+    string hashAlgo, const Path & srcPath)
+{
+    Hash h(htSHA256);
+    {
+        SwitchToOriginalUser sw;
+        h = hashPath(htSHA256, srcPath);
+    }
+
+    string baseName = baseNameOf(srcPath);
+
+    Path dstPath;
+    
+    if (fixed) {
+
+        HashType ht(parseHashType(hashAlgo));
+        Hash h2(ht);
+        {
+            SwitchToOriginalUser sw;
+            h2 = recursive ? hashPath(ht, srcPath) : hashFile(ht, srcPath);
+        }
+        
+        dstPath = makeFixedOutputPath(recursive, hashAlgo, h2, baseName);
+    }
+        
+    else dstPath = makeStorePath("source", h, baseName);
+
+    return std::pair<Path, Hash>(dstPath, h);
+}
+
+
+Path computeStorePathForText(const string & suffix, const string & s)
+{
+    Hash hash = hashString(htSHA256, s);
+    return makeStorePath("text", hash, suffix);
+}
+
+
 }
 
 
