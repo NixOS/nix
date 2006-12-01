@@ -143,6 +143,7 @@ void run(Strings args)
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
         string arg = *i++;
         if (arg == "--slave") slave = true;
+        if (arg == "--daemon") daemon = true;
     }
 
     if (slave) {
@@ -156,7 +157,6 @@ void run(Strings args)
 
     else
         throw Error("must be run in either --slave or --daemon mode");
-        
 }
 
 
@@ -165,4 +165,4 @@ void printHelp()
 }
 
 
-string programId = "nix-store";
+string programId = "nix-worker";
