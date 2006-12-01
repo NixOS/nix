@@ -389,7 +389,9 @@ static Expr primToFile(EvalState & state, const ATermVector & args)
         refs.insert(*i);
     }
     
-    Path storePath = store->addTextToStore(name, contents, refs);
+    Path storePath = readOnlyMode
+        ? computeStorePathForText(name, contents)
+        : store->addTextToStore(name, contents, refs);
 
     /* Note: we don't need to add `context' to the context of the
        result, since `storePath' itself has references to the paths
