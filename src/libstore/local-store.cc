@@ -619,20 +619,20 @@ static void invalidatePath(Transaction & txn, const Path & path)
 }
 
 
-Path LocalStore::_addToStore(bool fixed, bool recursive,
-    string hashAlgo, const Path & _srcPath)
+Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
+    bool recursive, string hashAlgo)
 {
     Path srcPath(absPath(_srcPath));
     debug(format("adding `%1%' to the store") % srcPath);
 
     std::pair<Path, Hash> pr =
-        computeStorePathForPath(fixed, recursive, hashAlgo, srcPath);
+        computeStorePathForPath(srcPath, fixed, recursive, hashAlgo);
     Path & dstPath(pr.first);
     Hash & h(pr.second);
 
-    if (!readOnlyMode) addTempRoot(dstPath);
+    addTempRoot(dstPath);
 
-    if (!readOnlyMode && !isValidPath(dstPath)) {
+    if (!isValidPath(dstPath)) {
 
         /* The first check above is an optimisation to prevent
            unnecessary lock acquisition. */
@@ -664,26 +664,14 @@ Path LocalStore::_addToStore(bool fixed, bool recursive,
 }
 
 
-Path LocalStore::addToStore(const Path & srcPath)
-{
-    return _addToStore(false, false, "", srcPath);
-}
-
-
-Path LocalStore::addToStoreFixed(bool recursive, string hashAlgo, const Path & srcPath)
-{
-    return _addToStore(true, recursive, hashAlgo, srcPath);
-}
-
-
 Path LocalStore::addTextToStore(const string & suffix, const string & s,
     const PathSet & references)
 {
     Path dstPath = computeStorePathForText(suffix, s);
     
-    if (!readOnlyMode) addTempRoot(dstPath);
+    addTempRoot(dstPath);
 
-    if (!readOnlyMode && !isValidPath(dstPath)) {
+    if (!isValidPath(dstPath)) {
 
         PathLocks outputLock(singleton<PathSet, Path>(dstPath));
 

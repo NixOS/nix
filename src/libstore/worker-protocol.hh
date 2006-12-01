@@ -15,7 +15,6 @@ typedef enum {
     wopQueryReferences,
     wopQueryReferrers,
     wopAddToStore,
-    wopAddToStoreFixed,
     wopAddTextToStore,
     wopBuildDerivations,
     wopEnsurePath,

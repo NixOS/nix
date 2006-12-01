@@ -133,7 +133,7 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     opArgs.pop_front();
 
     for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); ++i)
-        cout << format("%1%\n") % store->addToStoreFixed(recursive, hashAlgo, *i);
+        cout << format("%1%\n") % store->addToStore(*i, true, recursive, hashAlgo);
 }
 
 

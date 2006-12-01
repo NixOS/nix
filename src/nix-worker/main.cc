@@ -79,25 +79,18 @@ void processConnection(Source & from, Sink & to)
             break;
         }
 
-        case wopAddToStore:
-        case wopAddToStoreFixed: {
+        case wopAddToStore: {
             /* !!! uberquick hack */
             string baseName = readString(from);
-            bool recursive = false;
-            string hashAlgo;
-            if (op == wopAddToStoreFixed) {
-                recursive = readInt(from) == 1;
-                hashAlgo = readString(from);
-            }
+            bool fixed = readInt(from) == 1;
+            bool recursive = readInt(from) == 1;
+            string hashAlgo = readString(from);
 
             Path tmp = createTempDir();
             Path tmp2 = tmp + "/" + baseName;
             restorePath(tmp2, from);
 
-            if (op == wopAddToStoreFixed)
-                writeString(store->addToStoreFixed(recursive, hashAlgo, tmp2), to);
-            else
-                writeString(store->addToStore(tmp2), to);
+            writeString(store->addToStore(tmp2, fixed, recursive, hashAlgo), to);
             
             deletePath(tmp);
             break;

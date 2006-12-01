@@ -93,8 +93,8 @@ Path makeFixedOutputPath(bool recursive,
 }
 
 
-std::pair<Path, Hash> computeStorePathForPath(bool fixed, bool recursive,
-    string hashAlgo, const Path & srcPath)
+std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
+    bool fixed, bool recursive, string hashAlgo)
 {
     Hash h(htSHA256);
     {

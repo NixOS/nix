@@ -3,7 +3,6 @@
 #include "remote-store.hh"
 #include "worker-protocol.hh"
 #include "archive.hh"
-#include "globals.hh"
 
 #include <iostream>
 #include <unistd.h>
@@ -123,33 +122,14 @@ void RemoteStore::queryReferrers(const Path & path,
 }
 
 
-Path RemoteStore::addToStore(const Path & srcPath)
+Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
+    bool recursive, string hashAlgo)
 {
-    if (readOnlyMode) {
-        /* No sense in making a round trip, we can just compute the
-           path here. */
-        return computeStorePathForPath(false, false, "", srcPath).first;
-    }
+    Path srcPath(absPath(_srcPath));
     
     writeInt(wopAddToStore, to);
     writeString(baseNameOf(srcPath), to);
-    dumpPath(srcPath, to);
-    Path path = readString(from);
-    return path;
-}
-
-
-Path RemoteStore::addToStoreFixed(bool recursive, string hashAlgo,
-    const Path & srcPath)
-{
-    if (readOnlyMode) {
-        /* No sense in making a round trip, we can just compute the
-           path here. */
-        return computeStorePathForPath(true, recursive, hashAlgo, srcPath).first;
-    }
-    
-    writeInt(wopAddToStoreFixed, to);
-    writeString(baseNameOf(srcPath), to);
+    writeInt(fixed ? 1 : 0, to);
     writeInt(recursive ? 1 : 0, to);
     writeString(hashAlgo, to);
     dumpPath(srcPath, to);
@@ -161,10 +141,6 @@ Path RemoteStore::addToStoreFixed(bool recursive, string hashAlgo,
 Path RemoteStore::addTextToStore(const string & suffix, const string & s,
     const PathSet & references)
 {
-    if (readOnlyMode) {
-        return computeStorePathForText(suffix, s);
-    }
-    
     writeInt(wopAddTextToStore, to);
     writeString(suffix, to);
     writeString(s, to);

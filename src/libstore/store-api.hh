@@ -63,14 +63,11 @@ public:
         PathSet & referrers) = 0;
 
     /* Copy the contents of a path to the store and register the
-       validity the resulting path.  The resulting path is
-       returned. */
-    virtual Path addToStore(const Path & srcPath) = 0;
-
-    /* Like addToStore(), but for pre-adding the outputs of
-       fixed-output derivations. */
-    virtual Path addToStoreFixed(bool recursive, string hashAlgo,
-        const Path & srcPath) = 0;
+       validity the resulting path.  The resulting path is returned.
+       If `fixed' is true, then the output of a fixed-output
+       derivation is pre-loaded into the Nix store. */
+    virtual Path addToStore(const Path & srcPath, bool fixed = false,
+        bool recursive = false, string hashAlgo = "") = 0;
 
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */
@@ -119,8 +116,8 @@ Path makeFixedOutputPath(bool recursive,
    it computes the store path to which srcPath is to be copied.
    Returns the store path and the cryptographic hash of the
    contents of srcPath. */
-std::pair<Path, Hash> computeStorePathForPath(bool fixed, bool recursive,
-    string hashAlgo, const Path & srcPath);
+std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
+    bool fixed = false, bool recursive = false, string hashAlgo = "");
 
 /* Preparatory part of addTextToStore().
 

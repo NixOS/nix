@@ -45,27 +45,19 @@ public:
 
     Hash queryPathHash(const Path & path);
 
-    void queryReferences(const Path & storePath,
-        PathSet & references);
+    void queryReferences(const Path & path, PathSet & references);
 
-    void queryReferrers(const Path & storePath,
-        PathSet & referrers);
+    void queryReferrers(const Path & path, PathSet & referrers);
 
-    Path addToStore(const Path & srcPath);
-
-    Path addToStoreFixed(bool recursive, string hashAlgo,
-        const Path & srcPath);
+    Path addToStore(const Path & srcPath, bool fixed = false,
+        bool recursive = false, string hashAlgo = "");
 
     Path addTextToStore(const string & suffix, const string & s,
         const PathSet & references);
 
     void buildDerivations(const PathSet & drvPaths);
 
-    void ensurePath(const Path & storePath);
-
-private:
-    Path _addToStore(bool fixed, bool recursive,
-        string hashAlgo, const Path & _srcPath);
+    void ensurePath(const Path & path);
 };
 
 
@@ -120,16 +112,16 @@ bool isValidPathTxn(const Transaction & txn, const Path & path);
 
 /* Sets the set of outgoing FS references for a store path.  Use with
    care! */
-void setReferences(const Transaction & txn, const Path & storePath,
+void setReferences(const Transaction & txn, const Path & path,
     const PathSet & references);
 
 /* Sets the deriver of a store path.  Use with care! */
-void setDeriver(const Transaction & txn, const Path & storePath,
+void setDeriver(const Transaction & txn, const Path & path,
     const Path & deriver);
 
 /* Query the deriver of a store path.  Return the empty string if no
    deriver has been set. */
-Path queryDeriver(const Transaction & txn, const Path & storePath);
+Path queryDeriver(const Transaction & txn, const Path & path);
 
 /* Delete a value from the nixStore directory. */
 void deleteFromStore(const Path & path, unsigned long long & bytesFreed);

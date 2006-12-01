@@ -37,10 +37,8 @@ public:
 
     void queryReferrers(const Path & path, PathSet & referrers);
 
-    Path addToStore(const Path & srcPath);
-
-    Path addToStoreFixed(bool recursive, string hashAlgo,
-        const Path & srcPath);
+    Path addToStore(const Path & srcPath, bool fixed = false,
+        bool recursive = false, string hashAlgo = "");
 
     Path addTextToStore(const string & suffix, const string & s,
         const PathSet & references);

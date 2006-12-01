@@ -5,6 +5,7 @@
 #include "store-api.hh"
 #include "derivations.hh"
 #include "nixexpr-ast.hh"
+#include "globals.hh"
 
 
 namespace nix {
@@ -251,7 +252,9 @@ string coerceToString(EvalState & state, Expr e, PathSet & context,
         if (state.srcToStore[path] != "")
             dstPath = state.srcToStore[path];
         else {
-            dstPath = store->addToStore(path);
+            dstPath = readOnlyMode
+                ? computeStorePathForPath(path).first
+                : store->addToStore(path);
             state.srcToStore[path] = dstPath;
             printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
                 % path % dstPath);
