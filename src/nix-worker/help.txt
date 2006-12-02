@@ -1,0 +1,10 @@
+Usage: nix-worker [OPTIONS...] [--daemon | --slave]
+
+`nix-worker' is a helper program used to implement secure, multi-user
+Nix stores.  In `--daemon' mode, it goes into the background and waits
+for incoming connections on a Unix domain socket, and forks a process
+for each connection to perform the Nix store operations requested by
+the caller.  In `--slave' mode, `nix-worker' is called directly, and
+the caller and the worker communicate with each other over
+stdin/stdout.  In this mode, the `nix-worker' program should have
+appropriate setuid privileges.

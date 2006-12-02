@@ -5,6 +5,8 @@
 #include "worker-protocol.hh"
 #include "archive.hh"
 
+#include <iostream>
+
 using namespace nix;
 
 
@@ -48,12 +50,13 @@ void processConnection(Source & from, Sink & to)
 
         switch (op) {
 
-        case wopQuit:
+        case wopQuit: {
             /* Close the database. */
             store.reset((StoreAPI *) 0);
             writeInt(1, to);
             quit = true;
             break;
+        }
 
         case wopIsValidPath: {
             Path path = readStorePath(from);
@@ -64,6 +67,12 @@ void processConnection(Source & from, Sink & to)
         case wopHasSubstitutes: {
             Path path = readStorePath(from);
             writeInt(store->hasSubstitutes(path), to);
+            break;
+        }
+
+        case wopQueryPathHash: {
+            Path path = readStorePath(from);
+            writeString(printHash(store->queryPathHash(path)), to);
             break;
         }
 
@@ -153,8 +162,11 @@ void run(Strings args)
 }
 
 
+#include "help.txt.hh"
+
 void printHelp()
 {
+    std::cout << string((char *) helpText, sizeof helpText);
 }
 
 

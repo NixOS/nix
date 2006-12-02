@@ -98,7 +98,10 @@ bool RemoteStore::hasSubstitutes(const Path & path)
 
 Hash RemoteStore::queryPathHash(const Path & path)
 {
-    throw Error("not implemented 3");
+    writeInt(wopQueryPathHash, to);
+    writeString(path, to);
+    string hash = readString(from);
+    return parseHash(htSHA256, hash);
 }
 
 
