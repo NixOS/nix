@@ -170,4 +170,19 @@ void RemoteStore::ensurePath(const Path & path)
 }
 
 
+void RemoteStore::addTempRoot(const Path & path)
+{
+    writeInt(wopAddTempRoot, to);
+    writeString(path, to);
+    readInt(from);
+}
+
+
+void RemoteStore::syncWithGC()
+{
+    writeInt(wopSyncWithGC, to);
+    readInt(from);
+}
+
+
 }

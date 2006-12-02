@@ -47,6 +47,10 @@ public:
 
     void ensurePath(const Path & path);
 
+    void addTempRoot(const Path & path);
+
+    void syncWithGC();
+    
 private:
     Pipe toChild;
     Pipe fromChild;

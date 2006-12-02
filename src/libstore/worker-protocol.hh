@@ -18,6 +18,8 @@ typedef enum {
     wopAddTextToStore,
     wopBuildDerivations,
     wopEnsurePath,
+    wopAddTempRoot,
+    wopSyncWithGC
 } WorkerOp;
 
 

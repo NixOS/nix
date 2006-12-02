@@ -76,16 +76,18 @@ void createSymlink(const Path & link, const Path & target, bool careful)
 }
 
 
+void LocalStore::syncWithGC()
+{
+    AutoCloseFD fdGCLock = openGCLock(ltRead);
+}
+
+
 Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
     bool indirect, bool allowOutsideRootsDir)
 {
     Path storePath(canonPath(_storePath));
     Path gcRoot(canonPath(_gcRoot));
     assertStorePath(storePath);
-
-    /* Grab the global GC root.  This prevents the set of permanent
-       roots from increasing while a GC is in progress. */
-    AutoCloseFD fdGCLock = openGCLock(ltRead);
 
     if (indirect) {
         string hash = printHash32(hashString(htSHA1, gcRoot));
@@ -110,6 +112,11 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
         createSymlink(gcRoot, storePath, false);
     }
 
+    /* Grab the global GC root, causing us to block while a GC is in
+       progress.  This prevents the set of permanent roots from
+       increasing while a GC is in progress. */
+    store->syncWithGC();
+    
     return gcRoot;
 }
 
@@ -119,7 +126,7 @@ static Path fnTempRoots;
 static AutoCloseFD fdTempRoots;
 
 
-void addTempRoot(const Path & path)
+void LocalStore::addTempRoot(const Path & path)
 {
     /* Create the temporary roots file for this process. */
     if (fdTempRoots == -1) {

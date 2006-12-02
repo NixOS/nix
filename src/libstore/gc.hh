@@ -26,12 +26,6 @@ typedef enum {
 void collectGarbage(GCAction action, const PathSet & pathsToDelete,
     bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed);
 
-/* Register a temporary GC root.  This root will automatically
-   disappear when this process exits.  WARNING: this function should
-   not be called inside a BDB transaction, otherwise we can
-   deadlock. */
-void addTempRoot(const Path & path);
-
 /* Remove the temporary roots file for this process.  Any temporary
    root becomes garbage after this point unless it has been registered
    as a (permanent) root. */

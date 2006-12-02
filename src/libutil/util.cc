@@ -122,7 +122,7 @@ Path dirOf(const Path & path)
 {
     Path::size_type pos = path.rfind('/');
     if (pos == string::npos)
-        throw Error(format("invalid file name: %1%") % path);
+        throw Error(format("invalid file name `%1%'") % path);
     return pos == 0 ? "/" : Path(path, 0, pos);
 }
 
@@ -131,7 +131,7 @@ string baseNameOf(const Path & path)
 {
     Path::size_type pos = path.rfind('/');
     if (pos == string::npos)
-        throw Error(format("invalid file name %1% ") % path);
+        throw Error(format("invalid file name `%1%'") % path);
     return string(path, pos + 1);
 }
 

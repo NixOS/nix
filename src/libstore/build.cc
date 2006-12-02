@@ -642,7 +642,7 @@ void DerivationGoal::haveStoreExpr()
 
     for (DerivationOutputs::iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
-        addTempRoot(i->second.path);
+        store->addTempRoot(i->second.path);
 
     /* Check what outputs paths are not already valid. */
     PathSet invalidOutputs = checkPathValidity(false);
@@ -1714,7 +1714,7 @@ void SubstitutionGoal::init()
 {
     trace("init");
 
-    addTempRoot(storePath);
+    store->addTempRoot(storePath);
     
     /* If the path already exists we're done. */
     if (store->isValidPath(storePath)) {

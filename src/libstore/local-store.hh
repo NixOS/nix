@@ -58,6 +58,10 @@ public:
     void buildDerivations(const PathSet & drvPaths);
 
     void ensurePath(const Path & path);
+
+    void addTempRoot(const Path & path);
+
+    void syncWithGC();
 };
 
 

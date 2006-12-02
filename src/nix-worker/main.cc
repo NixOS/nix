@@ -127,6 +127,19 @@ void processConnection(Source & from, Sink & to)
             break;
         }
 
+        case wopAddTempRoot: {
+            Path path = readStorePath(from);
+            store->addTempRoot(path);
+            writeInt(1, to);
+            break;
+        }
+
+        case wopSyncWithGC: {
+            store->syncWithGC();
+            writeInt(1, to);
+            break;
+        }
+
         default:
             throw Error(format("invalid operation %1%") % op);
         }

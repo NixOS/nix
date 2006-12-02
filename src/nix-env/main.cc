@@ -182,7 +182,7 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
 
         /* This is only necessary when installing store paths, e.g.,
            `nix-env -i /nix/store/abcd...-foo'. */
-        addTempRoot(i->queryOutPath(state));
+        store->addTempRoot(i->queryOutPath(state));
         store->ensurePath(i->queryOutPath(state));
         
         references.insert(i->queryOutPath(state));
@@ -940,7 +940,7 @@ static void opSwitchProfile(Globals & globals,
     if (opArgs.size() != 1)
         throw UsageError(format("exactly one argument expected"));
 
-    Path profile = opArgs.front();
+    Path profile = absPath(opArgs.front());
     Path profileLink = getHomeDir() + "/.nix-profile";
 
     switchLink(profileLink, profile);
