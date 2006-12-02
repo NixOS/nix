@@ -92,10 +92,7 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
         Path realRoot = canonPath((format("%1%/%2%/auto/%3%")
             % nixStateDir % gcRootsDir % hash).str());
         
-        {
-            SwitchToOriginalUser sw;
-            createSymlink(gcRoot, storePath, true);
-        }
+        createSymlink(gcRoot, storePath, true);
         createSymlink(realRoot, gcRoot, false);
     }
 

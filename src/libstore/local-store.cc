@@ -207,10 +207,7 @@ void copyPath(const Path & src, const Path & dst)
        files. */ 
 
     CopySink sink;
-    {
-        SwitchToOriginalUser sw;
-        dumpPath(src, sink);
-    }
+    dumpPath(src, sink);
 
     CopySource source(sink.s);
     restorePath(dst, source);

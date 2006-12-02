@@ -909,37 +909,6 @@ static gid_t savedGid, nixGid;
 #endif
 
 
-SwitchToOriginalUser::SwitchToOriginalUser()
-{
-#if HAVE_SETRESUID
-    /* Temporarily switch the effective uid/gid back to the saved
-       uid/gid (which is the uid/gid of the user that executed the Nix
-       program; it's *not* the real uid/gid, since we changed that to
-       the Nix user in switchToNixUser()). */
-    if (haveSwitched) {
-        if (setuid(savedUid) == -1)
-            throw SysError(format("temporarily restoring uid to `%1%'") % savedUid); 
-        if (setgid(savedGid) == -1)
-            throw SysError(format("temporarily restoring gid to `%1%'") % savedGid); 
-    }
-#endif
-}
-
-
-SwitchToOriginalUser::~SwitchToOriginalUser()
-{
-#if HAVE_SETRESUID
-    /* Switch the effective uid/gid back to the Nix user. */
-    if (haveSwitched) {
-        if (setuid(nixUid) == -1)
-            throw SysError(format("restoring uid to `%1%'") % nixUid); 
-        if (setgid(nixGid) == -1)
-            throw SysError(format("restoring gid to `%1%'") % nixGid); 
-    }
-#endif
-}
-
-
 void switchToNixUser()
 {
 #if 0

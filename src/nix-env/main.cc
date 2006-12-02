@@ -943,7 +943,6 @@ static void opSwitchProfile(Globals & globals,
     Path profile = opArgs.front();
     Path profileLink = getHomeDir() + "/.nix-profile";
 
-    SwitchToOriginalUser sw;
     switchLink(profileLink, profile);
 }
 
@@ -1092,7 +1091,6 @@ static void opDefaultExpr(Globals & globals,
     Path defNixExpr = absPath(opArgs.front());
     Path defNixExprLink = getDefNixExprPath();
     
-    SwitchToOriginalUser sw;
     switchLink(defNixExprLink, defNixExpr);
 }
 
@@ -1196,7 +1194,6 @@ void run(Strings args)
     if (!op) throw UsageError("no operation specified");
 
     if (globals.profile == "") {
-        SwitchToOriginalUser sw;
         Path profileLink = getHomeDir() + "/.nix-profile";
         globals.profile = pathExists(profileLink)
             ? absPath(readLink(profileLink), dirOf(profileLink))

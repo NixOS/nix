@@ -250,12 +250,6 @@ bool string2Int(const string & s, int & n);
 
 
 /* Setuid support. */
-struct SwitchToOriginalUser
-{
-    SwitchToOriginalUser();
-    ~SwitchToOriginalUser();
-};
-
 void switchToNixUser();
 
  
