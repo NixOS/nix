@@ -249,10 +249,6 @@ string int2String(int n);
 bool string2Int(const string & s, int & n);
 
 
-/* Setuid support. */
-void switchToNixUser();
-
- 
 }
 
 

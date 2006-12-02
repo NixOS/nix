@@ -15,6 +15,9 @@
 #include <aterm2.h>
 
 
+extern char * * environ;
+
+
 namespace nix {
 
 
@@ -204,6 +207,54 @@ static void initAndRun(int argc, char * * argv)
 }
 
 
+static void setuidInit()
+{
+    /* Don't do anything if this is not a setuid binary. */
+    if (getuid() == geteuid() && getgid() == getegid()) return;
+
+    uid_t nixUid = geteuid();
+    gid_t nixGid = getegid();
+    
+    fprintf(stderr, "<<< setuid mode >>>\n");
+
+    /* Don't trust the environment. */
+    environ = 0;
+
+    /* Don't trust the current directory. */
+    if (chdir("/") == -1) abort();
+
+    /* Make sure that file descriptors 0, 1, 2 are open. */
+    for (int fd = 0; fd <= 2; ++fd) {
+        struct stat st;
+        if (fstat(fd, &st) == -1) abort();
+    }
+
+    /* Set the real (and preferably also the save) uid/gid to the
+       effective uid/gid.  This matters mostly when we're not using
+       build-users (bad!), since some builders (like Perl) complain
+       when real != effective.
+
+       On systems where setresuid is unavailable, we can't drop the
+       saved uid/gid.  This means that we could go back to the
+       original real uid (i.e., the uid of the caller).  That's not
+       really a problem, except maybe when we execute a builder and
+       we're not using build-users.  In that case, the builder may be
+       able to switch to the uid of the caller and possibly do bad
+       stuff.  But note that when not using build-users, the builder
+       could also modify the Nix executables (say, replace them by a
+       Trojan horse), so the problem is already there. */
+
+#if HAVE_SETRESUID
+    setresuid(nixUid, nixUid, nixUid);
+    setresgid(nixGid, nixGid, nixGid);
+#else
+    /* Note: doesn't set saved uid/gid! */
+    setuid(nixUid);
+    setgid(nixGid);
+#endif
+}
+
+
 }
 
 
@@ -212,10 +263,11 @@ static char buf[1024];
 int main(int argc, char * * argv)
 {
     using namespace nix;
-    
-    /* If we are setuid root, we have to get rid of the excess
-       privileges ASAP. */
-    switchToNixUser();
+
+    /* If we're setuid, then we need to take some security precautions
+       right away. */
+    if (argc == 0) abort();
+    setuidInit();
     
     /* ATerm setup. */
     ATerm bottomOfStack;
