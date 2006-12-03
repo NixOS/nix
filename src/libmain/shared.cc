@@ -244,7 +244,7 @@ static void setuidInit()
        could also modify the Nix executables (say, replace them by a
        Trojan horse), so the problem is already there. */
 
-#if 0 && HAVE_SETRESUID
+#if HAVE_SETRESUID
     if (setresuid(nixUid, nixUid, nixUid)) abort();
     if (setresgid(nixGid, nixGid, nixGid)) abort();
 #elif HAVE_SETREUID

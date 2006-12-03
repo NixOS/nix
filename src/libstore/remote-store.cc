@@ -73,6 +73,7 @@ RemoteStore::RemoteStore()
     
     /* Send the magic greeting, check for the reply. */
     try {
+        processStderr();
         writeInt(WORKER_MAGIC_1, to);
         unsigned int magic = readInt(from);
         if (magic != WORKER_MAGIC_2) throw Error("protocol mismatch");

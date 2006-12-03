@@ -4,6 +4,7 @@
 #include "serialise.hh"
 #include "worker-protocol.hh"
 #include "archive.hh"
+#include "globals.hh"
 
 #include <iostream>
 #include <unistd.h>
@@ -30,7 +31,9 @@ static PathSet readStorePaths(Source & from)
 }
 
 
-static Sink * _to; /* !!! should make writeToStderr an object */
+static FdSource from(STDIN_FILENO);
+static FdSink to(STDOUT_FILENO);
+
 bool canSendStderr;
 
 
@@ -40,11 +43,13 @@ bool canSendStderr;
    socket. */
 static void tunnelStderr(const unsigned char * buf, size_t count)
 {
+    if (canSendStderr)
+        writeFull(STDERR_FILENO, (unsigned char *) "L: ", 3);
     writeFull(STDERR_FILENO, buf, count);
     if (canSendStderr) {
         try {
-            writeInt(STDERR_NEXT, *_to);
-            writeString(string((char *) buf, count), *_to);
+            writeInt(STDERR_NEXT, to);
+            writeString(string((char *) buf, count), to);
         } catch (...) {
             /* Write failed; that means that the other side is
                gone. */
@@ -118,7 +123,7 @@ static void stopWork()
         throw SysError("ignoring SIGIO");
     
     canSendStderr = false;
-    writeInt(STDERR_LAST, *_to);
+    writeInt(STDERR_LAST, to);
 }
 
 
@@ -225,21 +230,46 @@ static void performOp(Source & from, Sink & to, unsigned int op)
 }
 
 
-static void processConnection(Source & from, Sink & to)
+static void processConnection()
 {
-    store = boost::shared_ptr<StoreAPI>(new LocalStore(true));
-
-    unsigned int magic = readInt(from);
-    if (magic != WORKER_MAGIC_1) throw Error("protocol mismatch");
-
-    writeInt(WORKER_MAGIC_2, to);
-
-    debug("greeting exchanged");
-    
-    _to = &to;
     canSendStderr = false;
     writeToStderr = tunnelStderr;
 
+    /* Allow us to receive SIGIO for events on the client socket. */
+    signal(SIGIO, SIG_IGN);
+    if (fcntl(STDIN_FILENO, F_SETOWN, getpid()) == -1)
+        throw SysError("F_SETOWN");
+    if (fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL, 0) | FASYNC) == -1)
+        throw SysError("F_SETFL");
+
+    /* Send startup error messages to the client. */
+    startWork();
+
+    try {
+
+        /* Prevent users from doing something very dangerous. */
+        if (setuidMode && geteuid() == 0 &&
+            querySetting("build-users", Strings()).size() == 0)
+            throw Error("if you run `nix-worker' setuid root, then you MUST set `build-users'!");
+
+        /* Open the store. */
+        store = boost::shared_ptr<StoreAPI>(new LocalStore(true));
+
+        stopWork();
+        
+    } catch (Error & e) {
+        writeInt(STDERR_ERROR, to);
+        writeString(e.msg(), to);
+        return;
+    }
+
+    /* Exchange the greeting. */
+    unsigned int magic = readInt(from);
+    if (magic != WORKER_MAGIC_1) throw Error("protocol mismatch");
+    writeInt(WORKER_MAGIC_2, to);
+    debug("greeting exchanged");
+
+    /* Process client requests. */
     bool quit = false;
 
     unsigned int opCount = 0;
@@ -252,7 +282,7 @@ static void processConnection(Source & from, Sink & to)
         try {
             performOp(from, to, op);
         } catch (Error & e) {
-            writeInt(STDERR_ERROR, *_to);
+            writeInt(STDERR_ERROR, to);
             writeString(e.msg(), to);
         }
 
@@ -273,27 +303,21 @@ void run(Strings args)
         if (arg == "--daemon") daemon = true;
     }
 
-    /* Allow us to receive SIGIO for events on the client socket. */
-    signal(SIGIO, SIG_IGN);
-    if (fcntl(STDIN_FILENO, F_SETOWN, getpid()) == -1)
-        throw SysError("F_SETOWN");
-    if (fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL, 0) | FASYNC) == -1)
-        throw SysError("F_SETFL");
-
     if (slave) {
-        FdSource source(STDIN_FILENO);
-        FdSink sink(STDOUT_FILENO);
-
         /* This prevents us from receiving signals from the terminal
            when we're running in setuid mode. */
         if (setsid() == -1)
             throw SysError(format("creating a new session"));
 
-        processConnection(source, sink);
+        processConnection();
     }
 
-    else if (daemon)
+    else if (daemon) {
+        if (setuidMode)
+            throw Error("daemon cannot be started in setuid mode");
+        
         throw Error("daemon mode not implemented");
+    }
 
     else
         throw Error("must be run in either --slave or --daemon mode");
