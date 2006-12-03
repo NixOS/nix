@@ -164,6 +164,12 @@ void run(Strings args)
     if (slave) {
         FdSource source(STDIN_FILENO);
         FdSink sink(STDOUT_FILENO);
+
+        /* This prevents us from receiving signals from the terminal
+           when we're running in setuid mode. */
+        if (setsid() == -1)
+            throw SysError(format("creating a new session"));
+
         processConnection(source, sink);
     }
 
