@@ -78,35 +78,44 @@
 #build-max-jobs = 1
 
 
-### Option `build-allow-root'
-#
-# This option controls Nix's behaviour when it is invoked under the
-# `root' user (or setuid-root).  If `true' (default), builds are
-# performed under the `root' user.  If `false', builds are performed
-# under one of the users listed in the `build-users' option (see
-# below).
-#build-allow-root = true
-
-
 ### Option `build-users'
 #
-# This option is only applicable if `build-allow-root' is `false' and
-# Nix is invoked under the `root' user (or setuid-root).  It contains
-# a list of user names under which Nix can execute builds.  Builds
-# cannot be performed by root since that would allow users to take
-# over the system by supplying specially crafted builders; and they
-# cannot be performed by the calling user since that would allow
-# him/her to influence the build result.
+# This option contains a list of user names under which Nix can
+# execute builds.  In multi-user Nix installations, builds should not
+# be performed by the Nix account since that would allow users to
+# arbitrarily modify the Nix store and database by supplying specially
+# crafted builders; and they cannot be performed by the calling user
+# since that would allow him/her to influence the build result.
 #
 # Thus this list should contain a number of `special' user accounts
 # created specifically for Nix, e.g., `nix-builder-1',
 # `nix-builder-2', and so on.  The more users the better, since at
 # most a number of builds equal to the number of build users can be
-# started.
+# running simultaneously.
+#
+# If this list is empty, builds will be performed under the Nix
+# account (that is, the uid under which the Nix daemon runs, or that
+# owns the setuid nix-worker program).
 #
 # Example:
 #   build-users = nix-builder-1 nix-builder-2 nix-builder-3
 #build-users =
+
+
+### Option `build-users-group'
+#
+# If `build-users' is used, then this option specifies the group ID
+# (gid) under which each build is to be performed.  This group should
+# have permission to create files in the Nix store, but not delete
+# them.  I.e., /nix/store should be owned by the Nix account, its
+# group should be the group specified here, and its mode should be
+# 1775.
+#
+# The default is `nix'.
+#
+# Example:
+#   build-users-group = nix
+#build-users-group =
 
 
 ### Option `system'

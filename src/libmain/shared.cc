@@ -258,6 +258,8 @@ static void setuidInit()
     if (setuid(nixUid)) abort();
     if (setgid(nixGid)) abort();
 #endif
+
+    setuidMode = true;
 }
 
 

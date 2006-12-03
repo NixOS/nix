@@ -235,10 +235,10 @@ void canonicalisePathMetaData(const Path & path)
                 throw SysError(format("changing mode of `%1%' to %2$o") % path % mode);
         }
 
-        if (st.st_uid != getuid() || st.st_gid != getgid()) {
-            if (chown(path.c_str(), getuid(), getgid()) == -1)
+        if (st.st_uid != geteuid() || st.st_gid != getegid()) {
+            if (chown(path.c_str(), geteuid(), getegid()) == -1)
                 throw SysError(format("changing owner/group of `%1%' to %2%/%3%")
-                    % path % getuid() % getgid());
+                    % path % geteuid() % getegid());
         }
 
         if (st.st_mtime != 0) {

@@ -1271,12 +1271,10 @@ void DerivationGoal::startBuilder()
     }
 
     
-    /* If we are running as root, and the `build-allow-root' setting
-       is `false', then we have to build as one of the users listed in
-       `build-users'. */
-    if (!queryBoolSetting("build-allow-root", true) &&
-        getuid() == rootUserId)
-    {
+    /* If `build-users' is not empty, then we have to build as one of
+       the users listed in `build-users'. */
+    gid_t gidBuildGroup = -1;    
+    if (querySetting("build-users", Strings()).size() > 0) {
         buildUser.acquire();
         assert(buildUser.getUID() != 0);
 
@@ -1288,6 +1286,14 @@ void DerivationGoal::startBuilder()
         if (chown(tmpDir.c_str(), buildUser.getUID(), (gid_t) -1) == -1)
             throw SysError(format("cannot change ownership of `%1%'") % tmpDir);
 
+        /* What group to execute the builder in? */
+        string buildGroup = querySetting("build-users-group", "nix");
+        struct group * gr = getgrnam(buildGroup.c_str());
+        if (!gr) throw Error(
+            format("the group `%1%' specified in `build-users-group' does not exist")
+            % buildGroup);
+        gidBuildGroup = gr->gr_gid;
+        
         /* Check that the Nix store has the appropriate permissions,
            i.e., owned by root and mode 1777 (sticky bit on so that
            the builder can create its output but not mess with the
@@ -1295,13 +1301,13 @@ void DerivationGoal::startBuilder()
         struct stat st;
         if (stat(nixStore.c_str(), &st) == -1)
             throw SysError(format("cannot stat `%1%'") % nixStore);
-        if (st.st_uid != rootUserId)
-            throw Error(format("`%1%' is not owned by root") % nixStore);
         if (!(st.st_mode & S_ISVTX) ||
-            ((st.st_mode & S_IRWXO) != S_IRWXO))
+            ((st.st_mode & S_IRWXG) != S_IRWXG) ||
+            (st.st_gid != gidBuildGroup))
             throw Error(format(
                 "builder does not have write permission to `%1%'; "
-                "try `chmod 1777 %1%'") % nixStore);
+                "try `chgrp %1% %2%; chmod 1775 %2%'")
+                % buildGroup % nixStore);
     }
 
     
@@ -1343,23 +1349,25 @@ void DerivationGoal::startBuilder()
                 envStrs.push_back(i->first + "=" + i->second);
             const char * * envArr = strings2CharPtrs(envStrs);
 
-            /* If we are running as root and `build-allow-root' is
-               `false', then switch to the user we allocated above.
-               Make sure that we drop all root privileges.  Note that
-               initChild() above has closed all file descriptors
-               except std*, so that's safe.  Also note that setuid()
-               when run as root sets the real, effective and saved
-               UIDs. */
+            /* If we are running in `build-users' mode, then switch to
+               the user we allocated above.  Make sure that we drop
+               all root privileges.  Note that initChild() above has
+               closed all file descriptors except std*, so that's
+               safe.  Also note that setuid() when run as root sets
+               the real, effective and saved UIDs. */
             if (buildUser.getUID() != 0) {
                 printMsg(lvlError, format("switching to uid `%1%'") % buildUser.getUID());
                 
-                /* !!! setgid also */
                 if (setgroups(0, 0) == -1)
                     throw SysError("cannot clear the set of supplementary groups");
+                
                 setuid(buildUser.getUID());
                 assert(getuid() == buildUser.getUID());
                 assert(geteuid() == buildUser.getUID());
 
+                setgid(gidBuildGroup);
+                assert(getgid() == gidBuildGroup);
+                assert(getegid() == gidBuildGroup);
             }
             
             /* Execute the program.  This should not return. */
