@@ -25,7 +25,7 @@ Path makeRootName(const Path & gcRoot, int & counter);
 void printGCWarning();
 
 /* Whether we're running setuid. */
-bool setuidMode = false;
+extern bool setuidMode;
 
 }
 

@@ -207,6 +207,9 @@ static void initAndRun(int argc, char * * argv)
 }
 
 
+bool setuidMode = false;
+
+
 static void setuidInit()
 {
     /* Don't do anything if this is not a setuid binary. */
