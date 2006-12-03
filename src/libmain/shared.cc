@@ -244,13 +244,19 @@ static void setuidInit()
        could also modify the Nix executables (say, replace them by a
        Trojan horse), so the problem is already there. */
 
-#if HAVE_SETRESUID
-    setresuid(nixUid, nixUid, nixUid);
-    setresgid(nixGid, nixGid, nixGid);
-#else
+#if 0 && HAVE_SETRESUID
+    if (setresuid(nixUid, nixUid, nixUid)) abort();
+    if (setresgid(nixGid, nixGid, nixGid)) abort();
+#elif HAVE_SETREUID
     /* Note: doesn't set saved uid/gid! */
-    setuid(nixUid);
-    setgid(nixGid);
+    fprintf(stderr, "warning: cannot set saved uid\n");
+    if (setreuid(nixUid, nixUid)) abort();
+    if (setregid(nixGid, nixGid)) abort();
+#else
+    /* Note: doesn't set real and saved uid/gid! */
+    fprintf(stderr, "warning: cannot set real and saved uids\n");
+    if (setuid(nixUid)) abort();
+    if (setgid(nixGid)) abort();
 #endif
 }
 
