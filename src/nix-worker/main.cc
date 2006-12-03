@@ -6,6 +6,9 @@
 #include "archive.hh"
 
 #include <iostream>
+#include <unistd.h>
+#include <signal.h>
+#include <fcntl.h>
 
 using namespace nix;
 
@@ -31,6 +34,10 @@ static Sink * _to; /* !!! should make writeToStderr an object */
 bool canSendStderr;
 
 
+/* This function is called anytime we want to write something to
+   stderr.  If we're in a state where the protocol allows it (i.e.,
+   when canSendStderr), send the message to the client over the
+   socket. */
 static void tunnelStderr(const unsigned char * buf, size_t count)
 {
     writeFull(STDERR_FILENO, buf, count);
@@ -48,11 +55,28 @@ static void tunnelStderr(const unsigned char * buf, size_t count)
 }
 
 
+/* A SIGIO signal is received when data is available on the client
+   communication scoket, or when the client has closed its side of the
+   socket.  This handler is enabled at precisely those moments in the
+   protocol when we're doing work and the client is supposed to be
+   quiet.  Thus, if we get a SIGIO signal, it means that the client
+   has quit.  So we should quit as well. */
+static void sigioHandler(int sigNo)
+{
+    _isInterrupted = 1;
+    canSendStderr = false;
+    write(STDERR_FILENO, "SIGIO\n", 6);
+}
+
+
 /* startWork() means that we're starting an operation for which we
    want to send out stderr to the client. */
 static void startWork()
 {
     canSendStderr = true;
+
+    /* Handle client death asynchronously. */
+    signal(SIGIO, sigioHandler);
 }
 
 
@@ -60,6 +84,11 @@ static void startWork()
    client. */
 static void stopWork()
 {
+    /* Stop handling async client death; we're going to a state where
+       we're either sending or receiving from the client, so we'll be
+       notified of client death anyway. */
+    signal(SIGIO, SIG_IGN);
+    
     canSendStderr = false;
     writeInt(STDERR_LAST, *_to);
 }
@@ -178,7 +207,7 @@ static void processConnection(Source & from, Sink & to)
     writeInt(WORKER_MAGIC_2, to);
 
     debug("greeting exchanged");
-
+    
     _to = &to;
     canSendStderr = false;
     writeToStderr = tunnelStderr;
@@ -215,6 +244,13 @@ void run(Strings args)
         if (arg == "--slave") slave = true;
         if (arg == "--daemon") daemon = true;
     }
+
+    /* Allow us to receive SIGIO for events on the client socket. */
+    signal(SIGIO, SIG_IGN);
+    if (fcntl(STDIN_FILENO, F_SETOWN, getpid()) == -1)
+        throw SysError("F_SETOWN");
+    if (fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL, 0) | FASYNC) == -1)
+        throw SysError("F_SETFL");
 
     if (slave) {
         FdSource source(STDIN_FILENO);
