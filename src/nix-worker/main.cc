@@ -76,7 +76,34 @@ static void startWork()
     canSendStderr = true;
 
     /* Handle client death asynchronously. */
-    signal(SIGIO, sigioHandler);
+    if (signal(SIGIO, sigioHandler) == SIG_ERR)
+        throw SysError("setting handler for SIGIO");
+
+    /* Of course, there is a race condition here: the socket could
+       have closed between when we last read from / wrote to it, and
+       between the time we set the handler for SIGIO.  In that case we
+       won't get the signal.  So do a non-blocking select() to find
+       out if any input is available on the socket.  If there is, it
+       has to be the 0-byte read that indicates that the socket has
+       closed. */
+    
+    struct timeval timeout;
+    timeout.tv_sec = timeout.tv_usec = 0;
+
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(STDIN_FILENO, &fds);
+        
+    if (select(STDIN_FILENO + 1, &fds, 0, 0, &timeout) == -1)
+        throw SysError("select()");
+
+    if (FD_ISSET(STDIN_FILENO, &fds)) {
+        char c;
+        if (read(STDIN_FILENO, &c, 1) != 0)
+            throw Error("EOF expected (protocol error?)");
+        _isInterrupted = 1;
+        checkInterrupt();
+    }
 }
 
 
@@ -87,7 +114,8 @@ static void stopWork()
     /* Stop handling async client death; we're going to a state where
        we're either sending or receiving from the client, so we'll be
        notified of client death anyway. */
-    signal(SIGIO, SIG_IGN);
+    if (signal(SIGIO, SIG_IGN) == SIG_ERR)
+        throw SysError("ignoring SIGIO");
     
     canSendStderr = false;
     writeInt(STDERR_LAST, *_to);
