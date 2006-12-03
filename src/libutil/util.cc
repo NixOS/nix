@@ -685,9 +685,11 @@ void Pid::kill()
 
     /* Wait until the child dies, disregarding the exit status. */
     int status;
-    while (waitpid(pid, &status, 0) == -1)
+    while (waitpid(pid, &status, 0) == -1) {
+        checkInterrupt();
         if (errno != EINTR) printMsg(lvlError,
             (SysError(format("waiting for process %1%") % pid).msg()));
+    }
 
     pid = -1;
 }
