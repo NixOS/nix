@@ -52,8 +52,7 @@ public:
     void syncWithGC();
     
 private:
-    Pipe toChild;
-    Pipe fromChild;
+    AutoCloseFD fdSelf;
     FdSink to;
     FdSource from;
     Pid child;

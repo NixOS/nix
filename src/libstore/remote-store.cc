@@ -6,6 +6,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
 #include <fcntl.h>
 
 #include <iostream>
@@ -17,10 +18,14 @@ namespace nix {
 
 RemoteStore::RemoteStore()
 {
-    toChild.create();
-    fromChild.create();
+    int sockets[2];
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1)
+        throw SysError("cannot create sockets");
 
+    fdSelf = sockets[0];
+    AutoCloseFD fdChild = sockets[1];
 
+    
     /* Start the worker. */
     string worker = "nix-worker";
 
@@ -33,14 +38,15 @@ RemoteStore::RemoteStore()
 
     case 0:
         try { /* child */
-
-            fromChild.readSide.close();
-            if (dup2(fromChild.writeSide, STDOUT_FILENO) == -1)
+            
+            if (dup2(fdChild, STDOUT_FILENO) == -1)
                 throw SysError("dupping write side");
 
-            toChild.writeSide.close();
-            if (dup2(toChild.readSide, STDIN_FILENO) == -1)
+            if (dup2(fdChild, STDIN_FILENO) == -1)
                 throw SysError("dupping read side");
+
+            close(fdSelf);
+            close(fdChild);
 
             int fdDebug = open("/tmp/worker-log", O_WRONLY | O_CREAT | O_TRUNC, 0644);
             assert(fdDebug != -1);
@@ -59,11 +65,10 @@ RemoteStore::RemoteStore()
         quickExit(1);
     }
 
-    fromChild.writeSide.close();
-    toChild.readSide.close();
+    fdChild.close();
 
-    from.fd = fromChild.readSide;
-    to.fd = toChild.writeSide;
+    from.fd = fdSelf;
+    to.fd = fdSelf;
 
     
     /* Send the magic greeting, check for the reply. */
@@ -81,8 +86,7 @@ RemoteStore::RemoteStore()
 RemoteStore::~RemoteStore()
 {
     try {
-        fromChild.readSide.close();
-        toChild.writeSide.close();
+        fdSelf.close();
         child.wait(true);
     } catch (Error & e) {
         printMsg(lvlError, format("error (ignored): %1%") % e.msg());
