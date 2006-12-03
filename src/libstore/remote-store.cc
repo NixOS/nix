@@ -4,6 +4,10 @@
 #include "worker-protocol.hh"
 #include "archive.hh"
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include <iostream>
 #include <unistd.h>
 
@@ -38,9 +42,15 @@ RemoteStore::RemoteStore()
             if (dup2(toChild.readSide, STDIN_FILENO) == -1)
                 throw SysError("dupping read side");
 
-            execlp(worker.c_str(), worker.c_str(),
-                "--slave", NULL);
+            int fdDebug = open("/tmp/worker-log", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            assert(fdDebug != -1);
+            if (dup2(fdDebug, STDERR_FILENO) == -1)
+                throw SysError("dupping stderr");
+            close(fdDebug);
             
+            execlp(worker.c_str(), worker.c_str(),
+                "-vvv", "--slave", NULL);
+
             throw SysError(format("executing `%1%'") % worker);
             
         } catch (std::exception & e) {
@@ -66,9 +76,13 @@ RemoteStore::RemoteStore()
 
 RemoteStore::~RemoteStore()
 {
-    writeInt(wopQuit, to);
-    readInt(from);
-    child.wait(true);
+    try {
+        fromChild.readSide.close();
+        toChild.writeSide.close();
+        child.wait(true);
+    } catch (Error & e) {
+        printMsg(lvlError, format("error (ignored): %1%") % e.msg());
+    }
 }
 
 
@@ -158,6 +172,7 @@ void RemoteStore::buildDerivations(const PathSet & drvPaths)
 {
     writeInt(wopBuildDerivations, to);
     writeStringSet(drvPaths, to);
+    processStderr();
     readInt(from);
 }
 
@@ -182,6 +197,20 @@ void RemoteStore::syncWithGC()
 {
     writeInt(wopSyncWithGC, to);
     readInt(from);
+}
+
+
+void RemoteStore::processStderr()
+{
+    unsigned int msg;
+    while ((msg = readInt(from)) == STDERR_NEXT) {
+        string s = readString(from);
+        writeToStderr((unsigned char *) s.c_str(), s.size());
+    }
+    if (msg == STDERR_ERROR)
+        throw Error(readString(from));
+    else if (msg != STDERR_LAST)
+        throw Error("protocol error processing standard error");
 }
 
 

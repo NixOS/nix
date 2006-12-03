@@ -437,7 +437,7 @@ void printMsg_(Verbosity level, const format & f)
     else if (logType == ltEscapes && level != lvlInfo)
         prefix = "\033[" + escVerbosity(level) + "s";
     string s = (format("%1%%2%\n") % prefix % f.str()).str();
-    writeFull(STDERR_FILENO, (const unsigned char *) s.c_str(), s.size());
+    writeToStderr((const unsigned char *) s.c_str(), s.size());
 }
 
 
@@ -448,6 +448,15 @@ void warnOnce(bool & haveWarned, const format & f)
         haveWarned = true;
     }
 }
+
+
+static void defaultWriteToStderr(const unsigned char * buf, size_t count)
+{
+    writeFull(STDERR_FILENO, buf, count);
+}
+
+
+void (*writeToStderr) (const unsigned char * buf, size_t count) = defaultWriteToStderr;
 
 
 void readFull(int fd, unsigned char * buf, size_t count)

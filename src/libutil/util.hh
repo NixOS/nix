@@ -131,6 +131,8 @@ void printMsg_(Verbosity level, const format & f);
 
 void warnOnce(bool & haveWarned, const format & f);
 
+extern void (*writeToStderr) (const unsigned char * buf, size_t count);
+
 
 /* Wrappers arount read()/write() that read/write exactly the
    requested number of bytes. */

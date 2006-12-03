@@ -872,7 +872,7 @@ static void drain(int fd)
             if (errno != EINTR)
                 throw SysError("draining");
         } else if (rd == 0) break;
-        else writeFull(STDERR_FILENO, buffer, rd);
+        else writeToStderr(buffer, rd);
     }
 }
 
@@ -1610,7 +1610,7 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
 {
     if (fd == logPipe.readSide) {
         if (verbosity >= buildVerbosity)
-            writeFull(STDERR_FILENO, (unsigned char *) data.c_str(), data.size());
+            writeToStderr((unsigned char *) data.c_str(), data.size());
         writeFull(fdLogFile, (unsigned char *) data.c_str(), data.size());
     }
 
@@ -1923,7 +1923,7 @@ void SubstitutionGoal::handleChildOutput(int fd, const string & data)
 {
     assert(fd == logPipe.readSide);
     if (verbosity >= buildVerbosity)
-        writeFull(STDERR_FILENO, (unsigned char *) data.c_str(), data.size());
+        writeToStderr((unsigned char *) data.c_str(), data.size());
     /* Don't write substitution output to a log file for now.  We
        probably should, though. */
 }

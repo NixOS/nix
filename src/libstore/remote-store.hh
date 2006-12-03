@@ -57,6 +57,8 @@ private:
     FdSink to;
     FdSource from;
     Pid child;
+
+    void processStderr();
 };
 
 
