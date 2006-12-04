@@ -18,6 +18,11 @@
 using namespace nix;
 
 
+#ifndef SIGPOLL
+#define SIGPOLL SIGIO
+#endif
+
+
 static Path readStorePath(Source & from)
 {
     Path path = readString(from);
