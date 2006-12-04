@@ -137,12 +137,10 @@ boost::shared_ptr<StoreAPI> store;
 
 boost::shared_ptr<StoreAPI> openStore(bool reserveSpace)
 {
-    string mode = getEnv("NIX_REMOTE");
-    if (mode == "")
+    if (getEnv("NIX_REMOTE") == "")
         return boost::shared_ptr<StoreAPI>(new LocalStore(reserveSpace));
-    else if (mode == "slave")
+    else
         return boost::shared_ptr<StoreAPI>(new RemoteStore());
-    else throw Error(format("invalid setting for NIX_REMOTE, `%1%'") % mode);
 }
 
 

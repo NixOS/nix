@@ -19,6 +19,35 @@ namespace nix {
 
 RemoteStore::RemoteStore()
 {
+    string remoteMode = getEnv("NIX_REMOTE");
+
+    if (remoteMode == "slave")
+        /* Fork off a setuid worker to do the privileged work. */
+        forkSlave();
+    else if (remoteMode == "daemon")
+        /* Connect to a daemon that does the privileged work for
+           us. */
+        ;
+    else
+         throw Error(format("invalid setting for NIX_REMOTE, `%1%'")
+             % remoteMode);
+            
+    
+    /* Send the magic greeting, check for the reply. */
+    try {
+        processStderr();
+        writeInt(WORKER_MAGIC_1, to);
+        unsigned int magic = readInt(from);
+        if (magic != WORKER_MAGIC_2) throw Error("protocol mismatch");
+    } catch (Error & e) {
+        throw Error(format("cannot start worker (%1%)")
+            % e.msg());
+    }
+}
+
+
+void RemoteStore::forkSlave()
+{
     int sockets[2];
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1)
         throw SysError("cannot create sockets");
@@ -26,7 +55,6 @@ RemoteStore::RemoteStore()
     fdSelf = sockets[0];
     AutoCloseFD fdChild = sockets[1];
 
-    
     /* Start the worker. */
     Path worker = getEnv("NIX_WORKER");
     if (worker == "")
@@ -78,18 +106,6 @@ RemoteStore::RemoteStore()
 
     from.fd = fdSelf;
     to.fd = fdSelf;
-
-    
-    /* Send the magic greeting, check for the reply. */
-    try {
-        processStderr();
-        writeInt(WORKER_MAGIC_1, to);
-        unsigned int magic = readInt(from);
-        if (magic != WORKER_MAGIC_2) throw Error("protocol mismatch");
-    } catch (Error & e) {
-        throw Error(format("cannot start worker process `%1%' (%2%)")
-            % worker % e.msg());
-    }
 }
 
 

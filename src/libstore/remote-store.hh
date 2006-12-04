@@ -58,6 +58,8 @@ private:
     Pid child;
 
     void processStderr();
+
+    void forkSlave();
 };
 
 
