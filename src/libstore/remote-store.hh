@@ -52,7 +52,7 @@ public:
     void syncWithGC();
     
 private:
-    AutoCloseFD fdSelf;
+    AutoCloseFD fdSocket;
     FdSink to;
     FdSource from;
     Pid child;
@@ -60,6 +60,8 @@ private:
     void processStderr();
 
     void forkSlave();
+    
+    void connectToDaemon();
 };
 
 

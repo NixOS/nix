@@ -28,4 +28,9 @@ typedef enum {
 #define STDERR_ERROR 0x63787470
 
 
+/* The default location of the daemon socket, relative to
+   nixStateDir. */
+#define DEFAULT_SOCKET_PATH "/daemon.socket"
+
+
 #endif /* !__WORKER_PROTOCOL_H */

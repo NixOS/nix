@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <fcntl.h>
 
 #include <iostream>
@@ -27,11 +28,14 @@ RemoteStore::RemoteStore()
     else if (remoteMode == "daemon")
         /* Connect to a daemon that does the privileged work for
            us. */
-        ;
+       connectToDaemon();
     else
          throw Error(format("invalid setting for NIX_REMOTE, `%1%'")
              % remoteMode);
             
+    from.fd = fdSocket;
+    to.fd = fdSocket;
+
     
     /* Send the magic greeting, check for the reply. */
     try {
@@ -52,7 +56,7 @@ void RemoteStore::forkSlave()
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1)
         throw SysError("cannot create sockets");
 
-    fdSelf = sockets[0];
+    fdSocket = sockets[0];
     AutoCloseFD fdChild = sockets[1];
 
     /* Start the worker. */
@@ -80,7 +84,7 @@ void RemoteStore::forkSlave()
             if (dup2(fdChild, STDIN_FILENO) == -1)
                 throw SysError("dupping read side");
 
-            close(fdSelf);
+            close(fdSocket);
             close(fdChild);
 
             int fdDebug = open("/tmp/worker-log", O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -104,16 +108,34 @@ void RemoteStore::forkSlave()
 
     fdChild.close();
 
-    from.fd = fdSelf;
-    to.fd = fdSelf;
+}
+
+
+void RemoteStore::connectToDaemon()
+{
+    fdSocket = socket(PF_UNIX, SOCK_STREAM, 0);
+    if (fdSocket == -1)
+        throw SysError("cannot create Unix domain socket");
+
+    string socketPath = nixStateDir + DEFAULT_SOCKET_PATH;
+
+    struct sockaddr_un addr;
+    addr.sun_family = AF_UNIX;
+    if (socketPath.size() >= sizeof(addr.sun_path))
+        throw Error(format("socket path `%1%' is too long") % socketPath);
+    strcpy(addr.sun_path, socketPath.c_str());
+    
+    if (connect(fdSocket, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+        throw SysError(format("cannot connect to daemon at `%1%'") % socketPath);
 }
 
 
 RemoteStore::~RemoteStore()
 {
     try {
-        fdSelf.close();
-        child.wait(true);
+        fdSocket.close();
+        if (child != -1)
+            child.wait(true);
     } catch (Error & e) {
         printMsg(lvlError, format("error (ignored): %1%") % e.msg());
     }
