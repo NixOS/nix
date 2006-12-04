@@ -85,10 +85,11 @@ unsigned int readInt(Source & source)
 string readString(Source & source)
 {
     unsigned int len = readInt(source);
-    char buf[len];
-    source((unsigned char *) buf, len);
+    unsigned char * buf = new unsigned char[len];
+    AutoDeleteArray<unsigned char> d(buf);
+    source(buf, len);
     readPadding(len, source);
-    return string(buf, len);
+    return string((char *) buf, len);
 }
 
  

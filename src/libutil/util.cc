@@ -191,18 +191,6 @@ Strings readDirectory(const Path & path)
 }
 
 
-template <class T>
-struct AutoDeleteArray
-{
-    T * p;
-    AutoDeleteArray(T * p) : p(p) { }
-    ~AutoDeleteArray() 
-    {
-        delete [] p;
-    }
-};
-
-
 string readFile(int fd)
 {
     struct stat st;
@@ -468,7 +456,7 @@ void readFull(int fd, unsigned char * buf, size_t count)
             if (errno == EINTR) continue;
             throw SysError("reading from file");
         }
-        if (res == 0) throw Error("unexpected end-of-file");
+        if (res == 0) throw EndOfFile("unexpected end-of-file");
         count -= res;
         buf += res;
     }
@@ -707,6 +695,7 @@ int Pid::wait(bool block)
         if (res == 0 && !block) return -1;
         if (errno != EINTR)
             throw SysError("cannot get child exit status");
+        checkInterrupt();
     }
 }
 
@@ -793,7 +782,7 @@ void _interrupted()
        kills the program! */
     if (!std::uncaught_exception()) {
         _isInterrupted = 0;
-        throw Error("interrupted by the user");
+        throw Interrupted("interrupted by the user");
     }
 }
 

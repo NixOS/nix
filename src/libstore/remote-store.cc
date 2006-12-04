@@ -39,10 +39,11 @@ RemoteStore::RemoteStore()
     
     /* Send the magic greeting, check for the reply. */
     try {
-        processStderr();
         writeInt(WORKER_MAGIC_1, to);
+        writeInt(verbosity, to);
         unsigned int magic = readInt(from);
         if (magic != WORKER_MAGIC_2) throw Error("protocol mismatch");
+        processStderr();
     } catch (Error & e) {
         throw Error(format("cannot start worker (%1%)")
             % e.msg());

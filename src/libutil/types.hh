@@ -44,8 +44,6 @@ public:
         newClass(const format & f) : superClass(f) { }; \
     };
 
-MakeError(UsageError, Error)
-
 
 typedef list<string> Strings;
 typedef set<string> StringSet;

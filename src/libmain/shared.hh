@@ -3,6 +3,8 @@
 
 #include "types.hh"
 
+#include <signal.h>
+
 
 /* These are not implemented here, but must be implemented by a
    program linking against libmain. */
@@ -26,6 +28,10 @@ void printGCWarning();
 
 /* Whether we're running setuid. */
 extern bool setuidMode;
+
+extern volatile ::sig_atomic_t blockInt;
+
+MakeError(UsageError, nix::Error)
 
 }
 

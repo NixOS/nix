@@ -139,6 +139,8 @@ extern void (*writeToStderr) (const unsigned char * buf, size_t count);
 void readFull(int fd, unsigned char * buf, size_t count);
 void writeFull(int fd, const unsigned char * buf, size_t count);
 
+MakeError(EndOfFile, Error)
+
 
 /* Read a file descriptor until EOF occurs. */
 string drainFD(int fd);
@@ -146,6 +148,19 @@ string drainFD(int fd);
 
 
 /* Automatic cleanup of resources. */
+
+
+template <class T>
+struct AutoDeleteArray
+{
+    T * p;
+    AutoDeleteArray(T * p) : p(p) { }
+    ~AutoDeleteArray() 
+    {
+        delete [] p;
+    }
+};
+
 
 class AutoDelete
 {
@@ -228,6 +243,8 @@ void inline checkInterrupt()
 {
     if (_isInterrupted) _interrupted();
 }
+
+MakeError(Interrupted, Error)
 
 
 /* String packing / unpacking. */
