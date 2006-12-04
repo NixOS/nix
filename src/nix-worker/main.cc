@@ -269,6 +269,15 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         break;
     }
 
+    case wopAddIndirectRoot: {
+        Path path = absPath(readString(from));
+        startWork();
+        store->addIndirectRoot(path);
+        stopWork();
+        writeInt(1, to);
+        break;
+    }
+
     case wopSyncWithGC: {
         startWork();
         store->syncWithGC();
@@ -473,6 +482,7 @@ void run(Strings args)
     else if (daemon) {
         if (setuidMode)
             throw Error("daemon cannot be started in setuid mode");
+        chdir("/");
         daemonLoop();
     }
 

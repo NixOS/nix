@@ -253,6 +253,15 @@ void RemoteStore::addTempRoot(const Path & path)
 }
 
 
+void RemoteStore::addIndirectRoot(const Path & path)
+{
+    writeInt(wopAddIndirectRoot, to);
+    writeString(path, to);
+    processStderr();
+    readInt(from);
+}
+
+
 void RemoteStore::syncWithGC()
 {
     writeInt(wopSyncWithGC, to);

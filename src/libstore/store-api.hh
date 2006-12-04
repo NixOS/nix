@@ -91,6 +91,13 @@ public:
        The root disappears as soon as we exit. */
     virtual void addTempRoot(const Path & path) = 0;
 
+    /* Add an indirect root, which is merely a symlink to `path' from
+       /nix/var/nix/gcroots/auto/<hash of `path'>.  `path' is supposed
+       to be a symlink to a store path.  The garbage collector will
+       automatically remove the indirect root when it finds that
+       `path' has disappeared. */
+    virtual void addIndirectRoot(const Path & path) = 0;
+
     /* Acquire the global GC lock, then immediately release it.  This
        function must be called after registering a new permanent root,
        but before exiting.  Otherwise, it is possible that a running

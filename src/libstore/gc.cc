@@ -82,6 +82,15 @@ void LocalStore::syncWithGC()
 }
 
 
+void LocalStore::addIndirectRoot(const Path & path)
+{
+    string hash = printHash32(hashString(htSHA1, path));
+    Path realRoot = canonPath((format("%1%/%2%/auto/%3%")
+        % nixStateDir % gcRootsDir % hash).str());
+    createSymlink(realRoot, path, false);
+}
+
+
 Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
     bool indirect, bool allowOutsideRootsDir)
 {
@@ -90,12 +99,8 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
     assertStorePath(storePath);
 
     if (indirect) {
-        string hash = printHash32(hashString(htSHA1, gcRoot));
-        Path realRoot = canonPath((format("%1%/%2%/auto/%3%")
-            % nixStateDir % gcRootsDir % hash).str());
-        
         createSymlink(gcRoot, storePath, true);
-        createSymlink(realRoot, gcRoot, false);
+        store->addIndirectRoot(gcRoot);
     }
 
     else {

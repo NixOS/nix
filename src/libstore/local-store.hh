@@ -61,6 +61,8 @@ public:
 
     void addTempRoot(const Path & path);
 
+    void addIndirectRoot(const Path & path);
+    
     void syncWithGC();
 };
 

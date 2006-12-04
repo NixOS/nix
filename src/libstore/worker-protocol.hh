@@ -19,7 +19,8 @@ typedef enum {
     wopBuildDerivations,
     wopEnsurePath,
     wopAddTempRoot,
-    wopSyncWithGC
+    wopAddIndirectRoot,
+    wopSyncWithGC,
 } WorkerOp;
 
 
