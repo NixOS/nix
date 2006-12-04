@@ -61,25 +61,36 @@ static void tunnelStderr(const unsigned char * buf, size_t count)
 }
 
 
-/* A SIGIO signal is received when data is available on the client
+/* A SIGPOLL signal is received when data is available on the client
    communication scoket, or when the client has closed its side of the
    socket.  This handler is enabled at precisely those moments in the
    protocol when we're doing work and the client is supposed to be
-   quiet.  Thus, if we get a SIGIO signal, it means that the client
+   quiet.  Thus, if we get a SIGPOLL signal, it means that the client
    has quit.  So we should quit as well.
 
    Too bad most operating systems don't support the POLL_HUP value for
-   si_code in siginfo_t.  That would make most of the SIGIO complexity
-   unnecessary, i.e., we could just enable SIGIO all the time and
-   wouldn't have to worry about races. */
+   si_code in siginfo_t.  That would make most of the SIGPOLL
+   complexity unnecessary, i.e., we could just enable SIGPOLL all the
+   time and wouldn't have to worry about races. */
 static void sigioHandler(int sigNo)
 {
     if (!blockInt) {
         _isInterrupted = 1;
         blockInt = 1;
         canSendStderr = false;
-        write(STDERR_FILENO, "SIGIO\n", 6);
+        write(STDERR_FILENO, "SIGPOLL\n", 8);
     }
+}
+
+
+static void setSigPollAction(bool ignore)
+{
+    struct sigaction act, oact;
+    act.sa_handler = ignore ? SIG_IGN : sigioHandler;
+    sigfillset(&act.sa_mask);
+    act.sa_flags = 0;
+    if (sigaction(SIGPOLL, &act, &oact))
+        throw SysError("setting handler for SIGPOLL");
 }
 
 
@@ -90,13 +101,12 @@ static void startWork()
     canSendStderr = true;
 
     /* Handle client death asynchronously. */
-    if (signal(SIGIO, sigioHandler) == SIG_ERR)
-        throw SysError("setting handler for SIGIO");
+    setSigPollAction(false);
 
     /* Of course, there is a race condition here: the socket could
        have closed between when we last read from / wrote to it, and
-       between the time we set the handler for SIGIO.  In that case we
-       won't get the signal.  So do a non-blocking select() to find
+       between the time we set the handler for SIGPOLL.  In that case
+       we won't get the signal.  So do a non-blocking select() to find
        out if any input is available on the socket.  If there is, it
        has to be the 0-byte read that indicates that the socket has
        closed. */
@@ -128,8 +138,7 @@ static void stopWork(bool success = true, const string & msg = "")
     /* Stop handling async client death; we're going to a state where
        we're either sending or receiving from the client, so we'll be
        notified of client death anyway. */
-    if (signal(SIGIO, SIG_IGN) == SIG_ERR)
-        throw SysError("ignoring SIGIO");
+    setSigPollAction(true);
     
     canSendStderr = false;
 
@@ -157,30 +166,41 @@ static void performOp(Source & from, Sink & to, unsigned int op)
 
     case wopIsValidPath: {
         Path path = readStorePath(from);
-        writeInt(store->isValidPath(path), to);
+        startWork();
+        bool result = store->isValidPath(path);
+        stopWork();
+        writeInt(result, to);
         break;
     }
 
     case wopHasSubstitutes: {
         Path path = readStorePath(from);
-        writeInt(store->hasSubstitutes(path), to);
+        startWork();
+        bool result = store->hasSubstitutes(path);
+        stopWork();
+        writeInt(result, to);
         break;
     }
 
     case wopQueryPathHash: {
         Path path = readStorePath(from);
-        writeString(printHash(store->queryPathHash(path)), to);
+        startWork();
+        Hash hash = store->queryPathHash(path);
+        stopWork();
+        writeString(printHash(hash), to);
         break;
     }
 
     case wopQueryReferences:
     case wopQueryReferrers: {
         Path path = readStorePath(from);
+        startWork();
         PathSet paths;
         if (op == wopQueryReferences)
             store->queryReferences(path, paths);
         else
             store->queryReferrers(path, paths);
+        stopWork();
         writeStringSet(paths, to);
         break;
     }
@@ -196,7 +216,11 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         Path tmp2 = tmp + "/" + baseName;
         restorePath(tmp2, from);
 
-        writeString(store->addToStore(tmp2, fixed, recursive, hashAlgo), to);
+        startWork();
+        Path path = store->addToStore(tmp2, fixed, recursive, hashAlgo);
+        stopWork();
+        
+        writeString(path, to);
             
         deletePath(tmp);
         break;
@@ -206,7 +230,10 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         string suffix = readString(from);
         string s = readString(from);
         PathSet refs = readStorePaths(from);
-        writeString(store->addTextToStore(suffix, s, refs), to);
+        startWork();
+        Path path = store->addTextToStore(suffix, s, refs);
+        stopWork();
+        writeString(path, to);
         break;
     }
 
@@ -221,20 +248,26 @@ static void performOp(Source & from, Sink & to, unsigned int op)
 
     case wopEnsurePath: {
         Path path = readStorePath(from);
+        startWork();
         store->ensurePath(path);
+        stopWork();
         writeInt(1, to);
         break;
     }
 
     case wopAddTempRoot: {
         Path path = readStorePath(from);
+        startWork();
         store->addTempRoot(path);
+        stopWork();
         writeInt(1, to);
         break;
     }
 
     case wopSyncWithGC: {
+        startWork();
         store->syncWithGC();
+        stopWork();
         writeInt(1, to);
         break;
     }
@@ -250,8 +283,8 @@ static void processConnection()
     canSendStderr = false;
     writeToStderr = tunnelStderr;
 
-    /* Allow us to receive SIGIO for events on the client socket. */
-    signal(SIGIO, SIG_IGN);
+    /* Allow us to receive SIGPOLL for events on the client socket. */
+    setSigPollAction(true);
     if (fcntl(from.fd, F_SETOWN, getpid()) == -1)
         throw SysError("F_SETOWN");
     if (fcntl(from.fd, F_SETFL, fcntl(from.fd, F_GETFL, 0) | FASYNC) == -1)
@@ -301,6 +334,8 @@ static void processConnection()
         } catch (Error & e) {
             stopWork(false, e.msg());
         }
+
+        assert(!canSendStderr);
     };
 
     printMsg(lvlError, format("%1% worker operations") % opCount);

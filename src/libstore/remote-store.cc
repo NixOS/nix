@@ -147,6 +147,7 @@ bool RemoteStore::isValidPath(const Path & path)
 {
     writeInt(wopIsValidPath, to);
     writeString(path, to);
+    processStderr();
     unsigned int reply = readInt(from);
     return reply != 0;
 }
@@ -162,6 +163,7 @@ bool RemoteStore::hasSubstitutes(const Path & path)
 {
     writeInt(wopHasSubstitutes, to);
     writeString(path, to);
+    processStderr();
     unsigned int reply = readInt(from);
     return reply != 0;
 }
@@ -171,6 +173,7 @@ Hash RemoteStore::queryPathHash(const Path & path)
 {
     writeInt(wopQueryPathHash, to);
     writeString(path, to);
+    processStderr();
     string hash = readString(from);
     return parseHash(htSHA256, hash);
 }
@@ -181,6 +184,7 @@ void RemoteStore::queryReferences(const Path & path,
 {
     writeInt(wopQueryReferences, to);
     writeString(path, to);
+    processStderr();
     PathSet references2 = readStringSet(from);
     references.insert(references2.begin(), references2.end());
 }
@@ -191,6 +195,7 @@ void RemoteStore::queryReferrers(const Path & path,
 {
     writeInt(wopQueryReferrers, to);
     writeString(path, to);
+    processStderr();
     PathSet referrers2 = readStringSet(from);
     referrers.insert(referrers2.begin(), referrers2.end());
 }
@@ -207,6 +212,7 @@ Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
     writeInt(recursive ? 1 : 0, to);
     writeString(hashAlgo, to);
     dumpPath(srcPath, to);
+    processStderr();
     Path path = readString(from);
     return path;
 }
@@ -220,6 +226,7 @@ Path RemoteStore::addTextToStore(const string & suffix, const string & s,
     writeString(s, to);
     writeStringSet(references, to);
     
+    processStderr();
     Path path = readString(from);
     return path;
 }
@@ -238,6 +245,7 @@ void RemoteStore::ensurePath(const Path & path)
 {
     writeInt(wopEnsurePath, to);
     writeString(path, to);
+    processStderr();
     readInt(from);
 }
 
@@ -246,6 +254,7 @@ void RemoteStore::addTempRoot(const Path & path)
 {
     writeInt(wopAddTempRoot, to);
     writeString(path, to);
+    processStderr();
     readInt(from);
 }
 
@@ -253,6 +262,7 @@ void RemoteStore::addTempRoot(const Path & path)
 void RemoteStore::syncWithGC()
 {
     writeInt(wopSyncWithGC, to);
+    processStderr();
     readInt(from);
 }
 
