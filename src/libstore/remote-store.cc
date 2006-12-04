@@ -32,6 +32,10 @@ RemoteStore::RemoteStore()
     if (worker == "")
         worker = nixBinDir + "/nix-worker";
 
+    string verbosityArg = "-";
+    for (int i = 1; i < verbosity; ++i)
+        verbosityArg += "v";
+
     child = fork();
     
     switch (child) {
@@ -57,8 +61,10 @@ RemoteStore::RemoteStore()
                 throw SysError("dupping stderr");
             close(fdDebug);
             
-            execlp(worker.c_str(), worker.c_str(),
-                "-vvv", "--slave", NULL);
+            execlp(worker.c_str(), worker.c_str(), "--slave",
+                /* hacky - must be at the end */
+                verbosityArg == "-" ? NULL : verbosityArg.c_str(),
+                NULL);
 
             throw SysError(format("executing `%1%'") % worker);
             
