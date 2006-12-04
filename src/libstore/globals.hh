@@ -32,6 +32,9 @@ extern string nixConfDir;
    stored. */
 extern string nixLibexecDir;
 
+/* nixBinDir is the directory where the main programs are stored. */
+extern string nixBinDir;
+
 
 /* Misc. global flags. */
 

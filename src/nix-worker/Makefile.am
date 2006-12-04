@@ -1,4 +1,4 @@
-libexec_PROGRAMS = nix-worker
+bin_PROGRAMS = nix-worker
 
 nix_worker_SOURCES = main.cc help.txt
 nix_worker_LDADD = ../libmain/libmain.la ../libstore/libstore.la ../libutil/libutil.la \

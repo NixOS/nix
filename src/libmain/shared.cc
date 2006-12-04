@@ -91,6 +91,7 @@ static void initAndRun(int argc, char * * argv)
     nixDBPath = getEnv("NIX_DB_DIR", nixStateDir + "/db");
     nixConfDir = canonPath(getEnv("NIX_CONF_DIR", NIX_CONF_DIR));
     nixLibexecDir = canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR));
+    nixBinDir = canonPath(getEnv("NIX_BIN_DIR", NIX_BIN_DIR));
 
     /* Get some settings from the configuration file. */
     thisSystem = querySetting("system", SYSTEM);

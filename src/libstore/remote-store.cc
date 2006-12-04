@@ -3,6 +3,7 @@
 #include "remote-store.hh"
 #include "worker-protocol.hh"
 #include "archive.hh"
+#include "globals.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -27,7 +28,9 @@ RemoteStore::RemoteStore()
 
     
     /* Start the worker. */
-    string worker = "nix-worker";
+    Path worker = getEnv("NIX_WORKER");
+    if (worker == "")
+        worker = nixBinDir + "/nix-worker";
 
     child = fork();
     
