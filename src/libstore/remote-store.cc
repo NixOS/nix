@@ -88,12 +88,6 @@ void RemoteStore::forkSlave()
             close(fdSocket);
             close(fdChild);
 
-            int fdDebug = open("/tmp/worker-log", O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            assert(fdDebug != -1);
-            if (dup2(fdDebug, STDERR_FILENO) == -1)
-                throw SysError("dupping stderr");
-            close(fdDebug);
-            
             execlp(worker.c_str(), worker.c_str(), "--slave",
                 /* hacky - must be at the end */
                 verbosityArg == "-" ? NULL : verbosityArg.c_str(),
