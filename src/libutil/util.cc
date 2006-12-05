@@ -35,6 +35,7 @@ Error & Error::addPrefix(const format & f)
 
 SysError::SysError(const format & f)
     : Error(format("%1%: %2%") % f.str() % strerror(errno))
+    , errNo(errno)
 {
 }
 

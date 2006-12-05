@@ -91,12 +91,6 @@ void LocalStore::addIndirectRoot(const Path & path)
 }
 
 
-typedef std::map<Path, Path> Roots;
-
-
-static void findRoots(Roots & roots, bool ignoreUnreadable);
-
-
 Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
     bool indirect, bool allowOutsideRootsDir)
 {
@@ -122,17 +116,17 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
             
         createSymlink(gcRoot, storePath, false);
 
-        /* Check that the root can be found by the garbage collector. */
-        Roots roots;
-        findRoots(roots, true);
-        if (roots.find(gcRoot) == roots.end())
-            printMsg(lvlError, 
-                format(
-                    "warning: the garbage collector does not find `%1%' as a root; "
-                    "therefore, `%2%' might be removed by the garbage collector")
-                % gcRoot % storePath);
     }
 
+    /* Check that the root can be found by the garbage collector. */
+    Roots roots = store->findRoots();
+    if (roots.find(gcRoot) == roots.end())
+        printMsg(lvlError, 
+            format(
+                "warning: the garbage collector does not find `%1%' as a root; "
+                "therefore, `%2%' might be removed by the garbage collector")
+            % gcRoot % storePath);
+        
     /* Grab the global GC root, causing us to block while a GC is in
        progress.  This prevents the set of permanent roots from
        increasing while a GC is in progress. */
@@ -308,58 +302,73 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
 
 
 static void findRoots(const Path & path, bool recurseSymlinks,
-    bool ignoreUnreadable, Roots & roots)
+    bool deleteStale, Roots & roots)
 {
-    struct stat st;
-    if (lstat(path.c_str(), &st) == -1)
-        throw SysError(format("statting `%1%'") % path);
+    try {
+        
+        struct stat st;
+        if (lstat(path.c_str(), &st) == -1)
+            throw SysError(format("statting `%1%'") % path);
 
-    printMsg(lvlVomit, format("looking at `%1%'") % path);
+        printMsg(lvlVomit, format("looking at `%1%'") % path);
 
-    if (S_ISDIR(st.st_mode)) {
-	Strings names = readDirectory(path);
-	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
-            findRoots(path + "/" + *i, recurseSymlinks, ignoreUnreadable, roots);
+        if (S_ISDIR(st.st_mode)) {
+            Strings names = readDirectory(path);
+            for (Strings::iterator i = names.begin(); i != names.end(); ++i)
+                findRoots(path + "/" + *i, recurseSymlinks, deleteStale, roots);
+        }
+
+        else if (S_ISLNK(st.st_mode)) {
+            Path target = absPath(readLink(path), dirOf(path));
+
+            if (isInStore(target)) {
+                debug(format("found root `%1%' in `%2%'")
+                    % target % path);
+                Path storePath = toStorePath(target);
+                if (store->isValidPath(storePath)) 
+                    roots[path] = storePath;
+                else
+                    printMsg(lvlInfo, format("skipping invalid root from `%1%' to `%2%'")
+                        % path % storePath);
+            }
+
+            else if (recurseSymlinks) {
+                if (pathExists(target))
+                    findRoots(target, false, deleteStale, roots);
+                else if (deleteStale) {
+                    printMsg(lvlInfo, format("removing stale link from `%1%' to `%2%'") % path % target);
+                    /* Note that we only delete when recursing, i.e.,
+                       when we are still in the `gcroots' tree.  We
+                       never delete stuff outside that tree. */
+                    unlink(path.c_str());
+                }
+            }
+        }
+
     }
 
-    else if (S_ISLNK(st.st_mode)) {
-        Path target = absPath(readLink(path), dirOf(path));
-
-        if (isInStore(target)) {
-            debug(format("found root `%1%' in `%2%'")
-                % target % path);
-            Path storePath = toStorePath(target);
-            if (store->isValidPath(storePath)) 
-                roots[path] = storePath;
-            else
-                printMsg(lvlInfo, format("skipping invalid root from `%1%' to `%2%'")
-                    % path % storePath);
-        }
-
-        else if (recurseSymlinks) {
-            struct stat st2;
-            if (lstat(target.c_str(), &st2) == 0)
-                findRoots(target, false, ignoreUnreadable, roots);
-            else if (ignoreUnreadable && errno == EACCES)
-                /* ignore */ ;
-            else if (errno == ENOENT || errno == ENOTDIR) {
-                printMsg(lvlInfo, format("removing stale link from `%1%' to `%2%'") % path % target);
-                /* Note that we only delete when recursing, i.e., when
-                   we are still in the `gcroots' tree.  We never
-                   delete stuff outside that tree. */
-                unlink(path.c_str());
-            }
-            else 
-                throw SysError(format("statting `%1%'") % target);
-        }
+    catch (SysError & e) {
+        /* We only ignore permanent failures. */
+        if (e.errNo == EACCES || e.errNo == ENOENT || e.errNo == ENOTDIR)
+            printMsg(lvlInfo, format("cannot read potential root `%1%'") % path);
+        else
+            throw;
     }
 }
 
 
-static void findRoots(Roots & roots, bool ignoreUnreadable)
+static Roots findRoots(bool deleteStale)
 {
+    Roots roots;
     Path rootsDir = canonPath((format("%1%/%2%") % nixStateDir % gcRootsDir).str());
-    findRoots(rootsDir, true, ignoreUnreadable, roots);
+    findRoots(rootsDir, true, deleteStale, roots);
+    return roots;
+}
+
+
+Roots LocalStore::findRoots()
+{
+    return nix::findRoots(false);
 }
 
 
@@ -437,8 +446,7 @@ void collectGarbage(GCAction action, const PathSet & pathsToDelete,
 
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
-    Roots rootMap;
-    findRoots(rootMap, false);
+    Roots rootMap = ignoreLiveness ? Roots() : findRoots(true);
 
     PathSet roots;
     for (Roots::iterator i = rootMap.begin(); i != rootMap.end(); ++i)

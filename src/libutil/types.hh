@@ -34,6 +34,7 @@ public:
 class SysError : public Error
 {
 public:
+    int errNo;
     SysError(const format & f);
 };
 

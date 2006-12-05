@@ -2,6 +2,7 @@
 #define __STOREAPI_H
 
 #include <string>
+#include <map>
 
 #include <boost/shared_ptr.hpp>
 
@@ -31,6 +32,9 @@ struct Substitute
 };
 
 typedef list<Substitute> Substitutes;
+
+
+typedef std::map<Path, Path> Roots;
 
 
 class StoreAPI 
@@ -117,6 +121,11 @@ public:
 
        In either case the permanent root is seen by the collector. */
     virtual void syncWithGC() = 0;
+
+    /* Find the roots of the garbage collector.  Each root is a pair
+       (link, storepath) where `link' is the path of the symlink
+       outside of the Nix store that point to `storePath'.  */
+    virtual Roots findRoots() = 0;
 
 };
 

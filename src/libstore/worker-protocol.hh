@@ -2,6 +2,9 @@
 #define __WORKER_PROTOCOL_H
 
 
+namespace nix {
+
+
 #define WORKER_MAGIC_1 0x6e697864
 #define WORKER_MAGIC_2 0x6478696e
 
@@ -21,6 +24,7 @@ typedef enum {
     wopAddTempRoot,
     wopAddIndirectRoot,
     wopSyncWithGC,
+    wopFindRoots,
 } WorkerOp;
 
 
@@ -32,6 +36,13 @@ typedef enum {
 /* The default location of the daemon socket, relative to
    nixStateDir. */
 #define DEFAULT_SOCKET_PATH "/daemon.socket"
+
+
+Path readStorePath(Source & from);
+PathSet readStorePaths(Source & from);
+
+    
+}
 
 
 #endif /* !__WORKER_PROTOCOL_H */

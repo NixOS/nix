@@ -23,23 +23,6 @@ using namespace nix;
 #endif
 
 
-static Path readStorePath(Source & from)
-{
-    Path path = readString(from);
-    assertStorePath(path);
-    return path;
-}
-
-
-static PathSet readStorePaths(Source & from)
-{
-    PathSet paths = readStringSet(from);
-    for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
-        assertStorePath(*i);
-    return paths;
-}
-
-
 static FdSource from(STDIN_FILENO);
 static FdSink to(STDOUT_FILENO);
 
@@ -283,6 +266,18 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         store->syncWithGC();
         stopWork();
         writeInt(1, to);
+        break;
+    }
+
+    case wopFindRoots: {
+        startWork();
+        Roots roots = store->findRoots();
+        stopWork();
+        writeInt(roots.size(), to);
+        for (Roots::iterator i = roots.begin(); i != roots.end(); ++i) {
+            writeString(i->first, to);
+            writeString(i->second, to);
+        }
         break;
     }
 

@@ -53,6 +53,8 @@ public:
     
     void syncWithGC();
     
+    Roots findRoots();
+    
 private:
     AutoCloseFD fdSocket;
     FdSink to;

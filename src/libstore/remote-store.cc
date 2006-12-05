@@ -18,6 +18,23 @@
 namespace nix {
 
 
+Path readStorePath(Source & from)
+{
+    Path path = readString(from);
+    assertStorePath(path);
+    return path;
+}
+
+
+PathSet readStorePaths(Source & from)
+{
+    PathSet paths = readStringSet(from);
+    for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
+        assertStorePath(*i);
+    return paths;
+}
+
+
 RemoteStore::RemoteStore()
 {
     string remoteMode = getEnv("NIX_REMOTE");
@@ -179,7 +196,7 @@ void RemoteStore::queryReferences(const Path & path,
     writeInt(wopQueryReferences, to);
     writeString(path, to);
     processStderr();
-    PathSet references2 = readStringSet(from);
+    PathSet references2 = readStorePaths(from);
     references.insert(references2.begin(), references2.end());
 }
 
@@ -190,7 +207,7 @@ void RemoteStore::queryReferrers(const Path & path,
     writeInt(wopQueryReferrers, to);
     writeString(path, to);
     processStderr();
-    PathSet referrers2 = readStringSet(from);
+    PathSet referrers2 = readStorePaths(from);
     referrers.insert(referrers2.begin(), referrers2.end());
 }
 
@@ -207,7 +224,7 @@ Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
     writeString(hashAlgo, to);
     dumpPath(srcPath, to);
     processStderr();
-    Path path = readString(from);
+    Path path = readStorePath(from);
     return path;
 }
 
@@ -221,7 +238,7 @@ Path RemoteStore::addTextToStore(const string & suffix, const string & s,
     writeStringSet(references, to);
     
     processStderr();
-    Path path = readString(from);
+    Path path = readStorePath(from);
     return path;
 }
 
@@ -267,6 +284,21 @@ void RemoteStore::syncWithGC()
     writeInt(wopSyncWithGC, to);
     processStderr();
     readInt(from);
+}
+
+
+Roots RemoteStore::findRoots()
+{
+    writeInt(wopFindRoots, to);
+    processStderr();
+    unsigned int count = readInt(from);
+    Roots result;
+    while (count--) {
+        Path link = readString(from);
+        Path target = readStorePath(from);
+        result[link] = target;
+    }
+    return result;
 }
 
 
