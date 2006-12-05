@@ -60,7 +60,7 @@ static void tunnelStderr(const unsigned char * buf, size_t count)
    si_code in siginfo_t.  That would make most of the SIGPOLL
    complexity unnecessary, i.e., we could just enable SIGPOLL all the
    time and wouldn't have to worry about races. */
-static void sigioHandler(int sigNo)
+static void sigPollHandler(int sigNo)
 {
     if (!blockInt) {
         _isInterrupted = 1;
@@ -71,10 +71,10 @@ static void sigioHandler(int sigNo)
 }
 
 
-static void setSigPollAction(bool ignore)
+static void setSigPollAction(bool enable)
 {
     struct sigaction act, oact;
-    act.sa_handler = ignore ? SIG_IGN : sigioHandler;
+    act.sa_handler = enable ? sigPollHandler : SIG_IGN;
     sigfillset(&act.sa_mask);
     act.sa_flags = 0;
     if (sigaction(SIGPOLL, &act, &oact))
@@ -89,7 +89,7 @@ static void startWork()
     canSendStderr = true;
 
     /* Handle client death asynchronously. */
-    setSigPollAction(false);
+    setSigPollAction(true);
 
     /* Of course, there is a race condition here: the socket could
        have closed between when we last read from / wrote to it, and
@@ -126,7 +126,7 @@ static void stopWork(bool success = true, const string & msg = "")
     /* Stop handling async client death; we're going to a state where
        we're either sending or receiving from the client, so we'll be
        notified of client death anyway. */
-    setSigPollAction(true);
+    setSigPollAction(false);
     
     canSendStderr = false;
 
@@ -315,7 +315,7 @@ static void processConnection()
     writeToStderr = tunnelStderr;
 
     /* Allow us to receive SIGPOLL for events on the client socket. */
-    setSigPollAction(true);
+    setSigPollAction(false);
     if (fcntl(from.fd, F_SETOWN, getpid()) == -1)
         throw SysError("F_SETOWN");
     if (fcntl(from.fd, F_SETFL, fcntl(from.fd, F_GETFL, 0) | FASYNC) == -1)
