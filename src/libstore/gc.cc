@@ -91,7 +91,10 @@ void LocalStore::addIndirectRoot(const Path & path)
 }
 
 
-static void findRoots(PathSet & roots, bool ignoreUnreadable);
+typedef std::map<Path, Path> Roots;
+
+
+static void findRoots(Roots & roots, bool ignoreUnreadable);
 
 
 Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
@@ -120,16 +123,14 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
         createSymlink(gcRoot, storePath, false);
 
         /* Check that the root can be found by the garbage collector. */
-        PathSet roots;
+        Roots roots;
         findRoots(roots, true);
-        if (roots.find(storePath) == roots.end()) {
-            static bool haveWarned = false;
-            warnOnce(haveWarned, 
+        if (roots.find(gcRoot) == roots.end())
+            printMsg(lvlError, 
                 format(
-                    "the path `%1%' is not reachable from the roots directory of the garbage collector; "
+                    "warning: the garbage collector does not find `%1%' as a root; "
                     "therefore, `%2%' might be removed by the garbage collector")
                 % gcRoot % storePath);
-        }
     }
 
     /* Grab the global GC root, causing us to block while a GC is in
@@ -307,7 +308,7 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
 
 
 static void findRoots(const Path & path, bool recurseSymlinks,
-    bool ignoreUnreadable, PathSet & roots)
+    bool ignoreUnreadable, Roots & roots)
 {
     struct stat st;
     if (lstat(path.c_str(), &st) == -1)
@@ -329,7 +330,7 @@ static void findRoots(const Path & path, bool recurseSymlinks,
                 % target % path);
             Path storePath = toStorePath(target);
             if (store->isValidPath(storePath)) 
-                roots.insert(storePath);
+                roots[path] = storePath;
             else
                 printMsg(lvlInfo, format("skipping invalid root from `%1%' to `%2%'")
                     % path % storePath);
@@ -355,7 +356,7 @@ static void findRoots(const Path & path, bool recurseSymlinks,
 }
 
 
-static void findRoots(PathSet & roots, bool ignoreUnreadable)
+static void findRoots(Roots & roots, bool ignoreUnreadable)
 {
     Path rootsDir = canonPath((format("%1%/%2%") % nixStateDir % gcRootsDir).str());
     findRoots(rootsDir, true, ignoreUnreadable, roots);
@@ -436,8 +437,12 @@ void collectGarbage(GCAction action, const PathSet & pathsToDelete,
 
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
+    Roots rootMap;
+    findRoots(rootMap, false);
+
     PathSet roots;
-    findRoots(roots, false);
+    for (Roots::iterator i = rootMap.begin(); i != rootMap.end(); ++i)
+        roots.insert(i->second);
 
     /* Add additional roots returned by the program specified by the
        NIX_ROOT_FINDER environment variable.  This is typically used
