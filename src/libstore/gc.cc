@@ -122,7 +122,7 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
     if (roots.find(gcRoot) == roots.end())
         printMsg(lvlError, 
             format(
-                "warning: the garbage collector does not find `%1%' as a root; "
+                "warning: `%1%' is not in a directory where the garbage collector looks for roots; "
                 "therefore, `%2%' might be removed by the garbage collector")
             % gcRoot % storePath);
         
