@@ -1364,13 +1364,13 @@ void DerivationGoal::startBuilder()
                 if (setgroups(0, 0) == -1)
                     throw SysError("cannot clear the set of supplementary groups");
                 
-                setuid(buildUser.getUID());
-                assert(getuid() == buildUser.getUID());
-                assert(geteuid() == buildUser.getUID());
-
                 setgid(gidBuildGroup);
                 assert(getgid() == gidBuildGroup);
                 assert(getegid() == gidBuildGroup);
+
+                setuid(buildUser.getUID());
+                assert(getuid() == buildUser.getUID());
+                assert(geteuid() == buildUser.getUID());
             }
             
             /* Execute the program.  This should not return. */
