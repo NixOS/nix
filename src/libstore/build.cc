@@ -450,11 +450,15 @@ static void killUser(uid_t uid)
 
             if (setuid(uid) == -1) abort();
 
-            if (kill(-1, SIGKILL) == -1)
-                throw SysError(format("cannot kill processes for UID `%1%'") % uid);
+	    while (true) {
+		if (kill(-1, SIGKILL) == 0) break;
+		if (errno == ESRCH) break; /* no more processes */
+		if (errno != EINTR)
+		    throw SysError(format("cannot kill processes for UID `%1%'") % uid);
+	    }
         
         } catch (std::exception & e) {
-            std::cerr << format("build error: %1%\n") % e.what();
+            std::cerr << format("killing build users: %1%\n") % e.what();
             quickExit(1);
         }
         quickExit(0);
@@ -965,7 +969,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
             throw SysError(format("executing `%1%'") % buildHook);
             
         } catch (std::exception & e) {
-            std::cerr << format("build error: %1%\n") % e.what();
+            std::cerr << format("build hook error: %1%\n") % e.what();
         }
         quickExit(1);
     }
