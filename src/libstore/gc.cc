@@ -91,6 +91,9 @@ void LocalStore::addIndirectRoot(const Path & path)
 }
 
 
+static void findRoots(PathSet & roots, bool ignoreUnreadable);
+
+
 Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
     bool indirect, bool allowOutsideRootsDir)
 {
@@ -115,6 +118,18 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
         }
             
         createSymlink(gcRoot, storePath, false);
+
+        /* Check that the root can be found by the garbage collector. */
+        PathSet roots;
+        findRoots(roots, true);
+        if (roots.find(storePath) == roots.end()) {
+            static bool haveWarned = false;
+            warnOnce(haveWarned, 
+                format(
+                    "the path `%1%' is not reachable from the roots directory of the garbage collector; "
+                    "therefore, `%2%' might be removed by the garbage collector")
+                % gcRoot % storePath);
+        }
     }
 
     /* Grab the global GC root, causing us to block while a GC is in
@@ -292,7 +307,7 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
 
 
 static void findRoots(const Path & path, bool recurseSymlinks,
-    PathSet & roots)
+    bool ignoreUnreadable, PathSet & roots)
 {
     struct stat st;
     if (lstat(path.c_str(), &st) == -1)
@@ -303,36 +318,47 @@ static void findRoots(const Path & path, bool recurseSymlinks,
     if (S_ISDIR(st.st_mode)) {
 	Strings names = readDirectory(path);
 	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
-            findRoots(path + "/" + *i, recurseSymlinks, roots);
+            findRoots(path + "/" + *i, recurseSymlinks, ignoreUnreadable, roots);
     }
 
     else if (S_ISLNK(st.st_mode)) {
-        string target = readLink(path);
-        Path target2 = absPath(target, dirOf(path));
+        Path target = absPath(readLink(path), dirOf(path));
 
-        if (isInStore(target2)) {
+        if (isInStore(target)) {
             debug(format("found root `%1%' in `%2%'")
-                % target2 % path);
-            Path target3 = toStorePath(target2);
-            if (store->isValidPath(target3)) 
-                roots.insert(target3);
+                % target % path);
+            Path storePath = toStorePath(target);
+            if (store->isValidPath(storePath)) 
+                roots.insert(storePath);
             else
                 printMsg(lvlInfo, format("skipping invalid root from `%1%' to `%2%'")
-                    % path % target3);
+                    % path % storePath);
         }
 
         else if (recurseSymlinks) {
-            if (pathExists(target2))
-                findRoots(target2, false, roots);
-            else {
-                printMsg(lvlInfo, format("removing stale link from `%1%' to `%2%'") % path % target2);
+            struct stat st2;
+            if (lstat(target.c_str(), &st2) == 0)
+                findRoots(target, false, ignoreUnreadable, roots);
+            else if (ignoreUnreadable && errno == EACCES)
+                /* ignore */ ;
+            else if (errno == ENOENT || errno == ENOTDIR) {
+                printMsg(lvlInfo, format("removing stale link from `%1%' to `%2%'") % path % target);
                 /* Note that we only delete when recursing, i.e., when
                    we are still in the `gcroots' tree.  We never
                    delete stuff outside that tree. */
                 unlink(path.c_str());
             }
+            else 
+                throw SysError(format("statting `%1%'") % target);
         }
     }
+}
+
+
+static void findRoots(PathSet & roots, bool ignoreUnreadable)
+{
+    Path rootsDir = canonPath((format("%1%/%2%") % nixStateDir % gcRootsDir).str());
+    findRoots(rootsDir, true, ignoreUnreadable, roots);
 }
 
 
@@ -410,10 +436,8 @@ void collectGarbage(GCAction action, const PathSet & pathsToDelete,
 
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
-    Path rootsDir = canonPath((format("%1%/%2%") % nixStateDir % gcRootsDir).str());
     PathSet roots;
-    if (!ignoreLiveness)
-        findRoots(rootsDir, true, roots);
+    findRoots(roots, false);
 
     /* Add additional roots returned by the program specified by the
        NIX_ROOT_FINDER environment variable.  This is typically used
