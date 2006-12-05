@@ -381,7 +381,7 @@ void UserLock::acquire()
             "in the Nix configuration file");
 
     for (Strings::iterator i = buildUsers.begin(); i != buildUsers.end(); ++i) {
-        printMsg(lvlError, format("trying user `%1%'") % *i);
+        debug(format("trying user `%1%'") % *i);
 
         struct passwd * pw = getpwnam(i->c_str());
         if (!pw)
@@ -1359,7 +1359,7 @@ void DerivationGoal::startBuilder()
                safe.  Also note that setuid() when run as root sets
                the real, effective and saved UIDs. */
             if (buildUser.getUID() != 0) {
-                printMsg(lvlError, format("switching to uid `%1%'") % buildUser.getUID());
+                printMsg(lvlInfo, format("switching to uid `%1%'") % buildUser.getUID());
                 
                 if (setgroups(0, 0) == -1)
                     throw SysError("cannot clear the set of supplementary groups");
