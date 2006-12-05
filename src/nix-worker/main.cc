@@ -29,6 +29,8 @@ static FdSource from(STDIN_FILENO);
 static FdSink to(STDOUT_FILENO);
 
 bool canSendStderr;
+pid_t myPid;
+
 
 
 /* This function is called anytime we want to write something to
@@ -37,7 +39,11 @@ bool canSendStderr;
    socket. */
 static void tunnelStderr(const unsigned char * buf, size_t count)
 {
-    if (canSendStderr) {
+    /* Don't send the message to the client if we're a child of the
+       process handling the connection.  Otherwise we could screw up
+       the protocol.  It's up to the parent to redirect stderr and
+       send it to the client somehow (e.g., as in build.cc). */
+    if (canSendStderr && myPid == getpid()) {
         try {
             writeInt(STDERR_NEXT, to);
             writeString(string((char *) buf, count), to);
@@ -47,7 +53,8 @@ static void tunnelStderr(const unsigned char * buf, size_t count)
             canSendStderr = false;
             throw;
         }
-    }
+    } else
+        writeFull(STDERR_FILENO, buf, count);
 }
 
 
@@ -344,6 +351,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
 static void processConnection()
 {
     canSendStderr = false;
+    myPid = getpid();    
     writeToStderr = tunnelStderr;
 
     /* Allow us to receive SIGPOLL for events on the client socket. */
