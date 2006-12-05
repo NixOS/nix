@@ -49,6 +49,34 @@ static void tunnelStderr(const unsigned char * buf, size_t count)
 }
 
 
+/* Return true if the remote side has closed its end of the
+   connection, false otherwise.  Should not be called on any socket on
+   which we expect input! */
+static bool isFarSideClosed(int socket)
+{
+    struct timeval timeout;
+    timeout.tv_sec = timeout.tv_usec = 0;
+
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(socket, &fds);
+        
+    if (select(socket + 1, &fds, 0, 0, &timeout) == -1)
+        throw SysError("select()");
+
+    if (!FD_ISSET(socket, &fds)) return false;
+
+    /* Destructive read to determine whether the select() marked the
+       socket as readable because there is actual input or because
+       we've reached EOF (i.e., a read of size 0 is available). */
+    char c;
+    if (read(socket, &c, 1) != 0)
+        throw Error("EOF expected (protocol error?)");
+    
+    return true;
+}
+
+
 /* A SIGPOLL signal is received when data is available on the client
    communication scoket, or when the client has closed its side of the
    socket.  This handler is enabled at precisely those moments in the
@@ -62,11 +90,27 @@ static void tunnelStderr(const unsigned char * buf, size_t count)
    time and wouldn't have to worry about races. */
 static void sigPollHandler(int sigNo)
 {
-    if (!blockInt) {
-        _isInterrupted = 1;
-        blockInt = 1;
-        canSendStderr = false;
-        write(STDERR_FILENO, "SIGPOLL\n", 8);
+    try {
+        /* Check that the far side actually closed.  We're still
+           getting spurious signals every once in a while.  I.e.,
+           there is no input available, but we get a signal with
+           POLL_IN set.  Maybe it's delayed or something. */
+        if (isFarSideClosed(from.fd)) {
+            if (!blockInt) {
+                _isInterrupted = 1;
+                blockInt = 1;
+                canSendStderr = false;
+                write(STDERR_FILENO, "SIGPOLL\n", 8);
+            }
+        } else {
+            string s = "spurious SIGPOLL\n";
+            write(STDERR_FILENO, s.c_str(), s.size());
+        }
+    }
+    catch (Error & e) {
+        /* Shouldn't happen. */
+        write(STDERR_FILENO, e.msg().c_str(), e.msg().size());
+        abort();
     }
 }
 
@@ -98,21 +142,7 @@ static void startWork()
        out if any input is available on the socket.  If there is, it
        has to be the 0-byte read that indicates that the socket has
        closed. */
-    
-    struct timeval timeout;
-    timeout.tv_sec = timeout.tv_usec = 0;
-
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(from.fd, &fds);
-        
-    if (select(from.fd + 1, &fds, 0, 0, &timeout) == -1)
-        throw SysError("select()");
-
-    if (FD_ISSET(from.fd, &fds)) {
-        char c;
-        if (read(from.fd, &c, 1) != 0)
-            throw Error("EOF expected (protocol error?)");
+    if (isFarSideClosed(from.fd)) {
         _isInterrupted = 1;
         checkInterrupt();
     }
