@@ -10,10 +10,12 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <fcntl.h>
+#include <errno.h>
 
 using namespace nix;
 
@@ -403,10 +405,17 @@ static void processConnection()
 }
 
 
-static void setSigChldAction(bool ignore)
+static void sigChldHandler(int sigNo)
+{
+    /* Reap all dead children. */
+    while (waitpid(-1, 0, WNOHANG) == 0) ;
+}
+
+
+static void setSigChldAction(bool autoReap)
 {
     struct sigaction act, oact;
-    act.sa_handler = ignore ? SIG_IGN : SIG_DFL;
+    act.sa_handler = autoReap ? sigChldHandler : SIG_DFL;
     sigfillset(&act.sa_mask);
     act.sa_flags = 0;
     if (sigaction(SIGCHLD, &act, &oact))
@@ -463,7 +472,10 @@ static void daemonLoop()
                 (struct sockaddr *) &remoteAddr, &remoteAddrLen);
             checkInterrupt();
             if (remote == -1)
-                throw SysError("accepting connection");
+		if (errno == EINTR)
+		    continue;
+		else
+		    throw SysError("accepting connection");
 
             printMsg(lvlInfo, format("accepted connection %1%") % remote);
 
