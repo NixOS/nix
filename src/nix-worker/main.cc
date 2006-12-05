@@ -365,9 +365,9 @@ static void processConnection()
     try {
 
         /* Prevent users from doing something very dangerous. */
-        if (setuidMode && geteuid() == 0 &&
+        if (geteuid() == 0 &&
             querySetting("build-users", Strings()).size() == 0)
-            throw Error("if you run `nix-worker' setuid root, then you MUST set `build-users'!");
+            throw Error("if you run `nix-worker' as root, then you MUST set `build-users'!");
 
         /* Open the store. */
         store = boost::shared_ptr<StoreAPI>(new LocalStore(true));
