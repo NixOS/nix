@@ -1,6 +1,5 @@
 #include "shared.hh"
 #include "globals.hh"
-#include "gc.hh"
 #include "store-api.hh"
 #include "util.hh"
 

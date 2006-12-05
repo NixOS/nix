@@ -37,6 +37,16 @@ typedef list<Substitute> Substitutes;
 typedef std::map<Path, Path> Roots;
 
 
+/* Garbage collector operation. */
+typedef enum {
+    gcReturnRoots,
+    gcReturnLive,
+    gcReturnDead,
+    gcDeleteDead,
+    gcDeleteSpecific,
+} GCAction;
+
+
 class StoreAPI 
 {
 public:
@@ -127,6 +137,33 @@ public:
        outside of the Nix store that point to `storePath'.  */
     virtual Roots findRoots() = 0;
 
+    /* Depending on `action', this function does the following:
+
+       - `gcReturnRoots': find and return the set of roots for the
+         garbage collector.  These are the store paths symlinked to in
+         the `gcroots' directory.
+
+       - `gcReturnLive': return the set of paths reachable from
+         (i.e. in the closure of) the roots.
+
+       - `gcReturnDead': return the set of paths not reachable from
+         the roots.
+
+       - `gcDeleteDead': actually delete the latter set.
+
+       - `gcDeleteSpecific': delete the paths listed in
+         `pathsToDelete', insofar as they are not reachable.
+
+       If `ignoreLiveness' is set, then reachability from the roots is
+       ignored (dangerous!).  However, the paths must still be
+       unreferenced *within* the store (i.e., there can be no other
+       store paths that depend on them).
+
+       For `gcReturnDead', `gcDeleteDead' and `gcDeleteSpecific', the
+       number of bytes that would be or was freed is returned in
+       `bytesFreed'. */
+    virtual void collectGarbage(GCAction action, const PathSet & pathsToDelete,
+        bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed) = 0;
 };
 
 
@@ -175,6 +212,17 @@ std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
    affected), but it has some backwards compatibility issues (the
    hashing scheme changes), so I'm not doing that for now. */
 Path computeStorePathForText(const string & suffix, const string & s);
+
+
+/* Remove the temporary roots file for this process.  Any temporary
+   root becomes garbage after this point unless it has been registered
+   as a (permanent) root. */
+void removeTempRoots();
+
+
+/* Register a permanent GC root. */
+Path addPermRoot(const Path & storePath, const Path & gcRoot,
+    bool indirect, bool allowOutsideRootsDir = false);
 
 
 /* For now, there is a single global store API object, but we'll

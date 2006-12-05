@@ -302,6 +302,27 @@ Roots RemoteStore::findRoots()
 }
 
 
+void RemoteStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
+    bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed)
+{
+    result.clear();
+    bytesFreed = 0;
+    writeInt(wopCollectGarbage, to);
+    writeInt(action, to);
+    writeStringSet(pathsToDelete, to);
+    writeInt(ignoreLiveness, to);
+    
+    processStderr();
+    
+    result = readStringSet(from);
+
+    /* Ugh - NAR integers are 64 bits, but read/writeInt() aren't. */
+    unsigned int lo = readInt(from);
+    unsigned int hi = readInt(from);
+    bytesFreed = (((unsigned long long) hi) << 32) | lo;
+}
+
+
 void RemoteStore::processStderr()
 {
     unsigned int msg;

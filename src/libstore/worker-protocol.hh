@@ -25,6 +25,7 @@ typedef enum {
     wopAddIndirectRoot,
     wopSyncWithGC,
     wopFindRoots,
+    wopCollectGarbage,
 } WorkerOp;
 
 

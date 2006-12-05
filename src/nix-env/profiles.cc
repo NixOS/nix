@@ -1,6 +1,6 @@
 #include "profiles.hh"
+#include "store-api.hh"
 #include "util.hh"
-#include "gc.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

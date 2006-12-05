@@ -4,7 +4,6 @@
 #include "db.hh"
 #include "archive.hh"
 #include "pathlocks.hh"
-#include "gc.hh"
 #include "aterm.hh"
 #include "derivations-ast.hh"
     

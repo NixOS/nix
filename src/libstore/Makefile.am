@@ -6,7 +6,7 @@ libstore_la_SOURCES = \
 
 pkginclude_HEADERS = \
  store-api.hh local-store.hh remote-store.hh derivations.hh misc.hh \
- globals.hh db.hh references.hh pathlocks.hh gc.hh  \
+ globals.hh db.hh references.hh pathlocks.hh \
  worker-protocol.hh
 
 libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la

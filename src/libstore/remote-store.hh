@@ -54,6 +54,9 @@ public:
     void syncWithGC();
     
     Roots findRoots();
+
+    void collectGarbage(GCAction action, const PathSet & pathsToDelete,
+        bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed);
     
 private:
     AutoCloseFD fdSocket;

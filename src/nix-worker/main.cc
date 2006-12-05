@@ -281,6 +281,28 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         break;
     }
 
+    case wopCollectGarbage: {
+        GCAction action = (GCAction) readInt(from);
+        PathSet pathsToDelete = readStorePaths(from);
+        bool ignoreLiveness = readInt(from);
+
+        PathSet result;
+        unsigned long long bytesFreed;
+        
+        startWork();
+        if (ignoreLiveness)
+            throw Error("you are not allowed to ignore liveness");
+        store->collectGarbage(action, pathsToDelete, ignoreLiveness,
+            result, bytesFreed);
+        stopWork();
+        
+        writeStringSet(result, to);
+        writeInt(bytesFreed & 0xffffffff, to);
+        writeInt(bytesFreed >> 32, to);
+        
+        break;
+    }
+            
     default:
         throw Error(format("invalid operation %1%") % op);
     }

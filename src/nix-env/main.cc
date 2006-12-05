@@ -2,7 +2,6 @@
 #include "names.hh"
 #include "globals.hh"
 #include "misc.hh"
-#include "gc.hh"
 #include "shared.hh"
 #include "parser.hh"
 #include "eval.hh"

@@ -1,4 +1,3 @@
-#include "gc.hh"
 #include "globals.hh"
 #include "misc.hh"
 #include "pathlocks.hh"
@@ -428,7 +427,7 @@ static Paths topoSort(const PathSet & paths)
 }
 
 
-void collectGarbage(GCAction action, const PathSet & pathsToDelete,
+void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed)
 {
     result.clear();
@@ -446,7 +445,7 @@ void collectGarbage(GCAction action, const PathSet & pathsToDelete,
 
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
-    Roots rootMap = ignoreLiveness ? Roots() : findRoots(true);
+    Roots rootMap = ignoreLiveness ? Roots() : nix::findRoots(true);
 
     PathSet roots;
     for (Roots::iterator i = rootMap.begin(); i != rootMap.end(); ++i)
@@ -456,7 +455,8 @@ void collectGarbage(GCAction action, const PathSet & pathsToDelete,
        NIX_ROOT_FINDER environment variable.  This is typically used
        to add running programs to the set of roots (to prevent them
        from being garbage collected). */
-    addAdditionalRoots(roots);
+    if (!ignoreLiveness)
+        addAdditionalRoots(roots);
 
     if (action == gcReturnRoots) {
         result = roots;

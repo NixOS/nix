@@ -2,7 +2,6 @@
 #include "pathlocks.hh"
 #include "misc.hh"
 #include "globals.hh"
-#include "gc.hh"
 #include "local-store.hh"
 #include "db.hh"
 #include "util.hh"

@@ -3,7 +3,6 @@
 
 #include "globals.hh"
 #include "misc.hh"
-#include "gc.hh"
 #include "archive.hh"
 #include "shared.hh"
 #include "dotgraph.hh"
@@ -573,7 +572,7 @@ static void opGC(Strings opFlags, Strings opArgs)
     PathSet result;
     PrintFreed freed(action == gcDeleteDead || action == gcReturnDead,
         action == gcReturnDead);
-    collectGarbage(action, PathSet(), false, result, freed.bytesFreed);
+    store->collectGarbage(action, PathSet(), false, result, freed.bytesFreed);
 
     if (action != gcDeleteDead) {
         for (PathSet::iterator i = result.begin(); i != result.end(); ++i)
@@ -601,7 +600,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
     
     PathSet dummy;
     PrintFreed freed(true, false);
-    collectGarbage(gcDeleteSpecific, pathsToDelete, ignoreLiveness,
+    store->collectGarbage(gcDeleteSpecific, pathsToDelete, ignoreLiveness,
         dummy, freed.bytesFreed);
 }
 
