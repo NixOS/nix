@@ -14,7 +14,7 @@
 #include <aterm2.h>
 
 
-extern char * * environ;
+#include "setuid-common.hh"
 
 
 namespace nix {
@@ -218,19 +218,10 @@ static void setuidInit()
     uid_t nixUid = geteuid();
     gid_t nixGid = getegid();
     
-    fprintf(stderr, "<<< setuid mode >>>\n");
-
-    /* Don't trust the environment. */
-    environ = 0;
+    setuidCleanup();
 
     /* Don't trust the current directory. */
     if (chdir("/") == -1) abort();
-
-    /* Make sure that file descriptors 0, 1, 2 are open. */
-    for (int fd = 0; fd <= 2; ++fd) {
-        struct stat st;
-        if (fstat(fd, &st) == -1) abort();
-    }
 
     /* Set the real (and preferably also the save) uid/gid to the
        effective uid/gid.  This matters mostly when we're not using
