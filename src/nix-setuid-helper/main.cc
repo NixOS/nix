@@ -23,9 +23,22 @@ using namespace nix;
 static void secureChown(uid_t uidFrom, uid_t uidTo, gid_t gidTo,
     const Path & path)
 {
-    /* Recursively chown `path' to the specified uid and gid, but only
-       if it is currently owned by the Nix account. */
-    /* !!! */
+    struct stat st;
+    if (lstat(path.c_str(), &st) == -1)
+        throw SysError(format("statting of `%1%'") % path);
+
+    if (st.st_uid != uidFrom)
+        throw Error(format("path `%1%' owned by the wrong owner") % path);
+
+    if (lchown(path.c_str(), uidTo, gidTo) == -1)
+        throw SysError(format("changing ownership of `%1%'") % path);
+
+    if (S_ISDIR(st.st_mode)) {
+        Strings names = readDirectory(path);
+	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
+            /* !!! recursion; check stack depth */
+	    secureChown(uidFrom, uidTo, gidTo, path + "/" + *i);
+    }
 }
 
 
