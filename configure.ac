@@ -271,6 +271,7 @@ AC_CONFIG_FILES([Makefile
    src/nix-instantiate/Makefile
    src/nix-env/Makefile
    src/nix-worker/Makefile
+   src/nix-setuid-helper/Makefile
    src/nix-log2xml/Makefile
    src/bsdiff-4.3/Makefile
    scripts/Makefile

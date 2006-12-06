@@ -454,11 +454,12 @@ static void killUser(uid_t uid)
 		if (kill(-1, SIGKILL) == 0) break;
 		if (errno == ESRCH) break; /* no more processes */
 		if (errno != EINTR)
-		    throw SysError(format("cannot kill processes for UID `%1%'") % uid);
+		    throw SysError(format("cannot kill processes for uid `%1%'") % uid);
 	    }
         
         } catch (std::exception & e) {
-            std::cerr << format("killing build users: %1%\n") % e.what();
+            std::cerr << format("killing processes beloging to uid `%1%': %1%\n")
+                % uid % e.what();
             quickExit(1);
         }
         quickExit(0);
@@ -466,7 +467,7 @@ static void killUser(uid_t uid)
     
     /* parent */
     if (pid.wait(true) != 0)
-        throw Error(format("cannot kill processes for UID `%1%'") % uid);
+        throw Error(format("cannot kill processes for uid `%1%'") % uid);
 
     /* !!! We should really do some check to make sure that there are
        no processes left running under `uid', but there is no portable
