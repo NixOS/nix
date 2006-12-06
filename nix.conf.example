@@ -115,7 +115,7 @@
 #
 # Example:
 #   build-users-group = nix-builders
-#build-users-group = nix-builders
+#build-users-group =
 
 
 ### Option `system'
