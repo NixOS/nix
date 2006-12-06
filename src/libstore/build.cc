@@ -341,6 +341,7 @@ private:
     AutoCloseFD fdUserLock;
 
     uid_t uid;
+    gid_t gid;
     
 public:
     UserLock();
@@ -350,6 +351,7 @@ public:
     void release();
 
     uid_t getUID();
+    uid_t getGID();
 };
 
 
@@ -358,7 +360,7 @@ PathSet UserLock::lockedPaths;
 
 UserLock::UserLock()
 {
-    uid = 0;
+    uid = gid = 0;
 }
 
 
@@ -371,21 +373,37 @@ UserLock::~UserLock()
 void UserLock::acquire()
 {
     assert(uid == 0);
-    
-    Strings buildUsers = querySetting("build-users", Strings());
 
-    if (buildUsers.empty())
-        throw Error(
-            "cannot build as `root'; you must define "
-            "one or more users for building in `build-users' "
-            "in the Nix configuration file");
+    string buildUsersGroup = querySetting("build-users-group", "");
+    assert(buildUsersGroup != "");
 
-    for (Strings::iterator i = buildUsers.begin(); i != buildUsers.end(); ++i) {
+    /* Get the members of the build-users-group. */
+    struct group * gr = getgrnam(buildUsersGroup.c_str());
+    if (!gr)
+        throw Error(format("the group `%1%' specified in `build-users-group' does not exist")
+            % buildUsersGroup);
+    gid = gr->gr_gid;
+
+    /* Copy the result of getgrnam. */
+    Strings users;
+    for (char * * p = gr->gr_mem; *p; ++p) {
+        debug(format("found build user `%1%'") % *p);
+        users.push_back(*p);
+    }
+
+    if (users.empty())
+        throw Error(format("the build users group `%1%' has no members")
+            % buildUsersGroup);
+
+    /* Find a user account that isn't currently in use for another
+       build. */
+    for (Strings::iterator i = users.begin(); i != users.end(); ++i) {
         debug(format("trying user `%1%'") % *i);
 
         struct passwd * pw = getpwnam(i->c_str());
         if (!pw)
-            throw Error(format("the user `%1%' listed in `build-users' does not exist") % *i);
+            throw Error(format("the user `%1%' in the group `%2%' does not exist")
+                % *i % buildUsersGroup);
 
         fnUserLock = (format("%1%/userpool/%2%") % nixStateDir % pw->pw_uid).str();
 
@@ -405,9 +423,9 @@ void UserLock::acquire()
         }
     }
 
-    throw Error("all build users are currently in use; "
-        "consider expanding the `build-users' field "
-        "in the Nix configuration file");
+    throw Error(format("all build users are currently in use; "
+        "consider creating additional users and adding them to the `%1%' group")
+        % buildUsersGroup);
 }
 
 
@@ -425,6 +443,12 @@ void UserLock::release()
 uid_t UserLock::getUID()
 {
     return uid;
+}
+
+
+uid_t UserLock::getGID()
+{
+    return gid;
 }
 
 
@@ -1275,12 +1299,12 @@ void DerivationGoal::startBuilder()
     }
 
     
-    /* If `build-users' is not empty, then we have to build as one of
-       the users listed in `build-users'. */
-    gid_t gidBuildGroup = -1;    
-    if (querySetting("build-users", Strings()).size() > 0) {
+    /* If `build-users-group' is not empty, then we have to build as
+       one of the members of that group. */
+    if (querySetting("build-users-group", "") != "") {
         buildUser.acquire();
         assert(buildUser.getUID() != 0);
+        assert(buildUser.getGID() != 0);
 
         /* Make sure that no other processes are executing under this
            uid. */
@@ -1290,16 +1314,8 @@ void DerivationGoal::startBuilder()
         if (chown(tmpDir.c_str(), buildUser.getUID(), (gid_t) -1) == -1)
             throw SysError(format("cannot change ownership of `%1%'") % tmpDir);
 
-        /* What group to execute the builder in? */
-        string buildGroup = querySetting("build-users-group", "nix");
-        struct group * gr = getgrnam(buildGroup.c_str());
-        if (!gr) throw Error(
-            format("the group `%1%' specified in `build-users-group' does not exist")
-            % buildGroup);
-        gidBuildGroup = gr->gr_gid;
-        
         /* Check that the Nix store has the appropriate permissions,
-           i.e., owned by root and mode 1777 (sticky bit on so that
+           i.e., owned by root and mode 1775 (sticky bit on so that
            the builder can create its output but not mess with the
            outputs of other processes). */
         struct stat st;
@@ -1307,11 +1323,11 @@ void DerivationGoal::startBuilder()
             throw SysError(format("cannot stat `%1%'") % nixStore);
         if (!(st.st_mode & S_ISVTX) ||
             ((st.st_mode & S_IRWXG) != S_IRWXG) ||
-            (st.st_gid != gidBuildGroup))
+            (st.st_gid != buildUser.getGID()))
             throw Error(format(
                 "builder does not have write permission to `%1%'; "
                 "try `chgrp %1% %2%; chmod 1775 %2%'")
-                % buildGroup % nixStore);
+                % buildUser.getGID() % nixStore);
     }
 
     
@@ -1365,13 +1381,15 @@ void DerivationGoal::startBuilder()
                 if (setgroups(0, 0) == -1)
                     throw SysError("cannot clear the set of supplementary groups");
                 
-                setgid(gidBuildGroup);
-                assert(getgid() == gidBuildGroup);
-                assert(getegid() == gidBuildGroup);
+                if (setgid(buildUser.getGID()) == -1 ||
+                    getgid() != buildUser.getGID() ||
+                    getegid() != buildUser.getGID())
+                    throw SysError("setgid failed");
 
-                setuid(buildUser.getUID());
-                assert(getuid() == buildUser.getUID());
-                assert(geteuid() == buildUser.getUID());
+                if (setuid(buildUser.getUID()) == -1 ||
+                    getuid() != buildUser.getUID() ||
+                    geteuid() != buildUser.getUID())
+                    throw SysError("setuid failed");
             }
             
             /* Execute the program.  This should not return. */

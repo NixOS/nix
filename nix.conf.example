@@ -78,44 +78,44 @@
 #build-max-jobs = 1
 
 
-### Option `build-users'
+### Option `build-users-group'
 #
-# This option contains a list of user names under which Nix can
-# execute builds.  In multi-user Nix installations, builds should not
+# This options specifies the Unix group containing the Nix build user
+# accounts.  In multi-user Nix installations, builds should not
 # be performed by the Nix account since that would allow users to
 # arbitrarily modify the Nix store and database by supplying specially
 # crafted builders; and they cannot be performed by the calling user
 # since that would allow him/her to influence the build result.
 #
-# Thus this list should contain a number of `special' user accounts
-# created specifically for Nix, e.g., `nix-builder-1',
-# `nix-builder-2', and so on.  The more users the better, since at
-# most a number of builds equal to the number of build users can be
-# running simultaneously.
+# Therefore, if this option is non-empty and specifies a valid group,
+# builds will be performed under the user accounts that are a member
+# of the group specified here (as listed in /etc/group).  Those user
+# accounts should not be used for any other purpose!
 #
-# If this list is empty, builds will be performed under the Nix
-# account (that is, the uid under which the Nix daemon runs, or that
-# owns the setuid nix-worker program).
+# Nix will never run two builds under the same user account at the
+# same time.  This is to prevent an obvious security hole: a malicious
+# user writing a Nix expression that modifies the build result of a
+# legitimate Nix expression being built by another user.  Therefore it
+# is good to have as many Nix build user accounts as you can spare.
+# (Remember: uids are cheap.)
+#
+# The build users should have permission to create files in the Nix
+# store, but not delete them.  Therefore, /nix/store should be owned
+# by the Nix account, its group should be the group specified here,
+# and its mode should be 1775.
+#
+# If the build users group is empty, builds will be performed under
+# the uid of the Nix process (that is, the uid of the caller if
+# $NIX_REMOTE is empty, the uid under which the Nix daemon runs if
+# $NIX_REMOTE is `daemon', or the uid that owns the setuid nix-worker
+# program if $NIX_REMOTE is `slave').  Obviously, this should not be
+# used in multi-user settings with untrusted users.
+#
+# The default is empty.
 #
 # Example:
-#   build-users = nix-builder-1 nix-builder-2 nix-builder-3
-#build-users =
-
-
-### Option `build-users-group'
-#
-# If `build-users' is used, then this option specifies the group ID
-# (gid) under which each build is to be performed.  This group should
-# have permission to create files in the Nix store, but not delete
-# them.  I.e., /nix/store should be owned by the Nix account, its
-# group should be the group specified here, and its mode should be
-# 1775.
-#
-# The default is `nix'.
-#
-# Example:
-#   build-users-group = nix
-#build-users-group =
+#   build-users-group = nix-builders
+build-users-group = nix-builders
 
 
 ### Option `system'

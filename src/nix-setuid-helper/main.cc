@@ -40,14 +40,18 @@ static void runBuilder(string userName,
        don't want to create that directory here. */
     secureChown(pw->pw_uid, gidBuilders, ".");
 
+                
     /* Set the real, effective and saved gid.  Must be done before
        setuid(), otherwise it won't set the real and saved gids. */
+    if (setgroups(0, 0) == -1)
+        throw SysError("cannot clear the set of supplementary groups");
     //setgid(gidBuilders);
 
     /* Set the real, effective and saved uid. */
-    setuid(pw->pw_uid);
-    if (getuid() != pw->pw_uid || geteuid() != pw->pw_uid)
-        throw Error("cannot setuid");
+    if (setuid(pw->pw_uid) == -1 ||
+        getuid() != pw->pw_uid ||
+        geteuid() != pw->pw_uid)
+        throw SysError("setuid failed");
 
     /* Execute the program. */
     std::vector<const char *> args;
