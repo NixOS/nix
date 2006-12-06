@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <stdlib.h>
 
 #include <pwd.h>
@@ -25,20 +26,26 @@ static void secureChown(uid_t uidTarget, gid_t gidTarget,
 }
 
 
-static void runBuilder(string userName,
-    string program, int argc, char * * argv)
+static uid_t nameToUid(const string & userName)
 {
     struct passwd * pw = getpwnam(userName.c_str());
     if (!pw)
-        throw Error(format("the user `%1%' does not exist") % userName);
+        throw Error(format("user `%1%' does not exist") % userName);
+    return pw->pw_uid;
+}
 
+
+static void runBuilder(const string & targetUser,
+    string program, int argc, char * * argv)
+{
+    uid_t uidTargetUser = nameToUid(targetUser);
     gid_t gidBuilders = 1234;
     
     /* Chown the current directory, *if* it is owned by the Nix
        account.  The idea is that the current directory is the
        temporary build directory in /tmp or somewhere else, and we
        don't want to create that directory here. */
-    secureChown(pw->pw_uid, gidBuilders, ".");
+    secureChown(uidTargetUser, gidBuilders, ".");
 
                 
     /* Set the real, effective and saved gid.  Must be done before
@@ -48,9 +55,9 @@ static void runBuilder(string userName,
     //setgid(gidBuilders);
 
     /* Set the real, effective and saved uid. */
-    if (setuid(pw->pw_uid) == -1 ||
-        getuid() != pw->pw_uid ||
-        geteuid() != pw->pw_uid)
+    if (setuid(uidTargetUser) == -1 ||
+        getuid() != uidTargetUser ||
+        geteuid() != uidTargetUser)
         throw SysError("setuid failed");
 
     /* Execute the program. */
@@ -63,6 +70,11 @@ static void runBuilder(string userName,
     if (execve(program.c_str(), (char * *) &args[0], 0) == -1)
         throw SysError(format("cannot execute `%1%'") % program);
 }
+
+
+#ifndef NIX_SETUID_CONFIG_FILE
+#define NIX_SETUID_CONFIG_FILE "/etc/nix-setuid.conf"
+#endif
 
 
 static void run(int argc, char * * argv) 
@@ -83,13 +95,38 @@ static void run(int argc, char * * argv)
        processes run (i.e., the supposed caller).  It should match our
        real uid.  The second is the Unix group to which the Nix
        builders belong (and nothing else!). */
-    /* !!! */
-    
-    
-    /* Make sure that we are called by the Nix account, not by someone
-       else. */
-    // ...
+    string configFile = NIX_SETUID_CONFIG_FILE;
+    AutoCloseFD fdConfig = open(configFile.c_str(), O_RDONLY);
+    if (fdConfig == -1)
+        throw SysError(format("opening `%1%'") % configFile);
 
+    /* Config file should be owned by root. */
+    struct stat st;
+    if (fstat(fdConfig, &st) == -1) throw SysError("statting file");
+    if (st.st_uid != 0)
+        throw Error(format("`%1%' not owned by root") % configFile);
+    if (st.st_mode & (S_IWGRP | S_IWOTH))
+        throw Error(format("`%1%' should not be group or world-writable") % configFile);
+
+    Strings tokens = tokenizeString(readFile(fdConfig));
+
+    fdConfig.close();
+
+    if (tokens.size() != 2)
+        throw Error(format("parse error in `%1%'") % configFile);
+
+    Strings::iterator i = tokens.begin();
+    string allowedUser = *i++;
+    string buildUsersGroup = *i++;
+
+
+    /* Check that the caller (real uid) is the one allowed to call
+       this program. */
+    uid_t uidAllowedUser = nameToUid(allowedUser);
+    if (uidAllowedUser != getuid())
+        throw Error("you are not allowed to call this program, go away");
+    
+    
     /* Perform the desired command. */
     if (argc < 2)
         throw Error("invalid arguments");
