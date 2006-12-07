@@ -1342,11 +1342,6 @@ void DerivationGoal::startBuilder()
 
             initChild();
 
-            /* Fill in the arguments. */
-            Strings args(drv.args);
-            args.push_front(baseNameOf(drv.builder));
-            const char * * argArr = strings2CharPtrs(args);
-
             /* Fill in the environment. */
             Strings envStrs;
             for (Environment::const_iterator i = env.begin();
@@ -1354,32 +1349,53 @@ void DerivationGoal::startBuilder()
                 envStrs.push_back(i->first + "=" + i->second);
             const char * * envArr = strings2CharPtrs(envStrs);
 
+            Path program = drv.builder.c_str();
+            std::vector<const char *> args; /* careful with c_str()! */
+            
             /* If we are running in `build-users' mode, then switch to
                the user we allocated above.  Make sure that we drop
                all root privileges.  Note that initChild() above has
                closed all file descriptors except std*, so that's
                safe.  Also note that setuid() when run as root sets
                the real, effective and saved UIDs. */
-            if (buildUser.getUID() != 0) {
+            if (buildUser.enabled()) {
                 printMsg(lvlInfo, format("switching to uid `%1%'") % buildUser.getUID());
-                
-                if (setgroups(0, 0) == -1)
-                    throw SysError("cannot clear the set of supplementary groups");
-                
-                if (setgid(buildUser.getGID()) == -1 ||
-                    getgid() != buildUser.getGID() ||
-                    getegid() != buildUser.getGID())
-                    throw SysError("setgid failed");
 
-                if (setuid(buildUser.getUID()) == -1 ||
-                    getuid() != buildUser.getUID() ||
-                    geteuid() != buildUser.getUID())
-                    throw SysError("setuid failed");
+                if (amPrivileged()) {
+                    
+                    if (setgroups(0, 0) == -1)
+                        throw SysError("cannot clear the set of supplementary groups");
+                
+                    if (setgid(buildUser.getGID()) == -1 ||
+                        getgid() != buildUser.getGID() ||
+                        getegid() != buildUser.getGID())
+                        throw SysError("setgid failed");
+
+                    if (setuid(buildUser.getUID()) == -1 ||
+                        getuid() != buildUser.getUID() ||
+                        geteuid() != buildUser.getUID())
+                        throw SysError("setuid failed");
+                    
+                } else {
+                    /* Let the setuid helper take care of it. */
+                    program = nixLibexecDir + "/nix-setuid-helper";
+                    args.push_back(program.c_str());
+                    args.push_back("run-builder");
+                    args.push_back("nix-builder-1"); /* !!! TODO */
+                    args.push_back(drv.builder.c_str());
+                }
             }
             
+            /* Fill in the arguments. */
+            string builderBasename = baseNameOf(drv.builder);
+            args.push_back(builderBasename.c_str());
+            for (Strings::iterator i = drv.args.begin();
+                 i != drv.args.end(); ++i)
+                args.push_back(i->c_str());
+            args.push_back(0);
+
             /* Execute the program.  This should not return. */
-            execve(drv.builder.c_str(),
-                (char * *) argArr, (char * *) envArr);
+            execve(program.c_str(), (char * *) &args[0], (char * *) envArr);
 
             throw SysError(format("executing `%1%'")
                 % drv.builder);
@@ -1484,7 +1500,7 @@ void DerivationGoal::computeClosure()
            build.  Also, the output should be owned by the build
            user. */
         if ((st.st_mode & (S_IWGRP | S_IWOTH)) ||
-            (buildUser.getUID() != 0 && st.st_uid != buildUser.getUID()))
+            (buildUser.enabled() && st.st_uid != buildUser.getUID()))
             throw Error(format("suspicious ownership or permission on `%1%'; rejecting this build output") % path);
 #endif
 

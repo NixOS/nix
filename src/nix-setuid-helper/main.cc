@@ -57,7 +57,7 @@ static uid_t nameToUid(const string & userName)
    user. */
 static void runBuilder(uid_t uidNix,
     const string & buildUsersGroup, const string & targetUser,
-    string program, int argc, char * * argv)
+    string program, int argc, char * * argv, char * * env)
 {
     uid_t uidTargetUser = nameToUid(targetUser);
 
@@ -107,12 +107,11 @@ static void runBuilder(uid_t uidNix,
 
     /* Execute the program. */
     std::vector<const char *> args;
-    args.push_back(program.c_str());
     for (int i = 0; i < argc; ++i)
         args.push_back(argv[i]);
     args.push_back(0);
     
-    if (execve(program.c_str(), (char * *) &args[0], 0) == -1)
+    if (execve(program.c_str(), (char * *) &args[0], env) == -1)
         throw SysError(format("cannot execute `%1%'") % program);
 }
 
@@ -180,10 +179,10 @@ static void run(int argc, char * * argv)
 
     if (command == "run-builder") {
         /* Syntax: nix-setuid-helper run-builder <username> <program>
-             <args...> */
+             <arg0 arg1...> */
         if (argc < 4) throw Error("missing user name / program name");
         runBuilder(uidNix, buildUsersGroup,
-            argv[2], argv[3], argc - 4, argv + 4);
+            argv[2], argv[3], argc - 4, argv + 4, oldEnviron);
     }
 
     else if (command == "fix-ownership") {
