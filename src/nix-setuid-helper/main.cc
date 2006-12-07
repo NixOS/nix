@@ -17,27 +17,42 @@
 using namespace nix;
 
 
-/* Recursively change the ownership of `path' from `uidFrom' to
-   `uidTo' and `gidTo'.  Barf if we encounter a file not owned by
-   `uidFrom'. */
-static void secureChown(uid_t uidFrom, uid_t uidTo, gid_t gidTo,
-    const Path & path)
+/* Recursively change the ownership of `path' to user `uidTo' and
+   group `gidTo'.  `path' must currently be owned by user `uidFrom',
+   or, if `uidFrom' is -1, by group `gidFrom'. */
+static void secureChown(uid_t uidFrom, gid_t gidFrom,
+    uid_t uidTo, gid_t gidTo, const Path & path)
 {
+    format error = format("cannot change ownership of `%1%'") % path;
+    
     struct stat st;
     if (lstat(path.c_str(), &st) == -1)
-        throw SysError(format("statting of `%1%'") % path);
+        /* Important: don't give any detailed error messages here.
+           Otherwise, the Nix account can discover information about
+           the existence of paths that it doesn't normally have access
+           to. */
+        throw Error(error);
 
-    if (st.st_uid != uidFrom)
-        throw Error(format("path `%1%' owned by the wrong owner") % path);
+    if (uidFrom != -1) {
+        assert(uidFrom != 0);
+        if (st.st_uid != uidFrom)
+            throw Error(error);
+    } else {
+        assert(gidFrom != 0);
+        if (st.st_gid != gidFrom)
+            throw Error(error);
+    }
+
+    assert(uidTo != 0 && gidTo != 0);
 
     if (lchown(path.c_str(), uidTo, gidTo) == -1)
-        throw SysError(format("changing ownership of `%1%'") % path);
+        throw Error(error);
 
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectory(path);
 	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
             /* !!! recursion; check stack depth */
-	    secureChown(uidFrom, uidTo, gidTo, path + "/" + *i);
+	    secureChown(uidFrom, gidFrom, uidTo, gidTo, path + "/" + *i);
     }
 }
 
@@ -55,8 +70,8 @@ static uid_t nameToUid(const string & userName)
    be a member of `buildUsersGroup'.  The ownership of the current
    directory is changed from the Nix user (uidNix) to the target
    user. */
-static void runBuilder(uid_t uidNix,
-    const string & buildUsersGroup, const string & targetUser,
+static void runBuilder(uid_t uidNix, gid_t gidBuildUsers,
+    const StringSet & buildUsers, const string & targetUser,
     string program, int argc, char * * argv, char * * env)
 {
     uid_t uidTargetUser = nameToUid(targetUser);
@@ -65,29 +80,16 @@ static void runBuilder(uid_t uidNix,
     if (uidTargetUser == 0)
         throw Error("won't setuid to root");
 
-    /* Get the gid and members of buildUsersGroup. */
-    struct group * gr = getgrnam(buildUsersGroup.c_str());
-    if (!gr)
-        throw Error(format("group `%1%' does not exist") % buildUsersGroup);
-    gid_t gidBuildUsers = gr->gr_gid;
-
     /* Verify that the target user is a member of that group. */
-    Strings users;
-    bool found = false;
-    for (char * * p = gr->gr_mem; *p; ++p)
-        if (string(*p) == targetUser) {
-            found = true;
-            break;
-        }
-    if (!found)
-        throw Error(format("user `%1%' is not a member of `%2%'")
-            % targetUser % buildUsersGroup);
+    if (buildUsers.find(targetUser) == buildUsers.end())
+        throw Error(format("user `%1%' is not a member of the build users group")
+            % targetUser);
     
     /* Chown the current directory, *if* it is owned by the Nix
        account.  The idea is that the current directory is the
        temporary build directory in /tmp or somewhere else, and we
        don't want to create that directory here. */
-    secureChown(uidNix, uidTargetUser, gidBuildUsers, ".");
+    secureChown(uidNix, -1, uidTargetUser, gidBuildUsers, ".");
 
     /* Set the real, effective and saved gid.  Must be done before
        setuid(), otherwise it won't set the real and saved gids. */
@@ -171,6 +173,17 @@ static void run(int argc, char * * argv)
         throw Error("you are not allowed to call this program, go away");
     
     
+    /* Get the gid and members of buildUsersGroup. */
+    struct group * gr = getgrnam(buildUsersGroup.c_str());
+    if (!gr)
+        throw Error(format("group `%1%' does not exist") % buildUsersGroup);
+    gid_t gidBuildUsers = gr->gr_gid;
+
+    StringSet buildUsers;
+    for (char * * p = gr->gr_mem; *p; ++p)
+        buildUsers.insert(*p);
+
+    
     /* Perform the desired command. */
     if (argc < 2)
         throw Error("invalid arguments");
@@ -181,17 +194,18 @@ static void run(int argc, char * * argv)
         /* Syntax: nix-setuid-helper run-builder <username> <program>
              <arg0 arg1...> */
         if (argc < 4) throw Error("missing user name / program name");
-        runBuilder(uidNix, buildUsersGroup,
+        runBuilder(uidNix, gidBuildUsers, buildUsers,
             argv[2], argv[3], argc - 4, argv + 4, oldEnviron);
     }
 
-    else if (command == "fix-ownership") {
-        /* Syntax: nix-setuid-helper <fix-ownership> <path> */
+    else if (command == "get-ownership") {
+        /* Syntax: nix-setuid-helper get-ownership <path> */
+        if (argc != 3) throw Error("missing path");
+        secureChown(-1, gidBuildUsers, uidNix, gidBuildUsers, argv[2]);
     }
 
     else throw Error ("invalid command");
 }
-
 
 
 int main(int argc, char * * argv)

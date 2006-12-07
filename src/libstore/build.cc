@@ -458,13 +458,65 @@ static bool amPrivileged()
 }
 
 
-void killUserWrapped(uid_t uid)
+static void killUserWrapped(uid_t uid)
 {
     if (amPrivileged())
         killUser(uid);
     else
         /* !!! TODO */
         printMsg(lvlError, "must kill");
+}
+
+
+static void getOwnership(const Path & path)
+{
+    string program = nixLibexecDir + "/nix-setuid-helper";
+            
+    /* Fork. */
+    Pid pid;
+    pid = fork();
+    switch (pid) {
+
+    case -1:
+        throw SysError("unable to fork");
+
+    case 0: /* child */
+        try {
+            std::vector<const char *> args; /* careful with c_str()!
+                                               */
+            args.push_back(program.c_str());
+            args.push_back("get-ownership");
+            args.push_back(path.c_str());
+            args.push_back(0);
+
+            execve(program.c_str(), (char * *) &args[0], 0);
+            throw SysError(format("executing `%1%'") % program);
+        }
+        catch (std::exception & e) {
+            std::cerr << "error: " << e.what() << std::endl;
+        }
+        quickExit(1);
+    }
+
+    /* Parent. */
+
+    /* Wait for the child to finish. */
+    int status = pid.wait(true);
+    if (!statusOk(status))
+        throw Error(format("program `%1%' %2%")
+            % program % statusToString(status));
+}
+
+
+static void deletePathWrapped(const Path & path)
+{
+    /* When using build users and we're not root, we may not have
+       sufficient permission to delete the path.  So use the setuid
+       helper to change ownership to us. */
+    if (querySetting("build-users-group", "") != ""
+        || !amPrivileged())
+        getOwnership(path);
+    deletePath(path);
 }
 
 
@@ -1170,7 +1222,7 @@ void DerivationGoal::startBuilder()
             throw Error(format("obstructed build: path `%1%' exists") % path);
         if (pathExists(path)) {
             debug(format("removing unregistered path `%1%'") % path);
-            deletePath(path);
+            deletePathWrapped(path);
         }
     }
 
@@ -1619,7 +1671,7 @@ void DerivationGoal::deleteTmpDir(bool force)
 		format("builder for `%1%' failed; keeping build directory `%2%'")
                 % drvPath % tmpDir);
         else
-            deletePath(tmpDir);
+            deletePathWrapped(tmpDir);
         tmpDir = "";
     }
 }
@@ -1833,7 +1885,7 @@ void SubstitutionGoal::tryToRun()
 
     /* Remove the (stale) output path if it exists. */
     if (pathExists(storePath))
-        deletePath(storePath);
+        deletePathWrapped(storePath);
 
     /* Fork the substitute program. */
     pid = fork();

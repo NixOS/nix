@@ -797,7 +797,7 @@ string runProgram(Path program)
     /* Wait for the child to finish. */
     int status = pid.wait(true);
     if (!statusOk(status))
-        throw Error(format("program `%1% %2%")
+        throw Error(format("program `%1%' %2%")
             % program % statusToString(status));
 
     return result;
