@@ -1424,7 +1424,7 @@ void DerivationGoal::startBuilder()
                safe.  Also note that setuid() when run as root sets
                the real, effective and saved UIDs. */
             if (buildUser.enabled()) {
-                printMsg(lvlInfo, format("switching to user `%1%'") % buildUser.getUser());
+                printMsg(lvlChatty, format("switching to user `%1%'") % buildUser.getUser());
 
                 if (amPrivileged()) {
                     
