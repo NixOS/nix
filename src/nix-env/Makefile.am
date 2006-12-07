@@ -1,6 +1,6 @@
 bin_PROGRAMS = nix-env
 
-nix_env_SOURCES = main.cc names.cc names.hh \
+nix_env_SOURCES = nix-env.cc names.cc names.hh \
  profiles.cc profiles.hh help.txt
 nix_env_LDADD = ../libmain/libmain.la ../libexpr/libexpr.la \
  ../libstore/libstore.la ../libutil/libutil.la \
