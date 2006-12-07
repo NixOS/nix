@@ -66,6 +66,15 @@ static uid_t nameToUid(const string & userName)
 }
 
 
+static void checkIfBuildUser(const StringSet & buildUsers,
+    const string & userName)
+{
+    if (buildUsers.find(userName) == buildUsers.end())
+        throw Error(format("user `%1%' is not a member of the build users group")
+            % userName);
+}
+
+
 /* Run `program' under user account `targetUser'.  `targetUser' should
    be a member of `buildUsersGroup'.  The ownership of the current
    directory is changed from the Nix user (uidNix) to the target
@@ -80,10 +89,9 @@ static void runBuilder(uid_t uidNix, gid_t gidBuildUsers,
     if (uidTargetUser == 0)
         throw Error("won't setuid to root");
 
-    /* Verify that the target user is a member of that group. */
-    if (buildUsers.find(targetUser) == buildUsers.end())
-        throw Error(format("user `%1%' is not a member of the build users group")
-            % targetUser);
+    /* Verify that the target user is a member of the build users
+       group. */
+    checkIfBuildUser(buildUsers, targetUser);
     
     /* Chown the current directory, *if* it is owned by the Nix
        account.  The idea is that the current directory is the
@@ -115,6 +123,21 @@ static void runBuilder(uid_t uidNix, gid_t gidBuildUsers,
     
     if (execve(program.c_str(), (char * *) &args[0], env) == -1)
         throw SysError(format("cannot execute `%1%'") % program);
+}
+
+
+void killBuildUser(gid_t gidBuildUsers,
+    const StringSet & buildUsers, const string & userName)
+{
+    uid_t uid = nameToUid(userName);
+    
+    /* Verify that the user whose processes we are to kill is a member
+       of the build users group. */
+    checkIfBuildUser(buildUsers, userName);
+
+    assert(uid != 0);
+
+    killUser(uid);
 }
 
 
@@ -202,6 +225,12 @@ static void run(int argc, char * * argv)
         /* Syntax: nix-setuid-helper get-ownership <path> */
         if (argc != 3) throw Error("missing path");
         secureChown(-1, gidBuildUsers, uidNix, gidBuildUsers, argv[2]);
+    }
+
+    else if (command == "kill") {
+        /* Syntax: nix-setuid-helper kill <username> */
+        if (argc != 3) throw Error("missing user name");
+        killBuildUser(gidBuildUsers, buildUsers, argv[2]);
     }
 
     else throw Error ("invalid command");

@@ -351,6 +351,8 @@ public:
     void acquire();
     void release();
 
+    void kill();
+
     string getUser() { return user; }
     uid_t getUID() { return uid; }
     uid_t getGID() { return gid; }
@@ -452,29 +454,8 @@ void UserLock::release()
 }
 
 
-bool amPrivileged()
-{
-    return geteuid() == 0;
-}
-
-
-bool haveBuildUsers()
-{
-    return querySetting("build-users-group", "") != "";
-}
-
-
-static void killUserWrapped(uid_t uid)
-{
-    if (amPrivileged())
-        killUser(uid);
-    else
-        /* !!! TODO */
-        printMsg(lvlError, "must kill");
-}
-
-
-void getOwnership(const Path & path)
+static void runSetuidHelper(const string & command,
+    const string & arg)
 {
     string program = nixLibexecDir + "/nix-setuid-helper";
             
@@ -491,8 +472,8 @@ void getOwnership(const Path & path)
             std::vector<const char *> args; /* careful with c_str()!
                                                */
             args.push_back(program.c_str());
-            args.push_back("get-ownership");
-            args.push_back(path.c_str());
+            args.push_back(command.c_str());
+            args.push_back(arg.c_str());
             args.push_back(0);
 
             execve(program.c_str(), (char * *) &args[0], 0);
@@ -511,6 +492,34 @@ void getOwnership(const Path & path)
     if (!statusOk(status))
         throw Error(format("program `%1%' %2%")
             % program % statusToString(status));
+}
+
+
+void UserLock::kill()
+{
+    assert(enabled());
+    if (amPrivileged())
+        killUser(uid);
+    else
+        runSetuidHelper("kill", user);
+}
+
+
+bool amPrivileged()
+{
+    return geteuid() == 0;
+}
+
+
+bool haveBuildUsers()
+{
+    return querySetting("build-users-group", "") != "";
+}
+
+
+void getOwnership(const Path & path)
+{
+    runSetuidHelper("get-ownership", path);
 }
 
 
@@ -850,7 +859,7 @@ void DerivationGoal::buildDone()
        open and modifies them after they have been chown'ed to
        root. */
     if (buildUser.enabled())
-        killUserWrapped(buildUser.getUID());
+        buildUser.kill();
 
     /* Close the read side of the logger pipe. */
     logPipe.readSide.close();
@@ -1332,7 +1341,7 @@ void DerivationGoal::startBuilder()
 
         /* Make sure that no other processes are executing under this
            uid. */
-        killUserWrapped(buildUser.getUID());
+        buildUser.kill();
         
         /* Change ownership of the temporary build directory, if we're
            root.  If we're not root, then the setuid helper will do it
