@@ -4,7 +4,7 @@ nix_worker_SOURCES = nix-worker.cc help.txt
 nix_worker_LDADD = ../libmain/libmain.la ../libstore/libstore.la ../libutil/libutil.la \
  ../boost/format/libformat.la ${bdb_lib} ${aterm_lib}
 
-main.o: help.txt.hh
+nix-worker.o: help.txt.hh
 
 %.txt.hh: %.txt
 	../bin2c/bin2c helpText < $< > $@ || (rm $@ && exit 1)
