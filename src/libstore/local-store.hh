@@ -139,6 +139,15 @@ void deleteFromStore(const Path & path, unsigned long long & bytesFreed);
 
 void verifyStore(bool checkContents);
 
+/* Whether we are in build users mode. */
+bool haveBuildUsers();
+
+/* Whether we are root. */
+bool amPrivileged();
+
+/* Recursively change the ownership of `path' to the current uid. */
+void getOwnership(const Path & path);
+
  
 }
 

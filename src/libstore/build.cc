@@ -452,9 +452,15 @@ void UserLock::release()
 }
 
 
-static bool amPrivileged()
+bool amPrivileged()
 {
     return geteuid() == 0;
+}
+
+
+bool haveBuildUsers()
+{
+    return querySetting("build-users-group", "") != "";
 }
 
 
@@ -468,7 +474,7 @@ static void killUserWrapped(uid_t uid)
 }
 
 
-static void getOwnership(const Path & path)
+void getOwnership(const Path & path)
 {
     string program = nixLibexecDir + "/nix-setuid-helper";
             
@@ -513,8 +519,7 @@ static void deletePathWrapped(const Path & path)
     /* When using build users and we're not root, we may not have
        sufficient permission to delete the path.  So use the setuid
        helper to change ownership to us. */
-    if (querySetting("build-users-group", "") != ""
-        || !amPrivileged())
+    if (haveBuildUsers() && !amPrivileged())
         getOwnership(path);
     deletePath(path);
 }
@@ -1320,7 +1325,7 @@ void DerivationGoal::startBuilder()
     
     /* If `build-users-group' is not empty, then we have to build as
        one of the members of that group. */
-    if (querySetting("build-users-group", "") != "") {
+    if (haveBuildUsers()) {
         buildUser.acquire();
         assert(buildUser.getUID() != 0);
         assert(buildUser.getGID() != 0);
