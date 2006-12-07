@@ -12,9 +12,10 @@
 
 #include "util.hh"
 
-#include "../libmain/setuid-common.hh"
-
 using namespace nix;
+
+
+extern char * * environ;
 
 
 /* Recursively change the ownership of `path' to user `uidTo' and

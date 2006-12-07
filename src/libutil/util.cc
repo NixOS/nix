@@ -17,6 +17,9 @@
 #include "util.hh"
 
 
+extern char * * environ;
+
+
 namespace nix {
 
 
@@ -815,6 +818,19 @@ void quickExit(int status)
 #else
     _exit(status);
 #endif
+}
+
+
+void setuidCleanup()
+{
+    /* Don't trust the environment. */
+    environ = 0;
+
+    /* Make sure that file descriptors 0, 1, 2 are open. */
+    for (int fd = 0; fd <= 2; ++fd) {
+        struct stat st;
+        if (fstat(fd, &st) == -1) abort();
+    }
 }
 
 

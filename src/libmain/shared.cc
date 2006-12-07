@@ -14,9 +14,6 @@
 #include <aterm2.h>
 
 
-#include "setuid-common.hh"
-
-
 namespace nix {
 
 

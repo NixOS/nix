@@ -237,6 +237,10 @@ string runProgram(Path program);
    Cygwin, _exit() doesn't seem to do the right thing.) */
 void quickExit(int status);
 
+/* Common initialisation for setuid programs: clear the environment,
+   sanitize file handles 0, 1 and 2. */
+void setuidCleanup();
+
 
 /* User interruption. */
 
