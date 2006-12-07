@@ -653,12 +653,24 @@ DerivationGoal::DerivationGoal(const Path & drvPath, Worker & worker)
 
 DerivationGoal::~DerivationGoal()
 {
-    if (pid != -1) worker.childTerminated(pid);
-    
     /* Careful: we should never ever throw an exception from a
        destructor. */
     try {
+        if (pid != -1) {
+            worker.childTerminated(pid);
+
+            if (buildUser.enabled()) {
+                /* Can't let pid's destructor do it, since it may not
+                   have the appropriate privilege (i.e., the setuid
+                   helper should do it). */
+                buildUser.kill();
+                pid.wait(true);
+                assert(pid == -1);
+            }
+        }
+        
         deleteTmpDir(false);
+        
     } catch (Error & e) {
         printMsg(lvlError, format("error (ignored): %1%") % e.msg());
     }
