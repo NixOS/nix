@@ -707,6 +707,53 @@ void Pid::setSeparatePG(bool separatePG)
 }
 
 
+void killUser(uid_t uid)
+{
+    debug(format("killing all processes running under uid `%1%'") % uid);
+
+    assert(uid != 0); /* just to be safe... */
+
+    /* The system call kill(-1, sig) sends the signal `sig' to all
+       users to which the current process can send signals.  So we
+       fork a process, switch to uid, and send a mass kill. */
+
+    Pid pid;
+    pid = fork();
+    switch (pid) {
+
+    case -1:
+        throw SysError("unable to fork");
+
+    case 0:
+        try { /* child */
+
+            if (setuid(uid) == -1) abort();
+
+	    while (true) {
+		if (kill(-1, SIGKILL) == 0) break;
+		if (errno == ESRCH) break; /* no more processes */
+		if (errno != EINTR)
+		    throw SysError(format("cannot kill processes for uid `%1%'") % uid);
+	    }
+        
+        } catch (std::exception & e) {
+            std::cerr << format("killing processes beloging to uid `%1%': %1%\n")
+                % uid % e.what();
+            quickExit(1);
+        }
+        quickExit(0);
+    }
+    
+    /* parent */
+    if (pid.wait(true) != 0)
+        throw Error(format("cannot kill processes for uid `%1%'") % uid);
+
+    /* !!! We should really do some check to make sure that there are
+       no processes left running under `uid', but there is no portable
+       way to do so (I think).  The most reliable way may be `ps -eo
+       uid | grep -q $uid'. */
+}
+
 
 //////////////////////////////////////////////////////////////////////
 

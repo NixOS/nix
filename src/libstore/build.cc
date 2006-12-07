@@ -352,6 +352,8 @@ public:
 
     uid_t getUID();
     uid_t getGID();
+
+    bool enabled();
 };
 
 
@@ -452,53 +454,26 @@ uid_t UserLock::getGID()
 }
 
 
-static void killUser(uid_t uid)
+bool UserLock::enabled()
 {
-    debug(format("killing all processes running under uid `%1%'") % uid);
-    
-    assert(uid != rootUserId); /* just to be safe... */
-
-    /* The system call kill(-1, sig) sends the signal `sig' to all
-       users to which the current process can send signals.  So we
-       fork a process, switch to uid, and send a mass kill. */
-
-    Pid pid;
-    pid = fork();
-    switch (pid) {
-
-    case -1:
-        throw SysError("unable to fork");
-
-    case 0:
-        try { /* child */
-
-            if (setuid(uid) == -1) abort();
-
-	    while (true) {
-		if (kill(-1, SIGKILL) == 0) break;
-		if (errno == ESRCH) break; /* no more processes */
-		if (errno != EINTR)
-		    throw SysError(format("cannot kill processes for uid `%1%'") % uid);
-	    }
-        
-        } catch (std::exception & e) {
-            std::cerr << format("killing processes beloging to uid `%1%': %1%\n")
-                % uid % e.what();
-            quickExit(1);
-        }
-        quickExit(0);
-    }
-    
-    /* parent */
-    if (pid.wait(true) != 0)
-        throw Error(format("cannot kill processes for uid `%1%'") % uid);
-
-    /* !!! We should really do some check to make sure that there are
-       no processes left running under `uid', but there is no portable
-       way to do so (I think).  The most reliable way may be `ps -eo
-       uid | grep -q $uid'. */
+    return uid != 0;
 }
 
+
+static bool amPrivileged()
+{
+    return geteuid() == 0;
+}
+
+
+void killUserWrapped(uid_t uid)
+{
+    if (amPrivileged())
+        killUser(uid);
+    else
+        /* !!! TODO */
+        printMsg(lvlError, "must kill");
+}
 
 
 //////////////////////////////////////////////////////////////////////
@@ -825,8 +800,8 @@ void DerivationGoal::buildDone()
        malicious user from leaving behind a process that keeps files
        open and modifies them after they have been chown'ed to
        root. */
-    if (buildUser.getUID() != 0)
-        killUser(buildUser.getUID());
+    if (buildUser.enabled())
+        killUserWrapped(buildUser.getUID());
 
     /* Close the read side of the logger pipe. */
     logPipe.readSide.close();
@@ -1308,11 +1283,15 @@ void DerivationGoal::startBuilder()
 
         /* Make sure that no other processes are executing under this
            uid. */
-        killUser(buildUser.getUID());
+        killUserWrapped(buildUser.getUID());
         
-        /* Change ownership of the temporary build directory.  !!! gid */
-        if (chown(tmpDir.c_str(), buildUser.getUID(), (gid_t) -1) == -1)
-            throw SysError(format("cannot change ownership of `%1%'") % tmpDir);
+        /* Change ownership of the temporary build directory, if we're
+           root.  If we're not root, then the setuid helper will do it
+           just before it starts the builder. */
+        if (amPrivileged()) {
+            if (chown(tmpDir.c_str(), buildUser.getUID(), buildUser.getGID()) == -1)
+                throw SysError(format("cannot change ownership of `%1%'") % tmpDir);
+        }
 
         /* Check that the Nix store has the appropriate permissions,
            i.e., owned by root and mode 1775 (sticky bit on so that
@@ -1325,7 +1304,7 @@ void DerivationGoal::startBuilder()
             ((st.st_mode & S_IRWXG) != S_IRWXG) ||
             (st.st_gid != buildUser.getGID()))
             throw Error(format(
-                "builder does not have write permission to `%1%'; "
+                "builder does not have write permission to `%2%'; "
                 "try `chgrp %1% %2%; chmod 1775 %2%'")
                 % buildUser.getGID() % nixStore);
     }

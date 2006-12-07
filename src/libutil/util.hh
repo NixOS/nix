@@ -224,6 +224,11 @@ public:
 };
 
 
+/* Kill all processes running under the specified uid by sending them
+   a SIGKILL. */
+void killUser(uid_t uid);
+
+
 /* Run a program and return its stdout in a string (i.e., like the
    shell backtick operator). */
 string runProgram(Path program);
