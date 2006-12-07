@@ -406,7 +406,7 @@ void UserLock::acquire()
         if (!pw)
             throw Error(format("the user `%1%' in the group `%2%' does not exist")
                 % *i % buildUsersGroup);
-
+        
         fnUserLock = (format("%1%/userpool/%2%") % nixStateDir % pw->pw_uid).str();
 
         if (lockedPaths.find(fnUserLock) != lockedPaths.end())
@@ -421,6 +421,12 @@ void UserLock::acquire()
             fdUserLock = fd.borrow();
             lockedPaths.insert(fnUserLock);
             uid = pw->pw_uid;
+
+            /* Sanity check... */
+            if (uid == getuid() || uid == geteuid())
+                throw Error(format("the Nix user should not be a member of `%1%'")
+                    % buildUsersGroup);
+            
             return;
         }
     }
