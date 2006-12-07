@@ -237,15 +237,7 @@ AM_CONDITIONAL(INIT_STATE, test "$init_state" = "yes")
 
 
 # Setuid installations.
-AC_CHECK_FUNC(setresuid, [HAVE_SETRESUID=1], [HAVE_SETRESUID=])
-if test "$HAVE_SETRESUID" = "1"; then
-    AC_DEFINE(HAVE_SETRESUID, 1, [whether we have setresuid()])
-fi
-
-AC_CHECK_FUNC(setreuid, [HAVE_SETREUID=1], [HAVE_SETREUID=])
-if test "$HAVE_SETREUID" = "1"; then
-    AC_DEFINE(HAVE_SETREUID, 1, [whether we have setreuid()])
-fi
+AC_CHECK_FUNCS([setresuid setreuid lchown])
 
 
 # This is needed if ATerm, Berkeley DB or bzip2 are static libraries,

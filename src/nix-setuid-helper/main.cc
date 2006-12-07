@@ -10,6 +10,7 @@
 #include <iostream>
 #include <vector>
 
+#include "config.h"
 #include "util.hh"
 
 using namespace nix;
@@ -46,8 +47,14 @@ static void secureChown(uid_t uidFrom, gid_t gidFrom,
 
     assert(uidTo != 0 && gidTo != 0);
 
+#if HAVE_LCHOWN
     if (lchown(path.c_str(), uidTo, gidTo) == -1)
         throw Error(error);
+#else
+    if (!S_ISLNK(st.st_mode) &&
+        chown(path.c_str(), uidTo, gidTo) == -1)
+        throw Error(error);
+#endif
 
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectory(path);
