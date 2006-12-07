@@ -223,6 +223,12 @@ void canonicalisePathMetaData(const Path & path)
 
     if (!S_ISLNK(st.st_mode)) {
 
+        if (st.st_uid != geteuid()) {
+            if (chown(path.c_str(), geteuid(), -1) == -1)
+                throw SysError(format("changing owner of `%1%' to %2%")
+                    % path % geteuid());
+        }
+
         /* Mask out all type related bits. */
         mode_t mode = st.st_mode & ~S_IFMT;
         
@@ -232,12 +238,6 @@ void canonicalisePathMetaData(const Path & path)
                  | (st.st_mode & S_IXUSR ? 0111 : 0);
             if (chmod(path.c_str(), mode) == -1)
                 throw SysError(format("changing mode of `%1%' to %2$o") % path % mode);
-        }
-
-        if (st.st_uid != geteuid() || st.st_gid != getegid()) {
-            if (chown(path.c_str(), geteuid(), getegid()) == -1)
-                throw SysError(format("changing owner/group of `%1%' to %2%/%3%")
-                    % path % geteuid() % getegid());
         }
 
         if (st.st_mtime != 0) {

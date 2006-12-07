@@ -1398,7 +1398,7 @@ void DerivationGoal::startBuilder()
                safe.  Also note that setuid() when run as root sets
                the real, effective and saved UIDs. */
             if (buildUser.enabled()) {
-                printMsg(lvlInfo, format("switching to uid `%1%'") % buildUser.getUID());
+                printMsg(lvlInfo, format("switching to user `%1%'") % buildUser.getUser());
 
                 if (amPrivileged()) {
                     
@@ -1544,6 +1544,12 @@ void DerivationGoal::computeClosure()
             throw Error(format("suspicious ownership or permission on `%1%'; rejecting this build output") % path);
 #endif
 
+        if (buildUser.enabled() && !amPrivileged())
+            /* Call the setuid helper to change ownership from the
+               build user to our uid.  If we *are* root, then
+               canonicalisePathMetaData() will take care of this. */
+            getOwnership(path);
+            
         /* Get rid of all weird permissions. */
 	canonicalisePathMetaData(path);
 
