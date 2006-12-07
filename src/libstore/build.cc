@@ -1698,10 +1698,13 @@ void DerivationGoal::initChild()
 void DerivationGoal::deleteTmpDir(bool force)
 {
     if (tmpDir != "") {
-        if (keepFailed && !force)
+        if (keepFailed && !force) {
 	    printMsg(lvlError, 
 		format("builder for `%1%' failed; keeping build directory `%2%'")
                 % drvPath % tmpDir);
+            if (buildUser.enabled() && !amPrivileged())
+                getOwnership(tmpDir);
+        }
         else
             deletePathWrapped(tmpDir);
         tmpDir = "";
