@@ -594,7 +594,7 @@ public:
 private:
     /* The states. */
     void init();
-    void haveStoreExpr();
+    void haveDerivation();
     void outputsSubstituted();
     void inputsRealised();
     void tryToBuild();
@@ -692,11 +692,11 @@ void DerivationGoal::init()
        substitute. */
     addWaitee(worker.makeSubstitutionGoal(drvPath));
 
-    state = &DerivationGoal::haveStoreExpr;
+    state = &DerivationGoal::haveDerivation;
 }
 
 
-void DerivationGoal::haveStoreExpr()
+void DerivationGoal::haveDerivation()
 {
     trace("loading derivation");
 
