@@ -340,6 +340,7 @@ private:
     Path fnUserLock;
     AutoCloseFD fdUserLock;
 
+    string user;
     uid_t uid;
     gid_t gid;
     
@@ -350,10 +351,12 @@ public:
     void acquire();
     void release();
 
-    uid_t getUID();
-    uid_t getGID();
+    string getUser() { return user; }
+    uid_t getUID() { return uid; }
+    uid_t getGID() { return gid; }
 
-    bool enabled();
+    bool enabled() { return uid != 0; }
+        
 };
 
 
@@ -420,6 +423,7 @@ void UserLock::acquire()
         if (lockFile(fd, ltWrite, false)) {
             fdUserLock = fd.borrow();
             lockedPaths.insert(fnUserLock);
+            user = *i;
             uid = pw->pw_uid;
 
             /* Sanity check... */
@@ -445,24 +449,6 @@ void UserLock::release()
     lockedPaths.erase(fnUserLock);
     fnUserLock = "";
     uid = 0;
-}
-
-
-uid_t UserLock::getUID()
-{
-    return uid;
-}
-
-
-uid_t UserLock::getGID()
-{
-    return gid;
-}
-
-
-bool UserLock::enabled()
-{
-    return uid != 0;
 }
 
 
@@ -1351,6 +1337,7 @@ void DerivationGoal::startBuilder()
 
             Path program = drv.builder.c_str();
             std::vector<const char *> args; /* careful with c_str()! */
+            string user; /* must be here for its c_str()! */
             
             /* If we are running in `build-users' mode, then switch to
                the user we allocated above.  Make sure that we drop
@@ -1381,7 +1368,8 @@ void DerivationGoal::startBuilder()
                     program = nixLibexecDir + "/nix-setuid-helper";
                     args.push_back(program.c_str());
                     args.push_back("run-builder");
-                    args.push_back("nix-builder-1"); /* !!! TODO */
+                    user = buildUser.getUser().c_str();
+                    args.push_back(user.c_str());
                     args.push_back(drv.builder.c_str());
                 }
             }
