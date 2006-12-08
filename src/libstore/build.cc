@@ -99,7 +99,7 @@ public:
 
     void addWaitee(GoalPtr waitee);
 
-    virtual void waiteeDone(GoalPtr waitee, bool success);
+    virtual void waiteeDone(GoalPtr waitee, ExitCode result);
 
     virtual void handleChildOutput(int fd, const string & data)
     {
@@ -123,8 +123,13 @@ public:
         return exitCode;
     }
 
+    void cancel()
+    {
+        amDone(ecFailed);
+    }
+
 protected:
-    void amDone(bool success = true);
+    void amDone(ExitCode result);
 };
 
 
@@ -189,13 +194,24 @@ public:
     /* Can we start another child process? */
     bool canBuildMore();
 
-    /* Registers / unregisters a running child process. */
+    /* Registers a running child process.  `inBuildSlot' means that
+       the process counts towards the jobs limit. */
     void childStarted(GoalPtr goal, pid_t pid,
         const set<int> & fds, bool inBuildSlot);
+
+    /* Unregisters a running child process.  `wakeSleepers' should be
+       false if there is no sense in waking up goals that are sleeping
+       because they can't run yet (e.g., there is no free build slot,
+       or the hook would still say `postpone'). */
     void childTerminated(pid_t pid, bool wakeSleepers = true);
 
-    /* Add a goal to the set of goals waiting for a build slot. */
-    void waitForBuildSlot(GoalPtr goal, bool reallyWait = false);
+    /* Put `goal' to sleep until a build slot becomes available (which
+       might be right away). */
+    void waitForBuildSlot(GoalPtr goal);
+
+    /* Put `goal' to sleep until a child process terminates, i.e., a
+       call is made to childTerminate(..., true).  */
+    void waitForChildTermination(GoalPtr goal);
     
     /* Loop until the specified top-level goals have finished. */
     void run(const Goals & topGoals);
@@ -205,19 +221,8 @@ public:
 };
 
 
-class SubstError : public Error
-{
-public:
-    SubstError(const format & f) : Error(f) { };
-};
-
-
-class BuildError : public Error
-{
-public:
-    BuildError(const format & f) : Error(f) { };
-};
-
+MakeError(SubstError, Error)
+MakeError(BuildError, Error)
 
 
 //////////////////////////////////////////////////////////////////////
@@ -230,7 +235,7 @@ void Goal::addWaitee(GoalPtr waitee)
 }
 
 
-void Goal::waiteeDone(GoalPtr waitee, bool success)
+void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
 {
     assert(waitees.find(waitee) != waitees.end());
     waitees.erase(waitee);
@@ -238,9 +243,9 @@ void Goal::waiteeDone(GoalPtr waitee, bool success)
     trace(format("waitee `%1%' done; %2% left") %
         waitee->name % waitees.size());
     
-    if (!success) ++nrFailed;
+    if (result == ecFailed) ++nrFailed;
     
-    if (waitees.empty() || (!success && !keepGoing)) {
+    if (waitees.empty() || (result == ecFailed && !keepGoing)) {
 
         /* If we failed and keepGoing is not set, we remove all
            remaining waitees. */
@@ -260,14 +265,15 @@ void Goal::waiteeDone(GoalPtr waitee, bool success)
 }
 
 
-void Goal::amDone(bool success)
+void Goal::amDone(ExitCode result)
 {
     trace("done");
     assert(exitCode == ecBusy);
-    exitCode = success ? ecSuccess : ecFailed;
+    assert(result == ecSuccess || result == ecFailed);
+    exitCode = result;
     for (WeakGoals::iterator i = waiters.begin(); i != waiters.end(); ++i) {
         GoalPtr goal = i->lock();
-        if (goal) goal->waiteeDone(shared_from_this(), success);
+        if (goal) goal->waiteeDone(shared_from_this(), result);
     }
     waiters.clear();
     worker.removeGoal(shared_from_this());
@@ -439,7 +445,7 @@ void UserLock::acquire()
         }
     }
 
-    throw Error(format("all build users are currently in use; "
+    throw BuildError(format("all build users are currently in use; "
         "consider creating additional users and adding them to the `%1%' group")
         % buildUsersGroup);
 }
@@ -715,7 +721,7 @@ void DerivationGoal::haveDerivation()
         printMsg(lvlError,
             format("cannot build missing derivation `%1%'")
             % drvPath);
-        amDone(false);
+        amDone(ecFailed);
         return;
     }
 
@@ -733,7 +739,7 @@ void DerivationGoal::haveDerivation()
 
     /* If they are all valid, then we're done. */
     if (invalidOutputs.size() == 0) {
-        amDone(true);
+        amDone(ecSuccess);
         return;
     }
 
@@ -764,7 +770,7 @@ void DerivationGoal::outputsSubstituted()
     nrFailed = 0;
 
     if (checkPathValidity(false).size() == 0) {
-        amDone(true);
+        amDone(ecSuccess);
         return;
     }
 
@@ -794,7 +800,7 @@ void DerivationGoal::inputsRealised()
             format("cannot build derivation `%1%': "
                 "%2% inputs could not be realised")
             % drvPath % nrFailed);
-        amDone(false);
+        amDone(ecFailed);
         return;
     }
 
@@ -821,14 +827,14 @@ void DerivationGoal::tryToBuild()
                 return;
             case rpPostpone:
                 /* Not now; wait until at least one child finishes. */
-                worker.waitForBuildSlot(shared_from_this(), true);
+                worker.waitForChildTermination(shared_from_this());
                 return;
             case rpDecline:
                 /* We should do it ourselves. */
                 break;
             case rpDone:
                 /* Somebody else did it. */
-                amDone();
+                amDone(ecSuccess);
                 return;
         }
 
@@ -841,7 +847,7 @@ void DerivationGoal::tryToBuild()
         /* Acquire locks and such.  If we then see that the build has
            been done by somebody else, we're done. */
         if (!prepareBuild()) {
-            amDone();
+            amDone(ecSuccess);
             return;
         }
 
@@ -850,7 +856,7 @@ void DerivationGoal::tryToBuild()
 
     } catch (BuildError & e) {
         printMsg(lvlError, e.msg());
-        amDone(false);
+        amDone(ecFailed);
         return;
     }
 
@@ -892,61 +898,62 @@ void DerivationGoal::buildDone()
     if (buildUser.enabled())
         buildUser.kill();
 
-    /* Some cleanup per path.  We do this here and not in
-       computeClosure() for convenience when the build has failed. */
-    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
-         i != drv.outputs.end(); ++i)
-    {
-        Path path = i->second.path;
-        if (!pathExists(path)) continue;
+    try {
 
-        struct stat st;
-        if (lstat(path.c_str(), &st))
-            throw SysError(format("getting attributes of path `%1%'") % path);
+        /* Some cleanup per path.  We do this here and not in
+           computeClosure() for convenience when the build has
+           failed. */
+        for (DerivationOutputs::iterator i = drv.outputs.begin(); 
+             i != drv.outputs.end(); ++i)
+        {
+            Path path = i->second.path;
+            if (!pathExists(path)) continue;
+
+            struct stat st;
+            if (lstat(path.c_str(), &st) == -1)
+                throw SysError(format("getting attributes of path `%1%'") % path);
             
 #ifndef __CYGWIN__
-        /* Check that the output is not group or world writable, as
-           that means that someone else can have interfered with the
-           build.  Also, the output should be owned by the build
-           user. */
-        if ((st.st_mode & (S_IWGRP | S_IWOTH)) ||
-            (buildUser.enabled() && st.st_uid != buildUser.getUID()))
-            throw Error(format("suspicious ownership or permission on `%1%'; rejecting this build output") % path);
+            /* Check that the output is not group or world writable,
+               as that means that someone else can have interfered
+               with the build.  Also, the output should be owned by
+               the build user. */
+            if ((st.st_mode & (S_IWGRP | S_IWOTH)) ||
+                (buildUser.enabled() && st.st_uid != buildUser.getUID()))
+                throw BuildError(format("suspicious ownership or permission on `%1%'; rejecting this build output") % path);
 #endif
 
-        /* Gain ownership of the build result using the setuid wrapper
-           if we're not root.  If we *are* root, then
-           canonicalisePathMetaData() will take care of this later
-           on. */
-        if (buildUser.enabled() && !amPrivileged())
-            getOwnership(path);
-    }
+            /* Gain ownership of the build result using the setuid
+               wrapper if we're not root.  If we *are* root, then
+               canonicalisePathMetaData() will take care of this later
+               on. */
+            if (buildUser.enabled() && !amPrivileged())
+                getOwnership(path);
+        }
     
-    /* Check the exit status. */
-    if (!statusOk(status)) {
-        deleteTmpDir(false);
-        printMsg(lvlError, format("builder for `%1%' %2%")
-            % drvPath % statusToString(status));
-        amDone(false);
-        return;
-    }
+        /* Check the exit status. */
+        if (!statusOk(status)) {
+            deleteTmpDir(false);
+            throw BuildError(format("builder for `%1%' %2%")
+                % drvPath % statusToString(status));
+        }
     
-    deleteTmpDir(true);
+        deleteTmpDir(true);
 
-    /* Compute the FS closure of the outputs and register them as
-       being valid. */
-    try {
+        /* Compute the FS closure of the outputs and register them as
+           being valid. */
         computeClosure();
+        
     } catch (BuildError & e) {
         printMsg(lvlError, e.msg());
-        amDone(false);
+        amDone(ecFailed);
         return;
     }
 
     /* Release the build user, if applicable. */
     buildUser.release();
 
-    amDone();
+    amDone(ecSuccess);
 }
 
 
@@ -1184,6 +1191,8 @@ void DerivationGoal::terminateBuildHook()
     debug("terminating build hook");
     pid_t savedPid = pid;
     pid.wait(true);
+    /* `false' means don't wake up waiting goals, since we want to
+       keep this build slot ourselves (at least if the hook reply XXX. */
     worker.childTerminated(savedPid, false);
     fromHook.readSide.close();
     toHook.writeSide.close();
@@ -1218,7 +1227,7 @@ bool DerivationGoal::prepareBuild()
 
     if (validPaths.size() > 0) {
         /* !!! fix this; try to delete valid paths */
-        throw Error(
+        throw BuildError(
             format("derivation `%1%' is blocked by its output paths")
             % drvPath);
     }
@@ -1250,7 +1259,7 @@ bool DerivationGoal::prepareBuild()
             if (inDrv.outputs.find(*j) != inDrv.outputs.end())
                 computeFSClosure(inDrv.outputs[*j].path, inputPaths);
             else
-                throw Error(
+                throw BuildError(
                     format("derivation `%1%' requires non-existent output `%2%' from input derivation `%3%'")
                     % drvPath % *j % i->first);
     }
@@ -1286,7 +1295,7 @@ void DerivationGoal::startBuilder()
     {
         Path path = i->second.path;
         if (store->isValidPath(path))
-            throw Error(format("obstructed build: path `%1%' exists") % path);
+            throw BuildError(format("obstructed build: path `%1%' exists") % path);
         if (pathExists(path)) {
             debug(format("removing unregistered path `%1%'") % path);
             deletePathWrapped(path);
@@ -1368,12 +1377,12 @@ void DerivationGoal::startBuilder()
     string s = drv.env["exportReferencesGraph"];
     Strings ss = tokenizeString(s);
     if (ss.size() % 2 != 0)
-        throw Error(format("odd number of tokens in `exportReferencesGraph': `%1%'") % s);
+        throw BuildError(format("odd number of tokens in `exportReferencesGraph': `%1%'") % s);
     for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
         string fileName = *i++;
         Path storePath = *i++;
         if (!store->isValidPath(storePath))
-            throw Error(format("`exportReferencesGraph' refers to an invalid path `%1%'")
+            throw BuildError(format("`exportReferencesGraph' refers to an invalid path `%1%'")
                 % storePath);
         checkStoreName(fileName); /* !!! abuse of this function */
         PathSet refs;
@@ -1534,7 +1543,7 @@ PathSet parseReferenceSpecifiers(const Derivation & drv, string attr)
             result.insert(*i);
         else if (drv.outputs.find(*i) != drv.outputs.end())
             result.insert(drv.outputs.find(*i)->second.path);
-        else throw Error(
+        else throw BuildError(
             format("derivation contains an illegal reference specifier `%1%'")
             % *i);
     }
@@ -1561,7 +1570,7 @@ void DerivationGoal::computeClosure()
         }
 
         struct stat st;
-        if (lstat(path.c_str(), &st))
+        if (lstat(path.c_str(), &st) == -1)
             throw SysError(format("getting attributes of path `%1%'") % path);
             
         startNest(nest, lvlTalkative,
@@ -1584,7 +1593,7 @@ void DerivationGoal::computeClosure()
                 /* The output path should be a regular file without
                    execute permission. */
                 if (!S_ISREG(st.st_mode) || (st.st_mode & S_IXUSR) != 0)
-                    throw Error(
+                    throw BuildError(
                         format("output path `%1% should be a non-executable regular file")
                         % path);
             }
@@ -1592,11 +1601,11 @@ void DerivationGoal::computeClosure()
             /* Check the hash. */
             HashType ht = parseHashType(algo);
             if (ht == htUnknown)
-                throw Error(format("unknown hash algorithm `%1%'") % algo);
+                throw BuildError(format("unknown hash algorithm `%1%'") % algo);
             Hash h = parseHash(ht, i->second.hash);
             Hash h2 = recursive ? hashPath(ht, path) : hashFile(ht, path);
             if (h != h2)
-                throw Error(
+                throw BuildError(
                     format("output path `%1%' should have %2% hash `%3%', instead has `%4%'")
                     % path % algo % printHash(h) % printHash(h2));
         }
@@ -1630,7 +1639,7 @@ void DerivationGoal::computeClosure()
             PathSet allowed = parseReferenceSpecifiers(drv, drv.env["allowedReferences"]);
             for (PathSet::iterator i = references.begin(); i != references.end(); ++i)
                 if (allowed.find(*i) == allowed.end())
-                    throw Error(format("output is not allowed to refer to path `%1%'") % *i);
+                    throw BuildError(format("output is not allowed to refer to path `%1%'") % *i);
         }
         
         /* Hash the contents of the path.  The hash is stored in the
@@ -1849,7 +1858,7 @@ void SubstitutionGoal::init()
     
     /* If the path already exists we're done. */
     if (store->isValidPath(storePath)) {
-        amDone();
+        amDone(ecSuccess);
         return;
     }
 
@@ -1880,8 +1889,12 @@ void SubstitutionGoal::referencesValid()
 {
     trace("all referenced realised");
 
-    if (nrFailed > 0)
-        throw Error(format("some references of path `%1%' could not be realised") % storePath);
+    if (nrFailed > 0) {
+        printMsg(lvlError,
+            format("some references of path `%1%' could not be realised") % storePath);
+        amDone(ecFailed);
+        return;
+    }
 
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)
@@ -1902,7 +1915,7 @@ void SubstitutionGoal::tryNext()
         printMsg(lvlError,
             format("path `%1%' is required, but it has no (remaining) substitutes")
             % storePath);
-        amDone(false);
+        amDone(ecFailed);
         return;
     }
     sub = subs.front();
@@ -1933,7 +1946,7 @@ void SubstitutionGoal::tryToRun()
     if (store->isValidPath(storePath)) {
         debug(format("store path `%1%' has become valid") % storePath);
         outputLock->setDeletion(true);
-        amDone();
+        amDone(ecSuccess);
         return;
     }
 
@@ -2046,7 +2059,7 @@ void SubstitutionGoal::finished()
     printMsg(lvlChatty,
         format("substitution of path `%1%' succeeded") % storePath);
 
-    amDone();
+    amDone(ecSuccess);
 }
 
 
@@ -2197,21 +2210,27 @@ void Worker::childTerminated(pid_t pid, bool wakeSleepers)
         }
 
         wantingToBuild.clear();
-        
     }
 }
 
 
-void Worker::waitForBuildSlot(GoalPtr goal, bool reallyWait)
+void Worker::waitForBuildSlot(GoalPtr goal)
 {
     debug("wait for build slot");
-    if (reallyWait && children.size() == 0)
-        throw Error("waiting for a build slot, yet there are no children - "
-            "maybe the build hook gave an inappropriate `postpone' reply?");
-    if (!reallyWait && canBuildMore())
+    if (canBuildMore())
         wakeUp(goal); /* we can do it right away */
     else
         wantingToBuild.insert(goal);
+}
+
+
+void Worker::waitForChildTermination(GoalPtr goal)
+{
+    debug("wait for child termination");
+    if (children.size() == 0)
+        throw Error("waiting for a build slot, yet there are no running children - "
+            "maybe the build hook gave an inappropriate `postpone' reply?");
+    wantingToBuild.insert(goal);
 }
 
 
@@ -2342,8 +2361,12 @@ void Worker::waitForInput()
 
         if (maxSilentTime != 0 &&
             now - i->second.lastOutput >= (time_t) maxSilentTime)
-            throw Error(format("%1% timed out after %2% seconds of silence")
+        {
+            printMsg(lvlError,
+                format("%1% timed out after %2% seconds of silence")
                 % goal->getName() % maxSilentTime);
+            goal->cancel();
+        }
     }
 }
 
