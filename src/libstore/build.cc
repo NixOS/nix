@@ -123,10 +123,10 @@ public:
         return exitCode;
     }
 
-    void cancel()
-    {
-        amDone(ecFailed);
-    }
+    /* Cancel the goal.  It should wake up its waiters, get rid of any
+       running child processes that are being monitored by the worker
+       (important!), etc. */
+    virtual void cancel() = 0;
 
 protected:
     void amDone(ExitCode result);
@@ -592,6 +592,8 @@ public:
     DerivationGoal(const Path & drvPath, Worker & worker);
     ~DerivationGoal();
 
+    void cancel();
+    
     void work();
 
     Path getDrvPath()
@@ -646,6 +648,9 @@ private:
 
     /* Return the set of (in)valid paths. */
     PathSet checkPathValidity(bool returnValid);
+
+    /* Forcibly kill the child process, if any. */
+    void killChild();
 };
 
 
@@ -664,33 +669,45 @@ DerivationGoal::~DerivationGoal()
     /* Careful: we should never ever throw an exception from a
        destructor. */
     try {
-        if (pid != -1) {
-            worker.childTerminated(pid);
-
-            if (buildUser.enabled()) {
-                /* Note that we can't let pid's destructor kill the
-                   the child process, since it may not have the
-                   appropriate privilege (i.e., the setuid helper
-                   should do it).
-
-                   However, if we're using a build user, then there is
-                   a tricky race condition: if we kill the build user
-                   before the child has done its setuid() to the build
-                   user uid, then it won't be killed, and we'll
-                   potentially lock up in pid.wait().  So also send a
-                   conventional kill to the child. */
-                ::kill(-pid, SIGKILL); /* ignore the result */
-                buildUser.kill();
-                pid.wait(true);
-                assert(pid == -1);
-            }
-        }
-        
+        killChild();
         deleteTmpDir(false);
-        
     } catch (Error & e) {
         printMsg(lvlError, format("error (ignored): %1%") % e.msg());
     }
+}
+
+
+void DerivationGoal::killChild()
+{
+    if (pid != -1) {
+        worker.childTerminated(pid);
+
+        if (buildUser.enabled()) {
+            /* We can't use pid.kill(), since we may not have the
+               appropriate privilege.  I.e., if we're not root, then
+               setuid helper should do it).
+
+               Also, if we're using a build user, then there is a
+               tricky race condition: if we kill the build user before
+               the child has done its setuid() to the build user uid,
+               then it won't be killed, and we'll potentially lock up
+               in pid.wait().  So also send a conventional kill to the
+               child. */
+            ::kill(-pid, SIGKILL); /* ignore the result */
+            buildUser.kill();
+            pid.wait(true);
+        } else
+            pid.kill();
+        
+        assert(pid == -1);
+    }
+}
+
+
+void DerivationGoal::cancel()
+{
+    killChild();
+    amDone(ecFailed);
 }
 
 
@@ -1813,6 +1830,8 @@ public:
     SubstitutionGoal(const Path & storePath, Worker & worker);
     ~SubstitutionGoal();
 
+    void cancel();
+    
     void work();
 
     /* The states. */
@@ -1840,7 +1859,21 @@ SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker)
 
 SubstitutionGoal::~SubstitutionGoal()
 {
+    /* !!! Once we let substitution goals run under a build user, we
+       need to do use the setuid helper just as in ~DerivationGoal().
+       Idem for cancel. */
     if (pid != -1) worker.childTerminated(pid);
+}
+
+
+void SubstitutionGoal::cancel()
+{
+    if (pid != -1) {
+        pid_t savedPid = pid;
+        pid.kill();
+        worker.childTerminated(savedPid);
+    }
+    amDone(ecFailed);
 }
 
 
@@ -2189,6 +2222,8 @@ void Worker::childStarted(GoalPtr goal,
 
 void Worker::childTerminated(pid_t pid, bool wakeSleepers)
 {
+    assert(pid != -1); /* common mistake */
+    
     Children::iterator i = children.find(pid);
     assert(i != children.end());
 
@@ -2329,38 +2364,50 @@ void Worker::waitForInput()
     time_t now = time(0);
 
     /* Process all available file descriptors. */
+
+    /* Since goals may be canceled from inside the loop below (causing
+       them go be erased from the `children' map), we have to be
+       careful that we don't keep iterators alive across calls to
+       cancel(). */
+    set<pid_t> pids;
     for (Children::iterator i = children.begin();
          i != children.end(); ++i)
+        pids.insert(i->first);
+            
+    for (set<pid_t>::iterator i = pids.begin();
+         i != pids.end(); ++i)
     {
         checkInterrupt();
-        GoalPtr goal = i->second.goal.lock();
+        Children::iterator j = children.find(*i);
+        if (j == children.end()) continue; // child destroyed
+        GoalPtr goal = j->second.goal.lock();
         assert(goal);
-        
-        set<int> fds2(i->second.fds);
-        for (set<int>::iterator j = fds2.begin(); j != fds2.end(); ++j) {
-            if (FD_ISSET(*j, &fds)) {
+
+        set<int> fds2(j->second.fds);
+        for (set<int>::iterator k = fds2.begin(); k != fds2.end(); ++k) {
+            if (FD_ISSET(*k, &fds)) {
                 unsigned char buffer[4096];
-                ssize_t rd = read(*j, buffer, sizeof(buffer));
+                ssize_t rd = read(*k, buffer, sizeof(buffer));
                 if (rd == -1) {
                     if (errno != EINTR)
                         throw SysError(format("reading from %1%")
                             % goal->getName());
                 } else if (rd == 0) {
                     debug(format("%1%: got EOF") % goal->getName());
-                    goal->handleEOF(*j);
-                    i->second.fds.erase(*j);
+                    goal->handleEOF(*k);
+                    j->second.fds.erase(*k);
                 } else {
                     printMsg(lvlVomit, format("%1%: read %2% bytes")
                         % goal->getName() % rd);
                     string data((char *) buffer, rd);
-                    goal->handleChildOutput(*j, data);
-                    i->second.lastOutput = now;
+                    goal->handleChildOutput(*k, data);
+                    j->second.lastOutput = now;
                 }
             }
         }
 
         if (maxSilentTime != 0 &&
-            now - i->second.lastOutput >= (time_t) maxSilentTime)
+            now - j->second.lastOutput >= (time_t) maxSilentTime)
         {
             printMsg(lvlError,
                 format("%1% timed out after %2% seconds of silence")
