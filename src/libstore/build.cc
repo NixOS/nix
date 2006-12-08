@@ -862,8 +862,16 @@ void DerivationGoal::buildDone()
     pid_t savedPid = pid;
     int status = pid.wait(true);
 
+    debug(format("builder process for `%1%' finished") % drvPath);
+
     /* So the child is gone now. */
     worker.childTerminated(savedPid);
+
+    /* Close the read side of the logger pipe. */
+    logPipe.readSide.close();
+
+    /* Close the log file. */
+    fdLogFile.close();
 
     /* When running under a build user, make sure that all processes
        running under that uid are gone.  This is to prevent a
@@ -873,14 +881,36 @@ void DerivationGoal::buildDone()
     if (buildUser.enabled())
         buildUser.kill();
 
-    /* Close the read side of the logger pipe. */
-    logPipe.readSide.close();
+    /* Some cleanup per path.  We do this here and not in
+       computeClosure() for convenience when the build has failed. */
+    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
+         i != drv.outputs.end(); ++i)
+    {
+        Path path = i->second.path;
+        if (!pathExists(path)) continue;
 
-    /* Close the log file. */
-    fdLogFile.close();
+        struct stat st;
+        if (lstat(path.c_str(), &st))
+            throw SysError(format("getting attributes of path `%1%'") % path);
+            
+#ifndef __CYGWIN__
+        /* Check that the output is not group or world writable, as
+           that means that someone else can have interfered with the
+           build.  Also, the output should be owned by the build
+           user. */
+        if ((st.st_mode & (S_IWGRP | S_IWOTH)) ||
+            (buildUser.enabled() && st.st_uid != buildUser.getUID()))
+            throw Error(format("suspicious ownership or permission on `%1%'; rejecting this build output") % path);
+#endif
 
-    debug(format("builder process for `%1%' finished") % drvPath);
-
+        /* Gain ownership of the build result using the setuid wrapper
+           if we're not root.  If we *are* root, then
+           canonicalisePathMetaData() will take care of this later
+           on. */
+        if (buildUser.enabled() && !amPrivileged())
+            getOwnership(path);
+    }
+    
     /* Check the exit status. */
     if (!statusOk(status)) {
         deleteTmpDir(false);
@@ -1560,22 +1590,6 @@ void DerivationGoal::computeClosure()
                     % path % algo % printHash(h) % printHash(h2));
         }
 
-#ifndef __CYGWIN__
-        /* Check that the output is not group or world writable, as
-           that means that someone else can have interfered with the
-           build.  Also, the output should be owned by the build
-           user. */
-        if ((st.st_mode & (S_IWGRP | S_IWOTH)) ||
-            (buildUser.enabled() && st.st_uid != buildUser.getUID()))
-            throw Error(format("suspicious ownership or permission on `%1%'; rejecting this build output") % path);
-#endif
-
-        if (buildUser.enabled() && !amPrivileged())
-            /* Call the setuid helper to change ownership from the
-               build user to our uid.  If we *are* root, then
-               canonicalisePathMetaData() will take care of this. */
-            getOwnership(path);
-            
         /* Get rid of all weird permissions. */
 	canonicalisePathMetaData(path);
 
