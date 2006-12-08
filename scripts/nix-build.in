@@ -83,6 +83,12 @@ EOF
         $n += 2;
     }
 
+    elsif ($arg eq "--max-jobs" or $arg eq "-j" or $arg eq "--max-silent-time") {
+        $n++;
+        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        push @buildArgs, ($arg, $ARGV[$n]);
+    }
+
     elsif (substr($arg, 0, 1) eq "-") {
         push @buildArgs, $arg;
     }

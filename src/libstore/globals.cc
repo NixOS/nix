@@ -24,6 +24,7 @@ Verbosity buildVerbosity = lvlInfo;
 unsigned int maxBuildJobs = 1;
 bool readOnlyMode = false;
 string thisSystem = "unset";
+unsigned int maxSilentTime = 0;
 
 
 static bool settingsRead = false;
@@ -102,6 +103,15 @@ bool queryBoolSetting(const string & name, bool def)
     else if (v == "false") return false;
     else throw Error(format("configuration option `%1%' should be either `true' or `false', not `%2%'")
         % name % v);
+}
+
+
+unsigned int queryIntSetting(const string & name, unsigned int def)
+{
+    int n;
+    if (!string2Int(querySetting(name, int2String(def)), n) || n < 0)
+        throw Error(format("configuration setting `%1%' should have an integer value") % name);
+    return n;
 }
 
  

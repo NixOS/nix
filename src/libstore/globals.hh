@@ -62,12 +62,19 @@ extern bool readOnlyMode;
 /* The canonical system name, as returned by config.guess. */ 
 extern string thisSystem;
 
+/* The maximum time in seconds that a builer can go without producing
+   any output on stdout/stderr before it is killed.  0 means
+   infinity. */
+extern unsigned int maxSilentTime;
+
 
 Strings querySetting(const string & name, const Strings & def);
 
 string querySetting(const string & name, const string & def);
 
 bool queryBoolSetting(const string & name, bool def);
+
+unsigned int queryIntSetting(const string & name, unsigned int def);
 
     
 }

@@ -78,6 +78,23 @@
 #build-max-jobs = 1
 
 
+### Option `build-max-silent-time'
+#
+# This option defines the maximum number of seconds that builder can
+# go without producing any data on standard output or standard error.
+# This is useful (for instance in a automated build system) to catch
+# builds that are stuck in an infinite loop, or to catch remote builds
+# that are hanging due to network problems.  It can be overriden using
+# the `--max-silent-time' command line switch.
+#
+# The value 0 means that there is no timeout.  This is also the
+# default.
+#
+# Example:
+#   build-max-silent-time = 600 # = 10 minutes
+#build-max-silent-time = 0
+
+
 ### Option `build-users-group'
 #
 # This options specifies the Unix group containing the Nix build user

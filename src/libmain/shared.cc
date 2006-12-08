@@ -57,6 +57,18 @@ static void setLogType(string lt)
 }
 
 
+static unsigned int getIntArg(const string & opt,
+    Strings::iterator & i, const Strings::iterator & end)
+{
+    ++i;
+    if (i == end) throw UsageError(format("`%1%' requires an argument") % opt);
+    int n;
+    if (!string2Int(*i, n) || n < 0)
+        throw UsageError(format("`%1%' requires a non-negative integer") % opt);
+    return n;
+}
+
+
 struct RemoveTempRoots 
 {
     ~RemoveTempRoots()
@@ -91,12 +103,8 @@ static void initAndRun(int argc, char * * argv)
 
     /* Get some settings from the configuration file. */
     thisSystem = querySetting("system", SYSTEM);
-    {
-        int n;
-        if (!string2Int(querySetting("build-max-jobs", "1"), n) || n < 0)
-            throw Error("invalid value for configuration setting `build-max-jobs'");
-        maxBuildJobs = n;
-    }
+    maxBuildJobs = queryIntSetting("build-max-jobs", 1);
+    maxSilentTime = queryIntSetting("build-max-silent-time", 0);
 
     /* Catch SIGINT. */
     struct sigaction act, oact;
@@ -180,16 +188,12 @@ static void initAndRun(int argc, char * * argv)
             keepGoing = true;
         else if (arg == "--fallback")
             tryFallback = true;
-        else if (arg == "--max-jobs" || arg == "-j") {
-            ++i;
-            if (i == args.end()) throw UsageError("`--max-jobs' requires an argument");
-            int n;
-            if (!string2Int(*i, n) || n < 0)
-                throw UsageError(format("`--max-jobs' requires a non-negative integer"));
-            maxBuildJobs = n;
-        }
+        else if (arg == "--max-jobs" || arg == "-j")
+            maxBuildJobs = getIntArg(arg, i, args.end());
         else if (arg == "--readonly-mode")
             readOnlyMode = true;
+        else if (arg == "--max-silent-time")
+            maxSilentTime = getIntArg(arg, i, args.end());
         else remaining.push_back(arg);
     }
 

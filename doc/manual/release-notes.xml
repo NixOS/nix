@@ -37,6 +37,11 @@
   <listitem><para>TODO: magic <varname>exportReferencesGraph</varname>
   attribute.</para></listitem>
 
+
+  <listitem><para>TODO: option <option>--max-silent-time</option>,
+  configuration setting
+  <literal>build-max-silent-time</literal>.</para></listitem>
+
   
 
 </itemizedlist>

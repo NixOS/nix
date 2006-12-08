@@ -13,6 +13,7 @@
 #include <boost/weak_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
 
+#include <time.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -135,6 +136,7 @@ struct Child
     WeakGoalPtr goal;
     set<int> fds;
     bool inBuildSlot;
+    time_t lastOutput; /* time we last got output on stdout/stderr */
 };
 
 typedef map<pid_t, Child> Children;
@@ -660,9 +662,18 @@ DerivationGoal::~DerivationGoal()
             worker.childTerminated(pid);
 
             if (buildUser.enabled()) {
-                /* Can't let pid's destructor do it, since it may not
-                   have the appropriate privilege (i.e., the setuid
-                   helper should do it). */
+                /* Note that we can't let pid's destructor kill the
+                   the child process, since it may not have the
+                   appropriate privilege (i.e., the setuid helper
+                   should do it).
+
+                   However, if we're using a build user, then there is
+                   a tricky race condition: if we kill the build user
+                   before the child has done its setuid() to the build
+                   user uid, then it won't be killed, and we'll
+                   potentially lock up in pid.wait().  So also send a
+                   conventional kill to the child. */
+                ::kill(-pid, SIGKILL); /* ignore the result */
                 buildUser.kill();
                 pid.wait(true);
                 assert(pid == -1);
@@ -2156,6 +2167,7 @@ void Worker::childStarted(GoalPtr goal,
     Child child;
     child.goal = goal;
     child.fds = fds;
+    child.lastOutput = time(0);
     child.inBuildSlot = inBuildSlot;
     children[pid] = child;
     if (inBuildSlot) nrChildren++;
@@ -2255,6 +2267,24 @@ void Worker::waitForInput()
        the logger pipe of a build, we assume that the builder has
        terminated. */
 
+    /* If we're monitoring for silence on stdout/stderr, sleep until
+       the first deadline for any child. */
+    struct timeval timeout;
+    if (maxSilentTime != 0) {
+        time_t oldest = 0;
+        for (Children::iterator i = children.begin();
+             i != children.end(); ++i)
+        {
+            oldest = oldest == 0 || i->second.lastOutput < oldest
+                ? i->second.lastOutput : oldest;
+        }
+        time_t now = time(0);
+        timeout.tv_sec = (time_t) (oldest + maxSilentTime) <= now ? 0 :
+            oldest + maxSilentTime - now;
+        timeout.tv_usec = 0;
+        printMsg(lvlVomit, format("sleeping %1% seconds") % timeout.tv_sec);
+    }
+
     /* Use select() to wait for the input side of any logger pipe to
        become `available'.  Note that `available' (i.e., non-blocking)
        includes EOF. */
@@ -2272,10 +2302,12 @@ void Worker::waitForInput()
         }
     }
 
-    if (select(fdMax, &fds, 0, 0, 0) == -1) {
+    if (select(fdMax, &fds, 0, 0, maxSilentTime != 0 ? &timeout : 0) == -1) {
         if (errno == EINTR) return;
         throw SysError("waiting for input");
     }
+
+    time_t now = time(0);
 
     /* Process all available file descriptors. */
     for (Children::iterator i = children.begin();
@@ -2284,9 +2316,9 @@ void Worker::waitForInput()
         checkInterrupt();
         GoalPtr goal = i->second.goal.lock();
         assert(goal);
+        
         set<int> fds2(i->second.fds);
-        for (set<int>::iterator j = fds2.begin(); j != fds2.end(); ++j)
-        {
+        for (set<int>::iterator j = fds2.begin(); j != fds2.end(); ++j) {
             if (FD_ISSET(*j, &fds)) {
                 unsigned char buffer[4096];
                 ssize_t rd = read(*j, buffer, sizeof(buffer));
@@ -2303,9 +2335,15 @@ void Worker::waitForInput()
                         % goal->getName() % rd);
                     string data((char *) buffer, rd);
                     goal->handleChildOutput(*j, data);
+                    i->second.lastOutput = now;
                 }
             }
         }
+
+        if (maxSilentTime != 0 &&
+            now - i->second.lastOutput >= (time_t) maxSilentTime)
+            throw Error(format("%1% timed out after %2% seconds of silence")
+                % goal->getName() % maxSilentTime);
     }
 }
 
