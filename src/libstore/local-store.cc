@@ -6,6 +6,7 @@
 #include "pathlocks.hh"
 #include "aterm.hh"
 #include "derivations-ast.hh"
+#include "config.h"
     
 #include <iostream>
 #include <algorithm>
@@ -213,7 +214,7 @@ void copyPath(const Path & src, const Path & dst)
 }
 
 
-void canonicalisePathMetaData(const Path & path)
+static void _canonicalisePathMetaData(const Path & path)
 {
     checkInterrupt();
 
@@ -221,13 +222,25 @@ void canonicalisePathMetaData(const Path & path)
     if (lstat(path.c_str(), &st))
 	throw SysError(format("getting attributes of path `%1%'") % path);
 
+    /* Change ownership to the current uid.  If its a symlink, use
+       lchown if available, otherwise don't bother.  Wrong ownership
+       of a symlink doesn't matter, since the owning user can't change
+       the symlink and can't delete it because the directory is not
+       writable.  The only exception is top-level paths in the Nix
+       store (since that directory is group-writable for the Nix build
+       users group); we check for this case below. */
+    if (st.st_uid != geteuid()) {
+#if HAVE_LCHOWN
+        if (lchown(path.c_str(), geteuid(), -1) == -1)
+#else
+        if (!S_ISLNK(st.st_mode) &&
+            chown(path.c_str(), geteuid(), -1) == -1)
+#endif
+            throw SysError(format("changing owner of `%1%' to %2%")
+                % path % geteuid());
+    }
+    
     if (!S_ISLNK(st.st_mode)) {
-
-        if (st.st_uid != geteuid()) {
-            if (chown(path.c_str(), geteuid(), -1) == -1)
-                throw SysError(format("changing owner of `%1%' to %2%")
-                    % path % geteuid());
-        }
 
         /* Mask out all type related bits. */
         mode_t mode = st.st_mode & ~S_IFMT;
@@ -253,7 +266,24 @@ void canonicalisePathMetaData(const Path & path)
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectory(path);
 	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
-	    canonicalisePathMetaData(path + "/" + *i);
+	    _canonicalisePathMetaData(path + "/" + *i);
+    }
+}
+
+
+void canonicalisePathMetaData(const Path & path)
+{
+    _canonicalisePathMetaData(path);
+
+    /* On platforms that don't have lchown(), the top-level path can't
+       be a symlink, since we can't change its ownership. */
+    struct stat st;
+    if (lstat(path.c_str(), &st))
+	throw SysError(format("getting attributes of path `%1%'") % path);
+
+    if (st.st_uid != geteuid()) {
+        assert(S_ISLNK(st.st_mode));
+        throw Error(format("wrong ownership of top-level store path `%1%'") % path);
     }
 }
 
