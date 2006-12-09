@@ -637,7 +637,7 @@ Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
 
         if (!isValidPath(dstPath)) {
 
-            if (pathExists(dstPath)) deletePath(dstPath);
+            if (pathExists(dstPath)) deletePathWrapped(dstPath);
 
             copyPath(srcPath, dstPath);
 
@@ -673,7 +673,7 @@ Path LocalStore::addTextToStore(const string & suffix, const string & s,
 
         if (!isValidPath(dstPath)) {
 
-            if (pathExists(dstPath)) deletePath(dstPath);
+            if (pathExists(dstPath)) deletePathWrapped(dstPath);
 
             writeStringToFile(dstPath, s);
 
@@ -710,18 +710,7 @@ void deleteFromStore(const Path & _path, unsigned long long & bytesFreed)
     }
     txn.commit();
 
-    try {
-        /* First try to delete it ourselves. */
-        deletePath(path, bytesFreed);
-    } catch (SysError & e) {
-        /* If this failed due to a permission error, then try it with
-           the setuid helper. */
-        if (haveBuildUsers() && !amPrivileged()) {
-            getOwnership(path);
-            deletePath(path, bytesFreed);
-        } else
-            throw;
-    }
+    deletePathWrapped(path, bytesFreed);
 }
 
 

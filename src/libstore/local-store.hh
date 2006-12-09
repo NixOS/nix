@@ -148,6 +148,12 @@ bool amPrivileged();
 /* Recursively change the ownership of `path' to the current uid. */
 void getOwnership(const Path & path);
 
+/* Like deletePath(), but changes the ownership of `path' using the
+   setuid wrapper if necessary (and possible). */
+void deletePathWrapped(const Path & path,
+    unsigned long long & bytesFreed);
+
+void deletePathWrapped(const Path & path);
  
 }
 
