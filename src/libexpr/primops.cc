@@ -620,6 +620,26 @@ static Expr primGetEnv(EvalState & state, const ATermVector & args)
 }
 
 
+/* Return the names of the attributes in an attribute set as a sorted
+   list of strings. */
+static Expr primAttrNames(EvalState & state, const ATermVector & args)
+{
+    ATermMap attrs(128); /* !!! */
+    queryAllAttrs(evalExpr(state, args[0]), attrs);
+
+    StringSet names;
+    for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i)
+        names.insert(aterm2String(i->key));
+
+    ATermList list = ATempty;
+    for (StringSet::const_reverse_iterator i = names.rbegin();
+         i != names.rend(); ++i)
+        list = ATinsert(list, makeStr(*i, PathSet()));
+
+    return makeList(list);
+}
+
+
 /* Apply a function to every element of a list. */
 static Expr primMap(EvalState & state, const ATermVector & args)
 {
@@ -732,6 +752,7 @@ void EvalState::addPrimOps()
     addPrimOp("__head", 1, primHead);
     addPrimOp("__tail", 1, primTail);
     addPrimOp("__getEnv", 1, primGetEnv);
+    addPrimOp("__attrNames", 1, primAttrNames);
 
     addPrimOp("map", 2, primMap);
     addPrimOp("__getAttr", 2, primGetAttr);

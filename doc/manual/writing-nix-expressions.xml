@@ -1362,6 +1362,24 @@ is also available as <function>builtins.derivation</function>.</para>
   </varlistentry>
 
   
+  <varlistentry><term><function>builtins.attrNames</function>
+  <replaceable>attrs</replaceable></term>
+
+    <listitem><para>Return the names of the attributes in the
+    attribute set <replaceable>attrs</replaceable> in a sorted list.
+    For instance, <literal>builtins.attrNames {y = 1; x =
+    "foo";}</literal> evaluates to <literal>["x" "y"]</literal>.
+    There is no built-in function <function>attrValues</function>, but
+    you can easily define it yourself:
+
+<programlisting>
+attrValues = attrs: map (name: builtins.getAttr name attrs) (builtins.attrNames attrs);</programlisting>
+
+    </para></listitem>
+
+  </varlistentry>
+
+  
   <varlistentry><term><function>baseNameOf</function> <replaceable>s</replaceable></term>
 
     <listitem><para>Return the <emphasis>base name</emphasis> of the
