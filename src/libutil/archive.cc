@@ -18,28 +18,29 @@ namespace nix {
 static string archiveVersion1 = "nix-archive-1";
 
 
-DumpFilter defaultDumpFilter;
+PathFilter defaultPathFilter;
 
 
-static void dump(const string & path, Sink & sink, DumpFilter & filter);
+static void dump(const string & path, Sink & sink, PathFilter & filter);
 
 
-static void dumpEntries(const Path & path, Sink & sink, DumpFilter & filter)
+static void dumpEntries(const Path & path, Sink & sink, PathFilter & filter)
 {
     Strings names = readDirectory(path);
     vector<string> names2(names.begin(), names.end());
     sort(names2.begin(), names2.end());
 
-    for (vector<string>::iterator it = names2.begin();
-         it != names2.end(); it++)
+    for (vector<string>::iterator i = names2.begin();
+         i != names2.end(); ++i)
     {
-        if (filter(path)) {
+        Path entry = path + "/" + *i;
+        if (filter(entry)) {
             writeString("entry", sink);
             writeString("(", sink);
             writeString("name", sink);
-            writeString(*it, sink);
+            writeString(*i, sink);
             writeString("node", sink);
-            dump(path + "/" + *it, sink, filter);
+            dump(entry, sink, filter);
             writeString(")", sink);
         }
     }
@@ -69,7 +70,7 @@ static void dumpContents(const Path & path, unsigned int size,
 }
 
 
-static void dump(const Path & path, Sink & sink, DumpFilter & filter)
+static void dump(const Path & path, Sink & sink, PathFilter & filter)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
@@ -106,7 +107,7 @@ static void dump(const Path & path, Sink & sink, DumpFilter & filter)
 }
 
 
-void dumpPath(const Path & path, Sink & sink, DumpFilter & filter)
+void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
 {
     writeString(archiveVersion1, sink);
     dump(path, sink, filter);

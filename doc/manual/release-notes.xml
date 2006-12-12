@@ -12,7 +12,7 @@
 <itemizedlist>
 
 
-  <listitem><para>TODO: multi-user  support.</para></listitem>
+  <listitem><para>TODO: multi-user support.</para></listitem>
 
   
   <listitem><para><command>nix-store</command> has a new operation
@@ -48,6 +48,11 @@
 
   <listitem><para>TODO: <command>nix-env</command>
   <option>--set</option>.</para></listitem>
+  
+
+  <listitem><para>TODO: new built-ins
+  <function>builtins.attrNames</function>,
+  <function>builtins.filterSource</function>.</para></listitem>
   
 
 </itemizedlist>

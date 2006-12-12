@@ -69,7 +69,10 @@ Hash hashFile(HashType ht, const Path & path);
 
 /* Compute the hash of the given path.  The hash is defined as
    (essentially) hashString(ht, dumpPath(path)). */
-Hash hashPath(HashType ht, const Path & path);
+struct PathFilter;
+extern PathFilter defaultPathFilter;
+Hash hashPath(HashType ht, const Path & path,
+    PathFilter & filter = defaultPathFilter);
 
 /* Compress a hash to the specified number of bytes by cyclically
    XORing bytes together. */

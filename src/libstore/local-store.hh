@@ -50,7 +50,8 @@ public:
     void queryReferrers(const Path & path, PathSet & referrers);
 
     Path addToStore(const Path & srcPath, bool fixed = false,
-        bool recursive = false, string hashAlgo = "");
+        bool recursive = false, string hashAlgo = "",
+        PathFilter & filter = defaultPathFilter);
 
     Path addTextToStore(const string & suffix, const string & s,
         const PathSet & references);

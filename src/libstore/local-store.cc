@@ -171,33 +171,7 @@ void createStoreTransaction(Transaction & txn)
 }
 
 
-/* Path copying. */
-
-struct CopySink : Sink
-{
-    string s;
-    virtual void operator () (const unsigned char * data, unsigned int len)
-    {
-        s.append((const char *) data, len);
-    }
-};
-
-
-struct CopySource : Source
-{
-    string & s;
-    unsigned int pos;
-    CopySource(string & _s) : s(_s), pos(0) { }
-    virtual void operator () (unsigned char * data, unsigned int len)
-    {
-        s.copy((char *) data, len, pos);
-        pos += len;
-        assert(pos <= s.size());
-    }
-};
-
-
-void copyPath(const Path & src, const Path & dst)
+void copyPath(const Path & src, const Path & dst, PathFilter & filter)
 {
     debug(format("copying `%1%' to `%2%'") % src % dst);
 
@@ -206,10 +180,10 @@ void copyPath(const Path & src, const Path & dst)
        for very large paths, but `copyPath' is mainly used for small
        files. */ 
 
-    CopySink sink;
-    dumpPath(src, sink);
+    StringSink sink;
+    dumpPath(src, sink, filter);
 
-    CopySource source(sink.s);
+    StringSource source(sink.s);
     restorePath(dst, source);
 }
 
@@ -646,13 +620,13 @@ static void invalidatePath(Transaction & txn, const Path & path)
 
 
 Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
-    bool recursive, string hashAlgo)
+    bool recursive, string hashAlgo, PathFilter & filter)
 {
     Path srcPath(absPath(_srcPath));
     debug(format("adding `%1%' to the store") % srcPath);
 
     std::pair<Path, Hash> pr =
-        computeStorePathForPath(srcPath, fixed, recursive, hashAlgo);
+        computeStorePathForPath(srcPath, fixed, recursive, hashAlgo, filter);
     Path & dstPath(pr.first);
     Hash & h(pr.second);
 
@@ -669,9 +643,9 @@ Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
 
             if (pathExists(dstPath)) deletePathWrapped(dstPath);
 
-            copyPath(srcPath, dstPath);
+            copyPath(srcPath, dstPath, filter);
 
-            Hash h2 = hashPath(htSHA256, dstPath);
+            Hash h2 = hashPath(htSHA256, dstPath, filter);
             if (h != h2)
                 throw Error(format("contents of `%1%' changed while copying it to `%2%' (%3% -> %4%)")
                     % srcPath % dstPath % printHash(h) % printHash(h2));

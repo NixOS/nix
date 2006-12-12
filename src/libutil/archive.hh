@@ -45,16 +45,16 @@ namespace nix {
 
      `+' denotes string concatenation. */
 
-struct DumpFilter
+struct PathFilter
 {
-    virtual ~DumpFilter() { }
+    virtual ~PathFilter() { }
     virtual bool operator () (const Path & path) { return true; }
 };
 
-extern DumpFilter defaultDumpFilter;
+extern PathFilter defaultPathFilter;
 
 void dumpPath(const Path & path, Sink & sink,
-    DumpFilter & filter = defaultDumpFilter);
+    PathFilter & filter = defaultPathFilter);
 
 void restorePath(const Path & path, Source & source);
 

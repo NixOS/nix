@@ -79,9 +79,12 @@ public:
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
        If `fixed' is true, then the output of a fixed-output
-       derivation is pre-loaded into the Nix store. */
+       derivation is pre-loaded into the Nix store.  The function
+       object `filter' can be used to exclude files (see
+       libutil/archive.hh). */
     virtual Path addToStore(const Path & srcPath, bool fixed = false,
-        bool recursive = false, string hashAlgo = "") = 0;
+        bool recursive = false, string hashAlgo = "",
+        PathFilter & filter = defaultPathFilter) = 0;
 
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */
@@ -195,7 +198,8 @@ Path makeFixedOutputPath(bool recursive,
    Returns the store path and the cryptographic hash of the
    contents of srcPath. */
 std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
-    bool fixed = false, bool recursive = false, string hashAlgo = "");
+    bool fixed = false, bool recursive = false, string hashAlgo = "",
+    PathFilter & filter = defaultPathFilter);
 
 /* Preparatory part of addTextToStore().
 

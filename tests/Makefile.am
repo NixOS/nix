@@ -15,12 +15,13 @@ user-envs.sh: user-envs.nix
 fixed.sh: fixed.nix
 gc-runtime.sh: gc-runtime.nix
 check-refs.sh: check-refs.nix
+filter-source.sh: filter-source.nix
 
 TESTS = init.sh hash.sh lang.sh add.sh simple.sh dependencies.sh \
   locking.sh parallel.sh build-hook.sh substitutes.sh substitutes2.sh \
   fallback.sh nix-push.sh gc.sh gc-concurrent.sh verify.sh nix-pull.sh \
   referrers.sh user-envs.sh logging.sh nix-build.sh misc.sh fixed.sh \
-  gc-runtime.sh install-package.sh check-refs.sh
+  gc-runtime.sh install-package.sh check-refs.sh filter-source.sh
 
 XFAIL_TESTS =
 
@@ -44,5 +45,6 @@ EXTRA_DIST = $(TESTS) \
   fixed.nix.in fixed.builder1.sh fixed.builder2.sh \
   gc-runtime.nix.in gc-runtime.builder.sh \
   check-refs.nix.in \
+  filter-source.nix.in \
   $(wildcard lang/*.nix) $(wildcard lang/*.exp) $(wildcard lang/*.exp.xml) \
   common.sh.in

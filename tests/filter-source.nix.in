@@ -1,0 +1,7 @@
+derivation {
+  name = "filter";
+  system = "@system@";
+  builder = "@shell@";
+  args = ["-e" "-x" (builtins.toFile "builder" "PATH=@testPath@; ln -s $input $out")];
+  input = builtins.filterSource (path: baseNameOf (toString path) != "foo") ./test-tmp/filterin;
+}

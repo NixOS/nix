@@ -240,6 +240,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         string hashAlgo = readString(from);
         
         Path tmp = createTempDir();
+        AutoDelete delTmp(tmp);
         Path tmp2 = tmp + "/" + baseName;
         restorePath(tmp2, from);
 
@@ -248,8 +249,6 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         stopWork();
         
         writeString(path, to);
-            
-        deletePath(tmp);
         break;
     }
 

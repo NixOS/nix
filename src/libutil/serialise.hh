@@ -66,6 +66,33 @@ struct FdSource : Source
 };
 
 
+/* A sink that writes data to a string. */
+struct StringSink : Sink
+{
+    string s;
+    virtual void operator () (const unsigned char * data, unsigned int len)
+    {
+        s.append((const char *) data, len);
+    }
+};
+
+
+/* A source that reads data from a string. */
+struct StringSource : Source
+{
+    string & s;
+    unsigned int pos;
+    StringSource(string & _s) : s(_s), pos(0) { }
+    virtual void operator () (unsigned char * data, unsigned int len)
+    {
+        s.copy((char *) data, len, pos);
+        pos += len;
+        if (pos > s.size())
+            throw Error("end of string reached");
+    }
+};
+
+
 void writePadding(unsigned int len, Sink & sink);
 void writeInt(unsigned int n, Sink & sink);
 void writeString(const string & s, Sink & sink);

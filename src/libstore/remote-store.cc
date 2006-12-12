@@ -213,7 +213,7 @@ void RemoteStore::queryReferrers(const Path & path,
 
 
 Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
-    bool recursive, string hashAlgo)
+    bool recursive, string hashAlgo, PathFilter & filter)
 {
     Path srcPath(absPath(_srcPath));
     
@@ -222,7 +222,7 @@ Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
     writeInt(fixed ? 1 : 0, to);
     writeInt(recursive ? 1 : 0, to);
     writeString(hashAlgo, to);
-    dumpPath(srcPath, to);
+    dumpPath(srcPath, to, filter);
     processStderr();
     Path path = readStorePath(from);
     return path;

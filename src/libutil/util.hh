@@ -164,10 +164,10 @@ struct AutoDeleteArray
 
 class AutoDelete
 {
-    string path;
+    Path path;
     bool del;
 public:
-    AutoDelete(const string & p);
+    AutoDelete(const Path & p);
     ~AutoDelete();
     void cancel();
 };

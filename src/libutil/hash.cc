@@ -294,13 +294,13 @@ struct HashSink : Sink
 };
 
 
-Hash hashPath(HashType ht, const Path & path)
+Hash hashPath(HashType ht, const Path & path, PathFilter & filter)
 {
     HashSink sink;
     sink.ht = ht;
     Hash hash(ht);
     start(ht, sink.ctx);
-    dumpPath(path, sink);
+    dumpPath(path, sink, filter);
     finish(ht, sink.ctx, hash.hash);
     return hash;
 }

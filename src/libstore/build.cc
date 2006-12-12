@@ -949,7 +949,7 @@ void DerivationGoal::buildDone()
                as that means that someone else can have interfered
                with the build.  Also, the output should be owned by
                the build user. */
-            if ((st.st_mode & (S_IWGRP | S_IWOTH)) ||
+            if ((!S_ISLNK(st.st_mode) && (st.st_mode & (S_IWGRP | S_IWOTH))) ||
                 (buildUser.enabled() && st.st_uid != buildUser.getUID()))
                 throw BuildError(format("suspicious ownership or permission on `%1%'; rejecting this build output") % path);
 #endif

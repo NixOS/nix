@@ -3,6 +3,7 @@
 #include "globals.hh"
 #include "store-api.hh"
 #include "util.hh"
+#include "archive.hh"
 #include "expr-to-xml.hh"
 #include "nixexpr-ast.hh"
 
@@ -726,6 +727,42 @@ static Expr primLessThan(EvalState & state, const ATermVector & args)
 }
 
 
+struct FilterFromExpr : PathFilter
+{
+    EvalState & state;
+    Expr filter;
+    
+    FilterFromExpr(EvalState & state, Expr filter)
+        : state(state), filter(filter)
+    {
+    }
+
+    bool operator () (const Path & path)
+    {
+        printMsg(lvlError, format("filter %1%") % path);
+        Expr call = makeCall(filter, makePath(toATerm(path)));
+        return evalBool(state, call);
+    }
+};
+
+
+static Expr primFilterSource(EvalState & state, const ATermVector & args)
+{
+    PathSet context;
+    Path path = coerceToPath(state, args[1], context);
+    if (!context.empty())
+        throw EvalError(format("string `%1%' cannot refer to other paths") % path);
+
+    FilterFromExpr filter(state, args[0]);
+
+    Path dstPath = readOnlyMode
+        ? computeStorePathForPath(path, false, false, "", filter).first
+        : store->addToStore(path, false, false, "", filter);
+
+    return makeStr(dstPath, singleton<PathSet>(dstPath));
+}
+
+
 void EvalState::addPrimOps()
 {
     addPrimOp("builtins", 0, primBuiltins);
@@ -762,6 +799,7 @@ void EvalState::addPrimOps()
     addPrimOp("__add", 2, primAdd);
     addPrimOp("__lessThan", 2, primLessThan);
     addPrimOp("__toFile", 2, primToFile);
+    addPrimOp("__filterSource", 2, primFilterSource);
 }
 
  
