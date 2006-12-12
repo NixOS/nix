@@ -18,10 +18,13 @@ namespace nix {
 static string archiveVersion1 = "nix-archive-1";
 
 
-static void dump(const string & path, Sink & sink);
+DumpFilter defaultDumpFilter;
 
 
-static void dumpEntries(const Path & path, Sink & sink)
+static void dump(const string & path, Sink & sink, DumpFilter & filter);
+
+
+static void dumpEntries(const Path & path, Sink & sink, DumpFilter & filter)
 {
     Strings names = readDirectory(path);
     vector<string> names2(names.begin(), names.end());
@@ -30,13 +33,15 @@ static void dumpEntries(const Path & path, Sink & sink)
     for (vector<string>::iterator it = names2.begin();
          it != names2.end(); it++)
     {
-        writeString("entry", sink);
-        writeString("(", sink);
-        writeString("name", sink);
-        writeString(*it, sink);
-        writeString("node", sink);
-        dump(path + "/" + *it, sink);
-        writeString(")", sink);
+        if (filter(path)) {
+            writeString("entry", sink);
+            writeString("(", sink);
+            writeString("name", sink);
+            writeString(*it, sink);
+            writeString("node", sink);
+            dump(path + "/" + *it, sink, filter);
+            writeString(")", sink);
+        }
     }
 }
 
@@ -64,7 +69,7 @@ static void dumpContents(const Path & path, unsigned int size,
 }
 
 
-static void dump(const Path & path, Sink & sink)
+static void dump(const Path & path, Sink & sink, DumpFilter & filter)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
@@ -85,7 +90,7 @@ static void dump(const Path & path, Sink & sink)
     else if (S_ISDIR(st.st_mode)) {
         writeString("type", sink);
         writeString("directory", sink);
-        dumpEntries(path, sink);
+        dumpEntries(path, sink, filter);
     }
 
     else if (S_ISLNK(st.st_mode)) {
@@ -101,10 +106,10 @@ static void dump(const Path & path, Sink & sink)
 }
 
 
-void dumpPath(const Path & path, Sink & sink)
+void dumpPath(const Path & path, Sink & sink, DumpFilter & filter)
 {
     writeString(archiveVersion1, sink);
-    dump(path, sink);
+    dump(path, sink, filter);
 }
 
 
