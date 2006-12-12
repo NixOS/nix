@@ -12,7 +12,7 @@
 <itemizedlist>
 
 
-  <listitem><para>TODO: multi-user support.</para></listitem>
+  <listitem><para>TODO: multi-user  support.</para></listitem>
 
   
   <listitem><para><command>nix-store</command> has a new operation
