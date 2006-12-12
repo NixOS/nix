@@ -6,6 +6,7 @@ Operations:
 
   --install / -i: add derivations to the user environment
   --upgrade / -u: upgrade derivation in the user environment
+  --set: create a user environment containing a single derivation
   --uninstall / -e: remove derivations from the user environment
   --query / -q: perform a query on an environment or Nix expression
 

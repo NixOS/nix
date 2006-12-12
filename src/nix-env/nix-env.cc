@@ -596,6 +596,31 @@ static void opUpgrade(Globals & globals,
 }
 
 
+static void opSet(Globals & globals,
+    Strings opFlags, Strings opArgs)
+{
+    if (opFlags.size() > 0)
+        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
+
+    DrvInfos elems;
+    queryInstSources(globals.state, globals.instSource, opArgs, elems, true);
+
+    if (elems.size() != 1)
+        throw Error("--set requires exactly one derivation");
+    
+    DrvInfo & drv(elems.front());
+
+    if (drv.queryDrvPath(globals.state) != "")
+        store->buildDerivations(singleton<PathSet>(drv.queryDrvPath(globals.state)));
+    else
+        store->ensurePath(drv.queryOutPath(globals.state));
+
+    debug(format("switching to new user environment"));
+    Path generation = createGeneration(globals.profile, drv.queryOutPath(globals.state));
+    switchLink(globals.profile, generation);
+}
+
+
 static void uninstallDerivations(Globals & globals, DrvNames & selectors,
     Path & profile)
 {
@@ -1152,6 +1177,8 @@ void run(Strings args)
             op = opUninstall;
         else if (arg == "--upgrade" || arg == "-u")
             op = opUpgrade;
+        else if (arg == "--set")
+            op = opSet;
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
         else if (arg == "--import" || arg == "-I") /* !!! bad name */

@@ -45,6 +45,9 @@
   configuration setting
   <literal>build-max-silent-time</literal>.</para></listitem>
 
+
+  <listitem><para>TODO: <command>nix-env</command>
+  <option>--set</option>.</para></listitem>
   
 
 </itemizedlist>
