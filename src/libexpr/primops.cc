@@ -739,7 +739,6 @@ struct FilterFromExpr : PathFilter
 
     bool operator () (const Path & path)
     {
-        printMsg(lvlError, format("filter %1%") % path);
         Expr call = makeCall(filter, makePath(toATerm(path)));
         return evalBool(state, call);
     }
