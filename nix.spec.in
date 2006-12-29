@@ -47,7 +47,6 @@ make
 make check
 
 %install
-sleep 50000
 rm -rf $RPM_BUILD_ROOT
 make DESTDIR=$RPM_BUILD_ROOT install
 rm $RPM_BUILD_ROOT/%{_prefix}/etc/nix/nix.conf
