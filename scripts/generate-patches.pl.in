@@ -348,10 +348,21 @@ foreach my $p (keys %dstOutPaths) {
 # patches that produce either paths in the destination or paths that
 # can be used as the base for other useful patches).
 
+print "propagating patches...\n";
+
 my $changed;
 do {
     # !!! we repeat this to reach the transitive closure; inefficient
     $changed = 0;
+
+    print "loop\n";
+
+    my %dstBasePaths;
+    foreach my $q (keys %dstPatches) {
+	foreach my $patch (@{$dstPatches{$q}}) {
+	    $dstBasePaths{$patch->{basePath}} = 1;
+	}
+    }
 
     foreach my $p (keys %srcPatches) {
         my $patchList = $srcPatches{$p};
@@ -360,22 +371,18 @@ do {
 
         # Is path $p included in the destination?  If so, include
         # patches that produce it.
-        $include = 1 if (defined $dstNarFiles{$p});
+        $include = 1 if defined $dstNarFiles{$p};
 
         # Is path $p a path that serves as a base for paths in the
         # destination?  If so, include patches that produce it.
-        foreach my $q (keys %dstPatches) {
-            foreach my $patch (@{$dstPatches{$q}}) {
-                # !!! check baseHash
-                $include = 1 if ($p eq $patch->{basePath});
-            }
-        }
+	# !!! check baseHash
+        $include = 1 if defined $dstBasePaths{$p};
 
         if ($include) {
             foreach my $patch (@{$patchList}) {
                 $changed = 1 if addPatch \%dstPatches, $p, $patch;
             }
-        }            
+        }
         
     }
     
