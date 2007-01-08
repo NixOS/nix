@@ -4,6 +4,12 @@ use strict;
 use File::Temp qw(tempdir);
 use readmanifest;
 
+
+# Some hard-coded options.
+my $maxNarSize = 100 * 1024 * 1024; # max size of NAR archives to generate patches for
+my $maxPatchFraction = 0.60; # if patch is bigger than this fraction of full archive, reject
+
+
 die unless scalar @ARGV == 5;
 
 my $hashAlgo = "sha256";
@@ -277,8 +283,6 @@ foreach my $p (keys %dstOutPaths) {
         my $srcNarBz2 = getNarBz2 \%srcNarFiles, $closest;
         my $dstNarBz2 = getNarBz2 \%dstNarFiles, $p;
 
-        my $maxNarSize = 100 * 1024 * 1024;
-
         system("@bunzip2@ < $srcNarBz2 > $tmpDir/A") == 0
             or die "cannot unpack $srcNarBz2";
 
@@ -310,16 +314,21 @@ foreach my $p (keys %dstOutPaths) {
         my $narDiffSize = (stat "$tmpDir/DIFF")[7];
         my $dstNarBz2Size = (stat $dstNarBz2)[7];
 
+        print "    size $narDiffSize; full size $dstNarBz2Size\n";
+        
         if ($narDiffSize >= $dstNarBz2Size) {
             print "    rejecting; patch bigger than full archive\n";
+            next;
+        }
+    
+        if ($narDiffSize / $dstNarBz2Size >= $maxPatchFraction) {
+            print "    rejecting; patch too large relative to full archive\n";
             next;
         }
     
         my $finalName =
             "$narDiffHash.nar-bsdiff";
 
-        print "    size $narDiffSize; full size $dstNarBz2Size\n";
-        
         if (-e "$patchesDir/$finalName") {
             print "    not copying, already exists\n";
         }
