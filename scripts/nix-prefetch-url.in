@@ -48,7 +48,8 @@ if test -z "$finalPath"; then
     mkdir $tmpPath
 
     # Perform the download.
-    @curl@ --fail --location --max-redirs 20 --disable-epsv --cookie-jar $tmpPath/cookies "$url" > $tmpFile
+    @curl@ --fail --location --max-redirs 20 --disable-epsv \
+        --cookie-jar $tmpPath/cookies "$url" > $tmpFile
 
     # Compute the hash.
     hash=$(@bindir@/nix-hash --type "$hashType" $hashFormat --flat $tmpFile)
