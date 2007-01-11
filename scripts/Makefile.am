@@ -15,6 +15,7 @@ install-exec-local: readmanifest.pm download-using-manifests.pl find-runtime-roo
 	$(INSTALL_DATA) readconfig.pm $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) download-using-manifests.pl $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) find-runtime-roots.pl $(DESTDIR)$(libexecdir)/nix 
+	$(INSTALL_PROGRAM) generate-patches.pl $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/nix
 
 include ../substitute.mk
