@@ -21,6 +21,7 @@ mkdir "$tmpDir/contents", 0777 or die;
 mkdir "$tmpDir/references", 0777 or die;
 mkdir "$tmpDir/derivers", 0777 or die;
 
+open TOPLEVEL, ">$tmpDir/top-level" or die;
 
 
 my %storePaths;
@@ -28,6 +29,12 @@ my %storePaths;
 
 while (@ARGV) {
     my $storePath = shift @ARGV;
+
+    # $storePath might be a symlink to the store, so resolve it.
+    $storePath = (`$binDir/nix-store --query --resolve '$storePath'`
+        or die "cannot resolve `$storePath'");
+    chomp $storePath;
+    print TOPLEVEL $storePath, "\n";
 
     # Get the closure of this path.
     my $pid = open(READ,

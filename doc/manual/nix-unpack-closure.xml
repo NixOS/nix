@@ -22,6 +22,12 @@ closure is a single file read from standard input.  See the
 description of <command>nix-pack-closure</command> for details and
 examples.</para>
 
+<para>The top-level paths in the closure (i.e., the paths passed to
+the original <command>nix-pack-closure</command> call that created the
+closure) are printed on standard output.  These paths can be passed,
+for instance, to <literal>nix-env -i</literal> to install them into a
+user environment on the target machine.</para>
+
 </refsection>
 
 

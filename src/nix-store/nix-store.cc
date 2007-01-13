@@ -296,7 +296,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 {
     enum { qOutputs, qRequisites, qReferences, qReferrers
          , qReferrersClosure, qDeriver, qBinding, qHash
-         , qTree, qGraph } query = qOutputs;
+         , qTree, qGraph, qResolve } query = qOutputs;
     bool useOutput = false;
     bool includeOutputs = false;
     bool forceRealise = false;
@@ -320,6 +320,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--hash") query = qHash;
         else if (*i == "--tree") query = qTree;
         else if (*i == "--graph") query = qGraph;
+        else if (*i == "--resolve") query = qResolve;
         else if (*i == "--use-output" || *i == "-u") useOutput = true;
         else if (*i == "--force-realise" || *i == "-f") forceRealise = true;
         else if (*i == "--include-outputs") includeOutputs = true;
@@ -410,6 +411,13 @@ static void opQuery(Strings opFlags, Strings opArgs)
             break;
         }
 
+        case qResolve: {
+            for (Strings::iterator i = opArgs.begin();
+                 i != opArgs.end(); ++i)
+                cout << format("%1%\n") % fixPath(*i);
+            break;
+        }
+            
         default:
             abort();
     }

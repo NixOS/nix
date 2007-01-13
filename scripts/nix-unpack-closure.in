@@ -77,3 +77,12 @@ closedir(DIR) or die;
 # Register the invalid paths as valid.
 system("nix-store --register-validity <'$tmpDir/validity'") == 0
     or die "nix-store --register-validity failed";
+
+
+# Show the top-level paths so that something useful can be done with
+# them, e.g., passing them to `nix-env -i'.
+if (-e "$tmpDir/unpacked/top-level") {
+    open TOPLEVEL, "<$tmpDir/unpacked/top-level" or die;
+    while (<TOPLEVEL>) { print "$_"; }
+    close TOPLEVEL;
+}

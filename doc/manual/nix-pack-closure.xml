@@ -58,6 +58,14 @@ $ nix-pack-closure $(which azureus) | ssh scratchy nix-unpack-closure</screen>
     
 </para>
 
+<para>As a variation on the previous example, copy
+<command>azureus</command>, and also install it in the user’s profile
+on the target machine:
+
+<screen>
+$ nix-pack-closure $(which azureus) | ssh scratchy 'nix-env -i $(nix-unpack-closure)'</screen>
+ 
+
 </refsection>
 
 
