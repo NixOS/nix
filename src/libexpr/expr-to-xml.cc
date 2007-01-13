@@ -2,6 +2,7 @@
 #include "xml-writer.hh"
 #include "nixexpr-ast.hh"
 #include "aterm.hh"
+#include "util.hh"
 
 
 namespace nix {
@@ -23,6 +24,8 @@ static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context)
     int i;
     ATermList as, es, formals;
     ATerm body, pos;
+
+    checkInterrupt();
 
     if (matchStr(e, s, context)) /* !!! show the context? */
         doc.writeEmptyElement("string", singletonAttrs("value", s));

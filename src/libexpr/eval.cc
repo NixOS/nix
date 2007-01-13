@@ -685,6 +685,9 @@ Expr strictEvalExpr(EvalState & state, Expr e, bool canonicalise)
             as2 = ATinsert(as2, makeBind(name, strictEvalExpr(state, e, canonicalise),
                                canonicalise ? makeNoPos() : pos));
         }
+        if (canonicalise) {
+            
+        }
         /* !!! sort attributes if canonicalise == true */
         return makeAttrs(ATreverse(as2));
     }
@@ -716,6 +719,7 @@ Expr strictEvalExpr(EvalState & state, Expr e, bool canonicalise)
 
             formals2 = ATinsert(formals2, makeFormal(name, valids, dummy));
         }
+        
         return makeFunction(ATreverse(formals2), body,
             canonicalise ? makeNoPos() : pos);
     }
