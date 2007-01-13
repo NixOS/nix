@@ -56,8 +56,7 @@ Expr evalFile(EvalState & state, const Path & path);
    attributes.  If `canonicalise' is true, we remove things like
    position information and make sure that attribute sets are in
    sorded order. */
-Expr strictEvalExpr(EvalState & state, Expr e,
-    bool canonicalise = false);
+Expr strictEvalExpr(EvalState & state, Expr e);
 
 /* Specific results. */
 string evalString(EvalState & state, Expr e, PathSet & context);

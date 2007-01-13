@@ -672,7 +672,10 @@ Expr evalFile(EvalState & state, const Path & path)
 }
 
 
-Expr strictEvalExpr(EvalState & state, Expr e, bool canonicalise)
+static Expr strictEvalExpr(EvalState & state, Expr e, ATermMap & nfs);
+
+
+static Expr strictEvalExpr_(EvalState & state, Expr e, ATermMap & nfs)
 {
     e = evalExpr(state, e);
 
@@ -682,13 +685,8 @@ Expr strictEvalExpr(EvalState & state, Expr e, bool canonicalise)
         for (ATermIterator i(as); i; ++i) {
             ATerm name; Expr e; ATerm pos;
             if (!matchBind(*i, name, e, pos)) abort(); /* can't happen */
-            as2 = ATinsert(as2, makeBind(name, strictEvalExpr(state, e, canonicalise),
-                               canonicalise ? makeNoPos() : pos));
+            as2 = ATinsert(as2, makeBind(name, strictEvalExpr(state, e, nfs), pos));
         }
-        if (canonicalise) {
-            
-        }
-        /* !!! sort attributes if canonicalise == true */
         return makeAttrs(ATreverse(as2));
     }
     
@@ -696,7 +694,7 @@ Expr strictEvalExpr(EvalState & state, Expr e, bool canonicalise)
     if (matchList(e, es)) {
         ATermList es2 = ATempty;
         for (ATermIterator i(es); i; ++i)
-            es2 = ATinsert(es2, strictEvalExpr(state, *i, canonicalise));
+            es2 = ATinsert(es2, strictEvalExpr(state, *i, nfs));
         return makeList(ATreverse(es2));
     }
     
@@ -713,18 +711,37 @@ Expr strictEvalExpr(EvalState & state, Expr e, bool canonicalise)
             if (matchValidValues(valids, valids2)) {
                 ATermList valids3 = ATempty;
                 for (ATermIterator j(valids2); j; ++j)
-                    valids3 = ATinsert(valids3, strictEvalExpr(state, *j, canonicalise));
+                    valids3 = ATinsert(valids3, strictEvalExpr(state, *j, nfs));
                 valids = makeValidValues(ATreverse(valids3));
             }
 
             formals2 = ATinsert(formals2, makeFormal(name, valids, dummy));
         }
         
-        return makeFunction(ATreverse(formals2), body,
-            canonicalise ? makeNoPos() : pos);
+        return makeFunction(ATreverse(formals2), body, pos);
     }
     
     return e;
+}
+
+
+static Expr strictEvalExpr(EvalState & state, Expr e, ATermMap & nfs)
+{
+    Expr nf = nfs.get(e);
+    if (nf) return nf;
+
+    nf = strictEvalExpr_(state, e, nfs);
+
+    nfs.set(e, nf);
+    
+    return nf;
+}
+
+
+Expr strictEvalExpr(EvalState & state, Expr e)
+{
+    ATermMap strictNormalForms;
+    return strictEvalExpr(state, e, strictNormalForms);
 }
 
 
