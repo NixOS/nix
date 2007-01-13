@@ -44,7 +44,7 @@ static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context)
 
     else if (matchAttrs(e, as)) {
         XMLOpenElement _(doc, "attrs");
-        ATermMap attrs(128);
+        ATermMap attrs;
         queryAllAttrs(e, attrs);
         StringSet names;
         for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i)

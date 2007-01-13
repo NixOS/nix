@@ -21,7 +21,7 @@ static Expr primBuiltins(EvalState & state, const ATermVector & args)
        calling a primop `foo' directly, they could say `if builtins ?
        foo then builtins.foo ... else ...'. */
 
-    ATermMap builtins(128);
+    ATermMap builtins(state.primOps.size());
 
     for (ATermMap::const_iterator i = state.primOps.begin();
          i != state.primOps.end(); ++i)
@@ -133,7 +133,7 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
 {
     startNest(nest, lvlVomit, "evaluating derivation");
 
-    ATermMap attrs(128); /* !!! */
+    ATermMap attrs;
     queryAllAttrs(evalExpr(state, args[0]), attrs, true);
 
     /* Figure out the name already (for stack backtraces). */
@@ -303,7 +303,7 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
 static Expr primDerivationLazy(EvalState & state, const ATermVector & args)
 {
     Expr eAttrs = evalExpr(state, args[0]);
-    ATermMap attrs(128); /* !!! */
+    ATermMap attrs;    
     queryAllAttrs(eAttrs, attrs, true);
 
     attrs.set(toATerm("type"),
@@ -625,7 +625,7 @@ static Expr primGetEnv(EvalState & state, const ATermVector & args)
    list of strings. */
 static Expr primAttrNames(EvalState & state, const ATermVector & args)
 {
-    ATermMap attrs(128); /* !!! */
+    ATermMap attrs;
     queryAllAttrs(evalExpr(state, args[0]), attrs);
 
     StringSet names;
@@ -689,7 +689,7 @@ static Expr primHasAttr(EvalState & state, const ATermVector & args)
 
 static Expr primRemoveAttrs(EvalState & state, const ATermVector & args)
 {
-    ATermMap attrs(128); /* !!! */
+    ATermMap attrs;
     queryAllAttrs(evalExpr(state, args[0]), attrs, true);
     
     ATermList list = evalList(state, args[1]);

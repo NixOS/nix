@@ -43,7 +43,7 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
     Expr a = attrs->get(toATerm("meta"));
     if (!a) return meta; /* fine, empty meta information */
 
-    ATermMap attrs2(16); /* !!! */
+    ATermMap attrs2;
     queryAllAttrs(evalExpr(state, a), attrs2);
 
     for (ATermMap::const_iterator i = attrs2.begin(); i != attrs2.end(); ++i) {
@@ -81,7 +81,7 @@ static bool getDerivation(EvalState & state, Expr e,
         e = evalExpr(state, e);
         if (!matchAttrs(e, es)) return true;
 
-        boost::shared_ptr<ATermMap> attrs(new ATermMap(32)); /* !!! */
+        boost::shared_ptr<ATermMap> attrs(new ATermMap());
         queryAllAttrs(e, *attrs, false);
     
         Expr a = attrs->get(toATerm("type"));

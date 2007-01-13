@@ -46,7 +46,7 @@ Expr findAlongAttrPath(EvalState & state, const string & attrPath,
 
         if (apType == apAttr) {
 
-            ATermMap attrs(128);
+            ATermMap attrs;
 
             if (!isAttrs(state, e, attrs))
                 throw TypeError(

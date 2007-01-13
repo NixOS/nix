@@ -37,7 +37,7 @@ static Expr substArgs(EvalState & state,
     ATermMap subs(nrFormals);
 
     /* Get the actual arguments and put them in the substitution. */
-    ATermMap args(128); /* !!! fix */
+    ATermMap args;
     queryAllAttrs(arg, args);
     for (ATermMap::const_iterator i = args.begin(); i != args.end(); ++i)
         subs.set(i->key, i->value);
@@ -151,7 +151,7 @@ static Expr updateAttrs(Expr e1, Expr e2)
 {
     /* Note: e1 and e2 should be in normal form. */
 
-    ATermMap attrs(128); /* !!! */
+    ATermMap attrs;
     queryAllAttrs(e1, attrs, true);
     queryAllAttrs(e2, attrs, true);
 
@@ -343,7 +343,7 @@ Expr autoCallFunction(Expr e, const ATermMap & args)
     ATerm body, pos;
     
     if (matchFunction(e, formals, body, pos)) {
-        ATermMap actualArgs(128);
+        ATermMap actualArgs(ATgetLength(formals));
         
         for (ATermIterator i(formals); i; ++i) {
             Expr name, def, value; ATerm values, def2;
@@ -496,7 +496,7 @@ Expr evalExpr2(EvalState & state, Expr e)
 
     /* Withs. */
     if (matchWith(e, e1, e2, pos)) {
-        ATermMap attrs(128); /* !!! */
+        ATermMap attrs;        
         try {
             e1 = evalExpr(state, e1);
             queryAllAttrs(e1, attrs);
@@ -550,7 +550,7 @@ Expr evalExpr2(EvalState & state, Expr e)
 
     /* Attribute existence test (?). */
     if (matchOpHasAttr(e, e1, name)) {
-        ATermMap attrs(128); /* !!! */
+        ATermMap attrs;
         queryAllAttrs(evalExpr(state, e1), attrs);
         return makeBool(attrs.get(name) != 0);
     }
@@ -576,7 +576,7 @@ Expr evalExpr2(EvalState & state, Expr e)
             if (matchAttrs(e1, as) && matchPath(e2, p)) {
                 static bool haveWarned = false;
                 warnOnce(haveWarned, format(
-                    "concatenation of a derivation and a path is deprecated, "
+                    "concatenation of a derivation and a path is deprecated; "
                     "you should write `drv + \"%1%\"' instead of `drv + %1%'")
                     % aterm2String(p));
                 PathSet context;

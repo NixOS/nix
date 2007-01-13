@@ -40,7 +40,7 @@ public:
 
     /* Create a map.  `expectedCount' is the number of elements the
        map is expected to hold. */
-    ATermMap(unsigned int expectedCount);
+    ATermMap(unsigned int expectedCount = 16);
     
     ATermMap(const ATermMap & map);
     
