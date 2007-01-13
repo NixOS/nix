@@ -45,7 +45,7 @@ static void printResult(EvalState & state, Expr e,
         if (xmlOutput)
             printTermAsXML(e, std::cout, context);
         else
-            std::cout << format("%1%\n") % e;
+            std::cout << format("%1%\n") % canonicaliseExpr(e);
     
     else {
         DrvInfos drvs;

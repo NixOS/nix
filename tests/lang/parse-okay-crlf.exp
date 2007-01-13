@@ -1,1 +1,1 @@
-Rec([Bind("x",Var("y"),Pos("(string)",6,4)),Bind("y",Int(123),Pos("(string)",10,4)),Bind("foo",Str("multi\nline\n  string\n  test\r",[]),Pos("(string)",14,6)),Bind("z",Int(456),Pos("(string)",19,4))],[])
+Rec([Bind("x",Var("y"),NoPos),Bind("y",Int(123),NoPos),Bind("foo",Str("multi\nline\n  string\n  test\r",[]),NoPos),Bind("z",Int(456),NoPos)],[])

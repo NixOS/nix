@@ -287,6 +287,45 @@ void checkVarDefs(const ATermMap & defs, Expr e)
 }
 
 
+struct Canonicalise : TermFun
+{
+    ATerm operator () (ATerm e)
+    {
+        /* Remove position info. */
+        ATerm path;
+        int line, column;
+        if (matchPos(e, path, line, column))
+            return makeNoPos();
+
+        /* Sort attribute sets. */
+        ATermList _;
+        if (matchAttrs(e, _)) {
+            ATermMap attrs;
+            queryAllAttrs(e, attrs);
+            StringSet names;
+            for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i)
+                names.insert(aterm2String(i->key));
+
+            ATermList attrs2 = ATempty;
+            for (StringSet::reverse_iterator i = names.rbegin(); i != names.rend(); ++i)
+                attrs2 = ATinsert(attrs2,
+                    makeBind(toATerm(*i), attrs.get(toATerm(*i)), makeNoPos()));
+
+            return makeAttrs(attrs2);
+        }
+        
+        return e;
+    }
+};
+
+
+Expr canonicaliseExpr(Expr & e)
+{
+    Canonicalise canonicalise;
+    return bottomupRewrite(canonicalise, e);
+}
+
+
 Expr makeBool(bool b)
 {
     return b ? eTrue : eFalse;

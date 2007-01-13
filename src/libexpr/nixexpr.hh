@@ -94,6 +94,11 @@ Expr substitute(const Substitution & subs, Expr e);
 void checkVarDefs(const ATermMap & def, Expr e);
 
 
+/* Canonicalise a Nix expression by sorting attributes and removing
+   location information. */
+Expr canonicaliseExpr(Expr & e);
+
+
 /* Create an expression representing a boolean. */
 Expr makeBool(bool b);
 
