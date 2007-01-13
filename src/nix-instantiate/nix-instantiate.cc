@@ -64,16 +64,19 @@ static void printResult(EvalState & state, Expr e,
 }
 
 
-Expr doEval(EvalState & state, string attrPath, bool parseOnly, bool strict,
-    const ATermMap & autoArgs, Expr e)
+void processExpr(EvalState & state, const Strings & attrPaths,
+    bool parseOnly, bool strict, const ATermMap & autoArgs,
+    bool evalOnly, bool xmlOutput, Expr e)
 {
-    e = findAlongAttrPath(state, attrPath, autoArgs, e);
-    if (!parseOnly)
-        if (strict)
-            e = strictEvalExpr(state, e);
-        else
-            e = evalExpr(state, e);
-    return e;
+    for (Strings::const_iterator i = attrPaths.begin(); i != attrPaths.end(); ++i) {
+        Expr e2 = findAlongAttrPath(state, *i, autoArgs, e);
+        if (!parseOnly)
+            if (strict)
+                e2 = strictEvalExpr(state, e2);
+            else
+                e2 = evalExpr(state, e2);
+        printResult(state, e2, evalOnly, xmlOutput, autoArgs);
+    }
 }
 
 
@@ -86,7 +89,7 @@ void run(Strings args)
     bool parseOnly = false;
     bool xmlOutput = false;
     bool strict = false;
-    string attrPath;
+    Strings attrPaths;
     ATermMap autoArgs(128);
 
     for (Strings::iterator i = args.begin();
@@ -107,7 +110,7 @@ void run(Strings args)
         else if (arg == "--attr" || arg == "-A") {
             if (i == args.end())
                 throw UsageError("`--attr' requires an argument");
-            attrPath = *i++;
+            attrPaths.push_back(*i++);
         }
         else if (arg == "--arg") {
             if (i == args.end())
@@ -135,12 +138,14 @@ void run(Strings args)
             files.push_back(arg);
     }
 
+    if (attrPaths.empty()) attrPaths.push_back("");
+
     store = openStore();
 
     if (readStdin) {
         Expr e = parseStdin(state);
-        e = doEval(state, attrPath, parseOnly, strict, autoArgs, e);
-        printResult(state, e, evalOnly, xmlOutput, autoArgs);
+        processExpr(state, attrPaths, parseOnly, strict, autoArgs,
+            evalOnly, xmlOutput, e);
     }
 
     for (Strings::iterator i = files.begin();
@@ -148,8 +153,8 @@ void run(Strings args)
     {
         Path path = absPath(*i);
         Expr e = parseExprFromFile(state, path);
-        e = doEval(state, attrPath, parseOnly, strict, autoArgs, e);
-        printResult(state, e, evalOnly, xmlOutput, autoArgs);
+        processExpr(state, attrPaths, parseOnly, strict, autoArgs,
+            evalOnly, xmlOutput, e);
     }
 
     printEvalStats(state);
