@@ -85,12 +85,6 @@ void initDerivationsHelpers();
    processor. */
 static void initAndRun(int argc, char * * argv)
 {
-    string root = getEnv("NIX_ROOT");
-    if (root != "") {
-        if (chroot(root.c_str()) != 0)
-            throw SysError(format("changing root to `%1%'") % root);
-    }
-    
     /* Setup Nix paths. */
     nixStore = canonPath(getEnv("NIX_STORE_DIR", getEnv("NIX_STORE", NIX_STORE_DIR)));
     nixDataDir = canonPath(getEnv("NIX_DATA_DIR", NIX_DATA_DIR));

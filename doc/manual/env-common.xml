@@ -10,17 +10,6 @@
 <variablelist>
 
   
-<varlistentry><term><envar>NIX_ROOT</envar></term>
-
-  <listitem><para>If <envar>NIX_ROOT</envar> is set, the Nix command
-  will on startup perform a <function>chroot()</function> to the
-  specified directory.  This is useful in certain bootstrapping
-  situations (e.g., when installing a Nix installation onto a hard
-  disk from CD-ROM).</para></listitem>
-
-</varlistentry>
-
-  
 <varlistentry><term><envar>NIX_IGNORE_SYMLINK_STORE</envar></term>
 
   <listitem>

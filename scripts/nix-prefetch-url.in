@@ -3,9 +3,6 @@
 url=$1
 expHash=$2
 
-# to prevent doing more than 1 chroot
-unset NIX_ROOT
-
 # needed to make it work on NixOS
 export PATH=$PATH:@coreutils@
 
