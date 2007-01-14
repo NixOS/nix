@@ -709,7 +709,7 @@ void deleteFromStore(const Path & _path, unsigned long long & bytesFreed)
         for (PathSet::iterator i = referrers.begin();
              i != referrers.end(); ++i)
             if (*i != path && isValidPathTxn(txn, *i))
-                throw Error(format("cannot delete path `%1%' because it is in use by path `%2%'") % path % *i);
+                throw PathInUse(format("cannot delete path `%1%' because it is in use by path `%2%'") % path % *i);
         invalidatePath(txn, path);
     }
     txn.commit();

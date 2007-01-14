@@ -138,6 +138,8 @@ Path queryDeriver(const Transaction & txn, const Path & path);
 /* Delete a value from the nixStore directory. */
 void deleteFromStore(const Path & path, unsigned long long & bytesFreed);
 
+MakeError(PathInUse, Error);
+
 void verifyStore(bool checkContents);
 
 /* Whether we are in build users mode. */

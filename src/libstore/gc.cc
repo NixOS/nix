@@ -599,9 +599,13 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
             printMsg(lvlInfo, format("deleting `%1%'") % *i);
             
             /* Okay, it's safe to delete. */
-            unsigned long long freed;
-            deleteFromStore(*i, freed);
-            bytesFreed += freed;
+            try {
+                unsigned long long freed;
+                deleteFromStore(*i, freed);
+                bytesFreed += freed;
+            } catch (PathInUse & e) {
+                printMsg(lvlError, format("warning: %1%") % e.msg());
+            }
 
 #ifndef __CYGWIN__
             if (fdLock != -1)
