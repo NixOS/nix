@@ -46,5 +46,5 @@ EXTRA_DIST = $(TESTS) \
   gc-runtime.nix.in gc-runtime.builder.sh \
   check-refs.nix.in \
   filter-source.nix.in \
-  $(wildcard lang/*.nix) $(wildcard lang/*.exp) $(wildcard lang/*.exp.xml) \
+  $(wildcard lang/*.nix) $(wildcard lang/*.exp) $(wildcard lang/*.exp.xml) $(wildcard lang/*.flags) \
   common.sh.in
