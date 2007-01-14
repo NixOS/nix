@@ -31,7 +31,7 @@ extern bool setuidMode;
 
 extern volatile ::sig_atomic_t blockInt;
 
-MakeError(UsageError, nix::Error)
+MakeError(UsageError, nix::Error);
 
 }
 

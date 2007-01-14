@@ -10,6 +10,7 @@
 #include "get-drvs.hh"
 #include "attr-path.hh"
 #include "pathlocks.hh"
+#include "common-opts.hh"
 #include "xml-writer.hh"
 #include "store-api.hh"
 #include "db.hh"
@@ -45,7 +46,7 @@ struct InstallSourceInfo
     Path profile; /* for srcProfile */
     string systemFilter; /* for srcNixExprDrvs */
     ATermMap autoArgs;
-    InstallSourceInfo() : autoArgs(128) { };
+    InstallSourceInfo() : autoArgs() { };
 };
 
 
@@ -1122,10 +1123,9 @@ static void opDefaultExpr(Globals & globals,
 static string needArg(Strings::iterator & i,
     Strings & args, const string & arg)
 {
-    ++i;
     if (i == args.end()) throw UsageError(
         format("`%1%' requires an argument") % arg);
-    return *i;
+    return *i++;
 }
 
 
@@ -1146,8 +1146,8 @@ void run(Strings args)
     globals.keepDerivations =
         queryBoolSetting("env-keep-derivations", false);
     
-    for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
-        string arg = *i;
+    for (Strings::iterator i = args.begin(); i != args.end(); ) {
+        string arg = *i++;
 
         Operation oldOp = op;
 
@@ -1161,16 +1161,9 @@ void run(Strings args)
         }
         else if (arg == "--attr" || arg == "-A")
             globals.instSource.type = srcAttrPath;
-        else if (arg == "--arg") { /* !!! code duplication from nix-instantiate */
-            i++;
-            if (i == args.end())
-                throw UsageError("`--arg' requires two arguments");
-            string name = *i++;
-            if (i == args.end())
-                throw UsageError("`--arg' requires two arguments");
-            Expr value = parseExprFromString(globals.state, *i, absPath("."));
-            globals.instSource.autoArgs.set(toATerm(name), value);
-        }
+        else if (parseOptionArg(arg, i, args.end(),
+                     globals.state, globals.instSource.autoArgs))
+            ;
         else if (arg == "--force-name") // undocumented flag for nix-install-package
             globals.forceName = needArg(i, args, arg);
         else if (arg == "--uninstall" || arg == "-e")

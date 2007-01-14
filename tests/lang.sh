@@ -40,7 +40,11 @@ for i in lang/eval-okay-*.nix; do
     i=$(basename $i .nix)
 
     if test -e lang/$i.exp; then
-        if ! $nixinstantiate --eval-only lang/$i.nix > lang/$i.out; then
+        flags=
+        if test -e lang/$i.flags; then
+            flags=$(cat lang/$i.flags)
+        fi
+        if ! $nixinstantiate $flags --eval-only lang/$i.nix > lang/$i.out; then
             echo "FAIL: $i should evaluate"
             fail=1
         elif ! $aterm_bin/atdiff lang/$i.out lang/$i.exp; then

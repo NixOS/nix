@@ -50,6 +50,9 @@
   <option>--set</option>.</para></listitem>
   
 
+  <listitem><para>TODO: <option>--argstr</option>.</para></listitem>
+  
+
   <listitem><para>TODO: new built-ins
   <function>builtins.attrNames</function>,
   <function>builtins.filterSource</function>.</para></listitem>

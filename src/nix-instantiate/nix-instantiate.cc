@@ -10,6 +10,7 @@
 #include "expr-to-xml.hh"
 #include "util.hh"
 #include "store-api.hh"
+#include "common-opts.hh"
 #include "help.txt.hh"
 
 
@@ -112,15 +113,8 @@ void run(Strings args)
                 throw UsageError("`--attr' requires an argument");
             attrPaths.push_back(*i++);
         }
-        else if (arg == "--arg") {
-            if (i == args.end())
-                throw UsageError("`--arg' requires two arguments");
-            string name = *i++;
-            if (i == args.end())
-                throw UsageError("`--arg' requires two arguments");
-            Expr value = parseExprFromString(state, *i++, absPath("."));
-            autoArgs.set(toATerm(name), value);
-        }
+        else if (parseOptionArg(arg, i, args.end(), state, autoArgs))
+            ;
         else if (arg == "--add-root") {
             if (i == args.end())
                 throw UsageError("`--add-root' requires an argument");
