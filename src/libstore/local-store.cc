@@ -722,6 +722,9 @@ void verifyStore(bool checkContents)
 {
     Transaction txn(nixDB);
 
+    
+    printMsg(lvlInfo, "checking path existence");
+
     Paths paths;
     PathSet validPaths;
     nixDB.enumTable(txn, dbValidPaths, paths);
@@ -748,9 +751,12 @@ void verifyStore(bool checkContents)
         }
     }
 
-    /* "Usable" paths are those that are valid or have a
+
+    printMsg(lvlInfo, "checking path realisability");
+    
+    /* "Realisable" paths are those that are valid or have a
        substitute. */
-    PathSet usablePaths(validPaths);
+    PathSet realisablePaths(validPaths);
 
     /* Check that the values of the substitute mappings are valid
        paths. */ 
@@ -759,47 +765,52 @@ void verifyStore(bool checkContents)
     for (Paths::iterator i = subKeys.begin(); i != subKeys.end(); ++i) {
         Substitutes subs = readSubstitutes(txn, *i);
         if (!isStorePath(*i)) {
-            printMsg(lvlError, format("found substitutes for non-store path `%1%'") % *i);
+            printMsg(lvlError, format("removing substitutes for non-store path `%1%'") % *i);
             nixDB.delPair(txn, dbSubstitutes, *i);
         }
         else if (subs.size() == 0)
             nixDB.delPair(txn, dbSubstitutes, *i);
         else
-	    usablePaths.insert(*i);
+	    realisablePaths.insert(*i);
     }
+    
 
-    /* Check the cleanup invariant: only usable paths can have
+    /* Check the cleanup invariant: only realisable paths can have
        `references', `referrers', or `derivers' entries. */
 
+
     /* Check the `derivers' table. */
+    printMsg(lvlInfo, "checking the derivers table");
     Paths deriversKeys;
     nixDB.enumTable(txn, dbDerivers, deriversKeys);
     for (Paths::iterator i = deriversKeys.begin();
          i != deriversKeys.end(); ++i)
     {
-        if (usablePaths.find(*i) == usablePaths.end()) {
-            printMsg(lvlError, format("found deriver entry for unusable path `%1%'")
+        if (realisablePaths.find(*i) == realisablePaths.end()) {
+            printMsg(lvlError, format("removing deriver entry for unrealisable path `%1%'")
                 % *i);
             nixDB.delPair(txn, dbDerivers, *i);
         }
         else {
             Path deriver = queryDeriver(txn, *i);
             if (!isStorePath(deriver)) {
-                printMsg(lvlError, format("found corrupt deriver `%1%' for `%2%'")
+                printMsg(lvlError, format("removing corrupt deriver `%1%' for `%2%'")
                     % deriver % *i);
                 nixDB.delPair(txn, dbDerivers, *i);
             }
         }
     }
 
+
     /* Check the `references' table. */
+    printMsg(lvlInfo, "checking the references table");
     Paths referencesKeys;
     nixDB.enumTable(txn, dbReferences, referencesKeys);
     for (Paths::iterator i = referencesKeys.begin();
          i != referencesKeys.end(); ++i)
     {
-        if (usablePaths.find(*i) == usablePaths.end()) {
-            printMsg(lvlError, format("found references entry for unusable path `%1%'")
+        if (realisablePaths.find(*i) == realisablePaths.end()) {
+            printMsg(lvlError, format("removing references entry for unrealisable path `%1%'")
                 % *i);
             setReferences(txn, *i, PathSet());
         }
@@ -812,7 +823,7 @@ void verifyStore(bool checkContents)
             {
                 string dummy;
                 if (!nixDB.queryString(txn, dbReferrers, addPrefix(*j, *i), dummy)) {
-                    printMsg(lvlError, format("missing referrer mapping from `%1%' to `%2%'")
+                    printMsg(lvlError, format("adding missing referrer mapping from `%1%' to `%2%'")
                         % *j % *i);
                     nixDB.setString(txn, dbReferrers, addPrefix(*j, *i), "");
                 }
@@ -824,45 +835,48 @@ void verifyStore(bool checkContents)
         }
     }
 
-#if 0 // !!!
     /* Check the `referrers' table. */
-    Paths referrersKeys;
-    nixDB.enumTable(txn, dbReferrers, referrersKeys);
-    for (Paths::iterator i = referrersKeys.begin();
-         i != referrersKeys.end(); ++i)
-    {
-        if (usablePaths.find(*i) == usablePaths.end()) {
-            printMsg(lvlError, format("found referrers entry for unusable path `%1%'")
-                % *i);
+    printMsg(lvlInfo, "checking the referrers table");
+    Strings referrers;
+    nixDB.enumTable(txn, dbReferrers, referrers);
+    for (Strings::iterator i = referrers.begin(); i != referrers.end(); ++i) {
+
+        /* Decode the entry (it's a tuple of paths). */
+        string::size_type nul = i->find((char) 0);
+        if (nul == string::npos) {
+            printMsg(lvlError, format("removing bad referrer table entry `%1%'") % *i);
+            nixDB.delPair(txn, dbReferrers, *i);
+            continue;
+        }
+        Path to(*i, 0, nul);
+        Path from(*i, nul + 1);
+        
+        if (realisablePaths.find(to) == realisablePaths.end()) {
+            printMsg(lvlError, format("removing referrer entry from `%1%' to unrealisable `%2%'")
+                % from % to);
             nixDB.delPair(txn, dbReferrers, *i);
         }
-        else {
-            PathSet referrers, newReferrers;
-            queryReferrers(txn, *i, referrers);
-            for (PathSet::iterator j = referrers.begin();
-                 j != referrers.end(); ++j)
-            {
-                Paths references;
-                if (usablePaths.find(*j) == usablePaths.end()) {
-                    printMsg(lvlError, format("referrer mapping from `%1%' to unusable `%2%'")
-                        % *i % *j);
-                } else {
-                    nixDB.queryStrings(txn, dbReferences, *j, references);
-                    if (find(references.begin(), references.end(), *i) == references.end()) {
-                        printMsg(lvlError, format("missing reference mapping from `%1%' to `%2%'")
-                            % *j % *i);
-                        /* !!! repair by inserting *i into references */
-                    }
-                    else newReferrers.insert(*j);
-                }
-            }
-            if (referrers != newReferrers)
-                nixDB.setStrings(txn, dbReferrers, *i,
-                    Paths(newReferrers.begin(), newReferrers.end()));
-        }
-    }
-#endif    
 
+        else if (realisablePaths.find(from) == realisablePaths.end()) {
+            printMsg(lvlError, format("removing referrer entry from unrealisable `%1%' to `%2%'")
+                % from % to);
+            nixDB.delPair(txn, dbReferrers, *i);
+        }
+        
+        else {
+            PathSet references;
+            queryReferences(txn, from, references);
+            if (find(references.begin(), references.end(), to) == references.end()) {
+                printMsg(lvlError, format("adding missing referrer mapping from `%1%' to `%2%'")
+                    % from % to);
+                references.insert(to);
+                setReferences(txn, from, references);
+            }
+        }
+        
+    }
+
+    
     txn.commit();
 }
 
