@@ -7,6 +7,10 @@
 #include "expr-to-xml.hh"
 #include "nixexpr-ast.hh"
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <algorithm>
 
 
@@ -739,7 +743,20 @@ struct FilterFromExpr : PathFilter
 
     bool operator () (const Path & path)
     {
-        Expr call = makeCall(filter, makePath(toATerm(path)));
+        struct stat st;
+        if (lstat(path.c_str(), &st))
+            throw SysError(format("getting attributes of path `%1%'") % path);
+
+        Expr call =
+            makeCall(
+                makeCall(filter, makePath(toATerm(path))),
+                makeStr(
+                    S_ISREG(st.st_mode) ? "regular" :
+                    S_ISDIR(st.st_mode) ? "directory" :
+                    S_ISLNK(st.st_mode) ? "symlink" :
+                    "unknown" /* not supported, will fail! */
+                    ));
+                
         return evalBool(state, call);
     }
 };
