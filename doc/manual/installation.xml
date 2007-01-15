@@ -205,6 +205,21 @@ on systems that have the <function>setresuid()</function> system call
 (such as Linux and FreeBSD), so on those systems the binaries are
 simply owned by the Nix user.</para></warning>
 
+
+
+<!--
+
+warning: the nix-builders group should contain *only* the Nix
+builders, and nothing else.  If the Nix account is compromised, you
+can execute programs under the accounts in the nix-builders group, so
+it obviously shouldn’t contain any “real” user accounts.  So don’t use
+an existing group like <literal>users</literal> — just create a new
+one.
+
+-->
+
+
+
 </section>
 
 </section>

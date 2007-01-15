@@ -369,9 +369,12 @@ Expr parseExprFromFile(EvalState & state, Path path)
     /* If `path' is a symlink, follow it.  This is so that relative
        path references work. */
     struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError(format("getting status of `%1%'") % path);
-    if (S_ISLNK(st.st_mode)) path = absPath(readLink(path), dirOf(path));
+    while (true) {
+        if (lstat(path.c_str(), &st))
+            throw SysError(format("getting status of `%1%'") % path);
+        if (!S_ISLNK(st.st_mode)) break;
+        path = absPath(readLink(path), dirOf(path));
+    }
 
     /* If `path' refers to a directory, append `/default.nix'. */
     if (stat(path.c_str(), &st))

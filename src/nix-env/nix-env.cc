@@ -1113,10 +1113,7 @@ static void opDefaultExpr(Globals & globals,
     if (opArgs.size() != 1)
         throw UsageError(format("exactly one argument expected"));
 
-    Path defNixExpr = absPath(opArgs.front());
-    Path defNixExprLink = getDefNixExprPath();
-    
-    switchLink(defNixExprLink, defNixExpr);
+    switchLink(getDefNixExprPath(), absPath(opArgs.front()));
 }
 
 
