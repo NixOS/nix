@@ -8,7 +8,7 @@ export PATH=$PATH:@coreutils@
 
 hashType=$NIX_HASH_ALGO
 if test -z "$hashType"; then
-    hashType=md5
+    hashType=sha256
 fi
 
 hashFormat=
