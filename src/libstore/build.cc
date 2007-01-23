@@ -1411,11 +1411,19 @@ void DerivationGoal::startBuilder()
         throw BuildError(format("odd number of tokens in `exportReferencesGraph': `%1%'") % s);
     for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
         string fileName = *i++;
-        Path storePath = *i++;
-        if (!store->isValidPath(storePath))
-            throw BuildError(format("`exportReferencesGraph' refers to an invalid path `%1%'")
-                % storePath);
         checkStoreName(fileName); /* !!! abuse of this function */
+
+        /* Check that the store path is valid. */
+        Path storePath = *i++;
+        if (!isInStore(storePath))
+            throw BuildError(format("`exportReferencesGraph' contains a non-store path `%1%'")
+                % storePath);
+        storePath = toStorePath(storePath);
+        if (!store->isValidPath(storePath))
+            throw BuildError(format("`exportReferencesGraph' contains an invalid path `%1%'")
+                % storePath);
+
+        /* Write closure info to `fileName'. */
         PathSet refs;
         computeFSClosure(storePath, refs);
         /* !!! in secure Nix, the writing should be done on the
