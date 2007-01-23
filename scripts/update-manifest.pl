@@ -9,9 +9,8 @@ my $cache = $ARGV[0];
 my $manifest = $ARGV[1];
 my %narFiles;
 my %patches;
-my %successors;
 
-readManifest $manifest, \%narFiles, \%patches, \%successors;
+readManifest $manifest, \%narFiles, \%patches;
 
 foreach my $storePath (keys %narFiles) {
     my $narFileList = $narFiles{$storePath};
@@ -50,4 +49,4 @@ if (! -e "$manifest.backup") {
     system "mv --reply=no '$manifest' '$manifest.backup'";
 }
 
-writeManifest $manifest, \%narFiles, \%patches, \%successors;
+writeManifest $manifest, \%narFiles, \%patches;

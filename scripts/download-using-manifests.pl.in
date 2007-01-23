@@ -35,11 +35,10 @@ print "\n*** Trying to download/patch `$targetPath'\n";
 # Load all manifests.
 my %narFiles;
 my %patches;
-my %successors;
 
 for my $manifest (glob "$manifestDir/*.nixmanifest") {
 #    print STDERR "reading $manifest\n";
-    if (readManifest($manifest, \%narFiles, \%patches, \%successors) < 3) {
+    if (readManifest($manifest, \%narFiles, \%patches) < 3) {
         print STDERR "you have an old-style manifest `$manifest'; please delete it\n";
         exit 1;
     }

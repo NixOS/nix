@@ -7,11 +7,10 @@ use readcache;
 
 my %allNarFiles;
 my %allPatches;
-my %allSuccessors;
 
 foreach my $manifest (glob "/data/webserver/dist/*/*/MANIFEST") {
     print STDERR "loading $manifest\n";
-    readManifest($manifest, \%allNarFiles, \%allPatches, \%allSuccessors, 1);
+    readManifest($manifest, \%allNarFiles, \%allPatches, 1);
 }
 
 
@@ -22,9 +21,8 @@ foreach my $manifest (@ARGV) {
 
     my %narFiles;
     my %patches;
-    my %successors;
 
-    if (readManifest($manifest, \%narFiles, \%patches, \%successors, 1) < 3) {
+    if (readManifest($manifest, \%narFiles, \%patches, 1) < 3) {
         print STDERR "manifest `$manifest' is too old (i.e., for Nix <= 0.7)\n";
 	next;
     }

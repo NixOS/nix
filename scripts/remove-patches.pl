@@ -7,13 +7,12 @@ for my $p (@ARGV) {
 
     my %narFiles;
     my %patches;
-    my %successors;
 
     readManifest $p,
-        \%narFiles, \%patches, \%successors;
+        \%narFiles, \%patches;
 
     %patches = ();
     
     writeManifest $p,
-        \%narFiles, \%patches, \%successors;
+        \%narFiles, \%patches;
 }

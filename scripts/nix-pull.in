@@ -29,7 +29,6 @@ umask 0022;
 # Process the URLs specified on the command line.
 my %narFiles;
 my %patches;
-my %successors;
 
 my $skipWrongStore = 0;
 
@@ -43,7 +42,7 @@ sub processURL {
            "'$url' > '$manifest'") == 0
            or die "curl failed: $?";
 
-    if (readManifest($manifest, \%narFiles, \%patches, \%successors) < 3) {
+    if (readManifest($manifest, \%narFiles, \%patches) < 3) {
         die "manifest `$url' is too old (i.e., for Nix <= 0.7)\n";
     }
 

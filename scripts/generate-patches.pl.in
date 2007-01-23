@@ -29,22 +29,19 @@ print "TEMP = $tmpDir\n";
 
 my %srcNarFiles;
 my %srcPatches;
-my %srcSuccessors;
 
 my %dstNarFiles;
 my %dstPatches;
-my %dstSuccessors;
 
 readManifest "$srcDir/MANIFEST",
-    \%srcNarFiles, \%srcPatches, \%srcSuccessors;
+    \%srcNarFiles, \%srcPatches;
 
 readManifest "$dstDir/MANIFEST",
-    \%dstNarFiles, \%dstPatches, \%dstSuccessors;
+    \%dstNarFiles, \%dstPatches;
 
 
 sub findOutputPaths {
     my $narFiles = shift;
-    my $successors = shift;
 
     my %outPaths;
     
@@ -69,10 +66,10 @@ sub findOutputPaths {
 }
 
 print "finding src output paths...\n";
-my %srcOutPaths = findOutputPaths \%srcNarFiles, \%srcSuccessors;
+my %srcOutPaths = findOutputPaths \%srcNarFiles;
 
 print "finding dst output paths...\n";
-my %dstOutPaths = findOutputPaths \%dstNarFiles, \%dstSuccessors;
+my %dstOutPaths = findOutputPaths \%dstNarFiles;
 
 
 sub getNameVersion {
@@ -400,4 +397,4 @@ do {
 
 # Rewrite the manifest of the destination (with the new patches).
 writeManifest "$dstDir/MANIFEST",
-    \%dstNarFiles, \%dstPatches, \%dstSuccessors;
+    \%dstNarFiles, \%dstPatches;
