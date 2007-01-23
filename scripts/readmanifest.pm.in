@@ -34,6 +34,7 @@ sub addPatch {
 sub readManifest {
     my $manifest = shift;
     my $narFiles = shift;
+    my $localPaths = shift;
     my $patches = shift;
     my $allowConflicts = shift;
     $allowConflicts = 0 unless defined $allowConflicts;
@@ -57,6 +58,7 @@ sub readManifest {
     my $references;
     my $deriver;
     my $hashAlgo;
+    my $copyFrom;
 
     while (<MANIFEST>) {
         chomp;
@@ -125,9 +127,25 @@ sub readManifest {
                         }, $allowConflicts;
                 }
 
+                elsif ($type eq "localPath") {
+
+                    $$localPaths{$storePath} = []
+                        unless defined $$localPaths{$storePath};
+
+                    my $localPathsList = $$localPaths{$storePath};
+
+                    # !!! remove duplicates
+                    
+                    push @{$localPathsList},
+                        { copyFrom => $copyFrom, references => $references
+                        , deriver => ""
+                        };
+                }
+
             }
             
             elsif (/^\s*StorePath:\s*(\/\S+)\s*$/) { $storePath = $1; }
+            elsif (/^\s*CopyFrom:\s*(\/\S+)\s*$/) { $copyFrom = $1; }
             elsif (/^\s*Hash:\s*(\S+)\s*$/) { $hash = $1; }
             elsif (/^\s*URL:\s*(\S+)\s*$/) { $url = $1; }
             elsif (/^\s*Size:\s*(\d+)\s*$/) { $size = $1; }
@@ -158,6 +176,7 @@ sub writeManifest
     my $manifest = shift;
     my $narFiles = shift;
     my $patches = shift;
+    my $copySources = shift;
 
     open MANIFEST, ">$manifest.tmp"; # !!! check exclusive
 

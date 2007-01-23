@@ -6,11 +6,12 @@ use readcache;
 
 
 my %allNarFiles;
+my %allLocalPaths;
 my %allPatches;
 
 foreach my $manifest (glob "/data/webserver/dist/*/*/MANIFEST") {
     print STDERR "loading $manifest\n";
-    readManifest($manifest, \%allNarFiles, \%allPatches, 1);
+    readManifest($manifest, \%allNarFiles, \%allLocalPaths, \%allPatches, 1);
 }
 
 

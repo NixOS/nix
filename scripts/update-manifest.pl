@@ -8,9 +8,10 @@ die unless scalar @ARGV == 2;
 my $cache = $ARGV[0];
 my $manifest = $ARGV[1];
 my %narFiles;
+my %localPaths;
 my %patches;
 
-readManifest $manifest, \%narFiles, \%patches;
+readManifest $manifest, \%narFiles, \%localPaths, \%patches;
 
 foreach my $storePath (keys %narFiles) {
     my $narFileList = $narFiles{$storePath};

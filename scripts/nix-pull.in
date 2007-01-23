@@ -28,6 +28,7 @@ umask 0022;
 
 # Process the URLs specified on the command line.
 my %narFiles;
+my %localPaths;
 my %patches;
 
 my $skipWrongStore = 0;
@@ -42,7 +43,7 @@ sub processURL {
            "'$url' > '$manifest'") == 0
            or die "curl failed: $?";
 
-    if (readManifest($manifest, \%narFiles, \%patches) < 3) {
+    if (readManifest($manifest, \%narFiles, \%localPaths, \%patches) < 3) {
         die "manifest `$url' is too old (i.e., for Nix <= 0.7)\n";
     }
 
@@ -80,7 +81,7 @@ while (@ARGV) {
 }
 
 
-my $size = scalar (keys %narFiles);
+my $size = scalar (keys %narFiles) + scalar (keys %localPaths);
 print "$size store paths in manifest\n";
 
 
@@ -90,19 +91,32 @@ print STDERR "registering substitutes...\n";
 my $pid = open(WRITE, "|$binDir/nix-store --register-substitutes")
     or die "cannot run nix-store";
 
+sub writeRegistration {
+    my $storePath = shift;
+    my $object = shift;
+    print WRITE "$storePath\n";
+    print WRITE "$object->{deriver}\n";
+    print WRITE "$libexecDir/nix/download-using-manifests.pl\n";
+    print WRITE "0\n";
+    my @references = split " ", $object->{references};
+    my $count = scalar @references;
+    print WRITE "$count\n";
+    foreach my $reference (@references) {
+        print WRITE "$reference\n";
+    }
+}
+
 foreach my $storePath (keys %narFiles) {
     my $narFileList = $narFiles{$storePath};
     foreach my $narFile (@{$narFileList}) {
-        print WRITE "$storePath\n";
-        print WRITE "$narFile->{deriver}\n";
-        print WRITE "$libexecDir/nix/download-using-manifests.pl\n";
-        print WRITE "0\n";
-        my @references = split " ", $narFile->{references};
-        my $count = scalar @references;
-        print WRITE "$count\n";
-        foreach my $reference (@references) {
-            print WRITE "$reference\n";
-        }
+        writeRegistration $storePath, $narFile;
+    }
+}
+
+foreach my $storePath (keys %localPaths) {
+    my $localPathList = $localPaths{$storePath};
+    foreach my $localPath (@{$localPathList}) {
+        writeRegistration $storePath, $localPath;
     }
 }
 

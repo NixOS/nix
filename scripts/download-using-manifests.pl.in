@@ -34,13 +34,27 @@ print "\n*** Trying to download/patch `$targetPath'\n";
 
 # Load all manifests.
 my %narFiles;
+my %localPaths;
 my %patches;
 
 for my $manifest (glob "$manifestDir/*.nixmanifest") {
 #    print STDERR "reading $manifest\n";
-    if (readManifest($manifest, \%narFiles, \%patches) < 3) {
+    if (readManifest($manifest, \%narFiles, \%localPaths, \%patches) < 3) {
         print STDERR "you have an old-style manifest `$manifest'; please delete it\n";
         exit 1;
+    }
+}
+
+
+# If we can copy from a local path, do that.
+my $localPathList = $localPaths{$targetPath};
+foreach my $localPath (@{$localPathList}) {
+    my $sourcePath = $localPath->{copyFrom};
+    if (-e $sourcePath) {
+        print "\n*** Step 1/1: copying from $sourcePath\n";
+        system("@bindir@/nix-store --dump $sourcePath | @bindir@/nix-store --restore $targetPath") == 0
+            or die "cannot copy `$sourcePath' to `$targetPath'";
+        exit 0;
     }
 }
 

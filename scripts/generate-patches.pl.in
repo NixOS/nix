@@ -28,16 +28,18 @@ print "TEMP = $tmpDir\n";
 #END { rmdir $tmpDir; }
 
 my %srcNarFiles;
+my %srcLocalPaths;
 my %srcPatches;
 
 my %dstNarFiles;
+my %dstLocalPaths;
 my %dstPatches;
 
 readManifest "$srcDir/MANIFEST",
-    \%srcNarFiles, \%srcPatches;
+    \%srcNarFiles, \%srcLocalPaths, \%srcPatches;
 
 readManifest "$dstDir/MANIFEST",
-    \%dstNarFiles, \%dstPatches;
+    \%dstNarFiles, \%dstLocalPaths, \%dstPatches;
 
 
 sub findOutputPaths {
