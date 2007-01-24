@@ -128,8 +128,15 @@ static void runBuilder(uid_t uidNix, gid_t gidBuildUsers,
     for (int i = 0; i < argc; ++i)
         args.push_back(argv[i]);
     args.push_back(0);
+
+    environ = env;
+
+    /* Glibc clears TMPDIR in setuid programs (see
+       sysdeps/generic/unsecvars.h in the Glibc sources), so bring it
+       back. */
+    setenv("TMPDIR", getenv("NIX_BUILD_TOP"), 1);
     
-    if (execve(program.c_str(), (char * *) &args[0], env) == -1)
+    if (execv(program.c_str(), (char * *) &args[0]) == -1)
         throw SysError(format("cannot execute `%1%'") % program);
 }
 
