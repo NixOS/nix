@@ -624,7 +624,7 @@ static Expr prim_toFile(EvalState & state, const ATermVector & args)
     }
     
     Path storePath = readOnlyMode
-        ? computeStorePathForText(name, contents)
+        ? computeStorePathForText(name, contents, refs)
         : store->addTextToStore(name, contents, refs);
 
     /* Note: we don't need to add `context' to the context of the

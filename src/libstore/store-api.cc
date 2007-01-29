@@ -73,6 +73,8 @@ Path makeStorePath(const string & type,
     string s = type + ":sha256:" + printHash(hash) + ":"
         + nixStore + ":" + suffix;
 
+    printMsg(lvlError, s);
+    
     checkStoreName(suffix);
 
     return nixStore + "/"
@@ -114,10 +116,19 @@ std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
 }
 
 
-Path computeStorePathForText(const string & suffix, const string & s)
+Path computeStorePathForText(const string & suffix, const string & s,
+    const PathSet & references)
 {
     Hash hash = hashString(htSHA256, s);
-    return makeStorePath("text", hash, suffix);
+    /* Stuff the references (if any) into the type.  This is a bit
+       hacky, but we can't put them in `s' since that would be
+       ambiguous. */
+    string type = "text";
+    for (PathSet::const_iterator i = references.begin(); i != references.end(); ++i) {
+        type += ":";
+        type += *i;
+    }
+    return makeStorePath(type, hash, suffix);
 }
 
 

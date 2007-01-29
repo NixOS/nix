@@ -215,7 +215,8 @@ std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
    simply yield a different store path, so other users wouldn't be
    affected), but it has some backwards compatibility issues (the
    hashing scheme changes), so I'm not doing that for now. */
-Path computeStorePathForText(const string & suffix, const string & s);
+Path computeStorePathForText(const string & suffix, const string & s,
+    const PathSet & references);
 
 
 /* Remove the temporary roots file for this process.  Any temporary

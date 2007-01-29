@@ -667,7 +667,7 @@ Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
 Path LocalStore::addTextToStore(const string & suffix, const string & s,
     const PathSet & references)
 {
-    Path dstPath = computeStorePathForText(suffix, s);
+    Path dstPath = computeStorePathForText(suffix, s, references);
     
     addTempRoot(dstPath);
 

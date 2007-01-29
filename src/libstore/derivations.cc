@@ -29,7 +29,7 @@ Path writeDerivation(const Derivation & drv, const string & name)
     string suffix = name + drvExtension;
     string contents = atPrint(unparseDerivation(drv));
     return readOnlyMode
-        ? computeStorePathForText(suffix, contents)
+        ? computeStorePathForText(suffix, contents, references)
         : store->addTextToStore(suffix, contents, references);
 }
 
