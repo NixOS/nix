@@ -22,7 +22,7 @@ namespace nix {
  *************************************************************/
 
 
-static Expr primBuiltins(EvalState & state, const ATermVector & args)
+static Expr prim_builtins(EvalState & state, const ATermVector & args)
 {
     /* Return an attribute set containing all primops.  This allows
        Nix expressions to test for new primops and take appropriate
@@ -47,20 +47,20 @@ static Expr primBuiltins(EvalState & state, const ATermVector & args)
 
 
 /* Boolean constructors. */
-static Expr primTrue(EvalState & state, const ATermVector & args)
+static Expr prim_true(EvalState & state, const ATermVector & args)
 {
     return eTrue;
 }
 
 
-static Expr primFalse(EvalState & state, const ATermVector & args)
+static Expr prim_false(EvalState & state, const ATermVector & args)
 {
     return eFalse;
 }
 
 
 /* Return the null value. */
-static Expr primNull(EvalState & state, const ATermVector & args)
+static Expr prim_null(EvalState & state, const ATermVector & args)
 {
     return makeNull();
 }
@@ -70,13 +70,13 @@ static Expr primNull(EvalState & state, const ATermVector & args)
    that differs between platforms, so Nix expressions using
    `__currentSystem' can evaluate to different values on different
    platforms. */
-static Expr primCurrentSystem(EvalState & state, const ATermVector & args)
+static Expr prim_currentSystem(EvalState & state, const ATermVector & args)
 {
     return makeStr(thisSystem);
 }
 
 
-static Expr primCurrentTime(EvalState & state, const ATermVector & args)
+static Expr prim_currentTime(EvalState & state, const ATermVector & args)
 {
     return ATmake("Int(<int>)", time(0));
 }
@@ -89,7 +89,7 @@ static Expr primCurrentTime(EvalState & state, const ATermVector & args)
 
 /* Load and evaluate an expression from path specified by the
    argument. */ 
-static Expr primImport(EvalState & state, const ATermVector & args)
+static Expr prim_import(EvalState & state, const ATermVector & args)
 {
     PathSet context;
     Path path = coerceToPath(state, args[0], context);
@@ -107,19 +107,8 @@ static Expr primImport(EvalState & state, const ATermVector & args)
 }
 
 
-/* Convert the argument to a string.  Paths are *not* copied to the
-   store, so `toString /foo/bar' yields `"/foo/bar"', not
-   `"/nix/store/whatever..."'. */
-static Expr primToString(EvalState & state, const ATermVector & args)
-{
-    PathSet context;
-    string s = coerceToString(state, args[0], context, true, false);
-    return makeStr(s, context);
-}
-
-
 /* Determine whether the argument is the null value. */
-static Expr primIsNull(EvalState & state, const ATermVector & args)
+static Expr prim_isNull(EvalState & state, const ATermVector & args)
 {
     return makeBool(matchNull(evalExpr(state, args[0])));
 }
@@ -177,7 +166,7 @@ static string relativise(Path pivot, Path p)
 }
 
 
-static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
+static Expr prim_dependencyClosure(EvalState & state, const ATermVector & args)
 {
     startNest(nest, lvlDebug, "finding dependencies");
 
@@ -272,7 +261,7 @@ static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
 }
 
 
-static Expr primAbort(EvalState & state, const ATermVector & args)
+static Expr prim_abort(EvalState & state, const ATermVector & args)
 {
     PathSet context;
     throw Abort(format("evaluation aborted with the following error message: `%1%'") %
@@ -281,14 +270,14 @@ static Expr primAbort(EvalState & state, const ATermVector & args)
 
 
 /* Return an environment variable.  Use with care. */
-static Expr primGetEnv(EvalState & state, const ATermVector & args)
+static Expr prim_getEnv(EvalState & state, const ATermVector & args)
 {
     string name = evalStringNoCtx(state, args[0]);
     return makeStr(getEnv(name));
 }
 
 
-static Expr primRelativise(EvalState & state, const ATermVector & args)
+static Expr prim_relativise(EvalState & state, const ATermVector & args)
 {
     PathSet context; /* !!! what to do? */
     Path pivot = coerceToPath(state, args[0], context);
@@ -364,7 +353,7 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
    derivation; `drvPath' containing the path of the Nix expression;
    and `type' set to `derivation' to indicate that this is a
    derivation. */
-static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
+static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 {
     startNest(nest, lvlVomit, "evaluating derivation");
 
@@ -535,7 +524,7 @@ static Expr primDerivationStrict(EvalState & state, const ATermVector & args)
 }
 
 
-static Expr primDerivationLazy(EvalState & state, const ATermVector & args)
+static Expr prim_derivationLazy(EvalState & state, const ATermVector & args)
 {
     Expr eAttrs = evalExpr(state, args[0]);
     ATermMap attrs;    
@@ -561,7 +550,7 @@ static Expr primDerivationLazy(EvalState & state, const ATermVector & args)
 
 
 /* Convert the argument to a path.  !!! obsolete? */
-static Expr primToPath(EvalState & state, const ATermVector & args)
+static Expr prim_toPath(EvalState & state, const ATermVector & args)
 {
     PathSet context;
     string path = coerceToPath(state, args[0], context);
@@ -569,7 +558,7 @@ static Expr primToPath(EvalState & state, const ATermVector & args)
 }
 
 
-static Expr primPathExists(EvalState & state, const ATermVector & args)
+static Expr prim_pathExists(EvalState & state, const ATermVector & args)
 {
     PathSet context;
     Path path = coerceToPath(state, args[0], context);
@@ -581,7 +570,7 @@ static Expr primPathExists(EvalState & state, const ATermVector & args)
 
 /* Return the base name of the given string, i.e., everything
    following the last slash. */
-static Expr primBaseNameOf(EvalState & state, const ATermVector & args)
+static Expr prim_baseNameOf(EvalState & state, const ATermVector & args)
 {
     PathSet context;
     return makeStr(baseNameOf(coerceToString(state, args[0], context)), context);
@@ -591,7 +580,7 @@ static Expr primBaseNameOf(EvalState & state, const ATermVector & args)
 /* Return the directory of the given path, i.e., everything before the
    last slash.  Return either a path or a string depending on the type
    of the argument. */
-static Expr primDirOf(EvalState & state, const ATermVector & args)
+static Expr prim_dirOf(EvalState & state, const ATermVector & args)
 {
     PathSet context;
     Expr e = evalExpr(state, args[0]); ATerm dummy;
@@ -609,7 +598,7 @@ static Expr primDirOf(EvalState & state, const ATermVector & args)
 /* Convert the argument (which can be any Nix expression) to an XML
    representation returned in a string.  Not all Nix expressions can
    be sensibly or completely represented (e.g., functions). */
-static Expr primToXML(EvalState & state, const ATermVector & args)
+static Expr prim_toXML(EvalState & state, const ATermVector & args)
 {
     std::ostringstream out;
     PathSet context;
@@ -620,7 +609,7 @@ static Expr primToXML(EvalState & state, const ATermVector & args)
 
 /* Store a string in the Nix store as a source file that can be used
    as an input by derivations. */
-static Expr primToFile(EvalState & state, const ATermVector & args)
+static Expr prim_toFile(EvalState & state, const ATermVector & args)
 {
     PathSet context;
     string name = evalStringNoCtx(state, args[0]);
@@ -677,7 +666,7 @@ struct FilterFromExpr : PathFilter
 };
 
 
-static Expr primFilterSource(EvalState & state, const ATermVector & args)
+static Expr prim_filterSource(EvalState & state, const ATermVector & args)
 {
     PathSet context;
     Path path = coerceToPath(state, args[1], context);
@@ -701,7 +690,7 @@ static Expr primFilterSource(EvalState & state, const ATermVector & args)
 
 /* Return the names of the attributes in an attribute set as a sorted
    list of strings. */
-static Expr primAttrNames(EvalState & state, const ATermVector & args)
+static Expr prim_attrNames(EvalState & state, const ATermVector & args)
 {
     ATermMap attrs;
     queryAllAttrs(evalExpr(state, args[0]), attrs);
@@ -720,7 +709,7 @@ static Expr primAttrNames(EvalState & state, const ATermVector & args)
 
 
 /* Dynamic version of the `.' operator. */
-static Expr primGetAttr(EvalState & state, const ATermVector & args)
+static Expr prim_getAttr(EvalState & state, const ATermVector & args)
 {
     string attr = evalStringNoCtx(state, args[0]);
     return evalExpr(state, makeSelect(args[1], toATerm(attr)));
@@ -728,14 +717,14 @@ static Expr primGetAttr(EvalState & state, const ATermVector & args)
 
 
 /* Dynamic version of the `?' operator. */
-static Expr primHasAttr(EvalState & state, const ATermVector & args)
+static Expr prim_hasAttr(EvalState & state, const ATermVector & args)
 {
     string attr = evalStringNoCtx(state, args[0]);
     return evalExpr(state, makeOpHasAttr(args[1], toATerm(attr)));
 }
 
 
-static Expr primRemoveAttrs(EvalState & state, const ATermVector & args)
+static Expr prim_removeAttrs(EvalState & state, const ATermVector & args)
 {
     ATermMap attrs;
     queryAllAttrs(evalExpr(state, args[0]), attrs, true);
@@ -756,7 +745,7 @@ static Expr primRemoveAttrs(EvalState & state, const ATermVector & args)
 
 
 /* Determine whether the argument is a list. */
-static Expr primIsList(EvalState & state, const ATermVector & args)
+static Expr prim_isList(EvalState & state, const ATermVector & args)
 {
     ATermList list;
     return makeBool(matchList(evalExpr(state, args[0]), list));
@@ -764,7 +753,7 @@ static Expr primIsList(EvalState & state, const ATermVector & args)
 
 
 /* Return the first element of a list. */
-static Expr primHead(EvalState & state, const ATermVector & args)
+static Expr prim_head(EvalState & state, const ATermVector & args)
 {
     ATermList list = evalList(state, args[0]);
     if (ATisEmpty(list))
@@ -775,7 +764,7 @@ static Expr primHead(EvalState & state, const ATermVector & args)
 
 /* Return a list consisting of everything but the the first element of
    a list. */
-static Expr primTail(EvalState & state, const ATermVector & args)
+static Expr prim_tail(EvalState & state, const ATermVector & args)
 {
     ATermList list = evalList(state, args[0]);
     if (ATisEmpty(list))
@@ -785,7 +774,7 @@ static Expr primTail(EvalState & state, const ATermVector & args)
 
 
 /* Apply a function to every element of a list. */
-static Expr primMap(EvalState & state, const ATermVector & args)
+static Expr prim_map(EvalState & state, const ATermVector & args)
 {
     Expr fun = evalExpr(state, args[0]);
     ATermList list = evalList(state, args[1]);
@@ -803,7 +792,7 @@ static Expr primMap(EvalState & state, const ATermVector & args)
  *************************************************************/
 
 
-static Expr primAdd(EvalState & state, const ATermVector & args)
+static Expr prim_add(EvalState & state, const ATermVector & args)
 {
     int i1 = evalInt(state, args[0]);
     int i2 = evalInt(state, args[1]);
@@ -811,7 +800,7 @@ static Expr primAdd(EvalState & state, const ATermVector & args)
 }
 
 
-static Expr primSub(EvalState & state, const ATermVector & args)
+static Expr prim_sub(EvalState & state, const ATermVector & args)
 {
     int i1 = evalInt(state, args[0]);
     int i2 = evalInt(state, args[1]);
@@ -819,7 +808,7 @@ static Expr primSub(EvalState & state, const ATermVector & args)
 }
 
 
-static Expr primLessThan(EvalState & state, const ATermVector & args)
+static Expr prim_lessThan(EvalState & state, const ATermVector & args)
 {
     int i1 = evalInt(state, args[0]);
     int i2 = evalInt(state, args[1]);
@@ -830,6 +819,17 @@ static Expr primLessThan(EvalState & state, const ATermVector & args)
 /*************************************************************
  * String manipulation
  *************************************************************/
+
+
+/* Convert the argument to a string.  Paths are *not* copied to the
+   store, so `toString /foo/bar' yields `"/foo/bar"', not
+   `"/nix/store/whatever..."'. */
+static Expr prim_toString(EvalState & state, const ATermVector & args)
+{
+    PathSet context;
+    string s = coerceToString(state, args[0], context, true, false);
+    return makeStr(s, context);
+}
 
 
 /* `substr start len str' returns the substring of `str' starting at
@@ -857,60 +857,65 @@ static Expr prim_stringLength(EvalState & state, const ATermVector & args)
 }
 
 
+/*************************************************************
+ * Primop registration
+ *************************************************************/
+
+
 void EvalState::addPrimOps()
 {
-    addPrimOp("builtins", 0, primBuiltins);
+    addPrimOp("builtins", 0, prim_builtins);
         
     // Constants
-    addPrimOp("true", 0, primTrue);
-    addPrimOp("false", 0, primFalse);
-    addPrimOp("null", 0, primNull);
-    addPrimOp("__currentSystem", 0, primCurrentSystem);
-    addPrimOp("__currentTime", 0, primCurrentTime);
+    addPrimOp("true", 0, prim_true);
+    addPrimOp("false", 0, prim_false);
+    addPrimOp("null", 0, prim_null);
+    addPrimOp("__currentSystem", 0, prim_currentSystem);
+    addPrimOp("__currentTime", 0, prim_currentTime);
 
     // Miscellaneous
-    addPrimOp("import", 1, primImport);
-    addPrimOp("toString", 1, primToString);
-    addPrimOp("isNull", 1, primIsNull);
-    addPrimOp("dependencyClosure", 1, primDependencyClosure);
-    addPrimOp("abort", 1, primAbort);
-    addPrimOp("__getEnv", 1, primGetEnv);
+    addPrimOp("import", 1, prim_import);
+    addPrimOp("isNull", 1, prim_isNull);
+    addPrimOp("dependencyClosure", 1, prim_dependencyClosure);
+    addPrimOp("abort", 1, prim_abort);
+    addPrimOp("__getEnv", 1, prim_getEnv);
 
-    addPrimOp("relativise", 2, primRelativise);
+    addPrimOp("relativise", 2, prim_relativise);
 
     // Derivations
-    addPrimOp("derivation!", 1, primDerivationStrict);
-    addPrimOp("derivation", 1, primDerivationLazy);
+    addPrimOp("derivation!", 1, prim_derivationStrict);
+    addPrimOp("derivation", 1, prim_derivationLazy);
 
     // Paths
-    addPrimOp("__toPath", 1, primToPath);
-    addPrimOp("__pathExists", 1, primPathExists);
-    addPrimOp("baseNameOf", 1, primBaseNameOf);
-    addPrimOp("dirOf", 1, primDirOf);
+    addPrimOp("__toPath", 1, prim_toPath);
+    addPrimOp("__pathExists", 1, prim_pathExists);
+    addPrimOp("baseNameOf", 1, prim_baseNameOf);
+    addPrimOp("dirOf", 1, prim_dirOf);
 
     // Creating files
-    addPrimOp("__toXML", 1, primToXML);
-    addPrimOp("__toFile", 2, primToFile);
-    addPrimOp("__filterSource", 2, primFilterSource);
+    addPrimOp("__toXML", 1, prim_toXML);
+    addPrimOp("__toFile", 2, prim_toFile);
+    addPrimOp("__filterSource", 2, prim_filterSource);
 
     // Attribute sets
-    addPrimOp("__attrNames", 1, primAttrNames);
-    addPrimOp("__getAttr", 2, primGetAttr);
-    addPrimOp("__hasAttr", 2, primHasAttr);
-    addPrimOp("removeAttrs", 2, primRemoveAttrs);
+    addPrimOp("__attrNames", 1, prim_attrNames);
+    addPrimOp("__getAttr", 2, prim_getAttr);
+    addPrimOp("__hasAttr", 2, prim_hasAttr);
+    addPrimOp("removeAttrs", 2, prim_removeAttrs);
 
     // Lists
-    addPrimOp("__isList", 1, primIsList);
-    addPrimOp("__head", 1, primHead);
-    addPrimOp("__tail", 1, primTail);
-    addPrimOp("map", 2, primMap);
+    addPrimOp("__isList", 1, prim_isList);
+    addPrimOp("__head", 1, prim_head);
+    addPrimOp("__tail", 1, prim_tail);
+    addPrimOp("map", 2, prim_map);
 
     // Integer arithmetic
-    addPrimOp("__add", 2, primAdd);
-    addPrimOp("__sub", 2, primSub);
-    addPrimOp("__lessThan", 2, primLessThan);
+    addPrimOp("__add", 2, prim_add);
+    addPrimOp("__sub", 2, prim_sub);
+    addPrimOp("__lessThan", 2, prim_lessThan);
 
     // String manipulation
+    addPrimOp("toString", 1, prim_toString);
     addPrimOp("__substring", 3, prim_substring);
     addPrimOp("__stringLength", 1, prim_stringLength);
 }
