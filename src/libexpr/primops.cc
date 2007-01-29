@@ -17,6 +17,11 @@
 namespace nix {
 
 
+/*************************************************************
+ * Constants
+ *************************************************************/
+
+
 static Expr primBuiltins(EvalState & state, const ATermVector & args)
 {
     /* Return an attribute set containing all primops.  This allows
@@ -41,6 +46,47 @@ static Expr primBuiltins(EvalState & state, const ATermVector & args)
 }
 
 
+/* Boolean constructors. */
+static Expr primTrue(EvalState & state, const ATermVector & args)
+{
+    return eTrue;
+}
+
+
+static Expr primFalse(EvalState & state, const ATermVector & args)
+{
+    return eFalse;
+}
+
+
+/* Return the null value. */
+static Expr primNull(EvalState & state, const ATermVector & args)
+{
+    return makeNull();
+}
+
+
+/* Return a string constant representing the current platform.  Note!
+   that differs between platforms, so Nix expressions using
+   `__currentSystem' can evaluate to different values on different
+   platforms. */
+static Expr primCurrentSystem(EvalState & state, const ATermVector & args)
+{
+    return makeStr(thisSystem);
+}
+
+
+static Expr primCurrentTime(EvalState & state, const ATermVector & args)
+{
+    return ATmake("Int(<int>)", time(0));
+}
+
+
+/*************************************************************
+ * Miscellaneous
+ *************************************************************/
+
+
 /* Load and evaluate an expression from path specified by the
    argument. */ 
 static Expr primImport(EvalState & state, const ATermVector & args)
@@ -61,14 +107,199 @@ static Expr primImport(EvalState & state, const ATermVector & args)
 }
 
 
-static Expr primPathExists(EvalState & state, const ATermVector & args)
+/* Convert the argument to a string.  Paths are *not* copied to the
+   store, so `toString /foo/bar' yields `"/foo/bar"', not
+   `"/nix/store/whatever..."'. */
+static Expr primToString(EvalState & state, const ATermVector & args)
 {
     PathSet context;
-    Path path = coerceToPath(state, args[0], context);
-    if (!context.empty())
-        throw EvalError(format("string `%1%' cannot refer to other paths") % path);
-    return makeBool(pathExists(path));
+    string s = coerceToString(state, args[0], context, true, false);
+    return makeStr(s, context);
 }
+
+
+/* Determine whether the argument is the null value. */
+static Expr primIsNull(EvalState & state, const ATermVector & args)
+{
+    return makeBool(matchNull(evalExpr(state, args[0])));
+}
+
+
+static Path findDependency(Path dir, string dep)
+{
+    if (dep[0] == '/') throw EvalError(
+        format("illegal absolute dependency `%1%'") % dep);
+
+    Path p = canonPath(dir + "/" + dep);
+
+    if (pathExists(p))
+        return p;
+    else
+        return "";
+}
+
+
+/* Make path `p' relative to directory `pivot'.  E.g.,
+   relativise("/a/b/c", "a/b/x/y") => "../x/y".  Both input paths
+   should be in absolute canonical form. */
+static string relativise(Path pivot, Path p)
+{
+    assert(pivot.size() > 0 && pivot[0] == '/');
+    assert(p.size() > 0 && p[0] == '/');
+        
+    if (pivot == p) return ".";
+
+    /* `p' is in `pivot'? */
+    Path pivot2 = pivot + "/";
+    if (p.substr(0, pivot2.size()) == pivot2) {
+        return p.substr(pivot2.size());
+    }
+
+    /* Otherwise, `p' is in a parent of `pivot'.  Find up till which
+       path component `p' and `pivot' match, and add an appropriate
+       number of `..' components. */
+    string::size_type i = 1;
+    while (1) {
+        string::size_type j = pivot.find('/', i);
+        if (j == string::npos) break;
+        j++;
+        if (pivot.substr(0, j) != p.substr(0, j)) break;
+        i = j;
+    }
+
+    string prefix;
+    unsigned int slashes = count(pivot.begin() + i, pivot.end(), '/') + 1;
+    while (slashes--) {
+        prefix += "../";
+    }
+
+    return prefix + p.substr(i);
+}
+
+
+static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
+{
+    startNest(nest, lvlDebug, "finding dependencies");
+
+    Expr attrs = evalExpr(state, args[0]);
+
+    /* Get the start set. */
+    Expr startSet = queryAttr(attrs, "startSet");
+    if (!startSet) throw EvalError("attribute `startSet' required");
+    ATermList startSet2 = evalList(state, startSet);
+
+    Path pivot;
+    PathSet workSet;
+    for (ATermIterator i(startSet2); i; ++i) {
+        PathSet context; /* !!! what to do? */
+        Path p = coerceToPath(state, *i, context);
+        workSet.insert(p);
+        pivot = dirOf(p);
+    }
+
+    /* Get the search path. */
+    PathSet searchPath;
+    Expr e = queryAttr(attrs, "searchPath");
+    if (e) {
+        ATermList list = evalList(state, e);
+        for (ATermIterator i(list); i; ++i) {
+            PathSet context; /* !!! what to do? */
+            Path p = coerceToPath(state, *i, context);
+            searchPath.insert(p);
+        }
+    }
+
+    Expr scanner = queryAttr(attrs, "scanner");
+    if (!scanner) throw EvalError("attribute `scanner' required");
+    
+    /* Construct the dependency closure by querying the dependency of
+       each path in `workSet', adding the dependencies to
+       `workSet'. */
+    PathSet doneSet;
+    while (!workSet.empty()) {
+	Path path = *(workSet.begin());
+	workSet.erase(path);
+
+	if (doneSet.find(path) != doneSet.end()) continue;
+        doneSet.insert(path);
+
+        try {
+            
+            /* Call the `scanner' function with `path' as argument. */
+            debug(format("finding dependencies in `%1%'") % path);
+            ATermList deps = evalList(state, makeCall(scanner, makeStr(path)));
+
+            /* Try to find the dependencies relative to the `path'. */
+            for (ATermIterator i(deps); i; ++i) {
+                string s = evalStringNoCtx(state, *i);
+                
+                Path dep = findDependency(dirOf(path), s);
+
+                if (dep == "") {
+                    for (PathSet::iterator j = searchPath.begin();
+                         j != searchPath.end(); ++j)
+                    {
+                        dep = findDependency(*j, s);
+                        if (dep != "") break;
+                    }
+                }
+                
+                if (dep == "")
+                    debug(format("did NOT find dependency `%1%'") % s);
+                else {
+                    debug(format("found dependency `%1%'") % dep);
+                    workSet.insert(dep);
+                }
+            }
+
+        } catch (Error & e) {
+            e.addPrefix(format("while finding dependencies in `%1%':\n")
+                % path);
+            throw;
+        }
+    }
+
+    /* Return a list of the dependencies we've just found. */
+    ATermList deps = ATempty;
+    for (PathSet::iterator i = doneSet.begin(); i != doneSet.end(); ++i) {
+        deps = ATinsert(deps, makeStr(relativise(pivot, *i)));
+        deps = ATinsert(deps, makeStr(*i));
+    }
+
+    debug(format("dependency list is `%1%'") % makeList(deps));
+    
+    return makeList(deps);
+}
+
+
+static Expr primAbort(EvalState & state, const ATermVector & args)
+{
+    PathSet context;
+    throw Abort(format("evaluation aborted with the following error message: `%1%'") %
+        evalString(state, args[0], context));
+}
+
+
+/* Return an environment variable.  Use with care. */
+static Expr primGetEnv(EvalState & state, const ATermVector & args)
+{
+    string name = evalStringNoCtx(state, args[0]);
+    return makeStr(getEnv(name));
+}
+
+
+static Expr primRelativise(EvalState & state, const ATermVector & args)
+{
+    PathSet context; /* !!! what to do? */
+    Path pivot = coerceToPath(state, args[0], context);
+    Path path = coerceToPath(state, args[1], context);
+    return makeStr(relativise(pivot, path));
+}
+
+
+/*************************************************************
+ * Derivations
+ *************************************************************/
 
 
 /* Returns the hash of a derivation modulo fixed-output
@@ -324,6 +555,30 @@ static Expr primDerivationLazy(EvalState & state, const ATermVector & args)
 }
 
 
+/*************************************************************
+ * Paths
+ *************************************************************/
+
+
+/* Convert the argument to a path.  !!! obsolete? */
+static Expr primToPath(EvalState & state, const ATermVector & args)
+{
+    PathSet context;
+    string path = coerceToPath(state, args[0], context);
+    return makeStr(canonPath(path), context);
+}
+
+
+static Expr primPathExists(EvalState & state, const ATermVector & args)
+{
+    PathSet context;
+    Path path = coerceToPath(state, args[0], context);
+    if (!context.empty())
+        throw EvalError(format("string `%1%' cannot refer to other paths") % path);
+    return makeBool(pathExists(path));
+}
+
+
 /* Return the base name of the given string, i.e., everything
    following the last slash. */
 static Expr primBaseNameOf(EvalState & state, const ATermVector & args)
@@ -346,24 +601,9 @@ static Expr primDirOf(EvalState & state, const ATermVector & args)
 }
 
 
-/* Convert the argument to a string.  Paths are *not* copied to the
-   store, so `toString /foo/bar' yields `"/foo/bar"', not
-   `"/nix/store/whatever..."'. */
-static Expr primToString(EvalState & state, const ATermVector & args)
-{
-    PathSet context;
-    string s = coerceToString(state, args[0], context, true, false);
-    return makeStr(s, context);
-}
-
-
-/* Convert the argument to a path.  !!! obsolete? */
-static Expr primToPath(EvalState & state, const ATermVector & args)
-{
-    PathSet context;
-    string path = coerceToPath(state, args[0], context);
-    return makeStr(canonPath(path), context);
-}
+/*************************************************************
+ * Creating files
+ *************************************************************/
 
 
 /* Convert the argument (which can be any Nix expression) to an XML
@@ -403,339 +643,6 @@ static Expr primToFile(EvalState & state, const ATermVector & args)
        used in args[1]. */
     
     return makeStr(storePath, singleton<PathSet>(storePath));
-}
-
-
-/* Boolean constructors. */
-static Expr primTrue(EvalState & state, const ATermVector & args)
-{
-    return eTrue;
-}
-
-
-static Expr primFalse(EvalState & state, const ATermVector & args)
-{
-    return eFalse;
-}
-
-
-/* Return the null value. */
-static Expr primNull(EvalState & state, const ATermVector & args)
-{
-    return makeNull();
-}
-
-
-/* Determine whether the argument is the null value. */
-static Expr primIsNull(EvalState & state, const ATermVector & args)
-{
-    return makeBool(matchNull(evalExpr(state, args[0])));
-}
-
-
-/* Determine whether the argument is a list. */
-static Expr primIsList(EvalState & state, const ATermVector & args)
-{
-    ATermList list;
-    return makeBool(matchList(evalExpr(state, args[0]), list));
-}
-
-
-static Path findDependency(Path dir, string dep)
-{
-    if (dep[0] == '/') throw EvalError(
-        format("illegal absolute dependency `%1%'") % dep);
-
-    Path p = canonPath(dir + "/" + dep);
-
-    if (pathExists(p))
-        return p;
-    else
-        return "";
-}
-
-
-/* Make path `p' relative to directory `pivot'.  E.g.,
-   relativise("/a/b/c", "a/b/x/y") => "../x/y".  Both input paths
-   should be in absolute canonical form. */
-static string relativise(Path pivot, Path p)
-{
-    assert(pivot.size() > 0 && pivot[0] == '/');
-    assert(p.size() > 0 && p[0] == '/');
-        
-    if (pivot == p) return ".";
-
-    /* `p' is in `pivot'? */
-    Path pivot2 = pivot + "/";
-    if (p.substr(0, pivot2.size()) == pivot2) {
-        return p.substr(pivot2.size());
-    }
-
-    /* Otherwise, `p' is in a parent of `pivot'.  Find up till which
-       path component `p' and `pivot' match, and add an appropriate
-       number of `..' components. */
-    string::size_type i = 1;
-    while (1) {
-        string::size_type j = pivot.find('/', i);
-        if (j == string::npos) break;
-        j++;
-        if (pivot.substr(0, j) != p.substr(0, j)) break;
-        i = j;
-    }
-
-    string prefix;
-    unsigned int slashes = count(pivot.begin() + i, pivot.end(), '/') + 1;
-    while (slashes--) {
-        prefix += "../";
-    }
-
-    return prefix + p.substr(i);
-}
-
-
-static Expr primDependencyClosure(EvalState & state, const ATermVector & args)
-{
-    startNest(nest, lvlDebug, "finding dependencies");
-
-    Expr attrs = evalExpr(state, args[0]);
-
-    /* Get the start set. */
-    Expr startSet = queryAttr(attrs, "startSet");
-    if (!startSet) throw EvalError("attribute `startSet' required");
-    ATermList startSet2 = evalList(state, startSet);
-
-    Path pivot;
-    PathSet workSet;
-    for (ATermIterator i(startSet2); i; ++i) {
-        PathSet context; /* !!! what to do? */
-        Path p = coerceToPath(state, *i, context);
-        workSet.insert(p);
-        pivot = dirOf(p);
-    }
-
-    /* Get the search path. */
-    PathSet searchPath;
-    Expr e = queryAttr(attrs, "searchPath");
-    if (e) {
-        ATermList list = evalList(state, e);
-        for (ATermIterator i(list); i; ++i) {
-            PathSet context; /* !!! what to do? */
-            Path p = coerceToPath(state, *i, context);
-            searchPath.insert(p);
-        }
-    }
-
-    Expr scanner = queryAttr(attrs, "scanner");
-    if (!scanner) throw EvalError("attribute `scanner' required");
-    
-    /* Construct the dependency closure by querying the dependency of
-       each path in `workSet', adding the dependencies to
-       `workSet'. */
-    PathSet doneSet;
-    while (!workSet.empty()) {
-	Path path = *(workSet.begin());
-	workSet.erase(path);
-
-	if (doneSet.find(path) != doneSet.end()) continue;
-        doneSet.insert(path);
-
-        try {
-            
-            /* Call the `scanner' function with `path' as argument. */
-            debug(format("finding dependencies in `%1%'") % path);
-            ATermList deps = evalList(state, makeCall(scanner, makeStr(path)));
-
-            /* Try to find the dependencies relative to the `path'. */
-            for (ATermIterator i(deps); i; ++i) {
-                string s = evalStringNoCtx(state, *i);
-                
-                Path dep = findDependency(dirOf(path), s);
-
-                if (dep == "") {
-                    for (PathSet::iterator j = searchPath.begin();
-                         j != searchPath.end(); ++j)
-                    {
-                        dep = findDependency(*j, s);
-                        if (dep != "") break;
-                    }
-                }
-                
-                if (dep == "")
-                    debug(format("did NOT find dependency `%1%'") % s);
-                else {
-                    debug(format("found dependency `%1%'") % dep);
-                    workSet.insert(dep);
-                }
-            }
-
-        } catch (Error & e) {
-            e.addPrefix(format("while finding dependencies in `%1%':\n")
-                % path);
-            throw;
-        }
-    }
-
-    /* Return a list of the dependencies we've just found. */
-    ATermList deps = ATempty;
-    for (PathSet::iterator i = doneSet.begin(); i != doneSet.end(); ++i) {
-        deps = ATinsert(deps, makeStr(relativise(pivot, *i)));
-        deps = ATinsert(deps, makeStr(*i));
-    }
-
-    debug(format("dependency list is `%1%'") % makeList(deps));
-    
-    return makeList(deps);
-}
-
-
-static Expr primAbort(EvalState & state, const ATermVector & args)
-{
-    PathSet context;
-    throw Abort(format("evaluation aborted with the following error message: `%1%'") %
-        evalString(state, args[0], context));
-}
-
-
-/* Return the first element of a list. */
-static Expr primHead(EvalState & state, const ATermVector & args)
-{
-    ATermList list = evalList(state, args[0]);
-    if (ATisEmpty(list))
-        throw Error("`head' called on an empty list");
-    return evalExpr(state, ATgetFirst(list));
-}
-
-
-/* Return a list consisting of everything but the the first element of
-   a list. */
-static Expr primTail(EvalState & state, const ATermVector & args)
-{
-    ATermList list = evalList(state, args[0]);
-    if (ATisEmpty(list))
-        throw Error("`tail' called on an empty list");
-    return makeList(ATgetNext(list));
-}
-
-
-/* Return an environment variable.  Use with care. */
-static Expr primGetEnv(EvalState & state, const ATermVector & args)
-{
-    string name = evalStringNoCtx(state, args[0]);
-    return makeStr(getEnv(name));
-}
-
-
-/* Return the names of the attributes in an attribute set as a sorted
-   list of strings. */
-static Expr primAttrNames(EvalState & state, const ATermVector & args)
-{
-    ATermMap attrs;
-    queryAllAttrs(evalExpr(state, args[0]), attrs);
-
-    StringSet names;
-    for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i)
-        names.insert(aterm2String(i->key));
-
-    ATermList list = ATempty;
-    for (StringSet::const_reverse_iterator i = names.rbegin();
-         i != names.rend(); ++i)
-        list = ATinsert(list, makeStr(*i, PathSet()));
-
-    return makeList(list);
-}
-
-
-/* Apply a function to every element of a list. */
-static Expr primMap(EvalState & state, const ATermVector & args)
-{
-    Expr fun = evalExpr(state, args[0]);
-    ATermList list = evalList(state, args[1]);
-
-    ATermList res = ATempty;
-    for (ATermIterator i(list); i; ++i)
-        res = ATinsert(res, makeCall(fun, *i));
-
-    return makeList(ATreverse(res));
-}
-
-
-/* Return a string constant representing the current platform.  Note!
-   that differs between platforms, so Nix expressions using
-   `__currentSystem' can evaluate to different values on different
-   platforms. */
-static Expr primCurrentSystem(EvalState & state, const ATermVector & args)
-{
-    return makeStr(thisSystem);
-}
-
-
-static Expr primCurrentTime(EvalState & state, const ATermVector & args)
-{
-    return ATmake("Int(<int>)", time(0));
-}
-
-
-/* Dynamic version of the `.' operator. */
-static Expr primGetAttr(EvalState & state, const ATermVector & args)
-{
-    string attr = evalStringNoCtx(state, args[0]);
-    return evalExpr(state, makeSelect(args[1], toATerm(attr)));
-}
-
-
-/* Dynamic version of the `?' operator. */
-static Expr primHasAttr(EvalState & state, const ATermVector & args)
-{
-    string attr = evalStringNoCtx(state, args[0]);
-    return evalExpr(state, makeOpHasAttr(args[1], toATerm(attr)));
-}
-
-
-static Expr primRemoveAttrs(EvalState & state, const ATermVector & args)
-{
-    ATermMap attrs;
-    queryAllAttrs(evalExpr(state, args[0]), attrs, true);
-    
-    ATermList list = evalList(state, args[1]);
-
-    for (ATermIterator i(list); i; ++i)
-        /* It's not an error for *i not to exist. */
-        attrs.remove(toATerm(evalStringNoCtx(state, *i)));
-
-    return makeAttrs(attrs);
-}
-
-
-static Expr primRelativise(EvalState & state, const ATermVector & args)
-{
-    PathSet context; /* !!! what to do? */
-    Path pivot = coerceToPath(state, args[0], context);
-    Path path = coerceToPath(state, args[1], context);
-    return makeStr(relativise(pivot, path));
-}
-
-
-static Expr primAdd(EvalState & state, const ATermVector & args)
-{
-    int i1 = evalInt(state, args[0]);
-    int i2 = evalInt(state, args[1]);
-    return makeInt(i1 + i2);
-}
-
-
-static Expr primSub(EvalState & state, const ATermVector & args)
-{
-    int i1 = evalInt(state, args[0]);
-    int i2 = evalInt(state, args[1]);
-    return makeInt(i1 - i2);
-}
-
-
-static Expr primLessThan(EvalState & state, const ATermVector & args)
-{
-    int i1 = evalInt(state, args[0]);
-    int i2 = evalInt(state, args[1]);
-    return makeBool(i1 < i2);
 }
 
 
@@ -788,6 +695,139 @@ static Expr primFilterSource(EvalState & state, const ATermVector & args)
 
 
 /*************************************************************
+ * Attribute sets
+ *************************************************************/
+
+
+/* Return the names of the attributes in an attribute set as a sorted
+   list of strings. */
+static Expr primAttrNames(EvalState & state, const ATermVector & args)
+{
+    ATermMap attrs;
+    queryAllAttrs(evalExpr(state, args[0]), attrs);
+
+    StringSet names;
+    for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i)
+        names.insert(aterm2String(i->key));
+
+    ATermList list = ATempty;
+    for (StringSet::const_reverse_iterator i = names.rbegin();
+         i != names.rend(); ++i)
+        list = ATinsert(list, makeStr(*i, PathSet()));
+
+    return makeList(list);
+}
+
+
+/* Dynamic version of the `.' operator. */
+static Expr primGetAttr(EvalState & state, const ATermVector & args)
+{
+    string attr = evalStringNoCtx(state, args[0]);
+    return evalExpr(state, makeSelect(args[1], toATerm(attr)));
+}
+
+
+/* Dynamic version of the `?' operator. */
+static Expr primHasAttr(EvalState & state, const ATermVector & args)
+{
+    string attr = evalStringNoCtx(state, args[0]);
+    return evalExpr(state, makeOpHasAttr(args[1], toATerm(attr)));
+}
+
+
+static Expr primRemoveAttrs(EvalState & state, const ATermVector & args)
+{
+    ATermMap attrs;
+    queryAllAttrs(evalExpr(state, args[0]), attrs, true);
+    
+    ATermList list = evalList(state, args[1]);
+
+    for (ATermIterator i(list); i; ++i)
+        /* It's not an error for *i not to exist. */
+        attrs.remove(toATerm(evalStringNoCtx(state, *i)));
+
+    return makeAttrs(attrs);
+}
+
+
+/*************************************************************
+ * Lists
+ *************************************************************/
+
+
+/* Determine whether the argument is a list. */
+static Expr primIsList(EvalState & state, const ATermVector & args)
+{
+    ATermList list;
+    return makeBool(matchList(evalExpr(state, args[0]), list));
+}
+
+
+/* Return the first element of a list. */
+static Expr primHead(EvalState & state, const ATermVector & args)
+{
+    ATermList list = evalList(state, args[0]);
+    if (ATisEmpty(list))
+        throw Error("`head' called on an empty list");
+    return evalExpr(state, ATgetFirst(list));
+}
+
+
+/* Return a list consisting of everything but the the first element of
+   a list. */
+static Expr primTail(EvalState & state, const ATermVector & args)
+{
+    ATermList list = evalList(state, args[0]);
+    if (ATisEmpty(list))
+        throw Error("`tail' called on an empty list");
+    return makeList(ATgetNext(list));
+}
+
+
+/* Apply a function to every element of a list. */
+static Expr primMap(EvalState & state, const ATermVector & args)
+{
+    Expr fun = evalExpr(state, args[0]);
+    ATermList list = evalList(state, args[1]);
+
+    ATermList res = ATempty;
+    for (ATermIterator i(list); i; ++i)
+        res = ATinsert(res, makeCall(fun, *i));
+
+    return makeList(ATreverse(res));
+}
+
+
+/*************************************************************
+ * Integer arithmetic
+ *************************************************************/
+
+
+static Expr primAdd(EvalState & state, const ATermVector & args)
+{
+    int i1 = evalInt(state, args[0]);
+    int i2 = evalInt(state, args[1]);
+    return makeInt(i1 + i2);
+}
+
+
+static Expr primSub(EvalState & state, const ATermVector & args)
+{
+    int i1 = evalInt(state, args[0]);
+    int i2 = evalInt(state, args[1]);
+    return makeInt(i1 - i2);
+}
+
+
+static Expr primLessThan(EvalState & state, const ATermVector & args)
+{
+    int i1 = evalInt(state, args[0]);
+    int i2 = evalInt(state, args[1]);
+    return makeBool(i1 < i2);
+}
+
+
+/*************************************************************
  * String manipulation
  *************************************************************/
 
@@ -821,41 +861,56 @@ void EvalState::addPrimOps()
 {
     addPrimOp("builtins", 0, primBuiltins);
         
+    // Constants
     addPrimOp("true", 0, primTrue);
     addPrimOp("false", 0, primFalse);
     addPrimOp("null", 0, primNull);
     addPrimOp("__currentSystem", 0, primCurrentSystem);
     addPrimOp("__currentTime", 0, primCurrentTime);
 
+    // Miscellaneous
     addPrimOp("import", 1, primImport);
-    addPrimOp("__pathExists", 1, primPathExists);
-    addPrimOp("derivation!", 1, primDerivationStrict);
-    addPrimOp("derivation", 1, primDerivationLazy);
-    addPrimOp("baseNameOf", 1, primBaseNameOf);
-    addPrimOp("dirOf", 1, primDirOf);
     addPrimOp("toString", 1, primToString);
-    addPrimOp("__toPath", 1, primToPath);
-    addPrimOp("__toXML", 1, primToXML);
     addPrimOp("isNull", 1, primIsNull);
-    addPrimOp("__isList", 1, primIsList);
     addPrimOp("dependencyClosure", 1, primDependencyClosure);
     addPrimOp("abort", 1, primAbort);
-    addPrimOp("__head", 1, primHead);
-    addPrimOp("__tail", 1, primTail);
     addPrimOp("__getEnv", 1, primGetEnv);
-    addPrimOp("__attrNames", 1, primAttrNames);
 
-    addPrimOp("map", 2, primMap);
-    addPrimOp("__getAttr", 2, primGetAttr);
-    addPrimOp("__hasAttr", 2, primHasAttr);
-    addPrimOp("removeAttrs", 2, primRemoveAttrs);
     addPrimOp("relativise", 2, primRelativise);
-    addPrimOp("__add", 2, primAdd);
-    addPrimOp("__sub", 2, primSub);
-    addPrimOp("__lessThan", 2, primLessThan);
+
+    // Derivations
+    addPrimOp("derivation!", 1, primDerivationStrict);
+    addPrimOp("derivation", 1, primDerivationLazy);
+
+    // Paths
+    addPrimOp("__toPath", 1, primToPath);
+    addPrimOp("__pathExists", 1, primPathExists);
+    addPrimOp("baseNameOf", 1, primBaseNameOf);
+    addPrimOp("dirOf", 1, primDirOf);
+
+    // Creating files
+    addPrimOp("__toXML", 1, primToXML);
     addPrimOp("__toFile", 2, primToFile);
     addPrimOp("__filterSource", 2, primFilterSource);
 
+    // Attribute sets
+    addPrimOp("__attrNames", 1, primAttrNames);
+    addPrimOp("__getAttr", 2, primGetAttr);
+    addPrimOp("__hasAttr", 2, primHasAttr);
+    addPrimOp("removeAttrs", 2, primRemoveAttrs);
+
+    // Lists
+    addPrimOp("__isList", 1, primIsList);
+    addPrimOp("__head", 1, primHead);
+    addPrimOp("__tail", 1, primTail);
+    addPrimOp("map", 2, primMap);
+
+    // Integer arithmetic
+    addPrimOp("__add", 2, primAdd);
+    addPrimOp("__sub", 2, primSub);
+    addPrimOp("__lessThan", 2, primLessThan);
+
+    // String manipulation
     addPrimOp("__substring", 3, prim_substring);
     addPrimOp("__stringLength", 1, prim_stringLength);
 }
