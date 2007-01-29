@@ -749,7 +749,7 @@ struct FilterFromExpr : PathFilter
 
         Expr call =
             makeCall(
-                makeCall(filter, makePath(toATerm(path))),
+                makeCall(filter, makeStr(path)),
                 makeStr(
                     S_ISREG(st.st_mode) ? "regular" :
                     S_ISDIR(st.st_mode) ? "directory" :
