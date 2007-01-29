@@ -55,7 +55,10 @@
 
   <listitem><para>TODO: new built-ins
   <function>builtins.attrNames</function>,
-  <function>builtins.filterSource</function>.</para></listitem>
+  <function>builtins.filterSource</function>,
+  <function>builtins.sub</function>,
+  <function>builtins.stringLength</function>,
+  <function>builtins.substring</function>.</para></listitem>
   
 
 </itemizedlist>

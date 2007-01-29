@@ -4,6 +4,9 @@ derivation {
   builder = "@shell@";
   args = ["-e" "-x" (builtins.toFile "builder" "PATH=@testPath@; ln -s $input $out")];
   input =
-    let filter = path: type: type != "symlink" && baseNameOf (toString path) != "foo";
+    let filter = path: type:
+      type != "symlink"
+      && baseNameOf path != "foo"
+      && !((import ./lang/lib.nix).hasSuffix ".bak" (baseNameOf path));
     in builtins.filterSource filter ./test-tmp/filterin;
 }

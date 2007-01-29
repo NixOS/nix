@@ -723,6 +723,14 @@ static Expr primAdd(EvalState & state, const ATermVector & args)
 }
 
 
+static Expr primSub(EvalState & state, const ATermVector & args)
+{
+    int i1 = evalInt(state, args[0]);
+    int i2 = evalInt(state, args[1]);
+    return makeInt(i1 - i2);
+}
+
+
 static Expr primLessThan(EvalState & state, const ATermVector & args)
 {
     int i1 = evalInt(state, args[0]);
@@ -779,6 +787,36 @@ static Expr primFilterSource(EvalState & state, const ATermVector & args)
 }
 
 
+/*************************************************************
+ * String manipulation
+ *************************************************************/
+
+
+/* `substr start len str' returns the substring of `str' starting at
+   character position `min(start, stringLength str)' inclusive and
+   ending at `min(start + len, stringLength str)'.  `start' must be
+   non-negative. */
+static Expr prim_substring(EvalState & state, const ATermVector & args)
+{
+    int start = evalInt(state, args[0]);
+    int len = evalInt(state, args[1]);
+    PathSet context;
+    string s = coerceToString(state, args[2], context);
+
+    if (start < 0) throw EvalError("negative start position in `substring'");
+
+    return makeStr(string(s, start, len), context);
+}
+
+
+static Expr prim_stringLength(EvalState & state, const ATermVector & args)
+{
+    PathSet context;
+    string s = coerceToString(state, args[0], context);
+    return makeInt(s.size());
+}
+
+
 void EvalState::addPrimOps()
 {
     addPrimOp("builtins", 0, primBuiltins);
@@ -813,10 +851,14 @@ void EvalState::addPrimOps()
     addPrimOp("removeAttrs", 2, primRemoveAttrs);
     addPrimOp("relativise", 2, primRelativise);
     addPrimOp("__add", 2, primAdd);
+    addPrimOp("__sub", 2, primSub);
     addPrimOp("__lessThan", 2, primLessThan);
     addPrimOp("__toFile", 2, primToFile);
     addPrimOp("__filterSource", 2, primFilterSource);
+
+    addPrimOp("__substring", 3, prim_substring);
+    addPrimOp("__stringLength", 1, prim_stringLength);
 }
 
- 
+
 }
