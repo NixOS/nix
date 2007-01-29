@@ -73,8 +73,6 @@ Path makeStorePath(const string & type,
     string s = type + ":sha256:" + printHash(hash) + ":"
         + nixStore + ":" + suffix;
 
-    printMsg(lvlError, s);
-    
     checkStoreName(suffix);
 
     return nixStore + "/"
