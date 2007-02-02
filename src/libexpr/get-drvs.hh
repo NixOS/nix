@@ -26,6 +26,9 @@ public:
     string attrPath; /* path towards the derivation */
     string system;
 
+    /* !!! these should really be hidden, and setMetaInfo() should
+       make a copy since the ATermMap can be shared between multiple
+       DrvInfos. */
     boost::shared_ptr<ATermMap> attrs;
 
     string queryDrvPath(EvalState & state) const;
@@ -41,6 +44,8 @@ public:
     {
         outPath = s;
     }
+
+    void setMetaInfo(const MetaInfo & meta);
 };
 
 

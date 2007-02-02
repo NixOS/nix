@@ -164,7 +164,11 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
     for (DrvInfos::const_iterator i = elems.begin(); 
          i != elems.end(); ++i)
     {
+        /* Create a pseudo-derivation containing the name, system,
+           output path, and optionally the derivation path, as well as
+           the meta attributes. */
         Path drvPath = keepDerivations ? i->queryDrvPath(state) : "";
+        
         ATermList as = ATmakeList4(
             makeBind(toATerm("type"),
                 makeStr("derivation"), makeNoPos()),
@@ -174,10 +178,18 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
                 makeStr(i->system), makeNoPos()),
             makeBind(toATerm("outPath"),
                 makeStr(i->queryOutPath(state)), makeNoPos()));
+        
         if (drvPath != "") as = ATinsert(as, 
             makeBind(toATerm("drvPath"),
                 makeStr(drvPath), makeNoPos()));
+        
+        if (i->attrs->get(toATerm("meta"))) as = ATinsert(as, 
+            makeBind(toATerm("meta"),
+                strictEvalExpr(state, i->attrs->get(toATerm("meta"))),
+                makeNoPos()));
+
         manifest = ATinsert(manifest, makeAttrs(as));
+        
         inputs = ATinsert(inputs, makeStr(i->queryOutPath(state)));
 
         /* This is only necessary when installing store paths, e.g.,
@@ -192,13 +204,13 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
     /* Also write a copy of the list of inputs to the store; we need
        it for future modifications of the environment. */
     Path manifestFile = store->addTextToStore("env-manifest",
-        atPrint(makeList(ATreverse(manifest))), references);
+        atPrint(canonicaliseExpr(makeList(ATreverse(manifest)))), references);
 
     Expr topLevel = makeCall(envBuilder, makeAttrs(ATmakeList3(
         makeBind(toATerm("system"),
             makeStr(thisSystem), makeNoPos()),
         makeBind(toATerm("derivations"),
-            makeList(ATreverse(inputs)), makeNoPos()),
+            makeList(ATreverse(manifest)), makeNoPos()),
         makeBind(toATerm("manifest"),
             makeStr(manifestFile, singleton<PathSet>(manifestFile)), makeNoPos())
         )));
@@ -506,8 +518,7 @@ typedef enum { utLt, utLeq, utEq, utAlways } UpgradeType;
 
 
 static void upgradeDerivations(Globals & globals,
-    const Strings & args, const Path & profile,
-    UpgradeType upgradeType)
+    const Strings & args, UpgradeType upgradeType)
 {
     debug(format("upgrading derivations"));
 
@@ -518,8 +529,8 @@ static void upgradeDerivations(Globals & globals,
 
     /* Load the currently installed derivations. */
     PathLocks lock;
-    lockProfile(lock, profile);
-    DrvInfos installedElems = queryInstalled(globals.state, profile);
+    lockProfile(lock, globals.profile);
+    DrvInfos installedElems = queryInstalled(globals.state, globals.profile);
 
     /* Fetch all derivations from the input file. */
     DrvInfos availElems;
@@ -577,7 +588,7 @@ static void upgradeDerivations(Globals & globals,
     }
 
     createUserEnv(globals.state, newElems,
-        profile, globals.keepDerivations);
+        globals.profile, globals.keepDerivations);
 }
 
 
@@ -593,7 +604,55 @@ static void opUpgrade(Globals & globals,
         else if (*i == "--always") upgradeType = utAlways;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
-    upgradeDerivations(globals, opArgs, globals.profile, upgradeType);
+    upgradeDerivations(globals, opArgs, upgradeType);
+}
+
+
+static void setMetaFlag(EvalState & state, DrvInfo & drv,
+    const string & name, const string & value)
+{
+    MetaInfo meta = drv.queryMetaInfo(state);
+    meta[name] = value;
+    drv.setMetaInfo(meta);
+}
+
+
+static void opSetFlag(Globals & globals,
+    Strings opFlags, Strings opArgs)
+{
+    if (opFlags.size() > 0)
+        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
+    if (opArgs.size() < 2)
+        throw UsageError("not enough arguments to `--set-flag'");
+
+    Strings::iterator arg = opArgs.begin();
+    string flagName = *arg++;
+    string flagValue = *arg++;
+    DrvNames selectors = drvNamesFromArgs(Strings(arg, opArgs.end()));
+
+    /* Load the currently installed derivations. */
+    PathLocks lock;
+    lockProfile(lock, globals.profile);
+    DrvInfos installedElems = queryInstalled(globals.state, globals.profile);
+
+    /* Update all matching derivations. */
+    for (DrvInfos::iterator i = installedElems.begin();
+         i != installedElems.end(); ++i)
+    {
+        DrvName drvName(i->name);
+        for (DrvNames::iterator j = selectors.begin();
+             j != selectors.end(); ++j)
+            if (j->matches(drvName)) {
+                printMsg(lvlInfo,
+                    format("setting flag on `%1%'") % i->name);
+                setMetaFlag(globals.state, *i, flagName, flagValue);
+                break;
+            }
+    }
+
+    /* Write the new user environment. */
+    createUserEnv(globals.state, installedElems,
+        globals.profile, globals.keepDerivations);
 }
 
 
@@ -1167,18 +1226,18 @@ void run(Strings args)
             op = opUninstall;
         else if (arg == "--upgrade" || arg == "-u")
             op = opUpgrade;
+        else if (arg == "--set-flag")
+            op = opSetFlag;
         else if (arg == "--set")
             op = opSet;
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
         else if (arg == "--import" || arg == "-I") /* !!! bad name */
             op = opDefaultExpr;
-        else if (arg == "--profile" || arg == "-p") {
+        else if (arg == "--profile" || arg == "-p")
             globals.profile = absPath(needArg(i, args, arg));
-        }
-        else if (arg == "--file" || arg == "-f") {
+        else if (arg == "--file" || arg == "-f")
             globals.instSource.nixExprPath = absPath(needArg(i, args, arg));
-        }
         else if (arg == "--switch-profile" || arg == "-S")
             op = opSwitchProfile;
         else if (arg == "--switch-generation" || arg == "-G")
@@ -1195,9 +1254,8 @@ void run(Strings args)
         }
         else if (arg == "--preserve-installed" || arg == "-P")
             globals.preserveInstalled = true;
-        else if (arg == "--system-filter") {
+        else if (arg == "--system-filter")
             globals.instSource.systemFilter = needArg(i, args, arg);
-        }
         else if (arg[0] == '-')
             opFlags.push_back(arg);
         else

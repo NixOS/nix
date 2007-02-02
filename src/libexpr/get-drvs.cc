@@ -60,6 +60,16 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
 }
 
 
+void DrvInfo::setMetaInfo(const MetaInfo & meta)
+{
+    ATermMap metaAttrs;
+    for (MetaInfo::const_iterator i = meta.begin(); i != meta.end(); ++i)
+        metaAttrs.set(toATerm(i->first),
+            makeAttrRHS(makeStr(i->second), makeNoPos()));
+    attrs->set(toATerm("meta"), makeAttrs(metaAttrs));
+}
+
+
 /* Cache for already evaluated derivations.  Usually putting ATerms in
    a STL container is unsafe (they're not scanning for GC roots), but
    here it doesn't matter; everything in this set is reachable from

@@ -319,7 +319,7 @@ struct Canonicalise : TermFun
 };
 
 
-Expr canonicaliseExpr(Expr & e)
+Expr canonicaliseExpr(Expr e)
 {
     Canonicalise canonicalise;
     return bottomupRewrite(canonicalise, e);
