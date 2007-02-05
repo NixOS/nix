@@ -1,4 +1,4 @@
-<nop>
+<nop xmlns="http://docbook.org/ns/docbook">
   
 <arg><option>--help</option></arg>
 <arg><option>--version</option></arg>

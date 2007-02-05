@@ -152,7 +152,7 @@ $ rm -rf /nix/var</screen>
 
 <para>You can install the latest stable version of Nix through Nix
 itself by subscribing to the channel <link
-xlink:href="http://nix.cs.uu.nl/dist/nix/channels-v3/nix-stable" /> ,
+xlink:href="http://nix.cs.uu.nl/dist/nix/channels-v3/nix-stable" />,
 or the latest unstable version by subscribing to the channel<link
 xlink:href="http://nix.cs.uu.nl/dist/nix/channels-v3/nix-unstable" />.
 You can also do a <link linkend="sec-one-click">one-click
