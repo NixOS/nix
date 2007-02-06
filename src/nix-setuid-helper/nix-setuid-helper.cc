@@ -105,7 +105,7 @@ static void runBuilder(uid_t uidNix, gid_t gidBuildUsers,
        account.  The idea is that the current directory is the
        temporary build directory in /tmp or somewhere else, and we
        don't want to create that directory here. */
-    secureChown(uidNix, -1, uidTargetUser, gidBuildUsers, ".");
+    secureChown(uidNix, (gid_t) -1, uidTargetUser, gidBuildUsers, ".");
 
     /* Set the real, effective and saved gid.  Must be done before
        setuid(), otherwise it won't set the real and saved gids. */
@@ -239,7 +239,7 @@ static void run(int argc, char * * argv)
     else if (command == "get-ownership") {
         /* Syntax: nix-setuid-helper get-ownership <path> */
         if (argc != 3) throw Error("missing path");
-        secureChown(-1, gidBuildUsers, uidNix, gidBuildUsers, argv[2]);
+        secureChown((uid_t) -1, gidBuildUsers, uidNix, gidBuildUsers, argv[2]);
     }
 
     else if (command == "kill") {
