@@ -1,0 +1,24 @@
+Generate a private key:
+
+$ openssl genrsa -out mykey.sec 2048
+
+The private key should be kept secret (only readable to the Nix daemon
+user).
+
+
+Generate the corresponding public key:
+
+$ openssl rsa -in mykey.sec -pubout > mykey.pub
+
+The public key should be copied to all machines to which you want to
+export store paths.
+
+
+Signing:
+
+$ nix-hash --type sha256 --flat svn.nar | openssl rsautl -sign -inkey mykey.sec > svn.nar.sign
+
+
+Verifying a signature:
+
+$ test "$(nix-hash --type sha256 --flat svn.nar)" = "$(openssl rsautl -verify -inkey mykey.pub -pubin -in svn.nar.sign)"
