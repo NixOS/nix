@@ -50,6 +50,9 @@ while (@ARGV) {
 }
 
 
+close TOPLEVEL or die;
+
+
 foreach my $storePath (sort(keys %storePaths)) {
     print STDERR "packing `$storePath'...\n";
 
