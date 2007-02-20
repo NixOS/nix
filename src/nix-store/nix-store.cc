@@ -638,6 +638,15 @@ static void opRestore(Strings opFlags, Strings opArgs)
 }
 
 
+static void opExport(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty()) throw UsageError("unknown flag");
+
+    FdSink sink(STDOUT_FILENO);
+    store->exportPath(*opArgs.begin(), false, sink);
+}
+
+
 /* Initialise the Nix databases. */
 static void opInit(Strings opFlags, Strings opArgs)
 {
@@ -707,6 +716,8 @@ void run(Strings args)
             op = opDump;
         else if (arg == "--restore")
             op = opRestore;
+        else if (arg == "--export")
+            op = opExport;
         else if (arg == "--init")
             op = opInit;
         else if (arg == "--verify")

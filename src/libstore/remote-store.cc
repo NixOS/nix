@@ -243,6 +243,13 @@ Path RemoteStore::addTextToStore(const string & suffix, const string & s,
 }
 
 
+void RemoteStore::exportPath(const Path & path, bool sign,
+    Sink & sink)
+{
+    throw Error("not implemented");
+}
+
+
 void RemoteStore::buildDerivations(const PathSet & drvPaths)
 {
     writeInt(wopBuildDerivations, to);

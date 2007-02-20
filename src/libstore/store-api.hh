@@ -7,6 +7,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "hash.hh"
+#include "serialise.hh"
 
 
 namespace nix {
@@ -90,6 +91,13 @@ public:
        a regular file containing the given string. */
     virtual Path addTextToStore(const string & suffix, const string & s,
         const PathSet & references) = 0;
+
+    /* Export a store path, that is, create a NAR dump of the store
+       path and append its references and its deriver.  Optionally, a
+       cryptographic signature (created by OpenSSL) of the preceding
+       data is attached. */
+    virtual void exportPath(const Path & path, bool sign,
+        Sink & sink) = 0;
 
     /* Ensure that the output paths of the derivation are valid.  If
        they are already valid, this is a no-op.  Otherwise, validity

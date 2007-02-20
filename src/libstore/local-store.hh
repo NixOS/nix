@@ -56,6 +56,9 @@ public:
     Path addTextToStore(const string & suffix, const string & s,
         const PathSet & references);
 
+    void exportPath(const Path & path, bool sign,
+        Sink & sink);
+
     void buildDerivations(const PathSet & drvPaths);
 
     void ensurePath(const Path & path);

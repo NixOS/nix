@@ -696,6 +696,24 @@ Path LocalStore::addTextToStore(const string & suffix, const string & s,
 }
 
 
+void LocalStore::exportPath(const Path & path, bool sign,
+    Sink & sink)
+{
+    assertStorePath(path);
+    
+    dumpPath(path, sink);
+
+    writeString(path, sink);
+    
+    PathSet references;
+    queryReferences(path, references);
+    writeStringSet(references, sink);
+
+    Path deriver = queryDeriver(noTxn, path);
+    writeString(deriver, sink);
+}
+
+
 void deleteFromStore(const Path & _path, unsigned long long & bytesFreed)
 {
     bytesFreed = 0;
