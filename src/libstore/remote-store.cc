@@ -256,7 +256,13 @@ void RemoteStore::exportPath(const Path & path, bool sign,
 
 Path RemoteStore::importPath(bool requireSignature, Source & source)
 {
-    throw Error("not implemented");
+    writeInt(wopImportPath, to);
+    /* We ignore requireSignature, since the worker forces it to true
+       anyway. */
+    
+    processStderr(0, &source);
+    Path path = readStorePath(from);
+    return path;
 }
 
 
@@ -340,16 +346,28 @@ void RemoteStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
 }
 
 
-void RemoteStore::processStderr(Sink * sink)
+void RemoteStore::processStderr(Sink * sink, Source * source)
 {
     unsigned int msg;
-    while ((msg = readInt(from)) == STDERR_NEXT || msg == STDERR_DATA) {
-        string s = readString(from);
-        if (msg == STDERR_DATA) {
+    while ((msg = readInt(from)) == STDERR_NEXT
+        || msg == STDERR_READ || msg == STDERR_WRITE) {
+        if (msg == STDERR_WRITE) {
+            string s = readString(from);
             if (!sink) throw Error("no sink");
             (*sink)((const unsigned char *) s.c_str(), s.size());
         }
-        else writeToStderr((const unsigned char *) s.c_str(), s.size());
+        else if (msg == STDERR_READ) {
+            if (!source) throw Error("no source");
+            unsigned int len = readInt(from);
+            unsigned char * buf = new unsigned char[len];
+            AutoDeleteArray<unsigned char> d(buf);
+            (*source)(buf, len);
+            writeString(string((const char *) buf, len), to);
+        }
+        else {
+            string s = readString(from);
+            writeToStderr((const unsigned char *) s.c_str(), s.size());
+        }
     }
     if (msg == STDERR_ERROR)
         throw Error(readString(from));

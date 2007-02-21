@@ -187,8 +187,33 @@ struct TunnelSink : Sink
     virtual void operator ()
         (const unsigned char * data, unsigned int len)
     {
-        writeInt(STDERR_DATA, to);
+        writeInt(STDERR_WRITE, to);
         writeString(string((const char *) data, len), to);
+    }
+};
+
+
+struct TunnelSource : Source
+{
+    Source & from;
+    TunnelSource(Source & from) : from(from)
+    {
+    }
+    virtual void operator ()
+        (unsigned char * data, unsigned int len)
+    {
+        /* Careful: we're going to receive data from the client now,
+           so we have to disable the SIGPOLL handler. */
+        setSigPollAction(false);
+        canSendStderr = false;
+        
+        writeInt(STDERR_READ, to);
+        writeInt(len, to);
+        string s = readString(from);
+        if (s.size() != len) throw Error("not enough data");
+        memcpy(data, (const unsigned char *) s.c_str(), len);
+
+        startWork();
     }
 };
 
@@ -286,6 +311,15 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         store->exportPath(path, sign, sink);
         stopWork();
         writeInt(1, to);
+        break;
+    }
+
+    case wopImportPath: {
+        startWork();
+        TunnelSource source(from);
+        Path path = store->importPath(true, source);
+        stopWork();
+        writeString(path, to);
         break;
     }
 

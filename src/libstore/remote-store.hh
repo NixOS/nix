@@ -70,7 +70,7 @@ private:
     FdSource from;
     Pid child;
 
-    void processStderr(Sink * sink = 0);
+    void processStderr(Sink * sink = 0, Source * source = 0);
 
     void forkSlave();
     
