@@ -623,9 +623,13 @@ static void opExport(Strings opFlags, Strings opArgs)
          i != opFlags.end(); ++i)
         if (*i == "--sign") sign = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
-    
+
     FdSink sink(STDOUT_FILENO);
-    store->exportPath(*opArgs.begin(), sign, sink);
+    for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); ++i) {
+        writeInt(1, sink);
+        store->exportPath(*i, sign, sink);
+    }
+    writeInt(0, sink);
 }
 
 
@@ -635,7 +639,8 @@ static void opImport(Strings opFlags, Strings opArgs)
     if (!opArgs.empty()) throw UsageError("no arguments expected");
     
     FdSource source(STDIN_FILENO);
-    cout << format("%1%\n") % store->importPath(false, source);
+    while (readInt(source) == 1)
+        cout << format("%1%\n") % store->importPath(false, source);
 }
 
 
