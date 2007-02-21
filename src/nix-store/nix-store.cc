@@ -640,7 +640,7 @@ static void opImport(Strings opFlags, Strings opArgs)
     
     FdSource source(STDIN_FILENO);
     while (readInt(source) == 1)
-        cout << format("%1%\n") % store->importPath(false, source);
+        cout << format("%1%\n") % store->importPath(false, source) << std::flush;
 }
 
 
