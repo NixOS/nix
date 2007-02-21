@@ -723,6 +723,13 @@ void LocalStore::exportPath(const Path & path, bool sign,
 {
     assertStorePath(path);
 
+    /* Wrap all of this in a transaction to make sure that we export
+       consistent metadata. */
+    Transaction txn(nixDB);
+    addTempRoot(path);
+    if (!isValidPath(path))
+        throw Error(format("path `%1%' is not valid") % path);
+
     HashAndWriteSink hashAndWriteSink(sink);
     
     dumpPath(path, hashAndWriteSink);
@@ -732,10 +739,10 @@ void LocalStore::exportPath(const Path & path, bool sign,
     writeString(path, hashAndWriteSink);
     
     PathSet references;
-    queryReferences(path, references);
+    nix::queryReferences(txn, path, references);
     writeStringSet(references, hashAndWriteSink);
 
-    Path deriver = queryDeriver(noTxn, path);
+    Path deriver = queryDeriver(txn, path);
     writeString(deriver, hashAndWriteSink);
 
     if (sign) {
@@ -762,6 +769,8 @@ void LocalStore::exportPath(const Path & path, bool sign,
         
     } else
         writeInt(0, hashAndWriteSink);
+
+    txn.commit();
 }
 
 
@@ -862,8 +871,9 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
             Transaction txn(nixDB);
             /* !!! if we were clever, we could prevent the hashPath()
                here. */
+            if (!isValidPath(deriver)) deriver = "";
             registerValidPath(txn, dstPath,
-                hashPath(htSHA256, dstPath), references, "");
+                hashPath(htSHA256, dstPath), references, deriver);
             txn.commit();
         }
         
