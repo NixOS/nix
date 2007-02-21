@@ -246,7 +246,11 @@ Path RemoteStore::addTextToStore(const string & suffix, const string & s,
 void RemoteStore::exportPath(const Path & path, bool sign,
     Sink & sink)
 {
-    throw Error("not implemented");
+    writeInt(wopExportPath, to);
+    writeString(path, to);
+    writeInt(sign ? 1 : 0, to);
+    processStderr(&sink); /* sink receives the actual data */
+    readInt(from);
 }
 
 
@@ -336,12 +340,16 @@ void RemoteStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
 }
 
 
-void RemoteStore::processStderr()
+void RemoteStore::processStderr(Sink * sink)
 {
     unsigned int msg;
-    while ((msg = readInt(from)) == STDERR_NEXT) {
+    while ((msg = readInt(from)) == STDERR_NEXT || msg == STDERR_DATA) {
         string s = readString(from);
-        writeToStderr((unsigned char *) s.c_str(), s.size());
+        if (msg == STDERR_DATA) {
+            if (!sink) throw Error("no sink");
+            (*sink)((const unsigned char *) s.c_str(), s.size());
+        }
+        else writeToStderr((const unsigned char *) s.c_str(), s.size());
     }
     if (msg == STDERR_ERROR)
         throw Error(readString(from));

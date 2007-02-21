@@ -178,6 +178,21 @@ static void stopWork(bool success = true, const string & msg = "")
 }
 
 
+struct TunnelSink : Sink
+{
+    Sink & to;
+    TunnelSink(Sink & to) : to(to)
+    {
+    }
+    virtual void operator ()
+        (const unsigned char * data, unsigned int len)
+    {
+        writeInt(STDERR_DATA, to);
+        writeString(string((const char *) data, len), to);
+    }
+};
+
+
 static void performOp(Source & from, Sink & to, unsigned int op)
 {
     switch (op) {
@@ -260,6 +275,17 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         Path path = store->addTextToStore(suffix, s, refs);
         stopWork();
         writeString(path, to);
+        break;
+    }
+
+    case wopExportPath: {
+        Path path = readStorePath(from);
+        bool sign = readInt(from) == 1;
+        startWork();
+        TunnelSink sink(to);
+        store->exportPath(path, sign, sink);
+        stopWork();
+        writeInt(1, to);
         break;
     }
 
