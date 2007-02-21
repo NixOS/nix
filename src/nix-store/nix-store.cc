@@ -537,12 +537,23 @@ static void opRegisterValidity(Strings opFlags, Strings opArgs)
 
 static void opCheckValidity(Strings opFlags, Strings opArgs)
 {
-    if (!opFlags.empty()) throw UsageError("unknown flag");
+    bool printInvalid = false;
+    
+    for (Strings::iterator i = opFlags.begin();
+         i != opFlags.end(); ++i)
+        if (*i == "--print-invalid") printInvalid = true;
+        else throw UsageError(format("unknown flag `%1%'") % *i);
 
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); ++i)
-        if (!store->isValidPath(*i))
-            throw Error(format("path `%1%' is not valid") % *i);
+    {
+        Path path = fixPath(*i);
+        if (!store->isValidPath(path))
+            if (printInvalid)
+                cout << format("%1%\n") % path;
+            else
+                throw Error(format("path `%1%' is not valid") % path);
+    }
 }
 
 
