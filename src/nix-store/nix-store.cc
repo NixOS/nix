@@ -651,6 +651,16 @@ static void opExport(Strings opFlags, Strings opArgs)
 }
 
 
+static void opImport(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty()) throw UsageError("unknown flag");
+    if (!opArgs.empty()) throw UsageError("no arguments expected");
+    
+    FdSource source(STDIN_FILENO);
+    cout << format("%1%\n") % store->importPath(false, source);
+}
+
+
 /* Initialise the Nix databases. */
 static void opInit(Strings opFlags, Strings opArgs)
 {
@@ -722,6 +732,8 @@ void run(Strings args)
             op = opRestore;
         else if (arg == "--export")
             op = opExport;
+        else if (arg == "--import")
+            op = opImport;
         else if (arg == "--init")
             op = opInit;
         else if (arg == "--verify")

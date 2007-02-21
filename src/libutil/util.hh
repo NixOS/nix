@@ -70,7 +70,7 @@ void deletePath(const Path & path, unsigned long long & bytesFreed);
 void makePathReadOnly(const Path & path);
 
 /* Create a temporary directory. */
-Path createTempDir();
+Path createTempDir(const Path & tmpRoot = "");
 
 /* Create a directory and all its parents, if necessary. */
 void createDirs(const Path & path);

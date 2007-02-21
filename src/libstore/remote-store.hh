@@ -47,6 +47,8 @@ public:
     void exportPath(const Path & path, bool sign,
         Sink & sink);
 
+    Path importPath(bool requireSignature, Source & source);
+    
     void buildDerivations(const PathSet & drvPaths);
 
     void ensurePath(const Path & path);

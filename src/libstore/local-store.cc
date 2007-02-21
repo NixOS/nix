@@ -6,6 +6,7 @@
 #include "pathlocks.hh"
 #include "aterm.hh"
 #include "derivations-ast.hh"
+#include "worker-protocol.hh"
 #include "config.h"
     
 #include <iostream>
@@ -743,8 +744,6 @@ void LocalStore::exportPath(const Path & path, bool sign,
 
         writeInt(1, hashAndWriteSink);
         
-        //printMsg(lvlError, format("HASH = %1%") % printHash(hash));
-
         Path tmpDir = createTempDir();
         AutoDelete delTmp(tmpDir);
         Path hashFile = tmpDir + "/hash";
@@ -759,12 +758,119 @@ void LocalStore::exportPath(const Path & path, bool sign,
         args.push_back(hashFile);
         string signature = runProgram("openssl", true, args);
 
-        //printMsg(lvlError, format("SIGNATURE = %1%") % signature);
-
         writeString(signature, hashAndWriteSink);
         
     } else
         writeInt(0, hashAndWriteSink);
+}
+
+
+struct HashAndReadSource : Source
+{
+    Source & readSource;
+    HashSink hashSink;
+    bool hashing;
+    HashAndReadSource(Source & readSource) : readSource(readSource), hashSink(htSHA256)
+    {
+        hashing = true;
+    }
+    virtual void operator ()
+        (unsigned char * data, unsigned int len)
+    {
+        readSource(data, len);
+        if (hashing) hashSink(data, len);
+    }
+};
+
+
+Path LocalStore::importPath(bool requireSignature, Source & source)
+{
+    HashAndReadSource hashAndReadSource(source);
+    
+    /* We don't yet know what store path this archive contains (the
+       store path follows the archive data proper), and besides, we
+       don't know yet whether the signature is valid. */
+    Path tmpDir = createTempDir(nixStore);
+    AutoDelete delTmp(tmpDir);
+    Path unpacked = tmpDir + "/unpacked";
+
+    restorePath(unpacked, hashAndReadSource);
+
+    unsigned int magic = readInt(hashAndReadSource);
+    if (magic != EXPORT_MAGIC)
+        throw Error("Nix archive cannot be imported; wrong format");
+
+    Path dstPath = readStorePath(hashAndReadSource);
+
+    PathSet references = readStorePaths(hashAndReadSource);
+
+    Path deriver = readStorePath(hashAndReadSource);
+
+    Hash hash = hashAndReadSource.hashSink.finish();
+    hashAndReadSource.hashing = false;
+
+    bool haveSignature = readInt(hashAndReadSource) == 1;
+
+    if (requireSignature && !haveSignature)
+        throw Error("imported archive lacks a signature");
+    
+    if (haveSignature) {
+        string signature = readString(hashAndReadSource);
+
+        Path sigFile = tmpDir + "/sig";
+        writeStringToFile(sigFile, signature);
+
+        Strings args;
+        args.push_back("rsautl");
+        args.push_back("-verify");
+        args.push_back("-inkey");
+        args.push_back(nixConfDir + "/signing-key.pub");
+        args.push_back("-pubin");
+        args.push_back("-in");
+        args.push_back(sigFile);
+        string hash2 = runProgram("openssl", true, args);
+
+        /* Note: runProgram() throws an exception if the signature is
+           invalid. */
+
+        if (printHash(hash) != hash2)
+            throw Error(
+                "signed hash doesn't match actual contents of imported "
+                "archive; archive could be corrupt, or someone is trying "
+                "to import a Trojan horse");
+    }
+
+    /* Do the actual import. */
+
+    /* !!! way too much code duplication with addTextToStore() etc. */
+    addTempRoot(dstPath);
+
+    if (!isValidPath(dstPath)) {
+
+        PathLocks outputLock(singleton<PathSet, Path>(dstPath));
+
+        if (!isValidPath(dstPath)) {
+
+            if (pathExists(dstPath)) deletePathWrapped(dstPath);
+
+            if (rename(unpacked.c_str(), dstPath.c_str()) == -1)
+                throw SysError(format("cannot move `%1%' to `%2%'")
+                    % unpacked % dstPath);
+
+            canonicalisePathMetaData(dstPath);
+            
+            Transaction txn(nixDB);
+            /* !!! if we were clever, we could prevent the hashPath()
+               here. */
+            registerValidPath(txn, dstPath,
+                hashPath(htSHA256, dstPath), references, "");
+            txn.commit();
+        }
+        
+        outputLock.setDeletion(true);
+    }
+    
+    return dstPath;
 }
 
 

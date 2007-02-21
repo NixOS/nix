@@ -250,6 +250,12 @@ void RemoteStore::exportPath(const Path & path, bool sign,
 }
 
 
+Path RemoteStore::importPath(bool requireSignature, Source & source)
+{
+    throw Error("not implemented");
+}
+
+
 void RemoteStore::buildDerivations(const PathSet & drvPaths)
 {
     writeInt(wopBuildDerivations, to);
