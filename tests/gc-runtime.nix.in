@@ -5,7 +5,7 @@ let {
 mkdir $out
 
 cat > $out/program <<EOF
-#! $SHELL
+#! @shell@
 sleep 10000
 EOF
 

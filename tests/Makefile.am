@@ -43,7 +43,7 @@ EXTRA_DIST = $(TESTS) \
   fallback.nix.in \
   user-envs.nix.in user-envs.builder.sh \
   fixed.nix.in fixed.builder1.sh fixed.builder2.sh \
-  gc-runtime.nix.in gc-runtime.builder.sh \
+  gc-runtime.nix.in \
   check-refs.nix.in \
   filter-source.nix.in \
   $(wildcard lang/*.nix) $(wildcard lang/*.exp) $(wildcard lang/*.exp.xml) $(wildcard lang/*.flags) \
