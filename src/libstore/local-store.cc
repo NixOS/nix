@@ -718,6 +718,16 @@ struct HashAndWriteSink : Sink
 #define EXPORT_MAGIC 0x4558494e
 
 
+static void checkSecrecy(const Path & path)
+{
+    struct stat st;
+    if (stat(path.c_str(), &st))
+        throw SysError(format("getting status of `%1%'") % path);
+    if ((st.st_mode & (S_IRWXG | S_IRWXO)) != 0)
+        throw Error(format("file `%1%' should be secret (inaccessible to everybody else)!") % path);
+}
+
+
 void LocalStore::exportPath(const Path & path, bool sign,
     Sink & sink)
 {
@@ -756,11 +766,14 @@ void LocalStore::exportPath(const Path & path, bool sign,
         Path hashFile = tmpDir + "/hash";
         writeStringToFile(hashFile, printHash(hash));
 
+        Path secretKey = nixConfDir + "/signing-key.sec";
+        checkSecrecy(secretKey);
+
         Strings args;
         args.push_back("rsautl");
         args.push_back("-sign");
         args.push_back("-inkey");
-        args.push_back(nixConfDir + "/signing-key.sec");
+        args.push_back(secretKey);
         args.push_back("-in");
         args.push_back(hashFile);
         string signature = runProgram("openssl", true, args);
