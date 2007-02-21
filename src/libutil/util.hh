@@ -231,7 +231,8 @@ void killUser(uid_t uid);
 
 /* Run a program and return its stdout in a string (i.e., like the
    shell backtick operator). */
-string runProgram(Path program);
+string runProgram(Path program, bool searchPath = false,
+    const Strings & args = Strings());
 
 /* Wrapper around _exit() on Unix and ExitProcess() on Windows.  (On
    Cygwin, _exit() doesn't seem to do the right thing.) */

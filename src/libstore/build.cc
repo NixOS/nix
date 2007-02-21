@@ -477,8 +477,7 @@ static void runSetuidHelper(const string & command,
 
     case 0: /* child */
         try {
-            std::vector<const char *> args; /* careful with c_str()!
-                                               */
+            std::vector<const char *> args; /* careful with c_str()! */
             args.push_back(program.c_str());
             args.push_back(command.c_str());
             args.push_back(arg.c_str());

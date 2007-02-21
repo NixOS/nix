@@ -696,21 +696,75 @@ Path LocalStore::addTextToStore(const string & suffix, const string & s,
 }
 
 
+struct HashAndWriteSink : Sink
+{
+    Sink & writeSink;
+    HashSink hashSink;
+    bool hashing;
+    HashAndWriteSink(Sink & writeSink) : writeSink(writeSink), hashSink(htSHA256)
+    {
+        hashing = true;
+    }
+    virtual void operator ()
+        (const unsigned char * data, unsigned int len)
+    {
+        writeSink(data, len);
+        if (hashing) hashSink(data, len);
+    }
+};
+
+
+#define EXPORT_MAGIC 0x4558494e
+
+
 void LocalStore::exportPath(const Path & path, bool sign,
     Sink & sink)
 {
     assertStorePath(path);
-    
-    dumpPath(path, sink);
 
-    writeString(path, sink);
+    HashAndWriteSink hashAndWriteSink(sink);
+    
+    dumpPath(path, hashAndWriteSink);
+
+    writeInt(EXPORT_MAGIC, hashAndWriteSink);
+
+    writeString(path, hashAndWriteSink);
     
     PathSet references;
     queryReferences(path, references);
-    writeStringSet(references, sink);
+    writeStringSet(references, hashAndWriteSink);
 
     Path deriver = queryDeriver(noTxn, path);
-    writeString(deriver, sink);
+    writeString(deriver, hashAndWriteSink);
+
+    if (sign) {
+        Hash hash = hashAndWriteSink.hashSink.finish();
+        hashAndWriteSink.hashing = false;
+
+        writeInt(1, hashAndWriteSink);
+        
+        //printMsg(lvlError, format("HASH = %1%") % printHash(hash));
+
+        Path tmpDir = createTempDir();
+        AutoDelete delTmp(tmpDir);
+        Path hashFile = tmpDir + "/hash";
+        writeStringToFile(hashFile, printHash(hash));
+
+        Strings args;
+        args.push_back("rsautl");
+        args.push_back("-sign");
+        args.push_back("-inkey");
+        args.push_back(nixConfDir + "/signing-key.sec");
+        args.push_back("-in");
+        args.push_back(hashFile);
+        string signature = runProgram("openssl", true, args);
+
+        //printMsg(lvlError, format("SIGNATURE = %1%") % signature);
+
+        writeString(signature, hashAndWriteSink);
+        
+    } else
+        writeInt(0, hashAndWriteSink);
 }
 
 

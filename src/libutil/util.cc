@@ -761,7 +761,7 @@ void killUser(uid_t uid)
 //////////////////////////////////////////////////////////////////////
 
 
-string runProgram(Path program)
+string runProgram(Path program, bool searchPath, const Strings & args)
 {
     /* Create a pipe. */
     Pipe pipe;
@@ -781,8 +781,17 @@ string runProgram(Path program)
 
             if (dup2(pipe.writeSide, STDOUT_FILENO) == -1)
                 throw SysError("dupping from-hook write side");
-            
-            execl(program.c_str(), program.c_str(), (char *) 0);
+
+            std::vector<const char *> cargs; /* careful with c_str()! */
+            cargs.push_back(program.c_str());
+            for (Strings::const_iterator i = args.begin(); i != args.end(); ++i)
+                cargs.push_back(i->c_str());
+            cargs.push_back(0);
+
+            if (searchPath)
+                execvp(program.c_str(), (char * *) &cargs[0]);
+            else
+                execv(program.c_str(), (char * *) &cargs[0]);
             throw SysError(format("executing `%1%'") % program);
             
         } catch (std::exception & e) {

@@ -282,27 +282,36 @@ Hash hashFile(HashType ht, const Path & path)
 }
 
 
-struct HashSink : Sink
+HashSink::HashSink(HashType ht) : ht(ht)
 {
-    HashType ht;
-    Ctx ctx;
-    virtual void operator ()
-        (const unsigned char * data, unsigned int len)
-    {
-        update(ht, ctx, data, len);
-    }
-};
+    ctx = new Ctx;
+    start(ht, *ctx);
+}
+    
+HashSink::~HashSink()
+{
+    delete ctx;
+}
+
+void HashSink::operator ()
+    (const unsigned char * data, unsigned int len)
+{
+    update(ht, *ctx, data, len);
+}
+
+Hash HashSink::finish()
+{
+    Hash hash(ht);
+    nix::finish(ht, *ctx, hash.hash);
+    return hash;
+}
 
 
 Hash hashPath(HashType ht, const Path & path, PathFilter & filter)
 {
-    HashSink sink;
-    sink.ht = ht;
-    Hash hash(ht);
-    start(ht, sink.ctx);
+    HashSink sink(ht);
     dumpPath(path, sink, filter);
-    finish(ht, sink.ctx, hash.hash);
-    return hash;
+    return sink.finish();
 }
 
 

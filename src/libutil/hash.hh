@@ -2,6 +2,7 @@
 #define __HASH_H
 
 #include "types.hh"
+#include "serialise.hh"
 
 
 namespace nix {
@@ -81,7 +82,23 @@ Hash compressHash(const Hash & hash, unsigned int newSize);
 /* Parse a string representing a hash type. */
 HashType parseHashType(const string & s);
 
- 
+
+typedef union Ctx;
+
+class HashSink : public Sink
+{
+private:
+    HashType ht;
+    Ctx * ctx;
+
+public:
+    HashSink(HashType ht);
+    ~HashSink();
+    virtual void operator () (const unsigned char * data, unsigned int len);
+    Hash finish();
+};
+
+
 }
 
     

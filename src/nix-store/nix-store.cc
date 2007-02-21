@@ -640,10 +640,14 @@ static void opRestore(Strings opFlags, Strings opArgs)
 
 static void opExport(Strings opFlags, Strings opArgs)
 {
-    if (!opFlags.empty()) throw UsageError("unknown flag");
-
+    bool sign = false;
+    for (Strings::iterator i = opFlags.begin();
+         i != opFlags.end(); ++i)
+        if (*i == "--sign") sign = true;
+        else throw UsageError(format("unknown flag `%1%'") % *i);
+    
     FdSink sink(STDOUT_FILENO);
-    store->exportPath(*opArgs.begin(), false, sink);
+    store->exportPath(*opArgs.begin(), sign, sink);
 }
 
 

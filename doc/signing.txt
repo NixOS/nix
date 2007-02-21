@@ -1,6 +1,6 @@
 Generate a private key:
 
-$ openssl genrsa -out mykey.sec 2048
+$ (umask 277 && openssl genrsa -out /nix/etc/nix/signing-key.sec 2048)
 
 The private key should be kept secret (only readable to the Nix daemon
 user).
@@ -8,7 +8,7 @@ user).
 
 Generate the corresponding public key:
 
-$ openssl rsa -in mykey.sec -pubout > mykey.pub
+$ openssl rsa -in /nix/etc/nix/signing-key.sec -pubout > /nix/etc/nix/signing-key.pub
 
 The public key should be copied to all machines to which you want to
 export store paths.
