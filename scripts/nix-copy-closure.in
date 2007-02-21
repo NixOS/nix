@@ -1,0 +1,55 @@
+#! @perl@ -w
+
+my $binDir = $ENV{"NIX_BIN_DIR"};
+$binDir = "@bindir@" unless defined $binDir;
+
+
+# Get the target host.
+my $sshHost = shift @ARGV;
+
+
+# !!! Copied from nix-pack-closure, should put this in a module.
+my %storePathsSeen;
+my @storePaths = ();
+
+while (@ARGV) {
+    my $storePath = shift @ARGV;
+
+    # $storePath might be a symlink to the store, so resolve it.
+    $storePath = (`$binDir/nix-store --query --resolve '$storePath'`
+        or die "cannot resolve `$storePath'");
+    chomp $storePath;
+
+    # Get the closure of this path.
+    my $pid = open(READ,
+        "$binDir/nix-store --query --requisites '$storePath'|") or die;
+    
+    while (<READ>) {
+        chomp;
+        die "bad: $_" unless /^\//;
+        if (!defined $storePathsSeen{$_}) {
+            push @storePaths, $_;
+            $storePathsSeen{$_} = 1;
+        }
+    }
+
+    close READ or die "nix-store failed: $?";
+}
+
+
+# Ask the remote host which paths are invalid.
+open(READ, "-|", "ssh", $sshHost, "nix-store", "--check-validity", "--print-invalid", @storePaths);
+my @missing = ();
+while (<READ>) {
+    chomp;
+    print STDERR "target needs $_\n";
+    push @missing, $_;
+}
+close READ or die;
+
+
+# Export the store paths and import them on the remote machine.
+if (scalar @missing > 0) {
+    system("nix-store --export @missing | ssh $sshHost nix-store --import") == 0
+        or die "copying store paths to remote machine failed: $?";
+}
