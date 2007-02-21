@@ -417,7 +417,7 @@ static void dfsVisit(const PathSet & paths, const Path & path,
 }
 
 
-static Paths topoSort(const PathSet & paths)
+Paths topoSortPaths(const PathSet & paths)
 {
     Paths sorted;
     PathSet visited;
@@ -550,7 +550,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
        which things can be deleted safely. */
     /* !!! when we have multiple output paths per derivation, this
        will not work anymore because we get cycles. */
-    Paths storePaths = topoSort(storePathSet);
+    Paths storePaths = topoSortPaths(storePathSet);
 
     /* Try to delete store paths in the topologically sorted order. */
     for (Paths::iterator i = storePaths.begin(); i != storePaths.end(); ++i) {

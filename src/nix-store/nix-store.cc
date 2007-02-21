@@ -210,14 +210,6 @@ static Path maybeUseOutput(const Path & storePath, bool useOutput, bool forceRea
 }
 
 
-static void printPathSet(const PathSet & paths)
-{
-    for (PathSet::iterator i = paths.begin(); 
-         i != paths.end(); ++i)
-        cout << format("%s\n") % *i;
-}
-
-
 /* Some code to print a tree representation of a derivation dependency
    graph.  Topological sorting is used to keep the tree relatively
    flat. */
@@ -225,34 +217,6 @@ static void printPathSet(const PathSet & paths)
 const string treeConn = "+---";
 const string treeLine = "|   ";
 const string treeNull = "    ";
-
-
-static void dfsVisit(const PathSet & paths, const Path & path,
-    PathSet & visited, Paths & sorted)
-{
-    if (visited.find(path) != visited.end()) return;
-    visited.insert(path);
-    
-    PathSet closure;
-    computeFSClosure(path, closure);
-    
-    for (PathSet::iterator i = closure.begin();
-         i != closure.end(); ++i)
-        if (*i != path && paths.find(*i) != paths.end())
-            dfsVisit(paths, *i, visited, sorted);
-
-    sorted.push_front(path);
-}
-
-
-static Paths topoSort(const PathSet & paths)
-{
-    Paths sorted;
-    PathSet visited;
-    for (PathSet::const_iterator i = paths.begin(); i != paths.end(); ++i)
-        dfsVisit(paths, *i, visited, sorted);
-    return sorted;
-}
 
 
 static void printTree(const Path & path,
@@ -279,7 +243,7 @@ static void printTree(const Path & path,
        closure(B).  That is, if derivation A is an (possibly indirect)
        input of B, then A is printed first.  This has the effect of
        flattening the tree, preventing deeply nested structures.  */
-    Paths sorted = topoSort(references);
+    Paths sorted = topoSortPaths(references);
     reverse(sorted.begin(), sorted.end());
 
     for (Paths::iterator i = sorted.begin(); i != sorted.end(); ++i) {
@@ -355,7 +319,10 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 else if (query == qReferrers) store->queryReferrers(path,  paths);
                 else if (query == qReferrersClosure) computeFSClosure(path, paths, true);
             }
-            printPathSet(paths);
+            Paths sorted = topoSortPaths(paths);
+            for (Paths::reverse_iterator i = sorted.rbegin(); 
+                 i != sorted.rend(); ++i)
+                cout << format("%s\n") % *i;
             break;
         }
 
