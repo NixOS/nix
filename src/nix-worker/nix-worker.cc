@@ -69,9 +69,9 @@ static bool isFarSideClosed(int socket)
     fd_set fds;
     FD_ZERO(&fds);
     FD_SET(socket, &fds);
-        
-    if (select(socket + 1, &fds, 0, 0, &timeout) == -1)
-        throw SysError("select()");
+
+    while (select(socket + 1, &fds, 0, 0, &timeout) == -1)
+        if (errno != EINTR) throw SysError("select()");
 
     if (!FD_ISSET(socket, &fds)) return false;
 
