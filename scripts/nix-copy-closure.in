@@ -15,9 +15,12 @@ EOF
 
 # Get the target host.
 my $sshHost = shift @ARGV;
-my @sshOpts = split ' ', $ENV{"NIX_SSHOPTS"};
+my @sshOpts = split ' ', ($ENV{"NIX_SSHOPTS"} or "");
 
 my $sign = 0;
+
+my $compressor = "cat";
+my $decompressor = "cat";
 
 
 # !!! Copied from nix-pack-closure, should put this in a module.
@@ -28,6 +31,11 @@ while (@ARGV) {
     my $storePath = shift @ARGV;
     if ($storePath eq "--sign") {
         $sign = 1;
+        next;
+    }
+    if ($storePath eq "--gzip") {
+        $compressor = "gzip";
+        $decompressor = "gunzip";
         next;
     }
 
@@ -54,7 +62,7 @@ while (@ARGV) {
 
 
 # Ask the remote host which paths are invalid.
-open(READ, "-|", "ssh", @sshOpts, $sshHost, "nix-store", "--check-validity", "--print-invalid", @storePaths);
+open(READ, "ssh @sshOpts $sshHost sh --login -c '\"nix-store --check-validity --print-invalid @storePaths\"'|");
 my @missing = ();
 while (<READ>) {
     chomp;
@@ -68,6 +76,6 @@ close READ or die;
 if (scalar @missing > 0) {
     my $extraOpts = "";
     $extraOpts .= "--sign" if $sign == 1;
-    system("nix-store --export $extraOpts @missing | ssh @sshOpts $sshHost nix-store --import") == 0
+    system("nix-store --export $extraOpts @missing | $compressor | ssh @sshOpts $sshHost sh --login -c '\"$decompressor | nix-store --import\"'") == 0
         or die "copying store paths to remote machine failed: $?";
 }
