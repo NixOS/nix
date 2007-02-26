@@ -58,7 +58,7 @@ if test -z "$finalPath"; then
     if test -n "$tmpPath"; then rm -rf $tmpPath || true; fi
 
     if test -n "$expHash" -a "$expHash" != "$hash"; then
-        echo "hash mismatch for URL \`$url'"
+        echo "hash mismatch for URL \`$url'" >&2
         exit 1
     fi
 fi
