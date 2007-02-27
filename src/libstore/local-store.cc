@@ -826,7 +826,8 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 
     PathSet references = readStorePaths(hashAndReadSource);
 
-    Path deriver = readStorePath(hashAndReadSource);
+    Path deriver = readString(hashAndReadSource);
+    if (deriver != "") assertStorePath(deriver);
 
     Hash hash = hashAndReadSource.hashSink.finish();
     hashAndReadSource.hashing = false;
