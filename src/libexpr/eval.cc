@@ -8,6 +8,10 @@
 #include "globals.hh"
 
 
+#define LocalNoInline(f) static f __attribute__((noinline)); f
+#define LocalNoInlineNoReturn(f) static f __attribute__((noinline, noreturn)); f
+
+
 namespace nix {
     
 
@@ -26,6 +30,42 @@ void EvalState::addPrimOp(const string & name,
     unsigned int arity, PrimOp primOp)
 {
     primOps.set(toATerm(name), makePrimOpDef(arity, ATmakeBlob(0, (void *) primOp)));
+}
+
+
+/* Every "format" object (even temporary) takes up a few hundred bytes
+   of stack space, which is a real killer in the recursive
+   evaluator.  So here are some helper functions for throwing
+   exceptions. */
+
+LocalNoInlineNoReturn(void throwEvalError(const char * s))
+{
+    throw EvalError(s);
+}
+
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
+{
+    throw EvalError(format(s) % s2);
+}
+
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s2))
+{
+    throw TypeError(format(s) % s2);
+}
+
+LocalNoInline(void addErrorPrefix(Error & e, const char * s))
+{
+    e.addPrefix(s);
+}
+
+LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2))
+{
+    e.addPrefix(format(s) % s2);
+}
+
+LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, const string & s3))
+{
+    e.addPrefix(format(s) % s2 % s3);
 }
 
 
@@ -111,7 +151,7 @@ static Expr substArgs(EvalState & state,
    to attributes substituted with selection expressions on the
    original set.  E.g., e = `rec {x = f x y; y = x;}' becomes `{x = f
    (e.x) (e.y); y = e.x;}'. */
-ATerm expandRec(ATerm e, ATermList rbnds, ATermList nrbnds)
+LocalNoInline(ATerm expandRec(ATerm e, ATermList rbnds, ATermList nrbnds))
 {
     ATerm name;
     Expr e2;
@@ -147,7 +187,7 @@ ATerm expandRec(ATerm e, ATermList rbnds, ATermList nrbnds)
 }
 
 
-static Expr updateAttrs(Expr e1, Expr e2)
+LocalNoInline(Expr updateAttrs(Expr e1, Expr e2))
 {
     /* Note: e1 and e2 should be in normal form. */
 
@@ -164,7 +204,7 @@ string evalString(EvalState & state, Expr e, PathSet & context)
     e = evalExpr(state, e);
     string s;
     if (!matchStr(e, s, context))
-        throw TypeError(format("value is %1% while a string was expected") % showType(e));
+        throwTypeError("value is %1% while a string was expected", showType(e));
     return s;
 }
 
@@ -185,7 +225,7 @@ int evalInt(EvalState & state, Expr e)
     e = evalExpr(state, e);
     int i;
     if (!matchInt(e, i))
-        throw TypeError(format("value is %1% while an integer was expected") % showType(e));
+        throwTypeError("value is %1% while an integer was expected", showType(e));
     return i;
 }
 
@@ -195,7 +235,7 @@ bool evalBool(EvalState & state, Expr e)
     e = evalExpr(state, e);
     if (e == eTrue) return true;
     else if (e == eFalse) return false;
-    else throw TypeError(format("value is %1% while a boolean was expected") % showType(e));
+    else throwTypeError("value is %1% while a boolean was expected", showType(e));
 }
 
 
@@ -204,7 +244,7 @@ ATermList evalList(EvalState & state, Expr e)
     e = evalExpr(state, e);
     ATermList list;
     if (!matchList(e, list))
-        throw TypeError(format("value is %1% while a list was expected") % showType(e));
+        throwTypeError("value is %1% while a list was expected", showType(e));
     return list;
 }
 
@@ -292,7 +332,7 @@ string coerceToString(EvalState & state, Expr e, PathSet & context,
         }
     }
     
-    throw TypeError(format("cannot coerce %1% to a string") % showType(e));
+    throwTypeError("cannot coerce %1% to a string", showType(e));
 }
 
 
@@ -362,6 +402,215 @@ Expr autoCallFunction(Expr e, const ATermMap & args)
 }
 
 
+/* Evaluation of various language constructs.  These have been taken
+   out of evalExpr2 to reduce stack space usage.  (GCC is really dumb
+   about stack space: it just adds up all the local variables and
+   temporaries of every scope into one huge stack frame.  This is
+   really bad for deeply recursive functions.) */
+
+
+LocalNoInline(Expr evalVar(EvalState & state, ATerm name))
+{
+    ATerm primOp = state.primOps.get(name);
+    if (!primOp)
+        throw EvalError(format("impossible: undefined variable `%1%'") % aterm2String(name));
+    int arity;
+    ATermBlob fun;
+    if (!matchPrimOpDef(primOp, arity, fun)) abort();
+    if (arity == 0)
+        /* !!! backtrace for primop call */
+        return ((PrimOp) ATgetBlobData(fun)) (state, ATermVector());
+    else
+        return makePrimOp(arity, fun, ATempty);
+}
+
+
+LocalNoInline(Expr evalCall(EvalState & state, Expr fun, Expr arg))
+{
+    ATermList formals;
+    ATerm pos, name;
+    Expr body;
+        
+    /* Evaluate the left-hand side. */
+    fun = evalExpr(state, fun);
+
+    /* Is it a primop or a function? */
+    int arity;
+    ATermBlob funBlob;
+    ATermList args;
+    if (matchPrimOp(fun, arity, funBlob, args)) {
+        args = ATinsert(args, arg);
+        if (ATgetLength(args) == arity) {
+            /* Put the arguments in a vector in reverse (i.e.,
+               actual) order. */
+            ATermVector args2(arity);
+            for (ATermIterator i(args); i; ++i)
+                args2[--arity] = *i;
+            /* !!! backtrace for primop call */
+            return ((PrimOp) ATgetBlobData(funBlob))
+                (state, args2);
+        } else
+            /* Need more arguments, so propagate the primop. */
+            return makePrimOp(arity, funBlob, args);
+    }
+
+    else if (matchFunction(fun, formals, body, pos)) {
+        arg = evalExpr(state, arg);
+        try {
+            return evalExpr(state, substArgs(state, body, formals, arg));
+        } catch (Error & e) {
+            addErrorPrefix(e, "while evaluating the function at %1%:\n",
+                showPos(pos));
+            throw;
+        }
+    }
+        
+    else if (matchFunction1(fun, name, body, pos)) {
+        try {
+            ATermMap subs(1);
+            subs.set(name, arg);
+            return evalExpr(state, substitute(Substitution(0, &subs), body));
+        } catch (Error & e) {
+            addErrorPrefix(e, "while evaluating the function at %1%:\n",
+                showPos(pos));
+            throw;
+        }
+    }
+
+    else throwTypeError(
+        "the left-hand side of the function call is neither a function nor a primop (built-in operation) but %1%",
+        showType(fun));
+}
+
+
+LocalNoInline(Expr evalSelect(EvalState & state, Expr e, ATerm name))
+{
+    ATerm pos;
+    string s = aterm2String(name);
+    Expr a = queryAttr(evalExpr(state, e), s, pos);
+    if (!a) throwEvalError("attribute `%1%' missing", s);
+    try {
+        return evalExpr(state, a);
+    } catch (Error & e) {
+        addErrorPrefix(e, "while evaluating the attribute `%1%' at %2%:\n",
+            s, showPos(pos));
+        throw;
+    }
+}
+
+
+LocalNoInline(Expr evalAssert(EvalState & state, Expr cond, Expr body, ATerm pos))
+{
+    if (!evalBool(state, cond))
+        throw AssertionError(format("assertion failed at %1%") % showPos(pos));
+    return evalExpr(state, body);
+}
+
+
+LocalNoInline(Expr evalWith(EvalState & state, Expr defs, Expr body, ATerm pos))
+{
+    ATermMap attrs;
+    try {
+        defs = evalExpr(state, defs);
+        queryAllAttrs(defs, attrs);
+    } catch (Error & e) {
+        addErrorPrefix(e, "while evaluating the `with' definitions at %1%:\n",
+            showPos(pos));
+        throw;
+    }
+    try {
+        body = substitute(Substitution(0, &attrs), body);
+        checkVarDefs(state.primOps, body);
+        return evalExpr(state, body);
+    } catch (Error & e) {
+        addErrorPrefix(e, "while evaluating the `with' body at %1%:\n",
+            showPos(pos));
+        throw;
+    } 
+}
+
+
+LocalNoInline(Expr evalHasAttr(EvalState & state, Expr e, ATerm name))
+{
+    ATermMap attrs;
+    queryAllAttrs(evalExpr(state, e), attrs);
+    return makeBool(attrs.get(name) != 0);
+}
+
+
+LocalNoInline(Expr evalPlusConcat(EvalState & state, Expr e))
+{
+    Expr e1, e2;
+    ATermList es;
+    
+    ATermVector args;
+    
+    if (matchOpPlus(e, e1, e2)) {
+
+        /* !!! Awful compatibility hack for `drv + /path'.
+           According to regular concatenation, /path should be
+           copied to the store and its store path should be
+           appended to the string.  However, in Nix <= 0.10, /path
+           was concatenated.  So handle that case separately, but
+           do print out a warning.  This code can go in Nix 0.12,
+           maybe. */
+        e1 = evalExpr(state, e1);
+        e2 = evalExpr(state, e2);
+
+        ATermList as;
+        ATerm p;
+        if (matchAttrs(e1, as) && matchPath(e2, p)) {
+            static bool haveWarned = false;
+            warnOnce(haveWarned, format(
+                    "concatenation of a derivation and a path is deprecated; "
+                    "you should write `drv + \"%1%\"' instead of `drv + %1%'")
+                % aterm2String(p));
+            PathSet context;
+            return makeStr(
+                coerceToString(state, makeSelect(e1, toATerm("outPath")), context)
+                + aterm2String(p), context);
+        }
+
+        args.push_back(e1);
+        args.push_back(e2);
+    }
+
+    else if (matchConcatStrings(e, es))
+        for (ATermIterator i(es); i; ++i) args.push_back(*i);
+        
+    try {
+        return concatStrings(state, args);
+    } catch (Error & e) {
+        addErrorPrefix(e, "in a string concatenation:\n");
+        throw;
+    }
+}
+
+
+LocalNoInline(Expr evalSubPath(EvalState & state, Expr e1, Expr e2))
+{
+    static bool haveWarned = false;
+    warnOnce(haveWarned, "the subpath operator (~) is deprecated, use string concatenation (+) instead");
+    ATermVector args;
+    args.push_back(e1);
+    args.push_back(e2);
+    return concatStrings(state, args, "/");
+}
+
+
+LocalNoInline(Expr evalOpConcat(EvalState & state, Expr e1, Expr e2))
+{
+    try {
+        ATermList l1 = evalList(state, e1);
+        ATermList l2 = evalList(state, e2);
+        return makeList(ATconcat(l1, l2));
+    } catch (Error & e) {
+        addErrorPrefix(e, "in a list concatenation:\n");
+        throw;
+    }
+}
+
+
 static char * deepestStack = (char *) -1; /* for measuring stack usage */
 
 
@@ -370,7 +619,7 @@ Expr evalExpr2(EvalState & state, Expr e)
     char x;
     if (&x < deepestStack) deepestStack = &x;
     
-    Expr e1, e2, e3, e4;
+    Expr e1, e2, e3;
     ATerm name, pos;
     AFun sym = ATgetAFun(e);
 
@@ -394,91 +643,13 @@ Expr evalExpr2(EvalState & state, Expr e)
 
     /* Any encountered variables must be primops (since undefined
        variables are detected after parsing). */
-    if (matchVar(e, name)) {
-        ATerm primOp = state.primOps.get(name);
-        if (!primOp)
-            throw EvalError(format("impossible: undefined variable `%1%'") % aterm2String(name));
-        int arity;
-        ATermBlob fun;
-        if (!matchPrimOpDef(primOp, arity, fun)) abort();
-        if (arity == 0)
-            /* !!! backtrace for primop call */
-            return ((PrimOp) ATgetBlobData(fun)) (state, ATermVector());
-        else
-            return makePrimOp(arity, fun, ATempty);
-    }
+    if (matchVar(e, name)) return evalVar(state, name);
 
     /* Function application. */
-    if (matchCall(e, e1, e2)) {
-
-        ATermList formals;
-        ATerm pos;
-        
-        /* Evaluate the left-hand side. */
-        e1 = evalExpr(state, e1);
-
-        /* Is it a primop or a function? */
-        int arity;
-        ATermBlob fun;
-        ATermList args;
-        if (matchPrimOp(e1, arity, fun, args)) {
-            args = ATinsert(args, e2);
-            if (ATgetLength(args) == arity) {
-                /* Put the arguments in a vector in reverse (i.e.,
-                   actual) order. */
-                ATermVector args2(arity);
-                for (ATermIterator i(args); i; ++i)
-                    args2[--arity] = *i;
-                /* !!! backtrace for primop call */
-                return ((PrimOp) ATgetBlobData((ATermBlob) fun))
-                    (state, args2);
-            } else
-                /* Need more arguments, so propagate the primop. */
-                return makePrimOp(arity, fun, args);
-        }
-
-        else if (matchFunction(e1, formals, e4, pos)) {
-            e2 = evalExpr(state, e2);
-            try {
-                return evalExpr(state, substArgs(state, e4, formals, e2));
-            } catch (Error & e) {
-                e.addPrefix(format("while evaluating the function at %1%:\n")
-                    % showPos(pos));
-                throw;
-            }
-        }
-        
-        else if (matchFunction1(e1, name, e4, pos)) {
-            try {
-                ATermMap subs(1);
-                subs.set(name, e2);
-                return evalExpr(state, substitute(Substitution(0, &subs), e4));
-            } catch (Error & e) {
-                e.addPrefix(format("while evaluating the function at %1%:\n")
-                    % showPos(pos));
-                throw;
-            }
-        }
-        
-        else throw TypeError(
-            format("the left-hand side of the function call is neither a function nor a primop (built-in operation) but %1%")
-            % showType(e1));
-    }
+    if (matchCall(e, e1, e2)) return evalCall(state, e1, e2);
 
     /* Attribute selection. */
-    if (matchSelect(e, e1, name)) {
-        ATerm pos;
-        string s1 = aterm2String(name);
-        Expr a = queryAttr(evalExpr(state, e1), s1, pos);
-        if (!a) throw EvalError(format("attribute `%1%' missing") % s1);
-        try {
-            return evalExpr(state, a);
-        } catch (Error & e) {
-            e.addPrefix(format("while evaluating the attribute `%1%' at %2%:\n")
-                % s1 % showPos(pos));
-            throw;
-        }
-    }
+    if (matchSelect(e, e1, name)) return evalSelect(state, e1, name);
 
     /* Mutually recursive sets. */
     ATermList rbnds, nrbnds;
@@ -486,41 +657,14 @@ Expr evalExpr2(EvalState & state, Expr e)
         return expandRec(e, rbnds, nrbnds);
 
     /* Conditionals. */
-    if (matchIf(e, e1, e2, e3)) {
-        if (evalBool(state, e1))
-            return evalExpr(state, e2);
-        else
-            return evalExpr(state, e3);
-    }
+    if (matchIf(e, e1, e2, e3))
+        return evalExpr(state, evalBool(state, e1) ? e2 : e3);
 
     /* Assertions. */
-    if (matchAssert(e, e1, e2, pos)) {
-        if (!evalBool(state, e1))
-            throw AssertionError(format("assertion failed at %1%") % showPos(pos));
-        return evalExpr(state, e2);
-    }
+    if (matchAssert(e, e1, e2, pos)) return evalAssert(state, e1, e2, pos);
 
     /* Withs. */
-    if (matchWith(e, e1, e2, pos)) {
-        ATermMap attrs;        
-        try {
-            e1 = evalExpr(state, e1);
-            queryAllAttrs(e1, attrs);
-        } catch (Error & e) {
-            e.addPrefix(format("while evaluating the `with' definitions at %1%:\n")
-                % showPos(pos));
-            throw;
-        }
-        try {
-            e2 = substitute(Substitution(0, &attrs), e2);
-            checkVarDefs(state.primOps, e2);
-            return evalExpr(state, e2);
-        } catch (Error & e) {
-            e.addPrefix(format("while evaluating the `with' body at %1%:\n")
-                % showPos(pos));
-            throw;
-        } 
-    }
+    if (matchWith(e, e1, e2, pos)) return evalWith(state, e1, e2, pos);
 
     /* Generic equality/inequality.  Note that the behaviour on
        composite data (lists, attribute sets) and functions is
@@ -555,88 +699,31 @@ Expr evalExpr2(EvalState & state, Expr e)
         return updateAttrs(evalExpr(state, e1), evalExpr(state, e2));
 
     /* Attribute existence test (?). */
-    if (matchOpHasAttr(e, e1, name)) {
-        ATermMap attrs;
-        queryAllAttrs(evalExpr(state, e1), attrs);
-        return makeBool(attrs.get(name) != 0);
-    }
+    if (matchOpHasAttr(e, e1, name)) return evalHasAttr(state, e1, name);
 
     /* String or path concatenation. */
-    ATermList es = ATempty;
-    if (matchOpPlus(e, e1, e2) || matchConcatStrings(e, es)) {
-        ATermVector args;
-        if (matchOpPlus(e, e1, e2)) {
-
-            /* !!! Awful compatibility hack for `drv + /path'.
-               According to regular concatenation, /path should be
-               copied to the store and its store path should be
-               appended to the string.  However, in Nix <= 0.10, /path
-               was concatenated.  So handle that case separately, but
-               do print out a warning.  This code can go in Nix 0.12,
-               maybe. */
-            e1 = evalExpr(state, e1);
-            e2 = evalExpr(state, e2);
-
-            ATermList as;
-            ATerm p;
-            if (matchAttrs(e1, as) && matchPath(e2, p)) {
-                static bool haveWarned = false;
-                warnOnce(haveWarned, format(
-                    "concatenation of a derivation and a path is deprecated; "
-                    "you should write `drv + \"%1%\"' instead of `drv + %1%'")
-                    % aterm2String(p));
-                PathSet context;
-                return makeStr(
-                    coerceToString(state, makeSelect(e1, toATerm("outPath")), context)
-                    + aterm2String(p), context);
-            }
-
-            args.push_back(e1);
-            args.push_back(e2);
-        } else
-            for (ATermIterator i(es); i; ++i) args.push_back(*i);
-        
-        try {
-            return concatStrings(state, args);
-        } catch (Error & e) {
-            e.addPrefix(format("in a string concatenation:\n"));
-            throw;
-        }
-    }
+    if (sym == symOpPlus || sym == symConcatStrings)
+        return evalPlusConcat(state, e);
 
     /* Backwards compatability: subpath operator (~). */
-    if (matchSubPath(e, e1, e2)) {
-        static bool haveWarned = false;
-        warnOnce(haveWarned, "the subpath operator (~) is deprecated, use string concatenation (+) instead");
-        ATermVector args;
-        args.push_back(e1);
-        args.push_back(e2);
-        return concatStrings(state, args, "/");
-    }
+    if (matchSubPath(e, e1, e2)) return evalSubPath(state, e1, e2);
 
     /* List concatenation. */
-    if (matchOpConcat(e, e1, e2)) {
-        try {
-            ATermList l1 = evalList(state, e1);
-            ATermList l2 = evalList(state, e2);
-            return makeList(ATconcat(l1, l2));
-        } catch (Error & e) {
-            e.addPrefix(format("in a list concatenation:\n"));
-            throw;
-        }
-    }
+    if (matchOpConcat(e, e1, e2)) return evalOpConcat(state, e1, e2);
 
     /* Barf. */
-    throw badTerm("invalid expression", e);
+    abort();
 }
 
 
 Expr evalExpr(EvalState & state, Expr e)
 {
     checkInterrupt();
-    
+
+#if 0
     startNest(nest, lvlVomit,
         format("evaluating expression: %1%") % e);
+#endif
 
     state.nrEvaluated++;
 
@@ -645,7 +732,7 @@ Expr evalExpr(EvalState & state, Expr e)
     Expr nf = state.normalForms.get(e);
     if (nf) {
         if (nf == makeBlackHole())
-            throw EvalError("infinite recursion encountered");
+            throwEvalError("infinite recursion encountered");
         state.nrCached++;
         return nf;
     }
@@ -655,7 +742,6 @@ Expr evalExpr(EvalState & state, Expr e)
     try {
         nf = evalExpr2(state, e);
     } catch (Error & err) {
-        debug("removing black hole");
         state.normalForms.remove(e);
         throw;
     }
