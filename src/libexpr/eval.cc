@@ -362,8 +362,14 @@ Expr autoCallFunction(Expr e, const ATermMap & args)
 }
 
 
+static char * deepestStack = (char *) -1; /* for measuring stack usage */
+
+
 Expr evalExpr2(EvalState & state, Expr e)
 {
+    char x;
+    if (&x < deepestStack) deepestStack = &x;
+    
     Expr e1, e2, e3, e4;
     ATerm name, pos;
     AFun sym = ATgetAFun(e);
@@ -752,12 +758,14 @@ extern "C" {
 
 void printEvalStats(EvalState & state)
 {
+    char x;
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
     printMsg(showStats ? lvlInfo : lvlDebug,
-        format("evaluated %1% expressions, %2% cache hits, %3%%% efficiency, used %4% ATerm bytes")
+        format("evaluated %1% expressions, %2% cache hits, %3%%% efficiency, used %4% ATerm bytes, used %5% bytes of stack space")
         % state.nrEvaluated % state.nrCached
         % ((float) state.nrCached / (float) state.nrEvaluated * 100)
-        % AT_calcAllocatedSize());
+        % AT_calcAllocatedSize()
+        % (&x - deepestStack));
     if (showStats)
         printATermMapStats();
 }
