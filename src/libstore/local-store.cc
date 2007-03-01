@@ -776,7 +776,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
         args.push_back(secretKey);
         args.push_back("-in");
         args.push_back(hashFile);
-        string signature = runProgram("openssl", true, args);
+        string signature = runProgram(OPENSSL_PATH, true, args);
 
         writeString(signature, hashAndWriteSink);
         
@@ -852,7 +852,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
             args.push_back("-pubin");
             args.push_back("-in");
             args.push_back(sigFile);
-            string hash2 = runProgram("openssl", true, args);
+            string hash2 = runProgram(OPENSSL_PATH, true, args);
 
             /* Note: runProgram() throws an exception if the signature
                is invalid. */

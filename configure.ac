@@ -126,6 +126,10 @@ NEED_PROG(perl, perl)
 NEED_PROG(tar, tar)
 AC_PATH_PROG(dot, dot)
 
+AC_PATH_PROG(openssl_prog, openssl, openssl) # if not found, call openssl in $PATH
+AC_SUBST(openssl_prog)
+AC_DEFINE_UNQUOTED(OPENSSL_PATH, ["$openssl_prog"], [Path of the OpenSSL binary])
+
 # Test that Perl has the open/fork feature (Perl 5.8.0 and beyond).
 AC_MSG_CHECKING([whether Perl is recent enough])
 if ! $perl -e 'open(FOO, "-|", "true"); while (<FOO>) { print; }; close FOO or die;'; then
