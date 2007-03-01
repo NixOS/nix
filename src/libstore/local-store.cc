@@ -840,27 +840,29 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
     if (haveSignature) {
         string signature = readString(hashAndReadSource);
 
-        Path sigFile = tmpDir + "/sig";
-        writeStringToFile(sigFile, signature);
+        if (requireSignature) {
+            Path sigFile = tmpDir + "/sig";
+            writeStringToFile(sigFile, signature);
 
-        Strings args;
-        args.push_back("rsautl");
-        args.push_back("-verify");
-        args.push_back("-inkey");
-        args.push_back(nixConfDir + "/signing-key.pub");
-        args.push_back("-pubin");
-        args.push_back("-in");
-        args.push_back(sigFile);
-        string hash2 = runProgram("openssl", true, args);
+            Strings args;
+            args.push_back("rsautl");
+            args.push_back("-verify");
+            args.push_back("-inkey");
+            args.push_back(nixConfDir + "/signing-key.pub");
+            args.push_back("-pubin");
+            args.push_back("-in");
+            args.push_back(sigFile);
+            string hash2 = runProgram("openssl", true, args);
 
-        /* Note: runProgram() throws an exception if the signature is
-           invalid. */
+            /* Note: runProgram() throws an exception if the signature
+               is invalid. */
 
-        if (printHash(hash) != hash2)
-            throw Error(
-                "signed hash doesn't match actual contents of imported "
-                "archive; archive could be corrupt, or someone is trying "
-                "to import a Trojan horse");
+            if (printHash(hash) != hash2)
+                throw Error(
+                    "signed hash doesn't match actual contents of imported "
+                    "archive; archive could be corrupt, or someone is trying "
+                    "to import a Trojan horse");
+        }
     }
 
     /* Do the actual import. */
