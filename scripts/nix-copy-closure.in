@@ -62,7 +62,7 @@ while (@ARGV) {
 
 
 # Ask the remote host which paths are invalid.
-open(READ, "ssh @sshOpts $sshHost sh --login -c '\"nix-store --check-validity --print-invalid @storePaths\"'|");
+open(READ, "ssh @sshOpts $sshHost bash --login -c '\"nix-store --check-validity --print-invalid @storePaths\"'|");
 my @missing = ();
 while (<READ>) {
     chomp;
@@ -76,6 +76,6 @@ close READ or die;
 if (scalar @missing > 0) {
     my $extraOpts = "";
     $extraOpts .= "--sign" if $sign == 1;
-    system("nix-store --export $extraOpts @missing | $compressor | ssh @sshOpts $sshHost sh --login -c '\"$decompressor | nix-store --import\"'") == 0
+    system("nix-store --export $extraOpts @missing | $compressor | ssh @sshOpts $sshHost bash --login -c '\"$decompressor | nix-store --import\"'") == 0
         or die "copying store paths to remote machine failed: $?";
 }
