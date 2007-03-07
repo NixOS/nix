@@ -1262,6 +1262,20 @@ bool DerivationGoal::prepareBuild()
             % drvPath);
     }
 
+    /* If any of the outputs already exist but are not registered,
+       delete them. */
+    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
+         i != drv.outputs.end(); ++i)
+    {
+        Path path = i->second.path;
+        if (store->isValidPath(path))
+            throw BuildError(format("obstructed build: path `%1%' exists") % path);
+        if (pathExists(path)) {
+            debug(format("removing unregistered path `%1%'") % path);
+            deletePathWrapped(path);
+        }
+    }
+
     /* Gather information necessary for computing the closure and/or
        running the build hook. */
     
@@ -1317,20 +1331,6 @@ void DerivationGoal::startBuilder()
         throw BuildError(
             format("a `%1%' is required to build `%3%', but I am a `%2%'")
             % drv.platform % thisSystem % drvPath);
-
-    /* If any of the outputs already exist but are not registered,
-       delete them. */
-    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
-         i != drv.outputs.end(); ++i)
-    {
-        Path path = i->second.path;
-        if (store->isValidPath(path))
-            throw BuildError(format("obstructed build: path `%1%' exists") % path);
-        if (pathExists(path)) {
-            debug(format("removing unregistered path `%1%'") % path);
-            deletePathWrapped(path);
-        }
-    }
 
     /* Construct the environment passed to the builder. */
     typedef map<string, string> Environment;
