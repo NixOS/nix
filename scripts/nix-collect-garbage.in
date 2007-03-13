@@ -21,21 +21,30 @@ for my $arg (@ARGV) {
 # If `-d' was specified, remove all old generations of all profiles.
 # Of course, this makes rollbacks to before this point in time
 # impossible.
-if ($removeOld) {
 
-    opendir DIR, $profilesDir or die;
+sub removeOldGenerations;
+sub removeOldGenerations {
+    my $dir = shift;
 
-    foreach my $name (sort (readdir DIR)) {
-        $name = $profilesDir . "/" . $name;
+    my $dh;
+    opendir $dh, $dir or die;
+
+    foreach my $name (sort (readdir $dh)) {
+        next if $name eq "." || $name eq "..";
+        $name = $dir . "/" . $name;
         if (-l $name && (readlink($name) =~ /link/)) {
             print STDERR "removing old generations of profile $name\n";
             system("@bindir@/nix-env", "-p", $name, "--delete-generations", "old");
         }
+        elsif (! -l $name && -d $name) {
+            removeOldGenerations $name;
+        }
     }
     
-    closedir DIR or die;
-    
+    closedir $dh or die;
 }
+
+removeOldGenerations $profilesDir if $removeOld;
 
 
 # Run the actual garbage collector.
