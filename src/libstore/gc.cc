@@ -118,13 +118,15 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
     }
 
     /* Check that the root can be found by the garbage collector. */
-    Roots roots = store->findRoots();
-    if (roots.find(gcRoot) == roots.end())
-        printMsg(lvlError, 
-            format(
-                "warning: `%1%' is not in a directory where the garbage collector looks for roots; "
-                "therefore, `%2%' might be removed by the garbage collector")
-            % gcRoot % storePath);
+    if (queryBoolSetting("gc-check-reachability", true)) {
+        Roots roots = store->findRoots();
+        if (roots.find(gcRoot) == roots.end())
+            printMsg(lvlError, 
+                format(
+                    "warning: `%1%' is not in a directory where the garbage collector looks for roots; "
+                    "therefore, `%2%' might be removed by the garbage collector")
+                % gcRoot % storePath);
+    }
         
     /* Grab the global GC root, causing us to block while a GC is in
        progress.  This prevents the set of permanent roots from
