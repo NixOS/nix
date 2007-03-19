@@ -213,6 +213,7 @@ class Pid
 {
     pid_t pid;
     bool separatePG;
+    int killSignal;
 public:
     Pid();
     ~Pid();
@@ -221,6 +222,7 @@ public:
     void kill();
     int wait(bool block);
     void setSeparatePG(bool separatePG);
+    void setKillSignal(int signal);
 };
 
 

@@ -641,6 +641,7 @@ Pid::Pid()
 {
     pid = -1;
     separatePG = false;
+    killSignal = SIGKILL;
 }
 
 
@@ -654,6 +655,7 @@ void Pid::operator =(pid_t pid)
 {
     if (this->pid != pid) kill();
     this->pid = pid;
+    killSignal = SIGKILL; // reset signal to default
 }
 
 
@@ -669,10 +671,10 @@ void Pid::kill()
     
     printMsg(lvlError, format("killing process %1%") % pid);
 
-    /* Send a KILL signal to the child.  If it has its own process
-       group, send the signal to every process in the child process
-       group (which hopefully includes *all* its children). */
-    if (::kill(separatePG ? -pid : pid, SIGKILL) != 0)
+    /* Send the requested signal to the child.  If it has its own
+       process group, send the signal to every process in the child
+       process group (which hopefully includes *all* its children). */
+    if (::kill(separatePG ? -pid : pid, killSignal) != 0)
         printMsg(lvlError, (SysError(format("killing process %1%") % pid).msg()));
 
     /* Wait until the child dies, disregarding the exit status. */
@@ -707,6 +709,12 @@ int Pid::wait(bool block)
 void Pid::setSeparatePG(bool separatePG)
 {
     this->separatePG = separatePG;
+}
+
+
+void Pid::setKillSignal(int signal)
+{
+    this->killSignal = signal;
 }
 
 

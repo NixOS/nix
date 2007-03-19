@@ -628,7 +628,7 @@ private:
     HookReply tryBuildHook();
 
     /* Synchronously wait for a build hook to finish. */
-    void terminateBuildHook();
+    void terminateBuildHook(bool kill = false);
 
     /* Acquires locks on the output paths and gathers information
        about the build (e.g., the input closures).  During this
@@ -991,6 +991,7 @@ static string readLine(int fd)
 {
     string s;
     while (1) {
+        checkInterrupt();
         char ch;
         ssize_t rd = read(fd, &ch, 1);
         if (rd == -1) {
@@ -1018,6 +1019,7 @@ static void drain(int fd)
 {
     unsigned char buffer[1024];
     while (1) {
+        checkInterrupt();
         ssize_t rd = read(fd, buffer, sizeof buffer);
         if (rd == -1) {
             if (errno != EINTR)
@@ -1124,6 +1126,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
     
     /* parent */
     pid.setSeparatePG(true);
+    pid.setKillSignal(SIGTERM);
     logPipe.writeSide.close();
     worker.childStarted(shared_from_this(),
         pid, singleton<set<int> >(logPipe.readSide), false);
@@ -1139,7 +1142,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
     try {
         reply = readLine(fromHook.readSide);
     } catch (Error & e) {
-        drain(logPipe.readSide);
+        terminateBuildHook(true);
         throw;
     }
 
@@ -1147,7 +1150,6 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 
     if (reply == "decline" || reply == "postpone") {
         /* Clean up the child.  !!! hacky / should verify */
-        drain(logPipe.readSide);
         terminateBuildHook();
         return reply == "decline" ? rpDecline : rpPostpone;
     }
@@ -1215,18 +1217,22 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 }
 
 
-void DerivationGoal::terminateBuildHook()
+void DerivationGoal::terminateBuildHook(bool kill)
 {
     /* !!! drain stdout of hook */
     debug("terminating build hook");
     pid_t savedPid = pid;
-    pid.wait(true);
+    if (kill)
+        pid.kill();
+    else
+        pid.wait(true);
     /* `false' means don't wake up waiting goals, since we want to
-       keep this build slot ourselves (at least if the hook reply XXX. */
+       keep this build slot ourselves. */
     worker.childTerminated(savedPid, false);
     fromHook.readSide.close();
     toHook.writeSide.close();
     fdLogFile.close();
+    drain(logPipe.readSide);
     logPipe.readSide.close();
     deleteTmpDir(true); /* get rid of the hook's temporary directory */
 }
@@ -2048,6 +2054,7 @@ void SubstitutionGoal::tryToRun()
     
     /* parent */
     pid.setSeparatePG(true);
+    pid.setKillSignal(SIGTERM);
     logPipe.writeSide.close();
     worker.childStarted(shared_from_this(),
         pid, singleton<set<int> >(logPipe.readSide), true);
