@@ -56,3 +56,20 @@ sub lsof {
 
 readProc;
 lsof;
+
+
+sub readFile {
+    my $path = shift;
+    if (-e $path) {
+        if (open FILE, "$path") {
+            while (<FILE>) {
+                print;
+            }
+            close FILE;
+        }
+    }
+}
+
+# This is rather NixOS-specific, so it probably shouldn't be here.
+readFile "/proc/sys/kernel/modprobe";
+readFile "/proc/sys/kernel/fbsplash";
