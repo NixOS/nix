@@ -465,7 +465,8 @@ void UserLock::release()
 static void runSetuidHelper(const string & command,
     const string & arg)
 {
-    string program = nixLibexecDir + "/nix-setuid-helper";
+    Path program = getEnv("NIX_SETUID_HELPER",
+        nixLibexecDir + "/nix-setuid-helper");
             
     /* Fork. */
     Pid pid;

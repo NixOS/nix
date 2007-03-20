@@ -43,8 +43,9 @@ Berkeley DB error: file validpaths (meta pgno = 0) has LSN [483][34721].
 Berkeley DB error: end of log is [1][28]
 Berkeley DB error: /nix/var/nix/db/validpaths: unexpected file type or format</screen>
 
-or other weird Berkeley DB errors, and they don’t away (i.e.,
-automatic recovery doesn’t work).  This may be the case after a system crash.</para>
+or other weird Berkeley DB errors, and they don’t go away (i.e.,
+automatic recovery doesn’t work).  This may be the case after a system
+crash.</para>
 
 <para>Solution: first try to run <command>db_recover</command> and
 then <link linkend='refsec-nix-store-verify'><command>nix-store
