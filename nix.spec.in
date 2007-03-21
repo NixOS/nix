@@ -13,7 +13,7 @@ Version: @version@
 Release: 1
 License: GPL
 Group: Software Deployment
-URL: http://www.cs.uu.nl/groups/ST/Trace/Nix
+URL: http://nix.cs.uu.nl/
 Source0: %{name}-@version@.tar.bz2
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 %define _prefix /nix
@@ -26,7 +26,12 @@ Provides: perl(readmanifest)
                                                                
 %description
 
-Nix is a system for software deployment.
+Nix is a purely functional package manager. It allows multiple
+versions of a package to be installed side-by-side, ensures that
+dependency specifications are complete, supports atomic upgrades and
+rollbacks, allows non-root users to install software, and has many
+other features. It is the basis of the NixOS Linux distribution, but
+it can be used equally well under other Unix systems.
 
 %prep
 %setup -q
