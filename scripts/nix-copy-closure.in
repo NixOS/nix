@@ -14,7 +14,7 @@ EOF
 
 
 # Get the target host.
-my $sshHost = shift @ARGV;
+my $sshHost;
 my @sshOpts = split ' ', ($ENV{"NIX_SSHOPTS"} or "");
 
 my $sign = 0;
@@ -22,60 +22,78 @@ my $sign = 0;
 my $compressor = "cat";
 my $decompressor = "cat";
 
+my $toMode = 1;
+
 
 # !!! Copied from nix-pack-closure, should put this in a module.
-my %storePathsSeen;
 my @storePaths = ();
 
 while (@ARGV) {
-    my $storePath = shift @ARGV;
-    if ($storePath eq "--sign") {
+    my $arg = shift @ARGV;
+    if ($arg eq "--sign") {
         $sign = 1;
         next;
     }
-    if ($storePath eq "--gzip") {
+    if ($arg eq "--gzip") {
         $compressor = "gzip";
         $decompressor = "gunzip";
         next;
     }
 
-    # $storePath might be a symlink to the store, so resolve it.
-    $storePath = (`$binDir/nix-store --query --resolve '$storePath'`
-        or die "cannot resolve `$storePath'");
-    chomp $storePath;
-
-    # Get the closure of this path.
-    my $pid = open(READ,
-        "$binDir/nix-store --query --requisites '$storePath'|") or die;
-    
-    while (<READ>) {
-        chomp;
-        die "bad: $_" unless /^\//;
-        if (!defined $storePathsSeen{$_}) {
-            push @storePaths, $_;
-            $storePathsSeen{$_} = 1;
-        }
+    if (!defined $sshHost) {
+        $sshHost = $arg;
+        next;
     }
 
-    close READ or die "nix-store failed: $?";
+    push @storePaths, $arg;
 }
 
 
-# Ask the remote host which paths are invalid.
-open(READ, "ssh @sshOpts $sshHost nix-store --check-validity --print-invalid @storePaths|");
-my @missing = ();
-while (<READ>) {
-    chomp;
-    print STDERR "target needs $_\n";
-    push @missing, $_;
-}
-close READ or die;
+if ($toMode) { # Copy TO the remote machine.
+
+    my @allStorePaths;
+    my %storePathsSeen;
+
+    foreach my $storePath (@storePaths) {
+        # $arg might be a symlink to the store, so resolve it.
+        my $storePath2 = (`$binDir/nix-store --query --resolve '$storePath'`
+            or die "cannot resolve `$storePath'");
+        chomp $storePath2;
+
+        # Get the closure of this path.
+        my $pid = open(READ,
+            "$binDir/nix-store --query --requisites '$storePath2'|") or die;
+    
+        while (<READ>) {
+            chomp;
+            die "bad: $_" unless /^\//;
+            if (!defined $storePathsSeen{$_}) {
+                push @allStorePaths, $_;
+                $storePathsSeen{$_} = 1
+            }
+        }
+
+        close READ or die "nix-store failed: $?";
+    }
 
 
-# Export the store paths and import them on the remote machine.
-if (scalar @missing > 0) {
-    my $extraOpts = "";
-    $extraOpts .= "--sign" if $sign == 1;
-    system("nix-store --export $extraOpts @missing | $compressor | ssh @sshOpts $sshHost '$decompressor | nix-store --import'") == 0
-        or die "copying store paths to remote machine failed: $?";
+    # Ask the remote host which paths are invalid.
+    open(READ, "ssh @sshOpts $sshHost nix-store --check-validity --print-invalid @allStorePaths|");
+    my @missing = ();
+    while (<READ>) {
+        chomp;
+        print STDERR "target needs $_\n";
+        push @missing, $_;
+    }
+    close READ or die;
+
+
+    # Export the store paths and import them on the remote machine.
+    if (scalar @missing > 0) {
+        my $extraOpts = "";
+        $extraOpts .= "--sign" if $sign == 1;
+        system("nix-store --export $extraOpts @missing | $compressor | ssh @sshOpts $sshHost '$decompressor | nix-store --import'") == 0
+            or die "copying store paths to remote machine failed: $?";
+    }
+
 }
