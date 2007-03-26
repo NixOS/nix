@@ -15,6 +15,11 @@
   <listitem><para>TODO: multi-user support.</para></listitem>
 
 
+  <listitem><para><command>nix-copy-closure</command> copies the
+  missing parts of a closure to or from a remote
+  machine.</para></listitem>
+
+
   <listitem><para><command>nix-prefetch-url</command> now by default
   computes the SHA-256 hash of the file instead of the MD5 hash.  In
   calls to <function>fetchurl</function> you should pass an
