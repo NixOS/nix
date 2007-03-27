@@ -142,7 +142,7 @@ else { # Copy FROM the remote machine.
     if (scalar @missing > 0) {
         my $extraOpts = "";
         $extraOpts .= "--sign" if $sign == 1;
-        system("ssh @sshOpts $sshHost 'nix-store --export $extraOpts @missing | $compressor' | $decompressor | nix-store --import") == 0
+        system("ssh @sshOpts $sshHost 'nix-store --export $extraOpts @missing | $compressor' | $decompressor | @bindir@/nix-store --import") == 0
             or die "copying store paths to remote machine `$sshHost' failed: $?";
     }
 
