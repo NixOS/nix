@@ -79,8 +79,11 @@ static bool isFarSideClosed(int socket)
        socket as readable because there is actual input or because
        we've reached EOF (i.e., a read of size 0 is available). */
     char c;
-    if (read(socket, &c, 1) != 0)
+    int rd;
+    if ((rd = read(socket, &c, 1)) > 0)
         throw Error("EOF expected (protocol error?)");
+    else if (rd == -1 && errno != ECONNRESET)
+        throw SysError("expected connection reset or EOF");
     
     return true;
 }
@@ -109,7 +112,8 @@ static void sigPollHandler(int sigNo)
                 _isInterrupted = 1;
                 blockInt = 1;
                 canSendStderr = false;
-                write(STDERR_FILENO, "SIGPOLL\n", 8);
+                string s = "SIGPOLL\n";
+                write(STDERR_FILENO, s.c_str(), s.size());
             }
         } else {
             string s = "spurious SIGPOLL\n";
@@ -118,8 +122,9 @@ static void sigPollHandler(int sigNo)
     }
     catch (Error & e) {
         /* Shouldn't happen. */
-        write(STDERR_FILENO, e.msg().c_str(), e.msg().size());
-        abort();
+        string s = "impossible: " + e.msg() + '\n';
+        write(STDERR_FILENO, s.c_str(), s.size());
+        throw;
     }
 }
 
