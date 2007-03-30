@@ -5,9 +5,15 @@ use File::Temp qw(tempdir);
 use readmanifest;
 
 
-# Some hard-coded options.
-my $maxNarSize = 100 * 1024 * 1024; # max size of NAR archives to generate patches for
-my $maxPatchFraction = 0.60; # if patch is bigger than this fraction of full archive, reject
+# Some patch generations options.
+
+# Max size of NAR archives to generate patches for.
+my $maxNarSize = $ENV{"NIX_MAX_NAR_SIZE"};
+$maxNarSize = 100 * 1024 * 1024 if !defined $maxNarSize;
+
+# If patch is bigger than this fraction of full archive, reject.
+my $maxPatchFraction = $ENV{"NIX_PATCH_FRACTION"};
+$maxPatchFraction = 0.60 if !defined $maxPatchFraction;
 
 
 die unless scalar @ARGV == 5;
