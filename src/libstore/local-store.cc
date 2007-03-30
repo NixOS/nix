@@ -1,3 +1,4 @@
+#include "config.h"
 #include "local-store.hh"
 #include "util.hh"
 #include "globals.hh"
@@ -7,7 +8,6 @@
 #include "aterm.hh"
 #include "derivations-ast.hh"
 #include "worker-protocol.hh"
-#include "config.h"
     
 #include <iostream>
 #include <algorithm>

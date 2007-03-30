@@ -1,9 +1,9 @@
+#include "config.h"
+
 #include "shared.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "util.hh"
-
-#include "config.h"
 
 #include <iostream>
 #include <cctype>
