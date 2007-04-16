@@ -36,7 +36,7 @@ static void secureChown(uid_t uidFrom, gid_t gidFrom,
            to. */
         throw Error(error);
 
-    if (uidFrom != -1) {
+    if (uidFrom != (uid_t) -1) {
         assert(uidFrom != 0);
         if (st.st_uid != uidFrom)
             throw Error(error);
