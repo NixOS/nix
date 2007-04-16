@@ -269,6 +269,14 @@ static Expr prim_abort(EvalState & state, const ATermVector & args)
 }
 
 
+static Expr prim_throw(EvalState & state, const ATermVector & args)
+{
+    PathSet context;
+    throw ThrownError(format("user-thrown exception: `%1%'") %
+        evalString(state, args[0], context));
+}
+
+
 /* Return an environment variable.  Use with care. */
 static Expr prim_getEnv(EvalState & state, const ATermVector & args)
 {
@@ -878,6 +886,7 @@ void EvalState::addPrimOps()
     addPrimOp("isNull", 1, prim_isNull);
     addPrimOp("dependencyClosure", 1, prim_dependencyClosure);
     addPrimOp("abort", 1, prim_abort);
+    addPrimOp("throw", 1, prim_throw);
     addPrimOp("__getEnv", 1, prim_getEnv);
 
     addPrimOp("relativise", 2, prim_relativise);
