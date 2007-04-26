@@ -45,7 +45,12 @@ Upgrade flags:
   --eq: "upgrade" if the current version is equal
   --always: upgrade regardless of current version
 
-Query types:
+Query sources:
+
+  --installed: use installed derivations (default)
+  --available / -a: use derivations available in Nix expression
+
+Query flags:
 
   --status / -s: print installed/present status
   --no-name: hide derivation names
@@ -55,11 +60,8 @@ Query types:
   --compare-versions / -c: compare version to available or installed
   --drv-path: print path of derivation
   --out-path: print path of derivation output
-
-Query sources:
-
-  --installed: use installed derivations (default)
-  --available / -a: use derivations available in Nix expression
+  --prebuilt-only: only show derivations whose prebuilt binaries are
+      available on this machine or are downloadable
 
 Options:
 

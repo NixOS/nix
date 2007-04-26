@@ -831,6 +831,7 @@ static void opQuery(Globals & globals,
     bool printDrvPath = false;
     bool printOutPath = false;
     bool printDescription = false;
+    bool prebuiltOnly = false;
     bool compareVersions = false;
     bool xmlOutput = false;
 
@@ -849,6 +850,7 @@ static void opQuery(Globals & globals,
         else if (*i == "--out-path") printOutPath = true;
         else if (*i == "--installed") source = sInstalled;
         else if (*i == "--available" || *i == "-a") source = sAvailable;
+        else if (*i == "--prebuilt-only" || *i == "-b") prebuiltOnly = true;
         else if (*i == "--xml") xmlOutput = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
@@ -914,6 +916,12 @@ static void opQuery(Globals & globals,
 
             /* For XML output. */
             XMLAttrs attrs;
+
+            if (prebuiltOnly) {
+                if (!store->isValidPath(i->queryOutPath(globals.state)) &&
+                    !store->hasSubstitutes(i->queryOutPath(globals.state)))
+                    continue;
+            }
         
             if (printStatus) {
                 bool hasSubs = store->hasSubstitutes(i->queryOutPath(globals.state));

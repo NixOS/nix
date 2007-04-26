@@ -74,6 +74,15 @@
   <option>--set-flag</option>.</para></listitem>
   
 
+  <listitem><para><command>nix-env -q</command> now has a flag
+  <option>--prebuilt-only</option> (<option>-b</option>) that causes
+  <command>nix-env</command> to show only those derivations whose
+  output is already in the Nix store or that can be substituted (i.e.,
+  downloaded from somewhere).  In other words, it shows the packages
+  that can be installed “quickly”, i.e., don’t need to be built from
+  source.</para></listitem>
+  
+
   <listitem><para>TODO: new built-ins
   <function>builtins.attrNames</function>,
   <function>builtins.filterSource</function>,
