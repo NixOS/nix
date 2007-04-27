@@ -482,8 +482,10 @@ static void installDerivations(Globals & globals,
          i != installedElems.end(); ++i)
     {
         DrvName drvName(i->name);
+        MetaInfo meta = i->queryMetaInfo(globals.state);
         if (!globals.preserveInstalled &&
-            newNames.find(drvName.name) != newNames.end())
+            newNames.find(drvName.name) != newNames.end() &&
+            meta["keep"] == "true")
             printMsg(lvlInfo,
                 format("replacing old `%1%'") % i->name);
         else
@@ -542,6 +544,9 @@ static void upgradeDerivations(Globals & globals,
          i != installedElems.end(); ++i)
     {
         DrvName drvName(i->name);
+
+        MetaInfo meta = i->queryMetaInfo(globals.state);
+        if (meta["keep"] == "true") continue;
 
         /* Find the derivation in the input Nix expression with the
            same name and satisfying the version constraints specified

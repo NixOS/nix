@@ -72,8 +72,8 @@
 
   <listitem><para>TODO: <command>nix-env</command>
   <option>--set-flag</option>.  Specific flags:
-  <literal>active</literal>,
-  <literal>priority</literal>.</para></listitem>
+  <literal>active</literal>, <literal>priority</literal>,
+  <literal>keep</literal>.</para></listitem>
   
 
   <listitem><para><command>nix-env -q</command> now has a flag
