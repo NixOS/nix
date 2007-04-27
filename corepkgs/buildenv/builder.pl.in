@@ -108,10 +108,15 @@ sub addPkg {
 
 
 # Symlink to the packages that have been installed explicitly by the user.
-my @args = split ' ', $ENV{"derivations"};
+my @paths = split ' ', $ENV{"derivations"};
+my @active = split ' ', $ENV{"active"};
 
-foreach my $pkgDir (sort @args) {
-    addPkg($pkgDir, 0);
+die if scalar @paths != scalar @active;
+
+for (my $n = 0; $n < scalar @paths; $n++) {
+    my $pkgDir = $paths[$n];
+    my $isActive = $active[$n];
+    addPkg($pkgDir, 0) if $isActive ne "false";
 }
 
 
