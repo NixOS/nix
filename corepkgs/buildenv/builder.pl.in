@@ -12,13 +12,15 @@ mkdir "$out", 0755 || die "error creating $out";
 
 my $symlinks = 0;
 
+my %priorities;
+
 
 # For each activated package, create symlinks.
 
 sub createLinks {
     my $srcDir = shift;
     my $dstDir = shift;
-    my $ignoreCollisions = shift;
+    my $priority = shift;
 
     my @srcFiles = glob("$srcDir/*");
 
@@ -42,7 +44,7 @@ sub createLinks {
             lstat $dstFile;
             
             if (-d _) {
-                createLinks($srcFile, $dstFile, $ignoreCollisions);
+                createLinks($srcFile, $dstFile, $priority);
             }
 
             elsif (-l _) {
@@ -53,27 +55,35 @@ sub createLinks {
                 unlink $dstFile or die "error unlinking `$dstFile': $!";
                 mkdir $dstFile, 0755 || 
                     die "error creating directory `$dstFile': $!";
-                createLinks($target, $dstFile, $ignoreCollisions);
-                createLinks($srcFile, $dstFile, $ignoreCollisions);
+                createLinks($target, $dstFile, $priority); # !!! <- priority isn't right
+                createLinks($srcFile, $dstFile, $priority);
             }
 
             else {
                 symlink($srcFile, $dstFile) ||
                     die "error creating link `$dstFile': $!";
+                $priorities{$dstFile} = $priority;
                 $symlinks++;
             }
         }
 
-        elsif (-l $dstFile) {
-            if (!$ignoreCollisions) {
-                my $target = readlink $dstFile;
-                die "collission between `$srcFile' and `$target'";
-            }
-        }
-
         else {
+
+            if (-l $dstFile) {
+                my $target = readlink $dstFile;
+                my $prevPriority = $priorities{$dstFile};
+                die ( "Collission between `$srcFile' and `$target'. "
+                    . "Suggested solution: use `nix-env --set-flag "
+                    . "priority NUMBER PKGNAME' to change the priority of "
+                    . "one of the conflicting packages.\n" )
+                    if $prevPriority == $priority;
+                next if $prevPriority < $priority;
+                unlink $dstFile or die;
+            }
+            
             symlink($srcFile, $dstFile) ||
                 die "error creating link `$dstFile': $!";
+            $priorities{$dstFile} = $priority;
             $symlinks++;
         }
     }
@@ -86,13 +96,13 @@ my %postponed;
 sub addPkg;
 sub addPkg {
     my $pkgDir = shift;
-    my $ignoreCollisions = shift;
+    my $priority = shift;
 
     return if (defined $done{$pkgDir});
     $done{$pkgDir} = 1;
 
 #    print "symlinking $pkgDir\n";
-    createLinks("$pkgDir", "$out", $ignoreCollisions);
+    createLinks("$pkgDir", "$out", $priority);
 
     my $propagatedFN = "$pkgDir/nix-support/propagated-user-env-packages";
     if (-e $propagatedFN) {
@@ -107,16 +117,29 @@ sub addPkg {
 }
 
 
-# Symlink to the packages that have been installed explicitly by the user.
-my @paths = split ' ', $ENV{"derivations"};
+# Convert the stuff we get from the environment back into a coherent
+# data type.
+my @paths = split ' ', $ENV{"paths"};
 my @active = split ' ', $ENV{"active"};
+my @priority = split ' ', $ENV{"priority"};
 
 die if scalar @paths != scalar @active;
+die if scalar @paths != scalar @priority;
+
+my %pkgs;
 
 for (my $n = 0; $n < scalar @paths; $n++) {
-    my $pkgDir = $paths[$n];
-    my $isActive = $active[$n];
-    addPkg($pkgDir, 0) if $isActive ne "false";
+    $pkgs{$paths[$n]} =
+        { active => $active[$n]
+        , priority => $priority[$n] };
+}
+
+
+# Symlink to the packages that have been installed explicitly by the
+# user.
+foreach my $pkg (sort (keys %pkgs)) {
+    #print $pkg, " ", $pkgs{$pkg}->{priority}, "\n";
+    addPkg($pkg, $pkgs{$pkg}->{priority}) if $pkgs{$pkg}->{active} ne "false";
 }
 
 
@@ -124,11 +147,12 @@ for (my $n = 0; $n < scalar @paths; $n++) {
 # installed by the user (i.e., package X declares that it want Y
 # installed as well).  We do these later because they have a lower
 # priority in case of collisions.
+my $priorityCounter = 1000; # don't care about collisions
 while (scalar(keys %postponed) > 0) {
     my @pkgDirs = keys %postponed;
     %postponed = ();
     foreach my $pkgDir (sort @pkgDirs) {
-        addPkg($pkgDir, 1);
+        addPkg($pkgDir, $priorityCounter++);
     }
 }
 
