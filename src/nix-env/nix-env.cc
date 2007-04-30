@@ -485,7 +485,7 @@ static void installDerivations(Globals & globals,
         MetaInfo meta = i->queryMetaInfo(globals.state);
         if (!globals.preserveInstalled &&
             newNames.find(drvName.name) != newNames.end() &&
-            meta["keep"] == "true")
+            meta["keep"] != "true")
             printMsg(lvlInfo,
                 format("replacing old `%1%'") % i->name);
         else
