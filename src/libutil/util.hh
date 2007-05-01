@@ -280,6 +280,11 @@ string int2String(int n);
 bool string2Int(const string & s, int & n);
 
 
+/* Exception handling in destructors: print an error message, then
+   ignore the exception. */
+void ignoreException();
+
+
 }
 
 

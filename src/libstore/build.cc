@@ -685,8 +685,8 @@ DerivationGoal::~DerivationGoal()
     try {
         killChild();
         deleteTmpDir(false);
-    } catch (Error & e) {
-        printMsg(lvlError, format("error (ignored): %1%") % e.msg());
+    } catch (...) {
+        ignoreException();
     }
 }
 

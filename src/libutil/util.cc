@@ -444,7 +444,11 @@ void warnOnce(bool & haveWarned, const format & f)
 
 static void defaultWriteToStderr(const unsigned char * buf, size_t count)
 {
-    writeFull(STDERR_FILENO, buf, count);
+    try {
+        writeFull(STDERR_FILENO, buf, count);
+    } catch (SysError & e) {
+        /* ignore EPIPE etc. */
+    }
 }
 
 
@@ -545,8 +549,8 @@ AutoCloseFD::~AutoCloseFD()
 {
     try {
         close();
-    } catch (Error & e) {
-        printMsg(lvlError, format("error (ignored): %1%") % e.msg());
+    } catch (...) {
+        ignoreException();
     }
 }
 
@@ -966,6 +970,16 @@ bool string2Int(const string & s, int & n)
     std::istringstream str(s);
     str >> n;
     return str && str.get() == EOF;
+}
+
+
+void ignoreException()
+{
+    try {
+        throw;
+    } catch (std::exception & e) {
+        printMsg(lvlError, format("error (ignored): %1%") % e.what());
+    }
 }
 
  

@@ -161,7 +161,11 @@ LocalStore::LocalStore(bool reserveSpace)
 LocalStore::~LocalStore()
 {
     /* If the database isn't open, this is a NOP. */
-    nixDB.close();
+    try {
+        nixDB.close();
+    } catch (...) {
+        ignoreException();
+    }
 }
 
 
