@@ -5,18 +5,29 @@
 cd $out/tmp
 
 expr=$out/default.nix
-echo '[' > $expr
+echo '{' > $expr
 
-nr=0
-for i in $inputs; do
-    echo "unpacking $i"
-    @bunzip2@ < $i | @tar@ xf -
-    @coreutils@/mv * ../$nr # !!! hacky
-    echo "(import ./$nr)" >> $expr
-    nr=$(($nr + 1))
+inputs=($inputs)
+for ((n = 0; n < ${#inputs[*]}; n += 2)); do
+    channelName=${inputs[n]}
+    channelTarball=${inputs[n+1]}
+    echo "unpacking channel $channelName"
+    @bunzip2@ < $channelTarball | @tar@ xf -
+
+    nr=1
+    dirName=$channelName
+    while test -e ../$dirName; do
+        nr=$((nr+1))
+        dirName=$channelName-$nr
+    done
+
+    @coreutils@/mv * ../$dirName # !!! hacky
+    
+    attrName=$(echo $dirName | @tr@ -- '- ' '__')
+    echo "$attrName = import ./$dirName {};" >> $expr
 done
 
-echo ']' >> $expr
+echo '} // {_combineChannels = true;}' >> $expr
 
 cd ..
 @coreutils@/rmdir tmp

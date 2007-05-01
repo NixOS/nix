@@ -139,6 +139,7 @@ fi
 AC_MSG_RESULT(yes)
 
 NEED_PROG(cat, cat)
+NEED_PROG(tr, tr)
 AC_ARG_WITH(coreutils-bin, AC_HELP_STRING([--with-coreutils-bin=PATH],
   [path of cat, mkdir, etc.]),
   coreutils=$withval, coreutils=$(dirname $cat))
