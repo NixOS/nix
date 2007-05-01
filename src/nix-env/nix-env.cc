@@ -836,6 +836,7 @@ static void opQuery(Globals & globals,
     bool printDrvPath = false;
     bool printOutPath = false;
     bool printDescription = false;
+    bool printMeta = false;
     bool prebuiltOnly = false;
     bool compareVersions = false;
     bool xmlOutput = false;
@@ -853,6 +854,7 @@ static void opQuery(Globals & globals,
         else if (*i == "--compare-versions" || *i == "-c") compareVersions = true;
         else if (*i == "--drv-path") printDrvPath = true;
         else if (*i == "--out-path") printOutPath = true;
+        else if (*i == "--meta") printMeta = true;
         else if (*i == "--installed") source = sInstalled;
         else if (*i == "--available" || *i == "-a") source = sAvailable;
         else if (*i == "--prebuilt-only" || *i == "-b") prebuiltOnly = true;
@@ -1014,7 +1016,18 @@ static void opQuery(Globals & globals,
             }
 
             if (xmlOutput)
-                xml.writeEmptyElement("item", attrs);
+                if (printMeta) {
+                    XMLOpenElement item(xml, "item", attrs);
+                    MetaInfo meta = i->queryMetaInfo(globals.state);
+                    for (MetaInfo::iterator j = meta.begin(); j != meta.end(); ++j) {
+                        XMLAttrs attrs2;
+                        attrs2["name"] = j->first;
+                        attrs2["value"] = j->second;
+                        xml.writeEmptyElement("meta", attrs2);
+                    }
+                }
+                else
+                    xml.writeEmptyElement("item", attrs);
             else
                 table.push_back(columns);
 

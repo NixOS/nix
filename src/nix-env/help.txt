@@ -52,6 +52,7 @@ Query sources:
 
 Query flags:
 
+  --xml: show output in XML format
   --status / -s: print installed/present status
   --no-name: hide derivation names
   --attr / -A: shows the unambiguous attribute name of the
@@ -60,6 +61,8 @@ Query flags:
   --compare-versions / -c: compare version to available or installed
   --drv-path: print path of derivation
   --out-path: print path of derivation output
+  --description: print description
+  --meta: print all meta attributes (only with --xml)
   --prebuilt-only: only show derivations whose prebuilt binaries are
       available on this machine or are downloadable
 

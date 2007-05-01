@@ -67,8 +67,8 @@
 
 
   <listitem><para>TODO: <command>nix-env</command> now maintains meta
-  info about installed packages in user
-  environments.</para></listitem>
+  info about installed packages in user environments.  <option>-q
+  --xml --meta</option> to show all meta info.</para></listitem>
 
   <listitem><para>TODO: <command>nix-env</command>
   <option>--set-flag</option>.  Specific flags:
