@@ -232,6 +232,16 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
 }
 
 
+static int comparePriorities(EvalState & state,
+    const DrvInfo & drv1, const DrvInfo & drv2)
+{
+    int prio1, prio2;
+    if (!string2Int(drv1.queryMetaInfo(state, "priority"), prio1)) prio1 = 0;
+    if (!string2Int(drv2.queryMetaInfo(state, "priority"), prio2)) prio2 = 0;
+    return prio2 - prio1; /* higher number = lower priority, so negate */
+}
+
+
 static DrvInfos filterBySelector(EvalState & state,
     const DrvInfos & allElems,
     const Strings & args, bool newestOnly)
@@ -258,8 +268,10 @@ static DrvInfos filterBySelector(EvalState & state,
         }
 
         /* If `newestOnly', if a selector matches multiple derivations
-           with the same name, pick the one with the highest version.
-           If there are multiple derivations with the same name *and*
+           with the same name, pick the one with the highest priority.
+           If there are multiple derivations with the same priority,
+           pick the one with the highest version.  If there are
+           multiple derivations with the same priority and name and
            version, then pick the first one. */
         if (newestOnly) {
 
@@ -270,13 +282,22 @@ static DrvInfos filterBySelector(EvalState & state,
 
             for (Matches::iterator j = matches.begin(); j != matches.end(); ++j) {
                 DrvName drvName(j->first.name);
+                int d = 1;
+
                 Newest::iterator k = newest.find(drvName.name);
+                
                 if (k != newest.end()) {
-                    int d = compareVersions(drvName.version, DrvName(k->second.first.name).version);
-                    if (d > 0) newest[drvName.name] = *j;
-                    else if (d == 0) multiple.insert(j->first.name);
-                } else
+                    d = comparePriorities(state, j->first, k->second.first);
+                    if (d == 0)
+                        d = compareVersions(drvName.version, DrvName(k->second.first.name).version);
+                }
+
+                if (d > 0) {
                     newest[drvName.name] = *j;
+                    multiple.erase(j->first.name);
+                } else if (d == 0) {
+                    multiple.insert(j->first.name);
+                }
             }
 
             matches.clear();
@@ -549,9 +570,10 @@ static void upgradeDerivations(Globals & globals,
         if (meta["keep"] == "true") continue;
 
         /* Find the derivation in the input Nix expression with the
-           same name and satisfying the version constraints specified
+           same name that satisfies the version constraints specified
            by upgradeType.  If there are multiple matches, take the
-           one with highest version. */
+           one with the highest priority.  If there are still multiple
+           matches, take the one with the highest version. */
         DrvInfos::iterator bestElem = availElems.end();
         DrvName bestName;
         for (DrvInfos::iterator j = availElems.begin();
@@ -559,16 +581,19 @@ static void upgradeDerivations(Globals & globals,
         {
             DrvName newName(j->name);
             if (newName.name == drvName.name) {
-                int d = compareVersions(drvName.version, newName.version);
+                int d = comparePriorities(globals.state, *i, *j);
+                if (d == 0) d = compareVersions(drvName.version, newName.version);
                 if (upgradeType == utLt && d < 0 ||
                     upgradeType == utLeq && d <= 0 ||
                     upgradeType == utEq && d == 0 ||
                     upgradeType == utAlways)
                 {
-                    if ((bestElem == availElems.end() ||
-                         compareVersions(
-                             bestName.version, newName.version) < 0))
-                    {
+                    int d2 = -1;
+                    if (bestElem != availElems.end()) {
+                        d2 = comparePriorities(globals.state, *bestElem, *j);
+                        if (d2 == 0) d2 = compareVersions(bestName.version, newName.version);
+                    }
+                    if (d2 < 0) {
                         bestElem = j;
                         bestName = newName;
                     }

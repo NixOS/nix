@@ -60,6 +60,15 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
 }
 
 
+string DrvInfo::queryMetaInfo(EvalState & state, const string & name) const
+{
+    /* !!! evaluates all meta attributes => inefficient */
+    MetaInfo meta = queryMetaInfo(state);
+    MetaInfo::iterator i = meta.find(name);
+    return i == meta.end() ? "" : i->second;
+}
+
+
 void DrvInfo::setMetaInfo(const MetaInfo & meta)
 {
     ATermMap metaAttrs;

@@ -34,6 +34,7 @@ public:
     string queryDrvPath(EvalState & state) const;
     string queryOutPath(EvalState & state) const;
     MetaInfo queryMetaInfo(EvalState & state) const;
+    string queryMetaInfo(EvalState & state, const string & name) const;
 
     void setDrvPath(const string & s)
     {
