@@ -55,7 +55,7 @@ sub createLinks {
                 unlink $dstFile or die "error unlinking `$dstFile': $!";
                 mkdir $dstFile, 0755 || 
                     die "error creating directory `$dstFile': $!";
-                createLinks($target, $dstFile, $priority); # !!! <- priority isn't right
+                createLinks($target, $dstFile, $priorities{$dstFile});
                 createLinks($srcFile, $dstFile, $priority);
             }
 
