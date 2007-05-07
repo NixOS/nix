@@ -143,6 +143,15 @@ Database::~Database()
 void openEnv(DbEnv * & env, const string & path, u_int32_t flags)
 {
     try {
+        createDirs(path);
+    } catch (SysError & e) {
+        if (e.errNo == EPERM || e.errNo == EACCES)
+            throw DbNoPermission(format("cannot create the Nix database in `%1%'") % path);
+        else
+            throw;
+    }
+        
+    try {
         env->open(path.c_str(),
             DB_INIT_LOCK | DB_INIT_LOG | DB_INIT_MPOOL | DB_INIT_TXN |
             DB_CREATE | flags,
