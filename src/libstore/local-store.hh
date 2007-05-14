@@ -13,7 +13,7 @@ class Transaction;
 
 
 /* Nix store and database schema version.  Version 1 (or 0) was Nix <=
-   0.7.  Version 2 was Nix 0.8 and 0.8.  Version 3 is Nix 0.10 and
+   0.7.  Version 2 was Nix 0.8 and 0.9.  Version 3 is Nix 0.10 and
    up. */
 const int nixSchemaVersion = 3;
 
