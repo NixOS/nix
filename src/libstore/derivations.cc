@@ -65,10 +65,10 @@ void throwBadDrv(ATerm t)
 Derivation parseDerivation(ATerm t)
 {
     Derivation drv;
-    ATermList outs, inDrvs, inSrcs, args, bnds;
+    ATermList outs, stateOuts, inDrvs, inSrcs, args, bnds;
     ATerm builder, platform;
 
-    if (!matchDerive(t, outs, inDrvs, inSrcs, platform, builder, args, bnds))
+    if (!matchDerive(t, outs, stateOuts, inDrvs, inSrcs, platform, builder, args, bnds))
         throwBadDrv(t);
 
     for (ATermIterator i(outs); i; ++i) {
@@ -129,6 +129,15 @@ ATerm unparseDerivation(const Derivation & drv)
                 toATerm(i->second.hashAlgo),
                 toATerm(i->second.hash)));
 
+    ATermList stateOutputs = ATempty;
+    for (DerivationStateOutputs::const_reverse_iterator i = drv.stateOutputs.rbegin(); i != drv.stateOutputs.rend(); ++i)
+        stateOutputs = ATinsert(stateOutputs,
+            makeDerivationOutput(
+                toATerm(i->first),
+                toATerm(i->second.statepath),
+                toATerm(i->second.hashAlgo),
+                toATerm(i->second.hash)));
+
     ATermList inDrvs = ATempty;
     for (DerivationInputs::const_reverse_iterator i = drv.inputDrvs.rbegin();
          i != drv.inputDrvs.rend(); ++i)
@@ -152,6 +161,7 @@ ATerm unparseDerivation(const Derivation & drv)
 
     return makeDerive(
         outputs,
+        stateOutputs,
         inDrvs,
         toATermList(drv.inputSrcs),
         toATerm(drv.platform),

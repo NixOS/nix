@@ -33,17 +33,44 @@ struct DerivationOutput
     }
 };
 
+struct DerivationStateOutput
+{
+    Path statepath;
+    string hashAlgo;
+    string hash;
+    bool enabled;
+    string shared;
+    string synchronization;
+    StringSet dirs;
+    DerivationStateOutput()
+    {
+    }
+    DerivationStateOutput(Path statepath, string hashAlgo, string hash, bool enabled, string shared, string synchronization, StringSet dirs)
+    {
+        this->statepath = statepath;
+        this->hashAlgo = hashAlgo;
+        this->hash = hash;
+        this->enabled = enabled;
+        this->shared = shared;
+        this->synchronization = synchronization;
+        this->dirs = dirs;
+    }
+};
+
+
+
 typedef std::map<string, DerivationOutput> DerivationOutputs;
+typedef std::map<string, DerivationStateOutput> DerivationStateOutputs;
 
 /* For inputs that are sub-derivations, we specify exactly which
    output IDs we are interested in. */
 typedef std::map<Path, StringSet> DerivationInputs;
-
 typedef std::map<string, string> StringPairs;
 
 struct Derivation
 {
     DerivationOutputs outputs; /* keyed on symbolic IDs */
+    DerivationStateOutputs stateOutputs; /*  */
     DerivationInputs inputDrvs; /* inputs that are sub-derivations */
     PathSet inputSrcs; /* inputs that are sources */
     string platform;

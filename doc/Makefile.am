@@ -1,1 +1,1 @@
-SUBDIRS = manual
+SUBDIRS = 

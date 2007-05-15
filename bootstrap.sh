@@ -1,6 +1,6 @@
 #! /bin/sh -e
 mkdir -p config
-libtoolize --copy
+libtoolize --force --copy
 aclocal
 autoheader
 automake --add-missing --copy

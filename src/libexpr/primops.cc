@@ -346,6 +346,13 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
 }
 
 
+static Expr prim_mkStatePath2(EvalState & state, const ATermVector & args)
+{
+    PathSet context;
+    return makeStr("$statepath", context);
+}
+
+
 /* Construct (as a unobservable side effect) a Nix derivation
    expression that performs the derivation described by the argument
    set.  Returns the original set extended with the following
@@ -384,6 +391,12 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     string outputHashAlgo;
     bool outputHashRecursive = false;
 
+  	//state vars
+    bool enableState = false;
+    string shareState = "none";
+    string syncState = "all";
+    StringSet dirs;
+
     for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
         string key = aterm2String(i->key);
         ATerm value;
@@ -410,6 +423,12 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
                 }
             }
 
+			//state variables
+   	        else if(key == "dirs") { }
+   	        else if(key == "shareState") { string s = coerceToString(state, value, context, true); shareState = s; }
+   	        else if(key == "synchronization") { string s = coerceToString(state, value, context, true); syncState = s; }
+   	        else if(key == "enableState") { bool b = evalBool(state, value); enableState = b; }
+            
             /* All other attributes are passed to the builder through
                the environment. */
             else {
@@ -489,24 +508,25 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
        have an empty value.  This ensures that changes in the set of
        output names do get reflected in the hash. */
     drv.env["out"] = "";
-    drv.outputs["out"] =
-        DerivationOutput("", outputHashAlgo, outputHash);
+    drv.outputs["out"] = DerivationOutput("", outputHashAlgo, outputHash);
         
     /* Use the masked derivation expression to compute the output
        path. */
-    Path outPath = makeStorePath("output:out",
-        hashDerivationModulo(state, drv), drvName);
+    Path outPath = makeStorePath("output:out", hashDerivationModulo(state, drv), drvName);
 
     /* Construct the final derivation store expression. */
     drv.env["out"] = outPath;
-    drv.outputs["out"] =
-        DerivationOutput(outPath, outputHashAlgo, outputHash);
+    drv.outputs["out"] = DerivationOutput(outPath, outputHashAlgo, outputHash);
+
+    /* Add the state path based on the outPath */
+    //hash h = ....
+    drv.env["statepath"] = outPath;
+    drv.stateOutputs["statepath"] = DerivationStateOutput(outPath, outputHashAlgo, outputHash, enableState, shareState, syncState, dirs);
 
     /* Write the resulting term into the Nix store directory. */
     Path drvPath = writeDerivation(drv, drvName);
 
-    printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'")
-        % drvName % drvPath);
+    printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'") % drvName % drvPath);
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store expressions, so we can't
@@ -574,8 +594,41 @@ static Expr prim_baseNameOf(EvalState & state, const ATermVector & args)
 {
     PathSet context;
     return makeStr(baseNameOf(coerceToString(state, args[0], context)), context);
+
 }
 
+/* ..... */
+
+static Expr prim_mkStatePath(EvalState & state, const ATermVector & args)
+{
+    PathSet context;
+    string indentifier = coerceToString(state, args[0], context);
+    string subdir = coerceToString(state, args[1], context);
+    string callingUser = "wouterdb";  //TODO: Change into variable
+    string statePrefix = "/nix/state/";  //TODO: Change into variable
+
+    //calculate state hash
+    Hash hash = hashString(htSHA256, indentifier + callingUser);
+
+    //make the path
+    string path = statePrefix + printHash(hash) + "/";
+
+    if(subdir == "")
+    {
+    }
+    else
+    {
+      path = path + subdir;
+    }
+
+    //PRE BUILD, After DRV Rewrite:
+    //ensureDir
+    //system("chown callingUser.root " + path);
+
+    //share state location if nessesary
+
+    return makeStr(path, context);
+}
 
 /* Return the directory of the given path, i.e., everything before the
    last slash.  Return either a path or a string depending on the type
