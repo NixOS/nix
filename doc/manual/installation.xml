@@ -6,6 +6,39 @@
 <title>Installation</title>
 
 
+<section><title>Supported platforms</title>
+
+<para>Nix is currently supported on the following platforms:
+
+<itemizedlist>
+
+  <listitem><para>Linux (particularly on x86, x86_64, and
+  PowerPC).</para></listitem>
+
+  <listitem><para>Mac OS X, both on Intel and
+  PowerPC.</para></listitem>
+
+  <listitem><para>FreeBSD (only tested on Intel).</para></listitem>
+
+  <listitem><para>Windows through <link
+  xlink:href="http://www.cygwin.com/">Cygwin</link>.</para>
+
+  <warning><para>On Cygwin, Nix <emphasis>must</emphasis> be installed
+  on an NTFS partition.  It will not work correctly on a FAT
+  partition.</para></warning>
+
+  </listitem>
+
+</itemizedlist>
+
+</para>
+
+<para>Nix is pretty portable, so it should work on most other Unix
+platforms as well.</para>
+
+</section>
+
+
 <section><title>Obtaining Nix</title>
 
 <para>The easiest way to obtain Nix is to download a <link
@@ -97,7 +130,7 @@ preceded by the command:
     </para>
 
 <screen>
-$ autoreconf -i</screen>
+$ ./boostrap</screen>
 
 <para>The installation path can be specified by passing the
 <option>--prefix=<replaceable>prefix</replaceable></option> to
@@ -163,49 +196,44 @@ xlink:href="http://nix.cs.uu.nl/dist/nix/" />.</para>
 </section>
 
 
-<section><title>Permissions</title>
+<section><title>Security</title>
 
-<para>All Nix operations must be performed under the user ID that owns
-the Nix store and database
-(<filename><replaceable>prefix</replaceable>/store</filename> and
-<filename><replaceable>prefix</replaceable>/var/nix/db</filename>,
-respectively).  When installed from the RPM packages, these
-directories are owned by <systemitem class="username">root</systemitem>.</para>
+<para>Nix has two basic security models.  First, it can be used in
+“single-user mode”, which is similar to what most other package
+management tools do: there is a single user (typically <systemitem
+class="username">root</systemitem>) who performs all package
+management operations.  All other users can then use the installed
+packages, but they cannot perform package management operations
+themselves.</para>
 
-<section><title>Setuid installation</title>
+<para>Alternatively, you can configure Nix in “multi-user mode”.  In
+this model, all users can perform package management operations — for
+instance, every user can install software without requiring root
+privileges.  Nix ensures that this is secure.  For instance, it’s not
+possible for one user to overwrite a package used by another user with
+a Trojan horse.</para>
 
-<para>As a somewhat <emphasis>ad hoc</emphasis> hack, you can also
-install the Nix binaries <quote>setuid</quote> so that a Nix store can
-be shared among several users.  To do this, configure Nix with the
-<emphasis>--enable-setuid</emphasis> option.  Nix will be installed as
-owned by a user and group specified by the
-<option>--with-nix-user=</option><parameter>user</parameter> and
-<option>--with-nix-group=</option><parameter>group</parameter>
-options.  E.g.,
 
-<screen>
-$ ./configure --enable-setuid --with-nix-user=my_nix_user --with-nix-group=my_nix_group</screen>
+<section><title>Single-user mode</title>
+  
+<para>In single-user mode, all Nix operations that access the database
+in <filename><replaceable>prefix</replaceable>/var/nix/db</filename>
+or modify the Nix store in
+<filename><replaceable>prefix</replaceable>/store</filename> must be
+performed under the user ID that owns those directories.  This is
+typically <systemitem class="username">root</systemitem>.  (If you
+install from RPM packages, that’s in fact the default ownership.)
+However, on single-user machines, it is often convenient to
+<command>chown</command> those directories to your normal user account
+so that you don’t have to <command>su</command> to <systemitem
+class="username">root</systemitem> all the time.</para>
 
-The user and group default to <literal>nix</literal>.  You should make
-sure that both the user and the group exist.  Any <quote>real</quote>
-users that you want to allow access should be added to the Nix
-group.</para>
+</section>
 
-<warning><para>A setuid installation should only by used if the users
-in the Nix group are mutually trusted, since any user in that group
-has the ability to change anything in the Nix store or database.  For
-instance, they could install a trojan horse in executables used by
-other users.</para></warning>
 
-<warning><para>On some platforms, the Nix binaries will be installed
-as setuid <literal>root</literal>.  They drop root privileges
-immediately after startup and switch to the Nix user.  The reason for
-this is that both the real and effective user must be set to the Nix
-user, and POSIX has no system call to do this.  This is not the case
-on systems that have the <function>setresuid()</function> system call
-(such as Linux and FreeBSD), so on those systems the binaries are
-simply owned by the Nix user.</para></warning>
+<section><title>Multi-user mode</title>
 
+<para></para>
 
 
 <!--
@@ -219,11 +247,17 @@ one.
 
 -->
 
-
+<note><para>Multi-user mode has one important limitation: only
+<systemitem class="username">root</systemitem> can run <command
+linkend="sec-nix-pull">nix-pull</command> to register the availability
+of pre-built binaries.  However, those registrations
+<emphasis>are</emphasis> used by all users to speed up
+builds.</para></note>
 
 </section>
 
-</section>
+
+</section> <!-- end of permissions section -->
 
 
 <section><title>Using Nix</title>

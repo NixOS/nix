@@ -85,7 +85,7 @@
         <title>nix-prefetch-url</title>
         <xi:include href="nix-prefetch-url.xml" />
       </section>
-      <section>
+      <section xml:id="sec-nix-pull">
         <title>nix-pull</title>
         <xi:include href="nix-pull.xml" />
       </section>

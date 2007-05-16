@@ -12,7 +12,9 @@
 <itemizedlist>
 
 
-  <listitem><para>TODO: multi-user support.</para></listitem>
+  <listitem><para>TODO: multi-user support.  The old setuid method for
+  sharing a store between multiple users has been
+  removed.</para></listitem>
 
 
   <listitem><para><command>nix-copy-closure</command> copies the
