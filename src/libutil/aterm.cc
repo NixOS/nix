@@ -51,3 +51,15 @@ ATermList nix::toATermList(const StringSet & ss)
         l = ATinsert(l, toATerm(*i));
     return l;
 }
+
+ATermList nix::toATermList(const SetStringSet & sss)
+{
+    ATermList l = ATempty;
+    for (SetStringSet::const_reverse_iterator i = sss.rbegin(); i != sss.rend(); ++i){
+		StringSet ss = *i;
+		for (StringSet::const_reverse_iterator j = ss.rbegin(); j != ss.rend(); ++j){
+			l = ATinsert(l, toATerm(*j));
+		}
+    }
+    return l;
+}

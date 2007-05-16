@@ -44,6 +44,7 @@ ATerm toATerm(const char * s);
 ATerm toATerm(const string & s);
 
 ATermList toATermList(const StringSet & ss);
+ATermList toATermList(const SetStringSet & sss);
  
 }
 

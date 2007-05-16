@@ -65,10 +65,10 @@ void throwBadDrv(ATerm t)
 Derivation parseDerivation(ATerm t)
 {
     Derivation drv;
-    ATermList outs, stateOuts, inDrvs, inSrcs, args, bnds;
+    ATermList outs, stateOuts, stateOutDirs, inDrvs, inSrcs, args, bnds;
     ATerm builder, platform;
 
-    if (!matchDerive(t, outs, stateOuts, inDrvs, inSrcs, platform, builder, args, bnds))
+    if (!matchDerive(t, outs, stateOuts, stateOutDirs, inDrvs, inSrcs, platform, builder, args, bnds))
         throwBadDrv(t);
 
     for (ATermIterator i(outs); i; ++i) {
@@ -132,11 +132,28 @@ ATerm unparseDerivation(const Derivation & drv)
     ATermList stateOutputs = ATempty;
     for (DerivationStateOutputs::const_reverse_iterator i = drv.stateOutputs.rbegin(); i != drv.stateOutputs.rend(); ++i)
         stateOutputs = ATinsert(stateOutputs,
-            makeDerivationOutput(
+            makeDerivationStateOutput(
                 toATerm(i->first),
                 toATerm(i->second.statepath),
                 toATerm(i->second.hashAlgo),
-                toATerm(i->second.hash)));
+                toATerm(i->second.hash),
+                toATerm(i->second.enabled),
+                toATerm(i->second.shared),
+                toATerm(i->second.synchronization)
+                ));
+                
+    ATermList stateOutputDirs = ATempty;
+    for (DerivationStateOutputDirs::const_reverse_iterator i = drv.stateOutputDirs.rbegin(); i != drv.stateOutputDirs.rend(); ++i)
+        stateOutputDirs = ATinsert(stateOutputDirs,
+            makeDerivationStateOutputDir(
+                toATerm(i->first),
+                toATerm(i->second.path),
+                toATerm(i->second.type),
+                toATerm(i->second.interval)
+                ));
+                
+   //toATermList(i->second.dirs)
+
 
     ATermList inDrvs = ATempty;
     for (DerivationInputs::const_reverse_iterator i = drv.inputDrvs.rbegin();
@@ -162,6 +179,7 @@ ATerm unparseDerivation(const Derivation & drv)
     return makeDerive(
         outputs,
         stateOutputs,
+        stateOutputDirs,
         inDrvs,
         toATermList(drv.inputSrcs),
         toATerm(drv.platform),

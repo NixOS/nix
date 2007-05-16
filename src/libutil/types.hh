@@ -48,6 +48,7 @@ public:
 
 typedef list<string> Strings;
 typedef set<string> StringSet;
+typedef set<StringSet> SetStringSet;
 
 
 /* Paths are just strings. */

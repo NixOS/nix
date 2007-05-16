@@ -1,10 +1,14 @@
 init initDerivationsHelpers
 
-Derive | ATermList ATermList ATermList string string ATermList ATermList | ATerm |
+#wouter added 2 ATermList
+
+Derive | ATermList ATermList ATermList ATermList ATermList string string ATermList ATermList | ATerm |
 
 | string string | ATerm | EnvBinding |
 | string ATermList | ATerm | DerivationInput |
 | string string string string | ATerm | DerivationOutput |
+| string string string string string string string | ATerm | DerivationStateOutput |
+| string string string string | ATerm | DerivationStateOutputDir |
 
 Closure | ATermList ATermList | ATerm | OldClosure |
 | string ATermList | ATerm | OldClosureElem |
