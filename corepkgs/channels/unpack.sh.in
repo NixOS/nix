@@ -24,7 +24,7 @@ for ((n = 0; n < ${#inputs[*]}; n += 2)); do
     @coreutils@/mv * ../$dirName # !!! hacky
     
     attrName=$(echo $dirName | @tr@ -- '- ' '__')
-    echo "$attrName = import ./$dirName {};" >> $expr
+    echo "$attrName = let e = import ./$dirName; in if builtins.isFunction e then e {} else e;" >> $expr
 done
 
 echo '} // {_combineChannels = true;}' >> $expr

@@ -114,6 +114,18 @@ static Expr prim_isNull(EvalState & state, const ATermVector & args)
 }
 
 
+/* Determine whether the argument is a function. */
+static Expr prim_isFunction(EvalState & state, const ATermVector & args)
+{
+    Expr e = evalExpr(state, args[0]);
+    ATermList formals;
+    ATerm name, body, pos;
+    return makeBool(
+        matchFunction(e, formals, body, pos) ||
+        matchFunction1(e, name, body, pos));
+}
+
+
 static Path findDependency(Path dir, string dep)
 {
     if (dep[0] == '/') throw EvalError(
@@ -884,6 +896,7 @@ void EvalState::addPrimOps()
     // Miscellaneous
     addPrimOp("import", 1, prim_import);
     addPrimOp("isNull", 1, prim_isNull);
+    addPrimOp("__isFunction", 1, prim_isFunction);
     addPrimOp("dependencyClosure", 1, prim_dependencyClosure);
     addPrimOp("abort", 1, prim_abort);
     addPrimOp("throw", 1, prim_throw);
