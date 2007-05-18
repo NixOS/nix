@@ -87,9 +87,10 @@ static void initAndRun(int argc, char * * argv)
 {
     /* Setup Nix paths. */
     nixStore = canonPath(getEnv("NIX_STORE_DIR", getEnv("NIX_STORE", NIX_STORE_DIR)));
+    nixStoreState = canonPath(getEnv("NIX_STORE_STATE_DIR", NIX_STORE_STATE_DIR));					//store state dir usually /nix/state
     nixDataDir = canonPath(getEnv("NIX_DATA_DIR", NIX_DATA_DIR));
     nixLogDir = canonPath(getEnv("NIX_LOG_DIR", NIX_LOG_DIR));
-    nixStateDir = canonPath(getEnv("NIX_STATE_DIR", NIX_STATE_DIR));
+    nixStateDir = canonPath(getEnv("NIX_STATE_DIR", NIX_STATE_DIR));							//nix global state dir
     nixDBPath = getEnv("NIX_DB_DIR", nixStateDir + "/db");
     nixConfDir = canonPath(getEnv("NIX_CONF_DIR", NIX_CONF_DIR));
     nixLibexecDir = canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR));

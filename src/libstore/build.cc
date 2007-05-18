@@ -588,6 +588,9 @@ private:
 
     /* The temporary directory. */
     Path tmpDir;
+    
+    /* The state directory. */
+    Path stateDir;
 
     /* File descriptor for the log file. */
     AutoCloseFD fdLogFile;
@@ -759,7 +762,7 @@ void DerivationGoal::haveDerivation()
     assert(store->isValidPath(drvPath));
 
     /* Get the derivation. */
-    drv = derivationFromPath(drvPath);
+    drv = derivationFromPath(drvPath);								//wouter look here
 
     for (DerivationOutputs::iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
@@ -1370,6 +1373,11 @@ void DerivationGoal::startBuilder()
     /* Create a temporary directory where the build will take
        place. */
     tmpDir = createTempDir();
+    
+    /* Create the state directory where the component can store it's state files place */
+    stateDir = createStateDirs(drv.stateOutputDirs, drv.stateOutputs);
+    
+    //TODO create the startupscript
 
     /* For convenience, set an environment pointing to the top build
        directory. */

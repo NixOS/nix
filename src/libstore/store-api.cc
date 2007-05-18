@@ -66,8 +66,7 @@ void checkStoreName(const string & name)
 }
 
 
-Path makeStorePath(const string & type,
-    const Hash & hash, const string & suffix)
+Path makeStorePath(const string & type, const Hash & hash, const string & suffix)
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
     string s = type + ":sha256:" + printHash(hash) + ":"
@@ -79,6 +78,20 @@ Path makeStorePath(const string & type,
         + printHash32(compressHash(hashString(htSHA256, s), 20))
         + "-" + suffix;
 }
+
+Path makeStatePath(const string & type, const Hash & hash, const string & suffix)
+{
+    /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
+    string s = type + ":sha256:" + printHash(hash) + ":"
+        + nixStoreState + ":" + suffix;
+
+    checkStoreName(suffix);
+
+    return nixStoreState + "/"
+        + printHash32(compressHash(hashString(htSHA256, s), 20))
+        + "-" + suffix;
+}
+
 
 
 Path makeFixedOutputPath(bool recursive,

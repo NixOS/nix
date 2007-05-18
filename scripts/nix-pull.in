@@ -21,6 +21,8 @@ $stateDir = "@localstatedir@/nix" unless defined $stateDir;
 my $storeDir = $ENV{"NIX_STORE_DIR"};
 $storeDir = "@storedir@" unless defined $storeDir;
 
+my $storeStateDir = $ENV{"NIX_STORE_STATE_DIR"};
+$storeStateDir = "@storestatedir@" unless defined $storeStateDir;
 
 # Prevent access problems in shared-stored installations.
 umask 0022;

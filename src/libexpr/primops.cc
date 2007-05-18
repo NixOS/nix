@@ -396,6 +396,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     bool disableState = false;
     string shareState = "none";
     string syncState = "all";
+    string stateIndentifier = "";
 
     for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
         string key = aterm2String(i->key);
@@ -427,22 +428,13 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
    	        else if(key == "stateDirs") {
               
               enableState = true;
-              
               value = evalExpr(state, value);
-              
               ATermList list = evalList(state, value);
               
-              printMsg(lvlError, format("DIRS `%1%'") % value);
-              printMsg(lvlError, format("DIRS `%1%'") % list);
-              
               for (ATermIterator j(list); j; ++j){
-
 				Expr v = evalExpr(state, *j);
-                printMsg(lvlError, format("DIRS2 `%1%'") % v);
-                
                 ATermMap stateDirattrs;
 			    queryAllAttrs(evalExpr(state, v), stateDirattrs, true);
-                
                 DerivationStateOutputDir dir = DerivationStateOutputDir();
                 
                 for (ATermMap::const_iterator k = stateDirattrs.begin(); k != stateDirattrs.end(); ++k) {
@@ -455,7 +447,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 			        startNest(nest, lvlVomit, format("processing statedir attribute `%1%'") % statekey);
 			        try {
 			            string s = coerceToString(state, statevalue, context, true);
-			            printMsg(lvlError, format("DIRS4 `%1%'") % s);    
+   
 			            if (statekey == "dir") { dir.path = s; }
 			            else if (statekey == "type") { dir.type = s; }
 			            else if (statekey == "interval") { dir.interval = s; }
@@ -469,16 +461,15 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
             	}
             	
             	drv.stateOutputDirs[dir.path] = dir;
-            	
                 //Expr e = queryAttr(v, "dir");
                 //printMsg(lvlError, format("DIRS3 `%1%'") % e);
-				                
               }
                  	         
    	        }
    	        else if(key == "shareState") { string s = coerceToString(state, value, context, true); shareState = s; }
    	        else if(key == "synchronization") { string s = coerceToString(state, value, context, true); syncState = s; }
    	        else if(key == "enableState") { bool b = evalBool(state, value); disableState = true; }
+            else if(key == "indentifier"){ string s = coerceToString(state, value, context, true); stateIndentifier = s; }
             
             /* All other attributes are passed to the builder through
                the environment. */
@@ -570,12 +561,19 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     drv.outputs["out"] = DerivationOutput(outPath, outputHashAlgo, outputHash);
 
     /* Add the state path based on the outPath */
-    //hash h = ....
-    drv.env["statepath"] = outPath;
+    string callingUser = "wouterdb";  //TODO: Change into variable
+    string statePrefix = "/nix/state/";  //TODO: Change into variable
+    
+    //Path outPath = makeStatePath("stateOutput:statepath", hashDerivationModulo(state, drv), drvName);
+    
+    string componentHash = printHash(hashDerivationModulo(state, drv));
+    Hash hash = hashString(htSHA256, stateIndentifier + callingUser + componentHash);		//calculate state hash
+    string statePath = statePrefix + printHash(hash) + "/";						//make the state path
+    drv.env["statepath"] = statePath;		
     string enableStateS = "false";
     if(enableState && disableState == false)
       enableStateS = "true";
-    drv.stateOutputs["stateOptions"] = DerivationStateOutput(outPath, outputHashAlgo, outputHash, enableStateS, shareState, syncState);
+    drv.stateOutputs["state"] = DerivationStateOutput(statePath, outputHashAlgo, outputHash, enableStateS, shareState, syncState);
 
     /* Write the resulting term into the Nix store directory. */
     Path drvPath = writeDerivation(drv, drvName);

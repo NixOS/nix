@@ -82,6 +82,34 @@ Derivation parseDerivation(ATerm t)
         out.hash = aterm2String(hash);
         drv.outputs[aterm2String(id)] = out;
     }
+    
+    //parse state part
+    for (ATermIterator i(stateOuts); i; ++i) {
+        ATerm id, statepath, hashAlgo, hash, enabled, shared, synchronization;
+        if (!matchDerivationStateOutput(*i, id, statepath, hashAlgo, hash, enabled, shared, synchronization))
+            throwBadDrv(t);
+        DerivationStateOutput stateOut;
+        stateOut.statepath = aterm2String(statepath);
+        //checkPath(stateOut.path);									//should we check the statpath .... ???
+        stateOut.hashAlgo = aterm2String(hashAlgo);
+        stateOut.hash = aterm2String(hash);
+        stateOut.enabled = aterm2String(enabled);
+        stateOut.shared = aterm2String(shared);
+        stateOut.synchronization = aterm2String(synchronization);
+        drv.stateOutputs[aterm2String(id)] = stateOut;
+    }
+    
+    //parse state dirs part
+    for (ATermIterator i(stateOutDirs); i; ++i) {
+        ATerm id, path, type, interval;
+        if (!matchDerivationStateOutputDir(*i, id, path, type, interval))
+            throwBadDrv(t);
+        DerivationStateOutputDir stateOutDirs;
+        stateOutDirs.path = aterm2String(path);
+        stateOutDirs.type = aterm2String(type);
+        stateOutDirs.interval = aterm2String(interval);
+        drv.stateOutputDirs[aterm2String(id)] = stateOutDirs;
+    }
 
     for (ATermIterator i(inDrvs); i; ++i) {
         ATerm drvPath;

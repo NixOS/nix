@@ -18,8 +18,8 @@ extern string nixDataDir; /* !!! fix */
 /* nixLogDir is the directory where we log various operations. */ 
 extern string nixLogDir;
 
-/* nixStateDir is the directory where state is stored. */
-extern string nixStateDir;
+/* nixStateDir is the directory where the state dirs of the components are stored.  */
+extern string nixStoreState;
 
 /* nixDBPath is the path name of our Berkeley DB environment. */
 extern string nixDBPath;

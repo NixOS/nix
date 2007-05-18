@@ -69,6 +69,12 @@ struct DerivationStateOutputDir
         this->type = type;
         this->interval = interval;
     }
+    
+    //sort function
+    /*bool operator<(const DerivationStateOutputDir& a, const DerivationStateOutputDir& b) {
+    	return a.path < b.path;
+	} */
+	bool operator<(const DerivationStateOutputDir& a) const { return path < a.path; }      
 };
 
 
