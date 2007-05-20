@@ -2,7 +2,7 @@
 #define __UTIL_H
 
 #include "types.hh"
-#include "../libstore/derivations.hh"
+#include "derivations.hh"
 
 #include <sys/types.h>
 #include <dirent.h>

@@ -18,11 +18,20 @@ extern string nixDataDir; /* !!! fix */
 /* nixLogDir is the directory where we log various operations. */ 
 extern string nixLogDir;
 
-/* nixStateDir is the directory where the state dirs of the components are stored.  */
+/* nixStoreState is the directory where the state dirs of the components are stored.  */
 extern string nixStoreState;
+
+/* nixStoreState is the directory where the repositorys of the state dirs of the components are stored.  */
+extern string nixStoreStateRepos;
+
+/* nixStateDir is the directory where state is stored. */
+extern string nixStateDir;
 
 /* nixDBPath is the path name of our Berkeley DB environment. */
 extern string nixDBPath;
+
+/* nixSVNPath is the path name of our SVN environment. */
+extern string nixSVNPath;
 
 /* nixConfDir is the directory where configuration files are
    stored. */
@@ -34,7 +43,6 @@ extern string nixLibexecDir;
 
 /* nixBinDir is the directory where the main programs are stored. */
 extern string nixBinDir;
-
 
 /* Misc. global flags. */
 

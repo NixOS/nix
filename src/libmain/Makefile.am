@@ -4,6 +4,9 @@ libmain_la_SOURCES = shared.cc shared.hh
 
 AM_CXXFLAGS = \
  -DNIX_STORE_DIR=\"$(storedir)\" \
+ -DNIX_STORE_STATE_DIR=\"$(storestatedir)\" \
+ -DNIX_STORE_STATE_REPOS_DIR=\"$(storestatereposdir)\" \
+ -DNIX_SVN_BIN_DIR=\"$(subversion)\" \
  -DNIX_DATA_DIR=\"$(datadir)\" \
  -DNIX_STATE_DIR=\"$(localstatedir)/nix\" \
  -DNIX_LOG_DIR=\"$(localstatedir)/log/nix\" \

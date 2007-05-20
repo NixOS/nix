@@ -345,14 +345,6 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
     return hashTerm(unparseDerivation(drv));
 }
 
-
-static Expr prim_mkStatePath2(EvalState & state, const ATermVector & args)
-{
-    PathSet context;
-    return makeStr("$statepath", context);
-}
-
-
 /* Construct (as a unobservable side effect) a Nix derivation
    expression that performs the derivation described by the argument
    set.  Returns the original set extended with the following
@@ -561,19 +553,16 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     drv.outputs["out"] = DerivationOutput(outPath, outputHashAlgo, outputHash);
 
     /* Add the state path based on the outPath */
-    string callingUser = "wouterdb";  //TODO: Change into variable
-    string statePrefix = "/nix/state/";  //TODO: Change into variable
+    string callingUser = "wouterdb";  															//TODO: Change into variable
+    string componentHash = printHash(hashDerivationModulo(state, drv));							//hash of the component path
+    Hash statehash = hashString(htSHA256, stateIndentifier + callingUser + componentHash);		//hash of the state path
+    Path stateOutPath = makeStatePath("stateOutput:statepath", statehash, drvName);				//
     
-    //Path outPath = makeStatePath("stateOutput:statepath", hashDerivationModulo(state, drv), drvName);
-    
-    string componentHash = printHash(hashDerivationModulo(state, drv));
-    Hash hash = hashString(htSHA256, stateIndentifier + callingUser + componentHash);		//calculate state hash
-    string statePath = statePrefix + printHash(hash) + "/";						//make the state path
-    drv.env["statepath"] = statePath;		
+    drv.env["statepath"] = stateOutPath;		
     string enableStateS = "false";
     if(enableState && disableState == false)
       enableStateS = "true";
-    drv.stateOutputs["state"] = DerivationStateOutput(statePath, outputHashAlgo, outputHash, enableStateS, shareState, syncState);
+    drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, outputHashAlgo, outputHash, enableStateS, shareState, syncState);
 
     /* Write the resulting term into the Nix store directory. */
     Path drvPath = writeDerivation(drv, drvName);
@@ -647,39 +636,6 @@ static Expr prim_baseNameOf(EvalState & state, const ATermVector & args)
     PathSet context;
     return makeStr(baseNameOf(coerceToString(state, args[0], context)), context);
 
-}
-
-/* ..... */
-
-static Expr prim_mkStatePath(EvalState & state, const ATermVector & args)
-{
-    PathSet context;
-    string indentifier = coerceToString(state, args[0], context);
-    string subdir = coerceToString(state, args[1], context);
-    string callingUser = "wouterdb";  //TODO: Change into variable
-    string statePrefix = "/nix/state/";  //TODO: Change into variable
-
-    //calculate state hash
-    Hash hash = hashString(htSHA256, indentifier + callingUser);
-
-    //make the path
-    string path = statePrefix + printHash(hash) + "/";
-
-    if(subdir == "")
-    {
-    }
-    else
-    {
-      path = path + subdir;
-    }
-
-    //PRE BUILD, After DRV Rewrite:
-    //ensureDir
-    //system("chown callingUser.root " + path);
-
-    //share state location if nessesary
-
-    return makeStr(path, context);
 }
 
 /* Return the directory of the given path, i.e., everything before the

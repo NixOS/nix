@@ -1,6 +1,10 @@
 #! /bin/sh -e
 
+export nixstatepath=/nixstate/nix
+export ACLOCAL_PATH=/root/.nix-profile/share/aclocal
+
 if [ "$1" = "full" ]; then
+  nix-env-all-pkgs.sh -i gnum4
   nix-env-all-pkgs.sh -i autoconf
   nix-env-all-pkgs.sh -i automake
   nix-env-all-pkgs.sh -i gnused
@@ -16,10 +20,19 @@ if [ "$1" = "full" ]; then
   nix-env-all-pkgs.sh -i gdb			#optional for debugging
 fi
 
-export nixstatepath=/nixstate/nix
-export ACLOCAL_PATH=/root/.nix-profile/share/aclocal
+if [ "$1" = "full" ] || [ "$1" = "auto" ]; then
+  export AUTOCONF=autoconf
+  export AUTOHEADER=autoheader
+  export AUTOMAKE=automake
+  autoconf
+  autoreconf -f
+  aclocal
+  autoheader
+  automake
+fi
 
 ./bootstrap.sh
+
 ./configure --with-aterm=$HOME/.nix-profile \
             --with-bzip2=$HOME/.nix-profile \
             --with-bdb=$HOME/.nix-profile \
@@ -28,7 +41,11 @@ export ACLOCAL_PATH=/root/.nix-profile/share/aclocal
             --with-docbook-xsl=/root/.nix-profile/xml/xsl/docbook \
             --prefix=$nixstatepath \
             --with-store-dir=/nix/store \
+	    --with-store-state-dir=/nix/state \
+            --with-store-state-repos-dir=/nix/staterepos \
             --localstatedir=/nix/var
+
+
 
 #Options from the nix expr
 #--disable-init-state
@@ -44,7 +61,7 @@ echo "New state nix version by wouter ..." > doc/manual/NEWS.txt
 make
 make install
 
-for i in $nixstatepath/bin/*; do
-  echo "pathing $i"
-  patchelf --set-rpath ../lib/nix/:$(patchelf --print-rpath $i) $i
-done
+#for i in $nixstatepath/bin/*; do
+#  echo "pathing $i"
+#  patchelf --set-rpath ../lib/nix/:$(patchelf --print-rpath $i) $i
+#done

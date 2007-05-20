@@ -10,10 +10,12 @@ namespace nix {
 
 string nixStore = "/UNINIT";
 string nixStoreState = "/UNINIT";
+string nixStoreStateRepos = "/UNINIT";
 string nixDataDir = "/UNINIT";
 string nixLogDir = "/UNINIT";
 string nixStateDir = "/UNINIT";
 string nixDBPath = "/UNINIT";
+string nixSVNPath = "/UNINIT";
 string nixConfDir = "/UNINIT";
 string nixLibexecDir = "/UNINIT";
 string nixBinDir = "/UNINIT";

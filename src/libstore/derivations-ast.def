@@ -8,7 +8,7 @@ Derive | ATermList ATermList ATermList ATermList ATermList string string ATermLi
 | string ATermList | ATerm | DerivationInput |
 | string string string string | ATerm | DerivationOutput |
 | string string string string string string string | ATerm | DerivationStateOutput |
-| string string string string | ATerm | DerivationStateOutputDir |
+| string string string | ATerm | DerivationStateOutputDir |
 
 Closure | ATermList ATermList | ATerm | OldClosure |
 | string ATermList | ATerm | OldClosureElem |

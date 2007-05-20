@@ -10,6 +10,7 @@ fi
 mkdir "$TEST_ROOT"
 
 mkdir "$NIX_STORE_DIR"
+mkdir "$NIX_STORE_STATE_DIR"
 mkdir "$NIX_DATA_DIR"
 mkdir "$NIX_LOCALSTATE_DIR"
 mkdir -p "$NIX_LOG_DIR"/drvs
@@ -19,6 +20,7 @@ mkdir "$NIX_CONF_DIR"
 
 mkdir $NIX_BIN_DIR
 ln -s $nixstore $NIX_BIN_DIR/
+ln -s $storestatedir $NIX_BIN_DIR/
 ln -s $nixinstantiate $NIX_BIN_DIR/
 ln -s $nixhash $NIX_BIN_DIR/
 ln -s $nixenv $NIX_BIN_DIR/

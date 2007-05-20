@@ -1,5 +1,9 @@
 #include "config.h"
 
+#include "util.hh"
+#include "globals.hh"
+#include "derivations.hh"
+
 #ifdef __CYGWIN__
 #include <windows.h>
 #endif
@@ -13,9 +17,6 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <fcntl.h>
-
-#include "util.hh"
-#include "../libstore/derivations.hh"
 
 extern char * * environ;
 
@@ -371,6 +372,10 @@ Path createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 	}
 	sort(stateDirsVector.begin(), stateDirsVector.end());
 	
+	printMsg(lvlError, format("nixStoreState: `%1%'") % nixStoreState);
+	printMsg(lvlError, format("nixStoreStateRepos: `%1%'") % nixStoreStateRepos);
+	printMsg(lvlError, format("nixSVNPath `%1%'") % nixSVNPath);
+		
 	for (vector<DerivationStateOutputDir>::iterator i = stateDirsVector.begin(); i != stateDirsVector.end(); ++i)
     {
 		DerivationStateOutputDir d = *(i);

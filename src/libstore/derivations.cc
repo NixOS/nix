@@ -102,8 +102,9 @@ Derivation parseDerivation(ATerm t)
     //parse state dirs part
     for (ATermIterator i(stateOutDirs); i; ++i) {
         ATerm id, path, type, interval;
-        if (!matchDerivationStateOutputDir(*i, id, path, type, interval))
+        if (!matchDerivationStateOutputDir(*i, id, /*path,*/ type, interval))
             throwBadDrv(t);
+        path = id;    
         DerivationStateOutputDir stateOutDirs;
         stateOutDirs.path = aterm2String(path);
         stateOutDirs.type = aterm2String(type);
@@ -175,7 +176,7 @@ ATerm unparseDerivation(const Derivation & drv)
         stateOutputDirs = ATinsert(stateOutputDirs,
             makeDerivationStateOutputDir(
                 toATerm(i->first),
-                toATerm(i->second.path),
+                //toATerm(i->second.path),
                 toATerm(i->second.type),
                 toATerm(i->second.interval)
                 ));

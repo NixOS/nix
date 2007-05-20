@@ -85,7 +85,7 @@ Path makeStatePath(const string & type, const Hash & hash, const string & suffix
     string s = type + ":sha256:" + printHash(hash) + ":"
         + nixStoreState + ":" + suffix;
 
-    checkStoreName(suffix);
+    checkStoreName(suffix);											//should this be here?
 
     return nixStoreState + "/"
         + printHash32(compressHash(hashString(htSHA256, s), 20))
