@@ -2,6 +2,7 @@
 #include "store-api.hh"
 #include "aterm.hh"
 #include "globals.hh"
+#include "util.hh"
 
 #include "derivations-ast.hh"
 #include "derivations-ast.cc"
@@ -65,10 +66,15 @@ void throwBadDrv(ATerm t)
 Derivation parseDerivation(ATerm t)
 {
     Derivation drv;
-    ATermList outs, stateOuts, stateOutDirs, inDrvs, inSrcs, args, bnds;
+    ATermList outs,  inDrvs, inSrcs, args, bnds;
+    ATermList stateOuts = ATempty, stateOutDirs = ATempty;
+    
     ATerm builder, platform;
 
-    if (!matchDerive(t, outs, stateOuts, stateOutDirs, inDrvs, inSrcs, platform, builder, args, bnds))
+	bool withState;
+    if (matchDerive(t, outs, stateOuts, stateOutDirs, inDrvs, inSrcs, platform, builder, args, bnds) ) { withState = true; }
+    else if (matchDeriveWithOutState(t, outs, inDrvs, inSrcs, platform, builder, args, bnds) ) { withState = false; }
+    else
         throwBadDrv(t);
 
     for (ATermIterator i(outs); i; ++i) {
@@ -83,35 +89,39 @@ Derivation parseDerivation(ATerm t)
         drv.outputs[aterm2String(id)] = out;
     }
     
-    //parse state part
-    for (ATermIterator i(stateOuts); i; ++i) {
-        ATerm id, statepath, hashAlgo, hash, enabled, shared, synchronization, createDirsBeforeInstall;
-        if (!matchDerivationStateOutput(*i, id, statepath, hashAlgo, hash, enabled, shared, synchronization, createDirsBeforeInstall))
-            throwBadDrv(t);
-        DerivationStateOutput stateOut;
-        stateOut.statepath = aterm2String(statepath);
-        //checkPath(stateOut.path);									//should we check the statpath .... ???
-        stateOut.hashAlgo = aterm2String(hashAlgo);
-        stateOut.hash = aterm2String(hash);
-        stateOut.enabled = aterm2String(enabled);
-        stateOut.shared = aterm2String(shared);
-        stateOut.synchronization = aterm2String(synchronization);
-        stateOut.createDirsBeforeInstall = aterm2String(createDirsBeforeInstall);
-        drv.stateOutputs[aterm2String(id)] = stateOut;
-    }
-    
-    //parse state dirs part
-    for (ATermIterator i(stateOutDirs); i; ++i) {
-        ATerm id, path, type, interval;
-        if (!matchDerivationStateOutputDir(*i, id, /*path,*/ type, interval))
-            throwBadDrv(t);
-        path = id;    
-        DerivationStateOutputDir stateOutDirs;
-        stateOutDirs.path = aterm2String(path);
-        stateOutDirs.type = aterm2String(type);
-        stateOutDirs.interval = aterm2String(interval);
-        drv.stateOutputDirs[aterm2String(id)] = stateOutDirs;
-    }
+    if(withState){
+	    //parse state part
+	    for (ATermIterator i(stateOuts); i; ++i) {
+	        ATerm id, statepath, hashAlgo, hash, enabled, shared, synchronization, createDirsBeforeInstall;
+	        if (!matchDerivationStateOutput(*i, id, statepath, hashAlgo, hash, enabled, shared, synchronization, createDirsBeforeInstall))
+	            throwBadDrv(t);
+	        DerivationStateOutput stateOut;
+	        stateOut.statepath = aterm2String(statepath);
+	        //checkPath(stateOut.path);									//should we check the statpath .... ???
+	        stateOut.hashAlgo = aterm2String(hashAlgo);
+	        stateOut.hash = aterm2String(hash);
+	        stateOut.enabled = aterm2String(enabled);
+	        stateOut.shared = aterm2String(shared);
+	        stateOut.synchronization = aterm2String(synchronization);
+	        stateOut.createDirsBeforeInstall = aterm2String(createDirsBeforeInstall);
+	        drv.stateOutputs[aterm2String(id)] = stateOut;
+	    }
+	}
+
+	if(withState){
+	    //parse state dirs part
+	    for (ATermIterator i(stateOutDirs); i; ++i) {
+	        ATerm id, path, type, interval;
+	        if (!matchDerivationStateOutputDir(*i, id, type, interval))
+	            throwBadDrv(t);
+	        path = id;    								//We prevent duplication since the key is also the path
+	        DerivationStateOutputDir stateOutDirs;
+	        stateOutDirs.path = aterm2String(path);
+	        stateOutDirs.type = aterm2String(type);
+	        stateOutDirs.interval = aterm2String(interval);
+	        drv.stateOutputDirs[aterm2String(id)] = stateOutDirs;
+	    }
+	}
 
     for (ATermIterator i(inDrvs); i; ++i) {
         ATerm drvPath;
@@ -150,8 +160,7 @@ Derivation parseDerivation(ATerm t)
 ATerm unparseDerivation(const Derivation & drv)
 {
     ATermList outputs = ATempty;
-    for (DerivationOutputs::const_reverse_iterator i = drv.outputs.rbegin();
-         i != drv.outputs.rend(); ++i)
+    for (DerivationOutputs::const_reverse_iterator i = drv.outputs.rbegin(); i != drv.outputs.rend(); ++i)
         outputs = ATinsert(outputs,
             makeDerivationOutput(
                 toATerm(i->first),
@@ -159,8 +168,14 @@ ATerm unparseDerivation(const Derivation & drv)
                 toATerm(i->second.hashAlgo),
                 toATerm(i->second.hash)));
 
+	//decide if we need to add state to the derivation
+    bool createState = false;
+        
     ATermList stateOutputs = ATempty;
-    for (DerivationStateOutputs::const_reverse_iterator i = drv.stateOutputs.rbegin(); i != drv.stateOutputs.rend(); ++i)
+    for (DerivationStateOutputs::const_reverse_iterator i = drv.stateOutputs.rbegin(); i != drv.stateOutputs.rend(); ++i){
+    	if(i->second.enabled == "true"){
+    		createState = true;
+    	}
         stateOutputs = ATinsert(stateOutputs,
             makeDerivationStateOutput(
                 toATerm(i->first),
@@ -172,18 +187,17 @@ ATerm unparseDerivation(const Derivation & drv)
                 toATerm(i->second.synchronization),
                 toATerm(i->second.createDirsBeforeInstall)
                 ));
+    }
                 
     ATermList stateOutputDirs = ATempty;
     for (DerivationStateOutputDirs::const_reverse_iterator i = drv.stateOutputDirs.rbegin(); i != drv.stateOutputDirs.rend(); ++i)
         stateOutputDirs = ATinsert(stateOutputDirs,
             makeDerivationStateOutputDir(
                 toATerm(i->first),
-                //toATerm(i->second.path),
+                //toATerm(i->second.path),			//removed to prevent duplication since the key is also the path 
                 toATerm(i->second.type),
                 toATerm(i->second.interval)
                 ));
-                
-   //toATermList(i->second.dirs)
 
 
     ATermList inDrvs = ATempty;
@@ -207,16 +221,28 @@ ATerm unparseDerivation(const Derivation & drv)
                 toATerm(i->first),
                 toATerm(i->second)));
 
-    return makeDerive(
-        outputs,
-        stateOutputs,
-        stateOutputDirs,
-        inDrvs,
-        toATermList(drv.inputSrcs),
-        toATerm(drv.platform),
-        toATerm(drv.builder),
-        args,
-        env);
+	if(createState){	
+	    return makeDerive(
+	        outputs,
+	        stateOutputs,
+	        stateOutputDirs,
+	        inDrvs,
+	        toATermList(drv.inputSrcs),
+	        toATerm(drv.platform),
+	        toATerm(drv.builder),
+	        args,
+	        env);
+	}
+	else{
+		return makeDeriveWithOutState(
+	        outputs,
+	        inDrvs,
+	        toATermList(drv.inputSrcs),
+	        toATerm(drv.platform),
+	        toATerm(drv.builder),
+	        args,
+	        env);
+	}
 }
 
 

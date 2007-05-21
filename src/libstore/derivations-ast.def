@@ -3,12 +3,19 @@ init initDerivationsHelpers
 #wouter added 2 ATermList
 
 Derive | ATermList ATermList ATermList ATermList ATermList string string ATermList ATermList | ATerm |
-
 | string string | ATerm | EnvBinding |
 | string ATermList | ATerm | DerivationInput |
 | string string string string | ATerm | DerivationOutput |
 | string string string string string string string string | ATerm | DerivationStateOutput |
 | string string string | ATerm | DerivationStateOutputDir |
+
+#We use DeriveWithOutState to create derivations that dont use state, and thus dont have the stateDerivationStateOutput and DerivationStateOutputDir in their derivation
+#Ive put this in because eelco requested it, and its easy to stay backwards compatible, but ultimately I thinks that it should be removed to prevent confusion & duplication
+
+DeriveWithOutState | ATermList ATermList ATermList string string ATermList ATermList | ATerm |
+| string string | ATerm | EnvBindingWithOutState |
+| string ATermList | ATerm | DerivationInputWithOutState |
+| string string string string | ATerm | DerivationOutputWithOutState |
 
 Closure | ATermList ATermList | ATerm | OldClosure |
 | string ATermList | ATerm | OldClosureElem |

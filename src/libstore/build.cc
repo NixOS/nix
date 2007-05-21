@@ -1378,7 +1378,11 @@ void DerivationGoal::startBuilder()
     
     /* Create the state directory where the component can store it's state files place */
     //TODO
-    stateDir = createStateDirs(drv.stateOutputDirs, drv.stateOutputs);
+    
+    //TODO include addDirsBefore ...
+    //if(enableState){ ... 
+    //stateDir = createStateDirs(drv.stateOutputDirs, drv.stateOutputs);
+    //}
     
     //TODO create the startupscript
 

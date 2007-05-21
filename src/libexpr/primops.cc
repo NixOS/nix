@@ -553,18 +553,21 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     /* Construct the final derivation store expression. */
     drv.env["out"] = outPath;
     drv.outputs["out"] = DerivationOutput(outPath, outputHashAlgo, outputHash);
+	
+	//only add state when we have to to keep compitibilty with the 'old' format.
+	if(enableState){    
+		/* Add the state path based on the outPath */
+	    string callingUser = "wouterdb";  															//TODO: Change into variable
+	    string componentHash = printHash(hashDerivationModulo(state, drv));							//hash of the component path
+	    Hash statehash = hashString(htSHA256, stateIndentifier + callingUser + componentHash);		//hash of the state path
+	    Path stateOutPath = makeStatePath("stateOutput:statepath", statehash, drvName);				//
 
-    /* Add the state path based on the outPath */
-    string callingUser = "wouterdb";  															//TODO: Change into variable
-    string componentHash = printHash(hashDerivationModulo(state, drv));							//hash of the component path
-    Hash statehash = hashString(htSHA256, stateIndentifier + callingUser + componentHash);		//hash of the state path
-    Path stateOutPath = makeStatePath("stateOutput:statepath", statehash, drvName);				//
-    
-    drv.env["statepath"] = stateOutPath;		
-    string enableStateS = bool2string(enableState && disableState);
-    string createDirsBeforeInstallS = bool2string(createDirsBeforeInstall);
+    	drv.env["statepath"] = stateOutPath;		
+    	string enableStateS = bool2string(enableState && disableState);
+    	string createDirsBeforeInstallS = bool2string(createDirsBeforeInstall);
 
-    drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, outputHashAlgo, outputHash, enableStateS, shareState, syncState, createDirsBeforeInstallS);
+    	drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, outputHashAlgo, outputHash, enableStateS, shareState, syncState, createDirsBeforeInstallS);
+	}
 
     /* Write the resulting term into the Nix store directory. */
     Path drvPath = writeDerivation(drv, drvName);
