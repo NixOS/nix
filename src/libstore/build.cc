@@ -5,6 +5,8 @@
 #include "local-store.hh"
 #include "db.hh"
 #include "util.hh"
+#include "store-state.hh"
+
 
 #include <map>
 #include <iostream>
@@ -1375,6 +1377,7 @@ void DerivationGoal::startBuilder()
     tmpDir = createTempDir();
     
     /* Create the state directory where the component can store it's state files place */
+    //TODO
     stateDir = createStateDirs(drv.stateOutputDirs, drv.stateOutputs);
     
     //TODO create the startupscript

@@ -2,7 +2,6 @@
 #define __UTIL_H
 
 #include "types.hh"
-#include "derivations.hh"
 
 #include <sys/types.h>
 #include <dirent.h>
@@ -72,9 +71,6 @@ void makePathReadOnly(const Path & path);
 
 /* Create a temporary directory. */
 Path createTempDir(const Path & tmpRoot = "");
-
-/* Create a state directory. */
-Path createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs);
 
 /* Create a directory and all its parents, if necessary. */
 void createDirs(const Path & path);

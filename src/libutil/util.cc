@@ -1,8 +1,6 @@
 #include "config.h"
 
 #include "util.hh"
-#include "globals.hh"
-#include "derivations.hh"
 
 #ifdef __CYGWIN__
 #include <windows.h>
@@ -348,66 +346,6 @@ Path createTempDir(const Path & tmpRoot)
 	    throw SysError(format("creating directory `%1%'") % tmpDir);
     }
 }
-
-//TODO include rights, variable svn ... ?
-Path createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs)
-{
-    /*while (1) {
-        checkInterrupt();
-		if (mkdir(statePath.c_str(), 0777) == 0) {
-		    if (chown(statePath.c_str(), (uid_t) -1, getegid()) != 0)
-			throw SysError(format("setting group of state directory `%1%'") % statePath);
-		    return tmpDir;
-		}
-		if (errno != EEXIST)
-		    throw SysError(format("creating state directory `%1%'") % statePath);
-	}*/
-	
-	string stateDir = stateOutputs.find("state")->second.statepath;
-	
-	//Convert the map into a sortable vector	
-	vector<DerivationStateOutputDir> stateDirsVector;	
-	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
-		stateDirsVector.push_back(i->second);
-	}
-	sort(stateDirsVector.begin(), stateDirsVector.end());
-	
-	printMsg(lvlError, format("nixStoreState: `%1%'") % nixStoreState);
-	printMsg(lvlError, format("nixStoreStateRepos: `%1%'") % nixStoreStateRepos);
-	printMsg(lvlError, format("nixSVNPath `%1%'") % nixSVNPath);
-		
-	for (vector<DerivationStateOutputDir>::iterator i = stateDirsVector.begin(); i != stateDirsVector.end(); ++i)
-    {
-		DerivationStateOutputDir d = *(i);
-		printMsg(lvlError, format("test `%1%'") % d.path);
-		
-		//calc create repos for this state location
-		Hash hash = hashString(htSHA256, stateDir + d.path);
-		
-		/*
-		cd ...
-		svnadmin create hashcode
-		
-		//create dirs		
-		svn checkout file:///nix/state/XXXX/PATH_TO_REPOS dir
-		chmod ....
-		chmod ....		
-				
-		//create commit script
-		svn add *
-		svn revert file-that-I-do-not-want-added another-file-not-to-add 
-
-		*/
-	}
-	
-	//create super commit script
-		
-	
-	//return root path
-	Path tmpDir;
-	return tmpDir;
-}
-
 
 void createDirs(const Path & path)
 {

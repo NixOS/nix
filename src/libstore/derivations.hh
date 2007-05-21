@@ -41,10 +41,11 @@ struct DerivationStateOutput
     string enabled;
     string shared;
     string synchronization;
+    string createStateDirsBeforeInstall;
     DerivationStateOutput()
     {
     }
-    DerivationStateOutput(Path statepath, string hashAlgo, string hash, string enabled, string shared, string synchronization)
+    DerivationStateOutput(Path statepath, string hashAlgo, string hash, string enabled, string shared, string synchronization, string createStateDirsBeforeInstall)
     {
         this->statepath = statepath;
         this->hashAlgo = hashAlgo;
@@ -52,6 +53,7 @@ struct DerivationStateOutput
         this->enabled = enabled;
         this->shared = shared;
         this->synchronization = synchronization;
+        this->createStateDirsBeforeInstall = createStateDirsBeforeInstall;
     }
 };
 
@@ -71,9 +73,6 @@ struct DerivationStateOutputDir
     }
     
     //sort function
-    /*bool operator<(const DerivationStateOutputDir& a, const DerivationStateOutputDir& b) {
-    	return a.path < b.path;
-	} */
 	bool operator<(const DerivationStateOutputDir& a) const { return path < a.path; }      
 };
 
