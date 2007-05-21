@@ -85,8 +85,8 @@ Derivation parseDerivation(ATerm t)
     
     //parse state part
     for (ATermIterator i(stateOuts); i; ++i) {
-        ATerm id, statepath, hashAlgo, hash, enabled, shared, synchronization;
-        if (!matchDerivationStateOutput(*i, id, statepath, hashAlgo, hash, enabled, shared, synchronization))
+        ATerm id, statepath, hashAlgo, hash, enabled, shared, synchronization, createDirsBeforeInstall;
+        if (!matchDerivationStateOutput(*i, id, statepath, hashAlgo, hash, enabled, shared, synchronization, createDirsBeforeInstall))
             throwBadDrv(t);
         DerivationStateOutput stateOut;
         stateOut.statepath = aterm2String(statepath);
@@ -96,6 +96,7 @@ Derivation parseDerivation(ATerm t)
         stateOut.enabled = aterm2String(enabled);
         stateOut.shared = aterm2String(shared);
         stateOut.synchronization = aterm2String(synchronization);
+        stateOut.createDirsBeforeInstall = aterm2String(createDirsBeforeInstall);
         drv.stateOutputs[aterm2String(id)] = stateOut;
     }
     
@@ -168,7 +169,8 @@ ATerm unparseDerivation(const Derivation & drv)
                 toATerm(i->second.hash),
                 toATerm(i->second.enabled),
                 toATerm(i->second.shared),
-                toATerm(i->second.synchronization)
+                toATerm(i->second.synchronization),
+                toATerm(i->second.createDirsBeforeInstall)
                 ));
                 
     ATermList stateOutputDirs = ATempty;

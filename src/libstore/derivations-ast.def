@@ -7,7 +7,7 @@ Derive | ATermList ATermList ATermList ATermList ATermList string string ATermLi
 | string string | ATerm | EnvBinding |
 | string ATermList | ATerm | DerivationInput |
 | string string string string | ATerm | DerivationOutput |
-| string string string string string string string | ATerm | DerivationStateOutput |
+| string string string string string string string string | ATerm | DerivationStateOutput |
 | string string string | ATerm | DerivationStateOutputDir |
 
 Closure | ATermList ATermList | ATerm | OldClosure |

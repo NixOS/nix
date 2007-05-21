@@ -966,5 +966,13 @@ bool string2Int(const string & s, int & n)
     return str && str.get() == EOF;
 }
 
+string bool2string(const bool b)
+{
+	if(b == true)
+	  return "true";
+	else
+      return "false";
+}
+
  
 }

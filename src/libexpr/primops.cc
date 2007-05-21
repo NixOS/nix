@@ -389,6 +389,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     string shareState = "none";
     string syncState = "all";
     string stateIndentifier = "";
+    bool createDirsBeforeInstall = false;
 
     for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
         string key = aterm2String(i->key);
@@ -462,7 +463,8 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
    	        else if(key == "synchronization") { string s = coerceToString(state, value, context, true); syncState = s; }
    	        else if(key == "enableState") { bool b = evalBool(state, value); disableState = true; }
             else if(key == "indentifier"){ string s = coerceToString(state, value, context, true); stateIndentifier = s; }
-            
+            else if(key == "createDirsBeforeInstall"){ bool b = evalBool(state, value); createDirsBeforeInstall = b; }
+                        
             /* All other attributes are passed to the builder through
                the environment. */
             else {
@@ -559,10 +561,10 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     Path stateOutPath = makeStatePath("stateOutput:statepath", statehash, drvName);				//
     
     drv.env["statepath"] = stateOutPath;		
-    string enableStateS = "false";
-    if(enableState && disableState == false)
-      enableStateS = "true";
-    drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, outputHashAlgo, outputHash, enableStateS, shareState, syncState);
+    string enableStateS = bool2string(enableState && disableState);
+    string createDirsBeforeInstallS = bool2string(createDirsBeforeInstall);
+
+    drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, outputHashAlgo, outputHash, enableStateS, shareState, syncState, createDirsBeforeInstallS);
 
     /* Write the resulting term into the Nix store directory. */
     Path drvPath = writeDerivation(drv, drvName);

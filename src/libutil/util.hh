@@ -279,6 +279,8 @@ bool statusOk(int status);
 string int2String(int n);
 bool string2Int(const string & s, int & n);
 
+/* Parse a bool to a string */
+string bool2string(const bool b);
 
 }
 

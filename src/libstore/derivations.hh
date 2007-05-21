@@ -41,11 +41,11 @@ struct DerivationStateOutput
     string enabled;
     string shared;
     string synchronization;
-    string createStateDirsBeforeInstall;
+    string createDirsBeforeInstall;
     DerivationStateOutput()
     {
     }
-    DerivationStateOutput(Path statepath, string hashAlgo, string hash, string enabled, string shared, string synchronization, string createStateDirsBeforeInstall)
+    DerivationStateOutput(Path statepath, string hashAlgo, string hash, string enabled, string shared, string synchronization, string createDirsBeforeInstall)
     {
         this->statepath = statepath;
         this->hashAlgo = hashAlgo;
@@ -53,7 +53,7 @@ struct DerivationStateOutput
         this->enabled = enabled;
         this->shared = shared;
         this->synchronization = synchronization;
-        this->createStateDirsBeforeInstall = createStateDirsBeforeInstall;
+        this->createDirsBeforeInstall = createDirsBeforeInstall;
     }
 };
 
