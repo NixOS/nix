@@ -92,7 +92,18 @@ Path makeStatePath(const string & type, const Hash & hash, const string & suffix
         + "-" + suffix;
 }
 
+Path makeStateReposPath(const string & type, const Hash & hash, const string & suffix)
+{
+    /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
+    string s = type + ":sha256:" + printHash(hash) + ":"
+        + nixStoreState + ":" + suffix;
 
+    checkStoreName(suffix);											//should this be here?
+
+    return nixStoreStateRepos + "/"
+        + printHash32(compressHash(hashString(htSHA256, s), 20))
+        + "-" + suffix;
+}
 
 Path makeFixedOutputPath(bool recursive,
     string hashAlgo, Hash hash, string name)

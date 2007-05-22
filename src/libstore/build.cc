@@ -1381,7 +1381,7 @@ void DerivationGoal::startBuilder()
     //We only create state dirs when state is enabled and when the dirs need to be created before the installation
     if(drv.stateOutputs.size() != 0)
     	if(drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
-	    	createStateDirs(drv.stateOutputDirs, drv.stateOutputs);
+	    	createStateDirs(drv.stateOutputDirs, drv.stateOutputs, drv.env);
 
     /* For convenience, set an environment pointing to the top build
        directory. */
@@ -1616,7 +1616,7 @@ void DerivationGoal::computeClosure()
     //We create state dirs only when state is enabled and when the dirs need to be created after the installation
     if(drv.stateOutputs.size() != 0)
     	if(!drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
-	    	createStateDirs(drv.stateOutputDirs, drv.stateOutputs);
+	    	createStateDirs(drv.stateOutputDirs, drv.stateOutputs, drv.env);
     
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all

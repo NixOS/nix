@@ -207,6 +207,9 @@ Path makeFixedOutputPath(bool recursive,
 /* Constructs a unique store state path name. */
 Path makeStatePath(const string & type, const Hash & hash, const string & suffix);
 
+/* Constructs a unique store state repos path name. */
+Path makeStateReposPath(const string & type, const Hash & hash, const string & suffix);
+
 
 /* This is the preparatory part of addToStore() and addToStoreFixed();
    it computes the store path to which srcPath is to be copied.

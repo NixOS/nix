@@ -29,7 +29,6 @@ bool readOnlyMode = false;
 string thisSystem = "unset";
 unsigned int maxSilentTime = 0;
 
-
 static bool settingsRead = false;
 
 static std::map<string, Strings> settings;

@@ -440,8 +440,13 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 			        startNest(nest, lvlVomit, format("processing statedir attribute `%1%'") % statekey);
 			        try {
 			            string s = coerceToString(state, statevalue, context, true);
-   
-			            if (statekey == "dir") { dir.path = s; }
+			            if (statekey == "dir") { 
+			            	//Add a / to the end if it's not there
+							if(s[s.length() - 1] != '/')
+				            	dir.path = s + "/";
+				            else
+				            	dir.path = s;
+			            }
 			            else if (statekey == "type") { dir.type = s; }
 			            else if (statekey == "interval") { dir.interval = s; }
 			            else throw EvalError(format("invalid subattirbute `%1%' for attribute dirs") % statekey);

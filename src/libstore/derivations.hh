@@ -40,8 +40,8 @@ struct DerivationStateOutput
     string hashAlgo;
     string hash;
     string enabled;
-    string shared;
-    string synchronization;
+    string shared;						//none, full, group
+    string synchronization;				//none, ... ?
     string createDirsBeforeInstall;
     DerivationStateOutput()
     {
@@ -69,8 +69,8 @@ struct DerivationStateOutput
 struct DerivationStateOutputDir
 {
     string path;
-    string type;
-    string interval;
+    string type;					//none, manual, interval, full
+    string interval;				//type int
     DerivationStateOutputDir()
     {
     }
