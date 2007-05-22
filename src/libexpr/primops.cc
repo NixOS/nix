@@ -384,8 +384,8 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     bool outputHashRecursive = false;
 
   	//state vars
-    bool enableState = false;
-    bool disableState = false;
+    bool enableState = false;		//We dont do state by default, but if a user defines stateDirs for example, than this becomes true.
+    bool disableState = false;		//Becomes true if the user explicitly says: no state
     string shareState = "none";
     string syncState = "all";
     string stateIndentifier = "";
@@ -417,7 +417,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
                 }
             }
 
-			//state variables
+			//Add specific state variables
    	        else if(key == "stateDirs") {
               
               enableState = true;
@@ -454,14 +454,12 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
             	}
             	
             	drv.stateOutputDirs[dir.path] = dir;
-                //Expr e = queryAttr(v, "dir");
-                //printMsg(lvlError, format("DIRS3 `%1%'") % e);
               }
                  	         
    	        }
    	        else if(key == "shareState") { string s = coerceToString(state, value, context, true); shareState = s; }
    	        else if(key == "synchronization") { string s = coerceToString(state, value, context, true); syncState = s; }
-   	        else if(key == "enableState") { bool b = evalBool(state, value); disableState = true; }
+   	        else if(key == "disableState") { bool b = evalBool(state, value); disableState = b; }
             else if(key == "indentifier"){ string s = coerceToString(state, value, context, true); stateIndentifier = s; }
             else if(key == "createDirsBeforeInstall"){ bool b = evalBool(state, value); createDirsBeforeInstall = b; }
                         
@@ -489,7 +487,6 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
                 % drvName % showPos(posDrvName));
             throw;
         }
-
     }
     
     /* Everything in the context of the strings in the derivation
@@ -555,15 +552,16 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     drv.outputs["out"] = DerivationOutput(outPath, outputHashAlgo, outputHash);
 	
 	//only add state when we have to to keep compitibilty with the 'old' format.
-	if(enableState){    
+	//We add state when it's enbaled by the keywords, and NOT disabled by the user
+	if(enableState && !disableState){    
 		/* Add the state path based on the outPath */
 	    string callingUser = "wouterdb";  															//TODO: Change into variable
 	    string componentHash = printHash(hashDerivationModulo(state, drv));							//hash of the component path
 	    Hash statehash = hashString(htSHA256, stateIndentifier + callingUser + componentHash);		//hash of the state path
-	    Path stateOutPath = makeStatePath("stateOutput:statepath", statehash, drvName);				//
+	    Path stateOutPath = makeStatePath("stateOutput:statepath", statehash, drvName);				//State path
 
     	drv.env["statepath"] = stateOutPath;		
-    	string enableStateS = bool2string(enableState && disableState);
+    	string enableStateS = bool2string("true");
     	string createDirsBeforeInstallS = bool2string(createDirsBeforeInstall);
 
     	drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, outputHashAlgo, outputHash, enableStateS, shareState, syncState, createDirsBeforeInstallS);
