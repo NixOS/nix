@@ -4,6 +4,7 @@
 typedef struct _ATerm * ATerm;
 
 #include "hash.hh"
+#include "util.hh"
 
 #include <map>
 
@@ -54,6 +55,14 @@ struct DerivationStateOutput
         this->shared = shared;
         this->synchronization = synchronization;
         this->createDirsBeforeInstall = createDirsBeforeInstall;
+    }
+    
+    bool getEnabled(){
+    	return string2bool(enabled);
+    }
+    
+    bool getCreateDirsBeforeInstall(){
+    	return string2bool(createDirsBeforeInstall);
     }
 };
 

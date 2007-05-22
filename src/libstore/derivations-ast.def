@@ -10,15 +10,14 @@ Derive | ATermList ATermList ATermList ATermList ATermList string string ATermLi
 | string string string | ATerm | DerivationStateOutputDir |
 
 #We use DeriveWithOutState to create derivations that dont use state, and thus dont have the stateDerivationStateOutput and DerivationStateOutputDir in their derivation
-#Ive put this in because eelco requested it, and its easy to stay backwards compatible, but ultimately I thinks that it should be removed to prevent confusion & duplication
-
-#!!!!!!!!Change the string "DeriveWithOutState" in derivations.ast-def.cc to "Derive"
-#TODO, make this automatic..
-
-DeriveWithOutState | ATermList ATermList ATermList string string ATermList ATermList | ATerm |
+#Ive put this in because eelco requested it, and its easy to stay backwards compatible, but ultimately I think that it should be removed to prevent confusion & duplication
+#The function will be called matchDerivateWithOutState, but it will match the Derive term to remain backwards compatible
+Derive | ATermList ATermList ATermList string string ATermList ATermList | ATerm | DeriveWithOutState
 | string string | ATerm | EnvBindingWithOutState |
 | string ATermList | ATerm | DerivationInputWithOutState |
 | string string string string | ATerm | DerivationOutputWithOutState |
+
+
 
 Closure | ATermList ATermList | ATerm | OldClosure |
 | string ATermList | ATerm | OldClosureElem |

@@ -1377,14 +1377,11 @@ void DerivationGoal::startBuilder()
     tmpDir = createTempDir();
     
     /* Create the state directory where the component can store it's state files place */
-    //TODO
-    
-    //TODO include addDirsBefore ...
-    //if(enableState){ ... 
-    //stateDir = createStateDirs(drv.stateOutputDirs, drv.stateOutputs);
-    //}
-    
-    //TODO create the startupscript
+    //printMsg(lvlError, format("STATE: `%1%'") % );
+    //We only create state dirs when state is enabled and when the dirs need to be created before the installation
+    if(drv.stateOutputs.size() != 0)
+    	if(drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
+	    	createStateDirs(drv.stateOutputDirs, drv.stateOutputs);
 
     /* For convenience, set an environment pointing to the top build
        directory. */
@@ -1615,6 +1612,11 @@ void DerivationGoal::computeClosure()
 {
     map<Path, PathSet> allReferences;
     map<Path, Hash> contentHashes;
+    
+    //We create state dirs only when state is enabled and when the dirs need to be created after the installation
+    if(drv.stateOutputs.size() != 0)
+    	if(!drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
+	    	createStateDirs(drv.stateOutputDirs, drv.stateOutputs);
     
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all

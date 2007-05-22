@@ -974,5 +974,38 @@ string bool2string(const bool b)
       return "false";
 }
 
+bool string2bool(const string & s)
+{
+	if(s == "true")
+	  return true;
+	else if(s == "false")
+      return false;
+    else{
+    	throw Error(format("cannot convert string: `%1%' to bool") % s);
+        quickExit(1);
+    	return false;
+    }
+}
+
+string triml(const string & s) {
+	string news = s;
+	int pos(0);
+	for ( ; news[pos]==' ' || news[pos]=='\t'; ++pos );
+		news.erase(0, pos);
+	return news;
+}
+
+string trimr(const string & s) {
+	string news = s;	
+	int pos(news.size());
+	for ( ; pos && news[pos-1]==' ' || news[pos]=='\t'; --pos );
+		news.erase(pos, news.size()-pos);
+	return news;
+}
+
+string trim(const string & s) {
+	return triml(trimr(s));
+}
+
  
 }

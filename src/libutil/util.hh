@@ -279,10 +279,18 @@ bool statusOk(int status);
 string int2String(int n);
 bool string2Int(const string & s, int & n);
 
-/* Parse a bool to a string */
+/* Parse a bool to a string and back */
 string bool2string(const bool b);
+bool string2bool(const string & s);
+
+//return modified string s with spaces trimmed from left
+string triml(const string & s);
+//return modified string s with spaces trimmed from right 
+string trimr(const string & s);
+//return modified string s with spaces trimmed from edges
+string trim(const string & s);
+
 
 }
-
 
 #endif /* !__UTIL_H */
