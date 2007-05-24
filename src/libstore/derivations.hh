@@ -81,6 +81,10 @@ struct DerivationStateOutputDir
         this->interval = interval;
     }
     
+    int getInterval(){
+    	return 0;			//TODO
+    }
+    
     //sort function
 	bool operator<(const DerivationStateOutputDir& a) const { return path < a.path; }      
 };

@@ -439,13 +439,18 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 			        if (!matchAttrRHS(staterhs, statevalue, statepos)) abort();
 			        startNest(nest, lvlVomit, format("processing statedir attribute `%1%'") % statekey);
 			        try {
-			            string s = coerceToString(state, statevalue, context, true);
+			            string s = trim(coerceToString(state, statevalue, context, true));
 			            if (statekey == "dir") { 
+			            	
 			            	//Add a / to the end if it's not there
 							if(s[s.length() - 1] != '/')
-				            	dir.path = s + "/";
-				            else
-				            	dir.path = s;
+				            	s = s + "/";
+				            
+				            //Remove the / at the beginning if it's there
+							if(s[0] == '/')
+				            	s = s.substr(1, s.length());
+				            
+				            dir.path = s;
 			            }
 			            else if (statekey == "type") { dir.type = s; }
 			            else if (statekey == "interval") { dir.interval = s; }
