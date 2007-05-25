@@ -72,6 +72,14 @@ static TableId dbSubstitutes = 0;
 static TableId dbDerivers = 0;
 
 
+/* dbStateCounters :: StatePath -> Int
+
+   This table lists the state folders that state managed components
+   and are of type interval.  
+*/
+static TableId dbStateCounters = 0;
+
+
 bool Substitute::operator == (const Substitute & sub) const
 {
     return program == sub.program
@@ -352,6 +360,9 @@ void queryReferences(const Transaction & txn,
     const Path & storePath, PathSet & references)
 {
     Paths references2;
+    
+    //WOUTER EDIT
+    
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
     nixDB.queryStrings(txn, dbReferences, storePath, references2);

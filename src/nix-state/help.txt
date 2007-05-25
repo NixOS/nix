@@ -1,0 +1,58 @@
+Usage: nix-state [OPTIONS...] [ARGUMENTS...]
+
+`nix-store' is a tool to manipulate the Nix store.
+
+Operations:
+
+  --realise / -r: ensure path validity; if a derivation, ensure that
+      validity of the outputs
+  --add / -A: copy a path to the Nix store
+  --delete: safely delete paths from the Nix store
+  --query / -q: query information
+  --read-log / -l: print build log of given store paths
+
+  --register-substitutes: register a substitute expression (dangerous!)
+  --clear-substitutes: clear all substitutes
+  --register-validity: register path validity (dangerous!)
+  --check-validity: check path validity
+
+  --gc: run the garbage collector
+
+  --dump: dump a path as a Nix archive
+  --restore: restore a path from a Nix archive
+
+  --init: initialise the Nix database
+  --verify: verify Nix structures
+
+  --version: output version information
+  --help: display help
+
+Query flags:
+
+  --outputs: query the output paths of a Nix derivation (default)
+  --requisites / -R: print all paths necessary to realise a path
+  --references: print all paths referenced by the given path
+  --referrers: print all paths directly refering to the given path
+  --referrers-closure: print all paths (in)directly refering to the given path
+  --tree: print a tree showing the dependency graph of the given paths
+  --graph: print a dot graph rooted at given paths
+
+Query switches (not applicable to all queries):
+
+  --use-output: perform query on output of derivation, not derivation itself
+  --force-realise: realise the path before performing the query
+  --include-outputs: in `-R' on a derivation, include requisites of outputs
+
+Garbage collector options:
+
+  --print-roots: print GC roots and exit
+  --print-live: print live paths and exit
+  --print-dead: print dead paths and exit
+  --delete: delete dead paths (default)
+    
+Options:
+
+  --verbose / -v: verbose operation (may be repeated)
+  --keep-failed / -K: keep temporary directories of failed builds
+
+  --add-root: add garbage collector roots for the result

@@ -1377,7 +1377,6 @@ void DerivationGoal::startBuilder()
     tmpDir = createTempDir();
     
     /* Create the state directory where the component can store it's state files place */
-    //printMsg(lvlError, format("STATE: `%1%'") % );
     //We only create state dirs when state is enabled and when the dirs need to be created before the installation
     if(drv.stateOutputs.size() != 0)
     	if(drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
