@@ -92,18 +92,20 @@ Derivation parseDerivation(ATerm t)
     if(withState){
 	    //parse state part
 	    for (ATermIterator i(stateOuts); i; ++i) {
-	        ATerm id, statepath, hashAlgo, hash, enabled, shared, synchronization, createDirsBeforeInstall;
-	        if (!matchDerivationStateOutput(*i, id, statepath, hashAlgo, hash, enabled, shared, synchronization, createDirsBeforeInstall))
+	        ATerm id, statepath, hashAlgo, hash, stateIdentifier, enabled, shared, synchronization, createDirsBeforeInstall, runtimeStateParamters;
+	        if (!matchDerivationStateOutput(*i, id, statepath, hashAlgo, hash, stateIdentifier, enabled, shared, synchronization, createDirsBeforeInstall, runtimeStateParamters))
 	            throwBadDrv(t);
 	        DerivationStateOutput stateOut;
 	        stateOut.statepath = aterm2String(statepath);
 	        //checkPath(stateOut.path);									//should we check the statpath .... ???
 	        stateOut.hashAlgo = aterm2String(hashAlgo);
 	        stateOut.hash = aterm2String(hash);
+	        stateOut.stateIdentifier = aterm2String(stateIdentifier);
 	        stateOut.enabled = aterm2String(enabled);
 	        stateOut.shared = aterm2String(shared);
 	        stateOut.synchronization = aterm2String(synchronization);
 	        stateOut.createDirsBeforeInstall = aterm2String(createDirsBeforeInstall);
+	        stateOut.runtimeStateParamters = aterm2String(runtimeStateParamters);
 	        drv.stateOutputs[aterm2String(id)] = stateOut;
 	    }
 	}
@@ -182,10 +184,12 @@ ATerm unparseDerivation(const Derivation & drv)
                 toATerm(i->second.statepath),
                 toATerm(i->second.hashAlgo),
                 toATerm(i->second.hash),
+                toATerm(i->second.stateIdentifier),
                 toATerm(i->second.enabled),
                 toATerm(i->second.shared),
                 toATerm(i->second.synchronization),
-                toATerm(i->second.createDirsBeforeInstall)
+                toATerm(i->second.createDirsBeforeInstall),
+                toATerm(i->second.runtimeStateParamters)
                 ));
     }
                 

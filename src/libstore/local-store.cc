@@ -8,6 +8,9 @@
 #include "aterm.hh"
 #include "derivations-ast.hh"
 #include "worker-protocol.hh"
+
+#include "derivations.hh"
+#include "misc.hh"
     
 #include <iostream>
 #include <algorithm>
@@ -1107,7 +1110,7 @@ void setStatePathsInterval(const PathSet & statePaths, const vector<int> & inter
 	int n=0;
     for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
     {
-        printMsg(lvlError, format("PATH: %1%") % *i);
+        printMsg(lvlError, format("Set interval of PATH: %1%") % *i);
         
         int interval=0;
         if(!allZero)
@@ -1127,19 +1130,21 @@ void LocalStore::setStatePathsInterval(const PathSet & statePaths, const vector<
 
 vector<int> getStatePathsInterval(const PathSet & statePaths)
 {
+
 	Transaction txn(nixDB);			//TODO should u do a transaction here? ... this might delay the process ...
 	
+	string data;
+	Paths referers;
+	
 	vector<int> intervals;
-    string data;
-    
-    for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i){
-    	
+    for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
+    {
     	nixDB.queryString(txn, dbStateCounters, *i, data);
-    	printMsg(lvlError, format("Data %1%") % data);	
-    }        
-	    
-    txn.commit();
+    	printMsg(lvlError, format("Data %1%") % data);				//TODO
     
+    }        
+    txn.commit();
+
     return intervals;
 }
 
@@ -1148,6 +1153,58 @@ vector<int> LocalStore::getStatePathsInterval(const PathSet & statePaths)
     return nix::getStatePathsInterval(statePaths);
 }
 
+
+Derivation getStateDerivation(const Path & path)
+{
+	Transaction txn(nixDB);			//TODO should u do a transaction here? ... this might delay the process ...
+	
+	string data;
+
+    //Get derivations of references    
+    nixDB.queryString(txn, dbDerivers, path, data);
+    printMsg(lvlError, format("DERIVERS %1%") % data);
+    
+    txn.commit();
+    
+    Derivation drv = derivationFromPath(data);
+    if(drv.stateOutputs.size() == 0)
+   		throw Error(format("This path is not a state derivation: `%1%'") % path);
+    
+    return drv;
+}
+
+Derivation LocalStore::getStateDerivation(const Path & path)
+{
+    return nix::getStateDerivation(path);
+}
+
+//TODO direct or all recursive parameter
+//TODO check if these are state components
+PathSet getStateReferencesClosure(const Path & path)
+{
+	Transaction txn(nixDB);			//TODO should u do a transaction here? ... this might delay the process ...
+
+	Strings data;
+	PathSet paths;
+	
+    Paths referencesKeys;
+    nixDB.queryStrings(txn, dbReferences, path, data);
+    for (Strings::iterator i = data.begin(); i != data.end(); ++i)
+    {
+		//printMsg(lvlError, format("References: `%1%'") % *i);
+		paths.insert(*i);
+    }
+    
+    txn.commit();
+    
+    return paths;
+	
+}
+
+PathSet LocalStore::getStateReferencesClosure(const Path & path)
+{
+    return nix::getStateReferencesClosure(path);
+}
 
 
 /* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */

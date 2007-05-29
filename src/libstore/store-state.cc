@@ -20,6 +20,7 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 	Path statePath = stateOutputs.find("state")->second.statepath;
 	string stateDir = statePath;
 	string drvName = env.find("name")->second;
+	string stateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
 	
 	//Convert the map into a sortable vector
 	vector<DerivationStateOutputDir> stateDirsVector;	
@@ -49,15 +50,7 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 		string fullstatedir = stateDir + "/" + thisdir;
 		Path statePath = fullstatedir;					//TODO call coerce function
 				
-		//calc create repos for this state location
-		Hash hash = hashString(htSHA256, stateDir + thisdir);
-		string repos = makeStateReposPath("stateOutput:staterepospath", hash, drvName); 
-		
-		//Were going to execute svn shell commands
-		executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin");				  //TODO create as nixbld.nixbld chmod 700
-
-		//TODO REPLACE TRUE INTO VAR
-	
+		//TODO REPLACE TRUE INTO VAR OF CREATEING DIRS BEFORE OR AFTER INSTALL
 		//Check if and how this dir needs to be versioned
 		if(d.type == "none"){
 			if(true){
@@ -66,7 +59,13 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 			nonversionedpaths.push_back(fullstatedir);
 			continue;
 		}
+		
+		//Create a repository for this state location
+		Hash hash = hashString(htSHA256, stateDir + thisdir);
+		string repos = makeStateReposPath("stateOutput:staterepospath", hash, drvName, stateIdentifier); 
+		executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin");				  //TODO create as nixbld.nixbld chmod 700
 
+		//
 		string checkoutcommand = svnbin + " checkout file://" + repos + " " + fullstatedir;
 		checkoutcommands.push_back(checkoutcommand);
 		subversionedpaths.push_back(fullstatedir);
@@ -78,6 +77,7 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 		else
 			subversionedpathsInterval.push_back(0);
 
+		//TODO REPLACE TRUE INTO VAR OF CREATEING DIRS BEFORE OR AFTER INSTALL
 		if(true){
 			printMsg(lvlError, format("Adding state subdir: %1% to %2% from repository %3%") % thisdir % fullstatedir % repos);
 			executeAndPrintShellCommand(checkoutcommand, "svn");  //TODO checkout as user	
@@ -121,6 +121,7 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
     }    	
 }
 
+//executes a shell command and captures and prints the output.
 void executeAndPrintShellCommand(const string & command, const string & commandName)
 {
 	string tempoutput = "svnoutput.txt";

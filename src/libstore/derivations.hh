@@ -39,22 +39,30 @@ struct DerivationStateOutput
     Path statepath;
     string hashAlgo;
     string hash;
-    string enabled;
+    string stateIdentifier;				//the identifier
+    string enabled;						//enable or disable state
     string shared;						//none, full, group
-    string synchronization;				//none, exclusive-lock-on-own-state-dir, exclusive-lock-on-all-(sub)-states-dir 
-    string createDirsBeforeInstall;
+    string synchronization;				//none (no locks), exclusive-lock-on-own-state-dir, exclusive-lock-on-all-(sub)-states-dir
+    
+    string commitReferences;			//TODO none, direct, recursive-all
+    string commitBinaries;				//TODO list of binaries that need (or not) to be committed when these binaries are called
+         
+    string createDirsBeforeInstall;		//if true: creates state dirs before installation
+	string runtimeStateParamters;		//if not empty: these are the runtime parameters where state can be found (you can use $statepath here)
     DerivationStateOutput()
     {
     }
-    DerivationStateOutput(Path statepath, string hashAlgo, string hash, string enabled, string shared, string synchronization, string createDirsBeforeInstall)
+    DerivationStateOutput(Path statepath, string hashAlgo, string hash, string stateIdentifier, string enabled, string shared, string synchronization, string createDirsBeforeInstall, string runtimeStateParamters)
     {
         this->statepath = statepath;
         this->hashAlgo = hashAlgo;
         this->hash = hash;
+        this->stateIdentifier = stateIdentifier;
         this->enabled = enabled;
         this->shared = shared;
         this->synchronization = synchronization;
         this->createDirsBeforeInstall = createDirsBeforeInstall;
+        this->runtimeStateParamters = runtimeStateParamters;
     }
     
     bool getEnabled(){

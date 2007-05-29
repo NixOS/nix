@@ -9,7 +9,7 @@
 #include "util.hh"
 #include "help.txt.hh"
 #include "local-store.hh"
-
+#include "derivations.hh"
 
 using namespace nix;
 using std::cin;
@@ -30,16 +30,6 @@ void printHelp()
 static void opCommitReferencesClosure(Strings opFlags, Strings opArgs)
 {
 	/*
-	Database nixDB;
-	
-	try {
-        nixDB.open(nixDBPath);
-    } catch (DbNoPermission & e) {
-        printMsg(lvlTalkative, "cannot access Nix database; continuing anyway");
-        //readOnlyMode = true;
-        return;
-    }
-
 	Paths referencesKeys;
 	Transaction txn(nixDB);
 	TableId dbReferences = nixDB.openTable("statecounters");
@@ -49,25 +39,52 @@ static void opCommitReferencesClosure(Strings opFlags, Strings opArgs)
     {
 		printMsg(lvlError, format("NIX-STATE: `%1%'") % *i);
     }*/
+
+	//Data from user / profile
+    string component = "/nix/store/1hyp7iiiig3rdf99y74yqhi2jkfpa8pf-hellohardcodedstateworld-1.0";
+    Path componentPath = component; //TODO call coerce function
+    string identifier = "test";
+    string binary = "hello";
+
+	//Wait for locks?
+	
+	//Run the component
     
-    PathSet a;
-    a.insert("/nix/state/m3h15msjdv1cliqdc3ijj906dzhsf6p0-hellohardcodedstateworld-1.0/log/");
-    store->getStatePathsInterval(a);
+    
+    //********************* Commit state *********************
+    
+    //get the derivation
+    Derivation drv = store->getStateDerivation(componentPath);
+    
+    DerivationStateOutputDirs stateOutputDirs;
+    DerivationStateOutputs stateOutputs; 
+    
+    //get dependecies (if neccecary) of all state components that need to be updated
+    PathSet paths = store->getStateReferencesClosure(componentPath);
+    
+    //get their derivations
+    //...
+    
+    //Get and update the intervals
+    //store->getStatePathsInterval(a);
+    //store->setStatePathsInterval(a);
+        
+    //call the bash script on all the the store-state components
+    
+    string svnbin = nixSVNPath + "/svn";
+	string svnadminbin = nixSVNPath + "/svnadmin";
+	
+    //svnbin=/nix/var/nix/profiles/per-user/root/profile/bin/svn
+	//subversionedpaths=( /nix/state/v6rr3yi5ilgn3k0kwxkk633ap4z0m1zi-hellohardcodedstateworld-1.0/ /nix/state/v6rr3yi5ilgn3k0kwxkk633ap4z0m1zi-hellohardcodedstateworld-1.0/log/ )
+	//subversionedpathsInterval=( 0 0 )
+	//nonversionedpaths=( /nix/state/v6rr3yi5ilgn3k0kwxkk633ap4z0m1zi-hellohardcodedstateworld-1.0/cache/ /nix/state/v6rr3yi5ilgn3k0kwxkk633ap4z0m1zi-hellohardcodedstateworld-1.0/log/test/ /nix/state/v6rr3yi5ilgn3k0kwxkk633ap4z0m1zi-hellohardcodedstateworld-1.0/log/test2/test2/ /nix/state/v6rr3yi5ilgn3k0kwxkk633ap4z0m1zi-hellohardcodedstateworld-1.0/logging/ )
+	//checkouts=( "/nix/var/nix/profiles/per-user/root/profile/bin/svn checkout file:///nix/staterepos/99dj5zg1ginj5as75nkb0psnp02krv2s-hellohardcodedstateworld-1.0 /nix/state/v6rr3yi5ilgn3k0kwxkk633ap4z0m1zi-hellohardcodedstateworld-1.0/" "/nix/var/nix/profiles/per-user/root/profile/bin/svn checkout file:///nix/staterepos/9ph3nd4irpvgs66h24xjvxrwpnrwy9n0-hellohardcodedstateworld-1.0 /nix/state/v6rr3yi5ilgn3k0kwxkk633ap4z0m1zi-hellohardcodedstateworld-1.0/log/" )
     
     
-    /*
-    Transaction txn;
-    createStoreTransaction(txn);
-    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
-         i != drv.outputs.end(); ++i)
-    {
-        registerValidPath(txn, i->second.path,
-            contentHashes[i->second.path],
-            allReferences[i->second.path],
-            drvPath);
-    }
-    txn.commit();
-    */
+    //for(...){
+    //
+    //}
+
 }
 
 

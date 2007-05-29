@@ -79,6 +79,10 @@ public:
 	void setStatePathsInterval(const PathSet & statePath, const vector<int> & intervals, bool allZero = false);
 	
 	vector<int> getStatePathsInterval(const PathSet & statePaths);
+	
+	Derivation getStateDerivation(const Path & path);
+	
+	PathSet getStateReferencesClosure(const Path & path);
 };
 
 

@@ -75,34 +75,44 @@ Path makeStorePath(const string & type, const Hash & hash, const string & suffix
     checkStoreName(suffix);
 
     return nixStore + "/"
-        + printHash32(compressHash(hashString(htSHA256, s), 20))
+        + printHash32(compressHash(hashString(htSHA256, s), 20))		//TODO maybe also add a suffix_stateIdentifier when: there is state & no runtime state args & ... ?
         + "-" + suffix;
 }
 
-Path makeStatePath(const string & type, const Hash & hash, const string & suffix)
+Path makeStatePath(const string & type, const Hash & hash, const string & suffix, const string & stateIdentifier)
 {
+    string suffix_stateIdentifier = stateIdentifier;
+    if(suffix_stateIdentifier != "")
+    	suffix_stateIdentifier = "-" + suffix_stateIdentifier; 
+    
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
     string s = type + ":sha256:" + printHash(hash) + ":"
-        + nixStoreState + ":" + suffix;
+        + nixStoreState + ":" + suffix + ":" + stateIdentifier;
 
-    checkStoreName(suffix);											//should this be here?
+    checkStoreName(suffix);
+    checkStoreName(stateIdentifier);
 
     return nixStoreState + "/"
         + printHash32(compressHash(hashString(htSHA256, s), 20))
-        + "-" + suffix;
+        + "-" + suffix + suffix_stateIdentifier;
 }
 
-Path makeStateReposPath(const string & type, const Hash & hash, const string & suffix)
+Path makeStateReposPath(const string & type, const Hash & hash, const string & suffix, const string & stateIdentifier)
 {
+    string suffix_stateIdentifier = stateIdentifier;
+    if(suffix_stateIdentifier != "")
+    	suffix_stateIdentifier = "-" + suffix_stateIdentifier; 
+
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
     string s = type + ":sha256:" + printHash(hash) + ":"
-        + nixStoreState + ":" + suffix;
+        + nixStoreState + ":" + suffix + ":" + stateIdentifier;
 
-    checkStoreName(suffix);											//should this be here?
-
+    checkStoreName(suffix);
+    checkStoreName(stateIdentifier);
+    
     return nixStoreStateRepos + "/"
         + printHash32(compressHash(hashString(htSHA256, s), 20))
-        + "-" + suffix;
+        + "-" + suffix + suffix_stateIdentifier;
 }
 
 Path makeFixedOutputPath(bool recursive,

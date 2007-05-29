@@ -388,8 +388,9 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     bool disableState = false;		//Becomes true if the user explicitly says: no state
     string shareState = "none";
     string syncState = "all";
-    string stateIndentifier = "";
+    string stateIdentifier = "";
     bool createDirsBeforeInstall = false;
+    string runtimeStateParamters = "";
 
     for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
         string key = aterm2String(i->key);
@@ -467,11 +468,12 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
               }
                  	         
    	        }
-   	        else if(key == "shareState") { string s = coerceToString(state, value, context, true); shareState = s; }
-   	        else if(key == "synchronization") { string s = coerceToString(state, value, context, true); syncState = s; }
-   	        else if(key == "disableState") { bool b = evalBool(state, value); disableState = b; }
-            else if(key == "indentifier"){ string s = coerceToString(state, value, context, true); stateIndentifier = s; }
-            else if(key == "createDirsBeforeInstall"){ bool b = evalBool(state, value); createDirsBeforeInstall = b; }
+   	        else if(key == "shareState") { shareState = coerceToString(state, value, context, true); }
+   	        else if(key == "synchronization") { syncState = coerceToString(state, value, context, true); }
+   	        else if(key == "disableState") { disableState = evalBool(state, value); }
+            else if(key == "identifier"){ stateIdentifier = coerceToString(state, value, context, true); }
+            else if(key == "createDirsBeforeInstall"){ createDirsBeforeInstall = evalBool(state, value); }
+            else if(key == "runtimeStateParamters"){ runtimeStateParamters = coerceToString(state, value, context, true); }
                         
             /* All other attributes are passed to the builder through
                the environment. */
@@ -565,16 +567,16 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 	//We add state when it's enbaled by the keywords, and NOT disabled by the user
 	if(enableState && !disableState){    
 		/* Add the state path based on the outPath */
-	    string callingUser = "wouterdb";  															//TODO: Change into variable
-	    string componentHash = printHash(hashDerivationModulo(state, drv));							//hash of the component path
-	    Hash statehash = hashString(htSHA256, stateIndentifier + callingUser + componentHash);		//hash of the state path
-	    Path stateOutPath = makeStatePath("stateOutput:statepath", statehash, drvName);				//State path
+	    string callingUser = "wouterdb";  																	//TODO: Change into variable
+	    string componentHash = printHash(hashDerivationModulo(state, drv));									//hash of the component path
+	    Hash statehash = hashString(htSHA256, callingUser + componentHash);									//hash of the state path
+	    Path stateOutPath = makeStatePath("stateOutput:statepath", statehash, drvName, stateIdentifier);	//State path
 
     	drv.env["statepath"] = stateOutPath;		
     	string enableStateS = bool2string("true");
     	string createDirsBeforeInstallS = bool2string(createDirsBeforeInstall);
 
-    	drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, outputHashAlgo, outputHash, enableStateS, shareState, syncState, createDirsBeforeInstallS);
+    	drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, outputHashAlgo, outputHash, stateIdentifier, enableStateS, shareState, syncState, createDirsBeforeInstallS, runtimeStateParamters);
 	}
 
     /* Write the resulting term into the Nix store directory. */

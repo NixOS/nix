@@ -8,6 +8,7 @@
 
 #include "hash.hh"
 #include "serialise.hh"
+#include "derivations.hh"
 
 
 namespace nix {
@@ -185,6 +186,13 @@ public:
 	
 	/* TODO */
 	virtual vector<int> getStatePathsInterval(const PathSet & statePaths) = 0;
+	
+	/* TODO */	
+	virtual Derivation getStateDerivation(const Path & path) = 0;
+
+	/* TODO */	
+	virtual PathSet getStateReferencesClosure(const Path & path) = 0;
+	
 };
 
 
@@ -211,10 +219,10 @@ Path makeFixedOutputPath(bool recursive,
     string hashAlgo, Hash hash, string name);
 
 /* Constructs a unique store state path name. */
-Path makeStatePath(const string & type, const Hash & hash, const string & suffix);
+Path makeStatePath(const string & type, const Hash & hash, const string & suffix, const string & stateIdentifier);
 
 /* Constructs a unique store state repos path name. */
-Path makeStateReposPath(const string & type, const Hash & hash, const string & suffix);
+Path makeStateReposPath(const string & type, const Hash & hash, const string & suffix, const string & stateIdentifier);
 
 
 /* This is the preparatory part of addToStore() and addToStoreFixed();

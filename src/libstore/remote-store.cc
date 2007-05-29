@@ -388,5 +388,19 @@ vector<int> RemoteStore::getStatePathsInterval(const PathSet & statePaths)
     return intervals;
 }
 
+//TODO
+Derivation RemoteStore::getStateDerivation(const Path & path)
+{
+	Derivation d;
+	return d;
+}
+	
+//TODO
+PathSet RemoteStore::getStateReferencesClosure(const Path & path)
+{
+	PathSet empty;
+	return empty;
+}
+
 
 }
