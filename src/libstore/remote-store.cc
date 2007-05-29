@@ -375,5 +375,18 @@ void RemoteStore::processStderr(Sink * sink, Source * source)
         throw Error("protocol error processing standard error");
 }
 
+//TODO
+void RemoteStore::setStatePathsInterval(const PathSet & statePaths, const vector<int> & intervals, bool allZero)
+{
+	
+}
+
+//TODO
+vector<int> RemoteStore::getStatePathsInterval(const PathSet & statePaths)
+{
+	vector<int> intervals;
+    return intervals;
+}
+
 
 }

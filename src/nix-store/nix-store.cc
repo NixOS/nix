@@ -11,7 +11,6 @@
 #include "util.hh"
 #include "help.txt.hh"
 
-
 using namespace nix;
 using std::cin;
 using std::cout;

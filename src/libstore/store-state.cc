@@ -11,12 +11,14 @@
 #include "util.hh"
 #include "derivations.hh"
 #include "store-api.hh"
+#include "local-store.hh"
 
 namespace nix {
 
 void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs, const StringPairs & env)
 {
-	string stateDir = stateOutputs.find("state")->second.statepath;
+	Path statePath = stateOutputs.find("state")->second.statepath;
+	string stateDir = statePath;
 	string drvName = env.find("name")->second;
 	
 	//Convert the map into a sortable vector
@@ -37,18 +39,20 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 	vector<int> subversionedpathsInterval;
 	vector<string> nonversionedpaths;			//of type none, no versioning needed
 	vector<string> checkoutcommands;
-				
+	PathSet statePaths;
+	
 	for (vector<DerivationStateOutputDir>::iterator i = stateDirsVector.begin(); i != stateDirsVector.end(); ++i)
     {
 		DerivationStateOutputDir d = *(i);
 
 		string thisdir = d.path;
 		string fullstatedir = stateDir + "/" + thisdir;
+		Path statePath = fullstatedir;					//TODO call coerce function
 				
 		//calc create repos for this state location
 		Hash hash = hashString(htSHA256, stateDir + thisdir);
-		string repos = makeStateReposPath("stateOutput:staterepospath", hash, drvName);
-
+		string repos = makeStateReposPath("stateOutput:staterepospath", hash, drvName); 
+		
 		//Were going to execute svn shell commands
 		executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin");				  //TODO create as nixbld.nixbld chmod 700
 
@@ -67,8 +71,10 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 		checkoutcommands.push_back(checkoutcommand);
 		subversionedpaths.push_back(fullstatedir);
 		
-		if(d.type == "interval")
+		if(d.type == "interval"){
+			statePaths.insert(statePath);
 			subversionedpathsInterval.push_back(d.getInterval());
+		}
 		else
 			subversionedpathsInterval.push_back(0);
 
@@ -77,6 +83,10 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 			executeAndPrintShellCommand(checkoutcommand, "svn");  //TODO checkout as user	
 		}
 	}
+	
+	//Add the statePaths that have an interval
+	vector<int> empty;
+	store->setStatePathsInterval(statePaths, empty, true);
 	
 	//create super commit script
 	printMsg(lvlError, format("svnbin=%1%") % svnbin);

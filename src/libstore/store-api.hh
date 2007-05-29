@@ -179,6 +179,12 @@ public:
        `bytesFreed'. */
     virtual void collectGarbage(GCAction action, const PathSet & pathsToDelete,
         bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed) = 0;
+        
+    /* TODO */
+	virtual void setStatePathsInterval(const PathSet & statePath, const vector<int> & intervals, bool allZero = false) = 0;
+	
+	/* TODO */
+	virtual vector<int> getStatePathsInterval(const PathSet & statePaths) = 0;
 };
 
 

@@ -8,6 +8,7 @@
 #include "db.hh"
 #include "util.hh"
 #include "help.txt.hh"
+#include "local-store.hh"
 
 
 using namespace nix;
@@ -24,14 +25,11 @@ void printHelp()
 }
 
 
-static Path gcRoot;
-static int rootNr = 0;
-static bool indirectRoot = false;
-
-
 //Look up the references of all (runtime) dependencies that maintain have state
-void commitReferencesClosure(){
 
+static void opCommitReferencesClosure(Strings opFlags, Strings opArgs)
+{
+	/*
 	Database nixDB;
 	
 	try {
@@ -44,17 +42,17 @@ void commitReferencesClosure(){
 
 	Paths referencesKeys;
 	Transaction txn(nixDB);
-	TableId dbReferences = nixDB.openTable("references");
+	TableId dbReferences = nixDB.openTable("statecounters");
 
 	nixDB.enumTable(txn, dbReferences, referencesKeys);
     for (Paths::iterator i = referencesKeys.begin(); i != referencesKeys.end(); ++i)
     {
 		printMsg(lvlError, format("NIX-STATE: `%1%'") % *i);
-    }
+    }*/
     
-    
-    
-    
+    PathSet a;
+    a.insert("/nix/state/m3h15msjdv1cliqdc3ijj906dzhsf6p0-hellohardcodedstateworld-1.0/log/");
+    store->getStatePathsInterval(a);
     
     
     /*
@@ -83,6 +81,7 @@ void commitReferencesClosure(){
 /* Scan the arguments; find the operation, set global flags, put all
    other flags in a list, and put all other arguments in another
    list. */
+
 void run(Strings args)
 {
     Strings opFlags, opArgs;
@@ -92,9 +91,10 @@ void run(Strings args)
         string arg = *i++;
 
         Operation oldOp = op;
-		/*
-        if (arg == "--realise" || arg == "-r")
-            op = opRealise;
+		
+        if (arg == "--start" || arg == "-r")
+            op = opCommitReferencesClosure;
+        /*
         else if (arg == "--add" || arg == "-A")
             op = opAdd;
         else if (arg == "--add-fixed")
@@ -103,19 +103,22 @@ void run(Strings args)
             op = opPrintFixedPath;
         else if (arg[0] == '-')
             opFlags.push_back(arg);
+        */
         else
             opArgs.push_back(arg);
 
         if (oldOp && oldOp != op)
             throw UsageError("only one operation may be specified");
-        */
     }
 
-	commitReferencesClosure();
+	//opCommitReferencesClosure();
     
-    //if (!op) throw UsageError("no operation specified");
+    if (!op) throw UsageError("no operation specified");
+    
+    /* !!! hack */
+    store = openStore();
 
-    //op(opFlags, opArgs);
+    op(opFlags, opArgs);
 }
 
 

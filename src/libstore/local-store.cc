@@ -143,6 +143,7 @@ LocalStore::LocalStore(bool reserveSpace)
     dbReferrers = nixDB.openTable("referrers", true); /* must be sorted */
     dbSubstitutes = nixDB.openTable("substitutes");
     dbDerivers = nixDB.openTable("derivers");
+    dbStateCounters = nixDB.openTable("statecounters");
 
     int curSchema = 0;
     Path schemaFN = nixDBPath + "/schema";
@@ -1094,6 +1095,59 @@ void verifyStore(bool checkContents)
     
     txn.commit();
 }
+
+void setStatePathsInterval(const PathSet & statePaths, const vector<int> & intervals, bool allZero)
+{
+	if(!allZero && statePaths.size() != intervals.size()){
+		throw Error("the number of statepaths and intervals must be equal");
+	} 
+	
+    Transaction txn(nixDB);
+
+	int n=0;
+    for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
+    {
+        printMsg(lvlError, format("PATH: %1%") % *i);
+        
+        int interval=0;
+        if(!allZero)
+        	interval = intervals.at(n);
+        
+        nixDB.setString(txn, dbStateCounters, *i, int2String(interval));
+        n++;
+    }
+
+    txn.commit();
+}
+
+void LocalStore::setStatePathsInterval(const PathSet & statePaths, const vector<int> & intervals, bool allZero)
+{
+    nix::setStatePathsInterval(statePaths, intervals, allZero);
+}
+
+vector<int> getStatePathsInterval(const PathSet & statePaths)
+{
+	Transaction txn(nixDB);			//TODO should u do a transaction here? ... this might delay the process ...
+	
+	vector<int> intervals;
+    string data;
+    
+    for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i){
+    	
+    	nixDB.queryString(txn, dbStateCounters, *i, data);
+    	printMsg(lvlError, format("Data %1%") % data);	
+    }        
+	    
+    txn.commit();
+    
+    return intervals;
+}
+
+vector<int> LocalStore::getStatePathsInterval(const PathSet & statePaths)
+{
+    return nix::getStatePathsInterval(statePaths);
+}
+
 
 
 /* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */

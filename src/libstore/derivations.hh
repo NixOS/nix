@@ -41,7 +41,7 @@ struct DerivationStateOutput
     string hash;
     string enabled;
     string shared;						//none, full, group
-    string synchronization;				//none, ... ?
+    string synchronization;				//none, exclusive-lock-on-own-state-dir, exclusive-lock-on-all-(sub)-states-dir 
     string createDirsBeforeInstall;
     DerivationStateOutput()
     {

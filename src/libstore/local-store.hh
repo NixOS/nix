@@ -75,6 +75,10 @@ public:
 
     void collectGarbage(GCAction action, const PathSet & pathsToDelete,
         bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed);
+        
+	void setStatePathsInterval(const PathSet & statePath, const vector<int> & intervals, bool allZero = false);
+	
+	vector<int> getStatePathsInterval(const PathSet & statePaths);
 };
 
 
