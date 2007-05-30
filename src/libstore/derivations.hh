@@ -90,7 +90,13 @@ struct DerivationStateOutputDir
     }
     
     int getInterval(){
-    	return 0;			//TODO
+    	if(interval == "") 
+          return 0;
+    	else{
+	    	int i;
+	    	if (!string2Int(interval, i)) throw Error("interval is not a number");
+	    	return i;
+    	}
     }
     
     //sort function

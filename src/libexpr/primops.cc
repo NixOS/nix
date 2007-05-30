@@ -451,11 +451,21 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 							if(s[0] == '/')
 				            	s = s.substr(1, s.length());
 				            
+				            if(s == stateRootRepos)
+				            	throw EvalError(format("The statedir `%1%' is a keyword and cannot be used, choose another name") % stateRootRepos);
+				            
 				            dir.path = s;
 			            }
 			            else if (statekey == "type") { dir.type = s; }
-			            else if (statekey == "interval") { dir.interval = s; }
-			            else throw EvalError(format("invalid subattirbute `%1%' for attribute dirs") % statekey);
+			            else if (statekey == "interval") { 
+			            	if(s == "")
+			            		continue;
+			            	int n;
+			            	if (!string2Int(s, n)) throw Error("interval is not a number"); 
+			            	if(n == 0) throw Error("Interval cannot be 0");
+			            	dir.interval = s; 
+			            }
+			            else throw EvalError(format("invalid sub-attirbute `%1%' for attribute dirs") % statekey);
             	    }
 			        catch (Error & e) {
 			            e.addPrefix(format("while evaluating the state derivation attribute `%1%' at %2%:\n") % key % showPos(statepos));

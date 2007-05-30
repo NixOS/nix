@@ -22,29 +22,15 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 	string drvName = env.find("name")->second;
 	string stateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
 	
-	//Convert the map into a sortable vector
-	vector<DerivationStateOutputDir> stateDirsVector;	
-	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
-		stateDirsVector.push_back(i->second);
-	}
-	sort(stateDirsVector.begin(), stateDirsVector.end());
-	
-	printMsg(lvlError, format("stateDir `%1%'") % stateDir);
-
 	string svnbin = nixSVNPath + "/svn";
 	string svnadminbin = nixSVNPath + "/svnadmin";
-				
-	//Vector includeing all commit scripts:
-	vector<string> commitscript;
-	vector<string> subversionedpaths;
-	vector<int> subversionedpathsInterval;
-	vector<string> nonversionedpaths;			//of type none, no versioning needed
-	vector<string> checkoutcommands;
-	PathSet statePaths;
 	
-	for (vector<DerivationStateOutputDir>::iterator i = stateDirsVector.begin(); i != stateDirsVector.end(); ++i)
-    {
-		DerivationStateOutputDir d = *(i);
+	PathSet intervalPaths;
+	
+	//TODO check if we can create stata and staterepos dirs
+	
+	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
+		DerivationStateOutputDir d = i->second;
 
 		string thisdir = d.path;
 		string fullstatedir = stateDir + "/" + thisdir;
@@ -56,69 +42,29 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 			if(true){
 				executeAndPrintShellCommand("mkdir -p " + fullstatedir, "mkdir");
 			}
-			nonversionedpaths.push_back(fullstatedir);
 			continue;
 		}
 		
 		//Create a repository for this state location
-		Hash hash = hashString(htSHA256, stateDir + thisdir);
-		string repos = makeStateReposPath("stateOutput:staterepospath", hash, drvName, stateIdentifier); 
-		executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin");				  //TODO create as nixbld.nixbld chmod 700
+		string repos = makeStateReposPath("stateOutput:staterepospath", stateDir, thisdir, drvName, stateIdentifier);
+		executeAndPrintShellCommand("mkdir -p " + repos, "mkdir");
+		executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin");				 //TODO create as nixbld.nixbld chmod 700... can you still commit than ??
 
-		//
-		string checkoutcommand = svnbin + " checkout file://" + repos + " " + fullstatedir;
-		checkoutcommands.push_back(checkoutcommand);
-		subversionedpaths.push_back(fullstatedir);
-		
 		if(d.type == "interval"){
-			statePaths.insert(statePath);
-			subversionedpathsInterval.push_back(d.getInterval());
+			intervalPaths.insert(statePath);
 		}
-		else
-			subversionedpathsInterval.push_back(0);
 
 		//TODO REPLACE TRUE INTO VAR OF CREATEING DIRS BEFORE OR AFTER INSTALL
 		if(true){
 			printMsg(lvlError, format("Adding state subdir: %1% to %2% from repository %3%") % thisdir % fullstatedir % repos);
+			string checkoutcommand = svnbin + " checkout file://" + repos + " " + fullstatedir;
 			executeAndPrintShellCommand(checkoutcommand, "svn");  //TODO checkout as user	
 		}
 	}
 	
-	//Add the statePaths that have an interval
+	//Initialize the counters for the statePaths that have an interval to 0
 	vector<int> empty;
-	store->setStatePathsInterval(statePaths, empty, true);
-	
-	//create super commit script
-	printMsg(lvlError, format("svnbin=%1%") % svnbin);
-	string subversionedstatepathsarray = "subversionedpaths=( "; 
-	for (vector<string>::iterator i = subversionedpaths.begin(); i != subversionedpaths.end(); ++i)
-    {
-		subversionedstatepathsarray += *(i) + " ";
-    }
-    printMsg(lvlError, format("%1%)") % subversionedstatepathsarray);
-	string subversionedpathsIntervalsarray = "subversionedpathsInterval=( "; 
-	for (vector<int>::iterator i = subversionedpathsInterval.begin(); i != subversionedpathsInterval.end(); ++i)
-    {
-		subversionedpathsIntervalsarray += int2String(*i) + " ";
-    }
-	printMsg(lvlError, format("%1%)") % subversionedpathsIntervalsarray);
-	string nonversionedstatepathsarray = "nonversionedpaths=( "; 
-	for (vector<string>::iterator i = nonversionedpaths.begin(); i != nonversionedpaths.end(); ++i)
-    {
-		nonversionedstatepathsarray += *(i) + " ";
-    }
-	printMsg(lvlError, format("%1%)") % nonversionedstatepathsarray);
-	string commandsarray = "checkouts=( "; 
-	for (vector<string>::iterator i = checkoutcommands.begin(); i != checkoutcommands.end(); ++i)
-    {
-		commandsarray += "\"" + *(i) + "\" ";
-    }
-	printMsg(lvlError, format("%1%)") % commandsarray);
-	for (vector<string>::iterator i = commitscript.begin(); i != commitscript.end(); ++i)
-    {
-    	string s = *(i);
-    	printMsg(lvlError, format("%1%") % s);
-    }    	
+	store->setStatePathsInterval(intervalPaths, empty, true);
 }
 
 //executes a shell command and captures and prints the output.

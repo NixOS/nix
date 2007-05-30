@@ -222,7 +222,7 @@ Path makeFixedOutputPath(bool recursive,
 Path makeStatePath(const string & type, const Hash & hash, const string & suffix, const string & stateIdentifier);
 
 /* Constructs a unique store state repos path name. */
-Path makeStateReposPath(const string & type, const Hash & hash, const string & suffix, const string & stateIdentifier);
+Path makeStateReposPath(const string & type, const Path statePath, const string subfolder, const string & suffix, const string & stateIdentifier);
 
 
 /* This is the preparatory part of addToStore() and addToStoreFixed();

@@ -97,8 +97,16 @@ Path makeStatePath(const string & type, const Hash & hash, const string & suffix
         + "-" + suffix + suffix_stateIdentifier;
 }
 
-Path makeStateReposPath(const string & type, const Hash & hash, const string & suffix, const string & stateIdentifier)
+Path makeStateReposPath(const string & type, const Path statePath, const string subfolder, const string & suffix, const string & stateIdentifier)
 {
+    //This is a little trick: we could use the same hash as the statepath, but we change it so the repository also gets a unique scannable hash
+    Hash hash = hashString(htSHA256, statePath); 
+    
+    //A little tick again, we dont want to add other repositorys in the root repository, so we rename it. 
+    string subfolder_ = subfolder;
+    if(subfolder == "")
+    	subfolder_ = stateRootRepos;
+    
     string suffix_stateIdentifier = stateIdentifier;
     if(suffix_stateIdentifier != "")
     	suffix_stateIdentifier = "-" + suffix_stateIdentifier; 
@@ -112,7 +120,7 @@ Path makeStateReposPath(const string & type, const Hash & hash, const string & s
     
     return nixStoreStateRepos + "/"
         + printHash32(compressHash(hashString(htSHA256, s), 20))
-        + "-" + suffix + suffix_stateIdentifier;
+        + "-" + suffix + suffix_stateIdentifier + "/" + subfolder_;
 }
 
 Path makeFixedOutputPath(bool recursive,

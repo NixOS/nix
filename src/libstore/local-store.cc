@@ -1162,7 +1162,7 @@ Derivation getStateDerivation(const Path & path)
 
     //Get derivations of references    
     nixDB.queryString(txn, dbDerivers, path, data);
-    printMsg(lvlError, format("DERIVERS %1%") % data);
+    //printMsg(lvlError, format("DERIVERS %1%") % data);
     
     txn.commit();
     

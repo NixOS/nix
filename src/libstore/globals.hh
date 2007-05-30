@@ -75,6 +75,9 @@ extern string thisSystem;
    infinity. */
 extern unsigned int maxSilentTime;
 
+//TODO
+extern string stateRootRepos;
+
 Strings querySetting(const string & name, const Strings & def);
 
 string querySetting(const string & name, const string & def);

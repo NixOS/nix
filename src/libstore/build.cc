@@ -1612,6 +1612,7 @@ void DerivationGoal::computeClosure()
     map<Path, PathSet> allReferences;
     map<Path, Hash> contentHashes;
     
+    //TODO MOVE THIS TO A PLACE THAT ALSO GETS CALLED WHEN WE DONT NEED TO BUILD ANYTHING
     //We create state dirs only when state is enabled and when the dirs need to be created after the installation
     if(drv.stateOutputs.size() != 0)
     	if(!drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
