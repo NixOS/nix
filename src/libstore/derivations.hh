@@ -42,7 +42,7 @@ struct DerivationStateOutput
     string stateIdentifier;				//the identifier
     string enabled;						//enable or disable state
     string shared;						//none, full, group
-    string synchronization;				//none (no locks), exclusive-lock-on-own-state-dir, exclusive-lock-on-all-(sub)-states-dir
+    string synchronization;				//none (no locks), exclusive-lock, recursive-exclusive-lock
     
     string commitReferences;			//TODO none, direct, recursive-all
     string commitBinaries;				//TODO list of binaries that need (or not) to be committed when these binaries are called
@@ -54,6 +54,15 @@ struct DerivationStateOutput
     }
     DerivationStateOutput(Path statepath, string hashAlgo, string hash, string stateIdentifier, string enabled, string shared, string synchronization, string createDirsBeforeInstall, string runtimeStateParamters)
     {
+        if(shared != "none" || shared != "full" || shared != "group")
+        	throw Error(format("shared '%1%' is not a correct type") % shared);
+        if(synchronization != "none" || synchronization != "exclusive-lock" || synchronization != "recursive-exclusive-lock")
+        	throw Error(format("synchronization '%1%' is not a correct type") % synchronization);
+        
+        //TODO
+        //commitReferences
+        //commitBinaries
+        
         this->statepath = statepath;
         this->hashAlgo = hashAlgo;
         this->hash = hash;
@@ -84,6 +93,9 @@ struct DerivationStateOutputDir
     }
     DerivationStateOutputDir(string path, string type, string interval)
     {
+        if(type != "none" || type != "manual" || type != "interval" || type != "full")
+        	throw Error(format("interval '%1%' is not a correct type") % type);
+        
         this->path = path;
         this->type = type;
         this->interval = interval;

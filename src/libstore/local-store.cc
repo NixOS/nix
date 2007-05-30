@@ -1140,7 +1140,12 @@ vector<int> getStatePathsInterval(const PathSet & statePaths)
     for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
     {
     	nixDB.queryString(txn, dbStateCounters, *i, data);
-    	printMsg(lvlError, format("Data %1%") % data);				//TODO
+
+		//TODO check if every key returns a value from the db
+    	
+    	int n;
+    	if (!string2Int(data, n)) throw Error("number expected");
+    	intervals.push_back(n);
     
     }        
     txn.commit();

@@ -290,6 +290,8 @@ string trimr(const string & s);
 //return modified string s with spaces trimmed from edges
 string trim(const string & s);
 
+//excecute a shell command
+void executeAndPrintShellCommand(const string & command, const string & commandName);
 
 }
 

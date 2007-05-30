@@ -10,6 +10,8 @@
 #include <cerrno>
 #include <cstdio>
 #include <sstream>
+#include <fstream>
+#include <iostream>
 
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -1007,5 +1009,60 @@ string trim(const string & s) {
 	return triml(trimr(s));
 }
 
+
+//executes a shell command and captures and prints the output.
+
+//TODO , check if we can integrate with runProgram
+
+void executeAndPrintShellCommand(const string & command, const string & commandName)
+{
+	string tempoutput = "svnoutput.txt";
+	string newcommand = command + " &> " + tempoutput;		//the  &> sends also stderr to stdout
+
+	int kidstatus, deadpid;
+	pid_t kidpid = fork();
+    switch (kidpid) {
+	    case -1:
+	        throw SysError("unable to fork");
+	    case 0:
+	        try { // child
+	            int rv = system(newcommand.c_str());
+				//int rv = execlp(svnbin.c_str(), svnbin.c_str(), ">", tempoutput.c_str(), NULL);		//TODO make this work ... ?
+				
+				string line;
+				std::ifstream myfile (tempoutput.c_str());
+				if (myfile.is_open()){
+					while (! myfile.eof() )
+				    {
+				      getline (myfile,line);
+				      if(trim(line) != "")
+					      printMsg(lvlError, format("[%2%]: %1%") % line % commandName);
+				    }
+				    myfile.close();
+				}
+				else{
+					throw SysError("svn state error");
+	            	quickExit(1);
+				} 
+	            
+				if (rv == -1) {
+					throw SysError("svn state error");
+					quickExit(99);
+				}
+		        quickExit(0);
+				
+	        } catch (std::exception & e) {
+	            std::cerr << format("state child error: %1%\n") % e.what();
+	            quickExit(1);
+	        }
+    }
+    deadpid = waitpid(kidpid, &kidstatus, 0);
+    if (deadpid == -1) {
+        std::cerr << format("state child waitpid error\n");
+        quickExit(1);
+    }
+    
+    remove(tempoutput.c_str());	//Remove the tempoutput file
+}
  
 }

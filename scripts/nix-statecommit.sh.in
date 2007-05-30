@@ -1,0 +1,92 @@
+#! /bin/sh
+# we cant do a -e since ...
+
+#check if there are enough arguments, if not, exit with an error
+
+debug="";		#set to "" for no debugging, set to "echo " to debug the commands
+
+if [ "$#" != 5 ] ; then
+  echo "Incorrect number of arguments"
+  exit 1;
+fi
+
+svnbin=$1
+subversionedpaths=( $2 )				#arrays
+subversionedpathsCommitBools=( $3 )
+nonversionedpaths=( $4 )
+checkouts=( $5 )
+
+#echo svnbin: $svnbin
+#echo subversionedpaths: $subversionedpaths
+#echo subversionedpathsCommitBools: $subversionedpathsCommitBools
+#echo nonversionedpaths: $nonversionedpaths
+#echo checkouts: $checkouts
+
+i=0
+for path in ${subversionedpaths[@]}
+do
+   if test -d $path; then 
+      cd $path;
+      
+      output=$($svnbin stat 2>&1 | grep "is not a working copy");
+      if [ "$output" != "" ] ; then       										#if the dir exists but is not yet an svn dir: create repos, if it doenst exits (is removed or something) than we dont do anything
+          $debug ${checkouts[$i]};
+      fi
+      
+      if [ "${subversionedpathsCommitBools[$i]}" = "true" ]; then				#Check if we need to commit this folder
+
+          echo "Entering $path"
+       															
+		  allsubdirs=( $(echo *) )												#TODO, maybe also add hidden files starting with a '.' , but we dont want to add .svn dirs
+		  
+		  subdirs=();
+		  for subdir in ${allsubdirs[@]}										#add all, exlucding explicity stated direct versioned-subdirs or explicity stated nonversioned-subdirs
+	      do																	#this is only to prevent some warnings, ultimately we would like svn add to have a option 'exclude dirs'
+			  subdir="$(pwd)/$subdir/";
+			  exclude=0;
+			  
+			  for svnp in ${subversionedpaths[@]}								#check if the subdir is in the list of subverioned paths
+			  do
+			  	  if [ "$svnp" = "$subdir" ]; then
+			  	    exclude=1;
+			  	    #echo "exclude versioned $svnp"
+			  	  fi
+			  done
+	
+			  for nonvp in ${nonversionedpaths[@]}								#check if the subdir is in the list of dirs that aren't supposed to be versioned
+			  do	
+			  	  if [ "$nonvp" = "$subdir" ]; then
+			  	    exclude=1;
+			  	    #echo "exclude nonversioned $svnp"
+			  	  fi
+			  done
+			  
+			  if [ $exclude = 0 ]; then											#Exclude the subdir if nessecary
+	             subdirs[${#subdirs[*]}]=$subdir
+	          fi
+	      done  
+		  
+		  if [ "$subdirs" != "" ]; then											
+			 echo "adding ${subdirs[@]}"
+	         $debug svn add ${subdirs[@]}										#add all subdirs
+	      
+	      	 for revpath in ${nonversionedpaths[@]}								#We need to revert sub-sub* dirs, since these havent been excluded
+		     do
+		       if test -d $revpath; then
+		         if [ "${revpath:0:${#path}}" == "$path" ]; then
+			 	   echo "Revert $revpath";
+			 	   $debug svn revert $revpath;
+		         fi
+		       fi
+		     done
+		     
+		     $debug svn -m "" commit;													#Finally, we commit
+	      fi
+	     
+	   fi
+      
+      cd - &> /dev/null;
+   fi
+  let "i+=1"
+done
+

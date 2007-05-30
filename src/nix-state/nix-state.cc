@@ -24,8 +24,47 @@ void printHelp()
     cout << string((char *) helpText, sizeof helpText);
 }
 
+//
 
-//Look up the references of all (runtime) dependencies that maintain have state
+static Derivation getDerivation_oneArgumentNoFlags(const Strings opFlags, const Strings opArgs)
+{
+	if (!opFlags.empty()) throw UsageError("unknown flag");
+    if (opArgs.size() != 1) throw UsageError("only one argument allowed");
+    string path = *opArgs.begin();
+    string component = path;		//TODO Parse
+    Path componentPath = component; //TODO call coerce function
+	return store->getStateDerivation(componentPath);
+}
+
+
+//********
+
+
+static void opShowStatePath(Strings opFlags, Strings opArgs)
+{
+	Derivation drv = getDerivation_oneArgumentNoFlags(opFlags, opArgs);
+	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
+	Path statePath = stateOutputs.find("state")->second.statepath;
+	printMsg(lvlError, format("%1%") % statePath);
+}
+
+
+static void opShowStateReposRootPath(Strings opFlags, Strings opArgs)
+{
+	Derivation drv = getDerivation_oneArgumentNoFlags(opFlags, opArgs);
+	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
+	Path statePath = stateOutputs.find("state")->second.statepath;
+	
+	string drvName = drv.env.find("name")->second;
+	string stateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
+	
+	//Get the a repository for this state location
+	string repos = makeStateReposPath("stateOutput:staterepospath", statePath, "", drvName, stateIdentifier);		//this is a copy from store-state.cc
+	repos = repos.substr(0, repos.length() - stateRootRepos.length());
+		
+	printMsg(lvlError, format("%1%") % repos);
+}
+
 
 static void opCommitReferencesClosure(Strings opFlags, Strings opArgs)
 {
@@ -40,9 +79,21 @@ static void opCommitReferencesClosure(Strings opFlags, Strings opArgs)
 		printMsg(lvlError, format("NIX-STATE: `%1%'") % *i);
     }*/
 
+    //get the derivation of the current component
+    Derivation drv = getDerivation_oneArgumentNoFlags(opFlags, opArgs);
+    DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
+    DerivationStateOutputs stateOutputs = drv.stateOutputs; 
+    DerivationOutputs outputs = drv.outputs;
+    string drvName = drv.env.find("name")->second;
+	string stateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
+    
+    
+    string path = *opArgs.begin();
+
 	//Data from user / profile
-    string component = "/nix/store/s0g22b5lw693cjpclypkzan27d11v5pg-hellohardcodedstateworld-1.0";
+    string component = path;		//TODO Parse
     Path componentPath = component; //TODO call coerce function
+    
     string identifier = "test";
     string binary = "hello";
 
@@ -53,45 +104,53 @@ static void opCommitReferencesClosure(Strings opFlags, Strings opArgs)
     
     //********************* Commit state *********************
     
-    //get the derivation of the current component
-    Derivation drv = store->getStateDerivation(componentPath);
-    DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
-    DerivationStateOutputs stateOutputs = drv.stateOutputs; 
-    DerivationOutputs outputs = drv.outputs;
-    string drvName = drv.env.find("name")->second;
-	string stateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
-    
-    
     //get dependecies (if neccecary) of all state components that need to be updated
     PathSet paths = store->getStateReferencesClosure(componentPath);
     
     //get their derivations
     //...
     
-    //Get and update the intervals
-    //store->getStatePathsInterval(a);
-    //store->setStatePathsInterval(a);
-        
     //call the bash script on all the the store-state components
+    
+    
+	
+	//******************* Call the commit script (recursively)
+
+	//for(...){
+    //
+    //}
     
     string svnbin = nixSVNPath + "/svn";
 	string svnadminbin = nixSVNPath + "/svnadmin";
-	
 	Path statePath = stateOutputs.find("state")->second.statepath;
-	string stateDir = statePath;
-	
+
 	//Vector includeing all commit scripts:
-	vector<string> commitscript;
 	vector<string> subversionedpaths;
-	vector<int> subversionedpathsInterval;
+	vector<bool> subversionedpathsCommitBoolean;
 	vector<string> nonversionedpaths;			//of type none, no versioning needed
 	vector<string> checkoutcommands;
 	
+	//Get all the inverals from the database at once
+	PathSet intervalPaths;
 	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
 		DerivationStateOutputDir d = i->second;
 
 		string thisdir = d.path;
-		string fullstatedir = stateDir + "/" + thisdir;
+		string fullstatedir = statePath + "/" + thisdir;
+		Path statePath = fullstatedir;					//TODO call coerce function
+		
+		if(d.type == "interval"){
+			intervalPaths.insert(statePath);
+		}
+	}
+	vector<int> intervals = store->getStatePathsInterval(intervalPaths);
+	
+	int intervalAt=0;	
+	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
+		DerivationStateOutputDir d = i->second;
+
+		string thisdir = d.path;
+		string fullstatedir = statePath + "/" + thisdir;
 		Path statePath = fullstatedir;					//TODO call coerce function
 
 		if(d.type == "none"){
@@ -100,64 +159,69 @@ static void opCommitReferencesClosure(Strings opFlags, Strings opArgs)
 		}
 				
 		//Get the a repository for this state location
-		string repos = makeStateReposPath("stateOutput:staterepospath", stateDir, thisdir, drvName, stateIdentifier);		//this is a copy from store-state.cc
+		string repos = makeStateReposPath("stateOutput:staterepospath", statePath, thisdir, drvName, stateIdentifier);		//this is a copy from store-state.cc
 				
 		//
 		checkoutcommands.push_back(svnbin + " checkout file://" + repos + " " + fullstatedir);
 		subversionedpaths.push_back(fullstatedir);
 		
 		if(d.type == "interval"){
-			subversionedpathsInterval.push_back(d.getInterval());
+
+			//TODO comment
+			
+			//Get the interval-counter from the database, and update it.
+			//printMsg(lvlError, format("Interval: %1% - %2%") %  % );
+			
+			int interval_counter = intervals[intervalAt];
+			int interval = d.getInterval();
+			
+			subversionedpathsCommitBoolean.push_back(interval_counter % interval == 0);
+    		
+			//update the interval
+			intervals[intervalAt] = interval_counter + 1;
+			
+			intervalAt++;
 		}
+		else if(d.type == "full")
+			subversionedpathsCommitBoolean.push_back(true);
+		else if(d.type == "manual")											//TODO !!!!!
+			subversionedpathsCommitBoolean.push_back(false);
 		else
-			subversionedpathsInterval.push_back(0);
+			throw Error(format("interval '%1%' is not handled in nix-state") % d.type);
 	}
+	
+	//Update the intervals again
+	//store->setStatePathsInterval(intervalPaths, intervals);		//TODO
 		
-	//create super commit script
-	printMsg(lvlError, format("svnbin=%1%") % svnbin);
-	string subversionedstatepathsarray = "subversionedpaths=( "; 
+	//Call the commit script with the appropiate paramenters
+	string subversionedstatepathsarray; 
 	for (vector<string>::iterator i = subversionedpaths.begin(); i != subversionedpaths.end(); ++i)
     {
 		subversionedstatepathsarray += *(i) + " ";
     }
-    printMsg(lvlError, format("%1%)") % subversionedstatepathsarray);
-	string subversionedpathsIntervalsarray = "subversionedpathsInterval=( "; 
-	for (vector<int>::iterator i = subversionedpathsInterval.begin(); i != subversionedpathsInterval.end(); ++i)
+	string subversionedpathsCommitBooleansarray; 
+	for (vector<bool>::iterator i = subversionedpathsCommitBoolean.begin(); i != subversionedpathsCommitBoolean.end(); ++i)
     {
-		subversionedpathsIntervalsarray += int2String(*i) + " ";
+		subversionedpathsCommitBooleansarray += bool2string(*i) + " ";
     }
-	printMsg(lvlError, format("%1%)") % subversionedpathsIntervalsarray);
-	string nonversionedstatepathsarray = "nonversionedpaths=( "; 
+	string nonversionedstatepathsarray; 
 	for (vector<string>::iterator i = nonversionedpaths.begin(); i != nonversionedpaths.end(); ++i)
     {
 		nonversionedstatepathsarray += *(i) + " ";
     }
-	printMsg(lvlError, format("%1%)") % nonversionedstatepathsarray);
-	string commandsarray = "checkouts=( "; 
+	string commandsarray; 
 	for (vector<string>::iterator i = checkoutcommands.begin(); i != checkoutcommands.end(); ++i)
     {
-		commandsarray += "\"" + *(i) + "\" ";
+		commandsarray += "\\\"" + *(i) + "\\\" ";
     }
-	printMsg(lvlError, format("%1%)") % commandsarray);
-	for (vector<string>::iterator i = commitscript.begin(); i != commitscript.end(); ++i)
-    {
-    	string s = *(i);
-    	printMsg(lvlError, format("%1%") % s);
-    }    	
-	
-	
-	
-    //svnbin=/nix/var/nix/profiles/per-user/root/profile/bin/svn
-	//subversionedpaths=( /nix/state/v6rr3yi5ilgn3k0kwxkk633ap4z0m1zi-hellohardcodedstateworld-1.0/ /nix/state/v6rr3yi5ilgn3k0kwxkk633ap4z0m1zi-hellohardcodedstateworld-1.0/log/ )
-	//subversionedpathsInterval=( 0 0 )
-	//nonversionedpaths=( /nix/state/v6rr3yi5ilgn3k0kwxkk633ap4z0m1zi-hellohardcodedstateworld-1.0/cache/ /nix/state/v6rr3yi5ilgn3k0kwxkk633ap4z0m1zi-hellohardcodedstateworld-1.0/log/test/ /nix/state/v6rr3yi5ilgn3k0kwxkk633ap4z0m1zi-hellohardcodedstateworld-1.0/log/test2/test2/ /nix/state/v6rr3yi5ilgn3k0kwxkk633ap4z0m1zi-hellohardcodedstateworld-1.0/logging/ )
-	//checkouts=( "/nix/var/nix/profiles/per-user/root/profile/bin/svn checkout file:///nix/staterepos/99dj5zg1ginj5as75nkb0psnp02krv2s-hellohardcodedstateworld-1.0 /nix/state/v6rr3yi5ilgn3k0kwxkk633ap4z0m1zi-hellohardcodedstateworld-1.0/" "/nix/var/nix/profiles/per-user/root/profile/bin/svn checkout file:///nix/staterepos/9ph3nd4irpvgs66h24xjvxrwpnrwy9n0-hellohardcodedstateworld-1.0 /nix/state/v6rr3yi5ilgn3k0kwxkk633ap4z0m1zi-hellohardcodedstateworld-1.0/log/" )
-    
-    
-    //for(...){
-    //
-    //}
-
+  	
+    //make the call
+    executeAndPrintShellCommand(nixLibexecDir + "/nix/nix-statecommit.sh " + svnbin + 
+    																   " \"" + subversionedstatepathsarray + "\" " +
+    																   " \"" + subversionedpathsCommitBooleansarray + "\" " +
+    																   " \"" + nonversionedstatepathsarray + "\" " +
+    																   " \"" + commandsarray + "\" ",
+    																   "commit-script");
 }
 
 
@@ -173,27 +237,18 @@ void run(Strings args)
 		
         if (arg == "--run" || arg == "-r")
             op = opCommitReferencesClosure;
+		else if (arg == "--showstatepath")
+			op = opShowStatePath;
+		else if (arg == "--showstatereposrootpath")
+			op = opShowStateReposRootPath;
 
         /*
-		
 		--commit
 		
 		--run-without-commit
 		
 		--backup
-		
-		--showlocation
-		
-		
 
-        else if (arg == "--add" || arg == "-A")
-            op = opAdd;
-        else if (arg == "--add-fixed")
-            op = opAddFixed;
-        else if (arg == "--print-fixed-path")
-            op = opPrintFixedPath;
-        else if (arg[0] == '-')
-            opFlags.push_back(arg);
         */
 
         else
