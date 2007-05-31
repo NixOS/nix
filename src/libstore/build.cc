@@ -764,7 +764,7 @@ void DerivationGoal::haveDerivation()
     assert(store->isValidPath(drvPath));
 
     /* Get the derivation. */
-    drv = derivationFromPath(drvPath);								//wouter look here
+    drv = derivationFromPath(drvPath);								
 
     for (DerivationOutputs::iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
@@ -772,6 +772,8 @@ void DerivationGoal::haveDerivation()
 
     /* Check what outputs paths are not already valid. */
     PathSet invalidOutputs = checkPathValidity(false);
+
+	
 
     /* If they are all valid, then we're done. */
     if (invalidOutputs.size() == 0) {
@@ -1377,6 +1379,7 @@ void DerivationGoal::startBuilder()
     tmpDir = createTempDir();
     
     /* Create the state directory where the component can store it's state files place */
+    //TODO MOVEEEEEEEEEEE
     //We only create state dirs when state is enabled and when the dirs need to be created before the installation
     if(drv.stateOutputs.size() != 0)
     	if(drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
@@ -2476,9 +2479,10 @@ void LocalStore::buildDerivations(const PathSet & drvPaths)
     Worker worker;
 
     Goals goals;
-    for (PathSet::const_iterator i = drvPaths.begin();
-         i != drvPaths.end(); ++i)
+    for (PathSet::const_iterator i = drvPaths.begin(); i != drvPaths.end(); ++i){
         goals.insert(worker.makeDerivationGoal(*i));
+        printMsg(lvlError, format("No component build, but state check: %1%") % *i);
+    }
 
     worker.run(goals);
 

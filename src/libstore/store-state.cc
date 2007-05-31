@@ -15,6 +15,14 @@
 
 namespace nix {
 
+
+void dsfsdfas()
+{
+	
+}
+
+
+
 void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs, const StringPairs & env)
 {
 	Path statePath = stateOutputs.find("state")->second.statepath;

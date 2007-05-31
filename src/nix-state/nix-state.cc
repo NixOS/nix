@@ -26,95 +26,91 @@ void printHelp()
 
 //
 
-static Derivation getDerivation_oneArgumentNoFlags(const Strings opFlags, const Strings opArgs)
+//
+Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, string & stateIdentifier, string & binary)
 {
-	if (!opFlags.empty()) throw UsageError("unknown flag");
-    if (opArgs.size() != 1) throw UsageError("only one argument allowed");
-    string path = *opArgs.begin();
-    string component = path;		//TODO Parse
-    Path componentPath = component; //TODO call coerce function
-	return store->getStateDerivation(componentPath);
+    if (!opFlags.empty()) throw UsageError("unknown flag");
+    if (opArgs.size() != 1 && opArgs.size() != 2) throw UsageError("only one or two arguments allowed (the component path & the identiefier which can be empty)");
+    
+	//Parse the full path like /nix/store/...../bin/hello
+    string fullPath = opArgs.front();
+    componentPath = fullPath.substr(nixStore.size() + 1, fullPath.size());		//+1 to strip off the /
+    int pos = componentPath.find("/",0);
+    componentPath = fullPath.substr(0, pos + nixStore.size() + 1);
+    binary = fullPath.substr(pos + nixStore.size() + 1, fullPath.size());
+
+    //TODO CHECK for validity of componentPath ... ?
+    
+    stateIdentifier = "";
+    if(opArgs.size() == 2){
+		opArgs.pop_front();
+		stateIdentifier = opArgs.front();	
+    }
+    //TODO check if this identifier exists !!!!!!!!!!!
+    
+    //printMsg(lvlError, format("%1% - %2% - %3% - %4%") % componentPath % statePath % stateIdentifier % binary);
+    
+    Derivation drv = store->getStateDerivation(componentPath);
+    DerivationStateOutputs stateOutputs = drv.stateOutputs; 
+    statePath = stateOutputs.find("state")->second.statepath;
+	return drv;
 }
 
-
-//********
-
-
+//Prints the statepath of a component - indetiefier combination
 static void opShowStatePath(Strings opFlags, Strings opArgs)
 {
-	Derivation drv = getDerivation_oneArgumentNoFlags(opFlags, opArgs);
-	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
-	Path statePath = stateOutputs.find("state")->second.statepath;
+	Path componentPath;
+    Path statePath;
+    string stateIdentifier;
+    string binary;
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary);
 	printMsg(lvlError, format("%1%") % statePath);
 }
 
-
+//Prints the root path that contains the repoisitorys of the state of a component - indetiefier combination
 static void opShowStateReposRootPath(Strings opFlags, Strings opArgs)
 {
-	Derivation drv = getDerivation_oneArgumentNoFlags(opFlags, opArgs);
-	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
-	Path statePath = stateOutputs.find("state")->second.statepath;
-	
+	Path componentPath;
+    Path statePath;
+    string stateIdentifier;
+    string binary;
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary);
 	string drvName = drv.env.find("name")->second;
-	string stateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
 	
 	//Get the a repository for this state location
 	string repos = makeStateReposPath("stateOutput:staterepospath", statePath, "", drvName, stateIdentifier);		//this is a copy from store-state.cc
-	repos = repos.substr(0, repos.length() - stateRootRepos.length());
-		
+	repos = repos.substr(0, repos.length() - (stateRootRepos.length() + 1) );
+	
 	printMsg(lvlError, format("%1%") % repos);
 }
 
 
 static void opCommitReferencesClosure(Strings opFlags, Strings opArgs)
 {
-	/*
-	Paths referencesKeys;
-	Transaction txn(nixDB);
-	TableId dbReferences = nixDB.openTable("statecounters");
-
-	nixDB.enumTable(txn, dbReferences, referencesKeys);
-    for (Paths::iterator i = referencesKeys.begin(); i != referencesKeys.end(); ++i)
-    {
-		printMsg(lvlError, format("NIX-STATE: `%1%'") % *i);
-    }*/
-
     //get the derivation of the current component
-    Derivation drv = getDerivation_oneArgumentNoFlags(opFlags, opArgs);
+    
+    Path componentPath;
+    Path statePath;
+    string stateIdentifier;
+    string binary;
+    
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary);
     DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
     DerivationStateOutputs stateOutputs = drv.stateOutputs; 
     DerivationOutputs outputs = drv.outputs;
     string drvName = drv.env.find("name")->second;
-	string stateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
     
-    
-    string path = *opArgs.begin();
-
-	//Data from user / profile
-    string component = path;		//TODO Parse
-    Path componentPath = component; //TODO call coerce function
-    
-    string identifier = "test";
-    string binary = "hello";
-
 	//Wait for locks?
+   
+    
+    //******************* Run the component
+    //TODO
+    
 	
-	//Run the component
-    
-    
-    //********************* Commit state *********************
-    
-    //get dependecies (if neccecary) of all state components that need to be updated
+	//******************* Afterwards, call the commit script (recursively)
+
+    //get dependecies (if neccecary | recusively) of all state components that need to be updated
     PathSet paths = store->getStateReferencesClosure(componentPath);
-    
-    //get their derivations
-    //...
-    
-    //call the bash script on all the the store-state components
-    
-    
-	
-	//******************* Call the commit script (recursively)
 
 	//for(...){
     //
@@ -122,7 +118,6 @@ static void opCommitReferencesClosure(Strings opFlags, Strings opArgs)
     
     string svnbin = nixSVNPath + "/svn";
 	string svnadminbin = nixSVNPath + "/svnadmin";
-	Path statePath = stateOutputs.find("state")->second.statepath;
 
 	//Vector includeing all commit scripts:
 	vector<string> subversionedpaths;
@@ -137,10 +132,9 @@ static void opCommitReferencesClosure(Strings opFlags, Strings opArgs)
 
 		string thisdir = d.path;
 		string fullstatedir = statePath + "/" + thisdir;
-		Path statePath = fullstatedir;					//TODO call coerce function
 		
 		if(d.type == "interval"){
-			intervalPaths.insert(statePath);
+			intervalPaths.insert(fullstatedir);
 		}
 	}
 	vector<int> intervals = store->getStatePathsInterval(intervalPaths);
@@ -166,20 +160,13 @@ static void opCommitReferencesClosure(Strings opFlags, Strings opArgs)
 		subversionedpaths.push_back(fullstatedir);
 		
 		if(d.type == "interval"){
-
-			//TODO comment
-			
-			//Get the interval-counter from the database, and update it.
-			//printMsg(lvlError, format("Interval: %1% - %2%") %  % );
-			
+			//Get the interval-counter from the database
 			int interval_counter = intervals[intervalAt];
 			int interval = d.getInterval();
-			
 			subversionedpathsCommitBoolean.push_back(interval_counter % interval == 0);
     		
 			//update the interval
 			intervals[intervalAt] = interval_counter + 1;
-			
 			intervalAt++;
 		}
 		else if(d.type == "full")
@@ -191,7 +178,7 @@ static void opCommitReferencesClosure(Strings opFlags, Strings opArgs)
 	}
 	
 	//Update the intervals again
-	//store->setStatePathsInterval(intervalPaths, intervals);		//TODO
+	//store->setStatePathsInterval(intervalPaths, intervals);
 		
 	//Call the commit script with the appropiate paramenters
 	string subversionedstatepathsarray; 
@@ -248,6 +235,10 @@ void run(Strings args)
 		--run-without-commit
 		
 		--backup
+		
+		--exclude-commit-paths
+		
+		
 
         */
 

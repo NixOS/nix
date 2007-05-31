@@ -387,7 +387,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     bool enableState = false;		//We dont do state by default, but if a user defines stateDirs for example, than this becomes true.
     bool disableState = false;		//Becomes true if the user explicitly says: no state
     string shareState = "none";
-    string syncState = "all";
+    string syncState = "none";
     string stateIdentifier = "";
     bool createDirsBeforeInstall = false;
     string runtimeStateParamters = "";

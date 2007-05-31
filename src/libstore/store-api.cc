@@ -31,7 +31,7 @@ bool isStorePath(const Path & path)
 void assertStorePath(const Path & path)
 {
     if (!isStorePath(path))
-        throw Error(format("path `%1%' is not in the Nix store") % path);
+        throw Error(format("path `%1%' is not in the Nix store") % path);		//TODO bug: this prints an empty path ...
 }
 
 

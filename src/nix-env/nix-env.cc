@@ -491,8 +491,7 @@ static void installDerivations(Globals & globals,
     }
 
     for (DrvInfos::iterator i = newElems.begin(); i != newElems.end(); ++i)
-        printMsg(lvlInfo,
-            format("installing `%1%'") % i->name);
+        printMsg(lvlInfo, format("installing `%1%'") % i->name);
         
     if (globals.dryRun) {
         printMissing(globals.state, newElems);

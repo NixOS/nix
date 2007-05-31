@@ -54,9 +54,9 @@ struct DerivationStateOutput
     }
     DerivationStateOutput(Path statepath, string hashAlgo, string hash, string stateIdentifier, string enabled, string shared, string synchronization, string createDirsBeforeInstall, string runtimeStateParamters)
     {
-        if(shared != "none" || shared != "full" || shared != "group")
+        if(shared != "none" && shared != "full" && shared != "group")
         	throw Error(format("shared '%1%' is not a correct type") % shared);
-        if(synchronization != "none" || synchronization != "exclusive-lock" || synchronization != "recursive-exclusive-lock")
+        if(synchronization != "none" && synchronization != "exclusive-lock" && synchronization != "recursive-exclusive-lock")
         	throw Error(format("synchronization '%1%' is not a correct type") % synchronization);
         
         //TODO
@@ -93,7 +93,7 @@ struct DerivationStateOutputDir
     }
     DerivationStateOutputDir(string path, string type, string interval)
     {
-        if(type != "none" || type != "manual" || type != "interval" || type != "full")
+        if(type != "none" && type != "manual" && type != "interval" && type != "full")
         	throw Error(format("interval '%1%' is not a correct type") % type);
         
         this->path = path;

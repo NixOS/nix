@@ -1094,6 +1094,8 @@ void verifyStore(bool checkContents)
         }
         
     }
+    
+    //TODO Check statecounters table....
 
     
     txn.commit();
@@ -1142,6 +1144,9 @@ vector<int> getStatePathsInterval(const PathSet & statePaths)
     	nixDB.queryString(txn, dbStateCounters, *i, data);
 
 		//TODO check if every key returns a value from the db
+    	if(data == ""){
+    		throw Error(format("Statepath `%1%' has returned no interval from the database") % *i);
+    	}
     	
     	int n;
     	if (!string2Int(data, n)) throw Error("number expected");
