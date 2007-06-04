@@ -403,13 +403,13 @@ PathSet RemoteStore::getStateReferencesClosure(const Path & path)
 }
 
 //TODO
-void RemoteStore::setUpdatedStateDerivation(const Path & newdrv, const Path & olddrv)
+void RemoteStore::setUpdatedStateDerivation(const Path & newdrv, const Path & storepath)
 {
 	
 }
 
 //TODO
-Path RemoteStore::getUpdatedStateDerivation(const Path & olddrv)
+Path RemoteStore::updateStateDerivation(const Path & storepath)
 {
 	Path p;
 	return p;

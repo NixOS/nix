@@ -72,9 +72,9 @@ public:
 	
 	PathSet getStateReferencesClosure(const Path & path);
 	
-	void setUpdatedStateDerivation(const Path & newdrv, const Path & olddrv);
+	void setUpdatedStateDerivation(const Path & newdrv, const Path & storepath);
 
-	Path getUpdatedStateDerivation(const Path & olddrv);
+	Path updateStateDerivation(const Path & storepath);
 	
     
 private:

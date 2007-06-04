@@ -623,8 +623,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 	if(enableState && !disableState){
 		Path deriver = queryDeriver(noTxn, outPath);	//query deriver
 		if(deriver != drvPath){
-			printMsg(lvlError, format("Adding to the db: update drv `%2%' with `%1%'") % drvPath % deriver);
-			store->setUpdatedStateDerivation(drvPath, deriver);			
+			store->setUpdatedStateDerivation(drvPath, outPath);			
 		}
 	}
 

@@ -229,14 +229,13 @@ void run(Strings args)
     Strings opFlags, opArgs;
     Operation op = 0;
 
+	/* test */
 	store = openStore();
-	Path p = "AADOLD";
-	store->setUpdatedStateDerivation("NEW1", p);
-	store->setUpdatedStateDerivation("NEW2", p);
-	store->setUpdatedStateDerivation("NEW3", p);
-	store->getUpdatedStateDerivation(p);
-	
+	Path p = "/nix/store/l569q3a2cfx834mcf3vhwczjgbaljnp7-hellohardcodedstateworld-1.0";
+	store->setUpdatedStateDerivation("/nix/store/63xcbrk3v5nbn9qla7rwnx6rvz3iqm5l-hellohardcodedstateworld-1.0.drv", p);
+	store->updateStateDerivation(p);
 	return;
+	/* test */
 
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
         string arg = *i++;
