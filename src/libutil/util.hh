@@ -293,6 +293,9 @@ string trim(const string & s);
 //excecute a shell command
 void executeAndPrintShellCommand(const string & command, const string & commandName);
 
+//Convert time_t to a string
+string time_t2string(const time_t & t);
+
 }
 
 #endif /* !__UTIL_H */

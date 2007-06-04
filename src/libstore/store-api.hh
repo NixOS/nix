@@ -193,6 +193,12 @@ public:
 	/* TODO */	
 	virtual PathSet getStateReferencesClosure(const Path & path) = 0;
 	
+	/* TODO */	
+	virtual void setUpdatedStateDerivation(const Path & newdrv, const Path & olddrv) = 0;
+
+	/* TODO */	
+	virtual Path getUpdatedStateDerivation(const Path & olddrv) = 0;
+	
 };
 
 

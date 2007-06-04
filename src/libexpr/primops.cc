@@ -1,11 +1,13 @@
 #include "misc.hh"
 #include "eval.hh"
+#include "db.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "util.hh"
 #include "archive.hh"
 #include "expr-to-xml.hh"
 #include "nixexpr-ast.hh"
+#include "local-store.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -313,24 +315,41 @@ static Expr prim_relativise(EvalState & state, const ATermVector & args)
    (basically) its outputHash. */
 static Hash hashDerivationModulo(EvalState & state, Derivation drv)
 {
+    //printMsg(lvlError, format("DRV: %1% %2%") % drv.env.find("name")->second % (drv.outputs.size() == 1));
+    
     /* Return a fixed hash for fixed-output derivations. */
     if (drv.outputs.size() == 1) {
         DerivationOutputs::const_iterator i = drv.outputs.begin();
+
         if (i->first == "out" &&
             i->second.hash != "")
         {
+            //printMsg(lvlError, format("%1% - %2% - %3%") % i->second.hashAlgo % i->second.hash % i->second.path);
+            
             return hashString(htSHA256, "fixed:out:"
                 + i->second.hashAlgo + ":"
                 + i->second.hash + ":"
                 + i->second.path);
         }
     }
+    
+    /* If we have a state derivation, we clear these paramters because they dont affect to outPath */
+    if(drv.stateOutputs.size() != 0){
+	    drv.env["statepath"] = "";		
+	   	drv.stateOutputs.clear();
+		drv.stateOutputDirs.clear();
+		
+		/* We do NOT clear the state identifier (what about the username ????) when there are NO 
+		 * runtime arguments, since this will affect the statePath and therefore the outPath 
+		 */
+		//TODO
+    }
+
 
     /* For other derivations, replace the inputs paths with recursive
        calls to this function.*/
     DerivationInputs inputs2;
-    for (DerivationInputs::iterator i = drv.inputDrvs.begin();
-         i != drv.inputDrvs.end(); ++i)
+    for (DerivationInputs::iterator i = drv.inputDrvs.begin(); i != drv.inputDrvs.end(); ++i)
     {
         Hash h = state.drvHashes[i->first];
         if (h.type == htUnknown) {
@@ -342,7 +361,9 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
     }
     drv.inputDrvs = inputs2;
     
-    return hashTerm(unparseDerivation(drv));
+    //printMsg(lvlError, format("%1%") % unparseDerivation(drv));
+    
+	return hashTerm(unparseDerivation(drv));
 }
 
 /* Construct (as a unobservable side effect) a Nix derivation
@@ -391,6 +412,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     string stateIdentifier = "";
     bool createDirsBeforeInstall = false;
     string runtimeStateParamters = "";
+    vector<DerivationStateOutputDir> stateDirs;
 
     for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
         string key = aterm2String(i->key);
@@ -474,7 +496,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 			        }
             	}
             	
-            	drv.stateOutputDirs[dir.path] = dir;
+            	stateDirs.push_back(dir);
               }
                  	         
    	        }
@@ -572,27 +594,39 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     /* Construct the final derivation store expression. */
     drv.env["out"] = outPath;
     drv.outputs["out"] = DerivationOutput(outPath, outputHashAlgo, outputHash);
-	
+    
+    //printMsg(lvlError, format("DerivationOutput %1% %2% %3%") % outPath % outputHashAlgo % outputHash);
 	//only add state when we have to to keep compitibilty with the 'old' format.
-	//We add state when it's enbaled by the keywords, and NOT disabled by the user
+	//We add state when it's enbaled by the keywords, and not excplicitly disabled by the user
 	if(enableState && !disableState){    
 		/* Add the state path based on the outPath */
 	    string callingUser = "wouterdb";  																	//TODO: Change into variable
-	    string componentHash = printHash(hashDerivationModulo(state, drv));									//hash of the component path
+	    string componentHash = outPath;																		//hash of the component path
 	    Hash statehash = hashString(htSHA256, callingUser + componentHash);									//hash of the state path
 	    Path stateOutPath = makeStatePath("stateOutput:statepath", statehash, drvName, stateIdentifier);	//State path
-
     	drv.env["statepath"] = stateOutPath;		
+
     	string enableStateS = bool2string("true");
     	string createDirsBeforeInstallS = bool2string(createDirsBeforeInstall);
-
     	drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, outputHashAlgo, outputHash, stateIdentifier, enableStateS, shareState, syncState, createDirsBeforeInstallS, runtimeStateParamters);
+    	
+    	for(vector<DerivationStateOutputDir>::iterator i = stateDirs.begin(); i != stateDirs.end(); ++i)
+    		drv.stateOutputDirs[(*i).path] = *(i);
 	}
 
     /* Write the resulting term into the Nix store directory. */
     Path drvPath = writeDerivation(drv, drvName);
 
     printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'") % drvName % drvPath);
+
+	/* TODO Write updated (no need to rebuild) state derivations to a special table, so they can be updated at build time */
+	if(enableState && !disableState){
+		Path deriver = queryDeriver(noTxn, outPath);	//query deriver
+		if(deriver != drvPath){
+			printMsg(lvlError, format("Adding to the db: update drv `%2%' with `%1%'") % drvPath % deriver);
+			store->setUpdatedStateDerivation(drvPath, deriver);			
+		}
+	}
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store expressions, so we can't

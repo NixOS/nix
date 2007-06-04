@@ -72,6 +72,10 @@ public:
 	
 	PathSet getStateReferencesClosure(const Path & path);
 	
+	void setUpdatedStateDerivation(const Path & newdrv, const Path & olddrv);
+
+	Path getUpdatedStateDerivation(const Path & olddrv);
+	
     
 private:
     AutoCloseFD fdSocket;

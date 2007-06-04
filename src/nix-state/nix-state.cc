@@ -85,7 +85,7 @@ static void opShowStateReposRootPath(Strings opFlags, Strings opArgs)
 }
 
 
-static void opCommitReferencesClosure(Strings opFlags, Strings opArgs)
+static void opRunComponent(Strings opFlags, Strings opArgs)
 {
     //get the derivation of the current component
     
@@ -100,9 +100,10 @@ static void opCommitReferencesClosure(Strings opFlags, Strings opArgs)
     DerivationOutputs outputs = drv.outputs;
     string drvName = drv.env.find("name")->second;
     
-	//Wait for locks?
-   
+    //Check if component is a state component !!!
     
+	//Wait for locks?
+	
     //******************* Run the component
     //TODO
     
@@ -112,6 +113,17 @@ static void opCommitReferencesClosure(Strings opFlags, Strings opArgs)
     //get dependecies (if neccecary | recusively) of all state components that need to be updated
     PathSet paths = store->getStateReferencesClosure(componentPath);
 
+
+	//TODO nix-store -q --tree $(nix-store -qd /nix/store/6x6glnb9idn53yxfqrz6wq53459vv3qd-firefox-2.0.0.3/)
+	
+	
+	//Transaction txn;
+   	//createStoreTransaction(txn);
+	//txn.commit();
+	
+	//or noTxn		
+		
+	
 	//for(...){
     //
     //}
@@ -217,17 +229,27 @@ void run(Strings args)
     Strings opFlags, opArgs;
     Operation op = 0;
 
+	store = openStore();
+	Path p = "AADOLD";
+	store->setUpdatedStateDerivation("NEW1", p);
+	store->setUpdatedStateDerivation("NEW2", p);
+	store->setUpdatedStateDerivation("NEW3", p);
+	store->getUpdatedStateDerivation(p);
+	
+	return;
+
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
         string arg = *i++;
 
         Operation oldOp = op;
 		
         if (arg == "--run" || arg == "-r")
-            op = opCommitReferencesClosure;
+            op = opRunComponent;
 		else if (arg == "--showstatepath")
 			op = opShowStatePath;
 		else if (arg == "--showstatereposrootpath")
 			op = opShowStateReposRootPath;
+
 
         /*
 		--commit
@@ -238,8 +260,8 @@ void run(Strings args)
 		
 		--exclude-commit-paths
 		
+		TODO update getDerivation in nix-store to handle state indentifiers
 		
-
         */
 
         else

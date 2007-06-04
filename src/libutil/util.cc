@@ -1064,5 +1064,12 @@ void executeAndPrintShellCommand(const string & command, const string & commandN
     
     remove(tempoutput.c_str());	//Remove the tempoutput file
 }
+
+string time_t2string(const time_t & t)
+{
+	int i = t;
+	string s = int2String(i);
+	return s;
+}
  
 }

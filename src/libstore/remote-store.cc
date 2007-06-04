@@ -402,5 +402,18 @@ PathSet RemoteStore::getStateReferencesClosure(const Path & path)
 	return empty;
 }
 
+//TODO
+void RemoteStore::setUpdatedStateDerivation(const Path & newdrv, const Path & olddrv)
+{
+	
+}
+
+//TODO
+Path RemoteStore::getUpdatedStateDerivation(const Path & olddrv)
+{
+	Path p;
+	return p;
+}
+
 
 }

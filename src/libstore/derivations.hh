@@ -21,8 +21,8 @@ const string drvExtension = ".drv";
 struct DerivationOutput
 {
     Path path;
-    string hashAlgo; /* hash used for expected hash computation */
-    string hash; /* expected hash, may be null */
+    string hashAlgo; 	/* hash used for expected hash computation */
+    string hash; 		/* expected hash, may be null */
     DerivationOutput()
     {
     }

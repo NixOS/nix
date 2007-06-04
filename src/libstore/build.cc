@@ -773,10 +773,11 @@ void DerivationGoal::haveDerivation()
     /* Check what outputs paths are not already valid. */
     PathSet invalidOutputs = checkPathValidity(false);
 
-	
-
     /* If they are all valid, then we're done. */
     if (invalidOutputs.size() == 0) {
+        
+        printMsg(lvlError, format("Check State VALIDITY BEFORE: `%1%'") % drvPath);
+        
         amDone(ecSuccess);
         return;
     }

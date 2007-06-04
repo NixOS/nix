@@ -11,7 +11,7 @@
 
 #include "derivations.hh"
 #include "misc.hh"
-    
+
 #include <iostream>
 #include <algorithm>
 
@@ -19,7 +19,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <utime.h>
-
+#include <time.h>
 
 namespace nix {
 
@@ -81,6 +81,11 @@ static TableId dbDerivers = 0;
    and are of type interval.  
 */
 static TableId dbStateCounters = 0;
+
+/* Path
+ 
+  */
+static TableId dbUpdatedDerivations = 0;
 
 
 bool Substitute::operator == (const Substitute & sub) const
@@ -147,6 +152,7 @@ LocalStore::LocalStore(bool reserveSpace)
     dbSubstitutes = nixDB.openTable("substitutes");
     dbDerivers = nixDB.openTable("derivers");
     dbStateCounters = nixDB.openTable("statecounters");
+    dbUpdatedDerivations = nixDB.openTable("updatedDerivations");
 
     int curSchema = 0;
     Path schemaFN = nixDBPath + "/schema";
@@ -1214,6 +1220,79 @@ PathSet getStateReferencesClosure(const Path & path)
 PathSet LocalStore::getStateReferencesClosure(const Path & path)
 {
     return nix::getStateReferencesClosure(path);
+}
+
+
+//TODO
+void setUpdatedStateDerivation(const Path & newdrv, const Path & olddrv)
+{
+	Transaction txn(nixDB);
+	
+	Strings data;
+	data.push_back(olddrv);
+		
+	time_t timestamp;
+  	time (&timestamp);
+  	string timestamp_s = time_t2string(timestamp);
+	printMsg(lvlError, format("Adding new drv (%1%) to replace old drv (%2%) with timestamp: %3%") % newdrv % olddrv % timestamp_s);
+	data.push_back(timestamp_s);										//create a timestamp to remember which one was last inserted
+							
+    nixDB.setStrings(txn, dbUpdatedDerivations, newdrv, data);
+    
+    //TODO check wheter were not duplicating an entry !!
+    
+	txn.commit();		
+}
+
+//TODO
+void LocalStore::setUpdatedStateDerivation(const Path & newdrv, const Path & olddrv)
+{
+	nix::setUpdatedStateDerivation(newdrv, olddrv);
+}
+
+//TODO
+Path getUpdatedStateDerivation(const Path & olddrv)		//TODO Path updateStateDerivationPath(const Path & storepath) 
+{
+	Transaction txn(nixDB);			//TODO should u do a transaction here? ... this might delay the process ...
+
+	Path storepath = olddrv;		//TODO FIX
+	Path drvPath = getStateDerivation(storepath);
+	Path newDerivation = drvPath;					//the new drv path first equals the old one until a new one is found 
+	
+	Strings keys;
+
+    //Get the (multiple) derivations of references    
+    nixDB.enumTable(txn, dbUpdatedDerivations, keys);
+    for (Strings::iterator i = keys.begin(); i != keys.end(); ++i)
+    {
+		string key = *i;
+		printMsg(lvlError, format("getUpdatedStateDerivation KEY: `%1%'") % key);
+		
+		Strings data;
+		nixDB.queryStrings(txn, dbUpdatedDerivations, key, data);
+	    for (Strings::iterator j = data.begin(); j != data.end(); ++j)
+	    {
+	    	printMsg(lvlError, format("getUpdatedStateDerivation: `%1%'") % *j);
+	    }
+    }
+    
+    
+
+	//Set the current derivation of derivers
+	
+    
+    //if()
+   	//	throw Error(format("T derivation: `%1%'") % path);
+    
+    txn.commit();
+    
+    return p;
+}
+
+//TODO
+Path LocalStore::getUpdatedStateDerivation(const Path & olddrv)
+{
+	return nix::getUpdatedStateDerivation(olddrv);
 }
 
 

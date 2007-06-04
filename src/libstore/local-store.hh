@@ -83,6 +83,11 @@ public:
 	Derivation getStateDerivation(const Path & path);
 	
 	PathSet getStateReferencesClosure(const Path & path);
+	
+	void setUpdatedStateDerivation(const Path & newdrv, const Path & olddrv);
+
+	Path getUpdatedStateDerivation(const Path & olddrv);
+	
 };
 
 
