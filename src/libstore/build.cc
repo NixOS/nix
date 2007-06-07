@@ -2477,12 +2477,14 @@ void LocalStore::buildDerivations(const PathSet & drvPaths)
     startNest(nest, lvlDebug,
         format("building %1%") % showPaths(drvPaths));
 
+	//Just before we build, we resolve the multiple derivations linked to one store path issue, by choosing the latest derivation
+	store->updateAllStateDerivations();
+
     Worker worker;
 
     Goals goals;
     for (PathSet::const_iterator i = drvPaths.begin(); i != drvPaths.end(); ++i){
         goals.insert(worker.makeDerivationGoal(*i));
-        printMsg(lvlError, format("No component build, but state check: %1%") % *i);
     }
 
     worker.run(goals);

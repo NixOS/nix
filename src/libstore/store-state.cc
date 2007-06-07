@@ -16,9 +16,12 @@
 namespace nix {
 
 
-void dsfsdfas()
+void updatedStateDerivation(Path storePath)
 {
-	
+	//Remove the old .svn folders
+		
+	//Create new repositorys, or use existing...
+	//createStateDirs already does that ...
 }
 
 

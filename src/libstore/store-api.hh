@@ -9,6 +9,7 @@
 #include "hash.hh"
 #include "serialise.hh"
 #include "derivations.hh"
+#include "db.hh"
 
 
 namespace nix {
@@ -194,10 +195,13 @@ public:
 	virtual PathSet getStateReferencesClosure(const Path & path) = 0;
 	
 	/* TODO */	
-	virtual void setUpdatedStateDerivation(const Path & newdrv, const Path & storepath) = 0;
+	virtual void addUpdatedStateDerivation(const Path & newdrv, const Path & storepath) = 0;
 
 	/* TODO */	
-	virtual Path updateStateDerivation(const Path & storepath) = 0;
+	virtual void updateStateDerivation(const Transaction & txn, const Path & storepath) = 0;
+	
+	/* TODO */
+	virtual void updateAllStateDerivations() = 0;
 	
 };
 

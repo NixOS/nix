@@ -102,7 +102,9 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     
     //Check if component is a state component !!!
     
-	//Wait for locks?
+    //Check for locks ...
+	//add locks ... ?
+	//svn lock ... ?
 	
     //******************* Run the component
     //TODO
@@ -156,7 +158,10 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		DerivationStateOutputDir d = i->second;
 
 		string thisdir = d.path;
+		
 		string fullstatedir = statePath + "/" + thisdir;
+		if(thisdir == "/")									//exception for the root dir
+			fullstatedir = statePath + "/";				
 		Path statePath = fullstatedir;					//TODO call coerce function
 
 		if(d.type == "none"){
@@ -229,11 +234,13 @@ void run(Strings args)
     Strings opFlags, opArgs;
     Operation op = 0;
 
-	/* test */
+	/* test *
 	store = openStore();
-	Path p = "/nix/store/l569q3a2cfx834mcf3vhwczjgbaljnp7-hellohardcodedstateworld-1.0";
-	store->setUpdatedStateDerivation("/nix/store/63xcbrk3v5nbn9qla7rwnx6rvz3iqm5l-hellohardcodedstateworld-1.0.drv", p);
-	store->updateStateDerivation(p);
+	Path p = "/nix/store/l569q3a2cfx834mcf3vhwczjgbaljnp7-hellohardcodedstateworld-1.0";										//
+	store->addUpdatedStateDerivation("/nix/store/63xcbrk3v5nbn9qla7rwnx6rvz3iqm5l-hellohardcodedstateworld-1.0.drv", p);		//
+	Path p2 = "/nix/store/4ycq45hsgc8yaj4vwafx3lgd473jaqwg-hellohardcodedstateworld-1.0";
+	store->addUpdatedStateDerivation("/nix/store/s6wggk924jx0gcb0l29ra4g9fxa3b4pp-hellohardcodedstateworld-1.0.drv", p2);		//
+	store->updateAllStateDerivations();
 	return;
 	/* test */
 
@@ -260,6 +267,14 @@ void run(Strings args)
 		--exclude-commit-paths
 		
 		TODO update getDerivation in nix-store to handle state indentifiers
+		
+		--update state drv
+		
+		--revert-to-state	(recursive revert...)
+		
+		--delete state?
+		
+		--
 		
         */
 

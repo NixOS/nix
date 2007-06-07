@@ -470,7 +470,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 				            	s = s + "/";
 				            
 				            //Remove the / at the beginning if it's there
-							if(s[0] == '/')
+							if(s[0] == '/' && s.length() != 1)
 				            	s = s.substr(1, s.length());
 				            
 				            if(s == stateRootRepos)
@@ -619,13 +619,17 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 
     printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'") % drvName % drvPath);
 
-	/* TODO Write updated (no need to rebuild) state derivations to a special table, so they can be updated at build time */
+	/* Write updated (no need to rebuild) state derivations to the database, so they can be updated at build time */	
 	if(enableState && !disableState){
-		Path deriver = queryDeriver(noTxn, outPath);	//query deriver
-		if(deriver != drvPath){
-			store->setUpdatedStateDerivation(drvPath, outPath);			
+		if(store->isValidPath(outPath)){									//Only add when the path is already valid
+			Path deriver = queryDeriver(noTxn, outPath);			//query the deriver		
+			if(deriver != drvPath){
+				store->addUpdatedStateDerivation(drvPath, outPath);						
+			}
 		}
+		//TODO Also add when path is not already valid, which drv does it take at build time, the latest ... guess so .. so we dont need to add? 
 	}
+	
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store expressions, so we can't

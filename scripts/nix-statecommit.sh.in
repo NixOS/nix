@@ -1,5 +1,5 @@
 #! /bin/sh
-# we cant do a -e since ...
+# we cant do a -e since ... svn can fail ??? TODO...
 
 #check if there are enough arguments, if not, exit with an error
 
@@ -17,21 +17,98 @@ nonversionedpaths=( $4 )
 checkouts=( $5 )
 
 #echo svnbin: $svnbin
-#echo subversionedpaths: $subversionedpaths
-#echo subversionedpathsCommitBools: $subversionedpathsCommitBools
-#echo nonversionedpaths: $nonversionedpaths
-#echo checkouts: $checkouts
+#echo subversionedpaths: ${subversionedpaths[@]}
+#echo subversionedpathsCommitBools: ${subversionedpathsCommitBools[@]}
+#echo nonversionedpaths: ${nonversionedpaths[@]}
+#echo checkouts: ${checkouts[@]}
 
-
-
-#TODO
 #
-# silence "is already under version control" messages
-# after a "revert $x" you can silence the "skipped '$x'"
 #
-#TODO
+#
+#
+function subversionSingleStateDir {
 
+	  excludelist=( "." ".." ".svn" );
 
+	  cd $1;
+	  echo cd $1;
+	  
+	  empty=$(ls)
+	  
+	  if [ "$empty" = "" ] ; then
+	  	allsubitems=();															#no subfiles / dirs
+	  else
+	  	allsubitems=( $(echo *) $(echo .*) )									#there are subfiles / dirs,also adds hidden items
+	  fi
+
+	  for subitem in ${allsubitems[@]}
+	  do
+	  	  if [ "$subitem" = ".svn" ]; then
+	  	  		allsubitems=( $(svn -N stat | sed -n '/^?/p' | sed 's/?     //' | tr -d "\12") )		#there are subfiles, and theyre already versioned
+	  	  fi
+	  done
+	  
+	  #echo "Allsubitems ${allsubitems[@]}"
+	  																		
+	  subitems=();
+	  for subitem in ${allsubitems[@]}										#add all, were going to exlucde explicity stated direct versioned-subdirs or explicity stated nonversioned-subdirs
+	     do																	#this is only to prevent some warnings, ultimately we would like svn add to have a option 'exclude dirs'
+
+		  exclude=0;
+		  
+	  	  for excl in ${excludelist[@]}										#check if the subitem is in the list of excluded dirs
+		  do
+		  	  if [ "$excl" = "$subitem" ]; then
+		  	    exclude=1;
+		  	    #echo "exclude $excl"
+		  	  fi
+		  done	  	  
+
+		  subitem="$(pwd)/$subitem";										#create the full path
+		  
+		  if test -d $subitem; then											#the subitem (file or a dir) may be a dir, so we add a / to the end
+		  	subitem="$subitem/";
+		  fi
+		  
+		  for svnp in ${subversionedpaths[@]}								#check if the subitem is in the list of subverioned paths
+		  do
+		  	  if [ "$svnp" = "$subitem" ]; then
+		  	    exclude=1;
+		  	    #echo "exclude versioned $svnp"
+		  	  fi
+		  done
+		
+		  for nonvp in ${nonversionedpaths[@]}								#check if the subitem is in the list of dirs that aren't supposed to be versioned
+		  do	
+		  	  if [ "$nonvp" = "$subitem" ]; then
+		  	    exclude=1;
+		  	    #echo "exclude nonversioned $svnp"
+		  	  fi
+		  done
+		  
+		 if [ $exclude = 0 ]; then											#Exclude the subitem if nessecary
+            subitems[${#subitems[*]}]=$subitem
+         fi
+      done  
+	  
+	  #echo ${subitems[@]}
+	  
+	  for item in ${subitems[@]}
+	     do
+	     if test -d $item; then											#add or go recursive subitems
+		     $debug svn -N add $item									#NON recursively add the dir
+		     subversionSingleStateDir $item
+		 else
+		 	 $debug svn add $item
+		 fi
+	  done
+
+}  
+
+#
+#
+#
+#
 
 i=0
 for path in ${subversionedpaths[@]}
@@ -40,69 +117,26 @@ do
       cd $path;
       
       output=$($svnbin stat 2>&1 | grep "is not a working copy");
-      if [ "$output" != "" ] ; then       										#if the dir exists but is not yet an svn dir: create repos, if it doenst exits (is removed or something) than we dont do anything
+      if [ "$output" != "" ] ; then       										#if the dir exists but is not yet an svn dir: checkout repos, if it doenst exits (is removed or something) than we dont do anything
           $debug ${checkouts[$i]};
       fi
       
       if [ "${subversionedpathsCommitBools[$i]}" = "true" ]; then				#Check if we need to commit this folder
 
           echo "Entering $path"
-       															
-		  allsubitems=( $(echo *) )												#TODO, maybe also add hidden files starting with a '.' , but we dont want to add .svn dirs
-		  																		#TODO2 maybe do something with svn stat to speed up ?
-		  subitems=();
-		  for subitem in ${allsubitems[@]}										#add all, were going to exlucde explicity stated direct versioned-subdirs or explicity stated nonversioned-subdirs
-	      do																	#this is only to prevent some warnings, ultimately we would like svn add to have a option 'exclude dirs'
-			  subitem="$(pwd)/$subitem";
-			  
-			  if test -d $subitem; then											#the subitem (file or a dir) may be a dir, so we add a / to the end
-			  	subitem="$subitem/";
-			  fi
-			  
-			  exclude=0;
-			  
-			  for svnp in ${subversionedpaths[@]}								#check if the subitem is in the list of subverioned paths
-			  do
-			  	  if [ "$svnp" = "$subitem" ]; then
-			  	    exclude=1;
-			  	    #echo "exclude versioned $svnp"
-			  	  fi
-			  done
-	
-			  for nonvp in ${nonversionedpaths[@]}								#check if the subitem is in the list of dirs that aren't supposed to be versioned
-			  do	
-			  	  if [ "$nonvp" = "$subitem" ]; then
-			  	    exclude=1;
-			  	    #echo "exclude nonversioned $svnp"
-			  	  fi
-			  done
-			  
-			  if [ $exclude = 0 ]; then											#Exclude the subitem if nessecary
-	             subitems[${#subitems[*]}]=$subitem
-	          fi
-	      done  
+
+		  subversionSingleStateDir $path;
 		  
-		  if [ "$subitems" != "" ]; then											
-			 echo "adding ${subitems[@]}"
-	         $debug svn add ${subitems[@]}										#add all subitems
-	      
-	      	 for revpath in ${nonversionedpaths[@]}								#We need to revert sub-sub* dirs, since these havent been excluded
-		     do
-		       if test -d $revpath; then
-		         if [ "${revpath:0:${#path}}" == "$path" ]; then
-			 	   echo "Revert $revpath";
-			 	   $debug svn revert $revpath;
-		         fi
-		       fi
-		     done
-		     
-		     $debug svn -m "" commit;													#Finally, we commit
-	      fi
-	     
+		  cd $path																#now that everything is added we can commit
+	      $debug svn -m "" commit;												
 	   fi
       
       cd - &> /dev/null;
    fi
   let "i+=1"
 done
+
+
+
+
 

@@ -1016,7 +1016,7 @@ string trim(const string & s) {
 
 void executeAndPrintShellCommand(const string & command, const string & commandName)
 {
-	string tempoutput = "svnoutput.txt";
+	string tempoutput = "/tmp/svnoutput.txt";
 	string newcommand = command + " &> " + tempoutput;		//the  &> sends also stderr to stdout
 
 	int kidstatus, deadpid;
