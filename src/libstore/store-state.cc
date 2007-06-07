@@ -22,18 +22,18 @@ void updatedStateDerivation(Path storePath)
 		
 	//Create new repositorys, or use existing...
 	//createStateDirs already does that ...
-	
 	printMsg(lvlError, format("Resetting state drv settings like repositorys"));
 	
 	//Create a repository for this state location
+	
 	//string repos = makeStateReposPath("stateOutput:staterepospath", stateDir, thisdir, drvName, stateIdentifier);
 	//executeAndPrintShellCommand("mkdir -p " + repos, "mkdir");
 	//executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin");				 //TODO create as nixbld.nixbld chmod 700... can you still commit than ??
 	
 	
+	//createStateDirs
+	
 }
-
-
 
 void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs, const StringPairs & env)
 {
@@ -69,6 +69,7 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 		string repos = makeStateReposPath("stateOutput:staterepospath", stateDir, thisdir, drvName, stateIdentifier);
 		executeAndPrintShellCommand("mkdir -p " + repos, "mkdir");
 		executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin");				 //TODO create as nixbld.nixbld chmod 700... can you still commit than ??
+//																								 //TODO Check if repos already exitst?
 
 		if(d.type == "interval"){
 			intervalPaths.insert(statePath);
@@ -86,6 +87,7 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 	vector<int> empty;
 	store->setStatePathsInterval(intervalPaths, empty, true);
 }
+
 
 
 }

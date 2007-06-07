@@ -95,8 +95,8 @@ function subversionSingleStateDir {
 	  
 	  for item in ${subitems[@]}
 	     do
-	     if test -d $item; then											#add or go recursive subitems
-		     $debug svn -N add $item									#NON recursively add the dir
+	     if test -d $item; then												#add or go recursive subitems
+		     $debug svn -N add $item										#NON recursively add the dir
 		     subversionSingleStateDir $item
 		 else
 		 	 $debug svn add $item
@@ -116,9 +116,20 @@ do
    if test -d $path; then														#if the dir doesnt exist, than we dont hav to do anything
       cd $path;
       
-      output=$($svnbin stat 2>&1 | grep "is not a working copy");
-      if [ "$output" != "" ] ; then       										#if the dir exists but is not yet an svn dir: checkout repos, if it doenst exits (is removed or something) than we dont do anything
-          $debug ${checkouts[$i]};
+	  																		    #HACK: I cant seem to find a way for bash to parse a 2 dimensional string array as argument, so we use a 1-d array with '|' as seperator
+      if ! test -d $path/.svn/; then       										#if the dir exists but is not yet an svn dir: checkout repos, if it doenst exits (is removed or something) than we dont do anything
+          checkoutcommand="";
+          while true; do
+		  	if [ "${checkouts[$i]}" = "|" ]; then 
+		  	  break
+		  	  let "i+=1"
+		  	fi
+		  	checkoutcommand="${checkoutcommand} ${checkouts[$i]}";
+		  	let "i+=1"
+		  done
+
+          #echo $checkoutcommand;
+          $debug $checkoutcommand;
       fi
       
       if [ "${subversionedpathsCommitBools[$i]}" = "true" ]; then				#Check if we need to commit this folder
@@ -133,7 +144,6 @@ do
       
       cd - &> /dev/null;
    fi
-  let "i+=1"
 done
 
 

@@ -19,6 +19,15 @@ using std::cout;
 typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
 
+/************************* Build time Functions ******************************/
+
+
+
+/************************* Build time Functions ******************************/
+
+
+
+
 void printHelp()
 {
     cout << string((char *) helpText, sizeof helpText);
@@ -51,7 +60,7 @@ Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & co
     }
     
     //TODO check if this identifier exists !!!!!!!!!!!
-        
+    
     
     Derivation drv = store->getStateDerivation(componentPath);
     DerivationStateOutputs stateOutputs = drv.stateOutputs; 
@@ -167,7 +176,9 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		string fullstatedir = statePath + "/" + thisdir;
 		if(thisdir == "/")									//exception for the root dir
 			fullstatedir = statePath + "/";				
-		Path statePath = fullstatedir;					//TODO call coerce function
+		
+		
+		//Path fullStatePath = fullstatedir;					//TODO call coerce function		//TODO REMOVE?
 
 		if(d.type == "none"){
 			nonversionedpaths.push_back(fullstatedir);
@@ -221,7 +232,8 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	string commandsarray; 
 	for (vector<string>::iterator i = checkoutcommands.begin(); i != checkoutcommands.end(); ++i)
     {
-		commandsarray += "\\\"" + *(i) + "\\\" ";
+		//#HACK: I cant seem to find a way for bash to parse a 2 dimensional string array as argument, so we use a 1-d array with '|' as seperator
+		commandsarray += "" + *(i) + " | ";
     }
   	
     //make the call
