@@ -31,7 +31,7 @@ function subversionSingleStateDir {
 	  excludelist=( "." ".." ".svn" );
 
 	  cd $1;
-	  echo cd $1;
+	  #echo cd $1;
 	  
 	  empty=$(ls)
 	  

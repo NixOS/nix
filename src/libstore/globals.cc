@@ -19,7 +19,6 @@ string nixSVNPath = "/UNINIT";
 string nixConfDir = "/UNINIT";
 string nixLibexecDir = "/UNINIT";
 string nixBinDir = "/UNINIT";
-string stateRootRepos = "root_repos/";
 
 bool keepFailed = false;
 bool keepGoing = false;

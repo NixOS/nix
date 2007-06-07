@@ -31,14 +31,14 @@ bool isStorePath(const Path & path)
 void assertStorePath(const Path & path)
 {
     if (!isStorePath(path))
-        throw Error(format("path `%1%' is not in the Nix store") % path);		//TODO bug: this prints an empty path ...
+        throw Error(format("path `%1%' is not in the Nix store (1)") % path);		//TODO bug: this prints an empty path ...
 }
 
 
 Path toStorePath(const Path & path)
 {
     if (!isInStore(path))
-        throw Error(format("path `%1%' is not in the Nix store") % path);
+        throw Error(format("path `%1%' is not in the Nix store (2)") % path);
     Path::size_type slash = path.find('/', nixStore.size() + 1);
     if (slash == Path::npos)
         return path;
@@ -102,10 +102,12 @@ Path makeStateReposPath(const string & type, const Path statePath, const string 
     //This is a little trick: we could use the same hash as the statepath, but we change it so the repository also gets a unique scannable hash
     Hash hash = hashString(htSHA256, statePath); 
     
-    //A little tick again, we dont want to add other repositorys in the root repository, so we rename it. 
-    string subfolder_ = subfolder;
-    if(subfolder == "")
-    	subfolder_ = stateRootRepos;
+    //We also hash repository subfolders the prevent collisions 
+    if(subfolder.length() == 0)
+    	throw Error(format("Cannot create a repository for a subfolder without a name"));
+    
+    string hash_subfolder = type + ":sha256:" + printHash(hash) + ":" + subfolder;
+    string subfolder_ = printHash32(compressHash(hashString(htSHA256, hash_subfolder), 20)) + "-" + subfolder;
     
     string suffix_stateIdentifier = stateIdentifier;
     if(suffix_stateIdentifier != "")

@@ -473,9 +473,6 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 							if(s[0] == '/' && s.length() != 1)
 				            	s = s.substr(1, s.length());
 				            
-				            if(s == stateRootRepos)
-				            	throw EvalError(format("The statedir `%1%' is a keyword and cannot be used, choose another name") % stateRootRepos);
-				            
 				            dir.path = s;
 			            }
 			            else if (statekey == "type") { dir.type = s; }

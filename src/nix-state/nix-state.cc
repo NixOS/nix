@@ -39,16 +39,19 @@ Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & co
     componentPath = fullPath.substr(0, pos + nixStore.size() + 1);
     binary = fullPath.substr(pos + nixStore.size() + 1, fullPath.size());
 
-    //TODO CHECK for validity of componentPath ... ?
-    
+    //TODO REAL CHECK for validity of componentPath ... ?
+    //printMsg(lvlError, format("%1% - %2% - %3% - %4%") % componentPath % statePath % stateIdentifier % binary);
+    if(componentPath == "/nix/store")
+ 		 throw UsageError("You must specify the full! binary path");
+        
     stateIdentifier = "";
     if(opArgs.size() == 2){
 		opArgs.pop_front();
 		stateIdentifier = opArgs.front();	
     }
-    //TODO check if this identifier exists !!!!!!!!!!!
     
-    //printMsg(lvlError, format("%1% - %2% - %3% - %4%") % componentPath % statePath % stateIdentifier % binary);
+    //TODO check if this identifier exists !!!!!!!!!!!
+        
     
     Derivation drv = store->getStateDerivation(componentPath);
     DerivationStateOutputs stateOutputs = drv.stateOutputs; 
@@ -78,8 +81,10 @@ static void opShowStateReposRootPath(Strings opFlags, Strings opArgs)
 	string drvName = drv.env.find("name")->second;
 	
 	//Get the a repository for this state location
-	string repos = makeStateReposPath("stateOutput:staterepospath", statePath, "", drvName, stateIdentifier);		//this is a copy from store-state.cc
-	repos = repos.substr(0, repos.length() - (stateRootRepos.length() + 1) );
+	string repos = makeStateReposPath("stateOutput:staterepospath", statePath, "/", drvName, stateIdentifier);		//this is a copy from store-state.cc
+
+	//TODO Strip off
+	//repos = repos.substr(0, repos.length() - .... );
 	
 	printMsg(lvlError, format("%1%") % repos);
 }
@@ -93,7 +98,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     Path statePath;
     string stateIdentifier;
     string binary;
-    
+
     Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary);
     DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
     DerivationStateOutputs stateOutputs = drv.stateOutputs; 
