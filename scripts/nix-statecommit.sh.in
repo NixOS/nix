@@ -5,8 +5,13 @@
 
 debug="";		#set to "" for no debugging, set to "echo " to debug the commands
 
-if [ "$#" != 5 ] ; then
+if [ "$#" != 5 ] || [ "$#" != 6 ] ; then
   echo "Incorrect number of arguments"
+  exit 1;
+fi
+
+if [ "$deletesvn" != "" ] && [ "$deletesvn" != "1" ]; then
+  echo "The last argument (DELETE svn folders) must be either empty (recommended) or 1"
   exit 1;
 fi
 
@@ -15,6 +20,7 @@ subversionedpaths=( $2 )				#arrays
 subversionedpathsCommitBools=( $3 )
 nonversionedpaths=( $4 )
 checkouts=( $5 )
+deletesvn=$6							#this flag can be set to 1 to DELETE all .svn folders and NOT commit
 
 #echo svnbin: $svnbin
 #echo subversionedpaths: ${subversionedpaths[@]}
@@ -45,6 +51,10 @@ function subversionSingleStateDir {
 	  do
 	  	  if [ "$subitem" = ".svn" ]; then
 	  	  		allsubitems=( $(svn -N stat | sed -n '/^?/p' | sed 's/?     //' | tr -d "\12") )		#there are subfiles, and theyre already versioned
+	  	  		
+	  	  		if [ "$deletesvn" = "1" ]; then
+	  	  		  rm -rf .svn/
+	  	  		fi
 	  	  fi
 	  done
 	  
@@ -96,10 +106,14 @@ function subversionSingleStateDir {
 	  for item in ${subitems[@]}
 	     do
 	     if test -d $item; then												#add or go recursive subitems
-		     $debug svn -N add $item										#NON recursively add the dir
+		     if [ "$deletesvn" != "1" ]; then
+		     	$debug svn -N add $item										#NON recursively add the dir
+		     fi
 		     subversionSingleStateDir $item
 		 else
-		 	 $debug svn add $item
+		     if [ "$deletesvn" != "1" ]; then
+		 	 	$debug svn add $item
+		 	 fi
 		 fi
 	  done
 
@@ -128,8 +142,9 @@ do
 		  	let "i+=1"
 		  done
 
-          #echo $checkoutcommand;
-          $debug $checkoutcommand;
+		  if [ "$deletesvn" != "1" ]; then
+          	$debug $checkoutcommand;
+          fi
       fi
       
       if [ "${subversionedpathsCommitBools[$i]}" = "true" ]; then				#Check if we need to commit this folder
@@ -138,8 +153,10 @@ do
 
 		  subversionSingleStateDir $path;
 		  
-		  cd $path																#now that everything is added we can commit
-	      $debug svn -m "" commit;												
+		  cd $path																#now that everything is added we go back to the 'root' path and commit
+	      if [ "$deletesvn" != "1" ]; then
+	      	$debug svn -m "" commit;			
+	      fi									
 	   fi
       
       cd - &> /dev/null;
