@@ -317,14 +317,16 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
 {
     //printMsg(lvlError, format("DRV: %1% %2%") % drv.env.find("name")->second % (drv.outputs.size() == 1));
     
-    /* Return a fixed hash for fixed-output derivations. */
+    /* Return a fixed hash for fixed-output derivations. 
+     * E.g. derivations that have a hash  
+     */
     if (drv.outputs.size() == 1) {
         DerivationOutputs::const_iterator i = drv.outputs.begin();
 
         if (i->first == "out" &&
             i->second.hash != "")
         {
-            //printMsg(lvlError, format("%1% - %2% - %3%") % i->second.hashAlgo % i->second.hash % i->second.path);
+            //printMsg(lvlError, format("FIXED OUTPUT: %1% - %2% - %3%") % i->second.hashAlgo % i->second.hash % i->second.path);
             
             return hashString(htSHA256, "fixed:out:"
                 + i->second.hashAlgo + ":"
@@ -333,18 +335,30 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
         }
     }
     
-    /* If we have a state derivation, we clear these paramters because they dont affect to outPath */
+    /* If we have a state derivation, we clear state paramters because they (sometimes) dont affect to outPath: 
+     * If this drv has runtime paramters: The state indentifier and thus statepath may change, but the componentPath (outPath) can stay the same
+     * If this drv doesnt have runtime paramters: The state indentifier and thus statepath may change, and thus the componentPath changes since it is build with another identifier
+     * In both cases: Other runtime state parameters like stateDirs, synchronisation and shareState never change the out or statepath so always need to be out of the hash 
+     */ 
     if(drv.stateOutputs.size() != 0){
-	    drv.env["statepath"] = "";		
-	   	drv.stateOutputs.clear();
-		drv.stateOutputDirs.clear();
-		
-		/* We do NOT clear the state identifier (what about the username ????) when there are NO 
-		 * runtime arguments, since this will affect the statePath and therefore the outPath 
-		 */
-		//TODO
-    }
-
+	    
+	    if(drv.stateOutputs.size() != 1)
+	    	throw EvalError(format("There are more then one stateOutputs in the derviation....."));
+	    
+	    DerivationStateOutput drvso = drv.stateOutputs["state"];
+	    
+	    if(drvso.runtimeStateParamters != ""){		//Has runtime parameters		-->  Clear all state parameters
+			drv.stateOutputs.clear();
+			drv.stateOutputDirs.clear();
+			drv.env["statepath"] = "";
+			printMsg(lvlError, format("YES RUNTIME"));
+	    }
+	    else{										//Has NO runtime parameters		-->  Clear state parameters selectively
+	    	drvso.clearAllRuntimeParamters();
+	    	drv.stateOutputDirs.clear();
+	    	printMsg(lvlError, format("NO RUNTIME"));
+	    }
+	}
 
     /* For other derivations, replace the inputs paths with recursive
        calls to this function.*/
@@ -360,9 +374,7 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
         inputs2[printHash(h)] = i->second;
     }
     drv.inputDrvs = inputs2;
-    
-    //printMsg(lvlError, format("%1%") % unparseDerivation(drv));
-    
+    //printMsg(lvlError, format("%1% with %2% --> %3%") % drv.env.find("name")->second % printHash(hashTerm(unparseDerivation(drv))) % unparseDerivation(drv));
 	return hashTerm(unparseDerivation(drv));
 }
 
@@ -583,10 +595,25 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
        output names do get reflected in the hash. */
     drv.env["out"] = "";
     drv.outputs["out"] = DerivationOutput("", outputHashAlgo, outputHash);
+	
+	/* If there are no runtime paratermers, then we need to take the the stateIdentifier into account for the hash calcaulation below: hashDerivationModulo(...) 
+	 * We also add enableState to make it parse the drv to a state-drv
+	 * We also add runtimeStateParamters for the hash calc in hashDerivationModulo(...) to check if its needs to take the stateIdentiefier into account in the hash
+	 */
+	if(enableState && !disableState){    
+		if(runtimeStateParamters == ""){
+			string enableStateS = bool2string("true");
+			drv.stateOutputs["state"] = DerivationStateOutput("", "", "", stateIdentifier, enableStateS, "", "", "", runtimeStateParamters, false);
+		}	
+	}
         
     /* Use the masked derivation expression to compute the output
        path. */
-    Path outPath = makeStorePath("output:out", hashDerivationModulo(state, drv), drvName);
+    
+    //TODO CLEANUP
+    Hash h = hashDerivationModulo(state, drv);
+    //printMsg(lvlError, format("USES: `%1%'") % printHash(h));
+    Path outPath = makeStorePath("output:out", h, drvName);
 
     /* Construct the final derivation store expression. */
     drv.env["out"] = outPath;

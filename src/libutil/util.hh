@@ -296,6 +296,11 @@ void executeAndPrintShellCommand(const string & command, const string & commandN
 //Convert time_t to a string
 string time_t2string(const time_t & t);
 
+bool FileExist(const string FileName);
+
+bool IsDirectory(const string FileName);
+
+
 }
 
 #endif /* !__UTIL_H */

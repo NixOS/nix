@@ -189,7 +189,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		string repos = makeStateReposPath("stateOutput:staterepospath", statePath, thisdir, drvName, stateIdentifier);		//this is a copy from store-state.cc
 				
 		//
-		checkoutcommands.push_back(svnbin + " checkout file://" + repos + " " + fullstatedir);
+		checkoutcommands.push_back(svnbin + " --ignore-externals checkout file://" + repos + " " + fullstatedir);
 		subversionedpaths.push_back(fullstatedir);
 		
 		if(d.type == "interval"){
@@ -260,7 +260,7 @@ void run(Strings args)
 	store->updateAllStateDerivations();
 	return;
 	/* test */
-
+	
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
         string arg = *i++;
 

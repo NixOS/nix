@@ -18,6 +18,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 
+
 extern char * * environ;
 
 
@@ -1071,5 +1072,25 @@ string time_t2string(const time_t & t)
 	string s = int2String(i);
 	return s;
 }
+
+bool FileExist(const string FileName)
+{
+	const char* FileName_C = FileName.c_str();
+	//strcpy(FileName_C, FileName.c_str());
+		        
+    struct stat my_stat;
+    return (stat(FileName_C, &my_stat) == 0);
+}
+
+bool IsDirectory(const string FileName)
+{
+	const char* FileName_C = FileName.c_str();
+	//strcpy(FileName_C, FileName.c_str());
+    
+    struct stat my_stat;
+    if (stat(FileName_C, &my_stat) != 0) return false;
+    return ((my_stat.st_mode & S_IFDIR) != 0);
+}
+
  
 }

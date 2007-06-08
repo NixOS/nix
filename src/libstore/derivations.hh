@@ -49,15 +49,19 @@ struct DerivationStateOutput
          
     string createDirsBeforeInstall;		//if true: creates state dirs before installation
 	string runtimeStateParamters;		//if not empty: these are the runtime parameters where state can be found (you can use $statepath here)
+    
     DerivationStateOutput()
     {
     }
-    DerivationStateOutput(Path statepath, string hashAlgo, string hash, string stateIdentifier, string enabled, string shared, string synchronization, string createDirsBeforeInstall, string runtimeStateParamters)
+    
+    DerivationStateOutput(Path statepath, string hashAlgo, string hash, string stateIdentifier, string enabled, string shared, string synchronization, string createDirsBeforeInstall, string runtimeStateParamters, bool check=true)
     {
-        if(shared != "none" && shared != "full" && shared != "group")
-        	throw Error(format("shared '%1%' is not a correct type") % shared);
-        if(synchronization != "none" && synchronization != "exclusive-lock" && synchronization != "recursive-exclusive-lock")
-        	throw Error(format("synchronization '%1%' is not a correct type") % synchronization);
+        if(check){
+	        if(shared != "none" && shared != "full" && shared != "group")
+	        	throw Error(format("shared '%1%' is not a correct type") % shared);
+	        if(synchronization != "none" && synchronization != "exclusive-lock" && synchronization != "recursive-exclusive-lock")
+	        	throw Error(format("synchronization '%1%' is not a correct type") % synchronization);
+        }
         
         //TODO
         //commitReferences
@@ -80,6 +84,21 @@ struct DerivationStateOutput
     
     bool getCreateDirsBeforeInstall(){
     	return string2bool(createDirsBeforeInstall);
+    }
+    
+    /*
+     * This sets all the paramters to "" to ensure they're not taken into account for the hash calculation in primops.cc 
+     */
+    void clearAllRuntimeParamters(){
+    	this->statepath = "";
+        //this->hashAlgo;						//Clear this one?
+        //this->hash;							//Clear this one?
+        //this->stateIdentifier;
+        this->enabled = "";
+        this->shared = "";
+        this->synchronization = "";
+        this->createDirsBeforeInstall = "";
+        this->runtimeStateParamters = "";
     }
 };
 

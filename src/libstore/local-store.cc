@@ -1282,7 +1282,7 @@ void updateAllStateDerivations()
 	for (Strings::iterator i = unique_paths.begin(); i != unique_paths.end(); ++i)
     {
     	string path = *i;
-    	printMsg(lvlError, format("Unique: %1%") % path);
+    	//printMsg(lvlError, format("Unique: %1%") % path);
     	store->updateStateDerivation(txn, path);				//TODO replace store->
     }
     

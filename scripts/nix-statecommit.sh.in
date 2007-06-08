@@ -5,7 +5,7 @@
 
 debug="";		#set to "" for no debugging, set to "echo " to debug the commands
 
-if [ "$#" != 5 ] || [ "$#" != 6 ] ; then
+if [ "$#" != 5 ] && [ "$#" != 6 ] ; then
   echo "Incorrect number of arguments"
   exit 1;
 fi
@@ -22,11 +22,12 @@ nonversionedpaths=( $4 )
 checkouts=( $5 )
 deletesvn=$6							#this flag can be set to 1 to DELETE all .svn folders and NOT commit
 
-#echo svnbin: $svnbin
-#echo subversionedpaths: ${subversionedpaths[@]}
-#echo subversionedpathsCommitBools: ${subversionedpathsCommitBools[@]}
-#echo nonversionedpaths: ${nonversionedpaths[@]}
-#echo checkouts: ${checkouts[@]}
+echo svnbin: $svnbin
+echo subversionedpaths: ${subversionedpaths[@]}
+echo subversionedpathsCommitBools: ${subversionedpathsCommitBools[@]}
+echo nonversionedpaths: ${nonversionedpaths[@]}
+echo checkouts: ${checkouts[@]}
+echo deletesvn: $deletesvn
 
 #
 #
@@ -125,23 +126,23 @@ function subversionSingleStateDir {
 #
 
 i=0
+i_checkout=0
 for path in ${subversionedpaths[@]}
 do
    if test -d $path; then														#if the dir doesnt exist, than we dont hav to do anything
       cd $path;
-      
-	  																		    #HACK: I cant seem to find a way for bash to parse a 2 dimensional string array as argument, so we use a 1-d array with '|' as seperator
-      if ! test -d $path/.svn/; then       										#if the dir exists but is not yet an svn dir: checkout repos, if it doenst exits (is removed or something) than we dont do anything
-          checkoutcommand="";
-          while true; do
-		  	if [ "${checkouts[$i]}" = "|" ]; then 
-		  	  break
-		  	  let "i+=1"
-		  	fi
-		  	checkoutcommand="${checkoutcommand} ${checkouts[$i]}";
-		  	let "i+=1"
-		  done
-
+	  																		    
+ 	  checkoutcommand="";														#HACK: I cant seem to find a way for bash to parse a 2 dimensional string array as argument, so we use a 1-d array with '|' as seperator
+      while true; do
+	     if [ "${checkouts[$i_checkout]}" = "|" ]; then 
+   		 	let "i_checkout+=1"
+	  	    break
+     	 fi
+	  	 checkoutcommand="${checkoutcommand} ${checkouts[$i_checkout]}";
+	  	 let "i_checkout+=1"
+	  done
+	  		
+      if ! test -d "${path}.svn/"; then       										#if the dir exists but is not yet an svn dir: checkout repos, if it doenst exits (is removed or something) than we dont do anything
 		  if [ "$deletesvn" != "1" ]; then
           	$debug $checkoutcommand;
           fi
@@ -157,9 +158,10 @@ do
 	      if [ "$deletesvn" != "1" ]; then
 	      	$debug svn -m "" commit;			
 	      fi									
-	   fi
+	  fi
       
       cd - &> /dev/null;
+      let "i+=1"
    fi
 done
 

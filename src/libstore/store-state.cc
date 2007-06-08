@@ -18,21 +18,14 @@ namespace nix {
 
 void updatedStateDerivation(Path storePath)
 {
-	//Remove the old .svn folders
+	//We dont remove the old .svn folders
+	//New repostorys are created by createStateDirs
 		
-	//Create new repositorys, or use existing...
-	//createStateDirs already does that ...
 	printMsg(lvlError, format("Resetting state drv settings like repositorys"));
 	
 	//Create a repository for this state location
 	
-	//string repos = makeStateReposPath("stateOutput:staterepospath", stateDir, thisdir, drvName, stateIdentifier);
-	//executeAndPrintShellCommand("mkdir -p " + repos, "mkdir");
-	//executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin");				 //TODO create as nixbld.nixbld chmod 700... can you still commit than ??
-	
-	
-	//createStateDirs
-	
+	//
 }
 
 void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs, const StringPairs & env)
@@ -47,7 +40,7 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 	
 	PathSet intervalPaths;
 	
-	//TODO check if we can create stata and staterepos dirs
+	//TODO check if we can create state and staterepos dirs
 	
 	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
 		DerivationStateOutputDir d = i->second;
@@ -56,31 +49,33 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 		string fullstatedir = stateDir + "/" + thisdir;
 		Path statePath = fullstatedir;					//TODO call coerce function
 				
-		//TODO REPLACE TRUE INTO VAR OF CREATEING DIRS BEFORE OR AFTER INSTALL
 		//Check if and how this dir needs to be versioned
 		if(d.type == "none"){
-			if(true){
-				executeAndPrintShellCommand("mkdir -p " + fullstatedir, "mkdir");
-			}
+			executeAndPrintShellCommand("mkdir -p " + fullstatedir, "mkdir");
 			continue;
 		}
 		
 		//Create a repository for this state location
 		string repos = makeStateReposPath("stateOutput:staterepospath", stateDir, thisdir, drvName, stateIdentifier);
 		executeAndPrintShellCommand("mkdir -p " + repos, "mkdir");
-		executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin");				 //TODO create as nixbld.nixbld chmod 700... can you still commit than ??
-//																								 //TODO Check if repos already exitst?
+		
+		if(IsDirectory(repos))
+			executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin");				 //TODO create as nixbld.nixbld chmod 700... can you still commit than ??
+		else
+			printMsg(lvlError, format("Repos %1% already exists, so we use that repository") % repos);
 
 		if(d.type == "interval"){
 			intervalPaths.insert(statePath);
 		}
 
-		//TODO REPLACE TRUE INTO VAR OF CREATEING DIRS BEFORE OR AFTER INSTALL
-		if(true){
-			printMsg(lvlError, format("Adding state subdir: %1% to %2% from repository %3%") % thisdir % fullstatedir % repos);
+		printMsg(lvlError, format("Adding state subdir: %1% to %2% from repository %3%") % thisdir % fullstatedir % repos);
+			
+		if(IsDirectory(fullstatedir + "/.svn/")){
 			string checkoutcommand = svnbin + " checkout file://" + repos + " " + fullstatedir;
-			executeAndPrintShellCommand(checkoutcommand, "svn");  //TODO checkout as user	
+			executeAndPrintShellCommand(checkoutcommand, "svn");  //TODO checkout as user
 		}
+		else
+			printMsg(lvlError, format("Statedir %1% already exists, so dont check out its repository again") % fullstatedir);
 	}
 	
 	//Initialize the counters for the statePaths that have an interval to 0
