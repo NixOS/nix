@@ -122,7 +122,7 @@ foreach my $expr (@exprs) {
     close DRVPATHS or exit 1;
 
     foreach my $drvPath (@drvPaths) {
-        my $target = readlink $drvPath;
+        my $target = readlink $drvPath or die "cannot read symlink `$drvPath'";
         print STDERR "store derivation is $target\n";
     }
 
@@ -134,7 +134,7 @@ foreach my $expr (@exprs) {
     close OUTPATHS or exit 1;
 
     foreach my $outPath (@outPaths) {
-        my $target = readlink $outPath;
+        my $target = readlink $outPath or die "cannot read symlink `$outPath'";
         print "$target\n";
     }
 }
