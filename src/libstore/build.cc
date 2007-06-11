@@ -1371,9 +1371,9 @@ void DerivationGoal::startBuilder()
     env["NIX_STORE"] = nixStore;
 
     /* Add all bindings specified in the derivation. */
-    for (StringPairs::iterator i = drv.env.begin();
-         i != drv.env.end(); ++i)
-        env[i->first] = i->second;
+    for (StringPairs::iterator i = drv.env.begin(); i != drv.env.end(); ++i){
+	    env[i->first] = i->second;
+    }
 
     /* Create a temporary directory where the build will take
        place. */
@@ -1382,9 +1382,14 @@ void DerivationGoal::startBuilder()
     /* Create the state directory where the component can store it's state files place */
     //TODO MOVEEEEEEEEEEE
     //We only create state dirs when state is enabled and when the dirs need to be created before the installation
-    if(drv.stateOutputs.size() != 0)
+    if(drv.stateOutputs.size() != 0){
+
+   		/* we check the recalculated state path at build time with the correct user for securiyt */
+   		checkStatePath(drv);
+    
     	if(drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
 	    	createStateDirs(drv.stateOutputDirs, drv.stateOutputs, drv.env);
+    }
 
     /* For convenience, set an environment pointing to the top build
        directory. */

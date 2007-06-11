@@ -421,6 +421,7 @@ Path queryDeriver(const Transaction & txn, const Path & storePath)
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
     Path deriver;
+    
     if (nixDB.queryString(txn, dbDerivers, storePath, deriver))
         return deriver;
     else

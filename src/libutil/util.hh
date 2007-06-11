@@ -300,6 +300,7 @@ bool FileExist(const string FileName);
 
 bool IsDirectory(const string FileName);
 
+string getCallingUserName();
 
 }
 

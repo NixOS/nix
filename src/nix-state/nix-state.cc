@@ -171,7 +171,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
 		DerivationStateOutputDir d = i->second;
 
-		string thisdir = d.path;
+		string thisdir = d.path;		//TODO CONVERT
 		
 		string fullstatedir = statePath + "/" + thisdir;
 		if(thisdir == "/")									//exception for the root dir
@@ -259,6 +259,13 @@ void run(Strings args)
 	store->addUpdatedStateDerivation("/nix/store/s6wggk924jx0gcb0l29ra4g9fxa3b4pp-hellohardcodedstateworld-1.0.drv", p2);		//
 	store->updateAllStateDerivations();
 	return;
+	string a = makeStatePathFromGolbalHash("8f3b56a9a985fce54fd88c3e95a81a4b6b11fb98da12b977aee7f278c73ad3d7-hellohardcodedstateworld-1.0-test2", "kaaz");
+	printMsg(lvlError, format("%1%") % a);
+	return;
+	*/
+	printMsg(lvlError, format("Result: \"%1%\"") % getCallingUserName());
+	return;
+	
 	/* test */
 	
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
@@ -291,7 +298,7 @@ void run(Strings args)
 		
 		--delete state?
 		
-		--
+		--user=...
 		
         */
 

@@ -351,12 +351,10 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
 			drv.stateOutputs.clear();
 			drv.stateOutputDirs.clear();
 			drv.env["statepath"] = "";
-			printMsg(lvlError, format("YES RUNTIME"));
 	    }
 	    else{										//Has NO runtime parameters		-->  Clear state parameters selectively
 	    	drvso.clearAllRuntimeParamters();
 	    	drv.stateOutputDirs.clear();
-	    	printMsg(lvlError, format("NO RUNTIME"));
 	    }
 	}
 
@@ -603,17 +601,14 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 	if(enableState && !disableState){    
 		if(runtimeStateParamters == ""){
 			string enableStateS = bool2string("true");
-			drv.stateOutputs["state"] = DerivationStateOutput("", "", "", stateIdentifier, enableStateS, "", "", "", runtimeStateParamters, false);
+			drv.stateOutputs["state"] = DerivationStateOutput("", "", "", "", stateIdentifier, enableStateS, "", "", "", runtimeStateParamters, "", false);
 		}	
 	}
         
     /* Use the masked derivation expression to compute the output
        path. */
-    
-    //TODO CLEANUP
-    Hash h = hashDerivationModulo(state, drv);
-    //printMsg(lvlError, format("USES: `%1%'") % printHash(h));
-    Path outPath = makeStorePath("output:out", h, drvName);
+    Hash componentHash = hashDerivationModulo(state, drv);
+    Path outPath = makeStorePath("output:out", componentHash, drvName);
 
     /* Construct the final derivation store expression. */
     drv.env["out"] = outPath;
@@ -623,16 +618,18 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 	//only add state when we have to to keep compitibilty with the 'old' format.
 	//We add state when it's enbaled by the keywords, and not excplicitly disabled by the user
 	if(enableState && !disableState){    
-		/* Add the state path based on the outPath */
-	    string callingUser = "wouterdb";  																	//TODO: Change into variable
-	    string componentHash = outPath;																		//hash of the component path
-	    Hash statehash = hashString(htSHA256, callingUser + componentHash);									//hash of the state path
-	    Path stateOutPath = makeStatePath("stateOutput:statepath", statehash, drvName, stateIdentifier);	//State path
+		/* Add the state path based on the outPath
+		 * 
+		 * NOTE: we do not include the username into the hash calculation of the statepath yet, multiple different users can use the same dervation 
+		 * but need different state paths. Thats why we keep a 'dummy' value e.g. global hash for everyone, and later at build time recalculate the real state path 
+		 */
+	    Path stateOutPath = makeStatePath(printHash(componentHash), drvName, stateIdentifier);		//State path
     	drv.env["statepath"] = stateOutPath;		
 
     	string enableStateS = bool2string("true");
     	string createDirsBeforeInstallS = bool2string(createDirsBeforeInstall);
-    	drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, outputHashAlgo, outputHash, stateIdentifier, enableStateS, shareState, syncState, createDirsBeforeInstallS, runtimeStateParamters);
+    	string username = getCallingUserName();
+    	drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, printHash(componentHash), outputHashAlgo, outputHash, stateIdentifier, enableStateS, shareState, syncState, createDirsBeforeInstallS, runtimeStateParamters, username);
     	
     	for(vector<DerivationStateOutputDir>::iterator i = stateDirs.begin(); i != stateDirs.end(); ++i)
     		drv.stateOutputDirs[(*i).path] = *(i);
@@ -646,14 +643,14 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 	/* Write updated (no need to rebuild) state derivations to the database, so they can be updated at build time */	
 	if(enableState && !disableState){
 		if(store->isValidPath(outPath)){									//Only add when the path is already valid
-			Path deriver = queryDeriver(noTxn, outPath);			//query the deriver		
+			Path deriver = queryDeriver(noTxn, outPath);					//query the deriver		
 			if(deriver != drvPath){
 				store->addUpdatedStateDerivation(drvPath, outPath);						
 			}
 		}
-		//TODO Also add when path is not already valid, which drv does it take at build time, the latest ... guess so .. so we dont need to add? 
+		//TODO Also add when path is not already valid, which drv does it take at build time, the latest ... guess so .. so we dont need to add?
 	}
-	
+
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store expressions, so we can't

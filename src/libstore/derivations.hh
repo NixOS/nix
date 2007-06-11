@@ -37,6 +37,7 @@ struct DerivationOutput
 struct DerivationStateOutput
 {
     Path statepath;
+    string componentHash;
     string hashAlgo;
     string hash;
     string stateIdentifier;				//the identifier
@@ -50,17 +51,21 @@ struct DerivationStateOutput
     string createDirsBeforeInstall;		//if true: creates state dirs before installation
 	string runtimeStateParamters;		//if not empty: these are the runtime parameters where state can be found (you can use $statepath here)
     
+    string username;					
+    
     DerivationStateOutput()
     {
     }
     
-    DerivationStateOutput(Path statepath, string hashAlgo, string hash, string stateIdentifier, string enabled, string shared, string synchronization, string createDirsBeforeInstall, string runtimeStateParamters, bool check=true)
+    DerivationStateOutput(Path statepath, string componentHash, string hashAlgo, string hash, string stateIdentifier, string enabled, string shared, string synchronization, string createDirsBeforeInstall, string runtimeStateParamters, string username, bool check=true)
     {
         if(check){
 	        if(shared != "none" && shared != "full" && shared != "group")
 	        	throw Error(format("shared '%1%' is not a correct type") % shared);
 	        if(synchronization != "none" && synchronization != "exclusive-lock" && synchronization != "recursive-exclusive-lock")
 	        	throw Error(format("synchronization '%1%' is not a correct type") % synchronization);
+	        if(username == "")
+	        	throw Error(format("Username cannot be empty"));
         }
         
         //TODO
@@ -68,6 +73,7 @@ struct DerivationStateOutput
         //commitBinaries
         
         this->statepath = statepath;
+        this->componentHash = componentHash;
         this->hashAlgo = hashAlgo;
         this->hash = hash;
         this->stateIdentifier = stateIdentifier;
@@ -76,6 +82,7 @@ struct DerivationStateOutput
         this->synchronization = synchronization;
         this->createDirsBeforeInstall = createDirsBeforeInstall;
         this->runtimeStateParamters = runtimeStateParamters;
+        this->username = username;
     }
     
     bool getEnabled(){
@@ -91,14 +98,16 @@ struct DerivationStateOutput
      */
     void clearAllRuntimeParamters(){
     	this->statepath = "";
+    	this->componentHash = "";
         //this->hashAlgo;						//Clear this one?
         //this->hash;							//Clear this one?
-        //this->stateIdentifier;
+        //this->stateIdentifier;				//Changes the statepath directly
         this->enabled = "";
         this->shared = "";
         this->synchronization = "";
         this->createDirsBeforeInstall = "";
         this->runtimeStateParamters = "";
+        //this->username;						//Changes the statepath directly 
     }
 };
 

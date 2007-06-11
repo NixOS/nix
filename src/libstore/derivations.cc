@@ -92,11 +92,12 @@ Derivation parseDerivation(ATerm t)
     if(withState){
 	    //parse state part
 	    for (ATermIterator i(stateOuts); i; ++i) {
-	        ATerm id, statepath, hashAlgo, hash, stateIdentifier, enabled, shared, synchronization, createDirsBeforeInstall, runtimeStateParamters;
-	        if (!matchDerivationStateOutput(*i, id, statepath, hashAlgo, hash, stateIdentifier, enabled, shared, synchronization, createDirsBeforeInstall, runtimeStateParamters))
+	        ATerm id, statepath, componentHash, hashAlgo, hash, stateIdentifier, enabled, shared, synchronization, createDirsBeforeInstall, runtimeStateParamters, username;
+	        if (!matchDerivationStateOutput(*i, id, statepath, componentHash, hashAlgo, hash, stateIdentifier, enabled, shared, synchronization, createDirsBeforeInstall, runtimeStateParamters, username))
 	            throwBadDrv(t);
 	        DerivationStateOutput stateOut;
 	        stateOut.statepath = aterm2String(statepath);
+	        stateOut.componentHash = aterm2String(componentHash);
 	        //checkPath(stateOut.path);									//should we check the statpath .... ???
 	        stateOut.hashAlgo = aterm2String(hashAlgo);
 	        stateOut.hash = aterm2String(hash);
@@ -106,6 +107,7 @@ Derivation parseDerivation(ATerm t)
 	        stateOut.synchronization = aterm2String(synchronization);
 	        stateOut.createDirsBeforeInstall = aterm2String(createDirsBeforeInstall);
 	        stateOut.runtimeStateParamters = aterm2String(runtimeStateParamters);
+	        stateOut.username = aterm2String(username);
 	        drv.stateOutputs[aterm2String(id)] = stateOut;
 	    }
 	}
@@ -182,6 +184,7 @@ ATerm unparseDerivation(const Derivation & drv)
             makeDerivationStateOutput(
                 toATerm(i->first),
                 toATerm(i->second.statepath),
+                toATerm(i->second.componentHash),
                 toATerm(i->second.hashAlgo),
                 toATerm(i->second.hash),
                 toATerm(i->second.stateIdentifier),
@@ -189,7 +192,8 @@ ATerm unparseDerivation(const Derivation & drv)
                 toATerm(i->second.shared),
                 toATerm(i->second.synchronization),
                 toATerm(i->second.createDirsBeforeInstall),
-                toATerm(i->second.runtimeStateParamters)
+                toATerm(i->second.runtimeStateParamters),
+                toATerm(i->second.username)
                 ));
     }
                 

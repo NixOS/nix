@@ -228,8 +228,11 @@ Path makeStorePath(const string & type,
 Path makeFixedOutputPath(bool recursive,
     string hashAlgo, Hash hash, string name);
 
-/* Constructs a unique store state path name. */
-Path makeStatePath(const string & type, const Hash & hash, const string & suffix, const string & stateIdentifier);
+/* TODO ... */
+Path makeStatePath(const string & componentHash, const string & suffix, const string & stateIdentifier);
+
+/* TODO ... */
+void checkStatePath(const Derivation & drv);
 
 /* Constructs a unique store state repos path name. */
 Path makeStateReposPath(const string & type, const Path statePath, const string subfolder, const string & suffix, const string & stateIdentifier);

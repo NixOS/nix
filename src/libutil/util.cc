@@ -1013,7 +1013,7 @@ string trim(const string & s) {
 
 //executes a shell command and captures and prints the output.
 
-//TODO , check if we can integrate with runProgram
+//TODO , check if we can replace!!! with runProgram  like this: string a = runProgram("whoami", true, s);
 
 void executeAndPrintShellCommand(const string & command, const string & commandName)
 {
@@ -1092,5 +1092,30 @@ bool IsDirectory(const string FileName)
     return ((my_stat.st_mode & S_IFDIR) != 0);
 }
 
+
+string getCallingUserName()
+{
+	//TODO Make this work on WINDOWS
+    /*
+    #include <windows.h>
+	   char acUserName[100];
+	   DWORD nUserName = sizeof(acUserName);
+	   if (GetUserName(acUserName, &nUserName))
+	       cout << "User name is " << acUserName << "." << endl;
+	   else
+	       cerr << "Failed to lookup user name, error code " << GetLastError() << "." << endl;
+    */
+    
+    //Linux
+    Strings empty;
+    string username = runProgram("whoami", true, empty);				//the username of the user that is trying to build the component
+																		//TODO Can and Should NOT be faked, so this is clearly unsafe ... :(
+    //Remove the \n
+    int pos = username.find("\n",0);
+	username.erase(pos,1);
+    
+    //return "root3";
+    return username;
+}
  
 }

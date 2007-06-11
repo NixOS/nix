@@ -79,23 +79,43 @@ Path makeStorePath(const string & type, const Hash & hash, const string & suffix
         + "-" + suffix;
 }
 
-Path makeStatePath(const string & type, const Hash & hash, const string & suffix, const string & stateIdentifier)
+Path makeStatePath(const string & componentHash, const string & suffix, const string & stateIdentifier)
 {
     string suffix_stateIdentifier = stateIdentifier;
     if(suffix_stateIdentifier != "")
     	suffix_stateIdentifier = "-" + suffix_stateIdentifier; 
     
+    string username = getCallingUserName();												//Can and Should NOT be faked
+    
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
-    string s = type + ":sha256:" + printHash(hash) + ":"
-        + nixStoreState + ":" + suffix + ":" + stateIdentifier;
+    string s = ":sha256:" + componentHash + ":"
+        + nixStoreState + ":" + suffix + ":" + stateIdentifier + ":" + username;
 
     checkStoreName(suffix);
     checkStoreName(stateIdentifier);
 
-    return nixStoreState + "/"
-        + printHash32(compressHash(hashString(htSHA256, s), 20))
-        + "-" + suffix + suffix_stateIdentifier;
+	return nixStoreState + "/"
+        	+ printHash32(compressHash(hashString(htSHA256, s), 20))
+        	+ "-" + suffix + suffix_stateIdentifier;
 }
+
+void checkStatePath(const Derivation & drv)
+{
+	Path drvPath = drv.stateOutputs.find("state")->second.statepath;
+
+    string componentHash = drv.stateOutputs.find("state")->second.componentHash;
+    string suffix = drv.env.find("name")->second;
+	string stateIdentifier = drv.stateOutputs.find("state")->second.stateIdentifier;
+    Path calculatedPath = makeStatePath(componentHash, suffix, stateIdentifier);
+	
+	printMsg(lvlError, format("CHECK: %1% %2%") % drvPath % calculatedPath);
+	
+	
+    if(drvPath != calculatedPath)
+    	Error(format("The statepath from the Derivation does not match the recalculated statepath, are u trying to spoof the statepath?"));
+}
+
+
 
 Path makeStateReposPath(const string & type, const Path statePath, const string subfolder, const string & suffix, const string & stateIdentifier)
 {

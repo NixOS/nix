@@ -6,7 +6,7 @@ Derive | ATermList ATermList ATermList ATermList ATermList string string ATermLi
 | string string | ATerm | EnvBinding |
 | string ATermList | ATerm | DerivationInput |
 | string string string string | ATerm | DerivationOutput |
-| string string string string string string string string string string | ATerm | DerivationStateOutput |
+| string string string string string string string string string string string string | ATerm | DerivationStateOutput |
 | string string string | ATerm | DerivationStateOutputDir |
 
 #We use DeriveWithOutState to create derivations that dont use state, and thus dont have the stateDerivationStateOutput and DerivationStateOutputDir in their derivation
