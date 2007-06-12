@@ -1065,7 +1065,7 @@ static string makeValidityRegistration(const PathSet & paths,
     for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i) {
         s += *i + "\n";
 
-        Path deriver = showDerivers ? queryDeriver(noTxn, *i) : "";
+        Path deriver = showDerivers ? store->queryDeriver(*i) : "";
         s += deriver + "\n";
 
         PathSet references;

@@ -77,6 +77,10 @@ public:
     virtual void queryReferrers(const Path & path,
         PathSet & referrers) = 0;
 
+    /* Query the deriver of a store path.  Return the empty string if
+       no deriver has been set. */
+    virtual Path queryDeriver(const Path & path) = 0;
+
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
        If `fixed' is true, then the output of a fixed-output

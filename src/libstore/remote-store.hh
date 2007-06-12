@@ -37,6 +37,8 @@ public:
 
     void queryReferrers(const Path & path, PathSet & referrers);
 
+    Path queryDeriver(const Path & path);
+    
     Path addToStore(const Path & srcPath, bool fixed = false,
         bool recursive = false, string hashAlgo = "",
         PathFilter & filter = defaultPathFilter);

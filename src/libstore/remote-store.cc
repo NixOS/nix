@@ -212,6 +212,15 @@ void RemoteStore::queryReferrers(const Path & path,
 }
 
 
+Path RemoteStore::queryDeriver(const Path & path)
+{
+    writeInt(wopQueryDeriver, to);
+    writeString(path, to);
+    processStderr();
+    return readStorePath(from);
+}
+
+
 Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
     bool recursive, string hashAlgo, PathFilter & filter)
 {
@@ -224,8 +233,7 @@ Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
     writeString(hashAlgo, to);
     dumpPath(srcPath, to, filter);
     processStderr();
-    Path path = readStorePath(from);
-    return path;
+    return readStorePath(from);
 }
 
 
@@ -238,8 +246,7 @@ Path RemoteStore::addTextToStore(const string & suffix, const string & s,
     writeStringSet(references, to);
     
     processStderr();
-    Path path = readStorePath(from);
-    return path;
+    return readStorePath(from);
 }
 
 
@@ -261,8 +268,7 @@ Path RemoteStore::importPath(bool requireSignature, Source & source)
        anyway. */
     
     processStderr(0, &source);
-    Path path = readStorePath(from);
-    return path;
+    return readStorePath(from);
 }
 
 

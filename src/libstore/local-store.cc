@@ -399,7 +399,7 @@ void setDeriver(const Transaction & txn, const Path & storePath,
 }
 
 
-Path queryDeriver(const Transaction & txn, const Path & storePath)
+static Path queryDeriver(const Transaction & txn, const Path & storePath)
 {
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
@@ -408,6 +408,12 @@ Path queryDeriver(const Transaction & txn, const Path & storePath)
         return deriver;
     else
         return "";
+}
+
+
+Path LocalStore::queryDeriver(const Path & path)
+{
+    return nix::queryDeriver(noTxn, path);
 }
 
 
@@ -756,7 +762,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
     nix::queryReferences(txn, path, references);
     writeStringSet(references, hashAndWriteSink);
 
-    Path deriver = queryDeriver(txn, path);
+    Path deriver = nix::queryDeriver(txn, path);
     writeString(deriver, hashAndWriteSink);
 
     if (sign) {

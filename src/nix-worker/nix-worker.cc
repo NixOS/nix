@@ -277,6 +277,15 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         break;
     }
 
+    case wopQueryDeriver: {
+        Path path = readStorePath(from);
+        startWork();
+        Path deriver = store->queryDeriver(path);
+        stopWork();
+        writeString(deriver, to);
+        break;
+    }
+
     case wopAddToStore: {
         /* !!! uberquick hack */
         string baseName = readString(from);

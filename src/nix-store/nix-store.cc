@@ -46,7 +46,7 @@ static Path fixPath(Path path)
 static Path useDeriver(Path path)
 {       
     if (!isDerivation(path)) {
-        path = queryDeriver(noTxn, path);
+        path = store->queryDeriver(path);
         if (path == "")
             throw Error(format("deriver of path `%1%' is not known") % path);
     }
@@ -330,7 +330,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
             {
-                Path deriver = queryDeriver(noTxn, fixPath(*i));
+                Path deriver = store->queryDeriver(fixPath(*i));
                 cout << format("%1%\n") %
                     (deriver == "" ? "unknown-deriver" : deriver);
             }

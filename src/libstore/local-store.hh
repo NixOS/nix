@@ -49,6 +49,8 @@ public:
 
     void queryReferrers(const Path & path, PathSet & referrers);
 
+    Path queryDeriver(const Path & path);
+    
     Path addToStore(const Path & srcPath, bool fixed = false,
         bool recursive = false, string hashAlgo = "",
         PathFilter & filter = defaultPathFilter);
@@ -135,10 +137,6 @@ void setReferences(const Transaction & txn, const Path & path,
 /* Sets the deriver of a store path.  Use with care! */
 void setDeriver(const Transaction & txn, const Path & path,
     const Path & deriver);
-
-/* Query the deriver of a store path.  Return the empty string if no
-   deriver has been set. */
-Path queryDeriver(const Transaction & txn, const Path & path);
 
 /* Delete a value from the nixStore directory. */
 void deleteFromStore(const Path & path, unsigned long long & bytesFreed);
