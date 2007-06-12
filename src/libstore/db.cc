@@ -203,9 +203,9 @@ void Database::open2(const string & path, bool removeOldEnv)
        run db_recover on the database to remove the existing DB
        environment (since changes only take effect on new
        environments). */
-    env->set_lk_max_locks(10000);
-    env->set_lk_max_lockers(10000);
-    env->set_lk_max_objects(10000);
+    env->set_lk_max_locks(100000);
+    env->set_lk_max_lockers(100000);
+    env->set_lk_max_objects(100000);
     env->set_lk_detect(DB_LOCK_DEFAULT);
     
     /* Dangerous, probably, but from the docs it *seems* that BDB

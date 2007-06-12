@@ -189,16 +189,7 @@ public:
 	virtual vector<int> getStatePathsInterval(const PathSet & statePaths) = 0;
 	
 	/* TODO */	
-	virtual Derivation getStateDerivation(const Path & path) = 0;
-
-	/* TODO */	
 	virtual PathSet getStateReferencesClosure(const Path & path) = 0;
-	
-	/* TODO */	
-	virtual void addUpdatedStateDerivation(const Path & newdrv, const Path & storepath) = 0;
-
-	/* TODO */	
-	virtual void updateStateDerivation(const Transaction & txn, const Path & storepath) = 0;
 	
 	/* TODO */
 	virtual void updateAllStateDerivations() = 0;

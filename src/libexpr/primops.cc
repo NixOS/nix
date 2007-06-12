@@ -639,7 +639,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 
     printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'") % drvName % drvPath);
 
-	/* Write updated (no need to rebuild) state derivations to the database, so they can be updated at build time */	
+	/* Write updated (no need to rebuild) state derivations to the database, so they can be updated at build time	
 	if(enableState && !disableState){
 		if(store->isValidPath(outPath)){									//Only add when the path is already valid
 			Path deriver = queryDeriver(noTxn, outPath);					//query the deriver		
@@ -647,9 +647,8 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 				store->addUpdatedStateDerivation(drvPath, outPath);						
 			}
 		}
-		//TODO Also add when path is not already valid, which drv does it take at build time, the latest ... guess so .. so we dont need to add?
 	}
-
+	*/
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store expressions, so we can't

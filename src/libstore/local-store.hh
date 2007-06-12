@@ -80,14 +80,10 @@ public:
 	
 	vector<int> getStatePathsInterval(const PathSet & statePaths);
 	
-	Derivation getStateDerivation(const Path & path);
-	
 	PathSet getStateReferencesClosure(const Path & path);
 	
 	void addUpdatedStateDerivation(const Path & newdrv, const Path & storepath);
 
-	void updateStateDerivation(const Transaction & txn, const Path & storepath);
-	
 	void updateAllStateDerivations();
 	
 };
@@ -154,6 +150,10 @@ void setDeriver(const Transaction & txn, const Path & path,
 /* Query the deriver of a store path.  Return the empty string if no
    deriver has been set. */
 Path queryDeriver(const Transaction & txn, const Path & path);
+
+/* Query the derivers of a state-store path. Gives an error (TODO?) if no
+   deriver has been set. */
+PathSet queryDerivers(const Transaction & txn, const Path & storePath, const string & identifier, const string & user);
 
 /* Delete a value from the nixStore directory. */
 void deleteFromStore(const Path & path, unsigned long long & bytesFreed);

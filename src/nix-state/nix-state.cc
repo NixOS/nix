@@ -57,18 +57,21 @@ Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & co
 		opArgs.pop_front();
 		stateIdentifier = opArgs.front();	
     }
-
 	string username = getCallingUserName();  
 
 	//printMsg(lvlError, format("%1% - %2% - %3% - %4% - %5%") % componentPath % statePath % stateIdentifier % binary % username);
-	
     
-    //TODO check if this identifier exists !!!!!!!!!!!
+    PathSet drvs = queryDerivers(noTxn, componentPath, stateIdentifier, username);
+    if(drvs.size() != 1)
+    	throw UsageError("You must specify the full! binary path");
+    Derivation drv;
+    for (PathSet::iterator i = drvs.begin(); i != drvs.end(); ++i)		//ugly workaround for drvs[0].
+     	drv = derivationFromPath(*i);
+     
+    queryDeriver(noTxn, "");
     
-    
-    Derivation drv = store->getStateDerivation(componentPath);
     DerivationStateOutputs stateOutputs = drv.stateOutputs; 
-    statePath = stateOutputs.find("state")->second.statepath;				//TODO STATEPATH BASED ON USERNAME AND INDENTIFIER !!!!!!!!!!!!!!!
+    statePath = stateOutputs.find("state")->second.statepath;
 	return drv;
 }
 
@@ -263,10 +266,18 @@ void run(Strings args)
 	store->addUpdatedStateDerivation("/nix/store/s6wggk924jx0gcb0l29ra4g9fxa3b4pp-hellohardcodedstateworld-1.0.drv", p2);		//
 	store->updateAllStateDerivations();
 	return;
+	
 	string a = makeStatePathFromGolbalHash("8f3b56a9a985fce54fd88c3e95a81a4b6b11fb98da12b977aee7f278c73ad3d7-hellohardcodedstateworld-1.0-test2", "kaaz");
 	printMsg(lvlError, format("%1%") % a);
 	return;
+	
 	printMsg(lvlError, format("Result: \"%1%\"") % getCallingUserName());
+	return;
+	*/
+	store = openStore();
+	//store->addUpdatedStateDerivation("/nix/store/bk4p7378ndm1p5qdr6a99wgxbiklilxy-hellohardcodedstateworld-1.0.drv", "/nix/store/vjijdazrn2jyzyk9sqwrl8fjq0qsmi8y-hellohardcodedstateworld-1.0");
+	
+	store->updateAllStateDerivations();
 	return;
 	
 	/* test */

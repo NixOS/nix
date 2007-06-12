@@ -82,11 +82,6 @@ static TableId dbDerivers = 0;
 */
 static TableId dbStateCounters = 0;
 
-/* Path
- 
-  */
-static TableId dbUpdatedDerivations = 0;
-
 
 bool Substitute::operator == (const Substitute & sub) const
 {
@@ -152,7 +147,6 @@ LocalStore::LocalStore(bool reserveSpace)
     dbSubstitutes = nixDB.openTable("substitutes");
     dbDerivers = nixDB.openTable("derivers");
     dbStateCounters = nixDB.openTable("statecounters");
-    dbUpdatedDerivations = nixDB.openTable("updatedDerivations");
 
     int curSchema = 0;
     Path schemaFN = nixDBPath + "/schema";
@@ -404,19 +398,43 @@ void LocalStore::queryReferrers(const Path & storePath,
 }
 
 
-void setDeriver(const Transaction & txn, const Path & storePath,
-    const Path & deriver)
+void setDeriver(const Transaction & txn, const Path & storePath, const Path & deriver)
 {
     assertStorePath(storePath);
     if (deriver == "") return;
     assertStorePath(deriver);
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
-    nixDB.setString(txn, dbDerivers, storePath, deriver);
+    
+    Derivation drv = derivationFromPath(deriver);		//Error if its a state component
+    if (drv.outputs.size() != 0)
+    	throw Error(format("path `%1%' is a state Path and its derivers need to be set by setDerivers") % storePath);
+    else
+	    nixDB.setString(txn, dbDerivers, storePath, deriver);
 }
 
 
-Path queryDeriver(const Transaction & txn, const Path & storePath)
+void setDerivers(const Transaction & txn, const Path & storePath, const PathSet & derivers)
+{
+	assertStorePath(storePath);
+    if (!isRealisablePath(txn, storePath))
+        throw Error(format("path `%1%' is not valid") % storePath);
+
+	Strings data;    	
+	for (PathSet::iterator i = derivers.begin(); i != derivers.end(); ++i){
+	   	string deriver = *i;
+	    assertStorePath(deriver);
+	   	Derivation drv = derivationFromPath(deriver);		
+    	if (drv.outputs.size() == 0)						//Error if its not a state component
+    		throw Error(format("path `%1%' is a NOT state Path at setDerivers") % storePath);
+       	data.push_back(deriver);
+	}
+	    	
+	nixDB.setStrings(txn, dbDerivers, storePath, data);					//update the db.
+}
+
+
+Path queryDeriver(const Transaction & txn, const Path & storePath)  
 {
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
@@ -426,6 +444,40 @@ Path queryDeriver(const Transaction & txn, const Path & storePath)
         return deriver;
     else
         return "";
+}
+
+//A '*' as argument stands for all identifiers or all users
+PathSet queryDerivers(const Transaction & txn, const Path & storePath, const string & identifier, const string & user)
+{
+	if (!isRealisablePath(txn, storePath))
+        throw Error(format("path `%1%' is not valid") % storePath);
+	
+	if(identifier == "" || user == "")
+		throw Error(format("The identifer or user argument is empty, use queryDeriver(...) for non-state components"));  
+	
+	Strings alldata;    	
+    nixDB.queryStrings(txn, dbDerivers, storePath, alldata);				//get all current derivers
+
+	PathSet filtereddata;
+	for (Strings::iterator i = alldata.begin(); i != alldata.end(); ++i) {
+		
+		string derivationpath = (*i);
+		Derivation drv = derivationFromPath(derivationpath);
+		
+		if (drv.outputs.size() != 1)
+			throw Error(format("The call queryDerivers with storepath %1% is not a statePath") % storePath);
+		
+		string getIdentifier = drv.stateOutputs.find("state")->second.stateIdentifier;
+		string getUser = drv.stateOutputs.find("state")->second.username;
+		
+		if( (getIdentifier == identifier || identifier == "*") && (getUser == user || user == "*") )
+			filtereddata.insert(derivationpath);
+	}
+	
+	if(filtereddata.size() == 0)
+		throw Error(format("There are no matching derivations with identifier %2% and user %3% for %1%") % storePath % identifier % user);
+	
+	return filtereddata;
 }
 
 
@@ -1170,31 +1222,7 @@ vector<int> LocalStore::getStatePathsInterval(const PathSet & statePaths)
     return nix::getStatePathsInterval(statePaths);
 }
 
-//TODO INCLUDE USERNAME + IDENTIFIER!!!!!
-Derivation getStateDerivation(const Path & path)
-{
-	Transaction txn(nixDB);			//TODO should u do a transaction here? ... this might delay the process ...
-	
-	string data;
-
-    //Get derivations of references    
-    nixDB.queryString(txn, dbDerivers, path, data);
-    //printMsg(lvlError, format("DERIVERS %1%") % data);
-    
-    txn.commit();
-    
-    Derivation drv = derivationFromPath(data);
-    if(drv.stateOutputs.size() == 0)
-   		throw Error(format("This path is not a state derivation: `%1%'") % path);
-    
-    return drv;
-}
-
-Derivation LocalStore::getStateDerivation(const Path & path)
-{
-    return nix::getStateDerivation(path);
-}
-
+ 
 //TODO direct or all recursive parameter
 //TODO check if these are state components
 PathSet getStateReferencesClosure(const Path & path)
@@ -1224,51 +1252,51 @@ PathSet LocalStore::getStateReferencesClosure(const Path & path)
 }
 
 
-void addUpdatedStateDerivation(const Path & newdrv, const Path & storepath)
+//Merges a new .... into the list TODO
+//This is all about one store path
+//We assume newdrv is the newest
+PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, const PathSet drvs)
 {
-	Transaction txn(nixDB);
+	PathSet newdrvs;
 
-	//Check wheter were not duplicating an entry, if so, than we wont have to do anything
-	//TODO
-	if(false){
+	Derivation drv = derivationFromPath(newdrv);
+	string identifier = drv.stateOutputs.find("state")->second.stateIdentifier;
+	string user = drv.stateOutputs.find("state")->second.username;
 	
-		return;	
-	}
-
-	Strings data;
-	data.push_back(storepath);
-	time_t timestamp;
-  	time (&timestamp);
-  	string timestamp_s = time_t2string(timestamp);
-	printMsg(lvlError, format("Adding new drv (%1%) to replace drv of old component (%2%) with timestamp: %3%") % newdrv % storepath % timestamp_s);
-	data.push_back(timestamp_s);										//create a timestamp to remember which one was last inserted
-    nixDB.setStrings(txn, dbUpdatedDerivations, newdrv, data);
+	for (PathSet::iterator i = drvs.begin(); i != drvs.end(); ++i)	//Check if we need to remove old drvs
+    {
+    	Path drv = *i;
+    	Derivation getdrv = derivationFromPath(drv);
+    	string getIdentifier = getdrv.stateOutputs.find("state")->second.stateIdentifier;
+		string getUser = getdrv.stateOutputs.find("state")->second.username;
+		
+		if( !(identifier == getIdentifier && getUser == user) )		//only insert if it doenst already exist
+			newdrvs.insert(drv);
+    }
     
-	txn.commit();		
-}
-
-void LocalStore::addUpdatedStateDerivation(const Path & newdrv, const Path & storepath)
-{
-	nix::addUpdatedStateDerivation(newdrv, storepath);
+    newdrvs.insert(newdrv);
+    return newdrvs;
 }
 
 //TODO INCLUDE USERNAME + IDENTIFIER, the can be multiple derivations for the same component
+//TODO add mergeNewDerivationIntoList
 void updateAllStateDerivations()		  
 {
+	/*
 	Transaction txn(nixDB);
-	
+
+	// Filter out all decrepated derivations, e.g. with a decrepated timestamp /	
 	Strings unique_paths;
-	
 	Strings keys;
     nixDB.enumTable(txn, dbUpdatedDerivations, keys);
     for (Strings::iterator i = keys.begin(); i != keys.end(); ++i)
     {
 		string drv_key = *i;	//the key is the derivation
     	Strings data;
+		
 		nixDB.queryStrings(txn, dbUpdatedDerivations, drv_key, data);
 	    string path = data.front();
     	bool exists = false;
-    	 
     	for (Strings::iterator j = unique_paths.begin(); j != unique_paths.end(); ++j)
     	{
 			string unique_path = *j;
@@ -1280,15 +1308,70 @@ void updateAllStateDerivations()
     	if(!exists)
     		unique_paths.push_back(path);
     }
-	
+    
+    
+    
+	// Now we merge the two sets of: storepath -> [derivations] together into the db /
 	for (Strings::iterator i = unique_paths.begin(); i != unique_paths.end(); ++i)
     {
-    	string path = *i;
-    	//printMsg(lvlError, format("Unique: %1%") % path);
-    	store->updateStateDerivation(txn, path);				//TODO replace store->
+    	string storepath = *i;
+    	printMsg(lvlError, format("Unique: %1%") % storepath);
+    	
+    	
+    	Path drvPath = queryDeriver(txn, storepath);
+		Path originalDerivation = drvPath;
+		Path newDerivation = drvPath;					//the new drv path first equals the old one until a new one is found 
+		int timestamp = 0;	
+		
+	    //Get the (multiple) derivations of references    
+		Strings keys;
+	    nixDB.enumTable(txn, dbUpdatedDerivations, keys);
+	    for (Strings::iterator i = keys.begin(); i != keys.end(); ++i)
+	    {
+			string drv_key = *i;	//the key is the derivation
+	
+			Strings data;
+			nixDB.queryStrings(txn, dbUpdatedDerivations, drv_key, data);
+		    string getstorepath = data.front();
+		    data.pop_front();
+		    string gettimestamp =  data.front();
+		    
+		    if(storepath == getstorepath){
+		    	
+		    	int gettimestamp_i;
+		    	string2Int(gettimestamp, gettimestamp_i);
+		    	
+		    	if(gettimestamp_i == timestamp)
+		    		throw Error(format("Error! Multiple changes at store path %4% at the same time: derivations: `%1%' and `%2%' with timestamp `%3%'") % newDerivation % drv_key % timestamp % storepath);
+		    	
+		    	if(timestamp == 0 || gettimestamp_i > timestamp){		//we choose the new derivation as the latest submitted derivation
+		    		//printMsg(lvlError, format("Replacing at store path %4% the old drv (%1%) with new drv (%2%) with timestamp: %3%") % newDerivation % drv_key % gettimestamp_i % storepath);
+		    		newDerivation = drv_key;
+		    		timestamp = gettimestamp_i;
+		    	}
+		    	
+		    	//Always Remove the old updatelink in the dbUpdatedDerivations
+		    	nixDB.delPair(txn, dbUpdatedDerivations, drv_key);
+		    } 
+		}
+		
+		if(originalDerivation != newDerivation)		//only update if neccecary
+		{
+			//Replace the old deriver link in the derivers database (TODO, maybe delete old deriver path????????)
+			setDeriver(txn, storepath, newDerivation);	
+						
+			//Call the stateUpdate function for the new derivation? Yes since this function is called at build time
+			printMsg(lvlError, format("Calling new state drv %1% for storepath %2%") % newDerivation % storepath);
+			//TODO check wheter we update before or after ??
+			//TODO
+		}
+		
+    	
     }
     
+    
     txn.commit();
+    */
 }
 
 void LocalStore::updateAllStateDerivations()
@@ -1296,62 +1379,6 @@ void LocalStore::updateAllStateDerivations()
 	nix::updateAllStateDerivations();
 }
 
-//TODO INCLUDE USERNAME + IDENTIFIER, the can be multiple derivations for the same component
-void updateStateDerivation(const Transaction & txn, const Path & storepath)		  
-{
-	Path drvPath = queryDeriver(txn, storepath);
-	Path originalDerivation = drvPath;
-	Path newDerivation = drvPath;					//the new drv path first equals the old one until a new one is found 
-	int timestamp = 0;	
-	
-    //Get the (multiple) derivations of references    
-	Strings keys;
-    nixDB.enumTable(txn, dbUpdatedDerivations, keys);
-    for (Strings::iterator i = keys.begin(); i != keys.end(); ++i)
-    {
-		string drv_key = *i;	//the key is the derivation
-
-		Strings data;
-		nixDB.queryStrings(txn, dbUpdatedDerivations, drv_key, data);
-	    string getstorepath = data.front();
-	    data.pop_front();
-	    string gettimestamp =  data.front();
-	    
-	    if(storepath == getstorepath){
-	    	
-	    	int gettimestamp_i;
-	    	string2Int(gettimestamp, gettimestamp_i);
-	    	
-	    	if(gettimestamp_i == timestamp)
-	    		throw Error(format("Error! Multiple changes at store path %4% at the same time: derivations: `%1%' and `%2%' with timestamp `%3%'") % newDerivation % drv_key % timestamp % storepath);
-	    	
-	    	if(timestamp == 0 || gettimestamp_i > timestamp){		//we choose the new derivation as the latest submitted derivation
-	    		//printMsg(lvlError, format("Replacing at store path %4% the old drv (%1%) with new drv (%2%) with timestamp: %3%") % newDerivation % drv_key % gettimestamp_i % storepath);
-	    		newDerivation = drv_key;
-	    		timestamp = gettimestamp_i;
-	    	}
-	    	
-	    	//Always Remove the old updatelink in the dbUpdatedDerivations
-	    	nixDB.delPair(txn, dbUpdatedDerivations, drv_key);
-	    } 
-	}
-	
-	if(originalDerivation != newDerivation)		//only update if neccecary
-	{
-		//Replace the old deriver link in the derivers database (TODO, maybe delete old deriver path????????)
-		setDeriver(txn, storepath, newDerivation);	
-					
-		//Call the stateUpdate function for the new derivation? Yes since this function is called at build time
-		printMsg(lvlError, format("Calling new state drv %1% for storepath %2%") % newDerivation % storepath);
-		//TODO check wheter we update before or after ??
-		//TODO
-	}
-}
-
-void LocalStore::updateStateDerivation(const Transaction & txn, const Path & storepath)
-{
-	nix::updateStateDerivation(txn, storepath);
-}
 
 
 /* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */

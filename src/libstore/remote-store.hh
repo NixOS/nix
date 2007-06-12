@@ -68,14 +68,8 @@ public:
 	
 	vector<int> getStatePathsInterval(const PathSet & statePaths);
 	
-	Derivation getStateDerivation(const Path & path);
-	
 	PathSet getStateReferencesClosure(const Path & path);
-	
-	void addUpdatedStateDerivation(const Path & newdrv, const Path & storepath);
 
-	void updateStateDerivation(const Transaction & txn, const Path & storepath);
-	
 	void updateAllStateDerivations();
 	
     

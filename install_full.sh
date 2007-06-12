@@ -4,6 +4,7 @@ export nixstatepath=/nixstate/nix
 export ACLOCAL_PATH=/root/.nix-profile/share/aclocal
 
 if [ "$1" = "full" ]; then
+  nix-env-all-pkgs.sh -i gcc
   nix-env-all-pkgs.sh -i gnum4
   nix-env-all-pkgs.sh -i autoconf
   nix-env-all-pkgs.sh -i automake

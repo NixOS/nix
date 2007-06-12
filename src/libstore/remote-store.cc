@@ -389,29 +389,10 @@ vector<int> RemoteStore::getStatePathsInterval(const PathSet & statePaths)
 }
 
 //TODO
-Derivation RemoteStore::getStateDerivation(const Path & path)
-{
-	Derivation d;
-	return d;
-}
-	
-//TODO
 PathSet RemoteStore::getStateReferencesClosure(const Path & path)
 {
 	PathSet empty;
 	return empty;
-}
-
-//TODO
-void RemoteStore::addUpdatedStateDerivation(const Path & newdrv, const Path & storepath)
-{
-	
-}
-
-//TODO
-void RemoteStore::updateStateDerivation(const Transaction & txn, const Path & storepath)
-{
-	
 }
 
 //TODO
