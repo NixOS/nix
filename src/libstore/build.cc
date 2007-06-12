@@ -775,9 +775,6 @@ void DerivationGoal::haveDerivation()
 
     /* If they are all valid, then we're done. */
     if (invalidOutputs.size() == 0) {
-        
-        printMsg(lvlError, format("Check State VALIDITY BEFORE: `%1%'") % drvPath);
-        
         amDone(ecSuccess);
         return;
     }

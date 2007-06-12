@@ -601,7 +601,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 	if(enableState && !disableState){    
 		if(runtimeStateParamters == ""){
 			string enableStateS = bool2string("true");
-			drv.stateOutputs["state"] = DerivationStateOutput("", "", "", "", stateIdentifier, enableStateS, "", "", "", runtimeStateParamters, "", false);
+			drv.stateOutputs["state"] = DerivationStateOutput("", "", "", "", stateIdentifier, enableStateS, "", "", "", runtimeStateParamters, getCallingUserName(), false);
 		}	
 	}
         
@@ -628,8 +628,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 
     	string enableStateS = bool2string("true");
     	string createDirsBeforeInstallS = bool2string(createDirsBeforeInstall);
-    	string username = getCallingUserName();
-    	drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, printHash(componentHash), outputHashAlgo, outputHash, stateIdentifier, enableStateS, shareState, syncState, createDirsBeforeInstallS, runtimeStateParamters, username);
+    	drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, printHash(componentHash), outputHashAlgo, outputHash, stateIdentifier, enableStateS, shareState, syncState, createDirsBeforeInstallS, runtimeStateParamters, getCallingUserName());
     	
     	for(vector<DerivationStateOutputDir>::iterator i = stateDirs.begin(); i != stateDirs.end(); ++i)
     		drv.stateOutputDirs[(*i).path] = *(i);

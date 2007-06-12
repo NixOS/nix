@@ -49,7 +49,6 @@ Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & co
     binary = fullPath.substr(pos + nixStore.size() + 1, fullPath.size());
 
     //TODO REAL CHECK for validity of componentPath ... ?
-    //printMsg(lvlError, format("%1% - %2% - %3% - %4%") % componentPath % statePath % stateIdentifier % binary);
     if(componentPath == "/nix/store")
  		 throw UsageError("You must specify the full! binary path");
         
@@ -58,13 +57,18 @@ Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & co
 		opArgs.pop_front();
 		stateIdentifier = opArgs.front();	
     }
+
+	string username = getCallingUserName();  
+
+	//printMsg(lvlError, format("%1% - %2% - %3% - %4% - %5%") % componentPath % statePath % stateIdentifier % binary % username);
+	
     
     //TODO check if this identifier exists !!!!!!!!!!!
     
     
     Derivation drv = store->getStateDerivation(componentPath);
     DerivationStateOutputs stateOutputs = drv.stateOutputs; 
-    statePath = stateOutputs.find("state")->second.statepath;
+    statePath = stateOutputs.find("state")->second.statepath;				//TODO STATEPATH BASED ON USERNAME AND INDENTIFIER !!!!!!!!!!!!!!!
 	return drv;
 }
 
@@ -262,7 +266,6 @@ void run(Strings args)
 	string a = makeStatePathFromGolbalHash("8f3b56a9a985fce54fd88c3e95a81a4b6b11fb98da12b977aee7f278c73ad3d7-hellohardcodedstateworld-1.0-test2", "kaaz");
 	printMsg(lvlError, format("%1%") % a);
 	return;
-	*/
 	printMsg(lvlError, format("Result: \"%1%\"") % getCallingUserName());
 	return;
 	

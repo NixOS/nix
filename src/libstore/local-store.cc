@@ -1170,7 +1170,7 @@ vector<int> LocalStore::getStatePathsInterval(const PathSet & statePaths)
     return nix::getStatePathsInterval(statePaths);
 }
 
-
+//TODO INCLUDE USERNAME + IDENTIFIER!!!!!
 Derivation getStateDerivation(const Path & path)
 {
 	Transaction txn(nixDB);			//TODO should u do a transaction here? ... this might delay the process ...
@@ -1252,6 +1252,7 @@ void LocalStore::addUpdatedStateDerivation(const Path & newdrv, const Path & sto
 	nix::addUpdatedStateDerivation(newdrv, storepath);
 }
 
+//TODO INCLUDE USERNAME + IDENTIFIER, the can be multiple derivations for the same component
 void updateAllStateDerivations()		  
 {
 	Transaction txn(nixDB);
@@ -1295,7 +1296,7 @@ void LocalStore::updateAllStateDerivations()
 	nix::updateAllStateDerivations();
 }
 
-
+//TODO INCLUDE USERNAME + IDENTIFIER, the can be multiple derivations for the same component
 void updateStateDerivation(const Transaction & txn, const Path & storepath)		  
 {
 	Path drvPath = queryDeriver(txn, storepath);
