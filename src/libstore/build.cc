@@ -2480,6 +2480,8 @@ void LocalStore::buildDerivations(const PathSet & drvPaths)
         format("building %1%") % showPaths(drvPaths));
 
 	//Just before we build, we resolve the multiple derivations linked to one store path issue, by choosing the latest derivation
+	
+	printMsg(lvlError, format("updateAllStateDerivations %1%") % showPaths(drvPaths));
 	store->updateAllStateDerivations();
 
     Worker worker;

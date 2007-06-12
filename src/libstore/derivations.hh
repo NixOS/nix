@@ -57,6 +57,7 @@ struct DerivationStateOutput
     {
     }
     
+    //TODO add const ??
     DerivationStateOutput(Path statepath, string componentHash, string hashAlgo, string hash, string stateIdentifier, string enabled, string shared, string synchronization, string createDirsBeforeInstall, string runtimeStateParamters, string username, bool check=true)
     {
         if(check){

@@ -406,27 +406,42 @@ void setDeriver(const Transaction & txn, const Path & storePath, const Path & de
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
     
-    Derivation drv = derivationFromPath(deriver);		//Error if its a state component
+    Derivation drv = derivationFromPath(deriver);		//Redirect if its a state component
     if (drv.outputs.size() != 0)
-    	throw Error(format("path `%1%' is a state Path and its derivers need to be set by setDerivers") % storePath);
+    	addStateDeriver(txn, storePath, deriver);		//TODO remove store->
     else
 	    nixDB.setString(txn, dbDerivers, storePath, deriver);
 }
 
 
-void setDerivers(const Transaction & txn, const Path & storePath, const PathSet & derivers)
+void addStateDeriver(const Transaction & txn, const Path & storePath, const Path & deriver)
 {
+	printMsg(lvlError, format("Adding State Derivers into DB %1%") % deriver);
+	
 	assertStorePath(storePath);
+	if (deriver == "") return;
+	assertStorePath(deriver);
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
 
+	Derivation drv = derivationFromPath(deriver);
+	string identifier = drv.stateOutputs.find("state")->second.stateIdentifier;
+	string user = drv.stateOutputs.find("state")->second.username;
+		
+	PathSet currentDerivers = queryDerivers(txn, storePath, identifier, user); 
+	PathSet updatedDerivers = mergeNewDerivationIntoList(storePath, deriver, currentDerivers, true);
+
 	Strings data;    	
-	for (PathSet::iterator i = derivers.begin(); i != derivers.end(); ++i){
+	for (PathSet::iterator i = updatedDerivers.begin(); i != updatedDerivers.end(); ++i){
 	   	string deriver = *i;
+	    
+	    //TODO Remove obsolete check
 	    assertStorePath(deriver);
 	   	Derivation drv = derivationFromPath(deriver);		
     	if (drv.outputs.size() == 0)						//Error if its not a state component
-    		throw Error(format("path `%1%' is a NOT state Path at setDerivers") % storePath);
+    		throw Error(format("path `%1%' is a NOT state Path at addStateDeriver") % storePath);
+       	//TODO Remove obsolete check
+       	
        	data.push_back(deriver);
 	}
 	    	
@@ -440,7 +455,14 @@ Path queryDeriver(const Transaction & txn, const Path & storePath)
         throw Error(format("path `%1%' is not valid") % storePath);
     Path deriver;
     
-    if (nixDB.queryString(txn, dbDerivers, storePath, deriver))
+    
+    bool b = nixDB.queryString(txn, dbDerivers, storePath, deriver);
+    
+    Derivation drv = derivationFromPath(deriver);		//Redirect if its a state component
+    if (drv.outputs.size() != 0)
+    	throw Error(format("This deriver `%1%' is a state deriver, u should use queryDerivers instead of queryDeriver") % deriver);
+    	    
+    if (b)
         return deriver;
     else
         return "";
@@ -473,9 +495,6 @@ PathSet queryDerivers(const Transaction & txn, const Path & storePath, const str
 		if( (getIdentifier == identifier || identifier == "*") && (getUser == user || user == "*") )
 			filtereddata.insert(derivationpath);
 	}
-	
-	if(filtereddata.size() == 0)
-		throw Error(format("There are no matching derivations with identifier %2% and user %3% for %1%") % storePath % identifier % user);
 	
 	return filtereddata;
 }
@@ -1255,7 +1274,7 @@ PathSet LocalStore::getStateReferencesClosure(const Path & path)
 //Merges a new .... into the list TODO
 //This is all about one store path
 //We assume newdrv is the newest
-PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, const PathSet drvs)
+PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, const PathSet drvs, bool deleteDrvs)
 {
 	PathSet newdrvs;
 
@@ -1272,6 +1291,12 @@ PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, 
 		
 		if( !(identifier == getIdentifier && getUser == user) )		//only insert if it doenst already exist
 			newdrvs.insert(drv);
+		else{
+			if(deleteDrvs){
+				printMsg(lvlError, format("Deleting decrepated state derivation: %1%") % drv);
+				deletePath(drv);			//Deletes the DRV from DISK!
+			}
+		}
     }
     
     newdrvs.insert(newdrv);
@@ -1282,6 +1307,9 @@ PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, 
 //TODO add mergeNewDerivationIntoList
 void updateAllStateDerivations()		  
 {
+	
+	//call AddStateDerivation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	
 	/*
 	Transaction txn(nixDB);
 

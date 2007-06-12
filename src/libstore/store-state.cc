@@ -60,9 +60,9 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 		executeAndPrintShellCommand("mkdir -p " + repos, "mkdir");
 		
 		if(IsDirectory(repos))
-			executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin");				 //TODO create as nixbld.nixbld chmod 700... can you still commit than ??
+			printMsg(lvlError, format("Repos %1% already exists, so we use that repository") % repos);			
 		else
-			printMsg(lvlError, format("Repos %1% already exists, so we use that repository") % repos);
+			executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin");				 //TODO create as nixbld.nixbld chmod 700... can you still commit than ??
 
 		if(d.type == "interval"){
 			intervalPaths.insert(statePath);

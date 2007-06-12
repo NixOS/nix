@@ -177,6 +177,12 @@ void deletePathWrapped(const Path & path,
     unsigned long long & bytesFreed);
 
 void deletePathWrapped(const Path & path);
+
+/* TODO */
+void addStateDeriver(const Transaction & txn, const Path & storePath, const Path & deriver);
+
+/* TODO */
+PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, const PathSet drvs, bool deleteDrvs = false);
  
 }
 
