@@ -1249,6 +1249,9 @@ vector<int> LocalStore::getStatePathsInterval(const PathSet & statePaths)
 PathSet getStateReferencesClosure(const Path & drvpath)
 {
 	PathSet empty;
+	
+	//get all ...
+	
 	return getStateReferencesClosure_(drvpath, empty);
 }
 	
@@ -1256,13 +1259,14 @@ PathSet getStateReferencesClosure_(const Path & drvpath, PathSet & paths)
 {
 	Transaction txn(nixDB);			//TODO should u do a transaction here? ... this might delay the process ...
 
-	Strings data;
+	Derivation drv = derivationFromPath(derivationPath);
+		
+	for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
+    {
+    	
+    }
 	
-	TODODODODOD..........
-	
-	
-    Paths referencesKeys;
-    nixDB.queryStrings(txn, dbReferences, path, data);
+	/*
     for (Strings::iterator i = data.begin(); i != data.end(); ++i)
     {
 		string storePath = *i;
@@ -1284,6 +1288,7 @@ PathSet getStateReferencesClosure_(const Path & drvpath, PathSet & paths)
 			//paths = mergePathSets(paths, rec);							//merge
     	}
     }
+    */
     
     txn.commit();
     return paths;

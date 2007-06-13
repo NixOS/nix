@@ -318,7 +318,10 @@ void run(Strings args)
 	//store->updateAllStateDerivations();
 	//return;
 	
-	PathSet paths = store->getStateReferencesClosure("/nix/store/928dd2wl5cgqg10hzc3aj4rqaips6bdk-hellohardcodedstateworld-dep1-1.0.drv");
+	PathSet paths
+	storePathRequisites("", false, paths);
+	
+	//PathSet paths = store->getStateReferencesClosure("/nix/store/928dd2wl5cgqg10hzc3aj4rqaips6bdk-hellohardcodedstateworld-dep1-1.0.drv");
 	return;
 	
 	/* test */
