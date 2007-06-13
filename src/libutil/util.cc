@@ -1117,5 +1117,28 @@ string getCallingUserName()
     //return "root6";
     return username;
 }
+
+PathSet mergePathSets(const PathSet & paths1, const PathSet & paths2)
+{
+	PathSet merged = paths2;
+	
+	for (PathSet::iterator i = paths1.begin(); i != paths1.end(); ++i)			//were inserting all paths from pathset1 into pathset2
+    {
+    	bool alreadyExists = false;
+		for (PathSet::iterator j = paths2.begin(); j != paths2.end(); ++j)		//search in p2 for duplicates
+    	{
+    		if(*i == *j){
+				alreadyExists = true;
+    			break;
+    		}
+    	}
+    	
+    	if( !alreadyExists ){													//insert into p2 if not duplicate
+    		merged.insert(*i);
+    	}
+    }
+    
+    return merged;
+}
  
 }

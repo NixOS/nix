@@ -639,6 +639,8 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 
     printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'") % drvName % drvPath);
 
+
+	//printMsg(lvlError, format("PRIMOPS %1%") % drvPath);
 	/* Write updated (no need to rebuild) state derivations to the database, so they can be updated at build time	
 	if(enableState && !disableState){
 		if(store->isValidPath(outPath)){									//Only add when the path is already valid

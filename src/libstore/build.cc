@@ -773,6 +773,11 @@ void DerivationGoal::haveDerivation()
     /* Check what outputs paths are not already valid. */
     PathSet invalidOutputs = checkPathValidity(false);
 
+	//Just before we build, we resolve the multiple derivations linked to one store path issue, by choosing the latest derivation
+	printMsg(lvlError, format("updateAllStateDerivations %1%") % drvPath);
+    //addStateDeriver(....);		//only on succesfull! build
+
+
     /* If they are all valid, then we're done. */
     if (invalidOutputs.size() == 0) {
         amDone(ecSuccess);
@@ -1678,13 +1683,17 @@ void DerivationGoal::computeClosure()
                     % path % algo % printHash(h) % printHash(h2));
         }
 
-        /* Get rid of all weird permissions. */
-	canonicalisePathMetaData(path);
+	    /* Get rid of all weird permissions. */
+		canonicalisePathMetaData(path);
 
-	/* For this output path, find the references to other paths contained
-	   in it. */
+		/* For this output path, find the references to other paths contained in it. */
         PathSet references = scanForReferences(path, allPaths);
-
+		
+		/* For this state-output path, find the references to other paths contained in it. */
+		Path statePath = drv.stateOutputs.find("state")->second.statepath;
+		PathSet state_references = scanForReferences(statePath, allPaths);
+		references = mergePathSets(references, state_references);
+		
         /* For debugging, print out the referenced and unreferenced
            paths. */
         for (PathSet::iterator i = inputPaths.begin();
@@ -2479,13 +2488,7 @@ void LocalStore::buildDerivations(const PathSet & drvPaths)
     startNest(nest, lvlDebug,
         format("building %1%") % showPaths(drvPaths));
 
-	//Just before we build, we resolve the multiple derivations linked to one store path issue, by choosing the latest derivation
-	
-	printMsg(lvlError, format("updateAllStateDerivations %1%") % showPaths(drvPaths));
-	store->updateAllStateDerivations();
-
     Worker worker;
-
     Goals goals;
     for (PathSet::const_iterator i = drvPaths.begin(); i != drvPaths.end(); ++i){
         goals.insert(worker.makeDerivationGoal(*i));

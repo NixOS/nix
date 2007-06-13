@@ -408,7 +408,7 @@ void setDeriver(const Transaction & txn, const Path & storePath, const Path & de
     
     Derivation drv = derivationFromPath(deriver);		//Redirect if its a state component
     if (drv.outputs.size() != 0)
-    	addStateDeriver(txn, storePath, deriver);		//TODO remove store->
+    	addStateDeriver(txn, storePath, deriver);		
     else
 	    nixDB.setString(txn, dbDerivers, storePath, deriver);
 }
@@ -474,14 +474,14 @@ PathSet queryDerivers(const Transaction & txn, const Path & storePath, const str
 	if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
 	
-	if(identifier == "" || user == "")
-		throw Error(format("The identifer or user argument is empty, use queryDeriver(...) for non-state components"));  
+	if(user == "")
+		throw Error(format("The user argument is empty, use queryDeriver(...) for non-state components"));  
 	
 	Strings alldata;    	
     nixDB.queryStrings(txn, dbDerivers, storePath, alldata);				//get all current derivers
 
 	PathSet filtereddata;
-	for (Strings::iterator i = alldata.begin(); i != alldata.end(); ++i) {
+	for (Strings::iterator i = alldata.begin(); i != alldata.end(); ++i) {	//filter on username and identifier
 		
 		string derivationpath = (*i);
 		Derivation drv = derivationFromPath(derivationpath);
@@ -495,6 +495,7 @@ PathSet queryDerivers(const Transaction & txn, const Path & storePath, const str
 		if( (getIdentifier == identifier || identifier == "*") && (getUser == user || user == "*") )
 			filtereddata.insert(derivationpath);
 	}
+	
 	
 	return filtereddata;
 }
@@ -1244,25 +1245,48 @@ vector<int> LocalStore::getStatePathsInterval(const PathSet & statePaths)
  
 //TODO direct or all recursive parameter
 //TODO check if these are state components
-PathSet getStateReferencesClosure(const Path & path)
+//TODO CHECK FOR DERIVATION INSTEAD OF 
+PathSet getStateReferencesClosure(const Path & drvpath)
+{
+	PathSet empty;
+	return getStateReferencesClosure_(drvpath, empty);
+}
+	
+PathSet getStateReferencesClosure_(const Path & drvpath, PathSet & paths)
 {
 	Transaction txn(nixDB);			//TODO should u do a transaction here? ... this might delay the process ...
 
 	Strings data;
-	PathSet paths;
+	
+	TODODODODOD..........
+	
 	
     Paths referencesKeys;
     nixDB.queryStrings(txn, dbReferences, path, data);
     for (Strings::iterator i = data.begin(); i != data.end(); ++i)
     {
-		//printMsg(lvlError, format("References: `%1%'") % *i);
-		paths.insert(*i);
+		string storePath = *i;
+		
+		bool alreadyExists = false;
+		for (PathSet::iterator j = paths.begin(); j != paths.end(); ++j)		//Get also the references of this dep.
+    	{
+    		string checkPath = *j;
+    		if(storePath == checkPath){
+				alreadyExists = true;
+    			break;
+    		}
+    	}
+    	
+    	if( !alreadyExists ){    	
+	    	printMsg(lvlError, format("References: `%1%'") % storePath);
+			paths.insert(storePath);
+			PathSet rec = getStateReferencesClosure_(storePath, paths); 	//go recursive
+			//paths = mergePathSets(paths, rec);							//merge
+    	}
     }
     
     txn.commit();
-    
     return paths;
-	
 }
 
 PathSet LocalStore::getStateReferencesClosure(const Path & path)
@@ -1293,7 +1317,7 @@ PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, 
 			newdrvs.insert(drv);
 		else{
 			if(deleteDrvs){
-				printMsg(lvlError, format("Deleting decrepated state derivation: %1%") % drv);
+				printMsg(lvlError, format("Deleting decrepated state derivation: %1% with identifier %2% and user %3%") % drv % identifier % user);
 				deletePath(drv);			//Deletes the DRV from DISK!
 			}
 		}
@@ -1307,6 +1331,7 @@ PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, 
 //TODO add mergeNewDerivationIntoList
 void updateAllStateDerivations()		  
 {
+	
 	
 	//call AddStateDerivation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	

@@ -302,6 +302,9 @@ bool IsDirectory(const string FileName);
 
 string getCallingUserName();
 
+/* TODO */
+PathSet mergePathSets(const PathSet & paths1, const PathSet & paths2);
+
 }
 
 #endif /* !__UTIL_H */

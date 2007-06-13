@@ -33,13 +33,14 @@ void printHelp()
     cout << string((char *) helpText, sizeof helpText);
 }
 
-//
 
 //
-Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, string & stateIdentifier, string & binary)
+Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, string & stateIdentifier, string & binary, string & derivationPath,
+									   bool getDerivers, PathSet & derivers, string & username) //optional
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
-    if (opArgs.size() != 1 && opArgs.size() != 2) throw UsageError("only one or two arguments allowed (the component path & the identiefier which can be empty)");
+    if ( (opArgs.size() != 1 && opArgs.size() != 2) && (getDerivers && opArgs.size() != 3) ) 
+    	throw UsageError("only one or two arguments allowed component path / identiefier (or a third when you need to see the derivations: [username]) )");
     
 	//Parse the full path like /nix/store/...../bin/hello
     string fullPath = opArgs.front();
@@ -52,28 +53,64 @@ Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & co
     if(componentPath == "/nix/store")
  		 throw UsageError("You must specify the full! binary path");
         
-    stateIdentifier = "";
-    if(opArgs.size() == 2){
+    if(opArgs.size() > 1){
 		opArgs.pop_front();
 		stateIdentifier = opArgs.front();	
     }
-	string username = getCallingUserName();  
+	
+	if(username == "")
+		username = getCallingUserName();  
 
-	//printMsg(lvlError, format("%1% - %2% - %3% - %4% - %5%") % componentPath % statePath % stateIdentifier % binary % username);
+	printMsg(lvlError, format("%1% - %2% - %3% - %4%") % componentPath % stateIdentifier % binary % username);
     
-    PathSet drvs = queryDerivers(noTxn, componentPath, stateIdentifier, username);
-    if(drvs.size() != 1)
-    	throw UsageError("You must specify the full! binary path");
+    derivers = queryDerivers(noTxn, componentPath, stateIdentifier, username);
+    
+    if(getDerivers == true)
+    	return Derivation();
+    else if(derivers.size() != 1)
+    	throw UsageError("There is more than one deriver....");
+        	
     Derivation drv;
-    for (PathSet::iterator i = drvs.begin(); i != drvs.end(); ++i)		//ugly workaround for drvs[0].
-     	drv = derivationFromPath(*i);
+    for (PathSet::iterator i = derivers.begin(); i != derivers.end(); ++i){		//ugly workaround for drvs[0].
+     	derivationPath = *i;
+     	drv = derivationFromPath(derivationPath);
+    }
      
-    queryDeriver(noTxn, "");
-    
     DerivationStateOutputs stateOutputs = drv.stateOutputs; 
     statePath = stateOutputs.find("state")->second.statepath;
 	return drv;
 }
+
+//Wrapper
+Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, string & stateIdentifier, string & binary, string & derivationPath)
+{
+	PathSet empty;
+	string empty2;
+	return getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath, false, empty, empty2);
+}
+
+//
+static void opShowDerivations(Strings opFlags, Strings opArgs)
+{
+	string username;
+	
+	if(opArgs.size() == 3)
+		username = opArgs.back();
+	else if(opArgs.size() == 2)
+		username = getCallingUserName();
+		
+	string stateIdentifier;		 
+	Path componentPath;
+    Path statePath;
+    string binary;
+    PathSet derivers;
+    string derivationPath;
+    Derivation drv = getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath, true, derivers, username);
+	
+	for (PathSet::iterator i = derivers.begin(); i != derivers.end(); ++i)
+     	printMsg(lvlError, format("%1%") % (*i));
+}
+
 
 //Prints the statepath of a component - indetiefier combination
 static void opShowStatePath(Strings opFlags, Strings opArgs)
@@ -82,7 +119,8 @@ static void opShowStatePath(Strings opFlags, Strings opArgs)
     Path statePath;
     string stateIdentifier;
     string binary;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary);
+    string derivationPath
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath);
 	printMsg(lvlError, format("%1%") % statePath);
 }
 
@@ -93,7 +131,8 @@ static void opShowStateReposRootPath(Strings opFlags, Strings opArgs)
     Path statePath;
     string stateIdentifier;
     string binary;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary);
+    string derivationPath;
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath);
 	string drvName = drv.env.find("name")->second;
 	
 	//Get the a repository for this state location
@@ -114,8 +153,8 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     Path statePath;
     string stateIdentifier;
     string binary;
-
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary);
+	string derivationPath
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath);
     DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
     DerivationStateOutputs stateOutputs = drv.stateOutputs; 
     DerivationOutputs outputs = drv.outputs;
@@ -134,7 +173,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	//******************* Afterwards, call the commit script (recursively)
 
     //get dependecies (if neccecary | recusively) of all state components that need to be updated
-    PathSet paths = store->getStateReferencesClosure(componentPath);
+    PathSet paths = store->getStateReferencesClosure(derivationPath);
 
 
 	//TODO nix-store -q --tree $(nix-store -qd /nix/store/6x6glnb9idn53yxfqrz6wq53459vv3qd-firefox-2.0.0.3/)
@@ -276,8 +315,10 @@ void run(Strings args)
 	*/
 	store = openStore();
 	//store->addUpdatedStateDerivation("/nix/store/bk4p7378ndm1p5qdr6a99wgxbiklilxy-hellohardcodedstateworld-1.0.drv", "/nix/store/vjijdazrn2jyzyk9sqwrl8fjq0qsmi8y-hellohardcodedstateworld-1.0");
+	//store->updateAllStateDerivations();
+	//return;
 	
-	store->updateAllStateDerivations();
+	PathSet paths = store->getStateReferencesClosure("/nix/store/928dd2wl5cgqg10hzc3aj4rqaips6bdk-hellohardcodedstateworld-dep1-1.0.drv");
 	return;
 	
 	/* test */
@@ -293,7 +334,8 @@ void run(Strings args)
 			op = opShowStatePath;
 		else if (arg == "--showstatereposrootpath")
 			op = opShowStateReposRootPath;
-
+		else if (arg == "--showderivations")
+			op = opShowDerivations;
 
         /*
 		--commit
