@@ -119,7 +119,7 @@ static void opShowStatePath(Strings opFlags, Strings opArgs)
     Path statePath;
     string stateIdentifier;
     string binary;
-    string derivationPath
+    string derivationPath;
     Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath);
 	printMsg(lvlError, format("%1%") % statePath);
 }
@@ -153,7 +153,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     Path statePath;
     string stateIdentifier;
     string binary;
-	string derivationPath
+	string derivationPath;
     Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath);
     DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
     DerivationStateOutputs stateOutputs = drv.stateOutputs; 
@@ -291,6 +291,39 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     																   "commit-script");
 }
 
+PathSet getStateReferencesClosure_(const Path & drvpath, PathSet & drvPaths, const PathSet & paths)
+{
+	Derivation drv = derivationFromPath(drvpath);
+	Path outPath = drv.outputs["out"].path;
+		
+	for (DerivationInputs::iterator i = drv.inputDrvs.begin(); i != drv.inputDrvs.end(); ++i){
+			
+		Path checkDrvPath = i->first;
+		printMsg(lvlError, format("DRVPS: `%1%'") % checkDrvPath);
+		
+	}
+	
+}
+
+PathSet getStateReferencesClosure(const Path & drvpath)
+{
+	PathSet empty;
+	PathSet paths;
+	Derivation drv = derivationFromPath(drvpath);
+	Path outPath = drv.outputs["out"].path;
+	computeFSClosure(outPath, paths);
+	PathSet drvRefs = getStateReferencesClosure_(drvpath, empty, paths);
+	
+	for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
+    {
+    	printMsg(lvlError, format("Referen2ces: `%1%'") % *i);
+    }	
+    
+    return drvRefs;
+}
+	
+
+
 
 void run(Strings args)
 {
@@ -318,10 +351,8 @@ void run(Strings args)
 	//store->updateAllStateDerivations();
 	//return;
 	
-	PathSet paths
-	storePathRequisites("", false, paths);
 	
-	//PathSet paths = store->getStateReferencesClosure("/nix/store/928dd2wl5cgqg10hzc3aj4rqaips6bdk-hellohardcodedstateworld-dep1-1.0.drv");
+	PathSet paths = getStateReferencesClosure("/nix/store/928dd2wl5cgqg10hzc3aj4rqaips6bdk-hellohardcodedstateworld-dep1-1.0.drv");
 	return;
 	
 	/* test */

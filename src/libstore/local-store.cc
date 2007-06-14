@@ -1252,19 +1252,16 @@ PathSet getStateReferencesClosure(const Path & drvpath)
 	
 	//get all ...
 	
-	return getStateReferencesClosure_(drvpath, empty);
+	return empty; // getStateReferencesClosure_(drvpath, empty);
 }
 	
 PathSet getStateReferencesClosure_(const Path & drvpath, PathSet & paths)
 {
 	Transaction txn(nixDB);			//TODO should u do a transaction here? ... this might delay the process ...
 
-	Derivation drv = derivationFromPath(derivationPath);
+	//Derivation drv = derivationFromPath(derivationPath);
 		
-	for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
-    {
-    	
-    }
+	//for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
 	
 	/*
     for (Strings::iterator i = data.begin(); i != data.end(); ++i)

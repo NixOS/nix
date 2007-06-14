@@ -185,7 +185,7 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
 PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, const PathSet drvs, bool deleteDrvs = false);
 
 /* TODO */ 
-PathSet getStateReferencesClosure_(const Path & drvpath, PathSet & paths);
+//PathSet getStateReferencesClosure_(const Path & drvpath, PathSet & paths);
  
 }
 
