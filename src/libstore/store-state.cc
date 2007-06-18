@@ -21,7 +21,7 @@ void updatedStateDerivation(Path storePath)
 	//We dont remove the old .svn folders
 	//New repostorys are created by createStateDirs
 		
-	printMsg(lvlError, format("Resetting state drv settings like repositorys"));
+	printMsg(lvlTalkative, format("Resetting state drv settings like repositorys"));
 	
 	//Create a repository for this state location
 	
@@ -60,7 +60,7 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 		executeAndPrintShellCommand("mkdir -p " + repos, "mkdir");
 		
 		if(IsDirectory(repos))
-			printMsg(lvlError, format("Repos %1% already exists, so we use that repository") % repos);			
+			printMsg(lvlTalkative, format("Repos %1% already exists, so we use that repository") % repos);			
 		else
 			executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin");				 //TODO create as nixbld.nixbld chmod 700... can you still commit than ??
 
@@ -68,14 +68,14 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 			intervalPaths.insert(statePath);
 		}
 
-		printMsg(lvlError, format("Adding state subdir: %1% to %2% from repository %3%") % thisdir % fullstatedir % repos);
+		printMsg(lvlTalkative, format("Adding state subdir: %1% to %2% from repository %3%") % thisdir % fullstatedir % repos);
 			
 		if(IsDirectory(fullstatedir + "/.svn/")){
 			string checkoutcommand = svnbin + " checkout file://" + repos + " " + fullstatedir;
 			executeAndPrintShellCommand(checkoutcommand, "svn");  //TODO checkout as user
 		}
 		else
-			printMsg(lvlError, format("Statedir %1% already exists, so dont check out its repository again") % fullstatedir);
+			printMsg(lvlTalkative, format("Statedir %1% already exists, so dont check out its repository again") % fullstatedir);
 	}
 	
 	//Initialize the counters for the statePaths that have an interval to 0

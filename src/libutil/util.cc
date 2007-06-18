@@ -1118,6 +1118,7 @@ string getCallingUserName()
     return username;
 }
 
+//merges two PathSets into one, removing doubles
 PathSet mergePathSets(const PathSet & paths1, const PathSet & paths2)
 {
 	PathSet merged = paths2;
@@ -1140,5 +1141,5 @@ PathSet mergePathSets(const PathSet & paths1, const PathSet & paths2)
     
     return merged;
 }
- 
+
 }

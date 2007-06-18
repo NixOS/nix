@@ -159,6 +159,7 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
 
     /* Construct the whole top level derivation. */
     PathSet references;
+    PathSet stateReferences;					//TODO TODO TODO TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ATermList manifest = ATempty;
     ATermList inputs = ATempty;
     for (DrvInfos::const_iterator i = elems.begin(); 
@@ -203,8 +204,7 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
 
     /* Also write a copy of the list of inputs to the store; we need
        it for future modifications of the environment. */
-    Path manifestFile = store->addTextToStore("env-manifest",
-        atPrint(canonicaliseExpr(makeList(ATreverse(manifest)))), references);
+    Path manifestFile = store->addTextToStore("env-manifest", atPrint(canonicaliseExpr(makeList(ATreverse(manifest)))), references, stateReferences);
 
     Expr topLevel = makeCall(envBuilder, makeAttrs(ATmakeList3(
         makeBind(toATerm("system"),

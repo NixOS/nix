@@ -230,12 +230,13 @@ Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
 
 
 Path RemoteStore::addTextToStore(const string & suffix, const string & s,
-    const PathSet & references)
+    const PathSet & references, const PathSet & stateReferences)
 {
     writeInt(wopAddTextToStore, to);
     writeString(suffix, to);
     writeString(s, to);
     writeStringSet(references, to);
+    writeStringSet(stateReferences, to);
     
     processStderr();
     Path path = readStorePath(from);
@@ -395,10 +396,14 @@ PathSet RemoteStore::getStateReferencesClosure(const Path & path)
 	return empty;
 }
 
-//TODO
-void RemoteStore::updateAllStateDerivations()
+bool RemoteStore::isStateComponent(const Path & path)
 {
-	
+	return false;	
+}
+
+bool RemoteStore::isStateDrv(const Path & drvpath)
+{
+	return false;	
 }
 
 

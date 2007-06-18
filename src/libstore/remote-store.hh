@@ -42,7 +42,7 @@ public:
         PathFilter & filter = defaultPathFilter);
 
     Path addTextToStore(const string & suffix, const string & s,
-        const PathSet & references);
+        const PathSet & references, const PathSet & stateReferences);
 
     void exportPath(const Path & path, bool sign,
         Sink & sink);
@@ -69,9 +69,11 @@ public:
 	vector<int> getStatePathsInterval(const PathSet & statePaths);
 	
 	PathSet getStateReferencesClosure(const Path & path);
-
-	void updateAllStateDerivations();
 	
+	bool isStateComponent(const Path & path);
+	
+	bool isStateDrv(const Path & drvpath);
+
     
 private:
     AutoCloseFD fdSocket;

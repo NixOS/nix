@@ -760,6 +760,7 @@ static Expr prim_toFile(EvalState & state, const ATermVector & args)
     string contents = evalString(state, args[1], context);
 
     PathSet refs;
+    PathSet stateRefs;		//TODO TODO TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     for (PathSet::iterator i = context.begin(); i != context.end(); ++i) {
         if (isDerivation(*i))
@@ -768,8 +769,8 @@ static Expr prim_toFile(EvalState & state, const ATermVector & args)
     }
     
     Path storePath = readOnlyMode
-        ? computeStorePathForText(name, contents, refs)
-        : store->addTextToStore(name, contents, refs);
+        ? computeStorePathForText(name, contents, refs, stateRefs)
+        : store->addTextToStore(name, contents, refs, stateRefs);
 
     /* Note: we don't need to add `context' to the context of the
        result, since `storePath' itself has references to the paths

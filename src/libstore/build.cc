@@ -1621,6 +1621,7 @@ PathSet parseReferenceSpecifiers(const Derivation & drv, string attr)
 void DerivationGoal::computeClosure()
 {
     map<Path, PathSet> allReferences;
+    map<Path, PathSet> allStateReferences;
     map<Path, Hash> contentHashes;
     
     //TODO MOVE THIS TO A PLACE THAT ALSO GETS CALLED WHEN WE DONT NEED TO BUILD ANYTHING
@@ -1646,8 +1647,7 @@ void DerivationGoal::computeClosure()
         if (lstat(path.c_str(), &st) == -1)
             throw SysError(format("getting attributes of path `%1%'") % path);
             
-        startNest(nest, lvlTalkative,
-            format("scanning for references inside `%1%'") % path);
+        startNest(nest, lvlTalkative, format("scanning for component and state references inside `%1%'") % path);
 
         /* Check that fixed-output derivations produced the right
            outputs (i.e., the content hash should match the specified
@@ -1689,10 +1689,20 @@ void DerivationGoal::computeClosure()
 		/* For this output path, find the references to other paths contained in it. */
         PathSet references = scanForReferences(path, allPaths);
 		
-		/* For this state-output path, find the references to other paths contained in it. */
-		Path statePath = drv.stateOutputs.find("state")->second.statepath;
-		PathSet state_references = scanForReferences(statePath, allPaths);
-		references = mergePathSets(references, state_references);
+		/* For this state-output path, find the references to other paths contained in it. 
+		 * Get the state paths (instead of out paths) from all components, and then call
+		 * scanForStateReferences().
+		 */
+		PathSet allStatePaths;
+		for (PathSet::const_iterator i = allPaths.begin(); i != allPaths.end(); i++){
+			Path componentPath = *i;
+			if(store->isStateComponent(componentPath)){
+				PathSet stateRefs = queryDerivers(noTxn, componentPath ,"*",getCallingUserName());
+				stateRefs = mergePathSets(stateRefs, allStatePaths);
+			}
+		}
+		PathSet stateReferences = scanForStateReferences(path, allStatePaths);
+		
 		
         /* For debugging, print out the referenced and unreferenced
            paths. */
@@ -1707,6 +1717,8 @@ void DerivationGoal::computeClosure()
         }
 
         allReferences[path] = references;
+        
+        allStateReferences[path] = stateReferences;
 
         /* If the derivation specifies an `allowedReferences'
            attribute (containing a list of paths that the output may
@@ -1745,6 +1757,7 @@ void DerivationGoal::computeClosure()
         registerValidPath(txn, i->second.path,
             contentHashes[i->second.path],
             allReferences[i->second.path],
+            allStateReferences[i->second.path],
             drvPath);
     }
     txn.commit();
@@ -1873,6 +1886,9 @@ private:
 
     /* Outgoing references for this path. */
     PathSet references;
+    
+    /* Outgoing state references for this path. */			//TODO CHECK THIS ENTIRE FILE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    PathSet stateReferences;
 
     /* Pipe for the substitute's standard output/error. */
     Pipe logPipe;
@@ -2145,7 +2161,7 @@ void SubstitutionGoal::finished()
     Transaction txn;
     createStoreTransaction(txn);
     registerValidPath(txn, storePath, contentHash,
-        references, sub.deriver);
+        references, stateReferences, sub.deriver);
     txn.commit();
 
     outputLock->setDeletion(true);

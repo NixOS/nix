@@ -92,7 +92,7 @@ public:
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */
     virtual Path addTextToStore(const string & suffix, const string & s,
-        const PathSet & references) = 0;
+        const PathSet & references, const PathSet & stateReferences) = 0;
 
     /* Export a store path, that is, create a NAR dump of the store
        path and append its references and its deriver.  Optionally, a
@@ -192,8 +192,12 @@ public:
 	virtual PathSet getStateReferencesClosure(const Path & path) = 0;
 	
 	/* TODO */
-	virtual void updateAllStateDerivations() = 0;
+	virtual bool isStateComponent(const Path & path) = 0;
 	
+	/* TODO */
+	virtual bool isStateDrv(const Path & drvpath) = 0;
+	
+
 };
 
 
@@ -252,7 +256,7 @@ std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
    affected), but it has some backwards compatibility issues (the
    hashing scheme changes), so I'm not doing that for now. */
 Path computeStorePathForText(const string & suffix, const string & s,
-    const PathSet & references);
+    const PathSet & references, const PathSet & stateReferences);
 
 
 /* Remove the temporary roots file for this process.  Any temporary

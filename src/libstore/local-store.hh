@@ -54,7 +54,7 @@ public:
         PathFilter & filter = defaultPathFilter);
 
     Path addTextToStore(const string & suffix, const string & s,
-        const PathSet & references);
+        const PathSet & references, const PathSet & stateReferences);
 
     void exportPath(const Path & path, bool sign,
         Sink & sink);
@@ -82,9 +82,9 @@ public:
 	
 	PathSet getStateReferencesClosure(const Path & path);
 	
-	void addUpdatedStateDerivation(const Path & newdrv, const Path & storepath);
-
-	void updateAllStateDerivations();
+	bool isStateComponent(const Path & path);
+	
+	bool isStateDrv(const Path & drvpath);
 	
 };
 
@@ -109,7 +109,8 @@ void clearSubstitutes();
    of the file system contents of the path.  The hash must be a
    SHA-256 hash. */
 void registerValidPath(const Transaction & txn,
-    const Path & path, const Hash & hash, const PathSet & references,
+    const Path & path, const Hash & hash, 
+    const PathSet & references, const PathSet & stateReferences,
     const Path & deriver);
 
 struct ValidPathInfo 

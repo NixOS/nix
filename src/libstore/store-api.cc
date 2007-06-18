@@ -179,7 +179,7 @@ std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
 
 
 Path computeStorePathForText(const string & suffix, const string & s,
-    const PathSet & references)
+    const PathSet & references, const PathSet & stateReferences)
 {
     Hash hash = hashString(htSHA256, s);
     /* Stuff the references (if any) into the type.  This is a bit
@@ -190,6 +190,11 @@ Path computeStorePathForText(const string & suffix, const string & s,
         type += ":";
         type += *i;
     }
+    for (PathSet::const_iterator i = stateReferences.begin(); i != stateReferences.end(); ++i) {
+        type += ":";
+        type += *i;
+    }
+
     return makeStorePath(type, hash, suffix);
 }
 

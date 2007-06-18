@@ -52,6 +52,8 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
     //TODO REAL CHECK for validity of componentPath ... ?
     if(componentPath == "/nix/store")
  		 throw UsageError("You must specify the full! binary path");
+     
+    //TODO CHECK IF PATH IS STATEPATH
         
     if(opArgs.size() > 1){
 		opArgs.pop_front();
@@ -61,7 +63,7 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
 	if(username == "")
 		username = getCallingUserName();  
 
-	printMsg(lvlError, format("%1% - %2% - %3% - %4%") % componentPath % stateIdentifier % binary % username);
+	printMsg(lvlTalkative, format("%1% - %2% - %3% - %4%") % componentPath % stateIdentifier % binary % username);
     
     derivers = queryDerivers(noTxn, componentPath, stateIdentifier, username);
     
@@ -108,7 +110,7 @@ static void opShowDerivations(Strings opFlags, Strings opArgs)
     Derivation drv = getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath, true, derivers, username);
 	
 	for (PathSet::iterator i = derivers.begin(); i != derivers.end(); ++i)
-     	printMsg(lvlError, format("%1%") % (*i));
+     	printMsg(lvlTalkative, format("%1%") % (*i));
 }
 
 
@@ -121,7 +123,7 @@ static void opShowStatePath(Strings opFlags, Strings opArgs)
     string binary;
     string derivationPath;
     Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath);
-	printMsg(lvlError, format("%1%") % statePath);
+	printMsg(lvlTalkative, format("%1%") % statePath);
 }
 
 //Prints the root path that contains the repoisitorys of the state of a component - indetiefier combination
@@ -141,7 +143,7 @@ static void opShowStateReposRootPath(Strings opFlags, Strings opArgs)
 	//TODO Strip off
 	//repos = repos.substr(0, repos.length() - .... );
 	
-	printMsg(lvlError, format("%1%") % repos);
+	printMsg(lvlTalkative, format("%1%") % repos);
 }
 
 
@@ -299,7 +301,7 @@ PathSet getStateReferencesClosure_(const Path & drvpath, PathSet & drvPaths, con
 	for (DerivationInputs::iterator i = drv.inputDrvs.begin(); i != drv.inputDrvs.end(); ++i){
 			
 		Path checkDrvPath = i->first;
-		printMsg(lvlError, format("DRVPS: `%1%'") % checkDrvPath);
+		printMsg(lvlTalkative, format("DRVPS: `%1%'") % checkDrvPath);
 		
 	}
 	
@@ -316,7 +318,7 @@ PathSet getStateReferencesClosure(const Path & drvpath)
 	
 	for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
     {
-    	printMsg(lvlError, format("Referen2ces: `%1%'") % *i);
+    	printMsg(lvlTalkative, format("Referen2ces: `%1%'") % *i);
     }	
     
     return drvRefs;
@@ -340,19 +342,22 @@ void run(Strings args)
 	return;
 	
 	string a = makeStatePathFromGolbalHash("8f3b56a9a985fce54fd88c3e95a81a4b6b11fb98da12b977aee7f278c73ad3d7-hellohardcodedstateworld-1.0-test2", "kaaz");
-	printMsg(lvlError, format("%1%") % a);
+	printMsg(lvlTalkative, format("%1%") % a);
 	return;
 	
-	printMsg(lvlError, format("Result: \"%1%\"") % getCallingUserName());
+	printMsg(lvlTalkative, format("Result: \"%1%\"") % getCallingUserName());
+	return;
+	
+	store = openStore();
+	store->addStateDeriver("/nix/store/0a151npn1aps8w75kpz2zm1yl3v11kbr-hellostateworld-1.0.drv", "/nix/store/k4v52ql98x2m09sb5pz7w1lrd4hamsm0-hellostateworld-1.0");
+	store->addStateDeriver("/nix/store/2hpx60ibdfv2pslg4rjvp177frijamvi-hellostateworld-1.0.drv", "/nix/store/k4v52ql98x2m09sb5pz7w1lrd4hamsm0-hellostateworld-1.0");
 	return;
 	*/
+	
 	store = openStore();
-	//store->addUpdatedStateDerivation("/nix/store/bk4p7378ndm1p5qdr6a99wgxbiklilxy-hellohardcodedstateworld-1.0.drv", "/nix/store/vjijdazrn2jyzyk9sqwrl8fjq0qsmi8y-hellohardcodedstateworld-1.0");
-	//store->updateAllStateDerivations();
-	//return;
-	
-	
-	PathSet paths = getStateReferencesClosure("/nix/store/928dd2wl5cgqg10hzc3aj4rqaips6bdk-hellohardcodedstateworld-dep1-1.0.drv");
+	printMsg(lvlError, format("1: %1%") % bool2string( store->isStateComponent("/nix/store/7xkw5fkz5yw7dpx0pc6l12bh9a56135c-hellostateworld-1.0") ) );
+	printMsg(lvlError, format("2: %1%") % bool2string( store->isStateComponent("/nix/store/05441jm8xmsidqm43ivk0micckf0mr2m-nvidiaDrivers") ) );
+	printMsg(lvlError, format("3: %1%") % bool2string( store->isStateDrv("/nix/store/2hpx60ibdfv2pslg4rjvp177frijamvi-hellostateworld-1.0.drv") ) );
 	return;
 	
 	/* test */

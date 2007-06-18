@@ -27,11 +27,15 @@ Path writeDerivation(const Derivation & drv, const string & name)
     /* Note that the outputs of a derivation are *not* references
        (that can be missing (of course) and should not necessarily be
        held during a garbage collection). */
+       
+    //TODO TODO TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    PathSet stateReferences;
+    
     string suffix = name + drvExtension;
     string contents = atPrint(unparseDerivation(drv));
     return readOnlyMode
-        ? computeStorePathForText(suffix, contents, references)
-        : store->addTextToStore(suffix, contents, references);
+        ? computeStorePathForText(suffix, contents, references, stateReferences)
+        : store->addTextToStore(suffix, contents, references, stateReferences);
 }
 
 

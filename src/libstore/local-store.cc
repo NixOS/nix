@@ -44,6 +44,15 @@ static TableId dbValidPaths = 0;
    paths. */
 static TableId dbReferences = 0;
 
+/* dbReferences :: Path -> [Path]
+
+   This table lists the outgoing file system state references for each
+   output path that has been built by a Nix derivation.  These are
+   found by scanning the path for the hash components of input
+   paths. */
+static TableId dbStateReferences = 0;
+
+
 /* dbReferrers :: Path -> Path
 
    This table is just the reverse mapping of dbReferences.  This table
@@ -82,6 +91,13 @@ static TableId dbDerivers = 0;
 */
 static TableId dbStateCounters = 0;
 
+
+/* dbStateCounters :: Path -> String
+
+   This table lists the all the state managed components, TODO we could store the entire DRV in here in the future
+    
+*/
+static TableId dbStateInfo = 0;
 
 bool Substitute::operator == (const Substitute & sub) const
 {
@@ -143,10 +159,12 @@ LocalStore::LocalStore(bool reserveSpace)
     }
     dbValidPaths = nixDB.openTable("validpaths");
     dbReferences = nixDB.openTable("references");
-    dbReferrers = nixDB.openTable("referrers", true); /* must be sorted */
+    dbReferrers = nixDB.openTable("referrers", true); /* must be sorted */				//TODO ADD STATE REFERERS?
     dbSubstitutes = nixDB.openTable("substitutes");
     dbDerivers = nixDB.openTable("derivers");
+	dbStateInfo = nixDB.openTable("stateinfo");
     dbStateCounters = nixDB.openTable("statecounters");
+    dbStateReferences = nixDB.openTable("references_state");
 
     int curSchema = 0;
     Path schemaFN = nixDBPath + "/schema";
@@ -365,7 +383,7 @@ void queryReferences(const Transaction & txn,
 {
     Paths references2;
     
-    //WOUTER EDIT
+    //WOUTER EDIT TODO
     
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
@@ -406,18 +424,18 @@ void setDeriver(const Transaction & txn, const Path & storePath, const Path & de
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
     
-    Derivation drv = derivationFromPath(deriver);		//Redirect if its a state component
-    if (drv.outputs.size() != 0)
-    	addStateDeriver(txn, storePath, deriver);		
-    else
+    Derivation drv = derivationFromPath(deriver);
+    if (drv.outputs.size() != 0){							//Redirect if its a state component
+    	addStateDeriver(txn, storePath, deriver);
+	}		
+    else{
 	    nixDB.setString(txn, dbDerivers, storePath, deriver);
+    }
 }
 
 
 void addStateDeriver(const Transaction & txn, const Path & storePath, const Path & deriver)
 {
-	printMsg(lvlError, format("Adding State Derivers into DB %1%") % deriver);
-	
 	assertStorePath(storePath);
 	if (deriver == "") return;
 	assertStorePath(deriver);
@@ -432,22 +450,44 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
 	PathSet updatedDerivers = mergeNewDerivationIntoList(storePath, deriver, currentDerivers, true);
 
 	Strings data;    	
-	for (PathSet::iterator i = updatedDerivers.begin(); i != updatedDerivers.end(); ++i){
-	   	string deriver = *i;
-	    
-	    //TODO Remove obsolete check
-	    assertStorePath(deriver);
-	   	Derivation drv = derivationFromPath(deriver);		
-    	if (drv.outputs.size() == 0)						//Error if its not a state component
-    		throw Error(format("path `%1%' is a NOT state Path at addStateDeriver") % storePath);
-       	//TODO Remove obsolete check
-       	
-       	data.push_back(deriver);
-	}
-	    	
-	nixDB.setStrings(txn, dbDerivers, storePath, data);					//update the db.
+	for (PathSet::iterator i = updatedDerivers.begin(); i != updatedDerivers.end(); ++i)		//Convert Paths to Strings
+       	data.push_back(*i);
+	
+	nixDB.setStrings(txn, dbDerivers, storePath, data);											//update the derivers db.
+	
+	nixDB.setString(txn, dbStateInfo, storePath, "");											//update the dbinfo db.	(maybe TODO)
+	
 }
 
+//TODO Add and ..
+bool isStateComponent(const Path & storePath)
+{
+	store->isValidPath(storePath);
+	string deriver;
+	
+	string data;
+	return nixDB.queryString(noTxn, dbStateInfo, storePath, data);											//update the dbinfo db.	(maybe TODO)
+}
+
+bool LocalStore::isStateComponent(const Path & storePath)
+{
+    return nix::isStateComponent(storePath);
+}
+
+//TODO Add and ..
+bool isStateDrv(const Path & drvPath)
+{
+	Derivation drv = derivationFromPath(drvPath);		//maybe  redirect the out path to isStateComponent?
+    if (drv.outputs.size() != 0)
+		return true;
+	else
+		return false;	
+}
+
+bool LocalStore::isStateDrv(const Path & isStateDrv)
+{
+    return nix::isStateDrv(isStateDrv);
+}
 
 Path queryDeriver(const Transaction & txn, const Path & storePath)  
 {
@@ -455,10 +495,9 @@ Path queryDeriver(const Transaction & txn, const Path & storePath)
         throw Error(format("path `%1%' is not valid") % storePath);
     Path deriver;
     
-    
     bool b = nixDB.queryString(txn, dbDerivers, storePath, deriver);
     
-    Derivation drv = derivationFromPath(deriver);		//Redirect if its a state component
+    Derivation drv = derivationFromPath(deriver);		
     if (drv.outputs.size() != 0)
     	throw Error(format("This deriver `%1%' is a state deriver, u should use queryDerivers instead of queryDeriver") % deriver);
     	    
@@ -491,11 +530,11 @@ PathSet queryDerivers(const Transaction & txn, const Path & storePath, const str
 		
 		string getIdentifier = drv.stateOutputs.find("state")->second.stateIdentifier;
 		string getUser = drv.stateOutputs.find("state")->second.username;
-		
+
+		//printMsg(lvlError, format("queryDerivers '%1%' '%2%' '%3%' '%4%' '%5%'") % derivationpath % getIdentifier % identifier % getUser % user);
 		if( (getIdentifier == identifier || identifier == "*") && (getUser == user || user == "*") )
 			filtereddata.insert(derivationpath);
 	}
-	
 	
 	return filtereddata;
 }
@@ -650,7 +689,8 @@ Hash LocalStore::queryPathHash(const Path & path)
 
 
 void registerValidPath(const Transaction & txn,
-    const Path & path, const Hash & hash, const PathSet & references,
+    const Path & path, const Hash & hash, 
+    const PathSet & references, const PathSet & stateReferences,
     const Path & deriver)
 {
     ValidPathInfo info;
@@ -748,7 +788,7 @@ Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
             canonicalisePathMetaData(dstPath);
             
             Transaction txn(nixDB);
-            registerValidPath(txn, dstPath, h, PathSet(), "");
+            registerValidPath(txn, dstPath, h, PathSet(), PathSet(), "");
             txn.commit();
         }
 
@@ -760,9 +800,9 @@ Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
 
 
 Path LocalStore::addTextToStore(const string & suffix, const string & s,
-    const PathSet & references)
+    const PathSet & references, const PathSet & stateReferences)
 {
-    Path dstPath = computeStorePathForText(suffix, s, references);
+    Path dstPath = computeStorePathForText(suffix, s, references, stateReferences);
     
     addTempRoot(dstPath);
 
@@ -779,8 +819,7 @@ Path LocalStore::addTextToStore(const string & suffix, const string & s,
             canonicalisePathMetaData(dstPath);
             
             Transaction txn(nixDB);
-            registerValidPath(txn, dstPath,
-                hashPath(htSHA256, dstPath), references, "");
+            registerValidPath(txn, dstPath, hashPath(htSHA256, dstPath), references, stateReferences, "");
             txn.commit();
         }
 
@@ -919,6 +958,9 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
     Path dstPath = readStorePath(hashAndReadSource);
 
     PathSet references = readStorePaths(hashAndReadSource);
+    
+    //TODO TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    PathSet stateReferences;
 
     Path deriver = readString(hashAndReadSource);
     if (deriver != "") assertStorePath(deriver);
@@ -983,7 +1025,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
                here. */
             if (!isValidPath(deriver)) deriver = "";
             registerValidPath(txn, dstPath,
-                hashPath(htSHA256, dstPath), references, deriver);
+                hashPath(htSHA256, dstPath), references, stateReferences, deriver);
             txn.commit();
         }
         
@@ -1315,123 +1357,19 @@ PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, 
     	string getIdentifier = getdrv.stateOutputs.find("state")->second.stateIdentifier;
 		string getUser = getdrv.stateOutputs.find("state")->second.username;
 		
-		if( !(identifier == getIdentifier && getUser == user) )		//only insert if it doenst already exist
-			newdrvs.insert(drv);
-		else{
+		if(identifier == getIdentifier && getUser == user)			//only insert if it doenst already exist
+		{	
 			if(deleteDrvs){
 				printMsg(lvlError, format("Deleting decrepated state derivation: %1% with identifier %2% and user %3%") % drv % identifier % user);
 				deletePath(drv);			//Deletes the DRV from DISK!
 			}
-		}
+		}	
+		else
+			newdrvs.insert(drv);
     }
     
     newdrvs.insert(newdrv);
     return newdrvs;
-}
-
-//TODO INCLUDE USERNAME + IDENTIFIER, the can be multiple derivations for the same component
-//TODO add mergeNewDerivationIntoList
-void updateAllStateDerivations()		  
-{
-	
-	
-	//call AddStateDerivation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	
-	/*
-	Transaction txn(nixDB);
-
-	// Filter out all decrepated derivations, e.g. with a decrepated timestamp /	
-	Strings unique_paths;
-	Strings keys;
-    nixDB.enumTable(txn, dbUpdatedDerivations, keys);
-    for (Strings::iterator i = keys.begin(); i != keys.end(); ++i)
-    {
-		string drv_key = *i;	//the key is the derivation
-    	Strings data;
-		
-		nixDB.queryStrings(txn, dbUpdatedDerivations, drv_key, data);
-	    string path = data.front();
-    	bool exists = false;
-    	for (Strings::iterator j = unique_paths.begin(); j != unique_paths.end(); ++j)
-    	{
-			string unique_path = *j;
-    	 	
-    		if(path == unique_path)
-    			exists = true;
-    	}
-    	 
-    	if(!exists)
-    		unique_paths.push_back(path);
-    }
-    
-    
-    
-	// Now we merge the two sets of: storepath -> [derivations] together into the db /
-	for (Strings::iterator i = unique_paths.begin(); i != unique_paths.end(); ++i)
-    {
-    	string storepath = *i;
-    	printMsg(lvlError, format("Unique: %1%") % storepath);
-    	
-    	
-    	Path drvPath = queryDeriver(txn, storepath);
-		Path originalDerivation = drvPath;
-		Path newDerivation = drvPath;					//the new drv path first equals the old one until a new one is found 
-		int timestamp = 0;	
-		
-	    //Get the (multiple) derivations of references    
-		Strings keys;
-	    nixDB.enumTable(txn, dbUpdatedDerivations, keys);
-	    for (Strings::iterator i = keys.begin(); i != keys.end(); ++i)
-	    {
-			string drv_key = *i;	//the key is the derivation
-	
-			Strings data;
-			nixDB.queryStrings(txn, dbUpdatedDerivations, drv_key, data);
-		    string getstorepath = data.front();
-		    data.pop_front();
-		    string gettimestamp =  data.front();
-		    
-		    if(storepath == getstorepath){
-		    	
-		    	int gettimestamp_i;
-		    	string2Int(gettimestamp, gettimestamp_i);
-		    	
-		    	if(gettimestamp_i == timestamp)
-		    		throw Error(format("Error! Multiple changes at store path %4% at the same time: derivations: `%1%' and `%2%' with timestamp `%3%'") % newDerivation % drv_key % timestamp % storepath);
-		    	
-		    	if(timestamp == 0 || gettimestamp_i > timestamp){		//we choose the new derivation as the latest submitted derivation
-		    		//printMsg(lvlError, format("Replacing at store path %4% the old drv (%1%) with new drv (%2%) with timestamp: %3%") % newDerivation % drv_key % gettimestamp_i % storepath);
-		    		newDerivation = drv_key;
-		    		timestamp = gettimestamp_i;
-		    	}
-		    	
-		    	//Always Remove the old updatelink in the dbUpdatedDerivations
-		    	nixDB.delPair(txn, dbUpdatedDerivations, drv_key);
-		    } 
-		}
-		
-		if(originalDerivation != newDerivation)		//only update if neccecary
-		{
-			//Replace the old deriver link in the derivers database (TODO, maybe delete old deriver path????????)
-			setDeriver(txn, storepath, newDerivation);	
-						
-			//Call the stateUpdate function for the new derivation? Yes since this function is called at build time
-			printMsg(lvlError, format("Calling new state drv %1% for storepath %2%") % newDerivation % storepath);
-			//TODO check wheter we update before or after ??
-			//TODO
-		}
-		
-    	
-    }
-    
-    
-    txn.commit();
-    */
-}
-
-void LocalStore::updateAllStateDerivations()
-{
-	nix::updateAllStateDerivations();
 }
 
 

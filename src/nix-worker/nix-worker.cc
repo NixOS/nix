@@ -301,8 +301,9 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         string suffix = readString(from);
         string s = readString(from);
         PathSet refs = readStorePaths(from);
+        PathSet stateRefs;						//TODO TODO TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         startWork();
-        Path path = store->addTextToStore(suffix, s, refs);
+        Path path = store->addTextToStore(suffix, s, refs, stateRefs);
         stopWork();
         writeString(path, to);
         break;
