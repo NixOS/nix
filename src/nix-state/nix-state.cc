@@ -22,7 +22,7 @@ typedef void (* Operation) (Strings opFlags, Strings opArgs);
 /************************* Build time Functions ******************************/
 
 
-
+//a
 /************************* Build time Functions ******************************/
 
 
@@ -175,10 +175,8 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	//******************* Afterwards, call the commit script (recursively)
 
     //get dependecies (if neccecary | recusively) of all state components that need to be updated
-    PathSet paths = store->getStateReferencesClosure(derivationPath);
-
-
-	//TODO nix-store -q --tree $(nix-store -qd /nix/store/6x6glnb9idn53yxfqrz6wq53459vv3qd-firefox-2.0.0.3/)
+    //
+	//TODO nix-store -qR $(nix-store -qd /nix/store/6x6glnb9idn53yxfqrz6wq53459vv3qd-firefox-2.0.0.3/)
 	
 	
 	//Transaction txn;
@@ -293,6 +291,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     																   "commit-script");
 }
 
+/*
 PathSet getStateReferencesClosure_(const Path & drvpath, PathSet & drvPaths, const PathSet & paths)
 {
 	Derivation drv = derivationFromPath(drvpath);
@@ -323,7 +322,7 @@ PathSet getStateReferencesClosure(const Path & drvpath)
     
     return drvRefs;
 }
-	
+	*/
 
 
 

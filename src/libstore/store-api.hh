@@ -73,6 +73,10 @@ public:
        The result is not cleared. */
     virtual void queryReferences(const Path & path,
         PathSet & references) = 0;
+        
+    /* Queries the set of outgoing FS state-references for a store path.
+       The result is not cleared. */
+    virtual void queryStateReferences(const Path & storePath, PathSet & stateReferences) = 0;
 
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
@@ -189,7 +193,7 @@ public:
 	virtual vector<int> getStatePathsInterval(const PathSet & statePaths) = 0;
 	
 	/* TODO */	
-	virtual PathSet getStateReferencesClosure(const Path & path) = 0;
+	virtual void registerMaybeStatePath(const Path & drvPath) = 0;
 	
 	/* TODO */
 	virtual bool isStateComponent(const Path & path) = 0;

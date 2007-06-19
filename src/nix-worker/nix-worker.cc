@@ -276,6 +276,20 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         writeStringSet(paths, to);
         break;
     }
+    
+    case wopQueryStateReferences:
+    case wopQueryStateReferrers: {
+        Path path = readStorePath(from);
+        startWork();
+        PathSet paths;
+        if (op == wopQueryStateReferences)
+            store->queryStateReferences(path, paths);
+        //else
+        //    store->queryStateReferrers(path, paths);			//TODO TODO implemnt function, and then commen out !!!!!!!!!!!!!!!!!!!!!
+        stopWork();
+        writeStringSet(paths, to);
+        break;
+    }
 
     case wopAddToStore: {
         /* !!! uberquick hack */

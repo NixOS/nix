@@ -200,6 +200,19 @@ void RemoteStore::queryReferences(const Path & path,
     references.insert(references2.begin(), references2.end());
 }
 
+void RemoteStore::queryStateReferences(const Path & path,
+    PathSet & stateReferences)
+{
+    writeInt(wopQueryStateReferences, to);
+    writeString(path, to);
+    processStderr();
+    
+    //TODO TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//    PathSet references2 = readStorePaths(from);
+//    references.insert(references2.begin(), references2.end());
+}
+
+
 
 void RemoteStore::queryReferrers(const Path & path,
     PathSet & referrers)
@@ -390,10 +403,9 @@ vector<int> RemoteStore::getStatePathsInterval(const PathSet & statePaths)
 }
 
 //TODO
-PathSet RemoteStore::getStateReferencesClosure(const Path & path)
+void RemoteStore::registerMaybeStatePath(const Path & drvPath)
 {
-	PathSet empty;
-	return empty;
+	
 }
 
 bool RemoteStore::isStateComponent(const Path & path)

@@ -35,6 +35,8 @@ public:
 
     void queryReferences(const Path & path, PathSet & references);
 
+	void queryStateReferences(const Path & storePath, PathSet & stateReferences);
+
     void queryReferrers(const Path & path, PathSet & referrers);
 
     Path addToStore(const Path & srcPath, bool fixed = false,
@@ -68,7 +70,7 @@ public:
 	
 	vector<int> getStatePathsInterval(const PathSet & statePaths);
 	
-	PathSet getStateReferencesClosure(const Path & path);
+	void registerMaybeStatePath(const Path & drvPath);
 	
 	bool isStateComponent(const Path & path);
 	

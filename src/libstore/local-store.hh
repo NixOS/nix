@@ -46,7 +46,9 @@ public:
     Hash queryPathHash(const Path & path);
 
     void queryReferences(const Path & path, PathSet & references);
-
+    
+    void queryStateReferences(const Path & storePath, PathSet & stateReferences);
+    
     void queryReferrers(const Path & path, PathSet & referrers);
 
     Path addToStore(const Path & srcPath, bool fixed = false,
@@ -80,7 +82,7 @@ public:
 	
 	vector<int> getStatePathsInterval(const PathSet & statePaths);
 	
-	PathSet getStateReferencesClosure(const Path & path);
+	void registerMaybeStatePath(const Path & drvPath);
 	
 	bool isStateComponent(const Path & path);
 	
@@ -119,6 +121,7 @@ struct ValidPathInfo
     Path deriver;
     Hash hash;
     PathSet references;
+    PathSet stateReferences;
 };
 
 typedef list<ValidPathInfo> ValidPathInfos;
@@ -142,7 +145,7 @@ bool isValidPathTxn(const Transaction & txn, const Path & path);
 /* Sets the set of outgoing FS references for a store path.  Use with
    care! */
 void setReferences(const Transaction & txn, const Path & path,
-    const PathSet & references);
+    const PathSet & references, const PathSet & stateReferences);
 
 /* Sets the deriver of a store path.  Use with care! */
 void setDeriver(const Transaction & txn, const Path & path,
@@ -185,8 +188,6 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
 /* TODO */
 PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, const PathSet drvs, bool deleteDrvs = false);
 
-/* TODO */ 
-//PathSet getStateReferencesClosure_(const Path & drvpath, PathSet & paths);
  
 }
 

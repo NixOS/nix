@@ -257,7 +257,7 @@ static void printTree(const Path & path,
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qOutputs, qRequisites, qReferences, qReferrers
+    enum { qOutputs, qRequisites, qReferences, qStateReferences, qReferrers
          , qReferrersClosure, qDeriver, qBinding, qHash
          , qTree, qGraph, qResolve } query = qOutputs;
     bool useOutput = false;
@@ -270,6 +270,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         if (*i == "--outputs") query = qOutputs;
         else if (*i == "--requisites" || *i == "-R") query = qRequisites;
         else if (*i == "--references") query = qReferences;
+        else if (*i == "--references-state") query = qStateReferences;
         else if (*i == "--referrers" || *i == "--referers") query = qReferrers;
         else if (*i == "--referrers-closure" || *i == "--referers-closure") query = qReferrersClosure;
         else if (*i == "--deriver" || *i == "-d") query = qDeriver;
@@ -305,6 +306,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qRequisites:
         case qReferences:
+        case qStateReferences:
         case qReferrers:
         case qReferrersClosure: {
             PathSet paths;
@@ -315,6 +317,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 if (query == qRequisites)
                     storePathRequisites(path, includeOutputs, paths);
                 else if (query == qReferences) store->queryReferences(path, paths);
+                else if (query == qStateReferences) store->queryStateReferences(path, paths);
                 else if (query == qReferrers) store->queryReferrers(path,  paths);
                 else if (query == qReferrersClosure) computeFSClosure(path, paths, true);
             }
@@ -424,6 +427,10 @@ static void opRegisterSubstitutes(Strings opFlags, Strings opArgs)
         Path srcPath;
         Substitute sub;
         PathSet references;
+        
+        //TODO TODO TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+        PathSet stateReferences;
+        
         getline(cin, srcPath);
         if (cin.eof()) break;
         getline(cin, sub.deriver);
@@ -443,7 +450,7 @@ static void opRegisterSubstitutes(Strings opFlags, Strings opArgs)
         }
         if (!cin || cin.eof()) throw Error("missing input");
         registerSubstitute(txn, srcPath, sub);
-        setReferences(txn, srcPath, references);
+        setReferences(txn, srcPath, references, stateReferences);
     }
 
     txn.commit();

@@ -773,10 +773,9 @@ void DerivationGoal::haveDerivation()
     /* Check what outputs paths are not already valid. */
     PathSet invalidOutputs = checkPathValidity(false);
 
-	//Just before we build, we resolve the multiple derivations linked to one store path issue, by choosing the latest derivation
+	//Just before we build the drvs, we already put in the database which component path is a state component path 
 	printMsg(lvlError, format("updateAllStateDerivations %1%") % drvPath);
-    //addStateDeriver(....);		//only on succesfull! build
-
+	store->registerMaybeStatePath(drvPath);
 
     /* If they are all valid, then we're done. */
     if (invalidOutputs.size() == 0) {
@@ -1696,13 +1695,24 @@ void DerivationGoal::computeClosure()
 		PathSet allStatePaths;
 		for (PathSet::const_iterator i = allPaths.begin(); i != allPaths.end(); i++){
 			Path componentPath = *i;
+			
+			printMsg(lvlError, format("COMP: %1%") % (*i));
+			
 			if(store->isStateComponent(componentPath)){
+				printMsg(lvlError, format("COMP-STATE: %1%") % (*i));
+				
 				PathSet stateRefs = queryDerivers(noTxn, componentPath ,"*",getCallingUserName());
-				stateRefs = mergePathSets(stateRefs, allStatePaths);
+				allStatePaths = mergePathSets(stateRefs, allStatePaths);
 			}
 		}
 		PathSet stateReferences = scanForStateReferences(path, allStatePaths);
 		
+		for (PathSet::const_iterator i = allStatePaths.begin(); i != allStatePaths.end(); i++){
+			printMsg(lvlError, format("allStatePaths: %1%") % (*i));
+		}
+		for (PathSet::const_iterator i = stateReferences.begin(); i != stateReferences.end(); i++){
+			printMsg(lvlError, format("stateReferences: %1%") % (*i));
+		}
 		
         /* For debugging, print out the referenced and unreferenced
            paths. */
