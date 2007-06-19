@@ -70,8 +70,6 @@ public:
 	
 	vector<int> getStatePathsInterval(const PathSet & statePaths);
 	
-	void registerMaybeStatePath(const Path & drvPath);
-	
 	bool isStateComponent(const Path & path);
 	
 	bool isStateDrv(const Path & drvpath);

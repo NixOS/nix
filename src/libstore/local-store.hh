@@ -82,8 +82,6 @@ public:
 	
 	vector<int> getStatePathsInterval(const PathSet & statePaths);
 	
-	void registerMaybeStatePath(const Path & drvPath);
-	
 	bool isStateComponent(const Path & path);
 	
 	bool isStateDrv(const Path & drvpath);
@@ -159,6 +157,9 @@ Path queryDeriver(const Transaction & txn, const Path & path);
    deriver has been set. */
 PathSet queryDerivers(const Transaction & txn, const Path & storePath, const string & identifier, const string & user);
 
+/* TODO */
+PathSet queryDeriversStatePath(const Transaction & txn, const Path & storePath, const string & identifier, const string & user);
+
 /* Delete a value from the nixStore directory. */
 void deleteFromStore(const Path & path, unsigned long long & bytesFreed);
 
@@ -188,6 +189,7 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
 /* TODO */
 PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, const PathSet drvs, bool deleteDrvs = false);
 
+bool isStateComponentTxn(const Transaction & txn, const Path & path);
  
 }
 

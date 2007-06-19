@@ -775,7 +775,6 @@ void DerivationGoal::haveDerivation()
 
 	//Just before we build the drvs, we already put in the database which component path is a state component path 
 	printMsg(lvlError, format("updateAllStateDerivations %1%") % drvPath);
-	store->registerMaybeStatePath(drvPath);
 
     /* If they are all valid, then we're done. */
     if (invalidOutputs.size() == 0) {
@@ -1745,12 +1744,20 @@ void DerivationGoal::computeClosure()
             PathSet(),
             drvPath);
     }
-    
-    //TODO COMMENT
+
+    /*
+     * TODO COMMENT
+     * 
+     * 
+     * 
+     * 
+     */
     
     for (DerivationOutputs::iterator i = drv.outputs.begin(); 
          i != drv.outputs.end(); ++i)
     {    
+    	Path path = i->second.path;
+    	
     	/* For this state-output path, find the references to other paths contained in it. 
 		 * Get the state paths (instead of out paths) from all components, and then call
 		 * scanForStateReferences().
@@ -1759,22 +1766,20 @@ void DerivationGoal::computeClosure()
 		for (PathSet::const_iterator i = allPaths.begin(); i != allPaths.end(); i++){
 			Path componentPath = *i;
 			
-			printMsg(lvlError, format("COMP: %1%") % (*i));
-			
-			if(store->isStateComponent(componentPath)){
+			//printMsg(lvlError, format("COMP: %1%") % (*i));
+			if(isStateComponentTxn(txn, componentPath)){
 				printMsg(lvlError, format("COMP-STATE: %1%") % (*i));
-				
-				PathSet stateRefs = queryDerivers(noTxn, componentPath ,"*",getCallingUserName());
+				PathSet stateRefs = queryDeriversStatePath(txn, componentPath ,"*",getCallingUserName());
 				allStatePaths = mergePathSets(stateRefs, allStatePaths);
 			}
 		}
 		PathSet stateReferences = scanForStateReferences(path, allStatePaths);
 		
 		for (PathSet::const_iterator i = allStatePaths.begin(); i != allStatePaths.end(); i++){
-			printMsg(lvlError, format("allStatePaths: %1%") % (*i));
+			debug(format("all possible StatePaths: %1%") % (*i));
 		}
 		for (PathSet::const_iterator i = stateReferences.begin(); i != stateReferences.end(); i++){
-			printMsg(lvlError, format("stateReferences: %1%") % (*i));
+			debug(format("state References scanned: %1%") % (*i));
 		}
 		
 		allStateReferences[path] = stateReferences;

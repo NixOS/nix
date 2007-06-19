@@ -192,9 +192,6 @@ public:
 	/* TODO */
 	virtual vector<int> getStatePathsInterval(const PathSet & statePaths) = 0;
 	
-	/* TODO */	
-	virtual void registerMaybeStatePath(const Path & drvPath) = 0;
-	
 	/* TODO */
 	virtual bool isStateComponent(const Path & path) = 0;
 	

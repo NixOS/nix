@@ -402,12 +402,6 @@ vector<int> RemoteStore::getStatePathsInterval(const PathSet & statePaths)
     return intervals;
 }
 
-//TODO
-void RemoteStore::registerMaybeStatePath(const Path & drvPath)
-{
-	
-}
-
 bool RemoteStore::isStateComponent(const Path & path)
 {
 	return false;	

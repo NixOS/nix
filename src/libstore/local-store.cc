@@ -485,18 +485,17 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
 }
 
 //TODO Add and ..
-bool isStateComponent(const Path & storePath)
+bool isStateComponentTxn(const Transaction & txn, const Path & storePath)
 {
-	store->isValidPath(storePath);
-	string deriver;
-	
+	isValidPathTxn(txn, storePath);
+
 	string data;
-	return nixDB.queryString(noTxn, dbStateInfo, storePath, data);								
+	return	nixDB.queryString(txn, dbStateInfo, storePath, data);							
 }
 
 bool LocalStore::isStateComponent(const Path & storePath)
 {
-    return nix::isStateComponent(storePath);
+    return nix::isStateComponentTxn(noTxn, storePath);
 }
 
 //TODO Add and ..
@@ -562,6 +561,18 @@ PathSet queryDerivers(const Transaction & txn, const Path & storePath, const str
 	}
 	
 	return filtereddata;
+}
+
+//TODO Wrapper around converting the drvPath to the statePath
+PathSet queryDeriversStatePath(const Transaction & txn, const Path & storePath, const string & identifier, const string & user)
+{
+	PathSet drvs = queryDerivers(txn, storePath, identifier, user);
+	PathSet statePaths;
+	for (PathSet::const_iterator i = drvs.begin(); i != drvs.end(); i++){
+		Derivation drv = derivationFromPath((*i));
+		statePaths.insert(drv.stateOutputs.find("state")->second.statepath);
+	}
+	return statePaths;
 }
 
 
@@ -1336,7 +1347,8 @@ PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, 
 		
 		if(identifier == getIdentifier && getUser == user)			//only insert if it doenst already exist
 		{	
-			if(deleteDrvs){
+			//We also check if it's NOT exactly the same drvpath
+			if(drv != newdrv && deleteDrvs){
 				printMsg(lvlTalkative, format("Deleting decrepated state derivation: %1% with identifier %2% and user %3%") % drv % identifier % user);
 				deletePath(drv);			//Deletes the DRV from DISK!
 			}
@@ -1352,6 +1364,7 @@ PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, 
 /* We register in this database which _component_ paths are state paths
  * This does not mean these paths are already valid!, you should look in derivivers for that 
  */
+/*
 void registerMaybeStatePath(const Path & drvPath)
 {
 	if(!isStateDrv(drvPath))
@@ -1370,7 +1383,7 @@ void LocalStore::registerMaybeStatePath(const Path & drvPath)
 {
     nix::registerMaybeStatePath(drvPath);
 }
-
+*/
 
 /* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */
 static void upgradeStore07()
