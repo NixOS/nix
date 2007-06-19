@@ -1688,31 +1688,7 @@ void DerivationGoal::computeClosure()
 		/* For this output path, find the references to other paths contained in it. */
         PathSet references = scanForReferences(path, allPaths);
 		
-		/* For this state-output path, find the references to other paths contained in it. 
-		 * Get the state paths (instead of out paths) from all components, and then call
-		 * scanForStateReferences().
-		 */
-		PathSet allStatePaths;
-		for (PathSet::const_iterator i = allPaths.begin(); i != allPaths.end(); i++){
-			Path componentPath = *i;
-			
-			printMsg(lvlError, format("COMP: %1%") % (*i));
-			
-			if(store->isStateComponent(componentPath)){
-				printMsg(lvlError, format("COMP-STATE: %1%") % (*i));
-				
-				PathSet stateRefs = queryDerivers(noTxn, componentPath ,"*",getCallingUserName());
-				allStatePaths = mergePathSets(stateRefs, allStatePaths);
-			}
-		}
-		PathSet stateReferences = scanForStateReferences(path, allStatePaths);
 		
-		for (PathSet::const_iterator i = allStatePaths.begin(); i != allStatePaths.end(); i++){
-			printMsg(lvlError, format("allStatePaths: %1%") % (*i));
-		}
-		for (PathSet::const_iterator i = stateReferences.begin(); i != stateReferences.end(); i++){
-			printMsg(lvlError, format("stateReferences: %1%") % (*i));
-		}
 		
         /* For debugging, print out the referenced and unreferenced
            paths. */
@@ -1728,7 +1704,6 @@ void DerivationGoal::computeClosure()
 
         allReferences[path] = references;
         
-        allStateReferences[path] = stateReferences;
 
         /* If the derivation specifies an `allowedReferences'
            attribute (containing a list of paths that the output may
@@ -1767,9 +1742,54 @@ void DerivationGoal::computeClosure()
         registerValidPath(txn, i->second.path,
             contentHashes[i->second.path],
             allReferences[i->second.path],
+            PathSet(),
+            drvPath);
+    }
+    
+    //TODO COMMENT
+    
+    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
+         i != drv.outputs.end(); ++i)
+    {    
+    	/* For this state-output path, find the references to other paths contained in it. 
+		 * Get the state paths (instead of out paths) from all components, and then call
+		 * scanForStateReferences().
+		 */
+		PathSet allStatePaths;
+		for (PathSet::const_iterator i = allPaths.begin(); i != allPaths.end(); i++){
+			Path componentPath = *i;
+			
+			printMsg(lvlError, format("COMP: %1%") % (*i));
+			
+			if(store->isStateComponent(componentPath)){
+				printMsg(lvlError, format("COMP-STATE: %1%") % (*i));
+				
+				PathSet stateRefs = queryDerivers(noTxn, componentPath ,"*",getCallingUserName());
+				allStatePaths = mergePathSets(stateRefs, allStatePaths);
+			}
+		}
+		PathSet stateReferences = scanForStateReferences(path, allStatePaths);
+		
+		for (PathSet::const_iterator i = allStatePaths.begin(); i != allStatePaths.end(); i++){
+			printMsg(lvlError, format("allStatePaths: %1%") % (*i));
+		}
+		for (PathSet::const_iterator i = stateReferences.begin(); i != stateReferences.end(); i++){
+			printMsg(lvlError, format("stateReferences: %1%") % (*i));
+		}
+		
+		allStateReferences[path] = stateReferences;
+    }
+    
+    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
+         i != drv.outputs.end(); ++i)
+    {
+        registerValidPath(txn, i->second.path,
+            contentHashes[i->second.path],
+            allReferences[i->second.path],
             allStateReferences[i->second.path],
             drvPath);
     }
+    
     txn.commit();
 
     /* It is now safe to delete the lock files, since all future
