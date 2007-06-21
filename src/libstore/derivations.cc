@@ -27,14 +27,11 @@ Path writeDerivation(const Derivation & drv, const string & name)
        (that can be missing (of course) and should not necessarily be
        held during a garbage collection). */
        
-    //We only need to hash over inputSrcs and inputDrvs (I think ...)
-    PathSet stateReferences;
-    
     string suffix = name + drvExtension;
     string contents = atPrint(unparseDerivation(drv));
     return readOnlyMode
-        ? computeStorePathForText(suffix, contents, references, stateReferences)
-        : store->addTextToStore(suffix, contents, references, stateReferences);
+        ? computeStorePathForText(suffix, contents, references)
+        : store->addTextToStore(suffix, contents, references);
 }
 
 

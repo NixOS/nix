@@ -1730,6 +1730,7 @@ void DerivationGoal::computeClosure()
        The reason that we do the transaction here and not on the fly
        while we are scanning (above) is so that we don't hold database
        locks for too long. */
+    
     Transaction txn;
     createStoreTransaction(txn);
     for (DerivationOutputs::iterator i = drv.outputs.begin(); 
@@ -1778,7 +1779,9 @@ void DerivationGoal::computeClosure()
 			
 		//If state is enabled: Seaches for state and component references in the state path 				 
 		if(isStateDrvTxn(txn, drv)){
-			Path statePath = drv.stateOutputs.find("state")->second.statepath; 
+			Path statePath = drv.stateOutputs.find("state")->second.statepath;
+			printMsg(lvlTalkative, format("scanning for component and state references inside `%1%'") % statePath);
+			 
 			PathSet state_references = scanForReferences(statePath, allPaths);
 			PathSet state_stateReferences = scanForStateReferences(statePath, allStatePaths);
 			all_state_references = mergePathSets(all_state_references, mergePathSets(state_references, state_stateReferences));
@@ -1794,8 +1797,7 @@ void DerivationGoal::computeClosure()
 		allStateReferences[path] = all_state_references;
     }
     
-    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
-         i != drv.outputs.end(); ++i)
+    for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
     {
         registerValidPath(txn, i->second.path,
             contentHashes[i->second.path],

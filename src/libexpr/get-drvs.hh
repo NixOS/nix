@@ -44,7 +44,7 @@ public:
     {
         outPath = s;
     }
-
+    
     void setMetaInfo(const MetaInfo & meta);
 };
 

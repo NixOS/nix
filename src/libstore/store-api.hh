@@ -100,7 +100,7 @@ public:
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */
     virtual Path addTextToStore(const string & suffix, const string & s,
-        const PathSet & references, const PathSet & stateReferences) = 0;
+        const PathSet & references) = 0;
 
     /* Export a store path, that is, create a NAR dump of the store
        path and append its references and its deriver.  Optionally, a
@@ -264,7 +264,7 @@ std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
    affected), but it has some backwards compatibility issues (the
    hashing scheme changes), so I'm not doing that for now. */
 Path computeStorePathForText(const string & suffix, const string & s,
-    const PathSet & references, const PathSet & stateReferences);
+    const PathSet & references);
 
 
 /* Remove the temporary roots file for this process.  Any temporary

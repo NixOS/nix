@@ -350,7 +350,7 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
 	    if(drvso.runtimeStateParamters != ""){		//Has runtime parameters		-->  Clear all state parameters
 			drv.stateOutputs.clear();
 			drv.stateOutputDirs.clear();
-			drv.env["statepath"] = "";
+			drv.env["statePath"] = "";
 	    }
 	    else{										//Has NO runtime parameters		-->  Clear state parameters selectively
 	    	drvso.clearAllRuntimeParamters();
@@ -617,14 +617,15 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     //printMsg(lvlError, format("DerivationOutput %1% %2% %3%") % outPath % outputHashAlgo % outputHash);
 	//only add state when we have to to keep compitibilty with the 'old' format.
 	//We add state when it's enbaled by the keywords, and not excplicitly disabled by the user
+	Path stateOutPath;
 	if(enableState && !disableState){    
 		/* Add the state path based on the outPath
 		 * 
 		 * NOTE: we do not include the username into the hash calculation of the statepath yet, multiple different users can use the same dervation 
 		 * but need different state paths. Thats why we keep a 'dummy' value e.g. global hash for everyone, and later at build time recalculate the real state path 
 		 */
-	    Path stateOutPath = makeStatePath(printHash(componentHash), drvName, stateIdentifier);		//State path
-    	drv.env["statepath"] = stateOutPath;		
+	    stateOutPath = makeStatePath(printHash(componentHash), drvName, stateIdentifier);		//State path
+    	drv.env["statePath"] = stateOutPath;		
 
     	string enableStateS = bool2string("true");
     	string createDirsBeforeInstallS = bool2string(createDirsBeforeInstall);
@@ -659,10 +660,10 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 
     /* !!! assumes a single output */
     ATermMap outAttrs(2);
-    outAttrs.set(toATerm("outPath"),
-        makeAttrRHS(makeStr(outPath, singleton<PathSet>(drvPath)), makeNoPos()));
-    outAttrs.set(toATerm("drvPath"),
-        makeAttrRHS(makeStr(drvPath, singleton<PathSet>(drvPath)), makeNoPos()));
+    outAttrs.set(toATerm("outPath"), makeAttrRHS(makeStr(outPath, singleton<PathSet>(drvPath)), makeNoPos()));
+    outAttrs.set(toATerm("drvPath"), makeAttrRHS(makeStr(drvPath, singleton<PathSet>(drvPath)), makeNoPos()));
+    if(enableState && !disableState)
+    	outAttrs.set(toATerm("statePath"), makeAttrRHS(makeStr(stateOutPath, singleton<PathSet>(drvPath)), makeNoPos()));
 
     return makeAttrs(outAttrs);
 }
@@ -683,6 +684,8 @@ static Expr prim_derivationLazy(EvalState & state, const ATermVector & args)
         makeAttrRHS(makeSelect(drvStrict, toATerm("outPath")), makeNoPos()));
     attrs.set(toATerm("drvPath"),
         makeAttrRHS(makeSelect(drvStrict, toATerm("drvPath")), makeNoPos()));
+    attrs.set(toATerm("statePath"),														//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! add a state check !
+        makeAttrRHS(makeSelect(drvStrict, toATerm("statePath")), makeNoPos()));
     
     return makeAttrs(attrs);
 }
@@ -769,8 +772,8 @@ static Expr prim_toFile(EvalState & state, const ATermVector & args)
     }
     
     Path storePath = readOnlyMode
-        ? computeStorePathForText(name, contents, refs, stateRefs)
-        : store->addTextToStore(name, contents, refs, stateRefs);
+        ? computeStorePathForText(name, contents, refs)
+        : store->addTextToStore(name, contents, refs);
 
     /* Note: we don't need to add `context' to the context of the
        result, since `storePath' itself has references to the paths

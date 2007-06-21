@@ -58,7 +58,7 @@ public:
         PathFilter & filter = defaultPathFilter);
 
     Path addTextToStore(const string & suffix, const string & s,
-        const PathSet & references, const PathSet & stateReferences);
+        const PathSet & references);
 
     void exportPath(const Path & path, bool sign,
         Sink & sink);

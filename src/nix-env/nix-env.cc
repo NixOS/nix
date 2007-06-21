@@ -159,7 +159,6 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
 
     /* Construct the whole top level derivation. */
     PathSet references;
-    PathSet stateReferences;					//TODO TODO TODO TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ATermList manifest = ATempty;
     ATermList inputs = ATempty;
     for (DrvInfos::const_iterator i = elems.begin(); 
@@ -197,14 +196,13 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
            `nix-env -i /nix/store/abcd...-foo'. */
         store->addTempRoot(i->queryOutPath(state));
         store->ensurePath(i->queryOutPath(state));
-        
         references.insert(i->queryOutPath(state));
         if (drvPath != "") references.insert(drvPath);
     }
 
     /* Also write a copy of the list of inputs to the store; we need
        it for future modifications of the environment. */
-    Path manifestFile = store->addTextToStore("env-manifest", atPrint(canonicaliseExpr(makeList(ATreverse(manifest)))), references, stateReferences);
+    Path manifestFile = store->addTextToStore("env-manifest", atPrint(canonicaliseExpr(makeList(ATreverse(manifest)))), references);
 
     Expr topLevel = makeCall(envBuilder, makeAttrs(ATmakeList3(
         makeBind(toATerm("system"),
@@ -379,6 +377,9 @@ static void queryInstSources(EvalState & state,
                 if (isDerivation(*i)) {
                     elem.setDrvPath(*i);
                     elem.setOutPath(findOutput(derivationFromPath(*i), "out"));
+                    
+                    //TODO !!!!!!!!!!!!!!!!!!!! setStatePath??
+                    
                     if (name.size() >= drvExtension.size() &&
                         string(name, name.size() - drvExtension.size()) == drvExtension)
                         name = string(name, 0, name.size() - drvExtension.size());

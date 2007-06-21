@@ -250,13 +250,12 @@ Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
 
 
 Path RemoteStore::addTextToStore(const string & suffix, const string & s,
-    const PathSet & references, const PathSet & stateReferences)
+    const PathSet & references)
 {
     writeInt(wopAddTextToStore, to);
     writeString(suffix, to);
     writeString(s, to);
     writeStringSet(references, to);
-    writeStringSet(stateReferences, to);
     
     processStderr();
     Path path = readStorePath(from);

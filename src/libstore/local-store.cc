@@ -483,8 +483,7 @@ void setDeriver(const Transaction & txn, const Path & storePath, const Path & de
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
     
-    Derivation drv = derivationFromPath(deriver);
-    if (drv.outputs.size() != 0){							//Redirect if its a state component
+    if (isStateDrvPathTxn(txn, deriver)){							//Redirect if its a state component
     	addStateDeriver(txn, storePath, deriver);
 	}		
     else{
@@ -787,14 +786,13 @@ void registerValidPath(const Transaction & txn,
 }
 
 
-void registerValidPaths(const Transaction & txn,
-    const ValidPathInfos & infos)
+void registerValidPaths(const Transaction & txn, const ValidPathInfos & infos)
 {
     PathSet newPaths;
     for (ValidPathInfos::const_iterator i = infos.begin();
          i != infos.end(); ++i)
         newPaths.insert(i->path);
-        
+
     for (ValidPathInfos::const_iterator i = infos.begin();
          i != infos.end(); ++i)
     {
@@ -804,7 +802,7 @@ void registerValidPaths(const Transaction & txn,
         setHash(txn, i->path, i->hash);
 
         setReferences(txn, i->path, i->references, i->stateReferences);
-    
+        
         /* Check that all referenced paths are also valid (or about to
            become valid). */
         for (PathSet::iterator j = i->references.begin();
@@ -882,10 +880,13 @@ Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
 }
 
 
+//Gets all derivations ...
 Path LocalStore::addTextToStore(const string & suffix, const string & s,
-    const PathSet & references, const PathSet & stateReferences)
+    const PathSet & references)
 {
-    Path dstPath = computeStorePathForText(suffix, s, references, stateReferences);
+    Path dstPath = computeStorePathForText(suffix, s, references);
+    
+    printMsg(lvlError, format("addTextToStore: %1%") % dstPath);
     
     addTempRoot(dstPath);
 
@@ -902,7 +903,7 @@ Path LocalStore::addTextToStore(const string & suffix, const string & s,
             canonicalisePathMetaData(dstPath);
             
             Transaction txn(nixDB);
-            registerValidPath(txn, dstPath, hashPath(htSHA256, dstPath), references, stateReferences, "");
+            registerValidPath(txn, dstPath, hashPath(htSHA256, dstPath), references, PathSet(), "");	//There are no stateReferences in drvs..... so we dont need to register them (I think)
             txn.commit();
         }
 
@@ -1299,8 +1300,7 @@ void verifyStore(bool checkContents)
             //TODO TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             
             if (find(references.begin(), references.end(), to) == references.end()) {
-                printMsg(lvlError, format("adding missing referrer mapping from `%1%' to `%2%'")
-                    % from % to);
+                printMsg(lvlError, format("adding missing referrer mapping from `%1%' to `%2%'") % from % to);
                 references.insert(to);
                 setReferences(txn, from, references, stateReferences);
             }
