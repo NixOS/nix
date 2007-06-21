@@ -21,14 +21,13 @@ Path writeDerivation(const Derivation & drv, const string & name)
 {
     PathSet references;
     references.insert(drv.inputSrcs.begin(), drv.inputSrcs.end());
-    for (DerivationInputs::const_iterator i = drv.inputDrvs.begin();
-         i != drv.inputDrvs.end(); ++i)
+    for (DerivationInputs::const_iterator i = drv.inputDrvs.begin(); i != drv.inputDrvs.end(); ++i)
         references.insert(i->first);
     /* Note that the outputs of a derivation are *not* references
        (that can be missing (of course) and should not necessarily be
        held during a garbage collection). */
        
-    //TODO TODO TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //We only need to hash over inputSrcs and inputDrvs (I think ...)
     PathSet stateReferences;
     
     string suffix = name + drvExtension;

@@ -1686,9 +1686,7 @@ void DerivationGoal::computeClosure()
 
 		/* For this output path, find the references to other paths contained in it. */
         PathSet references = scanForReferences(path, allPaths);
-		
-		
-		
+				
         /* For debugging, print out the referenced and unreferenced
            paths. */
         for (PathSet::iterator i = inputPaths.begin();
@@ -1703,7 +1701,6 @@ void DerivationGoal::computeClosure()
 
         allReferences[path] = references;
         
-
         /* If the derivation specifies an `allowedReferences'
            attribute (containing a list of paths that the output may
            refer to), check that all references are in that list.  !!!
@@ -1746,15 +1743,18 @@ void DerivationGoal::computeClosure()
     }
 
     /*
-     * TODO COMMENT
+     * We first register alls paths as valid, and only scan for component references.
+     * Now that those paths are registered as valid, we're able to call queryDeriversStatePath
      * 
+     * We already scanned for Component references in Component paths  
+     * Now we scan in Component paths for state references
      * 
-     * 
-     * 
+     * If state is enabled for the path we:
+     * scan for and state references and component references in the state path
      */
     
-    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
-         i != drv.outputs.end(); ++i)
+    //TODO we scan for each output, be then we do multiple scans inside for the state path .....
+    for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
     {    
     	Path path = i->second.path;
     	
@@ -1766,23 +1766,32 @@ void DerivationGoal::computeClosure()
 		for (PathSet::const_iterator i = allPaths.begin(); i != allPaths.end(); i++){
 			Path componentPath = *i;
 			
-			//printMsg(lvlError, format("COMP: %1%") % (*i));
 			if(isStateComponentTxn(txn, componentPath)){
-				printMsg(lvlError, format("COMP-STATE: %1%") % (*i));
+				//printMsg(lvlError, format("Scanning for state path: %1%") % (*i));
 				PathSet stateRefs = queryDeriversStatePath(txn, componentPath ,"*",getCallingUserName());
 				allStatePaths = mergePathSets(stateRefs, allStatePaths);
 			}
 		}
-		PathSet stateReferences = scanForStateReferences(path, allStatePaths);
 		
+		//We scan for state references in the component path
+		PathSet all_state_references = scanForStateReferences(path, allStatePaths);
+			
+		//If state is enabled: Seaches for state and component references in the state path 				 
+		if(isStateDrvTxn(txn, drv)){
+			Path statePath = drv.stateOutputs.find("state")->second.statepath; 
+			PathSet state_references = scanForReferences(statePath, allPaths);
+			PathSet state_stateReferences = scanForStateReferences(statePath, allStatePaths);
+			all_state_references = mergePathSets(all_state_references, mergePathSets(state_references, state_stateReferences));
+		}
+
 		for (PathSet::const_iterator i = allStatePaths.begin(); i != allStatePaths.end(); i++){
 			debug(format("all possible StatePaths: %1%") % (*i));
 		}
-		for (PathSet::const_iterator i = stateReferences.begin(); i != stateReferences.end(); i++){
+		for (PathSet::const_iterator i = all_state_references.begin(); i != all_state_references.end(); i++){
 			debug(format("state References scanned: %1%") % (*i));
 		}
 		
-		allStateReferences[path] = stateReferences;
+		allStateReferences[path] = all_state_references;
     }
     
     for (DerivationOutputs::iterator i = drv.outputs.begin(); 

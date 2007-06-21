@@ -147,6 +147,17 @@ static void opShowStateReposRootPath(Strings opFlags, Strings opArgs)
 }
 
 
+//TODO
+static void recheckrefsinstaterecursive()
+{
+
+	//PathSet state_references = scanForReferences(statePath, allPaths);
+	//PathSet state_stateReferences = scanForStateReferences(statePath, allStatePaths);
+	
+}
+
+
+
 static void opRunComponent(Strings opFlags, Strings opArgs)
 {
     //get the derivation of the current component
@@ -356,7 +367,7 @@ void run(Strings args)
 	store = openStore();
 	printMsg(lvlError, format("1: %1%") % bool2string( store->isStateComponent("/nix/store/7xkw5fkz5yw7dpx0pc6l12bh9a56135c-hellostateworld-1.0") ) );
 	printMsg(lvlError, format("2: %1%") % bool2string( store->isStateComponent("/nix/store/05441jm8xmsidqm43ivk0micckf0mr2m-nvidiaDrivers") ) );
-	printMsg(lvlError, format("3: %1%") % bool2string( store->isStateDrv("/nix/store/2hpx60ibdfv2pslg4rjvp177frijamvi-hellostateworld-1.0.drv") ) );
+	printMsg(lvlError, format("3: %1%") % bool2string( store->isStateDrvPath("/nix/store/2hpx60ibdfv2pslg4rjvp177frijamvi-hellostateworld-1.0.drv") ) );
 	return;
 	
 	/* test */
@@ -393,6 +404,11 @@ void run(Strings args)
 		--delete state?
 		
 		--user=...
+		
+		--show-state-references- -rev = ...
+		--show-state-references-current			//in nix-store
+		--show-state-referrers- -rev = ...
+		--show-state-referrers-current			//in nix-store
 		
         */
 

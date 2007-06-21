@@ -284,8 +284,8 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         PathSet paths;
         if (op == wopQueryStateReferences)
             store->queryStateReferences(path, paths);
-        //else
-        //    store->queryStateReferrers(path, paths);			//TODO TODO implemnt function, and then commen out !!!!!!!!!!!!!!!!!!!!!
+        else
+            store->queryStateReferrers(path, paths);			//TODO Does this work???
         stopWork();
         writeStringSet(paths, to);
         break;

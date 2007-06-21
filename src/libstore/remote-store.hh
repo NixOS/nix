@@ -38,6 +38,8 @@ public:
 	void queryStateReferences(const Path & storePath, PathSet & stateReferences);
 
     void queryReferrers(const Path & path, PathSet & referrers);
+    
+    void queryStateReferrers(const Path & path, PathSet & stateReferrers);
 
     Path addToStore(const Path & srcPath, bool fixed = false,
         bool recursive = false, string hashAlgo = "",
@@ -72,7 +74,9 @@ public:
 	
 	bool isStateComponent(const Path & path);
 	
-	bool isStateDrv(const Path & drvpath);
+	bool isStateDrvPath(const Path & drvpath);
+	
+	bool isStateDrv(Derivation drv);
 
     
 private:

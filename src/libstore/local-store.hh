@@ -50,6 +50,8 @@ public:
     void queryStateReferences(const Path & storePath, PathSet & stateReferences);
     
     void queryReferrers(const Path & path, PathSet & referrers);
+    
+    void queryStateReferrers(const Path & path, PathSet & stateReferrers);
 
     Path addToStore(const Path & srcPath, bool fixed = false,
         bool recursive = false, string hashAlgo = "",
@@ -84,7 +86,9 @@ public:
 	
 	bool isStateComponent(const Path & path);
 	
-	bool isStateDrv(const Path & drvpath);
+	bool isStateDrvPath(const Path & drvpath);
+	
+	bool isStateDrv(Derivation drv);
 	
 };
 
@@ -140,7 +144,7 @@ void canonicalisePathMetaData(const Path & path);
 /* Checks whether a path is valid. */ 
 bool isValidPathTxn(const Transaction & txn, const Path & path);
 
-/* Sets the set of outgoing FS references for a store path.  Use with
+/* Sets the set of outgoing FS (also state) references for a store path.  Use with
    care! */
 void setReferences(const Transaction & txn, const Path & path,
     const PathSet & references, const PathSet & stateReferences);
@@ -190,6 +194,10 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
 PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, const PathSet drvs, bool deleteDrvs = false);
 
 bool isStateComponentTxn(const Transaction & txn, const Path & path);
+
+bool isStateDrvPathTxn(const Transaction & txn, const Path & drvPath);
+
+bool isStateDrvTxn(const Transaction & txn, Derivation drv);
  
 }
 

@@ -257,7 +257,7 @@ static void printTree(const Path & path,
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qOutputs, qRequisites, qReferences, qStateReferences, qReferrers
+    enum { qOutputs, qRequisites, qReferences, qStateReferences, qReferrers, qStateReferrers
          , qReferrersClosure, qDeriver, qBinding, qHash
          , qTree, qGraph, qResolve } query = qOutputs;
     bool useOutput = false;
@@ -272,6 +272,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--references") query = qReferences;
         else if (*i == "--references-state") query = qStateReferences;
         else if (*i == "--referrers" || *i == "--referers") query = qReferrers;
+        else if (*i == "--referrers-state" || *i == "--referers-state") query = qStateReferrers;
         else if (*i == "--referrers-closure" || *i == "--referers-closure") query = qReferrersClosure;
         else if (*i == "--deriver" || *i == "-d") query = qDeriver;
         else if (*i == "--binding" || *i == "-b") {
@@ -308,6 +309,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qReferences:
         case qStateReferences:
         case qReferrers:
+        case qStateReferrers:
         case qReferrersClosure: {
             PathSet paths;
             for (Strings::iterator i = opArgs.begin();
@@ -319,6 +321,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 else if (query == qReferences) store->queryReferences(path, paths);
                 else if (query == qStateReferences) store->queryStateReferences(path, paths);
                 else if (query == qReferrers) store->queryReferrers(path,  paths);
+                else if (query == qStateReferrers) store->queryStateReferrers(path,  paths);
                 else if (query == qReferrersClosure) computeFSClosure(path, paths, true);
             }
             Paths sorted = topoSortPaths(paths);

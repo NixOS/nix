@@ -760,7 +760,7 @@ static Expr prim_toFile(EvalState & state, const ATermVector & args)
     string contents = evalString(state, args[1], context);
 
     PathSet refs;
-    PathSet stateRefs;		//TODO TODO TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    PathSet stateRefs;		//refs refers to the file references, there are no state references in this case.
 
     for (PathSet::iterator i = context.begin(); i != context.end(); ++i) {
         if (isDerivation(*i))

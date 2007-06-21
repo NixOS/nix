@@ -83,6 +83,10 @@ public:
     virtual void queryReferrers(const Path & path,
         PathSet & referrers) = 0;
 
+	/* Queries the set of incoming FS state-references for a store path.
+       The result is not cleared. */
+    virtual void queryStateReferrers(const Path & path, PathSet & stateReferrers) = 0;
+
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
        If `fixed' is true, then the output of a fixed-output
@@ -196,7 +200,10 @@ public:
 	virtual bool isStateComponent(const Path & path) = 0;
 	
 	/* TODO */
-	virtual bool isStateDrv(const Path & drvpath) = 0;
+	virtual bool isStateDrvPath(const Path & drvpath) = 0;
+	
+	/* TODO */
+	virtual bool isStateDrv(Derivation drv) = 0;
 	
 
 };
