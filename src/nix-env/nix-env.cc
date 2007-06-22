@@ -377,7 +377,6 @@ static void queryInstSources(EvalState & state,
                 if (isDerivation(*i)) {
                     elem.setDrvPath(*i);
                     elem.setOutPath(findOutput(derivationFromPath(*i), "out"));
-                    
                     //TODO !!!!!!!!!!!!!!!!!!!! setStatePath??
                     
                     if (name.size() >= drvExtension.size() &&

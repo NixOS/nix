@@ -163,41 +163,6 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 }
 
 
-/* Place in `paths' the set of paths that are required to `realise'
-   the given store path, i.e., all paths necessary for valid
-   deployment of the path.  For a derivation, this is the union of
-   requisites of the inputs, plus the derivation; for other store
-   paths, it is the set of paths in the FS closure of the path.  If
-   `includeOutputs' is true, include the requisites of the output
-   paths of derivations as well.
-
-   Note that this function can be used to implement three different
-   deployment policies:
-
-   - Source deployment (when called on a derivation).
-   - Binary deployment (when called on an output path).
-   - Source/binary deployment (when called on a derivation with
-     `includeOutputs' set to true).
-*/
-static void storePathRequisites(const Path & storePath,
-    bool includeOutputs, PathSet & paths)
-{
-    computeFSClosure(storePath, paths);
-
-    if (includeOutputs) {
-        for (PathSet::iterator i = paths.begin();
-             i != paths.end(); ++i)
-            if (isDerivation(*i)) {
-                Derivation drv = derivationFromPath(*i);
-                for (DerivationOutputs::iterator j = drv.outputs.begin();
-                     j != drv.outputs.end(); ++j)
-                    if (store->isValidPath(j->second.path))
-                        computeFSClosure(j->second.path, paths);
-            }
-    }
-}
-
-
 static Path maybeUseOutput(const Path & storePath, bool useOutput, bool forceRealise)
 {
     if (forceRealise) realisePath(storePath);
@@ -257,8 +222,8 @@ static void printTree(const Path & path,
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qOutputs, qRequisites, qReferences, qStateReferences, qReferrers, qStateReferrers
-         , qReferrersClosure, qDeriver, qBinding, qHash
+    enum { qOutputs, qRequisites, qRequisitesWithState, qReferences, qStateReferences, qReferrers, qStateReferrers
+         , qReferrersClosure, qReferrersClosureWithState, qDeriver, qBinding, qHash
          , qTree, qGraph, qResolve } query = qOutputs;
     bool useOutput = false;
     bool includeOutputs = false;
@@ -269,11 +234,13 @@ static void opQuery(Strings opFlags, Strings opArgs)
          i != opFlags.end(); ++i)
         if (*i == "--outputs") query = qOutputs;
         else if (*i == "--requisites" || *i == "-R") query = qRequisites;
+		else if (*i == "--requisites-withstate") query = qRequisitesWithState;
         else if (*i == "--references") query = qReferences;
         else if (*i == "--references-state") query = qStateReferences;
         else if (*i == "--referrers" || *i == "--referers") query = qReferrers;
         else if (*i == "--referrers-state" || *i == "--referers-state") query = qStateReferrers;
         else if (*i == "--referrers-closure" || *i == "--referers-closure") query = qReferrersClosure;
+        else if (*i == "--referrers-closure-withstate" || *i == "--referers-closure-withstate") query = qReferrersClosureWithState;
         else if (*i == "--deriver" || *i == "-d") query = qDeriver;
         else if (*i == "--binding" || *i == "-b") {
             if (opArgs.size() == 0)
@@ -306,23 +273,26 @@ static void opQuery(Strings opFlags, Strings opArgs)
         }
 
         case qRequisites:
+        case qRequisitesWithState:
         case qReferences:
         case qStateReferences:
         case qReferrers:
         case qStateReferrers:
-        case qReferrersClosure: {
+        case qReferrersClosure:
+        case qReferrersClosureWithState: {
             PathSet paths;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
             {
                 Path path = maybeUseOutput(fixPath(*i), useOutput, forceRealise);
-                if (query == qRequisites)
-                    storePathRequisites(path, includeOutputs, paths);
+                if (query == qRequisites) store->storePathRequisites(path, includeOutputs, paths, false);
+                else if (query == qRequisitesWithState) store->storePathRequisites(path, includeOutputs, paths, true);
                 else if (query == qReferences) store->queryReferences(path, paths);
                 else if (query == qStateReferences) store->queryStateReferences(path, paths);
                 else if (query == qReferrers) store->queryReferrers(path,  paths);
                 else if (query == qStateReferrers) store->queryStateReferrers(path,  paths);
-                else if (query == qReferrersClosure) computeFSClosure(path, paths, true);
+                else if (query == qReferrersClosure) computeFSClosure(path, paths, false, true);
+                else if (query == qReferrersClosureWithState) computeFSClosure(path, paths, true, true);
             }
             Paths sorted = topoSortPaths(paths);
             for (Paths::reverse_iterator i = sorted.rbegin(); 

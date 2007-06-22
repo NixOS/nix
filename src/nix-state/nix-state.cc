@@ -22,11 +22,12 @@ typedef void (* Operation) (Strings opFlags, Strings opArgs);
 /************************* Build time Functions ******************************/
 
 
-//a
+
 /************************* Build time Functions ******************************/
 
 
 
+/************************* Run time Functions ******************************/
 
 void printHelp()
 {
@@ -35,7 +36,7 @@ void printHelp()
 
 
 //
-Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, string & stateIdentifier, string & binary, string & derivationPath,
+Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, string & stateIdentifier, string & binary, string & derivationPath, bool isStatePath,
 									   bool getDerivers, PathSet & derivers, string & username) //optional
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
@@ -53,7 +54,8 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
     if(componentPath == "/nix/store")
  		 throw UsageError("You must specify the full! binary path");
      
-    //TODO CHECK IF PATH IS STATEPATH
+    //Check if path is statepath
+    isStatePath = store->isStateComponent(componentPath);
         
     if(opArgs.size() > 1){
 		opArgs.pop_front();
@@ -63,14 +65,16 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
 	if(username == "")
 		username = getCallingUserName();  
 
-	printMsg(lvlTalkative, format("%1% - %2% - %3% - %4%") % componentPath % stateIdentifier % binary % username);
+	//printMsg(lvlError, format("%1% - %2% - %3% - %4%") % componentPath % stateIdentifier % binary % username);
     
     derivers = queryDerivers(noTxn, componentPath, stateIdentifier, username);
     
     if(getDerivers == true)
     	return Derivation();
+    else if(derivers.size() == 0)
+    	throw UsageError(format("There are no derivers with this combination of identifier '%1%' and username '%2%'") % stateIdentifier % username);
     else if(derivers.size() != 1)
-    	throw UsageError("There is more than one deriver....");
+    	throw UsageError(format("There is more than one deriver with identifier '%1%' and username '%2%'") % stateIdentifier % username);
         	
     Derivation drv;
     for (PathSet::iterator i = derivers.begin(); i != derivers.end(); ++i){		//ugly workaround for drvs[0].
@@ -84,11 +88,11 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
 }
 
 //Wrapper
-Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, string & stateIdentifier, string & binary, string & derivationPath)
+Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, string & stateIdentifier, string & binary, string & derivationPath, bool & isStatePath)
 {
 	PathSet empty;
 	string empty2;
-	return getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath, false, empty, empty2);
+	return getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath, isStatePath, false, empty, empty2);
 }
 
 //
@@ -107,10 +111,14 @@ static void opShowDerivations(Strings opFlags, Strings opArgs)
     string binary;
     PathSet derivers;
     string derivationPath;
-    Derivation drv = getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath, true, derivers, username);
+    bool isStatePath;
+    Derivation drv = getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath, true, isStatePath, derivers, username);
+	
+	if(!isStatePath)
+		throw UsageError(format("This path '%1%' is not a state path") % componentPath);
 	
 	for (PathSet::iterator i = derivers.begin(); i != derivers.end(); ++i)
-     	printMsg(lvlTalkative, format("%1%") % (*i));
+     	printMsg(lvlError, format("%1%") % (*i));
 }
 
 
@@ -122,8 +130,13 @@ static void opShowStatePath(Strings opFlags, Strings opArgs)
     string stateIdentifier;
     string binary;
     string derivationPath;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath);
-	printMsg(lvlTalkative, format("%1%") % statePath);
+    bool isStatePath;
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath, isStatePath);
+    
+    if(!isStatePath)
+		throw UsageError(format("This path '%1%' is not a state path") % componentPath);
+    
+	printMsg(lvlError, format("%1%") % statePath);
 }
 
 //Prints the root path that contains the repoisitorys of the state of a component - indetiefier combination
@@ -134,18 +147,33 @@ static void opShowStateReposRootPath(Strings opFlags, Strings opArgs)
     string stateIdentifier;
     string binary;
     string derivationPath;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath);
-	string drvName = drv.env.find("name")->second;
+    bool isStatePath;
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath, isStatePath);
+	
+	if(!isStatePath)
+		throw UsageError(format("This path '%1%' is not a state path") % componentPath);
 	
 	//Get the a repository for this state location
+	string drvName = drv.env.find("name")->second;
 	string repos = makeStateReposPath("stateOutput:staterepospath", statePath, "/", drvName, stateIdentifier);		//this is a copy from store-state.cc
 
-	//TODO Strip off
-	//repos = repos.substr(0, repos.length() - .... );
-	
-	printMsg(lvlTalkative, format("%1%") % repos);
+	printMsg(lvlError, format("%1%") % repos);
 }
 
+
+PathSet getReferencesClosureWithState(const Path & storepath)
+{
+	PathSet paths;
+	store->storePathRequisites(storepath, false, paths, true);
+	
+	for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
+	{
+		printMsg(lvlError, format("REFCLOSURE %1%") % *i);
+	}
+
+	//return drvs !	(combo of component + state | component path)
+	//return single state paths
+}
 
 //TODO
 static void recheckrefsinstaterecursive()
@@ -167,7 +195,8 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     string stateIdentifier;
     string binary;
 	string derivationPath;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath);
+	bool isStatePath;
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath, isStatePath);
     DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
     DerivationStateOutputs stateOutputs = drv.stateOutputs; 
     DerivationOutputs outputs = drv.outputs;
@@ -302,39 +331,6 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     																   "commit-script");
 }
 
-/*
-PathSet getStateReferencesClosure_(const Path & drvpath, PathSet & drvPaths, const PathSet & paths)
-{
-	Derivation drv = derivationFromPath(drvpath);
-	Path outPath = drv.outputs["out"].path;
-		
-	for (DerivationInputs::iterator i = drv.inputDrvs.begin(); i != drv.inputDrvs.end(); ++i){
-			
-		Path checkDrvPath = i->first;
-		printMsg(lvlTalkative, format("DRVPS: `%1%'") % checkDrvPath);
-		
-	}
-	
-}
-
-PathSet getStateReferencesClosure(const Path & drvpath)
-{
-	PathSet empty;
-	PathSet paths;
-	Derivation drv = derivationFromPath(drvpath);
-	Path outPath = drv.outputs["out"].path;
-	computeFSClosure(outPath, paths);
-	PathSet drvRefs = getStateReferencesClosure_(drvpath, empty, paths);
-	
-	for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
-    {
-    	printMsg(lvlTalkative, format("Referen2ces: `%1%'") % *i);
-    }	
-    
-    return drvRefs;
-}
-	*/
-
 
 
 void run(Strings args)
@@ -362,13 +358,14 @@ void run(Strings args)
 	store->addStateDeriver("/nix/store/0a151npn1aps8w75kpz2zm1yl3v11kbr-hellostateworld-1.0.drv", "/nix/store/k4v52ql98x2m09sb5pz7w1lrd4hamsm0-hellostateworld-1.0");
 	store->addStateDeriver("/nix/store/2hpx60ibdfv2pslg4rjvp177frijamvi-hellostateworld-1.0.drv", "/nix/store/k4v52ql98x2m09sb5pz7w1lrd4hamsm0-hellostateworld-1.0");
 	return;
-	*/
-	
+		
 	store = openStore();
 	printMsg(lvlError, format("1: %1%") % bool2string( store->isStateComponent("/nix/store/7xkw5fkz5yw7dpx0pc6l12bh9a56135c-hellostateworld-1.0") ) );
 	printMsg(lvlError, format("2: %1%") % bool2string( store->isStateComponent("/nix/store/05441jm8xmsidqm43ivk0micckf0mr2m-nvidiaDrivers") ) );
 	printMsg(lvlError, format("3: %1%") % bool2string( store->isStateDrvPath("/nix/store/2hpx60ibdfv2pslg4rjvp177frijamvi-hellostateworld-1.0.drv") ) );
 	return;
+	
+	*/
 	
 	/* test */
 	

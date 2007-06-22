@@ -88,7 +88,9 @@ public:
 	
 	bool isStateDrvPath(const Path & drvpath);
 	
-	bool isStateDrv(Derivation drv);
+	bool isStateDrv(const Derivation & drv);
+	
+	void storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState);
 	
 };
 
@@ -197,7 +199,7 @@ bool isStateComponentTxn(const Transaction & txn, const Path & path);
 
 bool isStateDrvPathTxn(const Transaction & txn, const Path & drvPath);
 
-bool isStateDrvTxn(const Transaction & txn, Derivation drv);
+bool isStateDrvTxn(const Transaction & txn, const Derivation & drv);
  
 }
 

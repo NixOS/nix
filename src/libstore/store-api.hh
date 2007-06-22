@@ -203,7 +203,9 @@ public:
 	virtual bool isStateDrvPath(const Path & drvpath) = 0;
 	
 	/* TODO */
-	virtual bool isStateDrv(Derivation drv) = 0;
+	virtual bool isStateDrv(const Derivation & drv) = 0;
+	
+	virtual void storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState) = 0;
 	
 
 };

@@ -18,6 +18,7 @@ Derivation derivationFromPath(const Path & drvPath)
 }
 
 
+/*
 void computeFSClosure(const Path & storePath,
     PathSet & paths, bool flipDirection)
 {
@@ -30,9 +31,39 @@ void computeFSClosure(const Path & storePath,
     else
         store->queryReferences(storePath, references);
 
-    for (PathSet::iterator i = references.begin();
-         i != references.end(); ++i)
+    for (PathSet::iterator i = references.begin(); i != references.end(); ++i)
         computeFSClosure(*i, paths, flipDirection);
+}
+*/
+
+void computeFSClosure(const Path & path, PathSet & paths, const bool & withState, bool flipDirection)
+{
+    if (paths.find(path) != paths.end()) return;
+    
+    paths.insert(path);
+
+    PathSet references;
+    PathSet stateReferences;
+    
+    if (flipDirection){
+        store->queryReferrers(path, references);
+        if(withState)
+        	store->queryStateReferrers(path, stateReferences);
+    }
+    else{
+        store->queryReferences(path, references);
+        if(withState)
+        	store->queryStateReferences(path, stateReferences);
+    }
+
+	PathSet allReferences;
+	if(withState)
+		allReferences = mergePathSets(references, stateReferences);
+	else
+		allReferences = references;
+
+    for (PathSet::iterator i = allReferences.begin(); i != allReferences.end(); ++i)
+        computeFSClosure(*i, paths, withState, flipDirection);
 }
 
 

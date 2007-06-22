@@ -320,8 +320,7 @@ static Substitutes readSubstitutes(const Transaction & txn,
 
 static bool isRealisablePath(const Transaction & txn, const Path & path)
 {
-    return isValidPathTxn(txn, path)
-        || readSubstitutes(txn, path).size() > 0;
+    return isValidPathTxn(txn, path) || readSubstitutes(txn, path).size() > 0;
 }
 
 
@@ -545,7 +544,7 @@ bool LocalStore::isStateDrvPath(const Path & isStateDrv)
 }
 
 //TODO Add and ..
-bool isStateDrvTxn(const Transaction & txn, Derivation drv)
+bool isStateDrvTxn(const Transaction & txn, const Derivation & drv)
 {
     if (drv.stateOutputs.size() != 0)
 		return true;
@@ -553,7 +552,7 @@ bool isStateDrvTxn(const Transaction & txn, Derivation drv)
 		return false;	
 }
 
-bool LocalStore::isStateDrv(Derivation drv)
+bool LocalStore::isStateDrv(const Derivation & drv)
 {
     return nix::isStateDrvTxn(noTxn, drv);
 }
@@ -886,7 +885,7 @@ Path LocalStore::addTextToStore(const string & suffix, const string & s,
 {
     Path dstPath = computeStorePathForText(suffix, s, references);
     
-    printMsg(lvlError, format("addTextToStore: %1%") % dstPath);
+    //printMsg(lvlError, format("addTextToStore: %1%") % dstPath);
     
     addTempRoot(dstPath);
 
@@ -1043,7 +1042,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 
     PathSet references = readStorePaths(hashAndReadSource);
     
-    //TODO TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //TODO TODO also ..??!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     PathSet stateReferences;
 
     Path deriver = readString(hashAndReadSource);
@@ -1137,7 +1136,7 @@ void deleteFromStore(const Path & _path, unsigned long long & bytesFreed)
         invalidatePath(txn, path);
         
         //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        //Also delete stateReferrers?????
+        //Also delete/invalidate stateReferrers?????
     }
     txn.commit();
 
@@ -1228,9 +1227,8 @@ void verifyStore(bool checkContents)
         }
     }
 
-	//TODO also check state references and refererres
-
     /* Check the `references' table. */
+    //TODO TODO Do the exact same thing for dbStateReferrers
     printMsg(lvlInfo, "checking the references table");
     Paths referencesKeys;
     nixDB.enumTable(txn, dbReferences, referencesKeys);
@@ -1264,6 +1262,7 @@ void verifyStore(bool checkContents)
     }
 
     /* Check the `referrers' table. */
+    //TODO TODO Do the exact same thing for dbStateReferrers, but merge! it into this one.... 
     printMsg(lvlInfo, "checking the referrers table");
     Strings referrers;
     nixDB.enumTable(txn, dbReferrers, referrers);
@@ -1294,10 +1293,9 @@ void verifyStore(bool checkContents)
         else {
             PathSet references;
             queryReferences(txn, from, references);
-            
-            PathSet stateReferences;
+
+            PathSet stateReferences;								//already a stateReferrers here!
             queryStateReferences(txn, from, stateReferences);
-            //TODO TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             
             if (find(references.begin(), references.end(), to) == references.end()) {
                 printMsg(lvlError, format("adding missing referrer mapping from `%1%' to `%2%'") % from % to);
@@ -1309,7 +1307,7 @@ void verifyStore(bool checkContents)
     }
     
     //TODO Check stateinfo and statecounters table
-
+	
     
     txn.commit();
 }
@@ -1412,29 +1410,43 @@ PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, 
     return newdrvs;
 }
 
-/* We register in this database which _component_ paths are state paths
- * This does not mean these paths are already valid!, you should look in derivivers for that 
- */
-/*
-void registerMaybeStatePath(const Path & drvPath)
-{
-	if(!isStateDrv(drvPath))
-		return;
+/* Place in `paths' the set of paths that are required to `realise'
+   the given store path, i.e., all paths necessary for valid
+   deployment of the path.  For a derivation, this is the union of
+   requisites of the inputs, plus the derivation; for other store
+   paths, it is the set of paths in the FS closure of the path.  If
+   `includeOutputs' is true, include the requisites of the output
+   paths of derivations as well.
 
-	printMsg(lvlError, format("derivation       aaa: %1% ") % drvPath);
+   Note that this function can be used to implement three different
+   deployment policies:
 
-
-	Derivation drv = derivationFromPath(drvPath);
-	Path storePath = drv.outputs["out"].path;
-	
-	nixDB.setString(noTxn, dbStateInfo, storePath, "");		//update the dbinfo db.	(maybe TODO)
-}
-
-void LocalStore::registerMaybeStatePath(const Path & drvPath)
-{
-    nix::registerMaybeStatePath(drvPath);
-}
+   - Source deployment (when called on a derivation).
+   - Binary deployment (when called on an output path).
+   - Source/binary deployment (when called on a derivation with
+     `includeOutputs' set to true).
 */
+void storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState)
+{
+    computeFSClosure(storePath, paths, withState);
+
+    if (includeOutputs) {
+        for (PathSet::iterator i = paths.begin();
+             i != paths.end(); ++i)
+            if (isDerivation(*i)) {
+                Derivation drv = derivationFromPath(*i);
+                for (DerivationOutputs::iterator j = drv.outputs.begin();
+                     j != drv.outputs.end(); ++j)
+                    if (store->isValidPath(j->second.path))
+                        computeFSClosure(j->second.path, paths, withState);
+            }
+    }
+}
+
+void LocalStore::storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState)
+{
+    return nix::storePathRequisites(storePath, includeOutputs, paths, withState);
+}
 
 /* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */
 static void upgradeStore07()

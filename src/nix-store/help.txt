@@ -31,11 +31,13 @@ Query flags:
 
   --outputs: query the output paths of a Nix derivation (default)
   --requisites / -R: print all paths necessary to realise a path
+  --requisites-withstate: same as --requisites but now also including state paths
   --references: print all paths referenced by the given path
   --references-state: print all state paths referenced by the given path  
   --referrers: print all paths directly refering to the given path
   --referrers-state: print all state paths directly refering to the given path
   --referrers-closure: print all paths (in)directly refering to the given path
+  --referrers-closure-withstate: same as --referrers-closure but now also including state paths
   --tree: print a tree showing the dependency graph of the given paths
   --graph: print a dot graph rooted at given paths
 

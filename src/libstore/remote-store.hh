@@ -76,7 +76,9 @@ public:
 	
 	bool isStateDrvPath(const Path & drvpath);
 	
-	bool isStateDrv(Derivation drv);
+	bool isStateDrv(const Derivation & drv);
+	
+	void storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState);
 
     
 private:
