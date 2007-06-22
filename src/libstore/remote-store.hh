@@ -26,6 +26,10 @@ public:
     /* Implementations of abstract store API methods. */
     
     bool isValidPath(const Path & path);
+    
+    bool isValidStatePath(const Path & path);
+    
+    bool isValidComponentOrStatePath(const Path & path);
 
     Substitutes querySubstitutes(const Path & path);
 

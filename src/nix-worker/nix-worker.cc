@@ -244,6 +244,24 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         writeInt(result, to);
         break;
     }
+    
+    case wopIsValidStatePath: {
+    	Path path = readStorePath(from);
+        startWork();
+        bool result = store->isValidStatePath(path);
+        stopWork();
+        writeInt(result, to);
+        break;    
+    }
+    
+    case wopIsValidComponentOrStatePath: {
+    	Path path = readStorePath(from);
+        startWork();
+        bool result = store->isValidComponentOrStatePath(path);
+        stopWork();
+        writeInt(result, to);
+        break;
+    }
 
     case wopHasSubstitutes: {
         Path path = readStorePath(from);

@@ -1620,6 +1620,7 @@ void DerivationGoal::computeClosure()
 {
     map<Path, PathSet> allReferences;
     map<Path, PathSet> allStateReferences;
+    map<Path, Path> statePaths;
     map<Path, Hash> contentHashes;
     
     //TODO MOVE THIS TO A PLACE THAT ALSO GETS CALLED WHEN WE DONT NEED TO BUILD ANYTHING
@@ -1737,9 +1738,10 @@ void DerivationGoal::computeClosure()
          i != drv.outputs.end(); ++i)
     {
         registerValidPath(txn, i->second.path,
+        	"",											//dummy statePath
             contentHashes[i->second.path],
             allReferences[i->second.path],
-            PathSet(),
+            PathSet(),									//dummy stateReferences
             drvPath);
     }
 
@@ -1785,7 +1787,11 @@ void DerivationGoal::computeClosure()
 			PathSet state_references = scanForReferences(statePath, allPaths);
 			PathSet state_stateReferences = scanForStateReferences(statePath, allStatePaths);
 			all_state_references = mergePathSets(all_state_references, mergePathSets(state_references, state_stateReferences));
+			
+			statePaths[path] = statePath; 
 		}
+		else
+			statePaths[path] = "";
 
 		for (PathSet::const_iterator i = allStatePaths.begin(); i != allStatePaths.end(); i++){
 			debug(format("all possible StatePaths: %1%") % (*i));
@@ -1795,14 +1801,17 @@ void DerivationGoal::computeClosure()
 		}
 		
 		allStateReferences[path] = all_state_references;
+		
     }
     
     for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
     {
-        registerValidPath(txn, i->second.path,
+        registerValidPath(txn, 
+        	i->second.path,								//component path
+        	statePaths[i->second.path],					//state path
             contentHashes[i->second.path],
-            allReferences[i->second.path],
-            allStateReferences[i->second.path],
+            allReferences[i->second.path],				//set of component-references
+            allStateReferences[i->second.path],			//set of state-references
             drvPath);
     }
     
@@ -2206,7 +2215,7 @@ void SubstitutionGoal::finished()
 
     Transaction txn;
     createStoreTransaction(txn);
-    registerValidPath(txn, storePath, contentHash,
+    registerValidPath(txn, storePath, "", contentHash,					//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! replace "" with a substitued state path !!!!!!!!
         references, stateReferences, sub.deriver);
     txn.commit();
 

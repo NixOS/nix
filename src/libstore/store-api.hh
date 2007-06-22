@@ -58,6 +58,12 @@ public:
 
     /* Checks whether a path is valid. */ 
     virtual bool isValidPath(const Path & path) = 0;
+    
+    /* TODO */
+    virtual bool isValidStatePath(const Path & path) = 0;
+    
+    /* TODO */
+    virtual bool isValidComponentOrStatePath(const Path & path) = 0;
 
     /* Return the substitutes for the given path. */
     virtual Substitutes querySubstitutes(const Path & path) = 0;

@@ -163,6 +163,23 @@ bool RemoteStore::isValidPath(const Path & path)
     return reply != 0;
 }
 
+bool RemoteStore::isValidStatePath(const Path & path)
+{
+	writeInt(wopIsValidStatePath, to);
+    writeString(path, to);
+    processStderr();
+    unsigned int reply = readInt(from);
+    return reply != 0;
+}
+    
+bool RemoteStore::isValidComponentOrStatePath(const Path & path)
+{
+	writeInt(wopIsValidComponentOrStatePath, to);
+    writeString(path, to);
+    processStderr();
+    unsigned int reply = readInt(from);
+    return reply != 0;
+}
 
 Substitutes RemoteStore::querySubstitutes(const Path & path)
 {

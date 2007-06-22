@@ -36,6 +36,12 @@ static Database nixDB;
    is, produced by a succesful build). */
 static TableId dbValidPaths = 0;
 
+/* dbValidStatePaths :: Path -> ()
+
+   The existence of a key $p$ indicates that state path $p$ is valid (that
+   is, produced by a succesful build). */
+static TableId dbValidStatePaths = 0;
+
 /* dbReferences :: Path -> [Path]
 
    This table lists the outgoing file system references for each
@@ -165,6 +171,7 @@ LocalStore::LocalStore(bool reserveSpace)
         return;
     }
     dbValidPaths = nixDB.openTable("validpaths");
+    dbValidStatePaths = nixDB.openTable("validpaths_state");
     dbReferences = nixDB.openTable("references");
     dbReferrers = nixDB.openTable("referrers", true); /* must be sorted */
     dbSubstitutes = nixDB.openTable("substitutes");
@@ -307,10 +314,30 @@ bool isValidPathTxn(const Transaction & txn, const Path & path)
     return nixDB.queryString(txn, dbValidPaths, path, s);
 }
 
-
 bool LocalStore::isValidPath(const Path & path)
 {
     return isValidPathTxn(noTxn, path);
+}
+
+bool isValidStatePathTxn(const Transaction & txn, const Path & path)
+{
+    string s;
+    return nixDB.queryString(txn, dbValidStatePaths, path, s);
+}
+
+bool LocalStore::isValidStatePath(const Path & path)
+{
+    return isValidStatePathTxn(noTxn, path);
+}
+
+bool isValidComponentOrStatePathTxn(const Transaction & txn, const Path & path)
+{
+    return (isValidPathTxn(txn, path) || isValidStatePathTxn(txn, path)); 
+}
+
+bool LocalStore::isValidComponentOrStatePath(const Path & path)
+{
+    return isValidComponentOrStatePathTxn(noTxn, path);
 }
 
 
@@ -736,13 +763,20 @@ void clearSubstitutes()
 }
 
 
-static void setHash(const Transaction & txn, const Path & storePath,
-    const Hash & hash)
+static void setHash(const Transaction & txn, const Path & storePath, const Hash & hash, bool stateHash = false)
 {
     assert(hash.type == htSHA256);
-    nixDB.setString(txn, dbValidPaths, storePath, "sha256:" + printHash(hash));
+    
+    if(stateHash)
+    	nixDB.setString(txn, dbValidStatePaths, storePath, "sha256:" + printHash(hash));
+    else
+    	nixDB.setString(txn, dbValidPaths, storePath, "sha256:" + printHash(hash));
 }
 
+static void setStateHash(const Transaction & txn, const Path & storePath, const Hash & hash)
+{
+	setHash(txn, storePath, hash, true);
+}
 
 static Hash queryHash(const Transaction & txn, const Path & storePath)
 {
@@ -769,12 +803,13 @@ Hash LocalStore::queryPathHash(const Path & path)
 
 
 void registerValidPath(const Transaction & txn,
-    const Path & path, const Hash & hash, 
+    const Path & path, const Path & statePath, const Hash & hash, 
     const PathSet & references, const PathSet & stateReferences,
     const Path & deriver)
 {
     ValidPathInfo info;
     info.path = path;
+    info.statePath = statePath;
     info.hash = hash;
     info.references = references;
     info.stateReferences = stateReferences;   
@@ -788,27 +823,29 @@ void registerValidPath(const Transaction & txn,
 void registerValidPaths(const Transaction & txn, const ValidPathInfos & infos)
 {
     PathSet newPaths;
-    for (ValidPathInfos::const_iterator i = infos.begin();
-         i != infos.end(); ++i)
+    for (ValidPathInfos::const_iterator i = infos.begin(); i != infos.end(); ++i)
         newPaths.insert(i->path);
 
-    for (ValidPathInfos::const_iterator i = infos.begin();
-         i != infos.end(); ++i)
+    for (ValidPathInfos::const_iterator i = infos.begin(); i != infos.end(); ++i)
     {
         assertStorePath(i->path);
 
         debug(format("registering path `%1%'") % i->path);
         setHash(txn, i->path, i->hash);
 
+		if (i->statePath != "")
+			setStateHash(txn, i->statePath, Hash());		//the hash value in the db now becomes empty, but if the key exists, we know that the state path is valid 
+
         setReferences(txn, i->path, i->references, i->stateReferences);
-        
-        /* Check that all referenced paths are also valid (or about to
-           become valid). */
+                
+        /* Check that all referenced paths are also valid (or about to) become valid). */
         for (PathSet::iterator j = i->references.begin();
              j != i->references.end(); ++j)
             if (!isValidPathTxn(txn, *j) && newPaths.find(*j) == newPaths.end())
                 throw Error(format("cannot register path `%1%' as valid, since its reference `%2%' is invalid")
                     % i->path % *j);
+
+		//TODO Also do this for stateReferences????
 
         setDeriver(txn, i->path, i->deriver);
     }
@@ -817,7 +854,7 @@ void registerValidPaths(const Transaction & txn, const ValidPathInfos & infos)
 
 /* Invalidate a path. The caller is responsible for checking that
    there are no referrers. */
-static void invalidatePath(Transaction & txn, const Path & path)
+static void invalidatePath(Transaction & txn, const Path & path)			//TODO Adjust for state paths????
 {
     debug(format("unregistering path `%1%'") % path);
 
@@ -830,7 +867,7 @@ static void invalidatePath(Transaction & txn, const Path & path)
         nixDB.delPair(txn, dbDerivers, path);								//TODO!!!!! also for state Derivers!!!!!!!!!!!!!!!
     }
     
-    nixDB.delPair(txn, dbValidPaths, path);									//Always?
+    nixDB.delPair(txn, dbValidPaths, path);									
 }
 
 
@@ -868,7 +905,7 @@ Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
             canonicalisePathMetaData(dstPath);
             
             Transaction txn(nixDB);
-            registerValidPath(txn, dstPath, h, PathSet(), PathSet(), "");
+            registerValidPath(txn, dstPath, "", h, PathSet(), PathSet(), "");			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK if the first "" (statepath) is needed here
             txn.commit();
         }
 
@@ -902,7 +939,8 @@ Path LocalStore::addTextToStore(const string & suffix, const string & s,
             canonicalisePathMetaData(dstPath);
             
             Transaction txn(nixDB);
-            registerValidPath(txn, dstPath, hashPath(htSHA256, dstPath), references, PathSet(), "");	//There are no stateReferences in drvs..... so we dont need to register them (I think)
+            registerValidPath(txn, dstPath, "", hashPath(htSHA256, dstPath), references, PathSet(), "");	//There are no stateReferences in drvs..... so we dont need to register them (I think)
+            																								//A drvs has also no statepath, so that is ok...
             txn.commit();
         }
 
@@ -1107,7 +1145,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
             /* !!! if we were clever, we could prevent the hashPath()
                here. */
             if (!isValidPath(deriver)) deriver = "";
-            registerValidPath(txn, dstPath,
+            registerValidPath(txn, dstPath, "",												//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!! replace "" for a state path ??????
                 hashPath(htSHA256, dstPath), references, stateReferences, deriver);
             txn.commit();
         }
@@ -1183,6 +1221,9 @@ void verifyStore(bool checkContents)
     /* "Realisable" paths are those that are valid or have a
        substitute. */
     PathSet realisablePaths(validPaths);
+    
+    
+    //TODO Do also for validStatePaths
 
     /* Check that the values of the substitute mappings are valid
        paths. */ 

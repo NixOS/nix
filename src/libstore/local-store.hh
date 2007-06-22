@@ -40,7 +40,11 @@ public:
     /* Implementations of abstract store API methods. */
     
     bool isValidPath(const Path & path);
-
+    
+    bool isValidStatePath(const Path & path);
+    
+    bool isValidComponentOrStatePath(const Path & path);
+    
     Substitutes querySubstitutes(const Path & srcPath);
 
     Hash queryPathHash(const Path & path);
@@ -115,13 +119,14 @@ void clearSubstitutes();
    of the file system contents of the path.  The hash must be a
    SHA-256 hash. */
 void registerValidPath(const Transaction & txn,
-    const Path & path, const Hash & hash, 
+    const Path & path, const Path & statepath, const Hash & hash, 
     const PathSet & references, const PathSet & stateReferences,
     const Path & deriver);
 
 struct ValidPathInfo 
 {
     Path path;
+    Path statePath;
     Path deriver;
     Hash hash;
     PathSet references;
