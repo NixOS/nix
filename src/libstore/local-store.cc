@@ -350,6 +350,10 @@ static bool isRealisablePath(const Transaction & txn, const Path & path)
     return isValidPathTxn(txn, path) || readSubstitutes(txn, path).size() > 0;
 }
 
+static bool isRealisableComponentOrStatePath(const Transaction & txn, const Path & path)
+{
+    return isValidComponentOrStatePathTxn(txn, path) || readSubstitutes(txn, path).size() > 0;					//TODO State paths are not yet in substitutes !!!!!!!!!!!!!!
+}
 
 static string addPrefix(const string & prefix, const string & s)
 {
@@ -440,8 +444,8 @@ void queryReferences(const Transaction & txn,
 {
     Paths references2;
     
-    if (!isRealisablePath(txn, storePath))
-        throw Error(format("path `%1%' is not valid") % storePath);
+    if (!isRealisableComponentOrStatePath(txn, storePath))
+        throw Error(format("path `%1%' is not valid 1") % storePath);
     nixDB.queryStrings(txn, dbReferences, storePath, references2);
     references.insert(references2.begin(), references2.end());
 }
@@ -458,8 +462,8 @@ void queryStateReferences(const Transaction & txn,
 {
     Paths stateReferences2;
     
-    if (!isRealisablePath(txn, storePath))
-        throw Error(format("path `%1%' is not valid") % storePath);
+    if (!isRealisableComponentOrStatePath(txn, storePath))
+        throw Error(format("path `%1%' is not valid 2") % storePath);
     nixDB.queryStrings(txn, dbStateReferences, storePath, stateReferences2);
     stateReferences.insert(stateReferences2.begin(), stateReferences2.end());
 }
@@ -472,7 +476,7 @@ void LocalStore::queryStateReferences(const Path & storePath, PathSet & stateRef
 void queryReferrers(const Transaction & txn,
     const Path & storePath, PathSet & referrers)
 {
-    if (!isRealisablePath(txn, storePath))
+    if (!isRealisableComponentOrStatePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
     PathSet referrers2 = getReferrers(txn, storePath);
     referrers.insert(referrers2.begin(), referrers2.end());
@@ -488,7 +492,7 @@ void LocalStore::queryReferrers(const Path & storePath,
 
 void queryStateReferrers(const Transaction & txn, const Path & storePath, PathSet & stateReferrers)
 {
-    if (!isRealisablePath(txn, storePath))
+    if (!isRealisableComponentOrStatePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
     PathSet stateReferrers2 = getStateReferrers(txn, storePath);
     stateReferrers.insert(stateReferrers2.begin(), stateReferrers2.end());
@@ -765,12 +769,13 @@ void clearSubstitutes()
 
 static void setHash(const Transaction & txn, const Path & storePath, const Hash & hash, bool stateHash = false)
 {
-    assert(hash.type == htSHA256);
-    
-    if(stateHash)
-    	nixDB.setString(txn, dbValidStatePaths, storePath, "sha256:" + printHash(hash));
-    else
+    if(stateHash){
+    	nixDB.setString(txn, dbValidStatePaths, storePath, "");
+    }
+    else{
     	nixDB.setString(txn, dbValidPaths, storePath, "sha256:" + printHash(hash));
+    	assert(hash.type == htSHA256);
+    }
 }
 
 static void setStateHash(const Transaction & txn, const Path & storePath, const Hash & hash)
