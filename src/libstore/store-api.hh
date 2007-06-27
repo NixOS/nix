@@ -75,6 +75,9 @@ public:
     /* Queries the hash of a valid path. */ 
     virtual Hash queryPathHash(const Path & path) = 0;
 
+	/* Queries the derivation Path of a valid state path. */
+	virtual Path queryStatePathDrv(const Path & statePath) = 0;
+
     /* Queries the set of outgoing FS references for a store path.
        The result is not cleared. */
     virtual void queryReferences(const Path & path,
@@ -212,7 +215,8 @@ public:
 	virtual bool isStateDrv(const Derivation & drv) = 0;
 	
 	virtual void storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState) = 0;
-	
+
+	virtual void storePathStateRequisitesOnly(const Path & storePath, const bool includeOutputs, PathSet & statePaths) = 0;	
 
 };
 
@@ -245,9 +249,14 @@ Path makeStatePath(const string & componentHash, const string & suffix, const st
 /* TODO ... */
 void checkStatePath(const Derivation & drv);
 
-/* Constructs a unique store state repos path name. */
-Path makeStateReposPath(const string & type, const Path statePath, const string subfolder, const string & suffix, const string & stateIdentifier);
+/* Calculates a unique store state repos path and also the root path  */
+void calculateStateReposPath(const string & type, const Path statePath, const string subfolder, const string & suffix, const string & stateIdentifier, Path & rootPath, Path & fullPath);
 
+/* Returns the full repository path */
+Path getStateReposPath(const string & type, const Path statePath, const string subfolder, const string & suffix, const string & stateIdentifier);
+
+/* Returns the root path containing the repository's */
+Path getStateReposRootPath(const string & type, const Path statePath, const string & suffix, const string & stateIdentifier);
 
 /* This is the preparatory part of addToStore() and addToStoreFixed();
    it computes the store path to which srcPath is to be copied.

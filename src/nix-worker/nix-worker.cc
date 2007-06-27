@@ -280,6 +280,15 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         writeString(printHash(hash), to);
         break;
     }
+    
+    case wopQueryStatePathDrv: {
+    	Path path = readStorePath(from);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! needs to be the state path
+        startWork();
+        Path p = store->queryStatePathDrv(path);
+        stopWork();
+        writeString(p, to);
+        break;    	
+    }
 
     case wopQueryReferences:
     case wopQueryReferrers: {
@@ -303,7 +312,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         if (op == wopQueryStateReferences)
             store->queryStateReferences(path, paths);
         else
-            store->queryStateReferrers(path, paths);			//TODO Does this work???
+            store->queryStateReferrers(path, paths);			//TODO Does this work???, how about the state path?????????
         stopWork();
         writeStringSet(paths, to);
         break;

@@ -115,9 +115,7 @@ void checkStatePath(const Derivation & drv)
     	Error(format("The statepath from the Derivation does not match the recalculated statepath, are u trying to spoof the statepath?"));
 }
 
-
-
-Path makeStateReposPath(const string & type, const Path statePath, const string subfolder, const string & suffix, const string & stateIdentifier)
+void calculateStateReposPath(const string & type, const Path statePath, const string subfolder, const string & suffix, const string & stateIdentifier, Path & rootPath, Path & fullPath)
 {
     //This is a little trick: we could use the same hash as the statepath, but we change it so the repository also gets a unique scannable hash
     Hash hash = hashString(htSHA256, statePath); 
@@ -127,7 +125,7 @@ Path makeStateReposPath(const string & type, const Path statePath, const string 
     	throw Error(format("Cannot create a repository for a subfolder without a name"));
     
     string hash_subfolder = type + ":sha256:" + printHash(hash) + ":" + subfolder;
-    string subfolder_ = printHash32(compressHash(hashString(htSHA256, hash_subfolder), 20)) + "-" + subfolder;
+    string subfolder2 = printHash32(compressHash(hashString(htSHA256, hash_subfolder), 20)) + "-" + subfolder;
     
     string suffix_stateIdentifier = stateIdentifier;
     if(suffix_stateIdentifier != "")
@@ -140,9 +138,27 @@ Path makeStateReposPath(const string & type, const Path statePath, const string 
     checkStoreName(suffix);
     checkStoreName(stateIdentifier);
     
-    return nixStoreStateRepos + "/"
+    rootPath = nixStoreStateRepos + "/"
         + printHash32(compressHash(hashString(htSHA256, s), 20))
-        + "-" + suffix + suffix_stateIdentifier + "/" + subfolder_;
+        + "-" + suffix + suffix_stateIdentifier;
+        
+    fullPath = rootPath + "/" + subfolder2;
+}
+
+Path getStateReposPath(const string & type, const Path statePath, const string subfolder, const string & suffix, const string & stateIdentifier)
+{
+	Path fullPath;
+	Path rootPath; 
+	calculateStateReposPath(type, statePath, subfolder, suffix, stateIdentifier, rootPath, fullPath);
+	return fullPath;
+}
+
+Path getStateReposRootPath(const string & type, const Path statePath, const string & suffix, const string & stateIdentifier)
+{
+	Path fullPath;
+	Path rootPath; 
+	calculateStateReposPath(type, statePath, "/", suffix, stateIdentifier, rootPath, fullPath);
+	return rootPath;
 }
 
 Path makeFixedOutputPath(bool recursive,

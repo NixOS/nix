@@ -30,8 +30,9 @@ Operations:
 Query flags:
 
   --outputs: query the output paths of a Nix derivation (default)
-  --requisites / -R: print all paths necessary to realise a path
-  --requisites-withstate: same as --requisites but now also including state paths
+  --requisites / -R: print all component paths necessary to realise a path
+  --requisites-state: same as --requisites but now only printing state paths
+  --requisites-full: same as --requisites but now also including state paths
   --references: print all paths referenced by the given path
   --references-state: print all state paths referenced by the given path  
   --referrers: print all paths directly refering to the given path

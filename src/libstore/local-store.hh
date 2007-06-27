@@ -48,6 +48,8 @@ public:
     Substitutes querySubstitutes(const Path & srcPath);
 
     Hash queryPathHash(const Path & path);
+    
+    Path queryStatePathDrv(const Path & statePath);
 
     void queryReferences(const Path & path, PathSet & references);
     
@@ -95,6 +97,8 @@ public:
 	bool isStateDrv(const Derivation & drv);
 	
 	void storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState);
+	
+	void storePathStateRequisitesOnly(const Path & storePath, const bool includeOutputs, PathSet & statePaths);
 	
 };
 
@@ -205,6 +209,8 @@ bool isStateComponentTxn(const Transaction & txn, const Path & path);
 bool isStateDrvPathTxn(const Transaction & txn, const Path & drvPath);
 
 bool isStateDrvTxn(const Transaction & txn, const Derivation & drv);
+
+void convertStatePathsToDerivations(const Transaction & txn, const Path & storePath);
  
 }
 

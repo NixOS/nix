@@ -39,6 +39,10 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 	string svnadminbin = nixSVNPath + "/svnadmin";
 	
 	PathSet intervalPaths;
+
+	//Make sure the 'root' path which holds the repositorys exists, so svn doenst complain.
+	string repos_root_path = getStateReposRootPath("stateOutput:staterepospath", stateDir, drvName, stateIdentifier);
+	executeAndPrintShellCommand("mkdir -p " + repos_root_path, "mkdir");
 	
 	//TODO check if we can create state and staterepos dirs
 	
@@ -56,13 +60,13 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 		}
 		
 		//Create a repository for this state location
-		string repos = makeStateReposPath("stateOutput:staterepospath", stateDir, thisdir, drvName, stateIdentifier);
-		executeAndPrintShellCommand("mkdir -p " + repos, "mkdir");
+		string repos = getStateReposPath("stateOutput:staterepospath", stateDir, thisdir, drvName, stateIdentifier);
+		
 		
 		if(IsDirectory(repos))
 			printMsg(lvlTalkative, format("Repos %1% already exists, so we use that repository") % repos);			
 		else
-			executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin");				 //TODO create as nixbld.nixbld chmod 700... can you still commit than ??
+			executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin");				 //TODO create as nixbld.nixbld chmod 700... can you still commit then ??
 
 		if(d.type == "interval"){
 			intervalPaths.insert(statePath);
@@ -70,12 +74,13 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 
 		printMsg(lvlTalkative, format("Adding state subdir: %1% to %2% from repository %3%") % thisdir % fullstatedir % repos);
 			
-		if(IsDirectory(fullstatedir + "/.svn/")){
+		string fullstatedir_svn = fullstatedir + "/.svn/";
+		if( ! IsDirectory(fullstatedir_svn) ){
 			string checkoutcommand = svnbin + " checkout file://" + repos + " " + fullstatedir;
 			executeAndPrintShellCommand(checkoutcommand, "svn");  //TODO checkout as user
 		}
 		else
-			printMsg(lvlTalkative, format("Statedir %1% already exists, so dont check out its repository again") % fullstatedir);
+			printMsg(lvlTalkative, format("Statedir %1% already exists, so dont check out its repository again") % fullstatedir_svn);
 	}
 	
 	//Initialize the counters for the statePaths that have an interval to 0

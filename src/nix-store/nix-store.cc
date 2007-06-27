@@ -222,7 +222,7 @@ static void printTree(const Path & path,
 /* Perform various sorts of queries. */
 static void opQuery(Strings opFlags, Strings opArgs)
 {
-    enum { qOutputs, qRequisites, qRequisitesWithState, qReferences, qStateReferences, qReferrers, qStateReferrers
+    enum { qOutputs, qRequisites, qRequisitesState, qRequisitesFull, qReferences, qStateReferences, qReferrers, qStateReferrers
          , qReferrersClosure, qReferrersClosureWithState, qDeriver, qBinding, qHash
          , qTree, qGraph, qResolve } query = qOutputs;
     bool useOutput = false;
@@ -234,7 +234,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
          i != opFlags.end(); ++i)
         if (*i == "--outputs") query = qOutputs;
         else if (*i == "--requisites" || *i == "-R") query = qRequisites;
-		else if (*i == "--requisites-withstate") query = qRequisitesWithState;
+		else if (*i == "--requisites-state") query = qRequisitesState;
+		else if (*i == "--requisites-full") query = qRequisitesFull;
         else if (*i == "--references") query = qReferences;
         else if (*i == "--references-state") query = qStateReferences;
         else if (*i == "--referrers" || *i == "--referers") query = qReferrers;
@@ -273,7 +274,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
         }
 
         case qRequisites:
-        case qRequisitesWithState:
+        case qRequisitesState:
+        case qRequisitesFull:
         case qReferences:
         case qStateReferences:
         case qReferrers:
@@ -286,7 +288,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
             {
                 Path path = maybeUseOutput(fixPath(*i), useOutput, forceRealise);
                 if (query == qRequisites) store->storePathRequisites(path, includeOutputs, paths, false);
-                else if (query == qRequisitesWithState) store->storePathRequisites(path, includeOutputs, paths, true);
+                else if (query == qRequisitesState) store->storePathStateRequisitesOnly(path, includeOutputs, paths);
+                else if (query == qRequisitesFull) store->storePathRequisites(path, includeOutputs, paths, true);
                 else if (query == qReferences) store->queryReferences(path, paths);
                 else if (query == qStateReferences) store->queryStateReferences(path, paths);
                 else if (query == qReferrers) store->queryReferrers(path,  paths);

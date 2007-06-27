@@ -1015,6 +1015,19 @@ string trim(const string & s) {
 
 //TODO , check if we can replace!!! with runProgram  like this: string a = runProgram("whoami", true, s);
 
+/*
+ 
+ Strings args;
+ args.push_back("rsautl");
+ args.push_back("-sign");
+ args.push_back("-inkey");
+ args.push_back(secretKey);
+ args.push_back("-in");
+ args.push_back(hashFile);
+ string signature = runProgram(OPENSSL_PATH, true, args);
+  
+ */
+
 void executeAndPrintShellCommand(const string & command, const string & commandName)
 {
 	string tempoutput = "/tmp/svnoutput.txt";
@@ -1073,20 +1086,18 @@ string time_t2string(const time_t & t)
 	return s;
 }
 
+//TODO Does this work on windows?
 bool FileExist(const string FileName)
 {
 	const char* FileName_C = FileName.c_str();
-	//strcpy(FileName_C, FileName.c_str());
-		        
     struct stat my_stat;
     return (stat(FileName_C, &my_stat) == 0);
 }
 
+//TODO Does this work on windows?
 bool IsDirectory(const string FileName)
 {
 	const char* FileName_C = FileName.c_str();
-	//strcpy(FileName_C, FileName.c_str());
-    
     struct stat my_stat;
     if (stat(FileName_C, &my_stat) != 0) return false;
     return ((my_stat.st_mode & S_IFDIR) != 0);
@@ -1095,7 +1106,7 @@ bool IsDirectory(const string FileName)
 
 string getCallingUserName()
 {
-	//TODO Make this work on WINDOWS
+	//TODO Make this work on WINDOWS: Untested!
     /*
     #include <windows.h>
 	   char acUserName[100];
@@ -1109,12 +1120,11 @@ string getCallingUserName()
     //Linux
     Strings empty;
     string username = runProgram("whoami", true, empty);				//the username of the user that is trying to build the component
-																		//TODO Can and Should NOT be faked, so this is clearly unsafe ... :(
+																		//TODO Can be faked, so this is clearly unsafe ... :(
     //Remove the \n
     int pos = username.find("\n",0);
 	username.erase(pos,1);
     
-    //return "root6";
     return username;
 }
 

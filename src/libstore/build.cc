@@ -1629,6 +1629,7 @@ void DerivationGoal::computeClosure()
     	if(!drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
 	    	createStateDirs(drv.stateOutputDirs, drv.stateOutputs, drv.env);
     
+    
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
        output paths read-only. */
@@ -1681,7 +1682,7 @@ void DerivationGoal::computeClosure()
                     format("output path `%1%' should have %2% hash `%3%', instead has `%4%'")
                     % path % algo % printHash(h) % printHash(h2));
         }
-
+        
 	    /* Get rid of all weird permissions. */
 		canonicalisePathMetaData(path);
 
@@ -1719,7 +1720,7 @@ void DerivationGoal::computeClosure()
            if we could combine this with filterReferences(). */
         contentHashes[path] = hashPath(htSHA256, path);
     }
-
+    
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  This is wrapped in one
        database transaction to ensure that if we crash, either
@@ -1737,6 +1738,8 @@ void DerivationGoal::computeClosure()
     for (DerivationOutputs::iterator i = drv.outputs.begin(); 
          i != drv.outputs.end(); ++i)
     {
+        //printMsg(lvlError, format("SetValidPath: %1%") % i->second.path);
+        
         registerValidPath(txn, i->second.path,
         	"",											//dummy statePath
             contentHashes[i->second.path],
@@ -1744,19 +1747,22 @@ void DerivationGoal::computeClosure()
             PathSet(),									//dummy stateReferences
             drvPath);
     }
-
+    
     /*
      * We first register alls paths as valid, and only scan for component references.
      * Now that those paths are registered as valid, we're able to call queryDeriversStatePath
      * 
-     * We already scanned for Component references in Component paths  
-     * Now we scan in Component paths for state references
+     * We already scanned for [Component references in Component paths]				//1  
+     * Now we scan in [Component paths for state references]						//2
      * 
      * If state is enabled for the path we:
-     * scan for and state references and component references in the state path
+     * [scan for and state references and component references in the state path]	//3,4
      */
     
     //TODO we scan for each output, be then we do multiple scans inside for the state path .....
+    
+    //TODO !!!!!!!!! we don not ONLY need to scan all outputs, but also (recursively) the component references in the state folders 
+    
     for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
     {    
     	Path path = i->second.path;
@@ -1770,7 +1776,7 @@ void DerivationGoal::computeClosure()
 			Path componentPath = *i;
 			
 			if(isStateComponentTxn(txn, componentPath)){
-				//printMsg(lvlError, format("Scanning for state path: %1%") % (*i));
+				//printMsg(lvlError, format("Scanning for state path: %1%") % componentPath);
 				PathSet stateRefs = queryDeriversStatePath(txn, componentPath ,"*",getCallingUserName());
 				allStatePaths = mergePathSets(stateRefs, allStatePaths);
 			}
@@ -1783,7 +1789,7 @@ void DerivationGoal::computeClosure()
 		if(isStateDrvTxn(txn, drv)){
 			Path statePath = drv.stateOutputs.find("state")->second.statepath;
 			printMsg(lvlTalkative, format("scanning for component and state references inside `%1%'") % statePath);
-			 
+			
 			PathSet state_references = scanForReferences(statePath, allPaths);
 			PathSet state_stateReferences = scanForStateReferences(statePath, allStatePaths);
 			all_state_references = mergePathSets(all_state_references, mergePathSets(state_references, state_stateReferences));

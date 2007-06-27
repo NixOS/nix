@@ -36,6 +36,8 @@ public:
     bool hasSubstitutes(const Path & path);
     
     Hash queryPathHash(const Path & path);
+    
+    Path queryStatePathDrv(const Path & statePath);
 
     void queryReferences(const Path & path, PathSet & references);
 
@@ -84,6 +86,7 @@ public:
 	
 	void storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState);
 
+	void storePathStateRequisitesOnly(const Path & storePath, const bool includeOutputs, PathSet & statePaths);
     
 private:
     AutoCloseFD fdSocket;

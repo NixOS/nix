@@ -17,28 +17,32 @@ Derivation derivationFromPath(const Path & drvPath)
     return parseDerivation(t);
 }
 
-
-/*
-void computeFSClosure(const Path & storePath,
-    PathSet & paths, bool flipDirection)
-{
-    if (paths.find(storePath) != paths.end()) return;
-    paths.insert(storePath);
-
-    PathSet references;
-    if (flipDirection)
-        store->queryReferrers(storePath, references);
-    else
-        store->queryReferences(storePath, references);
-
-    for (PathSet::iterator i = references.begin(); i != references.end(); ++i)
-        computeFSClosure(*i, paths, flipDirection);
-}
-*/
-
 void computeFSClosure(const Path & path, PathSet & paths, const bool & withState, bool flipDirection)
 {
-    if (paths.find(path) != paths.end()) return;
+	PathSet allPaths;
+	computeFSClosureRec(path, allPaths, flipDirection);
+	
+    //if withState is false, we filter out all state paths
+	if(withState == false){
+		for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i){
+			if ( ! store->isValidStatePath(*i) ){
+				paths.insert(*i);
+			
+				//TODO (OBSOLETE) CHECK TO SEE IF THERE WERE NO /NIX/STATE PATHS THAT ARENT VALID AT THIS POINT, REMOVE THIS IN THE FUTURE
+				string test = "/nix/state";
+				if((*i).substr(0, test.size()) == test)
+					throw Error(format("THIS CANNOT HAPPEN ! computeFSClosure is called before the state path was valid...."));
+			}
+		}
+	}
+	else{
+		paths = allPaths;	
+	}
+}
+
+void computeFSClosureRec(const Path & path, PathSet & paths, const bool & flipDirection)
+{
+    if (paths.find(path) != paths.end()) return;	//takes care of double entries
     
     paths.insert(path);
 
@@ -47,23 +51,18 @@ void computeFSClosure(const Path & path, PathSet & paths, const bool & withState
     
     if (flipDirection){
         store->queryReferrers(path, references);
-        if(withState)
-        	store->queryStateReferrers(path, stateReferences);
+       	store->queryStateReferrers(path, stateReferences);
     }
     else{
         store->queryReferences(path, references);
-        if(withState)
-        	store->queryStateReferences(path, stateReferences);
+       	store->queryStateReferences(path, stateReferences);
     }
 
 	PathSet allReferences;
-	if(withState)
-		allReferences = mergePathSets(references, stateReferences);
-	else
-		allReferences = references;
+	allReferences = mergePathSets(references, stateReferences);
 
     for (PathSet::iterator i = allReferences.begin(); i != allReferences.end(); ++i)
-        computeFSClosure(*i, paths, withState, flipDirection);
+        computeFSClosureRec(*i, paths, flipDirection);
 }
 
 

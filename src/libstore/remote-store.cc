@@ -206,6 +206,14 @@ Hash RemoteStore::queryPathHash(const Path & path)
     return parseHash(htSHA256, hash);
 }
 
+Path RemoteStore::queryStatePathDrv(const Path & statePath)
+{
+	writeInt(wopQueryStatePathDrv, to);
+	writeString(statePath, to);
+    processStderr();
+    Path p = readString(from);				//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! check wheter from is the state path ????
+    return p;
+}
 
 void RemoteStore::queryReferences(const Path & path,
     PathSet & references)
@@ -445,6 +453,12 @@ bool RemoteStore::isStateDrv(const Derivation & drv)
 
 //TODO
 void RemoteStore::storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState)
+{
+	
+}
+
+//TODO
+void RemoteStore::storePathStateRequisitesOnly(const Path & storePath, const bool includeOutputs, PathSet & statePaths)
 {
 	
 }

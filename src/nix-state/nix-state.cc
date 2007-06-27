@@ -18,6 +18,10 @@ using std::cout;
 
 typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
+//two global variables
+string stateIdentifier;
+string username;
+
 
 /************************* Build time Functions ******************************/
 
@@ -36,12 +40,13 @@ void printHelp()
 
 
 //
-Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, string & stateIdentifier, string & binary, string & derivationPath, bool isStatePath,
-									   bool getDerivers, PathSet & derivers, string & username) //optional
+Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, 
+									   string & binary, string & derivationPath, bool isStatePath, Strings & program_args,
+									   bool getDerivers, PathSet & derivers) 	//optional
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
-    if ( (opArgs.size() != 1 && opArgs.size() != 2) && (getDerivers && opArgs.size() != 3) ) 
-    	throw UsageError("only one or two arguments allowed component path / identiefier (or a third when you need to see the derivations: [username]) )");
+    if ( opArgs.size() != 1 && opArgs.size() != 2 ) 
+    	throw UsageError("only one or two arguments allowed component path and program arguments (counts as one) ");
     
 	//Parse the full path like /nix/store/...../bin/hello
     string fullPath = opArgs.front();
@@ -56,63 +61,67 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
      
     //Check if path is statepath
     isStatePath = store->isStateComponent(componentPath);
-        
+      
+    //Extract the program arguments
+    string allargs;
     if(opArgs.size() > 1){
 		opArgs.pop_front();
-		stateIdentifier = opArgs.front();	
-    }
-	
-	if(username == "")
-		username = getCallingUserName();  
+		allargs = opArgs.front();
+		
+		Strings progam_args;
+		//TODO !!!!!!!!!!!!!!!!!!!!!!			
+    }    
 
-	//printMsg(lvlError, format("%1% - %2% - %3% - %4%") % componentPath % stateIdentifier % binary % username);
+	printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % stateIdentifier % binary % username % allargs);
     
-    derivers = queryDerivers(noTxn, componentPath, stateIdentifier, username);
+    if(isStatePath)
+    	derivers = queryDerivers(noTxn, componentPath, stateIdentifier, username);
+    else
+    	derivers.insert(queryDeriver(noTxn, componentPath));
     
     if(getDerivers == true)
     	return Derivation();
-    else if(derivers.size() == 0)
-    	throw UsageError(format("There are no derivers with this combination of identifier '%1%' and username '%2%'") % stateIdentifier % username);
-    else if(derivers.size() != 1)
-    	throw UsageError(format("There is more than one deriver with identifier '%1%' and username '%2%'") % stateIdentifier % username);
+    
+    if(isStatePath){	
+	    if(derivers.size() == 0)
+	    	throw UsageError(format("There are no derivers with this combination of identifier '%1%' and username '%2%'") % stateIdentifier % username);
+	    if(derivers.size() != 1)
+	    	throw UsageError(format("There is more than one deriver with stateIdentifier '%1%' and username '%2%'") % stateIdentifier % username);
+    }
         	
     Derivation drv;
     for (PathSet::iterator i = derivers.begin(); i != derivers.end(); ++i){		//ugly workaround for drvs[0].
      	derivationPath = *i;
      	drv = derivationFromPath(derivationPath);
     }
-     
-    DerivationStateOutputs stateOutputs = drv.stateOutputs; 
-    statePath = stateOutputs.find("state")->second.statepath;
+	
+	if(isStatePath){
+    	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
+    	statePath = stateOutputs.find("state")->second.statepath;
+	}
+	
 	return drv;
 }
 
 //Wrapper
-Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, string & stateIdentifier, string & binary, string & derivationPath, bool & isStatePath)
+Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, 
+									  string & binary, string & derivationPath, bool & isStatePath, Strings & program_args)
 {
 	PathSet empty;
-	string empty2;
-	return getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath, isStatePath, false, empty, empty2);
+	return getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args, false, empty);
 }
 
 //
 static void opShowDerivations(Strings opFlags, Strings opArgs)
 {
-	string username;
-	
-	if(opArgs.size() == 3)
-		username = opArgs.back();
-	else if(opArgs.size() == 2)
-		username = getCallingUserName();
-		
-	string stateIdentifier;		 
 	Path componentPath;
     Path statePath;
     string binary;
     PathSet derivers;
     string derivationPath;
     bool isStatePath;
-    Derivation drv = getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath, true, isStatePath, derivers, username);
+    Strings program_args;
+    Derivation drv = getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args, true, derivers);
 	
 	if(!isStatePath)
 		throw UsageError(format("This path '%1%' is not a state path") % componentPath);
@@ -127,11 +136,11 @@ static void opShowStatePath(Strings opFlags, Strings opArgs)
 {
 	Path componentPath;
     Path statePath;
-    string stateIdentifier;
     string binary;
     string derivationPath;
     bool isStatePath;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath, isStatePath);
+    Strings program_args;
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args);
     
     if(!isStatePath)
 		throw UsageError(format("This path '%1%' is not a state path") % componentPath);
@@ -144,191 +153,175 @@ static void opShowStateReposRootPath(Strings opFlags, Strings opArgs)
 {
 	Path componentPath;
     Path statePath;
-    string stateIdentifier;
     string binary;
     string derivationPath;
     bool isStatePath;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath, isStatePath);
+    Strings program_args;
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args);
 	
 	if(!isStatePath)
 		throw UsageError(format("This path '%1%' is not a state path") % componentPath);
 	
 	//Get the a repository for this state location
 	string drvName = drv.env.find("name")->second;
-	string repos = makeStateReposPath("stateOutput:staterepospath", statePath, "/", drvName, stateIdentifier);		//this is a copy from store-state.cc
+	string repos = getStateReposPath("stateOutput:staterepospath", statePath, "/", drvName, stateIdentifier);		//this is a copy from store-state.cc
 
 	printMsg(lvlError, format("%1%") % repos);
 }
 
-
-PathSet getReferencesClosureWithState(const Path & storepath)
+//Comment TODO
+PathSet getAllStateDerivationsRecursively(const Path & storePath)
 {
-	PathSet paths;
-	store->storePathRequisites(storepath, false, paths, true);
+	//Get recursively all state paths
+	PathSet statePaths;
+	store->storePathStateRequisitesOnly(storePath, false, statePaths);		
 	
-	for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
-	{
-		printMsg(lvlError, format("REFCLOSURE %1%") % *i);
-	}
-
-	//return drvs !	(combo of component + state | component path)
-	//return single state paths
+	//Find the matching drv with the statePath
+	PathSet derivations;	
+	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
+		derivations.insert(store->queryStatePathDrv(*i));
+			
+	return derivations;
 }
-
-//TODO
-static void recheckrefsinstaterecursive()
-{
-
-	//PathSet state_references = scanForReferences(statePath, allPaths);
-	//PathSet state_stateReferences = scanForStateReferences(statePath, allStatePaths);
-	
-}
-
-
 
 static void opRunComponent(Strings opFlags, Strings opArgs)
 {
-    //get the derivation of the current component
-    
+    //get the all the info of the component that is being called (we dont really use it yet)
     Path componentPath;
     Path statePath;
-    string stateIdentifier;
     string binary;
 	string derivationPath;
 	bool isStatePath;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, stateIdentifier, binary, derivationPath, isStatePath);
-    DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
-    DerivationStateOutputs stateOutputs = drv.stateOutputs; 
-    DerivationOutputs outputs = drv.outputs;
-    string drvName = drv.env.find("name")->second;
+	Strings program_args;
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args);
+        
+    //Specifiy the SVN binarys
+    string svnbin = nixSVNPath + "/svn";
+	string svnadminbin = nixSVNPath + "/svnadmin";
     
-    //Check if component is a state component !!!
-    
-    //Check for locks ...
+        
+    //Check for locks ... ?
 	//add locks ... ?
 	//svn lock ... ?
-	
-    //******************* Run the component
-    //TODO
-    
-	
-	//******************* Afterwards, call the commit script (recursively)
 
     //get dependecies (if neccecary | recusively) of all state components that need to be updated
-    //
-	//TODO nix-store -qR $(nix-store -qd /nix/store/6x6glnb9idn53yxfqrz6wq53459vv3qd-firefox-2.0.0.3/)
+    //TODO maybe also scan the parameters for state or component hashes?
+    PathSet drvs = getAllStateDerivationsRecursively(componentPath);
 	
-	
+	//????	
 	//Transaction txn;
    	//createStoreTransaction(txn);
 	//txn.commit();
-	
-	//or noTxn		
 		
+	//******************* With everything in place, we call the commit script on all statePaths **********************
 	
-	//for(...){
-    //
-    //}
-    
-    string svnbin = nixSVNPath + "/svn";
-	string svnadminbin = nixSVNPath + "/svnadmin";
-
-	//Vector includeing all commit scripts:
-	vector<string> subversionedpaths;
-	vector<bool> subversionedpathsCommitBoolean;
-	vector<string> nonversionedpaths;			//of type none, no versioning needed
-	vector<string> checkoutcommands;
+	for (PathSet::iterator d = drvs.begin(); d != drvs.end(); ++d)
+	{
+		//Extract the neccecary info from each Drv
+		Path drvPath = *d;
+       	Derivation drv = derivationFromPath(drvPath);
+       	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
+    	Path statePath = stateOutputs.find("state")->second.statepath;
+	    DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
+	    string drvName = drv.env.find("name")->second; 
 	
-	//Get all the inverals from the database at once
-	PathSet intervalPaths;
-	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
-		DerivationStateOutputDir d = i->second;
-
-		string thisdir = d.path;
-		string fullstatedir = statePath + "/" + thisdir;
+		//Print
+		printMsg(lvlError, format("Committing statePath: %1%") % statePath);
+	
+		//Vector includeing all commit scripts:
+		vector<string> subversionedpaths;
+		vector<bool> subversionedpathsCommitBoolean;
+		vector<string> nonversionedpaths;			//of type none, no versioning needed
+		vector<string> checkoutcommands;
 		
-		if(d.type == "interval"){
-			intervalPaths.insert(fullstatedir);
+		//Get all the inverals from the database at once
+		PathSet intervalPaths;
+		for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
+			DerivationStateOutputDir d = i->second;
+	
+			string thisdir = d.path;
+			string fullstatedir = statePath + "/" + thisdir;
+			
+			if(d.type == "interval"){
+				intervalPaths.insert(fullstatedir);
+			}
 		}
+		vector<int> intervals = store->getStatePathsInterval(intervalPaths);
+		
+		int intervalAt=0;	
+		for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
+			DerivationStateOutputDir d = i->second;
+	
+			string thisdir = d.path;		//TODO CONVERT
+			
+			string fullstatedir = statePath + "/" + thisdir;
+			if(thisdir == "/")									//exception for the root dir
+				fullstatedir = statePath + "/";				
+			
+			if(d.type == "none"){
+				nonversionedpaths.push_back(fullstatedir);
+				continue;
+			}
+					
+			//Get the a repository for this state location
+			string repos = getStateReposPath("stateOutput:staterepospath", statePath, thisdir, drvName, stateIdentifier);		//this is a copy from store-state.cc
+					
+			//Add the checkout command in case its needed
+			checkoutcommands.push_back(svnbin + " --ignore-externals checkout file://" + repos + " " + fullstatedir);
+			subversionedpaths.push_back(fullstatedir);
+			
+			if(d.type == "interval"){
+				//Get the interval-counter from the database
+				int interval_counter = intervals[intervalAt];
+				int interval = d.getInterval();
+				subversionedpathsCommitBoolean.push_back(interval_counter % interval == 0);
+	    		
+				//update the interval
+				intervals[intervalAt] = interval_counter + 1;
+				intervalAt++;
+			}
+			else if(d.type == "full")
+				subversionedpathsCommitBoolean.push_back(true);
+			else if(d.type == "manual")											//TODO !!!!!
+				subversionedpathsCommitBoolean.push_back(false);
+			else
+				throw Error(format("interval '%1%' is not handled in nix-state") % d.type);
+		}
+		
+		//Update the intervals again	
+		//store->setStatePathsInterval(intervalPaths, intervals);	//TODO UNCOMMENT
+			
+		//Call the commit script with the appropiate paramenters
+		string subversionedstatepathsarray; 
+		for (vector<string>::iterator i = subversionedpaths.begin(); i != subversionedpaths.end(); ++i)
+	    {
+			subversionedstatepathsarray += *(i) + " ";
+	    }
+		string subversionedpathsCommitBooleansarray; 
+		for (vector<bool>::iterator i = subversionedpathsCommitBoolean.begin(); i != subversionedpathsCommitBoolean.end(); ++i)
+	    {
+			subversionedpathsCommitBooleansarray += bool2string(*i) + " ";
+	    }
+		string nonversionedstatepathsarray; 
+		for (vector<string>::iterator i = nonversionedpaths.begin(); i != nonversionedpaths.end(); ++i)
+	    {
+			nonversionedstatepathsarray += *(i) + " ";
+	    }
+		string commandsarray; 
+		for (vector<string>::iterator i = checkoutcommands.begin(); i != checkoutcommands.end(); ++i)
+	    {
+			//#HACK: I cant seem to find a way for bash to parse a 2 dimensional string array as argument, so we use a 1-d array with '|' as seperator
+			commandsarray += "" + *(i) + " | ";
+	    }
+	  	
+	    //make the call
+	    executeAndPrintShellCommand(nixLibexecDir + "/nix/nix-statecommit.sh " + svnbin + 
+	    																   " \"" + subversionedstatepathsarray + "\" " +
+	    																   " \"" + subversionedpathsCommitBooleansarray + "\" " +
+	    																   " \"" + nonversionedstatepathsarray + "\" " +
+	    																   " \"" + commandsarray + "\" ",
+	    																   "commit-script");
 	}
-	vector<int> intervals = store->getStatePathsInterval(intervalPaths);
-	
-	int intervalAt=0;	
-	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
-		DerivationStateOutputDir d = i->second;
-
-		string thisdir = d.path;		//TODO CONVERT
-		
-		string fullstatedir = statePath + "/" + thisdir;
-		if(thisdir == "/")									//exception for the root dir
-			fullstatedir = statePath + "/";				
-		
-		
-		//Path fullStatePath = fullstatedir;					//TODO call coerce function		//TODO REMOVE?
-
-		if(d.type == "none"){
-			nonversionedpaths.push_back(fullstatedir);
-			continue;
-		}
-				
-		//Get the a repository for this state location
-		string repos = makeStateReposPath("stateOutput:staterepospath", statePath, thisdir, drvName, stateIdentifier);		//this is a copy from store-state.cc
-				
-		//
-		checkoutcommands.push_back(svnbin + " --ignore-externals checkout file://" + repos + " " + fullstatedir);
-		subversionedpaths.push_back(fullstatedir);
-		
-		if(d.type == "interval"){
-			//Get the interval-counter from the database
-			int interval_counter = intervals[intervalAt];
-			int interval = d.getInterval();
-			subversionedpathsCommitBoolean.push_back(interval_counter % interval == 0);
-    		
-			//update the interval
-			intervals[intervalAt] = interval_counter + 1;
-			intervalAt++;
-		}
-		else if(d.type == "full")
-			subversionedpathsCommitBoolean.push_back(true);
-		else if(d.type == "manual")											//TODO !!!!!
-			subversionedpathsCommitBoolean.push_back(false);
-		else
-			throw Error(format("interval '%1%' is not handled in nix-state") % d.type);
-	}
-	
-	//Update the intervals again
-	//store->setStatePathsInterval(intervalPaths, intervals);
-		
-	//Call the commit script with the appropiate paramenters
-	string subversionedstatepathsarray; 
-	for (vector<string>::iterator i = subversionedpaths.begin(); i != subversionedpaths.end(); ++i)
-    {
-		subversionedstatepathsarray += *(i) + " ";
-    }
-	string subversionedpathsCommitBooleansarray; 
-	for (vector<bool>::iterator i = subversionedpathsCommitBoolean.begin(); i != subversionedpathsCommitBoolean.end(); ++i)
-    {
-		subversionedpathsCommitBooleansarray += bool2string(*i) + " ";
-    }
-	string nonversionedstatepathsarray; 
-	for (vector<string>::iterator i = nonversionedpaths.begin(); i != nonversionedpaths.end(); ++i)
-    {
-		nonversionedstatepathsarray += *(i) + " ";
-    }
-	string commandsarray; 
-	for (vector<string>::iterator i = checkoutcommands.begin(); i != checkoutcommands.end(); ++i)
-    {
-		//#HACK: I cant seem to find a way for bash to parse a 2 dimensional string array as argument, so we use a 1-d array with '|' as seperator
-		commandsarray += "" + *(i) + " | ";
-    }
-  	
-    //make the call
-    executeAndPrintShellCommand(nixLibexecDir + "/nix/nix-statecommit.sh " + svnbin + 
-    																   " \"" + subversionedstatepathsarray + "\" " +
-    																   " \"" + subversionedpathsCommitBooleansarray + "\" " +
-    																   " \"" + nonversionedstatepathsarray + "\" " +
-    																   " \"" + commandsarray + "\" ",
-    																   "commit-script");
 }
 
 
@@ -337,6 +330,7 @@ void run(Strings args)
 {
     Strings opFlags, opArgs;
     Operation op = 0;
+    
 
 	/* test *
 	store = openStore();
@@ -363,10 +357,18 @@ void run(Strings args)
 	printMsg(lvlError, format("1: %1%") % bool2string( store->isStateComponent("/nix/store/7xkw5fkz5yw7dpx0pc6l12bh9a56135c-hellostateworld-1.0") ) );
 	printMsg(lvlError, format("2: %1%") % bool2string( store->isStateComponent("/nix/store/05441jm8xmsidqm43ivk0micckf0mr2m-nvidiaDrivers") ) );
 	printMsg(lvlError, format("3: %1%") % bool2string( store->isStateDrvPath("/nix/store/2hpx60ibdfv2pslg4rjvp177frijamvi-hellostateworld-1.0.drv") ) );
+	
+	store = openStore();
+	convertStatePathsToDerivations(noTxn, "");
 	return;
 	
+	store = openStore();
+	Path p = store->queryStatePathDrv("/nix/state/6g6kfgimz8szznlshf13s29fn01zp99d-hellohardcodedstateworld-1.0-test2");
+	printMsg(lvlError, format("Result: %1%") % p);
+	return;
+
 	*/
-	
+
 	/* test */
 	
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
@@ -374,7 +376,7 @@ void run(Strings args)
 
         Operation oldOp = op;
 		
-        if (arg == "--run" || arg == "-r")
+        if (arg == "--commit" || arg == "-c")
             op = opRunComponent;
 		else if (arg == "--showstatepath")
 			op = opShowStatePath;
@@ -400,22 +402,23 @@ void run(Strings args)
 		
 		--delete state?
 		
-		--user=...
-		
-		--show-state-references- -rev = ...
-		--show-state-references-current			//in nix-store
-		--show-state-referrers- -rev = ...
-		--show-state-referrers-current			//in nix-store
-		
         */
-
+        
+        else if (arg.substr(0,13) == "--identifier=")
+        	stateIdentifier = arg.substr(13,arg.length());
+        else if (arg.substr(0,7) == "--user=")
+        	username = arg.substr(7,arg.length());
         else
             opArgs.push_back(arg);
 
         if (oldOp && oldOp != op)
             throw UsageError("only one operation may be specified");
     }
+    
+    if(username == "")
+		username = getCallingUserName();
 
+	printMsg(lvlError, format("%1% - %2%") % stateIdentifier % username);
     
     if (!op) throw UsageError("no operation specified");
     

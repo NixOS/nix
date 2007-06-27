@@ -22,12 +22,15 @@ nonversionedpaths=( $4 )
 checkouts=( $5 )
 deletesvn=$6							#this flag can be set to 1 to DELETE all .svn folders and NOT commit
 
-echo svnbin: $svnbin
-echo subversionedpaths: ${subversionedpaths[@]}
-echo subversionedpathsCommitBools: ${subversionedpathsCommitBools[@]}
-echo nonversionedpaths: ${nonversionedpaths[@]}
-echo checkouts: ${checkouts[@]}
-echo deletesvn: $deletesvn
+
+if [ "$debug" != "" ] ; then
+	echo svnbin: $svnbin
+	echo subversionedpaths: ${subversionedpaths[@]}
+	echo subversionedpathsCommitBools: ${subversionedpathsCommitBools[@]}
+	echo nonversionedpaths: ${nonversionedpaths[@]}
+	echo checkouts: ${checkouts[@]}
+	echo deletesvn: $deletesvn
+fi
 
 #
 #

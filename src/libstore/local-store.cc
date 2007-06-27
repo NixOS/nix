@@ -507,16 +507,24 @@ void LocalStore::queryStateReferrers(const Path & storePath, PathSet & stateRefe
 
 void setDeriver(const Transaction & txn, const Path & storePath, const Path & deriver)
 {
+    printMsg(lvlError, format("xxxxxxxxxxxxxxxxxxxxxxx"));
+    
     assertStorePath(storePath);
+    printMsg(lvlError, format("Ttttttttttttttttttttttttt"));
     if (deriver == "") return;
+    printMsg(lvlError, format("uuuuuuuuuuuuuuuuuuuuuuuuuuuuu"));
     assertStorePath(deriver);
+    printMsg(lvlError, format("yyyyyyyyyyyyyyyyyyyyyyyyy"));
+    
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
     
     if (isStateDrvPathTxn(txn, deriver)){							//Redirect if its a state component
+    	printMsg(lvlError, format("bbbbbbbbbbbbbbb"));
     	addStateDeriver(txn, storePath, deriver);
 	}		
     else{
+	    printMsg(lvlError, format("ccccccccccccccccccc"));
 	    nixDB.setString(txn, dbDerivers, storePath, deriver);
     }
 }
@@ -530,12 +538,18 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
 
+	printMsg(lvlError, format("dddddddddddddd"));
+
 	Derivation drv = derivationFromPath(deriver);
 	string identifier = drv.stateOutputs.find("state")->second.stateIdentifier;
 	string user = drv.stateOutputs.find("state")->second.username;
+	
+	printMsg(lvlError, format("eeeeeeeeeeeeeeeeee"));
 		
 	PathSet currentDerivers = queryDerivers(txn, storePath, identifier, user); 
 	PathSet updatedDerivers = mergeNewDerivationIntoList(storePath, deriver, currentDerivers, true);
+
+	printMsg(lvlError, format("ffffffffffffffffffff"));
 
 	Strings data;    	
 	for (PathSet::iterator i = updatedDerivers.begin(); i != updatedDerivers.end(); ++i)		//Convert Paths to Strings
@@ -597,7 +611,7 @@ Path queryDeriver(const Transaction & txn, const Path & storePath)
     bool b = nixDB.queryString(txn, dbDerivers, storePath, deriver);
     
     Derivation drv = derivationFromPath(deriver);		
-    if (drv.outputs.size() != 0)
+    if (isStateDrvTxn(txn, drv))
     	throw Error(format("This deriver `%1%' is a state deriver, u should use queryDerivers instead of queryDeriver") % deriver);
     	    
     if (b)
@@ -769,18 +783,14 @@ void clearSubstitutes()
 
 static void setHash(const Transaction & txn, const Path & storePath, const Hash & hash, bool stateHash = false)
 {
-    if(stateHash){
-    	nixDB.setString(txn, dbValidStatePaths, storePath, "");
-    }
-    else{
-    	nixDB.setString(txn, dbValidPaths, storePath, "sha256:" + printHash(hash));
-    	assert(hash.type == htSHA256);
-    }
+   	nixDB.setString(txn, dbValidPaths, storePath, "sha256:" + printHash(hash));
+   	assert(hash.type == htSHA256);
 }
 
-static void setStateHash(const Transaction & txn, const Path & storePath, const Hash & hash)
+static void setStateValid(const Transaction & txn, const Path & statePath, const Path & drvPath)
 {
-	setHash(txn, storePath, hash, true);
+	printMsg(lvlError, format("setStateValid: '%1%' '%2%'") % statePath % drvPath);
+	nixDB.setString(txn, dbValidStatePaths, statePath, drvPath);
 }
 
 static Hash queryHash(const Transaction & txn, const Path & storePath)
@@ -804,6 +814,20 @@ Hash LocalStore::queryPathHash(const Path & path)
     if (!isValidPath(path))
         throw Error(format("path `%1%' is not valid") % path);
     return queryHash(noTxn, path);
+}
+
+static Path queryStatePathDrv(const Transaction & txn, const Path & statePath)
+{
+	string s;
+    nixDB.queryString(txn, dbValidStatePaths, statePath, s);
+    return s;
+}
+
+Path LocalStore::queryStatePathDrv(const Path & statePath)
+{
+    if (!isValidStatePath(statePath))
+        throw Error(format("statepath `%1%' is not valid") % statePath);
+    return nix::queryStatePathDrv(noTxn, statePath);
 }
 
 
@@ -839,19 +863,18 @@ void registerValidPaths(const Transaction & txn, const ValidPathInfos & infos)
         setHash(txn, i->path, i->hash);
 
 		if (i->statePath != "")
-			setStateHash(txn, i->statePath, Hash());		//the hash value in the db now becomes empty, but if the key exists, we know that the state path is valid 
+			setStateValid(txn, i->statePath, i->deriver);			//if the key exists, we know that the state path is valid, we set the value to the drvPath 
 
         setReferences(txn, i->path, i->references, i->stateReferences);
-                
+        
         /* Check that all referenced paths are also valid (or about to) become valid). */
+        //TODO Maybe also check this for stateReferences????
         for (PathSet::iterator j = i->references.begin();
              j != i->references.end(); ++j)
             if (!isValidPathTxn(txn, *j) && newPaths.find(*j) == newPaths.end())
                 throw Error(format("cannot register path `%1%' as valid, since its reference `%2%' is invalid")
                     % i->path % *j);
-
-		//TODO Also do this for stateReferences????
-
+		
         setDeriver(txn, i->path, i->deriver);
     }
 }
@@ -1489,9 +1512,77 @@ void storePathRequisites(const Path & storePath, const bool includeOutputs, Path
     }
 }
 
+/*
+ * Same as storePathRequisites with withState=true, but now only returns the state paths
+ */
+void storePathStateRequisitesOnlyTxn(const Transaction & txn, const Path & storePath, const bool includeOutputs, PathSet & statePaths)
+{
+	PathSet paths;
+	storePathRequisites(storePath, includeOutputs, paths, true);
+	
+	//filter out all non-state paths
+	for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i){
+		if (isValidStatePathTxn(txn, *i))
+			statePaths.insert(*i);
+	}	
+}
+
+void LocalStore::storePathStateRequisitesOnly(const Path & storePath, const bool includeOutputs, PathSet & statePaths)
+{
+	nix::storePathStateRequisitesOnlyTxn(noTxn, storePath, includeOutputs, statePaths);
+}
 void LocalStore::storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState)
 {
     return nix::storePathRequisites(storePath, includeOutputs, paths, withState);
+}
+
+void convertStatePathsToDerivations(const Transaction & txn, const Path & storePath)
+{
+	//TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	
+}
+
+void getDependenciesAtBuildTime(const Transaction & txn, const Path & drvPath)
+{
+ 	Derivation drv = derivationFromPath(drvPath);	
+ 	PathSet allPaths;
+ 	PathSet inputPaths; 
+ 		 	
+ 	//TODO THIS IS A DIRECT COPY FROM BUILD.CC WE SHOULD MERGE !!!!!!!!!!!!1!!!!!!!!!!!!!
+ 	
+ 	/* The outputs are referenceable paths. */ 
+    for (DerivationOutputs::iterator i = drv.outputs.begin();
+         i != drv.outputs.end(); ++i)
+    {
+        debug(format("building path `%1%'") % i->second.path);
+        allPaths.insert(i->second.path);
+    } 
+
+    /* First, the input derivations. */
+    for (DerivationInputs::iterator i = drv.inputDrvs.begin();
+         i != drv.inputDrvs.end(); ++i)
+    {
+        /* Add the relevant output closures of the input derivation
+           `*i' as input paths.  Only add the closures of output paths
+           that are specified as inputs. */ 
+        assert(store->isValidPath(i->first));
+        Derivation inDrv = derivationFromPath(i->first);
+        for (StringSet::iterator j = i->second.begin(); j != i->second.end(); ++j)
+            if (inDrv.outputs.find(*j) != inDrv.outputs.end())
+                computeFSClosure(inDrv.outputs[*j].path, inputPaths, false);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
+            else
+                throw Error(format("derivation `%1%' requires non-existent output `%2%' from input derivation `%3%'") % drvPath % *j % i->first);
+    }
+
+    /* Second, the input sources. */
+    for (PathSet::iterator i = drv.inputSrcs.begin(); i != drv.inputSrcs.end(); ++i)
+        computeFSClosure(*i, inputPaths, false);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
+
+    //debug(format("added input paths %1%") % showPaths(inputPaths)); //TODO
+    allPaths.insert(inputPaths.begin(), inputPaths.end());
+    
+    for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
+    	printMsg(lvlError, format("ALLPATHS2: %1%") % *i);
 }
 
 /* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */
