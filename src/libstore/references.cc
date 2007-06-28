@@ -152,17 +152,5 @@ PathSet scanForReferences(const string & path, const PathSet & paths)
     return found;
 }
 
-/* A wrapper for now, but we may extend */
-PathSet scanForStateReferences(const string & path, const PathSet & statePaths)
-{
-    return scanForReferences(path, statePaths);
-}
-
-PathSet scanForALLReferences(const string & path)
-{
-	PathSet p;
-	throw Error("TODO");
-	return p; 
-}
  
 }

@@ -63,7 +63,7 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
     isStatePath = store->isStateComponent(componentPath);
       
     //Extract the program arguments
-    string allargs;
+    string allArgs;
     if(opArgs.size() > 1){
 		opArgs.pop_front();
 		allArgs = opArgs.front();
@@ -72,7 +72,7 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
 		//Strings progam_args_strings = tokenizeString(allArgs, " ");
     }
 
-	printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % stateIdentifier % binary % username % allargs);
+	printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % stateIdentifier % binary % username % allArgs);
     
     if(isStatePath)
     	derivers = queryDerivers(noTxn, componentPath, stateIdentifier, username);
@@ -200,13 +200,17 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	string svnadminbin = nixSVNPath + "/svnadmin";
     
         
-    //Check for locks ... ?
+    //Check for locks ... ? or put locks on the neseccary state components
+    //WARNING: we need to watch out for deadlocks!
 	//add locks ... ?
 	//svn lock ... ?
 
     //get dependecies (if neccecary | recusively) of all state components that need to be updated
-    //TODO maybe also scan the parameters for state or component hashes?
     PathSet drvs = getAllStateDerivationsRecursively(componentPath);
+    
+    
+    //TODO maybe also scan the parameters for state or component hashes?
+    //program_args
 	
 	//????	
 	//Transaction txn;
@@ -215,7 +219,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	
 	//******************* Run ****************************
 	
-	executeShellCommand(componentPath + binary);	//more efficient way needed ???
+	executeShellCommand(componentPath + binary + " " + program_args);	//more efficient way needed ???
   		
 	//******************* With everything in place, we call the commit script on all statePaths **********************
 	
@@ -367,15 +371,19 @@ void run(Strings args)
 	printMsg(lvlError, format("3: %1%") % bool2string( store->isStateDrvPath("/nix/store/2hpx60ibdfv2pslg4rjvp177frijamvi-hellostateworld-1.0.drv") ) );
 	
 	store = openStore();
-	convertStatePathsToDerivations(noTxn, "");
-	return;
-	
-	store = openStore();
 	Path p = store->queryStatePathDrv("/nix/state/6g6kfgimz8szznlshf13s29fn01zp99d-hellohardcodedstateworld-1.0-test2");
 	printMsg(lvlError, format("Result: %1%") % p);
 	return;
 
+	
 	*/
+	
+	string path = "afddsafsdafsdaf.drv";
+	printMsg(lvlError, format("Result: %1%") % path.substr(path.length() - 4,path.length()));
+	
+	store = openStore();
+	store->scanForAllReferences("/nix/state/0qhlpz1ji4gvg3j6nk5vkcddmi3m5x1r-hellohardcodedstateworld-1.0-test2");
+	return;
 	
 	/* test */
 	
@@ -399,7 +407,7 @@ void run(Strings args)
 
 		--run-without-commit
 		
-		--backup
+		--backup ?
 		
 		--exclude-commit-paths
 		
@@ -407,7 +415,9 @@ void run(Strings args)
 		
 		--revert-to-state	(recursive revert...)
 		
-		--delete state?
+		--delete-state
+		
+		--share-from
 		
         */
         

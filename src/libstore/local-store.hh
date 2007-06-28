@@ -100,6 +100,10 @@ public:
 	
 	void storePathStateRequisitesOnly(const Path & storePath, const bool includeOutputs, PathSet & statePaths);
 	
+	void scanForAllReferences(const Path & statePath);
+	
+	void scanForAllReferencesRecusively(const Path & storePath);
+	
 };
 
 
@@ -209,8 +213,6 @@ bool isStateComponentTxn(const Transaction & txn, const Path & path);
 bool isStateDrvPathTxn(const Transaction & txn, const Path & drvPath);
 
 bool isStateDrvTxn(const Transaction & txn, const Derivation & drv);
-
-void convertStatePathsToDerivations(const Transaction & txn, const Path & storePath);
  
 }
 

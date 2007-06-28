@@ -1052,41 +1052,20 @@ string trim(const string & s) {
 }
 
 
-//executes a shell command and captures and prints the output.
-
-//TODO , check if we can replace!!! with runProgram  like this: string a = runProgram("whoami", true, s);
-
-/*
- 
- Strings args;
- args.push_back("rsautl");
- args.push_back("-sign");
- args.push_back("-inkey");
- args.push_back(secretKey);
- args.push_back("-in");
- args.push_back(hashFile);
- string signature = runProgram(OPENSSL_PATH, true, args);
-  
- */
-
+//executes a shell command, captures and prints the output.
 void runProgram_AndPrintOutput(Path program, bool searchPath, const Strings & args, const string outputPrefix)
 {
 	string program_output = runProgram(program, searchPath, args);
 
 	//Add the prefix on every line
-	//TODO
-	
 	Strings lines = tokenizeString(program_output, "\n");
 	for (Strings::const_iterator i = lines.begin(); i != lines.end(); ++i){
 		if(trim(*i) != "")
-			printMsg(lvlError, format("[%2%]- %1%") % *i % outputPrefix);
+			printMsg(lvlError, format("[%2%]: %1%") % *i % outputPrefix);
 	}
-	
-	//Remove the trailing \n
-    //size_t found = program_output.find_last_of("\n");
-	//printMsg(lvlError, format("%1%") % program_output.substr(0,found));
 }
 
+//executes a direct shell command (faster)
 void executeShellCommand(const string & command)
 {
 	int kidstatus, deadpid;

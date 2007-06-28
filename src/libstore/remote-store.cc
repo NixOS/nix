@@ -463,4 +463,18 @@ void RemoteStore::storePathStateRequisitesOnly(const Path & storePath, const boo
 	
 }
 
+//TODO
+void RemoteStore::scanForAllReferences(const Path & statePath)
+{
+	
+}
+
+//TODO	
+void RemoteStore::scanForAllReferencesRecusively(const Path & storePath)
+{
+	
+}
+
+
+
 }

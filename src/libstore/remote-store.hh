@@ -87,6 +87,10 @@ public:
 	void storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState);
 
 	void storePathStateRequisitesOnly(const Path & storePath, const bool includeOutputs, PathSet & statePaths);
+	
+	void scanForAllReferences(const Path & statePath);
+	
+	void scanForAllReferencesRecusively(const Path & storePath);
     
 private:
     AutoCloseFD fdSocket;

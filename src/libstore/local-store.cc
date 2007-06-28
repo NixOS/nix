@@ -1,3 +1,4 @@
+#include "references.hh"
 #include "config.h"
 #include "local-store.hh"
 #include "util.hh"
@@ -96,7 +97,6 @@ static TableId dbSubstitutes = 0;
    derivations specifying an expected hash). */
 static TableId dbDerivers = 0;
 
-
 /* dbStateCounters :: StatePath -> Int
 
    This table lists the state folders that state managed components
@@ -104,8 +104,7 @@ static TableId dbDerivers = 0;
 */
 static TableId dbStateCounters = 0;
 
-
-/* dbStateCounters :: Path -> String
+/* dbStateInfo :: Path -> DerivationPath
 
    This table lists the all the state managed components, TODO we could store the entire DRV in here in the future
     
@@ -852,10 +851,10 @@ void registerValidPaths(const Transaction & txn, const ValidPathInfos & infos)
         assertStorePath(i->path);
 
         debug(format("registering path `%1%'") % i->path);
-        setHash(txn, i->path, i->hash);
+        setHash(txn, i->path, i->hash);								//set path valid
 
 		if (i->statePath != "")
-			setStateValid(txn, i->statePath, i->deriver);			//if the key exists, we know that the state path is valid, we set the value to the drvPath 
+			setStateValid(txn, i->statePath, i->deriver);			//set state path valid 
 
         setReferences(txn, i->path, i->references, i->stateReferences);
         
@@ -1504,6 +1503,11 @@ void storePathRequisites(const Path & storePath, const bool includeOutputs, Path
     }
 }
 
+void LocalStore::storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState)
+{
+    return nix::storePathRequisites(storePath, includeOutputs, paths, withState);
+}
+
 /*
  * Same as storePathRequisites with withState=true, but now only returns the state paths
  */
@@ -1523,17 +1527,15 @@ void LocalStore::storePathStateRequisitesOnly(const Path & storePath, const bool
 {
 	nix::storePathStateRequisitesOnlyTxn(noTxn, storePath, includeOutputs, statePaths);
 }
-void LocalStore::storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState)
-{
-    return nix::storePathRequisites(storePath, includeOutputs, paths, withState);
-}
 
-void convertStatePathsToDerivations(const Transaction & txn, const Path & storePath)
-{
-	//TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	
-}
 
+
+/*
+ * TODO
+ * 
+ * Not used yet ......................... (should we use it .... ???)
+ * 
+ */
 void getDependenciesAtBuildTime(const Transaction & txn, const Path & drvPath)
 {
  	Derivation drv = derivationFromPath(drvPath);	
@@ -1576,6 +1578,64 @@ void getDependenciesAtBuildTime(const Transaction & txn, const Path & drvPath)
     for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
     	printMsg(lvlError, format("ALLPATHS2: %1%") % *i);
 }
+
+void scanForAllReferences(const Transaction & txn, const Path & statePath)
+{
+	//get all possible state and component references
+	
+	Paths referencesKeys;
+	Paths referencesKeys2;
+	Paths stateReferencesKeys;
+    nixDB.enumTable(txn, dbReferences, referencesKeys);
+    nixDB.enumTable(txn, dbStateReferences, stateReferencesKeys);
+    
+    for (Paths::iterator i = stateReferencesKeys.begin(); i != stateReferencesKeys.end(); ++i)
+    	printMsg(lvlError, format("STATE: %1%") % *i);
+    
+    //Remove derivation paths .....
+    for (Paths::iterator i = referencesKeys.begin(); i != referencesKeys.end(); ++i){
+    	string path = *i;
+    	//printMsg(lvlError, format("refkey: %1%") % path);
+    	if(path.substr(path.length() - 4,path.length()) != ".drv")		//TODO HACK: we should have a typed table or a seperate table ....
+    		referencesKeys2.push_back(path);
+    }
+
+	//Merge
+	PathSet scanPaths =	mergePathSets(PathSet(referencesKeys2.begin(), referencesKeys2.end()), 
+									  PathSet(stateReferencesKeys.begin(), stateReferencesKeys.end()));  
+    
+    //for (PathSet::iterator i = scanPaths.begin(); i != scanPaths.end(); ++i)
+    //	printMsg(lvlError, format("SCANNED: %1%") % *i);
+    
+    //Scan in statePath
+    PathSet scannedReferences = scanForReferences(statePath, scanPaths);
+    
+    for (PathSet::iterator i = scannedReferences.begin(); i != scannedReferences.end(); ++i)
+    	printMsg(lvlError, format("RESULT: %1%") % *i);
+}
+
+void LocalStore::scanForAllReferences(const Path & statePath)
+{
+    return nix::scanForAllReferences(noTxn, statePath);
+}
+
+void scanForAllReferencesRecusively(const Transaction & txn, const Path & storePath)
+{
+	//get all state references
+	
+	//call scanForAllReferences on all
+	
+	//compare results with the current registered component and state paths
+	
+	//update the extra references in a new table??? why??? 
+	//(remember we need to keep the old as the basis, and things can change, the db is not consisten anymore then ....) and error if neseccary
+}
+
+void LocalStore::scanForAllReferencesRecusively(const Path & storePath)
+{
+    return nix::scanForAllReferencesRecusively(noTxn, storePath);
+}
+
 
 /* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */
 static void upgradeStore07()

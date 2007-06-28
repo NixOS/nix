@@ -1759,9 +1759,10 @@ void DerivationGoal::computeClosure()
      * [scan for and state references and component references in the state path]	//3,4
      */
     
-    //TODO we scan for each output, be then we do multiple scans inside for the state path .....
+    //TODO we scan for each output-path, be then we do multiple scans on the state path if there are more ouputs paths then 1.....
     
-    //TODO !!!!!!!!! we don not ONLY need to scan all outputs, but also (recursively) the component references in the state folders 
+    //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // WE NOW ONLY REGISTER COMPONETS PATHS WITH registerValidPath BUT WE SHOULD ALSO REGISTER STATE PAHTS AS VALID AND SET THEIR REFERENCES !!!!!!!!!!!!!!!!!!!!!!!
     
     for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
     {    
@@ -1769,7 +1770,7 @@ void DerivationGoal::computeClosure()
     	
     	/* For this state-output path, find the references to other paths contained in it. 
 		 * Get the state paths (instead of out paths) from all components, and then call
-		 * scanForStateReferences().
+		 * scanForReferences().
 		 */
 		PathSet allStatePaths;
 		for (PathSet::const_iterator i = allPaths.begin(); i != allPaths.end(); i++){
@@ -1783,7 +1784,7 @@ void DerivationGoal::computeClosure()
 		}
 		
 		//We scan for state references in the component path
-		PathSet all_state_references = scanForStateReferences(path, allStatePaths);
+		PathSet all_state_references = scanForReferences(path, allStatePaths);
 			
 		//If state is enabled: Seaches for state and component references in the state path 				 
 		if(isStateDrvTxn(txn, drv)){
@@ -1791,7 +1792,7 @@ void DerivationGoal::computeClosure()
 			printMsg(lvlTalkative, format("scanning for component and state references inside `%1%'") % statePath);
 			
 			PathSet state_references = scanForReferences(statePath, allPaths);
-			PathSet state_stateReferences = scanForStateReferences(statePath, allStatePaths);
+			PathSet state_stateReferences = scanForReferences(statePath, allStatePaths);
 			all_state_references = mergePathSets(all_state_references, mergePathSets(state_references, state_stateReferences));
 			
 			statePaths[path] = statePath; 
@@ -1799,15 +1800,13 @@ void DerivationGoal::computeClosure()
 		else
 			statePaths[path] = "";
 
-		for (PathSet::const_iterator i = allStatePaths.begin(); i != allStatePaths.end(); i++){
+		//debugging
+		for (PathSet::const_iterator i = allStatePaths.begin(); i != allStatePaths.end(); i++)
 			debug(format("all possible StatePaths: %1%") % (*i));
-		}
-		for (PathSet::const_iterator i = all_state_references.begin(); i != all_state_references.end(); i++){
+		for (PathSet::const_iterator i = all_state_references.begin(); i != all_state_references.end(); i++)
 			debug(format("state References scanned: %1%") % (*i));
-		}
 		
 		allStateReferences[path] = all_state_references;
-		
     }
     
     for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
