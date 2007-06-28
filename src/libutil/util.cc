@@ -1069,43 +1069,26 @@ string trim(const string & s) {
   
  */
 
-string runProgram_AndPrintOutput(Path program, bool searchPath, const Strings & args, const string outputPrefix)
+void runProgram_AndPrintOutput(Path program, bool searchPath, const Strings & args, const string outputPrefix)
 {
-	string program_output = runProgram(program, true, args);
+	string program_output = runProgram(program, searchPath, args);
 
 	//Add the prefix on every line
 	//TODO
-		
+	
+	Strings lines = tokenizeString(program_output, "\n");
+	for (Strings::const_iterator i = lines.begin(); i != lines.end(); ++i){
+		if(trim(*i) != "")
+			printMsg(lvlError, format("[%2%]- %1%") % *i % outputPrefix);
+	}
+	
 	//Remove the trailing \n
-    size_t found = program_output.find_last_of("\n");
-	printMsg(lvlError, format("%1%") % program_output.substr(0,found));
+    //size_t found = program_output.find_last_of("\n");
+	//printMsg(lvlError, format("%1%") % program_output.substr(0,found));
 }
 
-void executeAndPrintShellCommand(const string & command, const string & commandName, const bool & captureOutput)
+void executeShellCommand(const string & command)
 {
-	///////////////////////
-	
-	if(captureOutput){
-		Strings progam_args = tokenizeStringWithQuotes(command);
-		string program_command = progam_args.front();
-		progam_args.pop_front();
-		
-		string program_output = runProgram(program_command, true, progam_args);
-		
-		//Remove the trailing \n
-    	size_t found = program_output.find_last_of("\n");
-		printMsg(lvlError, format("%1%") % program_output.substr(0,found));
-		return;	
-	}
-		
-	/////////////////////
-	
-	string tempoutput = "/tmp/svnoutput.txt";
-	string newcommand = command;
-	
-	if(captureOutput)
-		newcommand += " &> " + tempoutput;		//the  &> sends also stderr to stdout
-
 	int kidstatus, deadpid;
 	pid_t kidpid = fork();
     switch (kidpid) {
@@ -1113,36 +1096,17 @@ void executeAndPrintShellCommand(const string & command, const string & commandN
 	        throw SysError("unable to fork");
 	    case 0:
 	        try { // child
-	            int rv = system(newcommand.c_str());
+	            int rv = system(command.c_str());
 				//int rv = execlp(svnbin.c_str(), svnbin.c_str(), ">", tempoutput.c_str(), NULL);		//TODO make this work ... ?
 				
-				string line;
-				std::ifstream myfile (tempoutput.c_str());
-				
-				if(captureOutput){
-					if (myfile.is_open()){
-						while (! myfile.eof() )
-					    {
-					      getline (myfile,line);
-					      if(trim(line) != "")
-						      printMsg(lvlError, format("[%2%]: %1%") % line % commandName);
-					    }
-					    myfile.close();
-					}
-					else{
-						throw SysError("executeAndPrintShellCommand(..) error");
-		            	quickExit(1);
-					} 
-				}
-	            
 				if (rv == -1) {
-					throw SysError("executeAndPrintShellCommand(..) error");
+					throw SysError("executeShellCommand(..) error");
 					quickExit(99);
 				}
 		        quickExit(0);
 				
 	        } catch (std::exception & e) {
-	            std::cerr << format("executeAndPrintShellCommand(..) child error: %1%\n") % e.what();
+	            std::cerr << format("executeShellCommand(..) child error: %1%\n") % e.what();
 	            quickExit(1);
 	        }
     }
@@ -1152,9 +1116,6 @@ void executeAndPrintShellCommand(const string & command, const string & commandN
         std::cerr << format("state child waitpid error\n");
         quickExit(1);
     }
-    
-    if(captureOutput)
-    	remove(tempoutput.c_str());	//Remove the tempoutput file
 }
 
 string time_t2string(const time_t & t)

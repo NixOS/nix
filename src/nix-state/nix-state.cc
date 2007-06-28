@@ -213,7 +213,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	
 	//******************* Run ****************************
 	
-	executeAndPrintShellCommand(componentPath + binary, "", false);			//more efficient way needed ???
+	executeShellCommand(componentPath + binary);	//more efficient way needed ???
   		
 	//******************* With everything in place, we call the commit script on all statePaths **********************
 	
@@ -317,12 +317,13 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	    }
 	  	
 	    //make the call
-	    executeAndPrintShellCommand(nixLibexecDir + "/nix/nix-statecommit.sh " + svnbin + 
-	    																   " \"" + subversionedstatepathsarray + "\" " +
-	    																   " \"" + subversionedpathsCommitBooleansarray + "\" " +
-	    																   " \"" + nonversionedstatepathsarray + "\" " +
-	    																   " \"" + commandsarray + "\" ",
-	    																   "commit-script", true);
+	    Strings p_args;
+		p_args.push_back(svnbin);
+		p_args.push_back(subversionedstatepathsarray);
+		p_args.push_back(subversionedpathsCommitBooleansarray);
+		p_args.push_back(nonversionedstatepathsarray);
+		p_args.push_back(commandsarray);
+		runProgram_AndPrintOutput(nixLibexecDir + "/nix/nix-statecommit.sh", true, p_args, "svn");
 	    																   
 	   	//TODO
 	   	//Scan again??

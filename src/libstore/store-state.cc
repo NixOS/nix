@@ -39,7 +39,12 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 
 	//Make sure the 'root' path which holds the repositorys exists, so svn doenst complain.
 	string repos_root_path = getStateReposRootPath("stateOutput:staterepospath", stateDir, drvName, stateIdentifier);
-	executeAndPrintShellCommand("mkdir -p " + repos_root_path, "mkdir", true);
+	
+	Strings p_args;
+	p_args.push_back("-p");
+	p_args.push_back(repos_root_path);
+	runProgram_AndPrintOutput("mkdir", true, p_args, "mkdir");
+	
 	
 	//TODO check if we can create state and staterepos dirs
 	
@@ -52,7 +57,10 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 				
 		//Check if and how this dir needs to be versioned
 		if(d.type == "none"){
-			executeAndPrintShellCommand("mkdir -p " + fullstatedir, "mkdir", true);
+			Strings p_args;
+			p_args.push_back("-p");
+			p_args.push_back(fullstatedir);
+			runProgram_AndPrintOutput("mkdir", true, p_args, "mkdir");
 			continue;
 		}
 		
@@ -62,8 +70,12 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 		
 		if(IsDirectory(repos))
 			printMsg(lvlTalkative, format("Repos %1% already exists, so we use that repository") % repos);			
-		else
-			executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin", true);				 //TODO create as nixbld.nixbld chmod 700... can you still commit then ??
+		else{
+			Strings p_args;
+			p_args.push_back("create");
+			p_args.push_back(repos);
+			runProgram_AndPrintOutput(svnadminbin, true, p_args, "svnadmin"); 				 //TODO create as nixbld.nixbld chmod 700... can you still commit then ??
+		}
 
 		if(d.type == "interval"){
 			intervalPaths.insert(statePath);
@@ -73,8 +85,11 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 			
 		string fullstatedir_svn = fullstatedir + "/.svn/";
 		if( ! IsDirectory(fullstatedir_svn) ){
-			string checkoutcommand = svnbin + " checkout file://" + repos + " " + fullstatedir;
-			executeAndPrintShellCommand(checkoutcommand, "svn", true);  //TODO checkout as user
+			Strings p_args;
+			p_args.push_back("checkout");
+			p_args.push_back("file://" + repos);
+			p_args.push_back(fullstatedir);
+			runProgram_AndPrintOutput(svnbin, true, p_args, "svn");	//TODO checkout as user
 		}
 		else
 			printMsg(lvlTalkative, format("Statedir %1% already exists, so dont check out its repository again") % fullstatedir_svn);
