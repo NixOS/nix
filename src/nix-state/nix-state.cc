@@ -41,7 +41,7 @@ void printHelp()
 
 //
 Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, 
-									   string & binary, string & derivationPath, bool isStatePath, Strings & program_args,
+									   string & binary, string & derivationPath, bool isStatePath, string & program_args,
 									   bool getDerivers, PathSet & derivers) 	//optional
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
@@ -66,9 +66,11 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
     string allargs;
     if(opArgs.size() > 1){
 		opArgs.pop_front();
-		allargs = opArgs.front();
-		Strings progam_args = tokenizeString(allargs, " ");
-    }    
+		allArgs = opArgs.front();
+		
+		program_args = allArgs;
+		//Strings progam_args_strings = tokenizeString(allArgs, " ");
+    }
 
 	printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % stateIdentifier % binary % username % allargs);
     
@@ -103,7 +105,7 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
 
 //Wrapper
 Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, 
-									  string & binary, string & derivationPath, bool & isStatePath, Strings & program_args)
+									  string & binary, string & derivationPath, bool & isStatePath, string & program_args)
 {
 	PathSet empty;
 	return getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args, false, empty);
@@ -118,7 +120,7 @@ static void opShowDerivations(Strings opFlags, Strings opArgs)
     PathSet derivers;
     string derivationPath;
     bool isStatePath;
-    Strings program_args;
+    string program_args;
     Derivation drv = getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args, true, derivers);
 	
 	if(!isStatePath)
@@ -137,7 +139,7 @@ static void opShowStatePath(Strings opFlags, Strings opArgs)
     string binary;
     string derivationPath;
     bool isStatePath;
-    Strings program_args;
+    string program_args;
     Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args);
     
     if(!isStatePath)
@@ -154,7 +156,7 @@ static void opShowStateReposRootPath(Strings opFlags, Strings opArgs)
     string binary;
     string derivationPath;
     bool isStatePath;
-    Strings program_args;
+    string program_args;
     Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args);
 	
 	if(!isStatePath)
@@ -190,7 +192,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     string binary;
 	string derivationPath;
 	bool isStatePath;
-	Strings program_args;
+	string program_args;
     Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args);
         
     //Specifiy the SVN binarys
@@ -402,8 +404,6 @@ void run(Strings args)
 		--exclude-commit-paths
 		
 		TODO update getDerivation in nix-store to handle state indentifiers
-		
-		--update state drv
 		
 		--revert-to-state	(recursive revert...)
 		
