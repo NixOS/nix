@@ -267,6 +267,8 @@ Strings unpackStrings(const string & s);
 /* String tokenizer. */
 Strings tokenizeString(const string & s, const string & separators = " \t\n\r");
 
+/* String tokenizer for commandline agruments. */
+Strings tokenizeStringWithQuotes(const string & s);
 
 /* Convert the exit status of a child as returned by wait() into an
    error string. */
@@ -291,7 +293,7 @@ string trimr(const string & s);
 string trim(const string & s);
 
 //excecute a shell command
-void executeAndPrintShellCommand(const string & command, const string & commandName);
+void executeAndPrintShellCommand(const string & command, const string & commandName, const bool & captureOutput);
 
 //Convert time_t to a string
 string time_t2string(const time_t & t);

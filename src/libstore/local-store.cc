@@ -507,17 +507,15 @@ void LocalStore::queryStateReferrers(const Path & storePath, PathSet & stateRefe
 
 void setDeriver(const Transaction & txn, const Path & storePath, const Path & deriver)
 {
-    printMsg(lvlError, format("xxxxxxxxxxxxxxxxxxxxxxx"));
-    
     assertStorePath(storePath);
-    printMsg(lvlError, format("Ttttttttttttttttttttttttt"));
     if (deriver == "") return;
-    printMsg(lvlError, format("uuuuuuuuuuuuuuuuuuuuuuuuuuuuu"));
     assertStorePath(deriver);
-    printMsg(lvlError, format("yyyyyyyyyyyyyyyyyyyyyyyyy"));
+    printMsg(lvlError, format("yyyyyyyyyyyyyyyyyyyyyyyyy"));		//hanged !!!!!!!!
     
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
+	
+	printMsg(lvlError, format("Ttttttttttttttttttttttttt %1%") % deriver);
     
     if (isStateDrvPathTxn(txn, deriver)){							//Redirect if its a state component
     	printMsg(lvlError, format("bbbbbbbbbbbbbbb"));
@@ -538,18 +536,12 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
 
-	printMsg(lvlError, format("dddddddddddddd"));
-
 	Derivation drv = derivationFromPath(deriver);
 	string identifier = drv.stateOutputs.find("state")->second.stateIdentifier;
 	string user = drv.stateOutputs.find("state")->second.username;
 	
-	printMsg(lvlError, format("eeeeeeeeeeeeeeeeee"));
-		
 	PathSet currentDerivers = queryDerivers(txn, storePath, identifier, user); 
 	PathSet updatedDerivers = mergeNewDerivationIntoList(storePath, deriver, currentDerivers, true);
-
-	printMsg(lvlError, format("ffffffffffffffffffff"));
 
 	Strings data;    	
 	for (PathSet::iterator i = updatedDerivers.begin(); i != updatedDerivers.end(); ++i)		//Convert Paths to Strings

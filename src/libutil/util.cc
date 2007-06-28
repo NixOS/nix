@@ -934,6 +934,47 @@ Strings tokenizeString(const string & s, const string & separators)
     return result;
 }
 
+//Splits on a space
+//Uses quotes: "...." to group multiple spaced arguments into one
+//Removes the grouping quotes at the call 
+//TODO bug a call with args: a b "c" d   will fail
+//TODO bug a call with args: a bc"d " e  will fail
+Strings tokenizeStringWithQuotes(const string & s)
+{
+	string separator = " ";
+    Strings result;
+    string::size_type pos = s.find_first_not_of(separator, 0);
+
+	string quote = "\"";
+	string inquotes = "";
+
+    while (pos != string::npos) {
+        string::size_type end = s.find_first_of(separator, pos + 1);
+        if (end == string::npos) end = s.size();
+        string token(s, pos, end - pos);
+        
+        pos = s.find_first_not_of(separator, end);
+        
+        //if first or last item is a quote, we switch inquotes
+        if(token.substr(0,1) == quote || token.substr(token.size()-1,token.size()) == quote){
+        	if(inquotes == ""){			//begin
+        		inquotes = token;
+        		continue;
+        	} 
+        	else{						//end
+        		token = inquotes + token;
+        		token = token.substr(1,token.size()-2);		//remove the grouping quotes
+        		inquotes = "";
+        	}     		
+        }
+        
+       	if(inquotes != "")				//middle
+			inquotes += separator + token;
+        else
+        	result.push_back(token);	//normal
+    }
+    return result;
+}
 
 string statusToString(int status)
 {
@@ -1028,10 +1069,30 @@ string trim(const string & s) {
   
  */
 
-void executeAndPrintShellCommand(const string & command, const string & commandName)
+void executeAndPrintShellCommand(const string & command, const string & commandName, const bool & captureOutput)
 {
+	///////////////////////
+	
+	if(captureOutput){
+		Strings progam_args = tokenizeStringWithQuotes(command);
+		string program_command = progam_args.front();
+		progam_args.pop_front();
+		
+		string program_output = runProgram(program_command, true, progam_args);
+		
+		//Remove the trailing \n
+    	size_t found = program_output.find_last_of("\n");
+		printMsg(lvlError, format("%1%") % program_output.substr(0,found));
+		return;	
+	}
+		
+	/////////////////////
+	
 	string tempoutput = "/tmp/svnoutput.txt";
-	string newcommand = command + " &> " + tempoutput;		//the  &> sends also stderr to stdout
+	string newcommand = command;
+	
+	if(captureOutput)
+		newcommand += " &> " + tempoutput;		//the  &> sends also stderr to stdout
 
 	int kidstatus, deadpid;
 	pid_t kidpid = fork();
@@ -1045,38 +1106,43 @@ void executeAndPrintShellCommand(const string & command, const string & commandN
 				
 				string line;
 				std::ifstream myfile (tempoutput.c_str());
-				if (myfile.is_open()){
-					while (! myfile.eof() )
-				    {
-				      getline (myfile,line);
-				      if(trim(line) != "")
-					      printMsg(lvlError, format("[%2%]: %1%") % line % commandName);
-				    }
-				    myfile.close();
+				
+				if(captureOutput){
+					if (myfile.is_open()){
+						while (! myfile.eof() )
+					    {
+					      getline (myfile,line);
+					      if(trim(line) != "")
+						      printMsg(lvlError, format("[%2%]: %1%") % line % commandName);
+					    }
+					    myfile.close();
+					}
+					else{
+						throw SysError("executeAndPrintShellCommand(..) error");
+		            	quickExit(1);
+					} 
 				}
-				else{
-					throw SysError("svn state error");
-	            	quickExit(1);
-				} 
 	            
 				if (rv == -1) {
-					throw SysError("svn state error");
+					throw SysError("executeAndPrintShellCommand(..) error");
 					quickExit(99);
 				}
 		        quickExit(0);
 				
 	        } catch (std::exception & e) {
-	            std::cerr << format("state child error: %1%\n") % e.what();
+	            std::cerr << format("executeAndPrintShellCommand(..) child error: %1%\n") % e.what();
 	            quickExit(1);
 	        }
     }
+    
     deadpid = waitpid(kidpid, &kidstatus, 0);
     if (deadpid == -1) {
         std::cerr << format("state child waitpid error\n");
         quickExit(1);
     }
     
-    remove(tempoutput.c_str());	//Remove the tempoutput file
+    if(captureOutput)
+    	remove(tempoutput.c_str());	//Remove the tempoutput file
 }
 
 string time_t2string(const time_t & t)
@@ -1121,7 +1187,7 @@ string getCallingUserName()
     Strings empty;
     string username = runProgram("whoami", true, empty);				//the username of the user that is trying to build the component
 																		//TODO Can be faked, so this is clearly unsafe ... :(
-    //Remove the \n
+    //Remove the trailing \n
     int pos = username.find("\n",0);
 	username.erase(pos,1);
     

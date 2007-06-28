@@ -145,7 +145,7 @@ do
 	  	 let "i_checkout+=1"
 	  done
 	  		
-      if ! test -d "${path}.svn/"; then       										#if the dir exists but is not yet an svn dir: checkout repos, if it doenst exits (is removed or something) than we dont do anything
+      if ! test -d "${path}.svn/"; then       									#if the dir exists but is not yet an svn dir: checkout repos, if it doenst exits (is removed or something) than we dont do anything
 		  if [ "$deletesvn" != "1" ]; then
           	$debug $checkoutcommand;
           fi

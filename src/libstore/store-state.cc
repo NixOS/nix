@@ -19,13 +19,10 @@ namespace nix {
 void updatedStateDerivation(Path storePath)
 {
 	//We dont remove the old .svn folders
-	//New repostorys are created by createStateDirs
+	//nothing to do since New repostorys are created by createStateDirs
 		
 	printMsg(lvlTalkative, format("Resetting state drv settings like repositorys"));
-	
-	//Create a repository for this state location
-	
-	//
+	 
 }
 
 void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs, const StringPairs & env)
@@ -42,7 +39,7 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 
 	//Make sure the 'root' path which holds the repositorys exists, so svn doenst complain.
 	string repos_root_path = getStateReposRootPath("stateOutput:staterepospath", stateDir, drvName, stateIdentifier);
-	executeAndPrintShellCommand("mkdir -p " + repos_root_path, "mkdir");
+	executeAndPrintShellCommand("mkdir -p " + repos_root_path, "mkdir", true);
 	
 	//TODO check if we can create state and staterepos dirs
 	
@@ -55,7 +52,7 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 				
 		//Check if and how this dir needs to be versioned
 		if(d.type == "none"){
-			executeAndPrintShellCommand("mkdir -p " + fullstatedir, "mkdir");
+			executeAndPrintShellCommand("mkdir -p " + fullstatedir, "mkdir", true);
 			continue;
 		}
 		
@@ -66,7 +63,7 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 		if(IsDirectory(repos))
 			printMsg(lvlTalkative, format("Repos %1% already exists, so we use that repository") % repos);			
 		else
-			executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin");				 //TODO create as nixbld.nixbld chmod 700... can you still commit then ??
+			executeAndPrintShellCommand(svnadminbin + " create " + repos, "svnadmin", true);				 //TODO create as nixbld.nixbld chmod 700... can you still commit then ??
 
 		if(d.type == "interval"){
 			intervalPaths.insert(statePath);
@@ -77,7 +74,7 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 		string fullstatedir_svn = fullstatedir + "/.svn/";
 		if( ! IsDirectory(fullstatedir_svn) ){
 			string checkoutcommand = svnbin + " checkout file://" + repos + " " + fullstatedir;
-			executeAndPrintShellCommand(checkoutcommand, "svn");  //TODO checkout as user
+			executeAndPrintShellCommand(checkoutcommand, "svn", true);  //TODO checkout as user
 		}
 		else
 			printMsg(lvlTalkative, format("Statedir %1% already exists, so dont check out its repository again") % fullstatedir_svn);

@@ -67,9 +67,7 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
     if(opArgs.size() > 1){
 		opArgs.pop_front();
 		allargs = opArgs.front();
-		
-		Strings progam_args;
-		//TODO !!!!!!!!!!!!!!!!!!!!!!			
+		Strings progam_args = tokenizeString(allargs, " ");
     }    
 
 	printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % stateIdentifier % binary % username % allargs);
@@ -212,7 +210,11 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	//Transaction txn;
    	//createStoreTransaction(txn);
 	//txn.commit();
-		
+	
+	//******************* Run ****************************
+	
+	executeAndPrintShellCommand(componentPath + binary, "", false);			//more efficient way needed ???
+  		
 	//******************* With everything in place, we call the commit script on all statePaths **********************
 	
 	for (PathSet::iterator d = drvs.begin(); d != drvs.end(); ++d)
@@ -320,7 +322,10 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	    																   " \"" + subversionedpathsCommitBooleansarray + "\" " +
 	    																   " \"" + nonversionedstatepathsarray + "\" " +
 	    																   " \"" + commandsarray + "\" ",
-	    																   "commit-script");
+	    																   "commit-script", true);
+	    																   
+	   	//TODO
+	   	//Scan again??
 	}
 }
 
@@ -368,7 +373,7 @@ void run(Strings args)
 	return;
 
 	*/
-
+	
 	/* test */
 	
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
@@ -376,7 +381,7 @@ void run(Strings args)
 
         Operation oldOp = op;
 		
-        if (arg == "--commit" || arg == "-c")
+        if (arg == "--run" || arg == "-r")
             op = opRunComponent;
 		else if (arg == "--showstatepath")
 			op = opShowStatePath;
@@ -386,8 +391,9 @@ void run(Strings args)
 			op = opShowDerivations;
 
         /*
-		--commit
 		
+		--commit
+
 		--run-without-commit
 		
 		--backup
@@ -418,8 +424,6 @@ void run(Strings args)
     if(username == "")
 		username = getCallingUserName();
 
-	printMsg(lvlError, format("%1% - %2%") % stateIdentifier % username);
-    
     if (!op) throw UsageError("no operation specified");
     
     /* !!! hack */
