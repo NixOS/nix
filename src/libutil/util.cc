@@ -1069,6 +1069,18 @@ string trim(const string & s) {
   
  */
 
+string runProgram_AndPrintOutput(Path program, bool searchPath, const Strings & args, const string outputPrefix)
+{
+	string program_output = runProgram(program, true, args);
+
+	//Add the prefix on every line
+	//TODO
+		
+	//Remove the trailing \n
+    size_t found = program_output.find_last_of("\n");
+	printMsg(lvlError, format("%1%") % program_output.substr(0,found));
+}
+
 void executeAndPrintShellCommand(const string & command, const string & commandName, const bool & captureOutput)
 {
 	///////////////////////

@@ -295,6 +295,9 @@ string trim(const string & s);
 //excecute a shell command
 void executeAndPrintShellCommand(const string & command, const string & commandName, const bool & captureOutput);
 
+//
+string runProgram_AndPrintOutput(Path program, bool searchPath, const Strings & args, const string outputPrefix);
+
 //Convert time_t to a string
 string time_t2string(const time_t & t);
 
