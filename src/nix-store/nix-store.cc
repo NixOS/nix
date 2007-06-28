@@ -286,7 +286,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
             {
-                Path path = maybeUseOutput(fixPath(*i), useOutput, forceRealise);
+                Path path = maybeUseOutput(fixPath(*i), useOutput, forceRealise);								//TODO This hangs on state paths ...
                 if (query == qRequisites) store->storePathRequisites(path, includeOutputs, paths, false);
                 else if (query == qRequisitesState) store->storePathStateRequisitesOnly(path, includeOutputs, paths);
                 else if (query == qRequisitesFull) store->storePathRequisites(path, includeOutputs, paths, true);

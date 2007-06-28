@@ -127,14 +127,13 @@ void clearSubstitutes();
    of the file system contents of the path.  The hash must be a
    SHA-256 hash. */
 void registerValidPath(const Transaction & txn,
-    const Path & path, const Path & statepath, const Hash & hash, 
+    const Path & component_or_state_path, const Hash & hash, 
     const PathSet & references, const PathSet & stateReferences,
     const Path & deriver);
 
 struct ValidPathInfo 
 {
     Path path;
-    Path statePath;
     Path deriver;
     Hash hash;
     PathSet references;
@@ -161,7 +160,7 @@ bool isValidPathTxn(const Transaction & txn, const Path & path);
 
 /* Sets the set of outgoing FS (also state) references for a store path.  Use with
    care! */
-void setReferences(const Transaction & txn, const Path & path,
+void setReferences(const Transaction & txn, const Path & store_or_statePath,
     const PathSet & references, const PathSet & stateReferences);
 
 /* Sets the deriver of a store path.  Use with care! */

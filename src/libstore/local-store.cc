@@ -381,7 +381,7 @@ static PathSet getReferrers(const Transaction & txn, const Path & storePath)
     return referrers;
 }
 
-static PathSet getStateReferrers(const Transaction & txn, const Path & storePath)		//TODO this is just a copy of getReferrers, maybe make the function more generic?
+static PathSet getStateReferrers(const Transaction & txn, const Path & storePath)		//TODO this is just a copy of getReferrers with a change to dbStateReferrers, maybe make the function more generic?
 {
     PathSet referrers;
     Strings keys;
@@ -391,50 +391,52 @@ static PathSet getStateReferrers(const Transaction & txn, const Path & storePath
     return referrers;
 }
 
-void setReferences(const Transaction & txn, const Path & storePath,
+void setReferences(const Transaction & txn, const Path & store_or_statePath,
     const PathSet & references, const PathSet & stateReferences)
 {
     /* For unrealisable paths, we can only clear the references. */
-    if (references.size() > 0 && !isRealisablePath(txn, storePath))
-        throw Error(
-            format("cannot set references for path `%1%' which is invalid and has no substitutes")
-            % storePath);
+    if (references.size() > 0 && !isRealisableComponentOrStatePath(txn, store_or_statePath))
+        throw Error(format("cannot set references for path `%1%' which is invalid and has no substitutes") % store_or_statePath);
+	
+	printMsg(lvlError, format("REGISTER: %1%") % store_or_statePath);
 
     Paths oldReferences;
-    nixDB.queryStrings(txn, dbReferences, storePath, oldReferences);
+    nixDB.queryStrings(txn, dbReferences, store_or_statePath, oldReferences);
 	PathSet oldReferences2(oldReferences.begin(), oldReferences.end());
 
 	Paths oldStateReferences;
-    nixDB.queryStrings(txn, dbStateReferences, storePath, oldStateReferences);
+    nixDB.queryStrings(txn, dbStateReferences, store_or_statePath, oldStateReferences);
 	PathSet oldStateReferences2(oldStateReferences.begin(), oldStateReferences.end());
     
     if (oldReferences2 == references && oldStateReferences2 == stateReferences) return;
     
-    nixDB.setStrings(txn, dbReferences, storePath,
+    printMsg(lvlError, format("REGISTER2: %1%") % store_or_statePath);
+    
+    nixDB.setStrings(txn, dbReferences, store_or_statePath,
         Paths(references.begin(), references.end()));
 
-	nixDB.setStrings(txn, dbStateReferences, storePath,
+	nixDB.setStrings(txn, dbStateReferences, store_or_statePath,
         Paths(stateReferences.begin(), stateReferences.end()));
 
     /* Update the referrers mappings of all new referenced paths. */
     for (PathSet::const_iterator i = references.begin(); i != references.end(); ++i)
         if (oldReferences2.find(*i) == oldReferences2.end())
-            nixDB.setString(txn, dbReferrers, addPrefix(*i, storePath), "");
+            nixDB.setString(txn, dbReferrers, addPrefix(*i, store_or_statePath), "");
 
 	/* Update the state referrers mappings of all new referenced paths. */
     for (PathSet::const_iterator i = stateReferences.begin(); i != stateReferences.end(); ++i)
         if (oldStateReferences2.find(*i) == oldStateReferences2.end())
-            nixDB.setString(txn, dbStateReferrers, addPrefix(*i, storePath), "");
+            nixDB.setString(txn, dbStateReferrers, addPrefix(*i, store_or_statePath), "");
 	
     /* Remove referrer mappings from paths that are no longer references. */
     for (Paths::iterator i = oldReferences.begin(); i != oldReferences.end(); ++i)
         if (references.find(*i) == references.end())
-            nixDB.delPair(txn, dbReferrers, addPrefix(*i, storePath));
+            nixDB.delPair(txn, dbReferrers, addPrefix(*i, store_or_statePath));
 
     /* Remove referrer mappings from paths that are no longer state references. */
     for (Paths::iterator i = oldStateReferences.begin(); i != oldStateReferences.end(); ++i)
         if (stateReferences.find(*i) == stateReferences.end())
-            nixDB.delPair(txn, dbStateReferrers, addPrefix(*i, storePath));
+            nixDB.delPair(txn, dbStateReferrers, addPrefix(*i, store_or_statePath));
 }
 
 
@@ -643,7 +645,7 @@ PathSet queryDerivers(const Transaction & txn, const Path & storePath, const str
 	return filtereddata;
 }
 
-//TODO Wrapper around converting the drvPath to the statePath
+//Wrapper around converting the drvPath to the statePath
 PathSet queryDeriversStatePath(const Transaction & txn, const Path & storePath, const string & identifier, const string & user)
 {
 	PathSet drvs = queryDerivers(txn, storePath, identifier, user);
@@ -823,13 +825,12 @@ Path LocalStore::queryStatePathDrv(const Path & statePath)
 
 
 void registerValidPath(const Transaction & txn,
-    const Path & path, const Path & statePath, const Hash & hash, 
+    const Path & component_or_state_path, const Hash & hash, 
     const PathSet & references, const PathSet & stateReferences,
     const Path & deriver)
 {
     ValidPathInfo info;
-    info.path = path;
-    info.statePath = statePath;
+    info.path = component_or_state_path;
     info.hash = hash;
     info.references = references;
     info.stateReferences = stateReferences;   
@@ -848,25 +849,37 @@ void registerValidPaths(const Transaction & txn, const ValidPathInfos & infos)
 
     for (ValidPathInfos::const_iterator i = infos.begin(); i != infos.end(); ++i)
     {
-        assertStorePath(i->path);
+        //Check the type of path: component or state
+        bool isStorePath_b;
+        if(isStorePath(i->path)){
+        	assertStorePath(i->path);
+        	isStorePath_b = true;
+        }
+        else{
+        	assertStatePath(i->path);
+        	isStorePath_b = false;
+        }
 
         debug(format("registering path `%1%'") % i->path);
-        setHash(txn, i->path, i->hash);								//set path valid
-
-		if (i->statePath != "")
-			setStateValid(txn, i->statePath, i->deriver);			//set state path valid 
+        
+        if(isStorePath_b)
+        	setHash(txn, i->path, i->hash);								//set compont path valid
+		else
+			setStateValid(txn, i->path, i->deriver);					//or set state path valid 
 
         setReferences(txn, i->path, i->references, i->stateReferences);
         
         /* Check that all referenced paths are also valid (or about to) become valid). */
-        //TODO Maybe also check this for stateReferences????
-        for (PathSet::iterator j = i->references.begin();
-             j != i->references.end(); ++j)
+        for (PathSet::iterator j = i->references.begin(); j != i->references.end(); ++j)
             if (!isValidPathTxn(txn, *j) && newPaths.find(*j) == newPaths.end())
-                throw Error(format("cannot register path `%1%' as valid, since its reference `%2%' is invalid")
-                    % i->path % *j);
+                throw Error(format("cannot register path `%1%' as valid, since its reference `%2%' is invalid") % i->path % *j);
+		//TODO Maybe also check this for stateReferences???? with isValidStatePathTxn ....
+		//for (....
 		
-        setDeriver(txn, i->path, i->deriver);
+		if(isStorePath_b)		
+        	setDeriver(txn, i->path, i->deriver);
+        
+        //TODO maybe also set a state deriver into dbStateDerivers .... well state is already linked to a drvpath in dbValidStatePaths ....
     }
 }
 
@@ -924,7 +937,7 @@ Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
             canonicalisePathMetaData(dstPath);
             
             Transaction txn(nixDB);
-            registerValidPath(txn, dstPath, "", h, PathSet(), PathSet(), "");			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK if the first "" (statepath) is needed here
+            registerValidPath(txn, dstPath, h, PathSet(), PathSet(), "");			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK (probabyly ok?)
             txn.commit();
         }
 
@@ -958,8 +971,8 @@ Path LocalStore::addTextToStore(const string & suffix, const string & s,
             canonicalisePathMetaData(dstPath);
             
             Transaction txn(nixDB);
-            registerValidPath(txn, dstPath, "", hashPath(htSHA256, dstPath), references, PathSet(), "");	//There are no stateReferences in drvs..... so we dont need to register them (I think)
-            																								//A drvs has also no statepath, so that is ok...
+            registerValidPath(txn, dstPath, hashPath(htSHA256, dstPath), references, PathSet(), "");	//There are no stateReferences in drvs..... so we dont need to register them (I think)
+            																							//A drvs has also no statepath, so that is ok...
             txn.commit();
         }
 
@@ -1164,7 +1177,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
             /* !!! if we were clever, we could prevent the hashPath()
                here. */
             if (!isValidPath(deriver)) deriver = "";
-            registerValidPath(txn, dstPath, "",												//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!! replace "" for a state path ??????
+            registerValidPath(txn, dstPath, 												//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!! replace how about state paths ??????
                 hashPath(htSHA256, dstPath), references, stateReferences, deriver);
             txn.commit();
         }
@@ -1589,8 +1602,16 @@ void scanForAllReferences(const Transaction & txn, const Path & statePath)
     nixDB.enumTable(txn, dbReferences, referencesKeys);
     nixDB.enumTable(txn, dbStateReferences, stateReferencesKeys);
     
-    for (Paths::iterator i = stateReferencesKeys.begin(); i != stateReferencesKeys.end(); ++i)
-    	printMsg(lvlError, format("STATE: %1%") % *i);
+    for (Paths::iterator i = referencesKeys.begin(); i != referencesKeys.end(); ++i){
+    	string s = *i;
+    	if (s.substr(0,10) == "/nix/state")
+    		printMsg(lvlError, format("referencesKeys: %1%") % s);
+    }
+    for (Paths::iterator i = stateReferencesKeys.begin(); i != stateReferencesKeys.end(); ++i){
+    	string s = *i;
+    	if (s.substr(0,10) == "/nix/state")
+    		printMsg(lvlError, format("stateReferencesKeys: %1%") % s);
+    }
     
     //Remove derivation paths .....
     for (Paths::iterator i = referencesKeys.begin(); i != referencesKeys.end(); ++i){

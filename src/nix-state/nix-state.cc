@@ -10,6 +10,7 @@
 #include "help.txt.hh"
 #include "local-store.hh"
 #include "derivations.hh"
+#include "store-api.hh"			//TODO REMOVE
 
 using namespace nix;
 using std::cin;
@@ -375,12 +376,16 @@ void run(Strings args)
 	printMsg(lvlError, format("Result: %1%") % p);
 	return;
 
-	
-	*/
-	
 	string path = "afddsafsdafsdaf.drv";
 	printMsg(lvlError, format("Result: %1%") % path.substr(path.length() - 4,path.length()));
-	
+
+	printMsg(lvlError, format("AA: %1%") % isStorePath("/nix/store/hbxqq4d67j2y21xzp7yp01qjfkcjjbc7-hellohardcodedstateworld-1.0"));
+	printMsg(lvlError, format("AA: %1%") % isStorePath("/nix/state/0qhlpz1ji4gvg3j6nk5vkcddmi3m5x1r-hellohardcodedstateworld-1.0-test2"));
+	printMsg(lvlError, format("AA: %1%") % isStatePath("/nix/store/hbxqq4d67j2y21xzp7yp01qjfkcjjbc7-hellohardcodedstateworld-1.0"));
+	printMsg(lvlError, format("AA: %1%") % isStatePath("/nix/state/0qhlpz1ji4gvg3j6nk5vkcddmi3m5x1r-hellohardcodedstateworld-1.0-test2"));
+
+	*/
+		
 	store = openStore();
 	store->scanForAllReferences("/nix/state/0qhlpz1ji4gvg3j6nk5vkcddmi3m5x1r-hellohardcodedstateworld-1.0-test2");
 	return;

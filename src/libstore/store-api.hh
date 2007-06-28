@@ -232,9 +232,14 @@ public:
 
 /* Throw an exception if `path' is not directly in the Nix store. */
 void assertStorePath(const Path & path);
+void assertStatePath(const Path & path);
 
 bool isInStore(const Path & path);
 bool isStorePath(const Path & path);
+
+bool isInStateStore(const Path & path);
+bool isStatePath(const Path & path);
+
 
 void checkStoreName(const string & name);
 

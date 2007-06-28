@@ -20,6 +20,13 @@ bool isInStore(const Path & path)
         && path[nixStore.size()] == '/';
 }
 
+bool isInStateStore(const Path & path)
+{
+    return path[0] == '/'
+        && string(path, 0, nixStoreState.size()) == nixStoreState
+        && path.size() >= nixStoreState.size() + 2
+        && path[nixStoreState.size()] == '/';
+}
 
 bool isStorePath(const Path & path)
 {
@@ -27,11 +34,22 @@ bool isStorePath(const Path & path)
         && path.find('/', nixStore.size() + 1) == Path::npos;
 }
 
+bool isStatePath(const Path & path)
+{
+    return isInStateStore(path)
+        && path.find('/', nixStoreState.size() + 1) == Path::npos;
+}
 
 void assertStorePath(const Path & path)
 {
     if (!isStorePath(path))
-        throw Error(format("path `%1%' is not in the Nix store (1)") % path);		//TODO bug: this prints an empty path ...
+        throw Error(format("component path `%1%' is not in the Nix store (1)") % path);		//TODO bug: this prints an empty path ...
+}
+
+void assertStatePath(const Path & path)
+{
+    if (!isStatePath(path))
+        throw Error(format("state path `%1%' is not in the Nix state-store (1)") % path);		//TODO bug: this prints an empty path ...
 }
 
 

@@ -1618,9 +1618,10 @@ PathSet parseReferenceSpecifiers(const Derivation & drv, string attr)
 
 void DerivationGoal::computeClosure()
 {
-    map<Path, PathSet> allReferences;
-    map<Path, PathSet> allStateReferences;
-    map<Path, Path> statePaths;
+    map<Path, PathSet> allReferences;			//all component references in componentpath		(one drv can have multiple output paths)
+    map<Path, PathSet> allStateReferences;		//all state references in componentpath			
+    PathSet state_references;					//all component references in statepath			(one drv can have only one state path)
+	PathSet state_stateReferences;				//all state references in statepath
     map<Path, Hash> contentHashes;
     
     //TODO MOVE THIS TO A PLACE THAT ALSO GETS CALLED WHEN WE DONT NEED TO BUILD ANYTHING
@@ -1741,7 +1742,6 @@ void DerivationGoal::computeClosure()
         //printMsg(lvlError, format("SetValidPath: %1%") % i->second.path);
         
         registerValidPath(txn, i->second.path,
-        	"",											//dummy statePath
             contentHashes[i->second.path],
             allReferences[i->second.path],
             PathSet(),									//dummy stateReferences
@@ -1759,66 +1759,80 @@ void DerivationGoal::computeClosure()
      * [scan for and state references and component references in the state path]	//3,4
      */
     
-    //TODO we scan for each output-path, be then we do multiple scans on the state path if there are more ouputs paths then 1.....
-    
-    //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    // WE NOW ONLY REGISTER COMPONETS PATHS WITH registerValidPath BUT WE SHOULD ALSO REGISTER STATE PAHTS AS VALID AND SET THEIR REFERENCES !!!!!!!!!!!!!!!!!!!!!!!
-    
+    PathSet allStatePaths;
+	for (PathSet::const_iterator i = allPaths.begin(); i != allPaths.end(); i++){
+		Path componentPath = *i;
+		
+		if(isStateComponentTxn(txn, componentPath)){
+			//printMsg(lvlError, format("Scanning for state path: %1%") % componentPath);
+			
+			//TODO A HACK !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+			//We should only get the state paths of the derivers in the build closure from drv.
+			//The we can dismiss the call to queryDeriversStatePath(...), and we only have to do registerValidPath once
+			
+			PathSet stateRefs = queryDeriversStatePath(txn, componentPath ,"*",getCallingUserName());		 
+			allStatePaths = mergePathSets(stateRefs, allStatePaths);
+		}
+	}
+		
+    //Scan all output paths ... comment TODO
     for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
     {    
     	Path path = i->second.path;
-    	
-    	/* For this state-output path, find the references to other paths contained in it. 
-		 * Get the state paths (instead of out paths) from all components, and then call
-		 * scanForReferences().
-		 */
-		PathSet allStatePaths;
-		for (PathSet::const_iterator i = allPaths.begin(); i != allPaths.end(); i++){
-			Path componentPath = *i;
 			
-			if(isStateComponentTxn(txn, componentPath)){
-				//printMsg(lvlError, format("Scanning for state path: %1%") % componentPath);
-				PathSet stateRefs = queryDeriversStatePath(txn, componentPath ,"*",getCallingUserName());
-				allStatePaths = mergePathSets(stateRefs, allStatePaths);
-			}
-		}
-		
 		//We scan for state references in the component path
-		PathSet all_state_references = scanForReferences(path, allStatePaths);
+		PathSet output_state_references = scanForReferences(path, allStatePaths);
 			
-		//If state is enabled: Seaches for state and component references in the state path 				 
-		if(isStateDrvTxn(txn, drv)){
-			Path statePath = drv.stateOutputs.find("state")->second.statepath;
-			printMsg(lvlTalkative, format("scanning for component and state references inside `%1%'") % statePath);
-			
-			PathSet state_references = scanForReferences(statePath, allPaths);
-			PathSet state_stateReferences = scanForReferences(statePath, allStatePaths);
-			all_state_references = mergePathSets(all_state_references, mergePathSets(state_references, state_stateReferences));
-			
-			statePaths[path] = statePath; 
-		}
-		else
-			statePaths[path] = "";
-
 		//debugging
 		for (PathSet::const_iterator i = allStatePaths.begin(); i != allStatePaths.end(); i++)
 			debug(format("all possible StatePaths: %1%") % (*i));
-		for (PathSet::const_iterator i = all_state_references.begin(); i != all_state_references.end(); i++)
+		for (PathSet::const_iterator i = output_state_references.begin(); i != output_state_references.end(); i++)
 			debug(format("state References scanned: %1%") % (*i));
 		
-		allStateReferences[path] = all_state_references;
+		allStateReferences[path] = output_state_references;
     }
     
+    //Scan the state Path
+    /* For this state-output path, find the references to other paths contained in it. 
+	 * Get the state paths (instead of out paths) from all components, and then call
+	 * scanForReferences().
+	 */
+	//If state is enabled: Seaches for state and component references in the state path 				 
+	if(isStateDrvTxn(txn, drv)){
+		Path statePath = drv.stateOutputs.find("state")->second.statepath;
+		printMsg(lvlTalkative, format("scanning for component and state references inside `%1%'") % statePath);
+		
+		state_references = scanForReferences(statePath, allPaths);
+		state_stateReferences = scanForReferences(statePath, allStatePaths);
+	}
+    
+    //Register all outputs now valid
     for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
     {
         registerValidPath(txn, 
         	i->second.path,								//component path
-        	statePaths[i->second.path],					//state path
             contentHashes[i->second.path],
             allReferences[i->second.path],				//set of component-references
             allStateReferences[i->second.path],			//set of state-references
             drvPath);
     }
+    
+    //Register the state path valid
+    if(isStateDrvTxn(txn, drv))
+    {
+    	Path statePath = drv.stateOutputs.find("state")->second.statepath;
+    	
+    	registerValidPath(txn,    	
+    		statePath,
+    		Hash(),										//emtpy hash
+    		state_references,
+    		state_stateReferences,
+    		drvPath);
+    	
+    	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    	// WE NOW ONLY REGISTER COMPONETS PATHS WITH registerValidPath BUT WE SHOULD ALSO REGISTER STATE PAHTS AS VALID AND SET THEIR REFERENCES !!!!!!!!!!!!!!!!!!!!!!!
+    }	    
     
     txn.commit();
 
@@ -2220,7 +2234,7 @@ void SubstitutionGoal::finished()
 
     Transaction txn;
     createStoreTransaction(txn);
-    registerValidPath(txn, storePath, "", contentHash,					//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! replace "" with a substitued state path !!!!!!!!
+    registerValidPath(txn, storePath, contentHash,					//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! how about substituing a state path ?????
         references, stateReferences, sub.deriver);
     txn.commit();
 
