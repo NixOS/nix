@@ -29,16 +29,30 @@ static Path gcRoot;
 static int rootNr = 0;
 static bool indirectRoot = false;
 
-
+//Fixes the path and checks if it is a store path , see also toStorePath 
 static Path fixPath(Path path)
 {
     path = absPath(path);
     while (!isInStore(path)) {
-        if (!isLink(path)) break;
+        if (!isLink(path)) 
+        	break;
         string target = readLink(path);
         path = absPath(target, dirOf(path));
     }
     return toStorePath(path);
+}
+
+//Fixes the path and checks if it is a store or state path 
+static Path fixStoreOrStatePath(Path path)
+{
+    path = absPath(path);
+    while (!isInStore(path) && !isInStateStore(path)) {
+        if (!isLink(path)) 
+        	break;
+        string target = readLink(path);
+        path = absPath(target, dirOf(path));
+    }
+    return toStoreOrStatePath(path);
 }
 
 
@@ -162,10 +176,13 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
             parseHash16or32(parseHashType(hashAlgo), hash), name);
 }
 
-
+/*
+ * .....??
+ */
 static Path maybeUseOutput(const Path & storePath, bool useOutput, bool forceRealise)
 {
-    if (forceRealise) realisePath(storePath);
+    if (forceRealise) 
+    	realisePath(storePath);
     if (useOutput && isDerivation(storePath)) {
         Derivation drv = derivationFromPath(storePath);
         return findOutput(drv, "out");
@@ -286,7 +303,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
             {
-                Path path = maybeUseOutput(fixPath(*i), useOutput, forceRealise);								//TODO This hangs on state paths ...
+                Path path = maybeUseOutput(fixStoreOrStatePath(*i), useOutput, forceRealise);
                 if (query == qRequisites) store->storePathRequisites(path, includeOutputs, paths, false);
                 else if (query == qRequisitesState) store->storePathStateRequisitesOnly(path, includeOutputs, paths);
                 else if (query == qRequisitesFull) store->storePathRequisites(path, includeOutputs, paths, true);
@@ -339,7 +356,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             }
             break;
 
-        case qTree: {
+        case qTree: {			//TODO include state path?
             PathSet done;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
@@ -347,7 +364,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             break;
         }
             
-        case qGraph: {
+        case qGraph: {			//TOOD include state path?
             PathSet roots;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)

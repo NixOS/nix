@@ -246,7 +246,7 @@ void checkStoreName(const string & name);
 /* Chop off the parts after the top-level store name, e.g.,
    /nix/store/abcd-foo/bar => /nix/store/abcd-foo. */
 Path toStorePath(const Path & path);
-
+Path toStoreOrStatePath(const Path & path);
 
 /* Constructs a unique store path name. */
 Path makeStorePath(const string & type,

@@ -582,6 +582,9 @@ private:
     /* Referenceable paths (i.e., input and output paths). */
     PathSet allPaths;
 
+	/* Referenceable paths (i.e., input and output paths). */
+    PathSet allStatePaths;
+
     /* User selected for running the builder. */
     UserLock buildUser;
 
@@ -1295,8 +1298,7 @@ bool DerivationGoal::prepareBuild()
        running the build hook. */
     
     /* The outputs are referenceable paths. */
-    for (DerivationOutputs::iterator i = drv.outputs.begin();
-         i != drv.outputs.end(); ++i)
+    for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
     {
         debug(format("building path `%1%'") % i->second.path);
         allPaths.insert(i->second.path);
@@ -1305,16 +1307,14 @@ bool DerivationGoal::prepareBuild()
     /* Determine the full set of input paths. */
 
     /* First, the input derivations. */
-    for (DerivationInputs::iterator i = drv.inputDrvs.begin();
-         i != drv.inputDrvs.end(); ++i)
+    for (DerivationInputs::iterator i = drv.inputDrvs.begin(); i != drv.inputDrvs.end(); ++i)
     {
         /* Add the relevant output closures of the input derivation
            `*i' as input paths.  Only add the closures of output paths
            that are specified as inputs. */
         assert(store->isValidPath(i->first));
         Derivation inDrv = derivationFromPath(i->first);
-        for (StringSet::iterator j = i->second.begin();
-             j != i->second.end(); ++j)
+        for (StringSet::iterator j = i->second.begin(); j != i->second.end(); ++j)
             if (inDrv.outputs.find(*j) != inDrv.outputs.end())
                 computeFSClosure(inDrv.outputs[*j].path, inputPaths, false);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
             else
@@ -1324,8 +1324,7 @@ bool DerivationGoal::prepareBuild()
     }
 
     /* Second, the input sources. */
-    for (PathSet::iterator i = drv.inputSrcs.begin();
-         i != drv.inputSrcs.end(); ++i)
+    for (PathSet::iterator i = drv.inputSrcs.begin(); i != drv.inputSrcs.end(); ++i)
         computeFSClosure(*i, inputPaths, false);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
 
     debug(format("added input paths %1%") % showPaths(inputPaths));
@@ -1759,7 +1758,7 @@ void DerivationGoal::computeClosure()
      * [scan for and state references and component references in the state path]	//3,4
      */
     
-    PathSet allStatePaths;
+    PathSet allStatePaths2;
 	for (PathSet::const_iterator i = allPaths.begin(); i != allPaths.end(); i++){
 		Path componentPath = *i;
 		
@@ -1772,7 +1771,7 @@ void DerivationGoal::computeClosure()
 			//The we can dismiss the call to queryDeriversStatePath(...), and we only have to do registerValidPath once
 			
 			PathSet stateRefs = queryDeriversStatePath(txn, componentPath ,"*",getCallingUserName());		 
-			allStatePaths = mergePathSets(stateRefs, allStatePaths);
+			allStatePaths2 = mergePathSets(stateRefs, allStatePaths2);
 		}
 	}
 		
@@ -1782,10 +1781,10 @@ void DerivationGoal::computeClosure()
     	Path path = i->second.path;
 			
 		//We scan for state references in the component path
-		PathSet output_state_references = scanForReferences(path, allStatePaths);
+		PathSet output_state_references = scanForReferences(path, allStatePaths2);
 			
 		//debugging
-		for (PathSet::const_iterator i = allStatePaths.begin(); i != allStatePaths.end(); i++)
+		for (PathSet::const_iterator i = allStatePaths2.begin(); i != allStatePaths2.end(); i++)
 			debug(format("all possible StatePaths: %1%") % (*i));
 		for (PathSet::const_iterator i = output_state_references.begin(); i != output_state_references.end(); i++)
 			debug(format("state References scanned: %1%") % (*i));
@@ -1804,7 +1803,7 @@ void DerivationGoal::computeClosure()
 		printMsg(lvlTalkative, format("scanning for component and state references inside `%1%'") % statePath);
 		
 		state_references = scanForReferences(statePath, allPaths);
-		state_stateReferences = scanForReferences(statePath, allStatePaths);
+		state_stateReferences = scanForReferences(statePath, allStatePaths2);
 	}
     
     //Register all outputs now valid

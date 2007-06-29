@@ -1549,6 +1549,7 @@ void LocalStore::storePathStateRequisitesOnly(const Path & storePath, const bool
  * Not used yet ......................... (should we use it .... ???)
  * 
  */
+/* 
 void getDependenciesAtBuildTime(const Transaction & txn, const Path & drvPath)
 {
  	Derivation drv = derivationFromPath(drvPath);	
@@ -1557,21 +1558,20 @@ void getDependenciesAtBuildTime(const Transaction & txn, const Path & drvPath)
  		 	
  	//TODO THIS IS A DIRECT COPY FROM BUILD.CC WE SHOULD MERGE !!!!!!!!!!!!1!!!!!!!!!!!!!
  	
- 	/* The outputs are referenceable paths. */ 
-    for (DerivationOutputs::iterator i = drv.outputs.begin();
-         i != drv.outputs.end(); ++i)
+ 	// The outputs are referenceable paths. 
+    for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
     {
         debug(format("building path `%1%'") % i->second.path);
         allPaths.insert(i->second.path);
     } 
 
-    /* First, the input derivations. */
+    // First, the input derivations. 
     for (DerivationInputs::iterator i = drv.inputDrvs.begin();
          i != drv.inputDrvs.end(); ++i)
     {
-        /* Add the relevant output closures of the input derivation
-           `*i' as input paths.  Only add the closures of output paths
-           that are specified as inputs. */ 
+        // Add the relevant output closures of the input derivation
+        // `*i' as input paths.  Only add the closures of output paths
+        // that are specified as inputs. 
         assert(store->isValidPath(i->first));
         Derivation inDrv = derivationFromPath(i->first);
         for (StringSet::iterator j = i->second.begin(); j != i->second.end(); ++j)
@@ -1581,7 +1581,7 @@ void getDependenciesAtBuildTime(const Transaction & txn, const Path & drvPath)
                 throw Error(format("derivation `%1%' requires non-existent output `%2%' from input derivation `%3%'") % drvPath % *j % i->first);
     }
 
-    /* Second, the input sources. */
+    // Second, the input sources.
     for (PathSet::iterator i = drv.inputSrcs.begin(); i != drv.inputSrcs.end(); ++i)
         computeFSClosure(*i, inputPaths, false);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
 
@@ -1591,6 +1591,7 @@ void getDependenciesAtBuildTime(const Transaction & txn, const Path & drvPath)
     for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
     	printMsg(lvlError, format("ALLPATHS2: %1%") % *i);
 }
+*/
 
 void scanForAllReferences(const Transaction & txn, const Path & statePath)
 {

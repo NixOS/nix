@@ -43,13 +43,13 @@ bool isStatePath(const Path & path)
 void assertStorePath(const Path & path)
 {
     if (!isStorePath(path))
-        throw Error(format("component path `%1%' is not in the Nix store (1)") % path);		//TODO bug: this prints an empty path ...
+        throw Error(format("component path `%1%' is not in the Nix store") % path);
 }
 
 void assertStatePath(const Path & path)
 {
     if (!isStatePath(path))
-        throw Error(format("state path `%1%' is not in the Nix state-store (1)") % path);		//TODO bug: this prints an empty path ...
+        throw Error(format("state path `%1%' is not in the Nix state-store") % path);
 }
 
 
@@ -58,6 +58,26 @@ Path toStorePath(const Path & path)
     if (!isInStore(path))
         throw Error(format("path `%1%' is not in the Nix store (2)") % path);
     Path::size_type slash = path.find('/', nixStore.size() + 1);
+    if (slash == Path::npos)
+        return path;
+    else
+        return Path(path, 0, slash);
+}
+
+Path toStoreOrStatePath(const Path & path)
+{
+    bool isStorePath = isInStore(path);
+    bool isStateStore = isInStateStore(path);
+    
+    if (!isStorePath && !isStateStore)
+        throw Error(format("path `%1%' is not in the Nix store or Nix state store") % path);
+    
+    Path::size_type slash;
+    if(isStorePath)
+    	slash = path.find('/', nixStore.size() + 1);
+    else
+    	slash = path.find('/', nixStoreState.size() + 1);
+    
     if (slash == Path::npos)
         return path;
     else
