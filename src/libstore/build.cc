@@ -578,6 +578,10 @@ private:
     /* All input paths (that is, the union of FS closures of the
        immediate input paths). */
     PathSet inputPaths; 
+    
+    /* All input-state-paths (that is, the union of FS closures of the
+       immediate input paths). */
+    PathSet inputStatePaths;
 
     /* Referenceable paths (i.e., input and output paths). */
     PathSet allPaths;
@@ -773,11 +777,10 @@ void DerivationGoal::haveDerivation()
          i != drv.outputs.end(); ++i)
         store->addTempRoot(i->second.path);
 
+	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Also add a temproot for state ????????????
+
     /* Check what outputs paths are not already valid. */
     PathSet invalidOutputs = checkPathValidity(false);
-
-	//Just before we build the drvs, we already put in the database which component path is a state component path 
-	printMsg(lvlError, format("updateAllStateDerivations %1%") % drvPath);
 
     /* If they are all valid, then we're done. */
     if (invalidOutputs.size() == 0) {
@@ -1303,7 +1306,11 @@ bool DerivationGoal::prepareBuild()
         debug(format("building path `%1%'") % i->second.path);
         allPaths.insert(i->second.path);
     }
-
+    
+    /* The state output is a referenceable path */
+    if(store->isStateDrv(drv))
+    	allStatePaths.insert(drv.stateOutputs.find("state")->second.statepath);
+  
     /* Determine the full set of input paths. */
 
     /* First, the input derivations. */
@@ -1315,8 +1322,10 @@ bool DerivationGoal::prepareBuild()
         assert(store->isValidPath(i->first));
         Derivation inDrv = derivationFromPath(i->first);
         for (StringSet::iterator j = i->second.begin(); j != i->second.end(); ++j)
-            if (inDrv.outputs.find(*j) != inDrv.outputs.end())
-                computeFSClosure(inDrv.outputs[*j].path, inputPaths, true, false);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
+            if (inDrv.outputs.find(*j) != inDrv.outputs.end()){
+                computeFSClosure(inDrv.outputs[*j].path, inputPaths, true, false);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE (done?)
+                computeFSClosure(inDrv.outputs[*j].path, inputStatePaths, false, true);		//TODO!!!!!!!!!!!!! HOW CAN THESE PATHS ALREADY BE VALID ..... ?????????????????????
+            }
             else
                 throw BuildError(
                     format("derivation `%1%' requires non-existent output `%2%' from input derivation `%3%'")
@@ -1324,12 +1333,16 @@ bool DerivationGoal::prepareBuild()
     }
 
     /* Second, the input sources. */
-    for (PathSet::iterator i = drv.inputSrcs.begin(); i != drv.inputSrcs.end(); ++i)
-        computeFSClosure(*i, inputPaths, true, false);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
+    for (PathSet::iterator i = drv.inputSrcs.begin(); i != drv.inputSrcs.end(); ++i){
+        computeFSClosure(*i, inputPaths, true, false);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE (done?)
+        computeFSClosure(*i, inputStatePaths, false, true);
+    }
 
     debug(format("added input paths %1%") % showPaths(inputPaths));
+    debug(format("added input state paths %1%") % showPaths(inputStatePaths));
 
     allPaths.insert(inputPaths.begin(), inputPaths.end());
+    allStatePaths.insert(inputStatePaths.begin(), inputStatePaths.end());
 
     return true;
 }
@@ -1629,12 +1642,15 @@ void DerivationGoal::computeClosure()
     	if(!drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
 	    	createStateDirs(drv.stateOutputDirs, drv.stateOutputs, drv.env);
     
-    
+    for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
+    	printMsg(lvlError, format("allPaths: %1%") % *i);
+    for (PathSet::iterator i = allStatePaths.begin(); i != allStatePaths.end(); ++i)
+    	printMsg(lvlError, format("allStatePaths: %1%") % *i);
+        
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
        output paths read-only. */
-    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
-         i != drv.outputs.end(); ++i)
+    for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
     {
         Path path = i->second.path;
         if (!pathExists(path)) {
@@ -1688,6 +1704,10 @@ void DerivationGoal::computeClosure()
 
 		/* For this output path, find the references to other paths contained in it. */
         PathSet references = scanForReferences(path, allPaths);
+		
+		//TODO comment
+		PathSet output_state_references = scanForReferences(path, allStatePaths);
+		allStateReferences[path] = output_state_references;
 				
         /* For debugging, print out the referenced and unreferenced
            paths. */
@@ -1721,6 +1741,20 @@ void DerivationGoal::computeClosure()
         contentHashes[path] = hashPath(htSHA256, path);
     }
     
+    //Scan the state Path
+    /* For this state-output path, find the references to other paths contained in it. 
+	 * Get the state paths (instead of out paths) from all components, and then call
+	 * scanForReferences().
+	 */
+	//If state is enabled: Seaches for state and component references in the state path 				 
+	if(isStateDrvTxn(noTxn, drv)){		//TODO 
+		Path statePath = drv.stateOutputs.find("state")->second.statepath;
+		printMsg(lvlTalkative, format("scanning for component and state references inside `%1%'") % statePath);
+		
+		state_references = scanForReferences(statePath, allPaths);
+		state_stateReferences = scanForReferences(statePath, allStatePaths);
+	}
+	
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  This is wrapped in one
        database transaction to ensure that if we crash, either
@@ -1739,13 +1773,33 @@ void DerivationGoal::computeClosure()
          i != drv.outputs.end(); ++i)
     {
         //printMsg(lvlError, format("SetValidPath: %1%") % i->second.path);
-        
+        /*
         registerValidPath(txn, i->second.path,
             contentHashes[i->second.path],
             allReferences[i->second.path],
             PathSet(),									//dummy stateReferences
+            drvPath);*/
+            
+         registerValidPath(txn, 
+        	i->second.path,								//component path
+            contentHashes[i->second.path],
+            allReferences[i->second.path],				//set of component-references
+            allStateReferences[i->second.path],			//set of state-references
             drvPath);
     }
+    
+    //Register the state path valid
+    if(isStateDrvTxn(txn, drv))
+    {
+    	Path statePath = drv.stateOutputs.find("state")->second.statepath;
+    	
+    	registerValidPath(txn,    	
+    		statePath,
+    		Hash(),										//emtpy hash
+    		state_references,
+    		state_stateReferences,
+    		drvPath);
+    }	    
     
     /*
      * We first register alls paths as valid, and only scan for component references.
@@ -1757,7 +1811,11 @@ void DerivationGoal::computeClosure()
      * If state is enabled for the path we:
      * [scan for and state references and component references in the state path]	//3,4
      */
-    
+     
+     
+     
+     //TODO REMOVE?
+    /*
     PathSet allStatePaths2;
 	for (PathSet::const_iterator i = allPaths.begin(); i != allPaths.end(); i++){
 		Path componentPath = *i;
@@ -1796,7 +1854,7 @@ void DerivationGoal::computeClosure()
     /* For this state-output path, find the references to other paths contained in it. 
 	 * Get the state paths (instead of out paths) from all components, and then call
 	 * scanForReferences().
-	 */
+	 * /
 	//If state is enabled: Seaches for state and component references in the state path 				 
 	if(isStateDrvTxn(txn, drv)){
 		Path statePath = drv.stateOutputs.find("state")->second.statepath;
@@ -1828,10 +1886,9 @@ void DerivationGoal::computeClosure()
     		state_references,
     		state_stateReferences,
     		drvPath);
-    	
-    	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    	// WE NOW ONLY REGISTER COMPONETS PATHS WITH registerValidPath BUT WE SHOULD ALSO REGISTER STATE PAHTS AS VALID AND SET THEIR REFERENCES !!!!!!!!!!!!!!!!!!!!!!!
-    }	    
+    }	   
+    
+    */ 
     
     txn.commit();
 

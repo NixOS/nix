@@ -25,22 +25,24 @@ void computeFSClosure(const Path & path, PathSet & paths, const bool & withCompo
 	if(!withComponents && !withState)
 		throw Error(format("Useless call to computeFSClosure, at leat withComponents or withState must be true"));
 	
-	//if withComponents is false .....
-	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	//TODO MAYBE EDIT: HOW CAN THESE PATHS ALREADY BE VALID SOMETIMES ..... ?????????????????????
+	for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
+		if ( !store->isValidPath(*i) && !store->isValidStatePath(*i) )
+			throw Error(format("Not a state or store path: ") % *i);
 	
     //if withState is false, we filter out all state paths
-	if(withState == false){
-		for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i){
-			if ( ! store->isValidStatePath(*i) ){
+	if( withComponents && !withState ){
+		for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
+			if ( store->isValidPath(*i) )
 				paths.insert(*i);
-			
-				//TODO (OBSOLETE) CHECK TO SEE IF THERE WERE NO /NIX/STATE PATHS THAT ARENT VALID AT THIS POINT, REMOVE THIS IN THE FUTURE
-				string test = "/nix/state";
-				if((*i).substr(0, test.size()) == test)
-					throw Error(format("THIS CANNOT HAPPEN ! computeFSClosure is called before the state path was valid...."));
-			}
-		}
 	}
+	//if withComponents is false, we filter out all component paths
+	else if( !withComponents && withState ){
+		for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
+			if ( store->isValidStatePath(*i) )
+				paths.insert(*i);
+	}
+	//all
 	else{
 		paths = allPaths;	
 	}

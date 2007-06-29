@@ -398,7 +398,7 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
     if (references.size() > 0 && !isRealisableComponentOrStatePath(txn, store_or_statePath))
         throw Error(format("cannot set references for path `%1%' which is invalid and has no substitutes") % store_or_statePath);
 	
-	printMsg(lvlError, format("REGISTER: %1%") % store_or_statePath);
+	//printMsg(lvlError, format("REGISTER: %1%") % store_or_statePath);
 
     Paths oldReferences;
     nixDB.queryStrings(txn, dbReferences, store_or_statePath, oldReferences);
@@ -410,7 +410,7 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
     
     if (oldReferences2 == references && oldStateReferences2 == stateReferences) return;
     
-    printMsg(lvlError, format("REGISTER2: %1%") % store_or_statePath);
+    //printMsg(lvlError, format("REGISTER2: %1%") % store_or_statePath);
     
     nixDB.setStrings(txn, dbReferences, store_or_statePath,
         Paths(references.begin(), references.end()));
@@ -511,19 +511,16 @@ void setDeriver(const Transaction & txn, const Path & storePath, const Path & de
     assertStorePath(storePath);
     if (deriver == "") return;
     assertStorePath(deriver);
-    printMsg(lvlError, format("yyyyyyyyyyyyyyyyyyyyyyyyy"));		//hanged !!!!!!!!
     
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
 	
 	printMsg(lvlError, format("Ttttttttttttttttttttttttt %1%") % deriver);
     
-    if (isStateDrvPathTxn(txn, deriver)){							//Redirect if its a state component
-    	printMsg(lvlError, format("bbbbbbbbbbbbbbb"));
+    if (isStateDrvPathTxn(txn, deriver)){							//Redirect if its a state component					//hanges somtimes !!!!!!!!!!!!!!!!!!!
     	addStateDeriver(txn, storePath, deriver);
 	}		
     else{
-	    printMsg(lvlError, format("ccccccccccccccccccc"));
 	    nixDB.setString(txn, dbDerivers, storePath, deriver);
     }
 }
