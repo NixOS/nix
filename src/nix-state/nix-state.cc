@@ -175,7 +175,7 @@ PathSet getAllStateDerivationsRecursively(const Path & storePath)
 {
 	//Get recursively all state paths
 	PathSet statePaths;
-	store->storePathStateRequisitesOnly(storePath, false, statePaths);		
+	store->storePathRequisites(storePath, false, statePaths, false, true);		
 	
 	//Find the matching drv with the statePath
 	PathSet derivations;	

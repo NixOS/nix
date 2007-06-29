@@ -17,10 +17,16 @@ Derivation derivationFromPath(const Path & drvPath)
     return parseDerivation(t);
 }
 
-void computeFSClosure(const Path & path, PathSet & paths, const bool & withState, bool flipDirection)
+void computeFSClosure(const Path & path, PathSet & paths, const bool & withComponents, const bool & withState, bool flipDirection)
 {
 	PathSet allPaths;
 	computeFSClosureRec(path, allPaths, flipDirection);
+	
+	if(!withComponents && !withState)
+		throw Error(format("Useless call to computeFSClosure, at leat withComponents or withState must be true"));
+	
+	//if withComponents is false .....
+	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	
     //if withState is false, we filter out all state paths
 	if(withState == false){

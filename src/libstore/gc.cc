@@ -469,7 +469,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
        roots under the `references' relation. */
     PathSet livePaths;
     for (PathSet::const_iterator i = roots.begin(); i != roots.end(); ++i)
-        computeFSClosure(canonPath(*i), livePaths, false);						//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO DELETE STATE??
+        computeFSClosure(canonPath(*i), livePaths, true, false);						//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO DELETE STATE??
 
     if (gcKeepDerivations) {
         for (PathSet::iterator i = livePaths.begin();
@@ -480,7 +480,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
                turned off). */
             Path deriver = queryDeriver(noTxn, *i);
             if (deriver != "" && store->isValidPath(deriver))
-                computeFSClosure(deriver, livePaths, false);							//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO KEEP STATE
+                computeFSClosure(deriver, livePaths, true, false);							//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO KEEP STATE
         }
     }
 
@@ -493,7 +493,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
                 for (DerivationOutputs::iterator j = drv.outputs.begin();
                      j != drv.outputs.end(); ++j)
                     if (store->isValidPath(j->second.path))
-                        computeFSClosure(j->second.path, livePaths, false);					//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO KEEP STATE
+                        computeFSClosure(j->second.path, livePaths, true, false);					//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO KEEP STATE
             }
     }
 
@@ -518,7 +518,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     PathSet tempRootsClosed;
     for (PathSet::iterator i = tempRoots.begin(); i != tempRoots.end(); ++i)
         if (store->isValidPath(*i))
-            computeFSClosure(*i, tempRootsClosed, false);									//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO .... STATE
+            computeFSClosure(*i, tempRootsClosed, true, false);									//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO .... STATE
         else
             tempRootsClosed.insert(*i);
 

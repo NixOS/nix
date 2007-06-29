@@ -17,8 +17,12 @@ Derivation derivationFromPath(const Path & drvPath);
    `flipDirection' is true, the set of paths that can reach
    `storePath' is returned; that is, the closures under the
    `referrers' relation instead of the `references' relation is
+   
+   withState = TODO comment
+   withComponents = TODO
+   
    returned. */
-void computeFSClosure(const Path & storePath, PathSet & paths, const bool & withState, bool flipDirection = false);
+void computeFSClosure(const Path & storePath, PathSet & paths, const bool & withComponents, const bool & withState, bool flipDirection = false);
 
 void computeFSClosureRec(const Path & path, PathSet & paths, const bool & flipDirection);	//private    
 

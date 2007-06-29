@@ -1499,9 +1499,9 @@ PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, 
    - Source/binary deployment (when called on a derivation with
      `includeOutputs' set to true).
 */
-void storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState)
+void storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState)
 {
-    computeFSClosure(storePath, paths, withState);
+    computeFSClosure(storePath, paths, withComponents, withState);
 
     if (includeOutputs) {
         for (PathSet::iterator i = paths.begin();
@@ -1511,37 +1511,15 @@ void storePathRequisites(const Path & storePath, const bool includeOutputs, Path
                 for (DerivationOutputs::iterator j = drv.outputs.begin();
                      j != drv.outputs.end(); ++j)
                     if (store->isValidPath(j->second.path))
-                        computeFSClosure(j->second.path, paths, withState);
+                        computeFSClosure(j->second.path, paths, withComponents, withState);
             }
     }
 }
 
-void LocalStore::storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState)
+void LocalStore::storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState)
 {
-    return nix::storePathRequisites(storePath, includeOutputs, paths, withState);
+    return nix::storePathRequisites(storePath, includeOutputs, paths, withComponents, withState);
 }
-
-/*
- * Same as storePathRequisites with withState=true, but now only returns the state paths
- */
-void storePathStateRequisitesOnlyTxn(const Transaction & txn, const Path & storePath, const bool includeOutputs, PathSet & statePaths)
-{
-	PathSet paths;
-	storePathRequisites(storePath, includeOutputs, paths, true);
-	
-	//filter out all non-state paths
-	for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i){
-		if (isValidStatePathTxn(txn, *i))
-			statePaths.insert(*i);
-	}	
-}
-
-void LocalStore::storePathStateRequisitesOnly(const Path & storePath, const bool includeOutputs, PathSet & statePaths)
-{
-	nix::storePathStateRequisitesOnlyTxn(noTxn, storePath, includeOutputs, statePaths);
-}
-
-
 
 /*
  * TODO
@@ -1576,14 +1554,14 @@ void getDependenciesAtBuildTime(const Transaction & txn, const Path & drvPath)
         Derivation inDrv = derivationFromPath(i->first);
         for (StringSet::iterator j = i->second.begin(); j != i->second.end(); ++j)
             if (inDrv.outputs.find(*j) != inDrv.outputs.end())
-                computeFSClosure(inDrv.outputs[*j].path, inputPaths, false);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
+                computeFSClosure(inDrv.outputs[*j].path, inputPaths, true, false);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
             else
                 throw Error(format("derivation `%1%' requires non-existent output `%2%' from input derivation `%3%'") % drvPath % *j % i->first);
     }
 
     // Second, the input sources.
     for (PathSet::iterator i = drv.inputSrcs.begin(); i != drv.inputSrcs.end(); ++i)
-        computeFSClosure(*i, inputPaths, false);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
+        computeFSClosure(*i, inputPaths, true, false);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
 
     //debug(format("added input paths %1%") % showPaths(inputPaths)); //TODO
     allPaths.insert(inputPaths.begin(), inputPaths.end());

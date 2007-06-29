@@ -304,15 +304,15 @@ static void opQuery(Strings opFlags, Strings opArgs)
                  i != opArgs.end(); ++i)
             {
                 Path path = maybeUseOutput(fixStoreOrStatePath(*i), useOutput, forceRealise);
-                if (query == qRequisites) store->storePathRequisites(path, includeOutputs, paths, false);
-                else if (query == qRequisitesState) store->storePathStateRequisitesOnly(path, includeOutputs, paths);
-                else if (query == qRequisitesFull) store->storePathRequisites(path, includeOutputs, paths, true);
+                if (query == qRequisites) store->storePathRequisites(path, includeOutputs, paths, true, false);
+                else if (query == qRequisitesState) store->storePathRequisites(path, includeOutputs, paths, false, true);
+                else if (query == qRequisitesFull) store->storePathRequisites(path, includeOutputs, paths, true, true);
                 else if (query == qReferences) store->queryReferences(path, paths);
                 else if (query == qStateReferences) store->queryStateReferences(path, paths);
                 else if (query == qReferrers) store->queryReferrers(path,  paths);
                 else if (query == qStateReferrers) store->queryStateReferrers(path,  paths);
-                else if (query == qReferrersClosure) computeFSClosure(path, paths, false, true);
-                else if (query == qReferrersClosureWithState) computeFSClosure(path, paths, true, true);
+                else if (query == qReferrersClosure) computeFSClosure(path, paths, true, false, true);
+                else if (query == qReferrersClosureWithState) computeFSClosure(path, paths, true, true, true);
             }
             Paths sorted = topoSortPaths(paths);
             for (Paths::reverse_iterator i = sorted.rbegin(); 

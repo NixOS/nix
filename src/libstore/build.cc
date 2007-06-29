@@ -1197,7 +1197,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
            *probably* already has it.) */
         PathSet allInputs;
         allInputs.insert(inputPaths.begin(), inputPaths.end());
-        computeFSClosure(drvPath, allInputs, false);								//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
+        computeFSClosure(drvPath, allInputs, true, false);								//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
         
         string s;
         for (PathSet::iterator i = allInputs.begin();
@@ -1316,7 +1316,7 @@ bool DerivationGoal::prepareBuild()
         Derivation inDrv = derivationFromPath(i->first);
         for (StringSet::iterator j = i->second.begin(); j != i->second.end(); ++j)
             if (inDrv.outputs.find(*j) != inDrv.outputs.end())
-                computeFSClosure(inDrv.outputs[*j].path, inputPaths, false);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
+                computeFSClosure(inDrv.outputs[*j].path, inputPaths, true, false);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
             else
                 throw BuildError(
                     format("derivation `%1%' requires non-existent output `%2%' from input derivation `%3%'")
@@ -1325,7 +1325,7 @@ bool DerivationGoal::prepareBuild()
 
     /* Second, the input sources. */
     for (PathSet::iterator i = drv.inputSrcs.begin(); i != drv.inputSrcs.end(); ++i)
-        computeFSClosure(*i, inputPaths, false);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
+        computeFSClosure(*i, inputPaths, true, false);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
 
     debug(format("added input paths %1%") % showPaths(inputPaths));
 
@@ -1450,7 +1450,7 @@ void DerivationGoal::startBuilder()
 
         /* Write closure info to `fileName'. */
         PathSet refs;
-        computeFSClosure(storePath, refs, false);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
+        computeFSClosure(storePath, refs, true, false);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
         /* !!! in secure Nix, the writing should be done on the
            build uid for security (maybe). */
         writeStringToFile(tmpDir + "/" + fileName,

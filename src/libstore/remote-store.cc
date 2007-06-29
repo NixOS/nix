@@ -452,13 +452,7 @@ bool RemoteStore::isStateDrv(const Derivation & drv)
 }
 
 //TODO
-void RemoteStore::storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState)
-{
-	
-}
-
-//TODO
-void RemoteStore::storePathStateRequisitesOnly(const Path & storePath, const bool includeOutputs, PathSet & statePaths)
+void RemoteStore::storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState)
 {
 	
 }

@@ -96,9 +96,7 @@ public:
 	
 	bool isStateDrv(const Derivation & drv);
 	
-	void storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withState);
-	
-	void storePathStateRequisitesOnly(const Path & storePath, const bool includeOutputs, PathSet & statePaths);
+	void storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState);
 	
 	void scanForAllReferences(const Path & statePath);
 	
