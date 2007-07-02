@@ -67,7 +67,7 @@ void computeFSClosureRec(const Path & path, PathSet & paths, const bool & flipDi
     }
 
 	PathSet allReferences;
-	allReferences = mergePathSets(references, stateReferences);
+	allReferences = pathSets_union(references, stateReferences);
 
     for (PathSet::iterator i = allReferences.begin(); i != allReferences.end(); ++i)
         computeFSClosureRec(*i, paths, flipDirection);

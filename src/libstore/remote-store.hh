@@ -84,11 +84,11 @@ public:
 	
 	bool isStateDrv(const Derivation & drv);
 	
-	void storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState);
+	void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState);
 
-	void scanForAllReferences(const Path & statePath);
+	void scanAndUpdateAllReferences(const Path & statePath);
 	
-	void scanForAllReferencesRecusively(const Path & storePath);
+	void scanAndUpdateAllReferencesRecusively(const Path & storeOrstatePath);
     
 private:
     AutoCloseFD fdSocket;

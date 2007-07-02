@@ -1146,28 +1146,78 @@ string getCallingUserName()
     return username;
 }
 
-//merges two PathSets into one, removing doubles
-PathSet mergePathSets(const PathSet & paths1, const PathSet & paths2)
+//merges two PathSets into one, removing doubles (union)
+PathSet pathSets_union(const PathSet & paths1, const PathSet & paths2)
 {
-	PathSet merged = paths2;
-	
-	for (PathSet::iterator i = paths1.begin(); i != paths1.end(); ++i)			//were inserting all paths from pathset1 into pathset2
-    {
-    	bool alreadyExists = false;
-		for (PathSet::iterator j = paths2.begin(); j != paths2.end(); ++j)		//search in p2 for duplicates
-    	{
-    		if(*i == *j){
-				alreadyExists = true;
-    			break;
-    		}
-    	}
-    	
-    	if( !alreadyExists ){													//insert into p2 if not duplicate
-    		merged.insert(*i);
-    	}
-    }
+	/*
+	for (PathSet::iterator i = paths1.begin(); i != paths1.end(); ++i)
+    		printMsg(lvlError, format("paths1: '%1%'") % (*i));
+    for (PathSet::iterator i = paths2.begin(); i != paths2.end(); ++i)
+    		printMsg(lvlError, format("paths2: '%1%'") % (*i));
+    */
     
-    return merged;
+    vector<Path> vector1(paths1.begin(), paths1.end());
+  	vector<Path> vector2(paths2.begin(), paths2.end());
+  	vector<Path> setResult;
+  	
+  	set_union(vector1.begin(), vector1.end(),vector2.begin(), vector2.end(), back_inserter(setResult));
+	
+	//Also available:
+	//set_symmetric_difference
+	//set_intersection
+
+	PathSet diff;	
+	for(int i=0; i<setResult.size(); i++)
+		diff.insert(setResult[i]);
+
+	/*
+    for (PathSet::iterator i = diff.begin(); i != diff.end(); ++i)
+    		printMsg(lvlError, format("diff: '%1%'") % (*i));
+    */
+    
+    return diff;
 }
+
+void pathSets_difference(const PathSet & oldpaths, const PathSet & newpaths, PathSet & addedpaths, PathSet & removedpaths)
+{
+	/*
+	for (PathSet::iterator i = oldpaths.begin(); i != oldpaths.end(); ++i)
+    	printMsg(lvlError, format("oldpaths: '%1%'") % (*i));
+    for (PathSet::iterator i = newpaths.begin(); i != newpaths.end(); ++i)
+    	printMsg(lvlError, format("newpaths: '%1%'") % (*i));
+	*/
+	
+	for (PathSet::iterator i = oldpaths.begin(); i != oldpaths.end(); ++i){
+		bool exists = false;
+		for (PathSet::iterator j = newpaths.begin(); j != newpaths.end(); ++j){
+			if(*i == *j){
+				exists = true;
+				break;
+			}
+		}
+		if(!exists)
+			removedpaths.insert(*i);			
+	}
+	
+	for (PathSet::iterator i = newpaths.begin(); i != newpaths.end(); ++i){
+		bool exists = false;
+		for (PathSet::iterator j = oldpaths.begin(); j != oldpaths.end(); ++j){
+			if(*i == *j){
+				exists = true;
+				break;
+			}
+		}
+		if(!exists)
+			addedpaths.insert(*i);			
+	}
+
+	/*
+    for (PathSet::iterator i = addedpaths.begin(); i != addedpaths.end(); ++i)
+    	printMsg(lvlError, format("addedpaths: '%1%'") % (*i));
+    for (PathSet::iterator i = removedpaths.begin(); i != removedpaths.end(); ++i)
+    	printMsg(lvlError, format("removedpaths: '%1%'") % (*i));
+    */
+}
+
 
 }

@@ -215,13 +215,13 @@ public:
 	virtual bool isStateDrv(const Derivation & drv) = 0;
 	
 	/* TODO */
-	virtual void storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState) = 0;
+	virtual void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState) = 0;
 
 	/* TODO */
-	virtual void scanForAllReferences(const Path & statePath) = 0;
+	virtual void scanAndUpdateAllReferences(const Path & statePath) = 0;
 	
 	/* TODO */
-	virtual void scanForAllReferencesRecusively(const Path & storePath) = 0;
+	virtual void scanAndUpdateAllReferencesRecusively(const Path & storeOrstatePath) = 0;
 };
 
 

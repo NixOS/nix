@@ -452,19 +452,19 @@ bool RemoteStore::isStateDrv(const Derivation & drv)
 }
 
 //TODO
-void RemoteStore::storePathRequisites(const Path & storePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState)
+void RemoteStore::storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState)
 {
 	
 }
 
 //TODO
-void RemoteStore::scanForAllReferences(const Path & statePath)
+void RemoteStore::scanAndUpdateAllReferences(const Path & statePath)
 {
 	
 }
 
 //TODO	
-void RemoteStore::scanForAllReferencesRecusively(const Path & storePath)
+void RemoteStore::scanAndUpdateAllReferencesRecusively(const Path & storeOrstatePath)
 {
 	
 }
