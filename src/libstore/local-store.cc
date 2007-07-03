@@ -398,7 +398,12 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
     if (references.size() > 0 && !isRealisableComponentOrStatePath(txn, store_or_statePath))
         throw Error(format("cannot set references for path `%1%' which is invalid and has no substitutes") % store_or_statePath);
 	
-	//printMsg(lvlError, format("REGISTER: %1%") % store_or_statePath);
+	/*
+	for (PathSet::iterator i = references.begin(); i != references.end(); ++i)
+    	printMsg(lvlError, format("'%2%' has references: %1%") % *i % store_or_statePath);
+    for (PathSet::iterator i = stateReferences.begin(); i != stateReferences.end(); ++i)
+    	printMsg(lvlError, format("'%2%' has stateReferences: %1%") % *i % store_or_statePath);
+	*/
 
     Paths oldReferences;
     nixDB.queryStrings(txn, dbReferences, store_or_statePath, oldReferences);
@@ -446,7 +451,7 @@ void queryReferences(const Transaction & txn,
     Paths references2;
     
     if (!isRealisableComponentOrStatePath(txn, storePath))
-        throw Error(format("path `%1%' is not valid 1") % storePath);
+        throw Error(format("path `%1%' is not valid") % storePath);
     nixDB.queryStrings(txn, dbReferences, storePath, references2);
     references.insert(references2.begin(), references2.end());
 }
@@ -459,19 +464,19 @@ void LocalStore::queryReferences(const Path & storePath,
 }
 
 void queryStateReferences(const Transaction & txn,
-    const Path & storePath, PathSet & stateReferences)
+    const Path & componentOrstatePath, PathSet & stateReferences)
 {
     Paths stateReferences2;
     
-    if (!isRealisableComponentOrStatePath(txn, storePath))
-        throw Error(format("path `%1%' is not valid 2") % storePath);
-    nixDB.queryStrings(txn, dbStateReferences, storePath, stateReferences2);
+    if (!isRealisableComponentOrStatePath(txn, componentOrstatePath))
+        throw Error(format("path `%1%' is not valid") % componentOrstatePath);
+    nixDB.queryStrings(txn, dbStateReferences, componentOrstatePath, stateReferences2);
     stateReferences.insert(stateReferences2.begin(), stateReferences2.end());
 }
 
-void LocalStore::queryStateReferences(const Path & storePath, PathSet & stateReferences)
+void LocalStore::queryStateReferences(const Path & componentOrstatePath, PathSet & stateReferences)
 {
-    nix::queryStateReferences(noTxn, storePath, stateReferences);
+    nix::queryStateReferences(noTxn, componentOrstatePath, stateReferences);
 }
 
 void queryReferrers(const Transaction & txn,
@@ -1644,17 +1649,17 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
 	(remember we need to keep the old as the basis, and things can change, the db is not consistent anymore then ....)
 	But we also dont want useless refereces ......
 	
-	TODO: solution, 
-	ALSO: 
+	Update the 2 references tables:	all state paths get: Path statepath --> List(int revnumber, List(References))
+	TODO EDIT TABLES references,references_state,referrers,referrers_state 
 	
-	Update the 2 references tables: 
-	all state paths get: run number + state references + revision numbers)	THIS ONE !!!!!!
+	New table stateRevisionClosure: Path StatePath + int revision --> List(int revnumbers)	
 															
 	A1(STATEPATH) 		  --> UPDATE ALL STATE REFERENCES IN DB			(TRANSACTION)
 	A2(STATEPATH [+ REV]) --> GIVE ALL STATE REFERENCES IN DB
 	
 	B1(STATEPATH) 		  --> SCAN ALL REFERENCES IN DB, LINK TO REVISION NUMBERS (WITH CALL TO A2)		(TRANSACTION)
 	B2(STATEPATH [+ REV]) --> GIVES ALL REFERENCES
+	
 	
 	
 	

@@ -89,6 +89,26 @@ public:
 
     void enumTable(const Transaction & txn, TableId table,
         Strings & keys, const string & keyPrefix = "");
+    
+    /* Set the stateReferences for a specific revision (and older until the next higher revision number in the table) */    
+    void setStateReferences(const Transaction & txn, TableId table,
+    	const Path & statePath, const int revision, const Strings & references);
+    
+    /* Returns the references for a specific revision (and older until the next higher revision number in the table) */
+    bool queryStateReferences(const Transaction & txn, TableId table,
+    	const Path & statePath, Strings & references, int revision = -1);
+    
+    /* Set the revision number of the statePath and the revision numbers of all state paths in the references closure */
+    void setStateRevisions(const Transaction & txn, TableId table,
+    	const Path & statePath, const int revision, const RevisionNumbers & revisions);
+    
+    /* Returns all the revision numbers of the state references closure of the given state path */
+    //bool queryStateRevisions(const Transaction & txn, TableId table,
+    //	const Path & statePath, RevisionNumbers & revisions, int revision = -1);
+    
+    /* Returns all available revision numbers of the given state path */
+    bool queryAllStateRevisions(const Transaction & txn, TableId table,
+    	const Path & statePath, RevisionNumbers & revisions);	
 };
 
 

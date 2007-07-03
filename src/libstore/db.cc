@@ -444,5 +444,53 @@ void Database::enumTable(const Transaction & txn, TableId table,
     } catch (DbException e) { rethrow(e); }
 }
 
+void Database::setStateReferences(const Transaction & txn, TableId table,
+   	const Path & statePath, const int revision, const Strings & references)
+{
+	//get all previous StateReferences
+	StateReferences newReferences;
+	
+	//Merge
+	newReferences[revision] = references;
+	
+	
+	
+	//Insert
+	string data = "";
+	checkInterrupt();
+    try {
+        Db * db = getDb(table);
+        Dbt kt((void *) statePath.c_str(), statePath.length());
+        Dbt dt((void *) data.c_str(), data.length());
+        db->put(txn.txn, &kt, &dt, 0);
+    } catch (DbException e) { rethrow(e); }
+}
+
+bool Database::queryStateReferences(const Transaction & txn, TableId table,
+   	const Path & statePath, Strings & references, int revision)
+{
+	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	return false;
+}   
+
+void Database::setStateRevisions(const Transaction & txn, TableId table,
+   	const Path & statePath, const int revision, const RevisionNumbers & revisions)
+{
+	//TODO
+}   
+/*
+bool Database::queryStateRevisions(const Transaction & txn, TableId table,
+   	const Path & statePath, RevisionNumbers & revisions, int revision = -1)
+{
+	//TODO
+	return false;
+}*/  
+
+bool Database::queryAllStateRevisions(const Transaction & txn, TableId table,
+    const Path & statePath, RevisionNumbers & revisions)
+{
+	//TODO
+	return false;
+}
  
 }

@@ -4,6 +4,7 @@
 #include <string>
 #include <list>
 #include <set>
+#include <map>
 
 #include <boost/format.hpp>
 
@@ -15,6 +16,7 @@ namespace nix {
 using std::string;
 using std::list;
 using std::set;
+using std::map;
 using std::vector;
 using boost::format;
 
@@ -50,11 +52,19 @@ typedef list<string> Strings;
 typedef set<string> StringSet;
 typedef set<StringSet> SetStringSet;
 
-
 /* Paths are just strings. */
 typedef string Path;
 typedef list<Path> Paths;
 typedef set<Path> PathSet;
+
+//state types
+struct RevisionNumbersKey { Path statePath; int revision; } ;
+typedef list<int> RevisionNumbers;								//the Strings (list) of StateReferences and this list are connected by position
+typedef map<int, Strings> StateReferences;
+
+//typedef std::map<int, Strings> StateReferencesKey;
+//typedef std::map<int, Strings> StateReferencesKey2;
+
 
  
 typedef enum { 

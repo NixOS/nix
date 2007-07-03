@@ -1642,10 +1642,12 @@ void DerivationGoal::computeClosure()
     	if(!drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
 	    	createStateDirs(drv.stateOutputDirs, drv.stateOutputs, drv.env);
     
+    /*
     for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
-    	printMsg(lvlError, format("allPaths: %1%") % *i);
+    	printMsg(lvlError, format("scanning for allPaths: %1%") % *i);
     for (PathSet::iterator i = allStatePaths.begin(); i != allStatePaths.end(); ++i)
-    	printMsg(lvlError, format("allStatePaths: %1%") % *i);
+    	printMsg(lvlError, format("scanning for allStatePaths: %1%") % *i);
+    */
         
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
