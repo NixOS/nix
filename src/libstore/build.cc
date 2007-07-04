@@ -1781,7 +1781,7 @@ void DerivationGoal::computeClosure()
             contentHashes[i->second.path],
             allReferences[i->second.path],				//set of component-references
             allStateReferences[i->second.path],			//set of state-references
-            drvPath);
+            drvPath, 0);
     }
     
     //Register the state path valid
@@ -1795,7 +1795,7 @@ void DerivationGoal::computeClosure()
     		Hash(),										//emtpy hash
     		state_references,
     		state_stateReferences,
-    		drvPath);
+    		drvPath, 0);
     }	    
     
     txn.commit();
@@ -2199,7 +2199,7 @@ void SubstitutionGoal::finished()
     Transaction txn;
     createStoreTransaction(txn);
     registerValidPath(txn, storePath, contentHash,					//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! how about substituing a state path ?????
-        references, stateReferences, sub.deriver);
+        references, stateReferences, sub.deriver, 0);
     txn.commit();
 
     outputLock->setDeletion(true);

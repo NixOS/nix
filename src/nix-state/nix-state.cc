@@ -399,11 +399,12 @@ void run(Strings args)
 	pathSets_difference(p1,p2,p3,p4);
 	pathSets_union(p1,p2);
 
-	
-		
-	store = openStore();
 	store->scanForAllReferences("/nix/state/i06flm2ahq5s0x3633z30dnav9f1wkb5-hellohardcodedstateworld-dep1-1.0-test");
+
+	store = openStore();
+	//setReferences_statePath("/nix/state/afsdsdafsdaf-sdaf", 7);
 	return;
+		
 	*/
 	
 	/* test */

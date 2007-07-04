@@ -103,8 +103,8 @@ public:
     	const Path & statePath, const int revision, const RevisionNumbers & revisions);
     
     /* Returns all the revision numbers of the state references closure of the given state path */
-    //bool queryStateRevisions(const Transaction & txn, TableId table,
-    //	const Path & statePath, RevisionNumbers & revisions, int revision = -1);
+    bool queryStateRevisions(const Transaction & txn, TableId table,
+    	const Path & statePath, RevisionNumbers & revisions, int revision = -1);
     
     /* Returns all available revision numbers of the given state path */
     bool queryAllStateRevisions(const Transaction & txn, TableId table,

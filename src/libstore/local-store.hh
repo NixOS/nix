@@ -127,7 +127,7 @@ void clearSubstitutes();
 void registerValidPath(const Transaction & txn,
     const Path & component_or_state_path, const Hash & hash, 
     const PathSet & references, const PathSet & stateReferences,
-    const Path & deriver);
+    const Path & deriver, const int revision);
 
 struct ValidPathInfo 
 {
@@ -136,6 +136,7 @@ struct ValidPathInfo
     Hash hash;
     PathSet references;
     PathSet stateReferences;
+    int revision;
 };
 
 typedef list<ValidPathInfo> ValidPathInfos;
@@ -157,9 +158,12 @@ void canonicalisePathMetaData(const Path & path);
 bool isValidPathTxn(const Transaction & txn, const Path & path);
 
 /* Sets the set of outgoing FS (also state) references for a store path.  Use with
-   care! */
+   care! 
+   
+   -1 for revision means overwrite the last revision
+   */
 void setReferences(const Transaction & txn, const Path & store_or_statePath,
-    const PathSet & references, const PathSet & stateReferences);
+    const PathSet & references, const PathSet & stateReferences, const int revision);
 
 /* Sets the deriver of a store path.  Use with care! */
 void setDeriver(const Transaction & txn, const Path & path,
@@ -210,6 +214,7 @@ bool isStateComponentTxn(const Transaction & txn, const Path & path);
 bool isStateDrvPathTxn(const Transaction & txn, const Path & drvPath);
 
 bool isStateDrvTxn(const Transaction & txn, const Derivation & drv);
+
  
 }
 

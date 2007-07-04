@@ -447,30 +447,52 @@ void Database::enumTable(const Transaction & txn, TableId table,
 void Database::setStateReferences(const Transaction & txn, TableId table,
    	const Path & statePath, const int revision, const Strings & references)
 {
-	//get all previous StateReferences
-	StateReferences newReferences;
+	//Create the key
+	string key = statePath + "-" + int2String(revision);
 	
-	//Merge
-	newReferences[revision] = references;
-	
-	
-	
-	//Insert
-	string data = "";
-	checkInterrupt();
-    try {
-        Db * db = getDb(table);
-        Dbt kt((void *) statePath.c_str(), statePath.length());
-        Dbt dt((void *) data.c_str(), data.length());
-        db->put(txn.txn, &kt, &dt, 0);
-    } catch (DbException e) { rethrow(e); }
+	//Insert	
+	setStrings(txn, table, key, references);
 }
 
 bool Database::queryStateReferences(const Transaction & txn, TableId table,
    	const Path & statePath, Strings & references, int revision)
 {
-	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	return false;
+	Strings keys;
+	enumTable(txn, table, keys);		//get all revisions
+	
+	string key = "";							//final key that matches revision + statePath
+	int highestRev = -1;
+
+	//Lookup which key we need	
+	for (Strings::iterator i = keys.begin(); i != keys.end(); ++i) {
+		string getStatePath = *i;
+		
+		if(getStatePath.substr(0, statePath.size()) == statePath){
+			int getRev;
+			bool succeed = string2Int(getStatePath.substr(statePath.size() + 1, getStatePath.size()), getRev);
+			if(!succeed)
+				throw Error("Malformed revision value after statePath in stateRefereneces");
+
+			printMsg(lvlError, format("KEY: %1% of %2%") % getStatePath % getRev);
+			
+			if(revision == -1){				//the user wants the last revision
+				if(getRev > highestRev)
+					highestRev = getRev;
+			}		
+			else if(revision == getRev){
+				key = getStatePath;
+				break;	
+			}
+		}
+	}
+
+	if(key == "" && highestRev == -1)	//no records found
+		return false;
+	
+	if(revision == -1)
+		key = statePath + "-" + int2String(highestRev);
+
+	return queryStrings(txn, table, key, references);		//now that we have the key, we can query the references
 }   
 
 void Database::setStateRevisions(const Transaction & txn, TableId table,
@@ -478,13 +500,13 @@ void Database::setStateRevisions(const Transaction & txn, TableId table,
 {
 	//TODO
 }   
-/*
+
 bool Database::queryStateRevisions(const Transaction & txn, TableId table,
-   	const Path & statePath, RevisionNumbers & revisions, int revision = -1)
+   	const Path & statePath, RevisionNumbers & revisions, int revision)
 {
 	//TODO
 	return false;
-}*/  
+}  
 
 bool Database::queryAllStateRevisions(const Transaction & txn, TableId table,
     const Path & statePath, RevisionNumbers & revisions)

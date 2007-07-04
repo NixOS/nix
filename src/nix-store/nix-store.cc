@@ -443,7 +443,7 @@ static void opRegisterSubstitutes(Strings opFlags, Strings opArgs)
         }
         if (!cin || cin.eof()) throw Error("missing input");
         registerSubstitute(txn, srcPath, sub);
-        setReferences(txn, srcPath, references, stateReferences);
+        setReferences(txn, srcPath, references, stateReferences, 0);	//state revision 0, e.g. first commit
     }
 
     txn.commit();
