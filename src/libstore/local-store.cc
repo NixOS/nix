@@ -49,7 +49,8 @@ static TableId dbValidStatePaths = 0;
    output path that has been built by a Nix derivation.  These are
    found by scanning the path for the hash components of input
    paths. */
-static TableId dbReferences = 0;
+static TableId dbComponentComponentReferences = 0;
+static TableId dbComponentStateReferences = 0;
 
 /* dbStateReferences :: Path -> [Path]
 
@@ -57,7 +58,8 @@ static TableId dbReferences = 0;
    output path that has been built by a Nix derivation.  These are
    found by scanning the path for the hash components of input
    paths. */
-static TableId dbStateReferences = 0;
+static TableId dbStateComponentReferences = 0;
+static TableId dbStateStateReferences = 0;
 
 
 /* dbReferrers :: Path -> Path
@@ -65,14 +67,17 @@ static TableId dbStateReferences = 0;
    This table is just the reverse mapping of dbReferences.  This table
    can have duplicate keys, each corresponding value denoting a single
    referrer. */
-static TableId dbReferrers = 0;
+static TableId dbComponentComponentReferrers = 0;
+static TableId dbComponentStateReferrers = 0;
 
 /* dbStateReferrers :: Path -> Path
 
    This table is just the reverse mapping of dbStateReferences.  This table
    can have duplicate keys, each corresponding value denoting a single
    referrer. */
-static TableId dbStateReferrers = 0;
+static TableId dbStateComponentReferrers = 0;
+static TableId dbStateStateReferrers = 0;
+
 
 /* dbSubstitutes :: Path -> [[Path]]
 
@@ -171,14 +176,20 @@ LocalStore::LocalStore(bool reserveSpace)
     }
     dbValidPaths = nixDB.openTable("validpaths");
     dbValidStatePaths = nixDB.openTable("validpaths_state");
-    dbReferences = nixDB.openTable("references");
-    dbReferrers = nixDB.openTable("referrers", true); /* must be sorted */
     dbSubstitutes = nixDB.openTable("substitutes");
     dbDerivers = nixDB.openTable("derivers");
+
 	dbStateInfo = nixDB.openTable("stateinfo");
     dbStateCounters = nixDB.openTable("statecounters");
-    dbStateReferences = nixDB.openTable("references_state");
-    dbStateReferrers = nixDB.openTable("referrers_state", true); /* must be sorted */	
+	dbComponentComponentReferences = nixDB.openTable("references");
+	dbComponentStateReferences = nixDB.openTable("references_c_s");
+	dbStateComponentReferences = nixDB.openTable("references_s_c");
+	dbStateStateReferences = nixDB.openTable("references_s_s");
+	dbComponentComponentReferrers = nixDB.openTable("referrers", true); /* must be sorted */
+	dbComponentStateReferrers = nixDB.openTable("referrers_c_s", true);
+	dbStateComponentReferrers = nixDB.openTable("referrers_s_c", true);
+	dbStateStateReferrers = nixDB.openTable("referrers_s_s", true);
+
 
     int curSchema = 0;
     Path schemaFN = nixDBPath + "/schema";
@@ -349,6 +360,11 @@ static bool isRealisablePath(const Transaction & txn, const Path & path)
     return isValidPathTxn(txn, path) || readSubstitutes(txn, path).size() > 0;
 }
 
+static bool isRealisableStatePath(const Transaction & txn, const Path & path)
+{
+    return isValidStatePathTxn(txn, path) || readSubstitutes(txn, path).size() > 0;
+}
+
 static bool isRealisableComponentOrStatePath(const Transaction & txn, const Path & path)
 {
     return isValidComponentOrStatePathTxn(txn, path) || readSubstitutes(txn, path).size() > 0;					//TODO State paths are not yet in substitutes !!!!!!!!!!!!!!
@@ -375,7 +391,14 @@ static PathSet getReferrers(const Transaction & txn, const Path & storePath)
 {
     PathSet referrers;
     Strings keys;
-    nixDB.enumTable(txn, dbReferrers, keys, storePath + string(1, (char) 0));
+    
+    if(isValidPathTxn(txn, storePath))
+    	nixDB.enumTable(txn, dbComponentComponentReferrers, keys, storePath + string(1, (char) 0));
+    else if(isValidStatePathTxn(txn, storePath))
+        nixDB.enumTable(txn, dbStateComponentReferrers, keys, storePath + string(1, (char) 0));
+    else
+    	throw Error(format("Path '%1%' is not a valid component or state path") % storePath);
+        
     for (Strings::iterator i = keys.begin(); i != keys.end(); ++i)
         referrers.insert(stripPrefix(storePath, *i));
     return referrers;
@@ -385,7 +408,14 @@ static PathSet getStateReferrers(const Transaction & txn, const Path & storePath
 {
     PathSet referrers;
     Strings keys;
-    nixDB.enumTable(txn, dbStateReferrers, keys, storePath + string(1, (char) 0));
+    
+    if(isValidPathTxn(txn, storePath))
+    	nixDB.enumTable(txn, dbComponentComponentReferrers, keys, storePath + string(1, (char) 0));
+    else if(isValidStatePathTxn(txn, storePath))
+    	nixDB.enumTable(txn, dbStateComponentReferrers, keys, storePath + string(1, (char) 0));
+    else
+    	throw Error(format("Path '%1%' is not a valid component or state path") % storePath);
+    
     for (Strings::iterator i = keys.begin(); i != keys.end(); ++i)
         referrers.insert(stripPrefix(storePath, *i));
     return referrers;
@@ -398,60 +428,86 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
     if (references.size() > 0 && !isRealisableComponentOrStatePath(txn, store_or_statePath))
         throw Error(format("cannot set references for path `%1%' which is invalid and has no substitutes") % store_or_statePath);
 	
-	/*
+	printMsg(lvlError, format("Setting references for %1%") % store_or_statePath);
 	for (PathSet::iterator i = references.begin(); i != references.end(); ++i)
     	printMsg(lvlError, format("'%2%' has references: %1%") % *i % store_or_statePath);
     for (PathSet::iterator i = stateReferences.begin(); i != stateReferences.end(); ++i)
     	printMsg(lvlError, format("'%2%' has stateReferences: %1%") % *i % store_or_statePath);
-	*/
+	
+	static TableId dbXComponentReferrers;
+   	static TableId dbXStateReferrers;
+   	PathSet oldReferences2;
+   	PathSet oldStateReferences2;
+   	Paths oldReferences_X_c;
+   	Paths oldReferences_X_s;
+	 
+    if(isRealisablePath(txn, store_or_statePath))
+    {
+		Paths oldReferences_c_c;
+    	Paths oldReferences_c_s;
+		
+    	nixDB.queryStrings(txn, dbComponentComponentReferences, store_or_statePath, oldReferences_c_c);
+		nixDB.queryStrings(txn, dbComponentStateReferences, store_or_statePath, oldReferences_c_s);
+    	
+    	oldReferences2 = PathSet(oldReferences_c_c.begin(), oldReferences_c_c.end());
+    	oldStateReferences2 = PathSet(oldReferences_c_s.begin(), oldReferences_c_s.end());
+    	if (oldReferences2 == references && oldStateReferences2 == stateReferences) return;
+    	
+    	nixDB.setStrings(txn, dbComponentComponentReferences, store_or_statePath, Paths(references.begin(), references.end()));
+		nixDB.setStrings(txn, dbComponentStateReferences, store_or_statePath, Paths(stateReferences.begin(), stateReferences.end()));
+	
+		//set vars for the referrers update code below	
+		dbXComponentReferrers = dbComponentComponentReferrers;
+   		dbXStateReferrers = dbComponentStateReferrers;
+   		oldReferences_X_c = oldReferences_c_c;
+   		oldReferences_X_s = oldReferences_c_s;
+    }
+    else if(isRealisableStatePath(txn, store_or_statePath))
+    {
+		Paths oldStateReferences_s_c;
+		Paths oldStateReferences_s_s;
 
-    Paths oldReferences;
-    nixDB.queryStrings(txn, dbReferences, store_or_statePath, oldReferences);
-	PathSet oldReferences2(oldReferences.begin(), oldReferences.end());
+		nixDB.queryStrings(txn, dbStateComponentReferences, store_or_statePath, oldStateReferences_s_c);
+		nixDB.queryStrings(txn, dbStateStateReferences, store_or_statePath, oldStateReferences_s_s);
+		
+		oldReferences2 = PathSet(oldStateReferences_s_c.begin(), oldStateReferences_s_c.end());
+    	oldStateReferences2 = PathSet(oldStateReferences_s_s.begin(), oldStateReferences_s_s.end());
+    	if (oldReferences2 == references && oldStateReferences2 == stateReferences) return;
+    	
+    	nixDB.setStrings(txn, dbStateComponentReferences, store_or_statePath, Paths(references.begin(), references.end()));
+		nixDB.setStateReferences(txn, dbStateStateReferences, store_or_statePath, revision, Paths(stateReferences.begin(), stateReferences.end()));
 
-	Paths oldStateReferences;
-    nixDB.queryStrings(txn, dbStateReferences, store_or_statePath, oldStateReferences);
-	PathSet oldStateReferences2(oldStateReferences.begin(), oldStateReferences.end());
+		//set vars for the referrers update code below	
+		dbXComponentReferrers = dbStateComponentReferrers;
+   		dbXStateReferrers = dbStateStateReferrers;
+   		oldReferences_X_c = oldStateReferences_s_c;
+   		oldReferences_X_s = oldStateReferences_s_s;
+    }
+    else
+    	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
     
-    if (oldReferences2 == references && oldStateReferences2 == stateReferences) return;
-    
-    //printMsg(lvlError, format("REGISTER2: %1%") % store_or_statePath);
-    
-    nixDB.setStrings(txn, dbReferences, store_or_statePath,
-        Paths(references.begin(), references.end()));
-
-	nixDB.setStrings(txn, dbStateReferences, store_or_statePath,
-        Paths(stateReferences.begin(), stateReferences.end()));
-        
-    /*
-    
-    //TODO SPECIAL
-    
-    nixDB.setStateReferences(txn, dbReferences, statePath, revision, Paths(references.begin(), references.end()));
-    nixDB.setStateReferences(txn, dbStateReferences, statePath, revision, Paths(stateReferences.begin(), stateReferences.end()));
-	         
-    */    
-    
-
-    /* Update the referrers mappings of all new referenced paths. */
+	//The follow 4 for-loops haved been made generic with variables, they work in the case of statePaths and storePaths
+   
+	/* Update the referrers mappings of all new referenced paths. */
     for (PathSet::const_iterator i = references.begin(); i != references.end(); ++i)
         if (oldReferences2.find(*i) == oldReferences2.end())
-            nixDB.setString(txn, dbReferrers, addPrefix(*i, store_or_statePath), "");
+            nixDB.setString(txn, dbXComponentReferrers, addPrefix(*i, store_or_statePath), "");
+
+	/* Remove referrer mappings from paths that are no longer references. */
+    for (Paths::iterator i = oldReferences_X_c.begin(); i != oldReferences_X_c.end(); ++i)
+        if (references.find(*i) == references.end())
+            nixDB.delPair(txn, dbXComponentReferrers, addPrefix(*i, store_or_statePath));
 
 	/* Update the state referrers mappings of all new referenced paths. */
     for (PathSet::const_iterator i = stateReferences.begin(); i != stateReferences.end(); ++i)
         if (oldStateReferences2.find(*i) == oldStateReferences2.end())
-            nixDB.setString(txn, dbStateReferrers, addPrefix(*i, store_or_statePath), "");
-	
-    /* Remove referrer mappings from paths that are no longer references. */
-    for (Paths::iterator i = oldReferences.begin(); i != oldReferences.end(); ++i)
-        if (references.find(*i) == references.end())
-            nixDB.delPair(txn, dbReferrers, addPrefix(*i, store_or_statePath));
+            nixDB.setString(txn, dbXStateReferrers, addPrefix(*i, store_or_statePath), "");
 
     /* Remove referrer mappings from paths that are no longer state references. */
-    for (Paths::iterator i = oldStateReferences.begin(); i != oldStateReferences.end(); ++i)
+    for (Paths::iterator i = oldReferences_X_s.begin(); i != oldReferences_X_s.end(); ++i)
         if (stateReferences.find(*i) == stateReferences.end())
-            nixDB.delPair(txn, dbStateReferrers, addPrefix(*i, store_or_statePath));
+            nixDB.delPair(txn, dbXStateReferrers, addPrefix(*i, store_or_statePath));	
+    
 }
 
 
@@ -460,9 +516,13 @@ void queryReferences(const Transaction & txn,
 {
     Paths references2;
     
-    if (!isRealisableComponentOrStatePath(txn, storePath))
-        throw Error(format("path `%1%' is not valid") % storePath);
-    nixDB.queryStrings(txn, dbReferences, storePath, references2);
+    if(isRealisablePath(txn, storePath))
+    	nixDB.queryStrings(txn, dbComponentComponentReferences, storePath, references2);
+    else if(isRealisableStatePath(txn, storePath))
+    	nixDB.queryStrings(txn, dbStateComponentReferences, storePath, references2);
+    else
+    	throw Error(format("Path '%1%' is not a valid component or state path") % storePath);
+    
     references.insert(references2.begin(), references2.end());
 }
 
@@ -478,9 +538,13 @@ void queryStateReferences(const Transaction & txn,
 {
     Paths stateReferences2;
     
-    if (!isRealisableComponentOrStatePath(txn, componentOrstatePath))
-        throw Error(format("path `%1%' is not valid") % componentOrstatePath);
-    nixDB.queryStrings(txn, dbStateReferences, componentOrstatePath, stateReferences2);
+    if(isRealisablePath(txn, componentOrstatePath))
+    	nixDB.queryStrings(txn, dbComponentStateReferences, componentOrstatePath, stateReferences2);
+    else if(isRealisableStatePath(txn, componentOrstatePath))
+    	nixDB.queryStrings(txn, dbStateStateReferences, componentOrstatePath, stateReferences2);				//TODO !!!!!!!!!!!!!!!! state-state references are not strings anymore !!!!
+    else
+    	throw Error(format("Path '%1%' is not a valid component or state path") % componentOrstatePath);
+    
     stateReferences.insert(stateReferences2.begin(), stateReferences2.end());
 }
 
@@ -584,7 +648,9 @@ bool LocalStore::isStateComponent(const Path & storePath)
 //TODO Add and ..
 bool isStateDrvPathTxn(const Transaction & txn, const Path & drvPath)
 {
+	printMsg(lvlError, format("Sssssssssssssssssss %1%") % drvPath);
 	Derivation drv = derivationFromPath(drvPath);
+	printMsg(lvlError, format("uuuuuuuuuuuuuuuuuu %1%") % drvPath);
     return isStateDrvTxn(txn, drv);
 }
 
@@ -1314,10 +1380,11 @@ void verifyStore(bool checkContents)
     }
 
     /* Check the `references' table. */
-    //TODO TODO Do the exact same thing for dbStateReferrers
+    //TODO TODO Do the exact same thing for the other dbreferres and references
+    
     printMsg(lvlInfo, "checking the references table");
     Paths referencesKeys;
-    nixDB.enumTable(txn, dbReferences, referencesKeys);
+    nixDB.enumTable(txn, dbComponentComponentReferences, referencesKeys);
     for (Paths::iterator i = referencesKeys.begin();
          i != referencesKeys.end(); ++i)
     {
@@ -1334,10 +1401,10 @@ void verifyStore(bool checkContents)
                  j != references.end(); ++j)
             {
                 string dummy;
-                if (!nixDB.queryString(txn, dbReferrers, addPrefix(*j, *i), dummy)) {
+                if (!nixDB.queryString(txn, dbComponentComponentReferrers, addPrefix(*j, *i), dummy)) {
                     printMsg(lvlError, format("adding missing referrer mapping from `%1%' to `%2%'")
                         % *j % *i);
-                    nixDB.setString(txn, dbReferrers, addPrefix(*j, *i), "");
+                    nixDB.setString(txn, dbComponentComponentReferrers, addPrefix(*j, *i), "");
                 }
                 if (isValid && validPaths.find(*j) == validPaths.end()) {
                     printMsg(lvlError, format("incomplete closure: `%1%' needs missing `%2%'")
@@ -1348,17 +1415,17 @@ void verifyStore(bool checkContents)
     }
 
     /* Check the `referrers' table. */
-    //TODO TODO Do the exact same thing for dbStateReferrers, but merge! it into this one.... 
+    //TODO TODO Do the exact same thing for the other dbreferres and references 
     printMsg(lvlInfo, "checking the referrers table");
     Strings referrers;
-    nixDB.enumTable(txn, dbReferrers, referrers);
+    nixDB.enumTable(txn, dbComponentComponentReferrers, referrers);
     for (Strings::iterator i = referrers.begin(); i != referrers.end(); ++i) {
 
         /* Decode the entry (it's a tuple of paths). */
         string::size_type nul = i->find((char) 0);
         if (nul == string::npos) {
             printMsg(lvlError, format("removing bad referrer table entry `%1%'") % *i);
-            nixDB.delPair(txn, dbReferrers, *i);
+            nixDB.delPair(txn, dbComponentComponentReferrers, *i);
             continue;
         }
         Path to(*i, 0, nul);
@@ -1367,13 +1434,13 @@ void verifyStore(bool checkContents)
         if (realisablePaths.find(to) == realisablePaths.end()) {
             printMsg(lvlError, format("removing referrer entry from `%1%' to unrealisable `%2%'")
                 % from % to);
-            nixDB.delPair(txn, dbReferrers, *i);
+            nixDB.delPair(txn, dbComponentComponentReferrers, *i);
         }
 
         else if (realisablePaths.find(from) == realisablePaths.end()) {
             printMsg(lvlError, format("removing referrer entry from unrealisable `%1%' to `%2%'")
                 % from % to);
-            nixDB.delPair(txn, dbReferrers, *i);
+            nixDB.delPair(txn, dbComponentComponentReferrers, *i);
         }
         
         else {
@@ -1600,27 +1667,37 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
 	//TODO
 
 	//get all possible state and component references
-	Paths referencesKeys;
-	Paths referencesKeys2;
-	Paths stateReferencesKeys;
-    nixDB.enumTable(txn, dbReferences, referencesKeys);
-    nixDB.enumTable(txn, dbStateReferences, stateReferencesKeys);
-    
-    for (Paths::iterator i = referencesKeys.begin(); i != referencesKeys.end(); ++i)
-    		debug(format("referencesKeys: %1%") % *i);
-    for (Paths::iterator i = stateReferencesKeys.begin(); i != stateReferencesKeys.end(); ++i)
-    		debug(format("stateReferencesKeys: %1%") % *i);
+	Paths referencesKeys_c_c;
+	Paths referencesKeys_c_s;
+	Paths stateReferencesKeys_s_c;
+	Paths stateReferencesKeys_s_s;
+    nixDB.enumTable(txn, dbComponentComponentReferences, referencesKeys_c_c);
+	nixDB.enumTable(txn, dbComponentStateReferences, referencesKeys_c_s);
+	nixDB.enumTable(txn, dbStateComponentReferences, stateReferencesKeys_s_c);
+	nixDB.enumTable(txn, dbStateStateReferences, stateReferencesKeys_s_s);				//TODO!!!!!!!!!! theses keys are DOUBLES !!!!!!!!!!!!!!!!!!!!!!!!
+
+	//Merge    
+    PathSet allReferencesKeys = pathSets_union(PathSet(referencesKeys_c_c.begin(), referencesKeys_c_c.end()), 
+    										   PathSet(referencesKeys_c_s.begin(), referencesKeys_c_s.end()));
+    PathSet allStateReferencesKeys = pathSets_union(PathSet(stateReferencesKeys_s_c.begin(), stateReferencesKeys_s_c.end()), 
+    												PathSet(stateReferencesKeys_s_s.begin(), stateReferencesKeys_s_s.end()));
+        
+    for (PathSet::iterator i = allReferencesKeys.begin(); i != allReferencesKeys.end(); ++i)
+    		debug(format("allReferencesKeys: %1%") % *i);
+    for (PathSet::iterator i = allStateReferencesKeys.begin(); i != allStateReferencesKeys.end(); ++i)
+    		debug(format("allStateReferencesKeys: %1%") % *i);
     
     //Remove derivation paths
-    for (Paths::iterator i = referencesKeys.begin(); i != referencesKeys.end(); ++i){
+	Paths allReferencesKeys2;			//without derivations
+    for (PathSet::iterator i = allReferencesKeys.begin(); i != allReferencesKeys.end(); ++i){
     	string path = *i;
     	if(path.substr(path.length() - 4,path.length()) != ".drv")		//TODO HACK: we should have a typed table or a seperate table ....
-    		referencesKeys2.push_back(path);
+    		allReferencesKeys2.push_back(path);
     }
 
     //Scan in for component and state references
-    PathSet state_references = scanForReferences(statePath, PathSet(referencesKeys2.begin(), referencesKeys2.end()));
-    PathSet state_stateReferences = scanForReferences(statePath, PathSet(stateReferencesKeys.begin(), stateReferencesKeys.end()));
+    PathSet state_references = scanForReferences(statePath, PathSet(allReferencesKeys2.begin(), allReferencesKeys2.end()));
+    PathSet state_stateReferences = scanForReferences(statePath, PathSet(allStateReferencesKeys.begin(), allStateReferencesKeys.end()));
     
     //Retrieve old references
     PathSet old_references;
@@ -1842,7 +1919,7 @@ static void upgradeStore09()
         nixDB.queryStrings(txn, dbReferers, *i, referers);
         for (Paths::iterator j = referers.begin();
              j != referers.end(); ++j)
-            nixDB.setString(txn, dbReferrers, addPrefix(*i, *j), "");
+            nixDB.setString(txn, dbComponentComponentReferrers, addPrefix(*i, *j), "");
         if (++n % 1000 == 0) {
             txn.commit();
             txn.begin(nixDB);

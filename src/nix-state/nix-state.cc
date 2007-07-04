@@ -406,6 +406,20 @@ void run(Strings args)
 	return;
 		
 	*/
+
+	Paths p1;
+	p1.push_back("a");
+	p1.push_back("b");
+	p1.push_back("c");
+	Paths p2;
+	p2.push_back("b");
+	p2.push_back("d");
+	
+	PathSet px = pathSets_union(PathSet(p1.begin(), p1.end()), PathSet(p2.begin(), p2.end()));
+	
+	for (PathSet::iterator i = px.begin(); i != px.end(); ++i)
+		printMsg(lvlError, format("MERGED: %1%") % *i);
+	return;
 	
 	/* test */
 	
