@@ -567,7 +567,10 @@ static void upgradeDerivations(Globals & globals,
         DrvName drvName(i->name);
 
         MetaInfo meta = i->queryMetaInfo(globals.state);
-        if (meta["keep"] == "true") continue;
+        if (meta["keep"] == "true") {
+            newElems.push_back(*i);
+            continue;
+        }
 
         /* Find the derivation in the input Nix expression with the
            same name that satisfies the version constraints specified
