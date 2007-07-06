@@ -772,6 +772,9 @@ void killUser(uid_t uid)
 
 string runProgram(Path program, bool searchPath, const Strings & args)
 {
+    /* Split args based on | for pipe-ing  */
+    
+    
     /* Create a pipe. */
     Pipe pipe;
     pipe.create();
@@ -813,6 +816,12 @@ string runProgram(Path program, bool searchPath, const Strings & args)
     /* Parent. */
 
     pipe.writeSide.close();
+    
+    /* Wait for the child to finish. */
+    int status = pid.wait(true);
+    if (!statusOk(status))
+        throw Error(format("program `%1%' %2%")
+            % program % statusToString(status));
     
     
     // Create a pipe.
@@ -863,15 +872,6 @@ string runProgram(Path program, bool searchPath, const Strings & args)
     /* Parent. */
     
     pipe2.writeSide.close();
-        
-
-    string result = drainFD(pipe2.readSide);
-
-    /* Wait for the child to finish. */
-    int status = pid.wait(true);
-    if (!statusOk(status))
-        throw Error(format("program `%1%' %2%")
-            % program % statusToString(status));
     
     /* wait for second ........... */        
     int status2 = pid2.wait(true);
@@ -879,6 +879,8 @@ string runProgram(Path program, bool searchPath, const Strings & args)
         throw Error(format("program `%1%' %2%")
             % program % statusToString(status));
 
+
+    string result = drainFD(pipe2.readSide);
     return result;
 }
 
