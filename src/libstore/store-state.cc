@@ -98,6 +98,9 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 	//Initialize the counters for the statePaths that have an interval to 0
 	vector<int> empty;
 	store->setStatePathsInterval(intervalPaths, empty, true);
+	
+	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+	//Initialize the revisions recursively
 }
 
 

@@ -59,8 +59,8 @@ typedef list<Path> Paths;
 typedef set<Path> PathSet;
 
 //state types
-struct RevisionNumbersKey { Path statePath; int revision; } ;
 typedef list<int> RevisionNumbers;								//the Strings (list) of StateReferences and this list are connected by position
+typedef list<RevisionNumbers> RevisionNumbersClosure;
 typedef map<int, Strings> StateReferences;
 
 //typedef std::map<int, Strings> StateReferencesKey;

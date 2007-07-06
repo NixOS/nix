@@ -91,7 +91,7 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
     }
         	
     Derivation drv;
-    for (PathSet::iterator i = derivers.begin(); i != derivers.end(); ++i){		//ugly workaround for drvs[0].
+    for (PathSet::iterator i = derivers.begin(); i != derivers.end(); ++i){		//ugly workaround for drvs[0].			TODO !!!!!!!!!!!!!!!!!!!! change to *(derivers.begin())
      	derivationPath = *i;
      	drv = derivationFromPath(derivationPath);
     }
@@ -189,29 +189,39 @@ RevisionNumbers readRevisionNumbers(const Derivation & drv)
 		string repos = getStateReposPath("stateOutput:staterepospath", statePath, thisdir, drvName, getStateIdentifier);		//this is a copy from store-state.cc
 		
 		if(IsDirectory(repos)){
-			printMsg(lvlError, format("'%1%'") % repos);	
 			Strings p_args;
-			p_args.push_back("info");
+			p_args.push_back(svnbin);
 			p_args.push_back("file://" + repos);
-	    	
-	    	string output = runProgram(svnbin, true, p_args);
-	    	
-	    	/*
-	    	p_args.clear();
-	    	p_args.push_back("-n");
-	    	p_args.push_back("/^Revision: /p");
-	    	p_args.push_back(output);
-	    	output = runProgram("sed", true, p_args);
-	    	*/
-	    	
-			printMsg(lvlError, format("%2%") % repos % output);
+	    	string output = runProgram(nixLibexecDir + "/nix/nix-readrevisions.sh", true, p_args);
+	    	int pos = output.find("\n",0);
+			output.erase(pos,1);
+			int revision;
+			bool succeed = string2Int(output, revision);
+			if(!succeed)
+				throw Error(format("Cannot read revision number of path '%1%'") % repos);				
+			revisions.push_back(revision);
 		}		
-		
+		else
+			revisions.push_back(-1);
 	}
-	
-	//svn info $repos | sed -n '/^Revision: /p' | sed 's/Revision: //'  | tr -d "\12"
-	
 	return revisions;	
+}
+
+void setAllRevisionNumbers(const PathSet & drvs)
+{
+	//for.....
+	
+		//DerivationStateOutputs stateOutputs = drv.stateOutputs; 
+    	//Path statePath = stateOutputs.find("state")->second.statepath;
+		//RevisionNumbers = readRevisionNumbers(drv);
+	
+	
+	
+	//setStateRevisions(notxn, TableId table,	const Path & statePath, const int revision, const RevisionNumbersClosure & revisions);
+    	/*
+    	bool queryStateRevisions(const Transaction & txn, TableId table,
+    	const Path & statePath, RevisionNumbersClosure & revisions, int revision = -1);
+    	*/
 }
 
 //Comment TODO
@@ -374,14 +384,16 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		p_args.push_back(nonversionedstatepathsarray);
 		p_args.push_back(commandsarray);
 		runProgram_AndPrintOutput(nixLibexecDir + "/nix/nix-statecommit.sh", true, p_args, "svn");
-	    																   
+	    													   
 	   	//TODO
 	   	//Scan if needed
 	   	//scanAndUpdateAllReferencesRecusively ...
 	   	
-	   	//TODO
-	   	//Update all revision numbers in the database
 	}
+	
+	//Update all revision numbers in the database
+	setAllRevisionNumbers(drvs);
+	
 }
 
 
@@ -472,12 +484,25 @@ void run(Strings args)
     nixDB.splitStatePathRevision(gets, statePath2, revision2);
 	printMsg(lvlError, format("'%1%' '%2%'") % statePath2 % int2String(revision2));
 	
-	*/
-	
 	store = openStore();
 	Derivation drv = derivationFromPath("/nix/store/r2lvhrd8zhb877n07cqvcyp11j9ws5p0-hellohardcodedstateworld-dep1-1.0.drv");
 	readRevisionNumbers(drv);
-	return;
+	
+	
+	Strings strings;
+	strings.push_back("1");
+	strings.push_back("3");
+	strings.push_back("2");
+	string packed = packStrings(strings);
+	printMsg(lvlError, format("PA '%1%'") % packed);
+	Strings strings2 = unpackStrings(packed);
+	for (Strings::iterator i = strings2.begin(); i != strings2.end(); ++i)
+		printMsg(lvlError, format("UN '%1%'") % *i);
+
+	*/
+	
+	//updateRevisionNumbers("/nix/state/xf582zrz6xl677llr07rvskgsi3dli1d-hellohardcodedstateworld-dep1-1.0-test");
+	//return;
 	
 	/* test */
 	

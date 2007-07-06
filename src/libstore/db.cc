@@ -498,6 +498,8 @@ bool Database::queryStateReferences(const Transaction & txn, TableId table,
 	Strings keys;
 	enumTable(txn, table, keys);		//get all revisions
 	
+	///////////////?!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! create function
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////	TODO
 	string key = "";					//final key that matches revision + statePath
 	int highestRev = -1;
 
@@ -520,7 +522,8 @@ bool Database::queryStateReferences(const Transaction & txn, TableId table,
 			}
 		}
 	}
-
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
 	if(key == "" && highestRev == -1)	//no records found (TODO throw error?)
 		return false;
 	
@@ -548,22 +551,94 @@ bool Database::queryStateReferrers(const Transaction & txn, TableId table,
    
 
 void Database::setStateRevisions(const Transaction & txn, TableId table,
-   	const Path & statePath, const int revision, const RevisionNumbers & revisions)
+   	const Path & statePath, const int revision, const RevisionNumbersClosure & revisions)
 {
-	//TODO
+	//Pack the data into Strings
+	const string seperator = "|";
+	Strings data;	
+	for (RevisionNumbersClosure::const_iterator i = revisions.begin(); i != revisions.end(); ++i) {
+		RevisionNumbers revisionNumbers = *i;
+		string packedNumbers = "";
+		for (RevisionNumbers::iterator j = revisionNumbers.begin(); j != revisionNumbers.end(); ++j)
+			packedNumbers += int2String(*j) + seperator;
+		packedNumbers = packedNumbers.substr(0, packedNumbers.length()-1);	//remove the last |
+		data.push_back(packedNumbers);
+	}
+	
+	//Create the key
+	string key = makeStatePathRevision(statePath, revision);
+	
+	//Insert	
+	setStrings(txn, table, key, data);
 }   
 
 bool Database::queryStateRevisions(const Transaction & txn, TableId table,
-   	const Path & statePath, RevisionNumbers & revisions, int revision)
+   	const Path & statePath, RevisionNumbersClosure & revisions, int revision)
 {
-	//TODO
-	return false;
+	const string seperator = "|";
+	
+	Strings keys;
+	enumTable(txn, table, keys);		//get all revisions
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////	
+	string key = "";					//final key that matches revision + statePath
+	int highestRev = -1;
+
+	//Lookup which key we need	
+	for (Strings::iterator i = keys.begin(); i != keys.end(); ++i) {
+		Path getStatePath_org = *i;
+		Path getStatePath;
+		int getRevision;
+		splitStatePathRevision(*i, getStatePath, getRevision);
+		
+		if(getStatePath == statePath){
+			
+			if(revision == -1){				//the user wants the last revision
+				if(getRevision > highestRev)
+					highestRev = getRevision;
+			}		
+			else if(revision == getRevision){
+				key = getStatePath_org;
+				break;	
+			}
+		}
+	}
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	if(key == "" && highestRev == -1)	//no records found (TODO throw error?)
+		return false;
+	
+	if(revision == -1)
+		key = makeStatePathRevision(statePath, highestRev);
+
+	Strings data; 
+	bool succeed = queryStrings(txn, table, key, data);		//now that we have the key, we can query the references
+	
+	//Unpack Strings into RevisionNumbersClosure
+	for (Strings::iterator i = data.begin(); i != data.end(); ++i){
+		RevisionNumbers revisionsGroup;
+		string packedNumbers = *i;
+		Strings tokens = tokenizeString(packedNumbers, seperator);
+		for (Strings::iterator j = tokens.begin(); j != tokens.end(); ++j){
+			int getRevision;
+			bool succeed = string2Int(*j, getRevision);
+			if(!succeed)
+				throw Error(format("Cannot read revision number from db of path '%1%'") % statePath);
+			revisionsGroup.push_back(getRevision);				
+		}	
+		revisions.push_back(revisionsGroup);
+	}
+	
+	return succeed;
 }  
 
 bool Database::queryAllStateRevisions(const Transaction & txn, TableId table,
     const Path & statePath, RevisionNumbers & revisions)
 {
 	//TODO
+	
+	//LIST OF x ..... y which revisions are available for a rollback
+	
 	return false;
 }
  
