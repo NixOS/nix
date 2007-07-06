@@ -49,6 +49,7 @@ public:
 
 
 typedef list<string> Strings;
+typedef list<Strings> StringsList;
 typedef set<string> StringSet;
 typedef set<StringSet> SetStringSet;
 

@@ -773,7 +773,7 @@ void killUser(uid_t uid)
 string runProgram(Path program, bool searchPath, const Strings & args)
 {
     /* Split args based on | for pipe-ing  */
-    
+    StringsList l;
     
     /* Create a pipe. */
     Pipe pipe;
