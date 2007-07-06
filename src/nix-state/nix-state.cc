@@ -170,6 +170,50 @@ static void opShowStateReposRootPath(Strings opFlags, Strings opArgs)
 	printMsg(lvlError, format("%1%") % repos);
 }
 
+RevisionNumbers readRevisionNumbers(const Derivation & drv)
+{
+	string svnbin = nixSVNPath + "/svn";
+	RevisionNumbers revisions;
+	
+    DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs; 
+    string drvName = drv.env.find("name")->second;
+    DerivationStateOutputs stateOutputs = drv.stateOutputs; 
+    Path statePath = stateOutputs.find("state")->second.statepath;
+	string getStateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
+	
+	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
+		DerivationStateOutputDir d = i->second;
+		string thisdir = d.path;
+		
+		//Get the a repository for this state location
+		string repos = getStateReposPath("stateOutput:staterepospath", statePath, thisdir, drvName, getStateIdentifier);		//this is a copy from store-state.cc
+		
+		if(IsDirectory(repos)){
+			printMsg(lvlError, format("'%1%'") % repos);	
+			Strings p_args;
+			p_args.push_back("info");
+			p_args.push_back("file://" + repos);
+	    	
+	    	string output = runProgram(svnbin, true, p_args);
+	    	
+	    	/*
+	    	p_args.clear();
+	    	p_args.push_back("-n");
+	    	p_args.push_back("/^Revision: /p");
+	    	p_args.push_back(output);
+	    	output = runProgram("sed", true, p_args);
+	    	*/
+	    	
+			printMsg(lvlError, format("%2%") % repos % output);
+		}		
+		
+	}
+	
+	//svn info $repos | sed -n '/^Revision: /p' | sed 's/Revision: //'  | tr -d "\12"
+	
+	return revisions;	
+}
+
 //Comment TODO
 PathSet getAllStateDerivationsRecursively(const Path & storePath)
 {
@@ -260,8 +304,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		int intervalAt=0;	
 		for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
 			DerivationStateOutputDir d = i->second;
-	
-			string thisdir = d.path;		//TODO CONVERT
+			string thisdir = d.path;
 			
 			string fullstatedir = statePath + "/" + thisdir;
 			if(thisdir == "/")									//exception for the root dir
@@ -298,7 +341,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		}
 		
 		//Update the intervals again	
-		//store->setStatePathsInterval(intervalPaths, intervals);	//TODO UNCOMMENT
+		store->setStatePathsInterval(intervalPaths, intervals);
 			
 		//Call the commit script with the appropiate paramenters
 		string subversionedstatepathsarray; 
@@ -323,7 +366,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 			commandsarray += "" + *(i) + " | ";
 	    }
 	  	
-	    //make the call
+	    //make the call to the commit script
 	    Strings p_args;
 		p_args.push_back(svnbin);
 		p_args.push_back(subversionedstatepathsarray);
@@ -333,8 +376,11 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		runProgram_AndPrintOutput(nixLibexecDir + "/nix/nix-statecommit.sh", true, p_args, "svn");
 	    																   
 	   	//TODO
-	   	//Scan again??
+	   	//Scan if needed
 	   	//scanAndUpdateAllReferencesRecusively ...
+	   	
+	   	//TODO
+	   	//Update all revision numbers in the database
 	}
 }
 
@@ -403,10 +449,7 @@ void run(Strings args)
 
 	store = openStore();
 	//setReferences_statePath("/nix/state/afsdsdafsdaf-sdaf", 7);
-	return;
-		
-	*/
-
+	
 	Paths p1;
 	p1.push_back("a");
 	p1.push_back("b");
@@ -419,6 +462,21 @@ void run(Strings args)
 	
 	for (PathSet::iterator i = px.begin(); i != px.end(); ++i)
 		printMsg(lvlError, format("MERGED: %1%") % *i);
+			
+	Database nixDB;
+	Path statePath = "afsdsdafsadf-sda-fsda-f-sdaf-sdaf";
+	int revision = 5;
+	Path statePath2;
+	Path gets = nixDB.makeStatePathRevision(statePath, revision);
+    int revision2;
+    nixDB.splitStatePathRevision(gets, statePath2, revision2);
+	printMsg(lvlError, format("'%1%' '%2%'") % statePath2 % int2String(revision2));
+	
+	*/
+	
+	store = openStore();
+	Derivation drv = derivationFromPath("/nix/store/r2lvhrd8zhb877n07cqvcyp11j9ws5p0-hellohardcodedstateworld-dep1-1.0.drv");
+	readRevisionNumbers(drv);
 	return;
 	
 	/* test */

@@ -81,20 +81,20 @@ public:
     /* Queries the set of outgoing FS references for a store path.
        The result is not cleared. */
     virtual void queryReferences(const Path & path,
-        PathSet & references) = 0;
+        PathSet & references, const int revision) = 0;
         
     /* Queries the set of outgoing FS state-references for a store path.
        The result is not cleared. */
-    virtual void queryStateReferences(const Path & storePath, PathSet & stateReferences) = 0;
+    virtual void queryStateReferences(const Path & storePath, PathSet & stateReferences, const int revision) = 0;
 
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
     virtual void queryReferrers(const Path & path,
-        PathSet & referrers) = 0;
+        PathSet & referrers, const int revision) = 0;
 
 	/* Queries the set of incoming FS state-references for a store path.
        The result is not cleared. */
-    virtual void queryStateReferrers(const Path & path, PathSet & stateReferrers) = 0;
+    virtual void queryStateReferrers(const Path & path, PathSet & stateReferrers, const int revision) = 0;
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.

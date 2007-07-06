@@ -11,7 +11,9 @@ namespace nix {
 Derivation derivationFromPath(const Path & drvPath)
 {
     assertStorePath(drvPath);
+    printMsg(lvlError, format("tttttttttttttttttt"));
     store->ensurePath(drvPath);
+    printMsg(lvlError, format("uuuuuuuuuuuuuuuuuu"));
     ATerm t = ATreadFromNamedFile(drvPath.c_str());
     if (!t) throw Error(format("cannot read aterm from `%1%'") % drvPath);
     return parseDerivation(t);
@@ -58,12 +60,12 @@ void computeFSClosureRec(const Path & path, PathSet & paths, const bool & flipDi
     PathSet stateReferences;
     
     if (flipDirection){
-        store->queryReferrers(path, references);
-       	store->queryStateReferrers(path, stateReferences);
+        store->queryReferrers(path, references, -1);
+       	store->queryStateReferrers(path, stateReferences, -1);
     }
     else{
-        store->queryReferences(path, references);
-       	store->queryStateReferences(path, stateReferences);
+        store->queryReferences(path, references, -1);
+       	store->queryStateReferences(path, stateReferences, -1);
     }
 
 	PathSet allReferences;
@@ -122,7 +124,7 @@ void queryMissing(const PathSet & targets,
             if (store->hasSubstitutes(p))
                 willSubstitute.insert(p);
             PathSet refs;
-            store->queryReferences(p, todo);
+            store->queryReferences(p, todo, -1);		//TODO?
         }
     }
 }

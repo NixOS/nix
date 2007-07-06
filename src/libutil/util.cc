@@ -806,18 +806,76 @@ string runProgram(Path program, bool searchPath, const Strings & args)
         } catch (std::exception & e) {
             std::cerr << "error: " << e.what() << std::endl;
         }
+        
         quickExit(1);
     }
 
     /* Parent. */
 
     pipe.writeSide.close();
+    
+    
+    // Create a pipe.
+    Pipe pipe2;
+    pipe2.create();
 
-    string result = drainFD(pipe.readSide);
+    // Fork.
+    Pid pid2;
+    pid2 = fork();
+    switch (pid2) {
+
+    case -1:
+        throw SysError("unable to fork");
+
+    case 0: // child
+        try {     
+        	
+        	pipe2.readSide.close();
+        	
+        	if (dup2(pipe2.writeSide, STDOUT_FILENO) == -1)
+                throw SysError("dupping from-hook write side");
+            
+            dup2(pipe.readSide, STDIN_FILENO);
+            
+            Path s = "grep";
+            Strings args2;
+            args2.push_back("Revision");
+            
+            std::vector<const char *> cargs; // careful with c_str()!
+            cargs.push_back(s.c_str());
+            for (Strings::const_iterator i = args2.begin(); i != args2.end(); ++i)
+                cargs.push_back(i->c_str());
+            cargs.push_back(0);
+            
+            if (searchPath)
+                execvp(s.c_str(), (char * *) &cargs[0]);
+            else
+                execv(s.c_str(), (char * *) &cargs[0]);
+            throw SysError(format("executing `%1%'") % s);
+        	
+        } catch (std::exception & e) {
+            std::cerr << "error: " << e.what() << std::endl;
+        }
+        
+        quickExit(1);
+    }
+    
+    /* Parent. */
+    
+    pipe2.writeSide.close();
+        
+
+    string result = drainFD(pipe2.readSide);
 
     /* Wait for the child to finish. */
     int status = pid.wait(true);
     if (!statusOk(status))
+        throw Error(format("program `%1%' %2%")
+            % program % statusToString(status));
+    
+    /* wait for second ........... */        
+    int status2 = pid2.wait(true);
+    if (!statusOk(status2))
         throw Error(format("program `%1%' %2%")
             % program % statusToString(status));
 
@@ -1149,44 +1207,21 @@ string getCallingUserName()
 //merges two PathSets into one, removing doubles (union)
 PathSet pathSets_union(const PathSet & paths1, const PathSet & paths2)
 {
-	/*
-	for (PathSet::iterator i = paths1.begin(); i != paths1.end(); ++i)
-    		printMsg(lvlError, format("paths1: '%1%'") % (*i));
-    for (PathSet::iterator i = paths2.begin(); i != paths2.end(); ++i)
-    		printMsg(lvlError, format("paths2: '%1%'") % (*i));
-    */
-    
     vector<Path> vector1(paths1.begin(), paths1.end());
   	vector<Path> vector2(paths2.begin(), paths2.end());
   	vector<Path> setResult;
   	
-  	set_union(vector1.begin(), vector1.end(),vector2.begin(), vector2.end(), back_inserter(setResult));
-	
-	//Also available:
-	//set_symmetric_difference
-	//set_intersection
+  	set_union(vector1.begin(), vector1.end(),vector2.begin(), vector2.end(), back_inserter(setResult)); 	//Also available: set_symmetric_difference and set_intersection
 
 	PathSet diff;	
 	for(int i=0; i<setResult.size(); i++)
 		diff.insert(setResult[i]);
 
-	/*
-    for (PathSet::iterator i = diff.begin(); i != diff.end(); ++i)
-    		printMsg(lvlError, format("diff: '%1%'") % (*i));
-    */
-    
     return diff;
 }
 
 void pathSets_difference(const PathSet & oldpaths, const PathSet & newpaths, PathSet & addedpaths, PathSet & removedpaths)
 {
-	/*
-	for (PathSet::iterator i = oldpaths.begin(); i != oldpaths.end(); ++i)
-    	printMsg(lvlError, format("oldpaths: '%1%'") % (*i));
-    for (PathSet::iterator i = newpaths.begin(); i != newpaths.end(); ++i)
-    	printMsg(lvlError, format("newpaths: '%1%'") % (*i));
-	*/
-	
 	for (PathSet::iterator i = oldpaths.begin(); i != oldpaths.end(); ++i){
 		bool exists = false;
 		for (PathSet::iterator j = newpaths.begin(); j != newpaths.end(); ++j){
@@ -1210,13 +1245,6 @@ void pathSets_difference(const PathSet & oldpaths, const PathSet & newpaths, Pat
 		if(!exists)
 			addedpaths.insert(*i);			
 	}
-
-	/*
-    for (PathSet::iterator i = addedpaths.begin(); i != addedpaths.end(); ++i)
-    	printMsg(lvlError, format("addedpaths: '%1%'") % (*i));
-    for (PathSet::iterator i = removedpaths.begin(); i != removedpaths.end(); ++i)
-    	printMsg(lvlError, format("removedpaths: '%1%'") % (*i));
-    */
 }
 
 

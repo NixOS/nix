@@ -18,8 +18,10 @@ Derivation derivationFromPath(const Path & drvPath);
    `storePath' is returned; that is, the closures under the
    `referrers' relation instead of the `references' relation is
    
-   withState = TODO comment
-   withComponents = TODO
+   withState = include the state paths into the closure
+   withComponents = include the component paths into the closure
+   
+   We can currentky only compute the closure of the latsest revision!
    
    returned. */
 void computeFSClosure(const Path & storePath, PathSet & paths, const bool & withComponents, const bool & withState, bool flipDirection = false);

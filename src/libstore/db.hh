@@ -90,6 +90,12 @@ public:
     void enumTable(const Transaction & txn, TableId table,
         Strings & keys, const string & keyPrefix = "");
     
+    /* TODO */
+    Path makeStatePathRevision(const Path & statePath, const int revision);
+    
+    /* TODO */
+    void splitStatePathRevision(const Path & revisionedStatePath, Path & statePath, int & revision);
+    
     /* Set the stateReferences for a specific revision (and older until the next higher revision number in the table) */    
     void setStateReferences(const Transaction & txn, TableId table,
     	const Path & statePath, const int revision, const Strings & references);
@@ -98,6 +104,10 @@ public:
     bool queryStateReferences(const Transaction & txn, TableId table,
     	const Path & statePath, Strings & references, int revision = -1);
     
+    /* Returns the referrers for a specific revision (and older until the next higher revision number in the table) */
+    bool queryStateReferrers(const Transaction & txn, TableId table,
+    	const Path & statePath, Strings & referrers, int revision = -1);
+        
     /* Set the revision number of the statePath and the revision numbers of all state paths in the references closure */
     void setStateRevisions(const Transaction & txn, TableId table,
     	const Path & statePath, const int revision, const RevisionNumbers & revisions);

@@ -444,11 +444,47 @@ void Database::enumTable(const Transaction & txn, TableId table,
     } catch (DbException e) { rethrow(e); }
 }
 
+/* State specific db functions */
+
+Path Database::makeStatePathRevision(const Path & statePath, const int revision)
+{
+	string prefix = "-REV-";
+	
+	return statePath + prefix + int2String(revision);
+}
+void Database::splitStatePathRevision(const Path & revisionedStatePath, Path & statePath, int & revision)
+{
+	string prefix = "-REV-";
+	
+	int pos = revisionedStatePath.find_last_not_of(prefix);
+	statePath = revisionedStatePath.substr(0, pos - prefix.length());
+	//printMsg(lvlError, format("'%1%' '%2%'") % statePath % revisionedStatePath.substr(pos, revisionedStatePath.size()));		 	
+	bool succeed = string2Int(revisionedStatePath.substr(pos, revisionedStatePath.size()), revision);
+	if(!succeed)
+		throw Error(format("Malformed revision value of path '%1%'") % revisionedStatePath);
+}
+														 
+
 void Database::setStateReferences(const Transaction & txn, TableId table,
    	const Path & statePath, const int revision, const Strings & references)
 {
+	//printMsg(lvlError, format("setStateReferences/Referrers %1%") % table);
+	
+	if(revision == -1)
+		throw Error("-1 is not a valid revision value for SET-references/referrers");
+
+	/*
+	for (Strings::const_iterator i = references.begin(); i != references.end(); ++i)
+		printMsg(lvlError, format("setStateReferences::: '%1%'") % *i);
+	*/
+	
+	//Warning if it already exists
+	Strings empty;
+	if( queryStateReferences(txn, table, statePath, empty, revision) )
+		printMsg(lvlError, format("Warning: The revision '%1%' already exists for set-references/referrers of path '%2%' with db '%3%'") % revision % statePath % table);
+	
 	//Create the key
-	string key = statePath + "-" + int2String(revision);
+	string key = makeStatePathRevision(statePath, revision);
 	
 	//Insert	
 	setStrings(txn, table, key, references);
@@ -457,43 +493,59 @@ void Database::setStateReferences(const Transaction & txn, TableId table,
 bool Database::queryStateReferences(const Transaction & txn, TableId table,
    	const Path & statePath, Strings & references, int revision)
 {
+	//printMsg(lvlError, format("queryStateReferences/Referrers %1%") % table);
+	
 	Strings keys;
 	enumTable(txn, table, keys);		//get all revisions
 	
-	string key = "";							//final key that matches revision + statePath
+	string key = "";					//final key that matches revision + statePath
 	int highestRev = -1;
 
 	//Lookup which key we need	
 	for (Strings::iterator i = keys.begin(); i != keys.end(); ++i) {
-		string getStatePath = *i;
+		Path getStatePath_org = *i;
+		Path getStatePath;
+		int getRevision;
+		splitStatePathRevision(*i, getStatePath, getRevision);
 		
-		if(getStatePath.substr(0, statePath.size()) == statePath){
-			int getRev;
-			bool succeed = string2Int(getStatePath.substr(statePath.size() + 1, getStatePath.size()), getRev);
-			if(!succeed)
-				throw Error("Malformed revision value after statePath in stateRefereneces");
-
-			printMsg(lvlError, format("KEY: %1% of %2%") % getStatePath % getRev);
+		if(getStatePath == statePath){
 			
 			if(revision == -1){				//the user wants the last revision
-				if(getRev > highestRev)
-					highestRev = getRev;
+				if(getRevision > highestRev)
+					highestRev = getRevision;
 			}		
-			else if(revision == getRev){
-				key = getStatePath;
+			else if(revision == getRevision){
+				key = getStatePath_org;
 				break;	
 			}
 		}
 	}
 
-	if(key == "" && highestRev == -1)	//no records found
+	if(key == "" && highestRev == -1)	//no records found (TODO throw error?)
 		return false;
 	
 	if(revision == -1)
-		key = statePath + "-" + int2String(highestRev);
+		key = makeStatePathRevision(statePath, highestRev);
 
 	return queryStrings(txn, table, key, references);		//now that we have the key, we can query the references
-}   
+}
+
+bool Database::queryStateReferrers(const Transaction & txn, TableId table,
+ 	const Path & statePath, Strings & referrers, int revision)
+{
+	//PathSet referrers;
+    Strings keys;
+    Path revisionedStatePath = makeStatePathRevision(statePath, revision);
+    
+   	enumTable(txn, table, keys, revisionedStatePath + string(1, (char) 0));
+        
+    for (Strings::iterator i = keys.begin(); i != keys.end(); ++i)
+        printMsg(lvlError, format("queryStateReferrers %1%") % *i);
+        //referrers.insert(stripPrefix(storePath, *i));
+    	
+	return false;
+}
+   
 
 void Database::setStateRevisions(const Transaction & txn, TableId table,
    	const Path & statePath, const int revision, const RevisionNumbers & revisions)

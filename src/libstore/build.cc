@@ -1083,7 +1083,7 @@ static string makeValidityRegistration(const PathSet & paths,
         s += deriver + "\n";
 
         PathSet references;
-        store->queryReferences(*i, references);
+        store->queryReferences(*i, references, -1);				//TODO check if this is ok
 
         s += (format("%1%\n") % references.size()).str();
             
@@ -2018,7 +2018,7 @@ void SubstitutionGoal::init()
 
     /* To maintain the closure invariant, we first have to realise the
        paths referenced by this one. */
-    store->queryReferences(storePath, references);
+    store->queryReferences(storePath, references, -1);
 
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)

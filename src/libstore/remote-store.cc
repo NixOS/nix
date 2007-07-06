@@ -216,44 +216,49 @@ Path RemoteStore::queryStatePathDrv(const Path & statePath)
 }
 
 void RemoteStore::queryReferences(const Path & path,
-    PathSet & references)
+    PathSet & references, const int revision)
 {
     writeInt(wopQueryReferences, to);
     writeString(path, to);
     processStderr();
     PathSet references2 = readStorePaths(from);
     references.insert(references2.begin(), references2.end());
+    //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! include revision?
 }
 
 void RemoteStore::queryStateReferences(const Path & path,
-    PathSet & stateReferences)
+    PathSet & stateReferences, const int revision)
 {
     writeInt(wopQueryStateReferences, to);
     writeString(path, to);
     processStderr();
 	PathSet stateReferences2 = readStorePaths(from);
 	stateReferences.insert(stateReferences2.begin(), stateReferences2.end());
+	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! include revision?
 }
 
 
 
 void RemoteStore::queryReferrers(const Path & path,
-    PathSet & referrers)
+    PathSet & referrers, const int revision)
 {
     writeInt(wopQueryReferrers, to);
     writeString(path, to);
     processStderr();
     PathSet referrers2 = readStorePaths(from);
     referrers.insert(referrers2.begin(), referrers2.end());
+	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! include revision?    
 }
 
-void RemoteStore::queryStateReferrers(const Path & path, PathSet & stateReferrers)
+void RemoteStore::queryStateReferrers(const Path & path, 
+	PathSet & stateReferrers, const int revision)
 {
 	writeInt(wopQueryStateReferrers, to);
     writeString(path, to);
     processStderr();
     PathSet stateReferrers2 = readStorePaths(from);
     stateReferrers.insert(stateReferrers2.begin(), stateReferrers2.end());
+    //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! include revision?
 }
 
 

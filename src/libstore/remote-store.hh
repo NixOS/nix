@@ -39,13 +39,13 @@ public:
     
     Path queryStatePathDrv(const Path & statePath);
 
-    void queryReferences(const Path & path, PathSet & references);
+    void queryReferences(const Path & path, PathSet & references, const int revision);
 
-	void queryStateReferences(const Path & storePath, PathSet & stateReferences);
+	void queryStateReferences(const Path & storePath, PathSet & stateReferences, const int revision);
 
-    void queryReferrers(const Path & path, PathSet & referrers);
+    void queryReferrers(const Path & path, PathSet & referrers, const int revision);
     
-    void queryStateReferrers(const Path & path, PathSet & stateReferrers);
+    void queryStateReferrers(const Path & path, PathSet & stateReferrers, const int revision);
 
     Path addToStore(const Path & srcPath, bool fixed = false,
         bool recursive = false, string hashAlgo = "",

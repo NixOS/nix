@@ -296,9 +296,9 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         startWork();
         PathSet paths;
         if (op == wopQueryReferences)
-            store->queryReferences(path, paths);
+            store->queryReferences(path, paths, -1);
         else
-            store->queryReferrers(path, paths);
+            store->queryReferrers(path, paths, -1);
         stopWork();
         writeStringSet(paths, to);
         break;
@@ -310,9 +310,9 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         startWork();
         PathSet paths;
         if (op == wopQueryStateReferences)
-            store->queryStateReferences(path, paths);
+            store->queryStateReferences(path, paths, -1);
         else
-            store->queryStateReferrers(path, paths);			//TODO Does this work???, how about the state path?????????
+            store->queryStateReferrers(path, paths, -1);			//TODO Does this work???, how about the state path?????????
         stopWork();
         writeStringSet(paths, to);
         break;

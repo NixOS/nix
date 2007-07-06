@@ -212,7 +212,7 @@ static void printTree(const Path & path,
     cout << format("%1%%2%\n") % firstPad % path;
 
     PathSet references;
-    store->queryReferences(path, references);
+    store->queryReferences(path, references, -1);											//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Adjust printTree, include state paths!
     
 #if 0     
     for (PathSet::iterator i = drv.inputSrcs.begin();
@@ -307,10 +307,10 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 if (query == qRequisites) store->storePathRequisites(path, includeOutputs, paths, true, false);
                 else if (query == qRequisitesState) store->storePathRequisites(path, includeOutputs, paths, false, true);
                 else if (query == qRequisitesFull) store->storePathRequisites(path, includeOutputs, paths, true, true);
-                else if (query == qReferences) store->queryReferences(path, paths);
-                else if (query == qStateReferences) store->queryStateReferences(path, paths);
-                else if (query == qReferrers) store->queryReferrers(path,  paths);
-                else if (query == qStateReferrers) store->queryStateReferrers(path,  paths);
+                else if (query == qReferences) store->queryReferences(path, paths, -1);
+                else if (query == qStateReferences) store->queryStateReferences(path, paths, -1);		//latest revision
+                else if (query == qReferrers) store->queryReferrers(path,  paths, -1);
+                else if (query == qStateReferrers) store->queryStateReferrers(path,  paths, -1);		//latest revision
                 else if (query == qReferrersClosure) computeFSClosure(path, paths, true, false, true);
                 else if (query == qReferrersClosureWithState) computeFSClosure(path, paths, true, true, true);
             }

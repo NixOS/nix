@@ -406,7 +406,7 @@ static void dfsVisit(const PathSet & paths, const Path & path,
     
     PathSet references;
     if (store->isValidPath(path))
-        store->queryReferences(path, references);
+        store->queryReferences(path, references, -1);						//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)
