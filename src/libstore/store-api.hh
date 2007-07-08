@@ -215,7 +215,7 @@ public:
 	virtual bool isStateDrv(const Derivation & drv) = 0;
 	
 	/* TODO */
-	virtual void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState) = 0;
+	virtual void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision) = 0;
 
 	/* TODO */
 	virtual void scanAndUpdateAllReferences(const Path & statePath) = 0;
@@ -224,10 +224,10 @@ public:
 	virtual void scanAndUpdateAllReferencesRecusively(const Path & storeOrstatePath) = 0;
 	
 	/* TODO */
-	virtual void setStateRevisions(const Path & statePath, const RevisionNumbersSetClosure & revisions, const int revision) = 0;
+	virtual void setStateRevisions(const Path & statePath, const RevisionNumbersSet & revisions, const int revision) = 0;
 	
 	/* TODO */
-	virtual bool queryStateRevisions(const Path & statePath, RevisionNumbersClosure & revisions, const int revision) = 0;
+	virtual bool queryStateRevisions(const Path & statePath, RevisionNumbers & revisions, const int revision) = 0;
 	
 	/* TODO */
 	virtual bool queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions) = 0;
@@ -268,13 +268,11 @@ Path makeStatePath(const string & componentHash, const string & suffix, const st
 void checkStatePath(const Derivation & drv);
 
 /* Calculates a unique store state repos path and also the root path  */
-void calculateStateReposPath(const string & type, const Path statePath, const string subfolder, const string & suffix, const string & stateIdentifier, Path & rootPath, Path & fullPath);
+void calculateStateReposPath(const string & type, const Path statePath, const string & suffix, const string & stateIdentifier, Path & path);
+
 
 /* Returns the full repository path */
-Path getStateReposPath(const string & type, const Path statePath, const string subfolder, const string & suffix, const string & stateIdentifier);
-
-/* Returns the root path containing the repository's */
-Path getStateReposRootPath(const string & type, const Path statePath, const string & suffix, const string & stateIdentifier);
+Path getStateReposPath(const string & type, const Path statePath, const string & suffix, const string & stateIdentifier);
 
 /* This is the preparatory part of addToStore() and addToStoreFixed();
    it computes the store path to which srcPath is to be copied.

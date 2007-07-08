@@ -5,7 +5,7 @@
 
 debug="";		#set to "" for no debugging, set to "echo " to debug the commands
 
-if [ "$#" != 5 ] && [ "$#" != 6 ] ; then
+if [ "$#" != 6 ] && [ "$#" != 7 ] ; then
   echo "Incorrect number of arguments"
   exit 1;
 fi
@@ -19,8 +19,9 @@ svnbin=$1
 subversionedpaths=( $2 )				#arrays
 subversionedpathsCommitBools=( $3 )
 nonversionedpaths=( $4 )
-checkouts=( $5 )
-deletesvn=$6							#this flag can be set to 1 to DELETE all .svn folders and NOT commit
+checkout=$5
+statepath=$6
+deletesvn=$7							#this flag can be set to 1 to DELETE all .svn folders and NOT commit
 
 
 if [ "$debug" != "" ] ; then
@@ -28,7 +29,8 @@ if [ "$debug" != "" ] ; then
 	echo subversionedpaths: ${subversionedpaths[@]}
 	echo subversionedpathsCommitBools: ${subversionedpathsCommitBools[@]}
 	echo nonversionedpaths: ${nonversionedpaths[@]}
-	echo checkouts: ${checkouts[@]}
+	echo checkouts: $checkout
+	echo statepath: $statepath
 	echo deletesvn: $deletesvn
 fi
 
@@ -46,9 +48,9 @@ function subversionSingleStateDir {
 	  empty=$(ls)
 	  
 	  if [ "$empty" = "" ] ; then
-	  	allsubitems=();															#no subfiles / dirs
+	  	allsubitems=();														#no subfiles / dirs
 	  else
-	  	allsubitems=( $(echo *) $(echo .*) )									#there are subfiles / dirs,also adds hidden items
+	  	allsubitems=( $(echo *) $(echo .*) )								#there are subfiles / dirs,also adds hidden items
 	  fi
 
 	  for subitem in ${allsubitems[@]}
@@ -128,39 +130,28 @@ function subversionSingleStateDir {
 #
 #
 
+if ! test -d "${statepath}/.svn/"; then       									#if the dir exists but is not yet an svn dir: checkout repos, if it doenst exits (is removed or something) than we dont do anything
+	if [ "$deletesvn" != "1" ]; then
+		$debug $checkout;
+	fi
+fi
+
 i=0
-i_checkout=0
 for path in ${subversionedpaths[@]}
 do
    if test -d $path; then														#if the dir doesnt exist, than we dont hav to do anything
       cd $path;
 	  																		    
- 	  checkoutcommand="";														#HACK: I cant seem to find a way for bash to parse a 2 dimensional string array as argument, so we use a 1-d array with '|' as seperator
-      while true; do
-	     if [ "${checkouts[$i_checkout]}" = "|" ]; then 
-   		 	let "i_checkout+=1"
-	  	    break
-     	 fi
-	  	 checkoutcommand="${checkoutcommand} ${checkouts[$i_checkout]}";
-	  	 let "i_checkout+=1"
-	  done
-	  		
-      if ! test -d "${path}.svn/"; then       									#if the dir exists but is not yet an svn dir: checkout repos, if it doenst exits (is removed or something) than we dont do anything
-		  if [ "$deletesvn" != "1" ]; then
-          	$debug $checkoutcommand;
-          fi
-      fi
-      
       if [ "${subversionedpathsCommitBools[$i]}" = "true" ]; then				#Check if we need to commit this folder
-
           echo "Entering $path"
-
-		  subversionSingleStateDir $path;
 		  
-		  cd $path																#now that everything is added we go back to the 'root' path and commit
-	      if [ "$deletesvn" != "1" ]; then
-	      	$debug svn -m "" commit;			
-	      fi									
+		  if ! test -d "${path}/.svn/"; then									#Also add yourself if nessecary
+		  	  if [ "$deletesvn" != "1" ]; then									
+				$debug svn -N add $path										
+			  fi
+		  fi
+		  
+		  subversionSingleStateDir $path;
 	  fi
       
       cd - &> /dev/null;
@@ -168,7 +159,8 @@ do
    fi
 done
 
-
-
-
+cd $statepath																	#now that everything is added we go back to the 'root' path and commit
+if [ "$deletesvn" != "1" ]; then
+	$debug svn -m "" commit;
+fi
 

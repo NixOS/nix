@@ -37,72 +37,54 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 	
 	PathSet intervalPaths;
 
-	//Make sure the 'root' path which holds the repositorys exists, so svn doenst complain.
-	string repos_root_path = getStateReposRootPath("stateOutput:staterepospath", stateDir, drvName, stateIdentifier);
+	//check if we can create state and staterepos dirs
+	//TODO
 	
-	Strings p_args;
-	p_args.push_back("-p");
-	p_args.push_back(repos_root_path);
-	runProgram_AndPrintOutput("mkdir", true, p_args, "mkdir");
+	//Create a repository for this state location
+	string repos = getStateReposPath("stateOutput:staterepospath", stateDir, drvName, stateIdentifier);
+
+	printMsg(lvlTalkative, format("Adding statedir '%1%' from repository '%2%'") % stateDir % repos);
 	
+	if(IsDirectory(repos))
+		printMsg(lvlTalkative, format("Repos %1% already exists, so we use that repository") % repos);			
+	else{
+		Strings p_args;
+		p_args.push_back("create");
+		p_args.push_back(repos);
+		runProgram_AndPrintOutput(svnadminbin, true, p_args, "svnadmin"); 				 //TODO create as nixbld.nixbld chmod 700... can you still commit then ??
+	}
 	
-	//TODO check if we can create state and staterepos dirs
+	string statedir_svn = stateDir + "/.svn/";
+	if( ! IsDirectory(statedir_svn) ){
+		Strings p_args;
+		p_args.push_back("checkout");
+		p_args.push_back("file://" + repos);
+		p_args.push_back(stateDir);
+		runProgram_AndPrintOutput(svnbin, true, p_args, "svn");	//TODO checkout as user
+	}
+	else
+		printMsg(lvlTalkative, format("Statedir %1% already exists, so dont check out its repository again") % statedir_svn);	
 	
 	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
 		DerivationStateOutputDir d = i->second;
 
 		string thisdir = d.path;
-		string fullstatedir = stateDir + "/" + thisdir;
-		Path statePath = fullstatedir;					//TODO call coerce function
+		Path fullstatedir = stateDir + "/" + thisdir;
 				
-		//Check if and how this dir needs to be versioned
-		if(d.type == "none"){
-			Strings p_args;
-			p_args.push_back("-p");
-			p_args.push_back(fullstatedir);
-			runProgram_AndPrintOutput("mkdir", true, p_args, "mkdir");
-			continue;
-		}
+		Strings p_args;
+		p_args.push_back("-p");
+		p_args.push_back(fullstatedir);
+		runProgram_AndPrintOutput("mkdir", true, p_args, "mkdir");
 		
-		//Create a repository for this state location
-		string repos = getStateReposPath("stateOutput:staterepospath", stateDir, thisdir, drvName, stateIdentifier);
-		
-		
-		if(IsDirectory(repos))
-			printMsg(lvlTalkative, format("Repos %1% already exists, so we use that repository") % repos);			
-		else{
-			Strings p_args;
-			p_args.push_back("create");
-			p_args.push_back(repos);
-			runProgram_AndPrintOutput(svnadminbin, true, p_args, "svnadmin"); 				 //TODO create as nixbld.nixbld chmod 700... can you still commit then ??
-		}
-
 		if(d.type == "interval"){
-			intervalPaths.insert(statePath);
-		}
-
-		printMsg(lvlTalkative, format("Adding state subdir: %1% to %2% from repository %3%") % thisdir % fullstatedir % repos);
-			
-		string fullstatedir_svn = fullstatedir + "/.svn/";
-		if( ! IsDirectory(fullstatedir_svn) ){
-			Strings p_args;
-			p_args.push_back("checkout");
-			p_args.push_back("file://" + repos);
-			p_args.push_back(fullstatedir);
-			runProgram_AndPrintOutput(svnbin, true, p_args, "svn");	//TODO checkout as user
-		}
-		else
-			printMsg(lvlTalkative, format("Statedir %1% already exists, so dont check out its repository again") % fullstatedir_svn);
+			intervalPaths.insert(fullstatedir);
+		}		
 	}
 	
 	//Initialize the counters for the statePaths that have an interval to 0
 	vector<int> empty;
 	store->setStatePathsInterval(intervalPaths, empty, true);
-	
-	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
-	//Initialize the revisions recursively
 }
-
 
 
 }

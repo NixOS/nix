@@ -11,18 +11,18 @@ namespace nix {
 Derivation derivationFromPath(const Path & drvPath)
 {
     assertStorePath(drvPath);
-    printMsg(lvlError, format("tttttttttttttttttt"));
+    //printMsg(lvlError, format("tttttttttttttttttt"));
     store->ensurePath(drvPath);
-    printMsg(lvlError, format("uuuuuuuuuuuuuuuuuu"));
+    //printMsg(lvlError, format("uuuuuuuuuuuuuuuuuu"));
     ATerm t = ATreadFromNamedFile(drvPath.c_str());
     if (!t) throw Error(format("cannot read aterm from `%1%'") % drvPath);
     return parseDerivation(t);
 }
 
-void computeFSClosure(const Path & path, PathSet & paths, const bool & withComponents, const bool & withState, bool flipDirection)
+void computeFSClosure(const Path & path, PathSet & paths, const bool & withComponents, const bool & withState, const int revision, bool flipDirection)
 {
 	PathSet allPaths;
-	computeFSClosureRec(path, allPaths, flipDirection);
+	computeFSClosureRec(path, allPaths, revision, flipDirection);
 	
 	if(!withComponents && !withState)
 		throw Error(format("Useless call to computeFSClosure, at leat withComponents or withState must be true"));
@@ -50,7 +50,7 @@ void computeFSClosure(const Path & path, PathSet & paths, const bool & withCompo
 	}
 }
 
-void computeFSClosureRec(const Path & path, PathSet & paths, const bool & flipDirection)
+void computeFSClosureRec(const Path & path, PathSet & paths, const int revision, const bool & flipDirection)
 {
     if (paths.find(path) != paths.end()) return;	//takes care of double entries
     
@@ -60,19 +60,19 @@ void computeFSClosureRec(const Path & path, PathSet & paths, const bool & flipDi
     PathSet stateReferences;
     
     if (flipDirection){
-        store->queryReferrers(path, references, -1);
-       	store->queryStateReferrers(path, stateReferences, -1);
+        store->queryReferrers(path, references, revision);
+       	store->queryStateReferrers(path, stateReferences, revision);
     }
     else{
-        store->queryReferences(path, references, -1);
-       	store->queryStateReferences(path, stateReferences, -1);
+        store->queryReferences(path, references, revision);
+       	store->queryStateReferences(path, stateReferences, revision);
     }
 
 	PathSet allReferences;
 	allReferences = pathSets_union(references, stateReferences);
 
     for (PathSet::iterator i = allReferences.begin(); i != allReferences.end(); ++i)
-        computeFSClosureRec(*i, paths, flipDirection);
+        computeFSClosureRec(*i, paths, revision, flipDirection);
 }
 
 

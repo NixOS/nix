@@ -1200,7 +1200,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
            *probably* already has it.) */
         PathSet allInputs;
         allInputs.insert(inputPaths.begin(), inputPaths.end());
-        computeFSClosure(drvPath, allInputs, true, false);								//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
+        computeFSClosure(drvPath, allInputs, true, false, -1);								//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
         
         string s;
         for (PathSet::iterator i = allInputs.begin();
@@ -1323,8 +1323,8 @@ bool DerivationGoal::prepareBuild()
         Derivation inDrv = derivationFromPath(i->first);
         for (StringSet::iterator j = i->second.begin(); j != i->second.end(); ++j)
             if (inDrv.outputs.find(*j) != inDrv.outputs.end()){
-                computeFSClosure(inDrv.outputs[*j].path, inputPaths, true, false);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE (done?)
-                computeFSClosure(inDrv.outputs[*j].path, inputStatePaths, false, true);		//TODO!!!!!!!!!!!!! HOW CAN THESE PATHS ALREADY BE VALID ..... ?????????????????????
+                computeFSClosure(inDrv.outputs[*j].path, inputPaths, true, false, -1);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE (done?)
+                computeFSClosure(inDrv.outputs[*j].path, inputStatePaths, false, true, -1);		//TODO!!!!!!!!!!!!! HOW CAN THESE PATHS ALREADY BE VALID ..... ?????????????????????
             }
             else
                 throw BuildError(
@@ -1334,8 +1334,8 @@ bool DerivationGoal::prepareBuild()
 
     /* Second, the input sources. */
     for (PathSet::iterator i = drv.inputSrcs.begin(); i != drv.inputSrcs.end(); ++i){
-        computeFSClosure(*i, inputPaths, true, false);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE (done?)
-        computeFSClosure(*i, inputStatePaths, false, true);
+        computeFSClosure(*i, inputPaths, true, false, -1);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE (done?)
+        computeFSClosure(*i, inputStatePaths, false, true, -1);
     }
 
     debug(format("added input paths %1%") % showPaths(inputPaths));
@@ -1463,7 +1463,7 @@ void DerivationGoal::startBuilder()
 
         /* Write closure info to `fileName'. */
         PathSet refs;
-        computeFSClosure(storePath, refs, true, false);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
+        computeFSClosure(storePath, refs, true, false, -1);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
         /* !!! in secure Nix, the writing should be done on the
            build uid for security (maybe). */
         writeStringToFile(tmpDir + "/" + fileName,

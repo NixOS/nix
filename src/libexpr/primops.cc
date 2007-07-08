@@ -485,6 +485,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 				            
 				            dir.path = s;
 			            }
+			            else if (statekey == "file") { dir.path = s; }
 			            else if (statekey == "type") { dir.type = s; }
 			            else if (statekey == "interval") { 
 			            	if(s == "")

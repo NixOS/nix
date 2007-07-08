@@ -116,7 +116,7 @@ static TableId dbStateCounters = 0;
 */
 static TableId dbStateInfo = 0;
 
-/* dbStateRevisions :: StatePath -> RevisionNumbersClosure
+/* dbStateRevisions :: StatePath -> RevisionNumbers
 
    This table lists the statepaths + recursive (indirect) references and the revision numbers of their repositorys
     
@@ -1491,7 +1491,7 @@ void setStatePathsInterval(const PathSet & statePaths, const vector<int> & inter
 	int n=0;
     for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
     {
-        printMsg(lvlError, format("Set interval of PATH: %1%") % *i);
+        //printMsg(lvlError, format("Set interval of PATH: %1%") % *i);
         
         int interval=0;
         if(!allZero)
@@ -1597,9 +1597,11 @@ PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, 
      
      TODO Change comment, this can also take state paths
 */
-void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState)
+void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision)
 {
-    computeFSClosure(storeOrstatePath, paths, withComponents, withState);
+    //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+    computeFSClosure(storeOrstatePath, paths, withComponents, withState, revision);
 
     if (includeOutputs) {
         for (PathSet::iterator i = paths.begin();
@@ -1609,14 +1611,14 @@ void storePathRequisites(const Path & storeOrstatePath, const bool includeOutput
                 for (DerivationOutputs::iterator j = drv.outputs.begin();
                      j != drv.outputs.end(); ++j)
                     if (store->isValidPath(j->second.path))
-                        computeFSClosure(j->second.path, paths, withComponents, withState);
+                        computeFSClosure(j->second.path, paths, withComponents, withState, revision);
             }
     }
 }
 
-void LocalStore::storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState)
+void LocalStore::storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision)
 {
-    return nix::storePathRequisites(storeOrstatePath, includeOutputs, paths, withComponents, withState);
+    return nix::storePathRequisites(storeOrstatePath, includeOutputs, paths, withComponents, withState, revision);
 }
 
 /*
@@ -1768,7 +1770,6 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
 	
 	
 	
-	
 	//update all revision numbers					(transaction)		NEW FUN THAT UPDATES THE REVISIONS
 	//update all revision numbers + references		(transaction)
 	//update all references
@@ -1796,9 +1797,9 @@ void LocalStore::scanAndUpdateAllReferences(const Path & statePath)
 
 void scanAndUpdateAllReferencesRecusively(const Transaction & txn, const Path & storeOrStatePath)		//TODO Can also work for statePaths???
 {
-	//get all state references recursively
+	//get all state current state references recursively
 	PathSet statePaths;
-	storePathRequisites(storeOrStatePath, false, statePaths, false, true);		//TODO CAN THIS ???
+	storePathRequisites(storeOrStatePath, false, statePaths, false, true, -1);		//TODO CAN THIS ???
 	
 	//call scanForAllReferences again on all newly found statePaths
 	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
@@ -1820,22 +1821,22 @@ void LocalStore::scanAndUpdateAllReferencesRecusively(const Path & storeOrStateP
     return nix::scanAndUpdateAllReferencesRecusively(noTxn, storeOrStatePath);
 }
 
-void setStateRevisions(const Transaction & txn, const Path & statePath, const RevisionNumbersSetClosure & revisions, const int revision)
+void setStateRevisions(const Transaction & txn, const Path & statePath, const RevisionNumbersSet & revisions, const int revision)
 {
 	nixDB.setStateRevisions(txn, dbStateRevisions, statePath, revisions, revision);	
 }
 
-void LocalStore::setStateRevisions(const Path & statePath, const RevisionNumbersSetClosure & revisions, const int revision)
+void LocalStore::setStateRevisions(const Path & statePath, const RevisionNumbersSet & revisions, const int revision)
 {
 	nix::setStateRevisions(noTxn, statePath, revisions, revision);	
 }
 
-bool queryStateRevisions(const Transaction & txn, const Path & statePath, RevisionNumbersClosure & revisions, const int revision)
+bool queryStateRevisions(const Transaction & txn, const Path & statePath, RevisionNumbers & revisions, const int revision)
 {
 	return nixDB.queryStateRevisions(txn, dbStateRevisions, statePath, revisions, revision);
 }
 
-bool LocalStore::queryStateRevisions(const Path & statePath, RevisionNumbersClosure & revisions, const int revision)
+bool LocalStore::queryStateRevisions(const Path & statePath, RevisionNumbers & revisions, const int revision)
 {
 	return nix::queryStateRevisions(noTxn, statePath, revisions, revision);
 }

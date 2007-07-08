@@ -24,9 +24,9 @@ Derivation derivationFromPath(const Path & drvPath);
    We can currentky only compute the closure of the latsest revision!
    
    returned. */
-void computeFSClosure(const Path & storePath, PathSet & paths, const bool & withComponents, const bool & withState, bool flipDirection = false);
+void computeFSClosure(const Path & storePath, PathSet & paths, const bool & withComponents, const bool & withState, const int revision, bool flipDirection = false);
 
-void computeFSClosureRec(const Path & path, PathSet & paths, const bool & flipDirection);	//private    
+void computeFSClosureRec(const Path & path, PathSet & paths, const int revision, const bool & flipDirection);	//TODO private    
 
 /* Return the path corresponding to the output identifier `id' in the
    given derivation. */

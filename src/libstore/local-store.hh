@@ -96,15 +96,15 @@ public:
 	
 	bool isStateDrv(const Derivation & drv);
 	
-	void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState);
+	void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision);
 	
 	void scanAndUpdateAllReferences(const Path & statePath);
 	
 	void scanAndUpdateAllReferencesRecusively(const Path & storeOrstatePath);
 	
-	void setStateRevisions(const Path & statePath, const RevisionNumbersSetClosure & revisions, const int revision);
+	void setStateRevisions(const Path & statePath, const RevisionNumbersSet & revisions, const int revision);
 	
-	bool queryStateRevisions(const Path & statePath, RevisionNumbersClosure & revisions, const int revision);
+	bool queryStateRevisions(const Path & statePath, RevisionNumbers & revisions, const int revision);
 	
 	bool queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions);
 	

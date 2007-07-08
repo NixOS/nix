@@ -60,13 +60,8 @@ typedef set<Path> PathSet;
 
 //state types
 typedef list<int> RevisionNumbers;								//the Strings (list) of StateReferences and this list are connected by position
-typedef map<Path, RevisionNumbers> RevisionNumbersSetClosure;	//We include to the paths to sort on
-typedef list<RevisionNumbers> RevisionNumbersClosure;
+typedef map<Path, int> RevisionNumbersSet;						//We include to the paths to sort on
 typedef map<int, Strings> StateReferences;
-
-//typedef std::map<int, Strings> StateReferencesKey;
-//typedef std::map<int, Strings> StateReferencesKey2;
-
 
  
 typedef enum { 

@@ -151,7 +151,7 @@ static void opShowStatePath(Strings opFlags, Strings opArgs)
 }
 
 //Prints the root path that contains the repoisitorys of the state of a component - indetiefier combination
-static void opShowStateReposRootPath(Strings opFlags, Strings opArgs)
+static void opShowStateReposPath(Strings opFlags, Strings opArgs)
 {
 	Path componentPath;
     Path statePath;
@@ -166,12 +166,12 @@ static void opShowStateReposRootPath(Strings opFlags, Strings opArgs)
 	
 	//Get the a repository for this state location
 	string drvName = drv.env.find("name")->second;
-	string repos = getStateReposPath("stateOutput:staterepospath", statePath, "/", drvName, stateIdentifier);		//this is a copy from store-state.cc
+	string repos = getStateReposPath("stateOutput:staterepospath", statePath, drvName, stateIdentifier);		//this is a copy from store-state.cc
 
 	printMsg(lvlError, format("%1%") % repos);
 }
 
-RevisionNumbers readRevisionNumbers(const Derivation & drv)
+int readRevisionNumber(const Derivation & drv)
 {
 	string svnbin = nixSVNPath + "/svn";
 	RevisionNumbers revisions;
@@ -182,42 +182,22 @@ RevisionNumbers readRevisionNumbers(const Derivation & drv)
     Path statePath = stateOutputs.find("state")->second.statepath;
 	string getStateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
 	
-	//TODO sort based on the repository
-	vector<Path> sorted_repositorys;
-	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
-		DerivationStateOutputDir d = i->second;
-		string thisdir = d.path;
-		//Get the a repository for this state location
-		string repos = getStateReposPath("stateOutput:staterepospath", statePath, thisdir, drvName, getStateIdentifier);		//this is a copy from store-state.cc
-		sorted_repositorys.push_back(repos);
-	}
-	sort(sorted_repositorys.begin(), sorted_repositorys.end());
+	string repos = getStateReposPath("stateOutput:staterepospath", statePath, drvName, getStateIdentifier);		//this is a copy from store-state.cc
 	
-	//After the sort read the paths	
-	for (vector<Path>::const_iterator i = sorted_repositorys.begin(); i != sorted_repositorys.end(); ++i){
-		string repos = *i;
-
-		//printMsg(lvlError, format("%1%") % repos);
-		
-		if(IsDirectory(repos)){
-			Strings p_args;
-			p_args.push_back(svnbin);
-			p_args.push_back("file://" + repos);
-	    	string output = runProgram(nixLibexecDir + "/nix/nix-readrevisions.sh", true, p_args);	//run
+	Strings p_args;
+	p_args.push_back(svnbin);
+	p_args.push_back("file://" + repos);
+	string output = runProgram(nixLibexecDir + "/nix/nix-readrevisions.sh", true, p_args);	//run
 	    	
-	    	int pos = output.find("\n",0);	//remove trailing \n
-			output.erase(pos,1);
+	int pos = output.find("\n",0);	//remove trailing \n
+	output.erase(pos,1);
 			
-			int revision;
-			bool succeed = string2Int(output, revision);
-			if(!succeed)
-				throw Error(format("Cannot read revision number of path '%1%'") % repos);				
-			revisions.push_back(revision);	//insert into array
-		}	
-		else
-			revisions.push_back(-1);
-	}
-	return revisions;	
+	int revision;
+	bool succeed = string2Int(output, revision);
+	if(!succeed)
+		throw Error(format("Cannot read revision number of path '%1%'") % repos);				
+	
+	return revision;	
 }
 
 /*
@@ -228,9 +208,7 @@ PathSet getAllStateDerivationsRecursively(const Path & storePath, const int revi
 {
 	//Get recursively all state paths
 	PathSet statePaths;
-	store->storePathRequisites(storePath, false, statePaths, false, true);		
-	
-	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! include revision
+	store->storePathRequisites(storePath, false, statePaths, false, true, revision);		
 	
 	//Find the matching drv with the statePath
 	PathSet derivations;	
@@ -259,10 +237,12 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 		return;	
 	}
 	
+	string revisions_txt="";
 	for (RevisionNumbers::iterator i = revisions.begin(); i != revisions.end(); ++i)
 	{
-		printMsg(lvlError, format("Available Revision: %1%") % int2String(*i));
-	}
+		revisions_txt += int2String(*i) + " ";
+	}	
+	printMsg(lvlError, format("Available Revisions: %1%") % revisions_txt);
 }
 
 static void revertToRevision(Strings opFlags, Strings opArgs)
@@ -275,51 +255,35 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
     string program_args;
     Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args);
     
-    bool recursive = true;	//TODO !!!!!!!!!
+    bool recursive = true;	//TODO !!!!!!!!!!!!!!!!!
     
-    //First, revert own statepath
-	   	
-    //Then, do the rest (if nessecary)
+    //Insert the direct statePath or all recursive statePaths into the list
     PathSet drvs;
     if(recursive)	
     	drvs = getAllStateDerivationsRecursively(componentPath, revision_arg); //get dependecies (if neccecary | recusively) of all state components that need to be updated
     else
     	drvs.insert(derivationPath);
-    /*
+    
+    //Revert each statePath in the list
    	for (PathSet::iterator d = drvs.begin(); d != drvs.end(); ++d)
 	{
     	Path drvPath = *d;
        	Derivation drv = derivationFromPath(drvPath);
        	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
     	Path statePath = stateOutputs.find("state")->second.statepath;
-	    DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
 	    string drvName = drv.env.find("name")->second; 
     	
-    	RevisionNumbersClosure getRivisionsClosure;
-		bool b = store->queryStateRevisions(statePath, getRivisionsClosure, revision_arg);
+    	RevisionNumbers getRivisions;
+		bool b = store->queryStateRevisions(statePath, getRivisions, revision_arg);
 		
-		//sort
-		for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
+		string repos = getStateReposPath("stateOutput:staterepospath", statePath, drvName, stateIdentifier);		//this is a copy from store-state.cc
 		
-			DerivationStateOutputDir d = i->second;
-			string thisdir = d.path;
-			//Get the a repository for this state location
-			string repos = getStateReposPath("stateOutput:staterepospath", statePath, thisdir, drvName, stateIdentifier);		//this is a copy from store-state.cc
-					
-			
-				
-			Strings p_args;
-			p_args.push_back(nixSVNPath + "/svn");
-			p_args.push_back(int2String(revision_arg));
-			p_args.push_back("file://" + repos);
-			string output = runProgram(nixLibexecDir + "/nix/nix-restorerevision.sh", true, p_args);	//run
-		
-			
-		}		
+		Strings p_args;
+		p_args.push_back(nixSVNPath + "/svn");
+		p_args.push_back(int2String(revision_arg));
+		p_args.push_back("file://" + repos);
+		string output = runProgram(nixLibexecDir + "/nix/nix-restorerevision.sh", true, p_args);	//run
 	} 
-	*/      
-    
-    //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 }
 
 static void opRunComponent(Strings opFlags, Strings opArgs)
@@ -343,7 +307,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	//add locks ... ?
 	//svn lock ... ?
 
-    //get dependecies (if neccecary | recusively) of all state components that need to be updated
+    //get all current dependecies (if neccecary | recusively) of all state components that need to be updated
     PathSet root_drvs = getAllStateDerivationsRecursively(root_componentPath, -1);
     
     //TODO maybe also scan the parameters for state or component hashes?
@@ -360,7 +324,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
   		
 	//******************* With everything in place, we call the commit script on all statePaths **********************
 	
-	map<Path, RevisionNumbers> rivisionsClosureMapping; 
+	RevisionNumbersSet rivisionMapping; 
 	
 	for (PathSet::iterator d = root_drvs.begin(); d != root_drvs.end(); ++d)		//TODO first commit own state path?
 	{
@@ -379,7 +343,6 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		vector<string> subversionedpaths;
 		vector<bool> subversionedpathsCommitBoolean;
 		vector<string> nonversionedpaths;			//of type none, no versioning needed
-		vector<string> checkoutcommands;
 		
 		//Get all the inverals from the database at once
 		PathSet intervalPaths;
@@ -409,11 +372,6 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 				continue;
 			}
 					
-			//Get the a repository for this state location
-			string repos = getStateReposPath("stateOutput:staterepospath", statePath, thisdir, drvName, stateIdentifier);		//this is a copy from store-state.cc
-					
-			//Add the checkout command in case its needed
-			checkoutcommands.push_back(svnbin + " --ignore-externals checkout file://" + repos + " " + fullstatedir);
 			subversionedpaths.push_back(fullstatedir);
 			
 			if(d.type == "interval"){
@@ -434,9 +392,10 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 				throw Error(format("interval '%1%' is not handled in nix-state") % d.type);
 		}
 		
-		//Update the intervals again	
-		store->setStatePathsInterval(intervalPaths, intervals);
-			
+		//Get the a repository for this state location
+		string repos = getStateReposPath("stateOutput:staterepospath", statePath, drvName, stateIdentifier);		//this is a copy from store-state.cc
+		string checkoutcommand = svnbin + " --ignore-externals checkout file://" + repos + " " + statePath;
+				
 		//Call the commit script with the appropiate paramenters
 		string subversionedstatepathsarray; 
 		for (vector<string>::iterator i = subversionedpaths.begin(); i != subversionedpaths.end(); ++i)
@@ -453,12 +412,6 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	    {
 			nonversionedstatepathsarray += *(i) + " ";
 	    }
-		string commandsarray; 
-		for (vector<string>::iterator i = checkoutcommands.begin(); i != checkoutcommands.end(); ++i)
-	    {
-			//#HACK: I cant seem to find a way for bash to parse a 2 dimensional string array as argument, so we use a 1-d array with '|' as seperator
-			commandsarray += "" + *(i) + " | ";
-	    }
 	  	
 	    //make the call to the commit script
 	    Strings p_args;
@@ -466,27 +419,29 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		p_args.push_back(subversionedstatepathsarray);
 		p_args.push_back(subversionedpathsCommitBooleansarray);
 		p_args.push_back(nonversionedstatepathsarray);
-		p_args.push_back(commandsarray);
+		p_args.push_back(checkoutcommand);
+		p_args.push_back(statePath);
 		runProgram_AndPrintOutput(nixLibexecDir + "/nix/nix-statecommit.sh", true, p_args, "svn");
+	    
+	    //Update the intervals again	
+		//store->setStatePathsInterval(intervalPaths, intervals);		//TODO!!!!!!!!!!!!!!!!!!!!!!
 	    
 	   	//TODO
 	   	//Scan if needed
 	   	if(false)
 	   		store->scanAndUpdateAllReferencesRecusively(statePath);
 		   	
-		rivisionsClosureMapping[statePath] = readRevisionNumbers(drv);	//Get current numbers
+		rivisionMapping[statePath] = readRevisionNumber(drv);	//Get current numbers
 	}
 	
 	//Store the revision numbers in the database for this statePath to a new revision
-	store->setStateRevisions(root_statePath, rivisionsClosureMapping, -1);
+	store->setStateRevisions(root_statePath, rivisionMapping, -1);
 	
-	RevisionNumbersClosure getRivisionsClosure;
-	bool b = store->queryStateRevisions(root_statePath, getRivisionsClosure, -1);
+	RevisionNumbers getRivisions;
+	bool b = store->queryStateRevisions(root_statePath, getRivisions, -1);
 	
-	for (RevisionNumbersClosure::iterator d = getRivisionsClosure.begin(); d != getRivisionsClosure.end(); ++d){
-		printMsg(lvlError, format("REVVV"));
-		for (RevisionNumbers::iterator e = (*d).begin(); e != (*d).end(); ++e)
-			printMsg(lvlError, format("REV %1%") % *e);
+	for (RevisionNumbers::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
+		printMsg(lvlError, format("REV %1%") % int2String(*i));
 	}
 	
 }
@@ -610,7 +565,7 @@ void run(Strings args)
 		else if (arg == "--showstatepath")
 			op = opShowStatePath;
 		else if (arg == "--showstatereposrootpath")
-			op = opShowStateReposRootPath;
+			op = opShowStateReposPath;
 		else if (arg == "--showderivations")
 			op = opShowDerivations;
 		else if (arg == "--showrevisions")

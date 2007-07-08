@@ -555,40 +555,6 @@ bool Database::queryStateReferences(const Transaction & txn, TableId table,
 	else
 		key = makeStatePathRevision(statePath, revision);
 	
-	/*
-	///////////////?!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! create function
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////	TODO
-	string key = "";					//final key that matches revision + statePath
-	int highestRev = -1;
-
-	//Lookup which key we need	
-	for (Strings::iterator i = keys.begin(); i != keys.end(); ++i) {
-		Path getStatePath_org = *i;
-		Path getStatePath;
-		int getRevision;
-		splitStatePathRevision(*i, getStatePath, getRevision);
-		
-		if(getStatePath == statePath){
-			
-			if(revision == -1){				//the user wants the last revision
-				if(getRevision > highestRev)
-					highestRev = getRevision;
-			}		
-			else if(revision == getRevision){
-				key = getStatePath_org;
-				break;	
-			}
-		}
-	}
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	
-	if(key == "" && highestRev == -1)	//no records found (TODO throw error?)
-		return false;
-	
-	if(revision == -1)
-		key = makeStatePathRevision(statePath, highestRev);
-	*/
-
 	return queryStrings(txn, table, key, references);		//now that we have the key, we can query the references
 }
 
@@ -610,15 +576,15 @@ bool Database::queryStateReferrers(const Transaction & txn, TableId table,
    
 
 void Database::setStateRevisions(const Transaction & txn, TableId table,
-   	const Path & statePath, const RevisionNumbersSetClosure & revisions, int revision)
+   	const Path & statePath, const RevisionNumbersSet & revisions, int revision)
 {
 	if(revision == -1)
 		revision = getNewRevisionNumber(txn, table, statePath);
 	
 	//Sort based on statePath to RevisionNumbersClosure
-	RevisionNumbersClosure sorted_revisions;
+	RevisionNumbers sorted_revisions;
 	vector<Path> sortedStatePaths;
-	for (RevisionNumbersSetClosure::const_iterator i = revisions.begin(); i != revisions.end(); ++i)
+	for (RevisionNumbersSet::const_iterator i = revisions.begin(); i != revisions.end(); ++i)
 		sortedStatePaths.push_back((*i).first);
     sort(sortedStatePaths.begin(), sortedStatePaths.end());
     for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
@@ -626,22 +592,16 @@ void Database::setStateRevisions(const Transaction & txn, TableId table,
 	
 	//////////////////
 	for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i){
-		printMsg(lvlError, format("Insert: %1%") % *i);
-		for (RevisionNumbers::const_iterator e = (revisions.at(*i)).begin(); e != (revisions.at(*i)).end(); ++e)
-			printMsg(lvlError, format("Rev: %1%") % *e);
+		printMsg(lvlError, format("Insert: %1% into %2%") % int2String(revisions.at(*i)) % *i);
+		
 	}
 	//////////////////
 	
-	//Pack the data into Strings
-	const string seperator = "|";
-	Strings data;	
-	for (RevisionNumbersClosure::const_iterator i = sorted_revisions.begin(); i != sorted_revisions.end(); ++i) {
-		RevisionNumbers revisionNumbers = *i;
-		string packedNumbers = "";
-		for (RevisionNumbers::iterator j = revisionNumbers.begin(); j != revisionNumbers.end(); ++j)
-			packedNumbers += int2String(*j) + seperator;
-		packedNumbers = packedNumbers.substr(0, packedNumbers.length()-1);	//remove the last |
-		data.push_back(packedNumbers);
+	//Convert the int's into Strings
+	Strings data;
+	for (RevisionNumbers::const_iterator i = sorted_revisions.begin(); i != sorted_revisions.end(); ++i) {
+		int revisionnumber = *i;
+		data.push_back(int2String(revisionnumber));
 	}
 	
 	//Create the key
@@ -652,10 +612,8 @@ void Database::setStateRevisions(const Transaction & txn, TableId table,
 }   
 
 bool Database::queryStateRevisions(const Transaction & txn, TableId table,
-   	const Path & statePath, RevisionNumbersClosure & revisions, int revision)
+   	const Path & statePath, RevisionNumbers & revisions, int revision)
 {
-	const string seperator = "|";
-	
 	Strings keys;
 	enumTable(txn, table, keys);		//get all revisions
 
@@ -668,55 +626,17 @@ bool Database::queryStateRevisions(const Transaction & txn, TableId table,
 	else
 		key = makeStatePathRevision(statePath, revision);
 		
-	/*
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////	
-	string key = "";					//final key that matches revision + statePath
-	int highestRev = -1;
-
-	//Lookup which key we need	
-	for (Strings::iterator i = keys.begin(); i != keys.end(); ++i) {
-		Path getStatePath_org = *i;
-		Path getStatePath;
-		int getRevision;
-		splitStatePathRevision(*i, getStatePath, getRevision);
-		
-		if(getStatePath == statePath){
-			
-			if(revision == -1){				//the user wants the last revision
-				if(getRevision > highestRev)
-					highestRev = getRevision;
-			}		
-			else if(revision == getRevision){
-				key = getStatePath_org;
-				break;	
-			}
-		}
-	}
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	if(key == "" && highestRev == -1)	//no records found (TODO throw error?)
-		return false;
-	
-	if(revision == -1)
-		key = makeStatePathRevision(statePath, highestRev);
-	*/
-	
 	Strings data; 
 	bool succeed = queryStrings(txn, table, key, data);		//now that we have the key, we can query the references
 	
-	//Unpack Strings into RevisionNumbersClosure
+	//Convert the Strings into int's
 	for (Strings::iterator i = data.begin(); i != data.end(); ++i){
-		RevisionNumbers revisionsGroup;
-		string packedNumbers = *i;
-		Strings tokens = tokenizeString(packedNumbers, seperator);
-		for (Strings::iterator j = tokens.begin(); j != tokens.end(); ++j){
-			int getRevision;
-			bool succeed = string2Int(*j, getRevision);
-			if(!succeed)
-				throw Error(format("Cannot read revision number from db of path '%1%'") % statePath);
-			revisionsGroup.push_back(getRevision);				
-		}	
-		revisions.push_back(revisionsGroup);
+		string getRevisionS = *i;
+		int getRevision;
+		bool succeed = string2Int(getRevisionS, getRevision);
+		if(!succeed)
+			throw Error(format("Cannot read revision number from db of path '%1%'") % statePath);
+		revisions.push_back(getRevision);
 	}
 	
 	return succeed;
