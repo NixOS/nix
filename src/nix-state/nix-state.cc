@@ -74,7 +74,7 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
 		//Strings progam_args_strings = tokenizeString(allArgs, " ");
     }
 
-	printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % stateIdentifier % binary % username % allArgs);
+	//printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % stateIdentifier % binary % username % allArgs);
     
     if(isStatePath)
     	derivers = queryDerivers(noTxn, componentPath, stateIdentifier, username);
@@ -197,7 +197,7 @@ RevisionNumbers readRevisionNumbers(const Derivation & drv)
 	for (vector<Path>::const_iterator i = sorted_repositorys.begin(); i != sorted_repositorys.end(); ++i){
 		string repos = *i;
 
-		printMsg(lvlError, format("%1%") % repos);
+		//printMsg(lvlError, format("%1%") % repos);
 		
 		if(IsDirectory(repos)){
 			Strings p_args;
@@ -224,11 +224,13 @@ RevisionNumbers readRevisionNumbers(const Derivation & drv)
  * Input: store (or statePath?)
  * Returns all the drv's of the statePaths (in)directly referenced.
  */
-PathSet getAllStateDerivationsRecursively(const Path & storePath)
+PathSet getAllStateDerivationsRecursively(const Path & storePath, const int revision)
 {
 	//Get recursively all state paths
 	PathSet statePaths;
 	store->storePathRequisites(storePath, false, statePaths, false, true);		
+	
+	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! include revision
 	
 	//Find the matching drv with the statePath
 	PathSet derivations;	
@@ -275,10 +277,47 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
     
     bool recursive = true;	//TODO !!!!!!!!!
     
-    //get dependecies (if neccecary | recusively) of all state components that need to be updated
-    PathSet root_drvs = getAllStateDerivationsRecursively(componentPath);
-    
-    //revision_arg
+    //First, revert own statepath
+	   	
+    //Then, do the rest (if nessecary)
+    PathSet drvs;
+    if(recursive)	
+    	drvs = getAllStateDerivationsRecursively(componentPath, revision_arg); //get dependecies (if neccecary | recusively) of all state components that need to be updated
+    else
+    	drvs.insert(derivationPath);
+    /*
+   	for (PathSet::iterator d = drvs.begin(); d != drvs.end(); ++d)
+	{
+    	Path drvPath = *d;
+       	Derivation drv = derivationFromPath(drvPath);
+       	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
+    	Path statePath = stateOutputs.find("state")->second.statepath;
+	    DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
+	    string drvName = drv.env.find("name")->second; 
+    	
+    	RevisionNumbersClosure getRivisionsClosure;
+		bool b = store->queryStateRevisions(statePath, getRivisionsClosure, revision_arg);
+		
+		//sort
+		for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
+		
+			DerivationStateOutputDir d = i->second;
+			string thisdir = d.path;
+			//Get the a repository for this state location
+			string repos = getStateReposPath("stateOutput:staterepospath", statePath, thisdir, drvName, stateIdentifier);		//this is a copy from store-state.cc
+					
+			
+				
+			Strings p_args;
+			p_args.push_back(nixSVNPath + "/svn");
+			p_args.push_back(int2String(revision_arg));
+			p_args.push_back("file://" + repos);
+			string output = runProgram(nixLibexecDir + "/nix/nix-restorerevision.sh", true, p_args);	//run
+		
+			
+		}		
+	} 
+	*/      
     
     //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 }
@@ -305,7 +344,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	//svn lock ... ?
 
     //get dependecies (if neccecary | recusively) of all state components that need to be updated
-    PathSet root_drvs = getAllStateDerivationsRecursively(root_componentPath);
+    PathSet root_drvs = getAllStateDerivationsRecursively(root_componentPath, -1);
     
     //TODO maybe also scan the parameters for state or component hashes?
     //program_args
@@ -323,7 +362,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	
 	map<Path, RevisionNumbers> rivisionsClosureMapping; 
 	
-	for (PathSet::iterator d = root_drvs.begin(); d != root_drvs.end(); ++d)
+	for (PathSet::iterator d = root_drvs.begin(); d != root_drvs.end(); ++d)		//TODO first commit own state path?
 	{
 		//Extract the neccecary info from each Drv
 		Path drvPath = *d;
