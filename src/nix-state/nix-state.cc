@@ -22,6 +22,7 @@ typedef void (* Operation) (Strings opFlags, Strings opArgs);
 //two global variables
 string stateIdentifier;
 string username;
+int revision_arg;
 
 
 /************************* Build time Functions ******************************/
@@ -181,50 +182,48 @@ RevisionNumbers readRevisionNumbers(const Derivation & drv)
     Path statePath = stateOutputs.find("state")->second.statepath;
 	string getStateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
 	
+	//TODO sort based on the repository
+	vector<Path> sorted_repositorys;
 	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
 		DerivationStateOutputDir d = i->second;
 		string thisdir = d.path;
-		
 		//Get the a repository for this state location
 		string repos = getStateReposPath("stateOutput:staterepospath", statePath, thisdir, drvName, getStateIdentifier);		//this is a copy from store-state.cc
+		sorted_repositorys.push_back(repos);
+	}
+	sort(sorted_repositorys.begin(), sorted_repositorys.end());
+	
+	//After the sort read the paths	
+	for (vector<Path>::const_iterator i = sorted_repositorys.begin(); i != sorted_repositorys.end(); ++i){
+		string repos = *i;
+
+		printMsg(lvlError, format("%1%") % repos);
 		
 		if(IsDirectory(repos)){
 			Strings p_args;
 			p_args.push_back(svnbin);
 			p_args.push_back("file://" + repos);
-	    	string output = runProgram(nixLibexecDir + "/nix/nix-readrevisions.sh", true, p_args);
-	    	int pos = output.find("\n",0);
+	    	string output = runProgram(nixLibexecDir + "/nix/nix-readrevisions.sh", true, p_args);	//run
+	    	
+	    	int pos = output.find("\n",0);	//remove trailing \n
 			output.erase(pos,1);
+			
 			int revision;
 			bool succeed = string2Int(output, revision);
 			if(!succeed)
 				throw Error(format("Cannot read revision number of path '%1%'") % repos);				
-			revisions.push_back(revision);
-		}		
+			revisions.push_back(revision);	//insert into array
+		}	
 		else
 			revisions.push_back(-1);
 	}
 	return revisions;	
 }
 
-void setAllRevisionNumbers(const PathSet & drvs)
-{
-	//for.....
-	
-		//DerivationStateOutputs stateOutputs = drv.stateOutputs; 
-    	//Path statePath = stateOutputs.find("state")->second.statepath;
-		//RevisionNumbers = readRevisionNumbers(drv);
-	
-	
-	
-	//setStateRevisions(notxn, TableId table,	const Path & statePath, const int revision, const RevisionNumbersClosure & revisions);
-    	/*
-    	bool queryStateRevisions(const Transaction & txn, TableId table,
-    	const Path & statePath, RevisionNumbersClosure & revisions, int revision = -1);
-    	*/
-}
-
-//Comment TODO
+/*
+ * Input: store (or statePath?)
+ * Returns all the drv's of the statePaths (in)directly referenced.
+ */
 PathSet getAllStateDerivationsRecursively(const Path & storePath)
 {
 	//Get recursively all state paths
@@ -239,16 +238,61 @@ PathSet getAllStateDerivationsRecursively(const Path & storePath)
 	return derivations;
 }
 
+//TODO also allow statePaths as input?
+static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
+{
+	Path componentPath;
+    Path statePath;
+    string binary;
+    string derivationPath;
+    bool isStatePath;
+    string program_args;
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args);
+	
+	RevisionNumbers revisions;
+	bool notEmpty = store->queryAvailableStateRevisions(statePath, revisions);
+	
+	if(!notEmpty){	//can this happen?
+		printMsg(lvlError, format("No revisions yet for: %1%") % statePath);
+		return;	
+	}
+	
+	for (RevisionNumbers::iterator i = revisions.begin(); i != revisions.end(); ++i)
+	{
+		printMsg(lvlError, format("Available Revision: %1%") % int2String(*i));
+	}
+}
+
+static void revertToRevision(Strings opFlags, Strings opArgs)
+{
+	Path componentPath;
+    Path statePath;
+    string binary;
+    string derivationPath;
+    bool isStatePath;
+    string program_args;
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args);
+    
+    bool recursive = true;	//TODO !!!!!!!!!
+    
+    //get dependecies (if neccecary | recusively) of all state components that need to be updated
+    PathSet root_drvs = getAllStateDerivationsRecursively(componentPath);
+    
+    //revision_arg
+    
+    //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+}
+
 static void opRunComponent(Strings opFlags, Strings opArgs)
 {
     //get the all the info of the component that is being called (we dont really use it yet)
-    Path componentPath;
-    Path statePath;
-    string binary;
-	string derivationPath;
-	bool isStatePath;
-	string program_args;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args);
+    Path root_componentPath;
+    Path root_statePath;
+    string root_binary;
+	string root_derivationPath;
+	bool root_isStatePath;
+	string root_program_args;
+    Derivation root_drv = getDerivation_andCheckArgs(opFlags, opArgs, root_componentPath, root_statePath, root_binary, root_derivationPath, root_isStatePath, root_program_args);
         
     //Specifiy the SVN binarys
     string svnbin = nixSVNPath + "/svn";
@@ -261,8 +305,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	//svn lock ... ?
 
     //get dependecies (if neccecary | recusively) of all state components that need to be updated
-    PathSet drvs = getAllStateDerivationsRecursively(componentPath);
-    
+    PathSet root_drvs = getAllStateDerivationsRecursively(root_componentPath);
     
     //TODO maybe also scan the parameters for state or component hashes?
     //program_args
@@ -274,11 +317,13 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	
 	//******************* Run ****************************
 	
-	executeShellCommand(componentPath + binary + " " + program_args);	//more efficient way needed ???
+	executeShellCommand(root_componentPath + root_binary + " " + root_program_args);	//more efficient way needed ???
   		
 	//******************* With everything in place, we call the commit script on all statePaths **********************
 	
-	for (PathSet::iterator d = drvs.begin(); d != drvs.end(); ++d)
+	map<Path, RevisionNumbers> rivisionsClosureMapping; 
+	
+	for (PathSet::iterator d = root_drvs.begin(); d != root_drvs.end(); ++d)
 	{
 		//Extract the neccecary info from each Drv
 		Path drvPath = *d;
@@ -384,18 +429,28 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		p_args.push_back(nonversionedstatepathsarray);
 		p_args.push_back(commandsarray);
 		runProgram_AndPrintOutput(nixLibexecDir + "/nix/nix-statecommit.sh", true, p_args, "svn");
-	    													   
+	    
 	   	//TODO
 	   	//Scan if needed
-	   	//scanAndUpdateAllReferencesRecusively ...
-	   	
+	   	if(false)
+	   		store->scanAndUpdateAllReferencesRecusively(statePath);
+		   	
+		rivisionsClosureMapping[statePath] = readRevisionNumbers(drv);	//Get current numbers
 	}
 	
-	//Update all revision numbers in the database
-	setAllRevisionNumbers(drvs);
+	//Store the revision numbers in the database for this statePath to a new revision
+	store->setStateRevisions(root_statePath, rivisionsClosureMapping, -1);
+	
+	RevisionNumbersClosure getRivisionsClosure;
+	bool b = store->queryStateRevisions(root_statePath, getRivisionsClosure, -1);
+	
+	for (RevisionNumbersClosure::iterator d = getRivisionsClosure.begin(); d != getRivisionsClosure.end(); ++d){
+		printMsg(lvlError, format("REVVV"));
+		for (RevisionNumbers::iterator e = (*d).begin(); e != (*d).end(); ++e)
+			printMsg(lvlError, format("REV %1%") % *e);
+	}
 	
 }
-
 
 
 void run(Strings args)
@@ -519,6 +574,11 @@ void run(Strings args)
 			op = opShowStateReposRootPath;
 		else if (arg == "--showderivations")
 			op = opShowDerivations;
+		else if (arg == "--showrevisions")
+			op = queryAvailableStateRevisions;
+		else if (arg.substr(0,21) == "--revert-to-revision=")
+			op = revertToRevision;
+		
 
         /*
 		
@@ -526,24 +586,40 @@ void run(Strings args)
 
 		--run-without-commit
 		
+		--showrevisions
+		
+		--revert-to-revision=
+		
+		--share-from
+		
+		--unshare
+				
+		OPTIONAL
+		
+		--scanreferences
+								
+		/////////////////////
+		
 		--backup ?
 		
 		--exclude-commit-paths
 		
 		TODO update getDerivation in nix-store to handle state indentifiers
 		
-		--revert-to-state	(recursive revert...)
-		
-		--delete-state
-		
-		--share-from
+		--delete-revision
 		
         */
         
+        else if (arg.substr(0,21) == "--revert-to-revision="){
+			bool succeed = string2Int(arg.substr(21,arg.length()), revision_arg);
+			if(!succeed)
+				throw UsageError("The given revision is not a valid number");
+        }
         else if (arg.substr(0,13) == "--identifier=")
         	stateIdentifier = arg.substr(13,arg.length());
         else if (arg.substr(0,7) == "--user=")
         	username = arg.substr(7,arg.length());
+        	
         else
             opArgs.push_back(arg);
 

@@ -456,22 +456,45 @@ void Database::splitStatePathRevision(const Path & revisionedStatePath, Path & s
 {
 	string prefix = "-REV-";
 	
-	int pos = revisionedStatePath.find_last_not_of(prefix);
-	statePath = revisionedStatePath.substr(0, pos - prefix.length());
-	//printMsg(lvlError, format("'%1%' '%2%'") % statePath % revisionedStatePath.substr(pos, revisionedStatePath.size()));		 	
-	bool succeed = string2Int(revisionedStatePath.substr(pos, revisionedStatePath.size()), revision);
+	int pos = revisionedStatePath.find_last_of(prefix);
+	statePath = revisionedStatePath.substr(0, pos - prefix.length() + 1);
+	//printMsg(lvlError, format("'%2%' - '%1%'") % revisionedStatePath.substr(pos+1, revisionedStatePath.length()) % int2String(pos));
+	bool succeed = string2Int(revisionedStatePath.substr(pos+1, revisionedStatePath.length()), revision);
 	if(!succeed)
 		throw Error(format("Malformed revision value of path '%1%'") % revisionedStatePath);
 }
 														 
 
+int Database::getNewRevisionNumber(const Transaction & txn, TableId table,
+   	const Path & statePath)
+{
+	//query
+	string data;
+	bool notEmpty = queryString(txn, table, statePath, data);
+	
+	if(!notEmpty){
+		setString(txn, table, statePath, int2String(1));
+		return 1;	
+	}
+	
+	int revision;
+	bool succeed = string2Int(data, revision);
+	if(!succeed)
+		throw Error(format("Malformed revision counter value of path '%1%'") % statePath);
+	
+	revision++;
+	setString(txn, table, statePath, int2String(revision));
+	
+	return revision;
+}
+
 void Database::setStateReferences(const Transaction & txn, TableId table,
-   	const Path & statePath, const int revision, const Strings & references)
+   	const Path & statePath, const Strings & references, int revision)
 {
 	//printMsg(lvlError, format("setStateReferences/Referrers %1%") % table);
 	
 	if(revision == -1)
-		throw Error("-1 is not a valid revision value for SET-references/referrers");
+		revision = getNewRevisionNumber(txn, table, statePath);
 
 	/*
 	for (Strings::const_iterator i = references.begin(); i != references.end(); ++i)
@@ -490,6 +513,31 @@ void Database::setStateReferences(const Transaction & txn, TableId table,
 	setStrings(txn, table, key, references);
 }
 
+bool Database::lookupHighestRevivison(const Strings & keys, const Path & statePath, string & key)
+{
+	int highestRev = -1;
+
+	//Lookup which key we need	
+	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i) {
+		
+		if((*i).substr(0, statePath.length()) != statePath || (*i).length() == statePath.length()) //dont check the new-revision key or other keys
+			continue;
+
+		//printMsg(lvlError, format("'%1%' - '%2%'") % *i % statePath);
+		Path getStatePath;
+		int getRevision;
+		splitStatePathRevision(*i, getStatePath, getRevision);
+		if(getRevision > highestRev)
+			highestRev = getRevision;
+	}
+
+	if(highestRev == -1)	//no records found (TODO throw error?)
+		return false;
+	
+	key = makeStatePathRevision(statePath, highestRev);		//final key that matches revision + statePath
+	return true;	
+}
+
 bool Database::queryStateReferences(const Transaction & txn, TableId table,
    	const Path & statePath, Strings & references, int revision)
 {
@@ -498,6 +546,16 @@ bool Database::queryStateReferences(const Transaction & txn, TableId table,
 	Strings keys;
 	enumTable(txn, table, keys);		//get all revisions
 	
+	string key;
+	if(revision == -1){
+		bool foundsomething = lookupHighestRevivison(keys, statePath, key);
+		if(!foundsomething)
+			return false;
+	}
+	else
+		key = makeStatePathRevision(statePath, revision);
+	
+	/*
 	///////////////?!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! create function
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////	TODO
 	string key = "";					//final key that matches revision + statePath
@@ -529,6 +587,7 @@ bool Database::queryStateReferences(const Transaction & txn, TableId table,
 	
 	if(revision == -1)
 		key = makeStatePathRevision(statePath, highestRev);
+	*/
 
 	return queryStrings(txn, table, key, references);		//now that we have the key, we can query the references
 }
@@ -551,12 +610,32 @@ bool Database::queryStateReferrers(const Transaction & txn, TableId table,
    
 
 void Database::setStateRevisions(const Transaction & txn, TableId table,
-   	const Path & statePath, const int revision, const RevisionNumbersClosure & revisions)
+   	const Path & statePath, const RevisionNumbersSetClosure & revisions, int revision)
 {
+	if(revision == -1)
+		revision = getNewRevisionNumber(txn, table, statePath);
+	
+	//Sort based on statePath to RevisionNumbersClosure
+	RevisionNumbersClosure sorted_revisions;
+	vector<Path> sortedStatePaths;
+	for (RevisionNumbersSetClosure::const_iterator i = revisions.begin(); i != revisions.end(); ++i)
+		sortedStatePaths.push_back((*i).first);
+    sort(sortedStatePaths.begin(), sortedStatePaths.end());
+    for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
+    	sorted_revisions.push_back(revisions.at(*i));
+	
+	//////////////////
+	for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i){
+		printMsg(lvlError, format("Insert: %1%") % *i);
+		for (RevisionNumbers::const_iterator e = (revisions.at(*i)).begin(); e != (revisions.at(*i)).end(); ++e)
+			printMsg(lvlError, format("Rev: %1%") % *e);
+	}
+	//////////////////
+	
 	//Pack the data into Strings
 	const string seperator = "|";
 	Strings data;	
-	for (RevisionNumbersClosure::const_iterator i = revisions.begin(); i != revisions.end(); ++i) {
+	for (RevisionNumbersClosure::const_iterator i = sorted_revisions.begin(); i != sorted_revisions.end(); ++i) {
 		RevisionNumbers revisionNumbers = *i;
 		string packedNumbers = "";
 		for (RevisionNumbers::iterator j = revisionNumbers.begin(); j != revisionNumbers.end(); ++j)
@@ -580,6 +659,16 @@ bool Database::queryStateRevisions(const Transaction & txn, TableId table,
 	Strings keys;
 	enumTable(txn, table, keys);		//get all revisions
 
+	string key;
+	if(revision == -1){
+		bool foundsomething = lookupHighestRevivison(keys, statePath, key);
+		if(!foundsomething)
+			return false;
+	}
+	else
+		key = makeStatePathRevision(statePath, revision);
+		
+	/*
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////	
 	string key = "";					//final key that matches revision + statePath
 	int highestRev = -1;
@@ -610,7 +699,8 @@ bool Database::queryStateRevisions(const Transaction & txn, TableId table,
 	
 	if(revision == -1)
 		key = makeStatePathRevision(statePath, highestRev);
-
+	*/
+	
 	Strings data; 
 	bool succeed = queryStrings(txn, table, key, data);		//now that we have the key, we can query the references
 	
@@ -632,14 +722,28 @@ bool Database::queryStateRevisions(const Transaction & txn, TableId table,
 	return succeed;
 }  
 
-bool Database::queryAllStateRevisions(const Transaction & txn, TableId table,
+//TODO include comments into revisions?
+bool Database::queryAvailableStateRevisions(const Transaction & txn, TableId table,
     const Path & statePath, RevisionNumbers & revisions)
 {
-	//TODO
+	Strings keys;
+	enumTable(txn, table, keys);		//get all revisions
 	
-	//LIST OF x ..... y which revisions are available for a rollback
+	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i) {
 	
-	return false;
+		if((*i).substr(0, statePath.length()) != statePath || (*i).length() == statePath.length()) //dont check the new-revision key or other keys
+			continue;
+
+		Path getStatePath;
+		int getRevision;
+		splitStatePathRevision(*i, getStatePath, getRevision);
+		revisions.push_back(getRevision);
+	}
+    
+    if(revisions.empty())
+    	return false;
+    else
+    	return true;
 }
  
 }

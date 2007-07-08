@@ -474,6 +474,22 @@ void RemoteStore::scanAndUpdateAllReferencesRecusively(const Path & storeOrstate
 	
 }
 
+//TODO
+void RemoteStore::setStateRevisions(const Path & statePath, const RevisionNumbersSetClosure & revisions, const int revision)
+{
+	
+}
 
+//TODO
+bool RemoteStore::queryStateRevisions(const Path & statePath, RevisionNumbersClosure & revisions, const int revision)
+{
+	return false;
+}
+
+//TODO
+bool RemoteStore::queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions)
+{
+	return false;	
+}
 
 }

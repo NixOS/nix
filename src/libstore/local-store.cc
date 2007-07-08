@@ -116,6 +116,13 @@ static TableId dbStateCounters = 0;
 */
 static TableId dbStateInfo = 0;
 
+/* dbStateRevisions :: StatePath -> RevisionNumbersClosure
+
+   This table lists the statepaths + recursive (indirect) references and the revision numbers of their repositorys
+    
+*/
+static TableId dbStateRevisions = 0;
+
 bool Substitute::operator == (const Substitute & sub) const
 {
     return program == sub.program
@@ -189,7 +196,8 @@ LocalStore::LocalStore(bool reserveSpace)
 	dbComponentStateReferrers = nixDB.openTable("referrers_c_s", true);
 	dbStateComponentReferrers = nixDB.openTable("referrers_s_c", true);
 	dbStateStateReferrers = nixDB.openTable("referrers_s_s", true);
-
+	dbStateRevisions = nixDB.openTable("staterevisions", true);
+	
 
     int curSchema = 0;
     Path schemaFN = nixDBPath + "/schema";
@@ -484,8 +492,8 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
 		oldReferences2 = PathSet(oldStateReferences_s_c.begin(), oldStateReferences_s_c.end());
     	oldStateReferences2 = PathSet(oldStateReferences_s_s.begin(), oldStateReferences_s_s.end());
 
-    	nixDB.setStateReferences(txn, dbStateComponentReferences, store_or_statePath, revision, Paths(references.begin(), references.end()));
-		nixDB.setStateReferences(txn, dbStateStateReferences, store_or_statePath, revision, Paths(stateReferences.begin(), stateReferences.end()));
+    	nixDB.setStateReferences(txn, dbStateComponentReferences, store_or_statePath, Paths(references.begin(), references.end()), revision);
+		nixDB.setStateReferences(txn, dbStateStateReferences, store_or_statePath, Paths(stateReferences.begin(), stateReferences.end()), revision);
 		
 		//set vars for the referrers update code below	
 		dbXComponentReferrers = dbStateComponentReferrers;
@@ -1702,6 +1710,8 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
     		allReferencesKeys2.push_back(path);
     }
 
+	//TODO maybe only scan in the changeset (patch) for new references? (this will be difficult and depending on the underlying versioning system)
+
     //Scan in for component and state references
     PathSet state_references = scanForReferences(statePath, PathSet(allReferencesKeys2.begin(), allReferencesKeys2.end()));
     PathSet state_stateReferences = scanForReferences(statePath, PathSet(allStateReferencesKeys.begin(), allStateReferencesKeys.end()));
@@ -1738,6 +1748,7 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
     		printMsg(lvlError, format("Added state reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
 
     //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   	
    	/*
    	Register Valid again if neccesary
    	update the extra references in a new table??? why??? 
@@ -1792,7 +1803,7 @@ void scanAndUpdateAllReferencesRecusively(const Transaction & txn, const Path & 
 	//call scanForAllReferences again on all newly found statePaths
 	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
 	{
-		//... and merge
+		//Scan, update, call recursively
 		PathSet newFoundComponentReferences;
 		PathSet newFoundStateReferences;
 		scanAndUpdateAllReferencesTxn(txn, *i, newFoundComponentReferences, newFoundStateReferences);
@@ -1808,6 +1819,37 @@ void LocalStore::scanAndUpdateAllReferencesRecusively(const Path & storeOrStateP
 {
     return nix::scanAndUpdateAllReferencesRecusively(noTxn, storeOrStatePath);
 }
+
+void setStateRevisions(const Transaction & txn, const Path & statePath, const RevisionNumbersSetClosure & revisions, const int revision)
+{
+	nixDB.setStateRevisions(txn, dbStateRevisions, statePath, revisions, revision);	
+}
+
+void LocalStore::setStateRevisions(const Path & statePath, const RevisionNumbersSetClosure & revisions, const int revision)
+{
+	nix::setStateRevisions(noTxn, statePath, revisions, revision);	
+}
+
+bool queryStateRevisions(const Transaction & txn, const Path & statePath, RevisionNumbersClosure & revisions, const int revision)
+{
+	return nixDB.queryStateRevisions(txn, dbStateRevisions, statePath, revisions, revision);
+}
+
+bool LocalStore::queryStateRevisions(const Path & statePath, RevisionNumbersClosure & revisions, const int revision)
+{
+	return nix::queryStateRevisions(noTxn, statePath, revisions, revision);
+}
+
+bool queryAvailableStateRevisions(const Transaction & txn, const Path & statePath, RevisionNumbers & revisions)
+{
+	 return nixDB.queryAvailableStateRevisions(txn, dbStateRevisions, statePath, revisions);
+}
+
+bool LocalStore::queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions)
+{
+	return nix::queryAvailableStateRevisions(noTxn, statePath, revisions);
+}
+
 
 
 /* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */

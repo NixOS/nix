@@ -222,6 +222,15 @@ public:
 	
 	/* TODO */
 	virtual void scanAndUpdateAllReferencesRecusively(const Path & storeOrstatePath) = 0;
+	
+	/* TODO */
+	virtual void setStateRevisions(const Path & statePath, const RevisionNumbersSetClosure & revisions, const int revision) = 0;
+	
+	/* TODO */
+	virtual bool queryStateRevisions(const Path & statePath, RevisionNumbersClosure & revisions, const int revision) = 0;
+	
+	/* TODO */
+	virtual bool queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions) = 0;
 };
 
 

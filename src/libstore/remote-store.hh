@@ -89,6 +89,12 @@ public:
 	void scanAndUpdateAllReferences(const Path & statePath);
 	
 	void scanAndUpdateAllReferencesRecusively(const Path & storeOrstatePath);
+	
+	void setStateRevisions(const Path & statePath, const RevisionNumbersSetClosure & revisions, const int revision);
+	
+	bool queryStateRevisions(const Path & statePath, RevisionNumbersClosure & revisions, const int revision);
+	
+	bool queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions);
     
 private:
     AutoCloseFD fdSocket;
