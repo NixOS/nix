@@ -196,9 +196,8 @@ LocalStore::LocalStore(bool reserveSpace)
 	dbComponentStateReferrers = nixDB.openTable("referrers_c_s", true);
 	dbStateComponentReferrers = nixDB.openTable("referrers_s_c", true);
 	dbStateStateReferrers = nixDB.openTable("referrers_s_s", true);
-	dbStateRevisions = nixDB.openTable("staterevisions", true);
+	dbStateRevisions = nixDB.openTable("staterevisions");
 	
-
     int curSchema = 0;
     Path schemaFN = nixDBPath + "/schema";
     if (pathExists(schemaFN)) {

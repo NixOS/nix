@@ -237,11 +237,14 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 		return;	
 	}
 	
-	string revisions_txt="";
+	//Sort ourselfes to create a nice output
+	vector<int> revisions_sort;
 	for (RevisionNumbers::iterator i = revisions.begin(); i != revisions.end(); ++i)
-	{
+		revisions_sort.push_back(*i);
+	sort(revisions_sort.begin(), revisions_sort.end());
+	string revisions_txt="";
+	for (vector<int>::iterator i = revisions_sort.begin(); i != revisions_sort.end(); ++i)
 		revisions_txt += int2String(*i) + " ";
-	}	
 	printMsg(lvlError, format("Available Revisions: %1%") % revisions_txt);
 }
 
@@ -282,7 +285,10 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
 		p_args.push_back(nixSVNPath + "/svn");
 		p_args.push_back(int2String(revision_arg));
 		p_args.push_back("file://" + repos);
+		p_args.push_back(statePath);
 		string output = runProgram(nixLibexecDir + "/nix/nix-restorerevision.sh", true, p_args);	//run
+		
+		printMsg(lvlError, format("Reverted statePath '%1%' to revision: %2%") % statePath % int2String(revision_arg));
 	} 
 }
 
@@ -570,9 +576,12 @@ void run(Strings args)
 			op = opShowDerivations;
 		else if (arg == "--showrevisions")
 			op = queryAvailableStateRevisions;
-		else if (arg.substr(0,21) == "--revert-to-revision=")
+		else if (arg.substr(0,21) == "--revert-to-revision="){
 			op = revertToRevision;
-		
+			bool succeed = string2Int(arg.substr(21,arg.length()), revision_arg);
+			if(!succeed)
+				throw UsageError("The given revision is not a valid number");
+		}
 
         /*
 		
@@ -604,11 +613,6 @@ void run(Strings args)
 		
         */
         
-        else if (arg.substr(0,21) == "--revert-to-revision="){
-			bool succeed = string2Int(arg.substr(21,arg.length()), revision_arg);
-			if(!succeed)
-				throw UsageError("The given revision is not a valid number");
-        }
         else if (arg.substr(0,13) == "--identifier=")
         	stateIdentifier = arg.substr(13,arg.length());
         else if (arg.substr(0,7) == "--user=")
