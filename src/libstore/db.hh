@@ -63,10 +63,6 @@ private:
     /* TODO */
     bool lookupHighestRevivison(const Strings & keys, const Path & statePath, string & key, int lowerthan = -1);
     
-    /* TODO */
-    int getNewRevisionNumber(const Transaction & txn, TableId table, const Path & statePath);
-    
-    
 public:
     Database();
     ~Database();
@@ -126,6 +122,10 @@ public:
     /* Returns all available revision numbers of the given state path */
     bool queryAvailableStateRevisions(const Transaction & txn, TableId table,
     	const Path & statePath, RevisionNumbers & revisions);	
+   
+    /* TODO */
+    int getNewRevisionNumber(const Transaction & txn, TableId table, const Path & statePath, bool update = true);
+    
 };
 
 

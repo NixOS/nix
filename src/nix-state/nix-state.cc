@@ -10,7 +10,6 @@
 #include "help.txt.hh"
 #include "local-store.hh"
 #include "derivations.hh"
-#include "store-api.hh"			//TODO REMOVE
 
 using namespace nix;
 using std::cin;
@@ -23,6 +22,7 @@ typedef void (* Operation) (Strings opFlags, Strings opArgs);
 string stateIdentifier;
 string username;
 int revision_arg;
+bool scanforReferences = false;
 
 
 /************************* Build time Functions ******************************/
@@ -346,7 +346,8 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
   		
 	//******************* With everything in place, we call the commit script on all statePaths **********************
 	
-	RevisionNumbersSet rivisionMapping; 
+	PathSet statePaths;
+	RevisionNumbersSet rivisionMapping;
 	
 	for (PathSet::iterator d = root_drvs.begin(); d != root_drvs.end(); ++d)		//TODO first commit own state path?
 	{
@@ -378,7 +379,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 				intervalPaths.insert(fullstatedir);
 			}
 		}
-		vector<int> intervals = store->getStatePathsInterval(intervalPaths);
+		vector<int> intervals = store->getStatePathsInterval(intervalPaths);		//TODO !!!!!!!!!!!!! txn ??
 		
 		int intervalAt=0;	
 		for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
@@ -446,22 +447,33 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		runProgram_AndPrintOutput(nixLibexecDir + "/nix/nix-statecommit.sh", true, p_args, "svn");
 	    
 	    //Update the intervals again	
-		//store->setStatePathsInterval(intervalPaths, intervals);		//TODO!!!!!!!!!!!!!!!!!!!!!! uncomment
+		//store->setStatePathsInterval(intervalPaths, intervals);		//TODO!!!!!!!!!!!!!!!!!!!!!! uncomment and txn ??
 	    
-	   	//TODO
-	   	//Scan if needed		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! needs a new revision number
-	   	if(false)
-	   		store->scanAndUpdateAllReferencesRecusively(statePath);
-		   	
+		statePaths.insert(statePath);							//Insert StatePath  	
 		rivisionMapping[statePath] = readRevisionNumber(drv);	//Get current numbers
 	}
 	
-	//Store the revision numbers in the database for this statePath to a new revision
-	store->setStateRevisions(root_statePath, rivisionMapping, -1);
+	//1.NEW TRANSACTION
+	//TODO
+
+	//Get new revision number
+	int newRevisionNumber = store->getNewRevisionNumber(root_statePath);
 	
+	//Scan for new references, and update with revision number
+   	if(scanforReferences){
+   		for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
+  			store->scanAndUpdateAllReferences(*i, newRevisionNumber, true);
+   	}
+	
+	//Store the revision numbers in the database for this statePath with revision number
+	store->setStateRevisions(root_statePath, rivisionMapping, newRevisionNumber);
+	
+	//4. COMMIT
+	//TODO
+
+	//Debugging	
 	RevisionNumbers getRivisions;
 	bool b = store->queryStateRevisions(root_statePath, getRivisions, -1);
-	
 	for (RevisionNumbers::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
 		printMsg(lvlError, format("REV %1%") % int2String(*i));
 	}
@@ -629,6 +641,8 @@ void run(Strings args)
 		
         */
         
+        else if (arg == "--scanreferences")
+        	scanforReferences = true;        
         else if (arg.substr(0,13) == "--identifier=")
         	stateIdentifier = arg.substr(13,arg.length());
         else if (arg.substr(0,7) == "--user=")

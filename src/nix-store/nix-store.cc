@@ -211,8 +211,8 @@ static void printTree(const Path & path,
 
     cout << format("%1%%2%\n") % firstPad % path;
 
-    PathSet references;
-    store->queryReferences(path, references, -1);											//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Adjust printTree, include state paths!
+    PathSet allReferences;
+    store->queryAllReferences(path, allReferences, -1);
     
 #if 0     
     for (PathSet::iterator i = drv.inputSrcs.begin();
@@ -224,7 +224,7 @@ static void printTree(const Path & path,
        closure(B).  That is, if derivation A is an (possibly indirect)
        input of B, then A is printed first.  This has the effect of
        flattening the tree, preventing deeply nested structures.  */
-    Paths sorted = topoSortPaths(references);
+    Paths sorted = topoSortPaths(allReferences);
     reverse(sorted.begin(), sorted.end());
 
     for (Paths::iterator i = sorted.begin(); i != sorted.end(); ++i) {
@@ -362,7 +362,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             }
             break;
 
-        case qTree: {			//TODO include state path?
+        case qTree: {
             PathSet done;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)

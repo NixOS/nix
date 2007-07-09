@@ -87,6 +87,8 @@ public:
        The result is not cleared. */
     virtual void queryStateReferences(const Path & storePath, PathSet & stateReferences, const int revision) = 0;
 
+	virtual void queryAllReferences(const Path & path, PathSet & allReferences, const int revision) = 0;
+
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
     virtual void queryReferrers(const Path & path,
@@ -218,10 +220,7 @@ public:
 	virtual void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision) = 0;
 
 	/* TODO */
-	virtual void scanAndUpdateAllReferences(const Path & statePath) = 0;
-	
-	/* TODO */
-	virtual void scanAndUpdateAllReferencesRecusively(const Path & storeOrstatePath) = 0;
+	virtual void scanAndUpdateAllReferences(const Path & statePath, const int revision, bool recursive) = 0;
 	
 	/* TODO */
 	virtual void setStateRevisions(const Path & statePath, const RevisionNumbersSet & revisions, const int revision) = 0;
@@ -231,6 +230,9 @@ public:
 	
 	/* TODO */
 	virtual bool queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions) = 0;
+	
+	/* TODO */
+	virtual int getNewRevisionNumber(const Path & statePath, bool update = true) = 0;
 };
 
 

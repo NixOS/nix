@@ -466,7 +466,7 @@ void Database::splitStatePathRevision(const Path & revisionedStatePath, Path & s
 														 
 
 int Database::getNewRevisionNumber(const Transaction & txn, TableId table,
-   	const Path & statePath)
+   	const Path & statePath, bool update)
 {
 	//query
 	string data;
@@ -482,8 +482,10 @@ int Database::getNewRevisionNumber(const Transaction & txn, TableId table,
 	if(!succeed)
 		throw Error(format("Malformed revision counter value of path '%1%'") % statePath);
 	
-	revision++;
-	setString(txn, table, statePath, int2String(revision));
+	if(update){
+		revision++;
+		setString(txn, table, statePath, int2String(revision));
+	}
 	
 	return revision;
 }

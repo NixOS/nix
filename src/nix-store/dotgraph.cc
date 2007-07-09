@@ -111,11 +111,12 @@ void printDotGraph(const PathSet & roots)
 
         cout << makeNode(path, symbolicName(path), "#ff0000");
         
-        PathSet references;
-        store->queryReferences(path, references, -1);					//TODO maybe also include state paths?
+        PathSet allReferences;
+    	store->queryAllReferences(path, allReferences, -1);
+        
 
-        for (PathSet::iterator i = references.begin();
-             i != references.end(); ++i)
+        for (PathSet::iterator i = allReferences.begin();
+             i != allReferences.end(); ++i)
         {
             if (*i != path) {
                 workList.insert(*i);

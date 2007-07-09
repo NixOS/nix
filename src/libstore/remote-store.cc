@@ -238,6 +238,12 @@ void RemoteStore::queryStateReferences(const Path & path,
 }
 
 
+void RemoteStore::queryAllReferences(const Path & path, 
+     PathSet & allReferences, const int revision)
+{
+     //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+     	
+}
 
 void RemoteStore::queryReferrers(const Path & path,
     PathSet & referrers, const int revision)
@@ -463,13 +469,7 @@ void RemoteStore::storePathRequisites(const Path & storeOrstatePath, const bool 
 }
 
 //TODO
-void RemoteStore::scanAndUpdateAllReferences(const Path & statePath)
-{
-	
-}
-
-//TODO	
-void RemoteStore::scanAndUpdateAllReferencesRecusively(const Path & storeOrstatePath)
+void RemoteStore::scanAndUpdateAllReferences(const Path & statePath, const int revision, bool recursive)
 {
 	
 }
@@ -490,6 +490,12 @@ bool RemoteStore::queryStateRevisions(const Path & statePath, RevisionNumbers & 
 bool RemoteStore::queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions)
 {
 	return false;	
+}
+
+//TODO
+int RemoteStore::getNewRevisionNumber(const Path & statePath, bool update)
+{
+	return 0;	
 }
 
 }

@@ -532,7 +532,7 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
 }
 
 
-void queryReferences(const Transaction & txn,
+void queryReferencesTxn(const Transaction & txn,
     const Path & store_or_statePath, PathSet & references, const int revision)
 {
     Paths references2;
@@ -551,10 +551,10 @@ void queryReferences(const Transaction & txn,
 void LocalStore::queryReferences(const Path & storePath,
     PathSet & references, const int revision)
 {
-    nix::queryReferences(noTxn, storePath, references, revision);
+    nix::queryReferencesTxn(noTxn, storePath, references, revision);
 }
 
-void queryStateReferences(const Transaction & txn,
+void queryStateReferencesTxn(const Transaction & txn,
     const Path & store_or_statePath, PathSet & stateReferences, const int revision)
 {
     Paths stateReferences2;
@@ -571,7 +571,22 @@ void queryStateReferences(const Transaction & txn,
 
 void LocalStore::queryStateReferences(const Path & componentOrstatePath, PathSet & stateReferences, const int revision)
 {
-    nix::queryStateReferences(noTxn, componentOrstatePath, stateReferences, revision);
+    nix::queryStateReferencesTxn(noTxn, componentOrstatePath, stateReferences, revision);
+}
+
+void queryAllReferencesTxn(const Transaction & txn, const Path & path, PathSet & allReferences, const int revision)
+{
+	PathSet references;
+    PathSet stateReferences;
+    queryReferencesTxn(txn, path, references, revision);
+    queryStateReferencesTxn(txn, path, stateReferences, revision);
+    allReferences = pathSets_union(references, stateReferences);
+}
+
+//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! make 1 function with 2 bools (component=t/f state=t/f) and 3 Pathsets (component, state, all)
+void LocalStore::queryAllReferences(const Path & path, PathSet & allReferences, const int revision)
+{
+	queryAllReferencesTxn(noTxn, path, allReferences, revision);
 }
 
 void queryReferrers(const Transaction & txn,
@@ -649,16 +664,21 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
 	
 }
 
-bool isStateComponentTxn(const Transaction & txn, const Path & storePath)
+
+//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! remove this entire function, replace by isValidStatePathTxn
+bool isStateComponentTxn(const Transaction & txn, const Path & statePath)
 {
-	isValidPathTxn(txn, storePath);
+	//return isValidStatePathTxn(txn, statePath);
+	
+	
 	string data;
-	return	nixDB.queryString(txn, dbStateInfo, storePath, data);							
+	return nixDB.queryString(txn, dbStateInfo, statePath, data);
+								
 }
 
-bool LocalStore::isStateComponent(const Path & storePath)
+bool LocalStore::isStateComponent(const Path & statePath)
 {
-    return nix::isStateComponentTxn(noTxn, storePath);
+    return nix::isStateComponentTxn(noTxn, statePath);
 }
 
 
@@ -1128,7 +1148,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
     writeString(path, hashAndWriteSink);
     
     PathSet references;
-    nix::queryReferences(txn, path, references, -1);		//TODO we can only now export the final revision
+    nix::queryReferencesTxn(txn, path, references, -1);		//TODO we can only now export the final revision
     writeStringSet(references, hashAndWriteSink);
 
     Path deriver = queryDeriver(txn, path);
@@ -1410,7 +1430,7 @@ void verifyStore(bool checkContents)
         else {
             bool isValid = validPaths.find(*i) != validPaths.end();
             PathSet references;
-            queryReferences(txn, *i, references, -1);				//TODO
+            queryReferencesTxn(txn, *i, references, -1);				//TODO
             for (PathSet::iterator j = references.begin();
                  j != references.end(); ++j)
             {
@@ -1459,10 +1479,10 @@ void verifyStore(bool checkContents)
         
         else {
             PathSet references;
-            queryReferences(txn, from, references, -1);			//TODO
+            queryReferencesTxn(txn, from, references, -1);			//TODO
 
             PathSet stateReferences;								//already a stateReferrers here!
-            queryStateReferences(txn, from, stateReferences, -1);		//TODO CHECK FOR ALL REVISIONS !
+            queryStateReferencesTxn(txn, from, stateReferences, -1);		//TODO CHECK FOR ALL REVISIONS !
             
             if (find(references.begin(), references.end(), to) == references.end()) {
                 printMsg(lvlError, format("adding missing referrer mapping from `%1%' to `%2%'") % from % to);
@@ -1508,11 +1528,9 @@ void LocalStore::setStatePathsInterval(const PathSet & statePaths, const vector<
     nix::setStatePathsInterval(statePaths, intervals, allZero);
 }
 
-vector<int> getStatePathsInterval(const PathSet & statePaths)
+vector<int> getStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePaths)
 {
 
-	Transaction txn(nixDB);			//TODO should u do a transaction here? ... this might delay the process ...
-	
 	string data;
 	Paths referers;
 	
@@ -1531,14 +1549,13 @@ vector<int> getStatePathsInterval(const PathSet & statePaths)
     	intervals.push_back(n);
     
     }        
-    txn.commit();
 
     return intervals;
 }
 
 vector<int> LocalStore::getStatePathsInterval(const PathSet & statePaths)
 {
-    return nix::getStatePathsInterval(statePaths);
+    return nix::getStatePathsIntervalTxn(noTxn, statePaths);
 }
 
  
@@ -1671,11 +1688,11 @@ void getDependenciesAtBuildTime(const Transaction & txn, const Path & drvPath)
 //TODO include this call in the validate function
 //TODO ONLY CALL THIS FUNCTION ON A NON-SHARED STATE PATH!!!!!!!!!!!
 void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePath
-								, PathSet & newFoundComponentReferences, PathSet & newFoundStateReferences) //only for recursion
+								, PathSet & newFoundComponentReferences, PathSet & newFoundStateReferences, const int revision) //only for recursion
 {
 	//Check if is a state Path
 	if(! isStateComponentTxn(txn, statePath))
-		throw Error(format("This path '%1%' is not a state path") % statePath);
+		throw Error(format("This path '%1%' is not a state path 1") % statePath);
 	
 	//TODO check if path is not a shared path !
 	//TODO
@@ -1718,8 +1735,8 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
     //Retrieve old references
     PathSet old_references;
     PathSet old_state_references;
-    queryReferences(txn, statePath, old_references, -1);				//get the latsest references
-    queryStateReferences(txn, statePath, old_state_references, -1);		
+    queryReferencesTxn(txn, statePath, old_references, -1);				//get the latsest references
+    queryStateReferencesTxn(txn, statePath, old_state_references, -1);		
     
     //Check for added and removed paths
 	PathSet diff_references_removed;
@@ -1746,30 +1763,7 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
     	for (PathSet::iterator i = diff_state_references_added.begin(); i != diff_state_references_added.end(); ++i)
     		printMsg(lvlError, format("Added state reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
 
-    //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-   	
-   	/*
-   	Register Valid again if neccesary
-   	
-	Update the 2 references tables:	all state paths get: Path statepath --> List(int revnumber, List(References))
-	TODO EDIT TABLES references,references_state,referrers,referrers_state 
-	
-	New table stateRevisionClosure: Path StatePath + int revision --> List(int revnumbers)	
-															
-	A1(STATEPATH) 		  --> UPDATE ALL STATE REFERENCES IN DB			(TRANSACTION)
-	A2(STATEPATH [+ REV]) --> GIVE ALL STATE REFERENCES IN DB
-	
-	B1(STATEPATH) 		  --> SCAN ALL REFERENCES IN DB, LINK TO REVISION NUMBERS (WITH CALL TO A2)		(TRANSACTION)
-	B2(STATEPATH [+ REV]) --> GIVES ALL REFERENCES
-	
-	
-	
-	//update all revision numbers					(transaction)		NEW FUN THAT UPDATES THE REVISIONS
-	//update all revision numbers + references		(transaction)
-	//update all references
-	*/
-	
-   	/*
+	//Finally register the paths valid with a new revision number
    	if(diff_references_added.size() != 0 || diff_state_references_added.size() != 0){
 	   	printMsg(lvlError, format("Updating new references for statepath: '%1%'")% statePath);
 	   	Path drvPath = queryStatePathDrv(txn, statePath);
@@ -1778,18 +1772,12 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
 	    		Hash(),				//emtpy hash
 	    		state_references,
 	    		state_stateReferences,
-	    		drvPath
-	    		);
-	}*/
+	    		drvPath,
+	    		revision);
+	}
 }
 
-void LocalStore::scanAndUpdateAllReferences(const Path & statePath)
-{
-	PathSet empty;
-    return nix::scanAndUpdateAllReferencesTxn(noTxn, statePath, empty, empty);
-}
-
-void scanAndUpdateAllReferencesRecusively(const Transaction & txn, const Path & storeOrStatePath)		//TODO Can also work for statePaths???
+void scanAndUpdateAllReferencesRecusively(const Transaction & txn, const Path & storeOrStatePath, const int revision)		//TODO Can also work for statePaths???
 {
 	//get all state current state references recursively
 	PathSet statePaths;
@@ -1801,48 +1789,71 @@ void scanAndUpdateAllReferencesRecusively(const Transaction & txn, const Path & 
 		//Scan, update, call recursively
 		PathSet newFoundComponentReferences;
 		PathSet newFoundStateReferences;
-		scanAndUpdateAllReferencesTxn(txn, *i, newFoundComponentReferences, newFoundStateReferences);
+		scanAndUpdateAllReferencesTxn(txn, *i, newFoundComponentReferences, newFoundStateReferences, revision);
 		PathSet allNewReferences = pathSets_union(newFoundComponentReferences, newFoundStateReferences);
 		
 		//Call the function recursively again on all newly found references											//TODO test if this doesnt go into an infinite loop
 		for (PathSet::iterator j = allNewReferences.begin(); j != allNewReferences.end(); ++j)
-			scanAndUpdateAllReferencesRecusively(txn, *j);
+			scanAndUpdateAllReferencesRecusively(txn, *j, revision);
 	}
 }
 
-void LocalStore::scanAndUpdateAllReferencesRecusively(const Path & storeOrStatePath)
+void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & storeOrStatePath, const int revision, bool recursive)
 {
-    return nix::scanAndUpdateAllReferencesRecusively(noTxn, storeOrStatePath);
+   if(recursive)
+    	nix::scanAndUpdateAllReferencesRecusively(txn, storeOrStatePath, revision);
+    else{
+    	
+    	//TODO check if storeOrStatePath is a statePath, else throw error
+    	
+    	PathSet empty;
+    	nix::scanAndUpdateAllReferencesTxn(txn, storeOrStatePath, empty, empty, revision);
+    }
 }
 
-void setStateRevisions(const Transaction & txn, const Path & statePath, const RevisionNumbersSet & revisions, const int revision)
+void LocalStore::scanAndUpdateAllReferences(const Path & storeOrStatePath, const int revision, bool recursive)
+{
+	nix::scanAndUpdateAllReferencesTxn(noTxn, storeOrStatePath, revision, recursive); 
+}
+
+void setStateRevisionsTxn(const Transaction & txn, const Path & statePath, const RevisionNumbersSet & revisions, const int revision)
 {
 	nixDB.setStateRevisions(txn, dbStateRevisions, statePath, revisions, revision);	
 }
 
 void LocalStore::setStateRevisions(const Path & statePath, const RevisionNumbersSet & revisions, const int revision)
 {
-	nix::setStateRevisions(noTxn, statePath, revisions, revision);	
+	nix::setStateRevisionsTxn(noTxn, statePath, revisions, revision);	
 }
 
-bool queryStateRevisions(const Transaction & txn, const Path & statePath, RevisionNumbers & revisions, const int revision)
+bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionNumbers & revisions, const int revision)
 {
 	return nixDB.queryStateRevisions(txn, dbStateRevisions, statePath, revisions, revision);
 }
 
 bool LocalStore::queryStateRevisions(const Path & statePath, RevisionNumbers & revisions, const int revision)
 {
-	return nix::queryStateRevisions(noTxn, statePath, revisions, revision);
+	return nix::queryStateRevisionsTxn(noTxn, statePath, revisions, revision);
 }
 
-bool queryAvailableStateRevisions(const Transaction & txn, const Path & statePath, RevisionNumbers & revisions)
+bool queryAvailableStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionNumbers & revisions)
 {
 	 return nixDB.queryAvailableStateRevisions(txn, dbStateRevisions, statePath, revisions);
 }
 
 bool LocalStore::queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions)
 {
-	return nix::queryAvailableStateRevisions(noTxn, statePath, revisions);
+	return nix::queryAvailableStateRevisionsTxn(noTxn, statePath, revisions);
+}
+
+int getNewRevisionNumberTxn(const Transaction & txn, const Path & statePath, const bool update)
+{
+	 return nixDB.getNewRevisionNumber(txn, dbStateRevisions, statePath, update);
+}
+
+int LocalStore::getNewRevisionNumber(const Path & statePath, bool update)
+{
+	return nix::getNewRevisionNumberTxn(noTxn, statePath, update);
 }
 
 
@@ -1916,7 +1927,7 @@ static void upgradeStore07()
                 }
 
                 PathSet prevReferences;
-                queryReferences(txn, path, prevReferences, -1);
+                queryReferencesTxn(txn, path, prevReferences, -1);
                 if (prevReferences.size() > 0 && references != prevReferences)
                     printMsg(lvlError, format("warning: conflicting references for `%1%'") % path);
 

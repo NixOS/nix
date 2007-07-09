@@ -43,6 +43,8 @@ public:
 
 	void queryStateReferences(const Path & storePath, PathSet & stateReferences, const int revision);
 
+	void queryAllReferences(const Path & path, PathSet & allReferences, const int revision);
+
     void queryReferrers(const Path & path, PathSet & referrers, const int revision);
     
     void queryStateReferrers(const Path & path, PathSet & stateReferrers, const int revision);
@@ -86,15 +88,15 @@ public:
 	
 	void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision);
 
-	void scanAndUpdateAllReferences(const Path & statePath);
-	
-	void scanAndUpdateAllReferencesRecusively(const Path & storeOrstatePath);
+	void scanAndUpdateAllReferences(const Path & statePath, const int revision, bool recursive);
 	
 	void setStateRevisions(const Path & statePath, const RevisionNumbersSet & revisions, const int revision);
 	
 	bool queryStateRevisions(const Path & statePath, RevisionNumbers & revisions, const int revision);
 	
 	bool queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions);
+	
+	int getNewRevisionNumber(const Path & statePath, bool update = true);
     
 private:
     AutoCloseFD fdSocket;
