@@ -145,7 +145,7 @@ do
       if [ "${subversionedpathsCommitBools[$i]}" = "true" ]; then				#Check if we need to commit this folder
           echo "Entering $path"
 		  
-		  if ! test -d "${path}/.svn/"; then									#Also add yourself if nessecary
+		  if ! test -d "${path}/.svn/"; then									#Dir: Also add yourself if nessecary
 		  	  if [ "$deletesvn" != "1" ]; then									
 				$debug svn -N add $path										
 			  fi
@@ -157,6 +157,19 @@ do
       cd - &> /dev/null;
       let "i+=1"
    fi
+
+   if test -f $path; then														#if its a file, see if it needs to be added
+	   
+	   if [ "${subversionedpathsCommitBools[$i]}" = "true" ]; then				#Check if we need to commit this file
+	   
+		   alreadyversioned=$(svn -N stat $path )
+		   if [ "$alreadyversioned" != "" ]; then
+  			    echo "Subversioning $path"
+		   		$debug svn add $path	
+		   fi
+	   fi
+   fi
+   
 done
 
 cd $statepath																	#now that everything is added we go back to the 'root' path and commit

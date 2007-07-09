@@ -69,8 +69,13 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 		DerivationStateOutputDir d = i->second;
 
 		string thisdir = d.path;
+		
+		//Check if it is a file
+		if(thisdir.substr(thisdir.length() -1 , thisdir.length()) != "/")
+			continue;
+		
 		Path fullstatedir = stateDir + "/" + thisdir;
-				
+		
 		Strings p_args;
 		p_args.push_back("-p");
 		p_args.push_back(fullstatedir);

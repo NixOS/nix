@@ -61,7 +61,7 @@ private:
     void open2(const string & path, bool removeOldEnv);
     
     /* TODO */
-    bool lookupHighestRevivison(const Strings & keys, const Path & statePath, string & key);
+    bool lookupHighestRevivison(const Strings & keys, const Path & statePath, string & key, int lowerthan = -1);
     
     /* TODO */
     int getNewRevisionNumber(const Transaction & txn, TableId table, const Path & statePath);

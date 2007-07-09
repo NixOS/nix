@@ -513,7 +513,7 @@ void Database::setStateReferences(const Transaction & txn, TableId table,
 	setStrings(txn, table, key, references);
 }
 
-bool Database::lookupHighestRevivison(const Strings & keys, const Path & statePath, string & key)
+bool Database::lookupHighestRevivison(const Strings & keys, const Path & statePath, string & key, int lowerthan)
 {
 	int highestRev = -1;
 
@@ -527,8 +527,15 @@ bool Database::lookupHighestRevivison(const Strings & keys, const Path & statePa
 		Path getStatePath;
 		int getRevision;
 		splitStatePathRevision(*i, getStatePath, getRevision);
-		if(getRevision > highestRev)
-			highestRev = getRevision;
+		if(getRevision > highestRev){
+		
+			if(lowerthan != -1){
+				if(getRevision <= lowerthan)			//if we have an uppper limit, see to it that we downt go over it
+					highestRev = getRevision;
+			}
+			else
+				highestRev = getRevision;
+		}
 	}
 
 	if(highestRev == -1)	//no records found (TODO throw error?)
@@ -546,7 +553,7 @@ bool Database::queryStateReferences(const Transaction & txn, TableId table,
 	Strings keys;
 	enumTable(txn, table, keys);		//get all revisions
 	
-	//Check if this revision exists key in the table
+	//Check if this revision exists key in the table, if it doesnt well find the highest key lower than it
 	string key = makeStatePathRevision(statePath, revision);
 	bool found = false;
 	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i) {
@@ -554,9 +561,14 @@ bool Database::queryStateReferences(const Transaction & txn, TableId table,
 			found = true;
 	}
 	
-	key = "";	//reset
-	if(revision == -1 || (!found)){
+	key = "";
+	if(revision == -1){
 		bool foundsomething = lookupHighestRevivison(keys, statePath, key);
+		if(!foundsomething)
+			return false;
+	}
+	else if(!found){
+		bool foundsomething = lookupHighestRevivison(keys, statePath, key, -1);
 		if(!foundsomething)
 			return false;
 	}
