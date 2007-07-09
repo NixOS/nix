@@ -573,13 +573,11 @@ bool Database::queryStateReferences(const Transaction & txn, TableId table,
 		bool foundsomething = lookupHighestRevivison(keys, statePath, key, -1);
 		if(!foundsomething)
 			return false;
+		//printMsg(lvlError, format("Warning: References for revision '%1%' not was not found, so taking the highest rev-key possible for statePath '%2%'") % revision % statePath);
 	}
 	else
 		key = makeStatePathRevision(statePath, revision);
 		
-	if(!found)
-		printMsg(lvlError, format("Warning: References for revision '%1%' not was not found, so taking the highest rev-key possible for statePath '%2%'") % revision % statePath);
-	
 		
 	return queryStrings(txn, table, key, references);		//now that we have the key, we can query the references
 }
@@ -607,10 +605,11 @@ void Database::setStateRevisions(const Transaction & txn, TableId table,
     for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
     	sorted_revisions.push_back(revisions.at(*i));
 	
-	//////////////////
+	//Debugging
+	/*
 	for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
 		printMsg(lvlError, format("Insert: %1% into %2%") % int2String(revisions.at(*i)) % *i);
-	//////////////////
+	*/
 	
 	//Convert the int's into Strings
 	Strings data;

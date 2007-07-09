@@ -456,13 +456,18 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	//1.NEW TRANSACTION
 	//TODO
 
+	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! only update the root with newRevisionNumber, the rest with the value from rivisionMapping !!!!!!!!!!!!!!!!!!!!!!!!!!
+
 	//Get new revision number
 	int newRevisionNumber = store->getNewRevisionNumber(root_statePath);
 	
 	//Scan for new references, and update with revision number
    	if(scanforReferences){
-   		for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
-  			store->scanAndUpdateAllReferences(*i, newRevisionNumber, true);
+   		/*
+   		for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)		//fails ....
+  			store->scanAndUpdateAllReferences(*i, newRevisionNumber, false);
+  		*/
+  		store->scanAndUpdateAllReferences(root_statePath, newRevisionNumber, true);		//goes recursive
    	}
 	
 	//Store the revision numbers in the database for this statePath with revision number
@@ -471,12 +476,14 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	//4. COMMIT
 	//TODO
 
-	//Debugging	
+	//Debugging
+	/*	
 	RevisionNumbers getRivisions;
 	bool b = store->queryStateRevisions(root_statePath, getRivisions, -1);
 	for (RevisionNumbers::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
 		printMsg(lvlError, format("REV %1%") % int2String(*i));
 	}
+	*/
 	
 }
 

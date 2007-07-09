@@ -134,6 +134,7 @@ PathSet scanForReferences(const string & path, const PathSet & paths)
             throw Error(format("bad reference `%1%'") % *i);
         string s = string(baseName, 0, pos);
         assert(s.size() == refLength);
+		//printMsg(lvlError, format("BACKMAP[%1%] = '%2%'") % s % *i);
         assert(backMap.find(s) == backMap.end());
         // parseHash(htSHA256, s);
         ids.insert(s);
