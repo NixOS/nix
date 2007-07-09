@@ -446,7 +446,7 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
     if (references.size() > 0 && !isRealisableComponentOrStatePath(txn, store_or_statePath))
         throw Error(format("cannot set references for path `%1%' which is invalid and has no substitutes") % store_or_statePath);
 	
-	printMsg(lvlError, format("Setting references for %1%") % store_or_statePath);
+	printMsg(lvlError, format("Setting references for %1% (revision:%2%)") % store_or_statePath % int2String(revision));
 	for (PathSet::iterator i = references.begin(); i != references.end(); ++i)
     	printMsg(lvlError, format("'%2%' has references: %1%") % *i % store_or_statePath);
     for (PathSet::iterator i = stateReferences.begin(); i != stateReferences.end(); ++i)
@@ -1598,8 +1598,6 @@ PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, 
 */
 void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision)
 {
-    //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
     computeFSClosure(storeOrstatePath, paths, withComponents, withState, revision);
 
     if (includeOutputs) {
@@ -1752,10 +1750,7 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
    	
    	/*
    	Register Valid again if neccesary
-   	update the extra references in a new table??? why??? 
-	(remember we need to keep the old as the basis, and things can change, the db is not consistent anymore then ....)
-	But we also dont want useless refereces ......
-	
+   	
 	Update the 2 references tables:	all state paths get: Path statepath --> List(int revnumber, List(References))
 	TODO EDIT TABLES references,references_state,referrers,referrers_state 
 	
@@ -1783,9 +1778,9 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
 	    		Hash(),				//emtpy hash
 	    		state_references,
 	    		state_stateReferences,
-	    		drvPath);
-	}
-	*/
+	    		drvPath
+	    		);
+	}*/
 }
 
 void LocalStore::scanAndUpdateAllReferences(const Path & statePath)

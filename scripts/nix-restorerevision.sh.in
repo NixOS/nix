@@ -10,6 +10,4 @@ if [ "$#" != 4 ] ; then
   exit 1;
 fi
 
-cd $statepath
-$svnbin merge -r HEAD:$torevision $repos
-cd -
+$svnbin merge -r HEAD:$torevision $repos $statepath

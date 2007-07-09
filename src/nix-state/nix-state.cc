@@ -260,36 +260,51 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
     
     bool recursive = true;	//TODO !!!!!!!!!!!!!!!!!
     
-    //Insert the direct statePath or all recursive statePaths into the list
     PathSet drvs;
-    if(recursive)	
+    if(recursive)
     	drvs = getAllStateDerivationsRecursively(componentPath, revision_arg); //get dependecies (if neccecary | recusively) of all state components that need to be updated
     else
-    	drvs.insert(derivationPath);
+		drvs.insert(derivationPath);	//Insert direct state path    	
     
-    //Revert each statePath in the list
-   	for (PathSet::iterator d = drvs.begin(); d != drvs.end(); ++d)
+    //Get the revisions recursively to also roll them back
+    RevisionNumbers getRivisions;
+	bool b = store->queryStateRevisions(statePath, getRivisions, revision_arg);
+    
+    //Sort the statePaths from all drvs
+	map<Path, string> state_repos;
+	vector<Path> sorted_paths;
+    for (PathSet::iterator d = drvs.begin(); d != drvs.end(); ++d)
 	{
     	Path drvPath = *d;
        	Derivation drv = derivationFromPath(drvPath);
        	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
     	Path statePath = stateOutputs.find("state")->second.statepath;
-	    string drvName = drv.env.find("name")->second; 
-    	
-    	RevisionNumbers getRivisions;
-		bool b = store->queryStateRevisions(statePath, getRivisions, revision_arg);
-		
+    	string drvName = drv.env.find("name")->second; 
 		string repos = getStateReposPath("stateOutput:staterepospath", statePath, drvName, stateIdentifier);		//this is a copy from store-state.cc
 		
+		state_repos[statePath] = repos; 
+		sorted_paths.push_back(statePath);
+	}
+	sort(sorted_paths.begin(), sorted_paths.end());	
+	
+	//Revert each statePath in the list
+	for (vector<Path>::iterator i = sorted_paths.begin(); i != sorted_paths.end(); ++i){
+		Path statePath = *i;
+		string repos = state_repos[statePath];
+		int revision = getRivisions.front();
+		getRivisions.pop_front();
+
+		printMsg(lvlError, format("Reverting statePath '%1%' to revision: %2%") % statePath % int2String(revision));
 		Strings p_args;
 		p_args.push_back(nixSVNPath + "/svn");
-		p_args.push_back(int2String(revision_arg));
+		p_args.push_back(int2String(revision));
 		p_args.push_back("file://" + repos);
 		p_args.push_back(statePath);
-		string output = runProgram(nixLibexecDir + "/nix/nix-restorerevision.sh", true, p_args);	//run
+		runProgram_AndPrintOutput(nixLibexecDir + "/nix/nix-restorerevision.sh", true, p_args, "svn");	//run
 		
-		printMsg(lvlError, format("Reverted statePath '%1%' to revision: %2%") % statePath % int2String(revision_arg));
-	} 
+		//TODO !!!!!!!!!!!!!!!!!!!!! do a commit
+		//TODO !!!!!!!!!!!!!!!!!!!!! check if statePath is a working copy
+	}
 }
 
 static void opRunComponent(Strings opFlags, Strings opArgs)
@@ -315,6 +330,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 
     //get all current dependecies (if neccecary | recusively) of all state components that need to be updated
     PathSet root_drvs = getAllStateDerivationsRecursively(root_componentPath, -1);
+    //TODO WHAT ABOUT YOURSELF??????????
     
     //TODO maybe also scan the parameters for state or component hashes?
     //program_args
@@ -430,10 +446,10 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		runProgram_AndPrintOutput(nixLibexecDir + "/nix/nix-statecommit.sh", true, p_args, "svn");
 	    
 	    //Update the intervals again	
-		//store->setStatePathsInterval(intervalPaths, intervals);		//TODO!!!!!!!!!!!!!!!!!!!!!!
+		//store->setStatePathsInterval(intervalPaths, intervals);		//TODO!!!!!!!!!!!!!!!!!!!!!! uncomment
 	    
 	   	//TODO
-	   	//Scan if needed
+	   	//Scan if needed		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! needs a new revision number
 	   	if(false)
 	   		store->scanAndUpdateAllReferencesRecusively(statePath);
 		   	

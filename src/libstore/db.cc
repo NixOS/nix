@@ -546,32 +546,35 @@ bool Database::queryStateReferences(const Transaction & txn, TableId table,
 	Strings keys;
 	enumTable(txn, table, keys);		//get all revisions
 	
-	string key;
-	if(revision == -1){
+	//Check if this revision exists key in the table
+	string key = makeStatePathRevision(statePath, revision);
+	bool found = false;
+	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i) {
+		if(key == *i)
+			found = true;
+	}
+	
+	key = "";	//reset
+	if(revision == -1 || (!found)){
 		bool foundsomething = lookupHighestRevivison(keys, statePath, key);
 		if(!foundsomething)
 			return false;
 	}
 	else
 		key = makeStatePathRevision(statePath, revision);
+		
+	if(!found)
+		printMsg(lvlError, format("Warning: References for revision '%1%' not was not found, so taking the highest rev-key possible for statePath '%2%'") % revision % statePath);
 	
+		
 	return queryStrings(txn, table, key, references);		//now that we have the key, we can query the references
 }
 
 bool Database::queryStateReferrers(const Transaction & txn, TableId table,
  	const Path & statePath, Strings & referrers, int revision)
 {
-	//PathSet referrers;
-    Strings keys;
-    Path revisionedStatePath = makeStatePathRevision(statePath, revision);
-    
-   	enumTable(txn, table, keys, revisionedStatePath + string(1, (char) 0));
-        
-    for (Strings::iterator i = keys.begin(); i != keys.end(); ++i)
-        printMsg(lvlError, format("queryStateReferrers %1%") % *i);
-        //referrers.insert(stripPrefix(storePath, *i));
-    	
-	return false;
+	//Exactly the same as queryStateReferences
+	return queryStateReferences(txn, table, statePath, referrers, revision);
 }
    
 
@@ -591,10 +594,8 @@ void Database::setStateRevisions(const Transaction & txn, TableId table,
     	sorted_revisions.push_back(revisions.at(*i));
 	
 	//////////////////
-	for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i){
+	for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
 		printMsg(lvlError, format("Insert: %1% into %2%") % int2String(revisions.at(*i)) % *i);
-		
-	}
 	//////////////////
 	
 	//Convert the int's into Strings
@@ -638,6 +639,9 @@ bool Database::queryStateRevisions(const Transaction & txn, TableId table,
 			throw Error(format("Cannot read revision number from db of path '%1%'") % statePath);
 		revisions.push_back(getRevision);
 	}
+	
+	if(!succeed)
+		throw Error(format("Revision '%1%' not found of statePath '%2%'") % int2String(revision) % statePath);
 	
 	return succeed;
 }  

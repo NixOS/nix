@@ -246,6 +246,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
     bool includeOutputs = false;
     bool forceRealise = false;
     string bindingName;
+    int revision = -1;	//last revision
 
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
@@ -274,6 +275,11 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--use-output" || *i == "-u") useOutput = true;
         else if (*i == "--force-realise" || *i == "-f") forceRealise = true;
         else if (*i == "--include-outputs") includeOutputs = true;
+        else if ((*i).substr(0,11) == "--revision="){
+        	bool succeed = string2Int((*i).substr(11,(*i).length()), revision);
+			if(!succeed)
+				throw UsageError("The given revision is not a valid number");
+        }
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
     switch (query) {
@@ -304,15 +310,15 @@ static void opQuery(Strings opFlags, Strings opArgs)
                  i != opArgs.end(); ++i)
             {
                 Path path = maybeUseOutput(fixStoreOrStatePath(*i), useOutput, forceRealise);
-                if (query == qRequisites) store->storePathRequisites(path, includeOutputs, paths, true, false, -1);
-                else if (query == qRequisitesState) store->storePathRequisites(path, includeOutputs, paths, false, true, -1);
-                else if (query == qRequisitesFull) store->storePathRequisites(path, includeOutputs, paths, true, true, -1);
-                else if (query == qReferences) store->queryReferences(path, paths, -1);
-                else if (query == qStateReferences) store->queryStateReferences(path, paths, -1);		//latest revision
-                else if (query == qReferrers) store->queryReferrers(path,  paths, -1);
-                else if (query == qStateReferrers) store->queryStateReferrers(path,  paths, -1);		//latest revision
-                else if (query == qReferrersClosure) computeFSClosure(path, paths, true, false, -1, true);
-                else if (query == qReferrersClosureWithState) computeFSClosure(path, paths, true, true, -1, true);
+                if (query == qRequisites) store->storePathRequisites(path, includeOutputs, paths, true, false, revision);
+                else if (query == qRequisitesState) store->storePathRequisites(path, includeOutputs, paths, false, true, revision);
+                else if (query == qRequisitesFull) store->storePathRequisites(path, includeOutputs, paths, true, true, revision);
+                else if (query == qReferences) store->queryReferences(path, paths, revision);
+                else if (query == qStateReferences) store->queryStateReferences(path, paths, revision);
+                else if (query == qReferrers) store->queryReferrers(path,  paths, revision);
+                else if (query == qStateReferrers) store->queryStateReferrers(path,  paths, revision);
+                else if (query == qReferrersClosure) computeFSClosure(path, paths, true, false, revision, true);
+                else if (query == qReferrersClosureWithState) computeFSClosure(path, paths, true, true, revision, true);
             }
             Paths sorted = topoSortPaths(paths);
             for (Paths::reverse_iterator i = sorted.rbegin(); 
