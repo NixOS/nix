@@ -11,7 +11,6 @@ namespace nix {
 Derivation derivationFromPath(const Path & drvPath)
 {
     assertStorePath(drvPath);
-    //printMsg(lvlError, format("tttttttttttttttttt"));
     store->ensurePath(drvPath);
     //printMsg(lvlError, format("uuuuuuuuuuuuuuuuuu"));
     ATerm t = ATreadFromNamedFile(drvPath.c_str());

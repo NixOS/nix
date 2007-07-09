@@ -374,7 +374,7 @@ static bool isRealisableStatePath(const Transaction & txn, const Path & path)
 
 static bool isRealisableComponentOrStatePath(const Transaction & txn, const Path & path)
 {
-    return isValidComponentOrStatePathTxn(txn, path) || readSubstitutes(txn, path).size() > 0;					//TODO State paths are not yet in substitutes !!!!!!!!!!!!!!
+    return isValidComponentOrStatePathTxn(txn, path) || readSubstitutes(txn, path).size() > 0;					//TODO State paths are not yet in substitutes !!!!!!!!!!!!!! ??
 }
 
 static string addPrefix(const string & prefix, const string & s)
@@ -665,15 +665,20 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
 }
 
 
-//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! remove this entire function, replace by isValidStatePathTxn
+//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! remove this entire function, replace by 
+
+/*
+ * Returns true or false wheter a store-component has a state component (e.g. has a state dir) or not. 
+ * Do NOT confuse this function with isValidStatePath
+ */
 bool isStateComponentTxn(const Transaction & txn, const Path & statePath)
 {
-	//return isValidStatePathTxn(txn, statePath);
-	
+	isValidPathTxn(txn, statePath);
 	
 	string data;
-	return nixDB.queryString(txn, dbStateInfo, statePath, data);
-								
+	bool nonempty = nixDB.queryString(txn, dbStateInfo, statePath, data);
+	 
+	return nonempty;
 }
 
 bool LocalStore::isStateComponent(const Path & statePath)
@@ -1691,8 +1696,10 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
 								, PathSet & newFoundComponentReferences, PathSet & newFoundStateReferences, const int revision) //only for recursion
 {
 	//Check if is a state Path
-	if(! isStateComponentTxn(txn, statePath))
-		throw Error(format("This path '%1%' is not a state path 1") % statePath);
+	if(! isValidStatePathTxn(txn, statePath))
+		throw Error(format("This path '%1%' is not a state path") % statePath);
+
+	printMsg(lvlError, format("scanAndUpdateAllReferencesTxn: '%1%' - %2%") % statePath % revision);
 	
 	//TODO check if path is not a shared path !
 	//TODO
@@ -1765,7 +1772,7 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
 
 	//Finally register the paths valid with a new revision number
    	if(diff_references_added.size() != 0 || diff_state_references_added.size() != 0){
-	   	printMsg(lvlError, format("Updating new references for statepath: '%1%'")% statePath);
+	   	printMsg(lvlError, format("Updating new references to revision %1% for statepath: '%2%'") % revision % statePath);
 	   	Path drvPath = queryStatePathDrv(txn, statePath);
 	   	registerValidPath(txn,    	
 	    		statePath,
