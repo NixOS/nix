@@ -631,7 +631,7 @@ void setDeriver(const Transaction & txn, const Path & storePath, const Path & de
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
 	
-	printMsg(lvlError, format("Ttttttttttttttttttttttttt %1%") % deriver);
+	//printMsg(lvlError, format("Ttttttttttttttttttttttttt %1%") % deriver);
     
     if (isStateDrvPathTxn(txn, deriver)){							//Redirect if its a state component					//hanges somtimes !!!!!!!!!!!!!!!!!!!
     	addStateDeriver(txn, storePath, deriver);
