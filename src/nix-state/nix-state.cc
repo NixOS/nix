@@ -41,17 +41,13 @@ void printHelp()
 }
 
 
-//
-Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, 
-									   string & binary, string & derivationPath, bool isStatePath, string & program_args,
-									   bool getDerivers, PathSet & derivers) 	//optional
+Derivation getDerivation(const string & fullPath, const string & program_args, Path & componentPath, Path & statePath, 
+						 string & binary, string & derivationPath, bool isStatePath,
+						 bool getDerivers, PathSet & derivers) 	//optional
 {
-    if (!opFlags.empty()) throw UsageError("unknown flag");
-    if ( opArgs.size() != 1 && opArgs.size() != 2 ) 
-    	throw UsageError("only one or two arguments allowed component path and program arguments (counts as one) ");
-    
 	//Parse the full path like /nix/store/...../bin/hello
-    string fullPath = opArgs.front();
+    //string fullPath = opArgs.front();
+    
     componentPath = fullPath.substr(nixStore.size() + 1, fullPath.size());		//+1 to strip off the /
     int pos = componentPath.find("/",0);
     componentPath = fullPath.substr(0, pos + nixStore.size() + 1);
@@ -64,17 +60,7 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
     //Check if path is statepath
     isStatePath = store->isStateComponent(componentPath);
       
-    //Extract the program arguments
-    string allArgs;
-    if(opArgs.size() > 1){
-		opArgs.pop_front();
-		allArgs = opArgs.front();
-		
-		program_args = allArgs;
-		//Strings progam_args_strings = tokenizeString(allArgs, " ");
-    }
-
-	//printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % stateIdentifier % binary % username % allArgs);
+	//printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % stateIdentifier % binary % username % program_args);
     
     if(isStatePath)
     	derivers = queryDerivers(noTxn, componentPath, stateIdentifier, username);
@@ -103,6 +89,27 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
 	}
 	
 	return drv;
+}
+
+//Wrapper
+Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, 
+									   string & binary, string & derivationPath, bool isStatePath, string & program_args,
+									   bool getDerivers, PathSet & derivers) 	//optional
+{
+	if (!opFlags.empty()) throw UsageError("unknown flag");
+    if ( opArgs.size() != 1 && opArgs.size() != 2 ) 
+    	throw UsageError("only one or two arguments allowed component path and program arguments (counts as one) ");
+    	
+   
+   	string fullPath = opArgs.front(); 
+   	
+    if(opArgs.size() > 1){
+		opArgs.pop_front();
+		program_args = opArgs.front();
+		//Strings progam_args_strings = tokenizeString(program_args, " ");
+    }
+   
+    return getDerivation(fullPath, program_args, componentPath, statePath, binary, derivationPath, isStatePath, getDerivers, derivers);	
 }
 
 //Wrapper
@@ -171,34 +178,7 @@ static void opShowStateReposPath(Strings opFlags, Strings opArgs)
 	printMsg(lvlError, format("%1%") % repos);
 }
 
-int readRevisionNumber(const Derivation & drv)
-{
-	string svnbin = nixSVNPath + "/svn";
-	RevisionNumbers revisions;
-	
-    DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs; 
-    string drvName = drv.env.find("name")->second;
-    DerivationStateOutputs stateOutputs = drv.stateOutputs; 
-    Path statePath = stateOutputs.find("state")->second.statepath;
-	string getStateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
-	
-	string repos = getStateReposPath("stateOutput:staterepospath", statePath, drvName, getStateIdentifier);		//this is a copy from store-state.cc
-	
-	Strings p_args;
-	p_args.push_back(svnbin);
-	p_args.push_back("file://" + repos);
-	string output = runProgram(nixLibexecDir + "/nix/nix-readrevisions.sh", true, p_args);	//run
-	    	
-	int pos = output.find("\n",0);	//remove trailing \n
-	output.erase(pos,1);
-			
-	int revision;
-	bool succeed = string2Int(output, revision);
-	if(!succeed)
-		throw Error(format("Cannot read revision number of path '%1%'") % repos);				
-	
-	return revision;	
-}
+
 
 /*
  * Input: store (or statePath?)
@@ -448,32 +428,20 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	    
 	    //Update the intervals again	
 		//store->setStatePathsInterval(intervalPaths, intervals);		//TODO!!!!!!!!!!!!!!!!!!!!!! uncomment and txn ??
-	    
-		statePaths.insert(statePath);							//Insert StatePath  	
-		rivisionMapping[statePath] = readRevisionNumber(drv);	//Get current numbers
 	}
 	
-	//1.NEW TRANSACTION
+	//Start transaction
 	//TODO
-
-	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! only update the root with newRevisionNumber, the rest with the value from rivisionMapping !!!!!!!!!!!!!!!!!!!!!!!!!!
 
 	//Get new revision number
 	int newRevisionNumber = store->getNewRevisionNumber(root_statePath);
 	
 	//Scan for new references, and update with revision number
    	if(scanforReferences){
-   		/*
-   		for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)		//fails ....
-  			store->scanAndUpdateAllReferences(*i, newRevisionNumber, false);
-  		*/
   		store->scanAndUpdateAllReferences(root_statePath, newRevisionNumber, true);		//goes recursive
    	}
-	
-	//Store the revision numbers in the database for this statePath with revision number
-	store->setStateRevisions(root_statePath, rivisionMapping, newRevisionNumber);
-	
-	//4. COMMIT
+		
+	//Commit
 	//TODO
 
 	//Debugging

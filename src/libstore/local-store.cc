@@ -1693,6 +1693,35 @@ void getDependenciesAtBuildTime(const Transaction & txn, const Path & drvPath)
 }
 */
 
+int readRevisionNumber(const Derivation & drv)
+{
+	string svnbin = nixSVNPath + "/svn";
+	RevisionNumbers revisions;
+	
+    DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs; 
+    string drvName = drv.env.find("name")->second;
+    DerivationStateOutputs stateOutputs = drv.stateOutputs; 
+    Path statePath = stateOutputs.find("state")->second.statepath;
+	string getStateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
+	
+	string repos = getStateReposPath("stateOutput:staterepospath", statePath, drvName, getStateIdentifier);		//this is a copy from store-state.cc
+	
+	Strings p_args;
+	p_args.push_back(svnbin);
+	p_args.push_back("file://" + repos);
+	string output = runProgram(nixLibexecDir + "/nix/nix-readrevisions.sh", true, p_args);	//run
+	    	
+	int pos = output.find("\n",0);	//remove trailing \n
+	output.erase(pos,1);
+			
+	int revision;
+	bool succeed = string2Int(output, revision);
+	if(!succeed)
+		throw Error(format("Cannot read revision number of path '%1%'") % repos);				
+	
+	return revision;	
+}
+
 //TODO include this call in the validate function
 //TODO ONLY CALL THIS FUNCTION ON A NON-SHARED STATE PATH!!!!!!!!!!!
 void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePath
@@ -1780,11 +1809,14 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
 	}
 }
 
-void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path & storeOrStatePath, const int revision)		//TODO Can also work for statePaths???
+void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path & storeOrStatePath, RevisionNumbersSet & rivisionMapping)		//TODO Can also work for statePaths???
 {
 	//get all state current state references recursively
 	PathSet statePaths;
 	storePathRequisites(storeOrStatePath, false, statePaths, false, true, -1);		//Get all current state dependencies
+	
+	//get all revisions
+	//TODO
 	
 	//call scanForAllReferences again on all newly found statePaths
 	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
@@ -1792,27 +1824,42 @@ void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path
 		//Scan, update, call recursively
 		PathSet newFoundComponentReferences;
 		PathSet newFoundStateReferences;
-		scanAndUpdateAllReferencesTxn(txn, *i, newFoundComponentReferences, newFoundStateReferences, revision);
+		scanAndUpdateAllReferencesTxn(txn, *i, newFoundComponentReferences, newFoundStateReferences, 000000000);		//TODO
 		PathSet allNewReferences = pathSets_union(newFoundComponentReferences, newFoundStateReferences);
 		
 		//Call the function recursively again on all newly found references											//TODO test if this doesnt go into an infinite loop
 		for (PathSet::iterator j = allNewReferences.begin(); j != allNewReferences.end(); ++j)
-			scanAndUpdateAllReferencesRecusivelyTxn(txn, *j, revision);
+			scanAndUpdateAllReferencesRecusivelyTxn(txn, *j, rivisionMapping);
 	}
 }
 
-void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & storeOrStatePath, const int revision, bool recursive)
+void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePath, const int state_revision, bool recursive)
 {
 	//TODO name-refactor storeOrStatePath to statePath
-   	if(! isValidStatePathTxn(txn, storeOrStatePath))	//check if storeOrStatePath is a statePath, else throw error
-   		throw Error(format("This path '%1%' is not a state path") % storeOrStatePath);
+   	if(! isValidStatePathTxn(txn, statePath))	//check if storeOrStatePath is a statePath, else throw error
+   		throw Error(format("This path '%1%' is not a state path") % statePath);
 
-   if(recursive)
-    	nix::scanAndUpdateAllReferencesRecusivelyTxn(txn, storeOrStatePath, revision);
+	RevisionNumbersSet rivisionMapping;
+
+	if(recursive){
+    	nix::scanAndUpdateAllReferencesRecusivelyTxn(txn, statePath, rivisionMapping);
+	}
     else{
+    	
+    	//get drv
+    	Derivation drv;		//TODO
+    	
+    	//get revision
+    	int revision = readRevisionNumber(drv);
+    	rivisionMapping[statePath] = revision;
+    	
+    	//update
     	PathSet empty;
-    	nix::scanAndUpdateAllReferencesTxn(txn, storeOrStatePath, empty, empty, revision);
+    	nix::scanAndUpdateAllReferencesTxn(txn, statePath, empty, empty, revision);
     }
+    
+    //Store the revision numbers in the database for this statePath with revision number
+	store->setStateRevisions(statePath, rivisionMapping, state_revision);
 }
 
 void LocalStore::scanAndUpdateAllReferences(const Path & storeOrStatePath, const int revision, bool recursive)
