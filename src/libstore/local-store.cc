@@ -929,7 +929,7 @@ Hash LocalStore::queryPathHash(const Path & path)
     return queryHash(noTxn, path);
 }
 
-static Path queryStatePathDrv(const Transaction & txn, const Path & statePath)
+Path queryStatePathDrvTxn(const Transaction & txn, const Path & statePath)
 {
 	string s;
     nixDB.queryString(txn, dbValidStatePaths, statePath, s);
@@ -940,7 +940,7 @@ Path LocalStore::queryStatePathDrv(const Path & statePath)
 {
     if (!isValidStatePath(statePath))
         throw Error(format("statepath `%1%' is not valid") % statePath);
-    return nix::queryStatePathDrv(noTxn, statePath);
+    return nix::queryStatePathDrvTxn(noTxn, statePath);
 }
 
 
@@ -1693,179 +1693,29 @@ void getDependenciesAtBuildTime(const Transaction & txn, const Path & drvPath)
 }
 */
 
-int readRevisionNumber(const Derivation & drv)
-{
-	string svnbin = nixSVNPath + "/svn";
-	RevisionNumbers revisions;
-	
-    DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs; 
-    string drvName = drv.env.find("name")->second;
-    DerivationStateOutputs stateOutputs = drv.stateOutputs; 
-    Path statePath = stateOutputs.find("state")->second.statepath;
-	string getStateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
-	
-	string repos = getStateReposPath("stateOutput:staterepospath", statePath, drvName, getStateIdentifier);		//this is a copy from store-state.cc
-	
-	Strings p_args;
-	p_args.push_back(svnbin);
-	p_args.push_back("file://" + repos);
-	string output = runProgram(nixLibexecDir + "/nix/nix-readrevisions.sh", true, p_args);	//run
-	    	
-	int pos = output.find("\n",0);	//remove trailing \n
-	output.erase(pos,1);
-			
-	int revision;
-	bool succeed = string2Int(output, revision);
-	if(!succeed)
-		throw Error(format("Cannot read revision number of path '%1%'") % repos);				
-	
-	return revision;	
-}
 
-//TODO include this call in the validate function
-//TODO ONLY CALL THIS FUNCTION ON A NON-SHARED STATE PATH!!!!!!!!!!!
-void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePath
-								, PathSet & newFoundComponentReferences, PathSet & newFoundStateReferences, const int revision) //only for recursion
-{
-	//Check if is a state Path
-	if(! isValidStatePathTxn(txn, statePath))
-		throw Error(format("This path '%1%' is not a state path") % statePath);
-
-	//printMsg(lvlError, format("scanAndUpdateAllReferencesTxn: '%1%' - %2%") % statePath % revision);
-	
-	//TODO check if path is not a shared path !
-	//TODO
-
-	//get all possible state and component references
-    Paths allComponentPaths;
-    Paths allStatePaths;
-    nixDB.enumTable(txn, dbValidPaths, allComponentPaths);
-    nixDB.enumTable(txn, dbValidStatePaths, allStatePaths);
-    
-    for (Paths::iterator i = allComponentPaths.begin(); i != allComponentPaths.end(); ++i)
-    		debug(format("allComponentPaths: %1%") % *i);
-    for (Paths::iterator i = allStatePaths.begin(); i != allStatePaths.end(); ++i)
-    		debug(format("allStatePaths: %1%") % *i);
-    
-    //Remove derivation paths
-	Paths allComponentPaths2;	//without derivations
-    for (Paths::iterator i = allComponentPaths.begin(); i != allComponentPaths.end(); ++i){
-    	string path = *i;
-    	if(path.substr(path.length() - 4,path.length()) != ".drv")		//TODO HACK: we should have a typed table or a seperate table ....
-    		allComponentPaths2.push_back(path);
-    }
-
-	//TODO maybe only scan in the changeset (patch) for new references? (this will be difficult and depending on the underlying versioning system)
-
-    //Scan in for (new) component and state references
-    PathSet state_references = scanForReferences(statePath, PathSet(allComponentPaths2.begin(), allComponentPaths2.end()));
-    PathSet state_stateReferences = scanForReferences(statePath, PathSet(allStatePaths.begin(), allStatePaths.end()));
-    
-    //Retrieve old references
-    PathSet old_references;
-    PathSet old_state_references;
-    queryReferencesTxn(txn, statePath, old_references, -1);				//get the latsest references
-    queryStateReferencesTxn(txn, statePath, old_state_references, -1);		
-    
-    //Check for added and removed paths
-	PathSet diff_references_removed;
-	PathSet diff_references_added;
-	pathSets_difference(state_references, old_references, diff_references_removed, diff_references_added);
-	PathSet diff_state_references_removed;
-	PathSet diff_state_references_added;
-	pathSets_difference(state_stateReferences, old_state_references, diff_state_references_removed, diff_state_references_added);
-
-	//Set PathSet's for the caller of this function
-	newFoundComponentReferences = diff_references_added;
-	newFoundStateReferences = diff_state_references_added;
-	
-	//Print error, but we could also throw an error.
-	if(diff_references_added.size() != 0)
-    	for (PathSet::iterator i = diff_references_added.begin(); i != diff_references_added.end(); ++i)
-    		printMsg(lvlError, format("Added component reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
-    if(diff_references_removed.size() != 0)
-    	for (PathSet::iterator i = diff_references_removed.begin(); i != diff_references_removed.end(); ++i)
-    		printMsg(lvlError, format("Removed component reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
-    if(diff_state_references_added.size() != 0)
-    	for (PathSet::iterator i = diff_state_references_added.begin(); i != diff_state_references_added.end(); ++i)
-    		printMsg(lvlError, format("Added state reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
-    if(diff_state_references_removed.size() != 0)
-    	for (PathSet::iterator i = diff_state_references_removed.begin(); i != diff_state_references_removed.end(); ++i)
-    		printMsg(lvlError, format("Removed state reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
-
-	//If any changes are detected: register the paths valid with a new revision number
-   	if(diff_references_added.size() != 0 || diff_references_removed.size() != 0 ||
-   	   diff_state_references_added.size() != 0 || diff_state_references_removed.size() != 0 )
-   	{
-	   	printMsg(lvlError, format("Updating new references to revision %1% for statepath: '%2%'") % revision % statePath);
-	   	Path drvPath = queryStatePathDrv(txn, statePath);
-	   	registerValidPath(txn,    	
-	    		statePath,
-	    		Hash(),				//emtpy hash
-	    		state_references,
-	    		state_stateReferences,
-	    		drvPath,
-	    		revision);
-	}
-}
-
-void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path & storeOrStatePath, RevisionNumbersSet & rivisionMapping)		//TODO Can also work for statePaths???
-{
-	//get all state current state references recursively
-	PathSet statePaths;
-	storePathRequisites(storeOrStatePath, false, statePaths, false, true, -1);		//Get all current state dependencies
-	
-	//get all revisions
-	//TODO
-	
-	//call scanForAllReferences again on all newly found statePaths
-	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
-	{
-		//Scan, update, call recursively
-		PathSet newFoundComponentReferences;
-		PathSet newFoundStateReferences;
-		scanAndUpdateAllReferencesTxn(txn, *i, newFoundComponentReferences, newFoundStateReferences, 000000000);		//TODO
-		PathSet allNewReferences = pathSets_union(newFoundComponentReferences, newFoundStateReferences);
-		
-		//Call the function recursively again on all newly found references											//TODO test if this doesnt go into an infinite loop
-		for (PathSet::iterator j = allNewReferences.begin(); j != allNewReferences.end(); ++j)
-			scanAndUpdateAllReferencesRecusivelyTxn(txn, *j, rivisionMapping);
-	}
-}
-
-void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePath, const int state_revision, bool recursive)
-{
-	//TODO name-refactor storeOrStatePath to statePath
-   	if(! isValidStatePathTxn(txn, statePath))	//check if storeOrStatePath is a statePath, else throw error
-   		throw Error(format("This path '%1%' is not a state path") % statePath);
-
-	RevisionNumbersSet rivisionMapping;
-
-	if(recursive){
-    	nix::scanAndUpdateAllReferencesRecusivelyTxn(txn, statePath, rivisionMapping);
-	}
-    else{
-    	
-    	//get drv
-    	Derivation drv;		//TODO
-    	
-    	//get revision
-    	int revision = readRevisionNumber(drv);
-    	rivisionMapping[statePath] = revision;
-    	
-    	//update
-    	PathSet empty;
-    	nix::scanAndUpdateAllReferencesTxn(txn, statePath, empty, empty, revision);
-    }
-    
-    //Store the revision numbers in the database for this statePath with revision number
-	store->setStateRevisions(statePath, rivisionMapping, state_revision);
-}
-
+//TODO REMOVE
 void LocalStore::scanAndUpdateAllReferences(const Path & storeOrStatePath, const int revision, bool recursive)
 {
-	nix::scanAndUpdateAllReferencesTxn(noTxn, storeOrStatePath, revision, recursive); 
+	//nix::scanAndUpdateAllReferencesTxn(noTxn, storeOrStatePath, revision, recursive); 
 }
+
+void queryAllValidPaths(const Transaction & txn, PathSet & allComponentPaths, PathSet & allStatePaths)
+{
+	Paths allComponentPaths2;
+    Paths allStatePaths2;
+    nixDB.enumTable(txn, dbValidPaths, allComponentPaths2);
+    nixDB.enumTable(txn, dbValidStatePaths, allStatePaths2);
+    allComponentPaths.insert(allComponentPaths2.begin(), allComponentPaths2.end());
+    allStatePaths.insert(allStatePaths2.begin(), allStatePaths2.end());
+    
+    for (PathSet::iterator i = allComponentPaths.begin(); i != allComponentPaths.end(); ++i)
+    		debug(format("allComponentPaths: %1%") % *i);
+    for (PathSet::iterator i = allStatePaths.begin(); i != allStatePaths.end(); ++i)
+    		debug(format("allStatePaths: %1%") % *i);
+    		
+}
+
 
 void setStateRevisionsTxn(const Transaction & txn, const Path & statePath, const RevisionNumbersSet & revisions, const int revision)
 {

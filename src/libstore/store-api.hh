@@ -269,12 +269,8 @@ Path makeStatePath(const string & componentHash, const string & suffix, const st
 /* TODO ... */
 void checkStatePath(const Derivation & drv);
 
-/* Calculates a unique store state repos path and also the root path  */
-void calculateStateReposPath(const string & type, const Path statePath, const string & suffix, const string & stateIdentifier, Path & path);
-
-
-/* Returns the full repository path */
-Path getStateReposPath(const string & type, const Path statePath, const string & suffix, const string & stateIdentifier);
+/* Calculates a unique store state repos path  */
+Path getStateReposPath(const string & type, const Path statePath);
 
 /* This is the preparatory part of addToStore() and addToStoreFixed();
    it computes the store path to which srcPath is to be copied.

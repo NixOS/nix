@@ -223,7 +223,13 @@ bool isStateDrvPathTxn(const Transaction & txn, const Path & drvPath);
 
 bool isStateDrvTxn(const Transaction & txn, const Derivation & drv);
 
- 
+//TODO
+void queryAllValidPaths(const Transaction & txn, PathSet & allComponentPaths, PathSet & allStatePaths);
+bool isValidStatePathTxn(const Transaction & txn, const Path & path);
+void queryReferencesTxn(const Transaction & txn, const Path & path, PathSet & references, const int revision);
+void queryStateReferencesTxn(const Transaction & txn, const Path & storePath, PathSet & stateReferences, const int revision);
+Path queryStatePathDrvTxn(const Transaction & txn, const Path & statePath);
+
 }
 
 

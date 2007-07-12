@@ -25,12 +25,10 @@ void updatedStateDerivation(Path storePath)
 	 
 }
 
-void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs, const StringPairs & env)
+void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs)
 {
 	Path statePath = stateOutputs.find("state")->second.statepath;
 	string stateDir = statePath;
-	string drvName = env.find("name")->second;
-	string stateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
 	
 	string svnbin = nixSVNPath + "/svn";
 	string svnadminbin = nixSVNPath + "/svnadmin";
@@ -41,7 +39,7 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 	//TODO
 	
 	//Create a repository for this state location
-	string repos = getStateReposPath("stateOutput:staterepospath", stateDir, drvName, stateIdentifier);
+	string repos = getStateReposPath("stateOutput:staterepospath", stateDir);
 
 	printMsg(lvlTalkative, format("Adding statedir '%1%' from repository '%2%'") % stateDir % repos);
 	

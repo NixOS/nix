@@ -591,10 +591,10 @@ bool Database::queryStateReferrers(const Transaction & txn, TableId table,
    
 
 void Database::setStateRevisions(const Transaction & txn, TableId table,
-   	const Path & statePath, const RevisionNumbersSet & revisions, int revision)
+   	const Path & statePath, const RevisionNumbersSet & revisions, int root_revision)
 {
-	if(revision == -1)
-		revision = getNewRevisionNumber(txn, table, statePath);
+	if(root_revision == -1)
+		root_revision = getNewRevisionNumber(txn, table, statePath);
 	
 	//Sort based on statePath to RevisionNumbersClosure
 	RevisionNumbers sorted_revisions;
@@ -606,10 +606,9 @@ void Database::setStateRevisions(const Transaction & txn, TableId table,
     	sorted_revisions.push_back(revisions.at(*i));
 	
 	//Debugging
-	/*
-	for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
-		printMsg(lvlError, format("Insert: %1% into %2%") % int2String(revisions.at(*i)) % *i);
-	*/
+	//for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
+	//	printMsg(lvlError, format("Insert: %1% into %2%") % int2String(revisions.at(*i)) % *i);
+	
 	
 	//Convert the int's into Strings
 	Strings data;
@@ -619,7 +618,7 @@ void Database::setStateRevisions(const Transaction & txn, TableId table,
 	}
 	
 	//Create the key
-	string key = makeStatePathRevision(statePath, revision);
+	string key = makeStatePathRevision(statePath, root_revision);
 	
 	//Insert	
 	setStrings(txn, table, key, data);

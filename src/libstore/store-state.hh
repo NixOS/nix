@@ -6,7 +6,7 @@
 namespace nix {
 
 /* Create a state directory. */
-void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs, const StringPairs & env);
+void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs);
 
 }
 

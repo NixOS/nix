@@ -10,6 +10,7 @@
 #include "help.txt.hh"
 #include "local-store.hh"
 #include "derivations.hh"
+#include "references.hh"
 
 using namespace nix;
 using std::cin;
@@ -41,8 +42,8 @@ void printHelp()
 }
 
 
-Derivation getDerivation(const string & fullPath, const string & program_args, Path & componentPath, Path & statePath, 
-						 string & binary, string & derivationPath, bool isStatePath,
+Derivation getDerivation(const string & fullPath, const string & program_args, string state_identifier, Path & componentPath, Path & statePath, 
+						 string & binary, string & derivationPath, bool isStateComponent,
 						 bool getDerivers, PathSet & derivers) 	//optional
 {
 	//Parse the full path like /nix/store/...../bin/hello
@@ -53,37 +54,34 @@ Derivation getDerivation(const string & fullPath, const string & program_args, P
     componentPath = fullPath.substr(0, pos + nixStore.size() + 1);
     binary = fullPath.substr(pos + nixStore.size() + 1, fullPath.size());
 
-    //TODO REAL CHECK for validity of componentPath ... ?
+    //TODO REAL CHECK for validity of componentPath ... ? sometimes, indentifier can be excluded
     if(componentPath == "/nix/store")
  		 throw UsageError("You must specify the full! binary path");
      
     //Check if path is statepath
-    isStatePath = store->isStateComponent(componentPath);
+    isStateComponent = store->isStateComponent(componentPath);
       
-	//printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % stateIdentifier % binary % username % program_args);
+	//printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % state_identifier % binary % username % program_args);
     
-    if(isStatePath)
-    	derivers = queryDerivers(noTxn, componentPath, stateIdentifier, username);
+    if(isStateComponent)
+    	derivers = queryDerivers(noTxn, componentPath, state_identifier, username);
     else
     	derivers.insert(queryDeriver(noTxn, componentPath));
     
     if(getDerivers == true)
     	return Derivation();
     
-    if(isStatePath){	
+    if(isStateComponent){	
 	    if(derivers.size() == 0)
-	    	throw UsageError(format("There are no derivers with this combination of identifier '%1%' and username '%2%'") % stateIdentifier % username);
+	    	throw UsageError(format("There are no derivers with this combination of identifier '%1%' and username '%2%'") % state_identifier % username);
 	    if(derivers.size() != 1)
-	    	throw UsageError(format("There is more than one deriver with stateIdentifier '%1%' and username '%2%'") % stateIdentifier % username);
+	    	throw UsageError(format("There is more than one deriver with state_identifier '%1%' and username '%2%'") % state_identifier % username);
     }
-        	
-    Derivation drv;
-    for (PathSet::iterator i = derivers.begin(); i != derivers.end(); ++i){		//ugly workaround for drvs[0].			TODO !!!!!!!!!!!!!!!!!!!! change to *(derivers.begin())
-     	derivationPath = *i;
-     	drv = derivationFromPath(derivationPath);
-    }
+    
+    //Retrieve the derivation, there is only 1 drvPath in derivers
+    Derivation drv = derivationFromPath(*(derivers.begin()));
 	
-	if(isStatePath){
+	if(isStateComponent){
     	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
     	statePath = stateOutputs.find("state")->second.statepath;
 	}
@@ -93,7 +91,7 @@ Derivation getDerivation(const string & fullPath, const string & program_args, P
 
 //Wrapper
 Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, 
-									   string & binary, string & derivationPath, bool isStatePath, string & program_args,
+									   string & binary, string & derivationPath, bool isStateComponent, string & program_args,
 									   bool getDerivers, PathSet & derivers) 	//optional
 {
 	if (!opFlags.empty()) throw UsageError("unknown flag");
@@ -109,15 +107,15 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
 		//Strings progam_args_strings = tokenizeString(program_args, " ");
     }
    
-    return getDerivation(fullPath, program_args, componentPath, statePath, binary, derivationPath, isStatePath, getDerivers, derivers);	
+    return getDerivation(fullPath, program_args, stateIdentifier, componentPath, statePath, binary, derivationPath, isStateComponent, getDerivers, derivers);	
 }
 
 //Wrapper
 Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, 
-									  string & binary, string & derivationPath, bool & isStatePath, string & program_args)
+									  string & binary, string & derivationPath, bool & isStateComponent, string & program_args)
 {
 	PathSet empty;
-	return getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args, false, empty);
+	return getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args, false, empty);
 }
 
 //
@@ -128,12 +126,12 @@ static void opShowDerivations(Strings opFlags, Strings opArgs)
     string binary;
     PathSet derivers;
     string derivationPath;
-    bool isStatePath;
+    bool isStateComponent;
     string program_args;
-    Derivation drv = getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args, true, derivers);
+    Derivation drv = getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args, true, derivers);
 	
-	if(!isStatePath)
-		throw UsageError(format("This path '%1%' is not a state path") % componentPath);
+	if(!isStateComponent)
+		throw UsageError(format("This path '%1%' is not a state-component path") % componentPath);
 	
 	for (PathSet::iterator i = derivers.begin(); i != derivers.end(); ++i)
      	printMsg(lvlError, format("%1%") % (*i));
@@ -147,12 +145,12 @@ static void opShowStatePath(Strings opFlags, Strings opArgs)
     Path statePath;
     string binary;
     string derivationPath;
-    bool isStatePath;
+    bool isStateComponent;
     string program_args;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args);
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
     
-    if(!isStatePath)
-		throw UsageError(format("This path '%1%' is not a state path") % componentPath);
+    if(!isStateComponent)
+		throw UsageError(format("This path '%1%' is not a state-component path") % componentPath);
     
 	printMsg(lvlError, format("%1%") % statePath);
 }
@@ -164,16 +162,15 @@ static void opShowStateReposPath(Strings opFlags, Strings opArgs)
     Path statePath;
     string binary;
     string derivationPath;
-    bool isStatePath;
+    bool isStateComponent;
     string program_args;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args);
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
 	
-	if(!isStatePath)
-		throw UsageError(format("This path '%1%' is not a state path") % componentPath);
+	if(!isStateComponent)
+		throw UsageError(format("This path '%1%' is not a state-component path") % componentPath);
 	
 	//Get the a repository for this state location
-	string drvName = drv.env.find("name")->second;
-	string repos = getStateReposPath("stateOutput:staterepospath", statePath, drvName, stateIdentifier);		//this is a copy from store-state.cc
+	string repos = getStateReposPath("stateOutput:staterepospath", statePath);		//this is a copy from store-state.cc
 
 	printMsg(lvlError, format("%1%") % repos);
 }
@@ -205,9 +202,9 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
     Path statePath;
     string binary;
     string derivationPath;
-    bool isStatePath;
+    bool isStateComponent;
     string program_args;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args);
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
 	
 	RevisionNumbers revisions;
 	bool notEmpty = store->queryAvailableStateRevisions(statePath, revisions);
@@ -228,24 +225,51 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 	printMsg(lvlError, format("Available Revisions: %1%") % revisions_txt);
 }
 
+int readRevisionNumber(Path statePath)
+{
+	string svnbin = nixSVNPath + "/svn";
+	RevisionNumbers revisions;
+	
+	string repos = getStateReposPath("stateOutput:staterepospath", statePath);		//this is a copy from store-state.cc
+	
+	//TODO Check if the .svn exists, it might be deleted, then we dont have to remember the state revision (set -1)
+	
+	Strings p_args;
+	p_args.push_back(svnbin);
+	p_args.push_back("file://" + repos);
+	string output = runProgram(nixLibexecDir + "/nix/nix-readrevisions.sh", true, p_args);	//run
+	    	
+	int pos = output.find("\n",0);	//remove trailing \n
+	output.erase(pos,1);
+			
+	int revision;
+	bool succeed = string2Int(output, revision);
+	if(!succeed)
+		throw Error(format("Cannot read revision number of path '%1%'") % repos);				
+	
+	return revision;	
+}
+
+
+
 static void revertToRevision(Strings opFlags, Strings opArgs)
 {
 	Path componentPath;
     Path statePath;
     string binary;
     string derivationPath;
-    bool isStatePath;
+    bool isStateComponent;
     string program_args;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStatePath, program_args);
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
     
     bool recursive = true;	//TODO !!!!!!!!!!!!!!!!!
     
-    PathSet drvs;
+    PathSet statePaths;
     if(recursive)
-    	drvs = getAllStateDerivationsRecursively(componentPath, revision_arg); //get dependecies (if neccecary | recusively) of all state components that need to be updated
+    	PathSet statePaths = getAllStateDerivationsRecursively(componentPath, revision_arg);	//get dependecies (if neccecary | recusively) of all state components that need to be updated
     else
-		drvs.insert(derivationPath);	//Insert direct state path    	
-    
+		statePaths.insert(derivationPath);	//Insert direct state path
+		    	
     //Get the revisions recursively to also roll them back
     RevisionNumbers getRivisions;
 	bool b = store->queryStateRevisions(statePath, getRivisions, revision_arg);
@@ -253,15 +277,8 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
     //Sort the statePaths from all drvs
 	map<Path, string> state_repos;
 	vector<Path> sorted_paths;
-    for (PathSet::iterator d = drvs.begin(); d != drvs.end(); ++d)
-	{
-    	Path drvPath = *d;
-       	Derivation drv = derivationFromPath(drvPath);
-       	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
-    	Path statePath = stateOutputs.find("state")->second.statepath;
-    	string drvName = drv.env.find("name")->second; 
-		string repos = getStateReposPath("stateOutput:staterepospath", statePath, drvName, stateIdentifier);		//this is a copy from store-state.cc
-		
+    for (PathSet::iterator d = statePaths.begin(); d != statePaths.end(); ++d){
+       	string repos = getStateReposPath("stateOutput:staterepospath", *d);		//this is a copy from store-state.cc
 		state_repos[statePath] = repos; 
 		sorted_paths.push_back(statePath);
 	}
@@ -287,6 +304,145 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
 	}
 }
 
+//TODO include this call in the validate function
+//TODO ONLY CALL THIS FUNCTION ON A NON-SHARED STATE PATH!!!!!!!!!!!
+void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePath
+								, PathSet & newFoundComponentReferences, PathSet & newFoundStateReferences, const int revision) //only for recursion
+{
+	//Check if is a state Path
+	if(! isValidStatePathTxn(txn, statePath))
+		throw Error(format("This path '%1%' is not a state path") % statePath);
+
+	//printMsg(lvlError, format("scanAndUpdateAllReferencesTxn: '%1%' - %2%") % statePath % revision);
+	
+	//TODO check if path is not a shared path !
+	//TODO
+
+	//get all possible state and component references
+    PathSet allComponentPaths;
+    PathSet allStatePaths;
+    queryAllValidPaths(txn, allComponentPaths, allStatePaths);
+    
+    //Remove derivation paths
+	PathSet allComponentPaths2;	//without derivations
+    for (PathSet::iterator i = allComponentPaths.begin(); i != allComponentPaths.end(); ++i){
+    	string path = *i;
+    	if(path.substr(path.length() - 4,path.length()) != ".drv")		//TODO HACK: we should have a typed table or a seperate table ....
+    		allComponentPaths2.insert(path);
+    }
+
+	//TODO maybe only scan in the changeset (patch) for new references? (this will be difficult and depending on the underlying versioning system)
+
+    //Scan in for (new) component and state references
+    PathSet state_references = scanForReferences(statePath, allComponentPaths2);		//TODO
+    PathSet state_stateReferences = scanForReferences(statePath, allStatePaths);
+    
+    //Retrieve old references
+    PathSet old_references;
+    PathSet old_state_references;
+    queryReferencesTxn(txn, statePath, old_references, -1);				//get the latsest references
+    queryStateReferencesTxn(txn, statePath, old_state_references, -1);		
+    
+    //Check for added and removed paths
+	PathSet diff_references_removed;
+	PathSet diff_references_added;
+	pathSets_difference(state_references, old_references, diff_references_removed, diff_references_added);
+	PathSet diff_state_references_removed;
+	PathSet diff_state_references_added;
+	pathSets_difference(state_stateReferences, old_state_references, diff_state_references_removed, diff_state_references_added);
+
+	//Set PathSet's for the caller of this function
+	newFoundComponentReferences = diff_references_added;
+	newFoundStateReferences = diff_state_references_added;
+	
+	//Print error, but we could also throw an error.
+	if(diff_references_added.size() != 0)
+    	for (PathSet::iterator i = diff_references_added.begin(); i != diff_references_added.end(); ++i)
+    		printMsg(lvlError, format("Added component reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
+    if(diff_references_removed.size() != 0)
+    	for (PathSet::iterator i = diff_references_removed.begin(); i != diff_references_removed.end(); ++i)
+    		printMsg(lvlError, format("Removed component reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
+    if(diff_state_references_added.size() != 0)
+    	for (PathSet::iterator i = diff_state_references_added.begin(); i != diff_state_references_added.end(); ++i)
+    		printMsg(lvlError, format("Added state reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
+    if(diff_state_references_removed.size() != 0)
+    	for (PathSet::iterator i = diff_state_references_removed.begin(); i != diff_state_references_removed.end(); ++i)
+    		printMsg(lvlError, format("Removed state reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
+
+	//If any changes are detected: register the paths valid with a new revision number
+   	if(diff_references_added.size() != 0 || diff_references_removed.size() != 0 ||
+   	   diff_state_references_added.size() != 0 || diff_state_references_removed.size() != 0 )
+   	{
+	   	printMsg(lvlError, format("Updating new references to revision %1% for statepath: '%2%'") % revision % statePath);
+	   	Path drvPath = queryStatePathDrvTxn(txn, statePath);
+	   	registerValidPath(txn,    	
+	    		statePath,
+	    		Hash(),				//emtpy hash
+	    		state_references,
+	    		state_stateReferences,
+	    		drvPath,
+	    		revision);
+	}
+}
+
+void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path & statePath)		//TODO Can also work for statePaths???
+{
+   	if(! isValidStatePathTxn(txn, statePath))
+   		throw Error(format("This path '%1%' is not a state path") % statePath);
+
+	//get all state current state references recursively
+	PathSet statePaths;
+	store->storePathRequisites(statePath, false, statePaths, false, true, -1);		//Get all current state dependencies
+	
+	//Add own statePath (may already be in there, but its a set, so no doubles)
+	statePaths.insert(statePath);
+	
+   	//We dont need to sort since the db does that
+	//call scanForAllReferences again on all statePaths
+		for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i){
+		int revision = readRevisionNumber(*i);
+		
+		//Scan, update, call recursively
+		PathSet newFoundComponentReferences;
+		PathSet newFoundStateReferences;
+		scanAndUpdateAllReferencesTxn(txn, *i, newFoundComponentReferences, newFoundStateReferences, revision);
+
+		//Call the function recursively again on all newly found references												//TODO test if this works
+		PathSet allNewReferences = pathSets_union(newFoundComponentReferences, newFoundStateReferences);
+		for (PathSet::iterator j = allNewReferences.begin(); j != allNewReferences.end(); ++j)
+			scanAndUpdateAllReferencesRecusivelyTxn(txn, *j);
+	}
+}
+
+void updateRevisionsRecursively(Path statePath)
+{
+	//
+	int newRevisionNumber = store->getNewRevisionNumber(statePath);
+	
+	//Save all revisions for the call to 
+	RevisionNumbersSet rivisionMapping;
+
+	PathSet statePaths;
+	store->storePathRequisites(statePath, false, statePaths, false, true, -1);		//Get all current state dependencies
+	
+	//Add own statePath (may already be in there, but its a set, so no doubles)
+	statePaths.insert(statePath);
+	
+   	//Sort
+   	vector<Path> sortedStatePaths;
+	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
+		sortedStatePaths.push_back(*i);
+    sort(sortedStatePaths.begin(), sortedStatePaths.end());
+		
+	//call scanForAllReferences again on all newly found statePaths
+	for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
+		rivisionMapping[*i] = readRevisionNumber(*i);	
+	
+	//Store the revision numbers in the database for this statePath with revision number
+	store->setStateRevisions(statePath, rivisionMapping, newRevisionNumber);								//TODO !!!!!!!!!!!!!!!!!! merge getNewRevisionNumber back into Database::setStateRevisions
+}
+
+
 static void opRunComponent(Strings opFlags, Strings opArgs)
 {
     //get the all the info of the component that is being called (we dont really use it yet)
@@ -294,9 +450,9 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     Path root_statePath;
     string root_binary;
 	string root_derivationPath;
-	bool root_isStatePath;
+	bool root_isStateComponent;
 	string root_program_args;
-    Derivation root_drv = getDerivation_andCheckArgs(opFlags, opArgs, root_componentPath, root_statePath, root_binary, root_derivationPath, root_isStatePath, root_program_args);
+    Derivation root_drv = getDerivation_andCheckArgs(opFlags, opArgs, root_componentPath, root_statePath, root_binary, root_derivationPath, root_isStateComponent, root_program_args);
         
     //Specifiy the SVN binarys
     string svnbin = nixSVNPath + "/svn";
@@ -316,7 +472,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     //program_args
 	
 	//????	
-	//Transaction txn;
+	Transaction txn;
    	//createStoreTransaction(txn);
 	//txn.commit();
 	
@@ -324,7 +480,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	
 	executeShellCommand(root_componentPath + root_binary + " " + root_program_args);	//more efficient way needed ???
   		
-	//******************* With everything in place, we call the commit script on all statePaths **********************
+	//******************* With everything in place, we call the commit script on all statePaths (in)directly referenced **********************
 	
 	PathSet statePaths;
 	RevisionNumbersSet rivisionMapping;
@@ -337,7 +493,6 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
        	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
     	Path statePath = stateOutputs.find("state")->second.statepath;
 	    DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
-	    string drvName = drv.env.find("name")->second; 
 	
 		//Print
 		printMsg(lvlError, format("Committing statePath: %1%") % statePath);
@@ -396,7 +551,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		}
 		
 		//Get the a repository for this state location
-		string repos = getStateReposPath("stateOutput:staterepospath", statePath, drvName, stateIdentifier);		//this is a copy from store-state.cc
+		string repos = getStateReposPath("stateOutput:staterepospath", statePath);		//this is a copy from store-state.cc
 		string checkoutcommand = svnbin + " --ignore-externals checkout file://" + repos + " " + statePath;
 				
 		//Call the commit script with the appropiate paramenters
@@ -430,28 +585,24 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		//store->setStatePathsInterval(intervalPaths, intervals);		//TODO!!!!!!!!!!!!!!!!!!!!!! uncomment and txn ??
 	}
 	
-	//Start transaction
-	//TODO
+	//Start transaction TODO
+
+	//Scan for new references, and update with revision number
+   	if(scanforReferences)
+  		scanAndUpdateAllReferencesRecusivelyTxn(txn, root_statePath);
 
 	//Get new revision number
-	int newRevisionNumber = store->getNewRevisionNumber(root_statePath);
-	
-	//Scan for new references, and update with revision number
-   	if(scanforReferences){
-  		store->scanAndUpdateAllReferences(root_statePath, newRevisionNumber, true);		//goes recursive
-   	}
+	updateRevisionsRecursively(root_statePath);
 		
-	//Commit
-	//TODO
+	//Commit transaction TODO
 
 	//Debugging
-	/*	
 	RevisionNumbers getRivisions;
 	bool b = store->queryStateRevisions(root_statePath, getRivisions, -1);
 	for (RevisionNumbers::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
 		printMsg(lvlError, format("REV %1%") % int2String(*i));
 	}
-	*/
+	
 	
 }
 
