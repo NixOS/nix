@@ -63,6 +63,9 @@ private:
     /* TODO */
     bool lookupHighestRevivison(const Strings & keys, const Path & statePath, string & key, int lowerthan = -1);
     
+    /* TODO */
+    int getNewRevisionNumber(const Transaction & txn, TableId table, const Path & statePath);
+    
 public:
     Database();
     ~Database();
@@ -113,18 +116,17 @@ public:
         
     /* Set the revision number of the statePath and the revision numbers of all state paths in the references closure */
     void setStateRevisions(const Transaction & txn, TableId table,
-    	const Path & statePath, const RevisionNumbersSet & revisions, int revision = -1);
+    	const Path & statePath, const RevisionNumbersSet & revisions);
     
     /* Returns all the revision numbers of the state references closure of the given state path */
-    bool queryStateRevisions(const Transaction & txn, TableId table,
-    	const Path & statePath, RevisionNumbers & revisions, int revision = -1);
+    bool queryStateRevisions(const Transaction & txn, TableId table, const PathSet statePath_deps,
+   	const Path & statePath, RevisionNumbersSet & revisions, int root_revision = -1);
     
     /* Returns all available revision numbers of the given state path */
     bool queryAvailableStateRevisions(const Transaction & txn, TableId table,
     	const Path & statePath, RevisionNumbers & revisions);	
    
-    /* TODO */
-    int getNewRevisionNumber(const Transaction & txn, TableId table, const Path & statePath, bool update = true);
+    
     
 };
 

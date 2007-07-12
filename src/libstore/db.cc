@@ -466,7 +466,7 @@ void Database::splitStatePathRevision(const Path & revisionedStatePath, Path & s
 														 
 
 int Database::getNewRevisionNumber(const Transaction & txn, TableId table,
-   	const Path & statePath, bool update)
+   	const Path & statePath)
 {
 	//query
 	string data;
@@ -482,10 +482,8 @@ int Database::getNewRevisionNumber(const Transaction & txn, TableId table,
 	if(!succeed)
 		throw Error(format("Malformed revision counter value of path '%1%'") % statePath);
 	
-	if(update){
-		revision++;
-		setString(txn, table, statePath, int2String(revision));
-	}
+	revision++;
+	setString(txn, table, statePath, int2String(revision));
 	
 	return revision;
 }
@@ -591,10 +589,10 @@ bool Database::queryStateReferrers(const Transaction & txn, TableId table,
    
 
 void Database::setStateRevisions(const Transaction & txn, TableId table,
-   	const Path & statePath, const RevisionNumbersSet & revisions, int root_revision)
+   	const Path & statePath, const RevisionNumbersSet & revisions)
 {
-	if(root_revision == -1)
-		root_revision = getNewRevisionNumber(txn, table, statePath);
+	//get a new revision number
+	int root_revision = getNewRevisionNumber(txn, table, statePath);
 	
 	//Sort based on statePath to RevisionNumbersClosure
 	RevisionNumbers sorted_revisions;
@@ -624,38 +622,46 @@ void Database::setStateRevisions(const Transaction & txn, TableId table,
 	setStrings(txn, table, key, data);
 }   
 
-bool Database::queryStateRevisions(const Transaction & txn, TableId table,
-   	const Path & statePath, RevisionNumbers & revisions, int revision)
+bool Database::queryStateRevisions(const Transaction & txn, TableId table, const PathSet statePath_deps,
+   	const Path & statePath, RevisionNumbersSet & revisions, int root_revision)
 {
 	Strings keys;
 	enumTable(txn, table, keys);		//get all revisions
 
 	string key;
-	if(revision == -1){
+	if(root_revision == -1){
 		bool foundsomething = lookupHighestRevivison(keys, statePath, key);
 		if(!foundsomething)
 			return false;
 	}
 	else
-		key = makeStatePathRevision(statePath, revision);
+		key = makeStatePathRevision(statePath, root_revision);
 		
 	Strings data; 
-	bool succeed = queryStrings(txn, table, key, data);		//now that we have the key, we can query the references
+	bool notempty = queryStrings(txn, table, key, data);		//now that we have the key, we can query the revisions
 	
-	//Convert the Strings into int's
-	for (Strings::iterator i = data.begin(); i != data.end(); ++i){
-		string getRevisionS = *i;
+	//sort all state references recursively
+	vector<Path> sortedStatePaths;
+	for (PathSet::iterator i = statePath_deps.begin(); i != statePath_deps.end(); ++i)
+		sortedStatePaths.push_back(*i);
+    sort(sortedStatePaths.begin(), sortedStatePaths.end());
+		
+	//Convert the Strings into int's and match them to the sorted statePaths
+	for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i){
+		string getRevisionS = data.front();
+		data.pop_front();
+		
 		int getRevision;
 		bool succeed = string2Int(getRevisionS, getRevision);
 		if(!succeed)
 			throw Error(format("Cannot read revision number from db of path '%1%'") % statePath);
-		revisions.push_back(getRevision);
+		revisions[*i] = getRevision;
 	}
 	
-	if(!succeed)
-		throw Error(format("Revision '%1%' not found of statePath '%2%'") % int2String(revision) % statePath);
+	if(!notempty)
+		throw Error(format("Root revision '%1%' not found of statePath '%2%'") % int2String(root_revision) % statePath);
 	
-	return succeed;
+	return notempty;
 }  
 
 //TODO include comments into revisions?

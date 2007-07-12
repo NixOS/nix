@@ -1694,12 +1694,6 @@ void getDependenciesAtBuildTime(const Transaction & txn, const Path & drvPath)
 */
 
 
-//TODO REMOVE
-void LocalStore::scanAndUpdateAllReferences(const Path & storeOrStatePath, const int revision, bool recursive)
-{
-	//nix::scanAndUpdateAllReferencesTxn(noTxn, storeOrStatePath, revision, recursive); 
-}
-
 void queryAllValidPaths(const Transaction & txn, PathSet & allComponentPaths, PathSet & allStatePaths)
 {
 	Paths allComponentPaths2;
@@ -1717,22 +1711,24 @@ void queryAllValidPaths(const Transaction & txn, PathSet & allComponentPaths, Pa
 }
 
 
-void setStateRevisionsTxn(const Transaction & txn, const Path & statePath, const RevisionNumbersSet & revisions, const int revision)
+void setStateRevisionsTxn(const Transaction & txn, const Path & statePath, const RevisionNumbersSet & revisions)
 {
-	nixDB.setStateRevisions(txn, dbStateRevisions, statePath, revisions, revision);	
+	nixDB.setStateRevisions(txn, dbStateRevisions, statePath, revisions);	
 }
 
-void LocalStore::setStateRevisions(const Path & statePath, const RevisionNumbersSet & revisions, const int revision)
+void LocalStore::setStateRevisions(const Path & statePath, const RevisionNumbersSet & revisions)
 {
-	nix::setStateRevisionsTxn(noTxn, statePath, revisions, revision);	
+	nix::setStateRevisionsTxn(noTxn, statePath, revisions);	
 }
 
-bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionNumbers & revisions, const int revision)
+bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionNumbersSet & revisions, const int revision)
 {
-	return nixDB.queryStateRevisions(txn, dbStateRevisions, statePath, revisions, revision);
+	PathSet statePaths;
+	storePathRequisites(statePath, false, statePaths, false, true, revision);		//Get all current state dependencies
+	return nixDB.queryStateRevisions(txn, dbStateRevisions, statePaths, statePath, revisions, revision);
 }
 
-bool LocalStore::queryStateRevisions(const Path & statePath, RevisionNumbers & revisions, const int revision)
+bool LocalStore::queryStateRevisions(const Path & statePath, RevisionNumbersSet & revisions, const int revision)
 {
 	return nix::queryStateRevisionsTxn(noTxn, statePath, revisions, revision);
 }
@@ -1747,15 +1743,6 @@ bool LocalStore::queryAvailableStateRevisions(const Path & statePath, RevisionNu
 	return nix::queryAvailableStateRevisionsTxn(noTxn, statePath, revisions);
 }
 
-int getNewRevisionNumberTxn(const Transaction & txn, const Path & statePath, const bool update)
-{
-	 return nixDB.getNewRevisionNumber(txn, dbStateRevisions, statePath, update);
-}
-
-int LocalStore::getNewRevisionNumber(const Path & statePath, bool update)
-{
-	return nix::getNewRevisionNumberTxn(noTxn, statePath, update);
-}
 
 
 

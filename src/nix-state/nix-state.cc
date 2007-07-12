@@ -271,25 +271,26 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
 		statePaths.insert(derivationPath);	//Insert direct state path
 		    	
     //Get the revisions recursively to also roll them back
-    RevisionNumbers getRivisions;
+    RevisionNumbersSet getRivisions;
 	bool b = store->queryStateRevisions(statePath, getRivisions, revision_arg);
     
     //Sort the statePaths from all drvs
-	map<Path, string> state_repos;
-	vector<Path> sorted_paths;
-    for (PathSet::iterator d = statePaths.begin(); d != statePaths.end(); ++d){
-       	string repos = getStateReposPath("stateOutput:staterepospath", *d);		//this is a copy from store-state.cc
-		state_repos[statePath] = repos; 
-		sorted_paths.push_back(statePath);
-	}
-	sort(sorted_paths.begin(), sorted_paths.end());	
+	//map<Path, string> state_repos;
+	//vector<Path> sorted_paths;
+    //for (PathSet::iterator d = statePaths.begin(); d != statePaths.end(); ++d){
+       	
+		//state_repos[statePath] = repos; 
+//		sorted_paths.push_back(statePath);
+	//}
+	//sort(sorted_paths.begin(), sorted_paths.end());	
+	
+	//string repos = 
 	
 	//Revert each statePath in the list
-	for (vector<Path>::iterator i = sorted_paths.begin(); i != sorted_paths.end(); ++i){
-		Path statePath = *i;
-		string repos = state_repos[statePath];
-		int revision = getRivisions.front();
-		getRivisions.pop_front();
+	for (RevisionNumbersSet::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
+		Path statePath = (*i).first;
+		int revision = (*i).second;
+		string repos = getStateReposPath("stateOutput:staterepospath", statePath);		//this is a copy from store-state.cc
 
 		printMsg(lvlError, format("Reverting statePath '%1%' to revision: %2%") % statePath % int2String(revision));
 		Strings p_args;
@@ -399,7 +400,7 @@ void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path
 	
    	//We dont need to sort since the db does that
 	//call scanForAllReferences again on all statePaths
-		for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i){
+	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i){
 		int revision = readRevisionNumber(*i);
 		
 		//Scan, update, call recursively
@@ -416,9 +417,6 @@ void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path
 
 void updateRevisionsRecursively(Path statePath)
 {
-	//
-	int newRevisionNumber = store->getNewRevisionNumber(statePath);
-	
 	//Save all revisions for the call to 
 	RevisionNumbersSet rivisionMapping;
 
@@ -439,7 +437,7 @@ void updateRevisionsRecursively(Path statePath)
 		rivisionMapping[*i] = readRevisionNumber(*i);	
 	
 	//Store the revision numbers in the database for this statePath with revision number
-	store->setStateRevisions(statePath, rivisionMapping, newRevisionNumber);								//TODO !!!!!!!!!!!!!!!!!! merge getNewRevisionNumber back into Database::setStateRevisions
+	store->setStateRevisions(statePath, rivisionMapping);
 }
 
 
@@ -597,10 +595,10 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	//Commit transaction TODO
 
 	//Debugging
-	RevisionNumbers getRivisions;
+	RevisionNumbersSet getRivisions;
 	bool b = store->queryStateRevisions(root_statePath, getRivisions, -1);
-	for (RevisionNumbers::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
-		printMsg(lvlError, format("REV %1%") % int2String(*i));
+	for (RevisionNumbersSet::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
+		printMsg(lvlError, format("State %1% has revision %2%") % (*i).first % int2String((*i).second));
 	}
 	
 	

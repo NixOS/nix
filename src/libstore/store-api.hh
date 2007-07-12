@@ -220,19 +220,13 @@ public:
 	virtual void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision) = 0;
 
 	/* TODO */
-	virtual void scanAndUpdateAllReferences(const Path & statePath, const int revision, bool recursive) = 0;
+	virtual void setStateRevisions(const Path & statePath, const RevisionNumbersSet & revisions) = 0;
 	
 	/* TODO */
-	virtual void setStateRevisions(const Path & statePath, const RevisionNumbersSet & revisions, const int revision) = 0;
-	
-	/* TODO */
-	virtual bool queryStateRevisions(const Path & statePath, RevisionNumbers & revisions, const int revision) = 0;
+	virtual bool queryStateRevisions(const Path & statePath, RevisionNumbersSet & revisions, const int revision) = 0;
 	
 	/* TODO */
 	virtual bool queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions) = 0;
-	
-	/* TODO */
-	virtual int getNewRevisionNumber(const Path & statePath, bool update = true) = 0;
 };
 
 

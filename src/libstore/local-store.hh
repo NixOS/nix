@@ -100,15 +100,11 @@ public:
 	
 	void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision);
 	
-	void scanAndUpdateAllReferences(const Path & statePath, const int revision, bool recursive);
+	void setStateRevisions(const Path & statePath, const RevisionNumbersSet & revisions);
 	
-	void setStateRevisions(const Path & statePath, const RevisionNumbersSet & revisions, const int revision);
-	
-	bool queryStateRevisions(const Path & statePath, RevisionNumbers & revisions, const int revision);
+	bool queryStateRevisions(const Path & statePath, RevisionNumbersSet & revisions, const int revision);
 	
 	bool queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions);
-	
-	int getNewRevisionNumber(const Path & statePath, bool update = true);
 	
 };
 
@@ -223,7 +219,7 @@ bool isStateDrvPathTxn(const Transaction & txn, const Path & drvPath);
 
 bool isStateDrvTxn(const Transaction & txn, const Derivation & drv);
 
-//TODO
+//TODO can this ?????
 void queryAllValidPaths(const Transaction & txn, PathSet & allComponentPaths, PathSet & allStatePaths);
 bool isValidStatePathTxn(const Transaction & txn, const Path & path);
 void queryReferencesTxn(const Transaction & txn, const Path & path, PathSet & references, const int revision);
