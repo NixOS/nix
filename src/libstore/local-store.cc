@@ -13,6 +13,8 @@
 #include "derivations.hh"
 #include "misc.hh"
 
+#include "store-state.hh"
+
 #include <iostream>
 #include <algorithm>
 
@@ -667,8 +669,6 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
 	
 }
 
-
-//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! remove this entire function, replace by 
 
 /*
  * Returns true or false wheter a store-component has a state component (e.g. has a state dir) or not. 
@@ -1643,57 +1643,6 @@ void LocalStore::storePathRequisites(const Path & storeOrstatePath, const bool i
     return nix::storePathRequisites(storeOrstatePath, includeOutputs, paths, withComponents, withState, revision);
 }
 
-/*
- * TODO
- * 
- * Not used yet ......................... (should we use it .... ???)
- * 
- */
-/* 
-void getDependenciesAtBuildTime(const Transaction & txn, const Path & drvPath)
-{
- 	Derivation drv = derivationFromPath(drvPath);	
- 	PathSet allPaths;
- 	PathSet inputPaths; 
- 		 	
- 	//TODO THIS IS A DIRECT COPY FROM BUILD.CC WE SHOULD MERGE !!!!!!!!!!!!1!!!!!!!!!!!!!
- 	
- 	// The outputs are referenceable paths. 
-    for (DerivationOutputs::iterator i = drv.outputs.begin(); i != drv.outputs.end(); ++i)
-    {
-        debug(format("building path `%1%'") % i->second.path);
-        allPaths.insert(i->second.path);
-    } 
-
-    // First, the input derivations. 
-    for (DerivationInputs::iterator i = drv.inputDrvs.begin();
-         i != drv.inputDrvs.end(); ++i)
-    {
-        // Add the relevant output closures of the input derivation
-        // `*i' as input paths.  Only add the closures of output paths
-        // that are specified as inputs. 
-        assert(store->isValidPath(i->first));
-        Derivation inDrv = derivationFromPath(i->first);
-        for (StringSet::iterator j = i->second.begin(); j != i->second.end(); ++j)
-            if (inDrv.outputs.find(*j) != inDrv.outputs.end())
-                computeFSClosure(inDrv.outputs[*j].path, inputPaths, true, false);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
-            else
-                throw Error(format("derivation `%1%' requires non-existent output `%2%' from input derivation `%3%'") % drvPath % *j % i->first);
-    }
-
-    // Second, the input sources.
-    for (PathSet::iterator i = drv.inputSrcs.begin(); i != drv.inputSrcs.end(); ++i)
-        computeFSClosure(*i, inputPaths, true, false);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
-
-    //debug(format("added input paths %1%") % showPaths(inputPaths)); //TODO
-    allPaths.insert(inputPaths.begin(), inputPaths.end());
-    
-    for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
-    	printMsg(lvlError, format("ALLPATHS2: %1%") % *i);
-}
-*/
-
-
 void queryAllValidPaths(const Transaction & txn, PathSet & allComponentPaths, PathSet & allStatePaths)
 {
 	Paths allComponentPaths2;
@@ -1725,6 +1674,8 @@ bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, Rev
 {
 	PathSet statePaths;
 	storePathRequisites(statePath, false, statePaths, false, true, revision);		//Get all current state dependencies
+	statePaths.insert(statePath);													//also insert the root statePath	
+	
 	return nixDB.queryStateRevisions(txn, dbStateRevisions, statePaths, statePath, revisions, revision);
 }
 
@@ -1743,8 +1694,15 @@ bool LocalStore::queryAvailableStateRevisions(const Path & statePath, RevisionNu
 	return nix::queryAvailableStateRevisionsTxn(noTxn, statePath, revisions);
 }
 
+void LocalStore::commitStatePath(const Path & statePath)
+{
+	nix::commitStatePathTxn(noTxn, statePath);
+}
 
-
+void LocalStore::updateRevisionsRecursively(const Path & statePath)
+{
+	nix::updateRevisionsRecursivelyTxn(noTxn, statePath);
+}
 
 /* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */
 static void upgradeStore07()

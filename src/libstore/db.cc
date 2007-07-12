@@ -449,9 +449,9 @@ void Database::enumTable(const Transaction & txn, TableId table,
 Path Database::makeStatePathRevision(const Path & statePath, const int revision)
 {
 	string prefix = "-REV-";
-	
 	return statePath + prefix + int2String(revision);
 }
+
 void Database::splitStatePathRevision(const Path & revisionedStatePath, Path & statePath, int & revision)
 {
 	string prefix = "-REV-";
@@ -606,8 +606,7 @@ void Database::setStateRevisions(const Transaction & txn, TableId table,
 	//Debugging
 	//for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
 	//	printMsg(lvlError, format("Insert: %1% into %2%") % int2String(revisions.at(*i)) % *i);
-	
-	
+		
 	//Convert the int's into Strings
 	Strings data;
 	for (RevisionNumbers::const_iterator i = sorted_revisions.begin(); i != sorted_revisions.end(); ++i) {
@@ -639,13 +638,17 @@ bool Database::queryStateRevisions(const Transaction & txn, TableId table, const
 		
 	Strings data; 
 	bool notempty = queryStrings(txn, table, key, data);		//now that we have the key, we can query the revisions
-	
+
+	//Check
+	if(statePath_deps.size() != data.size())
+		throw Error(format("The number of statepath references doenst equal the number of revisions for '%1%'") % statePath);
+		
 	//sort all state references recursively
 	vector<Path> sortedStatePaths;
 	for (PathSet::iterator i = statePath_deps.begin(); i != statePath_deps.end(); ++i)
 		sortedStatePaths.push_back(*i);
     sort(sortedStatePaths.begin(), sortedStatePaths.end());
-		
+	
 	//Convert the Strings into int's and match them to the sorted statePaths
 	for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i){
 		string getRevisionS = data.front();

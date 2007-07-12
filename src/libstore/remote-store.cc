@@ -486,5 +486,16 @@ bool RemoteStore::queryAvailableStateRevisions(const Path & statePath, RevisionN
 	return false;	
 }
 
+//TODO
+void RemoteStore::commitStatePath(const Path & statePath)
+{
+	
+}
+
+//TODO
+void RemoteStore::updateRevisionsRecursively(const Path & statePath)
+{
+	
+}
 
 }

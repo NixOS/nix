@@ -106,6 +106,9 @@ public:
 	
 	bool queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions);
 	
+	void commitStatePath(const Path & statePath);
+	
+	void updateRevisionsRecursively(const Path & statePath);
 };
 
 
@@ -225,6 +228,8 @@ bool isValidStatePathTxn(const Transaction & txn, const Path & path);
 void queryReferencesTxn(const Transaction & txn, const Path & path, PathSet & references, const int revision);
 void queryStateReferencesTxn(const Transaction & txn, const Path & storePath, PathSet & stateReferences, const int revision);
 Path queryStatePathDrvTxn(const Transaction & txn, const Path & statePath);
+void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision);
+void setStateRevisionsTxn(const Transaction & txn, const Path & statePath, const RevisionNumbersSet & revisions);
 
 }
 

@@ -17,7 +17,7 @@ BUILT_SOURCES = derivations-ast.cc derivations-ast.hh
 EXTRA_DIST = derivations-ast.def derivations-ast.cc
 
 AM_CXXFLAGS = -Wall \
- -I$(srcdir)/.. ${bdb_include} ${aterm_include} -I$(srcdir)/../libutil
+ -I$(srcdir)/.. ${bdb_include} ${aterm_include} -I$(srcdir)/../libutil -I$(srcdir)/../nix-state
 
 derivations-ast.cc derivations-ast.hh: ../aterm-helper.pl derivations-ast.def
 	$(perl) $(srcdir)/../aterm-helper.pl derivations-ast.hh derivations-ast.cc < $(srcdir)/derivations-ast.def

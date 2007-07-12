@@ -11,6 +11,7 @@
 #include "local-store.hh"
 #include "derivations.hh"
 #include "references.hh"
+#include "store-state.hh"
 
 using namespace nix;
 using std::cin;
@@ -24,6 +25,7 @@ string stateIdentifier;
 string username;
 int revision_arg;
 bool scanforReferences = false;
+bool only_commit = false;
 
 
 /************************* Build time Functions ******************************/
@@ -225,33 +227,6 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 	printMsg(lvlError, format("Available Revisions: %1%") % revisions_txt);
 }
 
-int readRevisionNumber(Path statePath)
-{
-	string svnbin = nixSVNPath + "/svn";
-	RevisionNumbers revisions;
-	
-	string repos = getStateReposPath("stateOutput:staterepospath", statePath);		//this is a copy from store-state.cc
-	
-	//TODO Check if the .svn exists, it might be deleted, then we dont have to remember the state revision (set -1)
-	
-	Strings p_args;
-	p_args.push_back(svnbin);
-	p_args.push_back("file://" + repos);
-	string output = runProgram(nixLibexecDir + "/nix/nix-readrevisions.sh", true, p_args);	//run
-	    	
-	int pos = output.find("\n",0);	//remove trailing \n
-	output.erase(pos,1);
-			
-	int revision;
-	bool succeed = string2Int(output, revision);
-	if(!succeed)
-		throw Error(format("Cannot read revision number of path '%1%'") % repos);				
-	
-	return revision;	
-}
-
-
-
 static void revertToRevision(Strings opFlags, Strings opArgs)
 {
 	Path componentPath;
@@ -415,30 +390,6 @@ void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path
 	}
 }
 
-void updateRevisionsRecursively(Path statePath)
-{
-	//Save all revisions for the call to 
-	RevisionNumbersSet rivisionMapping;
-
-	PathSet statePaths;
-	store->storePathRequisites(statePath, false, statePaths, false, true, -1);		//Get all current state dependencies
-	
-	//Add own statePath (may already be in there, but its a set, so no doubles)
-	statePaths.insert(statePath);
-	
-   	//Sort
-   	vector<Path> sortedStatePaths;
-	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
-		sortedStatePaths.push_back(*i);
-    sort(sortedStatePaths.begin(), sortedStatePaths.end());
-		
-	//call scanForAllReferences again on all newly found statePaths
-	for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
-		rivisionMapping[*i] = readRevisionNumber(*i);	
-	
-	//Store the revision numbers in the database for this statePath with revision number
-	store->setStateRevisions(statePath, rivisionMapping);
-}
 
 
 static void opRunComponent(Strings opFlags, Strings opArgs)
@@ -452,136 +403,34 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	string root_program_args;
     Derivation root_drv = getDerivation_andCheckArgs(opFlags, opArgs, root_componentPath, root_statePath, root_binary, root_derivationPath, root_isStateComponent, root_program_args);
         
-    //Specifiy the SVN binarys
-    string svnbin = nixSVNPath + "/svn";
-	string svnadminbin = nixSVNPath + "/svnadmin";
-    
-        
     //Check for locks ... ? or put locks on the neseccary state components
     //WARNING: we need to watch out for deadlocks!
 	//add locks ... ?
 	//svn lock ... ?
 
-    //get all current dependecies (if neccecary | recusively) of all state components that need to be updated
-    PathSet root_drvs = getAllStateDerivationsRecursively(root_componentPath, -1);
-    //TODO WHAT ABOUT YOURSELF??????????
+	//get all current dependecies (if neccecary | recusively) of all state components that need to be updated
+    PathSet statePaths;
+	store->storePathRequisites(root_componentPath, false, statePaths, false, true, -1);
+	statePaths.insert(root_statePath);
     
     //TODO maybe also scan the parameters for state or component hashes?
     //program_args
 	
-	//????	
+	//TODO
 	Transaction txn;
    	//createStoreTransaction(txn);
-	//txn.commit();
+	
 	
 	//******************* Run ****************************
 	
-	executeShellCommand(root_componentPath + root_binary + " " + root_program_args);	//more efficient way needed ???
+	if(!only_commit)
+		executeShellCommand(root_componentPath + root_binary + " " + root_program_args);	//more efficient way needed ???
   		
 	//******************* With everything in place, we call the commit script on all statePaths (in)directly referenced **********************
 	
-	PathSet statePaths;
-	RevisionNumbersSet rivisionMapping;
-	
-	for (PathSet::iterator d = root_drvs.begin(); d != root_drvs.end(); ++d)		//TODO first commit own state path?
-	{
-		//Extract the neccecary info from each Drv
-		Path drvPath = *d;
-       	Derivation drv = derivationFromPath(drvPath);
-       	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
-    	Path statePath = stateOutputs.find("state")->second.statepath;
-	    DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
-	
-		//Print
-		printMsg(lvlError, format("Committing statePath: %1%") % statePath);
-	
-		//Vector includeing all commit scripts:
-		vector<string> subversionedpaths;
-		vector<bool> subversionedpathsCommitBoolean;
-		vector<string> nonversionedpaths;			//of type none, no versioning needed
-		
-		//Get all the inverals from the database at once
-		PathSet intervalPaths;
-		for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
-			DerivationStateOutputDir d = i->second;
-	
-			string thisdir = d.path;
-			string fullstatedir = statePath + "/" + thisdir;
-			
-			if(d.type == "interval"){
-				intervalPaths.insert(fullstatedir);
-			}
-		}
-		vector<int> intervals = store->getStatePathsInterval(intervalPaths);		//TODO !!!!!!!!!!!!! txn ??
-		
-		int intervalAt=0;	
-		for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
-			DerivationStateOutputDir d = i->second;
-			string thisdir = d.path;
-			
-			string fullstatedir = statePath + "/" + thisdir;
-			if(thisdir == "/")									//exception for the root dir
-				fullstatedir = statePath + "/";				
-			
-			if(d.type == "none"){
-				nonversionedpaths.push_back(fullstatedir);
-				continue;
-			}
-					
-			subversionedpaths.push_back(fullstatedir);
-			
-			if(d.type == "interval"){
-				//Get the interval-counter from the database
-				int interval_counter = intervals[intervalAt];
-				int interval = d.getInterval();
-				subversionedpathsCommitBoolean.push_back(interval_counter % interval == 0);
-	    		
-				//update the interval
-				intervals[intervalAt] = interval_counter + 1;
-				intervalAt++;
-			}
-			else if(d.type == "full")
-				subversionedpathsCommitBoolean.push_back(true);
-			else if(d.type == "manual")											//TODO !!!!!
-				subversionedpathsCommitBoolean.push_back(false);
-			else
-				throw Error(format("interval '%1%' is not handled in nix-state") % d.type);
-		}
-		
-		//Get the a repository for this state location
-		string repos = getStateReposPath("stateOutput:staterepospath", statePath);		//this is a copy from store-state.cc
-		string checkoutcommand = svnbin + " --ignore-externals checkout file://" + repos + " " + statePath;
-				
-		//Call the commit script with the appropiate paramenters
-		string subversionedstatepathsarray; 
-		for (vector<string>::iterator i = subversionedpaths.begin(); i != subversionedpaths.end(); ++i)
-	    {
-			subversionedstatepathsarray += *(i) + " ";
-	    }
-		string subversionedpathsCommitBooleansarray; 
-		for (vector<bool>::iterator i = subversionedpathsCommitBoolean.begin(); i != subversionedpathsCommitBoolean.end(); ++i)
-	    {
-			subversionedpathsCommitBooleansarray += bool2string(*i) + " ";
-	    }
-		string nonversionedstatepathsarray; 
-		for (vector<string>::iterator i = nonversionedpaths.begin(); i != nonversionedpaths.end(); ++i)
-	    {
-			nonversionedstatepathsarray += *(i) + " ";
-	    }
-	  	
-	    //make the call to the commit script
-	    Strings p_args;
-		p_args.push_back(svnbin);
-		p_args.push_back(subversionedstatepathsarray);
-		p_args.push_back(subversionedpathsCommitBooleansarray);
-		p_args.push_back(nonversionedstatepathsarray);
-		p_args.push_back(checkoutcommand);
-		p_args.push_back(statePath);
-		runProgram_AndPrintOutput(nixLibexecDir + "/nix/nix-statecommit.sh", true, p_args, "svn");
-	    
-	    //Update the intervals again	
-		//store->setStatePathsInterval(intervalPaths, intervals);		//TODO!!!!!!!!!!!!!!!!!!!!!! uncomment and txn ??
-	}
+	//Commit all statePaths
+	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)		//TODO first commit own state path?
+		commitStatePathTxn(txn, *i);
 	
 	//Start transaction TODO
 
@@ -590,10 +439,11 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
   		scanAndUpdateAllReferencesRecusivelyTxn(txn, root_statePath);
 
 	//Get new revision number
-	updateRevisionsRecursively(root_statePath);
+	updateRevisionsRecursivelyTxn(txn, root_statePath);
 		
-	//Commit transaction TODO
-
+	//Commit transaction
+	//txn.commit();
+	
 	//Debugging
 	RevisionNumbersSet getRivisions;
 	bool b = store->queryStateRevisions(root_statePath, getRivisions, -1);
@@ -720,6 +570,10 @@ void run(Strings args)
 		
         if (arg == "--run" || arg == "-r")
             op = opRunComponent;
+        else if (arg == "--commit-only"){
+			op = opRunComponent;
+			only_commit = true;
+    	}
 		else if (arg == "--showstatepath")
 			op = opShowStatePath;
 		else if (arg == "--showstatereposrootpath")

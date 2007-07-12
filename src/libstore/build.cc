@@ -7,7 +7,6 @@
 #include "util.hh"
 #include "store-state.hh"
 
-
 #include <map>
 #include <iostream>
 #include <sstream>
@@ -1787,15 +1786,22 @@ void DerivationGoal::computeClosure()
     //Register the state path valid
     if(isStateDrvTxn(txn, drv))
     {
-		//TODO ONLY CALL THIS FUNCTION ON A NON-SHARED STATE PATH!!!!!!!!!!!
-
-    	Path statePath = drv.stateOutputs.find("state")->second.statepath;
+		//TODO ONLY CALL THIS FUNCTION ON A NON-SHARED STATE PATH!!!!!!!!!!!	(why?)
+		Path statePath = drv.stateOutputs.find("state")->second.statepath;		
+		
     	registerValidPath(txn,    	
     		statePath,
     		Hash(),										//emtpy hash
     		state_references,
     		state_stateReferences,
-    		drvPath, 0);
+    		drvPath, 0);							//TODO !!!!!!!!!!!!
+    	
+    	//Commit state
+		commitStatePathTxn(txn, statePath);
+		
+		//Set first revision (if we committed something)
+		if(readRevisionNumber(statePath) == 1)
+			updateRevisionsRecursivelyTxn(txn, statePath);
     }	    
     
     txn.commit();
@@ -2104,6 +2110,7 @@ void SubstitutionGoal::tryToRun()
     logPipe.create();
 
     /* Remove the (stale) output path if it exists. */
+    /* TODO also remove state Path ? */
     if (pathExists(storePath))
         deletePathWrapped(storePath);
 

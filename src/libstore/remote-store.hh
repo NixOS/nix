@@ -93,6 +93,10 @@ public:
 	bool queryStateRevisions(const Path & statePath, RevisionNumbersSet & revisions, const int revision);
 	
 	bool queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions);
+
+	void commitStatePath(const Path & statePath);
+	
+	void updateRevisionsRecursively(const Path & statePath);
     
 private:
     AutoCloseFD fdSocket;

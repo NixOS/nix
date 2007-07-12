@@ -227,6 +227,10 @@ public:
 	
 	/* TODO */
 	virtual bool queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions) = 0;
+	
+	virtual void commitStatePath(const Path & statePath) = 0;
+	
+	virtual void updateRevisionsRecursively(const Path & statePath) = 0;
 };
 
 
