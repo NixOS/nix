@@ -202,7 +202,7 @@ void updateRevisionsRecursivelyTxn(const Transaction & txn, const Path & statePa
 	RevisionNumbersSet rivisionMapping;
 
 	PathSet statePaths;
-	storePathRequisites(statePath, false, statePaths, false, true, -1);		//Get all current state dependencies
+	storePathRequisitesTxn(txn, statePath, false, statePaths, false, true, -1);		//Get all current state dependencies
 	
 	//Add own statePath (may already be in there, but its a set, so no doubles)
 	statePaths.insert(statePath);

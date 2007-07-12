@@ -1,6 +1,7 @@
 #include "misc.hh"
 #include "store-api.hh"
 #include "db.hh"
+#include "local-store.hh"
 
 #include <aterm2.h>
 
@@ -20,27 +21,32 @@ Derivation derivationFromPath(const Path & drvPath)
 
 void computeFSClosure(const Path & path, PathSet & paths, const bool & withComponents, const bool & withState, const int revision, bool flipDirection)
 {
+	computeFSClosureTxn(noTxn, path, paths, withComponents, withState, revision, flipDirection);
+}
+
+void computeFSClosureTxn(const Transaction & txn, const Path & path, PathSet & paths, const bool & withComponents, const bool & withState, const int revision, bool flipDirection)
+{
 	PathSet allPaths;
-	computeFSClosureRec(path, allPaths, revision, flipDirection);
+	computeFSClosureRecTxn(txn, path, allPaths, revision, flipDirection);
 	
 	if(!withComponents && !withState)
 		throw Error(format("Useless call to computeFSClosure, at leat withComponents or withState must be true"));
 	
 	//TODO MAYBE EDIT: HOW CAN THESE PATHS ALREADY BE VALID SOMETIMES ..... ?????????????????????
 	for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
-		if ( !store->isValidPath(*i) && !store->isValidStatePath(*i) )
+		if ( !isValidPathTxn(txn, *i) && !isValidStatePathTxn(txn, *i) )
 			throw Error(format("Not a state or store path: ") % *i);
 	
     //if withState is false, we filter out all state paths
 	if( withComponents && !withState ){
 		for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
-			if ( store->isValidPath(*i) )
+			if ( isValidPathTxn(txn, *i) )
 				paths.insert(*i);
 	}
 	//if withComponents is false, we filter out all component paths
 	else if( !withComponents && withState ){
 		for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
-			if ( store->isValidStatePath(*i) )
+			if ( isValidStatePathTxn(txn, *i) )
 				paths.insert(*i);
 	}
 	//all
@@ -49,7 +55,7 @@ void computeFSClosure(const Path & path, PathSet & paths, const bool & withCompo
 	}
 }
 
-void computeFSClosureRec(const Path & path, PathSet & paths, const int revision, const bool & flipDirection)
+void computeFSClosureRecTxn(const Transaction & txn, const Path & path, PathSet & paths, const int revision, const bool & flipDirection)
 {
     if (paths.find(path) != paths.end()) return;	//takes care of double entries
     
@@ -59,19 +65,19 @@ void computeFSClosureRec(const Path & path, PathSet & paths, const int revision,
     PathSet stateReferences;
     
     if (flipDirection){
-        store->queryReferrers(path, references, revision);
-       	store->queryStateReferrers(path, stateReferences, revision);
+        queryReferrersTxn(txn, path, references, revision);
+       	queryStateReferrersTxn(txn, path, stateReferences, revision);
     }
     else{
-        store->queryReferences(path, references, revision);
-       	store->queryStateReferences(path, stateReferences, revision);
+        queryReferencesTxn(txn, path, references, revision);
+       	queryStateReferencesTxn(txn, path, stateReferences, revision);
     }
 
 	PathSet allReferences;
 	allReferences = pathSets_union(references, stateReferences);
 
     for (PathSet::iterator i = allReferences.begin(); i != allReferences.end(); ++i)
-        computeFSClosureRec(*i, paths, revision, flipDirection);
+        computeFSClosureRecTxn(txn, *i, paths, revision, flipDirection);
 }
 
 

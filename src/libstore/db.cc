@@ -604,8 +604,8 @@ void Database::setStateRevisions(const Transaction & txn, TableId table,
     	sorted_revisions.push_back(revisions.at(*i));
 	
 	//Debugging
-	//for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
-	//	printMsg(lvlError, format("Insert: %1% into %2%") % int2String(revisions.at(*i)) % *i);
+	for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
+		printMsg(lvlError, format("Insert: %1% into %2%") % int2String(revisions.at(*i)) % *i);
 		
 	//Convert the int's into Strings
 	Strings data;

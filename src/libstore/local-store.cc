@@ -594,7 +594,7 @@ void LocalStore::queryAllReferences(const Path & path, PathSet & allReferences, 
 	queryAllReferencesTxn(noTxn, path, allReferences, revision);
 }
 
-void queryReferrers(const Transaction & txn,
+void queryReferrersTxn(const Transaction & txn,
     const Path & storePath, PathSet & referrers, const int revision)
 {
     if (!isRealisableComponentOrStatePath(txn, storePath))
@@ -606,11 +606,11 @@ void queryReferrers(const Transaction & txn,
 void LocalStore::queryReferrers(const Path & storePath,
     PathSet & referrers, const int revision)
 {
-    nix::queryReferrers(noTxn, storePath, referrers, revision);
+    nix::queryReferrersTxn(noTxn, storePath, referrers, revision);
 }
 
 
-void queryStateReferrers(const Transaction & txn, const Path & storePath, PathSet & stateReferrers, const int revision)
+void queryStateReferrersTxn(const Transaction & txn, const Path & storePath, PathSet & stateReferrers, const int revision)
 {
     if (!isRealisableComponentOrStatePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
@@ -620,7 +620,7 @@ void queryStateReferrers(const Transaction & txn, const Path & storePath, PathSe
 
 void LocalStore::queryStateReferrers(const Path & storePath, PathSet & stateReferrers, const int revision)
 {
-    nix::queryStateReferrers(noTxn, storePath, stateReferrers, revision);
+    nix::queryStateReferrersTxn(noTxn, storePath, stateReferrers, revision);
 }
 
 
@@ -1623,7 +1623,12 @@ PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, 
 */
 void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision)
 {
-    computeFSClosure(storeOrstatePath, paths, withComponents, withState, revision);
+	nix::storePathRequisitesTxn(noTxn, storeOrstatePath, includeOutputs, paths, withComponents, withState, revision);
+}
+
+void storePathRequisitesTxn(const Transaction & txn, const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision)
+{
+    computeFSClosureTxn(txn, storeOrstatePath, paths, withComponents, withState, revision);
 
     if (includeOutputs) {
         for (PathSet::iterator i = paths.begin();
@@ -1632,15 +1637,15 @@ void storePathRequisites(const Path & storeOrstatePath, const bool includeOutput
                 Derivation drv = derivationFromPath(*i);
                 for (DerivationOutputs::iterator j = drv.outputs.begin();
                      j != drv.outputs.end(); ++j)
-                    if (store->isValidPath(j->second.path))
-                        computeFSClosure(j->second.path, paths, withComponents, withState, revision);
+                    if (isValidPathTxn(txn, j->second.path))
+                        computeFSClosureTxn(txn, j->second.path, paths, withComponents, withState, revision);
             }
     }
 }
 
 void LocalStore::storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision)
 {
-    return nix::storePathRequisites(storeOrstatePath, includeOutputs, paths, withComponents, withState, revision);
+    nix::storePathRequisites(storeOrstatePath, includeOutputs, paths, withComponents, withState, revision);
 }
 
 void queryAllValidPaths(const Transaction & txn, PathSet & allComponentPaths, PathSet & allStatePaths)

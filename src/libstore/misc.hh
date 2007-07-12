@@ -2,6 +2,7 @@
 #define __MISC_H
 
 #include "derivations.hh"
+#include "db.hh"
 
 
 namespace nix {
@@ -26,7 +27,9 @@ Derivation derivationFromPath(const Path & drvPath);
    returned. */
 void computeFSClosure(const Path & storePath, PathSet & paths, const bool & withComponents, const bool & withState, const int revision, bool flipDirection = false);
 
-void computeFSClosureRec(const Path & path, PathSet & paths, const int revision, const bool & flipDirection);	//TODO private    
+void computeFSClosureTxn(const Transaction & txn, const Path & storePath, PathSet & paths, const bool & withComponents, const bool & withState, const int revision, bool flipDirection = false);
+
+void computeFSClosureRecTxn(const Transaction & txn, const Path & path, PathSet & paths, const int revision, const bool & flipDirection);	//TODO private    
 
 /* Return the path corresponding to the output identifier `id' in the
    given derivation. */
