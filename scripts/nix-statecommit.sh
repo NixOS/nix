@@ -42,6 +42,8 @@ function subversionSingleStateDir {
 
 	  excludelist=( "." ".." ".svn" );
 
+      checkForSVNDelete $1;													#check for deleted files/folders (TODO does this also need to be here ???)
+
 	  cd $1;
 	  #echo cd $1;
 	  
@@ -56,7 +58,7 @@ function subversionSingleStateDir {
 	  for subitem in ${allsubitems[@]}
 	  do
 	  	  if [ "$subitem" = ".svn" ]; then
-	  	  		allsubitems=( $(svn -N stat | sed -n '/^?/p' | sed 's/?     //' | tr -d "\12") )		#there are subfiles, and theyre already versioned
+	  	  		allsubitems=( $($svnbin -N stat | sed -n '/^?/p' | sed 's/?     //' | tr -d "\12") )		#there are subfiles, and theyre already versioned
 	  	  		
 	  	  		if [ "$deletesvn" = "1" ]; then
 	  	  		  rm -rf .svn/
@@ -113,12 +115,12 @@ function subversionSingleStateDir {
 	     do
 	     if test -d $item; then												#add or go recursive subitems
 		     if [ "$deletesvn" != "1" ]; then
-		     	$debug svn -N add $item										#NON recursively add the dir
+		     	$debug $svnbin -N add $item									#NON recursively add the dir
 		     fi
 		     subversionSingleStateDir $item
 		 else
 		     if [ "$deletesvn" != "1" ]; then
-		 	 	$debug svn add $item
+		 	 	$debug $svnbin add $item
 		 	 fi
 		 fi
 	  done
@@ -126,12 +128,28 @@ function subversionSingleStateDir {
 }  
 
 #
+# Takes a dir or file, checks for deleted files / folders and svn delete's them
+#
+
+function checkForSVNDelete {
+
+	#echo checking for deleted items: $1;
+	allsubitems=( $($svnbin -N stat $1 | sed -n '/^!/p' | sed 's/!     //' | tr -d "\12") )		#select all deleted files
+	#echo "All deleted subitems ${allsubitems[@]}"
+	
+	for subitem in ${allsubitems[@]}															#then svn delete them
+	do	
+		$debug $svnbin delete $subitem
+	done
+}
+
+#
 #
 #
 #
 
-if ! test -d "${statepath}/.svn/"; then       									#if the dir exists but is not yet an svn dir: checkout repos, if it doenst exits (is removed or something) than we dont do anything
-	if [ "$deletesvn" != "1" ]; then
+if ! test -d "${statepath}/.svn/"; then       									#if the root dir exists but is not yet an svn dir: checkout repos, if it doenst exits (is removed or something) than we dont do anything
+	if [ "$deletesvn" != "1" ]; then											#TODO !!!!!!!!!!!!!!! we shouldnt checkout !!!!!!!!!!!!!!!!!
 		$debug $checkout;
 	fi
 fi
@@ -139,6 +157,9 @@ fi
 i=0
 for path in ${subversionedpaths[@]}
 do
+   
+   checkForSVNDelete $path;														#check if path or file is deleted
+   
    if test -d $path; then														#if the dir doesnt exist, than we dont hav to do anything
       cd $path;
 	  																		    
@@ -147,7 +168,7 @@ do
 		  
 		  if ! test -d "${path}/.svn/"; then									#Dir: Also add yourself if nessecary
 		  	  if [ "$deletesvn" != "1" ]; then									
-				$debug svn -N add $path										
+				$debug $svnbin -N add $path										
 			  fi
 		  fi
 		  
@@ -165,7 +186,7 @@ do
 		   alreadyversioned=$(svn -N stat $path )
 		   if [ "$alreadyversioned" != "" ]; then
   			    echo "Subversioning $path"
-		   		$debug svn add $path	
+		   		$debug $svnbin add $path	
 		   fi
 	   fi
    fi
@@ -174,6 +195,7 @@ done
 
 cd $statepath																	#now that everything is added we go back to the 'root' path and commit
 if [ "$deletesvn" != "1" ]; then
-	$debug svn -m "" commit;
+	$debug $svnbin -m "" commit;
+	$debug $svnbin up "" commit;												#do a svn up to update the local revision number ... (the contents stays the same)
 fi
 
