@@ -66,13 +66,13 @@ void throwBadDrv(ATerm t)
 Derivation parseDerivation(ATerm t)
 {
     Derivation drv;
-    ATermList outs,  inDrvs, inSrcs, args, bnds;
+    ATermList outs, solidStateDeps, inDrvs, inSrcs, args, bnds;
     ATermList stateOuts = ATempty, stateOutDirs = ATempty;
     
     ATerm builder, platform;
 
 	bool withState;
-    if (matchDerive(t, outs, stateOuts, stateOutDirs, inDrvs, inSrcs, platform, builder, args, bnds) ) { withState = true; }
+    if (matchDerive(t, outs, stateOuts, stateOutDirs, solidStateDeps, inDrvs, inSrcs, platform, builder, args, bnds) ) { withState = true; }
     else if (matchDeriveWithOutState(t, outs, inDrvs, inSrcs, platform, builder, args, bnds) ) { withState = false; }
     else
         throwBadDrv(t);
@@ -89,7 +89,8 @@ Derivation parseDerivation(ATerm t)
         drv.outputs[aterm2String(id)] = out;
     }
     
-    if(withState){
+    if(withState)
+    {
 	    //parse state part
 	    for (ATermIterator i(stateOuts); i; ++i) {
 	        ATerm id, statepath, componentHash, hashAlgo, hash, stateIdentifier, enabled, shared, synchronization, createDirsBeforeInstall, runtimeStateParamters, username;
@@ -110,9 +111,7 @@ Derivation parseDerivation(ATerm t)
 	        stateOut.username = aterm2String(username);
 	        drv.stateOutputs[aterm2String(id)] = stateOut;
 	    }
-	}
 
-	if(withState){
 	    //parse state dirs part
 	    for (ATermIterator i(stateOutDirs); i; ++i) {
 	        ATerm id, path, type, interval;
@@ -125,6 +124,13 @@ Derivation parseDerivation(ATerm t)
 	        stateOutDirs.interval = aterm2String(interval);
 	        drv.stateOutputDirs[aterm2String(id)] = stateOutDirs;
 	    }
+	    
+	    //parse solid state dependencies
+	    for (ATermIterator i(solidStateDeps); i; ++i) {
+	        if (ATgetType(*i) != AT_APPL)
+	            throw badTerm("string expected", *i);
+	        drv.solidStateDeps.insert(aterm2String(*i));
+    	}
 	}
 
     for (ATermIterator i(inDrvs); i; ++i) {
@@ -202,11 +208,14 @@ ATerm unparseDerivation(const Derivation & drv)
         stateOutputDirs = ATinsert(stateOutputDirs,
             makeDerivationStateOutputDir(
                 toATerm(i->first),
-                //toATerm(i->second.path),			//removed to prevent duplication since the key is also the path 
                 toATerm(i->second.type),
                 toATerm(i->second.interval)
                 ));
-
+	
+	ATermList solidStateDeps = ATempty;
+	for (StringSet::const_reverse_iterator i = drv.solidStateDeps.rbegin();
+         i != drv.solidStateDeps.rend(); ++i)
+        solidStateDeps = ATinsert(solidStateDeps, toATerm(*i));
 
     ATermList inDrvs = ATempty;
     for (DerivationInputs::const_reverse_iterator i = drv.inputDrvs.rbegin();
@@ -234,6 +243,7 @@ ATerm unparseDerivation(const Derivation & drv)
 	        outputs,
 	        stateOutputs,
 	        stateOutputDirs,
+	        solidStateDeps,
 	        inDrvs,
 	        toATermList(drv.inputSrcs),
 	        toATerm(drv.platform),

@@ -158,8 +158,9 @@ typedef std::map<string, string> StringPairs;
 struct Derivation
 {
     DerivationOutputs outputs; /* keyed on symbolic IDs */
-    DerivationStateOutputs stateOutputs; /*  */
-    DerivationStateOutputDirs stateOutputDirs; /*  */    
+    DerivationStateOutputs stateOutputs; /* TODO */
+    DerivationStateOutputDirs stateOutputDirs; /* TODO */
+    StringSet solidStateDeps;	/* TODO */    
     DerivationInputs inputDrvs; /* inputs that are sub-derivations */
     PathSet inputSrcs; /* inputs that are sources */
     string platform;

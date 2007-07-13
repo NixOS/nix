@@ -3,7 +3,7 @@
 
 #check if there are enough arguments, if not, exit with an error
 
-debug="echo ";		#set to "" for no debugging, set to "echo " to debug the commands
+debug="";		#set to "" for no debugging, set to "echo " to debug the commands
 
 if [ "$#" != 6 ] && [ "$#" != 7 ] ; then
   echo "Incorrect number of arguments"
@@ -33,6 +33,8 @@ if [ "$debug" != "" ] ; then
 	echo statepath: $statepath
 	echo deletesvn: $deletesvn
 fi
+
+# TODO: we need a solution for symlinks, svn doesnt support them
 
 #
 #

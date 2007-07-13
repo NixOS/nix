@@ -240,6 +240,9 @@ void setStateRevisionsTxn(const Transaction & txn, const Path & statePath, const
 bool isValidPathTxn(const Transaction & txn, const Path & path);
 bool isValidStatePathTxn(const Transaction & txn, const Path & path);
 
+void setSolidStateReferencesTxn(const Transaction & txn, const Path & statePath, const PathSet & paths);
+bool querySolidStateReferencesTxn(const Transaction & txn, const Path & statePath, PathSet & paths);
+
 }
 
 

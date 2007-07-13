@@ -449,7 +449,6 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
                     drv.args.push_back(s);
                 }
             }
-
 			//Add specific state variables
    	        else if(key == "stateDirs") {
               
@@ -508,6 +507,19 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
               }
                  	         
    	        }
+   	        else if(key == "solidStateDependencies"){
+                ATermList es;
+                value = evalExpr(state, value);
+                if (!matchList(value, es)) {
+                    static bool haveWarned = false;
+                    warnOnce(haveWarned, "the `solidStateDependencies' attribute should evaluate to a list");
+                    es = flattenList(state, value);
+                }
+                for (ATermIterator i(es); i; ++i) {
+                    string s = coerceToString(state, *i, context, true);
+                    drv.solidStateDeps.insert(s);
+                }
+            }
    	        else if(key == "shareState") { shareState = coerceToString(state, value, context, true); }
    	        else if(key == "synchronization") { syncState = coerceToString(state, value, context, true); }
    	        else if(key == "disableState") { disableState = evalBool(state, value); }
@@ -614,6 +626,13 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     /* Construct the final derivation store expression. */
     drv.env["out"] = outPath;
     drv.outputs["out"] = DerivationOutput(outPath, outputHashAlgo, outputHash);
+    
+    /* Replace $(statePath) in solidStateDeps */
+    for (StringSet::iterator i = drv.solidStateDeps.begin(); i != drv.solidStateDeps.end(); ++i)
+    	if(*i == "$(statePath)" || "$statePath" ){
+    		drv.solidStateDeps.erase(*i);
+    		drv.solidStateDeps.insert(outPath);   
+    	} 		
     
     //printMsg(lvlError, format("DerivationOutput %1% %2% %3%") % outPath % outputHashAlgo % outputHash);
 	//only add state when we have to to keep compitibilty with the 'old' format.

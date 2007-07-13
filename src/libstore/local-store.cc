@@ -80,6 +80,12 @@ static TableId dbComponentStateReferrers = 0;
 static TableId dbStateComponentReferrers = 0;
 static TableId dbStateStateReferrers = 0;
 
+/* dbSolidStateReferences :: Path -> [Path] 
+ * 
+ * TODO Comment!!!!!!!!!!!!!!!!!!!!!!!1
+ * 
+ */
+static TableId dbSolidStateReferences = 0;
 
 /* dbSubstitutes :: Path -> [[Path]]
 
@@ -190,15 +196,17 @@ LocalStore::LocalStore(bool reserveSpace)
 
 	dbStateInfo = nixDB.openTable("stateinfo");
     dbStateCounters = nixDB.openTable("statecounters");
-	dbComponentComponentReferences = nixDB.openTable("references");
+	dbComponentComponentReferences = nixDB.openTable("references");	/* c_c */
 	dbComponentStateReferences = nixDB.openTable("references_c_s");
 	dbStateComponentReferences = nixDB.openTable("references_s_c");
 	dbStateStateReferences = nixDB.openTable("references_s_s");
-	dbComponentComponentReferrers = nixDB.openTable("referrers", true); /* must be sorted */
+	dbComponentComponentReferrers = nixDB.openTable("referrers", true); /* must be sorted */ /* c_c */
 	dbComponentStateReferrers = nixDB.openTable("referrers_c_s", true);
 	dbStateComponentReferrers = nixDB.openTable("referrers_s_c", true);
 	dbStateStateReferrers = nixDB.openTable("referrers_s_s", true);
 	dbStateRevisions = nixDB.openTable("staterevisions");
+
+	dbSolidStateReferences = nixDB.openTable("references_solid_c_s");	/* The contents of this table is included in references_c_s */
 	
     int curSchema = 0;
     Path schemaFN = nixDBPath + "/schema";
@@ -1707,6 +1715,20 @@ void LocalStore::commitStatePath(const Path & statePath)
 void LocalStore::updateRevisionsRecursively(const Path & statePath)
 {
 	nix::updateRevisionsRecursivelyTxn(noTxn, statePath);
+}
+
+void setSolidStateReferencesTxn(const Transaction & txn, const Path & statePath, const PathSet & paths)
+{
+	Strings ss = Strings(paths.begin(), paths.end());
+	nixDB.setStrings(txn, dbSolidStateReferences, statePath, ss);
+}
+
+bool querySolidStateReferencesTxn(const Transaction & txn, const Path & statePath, PathSet & paths)
+{
+	Strings ss;
+	bool notempty = nixDB.queryStrings(txn, dbSolidStateReferences, statePath, ss);
+	paths.insert(ss.begin(), ss.end());
+	return notempty;
 }
 
 /* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */

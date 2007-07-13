@@ -1,8 +1,6 @@
 init initDerivationsHelpers
 
-#wouter added 2 ATermList
-
-Derive | ATermList ATermList ATermList ATermList ATermList string string ATermList ATermList | ATerm |
+Derive | ATermList ATermList ATermList ATermList ATermList ATermList string string ATermList ATermList | ATerm |
 | string string | ATerm | EnvBinding |
 | string ATermList | ATerm | DerivationInput |
 | string string string string | ATerm | DerivationOutput |
@@ -10,7 +8,7 @@ Derive | ATermList ATermList ATermList ATermList ATermList string string ATermLi
 | string string string | ATerm | DerivationStateOutputDir |
 
 #We use DeriveWithOutState to create derivations that dont use state, and thus dont have the stateDerivationStateOutput and DerivationStateOutputDir in their derivation
-#Ive put this in because eelco requested it, and its easy to stay backwards compatible, but ultimately I think that it should be removed to prevent confusion & duplication
+#Ive put this in becuase its easy to stay backwards compatible, but maybe it should be removed somtime to prevent confusion & duplication
 #The function will be called matchDerivateWithOutState, but it will match the Derive term to remain backwards compatible
 
 Derive | ATermList ATermList ATermList string string ATermList ATermList | ATerm | DeriveWithOutState
