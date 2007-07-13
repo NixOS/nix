@@ -3,7 +3,7 @@
 
 #check if there are enough arguments, if not, exit with an error
 
-debug="";		#set to "" for no debugging, set to "echo " to debug the commands
+debug="echo ";		#set to "" for no debugging, set to "echo " to debug the commands
 
 if [ "$#" != 6 ] && [ "$#" != 7 ] ; then
   echo "Incorrect number of arguments"
@@ -109,7 +109,7 @@ function subversionSingleStateDir {
          fi
       done  
 	  
-	  #echo ${subitems[@]}
+	  echo Adding subitems ${subitems[@]}
 	  
 	  for item in ${subitems[@]}
 	     do
