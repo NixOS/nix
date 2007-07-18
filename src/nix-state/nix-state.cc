@@ -310,8 +310,8 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
 	//TODO maybe only scan in the changeset (patch) for new references? (this will be difficult and depending on the underlying versioning system)
 
     //Scan in for (new) component and state references
-    PathSet state_references = scanForReferences(statePath, allComponentPaths2);		//TODO
-    PathSet state_stateReferences = scanForReferences(statePath, allStatePaths);
+    PathSet state_references = scanForReferences(statePath, allComponentPaths2);
+    PathSet state_stateReferences = scanForStateReferences(statePath, allStatePaths);
     
     //Retrieve old references
     PathSet old_references;

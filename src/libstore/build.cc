@@ -1711,7 +1711,7 @@ void DerivationGoal::computeClosure()
 		allReferences[path] = references;
 		
 		/* For this output path, find the state references to other paths contained in it. */
-		PathSet output_state_references = scanForReferences(path, allStatePaths);
+		PathSet output_state_references = scanForStateReferences(path, allStatePaths);
 		allStateReferences[path] = output_state_references;
 				
         /* For debugging, print out the referenced and unreferenced
@@ -1758,7 +1758,7 @@ void DerivationGoal::computeClosure()
 		printMsg(lvlTalkative, format("scanning for component and state references inside `%1%'") % statePath);
 		
 		state_references = scanForReferences(statePath, allPaths);
-		state_stateReferences = scanForReferences(statePath, allStatePaths);
+		state_stateReferences = scanForStateReferences(statePath, allStatePaths);
 	}
 	
     /* Register each output path as valid, and register the sets of

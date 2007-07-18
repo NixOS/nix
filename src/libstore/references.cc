@@ -118,13 +118,36 @@ void checkPath(const string & path,
     else throw Error(format("unknown file type: %1%") % path);
 }
 
-
 PathSet scanForReferences(const string & path, const PathSet & paths)
 {
 	return scanForReferencesTxn(noTxn, path, paths);
 }
 
 PathSet scanForReferencesTxn(const Transaction & txn, const Path & path, const PathSet & paths)
+{
+	return scanForReferencesTxn_(txn, path, paths);
+}
+
+PathSet scanForStateReferences(const string & path, const PathSet & paths)
+{
+	return scanForStateReferencesTxn(noTxn, path, paths);
+}
+
+PathSet scanForStateReferencesTxn(const Transaction & txn, const Path & path, const PathSet & paths)
+{
+	//Get the references from the scan	
+	PathSet org_references = scanForReferencesTxn_(txn, path, paths);
+	
+	//Get the solid state dependencies, and also insert them
+    PathSet solidStateDeps;
+    querySolidStateReferencesTxn(txn, path, solidStateDeps);
+	org_references.insert(solidStateDeps.begin(), solidStateDeps.end());
+
+	return org_references;
+}
+ 
+
+PathSet scanForReferencesTxn_(const Transaction & txn, const Path & path, const PathSet & paths)
 {
     std::map<string, Path> backMap;
     StringSet ids;
@@ -156,16 +179,8 @@ PathSet scanForReferencesTxn(const Transaction & txn, const Path & path, const P
         found.insert(j->second);
     }
 
-    //Get the solid state dependencies, and also insert them
-    PathSet solidStateDeps;
-    querySolidStateReferencesTxn(txn, path, solidStateDeps);
-	found.insert(solidStateDeps.begin(), solidStateDeps.end());
-
-	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! we only scan the paths, if we scan for state references, this STORE path will show up !!!!!!!!!!!!!!
-	//TODO Create a scanForReferencesState() funtion wrapper !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	
     return found;
 }
 
- 
+
 }
