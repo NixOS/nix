@@ -93,8 +93,8 @@ Derivation parseDerivation(ATerm t)
     {
 	    //parse state part
 	    for (ATermIterator i(stateOuts); i; ++i) {
-	        ATerm id, statepath, componentHash, hashAlgo, hash, stateIdentifier, enabled, shared, synchronization, createDirsBeforeInstall, runtimeStateParamters, username;
-	        if (!matchDerivationStateOutput(*i, id, statepath, componentHash, hashAlgo, hash, stateIdentifier, enabled, shared, synchronization, createDirsBeforeInstall, runtimeStateParamters, username))
+	        ATerm id, statepath, componentHash, hashAlgo, hash, stateIdentifier, enabled, shareType, synchronization, createDirsBeforeInstall, runtimeStateParamters, username, sharedState;
+	        if (!matchDerivationStateOutput(*i, id, statepath, componentHash, hashAlgo, hash, stateIdentifier, enabled, shareType, synchronization, createDirsBeforeInstall, runtimeStateParamters, username, sharedState))
 	            throwBadDrv(t);
 	        DerivationStateOutput stateOut;
 	        stateOut.statepath = aterm2String(statepath);
@@ -104,11 +104,12 @@ Derivation parseDerivation(ATerm t)
 	        stateOut.hash = aterm2String(hash);
 	        stateOut.stateIdentifier = aterm2String(stateIdentifier);
 	        stateOut.enabled = aterm2String(enabled);
-	        stateOut.shared = aterm2String(shared);
+	        stateOut.shareType = aterm2String(shareType);
 	        stateOut.synchronization = aterm2String(synchronization);
 	        stateOut.createDirsBeforeInstall = aterm2String(createDirsBeforeInstall);
 	        stateOut.runtimeStateParamters = aterm2String(runtimeStateParamters);
 	        stateOut.username = aterm2String(username);
+	        stateOut.sharedState = aterm2String(sharedState);  
 	        drv.stateOutputs[aterm2String(id)] = stateOut;
 	    }
 
@@ -195,11 +196,12 @@ ATerm unparseDerivation(const Derivation & drv)
                 toATerm(i->second.hash),
                 toATerm(i->second.stateIdentifier),
                 toATerm(i->second.enabled),
-                toATerm(i->second.shared),
+                toATerm(i->second.shareType),
                 toATerm(i->second.synchronization),
                 toATerm(i->second.createDirsBeforeInstall),
                 toATerm(i->second.runtimeStateParamters),
-                toATerm(i->second.username)
+                toATerm(i->second.username),
+                toATerm(i->second.sharedState)
                 ));
     }
                 

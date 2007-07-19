@@ -417,11 +417,12 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
   	//state vars
     bool enableState = false;		//We dont do state by default, but if a user defines stateDirs for example, than this becomes true.
     bool disableState = false;		//Becomes true if the user explicitly says: no state
-    string shareState = "none";
+    string shareType = "none";
     string syncState = "none";
     string stateIdentifier = "";
     bool createDirsBeforeInstall = false;
     string runtimeStateParamters = "";
+    string sharedState = "";
     vector<DerivationStateOutputDir> stateDirs;
 
     for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
@@ -520,13 +521,14 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
                     drv.solidStateDeps.insert(s);
                 }
             }
-   	        else if(key == "shareState") { shareState = coerceToString(state, value, context, true); }
+   	        else if(key == "shareType") { shareType = coerceToString(state, value, context, true); }
    	        else if(key == "synchronization") { syncState = coerceToString(state, value, context, true); }
    	        else if(key == "disableState") { disableState = evalBool(state, value); }
             else if(key == "identifier"){ stateIdentifier = coerceToString(state, value, context, true); }
             else if(key == "createDirsBeforeInstall"){ createDirsBeforeInstall = evalBool(state, value); }
             else if(key == "runtimeStateParamters"){ runtimeStateParamters = coerceToString(state, value, context, true); }
-                        
+            else if(key == "shareStateFrom"){ sharedState = coerceToString(state, value, context, true);  }
+            
             /* All other attributes are passed to the builder through
                the environment. */
             else {
@@ -614,7 +616,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 	if(enableState && !disableState){    
 		if(runtimeStateParamters == ""){
 			string enableStateS = bool2string("true");
-			drv.stateOutputs["state"] = DerivationStateOutput("", "", "", "", stateIdentifier, enableStateS, "", "", "", runtimeStateParamters, getCallingUserName(), false);
+			drv.stateOutputs["state"] = DerivationStateOutput("", "", "", "", stateIdentifier, enableStateS, "", "", "", runtimeStateParamters, getCallingUserName(), "", false);
 		}	
 	}
         
@@ -649,7 +651,8 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 
     	string enableStateS = bool2string("true");
     	string createDirsBeforeInstallS = bool2string(createDirsBeforeInstall);
-    	drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, printHash(componentHash), outputHashAlgo, outputHash, stateIdentifier, enableStateS, shareState, syncState, createDirsBeforeInstallS, runtimeStateParamters, getCallingUserName());
+    	drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, printHash(componentHash), outputHashAlgo, outputHash, stateIdentifier, enableStateS, 
+    	                                                  shareType, syncState, createDirsBeforeInstallS, runtimeStateParamters, getCallingUserName(), sharedState);
     	
     	for(vector<DerivationStateOutputDir>::iterator i = stateDirs.begin(); i != stateDirs.end(); ++i)
     		drv.stateOutputDirs[(*i).path] = *(i);

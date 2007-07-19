@@ -1754,11 +1754,22 @@ void DerivationGoal::computeClosure()
      * [scan for and state references and component references in the state path]	//3,4
      */
 	if(isStateDrvTxn(noTxn, drv)){		//TODO 
-		Path statePath = drv.stateOutputs.find("state")->second.statepath;
-		printMsg(lvlTalkative, format("scanning for component and state references inside `%1%'") % statePath);
 		
-		state_references = scanForReferences(statePath, allPaths);
-		state_stateReferences = scanForStateReferences(statePath, allStatePaths);
+		Path sharedState = drv.stateOutputs.find("state")->second.sharedState;
+		if(sharedState != ""){
+			if (!store->isValidStatePath(sharedState))
+				throw BuildError(format("sharedState path `%1%', is not a valid state path") % sharedState); 
+			
+			//We dont need to scan for state references since at the query to the state path we give the results of the linked-to path
+		}
+		else
+		{
+			Path statePath = drv.stateOutputs.find("state")->second.statepath;
+			printMsg(lvlTalkative, format("scanning for component and state references inside `%1%'") % statePath);
+		
+			state_references = scanForReferences(statePath, allPaths);
+			state_stateReferences = scanForStateReferences(statePath, allStatePaths);
+		}
 	}
 	
     /* Register each output path as valid, and register the sets of
@@ -1789,7 +1800,6 @@ void DerivationGoal::computeClosure()
     //Register the state path valid
     if(isStateDrvTxn(txn, drv))
     {
-		//TODO ONLY CALL THIS FUNCTION ON A NON-SHARED STATE PATH!!!!!!!!!!!	(why?)
 		Path statePath = drv.stateOutputs.find("state")->second.statepath;		
 		
     	registerValidPath(txn,    	
@@ -1797,14 +1807,31 @@ void DerivationGoal::computeClosure()
     		Hash(),										//emtpy hash
     		state_references,
     		state_stateReferences,
-    		drvPath, 0);							//TODO !!!!!!!!!!!!
-    	
+    		drvPath, 0);
+
     	//Commit state
 		commitStatePathTxn(txn, statePath);
-		
+			
 		//Set first revision (if we committed something)
 		if(readRevisionNumber(statePath) == 1)
 			updateRevisionsRecursivelyTxn(txn, statePath);
+
+		//Shared state
+    	Path sharedState = drv.stateOutputs.find("state")->second.sharedState;
+		if(sharedState != ""){
+			//Remove state path
+			deletePathWrapped(statePath);
+			
+			//Symlink link to the share path
+			Strings p_args;
+			p_args.push_back("-sf");
+			p_args.push_back(sharedState);
+			p_args.push_back(statePath);
+			runProgram_AndPrintOutput("ln", true, p_args, "ln");	//run
+			
+			//Set in database
+			setSharedStateTxn(txn, statePath, sharedState);
+		}
     }	    
     
     txn.commit();

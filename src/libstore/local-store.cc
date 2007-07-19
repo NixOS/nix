@@ -131,6 +131,12 @@ static TableId dbStateInfo = 0;
 */
 static TableId dbStateRevisions = 0;
 
+/* dbSharedState :: Path -> Path
+ * 
+ * Lists all paths that are shared with other paths 
+ */
+static TableId dbSharedState = 0;
+
 bool Substitute::operator == (const Substitute & sub) const
 {
     return program == sub.program
@@ -205,6 +211,7 @@ LocalStore::LocalStore(bool reserveSpace)
 	dbStateComponentReferrers = nixDB.openTable("referrers_s_c", true);
 	dbStateStateReferrers = nixDB.openTable("referrers_s_s", true);
 	dbStateRevisions = nixDB.openTable("staterevisions");
+	dbSharedState = nixDB.openTable("sharedState");
 
 	dbSolidStateReferences = nixDB.openTable("references_solid_c_s");	/* The contents of this table is included in references_c_s */
 	
@@ -406,6 +413,7 @@ static string stripPrefix(const string & prefix, const string & s)
 
 //TODO move the code of get(State)Referrers into query variant ..... !!!!!!!!!!!!!!!!!!!!!!!!!!!!???  
 
+/********************/
 
 static PathSet getReferrers(const Transaction & txn, const Path & store_or_statePath, const int revision)
 {
@@ -630,6 +638,8 @@ void LocalStore::queryStateReferrers(const Path & storePath, PathSet & stateRefe
 {
     nix::queryStateReferrersTxn(noTxn, storePath, stateReferrers, revision);
 }
+
+/********************/
 
 
 void setDeriver(const Transaction & txn, const Path & storePath, const Path & deriver)
@@ -1731,6 +1741,41 @@ bool querySolidStateReferencesTxn(const Transaction & txn, const Path & statePat
 	return notempty;
 }
 
+void setSharedStateTxn(const Transaction & txn, const Path & statePath, const Path & shared_with)
+{
+	//Remove earlier entries
+	nixDB.delPair(txn, dbSharedState, statePath);
+
+	//Set new entry
+	nixDB.setString(txn, dbSharedState, statePath, shared_with);
+}
+
+bool querySharedStateTxn(const Transaction & txn, const Path & statePath, Path & shared_with)
+{
+	return nixDB.queryString(txn, dbSharedState, statePath, shared_with);
+}
+
+PathSet toNonSharedPathSetTxn(const Transaction & txn, const PathSet & statePaths)
+{
+	PathSet real_statePaths;
+
+	//we loop over all paths in the list
+	for (PathSet::const_iterator i = statePaths.begin(); i != statePaths.end(); ++i){
+		Path sharedPath;
+		Path checkPath = *i;
+		real_statePaths.insert(checkPath);
+		
+		//for each path we do querySharedStateTxn until there the current path is not a shared path anymore  
+		while(querySharedStateTxn(txn, checkPath, sharedPath)){
+			real_statePaths.erase(checkPath);
+			real_statePaths.insert(sharedPath);
+			checkPath = sharedPath;
+		}
+	}
+		
+	return real_statePaths;
+}
+	
 /* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */
 static void upgradeStore07()
 {

@@ -243,6 +243,9 @@ bool isValidStatePathTxn(const Transaction & txn, const Path & path);
 void setSolidStateReferencesTxn(const Transaction & txn, const Path & statePath, const PathSet & paths);
 bool querySolidStateReferencesTxn(const Transaction & txn, const Path & statePath, PathSet & paths);
 
+void setSharedStateTxn(const Transaction & txn, const Path & statePath, const Path & shared_with);
+PathSet toNonSharedPathSetTxn(const Transaction & txn, const PathSet & statePaths);
+
 }
 
 

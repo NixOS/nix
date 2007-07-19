@@ -249,18 +249,6 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
     RevisionNumbersSet getRivisions;
 	bool b = store->queryStateRevisions(statePath, getRivisions, revision_arg);
     
-    //Sort the statePaths from all drvs
-	//map<Path, string> state_repos;
-	//vector<Path> sorted_paths;
-    //for (PathSet::iterator d = statePaths.begin(); d != statePaths.end(); ++d){
-       	
-		//state_repos[statePath] = repos; 
-//		sorted_paths.push_back(statePath);
-	//}
-	//sort(sorted_paths.begin(), sorted_paths.end());	
-	
-	//string repos = 
-	
 	//Revert each statePath in the list
 	for (RevisionNumbersSet::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
 		Path statePath = (*i).first;
@@ -412,6 +400,9 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     PathSet statePaths;
 	store->storePathRequisites(root_componentPath, false, statePaths, false, true, -1);
 	statePaths.insert(root_statePath);
+    
+    //Replace all shared paths in the set for their real paths 
+    statePaths = toNonSharedPathSetTxn(noTxn, statePaths);
     
     //TODO maybe also scan the parameters for state or component hashes?
     //program_args

@@ -42,7 +42,7 @@ struct DerivationStateOutput
     string hash;
     string stateIdentifier;				//the identifier
     string enabled;						//enable or disable state
-    string shared;						//none, full, group
+    string shareType;						//none, full, group
     string synchronization;				//none (no locks), exclusive-lock, recursive-exclusive-lock
     
     string commitReferences;			//TODO none, direct, recursive-all
@@ -51,18 +51,20 @@ struct DerivationStateOutput
     string createDirsBeforeInstall;		//if true: creates state dirs before installation
 	string runtimeStateParamters;		//if not empty: these are the runtime parameters where state can be found (you can use $statepath here)
     
-    string username;					
+    string username;	
+    
+    string sharedState;					//Path to share state From		
     
     DerivationStateOutput()
     {
     }
     
     //TODO add const ??
-    DerivationStateOutput(Path statepath, string componentHash, string hashAlgo, string hash, string stateIdentifier, string enabled, string shared, string synchronization, string createDirsBeforeInstall, string runtimeStateParamters, string username, bool check=true)
+    DerivationStateOutput(Path statepath, string componentHash, string hashAlgo, string hash, string stateIdentifier, string enabled, string shareType, string synchronization, string createDirsBeforeInstall, string runtimeStateParamters, string username, string sharedState, bool check=true)
     {
         if(check){
-	        if(shared != "none" && shared != "full" && shared != "group")
-	        	throw Error(format("shared '%1%' is not a correct type") % shared);
+	        if(shareType != "none" && shareType != "full" && shareType != "group")
+	        	throw Error(format("shareType '%1%' is not a correct type") % shareType);
 	        if(synchronization != "none" && synchronization != "exclusive-lock" && synchronization != "recursive-exclusive-lock")
 	        	throw Error(format("synchronization '%1%' is not a correct type") % synchronization);
 	        if(username == "")
@@ -79,11 +81,12 @@ struct DerivationStateOutput
         this->hash = hash;
         this->stateIdentifier = stateIdentifier;
         this->enabled = enabled;
-        this->shared = shared;
+        this->shareType = shareType;
         this->synchronization = synchronization;
         this->createDirsBeforeInstall = createDirsBeforeInstall;
         this->runtimeStateParamters = runtimeStateParamters;
         this->username = username;
+        this->sharedState = sharedState;
     }
     
     bool getEnabled(){
@@ -104,11 +107,13 @@ struct DerivationStateOutput
         //this->hash;							//Clear this one?
         //this->stateIdentifier;				//Changes the statepath directly
         this->enabled = "";
-        this->shared = "";
+        this->shareType = "";
         this->synchronization = "";
         this->createDirsBeforeInstall = "";
         this->runtimeStateParamters = "";
-        //this->username;						//Changes the statepath directly 
+        //this->username;						//Changes the statepath directly
+        this->sharedState = "";
+         
     }
 };
 
