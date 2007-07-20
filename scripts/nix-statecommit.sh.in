@@ -197,6 +197,10 @@ done
 
 cd $statepath																	#now that everything is added we go back to the 'root' path and commit
 if [ "$deletesvn" != "1" ]; then
+
+	#TODO this could be done transactional...
+
+	$debug $svnbin up "" commit;												#do a svn up to get the new changes
 	$debug $svnbin -m "" commit;
 	$debug $svnbin up "" commit;												#do a svn up to update the local revision number ... (the contents stays the same)
 fi

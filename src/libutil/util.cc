@@ -1112,7 +1112,7 @@ bool FileExist(const string FileName)
 }
 
 //TODO Does this work on windows?
-bool IsDirectory(const string FileName)
+bool IsDirectory(const string FileName)						//TODO Use pathExists??
 {
 	const char* FileName_C = FileName.c_str();
     struct stat my_stat;

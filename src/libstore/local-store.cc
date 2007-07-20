@@ -410,53 +410,6 @@ static string stripPrefix(const string & prefix, const string & s)
     return string(s, prefix.size() + 1);
 }
 
-
-//TODO move the code of get(State)Referrers into query variant ..... !!!!!!!!!!!!!!!!!!!!!!!!!!!!???  
-
-/********************/
-
-static PathSet getReferrers(const Transaction & txn, const Path & store_or_statePath, const int revision)
-{
-    if(isValidPathTxn(txn, store_or_statePath)){
-		PathSet referrers;
-    	Strings keys;
-	   	nixDB.enumTable(txn, dbComponentComponentReferrers, keys, store_or_statePath + string(1, (char) 0));
-    	for (Strings::iterator i = keys.begin(); i != keys.end(); ++i)
-        	referrers.insert(stripPrefix(store_or_statePath, *i));
-    	return referrers;
-    }
-    else if(isValidStatePathTxn(txn, store_or_statePath)){
-        Paths referrers;
-        nixDB.queryStateReferrers(txn, dbStateComponentReferrers, store_or_statePath, referrers, revision);
-        PathSet p(referrers.begin(), referrers.end());
-        return p;
-    }
-    else
-    	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
- 
-}
-
-static PathSet getStateReferrers(const Transaction & txn, const Path & store_or_statePath, const int revision)		//TODO this is just a copy of getReferrers with a change to dbStateReferrers, maybe make the function more generic?
-{
-    if(isValidPathTxn(txn, store_or_statePath)){
-	    PathSet referrers;
-    	Strings keys;
-   		nixDB.enumTable(txn, dbComponentStateReferrers, keys, store_or_statePath + string(1, (char) 0));
-    	for (Strings::iterator i = keys.begin(); i != keys.end(); ++i)
-        	referrers.insert(stripPrefix(store_or_statePath, *i));
-    	return referrers;
-    }
-    else if(isValidStatePathTxn(txn, store_or_statePath)){
-    	Paths referrers;
-    	nixDB.queryStateReferrers(txn, dbStateStateReferrers, store_or_statePath, referrers, revision);
-    	PathSet p(referrers.begin(), referrers.end());
-        return p;
-    }
-    else
-    	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
-}
-
-
 void setReferences(const Transaction & txn, const Path & store_or_statePath,
     const PathSet & references, const PathSet & stateReferences, const int revision)
 {
@@ -552,38 +505,37 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
             nixDB.delPair(txn, dbXStateReferrers, addPrefix(*i, store_or_statePath2));	
 }
 
-
-void queryReferencesTxn(const Transaction & txn,
-    const Path & store_or_statePath, PathSet & references, const int revision)
+void queryReferencesTxn(const Transaction & txn, const Path & store_or_statePath, PathSet & references, const int revision)
 {
     Paths references2;
     
     if(isRealisablePath(txn, store_or_statePath))
     	nixDB.queryStrings(txn, dbComponentComponentReferences, store_or_statePath, references2);
-    else if(isRealisableStatePath(txn, store_or_statePath))
-    	nixDB.queryStateReferences(txn, dbStateComponentReferences, store_or_statePath, references2, revision);
+    else if(isRealisableStatePath(txn, store_or_statePath)){
+    	Path statePath_ns = toNonSharedPathTxn(txn, store_or_statePath);	    //Lookup its where it points to if its shared
+    	nixDB.queryStateReferences(txn, dbStateComponentReferences, statePath_ns, references2, revision);
+    }
     else
     	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
     
     references.insert(references2.begin(), references2.end());
 }
 
-
-void LocalStore::queryReferences(const Path & storePath,
-    PathSet & references, const int revision)
+void LocalStore::queryReferences(const Path & storePath, PathSet & references, const int revision)
 {
     nix::queryReferencesTxn(noTxn, storePath, references, revision);
 }
 
-void queryStateReferencesTxn(const Transaction & txn,
-    const Path & store_or_statePath, PathSet & stateReferences, const int revision)
+void queryStateReferencesTxn(const Transaction & txn, const Path & store_or_statePath, PathSet & stateReferences, const int revision)
 {
     Paths stateReferences2;
     
     if(isRealisablePath(txn, store_or_statePath))
     	nixDB.queryStrings(txn, dbComponentStateReferences, store_or_statePath, stateReferences2);
-    else if(isRealisableStatePath(txn, store_or_statePath))
-    	nixDB.queryStateReferences(txn, dbStateStateReferences, store_or_statePath, stateReferences2, revision);	
+    else if(isRealisableStatePath(txn, store_or_statePath)){
+    	Path statePath_ns = toNonSharedPathTxn(txn, store_or_statePath);	    //Lookup its where it points to if its shared
+    	nixDB.queryStateReferences(txn, dbStateStateReferences, statePath_ns, stateReferences2, revision);
+    }	
     else
     	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
     
@@ -604,17 +556,47 @@ void queryAllReferencesTxn(const Transaction & txn, const Path & path, PathSet &
     allReferences = pathSets_union(references, stateReferences);
 }
 
-//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! make 1 function with 2 bools (component=t/f state=t/f) and 3 Pathsets (component, state, all)
 void LocalStore::queryAllReferences(const Path & path, PathSet & allReferences, const int revision)
 {
 	queryAllReferencesTxn(noTxn, path, allReferences, revision);
+}
+
+static PathSet getXReferrers(const Transaction & txn, const Path & store_or_statePath, const int revision, const TableId & table)
+{
+    if(isValidPathTxn(txn, store_or_statePath)){
+	    PathSet referrers;
+    	Strings keys;
+   		nixDB.enumTable(txn, table, keys, store_or_statePath + string(1, (char) 0));
+    	for (Strings::iterator i = keys.begin(); i != keys.end(); ++i)
+        	referrers.insert(stripPrefix(store_or_statePath, *i));
+    	return referrers;
+    }
+    else if(isValidStatePathTxn(txn, store_or_statePath)){
+    	Path statePath_ns = toNonSharedPathTxn(txn, store_or_statePath);	    //Lookup its where it points to if its shared
+    	Paths referrers;
+    	nixDB.queryStateReferrers(txn, table, statePath_ns, referrers, revision);
+    	PathSet p(referrers.begin(), referrers.end());
+        return p;
+    }
+    else
+    	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
+}
+
+static PathSet getReferrers(const Transaction & txn, const Path & store_or_statePath, const int revision)
+{
+	return getXReferrers(txn, store_or_statePath, revision, dbComponentComponentReferrers);
+}
+
+static PathSet getStateReferrers(const Transaction & txn, const Path & store_or_statePath, const int revision)
+{
+	return getXReferrers(txn, store_or_statePath, revision, dbStateStateReferrers);
 }
 
 void queryReferrersTxn(const Transaction & txn,
     const Path & storePath, PathSet & referrers, const int revision)
 {
     if (!isRealisableComponentOrStatePath(txn, storePath))
-        throw Error(format("path `%1%' is not valid") % storePath);
+		throw Error(format("path `%1%' is not valid") % storePath);
     PathSet referrers2 = getReferrers(txn, storePath, revision);
     referrers.insert(referrers2.begin(), referrers2.end());
 }
@@ -624,7 +606,6 @@ void LocalStore::queryReferrers(const Path & storePath,
 {
     nix::queryReferrersTxn(noTxn, storePath, referrers, revision);
 }
-
 
 void queryStateReferrersTxn(const Transaction & txn, const Path & storePath, PathSet & stateReferrers, const int revision)
 {
@@ -638,9 +619,6 @@ void LocalStore::queryStateReferrers(const Path & storePath, PathSet & stateRefe
 {
     nix::queryStateReferrersTxn(noTxn, storePath, stateReferrers, revision);
 }
-
-/********************/
-
 
 void setDeriver(const Transaction & txn, const Path & storePath, const Path & deriver)
 {
@@ -1755,23 +1733,25 @@ bool querySharedStateTxn(const Transaction & txn, const Path & statePath, Path &
 	return nixDB.queryString(txn, dbSharedState, statePath, shared_with);
 }
 
+Path toNonSharedPathTxn(const Transaction & txn, const Path & statePath)
+{
+	//we do querySharedStateTxn until there the current path is not a shared path anymore  
+	Path sharedPath;
+	Path returnedPath = statePath;
+	
+	while(querySharedStateTxn(txn, returnedPath, sharedPath))
+		returnedPath = sharedPath;
+	
+	return returnedPath;
+}
+
 PathSet toNonSharedPathSetTxn(const Transaction & txn, const PathSet & statePaths)
 {
 	PathSet real_statePaths;
 
 	//we loop over all paths in the list
-	for (PathSet::const_iterator i = statePaths.begin(); i != statePaths.end(); ++i){
-		Path sharedPath;
-		Path checkPath = *i;
-		real_statePaths.insert(checkPath);
-		
-		//for each path we do querySharedStateTxn until there the current path is not a shared path anymore  
-		while(querySharedStateTxn(txn, checkPath, sharedPath)){
-			real_statePaths.erase(checkPath);
-			real_statePaths.insert(sharedPath);
-			checkPath = sharedPath;
-		}
-	}
+	for (PathSet::const_iterator i = statePaths.begin(); i != statePaths.end(); ++i)
+		real_statePaths.insert(toNonSharedPathTxn(txn, *i));
 		
 	return real_statePaths;
 }

@@ -1950,7 +1950,7 @@ class SubstitutionGoal : public Goal
 {
 private:
     /* The store path that should be realised through a substitute. */
-    Path storePath;
+    Path storePath;															//TODO !!!!!!!!!!!!!!!!!!!!! add statePath?
 
     /* The remaining substitutes for this path. */
     Substitutes subs;
@@ -1961,7 +1961,7 @@ private:
     /* Outgoing references for this path. */
     PathSet references;
     
-    /* Outgoing state references for this path. */			//TODO CHECK THIS ENTIRE FILE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    /* Outgoing state references for this path. */
     PathSet stateReferences;
 
     /* Pipe for the substitute's standard output/error. */
@@ -2140,9 +2140,14 @@ void SubstitutionGoal::tryToRun()
     logPipe.create();
 
     /* Remove the (stale) output path if it exists. */
-    /* TODO also remove state Path ? */
     if (pathExists(storePath))
         deletePathWrapped(storePath);
+
+    /* TODO Remove the (stale) state path if it exists. ????????????????? !!!!!!!!!!!!!!!!!!!! */	
+	//if(isStatePath .... ??)
+	//	if (pathExists(statePath))
+    //  	deletePathWrapped(statePath);
+		
 
     /* Fork the substitute program. */
     pid = fork();
