@@ -4,7 +4,7 @@ bin_SCRIPTS = nix-collect-garbage \
   nix-pack-closure nix-unpack-closure \
   nix-copy-closure
 
-noinst_SCRIPTS = nix-profile.sh generate-patches.pl find-runtime-roots.pl nix-statecommit.sh nix-readrevisions.sh nix-restorerevision.sh
+noinst_SCRIPTS = nix-profile.sh generate-patches.pl find-runtime-roots.pl nix-readrevisions.sh nix-restorerevision.sh
 
 nix-pull nix-push: readmanifest.pm readconfig.pm download-using-manifests.pl
 
@@ -17,7 +17,6 @@ install-exec-local: readmanifest.pm download-using-manifests.pl find-runtime-roo
 	$(INSTALL_PROGRAM) download-using-manifests.pl $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) find-runtime-roots.pl $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) generate-patches.pl $(DESTDIR)$(libexecdir)/nix 
-	$(INSTALL_PROGRAM) nix-statecommit.sh $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) nix-readrevisions.sh $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) nix-restorerevision.sh $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/nix
@@ -36,6 +35,5 @@ EXTRA_DIST = nix-collect-garbage.in \
   nix-pack-closure.in nix-unpack-closure.in \
   nix-copy-closure.in \
   find-runtime-roots.pl.in \
-  nix-statecommit.sh.in \
   nix-readrevisions.sh.in \
   nix-restorerevision.sh.in

@@ -14,6 +14,7 @@
 #include "local-store.hh"
 #include "misc.hh"
 #include "archive.hh"
+#include "snapshot.hh"
 
 namespace nix {
 
@@ -29,8 +30,11 @@ void updatedStateDerivation(Path storePath)
 
 void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs)
 {
+	
 	Path statePath = stateOutputs.find("state")->second.statepath;
 	string stateDir = statePath;
+	
+	/*
 	
 	string svnbin = nixSVNPath + "/svn";
 	string svnadminbin = nixSVNPath + "/svnadmin";
@@ -89,6 +93,8 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 	//Initialize the counters for the statePaths that have an interval to 0
 	vector<int> empty;
 	store->setStatePathsInterval(intervalPaths, empty, true);
+	
+	*/
 }
 
 void commitStatePathTxn(const Transaction & txn, const Path & statePath)
@@ -223,6 +229,13 @@ void updateRevisionsRecursivelyTxn(const Transaction & txn, const Path & statePa
 
 int readRevisionNumber(Path statePath)
 {
+	string s = "/media/ext3cow/cca/";
+	const char* ss = s.c_str();
+	unsigned int i = take_snapshot(ss);
+	printMsg(lvlError, format("SS: '%1%'") % i);
+	
+	////////
+	/*
 	string svnbin = nixSVNPath + "/svn";
 	RevisionNumbers revisions;
 	
@@ -243,8 +256,9 @@ int readRevisionNumber(Path statePath)
 	if(!succeed)
 		throw Error(format("Cannot read revision number of path '%1%'") % repos);				
 	
-	return revision;	
+	return revision;
+	*/
+	return 0;	
 }
-
 
 }

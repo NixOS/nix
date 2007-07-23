@@ -10,6 +10,7 @@ pkginclude_HEADERS = \
  worker-protocol.hh store-state.hh
 
 libstore_la_LIBADD = ../libutil/libutil.la \
+ ../libext3cow/libext3cow.la \
  ../boost/format/libformat.la
 
 BUILT_SOURCES = derivations-ast.cc derivations-ast.hh
@@ -17,7 +18,7 @@ BUILT_SOURCES = derivations-ast.cc derivations-ast.hh
 EXTRA_DIST = derivations-ast.def derivations-ast.cc
 
 AM_CXXFLAGS = -Wall \
- -I$(srcdir)/.. ${bdb_include} ${aterm_include} -I$(srcdir)/../libutil -I$(srcdir)/../nix-state
+ -I$(srcdir)/.. ${bdb_include} ${aterm_include} -I$(srcdir)/../libutil -I$(srcdir)/../nix-state -I$(srcdir)/../libext3cow
 
 derivations-ast.cc derivations-ast.hh: ../aterm-helper.pl derivations-ast.def
 	$(perl) $(srcdir)/../aterm-helper.pl derivations-ast.hh derivations-ast.cc < $(srcdir)/derivations-ast.def

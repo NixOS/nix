@@ -277,6 +277,7 @@ AC_CONFIG_FILES([Makefile
    src/libutil/Makefile
    src/libstore/Makefile
    src/libmain/Makefile
+   src/libext3cow/Makefile
    src/nix-store/Makefile
    src/nix-state/Makefile
    src/nix-hash/Makefile
