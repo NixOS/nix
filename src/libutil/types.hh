@@ -60,7 +60,7 @@ typedef set<Path> PathSet;
 
 //state types
 typedef list<int> RevisionNumbers;								//the Strings (list) of StateReferences and this list are connected by position
-typedef map<Path, RevisionNumbers> RevisionNumbersSet;						//We include to the paths to sort on
+typedef map<Path, map<Path, unsigned int> > RevisionNumbersSet;			//We include to the paths to sort on
 typedef map<int, Strings> StateReferences;
 
  

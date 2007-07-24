@@ -918,6 +918,36 @@ Strings unpackStrings(const string & s)
     return strings;
 }
 
+string packRevisionNumbers(const RevisionNumbers & revs)
+{
+    string seperator = "|";
+    string d = "";
+    for (RevisionNumbers::const_iterator i = revs.begin();
+         i != revs.end(); ++i){
+        d += int2String(*i) + seperator;
+    }
+    return d;
+}
+    
+RevisionNumbers unpackRevisionNumbers(const string & packed)
+{
+    string seperator = "|";
+    Strings ss = tokenizeString(packed, seperator);
+    RevisionNumbers revs;
+    
+    for (Strings::const_iterator i = ss.begin();
+         i != ss.end(); ++i){
+    	
+    	int rev;
+    	bool succeed = string2Int(*i, rev);
+    	if(!succeed)
+    		throw Error(format("Corrupted revisions db entry: `%1%'") % packed);
+    	revs.push_back(rev);
+    }
+        
+    return revs;
+}
+
 
 Strings tokenizeString(const string & s, const string & separators)
 {

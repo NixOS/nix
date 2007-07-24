@@ -107,8 +107,6 @@ public:
 	bool queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions);
 	
 	void commitStatePath(const Path & statePath);
-	
-	void updateRevisionsRecursively(const Path & statePath);
 };
 
 

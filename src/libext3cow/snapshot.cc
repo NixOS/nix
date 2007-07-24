@@ -6,10 +6,13 @@
 
 #include "ext3cow_tools.h"
 #include "snapshot.hh"
+#include "types.hh"
 
 //using namespace nix;
 
 namespace nix {
+
+/////////////////////Original functions commented out: 
 
 /*
 void snapshot_usage(void){
@@ -17,7 +20,6 @@ void snapshot_usage(void){
   fprintf(stderr, "usage: snapshot <mountpoint>\n");
 
 }
-
 
 int snapshot_main(int argc, char** argv){
 
@@ -56,13 +58,14 @@ int snapshot_main(int argc, char** argv){
 }
 */
 
-//End original function
-unsigned int take_snapshot(const char* dir) //const string & file_or_dir)
+/////////////////////End original functions
+
+
+unsigned int take_snapshot(const string & dir2) //const string & file_or_dir)
 {
-  //const char* dir = "test";
+  const char* dir = dir2.c_str();
 
   int fd;
-  int ret;
   unsigned int epoch = 0;
   
   //char path[256] = ".\0";

@@ -1700,11 +1700,6 @@ void LocalStore::commitStatePath(const Path & statePath)
 	nix::commitStatePathTxn(noTxn, statePath);
 }
 
-void LocalStore::updateRevisionsRecursively(const Path & statePath)
-{
-	nix::updateRevisionsRecursivelyTxn(noTxn, statePath);
-}
-
 void setSolidStateReferencesTxn(const Transaction & txn, const Path & statePath, const PathSet & paths)
 {
 	Strings ss = Strings(paths.begin(), paths.end());

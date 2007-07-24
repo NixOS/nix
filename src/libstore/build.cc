@@ -1812,10 +1812,6 @@ void DerivationGoal::computeClosure()
     	//Commit state
 		commitStatePathTxn(txn, statePath);
 			
-		//Set first revision (if we committed something)
-		if(readRevisionNumber(statePath) == 1)
-			updateRevisionsRecursivelyTxn(txn, statePath);
-
 		//Shared state
     	Path sharedState = drv.stateOutputs.find("state")->second.sharedState;
 		if(sharedState != ""){

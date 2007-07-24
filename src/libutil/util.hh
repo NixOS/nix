@@ -302,7 +302,7 @@ string time_t2string(const time_t & t);
 
 bool FileExist(const string FileName);
 
-bool IsDirectory(const string FileName);
+bool IsDirectory(const string FileName);		//TODO replace by pathexists
 
 string getCallingUserName();
 
@@ -311,6 +311,10 @@ PathSet pathSets_union(const PathSet & paths1, const PathSet & paths2);
 
 /* TODO */
 void pathSets_difference(const PathSet & oldpaths, const PathSet & newpaths, PathSet & addedpaths, PathSet & removedpaths);
+
+string packRevisionNumbers(const RevisionNumbers & revs);
+    
+RevisionNumbers unpackRevisionNumbers(const string & packed);
 
 }
 

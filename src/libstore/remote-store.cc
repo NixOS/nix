@@ -492,10 +492,4 @@ void RemoteStore::commitStatePath(const Path & statePath)
 	
 }
 
-//TODO
-void RemoteStore::updateRevisionsRecursively(const Path & statePath)
-{
-	
-}
-
 }

@@ -34,40 +34,17 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 	Path statePath = stateOutputs.find("state")->second.statepath;
 	string stateDir = statePath;
 	
-	/*
-	
-	string svnbin = nixSVNPath + "/svn";
-	string svnadminbin = nixSVNPath + "/svnadmin";
-	
 	PathSet intervalPaths;
 
-	//check if we can create state and staterepos dirs
+	//check if we can create state dirs
 	//TODO
 	
-	//Create a repository for this state location
-	string repos = getStateReposPath("stateOutput:staterepospath", stateDir);
-
-	printMsg(lvlTalkative, format("Adding statedir '%1%' from repository '%2%'") % stateDir % repos);
-	
-	if(IsDirectory(repos))
-		printMsg(lvlTalkative, format("Repos %1% already exists, so we use that repository") % repos);			
-	else{
-		Strings p_args;
-		p_args.push_back("create");
-		p_args.push_back(repos);
-		runProgram_AndPrintOutput(svnadminbin, true, p_args, "svnadmin"); 				 //TODO create as nixbld.nixbld chmod 700... can you still commit then ??
-	}
-	
-	string statedir_svn = stateDir + "/.svn/";
-	if( ! IsDirectory(statedir_svn) ){
-		Strings p_args;
-		p_args.push_back("checkout");
-		p_args.push_back("file://" + repos);
-		p_args.push_back(stateDir);
-		runProgram_AndPrintOutput(svnbin, true, p_args, "svn");	//TODO checkout as user
+	/*
+	if( ! IsDirectory( ....... ) ){
 	}
 	else
-		printMsg(lvlTalkative, format("Statedir %1% already exists, so dont check out its repository again") % statedir_svn);	
+		printMsg(lvlTalkative, format("Statedir %1% already exists, so dont ........ ???? ") % ...);
+	*/	
 	
 	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
 		DerivationStateOutputDir d = i->second;
@@ -93,36 +70,22 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 	//Initialize the counters for the statePaths that have an interval to 0
 	vector<int> empty;
 	store->setStatePathsInterval(intervalPaths, empty, true);
-	
-	*/
 }
 
 void commitStatePathTxn(const Transaction & txn, const Path & statePath)
 {
+	//TODO: include code from:	updateRevisionsRecursivelyTxn(txn, root_statePath);
+	
 	if(!isValidStatePathTxn(txn, statePath))
 		throw Error(format("path `%1%' is not a valid state path") % statePath);
     
-	
 	//queryDeriversStatePath??
 	Derivation drv = derivationFromPath(queryStatePathDrvTxn(txn, statePath));
-	
-	//Extract the neccecary info from each Drv
   	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
-   	//Path statePath = stateOutputs.find("state")->second.statepath;
     DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
 
-	//Specifiy the SVN binarys
-    string svnbin = nixSVNPath + "/svn";
-	string svnadminbin = nixSVNPath + "/svnadmin";
+	printMsg(lvlError, format("Snapshotting statePath: %1%") % statePath);
 
-	//Print
-	printMsg(lvlError, format("Committing statePath: %1%") % statePath);
-
-	//Vector includeing all commit scripts:
-	vector<string> subversionedpaths;
-	vector<bool> subversionedpathsCommitBoolean;
-	vector<string> nonversionedpaths;			//of type none, no versioning needed
-	
 	//Get all the inverals from the database at once
 	PathSet intervalPaths;
 	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
@@ -135,10 +98,10 @@ void commitStatePathTxn(const Transaction & txn, const Path & statePath)
 			intervalPaths.insert(fullstatedir);
 		}
 	}
-	vector<int> intervals = store->getStatePathsInterval(intervalPaths);		//TODO !!!!!!!!!!!!! txn ??
+	vector<int> intervals = store->getStatePathsInterval(intervalPaths);		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! txn
 	
 	int intervalAt=0;	
-	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
+	for (DerivationStateOutputDirs::const_iterator i = stateOutputDirs.begin(); i != stateOutputDirs.end(); ++i){
 		DerivationStateOutputDir d = i->second;
 		string thisdir = d.path;
 		
@@ -147,61 +110,50 @@ void commitStatePathTxn(const Transaction & txn, const Path & statePath)
 			fullstatedir = statePath + "/";				
 		
 		if(d.type == "none"){
-			nonversionedpaths.push_back(fullstatedir);
 			continue;
 		}
-				
-		subversionedpaths.push_back(fullstatedir);
 		
 		if(d.type == "interval"){
 			//Get the interval-counter from the database
 			int interval_counter = intervals[intervalAt];
 			int interval = d.getInterval();
-			subversionedpathsCommitBoolean.push_back(interval_counter % interval == 0);
-    		
+
 			//update the interval
 			intervals[intervalAt] = interval_counter + 1;
 			intervalAt++;
+						
+			if(interval_counter % interval != 0){	return;		}
 		}
-		else if(d.type == "full")
-			subversionedpathsCommitBoolean.push_back(true);
-		else if(d.type == "manual")											//TODO !!!!!
-			subversionedpathsCommitBoolean.push_back(false);
+		else if(d.type == "full"){	}			
+		else if(d.type == "manual"){ return; }		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!			
 		else
-			throw Error(format("interval '%1%' is not handled in nix-state") % d.type);
-	}
-	
-	//Get the a repository for this state location
-	string repos = getStateReposPath("stateOutput:staterepospath", statePath);		//this is a copy from store-state.cc
-	string checkoutcommand = svnbin + " --ignore-externals checkout file://" + repos + " " + statePath;
+			throw Error(format("Type '%1%' is not handled in nix-state") % d.type);
 			
-	//Call the commit script with the appropiate paramenters
-	string subversionedstatepathsarray; 
-	for (vector<string>::iterator i = subversionedpaths.begin(); i != subversionedpaths.end(); ++i)
-		subversionedstatepathsarray += *(i) + " ";
-
-	string subversionedpathsCommitBooleansarray; 
-	for (vector<bool>::iterator i = subversionedpathsCommitBoolean.begin(); i != subversionedpathsCommitBoolean.end(); ++i)
-		subversionedpathsCommitBooleansarray += bool2string(*i) + " ";
-
-	string nonversionedstatepathsarray; 
-	for (vector<string>::iterator i = nonversionedpaths.begin(); i != nonversionedpaths.end(); ++i)
-		nonversionedstatepathsarray += *(i) + " ";
+		//We got here so we need to commit
+		
+		unsigned int epoch_time;
+		
+		if(pathExists(fullstatedir) || FileExist(fullstatedir)){
+			epoch_time = take_snapshot(fullstatedir);
+			printMsg(lvlError, format("Snapshotted '%1%' with id '%2%'") % fullstatedir % epoch_time);
+		}
+		else
+		{
+			//TODO !!!!!!!!!!!!!!	
+		}
+		
+		//Put in database !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		//TODO
+	}
 	  	
-    //make the call to the commit script
-    Strings p_args;
-	p_args.push_back(svnbin);
-	p_args.push_back(subversionedstatepathsarray);
-	p_args.push_back(subversionedpathsCommitBooleansarray);
-	p_args.push_back(nonversionedstatepathsarray);
-	p_args.push_back(checkoutcommand);
-	p_args.push_back(statePath);
-	runProgram_AndPrintOutput(nixLibexecDir + "/nix/nix-statecommit.sh", true, p_args, "svn");
-    
     //Update the intervals again	
-	//setStatePathsIntervalTxn(txn, intervalPaths, intervals);		//TODO!!!!!!!!!!!!!!!!!!!!!! uncomment and txn ??
+	//setStatePathsIntervalTxn(txn, intervalPaths, intervals);		//TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!! uncomment
 }
 
+/*
+ * This function takes all state requisites (references) and revision numbers and stores them ...
+ */
+/* 
 void updateRevisionsRecursivelyTxn(const Transaction & txn, const Path & statePath)
 {
 	//Save all revisions for the call to 
@@ -229,13 +181,6 @@ void updateRevisionsRecursivelyTxn(const Transaction & txn, const Path & statePa
 
 int readRevisionNumber(Path statePath)
 {
-	string s = "/media/ext3cow/cca/";
-	const char* ss = s.c_str();
-	unsigned int i = take_snapshot(ss);
-	printMsg(lvlError, format("SS: '%1%'") % i);
-	
-	////////
-	/*
 	string svnbin = nixSVNPath + "/svn";
 	RevisionNumbers revisions;
 	
@@ -257,8 +202,12 @@ int readRevisionNumber(Path statePath)
 		throw Error(format("Cannot read revision number of path '%1%'") % repos);				
 	
 	return revision;
-	*/
-	return 0;	
 }
+*/
+
+//	string s = "/media/ext3cow/cca/";
+//	unsigned int i = take_snapshot(s);
+//	printMsg(lvlError, format("SS: '%1%'") % i);
+
 
 }

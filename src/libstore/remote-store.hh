@@ -96,8 +96,6 @@ public:
 
 	void commitStatePath(const Path & statePath);
 	
-	void updateRevisionsRecursively(const Path & statePath);
-    
 private:
     AutoCloseFD fdSocket;
     FdSink to;

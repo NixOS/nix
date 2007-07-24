@@ -252,19 +252,9 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
 	//Revert each statePath in the list
 	for (RevisionNumbersSet::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
 		Path statePath = (*i).first;
-		int revision = (*i).second;
-		string repos = getStateReposPath("stateOutput:staterepospath", statePath);		//this is a copy from store-state.cc
-
-		printMsg(lvlError, format("Reverting statePath '%1%' to revision: %2%") % statePath % int2String(revision));
-		Strings p_args;
-		p_args.push_back(nixSVNPath + "/svn");
-		p_args.push_back(int2String(revision));
-		p_args.push_back("file://" + repos);
-		p_args.push_back(statePath);
-		runProgram_AndPrintOutput(nixLibexecDir + "/nix/nix-restorerevision.sh", true, p_args, "svn");	//run
+		map<Path, unsigned int> revisioned_paths = (*i).second;
 		
-		//TODO !!!!!!!!!!!!!!!!!!!!! do a commit
-		//TODO !!!!!!!!!!!!!!!!!!!!! check if statePath is a working copy
+		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	}
 }
 
@@ -364,7 +354,10 @@ void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path
    	//We dont need to sort since the db does that
 	//call scanForAllReferences again on all statePaths
 	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i){
-		int revision = readRevisionNumber(*i);
+		
+		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		int revision = 0;
+		//Get last revision number from DB !!!!!!!!!!
 		
 		//Scan, update, call recursively
 		PathSet newFoundComponentReferences;
@@ -418,20 +411,17 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		executeShellCommand(root_componentPath + root_binary + " " + root_program_args);	//more efficient way needed ???
   		
 	//******************* With everything in place, we call the commit script on all statePaths (in)directly referenced **********************
+
+	//Start transaction TODO
+
+	//Scan for new references if neccecary
+   	if(scanforReferences)
+  		scanAndUpdateAllReferencesRecusivelyTxn(txn, root_statePath);
 	
 	//Commit all statePaths
 	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)		//TODO first commit own state path?
 		commitStatePathTxn(txn, *i);
 	
-	//Start transaction TODO
-
-	//Scan for new references, and update with revision number
-   	if(scanforReferences)
-  		scanAndUpdateAllReferencesRecusivelyTxn(txn, root_statePath);
-
-	//Get new revision number
-	updateRevisionsRecursivelyTxn(txn, root_statePath);
-		
 	//Commit transaction
 	//txn.commit();
 	
@@ -439,7 +429,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	RevisionNumbersSet getRivisions;
 	bool b = store->queryStateRevisions(root_statePath, getRivisions, -1);
 	for (RevisionNumbersSet::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
-		printMsg(lvlError, format("State %1% has revision %2%") % (*i).first % int2String((*i).second));
+		//printMsg(lvlError, format("State %1% has revision %2%") % (*i).first % int2String((*i).second));
 	}
 	
 	

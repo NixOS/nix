@@ -1,6 +1,9 @@
 #include "db.hh"
 #include "util.hh"
 #include "pathlocks.hh"
+#include "derivations.hh"
+#include "local-store.hh"
+#include "misc.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -595,25 +598,39 @@ void Database::setStateRevisions(const Transaction & txn, TableId table,
 	int root_revision = getNewRevisionNumber(txn, table, statePath);
 	
 	//Sort based on statePath to RevisionNumbersClosure
-	RevisionNumbers sorted_revisions;
 	vector<Path> sortedStatePaths;
 	for (RevisionNumbersSet::const_iterator i = revisions.begin(); i != revisions.end(); ++i)
 		sortedStatePaths.push_back((*i).first);
     sort(sortedStatePaths.begin(), sortedStatePaths.end());
-    for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
-    	sorted_revisions.push_back(revisions.at(*i));
+
+	vector<RevisionNumbers> sorted_revisions;    
+    for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i){
+    	map<Path, unsigned int> ss_revisions = revisions.at(*i);
+
+		//Sort the set of paths that have revisions based on 
+		vector<Path> sorted_ssp;
+		for (map<Path, unsigned int>::const_iterator j = ss_revisions.begin(); j != ss_revisions.end(); ++j)
+			sorted_ssp.push_back((*j).first);
+		sort(sorted_ssp.begin(), sorted_ssp.end());
+		
+		//Insert into sorted_ss_revs based on the sorted order
+		RevisionNumbers sorted_ss_revs;
+		for (vector<Path>::const_iterator j = sorted_ssp.begin(); j != sorted_ssp.end(); ++j)
+			sorted_ss_revs.push_back(ss_revisions.at(*j));
+
+		//Insert ......
+    	sorted_revisions.push_back(sorted_ss_revs);
+    }		 
 	
 	//Debugging
-	for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
-		printMsg(lvlError, format("Insert: %1% into %2%") % int2String(revisions.at(*i)) % *i);
+	//for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
+	//	printMsg(lvlError, format("Insert: %1% into %2%") % revisions.at(*i) % *i);
 		
-	//Convert the int's into Strings
+	//Convert the vector<RevisionNumbers> into Strings
 	Strings data;
-	for (RevisionNumbers::const_iterator i = sorted_revisions.begin(); i != sorted_revisions.end(); ++i) {
-		int revisionnumber = *i;
-		data.push_back(int2String(revisionnumber));
-	}
-	
+	for (vector<RevisionNumbers>::const_iterator i = sorted_revisions.begin(); i != sorted_revisions.end(); ++i)
+		data.push_back(packRevisionNumbers(*i));
+		
 	//Create the key
 	string key = makeStatePathRevision(statePath, root_revision);
 	
@@ -651,14 +668,32 @@ bool Database::queryStateRevisions(const Transaction & txn, TableId table, const
 	
 	//Convert the Strings into int's and match them to the sorted statePaths
 	for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i){
-		string getRevisionS = data.front();
+		
+		RevisionNumbers ss_revisions = unpackRevisionNumbers(data.front());
 		data.pop_front();
 		
-		int getRevision;
-		bool succeed = string2Int(getRevisionS, getRevision);
-		if(!succeed)
-			throw Error(format("Cannot read revision number from db of path '%1%'") % statePath);
-		revisions[*i] = getRevision;
+		//query state versioined directorys/files
+		vector<Path> sortedPaths;
+		Derivation drv = derivationFromPath(queryStatePathDrvTxn(txn, statePath));
+  		DerivationStateOutputs stateOutputs = drv.stateOutputs; 
+    	DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
+    	for (DerivationStateOutputDirs::const_iterator j = stateOutputDirs.begin(); j != stateOutputDirs.end(); ++j){
+			string thisdir = (j->second).path;
+			string fullstatedir = statePath + "/" + thisdir;
+			if(thisdir == "/")									//exception for the root dir
+				fullstatedir = statePath + "/";
+			sortedPaths.push_back(fullstatedir);
+    	}			
+		sort(sortedPaths.begin(), sortedPaths.end());	//sort
+				
+		//link
+		map<Path, unsigned int> revisions_ss;
+		for (vector<Path>::const_iterator j = sortedPaths.begin(); j != sortedPaths.end(); ++j){
+			revisions_ss[*j] = ss_revisions.front();
+			ss_revisions.pop_front();
+		}
+						
+		revisions[*i] = revisions_ss;
 	}
 	
 	if(!notempty)

@@ -14,10 +14,10 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 void commitStatePathTxn(const Transaction & txn, const Path & statePath);
 
 /* TODO */
-void updateRevisionsRecursivelyTxn(const Transaction & txn, const Path & statePath);
+//void updateRevisionsRecursivelyTxn(const Transaction & txn, const Path & statePath);
 
 /* TODO */
-int readRevisionNumber(Path statePath);
+//int readRevisionNumber(Path statePath);
 
 }
 
