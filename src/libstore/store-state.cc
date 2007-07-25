@@ -57,10 +57,7 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 		
 		Path fullstatedir = stateDir + "/" + thisdir;
 		
-		Strings p_args;
-		p_args.push_back("-p");
-		p_args.push_back(fullstatedir);
-		runProgram_AndPrintOutput("mkdir", true, p_args, "mkdir");
+		ensureDirExists(fullstatedir);
 		
 		if(d.type == "interval"){
 			intervalPaths.insert(fullstatedir);
@@ -72,10 +69,8 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 	store->setStatePathsInterval(intervalPaths, empty, true);
 }
 
-void commitStatePathTxn(const Transaction & txn, const Path & statePath)
+Snapshots commitStatePathTxn(const Transaction & txn, const Path & statePath)
 {
-	//TODO: include code from:	updateRevisionsRecursivelyTxn(txn, root_statePath);
-	
 	if(!isValidStatePathTxn(txn, statePath))
 		throw Error(format("path `%1%' is not a valid state path") % statePath);
     
@@ -100,6 +95,8 @@ void commitStatePathTxn(const Transaction & txn, const Path & statePath)
 	}
 	vector<int> intervals = store->getStatePathsInterval(intervalPaths);		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! txn
 	
+	Snapshots revisions_list;
+	
 	int intervalAt=0;	
 	for (DerivationStateOutputDirs::const_iterator i = stateOutputDirs.begin(); i != stateOutputDirs.end(); ++i){
 		DerivationStateOutputDir d = i->second;
@@ -122,92 +119,31 @@ void commitStatePathTxn(const Transaction & txn, const Path & statePath)
 			intervals[intervalAt] = interval_counter + 1;
 			intervalAt++;
 						
-			if(interval_counter % interval != 0){	return;		}
+			if(interval_counter % interval != 0){	continue;		}
 		}
 		else if(d.type == "full"){	}			
-		else if(d.type == "manual"){ return; }		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!			
+		else if(d.type == "manual"){ 	continue; 	}		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!			
 		else
 			throw Error(format("Type '%1%' is not handled in nix-state") % d.type);
 			
 		//We got here so we need to commit
 		
-		unsigned int epoch_time;
+		unsigned int revision_number;
 		
 		if(pathExists(fullstatedir) || FileExist(fullstatedir)){
-			epoch_time = take_snapshot(fullstatedir);
-			printMsg(lvlError, format("Snapshotted '%1%' with id '%2%'") % fullstatedir % epoch_time);
+			revision_number = take_snapshot(fullstatedir);
+			printMsg(lvlError, format("Snapshotted '%1%' with id '%2%'") % fullstatedir % revision_number);
 		}
 		else
-		{
-			//TODO !!!!!!!!!!!!!!	
-		}
+			revision_number = 0;	//deleted, so we assign 0 to indicate that 	
 		
-		//Put in database !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		//TODO
+		revisions_list[fullstatedir] = revision_number;
 	}
 	  	
+	return revisions_list; 
+	 
     //Update the intervals again	
 	//setStatePathsIntervalTxn(txn, intervalPaths, intervals);		//TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!! uncomment
 }
-
-/*
- * This function takes all state requisites (references) and revision numbers and stores them ...
- */
-/* 
-void updateRevisionsRecursivelyTxn(const Transaction & txn, const Path & statePath)
-{
-	//Save all revisions for the call to 
-	RevisionNumbersSet rivisionMapping;
-
-	PathSet statePaths;
-	storePathRequisitesTxn(txn, statePath, false, statePaths, false, true, -1);		//Get all current state dependencies
-	
-	//Add own statePath (may already be in there, but its a set, so no doubles)
-	statePaths.insert(statePath);
-	
-   	//Sort
-   	vector<Path> sortedStatePaths;
-	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
-		sortedStatePaths.push_back(*i);
-    sort(sortedStatePaths.begin(), sortedStatePaths.end());
-		
-	//call scanForAllReferences again on all newly found statePaths
-	for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
-		rivisionMapping[*i] = readRevisionNumber(*i);	
-	
-	//Store the revision numbers in the database for this statePath with revision number
-	setStateRevisionsTxn(txn, statePath, rivisionMapping);
-} 
-
-int readRevisionNumber(Path statePath)
-{
-	string svnbin = nixSVNPath + "/svn";
-	RevisionNumbers revisions;
-	
-	string repos = getStateReposPath("stateOutput:staterepospath", statePath);		//this is a copy from store-state.cc
-	
-	//TODO Check if the .svn exists, it might be deleted, then we dont have to remember the state revision (set -1)
-	
-	Strings p_args;
-	p_args.push_back(svnbin);
-	p_args.push_back("file://" + repos);
-	string output = runProgram(nixLibexecDir + "/nix/nix-readrevisions.sh", true, p_args);	//run
-	    	
-	int pos = output.find("\n",0);	//remove trailing \n
-	output.erase(pos,1);
-			
-	int revision;
-	bool succeed = string2Int(output, revision);
-	if(!succeed)
-		throw Error(format("Cannot read revision number of path '%1%'") % repos);				
-	
-	return revision;
-}
-*/
-
-//	string s = "/media/ext3cow/cca/";
-//	unsigned int i = take_snapshot(s);
-//	printMsg(lvlError, format("SS: '%1%'") % i);
-
 
 }

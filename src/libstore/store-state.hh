@@ -11,7 +11,7 @@ namespace nix {
 void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs);
 
 /* TODO */
-void commitStatePathTxn(const Transaction & txn, const Path & statePath);
+Snapshots commitStatePathTxn(const Transaction & txn, const Path & statePath);
 
 /* TODO */
 //void updateRevisionsRecursivelyTxn(const Transaction & txn, const Path & statePath);

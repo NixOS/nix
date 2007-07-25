@@ -1809,8 +1809,12 @@ void DerivationGoal::computeClosure()
     		state_stateReferences,
     		drvPath, 0);
 
-    	//Commit state
-		commitStatePathTxn(txn, statePath);
+    	//Commit state (we only include our own state in the rivisionMapping (but other build component states might have been changed !!!! TODO) 
+		RevisionClosure rivisionMapping;
+		rivisionMapping[statePath] = commitStatePathTxn(txn, statePath);
+		
+		//Save the new revision
+		setStateRevisionsTxn(txn, statePath, rivisionMapping);
 			
 		//Shared state
     	Path sharedState = drv.stateOutputs.find("state")->second.sharedState;

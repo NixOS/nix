@@ -1,5 +1,6 @@
 #include <iostream>
 #include <algorithm>
+#include <sys/time.h>
 
 #include "globals.hh"
 #include "misc.hh"
@@ -158,7 +159,7 @@ static void opShowStatePath(Strings opFlags, Strings opArgs)
 }
 
 //Prints the root path that contains the repoisitorys of the state of a component - indetiefier combination
-static void opShowStateReposPath(Strings opFlags, Strings opArgs)
+static void opShowStatePathAtRevision(Strings opFlags, Strings opArgs)
 {
 	Path componentPath;
     Path statePath;
@@ -171,10 +172,9 @@ static void opShowStateReposPath(Strings opFlags, Strings opArgs)
 	if(!isStateComponent)
 		throw UsageError(format("This path '%1%' is not a state-component path") % componentPath);
 	
-	//Get the a repository for this state location
-	string repos = getStateReposPath("stateOutput:staterepospath", statePath);		//this is a copy from store-state.cc
-
-	printMsg(lvlError, format("%1%") % repos);
+	//TODO
+	
+	//printMsg(lvlError, format("%1%") % repos);
 }
 
 
@@ -236,6 +236,7 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
     bool isStateComponent;
     string program_args;
     Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
+    DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
     
     bool recursive = true;	//TODO !!!!!!!!!!!!!!!!!
     
@@ -246,15 +247,71 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
 		statePaths.insert(derivationPath);	//Insert direct state path
 		    	
     //Get the revisions recursively to also roll them back
-    RevisionNumbersSet getRivisions;
+    RevisionClosure getRivisions;
 	bool b = store->queryStateRevisions(statePath, getRivisions, revision_arg);
     
 	//Revert each statePath in the list
-	for (RevisionNumbersSet::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
+	for (RevisionClosure::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
 		Path statePath = (*i).first;
-		map<Path, unsigned int> revisioned_paths = (*i).second;
+		Snapshots revisioned_paths = (*i).second;
 		
-		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		//TODO Sort snapshots??? eg first restore root, then the subdirs??
+		
+		for (Snapshots::iterator j = revisioned_paths.begin(); j != revisioned_paths.end(); ++j){
+			Path revertPathOrFile = (*j).first;
+			unsigned int epoch = (*j).second;
+			
+			//printMsg(lvlError, format("MAYBE '%1%'") % revertPathOrFile);
+			
+			//Look up the type from the drv with for the current snapshotted path
+			Path statePath_postfix = revertPathOrFile.substr(nixStoreState.length() + 1, revertPathOrFile.length() - nixStoreState.length());
+			statePath_postfix = statePath_postfix.substr(statePath_postfix.find_first_of("/") + 1, statePath_postfix.length());
+			if(statePath_postfix == "")
+				statePath_postfix = "/";
+			string type = stateOutputDirs.at(statePath_postfix).type;
+			if(type == "none")
+				continue;
+
+			//Now that were still here, we need to copy the state from the previous version back
+			Strings p_args;
+			p_args.push_back("-c");		//we use the shell to execute the cp command becuase the shell expands the '*' 
+			string cpcommand = "cp -R";
+			if(revertPathOrFile.substr(revertPathOrFile.length() -1 , revertPathOrFile.length()) == "/"){		//is dir
+				cpcommand += " " + (revertPathOrFile.substr(0, revertPathOrFile.length() -1) + "@" + unsignedInt2String(epoch)  + "/*");
+				
+				//clean all contents of the folder first (so were sure the path is clean)
+				if(pathExists(revertPathOrFile))
+					deletePath(revertPathOrFile);
+				
+				//If path was not deleted in the previous version, we need to make sure it exists or cp will fail
+				if(epoch == 0)
+					continue;
+				else
+					ensureDirExists(revertPathOrFile);
+			}
+			else{																//is file
+				cpcommand += " " + (revertPathOrFile + "@" + unsignedInt2String(epoch));
+				
+				if(epoch == 0){
+					//delete file
+					if(FileExist(revertPathOrFile))
+						deletePath(revertPathOrFile);	//we only delete if the cp doesnt overwrite it below
+					continue;
+				}
+			}
+
+			printMsg(lvlError, format("Reverting '%1%'") % revertPathOrFile);
+			
+			cpcommand += " " + revertPathOrFile;
+			p_args.push_back(cpcommand);
+			
+			//for (Strings::iterator h = p_args.begin(); h != p_args.end(); ++h)
+			//	printMsg(lvlError, format("SH ARGS '%1%'") % *h);
+			
+			runProgram_AndPrintOutput("sh", true, p_args, "sh-cp");			//TODO does this work on windows?
+		}
+		
+		printMsg(lvlError, format("Reverted state of '%1%' to revision '%2%'") % statePath % revision_arg);
 	}
 }
 
@@ -357,7 +414,8 @@ void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path
 		
 		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		int revision = 0;
-		//Get last revision number from DB !!!!!!!!!!
+		//Get last revision number from DB !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		//TODO first snapshot all paths....?
 		
 		//Scan, update, call recursively
 		PathSet newFoundComponentReferences;
@@ -408,7 +466,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	//******************* Run ****************************
 	
 	if(!only_commit)
-		executeShellCommand(root_componentPath + root_binary + " " + root_program_args);	//more efficient way needed ???
+		executeShellCommand(root_componentPath + root_binary + " " + root_program_args);
   		
 	//******************* With everything in place, we call the commit script on all statePaths (in)directly referenced **********************
 
@@ -419,16 +477,20 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
   		scanAndUpdateAllReferencesRecusivelyTxn(txn, root_statePath);
 	
 	//Commit all statePaths
+	RevisionClosure rivisionMapping;
 	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)		//TODO first commit own state path?
-		commitStatePathTxn(txn, *i);
+		rivisionMapping[*i] = commitStatePathTxn(txn, *i);
+	
+	//Save new revisions
+	setStateRevisionsTxn(txn, root_statePath, rivisionMapping);
 	
 	//Commit transaction
 	//txn.commit();
 	
 	//Debugging
-	RevisionNumbersSet getRivisions;
+	RevisionClosure getRivisions;
 	bool b = store->queryStateRevisions(root_statePath, getRivisions, -1);
-	for (RevisionNumbersSet::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
+	for (RevisionClosure::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
 		//printMsg(lvlError, format("State %1% has revision %2%") % (*i).first % int2String((*i).second));
 	}
 	
@@ -537,10 +599,19 @@ void run(Strings args)
 	for (Strings::iterator i = strings2.begin(); i != strings2.end(); ++i)
 		printMsg(lvlError, format("UN '%1%'") % *i);
 
-	*/
-	
 	//updateRevisionNumbers("/nix/state/xf582zrz6xl677llr07rvskgsi3dli1d-hellohardcodedstateworld-dep1-1.0-test");
 	//return;
+	
+	//printMsg(lvlError, format("NOW: '%1%'") % getTimeStamp());
+	
+	//auto sort
+	map<string, string> test;
+	test["q"] = "324";
+	test["c"] = "3241";
+	test["a"] = "a";
+	for (map<string, string>::const_iterator j = test.begin(); j != test.end(); ++j)
+		printMsg(lvlError, format("KEY: '%1%'") % (*j).first);
+	*/
 
 	/* test */
 	
@@ -557,8 +628,6 @@ void run(Strings args)
     	}
 		else if (arg == "--showstatepath")
 			op = opShowStatePath;
-		else if (arg == "--showstatereposrootpath")
-			op = opShowStateReposPath;
 		else if (arg == "--showderivations")
 			op = opShowDerivations;
 		else if (arg == "--showrevisions")
@@ -571,10 +640,9 @@ void run(Strings args)
 		}
 
         /*
-		
-		--commit
-
 		--run-without-commit
+
+		--show-revision-path=....
 		
 		--showrevisions
 		

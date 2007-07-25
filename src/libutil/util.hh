@@ -280,6 +280,10 @@ bool statusOk(int status);
 string int2String(int n);
 bool string2Int(const string & s, int & n);
 
+/* */
+bool string2UnsignedInt(const string & s, unsigned int & n);
+string unsignedInt2String(unsigned int n);
+
 /* Parse a bool to a string and back */
 string bool2string(const bool b);
 bool string2bool(const string & s);
@@ -297,8 +301,7 @@ void executeShellCommand(const string & command);
 //
 void runProgram_AndPrintOutput(Path program, bool searchPath, const Strings & args, const string outputPrefix);
 
-//Convert time_t to a string
-string time_t2string(const time_t & t);
+int getTimeStamp();
 
 bool FileExist(const string FileName);
 
@@ -312,9 +315,8 @@ PathSet pathSets_union(const PathSet & paths1, const PathSet & paths2);
 /* TODO */
 void pathSets_difference(const PathSet & oldpaths, const PathSet & newpaths, PathSet & addedpaths, PathSet & removedpaths);
 
-string packRevisionNumbers(const RevisionNumbers & revs);
-    
-RevisionNumbers unpackRevisionNumbers(const string & packed);
+
+void ensureDirExists(const Path & path);
 
 }
 

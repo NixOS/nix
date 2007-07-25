@@ -1039,6 +1039,20 @@ bool string2Int(const string & s, int & n)
     return str && str.get() == EOF;
 }
 
+string unsignedInt2String(unsigned int n)
+{
+    std::ostringstream str;
+    str << n;
+    return str.str();
+}
+
+bool string2UnsignedInt(const string & s, unsigned int & n)
+{
+    std::istringstream str(s);
+    str >> n;
+    return str && str.get() == EOF;
+}
+
 string bool2string(const bool b)
 {
 	if(b == true)
@@ -1126,11 +1140,11 @@ void executeShellCommand(const string & command)
     }
 }
 
-string time_t2string(const time_t & t)
+int getTimeStamp()
 {
-	int i = t;
-	string s = int2String(i);
-	return s;
+	const time_t now = time(0);
+	int i = now;
+	return i;
 }
 
 //TODO Does this work on windows?
@@ -1218,5 +1232,12 @@ void pathSets_difference(const PathSet & oldpaths, const PathSet & newpaths, Pat
 	}
 }
 
+void ensureDirExists(const Path & path)
+{
+	Strings p_args;
+	p_args.push_back("-p");
+	p_args.push_back(path);
+	runProgram_AndPrintOutput("mkdir", true, p_args, "mkdir");		//TODO ensurePath	
+}
 
 }

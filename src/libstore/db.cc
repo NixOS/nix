@@ -466,7 +466,6 @@ void Database::splitStatePathRevision(const Path & revisionedStatePath, Path & s
 	if(!succeed)
 		throw Error(format("Malformed revision value of path '%1%'") % revisionedStatePath);
 }
-														 
 
 int Database::getNewRevisionNumber(const Transaction & txn, TableId table,
    	const Path & statePath)
@@ -489,31 +488,6 @@ int Database::getNewRevisionNumber(const Transaction & txn, TableId table,
 	setString(txn, table, statePath, int2String(revision));
 	
 	return revision;
-}
-
-void Database::setStateReferences(const Transaction & txn, TableId table,
-   	const Path & statePath, const Strings & references, int revision)
-{
-	//printMsg(lvlError, format("setStateReferences/Referrers %1%") % table);
-	
-	if(revision == -1)
-		revision = getNewRevisionNumber(txn, table, statePath);
-
-	/*
-	for (Strings::const_iterator i = references.begin(); i != references.end(); ++i)
-		printMsg(lvlError, format("setStateReferences::: '%1%'") % *i);
-	*/
-	
-	//Warning if it already exists
-	Strings empty;
-	if( queryStateReferences(txn, table, statePath, empty, revision) )
-		printMsg(lvlError, format("Warning: The revision '%1%' already exists for set-references/referrers of path '%2%' with db '%3%'") % revision % statePath % table);
-	
-	//Create the key
-	string key = makeStatePathRevision(statePath, revision);
-	
-	//Insert	
-	setStrings(txn, table, key, references);
 }
 
 bool Database::lookupHighestRevivison(const Strings & keys, const Path & statePath, string & key, int lowerthan)
@@ -546,6 +520,33 @@ bool Database::lookupHighestRevivison(const Strings & keys, const Path & statePa
 	
 	key = makeStatePathRevision(statePath, highestRev);		//final key that matches revision + statePath
 	return true;	
+}
+
+//////////////////////////////////////////////
+
+void Database::setStateReferences(const Transaction & txn, TableId table,
+   	const Path & statePath, const Strings & references, int revision)
+{
+	//printMsg(lvlError, format("setStateReferences/Referrers %1%") % table);
+	
+	if(revision == -1)
+		revision = getNewRevisionNumber(txn, table, statePath);
+
+	/*
+	for (Strings::const_iterator i = references.begin(); i != references.end(); ++i)
+		printMsg(lvlError, format("setStateReferences::: '%1%'") % *i);
+	*/
+	
+	//Warning if it already exists
+	Strings empty;
+	if( queryStateReferences(txn, table, statePath, empty, revision) )
+		printMsg(lvlError, format("Warning: The revision '%1%' already exists for set-references/referrers of path '%2%' with db '%3%'") % revision % statePath % table);
+	
+	//Create the key
+	string key = makeStatePathRevision(statePath, revision);
+	
+	//Insert	
+	setStrings(txn, table, key, references);
 }
 
 bool Database::queryStateReferences(const Transaction & txn, TableId table,
@@ -589,129 +590,119 @@ bool Database::queryStateReferrers(const Transaction & txn, TableId table,
 	//Exactly the same as queryStateReferences
 	return queryStateReferences(txn, table, statePath, referrers, revision);
 }
+
+/////////////////////////////////////////////
    
 
-void Database::setStateRevisions(const Transaction & txn, TableId table,
-   	const Path & statePath, const RevisionNumbersSet & revisions)
+void Database::setStateRevisions(const Transaction & txn, TableId revisions_table, TableId snapshots_table,
+   	const Path & root_statePath, const RevisionClosure & revisions)
 {
-	//get a new revision number
-	int root_revision = getNewRevisionNumber(txn, table, statePath);
+	int ts = getTimeStamp();
 	
-	//Sort based on statePath to RevisionNumbersClosure
-	vector<Path> sortedStatePaths;
-	for (RevisionNumbersSet::const_iterator i = revisions.begin(); i != revisions.end(); ++i)
-		sortedStatePaths.push_back((*i).first);
-    sort(sortedStatePaths.begin(), sortedStatePaths.end());
-
-	vector<RevisionNumbers> sorted_revisions;    
-    for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i){
-    	map<Path, unsigned int> ss_revisions = revisions.at(*i);
-
-		//Sort the set of paths that have revisions based on 
-		vector<Path> sorted_ssp;
-		for (map<Path, unsigned int>::const_iterator j = ss_revisions.begin(); j != ss_revisions.end(); ++j)
-			sorted_ssp.push_back((*j).first);
-		sort(sorted_ssp.begin(), sorted_ssp.end());
-		
-		//Insert into sorted_ss_revs based on the sorted order
-		RevisionNumbers sorted_ss_revs;
-		for (vector<Path>::const_iterator j = sorted_ssp.begin(); j != sorted_ssp.end(); ++j)
-			sorted_ss_revs.push_back(ss_revisions.at(*j));
-
-		//Insert ......
-    	sorted_revisions.push_back(sorted_ss_revs);
-    }		 
+	//Insert all ss_epochs into table ...... with the current ts.
+	for (RevisionClosure::const_iterator i = revisions.begin(); i != revisions.end(); ++i){
+		string key = makeStatePathRevision((*i).first, ts);
+		Strings data;
+			//the map<> takes care of the sorting on
+		for (Snapshots::const_iterator j = (*i).second.begin(); j != (*i).second.end(); ++j)
+			data.push_back(int2String((*j).second));
+		setStrings(txn, snapshots_table, key, data);
+	}
 	
-	//Debugging
-	//for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i)
-	//	printMsg(lvlError, format("Insert: %1% into %2%") % revisions.at(*i) % *i);
+	//Insert for each statePath a new revision record linked to the ss_epochs
+	for (RevisionClosure::const_iterator i = revisions.begin(); i != revisions.end(); ++i){
+		Path statePath = (*i).first;
+		int revision = getNewRevisionNumber(txn, revisions_table, statePath);	//get a new revision number
+		string key = makeStatePathRevision(statePath, revision);
 		
-	//Convert the vector<RevisionNumbers> into Strings
-	Strings data;
-	for (vector<RevisionNumbers>::const_iterator i = sorted_revisions.begin(); i != sorted_revisions.end(); ++i)
-		data.push_back(packRevisionNumbers(*i));
+		//get all its requisites
+		PathSet statePaths;
+		storePathRequisitesTxn(txn, statePath, false, statePaths, false, true, -1);
+		statePaths.insert(statePath);
 		
-	//Create the key
-	string key = makeStatePathRevision(statePath, root_revision);
-	
-	//Insert	
-	setStrings(txn, table, key, data);
+		//save in db
+		Strings data;
+		for (PathSet::const_iterator j = statePaths.begin(); j != statePaths.end(); ++j)
+			data.push_back(makeStatePathRevision(*j, ts));		
+		setStrings(txn, revisions_table, key, data);
+	}
 }   
 
-bool Database::queryStateRevisions(const Transaction & txn, TableId table, const PathSet statePath_deps,
-   	const Path & statePath, RevisionNumbersSet & revisions, int root_revision)
+bool Database::queryStateRevisions(const Transaction & txn, TableId revisions_table, TableId snapshots_table,
+   	const Path & statePath, RevisionClosure & revisions, int root_revision)
 {
-	Strings keys;
-	enumTable(txn, table, keys);		//get all revisions
-
 	string key;
+	
 	if(root_revision == -1){
+		Strings keys;
+		enumTable(txn, revisions_table, keys);		//get all revisions
 		bool foundsomething = lookupHighestRevivison(keys, statePath, key);
 		if(!foundsomething)
 			return false;
 	}
 	else
 		key = makeStatePathRevision(statePath, root_revision);
-		
-	Strings data; 
-	bool notempty = queryStrings(txn, table, key, data);		//now that we have the key, we can query the revisions
-
-	//Check
-	if(statePath_deps.size() != data.size())
-		throw Error(format("The number of statepath references doenst equal the number of revisions for '%1%'") % statePath);
-		
-	//sort all state references recursively
-	vector<Path> sortedStatePaths;
-	for (PathSet::iterator i = statePath_deps.begin(); i != statePath_deps.end(); ++i)
-		sortedStatePaths.push_back(*i);
-    sort(sortedStatePaths.begin(), sortedStatePaths.end());
 	
-	//Convert the Strings into int's and match them to the sorted statePaths
-	for (vector<Path>::const_iterator i = sortedStatePaths.begin(); i != sortedStatePaths.end(); ++i){
+	//Get references pointingg to snapshots_table from revisions_table with root_revision
+	Strings references;
+	bool notempty = queryStrings(txn, revisions_table, key, references);
+	
+	if(!notempty)
+		throw Error(format("Root revision '%1%' not found of statePath '%2%'") % int2String(root_revision) % statePath);
 		
-		RevisionNumbers ss_revisions = unpackRevisionNumbers(data.front());
-		data.pop_front();
+	//
+	for (Strings::iterator i = references.begin(); i != references.end(); ++i){
+		
+		Path getStatePath;
+		int getTimestamp;
+		splitStatePathRevision(*i, getStatePath, getTimestamp);
 		
 		//query state versioined directorys/files
 		vector<Path> sortedPaths;
-		Derivation drv = derivationFromPath(queryStatePathDrvTxn(txn, statePath));
+		Derivation drv = derivationFromPath(queryStatePathDrvTxn(txn, getStatePath));
   		DerivationStateOutputs stateOutputs = drv.stateOutputs; 
     	DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
     	for (DerivationStateOutputDirs::const_iterator j = stateOutputDirs.begin(); j != stateOutputDirs.end(); ++j){
 			string thisdir = (j->second).path;
-			string fullstatedir = statePath + "/" + thisdir;
+			string fullstatedir = getStatePath + "/" + thisdir;
 			if(thisdir == "/")									//exception for the root dir
 				fullstatedir = statePath + "/";
 			sortedPaths.push_back(fullstatedir);
     	}			
 		sort(sortedPaths.begin(), sortedPaths.end());	//sort
-				
-		//link
-		map<Path, unsigned int> revisions_ss;
-		for (vector<Path>::const_iterator j = sortedPaths.begin(); j != sortedPaths.end(); ++j){
-			revisions_ss[*j] = ss_revisions.front();
-			ss_revisions.pop_front();
+		
+		Strings snapshots_s;
+		Snapshots snapshots;		
+		queryStrings(txn, snapshots_table, *i, snapshots_s);
+		int counter=0;
+		for (Strings::iterator j = snapshots_s.begin(); j != snapshots_s.end(); ++j){
+			
+			unsigned int revision;
+			bool succeed = string2UnsignedInt(*j, revision);
+			if(!succeed)
+				throw Error(format("Malformed epoch (snapshot timestamp) value of path '%1%'") % statePath);
+			
+			snapshots[sortedPaths.at(counter)] = revision;
+			counter++;
 		}
-						
-		revisions[*i] = revisions_ss;
+		
+		revisions[getStatePath] = snapshots;
 	}
 	
-	if(!notempty)
-		throw Error(format("Root revision '%1%' not found of statePath '%2%'") % int2String(root_revision) % statePath);
 	
 	return notempty;
 }  
 
 //TODO include comments into revisions?
-bool Database::queryAvailableStateRevisions(const Transaction & txn, TableId table,
+bool Database::queryAvailableStateRevisions(const Transaction & txn, TableId revisions_table,
     const Path & statePath, RevisionNumbers & revisions)
 {
 	Strings keys;
-	enumTable(txn, table, keys);		//get all revisions
+	enumTable(txn, revisions_table, keys);		//get all revisions
 	
 	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i) {
 	
-		if((*i).substr(0, statePath.length()) != statePath || (*i).length() == statePath.length()) //dont check the new-revision key or other keys
+		if((*i).substr(0, statePath.length()) != statePath || (*i).length() == statePath.length()) 		//dont check the new-revision key or other keys
 			continue;
 
 		Path getStatePath;

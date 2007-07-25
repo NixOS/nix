@@ -124,12 +124,19 @@ static TableId dbStateCounters = 0;
 */
 static TableId dbStateInfo = 0;
 
-/* dbStateRevisions :: StatePath -> RevisionNumbers
+/* dbStateRevisions :: StatePath -> [StatePath]
 
-   This table lists the statepaths + recursive (indirect) references and the revision numbers of their repositorys
+   This table lists the ...............
     
 */
 static TableId dbStateRevisions = 0;
+
+/* dbStateSnapshots :: StatePath -> RevisionNumbers
+
+   This table lists the ...............
+    
+*/
+static TableId dbStateSnapshots = 0;
 
 /* dbSharedState :: Path -> Path
  * 
@@ -211,6 +218,7 @@ LocalStore::LocalStore(bool reserveSpace)
 	dbStateComponentReferrers = nixDB.openTable("referrers_s_c", true);
 	dbStateStateReferrers = nixDB.openTable("referrers_s_s", true);
 	dbStateRevisions = nixDB.openTable("staterevisions");
+	dbStateSnapshots = nixDB.openTable("stateSnapshots");
 	dbSharedState = nixDB.openTable("sharedState");
 
 	dbSolidStateReferences = nixDB.openTable("references_solid_c_s");	/* The contents of this table is included in references_c_s */
@@ -1661,26 +1669,22 @@ void queryAllValidPaths(const Transaction & txn, PathSet & allComponentPaths, Pa
 }
 
 
-void setStateRevisionsTxn(const Transaction & txn, const Path & statePath, const RevisionNumbersSet & revisions)
+void setStateRevisionsTxn(const Transaction & txn, const Path & statePath, const RevisionClosure & revisions)
 {
-	nixDB.setStateRevisions(txn, dbStateRevisions, statePath, revisions);	
+	nixDB.setStateRevisions(txn, dbStateRevisions, dbStateSnapshots, statePath, revisions);	
 }
 
-void LocalStore::setStateRevisions(const Path & statePath, const RevisionNumbersSet & revisions)
+void LocalStore::setStateRevisions(const Path & statePath, const RevisionClosure & revisions)
 {
 	nix::setStateRevisionsTxn(noTxn, statePath, revisions);	
 }
 
-bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionNumbersSet & revisions, const int revision)
+bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionClosure & revisions, const int revision)
 {
-	PathSet statePaths;
-	storePathRequisites(statePath, false, statePaths, false, true, revision);		//Get all current state dependencies
-	statePaths.insert(statePath);													//also insert the root statePath	
-	
-	return nixDB.queryStateRevisions(txn, dbStateRevisions, statePaths, statePath, revisions, revision);
+	return nixDB.queryStateRevisions(txn, dbStateRevisions, dbStateSnapshots, statePath, revisions, revision);
 }
 
-bool LocalStore::queryStateRevisions(const Path & statePath, RevisionNumbersSet & revisions, const int revision)
+bool LocalStore::queryStateRevisions(const Path & statePath, RevisionClosure & revisions, const int revision)
 {
 	return nix::queryStateRevisionsTxn(noTxn, statePath, revisions, revision);
 }

@@ -115,15 +115,15 @@ public:
     	const Path & statePath, Strings & referrers, int revision = -1);
         
     /* Set the revision number of the statePath and the revision numbers of all state paths in the references closure */
-    void setStateRevisions(const Transaction & txn, TableId table,
-    	const Path & statePath, const RevisionNumbersSet & revisions);
+    void setStateRevisions(const Transaction & txn, TableId revisions_table, TableId snapshots_table,
+    	const Path & statePath, const RevisionClosure & revisions);
     
     /* Returns all the revision numbers of the state references closure of the given state path */
-    bool queryStateRevisions(const Transaction & txn, TableId table, const PathSet statePath_deps,
-   	const Path & statePath, RevisionNumbersSet & revisions, int root_revision = -1);
+    bool queryStateRevisions(const Transaction & txn, TableId revisions_table, TableId snapshots_table,
+    const Path & statePath, RevisionClosure & revisions, int root_revision = -1);
     
     /* Returns all available revision numbers of the given state path */
-    bool queryAvailableStateRevisions(const Transaction & txn, TableId table,
+    bool queryAvailableStateRevisions(const Transaction & txn, TableId revisions_table,
     	const Path & statePath, RevisionNumbers & revisions);	
    
     

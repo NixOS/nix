@@ -89,7 +89,7 @@ unsigned int take_snapshot(const string & dir2) //const string & file_or_dir)
     exit(1);
   }
   
-  printf("%u\n", (unsigned int)epoch);
+  //printf("%u\n", (unsigned int)epoch);
 
   return epoch;
 }

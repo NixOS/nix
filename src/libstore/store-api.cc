@@ -151,29 +151,6 @@ void checkStatePath(const Derivation & drv)
     	Error(format("The statepath from the Derivation does not match the recalculated statepath, are u trying to spoof the statepath?"));
 }
 
-Path getStateReposPath(const string & type, const Path statePath)
-{
-    //This is a little trick: we could use the same hash as the statepath, but we change it so the repository also gets a unique scannable hash
-    Hash hash = hashString(htSHA256, statePath); 
-    
-    //Extract suffix and stateIdentifier from statePath
-	int pos = statePath.find_first_of("-");
-	string suffix = statePath.substr(pos, statePath.length());
-	    
-    /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
-    string s = type + ":sha256:" + printHash(hash) + ":"
-        + nixStoreState + ":" + suffix;
-
-    checkStoreName(suffix);
-    
-    Path path = nixStoreStateRepos + "/"
-        + printHash32(compressHash(hashString(htSHA256, s), 20))
-        + suffix + "/";
-        
-    return path;
-}
-
-
 Path makeFixedOutputPath(bool recursive,
     string hashAlgo, Hash hash, string name)
 {

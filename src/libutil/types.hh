@@ -59,8 +59,9 @@ typedef list<Path> Paths;
 typedef set<Path> PathSet;
 
 //state types
-typedef list<int> RevisionNumbers;								//the Strings (list) of StateReferences and this list are connected by position
-typedef map<Path, map<Path, unsigned int> > RevisionNumbersSet;			//We include to the paths to sort on
+typedef list<int> RevisionNumbers;							//the Strings (list) of StateReferences and this list are connected by position
+typedef map<Path, unsigned int> Snapshots;					//Automatically sorted on Path :)
+typedef map<Path, Snapshots > RevisionClosure;
 typedef map<int, Strings> StateReferences;
 
  

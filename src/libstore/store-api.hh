@@ -220,10 +220,10 @@ public:
 	virtual void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision) = 0;
 
 	/* TODO */
-	virtual void setStateRevisions(const Path & statePath, const RevisionNumbersSet & revisions) = 0;
+	virtual void setStateRevisions(const Path & statePath, const RevisionClosure & revisions) = 0;
 	
 	/* TODO */
-	virtual bool queryStateRevisions(const Path & statePath, RevisionNumbersSet & revisions, const int revision) = 0;
+	virtual bool queryStateRevisions(const Path & statePath, RevisionClosure & revisions, const int revision) = 0;
 	
 	/* TODO */
 	virtual bool queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions) = 0;
@@ -264,9 +264,6 @@ Path makeStatePath(const string & componentHash, const string & suffix, const st
 
 /* TODO ... */
 void checkStatePath(const Derivation & drv);
-
-/* Calculates a unique store state repos path  */
-Path getStateReposPath(const string & type, const Path statePath);
 
 /* This is the preparatory part of addToStore() and addToStoreFixed();
    it computes the store path to which srcPath is to be copied.
