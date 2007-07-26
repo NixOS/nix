@@ -277,7 +277,8 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
 			p_args.push_back("-c");		//we use the shell to execute the cp command becuase the shell expands the '*' 
 			string cpcommand = "cp -R";
 			if(revertPathOrFile.substr(revertPathOrFile.length() -1 , revertPathOrFile.length()) == "/"){		//is dir
-				cpcommand += " " + (revertPathOrFile.substr(0, revertPathOrFile.length() -1) + "@" + unsignedInt2String(epoch)  + "/*");
+				string revert_to_path = revertPathOrFile.substr(0, revertPathOrFile.length() -1) + "@" + unsignedInt2String(epoch);
+				cpcommand += " " + revert_to_path + "/*";
 				
 				//clean all contents of the folder first (so were sure the path is clean)
 				if(pathExists(revertPathOrFile))
@@ -288,6 +289,14 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
 					continue;
 				else
 					ensureDirExists(revertPathOrFile);
+				
+				//If the the dir has not contents then a cp ..../* will error since * cannot be expanded. So in this case were done and dont have to revert.
+				Strings p2_args;
+				p2_args.push_back("-A");
+				p2_args.push_back(revert_to_path + "/");
+				string output = runProgram("ls", true, p2_args);
+				if(output == "")
+					continue;
 			}
 			else{																//is file
 				cpcommand += " " + (revertPathOrFile + "@" + unsignedInt2String(epoch));
@@ -299,15 +308,11 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
 					continue;
 				}
 			}
-
-			printMsg(lvlError, format("Reverting '%1%'") % revertPathOrFile);
 			
+			//Revert
+			printMsg(lvlError, format("Reverting '%1%'") % revertPathOrFile);
 			cpcommand += " " + revertPathOrFile;
 			p_args.push_back(cpcommand);
-			
-			//for (Strings::iterator h = p_args.begin(); h != p_args.end(); ++h)
-			//	printMsg(lvlError, format("SH ARGS '%1%'") % *h);
-			
 			runProgram_AndPrintOutput("sh", true, p_args, "sh-cp");			//TODO does this work on windows?
 		}
 		

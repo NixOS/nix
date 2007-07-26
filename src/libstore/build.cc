@@ -1397,7 +1397,7 @@ void DerivationGoal::startBuilder()
 
    		/* we check the recalculated state path at build time with the correct user for securiyt */
    		checkStatePath(drv);
-    
+	
     	if(drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
 	    	createStateDirs(drv.stateOutputDirs, drv.stateOutputs);
     }

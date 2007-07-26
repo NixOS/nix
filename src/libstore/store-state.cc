@@ -22,15 +22,13 @@ namespace nix {
 void updatedStateDerivation(Path storePath)
 {
 	//We dont remove the old .svn folders
-	//nothing to do since New repostorys are created by createStateDirs
+	//update in database?
 		
-	printMsg(lvlTalkative, format("Resetting state drv settings like repositorys"));
-	 
+	printMsg(lvlTalkative, format("Resetting state drv settings"));
 }
 
 void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs)
 {
-	
 	Path statePath = stateOutputs.find("state")->second.statepath;
 	string stateDir = statePath;
 	
@@ -51,7 +49,7 @@ void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const De
 
 		string thisdir = d.path;
 		
-		//Check if it is a file
+		//If it is a file: continue
 		if(thisdir.substr(thisdir.length() -1 , thisdir.length()) != "/")
 			continue;
 		
@@ -127,12 +125,10 @@ Snapshots commitStatePathTxn(const Transaction & txn, const Path & statePath)
 			throw Error(format("Type '%1%' is not handled in nix-state") % d.type);
 			
 		//We got here so we need to commit
-		
 		unsigned int revision_number;
-		
 		if(pathExists(fullstatedir) || FileExist(fullstatedir)){
 			revision_number = take_snapshot(fullstatedir);
-			printMsg(lvlError, format("Snapshotted '%1%' with id '%2%'") % fullstatedir % revision_number);
+			printMsg(lvlError, format("Snapshotted '%1%@%2%'") % fullstatedir % revision_number);
 		}
 		else
 			revision_number = 0;	//deleted, so we assign 0 to indicate that 	
