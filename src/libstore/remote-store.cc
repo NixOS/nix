@@ -469,13 +469,13 @@ void RemoteStore::storePathRequisites(const Path & storeOrstatePath, const bool 
 }
 
 //TODO
-void RemoteStore::setStateRevisions(const Path & statePath, const RevisionClosure & revisions)
+void RemoteStore::setStateRevisions(const RevisionClosure & revisions)
 {
 	
 }
 
 //TODO
-bool RemoteStore::queryStateRevisions(const Path & statePath, RevisionClosure & revisions, const int revision)
+bool RemoteStore::queryStateRevisions(const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const int revision)
 {
 	return false;
 }

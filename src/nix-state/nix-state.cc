@@ -236,9 +236,10 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
     bool isStateComponent;
     string program_args;
     Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
-    DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
     
     bool recursive = true;	//TODO !!!!!!!!!!!!!!!!!
+    
+    //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! add TXN here ???????????
     
     PathSet statePaths;
     if(recursive)
@@ -248,12 +249,21 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
 		    	
     //Get the revisions recursively to also roll them back
     RevisionClosure getRivisions;
-	bool b = store->queryStateRevisions(statePath, getRivisions, revision_arg);
+    RevisionClosureTS getTimestamps;
+	bool b = store->queryStateRevisions(statePath, getRivisions, getTimestamps, revision_arg);
     
 	//Revert each statePath in the list
 	for (RevisionClosure::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
 		Path statePath = (*i).first;
 		Snapshots revisioned_paths = (*i).second;
+		int timestamp = getTimestamps[statePath];
+		
+		//get new timestamp (just before restoring the path) for references update ???
+		
+		
+		//get its derivation-state-items
+		Derivation statePath_drv = derivationFromPath(queryStatePathDrvTxn(noTxn, statePath));
+		DerivationStateOutputDirs stateOutputDirs = statePath_drv.stateOutputDirs; 
 		
 		//TODO Sort snapshots??? eg first restore root, then the subdirs??
 		
@@ -275,19 +285,18 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
 			//Now that were still here, we need to copy the state from the previous version back
 			Strings p_args;
 			p_args.push_back("-c");		//we use the shell to execute the cp command becuase the shell expands the '*' 
-			string cpcommand = "cp -R";
+			string cpcommand = "cp";
 			if(revertPathOrFile.substr(revertPathOrFile.length() -1 , revertPathOrFile.length()) == "/"){		//is dir
 				string revert_to_path = revertPathOrFile.substr(0, revertPathOrFile.length() -1) + "@" + unsignedInt2String(epoch);
-				cpcommand += " " + revert_to_path + "/*";
+				cpcommand += " -R " + revert_to_path + "/*";
 				
 				//clean all contents of the folder first (so were sure the path is clean)
 				if(pathExists(revertPathOrFile))
 					deletePath(revertPathOrFile);
 				
-				//If path was not deleted in the previous version, we need to make sure it exists or cp will fail
-				if(epoch == 0)
+				if(epoch == 0)		//Path was deleted so were done
 					continue;
-				else
+				else				//If path was not deleted in the previous version, we need to make sure it exists or cp will fail
 					ensureDirExists(revertPathOrFile);
 				
 				//If the the dir has not contents then a cp ..../* will error since * cannot be expanded. So in this case were done and dont have to revert.
@@ -310,20 +319,40 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
 			}
 			
 			//Revert
-			printMsg(lvlError, format("Reverting '%1%'") % revertPathOrFile);
+			printMsg(lvlError, format("Reverting '%1%@%2%'") % revertPathOrFile % unsignedInt2String(epoch));
+			printMsg(lvlError, format("Command: '%1%'") % cpcommand);
 			cpcommand += " " + revertPathOrFile;
 			p_args.push_back(cpcommand);
 			runProgram_AndPrintOutput("sh", true, p_args, "sh-cp");			//TODO does this work on windows?
 		}
 		
+		
+		//Also revert state references to the specific revision (the revision is already converted to a timestamp here)
+		PathSet state_stateReferences;
+	    queryStateReferencesTxn(noTxn, statePath, state_stateReferences, -1, timestamp);
+    	
+    	PathSet state_references;
+    	queryReferencesTxn(noTxn, statePath, state_references, -1, timestamp);
+    	
+    	//nixDB.setStateReferences(txn, dbStateComponentReferences, dbStateRevisions, statePath, ..., -1, NEWTIMESTAMP);
+		//nixDB.setStateReferences(txn, dbStateStateReferences, dbStateRevisions, statePath, ........, -1, NEWTIMESTAMP);
+		
+		//TODO SET REFERRERS ALSO BACK !!!!!!!!!!
+		//setReferences is based on a revision, but make can change that ??
+    	
 		printMsg(lvlError, format("Reverted state of '%1%' to revision '%2%'") % statePath % revision_arg);
 	}
+	
+	
+    
+    	
+	
 }
 
 //TODO include this call in the validate function
 //TODO ONLY CALL THIS FUNCTION ON A NON-SHARED STATE PATH!!!!!!!!!!!
 void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePath
-								, PathSet & newFoundComponentReferences, PathSet & newFoundStateReferences, const int revision) //only for recursion
+								, PathSet & newFoundComponentReferences, PathSet & newFoundStateReferences) //only for recursion
 {
 	//Check if is a state Path
 	if(! isValidStatePathTxn(txn, statePath))
@@ -389,7 +418,7 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
    	if(diff_references_added.size() != 0 || diff_references_removed.size() != 0 ||
    	   diff_state_references_added.size() != 0 || diff_state_references_removed.size() != 0 )
    	{
-	   	printMsg(lvlError, format("Updating new references to revision %1% for statepath: '%2%'") % revision % statePath);
+	   	printMsg(lvlError, format("Updating new references for statepath: '%1%'") % statePath);
 	   	Path drvPath = queryStatePathDrvTxn(txn, statePath);
 	   	registerValidPath(txn,    	
 	    		statePath,
@@ -397,7 +426,7 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
 	    		state_references,
 	    		state_stateReferences,
 	    		drvPath,
-	    		revision);
+	    		-1);				//Set at a new timestamp
 	}
 }
 
@@ -417,15 +446,10 @@ void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path
 	//call scanForAllReferences again on all statePaths
 	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i){
 		
-		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		int revision = 0;
-		//Get last revision number from DB !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		//TODO first snapshot all paths....?
-		
 		//Scan, update, call recursively
 		PathSet newFoundComponentReferences;
 		PathSet newFoundStateReferences;
-		scanAndUpdateAllReferencesTxn(txn, *i, newFoundComponentReferences, newFoundStateReferences, revision);
+		scanAndUpdateAllReferencesTxn(txn, *i, newFoundComponentReferences, newFoundStateReferences);
 
 		//Call the function recursively again on all newly found references												//TODO test if this works
 		PathSet allNewReferences = pathSets_union(newFoundComponentReferences, newFoundStateReferences);
@@ -452,34 +476,33 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	//add locks ... ?
 	//svn lock ... ?
 
-	//get all current dependecies (if neccecary | recusively) of all state components that need to be updated
-    PathSet statePaths;
-	store->storePathRequisites(root_componentPath, false, statePaths, false, true, -1);
-	statePaths.insert(root_statePath);
-    
-    //Replace all shared paths in the set for their real paths 
-    statePaths = toNonSharedPathSetTxn(noTxn, statePaths);
-    
     //TODO maybe also scan the parameters for state or component hashes?
     //program_args
 	
 	//TODO
 	Transaction txn;
    	//createStoreTransaction(txn);
-	
-	
+		
 	//******************* Run ****************************
 	
 	if(!only_commit)
 		executeShellCommand(root_componentPath + root_binary + " " + root_program_args);
   		
-	//******************* With everything in place, we call the commit script on all statePaths (in)directly referenced **********************
-
-	//Start transaction TODO
-
-	//Scan for new references if neccecary
+	//******************* Scan for new references if neccecary
    	if(scanforReferences)
   		scanAndUpdateAllReferencesRecusivelyTxn(txn, root_statePath);
+
+	//get all current (maybe updated by the scan) dependecies (if neccecary | recusively) of all state components that need to be updated
+    PathSet statePaths;
+	store->storePathRequisites(root_componentPath, false, statePaths, false, true, -1);
+	statePaths.insert(root_statePath);
+
+	//Start transaction TODO
+    
+    //Replace all shared paths in the set for their real paths 
+    statePaths = toNonSharedPathSetTxn(noTxn, statePaths);
+	
+	//******************* With everything in place, we call the commit script on all statePaths (in)directly referenced **********************
 	
 	//Commit all statePaths
 	RevisionClosure rivisionMapping;
@@ -487,14 +510,15 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		rivisionMapping[*i] = commitStatePathTxn(txn, *i);
 	
 	//Save new revisions
-	setStateRevisionsTxn(txn, root_statePath, rivisionMapping);
+	setStateRevisionsTxn(txn, rivisionMapping);
 	
 	//Commit transaction
 	//txn.commit();
 	
 	//Debugging
 	RevisionClosure getRivisions;
-	bool b = store->queryStateRevisions(root_statePath, getRivisions, -1);
+	RevisionClosureTS empty;
+	bool b = store->queryStateRevisions(root_statePath, getRivisions, empty, -1);
 	for (RevisionClosure::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
 		//printMsg(lvlError, format("State %1% has revision %2%") % (*i).first % int2String((*i).second));
 	}
@@ -607,8 +631,6 @@ void run(Strings args)
 	//updateRevisionNumbers("/nix/state/xf582zrz6xl677llr07rvskgsi3dli1d-hellohardcodedstateworld-dep1-1.0-test");
 	//return;
 	
-	//printMsg(lvlError, format("NOW: '%1%'") % getTimeStamp());
-	
 	//auto sort
 	map<string, string> test;
 	test["q"] = "324";
@@ -616,6 +638,10 @@ void run(Strings args)
 	test["a"] = "a";
 	for (map<string, string>::const_iterator j = test.begin(); j != test.end(); ++j)
 		printMsg(lvlError, format("KEY: '%1%'") % (*j).first);
+	
+	printMsg(lvlError, format("NOW: '%1%'") % getTimeStamp());
+	return;
+
 	*/
 
 	/* test */

@@ -451,13 +451,13 @@ void Database::enumTable(const Transaction & txn, TableId table,
 
 Path Database::makeStatePathRevision(const Path & statePath, const int revision)
 {
-	string prefix = "-REV-";
+	string prefix = "-KEY-";
 	return statePath + prefix + int2String(revision);
 }
 
 void Database::splitStatePathRevision(const Path & revisionedStatePath, Path & statePath, int & revision)
 {
-	string prefix = "-REV-";
+	string prefix = "-KEY-";
 	
 	int pos = revisionedStatePath.find_last_of(prefix);
 	statePath = revisionedStatePath.substr(0, pos - prefix.length() + 1);
@@ -515,95 +515,128 @@ bool Database::lookupHighestRevivison(const Strings & keys, const Path & statePa
 		}
 	}
 
-	if(highestRev == -1)	//no records found (TODO throw error?)
+	if(highestRev == -1)	//no records found
 		return false;
 	
 	key = makeStatePathRevision(statePath, highestRev);		//final key that matches revision + statePath
 	return true;	
 }
 
-//////////////////////////////////////////////
+bool Database::revisionToTimeStamp(const Transaction & txn, TableId revisions_table, const Path & statePath, const int revision, int & timestamp)
+{
+	string key = makeStatePathRevision(statePath, revision);
+	Strings references;
+	bool notempty = queryStrings(txn, revisions_table, key, references);
+	
+	if(notempty){	
+		Path empty; 
+		splitStatePathRevision(*(references.begin()), empty, timestamp);	//extract the timestamp
+		//printMsg(lvlError, format("PRINT '%1%'") % timestamp);
+		return true;
+	}
+	else
+		return false;		
+}
 
-void Database::setStateReferences(const Transaction & txn, TableId table,
+void Database::setStateReferences(const Transaction & txn, TableId references_table, TableId revisions_table,
    	const Path & statePath, const Strings & references, int revision)
 {
 	//printMsg(lvlError, format("setStateReferences/Referrers %1%") % table);
 	
+	int timestamp;
 	if(revision == -1)
-		revision = getNewRevisionNumber(txn, table, statePath);
+		timestamp = getTimeStamp();
+	else{
+		bool found = revisionToTimeStamp(txn, revisions_table, statePath, revision, timestamp);
+		if(!found)
+			throw Error(format("Revision '%1%' cannot be matched to a timestamp...") % revision);
+	}		
 
-	/*
-	for (Strings::const_iterator i = references.begin(); i != references.end(); ++i)
-		printMsg(lvlError, format("setStateReferences::: '%1%'") % *i);
-	*/
+	//for (Strings::const_iterator i = references.begin(); i != references.end(); ++i)
+	//	printMsg(lvlError, format("setStateReferences::: '%1%'") % *i);
 	
 	//Warning if it already exists
 	Strings empty;
-	if( queryStateReferences(txn, table, statePath, empty, revision) )
-		printMsg(lvlError, format("Warning: The revision '%1%' already exists for set-references/referrers of path '%2%' with db '%3%'") % revision % statePath % table);
+	if( queryStateReferences(txn, references_table, revisions_table, statePath, empty, -1, timestamp) )
+		printMsg(lvlError, format("Warning: The timestamp '%1%' already exists for set-references/referrers of path '%2%' with db '%3%'") % timestamp % statePath % references_table);
 	
 	//Create the key
-	string key = makeStatePathRevision(statePath, revision);
+	string key = makeStatePathRevision(statePath, timestamp);
 	
 	//Insert	
-	setStrings(txn, table, key, references);
+	setStrings(txn, references_table, key, references);
 }
 
-bool Database::queryStateReferences(const Transaction & txn, TableId table,
-   	const Path & statePath, Strings & references, int revision)
+bool Database::queryStateReferences(const Transaction & txn, TableId references_table, TableId revisions_table,
+   	const Path & statePath, Strings & references, int revision, int timestamp)
 {
-	//printMsg(lvlError, format("queryStateReferences/Referrers %1%") % table);
+	//printMsg(lvlError, format("queryStateReferences/Referrers '%1%' with revision '%2%'") % references_table % revision);
+
+	//Convert revision to timestamp number useing the revisions_table
+	if(timestamp == -1 && revision != -1){	
+		bool found = revisionToTimeStamp(txn, revisions_table, statePath, revision, timestamp);
+		if(!found)			//we are asked for references of some revision, but there are no references registered yet, so we return false;
+			return false;
+	}		
 	
 	Strings keys;
-	enumTable(txn, table, keys);		//get all revisions
-	
-	//Check if this revision exists key in the table, if it doesnt well find the highest key lower than it
-	string key = makeStatePathRevision(statePath, revision);
-	bool found = false;
-	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-		if(key == *i)
-			found = true;
-	}
-	
-	key = "";
-	if(revision == -1){
+	enumTable(txn, references_table, keys);
+
+	//Mabye we need the latest timestamp?
+	string key = "";
+	if(timestamp == -1){
 		bool foundsomething = lookupHighestRevivison(keys, statePath, key);
 		if(!foundsomething)
 			return false;
+		else
+			return queryStrings(txn, references_table, key, references);
 	}
-	else if(!found){
+	
+	//If a specific key is given: check if this timestamp exists key in the table
+	key = makeStatePathRevision(statePath, timestamp);
+	bool found = false;
+	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i) {
+		if(key == *i){
+			found = true;
+			key = makeStatePathRevision(statePath, timestamp);
+		}
+	}
+	
+	//If it doesn't exist in the table then find the highest key lower than it
+	if(!found){
 		bool foundsomething = lookupHighestRevivison(keys, statePath, key, -1);
 		if(!foundsomething)
 			return false;
-		//printMsg(lvlError, format("Warning: References for revision '%1%' not was not found, so taking the highest rev-key possible for statePath '%2%'") % revision % statePath);
+		//printMsg(lvlError, format("Warning: References for timestamp '%1%' not was not found, so taking the highest rev-key possible for statePath '%2%'") % timestamp % statePath);
 	}
-	else
-		key = makeStatePathRevision(statePath, revision);
 		
-		
-	return queryStrings(txn, table, key, references);		//now that we have the key, we can query the references
+	return queryStrings(txn, references_table, key, references);		//now that we have the key, we can query the references
 }
 
-bool Database::queryStateReferrers(const Transaction & txn, TableId table,
- 	const Path & statePath, Strings & referrers, int revision)
+void Database::setStateReferrers(const Transaction & txn, TableId referrers_table, TableId revisions_table,
+    	const Path & statePath, const Strings & referrers, int revision)
+{
+	//Exactly the same as the setStateReferences
+	setStateReferences(txn, referrers_table, revisions_table, statePath, referrers, revision);
+}
+
+bool Database::queryStateReferrers(const Transaction & txn, TableId referrers_table, TableId revisions_table,
+ 	const Path & statePath, Strings & referrers, int revision, int timestamp)
 {
 	//Exactly the same as queryStateReferences
-	return queryStateReferences(txn, table, statePath, referrers, revision);
+	return queryStateReferences(txn, referrers_table, revisions_table, statePath, referrers, revision, timestamp);
 }
 
-/////////////////////////////////////////////
-   
-
 void Database::setStateRevisions(const Transaction & txn, TableId revisions_table, TableId snapshots_table,
-   	const Path & root_statePath, const RevisionClosure & revisions)
+   	const RevisionClosure & revisions)
 {
 	int ts = getTimeStamp();
 	
-	//Insert all ss_epochs into table ...... with the current ts.
+	//Insert all ss_epochs into snapshots_table with the current ts.
 	for (RevisionClosure::const_iterator i = revisions.begin(); i != revisions.end(); ++i){
 		string key = makeStatePathRevision((*i).first, ts);
 		Strings data;
-			//the map<> takes care of the sorting on
+		//the map<> takes care of the sorting on the Path
 		for (Snapshots::const_iterator j = (*i).second.begin(); j != (*i).second.end(); ++j)
 			data.push_back(int2String((*j).second));
 		setStrings(txn, snapshots_table, key, data);
@@ -612,24 +645,25 @@ void Database::setStateRevisions(const Transaction & txn, TableId revisions_tabl
 	//Insert for each statePath a new revision record linked to the ss_epochs
 	for (RevisionClosure::const_iterator i = revisions.begin(); i != revisions.end(); ++i){
 		Path statePath = (*i).first;
+		
 		int revision = getNewRevisionNumber(txn, revisions_table, statePath);	//get a new revision number
 		string key = makeStatePathRevision(statePath, revision);
 		
 		//get all its requisites
-		PathSet statePaths;
-		storePathRequisitesTxn(txn, statePath, false, statePaths, false, true, -1);
-		statePaths.insert(statePath);
+		PathSet statePath_references;
+		storePathRequisitesTxn(txn, statePath, false, statePath_references, false, true, -1);
+		statePath_references.insert(statePath);
 		
 		//save in db
 		Strings data;
-		for (PathSet::const_iterator j = statePaths.begin(); j != statePaths.end(); ++j)
+		for (PathSet::const_iterator j = statePath_references.begin(); j != statePath_references.end(); ++j)
 			data.push_back(makeStatePathRevision(*j, ts));		
 		setStrings(txn, revisions_table, key, data);
 	}
 }   
 
 bool Database::queryStateRevisions(const Transaction & txn, TableId revisions_table, TableId snapshots_table,
-   	const Path & statePath, RevisionClosure & revisions, int root_revision)
+   	const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, int root_revision)
 {
 	string key;
 	
@@ -643,15 +677,15 @@ bool Database::queryStateRevisions(const Transaction & txn, TableId revisions_ta
 	else
 		key = makeStatePathRevision(statePath, root_revision);
 	
-	//Get references pointingg to snapshots_table from revisions_table with root_revision
-	Strings references;
-	bool notempty = queryStrings(txn, revisions_table, key, references);
+	//Get references pointing to snapshots_table from revisions_table with root_revision
+	Strings statePaths;
+	bool notempty = queryStrings(txn, revisions_table, key, statePaths);
 	
 	if(!notempty)
 		throw Error(format("Root revision '%1%' not found of statePath '%2%'") % int2String(root_revision) % statePath);
 		
-	//
-	for (Strings::iterator i = references.begin(); i != references.end(); ++i){
+	//For each statePath add the revisions
+	for (Strings::iterator i = statePaths.begin(); i != statePaths.end(); ++i){
 		
 		Path getStatePath;
 		int getTimestamp;
@@ -687,6 +721,7 @@ bool Database::queryStateRevisions(const Transaction & txn, TableId revisions_ta
 		}
 		
 		revisions[getStatePath] = snapshots;
+		timestamps[getStatePath] = getTimestamp;
 	}
 	
 	

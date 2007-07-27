@@ -100,9 +100,9 @@ public:
 	
 	void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision);
 	
-	void setStateRevisions(const Path & statePath, const RevisionClosure & revisions);
+	void setStateRevisions(const RevisionClosure & revisions);
 	
-	bool queryStateRevisions(const Path & statePath, RevisionClosure & revisions, const int revision);
+	bool queryStateRevisions(const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const int revision);
 	
 	bool queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions);
 	
@@ -224,16 +224,15 @@ bool isStateDrvTxn(const Transaction & txn, const Derivation & drv);
 void queryAllValidPaths(const Transaction & txn, PathSet & allComponentPaths, PathSet & allStatePaths);
 bool isValidStatePathTxn(const Transaction & txn, const Path & path);
 
-void queryReferencesTxn(const Transaction & txn, const Path & path, PathSet & references, const int revision);
-void queryStateReferencesTxn(const Transaction & txn, const Path & storePath, PathSet & stateReferences, const int revision);
+void queryReferencesTxn(const Transaction & txn, const Path & path, PathSet & references, const int revision, int timestamp = -1);
+void queryStateReferencesTxn(const Transaction & txn, const Path & storePath, PathSet & stateReferences, const int revision, int timestamp = -1);
 
 void queryReferrersTxn(const Transaction & txn, const Path & storePath, PathSet & referrers, const int revision);
 void queryStateReferrersTxn(const Transaction & txn, const Path & storePath, PathSet & stateReferrers, const int revision);
 
-
 Path queryStatePathDrvTxn(const Transaction & txn, const Path & statePath);
 void storePathRequisitesTxn(const Transaction & txn, const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision);
-void setStateRevisionsTxn(const Transaction & txn, const Path & statePath, const RevisionClosure & revisions);
+void setStateRevisionsTxn(const Transaction & txn, const RevisionClosure & revisions);
 
 bool isValidPathTxn(const Transaction & txn, const Path & path);
 bool isValidStatePathTxn(const Transaction & txn, const Path & path);

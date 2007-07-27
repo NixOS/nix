@@ -88,9 +88,9 @@ public:
 	
 	void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision);
 
-	void setStateRevisions(const Path & statePath, const RevisionClosure & revisions);
+	void setStateRevisions(const RevisionClosure & revisions);
 	
-	bool queryStateRevisions(const Path & statePath, RevisionClosure & revisions, const int revision);
+	bool queryStateRevisions(const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const int revision);
 	
 	bool queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions);
 
