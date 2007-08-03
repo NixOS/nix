@@ -495,15 +495,26 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
     
 }
 
-void queryReferencesTxn(const Transaction & txn, const Path & store_or_statePath, PathSet & references, const int revision, int timestamp)
+void queryXReferencesTxn(const Transaction & txn, const Path & store_or_statePath, PathSet & references, const int revision, int timestamp, const bool component_or_state)
 {
     Paths references2;
+    Table table1;
+    Table table2;
+    
+    if(component_or_state){
+    	table1 = dbComponentComponentReferences;
+    	table2 = dbStateComponentReferences;
+    }
+    else{
+    	table1 = dbComponentStateReferences;
+    	table2 = dbStateStateReferences;
+    }    	
     
     if(isRealisablePath(txn, store_or_statePath))
-    	nixDB.queryStrings(txn, dbComponentComponentReferences, store_or_statePath, references2);
+    	nixDB.queryStrings(txn, table1, store_or_statePath, references2);
     else if(isRealisableStatePath(txn, store_or_statePath)){
     	Path statePath_ns = toNonSharedPathTxn(txn, store_or_statePath);	    //Lookup its where it points to if its shared
-    	nixDB.queryStateReferences(txn, dbStateComponentReferences, dbStateRevisions, statePath_ns, references2, revision, timestamp);
+    	nixDB.queryStateReferences(txn, table2, dbStateRevisions, statePath_ns, references2, revision, timestamp);
     }
     else
     	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
@@ -511,12 +522,9 @@ void queryReferencesTxn(const Transaction & txn, const Path & store_or_statePath
     references.insert(references2.begin(), references2.end());
 }
 
-void LocalStore::queryReferences(const Path & storePath, PathSet & references, const int revision)
-{
-    nix::queryReferencesTxn(noTxn, storePath, references, revision);
-}
 
 /* TODO this is just a copy of queryReferencesTxn with small differences */
+/*
 void queryStateReferencesTxn(const Transaction & txn, const Path & store_or_statePath, PathSet & stateReferences, const int revision, int timestamp)
 {
     Paths stateReferences2;
@@ -532,10 +540,16 @@ void queryStateReferencesTxn(const Transaction & txn, const Path & store_or_stat
     
     stateReferences.insert(stateReferences2.begin(), stateReferences2.end());
 }
+*/
+
+void LocalStore::queryReferences(const Path & storePath, PathSet & references, const int revision)
+{
+    nix::queryXReferencesTxn(noTxn, storePath, references, revision, true);
+}
 
 void LocalStore::queryStateReferences(const Path & componentOrstatePath, PathSet & stateReferences, const int revision)
 {
-    nix::queryStateReferencesTxn(noTxn, componentOrstatePath, stateReferences, revision);
+    nix::queryXReferencesTxn(noTxn, componentOrstatePath, stateReferences, revision, false);
 }
 
 void queryAllReferencesTxn(const Transaction & txn, const Path & path, PathSet & allReferences, const int revision)
