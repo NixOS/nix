@@ -69,8 +69,8 @@ void computeFSClosureRecTxn(const Transaction & txn, const Path & path, PathSet 
        	queryStateReferrersTxn(txn, path, stateReferences, revision);
     }
     else{
-        queryReferencesTxn(txn, path, references, revision);
-       	queryStateReferencesTxn(txn, path, stateReferences, revision);
+        queryXReferencesTxn(txn, path, references, true, revision);
+       	queryXReferencesTxn(txn, path, stateReferences, false, revision);
     }
 
 	PathSet allReferences;

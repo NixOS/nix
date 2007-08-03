@@ -107,7 +107,7 @@ public:
 	    
     /* Set the stateReferences for a specific revision (and older until the next higher revision number in the table) */    
     void setStateReferences(const Transaction & txn, TableId references_table, TableId revisions_table,
-    	const Path & statePath, const Strings & references, int revision = -1);
+    	const Path & statePath, const Strings & references, int revision = -1, int timestamp = -1);
     
     /* Returns the references for a specific revision (and older until the next higher revision number in the table) */
     bool queryStateReferences(const Transaction & txn, TableId references_table, TableId revisions_table,

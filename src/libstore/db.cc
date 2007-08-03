@@ -539,14 +539,13 @@ bool Database::revisionToTimeStamp(const Transaction & txn, TableId revisions_ta
 }
 
 void Database::setStateReferences(const Transaction & txn, TableId references_table, TableId revisions_table,
-   	const Path & statePath, const Strings & references, int revision)
+   	const Path & statePath, const Strings & references, int revision, int timestamp)
 {
 	//printMsg(lvlError, format("setStateReferences/Referrers %1%") % table);
 	
-	int timestamp;
-	if(revision == -1)
+	if(revision == -1 && timestamp == -1)
 		timestamp = getTimeStamp();
-	else{
+	if(revision != -1 && timestamp == -1){
 		bool found = revisionToTimeStamp(txn, revisions_table, statePath, revision, timestamp);
 		if(!found)
 			throw Error(format("Revision '%1%' cannot be matched to a timestamp...") % revision);
@@ -564,9 +563,9 @@ void Database::setStateReferences(const Transaction & txn, TableId references_ta
 	string key = mergeToDBKey(statePath, timestamp);
 	
 	
-	printMsg(lvlError, format("Set references '%1%'") % key);
-	for (Strings::const_iterator i = references.begin(); i != references.end(); ++i)
-		printMsg(lvlError, format("reference '%1%'") % *i);
+	//printMsg(lvlError, format("Set references '%1%'") % key);
+	//for (Strings::const_iterator i = references.begin(); i != references.end(); ++i)
+	//	printMsg(lvlError, format("reference '%1%'") % *i);
 	
 	//Insert	
 	setStrings(txn, references_table, key, references, false);				//The false makes sure also empty references are set

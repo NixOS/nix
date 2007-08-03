@@ -246,20 +246,20 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
     	PathSet statePaths = getAllStateDerivationsRecursively(componentPath, revision_arg);	//get dependecies (if neccecary | recusively) of all state components that need to be updated
     else
 		statePaths.insert(derivationPath);	//Insert direct state path
+
+	//get a new timestamp for the references update
+	int newTimestamp = getTimeStamp();
 		    	
     //Get the revisions recursively to also roll them back
     RevisionClosure getRivisions;
     RevisionClosureTS getTimestamps;
 	bool b = store->queryStateRevisions(statePath, getRivisions, getTimestamps, revision_arg);
-    
+
 	//Revert each statePath in the list
 	for (RevisionClosure::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
 		Path statePath = (*i).first;
 		Snapshots revisioned_paths = (*i).second;
 		int timestamp = getTimestamps[statePath];
-		
-		//get new timestamp (just before restoring the path) for references update ???
-		
 		
 		//get its derivation-state-items
 		Derivation statePath_drv = derivationFromPath(queryStatePathDrvTxn(noTxn, statePath));
@@ -327,26 +327,20 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
 		}
 		
 		
-		//Also revert state references to the specific revision (the revision is already converted to a timestamp here)
-		PathSet state_stateReferences;
-	    queryStateReferencesTxn(noTxn, statePath, state_stateReferences, -1, timestamp);
-    	
-    	PathSet state_references;
-    	queryReferencesTxn(noTxn, statePath, state_references, -1, timestamp);
-    	
-    	//nixDB.setStateReferences(txn, dbStateComponentReferences, dbStateRevisions, statePath, ..., -1, NEWTIMESTAMP);
-		//nixDB.setStateReferences(txn, dbStateStateReferences, dbStateRevisions, statePath, ........, -1, NEWTIMESTAMP);
+		//*** Now also revert state references to the specific revision (the revision is already converted to a timestamp here)
 		
-		//TODO SET REFERRERS ALSO BACK !!!!!!!!!!
-		//setReferences is based on a revision, but make can change that ??
+		//Query the references of the old revision (already converted to a timestamp)		
+    	PathSet state_references;
+    	queryXReferencesTxn(noTxn, statePath, state_references, true, -1, timestamp);
+		PathSet state_stateReferences;
+	    queryXReferencesTxn(noTxn, statePath, state_stateReferences, false, -1, timestamp);
     	
+    	//Now set these old references as the new references at the new (just created) Timestamp
+    	setStateComponentReferencesTxn(noTxn, statePath, Strings(state_references.begin(), state_references.end()), -1, newTimestamp);
+		setStateStateReferencesTxn(noTxn, statePath, Strings(state_stateReferences.begin(), state_stateReferences.end()), -1, newTimestamp);
+		
 		printMsg(lvlError, format("Reverted state of '%1%' to revision '%2%'") % statePath % revision_arg);
 	}
-	
-	
-    
-    	
-	
 }
 
 //TODO include this call in the validate function
@@ -385,8 +379,8 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
     //Retrieve old references
     PathSet old_references;
     PathSet old_state_references;
-    queryReferencesTxn(txn, statePath, old_references, -1);				//get the latsest references
-    queryStateReferencesTxn(txn, statePath, old_state_references, -1);		
+    queryXReferencesTxn(txn, statePath, old_references, true, -1);				//get the latsest references
+    queryXReferencesTxn(txn, statePath, old_state_references, false, -1);		
     
     //Check for added and removed paths
 	PathSet diff_references_removed;

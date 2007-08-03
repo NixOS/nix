@@ -220,8 +220,13 @@ bool isStateDrvTxn(const Transaction & txn, const Derivation & drv);
 void queryAllValidPaths(const Transaction & txn, PathSet & allComponentPaths, PathSet & allStatePaths);
 bool isValidStatePathTxn(const Transaction & txn, const Path & path);
 
-void queryReferencesTxn(const Transaction & txn, const Path & path, PathSet & references, const int revision, int timestamp = -1);
-void queryStateReferencesTxn(const Transaction & txn, const Path & storePath, PathSet & stateReferences, const int revision, int timestamp = -1);
+void queryXReferencesTxn(const Transaction & txn, const Path & path, PathSet & references, const bool component_or_state, const int revision, int timestamp = -1);
+
+//TODO THESE DONT BELONG HERE, REFACTOR CODE, EG MOVE FUNCTIONS AROUND
+void setStateComponentReferencesTxn(const Transaction & txn, const Path & statePath, const Strings & references, int revision, int timestamp);
+void setStateStateReferencesTxn(const Transaction & txn, const Path & statePath, const Strings & references, int revision, int timestamp);
+
+
 
 void queryReferrersTxn(const Transaction & txn, const Path & storePath, PathSet & referrers, const int revision);
 void queryStateReferrersTxn(const Transaction & txn, const Path & storePath, PathSet & stateReferrers, const int revision);
