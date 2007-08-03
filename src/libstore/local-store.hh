@@ -178,12 +178,11 @@ void setDeriver(const Transaction & txn, const Path & path,
    deriver has been set. */
 Path queryDeriver(const Transaction & txn, const Path & path);
 
-/* Query the derivers of a state-store path. Gives an error (TODO?) if no
-   deriver has been set. */
+/* Query the derivers of a state-store path. */
 PathSet queryDerivers(const Transaction & txn, const Path & storePath, const string & identifier, const string & user);
 
-/* TODO */
-PathSet queryDeriversStatePath(const Transaction & txn, const Path & storePath, const string & identifier, const string & user);
+/* Query the derivers of a state path. (are there more then 1 for a statepath?) */
+//PathSet queryDeriversStatePath(const Transaction & txn, const Path & storePath, const string & identifier, const string & user);
 
 /* Delete a value from the nixStore directory. */
 void deleteFromStore(const Path & path, unsigned long long & bytesFreed);
@@ -208,11 +207,8 @@ void deletePathWrapped(const Path & path,
 
 void deletePathWrapped(const Path & path);
 
-/* TODO */
+/* Adds a new deriver based on storePath to the dbDerivers table */
 void addStateDeriver(const Transaction & txn, const Path & storePath, const Path & deriver);
-
-/* TODO */
-PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, const PathSet drvs, bool deleteDrvs = false);
 
 bool isStateComponentTxn(const Transaction & txn, const Path & path);
 

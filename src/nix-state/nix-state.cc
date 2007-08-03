@@ -419,18 +419,15 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
    	//diff_state_references_added.size() != 0 || diff_state_references_removed.size() != 0 )
 
 	//We always set the referernces so we know they were scanned (maybe the same) at a certain time
-	if(true)
-   	{
-	   	printMsg(lvlError, format("Updating new references for statepath: '%1%'") % statePath);
-	   	Path drvPath = queryStatePathDrvTxn(txn, statePath);
-	   	registerValidPath(txn,    	
-	    		statePath,
-	    		Hash(),				//emtpy hash
-	    		state_references,
-	    		state_stateReferences,
-	    		drvPath,
-	    		-1);				//Set at a new timestamp
-	}
+   	printMsg(lvlError, format("Updating new references for statepath: '%1%'") % statePath);
+   	Path drvPath = queryStatePathDrvTxn(txn, statePath);
+   	registerValidPath(txn,    	
+    		statePath,
+    		Hash(),				//emtpy hash
+    		state_references,
+    		state_stateReferences,
+    		drvPath,
+    		-1);				//Set at a new timestamp
 }
 
 void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path & statePath)		//TODO Can also work for statePaths???

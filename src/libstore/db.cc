@@ -618,20 +618,6 @@ bool Database::queryStateReferences(const Transaction & txn, TableId references_
 	return queryStrings(txn, references_table, key, references);		//now that we have the key, we can query the references
 }
 
-void Database::setStateReferrers(const Transaction & txn, TableId referrers_table, TableId revisions_table,
-    	const Path & statePath, const Strings & referrers, int revision)
-{
-	//Exactly the same as the setStateReferences
-	setStateReferences(txn, referrers_table, revisions_table, statePath, referrers, revision);
-}
-
-bool Database::queryStateReferrers(const Transaction & txn, TableId referrers_table, TableId revisions_table,
- 	const Path & statePath, Strings & referrers, int revision, int timestamp)
-{
-	//Exactly the same as queryStateReferences
-	return queryStateReferences(txn, referrers_table, revisions_table, statePath, referrers, revision, timestamp);
-}
-
 void Database::setStateRevisions(const Transaction & txn, TableId revisions_table, TableId snapshots_table,
    	const RevisionClosure & revisions)
 {

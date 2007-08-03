@@ -63,26 +63,17 @@ static TableId dbComponentStateReferences = 0;
 static TableId dbStateComponentReferences = 0;
 static TableId dbStateStateReferences = 0;
 
-
-/* dbReferrers :: Path -> Path
-
-   This table is just the reverse mapping of dbReferences.  This table
-   can have duplicate keys, each corresponding value denoting a single
-   referrer. */
-static TableId dbComponentComponentReferrers = 0;
-static TableId dbComponentStateReferrers = 0;
-
-/* dbStateReferrers :: Path -> Path
-
-   This table is just the reverse mapping of dbStateReferences.  This table
-   can have duplicate keys, each corresponding value denoting a single
-   referrer. */
-static TableId dbStateComponentReferrers = 0;
-static TableId dbStateStateReferrers = 0;
-
 /* dbSolidStateReferences :: Path -> [Path] 
  * 
- * TODO Comment!!!!!!!!!!!!!!!!!!!!!!!1
+ * This is used to store references that are ALWAYS detected while scanning 
+ * the store path, this is to include components that cannont be configured
+ * to put their state in /nix/state. We then use this workaround:
+ * mozilla firefox has state in 
+ * ~/.mozilla/firefox --symlinked_to--> /nix/state/...HASH.....-firefox/ 
+ * 
+ * Now the component firefox in the store does now detect the HASH since it
+ * is not in there, so we store the state path in this table which causes a
+ * scan of the firefox-store path to always return the firefox state path. 
  * 
  */
 static TableId dbSolidStateReferences = 0;
@@ -111,36 +102,69 @@ static TableId dbSubstitutes = 0;
 static TableId dbDerivers = 0;
 
 /* dbStateCounters :: StatePath -> Int
-
-   This table lists the state folders that state managed components
-   and are of type interval.  
-*/
+ * This table lists the state path sub folders that are of type interval.
+ *
+ * Some folders/files need only to be committed every 10'th run, so
+ * we store the counting in this table 
+ */
 static TableId dbStateCounters = 0;
 
-/* dbStateInfo :: Path -> DerivationPath
-
-   This table lists the all the state managed components, TODO we could store the entire DRV in here in the future
-    
-*/
+/* dbStateInfo :: Path -> 
+ * 
+ * This table lists all the store components, that are state-store components
+ * meaning that this component has a /nix/state/ entry to store its state
+ * and thus this component (should) have a reference to that state path  
+ * 
+ * TODO the value is now empty but we could store the entire DRV in here in the future
+ */
 static TableId dbStateInfo = 0;
 
 /* dbStateRevisions :: StatePath -> [StatePath]
-
-   This table lists the ...............
-    
-*/
+ * 
+ * This table stores the revisions of state components and its dependecies
+ * on other state components. A revsion has a number of statepaths at a 
+ * certain a timestamp.
+ * 
+ * For example, a state path A at revision 1 depends on its own statepath at
+ * a ceratain timstamp and 1 other statepath at a certain timstamp:
+ *  
+ * /nix/state/HASH-A-1.0-test-KEY-1
+ * -->
+ * [ /nix/state/HASH-A-1.0-test-KEY-1186135321, /nix/state/HASH-B-1.0-test-KEY-1186135321 ]
+ *
+ */
 static TableId dbStateRevisions = 0;
 
 /* dbStateSnapshots :: StatePath -> RevisionNumbers
-
-   This table lists the ...............
-    
-*/
+ * 
+ * This table stores the snapshot numbers the sub state files/folders
+ * at a certain timestamp. These snapshot numbers are just timestamps
+ * produced by ext3cow 
+ * 
+ * /nix/state/HASH-A-1.0-test-KEY-1185473750
+ * -->
+ * [ 1185473750, 00118547375 ]
+ * 
+ * The timestamps are ordered based on the path of the subfolder !!
+ * 
+ * So if a has:
+ * 
+ * /nix/state/....A../log
+ * /nix/state/....A../cache
+ * 
+ * then ./cache has TS 1185473750
+ * and ./log has TS 00118547375
+ *  
+ */
 static TableId dbStateSnapshots = 0;
 
 /* dbSharedState :: Path -> Path
  * 
- * Lists all paths that are shared with other paths 
+ * This table links each statepath to a list of epoch numbers.
+ * These numbers represent the timestamps of the sub-state folders 
+ * when they are snapshotted.
+ * 
+ *   
  */
 static TableId dbSharedState = 0;
 
@@ -213,14 +237,9 @@ LocalStore::LocalStore(bool reserveSpace)
 	dbComponentStateReferences = nixDB.openTable("references_c_s");
 	dbStateComponentReferences = nixDB.openTable("references_s_c");
 	dbStateStateReferences = nixDB.openTable("references_s_s");
-	dbComponentComponentReferrers = nixDB.openTable("referrers", true); /* must be sorted */ /* c_c */
-	dbComponentStateReferrers = nixDB.openTable("referrers_c_s", true);
-	dbStateComponentReferrers = nixDB.openTable("referrers_s_c", true);
-	dbStateStateReferrers = nixDB.openTable("referrers_s_s", true);
 	dbStateRevisions = nixDB.openTable("staterevisions");
 	dbStateSnapshots = nixDB.openTable("stateSnapshots");
 	dbSharedState = nixDB.openTable("sharedState");
-
 	dbSolidStateReferences = nixDB.openTable("references_solid_c_s");	/* The contents of this table is included in references_c_s */
 	
     int curSchema = 0;
@@ -402,11 +421,11 @@ static bool isRealisableComponentOrStatePath(const Transaction & txn, const Path
     return isValidComponentOrStatePathTxn(txn, path) || readSubstitutes(txn, path).size() > 0;					//TODO State paths are not yet in substitutes !!!!!!!!!!!!!! ??
 }
 
+/*
 static string addPrefix(const string & prefix, const string & s)
 {
     return prefix + string(1, (char) 0) + s;
 }
-
 
 static string stripPrefix(const string & prefix, const string & s)
 {
@@ -417,7 +436,7 @@ static string stripPrefix(const string & prefix, const string & s)
             % s % prefix);
     return string(s, prefix.size() + 1);
 }
-
+*/
 
 
 void setReferences(const Transaction & txn, const Path & store_or_statePath,
@@ -447,7 +466,7 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
 
     	PathSet oldReferences = PathSet(oldReferences_c_c.begin(), oldReferences_c_c.end());
     	PathSet oldStateReferences = PathSet(oldReferences_c_s.begin(), oldReferences_c_s.end());
-    	if (oldReferences == references && oldStateReferences == stateReferences) return;						//watch out we way need to set the referrers.... (at a ts) 
+    	if (oldReferences == references && oldStateReferences == stateReferences) return; 
     	
     	nixDB.setStrings(txn, dbComponentComponentReferences, store_or_statePath, Paths(references.begin(), references.end()));
 		nixDB.setStrings(txn, dbComponentStateReferences, store_or_statePath, Paths(stateReferences.begin(), stateReferences.end()));
@@ -533,53 +552,108 @@ void LocalStore::queryAllReferences(const Path & path, PathSet & allReferences, 
 	queryAllReferencesTxn(noTxn, path, allReferences, revision);
 }
 
-static PathSet getXReferrers(const Transaction & txn, const Path & store_or_statePath, const int revision, const TableId & table)
+static PathSet getXReferrers(const Transaction & txn, const Path & store_or_statePath, const int revision, const bool component_or_state)
 {
-    /*
-    if(isValidPathTxn(txn, store_or_statePath)){
-	    PathSet referrers;
-    	Strings keys;
-   		nixDB.enumTable(txn, table, keys, store_or_statePath + string(1, (char) 0));
-    	for (Strings::iterator i = keys.begin(); i != keys.end(); ++i)
-        	referrers.insert(stripPrefix(store_or_statePath, *i));
-    	return referrers;
-    }
-    else if(isValidStatePathTxn(txn, store_or_statePath)){
-    	Path statePath_ns = toNonSharedPathTxn(txn, store_or_statePath);	    //Lookup its where it points to if its shared
-    	Paths referrers;
-    	nixDB.queryStateReferrers(txn, table, dbStateRevisions, statePath_ns, referrers, revision);
-    	PathSet p(referrers.begin(), referrers.end());
-        return p;
-    }
-    else
-    	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
-    	*/
-
-	//TODO!!!!!!!!!!!!!!!!!!!! use revision !!!!!!!!!!!!!!!!!!!!! add timestamp ?????
-
-	PathSet referrers;
+    TableId table;
+    Path path;
     
-    if(isValidPathTxn(txn, store_or_statePath)){
+    if( !isValidPathTxn(txn, store_or_statePath) && !isValidStatePathTxn(txn, store_or_statePath) )
+    	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
+    
+    //NO TS
+    if(component_or_state){	//we need component references
+		if(isValidPathTxn(txn, store_or_statePath)){
+			path = store_or_statePath;
+			table = dbComponentComponentReferences;	
+		}
+		else if(isValidStatePathTxn(txn, store_or_statePath)){
+			path = toNonSharedPathTxn(txn, store_or_statePath);	    //Lookup its where it points to if its shared
+			table = dbComponentStateReferences;
+    	}	
+						
+		//printMsg(lvlError, format("we need component references: '%1%' '%2%' '%3%'") % path % store_or_statePath % table);
 	
+		//check which key refers to our 'path' (we dont have to deal with timestamps since componentpaths are immutable)	
+		Strings keys;
+		nixDB.enumTable(txn, table, keys);
+	    PathSet referrers;
+		for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i){
+			
+			Strings references;
+			nixDB.queryStrings(txn, table, *i, references);
+			for (Strings::iterator j = references.begin(); j != references.end(); ++j){ 
+				if(*j == path)
+					referrers.insert(*i);	//we found a referrer
+			}
+		}
+		
+		return referrers;
     }
-    else if(isValidStatePathTxn(txn, store_or_statePath)){
-    	Path statePath_ns = toNonSharedPathTxn(txn, store_or_statePath);	    //Lookup its where it points to if its shared
-    
+    //TS
+    else{	//we need state references
+	   	if(isValidPathTxn(txn, store_or_statePath)){
+			path = store_or_statePath;
+			table = dbStateComponentReferences;	
+	   	}
+		else if(isValidStatePathTxn(txn, store_or_statePath)){
+			path = toNonSharedPathTxn(txn, store_or_statePath);	    //Lookup its where it points to if its shared
+			table = dbStateStateReferences;
+		}
+			
+		//printMsg(lvlError, format("we need state references: '%1%' '%2%' '%3%'") % path % store_or_statePath % table);
+		
+		//Now in references of ALL referrers, (possibly lookup their latest TS based on revision)
+		int timestamp;
+		if(revision != -1){
+    		bool succeed = nixDB.revisionToTimeStamp(txn, dbStateRevisions, path, revision, timestamp);
+	    	if(!succeed)
+	    		throw Error(format("Getreferrers cannot find timestamp for revision: '%1%'") % revision);
+		}
+	    
+	    Strings keys;
+		nixDB.enumTable(txn, table, keys);
+		map<string, int> latest;
+		for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i){
+			Path getStatePath;
+			int getRevision;
+			nixDB.splitDBKey(*i, getStatePath, getRevision);
+		
+			if(latest[getStatePath]	== 0) 				//either it is unset
+				latest[getStatePath] = getRevision;
+			else if(latest[getStatePath] < getRevision){ 			
+				if(revision != -1 && getRevision <= timestamp)	//or it is greater, but not greater then the timestamp
+					latest[getStatePath] = getRevision;
+				else											//we need the latest so greater is good
+					latest[getStatePath] = getRevision;
+			}
+		}
+	    
+	    //now check if they refer to 'path' (if you cant find it, then they dont referr to it)
+	    PathSet referrers;
+		for (map<string, int>::const_iterator i = latest.begin(); i != latest.end(); ++i){
+
+			//printMsg(lvlError, format("AAAAA '%1%'") % (*i).first);
+			
+			Strings references;
+			nixDB.queryStrings(txn, table, nixDB.mergeToDBKey((*i).first, (*i).second), references);
+			for (Strings::iterator j = references.begin(); j != references.end(); ++j){ 
+				//printMsg(lvlError, format("TEST: '%1%' has ref '%2%' check with '%3%'") % (*i).first % *j % path);
+				if(*j == path)
+					referrers.insert((*i).first);	//we found a referrer
+			}
+		}
+		return referrers;	
     }
-    else
-    	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
-    
-    
 }
 
 static PathSet getReferrers(const Transaction & txn, const Path & store_or_statePath, const int revision)
 {
-	return getXReferrers(txn, store_or_statePath, revision, dbComponentComponentReferrers);
+	return getXReferrers(txn, store_or_statePath, revision, true);
 }
 
 static PathSet getStateReferrers(const Transaction & txn, const Path & store_or_statePath, const int revision)
 {
-	return getXReferrers(txn, store_or_statePath, revision, dbStateStateReferrers);
+	return getXReferrers(txn, store_or_statePath, revision, false);
 }
 
 void queryReferrersTxn(const Transaction & txn,
@@ -629,6 +703,41 @@ void setDeriver(const Transaction & txn, const Path & storePath, const Path & de
     }
 }
 
+/* Private function only used by addStateDeriver
+ * Merges a new derivation into a list of derivations, this function takes username and statepath 
+ * into account. This function is used to update derivations that have only changed in their sub state
+ * paths that need to be versioned for example. We assume newdrv is the newest.
+ */
+PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, const PathSet drvs, bool deleteDrvs)
+{
+	PathSet newdrvs;
+
+	Derivation drv = derivationFromPath(newdrv);
+	string identifier = drv.stateOutputs.find("state")->second.stateIdentifier;
+	string user = drv.stateOutputs.find("state")->second.username;
+	
+	for (PathSet::iterator i = drvs.begin(); i != drvs.end(); ++i)	//Check if we need to remove old drvs
+    {
+    	Path drv = *i;
+    	Derivation getdrv = derivationFromPath(drv);
+    	string getIdentifier = getdrv.stateOutputs.find("state")->second.stateIdentifier;
+		string getUser = getdrv.stateOutputs.find("state")->second.username;
+		
+		if(identifier == getIdentifier && getUser == user)			//only insert if it doenst already exist
+		{	
+			//We also check if it's NOT exactly the same drvpath
+			if(drv != newdrv && deleteDrvs){
+				printMsg(lvlTalkative, format("Deleting decrepated state derivation: %1% with identifier %2% and user %3%") % drv % identifier % user);
+				deletePath(drv);			//Deletes the DRV from DISK!
+			}
+		}	
+		else
+			newdrvs.insert(drv);
+    }
+    
+    newdrvs.insert(newdrv);
+    return newdrvs;
+}
 
 void addStateDeriver(const Transaction & txn, const Path & storePath, const Path & deriver)
 {
@@ -652,7 +761,6 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
 	nixDB.setStrings(txn, dbDerivers, storePath, data);											//update the derivers db.
 	
 	nixDB.setString(txn, dbStateInfo, storePath, "");											//update the dbinfo db.	(maybe TODO)
-	
 }
 
 
@@ -752,6 +860,7 @@ PathSet queryDerivers(const Transaction & txn, const Path & storePath, const str
 }
 
 //Wrapper around converting the drvPath to the statePath
+/*
 PathSet queryDeriversStatePath(const Transaction & txn, const Path & storePath, const string & identifier, const string & user)
 {
 	PathSet drvs = queryDerivers(txn, storePath, identifier, user);
@@ -762,6 +871,7 @@ PathSet queryDeriversStatePath(const Transaction & txn, const Path & storePath, 
 	}
 	return statePaths;
 }
+*/
 
 
 const int substituteVersion = 2;
@@ -1428,12 +1538,15 @@ void verifyStore(bool checkContents)
             for (PathSet::iterator j = references.begin();
                  j != references.end(); ++j)
             {
+                /*
                 string dummy;
                 if (!nixDB.queryString(txn, dbComponentComponentReferrers, addPrefix(*j, *i), dummy)) {
                     printMsg(lvlError, format("adding missing referrer mapping from `%1%' to `%2%'")
                         % *j % *i);
                     nixDB.setString(txn, dbComponentComponentReferrers, addPrefix(*j, *i), "");
                 }
+                */
+                
                 if (isValid && validPaths.find(*j) == validPaths.end()) {
                     printMsg(lvlError, format("incomplete closure: `%1%' needs missing `%2%'")
                         % *i % *j);
@@ -1443,13 +1556,14 @@ void verifyStore(bool checkContents)
     }
 
     /* Check the `referrers' table. */
-    //TODO TODO Do the exact same thing for the other dbreferres and references 
+    //TODO TODO Do the exact same thing for the other dbreferres and references
+    /* 
     printMsg(lvlInfo, "checking the referrers table");
     Strings referrers;
     nixDB.enumTable(txn, dbComponentComponentReferrers, referrers);
     for (Strings::iterator i = referrers.begin(); i != referrers.end(); ++i) {
 
-        /* Decode the entry (it's a tuple of paths). */
+        // Decode the entry (it's a tuple of paths)
         string::size_type nul = i->find((char) 0);
         if (nul == string::npos) {
             printMsg(lvlError, format("removing bad referrer table entry `%1%'") % *i);
@@ -1484,8 +1598,8 @@ void verifyStore(bool checkContents)
                 setReferences(txn, from, references, stateReferences, -1);
             }
         }
-        
     }
+    */
     
     //TODO Check stateinfo and statecounters table
 	
@@ -1552,41 +1666,6 @@ vector<int> LocalStore::getStatePathsInterval(const PathSet & statePaths)
     return nix::getStatePathsIntervalTxn(noTxn, statePaths);
 }
 
- 
-
-//Merges a new .... into the list TODO
-//This is all about one store path
-//We assume newdrv is the newest
-PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, const PathSet drvs, bool deleteDrvs)
-{
-	PathSet newdrvs;
-
-	Derivation drv = derivationFromPath(newdrv);
-	string identifier = drv.stateOutputs.find("state")->second.stateIdentifier;
-	string user = drv.stateOutputs.find("state")->second.username;
-	
-	for (PathSet::iterator i = drvs.begin(); i != drvs.end(); ++i)	//Check if we need to remove old drvs
-    {
-    	Path drv = *i;
-    	Derivation getdrv = derivationFromPath(drv);
-    	string getIdentifier = getdrv.stateOutputs.find("state")->second.stateIdentifier;
-		string getUser = getdrv.stateOutputs.find("state")->second.username;
-		
-		if(identifier == getIdentifier && getUser == user)			//only insert if it doenst already exist
-		{	
-			//We also check if it's NOT exactly the same drvpath
-			if(drv != newdrv && deleteDrvs){
-				printMsg(lvlTalkative, format("Deleting decrepated state derivation: %1% with identifier %2% and user %3%") % drv % identifier % user);
-				deletePath(drv);			//Deletes the DRV from DISK!
-			}
-		}	
-		else
-			newdrvs.insert(drv);
-    }
-    
-    newdrvs.insert(newdrv);
-    return newdrvs;
-}
 
 /* Place in `paths' the set of paths that are required to `realise'
    the given store path, i.e., all paths necessary for valid
@@ -1836,11 +1915,12 @@ static void upgradeStore09()
 
     if (!pathExists(nixDBPath + "/referers")) return;
 
+	/*
     Transaction txn(nixDB);
-
+    
     std::cerr << "converting referers to referrers...";
 
-    TableId dbReferers = nixDB.openTable("referers"); /* sic! */
+    TableId dbReferers = nixDB.openTable("referers"); // sic!
 
     Paths referersKeys;
     nixDB.enumTable(txn, dbReferers, referersKeys);
@@ -1864,11 +1944,14 @@ static void upgradeStore09()
 
     txn.commit();
     
+    
     std::cerr << std::endl;
 
     nixDB.closeTable(dbReferers);
+	*/
 
     nixDB.deleteTable("referers");
+    
 }
 
  

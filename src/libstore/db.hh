@@ -66,9 +66,6 @@ private:
     /* TODO */
     int getNewRevisionNumber(const Transaction & txn, TableId table, const Path & statePath);
     
-    /* */
-    bool revisionToTimeStamp(const Transaction & txn, TableId revisions_table, const Path & statePath, const int revision, int & timestamp);
-    
 public:
     Database();
     ~Database();
@@ -104,7 +101,10 @@ public:
     
     /* TODO */
     void splitDBKey(const Path & revisionedStatePath, Path & statePath, int & revision);
-    
+
+	/* TODO */
+    bool revisionToTimeStamp(const Transaction & txn, TableId revisions_table, const Path & statePath, const int revision, int & timestamp);
+	    
     /* Set the stateReferences for a specific revision (and older until the next higher revision number in the table) */    
     void setStateReferences(const Transaction & txn, TableId references_table, TableId revisions_table,
     	const Path & statePath, const Strings & references, int revision = -1);
@@ -113,14 +113,6 @@ public:
     bool queryStateReferences(const Transaction & txn, TableId references_table, TableId revisions_table,
     	const Path & statePath, Strings & references, int revision = -1, int timestamp = -1);
 
-	/* Set the stateReferences for a specific revision (and older until the next higher revision number in the table) */    
-    void setStateReferrers(const Transaction & txn, TableId referrers_table, TableId revisions_table,
-    	const Path & statePath, const Strings & referrers, int revision = -1);
-        
-    /* Returns the referrers for a specific revision (and older until the next higher revision number in the table) */
-    bool queryStateReferrers(const Transaction & txn, TableId referrers_table, TableId revisions_table,
-    	const Path & statePath, Strings & referrers, int revision = -1, int timestamp = -1);
-    
     /* Set the revision number of the statePath and the revision numbers of all state paths in the references closure */
     void setStateRevisions(const Transaction & txn, TableId revisions_table, TableId snapshots_table,
     	const RevisionClosure & revisions);
