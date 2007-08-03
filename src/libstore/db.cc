@@ -632,55 +632,6 @@ bool Database::queryStateReferrers(const Transaction & txn, TableId referrers_ta
 	return queryStateReferences(txn, referrers_table, revisions_table, statePath, referrers, revision, timestamp);
 }
 
- //PRIVATE !!!!!!
-//Update the referrers of some path because the store_or_statePath got new references
-void Database::updateReferredPath(const Transaction & txn, TableId revisions_table, TableId referrers_X_s_table,
-	const Path & referred_state_or_store_Path, const Path & statePath, const int revision)
-{
-	
-	//referred_state_or_store_Path --> statePath
-	
-	//you dont know what referred_state_or_store_Path is !!!!!!!!!!!! add a bool !!!!!!
-	
-	if(revision != -1){
-		//Get timestamp of revision
-		int timestamp;
-		bool succeed = revisionToTimeStamp(txn, revisions_table, referred_state_or_store_Path, revision, timestamp);
-		if(!succeed)
-			throw Error(format("Couldnt find timestamp for revision '%1%' at update referrers mapping for '%2%'") % revision % referred_state_or_store_Path);
-		
-		//remove all dynamic (that have a ts) referrers of that revision first (except if it is the latest, eg. -1)
-		delPair(txn, referrers_X_s_table, mergeToDBKey(referred_state_or_store_Path, timestamp));
-		
-	}
-		
-	//now get the referrers at timestamp (or just the latest if revision is -1)	
-	PathSet referrers;
-	//TODO
-	
-	//if( ! state)
-	//getReferrers...............	
-	//dbStateComponentReferrers
-	//else
-	//getStateReferrers...............
-	//dbStateStateReferrers
-	
-	
-	//string kkkk = nixDB.mergeToDBKey(store_or_statePath, revision);
-    	
- 	//Add store_or_statePath in .... if nessacary (if in references)
- 	//TODO
- 	//referredPath - TS --> store_or_statePath ADD
- 			
- 	//Set Remove store_or_statePath in .... if nessacary (if not in references)
-	//TODO
-	//referredPath - TS --> store_or_statePath DEL
-	
-	
-	//set the new referrers of revision (-1 insert as a new timestamp)
-	//nixDB.setStateReferrers(txn, table, dbStateRevisions, referredPath, ........, revision);
-}
-
 void Database::setStateRevisions(const Transaction & txn, TableId revisions_table, TableId snapshots_table,
    	const RevisionClosure & revisions)
 {

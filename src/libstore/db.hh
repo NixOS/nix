@@ -121,10 +121,6 @@ public:
     bool queryStateReferrers(const Transaction & txn, TableId referrers_table, TableId revisions_table,
     	const Path & statePath, Strings & referrers, int revision = -1, int timestamp = -1);
     
-    /* TODO */
-    void updateReferredPath(const Transaction & txn, TableId revisions_table, TableId referrers_X_s_table,
-    	const Path & referred_state_or_store_Path, const Path & statePath, const int revision);
-     
     /* Set the revision number of the statePath and the revision numbers of all state paths in the references closure */
     void setStateRevisions(const Transaction & txn, TableId revisions_table, TableId snapshots_table,
     	const RevisionClosure & revisions);
