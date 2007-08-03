@@ -100,10 +100,10 @@ public:
         Strings & keys, const string & keyPrefix = "");
     
     /* TODO */
-    Path makeStatePathRevision(const Path & statePath, const int revision);
+    Path mergeToDBKey(const Path & statePath, const int revision);
     
     /* TODO */
-    void splitStatePathRevision(const Path & revisionedStatePath, Path & statePath, int & revision);
+    void splitDBKey(const Path & revisionedStatePath, Path & statePath, int & revision);
     
     /* Set the stateReferences for a specific revision (and older until the next higher revision number in the table) */    
     void setStateReferences(const Transaction & txn, TableId references_table, TableId revisions_table,
@@ -120,6 +120,10 @@ public:
     /* Returns the referrers for a specific revision (and older until the next higher revision number in the table) */
     bool queryStateReferrers(const Transaction & txn, TableId referrers_table, TableId revisions_table,
     	const Path & statePath, Strings & referrers, int revision = -1, int timestamp = -1);
+    
+    /* TODO */
+    void updateReferredPath(const Transaction & txn, TableId revisions_table, TableId referrers_X_s_table,
+    	const Path & referred_state_or_store_Path, const Path & statePath, const int revision);
      
     /* Set the revision number of the statePath and the revision numbers of all state paths in the references closure */
     void setStateRevisions(const Transaction & txn, TableId revisions_table, TableId snapshots_table,

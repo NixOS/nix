@@ -415,8 +415,11 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
     		printMsg(lvlError, format("Removed state reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
 
 	//If any changes are detected: register the paths valid with a new revision number
-   	if(diff_references_added.size() != 0 || diff_references_removed.size() != 0 ||
-   	   diff_state_references_added.size() != 0 || diff_state_references_removed.size() != 0 )
+   	//if(diff_references_added.size() != 0 || diff_references_removed.size() != 0 ||
+   	//diff_state_references_added.size() != 0 || diff_state_references_removed.size() != 0 )
+
+	//We always set the referernces so we know they were scanned (maybe the same) at a certain time
+	if(true)
    	{
 	   	printMsg(lvlError, format("Updating new references for statepath: '%1%'") % statePath);
 	   	Path drvPath = queryStatePathDrvTxn(txn, statePath);
@@ -638,10 +641,15 @@ void run(Strings args)
 	test["a"] = "a";
 	for (map<string, string>::const_iterator j = test.begin(); j != test.end(); ++j)
 		printMsg(lvlError, format("KEY: '%1%'") % (*j).first);
-	
 	printMsg(lvlError, format("NOW: '%1%'") % getTimeStamp());
 	return;
 
+	map<string, int> test;
+	test["a"] = 1;
+	test["b"] = 2;
+	printMsg(lvlError, format("NOW: '%1%'") % test["q"]);
+	return;	
+	
 	*/
 
 	/* test */

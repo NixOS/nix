@@ -418,6 +418,8 @@ static string stripPrefix(const string & prefix, const string & s)
     return string(s, prefix.size() + 1);
 }
 
+
+
 void setReferences(const Transaction & txn, const Path & store_or_statePath,
     const PathSet & references, const PathSet & stateReferences, const int revision)
 {
@@ -445,13 +447,13 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
 
     	PathSet oldReferences = PathSet(oldReferences_c_c.begin(), oldReferences_c_c.end());
     	PathSet oldStateReferences = PathSet(oldReferences_c_s.begin(), oldReferences_c_s.end());
-    	if (oldReferences == references && oldStateReferences == stateReferences) return;
+    	if (oldReferences == references && oldStateReferences == stateReferences) return;						//watch out we way need to set the referrers.... (at a ts) 
     	
     	nixDB.setStrings(txn, dbComponentComponentReferences, store_or_statePath, Paths(references.begin(), references.end()));
 		nixDB.setStrings(txn, dbComponentStateReferences, store_or_statePath, Paths(stateReferences.begin(), stateReferences.end()));
 	
-		//Handle referrers ......
-   		
+		//Handle referrers like the old way, because references (and so referrers) referrers never change (So these do not have a timestamp)
+		   		
    		//dbComponentComponentReferrers
    		//dbComponentStateReferrers
    		/*
@@ -477,53 +479,27 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
 
 		PathSet oldReferences = PathSet(oldStateReferences_s_c.begin(), oldStateReferences_s_c.end());
     	PathSet oldStateReferences = PathSet(oldStateReferences_s_s.begin(), oldStateReferences_s_s.end());
-		//if (oldReferences == references && oldStateReferences == stateReferences) return;								//TODO Turn on ????????????
 
 		//set the references of revision (-1 insert as a new timestamp)
     	nixDB.setStateReferences(txn, dbStateComponentReferences, dbStateRevisions, store_or_statePath, Paths(references.begin(), references.end()), revision);
 		nixDB.setStateReferences(txn, dbStateStateReferences, dbStateRevisions, store_or_statePath, Paths(stateReferences.begin(), stateReferences.end()), revision);
 
-
 		//REFERRERS
 
    		//for all references old and new, state and component
-   		PathSet all = pathSets_union(pathSets_union(references, oldReferences), pathSets_union(oldStateReferences, stateReferences));		//TODO SPLIT in state and non state
-   		for (PathSet::const_iterator i = all.begin(); i != all.end(); ++i){
-   			
-   			Path referredPath = *i;		//Path referred to by the statePath
-   			
-   			//query the refererrers of revision (-1 is query the latest refererrers)
-			Paths referrers_s_c;
-			Paths referrers_s_s;
-			nixDB.queryStateReferrers(txn, dbStateComponentReferrers, dbStateRevisions, referredPath, referrers_s_c, revision);		//may contain other referred by paths 
-			nixDB.queryStateReferrers(txn, dbStateStateReferrers, dbStateRevisions, referredPath, referrers_s_s, revision);
-	   		PathSet oldReferrers = PathSet(referrers_s_c.begin(), referrers_s_c.end());
-	    	PathSet oldStateReferrers = PathSet(referrers_s_s.begin(), referrers_s_s.end());
-   			
-   			
-   			//Add store_or_statePath in  if nessacary (if in references)
-   			//TODO
-   			
-   			//Remove store_or_statePath if nessacary (if not in references)
-   			//TODO
-   			
-   			//set the new referrers of revision (-1 insert as a new timestamp)
-    		//nixDB.setStateReferrers(txn, dbStateComponentReferences, dbStateRevisions, referredPath, ........, revision);
-			//nixDB.setStateReferrers(txn, dbStateStateReferences, dbStateRevisions, referredPath, ......, revision);
-   			
-   		}
+   		PathSet all_references = pathSets_union(references, oldReferences);
+		PathSet all_stateReferences = pathSets_union(oldStateReferences, stateReferences);
+   		
+   		for (PathSet::const_iterator i = all_references.begin(); i != all_references.end(); ++i)
+   			nixDB.updateReferredPath(txn, dbStateRevisions, dbComponentStateReferrers, *i, store_or_statePath, revision);
+   		
+   		for (PathSet::const_iterator i = all_stateReferences.begin(); i != all_stateReferences.end(); ++i)
+   			nixDB.updateReferredPath(txn, dbStateRevisions, dbStateStateReferrers, *i, store_or_statePath, revision);
+   		
     }
     else
     	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
     
-   	//store_or_statePath must be postfixed in case it is a statePath 
-    Path store_or_statePath2 = store_or_statePath;
-    if(isRealisableStatePath(txn, store_or_statePath))
-   		store_or_statePath2 = nixDB.makeStatePathRevision(store_or_statePath, revision);								//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! THIS OK ???
-																														//NO ???? SINCE THE KEYS SHOULD BE TIMESTAMPED ??
-																														//WE NEEED TO inlcude the revision !!
-        
-
 }
 
 void queryReferencesTxn(const Transaction & txn, const Path & store_or_statePath, PathSet & references, const int revision, int timestamp)
@@ -585,6 +561,7 @@ void LocalStore::queryAllReferences(const Path & path, PathSet & allReferences, 
 
 static PathSet getXReferrers(const Transaction & txn, const Path & store_or_statePath, const int revision, const TableId & table)
 {
+    /*
     if(isValidPathTxn(txn, store_or_statePath)){
 	    PathSet referrers;
     	Strings keys;
@@ -602,6 +579,70 @@ static PathSet getXReferrers(const Transaction & txn, const Path & store_or_stat
     }
     else
     	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
+    	*/
+
+	//TODO!!!!!!!!!!!!!!!!!!!! use revision !!!!!!!!!!!!!!!!!!!!! add timestamp ?????
+
+	PathSet referrers;
+    
+    if(isValidPathTxn(txn, store_or_statePath) || isValidStatePathTxn(txn, store_or_statePath)){
+
+		//Lookup its where it points to if its shared
+		Path store_or_statePath_ns;
+		if(isValidStatePathTxn(txn, store_or_statePath))
+    		store_or_statePath_ns = toNonSharedPathTxn(txn, store_or_statePath);
+    	
+		map<string, int> possible_referrers;	//referrer at timestamp
+
+		Strings keys;
+   		nixDB.enumTable(txn, table, keys);
+   		for (Strings::iterator i = keys.begin(); i != keys.end(); ++i){
+   			if( (*i).substr(0, store_or_statePath_ns.length()) == store_or_statePath_ns){
+   				  if( (*i).length() == store_or_statePath_ns.length() )
+   				  	referrers.insert(*i);									//referrers from components
+   				  else{
+   				  	
+   				  	//now filter the latest of each value
+   				  	Path empty;
+   				  	int timestamp;
+   				  	nixDB.splitDBKey(*i, empty, timestamp);
+   				  	
+   				  	string data;
+   				  	nixDB.queryString(txn, table, *i, data);
+   				  	
+   				  	Path statePath; 
+   				  	int added_or_removed;
+   				  	nixDB.splitDBKey(data, statePath, added_or_removed);
+   				  	
+   				  	if(possible_referrers[statePath] != 0)		//if not yet set
+   				  		if(timestamp > possible_referrers[statePath])
+   				  			possible_referrers[statePath] = timestamp;
+   				  	else
+   				  		possible_referrers[statePath] = timestamp;
+   				  }
+   			}
+   		}
+   		
+   		//Check wheter the latest was added or deleted
+   		for (map<string, int>::iterator i = possible_referrers.begin(); i != possible_referrers.end(); ++i){
+   			
+   			string data;
+   			nixDB.queryString(txn, table, nixDB.mergeToDBKey(store_or_statePath_ns, (*i).second), data);
+   			
+   			Path statePath; 
+   			int added_or_removed;
+   			nixDB.splitDBKey(data, statePath, added_or_removed);
+   			
+   			if(added_or_removed == 1)		//now filter on -0 (removed) or -1 (added)
+   				referrers.insert(statePath);
+   		}
+   		
+    	return referrers;
+    }
+    else
+    	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
+    
+    
 }
 
 static PathSet getReferrers(const Transaction & txn, const Path & store_or_statePath, const int revision)
