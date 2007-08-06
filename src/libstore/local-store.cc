@@ -992,7 +992,7 @@ static void setHash(const Transaction & txn, const Path & storePath, const Hash 
 
 static void setStateValid(const Transaction & txn, const Path & statePath, const Path & drvPath)
 {
-	printMsg(lvlError, format("setStateValid: '%1%' '%2%'") % statePath % drvPath);
+	//printMsg(lvlError, format("Setting statetpath as a valid path in dbValidStatePaths '%1%' with drv '%2%'") % statePath % drvPath);
 	nixDB.setString(txn, dbValidStatePaths, statePath, drvPath);
 }
 

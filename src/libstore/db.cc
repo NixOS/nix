@@ -541,7 +541,7 @@ bool Database::revisionToTimeStamp(const Transaction & txn, TableId revisions_ta
 void Database::setStateReferences(const Transaction & txn, TableId references_table, TableId revisions_table,
    	const Path & statePath, const Strings & references, int revision, int timestamp)
 {
-	//printMsg(lvlError, format("setStateReferences/Referrers %1%") % table);
+	//printMsg(lvlError, format("setStateReferences '%1%' for '%2%'") % references_table % statePath);
 	
 	if(revision == -1 && timestamp == -1)
 		timestamp = getTimeStamp();
@@ -556,13 +556,13 @@ void Database::setStateReferences(const Transaction & txn, TableId references_ta
 	
 	//Warning if it already exists
 	Strings empty;
-	if( queryStateReferences(txn, references_table, revisions_table, statePath, empty, -1, timestamp) )
-		printMsg(lvlError, format("Warning: The timestamp '%1%' already exists for set-references/referrers of path '%2%' with db '%3%'") % timestamp % statePath % references_table);
+	if( queryStrings(txn, references_table, mergeToDBKey(statePath, timestamp), empty) )
+		printMsg(lvlError, format("Warning: The timestamp '%1%' (now: '%5%')  / revision '%4%' already exists for set-references of path '%2%' with db '%3%'") 
+		% timestamp % statePath % references_table % revision % getTimeStamp());
 	
 	//Create the key
 	string key = mergeToDBKey(statePath, timestamp);
-	
-	
+		
 	//printMsg(lvlError, format("Set references '%1%'") % key);
 	//for (Strings::const_iterator i = references.begin(); i != references.end(); ++i)
 	//	printMsg(lvlError, format("reference '%1%'") % *i);
@@ -574,14 +574,14 @@ void Database::setStateReferences(const Transaction & txn, TableId references_ta
 bool Database::queryStateReferences(const Transaction & txn, TableId references_table, TableId revisions_table,
    	const Path & statePath, Strings & references, int revision, int timestamp)
 {
-	//printMsg(lvlError, format("queryStateReferences/Referrers '%1%' with revision '%2%'") % references_table % revision);
+	//printMsg(lvlError, format("queryStateReferences '%1%' with revision '%2%'") % references_table % revision);
 
 	//Convert revision to timestamp number useing the revisions_table
 	if(timestamp == -1 && revision != -1){	
 		bool found = revisionToTimeStamp(txn, revisions_table, statePath, revision, timestamp);
 		if(!found)			//we are asked for references of some revision, but there are no references registered yet, so we return false;
 			return false;
-	}		
+	}
 	
 	Strings keys;
 	enumTable(txn, references_table, keys);

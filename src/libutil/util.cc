@@ -18,7 +18,6 @@
 #include <sys/types.h>
 #include <fcntl.h>
 
-
 extern char * * environ;
 
 
@@ -1152,11 +1151,23 @@ bool FileExist(const string FileName)
 {
 	const char* FileName_C = FileName.c_str();
     struct stat my_stat;
-    return (stat(FileName_C, &my_stat) == 0);
+    if (stat(FileName_C, &my_stat) != 0) return false;
+    return ((my_stat.st_mode & S_IFREG) != 0);
+    
+    /*
+       S_IFMT     0170000   bitmask for the file type bitfields
+       S_IFSOCK   0140000   socket
+       S_IFLNK    0120000   symbolic link
+       S_IFREG    0100000   regular file
+       S_IFBLK    0060000   block device
+       S_IFDIR    0040000   directory
+       S_IFCHR    0020000   character device
+       S_IFIFO    0010000   fifo
+    */
 }
 
 //TODO Does this work on windows?
-bool IsDirectory(const string FileName)						//TODO Use pathExists??
+bool IsDirectory(const string FileName)
 {
 	const char* FileName_C = FileName.c_str();
     struct stat my_stat;

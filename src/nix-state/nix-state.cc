@@ -50,17 +50,14 @@ Derivation getDerivation(const string & fullPath, const string & program_args, s
 						 bool getDerivers, PathSet & derivers) 	//optional
 {
 	//Parse the full path like /nix/store/...../bin/hello
-    //string fullPath = opArgs.front();
-    
     componentPath = fullPath.substr(nixStore.size() + 1, fullPath.size());		//+1 to strip off the /
     int pos = componentPath.find("/",0);
     componentPath = fullPath.substr(0, pos + nixStore.size() + 1);
     binary = fullPath.substr(pos + nixStore.size() + 1, fullPath.size());
 
-    //TODO REAL CHECK for validity of componentPath ... ? sometimes, indentifier can be excluded
-    if(componentPath == "/nix/store")
- 		 throw UsageError("You must specify the full! binary path");
-     
+	if( ! (store->isValidPath(componentPath) || store->isValidStatePath(componentPath)) )
+		throw UsageError(format("Path '%1%' is not a valid state or store path") % componentPath);
+
     //Check if path is statepath
     isStateComponent = store->isStateComponent(componentPath);
       
@@ -158,27 +155,6 @@ static void opShowStatePath(Strings opFlags, Strings opArgs)
 	printMsg(lvlError, format("%1%") % statePath);
 }
 
-//Prints the root path that contains the repoisitorys of the state of a component - indetiefier combination
-static void opShowStatePathAtRevision(Strings opFlags, Strings opArgs)
-{
-	Path componentPath;
-    Path statePath;
-    string binary;
-    string derivationPath;
-    bool isStateComponent;
-    string program_args;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
-	
-	if(!isStateComponent)
-		throw UsageError(format("This path '%1%' is not a state-component path") % componentPath);
-	
-	//TODO
-	
-	//printMsg(lvlError, format("%1%") % repos);
-}
-
-
-
 /*
  * Input: store (or statePath?)
  * Returns all the drv's of the statePaths (in)directly referenced.
@@ -221,10 +197,11 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 	for (RevisionNumbers::iterator i = revisions.begin(); i != revisions.end(); ++i)
 		revisions_sort.push_back(*i);
 	sort(revisions_sort.begin(), revisions_sort.end());
-	string revisions_txt="";
+	
 	for (vector<int>::iterator i = revisions_sort.begin(); i != revisions_sort.end(); ++i)
-		revisions_txt += int2String(*i) + " ";
-	printMsg(lvlError, format("Available Revisions: %1%") % revisions_txt);
+		printMsg(lvlError, format("Available Revision: %1% with date .....") % *i);
+	
+	
 }
 
 static void revertToRevision(Strings opFlags, Strings opArgs)
@@ -323,7 +300,7 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
 			printMsg(lvlError, format("Command: '%1%'") % cpcommand);
 			cpcommand += " " + revertPathOrFile;
 			p_args.push_back(cpcommand);
-			runProgram_AndPrintOutput("sh", true, p_args, "sh-cp");			//TODO does this work on windows?
+			runProgram_AndPrintOutput("sh", true, p_args, "sh-cp");
 		}
 		
 		
@@ -408,10 +385,6 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
     	for (PathSet::iterator i = diff_state_references_removed.begin(); i != diff_state_references_removed.end(); ++i)
     		printMsg(lvlError, format("Removed state reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
 
-	//If any changes are detected: register the paths valid with a new revision number
-   	//if(diff_references_added.size() != 0 || diff_references_removed.size() != 0 ||
-   	//diff_state_references_added.size() != 0 || diff_state_references_removed.size() != 0 )
-
 	//We always set the referernces so we know they were scanned (maybe the same) at a certain time
    	printMsg(lvlError, format("Updating new references for statepath: '%1%'") % statePath);
    	Path drvPath = queryStatePathDrvTxn(txn, statePath);
@@ -424,7 +397,7 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
     		-1);				//Set at a new timestamp
 }
 
-void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path & statePath)		//TODO Can also work for statePaths???
+void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path & statePath)
 {
    	if(! isValidStatePathTxn(txn, statePath))
    		throw Error(format("This path '%1%' is not a state path") % statePath);
@@ -465,6 +438,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	string root_program_args;
     Derivation root_drv = getDerivation_andCheckArgs(opFlags, opArgs, root_componentPath, root_statePath, root_binary, root_derivationPath, root_isStateComponent, root_program_args);
         
+    //TODO
     //Check for locks ... ? or put locks on the neseccary state components
     //WARNING: we need to watch out for deadlocks!
 	//add locks ... ?
@@ -479,8 +453,12 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		
 	//******************* Run ****************************
 	
-	if(!only_commit)
+	if(!only_commit){
+    	if( ! FileExist(root_componentPath + root_binary) )
+    		throw Error(format("You must specify the full binary path: '%1%'") % (root_componentPath + root_binary));
+    		
 		executeShellCommand(root_componentPath + root_binary + " " + root_program_args);
+	}
   		
 	//******************* Scan for new references if neccecary
    	if(scanforReferences)
@@ -641,8 +619,23 @@ void run(Strings args)
 	printMsg(lvlError, format("NOW: '%1%'") % test["q"]);
 	return;	
 	
-	*/
+	printMsg(lvlError, format("NOW: '%1%'") % pathExists("/etc") );
+	printMsg(lvlError, format("NOW: '%1%'") % pathExists("/etc/passwd") );
+	return;
+	
 
+	printMsg(lvlError, format("NOW: '%1%'") % FileExist("/nix/store/65c7p6c8j0vy6b8fjgq84zziiavswqha-hellohardcodedstateworld-1.0/") );
+	printMsg(lvlError, format("NOW: '%1%'") % FileExist("/nix/store/65c7p6c8j0vy6b8fjgq84zziiavswqha-hellohardcodedstateworld-1.0/bin/hello") );
+	printMsg(lvlError, format("NOW: '%1%'") % IsDirectory("/nix/store/65c7p6c8j0vy6b8fjgq84zziiavswqha-hellohardcodedstateworld-1.0/") );
+	printMsg(lvlError, format("NOW: '%1%'") % IsDirectory("/nix/store/65c7p6c8j0vy6b8fjgq84zziiavswqha-hellohardcodedstateworld-1.0/bin/hello") );
+	printMsg(lvlError, format("NOW: '%1%'") % FileExist("/nix/store/65c7p6c8j0vy6b8fjgq8") );
+	printMsg(lvlError, format("NOW: '%1%'") % IsDirectory("/nix/store/65c7p6c8j0vy6b8fjg") );
+	
+	return;
+	*/
+	
+	
+	
 	/* test */
 	
     for (Strings::iterator i = args.begin(); i != args.end(); ) {

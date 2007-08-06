@@ -36,8 +36,15 @@ Path dirOf(const Path & path);
    following the final `/'. */
 string baseNameOf(const Path & path);
 
-/* Return true iff the given path exists. */
+/* Return true if the given path (dir of file) exists. */
 bool pathExists(const Path & path);
+
+/* Return true if the given file exists. */
+bool FileExist(const string FileName);
+
+/* Return true if the given dir exists. */
+bool IsDirectory(const string FileName);
+
 
 /* Read the contents (target) of a symbolic link.  The result is not
    in any way canonicalised. */
@@ -302,10 +309,6 @@ void executeShellCommand(const string & command);
 void runProgram_AndPrintOutput(Path program, bool searchPath, const Strings & args, const string outputPrefix);
 
 int getTimeStamp();
-
-bool FileExist(const string FileName);
-
-bool IsDirectory(const string FileName);		//TODO replace by pathexists
 
 string getCallingUserName();
 
