@@ -1248,7 +1248,19 @@ void ensureDirExists(const Path & path)
 	Strings p_args;
 	p_args.push_back("-p");
 	p_args.push_back(path);
-	runProgram_AndPrintOutput("mkdir", true, p_args, "mkdir");		//TODO ensurePath	
+	runProgram_AndPrintOutput("mkdir", true, p_args, "mkdir");		//TODO ensurePath
 }
+
+string padd(const string & s, char c , unsigned int size, bool front)
+{
+	string ss = s;
+	while (ss.length() < size){
+		if(front)
+			ss = c + ss;
+		else
+			ss = ss  + c;
+	}
+	return ss;
+} 
 
 }

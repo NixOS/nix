@@ -24,6 +24,7 @@ typedef void (* Operation) (Strings opFlags, Strings opArgs);
 //two global variables
 string stateIdentifier;
 string username;
+string comment;
 int revision_arg;
 bool scanforReferences = false;
 bool only_commit = false;
@@ -55,7 +56,7 @@ Derivation getDerivation(const string & fullPath, const string & program_args, s
     componentPath = fullPath.substr(0, pos + nixStore.size() + 1);
     binary = fullPath.substr(pos + nixStore.size() + 1, fullPath.size());
 
-	if( ! (store->isValidPath(componentPath) || store->isValidStatePath(componentPath)) )
+	if( !(store->isValidPath(componentPath) || store->isValidStatePath(componentPath)) )
 		throw UsageError(format("Path '%1%' is not a valid state or store path") % componentPath);
 
     //Check if path is statepath
@@ -173,35 +174,59 @@ PathSet getAllStateDerivationsRecursively(const Path & storePath, const int revi
 	return derivations;
 }
 
-//TODO also allow statePaths as input?
 static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 {
-	Path componentPath;
-    Path statePath;
-    string binary;
-    string derivationPath;
-    bool isStateComponent;
-    string program_args;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
+	Path statePath;
+
+	if(store->isValidStatePath(*(opArgs.begin())))
+		statePath = *(opArgs.begin());
+	else{
+		Path componentPath;
+	    string binary;
+	    string derivationPath;
+	    bool isStateComponent;
+	    string program_args;
+	    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
+	}
 	
-	RevisionNumbers revisions;
+	RevisionInfos revisions;
 	bool notEmpty = store->queryAvailableStateRevisions(statePath, revisions);
 	
-	if(!notEmpty){	//can this happen?
+	
+	if(!notEmpty){
 		printMsg(lvlError, format("No revisions yet for: %1%") % statePath);
 		return;	
 	}
 	
 	//Sort ourselfes to create a nice output
 	vector<int> revisions_sort;
-	for (RevisionNumbers::iterator i = revisions.begin(); i != revisions.end(); ++i)
-		revisions_sort.push_back(*i);
+	int highestrev;
+	for (RevisionInfos::iterator i = revisions.begin(); i != revisions.end(); ++i){
+		int rev = (*i).first;
+		revisions_sort.push_back(rev);
+		if(rev > highestrev)
+			highestrev = rev;
+	}
 	sort(revisions_sort.begin(), revisions_sort.end());
-	
+
+	int max_size = int2String(highestrev).length();
 	for (vector<int>::iterator i = revisions_sort.begin(); i != revisions_sort.end(); ++i)
-		printMsg(lvlError, format("Available Revision: %1% with date .....") % *i);
-	
-	
+	{
+		int rev = *i;
+		string rev_s = padd(int2String(rev), '0' , max_size, true);	//pad revisions with a 0
+		unsigned int ts = revisions[rev].timestamp;
+		time_t time = atoi(unsignedInt2String(ts).c_str());
+		string human_date = ctime(&time);
+		human_date.erase(human_date.find("\n",0),1);	//remove newline
+		string comment = revisions[rev].comment;
+		
+		
+		
+		if(trim(comment) != "")
+			printMsg(lvlError, format("Rev. %1% @ %2% (%3%) -- %4%") % rev_s % human_date % ts % comment);
+		else
+			printMsg(lvlError, format("Rev. %1% @ %2% (%3%)") % rev_s % human_date % ts);
+	}	
 }
 
 static void revertToRevision(Strings opFlags, Strings opArgs)
@@ -482,7 +507,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		rivisionMapping[*i] = commitStatePathTxn(txn, *i);
 	
 	//Save new revisions
-	setStateRevisionsTxn(txn, rivisionMapping);
+	setStateRevisionsTxn(txn, rivisionMapping, root_statePath, comment);
 	
 	//Commit transaction
 	//txn.commit();
@@ -697,7 +722,8 @@ void run(Strings args)
         	stateIdentifier = arg.substr(13,arg.length());
         else if (arg.substr(0,7) == "--user=")
         	username = arg.substr(7,arg.length());
-        	
+        else if (arg.substr(0,10) == "--comment=")
+        	comment = arg.substr(10,arg.length());
         else
             opArgs.push_back(arg);
 

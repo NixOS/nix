@@ -469,7 +469,7 @@ void RemoteStore::storePathRequisites(const Path & storeOrstatePath, const bool 
 }
 
 //TODO
-void RemoteStore::setStateRevisions(const RevisionClosure & revisions)
+void RemoteStore::setStateRevisions(const RevisionClosure & revisions, const Path & rootStatePath, const string & comment)
 {
 	
 }
@@ -481,7 +481,7 @@ bool RemoteStore::queryStateRevisions(const Path & statePath, RevisionClosure & 
 }
 
 //TODO
-bool RemoteStore::queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions)
+bool RemoteStore::queryAvailableStateRevisions(const Path & statePath, RevisionInfos & revisions)
 {
 	return false;	
 }

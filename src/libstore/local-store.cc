@@ -135,6 +135,11 @@ static TableId dbStateInfo = 0;
  */
 static TableId dbStateRevisions = 0;
 
+/*
+ * A additional table to store comments for revisions 
+ */
+static TableId dbStateRevisionsComments = 0;
+
 /* dbStateSnapshots :: StatePath -> RevisionNumbers
  * 
  * This table stores the snapshot numbers the sub state files/folders
@@ -238,6 +243,7 @@ LocalStore::LocalStore(bool reserveSpace)
 	dbStateComponentReferences = nixDB.openTable("references_s_c");
 	dbStateStateReferences = nixDB.openTable("references_s_s");
 	dbStateRevisions = nixDB.openTable("staterevisions");
+	dbStateRevisionsComments = nixDB.openTable("staterevisions_comments");
 	dbStateSnapshots = nixDB.openTable("stateSnapshots");
 	dbSharedState = nixDB.openTable("sharedState");
 	dbSolidStateReferences = nixDB.openTable("references_solid_c_s");	/* The contents of this table is included in references_c_s */
@@ -1674,14 +1680,14 @@ void queryAllValidPaths(const Transaction & txn, PathSet & allComponentPaths, Pa
 }
 
 
-void setStateRevisionsTxn(const Transaction & txn, const RevisionClosure & revisions)
+void setStateRevisionsTxn(const Transaction & txn, const RevisionClosure & revisions, const Path & rootStatePath, const string & comment)
 {
-	nixDB.setStateRevisions(txn, dbStateRevisions, dbStateSnapshots, revisions);	
+	nixDB.setStateRevisions(txn, dbStateRevisions, dbStateRevisionsComments, dbStateSnapshots, revisions, rootStatePath, comment);	
 }
 
-void LocalStore::setStateRevisions(const RevisionClosure & revisions)
+void LocalStore::setStateRevisions(const RevisionClosure & revisions, const Path & rootStatePath, const string & comment)
 {
-	nix::setStateRevisionsTxn(noTxn, revisions);	
+	nix::setStateRevisionsTxn(noTxn, revisions, rootStatePath, comment);	
 }
 
 bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const int revision)
@@ -1694,12 +1700,12 @@ bool LocalStore::queryStateRevisions(const Path & statePath, RevisionClosure & r
 	return nix::queryStateRevisionsTxn(noTxn, statePath, revisions, timestamps, revision);
 }
 
-bool queryAvailableStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionNumbers & revisions)
+bool queryAvailableStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionInfos & revisions)
 {
-	 return nixDB.queryAvailableStateRevisions(txn, dbStateRevisions, statePath, revisions);
+	 return nixDB.queryAvailableStateRevisions(txn, dbStateRevisions, dbStateRevisionsComments, statePath, revisions);
 }
 
-bool LocalStore::queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions)
+bool LocalStore::queryAvailableStateRevisions(const Path & statePath, RevisionInfos & revisions)
 {
 	return nix::queryAvailableStateRevisionsTxn(noTxn, statePath, revisions);
 }

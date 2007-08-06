@@ -617,9 +617,12 @@ bool Database::queryStateReferences(const Transaction & txn, TableId references_
 	return queryStrings(txn, references_table, key, references);		//now that we have the key, we can query the references
 }
 
-void Database::setStateRevisions(const Transaction & txn, TableId revisions_table, TableId snapshots_table,
-   	const RevisionClosure & revisions)
+void Database::setStateRevisions(const Transaction & txn, TableId revisions_table, TableId revisions_comments,
+	 TableId snapshots_table, const RevisionClosure & revisions, const Path & rootStatePath, const string & comment)
 {
+	if( !isStatePath(rootStatePath)	)	//weak check on statePath
+		throw Error(format("StatePath '%1%' is not a statepath") % rootStatePath);
+			
 	int ts = getTimeStamp();
 	
 	//Insert all ss_epochs into snapshots_table with the current ts.
@@ -637,6 +640,7 @@ void Database::setStateRevisions(const Transaction & txn, TableId revisions_tabl
 		Path statePath = (*i).first;
 		
 		int revision = getNewRevisionNumber(txn, revisions_table, statePath);	//get a new revision number
+		
 		string key = mergeToDBKey(statePath, revision);
 		
 		//get all its requisites
@@ -650,6 +654,16 @@ void Database::setStateRevisions(const Transaction & txn, TableId revisions_tabl
 			data.push_back(mergeToDBKey(*j, ts));		
 		
 		setStrings(txn, revisions_table, key, data, false);				//The false makes sure also empty revisions are set
+		
+		//save the date and comments
+		Strings metadata;
+		metadata.push_back(int2String(ts));
+		if(statePath == rootStatePath)
+			metadata.push_back(comment);
+		else
+			metadata.push_back("Part of the snashot closure for " + rootStatePath);
+		setStrings(txn, revisions_comments, key, metadata);
+		
 	}
 }   
 
@@ -720,8 +734,8 @@ bool Database::queryStateRevisions(const Transaction & txn, TableId revisions_ta
 }  
 
 //TODO include comments into revisions?
-bool Database::queryAvailableStateRevisions(const Transaction & txn, TableId revisions_table,
-    const Path & statePath, RevisionNumbers & revisions)
+bool Database::queryAvailableStateRevisions(const Transaction & txn, TableId revisions_table, TableId revisions_comments,
+    const Path & statePath, RevisionInfos & revisions)
 {
 	Strings keys;
 	enumTable(txn, revisions_table, keys);		//get all revisions
@@ -734,7 +748,19 @@ bool Database::queryAvailableStateRevisions(const Transaction & txn, TableId rev
 		Path getStatePath;
 		int getRevision;
 		splitDBKey(*i, getStatePath, getRevision);
-		revisions.push_back(getRevision);
+		
+		//save the date and comments
+		RevisionInfo rev;
+		Strings metadata;
+		queryStrings(txn, revisions_comments, *i, metadata);
+		unsigned int ts;
+		bool succeed = string2UnsignedInt(*(metadata.begin()), ts);
+		if(!succeed)
+			throw Error(format("Malformed timestamp in the revisions-comments table of path '%1%'") % *i);
+		rev.timestamp = ts;
+		metadata.pop_front();		
+		rev.comment = *(metadata.begin());
+		revisions[getRevision] = rev; 
 	}
     
     if(revisions.empty())

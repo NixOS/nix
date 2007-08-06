@@ -1814,7 +1814,7 @@ void DerivationGoal::computeClosure()
 		rivisionMapping[statePath] = commitStatePathTxn(txn, statePath);
 		
 		//Save the new revision
-		setStateRevisionsTxn(txn, rivisionMapping);
+		setStateRevisionsTxn(txn, rivisionMapping, statePath, "Initial build revision.");
 			
 		//Shared state
     	Path sharedState = drv.stateOutputs.find("state")->second.sharedState;

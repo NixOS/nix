@@ -220,13 +220,13 @@ public:
 	virtual void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision) = 0;
 
 	/* TODO */
-	virtual void setStateRevisions(const RevisionClosure & revisions) = 0;
+	virtual void setStateRevisions(const RevisionClosure & revisions, const Path & rootStatePath, const string & comment) = 0;
 	
 	/* TODO */
 	virtual bool queryStateRevisions(const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const int revision) = 0;
 	
 	/* TODO */
-	virtual bool queryAvailableStateRevisions(const Path & statePath, RevisionNumbers & revisions) = 0;
+	virtual bool queryAvailableStateRevisions(const Path & statePath, RevisionInfos & revisions) = 0;
 	
 	/* TODO */
 	virtual void commitStatePath(const Path & statePath) = 0;
