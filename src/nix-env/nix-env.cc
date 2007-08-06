@@ -1062,7 +1062,7 @@ static void opQuery(Globals & globals,
             cout.flush();
 
         } catch (AssertionError & e) {
-            /* !!! hm, maybe we should give some sort of warning here? */
+            printMsg(lvlTalkative, format("skipping derivation named `%1%' which gives an assertion failure") % i->name);
         }
     }
 
