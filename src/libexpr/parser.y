@@ -383,20 +383,8 @@ Expr parseExprFromFile(EvalState & state, Path path)
     if (S_ISDIR(st.st_mode))
         path = canonPath(path + "/default.nix");
 
-    /* Read the input file.  We can't use SGparseFile() because it's
-       broken, so we read the input ourselves and call
-       SGparseString(). */
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY);
-    if (fd == -1) throw SysError(format("opening `%1%'") % path);
-
-    if (fstat(fd, &st) == -1)
-        throw SysError(format("statting `%1%'") % path);
-
-    char text[st.st_size + 1];
-    readFull(fd, (unsigned char *) text, st.st_size);
-    text[st.st_size] = 0;
-
-    return parse(state, text, path, dirOf(path));
+    /* Read and parse the input file. */
+    return parse(state, readFile(path).c_str(), path, dirOf(path));
 }
 
 
