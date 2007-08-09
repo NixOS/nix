@@ -7,7 +7,7 @@ use readmanifest;
 my $tmpDir = tempdir("nix-pull.XXXXXX", CLEANUP => 1, TMPDIR => 1)
     or die "cannot create a temporary directory";
 
-my $manifest = "$tmpDir/manifest";
+#my $manifest = "$tmpDir/manifest";
 
 my $binDir = $ENV{"NIX_BIN_DIR"};
 $binDir = "@bindir@" unless defined $binDir;
@@ -37,12 +37,13 @@ sub processURL {
     my $url = shift;
 
     $url =~ s/\/$//;
-    print "obtaining list of Nix archives at $url...\n";
+    print "obtaining list of Nix archives at `$url'...\n";
 
-    system("@curl@ --fail -# --show-error --location --max-redirs 20 " .
-           "'$url' > '$manifest'") == 0
-           or die "curl failed: $?";
-
+    $ENV{"PRINT_PATH"} = 1;
+    $ENV{"QUIET"} = 1;
+    my ($dummy, $manifest) = `@bindir@/nix-prefetch-url '$url'`;
+    chomp $manifest;
+    
     if (readManifest($manifest, \%narFiles, \%localPaths, \%patches) < 3) {
         die "manifest `$url' is too old (i.e., for Nix <= 0.7)\n";
     }
@@ -67,8 +68,8 @@ sub processURL {
     
     my $finalPath = "$stateDir/manifests/$baseName-$hash.nixmanifest";
     
-    system ("@coreutils@/mv", "-f", "$manifest", "$finalPath") == 0
-        or die "cannot move `$manifest' to `$finalPath";
+    system ("@coreutils@/ln", "-sfn", "$manifest", "$finalPath") == 0
+        or die "cannot link `$finalPath to `$manifest'";
 }
 
 while (@ARGV) {
