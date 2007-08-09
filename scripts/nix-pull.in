@@ -39,7 +39,7 @@ sub processURL {
     $url =~ s/\/$//;
     print "obtaining list of Nix archives at $url...\n";
 
-    system("@curl@ --fail --silent --show-error --location --max-redirs 20 " .
+    system("@curl@ --fail -# --show-error --location --max-redirs 20 " .
            "'$url' > '$manifest'") == 0
            or die "curl failed: $?";
 

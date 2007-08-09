@@ -98,7 +98,8 @@ sub update {
         my $fullURL = "$url/nixexprs.tar.bz2";
         print "downloading Nix expressions from `$fullURL'...\n";
         $ENV{"PRINT_PATH"} = 1;
-        my ($hash, $path) = `@bindir@/nix-prefetch-url '$fullURL' 2> /dev/null`;
+        $ENV{"QUIET"} = 1;
+        my ($hash, $path) = `@bindir@/nix-prefetch-url '$fullURL'`;
         die "cannot fetch `$fullURL'" if $? != 0;
         chomp $path;
         $inputs .= '"' . $channelName . '"' . " " . $path . " ";

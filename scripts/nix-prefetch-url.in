@@ -36,6 +36,12 @@ if test -n "$expHash"; then
 fi
 
 
+doDownload() {
+    @curl@ $cacheFlags --fail -# --show-error --location --max-redirs 20 --disable-epsv \
+        --cookie-jar $tmpPath/cookies "$url" -o $tmpFile
+}
+
+
 # If we don't know the hash or a file with that hash doesn't exist,
 # download the file and add it to the store.
 if test -z "$finalPath"; then
@@ -44,22 +50,60 @@ if test -z "$finalPath"; then
     tmpFile=$tmpPath/$name
     mkdir $tmpPath
 
+    # Optionally do timestamp-based caching of the download.
+    # Actually, the only thing that we cache in $NIX_DOWNLOAD_CACHE is
+    # the hash and the timestamp of the file at $url.  The caching of
+    # the file *contents* is done in Nix store, where it can be
+    # garbage-collected independently.
+    if test -n "$NIX_DOWNLOAD_CACHE"; then
+        urlHash="$(echo -n "$url" | nix-hash --type sha256 --base32 --flat /dev/stdin)"
+        echo "$url" > "$NIX_DOWNLOAD_CACHE/$urlHash.url"
+        cachedHashFN="$NIX_DOWNLOAD_CACHE/$urlHash.$hashType"
+        cachedTimestampFN="$NIX_DOWNLOAD_CACHE/$urlHash.stamp"
+        cacheFlags="--remote-time"
+        if test -e "$cachedTimestampFN" -a -e "$cachedHashFN"; then
+            # Only download the file if it is newer than the cached version.
+            cacheFlags="$cacheFlags --time-cond $cachedTimestampFN"
+        fi
+    fi
+
     # Perform the download.
-    @curl@ --fail --location --max-redirs 20 --disable-epsv \
-        --cookie-jar $tmpPath/cookies "$url" > $tmpFile
+    doDownload
 
-    # Compute the hash.
-    hash=$(@bindir@/nix-hash --type "$hashType" $hashFormat --flat $tmpFile)
-    if ! test -n "$QUIET"; then echo "hash is $hash" >&2; fi
+    if test -n "$NIX_DOWNLOAD_CACHE" -a ! -e $tmpFile; then
+        # Curl didn't create $tmpFile, so apparently there's no newer
+        # file on the server.
+        hash=$(cat $cachedHashFN)
+        finalPath=$(@bindir@/nix-store --print-fixed-path "$hashType" "$hash" "$name") 
+        if ! @bindir@/nix-store --check-validity "$finalPath" 2> /dev/null; then
+            echo "cached contents of \`$url' disappeared, redownloading..." >&2
+            finalPath=
+            cacheFlags="--remote-time"
+            doDownload
+        fi
+    fi
 
-    # Add the downloaded file to the Nix store.
-    finalPath=$(@bindir@/nix-store --add-fixed "$hashType" $tmpFile)
+    if test -z "$finalPath"; then
 
-    if test -n "$tmpPath"; then rm -rf $tmpPath || true; fi
+        # Compute the hash.
+        hash=$(@bindir@/nix-hash --type "$hashType" $hashFormat --flat $tmpFile)
+        if ! test -n "$QUIET"; then echo "hash is $hash" >&2; fi
 
-    if test -n "$expHash" -a "$expHash" != "$hash"; then
-        echo "hash mismatch for URL \`$url'" >&2
-        exit 1
+        if test -n "$NIX_DOWNLOAD_CACHE"; then
+            echo $hash > $cachedHashFN
+            touch -r $tmpFile $cachedTimestampFN
+        fi
+
+        # Add the downloaded file to the Nix store.
+        finalPath=$(@bindir@/nix-store --add-fixed "$hashType" $tmpFile)
+
+        if test -n "$tmpPath"; then rm -rf $tmpPath || true; fi
+
+        if test -n "$expHash" -a "$expHash" != "$hash"; then
+            echo "hash mismatch for URL \`$url'" >&2
+            exit 1
+        fi
+        
     fi
 fi
 
