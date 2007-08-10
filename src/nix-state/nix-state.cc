@@ -28,6 +28,7 @@ string comment;
 int revision_arg;
 bool scanforReferences = false;
 bool only_commit = false;
+bool revert_recursively = false;
 
 
 /************************* Build time Functions ******************************/
@@ -59,7 +60,7 @@ Derivation getDerivation(const string & fullPath, const string & program_args, s
 	if( !(store->isValidPath(componentPath) || store->isValidStatePath(componentPath)) )
 		throw UsageError(format("Path '%1%' is not a valid state or store path") % componentPath);
 
-    //Check if path is statepath
+    //Check if path is store-statepath
     isStateComponent = store->isStateComponent(componentPath);
       
 	//printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % state_identifier % binary % username % program_args);
@@ -80,7 +81,8 @@ Derivation getDerivation(const string & fullPath, const string & program_args, s
     }
     
     //Retrieve the derivation, there is only 1 drvPath in derivers
-    Derivation drv = derivationFromPath(*(derivers.begin()));
+    derivationPath = *(derivers.begin());
+    Derivation drv = derivationFromPath(derivationPath);
 	
 	if(isStateComponent){
     	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
@@ -239,7 +241,7 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
     string program_args;
     Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
     
-    bool recursive = true;	//TODO !!!!!!!!!!!!!!!!!
+    bool recursive = revert_recursively;
     
     //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! add TXN here ???????????
     
@@ -368,7 +370,7 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
 	PathSet allComponentPaths2;	//without derivations
     for (PathSet::iterator i = allComponentPaths.begin(); i != allComponentPaths.end(); ++i){
     	string path = *i;
-    	if(path.substr(path.length() - 4,path.length()) != ".drv")		//TODO HACK: we should have a typed table or a seperate table ....
+    	if(path.substr(path.length() - 4,path.length()) != drvExtension)		//TODO HACK: we should have a typed table or a seperate table ....	 	drvExtension == ".drv"
     		allComponentPaths2.insert(path);
     }
 
@@ -462,7 +464,9 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	bool root_isStateComponent;
 	string root_program_args;
     Derivation root_drv = getDerivation_andCheckArgs(opFlags, opArgs, root_componentPath, root_statePath, root_binary, root_derivationPath, root_isStateComponent, root_program_args);
-        
+    
+    printMsg(lvlError, format("compp: '%1%'\nstatep: '%2%'\nbinary: '%3%'\ndrv:'%4%'") % root_componentPath % root_statePath % root_binary % root_derivationPath);
+    
     //TODO
     //Check for locks ... ? or put locks on the neseccary state components
     //WARNING: we need to watch out for deadlocks!
@@ -724,6 +728,8 @@ void run(Strings args)
         	username = arg.substr(7,arg.length());
         else if (arg.substr(0,10) == "--comment=")
         	comment = arg.substr(10,arg.length());
+        else if (arg.substr(0,10) == "--revert-to-revision-recursively")
+        	revert_recursively = true;	
         else
             opArgs.push_back(arg);
 

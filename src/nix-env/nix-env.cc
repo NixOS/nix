@@ -146,8 +146,7 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
          i != elems.end(); ++i)
         /* Call to `isDerivation' is for compatibility with Nix <= 0.7
            user environments. */
-        if (i->queryDrvPath(state) != "" &&
-            isDerivation(i->queryDrvPath(state)))
+        if (i->queryDrvPath(state) != "" && isDerivation(i->queryDrvPath(state)))
             drvsToBuild.insert(i->queryDrvPath(state));
 
     debug(format("building user environment dependencies"));
@@ -161,6 +160,7 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
     PathSet references;
     ATermList manifest = ATempty;
     ATermList inputs = ATempty;
+    ATermList stateIdentifiers = ATempty; 
     for (DrvInfos::const_iterator i = elems.begin(); 
          i != elems.end(); ++i)
     {
@@ -169,7 +169,7 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
            the meta attributes. */
         Path drvPath = keepDerivations ? i->queryDrvPath(state) : "";
         
-        ATermList as = ATmakeList4(
+        ATermList as = ATmakeList5(
             makeBind(toATerm("type"),
                 makeStr("derivation"), makeNoPos()),
             makeBind(toATerm("name"),
@@ -177,18 +177,26 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
             makeBind(toATerm("system"),
                 makeStr(i->system), makeNoPos()),
             makeBind(toATerm("outPath"),
-                makeStr(i->queryOutPath(state)), makeNoPos()));
+                makeStr(i->queryOutPath(state)), makeNoPos()),
+            makeBind(toATerm("stateIdentifier"),
+               makeStr(i->queryStateIdentifier(state)), makeNoPos()) );
         
-        if (drvPath != "") as = ATinsert(as, 
-            makeBind(toATerm("drvPath"),
-                makeStr(drvPath), makeNoPos()));
+        if (drvPath != "") 
+        	as = ATinsert(as, makeBind(toATerm("drvPath"), makeStr(drvPath), makeNoPos()));
         
-        if (i->attrs->get(toATerm("meta"))) as = ATinsert(as, 
-            makeBind(toATerm("meta"),
-                strictEvalExpr(state, i->attrs->get(toATerm("meta"))),
-                makeNoPos()));
+        if (i->attrs->get(toATerm("meta"))) 
+        	as = ATinsert(as, makeBind(toATerm("meta"), 
+        		strictEvalExpr(state, i->attrs->get(toATerm("meta"))), makeNoPos()));
 
-        manifest = ATinsert(manifest, makeAttrs(as));
+        manifest = ATinsert(manifest, makeAttrs(as));	//All DrvInfo's are inserted here
+        
+        /*ATermList ass = ATmakeList1(
+            makeBind(toATerm("stateIdentifier"), makeStr(i->queryStateIdentifier(state)), makeNoPos()) 
+            );*/
+        
+        stateIdentifiers = ATinsert(stateIdentifiers, makeStr(i->queryStateIdentifier(state)));
+        
+        //printMsg(lvlError, format("TEST2 '%1%'") % makeAttrs(as));
         
         inputs = ATinsert(inputs, makeStr(i->queryOutPath(state)));
 
@@ -197,31 +205,52 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
         store->addTempRoot(i->queryOutPath(state));
         store->ensurePath(i->queryOutPath(state));
         references.insert(i->queryOutPath(state));
-        if (drvPath != "") references.insert(drvPath);
+                
+        if (drvPath != "") 
+        	references.insert(drvPath);
     }
+    
+    //printMsg(lvlError, format("TEST '%1%'") % atPrint(canonicaliseExpr(makeList(ATreverse(manifest)))) );
+    //printMsg(lvlError, format("TEST2 '%1%'") % makeList(ATreverse(manifest)) );
+    //printMsg(lvlError, format("TEST2 '%1%'") % makeBind(toATerm("stateIdentifiers"), makeList(ATreverse(manifest)), makeNoPos()) );
+	printMsg(lvlError, format("TEST '%1%'") % atPrint(canonicaliseExpr(makeList(ATreverse(stateIdentifiers)))) );
+
+	/* Extract ... */
+	
 
     /* Also write a copy of the list of inputs to the store; we need
        it for future modifications of the environment. */
     Path manifestFile = store->addTextToStore("env-manifest", atPrint(canonicaliseExpr(makeList(ATreverse(manifest)))), references);
 
-    Expr topLevel = makeCall(envBuilder, makeAttrs(ATmakeList3(
+    Expr topLevel = makeCall(envBuilder, makeAttrs(ATmakeList4(
         makeBind(toATerm("system"),
             makeStr(thisSystem), makeNoPos()),
         makeBind(toATerm("derivations"),
             makeList(ATreverse(manifest)), makeNoPos()),
+        makeBind(toATerm("stateIdentifiers"),
+            makeList(ATreverse(stateIdentifiers)), makeNoPos()),
         makeBind(toATerm("manifest"),
             makeStr(manifestFile, singleton<PathSet>(manifestFile)), makeNoPos())
         )));
+
+	//printMsg(lvlError, format("Write manifest '%1%'") % topLevel); 
 
     /* Instantiate it. */
     debug(format("evaluating builder expression `%1%'") % topLevel);
     DrvInfo topLevelDrv;
     if (!getDerivation(state, topLevel, topLevelDrv))
         abort();
-    
+
+	printMsg(lvlError, format("TEST5 '%1%'") % topLevelDrv.queryStateIdentifier(state));
+	printMsg(lvlError, format("BUILD ENV DRV: '%1%'") % topLevelDrv.queryDrvPath(state) );
+	    
     /* Realise the resulting store expression. */
     debug(format("building user environment"));
-    store->buildDerivations(singleton<PathSet>(topLevelDrv.queryDrvPath(state)));
+    store->buildDerivations(singleton<PathSet>(topLevelDrv.queryDrvPath(state)));					//HERE IS THE DRV !!!!!!!!!!!
+
+	//switch .....
+
+	printMsg(lvlError, format("TEST6"));
 
     /* Switch the current user environment to the output path. */
     debug(format("switching to new user environment"));
@@ -312,6 +341,11 @@ static void queryInstSources(EvalState & state,
     DrvInfos & elems, bool newestOnly)
 {
     InstallSourceType type = instSource.type;
+	
+	for (Strings::const_iterator i = args.begin(); i != args.end(); ++i)
+		printMsg(lvlError, format("queryInstSources arg '%1%'") % *i);
+    printMsg(lvlError, format("queryInstSources TYPE '%1%'") % (type == srcUnknown));
+
     if (type == srcUnknown && args.size() > 0 && args.front()[0] == '/')
         type = srcStorePaths;
     
@@ -365,10 +399,14 @@ static void queryInstSources(EvalState & state,
             for (Strings::const_iterator i = args.begin();
                  i != args.end(); ++i)
             {
+                printMsg(lvlError, format("AAAAA333 %1%'") % *i);	
+                
                 assertStorePath(*i);
 
+				printMsg(lvlError, format("AAAAA444 %1%'") % *i);
+
                 DrvInfo elem;
-                elem.attrs = boost::shared_ptr<ATermMap>(new ATermMap(0)); /* ugh... */
+                elem.attrs = boost::shared_ptr<ATermMap>(new ATermMap(0)); 	/* ugh... */
                 string name = baseNameOf(*i);
                 string::size_type dash = name.find('-');
                 if (dash != string::npos)
@@ -377,13 +415,18 @@ static void queryInstSources(EvalState & state,
                 if (isDerivation(*i)) {
                     elem.setDrvPath(*i);
                     elem.setOutPath(findOutput(derivationFromPath(*i), "out"));
-                    //TODO !!!!!!!!!!!!!!!!!!!! setStatePath??
                     
                     if (name.size() >= drvExtension.size() &&
                         string(name, name.size() - drvExtension.size()) == drvExtension)
                         name = string(name, 0, name.size() - drvExtension.size());
                 }
-                else elem.setOutPath(*i);
+                else 
+                {
+                	elem.setOutPath(*i);
+                	
+                	//if(drv.stateOutputs.size() != 0)
+                    //	elem.setStateIdentifier(drv.stateOutputs.find("state")->second.stateIdentifier);
+                }
 
                 elem.name = name;
 
@@ -466,6 +509,21 @@ static void installDerivations(Globals & globals,
            one-click installs, namely those where the name used in the
            path is not the one we want (e.g., `java-front' versus
            `java-front-0.9pre15899'). */
+        
+        //printMsg(lvlError, format("New component to install DRV: '%1%'") % i->queryDrvPath(globals.state));
+        
+        //Set the state indentifier
+        if( store->isStateComponent(i->queryOutPath(globals.state)) )
+        {
+        	Derivation drv = derivationFromPath(i->queryDrvPath(globals.state));
+        	DerivationStateOutputs stateOutputs = drv.stateOutputs;
+        	string stateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
+        	if(stateIdentifier == "")
+	        	i->setStateIdentifier("__EMTPY__");
+	        else
+	        	i->setStateIdentifier(stateIdentifier);	
+        }
+        
         if (globals.forceName != "")
             i->name = globals.forceName;
         newNames.insert(DrvName(i->name).name);
@@ -478,14 +536,18 @@ static void installDerivations(Globals & globals,
     DrvInfos installedElems = queryInstalled(globals.state, profile);
 
     DrvInfos allElems(newElems);
-    for (DrvInfos::iterator i = installedElems.begin();
-         i != installedElems.end(); ++i)
+    for (DrvInfos::iterator i = installedElems.begin(); i != installedElems.end(); ++i)
     {
         DrvName drvName(i->name);
-        if (!globals.preserveInstalled &&
-            newNames.find(drvName.name) != newNames.end())
-            printMsg(lvlInfo,
-                format("replacing old `%1%'") % i->name);
+        
+        //TODO !!!!!!!!!!!!!!!!!!!!!!!! SHARE (OR COPY) STATE HERE IF NEEDED
+        //if( newNames.find(drvName.name) != newNames.end() && identifier == identifier )
+        //{
+        
+        //}
+        
+        if (!globals.preserveInstalled && newNames.find(drvName.name) != newNames.end())						
+            printMsg(lvlInfo, format("replacing old `%1%'") % i->name);
         else
             allElems.push_back(*i);
     }

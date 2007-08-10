@@ -93,6 +93,8 @@ Path createGeneration(Path profile, Path outPath)
     makeName(profile, num + 1, generation);
     addPermRoot(outPath, generation, false, true);
 
+	printMsg(lvlError, format("TEST3 '%1%' '%2%' --> '%3%'") % profile % outPath % generation);
+
     return generation;
 }
 
@@ -115,7 +117,8 @@ void deleteGeneration(const Path & profile, unsigned int gen)
 void switchLink(Path link, Path target)
 {
     /* Hacky. */
-    if (dirOf(target) == dirOf(link)) target = baseNameOf(target);
+    if (dirOf(target) == dirOf(link)) 
+    	target = baseNameOf(target);
     
     Path tmp = canonPath(dirOf(link) + "/.new_" + baseNameOf(link));
     if (symlink(target.c_str(), tmp.c_str()) != 0)

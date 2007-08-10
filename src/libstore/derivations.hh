@@ -69,6 +69,8 @@ struct DerivationStateOutput
 	        	throw Error(format("synchronization '%1%' is not a correct type") % synchronization);
 	        if(username == "")
 	        	throw Error(format("Username cannot be empty"));
+	        if(stateIdentifier == "__EMTPY__" || stateIdentifier == "__NOSTATE__")
+	        	throw Error(format("the stateIdenfier cannot be this value '%1%'") % stateIdentifier);
         }
         
         //TODO

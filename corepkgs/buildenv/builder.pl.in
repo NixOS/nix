@@ -3,6 +3,7 @@
 use strict;
 use Cwd;
 use IO::Handle;
+use Fcntl;
 
 STDOUT->autoflush(1);
 
@@ -11,14 +12,28 @@ mkdir "$out", 0755 || die "error creating $out";
 
 
 my $symlinks = 0;
-
+my %path_identifier;
+my $srcDirSlashes = 3;
 
 # For each activated package, create symlinks.
 
 sub createLinks {
     my $srcDir = shift;
+    
+    my @srcDirParts = split /\// , $srcDir;
+    my $srcDirRoot = ""; 
+    my $srcDirCounter=1;
+    while ($srcDirCounter <= $srcDirSlashes) {
+       $srcDirRoot = $srcDirRoot . "/" . $srcDirParts[$srcDirCounter];
+       $srcDirCounter++;
+    }
+	#print "srcDirRoot $srcDirRoot \n";
+    
+    my $pkgStateIdentifier = $path_identifier{$srcDirRoot};
     my $dstDir = shift;
     my $ignoreCollisions = shift;
+
+	# print "createLinks $srcDir to $dstDir with iden $pkgStateIdentifier \n";
 
     my @srcFiles = glob("$srcDir/*");
 
@@ -27,20 +42,21 @@ sub createLinks {
         $baseName =~ s/^.*\///g; # strip directory
         my $dstFile = "$dstDir/$baseName";
 
-        # Urgh, hacky...
-	if ($srcFile =~ /\/propagated-build-inputs$/ ||
+    	# Urgh, hacky...
+		if ($srcFile =~ /\/propagated-build-inputs$/ ||
             $srcFile =~ /\/nix-support$/ ||
             $srcFile =~ /\/perllocal.pod$/ ||
             $srcFile =~ /\/info\/dir$/ ||
             $srcFile =~ /\/log$/)
         {
             # Do nothing.
-	}
+		}
 
         elsif (-d $srcFile) {
 
             lstat $dstFile;
             
+            #go recursive on directorys
             if (-d _) {
                 createLinks($srcFile, $dstFile, $ignoreCollisions);
             }
@@ -51,30 +67,66 @@ sub createLinks {
                     die "collission between directory `$srcFile' and non-directory `$target'";
                 }
                 unlink $dstFile or die "error unlinking `$dstFile': $!";
-                mkdir $dstFile, 0755 || 
-                    die "error creating directory `$dstFile': $!";
+                mkdir $dstFile, 0755 || die "error creating directory `$dstFile': $!";
                 createLinks($target, $dstFile, $ignoreCollisions);
                 createLinks($srcFile, $dstFile, $ignoreCollisions);
             }
 
             else {
+                
+                # print "1STLINK $srcFile to $dstFile with iden $pkgStateIdentifier \n";
+                
                 symlink($srcFile, $dstFile) ||
                     die "error creating link `$dstFile': $!";
                 $symlinks++;
             }
         }
 
-        elsif (-l $dstFile) {
-            if (!$ignoreCollisions) {
-                my $target = readlink $dstFile;
-                die "collission between `$srcFile' and `$target'";
-            }
-        }
-
         else {
-            symlink($srcFile, $dstFile) ||
-                die "error creating link `$dstFile': $!";
-            $symlinks++;
+
+			# print "ELSE LINK $srcFile to $dstFile with iden $pkgStateIdentifier \n";
+
+			# if we have .....
+			if($pkgStateIdentifier ne "__NOSTATE__" && $pkgStateIdentifier ne ""){
+	            
+	            my @pathparts = split /\// , $srcFile;
+	            my $parentDir = $pathparts[scalar(@pathparts) - 2];
+	            
+	            if( $parentDir eq "bin" || $parentDir eq "sbin"){		#hacky....
+		            
+		            print "STATELINK $srcFile to $dstFile \n";
+		            
+		            my $new_dstFile;
+		            if($pkgStateIdentifier eq "__EMTPY__")
+		            {	$new_dstFile = $dstFile;	}
+		            else
+		            {	$new_dstFile = "$dstFile-$pkgStateIdentifier";	}
+		            
+		            if (-l $new_dstFile) {
+			            if (!$ignoreCollisions) {
+			                my $target = readlink $new_dstFile;
+			                die "(state) collission between `$srcFile' and `$target'";
+			            }
+			        }
+		            
+		            sysopen (DSTFILEHANDLE, $new_dstFile, O_RDWR|O_EXCL|O_CREAT, 0755);
+					printf DSTFILEHANDLE "#! @shell@ \n";
+					printf DSTFILEHANDLE "/nixstate/nix/bin/nix-state --run --identifier=$pkgStateIdentifier \$* $srcFile \n";
+					close (DSTFILEHANDLE);
+	            }
+            }
+            else{
+	            if (-l $dstFile) {
+		            if (!$ignoreCollisions) {
+		                my $target = readlink $dstFile;
+		                die "collission between `$srcFile' and `$target'";
+		            }
+		        }
+	            
+	            symlink($srcFile, $dstFile) ||
+	                die "error creating link `$dstFile': $!";
+	            $symlinks++;
+            }
         }
     }
 }
@@ -86,6 +138,7 @@ my %postponed;
 sub addPkg;
 sub addPkg {
     my $pkgDir = shift;
+    my $pkgStateIdentifier = shift;
     my $ignoreCollisions = shift;
 
     return if (defined $done{$pkgDir});
@@ -108,10 +161,18 @@ sub addPkg {
 
 
 # Symlink to the packages that have been installed explicitly by the user.
-my @args = split ' ', $ENV{"derivations"};
+my @storePaths = split ' ', $ENV{"derivations"};
+my @stateIdentifiers = split ' ', $ENV{"stateIdentifiers"};
+my $si_counter = 0;
 
-foreach my $pkgDir (sort @args) {
-    addPkg($pkgDir, 0);
+foreach my $pkgDir (@storePaths) {					#Commented the sort out
+
+	print "SP: $pkgDir \n";
+	$path_identifier{$pkgDir} = $stateIdentifiers[$si_counter];
+	print "SI: $path_identifier{$pkgDir} \n";
+	
+    addPkg($pkgDir, $stateIdentifiers[$si_counter], 0);
+    $si_counter++;
 }
 
 
@@ -120,9 +181,10 @@ foreach my $pkgDir (sort @args) {
 # installed as well).  We do these later because they have a lower
 # priority in case of collisions.
 while (scalar(keys %postponed) > 0) {
-    my @pkgDirs = keys %postponed;
+    
+    my @pkgDirs = keys %postponed;					# TODODODODODOD !!!!!!!!!!!!!!!!!!!!!
     %postponed = ();
-    foreach my $pkgDir (sort @pkgDirs) {
+    foreach my $pkgDir (sort @pkgDirs) {			   
         addPkg($pkgDir, 1);
     }
 }

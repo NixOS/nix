@@ -20,6 +20,7 @@ struct DrvInfo
 private:
     string drvPath;
     string outPath;
+    string stateIdentifier;
     
 public:
     string name;
@@ -33,6 +34,7 @@ public:
 
     string queryDrvPath(EvalState & state) const;
     string queryOutPath(EvalState & state) const;
+    string queryStateIdentifier(EvalState & state) const;
     MetaInfo queryMetaInfo(EvalState & state) const;
 
     void setDrvPath(const string & s)
@@ -43,6 +45,11 @@ public:
     void setOutPath(const string & s)
     {
         outPath = s;
+    }
+    
+    void setStateIdentifier(const string & s)
+    {
+    	stateIdentifier = s;	
     }
     
     void setMetaInfo(const MetaInfo & meta);

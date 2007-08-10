@@ -2587,6 +2587,9 @@ void LocalStore::buildDerivations(const PathSet & drvPaths)
     Worker worker;
     Goals goals;
     for (PathSet::const_iterator i = drvPaths.begin(); i != drvPaths.end(); ++i){
+
+		printMsg(lvlError, format("BUILD: '%1%'") % *i);
+
         goals.insert(worker.makeDerivationGoal(*i));
     }
 

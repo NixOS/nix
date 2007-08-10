@@ -35,6 +35,30 @@ string DrvInfo::queryOutPath(EvalState & state) const
     return outPath;
 }
 
+string DrvInfo::queryStateIdentifier(EvalState & state) const
+{
+	if (stateIdentifier == "") {
+        ATermMap attrs2 = *attrs;
+        
+        for (ATermMap::const_iterator i = attrs2.begin(); i != attrs2.end(); ++i) {
+        	
+        	string key = (string)aterm2String(i->key);		//cast because aterm2String returns a char*
+        	//printMsg(lvlError, format("ATTR2: '%1%'") % key);
+	       	if(key == "stateIdentifier"){		  
+        		PathSet context;
+            	string value = coerceToString(state, i->value, context);
+        		(string &) stateIdentifier = value;
+        	}
+        }
+        
+        //If still empty
+        if (trim(stateIdentifier) == "")
+        	(string &) stateIdentifier = "__NOSTATE__";
+    }
+    
+    return stateIdentifier;
+}
+
 
 MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
 {
@@ -93,20 +117,23 @@ static bool getDerivation(EvalState & state, Expr e,
 
         boost::shared_ptr<ATermMap> attrs(new ATermMap());
         queryAllAttrs(e, *attrs, false);
-    
+
         Expr a = attrs->get(toATerm("type"));
-        if (!a || evalStringNoCtx(state, a) != "derivation") return true;
+        if (!a || evalStringNoCtx(state, a) != "derivation") 
+        	return true;
 
         /* Remove spurious duplicates (e.g., an attribute set like
            `rec { x = derivation {...}; y = x;}'. */
-        if (doneExprs.find(e) != doneExprs.end()) return false;
+        if (doneExprs.find(e) != doneExprs.end()) 
+        	return false;
         doneExprs.insert(e);
 
         DrvInfo drv;
     
         a = attrs->get(toATerm("name"));
         /* !!! We really would like to have a decent back trace here. */
-        if (!a) throw TypeError("derivation name missing");
+        if (!a) 
+        	throw TypeError("derivation name missing");
         drv.name = evalStringNoCtx(state, a);
 
         a = attrs->get(toATerm("system"));
@@ -133,7 +160,8 @@ bool getDerivation(EvalState & state, Expr e, DrvInfo & drv)
     Exprs doneExprs;
     DrvInfos drvs;
     getDerivation(state, e, "", drvs, doneExprs);
-    if (drvs.size() != 1) return false;
+    if (drvs.size() != 1) 
+    	return false;
     drv = drvs.front();
     return true;
 }

@@ -768,19 +768,19 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
  * Returns true or false wheter a store-component has a state component (e.g. has a state dir) or not. 
  * Do NOT confuse this function with isValidStatePath
  */
-bool isStateComponentTxn(const Transaction & txn, const Path & statePath)
+bool isStateComponentTxn(const Transaction & txn, const Path & storePath)
 {
-	isValidPathTxn(txn, statePath);
+	isValidPathTxn(txn, storePath);
 	
 	string data;
-	bool nonempty = nixDB.queryString(txn, dbStateInfo, statePath, data);
+	bool nonempty = nixDB.queryString(txn, dbStateInfo, storePath, data);
 	 
 	return nonempty;
 }
 
-bool LocalStore::isStateComponent(const Path & statePath)
+bool LocalStore::isStateComponent(const Path & storePath)
 {
-    return nix::isStateComponentTxn(noTxn, statePath);
+    return nix::isStateComponentTxn(noTxn, storePath);
 }
 
 
