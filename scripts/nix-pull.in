@@ -7,8 +7,6 @@ use readmanifest;
 my $tmpDir = tempdir("nix-pull.XXXXXX", CLEANUP => 1, TMPDIR => 1)
     or die "cannot create a temporary directory";
 
-#my $manifest = "$tmpDir/manifest";
-
 my $binDir = $ENV{"NIX_BIN_DIR"};
 $binDir = "@bindir@" unless defined $binDir;
 
@@ -33,16 +31,42 @@ my %patches;
 
 my $skipWrongStore = 0;
 
+sub downloadFile {
+    my $url = shift;
+    $ENV{"PRINT_PATH"} = 1;
+    $ENV{"QUIET"} = 1;
+    my ($dummy, $path) = `@bindir@/nix-prefetch-url '$url'`;
+    chomp $path;
+    return $path;
+}
+
 sub processURL {
     my $url = shift;
 
     $url =~ s/\/$//;
-    print "obtaining list of Nix archives at `$url'...\n";
 
-    $ENV{"PRINT_PATH"} = 1;
-    $ENV{"QUIET"} = 1;
-    my ($dummy, $manifest) = `@bindir@/nix-prefetch-url '$url'`;
-    chomp $manifest;
+    my $manifest;
+
+    # First see if a bzipped manifest is available.
+    if (system("@curl@ --fail --silent --head '$url'.bz2 > /dev/null") == 0) {
+        print "obtaining list of Nix archives at `$url.bz2'...\n";
+        my $bzipped = downloadFile "$url.bz2";
+
+        $manifest = "$tmpDir/MANIFEST";
+
+        system("@bunzip2@ < $bzipped > $manifest") == 0
+            or die "cannot decompress manifest";
+
+        $manifest = (`$binDir/nix-store --add $manifest`
+                     or die "cannot copy $manifest to the store");
+        chomp $manifest;
+    }
+
+    # Otherwise, just get the uncompressed manifest.
+    else {
+        print "obtaining list of Nix archives at `$url'...\n";
+        $manifest = downloadFile $url;
+    }
     
     if (readManifest($manifest, \%narFiles, \%localPaths, \%patches) < 3) {
         die "manifest `$url' is too old (i.e., for Nix <= 0.7)\n";
@@ -68,7 +92,7 @@ sub processURL {
     
     my $finalPath = "$stateDir/manifests/$baseName-$hash.nixmanifest";
     
-    system ("@coreutils@/ln", "-sfn", "$manifest", "$finalPath") == 0
+    system("@coreutils@/ln", "-sfn", "$manifest", "$finalPath") == 0
         or die "cannot link `$finalPath to `$manifest'";
 }
 
