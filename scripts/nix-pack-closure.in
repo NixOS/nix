@@ -17,9 +17,9 @@ $binDir = "@bindir@" unless defined $binDir;
 my $tmpDir = tempdir("nix-pack-closure.XXXXXX", CLEANUP => 1, TMPDIR => 1)
     or die "cannot create a temporary directory";
 
-mkdir "$tmpDir/contents", 0777 or die;
-mkdir "$tmpDir/references", 0777 or die;
-mkdir "$tmpDir/derivers", 0777 or die;
+mkdir "$tmpDir/contents", 0755 or die;
+mkdir "$tmpDir/references", 0755 or die;
+mkdir "$tmpDir/derivers", 0755 or die;
 
 open TOPLEVEL, ">$tmpDir/top-level" or die;
 

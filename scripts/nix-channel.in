@@ -8,6 +8,12 @@ my $stateDir = $ENV{"NIX_STATE_DIR"};
 $stateDir = "@localstatedir@/nix" unless defined $stateDir;
 
 
+# Turn on caching in nix-prefetch-url.
+my $channelCache = "$stateDir/channel-cache";
+$ENV{'NIX_DOWNLOAD_CACHE'} = $channelCache;
+mkdir $channelCache, 0755 unless -e $channelCache;
+
+
 # Figure out the name of the `.nix-channels' file to use.
 my $home = $ENV{"HOME"};
 die '$HOME not set' unless defined $home;
