@@ -25,6 +25,7 @@ unsigned int maxBuildJobs = 1;
 bool readOnlyMode = false;
 string thisSystem = "unset";
 unsigned int maxSilentTime = 0;
+Paths substituters;
 
 
 static bool settingsRead = false;

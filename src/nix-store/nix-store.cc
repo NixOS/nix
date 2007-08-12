@@ -413,54 +413,6 @@ static void opReadLog(Strings opFlags, Strings opArgs)
 }
 
 
-static void opRegisterSubstitutes(Strings opFlags, Strings opArgs)
-{
-    if (!opFlags.empty()) throw UsageError("unknown flag");
-    if (!opArgs.empty()) throw UsageError("no arguments expected");
-
-    Transaction txn;
-    createStoreTransaction(txn);
-
-    while (1) {
-        Path srcPath;
-        Substitute sub;
-        PathSet references;
-        getline(cin, srcPath);
-        if (cin.eof()) break;
-        getline(cin, sub.deriver);
-        getline(cin, sub.program);
-        string s; int n;
-        getline(cin, s);
-        if (!string2Int(s, n)) throw Error("number expected");
-        while (n--) {
-            getline(cin, s);
-            sub.args.push_back(s);
-        }
-        getline(cin, s);
-        if (!string2Int(s, n)) throw Error("number expected");
-        while (n--) {
-            getline(cin, s);
-            references.insert(s);
-        }
-        if (!cin || cin.eof()) throw Error("missing input");
-        registerSubstitute(txn, srcPath, sub);
-        setReferences(txn, srcPath, references);
-    }
-
-    txn.commit();
-}
-
-
-static void opClearSubstitutes(Strings opFlags, Strings opArgs)
-{
-    if (!opFlags.empty()) throw UsageError("unknown flag");
-    if (!opArgs.empty())
-        throw UsageError("no arguments expected");
-
-    clearSubstitutes();
-}
-
-
 static void opRegisterValidity(Strings opFlags, Strings opArgs)
 {
     bool reregister = false; // !!! maybe this should be the default
@@ -475,18 +427,8 @@ static void opRegisterValidity(Strings opFlags, Strings opArgs)
     ValidPathInfos infos;
     
     while (1) {
-        ValidPathInfo info;
-        getline(cin, info.path);
-        if (cin.eof()) break;
-        getline(cin, info.deriver);
-        string s; int n;
-        getline(cin, s);
-        if (!string2Int(s, n)) throw Error("number expected");
-        while (n--) {
-            getline(cin, s);
-            info.references.insert(s);
-        }
-        if (!cin || cin.eof()) throw Error("missing input");
+        ValidPathInfo info = decodeValidPathInfo(cin);
+        if (info.path == "") break;
         if (!store->isValidPath(info.path) || reregister) {
             /* !!! races */
             canonicalisePathMetaData(info.path);
@@ -699,10 +641,6 @@ void run(Strings args)
             op = opQuery;
         else if (arg == "--read-log" || arg == "-l")
             op = opReadLog;
-        else if (arg == "--register-substitutes")
-            op = opRegisterSubstitutes;
-        else if (arg == "--clear-substitutes")
-            op = opClearSubstitutes;
         else if (arg == "--register-validity")
             op = opRegisterValidity;
         else if (arg == "--check-validity")

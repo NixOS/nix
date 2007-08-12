@@ -651,36 +651,6 @@ $ gv graph.ps</screen>
 
 <!--######################################################################-->
 
-<!--
-<refsection><title>Operation <option>-XXX-substitute</option></title>
-
-<refsection><title>Synopsis</title>
-
-<cmdsynopsis>
-  <command>nix-store</command>
-  <arg choice='plain'><option>-XXX-substitute</option></arg>
-  <arg choice='plain'
-       rep='repeat'><replaceable>srcpath</replaceable> <replaceable>subpath</replaceable></arg>
-</cmdsynopsis>
-</refsection>
-
-<refsection><title>Description</title>
-            
-<para>The operation <option>-XXX-substitute</option> registers that the
-store path <replaceable>srcpath</replaceable> can be built by
-realising the derivation expression in
-<replaceable>subpath</replaceable>.  This is used to implement binary
-deployment.</para>
-
-</refsection>
-            
-</refsection>
--->
-
-
-
-<!--######################################################################-->
-
 <refsection xml:id='refsec-nix-store-verify'><title>Operation <option>--verify</option></title>
 
 <refsection>

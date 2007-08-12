@@ -194,7 +194,8 @@ void Database::open2(const string & path, bool removeOldEnv)
 
     env->set_errcall(errorPrinter);
     env->set_msgcall(messagePrinter);
-    //env->set_verbose(DB_VERB_REGISTER, 1);
+    if (getEnv("NIX_DEBUG_DB_REGISTER") == "1")
+        env->set_verbose(DB_VERB_REGISTER, 1);
     env->set_verbose(DB_VERB_RECOVERY, 1);
     
     /* Smaller log files. */
@@ -454,4 +455,14 @@ void Database::enumTable(const Transaction & txn, TableId table,
 }
 
  
+void Database::clearTable(const Transaction & txn, TableId table)
+{
+    try {
+        Db * db = getDb(table);
+        u_int32_t count;
+        db->truncate(txn.txn, &count, 0);
+    } catch (DbException e) { rethrow(e); }
+}
+
+
 }

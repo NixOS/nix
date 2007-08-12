@@ -27,10 +27,6 @@ public:
     
     bool isValidPath(const Path & path);
 
-    Substitutes querySubstitutes(const Path & path);
-
-    bool hasSubstitutes(const Path & path);
-    
     Hash queryPathHash(const Path & path);
 
     void queryReferences(const Path & path, PathSet & references);
@@ -38,6 +34,10 @@ public:
     void queryReferrers(const Path & path, PathSet & referrers);
 
     Path queryDeriver(const Path & path);
+    
+    PathSet querySubstitutablePaths();
+    
+    bool hasSubstitutes(const Path & path);
     
     Path addToStore(const Path & srcPath, bool fixed = false,
         bool recursive = false, string hashAlgo = "",

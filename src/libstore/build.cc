@@ -164,6 +164,11 @@ private:
     /* Goals waiting for a build slot. */
     WeakGoals wantingToBuild;
 
+    /* Goals waiting for info from substituters (using --query-info),
+       and the info they're (collectively) waiting for. */
+    WeakGoals waitingForInfo;
+    map<Path, PathSet> requestedInfo;
+
     /* Child processes currently running. */
     Children children;
 
@@ -212,12 +217,24 @@ public:
     /* Put `goal' to sleep until a child process terminates, i.e., a
        call is made to childTerminate(..., true).  */
     void waitForChildTermination(GoalPtr goal);
+
+    /* Put `goal' to sleep until the top-level loop has run `sub' to
+       get info about `storePath' (with --query-info).  We combine
+       substituter invocations to reduce overhead. */
+    void waitForInfo(GoalPtr goal, Path sub, Path storePath);
     
     /* Loop until the specified top-level goals have finished. */
     void run(const Goals & topGoals);
 
     /* Wait for input to become available. */
     void waitForInput();
+
+private:
+
+    /* Process the pending paths in requestedInfo and wake up the
+       goals in waitingForInfo. */
+    void getInfo();
+    
 };
 
 
@@ -783,7 +800,7 @@ void DerivationGoal::haveDerivation()
            substitutes. */
         if (store->hasSubstitutes(*i))
             addWaitee(worker.makeSubstitutionGoal(*i));
-
+    
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         outputsSubstituted();
     else
@@ -1829,18 +1846,22 @@ PathSet DerivationGoal::checkPathValidity(bool returnValid)
 
 class SubstitutionGoal : public Goal
 {
+    friend class Worker;
+    
 private:
     /* The store path that should be realised through a substitute. */
     Path storePath;
 
-    /* The remaining substitutes for this path. */
-    Substitutes subs;
+    /* The remaining substituters. */
+    Paths subs;
 
-    /* The current substitute. */
-    Substitute sub;
+    /* The current substituter. */
+    Path sub;
 
-    /* Outgoing references for this path. */
+    /* Path info returned by the substituter's --query-info operation. */
+    bool infoOkay;
     PathSet references;
+    Path deriver;
 
     /* Pipe for the substitute's standard output/error. */
     Pipe logPipe;
@@ -1864,8 +1885,9 @@ public:
 
     /* The states. */
     void init();
-    void referencesValid();
     void tryNext();
+    void gotInfo();
+    void referencesValid();
     void tryToRun();
     void finished();
 
@@ -1923,17 +1945,46 @@ void SubstitutionGoal::init()
         return;
     }
 
-    /* !!! race condition; should get the substitutes and the
-       references in a transaction (in case a clearSubstitutes() is
-       done simultaneously). */
+    subs = substituters;
 
-    /* Read the substitutes. */
-    subs = store->querySubstitutes(storePath);
+    tryNext();
+}
 
+
+void SubstitutionGoal::tryNext()
+{
+    trace("trying next substituter");
+
+    if (subs.size() == 0) {
+        /* None left.  Terminate this goal and let someone else deal
+           with it. */
+        printMsg(lvlError,
+            format("path `%1%' is required, but there is no substituter that can build it")
+            % storePath);
+        amDone(ecFailed);
+        return;
+    }
+
+    sub = subs.front();
+    subs.pop_front();
+
+    infoOkay = false;
+    state = &SubstitutionGoal::gotInfo;
+    worker.waitForInfo(shared_from_this(), sub, storePath);
+}
+
+
+void SubstitutionGoal::gotInfo()
+{
+    trace("got info");
+
+    if (!infoOkay) {
+        tryNext();
+        return;
+    }
+    
     /* To maintain the closure invariant, we first have to realise the
        paths referenced by this one. */
-    store->queryReferences(storePath, references);
-
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)
         if (*i != storePath) /* ignore self-references */
@@ -1948,7 +1999,7 @@ void SubstitutionGoal::init()
 
 void SubstitutionGoal::referencesValid()
 {
-    trace("all referenced realised");
+    trace("all references realised");
 
     if (nrFailed > 0) {
         printMsg(lvlError,
@@ -1961,28 +2012,7 @@ void SubstitutionGoal::referencesValid()
          i != references.end(); ++i)
         if (*i != storePath) /* ignore self-references */
             assert(store->isValidPath(*i));
-    
-    tryNext();
-}
 
-
-void SubstitutionGoal::tryNext()
-{
-    trace("trying next substitute");
-
-    if (subs.size() == 0) {
-        /* None left.  Terminate this goal and let someone else deal
-           with it. */
-        printMsg(lvlError,
-            format("path `%1%' is required, but it has no (remaining) substitutes")
-            % storePath);
-        amDone(ecFailed);
-        return;
-    }
-    sub = subs.front();
-    subs.pop_front();
-
-    /* Wait until we can run the substitute program. */
     state = &SubstitutionGoal::tryToRun;
     worker.waitForBuildSlot(shared_from_this());
 }
@@ -2013,7 +2043,7 @@ void SubstitutionGoal::tryToRun()
 
     printMsg(lvlInfo,
         format("substituting path `%1%' using substituter `%2%'")
-        % storePath % sub.program);
+        % storePath % sub);
     
     logPipe.create();
 
@@ -2038,14 +2068,15 @@ void SubstitutionGoal::tryToRun()
             commonChildInit(logPipe);
 
             /* Fill in the arguments. */
-            Strings args(sub.args);
-            args.push_front(storePath);
-            args.push_front(baseNameOf(sub.program));
+            Strings args;
+            args.push_back(baseNameOf(sub));
+            args.push_back("--substitute");
+            args.push_back(storePath);
             const char * * argArr = strings2CharPtrs(args);
 
-            execv(sub.program.c_str(), (char * *) argArr);
+            execv(sub.c_str(), (char * *) argArr);
             
-            throw SysError(format("executing `%1%'") % sub.program);
+            throw SysError(format("executing `%1%'") % sub);
             
         } catch (std::exception & e) {
             std::cerr << format("substitute error: %1%\n") % e.what();
@@ -2098,7 +2129,7 @@ void SubstitutionGoal::finished()
 
         printMsg(lvlInfo,
             format("substitution of path `%1%' using substituter `%2%' failed: %3%")
-            % storePath % sub.program % e.msg());
+            % storePath % sub % e.msg());
         
         /* Try the next substitute. */
         state = &SubstitutionGoal::tryNext;
@@ -2113,7 +2144,7 @@ void SubstitutionGoal::finished()
     Transaction txn;
     createStoreTransaction(txn);
     registerValidPath(txn, storePath, contentHash,
-        references, sub.deriver);
+        references, deriver);
     txn.commit();
 
     outputLock->setDeletion(true);
@@ -2298,6 +2329,76 @@ void Worker::waitForChildTermination(GoalPtr goal)
 }
 
 
+void Worker::waitForInfo(GoalPtr goal, Path sub, Path storePath)
+{
+    debug("wait for info");
+    requestedInfo[sub].insert(storePath);
+    waitingForInfo.insert(goal);
+}
+
+
+void Worker::getInfo()
+{
+    for (map<Path, PathSet>::iterator i = requestedInfo.begin();
+         i != requestedInfo.end(); ++i)
+    {
+        Path sub = i->first;
+        PathSet paths = i->second;
+
+        while (!paths.empty()) {
+
+            /* Run the substituter for at most 100 paths at a time to
+               prevent command line overflows. */
+            PathSet paths2;
+            while (!paths.empty() && paths2.size() < 100) {
+                paths2.insert(*paths.begin());
+                paths.erase(paths.begin());
+            }
+
+            /* Ask the substituter for the references and deriver of
+               the paths. */
+            debug(format("running `%1%' to get info about `%2%'") % sub % showPaths(paths2));
+            Strings args;
+            args.push_back("--query-info");
+            args.insert(args.end(), paths2.begin(), paths2.end());
+            string res = runProgram(sub, false, args);
+            std::istringstream str(res);
+
+            while (true) {
+                ValidPathInfo info = decodeValidPathInfo(str);
+                if (info.path == "") break;
+
+                /* !!! inefficient */
+                for (WeakGoals::iterator k = waitingForInfo.begin();
+                     k != waitingForInfo.end(); ++k)
+                {
+                    GoalPtr goal = k->lock();
+                    if (goal) {
+                        SubstitutionGoal * goal2 = dynamic_cast<SubstitutionGoal *>(goal.get());
+                        if (goal2->storePath == info.path) {
+                            goal2->references = info.references;
+                            goal2->deriver = info.deriver;
+                            goal2->infoOkay = true;
+                            wakeUp(goal);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (WeakGoals::iterator k = waitingForInfo.begin();
+         k != waitingForInfo.end(); ++k)
+    {
+        GoalPtr goal = k->lock();
+        if (goal) wakeUp(goal);
+    }
+    
+    requestedInfo.clear();
+    waitingForInfo.clear(); // !!! have we done them all?
+}
+
+
 void Worker::run(const Goals & _topGoals)
 {
     for (Goals::iterator i = _topGoals.begin();
@@ -2324,11 +2425,14 @@ void Worker::run(const Goals & _topGoals)
 
         if (topGoals.empty()) break;
 
-        /* !!! not when we're polling */
-        assert(!children.empty());
-        
+        getInfo();
+
         /* Wait for input. */
-        waitForInput();
+        if (!children.empty())
+            waitForInput();
+        else
+            /* !!! not when we're polling */
+            assert(!awake.empty());
     }
 
     /* If --keep-going is not set, it's possible that the main goal

@@ -19,23 +19,18 @@ using std::vector;
 using boost::format;
 
 
-class Error : public std::exception
+/* BaseError should generally not be caught, as it has Interrupted as
+   a subclass. Catch Error instead. */
+class BaseError : public std::exception 
 {
 protected:
     string err;
 public:
-    Error(const format & f);
-    ~Error() throw () { };
+    BaseError(const format & f);
+    ~BaseError() throw () { };
     const char * what() const throw () { return err.c_str(); }
     const string & msg() const throw () { return err; }
-    Error & addPrefix(const format & f);
-};
-
-class SysError : public Error
-{
-public:
-    int errNo;
-    SysError(const format & f);
+    BaseError & addPrefix(const format & f);
 };
 
 #define MakeError(newClass, superClass) \
@@ -44,6 +39,15 @@ public:
     public:                                             \
         newClass(const format & f) : superClass(f) { }; \
     };
+
+MakeError(Error, BaseError)
+
+class SysError : public Error
+{
+public:
+    int errNo;
+    SysError(const format & f);
+};
 
 
 typedef list<string> Strings;

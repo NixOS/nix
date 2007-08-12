@@ -256,7 +256,7 @@ void inline checkInterrupt()
     if (_isInterrupted) _interrupted();
 }
 
-MakeError(Interrupted, Error)
+MakeError(Interrupted, BaseError)
 
 
 /* String packing / unpacking. */

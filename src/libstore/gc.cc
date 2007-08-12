@@ -602,6 +602,8 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
             }
 #endif
 
+            if (!pathExists(*i)) continue;
+                
             printMsg(lvlInfo, format("deleting `%1%'") % *i);
             
             /* Okay, it's safe to delete. */

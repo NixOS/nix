@@ -89,6 +89,8 @@ public:
 
     void enumTable(const Transaction & txn, TableId table,
         Strings & keys, const string & keyPrefix = "");
+
+    void clearTable(const Transaction & txn, TableId table);
 };
 
 

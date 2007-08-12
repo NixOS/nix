@@ -23,6 +23,10 @@ extern string drvsLogDir;
 
 class LocalStore : public StoreAPI
 {
+private:
+    bool substitutablePathsLoaded;
+    PathSet substitutablePaths;
+    
 public:
 
     /* Open the database environment.  If `reserveSpace' is true, make
@@ -41,8 +45,6 @@ public:
     
     bool isValidPath(const Path & path);
 
-    Substitutes querySubstitutes(const Path & srcPath);
-
     Hash queryPathHash(const Path & path);
 
     void queryReferences(const Path & path, PathSet & references);
@@ -50,6 +52,10 @@ public:
     void queryReferrers(const Path & path, PathSet & referrers);
 
     Path queryDeriver(const Path & path);
+    
+    PathSet querySubstitutablePaths();
+    
+    bool hasSubstitutes(const Path & path);
     
     Path addToStore(const Path & srcPath, bool fixed = false,
         bool recursive = false, string hashAlgo = "",
@@ -86,13 +92,6 @@ void createStoreTransaction(Transaction & txn);
 /* Copy a path recursively. */
 void copyPath(const Path & src, const Path & dst);
 
-/* Register a substitute. */
-void registerSubstitute(const Transaction & txn,
-    const Path & srcPath, const Substitute & sub);
-
-/* Deregister all substitutes. */
-void clearSubstitutes();
-
 /* Register the validity of a path, i.e., that `path' exists, that the
    paths referenced by it exists, and in the case of an output path of
    a derivation, that it has been produced by a succesful execution of
@@ -102,14 +101,6 @@ void clearSubstitutes();
 void registerValidPath(const Transaction & txn,
     const Path & path, const Hash & hash, const PathSet & references,
     const Path & deriver);
-
-struct ValidPathInfo 
-{
-    Path path;
-    Path deriver;
-    Hash hash;
-    PathSet references;
-};
 
 typedef list<ValidPathInfo> ValidPathInfos;
 

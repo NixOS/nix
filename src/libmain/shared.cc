@@ -113,6 +113,12 @@ static void initAndRun(int argc, char * * argv)
     nixLibexecDir = canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR));
     nixBinDir = canonPath(getEnv("NIX_BIN_DIR", NIX_BIN_DIR));
 
+    string subs = getEnv("NIX_SUBSTITUTERS", "default");
+    if (subs == "default")
+        substituters.push_back(nixLibexecDir + "/nix/download-using-manifests.pl");
+    else
+        substituters = tokenizeString(subs, ":");
+
     /* Get some settings from the configuration file. */
     thisSystem = querySetting("system", SYSTEM);
     maxBuildJobs = queryIntSetting("build-max-jobs", 1);
@@ -320,7 +326,7 @@ int main(int argc, char * * argv)
                 "Try `%2% --help' for more information.")
             % e.what() % programId);
         return 1;
-    } catch (Error & e) {
+    } catch (BaseError & e) {
         printMsg(lvlError, format("error: %1%") % e.msg());
         return 1;
     } catch (std::exception & e) {

@@ -8,7 +8,8 @@ namespace nix {
 
 bool StoreAPI::hasSubstitutes(const Path & path)
 {
-    return !querySubstitutes(path).empty();
+    PathSet paths = querySubstitutablePaths();
+    return paths.find(path) != paths.end();
 }
 
 
@@ -127,6 +128,24 @@ Path computeStorePathForText(const string & suffix, const string & s,
         type += *i;
     }
     return makeStorePath(type, hash, suffix);
+}
+
+
+ValidPathInfo decodeValidPathInfo(std::istream & str)
+{
+    ValidPathInfo info;
+    getline(str, info.path);
+    if (str.eof()) { info.path = ""; return info; }
+    getline(str, info.deriver);
+    string s; int n;
+    getline(str, s);
+    if (!string2Int(s, n)) throw Error("number expected");
+    while (n--) {
+        getline(str, s);
+        info.references.insert(s);
+    }
+    if (!str || str.eof()) throw Error("missing input");
+    return info;
 }
 
 

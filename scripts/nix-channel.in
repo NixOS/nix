@@ -76,10 +76,6 @@ sub removeChannel {
 sub update {
     readChannels;
 
-    # Get rid of all the old substitutes.
-    system("@bindir@/nix-store", "--clear-substitutes") == 0
-        or die "cannot clear substitutes";
-
     # Remove all the old manifests.
     for my $manifest (glob "$stateDir/manifests/*.nixmanifest") {
         unlink $manifest or die "cannot remove `$manifest': $!";

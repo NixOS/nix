@@ -164,12 +164,6 @@ bool RemoteStore::isValidPath(const Path & path)
 }
 
 
-Substitutes RemoteStore::querySubstitutes(const Path & path)
-{
-    throw Error("not implemented 2");
-}
-
-
 bool RemoteStore::hasSubstitutes(const Path & path)
 {
     writeInt(wopHasSubstitutes, to);
@@ -218,6 +212,12 @@ Path RemoteStore::queryDeriver(const Path & path)
     writeString(path, to);
     processStderr();
     return readStorePath(from);
+}
+
+
+PathSet RemoteStore::querySubstitutablePaths()
+{
+    throw Error("not implemented");
 }
 
 
