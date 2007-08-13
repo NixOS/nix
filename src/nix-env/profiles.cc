@@ -93,8 +93,6 @@ Path createGeneration(Path profile, Path outPath)
     makeName(profile, num + 1, generation);
     addPermRoot(outPath, generation, false, true);
 
-	printMsg(lvlError, format("TEST3 '%1%' '%2%' --> '%3%'") % profile % outPath % generation);
-
     return generation;
 }
 

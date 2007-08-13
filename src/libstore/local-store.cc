@@ -1729,13 +1729,13 @@ bool querySolidStateReferencesTxn(const Transaction & txn, const Path & statePat
 	return notempty;
 }
 
-void setSharedStateTxn(const Transaction & txn, const Path & statePath, const Path & shared_with)
+void setSharedStateTxn(const Transaction & txn, const Path & fromExisting, const Path & toNew)
 {
 	//Remove earlier entries
-	nixDB.delPair(txn, dbSharedState, statePath);
+	nixDB.delPair(txn, dbSharedState, toNew);
 
 	//Set new entry
-	nixDB.setString(txn, dbSharedState, statePath, shared_with);
+	nixDB.setString(txn, dbSharedState, toNew, fromExisting);
 }
 
 bool querySharedStateTxn(const Transaction & txn, const Path & statePath, Path & shared_with)

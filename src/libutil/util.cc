@@ -1262,6 +1262,16 @@ string padd(const string & s, char c , unsigned int size, bool front)
 			ss = ss  + c;
 	}
 	return ss;
-} 
+}
+
+void sharePath(const Path & fromExisting, const Path & toNew)
+{
+	//Symlink link to the share path
+	Strings p_args;
+	p_args.push_back("-sf");
+	p_args.push_back(fromExisting);
+	p_args.push_back(toNew);
+	runProgram_AndPrintOutput("ln", true, p_args, "ln");	//run
+}
 
 }

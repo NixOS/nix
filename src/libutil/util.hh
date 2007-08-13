@@ -322,6 +322,8 @@ void ensureDirExists(const Path & path);
 
 string padd(const string & s, char c , unsigned int size, bool front = false);
 
+void sharePath(const Path & fromExisting, const Path & toNew);
+
 }
 
 #endif /* !__UTIL_H */

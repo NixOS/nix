@@ -1821,16 +1821,10 @@ void DerivationGoal::computeClosure()
 		if(sharedState != ""){
 			//Remove state path
 			deletePathWrapped(statePath);
-			
-			//Symlink link to the share path
-			Strings p_args;
-			p_args.push_back("-sf");
-			p_args.push_back(sharedState);
-			p_args.push_back(statePath);
-			runProgram_AndPrintOutput("ln", true, p_args, "ln");	//run
+			sharePath(sharedState, statePath);
 			
 			//Set in database
-			setSharedStateTxn(txn, statePath, sharedState);
+			setSharedStateTxn(txn, sharedState, statePath);
 		}
     }	    
     
@@ -2587,9 +2581,7 @@ void LocalStore::buildDerivations(const PathSet & drvPaths)
     Worker worker;
     Goals goals;
     for (PathSet::const_iterator i = drvPaths.begin(); i != drvPaths.end(); ++i){
-
-		printMsg(lvlError, format("BUILD: '%1%'") % *i);
-
+		//printMsg(lvlError, format("BUILD: '%1%'") % *i);
         goals.insert(worker.makeDerivationGoal(*i));
     }
 

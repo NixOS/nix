@@ -143,7 +143,9 @@ static bool getDerivation(EvalState & state, Expr e,
             drv.system = evalStringNoCtx(state, a);
 
         drv.attrs = attrs;
-
+        
+        //printMsg(lvlError, format("TEST '%1%'") % evalStringNoCtx(state, a) );
+        
         drv.attrPath = attrPath;
 
         drvs.push_back(drv);

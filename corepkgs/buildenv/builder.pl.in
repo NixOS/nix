@@ -20,6 +20,8 @@ my $srcDirSlashes = 3;
 sub createLinks {
     my $srcDir = shift;
     
+    #Lookup each $stateIdentifiers in $path_identifier
+    #we strip $srcDir to its rootdir e.g. /nix/store/......./
     my @srcDirParts = split /\// , $srcDir;
     my $srcDirRoot = ""; 
     my $srcDirCounter=1;
@@ -28,8 +30,8 @@ sub createLinks {
        $srcDirCounter++;
     }
 	#print "srcDirRoot $srcDirRoot \n";
-    
     my $pkgStateIdentifier = $path_identifier{$srcDirRoot};
+    
     my $dstDir = shift;
     my $ignoreCollisions = shift;
 
@@ -138,7 +140,6 @@ my %postponed;
 sub addPkg;
 sub addPkg {
     my $pkgDir = shift;
-    my $pkgStateIdentifier = shift;
     my $ignoreCollisions = shift;
 
     return if (defined $done{$pkgDir});
@@ -167,11 +168,12 @@ my $si_counter = 0;
 
 foreach my $pkgDir (@storePaths) {					#Commented the sort out
 
-	print "SP: $pkgDir \n";
+	#Link each $pkgDir to a $stateIdentifiers in $path_identifier
+	#print "SP: $pkgDir \n";
 	$path_identifier{$pkgDir} = $stateIdentifiers[$si_counter];
-	print "SI: $path_identifier{$pkgDir} \n";
+	#print "SI: $path_identifier{$pkgDir} \n";
 	
-    addPkg($pkgDir, $stateIdentifiers[$si_counter], 0);
+    addPkg($pkgDir, 0);
     $si_counter++;
 }
 
@@ -182,7 +184,7 @@ foreach my $pkgDir (@storePaths) {					#Commented the sort out
 # priority in case of collisions.
 while (scalar(keys %postponed) > 0) {
     
-    my @pkgDirs = keys %postponed;					# TODODODODODOD !!!!!!!!!!!!!!!!!!!!!
+    my @pkgDirs = keys %postponed;
     %postponed = ();
     foreach my $pkgDir (sort @pkgDirs) {			   
         addPkg($pkgDir, 1);

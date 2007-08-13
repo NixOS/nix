@@ -15,6 +15,7 @@
 #include "store-api.hh"
 #include "db.hh"
 #include "util.hh"
+#include "local-store.hh"
 
 #include <cerrno>
 #include <ctime>
@@ -189,14 +190,9 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
         		strictEvalExpr(state, i->attrs->get(toATerm("meta"))), makeNoPos()));
 
         manifest = ATinsert(manifest, makeAttrs(as));	//All DrvInfo's are inserted here
-        
-        /*ATermList ass = ATmakeList1(
-            makeBind(toATerm("stateIdentifier"), makeStr(i->queryStateIdentifier(state)), makeNoPos()) 
-            );*/
-        
+
+		//Insert the new stateIdentifier into the stateIdentifiers Atermlist   
         stateIdentifiers = ATinsert(stateIdentifiers, makeStr(i->queryStateIdentifier(state)));
-        
-        //printMsg(lvlError, format("TEST2 '%1%'") % makeAttrs(as));
         
         inputs = ATinsert(inputs, makeStr(i->queryOutPath(state)));
 
@@ -210,13 +206,7 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
         	references.insert(drvPath);
     }
     
-    //printMsg(lvlError, format("TEST '%1%'") % atPrint(canonicaliseExpr(makeList(ATreverse(manifest)))) );
-    //printMsg(lvlError, format("TEST2 '%1%'") % makeList(ATreverse(manifest)) );
-    //printMsg(lvlError, format("TEST2 '%1%'") % makeBind(toATerm("stateIdentifiers"), makeList(ATreverse(manifest)), makeNoPos()) );
-	printMsg(lvlError, format("TEST '%1%'") % atPrint(canonicaliseExpr(makeList(ATreverse(stateIdentifiers)))) );
-
-	/* Extract ... */
-	
+	//printMsg(lvlError, format("TEST '%1%'") % atPrint(canonicaliseExpr(makeList(ATreverse(stateIdentifiers)))) );
 
     /* Also write a copy of the list of inputs to the store; we need
        it for future modifications of the environment. */
@@ -233,24 +223,15 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
             makeStr(manifestFile, singleton<PathSet>(manifestFile)), makeNoPos())
         )));
 
-	//printMsg(lvlError, format("Write manifest '%1%'") % topLevel); 
-
     /* Instantiate it. */
     debug(format("evaluating builder expression `%1%'") % topLevel);
     DrvInfo topLevelDrv;
     if (!getDerivation(state, topLevel, topLevelDrv))
         abort();
 
-	printMsg(lvlError, format("TEST5 '%1%'") % topLevelDrv.queryStateIdentifier(state));
-	printMsg(lvlError, format("BUILD ENV DRV: '%1%'") % topLevelDrv.queryDrvPath(state) );
-	    
     /* Realise the resulting store expression. */
     debug(format("building user environment"));
-    store->buildDerivations(singleton<PathSet>(topLevelDrv.queryDrvPath(state)));					//HERE IS THE DRV !!!!!!!!!!!
-
-	//switch .....
-
-	printMsg(lvlError, format("TEST6"));
+    store->buildDerivations(singleton<PathSet>(topLevelDrv.queryDrvPath(state)));
 
     /* Switch the current user environment to the output path. */
     debug(format("switching to new user environment"));
@@ -342,10 +323,6 @@ static void queryInstSources(EvalState & state,
 {
     InstallSourceType type = instSource.type;
 	
-	for (Strings::const_iterator i = args.begin(); i != args.end(); ++i)
-		printMsg(lvlError, format("queryInstSources arg '%1%'") % *i);
-    printMsg(lvlError, format("queryInstSources TYPE '%1%'") % (type == srcUnknown));
-
     if (type == srcUnknown && args.size() > 0 && args.front()[0] == '/')
         type = srcStorePaths;
     
@@ -399,11 +376,7 @@ static void queryInstSources(EvalState & state,
             for (Strings::const_iterator i = args.begin();
                  i != args.end(); ++i)
             {
-                printMsg(lvlError, format("AAAAA333 %1%'") % *i);	
-                
                 assertStorePath(*i);
-
-				printMsg(lvlError, format("AAAAA444 %1%'") % *i);
 
                 DrvInfo elem;
                 elem.attrs = boost::shared_ptr<ATermMap>(new ATermMap(0)); 	/* ugh... */
@@ -421,12 +394,7 @@ static void queryInstSources(EvalState & state,
                         name = string(name, 0, name.size() - drvExtension.size());
                 }
                 else 
-                {
                 	elem.setOutPath(*i);
-                	
-                	//if(drv.stateOutputs.size() != 0)
-                    //	elem.setStateIdentifier(drv.stateOutputs.find("state")->second.stateIdentifier);
-                }
 
                 elem.name = name;
 
@@ -510,14 +478,14 @@ static void installDerivations(Globals & globals,
            path is not the one we want (e.g., `java-front' versus
            `java-front-0.9pre15899'). */
         
-        //printMsg(lvlError, format("New component to install DRV: '%1%'") % i->queryDrvPath(globals.state));
-        
-        //Set the state indentifier
-        if( store->isStateComponent(i->queryOutPath(globals.state)) )
+        //Set the state indentifier if it is a state-component
+        printMsg(lvlError, format("New component to install DRV: '%1%'") % i->queryDrvPath(globals.state));
+        Derivation drv = derivationFromPath(i->queryDrvPath(globals.state));
+        if(store->isStateDrv(drv))
         {
-        	Derivation drv = derivationFromPath(i->queryDrvPath(globals.state));
         	DerivationStateOutputs stateOutputs = drv.stateOutputs;
         	string stateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
+        	printMsg(lvlError, format("Add '%2%' with '%1%'") % stateIdentifier % i->queryOutPath(globals.state) );
         	if(stateIdentifier == "")
 	        	i->setStateIdentifier("__EMTPY__");
 	        else
@@ -535,19 +503,67 @@ static void installDerivations(Globals & globals,
     lockProfile(lock, profile);
     DrvInfos installedElems = queryInstalled(globals.state, profile);
 
+
+	StringPairs toBeShared;		//Mapping from old --> new statePath
+
     DrvInfos allElems(newElems);
     for (DrvInfos::iterator i = installedElems.begin(); i != installedElems.end(); ++i)
     {
         DrvName drvName(i->name);
         
-        //TODO !!!!!!!!!!!!!!!!!!!!!!!! SHARE (OR COPY) STATE HERE IF NEEDED
-        //if( newNames.find(drvName.name) != newNames.end() && identifier == identifier )
-        //{
-        
-        //}
-        
-        if (!globals.preserveInstalled && newNames.find(drvName.name) != newNames.end())						
-            printMsg(lvlInfo, format("replacing old `%1%'") % i->name);
+        if (!globals.preserveInstalled && newNames.find(drvName.name) != newNames.end()){						
+            
+	        //******** We're gonna check if the component and state indentifiers are the same, 
+	        //         since we may need to share state in that case.
+	        
+	        string oldStateIdentifier = i->queryStateIdentifier(globals.state);		//get the old stateIdentifier
+	        if(oldStateIdentifier != "__NOSTATE__")
+	        {
+        		//get the new stateIdentifier
+        		string newStateIdentifier;
+        		string newStatePath;
+        		string newSharedState;
+        		for (DrvInfos::iterator j = newElems.begin(); j != newElems.end(); ++j) {
+        			DrvName newDrvName(j->name);
+        			if(newDrvName.name == drvName.name){
+        				Derivation newDrv = derivationFromPath(j->queryDrvPath(globals.state));
+        				DerivationStateOutputs newStateOutputs = newDrv.stateOutputs;
+        				newStateIdentifier = newStateOutputs.find("state")->second.stateIdentifier;
+        				newStatePath = newDrv.stateOutputs.find("state")->second.statepath;
+        				newSharedState = newDrv.stateOutputs.find("state")->second.sharedState;
+        				break;
+        			}    			
+        		}	
+        		//printMsg(lvlError, format("old '%1%' new '%2%'") % oldStateIdentifier % newStateIdentifier);
+        		
+        		if(	newSharedState == "" 
+        			&&
+        			(oldStateIdentifier == newStateIdentifier
+        		   		|| (oldStateIdentifier == "__EMTPY__" && newStateIdentifier == "")) 
+        		   ){
+        			
+        			string oldStatePath;
+        			//query old state path
+        			PathSet derivers = queryDerivers(noTxn, i->queryOutPath(globals.state), newStateIdentifier, getCallingUserName());
+        			if(derivers.size() != 1)
+	    				throw Error(format("Internal Error: There is not exactly one deriver with state_identifier '%1%' for path '%2%'") 
+	    									% newStateIdentifier % i->queryOutPath(globals.state));
+        			Path oldDrvPath = *(derivers.begin());
+    				Derivation oldDrv = derivationFromPath(oldDrvPath);
+    				oldStatePath = oldDrv.stateOutputs.find("state")->second.statepath;
+    				
+        			//SharePaths
+        			printMsg(lvlError, format("Sharing state from old to new component '%1%' --> '%2%'") % newStatePath % oldStatePath);
+					toBeShared[oldStatePath] = newStatePath;
+	        	}
+        		else{	//If not equal, then we do not replace, so we push back (just like the else branch)  			
+        			printMsg(lvlError, format("Installing new state-component component '%1%' with identifier '%2%'") % drvName.name % oldStateIdentifier);
+        			allElems.push_back(*i);
+        		}
+	        }
+	        else
+	        	printMsg(lvlInfo, format("replacing old `%1%'") % i->name);
+        }
         else
             allElems.push_back(*i);
     }
@@ -562,6 +578,18 @@ static void installDerivations(Globals & globals,
 
     createUserEnv(globals.state, allElems,
         profile, globals.keepDerivations);
+    
+    //After all components have been built succesfully, share their state paths with the old ones    
+    for (StringPairs::iterator i = toBeShared.begin(); i != toBeShared.end(); ++i){
+
+		deletePathWrapped(i->second);		//Remove contents of current new state path
+		sharePath(i->first, i->second);		//Share new statepath to the old statepath
+		
+		//Set in database
+		setSharedStateTxn(noTxn, i->first, i->second);
+    }
+    
+    
 }
 
 
@@ -578,6 +606,7 @@ static void opInstall(Globals & globals,
 typedef enum { utLt, utLeq, utEq, utAlways } UpgradeType;
 
 
+//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 static void upgradeDerivations(Globals & globals,
     const Strings & args, UpgradeType upgradeType)
 {
