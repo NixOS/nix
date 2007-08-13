@@ -65,3 +65,7 @@ clearProfiles() {
     profiles="$NIX_STATE_DIR"/profiles
     rm -f $profiles/*
 }
+
+clearManifests() {
+    rm -f $NIX_STATE_DIR/manifests/*
+}

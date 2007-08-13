@@ -1,15 +1,19 @@
 source common.sh
 
-drvPath=$($nixinstantiate fallback.nix)
+clearStore
+
+drvPath=$($nixinstantiate simple.nix)
 echo "derivation is $drvPath"
 
 outPath=$($nixstore -q --fallback "$drvPath")
 echo "output path is $outPath"
 
-# Register a non-existant substitute
-(echo $outPath && echo "" && echo $TOP/no-such-program && echo 0 && echo 0) | $nixstore --register-substitutes
+# Build with a substitute that fails.  This should fail.
+export NIX_SUBSTITUTERS=$(pwd)/substituter2.sh
+if $nixstore -r "$drvPath"; then echo unexpected fallback; exit 1; fi
 
-# Build the derivation
+# Build with a substitute that fails.  This should fall back to a source build.
+export NIX_SUBSTITUTERS=$(pwd)/substituter2.sh
 $nixstore -r --fallback "$drvPath"
 
 text=$(cat "$outPath"/hello)

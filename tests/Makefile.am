@@ -2,14 +2,11 @@ TESTS_ENVIRONMENT = $(SHELL) -e
 
 extra1 = $(shell pwd)/test-tmp/shared
 
-simple.sh: simple.nix
+simple.sh substitutes.sh substitutes2.sh fallback.sh: simple.nix
 dependencies.sh gc.sh nix-push.sh nix-pull.in logging.sh nix-build.sh install-package.sh check-refs.sh: dependencies.nix
 locking.sh: locking.nix
 parallel.sh: parallel.nix
 build-hook.sh: build-hook.nix
-substitutes.sh: substitutes.nix
-substitutes2.sh: substitutes2.nix
-fallback.sh: fallback.nix
 gc-concurrent.sh: gc-concurrent.nix gc-concurrent2.nix
 user-envs.sh: user-envs.nix
 fixed.sh: fixed.nix
@@ -36,11 +33,9 @@ EXTRA_DIST = $(TESTS) \
   locking.nix.in locking.builder.sh \
   parallel.nix.in parallel.builder.sh \
   build-hook.nix.in build-hook.hook.sh \
-  substitutes.nix.in substituter.sh \
-  substitutes2.nix.in substituter2.sh \
+  substituter.sh substituter2.sh \
   gc-concurrent.nix.in gc-concurrent.builder.sh \
   gc-concurrent2.nix.in gc-concurrent2.builder.sh \
-  fallback.nix.in \
   user-envs.nix.in user-envs.builder.sh \
   fixed.nix.in fixed.builder1.sh fixed.builder2.sh \
   gc-runtime.nix.in \
