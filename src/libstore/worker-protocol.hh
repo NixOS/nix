@@ -10,9 +10,9 @@ namespace nix {
 
 
 typedef enum {
-    wopQuit,
+    wopQuit = 0,
     wopIsValidPath,
-    wopHasSubstitutes,
+    wopHasSubstitutes = 3,
     wopQueryPathHash,
     wopQueryReferences,
     wopQueryReferrers,
