@@ -22,6 +22,7 @@ ln -s $nixstore $NIX_BIN_DIR/
 ln -s $nixinstantiate $NIX_BIN_DIR/
 ln -s $nixhash $NIX_BIN_DIR/
 ln -s $nixenv $NIX_BIN_DIR/
+ln -s $nixworker $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-prefetch-url $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-collect-garbage $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-build $NIX_BIN_DIR/

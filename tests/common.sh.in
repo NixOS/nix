@@ -18,7 +18,9 @@ export NIX_LIBEXEC_DIR=$TEST_ROOT/bin
 export NIX_ROOT_FINDER=
 export SHARED=$TEST_ROOT/shared
 
-export NIX_REMOTE=
+if test -z "$FORCE_NIX_REMOTE"; then
+    export NIX_REMOTE=
+fi
 
 export REAL_BIN_DIR=@bindir@
 export REAL_LIBEXEC_DIR=@libexecdir@
@@ -45,6 +47,7 @@ export nixinstantiate=$TOP/src/nix-instantiate/nix-instantiate
 export nixstore=$TOP/src/nix-store/nix-store
 export nixenv=$TOP/src/nix-env/nix-env
 export nixhash=$TOP/src/nix-hash/nix-hash
+export nixworker=$TOP/src/nix-worker/nix-worker
 export nixbuild=$NIX_BIN_DIR/nix-build
 
 readLink() {
