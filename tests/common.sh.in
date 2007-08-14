@@ -2,7 +2,7 @@ set -e
 
 export TEST_ROOT=$(pwd)/test-tmp
 export NIX_STORE_DIR
-if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store); then
+if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
     # Maybe the build directory is symlinked.
     export NIX_IGNORE_SYMLINK_STORE=1
     NIX_STORE_DIR=$TEST_ROOT/store
