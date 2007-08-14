@@ -4,8 +4,6 @@ Usage: nix-state [OPTIONS...] [ARGUMENTS...]
 
 Operations:
 
-  --realise / -r: ensure path validity; if a derivation, ensure that validity of the outputs
-
   --version: output version information
   --help: display help
 

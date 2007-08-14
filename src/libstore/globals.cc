@@ -10,7 +10,6 @@ namespace nix {
 
 string nixStore = "/UNINIT";
 string nixStoreState = "/UNINIT";
-string nixStoreStateRepos = "/UNINIT";
 string nixDataDir = "/UNINIT";
 string nixLogDir = "/UNINIT";
 string nixStateDir = "/UNINIT";

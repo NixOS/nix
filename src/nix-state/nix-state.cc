@@ -13,6 +13,7 @@
 #include "derivations.hh"
 #include "references.hh"
 #include "store-state.hh"
+#include "config.h"
 
 using namespace nix;
 using std::cin;
@@ -46,8 +47,7 @@ void printHelp()
     cout << string((char *) helpText, sizeof helpText);
 }
 
-
-Derivation getDerivation(const string & fullPath, const string & program_args, string state_identifier, Path & componentPath, Path & statePath, 
+Derivation getDerivation(const string & fullPath, const Strings & program_args, string state_identifier, Path & componentPath, Path & statePath, 
 						 string & binary, string & derivationPath, bool isStateComponent,
 						 bool getDerivers, PathSet & derivers) 	//optional
 {
@@ -94,20 +94,26 @@ Derivation getDerivation(const string & fullPath, const string & program_args, s
 
 //Wrapper
 Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, 
-									   string & binary, string & derivationPath, bool isStateComponent, string & program_args,
+									   string & binary, string & derivationPath, bool isStateComponent, Strings & program_args,
 									   bool getDerivers, PathSet & derivers) 	//optional
 {
 	if (!opFlags.empty()) throw UsageError("unknown flag");
-    if ( opArgs.size() != 1 && opArgs.size() != 2 ) 
-    	throw UsageError("only one or two arguments allowed component path and program arguments (counts as one) ");
+    if ( opArgs.size() < 1) 
+    	throw UsageError("you must specify at least the component path (optional are the program arguments wrapped like this \"$@\")");
     	
-   
    	string fullPath = opArgs.front(); 
    	
     if(opArgs.size() > 1){
+		
 		opArgs.pop_front();
-		program_args = opArgs.front();
-		//Strings progam_args_strings = tokenizeString(program_args, " ");
+		for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); ++i){
+			string arg = *i;
+			if(arg == "\\--help" || arg == "\\--version")
+				arg = arg.substr(1, arg.length());
+			
+			//printMsg(lvlError, format("Args: %1%") % arg);
+			program_args.push_back(arg);			
+		}
     }
    
     return getDerivation(fullPath, program_args, stateIdentifier, componentPath, statePath, binary, derivationPath, isStateComponent, getDerivers, derivers);	
@@ -115,7 +121,7 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
 
 //Wrapper
 Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, 
-									  string & binary, string & derivationPath, bool & isStateComponent, string & program_args)
+									  string & binary, string & derivationPath, bool & isStateComponent, Strings & program_args)
 {
 	PathSet empty;
 	return getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args, false, empty);
@@ -130,7 +136,7 @@ static void opShowDerivations(Strings opFlags, Strings opArgs)
     PathSet derivers;
     string derivationPath;
     bool isStateComponent;
-    string program_args;
+    Strings program_args;
     Derivation drv = getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args, true, derivers);
 	
 	if(!isStateComponent)
@@ -149,7 +155,7 @@ static void opShowStatePath(Strings opFlags, Strings opArgs)
     string binary;
     string derivationPath;
     bool isStateComponent;
-    string program_args;
+    Strings program_args;
     Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
     
     if(!isStateComponent)
@@ -187,8 +193,15 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 	    string binary;
 	    string derivationPath;
 	    bool isStateComponent;
-	    string program_args;
+	    Strings program_args;
 	    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
+	}
+	
+	//Unshare if neccacary
+	Path nonSharedStatePath = toNonSharedPathTxn(noTxn, statePath);
+	if(nonSharedStatePath != statePath){
+		printMsg(lvlError, format("The statePath is shared with this path %1%") % nonSharedStatePath);
+		statePath = nonSharedStatePath;
 	}
 	
 	RevisionInfos revisions;
@@ -222,8 +235,6 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 		human_date.erase(human_date.find("\n",0),1);	//remove newline
 		string comment = revisions[rev].comment;
 		
-		
-		
 		if(trim(comment) != "")
 			printMsg(lvlError, format("Rev. %1% @ %2% (%3%) -- %4%") % rev_s % human_date % ts % comment);
 		else
@@ -238,7 +249,7 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
     string binary;
     string derivationPath;
     bool isStateComponent;
-    string program_args;
+    Strings program_args;
     Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
     
     bool recursive = revert_recursively;
@@ -462,10 +473,10 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     string root_binary;
 	string root_derivationPath;
 	bool root_isStateComponent;
-	string root_program_args;
+	Strings root_program_args;
     Derivation root_drv = getDerivation_andCheckArgs(opFlags, opArgs, root_componentPath, root_statePath, root_binary, root_derivationPath, root_isStateComponent, root_program_args);
     
-    printMsg(lvlError, format("compp: '%1%'\nstatep: '%2%'\nbinary: '%3%'\ndrv:'%4%'") % root_componentPath % root_statePath % root_binary % root_derivationPath);
+    //printMsg(lvlError, format("compp: '%1%'\nstatep: '%2%'\nbinary: '%3%'\ndrv:'%4%'") % root_componentPath % root_statePath % root_binary % root_derivationPath);
     
     //TODO
     //Check for locks ... ? or put locks on the neseccary state components
@@ -485,8 +496,20 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	if(!only_commit){
     	if( ! FileExist(root_componentPath + root_binary) )
     		throw Error(format("You must specify the full binary path: '%1%'") % (root_componentPath + root_binary));
-    		
-		executeShellCommand(root_componentPath + root_binary + " " + root_program_args);
+    	
+    	string root_args = "";
+    	for (Strings::iterator i = root_program_args.begin(); i != root_program_args.end(); ++i){
+    	
+    		if(*i == "--help")
+    			printMsg(lvlInfo, format("%1%\n------------------------------------------------------------") % helpText);
+    		if(*i == "--version")
+    			printMsg(lvlInfo, format("%1% (Nix) %2%\n------------------------------------------------------------") % programId % NIX_VERSION );
+    	
+    		root_args += " \"" + *i + "\"";
+    	}
+    	
+    	//printMsg(lvlError, format("Command: '%1%'")	% (root_componentPath + root_binary + root_args));
+		executeShellCommand(root_componentPath + root_binary + root_args);
 	}
   		
 	//******************* Scan for new references if neccecary
@@ -659,9 +682,19 @@ void run(Strings args)
 	printMsg(lvlError, format("NOW: '%1%'") % IsDirectory("/nix/store/65c7p6c8j0vy6b8fjgq84zziiavswqha-hellohardcodedstateworld-1.0/bin/hello") );
 	printMsg(lvlError, format("NOW: '%1%'") % FileExist("/nix/store/65c7p6c8j0vy6b8fjgq8") );
 	printMsg(lvlError, format("NOW: '%1%'") % IsDirectory("/nix/store/65c7p6c8j0vy6b8fjg") );
+
+	store = openStore();
 	
+	// /nix/state/g8vby0bjfrs85qpf1jfajrcrmlawn442-hellohardcodedstateworld-1.0-
+	// /nix/state/6l93ff3bn1mk61jbdd34diafmb4aq7c6-hellohardcodedstateworld-1.0-
+	// /nix/state/x8k4xiv8m4zmx26gmb0pyymmd6671fyy-hellohardcodedstateworld-1.0-
+	
+	PathSet p = getSharedWithPathSetRecTxn(noTxn, "/nix/state/6l93ff3bn1mk61jbdd34diafmb4aq7c6-hellohardcodedstateworld-1.0-");
+	for (PathSet::iterator j = p.begin(); j != p.end(); ++j)
+		printMsg(lvlError, format("P: '%1%'") % *j );
 	return;
-	*/
+
+	//	*/
 	
 	
 	
@@ -733,7 +766,8 @@ void run(Strings args)
         else
             opArgs.push_back(arg);
 
-        if (oldOp && oldOp != op)
+		//in the startscript u can have --run, but could do showrevisions
+        if (oldOp && oldOp != op && oldOp != opRunComponent)			
             throw UsageError("only one operation may be specified");
     }
     

@@ -658,7 +658,10 @@ void Database::setStateRevisions(const Transaction & txn, TableId revisions_tabl
 		//save the date and comments
 		Strings metadata;
 		metadata.push_back(int2String(ts));
-		if(statePath == rootStatePath)
+		
+		//get all paths that point to the same state (using shareing) and check if one of them equals the rootStatePath
+		PathSet sharedWith = getSharedWithPathSetRecTxn(txn, statePath);
+		if(statePath == rootStatePath || sharedWith.find(rootStatePath) != sharedWith.end())
 			metadata.push_back(comment);
 		else
 			metadata.push_back("Part of the snashot closure for " + rootStatePath);

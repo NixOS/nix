@@ -21,9 +21,6 @@ extern string nixLogDir;
 /* nixStoreState is the directory where the state dirs of the components are stored.  */
 extern string nixStoreState;
 
-/* nixStoreState is the directory where the repositorys of the state dirs of the components are stored.  */
-extern string nixStoreStateRepos;
-
 /* nixStateDir is the directory where state is stored. */
 extern string nixStateDir;
 

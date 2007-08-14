@@ -1776,6 +1776,48 @@ void setStateStateReferencesTxn(const Transaction & txn, const Path & statePath,
 	nixDB.setStateReferences(txn, dbStateStateReferences, dbStateRevisions, statePath, references, revision, timestamp);
 }
 
+//Lookups which statePaths directy share (point to) statePath
+PathSet getSharedWithPathSetTxn(const Transaction & txn, const Path & statePath)
+{
+	PathSet statePaths;
+
+	//enumtable
+	Strings keys;
+	nixDB.enumTable(txn, dbSharedState, keys);
+	
+	for (Strings::iterator i = keys.begin(); i != keys.end(); ++i){
+		Path shared_with;
+		nixDB.queryString(txn, dbSharedState, *i, shared_with);
+		if (shared_with == statePath)
+			statePaths.insert(*i);
+	}
+
+	return statePaths;
+}
+
+PathSet getSharedWithPathSetRecTxn_private(const Transaction & txn, const Path & statePath, PathSet & statePaths)
+{
+	//Get all paths pointing to statePath
+	PathSet newStatePaths = getSharedWithPathSetTxn(txn, statePath);
+	
+	//go into recursion to see if there are more paths indirectly pointing to statePath
+	for (PathSet::iterator i = newStatePaths.begin(); i != newStatePaths.end(); ++i)
+		//Only recurse on the really new statePaths to prevent infinite recursion
+		if(statePaths.find(*i) == statePaths.end()) 
+			statePaths = pathSets_union(statePaths, getSharedWithPathSetRecTxn_private(txn, *i, statePaths));
+	
+	return statePaths;
+}
+
+//Note: Also returns statePath in the PathSet 
+PathSet getSharedWithPathSetRecTxn(const Transaction & txn, const Path & statePath)
+{
+	//To no shared state path
+	Path statePath_ns = toNonSharedPathTxn(txn, statePath);
+	PathSet empty;
+	return getSharedWithPathSetRecTxn_private(txn, statePath_ns, empty);
+}	
+
 	
 /* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */
 static void upgradeStore07()

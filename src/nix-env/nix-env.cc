@@ -557,7 +557,7 @@ static void installDerivations(Globals & globals,
 					toBeShared[oldStatePath] = newStatePath;
 	        	}
         		else{	//If not equal, then we do not replace, so we push back (just like the else branch)  			
-        			printMsg(lvlError, format("Installing new state-component component '%1%' with identifier '%2%'") % drvName.name % oldStateIdentifier);
+        			printMsg(lvlError, format("Installing new state-component component '%1%' with identifier '%2%'") % drvName.name % newStateIdentifier);
         			allElems.push_back(*i);
         		}
 	        }

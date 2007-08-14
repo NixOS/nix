@@ -99,10 +99,15 @@ sub createLinks {
 		            print "STATELINK $srcFile to $dstFile \n";
 		            
 		            my $new_dstFile;
-		            if($pkgStateIdentifier eq "__EMTPY__")
-		            {	$new_dstFile = $dstFile;	}
-		            else
-		            {	$new_dstFile = "$dstFile-$pkgStateIdentifier";	}
+		            my $new_stateIdentifier;		            
+		            if($pkgStateIdentifier eq "__EMTPY__"){
+		            	$new_dstFile = $dstFile;
+		            	$new_stateIdentifier = "";
+		            }
+		            else{
+		            	$new_dstFile = "$dstFile-$pkgStateIdentifier";
+		            	$new_stateIdentifier = $pkgStateIdentifier;
+		            }
 		            
 		            if (-l $new_dstFile) {
 			            if (!$ignoreCollisions) {
@@ -111,9 +116,22 @@ sub createLinks {
 			            }
 			        }
 		            
+		            # if only my GF were this dirty ...
+		            # TODO ...
 		            sysopen (DSTFILEHANDLE, $new_dstFile, O_RDWR|O_EXCL|O_CREAT, 0755);
 					printf DSTFILEHANDLE "#! @shell@ \n";
-					printf DSTFILEHANDLE "/nixstate/nix/bin/nix-state --run --identifier=$pkgStateIdentifier \$* $srcFile \n";
+					printf DSTFILEHANDLE "args2=( ) \n";
+					printf DSTFILEHANDLE "for arg in \"\$@\" \n";
+					printf DSTFILEHANDLE "do \n";
+					printf DSTFILEHANDLE "  if [ \"\$arg\" = \"--help\" ]; then \n";
+					printf DSTFILEHANDLE "    args2=( \"\${args2[@]}\" \"\\--help\" ) \n";
+					printf DSTFILEHANDLE "  elif [ \"\$arg\" = \"--version\" ]; then \n";
+					printf DSTFILEHANDLE "    args2=( \"\${args2[@]}\" \"\\--version\" ) \n";
+					printf DSTFILEHANDLE "  else \n";
+					printf DSTFILEHANDLE "    args2=( \"\${args2[@]}\" \"\$arg\" ) \n";
+					printf DSTFILEHANDLE "  fi \n";
+					printf DSTFILEHANDLE "done \n";
+					printf DSTFILEHANDLE "/nixstate/nix/bin/nix-state --run --identifier=$new_stateIdentifier $srcFile \"\${args2[@]}\" \n";		#TODO !!!!!!!!!! fix hard link
 					close (DSTFILEHANDLE);
 	            }
             }
