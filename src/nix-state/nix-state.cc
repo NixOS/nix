@@ -44,7 +44,8 @@ bool revert_recursively = false;
 
 void printHelp()
 {
-    cout << string((char *) helpText, sizeof helpText);
+    printMsg(lvlInfo, format("%1%") % helpText);
+    //cout << string((char *) helpText, sizeof helpText);
 }
 
 Derivation getDerivation(const string & fullPath, const Strings & program_args, string state_identifier, Path & componentPath, Path & statePath, 
@@ -108,9 +109,6 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
 		opArgs.pop_front();
 		for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); ++i){
 			string arg = *i;
-			if(arg == "\\--help" || arg == "\\--version")
-				arg = arg.substr(1, arg.length());
-			
 			//printMsg(lvlError, format("Args: %1%") % arg);
 			program_args.push_back(arg);			
 		}
@@ -499,16 +497,13 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     	
     	string root_args = "";
     	for (Strings::iterator i = root_program_args.begin(); i != root_program_args.end(); ++i){
-    	
-    		if(*i == "--help")
-    			printMsg(lvlInfo, format("%1%\n------------------------------------------------------------") % helpText);
-    		if(*i == "--version")
-    			printMsg(lvlInfo, format("%1% (Nix) %2%\n------------------------------------------------------------") % programId % NIX_VERSION );
-    	
+    		if(*i == "--help" || *i == "--version")
+    			printMsg(lvlError, format("%1%") % padd("", '-', 100));
+    		//printMsg(lvlError, format("ARG %1%") % *i);
     		root_args += " \"" + *i + "\"";
     	}
     	
-    	//printMsg(lvlError, format("Command: '%1%'")	% (root_componentPath + root_binary + root_args));
+    	printMsg(lvlError, format("Command: '%1%'")	% (root_componentPath + root_binary + root_args));
 		executeShellCommand(root_componentPath + root_binary + root_args);
 	}
   		

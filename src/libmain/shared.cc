@@ -170,13 +170,15 @@ static void initAndRun(int argc, char * * argv)
             ; /* !!! obsolete - remove eventually */
         else if (arg == "--no-build-output" || arg == "-Q")
             buildVerbosity = lvlVomit;
+        
+        //we need to push back since arguments need to be passed on in the state wrapper script
         else if (arg == "--help") {
             printHelp();
-            return;
+            remaining.push_back(arg);
         }
         else if (arg == "--version") {
             std::cout << format("%1% (Nix) %2%") % programId % NIX_VERSION << std::endl;
-            return;
+            remaining.push_back(arg);
         }
         else if (arg == "--keep-failed" || arg == "-K")
             keepFailed = true;
