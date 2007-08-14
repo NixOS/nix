@@ -35,8 +35,9 @@ sub downloadFile {
     my $url = shift;
     $ENV{"PRINT_PATH"} = 1;
     $ENV{"QUIET"} = 1;
-    my ($dummy, $path) = `@bindir@/nix-prefetch-url '$url'`;
+    my ($dummy, $path) = `$binDir/nix-prefetch-url '$url'`;
     chomp $path;
+    die "nix-prefetch-url did not return a path" unless defined $path;
     return $path;
 }
 
