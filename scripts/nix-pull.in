@@ -36,8 +36,9 @@ sub downloadFile {
     $ENV{"PRINT_PATH"} = 1;
     $ENV{"QUIET"} = 1;
     my ($dummy, $path) = `$binDir/nix-prefetch-url '$url'`;
-    chomp $path;
+    die "cannot fetch `$url'" if $? != 0;
     die "nix-prefetch-url did not return a path" unless defined $path;
+    chomp $path;
     return $path;
 }
 
@@ -70,7 +71,7 @@ sub processURL {
     }
     
     if (readManifest($manifest, \%narFiles, \%localPaths, \%patches) < 3) {
-        die "manifest `$url' is too old (i.e., for Nix <= 0.7)\n";
+        die "`$url' is not manifest or it is too old (i.e., for Nix <= 0.7)\n";
     }
 
     if ($skipWrongStore) {

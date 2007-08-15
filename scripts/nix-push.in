@@ -265,7 +265,7 @@ print STDERR "uploading manifest...\n";
 if ($localCopy) {
     copyFile $manifest, $localManifestFile;
 } else {
-    system("$curl  --show-error --upload-file " .
+    system("$curl --show-error --upload-file " .
            "'$manifest' '$manifestPutURL' > /dev/null") == 0 or
            die "curl failed on $manifest: $?";
 }
