@@ -1,6 +1,6 @@
 pkglib_LTLIBRARIES = libext3cow.la
 
-libext3cow_la_SOURCES = epoch2date.c snapshot.cc tt.c ext3cow_tools.h
+libext3cow_la_SOURCES = epoch2date.c snapshot.cc tt.c ext3cow_tools.h ext3cow_fs.h
 
 pkginclude_HEADERS = snapshot.hh
 

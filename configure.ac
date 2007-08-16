@@ -169,11 +169,6 @@ AC_ARG_WITH(store-state-dir, AC_HELP_STRING([--with-store-state-dir=PATH],
   storestatedir=$withval, storestatedir='${prefix}/state')
 AC_SUBST(storestatedir)
 
-AC_ARG_WITH(store-state-repos-dir, AC_HELP_STRING([--with-store-state-repos-dir=PATH],
-  [path of the Nix state store repository]),
-  storestatereposdir=$withval, storestatereposdir='${prefix}/staterepos')
-AC_SUBST(storestatereposdir)
-
 AC_ARG_WITH(bdb, AC_HELP_STRING([--with-bdb=PATH],
   [prefix of Berkeley DB]),
   bdb=$withval, bdb=)
@@ -188,11 +183,11 @@ fi
 AC_SUBST(bdb_lib)
 AC_SUBST(bdb_include)
 
-NEED_PROG(svn, svn)
-AC_ARG_WITH(svn-bin, AC_HELP_STRING([--with-svn-bin=PATH],
-  [path of svn, svnadmin]),
-  subversion=$withval, subversion=$(dirname $svn))
-AC_SUBST(subversion)
+AC_ARG_WITH(ext3cow-header, AC_HELP_STRING([--with-ext3cow-header=PATH],
+  [path of the header ext3cow header ext3cow_fs.h]),
+  ext3cowheader=$withval, ext3cowheader=)
+AC_SUBST(ext3cowheader)
+AC_CHECK_HEADER(${ext3cowheader})
 
 AC_ARG_WITH(aterm, AC_HELP_STRING([--with-aterm=PATH],
   [prefix of CWI ATerm library]),

@@ -212,7 +212,7 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
        it for future modifications of the environment. */
     Path manifestFile = store->addTextToStore("env-manifest", atPrint(canonicaliseExpr(makeList(ATreverse(manifest)))), references);
 
-    Expr topLevel = makeCall(envBuilder, makeAttrs(ATmakeList4(
+    Expr topLevel = makeCall(envBuilder, makeAttrs(ATmakeList6(
         makeBind(toATerm("system"),
             makeStr(thisSystem), makeNoPos()),
         makeBind(toATerm("derivations"),
@@ -220,7 +220,11 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
         makeBind(toATerm("stateIdentifiers"),
             makeList(ATreverse(stateIdentifiers)), makeNoPos()),
         makeBind(toATerm("manifest"),
-            makeStr(manifestFile, singleton<PathSet>(manifestFile)), makeNoPos())
+            makeStr(manifestFile, singleton<PathSet>(manifestFile)), makeNoPos()),
+        makeBind(toATerm("nixBinDir"),
+            makeStr(nixBinDir), makeNoPos()),
+        makeBind(toATerm("nixStore"),
+            makeStr(nixStore), makeNoPos())
         )));
 
     /* Instantiate it. */

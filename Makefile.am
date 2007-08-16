@@ -46,8 +46,14 @@ else
 init-state:
 endif
 
+init-ext3cow-header-hack:
+	@echo "Symlinking ext3cow header file into src"
+	ln -sf $(ext3cowheader) src/libext3cow/
+
 svn-revision:
 	svnversion . > svn-revision
+
+all: init-ext3cow-header-hack
 
 all-local: NEWS
 

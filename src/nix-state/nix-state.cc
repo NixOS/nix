@@ -481,9 +481,6 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     //WARNING: we need to watch out for deadlocks!
 	//add locks ... ?
 	//svn lock ... ?
-
-    //TODO maybe also scan the parameters for state or component hashes?
-    //program_args
 	
 	//TODO
 	Transaction txn;
@@ -501,6 +498,9 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     			printMsg(lvlError, format("%1%") % padd("", '-', 100));
     		//printMsg(lvlError, format("ARG %1%") % *i);
     		root_args += " \"" + *i + "\"";
+    		
+    		//TODO also scan the parameters for state or component hashes?
+    		//program_args
     	}
     	
     	printMsg(lvlError, format("Command: '%1%'")	% (root_componentPath + root_binary + root_args));
@@ -689,9 +689,10 @@ void run(Strings args)
 		printMsg(lvlError, format("P: '%1%'") % *j );
 	return;
 
-	//	*/
-	
-	
+	printMsg(lvlError, format("header: '%1%'") % nixExt3CowHeader);
+	return;
+
+	*/		
 	
 	/* test */
 	

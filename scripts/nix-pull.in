@@ -24,11 +24,8 @@ $storeDir = "@storedir@" unless defined $storeDir;
 my $storeStateDir = $ENV{"NIX_STORE_STATE_DIR"};
 $storeStateDir = "@storestatedir@" unless defined $storeStateDir;
 
-my $storeStateReposDir = $ENV{"NIX_STORE_STATE_REPOS_DIR"};
-$storeStateReposDir = "@storestatereposdir@" unless defined $storeStateReposDir;
-
-my $subversion = $ENV{"NIX_SVN_BIN_DIR"};
-$subversion = "@subversion@" unless defined $subversion;
+my $ext3cowheader = $ENV{"NIX_EXT3_COW_HEADER"};
+$ext3cowheader = "@ext3cowheader@" unless defined $ext3cowheader;
 
 # Prevent access problems in shared-stored installations.
 umask 0022;

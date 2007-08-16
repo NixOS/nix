@@ -1,4 +1,4 @@
-{system, derivations, stateIdentifiers, manifest}:
+{system, derivations, stateIdentifiers, manifest, nixBinDir, nixStore}:
 
 derivation { 
   name = "user-environment";
@@ -7,4 +7,5 @@ derivation {
   derivations = derivations;
   stateIdentifiers = stateIdentifiers;
   manifest = manifest;
+  inherit nixBinDir nixStore;
 }

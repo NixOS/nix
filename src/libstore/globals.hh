@@ -27,8 +27,8 @@ extern string nixStateDir;
 /* nixDBPath is the path name of our Berkeley DB environment. */
 extern string nixDBPath;
 
-/* nixSVNPath is the path name of our SVN environment. */
-extern string nixSVNPath;
+/* nixExt3CowHeader is the header file used to communicate with ext3cow. */
+extern string nixExt3CowHeader;
 
 /* nixConfDir is the directory where configuration files are
    stored. */
