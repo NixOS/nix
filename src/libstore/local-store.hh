@@ -244,6 +244,8 @@ PathSet toNonSharedPathSetTxn(const Transaction & txn, const PathSet & statePath
 Path toNonSharedPathTxn(const Transaction & txn, const Path & statePath);
 PathSet getSharedWithPathSetRecTxn(const Transaction & txn, const Path & statePath);
 
+void ensurePathTxn(const Transaction & txn, const Path & path);
+
 }
 
 

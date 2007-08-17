@@ -6,6 +6,7 @@
 #include "db.hh"
 #include "util.hh"
 #include "store-state.hh"
+#include "build.hh"
 
 #include <map>
 #include <iostream>
@@ -770,7 +771,7 @@ void DerivationGoal::haveDerivation()
     assert(store->isValidPath(drvPath));
 
     /* Get the derivation. */
-    drv = derivationFromPath(drvPath);								
+    drv = derivationFromPathTxn(noTxn, drvPath);								
 
     for (DerivationOutputs::iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
@@ -1319,7 +1320,7 @@ bool DerivationGoal::prepareBuild()
            `*i' as input paths.  Only add the closures of output paths
            that are specified as inputs. */
         assert(store->isValidPath(i->first));
-        Derivation inDrv = derivationFromPath(i->first);
+        Derivation inDrv = derivationFromPathTxn(noTxn, i->first);
         for (StringSet::iterator j = i->second.begin(); j != i->second.end(); ++j)
             if (inDrv.outputs.find(*j) != inDrv.outputs.end()){
                 computeFSClosure(inDrv.outputs[*j].path, inputPaths, true, false, -1);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE (done?)
@@ -2600,10 +2601,12 @@ void LocalStore::buildDerivations(const PathSet & drvPaths)
 }
 
 
-void LocalStore::ensurePath(const Path & path)
+void ensurePathTxn(const Transaction & txn, const Path & path)
 {
     /* If the path is already valid, we're done. */
-    if (store->isValidPath(path)) return;
+    
+    if (isValidPathTxn(txn, path)) 
+    	return;
 
     Worker worker;
     GoalPtr goal = worker.makeSubstitutionGoal(path);
@@ -2613,6 +2616,11 @@ void LocalStore::ensurePath(const Path & path)
 
     if (goal->getExitCode() != Goal::ecSuccess)
         throw Error(format("path `%1%' does not exist and cannot be created") % path);
+}
+
+void LocalStore::ensurePath(const Path & path)
+{
+	ensurePathTxn(noTxn, path);
 }
 
  

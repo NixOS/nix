@@ -489,7 +489,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
         for (PathSet::iterator i = livePaths.begin();
              i != livePaths.end(); ++i)
             if (isDerivation(*i)) {
-                Derivation drv = derivationFromPath(*i);
+                Derivation drv = derivationFromPathTxn(noTxn, *i);
                 for (DerivationOutputs::iterator j = drv.outputs.begin();
                      j != drv.outputs.end(); ++j)
                     if (store->isValidPath(j->second.path))

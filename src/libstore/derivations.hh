@@ -49,7 +49,7 @@ struct DerivationStateOutput
     string commitBinaries;				//TODO list of binaries that need (or not) to be committed when these binaries are called
          
     string createDirsBeforeInstall;		//if true: creates state dirs before installation
-	string runtimeStateParamters;		//if not empty: these are the runtime parameters where state can be found (you can use $statepath here)
+	string runtimeStateArgs;			//if not empty: these are the runtime parameters where state can be found (you can use $statepath here)
     
     string username;	
     
@@ -60,7 +60,7 @@ struct DerivationStateOutput
     }
     
     //TODO add const ??
-    DerivationStateOutput(Path statepath, string componentHash, string hashAlgo, string hash, string stateIdentifier, string enabled, string shareType, string synchronization, string createDirsBeforeInstall, string runtimeStateParamters, string username, string sharedState, bool check=true)
+    DerivationStateOutput(Path statepath, string componentHash, string hashAlgo, string hash, string stateIdentifier, string enabled, string shareType, string synchronization, string createDirsBeforeInstall, string runtimeStateArgs, string username, string sharedState, bool check=true)
     {
         if(check){
 	        if(shareType != "none" && shareType != "full" && shareType != "group")
@@ -71,6 +71,10 @@ struct DerivationStateOutput
 	        	throw Error(format("Username cannot be empty"));
 	        if(stateIdentifier == "__EMTPY__" || stateIdentifier == "__NOSTATE__")
 	        	throw Error(format("the stateIdenfier cannot be this value '%1%'") % stateIdentifier);
+	        if(runtimeStateArgs == "__NOARGS__")
+	        	throw Error(format("the runtimeStateArgs cannot be this value '%1%'") % runtimeStateArgs);
+	        
+	        
         }
         
         //TODO
@@ -86,7 +90,7 @@ struct DerivationStateOutput
         this->shareType = shareType;
         this->synchronization = synchronization;
         this->createDirsBeforeInstall = createDirsBeforeInstall;
-        this->runtimeStateParamters = runtimeStateParamters;
+        this->runtimeStateArgs = runtimeStateArgs;
         this->username = username;
         this->sharedState = sharedState;
     }
@@ -112,7 +116,7 @@ struct DerivationStateOutput
         this->shareType = "";
         this->synchronization = "";
         this->createDirsBeforeInstall = "";
-        this->runtimeStateParamters = "";
+        this->runtimeStateArgs = "";
         //this->username;						//Changes the statepath directly
         this->sharedState = "";
          

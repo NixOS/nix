@@ -162,6 +162,7 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
     ATermList manifest = ATempty;
     ATermList inputs = ATempty;
     ATermList stateIdentifiers = ATempty; 
+    ATermList runtimeStateArgs = ATempty;
     for (DrvInfos::const_iterator i = elems.begin(); 
          i != elems.end(); ++i)
     {
@@ -193,6 +194,8 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
 
 		//Insert the new stateIdentifier into the stateIdentifiers Atermlist   
         stateIdentifiers = ATinsert(stateIdentifiers, makeStr(i->queryStateIdentifier(state)));
+        //Insert the new runtime state args into the runtimeStateArgs Atermlist   
+        runtimeStateArgs = ATinsert(runtimeStateArgs, makeStr(i->queryRuntimeStateArgs(state)));
         
         inputs = ATinsert(inputs, makeStr(i->queryOutPath(state)));
 
@@ -207,25 +210,34 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
     }
     
 	//printMsg(lvlError, format("TEST '%1%'") % atPrint(canonicaliseExpr(makeList(ATreverse(stateIdentifiers)))) );
+	//printMsg(lvlError, format("TEST '%1%'") % atPrint(canonicaliseExpr(makeList(ATreverse(runtimeStateArgs)))) );
 
     /* Also write a copy of the list of inputs to the store; we need
        it for future modifications of the environment. */
     Path manifestFile = store->addTextToStore("env-manifest", atPrint(canonicaliseExpr(makeList(ATreverse(manifest)))), references);
 
-    Expr topLevel = makeCall(envBuilder, makeAttrs(ATmakeList6(
-        makeBind(toATerm("system"),
-            makeStr(thisSystem), makeNoPos()),
-        makeBind(toATerm("derivations"),
-            makeList(ATreverse(manifest)), makeNoPos()),
-        makeBind(toATerm("stateIdentifiers"),
-            makeList(ATreverse(stateIdentifiers)), makeNoPos()),
-        makeBind(toATerm("manifest"),
-            makeStr(manifestFile, singleton<PathSet>(manifestFile)), makeNoPos()),
-        makeBind(toATerm("nixBinDir"),
-            makeStr(nixBinDir), makeNoPos()),
+    Expr topLevel = makeCall(envBuilder, makeAttrs(
+    
+    	ATinsert(    	
+    	ATmakeList6(
+	        makeBind(toATerm("system"),
+	            makeStr(thisSystem), makeNoPos()),
+	        makeBind(toATerm("derivations"),
+	            makeList(ATreverse(manifest)), makeNoPos()),
+	        makeBind(toATerm("stateIdentifiers"),
+	            makeList(ATreverse(stateIdentifiers)), makeNoPos()),
+	        makeBind(toATerm("runtimeStateArgs"),
+	            makeList(ATreverse(runtimeStateArgs)), makeNoPos()),
+	        makeBind(toATerm("manifest"),
+	            makeStr(manifestFile, singleton<PathSet>(manifestFile)), makeNoPos()),
+	        makeBind(toATerm("nixBinDir"),
+	            makeStr(nixBinDir), makeNoPos()) )
+        ,
         makeBind(toATerm("nixStore"),
             makeStr(nixStore), makeNoPos())
-        )));
+        )
+        
+        ));
 
     /* Instantiate it. */
     debug(format("evaluating builder expression `%1%'") % topLevel);
@@ -391,7 +403,7 @@ static void queryInstSources(EvalState & state,
 
                 if (isDerivation(*i)) {
                     elem.setDrvPath(*i);
-                    elem.setOutPath(findOutput(derivationFromPath(*i), "out"));
+                    elem.setOutPath(findOutput(derivationFromPathTxn(noTxn, *i), "out"));
                     
                     if (name.size() >= drvExtension.size() &&
                         string(name, name.size() - drvExtension.size()) == drvExtension)
@@ -484,7 +496,7 @@ static void installDerivations(Globals & globals,
         
         //Set the state indentifier if it is a state-component
         printMsg(lvlError, format("New component to install DRV: '%1%'") % i->queryDrvPath(globals.state));
-        Derivation drv = derivationFromPath(i->queryDrvPath(globals.state));
+        Derivation drv = derivationFromPathTxn(noTxn, i->queryDrvPath(globals.state));
         if(store->isStateDrv(drv))
         {
         	DerivationStateOutputs stateOutputs = drv.stateOutputs;
@@ -515,6 +527,7 @@ static void installDerivations(Globals & globals,
     {
         DrvName drvName(i->name);
         
+        //We may need to share state
         if (!globals.preserveInstalled && newNames.find(drvName.name) != newNames.end()){						
             
 	        //******** We're gonna check if the component and state indentifiers are the same, 
@@ -530,7 +543,7 @@ static void installDerivations(Globals & globals,
         		for (DrvInfos::iterator j = newElems.begin(); j != newElems.end(); ++j) {
         			DrvName newDrvName(j->name);
         			if(newDrvName.name == drvName.name){
-        				Derivation newDrv = derivationFromPath(j->queryDrvPath(globals.state));
+        				Derivation newDrv = derivationFromPathTxn(noTxn, j->queryDrvPath(globals.state));
         				DerivationStateOutputs newStateOutputs = newDrv.stateOutputs;
         				newStateIdentifier = newStateOutputs.find("state")->second.stateIdentifier;
         				newStatePath = newDrv.stateOutputs.find("state")->second.statepath;
@@ -540,6 +553,8 @@ static void installDerivations(Globals & globals,
         		}	
         		//printMsg(lvlError, format("old '%1%' new '%2%'") % oldStateIdentifier % newStateIdentifier);
         		
+        		//if it doesnt need to share state with some other component
+        		//&& the identifiers are equal
         		if(	newSharedState == "" 
         			&&
         			(oldStateIdentifier == newStateIdentifier
@@ -553,7 +568,7 @@ static void installDerivations(Globals & globals,
 	    				throw Error(format("Internal Error: There is not exactly one deriver with state_identifier '%1%' for path '%2%'") 
 	    									% newStateIdentifier % i->queryOutPath(globals.state));
         			Path oldDrvPath = *(derivers.begin());
-    				Derivation oldDrv = derivationFromPath(oldDrvPath);
+    				Derivation oldDrv = derivationFromPathTxn(noTxn, oldDrvPath);
     				oldStatePath = oldDrv.stateOutputs.find("state")->second.statepath;
     				
         			//SharePaths

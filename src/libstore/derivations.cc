@@ -66,8 +66,8 @@ void throwBadDrv(ATerm t)
 Derivation parseDerivation(ATerm t)
 {
     Derivation drv;
-    ATermList outs, solidStateDeps, inDrvs, inSrcs, args, bnds;
-    ATermList stateOuts = ATempty, stateOutDirs = ATempty;
+    ATermList outs, inDrvs, inSrcs, args, bnds;
+    ATermList stateOuts = ATempty, stateOutDirs = ATempty, solidStateDeps = ATempty;
     
     ATerm builder, platform;
 
@@ -93,8 +93,8 @@ Derivation parseDerivation(ATerm t)
     {
 	    //parse state part
 	    for (ATermIterator i(stateOuts); i; ++i) {
-	        ATerm id, statepath, componentHash, hashAlgo, hash, stateIdentifier, enabled, shareType, synchronization, createDirsBeforeInstall, runtimeStateParamters, username, sharedState;
-	        if (!matchDerivationStateOutput(*i, id, statepath, componentHash, hashAlgo, hash, stateIdentifier, enabled, shareType, synchronization, createDirsBeforeInstall, runtimeStateParamters, username, sharedState))
+	        ATerm id, statepath, componentHash, hashAlgo, hash, stateIdentifier, enabled, shareType, synchronization, createDirsBeforeInstall, runtimeStateArgs, username, sharedState;
+	        if (!matchDerivationStateOutput(*i, id, statepath, componentHash, hashAlgo, hash, stateIdentifier, enabled, shareType, synchronization, createDirsBeforeInstall, runtimeStateArgs, username, sharedState))
 	            throwBadDrv(t);
 	        DerivationStateOutput stateOut;
 	        stateOut.statepath = aterm2String(statepath);
@@ -107,7 +107,7 @@ Derivation parseDerivation(ATerm t)
 	        stateOut.shareType = aterm2String(shareType);
 	        stateOut.synchronization = aterm2String(synchronization);
 	        stateOut.createDirsBeforeInstall = aterm2String(createDirsBeforeInstall);
-	        stateOut.runtimeStateParamters = aterm2String(runtimeStateParamters);
+	        stateOut.runtimeStateArgs = aterm2String(runtimeStateArgs);
 	        stateOut.username = aterm2String(username);
 	        stateOut.sharedState = aterm2String(sharedState);  
 	        drv.stateOutputs[aterm2String(id)] = stateOut;
@@ -199,7 +199,7 @@ ATerm unparseDerivation(const Derivation & drv)
                 toATerm(i->second.shareType),
                 toATerm(i->second.synchronization),
                 toATerm(i->second.createDirsBeforeInstall),
-                toATerm(i->second.runtimeStateParamters),
+                toATerm(i->second.runtimeStateArgs),
                 toATerm(i->second.username),
                 toATerm(i->second.sharedState)
                 ));

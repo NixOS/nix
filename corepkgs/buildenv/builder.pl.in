@@ -10,9 +10,12 @@ STDOUT->autoflush(1);
 my $out = $ENV{"out"};
 mkdir "$out", 0755 || die "error creating $out";
 
+sub readlink_or_StateWrapper;
 
 my $symlinks = 0;
-my %path_identifier;
+my %path_state_identifier;
+my %path_runtimeArgs;
+
 
 my $nixBinDir = $ENV{"nixBinDir"};
 my $nixStore = $ENV{"nixStore"};
@@ -22,12 +25,13 @@ my $nixStore = $ENV{"nixStore"};
 sub createLinks {
     my $srcDir = shift;
     
-    #Lookup each $stateIdentifiers in $path_identifier
+    #Lookup each $stateIdentifiers in $path_state_identifier
     #we strip $srcDir to its rootdir e.g. /nix/store/......./
     my @srcDirParts = split /\// , substr($srcDir, length ($nixStore), length ($srcDir));
     my $srcDirRoot = $nixStore . "/" . $srcDirParts[1];
 	# print "srcDirRoot $srcDirRoot \n";
-    my $pkgStateIdentifier = $path_identifier{$srcDirRoot};
+    my $pkgStateIdentifier = $path_state_identifier{$srcDirRoot};
+    my $pkgRuntimeStateArgs = $path_runtimeArgs{$srcDirRoot};
     
     my $dstDir = shift;
     my $ignoreCollisions = shift;
@@ -93,7 +97,7 @@ sub createLinks {
 	            
 	            if( $parentDir eq "bin" || $parentDir eq "sbin"){		#hacky....
 		            
-		            print "STATELINK $srcFile to $dstFile \n";
+		            print "STATELINK $srcFile to $dstFile - $pkgStateIdentifier \n";
 		            
 		            my $new_dstFile;
 		            my $new_stateIdentifier;		            
@@ -106,23 +110,29 @@ sub createLinks {
 		            	$new_stateIdentifier = $pkgStateIdentifier;
 		            }
 		            
-		            if (-l $new_dstFile) {
+		            # We also check with -e if the wrapperscript-file exists, and if is it a symlink (with -l)
+		            if (-l $new_dstFile || -e $new_dstFile) {
 			            if (!$ignoreCollisions) {
-			                my $target = readlink $new_dstFile;
-			                die "(state) collission between `$srcFile' and `$target'";
+			                my $target = readlink_or_StateWrapper $new_dstFile;
+			                die "(state) collission between `$srcFile' and `$target' (over $new_dstFile)";
 			            }
 			        }
 		            
 		            sysopen (DSTFILEHANDLE, $new_dstFile, O_RDWR|O_EXCL|O_CREAT, 0755);
 					printf DSTFILEHANDLE "#! @shell@ \n";
-					printf DSTFILEHANDLE "$nixBinDir/nix-state --run --identifier=$new_stateIdentifier $srcFile \"\$@\" \n";
+					
+					if($pkgRuntimeStateArgs eq "__NOARGS__")
+					{ printf DSTFILEHANDLE "$nixBinDir/nix-state --run --identifier=$new_stateIdentifier $srcFile \"\$@\" \n"; }
+					else
+					{ printf DSTFILEHANDLE "$nixBinDir/nix-state --run --identifier=$new_stateIdentifier $srcFile \"\$@\" $pkgRuntimeStateArgs \n"; }	# TODO, maybe first R.T.A. then other args ?
+					
 					close (DSTFILEHANDLE);
 	            }
             }
             else{
-	            if (-l $dstFile) {
+	            if (-l $dstFile || -e $dstFile) {
 		            if (!$ignoreCollisions) {
-		                my $target = readlink $dstFile;
+		                my $target = readlink_or_StateWrapper $dstFile;
 		                die "collission between `$srcFile' and `$target'";
 		            }
 		        }
@@ -162,18 +172,37 @@ sub addPkg {
     }
 }
 
+sub readlink_or_StateWrapper {
+
+	my $src = shift;
+	my $target;
+
+    if (-l $src)
+    {   $target = readlink $src;    }
+    else{
+    	open(DAT, $src) || die("Could not open file!");
+        my @raw_data=<DAT>;
+        close(DAT);
+        $target = $raw_data[1];
+    }
+    return $target
+}
 
 # Symlink to the packages that have been installed explicitly by the user.
 my @storePaths = split ' ', $ENV{"derivations"};
 my @stateIdentifiers = split ' ', $ENV{"stateIdentifiers"};
+my @runtimeStateArgs = split ' ', $ENV{"runtimeStateArgs_arg"};
 my $si_counter = 0;
 
 foreach my $pkgDir (@storePaths) {					#Commented the sort out
 
-	#Link each $pkgDir to a $stateIdentifiers in $path_identifier
-	#print "SP: $pkgDir \n";
-	$path_identifier{$pkgDir} = $stateIdentifiers[$si_counter];
-	#print "SI: $path_identifier{$pkgDir} \n";
+	#Link each $pkgDir to a $stateIdentifiers in $path_state_identifier
+	$path_state_identifier{$pkgDir} = $stateIdentifiers[$si_counter];
+	$path_runtimeArgs{$pkgDir} = $runtimeStateArgs[$si_counter];
+
+	# print "SP: $pkgDir \n";
+	# print "SI: $path_state_identifier{$pkgDir} \n";
+	# print "RT: $path_runtimeArgs{$pkgDir} \n";	
 	
     addPkg($pkgDir, 0);
     $si_counter++;
@@ -193,8 +222,6 @@ while (scalar(keys %postponed) > 0) {
     }
 }
 
-
 print STDERR "created $symlinks symlinks in user environment\n";
-
 
 symlink($ENV{"manifest"}, "$out/manifest") or die "cannot create manifest";

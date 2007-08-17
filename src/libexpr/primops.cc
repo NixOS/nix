@@ -347,7 +347,7 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
 	    
 	    DerivationStateOutput drvso = drv.stateOutputs["state"];
 	    
-	    if(drvso.runtimeStateParamters != ""){		//Has runtime parameters		-->  Clear all state parameters
+	    if(drvso.runtimeStateArgs != ""){		//Has runtime parameters		-->  Clear all state parameters
 			drv.stateOutputs.clear();
 			drv.stateOutputDirs.clear();
 			drv.env["statePath"] = "";
@@ -365,7 +365,7 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
     {
         Hash h = state.drvHashes[i->first];
         if (h.type == htUnknown) {
-            Derivation drv2 = derivationFromPath(i->first);
+            Derivation drv2 = derivationFromPathTxn(noTxn, i->first);
             h = hashDerivationModulo(state, drv2);
             state.drvHashes[i->first] = h;
         }
@@ -421,7 +421,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     string syncState = "none";
     string stateIdentifier = "";
     bool createDirsBeforeInstall = false;
-    string runtimeStateParamters = "";
+    string runtimeStateArgs = "";
     string sharedState = "";
     vector<DerivationStateOutputDir> stateDirs;
 
@@ -526,7 +526,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
    	        else if(key == "disableState") { disableState = evalBool(state, value); }
             else if(key == "identifier"){ stateIdentifier = coerceToString(state, value, context, true); }
             else if(key == "createDirsBeforeInstall"){ createDirsBeforeInstall = evalBool(state, value); }
-            else if(key == "runtimeStateParamters"){ runtimeStateParamters = coerceToString(state, value, context, true); }
+            else if(key == "runtimeStateArgs"){ runtimeStateArgs = coerceToString(state, value, context, true); }
             else if(key == "shareStateFrom"){ sharedState = coerceToString(state, value, context, true);  }
             
             /* All other attributes are passed to the builder through
@@ -611,12 +611,12 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 	
 	/* If there are no runtime paratermers, then we need to take the the stateIdentifier into account for the hash calcaulation below: hashDerivationModulo(...) 
 	 * We also add enableState to make it parse the drv to a state-drv
-	 * We also add runtimeStateParamters for the hash calc in hashDerivationModulo(...) to check if its needs to take the stateIdentiefier into account in the hash
+	 * We also add runtimeStateArgs for the hash calc in hashDerivationModulo(...) to check if its needs to take the stateIdentiefier into account in the hash
 	 */
 	if(enableState && !disableState){    
-		if(runtimeStateParamters == ""){
+		if(runtimeStateArgs == ""){
 			string enableStateS = bool2string("true");
-			drv.stateOutputs["state"] = DerivationStateOutput("", "", "", "", stateIdentifier, enableStateS, "", "", "", runtimeStateParamters, getCallingUserName(), "", false);
+			drv.stateOutputs["state"] = DerivationStateOutput("", "", "", "", stateIdentifier, enableStateS, "", "", "", runtimeStateArgs, getCallingUserName(), "", false);
 		}	
 	}
         
@@ -652,7 +652,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     	string enableStateS = bool2string("true");
     	string createDirsBeforeInstallS = bool2string(createDirsBeforeInstall);
     	drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, printHash(componentHash), outputHashAlgo, outputHash, stateIdentifier, enableStateS, 
-    	                                                  shareType, syncState, createDirsBeforeInstallS, runtimeStateParamters, getCallingUserName(), sharedState);
+    	                                                  shareType, syncState, createDirsBeforeInstallS, runtimeStateArgs, getCallingUserName(), sharedState);
     	
     	for(vector<DerivationStateOutputDir>::iterator i = stateDirs.begin(); i != stateDirs.end(); ++i)
     		drv.stateOutputDirs[(*i).path] = *(i);

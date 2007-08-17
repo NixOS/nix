@@ -75,7 +75,7 @@ static Path realisePath(const Path & path)
         PathSet paths;
         paths.insert(path);
         store->buildDerivations(paths);
-        Path outPath = findOutput(derivationFromPath(path), "out");
+        Path outPath = findOutput(derivationFromPathTxn(noTxn, path), "out");
         
         if (gcRoot == "")
             printGCWarning();
@@ -184,7 +184,7 @@ static Path maybeUseOutput(const Path & storePath, bool useOutput, bool forceRea
     if (forceRealise) 
     	realisePath(storePath);
     if (useOutput && isDerivation(storePath)) {
-        Derivation drv = derivationFromPath(storePath);
+        Derivation drv = derivationFromPathTxn(noTxn, storePath);
         return findOutput(drv, "out");
     }
     else return storePath;
@@ -290,7 +290,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             {
                 *i = fixPath(*i);
                 if (forceRealise) realisePath(*i);
-                Derivation drv = derivationFromPath(*i);
+                Derivation drv = derivationFromPathTxn(noTxn, *i);
                 cout << format("%1%\n") % findOutput(drv, "out");
             }
             break;
@@ -342,7 +342,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                  i != opArgs.end(); ++i)
             {
                 Path path = useDeriver(fixPath(*i));
-                Derivation drv = derivationFromPath(path);
+                Derivation drv = derivationFromPathTxn(noTxn, path);
                 StringPairs::iterator j = drv.env.find(bindingName);
                 if (j == drv.env.end())
                     throw Error(format("derivation `%1%' has no environment binding named `%2%'")

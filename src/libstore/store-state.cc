@@ -73,7 +73,7 @@ Snapshots commitStatePathTxn(const Transaction & txn, const Path & statePath)
 		throw Error(format("path `%1%' is not a valid state path") % statePath);
     
 	//queryDeriversStatePath??
-	Derivation drv = derivationFromPath(queryStatePathDrvTxn(txn, statePath));
+	Derivation drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, statePath));
   	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
     DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
 

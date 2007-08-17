@@ -10,7 +10,7 @@ namespace nix {
 
 /* Read a derivation, after ensuring its existence through
    ensurePath(). */
-Derivation derivationFromPath(const Path & drvPath);
+Derivation derivationFromPathTxn(const Transaction & txn, const Path & drvPath);
 
 /* Place in `paths' the set of all store paths in the file system
    closure of `storePath'; that is, all paths than can be directly or

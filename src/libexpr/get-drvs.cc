@@ -59,6 +59,29 @@ string DrvInfo::queryStateIdentifier(EvalState & state) const
     return stateIdentifier;
 }
 
+string DrvInfo::queryRuntimeStateArgs(EvalState & state) const
+{
+	if (runtimeStateArgs == "") {
+        ATermMap attrs2 = *attrs;
+        
+        for (ATermMap::const_iterator i = attrs2.begin(); i != attrs2.end(); ++i) {
+        	
+        	string key = (string)aterm2String(i->key);		//cast because aterm2String returns a char*
+	       	if(key == "runtimeStateArgs"){		  
+        		PathSet context;
+            	string value = coerceToString(state, i->value, context);
+        		(string &) runtimeStateArgs = value;
+        	}
+        }
+        
+        //If still empty
+        if (trim(runtimeStateArgs) == "")
+        	(string &) runtimeStateArgs = "__NOARGS__";
+    }
+    
+    return runtimeStateArgs;
+}
+
 
 MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
 {

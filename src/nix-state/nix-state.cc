@@ -83,7 +83,7 @@ Derivation getDerivation(const string & fullPath, const Strings & program_args, 
     
     //Retrieve the derivation, there is only 1 drvPath in derivers
     derivationPath = *(derivers.begin());
-    Derivation drv = derivationFromPath(derivationPath);
+    Derivation drv = derivationFromPathTxn(noTxn, derivationPath);
 	
 	if(isStateComponent){
     	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
@@ -275,7 +275,7 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
 		int timestamp = getTimestamps[statePath];
 		
 		//get its derivation-state-items
-		Derivation statePath_drv = derivationFromPath(queryStatePathDrvTxn(noTxn, statePath));
+		Derivation statePath_drv = derivationFromPathTxn(noTxn, queryStatePathDrvTxn(noTxn, statePath));
 		DerivationStateOutputDirs stateOutputDirs = statePath_drv.stateOutputDirs; 
 		
 		//TODO Sort snapshots??? eg first restore root, then the subdirs??

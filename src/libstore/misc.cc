@@ -9,13 +9,13 @@
 namespace nix {
 
 
-Derivation derivationFromPath(const Path & drvPath)
+Derivation derivationFromPathTxn(const Transaction & txn, const Path & drvPath)
 {
     assertStorePath(drvPath);
-    store->ensurePath(drvPath);
-    //printMsg(lvlError, format("uuuuuuuuuuuuuuuuuu"));
+    ensurePathTxn(txn, drvPath);
     ATerm t = ATreadFromNamedFile(drvPath.c_str());
-    if (!t) throw Error(format("cannot read aterm from `%1%'") % drvPath);
+    if (!t) 
+    	throw Error(format("cannot read aterm from `%1%'") % drvPath);
     return parseDerivation(t);
 }
 
@@ -103,7 +103,7 @@ void queryMissing(const PathSet & targets,
 
         if (isDerivation(p)) {
             if (!store->isValidPath(p)) continue;
-            Derivation drv = derivationFromPath(p);
+            Derivation drv = derivationFromPathTxn(noTxn, p);
 
             bool mustBuild = false;
             for (DerivationOutputs::iterator i = drv.outputs.begin();

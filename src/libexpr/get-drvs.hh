@@ -21,6 +21,7 @@ private:
     string drvPath;
     string outPath;
     string stateIdentifier;
+    string runtimeStateArgs;
     
 public:
     string name;
@@ -35,6 +36,7 @@ public:
     string queryDrvPath(EvalState & state) const;
     string queryOutPath(EvalState & state) const;
     string queryStateIdentifier(EvalState & state) const;
+    string queryRuntimeStateArgs(EvalState & state) const;
     MetaInfo queryMetaInfo(EvalState & state) const;
 
     void setDrvPath(const string & s)
@@ -50,6 +52,11 @@ public:
     void setStateIdentifier(const string & s)
     {
     	stateIdentifier = s;	
+    }
+    
+    void setRuntimeStateArgs(const string & s)
+    {
+    	runtimeStateArgs = s;	
     }
     
     void setMetaInfo(const MetaInfo & meta);

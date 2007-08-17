@@ -453,7 +453,6 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
         throw Error(format("cannot set references for path `%1%' which is invalid and has no substitutes") % store_or_statePath);
 	
 	
-	printMsg(lvlError, format("Setting references for %1% (revision:%2%)") % store_or_statePath % int2String(revision));
 	/*
 	for (PathSet::iterator i = references.begin(); i != references.end(); ++i)
     	printMsg(lvlError, format("'%2%' has references: %1%") % *i % store_or_statePath);
@@ -463,6 +462,8 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
 	
     if(isRealisablePath(txn, store_or_statePath))
     {
+		printMsg(lvlError, format("Setting references for storepath '%1%'") % store_or_statePath);
+		
 		//Just overwrite the old references, since there is oly 1 revision of a storePath
 		
 		Paths oldReferences_c_c;
@@ -481,6 +482,8 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
     else if(isRealisableStatePath(txn, store_or_statePath))
     {
 		
+		printMsg(lvlError, format("Setting references for statepath '%1%' (revision:%2%)") % store_or_statePath % int2String(revision));
+		
 		//Write references to a special revision (since there are multiple revisions of a statePath)
 
 		//query the references of revision (-1 is query the latest references)
@@ -498,7 +501,7 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
     }
     else
     	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
-    
+    	
 }
 
 void queryXReferencesTxn(const Transaction & txn, const Path & store_or_statePath, PathSet & references, const bool component_or_state, const int revision, int timestamp)
@@ -693,9 +696,7 @@ void setDeriver(const Transaction & txn, const Path & storePath, const Path & de
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
 	
-	//printMsg(lvlError, format("Ttttttttttttttttttttttttt %1%") % deriver);
-    
-    if (isStateDrvPathTxn(txn, deriver)){							//Redirect if its a state component					//hanges somtimes !!!!!!!!!!!!!!!!!!!
+    if (isStateDrvPathTxn(txn, deriver)){								//Redirect if its a state component					
     	addStateDeriver(txn, storePath, deriver);
 	}		
     else{
@@ -712,14 +713,14 @@ PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, 
 {
 	PathSet newdrvs;
 
-	Derivation drv = derivationFromPath(newdrv);
+	Derivation drv = derivationFromPathTxn(noTxn, newdrv);
 	string identifier = drv.stateOutputs.find("state")->second.stateIdentifier;
 	string user = drv.stateOutputs.find("state")->second.username;
 	
 	for (PathSet::iterator i = drvs.begin(); i != drvs.end(); ++i)	//Check if we need to remove old drvs
     {
     	Path drv = *i;
-    	Derivation getdrv = derivationFromPath(drv);
+    	Derivation getdrv = derivationFromPathTxn(noTxn, drv);
     	string getIdentifier = getdrv.stateOutputs.find("state")->second.stateIdentifier;
 		string getUser = getdrv.stateOutputs.find("state")->second.username;
 		
@@ -747,7 +748,7 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
 
-	Derivation drv = derivationFromPath(deriver);
+	Derivation drv = derivationFromPathTxn(txn, deriver);
 	string identifier = drv.stateOutputs.find("state")->second.stateIdentifier;
 	string user = drv.stateOutputs.find("state")->second.username;
 	
@@ -786,8 +787,7 @@ bool LocalStore::isStateComponent(const Path & storePath)
 
 bool isStateDrvPathTxn(const Transaction & txn, const Path & drvPath)
 {
-	//printMsg(lvlError, format("Sssssssssssssssssss %1%") % drvPath);
-	Derivation drv = derivationFromPath(drvPath);
+	Derivation drv = derivationFromPathTxn(txn, drvPath);
     return isStateDrvTxn(txn, drv);
 }
 
@@ -817,7 +817,7 @@ Path queryDeriver(const Transaction & txn, const Path & storePath)
     
     bool b = nixDB.queryString(txn, dbDerivers, storePath, deriver);
     
-    Derivation drv = derivationFromPath(deriver);		
+    Derivation drv = derivationFromPathTxn(txn, deriver);		
     if (isStateDrvTxn(txn, drv))
     	throw Error(format("This deriver `%1%' is a state deriver, u should use queryDerivers instead of queryDeriver") % deriver);
     	    
@@ -843,7 +843,7 @@ PathSet queryDerivers(const Transaction & txn, const Path & storePath, const str
 	for (Strings::iterator i = alldata.begin(); i != alldata.end(); ++i) {	//filter on username and identifier
 		
 		string derivationpath = (*i);
-		Derivation drv = derivationFromPath(derivationpath);
+		Derivation drv = derivationFromPathTxn(txn, derivationpath);
 		
 		if (drv.outputs.size() != 1)
 			throw Error(format("The call queryDerivers with storepath %1% is not a statePath") % storePath);
@@ -1093,8 +1093,9 @@ void registerValidPaths(const Transaction & txn, const ValidPathInfos & infos)
 		
 		//We cannot check the statePath since registerValidPath is called twice, first for the component path, and then for the state path....
 				
-		if(isStorePath_b)		
+		if(isStorePath_b){		
         	setDeriver(txn, i->path, i->deriver);
+		}
         
         //TODO maybe also set a state deriver into dbStateDerivers .... well state is already linked to a drvpath in dbValidStatePaths ....
     }
@@ -1649,7 +1650,7 @@ void storePathRequisitesTxn(const Transaction & txn, const Path & storeOrstatePa
         for (PathSet::iterator i = paths.begin();
              i != paths.end(); ++i)
             if (isDerivation(*i)) {
-                Derivation drv = derivationFromPath(*i);
+                Derivation drv = derivationFromPathTxn(txn, *i);
                 for (DerivationOutputs::iterator j = drv.outputs.begin();
                      j != drv.outputs.end(); ++j)
                     if (isValidPathTxn(txn, j->second.path))
@@ -1816,9 +1817,8 @@ PathSet getSharedWithPathSetRecTxn(const Transaction & txn, const Path & statePa
 	Path statePath_ns = toNonSharedPathTxn(txn, statePath);
 	PathSet empty;
 	return getSharedWithPathSetRecTxn_private(txn, statePath_ns, empty);
-}	
+}
 
-	
 /* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */
 static void upgradeStore07()
 {

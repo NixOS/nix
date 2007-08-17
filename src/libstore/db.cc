@@ -701,7 +701,7 @@ bool Database::queryStateRevisions(const Transaction & txn, TableId revisions_ta
 		
 		//query state versioined directorys/files
 		vector<Path> sortedPaths;
-		Derivation drv = derivationFromPath(queryStatePathDrvTxn(txn, getStatePath));
+		Derivation drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, getStatePath));
   		DerivationStateOutputs stateOutputs = drv.stateOutputs; 
     	DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
     	for (DerivationStateOutputDirs::const_iterator j = stateOutputDirs.begin(); j != stateOutputDirs.end(); ++j){
