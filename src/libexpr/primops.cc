@@ -296,6 +296,17 @@ static Expr prim_getEnv(EvalState & state, const ATermVector & args)
     return makeStr(getEnv(name));
 }
 
+/* for debugging purposes. print the first arg on stdout (perhaps stderr should be used?)
+ * and return the second
+ */
+static Expr prim_trace(EvalState & state, const ATermVector & args)
+{
+    //string str = evalStringNoCtx(state, args[0]);
+
+    Expr a = evalExpr(state, args[0]);
+    printf("traced value: %s\n", atPrint(a).c_str());
+    return evalExpr(state, args[1]);
+}
 
 static Expr prim_relativise(EvalState & state, const ATermVector & args)
 {
@@ -744,6 +755,39 @@ static Expr prim_hasAttr(EvalState & state, const ATermVector & args)
 }
 
 
+/* takes 
+ * param: list of { attr="attr"; value=value } 
+ * returns an attribute set
+ * */
+static Expr prim_listToAttrs(EvalState & state, const ATermVector & args)
+{
+  try {
+    ATermMap res = ATermMap();
+
+    ATermList list;
+    list = evalList(state, args[0]);
+    for (ATermIterator i(list); i; ++i){
+      // *i should now contain a pointer to the list item expression
+      ATermList attrs;
+      Expr evaledExpr = evalExpr(state, *i);
+      if (matchAttrs(evaledExpr, attrs)){
+        Expr e = evalExpr(state, makeSelect(evaledExpr, toATerm("attr")));
+        string attr = evalStringNoCtx(state,e);
+        ATerm value;
+        Expr r = makeSelect(evaledExpr, toATerm("value"));
+        res.set(toATerm(attr), makeAttrRHS(r, makeNoPos()));
+      }
+      else {
+        throw EvalError(format("passed list item is a %s (value: %s). Set { attr=\"name\"; value=nix expr; } expected.") % showType(evaledExpr) % showValue(evaledExpr)); 
+      }
+    } // for
+    return makeAttrs(res);
+  } catch (Error & e) {
+    e.addPrefix(format("while calling listToAttrs "));
+    throw;
+  }
+}
+
 static Expr prim_removeAttrs(EvalState & state, const ATermVector & args)
 {
     ATermMap attrs;
@@ -758,6 +802,12 @@ static Expr prim_removeAttrs(EvalState & state, const ATermVector & args)
     return makeAttrs(attrs);
 }
 
+/* Determine whether the argument is a list. */
+static Expr prim_isAttrs(EvalState & state, const ATermVector & args)
+{
+    ATermList list;
+    return makeBool(matchAttrs(evalExpr(state, args[0]), list));
+}
 
 /*************************************************************
  * Lists
@@ -901,6 +951,7 @@ void EvalState::addPrimOps()
     addPrimOp("abort", 1, prim_abort);
     addPrimOp("throw", 1, prim_throw);
     addPrimOp("__getEnv", 1, prim_getEnv);
+    addPrimOp("__trace", 2, prim_trace);
 
     addPrimOp("relativise", 2, prim_relativise);
 
@@ -923,7 +974,9 @@ void EvalState::addPrimOps()
     addPrimOp("__attrNames", 1, prim_attrNames);
     addPrimOp("__getAttr", 2, prim_getAttr);
     addPrimOp("__hasAttr", 2, prim_hasAttr);
+    addPrimOp("__isAttrs", 1, prim_isAttrs);
     addPrimOp("removeAttrs", 2, prim_removeAttrs);
+    addPrimOp("__listToAttrs", 1, prim_listToAttrs);
 
     // Lists
     addPrimOp("__isList", 1, prim_isList);
