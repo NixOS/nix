@@ -43,8 +43,6 @@ public:
 
 	void queryStateReferences(const Path & storePath, PathSet & stateReferences, const int revision);
 
-	void queryAllReferences(const Path & path, PathSet & allReferences, const int revision);
-
     void queryReferrers(const Path & path, PathSet & referrers, const int revision);
     
     void queryStateReferrers(const Path & path, PathSet & stateReferrers, const int revision);
@@ -76,17 +74,13 @@ public:
     void collectGarbage(GCAction action, const PathSet & pathsToDelete,
         bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed);
         
-    void setStatePathsInterval(const PathSet & statePath, const vector<int> & intervals, bool allZero = false);
+    void setStatePathsInterval(const PathSet & statePath, const IntVector & intervals, bool allZero = false);
 	
-	vector<int> getStatePathsInterval(const PathSet & statePaths);
+	IntVector getStatePathsInterval(const PathSet & statePaths);
 	
 	bool isStateComponent(const Path & path);
 	
-	bool isStateDrvPath(const Path & drvpath);
-	
-	bool isStateDrv(const Derivation & drv);
-	
-	void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision);
+	void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const int revision);
 
 	void setStateRevisions(const RevisionClosure & revisions, const Path & rootStatePath, const string & comment);
 	
@@ -104,7 +98,7 @@ public:
 	
 	PathSet toNonSharedPathSet(const PathSet & statePaths);
 	
-	void revertToRevision(Path & componentPath, Path & derivationPath, Path & statePath, int revision_arg, bool recursive);
+	void revertToRevision(const Path & componentPath, const Path & derivationPath, const Path & statePath, const int revision_arg, const bool recursive);
 	
 private:
     AutoCloseFD fdSocket;

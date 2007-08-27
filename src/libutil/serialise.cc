@@ -55,6 +55,50 @@ void writeStringSet(const StringSet & ss, Sink & sink)
         writeString(*i, sink);
 }
 
+void writeIntVector(const IntVector & iv, Sink & sink)
+{
+    writeInt(iv.size(), sink);
+    for(int i=0;i < iv.size(); i++)
+        writeString(int2String(iv.at(i)), sink);
+}
+
+void writeRevisionClosure(const RevisionClosure & rc, Sink & sink)
+{
+    writeInt(rc.size(), sink);
+    for (RevisionClosure::const_iterator i = rc.begin(); i != rc.end(); ++i){
+    	writeString((*i).first, sink);
+    	writeSnapshots((*i).second, sink);
+    }
+}
+
+void writeSnapshots(const Snapshots & ss, Sink & sink)
+{
+    writeInt(ss.size(), sink);
+    for (Snapshots::const_iterator i = ss.begin(); i != ss.end(); ++i){
+    	writeString((*i).first, sink);
+    	writeInt((*i).second, sink);			//TODO MUST BE UNSGINED INT
+    }
+}
+
+void writeRevisionClosureTS(const RevisionClosureTS & rc, Sink & sink)
+{
+	writeInt(rc.size(), sink);
+    for (RevisionClosureTS::const_iterator i = rc.begin(); i != rc.end(); ++i){
+    	writeString((*i).first, sink);
+    	writeInt((*i).second, sink);
+    }
+}
+
+void writeRevisionInfos(const RevisionInfos & ri, Sink & sink)
+{
+	writeInt(ri.size(), sink);
+    for (RevisionInfos::const_iterator i = ri.begin(); i != ri.end(); ++i){
+    	writeInt((*i).first, sink);
+    	RevisionInfo rvi = (*i).second;
+    	writeString(rvi.comment, sink);
+    	writeInt(rvi.timestamp, sink);			//TODO MUST BE UNSGINED INT 
+    }
+}
 
 void readPadding(unsigned int len, Source & source)
 {
@@ -102,5 +146,86 @@ StringSet readStringSet(Source & source)
     return ss;
 }
 
+/*
+//IntVector
+//RevisionClosure
+//RevisionClosureTS
+//RevisionInfos
+
+struct RevisionInfo
+{ 
+	string comment;
+	unsigned int timestamp;
+};
+typedef map<int, RevisionInfo> RevisionInfos;
+typedef map<Path, unsigned int> Snapshots;					//Automatically sorted on Path :)
+typedef map<Path, Snapshots> RevisionClosure;
+typedef map<Path, int> RevisionClosureTS;
+
+*/
+
+IntVector readIntVector(Source & source)
+{
+    unsigned int count = readInt(source);
+	IntVector iv;  
+	while (count--){
+		string s = readString(source);
+		int i;
+		if (!string2Int(s, i))
+            throw Error(format("`%1%' is corrupt in readIntVector") % s);
+		iv.push_back(i);
+	}
+    return iv;
+}
+
+RevisionClosure readRevisionClosure(Source & source)
+{
+    unsigned int count = readInt(source);
+    RevisionClosure rc;  
+	while (count--){
+    	string path = readString(source);
+    	Snapshots ss = readSnapshots(source);
+    	rc[path] = ss;
+    }
+    return rc;
+}
+
+
+Snapshots readSnapshots(Source & source)
+{
+    unsigned int count = readInt(source);
+    Snapshots ss;  
+	while (count--){
+    	string path = readString(source);
+    	unsigned int ri = readInt(source);			//TODO MUST BE UNSGINED INT
+    	ss[path] = ri;
+    }
+    return ss;
+}
+
+
+RevisionClosureTS readRevisionClosureTS(Source & source)
+{
+	unsigned int count = readInt(source);
+    RevisionClosureTS rc;  
+	while (count--){
+    	string path = readString(source);
+    	int ri = readInt(source);
+    	rc[path] = ri;
+    }
+    return rc;
+}
+
+RevisionInfos readRevisionInfos(Source & source)
+{
+	unsigned int count = readInt(source);
+    RevisionInfos ri;  
+	while (count--){
+    	readInt(source);
+    	RevisionInfo rvi;
+    	rvi.comment = readString(source);
+    	rvi.timestamp = readInt(source); 
+    }
+}
 
 }

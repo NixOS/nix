@@ -1308,7 +1308,7 @@ bool DerivationGoal::prepareBuild()
     }
     
     /* The state output is a referenceable path */
-    if(store->isStateDrv(drv))
+    if(isStateDrv(drv))
     	allStatePaths.insert(drv.stateOutputs.find("state")->second.statepath);
   
     /* Determine the full set of input paths. */
@@ -1754,7 +1754,7 @@ void DerivationGoal::computeClosure()
      * If state is enabled for the path we:
      * [scan for and state references and component references in the state path]	//3,4
      */
-	if(isStateDrvTxn(noTxn, drv)){		//TODO 
+	if(isStateDrv(drv)){		//TODO 
 		
 		Path sharedState = drv.stateOutputs.find("state")->second.sharedState;
 		if(sharedState != ""){
@@ -1799,7 +1799,7 @@ void DerivationGoal::computeClosure()
     }
     
     //Register the state path valid
-    if(isStateDrvTxn(txn, drv))
+    if(isStateDrv(drv))
     {
 		Path statePath = drv.stateOutputs.find("state")->second.statepath;		
 		

@@ -140,7 +140,7 @@ static TableId dbStateRevisions = 0;
  */
 static TableId dbStateRevisionsComments = 0;
 
-/* dbStateSnapshots :: StatePath -> RevisionNumbers
+/* dbStateSnapshots :: StatePath -> IntVector
  * 
  * This table stores the snapshot numbers the sub state files/folders
  * at a certain timestamp. These snapshot numbers are just timestamps
@@ -541,20 +541,6 @@ void LocalStore::queryStateReferences(const Path & componentOrstatePath, PathSet
     nix::queryXReferencesTxn(noTxn, componentOrstatePath, stateReferences, revision, false);
 }
 
-void queryAllReferencesTxn(const Transaction & txn, const Path & path, PathSet & allReferences, const int revision)
-{
-	PathSet references;
-    PathSet stateReferences;
-    queryXReferencesTxn(txn, path, references, true, revision);
-    queryXReferencesTxn(txn, path, stateReferences, false, revision);
-    allReferences = pathSets_union(references, stateReferences);
-}
-
-void LocalStore::queryAllReferences(const Path & path, PathSet & allReferences, const int revision)
-{
-	queryAllReferencesTxn(noTxn, path, allReferences, revision);
-}
-
 static PathSet getXReferrers(const Transaction & txn, const Path & store_or_statePath, const bool component_or_state, const int revision)
 {
     TableId table = 0;
@@ -788,25 +774,12 @@ bool LocalStore::isStateComponent(const Path & storePath)
 bool isStateDrvPathTxn(const Transaction & txn, const Path & drvPath)
 {
 	Derivation drv = derivationFromPathTxn(txn, drvPath);
-    return isStateDrvTxn(txn, drv);
+    return isStateDrv(drv);
 }
 
-bool LocalStore::isStateDrvPath(const Path & isStateDrv)
+bool isStateDrv(const Derivation & drv)
 {
-    return nix::isStateDrvPathTxn(noTxn, isStateDrv);
-}
-
-bool isStateDrvTxn(const Transaction & txn, const Derivation & drv)
-{
-    if (drv.stateOutputs.size() != 0)
-		return true;
-	else
-		return false;	
-}
-
-bool LocalStore::isStateDrv(const Derivation & drv)
-{
-    return nix::isStateDrvTxn(noTxn, drv);
+    return (drv.stateOutputs.size() != 0);
 }
 
 static Path queryDeriver(const Transaction & txn, const Path & storePath)  
@@ -818,7 +791,7 @@ static Path queryDeriver(const Transaction & txn, const Path & storePath)
     bool b = nixDB.queryString(txn, dbDerivers, storePath, deriver);
     
     Derivation drv = derivationFromPathTxn(txn, deriver);		
-    if (isStateDrvTxn(txn, drv))
+    if (isStateDrv(drv))
     	throw Error(format("This deriver `%1%' is a state deriver, u should use queryDerivers instead of queryDeriver") % deriver);
     	    
     if (b)
@@ -1573,7 +1546,7 @@ void verifyStore(bool checkContents)
     txn.commit();
 }
 
-void setStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePaths, const vector<int> & intervals, bool allZero)
+void setStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePaths, const IntVector & intervals, bool allZero)
 {
 	if(!allZero && statePaths.size() != intervals.size()){
 		throw Error("the number of statepaths and intervals must be equal");
@@ -1587,25 +1560,25 @@ void setStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePath
         int interval=0;
         if(!allZero)
         	interval = intervals.at(n);
-        
+                
         nixDB.setString(txn, dbStateCounters, *i, int2String(interval));
         n++;
     }
 }
 
-void LocalStore::setStatePathsInterval(const PathSet & statePaths, const vector<int> & intervals, bool allZero)
+void LocalStore::setStatePathsInterval(const PathSet & statePaths, const IntVector & intervals, bool allZero)
 {
 	Transaction txn(nixDB);
     nix::setStatePathsIntervalTxn(txn, statePaths, intervals, allZero);
     txn.commit();
 }
 
-vector<int> getStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePaths)
+IntVector getStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePaths)
 {
 	string data;
 	Paths referers;
 	
-	vector<int> intervals;
+	IntVector intervals;
     for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
     {
     	nixDB.queryString(txn, dbStateCounters, *i, data);
@@ -1620,7 +1593,7 @@ vector<int> getStatePathsIntervalTxn(const Transaction & txn, const PathSet & st
     return intervals;
 }
 
-vector<int> LocalStore::getStatePathsInterval(const PathSet & statePaths)
+IntVector LocalStore::getStatePathsInterval(const PathSet & statePaths)
 {
     return nix::getStatePathsIntervalTxn(noTxn, statePaths);
 }
@@ -1645,12 +1618,12 @@ vector<int> LocalStore::getStatePathsInterval(const PathSet & statePaths)
      
      TODO Change comment, this can also take state paths
 */
-void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision)
+void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const int revision)
 {
 	nix::storePathRequisitesTxn(noTxn, storeOrstatePath, includeOutputs, paths, withComponents, withState, revision);
 }
 
-void storePathRequisitesTxn(const Transaction & txn, const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision)
+void storePathRequisitesTxn(const Transaction & txn, const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const int revision)
 {
     computeFSClosureTxn(txn, storeOrstatePath, paths, withComponents, withState, revision);
 
@@ -1667,7 +1640,7 @@ void storePathRequisitesTxn(const Transaction & txn, const Path & storeOrstatePa
     }
 }
 
-void LocalStore::storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision)
+void LocalStore::storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const int revision)
 {
     nix::storePathRequisites(storeOrstatePath, includeOutputs, paths, withComponents, withState, revision);
 }
@@ -1848,7 +1821,7 @@ PathSet getSharedWithPathSetRecTxn(const Transaction & txn, const Path & statePa
 }
 
 
-void LocalStore::revertToRevision(Path & componentPath, Path & derivationPath, Path & statePath, int revision_arg, bool recursive)
+void LocalStore::revertToRevision(const Path & componentPath, const Path & derivationPath, const Path & statePath, const int revision_arg, const bool recursive)
 {
 	Transaction txn(nixDB);
 	revertToRevisionTxn(txn, componentPath, derivationPath, statePath, revision_arg, recursive);

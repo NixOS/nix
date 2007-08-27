@@ -919,22 +919,22 @@ Strings unpackStrings(const string & s)
     return strings;
 }
 
-string packRevisionNumbers(const RevisionNumbers & revs)
+string packRevisionNumbers(const IntVector & revs)
 {
     string seperator = "|";
     string d = "";
-    for (RevisionNumbers::const_iterator i = revs.begin();
+    for (IntVector::const_iterator i = revs.begin();
          i != revs.end(); ++i){
         d += int2String(*i) + seperator;
     }
     return d;
 }
     
-RevisionNumbers unpackRevisionNumbers(const string & packed)
+IntVector unpackRevisionNumbers(const string & packed)
 {
     string seperator = "|";
     Strings ss = tokenizeString(packed, seperator);
-    RevisionNumbers revs;
+    IntVector revs;
     
     for (Strings::const_iterator i = ss.begin();
          i != ss.end(); ++i){

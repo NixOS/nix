@@ -98,11 +98,22 @@ void writeInt(unsigned int n, Sink & sink);
 void writeString(const string & s, Sink & sink);
 void writeStringSet(const StringSet & ss, Sink & sink);
 
+void writeIntVector(const IntVector & iv, Sink & sink);
+void writeRevisionClosure(const RevisionClosure & rc, Sink & sink);
+void writeSnapshots(const Snapshots & ss, Sink & sink);
+void writeRevisionClosureTS(const RevisionClosureTS & rc, Sink & sink);
+void writeRevisionInfos(const RevisionInfos & ri, Sink & sink);
+
 void readPadding(unsigned int len, Source & source);
 unsigned int readInt(Source & source);
 string readString(Source & source);
 StringSet readStringSet(Source & source);
 
+IntVector readIntVector(Source & source);
+RevisionClosure readRevisionClosure(Source & source);
+Snapshots readSnapshots(Source & source);
+RevisionClosureTS readRevisionClosureTS(Source & source);
+RevisionInfos readRevisionInfos(Source & source);
 
 }
 

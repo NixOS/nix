@@ -25,7 +25,7 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
 								
 void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path & statePath);
 
-void revertToRevisionTxn(const Transaction & txn, Path & componentPath, Path & derivationPath, Path & statePath, int revision_arg, bool recursive);
+void revertToRevisionTxn(const Transaction & txn, const Path & componentPath, const Path & derivationPath, const Path & statePath, const int revision_arg, const bool recursive);
 
 }
 

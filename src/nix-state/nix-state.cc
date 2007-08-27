@@ -213,7 +213,7 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 	}
 	
 	//Sort ourselfes to create a nice output
-	vector<int> revisions_sort;
+	IntVector revisions_sort;
 	int highestrev;
 	for (RevisionInfos::iterator i = revisions.begin(); i != revisions.end(); ++i){
 		int rev = (*i).first;
@@ -224,7 +224,7 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 	sort(revisions_sort.begin(), revisions_sort.end());
 
 	int max_size = int2String(highestrev).length();
-	for (vector<int>::iterator i = revisions_sort.begin(); i != revisions_sort.end(); ++i)
+	for (IntVector::iterator i = revisions_sort.begin(); i != revisions_sort.end(); ++i)
 	{
 		int rev = *i;
 		string rev_s = padd(int2String(rev), '0' , max_size, true);	//pad revisions with a 0

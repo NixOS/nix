@@ -497,7 +497,7 @@ static void installDerivations(Globals & globals,
         //Set the state indentifier if it is a state-component
         printMsg(lvlError, format("New component to install DRV: '%1%'") % i->queryDrvPath(globals.state));
         Derivation drv = derivationFromPathTxn(noTxn, i->queryDrvPath(globals.state));
-        if(store->isStateDrv(drv))
+        if(isStateDrv(drv))
         {
         	DerivationStateOutputs stateOutputs = drv.stateOutputs;
         	string stateIdentifier = stateOutputs.find("state")->second.stateIdentifier;

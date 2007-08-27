@@ -59,7 +59,7 @@ typedef list<Path> Paths;
 typedef set<Path> PathSet;
 
 //state types
-typedef list<int> RevisionNumbers;							//the Strings (list) of StateReferences and this list are connected by position
+typedef vector<int> IntVector;								//the Strings (list) of StateReferences and this list are connected by position
 struct RevisionInfo
 { 
 	string comment;

@@ -55,8 +55,6 @@ public:
     
     void queryStateReferences(const Path & storePath, PathSet & stateReferences, const int revision);
     
-    void queryAllReferences(const Path & path, PathSet & allReferences, const int revision);
-    
     void queryReferrers(const Path & path, PathSet & referrers, const int revision);
     
     void queryStateReferrers(const Path & path, PathSet & stateReferrers, const int revision);
@@ -90,17 +88,13 @@ public:
     
     /////////////////////////////
         
-	void setStatePathsInterval(const PathSet & statePath, const vector<int> & intervals, bool allZero = false);
+	void setStatePathsInterval(const PathSet & statePath, const IntVector & intervals, bool allZero = false);
 	
-	vector<int> getStatePathsInterval(const PathSet & statePaths);
+	IntVector getStatePathsInterval(const PathSet & statePaths);
 	
 	bool isStateComponent(const Path & storePath);
 	
-	bool isStateDrvPath(const Path & drvpath);
-	
-	bool isStateDrv(const Derivation & drv);
-	
-	void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision);
+	void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const int revision);
 	
 	void setStateRevisions(const RevisionClosure & revisions, const Path & rootStatePath, const string & comment);
 	
@@ -110,7 +104,7 @@ public:
 	
 	Snapshots commitStatePath(const Path & statePath);
 	
-	Path queryDeriver(const Path & path);																//should these be in here ????
+	Path queryDeriver(const Path & path);
 	
 	PathSet queryDerivers(const Path & storePath, const string & identifier, const string & user);		//should these be in here ????
 	
@@ -118,7 +112,7 @@ public:
 	
 	PathSet toNonSharedPathSet(const PathSet & statePaths);
 	
-	void revertToRevision(Path & componentPath, Path & derivationPath, Path & statePath, int revision_arg, bool recursive);
+	void revertToRevision(const Path & componentPath, const Path & derivationPath, const Path & statePath, const int revision_arg, const bool recursive);
 };
 
 
@@ -219,7 +213,7 @@ bool isStateComponentTxn(const Transaction & txn, const Path & path);
 
 bool isStateDrvPathTxn(const Transaction & txn, const Path & drvPath);
 
-bool isStateDrvTxn(const Transaction & txn, const Derivation & drv);
+bool isStateDrv(const Derivation & drv);
 
 //TODO can this ?????
 void queryAllValidPathsTxn(const Transaction & txn, PathSet & allComponentPaths, PathSet & allStatePaths);
@@ -235,7 +229,7 @@ void queryReferrersTxn(const Transaction & txn, const Path & storePath, PathSet 
 void queryStateReferrersTxn(const Transaction & txn, const Path & storePath, PathSet & stateReferrers, const int revision);
 
 Path queryStatePathDrvTxn(const Transaction & txn, const Path & statePath);
-void storePathRequisitesTxn(const Transaction & txn, const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision);
+void storePathRequisitesTxn(const Transaction & txn, const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const int revision);
 void setStateRevisionsTxn(const Transaction & txn, const RevisionClosure & revisions, const Path & rootStatePath, const string & comment);
 
 bool isValidPathTxn(const Transaction & txn, const Path & path);
@@ -250,10 +244,10 @@ Path toNonSharedPathTxn(const Transaction & txn, const Path & statePath);
 PathSet getSharedWithPathSetRecTxn(const Transaction & txn, const Path & statePath);
 
 void ensurePathTxn(const Transaction & txn, const Path & path);
-vector<int> getStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePaths);
+IntVector getStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePaths);
 
 bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const int revision);
-void setStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePath, const vector<int> & intervals, bool allZero = false);
+void setStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePath, const IntVector & intervals, bool allZero = false);
 
 }
 

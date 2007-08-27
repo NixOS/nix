@@ -34,7 +34,19 @@ typedef enum {
     wopExportPath,
     wopImportPath,
     wopQueryDeriver,
+
     wopQueryDerivers,
+    wopSetStatePathsInterval,
+	wopGetStatePathsInterval,
+	wopIsStateComponent,
+	wopStorePathRequisites,
+	wopSetStateRevisions,
+	wopQueryStateRevisions,
+	wopQueryAvailableStateRevisions,
+	wopCommitStatePath,
+	wopScanAndUpdateAllReferences,
+	wopToNonSharedPathSet,
+	wopRevertToRevision,
 } WorkerOp;
 
 

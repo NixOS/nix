@@ -211,8 +211,12 @@ static void printTree(const Path & path,
 
     cout << format("%1%%2%\n") % firstPad % path;
 
-    PathSet allReferences;
-    store->queryAllReferences(path, allReferences, -1);
+	//Lookup all references
+	PathSet references;
+	PathSet stateReferences;
+    store->queryReferences(path, references, -1);
+    store->queryStateReferences(path, stateReferences, -1);
+    PathSet allReferences = pathSets_union(references, stateReferences);
     
 #if 0     
     for (PathSet::iterator i = drv.inputSrcs.begin();

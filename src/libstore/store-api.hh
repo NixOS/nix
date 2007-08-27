@@ -87,8 +87,6 @@ public:
        The result is not cleared. */
     virtual void queryStateReferences(const Path & storePath, PathSet & stateReferences, const int revision) = 0;
 
-	virtual void queryAllReferences(const Path & path, PathSet & allReferences, const int revision) = 0;
-
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
     virtual void queryReferrers(const Path & path,
@@ -202,22 +200,16 @@ public:
         bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed) = 0;
         
     /* TODO */
-	virtual void setStatePathsInterval(const PathSet & statePath, const vector<int> & intervals, bool allZero = false) = 0;
+	virtual void setStatePathsInterval(const PathSet & statePath, const IntVector & intervals, bool allZero = false) = 0;
 	
 	/* TODO */
-	virtual vector<int> getStatePathsInterval(const PathSet & statePaths) = 0;
+	virtual IntVector getStatePathsInterval(const PathSet & statePaths) = 0;
 	
 	/* Checks whether a path is a component path that has a statePath. */
 	virtual bool isStateComponent(const Path & path) = 0;
 	
 	/* TODO */
-	virtual bool isStateDrvPath(const Path & drvpath) = 0;
-	
-	/* TODO */
-	virtual bool isStateDrv(const Derivation & drv) = 0;
-	
-	/* TODO */
-	virtual void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision) = 0;
+	virtual void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const int revision) = 0;
 
 	/* TODO */
 	virtual void setStateRevisions(const RevisionClosure & revisions, const Path & rootStatePath, const string & comment) = 0;
@@ -234,14 +226,18 @@ public:
 	/* Query the deriver of a store path.  Return the empty string if
 	   no deriver has been set. */
 	virtual Path queryDeriver(const Path & path) = 0;
-	
+
+	/* TODO */
 	virtual PathSet queryDerivers(const Path & storePath, const string & identifier, const string & user) = 0;
-	
+
+	/* TODO */
 	virtual void scanAndUpdateAllReferences(const Path & statePath, const bool recursive) = 0;
 	
+	/* TODO */
 	virtual PathSet toNonSharedPathSet(const PathSet & statePaths) = 0;
 	
-	virtual void revertToRevision(Path & componentPath, Path & derivationPath, Path & statePath, int revision_arg, bool recursive) = 0;
+	/* TODO */
+	virtual void revertToRevision(const Path & componentPath, const Path & derivationPath, const Path & statePath, const int revision_arg, const bool recursive) = 0;
 };
 
 

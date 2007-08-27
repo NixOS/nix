@@ -65,7 +65,7 @@ void createStateDirsTxn(const Transaction & txn, const DerivationStateOutputDirs
 	}
 	
 	//Initialize the counters for the statePaths that have an interval to 0
-	vector<int> empty;
+	IntVector empty;
 	setStatePathsIntervalTxn(txn, intervalPaths, empty, true);
 }
 
@@ -90,7 +90,7 @@ PathSet getAllStateDerivationsRecursivelyTxn(const Transaction & txn, const Path
 
 
 
-void revertToRevisionTxn(const Transaction & txn, Path & componentPath, Path & derivationPath, Path & statePath, int revision_arg, bool recursive)
+void revertToRevisionTxn(const Transaction & txn, const Path & componentPath, const Path & derivationPath, const Path & statePath, const int revision_arg, const bool recursive)
 {
     
     PathSet statePaths;
@@ -222,7 +222,7 @@ Snapshots commitStatePathTxn(const Transaction & txn, const Path & statePath)
 			intervalPaths.insert(fullstatedir);
 		}
 	}
-	vector<int> intervals = getStatePathsIntervalTxn(txn, intervalPaths);
+	IntVector intervals = getStatePathsIntervalTxn(txn, intervalPaths);
 	
 	Snapshots revisions_list;
 	

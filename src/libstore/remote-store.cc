@@ -212,8 +212,7 @@ Path RemoteStore::queryStatePathDrv(const Path & statePath)
 	writeInt(wopQueryStatePathDrv, to);
 	writeString(statePath, to);
     processStderr();
-    Path p = readString(from);				//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! check wheter from is the state path ????
-    return p;
+    return readString(from);
 }
 
 void RemoteStore::queryReferences(const Path & path,
@@ -221,10 +220,10 @@ void RemoteStore::queryReferences(const Path & path,
 {
     writeInt(wopQueryReferences, to);
     writeString(path, to);
+    writeInt(revision, to);
     processStderr();
     PathSet references2 = readStorePaths(from);
     references.insert(references2.begin(), references2.end());
-    //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! include revision?
 }
 
 void RemoteStore::queryStateReferences(const Path & path,
@@ -232,29 +231,23 @@ void RemoteStore::queryStateReferences(const Path & path,
 {
     writeInt(wopQueryStateReferences, to);
     writeString(path, to);
+    writeInt(revision, to);
     processStderr();
 	PathSet stateReferences2 = readStorePaths(from);
 	stateReferences.insert(stateReferences2.begin(), stateReferences2.end());
-	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! include revision?
 }
 
-
-void RemoteStore::queryAllReferences(const Path & path, 
-     PathSet & allReferences, const int revision)
-{
-     //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-     	
-}
 
 void RemoteStore::queryReferrers(const Path & path,
     PathSet & referrers, const int revision)
 {
     writeInt(wopQueryReferrers, to);
     writeString(path, to);
+    writeInt(revision, to);
     processStderr();
     PathSet referrers2 = readStorePaths(from);
     referrers.insert(referrers2.begin(), referrers2.end());
-	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! include revision?    
+   
 }
 
 void RemoteStore::queryStateReferrers(const Path & path, 
@@ -262,10 +255,10 @@ void RemoteStore::queryStateReferrers(const Path & path,
 {
 	writeInt(wopQueryStateReferrers, to);
     writeString(path, to);
+    writeInt(revision, to);
     processStderr();
     PathSet stateReferrers2 = readStorePaths(from);
     stateReferrers.insert(stateReferrers2.begin(), stateReferrers2.end());
-    //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! include revision?
 }
 
 
@@ -319,7 +312,7 @@ Path RemoteStore::importPath(bool requireSignature, Source & source)
        anyway. */
     
     processStderr(0, &source);
-    Path path = readStorePath(from);
+    //Path path = readStorePath(from);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	remove 
     return readStorePath(from);
 }
 
@@ -403,6 +396,136 @@ void RemoteStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     bytesFreed = (((unsigned long long) hi) << 32) | lo;
 }
 
+PathSet RemoteStore::queryDerivers(const Path & storePath, const string & identifier, const string & user)
+{
+	writeInt(wopQueryDerivers, to);
+	writeString(storePath, to);
+	writeString(identifier, to);
+	writeString(user, to);
+	processStderr();
+	return readStorePaths(from);		//TODO is this ok ??
+}
+
+void RemoteStore::setStatePathsInterval(const PathSet & statePaths, const IntVector & intervals, bool allZero)
+{
+    writeInt(wopSetStatePathsInterval, to);
+	writeStringSet(statePaths, to);
+	writeIntVector(intervals, to);
+	writeInt(allZero ? 1 : 0, to);
+	processStderr();
+	readInt(from);
+}
+
+IntVector RemoteStore::getStatePathsInterval(const PathSet & statePaths)
+{
+	writeInt(wopGetStatePathsInterval, to);
+	writeStringSet(statePaths, to);
+	processStderr();
+	return readIntVector(from);
+}
+
+bool RemoteStore::isStateComponent(const Path & path)
+{
+	writeInt(wopIsStateComponent, to);
+	writeString(path, to);
+	processStderr();
+	unsigned int reply = readInt(from);
+    return reply != 0;
+}
+
+void RemoteStore::storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const int revision)
+{
+	writeInt(wopStorePathRequisites, to);
+	writeString(storeOrstatePath, to);
+	writeInt(includeOutputs ? 1 : 0, to);
+	writeStringSet(paths, to);
+	writeInt(withComponents ? 1 : 0, to);
+	writeInt(withState ? 1 : 0, to);
+	writeInt(revision, to);	
+	processStderr();
+	readInt(from);
+}
+
+void RemoteStore::setStateRevisions(const RevisionClosure & revisions, const Path & rootStatePath, const string & comment)
+{
+	writeInt(wopSetStateRevisions, to);
+	writeRevisionClosure(revisions, to);
+	writeString(rootStatePath, to);
+	writeString(comment, to);	
+	processStderr();
+	readInt(from);
+}
+
+bool RemoteStore::queryStateRevisions(const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const int revision)
+{
+	writeInt(wopQueryStateRevisions, to);
+	writeString(statePath, to); 
+	writeInt(revision, to);
+	RevisionClosure revisions2 = readRevisionClosure(from);			
+	RevisionClosureTS timestamps2 = readRevisionClosureTS(from); 
+	revisions = revisions2;												//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	timestamps = timestamps2;											//TODO !!!!!!!!!!!!!!!!!!!! COPY BY VALUE I THINK
+	processStderr();
+	unsigned int reply = readInt(from);
+    return reply != 0;
+}
+
+bool RemoteStore::queryAvailableStateRevisions(const Path & statePath, RevisionInfos & revisions)
+{
+	writeInt(wopQueryAvailableStateRevisions, to);
+	writeString(statePath, to);
+	RevisionInfos revisions2 = readRevisionInfos(from);			
+	revisions = revisions2;												//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	processStderr();
+	unsigned int reply = readInt(from);
+    return reply != 0;	
+}
+
+Snapshots RemoteStore::commitStatePath(const Path & statePath)
+{
+	writeInt(wopCommitStatePath, to);
+	writeString(statePath, to);
+	processStderr();
+	return readSnapshots(from);
+}	
+
+void RemoteStore::scanAndUpdateAllReferences(const Path & statePath, const bool recursive)
+{
+	writeInt(wopScanAndUpdateAllReferences, to);
+	writeString(statePath, to);
+	writeInt(recursive ? 1 : 0, to);
+	processStderr();
+	readInt(from);
+}
+
+Path RemoteStore::queryDeriver(const Path & path)
+{
+	writeInt(wopQueryDeriver, to);
+	writeString(path, to);
+	processStderr();
+	return readStorePath(from);
+}
+
+PathSet RemoteStore::toNonSharedPathSet(const PathSet & statePaths)
+{
+	writeInt(wopToNonSharedPathSet, to);
+	writeStringSet(statePaths, to);
+	processStderr();
+	return readStringSet(from);			//TODO !!!!!!!!!!!!!!! create a readStatePaths just like  readStorePaths
+}
+
+void RemoteStore::revertToRevision(const Path & componentPath, const Path & derivationPath, const Path & statePath, const int revision_arg, const bool recursive)
+{
+	writeInt(wopRevertToRevision, to);
+	writeString(componentPath, to);
+	writeString(derivationPath, to);
+	writeString(statePath, to);
+	writeInt(revision_arg, to);
+	writeInt(recursive ? 1 : 0, to);
+	processStderr();
+	readInt(from);
+}
+
 
 void RemoteStore::processStderr(Sink * sink, Source * source)
 {
@@ -433,100 +556,6 @@ void RemoteStore::processStderr(Sink * sink, Source * source)
         throw Error("protocol error processing standard error");
 }
 
-//TODO
-void RemoteStore::setStatePathsInterval(const PathSet & statePaths, const vector<int> & intervals, bool allZero)
-{
-	
-}
 
-//TODO
-vector<int> RemoteStore::getStatePathsInterval(const PathSet & statePaths)
-{
-	vector<int> intervals;
-    return intervals;
-}
-
-//TODO
-bool RemoteStore::isStateComponent(const Path & path)
-{
-	return false;	
-}
-
-//TODO
-bool RemoteStore::isStateDrvPath(const Path & drvpath)
-{
-	return false;
-}
-
-//TODO
-bool RemoteStore::isStateDrv(const Derivation & drv)
-{
-	return false;
-}
-
-//TODO
-void RemoteStore::storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool & withComponents, const bool & withState, const int revision)
-{
-	
-}
-
-//TODO
-void RemoteStore::setStateRevisions(const RevisionClosure & revisions, const Path & rootStatePath, const string & comment)
-{
-	
-}
-
-//TODO
-bool RemoteStore::queryStateRevisions(const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const int revision)
-{
-	return false;
-}
-
-//TODO
-bool RemoteStore::queryAvailableStateRevisions(const Path & statePath, RevisionInfos & revisions)
-{
-	return false;	
-}
-
-//TODO
-Snapshots RemoteStore::commitStatePath(const Path & statePath)
-{
-	Snapshots ss;
-	return ss;
-}	
-
-void RemoteStore::scanAndUpdateAllReferences(const Path & statePath, const bool recursive)
-{
-
-}
-
-Path RemoteStore::queryDeriver(const Path & path)
-{
-	writeInt(wopQueryDeriver, to);
-	writeString(path, to);
-	processStderr();
-	return readStorePath(from);
-}
-
-PathSet RemoteStore::queryDerivers(const Path & storePath, const string & identifier, const string & user)
-{
-	writeInt(wopQueryDerivers, to);
-	writeString(storePath, to);
-	writeString(identifier, to);
-	writeString(user, to);
-	processStderr();
-	return readStorePaths(from);		//TODO is this ok ??
-}
-
-PathSet RemoteStore::toNonSharedPathSet(const PathSet & statePaths)
-{
-	PathSet p;
-	return p;	
-}
-
-void RemoteStore::revertToRevision(Path & componentPath, Path & derivationPath, Path & statePath, int revision_arg, bool recursive)
-{
-	
-}
 
 }

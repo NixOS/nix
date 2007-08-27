@@ -284,7 +284,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
     case wopQueryStatePathDrv: {
-    	Path path = readStorePath(from);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! needs to be the state path
+    	Path path = readString(from);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! make a readStatePath...
         startWork();
         Path p = store->queryStatePathDrv(path);
         stopWork();
@@ -295,12 +295,13 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     case wopQueryReferences:
     case wopQueryReferrers: {
         Path path = readStorePath(from);
+        int revision = readInt(from);
         startWork();
         PathSet paths;
         if (op == wopQueryReferences)
-            store->queryReferences(path, paths, -1);
+            store->queryReferences(path, paths, revision);
         else
-            store->queryReferrers(path, paths, -1);
+            store->queryReferrers(path, paths, revision);
         stopWork();
         writeStringSet(paths, to);
         break;
@@ -309,12 +310,13 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     case wopQueryStateReferences:
     case wopQueryStateReferrers: {
         Path path = readStorePath(from);
+        int revision = readInt(from);
         startWork();
         PathSet paths;
         if (op == wopQueryStateReferences)
-            store->queryStateReferences(path, paths, -1);
+            store->queryStateReferences(path, paths, revision);
         else
-            store->queryStateReferrers(path, paths, -1);			//TODO Does this work???, how about the state path?????????
+            store->queryStateReferrers(path, paths, revision);			//TODO Does this work???, how about the state path?????????
         stopWork();
         writeStringSet(paths, to);
         break;
@@ -329,17 +331,6 @@ static void performOp(Source & from, Sink & to, unsigned int op)
 		break;
 	}
 	
-	case wopQueryDerivers: {
-		Path path = readStorePath(from);
-		string identifier = readString(from);
-		string user = readString(from);
-		startWork();
-		PathSet derivers = store->queryDerivers(path, identifier, user);
-		stopWork();
-		writeStringSet(derivers, to);
-		break;
-	}
-
     case wopAddToStore: {
         string baseName = readString(from);
         bool fixed = readInt(from) == 1;
@@ -473,6 +464,72 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         writeInt(bytesFreed >> 32, to);
         
         break;
+    }
+    
+    case wopQueryDerivers: {
+		Path path = readStorePath(from);
+		string identifier = readString(from);
+		string user = readString(from);
+		startWork();
+		PathSet derivers = store->queryDerivers(path, identifier, user);
+		stopWork();
+		writeStringSet(derivers, to);
+		break;
+	}
+    
+    case wopSetStatePathsInterval: {
+    
+    	break;
+    }
+    
+	case wopGetStatePathsInterval: {
+    
+    	break;
+    }
+    
+	case wopIsStateComponent: {
+    
+    	break;
+    }
+    
+	case wopStorePathRequisites: {
+    
+    	break;
+    }
+    
+	case wopSetStateRevisions: {
+    
+    	break;
+    }
+    
+	case wopQueryStateRevisions: {
+    
+    	break;
+    }
+    
+	case wopQueryAvailableStateRevisions: {
+    
+    	break;
+    }
+    
+	case wopCommitStatePath: {
+    
+    	break;
+    }
+    
+	case wopScanAndUpdateAllReferences: {
+    
+    	break;
+    }
+    
+	case wopToNonSharedPathSet: {
+    
+    	break;
+    }
+    
+	case wopRevertToRevision: {
+    
+    	break;
     }
             
     default:
