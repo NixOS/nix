@@ -310,7 +310,7 @@ void runProgram_AndPrintOutput(Path program, bool searchPath, const Strings & ar
 
 int getTimeStamp();
 
-string getCallingUserName();
+//string getCallingUserName();
 
 /* TODO */
 PathSet pathSets_union(const PathSet & paths1, const PathSet & paths2);

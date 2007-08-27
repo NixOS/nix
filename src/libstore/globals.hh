@@ -80,7 +80,16 @@ bool queryBoolSetting(const string & name, bool def);
 
 unsigned int queryIntSetting(const string & name, unsigned int def);
 
-    
+/* TODO PRIVATE: UID of the user that calls the nix-worker daemon */
+extern uid_t callingUID;
+
+/* get/set the UID of the user that calls the nix-worker daemon */
+uid_t queryCallingUID();
+void setCallingUID(uid_t uid, bool reset = false);
+/* get the username based on the UID of the user that calls the nix-worker daemon */
+string queryCallingUsername();
+
+extern bool debugWorker;        
 }
 
 

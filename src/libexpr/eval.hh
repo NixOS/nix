@@ -16,7 +16,7 @@ class Hash;
 typedef std::map<Path, PathSet> DrvRoots;
 typedef std::map<Path, Hash> DrvHashes;
 
-/* Cache for calls to addToStore(); maps source paths to the store
+/* Cache for calls to addToStore(); maps source paths to the store				//THIS OK ????
    paths. */
 typedef std::map<Path, Path> SrcToStore;
 

@@ -3,7 +3,7 @@
 
 #include <map>
 #include <algorithm>
-
+#include <pwd.h>
 
 namespace nix {
 
@@ -27,8 +27,9 @@ unsigned int maxBuildJobs = 1;
 bool readOnlyMode = false;
 string thisSystem = "unset";
 unsigned int maxSilentTime = 0;
-
 static bool settingsRead = false;
+uid_t callingUID = 0;
+bool debugWorker = true;
 
 static std::map<string, Strings> settings;
 
@@ -115,5 +116,32 @@ unsigned int queryIntSetting(const string & name, unsigned int def)
     return n;
 }
 
- 
+uid_t queryCallingUID()
+{
+	/* A root user will not even bother calling the daemon, so there is no way to check
+	 * If the uid is not yet set...
+	 */	 
+	return callingUID;	
+}
+
+void setCallingUID(uid_t uid, bool reset)
+{
+	if(callingUID != 0 && !reset)
+		throw Error(format("The UID of the caller aleady set! at this point"));
+	
+	callingUID = uid;
+}
+
+string queryCallingUsername()
+{
+	uid_t uid = queryCallingUID();
+	
+	passwd *pwd = getpwuid(uid);
+	char *pw_name = pwd->pw_name;
+	
+	return (string)pw_name;
+}
+
+
+     
 }

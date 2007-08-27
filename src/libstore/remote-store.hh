@@ -94,7 +94,17 @@ public:
 	
 	bool queryAvailableStateRevisions(const Path & statePath, RevisionInfos & revisions);
 
-	void commitStatePath(const Path & statePath);
+	Snapshots commitStatePath(const Path & statePath);
+	
+	Path queryDeriver(const Path & path);
+	
+	PathSet queryDerivers(const Path & storePath, const string & identifier, const string & user);
+	
+	void scanAndUpdateAllReferences(const Path & statePath, const bool recursive);
+	
+	PathSet toNonSharedPathSet(const PathSet & statePaths);
+	
+	void revertToRevision(Path & componentPath, Path & derivationPath, Path & statePath, int revision_arg, bool recursive);
 	
 private:
     AutoCloseFD fdSocket;

@@ -11,4 +11,4 @@ nix-state.o: help.txt.hh
 
 AM_CXXFLAGS = \
  -I$(srcdir)/.. ${bdb_include} $(aterm_include) -I$(srcdir)/../libutil \
- -I$(srcdir)/../libstore -I$(srcdir)/../libmain
+ -I$(srcdir)/../libstore -I$(srcdir)/../libmain -I$(srcdir)/../libext3cow

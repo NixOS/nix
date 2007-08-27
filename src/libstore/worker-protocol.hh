@@ -33,6 +33,8 @@ typedef enum {
     wopCollectGarbage,
     wopExportPath,
     wopImportPath,
+    wopQueryDeriver,
+    wopQueryDerivers,
 } WorkerOp;
 
 

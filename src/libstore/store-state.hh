@@ -8,7 +8,7 @@
 namespace nix {
 
 /* Create a state directory. */
-void createStateDirs(const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs);
+void createStateDirsTxn(const Transaction & txn, const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs);
 
 /* TODO */
 Snapshots commitStatePathTxn(const Transaction & txn, const Path & statePath);
@@ -18,6 +18,14 @@ Snapshots commitStatePathTxn(const Transaction & txn, const Path & statePath);
 
 /* TODO */
 //int readRevisionNumber(Path statePath);
+
+
+void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePath
+								, PathSet & newFoundComponentReferences, PathSet & newFoundStateReferences);
+								
+void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path & statePath);
+
+void revertToRevisionTxn(const Transaction & txn, Path & componentPath, Path & derivationPath, Path & statePath, int revision_arg, bool recursive);
 
 }
 

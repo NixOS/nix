@@ -256,11 +256,11 @@ LocalStore::LocalStore(bool reserveSpace)
             throw Error(format("`%1%' is corrupt") % schemaFN);
     }
 
-    if (curSchema > nixSchemaVersion)
+    if (curSchema > nixSchemaVersion && curSchema != 4)					//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MAJOR HACK, I SHOULD MERGE WITH THE TRUNK
         throw Error(format("current Nix store schema is version %1%, but I only support %2%")
             % curSchema % nixSchemaVersion);
 
-    if (curSchema < nixSchemaVersion) {
+    if (curSchema < nixSchemaVersion && curSchema != 4) {				//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MAJOR HACK, I SHOULD MERGE WITH THE TRUNK
         if (curSchema <= 1)
             upgradeStore07();
         if (curSchema == 2)
@@ -809,7 +809,7 @@ bool LocalStore::isStateDrv(const Derivation & drv)
     return nix::isStateDrvTxn(noTxn, drv);
 }
 
-Path queryDeriver(const Transaction & txn, const Path & storePath)  
+static Path queryDeriver(const Transaction & txn, const Path & storePath)  
 {
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
@@ -825,6 +825,11 @@ Path queryDeriver(const Transaction & txn, const Path & storePath)
         return deriver;
     else
         return "";
+}
+
+Path LocalStore::queryDeriver(const Path & path)
+{
+	return nix::queryDeriver(noTxn, path);
 }
 
 //A '*' as argument stands for all identifiers or all users
@@ -857,6 +862,11 @@ PathSet queryDerivers(const Transaction & txn, const Path & storePath, const str
 	}
 	
 	return filtereddata;
+}
+
+PathSet LocalStore::queryDerivers(const Path & storePath, const string & identifier, const string & user)
+{
+	return nix::queryDerivers(noTxn, storePath, identifier, user);
 }
 
 //Wrapper around converting the drvPath to the statePath
@@ -1158,10 +1168,11 @@ Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
             registerValidPath(txn, dstPath, h, PathSet(), PathSet(), "", -1);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK (probabyly ok?)
             txn.commit();
         }
+        
 
         outputLock.setDeletion(true);
     }
-
+    
     return dstPath;
 }
 
@@ -1256,7 +1267,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
     nix::queryXReferencesTxn(txn, path, references, true, -1);		//TODO we can only now export the final revision	//TODO also export the state references ???
     writeStringSet(references, hashAndWriteSink);
 
-    Path deriver = queryDeriver(txn, path);
+    Path deriver = nix::queryDeriver(txn, path);
     writeString(deriver, hashAndWriteSink);
 
     if (sign) {
@@ -1423,8 +1434,7 @@ void deleteFromStore(const Path & _path, unsigned long long & bytesFreed)
                 throw PathInUse(format("cannot delete path `%1%' because it is in use by path `%2%'") % path % *i);
         invalidatePath(txn, path);
         
-        //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        //Also delete/invalidate stateReferrers?????
+        //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Also delete/invalidate stateReferrers?????
     }
     txn.commit();
 
@@ -1563,13 +1573,11 @@ void verifyStore(bool checkContents)
     txn.commit();
 }
 
-void setStatePathsInterval(const PathSet & statePaths, const vector<int> & intervals, bool allZero)
+void setStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePaths, const vector<int> & intervals, bool allZero)
 {
 	if(!allZero && statePaths.size() != intervals.size()){
 		throw Error("the number of statepaths and intervals must be equal");
 	} 
-	
-    Transaction txn(nixDB);
 
 	int n=0;
     for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
@@ -1583,13 +1591,13 @@ void setStatePathsInterval(const PathSet & statePaths, const vector<int> & inter
         nixDB.setString(txn, dbStateCounters, *i, int2String(interval));
         n++;
     }
-
-    txn.commit();
 }
 
 void LocalStore::setStatePathsInterval(const PathSet & statePaths, const vector<int> & intervals, bool allZero)
 {
-    nix::setStatePathsInterval(statePaths, intervals, allZero);
+	Transaction txn(nixDB);
+    nix::setStatePathsIntervalTxn(txn, statePaths, intervals, allZero);
+    txn.commit();
 }
 
 vector<int> getStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePaths)
@@ -1664,7 +1672,7 @@ void LocalStore::storePathRequisites(const Path & storeOrstatePath, const bool i
     nix::storePathRequisites(storeOrstatePath, includeOutputs, paths, withComponents, withState, revision);
 }
 
-void queryAllValidPaths(const Transaction & txn, PathSet & allComponentPaths, PathSet & allStatePaths)
+void queryAllValidPathsTxn(const Transaction & txn, PathSet & allComponentPaths, PathSet & allStatePaths)
 {
 	Paths allComponentPaths2;
     Paths allStatePaths2;
@@ -1711,9 +1719,24 @@ bool LocalStore::queryAvailableStateRevisions(const Path & statePath, RevisionIn
 	return nix::queryAvailableStateRevisionsTxn(noTxn, statePath, revisions);
 }
 
-void LocalStore::commitStatePath(const Path & statePath)
+Snapshots LocalStore::commitStatePath(const Path & statePath)
 {
-	nix::commitStatePathTxn(noTxn, statePath);
+	Transaction txn(nixDB);
+	Snapshots ss = nix::commitStatePathTxn(txn, statePath);
+	txn.commit();
+	return ss;	
+}
+
+void LocalStore::scanAndUpdateAllReferences(const Path & statePath, const bool recursive)
+{
+	Transaction txn(nixDB);
+	if(recursive)
+		nix::scanAndUpdateAllReferencesRecusivelyTxn(txn, statePath);
+	else{
+		PathSet empty;
+		nix::scanAndUpdateAllReferencesTxn(txn, statePath, empty, empty);
+	}
+	txn.commit();
 }
 
 void setSolidStateReferencesTxn(const Transaction & txn, const Path & statePath, const PathSet & paths)
@@ -1767,6 +1790,11 @@ PathSet toNonSharedPathSetTxn(const Transaction & txn, const PathSet & statePath
 	return real_statePaths;
 }
 
+PathSet LocalStore::toNonSharedPathSet(const PathSet & statePaths)
+{
+	return toNonSharedPathSetTxn(noTxn, statePaths);
+}
+
 void setStateComponentReferencesTxn(const Transaction & txn, const Path & statePath, const Strings & references, int revision, int timestamp)
 {
 	nixDB.setStateReferences(txn, dbStateComponentReferences, dbStateRevisions, statePath, references, revision, timestamp);
@@ -1818,6 +1846,15 @@ PathSet getSharedWithPathSetRecTxn(const Transaction & txn, const Path & statePa
 	PathSet empty;
 	return getSharedWithPathSetRecTxn_private(txn, statePath_ns, empty);
 }
+
+
+void LocalStore::revertToRevision(Path & componentPath, Path & derivationPath, Path & statePath, int revision_arg, bool recursive)
+{
+	Transaction txn(nixDB);
+	revertToRevisionTxn(txn, componentPath, derivationPath, statePath, revision_arg, recursive);
+	txn.commit();	
+}
+
 
 /* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */
 static void upgradeStore07()

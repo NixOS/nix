@@ -59,7 +59,7 @@ public:
     /* Checks whether a path is valid. */ 
     virtual bool isValidPath(const Path & path) = 0;
     
-    /* TODO */
+    /* Checks whether a state-path is valid. */
     virtual bool isValidStatePath(const Path & path) = 0;
     
     /* TODO */
@@ -207,7 +207,7 @@ public:
 	/* TODO */
 	virtual vector<int> getStatePathsInterval(const PathSet & statePaths) = 0;
 	
-	/* TODO */
+	/* Checks whether a path is a component path that has a statePath. */
 	virtual bool isStateComponent(const Path & path) = 0;
 	
 	/* TODO */
@@ -229,7 +229,19 @@ public:
 	virtual bool queryAvailableStateRevisions(const Path & statePath, RevisionInfos & revisions) = 0;
 	
 	/* TODO */
-	virtual void commitStatePath(const Path & statePath) = 0;
+	virtual Snapshots commitStatePath(const Path & statePath) = 0;
+	
+	/* Query the deriver of a store path.  Return the empty string if
+	   no deriver has been set. */
+	virtual Path queryDeriver(const Path & path) = 0;
+	
+	virtual PathSet queryDerivers(const Path & storePath, const string & identifier, const string & user) = 0;
+	
+	virtual void scanAndUpdateAllReferences(const Path & statePath, const bool recursive) = 0;
+	
+	virtual PathSet toNonSharedPathSet(const PathSet & statePaths) = 0;
+	
+	virtual void revertToRevision(Path & componentPath, Path & derivationPath, Path & statePath, int revision_arg, bool recursive) = 0;
 };
 
 

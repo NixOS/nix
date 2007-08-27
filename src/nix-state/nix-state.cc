@@ -14,6 +14,7 @@
 #include "references.hh"
 #include "store-state.hh"
 #include "config.h"
+#include "snapshot.hh"
 
 using namespace nix;
 using std::cin;
@@ -67,9 +68,9 @@ Derivation getDerivation(const string & fullPath, const Strings & program_args, 
 	//printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % state_identifier % binary % username % program_args);
     
     if(isStateComponent)
-    	derivers = queryDerivers(noTxn, componentPath, state_identifier, username);
+    	derivers = store->queryDerivers(componentPath, state_identifier, username);
     else
-    	derivers.insert(queryDeriver(noTxn, componentPath));
+    	derivers.insert(store->queryDeriver(componentPath));
     
     if(getDerivers == true)
     	return Derivation();
@@ -162,23 +163,22 @@ static void opShowStatePath(Strings opFlags, Strings opArgs)
 	printMsg(lvlError, format("%1%") % statePath);
 }
 
-/*
- * Input: store (or statePath?)
- * Returns all the drv's of the statePaths (in)directly referenced.
- */
-PathSet getAllStateDerivationsRecursively(const Path & storePath, const int revision)
+
+static void revertToRevision(Strings opFlags, Strings opArgs)
 {
-	//Get recursively all state paths
-	PathSet statePaths;
-	store->storePathRequisites(storePath, false, statePaths, false, true, revision);		
-	
-	//Find the matching drv with the statePath
-	PathSet derivations;	
-	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
-		derivations.insert(store->queryStatePathDrv(*i));
-			
-	return derivations;
+	Path componentPath;
+    Path statePath;
+    string binary;
+    string derivationPath;
+    bool isStateComponent;
+    Strings program_args;
+    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
+    
+    bool recursive = revert_recursively;
+    
+    store->revertToRevision(componentPath, derivationPath, statePath, revision_arg, recursive);
 }
+
 
 static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 {
@@ -196,7 +196,9 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 	}
 	
 	//Unshare if neccacary
-	Path nonSharedStatePath = toNonSharedPathTxn(noTxn, statePath);
+	PathSet nonSharedPaths;
+	nonSharedPaths.insert(statePath);
+	Path nonSharedStatePath = *((store->toNonSharedPathSet(nonSharedPaths)).begin());			//TODO CHECK IF THIS WORKS !!!!!!!!
 	if(nonSharedStatePath != statePath){
 		printMsg(lvlError, format("The statePath is shared with this path %1%") % nonSharedStatePath);
 		statePath = nonSharedStatePath;
@@ -204,8 +206,7 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 	
 	RevisionInfos revisions;
 	bool notEmpty = store->queryAvailableStateRevisions(statePath, revisions);
-	
-	
+		
 	if(!notEmpty){
 		printMsg(lvlError, format("No revisions yet for: %1%") % statePath);
 		return;	
@@ -240,227 +241,6 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 	}	
 }
 
-static void revertToRevision(Strings opFlags, Strings opArgs)
-{
-	Path componentPath;
-    Path statePath;
-    string binary;
-    string derivationPath;
-    bool isStateComponent;
-    Strings program_args;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
-    
-    bool recursive = revert_recursively;
-    
-    //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! add TXN here ???????????
-    
-    PathSet statePaths;
-    if(recursive)
-    	PathSet statePaths = getAllStateDerivationsRecursively(componentPath, revision_arg);	//get dependecies (if neccecary | recusively) of all state components that need to be updated
-    else
-		statePaths.insert(derivationPath);	//Insert direct state path
-
-	//get a new timestamp for the references update
-	int newTimestamp = getTimeStamp();
-		    	
-    //Get the revisions recursively to also roll them back
-    RevisionClosure getRivisions;
-    RevisionClosureTS getTimestamps;
-	bool b = store->queryStateRevisions(statePath, getRivisions, getTimestamps, revision_arg);
-
-	//Revert each statePath in the list
-	for (RevisionClosure::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
-		Path statePath = (*i).first;
-		Snapshots revisioned_paths = (*i).second;
-		int timestamp = getTimestamps[statePath];
-		
-		//get its derivation-state-items
-		Derivation statePath_drv = derivationFromPathTxn(noTxn, queryStatePathDrvTxn(noTxn, statePath));
-		DerivationStateOutputDirs stateOutputDirs = statePath_drv.stateOutputDirs; 
-		
-		//TODO Sort snapshots??? eg first restore root, then the subdirs??
-		
-		for (Snapshots::iterator j = revisioned_paths.begin(); j != revisioned_paths.end(); ++j){
-			Path revertPathOrFile = (*j).first;
-			unsigned int epoch = (*j).second;
-			
-			//printMsg(lvlError, format("MAYBE '%1%'") % revertPathOrFile);
-			
-			//Look up the type from the drv with for the current snapshotted path
-			Path statePath_postfix = revertPathOrFile.substr(nixStoreState.length() + 1, revertPathOrFile.length() - nixStoreState.length());
-			statePath_postfix = statePath_postfix.substr(statePath_postfix.find_first_of("/") + 1, statePath_postfix.length());
-			if(statePath_postfix == "")
-				statePath_postfix = "/";
-			string type = stateOutputDirs.at(statePath_postfix).type;
-			if(type == "none")
-				continue;
-
-			//Now that were still here, we need to copy the state from the previous version back
-			Strings p_args;
-			p_args.push_back("-c");		//we use the shell to execute the cp command becuase the shell expands the '*' 
-			string cpcommand = "cp";
-			if(revertPathOrFile.substr(revertPathOrFile.length() -1 , revertPathOrFile.length()) == "/"){		//is dir
-				string revert_to_path = revertPathOrFile.substr(0, revertPathOrFile.length() -1) + "@" + unsignedInt2String(epoch);
-				cpcommand += " -R " + revert_to_path + "/*";
-				
-				//clean all contents of the folder first (so were sure the path is clean)
-				if(pathExists(revertPathOrFile))
-					deletePath(revertPathOrFile);
-				
-				if(epoch == 0)		//Path was deleted so were done
-					continue;
-				else				//If path was not deleted in the previous version, we need to make sure it exists or cp will fail
-					ensureDirExists(revertPathOrFile);
-				
-				//If the the dir has not contents then a cp ..../* will error since * cannot be expanded. So in this case were done and dont have to revert.
-				Strings p2_args;
-				p2_args.push_back("-A");
-				p2_args.push_back(revert_to_path + "/");
-				string output = runProgram("ls", true, p2_args);
-				if(output == "")
-					continue;
-			}
-			else{																//is file
-				cpcommand += " " + (revertPathOrFile + "@" + unsignedInt2String(epoch));
-				
-				if(epoch == 0){
-					//delete file
-					if(FileExist(revertPathOrFile))
-						deletePath(revertPathOrFile);	//we only delete if the cp doesnt overwrite it below
-					continue;
-				}
-			}
-			
-			//Revert
-			printMsg(lvlError, format("Reverting '%1%@%2%'") % revertPathOrFile % unsignedInt2String(epoch));
-			printMsg(lvlError, format("Command: '%1%'") % cpcommand);
-			cpcommand += " " + revertPathOrFile;
-			p_args.push_back(cpcommand);
-			runProgram_AndPrintOutput("sh", true, p_args, "sh-cp");
-		}
-		
-		
-		//*** Now also revert state references to the specific revision (the revision is already converted to a timestamp here)
-		
-		//Query the references of the old revision (already converted to a timestamp)		
-    	PathSet state_references;
-    	queryXReferencesTxn(noTxn, statePath, state_references, true, -1, timestamp);
-		PathSet state_stateReferences;
-	    queryXReferencesTxn(noTxn, statePath, state_stateReferences, false, -1, timestamp);
-    	
-    	//Now set these old references as the new references at the new (just created) Timestamp
-    	setStateComponentReferencesTxn(noTxn, statePath, Strings(state_references.begin(), state_references.end()), -1, newTimestamp);
-		setStateStateReferencesTxn(noTxn, statePath, Strings(state_stateReferences.begin(), state_stateReferences.end()), -1, newTimestamp);
-		
-		printMsg(lvlError, format("Reverted state of '%1%' to revision '%2%'") % statePath % revision_arg);
-	}
-}
-
-//TODO include this call in the validate function
-//TODO ONLY CALL THIS FUNCTION ON A NON-SHARED STATE PATH!!!!!!!!!!!
-void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePath
-								, PathSet & newFoundComponentReferences, PathSet & newFoundStateReferences) //only for recursion
-{
-	//Check if is a state Path
-	if(! isValidStatePathTxn(txn, statePath))
-		throw Error(format("This path '%1%' is not a state path") % statePath);
-
-	//printMsg(lvlError, format("scanAndUpdateAllReferencesTxn: '%1%' - %2%") % statePath % revision);
-	
-	//TODO check if path is not a shared path !
-	//TODO
-
-	//get all possible state and component references
-    PathSet allComponentPaths;
-    PathSet allStatePaths;
-    queryAllValidPaths(txn, allComponentPaths, allStatePaths);
-    
-    //Remove derivation paths
-	PathSet allComponentPaths2;	//without derivations
-    for (PathSet::iterator i = allComponentPaths.begin(); i != allComponentPaths.end(); ++i){
-    	string path = *i;
-    	if(path.substr(path.length() - 4,path.length()) != drvExtension)		//TODO HACK: we should have a typed table or a seperate table ....	 	drvExtension == ".drv"
-    		allComponentPaths2.insert(path);
-    }
-
-	//TODO maybe only scan in the changeset (patch) for new references? (this will be difficult and depending on the underlying versioning system)
-
-    //Scan in for (new) component and state references
-    PathSet state_references = scanForReferences(statePath, allComponentPaths2);
-    PathSet state_stateReferences = scanForStateReferences(statePath, allStatePaths);
-    
-    //Retrieve old references
-    PathSet old_references;
-    PathSet old_state_references;
-    queryXReferencesTxn(txn, statePath, old_references, true, -1);				//get the latsest references
-    queryXReferencesTxn(txn, statePath, old_state_references, false, -1);		
-    
-    //Check for added and removed paths
-	PathSet diff_references_removed;
-	PathSet diff_references_added;
-	pathSets_difference(state_references, old_references, diff_references_removed, diff_references_added);
-	PathSet diff_state_references_removed;
-	PathSet diff_state_references_added;
-	pathSets_difference(state_stateReferences, old_state_references, diff_state_references_removed, diff_state_references_added);
-
-	//Set PathSet's for the caller of this function
-	newFoundComponentReferences = diff_references_added;
-	newFoundStateReferences = diff_state_references_added;
-	
-	//Print error, but we could also throw an error.
-	if(diff_references_added.size() != 0)
-    	for (PathSet::iterator i = diff_references_added.begin(); i != diff_references_added.end(); ++i)
-    		printMsg(lvlError, format("Added component reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
-    if(diff_references_removed.size() != 0)
-    	for (PathSet::iterator i = diff_references_removed.begin(); i != diff_references_removed.end(); ++i)
-    		printMsg(lvlError, format("Removed component reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
-    if(diff_state_references_added.size() != 0)
-    	for (PathSet::iterator i = diff_state_references_added.begin(); i != diff_state_references_added.end(); ++i)
-    		printMsg(lvlError, format("Added state reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
-    if(diff_state_references_removed.size() != 0)
-    	for (PathSet::iterator i = diff_state_references_removed.begin(); i != diff_state_references_removed.end(); ++i)
-    		printMsg(lvlError, format("Removed state reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
-
-	//We always set the referernces so we know they were scanned (maybe the same) at a certain time
-   	printMsg(lvlError, format("Updating new references for statepath: '%1%'") % statePath);
-   	Path drvPath = queryStatePathDrvTxn(txn, statePath);
-   	registerValidPath(txn,    	
-    		statePath,
-    		Hash(),				//emtpy hash
-    		state_references,
-    		state_stateReferences,
-    		drvPath,
-    		-1);				//Set at a new timestamp
-}
-
-void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path & statePath)
-{
-   	if(! isValidStatePathTxn(txn, statePath))
-   		throw Error(format("This path '%1%' is not a state path") % statePath);
-
-	//get all state current state references recursively
-	PathSet statePaths;
-	store->storePathRequisites(statePath, false, statePaths, false, true, -1);		//Get all current state dependencies
-	
-	//Add own statePath (may already be in there, but its a set, so no doubles)
-	statePaths.insert(statePath);
-	
-   	//We dont need to sort since the db does that
-	//call scanForAllReferences again on all statePaths
-	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i){
-		
-		//Scan, update, call recursively
-		PathSet newFoundComponentReferences;
-		PathSet newFoundStateReferences;
-		scanAndUpdateAllReferencesTxn(txn, *i, newFoundComponentReferences, newFoundStateReferences);
-
-		//Call the function recursively again on all newly found references												//TODO test if this works
-		PathSet allNewReferences = pathSets_union(newFoundComponentReferences, newFoundStateReferences);
-		for (PathSet::iterator j = allNewReferences.begin(); j != allNewReferences.end(); ++j)
-			scanAndUpdateAllReferencesRecusivelyTxn(txn, *j);
-	}
-}
-
 
 
 static void opRunComponent(Strings opFlags, Strings opArgs)
@@ -482,9 +262,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	//add locks ... ?
 	//svn lock ... ?
 	
-	//TODO
-	Transaction txn;
-   	//createStoreTransaction(txn);
+	
 		
 	//******************* Run ****************************
 	
@@ -506,10 +284,16 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     	printMsg(lvlError, format("Command: '%1%'")	% (root_componentPath + root_binary + root_args));
 		executeShellCommand(root_componentPath + root_binary + root_args);
 	}
+  	
+  	//////////////////////////////
+  	
+  	//TODO
+	Transaction txn;
+   	//createStoreTransaction(txn);
   		
 	//******************* Scan for new references if neccecary
    	if(scanforReferences)
-  		scanAndUpdateAllReferencesRecusivelyTxn(txn, root_statePath);
+  		store->scanAndUpdateAllReferences(root_statePath, true);		//TODO make recursive a paramter?
 
 	//get all current (maybe updated by the scan) dependecies (if neccecary | recusively) of all state components that need to be updated
     PathSet statePaths;
@@ -519,17 +303,17 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	//Start transaction TODO
     
     //Replace all shared paths in the set for their real paths 
-    statePaths = toNonSharedPathSetTxn(noTxn, statePaths);
+    statePaths = store->toNonSharedPathSet(statePaths);
 	
 	//******************* With everything in place, we call the commit script on all statePaths (in)directly referenced **********************
 	
 	//Commit all statePaths
 	RevisionClosure rivisionMapping;
 	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)		//TODO first commit own state path?
-		rivisionMapping[*i] = commitStatePathTxn(txn, *i);
+		rivisionMapping[*i] = store->commitStatePath(*i);
 	
 	//Save new revisions
-	setStateRevisionsTxn(txn, rivisionMapping, root_statePath, comment);
+	store->setStateRevisions(rivisionMapping, root_statePath, comment);				//TODO how about the txn?
 	
 	//Commit transaction
 	//txn.commit();
@@ -576,7 +360,7 @@ void run(Strings args)
 	store = openStore();
 	printMsg(lvlError, format("1: %1%") % bool2string( store->isStateComponent("/nix/store/7xkw5fkz5yw7dpx0pc6l12bh9a56135c-hellostateworld-1.0") ) );
 	printMsg(lvlError, format("2: %1%") % bool2string( store->isStateComponent("/nix/store/05441jm8xmsidqm43ivk0micckf0mr2m-nvidiaDrivers") ) );
-	printMsg(lvlError, format("3: %1%") % bool2string( store->isStateDrvPath("/nix/store/2hpx60ibdfv2pslg4rjvp177frijamvi-hellostateworld-1.0.drv") ) );
+	printMsg(lvlError, format("3: %1%") % bool2string( isState Drv Path("/nix/store/2hpx60ibdfv2pslg4rjvp177frijamvi-hellostateworld-1.0.drv") ) );
 	
 	store = openStore();
 	Path p = store->queryStatePathDrv("/nix/state/6g6kfgimz8szznlshf13s29fn01zp99d-hellohardcodedstateworld-1.0-test2");
@@ -684,7 +468,7 @@ void run(Strings args)
 	// /nix/state/6l93ff3bn1mk61jbdd34diafmb4aq7c6-hellohardcodedstateworld-1.0-
 	// /nix/state/x8k4xiv8m4zmx26gmb0pyymmd6671fyy-hellohardcodedstateworld-1.0-
 	
-	PathSet p = getSharedWithPathSetRecTxn(noTxn, "/nix/state/6l93ff3bn1mk61jbdd34diafmb4aq7c6-hellohardcodedstateworld-1.0-");
+	PathSet p = store->getSharedWithPathSetRec("/nix/state/6l93ff3bn1mk61jbdd34diafmb4aq7c6-hellohardcodedstateworld-1.0-");
 	for (PathSet::iterator j = p.begin(); j != p.end(); ++j)
 		printMsg(lvlError, format("P: '%1%'") % *j );
 	return;
@@ -767,8 +551,9 @@ void run(Strings args)
             throw UsageError("only one operation may be specified");
     }
     
+    //If no username given: take the username of the caller
     if(username == "")
-		username = getCallingUserName();
+		username = int2String(geteuid());
 
     if (!op) throw UsageError("no operation specified");
     

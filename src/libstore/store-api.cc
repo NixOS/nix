@@ -122,7 +122,7 @@ Path makeStatePath(const string & componentHash, const string & suffix, const st
     string suffix_stateIdentifier = stateIdentifier;
    	suffix_stateIdentifier = "-" + suffix_stateIdentifier; 
     
-    string username = getCallingUserName();												//Can and Should NOT be faked
+    string username = queryCallingUsername();					//Should NOT be fake-able
     
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
     string s = ":sha256:" + componentHash + ":"

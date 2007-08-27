@@ -43,7 +43,7 @@ static void tunnelStderr(const unsigned char * buf, size_t count)
        process handling the connection.  Otherwise we could screw up
        the protocol.  It's up to the parent to redirect stderr and
        send it to the client somehow (e.g., as in build.cc). */
-    if (canSendStderr && myPid == getpid()) {
+    if (canSendStderr && myPid == getpid() && (!debugWorker)) {						//TODO debugWorker commit
         try {
             writeInt(STDERR_NEXT, to);
             writeString(string((char *) buf, count), to);
@@ -53,8 +53,10 @@ static void tunnelStderr(const unsigned char * buf, size_t count)
             canSendStderr = false;
             throw;
         }
-    } else
+    } else{
+     	//printMsg(lvlInfo, format("nix-worker: debug mode"));
         writeFull(STDERR_FILENO, buf, count);
+    }
 }
 
 
@@ -317,24 +319,50 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         writeStringSet(paths, to);
         break;
     }
+    
+    case wopQueryDeriver: {
+		Path path = readStorePath(from);
+		startWork();
+		Path deriver = store->queryDeriver(path);
+		stopWork();
+		writeString(deriver, to);
+		break;
+	}
+	
+	case wopQueryDerivers: {
+		Path path = readStorePath(from);
+		string identifier = readString(from);
+		string user = readString(from);
+		startWork();
+		PathSet derivers = store->queryDerivers(path, identifier, user);
+		stopWork();
+		writeStringSet(derivers, to);
+		break;
+	}
 
     case wopAddToStore: {
-        /* !!! uberquick hack */
         string baseName = readString(from);
         bool fixed = readInt(from) == 1;
         bool recursive = readInt(from) == 1;
         string hashAlgo = readString(from);
-        
+
+		printMsg(lvlInfo, format("NIXWORKER: WOP 1"));
+
+		/* !!! uberquick hack */        
         Path tmp = createTempDir();
         AutoDelete delTmp(tmp);
         Path tmp2 = tmp + "/" + baseName;
         restorePath(tmp2, from);
 
+		printMsg(lvlInfo, format("NIXWORKER: WOP 2"));
+
         startWork();
         Path path = store->addToStore(tmp2, fixed, recursive, hashAlgo);
         stopWork();
-        
+
+        printMsg(lvlInfo, format("NIXWORKER: WOP 3 '%1%'") % path);
         writeString(path, to);
+        printMsg(lvlInfo, format("NIXWORKER: WOP 4"));
         break;
     }
 
@@ -468,7 +496,8 @@ static void processConnection()
 
     /* Exchange the greeting. */
     unsigned int magic = readInt(from);
-    if (magic != WORKER_MAGIC_1) throw Error("protocol mismatch");
+    if (magic != WORKER_MAGIC_1) 
+    	throw Error("protocol mismatch");
     verbosity = (Verbosity) readInt(from);
     writeInt(WORKER_MAGIC_2, to);
 
@@ -506,7 +535,9 @@ static void processConnection()
         opCount++;
 
         try {
+        	printMsg(lvlInfo, format("Processing op '%1%'") % op);
             performOp(from, to, op);
+            printMsg(lvlInfo, format("Processed op '%1%'") % op);
         } catch (Error & e) {
             stopWork(false, e.msg());
         }
@@ -535,12 +566,27 @@ static void setSigChldAction(bool autoReap)
         throw SysError("setting SIGCHLD handler");
 }
 
+/* Returns the user ID of the one connecting to the socket though 
+ * SCM_CREDENTIALS. This uid is checked by the kernel and cannot be faked :)
+ */
+uid_t getpeereuid(int sd)
+{
+	struct ucred cred;
+	int len = sizeof (cred);
+	socklen_t len2 = (socklen_t)len;
+
+	if ( getsockopt(sd, SOL_SOCKET, SO_PEERCRED, &cred, &len2) )
+		throw SysError("Cannot get SCM_CREDENTIALS for socket");
+
+	return cred.uid;
+} 
 
 static void daemonLoop()
 {
     /* Get rid of children automatically; don't let them become
        zombies. */
     setSigChldAction(true);
+    
     
     /* Create and bind to a Unix domain socket. */
     AutoCloseFD fdSocket = socket(PF_UNIX, SOCK_STREAM, 0);
@@ -575,7 +621,8 @@ static void daemonLoop()
             /* Important: the server process *cannot* open the
                Berkeley DB environment, because it doesn't like forks
                very much. */
-            assert(!store);
+            if(!debugWorker)
+	            assert(!store);
             
             /* Accept a connection. */
             struct sockaddr_un remoteAddr;
@@ -585,42 +632,76 @@ static void daemonLoop()
                 (struct sockaddr *) &remoteAddr, &remoteAddrLen);
             checkInterrupt();
             if (remote == -1)
-		if (errno == EINTR)
-		    continue;
-		else
-		    throw SysError("accepting connection");
+				if (errno == EINTR)
+				    continue;
+				else
+				    throw SysError("accepting connection");
 
-            printMsg(lvlInfo, format("accepted connection %1%") % remote);
+			uid_t caller_uid = getpeereuid(remote);
 
-            /* Fork a child to handle the connection. */
-            pid_t child;
-            child = fork();
-    
-            switch (child) {
-        
-            case -1:
-                throw SysError("unable to fork");
-
-            case 0:
-                try { /* child */
-                    
-                    /* Background the worker. */
-                    if (setsid() == -1)
-                        throw SysError(format("creating a new session"));
-
-                    /* Restore normal handling of SIGCHLD. */
-                    setSigChldAction(false);
-                    
-                    /* Handle the connection. */
-                    from.fd = remote;
-                    to.fd = remote;
-                    processConnection();
-                    
-                } catch (std::exception & e) {
-                    std::cerr << format("child error: %1%\n") % e.what();
-                }
-                exit(0);
-            }
+			printMsg(lvlInfo, format("accepted connection '%1%'") 
+            		% remote);
+			
+			if(!debugWorker)
+			{
+			
+	            /* Fork a child to handle the connection. */
+	            pid_t child;
+	            child = fork();
+	    
+	            switch (child) {
+	        
+	            case -1:
+	                throw SysError("unable to fork");
+	
+	            case 0:
+	                try { /* child */
+	                    
+	                    /* We set the user id of the caller in the fork */
+	                    setCallingUID(caller_uid);
+	                    printMsg(lvlInfo, format("Fork for connection '%1%' created for userid: '%2%' with username: '%3%'") 
+	            								% remote % queryCallingUID() % queryCallingUsername());
+	                    
+	                    /* Background the worker. */
+	                    if (setsid() == -1)
+	                        throw SysError(format("creating a new session"));
+	
+	                    /* Restore normal handling of SIGCHLD. */
+	                    setSigChldAction(false);
+	                    
+	                    /* Handle the connection. */
+	                    from.fd = remote;
+	                    to.fd = remote;
+	                    processConnection();
+	                    
+	                } catch (std::exception & e) {
+	                    std::cerr << format("child error: %1%\n") % e.what();
+	                }
+	                exit(0);
+	            }
+			}
+			else
+			{
+				printMsg(lvlInfo, format("Nix-worker: debug mode: we can only process 1 job at the time"));
+				
+				/* We RESET the user id of the caller cause we have no fork */
+	            setCallingUID(caller_uid, true);
+	            printMsg(lvlInfo, format("Debug connection '%1%' created for userid: '%2%' with username: '%3%'") 
+	            						 % remote % queryCallingUID() % queryCallingUsername());
+	            
+	            /* Background the worker. */
+	            //if (setsid() == -1)
+	            //	throw SysError(format("creating a new session"));
+	
+	            /* Restore normal handling of SIGCHLD. */
+	            //setSigChldAction(false);
+	                    
+	            /* Handle the connection. */
+	            from.fd = remote;
+	            to.fd = remote;
+				processConnection();
+	                    
+			}
 
         } catch (Interrupted & e) {
             throw;

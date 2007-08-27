@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
-export nixstatepath=/nixstate/nix
-export ACLOCAL_PATH=/root/.nix-profile/share/aclocal
+export nixstatepath=/nixstate2/nix
+export ACLOCAL_PATH=/home/wouterdb/.nix-profile/share/aclocal
 
 if [ "$1" = "full" ]; then
   nix-env-all-pkgs.sh -i gcc
@@ -19,7 +19,8 @@ if [ "$1" = "full" ]; then
   nix-env-all-pkgs.sh -i docbook5-xsl
   nix-env-all-pkgs.sh -i bison
   nix-env-all-pkgs.sh -i gdb			#optional for debugging
-  nix-env-all-pkgs.sh -i e3cfsprogs
+  nix-env-all-pkgs.sh -i gnupatch
+  nix-env-all-pkgs.sh -i gnumake
 fi
 
 if [ "$1" = "full" ] || [ "$1" = "auto" ]; then
@@ -39,8 +40,8 @@ fi
             --with-bzip2=$HOME/.nix-profile \
             --with-bdb=$HOME/.nix-profile \
             --with-docbook-xsl=$HOME/.nix-profile \
-            --with-docbook-rng=/root/.nix-profile/xml/rng/docbook \
-            --with-docbook-xsl=/root/.nix-profile/xml/xsl/docbook \
+            --with-docbook-rng=/home/wouterdb/.nix-profile/xml/rng/docbook \
+            --with-docbook-xsl=/home/wouterdb/.nix-profile/xml/xsl/docbook \
             --prefix=$nixstatepath \
             --with-store-dir=/nix/store \
 	    	--with-store-state-dir=/nix/state \
@@ -61,9 +62,3 @@ fi
 
 echo "New state nix version by wouter ..." > doc/manual/NEWS.txt
 make
-make install
-
-#for i in $nixstatepath/bin/*; do
-#  echo "pathing $i"
-#  patchelf --set-rpath ../lib/nix/:$(patchelf --print-rpath $i) $i
-#done

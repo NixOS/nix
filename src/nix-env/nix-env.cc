@@ -563,7 +563,7 @@ static void installDerivations(Globals & globals,
         			
         			string oldStatePath;
         			//query old state path
-        			PathSet derivers = queryDerivers(noTxn, i->queryOutPath(globals.state), newStateIdentifier, getCallingUserName());
+        			PathSet derivers = store->queryDerivers(i->queryOutPath(globals.state), newStateIdentifier, int2String(geteuid()));		//TODO Check if username if ok
         			if(derivers.size() != 1)
 	    				throw Error(format("Internal Error: There is not exactly one deriver with state_identifier '%1%' for path '%2%'") 
 	    									% newStateIdentifier % i->queryOutPath(globals.state));

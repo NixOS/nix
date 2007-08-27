@@ -39,6 +39,7 @@ RemoteStore::RemoteStore()
 {
     string remoteMode = getEnv("NIX_REMOTE");
 
+	debug(format("Client remoteMode: '%1%'") % remoteMode);
     if (remoteMode == "slave")
         /* Fork off a setuid worker to do the privileged work. */
         forkSlave();
@@ -280,7 +281,9 @@ Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
     writeString(hashAlgo, to);
     dumpPath(srcPath, to, filter);
     processStderr();
-    Path path = readStorePath(from);
+    printMsg(lvlInfo, format("REMOTESTORE: ADD TO STORE REMOTE 1"));
+    Path path = readStorePath(from);		
+    printMsg(lvlInfo, format("REMOTESTORE: ADD TO STORE REMOTE 2"));
     return path;
 }
 
@@ -294,8 +297,7 @@ Path RemoteStore::addTextToStore(const string & suffix, const string & s,
     writeStringSet(references, to);
     
     processStderr();
-    Path path = readStorePath(from);
-    return path;
+    return readStorePath(from);
 }
 
 
@@ -318,7 +320,7 @@ Path RemoteStore::importPath(bool requireSignature, Source & source)
     
     processStderr(0, &source);
     Path path = readStorePath(from);
-    return path;
+    return readStorePath(from);
 }
 
 
@@ -487,7 +489,42 @@ bool RemoteStore::queryAvailableStateRevisions(const Path & statePath, RevisionI
 }
 
 //TODO
-void RemoteStore::commitStatePath(const Path & statePath)
+Snapshots RemoteStore::commitStatePath(const Path & statePath)
+{
+	Snapshots ss;
+	return ss;
+}	
+
+void RemoteStore::scanAndUpdateAllReferences(const Path & statePath, const bool recursive)
+{
+
+}
+
+Path RemoteStore::queryDeriver(const Path & path)
+{
+	writeInt(wopQueryDeriver, to);
+	writeString(path, to);
+	processStderr();
+	return readStorePath(from);
+}
+
+PathSet RemoteStore::queryDerivers(const Path & storePath, const string & identifier, const string & user)
+{
+	writeInt(wopQueryDerivers, to);
+	writeString(storePath, to);
+	writeString(identifier, to);
+	writeString(user, to);
+	processStderr();
+	return readStorePaths(from);		//TODO is this ok ??
+}
+
+PathSet RemoteStore::toNonSharedPathSet(const PathSet & statePaths)
+{
+	PathSet p;
+	return p;	
+}
+
+void RemoteStore::revertToRevision(Path & componentPath, Path & derivationPath, Path & statePath, int revision_arg, bool recursive)
 {
 	
 }

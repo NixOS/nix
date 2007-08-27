@@ -87,6 +87,8 @@ public:
 
     void collectGarbage(GCAction action, const PathSet & pathsToDelete,
         bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed);
+    
+    /////////////////////////////
         
 	void setStatePathsInterval(const PathSet & statePath, const vector<int> & intervals, bool allZero = false);
 	
@@ -106,7 +108,17 @@ public:
 	
 	bool queryAvailableStateRevisions(const Path & statePath, RevisionInfos & revisions);
 	
-	void commitStatePath(const Path & statePath);
+	Snapshots commitStatePath(const Path & statePath);
+	
+	Path queryDeriver(const Path & path);																//should these be in here ????
+	
+	PathSet queryDerivers(const Path & storePath, const string & identifier, const string & user);		//should these be in here ????
+	
+	void scanAndUpdateAllReferences(const Path & statePath, const bool recursive);
+	
+	PathSet toNonSharedPathSet(const PathSet & statePaths);
+	
+	void revertToRevision(Path & componentPath, Path & derivationPath, Path & statePath, int revision_arg, bool recursive);
 };
 
 
@@ -174,15 +186,8 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
 void setDeriver(const Transaction & txn, const Path & path,
     const Path & deriver);
 
-/* Query the deriver of a store path.  Return the empty string if no
-   deriver has been set. */
-Path queryDeriver(const Transaction & txn, const Path & path);
-
 /* Query the derivers of a state-store path. */
 PathSet queryDerivers(const Transaction & txn, const Path & storePath, const string & identifier, const string & user);
-
-/* Query the derivers of a state path. (are there more then 1 for a statepath?) */
-//PathSet queryDeriversStatePath(const Transaction & txn, const Path & storePath, const string & identifier, const string & user);
 
 /* Delete a value from the nixStore directory. */
 void deleteFromStore(const Path & path, unsigned long long & bytesFreed);
@@ -217,7 +222,7 @@ bool isStateDrvPathTxn(const Transaction & txn, const Path & drvPath);
 bool isStateDrvTxn(const Transaction & txn, const Derivation & drv);
 
 //TODO can this ?????
-void queryAllValidPaths(const Transaction & txn, PathSet & allComponentPaths, PathSet & allStatePaths);
+void queryAllValidPathsTxn(const Transaction & txn, PathSet & allComponentPaths, PathSet & allStatePaths);
 bool isValidStatePathTxn(const Transaction & txn, const Path & path);
 
 void queryXReferencesTxn(const Transaction & txn, const Path & path, PathSet & references, const bool component_or_state, const int revision, int timestamp = -1);
@@ -245,6 +250,10 @@ Path toNonSharedPathTxn(const Transaction & txn, const Path & statePath);
 PathSet getSharedWithPathSetRecTxn(const Transaction & txn, const Path & statePath);
 
 void ensurePathTxn(const Transaction & txn, const Path & path);
+vector<int> getStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePaths);
+
+bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const int revision);
+void setStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePath, const vector<int> & intervals, bool allZero = false);
 
 }
 

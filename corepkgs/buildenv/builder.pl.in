@@ -121,10 +121,12 @@ sub createLinks {
 		            sysopen (DSTFILEHANDLE, $new_dstFile, O_RDWR|O_EXCL|O_CREAT, 0755);
 					printf DSTFILEHANDLE "#! @shell@ \n";
 					
-					if($pkgRuntimeStateArgs eq "__NOARGS__")
-					{ printf DSTFILEHANDLE "$nixBinDir/nix-state --run --identifier=$new_stateIdentifier $srcFile \"\$@\" \n"; }
-					else
-					{ printf DSTFILEHANDLE "$nixBinDir/nix-state --run --identifier=$new_stateIdentifier $srcFile \"\$@\" $pkgRuntimeStateArgs \n"; }	# TODO, maybe first R.T.A. then other args ?
+					if($pkgRuntimeStateArgs eq "__NOARGS__"){ 
+						printf DSTFILEHANDLE "$nixBinDir/nix-state --run --identifier=$new_stateIdentifier $srcFile \"\$@\" \n"; 
+					}
+					else{ 
+						printf DSTFILEHANDLE "$nixBinDir/nix-state --run --identifier=$new_stateIdentifier $srcFile \"\$@\" $pkgRuntimeStateArgs \n"; 
+					}	# TODO, maybe first R.T.A. then other args ?
 					
 					close (DSTFILEHANDLE);
 	            }

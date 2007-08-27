@@ -370,8 +370,9 @@ void writeStringToFile(const Path & path, const string & s)
 
 
 LogType logType = ltPretty;
-Verbosity verbosity = lvlInfo;
+//Verbosity verbosity = lvlInfo;
 //Verbosity verbosity = lvlDebug;
+Verbosity verbosity = lvlVomit;
 
 static int nestingLevel = 0;
 
@@ -1176,20 +1177,9 @@ bool IsDirectory(const string FileName)
     return ((my_stat.st_mode & S_IFDIR) != 0);
 }
 
-
+/*
 string getCallingUserName()
 {
-	//TODO Make this work on WINDOWS: Untested!
-    /*
-    #include <windows.h>
-	   char acUserName[100];
-	   DWORD nUserName = sizeof(acUserName);
-	   if (GetUserName(acUserName, &nUserName))
-	       cout << "User name is " << acUserName << "." << endl;
-	   else
-	       cerr << "Failed to lookup user name, error code " << GetLastError() << "." << endl;
-    */
-    
     //Linux
     Strings empty;
     string username = runProgram("whoami", true, empty);				//the username of the user that is trying to build the component
@@ -1200,6 +1190,7 @@ string getCallingUserName()
     
     return username;
 }
+*/
 
 //merges two PathSets into one, removing doubles (union)
 PathSet pathSets_union(const PathSet & paths1, const PathSet & paths2)

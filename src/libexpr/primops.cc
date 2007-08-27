@@ -613,10 +613,15 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 	 * We also add enableState to make it parse the drv to a state-drv
 	 * We also add runtimeStateArgs for the hash calc in hashDerivationModulo(...) to check if its needs to take the stateIdentiefier into account in the hash
 	 */
+	
+	//TODO CHECK DRVS ARE CREATED BY THE USER AND NOT DAEMON ???????????????????????????
+	//queryCallingUsername()
+	//THERE ARE 2 CALLS TO DerivationStateOutput below !!!!!!!!!!!!!!!!!!!!!!
+	 
 	if(enableState && !disableState){    
 		if(runtimeStateArgs == ""){
 			string enableStateS = bool2string("true");
-			drv.stateOutputs["state"] = DerivationStateOutput("", "", "", "", stateIdentifier, enableStateS, "", "", "", runtimeStateArgs, getCallingUserName(), "", false);
+			drv.stateOutputs["state"] = DerivationStateOutput("", "", "", "", stateIdentifier, enableStateS, "", "", "", runtimeStateArgs, queryCallingUsername(), "", false);
 		}	
 	}
         
@@ -652,7 +657,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     	string enableStateS = bool2string("true");
     	string createDirsBeforeInstallS = bool2string(createDirsBeforeInstall);
     	drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, printHash(componentHash), outputHashAlgo, outputHash, stateIdentifier, enableStateS, 
-    	                                                  shareType, syncState, createDirsBeforeInstallS, runtimeStateArgs, getCallingUserName(), sharedState);
+    	                                                  shareType, syncState, createDirsBeforeInstallS, runtimeStateArgs, queryCallingUsername(), sharedState);
     	
     	for(vector<DerivationStateOutputDir>::iterator i = stateDirs.begin(); i != stateDirs.end(); ++i)
     		drv.stateOutputDirs[(*i).path] = *(i);
@@ -694,7 +699,7 @@ static Expr prim_derivationLazy(EvalState & state, const ATermVector & args)
         makeAttrRHS(makeSelect(drvStrict, toATerm("outPath")), makeNoPos()));
     attrs.set(toATerm("drvPath"),
         makeAttrRHS(makeSelect(drvStrict, toATerm("drvPath")), makeNoPos()));
-    attrs.set(toATerm("statePath"),														//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! add a state check !
+    attrs.set(toATerm("statePath"),
         makeAttrRHS(makeSelect(drvStrict, toATerm("statePath")), makeNoPos()));
     
     return makeAttrs(attrs);

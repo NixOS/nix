@@ -478,7 +478,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
             /* Note that the deriver need not be valid (e.g., if we
                previously ran the collector with `gcKeepDerivations'
                turned off). */
-            Path deriver = queryDeriver(noTxn, *i);
+            Path deriver = store->queryDeriver(*i);
             if (deriver != "" && store->isValidPath(deriver))
                 computeFSClosure(deriver, livePaths, true, false, -1);							//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO KEEP STATE
         }

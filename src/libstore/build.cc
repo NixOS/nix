@@ -1079,7 +1079,7 @@ static string makeValidityRegistration(const PathSet & paths,
     for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i) {
         s += *i + "\n";
 
-        Path deriver = showDerivers ? queryDeriver(noTxn, *i) : "";
+        Path deriver = showDerivers ? store->queryDeriver(*i) : "";
         s += deriver + "\n";
 
         PathSet references;
@@ -1400,7 +1400,7 @@ void DerivationGoal::startBuilder()
    		checkStatePath(drv);
 	
     	if(drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
-	    	createStateDirs(drv.stateOutputDirs, drv.stateOutputs);
+	    	createStateDirsTxn(noTxn, drv.stateOutputDirs, drv.stateOutputs);
     }
 
     /* For convenience, set an environment pointing to the top build
@@ -1640,7 +1640,7 @@ void DerivationGoal::computeClosure()
     //We create state dirs only when state is enabled and when the dirs need to be created after the installation
     if(drv.stateOutputs.size() != 0)
     	if(!drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
-	    	createStateDirs(drv.stateOutputDirs, drv.stateOutputs);
+	    	createStateDirsTxn(noTxn, drv.stateOutputDirs, drv.stateOutputs);
     
     /*
     for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
