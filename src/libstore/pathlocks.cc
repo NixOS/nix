@@ -161,10 +161,8 @@ void PathLocks::lockPaths(const PathSet & _paths, const string & waitMsg)
 
         debug(format("locking path `%1%'") % path);
 
-        if (lockedPaths.find(lockPath) != lockedPaths.end()) {
-            debug(format("already holding lock on `%1%'") % lockPath);
-            continue;
-        }
+        if (lockedPaths.find(lockPath) != lockedPaths.end())
+            throw Error("deadlock: trying to re-acquire self-held lock");
 
         AutoCloseFD fd;
         

@@ -61,6 +61,8 @@ void createSymlink(const Path & link, const Path & target, bool careful)
     /* Create directories up to `gcRoot'. */
     createDirs(dirOf(link));
 
+    /* !!! shouldn't removing and creating the symlink be atomic? */
+
     /* Remove the old symlink. */
     if (pathExists(link)) {
         if (careful && (!isLink(link) || !isInStore(readLink(link))))
@@ -68,7 +70,7 @@ void createSymlink(const Path & link, const Path & target, bool careful)
         unlink(link.c_str());
     }
 
-    /* And create the new own. */
+    /* And create the new one. */
     if (symlink(target.c_str(), link.c_str()) == -1)
         throw SysError(format("symlinking `%1%' to `%2%'")
             % link % target);
