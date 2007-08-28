@@ -223,5 +223,12 @@ void PathLocks::setDeletion(bool deletePaths)
     this->deletePaths = deletePaths;
 }
 
+
+bool pathIsLockedByMe(const Path & path)
+{
+    Path lockPath = path + ".lock";
+    return lockedPaths.find(lockPath) != lockedPaths.end();
+}
+
  
 }
