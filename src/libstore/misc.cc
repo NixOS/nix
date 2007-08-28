@@ -9,14 +9,27 @@
 namespace nix {
 
 
-Derivation derivationFromPathTxn(const Transaction & txn, const Path & drvPath)
+Derivation derivationFromPathPrivate(const bool dotxn, const Transaction & txn, const Path & drvPath)
 {
     assertStorePath(drvPath);
-    ensurePathTxn(txn, drvPath);
+    if(dotxn)
+    	ensurePathTxn(txn, drvPath);
+    else
+    	store->ensurePath(drvPath);
     ATerm t = ATreadFromNamedFile(drvPath.c_str());
     if (!t) 
     	throw Error(format("cannot read aterm from `%1%'") % drvPath);
     return parseDerivation(t);
+}
+
+//Wrappers
+Derivation derivationFromPath(const Path & drvPath)
+{
+	return derivationFromPathPrivate(false, noTxn, drvPath);
+}
+Derivation derivationFromPathTxn(const Transaction & txn, const Path & drvPath)
+{
+	return derivationFromPathPrivate(true, txn, drvPath);
 }
 
 void computeFSClosure(const Path & path, PathSet & paths, const bool & withComponents, const bool & withState, const int revision, bool flipDirection)

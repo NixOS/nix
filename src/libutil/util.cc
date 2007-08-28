@@ -370,9 +370,9 @@ void writeStringToFile(const Path & path, const string & s)
 
 
 LogType logType = ltPretty;
-//Verbosity verbosity = lvlInfo;
+Verbosity verbosity = lvlInfo;
 //Verbosity verbosity = lvlDebug;
-Verbosity verbosity = lvlVomit;
+//Verbosity verbosity = lvlVomit;
 
 static int nestingLevel = 0;
 

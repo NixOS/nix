@@ -117,7 +117,7 @@ unsigned int readInt(Source & source)
     unsigned char buf[8];
     source(buf, sizeof(buf));
     if (buf[4] || buf[5] || buf[6] || buf[7])
-        throw Error("implementation cannot deal with > 32-bit integers");
+        throw Error("implementation cannot deal with > 32-bit integers");		//TODO !!!!!!!!!!!!!!!!! unsigned Int reader
     return
         buf[0] |
         (buf[1] << 8) |

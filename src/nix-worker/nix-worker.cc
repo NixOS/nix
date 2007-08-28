@@ -337,23 +337,16 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         bool recursive = readInt(from) == 1;
         string hashAlgo = readString(from);
 
-		printMsg(lvlInfo, format("NIXWORKER: WOP 1"));
-
 		/* !!! uberquick hack */        
         Path tmp = createTempDir();
         AutoDelete delTmp(tmp);
         Path tmp2 = tmp + "/" + baseName;
         restorePath(tmp2, from);
 
-		printMsg(lvlInfo, format("NIXWORKER: WOP 2"));
-
         startWork();
         Path path = store->addToStore(tmp2, fixed, recursive, hashAlgo);
         stopWork();
-
-        printMsg(lvlInfo, format("NIXWORKER: WOP 3 '%1%'") % path);
         writeString(path, to);
-        printMsg(lvlInfo, format("NIXWORKER: WOP 4"));
         break;
     }
 
@@ -478,57 +471,122 @@ static void performOp(Source & from, Sink & to, unsigned int op)
 	}
     
     case wopSetStatePathsInterval: {
-    
+    	PathSet statePaths = readStringSet(from);
+		IntVector intervals = readIntVector(from);
+		bool allZero = readInt(from) == 1;
+    	startWork();
+        store->setStatePathsInterval(statePaths, intervals, allZero);
+        stopWork();
+        writeInt(1, to);
     	break;
     }
     
 	case wopGetStatePathsInterval: {
-    
+		PathSet statePaths = readStringSet(from);
+    	startWork();
+    	IntVector iv = store->getStatePathsInterval(statePaths);
+        stopWork();
+        writeIntVector(iv, to);
     	break;
     }
     
 	case wopIsStateComponent: {
-    
+    	Path path = readString(from);
+    	startWork();
+    	bool result = store->isStateComponent(path);
+    	stopWork();
+    	writeInt(result, to);
     	break;
     }
     
 	case wopStorePathRequisites: {
-    
+		Path storeOrstatePath = readString(from);
+		bool includeOutputs = readInt(from) == 1;
+		PathSet paths = readStringSet(from);
+		bool withComponents = readInt(from) == 1;
+		bool withState = readInt(from) == 1;
+		int revision = readInt(from);
+		startWork();
+        store->storePathRequisites(storeOrstatePath, includeOutputs, paths, withComponents, withState, revision);
+        stopWork();
+        writeInt(1, to);	
     	break;
     }
     
 	case wopSetStateRevisions: {
-    
+    	RevisionClosure revisions = readRevisionClosure(from);
+		Path rootStatePath = readString(from);
+		string comment = readString(from);
+		startWork();
+        store->setStateRevisions(revisions, rootStatePath, comment);
+        stopWork();
+        writeInt(1, to);
     	break;
     }
     
 	case wopQueryStateRevisions: {
-    
+    	Path statePath = readString(from); 
+		int revision = readInt(from);
+		RevisionClosure revisions;
+		RevisionClosureTS timestamps;
+		startWork();
+        bool result = store->queryStateRevisions(statePath, revisions, timestamps, revision);
+        stopWork();
+		writeRevisionClosure(revisions, to);
+		writeRevisionClosureTS(timestamps, to);
+		writeInt(result, to);
     	break;
     }
     
 	case wopQueryAvailableStateRevisions: {
-    
+    	Path statePath = readString(from);
+    	RevisionInfos revisions;
+    	startWork();
+        bool result = store->queryAvailableStateRevisions(statePath, revisions);
+        stopWork();
+        writeRevisionInfos(revisions, to);
+        writeInt(result, to);
     	break;
     }
     
 	case wopCommitStatePath: {
-    
+    	Path statePath = readString(from);
+    	startWork();
+        Snapshots ss = store->commitStatePath(statePath);
+        stopWork();
+        writeSnapshots(ss, to);
     	break;
     }
     
 	case wopScanAndUpdateAllReferences: {
-    
+    	Path statePath = readString(from);
+		bool recursive = readInt(from) == 1;
+    	startWork();
+        store->scanAndUpdateAllReferences(statePath, recursive);
+        stopWork();
+    	writeInt(1, to);
     	break;
     }
     
 	case wopToNonSharedPathSet: {
-    
+    	PathSet statePaths = readStringSet(from);
+    	startWork();
+    	PathSet statePaths_ns = store->toNonSharedPathSet(statePaths);
+    	stopWork();
+    	writeStringSet(statePaths_ns, to);
     	break;
     }
     
 	case wopRevertToRevision: {
-    
+    	Path componentPath = readString(from);
+		Path derivationPath = readString(from);
+		Path statePath = readString(from);
+		int revision_arg = readInt(from);
+		bool recursive = readInt(from) == 1;
+		startWork();
+    	store->revertToRevision(componentPath, derivationPath, statePath, revision_arg, recursive);
+    	stopWork();
+    	writeInt(1, to);
     	break;
     }
             

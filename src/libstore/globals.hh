@@ -86,8 +86,15 @@ extern uid_t callingUID;
 /* get/set the UID of the user that calls the nix-worker daemon */
 uid_t queryCallingUID();
 void setCallingUID(uid_t uid, bool reset = false);
+
+/* Convert a uid to a username: Watch it! this segfaults when given a wrong uid !! */
+string uidToUsername(uid_t uid);
+
 /* get the username based on the UID of the user that calls the nix-worker daemon */
 string queryCallingUsername();
+
+/* get the username based on the UID of the user currently runs the process */
+string queryCurrentUsername();
 
 extern bool debugWorker;        
 }

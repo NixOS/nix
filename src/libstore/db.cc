@@ -71,7 +71,7 @@ Transaction::~Transaction()
 void Transaction::begin(Database & db)
 {
     assert(txn == 0);
-    db.requireEnv();
+    db.requireEnv("begin transaction");
     try {
         db.env->txn_begin(0, &txn, 0);
     } catch (DbException e) { rethrow(e); }
@@ -110,11 +110,11 @@ void Transaction::moveTo(Transaction & t)
 }
 
 
-void Database::requireEnv()
+void Database::requireEnv(string debug)
 {
     checkInterrupt();
-    if (!env) throw Error("database environment is not open "
-        "(maybe you don't have sufficient permission?)");
+    if (!env) throw Error(format("database environment is not open while trying '%1%'"
+                          "(maybe you don't have sufficient permission?)") % debug);
 }
 
 
@@ -300,7 +300,7 @@ void Database::close()
 
 TableId Database::openTable(const string & tableName, bool sorted)
 {
-    requireEnv();
+    requireEnv(tableName);
     TableId table = nextId++;
 
     try {

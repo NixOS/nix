@@ -12,6 +12,9 @@ namespace nix {
    ensurePath(). */
 Derivation derivationFromPathTxn(const Transaction & txn, const Path & drvPath);
 
+/* Same as above, but wihouth a txn now. This function can be called from the user side */
+Derivation derivationFromPath(const Path & drvPath);
+
 /* Place in `paths' the set of all store paths in the file system
    closure of `storePath'; that is, all paths than can be directly or
    indirectly reached from it.  `paths' is not cleared.  If

@@ -54,7 +54,7 @@ private:
     TableId nextId;
     std::map<TableId, Db *> tables;
 
-    void requireEnv();
+    void requireEnv(string debug);
 
     Db * getDb(TableId table);
 

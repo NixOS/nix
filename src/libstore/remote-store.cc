@@ -274,9 +274,7 @@ Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
     writeString(hashAlgo, to);
     dumpPath(srcPath, to, filter);
     processStderr();
-    printMsg(lvlInfo, format("REMOTESTORE: ADD TO STORE REMOTE 1"));
     Path path = readStorePath(from);		
-    printMsg(lvlInfo, format("REMOTESTORE: ADD TO STORE REMOTE 2"));
     return path;
 }
 
@@ -396,6 +394,14 @@ void RemoteStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     bytesFreed = (((unsigned long long) hi) << 32) | lo;
 }
 
+Path RemoteStore::queryDeriver(const Path & path)
+{
+	writeInt(wopQueryDeriver, to);
+	writeString(path, to);
+	processStderr();
+	return readStorePath(from);
+}
+
 PathSet RemoteStore::queryDerivers(const Path & storePath, const string & identifier, const string & user)
 {
 	writeInt(wopQueryDerivers, to);
@@ -498,13 +504,6 @@ void RemoteStore::scanAndUpdateAllReferences(const Path & statePath, const bool 
 	readInt(from);
 }
 
-Path RemoteStore::queryDeriver(const Path & path)
-{
-	writeInt(wopQueryDeriver, to);
-	writeString(path, to);
-	processStderr();
-	return readStorePath(from);
-}
 
 PathSet RemoteStore::toNonSharedPathSet(const PathSet & statePaths)
 {

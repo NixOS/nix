@@ -75,7 +75,7 @@ static Path realisePath(const Path & path)
         PathSet paths;
         paths.insert(path);
         store->buildDerivations(paths);
-        Path outPath = findOutput(derivationFromPathTxn(noTxn, path), "out");
+        Path outPath = findOutput(derivationFromPath(path), "out");
         
         if (gcRoot == "")
             printGCWarning();
@@ -100,7 +100,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); ++i)
         *i = fixPath(*i);
-            
+    
     if (opArgs.size() > 1) {
         PathSet drvPaths;
         for (Strings::iterator i = opArgs.begin();

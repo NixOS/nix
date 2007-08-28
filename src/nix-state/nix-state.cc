@@ -84,7 +84,7 @@ Derivation getDerivation(const string & fullPath, const Strings & program_args, 
     
     //Retrieve the derivation, there is only 1 drvPath in derivers
     derivationPath = *(derivers.begin());
-    Derivation drv = derivationFromPathTxn(noTxn, derivationPath);
+    Derivation drv = derivationFromPath(derivationPath);
 	
 	if(isStateComponent){
     	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
@@ -474,6 +474,9 @@ void run(Strings args)
 	return;
 
 	printMsg(lvlError, format("header: '%1%'") % nixExt3CowHeader);
+	
+	printMsg(lvlError, format("Username fail: '%1%'") % uidToUsername(23423));		//Segfaults correctly
+
 	return;
 
 	*/		
@@ -551,9 +554,9 @@ void run(Strings args)
             throw UsageError("only one operation may be specified");
     }
     
-    //If no username given: take the username of the caller
+    //If no username given get it
     if(username == "")
-		username = int2String(geteuid());
+		username = queryCurrentUsername();
 
     if (!op) throw UsageError("no operation specified");
     
