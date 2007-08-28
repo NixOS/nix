@@ -1310,6 +1310,10 @@ DerivationGoal::PrepareBuildReply DerivationGoal::prepareBuild()
     /* Obtain locks on all output paths.  The locks are automatically
        released when we exit this function or Nix crashes. */
     /* !!! BUG: this could block, which is not allowed. */
+    /* !!! and once we make this non-blocking, we should carefully
+       consider the case where some but not all locks are required; we
+       should then release the acquired locks so that the other
+       processes and the pathIsLockedByMe() test don't get confused. */
     outputLocks.lockPaths(outputPaths(drv.outputs),
         (format("waiting for lock on %1%") % showPaths(outputPaths(drv.outputs))).str());
 
@@ -2080,6 +2084,7 @@ void SubstitutionGoal::tryToRun()
     /* Maybe a derivation goal has already locked this path
        (exceedingly unlikely, since it should have used a substitute
        first, but let's be defensive). */
+    outputLock.reset(); // make sure this goal's lock is gone
     if (pathIsLockedByMe(storePath)) {
         debug(format("restarting substitution of `%1%' because it's locked by another goal")
             % storePath);
