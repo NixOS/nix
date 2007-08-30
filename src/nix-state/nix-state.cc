@@ -28,8 +28,9 @@ string stateIdentifier;
 string username;
 string comment;
 unsigned int revision_arg;
-bool scanforReferences = false;
-bool only_commit = false;
+bool r_scanforReferences = false;
+bool r_commit = true;
+bool r_run = true;
 bool revert_recursively = false;
 
 
@@ -261,12 +262,11 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     //WARNING: we need to watch out for deadlocks!
 	//add locks ... ?
 	//svn lock ... ?
-	
-	
+		
 		
 	//******************* Run ****************************
 	
-	if(!only_commit){
+	if(r_run){
     	if( ! FileExist(root_componentPath + root_binary) )
     		throw Error(format("You must specify the full binary path: '%1%'") % (root_componentPath + root_binary));
     	
@@ -285,35 +285,37 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 		executeShellCommand(root_componentPath + root_binary + root_args);
 	}
   	
-  	//////////////////////////////
   	
   	//TODO
 	Transaction txn;
    	//createStoreTransaction(txn);
   		
 	//******************* Scan for new references if neccecary
-   	if(scanforReferences)
+   	if(r_scanforReferences)
   		store->scanAndUpdateAllReferences(root_statePath, true);		//TODO make recursive a paramter?
 
-	//get all current (maybe updated by the scan) dependecies (if neccecary | recusively) of all state components that need to be updated
-    PathSet statePaths;
-	store->storePathRequisites(root_componentPath, false, statePaths, false, true, 0);
-	statePaths.insert(root_statePath);
-
-	//Start transaction TODO
-    
-    //Replace all shared paths in the set for their real paths 
-    statePaths = store->toNonSharedPathSet(statePaths);
 	
 	//******************* With everything in place, we call the commit script on all statePaths (in)directly referenced **********************
 	
-	//Commit all statePaths
-	RevisionClosure rivisionMapping;
-	for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)		//TODO first commit own state path?
-		rivisionMapping[*i] = store->commitStatePath(*i);
+	if(r_commit){
+		//get all current (maybe updated by the scan) dependecies (if neccecary | recusively) of all state components that need to be updated
+	    PathSet statePaths;
+		store->storePathRequisites(root_componentPath, false, statePaths, false, true, 0);
+		statePaths.insert(root_statePath);
 	
-	//Save new revisions
-	store->setStateRevisions(rivisionMapping, root_statePath, comment);				//TODO how about the txn?
+		//Start transaction TODO
+	    
+	    //Replace all shared paths in the set for their real paths 
+	    statePaths = store->toNonSharedPathSet(statePaths);
+		
+		//Commit all statePaths
+		RevisionClosure rivisionMapping;
+		for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)		//TODO first commit own state path?
+			rivisionMapping[*i] = store->commitStatePath(*i);
+		
+		//Save new revisions
+		store->setStateRevisions(rivisionMapping, root_statePath, comment);				//TODO how about the txn?
+	}
 	
 	//Commit transaction
 	//txn.commit();
@@ -323,16 +325,10 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	RevisionClosureTS empty;
 	bool b = store->queryStateRevisions(root_statePath, getRivisions, empty, 0);
 	for (RevisionClosure::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
-		printMsg(lvlError, format("State '%1%' has revision") % (*i).first);
+		//printMsg(lvlError, format("State '%1%' has revision") % (*i).first);
 	}
 	
 }
-
-void testUI(unsigned int i)
-{
-	printMsg(lvlError, format("Int: %1%") % i);
-}
-
 
 void run(Strings args)
 {
@@ -499,44 +495,66 @@ void run(Strings args)
 
         Operation oldOp = op;
 		
-        if (arg == "--run" || arg == "-r")
+		//Run options
+		
+        if (arg == "--run" || arg == "-r")		//run and commit
             op = opRunComponent;
         else if (arg == "--commit-only"){
 			op = opRunComponent;
-			only_commit = true;
+			r_commit = true;			
+			r_run = false;
+			r_scanforReferences = false;
     	}
+    	else if (arg == "--run-only"){
+			op = opRunComponent;
+			r_commit = false;			
+			r_run = true;
+			r_scanforReferences = false;
+    	}
+    	else if (arg == "--scan-only"){
+			op = opRunComponent;
+			r_commit = false;			
+			r_run = false;
+			r_scanforReferences = true;
+    	}
+    	else if (arg == "--scanreferences"){
+    		r_scanforReferences = true;
+    	}
+    	else if (arg.substr(0,10) == "--comment=")
+        	comment = arg.substr(10,arg.length());
+    	
+    	
+    	//Info options
+    	
 		else if (arg == "--showstatepath")
 			op = opShowStatePath;
 		else if (arg == "--showderivations")
 			op = opShowDerivations;
 		else if (arg == "--showrevisions")
 			op = queryAvailableStateRevisions;
+			
+		
+		//State options
+		
 		else if (arg.substr(0,21) == "--revert-to-revision="){
 			op = revertToRevision;
 			bool succeed = string2UnsignedInt(arg.substr(21,arg.length()), revision_arg);
 			if(!succeed)
 				throw UsageError("The given revision is not a valid number");
 		}
-
-        /*
-		--run-without-commit
-
-		--show-revision-path=....
+		else if (arg.substr(0,10) == "--revert-to-revision-recursively")
+        	revert_recursively = true;	
 		
-		--showrevisions
-		
-		--revert-to-revision=
-		
+	    /*
 		--share-from
 		
 		--unshare
-				
-		OPTIONAL
-		
-		--scanreferences
-								
-		/////////////////////
-		
+		*/
+	
+	
+		//Maybe
+	
+		/*			
 		--backup ?
 		
 		--exclude-commit-paths
@@ -547,16 +565,13 @@ void run(Strings args)
 		
         */
         
-        else if (arg == "--scanreferences")
-        	scanforReferences = true;        
+       	//Manipulate options....
         else if (arg.substr(0,13) == "--identifier=")
         	stateIdentifier = arg.substr(13,arg.length());
         else if (arg.substr(0,7) == "--user=")
         	username = arg.substr(7,arg.length());
-        else if (arg.substr(0,10) == "--comment=")
-        	comment = arg.substr(10,arg.length());
-        else if (arg.substr(0,10) == "--revert-to-revision-recursively")
-        	revert_recursively = true;	
+        	
+
         else
             opArgs.push_back(arg);
 

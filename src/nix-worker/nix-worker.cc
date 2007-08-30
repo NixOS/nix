@@ -248,7 +248,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
     case wopIsValidStatePath: {
-    	Path path = readStorePath(from);
+    	Path path = readString(from);		//TODO readStatePath
         startWork();
         bool result = store->isValidStatePath(path);
         stopWork();

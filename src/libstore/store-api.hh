@@ -214,7 +214,11 @@ public:
 	/* TODO */
 	virtual void setStateRevisions(const RevisionClosure & revisions, const Path & rootStatePath, const string & comment) = 0;
 	
-	/* TODO */
+	/*  
+	 * TODO Not sure wheter this comment is 100% correct
+	 * Querys all available state revision closures.
+	 * (e.g. a references scan can change this)
+	 */
 	virtual bool queryStateRevisions(const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const unsigned int revision) = 0;
 	
 	/* TODO */
