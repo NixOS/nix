@@ -517,6 +517,8 @@ static void daemonLoop()
 
     string socketPath = nixStateDir + DEFAULT_SOCKET_PATH;
 
+    createDirs(dirOf(socketPath));
+
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
     if (socketPath.size() >= sizeof(addr.sun_path))
@@ -526,7 +528,8 @@ static void daemonLoop()
     unlink(socketPath.c_str());
 
     /* Make sure that the socket is created with 0666 permission
-       (everybody can connect). */
+       (everybody can connect --- provided they have access to the
+       directory containing the socket). */
     mode_t oldMode = umask(0111);
     int res = bind(fdSocket, (struct sockaddr *) &addr, sizeof(addr));
     umask(oldMode);
