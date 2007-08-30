@@ -38,6 +38,11 @@ void writeInt(unsigned int n, Sink & sink)
     sink(buf, sizeof(buf));
 }
 
+void writeBigUnsignedInt(unsigned int n, Sink & sink)
+{
+    writeString(unsignedInt2String(n), sink);		//TODO better way?
+}
+
 
 void writeString(const string & s, Sink & sink)
 {
@@ -58,8 +63,8 @@ void writeStringSet(const StringSet & ss, Sink & sink)
 void writeIntVector(const IntVector & iv, Sink & sink)
 {
     writeInt(iv.size(), sink);
-    for(int i=0;i < iv.size(); i++)
-        writeString(int2String(iv.at(i)), sink);
+    for(unsigned int i=0;i < iv.size(); i++)
+        writeString(int2String(iv.at(i)), sink);		//TODO !!!!!!!!!!!!!!!!!!! writeInts ???????????
 }
 
 void writeRevisionClosure(const RevisionClosure & rc, Sink & sink)
@@ -76,7 +81,7 @@ void writeSnapshots(const Snapshots & ss, Sink & sink)
     writeInt(ss.size(), sink);
     for (Snapshots::const_iterator i = ss.begin(); i != ss.end(); ++i){
     	writeString((*i).first, sink);
-    	writeInt((*i).second, sink);			//TODO MUST BE UNSGINED INT
+    	writeBigUnsignedInt((*i).second, sink);
     }
 }
 
@@ -85,7 +90,7 @@ void writeRevisionClosureTS(const RevisionClosureTS & rc, Sink & sink)
 	writeInt(rc.size(), sink);
     for (RevisionClosureTS::const_iterator i = rc.begin(); i != rc.end(); ++i){
     	writeString((*i).first, sink);
-    	writeInt((*i).second, sink);
+    	writeBigUnsignedInt((*i).second, sink);
     }
 }
 
@@ -93,10 +98,10 @@ void writeRevisionInfos(const RevisionInfos & ri, Sink & sink)
 {
 	writeInt(ri.size(), sink);
     for (RevisionInfos::const_iterator i = ri.begin(); i != ri.end(); ++i){
-    	writeInt((*i).first, sink);
+    	writeBigUnsignedInt((*i).first, sink);
     	RevisionInfo rvi = (*i).second;
     	writeString(rvi.comment, sink);
-    	writeInt(rvi.timestamp, sink);			//TODO MUST BE UNSGINED INT 
+    	writeBigUnsignedInt(rvi.timestamp, sink); 
     }
 }
 
@@ -111,18 +116,26 @@ void readPadding(unsigned int len, Source & source)
     }
 }
 
-
 unsigned int readInt(Source & source)
 {
     unsigned char buf[8];
     source(buf, sizeof(buf));
     if (buf[4] || buf[5] || buf[6] || buf[7])
-        throw Error("implementation cannot deal with > 32-bit integers");		//TODO !!!!!!!!!!!!!!!!! unsigned Int reader
+        throw Error("implementation cannot deal with > 32-bit integers");
     return
         buf[0] |
         (buf[1] << 8) |
         (buf[2] << 16) |
         (buf[3] << 24);
+}
+
+unsigned int readBigUnsignedInt(Source & source)
+{
+ 	string s = readString(source);
+ 	unsigned int i;
+ 	if(! string2UnsignedInt(s, i) )
+ 		throw Error(format("Serialize: readBigUnsignedInt cannot read int: '%1%'") % s);
+	return i;
 }
 
 
@@ -146,30 +159,12 @@ StringSet readStringSet(Source & source)
     return ss;
 }
 
-/*
-//IntVector
-//RevisionClosure
-//RevisionClosureTS
-//RevisionInfos
-
-struct RevisionInfo
-{ 
-	string comment;
-	unsigned int timestamp;
-};
-typedef map<int, RevisionInfo> RevisionInfos;
-typedef map<Path, unsigned int> Snapshots;					//Automatically sorted on Path :)
-typedef map<Path, Snapshots> RevisionClosure;
-typedef map<Path, int> RevisionClosureTS;
-
-*/
-
 IntVector readIntVector(Source & source)
 {
     unsigned int count = readInt(source);
 	IntVector iv;  
 	while (count--){
-		string s = readString(source);
+		string s = readString(source);				//TODO !!!!!!!!!!!!!!!!!!!! readInt ???????????????
 		int i;
 		if (!string2Int(s, i))
             throw Error(format("`%1%' is corrupt in readIntVector") % s);
@@ -197,7 +192,7 @@ Snapshots readSnapshots(Source & source)
     Snapshots ss;  
 	while (count--){
     	string path = readString(source);
-    	unsigned int ri = readInt(source);			//TODO MUST BE UNSGINED INT
+    	unsigned int ri = readBigUnsignedInt(source);
     	ss[path] = ri;
     }
     return ss;
@@ -210,7 +205,7 @@ RevisionClosureTS readRevisionClosureTS(Source & source)
     RevisionClosureTS rc;  
 	while (count--){
     	string path = readString(source);
-    	int ri = readInt(source);
+    	int ri = readBigUnsignedInt(source);
     	rc[path] = ri;
     }
     return rc;
@@ -221,11 +216,13 @@ RevisionInfos readRevisionInfos(Source & source)
 	unsigned int count = readInt(source);
     RevisionInfos ri;  
 	while (count--){
-    	readInt(source);
+    	unsigned int revision = readBigUnsignedInt(source);
     	RevisionInfo rvi;
     	rvi.comment = readString(source);
-    	rvi.timestamp = readInt(source); 
+    	rvi.timestamp = readBigUnsignedInt(source);
+    	ri[revision] = rvi;
     }
+    return ri;
 }
 
 }

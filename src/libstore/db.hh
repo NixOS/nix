@@ -61,10 +61,10 @@ private:
     void open2(const string & path, bool removeOldEnv);
     
     /* TODO */
-    bool lookupHighestRevivison(const Strings & keys, const Path & statePath, string & key, int lowerthan = -1);
+    bool lookupHighestRevivison(const Strings & keys, const Path & statePath, string & key, unsigned int lowerthan = 0);
     
     /* TODO */
-    int getNewRevisionNumber(const Transaction & txn, TableId table, const Path & statePath);
+    unsigned int getNewRevisionNumber(const Transaction & txn, TableId table, const Path & statePath);
     
 public:
     Database();
@@ -97,21 +97,21 @@ public:
         Strings & keys, const string & keyPrefix = "");
     
     /* TODO */
-    Path mergeToDBKey(const Path & statePath, const int revision);
+    Path mergeToDBKey(const Path & statePath, const unsigned int intvalue);
     
     /* TODO */
-    void splitDBKey(const Path & revisionedStatePath, Path & statePath, int & revision);
+    void splitDBKey(const Path & revisionedStatePath, Path & statePath, unsigned int & intvalue);
 
 	/* TODO */
-    bool revisionToTimeStamp(const Transaction & txn, TableId revisions_table, const Path & statePath, const int revision, int & timestamp);
+    bool revisionToTimeStamp(const Transaction & txn, TableId revisions_table, const Path & statePath, const int revision, unsigned int & timestamp);
 	    
     /* Set the stateReferences for a specific revision (and older until the next higher revision number in the table) */    
     void setStateReferences(const Transaction & txn, TableId references_table, TableId revisions_table,
-    	const Path & statePath, const Strings & references, int revision = -1, int timestamp = -1);
+    	const Path & statePath, const Strings & references, const unsigned int revision = 0, const unsigned int timestamp = 0);
     
     /* Returns the references for a specific revision (and older until the next higher revision number in the table) */
     bool queryStateReferences(const Transaction & txn, TableId references_table, TableId revisions_table,
-    	const Path & statePath, Strings & references, int revision = -1, int timestamp = -1);
+    	const Path & statePath, Strings & references, const unsigned int revision = 0, const unsigned int timestamp = 0);		
 
     /* Set the revision number of the statePath and the revision numbers of all state paths in the references closure */
     void setStateRevisions(const Transaction & txn, TableId revisions_table, TableId revisions_comments,
@@ -119,7 +119,7 @@ public:
     
     /* Returns all the revision numbers of the state references closure of the given state path */
     bool queryStateRevisions(const Transaction & txn, TableId revisions_table, TableId snapshots_table,
-    const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, int root_revision = -1);
+    const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const unsigned int root_revision = 0);
     
     /* Returns all available revision numbers of the given state path */
     bool queryAvailableStateRevisions(const Transaction & txn, TableId revisions_table, TableId revisions_comments,

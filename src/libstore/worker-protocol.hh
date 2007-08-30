@@ -10,8 +10,8 @@ namespace nix {
 
 
 typedef enum {
-    wopQuit,
-    wopIsValidPath,
+    wopQuit,								//0
+    wopIsValidPath,							
     wopIsValidStatePath,
     wopIsValidComponentOrStatePath,
     wopQuerySubstitutes,
@@ -20,9 +20,9 @@ typedef enum {
     wopQueryStatePathDrv,
     wopQueryReferences,
     wopQueryStateReferences,
-    wopQueryReferrers,
-    wopQueryStateReferrers,
-    wopAddToStore,
+    wopQueryReferrers,						//10
+    wopQueryStateReferrers,					
+    wopAddToStore,							
     wopAddTextToStore,
     wopBuildDerivations,					//TODO HANGS SOMETIMES !!!!!
     wopEnsurePath,
@@ -30,23 +30,23 @@ typedef enum {
     wopAddIndirectRoot,
     wopSyncWithGC,
     wopFindRoots,
-    wopCollectGarbage,
-    wopExportPath,
+    wopCollectGarbage,						//20
+    wopExportPath,							
     wopImportPath,
     wopQueryDeriver,
-
     wopQueryDerivers,
     wopSetStatePathsInterval,
 	wopGetStatePathsInterval,
 	wopIsStateComponent,
 	wopStorePathRequisites,
 	wopSetStateRevisions,
-	wopQueryStateRevisions,
-	wopQueryAvailableStateRevisions,
+	wopQueryStateRevisions,					//30
+	wopQueryAvailableStateRevisions,		
 	wopCommitStatePath,
 	wopScanAndUpdateAllReferences,
 	wopToNonSharedPathSet,
 	wopRevertToRevision,
+	wopSetSharedState,
 } WorkerOp;
 
 

@@ -140,7 +140,7 @@ static TableId dbStateRevisions = 0;
  */
 static TableId dbStateRevisionsComments = 0;
 
-/* dbStateSnapshots :: StatePath -> IntVector
+/* dbStateSnapshots :: StatePath -> RevisionClosure
  * 
  * This table stores the snapshot numbers the sub state files/folders
  * at a certain timestamp. These snapshot numbers are just timestamps
@@ -446,7 +446,7 @@ static string stripPrefix(const string & prefix, const string & s)
 
 
 void setReferences(const Transaction & txn, const Path & store_or_statePath,
-    const PathSet & references, const PathSet & stateReferences, const int revision)
+    const PathSet & references, const PathSet & stateReferences, const unsigned int revision)
 {
     /* For unrealisable paths, we can only clear the references. */
     if (references.size() > 0 && !isRealisableComponentOrStatePath(txn, store_or_statePath))
@@ -482,11 +482,11 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
     else if(isRealisableStatePath(txn, store_or_statePath))
     {
 		
-		printMsg(lvlError, format("Setting references for statepath '%1%' (revision:%2%)") % store_or_statePath % int2String(revision));
+		printMsg(lvlError, format("Setting references for statepath '%1%' (revision:%2%)") % store_or_statePath % unsignedInt2String(revision));
 		
 		//Write references to a special revision (since there are multiple revisions of a statePath)
 
-		//query the references of revision (-1 is query the latest references)
+		//query the references of revision (0 is query the latest references)
 		Paths oldStateReferences_s_c;
 		Paths oldStateReferences_s_s;
 		nixDB.queryStateReferences(txn, dbStateComponentReferences, dbStateRevisions, store_or_statePath, oldStateReferences_s_c, revision); 
@@ -495,7 +495,7 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
 		PathSet oldReferences = PathSet(oldStateReferences_s_c.begin(), oldStateReferences_s_c.end());
     	PathSet oldStateReferences = PathSet(oldStateReferences_s_s.begin(), oldStateReferences_s_s.end());
 
-		//set the references of revision (-1 insert as a new timestamp)
+		//set the references of revision (0 insert as a new timestamp)
     	nixDB.setStateReferences(txn, dbStateComponentReferences, dbStateRevisions, store_or_statePath, Paths(references.begin(), references.end()), revision);
 		nixDB.setStateReferences(txn, dbStateStateReferences, dbStateRevisions, store_or_statePath, Paths(stateReferences.begin(), stateReferences.end()), revision);
     }
@@ -504,7 +504,7 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
     	
 }
 
-void queryXReferencesTxn(const Transaction & txn, const Path & store_or_statePath, PathSet & references, const bool component_or_state, const int revision, int timestamp)
+void queryXReferencesTxn(const Transaction & txn, const Path & store_or_statePath, PathSet & references, const bool component_or_state, const unsigned int revision, const unsigned int timestamp)
 {
     Paths references2;
     TableId table1;
@@ -531,17 +531,17 @@ void queryXReferencesTxn(const Transaction & txn, const Path & store_or_statePat
     references.insert(references2.begin(), references2.end());
 }
 
-void LocalStore::queryReferences(const Path & storePath, PathSet & references, const int revision)
+void LocalStore::queryReferences(const Path & storePath, PathSet & references, const unsigned int revision)
 {
     nix::queryXReferencesTxn(noTxn, storePath, references, revision, true);
 }
 
-void LocalStore::queryStateReferences(const Path & componentOrstatePath, PathSet & stateReferences, const int revision)
+void LocalStore::queryStateReferences(const Path & componentOrstatePath, PathSet & stateReferences, const unsigned int revision)
 {
     nix::queryXReferencesTxn(noTxn, componentOrstatePath, stateReferences, revision, false);
 }
 
-static PathSet getXReferrers(const Transaction & txn, const Path & store_or_statePath, const bool component_or_state, const int revision)
+static PathSet getXReferrers(const Transaction & txn, const Path & store_or_statePath, const bool component_or_state, const unsigned int revision)
 {
     TableId table = 0;
     Path path;
@@ -592,8 +592,8 @@ static PathSet getXReferrers(const Transaction & txn, const Path & store_or_stat
 		//printMsg(lvlError, format("we need state references: '%1%' '%2%' '%3%'") % path % store_or_statePath % table);
 		
 		//Now in references of ALL referrers, (possibly lookup their latest TS based on revision)
-		int timestamp;
-		if(revision != -1){
+		unsigned int timestamp;
+		if(revision != 0){
     		bool succeed = nixDB.revisionToTimeStamp(txn, dbStateRevisions, path, revision, timestamp);
 	    	if(!succeed)
 	    		throw Error(format("Getreferrers cannot find timestamp for revision: '%1%'") % revision);
@@ -601,16 +601,16 @@ static PathSet getXReferrers(const Transaction & txn, const Path & store_or_stat
 	    
 	    Strings keys;
 		nixDB.enumTable(txn, table, keys);
-		map<string, int> latest;
+		map<string, unsigned int> latest;
 		for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i){
 			Path getStatePath;
-			int getRevision;
+			unsigned int getRevision;
 			nixDB.splitDBKey(*i, getStatePath, getRevision);
 		
-			if(latest[getStatePath]	== 0) 				//either it is unset
+			if(latest[getStatePath]	== 0) 						//either it is unset
 				latest[getStatePath] = getRevision;
 			else if(latest[getStatePath] < getRevision){ 			
-				if(revision != -1 && getRevision <= timestamp)	//or it is greater, but not greater then the timestamp
+				if(revision != 0 && getRevision <= timestamp)	//or it is greater, but not greater then the timestamp			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!! WERE COMPARING A REVISION TO A TIMESTAMP ???
 					latest[getStatePath] = getRevision;
 				else											//we need the latest so greater is good
 					latest[getStatePath] = getRevision;
@@ -619,7 +619,7 @@ static PathSet getXReferrers(const Transaction & txn, const Path & store_or_stat
 	    
 	    //now check if they refer to 'path' (if you cant find it, then they dont referr to it)
 	    PathSet referrers;
-		for (map<string, int>::const_iterator i = latest.begin(); i != latest.end(); ++i){
+		for (map<string, unsigned int>::const_iterator i = latest.begin(); i != latest.end(); ++i){
 
 			//printMsg(lvlError, format("AAAAA '%1%'") % (*i).first);
 			
@@ -635,18 +635,18 @@ static PathSet getXReferrers(const Transaction & txn, const Path & store_or_stat
     }
 }
 
-static PathSet getReferrersTxn(const Transaction & txn, const Path & store_or_statePath, const int revision)
+static PathSet getReferrersTxn(const Transaction & txn, const Path & store_or_statePath, const unsigned int revision)
 {
 	return getXReferrers(txn, store_or_statePath, true, revision);
 }
 
-static PathSet getStateReferrersTxn(const Transaction & txn, const Path & store_or_statePath, const int revision)
+static PathSet getStateReferrersTxn(const Transaction & txn, const Path & store_or_statePath, const unsigned int revision)
 {
 	return getXReferrers(txn, store_or_statePath, false, revision);
 }
 
 void queryReferrersTxn(const Transaction & txn,
-    const Path & storePath, PathSet & referrers, const int revision)
+    const Path & storePath, PathSet & referrers, const unsigned int revision)
 {
     if (!isRealisableComponentOrStatePath(txn, storePath))
 		throw Error(format("path `%1%' is not valid") % storePath);
@@ -655,12 +655,12 @@ void queryReferrersTxn(const Transaction & txn,
 }
 
 void LocalStore::queryReferrers(const Path & storePath,
-    PathSet & referrers, const int revision)
+    PathSet & referrers, const unsigned int revision)
 {
     nix::queryReferrersTxn(noTxn, storePath, referrers, revision);
 }
 
-void queryStateReferrersTxn(const Transaction & txn, const Path & storePath, PathSet & stateReferrers, const int revision)
+void queryStateReferrersTxn(const Transaction & txn, const Path & storePath, PathSet & stateReferrers, const unsigned int revision)
 {
     if (!isRealisableComponentOrStatePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
@@ -668,7 +668,7 @@ void queryStateReferrersTxn(const Transaction & txn, const Path & storePath, Pat
     stateReferrers.insert(stateReferrers2.begin(), stateReferrers2.end());
 }
 
-void LocalStore::queryStateReferrers(const Path & storePath, PathSet & stateReferrers, const int revision)
+void LocalStore::queryStateReferrers(const Path & storePath, PathSet & stateReferrers, const unsigned int revision)
 {
     nix::queryStateReferrersTxn(noTxn, storePath, stateReferrers, revision);
 }
@@ -1026,7 +1026,7 @@ Path LocalStore::queryStatePathDrv(const Path & statePath)
 void registerValidPath(const Transaction & txn,
     const Path & component_or_state_path, const Hash & hash, 
     const PathSet & references, const PathSet & stateReferences,
-    const Path & deriver, const int revision)
+    const Path & deriver, const unsigned int revision)
 {
     ValidPathInfo info;
     info.path = component_or_state_path;
@@ -1237,7 +1237,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
     writeString(path, hashAndWriteSink);
     
     PathSet references;
-    nix::queryXReferencesTxn(txn, path, references, true, -1);		//TODO we can only now export the final revision	//TODO also export the state references ???
+    nix::queryXReferencesTxn(txn, path, references, true, 0);		//TODO we can only now export the final revision	//TODO also export the state references ???
     writeStringSet(references, hashAndWriteSink);
 
     Path deriver = nix::queryDeriver(txn, path);
@@ -1618,12 +1618,12 @@ IntVector LocalStore::getStatePathsInterval(const PathSet & statePaths)
      
      TODO Change comment, this can also take state paths
 */
-void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const int revision)
+void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const unsigned int revision)
 {
 	nix::storePathRequisitesTxn(noTxn, storeOrstatePath, includeOutputs, paths, withComponents, withState, revision);
 }
 
-void storePathRequisitesTxn(const Transaction & txn, const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const int revision)
+void storePathRequisitesTxn(const Transaction & txn, const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const unsigned int revision)
 {
     computeFSClosureTxn(txn, storeOrstatePath, paths, withComponents, withState, revision);
 
@@ -1640,7 +1640,7 @@ void storePathRequisitesTxn(const Transaction & txn, const Path & storeOrstatePa
     }
 }
 
-void LocalStore::storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const int revision)
+void LocalStore::storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const unsigned int revision)
 {
     nix::storePathRequisites(storeOrstatePath, includeOutputs, paths, withComponents, withState, revision);
 }
@@ -1672,12 +1672,12 @@ void LocalStore::setStateRevisions(const RevisionClosure & revisions, const Path
 	nix::setStateRevisionsTxn(noTxn, revisions, rootStatePath, comment);	
 }
 
-bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const int revision)
+bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const unsigned int revision)
 {
 	return nixDB.queryStateRevisions(txn, dbStateRevisions, dbStateSnapshots, statePath, revisions, timestamps, revision);
 }
 
-bool LocalStore::queryStateRevisions(const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const int revision)
+bool LocalStore::queryStateRevisions(const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const unsigned int revision)
 {
 	return nix::queryStateRevisionsTxn(noTxn, statePath, revisions, timestamps, revision);
 }
@@ -1735,6 +1735,18 @@ void setSharedStateTxn(const Transaction & txn, const Path & fromExisting, const
 	nixDB.setString(txn, dbSharedState, toNew, fromExisting);
 }
 
+void LocalStore::setSharedState(const Path & fromExisting, const Path & toNew)
+{
+	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LEGALITY CHECK IF THE PATH MAY BE SHARED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	//TODO
+	
+	//
+	Transaction txn(nixDB);
+	setSharedStateTxn(txn, fromExisting, toNew);
+	txn.commit();
+}
+
+
 bool querySharedStateTxn(const Transaction & txn, const Path & statePath, Path & shared_with)
 {
 	return nixDB.queryString(txn, dbSharedState, statePath, shared_with);
@@ -1768,12 +1780,12 @@ PathSet LocalStore::toNonSharedPathSet(const PathSet & statePaths)
 	return toNonSharedPathSetTxn(noTxn, statePaths);
 }
 
-void setStateComponentReferencesTxn(const Transaction & txn, const Path & statePath, const Strings & references, int revision, int timestamp)
+void setStateComponentReferencesTxn(const Transaction & txn, const Path & statePath, const Strings & references, const unsigned int revision, const unsigned int timestamp)
 {
 	nixDB.setStateReferences(txn, dbStateComponentReferences, dbStateRevisions, statePath, references, revision, timestamp);
 }
 
-void setStateStateReferencesTxn(const Transaction & txn, const Path & statePath, const Strings & references, int revision, int timestamp)
+void setStateStateReferencesTxn(const Transaction & txn, const Path & statePath, const Strings & references, const unsigned int revision, const unsigned int timestamp)
 {
 	nixDB.setStateReferences(txn, dbStateStateReferences, dbStateRevisions, statePath, references, revision, timestamp);
 }
@@ -1821,7 +1833,7 @@ PathSet getSharedWithPathSetRecTxn(const Transaction & txn, const Path & statePa
 }
 
 
-void LocalStore::revertToRevision(const Path & componentPath, const Path & derivationPath, const Path & statePath, const int revision_arg, const bool recursive)
+void LocalStore::revertToRevision(const Path & componentPath, const Path & derivationPath, const Path & statePath, const unsigned int revision_arg, const bool recursive)
 {
 	Transaction txn(nixDB);
 	revertToRevisionTxn(txn, componentPath, derivationPath, statePath, revision_arg, recursive);

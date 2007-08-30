@@ -406,7 +406,7 @@ static void dfsVisit(const PathSet & paths, const Path & path,
     
     PathSet references;
     if (store->isValidPath(path))
-        store->queryReferences(path, references, -1);						//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        store->queryReferences(path, references, 0);						//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)
@@ -469,7 +469,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
        roots under the `references' relation. */
     PathSet livePaths;
     for (PathSet::const_iterator i = roots.begin(); i != roots.end(); ++i)
-        computeFSClosure(canonPath(*i), livePaths, true, false, -1);						//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO DELETE STATE??
+        computeFSClosure(canonPath(*i), livePaths, true, false, 0);						//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO DELETE STATE??
 
     if (gcKeepDerivations) {
         for (PathSet::iterator i = livePaths.begin();
@@ -480,7 +480,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
                turned off). */
             Path deriver = store->queryDeriver(*i);
             if (deriver != "" && store->isValidPath(deriver))
-                computeFSClosure(deriver, livePaths, true, false, -1);							//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO KEEP STATE
+                computeFSClosure(deriver, livePaths, true, false, 0);							//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO KEEP STATE
         }
     }
 
@@ -493,7 +493,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
                 for (DerivationOutputs::iterator j = drv.outputs.begin();
                      j != drv.outputs.end(); ++j)
                     if (store->isValidPath(j->second.path))
-                        computeFSClosure(j->second.path, livePaths, true, false, -1);					//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO KEEP STATE
+                        computeFSClosure(j->second.path, livePaths, true, false, 0);					//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO KEEP STATE
             }
     }
 
@@ -518,7 +518,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     PathSet tempRootsClosed;
     for (PathSet::iterator i = tempRoots.begin(); i != tempRoots.end(); ++i)
         if (store->isValidPath(*i))
-            computeFSClosure(*i, tempRootsClosed, true, false, -1);									//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO .... STATE
+            computeFSClosure(*i, tempRootsClosed, true, false, 0);									//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO .... STATE
         else
             tempRootsClosed.insert(*i);
 

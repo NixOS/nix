@@ -919,28 +919,26 @@ Strings unpackStrings(const string & s)
     return strings;
 }
 
-string packRevisionNumbers(const IntVector & revs)
+/*
+string packRevisionNumbers(const UnsignedIntVector & revs)
 {
     string seperator = "|";
     string d = "";
-    for (IntVector::const_iterator i = revs.begin();
-         i != revs.end(); ++i){
-        d += int2String(*i) + seperator;
+    for (UnsignedIntVector::const_iterator i = revs.begin(); i != revs.end(); ++i){
+        d += unsignedInt2String(*i) + seperator;
     }
     return d;
 }
     
-IntVector unpackRevisionNumbers(const string & packed)
+UnsignedIntVector unpackRevisionNumbers(const string & packed)
 {
     string seperator = "|";
     Strings ss = tokenizeString(packed, seperator);
-    IntVector revs;
+    UnsignedIntVector revs;
     
-    for (Strings::const_iterator i = ss.begin();
-         i != ss.end(); ++i){
-    	
+    for (Strings::const_iterator i = ss.begin(); i != ss.end(); ++i){
     	int rev;
-    	bool succeed = string2Int(*i, rev);
+    	bool succeed = string2UnsignedInt(*i, rev);
     	if(!succeed)
     		throw Error(format("Corrupted revisions db entry: `%1%'") % packed);
     	revs.push_back(rev);
@@ -948,7 +946,7 @@ IntVector unpackRevisionNumbers(const string & packed)
         
     return revs;
 }
-
+*/
 
 Strings tokenizeString(const string & s, const string & separators)
 {
@@ -1141,10 +1139,10 @@ void executeShellCommand(const string & command)
     }
 }
 
-int getTimeStamp()
+unsigned int getTimeStamp()
 {
 	const time_t now = time(0);
-	int i = now;
+	unsigned int i = now;
 	return i;
 }
 
@@ -1241,6 +1239,22 @@ void ensureDirExists(const Path & path)
 	p_args.push_back("-p");
 	p_args.push_back(path);
 	runProgram_AndPrintOutput("mkdir", true, p_args, "mkdir");		//TODO ensurePath
+}
+
+void setStatePathRights(const Path & statePath, const string & user, const string & group, const string & chmod)
+{
+	ensureDirExists(statePath);
+	Strings p_args;
+	p_args.push_back(user + "." + group);
+	p_args.push_back(statePath);
+	runProgram_AndPrintOutput("chown", true, p_args, "chown");
+	
+	if(chmod != "")	{
+		p_args.clear();
+		p_args.push_back(chmod);
+		p_args.push_back(statePath);
+		runProgram_AndPrintOutput("chmod", true, p_args, "chmod");
+	}
 }
 
 string padd(const string & s, char c , unsigned int size, bool front)

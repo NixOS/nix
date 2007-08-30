@@ -8,7 +8,7 @@
 namespace nix {
 
 /* Create a state directory. */
-void createStateDirsTxn(const Transaction & txn, const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs);
+void createSubStateDirsTxn(const Transaction & txn, const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs);
 
 /* TODO */
 Snapshots commitStatePathTxn(const Transaction & txn, const Path & statePath);

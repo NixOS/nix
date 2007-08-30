@@ -403,7 +403,7 @@ static void queryInstSources(EvalState & state,
 
                 if (isDerivation(*i)) {
                     elem.setDrvPath(*i);
-                    elem.setOutPath(findOutput(derivationFromPathTxn(noTxn, *i), "out"));
+                    elem.setOutPath(findOutput(derivationFromPath(*i), "out"));
                     
                     if (name.size() >= drvExtension.size() &&
                         string(name, name.size() - drvExtension.size()) == drvExtension)
@@ -543,7 +543,7 @@ static void installDerivations(Globals & globals,
         		for (DrvInfos::iterator j = newElems.begin(); j != newElems.end(); ++j) {
         			DrvName newDrvName(j->name);
         			if(newDrvName.name == drvName.name){
-        				Derivation newDrv = derivationFromPathTxn(noTxn, j->queryDrvPath(globals.state));
+        				Derivation newDrv = derivationFromPath(j->queryDrvPath(globals.state));
         				DerivationStateOutputs newStateOutputs = newDrv.stateOutputs;
         				newStateIdentifier = newStateOutputs.find("state")->second.stateIdentifier;
         				newStatePath = newDrv.stateOutputs.find("state")->second.statepath;
@@ -563,12 +563,12 @@ static void installDerivations(Globals & globals,
         			
         			string oldStatePath;
         			//query old state path
-        			PathSet derivers = store->queryDerivers(i->queryOutPath(globals.state), newStateIdentifier, int2String(geteuid()));		//TODO Check if username if ok
+        			PathSet derivers = store->queryDerivers(i->queryOutPath(globals.state), newStateIdentifier, queryCurrentUsername());		//TODO Check if username if ok
         			if(derivers.size() != 1)
 	    				throw Error(format("Internal Error: There is not exactly one deriver with state_identifier '%1%' for path '%2%'") 
 	    									% newStateIdentifier % i->queryOutPath(globals.state));
         			Path oldDrvPath = *(derivers.begin());
-    				Derivation oldDrv = derivationFromPathTxn(noTxn, oldDrvPath);
+    				Derivation oldDrv = derivationFromPath(oldDrvPath);
     				oldStatePath = oldDrv.stateOutputs.find("state")->second.statepath;
     				
         			//SharePaths
@@ -605,7 +605,7 @@ static void installDerivations(Globals & globals,
 		sharePath(i->first, i->second);		//Share new statepath to the old statepath
 		
 		//Set in database
-		setSharedStateTxn(noTxn, i->first, i->second);
+		store->setSharedState(i->first, i->second);
     }
     
     

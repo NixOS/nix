@@ -449,25 +449,25 @@ void Database::enumTable(const Transaction & txn, TableId table,
 
 /* State specific db functions */
 
-Path Database::mergeToDBKey(const Path & statePath, const int revision)
+Path Database::mergeToDBKey(const Path & statePath, const unsigned int intvalue)
 {
 	string prefix = "-KEY-";
-	return statePath + prefix + int2String(revision);
+	return statePath + prefix + unsignedInt2String(intvalue);
 }
 
-void Database::splitDBKey(const Path & revisionedStatePath, Path & statePath, int & revision)
+void Database::splitDBKey(const Path & revisionedStatePath, Path & statePath, unsigned int & intvalue)
 {
 	string prefix = "-KEY-";
 	
 	int pos = revisionedStatePath.find_last_of(prefix);
 	statePath = revisionedStatePath.substr(0, pos - prefix.length() + 1);
 	//printMsg(lvlError, format("'%2%' - '%1%'") % revisionedStatePath.substr(pos+1, revisionedStatePath.length()) % int2String(pos));
-	bool succeed = string2Int(revisionedStatePath.substr(pos+1, revisionedStatePath.length()), revision);
+	bool succeed = string2UnsignedInt(revisionedStatePath.substr(pos+1, revisionedStatePath.length()), intvalue);
 	if(!succeed)
 		throw Error(format("Malformed revision value of path '%1%'") % revisionedStatePath);
 }
 
-int Database::getNewRevisionNumber(const Transaction & txn, TableId table,
+unsigned int Database::getNewRevisionNumber(const Transaction & txn, TableId table,
    	const Path & statePath)
 {
 	//query
@@ -476,37 +476,37 @@ int Database::getNewRevisionNumber(const Transaction & txn, TableId table,
 	
 	if(!notEmpty){
 		setString(txn, table, statePath, int2String(1));
-		return 1;	
+		return 1;	//we begin counting from 1 since 0 is a special value representing the last revision	
 	}
 	
-	int revision;
-	bool succeed = string2Int(data, revision);
+	unsigned int revision;
+	bool succeed = string2UnsignedInt(data, revision);
 	if(!succeed)
 		throw Error(format("Malformed revision counter value of path '%1%'") % statePath);
 	
 	revision++;
-	setString(txn, table, statePath, int2String(revision));
+	setString(txn, table, statePath, unsignedInt2String(revision));
 	
 	return revision;
 }
 
-bool Database::lookupHighestRevivison(const Strings & keys, const Path & statePath, string & key, int lowerthan)
+bool Database::lookupHighestRevivison(const Strings & keys, const Path & statePath, string & key, unsigned int lowerthan)
 {
-	int highestRev = -1;
+	unsigned int highestRev = 0;
 
 	//Lookup which key we need	
 	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i) {
 		
-		if((*i).substr(0, statePath.length()) != statePath || (*i).length() == statePath.length()) //dont check the new-revision key or other keys
+		if((*i).substr(0, statePath.length()) != statePath || (*i).length() == statePath.length()) 		//dont check the new-revision key or other keys
 			continue;
 
 		//printMsg(lvlError, format("'%1%' - '%2%'") % *i % statePath);
 		Path getStatePath;
-		int getRevision;
+		unsigned int getRevision;
 		splitDBKey(*i, getStatePath, getRevision);
 		if(getRevision > highestRev){
 		
-			if(lowerthan != -1){
+			if(lowerthan != 0){
 				if(getRevision <= lowerthan)			//if we have an uppper limit, see to it that we downt go over it
 					highestRev = getRevision;
 			}
@@ -515,14 +515,14 @@ bool Database::lookupHighestRevivison(const Strings & keys, const Path & statePa
 		}
 	}
 
-	if(highestRev == -1)	//no records found
+	if(highestRev == 0)	//no records found
 		return false;
 	
 	key = mergeToDBKey(statePath, highestRev);		//final key that matches revision + statePath
 	return true;	
 }
 
-bool Database::revisionToTimeStamp(const Transaction & txn, TableId revisions_table, const Path & statePath, const int revision, int & timestamp)
+bool Database::revisionToTimeStamp(const Transaction & txn, TableId revisions_table, const Path & statePath, const int revision, unsigned int & timestamp)
 {
 	string key = mergeToDBKey(statePath, revision);
 	Strings references;
@@ -539,14 +539,16 @@ bool Database::revisionToTimeStamp(const Transaction & txn, TableId revisions_ta
 }
 
 void Database::setStateReferences(const Transaction & txn, TableId references_table, TableId revisions_table,
-   	const Path & statePath, const Strings & references, int revision, int timestamp)
+   	const Path & statePath, const Strings & references, const unsigned int revision, const unsigned int timestamp)
 {
 	//printMsg(lvlError, format("setStateReferences '%1%' for '%2%'") % references_table % statePath);
-	
-	if(revision == -1 && timestamp == -1)
-		timestamp = getTimeStamp();
-	if(revision != -1 && timestamp == -1){
-		bool found = revisionToTimeStamp(txn, revisions_table, statePath, revision, timestamp);
+
+	//Find the timestamp if we need	
+	unsigned int timestamp2 = timestamp;
+	if(revision == 0 && timestamp == 0)
+		timestamp2 = getTimeStamp();
+	else if(revision != 0 && timestamp == 0){
+		bool found = revisionToTimeStamp(txn, revisions_table, statePath, revision, timestamp2);
 		if(!found)
 			throw Error(format("Revision '%1%' cannot be matched to a timestamp...") % revision);
 	}		
@@ -556,12 +558,12 @@ void Database::setStateReferences(const Transaction & txn, TableId references_ta
 	
 	//Warning if it already exists
 	Strings empty;
-	if( queryStrings(txn, references_table, mergeToDBKey(statePath, timestamp), empty) )
+	if( queryStrings(txn, references_table, mergeToDBKey(statePath, timestamp2), empty) )
 		printMsg(lvlError, format("Warning: The timestamp '%1%' (now: '%5%')  / revision '%4%' already exists for set-references of path '%2%' with db '%3%'") 
-		% timestamp % statePath % references_table % revision % getTimeStamp());
+		% timestamp2 % statePath % references_table % revision % getTimeStamp());
 	
 	//Create the key
-	string key = mergeToDBKey(statePath, timestamp);
+	string key = mergeToDBKey(statePath, timestamp2);
 		
 	//printMsg(lvlError, format("Set references '%1%'") % key);
 	//for (Strings::const_iterator i = references.begin(); i != references.end(); ++i)
@@ -572,13 +574,14 @@ void Database::setStateReferences(const Transaction & txn, TableId references_ta
 }
 
 bool Database::queryStateReferences(const Transaction & txn, TableId references_table, TableId revisions_table,
-   	const Path & statePath, Strings & references, int revision, int timestamp)
+   	const Path & statePath, Strings & references, const unsigned int revision, const unsigned int timestamp)
 {
 	//printMsg(lvlError, format("queryStateReferences '%1%' with revision '%2%'") % references_table % revision);
 
 	//Convert revision to timestamp number useing the revisions_table
-	if(timestamp == -1 && revision != -1){	
-		bool found = revisionToTimeStamp(txn, revisions_table, statePath, revision, timestamp);
+	unsigned int timestamp2 = timestamp; 
+	if(timestamp == 0 && revision != 0){	
+		bool found = revisionToTimeStamp(txn, revisions_table, statePath, revision, timestamp2);
 		if(!found)			//we are asked for references of some revision, but there are no references registered yet, so we return false;
 			return false;
 	}
@@ -588,7 +591,7 @@ bool Database::queryStateReferences(const Transaction & txn, TableId references_
 
 	//Mabye we need the latest timestamp?
 	string key = "";
-	if(timestamp == -1){
+	if(timestamp2 == 0){
 		bool foundsomething = lookupHighestRevivison(keys, statePath, key);
 		if(!foundsomething)
 			return false;
@@ -597,21 +600,21 @@ bool Database::queryStateReferences(const Transaction & txn, TableId references_
 	}
 	
 	//If a specific key is given: check if this timestamp exists key in the table
-	key = mergeToDBKey(statePath, timestamp);
+	key = mergeToDBKey(statePath, timestamp2);
 	bool found = false;
 	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i) {
 		if(key == *i){
 			found = true;
-			key = mergeToDBKey(statePath, timestamp);
+			key = mergeToDBKey(statePath, timestamp2);
 		}
 	}
 	
 	//If it doesn't exist in the table then find the highest key lower than it
 	if(!found){
-		bool foundsomething = lookupHighestRevivison(keys, statePath, key, -1);
+		bool foundsomething = lookupHighestRevivison(keys, statePath, key, 0);
 		if(!foundsomething)
 			return false;
-		//printMsg(lvlError, format("Warning: References for timestamp '%1%' not was not found, so taking the highest rev-key possible for statePath '%2%'") % timestamp % statePath);
+		//printMsg(lvlError, format("Warning: References for timestamp '%1%' not was not found, so taking the highest rev-key possible for statePath '%2%'") % timestamp2 % statePath);
 	}
 		
 	return queryStrings(txn, references_table, key, references);		//now that we have the key, we can query the references
@@ -623,11 +626,11 @@ void Database::setStateRevisions(const Transaction & txn, TableId revisions_tabl
 	if( !isStatePath(rootStatePath)	)	//weak check on statePath
 		throw Error(format("StatePath '%1%' is not a statepath") % rootStatePath);
 			
-	int ts = getTimeStamp();
+	unsigned int timestamp = getTimeStamp();
 	
 	//Insert all ss_epochs into snapshots_table with the current ts.
 	for (RevisionClosure::const_iterator i = revisions.begin(); i != revisions.end(); ++i){
-		string key = mergeToDBKey((*i).first, ts);
+		string key = mergeToDBKey((*i).first, timestamp);
 		Strings data;
 		//the map<> takes care of the sorting on the Path
 		for (Snapshots::const_iterator j = (*i).second.begin(); j != (*i).second.end(); ++j)
@@ -639,25 +642,25 @@ void Database::setStateRevisions(const Transaction & txn, TableId revisions_tabl
 	for (RevisionClosure::const_iterator i = revisions.begin(); i != revisions.end(); ++i){
 		Path statePath = (*i).first;
 		
-		int revision = getNewRevisionNumber(txn, revisions_table, statePath);	//get a new revision number
+		unsigned int revision = getNewRevisionNumber(txn, revisions_table, statePath);	//get a new revision number
 		
 		string key = mergeToDBKey(statePath, revision);
 		
 		//get all its requisites
 		PathSet statePath_references;
-		storePathRequisitesTxn(txn, statePath, false, statePath_references, false, true, -1);
+		storePathRequisitesTxn(txn, statePath, false, statePath_references, false, true, 0);
 		statePath_references.insert(statePath);
 		
 		//save in db
 		Strings data;
 		for (PathSet::const_iterator j = statePath_references.begin(); j != statePath_references.end(); ++j)
-			data.push_back(mergeToDBKey(*j, ts));		
+			data.push_back(mergeToDBKey(*j, timestamp));		
 		
 		setStrings(txn, revisions_table, key, data, false);				//The false makes sure also empty revisions are set
 		
 		//save the date and comments
 		Strings metadata;
-		metadata.push_back(int2String(ts));
+		metadata.push_back(unsignedInt2String(timestamp));
 		
 		//get all paths that point to the same state (using shareing) and check if one of them equals the rootStatePath
 		PathSet sharedWith = getSharedWithPathSetRecTxn(txn, statePath);
@@ -671,11 +674,11 @@ void Database::setStateRevisions(const Transaction & txn, TableId revisions_tabl
 }   
 
 bool Database::queryStateRevisions(const Transaction & txn, TableId revisions_table, TableId snapshots_table,
-   	const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, int root_revision)
+   	const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const unsigned int root_revision)
 {
 	string key;
 	
-	if(root_revision == -1){
+	if(root_revision == 0){
 		Strings keys;
 		enumTable(txn, revisions_table, keys);		//get all revisions
 		bool foundsomething = lookupHighestRevivison(keys, statePath, key);
@@ -690,13 +693,13 @@ bool Database::queryStateRevisions(const Transaction & txn, TableId revisions_ta
 	bool notempty = queryStrings(txn, revisions_table, key, statePaths);
 	
 	if(!notempty)
-		throw Error(format("Root revision '%1%' not found of statePath '%2%'") % int2String(root_revision) % statePath);
+		throw Error(format("Root revision '%1%' not found of statePath '%2%'") % unsignedInt2String(root_revision) % statePath);
 		
 	//For each statePath add the revisions
 	for (Strings::iterator i = statePaths.begin(); i != statePaths.end(); ++i){
 		
 		Path getStatePath;
-		int getTimestamp;
+		unsigned int getTimestamp;
 		splitDBKey(*i, getStatePath, getTimestamp);
 		
 		//query state versioined directorys/files
@@ -732,7 +735,6 @@ bool Database::queryStateRevisions(const Transaction & txn, TableId revisions_ta
 		timestamps[getStatePath] = getTimestamp;
 	}
 	
-	
 	return notempty;
 }  
 
@@ -749,7 +751,7 @@ bool Database::queryAvailableStateRevisions(const Transaction & txn, TableId rev
 			continue;
 
 		Path getStatePath;
-		int getRevision;
+		unsigned int getRevision;
 		splitDBKey(*i, getStatePath, getRevision);
 		
 		//save the date and comments

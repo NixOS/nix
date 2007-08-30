@@ -27,7 +27,7 @@ typedef void (* Operation) (Strings opFlags, Strings opArgs);
 string stateIdentifier;
 string username;
 string comment;
-int revision_arg;
+unsigned int revision_arg;
 bool scanforReferences = false;
 bool only_commit = false;
 bool revert_recursively = false;
@@ -213,7 +213,7 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 	}
 	
 	//Sort ourselfes to create a nice output
-	IntVector revisions_sort;
+	UnsignedIntVector revisions_sort;
 	int highestrev;
 	for (RevisionInfos::iterator i = revisions.begin(); i != revisions.end(); ++i){
 		int rev = (*i).first;
@@ -224,7 +224,7 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 	sort(revisions_sort.begin(), revisions_sort.end());
 
 	int max_size = int2String(highestrev).length();
-	for (IntVector::iterator i = revisions_sort.begin(); i != revisions_sort.end(); ++i)
+	for (UnsignedIntVector::iterator i = revisions_sort.begin(); i != revisions_sort.end(); ++i)
 	{
 		int rev = *i;
 		string rev_s = padd(int2String(rev), '0' , max_size, true);	//pad revisions with a 0
@@ -297,7 +297,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 
 	//get all current (maybe updated by the scan) dependecies (if neccecary | recusively) of all state components that need to be updated
     PathSet statePaths;
-	store->storePathRequisites(root_componentPath, false, statePaths, false, true, -1);
+	store->storePathRequisites(root_componentPath, false, statePaths, false, true, 0);
 	statePaths.insert(root_statePath);
 
 	//Start transaction TODO
@@ -321,12 +321,16 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	//Debugging
 	RevisionClosure getRivisions;
 	RevisionClosureTS empty;
-	bool b = store->queryStateRevisions(root_statePath, getRivisions, empty, -1);
+	bool b = store->queryStateRevisions(root_statePath, getRivisions, empty, 0);
 	for (RevisionClosure::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
-		//printMsg(lvlError, format("State %1% has revision %2%") % (*i).first % int2String((*i).second));
+		printMsg(lvlError, format("State '%1%' has revision") % (*i).first);
 	}
 	
-	
+}
+
+void testUI(unsigned int i)
+{
+	printMsg(lvlError, format("Int: %1%") % i);
 }
 
 
@@ -409,12 +413,12 @@ void run(Strings args)
 			
 	Database nixDB;
 	Path statePath = "afsdsdafsadf-sda-fsda-f-sdaf-sdaf";
-	int revision = 5;
+	unsigned int revision = 5;
 	Path statePath2;
 	Path gets = nixDB.makeStatePathRevision(statePath, revision);
     int revision2;
     nixDB.splitStatePathRevision(gets, statePath2, revision2);
-	printMsg(lvlError, format("'%1%' '%2%'") % statePath2 % int2String(revision2));
+	printMsg(lvlError, format("'%1%' '%2%'") % statePath2 % unsignedInt2String(revision2));
 	
 	store = openStore();
 	Derivation drv = derivationFromPath("/nix/store/r2lvhrd8zhb877n07cqvcyp11j9ws5p0-hellohardcodedstateworld-dep1-1.0.drv");
@@ -477,10 +481,17 @@ void run(Strings args)
 	
 	printMsg(lvlError, format("Username fail: '%1%'") % uidToUsername(23423));		//Segfaults correctly
 
-	return;
+	int b = -1;
+    unsigned int c = b;
+    std::cout << "UNSIGNED INT: " << c  << "\n";		//prints 4294967295 !!!!!!			
 
-	*/		
-	
+	store = openStore();
+	RevisionClosure revisions; 
+	RevisionClosureTS timestamps;
+	bool b = store->queryStateRevisions("/nix/state/aacs4qpi9jzg4vmhj09d0ichframh22x-hellohardcodedstateworld-1.0-test", revisions, timestamps, 0);
+
+	return;
+	*/
 	/* test */
 	
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
@@ -502,7 +513,7 @@ void run(Strings args)
 			op = queryAvailableStateRevisions;
 		else if (arg.substr(0,21) == "--revert-to-revision="){
 			op = revertToRevision;
-			bool succeed = string2Int(arg.substr(21,arg.length()), revision_arg);
+			bool succeed = string2UnsignedInt(arg.substr(21,arg.length()), revision_arg);
 			if(!succeed)
 				throw UsageError("The given revision is not a valid number");
 		}

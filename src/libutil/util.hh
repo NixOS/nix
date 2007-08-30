@@ -308,7 +308,7 @@ void executeShellCommand(const string & command);
 //
 void runProgram_AndPrintOutput(Path program, bool searchPath, const Strings & args, const string outputPrefix);
 
-int getTimeStamp();
+unsigned int getTimeStamp();
 
 //string getCallingUserName();
 
@@ -318,7 +318,11 @@ PathSet pathSets_union(const PathSet & paths1, const PathSet & paths2);
 /* TODO */
 void pathSets_difference(const PathSet & oldpaths, const PathSet & newpaths, PathSet & addedpaths, PathSet & removedpaths);
 
+/* TODO */
 void ensureDirExists(const Path & path);
+
+/* TODO */
+void setStatePathRights(const Path & statePath, const string & user, const string & group, const string & chmod = "");
 
 string padd(const string & s, char c , unsigned int size, bool front = false);
 

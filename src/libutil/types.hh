@@ -59,16 +59,17 @@ typedef list<Path> Paths;
 typedef set<Path> PathSet;
 
 //state types
-typedef vector<int> IntVector;								//the Strings (list) of StateReferences and this list are connected by position
+typedef vector<int> IntVector;								//the Strings (list) of StateReferences and this list are connected by position		//TODO
+typedef vector<unsigned int> UnsignedIntVector;
 struct RevisionInfo
 { 
 	string comment;
 	unsigned int timestamp;
 };
-typedef map<int, RevisionInfo> RevisionInfos;
+typedef map<unsigned int, RevisionInfo> RevisionInfos;
 typedef map<Path, unsigned int> Snapshots;					//Automatically sorted on Path :)
 typedef map<Path, Snapshots> RevisionClosure;
-typedef map<Path, int> RevisionClosureTS;
+typedef map<Path, unsigned int> RevisionClosureTS;			//Paht with a timestamp about when the revision was made.
 typedef map<int, Strings> StateReferences;
 
  

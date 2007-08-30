@@ -295,7 +295,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     case wopQueryReferences:
     case wopQueryReferrers: {
         Path path = readStorePath(from);
-        int revision = readInt(from);
+        unsigned int revision = readBigUnsignedInt(from);
         startWork();
         PathSet paths;
         if (op == wopQueryReferences)
@@ -310,7 +310,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     case wopQueryStateReferences:
     case wopQueryStateReferrers: {
         Path path = readStorePath(from);
-        int revision = readInt(from);
+        unsigned int revision = readBigUnsignedInt(from);
         startWork();
         PathSet paths;
         if (op == wopQueryStateReferences)
@@ -505,7 +505,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
 		PathSet paths = readStringSet(from);
 		bool withComponents = readInt(from) == 1;
 		bool withState = readInt(from) == 1;
-		int revision = readInt(from);
+		unsigned int revision = readBigUnsignedInt(from);
 		startWork();
         store->storePathRequisites(storeOrstatePath, includeOutputs, paths, withComponents, withState, revision);
         stopWork();
@@ -525,8 +525,9 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
 	case wopQueryStateRevisions: {
+		printMsg(lvlError, format("queryStateRevisions nix-worker"));
     	Path statePath = readString(from); 
-		int revision = readInt(from);
+		unsigned int revision = readBigUnsignedInt(from);
 		RevisionClosure revisions;
 		RevisionClosureTS timestamps;
 		startWork();
@@ -581,7 +582,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     	Path componentPath = readString(from);
 		Path derivationPath = readString(from);
 		Path statePath = readString(from);
-		int revision_arg = readInt(from);
+		unsigned int revision_arg = readBigUnsignedInt(from);
 		bool recursive = readInt(from) == 1;
 		startWork();
     	store->revertToRevision(componentPath, derivationPath, statePath, revision_arg, recursive);
@@ -589,6 +590,16 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     	writeInt(1, to);
     	break;
     }
+    
+	case wopSetSharedState: {
+		Path fromExisting = readString(from);
+		Path toNew = readString(from);
+		startWork();
+    	store->setSharedState(fromExisting, toNew);
+    	stopWork();
+    	writeInt(1, to);
+		break;
+	}    
             
     default:
         throw Error(format("invalid operation %1%") % op);

@@ -142,7 +142,7 @@ void queryMissing(const PathSet & targets,
             if (store->hasSubstitutes(p))
                 willSubstitute.insert(p);
             PathSet refs;
-            store->queryReferences(p, todo, -1);		//TODO?
+            store->queryReferences(p, todo, 0);		//TODO?
         }
     }
 }

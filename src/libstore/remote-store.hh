@@ -39,13 +39,13 @@ public:
     
     Path queryStatePathDrv(const Path & statePath);
 
-    void queryReferences(const Path & path, PathSet & references, const int revision);
+    void queryReferences(const Path & path, PathSet & references, const unsigned int revision);
 
-	void queryStateReferences(const Path & storePath, PathSet & stateReferences, const int revision);
+	void queryStateReferences(const Path & storePath, PathSet & stateReferences, const unsigned int revision);
 
-    void queryReferrers(const Path & path, PathSet & referrers, const int revision);
+    void queryReferrers(const Path & path, PathSet & referrers, const unsigned int revision);
     
-    void queryStateReferrers(const Path & path, PathSet & stateReferrers, const int revision);
+    void queryStateReferrers(const Path & path, PathSet & stateReferrers, const unsigned int revision);
 
     Path addToStore(const Path & srcPath, bool fixed = false,
         bool recursive = false, string hashAlgo = "",
@@ -80,11 +80,11 @@ public:
 	
 	bool isStateComponent(const Path & path);
 	
-	void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const int revision);
+	void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const unsigned int revision);
 
 	void setStateRevisions(const RevisionClosure & revisions, const Path & rootStatePath, const string & comment);
 	
-	bool queryStateRevisions(const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const int revision);
+	bool queryStateRevisions(const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const unsigned int revision);
 	
 	bool queryAvailableStateRevisions(const Path & statePath, RevisionInfos & revisions);
 
@@ -98,7 +98,9 @@ public:
 	
 	PathSet toNonSharedPathSet(const PathSet & statePaths);
 	
-	void revertToRevision(const Path & componentPath, const Path & derivationPath, const Path & statePath, const int revision_arg, const bool recursive);
+	void revertToRevision(const Path & componentPath, const Path & derivationPath, const Path & statePath, const unsigned int revision_arg, const bool recursive);
+	
+	void setSharedState(const Path & fromExisting, const Path & toNew);
 	
 private:
     AutoCloseFD fdSocket;

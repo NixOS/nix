@@ -1083,7 +1083,7 @@ static string makeValidityRegistration(const PathSet & paths,
         s += deriver + "\n";
 
         PathSet references;
-        store->queryReferences(*i, references, -1);				//TODO check if this is ok
+        store->queryReferences(*i, references, 0);				//TODO check if this is ok
 
         s += (format("%1%\n") % references.size()).str();
             
@@ -1200,7 +1200,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
            *probably* already has it.) */
         PathSet allInputs;
         allInputs.insert(inputPaths.begin(), inputPaths.end());
-        computeFSClosure(drvPath, allInputs, true, false, -1);								//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
+        computeFSClosure(drvPath, allInputs, true, false, 0);								//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
         
         string s;
         for (PathSet::iterator i = allInputs.begin();
@@ -1323,8 +1323,8 @@ bool DerivationGoal::prepareBuild()
         Derivation inDrv = derivationFromPathTxn(noTxn, i->first);
         for (StringSet::iterator j = i->second.begin(); j != i->second.end(); ++j)
             if (inDrv.outputs.find(*j) != inDrv.outputs.end()){
-                computeFSClosure(inDrv.outputs[*j].path, inputPaths, true, false, -1);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE (done?)
-                computeFSClosure(inDrv.outputs[*j].path, inputStatePaths, false, true, -1);		//TODO!!!!!!!!!!!!! HOW CAN THESE PATHS ALREADY BE VALID ..... ?????????????????????
+                computeFSClosure(inDrv.outputs[*j].path, inputPaths, true, false, 0);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE (done?)
+                computeFSClosure(inDrv.outputs[*j].path, inputStatePaths, false, true, 0);		//TODO!!!!!!!!!!!!! HOW CAN THESE PATHS ALREADY BE VALID ..... ?????????????????????
             }
             else
                 throw BuildError(
@@ -1334,8 +1334,8 @@ bool DerivationGoal::prepareBuild()
 
     /* Second, the input sources. */
     for (PathSet::iterator i = drv.inputSrcs.begin(); i != drv.inputSrcs.end(); ++i){
-        computeFSClosure(*i, inputPaths, true, false, -1);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE (done?)
-        computeFSClosure(*i, inputStatePaths, false, true, -1);
+        computeFSClosure(*i, inputPaths, true, false, 0);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE (done?)
+        computeFSClosure(*i, inputStatePaths, false, true, 0);
     }
 
     debug(format("added input paths %1%") % showPaths(inputPaths));
@@ -1400,7 +1400,7 @@ void DerivationGoal::startBuilder()
    		checkStatePath(drv);
 	
     	if(drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
-	    	createStateDirsTxn(noTxn, drv.stateOutputDirs, drv.stateOutputs);
+	    	createSubStateDirsTxn(noTxn, drv.stateOutputDirs, drv.stateOutputs);
     }
 
     /* For convenience, set an environment pointing to the top build
@@ -1463,7 +1463,7 @@ void DerivationGoal::startBuilder()
 
         /* Write closure info to `fileName'. */
         PathSet refs;
-        computeFSClosure(storePath, refs, true, false, -1);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
+        computeFSClosure(storePath, refs, true, false, 0);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE
         /* !!! in secure Nix, the writing should be done on the
            build uid for security (maybe). */
         writeStringToFile(tmpDir + "/" + fileName,
@@ -1640,7 +1640,7 @@ void DerivationGoal::computeClosure()
     //We create state dirs only when state is enabled and when the dirs need to be created after the installation
     if(drv.stateOutputs.size() != 0)
     	if(!drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
-	    	createStateDirsTxn(noTxn, drv.stateOutputDirs, drv.stateOutputs);
+	    	createSubStateDirsTxn(noTxn, drv.stateOutputDirs, drv.stateOutputs);
     
     /*
     for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
@@ -1795,7 +1795,7 @@ void DerivationGoal::computeClosure()
             contentHashes[i->second.path],
             allReferences[i->second.path],				//set of component-references
             allStateReferences[i->second.path],			//set of state-references
-            drvPath, -1);
+            drvPath, 0);
     }
     
     //Register the state path valid
@@ -1808,7 +1808,7 @@ void DerivationGoal::computeClosure()
     		Hash(),										//emtpy hash
     		state_references,
     		state_stateReferences,
-    		drvPath, -1);
+    		drvPath, 0);
 
     	//Commit state (we only include our own state in the rivisionMapping (but other build component states might have been changed !!!! TODO) 
 		RevisionClosure rivisionMapping;
@@ -1816,7 +1816,7 @@ void DerivationGoal::computeClosure()
 		
 		//Save the new revision
 		setStateRevisionsTxn(txn, rivisionMapping, statePath, "Initial build revision.");
-			
+		
 		//Shared state
     	Path sharedState = drv.stateOutputs.find("state")->second.sharedState;
 		if(sharedState != ""){
@@ -1826,6 +1826,10 @@ void DerivationGoal::computeClosure()
 			
 			//Set in database
 			setSharedStateTxn(txn, sharedState, statePath);
+		}
+		//If not shared: create the dir and set the rights
+		else{
+			setStatePathRights(statePath, queryCallingUsername(), "nixbld", "700");
 		}
     }	    
     
@@ -2049,7 +2053,7 @@ void SubstitutionGoal::init()
 
     /* To maintain the closure invariant, we first have to realise the
        paths referenced by this one. */
-    store->queryReferences(storePath, references, -1);
+    store->queryReferences(storePath, references, 0);
 
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)

@@ -29,7 +29,7 @@ void updatedStateDerivation(Path storePath)
 }
 */
 
-void createStateDirsTxn(const Transaction & txn, const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs)
+void createSubStateDirsTxn(const Transaction & txn, const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs)
 {
 	Path statePath = stateOutputs.find("state")->second.statepath;
 	string stateDir = statePath;
@@ -57,7 +57,7 @@ void createStateDirsTxn(const Transaction & txn, const DerivationStateOutputDirs
 		
 		Path fullstatedir = stateDir + "/" + thisdir;
 		
-		ensureDirExists(fullstatedir);
+		setStatePathRights(fullstatedir, queryCallingUsername(), "nixbld");
 		
 		if(d.type == "interval"){
 			intervalPaths.insert(fullstatedir);
@@ -100,7 +100,7 @@ void revertToRevisionTxn(const Transaction & txn, const Path & componentPath, co
 		statePaths.insert(derivationPath);	//Insert direct state path
 
 	//get a new timestamp for the references update
-	int newTimestamp = getTimeStamp();
+	unsigned int newTimestamp = getTimeStamp();
 		    	
     //Get the revisions recursively to also roll them back
     RevisionClosure getRivisions;
@@ -111,7 +111,7 @@ void revertToRevisionTxn(const Transaction & txn, const Path & componentPath, co
 	for (RevisionClosure::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
 		Path statePath = (*i).first;
 		Snapshots revisioned_paths = (*i).second;
-		int timestamp = getTimestamps[statePath];
+		unsigned int timestamp = getTimestamps[statePath];
 		
 		//get its derivation-state-items
 		Derivation statePath_drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(noTxn, statePath));
@@ -183,13 +183,13 @@ void revertToRevisionTxn(const Transaction & txn, const Path & componentPath, co
 		
 		//Query the references of the old revision (already converted to a timestamp)		
     	PathSet state_references;
-    	queryXReferencesTxn(txn, statePath, state_references, true, -1, timestamp);
+    	queryXReferencesTxn(txn, statePath, state_references, true, 0, timestamp);
 		PathSet state_stateReferences;
-	    queryXReferencesTxn(txn, statePath, state_stateReferences, false, -1, timestamp);
+	    queryXReferencesTxn(txn, statePath, state_stateReferences, false, 0, timestamp);
     	
     	//Now set these old references as the new references at the new (just created) Timestamp
-    	setStateComponentReferencesTxn(txn, statePath, Strings(state_references.begin(), state_references.end()), -1, newTimestamp);
-		setStateStateReferencesTxn(txn, statePath, Strings(state_stateReferences.begin(), state_stateReferences.end()), -1, newTimestamp);
+    	setStateComponentReferencesTxn(txn, statePath, Strings(state_references.begin(), state_references.end()), 0, newTimestamp);
+		setStateStateReferencesTxn(txn, statePath, Strings(state_stateReferences.begin(), state_stateReferences.end()), 0, newTimestamp);
 		
 		printMsg(lvlError, format("Reverted state of '%1%' to revision '%2%'") % statePath % revision_arg);
 	}
@@ -309,8 +309,8 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
     //Retrieve old references
     PathSet old_references;
     PathSet old_state_references;
-    queryXReferencesTxn(txn, statePath, old_references, true, -1);				//get the latsest references
-    queryXReferencesTxn(txn, statePath, old_state_references, false, -1);		
+    queryXReferencesTxn(txn, statePath, old_references, true, 0);				//get the latsest references
+    queryXReferencesTxn(txn, statePath, old_state_references, false, 0);		
     
     //Check for added and removed paths
 	PathSet diff_references_removed;
@@ -347,7 +347,7 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
     		state_references,
     		state_stateReferences,
     		drvPath,
-    		-1);				//Set at a new timestamp
+    		0);				//Set at a new timestamp
 }
 
 void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path & statePath)
@@ -357,7 +357,7 @@ void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path
 
 	//get all state current state references recursively
 	PathSet statePaths;
-	storePathRequisitesTxn(txn, statePath, false, statePaths, false, true, -1);		//Get all current state dependencies
+	storePathRequisitesTxn(txn, statePath, false, statePaths, false, true, 0);		//Get all current state dependencies
 	
 	//Add own statePath (may already be in there, but its a set, so no doubles)
 	statePaths.insert(statePath);

@@ -214,8 +214,8 @@ static void printTree(const Path & path,
 	//Lookup all references
 	PathSet references;
 	PathSet stateReferences;
-    store->queryReferences(path, references, -1);
-    store->queryStateReferences(path, stateReferences, -1);
+    store->queryReferences(path, references, 0);
+    store->queryStateReferences(path, stateReferences, 0);
     PathSet allReferences = pathSets_union(references, stateReferences);
     
 #if 0     
@@ -250,7 +250,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
     bool includeOutputs = false;
     bool forceRealise = false;
     string bindingName;
-    int revision = -1;	//last revision
+    unsigned int revision = 0;	//last revision
 
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
@@ -280,7 +280,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--force-realise" || *i == "-f") forceRealise = true;
         else if (*i == "--include-outputs") includeOutputs = true;
         else if ((*i).substr(0,11) == "--revision="){
-        	bool succeed = string2Int((*i).substr(11,(*i).length()), revision);
+        	bool succeed = string2UnsignedInt((*i).substr(11,(*i).length()), revision);
 			if(!succeed)
 				throw UsageError("The given revision is not a valid number");
         }

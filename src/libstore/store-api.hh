@@ -81,20 +81,20 @@ public:
     /* Queries the set of outgoing FS references for a store path.
        The result is not cleared. */
     virtual void queryReferences(const Path & path,
-        PathSet & references, const int revision) = 0;
+        PathSet & references, const unsigned int revision) = 0;
         
     /* Queries the set of outgoing FS state-references for a store path.
        The result is not cleared. */
-    virtual void queryStateReferences(const Path & storePath, PathSet & stateReferences, const int revision) = 0;
+    virtual void queryStateReferences(const Path & storePath, PathSet & stateReferences, const unsigned int revision) = 0;
 
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
     virtual void queryReferrers(const Path & path,
-        PathSet & referrers, const int revision) = 0;
+        PathSet & referrers, const unsigned int revision) = 0;
 
 	/* Queries the set of incoming FS state-references for a store path.
        The result is not cleared. */
-    virtual void queryStateReferrers(const Path & path, PathSet & stateReferrers, const int revision) = 0;
+    virtual void queryStateReferrers(const Path & path, PathSet & stateReferrers, const unsigned int revision) = 0;
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
@@ -209,13 +209,13 @@ public:
 	virtual bool isStateComponent(const Path & path) = 0;
 	
 	/* TODO */
-	virtual void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const int revision) = 0;
+	virtual void storePathRequisites(const Path & storeOrstatePath, const bool includeOutputs, PathSet & paths, const bool withComponents, const bool withState, const unsigned int revision) = 0;
 
 	/* TODO */
 	virtual void setStateRevisions(const RevisionClosure & revisions, const Path & rootStatePath, const string & comment) = 0;
 	
 	/* TODO */
-	virtual bool queryStateRevisions(const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const int revision) = 0;
+	virtual bool queryStateRevisions(const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const unsigned int revision) = 0;
 	
 	/* TODO */
 	virtual bool queryAvailableStateRevisions(const Path & statePath, RevisionInfos & revisions) = 0;
@@ -237,7 +237,10 @@ public:
 	virtual PathSet toNonSharedPathSet(const PathSet & statePaths) = 0;
 	
 	/* TODO */
-	virtual void revertToRevision(const Path & componentPath, const Path & derivationPath, const Path & statePath, const int revision_arg, const bool recursive) = 0;
+	virtual void revertToRevision(const Path & componentPath, const Path & derivationPath, const Path & statePath, const unsigned int revision_arg, const bool recursive) = 0;
+	
+	/* TODO */
+	virtual void setSharedState(const Path & fromExisting, const Path & toNew) = 0;
 };
 
 
