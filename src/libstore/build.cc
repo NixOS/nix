@@ -1829,7 +1829,9 @@ void DerivationGoal::computeClosure()
 		}
 		//If not shared: create the dir and set the rights
 		else{
-			setStatePathRights(statePath, queryCallingUsername(), "nixbld", "700");
+			ensureDirExists(statePath);
+			setChown(statePath, queryCallingUsername(), "nixbld");
+			setChmod(statePath, "700");
 		}
     }	    
     

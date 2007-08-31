@@ -572,7 +572,7 @@ static void installDerivations(Globals & globals,
     				oldStatePath = oldDrv.stateOutputs.find("state")->second.statepath;
     				
         			//SharePaths
-        			printMsg(lvlError, format("Sharing state from old to new component '%1%' --> '%2%'") % newStatePath % oldStatePath);
+        			printMsg(lvlError, format("Sharing state from old <-- new component '%1%' <-- '%2%'") % oldStatePath % newStatePath);
 					toBeShared[oldStatePath] = newStatePath;
 	        	}
         		else{	//If not equal, then we do not replace, so we push back (just like the else branch)  			
@@ -601,7 +601,9 @@ static void installDerivations(Globals & globals,
     //After all components have been built succesfully, share their state paths with the old ones    
     for (StringPairs::iterator i = toBeShared.begin(); i != toBeShared.end(); ++i){
 
-		deletePathWrapped(i->second);		//Remove contents of current new state path
+		printMsg(lvlError, format("Sharing state from old <-- new component '%1%' <-- '%2%'") % i->first % i->second);
+		
+		deletePath(i->second);				//Remove contents of current new state path
 		sharePath(i->first, i->second);		//Share new statepath to the old statepath
 		
 		//Set in database

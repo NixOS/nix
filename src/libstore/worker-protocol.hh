@@ -24,7 +24,7 @@ typedef enum {
     wopQueryStateReferrers,					
     wopAddToStore,							
     wopAddTextToStore,
-    wopBuildDerivations,					//TODO HANGS SOMETIMES !!!!!
+    wopBuildDerivations,					//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! HANGS SOMETIMES !!!!!
     wopEnsurePath,
     wopAddTempRoot,
     wopAddIndirectRoot,

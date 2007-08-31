@@ -21,6 +21,9 @@ if [ "$1" = "full" ]; then
   nix-env-all-pkgs.sh -i gdb			#optional for debugging
   nix-env-all-pkgs.sh -i gnupatch
   nix-env-all-pkgs.sh -i gnumake
+  nix-env-all-pkgs.sh -i ext3cow-tools
+  nix-env-all-pkgs.sh -i e3cfsprogs
+  
 fi
 
 if [ "$1" = "full" ] || [ "$1" = "auto" ]; then

@@ -322,7 +322,8 @@ void pathSets_difference(const PathSet & oldpaths, const PathSet & newpaths, Pat
 void ensureDirExists(const Path & path);
 
 /* TODO */
-void setStatePathRights(const Path & statePath, const string & user, const string & group, const string & chmod = "");
+void setChown(const Path & pathOrFile, const string & user, const string & group, bool recursive = false);
+void setChmod(const Path & pathOrFile, const string & chmod);
 
 string padd(const string & s, char c , unsigned int size, bool front = false);
 

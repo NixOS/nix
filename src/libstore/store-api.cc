@@ -143,9 +143,11 @@ void checkStatePath(const Derivation & drv)
     string componentHash = drv.stateOutputs.find("state")->second.componentHash;
     string suffix = drv.env.find("name")->second;
 	string stateIdentifier = drv.stateOutputs.find("state")->second.stateIdentifier;
-    Path calculatedPath = makeStatePath(componentHash, suffix, stateIdentifier);
+    Path calculatedPath = makeStatePath(componentHash, suffix, stateIdentifier);				//TODO INCLUDE USER !!!!!!!!!!!!
 	
-	printMsg(lvlError, format("Checking statePath validity: %1% %2%") % drvPath % calculatedPath);
+	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! calculatedPath IS NOT CORRECT ANYMORE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	
+	printMsg(lvlError, format("Checking statePath validity: %1% %2%") % drvPath % calculatedPath);		
 		
     if(drvPath != calculatedPath)
     	Error(format("The statepath from the Derivation does not match the recalculated statepath, are u trying to spoof the statepath?"));

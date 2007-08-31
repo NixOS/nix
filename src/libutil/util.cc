@@ -259,7 +259,7 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 
     struct stat st;
     if (lstat(path.c_str(), &st))
-	throw SysError(format("getting attributes of path `%1%'") % path);
+		throw SysError(format("getting attributes of path `%1%'") % path);
 
     bytesFreed += st.st_size;
 
@@ -269,7 +269,7 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 	/* Make the directory writable. */
 	if (!(st.st_mode & S_IWUSR)) {
 	    if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
-		throw SysError(format("making `%1%' writable") % path);
+			throw SysError(format("making `%1%' writable") % path);
 	}
 
 	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
@@ -1241,20 +1241,22 @@ void ensureDirExists(const Path & path)
 	runProgram_AndPrintOutput("mkdir", true, p_args, "mkdir");		//TODO ensurePath
 }
 
-void setStatePathRights(const Path & statePath, const string & user, const string & group, const string & chmod)
+void setChown(const Path & pathOrFile, const string & user, const string & group, bool recursive)
 {
-	ensureDirExists(statePath);
 	Strings p_args;
+	if(recursive)
+		p_args.push_back("-R");
 	p_args.push_back(user + "." + group);
-	p_args.push_back(statePath);
+	p_args.push_back(pathOrFile);
 	runProgram_AndPrintOutput("chown", true, p_args, "chown");
-	
-	if(chmod != "")	{
-		p_args.clear();
-		p_args.push_back(chmod);
-		p_args.push_back(statePath);
-		runProgram_AndPrintOutput("chmod", true, p_args, "chmod");
-	}
+} 
+
+void setChmod(const Path & pathOrFile, const string & chmod)
+{
+	Strings p_args;
+	p_args.push_back(chmod);
+	p_args.push_back(pathOrFile);
+	runProgram_AndPrintOutput("chmod", true, p_args, "chmod");
 }
 
 string padd(const string & s, char c , unsigned int size, bool front)

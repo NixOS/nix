@@ -527,6 +527,7 @@ void RemoteStore::revertToRevision(const Path & componentPath, const Path & deri
 
 void RemoteStore::setSharedState(const Path & fromExisting, const Path & toNew)
 {
+	writeInt(wopSetSharedState, to);
 	writeString(fromExisting, to);
 	writeString(toNew, to);
 	processStderr();

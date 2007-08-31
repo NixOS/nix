@@ -50,19 +50,22 @@ void createSubStateDirsTxn(const Transaction & txn, const DerivationStateOutputD
 		DerivationStateOutputDir d = i->second;
 
 		string thisdir = d.path;
-		
-		//If it is a file: continue
-		if(thisdir.substr(thisdir.length() -1 , thisdir.length()) != "/")
-			continue;
-		
 		Path fullstatedir = stateDir + "/" + thisdir;
 		
-		setStatePathRights(fullstatedir, queryCallingUsername(), "nixbld");
+		//If it is a file: continue
+		if(thisdir.substr(thisdir.length() -1 , thisdir.length()) != "/"){
+			continue;
+		}		
+		
+		ensureDirExists(fullstatedir);
 		
 		if(d.type == "interval"){
 			intervalPaths.insert(fullstatedir);
 		}		
 	}
+	
+	setChown(statePath, queryCallingUsername(), "nixbld", true);		//Set all dirs in the statePath recursively to their owners
+	printMsg(lvlTalkative, format("Set CHOWN '%1%'") % (statePath + "-" + queryCallingUsername()));
 	
 	//Initialize the counters for the statePaths that have an interval to 0
 	IntVector empty;
