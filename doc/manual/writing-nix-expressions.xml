@@ -1217,6 +1217,10 @@ set, the attributes of which specify the inputs of the build.</para>
       They are simply concatenated, separated by
       spaces.</para></listitem>
 
+      <listitem><para><emphasis>true</emphasis> is passed as 
+      <emphasis>1</emphasis>, <emphasis>false</emphasis>
+      and <emphasis>null</emphasis> are passed as empty string.
+      </para></listitem>
     </itemizedlist>
 
   </para></listitem>
