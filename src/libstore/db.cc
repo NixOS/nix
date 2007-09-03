@@ -664,13 +664,6 @@ void Database::setStateRevisions(const Transaction & txn, TableId revisions_tabl
 		
 		//get all paths that point to the same state (using shareing) and check if one of them equals the rootStatePath
 		PathSet sharedWith = getSharedWithPathSetRecTxn(txn, statePath);
-		
-		/*
-		printMsg(lvlError, format("SP RootSP '%1%' - '%2%'") % statePath % rootStatePath);
-		for (PathSet::const_iterator j = sharedWith.begin(); j != sharedWith.end(); ++j)
-			printMsg(lvlError, format("SP SW '%1%'") % *j);
-		*/
-		
 		if(statePath == rootStatePath || sharedWith.find(rootStatePath) != sharedWith.end())
 			metadata.push_back(comment);
 		else

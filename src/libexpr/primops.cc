@@ -423,6 +423,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     bool createDirsBeforeInstall = false;
     string runtimeStateArgs = "";
     string sharedState = "";
+    string externalState = "";
     vector<DerivationStateOutputDir> stateDirs;
 
     for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
@@ -508,7 +509,9 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
               }
                  	         
    	        }
-   	        else if(key == "solidStateDependencies"){
+   	        else if(key == "solidStateDependency"){
+                
+                /*
                 ATermList es;
                 value = evalExpr(state, value);
                 if (!matchList(value, es)) {
@@ -520,6 +523,8 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
                     string s = coerceToString(state, *i, context, true);
                     drv.solidStateDeps.insert(s);
                 }
+                */
+                externalState = coerceToString(state, value, context, true);
             }
    	        else if(key == "shareType") { shareType = coerceToString(state, value, context, true); }
    	        else if(key == "synchronization") { syncState = coerceToString(state, value, context, true); }
@@ -621,7 +626,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 	if(enableState && !disableState){    
 		if(runtimeStateArgs == ""){
 			string enableStateS = bool2string("true");
-			drv.stateOutputs["state"] = DerivationStateOutput("", "", "", "", stateIdentifier, enableStateS, "", "", "", runtimeStateArgs, queryCurrentUsername(), "", false);
+			drv.stateOutputs["state"] = DerivationStateOutput("", "", "", "", stateIdentifier, enableStateS, "", "", "", runtimeStateArgs, queryCurrentUsername(), "", "", false);
 		}	
 	}
         
@@ -633,13 +638,6 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     /* Construct the final derivation store expression. */
     drv.env["out"] = outPath;
     drv.outputs["out"] = DerivationOutput(outPath, outputHashAlgo, outputHash);
-    
-    /* Replace $(statePath) in solidStateDeps */
-    for (StringSet::iterator i = drv.solidStateDeps.begin(); i != drv.solidStateDeps.end(); ++i)
-    	if(*i == "$(statePath)" || "$statePath" ){
-    		drv.solidStateDeps.erase(*i);
-    		drv.solidStateDeps.insert(outPath);   
-    	} 		
     
     //printMsg(lvlError, format("DerivationOutput %1% %2% %3%") % outPath % outputHashAlgo % outputHash);
 	//only add state when we have to to keep compitibilty with the 'old' format.
@@ -657,7 +655,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     	string enableStateS = bool2string("true");
     	string createDirsBeforeInstallS = bool2string(createDirsBeforeInstall);
     	drv.stateOutputs["state"] = DerivationStateOutput(stateOutPath, printHash(componentHash), outputHashAlgo, outputHash, stateIdentifier, enableStateS, 
-    	                                                  shareType, syncState, createDirsBeforeInstallS, runtimeStateArgs, queryCurrentUsername(), sharedState);
+    	                                                  shareType, syncState, createDirsBeforeInstallS, runtimeStateArgs, queryCurrentUsername(), sharedState, externalState);
     	
     	for(vector<DerivationStateOutputDir>::iterator i = stateDirs.begin(); i != stateDirs.end(); ++i)
     		drv.stateOutputDirs[(*i).path] = *(i);

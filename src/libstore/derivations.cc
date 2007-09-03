@@ -67,12 +67,12 @@ Derivation parseDerivation(ATerm t)
 {
     Derivation drv;
     ATermList outs, inDrvs, inSrcs, args, bnds;
-    ATermList stateOuts = ATempty, stateOutDirs = ATempty, solidStateDeps = ATempty;
+    ATermList stateOuts = ATempty, stateOutDirs = ATempty;
     
     ATerm builder, platform;
 
 	bool withState;
-    if (matchDerive(t, outs, stateOuts, stateOutDirs, solidStateDeps, inDrvs, inSrcs, platform, builder, args, bnds) ) { withState = true; }
+    if (matchDerive(t, outs, stateOuts, stateOutDirs, inDrvs, inSrcs, platform, builder, args, bnds) ) { withState = true; }
     else if (matchDeriveWithOutState(t, outs, inDrvs, inSrcs, platform, builder, args, bnds) ) { withState = false; }
     else
         throwBadDrv(t);
@@ -93,8 +93,8 @@ Derivation parseDerivation(ATerm t)
     {
 	    //parse state part
 	    for (ATermIterator i(stateOuts); i; ++i) {
-	        ATerm id, statepath, componentHash, hashAlgo, hash, stateIdentifier, enabled, shareType, synchronization, createDirsBeforeInstall, runtimeStateArgs, username, sharedState;
-	        if (!matchDerivationStateOutput(*i, id, statepath, componentHash, hashAlgo, hash, stateIdentifier, enabled, shareType, synchronization, createDirsBeforeInstall, runtimeStateArgs, username, sharedState))
+	        ATerm id, statepath, componentHash, hashAlgo, hash, stateIdentifier, enabled, shareType, synchronization, createDirsBeforeInstall, runtimeStateArgs, username, sharedState, externalState;		//TODO unitialized warning
+	        if (!matchDerivationStateOutput(*i, id, statepath, componentHash, hashAlgo, hash, stateIdentifier, enabled, shareType, synchronization, createDirsBeforeInstall, runtimeStateArgs, username, sharedState, externalState))
 	            throwBadDrv(t);
 	        DerivationStateOutput stateOut;
 	        stateOut.statepath = aterm2String(statepath);
@@ -109,7 +109,8 @@ Derivation parseDerivation(ATerm t)
 	        stateOut.createDirsBeforeInstall = aterm2String(createDirsBeforeInstall);
 	        stateOut.runtimeStateArgs = aterm2String(runtimeStateArgs);
 	        stateOut.username = aterm2String(username);
-	        stateOut.sharedState = aterm2String(sharedState);  
+	        stateOut.sharedState = aterm2String(sharedState);
+	        stateOut.externalState = aterm2String(externalState);
 	        drv.stateOutputs[aterm2String(id)] = stateOut;
 	    }
 
@@ -126,12 +127,6 @@ Derivation parseDerivation(ATerm t)
 	        drv.stateOutputDirs[aterm2String(id)] = stateOutDirs;
 	    }
 	    
-	    //parse solid state dependencies
-	    for (ATermIterator i(solidStateDeps); i; ++i) {
-	        if (ATgetType(*i) != AT_APPL)
-	            throw badTerm("string expected", *i);
-	        drv.solidStateDeps.insert(aterm2String(*i));
-    	}
 	}
 
     for (ATermIterator i(inDrvs); i; ++i) {
@@ -201,7 +196,8 @@ ATerm unparseDerivation(const Derivation & drv)
                 toATerm(i->second.createDirsBeforeInstall),
                 toATerm(i->second.runtimeStateArgs),
                 toATerm(i->second.username),
-                toATerm(i->second.sharedState)
+                toATerm(i->second.sharedState),
+                toATerm(i->second.externalState)
                 ));
     }
                 
@@ -214,11 +210,6 @@ ATerm unparseDerivation(const Derivation & drv)
                 toATerm(i->second.interval)
                 ));
 	
-	ATermList solidStateDeps = ATempty;
-	for (StringSet::const_reverse_iterator i = drv.solidStateDeps.rbegin();
-         i != drv.solidStateDeps.rend(); ++i)
-        solidStateDeps = ATinsert(solidStateDeps, toATerm(*i));
-
     ATermList inDrvs = ATempty;
     for (DerivationInputs::const_reverse_iterator i = drv.inputDrvs.rbegin();
          i != drv.inputDrvs.rend(); ++i)
@@ -245,7 +236,6 @@ ATerm unparseDerivation(const Derivation & drv)
 	        outputs,
 	        stateOutputs,
 	        stateOutputDirs,
-	        solidStateDeps,
 	        inDrvs,
 	        toATermList(drv.inputSrcs),
 	        toATerm(drv.platform),

@@ -487,6 +487,8 @@ static void installDerivations(Globals & globals,
     DrvInfos newElems;
     queryInstSources(globals.state, globals.instSource, args, newElems, true);
 
+	StringPairs externalStates;		//Mapping from statePath --> some path outide the store 
+
     StringSet newNames;
     for (DrvInfos::iterator i = newElems.begin(); i != newElems.end(); ++i) {
         /* `forceName' is a hack to get package names right in some
@@ -501,11 +503,20 @@ static void installDerivations(Globals & globals,
         {
         	DerivationStateOutputs stateOutputs = drv.stateOutputs;
         	string stateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
-        	printMsg(lvlError, format("Add '%2%' with '%1%'") % stateIdentifier % i->queryOutPath(globals.state) );
+        	printMsg(lvlError, format("Add '%2%' with '%1%'") % stateIdentifier % i->queryOutPath(globals.state));
         	if(stateIdentifier == "")
 	        	i->setStateIdentifier("__EMTPY__");
 	        else
 	        	i->setStateIdentifier(stateIdentifier);	
+	        
+	        //Later on we need to link the sharedState path out of the store to the statePath inside the state-store
+	        string externalState = stateOutputs.find("state")->second.externalState;
+	        Path statePath = stateOutputs.find("state")->second.statepath;
+			if(externalState != ""){
+				if(stateIdentifier != "")
+					externalState = externalState + "-" +  stateIdentifier;
+				externalStates[statePath] = externalState;
+			}
         }
         
         if (globals.forceName != "")
@@ -609,7 +620,41 @@ static void installDerivations(Globals & globals,
 		//Set in database
 		store->setSharedState(i->first, i->second);
     }
+
+    //Let the stateDirs in /nix/state point to the solidStateDependencies
+    for (StringPairs::iterator i = externalStates.begin(); i != externalStates.end(); ++i){
+    	
+    	Path statePath = i->first;
+    	Path externalState = i->second;
     
+    	//1. If dir externalState exists, we move its data into the statePath
+    	//2. We ensure that the parent dir of externalState exists so we can create a symlink
+    	if(IsDirectory(externalState)){
+    		copyContents(externalState, statePath);
+    		
+    		//TODO !!!!!!!!!!!!!!
+    		//cp: cannot stat `/home/wouterdb/test/aaaaaaaa-test/*': No such file or directory
+			//error: program `cp' failed with exit code 1
+    		
+    		deletePath(externalState);
+    	}
+    	else{
+    		
+    		//Ensure parent dir
+    		//outsidestorePath
+    		//ensureDirExists();
+    	}
+    	
+    	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! these last 2 items should be done by the store I think for security reasons !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    	// /nix/state should be root.nixbl and 775
+    	
+    	//Now we create a symlink externalState --> statePath
+    	printMsg(lvlError, format("SYMLINK: '%1%' --> '%2%'") % externalState % statePath);
+    	symlinkPath(statePath, externalState);
+    	
+    	//SET IN DB !!!
+    	//TODO
+    }
     
 }
 

@@ -55,12 +55,14 @@ struct DerivationStateOutput
     
     string sharedState;					//Path to share state From		
     
+    string externalState;				//a statePath not not in the stateStore (Official hack)
+    
     DerivationStateOutput()
     {
     }
     
     //TODO add const ??
-    DerivationStateOutput(Path statepath, string componentHash, string hashAlgo, string hash, string stateIdentifier, string enabled, string shareType, string synchronization, string createDirsBeforeInstall, string runtimeStateArgs, string username, string sharedState, bool check=true)
+    DerivationStateOutput(Path statepath, string componentHash, string hashAlgo, string hash, string stateIdentifier, string enabled, string shareType, string synchronization, string createDirsBeforeInstall, string runtimeStateArgs, string username, string sharedState, string externalState, bool check=true)
     {
         if(check){
 	        if(shareType != "none" && shareType != "full" && shareType != "group")
@@ -73,8 +75,8 @@ struct DerivationStateOutput
 	        	throw Error(format("the stateIdenfier cannot be this value '%1%'") % stateIdentifier);
 	        if(runtimeStateArgs == "__NOARGS__")
 	        	throw Error(format("the runtimeStateArgs cannot be this value '%1%'") % runtimeStateArgs);
-	        
-	        
+			if(externalState != "" && sharedState != "")
+				throw Error(format("You cannot have an externalState and sharedState at the same time"));	        
         }
         
         //TODO
@@ -93,6 +95,7 @@ struct DerivationStateOutput
         this->runtimeStateArgs = runtimeStateArgs;
         this->username = username;
         this->sharedState = sharedState;
+		this->externalState = externalState;        
     }
     
     bool getEnabled(){
@@ -119,6 +122,7 @@ struct DerivationStateOutput
         this->runtimeStateArgs = "";
         //this->username;						//Changes the statepath directly
         this->sharedState = "";
+        this->externalState = "";
          
     }
 };
@@ -171,7 +175,6 @@ struct Derivation
     DerivationOutputs outputs; /* keyed on symbolic IDs */
     DerivationStateOutputs stateOutputs; /* TODO */
     DerivationStateOutputDirs stateOutputDirs; /* TODO */
-    StringSet solidStateDeps;	/* TODO */    
     DerivationInputs inputDrvs; /* inputs that are sub-derivations */
     PathSet inputSrcs; /* inputs that are sources */
     string platform;

@@ -1813,20 +1813,14 @@ PathSet getSharedWithPathSetRecTxn_private(const Transaction & txn, const Path &
 {
 	//Get all paths pointing to statePath
 	PathSet newStatePaths = getDirectlySharedWithPathSetTxn(txn, statePath);
-	
-	/*		
-	printMsg(lvlError, format("getSharedWithPathSetRecTxn_private: '%1%'") % statePath);
-	for (PathSet::const_iterator j = newStatePaths.begin(); j != newStatePaths.end(); ++j)
-			printMsg(lvlError, format("newStatePaths '%1%'") % *j);
-	*/
 		
 	//go into recursion to see if there are more paths indirectly pointing to statePath
 	for (PathSet::iterator i = newStatePaths.begin(); i != newStatePaths.end(); ++i){
+		
 		//Only recurse on the really new statePaths to prevent infinite recursion
-		if(statePaths.find(*i) == statePaths.end())
-		{ 
+		if(statePaths.find(*i) == statePaths.end())	{ 
 			statePaths.insert(*i);
-			statePaths = pathSets_union(statePaths, getSharedWithPathSetRecTxn_private(txn, *i, statePaths));		//TODO !!!!!!!!!!!!!!!!!!!!!!
+			statePaths = pathSets_union(statePaths, getSharedWithPathSetRecTxn_private(txn, *i, statePaths));
 		}
 	}
 	

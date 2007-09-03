@@ -327,7 +327,14 @@ void setChmod(const Path & pathOrFile, const string & chmod);
 
 string padd(const string & s, char c , unsigned int size, bool front = false);
 
+/* Symlinks one path to the other */
+void symlinkPath(const Path & fromExisting, const Path & toNew);
+
+/* Exactly the same as symlinkPath */
 void sharePath(const Path & fromExisting, const Path & toNew);
+
+/* Copy all files and folders recursively (also the hidden ones) from the dir from/... to the dir to/... */
+void copyContents(const Path & from, const Path & to);
 
 }
 

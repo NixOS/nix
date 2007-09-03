@@ -1271,14 +1271,37 @@ string padd(const string & s, char c , unsigned int size, bool front)
 	return ss;
 }
 
-void sharePath(const Path & fromExisting, const Path & toNew)
+void symlinkPath(const Path & fromExisting, const Path & toNew)
 {
 	//Symlink link to the share path
+	//Usage: ln [OPTION]... [-T] TARGET LINK_NAME   (1st form)
 	Strings p_args;
 	p_args.push_back("-sf");
-	p_args.push_back(fromExisting);
+	p_args.push_back(fromExisting);	
 	p_args.push_back(toNew);
-	runProgram_AndPrintOutput("ln", true, p_args, "ln");	//run
+	runProgram_AndPrintOutput("ln", true, p_args, "ln");
+	
+	printMsg(lvlError, format("ln -sf %1% %2%") % fromExisting % toNew);
+}
+
+void sharePath(const Path & fromExisting, const Path & toNew)
+{
+	symlinkPath(fromExisting, toNew);
+}
+
+void copyContents(const Path & from, const Path & to)
+{
+	Strings p_args;
+	p_args.push_back("-R");
+	p_args.push_back(from + "/*");
+	p_args.push_back(to);
+	runProgram_AndPrintOutput("cp", true, p_args, "cp");
+	
+	p_args.clear();
+	p_args.push_back("-R");
+	p_args.push_back(from + "/.*");		//Also copy the hidden files
+	p_args.push_back(to);
+	runProgram_AndPrintOutput("cp", true, p_args, "cp");
 }
 
 }

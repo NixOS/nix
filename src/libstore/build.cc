@@ -1704,8 +1704,17 @@ void DerivationGoal::computeClosure()
 	    /* Get rid of all weird permissions. */
 		canonicalisePathMetaData(path);
 		
-		/* Just before the very first scanForReferences, we insert the solid state references in its table so its references will show up in the scan*/
-		setSolidStateReferencesTxn(noTxn, path, drv.solidStateDeps);
+		/* In case we have an externalState:
+		 * Just before the very first scanForReferences, we insert the solid state references 
+		 * in its table so its references will show up in the scan 
+		 */
+		if(isStateDrv(drv)){
+			if(drv.stateOutputs.find("state")->second.externalState != ""){
+				PathSet singStatePath;
+				singStatePath.insert(drv.stateOutputs.find("state")->second.statepath);
+				setSolidStateReferencesTxn(noTxn, path, singStatePath);
+			}
+		} 
 
 		/* For this output path, find the component references to other paths contained in it. */
         PathSet references = scanForReferences(path, allPaths);
