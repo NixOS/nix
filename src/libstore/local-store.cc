@@ -1791,7 +1791,7 @@ void setStateStateReferencesTxn(const Transaction & txn, const Path & statePath,
 }
 
 //Lookups which statePaths directy share (point to) statePath
-PathSet getSharedWithPathSetTxn(const Transaction & txn, const Path & statePath)
+PathSet getDirectlySharedWithPathSetTxn(const Transaction & txn, const Path & statePath)
 {
 	PathSet statePaths;
 
@@ -1812,31 +1812,51 @@ PathSet getSharedWithPathSetTxn(const Transaction & txn, const Path & statePath)
 PathSet getSharedWithPathSetRecTxn_private(const Transaction & txn, const Path & statePath, PathSet & statePaths)
 {
 	//Get all paths pointing to statePath
-	PathSet newStatePaths = getSharedWithPathSetTxn(txn, statePath);
+	PathSet newStatePaths = getDirectlySharedWithPathSetTxn(txn, statePath);
 	
+	/*		
+	printMsg(lvlError, format("getSharedWithPathSetRecTxn_private: '%1%'") % statePath);
+	for (PathSet::const_iterator j = newStatePaths.begin(); j != newStatePaths.end(); ++j)
+			printMsg(lvlError, format("newStatePaths '%1%'") % *j);
+	*/
+		
 	//go into recursion to see if there are more paths indirectly pointing to statePath
-	for (PathSet::iterator i = newStatePaths.begin(); i != newStatePaths.end(); ++i)
+	for (PathSet::iterator i = newStatePaths.begin(); i != newStatePaths.end(); ++i){
 		//Only recurse on the really new statePaths to prevent infinite recursion
-		if(statePaths.find(*i) == statePaths.end()) 
-			statePaths = pathSets_union(statePaths, getSharedWithPathSetRecTxn_private(txn, *i, statePaths));
+		if(statePaths.find(*i) == statePaths.end())
+		{ 
+			statePaths.insert(*i);
+			statePaths = pathSets_union(statePaths, getSharedWithPathSetRecTxn_private(txn, *i, statePaths));		//TODO !!!!!!!!!!!!!!!!!!!!!!
+		}
+	}
 	
 	return statePaths;
 }
 
-//Note: Also returns statePath in the PathSet 
 PathSet getSharedWithPathSetRecTxn(const Transaction & txn, const Path & statePath)
 {
 	//To no shared state path
 	Path statePath_ns = toNonSharedPathTxn(txn, statePath);
-	PathSet empty;
-	return getSharedWithPathSetRecTxn_private(txn, statePath_ns, empty);
+	
+	//Also insert non-shared state path if it doenst equal statePath 
+	PathSet statePaths;
+	if(statePath_ns != statePath)
+		statePaths.insert(statePath_ns);
+	
+	//Make the call to get all shared with paths
+	PathSet result = getSharedWithPathSetRecTxn_private(txn, statePath_ns, statePaths);
+	
+	//Remove yourself from the list eventually
+	result.erase(statePath);
+	
+	return result;
 }
 
 
-void LocalStore::revertToRevision(const Path & componentPath, const Path & derivationPath, const Path & statePath, const unsigned int revision_arg, const bool recursive)
+void LocalStore::revertToRevision(const Path & statePath, const unsigned int revision_arg, const bool recursive)
 {
 	Transaction txn(nixDB);
-	revertToRevisionTxn(txn, componentPath, derivationPath, statePath, revision_arg, recursive);
+	revertToRevisionTxn(txn, statePath, revision_arg, recursive);
 	txn.commit();	
 }
 

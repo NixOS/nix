@@ -513,11 +513,9 @@ PathSet RemoteStore::toNonSharedPathSet(const PathSet & statePaths)
 	return readStringSet(from);			//TODO !!!!!!!!!!!!!!! create a readStatePaths just like  readStorePaths
 }
 
-void RemoteStore::revertToRevision(const Path & componentPath, const Path & derivationPath, const Path & statePath, const unsigned int revision_arg, const bool recursive)
+void RemoteStore::revertToRevision(const Path & statePath, const unsigned int revision_arg, const bool recursive)
 {
 	writeInt(wopRevertToRevision, to);
-	writeString(componentPath, to);
-	writeString(derivationPath, to);
 	writeString(statePath, to);
 	writeBigUnsignedInt(revision_arg, to);
 	writeInt(recursive ? 1 : 0, to);

@@ -241,7 +241,7 @@ public:
 	virtual PathSet toNonSharedPathSet(const PathSet & statePaths) = 0;
 	
 	/* TODO */
-	virtual void revertToRevision(const Path & componentPath, const Path & derivationPath, const Path & statePath, const unsigned int revision_arg, const bool recursive) = 0;
+	virtual void revertToRevision(const Path & statePath, const unsigned int revision_arg, const bool recursive) = 0;
 	
 	/* TODO */
 	virtual void setSharedState(const Path & fromExisting, const Path & toNew) = 0;

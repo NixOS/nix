@@ -579,13 +579,11 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
 	case wopRevertToRevision: {
-    	Path componentPath = readString(from);
-		Path derivationPath = readString(from);
 		Path statePath = readString(from);
 		unsigned int revision_arg = readBigUnsignedInt(from);
 		bool recursive = readInt(from) == 1;
 		startWork();
-    	store->revertToRevision(componentPath, derivationPath, statePath, revision_arg, recursive);
+    	store->revertToRevision(statePath, revision_arg, recursive);
     	stopWork();
     	writeInt(1, to);
     	break;

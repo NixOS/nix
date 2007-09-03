@@ -93,22 +93,18 @@ PathSet getAllStateDerivationsRecursivelyTxn(const Transaction & txn, const Path
 
 
 
-void revertToRevisionTxn(const Transaction & txn, const Path & componentPath, const Path & derivationPath, const Path & statePath, const int revision_arg, const bool recursive)
+void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const int revision_arg, const bool recursive)
 {
-    
-    PathSet statePaths;
-    if(recursive)
-    	PathSet statePaths = getAllStateDerivationsRecursivelyTxn(txn, componentPath, revision_arg);	//get dependecies (if neccecary | recusively) of all state components that need to be updated
-    else
-		statePaths.insert(derivationPath);	//Insert direct state path
-
+	//Unshare the path
+	Path statePath_ns = toNonSharedPathTxn(txn, statePath);
+	
 	//get a new timestamp for the references update
 	unsigned int newTimestamp = getTimeStamp();
 		    	
     //Get the revisions recursively to also roll them back
     RevisionClosure getRivisions;
     RevisionClosureTS getTimestamps;
-	queryStateRevisionsTxn(txn, statePath, getRivisions, getTimestamps, revision_arg);
+	queryStateRevisionsTxn(txn, statePath_ns, getRivisions, getTimestamps, revision_arg);
 
 	//Revert each statePath in the list
 	for (RevisionClosure::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){

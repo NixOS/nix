@@ -112,7 +112,7 @@ public:
 	
 	PathSet toNonSharedPathSet(const PathSet & statePaths);
 	
-	void revertToRevision(const Path & componentPath, const Path & derivationPath, const Path & statePath, const unsigned int revision_arg, const bool recursive);
+	void revertToRevision(const Path & statePath, const unsigned int revision_arg, const bool recursive);
 	
 	void setSharedState(const Path & fromExisting, const Path & toNew);
 };
@@ -243,6 +243,10 @@ bool querySolidStateReferencesTxn(const Transaction & txn, const Path & statePat
 void setSharedStateTxn(const Transaction & txn, const Path & fromExisting, const Path & toNew);
 PathSet toNonSharedPathSetTxn(const Transaction & txn, const PathSet & statePaths);
 Path toNonSharedPathTxn(const Transaction & txn, const Path & statePath);
+
+/*
+ * Returns a pathset with all paths (including itself) that eventually share the same statePath
+ */
 PathSet getSharedWithPathSetRecTxn(const Transaction & txn, const Path & statePath);
 
 void ensurePathTxn(const Transaction & txn, const Path & path);

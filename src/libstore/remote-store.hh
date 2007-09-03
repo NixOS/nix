@@ -98,7 +98,7 @@ public:
 	
 	PathSet toNonSharedPathSet(const PathSet & statePaths);
 	
-	void revertToRevision(const Path & componentPath, const Path & derivationPath, const Path & statePath, const unsigned int revision_arg, const bool recursive);
+	void revertToRevision(const Path & statePath, const unsigned int revision_arg, const bool recursive);
 	
 	void setSharedState(const Path & fromExisting, const Path & toNew);
 	
