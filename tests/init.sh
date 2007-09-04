@@ -27,6 +27,7 @@ ln -s $TOP/scripts/nix-prefetch-url $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-collect-garbage $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-build $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-install-package $NIX_BIN_DIR/
+ln -s $TOP/scripts/nix-push $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-pull $NIX_BIN_DIR/
 ln -s $bzip2_bin_test/bzip2 $NIX_BIN_DIR/
 ln -s $bzip2_bin_test/bunzip2 $NIX_BIN_DIR/
@@ -57,7 +58,9 @@ for i in \
     $NIX_BIN_DIR/nix-collect-garbage \
     $NIX_BIN_DIR/nix-build \
     $NIX_BIN_DIR/nix-install-package \
+    $NIX_BIN_DIR/nix-push \
     $NIX_BIN_DIR/nix-pull \
+    $NIX_BIN_DIR/nix/readmanifest.pm \
     ; do
     sed < $i > $i.tmp \
         -e "s^$REAL_BIN_DIR^$NIX_BIN_DIR^" \
