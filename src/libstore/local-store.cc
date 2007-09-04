@@ -501,7 +501,6 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
     }
     else
     	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
-    	
 }
 
 void queryXReferencesTxn(const Transaction & txn, const Path & store_or_statePath, PathSet & references, const bool component_or_state, const unsigned int revision, const unsigned int timestamp)
@@ -695,18 +694,18 @@ void setDeriver(const Transaction & txn, const Path & storePath, const Path & de
  * into account. This function is used to update derivations that have only changed in their sub state
  * paths that need to be versioned for example. We assume newdrv is the newest.
  */
-PathSet mergeNewDerivationIntoList(const Path & storepath, const Path & newdrv, const PathSet drvs, bool deleteDrvs)
+PathSet mergeNewDerivationIntoListTxn(const Transaction txn, const Path & storepath, const Path & newdrv, const PathSet drvs, bool deleteDrvs)
 {
 	PathSet newdrvs;
 
-	Derivation drv = derivationFromPathTxn(noTxn, newdrv);
+	Derivation drv = derivationFromPathTxn(txn, newdrv);
 	string identifier = drv.stateOutputs.find("state")->second.stateIdentifier;
 	string user = drv.stateOutputs.find("state")->second.username;
 	
 	for (PathSet::iterator i = drvs.begin(); i != drvs.end(); ++i)	//Check if we need to remove old drvs
     {
     	Path drv = *i;
-    	Derivation getdrv = derivationFromPathTxn(noTxn, drv);
+    	Derivation getdrv = derivationFromPathTxn(txn, drv);
     	string getIdentifier = getdrv.stateOutputs.find("state")->second.stateIdentifier;
 		string getUser = getdrv.stateOutputs.find("state")->second.username;
 		
@@ -739,14 +738,17 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
 	string user = drv.stateOutputs.find("state")->second.username;
 	
 	PathSet currentDerivers = queryDerivers(txn, storePath, identifier, user); 
-	PathSet updatedDerivers = mergeNewDerivationIntoList(storePath, deriver, currentDerivers, true);
+	PathSet updatedDerivers = mergeNewDerivationIntoListTxn(txn, storePath, deriver, currentDerivers, true);
 
 	Strings data;    	
 	for (PathSet::iterator i = updatedDerivers.begin(); i != updatedDerivers.end(); ++i)		//Convert Paths to Strings
        	data.push_back(*i);
 	
+	for (Strings::iterator i = data.begin(); i != data.end(); ++i)
+    	printMsg(lvlError, format("AA: %1%") % *i);
 	nixDB.setStrings(txn, dbDerivers, storePath, data);											//update the derivers db.
 	
+	printMsg(lvlError, format("%BB"));
 	nixDB.setString(txn, dbStateInfo, storePath, "");											//update the dbinfo db.	(maybe TODO)
 }
 
@@ -1728,6 +1730,9 @@ bool querySolidStateReferencesTxn(const Transaction & txn, const Path & statePat
 
 void setSharedStateTxn(const Transaction & txn, const Path & fromExisting, const Path & toNew)
 {
+	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LEGALITY CHECK IF THE PATH MAY BE SHARED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	//TODO
+
 	//Remove earlier entries
 	nixDB.delPair(txn, dbSharedState, toNew);
 
@@ -1737,10 +1742,6 @@ void setSharedStateTxn(const Transaction & txn, const Path & fromExisting, const
 
 void LocalStore::setSharedState(const Path & fromExisting, const Path & toNew)
 {
-	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LEGALITY CHECK IF THE PATH MAY BE SHARED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	//TODO
-	
-	//
 	Transaction txn(nixDB);
 	setSharedStateTxn(txn, fromExisting, toNew);
 	txn.commit();

@@ -457,10 +457,10 @@ void run(Strings args)
 
 	printMsg(lvlError, format("NOW: '%1%'") % FileExist("/nix/store/65c7p6c8j0vy6b8fjgq84zziiavswqha-hellohardcodedstateworld-1.0/") );
 	printMsg(lvlError, format("NOW: '%1%'") % FileExist("/nix/store/65c7p6c8j0vy6b8fjgq84zziiavswqha-hellohardcodedstateworld-1.0/bin/hello") );
-	printMsg(lvlError, format("NOW: '%1%'") % IsDirectory("/nix/store/65c7p6c8j0vy6b8fjgq84zziiavswqha-hellohardcodedstateworld-1.0/") );
-	printMsg(lvlError, format("NOW: '%1%'") % IsDirectory("/nix/store/65c7p6c8j0vy6b8fjgq84zziiavswqha-hellohardcodedstateworld-1.0/bin/hello") );
+	printMsg(lvlError, format("NOW: '%1%'") % DirectoryExist("/nix/store/65c7p6c8j0vy6b8fjgq84zziiavswqha-hellohardcodedstateworld-1.0/") );
+	printMsg(lvlError, format("NOW: '%1%'") % DirectoryExist("/nix/store/65c7p6c8j0vy6b8fjgq84zziiavswqha-hellohardcodedstateworld-1.0/bin/hello") );
 	printMsg(lvlError, format("NOW: '%1%'") % FileExist("/nix/store/65c7p6c8j0vy6b8fjgq8") );
-	printMsg(lvlError, format("NOW: '%1%'") % IsDirectory("/nix/store/65c7p6c8j0vy6b8fjg") );
+	printMsg(lvlError, format("NOW: '%1%'") % DirectoryExist("/nix/store/65c7p6c8j0vy6b8fjg") );
 
 	store = openStore();
 	
@@ -498,7 +498,19 @@ void run(Strings args)
 	sharedWith = getSharedWithPathSetRecTxn(noTxn, "/nix/state/7c9azkk6qfk18hsvw4a5d8vk1p6qryk0-hellohardcodedstateworld-1.0-test");
 	for (PathSet::const_iterator j = sharedWith.begin(); j != sharedWith.end(); ++j)
 		printMsg(lvlError, format("RootSP SW '%1%'") % *j);
-		
+	
+	
+	printMsg(lvlError, format("ISL 1 '%1%'") % IsSymlink("/home/wouterdb/test/aaaaaaaa-test"));
+	printMsg(lvlError, format("ISL 2 '%1%'") % IsSymlink("/home/wouterdb/test/aad"));
+	printMsg(lvlError, format("ISL 1 '%1%'") % readLink("/home/wouterdb/test/aaaaaaaa-test"));
+	
+	PathSet comparePaths;
+	comparePaths.insert("/nix/state/rxi9isplmqvgjp7xrrq2zlz0s2w5h0mh-hellohardcodedstateworld-solid-1.0-test");
+    comparePaths.insert("/nix/state/7c9azkk6qfk18hsvw4a5d8vk1p6qryk0-hellohardcodedstateworld-1.0-test");
+    PathSet comparePaths_result = store->toNonSharedPathSet(comparePaths);
+	for (PathSet::const_iterator j = comparePaths_result.begin(); j != comparePaths_result.end(); ++j)
+		printMsg(lvlError, format("RES '%1%'") % *j);
+	
 	return;
 	
 	*/

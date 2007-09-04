@@ -43,8 +43,10 @@ bool pathExists(const Path & path);
 bool FileExist(const string FileName);
 
 /* Return true if the given dir exists. */
-bool IsDirectory(const string FileName);
+bool DirectoryExist(const string FileName);
 
+/* Return true if the given filename is a symlink. */
+bool IsSymlink(const string FileName);
 
 /* Read the contents (target) of a symbolic link.  The result is not
    in any way canonicalised. */
@@ -329,9 +331,6 @@ string padd(const string & s, char c , unsigned int size, bool front = false);
 
 /* Symlinks one path to the other */
 void symlinkPath(const Path & fromExisting, const Path & toNew);
-
-/* Exactly the same as symlinkPath */
-void sharePath(const Path & fromExisting, const Path & toNew);
 
 /* Copy all files and folders recursively (also the hidden ones) from the dir from/... to the dir to/... */
 void copyContents(const Path & from, const Path & to);

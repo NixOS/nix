@@ -1831,7 +1831,7 @@ void DerivationGoal::computeClosure()
 		if(sharedState != ""){
 			//Remove state path
 			deletePathWrapped(statePath);
-			sharePath(sharedState, statePath);
+			symlinkPath(sharedState, statePath);
 			
 			//Set in database
 			setSharedStateTxn(txn, sharedState, statePath);

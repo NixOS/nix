@@ -513,8 +513,6 @@ static void installDerivations(Globals & globals,
 	        string externalState = stateOutputs.find("state")->second.externalState;
 	        Path statePath = stateOutputs.find("state")->second.statepath;
 			if(externalState != ""){
-				if(stateIdentifier != "")
-					externalState = externalState + "-" +  stateIdentifier;
 				externalStates[statePath] = externalState;
 			}
         }
@@ -615,7 +613,7 @@ static void installDerivations(Globals & globals,
 		printMsg(lvlError, format("Sharing state from old <-- new component '%1%' <-- '%2%'") % i->first % i->second);
 		
 		deletePath(i->second);				//Remove contents of current new state path
-		sharePath(i->first, i->second);		//Share new statepath to the old statepath
+		symlinkPath(i->first, i->second);		//Share new statepath to the old statepath
 		
 		//Set in database
 		store->setSharedState(i->first, i->second);
@@ -629,31 +627,35 @@ static void installDerivations(Globals & globals,
     
     	//1. If dir externalState exists, we move its data into the statePath
     	//2. We ensure that the parent dir of externalState exists so we can create a symlink
-    	if(IsDirectory(externalState)){
-    		copyContents(externalState, statePath);
-    		
-    		//TODO !!!!!!!!!!!!!!
-    		//cp: cannot stat `/home/wouterdb/test/aaaaaaaa-test/*': No such file or directory
-			//error: program `cp' failed with exit code 1
+    	if(DirectoryExist(externalState)){
+
+			//We cannot copy into itself so we have to test that    		
+    		if(IsSymlink(externalState)){
+    			Path read_statePath = readLink(externalState);
+    			assert(store->isValidStatePath(read_statePath));
+    			PathSet comparePaths;
+    			comparePaths.insert(statePath);
+    			comparePaths.insert(read_statePath);
+    			if(store->toNonSharedPathSet(comparePaths).size() != 1)
+    				copyContents(externalState, statePath);
+    		}
+    		else
+    			copyContents(externalState, statePath);
     		
     		deletePath(externalState);
     	}
     	else{
-    		
     		//Ensure parent dir
-    		//outsidestorePath
-    		//ensureDirExists();
+    		string externalState_p = externalState;
+    		if(externalState_p[externalState_p.length() - 1] == '/')
+				  externalState_p.erase(externalState_p.length(),1);
+    		externalState_p = externalState_p.substr(0,externalState_p.find_last_of('/')); 
+    		ensureDirExists(externalState_p);
     	}
-    	
-    	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! these last 2 items should be done by the store I think for security reasons !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    	// /nix/state should be root.nixbl and 775
     	
     	//Now we create a symlink externalState --> statePath
     	printMsg(lvlError, format("SYMLINK: '%1%' --> '%2%'") % externalState % statePath);
     	symlinkPath(statePath, externalState);
-    	
-    	//SET IN DB !!!
-    	//TODO
     }
     
 }

@@ -383,12 +383,14 @@ void Database::setString(const Transaction & txn, TableId table,
     const string & key, const string & data)
 {
     checkInterrupt();
+    printMsg(lvlError, format("SS: '%1%'") % data);
     try {
         Db * db = getDb(table);
         Dbt kt((void *) key.c_str(), key.length());
         Dbt dt((void *) data.c_str(), data.length());
         db->put(txn.txn, &kt, &dt, 0);
     } catch (DbException e) { rethrow(e); }
+    printMsg(lvlError, format("SETTEDS"));
 }
 
 

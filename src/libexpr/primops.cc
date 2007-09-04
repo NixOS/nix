@@ -509,23 +509,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
               }
                  	         
    	        }
-   	        else if(key == "solidStateDependency"){
-                
-                /*
-                ATermList es;
-                value = evalExpr(state, value);
-                if (!matchList(value, es)) {
-                    static bool haveWarned = false;
-                    warnOnce(haveWarned, "the `solidStateDependencies' attribute should evaluate to a list");
-                    es = flattenList(state, value);
-                }
-                for (ATermIterator i(es); i; ++i) {
-                    string s = coerceToString(state, *i, context, true);
-                    drv.solidStateDeps.insert(s);
-                }
-                */
-                externalState = coerceToString(state, value, context, true);
-            }
+   	        else if(key == "solidStateDependency"){  externalState = coerceToString(state, value, context, true); }
    	        else if(key == "shareType") { shareType = coerceToString(state, value, context, true); }
    	        else if(key == "synchronization") { syncState = coerceToString(state, value, context, true); }
    	        else if(key == "disableState") { disableState = evalBool(state, value); }
@@ -619,10 +603,6 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 	 * We also add runtimeStateArgs for the hash calc in hashDerivationModulo(...) to check if its needs to take the stateIdentiefier into account in the hash
 	 */
 	
-	//TODO CHECK DRVS ARE CREATED BY THE USER AND NOT DAEMON ???????????????????????????
-	//queryCallingUsername()
-	//THERE ARE 2 CALLS TO DerivationStateOutput below !!!!!!!!!!!!!!!!!!!!!!
-	 
 	if(enableState && !disableState){    
 		if(runtimeStateArgs == ""){
 			string enableStateS = bool2string("true");
