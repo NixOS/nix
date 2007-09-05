@@ -28,6 +28,7 @@ using namespace nix;
 static FdSource from(STDIN_FILENO);
 static FdSink to(STDOUT_FILENO);
 
+bool storeOpen = false;
 bool canSendStderr;
 pid_t myPid;
 
@@ -43,7 +44,7 @@ static void tunnelStderr(const unsigned char * buf, size_t count)
        process handling the connection.  Otherwise we could screw up
        the protocol.  It's up to the parent to redirect stderr and
        send it to the client somehow (e.g., as in build.cc). */
-    if (canSendStderr && myPid == getpid() && (!debugWorker)) {						//TODO debugWorker commit
+    if ((canSendStderr && myPid == getpid()) && (sendOutput)) {
         try {
             writeInt(STDERR_NEXT, to);
             writeString(string((char *) buf, count), to);
@@ -54,7 +55,6 @@ static void tunnelStderr(const unsigned char * buf, size_t count)
             throw;
         }
     } else{
-     	//printMsg(lvlInfo, format("nix-worker: debug mode"));
         writeFull(STDERR_FILENO, buf, count);
     }
 }
@@ -232,7 +232,9 @@ static void performOp(Source & from, Sink & to, unsigned int op)
 #if 0        
     case wopQuit: {
         /* Close the database. */
-        store.reset((StoreAPI *) 0);
+        if(!singleThreaded){
+        	store.reset((StoreAPI *) 0);
+        }
         writeInt(1, to);
         break;
     }
@@ -636,7 +638,16 @@ static void processConnection()
             throw Error("if you run `nix-worker' as root, then you MUST set `build-users-group'!");
 
         /* Open the store. */
-        store = boost::shared_ptr<StoreAPI>(new LocalStore(true));
+        if(singleThreaded){    //only open once
+			if(!storeOpen){
+				printMsg(lvlError, format("Opening store"));
+				storeOpen = true;
+				store = boost::shared_ptr<StoreAPI>(new LocalStore(true));
+			}
+        }
+		else{
+			store = boost::shared_ptr<StoreAPI>(new LocalStore(true));
+		}
 
         stopWork();
         
@@ -745,8 +756,8 @@ static void daemonLoop()
             /* Important: the server process *cannot* open the
                Berkeley DB environment, because it doesn't like forks
                very much. */
-            if(!debugWorker)
-	            assert(!store);
+            if(!singleThreaded)
+            	assert(!store);
             
             /* Accept a connection. */
             struct sockaddr_un remoteAddr;
@@ -766,9 +777,29 @@ static void daemonLoop()
 			printMsg(lvlInfo, format("accepted connection '%1%'") 
             		% remote);
 			
-			if(!debugWorker)
-			{
 			
+			if(singleThreaded)
+			{
+				printMsg(lvlInfo, format("Nix-worker: debug mode: we can only process 1 job at the time"));
+
+                /* We RESET the user id of the caller cause we have no fork */
+                setCallingUID(caller_uid, true);
+                printMsg(lvlInfo, format("Debug connection '%1%' created for userid: '%2%' with username: '%3%'")
+                                                                % remote % queryCallingUID() % queryCallingUsername());
+
+                /* Background the worker. */
+                //if (setsid() == -1)
+                //  throw SysError(format("creating a new session"));
+                /* Restore normal handling of SIGCHLD. */
+				//setSigChldAction(false);
+
+				/* Handle the connection. */
+				from.fd = remote;
+				to.fd = remote;
+				processConnection();
+			}
+			else
+			{
 	            /* Fork a child to handle the connection. */
 	            pid_t child;
 	            child = fork();
@@ -803,28 +834,6 @@ static void daemonLoop()
 	                }
 	                exit(0);
 	            }
-			}
-			else
-			{
-				printMsg(lvlInfo, format("Nix-worker: debug mode: we can only process 1 job at the time"));
-				
-				/* We RESET the user id of the caller cause we have no fork */
-	            setCallingUID(caller_uid, true);
-	            printMsg(lvlInfo, format("Debug connection '%1%' created for userid: '%2%' with username: '%3%'") 
-	            						 % remote % queryCallingUID() % queryCallingUsername());
-	            
-	            /* Background the worker. */
-	            //if (setsid() == -1)
-	            //	throw SysError(format("creating a new session"));
-	
-	            /* Restore normal handling of SIGCHLD. */
-	            //setSigChldAction(false);
-	                    
-	            /* Handle the connection. */
-	            from.fd = remote;
-	            to.fd = remote;
-				processConnection();
-	                    
 			}
 
         } catch (Interrupted & e) {

@@ -40,7 +40,7 @@ void createSubStateDirsTxn(const Transaction & txn, const DerivationStateOutputD
 	//TODO
 	
 	/*
-	if( ! DirectoryExist( ....... ) ){
+	if( ! DirectoryExists( ....... ) ){
 	}
 	else
 		printMsg(lvlTalkative, format("Statedir %1% already exists, so dont ........ ???? ") % ...);

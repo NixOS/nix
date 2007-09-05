@@ -42,7 +42,7 @@ bool pathExists(const Path & path);
 /* Return true if the given file exists. */
 bool FileExist(const string FileName);
 
-/* Return true if the given dir exists. */
+/* Return true if the given filename is a dir. */
 bool DirectoryExist(const string FileName);
 
 /* Return true if the given filename is a symlink. */

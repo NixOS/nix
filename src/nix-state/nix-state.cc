@@ -486,11 +486,6 @@ void run(Strings args)
 	RevisionClosureTS timestamps;
 	bool b = store->queryStateRevisions("/nix/state/aacs4qpi9jzg4vmhj09d0ichframh22x-hellohardcodedstateworld-1.0-test", revisions, timestamps, 0);
 
-	*/
-	
-	store = openStore();	
-
-	/*
 	PathSet sharedWith = getSharedWithPathSetRecTxn(noTxn, "/nix/state/1kjxymaxf0i6qp5k8ggacc06bzbi4b82-hellohardcodedstateworld-1.0-test");
 	for (PathSet::const_iterator j = sharedWith.begin(); j != sharedWith.end(); ++j)
 		printMsg(lvlError, format("RootSP SW '%1%'") % *j);

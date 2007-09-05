@@ -1177,15 +1177,13 @@ bool DirectoryExist(const string FileName)
 }
 
 //TODO Does this work on windows?
-
 bool IsSymlink(const string FileName)
 {
 	const char* FileName_C = FileName.c_str();
-    struct stat my_stat;
-    if (lstat(FileName_C, &my_stat) != 0) return false;
-    return (S_ISLNK(my_stat.st_mode) != 0);
+	struct stat my_stat;
+	if (lstat(FileName_C, &my_stat) != 0) return false;
+	return (S_ISLNK(my_stat.st_mode) != 0);
 }
-
 
 /*
 string getCallingUserName()
@@ -1292,6 +1290,7 @@ void symlinkPath(const Path & fromExisting, const Path & toNew)
 	p_args.push_back(fromExisting);	
 	p_args.push_back(toNew);
 	runProgram_AndPrintOutput("ln", true, p_args, "ln");
+	
 	//printMsg(lvlError, format("ln -sf %1% %2%") % fromExisting % toNew);
 }
 
@@ -1299,7 +1298,7 @@ void copyContents(const Path & from, const Path & to)
 {
 	Strings p_args;
 	p_args.push_back("-R");
-	p_args.push_back(from + "/");		//the / makes sure it copys the contents of the dir, not just the symlink
+	p_args.push_back(from + "/");           //the / makes sure it copys the contents of the dir, not just the symlink
 	p_args.push_back(to);
 	runProgram_AndPrintOutput("cp", true, p_args, "cp");
 }

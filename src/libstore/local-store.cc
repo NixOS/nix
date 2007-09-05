@@ -694,7 +694,7 @@ void setDeriver(const Transaction & txn, const Path & storePath, const Path & de
  * into account. This function is used to update derivations that have only changed in their sub state
  * paths that need to be versioned for example. We assume newdrv is the newest.
  */
-PathSet mergeNewDerivationIntoListTxn(const Transaction txn, const Path & storepath, const Path & newdrv, const PathSet drvs, bool deleteDrvs)
+PathSet mergeNewDerivationIntoListTxn(const Transaction & txn, const Path & storepath, const Path & newdrv, const PathSet drvs, bool deleteDrvs)
 {
 	PathSet newdrvs;
 
@@ -744,11 +744,8 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
 	for (PathSet::iterator i = updatedDerivers.begin(); i != updatedDerivers.end(); ++i)		//Convert Paths to Strings
        	data.push_back(*i);
 	
-	for (Strings::iterator i = data.begin(); i != data.end(); ++i)
-    	printMsg(lvlError, format("AA: %1%") % *i);
 	nixDB.setStrings(txn, dbDerivers, storePath, data);											//update the derivers db.
 	
-	printMsg(lvlError, format("%BB"));
 	nixDB.setString(txn, dbStateInfo, storePath, "");											//update the dbinfo db.	(maybe TODO)
 }
 

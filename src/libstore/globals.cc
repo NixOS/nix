@@ -29,7 +29,9 @@ string thisSystem = "unset";
 unsigned int maxSilentTime = 0;
 static bool settingsRead = false;
 uid_t callingUID = 0;			//A root user will not set this value, so the default uid is 0
-bool debugWorker = false;		//TODO Still experimental ! this gives an store already open at the second call 
+
+bool singleThreaded = false;	//TODO Gives an error: cannot start worker (environment already open) / waiting for process 7487: No child processes
+bool sendOutput = true;
 
 static std::map<string, Strings> settings;
 

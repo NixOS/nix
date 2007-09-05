@@ -509,7 +509,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
               }
                  	         
    	        }
-   	        else if(key == "solidStateDependency"){  externalState = coerceToString(state, value, context, true); }
+   	        else if(key == "solidStateDependency"){ externalState = coerceToString(state, value, context, true); }
    	        else if(key == "shareType") { shareType = coerceToString(state, value, context, true); }
    	        else if(key == "synchronization") { syncState = coerceToString(state, value, context, true); }
    	        else if(key == "disableState") { disableState = evalBool(state, value); }

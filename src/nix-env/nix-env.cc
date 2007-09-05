@@ -628,7 +628,6 @@ static void installDerivations(Globals & globals,
     	//1. If dir externalState exists, we move its data into the statePath
     	//2. We ensure that the parent dir of externalState exists so we can create a symlink
     	if(DirectoryExist(externalState)){
-
 			//We cannot copy into itself so we have to test that    		
     		if(IsSymlink(externalState)){
     			Path read_statePath = readLink(externalState);
@@ -641,15 +640,15 @@ static void installDerivations(Globals & globals,
     		}
     		else
     			copyContents(externalState, statePath);
-    		
+
     		deletePath(externalState);
     	}
     	else{
     		//Ensure parent dir
     		string externalState_p = externalState;
     		if(externalState_p[externalState_p.length() - 1] == '/')
-				  externalState_p.erase(externalState_p.length(),1);
-    		externalState_p = externalState_p.substr(0,externalState_p.find_last_of('/')); 
+    			externalState_p.erase(externalState_p.length(),1);
+    		externalState_p = externalState_p.substr(0,externalState_p.find_last_of('/'));
     		ensureDirExists(externalState_p);
     	}
     	
