@@ -1914,7 +1914,8 @@ void DerivationGoal::deleteTmpDir(bool force)
                 getOwnership(tmpDir);
         }
         else
-            deletePathWrapped(tmpDir);
+			deletePathWrapped(tmpDir);
+            
         tmpDir = "";
     }
 }

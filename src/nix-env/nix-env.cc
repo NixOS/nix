@@ -650,6 +650,7 @@ static void installDerivations(Globals & globals,
     			externalState_p.erase(externalState_p.length(),1);
     		externalState_p = externalState_p.substr(0,externalState_p.find_last_of('/'));
     		ensureDirExists(externalState_p);
+    		//printMsg(lvlError, format("EnsureDir: '%1%'") % externalState_p);
     	}
     	
     	//Now we create a symlink externalState --> statePath

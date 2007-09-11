@@ -138,23 +138,29 @@ static void initAndRun(int argc, char * * argv)
     while (argc--) args.push_back(*argv++);
     args.erase(args.begin());
     
-    /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f'), and
-       ignore options for the ATerm library. */
-    for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
-        string arg = *i;
-        if (string(arg, 0, 4) == "-at-") ;
-        else if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-') {
-            for (unsigned int j = 1; j < arg.length(); j++)
-                if (isalpha(arg[j]))
-                    remaining.push_back((string) "-" + arg[j]);
-                else {
-                    remaining.push_back(string(arg, j));
-                    break;
-                }
-        } else remaining.push_back(arg);
+    /* We dont expand for nix-state since we need to pass arguments to other 
+     * programs that can decide for themselves if they want expansion or not 
+     */
+    if(programId != "nix-state")	 
+    {
+	    /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f'), and
+	       ignore options for the ATerm library. */
+	    for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
+	        string arg = *i;
+	        if (string(arg, 0, 4) == "-at-") ;
+	        else if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-') {
+	            for (unsigned int j = 1; j < arg.length(); j++)
+	                if (isalpha(arg[j]))
+	                    remaining.push_back((string) "-" + arg[j]);
+	                else {
+	                    remaining.push_back(string(arg, j));
+	                    break;
+	                }
+	        } else remaining.push_back(arg);
+	    }
+	    args = remaining;
+	    remaining.clear();
     }
-    args = remaining;
-    remaining.clear();
 
     /* Process default options. */
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {

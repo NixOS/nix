@@ -594,8 +594,10 @@ void run(Strings args)
         	username = arg.substr(7,arg.length());
         	
 
-        else
+        else{
             opArgs.push_back(arg);
+            //printMsg(lvlInfo, format("ARG: %1%") % arg);
+        }
 
 		//in the startscript u can have --run, but could do showrevisions
         if (oldOp && oldOp != op && oldOp != opRunComponent)			
