@@ -2,6 +2,9 @@ source common.sh
 
 clearStore
 
+export IMPURE_VAR1=foo
+export IMPURE_VAR2=bar
+
 echo 'testing good...'
 drvs=$($nixinstantiate fixed.nix -A good)
 echo $drvs
