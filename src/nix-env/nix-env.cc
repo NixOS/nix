@@ -22,6 +22,8 @@
 #include <iostream>
 #include <sstream>
 
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 
@@ -72,11 +74,53 @@ void printHelp()
 }
 
 
+static bool isNixExpr(const Path & path)
+{
+    struct stat st;
+    if (stat(path.c_str(), &st) == -1)
+        throw SysError(format("getting information about `%1%'") % path);
+
+    return !S_ISDIR(st.st_mode) || pathExists(path + "/default.nix");
+}
+
+
+static void getAllExprs(EvalState & state,
+    const Path & path, ATermMap & attrs)
+{
+    Strings names = readDirectory(path);
+
+    for (Strings::iterator i = names.begin(); i != names.end(); ++i) {
+        Path path2 = path + "/" + *i;
+        if (isNixExpr(path2))
+            attrs.set(toATerm(*i), makeAttrRHS(
+                    parseExprFromFile(state, absPath(path2)), makeNoPos()));
+        else
+            getAllExprs(state, path2, attrs);
+    }
+}
+
+
+static Expr loadSourceExpr(EvalState & state, const Path & path)
+{
+    if (isNixExpr(path)) return parseExprFromFile(state, absPath(path));
+
+    /* The path is a directory.  Put the Nix expressions in the
+       directory in an attribute set, with the file name of each
+       expression as the attribute name.  Recurse into subdirectories
+       (but keep the attribute set flat, not nested, to make it easier
+       for a user to have a ~/.nix-defexpr directory that includes
+       some system-wide directory). */
+    ATermMap attrs;
+    attrs.set(toATerm("_combineChannels"), makeAttrRHS(eTrue, makeNoPos()));
+    getAllExprs(state, path, attrs);
+    return makeAttrs(attrs);
+}
+
+
 static void loadDerivations(EvalState & state, Path nixExprPath,
     string systemFilter, const ATermMap & autoArgs, DrvInfos & elems)
 {
-    getDerivations(state,
-        parseExprFromFile(state, absPath(nixExprPath)), "", autoArgs, elems);
+    getDerivations(state, loadSourceExpr(state, nixExprPath), "", autoArgs, elems);
 
     /* Filter out all derivations not applicable to the current
        system. */
@@ -365,9 +409,7 @@ static void queryInstSources(EvalState & state,
            (import ./foo.nix)' = `(import ./foo.nix).bar'. */
         case srcNixExprs: {
                 
-
-            Expr e1 = parseExprFromFile(state,
-                absPath(instSource.nixExprPath));
+            Expr e1 = loadSourceExpr(state, instSource.nixExprPath);
 
             for (Strings::const_iterator i = args.begin();
                  i != args.end(); ++i)
@@ -429,7 +471,7 @@ static void queryInstSources(EvalState & state,
                  i != args.end(); ++i)
                 getDerivations(state,
                     findAlongAttrPath(state, *i, instSource.autoArgs,
-                        parseExprFromFile(state, instSource.nixExprPath)),
+                        loadSourceExpr(state, instSource.nixExprPath)),
                     "", instSource.autoArgs, elems);
             break;
         }
@@ -1218,18 +1260,6 @@ static void opDeleteGenerations(Globals & globals,
 }
 
 
-static void opDefaultExpr(Globals & globals,
-    Strings opFlags, Strings opArgs)
-{
-    if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
-    if (opArgs.size() != 1)
-        throw UsageError(format("exactly one argument expected"));
-
-    switchLink(getDefNixExprPath(), absPath(opArgs.front()));
-}
-
-
 static string needArg(Strings::iterator & i,
     Strings & args, const string & arg)
 {
@@ -1286,8 +1316,6 @@ void run(Strings args)
             op = opSet;
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
-        else if (arg == "--import" || arg == "-I") /* !!! bad name */
-            op = opDefaultExpr;
         else if (arg == "--profile" || arg == "-p")
             globals.profile = absPath(needArg(i, args, arg));
         else if (arg == "--file" || arg == "-f")

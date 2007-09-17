@@ -154,6 +154,7 @@ bool pathExists(const Path & path)
 
 Path readLink(const Path & path)
 {
+    checkInterrupt();
     struct stat st;
     if (lstat(path.c_str(), &st))
         throw SysError(format("getting status of `%1%'") % path);

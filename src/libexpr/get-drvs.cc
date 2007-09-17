@@ -171,8 +171,8 @@ static void getDerivations(EvalState & state, Expr e,
         ATermMap drvMap(ATgetLength(es));
         queryAllAttrs(e, drvMap);
 
-        /* !!! undocumented hackery to support
-           corepkgs/channels/unpack.sh. */
+        /* !!! undocumented hackery to support combining channels in
+           nix-env.cc. */
         Expr e2 = drvMap.get(toATerm("_combineChannels"));
         bool combineChannels = e2 && evalBool(state, e2);
         
