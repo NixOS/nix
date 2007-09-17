@@ -728,8 +728,10 @@ PathSet mergeNewDerivationIntoListTxn(const Transaction & txn, const Path & stor
 void addStateDeriver(const Transaction & txn, const Path & storePath, const Path & deriver)
 {
 	assertStorePath(storePath);
-	if (deriver == "") return;
+	if (deriver == "") 
+		return;
 	assertStorePath(deriver);
+	
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
 

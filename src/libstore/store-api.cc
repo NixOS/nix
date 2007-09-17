@@ -143,6 +143,12 @@ void checkStatePath(const Derivation & drv)
     string componentHash = drv.stateOutputs.find("state")->second.componentHash;
     string suffix = drv.env.find("name")->second;
 	string stateIdentifier = drv.stateOutputs.find("state")->second.stateIdentifier;
+	
+	
+	//TODO Name check
+	
+	
+	
     Path calculatedPath = makeStatePath(componentHash, suffix, stateIdentifier);				//TODO INCLUDE USER !!!!!!!!!!!!
 	
 	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! calculatedPath IS NOT CORRECT ANYMORE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

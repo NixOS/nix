@@ -564,10 +564,15 @@ static void installDerivations(Globals & globals,
         		
         		//if it doesnt need to share state with some other component
         		//&& the identifiers are equal
+        		
+        		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        		//TODO && (the users are equal || OR SHARED BETWEEN USERS)			
+        		//TODO 
         		if(	newSharedState == "" 
         			&&
         			(oldStateIdentifier == newStateIdentifier
-        		   		|| (oldStateIdentifier == "__EMTPY__" && newStateIdentifier == "")) 
+        		   		|| (oldStateIdentifier == "__EMTPY__" && newStateIdentifier == ""))
+        		   	 
         		   ){
         			
         			string oldStatePath;
@@ -604,10 +609,14 @@ static void installDerivations(Globals & globals,
         return;
     }
 
+	printMsg(lvlError, format("DONE!!!!!!!!"));
+
     createUserEnv(globals.state, allElems,
         profile, globals.keepDerivations);
     
-    //After all components have been built succesfully, share their state paths with the old ones    
+    printMsg(lvlError, format("DONE!!!!!!!!"));
+    
+    //After all components have been built succesfully, share their state paths with the old ones
     for (StringPairs::iterator i = toBeShared.begin(); i != toBeShared.end(); ++i){
 
 		printMsg(lvlError, format("Sharing state from old <-- new component '%1%' <-- '%2%'") % i->first % i->second);
@@ -618,6 +627,7 @@ static void installDerivations(Globals & globals,
 		//Set in database
 		store->setSharedState(i->first, i->second);
     }
+    
 
     //Let the stateDirs in /nix/state point to the solidStateDependencies
     for (StringPairs::iterator i = externalStates.begin(); i != externalStates.end(); ++i){

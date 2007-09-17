@@ -340,7 +340,7 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
      * If this drv doesnt have runtime paramters: The state indentifier and thus statepath may change, and thus the componentPath changes since it is build with another identifier
      * In both cases: Other runtime state parameters like stateDirs, synchronisation and shareState never change the out or statepath so always need to be out of the hash 
      */ 
-    if(drv.stateOutputs.size() != 0){
+    if(isStateDrv(drv)){
 	    
 	    if(drv.stateOutputs.size() != 1)
 	    	throw EvalError(format("There are more then one stateOutputs in the derviation....."));
@@ -655,7 +655,14 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     ATermMap outAttrs(2);
     outAttrs.set(toATerm("outPath"), makeAttrRHS(makeStr(outPath, singleton<PathSet>(drvPath)), makeNoPos()));
     outAttrs.set(toATerm("drvPath"), makeAttrRHS(makeStr(drvPath, singleton<PathSet>(drvPath)), makeNoPos()));
-    if(enableState && !disableState)
+    
+    /* TODO !!!!!!!!!!!!!!!!!!!! Recheck this !!!!!!!!!!!!!!!!!!!!
+     * We now always set the statePath since someone might 'convert' and old non-state expression into a state expression like this:
+     * let oldDrv = import ../../applications/networking/mailreaders/thunderbird-2.x;
+     * 	   newDrv = stdenv.mkDerivation( oldDrv { ... } // { name = "x-state-v"; stateDirs = [ ... ]; }  );
+	 * in newDrv
+     */ 
+    //if(enableState && !disableState)		
     	outAttrs.set(toATerm("statePath"), makeAttrRHS(makeStr(stateOutPath, singleton<PathSet>(drvPath)), makeNoPos()));
 
     return makeAttrs(outAttrs);
