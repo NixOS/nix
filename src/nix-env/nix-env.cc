@@ -116,9 +116,14 @@ static void getAllExprs(EvalState & state,
 
     for (Strings::iterator i = names.begin(); i != names.end(); ++i) {
         Path path2 = path + "/" + *i;
+        
+        struct stat st;
+        if (stat(path2.c_str(), &st) == -1)
+            continue; // ignore dangling symlinks in ~/.nix-defexpr
+        
         if (isNixExpr(path2))
             attrs.set(toATerm(*i), makeAttrRHS(
-                parseExprFromFile(state, absPath(path2)), makeNoPos()));
+                    parseExprFromFile(state, absPath(path2)), makeNoPos()));
         else
             getAllExprs(state, path2, attrs);
     }
