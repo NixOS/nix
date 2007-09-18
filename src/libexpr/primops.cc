@@ -629,8 +629,8 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 		 * NOTE: we do not include the username into the hash calculation of the statepath yet, multiple different users can use the same dervation 
 		 * but need different state paths. Thats why we keep a 'dummy' value e.g. global hash for everyone, and later at build time recalculate the real state path 
 		 */
-	    stateOutPath = makeStatePath(printHash(componentHash), drvName, stateIdentifier);		//State path
-    	drv.env["statePath"] = stateOutPath;		
+	    stateOutPath = makeStatePath(printHash(componentHash), drvName, stateIdentifier, queryCurrentUsername());		//State path
+    	drv.env["statePath"] = stateOutPath;
 
     	string enableStateS = bool2string("true");
     	string createDirsBeforeInstallS = bool2string(createDirsBeforeInstall);

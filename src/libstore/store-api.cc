@@ -117,12 +117,10 @@ Path makeStorePath(const string & type, const Hash & hash, const string & suffix
         + "-" + suffix;
 }
 
-Path makeStatePath(const string & componentHash, const string & suffix, const string & stateIdentifier)
+Path makeStatePath(const string & componentHash, const string & suffix, const string & stateIdentifier, const string & username)
 {
     string suffix_stateIdentifier = stateIdentifier;
    	suffix_stateIdentifier = "-" + suffix_stateIdentifier; 
-    
-    string username = queryCallingUsername();					//Should NOT be fake-able
     
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
     string s = ":sha256:" + componentHash + ":"
@@ -143,20 +141,21 @@ void checkStatePath(const Derivation & drv)
     string componentHash = drv.stateOutputs.find("state")->second.componentHash;
     string suffix = drv.env.find("name")->second;
 	string stateIdentifier = drv.stateOutputs.find("state")->second.stateIdentifier;
+	string drvUser = drv.stateOutputs.find("state")->second.username;
 	
+	string callingUser = queryCallingUsername();
+
+	//Check name (TODO how about sharing of drvs between users?) (user is filled in on the fly)
+	if(drvUser != callingUser)
+		throw Error(format("The calling user does not match the user specified in the drv '%1%'") % drvPath);
 	
-	//TODO Name check
-	//if( user != callinguser
-	
-	
-    Path calculatedPath = makeStatePath(componentHash, suffix, stateIdentifier);				//TODO INCLUDE USER !!!!!!!!!!!!
-	
-	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! calculatedPath IS NOT CORRECT ANYMORE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    Path calculatedPath = makeStatePath(componentHash, suffix, stateIdentifier, callingUser);
 	
 	printMsg(lvlError, format("Checking statePath validity: %1% %2%") % drvPath % calculatedPath);		
-		
+	
+	//Check Calculated path
     if(drvPath != calculatedPath)
-    	Error(format("The statepath from the Derivation does not match the recalculated statepath, are u trying to spoof the statepath?"));
+    	throw Error(format("The statepath from the Derivation does not match the recalculated statepath, are u trying to spoof the statepath?"));
 }
 
 Path makeFixedOutputPath(bool recursive,

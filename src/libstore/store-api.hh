@@ -279,7 +279,7 @@ Path makeFixedOutputPath(bool recursive,
     string hashAlgo, Hash hash, string name);
 
 /* TODO ... */
-Path makeStatePath(const string & componentHash, const string & suffix, const string & stateIdentifier);
+Path makeStatePath(const string & componentHash, const string & suffix, const string & stateIdentifier, const string & user);
 
 /* TODO ... */
 void checkStatePath(const Derivation & drv);
