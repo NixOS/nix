@@ -860,7 +860,7 @@ void DerivationGoal::inputsRealised()
 void DerivationGoal::tryToBuild()
 {
     trace("trying to build");
-
+    
     try {
 
         /* Is the build hook willing to accept this job? */
@@ -1296,7 +1296,7 @@ bool DerivationGoal::prepareBuild()
             deletePathWrapped(path);
         }
     }
-
+    
     /* Gather information necessary for computing the closure and/or
        running the build hook. */
     
@@ -1310,7 +1310,7 @@ bool DerivationGoal::prepareBuild()
     /* The state output is a referenceable path */
     if(isStateDrv(drv))
     	allStatePaths.insert(drv.stateOutputs.find("state")->second.statepath);
-  
+
     /* Determine the full set of input paths. */
 
     /* First, the input derivations. */
@@ -1331,13 +1331,13 @@ bool DerivationGoal::prepareBuild()
                     format("derivation `%1%' requires non-existent output `%2%' from input derivation `%3%'")
                     % drvPath % *j % i->first);
     }
-
+    
     /* Second, the input sources. */
     for (PathSet::iterator i = drv.inputSrcs.begin(); i != drv.inputSrcs.end(); ++i){
         computeFSClosure(*i, inputPaths, true, false, 0);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE (done?)
         computeFSClosure(*i, inputStatePaths, false, true, 0);
     }
-
+    
     debug(format("added input paths %1%") % showPaths(inputPaths));
     debug(format("added input state paths %1%") % showPaths(inputStatePaths));
 
@@ -1829,18 +1829,11 @@ void DerivationGoal::computeClosure()
 		//Shared state
     	Path sharedState = drv.stateOutputs.find("state")->second.sharedState;
 		if(sharedState != ""){
-			//Remove state path
-			deletePathWrapped(statePath);
-			symlinkPath(sharedState, statePath);
-			
-			//Set in database
-			setSharedStateTxn(txn, sharedState, statePath);
+			shareStateTxn(txn, sharedState, statePath, false);
 		}
 		//If not shared: create the dir and set the rights
 		else{
-			ensureDirExists(statePath);
-			setChown(statePath, queryCallingUsername(), "nixbld");
-			setChmod(statePath, "700");
+			ensureStateDir(statePath, queryCallingUsername(), "nixbld", "700");
 		}
     }	    
     
@@ -2598,7 +2591,7 @@ void LocalStore::buildDerivations(const PathSet & drvPaths)
     Worker worker;
     Goals goals;
     for (PathSet::const_iterator i = drvPaths.begin(); i != drvPaths.end(); ++i){
-		//printMsg(lvlError, format("BUILD: '%1%'") % *i);
+		printMsg(lvlError, format("BUILD: '%1%'") % *i);
         goals.insert(worker.makeDerivationGoal(*i));
     }
 

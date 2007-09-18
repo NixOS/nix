@@ -17,6 +17,8 @@
 #include "snapshot.hh"
 #include "references.hh"
 
+//for nixDB
+
 namespace nix {
 
 /*
@@ -113,7 +115,7 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
 		unsigned int timestamp = getTimestamps[statePath];
 		
 		//get its derivation-state-items
-		Derivation statePath_drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(noTxn, statePath));
+		Derivation statePath_drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, statePath));
 		DerivationStateOutputDirs stateOutputDirs = statePath_drv.stateOutputDirs; 
 		
 		//TODO Sort snapshots??? eg first restore root, then the subdirs??
@@ -375,6 +377,335 @@ void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path
 		for (PathSet::iterator j = allNewReferences.begin(); j != allNewReferences.end(); ++j)
 			scanAndUpdateAllReferencesRecusivelyTxn(txn, *j);
 	}
+}
+
+// ******************************************************************* DB FUNCTIONS
+
+/* State specific db functions */
+
+Path mergeToDBKey(const Path & statePath, const unsigned int intvalue)
+{
+	string prefix = "-KEY-";
+	return statePath + prefix + unsignedInt2String(intvalue);
+}
+
+void splitDBKey(const Path & revisionedStatePath, Path & statePath, unsigned int & intvalue)
+{
+	string prefix = "-KEY-";
+	
+	int pos = revisionedStatePath.find_last_of(prefix);
+	statePath = revisionedStatePath.substr(0, pos - prefix.length() + 1);
+	//printMsg(lvlError, format("'%2%' - '%1%'") % revisionedStatePath.substr(pos+1, revisionedStatePath.length()) % int2String(pos));
+	bool succeed = string2UnsignedInt(revisionedStatePath.substr(pos+1, revisionedStatePath.length()), intvalue);
+	if(!succeed)
+		throw Error(format("Malformed revision value of path '%1%'") % revisionedStatePath);
+}
+
+unsigned int getNewRevisionNumber(Database & nixDB, const Transaction & txn, TableId table,
+   	const Path & statePath)
+{
+	//query
+	string data;
+	bool notEmpty = nixDB.queryString(txn, table, statePath, data);
+	
+	if(!notEmpty){
+		nixDB.setString(txn, table, statePath, int2String(1));
+		return 1;	//we begin counting from 1 since 0 is a special value representing the last revision	
+	}
+	
+	unsigned int revision;
+	bool succeed = string2UnsignedInt(data, revision);
+	if(!succeed)
+		throw Error(format("Malformed revision counter value of path '%1%'") % statePath);
+	
+	revision++;
+	nixDB.setString(txn, table, statePath, unsignedInt2String(revision));
+	
+	return revision;
+}
+
+bool lookupHighestRevivison(const Strings & keys, const Path & statePath, string & key, unsigned int lowerthan)
+{
+	unsigned int highestRev = 0;
+
+	//Lookup which key we need	
+	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i) {
+		
+		if((*i).substr(0, statePath.length()) != statePath || (*i).length() == statePath.length()) 		//dont check the new-revision key or other keys
+			continue;
+
+		//printMsg(lvlError, format("'%1%' - '%2%'") % *i % statePath);
+		Path getStatePath;
+		unsigned int getRevision;
+		splitDBKey(*i, getStatePath, getRevision);
+		if(getRevision > highestRev){
+		
+			if(lowerthan != 0){
+				if(getRevision <= lowerthan)			//if we have an uppper limit, see to it that we downt go over it
+					highestRev = getRevision;
+			}
+			else
+				highestRev = getRevision;
+		}
+	}
+
+	if(highestRev == 0)	//no records found
+		return false;
+	
+	key = mergeToDBKey(statePath, highestRev);		//final key that matches revision + statePath
+	return true;	
+}
+
+bool revisionToTimeStamp(Database & nixDB, const Transaction & txn, TableId revisions_table, const Path & statePath, const int revision, unsigned int & timestamp)
+{
+	string key = mergeToDBKey(statePath, revision);
+	Strings references;
+	bool notempty = nixDB.queryStrings(txn, revisions_table, key, references);
+	
+	if(notempty){	
+		Path empty; 
+		splitDBKey(*(references.begin()), empty, timestamp);	//extract the timestamp
+		//printMsg(lvlError, format("PRINT '%1%'") % timestamp);
+		return true;
+	}
+	else
+		return false;		
+}
+
+void setStateReferences(Database & nixDB, const Transaction & txn, TableId references_table, TableId revisions_table,
+   	const Path & statePath, const Strings & references, const unsigned int revision, const unsigned int timestamp)
+{
+	//printMsg(lvlError, format("setStateReferences '%1%' for '%2%'") % references_table % statePath);
+
+	//Find the timestamp if we need	
+	unsigned int timestamp2 = timestamp;
+	if(revision == 0 && timestamp == 0)
+		timestamp2 = getTimeStamp();
+	else if(revision != 0 && timestamp == 0){
+		bool found = revisionToTimeStamp(nixDB, txn, revisions_table, statePath, revision, timestamp2);
+		if(!found)
+			throw Error(format("Revision '%1%' cannot be matched to a timestamp...") % revision);
+	}		
+
+	//for (Strings::const_iterator i = references.begin(); i != references.end(); ++i)
+	//	printMsg(lvlError, format("setStateReferences::: '%1%'") % *i);
+	
+	//Warning if it already exists
+	Strings empty;
+	if( nixDB.queryStrings(txn, references_table, mergeToDBKey(statePath, timestamp2), empty) )
+		printMsg(lvlError, format("Warning: The timestamp '%1%' (now: '%5%')  / revision '%4%' already exists for set-references of path '%2%' with db '%3%'") 
+		% timestamp2 % statePath % references_table % revision % getTimeStamp());
+	
+	//Create the key
+	string key = mergeToDBKey(statePath, timestamp2);
+		
+	//printMsg(lvlError, format("Set references '%1%'") % key);
+	//for (Strings::const_iterator i = references.begin(); i != references.end(); ++i)
+	//	printMsg(lvlError, format("reference '%1%'") % *i);
+	
+	//Insert	
+	nixDB.setStrings(txn, references_table, key, references, false);				//The false makes sure also empty references are set
+}
+
+bool queryStateReferences(Database & nixDB, const Transaction & txn, TableId references_table, TableId revisions_table,
+   	const Path & statePath, Strings & references, const unsigned int revision, const unsigned int timestamp)
+{
+	//printMsg(lvlError, format("queryStateReferences '%1%' with revision '%2%'") % references_table % revision);
+
+	//Convert revision to timestamp number useing the revisions_table
+	unsigned int timestamp2 = timestamp; 
+	if(timestamp == 0 && revision != 0){	
+		bool found = revisionToTimeStamp(nixDB, txn, revisions_table, statePath, revision, timestamp2);
+		if(!found)			//we are asked for references of some revision, but there are no references registered yet, so we return false;
+			return false;
+	}
+	
+	Strings keys;
+	nixDB.enumTable(txn, references_table, keys);
+
+	//Mabye we need the latest timestamp?
+	string key = "";
+	if(timestamp2 == 0){
+		bool foundsomething = lookupHighestRevivison(keys, statePath, key);
+		if(!foundsomething)
+			return false;
+		else
+			return nixDB.queryStrings(txn, references_table, key, references);
+	}
+	
+	//If a specific key is given: check if this timestamp exists key in the table
+	key = mergeToDBKey(statePath, timestamp2);
+	bool found = false;
+	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i) {
+		if(key == *i){
+			found = true;
+			key = mergeToDBKey(statePath, timestamp2);
+		}
+	}
+	
+	//If it doesn't exist in the table then find the highest key lower than it
+	if(!found){
+		bool foundsomething = lookupHighestRevivison(keys, statePath, key, 0);
+		if(!foundsomething)
+			return false;
+		//printMsg(lvlError, format("Warning: References for timestamp '%1%' not was not found, so taking the highest rev-key possible for statePath '%2%'") % timestamp2 % statePath);
+	}
+		
+	return nixDB.queryStrings(txn, references_table, key, references);		//now that we have the key, we can query the references
+}
+
+void setStateRevisions(Database & nixDB, const Transaction & txn, TableId revisions_table, TableId revisions_comments,
+	 TableId snapshots_table, const RevisionClosure & revisions, const Path & rootStatePath, const string & comment)
+{
+	if( !isStatePath(rootStatePath)	)	//weak check on statePath
+		throw Error(format("StatePath '%1%' is not a statepath") % rootStatePath);
+			
+	unsigned int timestamp = getTimeStamp();
+	
+	//Insert all ss_epochs into snapshots_table with the current ts.
+	for (RevisionClosure::const_iterator i = revisions.begin(); i != revisions.end(); ++i){
+		string key = mergeToDBKey((*i).first, timestamp);
+		Strings data;
+		//the map<> takes care of the sorting on the Path
+		for (Snapshots::const_iterator j = (*i).second.begin(); j != (*i).second.end(); ++j)
+			data.push_back(int2String((*j).second));
+		nixDB.setStrings(txn, snapshots_table, key, data);
+	}
+	
+	//Insert for each statePath a new revision record linked to the ss_epochs
+	for (RevisionClosure::const_iterator i = revisions.begin(); i != revisions.end(); ++i){
+		Path statePath = (*i).first;
+		
+		unsigned int revision = getNewRevisionNumber(nixDB, txn, revisions_table, statePath);	//get a new revision number
+		
+		string key = mergeToDBKey(statePath, revision);
+		
+		//get all its requisites
+		PathSet statePath_references;
+		storePathRequisitesTxn(txn, statePath, false, statePath_references, false, true, 0);
+		statePath_references.insert(statePath);
+		
+		//save in db
+		Strings data;
+		for (PathSet::const_iterator j = statePath_references.begin(); j != statePath_references.end(); ++j)
+			data.push_back(mergeToDBKey(*j, timestamp));		
+		
+		nixDB.setStrings(txn, revisions_table, key, data, false);				//The false makes sure also empty revisions are set
+		
+		//save the date and comments
+		Strings metadata;
+		metadata.push_back(unsignedInt2String(timestamp));
+		
+		//get all paths that point to the same state (using shareing) and check if one of them equals the rootStatePath
+		PathSet sharedWith = getSharedWithPathSetRecTxn(txn, statePath);
+		if(statePath == rootStatePath || sharedWith.find(rootStatePath) != sharedWith.end())
+			metadata.push_back(comment);
+		else
+			metadata.push_back("Part of the snashot closure for " + rootStatePath);
+		nixDB.setStrings(txn, revisions_comments, key, metadata);
+		
+	}
+}   
+
+bool queryStateRevisions(Database & nixDB, const Transaction & txn, TableId revisions_table, TableId snapshots_table,
+   	const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const unsigned int root_revision)
+{
+	string key;
+	
+	if(root_revision == 0){
+		Strings keys;
+		nixDB.enumTable(txn, revisions_table, keys);		//get all revisions
+		bool foundsomething = lookupHighestRevivison(keys, statePath, key);
+		if(!foundsomething)
+			return false;
+	}
+	else
+		key = mergeToDBKey(statePath, root_revision);
+	
+	//Get references pointing to snapshots_table from revisions_table with root_revision
+	Strings statePaths;
+	bool notempty = nixDB.queryStrings(txn, revisions_table, key, statePaths);
+	
+	if(!notempty)
+		throw Error(format("Root revision '%1%' not found of statePath '%2%'") % unsignedInt2String(root_revision) % statePath);
+		
+	//For each statePath add the revisions
+	for (Strings::iterator i = statePaths.begin(); i != statePaths.end(); ++i){
+		
+		Path getStatePath;
+		unsigned int getTimestamp;
+		splitDBKey(*i, getStatePath, getTimestamp);
+		
+		//query state versioined directorys/files
+		vector<Path> sortedPaths;
+		Derivation drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, getStatePath));
+  		DerivationStateOutputs stateOutputs = drv.stateOutputs; 
+    	DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
+    	for (DerivationStateOutputDirs::const_iterator j = stateOutputDirs.begin(); j != stateOutputDirs.end(); ++j){
+			string thisdir = (j->second).path;
+			string fullstatedir = getStatePath + "/" + thisdir;
+			if(thisdir == "/")									//exception for the root dir
+				fullstatedir = statePath + "/";
+			sortedPaths.push_back(fullstatedir);
+    	}			
+		sort(sortedPaths.begin(), sortedPaths.end());	//sort
+		
+		Strings snapshots_s;
+		Snapshots snapshots;		
+		nixDB.queryStrings(txn, snapshots_table, *i, snapshots_s);
+		int counter=0;
+		for (Strings::iterator j = snapshots_s.begin(); j != snapshots_s.end(); ++j){
+			
+			unsigned int revision;
+			bool succeed = string2UnsignedInt(*j, revision);
+			if(!succeed)
+				throw Error(format("Malformed epoch (snapshot timestamp) value of path '%1%'") % statePath);
+			
+			snapshots[sortedPaths.at(counter)] = revision;
+			counter++;
+		}
+		
+		revisions[getStatePath] = snapshots;
+		timestamps[getStatePath] = getTimestamp;
+	}
+	
+	return notempty;
+}  
+
+//TODO include comments into revisions?
+bool queryAvailableStateRevisions(Database & nixDB, const Transaction & txn, TableId revisions_table, TableId revisions_comments,
+    const Path & statePath, RevisionInfos & revisions)
+{
+	Strings keys;
+	nixDB.enumTable(txn, revisions_table, keys);		//get all revisions
+	
+	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i) {
+	
+		if((*i).substr(0, statePath.length()) != statePath || (*i).length() == statePath.length()) 		//dont check the new-revision key or other keys
+			continue;
+
+		Path getStatePath;
+		unsigned int getRevision;
+		splitDBKey(*i, getStatePath, getRevision);
+		
+		//save the date and comments
+		RevisionInfo rev;
+		Strings metadata;
+		nixDB.queryStrings(txn, revisions_comments, *i, metadata);
+		unsigned int ts;
+		bool succeed = string2UnsignedInt(*(metadata.begin()), ts);
+		if(!succeed)
+			throw Error(format("Malformed timestamp in the revisions-comments table of path '%1%'") % *i);
+		rev.timestamp = ts;
+		metadata.pop_front();		
+		rev.comment = *(metadata.begin());
+		revisions[getRevision] = rev; 
+	}
+    
+    if(revisions.empty())
+    	return false;
+    else
+    	return true;
 }
 
 }

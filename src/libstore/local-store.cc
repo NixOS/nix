@@ -477,7 +477,6 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
     	
     	nixDB.setStrings(txn, dbComponentComponentReferences, store_or_statePath, Paths(references.begin(), references.end()));
 		nixDB.setStrings(txn, dbComponentStateReferences, store_or_statePath, Paths(stateReferences.begin(), stateReferences.end()));
-   		
     }
     else if(isRealisableStatePath(txn, store_or_statePath))
     {
@@ -489,15 +488,15 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
 		//query the references of revision (0 is query the latest references)
 		Paths oldStateReferences_s_c;
 		Paths oldStateReferences_s_s;
-		nixDB.queryStateReferences(txn, dbStateComponentReferences, dbStateRevisions, store_or_statePath, oldStateReferences_s_c, revision); 
-		nixDB.queryStateReferences(txn, dbStateStateReferences, dbStateRevisions, store_or_statePath, oldStateReferences_s_s, revision);
+		queryStateReferences(nixDB, txn, dbStateComponentReferences, dbStateRevisions, store_or_statePath, oldStateReferences_s_c, revision); 
+		queryStateReferences(nixDB, txn, dbStateStateReferences, dbStateRevisions, store_or_statePath, oldStateReferences_s_s, revision);
 
 		PathSet oldReferences = PathSet(oldStateReferences_s_c.begin(), oldStateReferences_s_c.end());
     	PathSet oldStateReferences = PathSet(oldStateReferences_s_s.begin(), oldStateReferences_s_s.end());
 
 		//set the references of revision (0 insert as a new timestamp)
-    	nixDB.setStateReferences(txn, dbStateComponentReferences, dbStateRevisions, store_or_statePath, Paths(references.begin(), references.end()), revision);
-		nixDB.setStateReferences(txn, dbStateStateReferences, dbStateRevisions, store_or_statePath, Paths(stateReferences.begin(), stateReferences.end()), revision);
+    	setStateReferences(nixDB, txn, dbStateComponentReferences, dbStateRevisions, store_or_statePath, Paths(references.begin(), references.end()), revision);
+		setStateReferences(nixDB, txn, dbStateStateReferences, dbStateRevisions, store_or_statePath, Paths(stateReferences.begin(), stateReferences.end()), revision);
     }
     else
     	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
@@ -516,13 +515,13 @@ void queryXReferencesTxn(const Transaction & txn, const Path & store_or_statePat
     else{
     	table1 = dbComponentStateReferences;
     	table2 = dbStateStateReferences;
-    }    	
+    }
     
     if(isRealisablePath(txn, store_or_statePath))
     	nixDB.queryStrings(txn, table1, store_or_statePath, references2);
     else if(isRealisableStatePath(txn, store_or_statePath)){
     	Path statePath_ns = toNonSharedPathTxn(txn, store_or_statePath);	    //Lookup its where it points to if its shared
-    	nixDB.queryStateReferences(txn, table2, dbStateRevisions, statePath_ns, references2, revision, timestamp);
+    	queryStateReferences(nixDB, txn, table2, dbStateRevisions, statePath_ns, references2, revision, timestamp);
     }
     else
     	throw Error(format("Path '%1%' is not a valid component or state path") % store_or_statePath);
@@ -593,7 +592,7 @@ static PathSet getXReferrers(const Transaction & txn, const Path & store_or_stat
 		//Now in references of ALL referrers, (possibly lookup their latest TS based on revision)
 		unsigned int timestamp;
 		if(revision != 0){
-    		bool succeed = nixDB.revisionToTimeStamp(txn, dbStateRevisions, path, revision, timestamp);
+    		bool succeed = revisionToTimeStamp(nixDB, txn, dbStateRevisions, path, revision, timestamp);
 	    	if(!succeed)
 	    		throw Error(format("Getreferrers cannot find timestamp for revision: '%1%'") % revision);
 		}
@@ -604,7 +603,7 @@ static PathSet getXReferrers(const Transaction & txn, const Path & store_or_stat
 		for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i){
 			Path getStatePath;
 			unsigned int getRevision;
-			nixDB.splitDBKey(*i, getStatePath, getRevision);
+			splitDBKey(*i, getStatePath, getRevision);
 		
 			if(latest[getStatePath]	== 0) 						//either it is unset
 				latest[getStatePath] = getRevision;
@@ -623,7 +622,7 @@ static PathSet getXReferrers(const Transaction & txn, const Path & store_or_stat
 			//printMsg(lvlError, format("AAAAA '%1%'") % (*i).first);
 			
 			Strings references;
-			nixDB.queryStrings(txn, table, nixDB.mergeToDBKey((*i).first, (*i).second), references);
+			nixDB.queryStrings(txn, table, mergeToDBKey((*i).first, (*i).second), references);
 			for (Strings::iterator j = references.begin(); j != references.end(); ++j){ 
 				//printMsg(lvlError, format("TEST: '%1%' has ref '%2%' check with '%3%'") % (*i).first % *j % path);
 				if(*j == path)
@@ -680,7 +679,7 @@ void setDeriver(const Transaction & txn, const Path & storePath, const Path & de
     
     if (!isRealisablePath(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
-	
+
     if (isStateDrvPathTxn(txn, deriver)){								//Redirect if its a state component					
     	addStateDeriver(txn, storePath, deriver);
 	}		
@@ -739,7 +738,7 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
 	string identifier = drv.stateOutputs.find("state")->second.stateIdentifier;
 	string user = drv.stateOutputs.find("state")->second.username;
 	
-	PathSet currentDerivers = queryDerivers(txn, storePath, identifier, user); 
+	PathSet currentDerivers = queryDerivers(txn, storePath, identifier, user);
 	PathSet updatedDerivers = mergeNewDerivationIntoListTxn(txn, storePath, deriver, currentDerivers, true);
 
 	Strings data;    	
@@ -1076,11 +1075,11 @@ void registerValidPaths(const Transaction & txn, const ValidPathInfos & infos)
                 throw Error(format("cannot register path `%1%' as valid, since its reference `%2%' is invalid") % i->path % *j);
 		
 		//We cannot check the statePath since registerValidPath is called twice, first for the component path, and then for the state path....
-				
+		
 		if(isStorePath_b){		
         	setDeriver(txn, i->path, i->deriver);
 		}
-        
+		
         //TODO maybe also set a state deriver into dbStateDerivers .... well state is already linked to a drvpath in dbValidStatePaths ....
     }
 }
@@ -1665,7 +1664,7 @@ void queryAllValidPathsTxn(const Transaction & txn, PathSet & allComponentPaths,
 
 void setStateRevisionsTxn(const Transaction & txn, const RevisionClosure & revisions, const Path & rootStatePath, const string & comment)
 {
-	nixDB.setStateRevisions(txn, dbStateRevisions, dbStateRevisionsComments, dbStateSnapshots, revisions, rootStatePath, comment);	
+	setStateRevisions(nixDB, txn, dbStateRevisions, dbStateRevisionsComments, dbStateSnapshots, revisions, rootStatePath, comment);	
 }
 
 void LocalStore::setStateRevisions(const RevisionClosure & revisions, const Path & rootStatePath, const string & comment)
@@ -1675,7 +1674,7 @@ void LocalStore::setStateRevisions(const RevisionClosure & revisions, const Path
 
 bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const unsigned int revision)
 {
-	return nixDB.queryStateRevisions(txn, dbStateRevisions, dbStateSnapshots, statePath, revisions, timestamps, revision);
+	return queryStateRevisions(nixDB, txn, dbStateRevisions, dbStateSnapshots, statePath, revisions, timestamps, revision);
 }
 
 bool LocalStore::queryStateRevisions(const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const unsigned int revision)
@@ -1685,7 +1684,7 @@ bool LocalStore::queryStateRevisions(const Path & statePath, RevisionClosure & r
 
 bool queryAvailableStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionInfos & revisions)
 {
-	 return nixDB.queryAvailableStateRevisions(txn, dbStateRevisions, dbStateRevisionsComments, statePath, revisions);
+	 return queryAvailableStateRevisions(nixDB, txn, dbStateRevisions, dbStateRevisionsComments, statePath, revisions);
 }
 
 bool LocalStore::queryAvailableStateRevisions(const Path & statePath, RevisionInfos & revisions)
@@ -1727,24 +1726,96 @@ bool querySolidStateReferencesTxn(const Transaction & txn, const Path & statePat
 	return notempty;
 }
 
-void setSharedStateTxn(const Transaction & txn, const Path & fromExisting, const Path & toNew)
+void unShareStateTxn(const Transaction & txn, const Path & path, const bool copyFromOld)
 {
-	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LEGALITY CHECK IF THE PATH MAY BE SHARED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	//TODO
-
-	//Remove earlier entries
-	nixDB.delPair(txn, dbSharedState, toNew);
-
-	//Set new entry
-	nixDB.setString(txn, dbSharedState, toNew, fromExisting);
+	//Check if is statePath
+	if(!isValidStatePathTxn(txn, path))
+		throw Error(format("Path `%1%' is not a valid state path") % path);
+	
+	//Check if path was shared...
+	Path sharedWithOldPath;
+	if(!querySharedStateTxn(txn, path, sharedWithOldPath))
+		throw Error(format("Path `%1%' is not a shared so cannot be unshared") % path);
+	
+	//Remove Symlink
+	removeSymlink(path);
+	
+	//Touch dir with correct rights
+	Derivation drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, path));
+	ensureStateDir(path, drv.stateOutputs.find("state")->second.username, "nixbld", "700");
+	
+	//Copy if necessary	(TODO first snapshot?)
+	if(copyFromOld){
+		copyContents(sharedWithOldPath, path);
+	}
+	
+	//Remove earlier entries (unshare)
+	nixDB.delPair(txn, dbSharedState, path);
 }
 
-void LocalStore::setSharedState(const Path & fromExisting, const Path & toNew)
+void LocalStore::unShareState(const Path & path, const bool copyFromOld)
 {
 	Transaction txn(nixDB);
-	setSharedStateTxn(txn, fromExisting, toNew);
+	unShareStateTxn(txn, path, copyFromOld);
 	txn.commit();
 }
+
+/* FROM (NEW) --> TO (EXISTING) */
+void shareStateTxn(const Transaction & txn, const Path & from, const Path & to, const bool snapshot)
+{
+	//Check if is statePath
+	if(! (isValidStatePathTxn(txn, from) && isValidStatePathTxn(txn, to)))
+		throw Error(format("Path `%1%' or `%2%' is not a valid state path") % from % to);
+	
+	//Cant share with yourself
+	if(from == to)
+		throw Error(format("You cannot share with yourself `%1%'") % from);
+
+	//Check for infinite recursion
+	//we do querySharedStateTxn until there the current path is not a shared path anymore
+	Path sharedPath;
+	Path returnedPath = to;
+	while(querySharedStateTxn(txn, returnedPath, sharedPath)){ 
+		if(sharedPath == from)
+			throw Error(format("You cannot create an infinite sharing loop !! `%1%' is already shared with `%2%'") % sharedPath % from);
+		returnedPath = sharedPath;
+	}
+	
+	//Check if the user has the right to share this path
+	Derivation from_drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, from));
+	Derivation to_drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, to));
+	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
+	
+	//Snapshot if necessary
+	if(snapshot){
+		//Commit state (we only include our own state in the rivisionMapping) 
+		RevisionClosure rivisionMapping;
+		rivisionMapping[from] = commitStatePathTxn(txn, from);
+		
+		//Save the new revision
+		setStateRevisionsTxn(txn, rivisionMapping, from, ("Before sharing revision with '" + to)+"'");
+	}
+
+	//If from was shared: unshare
+	Path empty;
+	if(querySharedStateTxn(txn, from, empty))
+		unShareStateTxn(txn, from, false);
+
+	//Remove state path and link
+	deletePathWrapped(from);
+	symlinkPath(to, from);		//a link named 'from' pointing to existing dir 'to' 
+
+	//Set new entry
+	nixDB.setString(txn, dbSharedState, from, to);
+}
+
+void LocalStore::shareState(const Path & from, const Path & to, const bool snapshot)
+{
+	Transaction txn(nixDB);
+	shareStateTxn(txn, from, to, snapshot);
+	txn.commit();
+}
+
 
 
 bool querySharedStateTxn(const Transaction & txn, const Path & statePath, Path & shared_with)
@@ -1758,9 +1829,11 @@ Path toNonSharedPathTxn(const Transaction & txn, const Path & statePath)
 	Path sharedPath;
 	Path returnedPath = statePath;
 	
-	while(querySharedStateTxn(txn, returnedPath, sharedPath))
+	while(querySharedStateTxn(txn, returnedPath, sharedPath)){
+		//printMsg(lvlError, format("querySharedStateTxn '%1%' '%2%'") % returnedPath % sharedPath);
 		returnedPath = sharedPath;
-	
+	}
+
 	return returnedPath;
 }
 
@@ -1782,12 +1855,12 @@ PathSet LocalStore::toNonSharedPathSet(const PathSet & statePaths)
 
 void setStateComponentReferencesTxn(const Transaction & txn, const Path & statePath, const Strings & references, const unsigned int revision, const unsigned int timestamp)
 {
-	nixDB.setStateReferences(txn, dbStateComponentReferences, dbStateRevisions, statePath, references, revision, timestamp);
+	setStateReferences(nixDB, txn, dbStateComponentReferences, dbStateRevisions, statePath, references, revision, timestamp);
 }
 
 void setStateStateReferencesTxn(const Transaction & txn, const Path & statePath, const Strings & references, const unsigned int revision, const unsigned int timestamp)
 {
-	nixDB.setStateReferences(txn, dbStateStateReferences, dbStateRevisions, statePath, references, revision, timestamp);
+	setStateReferences(nixDB, txn, dbStateStateReferences, dbStateRevisions, statePath, references, revision, timestamp);
 }
 
 //Lookups which statePaths directy share (point to) statePath

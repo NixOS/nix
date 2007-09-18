@@ -114,7 +114,9 @@ public:
 	
 	void revertToRevision(const Path & statePath, const unsigned int revision_arg, const bool recursive);
 	
-	void setSharedState(const Path & fromExisting, const Path & toNew);
+	void shareState(const Path & from, const Path & to, const bool snapshot);
+	
+	void unShareState(const Path & path, const bool copyFromOld);
 };
 
 
@@ -217,13 +219,14 @@ bool isStateDrvPathTxn(const Transaction & txn, const Path & drvPath);
 
 bool isStateDrv(const Derivation & drv);
 
-//TODO can this ?????
+
+//TODO CHECK IF THESE DONT BELONG HERE, REFACTOR CODE, EG MOVE FUNCTIONS AROUND
+
 void queryAllValidPathsTxn(const Transaction & txn, PathSet & allComponentPaths, PathSet & allStatePaths);
 bool isValidStatePathTxn(const Transaction & txn, const Path & path);
 
 void queryXReferencesTxn(const Transaction & txn, const Path & path, PathSet & references, const bool component_or_state, const unsigned int revision, const unsigned int timestamp = 0);
 
-//TODO THESE DONT BELONG HERE, REFACTOR CODE, EG MOVE FUNCTIONS AROUND
 void setStateComponentReferencesTxn(const Transaction & txn, const Path & statePath, const Strings & references, const unsigned int revision, const unsigned int timestamp);
 void setStateStateReferencesTxn(const Transaction & txn, const Path & statePath, const Strings & references, const unsigned int revision, const unsigned int timestamp);
 
@@ -240,7 +243,9 @@ bool isValidStatePathTxn(const Transaction & txn, const Path & path);
 void setSolidStateReferencesTxn(const Transaction & txn, const Path & statePath, const PathSet & paths);
 bool querySolidStateReferencesTxn(const Transaction & txn, const Path & statePath, PathSet & paths);
 
-void setSharedStateTxn(const Transaction & txn, const Path & fromExisting, const Path & toNew);
+void shareStateTxn(const Transaction & txn, const Path & from, const Path & to, const bool snapshot);
+void unShareStateTxn(const Transaction & txn, const Path & path, const bool copyFromOld);
+
 PathSet toNonSharedPathSetTxn(const Transaction & txn, const PathSet & statePaths);
 Path toNonSharedPathTxn(const Transaction & txn, const Path & statePath);
 
@@ -254,6 +259,7 @@ IntVector getStatePathsIntervalTxn(const Transaction & txn, const PathSet & stat
 
 bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const unsigned int revision);
 void setStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePath, const IntVector & intervals, bool allZero = false);
+bool querySharedStateTxn(const Transaction & txn, const Path & statePath, Path & shared_with);
 
 }
 

@@ -244,7 +244,10 @@ public:
 	virtual void revertToRevision(const Path & statePath, const unsigned int revision_arg, const bool recursive) = 0;
 	
 	/* TODO */
-	virtual void setSharedState(const Path & fromExisting, const Path & toNew) = 0;
+	virtual void shareState(const Path & from, const Path & to, const bool snapshot) = 0;
+	
+	/* TODO */
+	virtual void unShareState(const Path & path, const bool copyFromOld) = 0;
 };
 
 

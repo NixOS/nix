@@ -46,7 +46,8 @@ typedef enum {
 	wopScanAndUpdateAllReferences,
 	wopToNonSharedPathSet,
 	wopRevertToRevision,
-	wopSetSharedState,
+	wopShareState,
+	wopUnShareState,
 } WorkerOp;
 
 

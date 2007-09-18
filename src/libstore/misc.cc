@@ -45,7 +45,7 @@ void computeFSClosureTxn(const Transaction & txn, const Path & path, PathSet & p
 	if(!withComponents && !withState)
 		throw Error(format("Useless call to computeFSClosure, at leat withComponents or withState must be true"));
 	
-	//TODO MAYBE EDIT: HOW CAN THESE PATHS ALREADY BE VALID SOMETIMES ..... ?????????????????????
+	//TODO HOW CAN THESE PATHS ALREADY BE VALID SOMETIMES ..... ?????????????????????
 	for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
 		if ( !isValidPathTxn(txn, *i) && !isValidStatePathTxn(txn, *i) )
 			throw Error(format("Not a state or store path: ") % *i);
@@ -70,7 +70,8 @@ void computeFSClosureTxn(const Transaction & txn, const Path & path, PathSet & p
 
 void computeFSClosureRecTxn(const Transaction & txn, const Path & path, PathSet & paths, const int revision, const bool & flipDirection)
 {
-    if (paths.find(path) != paths.end()) return;	//takes care of double entries
+    if (paths.find(path) != paths.end())	//takes care of double entries 
+    	return;
     
     paths.insert(path);
 

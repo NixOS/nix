@@ -609,25 +609,20 @@ static void installDerivations(Globals & globals,
         return;
     }
 
-	printMsg(lvlError, format("DONE!!!!!!!!"));
-
     createUserEnv(globals.state, allElems,
         profile, globals.keepDerivations);
-    
-    printMsg(lvlError, format("DONE!!!!!!!!"));
     
     //After all components have been built succesfully, share their state paths with the old ones
     for (StringPairs::iterator i = toBeShared.begin(); i != toBeShared.end(); ++i){
 
 		printMsg(lvlError, format("Sharing state from old <-- new component '%1%' <-- '%2%'") % i->first % i->second);
 		
-		deletePath(i->second);				//Remove contents of current new state path
-		symlinkPath(i->first, i->second);		//Share new statepath to the old statepath
-		
-		//Set in database
-		store->setSharedState(i->first, i->second);
+		//Share from new --> to existing
+		store->shareState(i->second, i->first, false);
     }
     
+    
+    //**********************
 
     //Let the stateDirs in /nix/state point to the solidStateDependencies
     for (StringPairs::iterator i = externalStates.begin(); i != externalStates.end(); ++i){
@@ -667,6 +662,8 @@ static void installDerivations(Globals & globals,
     	printMsg(lvlError, format("SYMLINK: '%1%' --> '%2%'") % externalState % statePath);
     	symlinkPath(statePath, externalState);
     }
+    
+    //**********************
     
 }
 

@@ -523,11 +523,21 @@ void RemoteStore::revertToRevision(const Path & statePath, const unsigned int re
 	readInt(from);
 }
 
-void RemoteStore::setSharedState(const Path & fromExisting, const Path & toNew)
+void RemoteStore::shareState(const Path & from_arg, const Path & to_arg, const bool snapshot)
 {
-	writeInt(wopSetSharedState, to);
-	writeString(fromExisting, to);
-	writeString(toNew, to);
+	writeInt(wopShareState, to);
+	writeString(from_arg, to);
+	writeString(to_arg, to);
+	writeInt(snapshot ? 1 : 0, to);
+	processStderr();
+	readInt(from);
+}
+
+void RemoteStore::unShareState(const Path & path, const bool copyFromOld)
+{
+	writeInt(wopUnShareState, to);
+	writeString(path, to);
+	writeInt(copyFromOld ? 1 : 0, to);
 	processStderr();
 	readInt(from);
 }

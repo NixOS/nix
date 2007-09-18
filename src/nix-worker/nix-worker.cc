@@ -591,11 +591,22 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     	break;
     }
     
-	case wopSetSharedState: {
-		Path fromExisting = readString(from);
-		Path toNew = readString(from);
+	case wopShareState: {
+		Path from_arg = readString(from);
+		Path to_arg = readString(from);
+		bool snapshot = readInt(from) == 1;
 		startWork();
-    	store->setSharedState(fromExisting, toNew);
+    	store->shareState(from_arg, to_arg, snapshot);
+    	stopWork();
+    	writeInt(1, to);
+		break;
+	}
+	
+	case wopUnShareState: {
+		Path path = readString(from);
+		bool copyFromOld = readInt(from) == 1;
+		startWork();
+    	store->unShareState(path, copyFromOld);
     	stopWork();
     	writeInt(1, to);
 		break;

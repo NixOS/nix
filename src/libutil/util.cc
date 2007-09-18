@@ -1281,24 +1281,45 @@ string padd(const string & s, char c , unsigned int size, bool front)
 	return ss;
 }
 
-void symlinkPath(const Path & fromExisting, const Path & toNew)
+void symlinkPath(const Path & existingDir, const Path & newLinkName)
 {
 	//Symlink link to the share path
 	//Usage: ln [OPTION]... [-T] TARGET LINK_NAME   (1st form)
 	Strings p_args;
 	p_args.push_back("-sf");
-	p_args.push_back(fromExisting);	
-	p_args.push_back(toNew);
+	p_args.push_back(existingDir);	
+	p_args.push_back(newLinkName);
 	runProgram_AndPrintOutput("ln", true, p_args, "ln");
 	
-	//printMsg(lvlError, format("ln -sf %1% %2%") % fromExisting % toNew);
+	//printMsg(lvlError, format("ln -sf %1% %2%") % existingDir % newLinkName);
+}
+
+void removeSymlink(const string & path)
+{
+	if(path[path.length() - 1] != '/')
+		throw Error(format("We dont want to remove the enitre directory, only the symlink, but a / is given for `%1%'") % path);
+	deletePath(path);
+}
+
+void ensureStateDir(const Path & statePath, const string & user, const string & group, const string & chmod)
+{
+	ensureDirExists(statePath);
+	setChown(statePath, user, group);
+	setChmod(statePath, chmod);	
 }
 
 void copyContents(const Path & from, const Path & to)
 {
+	//Copy all files + dirs recursively
 	Strings p_args;
 	p_args.push_back("-R");
-	p_args.push_back(from + "/");           //the / makes sure it copys the contents of the dir, not just the symlink
+	p_args.push_back(from + "/*");
+	p_args.push_back(to);
+	runProgram_AndPrintOutput("cp", true, p_args, "cp");
+	
+	//Also copy the hidden files (but not the ../ dir)
+	p_args.clear();
+	p_args.push_back(from + "/.[a-zA-Z0-9]*");
 	p_args.push_back(to);
 	runProgram_AndPrintOutput("cp", true, p_args, "cp");
 }

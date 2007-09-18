@@ -196,7 +196,7 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 	    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
 	}
 	
-	//Unshare if neccacary
+	//Lookup unshared path if neccacary
 	PathSet nonSharedPaths;
 	nonSharedPaths.insert(statePath);
 	Path nonSharedStatePath = *((store->toNonSharedPathSet(nonSharedPaths)).begin());			//TODO CHECK IF THIS WORKS !!!!!!!!
@@ -505,11 +505,15 @@ void run(Strings args)
     PathSet comparePaths_result = store->toNonSharedPathSet(comparePaths);
 	for (PathSet::const_iterator j = comparePaths_result.begin(); j != comparePaths_result.end(); ++j)
 		printMsg(lvlError, format("RES '%1%'") % *j);
+
+	deletePath("/nix/state/b");
+	copyContents("/nix/state/a", "/nix/state/b");
 	
 	return;
 	
 	*/
 	
+
 	/* test */
 	
     for (Strings::iterator i = args.begin(); i != args.end(); ) {

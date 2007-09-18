@@ -146,7 +146,7 @@ void checkStatePath(const Derivation & drv)
 	
 	
 	//TODO Name check
-	
+	//if( user != callinguser
 	
 	
     Path calculatedPath = makeStatePath(componentHash, suffix, stateIdentifier);				//TODO INCLUDE USER !!!!!!!!!!!!

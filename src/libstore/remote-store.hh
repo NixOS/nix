@@ -100,7 +100,9 @@ public:
 	
 	void revertToRevision(const Path & statePath, const unsigned int revision_arg, const bool recursive);
 	
-	void setSharedState(const Path & fromExisting, const Path & toNew);
+	void shareState(const Path & from, const Path & to, const bool snapshot);
+	
+	void unShareState(const Path & path, const bool copyFromOld);
 	
 private:
     AutoCloseFD fdSocket;
