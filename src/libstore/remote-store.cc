@@ -53,18 +53,24 @@ RemoteStore::RemoteStore()
     from.fd = fdSocket;
     to.fd = fdSocket;
 
-    
     /* Send the magic greeting, check for the reply. */
     try {
         writeInt(WORKER_MAGIC_1, to);
-        writeInt(verbosity, to);
         unsigned int magic = readInt(from);
         if (magic != WORKER_MAGIC_2) throw Error("protocol mismatch");
+
+        unsigned int daemonVersion = readInt(from);
+        if (GET_PROTOCOL_MAJOR(daemonVersion) != GET_PROTOCOL_MAJOR(PROTOCOL_VERSION))
+            throw Error("Nix daemon protocol version not supported");
+        writeInt(PROTOCOL_VERSION, to);
         processStderr();
+
     } catch (Error & e) {
         throw Error(format("cannot start worker (%1%)")
             % e.msg());
     }
+
+    setOptions();
 }
 
 
@@ -151,6 +157,19 @@ RemoteStore::~RemoteStore()
     } catch (...) {
         ignoreException();
     }
+}
+
+
+void RemoteStore::setOptions()
+{
+    writeInt(wopSetOptions, to);
+    writeInt(keepFailed, to);
+    writeInt(keepGoing, to);
+    writeInt(tryFallback, to);
+    writeInt(verbosity, to);
+    writeInt(maxBuildJobs, to);
+    writeInt(maxSilentTime, to);
+    processStderr();
 }
 
 

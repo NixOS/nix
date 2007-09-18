@@ -414,6 +414,19 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         
         break;
     }
+
+    case wopSetOptions: {
+        keepFailed = readInt(from) != 0;
+        keepGoing = readInt(from) != 0;
+        tryFallback = readInt(from) != 0;
+        verbosity = (Verbosity) readInt(from);
+        maxBuildJobs = readInt(from);
+        maxSilentTime = readInt(from);
+        startWork();
+        stopWork();
+        break;
+    }
+            
             
     default:
         throw Error(format("invalid operation %1%") % op);
@@ -437,13 +450,18 @@ static void processConnection()
     /* Exchange the greeting. */
     unsigned int magic = readInt(from);
     if (magic != WORKER_MAGIC_1) throw Error("protocol mismatch");
-    verbosity = (Verbosity) readInt(from);
     writeInt(WORKER_MAGIC_2, to);
+
+    writeInt(PROTOCOL_VERSION, to);
+    unsigned int clientVersion = readInt(from);
 
     /* Send startup error messages to the client. */
     startWork();
 
     try {
+
+        /* If we can't accept clientVersion, then throw an error
+           *here* (not above). */
 
         /* Prevent users from doing something very dangerous. */
         if (geteuid() == 0 &&

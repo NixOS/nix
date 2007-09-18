@@ -773,7 +773,6 @@ static Expr prim_listToAttrs(EvalState & state, const ATermVector & args)
       if (matchAttrs(evaledExpr, attrs)){
         Expr e = evalExpr(state, makeSelect(evaledExpr, toATerm("attr")));
         string attr = evalStringNoCtx(state,e);
-        ATerm value;
         Expr r = makeSelect(evaledExpr, toATerm("value"));
         res.set(toATerm(attr), makeAttrRHS(r, makeNoPos()));
       }
@@ -783,7 +782,7 @@ static Expr prim_listToAttrs(EvalState & state, const ATermVector & args)
     } // for
     return makeAttrs(res);
   } catch (Error & e) {
-    e.addPrefix(format("while calling listToAttrs "));
+    e.addPrefix(format("in `listToAttrs':\n"));
     throw;
   }
 }
