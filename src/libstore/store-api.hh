@@ -238,6 +238,9 @@ public:
 	virtual void scanAndUpdateAllReferences(const Path & statePath, const bool recursive) = 0;
 	
 	/* TODO */
+	virtual bool getSharedWith(const Path & statePath1, Path & statePath2) = 0;
+	
+	/* TODO */
 	virtual PathSet toNonSharedPathSet(const PathSet & statePaths) = 0;
 	
 	/* TODO */

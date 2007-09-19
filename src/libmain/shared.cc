@@ -178,7 +178,7 @@ static void initAndRun(int argc, char * * argv)
             buildVerbosity = lvlVomit;
         
         //we need to push back since arguments need to be passed on in the state wrapper script
-        else if (arg == "--help") {
+        else if (arg == "--help" && programId != "nix-state") {
             printHelp();
             remaining.push_back(arg);
         }

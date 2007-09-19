@@ -571,6 +571,17 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     	break;
     }
     
+    case wopGetSharedWith: {
+		Path statePath1 = readString(from);
+		Path statePath2;
+		startWork();
+        bool result = store->getSharedWith(statePath1, statePath2);
+        stopWork();
+        writeString(statePath2, to);
+        writeInt(result, to);
+    	break;
+	}
+    
 	case wopToNonSharedPathSet: {
     	PathSet statePaths = readStringSet(from);
     	startWork();

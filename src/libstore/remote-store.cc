@@ -286,7 +286,6 @@ Path RemoteStore::addTextToStore(const string & suffix, const string & s,
     writeString(suffix, to);
     writeString(s, to);
     writeStringSet(references, to);
-    
     processStderr();
     return readStorePath(from);
 }
@@ -310,7 +309,6 @@ Path RemoteStore::importPath(bool requireSignature, Source & source)
        anyway. */
     
     processStderr(0, &source);
-    //Path path = readStorePath(from);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	remove 
     return readStorePath(from);
 }
 
@@ -504,6 +502,15 @@ void RemoteStore::scanAndUpdateAllReferences(const Path & statePath, const bool 
 	readInt(from);
 }
 
+bool RemoteStore::getSharedWith(const Path & statePath1, Path & statePath2)
+{
+	writeInt(wopGetSharedWith, to);
+	writeString(statePath1, to);
+	processStderr();
+	statePath2 = readString(from);
+	unsigned int reply = readInt(from);
+    return reply != 0;
+}
 
 PathSet RemoteStore::toNonSharedPathSet(const PathSet & statePaths)
 {

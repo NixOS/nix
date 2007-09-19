@@ -2,8 +2,41 @@ Usage: nix-state [OPTIONS...] [ARGUMENTS...]
 
 `nix-state' is a tool to manipulate the Nix state-store and to run programs.
 
-Operations:
+Run Operations:
 
+  --run / -r: run and commit state
+  --commit-only: commit state
+  --run-only: run
+  --scan-only: scan for references
+
+Run Options:		
+
+  --scanreferences: set scan for references
+  --comment=...: Add a comment for commiting  
+
+Information:
+
+  --showstatepath: print the state path
+  --showderivations: print all derivations of this path
+  --showrevisions: show all revisions of the state path
+  --showsharedpaths: show where this path points to
   --version: output version information
   --help: display help
 
+Share state Operations:
+
+  --unshare: unshare this path
+  --share-with a b: make the path a point to the path b
+
+Share state Options:
+
+  --unshare-branch-state: 
+  --unshare-restore-old-state: 
+ 
+Revert state Operations:
+
+  --revert-to-revision=x: revert to revision x
+
+Revert state Options:
+
+  --revert-to-revision-recursively: revert recursively

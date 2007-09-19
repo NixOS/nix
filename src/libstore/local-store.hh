@@ -110,6 +110,8 @@ public:
 	
 	void scanAndUpdateAllReferences(const Path & statePath, const bool recursive);
 	
+	bool getSharedWith(const Path & statePath1, Path & statePath2);
+	
 	PathSet toNonSharedPathSet(const PathSet & statePaths);
 	
 	void revertToRevision(const Path & statePath, const unsigned int revision_arg, const bool recursive);

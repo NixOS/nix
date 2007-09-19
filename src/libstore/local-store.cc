@@ -1837,6 +1837,11 @@ Path toNonSharedPathTxn(const Transaction & txn, const Path & statePath)
 	return returnedPath;
 }
 
+bool LocalStore::getSharedWith(const Path & statePath1, Path & statePath2)
+{
+	return querySharedStateTxn(noTxn, statePath1, statePath2);
+}
+
 PathSet toNonSharedPathSetTxn(const Transaction & txn, const PathSet & statePaths)
 {
 	PathSet real_statePaths;

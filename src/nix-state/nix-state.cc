@@ -32,6 +32,8 @@ bool r_scanforReferences = false;
 bool r_commit = true;
 bool r_run = true;
 bool revert_recursively = false;
+bool unshare_branch = false;
+bool unshare_restore_old = false;
 
 
 /************************* Build time Functions ******************************/
@@ -243,6 +245,36 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 }
 
 
+static void opShowSharedPaths(Strings opFlags, Strings opArgs)
+{
+	Path statePath = *(opArgs.begin());
+	if(!store->isValidStatePath(statePath))
+		throw UsageError(format("Path '%1%' is not a valid state path.") % statePath);
+		
+	Path statePath1 = statePath;
+	Path statePath2;
+	bool isShared = false;
+	while(store->getSharedWith(statePath1, statePath2))
+	{
+		isShared = true;
+		printMsg(lvlError, format("Path '%1%' ---is shared with---> '%2%'") % statePath1 % statePath2);
+		statePath1 = statePath2;
+	}
+	
+	if(!isShared)
+		printMsg(lvlError, format("Path '%1%' is not shared with another path") % statePath1);
+}
+
+static void opUnshare(Strings opFlags, Strings opArgs)
+{
+	
+}
+
+static void opShareWith(Strings opFlags, Strings opArgs)
+{
+	
+}
+
 
 static void opRunComponent(Strings opFlags, Strings opArgs)
 {
@@ -272,8 +304,15 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     	
     	string root_args = "";
     	for (Strings::iterator i = root_program_args.begin(); i != root_program_args.end(); ++i){
-    		if(*i == "--help" || *i == "--version")
+    		if(*i == "--help" || *i == "--version"){
+    			printMsg(lvlError, format("Usage: try --statehelp for extended state help options"));
+    			printMsg(lvlError, format("%1%") % padd("", '-', 54));
+    		}
+    		else if(*i == "--statehelp"){
     			printMsg(lvlError, format("%1%") % padd("", '-', 100));
+    			printHelp();
+    		}
+    		
     		//printMsg(lvlError, format("ARG %1%") % *i);
     		root_args += " \"" + *i + "\"";
     		
@@ -522,7 +561,6 @@ void run(Strings args)
         Operation oldOp = op;
 		
 		//Run options
-		
         if (arg == "--run" || arg == "-r")		//run and commit
             op = opRunComponent;
         else if (arg == "--commit-only"){
@@ -551,7 +589,6 @@ void run(Strings args)
     	
     	
     	//Info options
-    	
 		else if (arg == "--showstatepath")
 			op = opShowStatePath;
 		else if (arg == "--showderivations")
@@ -560,16 +597,27 @@ void run(Strings args)
 			op = queryAvailableStateRevisions;
 			
 		
-		//State options
-		
+		//Revering State options
 		else if (arg.substr(0,21) == "--revert-to-revision="){
 			op = revertToRevision;
 			bool succeed = string2UnsignedInt(arg.substr(21,arg.length()), revision_arg);
 			if(!succeed)
 				throw UsageError("The given revision is not a valid number");
 		}
-		else if (arg.substr(0,10) == "--revert-to-revision-recursively")
+		else if (arg == "--revert-to-revision-recursively")
         	revert_recursively = true;	
+		
+		//Shared state options
+		else if (arg == "--showsharedpaths")	
+			op = opShowSharedPaths;
+		else if (arg == "--unshare")
+			op = opUnshare;
+		else if (arg == "--unshare-branch-state")
+			unshare_branch = true;
+		else if (arg == "--unshare-restore-old-state")
+			unshare_restore_old = true;
+		else if (arg == "--share-with")
+			op = opShareWith;
 		
 	    /*
 		--share-from

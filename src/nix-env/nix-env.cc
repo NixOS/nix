@@ -566,7 +566,7 @@ static void installDerivations(Globals & globals,
         		//&& the identifiers are equal
         		
         		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        		//TODO && (the users are equal || OR SHARED BETWEEN USERS)			
+        		//TODO && (the users are equal || OR SHARED BETWEEN USERS)		isnt this already user specific?		
         		//TODO 
         		if(	newSharedState == "" 
         			&&
@@ -620,7 +620,6 @@ static void installDerivations(Globals & globals,
 		//Share from new --> to existing
 		store->shareState(i->second, i->first, false);
     }
-    
     
     //**********************
 

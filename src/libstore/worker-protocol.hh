@@ -44,6 +44,7 @@ typedef enum {
 	wopQueryAvailableStateRevisions,		
 	wopCommitStatePath,
 	wopScanAndUpdateAllReferences,
+	wopGetSharedWith,
 	wopToNonSharedPathSet,
 	wopRevertToRevision,
 	wopShareState,
