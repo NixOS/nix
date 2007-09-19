@@ -13,14 +13,21 @@
         <firstname>Eelco</firstname>
         <surname>Dolstra</surname>
       </personname>
+      <affiliation>
+        <orgname>Utrecht University</orgname>
+        <orgdiv>Faculty of Science, Department of Information and Computing Sciences</orgdiv>
+      </affiliation>
     </author>
 
     <copyright>
       <year>2004</year>
       <year>2005</year>
       <year>2006</year>
+      <year>2007</year>
       <holder>Eelco Dolstra</holder>
     </copyright>
+
+    <date>September 2007</date>
     
   </info>
 
@@ -49,7 +56,7 @@
         <title>nix-instantiate</title>
         <xi:include href="nix-instantiate.xml" />
       </section>
-      <section>
+      <section xml:id="sec-nix-store">
         <title>nix-store</title>
         <xi:include href="nix-store.xml" />
       </section>
@@ -65,9 +72,13 @@
         <title>nix-channel</title>
         <xi:include href="nix-channel.xml" />
       </section>
-      <section>
+      <section xml:id="sec-nix-collect-garbage">
         <title>nix-collect-garbage</title>
         <xi:include href="nix-collect-garbage.xml" />
+      </section>
+      <section xml:id="sec-nix-copy-closure">
+        <title>nix-copy-closure</title>
+        <xi:include href="nix-copy-closure.xml" />
       </section>
       <section xml:id="sec-nix-hash">
         <title>nix-hash</title>
@@ -77,11 +88,11 @@
         <title>nix-install-package</title>
         <xi:include href="nix-install-package.xml" />
       </section>
-      <section>
+      <section xml:id="sec-nix-pack-closure">
         <title>nix-pack-closure</title>
         <xi:include href="nix-pack-closure.xml" />
       </section>
-      <section>
+      <section xml:id="sec-nix-prefetch-url">
         <title>nix-prefetch-url</title>
         <xi:include href="nix-prefetch-url.xml" />
       </section>
@@ -93,7 +104,7 @@
         <title>nix-push</title>
         <xi:include href="nix-push.xml" />
       </section>
-      <section>
+      <section xml:id="sec-nix-unpack-closure">
         <title>nix-unpack-closure</title>
         <xi:include href="nix-unpack-closure.xml" />
       </section>

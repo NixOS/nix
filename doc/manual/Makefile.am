@@ -15,7 +15,7 @@ man1_MANS = nix-env.1 nix-build.1 nix-store.1 nix-instantiate.1 \
  nix-collect-garbage.1 nix-push.1 nix-pull.1 \
  nix-prefetch-url.1 nix-channel.1 \
  nix-pack-closure.1 nix-unpack-closure.1 \
- nix-install-package.1 nix-hash.1
+ nix-install-package.1 nix-hash.1 nix-copy-closure.1
 
 FIGURES = figures/user-environments.png
 
@@ -31,7 +31,7 @@ MANUAL_SRCS = manual.xml introduction.xml installation.xml \
 manual.is-valid: $(MANUAL_SRCS) version.txt
 #	$(XMLLINT) --xinclude $< | $(XMLLINT) --noout --nonet --relaxng $(docbookrng)/docbook.rng -
 	if test "$(jing)" != "false"; then \
-		$(XMLLINT) --xinclude $< | $(jing) $(docbookrng)/docbook.rng /dev/stdin; \
+		$(XMLLINT) --xinclude $< | $(jing) $(docbookrng)/docbook.rng /dev/fd/0; \
 	else \
 		echo "Not validating."; \
 	fi

@@ -1,5 +1,6 @@
 <article xmlns="http://docbook.org/ns/docbook"
-         xmlns:xlink="http://www.w3.org/1999/xlink">
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xml:id="sec-relnotes">
 
 <title>Nix Release Notes</title>
 
@@ -7,7 +8,7 @@
 
 <!--==================================================================-->
 
-<section><title>Release 0.11 (TBA)</title>
+<section xml:id="ssec-relnotes-0.11"><title>Release 0.11 (TBA)</title>
 
 <itemizedlist>
 
@@ -17,9 +18,10 @@
   removed.</para></listitem>
 
 
-  <listitem><para><command>nix-copy-closure</command> copies the
-  missing parts of a closure to or from a remote
-  machine.</para></listitem>
+  <listitem><para>The new command <command>nix-copy-closure</command>
+  gives you an easy and efficient way to exchange software between
+  machines.  It copies the missing parts of the closure of a set of
+  store path to or from a remote machine.</para></listitem>
 
 
   <listitem><para><command>nix-prefetch-url</command> now by default
@@ -99,6 +101,21 @@
   <function>builtins.sub</function>,
   <function>builtins.stringLength</function>,
   <function>builtins.substring</function>.</para></listitem>
+
+
+  <listitem><para>TODO: each subscribed channel is its own attribute
+  in the top-level expression generated for the channel, this allows
+  disambiguation (<command>nix-env -qaA</command>).</para></listitem>
+
+
+  <listitem><para>TODO: substitutes table is gone, registering
+  substitutes is now much faster.</para></listitem>
+
+
+  <listitem><para><command>nix-prefetch-url</command> now has a
+  limited form of caching.  This is used by
+  <command>nix-channel</command> to prevent unnecessary downloads when
+  the channel hasn’t changed.</para></listitem>
   
 
 </itemizedlist>
