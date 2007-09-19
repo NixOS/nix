@@ -1281,17 +1281,23 @@ string padd(const string & s, char c , unsigned int size, bool front)
 	return ss;
 }
 
-void symlinkPath(const Path & existingDir, const Path & newLinkName)
+void symlinkPath(const Path & existingDir, const Path & newLinkName)	//TODO bool shellexpansion
 {
 	//Symlink link to the share path
 	//Usage: ln [OPTION]... [-T] TARGET LINK_NAME   (1st form)
 	Strings p_args;
+	p_args.push_back("-c");	//we call the shell (/bin/sh -c) so it expands the ~ to a users home dir
+	p_args.push_back("ln -sf " + existingDir + " " + newLinkName);
+	/*
 	p_args.push_back("-sf");
 	p_args.push_back(existingDir);	
 	p_args.push_back(newLinkName);
-	runProgram_AndPrintOutput("ln", true, p_args, "ln");
+	*/
+	runProgram_AndPrintOutput("/bin/sh", true, p_args, "sh-ln");
 	
-	//printMsg(lvlError, format("ln -sf %1% %2%") % existingDir % newLinkName);
+	executeShellCommand("whoami");
+	executeShellCommand("pwd");
+	printMsg(lvlError, format("ln -sf %1% %2%") % existingDir % newLinkName);
 }
 
 void removeSymlink(const string & path)
@@ -1308,20 +1314,45 @@ void ensureStateDir(const Path & statePath, const string & user, const string & 
 	setChmod(statePath, chmod);	
 }
 
-void copyContents(const Path & from, const Path & to)
+void copyContents(const Path & from, const Path & to)	//TODO bool shellexpansion, bool failure for nix-env
 {
+	//executeShellCommand("whoami");
+	
+	//TODO Could be a symlink (to a non-existing dir)
+	/*
+	if(!DirectoryExist(from))
+		throw Error(format("Path `%1%' doenst exist ...") % from);
+	if(!DirectoryExist(to))
+		throw Error(format("Path `%1%' doenst exist ...") % to);
+	*/
+	
+	//executeShellCommand("ls -l "+from);
+	//executeShellCommand("ls -l "+from+"/");
+	//executeShellCommand("ls -l "+to);
+	//executeShellCommand("ls -l "+to+"/");
+	
 	//Copy all files + dirs recursively
 	Strings p_args;
+	p_args.push_back("-c");				//we call the shell (/bin/sh -c) so it expands the * to all files
+	p_args.push_back("cp -R "+from + "/* "+to);
+	/*
+	p_args.push_back("cp");
 	p_args.push_back("-R");
 	p_args.push_back(from + "/*");
 	p_args.push_back(to);
-	runProgram_AndPrintOutput("cp", true, p_args, "cp");
+	*/
+	runProgram_AndPrintOutput("/bin/sh", true, p_args, "sh-cp");
 	
 	//Also copy the hidden files (but not the ../ dir)
-	p_args.clear();
+	p_args.empty();
+	p_args.push_back("-c");
+	p_args.push_back("cp " + from + "/.[a-zA-Z0-9]* " +to);
+	/*
+	p_args.push_back(cp");
 	p_args.push_back(from + "/.[a-zA-Z0-9]*");
 	p_args.push_back(to);
-	runProgram_AndPrintOutput("cp", true, p_args, "cp");
+	*/
+	runProgram_AndPrintOutput("/bin/sh", true, p_args, "sh-cp");
 }
 
 }

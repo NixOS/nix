@@ -639,7 +639,7 @@ static void installDerivations(Globals & globals,
     			PathSet comparePaths;
     			comparePaths.insert(statePath);
     			comparePaths.insert(read_statePath);
-    			if(store->toNonSharedPathSet(comparePaths).size() != 1)
+    			if(store->toNonSharedPathSet(comparePaths).size() != 1)			//TODO !!!!!!!!!!!!! only copy when not already a symlink to a statePath !!!!!!!!!
     				copyContents(externalState, statePath);
     		}
     		else
@@ -659,6 +659,7 @@ static void installDerivations(Globals & globals,
     	
     	//Now we create a symlink externalState --> statePath
     	printMsg(lvlError, format("SYMLINK: '%1%' --> '%2%'") % externalState % statePath);
+    	executeShellCommand("whoami");
     	symlinkPath(statePath, externalState);
     }
     
