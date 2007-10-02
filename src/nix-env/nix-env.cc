@@ -639,7 +639,7 @@ static void installDerivations(Globals & globals,
     			PathSet comparePaths;
     			comparePaths.insert(statePath);
     			comparePaths.insert(read_statePath);
-    			if(store->toNonSharedPathSet(comparePaths).size() != 1)			//TODO !!!!!!!!!!!!! only copy when not already a symlink to a statePath !!!!!!!!!
+    			if(store->toNonSharedPathSet(comparePaths).size() != 1)			//TODO !!!!!!!!!!!!!??
     				copyContents(externalState, statePath);
     		}
     		else

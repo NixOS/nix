@@ -1726,7 +1726,7 @@ bool querySolidStateReferencesTxn(const Transaction & txn, const Path & statePat
 	return notempty;
 }
 
-void unShareStateTxn(const Transaction & txn, const Path & path, const bool copyFromOld)
+void unShareStateTxn(const Transaction & txn, const Path & path, const bool branch, const bool restoreOld)		//TODO ADD BOOL YES/NO TO RESTORE OLD STATE (LAST REV.)
 {
 	//Check if is statePath
 	if(!isValidStatePathTxn(txn, path))
@@ -1739,24 +1739,32 @@ void unShareStateTxn(const Transaction & txn, const Path & path, const bool copy
 	
 	//Remove Symlink
 	removeSymlink(path);
+
+	//Remove earlier entries (unshare)		(we must do this before revertToRevisionTxn)
+	nixDB.delPair(txn, dbSharedState, path);
 	
 	//Touch dir with correct rights
 	Derivation drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, path));
 	ensureStateDir(path, drv.stateOutputs.find("state")->second.username, "nixbld", "700");
 	
-	//Copy if necessary	(TODO first snapshot?)
-	if(copyFromOld){
+	if(branch && restoreOld)
+		throw Error(format("You cannot branch and restore the old state at the same time for path: '%1%' ") % path);
+
+	//Copy if necessary
+	if(branch){
 		copyContents(sharedWithOldPath, path);
 	}
 	
-	//Remove earlier entries (unshare)
-	nixDB.delPair(txn, dbSharedState, path);
+	//Restore the latest snapshot (non-recursive) made on this statepath
+	if(restoreOld){
+		revertToRevisionTxn(txn, path, 0, false);
+	}
 }
 
-void LocalStore::unShareState(const Path & path, const bool copyFromOld)
+void LocalStore::unShareState(const Path & path, const bool branch, const bool restoreOld)
 {
 	Transaction txn(nixDB);
-	unShareStateTxn(txn, path, copyFromOld);
+	unShareStateTxn(txn, path, branch, restoreOld);
 	txn.commit();
 }
 
@@ -1799,7 +1807,7 @@ void shareStateTxn(const Transaction & txn, const Path & from, const Path & to, 
 	//If from was shared: unshare
 	Path empty;
 	if(querySharedStateTxn(txn, from, empty))
-		unShareStateTxn(txn, from, false);
+		unShareStateTxn(txn, from, false, false);
 
 	//Remove state path and link
 	deletePathWrapped(from);

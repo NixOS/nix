@@ -25,6 +25,7 @@ namespace nix {
 									
 	void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path & statePath);
 	
+	/* revision 0 == latest ????? */
 	void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const int revision_arg, const bool recursive);
 
 	
@@ -54,7 +55,7 @@ namespace nix {
     bool queryStateReferences(Database & nixDB, const Transaction & txn, TableId references_table, TableId revisions_table,
     	const Path & statePath, Strings & references, const unsigned int revision = 0, const unsigned int timestamp = 0);		
 
-    /* Set the revision number of the statePath and the revision numbers of all state paths in the references closure */
+    /* Get the revision number of the statePath and the revision numbers of all state paths in the references closure */
     void setStateRevisions(Database & nixDB, const Transaction & txn, TableId revisions_table, TableId revisions_comments,
     	TableId snapshots_table, const RevisionClosure & revisions, const Path & rootStatePath, const string & comment);
     

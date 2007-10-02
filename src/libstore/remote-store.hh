@@ -104,7 +104,7 @@ public:
 	
 	void shareState(const Path & from, const Path & to, const bool snapshot);
 	
-	void unShareState(const Path & path, const bool copyFromOld);
+	void unShareState(const Path & path, const bool branch, const bool restoreOld);
 	
 private:
     AutoCloseFD fdSocket;

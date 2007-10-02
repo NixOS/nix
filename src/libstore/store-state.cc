@@ -108,6 +108,12 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
     RevisionClosureTS getTimestamps;
 	queryStateRevisionsTxn(txn, statePath_ns, getRivisions, getTimestamps, revision_arg);
 
+	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	//include recursive
+	//lookup 0 (latest) to the real revision
+
+	
+
 	//Revert each statePath in the list
 	for (RevisionClosure::iterator i = getRivisions.begin(); i != getRivisions.end(); ++i){
 		Path statePath = (*i).first;
@@ -180,7 +186,7 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
 		}
 		
 		
-		//*** Now also revert state references to the specific revision (the revision is already converted to a timestamp here)
+		//*** Now also revert _state references_ to the specific revision (the revision is already converted to a timestamp here)
 		
 		//Query the references of the old revision (already converted to a timestamp)		
     	PathSet state_references;

@@ -615,9 +615,10 @@ static void performOp(Source & from, Sink & to, unsigned int op)
 	
 	case wopUnShareState: {
 		Path path = readString(from);
-		bool copyFromOld = readInt(from) == 1;
+		bool branch = readInt(from) == 1;
+		bool restoreOld = readInt(from) == 1;
 		startWork();
-    	store->unShareState(path, copyFromOld);
+    	store->unShareState(path, branch, restoreOld);
     	stopWork();
     	writeInt(1, to);
 		break;

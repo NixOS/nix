@@ -540,11 +540,12 @@ void RemoteStore::shareState(const Path & from_arg, const Path & to_arg, const b
 	readInt(from);
 }
 
-void RemoteStore::unShareState(const Path & path, const bool copyFromOld)
+void RemoteStore::unShareState(const Path & path, const bool branch, const bool restoreOld)
 {
 	writeInt(wopUnShareState, to);
 	writeString(path, to);
-	writeInt(copyFromOld ? 1 : 0, to);
+	writeInt(branch ? 1 : 0, to);
+	writeInt(restoreOld ? 1 : 0, to);
 	processStderr();
 	readInt(from);
 }

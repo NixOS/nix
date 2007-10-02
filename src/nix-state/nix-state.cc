@@ -33,7 +33,9 @@ bool r_commit = true;
 bool r_run = true;
 bool revert_recursively = false;
 bool unshare_branch = false;
-bool unshare_restore_old = false;
+bool unshare_restoreOld = true;
+string share_with;
+string copy_from;
 
 
 /************************* Build time Functions ******************************/
@@ -267,12 +269,27 @@ static void opShowSharedPaths(Strings opFlags, Strings opArgs)
 
 static void opUnshare(Strings opFlags, Strings opArgs)
 {
+	Path statePath = *(opArgs.begin());
+	if(!store->isValidStatePath(statePath))
+		throw UsageError(format("Path '%1%' is not a valid state path.") % statePath);
 	
+	store->unShareState(statePath, unshare_branch, unshare_restoreOld);
 }
 
 static void opShareWith(Strings opFlags, Strings opArgs)
 {
+	Path statePath = *(opArgs.begin());
+	if(!store->isValidStatePath(statePath))
+		throw UsageError(format("Path '%1%' is not a valid state path.") % statePath);
 	
+	store->shareState(statePath, share_with, false);
+}
+
+static void opCopyFrom(Strings opFlags, Strings opArgs)
+{
+	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	//copy_from
+	throw UsageError(format("TODO !!!!!!!!!!!!"));
 }
 
 
@@ -307,10 +324,14 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     		if(*i == "--help" || *i == "--version"){
     			printMsg(lvlError, format("Usage: try --statehelp for extended state help options"));
     			printMsg(lvlError, format("%1%") % padd("", '-', 54));
+    			r_scanforReferences = false;
+    			r_commit = false;
     		}
     		else if(*i == "--statehelp"){
     			printMsg(lvlError, format("%1%") % padd("", '-', 100));
     			printHelp();
+    			r_scanforReferences = false;
+    			r_commit = false;
     		}
     		
     		//printMsg(lvlError, format("ARG %1%") % *i);
@@ -555,6 +576,11 @@ void run(Strings args)
 
 	/* test */
 	
+	if(args.size() == 1 && ( *(args.begin()) == "--help" || *(args.begin()) == "--statehelp")){
+		printHelp();
+		return;	
+	}
+	
     for (Strings::iterator i = args.begin(); i != args.end(); ) {
         string arg = *i++;
 
@@ -612,17 +638,23 @@ void run(Strings args)
 			op = opShowSharedPaths;
 		else if (arg == "--unshare")
 			op = opUnshare;
-		else if (arg == "--unshare-branch-state")
+		else if (arg == "--unshare-and-branch-state")
 			unshare_branch = true;
-		else if (arg == "--unshare-restore-old-state")
-			unshare_restore_old = true;
-		else if (arg == "--share-with")
+		else if (arg == "--unshare-and-restore-old-state")		//default true
+			unshare_restoreOld = true;
+		else if (arg.substr(0,13) == "--share-with="){
 			op = opShareWith;
+			share_with = arg.substr(13,arg.length());
+		}
+		else if (arg.substr(0,12) == "--copy-from="){
+			op = opCopyFrom;
+			copy_from = arg.substr(12,arg.length());
+		}
 		
 	    /*
-		--share-from
 		
-		--unshare
+		--copy-from
+		
 		*/
 	
 	

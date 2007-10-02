@@ -118,7 +118,7 @@ public:
 	
 	void shareState(const Path & from, const Path & to, const bool snapshot);
 	
-	void unShareState(const Path & path, const bool copyFromOld);
+	void unShareState(const Path & path, const bool branch, const bool restoreOld);
 };
 
 
@@ -246,7 +246,7 @@ void setSolidStateReferencesTxn(const Transaction & txn, const Path & statePath,
 bool querySolidStateReferencesTxn(const Transaction & txn, const Path & statePath, PathSet & paths);
 
 void shareStateTxn(const Transaction & txn, const Path & from, const Path & to, const bool snapshot);
-void unShareStateTxn(const Transaction & txn, const Path & path, const bool copyFromOld);
+void unShareStateTxn(const Transaction & txn, const Path & path, const bool branch, const bool restoreOld);
 
 PathSet toNonSharedPathSetTxn(const Transaction & txn, const PathSet & statePaths);
 Path toNonSharedPathTxn(const Transaction & txn, const Path & statePath);

@@ -250,7 +250,7 @@ public:
 	virtual void shareState(const Path & from, const Path & to, const bool snapshot) = 0;
 	
 	/* TODO */
-	virtual void unShareState(const Path & path, const bool copyFromOld) = 0;
+	virtual void unShareState(const Path & path, const bool branch, const bool restoreOld) = 0;
 };
 
 

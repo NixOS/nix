@@ -1,4 +1,4 @@
-Usage: nix-state [OPTIONS...] [ARGUMENTS...]
+Usage: nix-state [OPTIONS...] [ARGUMENTS...] [NIX Store/State-Path]
 
 `nix-state' is a tool to manipulate the Nix state-store and to run programs.
 
@@ -26,12 +26,13 @@ Information:
 Share state Operations:
 
   --unshare: unshare this path
-  --share-with a b: make the path a point to the path b
+  --share-with=a b: make the statepath b point to a
+  --copy-from=a b: make the contents of statepath b equal to the contents of a
 
 Share state Options:
 
-  --unshare-branch-state: 
-  --unshare-restore-old-state: 
+  --unshare-and-branch-state: 
+  --unshare-and-restore-old-state: (default)
  
 Revert state Operations:
 
