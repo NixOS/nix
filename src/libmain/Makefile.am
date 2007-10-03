@@ -6,6 +6,7 @@ AM_CXXFLAGS = \
  -DNIX_STORE_DIR=\"$(storedir)\" \
  -DNIX_STORE_STATE_DIR=\"$(storestatedir)\" \
  -DNIX_EXT3_COW_HEADER=\"$(ext3cowheader)\" \
+ -DNIX_RSYNC=\"$(rsync)\" \
  -DNIX_DATA_DIR=\"$(datadir)\" \
  -DNIX_STATE_DIR=\"$(localstatedir)/nix\" \
  -DNIX_LOG_DIR=\"$(localstatedir)/log/nix\" \

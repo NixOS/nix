@@ -184,10 +184,16 @@ AC_SUBST(bdb_lib)
 AC_SUBST(bdb_include)
 
 AC_ARG_WITH(ext3cow-header, AC_HELP_STRING([--with-ext3cow-header=PATH],
-  [path of the header ext3cow header ext3cow_fs.h]),
+  [path of the ext3cow header ext3cow_fs.h]),
   ext3cowheader=$withval, ext3cowheader=)
 AC_SUBST(ext3cowheader)
 AC_CHECK_HEADER(${ext3cowheader})
+
+NEED_PROG(rsync, rsync)
+AC_ARG_WITH(rsync, AC_HELP_STRING([--with-rsync=PATH],
+  [path to the rsync binary.]),
+  rsync=$withval)
+AC_SUBST(rsync)
 
 AC_ARG_WITH(aterm, AC_HELP_STRING([--with-aterm=PATH],
   [prefix of CWI ATerm library]),

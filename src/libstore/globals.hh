@@ -30,6 +30,9 @@ extern string nixDBPath;
 /* nixExt3CowHeader is the header file used to communicate with ext3cow. */
 extern string nixExt3CowHeader;
 
+/* nixRsync is used to copy from one statedir to the other. */
+extern string nixRsync;
+
 /* nixConfDir is the directory where configuration files are
    stored. */
 extern string nixConfDir;

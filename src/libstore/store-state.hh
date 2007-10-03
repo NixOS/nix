@@ -66,7 +66,9 @@ namespace nix {
     /* Returns all available revision numbers of the given state path */
     bool queryAvailableStateRevisions(Database & nixDB, const Transaction & txn, TableId revisions_table, TableId revisions_comments,
     	const Path & statePath, RevisionInfos & revisions);	
-
+    
+    /* Copy all files and folders recursively (also the hidden ones) from the dir from/... to the dir to/... and delete the rest in to/ (Rsync) */
+	void copyContents(const Path & from, const Path & to);
 
 }
 

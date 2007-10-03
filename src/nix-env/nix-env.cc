@@ -16,6 +16,7 @@
 #include "db.hh"
 #include "util.hh"
 #include "local-store.hh"
+#include "store-state.hh"
 
 #include <cerrno>
 #include <ctime>

@@ -1288,15 +1288,7 @@ void symlinkPath(const Path & existingDir, const Path & newLinkName)	//TODO bool
 	Strings p_args;
 	p_args.push_back("-c");	//we call the shell (/bin/sh -c) so it expands the ~ to a users home dir
 	p_args.push_back("ln -sf " + existingDir + " " + newLinkName);
-	/*
-	p_args.push_back("-sf");
-	p_args.push_back(existingDir);	
-	p_args.push_back(newLinkName);
-	*/
 	runProgram_AndPrintOutput("/bin/sh", true, p_args, "sh-ln");
-	
-	//executeShellCommand("whoami");
-	//executeShellCommand("pwd");
 	printMsg(lvlError, format("ln -sf %1% %2%") % existingDir % newLinkName);
 }
 
@@ -1314,31 +1306,6 @@ void ensureStateDir(const Path & statePath, const string & user, const string & 
 	setChmod(statePath, chmod);	
 }
 
-void copyContents(const Path & from, const Path & to)	//TODO bool shellexpansion, bool failure for nix-env
-{
-	//TODO Could be a symlink (to a non-existing dir)
-	/*
-	if(!DirectoryExist(from))
-		throw Error(format("Path `%1%' doenst exist ...") % from);
-	if(!DirectoryExist(to))
-		throw Error(format("Path `%1%' doenst exist ...") % to);
-	*/
-	
-	//TODO do a Rsync instead of a cp.
-	//rsync -avHx --delete from to
-		
-	//Copy all files + dirs recursively
-	Strings p_args;
-	p_args.push_back("-c");				//we call the shell (/bin/sh -c) so it expands the * to all files
-	p_args.push_back("cp -R "+from + "/* "+to);
-	runProgram_AndPrintOutput("/bin/sh", true, p_args, "sh-cp");
-	
-	//Also copy the hidden files (but not the ../ dir)
-	p_args.empty();
-	p_args.push_back("-c");
-	p_args.push_back("cp " + from + "/.[a-zA-Z0-9]* " +to);
-	runProgram_AndPrintOutput("/bin/sh", true, p_args, "sh-cp");
-	
-}
+
 
 }

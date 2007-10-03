@@ -336,9 +336,6 @@ void removeSymlink(const string & path);
 
 void ensureStateDir(const Path & statePath, const string & user, const string & group, const string & chmod);
 
-/* Copy all files and folders recursively (also the hidden ones) from the dir from/... to the dir to/... */
-void copyContents(const Path & from, const Path & to);
-
 }
 
 #endif /* !__UTIL_H */

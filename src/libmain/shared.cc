@@ -93,6 +93,7 @@ static void initAndRun(int argc, char * * argv)
     nixStateDir = canonPath(getEnv("NIX_STATE_DIR", NIX_STATE_DIR));									//nix global state dir
     nixDBPath = getEnv("NIX_DB_DIR", nixStateDir + "/db");
     nixExt3CowHeader = getEnv("NIX_EXT3_COW_HEADER", NIX_EXT3_COW_HEADER);
+    nixRsync = getEnv("NIX_RSYNC", NIX_RSYNC);
     nixConfDir = canonPath(getEnv("NIX_CONF_DIR", NIX_CONF_DIR));
     nixLibexecDir = canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR));
     nixBinDir = canonPath(getEnv("NIX_BIN_DIR", NIX_BIN_DIR));

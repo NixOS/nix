@@ -15,6 +15,7 @@ string nixLogDir = "/UNINIT";
 string nixStateDir = "/UNINIT";
 string nixDBPath = "/UNINIT";
 string nixExt3CowHeader = "/UNINIT";
+string nixRsync = "/UNINIT";
 string nixConfDir = "/UNINIT";
 string nixLibexecDir = "/UNINIT";
 string nixBinDir = "/UNINIT";

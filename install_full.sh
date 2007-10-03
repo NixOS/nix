@@ -23,7 +23,7 @@ if [ "$1" = "full" ]; then
   nix-env-all-pkgs.sh -i gnumake
   nix-env-all-pkgs.sh -i ext3cow-tools
   nix-env-all-pkgs.sh -i e3cfsprogs
-  
+  nix-env-all-pkgs.sh -i rsync  
 fi
 
 if [ "$1" = "full" ] || [ "$1" = "auto" ]; then
@@ -50,8 +50,6 @@ fi
 	    	--with-store-state-dir=/nix/state \
             --with-ext3cow-header=/nix/store/v95qf520d6972pshykrah1dz3z53rkmj-linux-2.6.21.7/lib/modules/2.6.21.7-default/build/include/linux/ext3cow_fs.h \
             --localstatedir=/nix/var
-
-
 
 #Options from the nix expr
 #--disable-init-state

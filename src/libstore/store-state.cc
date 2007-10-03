@@ -108,7 +108,7 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
     RevisionClosureTS getTimestamps;
 	queryStateRevisionsTxn(txn, statePath_ns, getRivisions, getTimestamps, revision_arg);
 
-	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	//include recursive
 	//lookup 0 (latest) to the real revision
 
@@ -712,6 +712,36 @@ bool queryAvailableStateRevisions(Database & nixDB, const Transaction & txn, Tab
     	return false;
     else
     	return true;
+}
+
+void copyContents(const Path & from, const Path & to)	//TODO bool shellexpansion, bool failure for nix-env
+{
+	//TODO Could be a symlink (to a non-existing dir)
+	/*
+	if(!DirectoryExist(from))
+		throw Error(format("Path `%1%' doenst exist ...") % from);
+	if(!DirectoryExist(to))
+		throw Error(format("Path `%1%' doenst exist ...") % to);
+	*/
+	
+	//We add a slash / to the end to ensure the contents is copyed
+	Path from2 = from;
+	Path to2 = to;
+	if(from2[from2.length() - 1] != '/')
+		from2 = from2 + "/";
+	if(to2[to2.length() - 1] != '/')
+		to2 = to2 + "/";
+	
+	printMsg(lvlError, format("Rsync from: '%1%' to: '%2%'") % from2 % to2);
+	
+	//Rsync from --> to and also with '-avHx --delete'
+	//This makes the paths completely equal (also deletes) and retains times ownership etc.
+	Strings p_args;
+	p_args.push_back("-avHx");
+	p_args.push_back("--delete");
+	p_args.push_back(from2);
+	p_args.push_back(to2);
+	runProgram_AndPrintOutput(nixRsync, true, p_args, "rsync");
 }
 
 }

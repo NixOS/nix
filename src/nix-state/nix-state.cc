@@ -568,11 +568,12 @@ void run(Strings args)
 
 	deletePath("/nix/state/b");
 	copyContents("/nix/state/a", "/nix/state/b");
+
+	printMsg(lvlError, format("Rsync: '%1%'") % nixRsync);
 	
+	copyContents("/nix/state/fwir6jlqygy90zadnx95zryfa8918qac-hellohardcodedstateworld-1.0-test/", "/home/wouterdb/tmp/aa/");  //TODO !!!!!!!!!!!!!!!!!!!
 	return;
-	
 	*/
-	
 
 	/* test */
 	
