@@ -279,17 +279,19 @@ static void opUnshare(Strings opFlags, Strings opArgs)
 static void opShareWith(Strings opFlags, Strings opArgs)
 {
 	Path statePath = *(opArgs.begin());
-	if(!store->isValidStatePath(statePath))
-		throw UsageError(format("Path '%1%' is not a valid state path.") % statePath);
+	if(!store->isValidStatePath(statePath) || !store->isValidStatePath(share_with))
+		throw UsageError(format("Path '%1%' or '%2%' is not a valid state path.") % statePath % share_with);
 	
 	store->shareState(statePath, share_with, false);
 }
 
 static void opCopyFrom(Strings opFlags, Strings opArgs)
 {
-	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	//copy_from
-	throw UsageError(format("TODO !!!!!!!!!!!!"));
+	Path statePath = *(opArgs.begin());
+	if(!store->isValidStatePath(statePath) || !store->isValidStatePath(copy_from))
+		throw UsageError(format("Path '%1%' or '%2%' is not a valid state path.") % statePath % copy_from);
+	
+	rsyncPaths(copy_from, statePath);
 }
 
 
@@ -522,7 +524,7 @@ void run(Strings args)
 	printMsg(lvlError, format("NOW: '%1%'") % FileExist("/nix/store/65c7p6c8j0vy6b8fjgq8") );
 	printMsg(lvlError, format("NOW: '%1%'") % DirectoryExist("/nix/store/65c7p6c8j0vy6b8fjg") );
 
-	store = openStore();
+	
 	
 	// /nix/state/g8vby0bjfrs85qpf1jfajrcrmlawn442-hellohardcodedstateworld-1.0-
 	// /nix/state/6l93ff3bn1mk61jbdd34diafmb4aq7c6-hellohardcodedstateworld-1.0-
@@ -572,8 +574,19 @@ void run(Strings args)
 	printMsg(lvlError, format("Rsync: '%1%'") % nixRsync);
 	
 	copyContents("/nix/state/fwir6jlqygy90zadnx95zryfa8918qac-hellohardcodedstateworld-1.0-test/", "/home/wouterdb/tmp/aa/");  //TODO !!!!!!!!!!!!!!!!!!!
+	
+	
+	
+	store = openStore();
+	Hash hash;
+	PathSet references;
+	PathSet stateReferences;
+	registerValidPath(noTxn, "/nix/store/sjnaisdpqyckc75c3mjz4msi9s1662cw-hellohardcodedstateworld-1.0", hash, references, stateReferences, "/nix/store/y7abzzpiknzps5kjb4qvdxvlhvxl6slj-hellohardcodedstateworld_import-1.0.drv", 0);
 	return;
-	*/
+	
+	//*/
+
+	
 
 	/* test */
 	
@@ -647,9 +660,9 @@ void run(Strings args)
 			op = opShareWith;
 			share_with = arg.substr(13,arg.length());
 		}
-		else if (arg.substr(0,12) == "--copy-from="){
+		else if (arg.substr(0,13) == "--rsync-from="){
 			op = opCopyFrom;
-			copy_from = arg.substr(12,arg.length());
+			copy_from = arg.substr(13,arg.length());
 		}
 		
 	    /*

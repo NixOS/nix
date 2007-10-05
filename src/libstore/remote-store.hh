@@ -39,11 +39,11 @@ public:
     
     Path queryStatePathDrv(const Path & statePath);
 
-    void queryReferences(const Path & path, PathSet & references, const unsigned int revision);
+    void queryStoreReferences(const Path & path, PathSet & references, const unsigned int revision);
 
 	void queryStateReferences(const Path & storePath, PathSet & stateReferences, const unsigned int revision);
 
-    void queryReferrers(const Path & path, PathSet & referrers, const unsigned int revision);
+    void queryStoreReferrers(const Path & path, PathSet & referrers, const unsigned int revision);
     
     void queryStateReferrers(const Path & path, PathSet & stateReferrers, const unsigned int revision);
 

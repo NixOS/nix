@@ -115,7 +115,7 @@ void printDotGraph(const PathSet & roots)
         //Lookup all references
 		PathSet references;
 		PathSet stateReferences;
-	    store->queryReferences(path, references, 0);
+	    store->queryStoreReferences(path, references, 0);
 	    store->queryStateReferences(path, stateReferences, 0);
 	    PathSet allReferences = pathSets_union(references, stateReferences);
 

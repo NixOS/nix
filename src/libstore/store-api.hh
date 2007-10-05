@@ -80,7 +80,7 @@ public:
 
     /* Queries the set of outgoing FS references for a store path.
        The result is not cleared. */
-    virtual void queryReferences(const Path & path,
+    virtual void queryStoreReferences(const Path & path,
         PathSet & references, const unsigned int revision) = 0;
         
     /* Queries the set of outgoing FS state-references for a store path.
@@ -89,7 +89,7 @@ public:
 
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
-    virtual void queryReferrers(const Path & path,
+    virtual void queryStoreReferrers(const Path & path,
         PathSet & referrers, const unsigned int revision) = 0;
 
 	/* Queries the set of incoming FS state-references for a store path.

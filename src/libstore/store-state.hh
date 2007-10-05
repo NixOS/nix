@@ -68,7 +68,7 @@ namespace nix {
     	const Path & statePath, RevisionInfos & revisions);	
     
     /* Copy all files and folders recursively (also the hidden ones) from the dir from/... to the dir to/... and delete the rest in to/ (Rsync) */
-	void copyContents(const Path & from, const Path & to);
+	void rsyncPaths(const Path & from, const Path & to);
 
 }
 

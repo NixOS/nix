@@ -33,16 +33,17 @@ static Database nixDB;
 
 /* Database tables. */
 
-/* dbValidPaths :: Path -> ()
+/* dbValidPaths :: Path -> sha256 Hash
 
    The existence of a key $p$ indicates that path $p$ is valid (that
    is, produced by a succesful build). */
 static TableId dbValidPaths = 0;
 
-/* dbValidStatePaths :: Path -> ()
+/* dbValidStatePaths :: statePath -> DrvPath
 
    The existence of a key $p$ indicates that state path $p$ is valid (that
-   is, produced by a succesful build). */
+   is, produced by a succesful build). 
+   */
 static TableId dbValidStatePaths = 0;
 
 /* dbReferences :: Path -> [Path]
@@ -445,8 +446,11 @@ static string stripPrefix(const string & prefix, const string & s)
 */
 
 
+/*
+ *  The revision can be omitted for normal store paths
+ */
 void setReferences(const Transaction & txn, const Path & store_or_statePath,
-    const PathSet & references, const PathSet & stateReferences, const unsigned int revision)
+    const PathSet & references, const PathSet & stateReferences, const unsigned int revision)		
 {
     /* For unrealisable paths, we can only clear the references. */
     if (references.size() > 0 && !isRealisableComponentOrStatePath(txn, store_or_statePath))
@@ -529,7 +533,7 @@ void queryXReferencesTxn(const Transaction & txn, const Path & store_or_statePat
     references.insert(references2.begin(), references2.end());
 }
 
-void LocalStore::queryReferences(const Path & storePath, PathSet & references, const unsigned int revision)
+void LocalStore::queryStoreReferences(const Path & storePath, PathSet & references, const unsigned int revision)
 {
     nix::queryXReferencesTxn(noTxn, storePath, references, revision, true);
 }
@@ -539,6 +543,7 @@ void LocalStore::queryStateReferences(const Path & componentOrstatePath, PathSet
     nix::queryXReferencesTxn(noTxn, componentOrstatePath, stateReferences, revision, false);
 }
 
+//Private
 static PathSet getXReferrers(const Transaction & txn, const Path & store_or_statePath, const bool component_or_state, const unsigned int revision)
 {
     TableId table = 0;
@@ -633,7 +638,7 @@ static PathSet getXReferrers(const Transaction & txn, const Path & store_or_stat
     }
 }
 
-static PathSet getReferrersTxn(const Transaction & txn, const Path & store_or_statePath, const unsigned int revision)
+static PathSet getStoreReferrersTxn(const Transaction & txn, const Path & store_or_statePath, const unsigned int revision)
 {
 	return getXReferrers(txn, store_or_statePath, true, revision);
 }
@@ -643,19 +648,19 @@ static PathSet getStateReferrersTxn(const Transaction & txn, const Path & store_
 	return getXReferrers(txn, store_or_statePath, false, revision);
 }
 
-void queryReferrersTxn(const Transaction & txn,
+void queryStoreReferrersTxn(const Transaction & txn,
     const Path & storePath, PathSet & referrers, const unsigned int revision)
 {
     if (!isRealisableComponentOrStatePath(txn, storePath))
 		throw Error(format("path `%1%' is not valid") % storePath);
-    PathSet referrers2 = getReferrersTxn(txn, storePath, revision);
+    PathSet referrers2 = getStoreReferrersTxn(txn, storePath, revision);
     referrers.insert(referrers2.begin(), referrers2.end());
 }
 
-void LocalStore::queryReferrers(const Path & storePath,
+void LocalStore::queryStoreReferrers(const Path & storePath,
     PathSet & referrers, const unsigned int revision)
 {
-    nix::queryReferrersTxn(noTxn, storePath, referrers, revision);
+    nix::queryStoreReferrersTxn(noTxn, storePath, referrers, revision);
 }
 
 void queryStateReferrersTxn(const Transaction & txn, const Path & storePath, PathSet & stateReferrers, const unsigned int revision)
@@ -944,10 +949,10 @@ Substitutes LocalStore::querySubstitutes(const Path & path)
 }
 
 
-static void invalidatePath(Transaction & txn, const Path & path);
+static void invalidateStorePath(Transaction & txn, const Path & path);
 
 
-void clearSubstitutes()
+void clearSubstitutes()								//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ALSO FOR STATE
 {
     Transaction txn(nixDB);
     
@@ -961,7 +966,7 @@ void clearSubstitutes()
         
         /* Maintain the cleanup invariant. */
         if (!isValidPathTxn(txn, *i))
-            invalidatePath(txn, *i);
+            invalidateStorePath(txn, *i);
     }
 
     /* !!! there should be no referrers to any of the invalid
@@ -1084,23 +1089,39 @@ void registerValidPaths(const Transaction & txn, const ValidPathInfos & infos)
     }
 }
 
-
-/* Invalidate a path. The caller is responsible for checking that
-   there are no referrers. */
-static void invalidatePath(Transaction & txn, const Path & path)			//TODO Adjust for state paths????
+static void invalidatexPath(Transaction & txn, const Path & path, const bool component_or_state)
 {
-    debug(format("unregistering path `%1%'") % path);
-
-    /* Clear the `references' entry for this path, as well as the
-       inverse `referrers' entries, and the `derivers' entry; but only
-       if there are no substitutes for this path.  This maintains the
-       cleanup invariant. */
-    if (querySubstitutes(txn, path).size() == 0) {
-        setReferences(txn, path, PathSet(), PathSet(), -1);					//Set last references empty	(TODO is this ok?)
-        nixDB.delPair(txn, dbDerivers, path);								//TODO!!!!! also for state Derivers!!!!!!!!!!!!!!!
-    }
+	debug(format("invalidating %2% path `%1%'") % path % (component_or_state ? "store" : "state"));
+	
+	/* Clear the `references' entry for this path, as well as the
+       inverse `referrers' entries, and the `derivers' entry. */
     
-    nixDB.delPair(txn, dbValidPaths, path);									
+    if(component_or_state)
+	    setReferences(txn, path, PathSet(), PathSet(), 0);	//This is a store path so the revision doenst matter
+    else
+    	setReferences(txn, path, PathSet(), PathSet(), 0);	//For now.... we only delete clear references for the new revision	(TODO !!!!!!!!!!!!!!!! CHECK IF WE REALLY SET IT FOR A NEW OR LAST REVISION)		
+    
+    nixDB.delPair(txn, dbDerivers, path);
+ 
+ 	if(component_or_state)
+    	nixDB.delPair(txn, dbValidPaths, path);
+    else
+    	nixDB.delPair(txn, dbValidStatePaths, path);
+ 
+ 	if(component_or_state)
+ 		nixDB.delPair(txn, dbStateInfo, path);		//We (may) need to delete if this key if path is a state-store path   
+}
+
+
+/* Invalidate a store or state path. The caller is responsible for checking that
+   there are no referrers. */
+static void invalidateStorePath(Transaction & txn, const Path & path)
+{
+	invalidatexPath(txn, path, true);
+}
+static void invalidateStatePath(Transaction & txn, const Path & path)
+{
+	invalidatexPath(txn, path, false);
 }
 
 
@@ -1391,36 +1412,54 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 }
 
 
-void deleteFromStore(const Path & _path, unsigned long long & bytesFreed)
+void deleteXFromStore(const Path & _path, unsigned long long & bytesFreed, const bool component_or_state)
 {
     bytesFreed = 0;
     Path path(canonPath(_path));
 
-    assertStorePath(path);
+	if(component_or_state)
+    	assertStorePath(path);
+    else
+    	assertStatePath(path);
 
     Transaction txn(nixDB);
-    if (isValidPathTxn(txn, path)) {
-        PathSet referrers = getReferrersTxn(txn, path, -1);		//delete latest referrers (TODO?)
-        for (PathSet::iterator i = referrers.begin();
-             i != referrers.end(); ++i)
-            if (*i != path && isValidPathTxn(txn, *i))
-                throw PathInUse(format("cannot delete path `%1%' because it is in use by path `%2%'") % path % *i);
-        invalidatePath(txn, path);
+    if (isValidPathTxn(txn, path) || isValidStatePathTxn(txn, path)) 
+    {
+        PathSet storeReferrers = getStoreReferrersTxn(txn, path, 0);
+        PathSet stateReferrers = getStateReferrersTxn(txn, path, 0);
         
-        //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Also delete/invalidate stateReferrers?????
+        for (PathSet::iterator i = storeReferrers.begin(); i != storeReferrers.end(); ++i)
+            if (*i != path && isValidPathTxn(txn, *i))
+                throw PathInUse(format("cannot delete %3% path `%1%' because it is in use by store path `%2%'") % path % *i % (component_or_state ? "store" : "state"));
+        for (PathSet::iterator i = stateReferrers.begin(); i != stateReferrers.end(); ++i)
+            if (*i != path && isValidPathTxn(txn, *i))
+                throw PathInUse(format("cannot delete %3% path `%1%' because it is in use by state path `%2%'") % path % *i % (component_or_state ? "store" : "state"));
+        
+        
+        if(component_or_state)
+        	invalidateStorePath(txn, path);
+        else
+        	invalidateStatePath(txn, path);
     }
     txn.commit();
 
     deletePathWrapped(path, bytesFreed);
 }
-
+void deleteFromStore(const Path & _path, unsigned long long & bytesFreed)
+{
+	deleteXFromStore(_path, bytesFreed, true);
+}
+void deleteFromState(const Path & _path, unsigned long long & bytesFreed)
+{
+	deleteXFromStore(_path, bytesFreed, false);
+}
 
 void verifyStore(bool checkContents)
 {
     Transaction txn(nixDB);
 
     
-    printMsg(lvlInfo, "checking path existence");
+    printMsg(lvlInfo, "checking store path existence");
 
     Paths paths;
     PathSet validPaths;
@@ -1428,23 +1467,41 @@ void verifyStore(bool checkContents)
 
     for (Paths::iterator i = paths.begin(); i != paths.end(); ++i) {
         if (!pathExists(*i)) {
-            printMsg(lvlError, format("path `%1%' disappeared") % *i);
-            invalidatePath(txn, *i);
+            printMsg(lvlError, format("store path `%1%' disappeared") % *i);
+            invalidateStorePath(txn, *i);
         } else if (!isStorePath(*i)) {
-            printMsg(lvlError, format("path `%1%' is not in the Nix store") % *i);
-            invalidatePath(txn, *i);
+            printMsg(lvlError, format("store path `%1%' is not in the Nix store") % *i);
+            invalidateStorePath(txn, *i);
         } else {
             if (checkContents) {
                 debug(format("checking contents of `%1%'") % *i);
                 Hash expected = queryHash(txn, *i);
                 Hash current = hashPath(expected.type, *i);
                 if (current != expected) {
-                    printMsg(lvlError, format("path `%1%' was modified! "
+                    printMsg(lvlError, format("store path `%1%' was modified! "
                                  "expected hash `%2%', got `%3%'")
                         % *i % printHash(expected) % printHash(current));
                 }
             }
             validPaths.insert(*i);
+        }
+    }
+    
+	printMsg(lvlInfo, "checking state path existence");
+
+    Paths statePaths;
+    PathSet validStatePaths;
+    nixDB.enumTable(txn, dbValidStatePaths, statePaths);
+    
+    for (Paths::iterator i = statePaths.begin(); i != statePaths.end(); ++i) {
+        if (!pathExists(*i)) {
+            printMsg(lvlError, format("state path `%1%' disappeared") % *i);
+            invalidateStatePath(txn, *i);
+        } else if (!isStatePath(*i)) {
+            printMsg(lvlError, format("state path `%1%' is not in the Nix state-store") % *i);
+            invalidateStatePath(txn, *i);
+        } else {
+            validStatePaths.insert(*i);
         }
     }
 
@@ -1456,7 +1513,8 @@ void verifyStore(bool checkContents)
     PathSet realisablePaths(validPaths);
     
     
-    //TODO Do also for validStatePaths
+    //TODO !!!!!!!!!!!!!!!!!!!!!!!!! Do also for validStatePaths
+    
 
     /* Check that the values of the substitute mappings are valid
        paths. */ 
@@ -1471,7 +1529,7 @@ void verifyStore(bool checkContents)
         else if (subs.size() == 0)
             nixDB.delPair(txn, dbSubstitutes, *i);
         else
-	    realisablePaths.insert(*i);
+			realisablePaths.insert(*i);
     }
     
 
@@ -1752,7 +1810,7 @@ void unShareStateTxn(const Transaction & txn, const Path & path, const bool bran
 
 	//Copy if necessary
 	if(branch){
-		copyContents(sharedWithOldPath, path);
+		rsyncPaths(sharedWithOldPath, path);
 	}
 	
 	//Restore the latest snapshot (non-recursive) made on this statepath

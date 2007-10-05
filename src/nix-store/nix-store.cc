@@ -214,7 +214,7 @@ static void printTree(const Path & path,
 	//Lookup all references
 	PathSet references;
 	PathSet stateReferences;
-    store->queryReferences(path, references, 0);
+    store->queryStoreReferences(path, references, 0);
     store->queryStateReferences(path, stateReferences, 0);
     PathSet allReferences = pathSets_union(references, stateReferences);
     
@@ -317,9 +317,9 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 if (query == qRequisites) store->storePathRequisites(path, includeOutputs, paths, true, false, revision);
                 else if (query == qRequisitesState) store->storePathRequisites(path, includeOutputs, paths, false, true, revision);
                 else if (query == qRequisitesFull) store->storePathRequisites(path, includeOutputs, paths, true, true, revision);
-                else if (query == qReferences) store->queryReferences(path, paths, revision);
+                else if (query == qReferences) store->queryStoreReferences(path, paths, revision);
                 else if (query == qStateReferences) store->queryStateReferences(path, paths, revision);
-                else if (query == qReferrers) store->queryReferrers(path,  paths, revision);
+                else if (query == qReferrers) store->queryStoreReferrers(path,  paths, revision);
                 else if (query == qStateReferrers) store->queryStateReferrers(path,  paths, revision);
                 else if (query == qReferrersClosure) computeFSClosure(path, paths, true, false, revision, true);
                 else if (query == qReferrersClosureWithState) computeFSClosure(path, paths, true, true, revision, true);
@@ -453,7 +453,7 @@ static void opRegisterSubstitutes(Strings opFlags, Strings opArgs)
         }
         if (!cin || cin.eof()) throw Error("missing input");
         registerSubstitute(txn, srcPath, sub);
-        setReferences(txn, srcPath, references, stateReferences, 0);	//state revision 0, e.g. first commit
+        setReferences(txn, srcPath, references, stateReferences, 1);	//state revision 1, e.g. first commit
     }
 
     txn.commit();

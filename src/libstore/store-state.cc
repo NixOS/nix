@@ -108,10 +108,18 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
     RevisionClosureTS getTimestamps;
 	queryStateRevisionsTxn(txn, statePath_ns, getRivisions, getTimestamps, revision_arg);
 
-	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	//include recursive
-	//lookup 0 (latest) to the real revision
 
+	//If not recursive: filter out all paths execpt statePath_ns
+	if(!recursive)	
+	{
+		Snapshots currentSS = getRivisions[statePath_ns];		//save SS of statePath_ns
+		getRivisions.clear();									//clear all
+		getRivisions[statePath_ns] = currentSS; 				//insert
+		
+		unsigned int currentTS = getTimestamps[statePath_ns];	//same as above	
+		getTimestamps.clear();
+		getTimestamps[statePath_ns] = currentTS;
+	}
 	
 
 	//Revert each statePath in the list
@@ -145,6 +153,7 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
 			Strings p_args;
 			p_args.push_back("-c");		//we use the shell to execute the cp command becuase the shell expands the '*' 
 			string cpcommand = "cp";
+			
 			if(revertPathOrFile.substr(revertPathOrFile.length() -1 , revertPathOrFile.length()) == "/"){		//is dir
 				string revert_to_path = revertPathOrFile.substr(0, revertPathOrFile.length() -1) + "@" + unsignedInt2String(epoch);
 				cpcommand += " -R " + revert_to_path + "/*";
@@ -166,7 +175,7 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
 				if(output == "")
 					continue;
 			}
-			else{																//is file
+			else{	//is file
 				cpcommand += " " + (revertPathOrFile + "@" + unsignedInt2String(epoch));
 				
 				if(epoch == 0){
@@ -186,7 +195,7 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
 		}
 		
 		
-		//*** Now also revert _state references_ to the specific revision (the revision is already converted to a timestamp here)
+		//*** Now also revert state _references_ to the specific revision (the revision is already converted to a timestamp here)
 		
 		//Query the references of the old revision (already converted to a timestamp)		
     	PathSet state_references;
@@ -198,7 +207,10 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
     	setStateComponentReferencesTxn(txn, statePath, Strings(state_references.begin(), state_references.end()), 0, newTimestamp);
 		setStateStateReferencesTxn(txn, statePath, Strings(state_stateReferences.begin(), state_stateReferences.end()), 0, newTimestamp);
 		
-		printMsg(lvlError, format("Reverted state of '%1%' to revision '%2%'") % statePath % revision_arg);
+		if(revision_arg == 0)
+			printMsg(lvlError, format("Reverted state of '%1%' to the latest revision") % statePath);	 //TODO lookup the number
+		else
+			printMsg(lvlError, format("Reverted state of '%1%' to revision '%2%'") % statePath % revision_arg);
 	}
 }
 
@@ -293,6 +305,8 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
 	
 	//TODO check if path is not a shared path !
 	//TODO
+	//TODO Unshare the path:	
+	//TODO Path statePath_ns = toNonSharedPathTxn(txn, statePath);
 
 	//get all possible state and component references
     PathSet allComponentPaths;
@@ -714,7 +728,7 @@ bool queryAvailableStateRevisions(Database & nixDB, const Transaction & txn, Tab
     	return true;
 }
 
-void copyContents(const Path & from, const Path & to)	//TODO bool shellexpansion, bool failure for nix-env
+void rsyncPaths(const Path & from, const Path & to)	//TODO bool shellexpansion, bool failure for nix-env
 {
 	//TODO Could be a symlink (to a non-existing dir)
 	/*

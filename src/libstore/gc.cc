@@ -406,7 +406,7 @@ static void dfsVisit(const PathSet & paths, const Path & path,
     
     PathSet references;
     if (store->isValidPath(path))
-        store->queryReferences(path, references, 0);						//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        store->queryStoreReferences(path, references, 0);						//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)
@@ -447,7 +447,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
 
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
-    Roots rootMap = ignoreLiveness ? Roots() : nix::findRoots(true);
+    Roots rootMap = ignoreLiveness ? Roots() : nix::findRoots(true);					//TODO Also find state roots?
 
     PathSet roots;
     for (Roots::iterator i = rootMap.begin(); i != rootMap.end(); ++i)
@@ -468,13 +468,17 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     /* Determine the live paths which is just the closure of the
        roots under the `references' relation. */
     PathSet livePaths;
-    for (PathSet::const_iterator i = roots.begin(); i != roots.end(); ++i)
-        computeFSClosure(canonPath(*i), livePaths, true, false, 0);						//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO DELETE STATE??
+    for (PathSet::const_iterator i = roots.begin(); i != roots.end(); ++i){
+    	printMsg(lvlError, format("CHECK '%1%'") % *i);
+        computeFSClosure(canonPath(*i), livePaths, true, false, 0);							//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO DELETE STATE??
+    }
+	
 
     if (gcKeepDerivations) {
         for (PathSet::iterator i = livePaths.begin();
              i != livePaths.end(); ++i)
         {
+            printMsg(lvlError, format("CHECK2 '%1%'") % *i);
             /* Note that the deriver need not be valid (e.g., if we
                previously ran the collector with `gcKeepDerivations'
                turned off). */
@@ -489,6 +493,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
         for (PathSet::iterator i = livePaths.begin();
              i != livePaths.end(); ++i)
             if (isDerivation(*i)) {
+            	printMsg(lvlError, format("CHECK3 '%1%'") % *i);
                 Derivation drv = derivationFromPathTxn(noTxn, *i);
                 for (DerivationOutputs::iterator j = drv.outputs.begin();
                      j != drv.outputs.end(); ++j)

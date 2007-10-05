@@ -51,11 +51,11 @@ public:
     
     Path queryStatePathDrv(const Path & statePath);
 
-    void queryReferences(const Path & path, PathSet & references, const unsigned int revision);
+    void queryStoreReferences(const Path & path, PathSet & references, const unsigned int revision);
     
     void queryStateReferences(const Path & storePath, PathSet & stateReferences, const unsigned int revision);
     
-    void queryReferrers(const Path & path, PathSet & referrers, const unsigned int revision);
+    void queryStoreReferrers(const Path & path, PathSet & referrers, const unsigned int revision);
     
     void queryStateReferrers(const Path & path, PathSet & stateReferrers, const unsigned int revision);
 
@@ -177,7 +177,7 @@ bool isValidPathTxn(const Transaction & txn, const Path & path);
 /* Sets the set of outgoing FS (also state) references for a store path.  Use with
    care! 
    
-   -1 for revision means overwrite the last revision
+   0 for revision means overwrite the last revision
    */
 void setReferences(const Transaction & txn, const Path & store_or_statePath,
     const PathSet & references, const PathSet & stateReferences, const unsigned int revision);
@@ -191,6 +191,9 @@ PathSet queryDerivers(const Transaction & txn, const Path & storePath, const str
 
 /* Delete a value from the nixStore directory. */
 void deleteFromStore(const Path & path, unsigned long long & bytesFreed);
+
+/* Delete a value from the nixState directory. */
+void deleteFromState(const Path & _path, unsigned long long & bytesFreed);
 
 MakeError(PathInUse, Error);
 
@@ -232,7 +235,7 @@ void queryXReferencesTxn(const Transaction & txn, const Path & path, PathSet & r
 void setStateComponentReferencesTxn(const Transaction & txn, const Path & statePath, const Strings & references, const unsigned int revision, const unsigned int timestamp);
 void setStateStateReferencesTxn(const Transaction & txn, const Path & statePath, const Strings & references, const unsigned int revision, const unsigned int timestamp);
 
-void queryReferrersTxn(const Transaction & txn, const Path & storePath, PathSet & referrers, const unsigned int revision);
+void queryStoreReferrersTxn(const Transaction & txn, const Path & storePath, PathSet & referrers, const unsigned int revision);
 void queryStateReferrersTxn(const Transaction & txn, const Path & storePath, PathSet & stateReferrers, const unsigned int revision);
 
 Path queryStatePathDrvTxn(const Transaction & txn, const Path & statePath);
@@ -262,6 +265,7 @@ IntVector getStatePathsIntervalTxn(const Transaction & txn, const PathSet & stat
 bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const unsigned int revision);
 void setStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePath, const IntVector & intervals, bool allZero = false);
 bool querySharedStateTxn(const Transaction & txn, const Path & statePath, Path & shared_with);
+
 
 }
 

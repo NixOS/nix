@@ -215,10 +215,10 @@ Path RemoteStore::queryStatePathDrv(const Path & statePath)
     return readString(from);
 }
 
-void RemoteStore::queryReferences(const Path & path,
+void RemoteStore::queryStoreReferences(const Path & path,
     PathSet & references, const unsigned int revision)
 {
-    writeInt(wopQueryReferences, to);
+    writeInt(wopQueryStoreReferences, to);
     writeString(path, to);
     writeBigUnsignedInt(revision, to);
     processStderr();
@@ -238,10 +238,10 @@ void RemoteStore::queryStateReferences(const Path & path,
 }
 
 
-void RemoteStore::queryReferrers(const Path & path,
+void RemoteStore::queryStoreReferrers(const Path & path,
     PathSet & referrers, const unsigned int revision)
 {
-    writeInt(wopQueryReferrers, to);
+    writeInt(wopQueryStoreReferrers, to);
     writeString(path, to);
     writeBigUnsignedInt(revision, to);
     processStderr();

@@ -72,6 +72,8 @@ void computeFSClosureRecTxn(const Transaction & txn, const Path & path, PathSet 
 {
     if (paths.find(path) != paths.end())	//takes care of double entries 
     	return;
+
+    //printMsg(lvlError, format("ComputeFSClosureRec '%1%'") % path);
     
     paths.insert(path);
 
@@ -79,7 +81,7 @@ void computeFSClosureRecTxn(const Transaction & txn, const Path & path, PathSet 
     PathSet stateReferences;
     
     if (flipDirection){
-        queryReferrersTxn(txn, path, references, revision);
+        queryStoreReferrersTxn(txn, path, references, revision);
        	queryStateReferrersTxn(txn, path, stateReferences, revision);
     }
     else{
@@ -143,7 +145,7 @@ void queryMissing(const PathSet & targets,
             if (store->hasSubstitutes(p))
                 willSubstitute.insert(p);
             PathSet refs;
-            store->queryReferences(p, todo, 0);		//TODO?
+            store->queryStoreReferences(p, todo, 0);		//TODO?
         }
     }
 }

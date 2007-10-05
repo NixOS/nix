@@ -294,16 +294,16 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         break;    	
     }
 
-    case wopQueryReferences:
-    case wopQueryReferrers: {
+    case wopQueryStoreReferences:
+    case wopQueryStoreReferrers: {
         Path path = readStorePath(from);
         unsigned int revision = readBigUnsignedInt(from);
         startWork();
         PathSet paths;
-        if (op == wopQueryReferences)
-            store->queryReferences(path, paths, revision);
+        if (op == wopQueryStoreReferences)
+            store->queryStoreReferences(path, paths, revision);
         else
-            store->queryReferrers(path, paths, revision);
+            store->queryStoreReferrers(path, paths, revision);
         stopWork();
         writeStringSet(paths, to);
         break;

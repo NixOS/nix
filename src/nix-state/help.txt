@@ -23,13 +23,13 @@ Information:
   --version: output version information
   --help: display help
 
-Share state Operations:
+(Un)Share state Operations:
 
   --unshare: unshare this path
   --share-with=a b: make the statepath b point to a
-  --copy-from=a b: make the contents of statepath b equal to the contents of a
+  --rsync-from=a b: make the contents of statepath b equal to the contents of a
 
-Share state Options:
+Unshare state Options:
 
   --unshare-and-branch-state: 
   --unshare-and-restore-old-state: (default)

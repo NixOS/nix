@@ -18,9 +18,9 @@ typedef enum {
     wopHasSubstitutes,
     wopQueryPathHash,
     wopQueryStatePathDrv,
-    wopQueryReferences,
+    wopQueryStoreReferences,
     wopQueryStateReferences,
-    wopQueryReferrers,						//10
+    wopQueryStoreReferrers,					//10
     wopQueryStateReferrers,					
     wopAddToStore,							
     wopAddTextToStore,
