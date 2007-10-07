@@ -163,7 +163,6 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
     ATermList manifest = ATempty;
     ATermList inputs = ATempty;
     ATermList stateIdentifiers = ATempty; 
-    ATermList runtimeStateArgs = ATempty;
     for (DrvInfos::const_iterator i = elems.begin(); 
          i != elems.end(); ++i)
     {
@@ -195,8 +194,6 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
 
 		//Insert the new stateIdentifier into the stateIdentifiers Atermlist   
         stateIdentifiers = ATinsert(stateIdentifiers, makeStr(i->queryStateIdentifier(state)));
-        //Insert the new runtime state args into the runtimeStateArgs Atermlist   
-        runtimeStateArgs = ATinsert(runtimeStateArgs, makeStr(i->queryRuntimeStateArgs(state)));
         
         inputs = ATinsert(inputs, makeStr(i->queryOutPath(state)));
 
@@ -220,15 +217,13 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
     Expr topLevel = makeCall(envBuilder, makeAttrs(
     
     	ATinsert(    	
-    	ATmakeList6(
+    	ATmakeList5(
 	        makeBind(toATerm("system"),
 	            makeStr(thisSystem), makeNoPos()),
 	        makeBind(toATerm("derivations"),
 	            makeList(ATreverse(manifest)), makeNoPos()),
 	        makeBind(toATerm("stateIdentifiers"),
 	            makeList(ATreverse(stateIdentifiers)), makeNoPos()),
-	        makeBind(toATerm("runtimeStateArgs"),
-	            makeList(ATreverse(runtimeStateArgs)), makeNoPos()),
 	        makeBind(toATerm("manifest"),
 	            makeStr(manifestFile, singleton<PathSet>(manifestFile)), makeNoPos()),
 	        makeBind(toATerm("nixBinDir"),
@@ -536,9 +531,13 @@ static void installDerivations(Globals & globals,
     for (DrvInfos::iterator i = installedElems.begin(); i != installedElems.end(); ++i)
     {
         DrvName drvName(i->name);
+        MetaInfo meta = i->queryMetaInfo(globals.state);
         
         //We may need to share state
-        if (!globals.preserveInstalled && newNames.find(drvName.name) != newNames.end()){						
+        if (!globals.preserveInstalled && 
+        	newNames.find(drvName.name) != newNames.end() &&
+        	meta["keep"] != "true"
+        	){						
             
 	        //******** We're gonna check if the component and state indentifiers are the same, 
 	        //         since we may need to share state in that case.
@@ -708,6 +707,9 @@ static void upgradeDerivations(Globals & globals,
          i != installedElems.end(); ++i)
     {
         DrvName drvName(i->name);
+
+        MetaInfo meta = i->queryMetaInfo(globals.state);
+        if (meta["keep"] == "true") continue;
 
         /* Find the derivation in the input Nix expression with the
            same name and satisfying the version constraints specified
@@ -997,6 +999,8 @@ static void opQuery(Globals & globals,
     bool printDrvPath = false;
     bool printOutPath = false;
     bool printDescription = false;
+    bool printMeta = false;
+    bool prebuiltOnly = false;
     bool compareVersions = false;
     bool xmlOutput = false;
 
@@ -1013,8 +1017,10 @@ static void opQuery(Globals & globals,
         else if (*i == "--compare-versions" || *i == "-c") compareVersions = true;
         else if (*i == "--drv-path") printDrvPath = true;
         else if (*i == "--out-path") printOutPath = true;
+        else if (*i == "--meta") printMeta = true;
         else if (*i == "--installed") source = sInstalled;
         else if (*i == "--available" || *i == "-a") source = sAvailable;
+        else if (*i == "--prebuilt-only" || *i == "-b") prebuiltOnly = true;
         else if (*i == "--xml") xmlOutput = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
@@ -1080,6 +1086,12 @@ static void opQuery(Globals & globals,
 
             /* For XML output. */
             XMLAttrs attrs;
+
+            if (prebuiltOnly) {
+                if (!store->isValidPath(i->queryOutPath(globals.state)) &&
+                    !store->hasSubstitutes(i->queryOutPath(globals.state)))
+                    continue;
+            }
         
             if (printStatus) {
                 bool hasSubs = store->hasSubstitutes(i->queryOutPath(globals.state));
@@ -1167,7 +1179,18 @@ static void opQuery(Globals & globals,
             }
 
             if (xmlOutput)
-                xml.writeEmptyElement("item", attrs);
+                if (printMeta) {
+                    XMLOpenElement item(xml, "item", attrs);
+                    MetaInfo meta = i->queryMetaInfo(globals.state);
+                    for (MetaInfo::iterator j = meta.begin(); j != meta.end(); ++j) {
+                        XMLAttrs attrs2;
+                        attrs2["name"] = j->first;
+                        attrs2["value"] = j->second;
+                        xml.writeEmptyElement("meta", attrs2);
+                    }
+                }
+                else
+                    xml.writeEmptyElement("item", attrs);
             else
                 table.push_back(columns);
 

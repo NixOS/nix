@@ -1466,6 +1466,7 @@ void verifyStore(bool checkContents)
     nixDB.enumTable(txn, dbValidPaths, paths);
 
     for (Paths::iterator i = paths.begin(); i != paths.end(); ++i) {
+        checkInterrupt();
         if (!pathExists(*i)) {
             printMsg(lvlError, format("store path `%1%' disappeared") % *i);
             invalidateStorePath(txn, *i);

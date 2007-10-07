@@ -616,6 +616,9 @@ static char * deepestStack = (char *) -1; /* for measuring stack usage */
 
 Expr evalExpr2(EvalState & state, Expr e)
 {
+    /* When changing this function, make sure that you don't cause a
+       (large) increase in stack consumption! */
+    
     char x;
     if (&x < deepestStack) deepestStack = &x;
     

@@ -9,14 +9,14 @@ STABLE=0
 
 # Put the revision number in the version.
 if test "$STABLE" != "1"; then
-    if REVISION=`test -d $srcdir/.svn && svnversion $srcdir 2> /dev/null`; then
+    if REVISION=`test -d $srcdir/.svn && svnversion -n $srcdir 2> /dev/null`; then
         VERSION=${VERSION}pre${REVISION}
     elif REVISION=`cat $srcdir/svn-revision 2> /dev/null`; then
         VERSION=${VERSION}pre${REVISION}
     fi
 fi
 
-AC_DEFINE_UNQUOTED(NIX_VERSION, ["$(echo $VERSION)"], [version])
+AC_DEFINE_UNQUOTED(NIX_VERSION, ["$VERSION"], [version])
 
 AC_PREFIX_DEFAULT(/nix)
 

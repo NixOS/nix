@@ -13,9 +13,9 @@ mkdir "$out", 0755 || die "error creating $out";
 sub readlink_or_StateWrapper;
 
 my $symlinks = 0;
-my %path_state_identifier;
-my %path_runtimeArgs;
+my %path_state_identifier = ();
 
+my %priorities;
 
 my $nixBinDir = $ENV{"nixBinDir"};
 my $nixStore = $ENV{"nixStore"};
@@ -30,13 +30,12 @@ sub createLinks {
     my @srcDirParts = split /\// , substr($srcDir, length ($nixStore), length ($srcDir));
     my $srcDirRoot = $nixStore . "/" . $srcDirParts[1];
 	# print "srcDirRoot $srcDirRoot \n";
-    my $pkgStateIdentifier = $path_state_identifier{$srcDirRoot};
-    my $pkgRuntimeStateArgs = $path_runtimeArgs{$srcDirRoot};
     
     my $dstDir = shift;
-    my $ignoreCollisions = shift;
+    my $priority = shift;
+	my $pkgStateIdentifier = $path_state_identifier{$srcDirRoot};		# We have to look it up each time since recursion can change the $srcDir, but not the identifier
 
-	# print "createLinks $srcDir to $dstDir with iden $pkgStateIdentifier \n";
+	#print "createLinks $srcDir to $dstDir with iden $pkgStateIdentifier \n";
 
     my @srcFiles = glob("$srcDir/*");
 
@@ -61,7 +60,7 @@ sub createLinks {
             
             #go recursive on directorys
             if (-d _) {
-                createLinks($srcFile, $dstFile, $ignoreCollisions);
+                createLinks($srcFile, $dstFile, $priority);
             }
 
             elsif (-l _) {
@@ -71,16 +70,17 @@ sub createLinks {
                 }
                 unlink $dstFile or die "error unlinking `$dstFile': $!";
                 mkdir $dstFile, 0755 || die "error creating directory `$dstFile': $!";
-                createLinks($target, $dstFile, $ignoreCollisions);
-                createLinks($srcFile, $dstFile, $ignoreCollisions);
+                createLinks($target, $dstFile, $priority); # !!! <- priority isn't right
+                createLinks($srcFile, $dstFile, $priority);
             }
 
             else {
                 
-                # print "1STLINK $srcFile to $dstFile with iden $pkgStateIdentifier \n";
+                #print "1ST DIR LINK $srcFile to $dstFile with iden $pkgStateIdentifier \n";
                 
                 symlink($srcFile, $dstFile) ||
                     die "error creating link `$dstFile': $!";
+                $priorities{$dstFile} = $priority;
                 $symlinks++;
             }
         }
@@ -89,7 +89,7 @@ sub createLinks {
 
 			# print "ELSE LINK $srcFile to $dstFile with iden $pkgStateIdentifier \n";
 
-			# if we have .....
+			# if we have a state component with a identifier different then ""
 			if($pkgStateIdentifier ne "__NOSTATE__" && $pkgStateIdentifier ne ""){
 	            
 	            my @pathparts = split /\// , $srcFile;
@@ -112,38 +112,42 @@ sub createLinks {
 		            
 		            # We also check with -e if the wrapperscript-file exists, and if is it a symlink (with -l)
 		            if (-l $new_dstFile || -e $new_dstFile) {
-			            if (!$ignoreCollisions) {
 			                my $target = readlink_or_StateWrapper $new_dstFile;
 			                die "(state) collission between `$srcFile' and `$target' (over $new_dstFile)";
-			            }
 			        }
 		            
 		            sysopen (DSTFILEHANDLE, $new_dstFile, O_RDWR|O_EXCL|O_CREAT, 0755);
 					printf DSTFILEHANDLE "#! @shell@ \n";
-					
-					if($pkgRuntimeStateArgs eq "__NOARGS__"){ 
-						printf DSTFILEHANDLE "$nixBinDir/nix-state --run --identifier=$new_stateIdentifier $srcFile \"\$@\" \n"; 
-					}
-					else{ 
-						printf DSTFILEHANDLE "$nixBinDir/nix-state --run --identifier=$new_stateIdentifier $srcFile \"\$@\" $pkgRuntimeStateArgs \n"; 
-					}	# TODO, maybe first R.T.A. then other args ?
-					
+					printf DSTFILEHANDLE "$nixBinDir/nix-state --run --identifier=$new_stateIdentifier $srcFile \"\$@\" \n"; 
 					close (DSTFILEHANDLE);
 	            }
-            }
-            else{
-	            if (-l $dstFile || -e $dstFile) {
-		            if (!$ignoreCollisions) {
-		                my $target = readlink_or_StateWrapper $dstFile;
-		                die "collission between `$srcFile' and `$target'";
-		            }
-		        }
 	            
+			}
+			elsif($pkgStateIdentifier ne "__NOSTATE__" && $pkgStateIdentifier eq ""){		#TODO we now dont create symlinks for state packages with a empty identifier
+																							#TODO but we must do it if there is no normal non-state pacakge
+			}
+			
+	        else {
+
+	            if (-l $dstFile || -e $dstFile) {
+	                my $target = readlink_or_StateWrapper $dstFile;
+	                my $prevPriority = $priorities{$dstFile};
+	                die ( "Collission between `$srcFile' and `$target'. "
+	                    . "Suggested solution: use `nix-env --set-flag "
+	                    . "priority NUMBER PKGNAME' to change the priority of "
+	                    . "one of the conflicting packages.\n" )
+	                    if $prevPriority == $priority;
+	                next if $prevPriority < $priority;
+	                unlink $dstFile or die;
+	            }
+	
+				# print "2ND LINK $srcFile to $dstFile with iden $pkgStateIdentifier \n";
 	            symlink($srcFile, $dstFile) ||
 	                die "error creating link `$dstFile': $!";
+	            $priorities{$dstFile} = $priority;
 	            $symlinks++;
-            }
-        }
+	        }
+		}
     }
 }
 
@@ -154,13 +158,13 @@ my %postponed;
 sub addPkg;
 sub addPkg {
     my $pkgDir = shift;
-    my $ignoreCollisions = shift;
+    my $priority = shift;
 
     return if (defined $done{$pkgDir});
     $done{$pkgDir} = 1;
 
 #    print "symlinking $pkgDir\n";
-    createLinks("$pkgDir", "$out", $ignoreCollisions);
+    createLinks("$pkgDir", "$out", $priority);
 
     my $propagatedFN = "$pkgDir/nix-support/propagated-user-env-packages";
     if (-e $propagatedFN) {
@@ -190,23 +194,39 @@ sub readlink_or_StateWrapper {
     return $target
 }
 
-# Symlink to the packages that have been installed explicitly by the user.
-my @storePaths = split ' ', $ENV{"derivations"};
 my @stateIdentifiers = split ' ', $ENV{"stateIdentifiers"};
-my @runtimeStateArgs = split ' ', $ENV{"runtimeStateArgs_arg"};
 my $si_counter = 0;
 
-foreach my $pkgDir (@storePaths) {					#Commented the sort out
+# Convert the stuff we get from the environment back into a coherent
+# data type.
+my @paths = split ' ', $ENV{"paths"};
+my @active = split ' ', $ENV{"active"};
+my @priority = split ' ', $ENV{"priority"};
 
-	#Link each $pkgDir to a $stateIdentifiers in $path_state_identifier
-	$path_state_identifier{$pkgDir} = $stateIdentifiers[$si_counter];
-	$path_runtimeArgs{$pkgDir} = $runtimeStateArgs[$si_counter];
+die if scalar @paths != scalar @active;
+die if scalar @paths != scalar @priority;
 
-	# print "SP: $pkgDir \n";
-	# print "SI: $path_state_identifier{$pkgDir} \n";
-	# print "RT: $path_runtimeArgs{$pkgDir} \n";	
-	
-    addPkg($pkgDir, 0);
+my %pkgs;
+
+for (my $n = 0; $n < scalar @paths; $n++) {
+    $pkgs{$paths[$n]} =
+        { active => $active[$n]
+        , priority => $priority[$n] 
+        , stateidentifier => $stateIdentifiers[$n]
+        };
+        
+    $path_state_identifier{$paths[$n]} = $stateIdentifiers[$n];
+}
+
+# Symlink to the packages that have been installed explicitly by the
+# user.
+foreach my $pkg (sort (keys %pkgs)) {
+
+	#print "SP: $pkg \n";
+	#print "SI: $pkgs{$pkg}->{stateidentifier} \n";
+    #print "PR: $pkgs{$pkg}->{priority} \n";	
+    
+    addPkg($pkg, $pkgs{$pkg}->{priority}) if $pkgs{$pkg}->{active} ne "false";
     $si_counter++;
 }
 
@@ -215,15 +235,17 @@ foreach my $pkgDir (@storePaths) {					#Commented the sort out
 # installed by the user (i.e., package X declares that it want Y
 # installed as well).  We do these later because they have a lower
 # priority in case of collisions.
+my $priorityCounter = 1000; # don't care about collisions
 while (scalar(keys %postponed) > 0) {
     
     my @pkgDirs = keys %postponed;
     %postponed = ();
-    foreach my $pkgDir (sort @pkgDirs) {			   
-        addPkg($pkgDir, 1);
+    foreach my $pkgDir (sort @pkgDirs) {
+        addPkg($pkgDir, $priorityCounter++);
     }
 }
 
 print STDERR "created $symlinks symlinks in user environment\n";
 
 symlink($ENV{"manifest"}, "$out/manifest") or die "cannot create manifest";
+
