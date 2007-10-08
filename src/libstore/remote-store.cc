@@ -149,8 +149,8 @@ RemoteStore::~RemoteStore()
         fdSocket.close();
         if (child != -1)
             child.wait(true);
-    } catch (Error & e) {
-        printMsg(lvlError, format("error (ignored): %1%") % e.msg());
+    } catch (...) {
+        ignoreException();
     }
 }
 

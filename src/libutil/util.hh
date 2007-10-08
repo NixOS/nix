@@ -336,6 +336,10 @@ void removeSymlink(const string & path);
 
 void ensureStateDir(const Path & statePath, const string & user, const string & group, const string & chmod);
 
+/* Exception handling in destructors: print an error message, then
+   ignore the exception. */
+void ignoreException();
+
 }
 
 #endif /* !__UTIL_H */
