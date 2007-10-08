@@ -38,6 +38,7 @@ public:
     string queryStateIdentifier(EvalState & state) const;
     string queryRuntimeStateArgs(EvalState & state) const;
     MetaInfo queryMetaInfo(EvalState & state) const;
+    string queryMetaInfo(EvalState & state, const string & name) const;
 
     void setDrvPath(const string & s)
     {

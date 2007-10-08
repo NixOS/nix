@@ -89,21 +89,22 @@ sub update {
     # Create a Nix expression that fetches and unpacks the channel Nix
     # expressions.
 
-    my $nixExpr = "[";
+    my $inputs = "[";
     foreach my $url (@channels) {
+        $url =~ /\/([^\/]+)\/?$/;
+        my $channelName = $1;
+        $channelName = "unnamed" unless defined $channelName;
+        print "$channelName\n";
+
         my $fullURL = "$url/nixexprs.tar.bz2";
         print "downloading Nix expressions from `$fullURL'...\n";
         $ENV{"PRINT_PATH"} = 1;
         my ($hash, $path) = `@bindir@/nix-prefetch-url '$fullURL' 2> /dev/null`;
         die "cannot fetch `$fullURL'" if $? != 0;
         chomp $path;
-        $nixExpr .= $path . " ";
+        $inputs .= '"' . $channelName . '"' . " " . $path . " ";
     }
-    $nixExpr .= "]";
-
-    $nixExpr =
-        "(import @datadir@/nix/corepkgs/channels/unpack.nix) " .
-        "{inputs = $nixExpr; system = \"@system@\";}";
+    $inputs .= "]";
 
     # Figure out a name for the GC root.
     my $userName = getpwuid($<);
@@ -113,7 +114,7 @@ sub update {
     
     # Instantiate the Nix expression.
     print "unpacking channel Nix expressions...\n";
-    my $storeExpr = `echo '$nixExpr' | @bindir@/nix-instantiate --add-root '$rootFile'.tmp -`
+    my $storeExpr = `@bindir@/nix-instantiate --add-root '$rootFile'.tmp @datadir@/nix/corepkgs/channels/unpack.nix --argstr system @system@ --arg inputs '$inputs'`
         or die "cannot instantiate Nix expression";
     chomp $storeExpr;
 

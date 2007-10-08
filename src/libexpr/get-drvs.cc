@@ -107,6 +107,15 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
 }
 
 
+string DrvInfo::queryMetaInfo(EvalState & state, const string & name) const
+{
+    /* !!! evaluates all meta attributes => inefficient */
+    MetaInfo meta = queryMetaInfo(state);
+    MetaInfo::iterator i = meta.find(name);
+    return i == meta.end() ? "" : i->second;
+}
+
+
 void DrvInfo::setMetaInfo(const MetaInfo & meta)
 {
     ATermMap metaAttrs;
@@ -214,12 +223,21 @@ static void getDerivations(EvalState & state, Expr e,
     if (matchAttrs(e, es)) {
         ATermMap drvMap(ATgetLength(es));
         queryAllAttrs(e, drvMap);
+
+        /* !!! undocumented hackery to support
+           corepkgs/channels/unpack.sh. */
+        Expr e2 = drvMap.get(toATerm("_combineChannels"));
+        bool combineChannels = e2 && evalBool(state, e2);
         
         for (ATermMap::const_iterator i = drvMap.begin(); i != drvMap.end(); ++i) {
             startNest(nest, lvlDebug,
                 format("evaluating attribute `%1%'") % aterm2String(i->key));
             string pathPrefix2 = addToPath(pathPrefix, aterm2String(i->key));
-            if (getDerivation(state, i->value, pathPrefix2, drvs, doneExprs)) {
+            if (combineChannels) {
+                if (((string) aterm2String(i->key)) != "_combineChannels")
+                    getDerivations(state, i->value, pathPrefix2, autoArgs, drvs, doneExprs);
+            }
+            else if (getDerivation(state, i->value, pathPrefix2, drvs, doneExprs)) {
                 /* If the value of this attribute is itself an
                    attribute set, should we recurse into it?  => Only
                    if it has a `recurseForDerivations = true'
@@ -229,8 +247,8 @@ static void getDerivations(EvalState & state, Expr e,
                 if (matchAttrs(e, es)) {
                     ATermMap attrs(ATgetLength(es));
                     queryAllAttrs(e, attrs, false);
-                    Expr e2 = attrs.get(toATerm("recurseForDerivations"));
-                    if (e2 && evalBool(state, e2))
+                    if (((e2 = attrs.get(toATerm("recurseForDerivations")))
+                            && evalBool(state, e2)))
                         getDerivations(state, e, pathPrefix2, autoArgs, drvs, doneExprs);
                 }
             }

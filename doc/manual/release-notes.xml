@@ -70,10 +70,16 @@
   info about installed packages in user environments.  <option>-q
   --xml --meta</option> to show all meta info.</para></listitem>
 
+  
   <listitem><para>TODO: <command>nix-env</command>
   <option>--set-flag</option>.  Specific flags:
   <literal>active</literal>, <literal>priority</literal>,
   <literal>keep</literal>.</para></listitem>
+
+  
+  <listitem><para>TODO: <command>nix-env</command> <option>-i</option>
+  / <option>-u</option> take package priorities into
+  account.</para></listitem>
   
 
   <listitem><para><command>nix-env -q</command> now has a flag
