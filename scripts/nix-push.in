@@ -264,8 +264,12 @@ foreach my $narArchive (@narArchives) {
 print STDERR "uploading manifest...\n";
 if ($localCopy) {
     copyFile $manifest, $localManifestFile;
+    copyFile "$manifest.bz2", "$localManifestFile.bz2";
 } else {
     system("$curl --show-error --upload-file " .
            "'$manifest' '$manifestPutURL' > /dev/null") == 0 or
+           die "curl failed on $manifest: $?";
+    system("$curl --show-error --upload-file " .
+           "'$manifest'.bz2 '$manifestPutURL'.bz2 > /dev/null") == 0 or
            die "curl failed on $manifest: $?";
 }

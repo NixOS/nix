@@ -24,6 +24,8 @@
 #include <iostream>
 #include <sstream>
 
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 
@@ -65,7 +67,7 @@ struct Globals
 
 
 typedef void (* Operation) (Globals & globals,
-    Strings opFlags, Strings opArgs);
+    Strings args, Strings opFlags, Strings opArgs);
 
 
 void printHelp()
@@ -74,11 +76,86 @@ void printHelp()
 }
 
 
+static string needArg(Strings::iterator & i,
+    Strings & args, const string & arg)
+{
+    if (i == args.end()) throw UsageError(
+        format("`%1%' requires an argument") % arg);
+    return *i++;
+}
+
+
+static bool parseInstallSourceOptions(Globals & globals,
+    Strings::iterator & i, Strings & args, const string & arg)
+{
+    if (arg == "--from-expression" || arg == "-E")
+        globals.instSource.type = srcNixExprs;
+    else if (arg == "--from-profile") {
+        globals.instSource.type = srcProfile;
+        globals.instSource.profile = needArg(i, args, arg);
+    }
+    else if (arg == "--attr" || arg == "-A")
+        globals.instSource.type = srcAttrPath;
+    else return false;
+    return true;
+}
+
+
+static bool isNixExpr(const Path & path)
+{
+    struct stat st;
+    if (stat(path.c_str(), &st) == -1)
+        throw SysError(format("getting information about `%1%'") % path);
+
+    return !S_ISDIR(st.st_mode) || pathExists(path + "/default.nix");
+}
+
+
+static void getAllExprs(EvalState & state,
+    const Path & path, ATermMap & attrs)
+{
+    Strings names = readDirectory(path);
+
+    for (Strings::iterator i = names.begin(); i != names.end(); ++i) {
+        Path path2 = path + "/" + *i;
+        
+        struct stat st;
+        if (stat(path2.c_str(), &st) == -1)
+            continue; // ignore dangling symlinks in ~/.nix-defexpr
+        
+        if (isNixExpr(path2))
+            attrs.set(toATerm(*i), makeAttrRHS(
+                    parseExprFromFile(state, absPath(path2)), makeNoPos()));
+        else
+            getAllExprs(state, path2, attrs);
+    }
+}
+
+
+static Expr loadSourceExpr(EvalState & state, const Path & path)
+{
+    if (isNixExpr(path)) return parseExprFromFile(state, absPath(path));
+
+    /* The path is a directory.  Put the Nix expressions in the
+       directory in an attribute set, with the file name of each
+       expression as the attribute name.  Recurse into subdirectories
+       (but keep the attribute set flat, not nested, to make it easier
+       for a user to have a ~/.nix-defexpr directory that includes
+       some system-wide directory). */
+    ATermMap attrs;
+    attrs.set(toATerm("_combineChannels"), makeAttrRHS(eTrue, makeNoPos()));
+    getAllExprs(state, path, attrs);
+    return makeAttrs(attrs);
+}
+
+
 static void loadDerivations(EvalState & state, Path nixExprPath,
-    string systemFilter, const ATermMap & autoArgs, DrvInfos & elems)
+    string systemFilter, const ATermMap & autoArgs,
+    const string & pathPrefix, DrvInfos & elems)
 {
     getDerivations(state,
-        parseExprFromFile(state, absPath(nixExprPath)), "", autoArgs, elems);
+        findAlongAttrPath(state, pathPrefix, autoArgs, loadSourceExpr(state, nixExprPath)),
+        pathPrefix, autoArgs, elems);
 
     /* Filter out all derivations not applicable to the current
        system. */
@@ -371,7 +448,7 @@ static void queryInstSources(EvalState & state,
                Nix expression. */
             DrvInfos allElems;
             loadDerivations(state, instSource.nixExprPath,
-                instSource.systemFilter, instSource.autoArgs, allElems);
+                instSource.systemFilter, instSource.autoArgs, "", allElems);
 
             elems = filterBySelector(state, allElems, args, newestOnly);
     
@@ -386,9 +463,7 @@ static void queryInstSources(EvalState & state,
            (import ./foo.nix)' = `(import ./foo.nix).bar'. */
         case srcNixExprs: {
                 
-
-            Expr e1 = parseExprFromFile(state,
-                absPath(instSource.nixExprPath));
+            Expr e1 = loadSourceExpr(state, instSource.nixExprPath);
 
             for (Strings::const_iterator i = args.begin();
                  i != args.end(); ++i)
@@ -452,7 +527,7 @@ static void queryInstSources(EvalState & state,
                  i != args.end(); ++i)
                 getDerivations(state,
                     findAlongAttrPath(state, *i, instSource.autoArgs,
-                        parseExprFromFile(state, instSource.nixExprPath)),
+                        loadSourceExpr(state, instSource.nixExprPath)),
                     "", instSource.autoArgs, elems);
             break;
         }
@@ -690,10 +765,15 @@ static void installDerivations(Globals & globals,
 
 
 static void opInstall(Globals & globals,
-    Strings opFlags, Strings opArgs)
+    Strings args, Strings opFlags, Strings opArgs)
 {
-    if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
+    for (Strings::iterator i = opFlags.begin(); i != opFlags.end(); ) {
+        string arg = *i++;
+        if (parseInstallSourceOptions(globals, i, opFlags, arg)) ;
+        else if (arg == "--preserve-installed" || arg == "-P")
+            globals.preserveInstalled = true;
+        else throw UsageError(format("unknown flag `%1%'") % arg);
+    }
 
     installDerivations(globals, opArgs, globals.profile);
 }
@@ -789,16 +869,18 @@ static void upgradeDerivations(Globals & globals,
 
 
 static void opUpgrade(Globals & globals,
-    Strings opFlags, Strings opArgs)
+    Strings args, Strings opFlags, Strings opArgs)
 {
     UpgradeType upgradeType = utLt;
-    for (Strings::iterator i = opFlags.begin();
-         i != opFlags.end(); ++i)
-        if (*i == "--lt") upgradeType = utLt;
-        else if (*i == "--leq") upgradeType = utLeq;
-        else if (*i == "--eq") upgradeType = utEq;
-        else if (*i == "--always") upgradeType = utAlways;
-        else throw UsageError(format("unknown flag `%1%'") % *i);
+    for (Strings::iterator i = opFlags.begin(); i != opFlags.end(); ) {
+        string arg = *i++;
+        if (parseInstallSourceOptions(globals, i, opFlags, arg)) ;
+        else if (arg == "--lt") upgradeType = utLt;
+        else if (arg == "--leq") upgradeType = utLeq;
+        else if (arg == "--eq") upgradeType = utEq;
+        else if (arg == "--always") upgradeType = utAlways;
+        else throw UsageError(format("unknown flag `%1%'") % arg);
+    }
 
     upgradeDerivations(globals, opArgs, upgradeType);
 }
@@ -814,7 +896,7 @@ static void setMetaFlag(EvalState & state, DrvInfo & drv,
 
 
 static void opSetFlag(Globals & globals,
-    Strings opFlags, Strings opArgs)
+    Strings args, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
         throw UsageError(format("unknown flag `%1%'") % opFlags.front());
@@ -853,10 +935,13 @@ static void opSetFlag(Globals & globals,
 
 
 static void opSet(Globals & globals,
-    Strings opFlags, Strings opArgs)
+    Strings args, Strings opFlags, Strings opArgs)
 {
-    if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
+    for (Strings::iterator i = opFlags.begin(); i != opFlags.end(); ) {
+        string arg = *i++;
+        if (parseInstallSourceOptions(globals, i, opFlags, arg)) ;
+        else throw UsageError(format("unknown flag `%1%'") % arg);
+    }
 
     DrvInfos elems;
     queryInstSources(globals.state, globals.instSource, opArgs, elems, true);
@@ -909,7 +994,7 @@ static void uninstallDerivations(Globals & globals, DrvNames & selectors,
 
 
 static void opUninstall(Globals & globals,
-    Strings opFlags, Strings opArgs)
+    Strings args, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
         throw UsageError(format("unknown flag `%1%'") % opFlags.front());
@@ -1016,9 +1101,11 @@ static string colorString(const string & s)
 
 
 static void opQuery(Globals & globals,
-    Strings opFlags, Strings opArgs)
+    Strings args, Strings opFlags, Strings opArgs)
 {
     typedef vector< map<string, string> > ResultSet;
+    Strings remaining;
+    string attrPath;
         
     bool printStatus = false;
     bool printName = true;
@@ -1036,45 +1123,46 @@ static void opQuery(Globals & globals,
 
     readOnlyMode = true; /* makes evaluation a bit faster */
 
-    for (Strings::iterator i = opFlags.begin();
-         i != opFlags.end(); ++i)
-        if (*i == "--status" || *i == "-s") printStatus = true;
-        else if (*i == "--no-name") printName = false;
-        else if (*i == "--system") printSystem = true;
-        else if (*i == "--description") printDescription = true;
-        else if (*i == "--compare-versions" || *i == "-c") compareVersions = true;
-        else if (*i == "--drv-path") printDrvPath = true;
-        else if (*i == "--out-path") printOutPath = true;
-        else if (*i == "--meta") printMeta = true;
-        else if (*i == "--installed") source = sInstalled;
-        else if (*i == "--available" || *i == "-a") source = sAvailable;
-        else if (*i == "--prebuilt-only" || *i == "-b") prebuiltOnly = true;
-        else if (*i == "--xml") xmlOutput = true;
-        else throw UsageError(format("unknown flag `%1%'") % *i);
-
-    if (globals.instSource.type == srcAttrPath) printAttrPath = true; /* hack */
-
-    if (opArgs.size() == 0) {
-        printMsg(lvlInfo, "warning: you probably meant to specify the argument '*' to show all packages");
+    for (Strings::iterator i = args.begin(); i != args.end(); ) {
+        string arg = *i++;
+        if (arg == "--status" || arg == "-s") printStatus = true;
+        else if (arg == "--no-name") printName = false;
+        else if (arg == "--system") printSystem = true;
+        else if (arg == "--description") printDescription = true;
+        else if (arg == "--compare-versions" || arg == "-c") compareVersions = true;
+        else if (arg == "--drv-path") printDrvPath = true;
+        else if (arg == "--out-path") printOutPath = true;
+        else if (arg == "--meta") printMeta = true;
+        else if (arg == "--installed") source = sInstalled;
+        else if (arg == "--available" || arg == "-a") source = sAvailable;
+        else if (arg == "--prebuilt-only" || arg == "-b") prebuiltOnly = true;
+        else if (arg == "--xml") xmlOutput = true;
+        else if (arg == "--attr-path" || arg == "-P") printAttrPath = true;
+        else if (arg == "--attr" || arg == "-A")
+            attrPath = needArg(i, args, arg);
+        else if (arg[0] == '-')
+            throw UsageError(format("unknown flag `%1%'") % arg);
+        else remaining.push_back(arg);
     }
+
+    if (remaining.size() == 0)
+        printMsg(lvlInfo, "warning: you probably meant to specify the argument '*' to show all packages");
 
     
     /* Obtain derivation information from the specified source. */
     DrvInfos availElems, installedElems;
 
-    if (source == sInstalled || compareVersions || printStatus) {
+    if (source == sInstalled || compareVersions || printStatus)
         installedElems = queryInstalled(globals.state, globals.profile);
-    }
 
-    if (source == sAvailable || compareVersions) {
+    if (source == sAvailable || compareVersions)
         loadDerivations(globals.state, globals.instSource.nixExprPath,
             globals.instSource.systemFilter, globals.instSource.autoArgs,
-            availElems);
-    }
+            attrPath, availElems);
 
     DrvInfos elems = filterBySelector(globals.state,
         source == sInstalled ? installedElems : availElems,
-        opArgs, false);
+        remaining, false);
     
     DrvInfos & otherElems(source == sInstalled ? availElems : installedElems);
 
@@ -1234,7 +1322,7 @@ static void opQuery(Globals & globals,
 
 
 static void opSwitchProfile(Globals & globals,
-    Strings opFlags, Strings opArgs)
+    Strings args, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
         throw UsageError(format("unknown flag `%1%'") % opFlags.front());
@@ -1282,7 +1370,7 @@ static void switchGeneration(Globals & globals, int dstGen)
 
 
 static void opSwitchGeneration(Globals & globals,
-    Strings opFlags, Strings opArgs)
+    Strings args, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
         throw UsageError(format("unknown flag `%1%'") % opFlags.front());
@@ -1298,7 +1386,7 @@ static void opSwitchGeneration(Globals & globals,
 
 
 static void opRollback(Globals & globals,
-    Strings opFlags, Strings opArgs)
+    Strings args, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
         throw UsageError(format("unknown flag `%1%'") % opFlags.front());
@@ -1310,7 +1398,7 @@ static void opRollback(Globals & globals,
 
 
 static void opListGenerations(Globals & globals,
-    Strings opFlags, Strings opArgs)
+    Strings args, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
         throw UsageError(format("unknown flag `%1%'") % opFlags.front());
@@ -1343,7 +1431,7 @@ static void deleteGeneration2(const Path & profile, unsigned int gen)
 
 
 static void opDeleteGenerations(Globals & globals,
-    Strings opFlags, Strings opArgs)
+    Strings args, Strings opFlags, Strings opArgs)
 {
     if (opFlags.size() > 0)
         throw UsageError(format("unknown flag `%1%'") % opFlags.front());
@@ -1381,30 +1469,9 @@ static void opDeleteGenerations(Globals & globals,
 }
 
 
-static void opDefaultExpr(Globals & globals,
-    Strings opFlags, Strings opArgs)
-{
-    if (opFlags.size() > 0)
-        throw UsageError(format("unknown flag `%1%'") % opFlags.front());
-    if (opArgs.size() != 1)
-        throw UsageError(format("exactly one argument expected"));
-
-    switchLink(getDefNixExprPath(), absPath(opArgs.front()));
-}
-
-
-static string needArg(Strings::iterator & i,
-    Strings & args, const string & arg)
-{
-    if (i == args.end()) throw UsageError(
-        format("`%1%' requires an argument") % arg);
-    return *i++;
-}
-
-
 void run(Strings args)
 {
-    Strings opFlags, opArgs;
+    Strings opFlags, opArgs, remaining;
     Operation op = 0;
     
     Globals globals;
@@ -1426,14 +1493,6 @@ void run(Strings args)
 
         if (arg == "--install" || arg == "-i")
             op = opInstall;
-        else if (arg == "--from-expression" || arg == "-E")
-            globals.instSource.type = srcNixExprs;
-        else if (arg == "--from-profile") {
-            globals.instSource.type = srcProfile;
-            globals.instSource.profile = needArg(i, args, arg);
-        }
-        else if (arg == "--attr" || arg == "-A")
-            globals.instSource.type = srcAttrPath;
         else if (parseOptionArg(arg, i, args.end(),
                      globals.state, globals.instSource.autoArgs))
             ;
@@ -1449,8 +1508,6 @@ void run(Strings args)
             op = opSet;
         else if (arg == "--query" || arg == "-q")
             op = opQuery;
-        else if (arg == "--import" || arg == "-I") /* !!! bad name */
-            op = opDefaultExpr;
         else if (arg == "--profile" || arg == "-p")
             globals.profile = absPath(needArg(i, args, arg));
         else if (arg == "--file" || arg == "-f")
@@ -1469,14 +1526,15 @@ void run(Strings args)
             printMsg(lvlInfo, "(dry run; not doing anything)");
             globals.dryRun = true;
         }
-        else if (arg == "--preserve-installed" || arg == "-P")
-            globals.preserveInstalled = true;
         else if (arg == "--system-filter")
             globals.instSource.systemFilter = needArg(i, args, arg);
-        else if (arg[0] == '-')
-            opFlags.push_back(arg);
-        else
-            opArgs.push_back(arg);
+        else {
+            remaining.push_back(arg);
+            if (arg[0] == '-') 
+                opFlags.push_back(arg);
+            else
+                opArgs.push_back(arg);
+        }
 
         if (oldOp && oldOp != op)
             throw UsageError("only one operation may be specified");
@@ -1493,7 +1551,7 @@ void run(Strings args)
     
     store = openStore();
 
-    op(globals, opFlags, opArgs);
+    op(globals, remaining, opFlags, opArgs);
 
     printEvalStats(globals.state);
 }

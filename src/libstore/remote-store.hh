@@ -117,6 +117,8 @@ private:
     void forkSlave();
     
     void connectToDaemon();
+
+    void setOptions();
 };
 
 

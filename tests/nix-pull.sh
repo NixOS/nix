@@ -2,7 +2,7 @@ source common.sh
 
 pullCache () {
     echo "pulling cache..."
-    $PERL -w -I$TOP/scripts $TOP/scripts/nix-pull file://$TEST_ROOT/manifest
+    $NIX_BIN_DIR/nix-pull file://$TEST_ROOT/manifest
 }
 
 clearStore

@@ -4,9 +4,6 @@
 @coreutils@/mkdir $out/tmp
 cd $out/tmp
 
-expr=$out/default.nix
-echo '{' > $expr
-
 inputs=($inputs)
 for ((n = 0; n < ${#inputs[*]}; n += 2)); do
     channelName=${inputs[n]}
@@ -15,19 +12,15 @@ for ((n = 0; n < ${#inputs[*]}; n += 2)); do
     @bunzip2@ < $channelTarball | @tar@ xf -
 
     nr=1
-    dirName=$channelName
+    attrName=$(echo $channelName | @tr@ -- '- ' '__')
+    dirName=$attrName
     while test -e ../$dirName; do
         nr=$((nr+1))
-        dirName=$channelName-$nr
+        dirName=$attrName-$nr
     done
 
     @coreutils@/mv * ../$dirName # !!! hacky
-    
-    attrName=$(echo $dirName | @tr@ -- '- ' '__')
-    echo "$attrName = let e = import ./$dirName; in if builtins.isFunction e then e {} else e;" >> $expr
 done
-
-echo '} // {_combineChannels = true;}' >> $expr
 
 cd ..
 @coreutils@/rmdir tmp

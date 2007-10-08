@@ -13,7 +13,7 @@ downloading it from URL.
 
 Flags:
   --profile / -p LINK: install into the specified profile
-  --non-interactive: don't run inside a new terminal XXX
+  --non-interactive: don't run inside a new terminal
 EOF
     ; # '
     exit 1;

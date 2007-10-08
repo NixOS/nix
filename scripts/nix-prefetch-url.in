@@ -48,7 +48,7 @@ if test -z "$finalPath"; then
 
     tmpPath=/tmp/nix-prefetch-url-$$ # !!! security?
     tmpFile=$tmpPath/$name
-    mkdir $tmpPath
+    mkdir $tmpPath # !!! retry if tmpPath already exists
 
     # Optionally do timestamp-based caching of the download.
     # Actually, the only thing that we cache in $NIX_DOWNLOAD_CACHE is

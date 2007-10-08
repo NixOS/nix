@@ -10,6 +10,7 @@ rec {
     outputHash = hash;
     PATH = "@testPath@";
     inherit dummy;
+    impureEnvVars = ["IMPURE_VAR1" "IMPURE_VAR2"];
   };
 
   f = f2 "";

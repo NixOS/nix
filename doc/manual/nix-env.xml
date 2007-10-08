@@ -142,14 +142,14 @@ linkend="sec-common-options" />.</para>
 <variablelist>
 
   <varlistentry><term><filename>~/.nix-defexpr</filename></term>
+
+  <!-- !!! .nix-defexpr can be a directory now -->
   
     <listitem><para>The default Nix expression used by the
     <option>--install</option>, <option>--upgrade</option>, and
     <option>--query --available</option> operations to obtain
-    derivations.  It is generally a symbolic link to some other
-    location set using the <option>--import</option> operation.  The
-    <option>--file</option> option may be used to override this
-    default.</para></listitem>
+    derivations.  The <option>--file</option> option may be used to
+    override this default.</para></listitem>
     
   </varlistentry>
 
@@ -1054,45 +1054,6 @@ switching from generation 92 to 91
 
 $ nix-env --rolback
 error: no generation older than the current (91) exists</screen>
-
-</refsection>
-    
-</refsection>
-
-
-  
-<!--######################################################################-->
-
-<refsection><title>Operation <option>--import</option></title>
-
-<refsection><title>Synopsis</title>
-
-<cmdsynopsis>
-  <command>nix-env</command>
-  <group choice='req'>
-    <arg choice='plain'><option>--import</option></arg>
-    <arg choice='plain'><option>-I</option></arg>
-  </group>
-  <arg choice='req'><replaceable>path</replaceable></arg>
-</cmdsynopsis>
-
-</refsection>
-
-
-<refsection><title>Description</title>
-            
-<para>This operation makes <replaceable>path</replaceable> the default
-active Nix expression for the user.  That is, the symlink
-<filename>~/.nix-userenv</filename> is made to point to
-<replaceable>path</replaceable>.</para>
-
-</refsection>
-
-
-<refsection><title>Examples</title>
-
-<screen>
-$ nix-env -I ~/nixpkgs-0.5/</screen>
 
 </refsection>
     

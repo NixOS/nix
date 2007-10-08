@@ -5,8 +5,11 @@
 namespace nix {
 
 
-#define WORKER_MAGIC_1 0x6e697864
-#define WORKER_MAGIC_2 0x6478696e
+#define WORKER_MAGIC_1 0x6e697863
+#define WORKER_MAGIC_2 0x6478696f
+
+#define PROTOCOL_VERSION 0x101
+#define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 
 
 typedef enum {
@@ -48,6 +51,7 @@ typedef enum {
 	wopRevertToRevision,
 	wopShareState,
 	wopUnShareState,						//37
+    wopSetOptions,
 } WorkerOp;
 
 

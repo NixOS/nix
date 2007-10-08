@@ -18,6 +18,8 @@ $ENV{'NIX_DOWNLOAD_CACHE'} = $channelCache if -W $channelCache;
 my $home = $ENV{"HOME"};
 die '$HOME not set' unless defined $home;
 my $channelsList = "$home/.nix-channels";
+
+my $nixDefExpr = "$home/.nix-defexpr";
     
 
 my @channels;
@@ -136,9 +138,12 @@ sub update {
 
     unlink "$rootFile.tmp";
 
-    # Make it the default Nix expression for `nix-env'.
-    system("@bindir@/nix-env", "--import", "$outPath") == 0
-         or die "cannot pull set default Nix expression to `$outPath'";
+    # Make the channels appear in nix-env.
+    unlink $nixDefExpr if -l $nixDefExpr; # old-skool ~/.nix-defexpr
+    mkdir $nixDefExpr or die "cannot create directory `$nixDefExpr'" if !-e $nixDefExpr;
+    my $channelLink = "$nixDefExpr/channels";
+    unlink $channelLink; # !!! not atomic
+    symlink($outPath, $channelLink) or die "cannot symlink `$channelLink' to `$outPath'";
 }
 
 

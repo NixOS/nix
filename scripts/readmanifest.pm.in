@@ -222,6 +222,14 @@ sub writeManifest
 
     rename("$manifest.tmp", $manifest)
         or die "cannot rename $manifest.tmp: $!";
+
+
+    # Create a bzipped manifest.
+    system("@bzip2@ < $manifest > $manifest.bz2.tmp") == 0
+        or die "cannot compress manifest";
+
+    rename("$manifest.bz2.tmp", "$manifest.bz2")
+        or die "cannot rename $manifest.bz2.tmp: $!";
 }
 
 
