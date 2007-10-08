@@ -1096,17 +1096,36 @@ static string makeValidityRegistration(const PathSet & paths,
     for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i) {
         s += *i + "\n";
 
-        Path deriver = showDerivers ? store->queryDeriver(*i) : "";
+        Path deriver = showDerivers ? store->queryDeriver(*i) : "";									//TODO HOW ABOUT MULTIPLE STATE-STORE DERIVERS? take last one ??!!
         s += deriver + "\n";
 
+		//store references
+
         PathSet references;
-        store->queryStoreReferences(*i, references, 0);				//TODO check if this is ok
+        store->queryStoreReferences(*i, references, 0);
 
         s += (format("%1%\n") % references.size()).str();
             
         for (PathSet::iterator j = references.begin();
              j != references.end(); ++j)
             s += *j + "\n";
+        
+        //state references
+        
+        PathSet stateReferences;
+        store->queryStateReferences(*i, stateReferences, 0);
+
+        s += (format("%1%\n") % stateReferences.size()).str();
+            
+        for (PathSet::iterator j = stateReferences.begin();
+             j != stateReferences.end(); ++j)
+            s += *j + "\n";
+        
+        //revision
+        
+        string revision = unsignedInt2String(0);
+        s += revision + "\n";
+        
     }
 
     return s;
@@ -2495,7 +2514,7 @@ void Worker::getInfo()
             std::istringstream str(res);
 
             while (true) {
-                ValidPathInfo info = decodeValidPathInfo(str);
+                ValidPathInfo info = decodeValidPathInfo(str);							//TODO Test is this is ok with the state-brand extension to struct ValidPath
                 if (info.path == "") break;
 
                 /* !!! inefficient */

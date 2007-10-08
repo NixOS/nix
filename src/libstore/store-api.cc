@@ -208,7 +208,6 @@ Path computeStorePathForText(const string & suffix, const string & s,
     return makeStorePath(type, hash, suffix);
 }
 
-//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ValidPathInfo decodeValidPathInfo(std::istream & str)
 {
     ValidPathInfo info;
@@ -245,7 +244,6 @@ ValidPathInfo decodeValidPathInfo(std::istream & str)
     if (!str || str.eof()) throw Error("missing input");
     return info;
 }
-//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 }

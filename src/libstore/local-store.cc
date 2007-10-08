@@ -392,43 +392,6 @@ bool LocalStore::isValidComponentOrStatePath(const Path & path)
     return isValidComponentOrStatePathTxn(noTxn, path);
 }
 
-//TODO REMOVE BLOCK
-/*
-static bool isRealisablePath(const Transaction & txn, const Path & path)
-{
-    return isValidPathTxn(txn, path) || readSubstitutes(txn, path).size() > 0;
-}
-
-static bool isRealisableStatePath(const Transaction & txn, const Path & path)
-{
-    return isValidStatePathTxn(txn, path) || readSubstitutes(txn, path).size() > 0;
-}
-
-
-static bool isRealisableComponentOrStatePath(const Transaction & txn, const Path & path)
-{
-    return isValidComponentOrStatePathTxn(txn, path) || readSubstitutes(txn, path).size() > 0;					//TODO State paths are not yet in substitutes !!!!!!!!!!!!!! ??
-}
-*/
-
-/*
-static string addPrefix(const string & prefix, const string & s)
-{
-    return prefix + string(1, (char) 0) + s;
-}
-
-static string stripPrefix(const string & prefix, const string & s)
-{
-    if (s.size() <= prefix.size() ||
-        string(s, 0, prefix.size()) != prefix ||
-        s[prefix.size()] != 0)
-        throw Error(format("string `%1%' is missing prefix `%2%'")
-            % s % prefix);
-    return string(s, prefix.size() + 1);
-}
-*/
-
-
 /*
  *  The revision can be omitted for normal store paths
  */
