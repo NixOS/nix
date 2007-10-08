@@ -645,8 +645,8 @@ void setDeriver(const Transaction & txn, const Path & storePath, const Path & de
 
 /* Private function only used by addStateDeriver
  * Merges a new derivation into a list of derivations, this function takes username and statepath 
- * into account. This function is used to update derivations that have only changed in their sub state
- * paths that need to be versioned for example. We assume newdrv is the newest.
+ * into account. This function is used to update derivations that have only changed for example in their sub state
+ * paths that need to be versioned. We assume newdrv is the newest.
  */
 PathSet mergeNewDerivationIntoListTxn(const Transaction & txn, const Path & storepath, const Path & newdrv, const PathSet drvs, bool deleteDrvs)
 {

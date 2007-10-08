@@ -1,0 +1,151 @@
+<refentry xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude">
+
+<refmeta>
+  <refentrytitle>nix-copy-closure</refentrytitle>
+  <manvolnum>1</manvolnum>
+  <refmiscinfo class="source">Nix</refmiscinfo>
+  <refmiscinfo class="version"><xi:include href="version.txt" parse="text"/></refmiscinfo>
+</refmeta>
+
+<refnamediv>
+  <refname>nix-copy-closure</refname>
+  <refpurpose>copy a closure to or from a remote machine via SSH</refpurpose>
+</refnamediv>
+
+<refsynopsisdiv>
+  <cmdsynopsis>
+    <command>nix-copy-closure</command>
+    <group>
+      <arg choice='plain'><option>--to</option></arg>
+      <arg choice='plain'><option>--from</option></arg>
+    </group>
+    <arg><option>--sign</option></arg>
+    <arg><option>--gzip</option></arg>
+    <arg choice='plain'>
+      <arg><replaceable>user@</replaceable></arg><replaceable>machine</replaceable>
+    </arg>
+    <arg choice='plain'><replaceable>paths</replaceable></arg>
+  </cmdsynopsis>
+</refsynopsisdiv>
+
+
+<refsection><title>Description</title>
+
+<para><command>nix-copy-closure</command> gives you an easy and
+efficient way to exchange software between machines.  Given one or
+more Nix store paths <replaceable>paths</replaceable> on the local
+machine, <command>nix-copy-closure</command> computes the closure of
+those paths (i.e. all their dependencies in the Nix store), and copies
+all paths in the closure to the remote machine via the
+<command>ssh</command> (Secure Shell) command.  With the
+<option>--from</option>, the direction is reversed:
+the closure of <replaceable>paths</replaceable> on a remote machine is
+copied to the Nix store on the local machine.</para>
+
+<para>This command is efficient because it only sends the store paths
+that are missing on the target machine.</para>
+
+<para>Since <command>nix-copy-closure</command> calls
+<command>ssh</command>, you may be asked to type in the appropriate
+password or passphrase.  In fact, you may be asked
+<emphasis>twice</emphasis> because <command>nix-copy-closure</command>
+currently connects twice to the remote machine, first to get the set
+of paths missing on the target machine, and second to send the dump of
+those paths.  If this bothers you, use
+<command>ssh-agent</command>.</para>
+
+
+<refsection><title>Options</title>
+
+<variablelist>
+  
+  <varlistentry><term><option>--to</option></term>
+
+    <listitem><para>Copy the closure of
+    <replaceable>paths</replaceable> from the local Nix store to the
+    Nix store on <replaceable>machine</replaceable>.  This is the
+    default.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--from</option></term>
+
+    <listitem><para>Copy the closure of
+    <replaceable>paths</replaceable> from the Nix store on
+    <replaceable>machine</replaceable> to the local Nix
+    store.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--sign</option></term>
+
+    <listitem><para>Let the sending machine cryptographically sign the
+    dump of each path with the key in
+    <filename>/nix/etc/nix/signing-key.sec</filename>.  If the user on
+    the target machine does not have direct access to the Nix store
+    (i.e., if the target machine has a multi-user Nix installation),
+    then the target machine will check the dump against
+    <filename>/nix/etc/nix/signing-key.pub</filename> before unpacking
+    it in its Nix store.  This allows secure sharing of store paths
+    between untrusted users on two machines, provided that there is a
+    trust relation between the Nix installations on both machines
+    (namely, they have matching public/secret keys).</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--gzip</option></term>
+
+    <listitem><para>Compress the dump of each path with
+    <command>gzip</command> before sending it.</para></listitem>
+
+  </varlistentry>
+
+</variablelist>
+
+</refsection>
+
+
+<refsection><title>Environment variables</title>
+
+<variablelist>
+
+  <varlistentry><term><envar>NIX_SSHOPTS</envar></term>
+
+    <listitem><para>Additional options to be passed to
+    <command>ssh</command> on the command line.</para></listitem>
+
+  </varlistentry>
+  
+</variablelist>
+
+</refsection>
+
+
+<refsection><title>Examples</title>
+
+<para>Copy Firefox with all its dependencies to a remote machine:
+
+<screen>
+$ nix-copy-closure alice@itchy.labs $(type -tP firefox)</screen>
+
+</para>
+
+<para>Copy Subversion from a remote machine and then install it into a
+user environment:
+
+<screen>
+$ nix-copy-closure --from alice@itchy.labs \
+    /nix/store/0dj0503hjxy5mbwlafv1rsbdiyx1gkdy-subversion-1.4.4
+$ nix-env -i /nix/store/0dj0503hjxy5mbwlafv1rsbdiyx1gkdy-subversion-1.4.4
+</screen>
+
+</para>
+
+</refsection>
+
+
+</refsection>
+
+</refentry>

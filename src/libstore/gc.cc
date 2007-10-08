@@ -446,6 +446,9 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     bool gcKeepDerivations =
         queryBoolSetting("gc-keep-derivations", true);
 
+	gcKeepDerivations = true;									//TODO for now. we always keep drvs in the state branch since we 
+																//need some of them to lookup info
+
     /* Acquire the global GC root.  This prevents
        a) New roots from being added.
        b) Processes from creating new temporary root files. */
@@ -453,7 +456,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
 
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
-    Roots rootMap = ignoreLiveness ? Roots() : nix::findRoots(true);					//TODO Also find state roots?
+    Roots rootMap = ignoreLiveness ? Roots() : nix::findRoots(true);					//TODO Also find state roots? TODO include sharing of state.
 
     PathSet roots;
     for (Roots::iterator i = rootMap.begin(); i != rootMap.end(); ++i)

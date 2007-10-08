@@ -1,6 +1,14 @@
 <refentry xmlns="http://docbook.org/ns/docbook"
-          xmlns:xlink="http://www.w3.org/1999/xlink">
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude">
   
+<refmeta>
+  <refentrytitle>nix-install-package</refentrytitle>
+  <manvolnum>1</manvolnum>
+  <refmiscinfo class="source">Nix</refmiscinfo>
+  <refmiscinfo class="version"><xi:include href="version.txt" parse="text"/></refmiscinfo>
+</refmeta>
+
 <refnamediv>
   <refname>nix-install-package</refname>
   <refpurpose>install a Nix Package file</refpurpose>
