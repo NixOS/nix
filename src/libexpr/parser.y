@@ -249,6 +249,7 @@ expr_list
 formals
   : formal ',' formals { $$ = ATinsert($3, $1); } /* idem - right recursive */
   | formal { $$ = ATinsert(ATempty, $1); }
+  | { $$ = ATempty; }
   ;
 
 formal

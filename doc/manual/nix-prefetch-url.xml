@@ -39,7 +39,7 @@ avoided.</para>
 <para>The environment variable <envar>NIX_HASH_ALGO</envar> specifies
 which hash algorithm to use.  It can be either <literal>md5</literal>,
 <literal>sha1</literal>, or <literal>sha256</literal>.  The default is
-<literal>md5</literal>.</para>
+<literal>sha256</literal>.</para>
 
 <para>If <replaceable>hash</replaceable> is specified, then a download
 is not performed if the Nix store already contains a file with the

@@ -478,7 +478,7 @@ LocalNoInline(Expr evalCall(EvalState & state, Expr fun, Expr arg))
     }
 
     else throwTypeError(
-        "the left-hand side of the function call is neither a function nor a primop (built-in operation) but %1%",
+        "attempt to call something which is neither a function nor a primop (built-in operation) but %1%",
         showType(fun));
 }
 

@@ -97,6 +97,11 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
     Path gcRoot(canonPath(_gcRoot));
     assertStorePath(storePath);
 
+    if (isInStore(gcRoot))
+        throw Error(format(
+                "creating a garbage collector root (%1%) in the Nix store is forbidden "
+                "(are you running nix-build inside the store?)") % gcRoot);
+
     if (indirect) {
         createSymlink(gcRoot, storePath, true);
         store->addIndirectRoot(gcRoot);
@@ -114,7 +119,6 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
         }
             
         createSymlink(gcRoot, storePath, false);
-
     }
 
     /* Check that the root can be found by the garbage collector. */

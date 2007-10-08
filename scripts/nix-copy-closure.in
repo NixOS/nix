@@ -120,7 +120,6 @@ else { # Copy FROM the remote machine.
         if (!defined $storePathsSeen{$_}) {
             push @allStorePaths, $_;
             $storePathsSeen{$_} = 1;
-            print "GOT $_\n";
         }
     }
 
