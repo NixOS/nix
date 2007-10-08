@@ -40,6 +40,9 @@ public:
 };
 
 
+bool pathIsLockedByMe(const Path & path);
+
+
 }
 
 

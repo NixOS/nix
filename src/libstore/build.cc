@@ -183,6 +183,9 @@ private:
     WeakGoalMap derivationGoals;
     WeakGoalMap substitutionGoals;
 
+    /* Goals waiting for busy paths to be unlocked. */
+    WeakGoals waitingForAnyGoal;
+    
 public:
 
     Worker();
@@ -224,6 +227,10 @@ public:
        get info about `storePath' (with --query-info).  We combine
        substituter invocations to reduce overhead. */
     void waitForInfo(GoalPtr goal, Path sub, Path storePath);
+
+    /* Wait for any goal to finish.  Pretty indiscriminate way to
+       wait for some resource that some other goal is holding. */
+    void waitForAnyGoal(GoalPtr goal);
     
     /* Loop until the specified top-level goals have finished. */
     void run(const Goals & topGoals);
@@ -654,7 +661,7 @@ private:
     void buildDone();
 
     /* Is the build hook willing to perform the build? */
-    typedef enum {rpAccept, rpDecline, rpPostpone, rpDone} HookReply;
+    typedef enum {rpAccept, rpDecline, rpPostpone, rpDone, rpRestart} HookReply;
     HookReply tryBuildHook();
 
     /* Synchronously wait for a build hook to finish. */
@@ -663,9 +670,13 @@ private:
     /* Acquires locks on the output paths and gathers information
        about the build (e.g., the input closures).  During this
        process its possible that we find out that the build is
-       unnecessary, in which case we return false (this is not an
-       error condition!). */
-    bool prepareBuild();
+       unnecessary, in which case we return prDone.  It's also
+       possible that some other goal is already building/substituting
+       the output paths, in which case we return prRestart (go back to
+       the haveDerivation() state).  Otherwise, prProceed is
+       returned. */
+    typedef enum {prProceed, prDone, prRestart} PrepareBuildReply;
+    PrepareBuildReply prepareBuild();
 
     /* Start building a derivation. */
     void startBuilder();
@@ -805,6 +816,20 @@ void DerivationGoal::haveDerivation()
         return;
     }
 
+    /* If this is a fixed-output derivation, it is possible that some
+       other goal is already building the output paths.  (The case
+       where some other process is building it is handled through
+       normal locking mechanisms.)  So if any output paths are already
+       being built, put this goal to sleep. */
+    for (PathSet::iterator i = invalidOutputs.begin();
+         i != invalidOutputs.end(); ++i)
+        if (pathIsLockedByMe(*i)) {
+            /* Wait until any goal finishes (hopefully the one that is
+               locking *i), then retry haveDerivation(). */
+            worker.waitForAnyGoal(shared_from_this());
+            return;
+        }
+
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
@@ -898,6 +923,12 @@ void DerivationGoal::tryToBuild()
                 /* Somebody else did it. */
                 amDone(ecSuccess);
                 return;
+            case rpRestart:
+                /* Somebody else is building this output path.
+                   Restart from haveDerivation(). */
+                state = &DerivationGoal::haveDerivation;
+                worker.waitForAnyGoal(shared_from_this());
+                return;
         }
 
         /* Make sure that we are allowed to start a build. */
@@ -908,8 +939,13 @@ void DerivationGoal::tryToBuild()
 
         /* Acquire locks and such.  If we then see that the build has
            been done by somebody else, we're done. */
-        if (!prepareBuild()) {
+        PrepareBuildReply preply = prepareBuild();
+        if (preply == prDone) {
             amDone(ecSuccess);
+            return;
+        } else if (preply == prRestart) {
+            state = &DerivationGoal::haveDerivation;
+            worker.waitForAnyGoal(shared_from_this());
             return;
         }
 
@@ -1209,11 +1245,12 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 
         /* Acquire locks and such.  If we then see that the output
            paths are now valid, we're done. */
-        if (!prepareBuild()) {
+        PrepareBuildReply preply = prepareBuild();
+        if (preply == prDone || preply == prRestart) {
             /* Tell the hook to exit. */
             writeLine(toHook.writeSide, "cancel");
             terminateBuildHook();
-            return rpDone;
+            return preply == prDone ? rpDone : rpRestart;
         }
 
         printMsg(lvlInfo, format("running hook to build path(s) %1%")
@@ -1289,11 +1326,27 @@ void DerivationGoal::terminateBuildHook(bool kill)
 }
 
 
-bool DerivationGoal::prepareBuild()
+DerivationGoal::PrepareBuildReply DerivationGoal::prepareBuild()
 {
+    /* Check for the possibility that some other goal in this process
+       has locked the output since we checked in haveDerivation().
+       (It can't happen between here and the lockPaths() call below
+       because we're not allowing multi-threading.) */
+    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
+         i != drv.outputs.end(); ++i)
+        if (pathIsLockedByMe(i->second.path)) {
+            debug(format("restarting derivation `%1%' because `%2%' is locked by another goal")
+                % drvPath % i->second.path);
+            return prRestart;
+        }
+    
     /* Obtain locks on all output paths.  The locks are automatically
        released when we exit this function or Nix crashes. */
     /* !!! BUG: this could block, which is not allowed. */
+    /* !!! and once we make this non-blocking, we should carefully
+       consider the case where some but not all locks are required; we
+       should then release the acquired locks so that the other
+       processes and the pathIsLockedByMe() test don't get confused. */
     outputLocks.lockPaths(outputPaths(drv.outputs),
         (format("waiting for lock on %1%") % showPaths(outputPaths(drv.outputs))).str());
 
@@ -1309,7 +1362,7 @@ bool DerivationGoal::prepareBuild()
         debug(format("skipping build of derivation `%1%', someone beat us to it")
             % drvPath);
         outputLocks.setDeletion(true);
-        return false;
+        return prDone;
     }
 
     if (validPaths.size() > 0) {
@@ -1380,7 +1433,7 @@ bool DerivationGoal::prepareBuild()
     allPaths.insert(inputPaths.begin(), inputPaths.end());
     allStatePaths.insert(inputStatePaths.begin(), inputStatePaths.end());
 
-    return true;
+    return prProceed;
 }
 
 
@@ -2171,6 +2224,17 @@ void SubstitutionGoal::tryToRun()
         return;
     }
 
+    /* Maybe a derivation goal has already locked this path
+       (exceedingly unlikely, since it should have used a substitute
+       first, but let's be defensive). */
+    outputLock.reset(); // make sure this goal's lock is gone
+    if (pathIsLockedByMe(storePath)) {
+        debug(format("restarting substitution of `%1%' because it's locked by another goal")
+            % storePath);
+        worker.waitForAnyGoal(shared_from_this());
+        return; /* restart in the tryToRun() state when another goal finishes */
+    }
+    
     /* Acquire a lock on the output path. */
     outputLock = boost::shared_ptr<PathLocks>(new PathLocks);
     outputLock->lockPaths(singleton<PathSet>(storePath),
@@ -2400,6 +2464,16 @@ void Worker::removeGoal(GoalPtr goal)
         if (goal->getExitCode() == Goal::ecFailed && !keepGoing)
             topGoals.clear();
     }
+
+    /* Wake up goals waiting for any goal to finish. */
+    for (WeakGoals::iterator i = waitingForAnyGoal.begin();
+         i != waitingForAnyGoal.end(); ++i)
+    {
+        GoalPtr goal = i->lock();
+        if (goal) wakeUp(goal);
+    }
+
+    waitingForAnyGoal.clear();
 }
 
 
@@ -2483,6 +2557,13 @@ void Worker::waitForInfo(GoalPtr goal, Path sub, Path storePath)
     debug("wait for info");
     requestedInfo[sub].insert(storePath);
     waitingForInfo.insert(goal);
+}
+
+
+void Worker::waitForAnyGoal(GoalPtr goal)
+{
+    debug("wait for any goal");
+    waitingForAnyGoal.insert(goal);
 }
 
 
