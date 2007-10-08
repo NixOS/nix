@@ -1,0 +1,1 @@
+List([Attrs([Bind("a",Str("A",[]),NoPos),Bind("b",Str("B",[]),NoPos)]),Attrs([Bind("a",Str("A",[]),NoPos),Bind("b",Str("B",[]),NoPos)])])

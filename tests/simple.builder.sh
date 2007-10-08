@@ -1,7 +1,7 @@
 echo "PATH=$PATH"
 
 # Verify that the PATH is empty.
-if mkdir foo; then exit 1; fi
+if mkdir foo 2> /dev/null; then exit 1; fi
 
 # Set a PATH (!!! impure).
 export PATH=$goodPath

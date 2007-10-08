@@ -13,9 +13,9 @@ class Transaction;
 
 
 /* Nix store and database schema version.  Version 1 (or 0) was Nix <=
-   0.7.  Version 2 was Nix 0.8 and 0.9.  Version 3 is Nix 0.10 and
-   up. */
-const int nixSchemaVersion = 3;
+   0.7.  Version 2 was Nix 0.8 and 0.9.  Version 3 is Nix 0.10.
+   Version 4 is Nix 0.11. */
+const int nixSchemaVersion = 4;
 
 
 extern string drvsLogDir;

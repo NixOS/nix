@@ -37,7 +37,7 @@ fi
 
 
 doDownload() {
-    @curl@ $cacheFlags --fail -# --show-error --location --max-redirs 20 --disable-epsv \
+    @curl@ $cacheFlags --fail -# --location --max-redirs 20 --disable-epsv \
         --cookie-jar $tmpPath/cookies "$url" -o $tmpFile
 }
 

@@ -1,6 +1,6 @@
 rec {
 
-  f = builder: mode: algo: hash: derivation {
+  f2 = dummy: builder: mode: algo: hash: derivation {
     name = "fixed";
     system = "@system@";
     builder = "@shell@";
@@ -9,7 +9,10 @@ rec {
     outputHashAlgo = algo;
     outputHash = hash;
     PATH = "@testPath@";
+    inherit dummy;
   };
+
+  f = f2 "";
 
   good = [
     (f ./fixed.builder1.sh "flat" "md5" "8ddd8be4b179a529afa5f2ffae4b9858")
@@ -33,6 +36,13 @@ rec {
   reallyBad = [
     # Hash too short, and not base-32 either.
     (f ./fixed.builder1.sh "flat" "md5" "ddd8be4b179a529afa5f2ffae4b9858")
+  ];
+
+  # Test for building two derivations in parallel that produce the
+  # same output path because they're fixed-output derivations.
+  parallelSame = [
+    (f2 "foo" ./fixed.builder2.sh "flat" "md5" "3670af73070fa14077ad74e0f5ea4e42")
+    (f2 "bar" ./fixed.builder2.sh "flat" "md5" "3670af73070fa14077ad74e0f5ea4e42")
   ];
 
 }

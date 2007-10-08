@@ -161,6 +161,7 @@ static TableId dbSharedState = 0;
 
 static void upgradeStore07();
 static void upgradeStore09();
+static void upgradeStore11();
 
 
 void checkStoreNotSymlink()
@@ -245,6 +246,8 @@ LocalStore::LocalStore(bool reserveSpace)
             upgradeStore07();
         if (curSchema == 2)
             upgradeStore09();
+        if (curSchema == 3)
+            upgradeStore11();
         writeFile(schemaFN, (format("%1%") % nixSchemaVersion).str());
     }
 }
@@ -1926,9 +1929,9 @@ static void upgradeStore09()
 {
     /* !!! we should disallow concurrent upgrades */
     
-    printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
-
     if (!pathExists(nixDBPath + "/referers")) return;
+
+    printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
 
 	/*
     Transaction txn(nixDB);
@@ -1970,4 +1973,29 @@ static void upgradeStore09()
 }
 
  
+/* Upgrade from schema 3 (Nix 0.10) to schema 4 (Nix >= 0.11).  The
+   only thing to do here is to delete the substitutes table and get
+   rid of invalid but substitutable references/referrers.  */
+static void upgradeStore11()
+{
+    if (!pathExists(nixDBPath + "/substitutes")) return;
+
+    printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
+
+    Transaction txn(nixDB);
+    TableId dbSubstitutes = nixDB.openTable("substitutes");
+
+    Paths subKeys;
+    nixDB.enumTable(txn, dbSubstitutes, subKeys);
+    for (Paths::iterator i = subKeys.begin(); i != subKeys.end(); ++i) {
+        if (!isValidPathTxn(txn, *i))
+            invalidateStorePath(txn, *i);
+    }
+    
+    txn.commit();
+    nixDB.closeTable(dbSubstitutes);
+    nixDB.deleteTable("substitutes");
+}
+
+
 }

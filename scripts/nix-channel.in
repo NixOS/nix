@@ -2,7 +2,7 @@
 
 use strict;
 
-my $rootsDir = "@localstatedir@/nix/gcroots/channels";
+my $rootsDir = "@localstatedir@/nix/gcroots";
 
 my $stateDir = $ENV{"NIX_STATE_DIR"};
 $stateDir = "@localstatedir@/nix" unless defined $stateDir;
@@ -10,8 +10,8 @@ $stateDir = "@localstatedir@/nix" unless defined $stateDir;
 
 # Turn on caching in nix-prefetch-url.
 my $channelCache = "$stateDir/channel-cache";
-$ENV{'NIX_DOWNLOAD_CACHE'} = $channelCache;
 mkdir $channelCache, 0755 unless -e $channelCache;
+$ENV{'NIX_DOWNLOAD_CACHE'} = $channelCache if -W $channelCache;
 
 
 # Figure out the name of the `.nix-channels' file to use.
@@ -76,16 +76,25 @@ sub removeChannel {
 sub update {
     readChannels;
 
-    # Remove all the old manifests.
-    for my $manifest (glob "$stateDir/manifests/*.nixmanifest") {
-        unlink $manifest or die "cannot remove `$manifest': $!";
-    }
+    # Do we have write permission to the manifests directory?  If not,
+    # then just skip pulling the manifest and just download the Nix
+    # expressions.  If the user is a non-privileged user in a
+    # multi-user Nix installation, he at least gets installation from
+    # source.
+    if (-W "$stateDir/manifests") {
 
-    # Pull cache manifests.
-    foreach my $url (@channels) {
-        #print "pulling cache manifest from `$url'\n";
-        system("@bindir@/nix-pull", "--skip-wrong-store", "$url/MANIFEST") == 0
-            or die "cannot pull cache manifest from `$url'";
+        # Remove all the old manifests.
+        for my $manifest (glob "$stateDir/manifests/*.nixmanifest") {
+            unlink $manifest or die "cannot remove `$manifest': $!";
+        }
+
+        # Pull cache manifests.
+        foreach my $url (@channels) {
+            #print "pulling cache manifest from `$url'\n";
+            system("@bindir@/nix-pull", "--skip-wrong-store", "$url/MANIFEST") == 0
+                or die "cannot pull cache manifest from `$url'";
+        }
+
     }
 
     # Create a Nix expression that fetches and unpacks the channel Nix
@@ -112,7 +121,7 @@ sub update {
     my $userName = getpwuid($<);
     die "who ARE you? go away" unless defined $userName;
 
-    my $rootFile = "$rootsDir/$userName";
+    my $rootFile = "$rootsDir/per-user/$userName/channels";
     
     # Instantiate the Nix expression.
     print "unpacking channel Nix expressions...\n";

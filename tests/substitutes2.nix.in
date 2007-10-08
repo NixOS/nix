@@ -1,6 +1,0 @@
-derivation {
-  name = "substitutes-2";
-  system = "@system@";
-  builder = "@shell@";
-  args = ["-e" "-x" ./simple.builder.sh];
-}
