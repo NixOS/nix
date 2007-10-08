@@ -35,11 +35,11 @@ init-state:
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/temproots
 	$(INSTALL) $(INIT_FLAGS) $(GROUP_WRITABLE) -d $(DESTDIR)$(localstatedir)/nix/gcroots/tmp
 	$(INSTALL) $(INIT_FLAGS) $(GROUP_WRITABLE) -d $(DESTDIR)$(localstatedir)/nix/gcroots/channels
-	rm -f $(DESTDIR)$(localstatedir)/nix/gcroots/profiles
-	ln -s $(localstatedir)/nix/profiles $(DESTDIR)$(localstatedir)/nix/gcroots/profiles
+	ln -sfn $(localstatedir)/nix/profiles $(DESTDIR)$(localstatedir)/nix/gcroots/profiles
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/userpool
 	$(INSTALL) $(INIT_FLAGS) -m 1777 -d $(DESTDIR)$(prefix)/store
 	$(INSTALL) $(INIT_FLAGS) $(GROUP_WRITABLE) -d $(DESTDIR)$(localstatedir)/nix/manifests
+	ln -sfn $(localstatedir)/nix/manifests $(DESTDIR)$(localstatedir)/nix/gcroots/manifests
 #	$(bindir)/nix-store --init
 
 else

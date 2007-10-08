@@ -24,13 +24,13 @@ extern char * * environ;
 namespace nix {
 
 
-Error::Error(const format & f)
+BaseError::BaseError(const format & f)
 {
     err = f.str();
 }
 
 
-Error & Error::addPrefix(const format & f)
+BaseError & BaseError::addPrefix(const format & f)
 {
     err = f.str() + err;
     return *this;
@@ -494,6 +494,7 @@ string drainFD(int fd)
     string result;
     unsigned char buffer[4096];
     while (1) {
+        checkInterrupt();
         ssize_t rd = read(fd, buffer, sizeof buffer);
         if (rd == -1) {
             if (errno != EINTR)
@@ -777,6 +778,8 @@ void killUser(uid_t uid)
 
 string runProgram(Path program, bool searchPath, const Strings & args)
 {
+    checkInterrupt();
+    
     /* Create a pipe. */
     Pipe pipe;
     pipe.create();

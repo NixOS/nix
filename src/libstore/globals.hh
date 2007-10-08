@@ -75,6 +75,11 @@ extern string thisSystem;
    infinity. */
 extern unsigned int maxSilentTime;
 
+/* The substituters.  There are programs that can somehow realise a
+   store path without building, e.g., by downloading it or copying it
+   from a CD. */
+extern Paths substituters;
+
 Strings querySetting(const string & name, const Strings & def);
 
 string querySetting(const string & name, const string & def);

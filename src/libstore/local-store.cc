@@ -79,22 +79,6 @@ static TableId dbStateStateReferences = 0;
  */
 static TableId dbSolidStateReferences = 0;
 
-/* dbSubstitutes :: Path -> [[Path]]
-
-   Each pair $(p, subs)$ tells Nix that it can use any of the
-   substitutes in $subs$ to build path $p$.  Each substitute defines a
-   command-line invocation of a program (i.e., the first list element
-   is the full path to the program, the remaining elements are
-   arguments).
-
-   The main purpose of this is for distributed caching of derivates.
-   One system can compute a derivate and put it on a website (as a Nix
-   archive), for instance, and then another system can register a
-   substitute for that derivate.  The substitute in this case might be
-   a Nix derivation that fetches the Nix archive.
-*/
-static TableId dbSubstitutes = 0;
-
 /* dbDerivers :: Path -> [Path]
 
    This table lists the derivation used to build a path.  There can
@@ -174,12 +158,6 @@ static TableId dbStateSnapshots = 0;
  */
 static TableId dbSharedState = 0;
 
-bool Substitute::operator == (const Substitute & sub) const
-{
-    return program == sub.program
-        && args == sub.args;
-}
-
 
 static void upgradeStore07();
 static void upgradeStore09();
@@ -205,6 +183,8 @@ void checkStoreNotSymlink()
 
 LocalStore::LocalStore(bool reserveSpace)
 {
+    substitutablePathsLoaded = false;
+    
     if (readOnlyMode) return;
 
     checkStoreNotSymlink();
@@ -234,7 +214,6 @@ LocalStore::LocalStore(bool reserveSpace)
     }
     dbValidPaths = nixDB.openTable("validpaths");
     dbValidStatePaths = nixDB.openTable("validpaths_state");
-    dbSubstitutes = nixDB.openTable("substitutes");
     dbDerivers = nixDB.openTable("derivers");
 
 	dbStateInfo = nixDB.openTable("stateinfo");
@@ -397,6 +376,7 @@ bool isValidStatePathTxn(const Transaction & txn, const Path & path)
     return nixDB.queryString(txn, dbValidStatePaths, path, s);
 }
 
+
 bool LocalStore::isValidStatePath(const Path & path)
 {
     return isValidStatePathTxn(noTxn, path);
@@ -412,11 +392,8 @@ bool LocalStore::isValidComponentOrStatePath(const Path & path)
     return isValidComponentOrStatePathTxn(noTxn, path);
 }
 
-
-static Substitutes readSubstitutes(const Transaction & txn,
-    const Path & srcPath);
-
-
+//TODO REMOVE BLOCK
+/*
 static bool isRealisablePath(const Transaction & txn, const Path & path)
 {
     return isValidPathTxn(txn, path) || readSubstitutes(txn, path).size() > 0;
@@ -427,10 +404,12 @@ static bool isRealisableStatePath(const Transaction & txn, const Path & path)
     return isValidStatePathTxn(txn, path) || readSubstitutes(txn, path).size() > 0;
 }
 
+
 static bool isRealisableComponentOrStatePath(const Transaction & txn, const Path & path)
 {
     return isValidComponentOrStatePathTxn(txn, path) || readSubstitutes(txn, path).size() > 0;					//TODO State paths are not yet in substitutes !!!!!!!!!!!!!! ??
 }
+*/
 
 /*
 static string addPrefix(const string & prefix, const string & s)
@@ -456,8 +435,9 @@ static string stripPrefix(const string & prefix, const string & s)
 void setReferences(const Transaction & txn, const Path & store_or_statePath,
     const PathSet & references, const PathSet & stateReferences, const unsigned int revision)		
 {
+
     /* For unrealisable paths, we can only clear the references. */
-    if (references.size() > 0 && !isRealisableComponentOrStatePath(txn, store_or_statePath))
+    if (references.size() > 0 && !isValidComponentOrStatePathTxn(txn, store_or_statePath))
         throw Error(format("cannot set references for path `%1%' which is invalid and has no substitutes") % store_or_statePath);
 	
 	
@@ -468,7 +448,7 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
     	printMsg(lvlError, format("'%2%' has stateReferences: %1%") % *i % store_or_statePath);
 	*/
 	
-    if(isRealisablePath(txn, store_or_statePath))
+    if(isValidPathTxn(txn, store_or_statePath))
     {
 		printMsg(lvlError, format("Setting references for storepath '%1%'") % store_or_statePath);
 		
@@ -486,7 +466,7 @@ void setReferences(const Transaction & txn, const Path & store_or_statePath,
     	nixDB.setStrings(txn, dbComponentComponentReferences, store_or_statePath, Paths(references.begin(), references.end()));
 		nixDB.setStrings(txn, dbComponentStateReferences, store_or_statePath, Paths(stateReferences.begin(), stateReferences.end()));
     }
-    else if(isRealisableStatePath(txn, store_or_statePath))
+    else if(isValidStatePathTxn(txn, store_or_statePath))
     {
 		
 		printMsg(lvlError, format("Setting references for statepath '%1%' (revision:%2%)") % store_or_statePath % unsignedInt2String(revision));
@@ -525,9 +505,9 @@ void queryXReferencesTxn(const Transaction & txn, const Path & store_or_statePat
     	table2 = dbStateStateReferences;
     }
     
-    if(isRealisablePath(txn, store_or_statePath))
+    if(isValidPathTxn(txn, store_or_statePath))
     	nixDB.queryStrings(txn, table1, store_or_statePath, references2);
-    else if(isRealisableStatePath(txn, store_or_statePath)){
+    else if(isValidStatePathTxn(txn, store_or_statePath)){
     	Path statePath_ns = toNonSharedPathTxn(txn, store_or_statePath);	    //Lookup its where it points to if its shared
     	queryStateReferences(nixDB, txn, table2, dbStateRevisions, statePath_ns, references2, revision, timestamp);
     }
@@ -655,7 +635,7 @@ static PathSet getStateReferrersTxn(const Transaction & txn, const Path & store_
 void queryStoreReferrersTxn(const Transaction & txn,
     const Path & storePath, PathSet & referrers, const unsigned int revision)
 {
-    if (!isRealisableComponentOrStatePath(txn, storePath))
+    if (!isValidComponentOrStatePathTxn(txn, storePath))	
 		throw Error(format("path `%1%' is not valid") % storePath);
     PathSet referrers2 = getStoreReferrersTxn(txn, storePath, revision);
     referrers.insert(referrers2.begin(), referrers2.end());
@@ -669,7 +649,7 @@ void LocalStore::queryStoreReferrers(const Path & storePath,
 
 void queryStateReferrersTxn(const Transaction & txn, const Path & storePath, PathSet & stateReferrers, const unsigned int revision)
 {
-    if (!isRealisableComponentOrStatePath(txn, storePath))
+    if (!isValidComponentOrStatePathTxn(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
     PathSet stateReferrers2 = getStateReferrersTxn(txn, storePath, revision);
     stateReferrers.insert(stateReferrers2.begin(), stateReferrers2.end());
@@ -686,7 +666,7 @@ void setDeriver(const Transaction & txn, const Path & storePath, const Path & de
     if (deriver == "") return;
     assertStorePath(deriver);
     
-    if (!isRealisablePath(txn, storePath))
+    if (!isValidPathTxn(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
 
     if (isStateDrvPathTxn(txn, deriver)){								//Redirect if its a state component					
@@ -740,7 +720,7 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
 		return;
 	assertStorePath(deriver);
 	
-    if (!isRealisablePath(txn, storePath))
+    if (!isValidPathTxn(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
 
 	Derivation drv = derivationFromPathTxn(txn, deriver);
@@ -793,7 +773,7 @@ bool isStateDrv(const Derivation & drv)
 
 static Path queryDeriver(const Transaction & txn, const Path & storePath)  
 {
-    if (!isRealisablePath(txn, storePath))
+    if (!isValidPathTxn(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
     Path deriver;
     
@@ -817,7 +797,7 @@ Path LocalStore::queryDeriver(const Path & path)
 //A '*' as argument stands for all identifiers or all users
 PathSet queryDerivers(const Transaction & txn, const Path & storePath, const string & identifier, const string & user)
 {
-	if (!isRealisablePath(txn, storePath))
+	if (!isValidPathTxn(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
 	
 	if(user == "")
@@ -845,7 +825,7 @@ PathSet queryDerivers(const Transaction & txn, const Path & storePath, const str
 	
 	return filtereddata;
 }
-
+	
 PathSet LocalStore::queryDerivers(const Path & storePath, const string & identifier, const string & user)
 {
 	return nix::queryDerivers(noTxn, storePath, identifier, user);
@@ -865,120 +845,33 @@ PathSet queryDeriversStatePath(const Transaction & txn, const Path & storePath, 
 }
 */
 
-
-const int substituteVersion = 2;
-
-
-static Substitutes readSubstitutes(const Transaction & txn,
-    const Path & srcPath)
+PathSet LocalStore::querySubstitutablePaths()
 {
-    Strings ss;
-    nixDB.queryStrings(txn, dbSubstitutes, srcPath, ss);
-
-    Substitutes subs;
-    
-    for (Strings::iterator i = ss.begin(); i != ss.end(); ++i) {
-        if (i->size() < 4 || (*i)[3] != 0) {
-            /* Old-style substitute.  !!! remove this code
-               eventually? */
-            break;
+    if (!substitutablePathsLoaded) {
+        for (Paths::iterator i = substituters.begin(); i != substituters.end(); ++i) {
+            debug(format("running `%1%' to find out substitutable paths") % *i);
+            Strings args;
+            args.push_back("--query-paths");
+            Strings ss = tokenizeString(runProgram(*i, false, args), "\n");
+            for (Strings::iterator j = ss.begin(); j != ss.end(); ++j) {
+                if (!isStorePath(*j))
+                    throw Error(format("`%1%' returned a bad substitutable path `%2%'")
+                        % *i % *j);
+                substitutablePaths.insert(*j);
+            }
         }
-        Strings ss2 = unpackStrings(*i);
-        if (ss2.size() == 0) continue;
-        int version;
-        if (!string2Int(ss2.front(), version)) continue;
-        if (version != substituteVersion) continue;
-        if (ss2.size() != 4) throw Error("malformed substitute");
-        Strings::iterator j = ss2.begin();
-        j++;
-        Substitute sub;
-        sub.deriver = *j++;
-        sub.program = *j++;
-        sub.args = unpackStrings(*j++);
-        subs.push_back(sub);
+        substitutablePathsLoaded = true;
     }
 
-    return subs;
+    return substitutablePaths;
 }
 
 
-static void writeSubstitutes(const Transaction & txn,
-    const Path & srcPath, const Substitutes & subs)
+bool LocalStore::hasSubstitutes(const Path & path)
 {
-    Strings ss;
-
-    for (Substitutes::const_iterator i = subs.begin();
-         i != subs.end(); ++i)
-    {
-        Strings ss2;
-        ss2.push_back((format("%1%") % substituteVersion).str());
-        ss2.push_back(i->deriver);
-        ss2.push_back(i->program);
-        ss2.push_back(packStrings(i->args));
-        ss.push_back(packStrings(ss2));
-    }
-
-    nixDB.setStrings(txn, dbSubstitutes, srcPath, ss);
-}
-
-
-void registerSubstitute(const Transaction & txn,
-    const Path & srcPath, const Substitute & sub)
-{
-    assertStorePath(srcPath);
-    
-    Substitutes subs = readSubstitutes(txn, srcPath);
-
-    if (find(subs.begin(), subs.end(), sub) != subs.end())
-        return;
-
-    /* New substitutes take precedence over old ones.  If the
-       substitute is already present, it's moved to the front. */
-    remove(subs.begin(), subs.end(), sub);
-    subs.push_front(sub);
-        
-    writeSubstitutes(txn, srcPath, subs);
-}
-
-
-Substitutes querySubstitutes(const Transaction & txn, const Path & path)
-{
-    return readSubstitutes(txn, path);
-}
-
-
-Substitutes LocalStore::querySubstitutes(const Path & path)
-{
-    return nix::querySubstitutes(noTxn, path);
-}
-
-
-static void invalidateStorePath(Transaction & txn, const Path & path);
-
-
-void clearSubstitutes()								//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ALSO FOR STATE
-{
-    Transaction txn(nixDB);
-    
-    /* Iterate over all paths for which there are substitutes. */
-    Paths subKeys;
-    nixDB.enumTable(txn, dbSubstitutes, subKeys);
-    for (Paths::iterator i = subKeys.begin(); i != subKeys.end(); ++i) {
-        
-        /* Delete all substitutes for path *i. */
-        nixDB.delPair(txn, dbSubstitutes, *i);
-        
-        /* Maintain the cleanup invariant. */
-        if (!isValidPathTxn(txn, *i))
-            invalidateStorePath(txn, *i);
-    }
-
-    /* !!! there should be no referrers to any of the invalid
-       substitutable paths.  This should be the case by construction
-       (the only referrers can be other invalid substitutable paths,
-       which have all been removed now). */
-    
-    txn.commit();
+    if (!substitutablePathsLoaded)
+        querySubstitutablePaths(); 
+    return substitutablePaths.find(path) != substitutablePaths.end();
 }
 
 
@@ -1510,37 +1403,8 @@ void verifyStore(bool checkContents)
         }
     }
 
-
-    printMsg(lvlInfo, "checking path realisability");
-    
-    /* "Realisable" paths are those that are valid or have a
-       substitute. */
-    PathSet realisablePaths(validPaths);
-    
-    
-    //TODO !!!!!!!!!!!!!!!!!!!!!!!!! Do also for validStatePaths
-    
-
-    /* Check that the values of the substitute mappings are valid
-       paths. */ 
-    Paths subKeys;
-    nixDB.enumTable(txn, dbSubstitutes, subKeys);
-    for (Paths::iterator i = subKeys.begin(); i != subKeys.end(); ++i) {
-        Substitutes subs = readSubstitutes(txn, *i);
-        if (!isStorePath(*i)) {
-            printMsg(lvlError, format("removing substitutes for non-store path `%1%'") % *i);
-            nixDB.delPair(txn, dbSubstitutes, *i);
-        }
-        else if (subs.size() == 0)
-            nixDB.delPair(txn, dbSubstitutes, *i);
-        else
-			realisablePaths.insert(*i);
-    }
-    
-
     /* Check the cleanup invariant: only realisable paths can have
        `references', `referrers', or `derivers' entries. */
-
 
     /* Check the `derivers' table. */
     printMsg(lvlInfo, "checking the derivers table");
@@ -1549,8 +1413,8 @@ void verifyStore(bool checkContents)
     for (Paths::iterator i = deriversKeys.begin();
          i != deriversKeys.end(); ++i)
     {
-        if (realisablePaths.find(*i) == realisablePaths.end()) {
-            printMsg(lvlError, format("removing deriver entry for unrealisable path `%1%'")
+        if (validPaths.find(*i) == validPaths.end()) {
+            printMsg(lvlError, format("removing deriver entry for invalid path `%1%'")
                 % *i);
             nixDB.delPair(txn, dbDerivers, *i);
         }
@@ -1572,13 +1436,12 @@ void verifyStore(bool checkContents)
     for (Paths::iterator i = referencesKeys.begin();
          i != referencesKeys.end(); ++i)
     {
-        if (realisablePaths.find(*i) == realisablePaths.end()) {
-            printMsg(lvlError, format("removing references entry for unrealisable path `%1%'")
+        if (validPaths.find(*i) == validPaths.end()) {
+            printMsg(lvlError, format("removing references entry for invalid path `%1%'")
                 % *i);
             setReferences(txn, *i, PathSet(), PathSet(), 0);		//TODO?
         }
         else {
-            bool isValid = validPaths.find(*i) != validPaths.end();
             PathSet references;
             queryXReferencesTxn(txn, *i, references, true, -1);				//TODO
             for (PathSet::iterator j = references.begin();
@@ -1594,7 +1457,7 @@ void verifyStore(bool checkContents)
                 }
                 */
                 
-                if (isValid && validPaths.find(*j) == validPaths.end()) {
+                if (validPaths.find(*j) == validPaths.end()) {
                     printMsg(lvlError, format("incomplete closure: `%1%' needs missing `%2%'")
                         % *i % *j);
                 }
@@ -1628,6 +1491,7 @@ void setStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePath
         n++;
     }
 }
+
 
 void LocalStore::setStatePathsInterval(const PathSet & statePaths, const IntVector & intervals, bool allZero)
 {

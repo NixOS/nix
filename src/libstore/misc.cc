@@ -124,8 +124,7 @@ void queryMissing(const PathSet & targets,
             bool mustBuild = false;
             for (DerivationOutputs::iterator i = drv.outputs.begin();
                  i != drv.outputs.end(); ++i)
-                if (!store->isValidPath(i->second.path) &&
-                    !store->hasSubstitutes(i->second.path))
+                if (!store->isValidPath(i->second.path) && !store->hasSubstitutes(i->second.path))
                     mustBuild = true;
 
             if (mustBuild) {
@@ -144,8 +143,8 @@ void queryMissing(const PathSet & targets,
             if (store->isValidPath(p)) continue;
             if (store->hasSubstitutes(p))
                 willSubstitute.insert(p);
-            PathSet refs;
-            store->queryStoreReferences(p, todo, 0);		//TODO?
+            // XXX call the substituters
+            // store->queryReferences(p, todo);
         }
     }
 }

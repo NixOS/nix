@@ -22,16 +22,6 @@ my $tmpNar2 = "$tmpDir/nar2";
 END { unlink $tmpNar; unlink $tmpNar2; rmdir $tmpDir; }
 
 
-# Check the arguments.
-die unless scalar @ARGV == 1;
-my $targetPath = $ARGV[0];
-
-my $date = strftime ("%F %H:%M:%S UTC", gmtime (time));
-print LOGFILE "$$ get $targetPath $date\n";
-
-print "\n*** Trying to download/patch `$targetPath'\n";
-
-
 # Load all manifests.
 my %narFiles;
 my %localPaths;
@@ -44,6 +34,54 @@ for my $manifest (glob "$manifestDir/*.nixmanifest") {
         exit 1;
     }
 }
+
+
+# Parse the arguments.
+
+if ($ARGV[0] eq "--query-paths") {
+    foreach my $storePath (keys %narFiles) { print "$storePath\n"; }
+    foreach my $storePath (keys %localPaths) { print "$storePath\n"; }
+    exit 0;
+}
+
+elsif ($ARGV[0] eq "--query-info") {
+    shift @ARGV;
+    foreach my $storePath (@ARGV) {
+        my $info;
+        if (defined $narFiles{$storePath}) {
+            $info = @{$narFiles{$storePath}}[0];
+        }
+        elsif (defined $localPaths{$storePath}) {
+            $info = @{$localPaths{$storePath}}[0];
+        }
+        else {
+            next; # not an error
+        }
+        print "$storePath\n";
+        print "$info->{deriver}\n";
+        my @references = split " ", $info->{references};
+        my $count = scalar @references;
+        print "$count\n";
+        foreach my $reference (@references) {
+            print "$reference\n";
+        }
+    }
+    exit 0;
+}
+
+elsif ($ARGV[0] ne "--substitute") {
+    die "syntax: $0 [--query-paths | --query-info PATHS... | --substitute PATH]\n";
+}
+
+
+die unless scalar @ARGV == 2;
+my $targetPath = $ARGV[1];
+
+
+my $date = strftime ("%F %H:%M:%S UTC", gmtime (time));
+print LOGFILE "$$ get $targetPath $date\n";
+
+print "\n*** Trying to download/patch `$targetPath'\n";
 
 
 # If we can copy from a local path, do that.

@@ -11,8 +11,6 @@ Operations:
   --query / -q: query information
   --read-log / -l: print build log of given store paths
 
-  --register-substitutes: register a substitute expression (dangerous!)
-  --clear-substitutes: clear all substitutes
   --register-validity: register path validity (dangerous!)
   --check-validity: check path validity
 

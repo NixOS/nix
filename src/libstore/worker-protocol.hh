@@ -14,7 +14,6 @@ typedef enum {
     wopIsValidPath,							
     wopIsValidStatePath,
     wopIsValidComponentOrStatePath,
-    wopQuerySubstitutes,
     wopHasSubstitutes,
     wopQueryPathHash,
     wopQueryStatePathDrv,

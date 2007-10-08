@@ -31,10 +31,6 @@ public:
     
     bool isValidComponentOrStatePath(const Path & path);
 
-    Substitutes querySubstitutes(const Path & path);
-
-    bool hasSubstitutes(const Path & path);
-    
     Hash queryPathHash(const Path & path);
     
     Path queryStatePathDrv(const Path & statePath);
@@ -48,6 +44,10 @@ public:
     void queryStateReferrers(const Path & path, PathSet & stateReferrers, const unsigned int revision);
 
     Path queryDeriver(const Path & path);
+    
+    PathSet querySubstitutablePaths();
+    
+    bool hasSubstitutes(const Path & path);
     
     Path addToStore(const Path & srcPath, bool fixed = false,
         bool recursive = false, string hashAlgo = "",

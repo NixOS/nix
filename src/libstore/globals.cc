@@ -28,9 +28,12 @@ unsigned int maxBuildJobs = 1;
 bool readOnlyMode = false;
 string thisSystem = "unset";
 unsigned int maxSilentTime = 0;
-static bool settingsRead = false;
-uid_t callingUID = 0;			//A root user will not set this value, so the default uid is 0
+Paths substituters;
 
+
+static bool settingsRead = false;
+
+uid_t callingUID = 0;			//A root user will not set this value, so the default uid is 0
 bool singleThreaded = false;	//TODO Gives an error: cannot start worker (environment already open) / waiting for process 7487: No child processes
 bool sendOutput = true;
 

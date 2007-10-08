@@ -182,12 +182,6 @@ bool RemoteStore::isValidComponentOrStatePath(const Path & path)
     return reply != 0;
 }
 
-Substitutes RemoteStore::querySubstitutes(const Path & path)
-{
-    throw Error("not implemented 2");
-}
-
-
 bool RemoteStore::hasSubstitutes(const Path & path)
 {
     writeInt(wopHasSubstitutes, to);
@@ -270,6 +264,12 @@ Path RemoteStore::queryDeriver(const Path & path)
 }
 
 
+PathSet RemoteStore::querySubstitutablePaths()
+{
+    throw Error("not implemented");
+}
+
+
 Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
     bool recursive, string hashAlgo, PathFilter & filter)
 {
@@ -283,8 +283,6 @@ Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
     dumpPath(srcPath, to, filter);
     processStderr();
     return readStorePath(from);
-    //Path path = readStorePath(from);		//TODO REMOVE CODE		
-    //return path;
 }
 
 

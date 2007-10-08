@@ -8,6 +8,12 @@ my $stateDir = $ENV{"NIX_STATE_DIR"};
 $stateDir = "@localstatedir@/nix" unless defined $stateDir;
 
 
+# Turn on caching in nix-prefetch-url.
+my $channelCache = "$stateDir/channel-cache";
+$ENV{'NIX_DOWNLOAD_CACHE'} = $channelCache;
+mkdir $channelCache, 0755 unless -e $channelCache;
+
+
 # Figure out the name of the `.nix-channels' file to use.
 my $home = $ENV{"HOME"};
 die '$HOME not set' unless defined $home;
@@ -70,10 +76,6 @@ sub removeChannel {
 sub update {
     readChannels;
 
-    # Get rid of all the old substitutes.
-    system("@bindir@/nix-store", "--clear-substitutes") == 0
-        or die "cannot clear substitutes";
-
     # Remove all the old manifests.
     for my $manifest (glob "$stateDir/manifests/*.nixmanifest") {
         unlink $manifest or die "cannot remove `$manifest': $!";
@@ -98,7 +100,8 @@ sub update {
         my $fullURL = "$url/nixexprs.tar.bz2";
         print "downloading Nix expressions from `$fullURL'...\n";
         $ENV{"PRINT_PATH"} = 1;
-        my ($hash, $path) = `@bindir@/nix-prefetch-url '$fullURL' 2> /dev/null`;
+        $ENV{"QUIET"} = 1;
+        my ($hash, $path) = `@bindir@/nix-prefetch-url '$fullURL'`;
         die "cannot fetch `$fullURL'" if $? != 0;
         chomp $path;
         $inputs .= '"' . $channelName . '"' . " " . $path . " ";

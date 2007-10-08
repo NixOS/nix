@@ -15,28 +15,6 @@
 namespace nix {
 
 
-/* A substitute is a program invocation that constructs some store
-   path (typically by fetching it from somewhere, e.g., from the
-   network). */
-struct Substitute
-{       
-    /* The derivation that built this store path (empty if none). */
-    Path deriver;
-    
-    /* Program to be executed to create the store path.  Must be in
-       the output path of `storeExpr'. */
-    Path program;
-
-    /* Extra arguments to be passed to the program (the first argument
-       is the store path to be substituted). */
-    Strings args;
-
-    bool operator == (const Substitute & sub) const;
-};
-
-typedef list<Substitute> Substitutes;
-
-
 typedef std::map<Path, Path> Roots;
 
 
@@ -64,13 +42,6 @@ public:
     
     /* TODO */
     virtual bool isValidComponentOrStatePath(const Path & path) = 0;
-
-    /* Return the substitutes for the given path. */
-    virtual Substitutes querySubstitutes(const Path & path) = 0;
-
-    /* More efficient variant if we just want to know if a path has
-       substitutes. */
-    virtual bool hasSubstitutes(const Path & path);
 
     /* Queries the hash of a valid path. */ 
     virtual Hash queryPathHash(const Path & path) = 0;
@@ -100,6 +71,13 @@ public:
        no deriver has been set. */
     virtual Path queryDeriver(const Path & path) = 0;
 
+    /* Query the set of substitutable paths. */
+    virtual PathSet querySubstitutablePaths() = 0;
+
+    /* More efficient variant if we just want to know if a path has
+       substitutes. */
+    virtual bool hasSubstitutes(const Path & path);
+    
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
        If `fixed' is true, then the output of a fixed-output
@@ -128,10 +106,10 @@ public:
 
     /* Ensure that the output paths of the derivation are valid.  If
        they are already valid, this is a no-op.  Otherwise, validity
-       can be reached in two ways.  First, if the output paths have
-       substitutes, then those can be used.  Second, the output paths
-       can be created by running the builder, after recursively
-       building any sub-derivations. */
+       can be reached in two ways.  First, if the output paths is
+       substitutable, then build the path that way.  Second, the
+       output paths can be created by running the builder, after
+       recursively building any sub-derivations. */
     virtual void buildDerivations(const PathSet & drvPaths) = 0;
 
     /* Ensure that a path is valid.  If it is not currently valid, it
@@ -337,6 +315,29 @@ extern boost::shared_ptr<StoreAPI> store;
 /* Factory method: open the Nix database, either through the local or
    remote implementation. */
 boost::shared_ptr<StoreAPI> openStore(bool reserveSpace = true);
+
+
+
+/* OLD TODO REMOVE
+struct ValidPathInfo 
+{
+    Path path;
+    Path deriver;
+    Hash hash;
+    PathSet references;
+};
+*/
+struct ValidPathInfo 
+{
+    Path path;
+    Path deriver;
+    Hash hash;
+    PathSet references;
+    PathSet stateReferences;
+    int unsigned revision;
+};
+
+ValidPathInfo decodeValidPathInfo(std::istream & str);
 
 
 }
