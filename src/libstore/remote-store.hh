@@ -47,6 +47,8 @@ public:
     
     void queryStateReferrers(const Path & path, PathSet & stateReferrers, const unsigned int revision);
 
+    Path queryDeriver(const Path & path);
+    
     Path addToStore(const Path & srcPath, bool fixed = false,
         bool recursive = false, string hashAlgo = "",
         PathFilter & filter = defaultPathFilter);
@@ -89,8 +91,6 @@ public:
 	bool queryAvailableStateRevisions(const Path & statePath, RevisionInfos & revisions);
 
 	Snapshots commitStatePath(const Path & statePath);
-	
-	Path queryDeriver(const Path & path);
 	
 	PathSet queryDerivers(const Path & storePath, const string & identifier, const string & user);
 	

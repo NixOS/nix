@@ -67,12 +67,12 @@ endif
 
 # bzip2
 
-BZIP2 = bzip2-1.0.3
+BZIP2 = bzip2-1.0.4
 
 $(BZIP2).tar.gz:
 	@echo "Nix requires bzip2 to build."
-	@echo "Please download version 1.0.3 from"
-	@echo "  http://www.bzip.org/1.0.3/bzip2-1.0.3.tar.gz"
+	@echo "Please download version 1.0.4 from"
+	@echo "  http://www.bzip.org/1.0.4/bzip2-1.0.4.tar.gz"
 	@echo "and place it in the externals/ directory."
 	false
 

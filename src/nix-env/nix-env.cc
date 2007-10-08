@@ -730,7 +730,10 @@ static void upgradeDerivations(Globals & globals,
         DrvName drvName(i->name);
 
         MetaInfo meta = i->queryMetaInfo(globals.state);
-        if (meta["keep"] == "true") continue;
+        if (meta["keep"] == "true") {
+            newElems.push_back(*i);
+            continue;
+        }
 
         /* Find the derivation in the input Nix expression with the
            same name that satisfies the version constraints specified
@@ -1222,7 +1225,7 @@ static void opQuery(Globals & globals,
             cout.flush();
 
         } catch (AssertionError & e) {
-            /* !!! hm, maybe we should give some sort of warning here? */
+            printMsg(lvlTalkative, format("skipping derivation named `%1%' which gives an assertion failure") % i->name);
         }
     }
 

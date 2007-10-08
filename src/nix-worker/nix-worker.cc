@@ -332,7 +332,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
 		writeString(deriver, to);
 		break;
 	}
-	
+
     case wopAddToStore: {
         string baseName = readString(from);
         bool fixed = readInt(from) == 1;

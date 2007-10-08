@@ -261,6 +261,14 @@ void RemoteStore::queryStateReferrers(const Path & path,
     stateReferrers.insert(stateReferrers2.begin(), stateReferrers2.end());
 }
 
+Path RemoteStore::queryDeriver(const Path & path)
+{
+    writeInt(wopQueryDeriver, to);
+    writeString(path, to);
+    processStderr();
+    return readStorePath(from);
+}
+
 
 Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
     bool recursive, string hashAlgo, PathFilter & filter)
@@ -274,8 +282,9 @@ Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
     writeString(hashAlgo, to);
     dumpPath(srcPath, to, filter);
     processStderr();
-    Path path = readStorePath(from);		
-    return path;
+    return readStorePath(from);
+    //Path path = readStorePath(from);		//TODO REMOVE CODE		
+    //return path;
 }
 
 
@@ -390,14 +399,6 @@ void RemoteStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     unsigned int lo = readInt(from);
     unsigned int hi = readInt(from);
     bytesFreed = (((unsigned long long) hi) << 32) | lo;
-}
-
-Path RemoteStore::queryDeriver(const Path & path)
-{
-	writeInt(wopQueryDeriver, to);
-	writeString(path, to);
-	processStderr();
-	return readStorePath(from);
 }
 
 PathSet RemoteStore::queryDerivers(const Path & storePath, const string & identifier, const string & user)
