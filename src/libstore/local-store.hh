@@ -21,6 +21,20 @@ const int nixSchemaVersion = 4;
 extern string drvsLogDir;
 
 
+struct OptimiseStats
+{
+    unsigned long totalFiles;
+    unsigned long sameContents;
+    unsigned long filesLinked;
+    unsigned long long bytesFreed;
+    OptimiseStats()
+    {
+        totalFiles = sameContents = filesLinked = 0;
+        bytesFreed = 0;
+    }
+};
+
+
 class LocalStore : public StoreAPI
 {
 private:
@@ -83,6 +97,10 @@ public:
 
     void collectGarbage(GCAction action, const PathSet & pathsToDelete,
         bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed);
+
+    /* Optimise the disk space usage of the Nix store by hard-linking
+       files with the same contents. */
+    void optimiseStore(bool dryRun, OptimiseStats & stats);
 };
 
 

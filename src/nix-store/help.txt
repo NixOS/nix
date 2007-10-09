@@ -21,6 +21,7 @@ Operations:
 
   --init: initialise the Nix database
   --verify: verify Nix structures
+  --optimise: optimise the Nix store by hard-linking identical files
 
   --version: output version information
   --help: display help

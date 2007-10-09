@@ -466,6 +466,13 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
 }
 
 
+static string showBytes(unsigned long long bytes)
+{
+    return (format("%d bytes (%.2f MiB)")
+        % bytes % (bytes / (1024.0 * 1024.0))).str();
+}
+
+
 struct PrintFreed 
 {
     bool show, dryRun;
@@ -477,9 +484,9 @@ struct PrintFreed
         if (show)
             cout << format(
                 (dryRun
-                    ? "%d bytes would be freed (%.2f MiB)\n"
-                    : "%d bytes freed (%.2f MiB)\n"))
-                % bytesFreed % (bytesFreed / (1024.0 * 1024.0));
+                    ? "%1% would be freed\n"
+                    : "%1% freed (%.2f MiB)\n"))
+                % showBytes(bytesFreed);
     }
 };
 
@@ -614,6 +621,43 @@ static void opVerify(Strings opFlags, Strings opArgs)
 }
 
 
+
+static void showOptimiseStats(OptimiseStats & stats)
+{
+    printMsg(lvlError,
+        format("%1% freed by hard-linking %2% files; there are %3% files with equal contents out of %4% files in total")
+        % showBytes(stats.bytesFreed)
+        % stats.filesLinked
+        % stats.sameContents
+        % stats.totalFiles);
+}
+
+
+/* Optimise the disk space usage of the Nix store by hard-linking
+   files with the same contents. */
+static void opOptimise(Strings opFlags, Strings opArgs)
+{
+    if (!opArgs.empty())
+        throw UsageError("no arguments expected");
+
+    for (Strings::iterator i = opFlags.begin();
+         i != opFlags.end(); ++i)
+        throw UsageError(format("unknown flag `%1%'") % *i);
+
+    LocalStore * store2(dynamic_cast<LocalStore *>(store.get()));
+    if (!store2) throw Error("you don't have sufficient rights to use --optimise");
+
+    OptimiseStats stats;
+    try {
+        store2->optimiseStore(true, stats);
+    } catch (...) {
+        showOptimiseStats(stats);
+        throw;
+    }
+    showOptimiseStats(stats);
+}
+
+
 /* Scan the arguments; find the operation, set global flags, put all
    other flags in a list, and put all other arguments in another
    list. */
@@ -659,6 +703,8 @@ void run(Strings args)
             op = opInit;
         else if (arg == "--verify")
             op = opVerify;
+        else if (arg == "--optimise")
+            op = opOptimise;
         else if (arg == "--add-root") {
             if (i == args.end())
                 throw UsageError("`--add-root requires an argument");

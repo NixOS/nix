@@ -174,7 +174,7 @@ void copyPath(const Path & src, const Path & dst, PathFilter & filter)
 }
 
 
-static void _canonicalisePathMetaData(const Path & path)
+static void _canonicalisePathMetaData(const Path & path, bool recurse)
 {
     checkInterrupt();
 
@@ -223,17 +223,17 @@ static void _canonicalisePathMetaData(const Path & path)
 
     }
 
-    if (S_ISDIR(st.st_mode)) {
+    if (recurse && S_ISDIR(st.st_mode)) {
         Strings names = readDirectory(path);
 	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
-	    _canonicalisePathMetaData(path + "/" + *i);
+	    _canonicalisePathMetaData(path + "/" + *i, true);
     }
 }
 
 
 void canonicalisePathMetaData(const Path & path)
 {
-    _canonicalisePathMetaData(path);
+    _canonicalisePathMetaData(path, true);
 
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
@@ -625,7 +625,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
        consistent metadata. */
     Transaction txn(nixDB);
     addTempRoot(path);
-    if (!isValidPath(path))
+    if (!isValidPathTxn(txn, path))
         throw Error(format("path `%1%' is not valid") % path);
 
     HashAndWriteSink hashAndWriteSink(sink);
@@ -947,6 +947,121 @@ void verifyStore(bool checkContents)
 
     
     txn.commit();
+}
+
+
+typedef std::map<Hash, std::pair<Path, ino_t> > HashToPath;
+
+
+static void toggleWritable(const Path & path, bool writable)
+{
+    struct stat st;
+    if (lstat(path.c_str(), &st))
+	throw SysError(format("getting attributes of path `%1%'") % path);
+
+    mode_t mode = st.st_mode;
+    if (writable) mode |= S_IWUSR;
+    else mode &= ~(S_IWUSR | S_IWGRP | S_IWOTH);
+    
+    if (chmod(path.c_str(), mode) == -1)
+        throw SysError(format("changing writability of `%1%'") % path);
+}
+
+
+static void hashAndLink(bool dryRun, HashToPath & hashToPath,
+    OptimiseStats & stats, const Path & path)
+{
+    struct stat st;
+    if (lstat(path.c_str(), &st))
+	throw SysError(format("getting attributes of path `%1%'") % path);
+
+    /* Sometimes SNAFUs can cause files in the Nix store to be
+       modified, in particular when running programs as root under
+       NixOS (example: $fontconfig/var/cache being modified).  Skip
+       those files. */
+    if (S_ISREG(st.st_mode) && (st.st_mode & S_IWUSR)) {
+        printMsg(lvlError, format("skipping suspicious writable file `%1%'") % path);
+        return;
+    }
+
+    /* We can hard link regular files and symlinks. */
+    if (S_ISREG(st.st_mode) || S_ISLNK(st.st_mode)) {
+
+        /* Hash the file.  Note that hashPath() returns the hash over
+           the NAR serialisation, which includes the execute bit on
+           the file.  Thus, executable and non-executable files with
+           the same contents *won't* be linked (which is good because
+           otherwise the permissions would be screwed up).
+
+           Also note that if `path' is a symlink, then we're hashing
+           the contents of the symlink (i.e. the result of
+           readlink()), not the contents of the target (which may not
+           even exist). */
+        Hash hash = hashPath(htSHA256, path);
+        stats.totalFiles++;
+        printMsg(lvlDebug, format("`%1%' has hash `%2%'") % path % printHash(hash));
+
+        std::pair<Path, ino_t> prevPath = hashToPath[hash];
+        
+        if (prevPath.first == "") {
+            hashToPath[hash] = std::pair<Path, ino_t>(path, st.st_ino);
+            return;
+        }
+            
+        /* Yes!  We've seen a file with the same contents.  Replace
+           the current file with a hard link to that file. */
+        stats.sameContents++;
+        if (prevPath.second == st.st_ino) {
+            printMsg(lvlDebug, format("`%1%' is already linked to `%2%'") % path % prevPath.first);
+            return;
+        }
+        
+        printMsg(lvlTalkative, format("linking `%1%' to `%2%'") % path % prevPath.first);
+
+        Path tempLink = (format("%1%.tmp-%2%-%3%")
+            % path % getpid() % rand()).str();
+
+        toggleWritable(dirOf(path), true);
+        
+        if (link(prevPath.first.c_str(), tempLink.c_str()) == -1)
+            throw SysError(format("cannot link `%1%' to `%2%'")
+                % tempLink % prevPath.first);
+
+        /* Atomically replace the old file with the new hard link. */
+        if (rename(tempLink.c_str(), path.c_str()) == -1)
+            throw SysError(format("cannot rename `%1%' to `%2%'")
+                % tempLink % path);
+
+        /* Make the directory read-only again and reset its timestamp
+           back to 0. */
+        _canonicalisePathMetaData(dirOf(path), false);
+        
+        stats.filesLinked++;
+        stats.bytesFreed += st.st_size;
+    }
+
+    if (S_ISDIR(st.st_mode)) {
+        Strings names = readDirectory(path);
+	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
+	    hashAndLink(dryRun, hashToPath, stats, path + "/" + *i);
+    }
+}
+
+
+void LocalStore::optimiseStore(bool dryRun, OptimiseStats & stats)
+{
+    HashToPath hashToPath;
+    
+    Paths paths;
+    PathSet validPaths;
+    nixDB.enumTable(noTxn, dbValidPaths, paths);
+
+    for (Paths::iterator i = paths.begin(); i != paths.end(); ++i) {
+        addTempRoot(*i);
+        if (!isValidPath(*i)) continue; /* path was GC'ed, probably */
+        startNest(nest, lvlChatty, format("hashing files in `%1%'") % *i);
+        hashAndLink(dryRun, hashToPath, stats, *i);
+    }
 }
 
 
