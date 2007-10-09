@@ -745,9 +745,18 @@ static Path queryDeriver(const Transaction & txn, const Path & storePath)
     
     bool b = nixDB.queryString(txn, dbDerivers, storePath, deriver);
     
-    Derivation drv = derivationFromPathTxn(txn, deriver);		
-    if (isStateDrv(drv))
-    	throw Error(format("This deriver `%1%' is a state deriver, u should use queryDerivers instead of queryDeriver") % deriver);
+    /* Note that the deriver need not be valid (e.g., if we
+       previously ran the garbage collector with `gcKeepDerivations'
+       turned off). */ 
+    if(deriver == ""){
+    	printMsg(lvlTalkative, format("WARNING: Path '%1%' has no deriver anymore") % storePath);
+    	return "";
+    }
+    
+    //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //Derivation drv = derivationFromPathTxn(txn, deriver);		//We cant do this (at this point) since the drv might not exist ....
+    //if (isStateDrv(drv))
+    //	throw Error(format("This deriver `%1%' is a state deriver, u should use queryDerivers instead of queryDeriver") % deriver);
     	    
     if (b)
         return deriver;
@@ -876,9 +885,9 @@ Hash LocalStore::queryPathHash(const Path & path)
     return queryHash(noTxn, path);
 }
 
-Path queryStatePathDrvTxn(const Transaction & txn, const Path & statePath)
-{
-	string s;
+Path queryStatePathDrvTxn(const Transaction & txn, const Path & statePath)		//TODO !!!!!!!!!!!!!!!!!!!!!! A STATEPATH CAN HAVE MORE THEN JUST ONE DRV!!!!!!!!!!!!!!!!!!!!!!!
+{																				//SOLUTION: make dbValidStatePaths :: statepath --> storepath
+	string s;																	//query includes username and identifier ....??
     nixDB.queryString(txn, dbValidStatePaths, statePath, s);
     return s;
 }

@@ -456,11 +456,12 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
 
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
-    Roots rootMap = ignoreLiveness ? Roots() : nix::findRoots(true);					//TODO Also find state roots? TODO include sharing of state.
+    Roots rootMap = ignoreLiveness ? Roots() : nix::findRoots(true);					//TODO Also find state roots --> nah ? TODO include sharing of state.
 
     PathSet roots;
     for (Roots::iterator i = rootMap.begin(); i != rootMap.end(); ++i)
         roots.insert(i->second);
+        
 
     /* Add additional roots returned by the program specified by the
        NIX_ROOT_FINDER environment variable.  This is typically used
@@ -479,7 +480,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     PathSet livePaths;
     for (PathSet::const_iterator i = roots.begin(); i != roots.end(); ++i){
     	printMsg(lvlError, format("CHECK '%1%'") % *i);
-        computeFSClosure(canonPath(*i), livePaths, true, false, 0);							//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO DELETE STATE??
+        computeFSClosure(canonPath(*i), livePaths, true, false, 0);							//TODO !!!!!!!!!! ALSO STATEPATHS TRUE???
     }
 	
 
@@ -487,15 +488,36 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
         for (PathSet::iterator i = livePaths.begin();
              i != livePaths.end(); ++i)
         {
-            printMsg(lvlError, format("CHECK2 '%1%'") % *i);
-            /* Note that the deriver need not be valid (e.g., if we
+        	if (store->isStateComponent(*i)){
+        		printMsg(lvlError, format("CHECK-STATE-STORE '%1%'") % *i);
+        		//we select ALL state Derivations here
+        		PathSet derivers = store->queryDerivers(*i, "*", "*");
+        		
+        		for (PathSet::const_iterator j = derivers.begin(); j != derivers.end(); ++j)
+					// We send each drv to computeFSClosure
+        			if (*j != "" && store->isValidPath(*j))
+                		computeFSClosure(*j, livePaths, true, false, 0);					//TODO !!!!!!!!!! ALSO STATEPATHS TRUE???
+        	}
+			else if (store->isValidPath(*i)){
+				printMsg(lvlError, format("CHECK-STORE '%1%'") % *i);
+            	Path deriver = store->queryDeriver(*i);
+            	printMsg(lvlError, format("CHECK-STORE DRV '%1%'") % deriver);
+				
+               /* Note that the deriver need not be valid (e.g., if we
                previously ran the collector with `gcKeepDerivations'
                turned off). */
-            Path deriver = store->queryDeriver(*i);
-            if (deriver != "" && store->isValidPath(deriver))
-                computeFSClosure(deriver, livePaths, true, false, 0);							//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO KEEP STATE
+				if (deriver != "" && store->isValidPath(deriver))
+                	computeFSClosure(deriver, livePaths, true, false, 0);					//TODO !!!!!!!!!! ALSO STATEPATHS TRUE???
+            }
+			
+			//else if (store->isValidStatePath(*i)){
+			            
+			else 
+				throw Error(format("path `%1%' is not a valid state/store path") % *i);    
         }
     }
+    
+    printMsg(lvlError, format("STAGE X"));
 
     if (gcKeepOutputs) {
         /* Hmz, identical to storePathRequisites in nix-store. */
@@ -619,7 +641,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
             /* Okay, it's safe to delete. */
             try {
                 unsigned long long freed;
-                deleteFromStore(*i, freed);
+                //deleteFromStore(*i, freed);											//TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PUT BACK ON
                 bytesFreed += freed;
             } catch (PathInUse & e) {
                 printMsg(lvlError, format("warning: %1%") % e.msg());
