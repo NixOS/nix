@@ -755,36 +755,37 @@ static Expr prim_hasAttr(EvalState & state, const ATermVector & args)
 }
 
 
-/* takes 
- * param: list of { attr="attr"; value=value } 
- * returns an attribute set
- * */
+/* Builds an attribute set from a list specifying (name, value)
+   pairs.  To be precise, a list [{name = "name1"; value = value1;}
+   ... {name = "nameN"; value = valueN;}] is transformed to {name1 =
+   value1; ... nameN = valueN;}. */
 static Expr prim_listToAttrs(EvalState & state, const ATermVector & args)
 {
-  try {
-    ATermMap res = ATermMap();
-
-    ATermList list;
-    list = evalList(state, args[0]);
-    for (ATermIterator i(list); i; ++i){
-      // *i should now contain a pointer to the list item expression
-      ATermList attrs;
-      Expr evaledExpr = evalExpr(state, *i);
-      if (matchAttrs(evaledExpr, attrs)){
-        Expr e = evalExpr(state, makeSelect(evaledExpr, toATerm("attr")));
-        string attr = evalStringNoCtx(state,e);
-        Expr r = makeSelect(evaledExpr, toATerm("value"));
-        res.set(toATerm(attr), makeAttrRHS(r, makeNoPos()));
-      }
-      else {
-        throw EvalError(format("passed list item is a %s (value: %s). Set { attr=\"name\"; value=nix expr; } expected.") % showType(evaledExpr) % showValue(evaledExpr)); 
-      }
-    } // for
-    return makeAttrs(res);
-  } catch (Error & e) {
-    e.addPrefix(format("in `listToAttrs':\n"));
-    throw;
-  }
+    try {
+        ATermMap res = ATermMap();
+        ATermList list;
+        list = evalList(state, args[0]);
+        for (ATermIterator i(list); i; ++i){
+            // *i should now contain a pointer to the list item expression
+            ATermList attrs;
+            Expr evaledExpr = evalExpr(state, *i);
+            if (matchAttrs(evaledExpr, attrs)){
+                Expr e = evalExpr(state, makeSelect(evaledExpr, toATerm("name")));
+                string attr = evalStringNoCtx(state,e);
+                Expr r = makeSelect(evaledExpr, toATerm("value"));
+                res.set(toATerm(attr), makeAttrRHS(r, makeNoPos()));
+            }
+            else
+                throw TypeError(format("list element in `listToAttrs' is %s, expected a set { name = \"<name>\"; value = <value>; }")
+                    % showType(evaledExpr));
+        }
+    
+        return makeAttrs(res);
+    
+    } catch (Error & e) {
+        e.addPrefix(format("in `listToAttrs':\n"));
+        throw;
+    }
 }
 
 static Expr prim_removeAttrs(EvalState & state, const ATermVector & args)
