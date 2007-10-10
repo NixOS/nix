@@ -485,7 +485,7 @@ struct PrintFreed
             cout << format(
                 (dryRun
                     ? "%1% would be freed\n"
-                    : "%1% freed (%.2f MiB)\n"))
+                    : "%1% freed\n"))
                 % showBytes(bytesFreed);
     }
 };
