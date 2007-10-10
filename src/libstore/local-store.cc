@@ -953,17 +953,12 @@ void verifyStore(bool checkContents)
 typedef std::map<Hash, std::pair<Path, ino_t> > HashToPath;
 
 
-static void toggleWritable(const Path & path, bool writable)
+static void makeWritable(const Path & path)
 {
     struct stat st;
     if (lstat(path.c_str(), &st))
 	throw SysError(format("getting attributes of path `%1%'") % path);
-
-    mode_t mode = st.st_mode;
-    if (writable) mode |= S_IWUSR;
-    else mode &= ~(S_IWUSR | S_IWGRP | S_IWOTH);
-    
-    if (chmod(path.c_str(), mode) == -1)
+    if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
         throw SysError(format("changing writability of `%1%'") % path);
 }
 
@@ -1023,7 +1018,11 @@ static void hashAndLink(bool dryRun, HashToPath & hashToPath,
             Path tempLink = (format("%1%.tmp-%2%-%3%")
                 % path % getpid() % rand()).str();
 
-            toggleWritable(dirOf(path), true);
+            /* Make the containing directory writable, but only if
+               it's not the store itself (we don't want or need to
+               mess with  its permissions). */
+            bool mustToggle = !isStorePath(path);
+            if (mustToggle) makeWritable(dirOf(path));
         
             if (link(prevPath.first.c_str(), tempLink.c_str()) == -1)
                 throw SysError(format("cannot link `%1%' to `%2%'")
@@ -1036,7 +1035,7 @@ static void hashAndLink(bool dryRun, HashToPath & hashToPath,
 
             /* Make the directory read-only again and reset its
                timestamp back to 0. */
-            _canonicalisePathMetaData(dirOf(path), false);
+            if (mustToggle) _canonicalisePathMetaData(dirOf(path), false);
             
         } else
             printMsg(lvlTalkative, format("would link `%1%' to `%2%'") % path % prevPath.first);
