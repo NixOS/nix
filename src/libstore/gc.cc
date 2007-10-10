@@ -452,11 +452,11 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     /* Acquire the global GC root.  This prevents
        a) New roots from being added.
        b) Processes from creating new temporary root files. */
-    AutoCloseFD fdGCLock = openGCLock(ltWrite);
+    AutoCloseFD fdGCLock = openGCLock(ltWrite);												//TODO !!!!!!!!!!!!!!!!!!! GET STATE LOCKS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
-    Roots rootMap = ignoreLiveness ? Roots() : nix::findRoots(true);					//TODO Also find state roots --> nah ? TODO include sharing of state.
+    Roots rootMap = ignoreLiveness ? Roots() : nix::findRoots(true);
 
     PathSet roots;
     for (Roots::iterator i = rootMap.begin(); i != rootMap.end(); ++i)
@@ -480,9 +480,10 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     PathSet livePaths;
     for (PathSet::const_iterator i = roots.begin(); i != roots.end(); ++i){
     	printMsg(lvlError, format("CHECK '%1%'") % *i);
-        computeFSClosure(canonPath(*i), livePaths, true, false, 0);							//TODO !!!!!!!!!! ALSO STATEPATHS TRUE???
+        computeFSClosure(canonPath(*i), livePaths, true, true, 0);
     }
-	
+
+	printMsg(lvlError, format("STAGE X"));
 
     if (gcKeepDerivations) {
         for (PathSet::iterator i = livePaths.begin();
@@ -496,28 +497,29 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
         		for (PathSet::const_iterator j = derivers.begin(); j != derivers.end(); ++j)
 					// We send each drv to computeFSClosure
         			if (*j != "" && store->isValidPath(*j))
-                		computeFSClosure(*j, livePaths, true, false, 0);					//TODO !!!!!!!!!! ALSO STATEPATHS TRUE???
+                		computeFSClosure(*j, livePaths, true, true, 0);
         	}
 			else if (store->isValidPath(*i)){
 				printMsg(lvlError, format("CHECK-STORE '%1%'") % *i);
             	Path deriver = store->queryDeriver(*i);
-            	printMsg(lvlError, format("CHECK-STORE DRV '%1%'") % deriver);
+            	//printMsg(lvlError, format("CHECK-STORE DRV '%1%'") % deriver);
 				
                /* Note that the deriver need not be valid (e.g., if we
                previously ran the collector with `gcKeepDerivations'
                turned off). */
 				if (deriver != "" && store->isValidPath(deriver))
-                	computeFSClosure(deriver, livePaths, true, false, 0);					//TODO !!!!!!!!!! ALSO STATEPATHS TRUE???
+                	computeFSClosure(deriver, livePaths, true, true, 0);
             }
-			
-			//else if (store->isValidStatePath(*i)){
-			            
-			else 
-				throw Error(format("path `%1%' is not a valid state/store path") % *i);    
+			else{
+				printMsg(lvlError, format("CHECK-STATE '%1%'") % *i);
+				
+				//TODO also get its deriver???? for if its component is gone !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+				
+			}    
         }
     }
     
-    printMsg(lvlError, format("STAGE X"));
+    printMsg(lvlError, format("STAGE Y"));
 
     if (gcKeepOutputs) {
         /* Hmz, identical to storePathRequisites in nix-store. */
@@ -529,7 +531,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
                 for (DerivationOutputs::iterator j = drv.outputs.begin();
                      j != drv.outputs.end(); ++j)
                     if (store->isValidPath(j->second.path))
-                        computeFSClosure(j->second.path, livePaths, true, false, 0);					//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO KEEP STATE
+                        computeFSClosure(j->second.path, livePaths, true, true, 0);					//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WHAT ARE (STATE) OUTPUTS ????????????
             }
     }
 
@@ -544,7 +546,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     PathSet tempRoots;
     FDs fds;
     readTempRoots(tempRoots, fds);
-
+    
     /* Close the temporary roots.  Note that we *cannot* do this in
        readTempRoots(), because there we may not have all locks yet,
        meaning that an invalid path can become valid (and thus add to
@@ -567,24 +569,37 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
        that is not currently in in `livePaths' or `tempRootsClosed'
        can be deleted. */
     
-    /* Read the Nix store directory to find all currently existing
+    ///TODO Calc get shared paths																	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //for: livePaths, tempRootsClosed
+    PathSet sharedWith_livePaths_tempRootsClosed;
+    
+    /* Read the Nix store and state directory's to find all currently existing
        paths. */
     PathSet storePathSet;
+    PathSet statePathSet;
+    
     if (action != gcDeleteSpecific) {
+    	
         Paths entries = readDirectory(nixStore);
+        Paths stateEntries = readDirectory(nixStoreState);
+        
         for (Paths::iterator i = entries.begin(); i != entries.end(); ++i)
             storePathSet.insert(canonPath(nixStore + "/" + *i));
+        
+        for (Paths::iterator i = stateEntries.begin(); i != stateEntries.end(); ++i)
+            statePathSet.insert(canonPath(nixStoreState + "/" + *i));
+        
     } else {
         for (PathSet::iterator i = pathsToDelete.begin();
              i != pathsToDelete.end(); ++i)
         {
-            assertStorePath(*i);
+            assertStorePath(*i);											//TODO ASSERTSTATEPATH !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             storePathSet.insert(*i);
         }
     }
 
     /* Topologically sort them under the `referrers' relation.  That
-       is, a < b iff a is in referrers(b).  This gives us the order in
+       is, a < b if a is in referrers(b).  This gives us the order in
        which things can be deleted safely. */
     /* !!! when we have multiple output paths per derivation, this
        will not work anymore because we get cycles. */
@@ -653,6 +668,95 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
                 writeFull(fdLock, (const unsigned char *) "d", 1);
 #endif
         }
+    }
+
+    /* Try to delete state paths. */
+    /* Topologically sort them under the `referrers' relation.  That
+       is, a < b if a is in referrers(b).  This gives us the order in
+       which things can be deleted safely. */
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! when we have multiple output paths per derivation, this
+       will not work anymore because we get cycles. */
+    Paths statePaths;
+    for (PathSet::iterator i = statePathSet.begin(); i != statePathSet.end(); ++i)
+    	statePaths.push_back(*i);
+    
+    
+    //
+    
+    for (Paths::iterator i = statePaths.begin(); i != statePaths.end(); ++i) {
+    	
+    	debug(format("considering deletion of state path `%1%'") % *i);
+        
+        if (livePaths.find(*i) != livePaths.end()) {
+            if (action == gcDeleteSpecific)
+                throw Error(format("cannot delete state path `%1%' since it is still alive") % *i);
+            debug(format("live state path `%1%'") % *i);
+            continue;
+        }
+
+        if (tempRootsClosed.find(*i) != tempRootsClosed.end()) {
+            debug(format("temporary root `%1%'") % *i);
+            continue;
+        }
+        
+        if (sharedWith_livePaths_tempRootsClosed.find(*i) != sharedWith_livePaths_tempRootsClosed.end()) {
+            debug(format("State path `%1%' is shared with another live path") % *i);
+            continue;
+        }
+        
+        debug(format("dead path `%1%'") % *i);
+        result.insert(*i);
+
+        /* If just returning the set of dead paths, we also return the
+           space that would be freed if we deleted them. */
+        if (action == gcReturnDead)
+            bytesFreed += computePathSize(*i);
+
+        if (action == gcDeleteDead || action == gcDeleteSpecific) {
+
+//TODO !!!!!!!!!!!!!!!!!!!!!! state locks
+/*
+#ifndef __CYGWIN__
+            AutoCloseFD fdLock;
+
+            /* Only delete a lock file if we can acquire a write lock
+               on it.  That means that it's either stale, or the
+               process that created it hasn't locked it yet.  In the
+               latter case the other process will detect that we
+               deleted the lock, and retry (see pathlocks.cc). * /
+            if (i->size() >= 5 && string(*i, i->size() - 5) == ".lock") {
+                fdLock = openLockFile(*i, false);
+                if (fdLock != -1 && !lockFile(fdLock, ltWrite, false)) {
+                    debug(format("skipping active lock `%1%'") % *i);
+                    continue;
+                }
+            }
+#endif
+*/
+
+            if (!pathExists(*i)) continue;
+                
+            printMsg(lvlInfo, format("deleting state path `%1%'") % *i);
+            
+            /* Okay, it's safe to delete. */
+            try {
+                unsigned long long freed;
+                //deleteFromState(*i, freed);											//TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PUT BACK ON
+                bytesFreed += freed;
+            } catch (PathInUse & e) {
+                printMsg(lvlError, format("warning: %1%") % e.msg());
+            }
+
+/*
+#ifndef __CYGWIN__
+            if (fdLock != -1)
+                /* Write token to stale (deleted) lock file. * /
+                writeFull(fdLock, (const unsigned char *) "d", 1);
+#endif
+*/
+
+        }
+        
     }
 }
 

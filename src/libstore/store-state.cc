@@ -399,7 +399,7 @@ void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path
 	}
 }
 
-// ******************************************************************* DB FUNCTIONS
+// ******************************************************* DB FUNCTIONS ********************************************************************
 
 /* State specific db functions */
 

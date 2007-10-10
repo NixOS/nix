@@ -314,8 +314,11 @@ unsigned int getTimeStamp();
 
 //string getCallingUserName();
 
-/* TODO */
+/* Merges two PathSets into one, removing doubles (union) */
 PathSet pathSets_union(const PathSet & paths1, const PathSet & paths2);
+
+/* TODO UNTESTED !!!!!!!!!!!!!! */
+void pathSets_union_ordered(PathSet & originalPaths, const PathSet & newPaths);
 
 /* TODO */
 void pathSets_difference(const PathSet & oldpaths, const PathSet & newpaths, PathSet & addedpaths, PathSet & removedpaths);

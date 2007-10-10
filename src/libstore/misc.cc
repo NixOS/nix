@@ -37,6 +37,10 @@ void computeFSClosure(const Path & path, PathSet & paths, const bool & withCompo
 	computeFSClosureTxn(noTxn, path, paths, withComponents, withState, revision, flipDirection);
 }
 
+/*
+ * Notice that the incoming 'paths' parameter can already be filled and only needs to be expanded
+ * Notice that we CANNOT change the order of the existing paths
+ */
 void computeFSClosureTxn(const Transaction & txn, const Path & path, PathSet & paths, const bool & withComponents, const bool & withState, const int revision, bool flipDirection)
 {
 	PathSet allPaths;
@@ -45,26 +49,22 @@ void computeFSClosureTxn(const Transaction & txn, const Path & path, PathSet & p
 	if(!withComponents && !withState)
 		throw Error(format("Useless call to computeFSClosure, at leat withComponents or withState must be true"));
 	
-	//TODO HOW CAN THESE PATHS ALREADY BE VALID SOMETIMES ..... ?????????????????????
 	for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
 		if ( !isValidPathTxn(txn, *i) && !isValidStatePathTxn(txn, *i) )
 			throw Error(format("Not a state or store path: ") % *i);
 	
-    //if withState is false, we filter out all state paths
-	if( withComponents && !withState ){
+    //if withComponents, we add all component paths
+	if( withComponents ){
 		for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
 			if ( isValidPathTxn(txn, *i) )
 				paths.insert(*i);
 	}
-	//if withComponents is false, we filter out all component paths
-	else if( !withComponents && withState ){
+	
+	//if withState, we add all state paths
+	if( withState ){
 		for (PathSet::iterator i = allPaths.begin(); i != allPaths.end(); ++i)
 			if ( isValidStatePathTxn(txn, *i) )
 				paths.insert(*i);
-	}
-	//all
-	else{
-		paths = allPaths;	
 	}
 }
 
@@ -88,7 +88,7 @@ void computeFSClosureRecTxn(const Transaction & txn, const Path & path, PathSet 
         queryXReferencesTxn(txn, path, references, true, revision);
        	queryXReferencesTxn(txn, path, stateReferences, false, revision);
     }
-
+    
 	PathSet allReferences;
 	allReferences = pathSets_union(references, stateReferences);
 

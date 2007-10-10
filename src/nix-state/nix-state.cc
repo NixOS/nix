@@ -437,20 +437,6 @@ void run(Strings args)
 	printMsg(lvlError, format("AA: %1%") % isStatePath("/nix/store/hbxqq4d67j2y21xzp7yp01qjfkcjjbc7-hellohardcodedstateworld-1.0"));
 	printMsg(lvlError, format("AA: %1%") % isStatePath("/nix/state/0qhlpz1ji4gvg3j6nk5vkcddmi3m5x1r-hellohardcodedstateworld-1.0-test2"));
 
-	PathSet p1;
-	PathSet p2;
-	PathSet p3;
-	PathSet p4;
-	p1.insert("a");
-	p1.insert("c");		//old
-	p1.insert("b");
-	p2.insert("b");
-	p2.insert("a");
-	p2.insert("cc");	//new
-	p2.insert("x");		//new
-	pathSets_difference(p1,p2,p3,p4);
-	pathSets_union(p1,p2);
-
 	store->scanForAllReferences("/nix/state/i06flm2ahq5s0x3633z30dnav9f1wkb5-hellohardcodedstateworld-dep1-1.0-test");
 
 	store = openStore();
@@ -575,19 +561,33 @@ void run(Strings args)
 	
 	copyContents("/nix/state/fwir6jlqygy90zadnx95zryfa8918qac-hellohardcodedstateworld-1.0-test/", "/home/wouterdb/tmp/aa/");  //TODO !!!!!!!!!!!!!!!!!!!
 	
-	
-	
-	store = openStore();
 	Hash hash;
 	PathSet references;
 	PathSet stateReferences;
 	registerValidPath(noTxn, "/nix/store/sjnaisdpqyckc75c3mjz4msi9s1662cw-hellohardcodedstateworld-1.0", hash, references, stateReferences, "/nix/store/y7abzzpiknzps5kjb4qvdxvlhvxl6slj-hellohardcodedstateworld_import-1.0.drv", 0);
+	
+	store = openStore();
+	store->isStateComponent("/nix/state/h72n75fx3c40aslbbp41vmj9gxl2skp1-hellohardcodedstateworld-1.0-test");
+	
+	PathSet p1;
+	PathSet p2;
+	PathSet p3;
+	PathSet p4;
+	p1.insert("a");
+	p1.insert("c");		//old
+	p1.insert("b");
+	p2.insert("b");
+	p2.insert("a");
+	p2.insert("cc");	//new
+	p2.insert("x");		//new
+	//pathSets_difference(p1,p2,p3,p4);
+	pathSets_union_ordered(p1,p2);
+	
+	throw Error(format("aaa"));
 	return;
-	
-	//*/
 
+	*/
 	
-
 	/* test */
 	
 	if(args.size() == 1 && ( *(args.begin()) == "--help" || *(args.begin()) == "--statehelp")){

@@ -1216,6 +1216,19 @@ string getCallingUserName()
 }
 */
 
+/* adds the second PathSet after the first, but removing doubles from the second (union)
+ * (We assume the first PathSet has no duplicates)
+ * UNTESTED !!!!!!!!!!!!!!
+ */ 
+void pathSets_union_ordered(PathSet & originalPaths, const PathSet & newPaths)
+{
+	for (PathSet::iterator i = newPaths.begin(); i != newPaths.end(); ++i){
+		if (originalPaths.find(*i) != originalPaths.end())
+			continue;
+		originalPaths.insert(*i);
+	}
+}
+
 //merges two PathSets into one, removing doubles (union)
 PathSet pathSets_union(const PathSet & paths1, const PathSet & paths2)
 {
@@ -1225,11 +1238,11 @@ PathSet pathSets_union(const PathSet & paths1, const PathSet & paths2)
   	
   	set_union(vector1.begin(), vector1.end(),vector2.begin(), vector2.end(), back_inserter(setResult)); 	//Also available: set_symmetric_difference and set_intersection
 
-	PathSet diff;	
+	PathSet unionPaths;	
 	for(unsigned int i=0; i<setResult.size(); i++)
-		diff.insert(setResult[i]);
+		unionPaths.insert(setResult[i]);
 
-    return diff;
+    return unionPaths;
 }
 
 void pathSets_difference(const PathSet & oldpaths, const PathSet & newpaths, PathSet & addedpaths, PathSet & removedpaths)
