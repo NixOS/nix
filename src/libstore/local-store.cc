@@ -1016,25 +1016,30 @@ static void hashAndLink(bool dryRun, HashToPath & hashToPath,
             return;
         }
         
-        printMsg(lvlTalkative, format("linking `%1%' to `%2%'") % path % prevPath.first);
+        if (!dryRun) {
+            
+            printMsg(lvlTalkative, format("linking `%1%' to `%2%'") % path % prevPath.first);
 
-        Path tempLink = (format("%1%.tmp-%2%-%3%")
-            % path % getpid() % rand()).str();
+            Path tempLink = (format("%1%.tmp-%2%-%3%")
+                % path % getpid() % rand()).str();
 
-        toggleWritable(dirOf(path), true);
+            toggleWritable(dirOf(path), true);
         
-        if (link(prevPath.first.c_str(), tempLink.c_str()) == -1)
-            throw SysError(format("cannot link `%1%' to `%2%'")
-                % tempLink % prevPath.first);
+            if (link(prevPath.first.c_str(), tempLink.c_str()) == -1)
+                throw SysError(format("cannot link `%1%' to `%2%'")
+                    % tempLink % prevPath.first);
 
-        /* Atomically replace the old file with the new hard link. */
-        if (rename(tempLink.c_str(), path.c_str()) == -1)
-            throw SysError(format("cannot rename `%1%' to `%2%'")
-                % tempLink % path);
+            /* Atomically replace the old file with the new hard link. */
+            if (rename(tempLink.c_str(), path.c_str()) == -1)
+                throw SysError(format("cannot rename `%1%' to `%2%'")
+                    % tempLink % path);
 
-        /* Make the directory read-only again and reset its timestamp
-           back to 0. */
-        _canonicalisePathMetaData(dirOf(path), false);
+            /* Make the directory read-only again and reset its
+               timestamp back to 0. */
+            _canonicalisePathMetaData(dirOf(path), false);
+            
+        } else
+            printMsg(lvlTalkative, format("would link `%1%' to `%2%'") % path % prevPath.first);
         
         stats.filesLinked++;
         stats.bytesFreed += st.st_size;

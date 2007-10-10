@@ -640,16 +640,19 @@ static void opOptimise(Strings opFlags, Strings opArgs)
     if (!opArgs.empty())
         throw UsageError("no arguments expected");
 
+    bool dryRun = false;
+
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
-        throw UsageError(format("unknown flag `%1%'") % *i);
+        if (*i == "--dry-run") dryRun = true;
+        else throw UsageError(format("unknown flag `%1%'") % *i);
 
     LocalStore * store2(dynamic_cast<LocalStore *>(store.get()));
     if (!store2) throw Error("you don't have sufficient rights to use --optimise");
 
     OptimiseStats stats;
     try {
-        store2->optimiseStore(true, stats);
+        store2->optimiseStore(dryRun, stats);
     } catch (...) {
         showOptimiseStats(stats);
         throw;
