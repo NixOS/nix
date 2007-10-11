@@ -564,12 +564,12 @@ static Expr prim_derivationLazy(EvalState & state, const ATermVector & args)
     attrs.set(toATerm("type"),
         makeAttrRHS(makeStr("derivation"), makeNoPos()));
 
-    Expr drvStrict = makeCall(makeVar(toATerm("derivation!")), eAttrs);
+    Expr drvStrict = allocCell(makeCall(makeVar(toATerm("derivation!")), eAttrs));
 
     attrs.set(toATerm("outPath"),
-        makeAttrRHS(allocCell(makeSelect(drvStrict, toATerm("outPath"))), makeNoPos()));
+        makeAttrRHS(makeSelect(drvStrict, toATerm("outPath")), makeNoPos()));
     attrs.set(toATerm("drvPath"),
-        makeAttrRHS(allocCell(makeSelect(drvStrict, toATerm("drvPath"))), makeNoPos()));
+        makeAttrRHS(makeSelect(drvStrict, toATerm("drvPath")), makeNoPos()));
     
     return makeAttrs(attrs);
 }

@@ -201,6 +201,48 @@ Expr substitute(const Substitution & subs, Expr e)
 }
 
 
+Expr allocCells(Expr e)
+{
+    checkInterrupt();
+
+    ATerm e2;
+    if (matchClosed(e, e2)) return e;
+
+    int i;
+    if (matchCell(e, i, e2))
+        return allocCell(allocCells(e2));
+
+    if (ATgetType(e) == AT_APPL) {
+        AFun fun = ATgetAFun(e);
+        int arity = ATgetArity(fun);
+        ATerm args[arity];
+        bool changed = false;
+
+        for (int i = 0; i < arity; ++i) {
+            ATerm arg = ATgetArgument(e, i);
+            args[i] = allocCells(arg);
+            if (args[i] != arg) changed = true;
+        }
+        
+        return changed ? (ATerm) ATmakeApplArray(fun, args) : e;
+    }
+
+    if (ATgetType(e) == AT_LIST) {
+        unsigned int len = ATgetLength((ATermList) e);
+        ATerm es[len];
+        ATermIterator i((ATermList) e);
+        for (unsigned int j = 0; i; ++i, ++j)
+            es[j] = allocCells(*i);
+        ATermList out = ATempty;
+        for (unsigned int j = len; j; --j)
+            out = ATinsert(out, es[j - 1]);
+        return (ATerm) out;
+    }
+
+    return e;
+}
+
+
 /* We use memoisation to prevent exponential complexity on heavily
    shared ATerms (remember, an ATerm is a graph, not a tree!).  Note
    that using an STL set is fine here wrt to ATerm garbage collection

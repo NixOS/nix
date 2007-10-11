@@ -478,7 +478,7 @@ LocalNoInline(Expr evalCall(EvalState & state, Expr fun, Expr arg))
     else if (matchFunction(fun, formals, body, pos)) {
         arg = evalExpr(state, arg);
         try {
-            return evalExpr(state, substArgs(state, body, formals, arg));
+            return evalExpr(state, substArgs(state, allocCells(body), formals, arg));
         } catch (Error & e) {
             addErrorPrefix(e, "while evaluating the function at %1%:\n",
                 showPos(pos));
@@ -491,7 +491,7 @@ LocalNoInline(Expr evalCall(EvalState & state, Expr fun, Expr arg))
             arg = speculativeEval(state, arg);
             ATermMap subs(1);
             subs.set(name, allocCell(arg));
-            return evalExpr(state, substitute(Substitution(0, &subs), body));
+            return evalExpr(state, substitute(Substitution(0, &subs), allocCells(body)));
         } catch (Error & e) {
             addErrorPrefix(e, "while evaluating the function at %1%:\n",
                 showPos(pos));

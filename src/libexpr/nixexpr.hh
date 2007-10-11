@@ -119,6 +119,8 @@ string showValue(Expr e);
 
 Expr allocCell(Expr e); // make an updateable cell (for simulating conventional laziness)
 
+Expr allocCells(Expr e); // re-allocate all cells in e
+
  
 }
 
