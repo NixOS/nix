@@ -39,6 +39,7 @@ struct EvalState
     unsigned int nrCached;
 
     bool cacheTerms;
+    bool strictMode;
 
     EvalState();
 

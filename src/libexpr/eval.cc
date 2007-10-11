@@ -25,6 +25,7 @@ EvalState::EvalState()
     addPrimOps();
 
     cacheTerms = getEnv("NIX_TERM_CACHE", "1") == "1";
+    strictMode = getEnv("NIX_STRICT", "0") == "1";
 }
 
 
@@ -71,6 +72,19 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, 
 }
 
 
+Expr speculativeEval(EvalState & state, Expr e)
+{
+    if (!state.strictMode) return e;
+    try {
+        return evalExpr(state, e);
+    } catch (EvalError & err) {
+        /* ignore, pass the original arg and depend on
+           laziness */
+        return e;
+    }
+}
+
+
 /* Substitute an argument set into the body of a function. */
 static Expr substArgs(EvalState & state,
     Expr body, ATermList formals, Expr arg)
@@ -82,7 +96,7 @@ static Expr substArgs(EvalState & state,
     ATermMap args;
     queryAllAttrs(arg, args);
     for (ATermMap::const_iterator i = args.begin(); i != args.end(); ++i)
-        subs.set(i->key, i->value);
+        subs.set(i->key, speculativeEval(state, i->value));
     
     /* Get the formal arguments. */
     ATermVector defsUsed;
@@ -469,6 +483,7 @@ LocalNoInline(Expr evalCall(EvalState & state, Expr fun, Expr arg))
         
     else if (matchFunction1(fun, name, body, pos)) {
         try {
+            arg = speculativeEval(state, arg);
             ATermMap subs(1);
             subs.set(name, arg);
             return evalExpr(state, substitute(Substitution(0, &subs), body));
@@ -725,7 +740,7 @@ Expr evalExpr(EvalState & state, Expr e)
 {
     checkInterrupt();
 
-#if 0
+#if 1
     startNest(nest, lvlVomit,
         format("evaluating expression: %1%") % e);
 #endif
