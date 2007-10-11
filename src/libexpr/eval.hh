@@ -41,6 +41,8 @@ struct EvalState
     bool cacheTerms;
     bool strictMode;
 
+    ATermMap parsings; /* path -> expr mapping */
+
     EvalState();
 
     void addPrimOps();

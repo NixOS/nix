@@ -383,8 +383,13 @@ Expr parseExprFromFile(EvalState & state, Path path)
     if (S_ISDIR(st.st_mode))
         path = canonPath(path + "/default.nix");
 
+    Expr cached = state.parsings.get(toATerm(path));
+    if (cached) return cached;
+
     /* Read and parse the input file. */
-    return parse(state, readFile(path).c_str(), path, dirOf(path));
+    cached = parse(state, readFile(path).c_str(), path, dirOf(path));
+    state.parsings.set(toATerm(path), cached);
+    return cached;
 }
 
 
