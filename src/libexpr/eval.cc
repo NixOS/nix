@@ -23,6 +23,8 @@ EvalState::EvalState()
     initNixExprHelpers();
 
     addPrimOps();
+
+    cacheTerms = getEnv("NIX_TERM_CACHE", "1") == "1";
 }
 
 
@@ -730,6 +732,8 @@ Expr evalExpr(EvalState & state, Expr e)
 
     state.nrEvaluated++;
 
+    if (!state.cacheTerms) return evalExpr2(state, e);
+    
     /* Consult the memo table to quickly get the normal form of
        previously evaluated expressions. */
     Expr nf = state.normalForms.get(e);
