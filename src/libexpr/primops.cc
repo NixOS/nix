@@ -567,9 +567,9 @@ static Expr prim_derivationLazy(EvalState & state, const ATermVector & args)
     Expr drvStrict = makeCall(makeVar(toATerm("derivation!")), eAttrs);
 
     attrs.set(toATerm("outPath"),
-        makeAttrRHS(makeSelect(drvStrict, toATerm("outPath")), makeNoPos()));
+        makeAttrRHS(allocCell(makeSelect(drvStrict, toATerm("outPath"))), makeNoPos()));
     attrs.set(toATerm("drvPath"),
-        makeAttrRHS(makeSelect(drvStrict, toATerm("drvPath")), makeNoPos()));
+        makeAttrRHS(allocCell(makeSelect(drvStrict, toATerm("drvPath"))), makeNoPos()));
     
     return makeAttrs(attrs);
 }
@@ -773,7 +773,7 @@ static Expr prim_listToAttrs(EvalState & state, const ATermVector & args)
                 Expr e = evalExpr(state, makeSelect(evaledExpr, toATerm("name")));
                 string attr = evalStringNoCtx(state,e);
                 Expr r = makeSelect(evaledExpr, toATerm("value"));
-                res.set(toATerm(attr), makeAttrRHS(r, makeNoPos()));
+                res.set(toATerm(attr), makeAttrRHS(allocCell(r), makeNoPos()));
             }
             else
                 throw TypeError(format("list element in `listToAttrs' is %s, expected a set { name = \"<name>\"; value = <value>; }")

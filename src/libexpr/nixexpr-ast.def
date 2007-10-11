@@ -73,6 +73,8 @@ Inherit | Expr ATermList Pos | ATerm |
 
 Scope | | Expr |
 
+Cell | int Expr | Expr |
+
 Formal | string ValidValues DefaultValue | ATerm |
 
 ValidValues | ATermList | ValidValues |

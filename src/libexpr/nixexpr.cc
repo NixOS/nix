@@ -2,6 +2,7 @@
 #include "derivations.hh"
 #include "util.hh"
 #include "aterm.hh"
+#include "eval.hh" // !!! urgh
 
 #include "nixexpr-ast.hh"
 #include "nixexpr-ast.cc"
@@ -397,6 +398,19 @@ string showValue(Expr e)
     if (e == eFalse) return "false";
     /* !!! incomplete */
     return "<unknown>";
+}
+
+
+static unsigned int cellCount = 0;
+
+
+Expr allocCell(Expr e)
+{
+    if (cacheTerms != 2) return e;
+    int i;
+    Expr e2;
+    if (matchCell(e, i, e2)) return e;
+    return makeCell(cellCount++, e);
 }
 
  

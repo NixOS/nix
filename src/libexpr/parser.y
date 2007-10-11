@@ -57,7 +57,7 @@ static Expr fixAttrs(int recursive, ATermList as)
             bool fromScope = matchScope(src);
             for (ATermIterator j(names); j; ++j) {
                 Expr rhs = fromScope ? makeVar(*j) : makeSelect(src, *j);
-                *is = ATinsert(*is, makeBind(*j, rhs, pos));
+                *is = ATinsert(*is, makeBind(*j, allocCell(rhs), pos));
             }
         } else bs = ATinsert(bs, *i);
     }
@@ -226,7 +226,7 @@ binds
 
 bind
   : ID '=' expr ';'
-    { $$ = makeBind($1, $3, CUR_POS); }
+    { $$ = makeBind($1, allocCell($3), CUR_POS); }
   | INHERIT inheritsrc ids ';'
     { $$ = makeInherit($2, $3, CUR_POS); }
   ;

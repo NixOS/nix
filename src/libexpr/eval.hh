@@ -27,6 +27,9 @@ struct EvalState;
 typedef Expr (* PrimOp) (EvalState &, const ATermVector & args);
 
 
+extern int cacheTerms; // 0 = don't, 1 = do, 2 = "cell" terms only
+
+
 struct EvalState 
 {
     ATermMap normalForms;
@@ -38,7 +41,6 @@ struct EvalState
     unsigned int nrEvaluated;
     unsigned int nrCached;
 
-    bool cacheTerms;
     bool strictMode;
 
     ATermMap parsings; /* path -> expr mapping */

@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "eval.hh"
 #include "parser.hh"
 #include "hash.hh"
@@ -13,6 +15,9 @@
 
 
 namespace nix {
+
+
+int cacheTerms;
     
 
 EvalState::EvalState()
@@ -24,7 +29,7 @@ EvalState::EvalState()
 
     addPrimOps();
 
-    cacheTerms = getEnv("NIX_TERM_CACHE", "1") == "1";
+    if (!string2Int(getEnv("NIX_TERM_CACHE"), cacheTerms)) cacheTerms = 1;
     strictMode = getEnv("NIX_STRICT", "0") == "1";
 }
 
@@ -405,7 +410,7 @@ Expr autoCallFunction(Expr e, const ATermMap & args)
             Expr name, def, value; ATerm values, def2;
             if (!matchFormal(*i, name, values, def2)) abort();
             if ((value = args.get(name)))
-                actualArgs.set(name, makeAttrRHS(value, makeNoPos()));
+                actualArgs.set(name, makeAttrRHS(allocCell(value), makeNoPos()));
             else if (!matchDefaultValue(def2, def))
                 throw TypeError(format("cannot auto-call a function that has an argument without a default value (`%1%')")
                     % aterm2String(name));
@@ -485,7 +490,7 @@ LocalNoInline(Expr evalCall(EvalState & state, Expr fun, Expr arg))
         try {
             arg = speculativeEval(state, arg);
             ATermMap subs(1);
-            subs.set(name, arg);
+            subs.set(name, allocCell(arg));
             return evalExpr(state, substitute(Substitution(0, &subs), body));
         } catch (Error & e) {
             addErrorPrefix(e, "while evaluating the function at %1%:\n",
@@ -641,6 +646,10 @@ Expr evalExpr2(EvalState & state, Expr e)
     
     Expr e1, e2, e3;
     ATerm name, pos;
+
+    int bla;
+    if (matchCell(e, bla, e1)) e = e1;
+
     AFun sym = ATgetAFun(e);
 
     /* Normal forms. */
@@ -732,6 +741,7 @@ Expr evalExpr2(EvalState & state, Expr e)
     if (matchOpConcat(e, e1, e2)) return evalOpConcat(state, e1, e2);
 
     /* Barf. */
+    //printMsg(lvlError, format("%1%") % e);
     abort();
 }
 
@@ -747,7 +757,13 @@ Expr evalExpr(EvalState & state, Expr e)
 
     state.nrEvaluated++;
 
-    if (!state.cacheTerms) return evalExpr2(state, e);
+    if (cacheTerms == 0) return evalExpr2(state, e);
+
+    if (cacheTerms == 2) {
+        int pseudoAddr;
+        Expr e2;
+        if (!matchCell(e, pseudoAddr, e2)) return evalExpr2(state, e);
+    }
     
     /* Consult the memo table to quickly get the normal form of
        previously evaluated expressions. */
