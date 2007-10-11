@@ -928,6 +928,17 @@ static Expr prim_stringLength(EvalState & state, const ATermVector & args)
 
 
 /*************************************************************
+ * Strictness
+ *************************************************************/
+
+
+static Expr prim_strict(EvalState & state, const ATermVector & args)
+{
+    return evalExpr(state, makeCall(args[0], evalExpr(state, args[1])));
+}
+
+
+/*************************************************************
  * Primop registration
  *************************************************************/
 
@@ -993,6 +1004,9 @@ void EvalState::addPrimOps()
     addPrimOp("toString", 1, prim_toString);
     addPrimOp("__substring", 3, prim_substring);
     addPrimOp("__stringLength", 1, prim_stringLength);
+
+    // Strictness
+    addPrimOp("strict", 2, prim_strict);
 }
 
 
