@@ -12,14 +12,11 @@ namespace nix {
 Derivation derivationFromPathPrivate(const bool dotxn, const Transaction & txn, const Path & drvPath)
 {
     assertStorePath(drvPath);
-    if(dotxn){
-    	printMsg(lvlError, format("ensurePathTxn(txn,%1%)") % drvPath);
+    if(dotxn)
     	ensurePathTxn(txn, drvPath);
-    }
-    else{
-    	printMsg(lvlError, format("store->ensurePathTxn(%1%)") % drvPath);
+    else
     	store->ensurePath(drvPath);
-    }
+    
     ATerm t = ATreadFromNamedFile(drvPath.c_str());
     if (!t) 
     	throw Error(format("cannot read aterm from `%1%'") % drvPath);

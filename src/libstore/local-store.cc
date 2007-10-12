@@ -626,6 +626,9 @@ void LocalStore::queryStateReferrers(const Path & storePath, PathSet & stateRefe
     nix::queryStateReferrersTxn(noTxn, storePath, stateReferrers, revision);
 }
 
+/*
+ * You can substitute a path withouth substituting the deriver!!!!!
+ */
 void setDeriver(const Transaction & txn, const Path & storePath, const Path & deriver)
 {
     assertStorePath(storePath);
@@ -635,7 +638,11 @@ void setDeriver(const Transaction & txn, const Path & storePath, const Path & de
     if (!isValidPathTxn(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
 
-    if (isStateDrvPathTxn(txn, deriver)){								//Redirect if its a state component					
+    if (isStateComponentTxn(txn, storePath)){								//Redirect if its a state component					
+
+    	if (!isValidPathTxn(txn, deriver))
+        	throw Error(format("Derivers `%1%' is not valid so we dont have the info for a store-state path") % storePath);
+        	
     	addStateDeriver(txn, storePath, deriver);
 	}		
     else{

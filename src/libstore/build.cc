@@ -2828,6 +2828,8 @@ void ensurePathTxn(const Transaction & txn, const Path & path)
     if (isValidPathTxn(txn, path)) 
     	return;
 
+	printMsg(lvlError, format("ensurePathTxn(%1%)") % path);
+
     Worker worker;
     GoalPtr goal = worker.makeSubstitutionGoal(path);
     Goals goals = singleton<Goals>(goal);
