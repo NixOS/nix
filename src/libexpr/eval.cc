@@ -18,6 +18,13 @@ namespace nix {
 
 
 int cacheTerms;
+
+bool shortCircuit;
+
+#define maxActiveCalls 4096
+
+ATerm activeCalls[maxActiveCalls];
+unsigned int activeCallsCount = 0;
     
 
 EvalState::EvalState()
@@ -30,7 +37,10 @@ EvalState::EvalState()
     addPrimOps();
 
     if (!string2Int(getEnv("NIX_TERM_CACHE"), cacheTerms)) cacheTerms = 1;
+    shortCircuit = getEnv("NIX_SHORT_CIRCUIT", "0") == "1";
     strictMode = getEnv("NIX_STRICT", "0") == "1";
+
+    ATprotectMemory(activeCalls, maxActiveCalls);
 }
 
 
@@ -746,6 +756,33 @@ Expr evalExpr2(EvalState & state, Expr e)
 }
 
 
+class ShortCircuit
+{
+};
+
+
+unsigned int fnord;
+
+
+void maybeShortCircuit(EvalState & state, Expr e, Expr nf)
+{
+    for (unsigned int i = 0; i < activeCallsCount; ++i) {
+        Expr fun, arg;
+        if (!matchCall(activeCalls[i], fun, arg)) abort();
+        if (arg == e) {
+            //printMsg(lvlError, format("blaat"));
+            //printMsg(lvlError, format("blaat %1% %2% %3%") % fun % arg % e);
+            Expr res = state.normalForms.get(makeCall(fun, nf));
+            if (res) {
+                fnord++;
+                //printMsg(lvlError, format("blaat"));
+                throw ShortCircuit();
+            }
+        }
+    }
+}
+
+
 Expr evalExpr(EvalState & state, Expr e)
 {
     checkInterrupt();
@@ -769,22 +806,86 @@ Expr evalExpr(EvalState & state, Expr e)
        previously evaluated expressions. */
     Expr nf = state.normalForms.get(e);
     if (nf) {
-        if (nf == makeBlackHole())
-            throwEvalError("infinite recursion encountered");
+        //if (nf == makeBlackHole())
+        //    throwEvalError("infinite recursion encountered");
         state.nrCached++;
         return nf;
     }
 
-    /* Otherwise, evaluate and memoize. */
-    state.normalForms.set(e, makeBlackHole());
-    try {
-        nf = evalExpr2(state, e);
-    } catch (Error & err) {
-        state.normalForms.remove(e);
-        throw;
+    Expr fun, arg;
+    if (shortCircuit && matchCall(e, fun, arg)) {
+
+#if 0        
+        Expr arg2 = state.normalForms.get(arg);
+        if (arg2) { /* the evaluated argument is now known */
+            //printMsg(lvlError, "foo");
+            /* do we know the result of the same function called
+               with the evaluated argument? */
+            Expr res = state.normalForms.get(makeCall(fun, arg2));
+            if (res) { /* woohoo! */
+                printMsg(lvlError, "dingdong");
+                state.normalForms.set(e, res);
+                return res;
+            }
+        }
+#endif
+
+        assert(activeCallsCount < maxActiveCalls);
+        activeCalls[activeCallsCount++] = e;
+
+        //state.normalForms.set(e, makeBlackHole());
+        try {
+            nf = evalExpr2(state, e);
+        }
+        catch (ShortCircuit & exception) {
+            //printMsg(lvlError, "catch!");
+            Expr arg2 = state.normalForms.get(arg);
+            if (arg2) { /* the evaluated argument is now known */
+                /* do we know the result of the same function called
+                   with the evaluated argument? */
+                Expr res = state.normalForms.get(makeCall(fun, arg2));
+                if (res) { /* woohoo! */
+                    //printMsg(lvlError, "woohoo!");
+                    //printMsg(lvlError, format("woohoo! %1% %2% %3% %4%") % fun % arg % arg2 % res);
+                    activeCallsCount--;
+                    state.normalForms.set(e, res);
+                    maybeShortCircuit(state, e, res);
+                    return res;
+                }
+            }
+            activeCallsCount--;
+            state.normalForms.remove(e);
+            throw; /* not for us */
+        }
+        catch (...) {
+            activeCallsCount--;
+            state.normalForms.remove(e);
+            throw;
+        }
+        activeCallsCount--;
+        state.normalForms.set(e, nf);
+        Expr arg2 = state.normalForms.get(arg);
+        if (arg2) state.normalForms.set(makeCall(fun, arg2), nf);
+        maybeShortCircuit(state, e, nf);
+        return nf;
+        
     }
-    state.normalForms.set(e, nf);
-    return nf;
+
+    else {
+        
+        /* Otherwise, evaluate and memoize. */
+        //state.normalForms.set(e, makeBlackHole());
+        try {
+            nf = evalExpr2(state, e);
+        } catch (...) {
+            state.normalForms.remove(e);
+            throw;
+        }
+        state.normalForms.set(e, nf);
+        maybeShortCircuit(state, e, nf);
+        return nf;
+
+    }
 }
 
 
@@ -884,6 +985,7 @@ void printEvalStats(EvalState & state)
 {
     char x;
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
+    printMsg(lvlError, format("FNORD %1%") % fnord);
     printMsg(showStats ? lvlInfo : lvlDebug,
         format("evaluated %1% expressions, %2% cache hits, %3%%% efficiency, used %4% ATerm bytes, used %5% bytes of stack space")
         % state.nrEvaluated % state.nrCached
