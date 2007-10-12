@@ -212,6 +212,8 @@ ValidPathInfo decodeValidPathInfo(std::istream & str)
 {
     ValidPathInfo info;
     
+	printMsg(lvlError, format("BEFORE decodeValidPathInfo"));
+    
     getline(str, info.path);
     if (str.eof()) { info.path = ""; return info; }
     
@@ -226,22 +228,31 @@ ValidPathInfo decodeValidPathInfo(std::istream & str)
         getline(str, s);
         info.references.insert(s);
     }
-    
-    getline(str, s);
-    if (!string2Int(s, n)) 
-    	throw Error("number expected");
-    while (n--) {
-        getline(str, s);
-        info.stateReferences.insert(s);
+
+    if(store->isStateComponent(info.path)){
+	    
+	    printMsg(lvlError, format("STATE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"));
+	    
+	    getline(str, s);
+	    if (!string2Int(s, n)) 
+	    	throw Error("number expected");
+	    while (n--) {
+	        getline(str, s);
+	        info.stateReferences.insert(s);
+	    }
+	    
+	    unsigned int u;
+		getline(str, s);
+	    if (!string2UnsignedInt(s, u)) 
+	    	throw Error("number expected");
+	   	info.revision = u;
     }
     
-    unsigned int u;
-	getline(str, s);
-    if (!string2UnsignedInt(s, u)) 
-    	throw Error("number expected");
-   	info.revision = u;
-    
-    if (!str || str.eof()) throw Error("missing input");
+    if (!str || str.eof()) 
+    	throw Error("missing input");
+   
+   	printMsg(lvlError, format("AFTER decodeValidPathInfo")); 	
+   
     return info;
 }
 

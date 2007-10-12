@@ -14,26 +14,26 @@ namespace nix {
 
 typedef enum {
     wopQuit = 0,							//0
-    wopIsValidPath,
-	wopHasSubstitutes = 3,
+    wopIsValidPath,							//1
+	wopHasSubstitutes = 3,					//3
     wopIsValidStatePath,
     wopIsValidComponentOrStatePath,
     wopQueryPathHash,
     wopQueryStatePathDrv,
     wopQueryStoreReferences,
     wopQueryStateReferences,
-    wopQueryStoreReferrers,					
-    wopQueryStateReferrers,					//10
+    wopQueryStoreReferrers,					//10
+    wopQueryStateReferrers,					
     wopAddToStore,							
-    wopAddTextToStore,
-    wopBuildDerivations,					//13
-    wopEnsurePath,
+    wopAddTextToStore,						//13
+    wopBuildDerivations,					//14
+    wopEnsurePath,							//15
     wopAddTempRoot,
     wopAddIndirectRoot,
     wopSyncWithGC,
     wopFindRoots,
-    wopCollectGarbage,						
-    wopExportPath,							//20
+    wopCollectGarbage,						//20
+    wopExportPath,							
     wopImportPath,
     wopQueryDeriver,
     wopQueryDerivers,
@@ -42,16 +42,16 @@ typedef enum {
 	wopIsStateComponent,
 	wopStorePathRequisites,
 	wopSetStateRevisions,
-	wopQueryStateRevisions,					
-	wopQueryAvailableStateRevisions,		//30
+	wopQueryStateRevisions,					//30
+	wopQueryAvailableStateRevisions,		
 	wopCommitStatePath,
 	wopScanAndUpdateAllReferences,
 	wopGetSharedWith,
 	wopToNonSharedPathSet,
 	wopRevertToRevision,
 	wopShareState,
-	wopUnShareState,						//37
-    wopSetOptions,
+	wopUnShareState,						
+    wopSetOptions,							//39
 } WorkerOp;
 
 

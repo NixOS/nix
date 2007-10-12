@@ -246,6 +246,14 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 	}	
 }
 
+static void opIsStateStorePath(Strings opFlags, Strings opArgs)		//Used by ..........
+{
+	Path path = *(opArgs.begin());
+	bool isStateComponent = store->isStateComponent(path);
+	cout << format("%s") % bool2string(isStateComponent);
+	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!! replace lvlErrors by cout << format("%s\n") % *i;
+}
+
 
 static void opShowSharedPaths(Strings opFlags, Strings opArgs)
 {
@@ -635,7 +643,8 @@ void run(Strings args)
 			op = opShowDerivations;
 		else if (arg == "--showrevisions")
 			op = queryAvailableStateRevisions;
-			
+		else if (arg == "--is-state-store-path-download-using-manifests")
+			op = opIsStateStorePath;			
 		
 		//Revering State options
 		else if (arg.substr(0,21) == "--revert-to-revision="){

@@ -467,7 +467,7 @@ void readFull(int fd, unsigned char * buf, size_t count)
             throw SysError("reading from file");
         }
         if (res == 0) 
-        	throw EndOfFile("unexpected end-of-file (in readFull so deamon communication)");
+        	throw EndOfFile("unexpected end-of-file (in readFull so daemon communication)");
         count -= res;
         buf += res;
     }

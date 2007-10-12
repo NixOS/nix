@@ -1146,22 +1146,24 @@ static string makeValidityRegistration(const PathSet & paths,
              j != references.end(); ++j)
             s += *j + "\n";
         
-        //state references
-        
-        PathSet stateReferences;
-        store->queryStateReferences(*i, stateReferences, 0);
+        if(store->isStateComponent(*i)){
 
-        s += (format("%1%\n") % stateReferences.size()).str();
-            
-        for (PathSet::iterator j = stateReferences.begin();
-             j != stateReferences.end(); ++j)
-            s += *j + "\n";
-        
-        //revision
-        
-        string revision = unsignedInt2String(0);
-        s += revision + "\n";
-        
+	        //state references
+	        
+	        PathSet stateReferences;
+	        store->queryStateReferences(*i, stateReferences, 0);
+	
+	        s += (format("%1%\n") % stateReferences.size()).str();
+	            
+	        for (PathSet::iterator j = stateReferences.begin();
+	             j != stateReferences.end(); ++j)
+	            s += *j + "\n";
+	        
+	        //revision
+	        
+	        string revision = unsignedInt2String(0);
+	        s += revision + "\n";
+        }
     }
 
     return s;
@@ -1852,7 +1854,7 @@ void DerivationGoal::computeClosure()
      * If state is enabled for the path we:
      * [scan for and state references and component references in the state path]	//3,4
      */
-	if(isStateDrv(drv)){		//TODO 
+	if(isStateDrv(drv)){ 
 		
 		Path sharedState = drv.stateOutputs.find("state")->second.sharedState;
 		if(sharedState != ""){
@@ -1861,8 +1863,7 @@ void DerivationGoal::computeClosure()
 			
 			//We dont need to scan for state references since at the query to the state path we give the results of the linked-to path
 		}
-		else
-		{
+		else{
 			Path statePath = drv.stateOutputs.find("state")->second.statepath;
 			printMsg(lvlTalkative, format("scanning for component and state references inside `%1%'") % statePath);
 		
@@ -2395,7 +2396,10 @@ static bool working = false;
 Worker::Worker()
 {
     /* Debugging: prevent recursive workers. */ 
-    if (working) abort();
+	printMsg(lvlError, format("Before abort '%1%'") % working);
+    if (working) 
+    	abort();
+    printMsg(lvlError, format("After abort"));
     working = true;
     nrChildren = 0;
 }
@@ -2592,6 +2596,7 @@ void Worker::getInfo()
             args.push_back("--query-info");
             args.insert(args.end(), paths2.begin(), paths2.end());
             string res = runProgram(sub, false, args);
+			printMsg(lvlError, format("run: '%1%' res: '%2%'") % sub % res);
             std::istringstream str(res);
 
             while (true) {
@@ -2606,14 +2611,18 @@ void Worker::getInfo()
                     if (goal) {
                         SubstitutionGoal * goal2 = dynamic_cast<SubstitutionGoal *>(goal.get());
                         if (goal2->storePath == info.path) {
-                            goal2->references = info.references;
+                            goal2->references = info.references;											
                             goal2->deriver = info.deriver;
+                            //goal2->stateReferences = info.stateReferences;							//TODO !!!!!!!!!!!!!!!!!!!!!!!!!! STATE REFERENCES FOR A SubstitutionGoal
+                            //goal2->revision = info.revision;
                             goal2->infoOkay = true;
                             wakeUp(goal);
                         }
                     }
                 }
             }
+            
+            printMsg(lvlError, format("AAAAAAAAA: '%1%'") % store->isStateComponent("/nix/store/3pw7vmdwdf3ccx6h6i2w0j52ribjswzn-hellotest-1.0"));
         }
     }
 

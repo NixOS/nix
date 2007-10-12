@@ -702,7 +702,12 @@ static void processConnection()
     while (true) {
         WorkerOp op;
         try {
-            op = (WorkerOp) readInt(from);
+        	int oppp = readInt(from);
+            op = (WorkerOp) oppp;
+            if(oppp == 14){
+            	printMsg(lvlError, format("Sleeping 10"));
+            	sleep(10);
+            }
         } catch (EndOfFile & e) {
             break;
         }
@@ -710,7 +715,7 @@ static void processConnection()
         opCount++;
 
         try {
-        	printMsg(lvlInfo, format("Processing op '%1%'") % op);
+        	printMsg(lvlInfo, format("Processing op '%1%' with pid '%2%'") % op % myPid);
             performOp(from, to, op);
             printMsg(lvlInfo, format("Processed op '%1%'") % op);
         } catch (Error & e) {
