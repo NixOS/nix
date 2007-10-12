@@ -412,7 +412,7 @@ static void dfsVisit(const PathSet & paths, const Path & path,
     
     PathSet references;
     if (store->isValidPath(path))
-        store->queryStoreReferences(path, references, 0);						//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        store->queryStoreReferences(path, references, 0);						
     
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)
@@ -423,6 +423,8 @@ static void dfsVisit(const PathSet & paths, const Path & path,
 
     sorted.push_front(path);
 }
+
+//TODO maybe? stateTopoSortPaths(const PathSet & paths)
 
 
 Paths topoSortPaths(const PathSet & paths)
@@ -445,9 +447,6 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
         queryBoolSetting("gc-keep-outputs", false);
     bool gcKeepDerivations =
         queryBoolSetting("gc-keep-derivations", true);
-
-	gcKeepDerivations = true;									//TODO for now. we always keep drvs in the state branch since we 
-																//need some of them to lookup info
 
     /* Acquire the global GC root.  This prevents
        a) New roots from being added.
@@ -479,7 +478,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
        roots under the `references' relation. */
     PathSet livePaths;
     for (PathSet::const_iterator i = roots.begin(); i != roots.end(); ++i){
-    	printMsg(lvlError, format("CHECK '%1%'") % *i);
+    	//printMsg(lvlError, format("CHECK '%1%'") % *i);
         computeFSClosure(canonPath(*i), livePaths, true, true, 0);
     }
 
@@ -490,7 +489,8 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
              i != livePaths.end(); ++i)
         {
         	if (store->isStateComponent(*i)){
-        		printMsg(lvlError, format("CHECK-STATE-STORE '%1%'") % *i);
+        		//printMsg(lvlError, format("Live state store '%1%'") % *i);
+        		
         		//we select ALL state Derivations here
         		PathSet derivers = store->queryDerivers(*i, "*", "*");
         		
@@ -500,9 +500,8 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
                 		computeFSClosure(*j, livePaths, true, true, 0);
         	}
 			else if (store->isValidPath(*i)){
-				printMsg(lvlError, format("CHECK-STORE '%1%'") % *i);
-            	Path deriver = store->queryDeriver(*i);
-            	//printMsg(lvlError, format("CHECK-STORE DRV '%1%'") % deriver);
+				//printMsg(lvlError, format("Live Store '%1%'") % *i);
+	           	Path deriver = store->queryDeriver(*i);
 				
                /* Note that the deriver need not be valid (e.g., if we
                previously ran the collector with `gcKeepDerivations'
@@ -510,12 +509,18 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
 				if (deriver != "" && store->isValidPath(deriver))
                 	computeFSClosure(deriver, livePaths, true, true, 0);
             }
+            else if (store->isValidStatePath(*i)){
+				//printMsg(lvlError, format("Live State '%1%'") % *i);            	
+            	Path deriver = queryStatePathDrvTxn(noTxn, *i);
+            	
+            	if(!store->isValidPath(deriver))
+            		throw Error(format("deriver `%1%' of state-store component `%2%' in GC is not valid") % deriver % *i);
+            	
+            	computeFSClosure(deriver, livePaths, true, true, 0);
+            }
 			else{
-				printMsg(lvlError, format("CHECK-STATE '%1%'") % *i);
-				
-				//TODO also get its deriver???? for if its component is gone !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-				
-			}    
+//				//throw error?		( check trunk?
+			}			    
         }
     }
     
@@ -526,12 +531,14 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
         for (PathSet::iterator i = livePaths.begin();
              i != livePaths.end(); ++i)
             if (isDerivation(*i)) {
-            	printMsg(lvlError, format("CHECK3 '%1%'") % *i);
+            	//printMsg(lvlError, format("CHECK3 '%1%'") % *i);
                 Derivation drv = derivationFromPathTxn(noTxn, *i);
                 for (DerivationOutputs::iterator j = drv.outputs.begin();
                      j != drv.outputs.end(); ++j)
                     if (store->isValidPath(j->second.path))
-                        computeFSClosure(j->second.path, livePaths, true, true, 0);					//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WHAT ARE (STATE) OUTPUTS ????????????
+                        computeFSClosure(j->second.path, livePaths, true, true, 0);					//TODO Check?
+                    else if (store->isValidStatePath(j->second.path))
+                    	computeFSClosure(j->second.path, livePaths, true, true, 0);
             }
     }
 
@@ -556,7 +563,9 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     PathSet tempRootsClosed;
     for (PathSet::iterator i = tempRoots.begin(); i != tempRoots.end(); ++i)
         if (store->isValidPath(*i))
-            computeFSClosure(*i, tempRootsClosed, true, false, 0);									//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO .... STATE
+            computeFSClosure(*i, tempRootsClosed, true, true, 0);									//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO .... STATE
+        else if(store->isValidStatePath(*i))
+        	computeFSClosure(*i, tempRootsClosed, true, true, 0);									//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO .... STATE
         else
             tempRootsClosed.insert(*i);
 
@@ -569,9 +578,38 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
        that is not currently in in `livePaths' or `tempRootsClosed'
        can be deleted. */
     
-    ///TODO Calc get shared paths																	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    //for: livePaths, tempRootsClosed
-    PathSet sharedWith_livePaths_tempRootsClosed;
+    /*
+     * We lookup all shared paths for: livePaths, tempRootsClosed
+     */
+    PathSet allLiveStatePaths;
+    
+    for (PathSet::iterator i = livePaths.begin(); i != livePaths.end(); ++i)
+    	if(store->isValidStatePath(*i)){
+			allLiveStatePaths.insert(*i);
+			allLiveStatePaths = pathSets_union(getSharedWithPathSetRecTxn(noTxn, *i), allLiveStatePaths);
+    	}    		
+    for (PathSet::iterator i = tempRootsClosed.begin(); i != tempRootsClosed.end(); ++i)
+    	if(store->isValidStatePath(*i)){
+    		allLiveStatePaths.insert(*i);
+			allLiveStatePaths = pathSets_union(getSharedWithPathSetRecTxn(noTxn, *i), allLiveStatePaths);
+    	}
+
+    /*
+     * Lookup all derivations, of all state paths, because they need to be kept for comitting
+     */
+    PathSet allStatePathDerivations;
+    for (PathSet::iterator i = allLiveStatePaths.begin(); i != allLiveStatePaths.end(); ++i){
+    	printMsg(lvlError, format("Live state path `%1%'") % *i);
+    
+    	//allStatePathDerivations
+    	
+    	//GET DERIVER  AND COMPUTE CLOSURE HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    	//if (deriver != "" && store->isValidPath(deriver))
+        // 	computeFSClosure(deriver, livePaths, true, true, 0);
+    }
+    
+    
+    
     
     /* Read the Nix store and state directory's to find all currently existing
        paths. */
@@ -651,7 +689,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
 
             if (!pathExists(*i)) continue;
                 
-            printMsg(lvlInfo, format("deleting `%1%'") % *i);
+            //printMsg(lvlInfo, format("deleting `%1%'") % *i);							//TODO
             
             /* Okay, it's safe to delete. */
             try {
@@ -686,21 +724,9 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     for (Paths::iterator i = statePaths.begin(); i != statePaths.end(); ++i) {
     	
     	debug(format("considering deletion of state path `%1%'") % *i);
-        
-        if (livePaths.find(*i) != livePaths.end()) {
-            if (action == gcDeleteSpecific)
-                throw Error(format("cannot delete state path `%1%' since it is still alive") % *i);
-            debug(format("live state path `%1%'") % *i);
-            continue;
-        }
 
-        if (tempRootsClosed.find(*i) != tempRootsClosed.end()) {
-            debug(format("temporary root `%1%'") % *i);
-            continue;
-        }
-        
-        if (sharedWith_livePaths_tempRootsClosed.find(*i) != sharedWith_livePaths_tempRootsClosed.end()) {
-            debug(format("State path `%1%' is shared with another live path") % *i);
+        if (allLiveStatePaths.find(*i) != allLiveStatePaths.end()) {
+            debug(format("State path `%1%' is alive (possibyly shared with another live path)") % *i);
             continue;
         }
         

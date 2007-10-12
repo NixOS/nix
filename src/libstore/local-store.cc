@@ -237,11 +237,11 @@ LocalStore::LocalStore(bool reserveSpace)
             throw Error(format("`%1%' is corrupt") % schemaFN);
     }
 
-    if (curSchema > nixSchemaVersion && curSchema != 4)					//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MAJOR HACK, I SHOULD MERGE WITH THE TRUNK
+    if (curSchema > nixSchemaVersion)					
         throw Error(format("current Nix store schema is version %1%, but I only support %2%")
             % curSchema % nixSchemaVersion);
 
-    if (curSchema < nixSchemaVersion && curSchema != 4) {				//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MAJOR HACK, I SHOULD MERGE WITH THE TRUNK
+    if (curSchema < nixSchemaVersion) {				
         if (curSchema <= 1)
             upgradeStore07();
         if (curSchema == 2)
@@ -756,14 +756,12 @@ static Path queryDeriver(const Transaction & txn, const Path & storePath)
        previously ran the garbage collector with `gcKeepDerivations'
        turned off). */ 
     if(deriver == ""){
-    	printMsg(lvlTalkative, format("WARNING: Path '%1%' has no deriver anymore") % storePath);
+    	//printMsg(lvlTalkative, format("WARNING: Path '%1%' has no deriver anymore") % storePath);
     	return "";
     }
     
-    //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    //Derivation drv = derivationFromPathTxn(txn, deriver);		//We cant do this (at this point) since the drv might not exist ....
-    //if (isStateDrv(drv))
-    //	throw Error(format("This deriver `%1%' is a state deriver, u should use queryDerivers instead of queryDeriver") % deriver);
+    if (isStateComponentTxn(txn, storePath))
+    	throw Error(format("This path `%1%' is a store-state path, u should use queryDerivers instead of queryDeriver") % storePath);
     	    
     if (b)
         return deriver;
@@ -892,9 +890,9 @@ Hash LocalStore::queryPathHash(const Path & path)
     return queryHash(noTxn, path);
 }
 
-Path queryStatePathDrvTxn(const Transaction & txn, const Path & statePath)		//TODO !!!!!!!!!!!!!!!!!!!!!! A STATEPATH CAN HAVE MORE THEN JUST ONE DRV!!!!!!!!!!!!!!!!!!!!!!!
-{																				//SOLUTION: make dbValidStatePaths :: statepath --> storepath
-	string s;																	//query includes username and identifier ....??
+Path queryStatePathDrvTxn(const Transaction & txn, const Path & statePath)		
+{																				
+	string s;																	
     nixDB.queryString(txn, dbValidStatePaths, statePath, s);
     return s;
 }
@@ -964,7 +962,7 @@ void registerValidPaths(const Transaction & txn, const ValidPathInfos & infos)
         	setDeriver(txn, i->path, i->deriver);
 		}
 		
-        //TODO maybe also set a state deriver into dbStateDerivers .... well state is already linked to a drvpath in dbValidStatePaths ....
+        //State is already linked to a drvpath in dbValidStatePaths
     }
 }
 
@@ -1038,7 +1036,7 @@ Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
             canonicalisePathMetaData(dstPath);
             
             Transaction txn(nixDB);
-            registerValidPath(txn, dstPath, h, PathSet(), PathSet(), "", -1);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK (probabyly ok?)
+            registerValidPath(txn, dstPath, h, PathSet(), PathSet(), "", 0);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK (probabyly ok?)
             txn.commit();
         }
         
@@ -1214,7 +1212,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 
     PathSet references = readStorePaths(hashAndReadSource);
     
-    //TODO TODO also ..??!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //TODO TODO also ..??!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     PathSet stateReferences;
 
     Path deriver = readString(hashAndReadSource);
@@ -1635,7 +1633,7 @@ bool querySolidStateReferencesTxn(const Transaction & txn, const Path & statePat
 	return notempty;
 }
 
-void unShareStateTxn(const Transaction & txn, const Path & path, const bool branch, const bool restoreOld)		//TODO ADD BOOL YES/NO TO RESTORE OLD STATE (LAST REV.)
+void unShareStateTxn(const Transaction & txn, const Path & path, const bool branch, const bool restoreOld)
 {
 	//Check if is statePath
 	if(!isValidStatePathTxn(txn, path))
@@ -1785,7 +1783,7 @@ void setStateStateReferencesTxn(const Transaction & txn, const Path & statePath,
 	setStateReferences(nixDB, txn, dbStateStateReferences, dbStateRevisions, statePath, references, revision, timestamp);
 }
 
-//Lookups which statePaths directy share (point to) statePath
+//Lookup which statePaths directy share (point to) statePath
 PathSet getDirectlySharedWithPathSetTxn(const Transaction & txn, const Path & statePath)
 {
 	PathSet statePaths;
@@ -1822,6 +1820,7 @@ PathSet getSharedWithPathSetRecTxn_private(const Transaction & txn, const Path &
 	return statePaths;
 }
 
+//Lookup recursively which statePaths (in)directy share (point to) statePath
 PathSet getSharedWithPathSetRecTxn(const Transaction & txn, const Path & statePath)
 {
 	//To no shared state path

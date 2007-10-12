@@ -704,10 +704,15 @@ static void processConnection()
         try {
         	int oppp = readInt(from);
             op = (WorkerOp) oppp;
+
+			/* Use for debugging*/
+			/*
             if(oppp == 14){
             	printMsg(lvlError, format("Sleeping 10"));
             	sleep(10);
             }
+            */
+            
         } catch (EndOfFile & e) {
             break;
         }

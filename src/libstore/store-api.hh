@@ -229,6 +229,7 @@ public:
 	
 	/* TODO */
 	virtual void unShareState(const Path & path, const bool branch, const bool restoreOld) = 0;
+	
 };
 
 
