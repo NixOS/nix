@@ -59,12 +59,29 @@ elsif ($ARGV[0] eq "--query-info") {
         }
         print "$storePath\n";
         print "$info->{deriver}\n";
+        
         my @references = split " ", $info->{references};
         my $count = scalar @references;
         print "$count\n";
         foreach my $reference (@references) {
             print "$reference\n";
-        }
+		}
+	
+		my $isStateStorePath = `@bindir@/nix-state --is-state-store-path-download-using-manifests $storePath`;
+		if($isStateStorePath ne "true" && $isStateStorePath ne "false"){
+			die "The call for isStateStorePath must return true or false.....";
+		}
+	
+		if($isStateStorePath eq "true"){
+	        my @stateReferences = split " ", $info->{stateReferences};
+	        my $scount = scalar @stateReferences;
+	        print "$scount\n";
+	        foreach my $stateReference (@stateReferences) {
+	            print "$stateReference\n";
+	        }
+	        
+	    	print "$info->{revision}\n";
+	    }
     }
     exit 0;
 }
