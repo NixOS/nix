@@ -761,6 +761,9 @@ static void installDerivations(Globals & globals,
     
     //**********************
     
+    
+    //TODO !!!!!!!!!!!!!!!!!!!!!!!
+    //Remove the external links when a user uninstalls
 }
 
 

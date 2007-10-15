@@ -2396,10 +2396,8 @@ static bool working = false;
 Worker::Worker()
 {
     /* Debugging: prevent recursive workers. */ 
-	printMsg(lvlError, format("Before abort '%1%'") % working);
     if (working) 
     	abort();
-    printMsg(lvlError, format("After abort"));
     working = true;
     nrChildren = 0;
 }

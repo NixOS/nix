@@ -437,7 +437,7 @@ Paths topoSortPaths(const PathSet & paths)
 }
 
 
-void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
+void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,				//TODO ? statePathsToDelete
     bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed)
 {
     result.clear();
@@ -447,6 +447,8 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
         queryBoolSetting("gc-keep-outputs", false);
     bool gcKeepDerivations =
         queryBoolSetting("gc-keep-derivations", true);
+
+	printMsg(lvlError, format("gcKeepOutputs %1% gcKeepDerivations: %2%") % gcKeepOutputs % gcKeepDerivations);
 
     /* Acquire the global GC root.  This prevents
        a) New roots from being added.
@@ -485,8 +487,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
 	printMsg(lvlError, format("STAGE X"));
 
     if (gcKeepDerivations) {
-        for (PathSet::iterator i = livePaths.begin();
-             i != livePaths.end(); ++i)
+        for (PathSet::iterator i = livePaths.begin(); i != livePaths.end(); ++i)
         {
         	if (store->isStateComponent(*i)){
         		//printMsg(lvlError, format("Live state store '%1%'") % *i);
@@ -513,14 +514,12 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
 				//printMsg(lvlError, format("Live State '%1%'") % *i);            	
             	Path deriver = queryStatePathDrvTxn(noTxn, *i);
             	
+            	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TODO put back on
             	if(!store->isValidPath(deriver))
-            		throw Error(format("deriver `%1%' of state-store component `%2%' in GC is not valid") % deriver % *i);
-            	
-            	computeFSClosure(deriver, livePaths, true, true, 0);
+            	{} //	throw Error(format("deriver `%1%' of state-store component `%2%' in GC is not valid") % deriver % *i);
+            	else			//TODO !!!!!!!!!!!!!! REMOVE ELSE
+            		computeFSClosure(deriver, livePaths, true, true, 0);
             }
-			else{
-//				//throw error?		( check trunk?
-			}			    
         }
     }
     
@@ -528,15 +527,14 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
 
     if (gcKeepOutputs) {
         /* Hmz, identical to storePathRequisites in nix-store. */
-        for (PathSet::iterator i = livePaths.begin();
-             i != livePaths.end(); ++i)
+        for (PathSet::iterator i = livePaths.begin(); i != livePaths.end(); ++i)
             if (isDerivation(*i)) {
             	//printMsg(lvlError, format("CHECK3 '%1%'") % *i);
                 Derivation drv = derivationFromPathTxn(noTxn, *i);
                 for (DerivationOutputs::iterator j = drv.outputs.begin();
                      j != drv.outputs.end(); ++j)
                     if (store->isValidPath(j->second.path))
-                        computeFSClosure(j->second.path, livePaths, true, true, 0);					//TODO Check?
+                        computeFSClosure(j->second.path, livePaths, true, true, 0);
                     else if (store->isValidStatePath(j->second.path))
                     	computeFSClosure(j->second.path, livePaths, true, true, 0);
             }
@@ -563,9 +561,9 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     PathSet tempRootsClosed;
     for (PathSet::iterator i = tempRoots.begin(); i != tempRoots.end(); ++i)
         if (store->isValidPath(*i))
-            computeFSClosure(*i, tempRootsClosed, true, true, 0);									//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO .... STATE
+            computeFSClosure(*i, tempRootsClosed, true, true, 0);
         else if(store->isValidStatePath(*i))
-        	computeFSClosure(*i, tempRootsClosed, true, true, 0);									//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO .... STATE
+        	computeFSClosure(*i, tempRootsClosed, true, true, 0);
         else
             tempRootsClosed.insert(*i);
 
@@ -600,16 +598,16 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     PathSet allStatePathDerivations;
     for (PathSet::iterator i = allLiveStatePaths.begin(); i != allLiveStatePaths.end(); ++i){
     	printMsg(lvlError, format("Live state path `%1%'") % *i);
-    
-    	//allStatePathDerivations
+    	Path stateDrv = queryStatePathDrvTxn(noTxn, *i);
+    	allStatePathDerivations.insert(stateDrv);
+    	//printMsg(lvlError, format("Live state path drv `%1%'") % stateDrv);
     	
-    	//GET DERIVER  AND COMPUTE CLOSURE HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    	//if (deriver != "" && store->isValidPath(deriver))
-        // 	computeFSClosure(deriver, livePaths, true, true, 0);
+       	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TODO put back on
+       	if(!store->isValidPath(stateDrv))
+        {} //	throw Error(format("deriver `%1%' of state component `%2%' in GC is not valid") % stateDrv % *i);
+       	
+       	//	computeFSClosure(stateDrv, livePaths, true, true, 0);			//TODO .................. should we do this ?????????????
     }
-    
-    
-    
     
     /* Read the Nix store and state directory's to find all currently existing
        paths. */
@@ -631,7 +629,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
         for (PathSet::iterator i = pathsToDelete.begin();
              i != pathsToDelete.end(); ++i)
         {
-            assertStorePath(*i);											//TODO ASSERTSTATEPATH !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            assertStorePath(*i);											//TODO ASSERTSTATEPATH, we for now we have no arg statePathsToDelete
             storePathSet.insert(*i);
         }
     }
@@ -657,6 +655,11 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
 
         if (tempRootsClosed.find(*i) != tempRootsClosed.end()) {
             debug(format("temporary root `%1%'") % *i);
+            continue;
+        }
+        
+        if (allStatePathDerivations.find(*i) != allStatePathDerivations.end()) {
+            debug(format("Keeping statePath derivation `%1%'") % *i);
             continue;
         }
 
@@ -689,12 +692,12 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
 
             if (!pathExists(*i)) continue;
                 
-            //printMsg(lvlInfo, format("deleting `%1%'") % *i);							//TODO
+            printMsg(lvlInfo, format("deleting store path `%1%'") % *i);
             
             /* Okay, it's safe to delete. */
             try {
                 unsigned long long freed;
-                //deleteFromStore(*i, freed);											//TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PUT BACK ON
+                deleteFromStore(*i, freed);
                 bytesFreed += freed;
             } catch (PathInUse & e) {
                 printMsg(lvlError, format("warning: %1%") % e.msg());
@@ -718,9 +721,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     for (PathSet::iterator i = statePathSet.begin(); i != statePathSet.end(); ++i)
     	statePaths.push_back(*i);
     
-    
     //
-    
     for (Paths::iterator i = statePaths.begin(); i != statePaths.end(); ++i) {
     	
     	debug(format("considering deletion of state path `%1%'") % *i);
@@ -740,7 +741,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
 
         if (action == gcDeleteDead || action == gcDeleteSpecific) {
 
-//TODO !!!!!!!!!!!!!!!!!!!!!! state locks
+//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! state locks
 /*
 #ifndef __CYGWIN__
             AutoCloseFD fdLock;
@@ -767,7 +768,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
             /* Okay, it's safe to delete. */
             try {
                 unsigned long long freed;
-                //deleteFromState(*i, freed);											//TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PUT BACK ON
+                deleteFromState(*i, freed);
                 bytesFreed += freed;
             } catch (PathInUse & e) {
                 printMsg(lvlError, format("warning: %1%") % e.msg());

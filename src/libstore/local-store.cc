@@ -972,21 +972,49 @@ static void invalidatexPath(Transaction & txn, const Path & path, const bool com
 	
 	/* Clear the `references' entry for this path, as well as the
        inverse `referrers' entries, and the `derivers' entry. */
-    
-    if(component_or_state)
+    if(component_or_state){
 	    setReferences(txn, path, PathSet(), PathSet(), 0);	//This is a store path so the revision doenst matter
-    else
-    	setReferences(txn, path, PathSet(), PathSet(), 0);	//For now.... we only delete clear references for the new revision	(TODO !!!!!!!!!!!!!!!! CHECK IF WE REALLY SET IT FOR A NEW OR LAST REVISION)		
-    
-    nixDB.delPair(txn, dbDerivers, path);
- 
- 	if(component_or_state)
+    	nixDB.delPair(txn, dbDerivers, path);
     	nixDB.delPair(txn, dbValidPaths, path);
-    else
+ 		
+ 		//if is store-state
+ 		if(isStateComponentTxn(txn, path)){
+
+			//delete all references	
+					
+ 		}	
+ 		 		
+ 		nixDB.delPair(txn, dbStateInfo, path);		//We (may) need to delete if this key if path is a state-store path
+ 		
+ 		
+ 		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    }
+ 	else{
+ 	
+ 		//For now.... we only delete clear references for the new revision	(TODO !!!!!!!!!!!!!!!! CHECK IF WE REALLY SET IT FOR A NEW OR LAST REVISION)
+    	setReferences(txn, path, PathSet(), PathSet(), 0);
+    	nixDB.delPair(txn, dbDerivers, path);
     	nixDB.delPair(txn, dbValidStatePaths, path);
- 
- 	if(component_or_state)
- 		nixDB.delPair(txn, dbStateInfo, path);		//We (may) need to delete if this key if path is a state-store path   
+    
+    	//TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! also clear 
+    	
+    	//state-counters
+    	///nix/state/pspj0srf5vh6qhwa1i11swqai9lnk581-hellohardcodedstateworld-1.0-test/log/
+    	//0
+    	
+    	//revisions
+    	///nix/state/4ngfrqhfj7n28p334ajcji9zrdrbdgaw-hellohardcodedstateworld-1.0-test
+ 		//1
+		///nix/state/aacs4qpi9jzg4vmhj09d0ichframh22x-hellohardcodedstateworld-1.0-test-KEY-16
+    	
+    	//comments
+    	// /nix/state/ryxrs01hkxyk4x96i58pc7n54y1gyhmb-hellostateworld-1.0-test-KEY-1
+		// \0a\00\00\001187346592\17\00\00\00Initial build revision.
+    	
+    	//stateSnapshots
+    	//nix/state/54crxisppkqy7929dysqyjdiladahrw7-hellohardcodedstateworld-1.0-test-KEY-1189076361
+ 		//\01\00\00\000\0a\00\00\001189076361\01\00\00\000
+ 	}
 }
 
 
@@ -1311,7 +1339,6 @@ void deleteXFromStore(const Path & _path, unsigned long long & bytesFreed, const
         for (PathSet::iterator i = stateReferrers.begin(); i != stateReferrers.end(); ++i)
             if (*i != path && isValidPathTxn(txn, *i))
                 throw PathInUse(format("cannot delete %3% path `%1%' because it is in use by state path `%2%'") % path % *i % (component_or_state ? "store" : "state"));
-        
         
         if(component_or_state)
         	invalidateStorePath(txn, path);
