@@ -34,6 +34,9 @@ typedef ATerm Pos;
 typedef vector<ATerm> ATermVector;
 
 
+extern Expr constRemoved;
+
+
 /* A substitution is a linked list of ATermMaps that map names to
    identifiers.  We use a list of ATermMaps rather than a single to
    make it easy to grow or shrink a substitution when entering a
@@ -53,7 +56,8 @@ struct Substitution
     {
         Expr x;
         for (const Substitution * s(this); s; s = s->prev)
-            if ((x = s->map->get(name))) return x;
+            if ((x = s->map->get(name)))
+                return x == constRemoved ? 0 : x;
         return 0;
     }
 };

@@ -109,7 +109,16 @@ Expr makeAttrs(const ATermMap & attrs)
 }
 
 
-Expr substitute(const Substitution & subs, Expr e)
+extern unsigned int substs;
+extern unsigned int substsCached;
+extern bool closedTerms;
+extern bool substCache;
+
+
+static Expr substitute(ATermMap & done, const Substitution & subs, Expr e);
+
+
+static Expr substitute2(ATermMap & done, const Substitution & subs, Expr e)
 {
     checkInterrupt();
 
@@ -117,19 +126,20 @@ Expr substitute(const Substitution & subs, Expr e)
 
     ATerm name, pos, e2;
 
+    substs++;
+
     /* As an optimisation, don't substitute in subterms known to be
        closed. */
-    if (matchClosed(e, e2)) return e;
+    if (closedTerms && matchClosed(e, e2)) return e;
 
     if (matchVar(e, name)) {
         Expr sub = subs.lookup(name);
-        if (sub == makeRemoved()) sub = 0;
         Expr wrapped;
         /* Add a "closed" wrapper around terms that aren't already
            closed.  The check is necessary to prevent repeated
            wrapping, e.g., closed(closed(closed(...))), which kills
            caching. */
-        return sub ? (matchClosed(sub, wrapped) ? sub : makeClosed(sub)) : e;
+        return sub ? ((!closedTerms || matchClosed(sub, wrapped)) ? sub : makeClosed(sub)) : e;
     }
 
     /* In case of a function, filter out all variables bound by this
@@ -141,18 +151,30 @@ Expr substitute(const Substitution & subs, Expr e)
         for (ATermIterator i(formals); i; ++i) {
             ATerm d1, d2;
             if (!matchFormal(*i, name, d1, d2)) abort();
-            map.set(name, makeRemoved());
+            if (subs.lookup(name))
+                map.set(name, constRemoved);
         }
-        Substitution subs2(&subs, &map);
-        return makeFunction(
-            (ATermList) substitute(subs2, (ATerm) formals),
-            substitute(subs2, body), pos);
+        if (map.size() == 0)
+            return makeFunction(
+                (ATermList) substitute(done, subs, (ATerm) formals),
+                substitute(done, subs, body), pos);
+        else {
+            Substitution subs2(&subs, &map);
+            ATermMap done2(128);
+            return makeFunction(
+                (ATermList) substitute(done2, subs2, (ATerm) formals),
+                substitute(done2, subs2, body), pos);
+        }
     }
 
     if (matchFunction1(e, name, body, pos)) {
-        ATermMap map(1);
-        map.set(name, makeRemoved());
-        return makeFunction1(name, substitute(Substitution(&subs, &map), body), pos);
+        if (subs.lookup(name)) {
+            ATermMap map(1);
+            map.set(name, constRemoved);
+            ATermMap done2(128);
+            return makeFunction1(name, substitute(done2, Substitution(&subs, &map), body), pos);
+        } else
+            return makeFunction1(name, substitute(done, subs, body), pos);
     }
         
     /* Idem for a mutually recursive attribute set. */
@@ -160,14 +182,21 @@ Expr substitute(const Substitution & subs, Expr e)
     if (matchRec(e, rbnds, nrbnds)) {
         ATermMap map(ATgetLength(rbnds) + ATgetLength(nrbnds));
         for (ATermIterator i(rbnds); i; ++i)
-            if (matchBind(*i, name, e2, pos)) map.set(name, makeRemoved());
-            else abort(); /* can't happen */
+            if (matchBind(*i, name, e2, pos) && subs.lookup(name))
+                map.set(name, constRemoved);
         for (ATermIterator i(nrbnds); i; ++i)
-            if (matchBind(*i, name, e2, pos)) map.set(name, makeRemoved());
-            else abort(); /* can't happen */
-        return makeRec(
-            (ATermList) substitute(Substitution(&subs, &map), (ATerm) rbnds),
-            (ATermList) substitute(subs, (ATerm) nrbnds));
+            if (matchBind(*i, name, e2, pos) && subs.lookup(name))
+                map.set(name, constRemoved);
+        if (map.size() == 0)
+            return makeRec(
+                (ATermList) substitute(done, subs, (ATerm) rbnds),
+                (ATermList) substitute(done, subs, (ATerm) nrbnds));
+        else {
+            ATermMap done2(128);
+            return makeRec(
+                (ATermList) substitute(done2, Substitution(&subs, &map), (ATerm) rbnds),
+                (ATermList) substitute(done, subs, (ATerm) nrbnds));
+        }
     }
 
     if (ATgetType(e) == AT_APPL) {
@@ -178,7 +207,7 @@ Expr substitute(const Substitution & subs, Expr e)
 
         for (int i = 0; i < arity; ++i) {
             ATerm arg = ATgetArgument(e, i);
-            args[i] = substitute(subs, arg);
+            args[i] = substitute(done, subs, arg);
             if (args[i] != arg) changed = true;
         }
         
@@ -189,8 +218,12 @@ Expr substitute(const Substitution & subs, Expr e)
         unsigned int len = ATgetLength((ATermList) e);
         ATerm es[len];
         ATermIterator i((ATermList) e);
-        for (unsigned int j = 0; i; ++i, ++j)
-            es[j] = substitute(subs, *i);
+        bool changed = false;
+        for (unsigned int j = 0; i; ++i, ++j) {
+            es[j] = substitute(done, subs, *i);
+            if (es[j] != *i) changed = true;
+        }
+        if (!changed) return e;
         ATermList out = ATempty;
         for (unsigned int j = len; j; --j)
             out = ATinsert(out, es[j - 1]);
@@ -198,6 +231,26 @@ Expr substitute(const Substitution & subs, Expr e)
     }
 
     return e;
+}
+
+
+static Expr substitute(ATermMap & done, const Substitution & subs, Expr e)
+{
+    Expr res = done[e];
+    if (substCache && res) {
+        substsCached++;
+        return res;
+    }
+    res = substitute2(done, subs, e);
+    done.set(e, res);
+    return res;
+}
+
+
+Expr substitute(const Substitution & subs, Expr e)
+{
+    ATermMap done(256);
+    return substitute(done, subs, e);
 }
 
 

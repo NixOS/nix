@@ -20,6 +20,8 @@ namespace nix {
 int cacheTerms;
 
 bool shortCircuit;
+bool closedTerms; // don't substitute under terms known to be closed
+bool substCache; // memoization of the term substitution function 
 
 #define maxActiveCalls 4096
 
@@ -39,6 +41,8 @@ EvalState::EvalState()
     if (!string2Int(getEnv("NIX_TERM_CACHE"), cacheTerms)) cacheTerms = 1;
     shortCircuit = getEnv("NIX_SHORT_CIRCUIT", "0") == "1";
     strictMode = getEnv("NIX_STRICT", "0") == "1";
+    closedTerms = getEnv("NIX_CLOSED_TERMS", "1") == "1";
+    substCache = getEnv("NIX_SUBST_CACHE", "1") == "1";
 
     ATprotectMemory(activeCalls, maxActiveCalls);
 }
@@ -882,7 +886,7 @@ Expr evalExpr(EvalState & state, Expr e)
             throw;
         }
         state.normalForms.set(e, nf);
-        maybeShortCircuit(state, e, nf);
+        if (shortCircuit) maybeShortCircuit(state, e, nf);
         return nf;
 
     }
@@ -981,17 +985,24 @@ extern "C" {
     unsigned long AT_calcAllocatedSize();
 }
 
+
+unsigned int substs = 0;
+unsigned int substsCached = 0;
+
+
 void printEvalStats(EvalState & state)
 {
     char x;
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
     printMsg(lvlError, format("FNORD %1%") % fnord);
     printMsg(showStats ? lvlInfo : lvlDebug,
-        format("evaluated %1% expressions, %2% cache hits, %3%%% efficiency, used %4% ATerm bytes, used %5% bytes of stack space")
+        format("evaluated %1% expressions, %2% cache hits, %3%%% efficiency, used %4% ATerm bytes, used %5% bytes of stack space, %6% substitutions (%7% cached)")
         % state.nrEvaluated % state.nrCached
         % ((float) state.nrCached / (float) state.nrEvaluated * 100)
         % AT_calcAllocatedSize()
-        % (&x - deepestStack));
+        % (&x - deepestStack)
+        % substs
+        % substsCached);
     if (showStats)
         printATermMapStats();
 }
