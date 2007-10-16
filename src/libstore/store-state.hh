@@ -28,6 +28,9 @@ namespace nix {
 	/* revision 0 == latest ????? */
 	void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const int revision_arg, const bool recursive);
 
+    /* Copy all files and folders recursively (also the hidden ones) from the dir from/... to the dir to/... and delete the rest in to/ (Rsync) */
+	void rsyncPaths(const Path & from, const Path & to);
+
 	
 	// **************************************** *******************************************
 	
@@ -67,9 +70,12 @@ namespace nix {
     bool queryAvailableStateRevisions(Database & nixDB, const Transaction & txn, TableId revisions_table, TableId revisions_comments,
     	const Path & statePath, RevisionInfos & revisions);	
     
-    /* Copy all files and folders recursively (also the hidden ones) from the dir from/... to the dir to/... and delete the rest in to/ (Rsync) */
-	void rsyncPaths(const Path & from, const Path & to);
-
+    void invalidateAllStateReferences(Database & nixDB, const Transaction & txn, TableId references_table, const Path & statePath);
+   
+   	void removeAllStatePathRevisions(Database & nixDB, const Transaction & txn, TableId revisions_table, 
+		TableId revisions_comments, TableId snapshots_table, TableId statecounters, const Path & statePath);
+   
+    
 }
 
 #endif /* !__STORESTATE_H */

@@ -1889,7 +1889,11 @@ void DerivationGoal::computeClosure()
     for (DerivationOutputs::iterator i = drv.outputs.begin(); 
          i != drv.outputs.end(); ++i)
     {
-         registerValidPath(txn, 
+		//Register the path as a store-state path
+		if(isStateDrvPathTxn(txn, drvPath))
+			setStateComponentTxn(txn, i->second.path);
+		
+		registerValidPath(txn, 
         	i->second.path,								//component path
             contentHashes[i->second.path],
             allReferences[i->second.path],				//set of component-references
@@ -1901,7 +1905,7 @@ void DerivationGoal::computeClosure()
     if(isStateDrv(drv))
     {
 		Path statePath = drv.stateOutputs.find("state")->second.statepath;		
-		
+
     	registerValidPath(txn,    	
     		statePath,
     		Hash(),										//emtpy hash

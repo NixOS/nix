@@ -705,10 +705,10 @@ static void processConnection()
         	int oppp = readInt(from);
             op = (WorkerOp) oppp;
 
-			/* Use for debugging*/
+			/* Use for debugging with gdb --pid=myPid */
 			/*
-            if(oppp == 14){
-            	printMsg(lvlError, format("Sleeping 10"));
+            if(oppp == 39){
+            	printMsg(lvlError, format("Sleeping 10 before op '%1%' with pid '%2%'") % op % myPid);
             	sleep(10);
             }
             */

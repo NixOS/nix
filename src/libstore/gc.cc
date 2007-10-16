@@ -479,46 +479,41 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
     /* Determine the live paths which is just the closure of the
        roots under the `references' relation. */
     PathSet livePaths;
-    for (PathSet::const_iterator i = roots.begin(); i != roots.end(); ++i){
-    	//printMsg(lvlError, format("CHECK '%1%'") % *i);
+    for (PathSet::const_iterator i = roots.begin(); i != roots.end(); ++i)
         computeFSClosure(canonPath(*i), livePaths, true, true, 0);
-    }
 
 	printMsg(lvlError, format("STAGE X"));
 
+    /* Note that the deriver need not be valid (e.g., if we
+    previously ran the collector with `gcKeepDerivations'
+	turned off). */
     if (gcKeepDerivations) {
         for (PathSet::iterator i = livePaths.begin(); i != livePaths.end(); ++i)
         {
         	if (store->isStateComponent(*i)){
         		//printMsg(lvlError, format("Live state store '%1%'") % *i);
         		
-        		//we select ALL state Derivations here
-        		PathSet derivers = store->queryDerivers(*i, "*", "*");
-        		
+        		PathSet derivers = store->queryDerivers(*i, "*", "*");		//we select ALL state Derivations here	//TODO ??? we shouldt select non live !!!!!!!!!
         		for (PathSet::const_iterator j = derivers.begin(); j != derivers.end(); ++j)
-					// We send each drv to computeFSClosure
         			if (*j != "" && store->isValidPath(*j))
                 		computeFSClosure(*j, livePaths, true, true, 0);
         	}
 			else if (store->isValidPath(*i)){
 				//printMsg(lvlError, format("Live Store '%1%'") % *i);
-	           	Path deriver = store->queryDeriver(*i);
 				
-               /* Note that the deriver need not be valid (e.g., if we
-               previously ran the collector with `gcKeepDerivations'
-               turned off). */
+	           	Path deriver = store->queryDeriver(*i);
 				if (deriver != "" && store->isValidPath(deriver))
                 	computeFSClosure(deriver, livePaths, true, true, 0);
             }
             else if (store->isValidStatePath(*i)){
-				//printMsg(lvlError, format("Live State '%1%'") % *i);            	
+				//printMsg(lvlError, format("Live State '%1%'") % *i);
             	Path deriver = queryStatePathDrvTxn(noTxn, *i);
             	
-            	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TODO put back on
+            	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TODO put back on
             	if(!store->isValidPath(deriver))
             	{} //	throw Error(format("deriver `%1%' of state-store component `%2%' in GC is not valid") % deriver % *i);
-            	else			//TODO !!!!!!!!!!!!!! REMOVE ELSE
-            		computeFSClosure(deriver, livePaths, true, true, 0);
+            	
+            	computeFSClosure(deriver, livePaths, true, true, 0);
             }
         }
     }
@@ -529,7 +524,6 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
         /* Hmz, identical to storePathRequisites in nix-store. */
         for (PathSet::iterator i = livePaths.begin(); i != livePaths.end(); ++i)
             if (isDerivation(*i)) {
-            	//printMsg(lvlError, format("CHECK3 '%1%'") % *i);
                 Derivation drv = derivationFromPathTxn(noTxn, *i);
                 for (DerivationOutputs::iterator j = drv.outputs.begin();
                      j != drv.outputs.end(); ++j)
@@ -577,10 +571,9 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
        can be deleted. */
     
     /*
-     * We lookup all shared paths for: livePaths, tempRootsClosed
+     * We lookup all state (also shared) paths for: livePaths, tempRootsClosed
      */
     PathSet allLiveStatePaths;
-    
     for (PathSet::iterator i = livePaths.begin(); i != livePaths.end(); ++i)
     	if(store->isValidStatePath(*i)){
 			allLiveStatePaths.insert(*i);
@@ -593,7 +586,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
     	}
 
     /*
-     * Lookup all derivations, of all state paths, because they need to be kept for comitting
+     * Lookup all derivations, of all state paths, because they need to be kept for comitting			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
      */
     PathSet allStatePathDerivations;
     for (PathSet::iterator i = allLiveStatePaths.begin(); i != allLiveStatePaths.end(); ++i){
@@ -629,7 +622,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
         for (PathSet::iterator i = pathsToDelete.begin();
              i != pathsToDelete.end(); ++i)
         {
-            assertStorePath(*i);											//TODO ASSERTSTATEPATH, we for now we have no arg statePathsToDelete
+            assertStorePath(*i);											//TODO ASSERTSTATEPATH, but for now we have no arg statePathsToDelete
             storePathSet.insert(*i);
         }
     }

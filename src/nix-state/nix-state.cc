@@ -70,7 +70,7 @@ Derivation getDerivation(const string & fullPath, const Strings & program_args, 
     //Check if path is store-statepath
     isStateComponent = store->isStateComponent(componentPath);
       
-	//printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % state_identifier % binary % username % program_args);
+	printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % state_identifier % binary % username % bool2string(isStateComponent));
     
     if(isStateComponent)
     	derivers = store->queryDerivers(componentPath, state_identifier, username);
@@ -240,9 +240,9 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 		string comment = revisions[rev].comment;
 		
 		if(trim(comment) != "")
-			printMsg(lvlError, format("Rev. %1% @ %2% (%3%) -- %4%") % rev_s % human_date % ts % comment);
+			printMsg(lvlError, format("Rev. %1% @ %2% (ts: %3%) -- %4%") % rev_s % human_date % ts % comment);
 		else
-			printMsg(lvlError, format("Rev. %1% @ %2% (%3%)") % rev_s % human_date % ts);
+			printMsg(lvlError, format("Rev. %1% @ %2% (ts: %3%)") % rev_s % human_date % ts);
 	}	
 }
 
@@ -596,6 +596,11 @@ void run(Strings args)
 
 	*/
 	
+	/*
+	store = openStore();
+	store->isStateComponent("/nix/state/rrki0fgjc42sfszgk95cg0bpchbc5xp7-hellohardcodedstateworld-1.0-test");
+	return;
+	*/	
 	/* test */
 	
 	if(args.size() == 1 && ( *(args.begin()) == "--help" || *(args.begin()) == "--statehelp")){

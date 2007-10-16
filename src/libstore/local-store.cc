@@ -129,11 +129,11 @@ static TableId dbStateRevisionsComments = 0;
  * 
  * This table stores the snapshot numbers the sub state files/folders
  * at a certain timestamp. These snapshot numbers are just timestamps
- * produced by ext3cow 
+ * produced by ext3cow
  * 
  * /nix/state/HASH-A-1.0-test-KEY-1185473750
  * -->
- * [ 1185473750, 00118547375 ]
+ * [ 1185473750, 00118547375 ]															// TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PATH-SS
  * 
  * The timestamps are ordered based on the path of the subfolder !!
  * 
@@ -708,10 +708,12 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
        	data.push_back(*i);
 	
 	nixDB.setStrings(txn, dbDerivers, storePath, data);											//update the derivers db.
-	
-	nixDB.setString(txn, dbStateInfo, storePath, "");											//update the dbinfo db.	(maybe TODO)
 }
 
+void setStateComponentTxn(const Transaction & txn, const Path & storePath)
+{
+	nixDB.setString(txn, dbStateInfo, storePath, "");	//update the dbinfo db.	(maybe TODO)	
+}
 
 /*
  * Returns true or false wheter a store-component has a state component (e.g. has a state dir) or not. 
@@ -979,41 +981,18 @@ static void invalidatexPath(Transaction & txn, const Path & path, const bool com
  		
  		//if is store-state
  		if(isStateComponentTxn(txn, path)){
-
-			//delete all references	
-					
+			nixDB.delPair(txn, dbSolidStateReferences, path);
+			nixDB.delPair(txn, dbStateInfo, path);
  		}	
- 		 		
- 		nixDB.delPair(txn, dbStateInfo, path);		//We (may) need to delete if this key if path is a state-store path
- 		
- 		
- 		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     }
  	else{
- 	
- 		//For now.... we only delete clear references for the new revision	(TODO !!!!!!!!!!!!!!!! CHECK IF WE REALLY SET IT FOR A NEW OR LAST REVISION)
-    	setReferences(txn, path, PathSet(), PathSet(), 0);
-    	nixDB.delPair(txn, dbDerivers, path);
+
+		nixDB.delPair(txn, dbDerivers, path);
     	nixDB.delPair(txn, dbValidStatePaths, path);
-    
-    	//TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! also clear 
-    	
-    	//state-counters
-    	///nix/state/pspj0srf5vh6qhwa1i11swqai9lnk581-hellohardcodedstateworld-1.0-test/log/
-    	//0
-    	
-    	//revisions
-    	///nix/state/4ngfrqhfj7n28p334ajcji9zrdrbdgaw-hellohardcodedstateworld-1.0-test
- 		//1
-		///nix/state/aacs4qpi9jzg4vmhj09d0ichframh22x-hellohardcodedstateworld-1.0-test-KEY-16
-    	
-    	//comments
-    	// /nix/state/ryxrs01hkxyk4x96i58pc7n54y1gyhmb-hellostateworld-1.0-test-KEY-1
-		// \0a\00\00\001187346592\17\00\00\00Initial build revision.
-    	
-    	//stateSnapshots
-    	//nix/state/54crxisppkqy7929dysqyjdiladahrw7-hellohardcodedstateworld-1.0-test-KEY-1189076361
- 		//\01\00\00\000\0a\00\00\001189076361\01\00\00\000
+		
+		invalidateAllStateReferences(nixDB, txn, dbStateComponentReferences, path);
+		invalidateAllStateReferences(nixDB, txn, dbStateStateReferences, path);
+		removeAllStatePathRevisions(nixDB, txn, dbStateRevisions, dbStateRevisionsComments, dbStateSnapshots, dbStateCounters, path);
  	}
 }
 
@@ -1330,7 +1309,7 @@ void deleteXFromStore(const Path & _path, unsigned long long & bytesFreed, const
     Transaction txn(nixDB);
     if (isValidPathTxn(txn, path) || isValidStatePathTxn(txn, path)) 
     {
-        PathSet storeReferrers = getStoreReferrersTxn(txn, path, 0);
+        PathSet storeReferrers = getStoreReferrersTxn(txn, path, 0);		//TODO GET REFERRERS OF ALL REVISIONS !!!!!!!!!!!!!!	!!!!!!!!!!!!!!!!!!!!!!!!
         PathSet stateReferrers = getStateReferrersTxn(txn, path, 0);
         
         for (PathSet::iterator i = storeReferrers.begin(); i != storeReferrers.end(); ++i)

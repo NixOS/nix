@@ -71,7 +71,7 @@ struct RevisionInfo
 	unsigned int timestamp;
 };
 typedef map<unsigned int, RevisionInfo> RevisionInfos;
-typedef map<Path, unsigned int> Snapshots;					//Automatically sorted on Path :)
+typedef map<Path, unsigned int> Snapshots;						// /nix/state/...../cache -> ....	Automatically sorted on Path :)
 typedef map<Path, Snapshots> RevisionClosure;
 typedef map<Path, unsigned int> RevisionClosureTS;			//Paht with a timestamp about when the revision was made.
 typedef map<int, Strings> StateReferences;

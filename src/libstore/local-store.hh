@@ -273,6 +273,7 @@ bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, Rev
 void setStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePath, const IntVector & intervals, bool allZero = false);
 bool querySharedStateTxn(const Transaction & txn, const Path & statePath, Path & shared_with);
 
+void setStateComponentTxn(const Transaction & txn, const Path & storePath);
 
 }
 

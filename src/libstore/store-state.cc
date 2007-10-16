@@ -128,18 +128,21 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
 		Snapshots revisioned_paths = (*i).second;
 		unsigned int timestamp = getTimestamps[statePath];
 		
+		
 		//get its derivation-state-items
-		Derivation statePath_drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, statePath));
-		DerivationStateOutputDirs stateOutputDirs = statePath_drv.stateOutputDirs; 
+		//Derivation statePath_drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, statePath));
+		//DerivationStateOutputDirs stateOutputDirs = statePath_drv.stateOutputDirs; 
 		
 		//TODO Sort snapshots??? eg first restore root, then the subdirs??
 		
 		for (Snapshots::iterator j = revisioned_paths.begin(); j != revisioned_paths.end(); ++j){
 			Path revertPathOrFile = (*j).first;
-			unsigned int epoch = (*j).second;
+			unsigned int epoch = (*j).second;			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			
-			//printMsg(lvlError, format("MAYBE '%1%'") % revertPathOrFile);
+			printMsg(lvlError, format("MAYBE '%1%''%2%'") % revertPathOrFile % epoch);
 			
+			
+			/*
 			//Look up the type from the drv with for the current snapshotted path
 			Path statePath_postfix = revertPathOrFile.substr(nixStoreState.length() + 1, revertPathOrFile.length() - nixStoreState.length());
 			statePath_postfix = statePath_postfix.substr(statePath_postfix.find_first_of("/") + 1, statePath_postfix.length());
@@ -152,8 +155,9 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
 			//Now that were still here, we need to copy the state from the previous version back
 			Strings p_args;
 			p_args.push_back("-c");		//we use the shell to execute the cp command becuase the shell expands the '*' 
-			string cpcommand = "cp";
-			
+			string cpcommand = "cp";		//TODO USE RSYNC!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			*/
+			/*
 			if(revertPathOrFile.substr(revertPathOrFile.length() -1 , revertPathOrFile.length()) == "/"){		//is dir
 				string revert_to_path = revertPathOrFile.substr(0, revertPathOrFile.length() -1) + "@" + unsignedInt2String(epoch);
 				cpcommand += " -R " + revert_to_path + "/*";
@@ -192,11 +196,12 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
 			cpcommand += " " + revertPathOrFile;
 			p_args.push_back(cpcommand);
 			runProgram_AndPrintOutput("sh", true, p_args, "sh-cp");
+			*/
 		}
 		
 		
 		//*** Now also revert state _references_ to the specific revision (the revision is already converted to a timestamp here)
-		
+		/*
 		//Query the references of the old revision (already converted to a timestamp)		
     	PathSet state_references;
     	queryXReferencesTxn(txn, statePath, state_references, true, 0, timestamp);
@@ -211,6 +216,7 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
 			printMsg(lvlError, format("Reverted state of '%1%' to the latest revision") % statePath);	 //TODO lookup the number
 		else
 			printMsg(lvlError, format("Reverted state of '%1%' to revision '%2%'") % statePath % revision_arg);
+		*/
 	}
 }
 
@@ -284,6 +290,7 @@ Snapshots commitStatePathTxn(const Transaction & txn, const Path & statePath)
 			revision_number = 0;	//deleted, so we assign 0 to indicate that 	
 		
 		revisions_list[fullstatedir] = revision_number;
+		//printMsg(lvlError, format("FSD %1% RN %2%") % fullstatedir % revision_number);
 	}
 	  	
 	return revisions_list; 
@@ -574,6 +581,49 @@ bool queryStateReferences(Database & nixDB, const Transaction & txn, TableId ref
 	return nixDB.queryStrings(txn, references_table, key, references);		//now that we have the key, we can query the references
 }
 
+void invalidateAllStateReferences(Database & nixDB, const Transaction & txn, TableId references_table, const Path & statePath)
+{
+	//Remove all references
+	Strings keys;
+	nixDB.enumTable(txn, references_table, keys);
+	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i){
+		if((*i).substr(0, statePath.length()) == statePath)
+			nixDB.delPair(txn, references_table, *i);
+	}
+}
+
+void removeAllStatePathRevisions(Database & nixDB, const Transaction & txn, TableId revisions_table, 
+	TableId revisions_comments, TableId snapshots_table, TableId statecounters, const Path & statePath)
+{
+	//Remove all revisions
+	nixDB.delPair(txn, revisions_table, statePath);
+	RevisionInfos revisions;
+	store->queryAvailableStateRevisions(statePath, revisions);
+	for (RevisionInfos::iterator i = revisions.begin(); i != revisions.end(); ++i){
+		unsigned int rev = (*i).first;
+		nixDB.delPair(txn, revisions_table, mergeToDBKey(statePath, rev));
+		
+		//Remove all comments
+		nixDB.delPair(txn, revisions_comments, mergeToDBKey(statePath, rev));
+	}
+
+	//Remove all snapshots
+	Strings keys;
+	nixDB.enumTable(txn, snapshots_table, keys);
+	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i){
+		if((*i).substr(0, statePath.length()) == statePath)
+			nixDB.delPair(txn, snapshots_table, *i);
+	}
+	
+	//Remove all state-counters
+	keys.clear();
+	nixDB.enumTable(txn, statecounters, keys);
+	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i){
+		if((*i).substr(0, statePath.length()) == statePath)
+			nixDB.delPair(txn, statecounters, *i);
+	}	
+}
+
 void setStateRevisions(Database & nixDB, const Transaction & txn, TableId revisions_table, TableId revisions_comments,
 	 TableId snapshots_table, const RevisionClosure & revisions, const Path & rootStatePath, const string & comment)
 {
@@ -588,7 +638,7 @@ void setStateRevisions(Database & nixDB, const Transaction & txn, TableId revisi
 		Strings data;
 		//the map<> takes care of the sorting on the Path
 		for (Snapshots::const_iterator j = (*i).second.begin(); j != (*i).second.end(); ++j)
-			data.push_back(int2String((*j).second));
+			data.push_back(mergeToDBKey((*j).first, (*j).second));
 		nixDB.setStrings(txn, snapshots_table, key, data);
 	}
 	
@@ -657,6 +707,7 @@ bool queryStateRevisions(Database & nixDB, const Transaction & txn, TableId revi
 		splitDBKey(*i, getStatePath, getTimestamp);
 		
 		//query state versioined directorys/files
+		/*
 		vector<Path> sortedPaths;
 		Derivation drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, getStatePath));
   		DerivationStateOutputs stateOutputs = drv.stateOutputs; 
@@ -669,6 +720,7 @@ bool queryStateRevisions(Database & nixDB, const Transaction & txn, TableId revi
 			sortedPaths.push_back(fullstatedir);
     	}			
 		sort(sortedPaths.begin(), sortedPaths.end());	//sort
+		*/
 		
 		Strings snapshots_s;
 		Snapshots snapshots;		
@@ -676,12 +728,11 @@ bool queryStateRevisions(Database & nixDB, const Transaction & txn, TableId revi
 		int counter=0;
 		for (Strings::iterator j = snapshots_s.begin(); j != snapshots_s.end(); ++j){
 			
+			Path snapshottedPath;			
 			unsigned int revision;
-			bool succeed = string2UnsignedInt(*j, revision);
-			if(!succeed)
-				throw Error(format("Malformed epoch (snapshot timestamp) value of path '%1%'") % statePath);
-			
-			snapshots[sortedPaths.at(counter)] = revision;
+			splitDBKey(*j, snapshottedPath, revision);
+						
+			snapshots[snapshottedPath] = revision;
 			counter++;
 		}
 		
@@ -715,7 +766,7 @@ bool queryAvailableStateRevisions(Database & nixDB, const Transaction & txn, Tab
 		unsigned int ts;
 		bool succeed = string2UnsignedInt(*(metadata.begin()), ts);
 		if(!succeed)
-			throw Error(format("Malformed timestamp in the revisions-comments table of path '%1%'") % *i);
+			throw Error(format("Malformed timestamp in the revisions table of path '%1%'") % *i);
 		rev.timestamp = ts;
 		metadata.pop_front();		
 		rev.comment = *(metadata.begin());
