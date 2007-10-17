@@ -21,7 +21,8 @@ int cacheTerms;
 
 bool shortCircuit;
 bool closedTerms; // don't substitute under terms known to be closed
-bool substCache; // memoization of the term substitution function 
+bool substCache; // memoization of the term substitution function
+bool posInfo; // attach position info to functions, assertions, attributes
 
 #define maxActiveCalls 4096
 
@@ -43,6 +44,7 @@ EvalState::EvalState()
     strictMode = getEnv("NIX_STRICT", "0") == "1";
     closedTerms = getEnv("NIX_CLOSED_TERMS", "1") == "1";
     substCache = getEnv("NIX_SUBST_CACHE", "1") == "1";
+    posInfo = getEnv("NIX_POS_INFO", "1") == "1";
 
     ATprotectMemory(activeCalls, maxActiveCalls);
 }

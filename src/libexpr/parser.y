@@ -70,11 +70,13 @@ static Expr fixAttrs(int recursive, ATermList as)
 
 void backToString(yyscan_t scanner);
 
+
+extern bool posInfo;
  
 static Pos makeCurPos(YYLTYPE * loc, ParseData * data)
 {
-    return makePos(toATerm(data->path),
-        loc->first_line, loc->first_column);
+    return posInfo ? makePos(toATerm(data->path),
+        loc->first_line, loc->first_column) : makeNoPos();
 }
 
 #define CUR_POS makeCurPos(yylocp, data)
