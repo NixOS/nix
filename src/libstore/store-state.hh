@@ -29,7 +29,7 @@ namespace nix {
 	void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const int revision_arg, const bool recursive);
 
     /* Copy all files and folders recursively (also the hidden ones) from the dir from/... to the dir to/... and delete the rest in to/ (Rsync) */
-	void rsyncPaths(const Path & from, const Path & to);
+	void rsyncPaths(const Path & from, const Path & to, const bool addSlashes);
 
 	
 	// **************************************** *******************************************

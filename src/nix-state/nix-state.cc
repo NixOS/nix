@@ -70,7 +70,7 @@ Derivation getDerivation(const string & fullPath, const Strings & program_args, 
     //Check if path is store-statepath
     isStateComponent = store->isStateComponent(componentPath);
       
-	printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % state_identifier % binary % username % bool2string(isStateComponent));
+	//printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % state_identifier % binary % username % bool2string(isStateComponent));
     
     if(isStateComponent)
     	derivers = store->queryDerivers(componentPath, state_identifier, username);
@@ -299,7 +299,7 @@ static void opCopyFrom(Strings opFlags, Strings opArgs)
 	if(!store->isValidStatePath(statePath) || !store->isValidStatePath(copy_from))
 		throw UsageError(format("Path '%1%' or '%2%' is not a valid state path.") % statePath % copy_from);
 	
-	rsyncPaths(copy_from, statePath);
+	rsyncPaths(copy_from, statePath, true);
 }
 
 

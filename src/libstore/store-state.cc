@@ -137,71 +137,32 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
 		
 		for (Snapshots::iterator j = revisioned_paths.begin(); j != revisioned_paths.end(); ++j){
 			Path revertPathOrFile = (*j).first;
-			unsigned int epoch = (*j).second;			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			unsigned int epoch = (*j).second;
 			
-			printMsg(lvlError, format("MAYBE '%1%''%2%'") % revertPathOrFile % epoch);
-			
-			
-			/*
-			//Look up the type from the drv with for the current snapshotted path
-			Path statePath_postfix = revertPathOrFile.substr(nixStoreState.length() + 1, revertPathOrFile.length() - nixStoreState.length());
-			statePath_postfix = statePath_postfix.substr(statePath_postfix.find_first_of("/") + 1, statePath_postfix.length());
-			if(statePath_postfix == "")
-				statePath_postfix = "/";
-			string type = stateOutputDirs.at(statePath_postfix).type;
-			if(type == "none")
+			if(epoch == 0)		//Path was deleted so were done
 				continue;
-
-			//Now that were still here, we need to copy the state from the previous version back
-			Strings p_args;
-			p_args.push_back("-c");		//we use the shell to execute the cp command becuase the shell expands the '*' 
-			string cpcommand = "cp";		//TODO USE RSYNC!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			*/
-			/*
-			if(revertPathOrFile.substr(revertPathOrFile.length() -1 , revertPathOrFile.length()) == "/"){		//is dir
-				string revert_to_path = revertPathOrFile.substr(0, revertPathOrFile.length() -1) + "@" + unsignedInt2String(epoch);
-				cpcommand += " -R " + revert_to_path + "/*";
-				
-				//clean all contents of the folder first (so were sure the path is clean)
-				if(pathExists(revertPathOrFile))
-					deletePath(revertPathOrFile);
-				
-				if(epoch == 0)		//Path was deleted so were done
-					continue;
-				else				//If path was not deleted in the previous version, we need to make sure it exists or cp will fail
-					ensureDirExists(revertPathOrFile);
-				
-				//If the the dir has not contents then a cp ..../* will error since * cannot be expanded. So in this case were done and dont have to revert.
-				Strings p2_args;
-				p2_args.push_back("-A");
-				p2_args.push_back(revert_to_path + "/");
-				string output = runProgram("ls", true, p2_args);
-				if(output == "")
-					continue;
-			}
-			else{	//is file
-				cpcommand += " " + (revertPathOrFile + "@" + unsignedInt2String(epoch));
-				
-				if(epoch == 0){
-					//delete file
-					if(FileExist(revertPathOrFile))
-						deletePath(revertPathOrFile);	//we only delete if the cp doesnt overwrite it below
-					continue;
-				}
-			}
 			
-			//Revert
 			printMsg(lvlError, format("Reverting '%1%@%2%'") % revertPathOrFile % unsignedInt2String(epoch));
-			printMsg(lvlError, format("Command: '%1%'") % cpcommand);
-			cpcommand += " " + revertPathOrFile;
-			p_args.push_back(cpcommand);
-			runProgram_AndPrintOutput("sh", true, p_args, "sh-cp");
-			*/
+
+			//Dir: Remove a slash at the end, we create /nix/state/...../cachedir@1234/
+			//File: Or create /nix/state/..../logfile.txt@1234
+			string revertPathOrFile_e;
+			if(revertPathOrFile.substr(revertPathOrFile.length() -1 , revertPathOrFile.length()) == "/"){
+				revertPathOrFile_e = revertPathOrFile.substr(0 , revertPathOrFile.length() -1) + "@" + unsignedInt2String(epoch) + "/";
+				
+				//TODO IF IS FILE: REMOVE THE FILE
+			}
+			else{
+				revertPathOrFile_e = revertPathOrFile + "@" + unsignedInt2String(epoch);
+				
+				//TODO IF IS DIR: REMOVE THE DIR
+			}
+						
+			rsyncPaths(revertPathOrFile_e, revertPathOrFile, false);
 		}
 		
 		
 		//*** Now also revert state _references_ to the specific revision (the revision is already converted to a timestamp here)
-		/*
 		//Query the references of the old revision (already converted to a timestamp)		
     	PathSet state_references;
     	queryXReferencesTxn(txn, statePath, state_references, true, 0, timestamp);
@@ -216,7 +177,6 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
 			printMsg(lvlError, format("Reverted state of '%1%' to the latest revision") % statePath);	 //TODO lookup the number
 		else
 			printMsg(lvlError, format("Reverted state of '%1%' to revision '%2%'") % statePath % revision_arg);
-		*/
 	}
 }
 
@@ -779,7 +739,7 @@ bool queryAvailableStateRevisions(Database & nixDB, const Transaction & txn, Tab
     	return true;
 }
 
-void rsyncPaths(const Path & from, const Path & to)	//TODO bool shellexpansion, bool failure for nix-env
+void rsyncPaths(const Path & from, const Path & to, const bool addSlashes)		//TODO bool shellexpansion, bool failure for nix-env
 {
 	//TODO Could be a symlink (to a non-existing dir)
 	/*
@@ -788,14 +748,16 @@ void rsyncPaths(const Path & from, const Path & to)	//TODO bool shellexpansion, 
 	if(!DirectoryExist(to))
 		throw Error(format("Path `%1%' doenst exist ...") % to);
 	*/
-	
-	//We add a slash / to the end to ensure the contents is copyed
+
 	Path from2 = from;
 	Path to2 = to;
-	if(from2[from2.length() - 1] != '/')
-		from2 = from2 + "/";
-	if(to2[to2.length() - 1] != '/')
-		to2 = to2 + "/";
+	if(addSlashes){	
+		//We add a slash / to the end to ensure the contents is copyed
+		if(from2[from2.length() - 1] != '/')
+			from2 = from2 + "/";
+		if(to2[to2.length() - 1] != '/')
+			to2 = to2 + "/";
+	}
 	
 	printMsg(lvlError, format("Rsync from: '%1%' to: '%2%'") % from2 % to2);
 	

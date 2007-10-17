@@ -1665,7 +1665,7 @@ void unShareStateTxn(const Transaction & txn, const Path & path, const bool bran
 
 	//Copy if necessary
 	if(branch){
-		rsyncPaths(sharedWithOldPath, path);
+		rsyncPaths(sharedWithOldPath, path, true);
 	}
 	
 	//Restore the latest snapshot (non-recursive) made on this statepath

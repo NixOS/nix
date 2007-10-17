@@ -736,10 +736,10 @@ static void installDerivations(Globals & globals,
     			comparePaths.insert(statePath);
     			comparePaths.insert(read_statePath);
     			if(store->toNonSharedPathSet(comparePaths).size() != 1)			//TODO !!!!!!!!!!!!!??
-    				rsyncPaths(externalState, statePath);
+    				rsyncPaths(externalState, statePath, true);
     		}
     		else
-    			rsyncPaths(externalState, statePath);
+    			rsyncPaths(externalState, statePath, true);
 
     		deletePath(externalState);
     	}
