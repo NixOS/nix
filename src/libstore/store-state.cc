@@ -551,7 +551,8 @@ void removeAllStatePathRevisions(Database & nixDB, const Transaction & txn, Tabl
 	//Remove all revisions
 	nixDB.delPair(txn, revisions_table, statePath);
 	RevisionInfos revisions;
-	store->queryAvailableStateRevisions(statePath, revisions);
+	queryAvailableStateRevisions(nixDB, txn, revisions_table, revisions_comments, statePath, revisions);
+	
 	for (RevisionInfos::iterator i = revisions.begin(); i != revisions.end(); ++i){
 		unsigned int rev = (*i).first;
 		nixDB.delPair(txn, revisions_table, mergeToDBKey(statePath, rev));
@@ -705,6 +706,8 @@ bool queryAvailableStateRevisions(Database & nixDB, const Transaction & txn, Tab
 	
 	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i) {
 	
+		printMsg(lvlError, format("QQQQ %1%") % *i);
+		
 		if((*i).substr(0, statePath.length()) != statePath || (*i).length() == statePath.length()) 		//dont check the new-revision key or other keys
 			continue;
 

@@ -710,7 +710,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
                 bytesFreed += freed;
             } catch (PathInUse & e) {
                 printMsg(lvlError, format("warning: %1%") % e.msg());
-            }
+            } 
 
 #ifndef __CYGWIN__
             if (fdLock != -1)
