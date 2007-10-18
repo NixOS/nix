@@ -275,6 +275,12 @@ bool querySharedStateTxn(const Transaction & txn, const Path & statePath, Path &
 
 void setStateComponentTxn(const Transaction & txn, const Path & storePath);
 
+void setVersionedStateEntriesTxn(const Transaction & txn, const Path & statePath, const StateInfos & infos, const unsigned int revision = 0, const unsigned int timestamp = 0);
+bool getVersionedStateEntriesTxn(const Transaction & txn, const Path & statePath, StateInfos & infos, const unsigned int revision = 0, const unsigned int timestamp = 0);
+
+void setStateUserGroupTxn(const Transaction & txn, const Path & statePath, const string & user, const string & group, int chmod);
+void getStateUserGroupTxn(const Transaction & txn, const Path & statePath, string & user, string & group, int & chmod);
+
 }
 
 

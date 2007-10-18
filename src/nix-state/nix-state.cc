@@ -621,9 +621,35 @@ void run(Strings args)
 			printMsg(lvlError, format("REF `%1%'") % *j);
 		}
 	}
+	store = openStore();
 	
+	Path statePath = "/mySTATEPATH";
+	unsigned int revision = 0;
+	unsigned int timestamp = 1234;
+	StateInfos infos;
+	StateInfo s1;
+	s1.path = "a";	s1.type = "t1";	s1.interval = 0;
+	StateInfo s2;
+	s2.path = "b";	s2.type = "t2";	s2.interval = 1000;
+	infos.push_back(s1);
+	infos.push_back(s2);
 	
+	setVersionedStateEntries(nixDB, txn, dbVersionItems, dbStateRevisions, 
+    	statePath, infos, revision, timestamp);
+    
+    StateInfos getInfos;
+	bool b = getVersionedStateEntries(nixDB, txn, dbVersionItems, dbStateRevisions, 
+		statePath, getInfos, revision, timestamp);
+	
+	printMsg(lvlError, format("B: %1%") % b);
+	
+	for (StateInfos::const_iterator i = getInfos.begin(); i != getInfos.end(); ++i) {
+		StateInfo si = *i;
+		printMsg(lvlError, format("SI: %1% %2% %3%") % si.path % si.type % si.interval);
+	}
+		
 	return;
+	
 	*/
 	/* test */
 	

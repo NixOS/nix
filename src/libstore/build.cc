@@ -1889,9 +1889,8 @@ void DerivationGoal::computeClosure()
     for (DerivationOutputs::iterator i = drv.outputs.begin(); 
          i != drv.outputs.end(); ++i)
     {
-		//Register the path as a store-state path
 		if(isStateDrvPathTxn(txn, drvPath))
-			setStateComponentTxn(txn, i->second.path);
+			setStateComponentTxn(txn, i->second.path);	//Register the path as a store-state path
 		
 		registerValidPath(txn, 
         	i->second.path,								//component path
@@ -1919,6 +1918,27 @@ void DerivationGoal::computeClosure()
 		
 		//Save the new revision
 		setStateRevisionsTxn(txn, rivisionMapping, statePath, "Initial build revision.");
+
+		//Convert stateInfo from drv to DB format
+		DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
+		StateInfos infos;
+		for (DerivationStateOutputDirs::const_reverse_iterator j = stateOutputDirs.rbegin(); j != stateOutputDirs.rend(); ++j){
+			DerivationStateOutputDir d = j->second;
+			StateInfo si;
+			si.path = d.path;
+			si.type = d.type;
+			
+			if(d.interval != ""){
+				bool succeed = string2UnsignedInt(d.interval, si.interval);
+				if(!succeed)
+					throw Error(format("Malformed interval value '%1%' in drv '%2%'") % d.interval % drvPath);
+			}
+			else
+				si.interval = 0;
+			infos.push_back(si);
+		}
+		setVersionedStateEntriesTxn(txn, statePath, infos); 							//register subdirs/files and their types of versioning
+		setStateUserGroupTxn(txn, statePath, queryCallingUsername(), "nixbld", 700);	//register the user and group
 		
 		//Shared state
     	Path sharedState = drv.stateOutputs.find("state")->second.sharedState;
@@ -2598,7 +2618,7 @@ void Worker::getInfo()
             args.push_back("--query-info");
             args.insert(args.end(), paths2.begin(), paths2.end());
             string res = runProgram(sub, false, args);
-			printMsg(lvlError, format("run: '%1%' res: '%2%'") % sub % res);
+			//printMsg(lvlError, format("run: '%1%' res: '%2%'") % sub % res);
             std::istringstream str(res);
 
             while (true) {
@@ -2623,8 +2643,6 @@ void Worker::getInfo()
                     }
                 }
             }
-            
-            printMsg(lvlError, format("AAAAAAAAA: '%1%'") % store->isStateComponent("/nix/store/3pw7vmdwdf3ccx6h6i2w0j52ribjswzn-hellotest-1.0"));
         }
     }
 

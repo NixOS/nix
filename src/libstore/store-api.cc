@@ -219,8 +219,6 @@ ValidPathInfo decodeValidPathInfo(std::istream & str)
 {
     ValidPathInfo info;
     
-	printMsg(lvlError, format("BEFORE decodeValidPathInfo"));
-    
     getline(str, info.path);
     if (str.eof()) { info.path = ""; return info; }
     
@@ -237,8 +235,6 @@ ValidPathInfo decodeValidPathInfo(std::istream & str)
     }
 
     if(store->isStateComponent(info.path)){
-	    
-	    printMsg(lvlError, format("STATE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"));
 	    
 	    getline(str, s);
 	    if (!string2Int(s, n)) 
@@ -257,8 +253,6 @@ ValidPathInfo decodeValidPathInfo(std::istream & str)
     
     if (!str || str.eof()) 
     	throw Error("missing input");
-   
-   	printMsg(lvlError, format("AFTER decodeValidPathInfo")); 	
    
     return info;
 }

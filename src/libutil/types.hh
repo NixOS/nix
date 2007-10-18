@@ -76,6 +76,15 @@ typedef map<Path, Snapshots> RevisionClosure;
 typedef map<Path, unsigned int> RevisionClosureTS;			//Paht with a timestamp about when the revision was made.
 typedef map<int, Strings> StateReferences;
 
+
+struct StateInfo
+{
+	string path;
+	string type;
+	unsigned int interval;
+};
+typedef list<StateInfo> StateInfos; 
+
  
 typedef enum { 
     lvlError,

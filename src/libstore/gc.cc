@@ -449,7 +449,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
     bool gcKeepDerivations =
         queryBoolSetting("gc-keep-derivations", true);
 
-	printMsg(lvlError, format("gcKeepOutputs %1% gcKeepDerivations: %2%") % gcKeepOutputs % gcKeepDerivations);
+	//printMsg(lvlError, format("gcKeepOutputs %1% gcKeepDerivations: %2%") % gcKeepOutputs % gcKeepDerivations);
 
     /* Acquire the global GC root.  This prevents
        a) New roots from being added.
@@ -482,8 +482,6 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
     PathSet livePaths;
     for (PathSet::const_iterator i = roots.begin(); i != roots.end(); ++i)
         computeFSClosure(canonPath(*i), livePaths, true, true, 0);
-
-	printMsg(lvlError, format("STAGE X"));
 
     /* Note that the deriver need not be valid (e.g., if we
     previously ran the collector with `gcKeepDerivations'
@@ -519,8 +517,6 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
         }
     }
     
-    printMsg(lvlError, format("STAGE Y"));
-
     if (gcKeepOutputs) {
         /* Hmz, identical to storePathRequisites in nix-store. */
         for (PathSet::iterator i = livePaths.begin(); i != livePaths.end(); ++i)
@@ -591,7 +587,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
      */
     PathSet allStatePathDerivations;
     for (PathSet::iterator i = allLiveStatePaths.begin(); i != allLiveStatePaths.end(); ++i){
-    	printMsg(lvlError, format("Live state path `%1%'") % *i);
+    	//printMsg(lvlError, format("Live state path `%1%'") % *i);
     	Path stateDrv = queryStatePathDrvTxn(noTxn, *i);
     	allStatePathDerivations.insert(stateDrv);
     	//printMsg(lvlError, format("Live state path drv `%1%'") % stateDrv);
@@ -639,8 +635,6 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
 		
 		if(*i != "/nix/store/zg8x9wdhcs4j0hvf33vg34c7m65adrpa-env-manifest")
 			continue;
-		
-		printMsg(lvlError, format("Consider DEL `%1%'") % *i);
 		
 		PathSet references;
 		store->queryStoreReferences(*i, references, 0);

@@ -158,6 +158,18 @@ static TableId dbStateSnapshots = 0;
  */
 static TableId dbSharedState = 0;
 
+/*
+ * StatePath :: string
+ * the string is converted to something of type StateInfos
+ */
+static TableId dbVersionItems = 0;
+
+/*
+ * StatePath :: string
+ * the string contains the user,group and chmod 
+ */
+static TableId dbStateRights = 0;
+
 
 static void upgradeStore07();
 static void upgradeStore09();
@@ -228,6 +240,8 @@ LocalStore::LocalStore(bool reserveSpace)
 	dbStateSnapshots = nixDB.openTable("stateSnapshots");
 	dbSharedState = nixDB.openTable("sharedState");
 	dbSolidStateReferences = nixDB.openTable("references_solid_c_s");	/* The contents of this table is included in references_c_s */
+	dbVersionItems = nixDB.openTable("stateItems");
+	dbStateRights = nixDB.openTable("stateRights");
 	
     int curSchema = 0;
     Path schemaFN = nixDBPath + "/schema";
@@ -556,7 +570,7 @@ static PathSet getXReferrers(const Transaction & txn, const Path & store_or_stat
 		for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i){
 			Path getStatePath;
 			unsigned int getRevision;
-			splitDBKey(*i, getStatePath, getRevision);
+			splitDBRevKey(*i, getStatePath, getRevision);
 		
 			if(latest[getStatePath]	== 0) 						//either it is unset
 				latest[getStatePath] = getRevision;
@@ -575,7 +589,7 @@ static PathSet getXReferrers(const Transaction & txn, const Path & store_or_stat
 			//printMsg(lvlError, format("AAAAA '%1%'") % (*i).first);
 			
 			Strings references;
-			nixDB.queryStrings(txn, table, mergeToDBKey((*i).first, (*i).second), references);
+			nixDB.queryStrings(txn, table, mergeToDBRevKey((*i).first, (*i).second), references);
 			for (Strings::iterator j = references.begin(); j != references.end(); ++j){ 
 				//printMsg(lvlError, format("TEST: '%1%' has ref '%2%' check with '%3%'") % (*i).first % *j % path);
 				if(*j == path)
@@ -1852,6 +1866,29 @@ void LocalStore::revertToRevision(const Path & statePath, const unsigned int rev
 	txn.commit();	
 }
 
+void setVersionedStateEntriesTxn(const Transaction & txn, const Path & statePath, 
+	const StateInfos & infos, const unsigned int revision, const unsigned int timestamp)
+{
+	setVersionedStateEntries(nixDB, txn, dbVersionItems, dbStateRevisions, 
+    	statePath, infos, revision, timestamp);
+}
+   
+bool getVersionedStateEntriesTxn(const Transaction & txn, const Path & statePath, 
+	StateInfos & infos, const unsigned int revision, const unsigned int timestamp)
+{
+	return getVersionedStateEntries(nixDB, txn, dbVersionItems, dbStateRevisions, 
+		statePath, infos, revision, timestamp);
+}
+
+void setStateUserGroupTxn(const Transaction & txn, const Path & statePath, const string & user, const string & group, int chmod)
+{
+	setStateUserGroup(nixDB, txn, dbStateRights, statePath, user, group, chmod);
+}
+
+void getStateUserGroupTxn(const Transaction & txn, const Path & statePath, string & user, string & group, int & chmod)
+{
+	getStateUserGroup(nixDB, txn, dbStateRights, statePath, user, group, chmod);
+}
 
 typedef std::map<Hash, std::pair<Path, ino_t> > HashToPath;
 

@@ -359,24 +359,70 @@ void scanAndUpdateAllReferencesRecusivelyTxn(const Transaction & txn, const Path
 	}
 }
 
+void rsyncPaths(const Path & from, const Path & to, const bool addSlashes)		//TODO bool shellexpansion, bool failure for nix-env
+{
+	//TODO Could be a symlink (to a non-existing dir)
+	/*
+	if(!DirectoryExist(from))
+		throw Error(format("Path `%1%' doenst exist ...") % from);
+	if(!DirectoryExist(to))
+		throw Error(format("Path `%1%' doenst exist ...") % to);
+	*/
+
+	Path from2 = from;
+	Path to2 = to;
+	if(addSlashes){	
+		//We add a slash / to the end to ensure the contents is copyed
+		if(from2[from2.length() - 1] != '/')
+			from2 = from2 + "/";
+		if(to2[to2.length() - 1] != '/')
+			to2 = to2 + "/";
+	}
+	
+	printMsg(lvlError, format("Rsync from: '%1%' to: '%2%'") % from2 % to2);
+	
+	//Rsync from --> to and also with '-avHx --delete'
+	//This makes the paths completely equal (also deletes) and retains times ownership etc.
+	Strings p_args;
+	p_args.push_back("-avHx");
+	p_args.push_back("--delete");
+	p_args.push_back(from2);
+	p_args.push_back(to2);
+	runProgram_AndPrintOutput(nixRsync, true, p_args, "rsync");
+}
+
 // ******************************************************* DB FUNCTIONS ********************************************************************
 
 /* State specific db functions */
 
-Path mergeToDBKey(const Path & statePath, const unsigned int intvalue)
+Path mergeToDBKey(const string & s1, const string & s2)
 {
 	string prefix = "-KEY-";
-	return statePath + prefix + unsignedInt2String(intvalue);
+	return s1 + prefix + s2;
+}
+Path mergeToDBRevKey(const Path & statePath, const unsigned int intvalue)
+{
+	return mergeToDBKey(statePath, unsignedInt2String(intvalue));
 }
 
-void splitDBKey(const Path & revisionedStatePath, Path & statePath, unsigned int & intvalue)
+void splitDBKey(const string & s, string & s1, string & s2)
 {
 	string prefix = "-KEY-";
+	size_t getPos = s.find_last_of(prefix);
 	
-	int pos = revisionedStatePath.find_last_of(prefix);
-	statePath = revisionedStatePath.substr(0, pos - prefix.length() + 1);
-	//printMsg(lvlError, format("'%2%' - '%1%'") % revisionedStatePath.substr(pos+1, revisionedStatePath.length()) % int2String(pos));
-	bool succeed = string2UnsignedInt(revisionedStatePath.substr(pos+1, revisionedStatePath.length()), intvalue);
+	if(getPos == string::npos)
+		throw Error(format("No prefx '%1%' found in '%2%' so we cannot split") % prefix % s);
+	
+	int pos = getPos;
+	s1 = s.substr(0, pos - prefix.length() + 1);
+	s2 = s.substr(pos+1, s.length());
+}
+void splitDBRevKey(const Path & revisionedStatePath, Path & statePath, unsigned int & intvalue)
+{
+	string s2;
+	splitDBKey(revisionedStatePath, statePath, s2);
+
+	bool succeed = string2UnsignedInt(s2, intvalue);
 	if(!succeed)
 		throw Error(format("Malformed revision value of path '%1%'") % revisionedStatePath);
 }
@@ -417,7 +463,7 @@ bool lookupHighestRevivison(const Strings & keys, const Path & statePath, string
 		//printMsg(lvlError, format("'%1%' - '%2%'") % *i % statePath);
 		Path getStatePath;
 		unsigned int getRevision;
-		splitDBKey(*i, getStatePath, getRevision);
+		splitDBRevKey(*i, getStatePath, getRevision);
 		if(getRevision > highestRev){
 		
 			if(lowerthan != 0){
@@ -432,19 +478,19 @@ bool lookupHighestRevivison(const Strings & keys, const Path & statePath, string
 	if(highestRev == 0)	//no records found
 		return false;
 	
-	key = mergeToDBKey(statePath, highestRev);		//final key that matches revision + statePath
+	key = mergeToDBRevKey(statePath, highestRev);		//final key that matches revision + statePath
 	return true;	
 }
 
 bool revisionToTimeStamp(Database & nixDB, const Transaction & txn, TableId revisions_table, const Path & statePath, const int revision, unsigned int & timestamp)
 {
-	string key = mergeToDBKey(statePath, revision);
+	string key = mergeToDBRevKey(statePath, revision);
 	Strings references;
 	bool notempty = nixDB.queryStrings(txn, revisions_table, key, references);
 	
 	if(notempty){	
 		Path empty; 
-		splitDBKey(*(references.begin()), empty, timestamp);	//extract the timestamp
+		splitDBRevKey(*(references.begin()), empty, timestamp);	//extract the timestamp
 		//printMsg(lvlError, format("PRINT '%1%'") % timestamp);
 		return true;
 	}
@@ -472,17 +518,13 @@ void setStateReferences(Database & nixDB, const Transaction & txn, TableId refer
 	
 	//Warning if it already exists
 	Strings empty;
-	if( nixDB.queryStrings(txn, references_table, mergeToDBKey(statePath, timestamp2), empty) )
+	if( nixDB.queryStrings(txn, references_table, mergeToDBRevKey(statePath, timestamp2), empty) )
 		printMsg(lvlError, format("Warning: The timestamp '%1%' (now: '%5%')  / revision '%4%' already exists for set-references of path '%2%' with db '%3%'") 
 		% timestamp2 % statePath % references_table % revision % getTimeStamp());
 	
 	//Create the key
-	string key = mergeToDBKey(statePath, timestamp2);
+	string key = mergeToDBRevKey(statePath, timestamp2);
 		
-	//printMsg(lvlError, format("Set references '%1%'") % key);
-	//for (Strings::const_iterator i = references.begin(); i != references.end(); ++i)
-	//	printMsg(lvlError, format("reference '%1%'") % *i);
-	
 	//Insert	
 	nixDB.setStrings(txn, references_table, key, references, false);				//The false makes sure also empty references are set
 }
@@ -514,12 +556,12 @@ bool queryStateReferences(Database & nixDB, const Transaction & txn, TableId ref
 	}
 	
 	//If a specific key is given: check if this timestamp exists key in the table
-	key = mergeToDBKey(statePath, timestamp2);
+	key = mergeToDBRevKey(statePath, timestamp2);
 	bool found = false;
 	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i) {
 		if(key == *i){
 			found = true;
-			key = mergeToDBKey(statePath, timestamp2);
+			key = mergeToDBRevKey(statePath, timestamp2);
 		}
 	}
 	
@@ -555,10 +597,10 @@ void removeAllStatePathRevisions(Database & nixDB, const Transaction & txn, Tabl
 	
 	for (RevisionInfos::iterator i = revisions.begin(); i != revisions.end(); ++i){
 		unsigned int rev = (*i).first;
-		nixDB.delPair(txn, revisions_table, mergeToDBKey(statePath, rev));
+		nixDB.delPair(txn, revisions_table, mergeToDBRevKey(statePath, rev));
 		
 		//Remove all comments
-		nixDB.delPair(txn, revisions_comments, mergeToDBKey(statePath, rev));
+		nixDB.delPair(txn, revisions_comments, mergeToDBRevKey(statePath, rev));
 	}
 
 	//Remove all snapshots
@@ -588,11 +630,11 @@ void setStateRevisions(Database & nixDB, const Transaction & txn, TableId revisi
 	
 	//Insert all ss_epochs into snapshots_table with the current ts.
 	for (RevisionClosure::const_iterator i = revisions.begin(); i != revisions.end(); ++i){
-		string key = mergeToDBKey((*i).first, timestamp);
+		string key = mergeToDBRevKey((*i).first, timestamp);
 		Strings data;
 		//the map<> takes care of the sorting on the Path
 		for (Snapshots::const_iterator j = (*i).second.begin(); j != (*i).second.end(); ++j)
-			data.push_back(mergeToDBKey((*j).first, (*j).second));
+			data.push_back(mergeToDBRevKey((*j).first, (*j).second));
 		nixDB.setStrings(txn, snapshots_table, key, data);
 	}
 	
@@ -602,7 +644,7 @@ void setStateRevisions(Database & nixDB, const Transaction & txn, TableId revisi
 		
 		unsigned int revision = getNewRevisionNumber(nixDB, txn, revisions_table, statePath);	//get a new revision number
 		
-		string key = mergeToDBKey(statePath, revision);
+		string key = mergeToDBRevKey(statePath, revision);
 		
 		//get all its requisites
 		PathSet statePath_references;
@@ -612,7 +654,7 @@ void setStateRevisions(Database & nixDB, const Transaction & txn, TableId revisi
 		//save in db
 		Strings data;
 		for (PathSet::const_iterator j = statePath_references.begin(); j != statePath_references.end(); ++j)
-			data.push_back(mergeToDBKey(*j, timestamp));		
+			data.push_back(mergeToDBRevKey(*j, timestamp));		
 		
 		nixDB.setStrings(txn, revisions_table, key, data, false);				//The false makes sure also empty revisions are set
 		
@@ -644,7 +686,7 @@ bool queryStateRevisions(Database & nixDB, const Transaction & txn, TableId revi
 			return false;
 	}
 	else
-		key = mergeToDBKey(statePath, root_revision);
+		key = mergeToDBRevKey(statePath, root_revision);
 	
 	//Get references pointing to snapshots_table from revisions_table with root_revision
 	Strings statePaths;
@@ -658,7 +700,7 @@ bool queryStateRevisions(Database & nixDB, const Transaction & txn, TableId revi
 		
 		Path getStatePath;
 		unsigned int getTimestamp;
-		splitDBKey(*i, getStatePath, getTimestamp);
+		splitDBRevKey(*i, getStatePath, getTimestamp);
 		
 		//query state versioined directorys/files
 		/*
@@ -684,7 +726,7 @@ bool queryStateRevisions(Database & nixDB, const Transaction & txn, TableId revi
 			
 			Path snapshottedPath;			
 			unsigned int revision;
-			splitDBKey(*j, snapshottedPath, revision);
+			splitDBRevKey(*j, snapshottedPath, revision);
 						
 			snapshots[snapshottedPath] = revision;
 			counter++;
@@ -713,7 +755,7 @@ bool queryAvailableStateRevisions(Database & nixDB, const Transaction & txn, Tab
 
 		Path getStatePath;
 		unsigned int getRevision;
-		splitDBKey(*i, getStatePath, getRevision);
+		splitDBRevKey(*i, getStatePath, getRevision);
 		
 		//save the date and comments
 		RevisionInfo rev;
@@ -735,36 +777,93 @@ bool queryAvailableStateRevisions(Database & nixDB, const Transaction & txn, Tab
     	return true;
 }
 
-void rsyncPaths(const Path & from, const Path & to, const bool addSlashes)		//TODO bool shellexpansion, bool failure for nix-env
+void setVersionedStateEntries(Database & nixDB, const Transaction & txn, TableId versionItems, TableId revisions_table, 
+	const Path & statePath, const StateInfos & infos, const unsigned int revision, const unsigned int timestamp)
 {
-	//TODO Could be a symlink (to a non-existing dir)
-	/*
-	if(!DirectoryExist(from))
-		throw Error(format("Path `%1%' doenst exist ...") % from);
-	if(!DirectoryExist(to))
-		throw Error(format("Path `%1%' doenst exist ...") % to);
-	*/
-
-	Path from2 = from;
-	Path to2 = to;
-	if(addSlashes){	
-		//We add a slash / to the end to ensure the contents is copyed
-		if(from2[from2.length() - 1] != '/')
-			from2 = from2 + "/";
-		if(to2[to2.length() - 1] != '/')
-			to2 = to2 + "/";
+	if( !isValidStatePathTxn(txn, statePath)	)
+		throw Error(format("path '%1%' is not a statepath") % statePath);
+	
+	//TODO THIS IS THE SAME CODE AS IN  SETSTATEREFERENCES !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	//Find the timestamp if we need	
+	unsigned int timestamp2 = timestamp;
+	if(revision == 0 && timestamp == 0)
+		timestamp2 = getTimeStamp();
+	else if(revision != 0 && timestamp == 0){
+		bool found = revisionToTimeStamp(nixDB, txn, revisions_table, statePath, revision, timestamp2);
+		if(!found)
+			throw Error(format("Revision '%1%' cannot be matched to a timestamp...") % revision);
 	}
 	
-	printMsg(lvlError, format("Rsync from: '%1%' to: '%2%'") % from2 % to2);
+	Strings ss;
+	for (StateInfos::const_iterator i = infos.begin(); i != infos.end(); ++i) {
+		StateInfo si = *i;
+		ss.push_back(mergeToDBKey(si.path, mergeToDBKey(si.type, unsignedInt2String(si.interval))));
+	}
+	nixDB.setStrings(txn, versionItems, statePath, ss);
+}
+
+bool getVersionedStateEntries(Database & nixDB, const Transaction & txn, TableId versionItems, TableId revisions_table, 
+	const Path & statePath, StateInfos & infos, const unsigned int revision, const unsigned int timestamp)
+{
+	if( !isValidStatePathTxn(txn, statePath)	)
+		throw Error(format("path '%1%' is not a statepath") % statePath);
+
+	//TODO THIS IS THE SAME CODE AS IN QUERY STATEREFERRERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+	//Convert revision to timestamp number useing the revisions_table
+	unsigned int timestamp2 = timestamp; 
+	if(timestamp == 0 && revision != 0){	
+		bool found = revisionToTimeStamp(nixDB, txn, revisions_table, statePath, revision, timestamp2);
+		if(!found)			//we are asked for references of some revision, but there are no references registered yet, so we return false;
+			return false;
+	}
 	
-	//Rsync from --> to and also with '-avHx --delete'
-	//This makes the paths completely equal (also deletes) and retains times ownership etc.
-	Strings p_args;
-	p_args.push_back("-avHx");
-	p_args.push_back("--delete");
-	p_args.push_back(from2);
-	p_args.push_back(to2);
-	runProgram_AndPrintOutput(nixRsync, true, p_args, "rsync");
+	Strings ss;
+	bool found = nixDB.queryStrings(txn, versionItems, statePath, ss);
+	if(!found)
+		return false;
+	
+	for (Strings::const_iterator i = ss.begin(); i != ss.end(); ++i) {
+		
+		StateInfo si;
+		
+		string s1;
+		string interval;
+		splitDBKey(*i, s1, interval);
+		bool succeed = string2UnsignedInt(interval, si.interval);
+		if(!succeed)
+			throw Error(format("Malformed TS value of record '%1%'") % *i);
+		
+		string path;
+		string type;
+		splitDBKey(s1, si.path, si.type);
+		
+		infos.push_back(si);
+	}
+	
+	return true;
+}
+
+void setStateUserGroup(Database & nixDB, const Transaction & txn, TableId stateRights, const Path & statePath, const string & user, const string & group, int chmod)
+{
+	string value = mergeToDBKey(user,mergeToDBKey(group, int2String(chmod)));
+	nixDB.setString(txn, stateRights, statePath, value);
+}
+
+void getStateUserGroup(Database & nixDB, const Transaction & txn, TableId stateRights, const Path & statePath, string & user, string & group, int & chmod)
+{
+	string value;
+	bool notEmpty = nixDB.queryString(txn, stateRights, statePath, value);
+	if(!notEmpty)
+		throw Error(format("No rights found for path '%1%'") % statePath);
+	
+	string s1;
+	string chmod_s;
+	splitDBKey(value, s1, chmod_s);
+	bool succeed = string2Int(chmod_s, chmod);
+	if(!succeed)
+		throw Error(format("Malformed chmod value of path '%1%'") % statePath);
+	
+	splitDBKey(s1, user, group);
 }
 
 }

@@ -42,10 +42,14 @@ namespace nix {
     unsigned int getNewRevisionNumber(Database & nixDB, const Transaction & txn, TableId table, const Path & statePath);
 
     /* TODO */
-    Path mergeToDBKey(const Path & statePath, const unsigned int intvalue);
+    Path mergeToDBKey(const string & s1, const string & s2);
+    Path mergeToDBRevKey(const Path & statePath, const unsigned int intvalue);
     
     /* TODO */
-    void splitDBKey(const Path & revisionedStatePath, Path & statePath, unsigned int & intvalue);
+    void splitDBKey(const string & s, string & s1, string & s2);
+    void splitDBRevKey(const Path & revisionedStatePath, Path & statePath, unsigned int & intvalue);
+
+	
 
 	/* TODO */
     bool revisionToTimeStamp(Database & nixDB, const Transaction & txn, TableId revisions_table, const Path & statePath, const int revision, unsigned int & timestamp);
@@ -70,11 +74,28 @@ namespace nix {
     bool queryAvailableStateRevisions(Database & nixDB, const Transaction & txn, TableId revisions_table, TableId revisions_comments,
     	const Path & statePath, RevisionInfos & revisions);	
     
+    /**/
     void invalidateAllStateReferences(Database & nixDB, const Transaction & txn, TableId references_table, const Path & statePath);
    
+   	/**/
    	void removeAllStatePathRevisions(Database & nixDB, const Transaction & txn, TableId revisions_table, 
 		TableId revisions_comments, TableId snapshots_table, TableId statecounters, const Path & statePath);
    
+    /**/
+    void setVersionedStateEntries(Database & nixDB, const Transaction & txn, TableId versionItems, TableId revisions_table, 
+    	const Path & statePath, const StateInfos & infos, const unsigned int revision = 0, const unsigned int timestamp = 0);
+    
+    /**/	
+	bool getVersionedStateEntries(Database & nixDB, const Transaction & txn, TableId versionItems, TableId revisions_table, 
+		const Path & statePath, StateInfos & infos, const unsigned int revision = 0, const unsigned int timestamp = 0);
+    
+    /**/
+    void setStateUserGroup(Database & nixDB, const Transaction & txn, TableId stateRights, const Path & statePath, const string & user, const string & group, int chmod);
+
+	/**/
+	void getStateUserGroup(Database & nixDB, const Transaction & txn, TableId stateRights, const Path & statePath, string & user, string & group, int & chmod);
+	
+    
     
 }
 
