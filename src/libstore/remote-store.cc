@@ -18,21 +18,54 @@
 namespace nix {
 
 
-Path readStorePath(Source & from)
+Path readXPath(Source & from, const bool canBeStore, const bool canBeState)
 {
     Path path = readString(from);
-    assertStorePath(path);
+    
+    if(canBeStore && canBeState)
+    	assertStoreOrStatePath(path);
+    else if(canBeStore)
+    	assertStorePath(path);
+    else if(canBeState)
+    	assertStatePath(path);
+    	
     return path;
 }
+Path readStorePath(Source & from)
+{
+	return readXPath(from, true, false);
+}	
+Path readStatePath(Source & from)
+{
+	return readXPath(from, false, true);
+}
+Path readStoreOrStatePath(Source & from)
+{
+	return readXPath(from, true, true);
+}
 
-
-PathSet readStorePaths(Source & from)
+PathSet readXPaths(Source & from, const bool canBeStore, const bool canBeState)
 {
     PathSet paths = readStringSet(from);
-    for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
-        assertStorePath(*i);
+    for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i){
+    	if(canBeStore && canBeState)
+    		assertStoreOrStatePath(*i);
+	    else if(canBeStore)
+	    	assertStorePath(*i);
+	    else if(canBeState)
+	    	assertStatePath(*i);
+    }
     return paths;
 }
+PathSet readStorePaths(Source & from)
+{
+	return readXPaths(from, true, false);
+}
+PathSet readStatePaths(Source & from)
+{
+	return readXPaths(from, false, true);
+}
+
 
 
 RemoteStore::RemoteStore()
@@ -246,7 +279,7 @@ void RemoteStore::queryStateReferences(const Path & path,
     writeString(path, to);
     writeBigUnsignedInt(revision, to);
     processStderr();
-	PathSet stateReferences2 = readStorePaths(from);
+	PathSet stateReferences2 = readStatePaths(from);
 	stateReferences.insert(stateReferences2.begin(), stateReferences2.end());
 }
 
@@ -270,7 +303,7 @@ void RemoteStore::queryStateReferrers(const Path & path,
     writeString(path, to);
     writeBigUnsignedInt(revision, to);
     processStderr();
-    PathSet stateReferrers2 = readStorePaths(from);
+    PathSet stateReferrers2 = readStatePaths(from);
     stateReferrers.insert(stateReferrers2.begin(), stateReferrers2.end());
 }
 

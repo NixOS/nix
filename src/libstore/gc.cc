@@ -407,12 +407,13 @@ static void addAdditionalRoots(PathSet & roots)
 static void dfsVisit(const PathSet & paths, const Path & path,
     PathSet & visited, Paths & sorted)
 {
-    if (visited.find(path) != visited.end()) return;
+    if (visited.find(path) != visited.end()) 
+    	return;
     visited.insert(path);
     
     PathSet references;
     if (store->isValidPath(path))
-        store->queryStoreReferences(path, references, 0);						
+        store->queryStoreReferences(path, references, 0);				
     
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)
@@ -633,6 +634,21 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
     /* !!! when we have multiple output paths per derivation, this
        will not work anymore because we get cycles. */
     Paths storePaths = topoSortPaths(storePathSet);
+
+	for (Paths::iterator i = storePaths.begin(); i != storePaths.end(); ++i) {
+		
+		if(*i != "/nix/store/zg8x9wdhcs4j0hvf33vg34c7m65adrpa-env-manifest")
+			continue;
+		
+		printMsg(lvlError, format("Consider DEL `%1%'") % *i);
+		
+		PathSet references;
+		store->queryStoreReferences(*i, references, 0);
+		for (PathSet::iterator j = references.begin(); j != references.end(); ++j) {
+			printMsg(lvlError, format("REF `%1%'") % *j);
+		}
+		
+	}
 
     /* Try to delete store paths in the topologically sorted order. */
     for (Paths::iterator i = storePaths.begin(); i != storePaths.end(); ++i) {

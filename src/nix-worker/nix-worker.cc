@@ -250,7 +250,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
     case wopIsValidStatePath: {
-    	Path path = readString(from);		//TODO readStatePath
+    	Path path = readStatePath(from); 
         startWork();
         bool result = store->isValidStatePath(path);
         stopWork();
@@ -259,7 +259,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
     case wopIsValidComponentOrStatePath: {
-    	Path path = readStorePath(from);
+    	Path path = readStoreOrStatePath(from);
         startWork();
         bool result = store->isValidComponentOrStatePath(path);
         stopWork();
@@ -286,7 +286,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
     case wopQueryStatePathDrv: {
-    	Path path = readString(from);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! make a readStatePath...
+    	Path path = readStatePath(from);
         startWork();
         Path p = store->queryStatePathDrv(path);
         stopWork();
@@ -296,7 +296,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
 
     case wopQueryStoreReferences:
     case wopQueryStoreReferrers: {
-        Path path = readStorePath(from);
+        Path path = readStoreOrStatePath(from);
         unsigned int revision = readBigUnsignedInt(from);
         startWork();
         PathSet paths;
@@ -311,7 +311,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     
     case wopQueryStateReferences:
     case wopQueryStateReferrers: {
-        Path path = readStorePath(from);
+        Path path = readStoreOrStatePath(from);
         unsigned int revision = readBigUnsignedInt(from);
         startWork();
         PathSet paths;
@@ -493,7 +493,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
 	case wopIsStateComponent: {
-    	Path path = readString(from);
+    	Path path = readStorePath(from);
     	startWork();
     	bool result = store->isStateComponent(path);
     	stopWork();
@@ -502,7 +502,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
 	case wopStorePathRequisites: {
-		Path storeOrstatePath = readString(from);
+		Path storeOrstatePath = readStoreOrStatePath(from);
 		bool includeOutputs = readInt(from) == 1;
 		PathSet paths = readStringSet(from);
 		bool withComponents = readInt(from) == 1;
@@ -528,7 +528,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     
 	case wopQueryStateRevisions: {
 		printMsg(lvlError, format("queryStateRevisions nix-worker"));
-    	Path statePath = readString(from); 
+    	Path statePath = readStatePath(from); 
 		unsigned int revision = readBigUnsignedInt(from);
 		RevisionClosure revisions;
 		RevisionClosureTS timestamps;
@@ -542,7 +542,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
 	case wopQueryAvailableStateRevisions: {
-    	Path statePath = readString(from);
+    	Path statePath = readStatePath(from);
     	RevisionInfos revisions;
     	startWork();
         bool result = store->queryAvailableStateRevisions(statePath, revisions);
@@ -553,7 +553,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
 	case wopCommitStatePath: {
-    	Path statePath = readString(from);
+    	Path statePath = readStatePath(from);
     	startWork();
         Snapshots ss = store->commitStatePath(statePath);
         stopWork();
@@ -562,7 +562,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
 	case wopScanAndUpdateAllReferences: {
-    	Path statePath = readString(from);
+    	Path statePath = readStatePath(from);
 		bool recursive = readInt(from) == 1;
     	startWork();
         store->scanAndUpdateAllReferences(statePath, recursive);
@@ -572,7 +572,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
     case wopGetSharedWith: {
-		Path statePath1 = readString(from);
+		Path statePath1 = readStatePath(from);
 		Path statePath2;
 		startWork();
         bool result = store->getSharedWith(statePath1, statePath2);
@@ -583,7 +583,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
 	}
     
 	case wopToNonSharedPathSet: {
-    	PathSet statePaths = readStringSet(from);
+    	PathSet statePaths = readStatePaths(from);
     	startWork();
     	PathSet statePaths_ns = store->toNonSharedPathSet(statePaths);
     	stopWork();
@@ -592,7 +592,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
 	case wopRevertToRevision: {
-		Path statePath = readString(from);
+		Path statePath = readStatePath(from);
 		unsigned int revision_arg = readBigUnsignedInt(from);
 		bool recursive = readInt(from) == 1;
 		startWork();
@@ -603,8 +603,8 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
 	case wopShareState: {
-		Path from_arg = readString(from);
-		Path to_arg = readString(from);
+		Path from_arg = readStatePath(from);
+		Path to_arg = readStatePath(from);
 		bool snapshot = readInt(from) == 1;
 		startWork();
     	store->shareState(from_arg, to_arg, snapshot);
@@ -614,7 +614,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
 	}
 	
 	case wopUnShareState: {
-		Path path = readString(from);
+		Path path = readStatePath(from);
 		bool branch = readInt(from) == 1;
 		bool restoreOld = readInt(from) == 1;
 		startWork();
@@ -706,12 +706,11 @@ static void processConnection()
             op = (WorkerOp) oppp;
 
 			/* Use for debugging with gdb --pid=myPid */
-			/*
-            if(oppp == 39){
-            	printMsg(lvlError, format("Sleeping 10 before op '%1%' with pid '%2%'") % op % myPid);
-            	sleep(10);
-            }
-            */
+			if(sleepForGDB)
+	            if(oppp == 39){
+	            	printMsg(lvlError, format("Sleeping 10 before op '%1%' with pid '%2%'") % op % myPid);
+	            	sleep(10);
+	            }
             
         } catch (EndOfFile & e) {
             break;

@@ -71,7 +71,11 @@ typedef enum {
 
 
 Path readStorePath(Source & from);
+Path readStatePath(Source & from);
+Path readStoreOrStatePath(Source & from);
+
 PathSet readStorePaths(Source & from);
+PathSet readStatePaths(Source & from);
 
     
 }

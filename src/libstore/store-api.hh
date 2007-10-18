@@ -56,7 +56,8 @@ public:
         
     /* Queries the set of outgoing FS state-references for a store path.
        The result is not cleared. */
-    virtual void queryStateReferences(const Path & storePath, PathSet & stateReferences, const unsigned int revision) = 0;
+    virtual void queryStateReferences(const Path & path, 
+    	PathSet & stateReferences, const unsigned int revision) = 0;
 
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
@@ -238,6 +239,7 @@ public:
 /* Throw an exception if `path' is not directly in the Nix store. */
 void assertStorePath(const Path & path);
 void assertStatePath(const Path & path);
+void assertStoreOrStatePath(const Path & path);
 
 bool isInStore(const Path & path);
 bool isStorePath(const Path & path);

@@ -20,7 +20,6 @@ using namespace nix;
 using std::cin;
 using std::cout;
 
-
 typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
 //two global variables
@@ -73,7 +72,7 @@ Derivation getDerivation(const string & fullPath, const Strings & program_args, 
 	//printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % state_identifier % binary % username % bool2string(isStateComponent));
     
     if(isStateComponent)
-    	derivers = store->queryDerivers(componentPath, state_identifier, username);
+    	derivers = store->queryDerivers(componentPath, state_identifier, username);			//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! needed ???
     else
     	derivers.insert(store->queryDeriver(componentPath));
     
@@ -594,13 +593,38 @@ void run(Strings args)
 	throw Error(format("aaa"));
 	return;
 
-	*/
 	
-	/*
-	store = openStore();
 	store->isStateComponent("/nix/state/rrki0fgjc42sfszgk95cg0bpchbc5xp7-hellohardcodedstateworld-1.0-test");
+	
+	store = openStore();
+	
+	PathSet p;
+	p.insert("/nix/store/zg8x9wdhcs4j0hvf33vg34c7m65adrpa-env-manifest");
+	p.insert("/nix/store/zwm6lwydkh84wmzhffvcgazmcrmamqw7-hellohardcodedstateworld-1.0");
+	for (PathSet::iterator i = p.begin(); i != p.end(); ++i) {
+		printMsg(lvlError, format("Path p has references `%1%'") % *i);
+		PathSet references;
+		store->queryStoreReferences(*i, references, 0);
+		for (PathSet::iterator j = references.begin(); j != references.end(); ++j) {
+			printMsg(lvlError, format("REF `%1%'") % *j);
+		}
+	}
+	
+	PathSet p2;
+	p2.insert("/nix/store/zg8x9wdhcs4j0hvf33vg34c7m65adrpa-env-manifest");
+	p2.insert("/nix/store/zwm6lwydkh84wmzhffvcgazmcrmamqw7-hellohardcodedstateworld-1.0");
+	for (PathSet::iterator i = p.begin(); i != p.end(); ++i) {
+		printMsg(lvlError, format("Path p has referrers `%1%'") % *i);
+		PathSet referrers;
+		store->queryStoreReferrers(*i, referrers, 0);
+		for (PathSet::iterator j = referrers.begin(); j != referrers.end(); ++j) {
+			printMsg(lvlError, format("REF `%1%'") % *j);
+		}
+	}
+	
+	
 	return;
-	*/	
+	*/
 	/* test */
 	
 	if(args.size() == 1 && ( *(args.begin()) == "--help" || *(args.begin()) == "--statehelp")){

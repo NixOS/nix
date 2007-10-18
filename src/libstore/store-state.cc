@@ -128,13 +128,6 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
 		Snapshots revisioned_paths = (*i).second;
 		unsigned int timestamp = getTimestamps[statePath];
 		
-		
-		//get its derivation-state-items
-		//Derivation statePath_drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, statePath));
-		//DerivationStateOutputDirs stateOutputDirs = statePath_drv.stateOutputDirs; 
-		
-		//TODO Sort snapshots??? eg first restore root, then the subdirs??
-		
 		for (Snapshots::iterator j = revisioned_paths.begin(); j != revisioned_paths.end(); ++j){
 			Path revertPathOrFile = (*j).first;
 			unsigned int epoch = (*j).second;

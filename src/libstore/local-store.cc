@@ -401,11 +401,9 @@ bool LocalStore::isValidComponentOrStatePath(const Path & path)
 void setReferences(const Transaction & txn, const Path & store_or_statePath,
     const PathSet & references, const PathSet & stateReferences, const unsigned int revision)		
 {
-
     /* For unrealisable paths, we can only clear the references. */
     if (references.size() > 0 && !isValidComponentOrStatePathTxn(txn, store_or_statePath))
         throw Error(format("cannot set references for path `%1%' which is invalid and has no substitutes") % store_or_statePath);
-	
 	
 	/*
 	for (PathSet::iterator i = references.begin(); i != references.end(); ++i)
@@ -483,14 +481,14 @@ void queryXReferencesTxn(const Transaction & txn, const Path & store_or_statePat
     references.insert(references2.begin(), references2.end());
 }
 
-void LocalStore::queryStoreReferences(const Path & storePath, PathSet & references, const unsigned int revision)
+void LocalStore::queryStoreReferences(const Path & componentOrstatePath, PathSet & references, const unsigned int revision)
 {
-    nix::queryXReferencesTxn(noTxn, storePath, references, revision, true);
+    nix::queryXReferencesTxn(noTxn, componentOrstatePath, references, true, revision);
 }
 
 void LocalStore::queryStateReferences(const Path & componentOrstatePath, PathSet & stateReferences, const unsigned int revision)
 {
-    nix::queryXReferencesTxn(noTxn, componentOrstatePath, stateReferences, revision, false);
+    nix::queryXReferencesTxn(noTxn, componentOrstatePath, stateReferences, false, revision);
 }
 
 //Private

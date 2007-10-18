@@ -53,6 +53,13 @@ void assertStatePath(const Path & path)
         throw Error(format("state path `%1%' is not in the Nix state-store") % path);
 }
 
+void assertStoreOrStatePath(const Path & path)
+{
+    if (!isStorePath(path) && !isStatePath(path))
+        throw Error(format("path `%1%' is not a store or state path") % path);
+}
+
+
 
 Path toStorePath(const Path & path)
 {

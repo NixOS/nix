@@ -104,8 +104,10 @@ string queryCallingUsername();
 /* get the username based on the UID of the user currently runs the process */
 string queryCurrentUsername();
 
+/* Debugging variables */
 extern bool singleThreaded;
-extern bool sendOutput;    
+extern bool sendOutput;
+extern bool sleepForGDB;    
   
 }
 
