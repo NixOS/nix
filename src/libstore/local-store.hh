@@ -126,7 +126,7 @@ public:
 	
 	Snapshots commitStatePath(const Path & statePath);
 	
-	PathSet queryDerivers(const Path & storePath, const string & identifier, const string & user);		//should these be in here ????
+	PathSet queryDerivers(const Path & storePath);		//should these be in here ????
 	
 	void scanAndUpdateAllReferences(const Path & statePath, const bool recursive);
 	
@@ -139,6 +139,8 @@ public:
 	void shareState(const Path & from, const Path & to, const bool snapshot);
 	
 	void unShareState(const Path & path, const bool branch, const bool restoreOld);
+	
+	Path lookupStatePath(const Path & storePath, const string & identifier, const string & user);
 
     /* Optimise the disk space usage of the Nix store by hard-linking
        files with the same contents. */
@@ -194,7 +196,7 @@ void setDeriver(const Transaction & txn, const Path & path,
     const Path & deriver);
 
 /* Query the derivers of a state-store path. */
-PathSet queryDerivers(const Transaction & txn, const Path & storePath, const string & identifier, const string & user);
+PathSet queryDerivers(const Transaction & txn, const Path & storePath);
 
 /* Delete a value from the nixStore directory. */
 void deleteFromStore(const Path & path, unsigned long long & bytesFreed);
@@ -274,7 +276,7 @@ void setStatePathsIntervalTxn(const Transaction & txn, const Path & statePath, c
 bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const unsigned int revision);
 bool querySharedStateTxn(const Transaction & txn, const Path & statePath, Path & shared_with);
 
-void setStateComponentTxn(const Transaction & txn, const Path & storePath);
+void setStateComponentTxn(const Transaction & txn, const Path & storePath, const Path & statePath, const string & identifier, const string & user);
 
 void setVersionedStateEntriesTxn(const Transaction & txn, const Path & statePath, const StateInfos & infos, const unsigned int revision = 0, const unsigned int timestamp = 0);
 bool getVersionedStateEntriesTxn(const Transaction & txn, const Path & statePath, StateInfos & infos, const unsigned int revision = 0, const unsigned int timestamp = 0);

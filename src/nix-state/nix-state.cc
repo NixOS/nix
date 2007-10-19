@@ -53,9 +53,9 @@ void printHelp()
     //cout << string((char *) helpText, sizeof helpText);
 }
 
-Derivation getDerivation(const string & fullPath, const Strings & program_args, string state_identifier, Path & componentPath, Path & statePath, 
-						 string & binary, string & derivationPath, bool isStateComponent,
-						 bool getDerivers, PathSet & derivers) 	//optional
+void getPathInfo(const string & fullPath, const Strings & program_args, string state_identifier, Path & componentPath, Path & statePath, 
+				 string & binary, string & derivationPath, bool isStateComponent,
+				 bool getDerivers, PathSet & derivers) 	//optional
 {
 	//Parse the full path like /nix/store/...../bin/hello
     componentPath = fullPath.substr(nixStore.size() + 1, fullPath.size());		//+1 to strip off the /
@@ -72,12 +72,12 @@ Derivation getDerivation(const string & fullPath, const Strings & program_args, 
 	//printMsg(lvlError, format("'%1%' - '%2%' - '%3%' - '%4%' - '%5%'") % componentPath % state_identifier % binary % username % bool2string(isStateComponent));
     
     if(isStateComponent)
-    	derivers = store->queryDerivers(componentPath, state_identifier, username);			//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! needed ???
+    	derivers = store->queryDerivers(componentPath);
     else
     	derivers.insert(store->queryDeriver(componentPath));
     
     if(getDerivers == true)
-    	return Derivation();
+    	return;
     
     if(isStateComponent){	
 	    if(derivers.size() == 0)
@@ -88,20 +88,16 @@ Derivation getDerivation(const string & fullPath, const Strings & program_args, 
     
     //Retrieve the derivation, there is only 1 drvPath in derivers
     derivationPath = *(derivers.begin());
-    Derivation drv = derivationFromPath(derivationPath);
 	
 	if(isStateComponent){
-    	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
-    	statePath = stateOutputs.find("state")->second.statepath;
+    	statePath = store->lookupStatePath(componentPath, state_identifier, username);
 	}
-	
-	return drv;
 }
 
 //Wrapper
-Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, 
-									   string & binary, string & derivationPath, bool isStateComponent, Strings & program_args,
-									   bool getDerivers, PathSet & derivers) 	//optional
+void getPathInfo_andCheckArgs_(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, 
+							   string & binary, string & derivationPath, bool isStateComponent, Strings & program_args,
+							   bool getDerivers, PathSet & derivers) 	//optional
 {
 	if (!opFlags.empty()) throw UsageError("unknown flag");
     if ( opArgs.size() < 1) 
@@ -119,15 +115,15 @@ Derivation getDerivation_andCheckArgs_(Strings opFlags, Strings opArgs, Path & c
 		}
     }
    
-    return getDerivation(fullPath, program_args, stateIdentifier, componentPath, statePath, binary, derivationPath, isStateComponent, getDerivers, derivers);	
+    getPathInfo(fullPath, program_args, stateIdentifier, componentPath, statePath, binary, derivationPath, isStateComponent, getDerivers, derivers);	
 }
 
 //Wrapper
-Derivation getDerivation_andCheckArgs(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, 
-									  string & binary, string & derivationPath, bool & isStateComponent, Strings & program_args)
+void getPathInfo_andCheckArgs(Strings opFlags, Strings opArgs, Path & componentPath, Path & statePath, 
+							  string & binary, string & derivationPath, bool & isStateComponent, Strings & program_args)
 {
 	PathSet empty;
-	return getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args, false, empty);
+	getPathInfo_andCheckArgs_(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args, false, empty);
 }
 
 //
@@ -140,7 +136,7 @@ static void opShowDerivations(Strings opFlags, Strings opArgs)
     string derivationPath;
     bool isStateComponent;
     Strings program_args;
-    Derivation drv = getDerivation_andCheckArgs_(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args, true, derivers);
+    getPathInfo_andCheckArgs_(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args, true, derivers);
 	
 	if(!isStateComponent)
 		throw UsageError(format("This path '%1%' is not a state-component path") % componentPath);
@@ -159,7 +155,7 @@ static void opShowStatePath(Strings opFlags, Strings opArgs)
     string derivationPath;
     bool isStateComponent;
     Strings program_args;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
+    getPathInfo_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
     
     if(!isStateComponent)
 		throw UsageError(format("This path '%1%' is not a state-component path") % componentPath);
@@ -176,7 +172,7 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
     string derivationPath;
     bool isStateComponent;
     Strings program_args;
-    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
+    getPathInfo_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
     
     bool recursive = revert_recursively;
     
@@ -196,7 +192,7 @@ static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 	    string derivationPath;
 	    bool isStateComponent;
 	    Strings program_args;
-	    Derivation drv = getDerivation_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
+	    getPathInfo_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
 	}
 	
 	//Lookup unshared path if neccacary
@@ -311,7 +307,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	string root_derivationPath;
 	bool root_isStateComponent;
 	Strings root_program_args;
-    Derivation root_drv = getDerivation_andCheckArgs(opFlags, opArgs, root_componentPath, root_statePath, root_binary, root_derivationPath, root_isStateComponent, root_program_args);
+    getPathInfo_andCheckArgs(opFlags, opArgs, root_componentPath, root_statePath, root_binary, root_derivationPath, root_isStateComponent, root_program_args);
     
     //printMsg(lvlError, format("compp: '%1%'\nstatep: '%2%'\nbinary: '%3%'\ndrv:'%4%'") % root_componentPath % root_statePath % root_binary % root_derivationPath);
     

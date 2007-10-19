@@ -671,15 +671,8 @@ static void installDerivations(Globals & globals,
         		   	 
         		   ){
         			
-        			string oldStatePath;
         			//query old state path
-        			PathSet derivers = store->queryDerivers(i->queryOutPath(globals.state), newStateIdentifier, queryCurrentUsername());		//TODO Check if username if ok
-        			if(derivers.size() != 1)
-	    				throw Error(format("Internal Error: There is not exactly one deriver with state_identifier '%1%' for path '%2%'") 
-	    									% newStateIdentifier % i->queryOutPath(globals.state));
-        			Path oldDrvPath = *(derivers.begin());
-    				Derivation oldDrv = derivationFromPath(oldDrvPath);
-    				oldStatePath = oldDrv.stateOutputs.find("state")->second.statepath;
+        			Path oldStatePath = store->lookupStatePath(i->queryOutPath(globals.state), newStateIdentifier, queryCurrentUsername());
     				
         			//SharePaths
         			printMsg(lvlError, format("Sharing state from old <-- new component '%1%' <-- '%2%'") % oldStatePath % newStatePath);

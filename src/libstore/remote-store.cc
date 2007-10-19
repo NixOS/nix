@@ -451,14 +451,12 @@ void RemoteStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     bytesFreed = (((unsigned long long) hi) << 32) | lo;
 }
 
-PathSet RemoteStore::queryDerivers(const Path & storePath, const string & identifier, const string & user)
+PathSet RemoteStore::queryDerivers(const Path & storePath)
 {
 	writeInt(wopQueryDerivers, to);
 	writeString(storePath, to);
-	writeString(identifier, to);
-	writeString(user, to);
 	processStderr();
-	return readStorePaths(from);		//TODO is this ok ??
+	return readStorePaths(from);
 }
 
 void RemoteStore::setStatePathsInterval(const Path & statePath, const CommitIntervals & intervals)
@@ -598,6 +596,16 @@ void RemoteStore::unShareState(const Path & path, const bool branch, const bool 
 	writeInt(restoreOld ? 1 : 0, to);
 	processStderr();
 	readInt(from);
+}
+
+Path RemoteStore::lookupStatePath(const Path & storePath, const string & identifier, const string & user)
+{
+	writeInt(wopLookupStatePath, to);
+	writeString(storePath, to);
+	writeString(identifier, to);
+	writeString(user, to);
+	processStderr();
+	return readStatePath(from);	
 }
 
 

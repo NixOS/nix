@@ -211,7 +211,7 @@ public:
 	virtual Snapshots commitStatePath(const Path & statePath) = 0;
 
 	/* TODO */
-	virtual PathSet queryDerivers(const Path & storePath, const string & identifier, const string & user) = 0;
+	virtual PathSet queryDerivers(const Path & storePath) = 0;
 
 	/* TODO */
 	virtual void scanAndUpdateAllReferences(const Path & statePath, const bool recursive) = 0;
@@ -230,6 +230,9 @@ public:
 	
 	/* TODO */
 	virtual void unShareState(const Path & path, const bool branch, const bool restoreOld) = 0;
+	
+	/* TODO */
+	virtual Path lookupStatePath(const Path & storePath, const string & identifier, const string & user) = 0;
 	
 };
 

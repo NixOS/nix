@@ -662,42 +662,6 @@ void setDeriver(const Transaction & txn, const Path & storePath, const Path & de
     }
 }
 
-/* Private function only used by addStateDeriver
- * Merges a new derivation into a list of derivations, this function takes username and statepath 
- * into account. This function is used to update derivations that have only changed for example in their sub state
- * paths that need to be versioned. We assume newdrv is the newest.
- */
-PathSet mergeNewDerivationIntoListTxn(const Transaction & txn, const Path & storepath, const Path & newdrv, const PathSet drvs, bool deleteDrvs)
-{
-	PathSet newdrvs;
-
-	Derivation drv = derivationFromPathTxn(txn, newdrv);
-	string identifier = drv.stateOutputs.find("state")->second.stateIdentifier;
-	string user = drv.stateOutputs.find("state")->second.username;
-	
-	for (PathSet::iterator i = drvs.begin(); i != drvs.end(); ++i)	//Check if we need to remove old drvs
-    {
-    	Path drv = *i;
-    	Derivation getdrv = derivationFromPathTxn(txn, drv);
-    	string getIdentifier = getdrv.stateOutputs.find("state")->second.stateIdentifier;
-		string getUser = getdrv.stateOutputs.find("state")->second.username;
-		
-		if(identifier == getIdentifier && getUser == user)			//only insert if it doenst already exist
-		{	
-			//We also check if it's NOT exactly the same drvpath
-			if(drv != newdrv && deleteDrvs){
-				printMsg(lvlTalkative, format("Deleting decrepated state derivation: %1% with identifier %2% and user %3%") % drv % identifier % user);
-				deletePath(drv);			//Deletes the DRV from DISK!
-			}
-		}	
-		else
-			newdrvs.insert(drv);
-    }
-    
-    newdrvs.insert(newdrv);
-    return newdrvs;
-}
-
 void addStateDeriver(const Transaction & txn, const Path & storePath, const Path & deriver)
 {
 	assertStorePath(storePath);
@@ -707,24 +671,66 @@ void addStateDeriver(const Transaction & txn, const Path & storePath, const Path
 	
     if (!isValidPathTxn(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
-
-	Derivation drv = derivationFromPathTxn(txn, deriver);
-	string identifier = drv.stateOutputs.find("state")->second.stateIdentifier;
-	string user = drv.stateOutputs.find("state")->second.username;
 	
-	PathSet currentDerivers = queryDerivers(txn, storePath, identifier, user);
-	PathSet updatedDerivers = mergeNewDerivationIntoListTxn(txn, storePath, deriver, currentDerivers, true);
-
-	Strings data;    	
-	for (PathSet::iterator i = updatedDerivers.begin(); i != updatedDerivers.end(); ++i)		//Convert Paths to Strings
-       	data.push_back(*i);
 	
+	Strings data;
+	nixDB.queryStrings(txn, dbDerivers, storePath, data);				//get all current derivers
+	data.push_back(deriver);
+	
+	//Remove duplicates
+	data.sort();
+	data.unique();
+	
+	//Update
 	nixDB.setStrings(txn, dbDerivers, storePath, data);											//update the derivers db.
 }
 
-void setStateComponentTxn(const Transaction & txn, const Path & storePath)
+void setStateComponentTxn(const Transaction & txn, const Path & storePath, 
+						const Path & statePath, const string & identifier, const string & user)
 {
-	nixDB.setString(txn, dbStateInfo, storePath, "");	//update the dbinfo db.	(maybe TODO)	
+	string key = mergeToDBKey(statePath, mergeToDBKey(identifier, user));
+	
+	Strings data;
+	nixDB.queryStrings(txn, dbStateInfo, storePath, data);
+	
+	for (Strings::iterator i = data.begin(); i != data.end(); ++i){
+		string t1, getUser, getStatePath, getIdentifier;
+		splitDBKey(*i, t1, getUser);
+		splitDBKey(t1, getStatePath, getIdentifier);
+		if(getUser == user && getIdentifier == identifier)
+			if(getStatePath == statePath)
+				return;
+			else
+				throw Error(format("Trying to insert duplicate state paths '%1%' and '%2%' for storepath '%3%'") % getStatePath % statePath % storePath);
+	}
+	
+   	data.push_back(key);
+	nixDB.setStrings(txn, dbStateInfo, storePath, data);	//update the dbinfo db.	(maybe TODO)	
+}
+
+Path lookupStatePathTxn(const Transaction & txn, const Path & storePath, 
+							const string & identifier, const string & user)
+{
+	if (!isValidPathTxn(txn, storePath))
+        throw Error(format("path `%1%' is not valid") % storePath);
+	
+	Strings data;
+	nixDB.queryStrings(txn, dbStateInfo, storePath, data);
+	
+	for (Strings::iterator i = data.begin(); i != data.end(); ++i){
+		string t1, getUser, getStatePath, getIdentifier;
+		splitDBKey(*i, t1, getUser);
+		splitDBKey(t1, getStatePath, getIdentifier);
+		if(getUser == user && getIdentifier == identifier)
+			return getStatePath;
+	}
+	
+	throw Error(format("No statePath found for '%1%' with user '%2%' and identifier '%3%'") % storePath % identifier % user);
+}
+
+Path LocalStore::lookupStatePath(const Path & storePath, const string & identifier, const string & user)
+{
+	return lookupStatePathTxn(noTxn, storePath, identifier, user);
 }
 
 /*
@@ -788,56 +794,33 @@ Path LocalStore::queryDeriver(const Path & path)
 	return nix::queryDeriver(noTxn, path);
 }
 
-//A '*' as argument stands for all identifiers or all users
-PathSet queryDerivers(const Transaction & txn, const Path & storePath, const string & identifier, const string & user)
+
+/*
+ * WARNING: Derivers might have been deleted by the GC and still be in this list !!
+ */
+PathSet queryDerivers(const Transaction & txn, const Path & storePath)
 {
 	if (!isValidPathTxn(txn, storePath))
         throw Error(format("path `%1%' is not valid") % storePath);
 	
-	if(user == "")
-		throw Error(format("The user argument is empty, use queryDeriver(...) for non-state components"));  
+	if(!isStateComponentTxn(txn, storePath))
+		throw Error(format("This path is not a store-state path '%1%'") % storePath);  
 	
-	Strings alldata;    	
-    nixDB.queryStrings(txn, dbDerivers, storePath, alldata);				//get all current derivers
+	Strings data;
+	PathSet derivers;
+	    	
+    nixDB.queryStrings(txn, dbDerivers, storePath, data);				//get all current derivers
+	for (Strings::iterator i = data.begin(); i != data.end(); ++i)
+		derivers.insert(*i);
 
-	PathSet filtereddata;
-	for (Strings::iterator i = alldata.begin(); i != alldata.end(); ++i) {	//filter on username and identifier
-		
-		string derivationpath = (*i);
-		Derivation drv = derivationFromPathTxn(txn, derivationpath);
-		
-		if (drv.outputs.size() != 1)
-			throw Error(format("The call queryDerivers with storepath %1% is not a statePath") % storePath);
-		
-		string getIdentifier = drv.stateOutputs.find("state")->second.stateIdentifier;
-		string getUser = drv.stateOutputs.find("state")->second.username;
-
-		//printMsg(lvlError, format("queryDerivers '%1%' '%2%' '%3%' '%4%' '%5%'") % derivationpath % getIdentifier % identifier % getUser % user);
-		if( (getIdentifier == identifier || identifier == "*") && (getUser == user || user == "*") )
-			filtereddata.insert(derivationpath);
-	}
-	
-	return filtereddata;
+	return derivers;
 }
 	
-PathSet LocalStore::queryDerivers(const Path & storePath, const string & identifier, const string & user)
+PathSet LocalStore::queryDerivers(const Path & storePath)
 {
-	return nix::queryDerivers(noTxn, storePath, identifier, user);
+	return nix::queryDerivers(noTxn, storePath);
 }
 
-//Wrapper around converting the drvPath to the statePath
-/*
-PathSet queryDeriversStatePath(const Transaction & txn, const Path & storePath, const string & identifier, const string & user)
-{
-	PathSet drvs = queryDerivers(txn, storePath, identifier, user);
-	PathSet statePaths;
-	for (PathSet::const_iterator i = drvs.begin(); i != drvs.end(); i++){
-		Derivation drv = derivationFromPath((*i));
-		statePaths.insert(drv.stateOutputs.find("state")->second.statepath);
-	}
-	return statePaths;
-}
-*/
 
 PathSet LocalStore::querySubstitutablePaths()
 {
@@ -1055,7 +1038,7 @@ Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
             canonicalisePathMetaData(dstPath);
             
             Transaction txn(nixDB);
-            registerValidPath(txn, dstPath, h, PathSet(), PathSet(), "", 0);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK (probabyly ok?)
+            registerValidPath(txn, dstPath, h, PathSet(), PathSet(), "", 0);
             txn.commit();
         }
         
@@ -1635,45 +1618,47 @@ bool querySolidStateReferencesTxn(const Transaction & txn, const Path & statePat
 	return notempty;
 }
 
-void unShareStateTxn(const Transaction & txn, const Path & path, const bool branch, const bool restoreOld)
+void unShareStateTxn(const Transaction & txn, const Path & statePath, const bool branch, const bool restoreOld)
 {
 	//Check if is statePath
-	if(!isValidStatePathTxn(txn, path))
-		throw Error(format("Path `%1%' is not a valid state path") % path);
+	if(!isValidStatePathTxn(txn, statePath))
+		throw Error(format("Path `%1%' is not a valid state path") % statePath);
 	
 	//Check if path was shared...
 	Path sharedWithOldPath;
-	if(!querySharedStateTxn(txn, path, sharedWithOldPath))
-		throw Error(format("Path `%1%' is not a shared so cannot be unshared") % path);
+	if(!querySharedStateTxn(txn, statePath, sharedWithOldPath))
+		throw Error(format("Path `%1%' is not a shared so cannot be unshared") % statePath);
 	
 	//Remove Symlink
-	removeSymlink(path);
+	removeSymlink(statePath);
 
 	//Remove earlier entries (unshare)		(we must do this before revertToRevisionTxn)
-	nixDB.delPair(txn, dbSharedState, path);
+	nixDB.delPair(txn, dbSharedState, statePath);
 	
 	//Touch dir with correct rights
-	Derivation drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, path));
-	ensureStateDir(path, drv.stateOutputs.find("state")->second.username, "nixbld", "700");
+	string user, group;
+	int chmod;
+	getStateUserGroupTxn(txn, statePath, user, group, chmod);
+	ensureStateDir(statePath, user, group, int2String(chmod));
 	
 	if(branch && restoreOld)
-		throw Error(format("You cannot branch and restore the old state at the same time for path: '%1%' ") % path);
+		throw Error(format("You cannot branch and restore the old state at the same time for path: '%1%' ") % statePath);
 
 	//Copy if necessary
 	if(branch){
-		rsyncPaths(sharedWithOldPath, path, true);
+		rsyncPaths(sharedWithOldPath, statePath, true);
 	}
 	
 	//Restore the latest snapshot (non-recursive) made on this statepath
 	if(restoreOld){
-		revertToRevisionTxn(txn, path, 0, false);
+		revertToRevisionTxn(txn, statePath, 0, false);
 	}
 }
 
-void LocalStore::unShareState(const Path & path, const bool branch, const bool restoreOld)
+void LocalStore::unShareState(const Path & statePath, const bool branch, const bool restoreOld)
 {
 	Transaction txn(nixDB);
-	unShareStateTxn(txn, path, branch, restoreOld);
+	unShareStateTxn(txn, statePath, branch, restoreOld);
 	txn.commit();
 }
 
@@ -1699,8 +1684,8 @@ void shareStateTxn(const Transaction & txn, const Path & from, const Path & to, 
 	}
 	
 	//Check if the user has the right to share this path
-	Derivation from_drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, from));
-	Derivation to_drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, to));
+	//from
+	//to
 	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
 	
 	//Snapshot if necessary

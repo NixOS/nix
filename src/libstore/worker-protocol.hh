@@ -51,7 +51,8 @@ typedef enum {
 	wopRevertToRevision,
 	wopShareState,
 	wopUnShareState,						
-    wopSetOptions,							//39
+	wopLookupStatePath,
+    wopSetOptions,							//40
 } WorkerOp;
 
 

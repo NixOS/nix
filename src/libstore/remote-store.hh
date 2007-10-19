@@ -92,7 +92,7 @@ public:
 
 	Snapshots commitStatePath(const Path & statePath);
 	
-	PathSet queryDerivers(const Path & storePath, const string & identifier, const string & user);
+	PathSet queryDerivers(const Path & storePath);
 	
 	void scanAndUpdateAllReferences(const Path & statePath, const bool recursive);
 	
@@ -105,6 +105,8 @@ public:
 	void shareState(const Path & from, const Path & to, const bool snapshot);
 	
 	void unShareState(const Path & path, const bool branch, const bool restoreOld);
+	
+	Path lookupStatePath(const Path & storePath, const string & identifier, const string & user);
 	
 private:
     AutoCloseFD fdSocket;

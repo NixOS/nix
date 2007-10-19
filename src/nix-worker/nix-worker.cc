@@ -463,10 +463,8 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     
     case wopQueryDerivers: {
 		Path path = readStorePath(from);
-		string identifier = readString(from);
-		string user = readString(from);
 		startWork();
-		PathSet derivers = store->queryDerivers(path, identifier, user);
+		PathSet derivers = store->queryDerivers(path);
 		stopWork();
 		writeStringSet(derivers, to);
 		break;
@@ -621,7 +619,18 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     	stopWork();
     	writeInt(1, to);
 		break;
-	}    
+	}
+	
+	case wopLookupStatePath: {
+		Path storePath = readStorePath(from);
+		string identifier = readString(from);
+		string user = readString(from);
+		startWork();
+    	Path statePath = store->lookupStatePath(storePath, identifier, user);
+    	stopWork();
+		writeString(statePath, to);
+		break;	
+	}
 
     case wopSetOptions: {
         keepFailed = readInt(from) != 0;
@@ -706,7 +715,7 @@ static void processConnection()
 
 			/* Use for debugging with gdb --pid=myPid */
 			if(sleepForGDB)
-	            if(oppp == 39){
+	            if(oppp == 40){
 	            	printMsg(lvlError, format("Sleeping 10 before op '%1%' with pid '%2%'") % op % myPid);
 	            	sleep(10);
 	            }

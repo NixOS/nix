@@ -492,7 +492,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
         	if (store->isStateComponent(*i)){
         		//printMsg(lvlError, format("Live state store '%1%'") % *i);
         		
-        		PathSet derivers = store->queryDerivers(*i, "*", "*");		//we select ALL state Derivations here	//TODO ??? we shouldt select non live !!!!!!!!!
+        		PathSet derivers = store->queryDerivers(*i);		//we select ALL state Derivations here
         		for (PathSet::const_iterator j = derivers.begin(); j != derivers.end(); ++j)
         			if (*j != "" && store->isValidPath(*j))
                 		computeFSClosure(*j, livePaths, true, true, 0);
@@ -508,9 +508,8 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
 				//printMsg(lvlError, format("Live State '%1%'") % *i);
             	Path deriver = queryStatePathDrvTxn(noTxn, *i);
             	
-            	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TODO put back on
             	if(!store->isValidPath(deriver))
-            	{} //	throw Error(format("deriver `%1%' of state-store component `%2%' in GC is not valid") % deriver % *i);
+            		throw Error(format("deriver `%1%' of state-store component `%2%' in GC is not valid") % deriver % *i);
             	
             	computeFSClosure(deriver, livePaths, true, true, 0);
             }

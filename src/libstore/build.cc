@@ -1887,8 +1887,14 @@ void DerivationGoal::computeClosure()
     for (DerivationOutputs::iterator i = drv.outputs.begin(); 
          i != drv.outputs.end(); ++i)
     {
-		if(isStateDrvPathTxn(txn, drvPath))
-			setStateComponentTxn(txn, i->second.path);	//Register the path as a store-state path
+		if(isStateDrv(drv)){			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK IF THE BUILDER ALSO COMES HERE TWICE WITH A RUNTIME STATEPATH DRV
+			
+			Path statePath = drv.stateOutputs.find("state")->second.statepath;
+			string identifier = drv.stateOutputs.find("state")->second.stateIdentifier;
+			string user = drv.stateOutputs.find("state")->second.username;
+			
+			setStateComponentTxn(txn, i->second.path, statePath, identifier , user);	//Register the path as a store-state path
+		}
 		
 		registerValidPath(txn, 
         	i->second.path,								//component path
