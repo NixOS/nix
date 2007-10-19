@@ -374,9 +374,6 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
 	
 		//Start transaction TODO
 	    
-	    //Replace all shared paths in the set for their real paths 
-	    statePaths = store->toNonSharedPathSet(statePaths);
-		
 		//Commit all statePaths
 		RevisionClosure rivisionMapping;
 		for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)		//TODO first commit own state path?

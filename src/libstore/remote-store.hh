@@ -76,9 +76,9 @@ public:
     void collectGarbage(GCAction action, const PathSet & pathsToDelete,
         bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed);
         
-    void setStatePathsInterval(const PathSet & statePath, const IntVector & intervals, bool allZero = false);
+    void setStatePathsInterval(const Path & statePath, const CommitIntervals & intervals);
 	
-	IntVector getStatePathsInterval(const PathSet & statePaths);
+	CommitIntervals getStatePathsInterval(const Path & statePath);
 	
 	bool isStateComponent(const Path & path);
 	

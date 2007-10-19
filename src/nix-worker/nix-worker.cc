@@ -473,22 +473,21 @@ static void performOp(Source & from, Sink & to, unsigned int op)
 	}
     
     case wopSetStatePathsInterval: {
-    	PathSet statePaths = readStringSet(from);
-		IntVector intervals = readIntVector(from);
-		bool allZero = readInt(from) == 1;
+    	Path statePath = readStatePath(from);
+		CommitIntervals intervals = readCommitIntervals(from);
     	startWork();
-        store->setStatePathsInterval(statePaths, intervals, allZero);
+        store->setStatePathsInterval(statePath, intervals);
         stopWork();
         writeInt(1, to);
     	break;
     }
     
 	case wopGetStatePathsInterval: {
-		PathSet statePaths = readStringSet(from);
+		Path statePath = readStatePath(from);
     	startWork();
-    	IntVector iv = store->getStatePathsInterval(statePaths);
+    	CommitIntervals ci = store->getStatePathsInterval(statePath);
         stopWork();
-        writeIntVector(iv, to);
+        writeCommitIntervals(ci, to);
     	break;
     }
     

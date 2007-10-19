@@ -105,6 +105,17 @@ void writeRevisionInfos(const RevisionInfos & ri, Sink & sink)
     }
 }
 
+void writeCommitIntervals(const CommitIntervals ci, Sink & sink)
+{
+	writeInt(ci.size(), sink);
+    for (CommitIntervals::const_iterator i = ci.begin(); i != ci.end(); ++i){
+    	writeString((*i).first, sink);
+    	writeBigUnsignedInt((*i).second, sink);
+    }
+}
+
+////////////////
+
 void readPadding(unsigned int len, Source & source)
 {
     if (len % 8) {
@@ -205,7 +216,7 @@ RevisionClosureTS readRevisionClosureTS(Source & source)
     RevisionClosureTS rc;  
 	while (count--){
     	string path = readString(source);
-    	int ri = readBigUnsignedInt(source);
+    	unsigned int ri = readBigUnsignedInt(source);
     	rc[path] = ri;
     }
     return rc;
@@ -223,6 +234,18 @@ RevisionInfos readRevisionInfos(Source & source)
     	ri[revision] = rvi;
     }
     return ri;
+}
+
+CommitIntervals readCommitIntervals(Source & source)
+{
+	unsigned int count = readInt(source);
+    CommitIntervals ci;  
+	while (count--){
+    	string path = readString(source);
+    	unsigned int ri = readBigUnsignedInt(source);
+    	ci[path] = ri;
+    }
+	return ci; 
 }
 
 }

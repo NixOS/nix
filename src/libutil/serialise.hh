@@ -104,6 +104,7 @@ void writeRevisionClosure(const RevisionClosure & rc, Sink & sink);
 void writeSnapshots(const Snapshots & ss, Sink & sink);
 void writeRevisionClosureTS(const RevisionClosureTS & rc, Sink & sink);
 void writeRevisionInfos(const RevisionInfos & ri, Sink & sink);
+void writeCommitIntervals(const CommitIntervals ci, Sink & sink);
 
 void readPadding(unsigned int len, Source & source);
 unsigned int readInt(Source & source);
@@ -116,6 +117,7 @@ RevisionClosure readRevisionClosure(Source & source);
 Snapshots readSnapshots(Source & source);
 RevisionClosureTS readRevisionClosureTS(Source & source);
 RevisionInfos readRevisionInfos(Source & source);
+CommitIntervals readCommitIntervals(Source & source);
 
 }
 

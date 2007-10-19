@@ -65,6 +65,7 @@ typedef set<Path> PathSet;
 //state types
 typedef vector<int> IntVector;								//the Strings (list) of StateReferences and this list are connected by position		//TODO
 typedef vector<unsigned int> UnsignedIntVector;
+typedef map<Path, unsigned int> CommitIntervals;
 struct RevisionInfo
 { 
 	string comment;

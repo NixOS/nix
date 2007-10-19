@@ -1470,57 +1470,41 @@ void verifyStore(bool checkContents)
     txn.commit();
 }
 
-void setStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePaths, const IntVector & intervals, bool allZero)
+void setStatePathsIntervalTxn(const Transaction & txn, const Path & statePath, const CommitIntervals & intervals)
 {
-	if(!allZero && statePaths.size() != intervals.size()){
-		throw Error("the number of statepaths and intervals must be equal");
-	} 
-
-	int n=0;
-    for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
-    {
-        //printMsg(lvlError, format("Set interval of PATH: %1%") % *i);
-        
-        int interval=0;
-        if(!allZero)
-        	interval = intervals.at(n);
-                
-        nixDB.setString(txn, dbStateCounters, *i, int2String(interval));
-        n++;
-    }
+    Strings data;
+    for (CommitIntervals::const_iterator i = intervals.begin(); i != intervals.end(); ++i)
+        data.push_back(mergeToDBRevKey((*i).first, (*i).second));
+    
+    nixDB.setStrings(txn, dbStateCounters, statePath, data);
 }
 
 
-void LocalStore::setStatePathsInterval(const PathSet & statePaths, const IntVector & intervals, bool allZero)
+void LocalStore::setStatePathsInterval(const Path & statePath, const CommitIntervals & intervals)
 {
 	Transaction txn(nixDB);
-    nix::setStatePathsIntervalTxn(txn, statePaths, intervals, allZero);
+    nix::setStatePathsIntervalTxn(txn, statePath, intervals);
     txn.commit();
 }
 
-IntVector getStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePaths)
+CommitIntervals getStatePathsIntervalTxn(const Transaction & txn, const Path & statePath)
 {
-	string data;
-	Paths referers;
-	
-	IntVector intervals;
-    for (PathSet::iterator i = statePaths.begin(); i != statePaths.end(); ++i)
+	Strings data;
+	nixDB.queryStrings(txn, dbStateCounters, statePath, data);
+	CommitIntervals intervals;
+    for (Strings::iterator i = data.begin(); i != data.end(); ++i)
     {
-    	nixDB.queryString(txn, dbStateCounters, *i, data);
-
-		//Check if every key returns a value from the db
-    	int n;
-    	if (!string2Int(data, n)) 
-    		throw Error(format("Statepath `%1%' has returned no valid interval from the database") % *i);
-    	intervals.push_back(n);
+    	Path p;
+    	unsigned int interval;
+    	splitDBRevKey(*i, p, interval);
+    	intervals[p] = interval;
     }        
-
     return intervals;
 }
 
-IntVector LocalStore::getStatePathsInterval(const PathSet & statePaths)
+CommitIntervals LocalStore::getStatePathsInterval(const Path & statePath)
 {
-    return nix::getStatePathsIntervalTxn(noTxn, statePaths);
+    return nix::getStatePathsIntervalTxn(noTxn, statePath);
 }
 
 

@@ -21,32 +21,17 @@
 
 namespace nix {
 
-/*
-void updatedStateDerivation(Path storePath)
-{
-	//We dont remove the old .svn folders
-	//update in database?
-		
-	printMsg(lvlTalkative, format("Resetting state drv settings"));
-}
-*/
 
+/*
+ * This gets called before a stateDir might be valid, so we get the data
+ * from the drv and not from the database
+ */
 void createSubStateDirsTxn(const Transaction & txn, const DerivationStateOutputDirs & stateOutputDirs, const DerivationStateOutputs & stateOutputs)
 {
 	Path statePath = stateOutputs.find("state")->second.statepath;
 	string stateDir = statePath;
 	
 	PathSet intervalPaths;
-
-	//check if we can create state dirs
-	//TODO
-	
-	/*
-	if( ! DirectoryExists( ....... ) ){
-	}
-	else
-		printMsg(lvlTalkative, format("Statedir %1% already exists, so dont ........ ???? ") % ...);
-	*/	
 	
 	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
 		DerivationStateOutputDir d = i->second;
@@ -68,11 +53,18 @@ void createSubStateDirsTxn(const Transaction & txn, const DerivationStateOutputD
 	
 	setChown(statePath, queryCallingUsername(), "nixbld", true);		//Set all dirs in the statePath recursively to their owners
 	printMsg(lvlTalkative, format("Set CHOWN '%1%'") % (statePath + "-" + queryCallingUsername()));
-	
-	//Initialize the counters for the statePaths that have an interval to 0
-	IntVector empty;
-	setStatePathsIntervalTxn(txn, intervalPaths, empty, true);
 }
+
+/*
+ * TODO
+ */
+void updatePaths()
+{
+	//set in db
+	
+	//update setStatePathsIntervalTxn(txn, intervalPaths, empty, true);
+}
+ 
 
 /*
  * Input: store (or statePath?)
@@ -143,7 +135,7 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
 			if(revertPathOrFile.substr(revertPathOrFile.length() -1 , revertPathOrFile.length()) == "/"){
 				revertPathOrFile_e = revertPathOrFile.substr(0 , revertPathOrFile.length() -1) + "@" + unsignedInt2String(epoch) + "/";
 				
-				//TODO IF IS FILE: REMOVE THE FILE
+				//TODO IF IS FILE: REMOVE THE FILE	todo MOVE THIS INTO RSYNCPATHS???
 			}
 			else{
 				revertPathOrFile_e = revertPathOrFile + "@" + unsignedInt2String(epoch);
@@ -175,65 +167,55 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
 
 
 
-//TODO maybe add user ID ?
 Snapshots commitStatePathTxn(const Transaction & txn, const Path & statePath)
 {
 	if(!isValidStatePathTxn(txn, statePath))
 		throw Error(format("path `%1%' is not a valid state path") % statePath);
     
-	//queryDeriversStatePath??
-	Derivation drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, statePath));
-  	DerivationStateOutputs stateOutputs = drv.stateOutputs; 
-    DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
-
 	printMsg(lvlError, format("Snapshotting statePath: %1%") % statePath);
 
-	//Get all the inverals from the database at once
-	PathSet intervalPaths;
-	for (DerivationStateOutputDirs::const_reverse_iterator i = stateOutputDirs.rbegin(); i != stateOutputDirs.rend(); ++i){
-		DerivationStateOutputDir d = i->second;
-
-		string thisdir = d.path;
-		string fullstatedir = statePath + "/" + thisdir;
-		
-		if(d.type == "interval"){
-			intervalPaths.insert(fullstatedir);
-		}
-	}
-	IntVector intervals = getStatePathsIntervalTxn(txn, intervalPaths);
+	//Get all paths from the db
+	StateInfos infos;
+	getVersionedStateEntriesTxn(txn, statePath, infos);
 	
+	//Get all interval counters
+	CommitIntervals intervals = getStatePathsIntervalTxn(txn, statePath);
+
 	Snapshots revisions_list;
 	
-	int intervalAt=0;	
-	for (DerivationStateOutputDirs::const_iterator i = stateOutputDirs.begin(); i != stateOutputDirs.end(); ++i){
-		DerivationStateOutputDir d = i->second;
-		string thisdir = d.path;
+	for (StateInfos::const_iterator i = infos.begin(); i != infos.end(); ++i){
 		
-		string fullstatedir = statePath + "/" + thisdir;
-		if(thisdir == "/")									//exception for the root dir
-			fullstatedir = statePath + "/";				
+		string thisdir = (*i).path;
+		string type = (*i).type;
+		unsigned int interval = (*i).interval;
 		
-		if(d.type == "none"){
+		if(type == "none"){
 			continue;
 		}
 		
-		if(d.type == "interval"){
-			//Get the interval-counter from the database
-			int interval_counter = intervals[intervalAt];
-			int interval = d.getInterval();
-
-			//update the interval
-			intervals[intervalAt] = interval_counter + 1;
-			intervalAt++;
-						
-			if(interval_counter % interval != 0){	continue;		}
-		}
-		else if(d.type == "full"){	}			
-		else if(d.type == "manual"){ 	continue; 	}		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!			
-		else
-			throw Error(format("Type '%1%' is not handled in nix-state") % d.type);
+		if(type == "interval"){
+			unsigned int interval_counter = intervals[thisdir];
 			
-		//We got here so we need to commit
+			//update the interval
+			intervals[thisdir] = (interval_counter + 1);
+
+			//We continue if we dont have to commit now
+			if(interval_counter % interval != 0)	
+				continue;
+		}
+		else if(type == "full"){	}			
+		else if(type == "manual"){ 	continue; 	}					//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!			
+		else
+			throw Error(format("Type '%1%' is not handled in nix-state") % type);
+
+		/////////// We got here so we need to commit
+		
+		//We get all info from the orignal path, but we snapshot on the shared path
+		Path sharedWith = toNonSharedPathTxn(txn, statePath);
+		string fullstatedir = sharedWith + "/" + thisdir;
+		if(thisdir == "/")										//exception for the root dir
+			fullstatedir = sharedWith + "/";					
+		
 		unsigned int revision_number;
 		if(pathExists(fullstatedir) || FileExist(fullstatedir)){
 			revision_number = take_snapshot(fullstatedir);
@@ -245,11 +227,11 @@ Snapshots commitStatePathTxn(const Transaction & txn, const Path & statePath)
 		revisions_list[fullstatedir] = revision_number;
 		//printMsg(lvlError, format("FSD %1% RN %2%") % fullstatedir % revision_number);
 	}
-	  	
+
+	//Update the intervals again	
+	setStatePathsIntervalTxn(txn, statePath, intervals);
+		  	
 	return revisions_list; 
-	 
-    //Update the intervals again	
-	//setStatePathsIntervalTxn(txn, intervalPaths, intervals);		//TODO!!!!!!!!!!!!!!!!!!!!!!!!!!!!! uncomment
 }
 
 //TODO include this call in the validate function
@@ -703,6 +685,7 @@ bool queryStateRevisions(Database & nixDB, const Transaction & txn, TableId revi
 		splitDBRevKey(*i, getStatePath, getTimestamp);
 		
 		//query state versioined directorys/files
+		//TODO REMOVE
 		/*
 		vector<Path> sortedPaths;
 		Derivation drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, getStatePath));

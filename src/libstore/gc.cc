@@ -582,22 +582,6 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
 			allLiveStatePaths = pathSets_union(getSharedWithPathSetRecTxn(noTxn, *i), allLiveStatePaths);
     	}
 
-    /*
-     * Lookup all derivations, of all state paths, because they need to be kept for comitting			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-     */
-    PathSet allStatePathDerivations;
-    for (PathSet::iterator i = allLiveStatePaths.begin(); i != allLiveStatePaths.end(); ++i){
-    	//printMsg(lvlError, format("Live state path `%1%'") % *i);
-    	Path stateDrv = queryStatePathDrvTxn(noTxn, *i);
-    	allStatePathDerivations.insert(stateDrv);
-    	//printMsg(lvlError, format("Live state path drv `%1%'") % stateDrv);
-    	
-       	//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TODO put back on
-       	if(!store->isValidPath(stateDrv))
-        {} //	throw Error(format("deriver `%1%' of state component `%2%' in GC is not valid") % stateDrv % *i);
-       	
-       	//	computeFSClosure(stateDrv, livePaths, true, true, 0);			//TODO .................. should we do this ?????????????
-    }
     
     /* Read the Nix store and state directory's to find all currently existing
        paths. */
@@ -661,11 +645,6 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
             continue;
         }
         
-        if (allStatePathDerivations.find(*i) != allStatePathDerivations.end()) {
-            debug(format("Keeping statePath derivation `%1%'") % *i);
-            continue;
-        }
-
         debug(format("dead path `%1%'") % *i);
         result.insert(*i);
 

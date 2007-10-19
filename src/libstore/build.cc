@@ -1483,13 +1483,12 @@ void DerivationGoal::startBuilder()
     tmpDir = createTempDir();
     
     /* Create the state directory where the component can store it's state files place */
-    //TODO MOVEEEEEEEEEEE
     //We only create state dirs when state is enabled and when the dirs need to be created before the installation
     if(drv.stateOutputs.size() != 0){
 
    		/* we check the recalculated state path at build time with the correct user for securiyt */
    		checkStatePath(drv);
-	
+
     	if(drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
 	    	createSubStateDirsTxn(noTxn, drv.stateOutputDirs, drv.stateOutputs);
     }
@@ -1727,7 +1726,6 @@ void DerivationGoal::computeClosure()
 	PathSet state_stateReferences;				//all state references in statepath
     map<Path, Hash> contentHashes;
     
-    //TODO MOVE THIS TO A PLACE THAT ALSO GETS CALLED WHEN WE DONT NEED TO BUILD ANYTHING
     //We create state dirs only when state is enabled and when the dirs need to be created after the installation
     if(drv.stateOutputs.size() != 0)
     	if(!drv.stateOutputs.find("state")->second.getCreateDirsBeforeInstall())
@@ -1920,8 +1918,10 @@ void DerivationGoal::computeClosure()
 		setStateRevisionsTxn(txn, rivisionMapping, statePath, "Initial build revision.");
 
 		//Convert stateInfo from drv to DB format
+		//And set all interval-ed paths to zero to begin with 
 		DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
 		StateInfos infos;
+		CommitIntervals intervals;
 		for (DerivationStateOutputDirs::const_reverse_iterator j = stateOutputDirs.rbegin(); j != stateOutputDirs.rend(); ++j){
 			DerivationStateOutputDir d = j->second;
 			StateInfo si;
@@ -1936,7 +1936,12 @@ void DerivationGoal::computeClosure()
 			else
 				si.interval = 0;
 			infos.push_back(si);
+			
+			
+			if(d.type == "interval")
+				intervals[d.path] = 0;
 		}
+		setStatePathsIntervalTxn(txn, statePath, intervals);							//Set intervals to zero
 		setVersionedStateEntriesTxn(txn, statePath, infos); 							//register subdirs/files and their types of versioning
 		setStateUserGroupTxn(txn, statePath, queryCallingUsername(), "nixbld", 700);	//register the user and group
 		
@@ -1945,6 +1950,7 @@ void DerivationGoal::computeClosure()
 		if(sharedState != ""){
 			shareStateTxn(txn, sharedState, statePath, false);
 		}
+		
 		//If not shared: create the dir and set the rights
 		else{
 			ensureStateDir(statePath, queryCallingUsername(), "nixbld", "700");

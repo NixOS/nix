@@ -663,7 +663,7 @@ static void installDerivations(Globals & globals,
         		
         		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         		//TODO && (the users are equal || OR SHARED BETWEEN USERS)		isnt this already user specific?		
-        		//TODO 
+        		//TODO
         		if(	newSharedState == "" 
         			&&
         			(oldStateIdentifier == newStateIdentifier

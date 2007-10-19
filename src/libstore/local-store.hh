@@ -110,9 +110,9 @@ public:
     
     /////////////////////////////
         
-	void setStatePathsInterval(const PathSet & statePath, const IntVector & intervals, bool allZero = false);
+	void setStatePathsInterval(const Path & statePath, const CommitIntervals & intervals);
 	
-	IntVector getStatePathsInterval(const PathSet & statePaths);
+	CommitIntervals getStatePathsInterval(const Path & statePath);
 	
 	bool isStateComponent(const Path & storePath);
 	
@@ -267,10 +267,11 @@ Path toNonSharedPathTxn(const Transaction & txn, const Path & statePath);
 PathSet getSharedWithPathSetRecTxn(const Transaction & txn, const Path & statePath);
 
 void ensurePathTxn(const Transaction & txn, const Path & path);
-IntVector getStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePaths);
+
+CommitIntervals getStatePathsIntervalTxn(const Transaction & txn, const Path & statePath);
+void setStatePathsIntervalTxn(const Transaction & txn, const Path & statePath, const CommitIntervals & intervals);
 
 bool queryStateRevisionsTxn(const Transaction & txn, const Path & statePath, RevisionClosure & revisions, RevisionClosureTS & timestamps, const unsigned int revision);
-void setStatePathsIntervalTxn(const Transaction & txn, const PathSet & statePath, const IntVector & intervals, bool allZero = false);
 bool querySharedStateTxn(const Transaction & txn, const Path & statePath, Path & shared_with);
 
 void setStateComponentTxn(const Transaction & txn, const Path & storePath);

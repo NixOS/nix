@@ -461,22 +461,21 @@ PathSet RemoteStore::queryDerivers(const Path & storePath, const string & identi
 	return readStorePaths(from);		//TODO is this ok ??
 }
 
-void RemoteStore::setStatePathsInterval(const PathSet & statePaths, const IntVector & intervals, bool allZero)
+void RemoteStore::setStatePathsInterval(const Path & statePath, const CommitIntervals & intervals)
 {
     writeInt(wopSetStatePathsInterval, to);
-	writeStringSet(statePaths, to);
-	writeIntVector(intervals, to);
-	writeInt(allZero ? 1 : 0, to);
+	writeString(statePath, to);
+	writeCommitIntervals(intervals, to);
 	processStderr();
 	readInt(from);
 }
 
-IntVector RemoteStore::getStatePathsInterval(const PathSet & statePaths)
+CommitIntervals RemoteStore::getStatePathsInterval(const Path & statePath)
 {
 	writeInt(wopGetStatePathsInterval, to);
-	writeStringSet(statePaths, to);
+	writeString(statePath, to);
 	processStderr();
-	return readIntVector(from);
+	return readCommitIntervals(from);
 }
 
 bool RemoteStore::isStateComponent(const Path & path)

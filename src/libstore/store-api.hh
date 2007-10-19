@@ -183,10 +183,10 @@ public:
         bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed) = 0;
         
     /* TODO */
-	virtual void setStatePathsInterval(const PathSet & statePath, const IntVector & intervals, bool allZero = false) = 0;
+	virtual void setStatePathsInterval(const Path & statePath, const CommitIntervals & intervals) = 0;
 	
 	/* TODO */
-	virtual IntVector getStatePathsInterval(const PathSet & statePaths) = 0;
+	virtual CommitIntervals getStatePathsInterval(const Path & statePath) = 0;
 	
 	/* Checks whether a path is a component path that has a statePath. */
 	virtual bool isStateComponent(const Path & path) = 0;
