@@ -20,7 +20,7 @@ man1_MANS = nix-env.1 nix-build.1 nix-store.1 nix-instantiate.1 \
 FIGURES = figures/user-environments.png
 
 MANUAL_SRCS = manual.xml introduction.xml installation.xml \
- package-management.xml writing-nix-expressions.xml \
+ package-management.xml writing-nix-expressions.xml builtins.xml \
  build-farm.xml \
  $(man1_MANS:.1=.xml) \
  troubleshooting.xml bugs.xml opt-common.xml opt-common-syn.xml \
