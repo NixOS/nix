@@ -1,4 +1,4 @@
-chapter xmlns="http://docbook.org/ns/docbook"
+<chapter xmlns="http://docbook.org/ns/docbook"
          xmlns:xlink="http://www.w3.org/1999/xlink"
          xml:id='chap-writing-nix-expressions'>
 
@@ -526,16 +526,15 @@ genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
     <filename>bin</filename> subdirectory, it's added to
     <envar>PATH</envar>; if it has a <filename>include</filename>
     subdirectory, it's added to GCC's header search path; and so
-    on.
-    <footnote><para>How does it work? setup tries sourcing 
-        $out/nix-support/setup-hook of all dependencies 
-        thereby defining environment variables.
-        If you have A depending on B depending on C
-        you can force the setup-hooks of C beeing sourced when evaluating
-        expression A by using
-        <programlisting>propagatedBuildInputs=[ C ];</programlisting>
-        instead of buildInputs when defining derivation B.
-    </para></footnote></para>
+    on.<footnote><para>How does it work? <filename>setup</filename>
+    tries to source the file
+    <filename><replaceable>pkg</replaceable>/nix-support/setup-hook</filename>
+    of all dependencies.  These “setup hooks” can then set up whatever
+    environment variables they want; for instance, the setup hook for
+    Perl sets the <envar>PERL5LIB</envar> environment variable to
+    contain the <filename>lib/site_perl</filename> directories of all
+    inputs.</para></footnote>
+    </para>
 
   </callout>
 
@@ -544,7 +543,7 @@ genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
     <para>The function <function>genericBuild</function> is defined in
     the file <literal>$stdenv/setup</literal>.</para>
 
-  </callout> looks for a file nix-support/setup-hook within the derivation path. 
+  </callout>
   
   <callout arearefs='ex-hello-builder2-co-3'>
 
@@ -1226,9 +1225,9 @@ set, the attributes of which specify the inputs of the build.</para>
       They are simply concatenated, separated by
       spaces.</para></listitem>
 
-      <listitem><para><emphasis>true</emphasis> is passed as 
-      <emphasis>1</emphasis>, <emphasis>false</emphasis>
-      and <emphasis>null</emphasis> are passed as empty string.
+      <listitem><para><literal>true</literal> is passed as the string
+      <literal>1</literal>, <literal>false</literal> and
+      <literal>null</literal> are passed as an empty string.
       </para></listitem>
     </itemizedlist>
 
