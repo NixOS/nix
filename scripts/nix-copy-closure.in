@@ -6,7 +6,7 @@ $binDir = "@bindir@" unless defined $binDir;
 
 if (scalar @ARGV < 1) {
     print STDERR <<EOF
-Usage: nix-copy-closure [--from | --to] HOSTNAME [--sign] PATHS...
+Usage: nix-copy-closure [--from | --to] HOSTNAME [--sign] [--gzip] PATHS...
 EOF
     ;
     exit 1;
