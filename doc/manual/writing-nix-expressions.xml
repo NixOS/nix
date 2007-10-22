@@ -1,4 +1,4 @@
-<chapter xmlns="http://docbook.org/ns/docbook"
+chapter xmlns="http://docbook.org/ns/docbook"
          xmlns:xlink="http://www.w3.org/1999/xlink"
          xml:id='chap-writing-nix-expressions'>
 
@@ -526,7 +526,16 @@ genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
     <filename>bin</filename> subdirectory, it's added to
     <envar>PATH</envar>; if it has a <filename>include</filename>
     subdirectory, it's added to GCC's header search path; and so
-    on.</para>
+    on.
+    <footnote><para>How does it work? setup tries sourcing 
+        $out/nix-support/setup-hook of all dependencies 
+        thereby defining environment variables.
+        If you have A depending on B depending on C
+        you can force the setup-hooks of C beeing sourced when evaluating
+        expression A by using
+        <programlisting>propagatedBuildInputs=[ C ];</programlisting>
+        instead of buildInputs when defining derivation B.
+    </para></footnote></para>
 
   </callout>
 
@@ -535,7 +544,7 @@ genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
     <para>The function <function>genericBuild</function> is defined in
     the file <literal>$stdenv/setup</literal>.</para>
 
-  </callout>
+  </callout> looks for a file nix-support/setup-hook within the derivation path. 
   
   <callout arearefs='ex-hello-builder2-co-3'>
 
