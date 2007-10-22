@@ -94,13 +94,12 @@ static TableId dbDerivers = 0;
  */
 static TableId dbStateCounters = 0;
 
-/* dbStateInfo :: Path -> 
+/* dbStateInfo :: StorePath -> [(StatePath, identifier, username)]
  * 
  * This table lists all the store components, that are state-store components
  * meaning that this component has a /nix/state/ entry to store its state
  * and thus this component (should) have a reference to that state path  
  * 
- * TODO the value is now empty but we could store the entire DRV in here in the future
  */
 static TableId dbStateInfo = 0;
 
@@ -133,17 +132,8 @@ static TableId dbStateRevisionsComments = 0;
  * 
  * /nix/state/HASH-A-1.0-test-KEY-1185473750
  * -->
- * [ 1185473750, 00118547375 ]															// TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PATH-SS
+ * [ (statePath/log, 1185473750), (statePath/output.dat, 1185473751) ]
  * 
- * The timestamps are ordered based on the path of the subfolder !!
- * 
- * So if a has:
- * 
- * /nix/state/....A../log
- * /nix/state/....A../cache
- * 
- * then ./cache has TS 1185473750
- * and ./log has TS 00118547375
  *  
  */
 static TableId dbStateSnapshots = 0;

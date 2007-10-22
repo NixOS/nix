@@ -526,7 +526,15 @@ genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
     <filename>bin</filename> subdirectory, it's added to
     <envar>PATH</envar>; if it has a <filename>include</filename>
     subdirectory, it's added to GCC's header search path; and so
-    on.</para>
+    on.<footnote><para>How does it work? <filename>setup</filename>
+    tries to source the file
+    <filename><replaceable>pkg</replaceable>/nix-support/setup-hook</filename>
+    of all dependencies.  These “setup hooks” can then set up whatever
+    environment variables they want; for instance, the setup hook for
+    Perl sets the <envar>PERL5LIB</envar> environment variable to
+    contain the <filename>lib/site_perl</filename> directories of all
+    inputs.</para></footnote>
+    </para>
 
   </callout>
 
@@ -1217,9 +1225,9 @@ set, the attributes of which specify the inputs of the build.</para>
       They are simply concatenated, separated by
       spaces.</para></listitem>
 
-      <listitem><para><emphasis>true</emphasis> is passed as 
-      <emphasis>1</emphasis>, <emphasis>false</emphasis>
-      and <emphasis>null</emphasis> are passed as empty string.
+      <listitem><para><literal>true</literal> is passed as the string
+      <literal>1</literal>, <literal>false</literal> and
+      <literal>null</literal> are passed as an empty string.
       </para></listitem>
     </itemizedlist>
 

@@ -55,7 +55,7 @@ Query flags:
   --xml: show output in XML format
   --status / -s: print installed/present status
   --no-name: hide derivation names
-  --attr / -A: shows the unambiguous attribute name of the
+  --attr-path / -P: shows the unambiguous attribute name of the
       derivation which can be used when installing with -A
   --system: print the platform type of the derivation 
   --compare-versions / -c: compare version to available or installed

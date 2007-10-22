@@ -333,10 +333,11 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     			r_commit = false;
     		}
     		else if(*i == "--statehelp"){
-    			printMsg(lvlError, format("%1%") % padd("", '-', 100));
+    			//printMsg(lvlError, format("%1%") % padd("", '-', 100));
     			printHelp();
     			r_scanforReferences = false;
     			r_commit = false;
+    			return;
     		}
     		
     		//printMsg(lvlError, format("ARG %1%") % *i);
@@ -357,7 +358,7 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
   		
 	//******************* Scan for new references if neccecary
    	if(r_scanforReferences)
-  		store->scanAndUpdateAllReferences(root_statePath, true);		//TODO make recursive a paramter?
+  		store->scanAndUpdateAllReferences(root_statePath, true);		//TODO make recursive a paramter? TXN???
 
 	
 	//******************* With everything in place, we call the commit script on all statePaths (in)directly referenced **********************

@@ -19,8 +19,6 @@ chdir $tmpDir or die "cannot change to `$tmpDir': $!";
 my $tmpNar = "$tmpDir/nar";
 my $tmpNar2 = "$tmpDir/nar2";
 
-END { unlink $tmpNar; unlink $tmpNar2; rmdir $tmpDir; }
-
 
 # Load all manifests.
 my %narFiles;

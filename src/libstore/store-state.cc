@@ -132,16 +132,10 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
 			//Dir: Remove a slash at the end, we create /nix/state/...../cachedir@1234/
 			//File: Or create /nix/state/..../logfile.txt@1234
 			string revertPathOrFile_e;
-			if(revertPathOrFile.substr(revertPathOrFile.length() -1 , revertPathOrFile.length()) == "/"){
+			if(revertPathOrFile.substr(revertPathOrFile.length() -1 , revertPathOrFile.length()) == "/")
 				revertPathOrFile_e = revertPathOrFile.substr(0 , revertPathOrFile.length() -1) + "@" + unsignedInt2String(epoch) + "/";
-				
-				//TODO IF IS FILE: REMOVE THE FILE	todo MOVE THIS INTO RSYNCPATHS???
-			}
-			else{
+			else
 				revertPathOrFile_e = revertPathOrFile + "@" + unsignedInt2String(epoch);
-				
-				//TODO IF IS DIR: REMOVE THE DIR
-			}
 						
 			rsyncPaths(revertPathOrFile_e, revertPathOrFile, false);
 		}
@@ -235,7 +229,6 @@ Snapshots commitStatePathTxn(const Transaction & txn, const Path & statePath)
 }
 
 //TODO include this call in the validate function
-//TODO ONLY CALL THIS FUNCTION ON A NON-SHARED STATE PATH!!!!!!!!!!!
 void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePath
 								, PathSet & newFoundComponentReferences, PathSet & newFoundStateReferences) //only for recursion
 {
@@ -245,10 +238,8 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
 
 	//printMsg(lvlError, format("scanAndUpdateAllReferencesTxn: '%1%' - %2%") % statePath % revision);
 	
-	//TODO check if path is not a shared path !
-	//TODO
-	//TODO Unshare the path:	
-	//TODO Path statePath_ns = toNonSharedPathTxn(txn, statePath);
+	//Check if path is not a shared path
+	Path statePath_ns = toNonSharedPathTxn(txn, statePath);
 
 	//get all possible state and component references
     PathSet allComponentPaths;
@@ -266,14 +257,14 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
 	//TODO maybe only scan in the changeset (patch) for new references? (this will be difficult and depending on the underlying versioning system)
 
     //Scan in for (new) component and state references
-    PathSet state_references = scanForReferences(statePath, allComponentPaths2);
-    PathSet state_stateReferences = scanForStateReferences(statePath, allStatePaths);
+    PathSet state_references = scanForReferences(statePath_ns, allComponentPaths2);
+    PathSet state_stateReferences = scanForStateReferences(statePath_ns, allStatePaths);
     
     //Retrieve old references
     PathSet old_references;
     PathSet old_state_references;
-    queryXReferencesTxn(txn, statePath, old_references, true, 0);				//get the latsest references
-    queryXReferencesTxn(txn, statePath, old_state_references, false, 0);		
+    queryXReferencesTxn(txn, statePath_ns, old_references, true, 0);				//get the latsest references
+    queryXReferencesTxn(txn, statePath_ns, old_state_references, false, 0);		
     
     //Check for added and removed paths
 	PathSet diff_references_removed;
@@ -290,22 +281,22 @@ void scanAndUpdateAllReferencesTxn(const Transaction & txn, const Path & statePa
 	//Print error, but we could also throw an error.
 	if(diff_references_added.size() != 0)
     	for (PathSet::iterator i = diff_references_added.begin(); i != diff_references_added.end(); ++i)
-    		printMsg(lvlError, format("Added component reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
+    		printMsg(lvlError, format("Added component reference found!: '%1%' in state path '%2%'") % (*i) % statePath_ns);
     if(diff_references_removed.size() != 0)
     	for (PathSet::iterator i = diff_references_removed.begin(); i != diff_references_removed.end(); ++i)
-    		printMsg(lvlError, format("Removed component reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
+    		printMsg(lvlError, format("Removed component reference found!: '%1%' in state path '%2%'") % (*i) % statePath_ns);
     if(diff_state_references_added.size() != 0)
     	for (PathSet::iterator i = diff_state_references_added.begin(); i != diff_state_references_added.end(); ++i)
-    		printMsg(lvlError, format("Added state reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
+    		printMsg(lvlError, format("Added state reference found!: '%1%' in state path '%2%'") % (*i) % statePath_ns);
     if(diff_state_references_removed.size() != 0)
     	for (PathSet::iterator i = diff_state_references_removed.begin(); i != diff_state_references_removed.end(); ++i)
-    		printMsg(lvlError, format("Removed state reference found!: '%1%' in state path '%2%'") % (*i) % statePath);
+    		printMsg(lvlError, format("Removed state reference found!: '%1%' in state path '%2%'") % (*i) % statePath_ns);
 
 	//We always set the referernces so we know they were scanned (maybe the same) at a certain time
-   	printMsg(lvlError, format("Updating new references for statepath: '%1%'") % statePath);
-   	Path drvPath = queryStatePathDrvTxn(txn, statePath);
+   	printMsg(lvlError, format("Updating new references for statepath: '%1%'") % statePath_ns);
+   	Path drvPath = queryStatePathDrvTxn(txn, statePath_ns);
    	registerValidPath(txn,    	
-    		statePath,
+    		statePath_ns,
     		Hash(),				//emtpy hash
     		state_references,
     		state_stateReferences,
@@ -350,6 +341,10 @@ void rsyncPaths(const Path & from, const Path & to, const bool addSlashes)		//TO
 	if(!DirectoryExist(to))
 		throw Error(format("Path `%1%' doenst exist ...") % to);
 	*/
+	
+	//TODO IF IS FILE: REMOVE THE FILE	todo MOVE THIS INTO RSYNCPATHS???				
+	//TODO IF IS DIR: REMOVE THE DIR
+	
 
 	Path from2 = from;
 	Path to2 = to;
@@ -683,23 +678,6 @@ bool queryStateRevisions(Database & nixDB, const Transaction & txn, TableId revi
 		Path getStatePath;
 		unsigned int getTimestamp;
 		splitDBRevKey(*i, getStatePath, getTimestamp);
-		
-		//query state versioined directorys/files
-		//TODO REMOVE
-		/*
-		vector<Path> sortedPaths;
-		Derivation drv = derivationFromPathTxn(txn, queryStatePathDrvTxn(txn, getStatePath));
-  		DerivationStateOutputs stateOutputs = drv.stateOutputs; 
-    	DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
-    	for (DerivationStateOutputDirs::const_iterator j = stateOutputDirs.begin(); j != stateOutputDirs.end(); ++j){
-			string thisdir = (j->second).path;
-			string fullstatedir = getStatePath + "/" + thisdir;
-			if(thisdir == "/")									//exception for the root dir
-				fullstatedir = statePath + "/";
-			sortedPaths.push_back(fullstatedir);
-    	}			
-		sort(sortedPaths.begin(), sortedPaths.end());	//sort
-		*/
 		
 		Strings snapshots_s;
 		Snapshots snapshots;		

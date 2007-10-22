@@ -1415,7 +1415,7 @@ DerivationGoal::PrepareBuildReply DerivationGoal::prepareBuild()
         for (StringSet::iterator j = i->second.begin(); j != i->second.end(); ++j)
             if (inDrv.outputs.find(*j) != inDrv.outputs.end()){
                 computeFSClosure(inDrv.outputs[*j].path, inputPaths, true, false, 0);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!! WE (MAY) ALSO NEED TO COPY STATE (done?)
-                computeFSClosure(inDrv.outputs[*j].path, inputStatePaths, false, true, 0);		//TODO!!!!!!!!!!!!! HOW CAN THESE PATHS ALREADY BE VALID ..... ?????????????????????
+                computeFSClosure(inDrv.outputs[*j].path, inputStatePaths, false, true, 0);
             }
             else
                 throw BuildError(
