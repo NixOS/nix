@@ -1,5 +1,6 @@
 <section xmlns="http://docbook.org/ns/docbook"
-              xmlns:xlink="http://www.w3.org/1999/xlink">
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xml:id='ssec-builtins'>
 
 <title>Built-in functions</title>
 
@@ -145,6 +146,58 @@ if builtins ? getEnv then __getEnv "PATH" else ""</programlisting>
   </varlistentry>
 
   
+  <varlistentry><term><function>builtins.filterSource</function>
+  <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+
+    <listitem>
+
+      <para>This function allows you to copy sources into the Nix
+      store while filtering certain files.  For instance, suppose that
+      you want to use the directory <filename>source-dir</filename> as
+      an input to a Nix expression, e.g.
+
+<programlisting>
+stdenv.mkDerivation {
+  ...
+  src = ./source-dir;
+}
+</programlisting>
+
+      However, if <filename>source-dir</filename> is a Subversion
+      working copy, then all those annoying <filename>.svn</filename>
+      subdirectories will also be copied to the store.  Worse, the
+      contents of those directories may change a lot, causing lots of
+      spurious rebuilds.  With <function>filterSource</function> you
+      can filter out the <filename>.svn</filename> directories:
+
+<programlisting>
+  src = builtins.filterSource
+    (path: type: type != "directory" || baseNameOf path != ".svn")
+    ./source-dir;
+</programlisting>
+
+      </para>
+
+      <para>Thus, the first argument <replaceable>e1</replaceable>
+      must be a predicate function that is called for each regular
+      file, directory or symlink in the source tree
+      <replaceable>e2</replaceable>.  If the function returns
+      <literal>true</literal>, the file is copied to the Nix store,
+      otherwise it is omitted.  The function is called with two
+      arguments.  The first is the full path of the file.  The second
+      is a string that identifies the type of the file, which is
+      either <literal>"regular"</literal>,
+      <literal>"directory"</literal>, <literal>"symlink"</literal> or
+      <literal>"unknown"</literal> (for other kinds of files such as
+      device nodes or fifos — but note that those cannot be copied to
+      the Nix store, so if the predicate returns
+      <literal>true</literal> for them, the copy will fail).</para>
+
+    </listitem>
+
+  </varlistentry>
+
+  
   <varlistentry><term><function>builtins.getAttr</function>
   <replaceable>s</replaceable> <replaceable>attrs</replaceable></term>
 
@@ -254,11 +307,31 @@ x: x + 456</programlisting>
   </varlistentry>
 
   
+  <varlistentry><term><function>builtins.isAttrs</function>
+  <replaceable>e</replaceable></term>
+
+    <listitem><para>Return <literal>true</literal> if
+    <replaceable>e</replaceable> evaluates to an attribute set, and
+    <literal>false</literal> otherwise.</para></listitem>
+
+  </varlistentry>
+
+  
   <varlistentry><term><function>builtins.isList</function>
   <replaceable>e</replaceable></term>
 
     <listitem><para>Return <literal>true</literal> if
     <replaceable>e</replaceable> evaluates to a list, and
+    <literal>false</literal> otherwise.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.isFunction</function>
+  <replaceable>e</replaceable></term>
+
+    <listitem><para>Return <literal>true</literal> if
+    <replaceable>e</replaceable> evaluates to a function, and
     <literal>false</literal> otherwise.</para></listitem>
 
   </varlistentry>
@@ -291,6 +364,33 @@ x: x + 456</programlisting>
 
   </varlistentry>
 
+  
+  <varlistentry><term><function>builtins.listToAttrs</function>
+  <replaceable>e</replaceable></term>
+
+    <listitem><para>Construct an attribute set from a list specifying
+    the names and values of each attribute.  Each element of the list
+    should be an attribute set consisting of a string-valued attribute
+    <varname>name</varname> specifying the name of the attribute, and
+    an attribute <varname>value</varname> specifying its value.
+    Example:
+
+<programlisting>
+builtins.listToAttrs [
+  {name = "foo"; value = 123;}
+  {name = "bar"; value = 456;}
+]
+</programlisting>
+
+    evaluates to
+
+<programlisting>
+{ foo = 123; bar = 456; }
+</programlisting>
+
+    </para></listitem>
+
+  </varlistentry>
   
   <varlistentry><term><function>map</function>
   <replaceable>f</replaceable> <replaceable>list</replaceable></term>
@@ -357,12 +457,64 @@ removeAttrs { x = 1; y = 2; z = 3; } ["a" "x" "z"]</screen>
   </varlistentry>
 
   
+  <varlistentry><term><function>builtins.stringLength</function>
+  <replaceable>e</replaceable></term>
+
+    <listitem><para>Return the length of the string
+    <replaceable>e</replaceable>.  If <replaceable>e</replaceable> is
+    not a string, evaluation is aborted.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.sub</function>
+  <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+
+    <listitem><para>Return the difference between the integers
+    <replaceable>e1</replaceable> and
+    <replaceable>e2</replaceable>.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.substr</function>
+  <replaceable>start</replaceable> <replaceable>len</replaceable>
+  <replaceable>s</replaceable></term>
+
+    <listitem><para>Return the substring of
+    <replaceable>s</replaceable> from character position
+    <replaceable>start</replaceable> (zero-based) up to but not
+    including <replaceable>start + len</replaceable>.  If
+    <replaceable>start</replaceable> is greater than the length of the
+    string, an empty string is returned, and if <replaceable>start +
+    len</replaceable> lies beyond the end of the string, only the
+    substring up to the end of the string is returned.
+    <replaceable>start</replaceable> must be
+    non-negative.</para></listitem>
+
+  </varlistentry>
+
+  
   <varlistentry><term><function>builtins.tail</function>
   <replaceable>list</replaceable></term>
 
     <listitem><para>Return the second to last elements of a list;
     abort evaluation if the argument isn’t a list or is an empty
     list.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>throw</function>
+  <replaceable>s</replaceable></term>
+
+    <listitem><para>Throw an error message
+    <replaceable>s</replaceable>.  This usually aborts Nix expression
+    evaluation, but in <command>nix-env -qa</command> and other
+    commands that try to evaluate a set of derivations to get
+    information about those derivations, a derivation that throws an
+    error is silently skipped (which is not the case for
+    <function>abort</function>).</para></listitem>
 
   </varlistentry>
 
@@ -578,6 +730,17 @@ stdenv.mkDerivation (rec {
     </example>
 
     </listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.trace</function>
+  <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+
+    <listitem><para>Evaluate <replaceable>e1</replaceable> and print its
+    abstract syntax representation on standard error.  Then return
+    <replaceable>e2</replaceable>.  This function is useful for
+    debugging.</para></listitem>
 
   </varlistentry>
 
