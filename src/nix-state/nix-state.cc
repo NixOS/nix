@@ -347,6 +347,20 @@ static void opRunComponent(Strings opFlags, Strings opArgs)
     		//program_args
     	}
     	
+    	//Lookup runtimeState args
+    	int chmod;
+    	string user, group, runtimeArgs;
+    	store->getStateOptions(root_statePath, user, group, chmod, runtimeArgs);
+    	Strings addedRuntimeArgs = tokenizeString(runtimeArgs, " ");
+    	for (Strings::iterator i = addedRuntimeArgs.begin(); i != addedRuntimeArgs.end(); ++i){
+    		string arg = *i;
+			size_t pos;
+			string keyword = "@statePath@";
+			while((pos=arg.find(keyword)) != string::npos)
+				arg.replace(pos,keyword.length(),root_statePath);
+   			root_args += " " + arg;
+    	}
+    	
     	printMsg(lvlError, format("Command: '%1%'")	% (root_componentPath + root_binary + root_args));
 		executeShellCommand(root_componentPath + root_binary + root_args);
 	}
@@ -560,7 +574,7 @@ void run(Strings args)
 
 	printMsg(lvlError, format("Rsync: '%1%'") % nixRsync);
 	
-	copyContents("/nix/state/fwir6jlqygy90zadnx95zryfa8918qac-hellohardcodedstateworld-1.0-test/", "/home/wouterdb/tmp/aa/");  //TODO !!!!!!!!!!!!!!!!!!!
+	copyContents("/nix/state/fwir6jlqygy90zadnx95zryfa8918qac-hellohardcodedstateworld-1.0-test/", "/home/wouterdb/tmp/aa/");
 	
 	Hash hash;
 	PathSet references;

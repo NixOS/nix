@@ -142,6 +142,11 @@ public:
 	
 	Path lookupStatePath(const Path & storePath, const string & identifier, const string & user);
 
+	void setStateOptions(const Path & statePath, const string & user, const string & group, int chmod, const string & runtimeArgs);
+	
+	void getStateOptions(const Path & statePath, string & user, string & group, int & chmod, string & runtimeArgs);
+
+
     /* Optimise the disk space usage of the Nix store by hard-linking
        files with the same contents. */
     void optimiseStore(bool dryRun, OptimiseStats & stats);
@@ -281,8 +286,8 @@ void setStateComponentTxn(const Transaction & txn, const Path & storePath, const
 void setVersionedStateEntriesTxn(const Transaction & txn, const Path & statePath, const StateInfos & infos, const unsigned int revision = 0, const unsigned int timestamp = 0);
 bool getVersionedStateEntriesTxn(const Transaction & txn, const Path & statePath, StateInfos & infos, const unsigned int revision = 0, const unsigned int timestamp = 0);
 
-void setStateUserGroupTxn(const Transaction & txn, const Path & statePath, const string & user, const string & group, int chmod);
-void getStateUserGroupTxn(const Transaction & txn, const Path & statePath, string & user, string & group, int & chmod);
+void setStateOptionsTxn(const Transaction & txn, const Path & statePath, const string & user, const string & group, int chmod, const string & runtimeArgs);
+void getStateOptionsTxn(const Transaction & txn, const Path & statePath, string & user, string & group, int & chmod, string & runtimeArgs);
 
 }
 

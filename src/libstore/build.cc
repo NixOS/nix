@@ -1949,7 +1949,10 @@ void DerivationGoal::computeClosure()
 		}
 		setStatePathsIntervalTxn(txn, statePath, intervals);							//Set intervals to zero
 		setVersionedStateEntriesTxn(txn, statePath, infos); 							//register subdirs/files and their types of versioning
-		setStateUserGroupTxn(txn, statePath, queryCallingUsername(), "nixbld", 700);	//register the user and group
+		
+		//register state options that may change
+		DerivationStateOutput drvso = drv.stateOutputs["state"];
+		setStateOptionsTxn(txn, statePath, queryCallingUsername(), "nixbld", 700, drvso.runtimeStateArgs);		
 		
 		//Shared state
     	Path sharedState = drv.stateOutputs.find("state")->second.sharedState;

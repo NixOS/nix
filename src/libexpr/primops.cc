@@ -366,7 +366,7 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
         }
     }
     
-    /* If we have a state derivation, we clear state paramters because they (sometimes) dont affect to outPath: 
+    /* If we have a state derivation, we clear state paramters because they (sometimes) can affect the outPath: 
      * If this drv has runtime paramters: The state indentifier and thus statepath may change, but the componentPath (outPath) can stay the same
      * If this drv doesnt have runtime paramters: The state indentifier and thus statepath may change, and thus the componentPath changes since it is build with another identifier
      * In both cases: Other runtime state parameters like stateDirs, synchronisation and shareState never change the out or statepath so always need to be out of the hash 
@@ -378,7 +378,7 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
 	    
 	    DerivationStateOutput drvso = drv.stateOutputs["state"];
 	    
-	    if(drvso.runtimeStateArgs != ""){		//Has runtime parameters		-->  Clear all state parameters
+	    if(drvso.runtimeStateArgs != ""){			//Has runtime parameters		-->  Clear all state parameters
 			drv.stateOutputs.clear();
 			drv.stateOutputDirs.clear();
 			drv.env["statePath"] = "";

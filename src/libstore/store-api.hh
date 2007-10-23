@@ -234,6 +234,12 @@ public:
 	/* TODO */
 	virtual Path lookupStatePath(const Path & storePath, const string & identifier, const string & user) = 0;
 	
+	/* TODO */
+	virtual void setStateOptions(const Path & statePath, const string & user, const string & group, int chmod, const string & runtimeArgs) = 0;
+	
+	/* TODO */
+	virtual void getStateOptions(const Path & statePath, string & user, string & group, int & chmod, string & runtimeArgs) = 0;
+	
 };
 
 

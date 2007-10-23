@@ -660,15 +660,9 @@ static void installDerivations(Globals & globals,
         		
         		//if it doesnt need to share state with some other component
         		//&& the identifiers are equal
-        		
-        		//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        		//TODO && (the users are equal || OR SHARED BETWEEN USERS)		isnt this already user specific?		
-        		//TODO
         		if(	newSharedState == "" 
         			&&
-        			(oldStateIdentifier == newStateIdentifier
-        		   		|| (oldStateIdentifier == "__EMTPY__" && newStateIdentifier == ""))
-        		   	 
+        			(oldStateIdentifier == newStateIdentifier || (oldStateIdentifier == "__EMTPY__" && newStateIdentifier == ""))
         		   ){
         			
         			//query old state path

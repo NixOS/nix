@@ -524,7 +524,6 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
 	case wopQueryStateRevisions: {
-		printMsg(lvlError, format("queryStateRevisions nix-worker"));
     	Path statePath = readStatePath(from); 
 		unsigned int revision = readBigUnsignedInt(from);
 		RevisionClosure revisions;
@@ -632,6 +631,34 @@ static void performOp(Source & from, Sink & to, unsigned int op)
 		break;	
 	}
 
+    case wopSetStateOptions: {
+		Path statePath = readStatePath(from);
+		string user = readString(from);
+		string group = readString(from);
+		int chmod = readInt(from);
+		string runtimeArgs = readString(from);
+		startWork();
+    	store->setStateOptions(statePath, user, group, chmod, runtimeArgs);
+    	stopWork();
+    	writeInt(1, to);
+		break;
+	}
+
+	case wopGetStateOptions: {
+		Path statePath = readString(from);
+		string user, group, runtimeArgs;
+		int chmod;
+		startWork();
+    	store->getStateOptions(statePath, user, group, chmod, runtimeArgs);
+    	stopWork();
+    	writeString(user, to);
+		writeString(group, to);
+		writeInt(chmod, to);
+		writeString(runtimeArgs, to);
+    	writeInt(1, to);
+		break;
+	}
+
     case wopSetOptions: {
         keepFailed = readInt(from) != 0;
         keepGoing = readInt(from) != 0;
@@ -643,7 +670,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         stopWork();
         break;
     }
-            
+    
     default:
         throw Error(format("invalid operation %1%") % op);
     }

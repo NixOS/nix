@@ -430,8 +430,6 @@ static void opRegisterValidity(Strings opFlags, Strings opArgs)
 
     ValidPathInfos infos;
     
-   	printMsg(lvlError, format("opRegisterValidity!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"));
-    
     while (1) {
         ValidPathInfo info = decodeValidPathInfo(cin);
         if (info.path == "") break;

@@ -90,10 +90,10 @@ namespace nix {
 		const Path & statePath, StateInfos & infos, const unsigned int revision = 0, const unsigned int timestamp = 0);
     
     /**/
-    void setStateUserGroup(Database & nixDB, const Transaction & txn, TableId stateRights, const Path & statePath, const string & user, const string & group, int chmod);
+    void setStateOptions(Database & nixDB, const Transaction & txn, TableId stateOptions, const Path & statePath, const string & user, const string & group, int chmod, const string & runtimeArgs);
 
 	/**/
-	void getStateUserGroup(Database & nixDB, const Transaction & txn, TableId stateRights, const Path & statePath, string & user, string & group, int & chmod);
+	void getStateOptions(Database & nixDB, const Transaction & txn, TableId stateOptions, const Path & statePath, string & user, string & group, int & chmod, string & runtimeArgs);
 	
     
     

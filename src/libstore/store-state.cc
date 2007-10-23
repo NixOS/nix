@@ -147,10 +147,19 @@ void revertToRevisionTxn(const Transaction & txn, const Path & statePath, const 
     	queryXReferencesTxn(txn, statePath, state_references, true, 0, timestamp);
 		PathSet state_stateReferences;
 	    queryXReferencesTxn(txn, statePath, state_stateReferences, false, 0, timestamp);
-    	
     	//Now set these old references as the new references at the new (just created) Timestamp
     	setStateComponentReferencesTxn(txn, statePath, Strings(state_references.begin(), state_references.end()), 0, newTimestamp);
 		setStateStateReferencesTxn(txn, statePath, Strings(state_stateReferences.begin(), state_stateReferences.end()), 0, newTimestamp);
+		
+		//Now set these old state-items as the new state-items at the new (just created) Timestamp
+		StateInfos infos;
+		getVersionedStateEntriesTxn(txn, statePath, infos, 0, timestamp);
+		setVersionedStateEntriesTxn(txn, statePath, infos, 0, newTimestamp);
+	
+		//Now set these old staterights as the new staterights at the new (just created) Timestamp
+		//void getStateOptionsTxn(const Transaction & txn, const Path & statePath, string & user, string & group, int & chmod);
+		//void setStateOptionsTxn(const Transaction & txn, const Path & statePath, const string & user, const string & group, int chmod);
+		//TODO !!!!!!!!!??
 		
 		if(revision_arg == 0)
 			printMsg(lvlError, format("Reverted state of '%1%' to the latest revision") % statePath);	 //TODO lookup the number
@@ -804,27 +813,33 @@ bool getVersionedStateEntries(Database & nixDB, const Transaction & txn, TableId
 	return true;
 }
 
-void setStateUserGroup(Database & nixDB, const Transaction & txn, TableId stateRights, const Path & statePath, const string & user, const string & group, int chmod)
+void setStateOptions(Database & nixDB, const Transaction & txn, TableId stateOptions, const Path & statePath, 
+	const string & user, const string & group, int chmod, const string & runtimeArgs)
 {
-	string value = mergeToDBKey(user,mergeToDBKey(group, int2String(chmod)));
-	nixDB.setString(txn, stateRights, statePath, value);
+	string value = mergeToDBKey(user,mergeToDBKey(group, mergeToDBKey(int2String(chmod), runtimeArgs)));
+	nixDB.setString(txn, stateOptions, statePath, value);
 }
 
-void getStateUserGroup(Database & nixDB, const Transaction & txn, TableId stateRights, const Path & statePath, string & user, string & group, int & chmod)
+void getStateOptions(Database & nixDB, const Transaction & txn, TableId stateOptions, const Path & statePath, 
+	string & user, string & group, int & chmod, string & runtimeArgs)
 {
 	string value;
-	bool notEmpty = nixDB.queryString(txn, stateRights, statePath, value);
+	bool notEmpty = nixDB.queryString(txn, stateOptions, statePath, value);
 	if(!notEmpty)
 		throw Error(format("No rights found for path '%1%'") % statePath);
 	
 	string s1;
+	splitDBKey(value, s1, runtimeArgs);
+	
+	string s2;
 	string chmod_s;
-	splitDBKey(value, s1, chmod_s);
+	splitDBKey(s1, s2, chmod_s);
+	
 	bool succeed = string2Int(chmod_s, chmod);
 	if(!succeed)
 		throw Error(format("Malformed chmod value of path '%1%'") % statePath);
 	
-	splitDBKey(s1, user, group);
+	splitDBKey(s2, user, group);
 }
 
 }

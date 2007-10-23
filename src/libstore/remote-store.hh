@@ -108,6 +108,10 @@ public:
 	
 	Path lookupStatePath(const Path & storePath, const string & identifier, const string & user);
 	
+	void setStateOptions(const Path & statePath, const string & user, const string & group, int chmod, const string & runtimeArgs);
+	
+	void getStateOptions(const Path & statePath, string & user, string & group, int & chmod, string & runtimeArgs);
+	
 private:
     AutoCloseFD fdSocket;
     FdSink to;

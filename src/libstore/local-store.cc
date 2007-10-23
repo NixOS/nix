@@ -156,9 +156,9 @@ static TableId dbVersionItems = 0;
 
 /*
  * StatePath :: string
- * the string contains the user,group and chmod 
+ * the string contains the user,group,chmod,runtimestateargs 
  */
-static TableId dbStateRights = 0;
+static TableId dbStateOptions = 0;
 
 
 static void upgradeStore07();
@@ -231,7 +231,7 @@ LocalStore::LocalStore(bool reserveSpace)
 	dbSharedState = nixDB.openTable("sharedState");
 	dbSolidStateReferences = nixDB.openTable("references_solid_c_s");	/* The contents of this table is included in references_c_s */
 	dbVersionItems = nixDB.openTable("stateItems");
-	dbStateRights = nixDB.openTable("stateRights");
+	dbStateOptions = nixDB.openTable("stateOptions");
 	
     int curSchema = 0;
     Path schemaFN = nixDBPath + "/schema";
@@ -559,16 +559,16 @@ static PathSet getXReferrers(const Transaction & txn, const Path & store_or_stat
 		map<string, unsigned int> latest;
 		for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i){
 			Path getStatePath;
-			unsigned int getRevision;
-			splitDBRevKey(*i, getStatePath, getRevision);
+			unsigned int getTimestamp;
+			splitDBRevKey(*i, getStatePath, getTimestamp);
 		
 			if(latest[getStatePath]	== 0) 						//either it is unset
-				latest[getStatePath] = getRevision;
-			else if(latest[getStatePath] < getRevision){ 			
-				if(revision != 0 && getRevision <= timestamp)	//or it is greater, but not greater then the timestamp			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!! WERE COMPARING A REVISION TO A TIMESTAMP ???
-					latest[getStatePath] = getRevision;
+				latest[getStatePath] = getTimestamp;
+			else if(latest[getStatePath] < getTimestamp){ 			
+				if(revision != 0 && getTimestamp <= timestamp)	//or it is greater, but not greater then the timestamp
+					latest[getStatePath] = getTimestamp;
 				else											//we need the latest so greater is good
-					latest[getStatePath] = getRevision;
+					latest[getStatePath] = getTimestamp;
 			}
 		}
 	    
@@ -1204,7 +1204,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 
     PathSet references = readStorePaths(hashAndReadSource);
     
-    //TODO TODO also ..??!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //TODO TODO also ?!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     PathSet stateReferences;
 
     Path deriver = readString(hashAndReadSource);
@@ -1294,8 +1294,8 @@ void deleteXFromStore(const Path & _path, unsigned long long & bytesFreed, const
     Transaction txn(nixDB);
     if (isValidPathTxn(txn, path) || isValidStatePathTxn(txn, path)) 
     {
-        PathSet storeReferrers = getStoreReferrersTxn(txn, path, 0);		//TODO GET REFERRERS OF ALL REVISIONS !!!!!!!!!!!!!!	!!!!!!!!!!!!!!!!!!!!!!!!
-        PathSet stateReferrers = getStateReferrersTxn(txn, path, 0);
+        PathSet storeReferrers = getStoreReferrersTxn(txn, path, 0);		//TODO GET REFERRERS OF ALL REVISIONS WHEN path IS A STATEPATH
+        PathSet stateReferrers = getStateReferrersTxn(txn, path, 0);		//TODO GET REFERRERS OF ALL REVISIONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
         for (PathSet::iterator i = storeReferrers.begin(); i != storeReferrers.end(); ++i)
             if (*i != path && isValidPathTxn(txn, *i))
@@ -1626,9 +1626,9 @@ void unShareStateTxn(const Transaction & txn, const Path & statePath, const bool
 	nixDB.delPair(txn, dbSharedState, statePath);
 	
 	//Touch dir with correct rights
-	string user, group;
+	string user, group, runtimeArgs;
 	int chmod;
-	getStateUserGroupTxn(txn, statePath, user, group, chmod);
+	getStateOptionsTxn(txn, statePath, user, group, chmod, runtimeArgs);
 	ensureStateDir(statePath, user, group, int2String(chmod));
 	
 	if(branch && restoreOld)
@@ -1839,14 +1839,24 @@ bool getVersionedStateEntriesTxn(const Transaction & txn, const Path & statePath
 		statePath, infos, revision, timestamp);
 }
 
-void setStateUserGroupTxn(const Transaction & txn, const Path & statePath, const string & user, const string & group, int chmod)
+void setStateOptionsTxn(const Transaction & txn, const Path & statePath, const string & user, const string & group, int chmod, const string & runtimeArgs)
 {
-	setStateUserGroup(nixDB, txn, dbStateRights, statePath, user, group, chmod);
+	setStateOptions(nixDB, txn, dbStateOptions, statePath, user, group, chmod, runtimeArgs);
 }
 
-void getStateUserGroupTxn(const Transaction & txn, const Path & statePath, string & user, string & group, int & chmod)
+void getStateOptionsTxn(const Transaction & txn, const Path & statePath, string & user, string & group, int & chmod, string & runtimeArgs)
 {
-	getStateUserGroup(nixDB, txn, dbStateRights, statePath, user, group, chmod);
+	getStateOptions(nixDB, txn, dbStateOptions, statePath, user, group, chmod, runtimeArgs);
+}
+
+void LocalStore::setStateOptions(const Path & statePath, const string & user, const string & group, int chmod, const string & runtimeArgs)
+{
+	setStateOptionsTxn(noTxn, statePath, user, group, chmod, runtimeArgs);
+}
+
+void LocalStore::getStateOptions(const Path & statePath, string & user, string & group, int & chmod, string & runtimeArgs)
+{
+	getStateOptionsTxn(noTxn, statePath, user, group, chmod, runtimeArgs);	
 }
 
 typedef std::map<Hash, std::pair<Path, ino_t> > HashToPath;

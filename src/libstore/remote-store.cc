@@ -516,8 +516,8 @@ bool RemoteStore::queryStateRevisions(const Path & statePath, RevisionClosure & 
 	processStderr();	
 	RevisionClosure revisions2 = readRevisionClosure(from);
 	RevisionClosureTS timestamps2 = readRevisionClosureTS(from);
-	revisions = revisions2;												//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	timestamps = timestamps2;											//TODO !!!!!!!!!!!!!!!!!!!! COPY BY VALUE I THINK
+	revisions = revisions2;												
+	timestamps = timestamps2;											//TODO Is this ok?? Maybe COPY BY VALUE ??
 	unsigned int reply = readInt(from);
     return reply != 0;
 }
@@ -528,7 +528,7 @@ bool RemoteStore::queryAvailableStateRevisions(const Path & statePath, RevisionI
 	writeString(statePath, to);
 	processStderr();
 	RevisionInfos revisions2 = readRevisionInfos(from);			
-	revisions = revisions2;												//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	revisions = revisions2;												
 	unsigned int reply = readInt(from);
     return reply != 0;	
 }
@@ -565,7 +565,7 @@ PathSet RemoteStore::toNonSharedPathSet(const PathSet & statePaths)
 	writeInt(wopToNonSharedPathSet, to);
 	writeStringSet(statePaths, to);
 	processStderr();
-	return readStringSet(from);			//TODO !!!!!!!!!!!!!!! create a readStatePaths just like readStorePaths
+	return readStatePaths(from);
 }
 
 void RemoteStore::revertToRevision(const Path & statePath, const unsigned int revision_arg, const bool recursive)
@@ -606,6 +606,30 @@ Path RemoteStore::lookupStatePath(const Path & storePath, const string & identif
 	writeString(user, to);
 	processStderr();
 	return readStatePath(from);	
+}
+
+void RemoteStore::setStateOptions(const Path & statePath, const string & user, const string & group, int chmod, const string & runtimeArgs)
+{
+	writeInt(wopSetStateOptions, to);
+	writeString(statePath, to);
+	writeString(user, to);
+	writeString(group, to);
+	writeInt(chmod, to);
+	writeString(runtimeArgs, to);
+	processStderr();
+	readInt(from);
+}
+
+void RemoteStore::getStateOptions(const Path & statePath, string & user, string & group, int & chmod, string & runtimeArgs)
+{
+	writeInt(wopGetStateOptions, to);
+	writeString(statePath, to);
+	processStderr();
+	user = readString(from);
+	group = readString(from);
+	chmod = readInt(from);
+	runtimeArgs = readString(from);
+	readInt(from);
 }
 
 
