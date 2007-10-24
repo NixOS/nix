@@ -46,6 +46,11 @@ h3 /* subsections */
     font-size: 125%;
 }
 
+div.simplesect h2
+{
+    font-size: 110%;
+}
+
 div.appendix h3
 {
     font-size: 150%;
