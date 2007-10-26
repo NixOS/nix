@@ -718,8 +718,6 @@ bool queryAvailableStateRevisions(Database & nixDB, const Transaction & txn, Tab
 	
 	for (Strings::const_iterator i = keys.begin(); i != keys.end(); ++i) {
 	
-		printMsg(lvlError, format("QQQQ %1%") % *i);
-		
 		if((*i).substr(0, statePath.length()) != statePath || (*i).length() == statePath.length()) 		//dont check the new-revision key or other keys
 			continue;
 

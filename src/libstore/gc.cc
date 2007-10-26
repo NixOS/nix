@@ -712,6 +712,12 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
             continue;
         }
         
+        string lostAndFound = nixStoreState + "/lost+found";
+        if(*i == lostAndFound){
+        	debug(format("Keeping `%1%' because its a special path") % lostAndFound);
+            continue;
+        }        
+        
         debug(format("dead path `%1%'") % *i);
         result.insert(*i);
 

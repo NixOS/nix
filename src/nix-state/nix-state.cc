@@ -163,6 +163,20 @@ static void opShowStatePath(Strings opFlags, Strings opArgs)
 	printMsg(lvlError, format("%1%") % statePath);
 }
 
+//Prints the storepath of a component
+static void opShowStorePath(Strings opFlags, Strings opArgs)
+{
+	Path componentPath;
+    Path statePath;
+    string binary;
+    string derivationPath;
+    bool isStateComponent;
+    Strings program_args;
+    getPathInfo_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
+    
+	printMsg(lvlError, format("%1%") % componentPath);
+}
+
 
 static void revertToRevision(Strings opFlags, Strings opArgs)
 {
@@ -252,7 +266,13 @@ static void opIsStateStorePath(Strings opFlags, Strings opArgs)		//Used by .....
 
 static void opShowSharedPaths(Strings opFlags, Strings opArgs)
 {
-	Path statePath = *(opArgs.begin());
+	//Path statePath = *(opArgs.begin());
+	Path componentPath, statePath;
+    string binary, derivationPath;
+    bool isStateComponent;
+    Strings program_args;
+    getPathInfo_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
+	
 	if(!store->isValidStatePath(statePath))
 		throw UsageError(format("Path '%1%' is not a valid state path.") % statePath);
 		
@@ -655,10 +675,15 @@ void run(Strings args)
 		StateInfo si = *i;
 		printMsg(lvlError, format("SI: %1% %2% %3%") % si.path % si.type % si.interval);
 	}
+	
+	printMsg(lvlError, format("DIREXTIST '%1%'") % DirectoryExist("/nix/state/test/test") );		//file		0
+	printMsg(lvlError, format("DIREXTIST '%1%'") % DirectoryExist("/nix/state/test/test2") );		//symlink	0
+	printMsg(lvlError, format("DIREXTIST '%1%'") % DirectoryExist("/nix/state/test/d1") );			//dir		1
+	printMsg(lvlError, format("DIREXTIST '%1%'") % DirectoryExist("/nix/state/test/d2") );			//symlink	1
 		
 	return;
-	
 	*/
+	
 	/* test */
 	
 	if(args.size() == 1 && ( *(args.begin()) == "--help" || *(args.begin()) == "--statehelp")){
@@ -702,6 +727,8 @@ void run(Strings args)
     	//Info options
 		else if (arg == "--showstatepath")
 			op = opShowStatePath;
+		else if (arg == "--showstorepath")
+			op = opShowStorePath;
 		else if (arg == "--showderivations")
 			op = opShowDerivations;
 		else if (arg == "--showrevisions")

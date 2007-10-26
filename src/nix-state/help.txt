@@ -17,10 +17,11 @@ Run Options:
 Information:
 
   --showstatepath: print the state path
+  --showstorepath: print the store path
   --showderivations: print all derivations of this path
   --showrevisions: show all revisions of the state path
   --showsharedpaths: show where this path points to
-  --XXXXXXXXXXXXXXXX: print if the path is a state/store path
+  --TODO: print if the path is a state/store path
   --version: output version information
   --help: display help
 

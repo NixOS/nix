@@ -595,7 +595,7 @@ static void installDerivations(Globals & globals,
         {
         	DerivationStateOutputs stateOutputs = drv.stateOutputs;
         	string stateIdentifier = stateOutputs.find("state")->second.stateIdentifier;
-        	printMsg(lvlError, format("Add '%2%' with '%1%'") % stateIdentifier % i->queryOutPath(globals.state));
+        	printMsg(lvlError, format("Add state component '%2%' with identifier '%1%'") % stateIdentifier % i->queryOutPath(globals.state));
         	if(stateIdentifier == "")
 	        	i->setStateIdentifier("__EMTPY__");
 	        else
@@ -722,7 +722,7 @@ static void installDerivations(Globals & globals,
     			PathSet comparePaths;
     			comparePaths.insert(statePath);
     			comparePaths.insert(read_statePath);
-    			if(store->toNonSharedPathSet(comparePaths).size() != 1)			//TODO !!!!!!!!!!!!!??
+    			if(store->toNonSharedPathSet(comparePaths).size() != 1)
     				rsyncPaths(externalState, statePath, true);
     		}
     		else
@@ -741,7 +741,7 @@ static void installDerivations(Globals & globals,
     	}
     	
     	//Now we create a symlink externalState --> statePath
-    	printMsg(lvlError, format("SYMLINK: '%1%' --> '%2%'") % externalState % statePath);
+    	printMsg(lvlError, format("SYMLINK: '%1%' --> '%2%'") % externalState % statePath);			//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DOESNT WORK OK >.....
     	executeShellCommand("whoami");
     	symlinkPath(statePath, externalState);
     }

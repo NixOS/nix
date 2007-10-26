@@ -1312,11 +1312,23 @@ string padd(const string & s, char c , unsigned int size, bool front)
 
 void symlinkPath(const Path & existingDir, const Path & newLinkName)	//TODO bool shellexpansion
 {
-	//Symlink link to the share path
-	//Usage: ln [OPTION]... [-T] TARGET LINK_NAME   (1st form)
+	/*
+	 * Symlink link to the share path
+	 * Usage: ln [OPTION]... [-T] TARGET LINK_NAME   (1st form)
+	 *  
+	 * we call the shell (/bin/sh -c) so it expands the ~ to a users home dir
+	 *
+	 * We do -snf for: 
+	 * -s : symlinking
+	 * -f : To remove existing destination files (this does NOT always overwrite the newLinkName !!!!)
+	 * -n : Treat destination that is a symlink to a directory as if it were a normal file	(This makes sure
+	 * 		that newLinkName is really overwritten)  
+	 */ 
+	
+	
 	Strings p_args;
-	p_args.push_back("-c");	//we call the shell (/bin/sh -c) so it expands the ~ to a users home dir
-	p_args.push_back("ln -sf " + existingDir + " " + newLinkName);
+	p_args.push_back("-c");		
+	p_args.push_back("ln -snf " + existingDir + " " + newLinkName);
 	runProgram_AndPrintOutput("/bin/sh", true, p_args, "sh-ln");
 	printMsg(lvlError, format("ln -sf %1% %2%") % existingDir % newLinkName);
 }
