@@ -296,17 +296,18 @@ static Expr prim_getEnv(EvalState & state, const ATermVector & args)
     return makeStr(getEnv(name));
 }
 
-/* for debugging purposes. print the first arg on stdout (perhaps stderr should be used?)
- * and return the second
+
+/* Evaluate the first expression, and print its abstract syntax tree
+   on standard error.  Then return the second expression.  Useful for
+   debugging.
  */
 static Expr prim_trace(EvalState & state, const ATermVector & args)
 {
-    //string str = evalStringNoCtx(state, args[0]);
-
-    Expr a = evalExpr(state, args[0]);
-    printf("traced value: %s\n", atPrint(a).c_str());
+    Expr e = evalExpr(state, args[0]);
+    printMsg(lvlError, format("trace: %1%") % e);
     return evalExpr(state, args[1]);
 }
+
 
 static Expr prim_relativise(EvalState & state, const ATermVector & args)
 {
