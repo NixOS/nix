@@ -99,6 +99,11 @@ static char buf[1024];]],
 AC_LANG_POP(C++)
 
 
+# Check for chroot support (requires chroot() and bind mounts).
+AC_CHECK_FUNCS([chroot])
+AC_CHECK_HEADERS([sys/mount.h])
+
+
 # Check for <locale>
 AC_LANG_PUSH(C++)
 AC_CHECK_HEADERS([locale])

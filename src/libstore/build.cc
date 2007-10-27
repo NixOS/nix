@@ -24,6 +24,15 @@
 #include <pwd.h>
 #include <grp.h>
 
+#include "config.h"
+
+#if HAVE_SYS_MOUNT_H
+#include <sys/mount.h>
+#endif
+
+
+#define CHROOT_ENABLED HAVE_CHROOT && HAVE_SYS_MOUNT_H && defined(MS_BIND)
+
 
 namespace nix {
 
@@ -583,9 +592,6 @@ void deletePathWrapped(const Path & path)
 //////////////////////////////////////////////////////////////////////
 
 
-#include <sys/mount.h>
-
-
 /* Helper RAII class for automatically unmounting bind-mounts in
    chroots. */
 struct BindMount
@@ -613,6 +619,7 @@ struct BindMount
     
     void bind(const Path & source, const Path & target)
     {
+#if CHROOT_ENABLED        
         debug(format("bind mounting `%1%' to `%2%'") % source % target);
 
         this->source = source;
@@ -622,10 +629,12 @@ struct BindMount
         
         if (mount(source.c_str(), target.c_str(), "", MS_BIND, 0) == -1)
             throw SysError(format("bind mount from `%1%' to `%2%' failed") % source % target);
+#endif
     }
 
     void unbind()
     {
+#if CHROOT_ENABLED
         if (source == "") return;
         
         debug(format("unmount bind-mount `%1%'") % target);
@@ -658,6 +667,7 @@ struct BindMount
         }
 
         source = "";
+#endif
     }
 };
 
@@ -1644,8 +1654,9 @@ void DerivationGoal::startBuilder()
     /* Are we doing a chroot build? */
     useChroot = queryBoolSetting("build-use-chroot", false);
     Path tmpRootDir;
-    
+
     if (useChroot) {
+#if CHROOT_ENABLED
         /* Create a temporary directory in which we set up the chroot
            environment using bind-mounts.
 
@@ -1683,6 +1694,10 @@ void DerivationGoal::startBuilder()
            guarantee that list elements are destroyed in order?) */
         for (Paths::iterator i = dirsInChroot.begin(); i != dirsInChroot.end(); ++i)
             bindMounts.push_front(boost::shared_ptr<BindMount>(new BindMount(*i, tmpRootDir + *i)));
+        
+#else
+        throw Error("chroot builds are not supported on this platform");
+#endif
     }
     
     
@@ -1710,6 +1725,7 @@ void DerivationGoal::startBuilder()
 
         try { /* child */
 
+#if CHROOT_ENABLED
             /* If building in a chroot, do the chroot right away.
                initChild() will do a chdir() to the temporary build
                directory to make sure the current directory is in the
@@ -1718,6 +1734,7 @@ void DerivationGoal::startBuilder()
                same directories.) */
             if (useChroot && chroot(tmpRootDir.c_str()) == -1)
                 throw SysError(format("cannot change root directory to `%1%'") % tmpRootDir);
+#endif
             
             initChild();
 
