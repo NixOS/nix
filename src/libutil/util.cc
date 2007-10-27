@@ -350,13 +350,16 @@ Path createTempDir(const Path & tmpRoot)
 }
 
 
-void createDirs(const Path & path)
+Paths createDirs(const Path & path)
 {
-    if (path == "/") return;
-    createDirs(dirOf(path));
-    if (!pathExists(path))
+    if (path == "/") return Paths();
+    Paths created = createDirs(dirOf(path));
+    if (!pathExists(path)) {
         if (mkdir(path.c_str(), 0777) == -1)
             throw SysError(format("creating directory `%1%'") % path);
+        created.push_back(path);
+    }
+    return created;
 }
 
 
@@ -509,14 +512,25 @@ string drainFD(int fd)
 //////////////////////////////////////////////////////////////////////
 
 
-AutoDelete::AutoDelete(const string & p) : path(p)
+AutoDelete::AutoDelete(const string & p, bool recursive) : path(p)
 {
     del = true;
+    this->recursive = recursive;
 }
 
 AutoDelete::~AutoDelete()
 {
-    if (del) deletePath(path);
+    try {
+        if (del)
+            if (recursive)
+                deletePath(path);
+            else {
+                if (remove(path.c_str()) == -1)
+                    throw SysError(format("cannot unlink `%1%'") % path);
+            }
+    } catch (...) {
+        ignoreException();
+    }
 }
 
 void AutoDelete::cancel()
@@ -752,10 +766,10 @@ void killUser(uid_t uid)
 		if (errno != EINTR)
 		    throw SysError(format("cannot kill processes for uid `%1%'") % uid);
 	    }
-        
+
         } catch (std::exception & e) {
-            std::cerr << format("killing processes beloging to uid `%1%': %1%\n")
-                % uid % e.what();
+            std::cerr << format("killing processes beloging to uid `%1%': %1%")
+                % uid % e.what() << std::endl;
             quickExit(1);
         }
         quickExit(0);
