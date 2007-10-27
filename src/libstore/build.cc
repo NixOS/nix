@@ -586,7 +586,8 @@ void deletePathWrapped(const Path & path)
 #include <sys/mount.h>
 
 
-/* Helper class for automatically unmounting bind-mounts in chroots. */
+/* Helper RAII class for automatically unmounting bind-mounts in
+   chroots. */
 struct BindMount
 {
     Path source, target;
@@ -612,7 +613,7 @@ struct BindMount
     
     void bind(const Path & source, const Path & target)
     {
-        printMsg(lvlError, format("bind mounting `%1%' to `%2%'") % source % target);
+        debug(format("bind mounting `%1%' to `%2%'") % source % target);
 
         this->source = source;
         this->target = target;
@@ -626,7 +627,8 @@ struct BindMount
     void unbind()
     {
         if (source == "") return;
-        printMsg(lvlError, format("umount `%1%'") % target);
+        
+        debug(format("unmount bind-mount `%1%'") % target);
 
         /* Urgh.  Unmount sometimes doesn't succeed right away because
            the mount point is still busy.  It shouldn't be, because
@@ -644,16 +646,18 @@ struct BindMount
                 sleep(1);
             }
             else
-                throw SysError(format("unmounting `%1%' failed") % target);
+                throw SysError(format("unmounting bind-mount `%1%' failed") % target);
         }
 
         /* Get rid of the directories for the mount point created in
            bind(). */
         for (Paths::reverse_iterator i = created.rbegin(); i != created.rend(); ++i) {
-            printMsg(lvlError, format("delete `%1%'") % *i);
+            debug(format("deleting `%1%'") % *i);
             if (remove(i->c_str()) == -1)
                 throw SysError(format("cannot unlink `%1%'") % *i);
         }
+
+        source = "";
     }
 };
 
@@ -704,11 +708,14 @@ private:
     /* Whether we're currently doing a chroot build. */
     bool useChroot;
 
+    /* A RAII object to delete the chroot directory. */
+    boost::shared_ptr<AutoDelete> autoDelChroot;
+    
     /* In chroot builds, the list of bind mounts currently active.
        The destructor of BindMount will cause the binds to be
        unmounted. */
     list<boost::shared_ptr<BindMount> > bindMounts;
-    
+
     typedef void (DerivationGoal::*GoalState)();
     GoalState state;
     
@@ -797,15 +804,8 @@ DerivationGoal::~DerivationGoal()
     /* Careful: we should never ever throw an exception from a
        destructor. */
     try {
-        printMsg(lvlError, "DESTROY");
         killChild();
         deleteTmpDir(false);
-    } catch (...) {
-        ignoreException();
-    }
-    try {
-        //sleep(1);
-        bindMounts.clear();
     } catch (...) {
         ignoreException();
     }
@@ -1646,7 +1646,27 @@ void DerivationGoal::startBuilder()
     Path tmpRootDir;
     
     if (useChroot) {
-        tmpRootDir = createTempDir();
+        /* Create a temporary directory in which we set up the chroot
+           environment using bind-mounts.
+
+           !!! Big danger here: since we're doing this in /tmp, there
+           is a risk that the admin does something like "rm -rf
+           /tmp/chroot-nix-*" to clean up aborted builds, and if some
+           of the bind-mounts are still active, then "rm -rf" will
+           happily recurse into those mount points (thereby deleting,
+           say, /nix/store).  Ideally, tmpRootDir should be created in
+           some special location (maybe in /nix/var/nix) where Nix
+           takes care of unmounting / deleting old chroots
+           automatically. */
+        tmpRootDir = createTempDir("", "chroot-nix");
+
+        /* Clean up the chroot directory automatically, but don't
+           recurse; that would be very very bad if the unmount of a
+           bind-mount fails. Instead BindMount::unbind() unmounts and
+           deletes exactly those directories that it created to
+           produce the mount point, so that after all the BindMount
+           destructors have run, tmpRootDir should be empty. */
+        autoDelChroot = boost::shared_ptr<AutoDelete>(new AutoDelete(tmpRootDir, false));
         
         printMsg(lvlChatty, format("setting up chroot environment in `%1%'") % tmpRootDir);
 

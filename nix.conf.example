@@ -135,6 +135,44 @@
 #build-users-group =
 
 
+### Option `build-use-chroot'
+#
+# If set to `true', builds will be performed in a chroot environment,
+# i.e., the build will be isolated from the normal file system
+# hierarchy and will only see the Nix store, the temporary build
+# directory, and the directories configured with the
+# `build-chroot-dirs' option (such as /proc and /dev).  This is useful
+# to prevent undeclared dependencies on files in directories such as
+# /usr/bin.
+#
+# The use of a chroot requires that Nix is run as root (but you can
+# still use the "build users" feature to perform builds under
+# different users than root).  Currently, chroot builds only work on
+# Linux because Nix uses "bind mounts" to make the Nix store and other
+# directories available inside the chroot.
+#
+# The default is `false'.
+#
+# Example:
+#   build-use-chroot = true
+#build-use-chroot = false
+
+
+### Option `build-chroot-dirs'
+#
+# When builds are performed in a chroot environment, Nix will mount
+# (using `mount --bind' on Linux) some directories from the normal
+# file system hierarchy inside the chroot.  These are the Nix store,
+# the temporary build directory (usually /tmp/nix-<pid>-<number>) and
+# the directories listed here.  The default is "/dev /proc".  Files
+# in /dev (such as /dev/null) are needed by many builds, and some
+# files in /proc may also be needed occasionally.
+#
+# Example:
+#   build-use-chroot = /dev /proc /bin
+#build-chroot-dirs = /dev /proc
+
+
 ### Option `system'
 #
 # This option specifies the canonical Nix system name of the current

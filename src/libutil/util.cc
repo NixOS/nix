@@ -318,19 +318,19 @@ void makePathReadOnly(const Path & path)
 }
 
 
-static Path tempName(const Path & tmpRoot)
+static Path tempName(const Path & tmpRoot, const Path & prefix)
 {
     static int counter = 0;
     Path tmpRoot2 = canonPath(tmpRoot.empty() ? getEnv("TMPDIR", "/tmp") : tmpRoot, true);
-    return (format("%1%/nix-%2%-%3%") % tmpRoot2 % getpid() % counter++).str();
+    return (format("%1%/%2%-%3%-%4%") % tmpRoot2 % prefix % getpid() % counter++).str();
 }
 
 
-Path createTempDir(const Path & tmpRoot)
+Path createTempDir(const Path & tmpRoot, const Path & prefix)
 {
     while (1) {
         checkInterrupt();
-	Path tmpDir = tempName(tmpRoot);
+	Path tmpDir = tempName(tmpRoot, prefix);
 	if (mkdir(tmpDir.c_str(), 0777) == 0) {
 	    /* Explicitly set the group of the directory.  This is to
 	       work around around problems caused by BSD's group

@@ -116,6 +116,9 @@
   limited form of caching.  This is used by
   <command>nix-channel</command> to prevent unnecessary downloads when
   the channel hasn’t changed.</para></listitem>
+
+
+  <listitem><para>TODO: chroot support.</para></listitem>
   
 
 </itemizedlist>
