@@ -47,8 +47,9 @@ struct InstallSourceInfo
     Path nixExprPath; /* for srcNixExprDrvs, srcNixExprs */
     Path profile; /* for srcProfile */
     string systemFilter; /* for srcNixExprDrvs */
+    bool prebuiltOnly;
     ATermMap autoArgs;
-    InstallSourceInfo() : autoArgs() { };
+    InstallSourceInfo() : prebuiltOnly(false) { };
 };
 
 
@@ -94,6 +95,8 @@ static bool parseInstallSourceOptions(Globals & globals,
     }
     else if (arg == "--attr" || arg == "-A")
         globals.instSource.type = srcAttrPath;
+    else if (arg == "--prebuilt-only" || arg == "-b")
+        globals.instSource.prebuiltOnly = true;
     else return false;
     return true;
 }
@@ -319,9 +322,16 @@ static int comparePriorities(EvalState & state,
 }
 
 
-static DrvInfos filterBySelector(EvalState & state,
-    const DrvInfos & allElems,
-    const Strings & args, bool newestOnly)
+static bool isPrebuilt(EvalState & state, const DrvInfo & elem)
+{
+    return
+        store->isValidPath(elem.queryOutPath(state)) ||
+        store->hasSubstitutes(elem.queryOutPath(state));
+}
+
+
+static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
+    const Strings & args, bool newestOnly, bool prebuiltOnly)
 {
     DrvNames selectors = drvNamesFromArgs(args);
 
@@ -340,7 +350,8 @@ static DrvInfos filterBySelector(EvalState & state,
             DrvName drvName(j->name);
             if (i->matches(drvName)) {
                 i->hits++;
-                matches.push_back(std::pair<DrvInfo, unsigned int>(*j, n));
+                if (!prebuiltOnly || isPrebuilt(state, *j))
+                    matches.push_back(std::pair<DrvInfo, unsigned int>(*j, n));
             }
         }
 
@@ -429,7 +440,8 @@ static void queryInstSources(EvalState & state,
             loadDerivations(state, instSource.nixExprPath,
                 instSource.systemFilter, instSource.autoArgs, "", allElems);
 
-            elems = filterBySelector(state, allElems, args, newestOnly);
+            elems = filterBySelector(state, allElems, args,
+                newestOnly, instSource.prebuiltOnly);
     
             break;
         }
@@ -495,7 +507,7 @@ static void queryInstSources(EvalState & state,
         case srcProfile: {
             elems = filterBySelector(state,
                 queryInstalled(state, instSource.profile),
-                args, newestOnly);
+                args, newestOnly, instSource.prebuiltOnly);
             break;
         }
 
@@ -999,7 +1011,7 @@ static void opQuery(Globals & globals,
 
     DrvInfos elems = filterBySelector(globals.state,
         source == sInstalled ? installedElems : availElems,
-        remaining, false);
+        remaining, false, prebuiltOnly);
     
     DrvInfos & otherElems(source == sInstalled ? availElems : installedElems);
 
@@ -1040,12 +1052,6 @@ static void opQuery(Globals & globals,
             /* For XML output. */
             XMLAttrs attrs;
 
-            if (prebuiltOnly) {
-                if (!store->isValidPath(i->queryOutPath(globals.state)) &&
-                    !store->hasSubstitutes(i->queryOutPath(globals.state)))
-                    continue;
-            }
-        
             if (printStatus) {
                 bool hasSubs = store->hasSubstitutes(i->queryOutPath(globals.state));
                 bool isInstalled = installed.find(i->queryOutPath(globals.state)) != installed.end();
