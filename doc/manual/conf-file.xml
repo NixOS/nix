@@ -118,6 +118,123 @@ env-keep-derivations = false
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-build-max-silent-time"><term><literal>build-max-silent-time</literal></term>
+
+    <listitem>
+
+      <para>This option defines the maximum number of seconds that a
+      builder can go without producing any data on standard output or
+      standard error.  This is useful (for instance in a automated
+      build system) to catch builds that are stuck in an infinite
+      loop, or to catch remote builds that are hanging due to network
+      problems.  It can be overriden using the <option
+      linkend="opt-max-silent-time">--max-silent-time</option> command
+      line switch.</para>
+
+      <para>The value <literal>0</literal> means that there is no
+      timeout.  This is also the default.</para>
+
+    </listitem>
+
+  </varlistentry>
+
+
+  <varlistentry xml:id="conf-build-users-group"><term><literal>build-users-group</literal></term>
+
+    <listitem><para>This options specifies the Unix group containing
+    the Nix build user accounts.  In multi-user Nix installations,
+    builds should not be performed by the Nix account since that would
+    allow users to arbitrarily modify the Nix store and database by
+    supplying specially crafted builders; and they cannot be performed
+    by the calling user since that would allow him/her to influence
+    the build result.</para>
+
+    <para>Therefore, if this option is non-empty and specifies a valid
+    group, builds will be performed under the user accounts that are a
+    member of the group specified here (as listed in
+    <filename>/etc/group</filename>).  Those user accounts should not
+    be used for any other purpose!</para>
+
+    <para>Nix will never run two builds under the same user account at
+    the same time.  This is to prevent an obvious security hole: a
+    malicious user writing a Nix expression that modifies the build
+    result of a legitimate Nix expression being built by another user.
+    Therefore it is good to have as many Nix build user accounts as
+    you can spare.  (Remember: uids are cheap.)</para>
+
+    <para>The build users should have permission to create files in
+    the Nix store, but not delete them.  Therefore,
+    <filename>/nix/store</filename> should be owned by the Nix
+    account, its group should be the group specified here, and its
+    mode should be <literal>1775</literal>.</para>
+
+    <para>If the build users group is empty, builds will be performed
+    under the uid of the Nix process (that is, the uid of the caller
+    if <envar>NIX_REMOTE</envar> is empty, the uid under which the Nix
+    daemon runs if <envar>NIX_REMOTE</envar> is
+    <literal>daemon</literal>, or the uid that owns the setuid
+    <command>nix-worker</command> program if <envar>NIX_REMOTE</envar>
+    is <literal>slave</literal>).  Obviously, this should not be used
+    in multi-user settings with untrusted users.</para>
+
+    </listitem>
+
+  </varlistentry>
+
+
+  <varlistentry><term><literal>build-use-chroot</literal></term>
+
+    <listitem><para>If set to <literal>true</literal>, builds will be
+    performed in a <emphasis>chroot environment</emphasis>, i.e., the
+    build will be isolated from the normal file system hierarchy and
+    will only see the Nix store, the temporary build directory, and
+    the directories configured with the <link
+    linkend='conf-build-chroot-dirs'><literal>build-chroot-dirs</literal>
+    option</link> (such as <filename>/proc</filename> and
+    <filename>/dev</filename>).  This is useful to prevent undeclared
+    dependencies on files in directories such as
+    <filename>/usr/bin</filename>.</para>
+
+    <para>The use of a chroot requires that Nix is run as root (but
+    you can still use the <link
+    linkend='conf-build-users-group'>“build users” feature</link> to
+    perform builds under different users than root).  Currently,
+    chroot builds only work on Linux because Nix uses “bind mounts” to
+    make the Nix store and other directories available inside the
+    chroot.</para>
+
+    </listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry xml:id="conf-build-chroot-dirs"><term><literal>build-chroot-dirs</literal></term>
+
+    <listitem><para>When builds are performed in a chroot environment,
+    Nix will mount (using <command>mount --bind</command> on Linux)
+    some directories from the normal file system hierarchy inside the
+    chroot.  These are the Nix store, the temporary build directory
+    (usually
+    <filename>/tmp/nix-<replaceable>pid</replaceable>-<replaceable>number</replaceable></filename>)
+    and the directories listed here.  The default is <literal>dev
+    /proc</literal>.  Files in <filename>/dev</filename> (such as
+    <filename>/dev/null</filename>) are needed by many builds, and
+    some files in <filename>/proc</filename> may also be needed
+    occasionally.</para>
+
+    <para>The value used on NixOS is
+    
+<programlisting>
+build-use-chroot = /dev /proc /bin</programlisting>
+
+    to make the <filename>/bin/sh</filename> symlink available (which
+    is still needed by many builders).</para>
+
+    </listitem>
+
+  </varlistentry>
+
+  
   <varlistentry><term><literal>system</literal></term>
 
     <listitem><para>This option specifies the canonical Nix system

@@ -103,6 +103,17 @@
 </varlistentry>
 
 
+<varlistentry xml:id="opt-max-silent-time"><term><option>--max-silent-time</option></term>
+
+  <listitem><para>Sets the maximum number of seconds that a builder
+  can go without producing any data on standard output or standard
+  error.  The default is specified by the <link
+  linkend='conf-build-max-silent-time'><literal>build-max-silent-time</literal></link>
+  configuration setting.  <literal>0</literal> means no
+  time-out.</para></listitem>
+
+</varlistentry>
+
 <varlistentry><term><option>--keep-going</option></term>
   <term><option>-k</option></term>
 
