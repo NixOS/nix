@@ -124,7 +124,7 @@ fi
 ])
 
 NEED_PROG(curl, curl)
-NEED_PROG(shell, sh)
+NEED_PROG(shell, bash)
 NEED_PROG(patch, patch)
 AC_PATH_PROG(xmllint, xmllint, false)
 AC_PATH_PROG(xsltproc, xsltproc, false)
