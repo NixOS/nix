@@ -101,12 +101,17 @@ AC_LANG_POP(C++)
 
 # Check for chroot support (requires chroot() and bind mounts).
 AC_CHECK_FUNCS([chroot])
-AC_CHECK_HEADERS([sys/mount.h])
+AC_CHECK_HEADERS([sys/param.h], [], [], [])
+AC_CHECK_HEADERS([sys/mount.h], [], [],
+[#ifdef HAVE_SYS_PARAM_H
+# include <sys/param.h>
+# endif
+])
 
 
 # Check for <locale>
 AC_LANG_PUSH(C++)
-AC_CHECK_HEADERS([locale])
+AC_CHECK_HEADERS([locale], [], [], [])
 AC_LANG_POP(C++)
 
 

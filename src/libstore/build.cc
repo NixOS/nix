@@ -24,12 +24,16 @@
 #include <pwd.h>
 #include <grp.h>
 
+
+/* Includes required for chroot support. */
 #include "config.h"
 
+#if HAVE_SYS_PARAM_H
+#include <sys/param.h>
+#endif
 #if HAVE_SYS_MOUNT_H
 #include <sys/mount.h>
 #endif
-
 
 #define CHROOT_ENABLED HAVE_CHROOT && HAVE_SYS_MOUNT_H && defined(MS_BIND)
 
