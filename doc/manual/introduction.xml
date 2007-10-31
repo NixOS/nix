@@ -1,135 +1,304 @@
 <chapter xmlns="http://docbook.org/ns/docbook"
-         xmlns:xlink="http://www.w3.org/1999/xlink">
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xml:id="chap-introduction">
 
 <title>Introduction</title>
 
-<para>Nix is a system for the deployment of software.  Software
-deployment is concerned with the creation, distribution, and
-management of software components (<quote>packages</quote>).  Its main
-features are:
 
-<itemizedlist>
+<section><title>About Nix</title>
 
-<listitem><para>It helps you make sure that dependency specifications
-are complete.  In general in a deployment system you have to specify
-for each component what its dependencies are, but there are no
-guarantees that this specification is complete.  If you forget a
-dependency, then the component will build and work correctly on
-<emphasis>your</emphasis> machine if you have the dependency
-installed, but not on the end user's machine if it's not
-there.</para></listitem>
+<para>Nix is a <emphasis>purely functional package manager</emphasis>.
+This means that it treats packages like values in purely functional
+programming languages such as Haskell — they are built by functions
+that don’t have side-effects, and they never change after they have
+been built.  Nix stores packages in the <emphasis>Nix
+store</emphasis>, usually the directory
+<filename>/nix/store</filename>, where each package has its own unique
+subdirectory such as
 
-<listitem><para>It is possible to have <emphasis>multiple versions or
-variants</emphasis> of a component installed at the same time.  In
-contrast, in systems such as RPM different versions of the same
-package tend to install to the same location in the file system, so
-installing one version will remove the other.  This is especially
-important if you want to use applications that have conflicting
-requirements on different versions of a component (e.g., application A
-requires version 1.0 of library X, while application B requires a
-non-backwards compatible version 1.1).</para></listitem>
+<programlisting>
+/nix/store/r8vvq9kq18pz08v249h8my6r9vs7s0n3-firefox-2.0.0.1/
+</programlisting>
 
-<listitem><para>Users can have different <quote>views</quote>
-(<quote>profiles</quote> in Nix parlance) on the set of installed
-applications in a system.  For instance, one user can have version 1.0
-of some package visible, while another is using version 1.1, and a
-third doesn't use it at all.</para></listitem>
+where <literal>r8vvq9kq…</literal> is a unique identifier for the
+package that captures all its dependencies (it’s a cryptographic hash
+of the package’s build dependency graph).  This enables many powerful
+features.</para>
 
-<listitem><para>It is possible to atomically
-<emphasis>upgrade</emphasis> software.  I.e., there is no time window
-during an upgrade in which part of the old version and part of the new
-version are simultaneously visible (which might well cause the
-component to fail).</para></listitem>
 
-<listitem><para>Likewise, it is possible to atomically roll back after
-an install, upgrade, or uninstall action.  That is, in a fast (O(1))
-operation the previous configuration of the system can be restored.
-This is because upgrade or uninstall actions don't actually remove
-components from the system.</para></listitem>
+<simplesect><title>Multiple versions</title>
 
-<listitem><para>Unused components can be
-<emphasis>garbage-collected</emphasis> automatically and safely: when
-you remove an application from a profile, its dependencies will be
-deleted by the garbage collector only if there are no other active
-applications using them.</para></listitem>
+<para>You can have multiple versions or variants of a package
+installed at the same time.  This is especially important when
+different applications have dependencies on different versions of the
+same package — it prevents the “DLL hell”.  Because of the hashing
+scheme, different versions of a package end up in different paths in
+the Nix store, so they don’t interfere with each other.</para>
 
-<listitem><para>Nix supports both source-based deployment models
-(where you distribute <emphasis>Nix expressions</emphasis> that tell
-Nix how to build software from source) and binary-based deployment
-models.  The latter is more-or-less transparent: installation of
-components is always based on Nix expressions, but if the expressions
-have been built before and Nix knows that the resulting binaries are
-available somewhere, it will use those instead.</para></listitem>
+<para>An important consequence is that operations like upgrading or
+uninstalling an application cannot break other applications, since
+these operations never “destructively” update or delete files that are
+used by other packages.</para>
 
-<listitem><para>Nix is flexible in the deployment policies that it
-supports.  There is a clear separation between the tools that
-implement basic Nix <emphasis>mechanisms</emphasis> (e.g., building
-Nix expressions), and the tools that implement various deployment
-<emphasis>policies</emphasis>.  For instance, there is a concept of
-<quote>Nix channels</quote> that can be used to keep software
-installations up-to-date automatically from a network source.  This is
-a policy that is implemented by a fairly short Perl script, which can
-be adapted easily to achieve similar policies.</para></listitem>
+</simplesect>
 
-<listitem><para>Nix component builds aim to be <quote>pure</quote>;
-that is, unaffected by anything other than the declared dependencies.
-This means that if a component was built successfully once, it can be
-rebuilt again on another machine and the result will be the same.  We
-cannot <emphasis>guarantee</emphasis> this (e.g., if the build depends
-on the time-of-day), but Nix (and the tools in the Nix Packages
-collection) takes special care to help achieve this.</para></listitem>
 
-<listitem><para>Nix expressions (the things that tell Nix how to build
-components) are self-contained: they describe not just components but
-complete compositions.  In other words, Nix expressions also describe
-how to build all the dependencies.  This is in contrast to component
-specification languages like RPM spec files, which might say that a
-component X depends on some other component Y, but since it does not
-describe <emphasis>exactly</emphasis> what Y is, the result of
-building or running X might be different on different machines.
-Combined with purity, self-containedness ensures that a component that
-<quote>works</quote> on one machine also works on another, when
-deployed using Nix.</para></listitem>
+<simplesect><title>Complete dependencies</title>
 
-<listitem><para>The Nix expression language makes it easy to describe
-variability in components (e.g., optional features or
-dependencies).</para></listitem>
+<para>Nix helps you make sure that package dependency specifications
+are complete.  In general, when you’re making a package for a package
+management system like RPM, you have to specify for each package what
+its dependencies are, but there are no guarantees that this
+specification is complete.  If you forget a dependency, then the
+component will build and work correctly on <emphasis>your</emphasis>
+machine if you have the dependency installed, but not on the end
+user's machine if it's not there.</para>
 
-<listitem><para>Nix is ideal for building build farms that do
-continuous builds of software from a version management system, since
-it can take care of building all the dependencies as well.  Also, Nix
-only rebuilds components that have changed, so there are no
-unnecessary builds.  In addition, Nix can transparently distribute
-build jobs over different machines, including different
-platforms.</para></listitem>
+<para>Since Nix on the other hand doesn’t install packages in “global”
+locations like <filename>/usr/bin</filename> but in package-specific
+directories, the risk of incomplete dependencies is greatly reduced.
+This is because tools such as compilers don’t search in per-packages
+directories such as
+<filename>/nix/store/5lbfaxb722zp…-openssl-0.9.8d/include</filename>,
+so if a package builds correctly on your system, this is because you
+specified the dependency explicitly.</para>
 
-<listitem><para>Nix can be used not only for software deployment, but
-also for <emphasis>service deployment</emphasis>, such as the
-deployment of a complete web server with all its configuration files,
-static pages, software dependencies, and so on.  Nix's advantages for
-software deployment also apply here: for instance, the ability
-trivially to have multiple configurations at the same time, or the
-ability to do rollbacks.</para></listitem>
+<para>Runtime dependencies are found by scanning binaries for the hash
+parts of Nix store paths (such as <literal>r8vvq9kq…</literal>).  This
+sounds risky, but it works extremely well.</para>
 
-<listitem><para>Nix can efficiently upgrade between different versions
-of a component through <emphasis>binary patching</emphasis>.  If
-patches are available on a server, and you try to install a new
-version of some component, Nix will automatically apply a patch (or
-sequence of patches), if available, to transform the installed
-component into the new version.</para></listitem> 
+</simplesect>
 
-</itemizedlist>
 
-</para>
+<simplesect><title>Multi-user support</title>
+
+<para>Starting at version 0.11, Nix has multi-user support.  This
+means that non-privileged users can securely install software.  Each
+user can have a different <emphasis>profile</emphasis>, a set of
+packages in the Nix store that appear in the user’s
+<envar>PATH</envar>.  If a user installs a package that another user
+has already installed previously, the package won’t be built or
+downloaded a second time.  At the same time, it is not possible for
+one user to inject a Trojan horse into a package that might be used by
+another user.</para>
+
+<!--
+<para>More details can be found in Section 3 of our <a
+href="docs/papers.html#securesharing">ASE 2005 paper</a>.</para>
+-->
+
+</simplesect>
+
+
+<simplesect><title>Atomic upgrades and rollbacks</title>
+
+<para>Since package management operations never overwrite packages in
+the Nix store but just add new versions in different paths, they are
+<emphasis>atomic</emphasis>.  So during a package upgrade, there is no
+time window in which the package has some files from the old version
+and some files from the new version — which would be bad because a
+program might well crash if it’s started during that period.</para>
+
+<para>And since package aren’t overwritten, the old versions are still
+there after an upgrade.  This means that you can <emphasis>roll
+back</emphasis> to the old version:</para>
+
+<screen>
+$ nix-env --upgrade <replaceable>some-packages</replaceable>
+$ nix-env --rollback
+</screen>
+
+</simplesect>
+
+
+<simplesect><title>Garbage collection</title>
+
+<para>When you install a package like this…
+
+<screen>
+$ nix-env --uninstall firefox
+</screen>
+
+the package isn’t deleted from the system right away (after all, you
+might want to do a rollback, or it might be in the profiles of other
+users).  Instead, unused packages can be deleted safely by running the
+<emphasis>garbage collector</emphasis>:
+
+<screen>
+$ nix-collect-garbage
+</screen>
+
+This deletes all packages that aren’t in use by any user profile or by
+a currently running program.</para>
+
+</simplesect>
+
+
+<simplesect><title>Functional package language</title>
+
+<para>Packages are built from <emphasis>Nix expressions</emphasis>,
+which is a simple functional language.  A Nix expression describes
+everything that goes into a package build action (a “derivation”):
+other packages, sources, the build script, environment variables for
+the build script, etc.  Nix tries very hard to ensure that Nix
+expressions are <emphasis>deterministic</emphasis>: building a Nix
+expression twice should yield the same result.</para>
+
+<para>Because it’s a functional language, it’s easy to support
+building variants of a package: turn the Nix expression into a
+function and call it any number of times with the appropriate
+arguments.  Due to the hashing scheme, variants don’t conflict with
+each other in the Nix store.</para>
+
+</simplesect>
+
+
+<simplesect><title>Transparent source/binary deployment</title>
+
+<para>Nix expressions generally describe how to build a package from
+source, so an installation action like
+
+<screen>
+$ nix-env --install firefox
+</screen>
+
+<emphasis>could</emphasis> cause quite a bit of build activity, as not
+only Firefox but also all its dependencies (all the way up to the C
+library and the compiler) would have to built, at least if they are
+not already in the Nix store.  This is a <emphasis>source deployment
+model</emphasis>.  For most users, building from source is not very
+pleasant as it takes far too long.  However, Nix can automatically
+skip building from source and download a pre-built binary instead if
+it knows about it.  <emphasis>Nix channels</emphasis> provide Nix
+expressions along with pre-built binaries.</para>
+
+<!--
+<para>source deployment model (like <a
+href="http://www.gentoo.org/">Gentoo</a>) and a binary model (like
+RPM)</para>
+-->
+
+</simplesect>
+
+
+<simplesect><title>Binary patching</title>
+
+<para>In addition to downloading binaries automatically if they’re
+available, Nix can download binary deltas that patch an existing
+package in the Nix store into a new version.  This speeds up
+upgrades.</para>
+
+</simplesect>
+
+
+<simplesect><title>Nix Packages collection</title>
+
+<para>We provide a large set of Nix expressions containing hundreds of
+existing Unix packages, the <emphasis>Nix Packages
+collection</emphasis> (Nixpkgs).</para>
+
+</simplesect>
+
+
+<simplesect><title>Service deployment</title>
+
+<para>Nix can be used not only for rolling out packages, but also
+complete <emphasis>configurations</emphasis> of services.  This is
+done by treating all the static bits of a service (such as software
+packages, configuration files, control scripts, static web pages,
+etc.) as “packages” that can be built by Nix expressions.  As a
+result, all the features above apply to services as well: for
+instance, you can roll back a web server configuration if a
+configuration change turns out to be undesirable, you can easily have
+multiple instances of a service (e.g., a test and production server),
+and because the whole service is built in a purely functional way from
+a Nix expression, it is repeatable so you can easily reproduce the
+service on another machine.</para>
+
+<!--
+<para>You can read more about this in our <a
+href="docs/papers.html#servicecm">SCM-12 paper</a>.</para>
+-->
+
+</simplesect>
+
+
+<simplesect><title>Portability</title>
+
+<para>Nix should run on most Unix systems, including Linux, FreeBSD and
+Mac OS X.  It is also supported on Windows using Cygwin.</para>
+
+</simplesect>
+
+
+<simplesect><title>NixOS</title>
+
+<para>NixOS is a Linux distribution based on Nix.  It uses Nix not
+just for package management but also to manage the system
+configuration (e.g., to build configuration files in
+<filename>/etc</filename>).  This means, among other things, that it’s
+possible to easily roll back the entire configuration of the system to
+an earlier state.  Also, users can install software without root
+privileges.  For more information and downloads, see the <link
+xlink:href="http://nix.cs.uu.nl/nixos/">NixOS homepage</link>.</para>
+
+</simplesect>
+
+
+<!-- other features:
+
+- build farms
+- reproducibility (Nix expressions allows whole configuration to be rebuilt)
+
+-->
+
+</section>
+
+
+<section><title>About us</title>
+
+<para>Nix was developed at the <link
+xlink:href="http://www.cs.uu.nl/">Department of Information and
+Computing Sciences</link>, Utrecht University by the <link
+xlink:href="http://www.cs.uu.nl/wiki/Trace/WebHome">TraCE
+project</link>.  The project is funded by the Software Engineering
+Research Program <link
+xlink:href="http://www.jacquard.nl/">Jacquard</link> to improve the
+support for variability in software systems.</para>
+
+</section>
+
+
+<section><title>About this manual</title>
 
 <para>This manual tells you how to install and use Nix and how to
 write Nix expressions for software not already in the Nix Packages
 collection.  It also discusses some advanced topics, such as setting
-up a Nix-based build farm, and doing service deployment using
-Nix.</para>
+up a Nix-based build farm.</para>
 
-<note><para>Some background information on Nix can be found in a
-number of papers.  The ICSE 2004 paper <citetitle
+</section>
+
+
+<section><title>License</title>
+
+<para>Nix is free software; you can redistribute it and/or modify it
+under the terms of the <link
+xlink:href="http://www.gnu.org/licenses/lgpl.html">GNU Lesser General
+Public License</link> as published by the <link
+xlink:href="http://www.fsf.org/">Free Software Foundation</link>;
+either version 2.1 of the License, or (at your option) any later
+version.  Nix is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.</para>
+
+</section>
+
+
+<section><title>More information</title>
+
+<para>Some background information on Nix can be found in a number of
+papers.  The ICSE 2004 paper <citetitle
 xlink:href='http://www.cs.uu.nl/~eelco/pubs/immdsd-icse2004-final.pdf'>Imposing
 a Memory Management Discipline on Software Deployment</citetitle>
 discusses the hashing mechanism used to ensure reliable dependency
@@ -141,10 +310,27 @@ gives a more general discussion of Nix from a system-administration
 perspective.  The CBSE 2005 paper <citetitle
 xlink:href='http://www.cs.uu.nl/~eelco/pubs/eupfcdm-cbse2005-final.pdf'>Efficient
 Upgrading in a Purely Functional Component Deployment Model
-</citetitle> is about transparent patch deployment in Nix.  Finally,
-the SCM-12 paper <citetitle
+</citetitle> is about transparent patch deployment in Nix.  The SCM-12
+paper <citetitle
 xlink:href='http://www.cs.uu.nl/~eelco/pubs/servicecm-scm12-final.pdf'>
 Service Configuration Management</citetitle> shows how services (e.g.,
-web servers) can be deployed and managed through Nix.</para></note>
+web servers) can be deployed and managed through Nix.  A short
+overview of NixOS is given in the HotOS XI paper <citetitle
+xlink:href="http://www.cs.uu.nl/~eelco/pubs/hotos-final.pdf">Purely
+Functional System Configuration Management</citetitle>.  The Nix
+homepage has <link
+xlink:href="http://nix.cs.uu.nl/docs/papers.html">an up-to-date list
+of Nix-related papers</link>.</para>
+
+<para>Nix is the subject of Eelco Dolstra’s PhD thesis <citetitle
+xlink:href="http://igitur-archive.library.uu.nl/dissertations/2006-0118-200031/index.htm">The
+Purely Functional Software Deployment Model</citetitle>, which
+contains most of the papers listed above.</para>
+
+<para>Nix has a homepage at <link
+xlink:href="http://nix.cs.uu.nl/"/>.</para>
+
+</section>
+
 
 </chapter>

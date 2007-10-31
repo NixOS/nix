@@ -1,4 +1,4 @@
-svn merge -r 9476:9506 https://svn.cs.uu.nl:12443/repos/trace/nix/trunk
+svn merge -r 9549:9561 https://svn.cs.uu.nl:12443/repos/trace/nix/trunk
 
 #already done:
 # 8628 
@@ -23,3 +23,6 @@ svn merge -r 9476:9506 https://svn.cs.uu.nl:12443/repos/trace/nix/trunk
 # 9445
 # 9476
 # 9506
+# 9536
+# 9549
+# 9561

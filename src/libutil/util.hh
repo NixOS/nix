@@ -79,10 +79,11 @@ void deletePath(const Path & path, unsigned long long & bytesFreed);
 void makePathReadOnly(const Path & path);
 
 /* Create a temporary directory. */
-Path createTempDir(const Path & tmpRoot = "");
+Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix");
 
-/* Create a directory and all its parents, if necessary. */
-void createDirs(const Path & path);
+/* Create a directory and all its parents, if necessary.  Returns the
+   list of created directories, in order of creation. */
+Paths createDirs(const Path & path);
 
 /* Create a file and write the given text to it.  The file is written
    in binary mode (i.e., no end-of-line conversions).  The path should
@@ -175,8 +176,9 @@ class AutoDelete
 {
     Path path;
     bool del;
+    bool recursive;    
 public:
-    AutoDelete(const Path & p);
+    AutoDelete(const Path & p, bool recursive = true);
     ~AutoDelete();
     void cancel();
 };

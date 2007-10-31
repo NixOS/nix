@@ -319,19 +319,19 @@ void makePathReadOnly(const Path & path)
 }
 
 
-static Path tempName(const Path & tmpRoot)
+static Path tempName(const Path & tmpRoot, const Path & prefix)
 {
     static int counter = 0;
     Path tmpRoot2 = canonPath(tmpRoot.empty() ? getEnv("TMPDIR", "/tmp") : tmpRoot, true);
-    return (format("%1%/nix-%2%-%3%") % tmpRoot2 % getpid() % counter++).str();
+    return (format("%1%/%2%-%3%-%4%") % tmpRoot2 % prefix % getpid() % counter++).str();
 }
 
 
-Path createTempDir(const Path & tmpRoot)
+Path createTempDir(const Path & tmpRoot, const Path & prefix)
 {
     while (1) {
         checkInterrupt();
-	Path tmpDir = tempName(tmpRoot);
+	Path tmpDir = tempName(tmpRoot, prefix);
 	if (mkdir(tmpDir.c_str(), 0777) == 0) {
 	    /* Explicitly set the group of the directory.  This is to
 	       work around around problems caused by BSD's group
@@ -350,13 +350,16 @@ Path createTempDir(const Path & tmpRoot)
     }
 }
 
-void createDirs(const Path & path)
+Paths createDirs(const Path & path)
 {
-    if (path == "/") return;
-    createDirs(dirOf(path));
-    if (!pathExists(path))
+    if (path == "/") return Paths();
+    Paths created = createDirs(dirOf(path));
+    if (!pathExists(path)) {
         if (mkdir(path.c_str(), 0777) == -1)
             throw SysError(format("creating directory `%1%'") % path);
+        created.push_back(path);
+    }
+    return created;
 }
 
 
@@ -511,14 +514,25 @@ string drainFD(int fd)
 //////////////////////////////////////////////////////////////////////
 
 
-AutoDelete::AutoDelete(const string & p) : path(p)
+AutoDelete::AutoDelete(const string & p, bool recursive) : path(p)
 {
     del = true;
+    this->recursive = recursive;
 }
 
 AutoDelete::~AutoDelete()
 {
-    if (del) deletePath(path);
+    try {
+        if (del)
+            if (recursive)
+                deletePath(path);
+            else {
+                if (remove(path.c_str()) == -1)
+                    throw SysError(format("cannot unlink `%1%'") % path);
+            }
+    } catch (...) {
+        ignoreException();
+    }
 }
 
 void AutoDelete::cancel()
@@ -754,10 +768,10 @@ void killUser(uid_t uid)
 		if (errno != EINTR)
 		    throw SysError(format("cannot kill processes for uid `%1%'") % uid);
 	    }
-        
+
         } catch (std::exception & e) {
-            std::cerr << format("killing processes beloging to uid `%1%': %1%\n")
-                % uid % e.what();
+            std::cerr << format("killing processes beloging to uid `%1%': %1%")
+                % uid % e.what() << std::endl;
             quickExit(1);
         }
         quickExit(0);
@@ -812,7 +826,7 @@ string runProgram(Path program, bool searchPath, const Strings & args)
             throw SysError(format("executing `%1%'") % program);
             
         } catch (std::exception & e) {
-            std::cerr << "error: " << e.what() << std::endl;
+            std::cerr << "error: " << e.what() << std::endl;		//TODO does not give the full error message
         }
         quickExit(1);
     }
@@ -1201,21 +1215,6 @@ bool IsSymlink(const string FileName)
 	return (S_ISLNK(my_stat.st_mode) != 0);
 }
 
-/*
-string getCallingUserName()
-{
-    //Linux
-    Strings empty;
-    string username = runProgram("whoami", true, empty);				//the username of the user that is trying to build the component
-																		//TODO Can be faked, so this is clearly unsafe ... :(
-    //Remove the trailing \n
-    int pos = username.find("\n",0);
-	username.erase(pos,1);
-    
-    return username;
-}
-*/
-
 /* adds the second PathSet after the first, but removing doubles from the second (union)
  * (We assume the first PathSet has no duplicates)
  * UNTESTED !!!!!!!!!!!!!!
@@ -1321,8 +1320,15 @@ void symlinkPath(const Path & existingDir, const Path & newLinkName)	//TODO bool
 	 * We do -snf for: 
 	 * -s : symlinking
 	 * -f : To remove existing destination files (this does NOT always overwrite the newLinkName !!!!)
-	 * -n : Treat destination that is a symlink to a directory as if it were a normal file	(This makes sure
-	 * 		that newLinkName is really overwritten)  
+	 * -n : Treat destination that is a symlink to a directory as if it were a normal file: 
+	 * 		When the destination is an actual directory (not a symlink to one), there is no ambiguity. 
+	 * 		The link is created in that directory. But when the specified destination is a symlink to a directory, 
+	 * 		there are two ways to treat the user's request. ln can treat the destination just as it would a normal 
+	 * 		directory and create the link in it. On the other hand, the destination can be viewed as a non-directory 
+	 * 		- as the symlink itself. In that case, ln must delete or backup that symlink before creating the new link. 
+	 * 		The default is to treat a destination that is a symlink to a directory just like a directory.
+	 * 
+	 * 	((This makes sure that newLinkName is really overwritten)
 	 */ 
 	
 	

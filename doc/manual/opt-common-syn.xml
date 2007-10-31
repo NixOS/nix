@@ -13,6 +13,10 @@
   </group>
   <replaceable>number</replaceable>
 </arg>
+<arg>
+  <arg><option>--max-silent-time</option></arg>
+  <replaceable>number</replaceable>
+</arg>
 <arg><option>--keep-going</option></arg>
 <arg><option>-k</option></arg>
 <arg><option>--keep-failed</option></arg>

@@ -27,6 +27,19 @@
 #include <grp.h>
 
 
+/* Includes required for chroot support. */
+#include "config.h"
+
+#if HAVE_SYS_PARAM_H
+#include <sys/param.h>
+#endif
+#if HAVE_SYS_MOUNT_H
+#include <sys/mount.h>
+#endif
+
+#define CHROOT_ENABLED HAVE_CHROOT && HAVE_SYS_MOUNT_H && defined(MS_BIND)
+
+
 namespace nix {
 
 using std::map;
@@ -585,6 +598,89 @@ void deletePathWrapped(const Path & path)
 //////////////////////////////////////////////////////////////////////
 
 
+/* Helper RAII class for automatically unmounting bind-mounts in
+   chroots. */
+struct BindMount
+{
+    Path source, target;
+    Paths created;
+
+    BindMount()
+    {
+    }
+
+    BindMount(const Path & source, const Path & target)
+    {
+        bind(source, target);
+    }
+
+    ~BindMount()
+    {
+        try {
+            unbind();
+        } catch (...) {
+            ignoreException();
+        }
+    }
+    
+    void bind(const Path & source, const Path & target)
+    {
+#if CHROOT_ENABLED        
+        debug(format("bind mounting `%1%' to `%2%'") % source % target);
+
+        this->source = source;
+        this->target = target;
+        
+        created = createDirs(target);
+        
+        if (mount(source.c_str(), target.c_str(), "", MS_BIND, 0) == -1)
+            throw SysError(format("bind mount from `%1%' to `%2%' failed") % source % target);
+#endif
+    }
+
+    void unbind()
+    {
+#if CHROOT_ENABLED
+        if (source == "") return;
+        
+        debug(format("unmount bind-mount `%1%'") % target);
+
+        /* Urgh.  Unmount sometimes doesn't succeed right away because
+           the mount point is still busy.  It shouldn't be, because
+           we've killed all the build processes by now (at least when
+           using a build user; see the check in killUser()).  But
+           maybe this is because those processes are still zombies and
+           are keeping some kernel structures busy (open files,
+           current directories, etc.).  So retry a few times
+           (actually, a 1 second sleep is almost certainly enough for
+           the zombies to be cleaned up). */
+        unsigned int tries = 0;
+        while (umount(target.c_str()) == -1) {
+            if (errno == EBUSY && ++tries < 10) {
+                printMsg(lvlError, format("unmounting `%1%' failed, retrying after 1 second...") % target);
+                sleep(1);
+            }
+            else
+                throw SysError(format("unmounting bind-mount `%1%' failed") % target);
+        }
+
+        /* Get rid of the directories for the mount point created in
+           bind(). */
+        for (Paths::reverse_iterator i = created.rbegin(); i != created.rend(); ++i) {
+            debug(format("deleting `%1%'") % *i);
+            if (remove(i->c_str()) == -1)
+                throw SysError(format("cannot unlink `%1%'") % *i);
+        }
+
+        source = "";
+#endif
+    }
+};
+
+
+//////////////////////////////////////////////////////////////////////
+
+
 class DerivationGoal : public Goal
 {
 private:
@@ -634,6 +730,17 @@ private:
     /* Pipes for talking to the build hook (if any). */
     Pipe toHook;
     Pipe fromHook;
+
+    /* Whether we're currently doing a chroot build. */
+    bool useChroot;
+
+    /* A RAII object to delete the chroot directory. */
+    boost::shared_ptr<AutoDelete> autoDelChroot;
+    
+    /* In chroot builds, the list of bind mounts currently active.
+       The destructor of BindMount will cause the binds to be
+       unmounted. */
+    list<boost::shared_ptr<BindMount> > bindMounts;
 
     typedef void (DerivationGoal::*GoalState)();
     GoalState state;
@@ -690,7 +797,7 @@ private:
     void openLogFile();
 
     /* Common initialisation to be performed in child processes (i.e.,
-       both in builders and in build hooks. */
+       both in builders and in build hooks). */
     void initChild();
     
     /* Delete the temporary directory, if we have one. */
@@ -1038,6 +1145,9 @@ void DerivationGoal::buildDone()
     
         deleteTmpDir(true);
 
+        /* In chroot builds, unmount the bind mounts ASAP. */
+        bindMounts.clear(); /* the destructors will do the rest */
+
         /* Compute the FS closure of the outputs and register them as
            being valid. */
         computeClosure();
@@ -1208,7 +1318,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
             throw SysError(format("executing `%1%'") % buildHook);
             
         } catch (std::exception & e) {
-            std::cerr << format("build hook error: %1%\n") % e.what();
+            std::cerr << format("build hook error: %1%") % e.what() << std::endl;
         }
         quickExit(1);
     }
@@ -1596,6 +1706,56 @@ void DerivationGoal::startBuilder()
                 % buildUser.getGID() % nixStore);
     }
 
+
+    /* Are we doing a chroot build? */
+    useChroot = queryBoolSetting("build-use-chroot", false);
+    Path tmpRootDir;
+
+    if (useChroot) {
+#if CHROOT_ENABLED
+        /* Create a temporary directory in which we set up the chroot
+           environment using bind-mounts.
+
+           !!! Big danger here: since we're doing this in /tmp, there
+           is a risk that the admin does something like "rm -rf
+           /tmp/chroot-nix-*" to clean up aborted builds, and if some
+           of the bind-mounts are still active, then "rm -rf" will
+           happily recurse into those mount points (thereby deleting,
+           say, /nix/store).  Ideally, tmpRootDir should be created in
+           some special location (maybe in /nix/var/nix) where Nix
+           takes care of unmounting / deleting old chroots
+           automatically. */
+        tmpRootDir = createTempDir("", "chroot-nix");
+
+        /* Clean up the chroot directory automatically, but don't
+           recurse; that would be very very bad if the unmount of a
+           bind-mount fails. Instead BindMount::unbind() unmounts and
+           deletes exactly those directories that it created to
+           produce the mount point, so that after all the BindMount
+           destructors have run, tmpRootDir should be empty. */
+        autoDelChroot = boost::shared_ptr<AutoDelete>(new AutoDelete(tmpRootDir, false));
+        
+        printMsg(lvlChatty, format("setting up chroot environment in `%1%'") % tmpRootDir);
+
+        Paths defaultDirs;
+        defaultDirs.push_back("/dev");
+        defaultDirs.push_back("/proc");
+        Paths dirsInChroot = querySetting("build-chroot-dirs", defaultDirs);
+
+        dirsInChroot.push_front(nixStore);
+        dirsInChroot.push_front(tmpDir);
+
+        /* Push BindMounts at the front of the list so that they get
+           unmounted in LIFO order.  (!!! Does the C++ standard
+           guarantee that list elements are destroyed in order?) */
+        for (Paths::iterator i = dirsInChroot.begin(); i != dirsInChroot.end(); ++i)
+            bindMounts.push_front(boost::shared_ptr<BindMount>(new BindMount(*i, tmpRootDir + *i)));
+        
+#else
+        throw Error("chroot builds are not supported on this platform");
+#endif
+    }
+    
     
     /* Run the builder. */
     printMsg(lvlChatty, format("executing builder `%1%'") %
@@ -1621,6 +1781,17 @@ void DerivationGoal::startBuilder()
 
         try { /* child */
 
+#if CHROOT_ENABLED
+            /* If building in a chroot, do the chroot right away.
+               initChild() will do a chdir() to the temporary build
+               directory to make sure the current directory is in the
+               chroot.  (Actually the order doesn't matter, since due
+               to the bind mount tmpDir and tmpRootDit/tmpDir are the
+               same directories.) */
+            if (useChroot && chroot(tmpRootDir.c_str()) == -1)
+                throw SysError(format("cannot change root directory to `%1%'") % tmpRootDir);
+#endif
+            
             initChild();
 
             /* Fill in the environment. */
@@ -1684,7 +1855,7 @@ void DerivationGoal::startBuilder()
                 % drv.builder);
             
         } catch (std::exception & e) {
-            std::cerr << format("build error: %1%\n") % e.what();
+            std::cerr << format("build error: %1%") % e.what() << std::endl;
         }
         quickExit(1);
     }
@@ -1916,13 +2087,6 @@ void DerivationGoal::computeClosure()
     		state_stateReferences,
     		drvPath, 0);
 
-    	//Commit state (we only include our own state in the rivisionMapping (but other build component states might have been changed !!!! TODO) 
-		RevisionClosure rivisionMapping;
-		rivisionMapping[statePath] = commitStatePathTxn(txn, statePath);
-		
-		//Save the new revision
-		setStateRevisionsTxn(txn, rivisionMapping, statePath, "Initial build revision.");
-
 		//Convert stateInfo from drv to DB format
 		//And set all interval-ed paths to zero to begin with 
 		DerivationStateOutputDirs stateOutputDirs = drv.stateOutputDirs;
@@ -1953,6 +2117,13 @@ void DerivationGoal::computeClosure()
 		//register state options that may change
 		DerivationStateOutput drvso = drv.stateOutputs["state"];
 		setStateOptionsTxn(txn, statePath, queryCallingUsername(), "nixbld", 700, drvso.runtimeStateArgs);		
+
+		//Commit state (we only include our own state in the rivisionMapping (but other build component states might have been changed !!!! TODO) 
+		RevisionClosure rivisionMapping;
+		rivisionMapping[statePath] = commitStatePathTxn(txn, statePath);
+		
+		//Save the new revision
+		setStateRevisionsTxn(txn, rivisionMapping, statePath, "Initial build revision.");
 		
 		//Shared state
     	Path sharedState = drv.stateOutputs.find("state")->second.sharedState;
@@ -2332,7 +2503,7 @@ void SubstitutionGoal::tryToRun()
             throw SysError(format("executing `%1%'") % sub);
             
         } catch (std::exception & e) {
-            std::cerr << format("substitute error: %1%\n") % e.what();
+            std::cerr << format("substitute error: %1%") % e.what() << std::endl;
         }
         quickExit(1);
     }

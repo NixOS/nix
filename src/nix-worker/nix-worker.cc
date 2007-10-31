@@ -240,8 +240,8 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
 #endif
 
-    case wopIsValidPath: {
-        Path path = readStorePath(from);
+    case wopIsValidPath: {								//we do a readString at isValidXXXX
+        Path path = readString(from);
         startWork();
         bool result = store->isValidPath(path);
         stopWork();
@@ -250,7 +250,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
     case wopIsValidStatePath: {
-    	Path path = readStatePath(from); 
+    	Path path = readString(from); 
         startWork();
         bool result = store->isValidStatePath(path);
         stopWork();
@@ -259,7 +259,7 @@ static void performOp(Source & from, Sink & to, unsigned int op)
     }
     
     case wopIsValidComponentOrStatePath: {
-    	Path path = readStoreOrStatePath(from);
+    	Path path = readString(from);
         startWork();
         bool result = store->isValidComponentOrStatePath(path);
         stopWork();

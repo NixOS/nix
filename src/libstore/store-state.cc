@@ -185,12 +185,14 @@ Snapshots commitStatePathTxn(const Transaction & txn, const Path & statePath)
 	CommitIntervals intervals = getStatePathsIntervalTxn(txn, statePath);
 
 	Snapshots revisions_list;
-	
+
 	for (StateInfos::const_iterator i = infos.begin(); i != infos.end(); ++i){
 		
 		string thisdir = (*i).path;
 		string type = (*i).type;
 		unsigned int interval = (*i).interval;
+		
+		//printMsg(lvlError, format("maybe ssing %1% %2%") % thisdir % type);
 		
 		if(type == "none"){
 			continue;

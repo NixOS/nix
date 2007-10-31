@@ -197,7 +197,6 @@ static void revertToRevision(Strings opFlags, Strings opArgs)
 static void queryAvailableStateRevisions(Strings opFlags, Strings opArgs)
 {
 	Path statePath;
-
 	if(store->isValidStatePath(*(opArgs.begin())))
 		statePath = *(opArgs.begin());
 	else{
@@ -292,7 +291,18 @@ static void opShowSharedPaths(Strings opFlags, Strings opArgs)
 
 static void opUnshare(Strings opFlags, Strings opArgs)
 {
-	Path statePath = *(opArgs.begin());
+	Path statePath;
+	if(store->isValidStatePath(*(opArgs.begin())))
+		statePath = *(opArgs.begin());
+	else{
+		Path componentPath;
+	    string binary;
+	    string derivationPath;
+	    bool isStateComponent;
+	    Strings program_args;
+	    getPathInfo_andCheckArgs(opFlags, opArgs, componentPath, statePath, binary, derivationPath, isStateComponent, program_args);
+	}	
+
 	if(!store->isValidStatePath(statePath))
 		throw UsageError(format("Path '%1%' is not a valid state path.") % statePath);
 	
@@ -784,10 +794,10 @@ void run(Strings args)
 		
         */
         
-       	//Manipulate options....
+       	//Manipulate options TODO only allow for root user ...
         else if (arg.substr(0,13) == "--identifier=")
         	stateIdentifier = arg.substr(13,arg.length());
-        else if (arg.substr(0,7) == "--user=")
+        else if (arg.substr(0,7) == "--nix-user=")
         	username = arg.substr(7,arg.length());
         	
 

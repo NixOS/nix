@@ -92,7 +92,8 @@
   output is already in the Nix store or that can be substituted (i.e.,
   downloaded from somewhere).  In other words, it shows the packages
   that can be installed “quickly”, i.e., don’t need to be built from
-  source.</para></listitem>
+  source.  TODO: flag is also available in nix-env -i /
+  -u.</para></listitem>
   
 
   <listitem><para>TODO: new built-ins
@@ -116,6 +117,9 @@
   limited form of caching.  This is used by
   <command>nix-channel</command> to prevent unnecessary downloads when
   the channel hasn’t changed.</para></listitem>
+
+
+  <listitem><para>TODO: chroot support.</para></listitem>
   
 
 </itemizedlist>

@@ -63,8 +63,6 @@ Query flags:
   --out-path: print path of derivation output
   --description: print description
   --meta: print all meta attributes (only with --xml)
-  --prebuilt-only: only show derivations whose prebuilt binaries are
-      available on this machine or are downloadable
 
 Options:
 
@@ -74,3 +72,5 @@ Options:
   --keep-failed / -K: keep temporary directories of failed builds
   --preserve-installed: do not replace currently installed versions in `-i'
   --system-filter SYSTEM: only use derivations for specified platform
+  --prebuilt-only / -b: only use derivations whose prebuilt binaries are
+      available on this machine or are downloadable

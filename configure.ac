@@ -99,9 +99,19 @@ static char buf[1024];]],
 AC_LANG_POP(C++)
 
 
+# Check for chroot support (requires chroot() and bind mounts).
+AC_CHECK_FUNCS([chroot])
+AC_CHECK_HEADERS([sys/param.h], [], [], [])
+AC_CHECK_HEADERS([sys/mount.h], [], [],
+[#ifdef HAVE_SYS_PARAM_H
+# include <sys/param.h>
+# endif
+])
+
+
 # Check for <locale>
 AC_LANG_PUSH(C++)
-AC_CHECK_HEADERS([locale])
+AC_CHECK_HEADERS([locale], [], [], [])
 AC_LANG_POP(C++)
 
 
@@ -114,7 +124,7 @@ fi
 ])
 
 NEED_PROG(curl, curl)
-NEED_PROG(shell, sh)
+NEED_PROG(shell, bash)
 NEED_PROG(patch, patch)
 AC_PATH_PROG(xmllint, xmllint, false)
 AC_PATH_PROG(xsltproc, xsltproc, false)
