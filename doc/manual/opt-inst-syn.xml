@@ -1,0 +1,15 @@
+<nop xmlns="http://docbook.org/ns/docbook">
+  
+  <arg>
+    <group choice='req'>
+      <arg choice='plain'><option>--attr</option></arg>
+      <arg choice='plain'><option>-A</option></arg>
+    </group>
+  </arg>
+
+  <arg><option>--from-expression</option></arg>
+  <arg><option>-E</option></arg>
+    
+  <arg><option>--from-profile</option> <replaceable>path</replaceable></arg>
+
+</nop>

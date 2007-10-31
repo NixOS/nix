@@ -263,6 +263,17 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 </varlistentry>
 
 
+<varlistentry xml:id="envar-remote"><term><envar>NIX_REMOTE</envar></term>
+
+  <listitem><para>This variable should be set to
+  <literal>daemon</literal> if you want to use the Nix daemon to
+  executed Nix operations, which is necessary in <link
+  linkend="ssec-multi-user">multi-user Nix installations</link>.
+  Otherwise, it should be left unset.</para></listitem>
+
+</varlistentry>
+
+    
 </variablelist>
 
 

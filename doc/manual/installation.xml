@@ -100,14 +100,16 @@ ubiquitous 2.5.4a won't.  Note that these are only required if you
 modify the parser or when you are building from the Subversion
 repository.</para>
 
-<para>Nix uses Sleepycat's Berkeley DB and CWI's ATerm library.  These
-are included in the Nix source distribution.  If you build from the
-Subversion repository, you must download them yourself and place them
-in the <filename>externals/</filename> directory.  See
+<para>Nix uses Sleepycat's Berkeley DB, CWI's ATerm library and the
+bzip2 compressor (including the bzip2 library).  These are included in
+the Nix source distribution.  If you build from the Subversion
+repository, you must download them yourself and place them in the
+<filename>externals/</filename> directory.  See
 <filename>externals/Makefile.am</filename> for the precise URLs of
 these packages.  Alternatively, if you already have them installed,
-you can use <command>configure</command>'s <option>--with-bdb</option>
-and <option>--with-aterm</option> options to point to their respective
+you can use <command>configure</command>'s
+<option>--with-bdb</option>, <option>--with-aterm</option> and
+<option>--with-bzip2</option> options to point to their respective
 locations.  Note that Berkeley DB <emphasis>must</emphasis> be version
 4.5; other versions may not have compatible database formats.</para>
 
@@ -118,19 +120,21 @@ locations.  Note that Berkeley DB <emphasis>must</emphasis> be version
 
 <para>After unpacking or checking out the Nix sources, issue the
 following commands:
-    </para>
 
 <screen>
 $ ./configure <replaceable>options...</replaceable>
 $ make
 $ make install</screen>
 
+</para>
+
 <para>When building from the Subversion repository, these should be
 preceded by the command:
-    </para>
 
 <screen>
-$ ./boostrap</screen>
+$ ./bootstrap</screen>
+
+</para>
 
 <para>The installation path can be specified by passing the
 <option>--prefix=<replaceable>prefix</replaceable></option> to
@@ -165,19 +169,23 @@ Hat Linux.  They have been known to work work on SuSE Linux 8.1 and
 distribution based on <literal>glibc</literal> 2.3 or later.</para>
 
 <para>Once downloaded, the RPMs can be installed or upgraded using
-<command>rpm -U</command>.  For example,</para>
+<command>rpm -U</command>.  For example,
 
 <screen>
 $ rpm -U nix-0.5pre664-1.i386.rpm</screen>
 
+</para>
+
 <para>The RPMs install into the directory <filename>/nix</filename>.
 Nix can be uninstalled using <command>rpm -e nix</command>.  After
 this it will be necessary to manually remove the Nix store and other
-auxiliary data:</para>
+auxiliary data:
 
 <screen>
 $ rm -rf /nix/store
 $ rm -rf /nix/var</screen>
+
+</para>
 
 </section>
 
@@ -187,7 +195,7 @@ $ rm -rf /nix/var</screen>
 <para>You can install the latest stable version of Nix through Nix
 itself by subscribing to the channel <link
 xlink:href="http://nix.cs.uu.nl/dist/nix/channels-v3/nix-stable" />,
-or the latest unstable version by subscribing to the channel<link
+or the latest unstable version by subscribing to the channel <link
 xlink:href="http://nix.cs.uu.nl/dist/nix/channels-v3/nix-unstable" />.
 You can also do a <link linkend="sec-one-click">one-click
 installation</link> by clicking on the package links at <link
@@ -231,33 +239,215 @@ class="username">root</systemitem> all the time.</para>
 </section>
 
 
-<section><title>Multi-user mode</title>
+<section xml:id="ssec-multi-user"><title>Multi-user mode</title>
 
-<para></para>
+<para>To allow a Nix store to be shared safely among multiple users,
+it is important that users are not able to run builders that modify
+the Nix store or database in arbitrary ways, or that interfere with
+builds started by other users.  If they could do so, they could
+install a Trojan horse in some package and compromise the accounts of
+other users.</para>
 
-
-<!--
-
-warning: the nix-builders group should contain *only* the Nix
-builders, and nothing else.  If the Nix account is compromised, you
-can execute programs under the accounts in the nix-builders group, so
-it obviously shouldn’t contain any “real” user accounts.  So don’t use
-an existing group like <literal>users</literal> — just create a new
-one.
-
--->
+<para>To prevent this, the Nix store and database are owned by some
+privileged user (usually <literal>root</literal>) and builders are
+executed under special user accounts (usually named
+<literal>nixbld1</literal>, <literal>nixbld2</literal>, etc.).  When a
+unprivileged user runs a Nix command, actions that operate on the Nix
+store (such as builds) are forwarded to a <emphasis>Nix
+daemon</emphasis> running under the owner of the Nix store/database
+that performs the operation.</para>
 
 <note><para>Multi-user mode has one important limitation: only
 <systemitem class="username">root</systemitem> can run <command
 linkend="sec-nix-pull">nix-pull</command> to register the availability
-of pre-built binaries.  However, those registrations
-<emphasis>are</emphasis> used by all users to speed up
-builds.</para></note>
+of pre-built binaries.  However, those registrations are shared by all
+users, so they still get the benefit from <command>nix-pull</command>s
+done by <systemitem class="username">root</systemitem>.</para></note>
+
+
+<section><title>Setting up the build users</title>
+
+<para>The <emphasis>build users</emphasis> are the special UIDs under
+which builds are performed.  They should all be members of the
+<emphasis>build users group</emphasis> (usually called
+<literal>nixbld</literal>).  This group should have no other members.
+The build users should not be members of any other group.</para>
+
+<para>Here is a typical <filename>/etc/group</filename> definition of
+the build users group with 10 build users:
+
+<programlisting>
+nixbld:!:30000:nixbld1,nixbld2,nixbld3,nixbld4,nixbld5,nixbld6,nixbld7,nixbld8,nixbld9,nixbld10
+</programlisting>
+
+In this example the <literal>nixbld</literal> group has UID 30000, but
+of course it can be anything that doesn’t collide with an existing
+group.</para>
+
+<para>Here is the corresponding part of
+<filename>/etc/passwd</filename>:
+
+<programlisting>
+nixbld1:x:30001:65534:Nix build user 1:/var/empty:/noshell
+nixbld2:x:30002:65534:Nix build user 2:/var/empty:/noshell
+nixbld3:x:30003:65534:Nix build user 3:/var/empty:/noshell
+...
+nixbld10:x:30010:65534:Nix build user 10:/var/empty:/noshell
+</programlisting>
+
+The home directory of the build users should not exist or should be an
+empty directory to which they do not have write access.</para>
+
+<para>The build users should have write access to the Nix store, but
+they should not have the right to delete files.  Thus the Nix store’s
+group should be the build users group, and it should have the sticky
+bit turned on (like <filename>/tmp</filename>):
+
+<screen>
+$ chgrp nixbld /nix/store
+$ chmod 1777 /nix/store
+</screen>
+
+</para>
+
+<para>Finally, you should tell Nix to use the build users by
+specifying the build users group in the <link
+linkend="conf-build-users-group"><literal>build-users-group</literal>
+option</link> in the <link linkend="sec-conf-file">Nix configuration
+file</link> (<literal>/nix/etc/nix/nix.conf</literal>):
+
+<programlisting>
+build-users-group = nixbld
+</programlisting>
+
+</para>
 
 </section>
 
 
-</section> <!-- end of permissions section -->
+<section><title>Nix store/database owned by root</title>
+
+<para>The simplest setup is to let <literal>root</literal> own the Nix
+store and database.  I.e.,
+
+<screen>
+$ chown -R root /nix/store /nix/var/nix</screen>
+
+</para>
+
+<para>The Nix daemon should be started as follows (as
+<literal>root</literal>):
+
+<screen>
+$ nix-worker --daemon</screen>
+
+You’ll want to put that line somewhere in your system’s boot
+scripts.</para>
+
+<para>To let unprivileged users use the daemon, they should set the
+<link linkend="envar-remote"><envar>NIX_REMOTE</envar> environment
+variable</link> to <literal>daemon</literal>.  So you should put a
+line like
+
+<programlisting>
+export NIX_REMOTE=daemon</programlisting>
+
+into the users’ login scripts.</para>
+
+</section>
+
+
+<section><title>Nix store/database not owned by root</title>
+
+<para>It is also possible to let the Nix store and database be owned
+by a non-root user, which should be more secure<footnote><para>Note
+however that even when the Nix daemon runs as root, not
+<emphasis>that</emphasis> much code is executed as root: Nix
+expression evaluation is performed by the calling (unprivileged) user,
+and builds are performed under the special build user accounts.  So
+only the code that accesses the database and starts builds is executed
+as <literal>root</literal>.</para></footnote>.  Typically, this user
+is a special account called <literal>nix</literal>, but it can be
+named anything.  It should own the Nix store and database:
+
+<screen>
+$ chown -R root /nix/store /nix/var/nix</screen>
+
+and of course <command>nix-worker --daemon</command> should be started
+under that user, e.g.,
+
+<screen>
+$ su - nix -c "exec /nix/bin/nix-worker --daemon"</screen>
+
+</para>
+
+<para>There is a catch, though: non-<literal>root</literal> users
+cannot start builds under the build user accounts, since the
+<function>setuid</function> system call is obviously privileged.  To
+allow a non-<literal>root</literal> Nix daemon to use the build user
+feature, it calls a setuid-root helper program,
+<command>nix-setuid-helper</command>.  This program is installed in
+<filename><replaceable>prefix</replaceable>/libexec/nix-setuid-helper</filename>.
+To set the permissions properly (Nix’s <command>make install</command>
+doesn’t do this, since we don’t want to ship setuid-root programs
+out-of-the-box):
+
+<screen>
+$ chown root.root /nix/libexec/nix-setuid-helper
+$ chmod 4755 /nix/libexec/nix-setuid-helper
+</screen>
+
+(This example assumes that the Nix binaries are installed in
+<filename>/nix</filename>.)</para>
+
+<para>Of course, the <command>nix-setuid-helper</command> command
+should not be usable by just anybody, since then anybody could run
+commands under the Nix build user accounts.  For that reason there is
+a configuration file <filename>/etc/nix-setuid.conf</filename> that
+restricts the use of the helper.  This file should be a text file
+containing precisely two lines, the first being the Nix daemon user
+and the second being the build users group, e.g.,
+
+<programlisting>
+nix
+nixbld
+</programlisting>
+
+The setuid-helper barfs if it is called by a user other than the one
+specified on the first line, or if it is asked to execute a build
+under a user who is not a member of the group specified on the second
+line.  The file <filename>/etc/nix-setuid.conf</filename> must be
+owned by root, and must not be group- or world-writable.  The
+setuid-helper barfs if this is not the case.</para>
+
+</section>
+
+
+<section><title>Restricting access</title>
+
+<para>To limit which users can perform Nix operations, you can use the
+permissions on the directory
+<filename>/nix/var/nix/daemon-socket</filename>.  For instance, if you
+want to restrict the use of Nix to the members of a group called
+<literal>nix-users</literal>, do
+
+<screen>
+$ chgrp nix-users /nix/var/nix/daemon-socket
+$ chmod ug=rwx,o= /nix/var/nix/daemon-socket
+</screen>
+
+This way, users who are not in the <literal>nix-users</literal> group
+cannot connect to the Unix domain socket
+<filename>/nix/var/nix/daemon-socket/socket</filename>, so they cannot
+perform Nix operations.</para>
+
+</section>
+
+
+</section> <!-- end of multi-user -->
+
+
+</section> <!-- end of security -->
 
 
 <section><title>Using Nix</title>
