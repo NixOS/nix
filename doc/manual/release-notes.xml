@@ -38,9 +38,13 @@
   paths.</para></listitem>
 
   
-  <listitem><para>TODO: <varname>allowedReferences</varname> for
-  checking the set of references in the output of a
-  derivation.</para></listitem>
+  <listitem><para>Derivations can specify the new special attribute
+  <varname>allowedReferences</varname> to enforce that the references
+  in the output of a derivation are a subset of a declared set of
+  paths.  For example, if <varname>allowedReferences</varname> is an
+  empty list, then the output must not have any references.  This is
+  used in NixOS to check that generated files such as initial ramdisks
+  for booting Linux don’t have any dependencies.</para></listitem>
 
 
   <listitem><para>TODO: semantic cleanups of string concatenation
@@ -54,8 +58,11 @@
   <command>nix-store --register-validity</command>.</para></listitem>
 
 
-  <listitem><para>TODO: magic <varname>exportReferencesGraph</varname>
-  attribute.</para></listitem>
+  <listitem><para>The new attribute
+  <varname>exportReferencesGraph</varname> allows builders access to
+  the references graph of their inputs.  This is used in NixOS for
+  tasks such as generating ISO-9660 images that contain a Nix store
+  populated with the closure of certain paths.</para></listitem>
 
 
   <listitem><para>TODO: option <option>--max-silent-time</option>,
@@ -109,8 +116,10 @@
   disambiguation (<command>nix-env -qaA</command>).</para></listitem>
 
 
-  <listitem><para>TODO: substitutes table is gone, registering
-  substitutes is now much faster.</para></listitem>
+  <listitem><para>The substitutes table has been removed from the
+  database.  This makes operations such as <command>nix-pull</command>
+  and <command>nix-channel --update</command>
+  <emphasis>much</emphasis> faster.</para></listitem>
 
 
   <listitem><para><command>nix-prefetch-url</command> now has a

@@ -17,7 +17,7 @@ functions and values.  For instance, <function>derivation</function>
 is also available as <function>builtins.derivation</function>.</para>
 
 
-<variablelist >
+<variablelist>
 
   
   <varlistentry><term><function>abort</function> <replaceable>s</replaceable></term>
