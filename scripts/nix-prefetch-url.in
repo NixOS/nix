@@ -36,6 +36,28 @@ if test -n "$expHash"; then
 fi
 
 
+mkTempDir() {
+    local i=0
+    while true; do
+        if test -z "$TMPDIR"; then TMPDIR=/tmp; fi
+        tmpPath=$TMPDIR/nix-prefetch-url-$$-$i
+        if mkdir "$tmpPath"; then break; fi
+        # !!! to bad we can't check for ENOENT in mkdir, so this check
+        # is slightly racy (it bombs out if somebody just removed
+        # $tmpPath...).
+        if ! test -e "$tmpPath"; then exit 1; fi
+        i=$((i + 1))
+    done
+    trap removeTempDir EXIT SIGINT SIGQUIT
+}
+
+removeTempDir() {
+    if test -n "$tmpPath"; then
+        rm -rf "$tmpPath" || true
+    fi
+}
+
+
 doDownload() {
     @curl@ $cacheFlags --fail -# --location --max-redirs 20 --disable-epsv \
         --cookie-jar $tmpPath/cookies "$url" -o $tmpFile
@@ -46,9 +68,8 @@ doDownload() {
 # download the file and add it to the store.
 if test -z "$finalPath"; then
 
-    tmpPath=/tmp/nix-prefetch-url-$$ # !!! security?
+    mkTempDir
     tmpFile=$tmpPath/$name
-    mkdir $tmpPath # !!! retry if tmpPath already exists
 
     # Optionally do timestamp-based caching of the download.
     # Actually, the only thing that we cache in $NIX_DOWNLOAD_CACHE is
@@ -97,8 +118,6 @@ if test -z "$finalPath"; then
 
         # Add the downloaded file to the Nix store.
         finalPath=$(@bindir@/nix-store --add-fixed "$hashType" $tmpFile)
-
-        if test -n "$tmpPath"; then rm -rf $tmpPath || true; fi
 
         if test -n "$expHash" -a "$expHash" != "$hash"; then
             echo "hash mismatch for URL \`$url'" >&2
