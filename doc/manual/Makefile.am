@@ -47,6 +47,14 @@ manual.html: $(MANUAL_SRCS) manual.is-valid images
 	$(XSLTPROC) --nonet --xinclude --output manual.html \
 	  $(docbookxsl)/html/docbook.xsl manual.xml
 
+manual.pdf: $(MANUAL_SRCS) manual.is-valid images
+	if test "$(dblatex)" != ""; then \
+		$(dblatex) manual.xml; \
+	else \
+		echo "Please install dblatex and rerun configure."; \
+		exit 1; \
+	fi
+
 
 NEWS_OPTS = \
  --stringparam generate.toc "article nop" \

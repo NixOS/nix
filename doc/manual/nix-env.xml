@@ -21,13 +21,6 @@
     <arg><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
     <arg>
       <group choice='req'>
-        <arg choice='plain'><option>--attr</option></arg>
-        <arg choice='plain'><option>-A</option></arg>
-      </group>
-      <replaceable>attrPath</replaceable>
-    </arg>
-    <arg>
-      <group choice='req'>
         <arg choice='plain'><option>--file</option></arg>
         <arg choice='plain'><option>-f</option></arg>
       </group>
@@ -45,9 +38,6 @@
       <replaceable>system</replaceable>
     </arg>
     <arg><option>--dry-run</option></arg>
-    <arg><option>--from-expression</option></arg>
-    <arg><option>-E</option></arg>
-    <arg><option>--from-profile</option> <replaceable>path</replaceable></arg>
     <arg choice='plain'><replaceable>operation</replaceable></arg>
     <arg rep='repeat'><replaceable>options</replaceable></arg>
     <arg rep='repeat'><replaceable>arguments</replaceable></arg>
@@ -190,6 +180,7 @@ linkend="sec-common-options" />.</para>
     <arg choice='plain'><option>--install</option></arg>
     <arg choice='plain'><option>-i</option></arg>
   </group>
+  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-inst-syn.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(/db:nop/*)" />
   <group choice='opt'>
     <arg choice='plain'><option>--preserve-installed</option></arg>
     <arg choice='plain'><option>-P</option></arg>
@@ -397,6 +388,7 @@ the following paths will be substituted:
     <arg choice='plain'><option>--upgrade</option></arg>
     <arg choice='plain'><option>-u</option></arg>
   </group>
+  <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-inst-syn.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(/db:nop/*)" />
   <group choice='opt'>
     <arg choice='plain'><option>--lt</option></arg>
     <arg choice='plain'><option>--leq</option></arg>
@@ -592,25 +584,21 @@ $ nix-env -e '*' <lineannotation>(remove everything)</lineannotation></screen>
     <arg choice='plain'><option>--query</option></arg>
     <arg choice='plain'><option>-q</option></arg>
   </group>
-  <arg><option>--xml</option></arg>
   <group choice='opt'>
     <arg choice='plain'><option>--installed</option></arg>
     <arg choice='plain'><option>--available</option></arg>
     <arg choice='plain'><option>-a</option></arg>
   </group>
+  
   <sbr />
+  
   <arg>
     <group choice='req'>
       <arg choice='plain'><option>--status</option></arg>
       <arg choice='plain'><option>-s</option></arg>
     </group>
   </arg>
-  <arg>
-    <group choice='req'>
-      <arg choice='plain'><option>--attr</option></arg>
-      <arg choice='plain'><option>-A</option></arg>
-    </group>
-  </arg>
+  <arg><option>--attr-path</option></arg>
   <arg><option>--no-name</option></arg>
   <arg>
     <group choice='req'>
@@ -622,6 +610,27 @@ $ nix-env -e '*' <lineannotation>(remove everything)</lineannotation></screen>
   <arg><option>--drv-path</option></arg>
   <arg><option>--out-path</option></arg>
   <arg><option>--description</option></arg>
+  <arg><option>--meta</option></arg>
+
+  <sbr />
+
+  <arg><option>--xml</option></arg>
+  <arg>
+    <group choice='req'>
+      <arg choice='plain'><option>--prebuilt-only</option></arg>
+      <arg choice='plain'><option>-b</option></arg>
+    </group>
+  </arg>
+  <arg>
+    <group choice='req'>
+      <arg choice='plain'><option>--attr</option></arg>
+      <arg choice='plain'><option>-A</option></arg>
+    </group>
+    <replaceable>attribute-path</replaceable>
+  </arg>
+
+  <sbr />
+  
   <arg choice='plain' rep='repeat'><replaceable>names</replaceable></arg>
 </cmdsynopsis>
 

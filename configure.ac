@@ -135,6 +135,7 @@ AC_PATH_PROG(bison, bison, false)
 NEED_PROG(perl, perl)
 NEED_PROG(tar, tar)
 AC_PATH_PROG(dot, dot)
+AC_PATH_PROG(dblatex, dblatex)
 
 AC_PATH_PROG(openssl_prog, openssl, openssl) # if not found, call openssl in $PATH
 AC_SUBST(openssl_prog)

@@ -607,7 +607,7 @@ language.</para>
 
 <simplesect><title>Simple values</title>
 
-<para>Nix has the following basic datatypes:
+<para>Nix has the following basic data types:
 
 <itemizedlist>
 
@@ -679,7 +679,7 @@ configureFlags = "
   instance, <filename>builder.sh</filename> is not a
   path<footnote><para>It's parsed as an expression that selects the
   attribute <varname>sh</varname> from the variable
-  <varname>builder</varname>.</para></footnote>.  If the filename is
+  <varname>builder</varname>.</para></footnote>.  If the file name is
   relative, i.e., if it does not begin with a slash, it is made
   absolute at parse time relative to the directory of the Nix
   expression that contained it.  For instance, if a Nix expression in
@@ -701,7 +701,7 @@ configureFlags = "
 <simplesect><title>Lists</title>
 
 <para>Lists are formed by enclosing a whitespace-separated list of
-values between square bracktes.  For example,
+values between square brackets.  For example,
 
 <programlisting>
 [ 123 ./foo.nix "abc" (f {x=y;}) ]</programlisting>
@@ -927,7 +927,7 @@ evaluates to <literal>["foobar" "foobla" "fooabc"]</literal>.</para>
 if <replaceable>e1</replaceable> then <replaceable>e2</replaceable> else <replaceable>e3</replaceable></programlisting>
 
 where <replaceable>e1</replaceable> is an expression that should
-evaluate to a boolean value (<literal>true</literal> or
+evaluate to a Boolean value (<literal>true</literal> or
 <literal>false</literal>).</para>
 
 </simplesect>
@@ -942,7 +942,7 @@ on or between features and dependencies hold.  They look like this:
 assert <replaceable>e1</replaceable>; <replaceable>e2</replaceable></programlisting>
 
 where <replaceable>e1</replaceable> is an expression that should
-evaluate to a boolean value.  If it evaluates to
+evaluate to a Boolean value.  If it evaluates to
 <literal>true</literal>, <replaceable>e2</replaceable> is returned;
 otherwise expression evaluation is aborted and a backtrace is printed.</para>
 
@@ -1234,7 +1234,7 @@ set, the attributes of which specify the inputs of the build.</para>
 
   </para></listitem>
 
-  <listitem><para>The optional argument <varname>args</varname>
+  <listitem><para>The optional attribute <varname>args</varname>
   specifies command-line arguments to be passed to the builder.  It
   should be a list.</para></listitem>
 
@@ -1336,6 +1336,233 @@ command-line argument.  See <xref linkend='sec-standard-environment'
 </itemizedlist>
 
 </para>
+
+
+<section><title>Advanced attributes</title>
+
+<para>Derivations can declare some infrequently used optional
+attributes.</para>
+
+<variablelist>
+
+  <varlistentry><term><varname>allowedReferences</varname></term>
+  
+    <listitem><para>The optional attribute
+    <varname>allowedReferences</varname> specifies a list of legal
+    references (dependencies) of the output of the builder.  For
+    example,
+
+<programlisting>
+allowedReferences = [];
+</programlisting>
+
+    enforces that the output of a derivation cannot have any runtime
+    dependencies on its inputs.  This is used in NixOS to check that
+    generated files such as initial ramdisks for booting Linux don’t
+    have accidental dependencies on other paths in the Nix
+    store.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><varname>exportReferencesGraph</varname></term>
+
+    <listitem><para>This attribute allows builders access to the
+    references graph of their inputs.  The attribute is a list of
+    inputs in the Nix store whose references graph the builder needs
+    to know.  The value of this attribute should be a list of pairs
+    <literal>[<replaceable>name1</replaceable>
+    <replaceable>path1</replaceable> <replaceable>name2</replaceable>
+    <replaceable>path2</replaceable>
+    <replaceable>...</replaceable>]</literal>.  The references graph
+    of each <replaceable>pathN</replaceable> will be stored in a text
+    file <replaceable>nameN</replaceable> in the temporary build
+    directory.  The text files have the format used by
+    <command>nix-store --register-validity</command> (with the deriver
+    fields left empty).  For example, when the following derivation is
+    built:
+
+<programlisting>
+derivation {
+  ...
+  exportReferencesGraph = ["libfoo-graph" libfoo];
+};
+</programlisting>
+
+    the references graph of <literal>libfoo</literal> is placed in the
+    file <filename>libfoo-graph</filename> in the temporary build
+    directory.</para>
+
+    <para><varname>exportReferencesGraph</varname> is useful for
+    builders that want to do something with the closure of a store
+    path.  Examples include the builders in NixOS that generate the
+    initial ramdisk for booting Linux (a <command>cpio</command>
+    archive containing the closure of the boot script) and the
+    ISO-9660 image for the installation CD (which is populated with a
+    Nix store containing the closure of a bootable NixOS
+    configuration).</para></listitem>
+
+  </varlistentry>
+
+
+  <varlistentry xml:id="fixed-output-drvs">
+    <term><varname>outputHash</varname></term>
+    <term><varname>outputHashAlgo</varname></term>
+    <term><varname>outputHashMode</varname></term>
+
+    <listitem><para>These attributes declare that the derivation is a
+    so-called <emphasis>fixed-output derivation</emphasis>, which
+    means that a cryptographic hash of the output is already known in
+    advance.  When the build of a fixed-output derivation finishes,
+    Nix computes the cryptographic hash of the output and compares it
+    to the hash declared with these attributes.  If there is a
+    mismatch, the build fails.</para>
+
+    <para>The rationale for fixed-output derivations is derivations
+    such as those produced by the <function>fetchurl</function>
+    function.  This function downloads a file from a given URL.  To
+    ensure that the downloaded file has not been modified, the caller
+    must also specify a cryptographic hash of the file.  For example,
+
+<programlisting>
+fetchurl {
+  url = http://ftp.gnu.org/pub/gnu/hello/hello-2.1.1.tar.gz;
+  md5 = "70c9ccf9fac07f762c24f2df2290784d";
+}
+</programlisting>
+
+    It sometimes happens that the URL of the file changes, e.g.,
+    because servers are reorganised or no longer available.  We then
+    must update the call to <function>fetchurl</function>, e.g.,
+
+<programlisting>
+fetchurl {
+  url = ftp://ftp.nluug.nl/pub/gnu/hello/hello-2.1.1.tar.gz;
+  md5 = "70c9ccf9fac07f762c24f2df2290784d";
+}
+</programlisting>
+
+    If a <function>fetchurl</function> derivation was treated like a
+    normal derivation, the output paths of the derivation and
+    <emphasis>all derivations depending on it</emphasis> would change.
+    For instance, if we were to change the URL of the Glibc source
+    distribution in Nixpkgs (a package on which almost all other
+    packages depend) massive rebuilds would be needed.  This is
+    unfortunate for a change which we know cannot have a real effect
+    as it propagates upwards through the dependency graph.</para>
+
+    <para>For fixed-output derivations, on the other hand, the name of
+    the output path only depends on the <varname>outputHash*</varname>
+    and <varname>name</varname> attributes, while all other attributes
+    are ignored for the purpose of computing the output path.  (The
+    <varname>name</varname> attribute is included because it is part
+    of the path.)</para>
+
+    <para>As an example, here is the (simplified) Nix expression for
+    <varname>fetchurl</varname>:
+
+<programlisting>
+{stdenv, curl}: # The <command>curl</command> program is used for downloading.
+
+{url, md5}:
+
+stdenv.mkDerivation {
+  name = baseNameOf (toString url);
+  builder = ./builder.sh;
+  buildInputs = [curl];
+
+  # This is a fixed-output derivation; the output must be a regular
+  # file with MD5 hash <varname>md5</varname>.
+  outputHashMode = "flat";
+  outputHashAlgo = "md5";
+  outputHash = md5;
+  
+  inherit url;
+}
+</programlisting>
+
+    </para>
+
+    <para>The <varname>outputHashAlgo</varname> attribute specifies
+    the hash algorithm used to compute the hash.  It can currently be
+    <literal>"md5"</literal>, <literal>"sha1"</literal> or
+    <literal>"sha256"</literal>.</para>
+
+    <para>The <varname>outputHashMode</varname> attribute determines
+    how the hash is computed.  It must be one of the following two
+    values:
+
+    <variablelist>
+
+      <varlistentry><term><literal>"flat"</literal></term>
+
+        <listitem><para>The output must be a non-executable regular
+        file.  If it isn’t, the build fails.  The hash is simply
+        computed over the contents of that file (so it’s equal to what
+        Unix commands like <command>md5sum</command> or
+        <command>sha1sum</command> produce).</para>
+
+        <para>This is the default.</para></listitem>
+
+      </varlistentry>
+    
+      <varlistentry><term><literal>"recursive"</literal></term>
+
+        <listitem><para>The hash is computed over the NAR archive dump
+        of the output (i.e., the result of <link
+        linkend="refsec-nix-store-dump"><command>nix-store
+        --dump</command></link>).  In this case, the output can be
+        anything, including a directory tree.</para></listitem>
+
+      </varlistentry>
+
+    </variablelist>
+
+    </para>
+
+    <para>The <varname>outputHash</varname> attribute, finally, must
+    be a string containing the hash in either hexadecimal or base-32
+    notation.  (See the <link
+    linkend="sec-nix-hash"><command>nix-hash</command> command</link>
+    for information about converting to and from base-32
+    notation.)</para></listitem>
+    
+  </varlistentry>
+
+  
+  <varlistentry><term><varname>impureEnvVars</varname></term>
+
+    <listitem><para>This attribute allows you to specify a list of
+    environment variables that should be passed from the environment
+    of the calling user to the builder.  Usually, the environment is
+    cleared completely when the builder is executed, but with this
+    attribute you can allow specific environment variables to be
+    passed unmodified.  For example, <function>fetchurl</function> in
+    Nixpkgs has the line
+
+<programlisting>
+impureEnvVars = ["http_proxy" "https_proxy" <replaceable>...</replaceable>];
+</programlisting>
+
+    to make it use the proxy server configuration specified by the
+    user in the environment variables <envar>http_proxy</envar> and
+    friends.</para>
+
+    <para>This attribute is only allowed in <link
+    linkend="fixed-output-drvs">fixed-output derivations</link>, where
+    impurities such as these are okay since (the hash of) the output
+    is known in advance.  It is ignored for all other
+    derivations.</para></listitem>
+
+  </varlistentry>
+
+  
+  
+
+</variablelist>
+
+</section>
+
 
 </section>
 

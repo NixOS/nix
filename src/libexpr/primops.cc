@@ -937,6 +937,7 @@ static Expr prim_listToAttrs(EvalState & state, const ATermVector & args)
     }
 }
 
+
 static Expr prim_removeAttrs(EvalState & state, const ATermVector & args)
 {
     ATermMap attrs;
@@ -951,12 +952,14 @@ static Expr prim_removeAttrs(EvalState & state, const ATermVector & args)
     return makeAttrs(attrs);
 }
 
+
 /* Determine whether the argument is a list. */
 static Expr prim_isAttrs(EvalState & state, const ATermVector & args)
 {
     ATermList list;
     return makeBool(matchAttrs(evalExpr(state, args[0]), list));
 }
+
 
 /*************************************************************
  * Lists
