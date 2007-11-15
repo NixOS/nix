@@ -4,6 +4,7 @@
 #include "local-store.hh"
 #include "db.hh"
 #include "util.hh"
+#include "gc.hh"
 
 #include <boost/shared_ptr.hpp>
 
@@ -445,6 +446,8 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
         queryBoolSetting("gc-keep-outputs", false);
     bool gcKeepDerivations =
         queryBoolSetting("gc-keep-derivations", true);
+    unsigned int gcKeepOutputsThreshold = 
+        queryIntSetting ("gc-keep-outputs-threshold", defaultGcLevel);
 
     /* Acquire the global GC root.  This prevents
        a) New roots from being added.
@@ -496,10 +499,18 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
              i != livePaths.end(); ++i)
             if (isDerivation(*i)) {
                 Derivation drv = derivationFromPath(*i);
-                for (DerivationOutputs::iterator j = drv.outputs.begin();
-                     j != drv.outputs.end(); ++j)
-                    if (store->isValidPath(j->second.path))
-                        computeFSClosure(j->second.path, livePaths);
+
+		string gcLevelStr = drv.env["__gcLevel"];
+		int gcLevel;
+		if (!string2Int(gcLevelStr,gcLevel)) {
+		    gcLevel = defaultGcLevel;
+		}
+		
+		if (gcLevel >= gcKeepOutputsThreshold)    
+		    for (DerivationOutputs::iterator j = drv.outputs.begin();
+		            j != drv.outputs.end(); ++j)
+			if (store->isValidPath(j->second.path))
+			    computeFSClosure(j->second.path, livePaths);
             }
     }
 
