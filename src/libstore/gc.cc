@@ -4,7 +4,6 @@
 #include "local-store.hh"
 #include "db.hh"
 #include "util.hh"
-#include "gc.hh"
 
 #include <boost/shared_ptr.hpp>
 
@@ -26,6 +25,8 @@ namespace nix {
 static string gcLockName = "gc.lock";
 static string tempRootsDir = "temproots";
 static string gcRootsDir = "gcroots";
+
+const unsigned int defaultGcLevel = 1000;
 
 
 /* Acquire the global GC lock.  This is used to prevent new Nix
