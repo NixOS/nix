@@ -34,4 +34,5 @@ EXTRA_DIST = nix-collect-garbage.in \
   generate-patches.pl.in \
   nix-pack-closure.in nix-unpack-closure.in \
   nix-copy-closure.in \
-  find-runtime-roots.pl.in
+  find-runtime-roots.pl.in \
+  build-remote.pl.in
