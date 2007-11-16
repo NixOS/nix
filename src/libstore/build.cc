@@ -1247,6 +1247,7 @@ static string makeValidityRegistration(const PathSet & paths,
 
 DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 {
+    if (!useBuildHook) return rpDecline;
     Path buildHook = getEnv("NIX_BUILD_HOOK");
     if (buildHook == "") return rpDecline;
     buildHook = absPath(buildHook);

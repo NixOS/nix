@@ -71,6 +71,7 @@ private:
     FdSink to;
     FdSource from;
     Pid child;
+    unsigned int daemonVersion;
 
     void processStderr(Sink * sink = 0, Source * source = 0);
 

@@ -26,6 +26,7 @@ bool readOnlyMode = false;
 string thisSystem = "unset";
 unsigned int maxSilentTime = 0;
 Paths substituters;
+bool useBuildHook = true;
 
 
 static bool settingsRead = false;

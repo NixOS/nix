@@ -223,7 +223,8 @@ struct TunnelSource : Source
 };
 
 
-static void performOp(Source & from, Sink & to, unsigned int op)
+static void performOp(unsigned int clientVersion,
+    Source & from, Sink & to, unsigned int op)
 {
     switch (op) {
 
@@ -422,6 +423,8 @@ static void performOp(Source & from, Sink & to, unsigned int op)
         verbosity = (Verbosity) readInt(from);
         maxBuildJobs = readInt(from);
         maxSilentTime = readInt(from);
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
+            useBuildHook = readInt(from) != 0;
         startWork();
         stopWork();
         break;
@@ -492,7 +495,7 @@ static void processConnection()
         opCount++;
 
         try {
-            performOp(from, to, op);
+            performOp(clientVersion, from, to, op);
         } catch (Error & e) {
             stopWork(false, e.msg());
         }

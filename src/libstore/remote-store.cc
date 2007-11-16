@@ -59,7 +59,7 @@ RemoteStore::RemoteStore()
         unsigned int magic = readInt(from);
         if (magic != WORKER_MAGIC_2) throw Error("protocol mismatch");
 
-        unsigned int daemonVersion = readInt(from);
+        daemonVersion = readInt(from);
         if (GET_PROTOCOL_MAJOR(daemonVersion) != GET_PROTOCOL_MAJOR(PROTOCOL_VERSION))
             throw Error("Nix daemon protocol version not supported");
         writeInt(PROTOCOL_VERSION, to);
@@ -169,6 +169,8 @@ void RemoteStore::setOptions()
     writeInt(verbosity, to);
     writeInt(maxBuildJobs, to);
     writeInt(maxSilentTime, to);
+    if (GET_PROTOCOL_MINOR(daemonVersion) >= 2)
+        writeInt(useBuildHook, to);
     processStderr();
 }
 
@@ -230,7 +232,9 @@ Path RemoteStore::queryDeriver(const Path & path)
     writeInt(wopQueryDeriver, to);
     writeString(path, to);
     processStderr();
-    return readStorePath(from);
+    Path drvPath = readString(from);
+    if (drvPath != "") assertStorePath(drvPath);
+    return drvPath;
 }
 
 

@@ -212,6 +212,8 @@ static void initAndRun(int argc, char * * argv)
             readOnlyMode = true;
         else if (arg == "--max-silent-time")
             maxSilentTime = getIntArg(arg, i, args.end());
+        else if (arg == "--no-build-hook")
+            useBuildHook = false;
         else remaining.push_back(arg);
     }
 
