@@ -584,12 +584,17 @@ static void opExport(Strings opFlags, Strings opArgs)
 
 static void opImport(Strings opFlags, Strings opArgs)
 {
-    if (!opFlags.empty()) throw UsageError("unknown flag");
+    bool requireSignature = false;
+    for (Strings::iterator i = opFlags.begin();
+         i != opFlags.end(); ++i)
+        if (*i == "--require-signature") requireSignature = true;
+        else throw UsageError(format("unknown flag `%1%'") % *i);
+    
     if (!opArgs.empty()) throw UsageError("no arguments expected");
     
     FdSource source(STDIN_FILENO);
     while (readInt(source) == 1)
-        cout << format("%1%\n") % store->importPath(false, source) << std::flush;
+        cout << format("%1%\n") % store->importPath(requireSignature, source) << std::flush;
 }
 
 
