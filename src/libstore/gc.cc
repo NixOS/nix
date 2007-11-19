@@ -26,6 +26,8 @@ static string gcLockName = "gc.lock";
 static string tempRootsDir = "temproots";
 static string gcRootsDir = "gcroots";
 
+const unsigned int defaultGcLevel = 1000;
+
 
 /* Acquire the global GC lock.  This is used to prevent new Nix
    processes from starting after the temporary root files have been
@@ -448,6 +450,8 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
         queryBoolSetting("gc-keep-outputs", false);
     bool gcKeepDerivations =
         queryBoolSetting("gc-keep-derivations", true);
+    unsigned int gcKeepOutputsThreshold = 
+        queryIntSetting ("gc-keep-outputs-threshold", defaultGcLevel);
 
 	//printMsg(lvlError, format("gcKeepOutputs %1% gcKeepDerivations: %2%") % gcKeepOutputs % gcKeepDerivations);
 
@@ -521,13 +525,31 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
         for (PathSet::iterator i = livePaths.begin(); i != livePaths.end(); ++i)
             if (isDerivation(*i)) {
                 Derivation drv = derivationFromPathTxn(noTxn, *i);
+
+/*
+ * TODO REMOVE
+<<<<<<< .working
                 for (DerivationOutputs::iterator j = drv.outputs.begin();
                      j != drv.outputs.end(); ++j)
                     if (store->isValidPath(j->second.path))
                         computeFSClosure(j->second.path, livePaths, true, true, 0);
                     else if (store->isValidStatePath(j->second.path))
                     	computeFSClosure(j->second.path, livePaths, true, true, 0);
-            }
+=======
+*/
+
+			string gcLevelStr = drv.env["__gcLevel"];
+			int gcLevel;
+			if (!string2Int(gcLevelStr,gcLevel)) {
+			    gcLevel = defaultGcLevel;
+			}
+			
+			if (gcLevel >= gcKeepOutputsThreshold)    
+			    for (DerivationOutputs::iterator j = drv.outputs.begin();
+			            j != drv.outputs.end(); ++j)
+				if (store->isValidPath(j->second.path) || store->isValidStatePath(j->second.path))
+				    computeFSClosure(j->second.path, livePaths, true, true, 0);
+           }
     }
 
     if (action == gcReturnLive) {

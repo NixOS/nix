@@ -80,6 +80,10 @@ extern unsigned int maxSilentTime;
    from a CD. */
 extern Paths substituters;
 
+/* Whether to use build hooks (for distributed builds).  Sometimes
+   users want to disable this from the command-line. */
+extern bool useBuildHook;
+
 Strings querySetting(const string & name, const Strings & def);
 
 string querySetting(const string & name, const string & def);

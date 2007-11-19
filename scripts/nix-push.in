@@ -146,7 +146,7 @@ while (scalar @tmp > 0) {
     # probably wouldn't make that much sense; pumping lots of data
     # around just to compress them won't gain that much.
     $ENV{"NIX_BUILD_HOOK"} = "";
-    my $pid = open(READ, "$binDir/nix-store --realise @tmp2|")
+    my $pid = open(READ, "$binDir/nix-store --no-build-hook --realise @tmp2|")
         or die "cannot run nix-store";
     while (<READ>) {
         chomp;

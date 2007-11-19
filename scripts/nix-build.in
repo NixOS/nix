@@ -77,9 +77,9 @@ EOF
         push @instArgs, ("--attr", $ARGV[$n]);
     }
 
-    elsif ($arg eq "--arg") {
-        die "$0: `--arg' requires two arguments\n" unless $n + 2 < scalar @ARGV;
-        push @instArgs, ("--arg", $ARGV[$n + 1], $ARGV[$n + 2]);
+    elsif ($arg eq "--arg" || $arg eq "--argstr") {
+        die "$0: `$arg' requires two arguments\n" unless $n + 2 < scalar @ARGV;
+        push @instArgs, ($arg, $ARGV[$n + 1], $ARGV[$n + 2]);
         $n += 2;
     }
 

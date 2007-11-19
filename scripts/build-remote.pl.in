@@ -1,0 +1,208 @@
+#! @perl@ -w
+
+use strict;
+use Fcntl ':flock';
+use English '-no_match_vars';
+
+# General operation:
+#
+# Try to find a free machine of type $neededSystem.  We do this as
+# follows:
+# - We acquire an exclusive lock on $currentLoad/main-lock.
+# - For each machine $machine of type $neededSystem and for each $slot
+#   less than the maximum load for that machine, we try to get an
+#   exclusive lock on $currentLoad/$machine-$slot (without blocking).
+#   If we get such a lock, we send "accept" to the caller.  Otherwise,
+#   we send "postpone" and exit. 
+# - We release the exclusive lock on $currentLoad/main-lock.
+# - We perform the build on $neededSystem.
+# - We release the exclusive lock on $currentLoad/$machine-$slot.
+#
+# The nice thing about this scheme is that if we die prematurely, the
+# locks are released automatically.
+
+my $loadIncreased = 0;
+
+my $amWilling = shift @ARGV;
+my $localSystem = shift @ARGV;
+my $neededSystem = shift @ARGV;
+my $drvPath = shift @ARGV;
+
+sub sendReply {
+    my $reply = shift;
+    open OUT, ">&3" or die;
+    print OUT "$reply\n";
+    close OUT;
+}
+
+sub decline {
+    sendReply "decline";
+    exit 0;
+}
+
+my $currentLoad = $ENV{"NIX_CURRENT_LOAD"};
+decline unless defined $currentLoad;
+mkdir $currentLoad, 0777 or die unless -d $currentLoad;
+
+my $conf = $ENV{"NIX_REMOTE_SYSTEMS"};
+decline if !defined $conf || ! -e $conf;
+
+# Decline if the local system can do the build.
+decline if $amWilling && ($localSystem eq $neededSystem);
+
+
+# Otherwise find a willing remote machine.
+my %machines;
+my %systemTypes;
+my %sshKeys;
+my %maxJobs;
+my %curJobs;
+
+
+# Read the list of machines.
+open CONF, "< $conf" or die;
+
+while (<CONF>) {
+    chomp;
+    s/\#.*$//g;
+    next if /^\s*$/;
+    /^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\d+)\s*$/ or die;
+    $machines{$1} = "";
+    $systemTypes{$1} = $2;
+    $sshKeys{$1} = $3;
+    $maxJobs{$1} = $4;
+}
+
+close CONF;
+
+
+# Acquire the exclusive lock on $currentLoad/main-lock.
+my $mainLock = "$currentLoad/main-lock";
+open MAINLOCK, ">>$mainLock" or die;
+flock(MAINLOCK, LOCK_EX) or die;
+
+
+# Find a suitable system.
+my $rightType = 0;
+my $machine;
+LOOP: foreach my $cur (keys %machines) {
+    if ($neededSystem eq $systemTypes{$cur}) {
+        $rightType = 1;
+
+        # We have a machine of the right type.  Try to get a lock on
+        # one of the machine's lock files.
+        my $slot = 0;
+        while ($slot < $maxJobs{$cur}) {
+            my $slotLock = "$currentLoad/$cur-$slot";
+            open SLOTLOCK, ">>$slotLock" or die;
+            if (flock(SLOTLOCK, LOCK_EX | LOCK_NB)) {
+                $machine = $cur;
+                last LOOP;
+            }                
+            close SLOTLOCK;
+            $slot++;
+        }
+    }
+}
+
+close MAINLOCK;
+
+
+# Didn't find one?
+if (!defined $machine) {
+    if ($rightType) {
+        sendReply "postpone";
+        exit 0;
+    } else {
+        decline;
+    }
+}
+
+# Yes we did, accept.
+sendReply "accept";
+open IN, "<&4" or die;
+my $x = <IN>;
+chomp $x;
+#print "got $x\n";  
+close IN;
+
+if ($x ne "okay") {
+    exit 0;
+}
+
+
+# Do the actual job.
+print "BUILDING REMOTE: $drvPath on $machine\n";
+
+# Make sure that we don't get any SSH passphrase or host key popups -
+# if there is any problem it should fail, not do something
+# interactive.
+$ENV{"DISPLAY"} = "";
+$ENV{"SSH_PASSWORD_FILE="} = "";
+$ENV{"SSH_ASKPASS="} = "";
+
+my $sshOpts = "-i $sshKeys{$machine} -x";
+
+# Hack to support Cygwin: if we login without a password, we don't
+# have exactly the same right as when we do.  This causes the
+# Microsoft C compiler to fail with certain flags:
+#
+#   http://connect.microsoft.com/VisualStudio/feedback/ViewFeedback.aspx?FeedbackID=99676
+#
+# So as a workaround, we pass a verbatim password.  ssh tries to makes
+# this very hard; the trick is to make it call SSH_ASKPASS to get the
+# password.  (It only calls this command when there is no controlling
+# terminal, but Nix ensures that is is the case.  When doing this
+# manually, use setsid(1).)
+if ($sshKeys{$machine} =~ /^password:/) {
+    my $passwordFile = $sshKeys{$machine};
+    $passwordFile =~ s/^password://;
+    $sshOpts = "ssh -x";
+    $ENV{"SSH_PASSWORD_FILE"} = $passwordFile;
+    $ENV{"SSH_ASKPASS"} = "/tmp/writepass";
+
+    open WRITEPASS, ">/tmp/writepass" or die;
+    print WRITEPASS "#! /bin/sh\ncat \"\$SSH_PASSWORD_FILE\"";
+    close WRITEPASS;
+    chmod 0755, "/tmp/writepass" or die;
+}
+
+my $inputs = `cat inputs`; die if ($? != 0);
+$inputs =~ s/\n/ /g;
+
+my $outputs = `cat outputs`; die if ($? != 0);
+$outputs =~ s/\n/ /g;
+
+print "COPYING INPUTS...\n";
+
+my $maybeSign = "";
+$maybeSign = "--sign" if -e "/nix/etc/nix/signing-key.sec";
+
+system("NIX_SSHOPTS=\"$sshOpts\" nix-copy-closure $machine $maybeSign $drvPath $inputs") == 0
+    or die "cannot copy inputs to $machine: $?";
+
+print "BUILDING...\n";
+
+system("ssh $sshOpts $machine 'nix-store -rvvK $drvPath'") == 0
+    or die "remote build on $machine failed: $?";
+
+print "REMOTE BUILD DONE: $drvPath on $machine\n";
+
+foreach my $output (split '\n', $outputs) {
+    my $maybeSignRemote = "";
+    $maybeSignRemote = "--sign" if $UID != 0;
+    
+    system("ssh $sshOpts $machine 'nix-store --export $maybeSignRemote $output' > dump") == 0
+	or die "cannot copy $output from $machine: $?";
+
+    # This doesn't work yet, since the caller has a lock on the output
+    # path.  We should move towards lock-free invocation of build
+    # hooks and substitutes.
+    #system("nix-store --import < dump") == 0
+    #    or die "cannot import $output: $?";
+
+    # Hack: skip the first 8 bytes (the nix-store --export next
+    # archive marker).  The archive follows.
+    system("(dd bs=1 count=8 of=/dev/null && cat) < dump | nix-store --restore $output") == 0
+	or die "cannot restore $output: $?";
+}
