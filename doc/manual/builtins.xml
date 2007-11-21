@@ -441,6 +441,15 @@ in config.someSetting</programlisting>
   -->
 
   
+  <varlistentry><term><function>builtins.readFile</function>
+  <replaceable>path</replaceable></term>
+
+    <listitem><para>Return the contents of the file
+    <replaceable>path</replaceable> as a string.</para></listitem>
+
+  </varlistentry>
+  
+  
   <varlistentry><term><function>removeAttrs</function>
   <replaceable>attrs</replaceable> <replaceable>list</replaceable></term>
 
