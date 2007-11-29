@@ -410,11 +410,17 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
     /* Check that all selectors have been used. */
     for (DrvNames::iterator i = selectors.begin();
          i != selectors.end(); ++i)
-        if (i->hits == 0)
+        if (i->hits == 0 && i->fullName != "*")
             throw Error(format("selector `%1%' matches no derivations")
                 % i->fullName);
 
     return elems;
+}
+
+
+static bool isPath(const string & s)
+{
+    return s.find('/') != string::npos;
 }
 
 
@@ -423,7 +429,7 @@ static void queryInstSources(EvalState & state,
     DrvInfos & elems, bool newestOnly)
 {
     InstallSourceType type = instSource.type;
-    if (type == srcUnknown && args.size() > 0 && args.front()[0] == '/')
+    if (type == srcUnknown && args.size() > 0 && isPath(args.front()))
         type = srcStorePaths;
     
     switch (type) {
@@ -475,23 +481,23 @@ static void queryInstSources(EvalState & state,
             for (Strings::const_iterator i = args.begin();
                  i != args.end(); ++i)
             {
-                assertStorePath(*i);
+                Path path = followLinksToStorePath(*i);
 
                 DrvInfo elem;
                 elem.attrs = boost::shared_ptr<ATermMap>(new ATermMap(0)); /* ugh... */
-                string name = baseNameOf(*i);
+                string name = baseNameOf(path);
                 string::size_type dash = name.find('-');
                 if (dash != string::npos)
                     name = string(name, dash + 1);
 
-                if (isDerivation(*i)) {
-                    elem.setDrvPath(*i);
-                    elem.setOutPath(findOutput(derivationFromPath(*i), "out"));
+                if (isDerivation(path)) {
+                    elem.setDrvPath(path);
+                    elem.setOutPath(findOutput(derivationFromPath(path), "out"));
                     if (name.size() >= drvExtension.size() &&
                         string(name, name.size() - drvExtension.size()) == drvExtension)
                         name = string(name, 0, name.size() - drvExtension.size());
                 }
-                else elem.setOutPath(*i);
+                else elem.setOutPath(path);
 
                 elem.name = name;
 
@@ -811,7 +817,7 @@ static void opSet(Globals & globals,
 }
 
 
-static void uninstallDerivations(Globals & globals, DrvNames & selectors,
+static void uninstallDerivations(Globals & globals, Strings & selectors,
     Path & profile)
 {
     PathLocks lock;
@@ -824,11 +830,13 @@ static void uninstallDerivations(Globals & globals, DrvNames & selectors,
     {
         DrvName drvName(i->name);
         bool found = false;
-        for (DrvNames::iterator j = selectors.begin();
-             j != selectors.end(); ++j)
-            if (j->matches(drvName)) {
-                printMsg(lvlInfo,
-                    format("uninstalling `%1%'") % i->name);
+        for (Strings::iterator j = selectors.begin(); j != selectors.end(); ++j)
+            /* !!! the repeated calls to followLinksToStorePath() are
+               expensive, should pre-compute them. */
+            if ((isPath(*j) && i->queryOutPath(globals.state) == followLinksToStorePath(*j))
+                || DrvName(*j).matches(drvName))
+            {
+                printMsg(lvlInfo, format("uninstalling `%1%'") % i->name);
                 found = true;
                 break;
             }
@@ -847,11 +855,7 @@ static void opUninstall(Globals & globals,
 {
     if (opFlags.size() > 0)
         throw UsageError(format("unknown flag `%1%'") % opFlags.front());
-
-    DrvNames drvNames = drvNamesFromArgs(opArgs);
-
-    uninstallDerivations(globals, drvNames,
-        globals.profile);
+    uninstallDerivations(globals, opArgs, globals.profile);
 }
 
 

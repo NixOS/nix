@@ -105,8 +105,7 @@ Path canonPath(const Path & path, bool resolveSymlinks)
             /* If s points to a symlink, resolve it and restart (since
                the symlink target might contain new symlinks). */
             if (resolveSymlinks && isLink(s)) {
-                followCount++;
-                if (followCount >= maxFollow)
+                if (++followCount >= maxFollow)
                     throw Error(format("infinite symlink recursion in path `%1%'") % path);
                 temp = absPath(readLink(s), dirOf(s))
                     + string(i, end);

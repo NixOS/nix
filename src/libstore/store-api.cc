@@ -48,6 +48,26 @@ Path toStorePath(const Path & path)
 }
 
 
+Path followLinksToStore(const Path & _path)
+{
+    Path path = absPath(_path);
+    while (!isInStore(path)) {
+        if (!isLink(path)) break;
+        string target = readLink(path);
+        path = absPath(target, dirOf(path));
+    }
+    if (!isInStore(path))
+        throw Error(format("path `%1%' is not in the Nix store") % path);
+    return path;
+}
+
+
+Path followLinksToStorePath(const Path & path)
+{
+    return toStorePath(followLinksToStore(path));
+}
+
+
 void checkStoreName(const string & name)
 {
     string validChars = "+-._?=";
