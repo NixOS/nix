@@ -46,6 +46,9 @@ Int | int | Expr |
 Str | string ATermList | Expr |
 Str | string | Expr | ObsoleteStr
 
+# Internal to the parser, doesn't occur in ASTs.
+IndStr | string | Expr |
+
 # A path is a reference to a file system object that is to be copied
 # to the Nix store when used as a derivation attribute.  When it is
 # concatenated to a string (i.e., `str + path'), it is also copied and

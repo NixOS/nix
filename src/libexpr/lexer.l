@@ -4,6 +4,7 @@
 
 
 %x STRING
+%x IND_STRING
 
 
 %{
@@ -122,6 +123,14 @@ inherit     { return INHERIT; }
 <STRING>\"  { BEGIN(INITIAL); return '"'; }
 <STRING>.   return yytext[0]; /* just in case: shouldn't be reached */
 
+\'\'(\ *\n)?     { BEGIN(IND_STRING); return IND_STRING_OPEN; }
+<IND_STRING>([^\$\']|\$[^\{\']|\'[^\'])+ {
+                   yylval->t = makeIndStr(toATerm(yytext));
+                   return IND_STR;
+                 }
+<IND_STRING>\$\{ { BEGIN(INITIAL); return DOLLAR_CURLY; }
+<IND_STRING>\'\' { BEGIN(INITIAL); return IND_STRING_CLOSE; }
+<IND_STRING>.    return yytext[0]; /* just in case: shouldn't be reached */
 
 {PATH}      { yylval->t = toATerm(yytext); return PATH; /* !!! alloc */ }
 {URI}       { yylval->t = toATerm(yytext); return URI; /* !!! alloc */ }
@@ -146,6 +155,12 @@ void backToString(yyscan_t scanner)
 {
     struct yyguts_t * yyg = (struct yyguts_t *) scanner;
     BEGIN(STRING);
+}
+
+void backToIndString(yyscan_t scanner)
+{
+    struct yyguts_t * yyg = (struct yyguts_t *) scanner;
+    BEGIN(IND_STRING);
 }
 
 }

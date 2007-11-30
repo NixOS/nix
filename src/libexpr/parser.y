@@ -68,9 +68,100 @@ static Expr fixAttrs(int recursive, ATermList as)
 }
 
 
-void backToString(yyscan_t scanner);
+static Expr stripIndentation(ATermList es)
+{
+    if (es == ATempty) return makeStr("");
+    
+    /* Figure out the minimum indentation.  Note that by design
+       whitespace-only final lines are not taken into account.  (So
+       the " " in "\n ''" is ignored, but the " " in "\n foo''" is.) */
+    bool atStartOfLine = true; /* = seen only whitespace in the current line */
+    unsigned int minIndent = 1000000;
+    unsigned int curIndent = 0;
+    ATerm e;
+    for (ATermIterator i(es); i; ++i) {
+        if (!matchIndStr(*i, e)) {
+            /* Anti-quotations end the current start-of-line whitespace. */
+            if (atStartOfLine) {
+                atStartOfLine = false;
+                if (curIndent < minIndent) minIndent = curIndent;
+            }
+            continue;
+        }
+        string s = aterm2String(e);
+        for (unsigned int j = 0; j < s.size(); ++j) {
+            if (atStartOfLine) {
+                if (s[j] == ' ')
+                    curIndent++;
+                else if (s[j] == '\n') {
+                    /* Empty line, doesn't influence minimum
+                       indentation. */
+                    curIndent = 0;
+                } else {
+                    atStartOfLine = false;
+                    if (curIndent < minIndent) minIndent = curIndent;
+                }
+            } else if (s[j] == '\n') {
+                atStartOfLine = true;
+                curIndent = 0;
+            }
+        }
+    }
 
- 
+    /* Strip spaces from each line. */
+    ATermList es2 = ATempty;
+    atStartOfLine = true;
+    unsigned int curDropped = 0;
+    unsigned int n = ATgetLength(es);
+    for (ATermIterator i(es); i; ++i, --n) {
+        if (!matchIndStr(*i, e)) {
+            atStartOfLine = false;
+            curDropped = 0;
+            es2 = ATinsert(es2, *i);
+            continue;
+        }
+        
+        string s = aterm2String(e);
+        string s2;
+        for (unsigned int j = 0; j < s.size(); ++j) {
+            if (atStartOfLine) {
+                if (s[j] == ' ') {
+                    if (curDropped++ >= minIndent)
+                        s2 += s[j];
+                }
+                else if (s[j] == '\n') {
+                    curDropped = 0;
+                    s2 += s[j];
+                } else {
+                    atStartOfLine = false;
+                    curDropped = 0;
+                    s2 += s[j];
+                }
+            } else {
+                s2 += s[j];
+                if (s[j] == '\n') atStartOfLine = true;
+            }
+        }
+
+        /* Remove the last line if it is empty and consists only of
+           spaces. */
+        if (n == 1) {
+            unsigned int p = s2.find_last_of('\n');
+            if (p != string::npos && s2.find_first_not_of(' ', p + 1) == string::npos)
+                s2 = string(s2, 0, p + 1);
+        }
+            
+        es2 = ATinsert(es2, makeStr(s2));
+    }
+
+    return makeConcatStrings(ATreverse(es2));
+}
+
+
+void backToString(yyscan_t scanner);
+void backToIndString(yyscan_t scanner);
+
+
 static Pos makeCurPos(YYLTYPE * loc, ParseData * data)
 {
     return makePos(toATerm(data->path),
@@ -121,10 +212,11 @@ static void freeAndUnprotect(void * p)
 
 %type <t> start expr expr_function expr_if expr_op
 %type <t> expr_app expr_select expr_simple bind inheritsrc formal
-%type <ts> binds ids expr_list formals string_parts
-%token <t> ID INT STR PATH URI
+%type <ts> binds ids expr_list formals string_parts ind_string_parts
+%token <t> ID INT STR IND_STR PATH URI
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL
 %token DOLLAR_CURLY /* == ${ */
+%token IND_STRING_OPEN IND_STRING_CLOSE
 
 %nonassoc IMPL
 %left OR
@@ -199,6 +291,9 @@ expr_simple
       else if (ATgetNext($2) == ATempty) $$ = ATgetFirst($2);
       else $$ = makeConcatStrings(ATreverse($2));
   }
+  | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
+      $$ = stripIndentation(ATreverse($2));
+  }
   | PATH { $$ = makePath(toATerm(absPath(aterm2String($1), data->basePath))); }
   | URI { $$ = makeStr($1, ATempty); }
   | '(' expr ')' { $$ = $2; }
@@ -216,6 +311,12 @@ expr_simple
 string_parts
   : string_parts STR { $$ = ATinsert($1, $2); }
   | string_parts DOLLAR_CURLY expr '}' { backToString(scanner); $$ = ATinsert($1, $3); }
+  | { $$ = ATempty; }
+  ;
+
+ind_string_parts
+  : ind_string_parts IND_STR { $$ = ATinsert($1, $2); }
+  | ind_string_parts DOLLAR_CURLY expr '}' { backToIndString(scanner); $$ = ATinsert($1, $3); }
   | { $$ = ATempty; }
   ;
 

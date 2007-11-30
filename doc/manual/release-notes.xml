@@ -131,6 +131,10 @@
   <listitem><para>TODO: chroot support.</para></listitem>
   
 
+  <listitem><para>TODO: <literal>''</literal>-style string
+  literals.</para></listitem>
+  
+
 </itemizedlist>
 
 </section>
