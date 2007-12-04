@@ -42,9 +42,8 @@ platforms as well.</para>
 <section><title>Obtaining Nix</title>
 
 <para>The easiest way to obtain Nix is to download a <link
-xlink:href="http://www.cs.uu.nl/groups/ST/Trace/Nix">source
-distribution</link>.  RPMs for Red Hat, SuSE, and Fedora Core are also
-available.</para>
+xlink:href="http://nix.cs.uu.nl/">source distribution</link>.  RPMs
+for Red Hat, SuSE, and Fedora Core are also available.</para>
 
 <para>Alternatively, the most recent sources of Nix can be obtained
 from its <link
@@ -161,12 +160,12 @@ options.</para>
 
 <section><title>Installing from RPMs</title>
 
-<para>RPM packages of Nix can be downloaded from <uri
-xlink:href="http://www.cs.uu.nl/groups/ST/Trace/Nix">http://www.cs.uu.nl/groups/ST/Trace/Nix</uri>.
-These RPMs should work for most fairly recent releases of SuSE and Red
-Hat Linux.  They have been known to work work on SuSE Linux 8.1 and
-9.0, and Red Hat 9.0.  In fact, it should work on any RPM-based Linux
-distribution based on <literal>glibc</literal> 2.3 or later.</para>
+<para>RPM packages of Nix can be downloaded from <link
+xlink:href="http://nix.cs.uu.nl/" />.  These RPMs should work for most
+fairly recent releases of SuSE and Red Hat Linux.  They have been
+known to work work on SuSE Linux 8.1 and 9.0, and Red Hat 9.0.  In
+fact, it should work on any RPM-based Linux distribution based on
+<literal>glibc</literal> 2.3 or later.</para>
 
 <para>Once downloaded, the RPMs can be installed or upgraded using
 <command>rpm -U</command>.  For example,

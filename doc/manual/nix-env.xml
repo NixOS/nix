@@ -48,7 +48,7 @@
 <refsection><title>Description</title>
 
 <para>The command <command>nix-env</command> is used to manipulate Nix
-user environments.  User environments are sets of software components
+user environments.  User environments are sets of software packages
 available to a user at some point in time.  In other words, they are a
 synthesised view of the programs available in the Nix store.  There
 may be many user environments: different users can have different
@@ -750,35 +750,35 @@ user environment elements, etc. -->
     <listitem><para>Compare installed versions to available versions,
     or vice versa (if <option>--available</option> is given).  This is
     useful for quickly seeing whether upgrades for installed
-    components are available in a Nix expression.  A column is added
+    packages are available in a Nix expression.  A column is added
     with the following meaning:
 
     <variablelist>
 
       <varlistentry><term><literal>&lt;</literal> <replaceable>version</replaceable></term>
 
-        <listitem><para>A newer version of the component is available
+        <listitem><para>A newer version of the package is available
         or installed.</para></listitem>
 
       </varlistentry>
       
       <varlistentry><term><literal>=</literal> <replaceable>version</replaceable></term>
 
-        <listitem><para>At most the same version of the component is
+        <listitem><para>At most the same version of the package is
         available or installed.</para></listitem>
 
       </varlistentry>
       
       <varlistentry><term><literal>></literal> <replaceable>version</replaceable></term>
 
-        <listitem><para>Only older versions of the component are
+        <listitem><para>Only older versions of the package are
         available or installed.</para></listitem>
 
       </varlistentry>
       
       <varlistentry><term><literal>- ?</literal></term>
 
-        <listitem><para>No version of the component is available or
+        <listitem><para>No version of the package is available or
         installed.</para></listitem>
 
       </varlistentry>

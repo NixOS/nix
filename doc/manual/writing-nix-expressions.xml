@@ -7,7 +7,7 @@
 
 
 <para>This chapter shows you how to write Nix expressions, which are
-the things that tell Nix how to build components.  It starts with a
+the things that tell Nix how to build packages.  It starts with a
 simple example (a Nix expression for GNU Hello), and then moves
 on to a more in-depth look at the Nix expression language.</para>
 
@@ -19,29 +19,28 @@ xlink:href='http://www.gnu.org/software/hello/hello.html'>GNU Hello
 package</link> to the Nix Packages collection.  Hello is a program
 that prints out the text <quote>Hello, world!</quote>.</para>
 
-<para>To add a component to the Nix Packages collection, you generally
+<para>To add a package to the Nix Packages collection, you generally
 need to do three things:
 
 <orderedlist>
 
-  <listitem><para>Write a Nix expression for the component.  This is a
-  file that describes all the inputs involved in building the
-  component, such as dependencies (other components required by the
-  component), sources, and so on.</para></listitem>
+  <listitem><para>Write a Nix expression for the package.  This is a
+  file that describes all the inputs involved in building the package,
+  such as dependencies, sources, and so on.</para></listitem>
 
   <listitem><para>Write a <emphasis>builder</emphasis>.  This is a
   shell script<footnote><para>In fact, it can be written in any
   language, but typically it's a <command>bash</command> shell
-  script.</para></footnote> that actually builds the component from
+  script.</para></footnote> that actually builds the package from
   the inputs.</para></listitem>
 
-  <listitem><para>Add the component to the file
+  <listitem><para>Add the package to the file
   <filename>pkgs/top-level/all-packages.nix</filename>.  The Nix
   expression written in the first step is a
-  <emphasis>function</emphasis>; it requires other components in order
+  <emphasis>function</emphasis>; it requires other packages in order
   to build it.  In this step you put it all together, i.e., you call
   the function with the right arguments to build the actual
-  component.</para></listitem>
+  package.</para></listitem>
 
 </orderedlist>
 
@@ -83,8 +82,8 @@ the single Nix expression in that directory
     arguments: <varname>stdenv</varname>, <varname>fetchurl</varname>,
     and <varname>perl</varname>.  They are needed to build Hello, but
     we don't know how to build them here; that's why they are function
-    arguments.  <varname>stdenv</varname> is a component that is used
-    by almost all Nix Packages components; it provides a
+    arguments.  <varname>stdenv</varname> is a package that is used
+    by almost all Nix Packages packages; it provides a
     <quote>standard</quote> environment consisting of the things you
     would expect in a basic Unix environment: a C/C++ compiler (GCC,
     to be precise), the Bash shell, fundamental Unix tools such as
@@ -99,19 +98,19 @@ the single Nix expression in that directory
     <replaceable>e</replaceable> is the body of the function.  So
     here, the entire remainder of the file is the body of the
     function; when given the required arguments, the body should
-    describe how to build an instance of the Hello component.</para>
+    describe how to build an instance of the Hello package.</para>
     
   </callout>
 
   <callout arearefs='ex-hello-nix-co-2'>
 
-    <para>So we have to build a component.  Building something from
+    <para>So we have to build a package.  Building something from
     other stuff is called a <emphasis>derivation</emphasis> in Nix (as
     opposed to sources, which are built by humans instead of
     computers).  We perform a derivation by calling
     <varname>stdenv.mkDerivation</varname>.
     <varname>mkDerivation</varname> is a function provided by
-    <varname>stdenv</varname> that builds a component from a set of
+    <varname>stdenv</varname> that builds a package from a set of
     <emphasis>attributes</emphasis>.  An attribute set is just a list
     of key/value pairs where each value is an arbitrary Nix
     expression.  They take the general form
@@ -125,10 +124,10 @@ the single Nix expression in that directory
   <callout arearefs='ex-hello-nix-co-3'>
 
     <para>The attribute <varname>name</varname> specifies the symbolic
-    name and version of the component.  Nix doesn't really care about
+    name and version of the package.  Nix doesn't really care about
     these things, but they are used by for instance <command>nix-env
     -q</command> to show a <quote>human-readable</quote> name for
-    components.  This attribute is required by
+    packages.  This attribute is required by
     <varname>mkDerivation</varname>.</para>
 
   </callout>
@@ -149,7 +148,7 @@ the single Nix expression in that directory
 
   <callout arearefs='ex-hello-nix-co-5'>
 
-    <para>The builder has to know what the sources of the component
+    <para>The builder has to know what the sources of the package
     are.  Here, the attribute <varname>src</varname> is bound to the
     result of a call to the <command>fetchurl</command> function.
     Given a URL and an MD5 hash of the expected contents of the file
@@ -246,7 +245,7 @@ steps:</para>
 
     <para>Since Hello needs Perl, we have to make sure that Perl is in
     the <envar>PATH</envar>.  The <envar>perl</envar> environment
-    variable points to the location of the Perl component (since it
+    variable points to the location of the Perl package (since it
     was passed in as an attribute to the derivation), so
     <filename><replaceable>$perl</replaceable>/bin</filename> is the
     directory containing the Perl interpreter.</para>
@@ -276,7 +275,7 @@ steps:</para>
 
     <para>GNU Hello is a typical Autoconf-based package, so we first
     have to run its <filename>configure</filename> script.  In Nix
-    every component is stored in a separate location in the Nix store,
+    every package is stored in a separate location in the Nix store,
     for instance
     <filename>/nix/store/9a54ba97fb71b65fda531012d0443ce2-hello-2.1.1</filename>.
     Nix computes this path by cryptographically hashing all attributes
@@ -338,7 +337,7 @@ rec { <co xml:id='ex-hello-composition-co-1' />
 function; it is missing some arguments that have to be filled in
 somewhere.  In the Nix Packages collection this is done in the file
 <filename>pkgs/top-level/all-packages.nix</filename>, where all
-Nix expressions for components are imported and called with the
+Nix expressions for packages are imported and called with the
 appropriate arguments.  <xref linkend='ex-hello-composition' /> shows
 some fragments of
 <filename>all-packages.nix</filename>.</para>
@@ -352,7 +351,7 @@ some fragments of
     <emphasis>mutually recursive</emphasis> set of attributes.  That
     is, the attributes can refer to each other.  This is precisely
     what we want since we want to <quote>plug</quote> the
-    various components into each other.</para>
+    various packages into each other.</para>
 
   </callout>
 
@@ -522,8 +521,8 @@ genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
   <callout arearefs='ex-hello-builder2-co-1'>
     
     <para>The <envar>buildInputs</envar> variable tells
-    <filename>setup</filename> to use the indicated components as
-    <quote>inputs</quote>.  This means that if a component provides a
+    <filename>setup</filename> to use the indicated packages as
+    <quote>inputs</quote>.  This means that if a package provides a
     <filename>bin</filename> subdirectory, it's added to
     <envar>PATH</envar>; if it has a <filename>include</filename>
     subdirectory, it's added to GCC's header search path; and so
@@ -594,9 +593,9 @@ Laziness means that arguments to functions are evaluated only when
 they are needed.  Functional means that functions are
 <quote>normal</quote> values that can be passed around and manipulated
 in interesting ways.  The language is not a full-featured, general
-purpose language.  It's main job is to describe components,
-compositions of components, and the variability within
-components.</para>
+purpose language.  It's main job is to describe packages,
+compositions of packages, and the variability within
+packages.</para>
 
 <para>This section presents the various features of the
 language.</para>
@@ -1191,7 +1190,7 @@ set, the attributes of which specify the inputs of the build.</para>
 
   <listitem><para>There must be an attribute named
   <varname>name</varname> whose value must be a string.  This is used
-  as a symbolic name for the component by <command>nix-env</command>,
+  as a symbolic name for the package by <command>nix-env</command>,
   and it is appended to the hash in the output path of the
   derivation.</para></listitem>
 
@@ -1579,7 +1578,7 @@ impureEnvVars = ["http_proxy" "https_proxy" <replaceable>...</replaceable>];
 
 <para>The standard build environment in the Nix Packages collection
 provides a basic environment for building Unix packages.  It consists
-of the following components:
+of the following packages:
 
 <itemizedlist>
 
@@ -1645,13 +1644,13 @@ following:
 
 <itemizedlist>
 
-  <listitem><para>All input components specified in the
+  <listitem><para>All input packages specified in the
   <envar>buildInputs</envar> environment variable have their
   <filename>/bin</filename> subdirectory added to <envar>PATH</envar>,
   their <filename>/include</filename> subdirectory added to the C/C++
   header file search path, and their <filename>/lib</filename>
   subdirectory added to the linker search path.  This can be extended.
-  For instance, when the <command>pkgconfig</command> component is
+  For instance, when the <command>pkgconfig</command> package is
   used, the subdirectory <filename>/lib/pkgconfig</filename> of each
   input is added to the <envar>PKG_CONFIG_PATH</envar> environment
   variable.</para></listitem>
@@ -1668,8 +1667,8 @@ following:
 
 <para>The <filename>setup</filename> script also exports a function
 called <function>genericBuild</function> that knows how to build
-typical Autoconf-style components.  It can be customised to perform
-builds for any type of component.  It is advisable to use
+typical Autoconf-style packages.  It can be customised to perform
+builds for any type of package.  It is advisable to use
 <function>genericBuild</function> since it provides facilities that
 are almost always useful such as unpacking of sources, patching of
 sources, nested logging, etc.</para>

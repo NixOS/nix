@@ -74,9 +74,9 @@
 
 <glossentry><glossterm>Nix expression</glossterm>
 
-  <glossdef><para>A high-level description of software components and
+  <glossdef><para>A high-level description of software packages and
   compositions thereof.  Deploying software using Nix entails writing
-  Nix expressions for your components.  Nix expressions are translated
+  Nix expressions for your packages.  Nix expressions are translated
   to derivations that are stored in the Nix store.  These derivations
   can then be built.</para></glossdef>
 
