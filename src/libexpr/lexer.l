@@ -128,6 +128,18 @@ inherit     { return INHERIT; }
                    yylval->t = makeIndStr(toATerm(yytext));
                    return IND_STR;
                  }
+<IND_STRING>\'\'\$ {
+                   yylval->t = makeIndStr(toATerm("$"));
+                   return IND_STR;
+                 }
+<IND_STRING>\'\'\' {
+                   yylval->t = makeIndStr(toATerm("''"));
+                   return IND_STR;
+                 }
+<IND_STRING>\'\'\\. {
+                   yylval->t = unescapeStr(yytext + 2);
+                   return IND_STR;
+                 }
 <IND_STRING>\$\{ { BEGIN(INITIAL); return DOLLAR_CURLY; }
 <IND_STRING>\'\' { BEGIN(INITIAL); return IND_STRING_CLOSE; }
 <IND_STRING>.    return yytext[0]; /* just in case: shouldn't be reached */
