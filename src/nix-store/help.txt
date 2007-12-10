@@ -16,8 +16,13 @@ Operations:
 
   --gc: run the garbage collector
 
-  --dump: dump a path as a Nix archive
-  --restore: restore a path from a Nix archive
+  --dump: dump a path as a Nix archive, forgetting dependencies
+  --restore: restore a path from a Nix archive, without
+      registering validity
+
+  --export: export a path as a Nix archive, marking dependencies
+  --import: import a path from a Nix archive, and register as 
+      valid
 
   --init: initialise the Nix database
   --verify: verify Nix structures
