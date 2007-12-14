@@ -256,6 +256,10 @@ AM_CONDITIONAL(INIT_STATE, test "$init_state" = "yes")
 AC_CHECK_FUNCS([setresuid setreuid lchown])
 
 
+# Nice to have, but not essential.
+AC_CHECK_FUNCS([strsignal])
+
+
 # This is needed if ATerm, Berkeley DB or bzip2 are static libraries,
 # and the Nix libraries are dynamic.
 if test "$(uname)" = "Darwin"; then

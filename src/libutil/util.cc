@@ -8,6 +8,7 @@
 #include <cerrno>
 #include <cstdio>
 #include <sstream>
+#include <cstring>
 
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -960,8 +961,15 @@ string statusToString(int status)
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         if (WIFEXITED(status))
             return (format("failed with exit code %1%") % WEXITSTATUS(status)).str();
-        else if (WIFSIGNALED(status))
-            return (format("failed due to signal %1%") % WTERMSIG(status)).str();
+        else if (WIFSIGNALED(status)) {
+	    int sig = WTERMSIG(status);
+#if HAVE_STRSIGNAL
+            const char * description = strsignal(sig);
+            return (format("failed due to signal %1% (%2%)") % sig % description).str();
+#else
+            return (format("failed due to signal %1%") % sig).str();
+#endif
+	}
         else
             return "died abnormally";
     } else return "succeeded";
