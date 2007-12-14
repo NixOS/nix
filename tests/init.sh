@@ -77,6 +77,20 @@ sed "s|^$|PATH='$PATH'|" < $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh > tmp
 chmod +x tmp
 mv tmp $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh
 
+# An uberhack for Mac OS X 10.5: download-using-manifests uses Perl,
+# and Perl links against Darwin's libutil.dylib (in /usr/lib), but
+# when running "make check", the libtool wrapper script around the Nix
+# binaries sets DYLD_LIBRARY_PATH so that Perl finds Nix's (completely
+# different) libutil --- so it barfs.  So generate a shell wrapper
+# around download-using-manifests that clears DYLD_LIBRARY_PATH.
+mv $NIX_BIN_DIR/nix/download-using-manifests.pl $NIX_BIN_DIR/nix/download-using-manifests.pl.real
+cat > $NIX_BIN_DIR/nix/download-using-manifests.pl <<EOF
+#! $SHELL -e
+export DYLD_LIBRARY_PATH=
+exec $NIX_BIN_DIR/nix/download-using-manifests.pl.real "\$@"
+EOF
+chmod +x $NIX_BIN_DIR/nix/download-using-manifests.pl
+
 # Initialise the database.
 $nixstore --init
 
