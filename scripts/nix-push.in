@@ -116,9 +116,9 @@ print NIX "]";
 close NIX;
 
 
-# Instantiate store expressions from the Nix expression.
+# Instantiate store derivations from the Nix expression.
 my @storeExprs;
-print STDERR "instantiating store expressions...\n";
+print STDERR "instantiating store derivations...\n";
 my $pid = open(READ, "$binDir/nix-instantiate $nixExpr|")
     or die "cannot run nix-instantiate";
 while (<READ>) {
