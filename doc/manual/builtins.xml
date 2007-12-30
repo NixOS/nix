@@ -486,7 +486,7 @@ removeAttrs { x = 1; y = 2; z = 3; } ["a" "x" "z"]</screen>
   </varlistentry>
 
   
-  <varlistentry><term><function>builtins.substr</function>
+  <varlistentry><term><function>builtins.substring</function>
   <replaceable>start</replaceable> <replaceable>len</replaceable>
   <replaceable>s</replaceable></term>
 

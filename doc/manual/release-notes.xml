@@ -8,20 +8,31 @@
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-0.11"><title>Release 0.11 (TBA)</title>
+<section xml:id="ssec-relnotes-0.11"><title>Release 0.11 (December 31,
+2007)</title>
+
+<para>The most important improvement in Nix 0.11 is secure multi-user
+support.  It also features many usability improvements and language
+extensions, many of them to support NixOS.  Here is an (incomplete)
+list:</para>
+
 
 <itemizedlist>
 
 
-  <listitem><para>TODO: multi-user support.  The old setuid method for
-  sharing a store between multiple users has been
-  removed.</para></listitem>
+  <listitem><para>Secure multi-user support.  A single Nix store can
+  now be shared between multiple (possible untrusted) users.  This is
+  an important feature for NixOS, where it allows non-root users to
+  install software.  The old setuid method for sharing a store between
+  multiple users has been removed.  Details for setting up a
+  multi-user store can be found in the manual.</para></listitem>
 
 
   <listitem><para>The new command <command>nix-copy-closure</command>
   gives you an easy and efficient way to exchange software between
   machines.  It copies the missing parts of the closure of a set of
-  store path to or from a remote machine.</para></listitem>
+  store path to or from a remote machine via
+  <command>ssh</command>.</para></listitem>
 
 
   <listitem><para><command>nix-prefetch-url</command> now by default
@@ -47,15 +58,21 @@
   for booting Linux don’t have any dependencies.</para></listitem>
 
 
+  <!--
   <listitem><para>TODO: semantic cleanups of string concatenation
   etc. (mostly in r6740).</para></listitem>
+  -->
 
 
-  <listitem><para>TODO: now using Berkeley DB 4.5.</para></listitem>
+  <listitem><para>Nix now uses Berkeley DB 4.5.  The database is
+  upgraded automatically, but you should be careful not to use old
+  versions of Nix that still use Berkeley DB 4.4.</para></listitem>
 
 
-  <listitem><para>TODO: option <option>--reregister</option> in
-  <command>nix-store --register-validity</command>.</para></listitem>
+  <!-- foo
+  <listitem><para>TODO: option <option>- -reregister</option> in
+  <command>nix-store - -register-validity</command>.</para></listitem>
+  -->
 
 
   <listitem><para>The new attribute
@@ -65,61 +82,118 @@
   populated with the closure of certain paths.</para></listitem>
 
 
-  <listitem><para>TODO: option <option>--max-silent-time</option>,
-  configuration setting
-  <literal>build-max-silent-time</literal>.</para></listitem>
+  <listitem><para>The option <option>--max-silent-time</option>
+  (corresponding to the configuration setting
+  <literal>build-max-silent-time</literal>) allows you to set a
+  timeout on builds — if a build produces no output on
+  <literal>stdout</literal> or <literal>stderr</literal> for the given
+  number of seconds, it is terminated.  This is useful for recovering
+  automatically from builds that are stuck in an infinite
+  loop.</para></listitem>
 
 
-  <listitem><para>TODO: <command>nix-env</command>
-  <option>--set</option>.</para></listitem>
+  <listitem><para><command>nix-env</command> <option>--set</option>
+  modifies the current generation of a profile so that it contains
+  exactly the specified derivation, and nothing else.  For example,
+  <literal>nix-env -p /nix/var/nix/profiles/browser --set
+  firefox</literal> lets the profile named
+  <filename>browser</filename> contain just Firefox.</para></listitem>
   
 
-  <listitem><para>TODO: <option>--argstr</option>.</para></listitem>
+  <listitem><para>The new <option>--argstr</option> (in
+  <command>nix-env</command>, <command>nix-instantiate</command> and
+  <command>nix-build</command>) is like <option>--arg</option>, except
+  that the value is a string.  For example, <literal>--argstr system
+  i686-linux</literal> is equivalent to <literal>--arg system
+  \"i686-linux\"'</literal> (note that <option>--argstr</option>
+  prevents annoying quoting around shell arguments).</para></listitem>
 
 
-  <listitem><para>TODO: <command>nix-env</command> now maintains meta
-  info about installed packages in user environments.  <option>-q
-  --xml --meta</option> to show all meta info.</para></listitem>
+  <listitem><para><command>nix-env</command> now maintains
+  meta-information about installed packages in profiles.  The
+  meta-information is the contents of the <varname>meta</varname>
+  attribute of derivations, such as <varname>description</varname> or
+  <varname>homepage</varname>.  The command <literal>nix-env -q --xml
+  --meta</literal> shows all meta-information.</para></listitem>
 
   
-  <listitem><para>TODO: <command>nix-env</command>
-  <option>--set-flag</option>.  Specific flags:
-  <literal>active</literal>, <literal>priority</literal>,
-  <literal>keep</literal>.</para></listitem>
+  <listitem><para><command>nix-env</command> now uses the
+  <varname>meta.priority</varname> attribute of derivations to resolve
+  filename collisions between packages.  Lower priority values denote
+  a higher priority.  For instance, the GCC wrapper package and the
+  Binutils package in Nixpkgs both have a file
+  <filename>bin/ld</filename>, so previously if you tried to install
+  both you would get a collision.  Now, on the other hand, the GCC
+  wrapper declares a higher priority than Binutils, so the former’s
+  <filename>bin/ld</filename> is symlinked in the user
+  environment.</para></listitem>
+
+
+  <listitem><para><command>nix-env --set-flag</command> allows
+  meta attributes of installed packages to be modified.  There are
+  several attributes that can be usefully modified, because they
+  affect <command>nix-env</command> behaviour or the user environment
+  build script:
+
+    <itemizedlist>
+
+      <listitem><para><varname>meta.priority</varname> can be changed
+      to resolve filename clashes (see above).</para></listitem>
+
+      <listitem><para><varname>meta.keep</varname> can be set to
+      <literal>true</literal> to prevent the package from being
+      upgraded or replaced.  Useful if you want to hang on to an older
+      version of a package.  (This is similar to masking in
+      Gentoo.)</para></listitem>
+
+      <listitem><para><varname>meta.active</varname> can be set to
+      <literal>false</literal> to “disable” the package.  That is, no
+      symlinks will be generated to the files of the package, but it
+      remains part of the profile (so it won’t be garbage-collected).
+      Set it back to <literal>true</literal> to re-enable the
+      package.</para></listitem>
+
+    </itemizedlist>
+
+  </para></listitem>
 
   
-  <listitem><para>TODO: <command>nix-env</command> <option>-i</option>
-  / <option>-u</option> take package priorities into
-  account.</para></listitem>
-  
-
   <listitem><para><command>nix-env -q</command> now has a flag
   <option>--prebuilt-only</option> (<option>-b</option>) that causes
   <command>nix-env</command> to show only those derivations whose
   output is already in the Nix store or that can be substituted (i.e.,
   downloaded from somewhere).  In other words, it shows the packages
   that can be installed “quickly”, i.e., don’t need to be built from
-  source.  TODO: flag is also available in nix-env -i /
-  -u.</para></listitem>
+  source.  The <option>-b</option> flag is also available in
+  <command>nix-env -i</command> and <command>nix-env -u</command> to
+  filter out derivations for which no pre-built binary is
+  available.</para></listitem>
   
 
-  <listitem><para>TODO: new built-ins
+  <listitem><para>Several new built-in functions:
   <function>builtins.attrNames</function>,
   <function>builtins.filterSource</function>,
-  <function>builtins.sub</function>,
+  <function>builtins.isAttrs</function>,
+  <function>builtins.isFunction</function>,
+  <function>builtins.listToAttrs</function>,
   <function>builtins.stringLength</function>,
-  <function>builtins.substring</function>.</para></listitem>
+  <function>builtins.sub</function>,
+  <function>builtins.substring</function>,
+  <function>throw</function>,
+  <function>builtins.trace</function>,
+  <function>builtins.readFile</function>.</para></listitem>
 
 
-  <listitem><para>TODO: each subscribed channel is its own attribute
-  in the top-level expression generated for the channel, this allows
-  disambiguation (<command>nix-env -qaA</command>).</para></listitem>
+  <listitem><para><command>nix-channel</command>: each subscribed
+  channel is its own attribute in the top-level expression generated
+  for the channel.  This allows disambiguation (e.g. <literal>nix-env
+  -i -A nixpkgs_unstable.firefox</literal>).</para></listitem>
 
 
   <listitem><para>The substitutes table has been removed from the
   database.  This makes operations such as <command>nix-pull</command>
-  and <command>nix-channel --update</command>
-  <emphasis>much</emphasis> faster.</para></listitem>
+  and <command>nix-channel --update</command> much, much
+  faster.</para></listitem>
 
 
   <listitem><para><command>nix-prefetch-url</command> now has a
@@ -128,11 +202,19 @@
   the channel hasn’t changed.</para></listitem>
 
 
-  <listitem><para>TODO: chroot support.</para></listitem>
+  <listitem><para>Nix can now perform builds in an automatically
+  generated “chroot”.  This prevents a builder from accessing stuff
+  outside of the Nix store, and thus helps ensure purity.  This is an
+  experimental feature.</para></listitem>
   
 
-  <listitem><para>TODO: <literal>''</literal>-style string
-  literals.</para></listitem>
+  <listitem><para>A new kind of string literal: strings between double
+  single-quotes (<literal>''</literal>) have indentation
+  “intelligently” removed.  This allows large strings (such as shell
+  scripts or configuration file fragments in NixOS) to cleanly follow
+  the indentation of the surrounding expression.  It also requires
+  much less escaping, since <literal>''</literal> is less common in
+  most languages than <literal>"</literal>.</para></listitem>
   
 
 </itemizedlist>

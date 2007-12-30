@@ -612,7 +612,10 @@ language.</para>
 
   <listitem>
 
-    <para><emphasis>Strings</emphasis> are enclosed between double
+    <para><emphasis>Strings</emphasis> can be written in three
+    ways.</para>
+
+    <para>The most common way is to enclose the string between double
     quotes, e.g., <literal>"foo bar"</literal>.  Strings can span
     multiple lines.  The special characters <literal>"</literal> and
     <literal>\</literal> and the character sequence
@@ -658,8 +661,73 @@ configureFlags = "
     some of which in turn contain expressions (e.g.,
     <literal>${mesa}</literal>).</para>
 
-    <para>As a convenience, <emphasis>URIs</emphasis> as defined in
-    appendix B of <link
+    <para>The second way to write string literals is as an
+    <emphasis>indented string</emphasis>, which is enclosed between
+    pairs of <emphasis>double single-quotes</emphasis>, like so:
+
+<programlisting>
+''
+  This is the first line.
+  This is the second line.
+    This is the third line.
+''</programlisting>
+
+    This kind of string literal intelligently strips indentation from
+    the start of each line.  To be precise, it strips from each line a
+    number of spaces equal to the minimal indentation of the string as
+    a whole (disregarding the indentation of empty lines).  For
+    instance, the first and second line are indented two space, while
+    the third line is indented three spaces.  Thus, two spaces are
+    stripped from each line, so the resulting string is
+
+<programlisting>    
+"This is the first line.\nThis is the second line.\n  This is the third line.\n"</programlisting>
+
+    </para>
+
+    <para>Note that the whitespace and newline following the opening
+    <literal>''</literal> is ignored if there is no non-whitespace
+    text on the initial line.</para>
+
+    <para>Antiquotation
+    (<literal>${<replaceable>expr</replaceable>}}</literal>) is
+    supported in indented strings.</para>
+
+    <para>Since <literal>${</literal> and <literal>''</literal> have
+    special meaning in indented strings, you need a way to quote them.
+    <literal>${</literal> can be escaped by prefixing it with
+    <literal>''</literal>, i.e., <literal>''${</literal>.
+    <literal>''</literal> can be escaped by prefixing it with
+    <literal>'</literal>, i.e., <literal>'''</literal>.  Finally,
+    linefeed, carriage-return and tab characters can be writted as
+    <literal>''\n</literal>, <literal>''\r</literal>,
+    <literal>''\t</literal>.</para>
+    
+    <para>Indented strings are primarily useful in that they allow
+    multi-line string literals to follow the indentation of the
+    enclosing Nix expression, and that less escaping is typically
+    necessary for strings representing languages such as shell scripts
+    and configuration files because <literal>''</literal> is much less
+    common than <literal>"</literal>.  Example:
+
+<programlisting>
+stdenv.mkDerivation {
+  <replaceable>...</replaceable>
+  postInstall =
+    ''
+      mkdir $out/bin $out/etc
+      cp foo $out/bin
+      echo "Hello World" > $out/etc/foo.conf
+      ${if enableBar then "cp bar $out/bin" else ""}
+    '';
+  <replaceable>...</replaceable>
+}    
+</programlisting>
+
+    </para>
+
+    <para>Finally, as a convenience, <emphasis>URIs</emphasis> as
+    defined in appendix B of <link
     xlink:href='http://www.ietf.org/rfc/rfc2396.txt'>RFC 2396</link>
     can be written <emphasis>as is</emphasis>, without quotes.  For
     instance, the string
