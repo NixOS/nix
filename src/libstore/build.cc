@@ -1619,6 +1619,44 @@ void DerivationGoal::startBuilder()
             makeValidityRegistration(refs, false));
     }
 
+    // The same for derivations
+    s = drv.env["exportBuildReferencesGraph"];
+    ss = tokenizeString(s);
+    if (ss.size() % 2 != 0)
+        throw BuildError(format("odd number of tokens in `exportReferencesGraph': `%1%'") % s);
+    for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
+        string fileName = *i++;
+        checkStoreName(fileName); /* !!! abuse of this function */
+
+        /* Check that the store path is valid. */
+        Path storePath = *i++;
+        if (!isInStore(storePath))
+            throw BuildError(format("`exportReferencesGraph' contains a non-store path `%1%'")
+                % storePath);
+        storePath = toStorePath(storePath);
+        if (!store->isValidPath(storePath))
+            throw BuildError(format("`exportReferencesGraph' contains an invalid path `%1%'")
+                % storePath);
+
+        /* Write closure info to `fileName'. */
+        PathSet refs1,refs;
+        computeFSClosure(storePath, refs1);
+	for (PathSet::iterator j = refs1.begin(); j != refs1.end() ; j++) {
+		refs.insert (*j);
+		if (isDerivation (*j)) {
+			Derivation deriv = derivationFromPath (*j);
+			for (DerivationOutputs::iterator k=deriv.outputs.begin(); 
+			    k != deriv.outputs.end(); k++) {
+				refs.insert(k->second.path);
+			}
+		}
+	}
+        /* !!! in secure Nix, the writing should be done on the
+           build uid for security (maybe). */
+        writeStringToFile(tmpDir + "/" + fileName,
+            makeValidityRegistration(refs, false));
+    }
+    
     
     /* If `build-users-group' is not empty, then we have to build as
        one of the members of that group. */
