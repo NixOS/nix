@@ -11,10 +11,11 @@
 <section xml:id="ssec-relnotes-0.11"><title>Release 0.11 (December 31,
 2007)</title>
 
-<para>The most important improvement in Nix 0.11 is secure multi-user
-support.  It also features many usability improvements and language
-extensions, many of them to support NixOS.  Here is an (incomplete)
-list:</para>
+<para>Nix 0.11 has many improvements over the previous stable release.
+The most important improvement is secure multi-user support.  It also
+features many usability enhancements and language extensions, many of
+them prompted by NixOS, the purely functional Linux distribution based
+on Nix.  Here is an (incomplete) list:</para>
 
 
 <itemizedlist>
