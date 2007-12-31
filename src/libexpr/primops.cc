@@ -917,8 +917,8 @@ static Expr prim_toString(EvalState & state, const ATermVector & args)
 }
 
 
-/* `substr start len str' returns the substring of `str' starting at
-   character position `min(start, stringLength str)' inclusive and
+/* `substring start len str' returns the substring of `str' starting
+   at character position `min(start, stringLength str)' inclusive and
    ending at `min(start + len, stringLength str)'.  `start' must be
    non-negative. */
 static Expr prim_substring(EvalState & state, const ATermVector & args)

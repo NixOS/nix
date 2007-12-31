@@ -129,6 +129,22 @@ list:</para>
   environment.</para></listitem>
 
 
+  <listitem><para><command>nix-env -i / -u</command>: instead of
+  breaking package ties by version, break them by priority and version
+  number.  That is, if there are multiple packages with the same name,
+  then pick the package with the highest priority, and only use the
+  version if there are multiple packages with the same
+  priority.</para>
+
+  <para>This makes it possible to mark specific versions/variant in
+  Nixpkgs more or less desirable than others.  A typical example would
+  be a beta version of some package (e.g.,
+  <literal>gcc-4.2.0rc1</literal>) which should not be installed even
+  though it is the highest version, except when it is explicitly
+  selected (e.g., <literal>nix-env -i
+  gcc-4.2.0rc1</literal>).</para></listitem>
+
+
   <listitem><para><command>nix-env --set-flag</command> allows
   meta attributes of installed packages to be modified.  There are
   several attributes that can be usefully modified, because they
@@ -215,7 +231,35 @@ list:</para>
   the indentation of the surrounding expression.  It also requires
   much less escaping, since <literal>''</literal> is less common in
   most languages than <literal>"</literal>.</para></listitem>
+
+
+  <listitem><para>The new command <command>nix-store
+  --optimise</command> reduces Nix store disk space usage by finding
+  identical files in the store and hard-linking them to each other.
+  It typically reduces the size of the store by something like
+  25-35%.</para></listitem>
+
   
+  <listitem><para>Allow <filename>~/.nix-defexpr</filename> to be a
+  directory, in which case the Nix expressions in that directory are
+  combined into an attribute set, with the file names used as the
+  names of the attributes.  The command <command>nix-env
+  --import</command> (which set the
+  <filename>~/.nix-defexpr</filename> symlink) is
+  removed.</para></listitem>
+
+
+  <listitem><para>Fixed-output derivations (like
+  <function>fetchurl</function>) can define the attribute
+  <varname>impureEnvVars</varname> to allow external environment
+  variables to be passed to builders.  This is used in Nixpkgs to
+  support proxy configuration, among other things.</para></listitem>
+
+
+  <listitem><para><command>nix-pull</command> now supports
+  bzip2-compressed manifests.  This speeds up
+  channels.</para></listitem>
+
 
 </itemizedlist>
 
