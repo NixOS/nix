@@ -37,7 +37,7 @@ list:</para>
 
   <listitem><para><command>nix-prefetch-url</command> now by default
   computes the SHA-256 hash of the file instead of the MD5 hash.  In
-  calls to <function>fetchurl</function> you should pass an
+  calls to <function>fetchurl</function> you should pass the
   <literal>sha256</literal> attribute instead of
   <literal>md5</literal>.  You can pass either a hexadecimal or a
   base-32 encoding of the hash.</para></listitem>
@@ -100,12 +100,12 @@ list:</para>
   <filename>browser</filename> contain just Firefox.</para></listitem>
   
 
-  <listitem><para>The new <option>--argstr</option> (in
+  <listitem><para>The new option <option>--argstr</option> (in
   <command>nix-env</command>, <command>nix-instantiate</command> and
   <command>nix-build</command>) is like <option>--arg</option>, except
   that the value is a string.  For example, <literal>--argstr system
   i686-linux</literal> is equivalent to <literal>--arg system
-  \"i686-linux\"'</literal> (note that <option>--argstr</option>
+  \"i686-linux\"</literal> (note that <option>--argstr</option>
   prevents annoying quoting around shell arguments).</para></listitem>
 
 
@@ -145,10 +145,10 @@ list:</para>
   gcc-4.2.0rc1</literal>).</para></listitem>
 
 
-  <listitem><para><command>nix-env --set-flag</command> allows
-  meta attributes of installed packages to be modified.  There are
-  several attributes that can be usefully modified, because they
-  affect <command>nix-env</command> behaviour or the user environment
+  <listitem><para><command>nix-env --set-flag</command> allows meta
+  attributes of installed packages to be modified.  There are several
+  attributes that can be usefully modified, because they affect the
+  behaviour of <command>nix-env</command> or the user environment
   build script:
 
     <itemizedlist>
@@ -159,8 +159,7 @@ list:</para>
       <listitem><para><varname>meta.keep</varname> can be set to
       <literal>true</literal> to prevent the package from being
       upgraded or replaced.  Useful if you want to hang on to an older
-      version of a package.  (This is similar to masking in
-      Gentoo.)</para></listitem>
+      version of a package.</para></listitem>
 
       <listitem><para><varname>meta.active</varname> can be set to
       <literal>false</literal> to “disable” the package.  That is, no
