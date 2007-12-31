@@ -35,61 +35,13 @@ list:</para>
   <command>ssh</command>.</para></listitem>
 
 
-  <listitem><para><command>nix-prefetch-url</command> now by default
-  computes the SHA-256 hash of the file instead of the MD5 hash.  In
-  calls to <function>fetchurl</function> you should pass the
-  <literal>sha256</literal> attribute instead of
-  <literal>md5</literal>.  You can pass either a hexadecimal or a
-  base-32 encoding of the hash.</para></listitem>
-
-  
-  <listitem><para><command>nix-store</command> has a new operation
-  <option>--read-log</option> (<option>-l</option>)
-  <parameter>paths</parameter> that shows the build log of the given
-  paths.</para></listitem>
-
-  
-  <listitem><para>Derivations can specify the new special attribute
-  <varname>allowedReferences</varname> to enforce that the references
-  in the output of a derivation are a subset of a declared set of
-  paths.  For example, if <varname>allowedReferences</varname> is an
-  empty list, then the output must not have any references.  This is
-  used in NixOS to check that generated files such as initial ramdisks
-  for booting Linux don’t have any dependencies.</para></listitem>
-
-
-  <!--
-  <listitem><para>TODO: semantic cleanups of string concatenation
-  etc. (mostly in r6740).</para></listitem>
-  -->
-
-
-  <listitem><para>Nix now uses Berkeley DB 4.5.  The database is
-  upgraded automatically, but you should be careful not to use old
-  versions of Nix that still use Berkeley DB 4.4.</para></listitem>
-
-
-  <!-- foo
-  <listitem><para>TODO: option <option>- -reregister</option> in
-  <command>nix-store - -register-validity</command>.</para></listitem>
-  -->
-
-
-  <listitem><para>The new attribute
-  <varname>exportReferencesGraph</varname> allows builders access to
-  the references graph of their inputs.  This is used in NixOS for
-  tasks such as generating ISO-9660 images that contain a Nix store
-  populated with the closure of certain paths.</para></listitem>
-
-
-  <listitem><para>The option <option>--max-silent-time</option>
-  (corresponding to the configuration setting
-  <literal>build-max-silent-time</literal>) allows you to set a
-  timeout on builds — if a build produces no output on
-  <literal>stdout</literal> or <literal>stderr</literal> for the given
-  number of seconds, it is terminated.  This is useful for recovering
-  automatically from builds that are stuck in an infinite
-  loop.</para></listitem>
+  <listitem><para>A new kind of string literal: strings between double
+  single-quotes (<literal>''</literal>) have indentation
+  “intelligently” removed.  This allows large strings (such as shell
+  scripts or configuration file fragments in NixOS) to cleanly follow
+  the indentation of the surrounding expression.  It also requires
+  much less escaping, since <literal>''</literal> is less common in
+  most languages than <literal>"</literal>.</para></listitem>
 
 
   <listitem><para><command>nix-env</command> <option>--set</option>
@@ -99,15 +51,6 @@ list:</para>
   firefox</literal> lets the profile named
   <filename>browser</filename> contain just Firefox.</para></listitem>
   
-
-  <listitem><para>The new option <option>--argstr</option> (in
-  <command>nix-env</command>, <command>nix-instantiate</command> and
-  <command>nix-build</command>) is like <option>--arg</option>, except
-  that the value is a string.  For example, <literal>--argstr system
-  i686-linux</literal> is equivalent to <literal>--arg system
-  \"i686-linux\"</literal> (note that <option>--argstr</option>
-  prevents annoying quoting around shell arguments).</para></listitem>
-
 
   <listitem><para><command>nix-env</command> now maintains
   meta-information about installed packages in profiles.  The
@@ -185,18 +128,46 @@ list:</para>
   available.</para></listitem>
   
 
-  <listitem><para>Several new built-in functions:
-  <function>builtins.attrNames</function>,
-  <function>builtins.filterSource</function>,
-  <function>builtins.isAttrs</function>,
-  <function>builtins.isFunction</function>,
-  <function>builtins.listToAttrs</function>,
-  <function>builtins.stringLength</function>,
-  <function>builtins.sub</function>,
-  <function>builtins.substring</function>,
-  <function>throw</function>,
-  <function>builtins.trace</function>,
-  <function>builtins.readFile</function>.</para></listitem>
+  <listitem><para>The new option <option>--argstr</option> (in
+  <command>nix-env</command>, <command>nix-instantiate</command> and
+  <command>nix-build</command>) is like <option>--arg</option>, except
+  that the value is a string.  For example, <literal>--argstr system
+  i686-linux</literal> is equivalent to <literal>--arg system
+  \"i686-linux\"</literal> (note that <option>--argstr</option>
+  prevents annoying quoting around shell arguments).</para></listitem>
+
+
+  <listitem><para><command>nix-store</command> has a new operation
+  <option>--read-log</option> (<option>-l</option>)
+  <parameter>paths</parameter> that shows the build log of the given
+  paths.</para></listitem>
+
+  
+  <!--
+  <listitem><para>TODO: semantic cleanups of string concatenation
+  etc. (mostly in r6740).</para></listitem>
+  -->
+
+
+  <listitem><para>Nix now uses Berkeley DB 4.5.  The database is
+  upgraded automatically, but you should be careful not to use old
+  versions of Nix that still use Berkeley DB 4.4.</para></listitem>
+
+
+  <!-- foo
+  <listitem><para>TODO: option <option>- -reregister</option> in
+  <command>nix-store - -register-validity</command>.</para></listitem>
+  -->
+
+
+  <listitem><para>The option <option>--max-silent-time</option>
+  (corresponding to the configuration setting
+  <literal>build-max-silent-time</literal>) allows you to set a
+  timeout on builds — if a build produces no output on
+  <literal>stdout</literal> or <literal>stderr</literal> for the given
+  number of seconds, it is terminated.  This is useful for recovering
+  automatically from builds that are stuck in an infinite
+  loop.</para></listitem>
 
 
   <listitem><para><command>nix-channel</command>: each subscribed
@@ -211,26 +182,30 @@ list:</para>
   faster.</para></listitem>
 
 
+  <listitem><para><command>nix-pull</command> now supports
+  bzip2-compressed manifests.  This speeds up
+  channels.</para></listitem>
+
+
   <listitem><para><command>nix-prefetch-url</command> now has a
   limited form of caching.  This is used by
   <command>nix-channel</command> to prevent unnecessary downloads when
   the channel hasn’t changed.</para></listitem>
 
 
+  <listitem><para><command>nix-prefetch-url</command> now by default
+  computes the SHA-256 hash of the file instead of the MD5 hash.  In
+  calls to <function>fetchurl</function> you should pass the
+  <literal>sha256</literal> attribute instead of
+  <literal>md5</literal>.  You can pass either a hexadecimal or a
+  base-32 encoding of the hash.</para></listitem>
+
+  
   <listitem><para>Nix can now perform builds in an automatically
   generated “chroot”.  This prevents a builder from accessing stuff
   outside of the Nix store, and thus helps ensure purity.  This is an
   experimental feature.</para></listitem>
   
-
-  <listitem><para>A new kind of string literal: strings between double
-  single-quotes (<literal>''</literal>) have indentation
-  “intelligently” removed.  This allows large strings (such as shell
-  scripts or configuration file fragments in NixOS) to cleanly follow
-  the indentation of the surrounding expression.  It also requires
-  much less escaping, since <literal>''</literal> is less common in
-  most languages than <literal>"</literal>.</para></listitem>
-
 
   <listitem><para>The new command <command>nix-store
   --optimise</command> reduces Nix store disk space usage by finding
@@ -239,13 +214,29 @@ list:</para>
   25-35%.</para></listitem>
 
   
-  <listitem><para>Allow <filename>~/.nix-defexpr</filename> to be a
+  <listitem><para><filename>~/.nix-defexpr</filename> can now be a
   directory, in which case the Nix expressions in that directory are
   combined into an attribute set, with the file names used as the
   names of the attributes.  The command <command>nix-env
   --import</command> (which set the
   <filename>~/.nix-defexpr</filename> symlink) is
   removed.</para></listitem>
+
+
+  <listitem><para>Derivations can specify the new special attribute
+  <varname>allowedReferences</varname> to enforce that the references
+  in the output of a derivation are a subset of a declared set of
+  paths.  For example, if <varname>allowedReferences</varname> is an
+  empty list, then the output must not have any references.  This is
+  used in NixOS to check that generated files such as initial ramdisks
+  for booting Linux don’t have any dependencies.</para></listitem>
+
+
+  <listitem><para>The new attribute
+  <varname>exportReferencesGraph</varname> allows builders access to
+  the references graph of their inputs.  This is used in NixOS for
+  tasks such as generating ISO-9660 images that contain a Nix store
+  populated with the closure of certain paths.</para></listitem>
 
 
   <listitem><para>Fixed-output derivations (like
@@ -255,9 +246,18 @@ list:</para>
   support proxy configuration, among other things.</para></listitem>
 
 
-  <listitem><para><command>nix-pull</command> now supports
-  bzip2-compressed manifests.  This speeds up
-  channels.</para></listitem>
+  <listitem><para>Several new built-in functions:
+  <function>builtins.attrNames</function>,
+  <function>builtins.filterSource</function>,
+  <function>builtins.isAttrs</function>,
+  <function>builtins.isFunction</function>,
+  <function>builtins.listToAttrs</function>,
+  <function>builtins.stringLength</function>,
+  <function>builtins.sub</function>,
+  <function>builtins.substring</function>,
+  <function>throw</function>,
+  <function>builtins.trace</function>,
+  <function>builtins.readFile</function>.</para></listitem>
 
 
 </itemizedlist>
