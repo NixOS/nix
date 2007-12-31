@@ -2,6 +2,13 @@
   
   <arg>
     <group choice='req'>
+      <arg choice='plain'><option>--prebuilt-only</option></arg>
+      <arg choice='plain'><option>-b</option></arg>
+    </group>
+  </arg>
+  
+  <arg>
+    <group choice='req'>
       <arg choice='plain'><option>--attr</option></arg>
       <arg choice='plain'><option>-A</option></arg>
     </group>

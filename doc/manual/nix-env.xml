@@ -19,6 +19,7 @@
     <command>nix-env</command>
     <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="opt-common-syn.xml#xmlns(db=http://docbook.org/ns/docbook)xpointer(/db:nop/*)" />
     <arg><option>--arg</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
+    <arg><option>--argstr</option> <replaceable>name</replaceable> <replaceable>value</replaceable></arg>
     <arg>
       <group choice='req'>
         <arg choice='plain'><option>--file</option></arg>
@@ -141,13 +142,33 @@ linkend="sec-common-options" />.</para>
 
   <varlistentry><term><filename>~/.nix-defexpr</filename></term>
 
-  <!-- !!! .nix-defexpr can be a directory now -->
-  
-    <listitem><para>The default Nix expression used by the
-    <option>--install</option>, <option>--upgrade</option>, and
-    <option>--query --available</option> operations to obtain
-    derivations.  The <option>--file</option> option may be used to
-    override this default.</para></listitem>
+    <listitem><para>A directory that contains the default Nix
+    expressions used by the <option>--install</option>,
+    <option>--upgrade</option>, and <option>--query
+    --available</option> operations to obtain derivations.  The
+    <option>--file</option> option may be used to override this
+    default.</para>
+
+    <para>The Nix expressions in this directory are combined into a
+    single attribute set, with each file as an attribute that has the
+    name of the file.  Thus, if <filename>~/.nix-defexpr</filename>
+    contains two files, <filename>foo</filename> and
+    <filename>bar</filename>, then the default Nix expression will
+    essentially be
+
+<programlisting>
+{
+  foo = import ~/.nix-defexpr/foo;
+  bar = import ~/.nix-defexpr/bar;
+}</programlisting>
+
+    </para>
+
+    <para>The command <command>nix-channel</command> places symlinks
+    to the downloaded Nix expressions from each subscribed channel in
+    this directory.</para>
+
+    </listitem>
     
   </varlistentry>
 
@@ -212,11 +233,21 @@ number of possible ways:
   <para>If there are multiple derivations matching a name in
   <replaceable>args</replaceable> that have the same name (e.g.,
   <literal>gcc-3.3.6</literal> and <literal>gcc-4.1.1</literal>), then
-  only the highest version will be installed.  You can force the
-  installation of multiple derivations with the same name by being
-  specific about the versions.  For instance, <literal>nix-env -i
-  gcc-3.3.6 gcc-4.1.1</literal> will install both version of GCC (and
-  will probably cause a user environment conflict!).</para></listitem>
+  the derivation with the highest <emphasis>priority</emphasis> is
+  used.  A derivation can define a priority by declaring the
+  <varname>meta.priority</varname> attribute.  This attribute should
+  be a number, with a higher value denoting a lower priority.  The
+  default priority is <literal>0</literal>.</para>
+
+  <para>If there are multiple matching derivations with the same
+  priority, then the derivation with the highest version will be
+  installed.</para>
+
+  <para>You can force the installation of multiple derivations with
+  the same name by being specific about the versions.  For instance,
+  <literal>nix-env -i gcc-3.3.6 gcc-4.1.1</literal> will install both
+  version of GCC (and will probably cause a user environment
+  conflict!).</para></listitem>
 
   <listitem><para>If <link
   linkend='opt-attr'><option>--attr</option></link>
@@ -262,6 +293,15 @@ number of possible ways:
 <refsection><title>Flags</title>
 
 <variablelist>
+
+  <varlistentry><term><option>--prebuild-only</option> / <option>-b</option></term>
+
+    <listitem><para>Use only derivations for which a substitute is
+    registered, i.e., there is a pre-built binary available that can
+    be downloaded in lieu of building the derivation.  Thus, no
+    packages will be built from source.</para></listitem>
+
+  </varlistentry>
 
   <varlistentry><term><option>--preserve-installed</option></term>
     <term><option>-P</option></term>
@@ -378,7 +418,7 @@ the following paths will be substituted:
   
 <!--######################################################################-->
 
-<refsection><title>Operation <option>--upgrade</option></title>
+<refsection xml:id="rsec-nix-env-upgrade"><title>Operation <option>--upgrade</option></title>
 
 <refsection><title>Synopsis</title>
 
@@ -462,6 +502,9 @@ installed.</para>
   </varlistentry>
 
 </variablelist>
+
+<para>For the other flags, see <option
+linkend="rsec-nix-env-install">--install</option>.</para>
 
 </refsection>
 
@@ -573,6 +616,111 @@ $ nix-env -e '*' <lineannotation>(remove everything)</lineannotation></screen>
 
   
 <!--######################################################################-->
+
+<refsection xml:id="rsec-nix-env-set-flag"><title>Operation <option>--set-flag</option></title>
+
+<refsection><title>Synopsis</title>
+
+<cmdsynopsis>
+  <command>nix-env</command>
+  <arg choice='plain'><option>--set-flag</option></arg>
+  <arg choice='plain'><replaceable>name</replaceable></arg>
+  <arg choice='plain'><replaceable>value</replaceable></arg>
+  <arg choice='plain' rep='repeat'><replaceable>drvnames</replaceable></arg>
+</cmdsynopsis>
+</refsection>
+
+<refsection><title>Description</title>
+            
+<para>The <option>--set-flag</option> operation allows meta attributes
+of installed packages to be modified.  There are several attributes
+that can be usefully modified, because they affect the behaviour of
+<command>nix-env</command> or the user environment build
+script:
+
+<itemizedlist>
+
+  <listitem><para><varname>priority</varname> can be changed to
+  resolve filename clashes.  The user environment build script uses
+  the <varname>meta.priority</varname> attribute of derivations to
+  resolve filename collisions between packages.  Lower priority values
+  denote a higher priority.  For instance, the GCC wrapper package and
+  the Binutils package in Nixpkgs both have a file
+  <filename>bin/ld</filename>, so previously if you tried to install
+  both you would get a collision.  Now, on the other hand, the GCC
+  wrapper declares a higher priority than Binutils, so the former’s
+  <filename>bin/ld</filename> is symlinked in the user
+  environment.</para></listitem>
+
+  <listitem><para><varname>keep</varname> can be set to
+  <literal>true</literal> to prevent the package from being upgraded
+  or replaced.  This is useful if you want to hang on to an older
+  version of a package.</para></listitem>
+
+  <listitem><para><varname>active</varname> can be set to
+  <literal>false</literal> to “disable” the package.  That is, no
+  symlinks will be generated to the files of the package, but it
+  remains part of the profile (so it won’t be garbage-collected).  It
+  can be set back to <literal>true</literal> to re-enable the
+  package.</para></listitem>
+
+</itemizedlist>
+
+</para>
+
+</refsection>
+            
+<refsection><title>Examples</title>
+
+<para>To prevent the currently installed Firefox from being upgraded:
+
+<screen>
+$ nix-env --set-flag keep true firefox</screen>
+
+After this, <command>nix-env -u</command> will ignore Firefox.</para>
+
+<para>To disable the currently installed Firefox, then install a new
+Firefox while the old remains part of the profile:
+
+<screen>
+$ nix-env -q \*
+firefox-2.0.0.9 <lineannotation>(the current one)</lineannotation>
+
+$ nix-env --preserve-installed -i firefox-2.0.0.11
+installing `firefox-2.0.0.11'
+building path(s) `/nix/store/myy0y59q3ig70dgq37jqwg1j0rsapzsl-user-environment'
+Collission between `/nix/store/<replaceable>...</replaceable>-firefox-2.0.0.11/bin/firefox'
+  and `/nix/store/<replaceable>...</replaceable>-firefox-2.0.0.9/bin/firefox'.
+<lineannotation>(i.e., can’t have two active at the same time)</lineannotation>
+
+$ nix-env --set-flag active false firefox
+setting flag on `firefox-2.0.0.9'
+
+$ nix-env --preserve-installed -i firefox-2.0.0.11
+installing `firefox-2.0.0.11'
+
+$ nix-env -q \*
+firefox-2.0.0.11 <lineannotation>(the enabled one)</lineannotation>
+firefox-2.0.0.9 <lineannotation>(the disabled one)</lineannotation></screen>
+
+</para>
+
+<para>To make files from <literal>binutils</literal> take precedence
+over files from <literal>gcc</literal>:
+
+<screen>
+$ nix-env --set-flag priority 5 binutils
+$ nix-env --set-flag priority 10 gcc</screen>
+
+</para>
+
+</refsection>
+    
+</refsection>
+
+
+  
+<!--######################################################################-->
   
 <refsection><title>Operation <option>--query</option></title>
 
@@ -598,7 +746,12 @@ $ nix-env -e '*' <lineannotation>(remove everything)</lineannotation></screen>
       <arg choice='plain'><option>-s</option></arg>
     </group>
   </arg>
-  <arg><option>--attr-path</option></arg>
+  <arg>
+    <group choice='req'>
+      <arg choice='plain'><option>--attr-path</option></arg>
+      <arg choice='plain'><option>-P</option></arg>
+    </group>
+  </arg>
   <arg><option>--no-name</option></arg>
   <arg>
     <group choice='req'>
@@ -621,6 +774,7 @@ $ nix-env -e '*' <lineannotation>(remove everything)</lineannotation></screen>
       <arg choice='plain'><option>-b</option></arg>
     </group>
   </arg>
+
   <arg>
     <group choice='req'>
       <arg choice='plain'><option>--attr</option></arg>
@@ -707,6 +861,16 @@ user environment elements, etc. -->
 
   </varlistentry>
 
+  <varlistentry><term><option>--prebuild-only</option> / <option>-b</option></term>
+
+    <listitem><para>Show only derivations for which a substitute is
+    registered, i.e., there is a pre-built binary available that can
+    be downloaded in lieu of building the derivation.  Thus, this
+    shows all packages that probably can be installed
+    quickly.</para></listitem>
+
+  </varlistentry>
+
   <varlistentry><term><option>--status</option></term>
     <term><option>-s</option></term>
   
@@ -726,8 +890,8 @@ user environment elements, etc. -->
     
   </varlistentry>
 
-  <varlistentry><term><option>--attr</option></term>
-    <term><option>-a</option></term>
+  <varlistentry><term><option>--attr-path</option></term>
+    <term><option>-P</option></term>
 
     <listitem><para>Print the <emphasis>attribute path</emphasis> of
     the derivation, which can be used to unambiguously select it using
@@ -816,6 +980,14 @@ user environment elements, etc. -->
     derivation, if available.  The description is taken from the
     <literal>meta.description</literal> attribute of the
     derivation.</para></listitem>
+    
+  </varlistentry>
+
+  <varlistentry><term><option>--meta</option></term>
+  
+    <listitem><para>Print all of the meta-attributes of the
+    derivation.  This option is only available with
+    <option>--xml</option>.</para></listitem>
     
   </varlistentry>
 
