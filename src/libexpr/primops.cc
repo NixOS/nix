@@ -942,6 +942,14 @@ static Expr prim_stringLength(EvalState & state, const ATermVector & args)
 }
 
 
+static Expr prim_unsafeDiscardStringContext(EvalState & state, const ATermVector & args)
+{
+    PathSet context;
+    string s = coerceToString(state, args[0], context);
+    return makeStr(s, PathSet());
+}
+
+
 /*************************************************************
  * Primop registration
  *************************************************************/
@@ -1009,6 +1017,8 @@ void EvalState::addPrimOps()
     addPrimOp("toString", 1, prim_toString);
     addPrimOp("__substring", 3, prim_substring);
     addPrimOp("__stringLength", 1, prim_stringLength);
+    addPrimOp("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
+    
 }
 
 
