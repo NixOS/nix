@@ -62,11 +62,11 @@ also <xref linkend="sec-channels" />.</para>
   <varlistentry><term><option>--update</option></term>
 
     <listitem><para>Downloads the Nix expressions of all subscribed
-    channels, makes the conjunction of these the default for
-    <command>nix-env</command> operations (by calling <command>nix-env
-    -I</command>), and performs a <command>nix-pull</command> on the
-    manifests of all channels to make pre-built binaries
-    available.</para></listitem>
+    channels, makes them the default for <command>nix-env</command>
+    operations (by symlinking them in the directory
+    <filename>~/.nix-defexpr</filename>), and performs a
+    <command>nix-pull</command> on the manifests of all channels to
+    make pre-built binaries available.</para></listitem>
 
   </varlistentry>
 

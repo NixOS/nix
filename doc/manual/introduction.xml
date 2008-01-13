@@ -50,7 +50,7 @@ are complete.  In general, when you’re making a package for a package
 management system like RPM, you have to specify for each package what
 its dependencies are, but there are no guarantees that this
 specification is complete.  If you forget a dependency, then the
-component will build and work correctly on <emphasis>your</emphasis>
+package will build and work correctly on <emphasis>your</emphasis>
 machine if you have the dependency installed, but not on the end
 user's machine if it's not there.</para>
 

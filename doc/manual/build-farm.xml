@@ -36,10 +36,10 @@ build farm, since:
   builds, and Nix expressions are self-contained.</para></listitem>
 
   <listitem><para>Nix will only rebuild things that have actually
-  changed.  For instance, if the sources of a component haven't
-  changed between runs of the build farm, the component won't be
-  rebuild (unless it was garbage-collected).  Also, dependencies
-  typically don't change very often, so they only need to be built
+  changed.  For instance, if the sources of a package haven't changed
+  between runs of the build farm, the package won't be rebuilt (unless
+  it was garbage-collected).  Also, dependencies typically don't
+  change very often, so they only need to be built
   once.</para></listitem>
 
   <listitem><para>The results of a Nix build farm can be made

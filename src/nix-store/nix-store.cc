@@ -29,7 +29,9 @@ static Path gcRoot;
 static int rootNr = 0;
 static bool indirectRoot = false;
 
+/*
 //Fixes the path and checks if it is a store path , see also toStorePath 
+<<<<<<< .working
 static Path fixPath(Path path)
 {
     path = absPath(path);
@@ -55,6 +57,9 @@ static Path fixStoreOrStatePath(Path path)
     return toStoreOrStatePath(path);
 }
 
+=======
+>>>>>>> .merge-right.r10133
+*/
 
 static Path useDeriver(Path path)
 {       
@@ -99,7 +104,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
 
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); ++i)
-        *i = fixPath(*i);
+        *i = followLinksToStorePath(*i);
     
     if (opArgs.size() > 1) {
         PathSet drvPaths;
@@ -292,7 +297,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
             {
-                *i = fixPath(*i);
+                *i = followLinksToStorePath(*i);
                 if (forceRealise) realisePath(*i);
                 Derivation drv = derivationFromPathTxn(noTxn, *i);
                 cout << format("%1%\n") % findOutput(drv, "out");
@@ -313,8 +318,10 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
             {
-                Path path = maybeUseOutput(fixStoreOrStatePath(*i), useOutput, forceRealise);
-                if (query == qRequisites) store->storePathRequisites(path, includeOutputs, paths, true, false, revision);
+                Path path = maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise);
+                
+                if (query == qRequisites) 
+                	store->storePathRequisites(path, includeOutputs, paths, true, false, revision);
                 else if (query == qRequisitesState) store->storePathRequisites(path, includeOutputs, paths, false, true, revision);
                 else if (query == qRequisitesFull) store->storePathRequisites(path, includeOutputs, paths, true, true, revision);
                 else if (query == qReferences) store->queryStoreReferences(path, paths, revision);
@@ -335,7 +342,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
             {
-                Path deriver = store->queryDeriver(fixPath(*i));
+                Path deriver = store->queryDeriver(followLinksToStorePath(*i));
                 cout << format("%1%\n") %
                     (deriver == "" ? "unknown-deriver" : deriver);
             }
@@ -345,7 +352,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
             {
-                Path path = useDeriver(fixPath(*i));
+                Path path = useDeriver(followLinksToStorePath(*i));
                 Derivation drv = derivationFromPathTxn(noTxn, path);
                 StringPairs::iterator j = drv.env.find(bindingName);
                 if (j == drv.env.end())
@@ -359,7 +366,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
             {
-                Path path = maybeUseOutput(fixPath(*i), useOutput, forceRealise);
+                Path path = maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise);
                 Hash hash = store->queryPathHash(path);
                 assert(hash.type == htSHA256);
                 cout << format("sha256:%1%\n") % printHash32(hash);
@@ -370,7 +377,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             PathSet done;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
-                printTree(fixPath(*i), "", "", done);
+                printTree(followLinksToStorePath(*i), "", "", done);
             break;
         }
             
@@ -378,7 +385,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             PathSet roots;
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
-                roots.insert(maybeUseOutput(fixPath(*i), useOutput, forceRealise));
+                roots.insert(maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise));
 	    printDotGraph(roots);
             break;
         }
@@ -386,7 +393,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qResolve: {
             for (Strings::iterator i = opArgs.begin();
                  i != opArgs.end(); ++i)
-                cout << format("%1%\n") % fixPath(*i);
+                cout << format("%1%\n") % followLinksToStorePath(*i);
             break;
         }
             
@@ -403,7 +410,7 @@ static void opReadLog(Strings opFlags, Strings opArgs)
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); ++i)
     {
-        Path path = useDeriver(fixPath(*i));
+        Path path = useDeriver(followLinksToStorePath(*i));
         
         Path logPath = (format("%1%/%2%/%3%") %
             nixLogDir % drvsLogDir % baseNameOf(path)).str();
@@ -460,7 +467,7 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); ++i)
     {
-        Path path = fixPath(*i);
+        Path path = followLinksToStorePath(*i);
         if (!store->isValidPath(path))
             if (printInvalid)
                 cout << format("%1%\n") % path;
@@ -535,7 +542,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
     PathSet pathsToDelete;
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); ++i)
-        pathsToDelete.insert(fixPath(*i));
+        pathsToDelete.insert(followLinksToStorePath(*i));
     
     PathSet dummy;
     PrintFreed freed(true, false);

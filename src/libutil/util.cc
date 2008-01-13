@@ -12,6 +12,7 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <cstring>
 
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -106,8 +107,7 @@ Path canonPath(const Path & path, bool resolveSymlinks)
             /* If s points to a symlink, resolve it and restart (since
                the symlink target might contain new symlinks). */
             if (resolveSymlinks && isLink(s)) {
-                followCount++;
-                if (followCount >= maxFollow)
+                if (++followCount >= maxFollow)
                     throw Error(format("infinite symlink recursion in path `%1%'") % path);
                 temp = absPath(readLink(s), dirOf(s))
                     + string(i, end);
@@ -1031,8 +1031,15 @@ string statusToString(int status)
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         if (WIFEXITED(status))
             return (format("failed with exit code %1%") % WEXITSTATUS(status)).str();
-        else if (WIFSIGNALED(status))
-            return (format("failed due to signal %1%") % WTERMSIG(status)).str();
+        else if (WIFSIGNALED(status)) {
+	    int sig = WTERMSIG(status);
+#if HAVE_STRSIGNAL
+            const char * description = strsignal(sig);
+            return (format("failed due to signal %1% (%2%)") % sig % description).str();
+#else
+            return (format("failed due to signal %1%") % sig).str();
+#endif
+	}
         else
             return "died abnormally";
     } else return "succeeded";

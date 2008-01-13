@@ -26,7 +26,7 @@ static string gcLockName = "gc.lock";
 static string tempRootsDir = "temproots";
 static string gcRootsDir = "gcroots";
 
-const unsigned int defaultGcLevel = 1000;
+static const int defaultGcLevel = 1000;
 
 
 /* Acquire the global GC lock.  This is used to prevent new Nix
@@ -450,7 +450,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
         queryBoolSetting("gc-keep-outputs", false);
     bool gcKeepDerivations =
         queryBoolSetting("gc-keep-derivations", true);
-    unsigned int gcKeepOutputsThreshold = 
+    int gcKeepOutputsThreshold = 
         queryIntSetting ("gc-keep-outputs-threshold", defaultGcLevel);
 
 	//printMsg(lvlError, format("gcKeepOutputs %1% gcKeepDerivations: %2%") % gcKeepOutputs % gcKeepDerivations);
@@ -536,7 +536,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
                     else if (store->isValidStatePath(j->second.path))
                     	computeFSClosure(j->second.path, livePaths, true, true, 0);
 =======
-*/
+
 
 			string gcLevelStr = drv.env["__gcLevel"];
 			int gcLevel;
@@ -550,6 +550,20 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,	
 				if (store->isValidPath(j->second.path) || store->isValidStatePath(j->second.path))
 				    computeFSClosure(j->second.path, livePaths, true, true, 0);
            }
+=======
+*/
+
+			string gcLevelStr = drv.env["__gcLevel"];
+			int gcLevel;
+			if (!string2Int(gcLevelStr, gcLevel))
+			    gcLevel = defaultGcLevel;
+			
+			if (gcLevel >= gcKeepOutputsThreshold)    
+			    for (DerivationOutputs::iterator j = drv.outputs.begin();
+	                         j != drv.outputs.end(); ++j)
+				if (store->isValidPath(j->second.path) || store->isValidStatePath(j->second.path))
+				    computeFSClosure(j->second.path, livePaths, true, true, 0);
+	     }
     }
 
     if (action == gcReturnLive) {

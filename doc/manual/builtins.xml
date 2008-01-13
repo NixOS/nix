@@ -441,6 +441,15 @@ in config.someSetting</programlisting>
   -->
 
   
+  <varlistentry><term><function>builtins.readFile</function>
+  <replaceable>path</replaceable></term>
+
+    <listitem><para>Return the contents of the file
+    <replaceable>path</replaceable> as a string.</para></listitem>
+
+  </varlistentry>
+  
+  
   <varlistentry><term><function>removeAttrs</function>
   <replaceable>attrs</replaceable> <replaceable>list</replaceable></term>
 
@@ -477,7 +486,7 @@ removeAttrs { x = 1; y = 2; z = 3; } ["a" "x" "z"]</screen>
   </varlistentry>
 
   
-  <varlistentry><term><function>builtins.substr</function>
+  <varlistentry><term><function>builtins.substring</function>
   <replaceable>start</replaceable> <replaceable>len</replaceable>
   <replaceable>s</replaceable></term>
 

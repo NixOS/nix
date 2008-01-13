@@ -259,10 +259,20 @@ bool isStatePath(const Path & path);
 
 void checkStoreName(const string & name);
 
+
 /* Chop off the parts after the top-level store name, e.g.,
    /nix/store/abcd-foo/bar => /nix/store/abcd-foo. */
 Path toStorePath(const Path & path);
 Path toStoreOrStatePath(const Path & path);
+
+/* Follow symlinks until we end up with a path in the Nix store. */
+Path followLinksToStore(const Path & path);
+
+
+/* Same as followLinksToStore(), but apply toStorePath() to the
+   result. */
+Path followLinksToStorePath(const Path & path);
+
 
 /* Constructs a unique store path name. */
 Path makeStorePath(const string & type,

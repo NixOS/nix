@@ -6,9 +6,9 @@
 
 
 <para>This chapter discusses how to do package management with Nix,
-i.e., how to obtain, install, upgrade, and erase components.  This is
+i.e., how to obtain, install, upgrade, and erase packages.  This is
 the “user’s” perspective of the Nix system — people
-who want to <emphasis>create</emphasis> components should consult
+who want to <emphasis>create</emphasis> packages should consult
 <xref linkend='chap-writing-nix-expressions' />.</para>
 
 
@@ -16,8 +16,8 @@ who want to <emphasis>create</emphasis> components should consult
 
 <para>The main command for package management is <link
 linkend="sec-nix-env"><command>nix-env</command></link>.  You can use
-it to install, upgrade, and erase components, and to query what
-components are installed or are available for installation.</para>
+it to install, upgrade, and erase packages, and to query what
+packages are installed or are available for installation.</para>
 
 <para>In Nix, different users can have different “views”
 on the set of installed applications.  That is, there might be lots of
@@ -30,10 +30,10 @@ environment</emphasis>, which is just a directory tree consisting of
 symlinks to the files of the active applications.  </para>
 
 <para>Components are installed from a set of <emphasis>Nix
-expressions</emphasis> that tell Nix how to build those components,
+expressions</emphasis> that tell Nix how to build those packages,
 including, if necessary, their dependencies.  There is a collection of
 Nix expressions called the Nix Package collection that contains
-components ranging from basic development stuff such as GCC and Glibc,
+packages ranging from basic development stuff such as GCC and Glibc,
 to end-user applications like Mozilla Firefox.  (Nix is however not
 tied to the Nix Package collection; you could write your own Nix
 expressions based on it, or completely new ones.)  You can download
@@ -41,7 +41,7 @@ the latest version from <link
 xlink:href='http://nix.cs.uu.nl/dist/nix' />.</para>
 
 <para>Assuming that you have downloaded and unpacked a release of Nix
-Packages, you can view the set of available components in the release:
+Packages, you can view the set of available packages in the release:
 
 <screen>
 $ nix-env -qaf nixpkgs-<replaceable>version</replaceable> '*'
@@ -74,7 +74,7 @@ gcc-4.1.1</screen>
 </para>
 
 <para>It is also possible to see the <emphasis>status</emphasis> of
-available components, i.e., whether they are installed into the user
+available packages, i.e., whether they are installed into the user
 environment and/or present in the system:
 
 <screen>
@@ -86,24 +86,24 @@ IPS bison-1.875d
 ...</screen>
 
 The first character (<literal>I</literal>) indicates whether the
-component is installed in your current user environment.  The second
+package is installed in your current user environment.  The second
 (<literal>P</literal>) indicates whether it is present on your system
 (in which case installing it into your user environment would be a
 very quick operation).  The last one (<literal>S</literal>) indicates
 whether there is a so-called <emphasis>substitute</emphasis> for the
-component, which is Nix’s mechanism for doing binary deployment.  It
-just means that Nix knows that it can fetch a pre-built component from
+package, which is Nix’s mechanism for doing binary deployment.  It
+just means that Nix knows that it can fetch a pre-built package from
 somewhere (typically a network server) instead of building it
 locally.</para>
 
 <para>So now that we have a set of Nix expressions we can build the
-components contained in them.  This is done using <literal>nix-env
+packages contained in them.  This is done using <literal>nix-env
 -i</literal>.  For instance,
 
 <screen>
 $ nix-env -f nixpkgs-<replaceable>version</replaceable> -i subversion</screen>
 
-will install the component called <literal>subversion</literal> (which
+will install the package called <literal>subversion</literal> (which
 is, of course, the <link
 xlink:href='http://subversion.tigris.org/'>Subversion version
 management system</link>).</para>
@@ -112,7 +112,7 @@ management system</link>).</para>
 Subversion and all its dependencies.  This will take quite a while —
 typically an hour or two on modern machines.  Fortunately, there is a
 faster way (so do a Ctrl-C on that install operation!): you just need
-to tell Nix that pre-built binaries of all those components are
+to tell Nix that pre-built binaries of all those packages are
 available somewhere.  This is done using the
 <command>nix-pull</command> command, which must be supplied with a URL
 containing a <emphasis>manifest</emphasis> describing what binaries
@@ -153,7 +153,7 @@ expressions, use <parameter>-i</parameter> instead of
 <parameter>-u</parameter>; <parameter>-i</parameter> will remove
 whatever version is already installed.</para>
 
-<para>You can also upgrade all components for which there are newer
+<para>You can also upgrade all packages for which there are newer
 versions:
 
 <screen>
@@ -199,19 +199,19 @@ set.</para></footnote></para>
 implementing the ability to allow different users to have different
 configurations, and to do atomic upgrades and rollbacks.  To
 understand how they work, it’s useful to know a bit about how Nix
-works.  In Nix, components are stored in unique locations in the
+works.  In Nix, packages are stored in unique locations in the
 <emphasis>Nix store</emphasis> (typically,
 <filename>/nix/store</filename>).  For instance, a particular version
-of the Subversion component might be stored in a directory
+of the Subversion package might be stored in a directory
 <filename>/nix/store/dpmvp969yhdqs7lm2r1a3gng7pyq6vy4-subversion-1.1.3/</filename>,
 while another version might be stored in
 <filename>/nix/store/5mq2jcn36ldlmh93yj1n8s9c95pj7c5s-subversion-1.1.2</filename>.
 The long strings prefixed to the directory names are cryptographic
 hashes<footnote><para>160-bit truncations of SHA-256 hashes encoded in
 a base-32 notation, to be precise.</para></footnote> of
-<emphasis>all</emphasis> inputs involved in building the component —
+<emphasis>all</emphasis> inputs involved in building the package —
 sources, dependencies, compiler flags, and so on.  So if two
-components differ in any way, they end up in different locations in
+packages differ in any way, they end up in different locations in
 the file system, so they don’t interfere with each other.  <xref
 linkend='fig-user-environments' /> shows a part of a typical Nix
 store.</para>
@@ -231,12 +231,12 @@ $ /nix/store/dpmvp969yhdq...-subversion-1.1.3/bin/svn</screen>
 
 every time you want to run Subversion.  Of course we could set up the
 <envar>PATH</envar> environment variable to include the
-<filename>bin</filename> directory of every component we want to use,
+<filename>bin</filename> directory of every package we want to use,
 but this is not very convenient since changing <envar>PATH</envar>
 doesn’t take effect for already existing processes.  The solution Nix
 uses is to create directory trees of symlinks to
-<emphasis>activated</emphasis> components.  These are called
-<emphasis>user environments</emphasis> and they are components
+<emphasis>activated</emphasis> packages.  These are called
+<emphasis>user environments</emphasis> and they are packages
 themselves (though automatically generated by
 <command>nix-env</command>), so they too reside in the Nix store.  For
 instance, in <xref linkend='fig-user-environments' /> the user
@@ -285,8 +285,8 @@ operation, a new user environment and generation link are created
 based on the current one, and finally the <filename>default</filename>
 symlink is made to point at the new generation.  This last step is
 atomic on Unix, which explains how we can do atomic upgrades.  (Note
-that the building/installing of new components doesn’t interfere in
-any way with old components, since they are stored in different
+that the building/installing of new packages doesn’t interfere in
+any way with old packages, since they are stored in different
 locations in the Nix store.)</para>
 
 <para>If you find that you want to undo a <command>nix-env</command>
@@ -352,18 +352,18 @@ This will <emphasis>not</emphasis> change the
 
 <para><command>nix-env</command> operations such as upgrades
 (<option>-u</option>) and uninstall (<option>-e</option>) never
-actually delete components from the system.  All they do (as shown
+actually delete packages from the system.  All they do (as shown
 above) is to create a new user environment that no longer contains
-symlinks to the “deleted” components.</para>
+symlinks to the “deleted” packages.</para>
 
-<para>Of course, since disk space is not infinite, unused components
+<para>Of course, since disk space is not infinite, unused packages
 should be removed at some point.  You can do this by running the Nix
-garbage collector.  It will remove from the Nix store any component
+garbage collector.  It will remove from the Nix store any package
 not used (directly or indirectly) by any generation of any
 profile.</para>
 
 <para>Note however that as long as old generations reference a
-component, it will not be deleted.  After all, we wouldn’t be able to
+package, it will not be deleted.  After all, we wouldn’t be able to
 do a rollback otherwise.  So in order for garbage collection to be
 effective, you should also delete (some) old generations.  Of course,
 this should only be done if you are certain that you will not need to
@@ -486,7 +486,7 @@ makes the union of each channel’s Nix expressions the default for
 <screen>
 $ nix-env -u '*'</screen>
 
-to upgrade all components in your profile to the latest versions
+to upgrade all packages in your profile to the latest versions
 available in the subscribed channels.</para>
 
 </section>

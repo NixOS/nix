@@ -9,6 +9,7 @@ Operations:
   --set: create a user environment containing a single derivation
   --uninstall / -e: remove derivations from the user environment
   --query / -q: perform a query on an environment or Nix expression
+  --set-flag NAME VALUE: set derivation meta-attribute to given value
 
 The previous operations take a list of derivation names.  The special
 name `*' may be used to indicate all derivations.
@@ -20,8 +21,6 @@ name `*' may be used to indicate all derivations.
   --delete-generations GENERATIONS...: deleted listed generations,
       `old' for all non-current generations
   
-  --import / -I FILE: set default Nix expression
-
   --version: output version information
   --help: display help
 

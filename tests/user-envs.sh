@@ -2,6 +2,8 @@ source common.sh
 
 clearProfiles
 
+set -x
+
 # Query installed: should be empty.
 test "$($nixenv -p $profiles/test -q '*' | wc -l)" -eq 0
 
@@ -70,6 +72,15 @@ test "$($nixenv -p $profiles/test --list-generations | wc -l)" -eq 5
 echo $outPath10
 $nixenv -p $profiles/test -i "$outPath10"
 $nixenv -p $profiles/test -q '*' | grep -q foo-1.0
+
+# Uninstall foo-1.0, using a symlink to its store path.
+ln -sfn $outPath10/bin/foo $TEST_ROOT/symlink
+$nixenv -p $profiles/test -e $TEST_ROOT/symlink
+if $nixenv -p $profiles/test -q '*' | grep -q foo; then false; fi
+
+# Install foo-1.0, now using a symlink to its store path.
+$nixenv -p $profiles/test -i $TEST_ROOT/symlink
+$nixenv -p $profiles/test -q '*' | grep -q foo
 
 # Delete all old generations.
 $nixenv -p $profiles/test --delete-generations old

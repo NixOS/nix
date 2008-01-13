@@ -779,4 +779,178 @@ archive is read from standard input.</para>
 </refsection>
 
 
+<!--######################################################################-->
+
+<refsection xml:id='refsec-nix-store-export'><title>Operation <option>--export</option></title>
+
+<refsection>
+  <title>Synopsis</title>
+  <cmdsynopsis>
+    <command>nix-store</command>
+    <arg choice='plain'><option>--export</option></arg>
+    <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+  </cmdsynopsis>
+</refsection>
+
+<refsection><title>Description</title>
+            
+<para>The operation <option>--export</option> writes a serialisation
+of the specified store paths to standard output in a format that can
+be imported into another Nix store with <command
+linkend="refsec-nix-store-import">nix-store --import</command>.  This
+is like <command linkend="refsec-nix-store-dump">nix-store
+--dump</command>, except that the NAR archive produced by that command
+doesn’t contain the necessary meta-information to allow it to be
+imported into another Nix store (namely, the set of references of the
+path).</para>
+
+<para>This command does not produce a <emphasis>closure</emphasis> of
+the specified paths, so if a store path references other store paths
+that are missing in the target Nix store, the import will fail.  To
+copy a whole closure, do something like
+
+<screen>
+$ nix-store --export $(nix-store -qR <replaceable>paths</replaceable>) > out</screen>
+
+</para>
+
+<para>For an example of how <option>--export</option> and
+<option>--import</option> can be used, see the source of the <command
+linkend="sec-nix-copy-closure">nix-copy-closure</command>
+command.</para>
+
+</refsection>
+            
+
+</refsection>
+
+
+<!--######################################################################-->
+
+<refsection xml:id='refsec-nix-store-import'><title>Operation <option>--import</option></title>
+
+<refsection>
+  <title>Synopsis</title>
+  <cmdsynopsis>
+    <command>nix-store</command>
+    <arg choice='plain'><option>--import</option></arg>
+  </cmdsynopsis>
+</refsection>
+
+<refsection><title>Description</title>
+            
+<para>The operation <option>--export</option> reads a serialisation of
+a set of store paths produced by <command
+linkend="refsec-nix-store-export">nix-store --import</command> from
+standard input and adds those store paths to the Nix store.  Paths
+that already exist in the Nix store are ignored.  If a path refers to
+another path that doesn’t exist in the Nix store, the import
+fails.</para>
+
+</refsection>
+            
+
+</refsection>
+
+
+<!--######################################################################-->
+
+<refsection><title>Operation <option>--optimise</option></title>
+
+<refsection>
+  <title>Synopsis</title>
+  <cmdsynopsis>
+    <command>nix-store</command>
+    <arg choice='plain'><option>--optimise</option></arg>
+  </cmdsynopsis>
+</refsection>
+
+<refsection><title>Description</title>
+            
+<para>The operation <option>--optimise</option> reduces Nix store disk
+space usage by finding identical files in the store and hard-linking
+them to each other.  It typically reduces the size of the store by
+something like 25-35%.  Only regular files and symlinks are
+hard-linked in this manner.  Files are considered identical when they
+have the same NAR archive serialisation: that is, regular files must
+have the same contents and permission (executable or non-executable),
+and symlinks must have the same contents.</para>
+
+<para>After completion, or when the command is interrupted, a report
+on the achieved savings is printed on standard error.</para>
+
+<para>Use <option>-vv</option> or <option>-vvv</option> to get some
+progress indication.</para>
+
+</refsection>
+            
+<refsection><title>Example</title>
+
+<screen>
+$ nix-store --optimise
+hashing files in `/nix/store/qhqx7l2f1kmwihc9bnxs7rc159hsxnf3-gcc-4.1.1'
+<replaceable>...</replaceable>
+541838819 bytes (516.74 MiB) freed by hard-linking 54143 files;
+there are 114486 files with equal contents out of 215894 files in total
+</screen>
+
+</refsection>
+
+
+</refsection>
+
+
+<!--######################################################################-->
+
+<refsection><title>Operation <option>--read-log</option></title>
+
+<refsection>
+  <title>Synopsis</title>
+  <cmdsynopsis>
+    <command>nix-store</command>
+    <group choice='req'>
+      <arg choice='plain'><option>--read-log</option></arg>
+      <arg choice='plain'><option>-l</option></arg>
+    </group>
+    <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+  </cmdsynopsis>
+</refsection>
+
+<refsection><title>Description</title>
+            
+<para>The operation <option>--read-log</option> prints the build log
+of the specified store paths on standard output.  The build log is
+whatever the builder of a derivation wrote to standard output and
+standard error.  If a store path is not a derivation, the deriver of
+the store path is used.</para>
+
+<para>Build logs are kept in
+<filename>/nix/var/log/nix/drvs</filename>.  However, there is no
+guarantee that a build log is available for any particular store
+path.  For instance, if the path was downloaded as a pre-built binary
+through a substitute, then the log is unavailable.</para>
+
+</refsection>
+            
+<refsection><title>Example</title>
+
+<screen>
+$ nix-store -l $(which ktorrent)
+building /nix/store/dhc73pvzpnzxhdgpimsd9sw39di66ph1-ktorrent-2.2.1
+unpacking sources
+unpacking source archive /nix/store/p8n1jpqs27mgkjw07pb5269717nzf5f8-ktorrent-2.2.1.tar.gz
+ktorrent-2.2.1/
+ktorrent-2.2.1/NEWS
+<replaceable>...</replaceable>
+</screen>
+
+</refsection>
+
+
+</refsection>
+
+
+<!-- TODO: export, import operations -->
+
+
 </refentry>

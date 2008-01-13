@@ -769,6 +769,17 @@ static Expr prim_dirOf(EvalState & state, const ATermVector & args)
 }
 
 
+/* Return the contents of a file as a string. */
+static Expr prim_readFile(EvalState & state, const ATermVector & args)
+{
+    PathSet context;
+    Path path = coerceToPath(state, args[0], context);
+    if (!context.empty())
+        throw EvalError(format("string `%1%' cannot refer to other paths") % path);
+    return makeStr(readFile(path));
+}
+
+
 /*************************************************************
  * Creating files
  *************************************************************/
@@ -1054,8 +1065,8 @@ static Expr prim_toString(EvalState & state, const ATermVector & args)
 }
 
 
-/* `substr start len str' returns the substring of `str' starting at
-   character position `min(start, stringLength str)' inclusive and
+/* `substring start len str' returns the substring of `str' starting
+   at character position `min(start, stringLength str)' inclusive and
    ending at `min(start + len, stringLength str)'.  `start' must be
    non-negative. */
 static Expr prim_substring(EvalState & state, const ATermVector & args)
@@ -1076,6 +1087,14 @@ static Expr prim_stringLength(EvalState & state, const ATermVector & args)
     PathSet context;
     string s = coerceToString(state, args[0], context);
     return makeInt(s.size());
+}
+
+
+static Expr prim_unsafeDiscardStringContext(EvalState & state, const ATermVector & args)
+{
+    PathSet context;
+    string s = coerceToString(state, args[0], context);
+    return makeStr(s, PathSet());
 }
 
 
@@ -1116,6 +1135,7 @@ void EvalState::addPrimOps()
     addPrimOp("__pathExists", 1, prim_pathExists);
     addPrimOp("baseNameOf", 1, prim_baseNameOf);
     addPrimOp("dirOf", 1, prim_dirOf);
+    addPrimOp("__readFile", 1, prim_readFile);
 
     // Creating files
     addPrimOp("__toXML", 1, prim_toXML);
@@ -1145,6 +1165,8 @@ void EvalState::addPrimOps()
     addPrimOp("toString", 1, prim_toString);
     addPrimOp("__substring", 3, prim_substring);
     addPrimOp("__stringLength", 1, prim_stringLength);
+    addPrimOp("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
+    
 }
 
 

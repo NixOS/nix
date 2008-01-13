@@ -4,7 +4,9 @@
 <title>Troubleshooting</title>
 
 
-<para>This section provides solutions for some common problems.</para>
+<para>This section provides solutions for some common problems.  See
+the <link xlink:href="https://bugs.cs.uu.nl/browse/NIX">Nix
+bug tracker</link> for a list of currently known issues.</para>
 
 
 <section><title>Berkeley DB: <quote>Cannot allocate memory</quote></title>
@@ -76,6 +78,46 @@ $ nix-store --verify</screen>
 
 </section>
 
+
+<section><title>Berkeley DB out of locks</title>
+
+<para>It is possible, especially in <command>nix-store
+--verify</command> or when running the garbage collector, to run out
+of Berkeley DB locks, like this:
+
+<screen>
+$ nix-store --verify
+checking path existence
+checking path realisability
+checking the derivers table
+checking the references table
+Berkeley DB error: Lock table is out of available object entries
+error: Db::get: Cannot allocate memory</screen>
+
+</para>
+
+<para>A workaround is to increase the number of locks that Berkeley DB
+allocates.  (The real solution would be for Nix to not use so many
+locks.)  This can be done by putting the following in the file
+<filename>/nix/var/nix/db/<link
+xlink:href="http://www.oracle.com/technology/documentation/berkeley-db/db/ref/env/db_config.html">DB_CONFIG</link></filename>:
+
+<programlisting>
+set_lk_max_locks   100000
+set_lk_max_lockers 100000
+set_lk_max_objects 100000
+</programlisting>
+
+(Increase these numbers if necessary.)  Then make sure that there are
+no running Nix processes and delete the Berkeley DB environment:
+
+<screen>
+$ rm /nix/var/nix/db/__db.*</screen>
+
+The Berkeley DB environment is automatically recreated with the new
+limits when you run any Nix command.</para>
+
+</section>
 
 
 <section><title>Collisions in <command>nix-env</command></title>

@@ -1,4 +1,4 @@
-AC_INIT(nix, 0.11)
+AC_INIT(nix, 0.12)
 AC_CONFIG_SRCDIR(README)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE([dist-bzip2 foreign])
@@ -271,6 +271,10 @@ AM_CONDITIONAL(INIT_STATE, test "$init_state" = "yes")
 
 # Setuid installations.
 AC_CHECK_FUNCS([setresuid setreuid lchown])
+
+
+# Nice to have, but not essential.
+AC_CHECK_FUNCS([strsignal])
 
 
 # This is needed if ATerm, Berkeley DB or bzip2 are static libraries,

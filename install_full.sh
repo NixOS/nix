@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-make clean
+make clean				# comment this out when needed !!!
 
 export nixstatepath=/nixstate2/nix
 export ACLOCAL_PATH=/home/wouterdb/.nix-profile/share/aclocal
