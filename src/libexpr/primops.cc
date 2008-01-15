@@ -949,6 +949,20 @@ static Expr prim_unsafeDiscardStringContext(EvalState & state, const ATermVector
     return makeStr(s, PathSet());
 }
 
+static Expr prim_ExprToString ( EvalState & state, const ATermVector & args)
+{
+	return makeStr ( atPrint ( evalExpr ( state, args [ 0 ] ) ) );
+}
+
+static Expr prim_StringToExpr ( EvalState & state, const ATermVector & args)
+{
+	string s;
+	PathSet l;
+	if (! matchStr ( evalExpr ( state, args[0] ), s, l )) {
+		throw EvalError("__stringToExpr needs string argument!");
+	}
+	return toATerm ( s );
+}
 
 /*************************************************************
  * Primop registration
@@ -975,6 +989,10 @@ void EvalState::addPrimOps()
     addPrimOp("throw", 1, prim_throw);
     addPrimOp("__getEnv", 1, prim_getEnv);
     addPrimOp("__trace", 2, prim_trace);
+    
+    // Expr <-> String
+    addPrimOp("__exprToString", 1, prim_ExprToString);
+    addPrimOp("__stringToExpr", 1, prim_StringToExpr);
 
     addPrimOp("relativise", 2, prim_relativise);
 

@@ -100,12 +100,15 @@ protected:
     {
         nrFailed = 0;
         exitCode = ecBusy;
+	forceInputs = false;
     }
 
     virtual ~Goal()
     {
         trace("goal destroyed");
     }
+
+    bool forceInputs;
 
 public:
     virtual void work() = 0;
@@ -140,6 +143,11 @@ public:
        running child processes that are being monitored by the worker
        (important!), etc. */
     virtual void cancel() = 0;
+
+    void setForceInputs(bool x)
+    {
+       forceInputs = x;
+    }
 
 protected:
     void amDone(ExitCode result);
@@ -745,7 +753,7 @@ public:
     {
         return drvPath;
     }
-    
+
 private:
     /* The states. */
     void init();
@@ -812,7 +820,6 @@ DerivationGoal::DerivationGoal(const Path & drvPath, Worker & worker)
     trace("created");
 }
 
-
 DerivationGoal::~DerivationGoal()
 {
     /* Careful: we should never ever throw an exception from a
@@ -824,7 +831,6 @@ DerivationGoal::~DerivationGoal()
         ignoreException();
     }
 }
-
 
 void DerivationGoal::killChild()
 {
@@ -905,8 +911,10 @@ void DerivationGoal::haveDerivation()
 
     /* If they are all valid, then we're done. */
     if (invalidOutputs.size() == 0) {
-        amDone(ecSuccess);
-        return;
+        if(! forceInputs) {
+	    amDone(ecSuccess);
+	    return;
+	}
     }
 
     /* If this is a fixed-output derivation, it is possible that some
@@ -950,8 +958,10 @@ void DerivationGoal::outputsSubstituted()
     nrFailed = 0;
 
     if (checkPathValidity(false).size() == 0) {
-        amDone(ecSuccess);
-        return;
+        if (! forceInputs){
+		amDone(ecSuccess);
+		return;
+	}
     }
 
     /* Otherwise, at least one of the output paths could not be
@@ -960,12 +970,42 @@ void DerivationGoal::outputsSubstituted()
     /* The inputs must be built before we can build this goal. */
     /* !!! but if possible, only install the paths that we need */
     for (DerivationInputs::iterator i = drv.inputDrvs.begin();
-         i != drv.inputDrvs.end(); ++i)
-        addWaitee(worker.makeDerivationGoal(i->first));
+         i != drv.inputDrvs.end(); ++i){
+	GoalPtr newGoal = worker.makeDerivationGoal(i->first);
+	newGoal->setForceInputs(forceInputs);
+        addWaitee(newGoal);
+    }
 
     for (PathSet::iterator i = drv.inputSrcs.begin();
          i != drv.inputSrcs.end(); ++i)
         addWaitee(worker.makeSubstitutionGoal(*i));
+
+    /* Actually, I do some work twice just to be on the safe side */
+    string s = drv.env["exportBuildReferencesGraph"]; 
+    Strings ss = tokenizeString(s);
+    if (ss.size() % 2 !=0)
+	throw BuildError(format("odd number of tokens in `exportBuildReferencesGraph': `%1%'") % s); 
+    for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
+	string fileName = *i++;
+	Path storePath=*i++;
+	
+        if (!isInStore(storePath))
+            throw BuildError(format("`exportBuildReferencesGraph' contains a non-store path `%1%'")
+                % storePath);
+        storePath = toStorePath(storePath);
+        if (!store->isValidPath(storePath))
+            throw BuildError(format("`exportBuildReferencesGraph' contains an invalid path `%1%'")
+                % storePath);
+        
+        /* Build-time closure should be in dependencies 
+	 * We really want just derivation, its closure
+	 * and outputs. Looks like we should build it.
+	 * */
+
+	GoalPtr newGoal = worker.makeDerivationGoal(storePath);
+	newGoal->setForceInputs(true);
+        addWaitee(newGoal);
+    }
 
     state = &DerivationGoal::inputsRealised;
 }
@@ -981,6 +1021,12 @@ void DerivationGoal::inputsRealised()
                 "%2% inputs could not be realised")
             % drvPath % nrFailed);
         amDone(ecFailed);
+        return;
+    }
+
+    /* Maybe we just wanted to force build of inputs */
+    if (checkPathValidity(false).size() == 0) {
+        amDone(ecSuccess);
         return;
     }
 
@@ -1623,7 +1669,7 @@ void DerivationGoal::startBuilder()
     s = drv.env["exportBuildReferencesGraph"];
     ss = tokenizeString(s);
     if (ss.size() % 2 != 0)
-        throw BuildError(format("odd number of tokens in `exportReferencesGraph': `%1%'") % s);
+        throw BuildError(format("odd number of tokens in `exportBuildReferencesGraph': `%1%'") % s);
     for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
         string fileName = *i++;
         checkStoreName(fileName); /* !!! abuse of this function */
@@ -1631,11 +1677,11 @@ void DerivationGoal::startBuilder()
         /* Check that the store path is valid. */
         Path storePath = *i++;
         if (!isInStore(storePath))
-            throw BuildError(format("`exportReferencesGraph' contains a non-store path `%1%'")
+            throw BuildError(format("`exportBuildReferencesGraph' contains a non-store path `%1%'")
                 % storePath);
         storePath = toStorePath(storePath);
         if (!store->isValidPath(storePath))
-            throw BuildError(format("`exportReferencesGraph' contains an invalid path `%1%'")
+            throw BuildError(format("`exportBuildReferencesGraph' contains an invalid path `%1%'")
                 % storePath);
 
         /* Write closure info to `fileName'. */
@@ -1648,6 +1694,7 @@ void DerivationGoal::startBuilder()
 			for (DerivationOutputs::iterator k=deriv.outputs.begin(); 
 			    k != deriv.outputs.end(); k++) {
 				refs.insert(k->second.path);
+				
 			}
 		}
 	}
