@@ -6,6 +6,7 @@
 #include "archive.hh"
 #include "expr-to-xml.hh"
 #include "nixexpr-ast.hh"
+#include "parser.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -949,6 +950,8 @@ static Expr prim_unsafeDiscardStringContext(EvalState & state, const ATermVector
     return makeStr(s, PathSet());
 }
 
+/* Expression serialization/deserialization */ 
+
 static Expr prim_ExprToString ( EvalState & state, const ATermVector & args)
 {
 	return makeStr ( atPrint ( evalExpr ( state, args [ 0 ] ) ) );
@@ -961,7 +964,7 @@ static Expr prim_StringToExpr ( EvalState & state, const ATermVector & args)
 	if (! matchStr ( evalExpr ( state, args[0] ), s, l )) {
 		throw EvalError("__stringToExpr needs string argument!");
 	}
-	return toATerm ( s );
+	return ATreadFromString(s.c_str());
 }
 
 /*************************************************************
