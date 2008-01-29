@@ -1263,34 +1263,6 @@ string showPaths(const PathSet & paths)
 }
 
 
-/* Return a string accepted by `nix-store --register-validity' that
-   registers the specified paths as valid.  Note: it's the
-   responsibility of the caller to provide a closure. */
-static string makeValidityRegistration(const PathSet & paths,
-    bool showDerivers)
-{
-    string s = "";
-    
-    for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i) {
-        s += *i + "\n";
-
-        Path deriver = showDerivers ? store->queryDeriver(*i) : "";
-        s += deriver + "\n";
-
-        PathSet references;
-        store->queryReferences(*i, references);
-
-        s += (format("%1%\n") % references.size()).str();
-            
-        for (PathSet::iterator j = references.begin();
-             j != references.end(); ++j)
-            s += *j + "\n";
-    }
-
-    return s;
-}
-
-
 DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 {
     if (!useBuildHook) return rpDecline;
@@ -1417,7 +1389,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
         /* The `references' file has exactly the format accepted by
            `nix-store --register-validity'. */
         writeStringToFile(referencesFN,
-            makeValidityRegistration(allInputs, true));
+            makeValidityRegistration(allInputs, true, false));
 
         /* Tell the hook to proceed. */ 
         writeLine(toHook.writeSide, "okay");
@@ -1662,7 +1634,7 @@ void DerivationGoal::startBuilder()
         /* !!! in secure Nix, the writing should be done on the
            build uid for security (maybe). */
         writeStringToFile(tmpDir + "/" + fileName,
-            makeValidityRegistration(refs, false));
+            makeValidityRegistration(refs, false, false));
     }
 
     // The same for derivations
@@ -1701,7 +1673,7 @@ void DerivationGoal::startBuilder()
         /* !!! in secure Nix, the writing should be done on the
            build uid for security (maybe). */
         writeStringToFile(tmpDir + "/" + fileName,
-            makeValidityRegistration(refs, false));
+            makeValidityRegistration(refs, false, false));
     }
     
     

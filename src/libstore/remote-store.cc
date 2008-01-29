@@ -185,6 +185,12 @@ bool RemoteStore::isValidPath(const Path & path)
 }
 
 
+PathSet RemoteStore::queryValidPaths()
+{
+    throw Error("not implemented");
+}
+
+
 bool RemoteStore::hasSubstitutes(const Path & path)
 {
     writeInt(wopHasSubstitutes, to);

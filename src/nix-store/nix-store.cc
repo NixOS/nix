@@ -401,26 +401,31 @@ static void opReadLog(Strings opFlags, Strings opArgs)
 }
 
 
-static void opRegisterValidity(Strings opFlags, Strings opArgs)
+static void opDumpDB(Strings opFlags, Strings opArgs)
 {
-    bool reregister = false; // !!! maybe this should be the default
-        
-    for (Strings::iterator i = opFlags.begin();
-         i != opFlags.end(); ++i)
-        if (*i == "--reregister") reregister = true;
-        else throw UsageError(format("unknown flag `%1%'") % *i);
+    if (!opFlags.empty()) throw UsageError("unknown flag");
+    if (!opArgs.empty())
+        throw UsageError("no arguments expected");
+    PathSet validPaths = store->queryValidPaths();
+    /* !!! this isn't streamy; makeValidityRegistration() builds a
+       potentially gigantic string. */
+    cout << makeValidityRegistration(validPaths, true, true);
+}
 
-    if (!opArgs.empty()) throw UsageError("no arguments expected");
 
+static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
+{
     ValidPathInfos infos;
     
     while (1) {
-        ValidPathInfo info = decodeValidPathInfo(cin);
+        ValidPathInfo info = decodeValidPathInfo(cin, hashGiven);
         if (info.path == "") break;
         if (!store->isValidPath(info.path) || reregister) {
             /* !!! races */
-            canonicalisePathMetaData(info.path);
-            info.hash = hashPath(htSHA256, info.path);
+            if (canonicalise)
+                canonicalisePathMetaData(info.path);
+            if (!hashGiven)
+                info.hash = hashPath(htSHA256, info.path);
             infos.push_back(info);
         }
     }
@@ -429,6 +434,32 @@ static void opRegisterValidity(Strings opFlags, Strings opArgs)
     createStoreTransaction(txn);
     registerValidPaths(txn, infos);
     txn.commit();
+}
+
+
+static void opLoadDB(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty()) throw UsageError("unknown flag");
+    if (!opArgs.empty())
+        throw UsageError("no arguments expected");
+    registerValidity(true, true, false);
+}
+
+
+static void opRegisterValidity(Strings opFlags, Strings opArgs)
+{
+    bool reregister = false; // !!! maybe this should be the default
+    bool hashGiven = false;
+        
+    for (Strings::iterator i = opFlags.begin();
+         i != opFlags.end(); ++i)
+        if (*i == "--reregister") reregister = true;
+        else if (*i == "--hash-given") hashGiven = true;
+        else throw UsageError(format("unknown flag `%1%'") % *i);
+
+    if (!opArgs.empty()) throw UsageError("no arguments expected");
+
+    registerValidity(reregister, hashGiven, true);
 }
 
 
@@ -681,6 +712,10 @@ void run(Strings args)
             op = opQuery;
         else if (arg == "--read-log" || arg == "-l")
             op = opReadLog;
+        else if (arg == "--dump-db")
+            op = opDumpDB;
+        else if (arg == "--load-db")
+            op = opLoadDB;
         else if (arg == "--register-validity")
             op = opRegisterValidity;
         else if (arg == "--check-validity")

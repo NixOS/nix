@@ -59,6 +59,8 @@ public:
     
     bool isValidPath(const Path & path);
 
+    PathSet queryValidPaths();
+    
     Hash queryPathHash(const Path & path);
 
     void queryReferences(const Path & path, PathSet & references);

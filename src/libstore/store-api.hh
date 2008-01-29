@@ -35,6 +35,9 @@ public:
     /* Checks whether a path is valid. */ 
     virtual bool isValidPath(const Path & path) = 0;
 
+    /* Query the set of valid paths. */
+    virtual PathSet queryValidPaths() = 0;
+
     /* Queries the hash of a valid path. */ 
     virtual Hash queryPathHash(const Path & path) = 0;
 
@@ -249,6 +252,9 @@ extern boost::shared_ptr<StoreAPI> store;
 boost::shared_ptr<StoreAPI> openStore(bool reserveSpace = true);
 
 
+string makeValidityRegistration(const PathSet & paths,
+    bool showDerivers, bool showHash);
+    
 struct ValidPathInfo 
 {
     Path path;
@@ -257,7 +263,8 @@ struct ValidPathInfo
     PathSet references;
 };
 
-ValidPathInfo decodeValidPathInfo(std::istream & str);
+ValidPathInfo decodeValidPathInfo(std::istream & str,
+    bool hashGiven = false);
 
 
 }

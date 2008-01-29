@@ -56,7 +56,6 @@ static TableId dbReferrers = 0;
 static TableId dbDerivers = 0;
 
 
-static void upgradeStore07();
 static void upgradeStore09();
 static void upgradeStore11();
 
@@ -128,12 +127,12 @@ LocalStore::LocalStore(bool reserveSpace)
             % curSchema % nixSchemaVersion);
 
     if (curSchema < nixSchemaVersion) {
+        if (curSchema == 0) /* new store */
+            curSchema = nixSchemaVersion;
         if (curSchema <= 1)
-            upgradeStore07();
-        if (curSchema == 2)
-            upgradeStore09();
-        if (curSchema == 3)
-            upgradeStore11();
+            throw Error("your Nix store is no longer supported");
+        if (curSchema <= 2) upgradeStore09();
+        if (curSchema <= 3) upgradeStore11();
         writeFile(schemaFN, (format("%1%") % nixSchemaVersion).str());
     }
 }
@@ -258,6 +257,14 @@ bool isValidPathTxn(const Transaction & txn, const Path & path)
 bool LocalStore::isValidPath(const Path & path)
 {
     return isValidPathTxn(noTxn, path);
+}
+
+
+PathSet LocalStore::queryValidPaths()
+{
+    Paths paths;
+    nixDB.enumTable(noTxn, dbValidPaths, paths);
+    return PathSet(paths.begin(), paths.end());
 }
 
 
@@ -1066,93 +1073,6 @@ void LocalStore::optimiseStore(bool dryRun, OptimiseStats & stats)
         startNest(nest, lvlChatty, format("hashing files in `%1%'") % *i);
         hashAndLink(dryRun, hashToPath, stats, *i);
     }
-}
-
-
-/* Upgrade from schema 1 (Nix <= 0.7) to schema 2 (Nix >= 0.8). */
-static void upgradeStore07()
-{
-    printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
-
-    Transaction txn(nixDB);
-
-    Paths validPaths2;
-    nixDB.enumTable(txn, dbValidPaths, validPaths2);
-    PathSet validPaths(validPaths2.begin(), validPaths2.end());
-
-    std::cerr << "hashing paths...";
-    int n = 0;
-    for (PathSet::iterator i = validPaths.begin(); i != validPaths.end(); ++i) {
-        checkInterrupt();
-        string s;
-        nixDB.queryString(txn, dbValidPaths, *i, s);
-        if (s == "") {
-            Hash hash = hashPath(htSHA256, *i);
-            setHash(txn, *i, hash);
-            std::cerr << ".";
-            if (++n % 1000 == 0) {
-                txn.commit();
-                txn.begin(nixDB);
-            }
-        }
-    }
-    std::cerr << std::endl;
-
-    txn.commit();
-
-    txn.begin(nixDB);
-    
-    std::cerr << "processing closures...";
-    for (PathSet::iterator i = validPaths.begin(); i != validPaths.end(); ++i) {
-        checkInterrupt();
-        if (i->size() > 6 && string(*i, i->size() - 6) == ".store") {
-            ATerm t = ATreadFromNamedFile(i->c_str());
-            if (!t) throw Error(format("cannot read aterm from `%1%'") % *i);
-
-            ATermList roots, elems;
-            if (!matchOldClosure(t, roots, elems)) continue;
-
-            for (ATermIterator j(elems); j; ++j) {
-
-                ATerm path2;
-                ATermList references2;
-                if (!matchOldClosureElem(*j, path2, references2)) continue;
-
-                Path path = aterm2String(path2);
-                if (validPaths.find(path) == validPaths.end())
-                    /* Skip this path; it's invalid.  This is a normal
-                       condition (Nix <= 0.7 did not enforce closure
-                       on closure store expressions). */
-                    continue;
-
-                PathSet references;
-                for (ATermIterator k(references2); k; ++k) {
-                    Path reference = aterm2String(*k);
-                    if (validPaths.find(reference) == validPaths.end())
-                        /* Bad reference.  Set it anyway and let the
-                           user fix it. */
-                        printMsg(lvlError, format("closure `%1%' contains reference from `%2%' "
-                                     "to invalid path `%3%' (run `nix-store --verify')")
-                            % *i % path % reference);
-                    references.insert(reference);
-                }
-
-                PathSet prevReferences;
-                queryReferences(txn, path, prevReferences);
-                if (prevReferences.size() > 0 && references != prevReferences)
-                    printMsg(lvlError, format("warning: conflicting references for `%1%'") % path);
-
-                if (references != prevReferences)
-                    setReferences(txn, path, references);
-            }
-            
-            std::cerr << ".";
-        }
-    }
-    std::cerr << std::endl;
-
-    /* !!! maybe this transaction is way too big */
-    txn.commit();
 }
 
 

@@ -151,11 +151,47 @@ Path computeStorePathForText(const string & suffix, const string & s,
 }
 
 
-ValidPathInfo decodeValidPathInfo(std::istream & str)
+/* Return a string accepted by decodeValidPathInfo() that
+   registers the specified paths as valid.  Note: it's the
+   responsibility of the caller to provide a closure. */
+string makeValidityRegistration(const PathSet & paths,
+    bool showDerivers, bool showHash)
+{
+    string s = "";
+    
+    for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i) {
+        s += *i + "\n";
+
+        if (showHash)
+            s += printHash(store->queryPathHash(*i)) + "\n";
+
+        Path deriver = showDerivers ? store->queryDeriver(*i) : "";
+        s += deriver + "\n";
+
+        PathSet references;
+        store->queryReferences(*i, references);
+
+        s += (format("%1%\n") % references.size()).str();
+            
+        for (PathSet::iterator j = references.begin();
+             j != references.end(); ++j)
+            s += *j + "\n";
+    }
+
+    return s;
+}
+
+
+ValidPathInfo decodeValidPathInfo(std::istream & str, bool hashGiven)
 {
     ValidPathInfo info;
     getline(str, info.path);
     if (str.eof()) { info.path = ""; return info; }
+    if (hashGiven) {
+        string s;
+        getline(str, s);
+        info.hash = parseHash(htSHA256, s);
+    }
     getline(str, info.deriver);
     string s; int n;
     getline(str, s);
