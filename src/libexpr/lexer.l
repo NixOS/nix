@@ -124,7 +124,7 @@ inherit     { return INHERIT; }
 <STRING>.   return yytext[0]; /* just in case: shouldn't be reached */
 
 \'\'(\ *\n)?     { BEGIN(IND_STRING); return IND_STRING_OPEN; }
-<IND_STRING>([^\$\']|\$[^\{\']|\'[^\'])+ {
+<IND_STRING>([^\$\']|\$[^\{\']|\'[^\'\$])+ {
                    yylval->t = makeIndStr(toATerm(yytext));
                    return IND_STR;
                  }
@@ -142,6 +142,10 @@ inherit     { return INHERIT; }
                  }
 <IND_STRING>\$\{ { BEGIN(INITIAL); return DOLLAR_CURLY; }
 <IND_STRING>\'\' { BEGIN(INITIAL); return IND_STRING_CLOSE; }
+<IND_STRING>\'   {
+                   yylval->t = makeIndStr(toATerm("'"));
+                   return IND_STR;
+                 }
 <IND_STRING>.    return yytext[0]; /* just in case: shouldn't be reached */
 
 {PATH}      { yylval->t = toATerm(yytext); return PATH; /* !!! alloc */ }
