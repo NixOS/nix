@@ -110,4 +110,11 @@ let
     And finally to interpret \n etc. as in a string: ''\n, ''\r, ''\t.
   '';
 
-in s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14
+  # Regression test: antiquotation in '${x}' should work, but didn't.
+  s15 = let x = "bla"; in ''
+    foo
+    '${x}'
+    bar
+  '';
+
+in s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14 + s15
