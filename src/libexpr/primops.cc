@@ -8,6 +8,7 @@
 #include "expr-to-xml.hh"
 #include "nixexpr-ast.hh"
 #include "local-store.hh"
+#include "parser.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -368,8 +369,8 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
     }
     
     /* If we have a state derivation, we clear state paramters because they (sometimes) can affect the outPath: 
-     * If this drv has runtime paramters: The state indentifier and thus statepath may change, but the componentPath (outPath) can stay the same
-     * If this drv doesnt have runtime paramters: The state indentifier and thus statepath may change, and thus the componentPath changes since it is build with another identifier
+     * If this drv has runtime paramters: 			The state indentifier and statepath may change, but the componentPath (outPath) can stay the same
+     * If this drv doesnt have runtime paramters: 	The state indentifier and statepath may change, but the componentPath changes since it is build with another identifier
      * In both cases: Other runtime state parameters like stateDirs, synchronisation and shareState never change the out or statepath so always need to be out of the hash 
      */ 
     if(isStateDrv(drv)){
@@ -1097,6 +1098,22 @@ static Expr prim_unsafeDiscardStringContext(EvalState & state, const ATermVector
     return makeStr(s, PathSet());
 }
 
+/* Expression serialization/deserialization */ 
+
+static Expr prim_ExprToString ( EvalState & state, const ATermVector & args)
+{
+	return makeStr ( atPrint ( evalExpr ( state, args [ 0 ] ) ) );
+}
+
+static Expr prim_StringToExpr ( EvalState & state, const ATermVector & args)
+{
+	string s;
+	PathSet l;
+	if (! matchStr ( evalExpr ( state, args[0] ), s, l )) {
+		throw EvalError("__stringToExpr needs string argument!");
+	}
+	return ATreadFromString(s.c_str());
+}
 
 /*************************************************************
  * Primop registration
@@ -1123,6 +1140,10 @@ void EvalState::addPrimOps()
     addPrimOp("throw", 1, prim_throw);
     addPrimOp("__getEnv", 1, prim_getEnv);
     addPrimOp("__trace", 2, prim_trace);
+    
+    // Expr <-> String
+    addPrimOp("__exprToString", 1, prim_ExprToString);
+    addPrimOp("__stringToExpr", 1, prim_StringToExpr);
 
     addPrimOp("relativise", 2, prim_relativise);
 

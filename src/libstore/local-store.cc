@@ -246,12 +246,12 @@ LocalStore::LocalStore(bool reserveSpace)
             % curSchema % nixSchemaVersion);
 
     if (curSchema < nixSchemaVersion) {				
+        if (curSchema == 0) /* new store */
+            curSchema = nixSchemaVersion;
         if (curSchema <= 1)
-            upgradeStore07();
-        if (curSchema == 2)
-            upgradeStore09();
-        if (curSchema == 3)
-            upgradeStore11();
+            throw Error("your Nix store is no longer supported");
+        if (curSchema <= 2) upgradeStore09();
+        if (curSchema <= 3) upgradeStore11();
         writeFile(schemaFN, (format("%1%") % nixSchemaVersion).str());
     }
 }
@@ -376,6 +376,31 @@ bool LocalStore::isValidPath(const Path & path)
 {
     return isValidPathTxn(noTxn, path);
 }
+
+PathSet LocalStore::queryValidPaths()
+{
+    Paths paths;
+    nixDB.enumTable(noTxn, dbValidPaths, paths);
+    return PathSet(paths.begin(), paths.end());
+}
+
+
+static string addPrefix(const string & prefix, const string & s)
+{
+    return prefix + string(1, (char) 0) + s;
+}
+
+
+static string stripPrefix(const string & prefix, const string & s)
+{
+    if (s.size() <= prefix.size() ||
+        string(s, 0, prefix.size()) != prefix ||
+        s[prefix.size()] != 0)
+        throw Error(format("string `%1%' is missing prefix `%2%'")
+            % s % prefix);
+    return string(s, prefix.size() + 1);
+}
+
 
 bool isValidStatePathTxn(const Transaction & txn, const Path & path)
 {

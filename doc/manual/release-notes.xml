@@ -8,6 +8,19 @@
 
 <!--==================================================================-->
 
+<section xml:id="ssec-relnotes-0.12"><title>Release 0.12 (TBA)</title>
+
+<itemizedlist>
+
+  <listitem><para><command>nix-store --dump-db / --load-db</command>.</para></listitem>
+
+</itemizedlist>
+
+</section>
+
+
+<!--==================================================================-->
+
 <section xml:id="ssec-relnotes-0.11"><title>Release 0.11 (December 31,
 2007)</title>
 

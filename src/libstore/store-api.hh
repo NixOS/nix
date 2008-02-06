@@ -43,6 +43,9 @@ public:
     /* TODO */
     virtual bool isValidComponentOrStatePath(const Path & path) = 0;
 
+    /* Query the set of valid paths. */
+    virtual PathSet queryValidPaths() = 0;
+
     /* Queries the hash of a valid path. */ 
     virtual Hash queryPathHash(const Path & path) = 0;
 
@@ -339,6 +342,9 @@ extern boost::shared_ptr<StoreAPI> store;
 boost::shared_ptr<StoreAPI> openStore(bool reserveSpace = true);
 
 
+string makeValidityRegistration(const PathSet & paths,
+    bool showDerivers, bool showHash);
+
 
 /* OLD TODO REMOVE
 struct ValidPathInfo 
@@ -359,7 +365,8 @@ struct ValidPathInfo
     int unsigned revision;
 };
 
-ValidPathInfo decodeValidPathInfo(std::istream & str);
+ValidPathInfo decodeValidPathInfo(std::istream & str,
+    bool hashGiven = false);
 
 
 }

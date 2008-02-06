@@ -63,6 +63,8 @@ public:
     
     bool isValidComponentOrStatePath(const Path & path);
     
+    PathSet queryValidPaths();
+    
     Hash queryPathHash(const Path & path);
     
     Path queryStatePathDrv(const Path & statePath);

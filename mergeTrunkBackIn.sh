@@ -1,4 +1,4 @@
-svn merge -r 9751:10133 https://svn.cs.uu.nl:12443/repos/trace/nix/trunk
+svn merge -r 10154:10531 https://svn.cs.uu.nl:12443/repos/trace/nix/trunk
 
 #already done:
 # 8628 
@@ -28,4 +28,6 @@ svn merge -r 9751:10133 https://svn.cs.uu.nl:12443/repos/trace/nix/trunk
 # 9561
 # 9584
 # 9751
-# 10133 TODO 
+# 10133
+# 10154
+# 10531

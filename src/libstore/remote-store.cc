@@ -236,6 +236,12 @@ bool RemoteStore::isValidComponentOrStatePath(const Path & path)
     return reply != 0;
 }
 
+PathSet RemoteStore::queryValidPaths()
+{
+    throw Error("not implemented");
+}
+
+
 bool RemoteStore::hasSubstitutes(const Path & path)
 {
     writeInt(wopHasSubstitutes, to);

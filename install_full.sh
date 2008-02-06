@@ -50,7 +50,7 @@ fi
             --prefix=$nixstatepath \
             --with-store-dir=/nix/store \
 	    	--with-store-state-dir=/nix/state \
-            --with-ext3cow-header=/nix/store/v95qf520d6972pshykrah1dz3z53rkmj-linux-2.6.21.7/lib/modules/2.6.21.7-default/build/include/linux/ext3cow_fs.h \
+            --with-ext3cow-header=/nix/store/2sm0h2xd1zsm5had53q1pvzmnsn8fy8k-linux-2.6.21/lib/modules/2.6.21-ck1-default/build/include/linux/ext3cow_fs.h \
             --localstatedir=/nix/var
 
 #Options from the nix expr
