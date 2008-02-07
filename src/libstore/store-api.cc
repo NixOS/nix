@@ -237,7 +237,7 @@ Path computeStorePathForText(const string & suffix, const string & s,
 /* Return a string accepted by decodeValidPathInfo() that
    registers the specified paths as valid.  Note: it's the
    responsibility of the caller to provide a closure. */
-string makeValidityRegistration(const PathSet & paths,
+string makeValidityRegistration(const PathSet & paths,										// TODO !!!!!!!!!!!!!!!!!!!!!! makeValidityRegistration CHECK CALLS FOR STATE PASSINGS? 
     bool showDerivers, bool showHash)
 {
     string s = "";
@@ -252,7 +252,7 @@ string makeValidityRegistration(const PathSet & paths,
         s += deriver + "\n";
 
         PathSet references;
-        store->queryReferences(*i, references);
+        store->queryStoreReferences(*i, references, 0);										//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! WE MAY NEED STATE???
 
         s += (format("%1%\n") % references.size()).str();
             
