@@ -215,7 +215,11 @@ static void checkVarDefs2(set<Expr> & done, const ATermMap & defs, Expr e)
     ATerm with, body;
     ATermList rbnds, nrbnds;
 
-    if (matchVar(e, name)) {
+    /* Closed terms don't have free variables, so we don't have to
+       check by definition. */
+    if (matchClosed(e, value)) return;
+    
+    else if (matchVar(e, name)) {
         if (!defs.get(name))
             throw EvalError(format("undefined variable `%1%'")
                 % aterm2String(name));
