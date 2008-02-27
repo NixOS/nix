@@ -1,0 +1,68 @@
+#! @shell@
+
+WORKING_DIRECTORY=$(mktemp -d "${TMPDIR:-/tmp}"/nix-reduce-build-XXXXXX);
+cd "$WORKING_DIRECTORY";
+
+if test -z "$1" ; then
+	echo 'nix-reduce-build (paths or Nix expressions) -- (logins at remote computers)' >&2
+	echo As in: >&2
+	echo nix-reduce-build /etc/nixos/nixos -- user@somewhere.nowhere.example.org >&2
+	exit;
+fi;
+
+while ! test "$1" = "--" || test "$1" = "" ; do 
+	echo "$1" >> initial; >&2
+	shift;
+done
+shift;
+echo Will work on $(cat initial | wc -l) targets. >&2
+
+while read ; do
+	case "$REPLY" in 
+		${NIX_STORE_PATH:-/nix/store}/*)
+			echo "$REPLY" >> paths; >&2
+			;;
+		*)
+			nix-instantiate "$REPLY" >> paths;
+			;;
+	esac;
+done < initial;
+echo Proceeding $(cat paths | wc -l) paths. >&2
+
+while read; do
+	case "$REPLY" in
+		*.drv)
+			echo "$REPLY" >> derivers; >&2
+			;;
+		*)
+			nix-store --query --deriver "$REPLY" >>derivers;
+			;;
+	esac;
+done < paths;
+echo Found $(cat derivers | wc -l) derivers. >&2
+
+cat derivers | xargs nix-store --query -R > derivers-closure;
+echo Proceeding at most $(cat derivers-closure | wc -l) derivers. >&2
+
+cat derivers-closure | egrep '[.]drv$' | xargs nix-store --query --outputs > wanted-paths;
+cat derivers-closure | egrep -v '[.]drv$' >> wanted-paths;
+echo Prepared $(cat wanted-paths | wc -l) paths to get. >&2
+
+cat wanted-paths | xargs nix-store --check-validity --print-invalid > needed-paths;
+echo We need $(cat needed-paths | wc -l) paths. >&2
+
+if test -z "$1" ; then
+	cat needed-paths;	
+fi;
+
+for i in "$@"; do 
+	cat needed-paths | while read; do 
+		nix-copy-closure --from "$i" --gzip "$REPLY" </dev/null || true; 
+	done;
+	mv needed-paths wanted-paths;
+	cat wanted-paths | xargs nix-store --check-validity --print-invalid > needed-paths;
+	echo We still need $(cat needed-paths | wc -l) paths. >&2
+done;
+
+cd /
+rm -r "$WORKING_DIRECTORY"
