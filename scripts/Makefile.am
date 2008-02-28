@@ -2,10 +2,10 @@ bin_SCRIPTS = nix-collect-garbage \
   nix-pull nix-push nix-prefetch-url \
   nix-install-package nix-channel nix-build \
   nix-pack-closure nix-unpack-closure \
-  nix-copy-closure nix-reduce-build
+  nix-copy-closure 
 
 noinst_SCRIPTS = nix-profile.sh generate-patches.pl \
-  find-runtime-roots.pl build-remote.pl
+  find-runtime-roots.pl build-remote.pl nix-reduce-build
 
 nix-pull nix-push: readmanifest.pm readconfig.pm download-using-manifests.pl
 
