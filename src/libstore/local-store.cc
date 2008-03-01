@@ -628,11 +628,8 @@ void LocalStore::exportPath(const Path & path, bool sign,
 {
     assertStorePath(path);
 
-    /* Wrap all of this in a transaction to make sure that we export
-       consistent metadata. */
-    Transaction txn(nixDB);
     addTempRoot(path);
-    if (!isValidPathTxn(txn, path))
+    if (!isValidPath(path))
         throw Error(format("path `%1%' is not valid") % path);
 
     HashAndWriteSink hashAndWriteSink(sink);
@@ -644,10 +641,10 @@ void LocalStore::exportPath(const Path & path, bool sign,
     writeString(path, hashAndWriteSink);
     
     PathSet references;
-    nix::queryReferences(txn, path, references);
+    queryReferences(path, references);
     writeStringSet(references, hashAndWriteSink);
 
-    Path deriver = nix::queryDeriver(txn, path);
+    Path deriver = queryDeriver(path);
     writeString(deriver, hashAndWriteSink);
 
     if (sign) {
@@ -677,8 +674,6 @@ void LocalStore::exportPath(const Path & path, bool sign,
         
     } else
         writeInt(0, hashAndWriteSink);
-
-    txn.commit();
 }
 
 
