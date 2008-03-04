@@ -111,11 +111,7 @@ LocalStore::LocalStore(bool reserveSpace)
         readOnlyMode = true;
         return;
     }
-    dbValidPaths = nixDB.openTable("validpaths");
-    dbReferences = nixDB.openTable("references");
-    dbReferrers = nixDB.openTable("referrers", true); /* must be sorted */
-    dbDerivers = nixDB.openTable("derivers");
-
+    
     int curSchema = 0;
     Path schemaFN = nixDBPath + "/schema";
     if (pathExists(schemaFN)) {
@@ -127,6 +123,13 @@ LocalStore::LocalStore(bool reserveSpace)
     if (curSchema > nixSchemaVersion)
         throw Error(format("current Nix store schema is version %1%, but I only support %2%")
             % curSchema % nixSchemaVersion);
+
+    if (curSchema < nixSchemaVersion) { // !!! temporary
+        dbValidPaths = nixDB.openTable("validpaths");
+        dbReferences = nixDB.openTable("references");
+        dbReferrers = nixDB.openTable("referrers", true); /* must be sorted */
+        dbDerivers = nixDB.openTable("derivers");
+    }
 
     if (curSchema < nixSchemaVersion) {
         if (curSchema == 0) /* new store */
@@ -250,6 +253,32 @@ void canonicalisePathMetaData(const Path & path)
 }
 
 
+Path metaPathFor(const Path & path)
+{
+    string baseName = baseNameOf(path);
+    return (format("%1%/meta/%2%") % nixDBPath % baseName).str();
+}
+
+
+Path infoFileFor(const Path & path)
+{
+    return metaPathFor(path) + ".info";
+}
+
+
+ValidPathInfo queryPathInfo(const Path & path)
+{
+    ValidPathInfo res;
+
+    Path infoFile = infoFileFor(path);
+    if (!pathExists(infoFile))
+        throw Error(format("path `%1%' is not valid") % path);
+    string info = readFile(infoFile);
+
+    return res;
+}
+
+
 bool isValidPathTxn(const Transaction & txn, const Path & path)
 {
     string s;
@@ -259,7 +288,7 @@ bool isValidPathTxn(const Transaction & txn, const Path & path)
 
 bool LocalStore::isValidPath(const Path & path)
 {
-    return isValidPathTxn(noTxn, path);
+    return pathExists(infoFileFor(path));
 }
 
 
@@ -342,10 +371,11 @@ void oldQueryReferences(const Transaction & txn,
 }
 
 
-void LocalStore::queryReferences(const Path & storePath,
+void LocalStore::queryReferences(const Path & path,
     PathSet & references)
 {
-    oldQueryReferences(noTxn, storePath, references);
+    ValidPathInfo info = queryPathInfo(path);
+    references.insert(info.references.begin(), info.references.end());
 }
 
 
@@ -1147,13 +1177,6 @@ static void upgradeStore11()
 }
 
 
-Path metaFileFor(const Path & path)
-{
-    string baseName = baseNameOf(path);
-    return (format("%1%/meta/%2%") % nixDBPath % baseName).str();
-}
-
-
 /* !!! move to util.cc */
 void appendFile(const Path & path, const string & s)
 {
@@ -1168,7 +1191,10 @@ void newRegisterValidPath(const Path & path,
     const Hash & hash, const PathSet & references,
     const Path & deriver)
 {
-    Path infoFile = metaFileFor(path) + ".info";
+    Path infoFile = infoFileFor(path);
+    if (pathExists(infoFile)) return;
+
+    // !!! acquire PathLock on infoFile here
 
     string refs;
     for (PathSet::const_iterator i = references.begin(); i != references.end(); ++i) {
@@ -1181,7 +1207,7 @@ void newRegisterValidPath(const Path & path,
            have referrer mappings back to `path'.  A " " is prefixed
            to separate it from the previous entry.  It's not suffixed
            to deal with interrupted partial writes to this file. */
-        Path referrersFile = metaFileFor(*i) + ".referrers";
+        Path referrersFile = metaPathFor(*i) + ".referrers";
         /* !!! locking */
         appendFile(referrersFile, " " + path);
     }
