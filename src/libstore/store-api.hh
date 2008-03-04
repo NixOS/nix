@@ -249,7 +249,7 @@ extern boost::shared_ptr<StoreAPI> store;
 
 /* Factory method: open the Nix database, either through the local or
    remote implementation. */
-boost::shared_ptr<StoreAPI> openStore(bool reserveSpace = true);
+boost::shared_ptr<StoreAPI> openStore();
 
 
 string makeValidityRegistration(const PathSet & paths,

@@ -2,7 +2,6 @@
 #include "local-store.hh"
 #include "util.hh"
 #include "globals.hh"
-#include "db.hh"
 #include "archive.hh"
 #include "pathlocks.hh"
 #include "aterm.hh"
@@ -22,44 +21,7 @@
 namespace nix {
 
     
-/* Nix database. */
-static Database nixDB;
-
-
-/* Database tables. */
-
-/* dbValidPaths :: Path -> ()
-
-   The existence of a key $p$ indicates that path $p$ is valid (that
-   is, produced by a succesful build). */
-static TableId dbValidPaths = 0;
-
-/* dbReferences :: Path -> [Path]
-
-   This table lists the outgoing file system references for each
-   output path that has been built by a Nix derivation.  These are
-   found by scanning the path for the hash components of input
-   paths. */
-static TableId dbReferences = 0;
-
-/* dbReferrers :: Path -> Path
-
-   This table is just the reverse mapping of dbReferences.  This table
-   can have duplicate keys, each corresponding value denoting a single
-   referrer. */
-static TableId dbReferrers = 0;
-
-/* dbDerivers :: Path -> [Path]
-
-   This table lists the derivation used to build a path.  There can
-   only be multiple such paths for fixed-output derivations (i.e.,
-   derivations specifying an expected hash). */
-static TableId dbDerivers = 0;
-
-
-static void upgradeStore09();
-static void upgradeStore11();
-static void upgradeStore12();
+void upgradeStore12();
 
 
 void checkStoreNotSymlink()
@@ -80,7 +42,7 @@ void checkStoreNotSymlink()
 }
 
 
-LocalStore::LocalStore(bool reserveSpace)
+LocalStore::LocalStore()
 {
     substitutablePathsLoaded = false;
     
@@ -89,24 +51,10 @@ LocalStore::LocalStore(bool reserveSpace)
     checkStoreNotSymlink();
 
     try {
-        Path reservedPath = nixDBPath + "/reserved";
-        string s = querySetting("gc-reserved-space", "");
-        int reservedSize;
-        if (!string2Int(s, reservedSize)) reservedSize = 1024 * 1024;
-        if (reserveSpace) {
-            struct stat st;
-            if (stat(reservedPath.c_str(), &st) == -1 ||
-                st.st_size != reservedSize)
-                writeFile(reservedPath, string(reservedSize, 'X'));
-        }
-        else
-            deletePath(reservedPath);
-    } catch (SysError & e) { /* don't care about errors */
-    }
-
-    try {
-        nixDB.open(nixDBPath);
-    } catch (DbNoPermission & e) {
+        createDirs(nixDBPath + "/info");
+        createDirs(nixDBPath + "/referrer");
+    } catch (Error & e) {
+        // !!! fix access check
         printMsg(lvlTalkative, "cannot access Nix database; continuing anyway");
         readOnlyMode = true;
         return;
@@ -124,20 +72,11 @@ LocalStore::LocalStore(bool reserveSpace)
         throw Error(format("current Nix store schema is version %1%, but I only support %2%")
             % curSchema % nixSchemaVersion);
 
-    if (curSchema < nixSchemaVersion) { // !!! temporary
-        dbValidPaths = nixDB.openTable("validpaths");
-        dbReferences = nixDB.openTable("references");
-        dbReferrers = nixDB.openTable("referrers", true); /* must be sorted */
-        dbDerivers = nixDB.openTable("derivers");
-    }
-
     if (curSchema < nixSchemaVersion) {
         if (curSchema == 0) /* new store */
             curSchema = nixSchemaVersion;
         if (curSchema <= 1)
             throw Error("your Nix store is no longer supported");
-        if (curSchema <= 2) upgradeStore09();
-        if (curSchema <= 3) upgradeStore11();
         if (curSchema <= 4) upgradeStore12();
         writeFile(schemaFN, (format("%1%") % nixSchemaVersion).str());
     }
@@ -146,19 +85,6 @@ LocalStore::LocalStore(bool reserveSpace)
 
 LocalStore::~LocalStore()
 {
-    /* If the database isn't open, this is a NOP. */
-    try {
-        nixDB.close();
-    } catch (...) {
-        ignoreException();
-    }
-}
-
-
-void createStoreTransaction(Transaction & txn)
-{
-    Transaction txn2(nixDB);
-    txn2.moveTo(txn);
 }
 
 
@@ -253,16 +179,84 @@ void canonicalisePathMetaData(const Path & path)
 }
 
 
-Path metaPathFor(const Path & path)
+Path infoFileFor(const Path & path)
 {
     string baseName = baseNameOf(path);
-    return (format("%1%/meta/%2%") % nixDBPath % baseName).str();
+    return (format("%1%/info/%2%") % nixDBPath % baseName).str();
 }
 
 
-Path infoFileFor(const Path & path)
+Path referrersFileFor(const Path & path)
 {
-    return metaPathFor(path) + ".info";
+    string baseName = baseNameOf(path);
+    return (format("%1%/referrer/%2%") % nixDBPath % baseName).str();
+}
+
+
+/* !!! move to util.cc */
+void appendFile(const Path & path, const string & s)
+{
+    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0666);
+    if (fd == -1)
+        throw SysError(format("opening file `%1%'") % path);
+    writeFull(fd, (unsigned char *) s.c_str(), s.size());
+}
+
+
+static void appendReferrer(const Path & from, const Path & to)
+{
+    Path referrersFile = referrersFileFor(from);
+    /* !!! locking */
+    appendFile(referrersFile, " " + to);
+}
+
+
+void registerValidPath(const Path & path,
+    const Hash & hash, const PathSet & references,
+    const Path & deriver)
+{
+    Path infoFile = infoFileFor(path);
+    if (pathExists(infoFile)) return;
+
+    // !!! acquire PathLock on infoFile here
+
+    string refs;
+    for (PathSet::const_iterator i = references.begin(); i != references.end(); ++i) {
+        if (!refs.empty()) refs += " ";
+        refs += *i;
+
+        /* Update the referrer mapping for *i.  This must be done
+           before the info file is written to maintain the invariant
+           that if `path' is a valid path, then all its references
+           have referrer mappings back to `path'.  A " " is prefixed
+           to separate it from the previous entry.  It's not suffixed
+           to deal with interrupted partial writes to this file. */
+        appendReferrer(*i, path);
+    }
+
+    string info = (format(
+        "Hash: sha256:%1%\n"
+        "References: %2%\n"
+        "Deriver: %3%\n"
+        "Registered-At: %4%\n")
+        % printHash(hash) % refs % deriver % time(0)).str();
+
+    // !!! atomicity
+    writeFile(infoFile, info);
+}
+
+
+Hash parseHashField(const Path & path, const string & s)
+{
+    string::size_type colon = s.find(':');
+    if (colon == string::npos)
+        throw Error(format("corrupt hash `%1%' in valid-path entry for `%2%'")
+            % s % path);
+    HashType ht = parseHashType(string(s, 0, colon));
+    if (ht == htUnknown)
+        throw Error(format("unknown hash type `%1%' in valid-path entry for `%2%'")
+            % string(s, 0, colon) % path);
+    return parseHash(ht, string(s, colon + 1));
 }
 
 
@@ -270,19 +264,34 @@ ValidPathInfo queryPathInfo(const Path & path)
 {
     ValidPathInfo res;
 
+    assertStorePath(path);
+    // !!! printMsg(lvlError, "queryPathInfo: " + path);
+    
+    /* Read the info file. */
     Path infoFile = infoFileFor(path);
     if (!pathExists(infoFile))
         throw Error(format("path `%1%' is not valid") % path);
     string info = readFile(infoFile);
 
+    /* Parse it. */
+    Strings lines = tokenizeString(info, "\n");
+
+    for (Strings::iterator i = lines.begin(); i != lines.end(); ++i) {
+        unsigned int p = i->find(':');
+        if (p == string::npos) continue; /* bad line */
+        string name(*i, 0, p);
+        string value(*i, p + 2);
+        if (name == "References") {
+            Strings refs = tokenizeString(value, " ");
+            res.references = PathSet(refs.begin(), refs.end());
+        } else if (name == "Deriver") {
+            res.deriver = value;
+        } else if (name == "Hash") {
+            res.hash = parseHashField(path, value);
+        }
+    }
+
     return res;
-}
-
-
-bool isValidPathTxn(const Transaction & txn, const Path & path)
-{
-    string s;
-    return nixDB.queryString(txn, dbValidPaths, path, s);
 }
 
 
@@ -294,31 +303,18 @@ bool LocalStore::isValidPath(const Path & path)
 
 PathSet LocalStore::queryValidPaths()
 {
-    Paths paths;
-    nixDB.enumTable(noTxn, dbValidPaths, paths);
-    return PathSet(paths.begin(), paths.end());
+    PathSet paths;
+    Strings entries = readDirectory(nixDBPath + "/info");
+    for (Strings::iterator i = entries.begin(); i != entries.end(); ++i) 
+        paths.insert(nixStore + "/" + *i);
+    return paths;
 }
 
 
-static string addPrefix(const string & prefix, const string & s)
-{
-    return prefix + string(1, (char) 0) + s;
-}
-
-
-static string stripPrefix(const string & prefix, const string & s)
-{
-    if (s.size() <= prefix.size() ||
-        string(s, 0, prefix.size()) != prefix ||
-        s[prefix.size()] != 0)
-        throw Error(format("string `%1%' is missing prefix `%2%'")
-            % s % prefix);
-    return string(s, prefix.size() + 1);
-}
-
-
+#if 0    
 static PathSet getReferrers(const Transaction & txn, const Path & storePath)
 {
+    throw Error("!!! getReferrers");
     PathSet referrers;
     Strings keys;
     nixDB.enumTable(txn, dbReferrers, keys, storePath + string(1, (char) 0));
@@ -326,8 +322,10 @@ static PathSet getReferrers(const Transaction & txn, const Path & storePath)
         referrers.insert(stripPrefix(storePath, *i));
     return referrers;
 }
+#endif
 
 
+#if 0
 void setReferences(const Transaction & txn, const Path & storePath,
     const PathSet & references)
 {
@@ -358,17 +356,7 @@ void setReferences(const Transaction & txn, const Path & storePath,
         if (references.find(*i) == references.end())
             nixDB.delPair(txn, dbReferrers, addPrefix(*i, storePath));
 }
-
-
-void oldQueryReferences(const Transaction & txn,
-    const Path & storePath, PathSet & references)
-{
-    Paths references2;
-    if (!isValidPathTxn(txn, storePath))
-        throw Error(format("path `%1%' is not valid") % storePath);
-    nixDB.queryStrings(txn, dbReferences, storePath, references2);
-    references.insert(references2.begin(), references2.end());
-}
+#endif
 
 
 void LocalStore::queryReferences(const Path & path,
@@ -379,23 +367,33 @@ void LocalStore::queryReferences(const Path & path,
 }
 
 
-void queryReferrers(const Transaction & txn,
-    const Path & storePath, PathSet & referrers)
+bool LocalStore::queryReferrersInternal(const Path & path, PathSet & referrers)
 {
-    if (!isValidPathTxn(txn, storePath))
-        throw Error(format("path `%1%' is not valid") % storePath);
-    PathSet referrers2 = getReferrers(txn, storePath);
-    referrers.insert(referrers2.begin(), referrers2.end());
+    bool allValid = true;
+    
+    if (!isValidPath(path))
+        throw Error(format("path `%1%' is not valid") % path);
+
+    Path p = referrersFileFor(path);
+    if (!pathExists(p)) return true;
+    Paths refs = tokenizeString(readFile(p), " ");
+
+    for (Paths::iterator i = refs.begin(); i != refs.end(); ++i)
+        /* Referrers can be invalid (see registerValidPath() for the
+           invariant), so we only return one if it is valid. */
+        if (isStorePath(*i) && isValidPath(*i)) referrers.insert(*i); else allValid = false;
+
+    return allValid;
 }
 
 
-void LocalStore::queryReferrers(const Path & storePath,
-    PathSet & referrers)
+void LocalStore::queryReferrers(const Path & path, PathSet & referrers)
 {
-    nix::queryReferrers(noTxn, storePath, referrers);
+    queryReferrersInternal(path, referrers);
 }
 
 
+#if 0
 void setDeriver(const Transaction & txn, const Path & storePath,
     const Path & deriver)
 {
@@ -406,23 +404,12 @@ void setDeriver(const Transaction & txn, const Path & storePath,
         throw Error(format("path `%1%' is not valid") % storePath);
     nixDB.setString(txn, dbDerivers, storePath, deriver);
 }
-
-
-static Path oldQueryDeriver(const Transaction & txn, const Path & storePath)
-{
-    if (!isValidPathTxn(txn, storePath))
-        throw Error(format("path `%1%' is not valid") % storePath);
-    Path deriver;
-    if (nixDB.queryString(txn, dbDerivers, storePath, deriver))
-        return deriver;
-    else
-        return "";
-}
+#endif
 
 
 Path LocalStore::queryDeriver(const Path & path)
 {
-    return oldQueryDeriver(noTxn, path);
+    return queryPathInfo(path).deriver;
 }
 
 
@@ -456,38 +443,13 @@ bool LocalStore::hasSubstitutes(const Path & path)
 }
 
 
-static void oldSetHash(const Transaction & txn, const Path & storePath,
-    const Hash & hash)
-{
-    assert(hash.type == htSHA256);
-    nixDB.setString(txn, dbValidPaths, storePath, "sha256:" + printHash(hash));
-}
-
-
-static Hash oldQueryHash(const Transaction & txn, const Path & storePath)
-{
-    string s;
-    nixDB.queryString(txn, dbValidPaths, storePath, s);
-    string::size_type colon = s.find(':');
-    if (colon == string::npos)
-        throw Error(format("corrupt hash `%1%' in valid-path entry for `%2%'")
-            % s % storePath);
-    HashType ht = parseHashType(string(s, 0, colon));
-    if (ht == htUnknown)
-        throw Error(format("unknown hash type `%1%' in valid-path entry for `%2%'")
-            % string(s, 0, colon) % storePath);
-    return parseHash(ht, string(s, colon + 1));
-}
-
-
 Hash LocalStore::queryPathHash(const Path & path)
 {
-    if (!isValidPath(path))
-        throw Error(format("path `%1%' is not valid") % path);
-    return oldQueryHash(noTxn, path);
+    return queryPathInfo(path).hash;
 }
 
 
+#if 0
 void registerValidPath(const Transaction & txn,
     const Path & path, const Hash & hash, const PathSet & references,
     const Path & deriver)
@@ -501,11 +463,13 @@ void registerValidPath(const Transaction & txn,
     infos.push_back(info);
     registerValidPaths(txn, infos);
 }
+#endif
 
 
-void registerValidPaths(const Transaction & txn,
-    const ValidPathInfos & infos)
+void registerValidPaths(const ValidPathInfos & infos)
 {
+    throw Error("!!! registerValidPaths");
+#if 0
     PathSet newPaths;
     for (ValidPathInfos::const_iterator i = infos.begin();
          i != infos.end(); ++i)
@@ -531,20 +495,24 @@ void registerValidPaths(const Transaction & txn,
 
         setDeriver(txn, i->path, i->deriver);
     }
+#endif
 }
 
 
 /* Invalidate a path.  The caller is responsible for checking that
    there are no referrers. */
-static void invalidatePath(Transaction & txn, const Path & path)
+static void invalidatePath(const Path & path)
 {
     debug(format("invalidating path `%1%'") % path);
 
+    throw Error("!!! invalidatePath");
+#if 0    
     /* Clear the `references' entry for this path, as well as the
        inverse `referrers' entries, and the `derivers' entry. */
     setReferences(txn, path, PathSet());
     nixDB.delPair(txn, dbDerivers, path);
     nixDB.delPair(txn, dbValidPaths, path);
+#endif
 }
 
 
@@ -581,9 +549,7 @@ Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
 
             canonicalisePathMetaData(dstPath);
             
-            Transaction txn(nixDB);
-            registerValidPath(txn, dstPath, h, PathSet(), "");
-            txn.commit();
+            registerValidPath(dstPath, h, PathSet(), "");
         }
 
         outputLock.setDeletion(true);
@@ -612,10 +578,8 @@ Path LocalStore::addTextToStore(const string & suffix, const string & s,
 
             canonicalisePathMetaData(dstPath);
             
-            Transaction txn(nixDB);
-            registerValidPath(txn, dstPath,
+            registerValidPath(dstPath,
                 hashPath(htSHA256, dstPath), references, "");
-            txn.commit();
         }
 
         outputLock.setDeletion(true);
@@ -807,13 +771,11 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 
             canonicalisePathMetaData(dstPath);
             
-            Transaction txn(nixDB);
             /* !!! if we were clever, we could prevent the hashPath()
                here. */
             if (!isValidPath(deriver)) deriver = "";
-            registerValidPath(txn, dstPath,
+            registerValidPath(dstPath,
                 hashPath(htSHA256, dstPath), references, deriver);
-            txn.commit();
         }
         
         outputLock.setDeletion(true);
@@ -825,6 +787,8 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 
 void deleteFromStore(const Path & _path, unsigned long long & bytesFreed)
 {
+    throw Error("!!! deleteFromStore");
+#if 0
     bytesFreed = 0;
     Path path(canonPath(_path));
 
@@ -842,105 +806,115 @@ void deleteFromStore(const Path & _path, unsigned long long & bytesFreed)
     txn.commit();
 
     deletePathWrapped(path, bytesFreed);
+#endif    
 }
 
 
-void verifyStore(bool checkContents)
+void LocalStore::verifyStore(bool checkContents)
 {
-    Transaction txn(nixDB);
+    /* !!! acquire the GC lock or something? */
 
-    
+
+    /* Check whether all valid paths actually exist. */
     printMsg(lvlInfo, "checking path existence");
 
-    Paths paths;
-    PathSet validPaths;
-    nixDB.enumTable(txn, dbValidPaths, paths);
-
-    for (Paths::iterator i = paths.begin(); i != paths.end(); ++i) {
+    PathSet validPaths2 = queryValidPaths(), validPaths;
+    
+    for (PathSet::iterator i = validPaths2.begin(); i != validPaths2.end(); ++i) {
         checkInterrupt();
-        if (!pathExists(*i)) {
-            printMsg(lvlError, format("path `%1%' disappeared") % *i);
-            invalidatePath(txn, *i);
-        } else if (!isStorePath(*i)) {
+        if (!isStorePath(*i)) {
             printMsg(lvlError, format("path `%1%' is not in the Nix store") % *i);
-            invalidatePath(txn, *i);
-        } else {
-            if (checkContents) {
-                debug(format("checking contents of `%1%'") % *i);
-                Hash expected = oldQueryHash(txn, *i);
-                Hash current = hashPath(expected.type, *i);
-                if (current != expected) {
-                    printMsg(lvlError, format("path `%1%' was modified! "
-                                 "expected hash `%2%', got `%3%'")
-                        % *i % printHash(expected) % printHash(current));
-                }
-            }
+            invalidatePath(*i);
+        } else if (!pathExists(*i)) {
+            printMsg(lvlError, format("path `%1%' disappeared") % *i);
+            invalidatePath(*i);
+        } else
             validPaths.insert(*i);
-        }
     }
 
 
-    /* Check the cleanup invariant: only valid paths can have
-       `references', `referrers', or `derivers' entries. */
+    /* Check the store path meta-information. */
+    printMsg(lvlInfo, "checking path meta-information");
 
+    std::map<Path, PathSet> referrersCache;
+    
+    for (PathSet::iterator i = validPaths.begin(); i != validPaths.end(); ++i) {
+        bool update = false;
+        ValidPathInfo info = queryPathInfo(*i);
 
-    /* Check the `derivers' table. */
-    printMsg(lvlInfo, "checking the derivers table");
-    Paths deriversKeys;
-    nixDB.enumTable(txn, dbDerivers, deriversKeys);
-    for (Paths::iterator i = deriversKeys.begin();
-         i != deriversKeys.end(); ++i)
-    {
-        if (validPaths.find(*i) == validPaths.end()) {
-            printMsg(lvlError, format("removing deriver entry for invalid path `%1%'")
-                % *i);
-            nixDB.delPair(txn, dbDerivers, *i);
-        }
-        else {
-            Path deriver = oldQueryDeriver(txn, *i);
-            if (!isStorePath(deriver)) {
-                printMsg(lvlError, format("removing corrupt deriver `%1%' for `%2%'")
-                    % deriver % *i);
-                nixDB.delPair(txn, dbDerivers, *i);
+        /* Check the references: each reference should be valid, and
+           it should have a matching referrer. */
+        for (PathSet::iterator j = info.references.begin();
+             j != info.references.end(); ++j)
+        {
+            if (referrersCache.find(*j) == referrersCache.end())
+                queryReferrers(*j, referrersCache[*j]);
+            if (referrersCache[*j].find(*i) == referrersCache[*j].end()) {
+                printMsg(lvlError, format("adding missing referrer mapping from `%1%' to `%2%'")
+                    % *j % *i);
+                appendReferrer(*j, *i);
+            }
+            if (validPaths.find(*j) == validPaths.end()) {
+                printMsg(lvlError, format("incomplete closure: `%1%' needs missing `%2%'")
+                    % *i % *j);
+                /* nothing we can do about it... */
             }
         }
-    }
 
-
-    /* Check the `references' table. */
-    printMsg(lvlInfo, "checking the references table");
-    Paths referencesKeys;
-    nixDB.enumTable(txn, dbReferences, referencesKeys);
-    for (Paths::iterator i = referencesKeys.begin();
-         i != referencesKeys.end(); ++i)
-    {
-        if (validPaths.find(*i) == validPaths.end()) {
-            printMsg(lvlError, format("removing references entry for invalid path `%1%'")
-                % *i);
-            setReferences(txn, *i, PathSet());
+        /* Check the deriver.  (Note that the deriver doesn't have to
+           be a valid path.) */
+        if (!info.deriver.empty() && !isStorePath(info.deriver)) {
+            info.deriver = "";
+            update = true;
         }
-        else {
-            PathSet references;
-            oldQueryReferences(txn, *i, references);
-            for (PathSet::iterator j = references.begin();
-                 j != references.end(); ++j)
-            {
-                string dummy;
-                if (!nixDB.queryString(txn, dbReferrers, addPrefix(*j, *i), dummy)) {
-                    printMsg(lvlError, format("adding missing referrer mapping from `%1%' to `%2%'")
-                        % *j % *i);
-                    nixDB.setString(txn, dbReferrers, addPrefix(*j, *i), "");
-                }
-                if (validPaths.find(*j) == validPaths.end()) {
-                    printMsg(lvlError, format("incomplete closure: `%1%' needs missing `%2%'")
-                        % *i % *j);
-                }
+
+        /* Check the content hash (optionally - slow). */
+        if (checkContents) {
+            debug(format("checking contents of `%1%'") % *i);
+            Hash current = hashPath(info.hash.type, *i);
+            if (current != info.hash) {
+                printMsg(lvlError, format("path `%1%' was modified! "
+                        "expected hash `%2%', got `%3%'")
+                    % *i % printHash(info.hash) % printHash(current));
             }
         }
+
+        if (update)
+            /* !!! */;
     }
 
-    /* Check the `referrers' table. */
-    printMsg(lvlInfo, "checking the referrers table");
+    referrersCache.clear();
+    
+
+    /* Check the referrers. */
+    printMsg(lvlInfo, "checking referrers");
+
+    Strings entries = readDirectory(nixDBPath + "/referrer");
+    for (Strings::iterator i = entries.begin(); i != entries.end(); ++i) {
+        Path from = nixStore + "/" + *i;
+        
+        if (validPaths.find(from) == validPaths.end()) {
+            printMsg(lvlError, format("removing referrers file for invalid `%1%'") % from);
+            Path p = referrersFileFor(from);
+            if (unlink(p.c_str()) == -1)
+                throw SysError(format("unlinking `%1%'") % p);
+            continue;
+        }
+
+        PathSet referrers;
+        bool allValid = queryReferrersInternal(from, referrers);
+        bool update = false;
+
+        if (!allValid) {
+            printMsg(lvlError, format("removing some stale paths from referrers of `%1%'") % from);
+            update = true;
+        }
+
+        if (update)
+            /* !!! */;
+    }
+    
+#if 0
     Strings referrers;
     nixDB.enumTable(txn, dbReferrers, referrers);
     for (Strings::iterator i = referrers.begin(); i != referrers.end(); ++i) {
@@ -979,9 +953,7 @@ void verifyStore(bool checkContents)
         }
         
     }
-
-    
-    txn.commit();
+#endif
 }
 
 
@@ -1090,159 +1062,15 @@ static void hashAndLink(bool dryRun, HashToPath & hashToPath,
 void LocalStore::optimiseStore(bool dryRun, OptimiseStats & stats)
 {
     HashToPath hashToPath;
-    
-    Paths paths;
-    PathSet validPaths;
-    nixDB.enumTable(noTxn, dbValidPaths, paths);
 
-    for (Paths::iterator i = paths.begin(); i != paths.end(); ++i) {
+    PathSet paths = queryValidPaths();
+
+    for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i) {
         addTempRoot(*i);
         if (!isValidPath(*i)) continue; /* path was GC'ed, probably */
         startNest(nest, lvlChatty, format("hashing files in `%1%'") % *i);
         hashAndLink(dryRun, hashToPath, stats, *i);
     }
-}
-
-
-/* Upgrade from schema 2 (0.8 <= Nix <= 0.9) to schema 3 (Nix >=
-   0.10).  The only thing to do here is to upgrade the old `referer'
-   table (which causes quadratic complexity in some cases) to the new
-   (and properly spelled) `referrer' table. */
-static void upgradeStore09() 
-{
-    /* !!! we should disallow concurrent upgrades */
-    
-    if (!pathExists(nixDBPath + "/referers")) return;
-
-    printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
-
-    Transaction txn(nixDB);
-
-    std::cerr << "converting referers to referrers...";
-
-    TableId dbReferers = nixDB.openTable("referers"); /* sic! */
-
-    Paths referersKeys;
-    nixDB.enumTable(txn, dbReferers, referersKeys);
-
-    int n = 0;
-    for (Paths::iterator i = referersKeys.begin();
-         i != referersKeys.end(); ++i)
-    {
-        Paths referers;
-        nixDB.queryStrings(txn, dbReferers, *i, referers);
-        for (Paths::iterator j = referers.begin();
-             j != referers.end(); ++j)
-            nixDB.setString(txn, dbReferrers, addPrefix(*i, *j), "");
-        if (++n % 1000 == 0) {
-            txn.commit();
-            txn.begin(nixDB);
-            std::cerr << "|";
-        }
-        std::cerr << ".";
-    }
-
-    txn.commit();
-    
-    std::cerr << std::endl;
-
-    nixDB.closeTable(dbReferers);
-
-    nixDB.deleteTable("referers");
-}
-
- 
-/* Upgrade from schema 3 (Nix 0.10) to schema 4 (Nix >= 0.11).  The
-   only thing to do here is to delete the substitutes table and get
-   rid of invalid but substitutable references/referrers.  */
-static void upgradeStore11()
-{
-    if (!pathExists(nixDBPath + "/substitutes")) return;
-
-    printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
-
-    Transaction txn(nixDB);
-    TableId dbSubstitutes = nixDB.openTable("substitutes");
-
-    Paths subKeys;
-    nixDB.enumTable(txn, dbSubstitutes, subKeys);
-    for (Paths::iterator i = subKeys.begin(); i != subKeys.end(); ++i) {
-        if (!isValidPathTxn(txn, *i))
-            invalidatePath(txn, *i);
-    }
-    
-    txn.commit();
-    nixDB.closeTable(dbSubstitutes);
-    nixDB.deleteTable("substitutes");
-}
-
-
-/* !!! move to util.cc */
-void appendFile(const Path & path, const string & s)
-{
-    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0666);
-    if (fd == -1)
-        throw SysError(format("opening file `%1%'") % path);
-    writeFull(fd, (unsigned char *) s.c_str(), s.size());
-}
-
-
-void newRegisterValidPath(const Path & path,
-    const Hash & hash, const PathSet & references,
-    const Path & deriver)
-{
-    Path infoFile = infoFileFor(path);
-    if (pathExists(infoFile)) return;
-
-    // !!! acquire PathLock on infoFile here
-
-    string refs;
-    for (PathSet::const_iterator i = references.begin(); i != references.end(); ++i) {
-        if (!refs.empty()) refs += " ";
-        refs += *i;
-
-        /* Update the referrer mapping for *i.  This must be done
-           before the info file is written to maintain the invariant
-           that if `path' is a valid path, then all its references
-           have referrer mappings back to `path'.  A " " is prefixed
-           to separate it from the previous entry.  It's not suffixed
-           to deal with interrupted partial writes to this file. */
-        Path referrersFile = metaPathFor(*i) + ".referrers";
-        /* !!! locking */
-        appendFile(referrersFile, " " + path);
-    }
-
-    string info = (format(
-        "Hash: sha256:%1%\n"
-        "References: %2%\n"
-        "Deriver: %3%\n"
-        "Registered-At: %4%\n")
-        % printHash(hash) % refs % deriver % time(0)).str();
-
-    // !!! atomicity
-    writeFile(infoFile, info);
-}
-
-
-/* Upgrade from schema 4 (Nix 0.11) to schema 5 (Nix >= 0.12).  The
-   old schema uses Berkeley DB, the new one stores store path
-   meta-information in files. */
-static void upgradeStore12()
-{
-    printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
-
-    Paths validPaths;
-    nixDB.enumTable(noTxn, dbValidPaths, validPaths);
-
-    for (Paths::iterator i = validPaths.begin(); i != validPaths.end(); ++i) {
-        Hash hash = oldQueryHash(noTxn, *i);
-        PathSet references; oldQueryReferences(noTxn, *i, references);
-        Path deriver = oldQueryDeriver(noTxn, *i);
-        newRegisterValidPath(*i, hash, references, deriver);
-        std::cerr << ".";
-    }
-
-    std::cerr << std::endl;
 }
 
 

@@ -3,7 +3,6 @@
 #include "misc.hh"
 #include "globals.hh"
 #include "local-store.hh"
-#include "db.hh"
 #include "util.hh"
 
 #include <map>
@@ -1994,27 +1993,17 @@ void DerivationGoal::computeClosure()
     }
 
     /* Register each output path as valid, and register the sets of
-       paths referenced by each of them.  This is wrapped in one
-       database transaction to ensure that if we crash, either
-       everything is registered or nothing is.  This is for
-       recoverability: unregistered paths in the store can be deleted
-       arbitrarily, while registered paths can only be deleted by
-       running the garbage collector.
-
-       The reason that we do the transaction here and not on the fly
-       while we are scanning (above) is so that we don't hold database
-       locks for too long. */
-    Transaction txn;
-    createStoreTransaction(txn);
+       paths referenced by each of them.  !!! this should be
+       atomic so that either all paths are registered as valid, or
+       none are. */
     for (DerivationOutputs::iterator i = drv.outputs.begin(); 
          i != drv.outputs.end(); ++i)
     {
-        registerValidPath(txn, i->second.path,
+        registerValidPath(i->second.path,
             contentHashes[i->second.path],
             allReferences[i->second.path],
             drvPath);
     }
-    txn.commit();
 
     /* It is now safe to delete the lock files, since all future
        lockers will see that the output paths are valid; they will not
@@ -2434,11 +2423,8 @@ void SubstitutionGoal::finished()
 
     Hash contentHash = hashPath(htSHA256, storePath);
 
-    Transaction txn;
-    createStoreTransaction(txn);
-    registerValidPath(txn, storePath, contentHash,
+    registerValidPath(storePath, contentHash,
         references, deriver);
-    txn.commit();
 
     outputLock->setDeletion(true);
     

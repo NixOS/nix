@@ -1,6 +1,5 @@
 #include "misc.hh"
 #include "store-api.hh"
-#include "db.hh"
 
 #include <aterm2.h>
 

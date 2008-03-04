@@ -430,10 +430,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         }
     }
 
-    Transaction txn;
-    createStoreTransaction(txn);
-    registerValidPaths(txn, infos);
-    txn.commit();
+    registerValidPaths(infos);
 }
 
 
@@ -641,9 +638,11 @@ static void opVerify(Strings opFlags, Strings opArgs)
         if (*i == "--check-contents") checkContents = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
     
-    verifyStore(checkContents);
-}
+    LocalStore * store2(dynamic_cast<LocalStore *>(store.get()));
+    if (!store2) throw Error("you don't have sufficient rights to use --verify");
 
+    store2->verifyStore(checkContents);
+}
 
 
 static void showOptimiseStats(OptimiseStats & stats)
@@ -755,7 +754,7 @@ void run(Strings args)
     if (!op) throw UsageError("no operation specified");
 
     if (op != opDump && op != opRestore) /* !!! hack */
-        store = openStore(op != opGC);
+        store = openStore();
 
     op(opFlags, opArgs);
 }
