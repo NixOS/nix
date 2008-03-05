@@ -16,7 +16,7 @@ Hash parseHashField(const Path & path, const string & s);
 /* Upgrade from schema 4 (Nix 0.11) to schema 5 (Nix >= 0.12).  The
    old schema uses Berkeley DB, the new one stores store path
    meta-information in files. */
-void upgradeStore12()
+void LocalStore::upgradeStore12()
 {
     printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
 

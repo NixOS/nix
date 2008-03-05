@@ -31,6 +31,14 @@ static int rootNr = 0;
 static bool indirectRoot = false;
 
 
+LocalStore & ensureLocalStore()
+{
+    LocalStore * store2(dynamic_cast<LocalStore *>(store.get()));
+    if (!store2) throw Error("you don't have sufficient rights to use --verify");
+    return *store2;
+}
+
+
 static Path useDeriver(Path path)
 {       
     if (!isDerivation(path)) {
@@ -430,7 +438,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         }
     }
 
-    registerValidPaths(infos);
+    ensureLocalStore().registerValidPaths(infos);
 }
 
 
@@ -638,10 +646,7 @@ static void opVerify(Strings opFlags, Strings opArgs)
         if (*i == "--check-contents") checkContents = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
     
-    LocalStore * store2(dynamic_cast<LocalStore *>(store.get()));
-    if (!store2) throw Error("you don't have sufficient rights to use --verify");
-
-    store2->verifyStore(checkContents);
+    ensureLocalStore().verifyStore(checkContents);
 }
 
 
@@ -670,12 +675,9 @@ static void opOptimise(Strings opFlags, Strings opArgs)
         if (*i == "--dry-run") dryRun = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
-    LocalStore * store2(dynamic_cast<LocalStore *>(store.get()));
-    if (!store2) throw Error("you don't have sufficient rights to use --optimise");
-
     OptimiseStats stats;
     try {
-        store2->optimiseStore(dryRun, stats);
+        ensureLocalStore().optimiseStore(dryRun, stats);
     } catch (...) {
         showOptimiseStats(stats);
         throw;

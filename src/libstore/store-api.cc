@@ -205,6 +205,19 @@ ValidPathInfo decodeValidPathInfo(std::istream & str, bool hashGiven)
 }
 
 
+string showPaths(const PathSet & paths)
+{
+    string s;
+    for (PathSet::const_iterator i = paths.begin();
+         i != paths.end(); ++i)
+    {
+        if (s.size() != 0) s += ", ";
+        s += "`" + *i + "'";
+    }
+    return s;
+}
+
+
 }
 
 

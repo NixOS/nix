@@ -252,6 +252,11 @@ extern boost::shared_ptr<StoreAPI> store;
 boost::shared_ptr<StoreAPI> openStore();
 
 
+/* Display a set of paths in human-readable form (i.e., between quotes
+   and separated by commas). */
+string showPaths(const PathSet & paths);
+
+
 string makeValidityRegistration(const PathSet & paths,
     bool showDerivers, bool showHash);
     
@@ -262,6 +267,8 @@ struct ValidPathInfo
     Hash hash;
     PathSet references;
 };
+
+typedef list<ValidPathInfo> ValidPathInfos;
 
 ValidPathInfo decodeValidPathInfo(std::istream & str,
     bool hashGiven = false);

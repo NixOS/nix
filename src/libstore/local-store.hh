@@ -91,6 +91,9 @@ public:
     void collectGarbage(GCAction action, const PathSet & pathsToDelete,
         bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed);
 
+    /* Delete a path from the Nix store. */
+    void deleteFromStore(const Path & path, unsigned long long & bytesFreed);
+    
     /* Optimise the disk space usage of the Nix store by hard-linking
        files with the same contents. */
     void optimiseStore(bool dryRun, OptimiseStats & stats);
@@ -98,27 +101,36 @@ public:
     /* Check the integrity of the Nix store. */
     void verifyStore(bool checkContents);
 
+    /* Register the validity of a path, i.e., that `path' exists, that
+       the paths referenced by it exists, and in the case of an output
+       path of a derivation, that it has been produced by a succesful
+       execution of the derivation (or something equivalent).  Also
+       register the hash of the file system contents of the path.  The
+       hash must be a SHA-256 hash. */
+    void registerValidPath(const Path & path,
+        const Hash & hash, const PathSet & references, const Path & deriver);
+
+    void registerValidPaths(const ValidPathInfos & infos);
+
 private:
 
+    /* !!! The cache can grow very big.  Maybe it should be pruned
+       every once in a while. */
+    std::map<Path, ValidPathInfo> pathInfoCache;
+
+    void registerValidPath(const ValidPathInfo & info);
+
+    ValidPathInfo queryPathInfo(const Path & path);
+
     bool queryReferrersInternal(const Path & path, PathSet & referrers);
+    
+    void upgradeStore12();
+
 };
 
 
 /* Copy a path recursively. */
 void copyPath(const Path & src, const Path & dst);
-
-/* Register the validity of a path, i.e., that `path' exists, that the
-   paths referenced by it exists, and in the case of an output path of
-   a derivation, that it has been produced by a succesful execution of
-   the derivation (or something equivalent).  Also register the hash
-   of the file system contents of the path.  The hash must be a
-   SHA-256 hash. */
-void registerValidPath(const Path & path,
-    const Hash & hash, const PathSet & references, const Path & deriver);
-
-typedef list<ValidPathInfo> ValidPathInfos;
-
-void registerValidPaths(const ValidPathInfos & infos);
 
 /* "Fix", or canonicalise, the meta-data of the files in a store path
    after it has been built.  In particular:
@@ -129,9 +141,6 @@ void registerValidPaths(const ValidPathInfos & infos);
    - the owner and group are set to the Nix user and group, if we're
      in a setuid Nix installation. */
 void canonicalisePathMetaData(const Path & path);
-
-/* Delete a value from the nixStore directory. */
-void deleteFromStore(const Path & path, unsigned long long & bytesFreed);
 
 MakeError(PathInUse, Error);
 

@@ -95,4 +95,5 @@ chmod +x $NIX_BIN_DIR/nix/download-using-manifests.pl
 $nixstore --init
 
 # Did anything happen?
-test -e "$NIX_DB_DIR"/validpaths
+test -e "$NIX_DB_DIR"/info
+test -e "$NIX_DB_DIR"/referrer

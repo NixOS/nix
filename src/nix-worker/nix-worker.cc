@@ -472,7 +472,7 @@ static void processConnection()
             throw Error("if you run `nix-worker' as root, then you MUST set `build-users-group'!");
 
         /* Open the store. */
-        store = boost::shared_ptr<StoreAPI>(new LocalStore(true));
+        store = boost::shared_ptr<StoreAPI>(new LocalStore());
 
         stopWork();
         
