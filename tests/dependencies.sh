@@ -11,7 +11,7 @@ $nixstore -q --graph "$drvPath" > $TEST_ROOT/graph
 if test -n "$dot"; then
     # Does it parse?
     $dot < $TEST_ROOT/graph
-fi    
+fi
 
 outPath=$($nixstore -rvv "$drvPath")
 

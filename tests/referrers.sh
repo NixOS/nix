@@ -13,7 +13,11 @@ echo "registering..."
 time for ((n = 0; n < $max; n++)); do
     storePath=$NIX_STORE_DIR/$n
     touch $storePath
-    (echo $storePath && echo && echo 1 && echo $reference)
+    ref2=$NIX_STORE_DIR/$((n+1))
+    if test $((n+1)) = $max; then
+        ref2=$reference
+    fi
+    (echo $storePath && echo && echo 2 && echo $reference && echo $ref2)
 done | $nixstore --register-validity 
 
 echo "collecting garbage..."

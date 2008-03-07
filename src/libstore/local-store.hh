@@ -142,6 +142,8 @@ void copyPath(const Path & src, const Path & dst);
      in a setuid Nix installation. */
 void canonicalisePathMetaData(const Path & path);
 
+void canonicalisePathMetaData(const Path & path, bool recurse);
+
 MakeError(PathInUse, Error);
 
 /* Whether we are in build users mode. */

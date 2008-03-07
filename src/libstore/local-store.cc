@@ -102,7 +102,7 @@ void copyPath(const Path & src, const Path & dst, PathFilter & filter)
 }
 
 
-static void _canonicalisePathMetaData(const Path & path, bool recurse)
+void canonicalisePathMetaData(const Path & path, bool recurse)
 {
     checkInterrupt();
 
@@ -154,14 +154,14 @@ static void _canonicalisePathMetaData(const Path & path, bool recurse)
     if (recurse && S_ISDIR(st.st_mode)) {
         Strings names = readDirectory(path);
 	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
-	    _canonicalisePathMetaData(path + "/" + *i, true);
+	    canonicalisePathMetaData(path + "/" + *i, true);
     }
 }
 
 
 void canonicalisePathMetaData(const Path & path)
 {
-    _canonicalisePathMetaData(path, true);
+    canonicalisePathMetaData(path, true);
 
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
@@ -246,6 +246,12 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
         if (!refs.empty()) refs += " ";
         refs += *i;
 
+        /* !!! locking: what if *i becomes invalid between here and
+           `path' becoming valid? */
+        if (*i != info.path && !isValidPath(*i))
+            throw Error(format("cannot register `%1%' as valid, because its reference `%2%' isn't valid")
+                % info.path % *i);
+
         /* Update the referrer mapping for *i.  This must be done
            before the info file is written to maintain the invariant
            that if `path' is a valid path, then all its references
@@ -265,6 +271,7 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
     // !!! atomicity
     writeFile(infoFile, s);
 }
+
 
 Hash parseHashField(const Path & path, const string & s)
 {
@@ -411,36 +418,40 @@ Hash LocalStore::queryPathHash(const Path & path)
 }
 
 
+static void dfsVisit(std::map<Path, ValidPathInfo> & infos,
+    const Path & path, PathSet & visited, Paths & sorted)
+{
+    if (visited.find(path) != visited.end()) return;
+    visited.insert(path);
+
+    ValidPathInfo & info(infos[path]);
+    
+    for (PathSet::iterator i = info.references.begin();
+         i != info.references.end(); ++i)
+        if (infos.find(*i) != infos.end())
+            dfsVisit(infos, *i, visited, sorted);
+
+    sorted.push_back(path);
+}
+
+
 void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 {
-    throw Error("!!! registerValidPaths");
-#if 0
-    PathSet newPaths;
-    for (ValidPathInfos::const_iterator i = infos.begin();
-         i != infos.end(); ++i)
-        newPaths.insert(i->path);
-        
-    for (ValidPathInfos::const_iterator i = infos.begin();
-         i != infos.end(); ++i)
-    {
-        assertStorePath(i->path);
-
-        debug(format("registering path `%1%'") % i->path);
-        oldSetHash(txn, i->path, i->hash);
-
-        setReferences(txn, i->path, i->references);
+    std::map<Path, ValidPathInfo> infosMap;
     
-        /* Check that all referenced paths are also valid (or about to
-           become valid). */
-        for (PathSet::iterator j = i->references.begin();
-             j != i->references.end(); ++j)
-            if (!isValidPathTxn(txn, *j) && newPaths.find(*j) == newPaths.end())
-                throw Error(format("cannot register path `%1%' as valid, since its reference `%2%' is invalid")
-                    % i->path % *j);
+    /* Sort the paths topologically under the references relation, so
+       that if path A is referenced by B, then A is registered before
+       B. */
+    for (ValidPathInfos::const_iterator i = infos.begin(); i != infos.end(); ++i)
+        infosMap[i->path] = *i;
 
-        setDeriver(txn, i->path, i->deriver);
-    }
-#endif
+    PathSet visited;
+    Paths sorted;
+    for (ValidPathInfos::const_iterator i = infos.begin(); i != infos.end(); ++i)
+        dfsVisit(infosMap, i->path, visited, sorted);
+
+    for (Paths::iterator i = sorted.begin(); i != sorted.end(); ++i)
+        registerValidPath(infosMap[*i]);
 }
 
 
@@ -868,123 +879,6 @@ void LocalStore::verifyStore(bool checkContents)
         }
 
         if (update) rewriteReferrers(from, referrersNew);
-    }
-}
-
-
-typedef std::map<Hash, std::pair<Path, ino_t> > HashToPath;
-
-
-static void makeWritable(const Path & path)
-{
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-	throw SysError(format("getting attributes of path `%1%'") % path);
-    if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
-        throw SysError(format("changing writability of `%1%'") % path);
-}
-
-
-static void hashAndLink(bool dryRun, HashToPath & hashToPath,
-    OptimiseStats & stats, const Path & path)
-{
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-	throw SysError(format("getting attributes of path `%1%'") % path);
-
-    /* Sometimes SNAFUs can cause files in the Nix store to be
-       modified, in particular when running programs as root under
-       NixOS (example: $fontconfig/var/cache being modified).  Skip
-       those files. */
-    if (S_ISREG(st.st_mode) && (st.st_mode & S_IWUSR)) {
-        printMsg(lvlError, format("skipping suspicious writable file `%1%'") % path);
-        return;
-    }
-
-    /* We can hard link regular files and symlinks. */
-    if (S_ISREG(st.st_mode) || S_ISLNK(st.st_mode)) {
-
-        /* Hash the file.  Note that hashPath() returns the hash over
-           the NAR serialisation, which includes the execute bit on
-           the file.  Thus, executable and non-executable files with
-           the same contents *won't* be linked (which is good because
-           otherwise the permissions would be screwed up).
-
-           Also note that if `path' is a symlink, then we're hashing
-           the contents of the symlink (i.e. the result of
-           readlink()), not the contents of the target (which may not
-           even exist). */
-        Hash hash = hashPath(htSHA256, path);
-        stats.totalFiles++;
-        printMsg(lvlDebug, format("`%1%' has hash `%2%'") % path % printHash(hash));
-
-        std::pair<Path, ino_t> prevPath = hashToPath[hash];
-        
-        if (prevPath.first == "") {
-            hashToPath[hash] = std::pair<Path, ino_t>(path, st.st_ino);
-            return;
-        }
-            
-        /* Yes!  We've seen a file with the same contents.  Replace
-           the current file with a hard link to that file. */
-        stats.sameContents++;
-        if (prevPath.second == st.st_ino) {
-            printMsg(lvlDebug, format("`%1%' is already linked to `%2%'") % path % prevPath.first);
-            return;
-        }
-        
-        if (!dryRun) {
-            
-            printMsg(lvlTalkative, format("linking `%1%' to `%2%'") % path % prevPath.first);
-
-            Path tempLink = (format("%1%.tmp-%2%-%3%")
-                % path % getpid() % rand()).str();
-
-            /* Make the containing directory writable, but only if
-               it's not the store itself (we don't want or need to
-               mess with  its permissions). */
-            bool mustToggle = !isStorePath(path);
-            if (mustToggle) makeWritable(dirOf(path));
-        
-            if (link(prevPath.first.c_str(), tempLink.c_str()) == -1)
-                throw SysError(format("cannot link `%1%' to `%2%'")
-                    % tempLink % prevPath.first);
-
-            /* Atomically replace the old file with the new hard link. */
-            if (rename(tempLink.c_str(), path.c_str()) == -1)
-                throw SysError(format("cannot rename `%1%' to `%2%'")
-                    % tempLink % path);
-
-            /* Make the directory read-only again and reset its
-               timestamp back to 0. */
-            if (mustToggle) _canonicalisePathMetaData(dirOf(path), false);
-            
-        } else
-            printMsg(lvlTalkative, format("would link `%1%' to `%2%'") % path % prevPath.first);
-        
-        stats.filesLinked++;
-        stats.bytesFreed += st.st_size;
-    }
-
-    if (S_ISDIR(st.st_mode)) {
-        Strings names = readDirectory(path);
-	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
-	    hashAndLink(dryRun, hashToPath, stats, path + "/" + *i);
-    }
-}
-
-
-void LocalStore::optimiseStore(bool dryRun, OptimiseStats & stats)
-{
-    HashToPath hashToPath;
-
-    PathSet paths = queryValidPaths();
-
-    for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i) {
-        addTempRoot(*i);
-        if (!isValidPath(*i)) continue; /* path was GC'ed, probably */
-        startNest(nest, lvlChatty, format("hashing files in `%1%'") % *i);
-        hashAndLink(dryRun, hashToPath, stats, *i);
     }
 }
 
