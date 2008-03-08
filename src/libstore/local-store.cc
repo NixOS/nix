@@ -15,7 +15,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <utime.h>
-#include <fcntl.h> // !!! remove
+#include <fcntl.h>
 
 
 namespace nix {
@@ -110,7 +110,7 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
     if (lstat(path.c_str(), &st))
 	throw SysError(format("getting attributes of path `%1%'") % path);
 
-    /* Change ownership to the current uid.  If its a symlink, use
+    /* Change ownership to the current uid.  If it's a symlink, use
        lchown if available, otherwise don't bother.  Wrong ownership
        of a symlink doesn't matter, since the owning user can't change
        the symlink and can't delete it because the directory is not
@@ -176,46 +176,65 @@ void canonicalisePathMetaData(const Path & path)
 }
 
 
-Path infoFileFor(const Path & path)
+static Path infoFileFor(const Path & path)
 {
     string baseName = baseNameOf(path);
     return (format("%1%/info/%2%") % nixDBPath % baseName).str();
 }
 
 
-Path referrersFileFor(const Path & path)
+static Path referrersFileFor(const Path & path)
 {
     string baseName = baseNameOf(path);
     return (format("%1%/referrer/%2%") % nixDBPath % baseName).str();
 }
 
 
-/* !!! move to util.cc */
-void appendFile(const Path & path, const string & s)
+static Path tmpFileForAtomicUpdate(const Path & path)
 {
-    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0666);
-    if (fd == -1)
-        throw SysError(format("opening file `%1%'") % path);
-    writeFull(fd, (unsigned char *) s.c_str(), s.size());
+    return (format("%1%/.%2%.%3%") % dirOf(path) % getpid() % baseNameOf(path)).str();
 }
 
 
 static void appendReferrer(const Path & from, const Path & to)
 {
     Path referrersFile = referrersFileFor(from);
-    /* !!! locking */
-    appendFile(referrersFile, " " + to);
+    
+    PathLocks referrersLock(singleton<PathSet, Path>(referrersFile));
+    referrersLock.setDeletion(true);
+
+    AutoCloseFD fd = open(referrersFile.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0666);
+    if (fd == -1) throw SysError(format("opening file `%1%'") % referrersFile);
+    
+    string s = " " + to;
+    writeFull(fd, (const unsigned char *) s.c_str(), s.size());
 }
 
 
 /* Atomically update the referrers file. */
 static void rewriteReferrers(const Path & path, const PathSet & referrers)
 {
+    Path referrersFile = referrersFileFor(path);
+    
+    PathLocks referrersLock(singleton<PathSet, Path>(referrersFile));
+    referrersLock.setDeletion(true);
+
+    Path tmpFile = tmpFileForAtomicUpdate(referrersFile);
+    
+    AutoCloseFD fd = open(tmpFile.c_str(), O_WRONLY | O_TRUNC | O_CREAT, 0666);
+    if (fd == -1) throw SysError(format("opening file `%1%'") % referrersFile);
+    
     string s;
     for (PathSet::const_iterator i = referrers.begin(); i != referrers.end(); ++i) {
         s += " "; s += *i;
     }
-    writeFile(referrersFileFor(path), s); /* !!! atomicity, locking */
+    
+    writeFull(fd, (const unsigned char *) s.c_str(), s.size());
+
+    fd.close(); /* for Windows; can't rename open file */
+
+    if (rename(tmpFile.c_str(), referrersFile.c_str()) == -1)
+        throw SysError(format("cannot rename `%1%' to `%2%'") % tmpFile % referrersFile);
 }
 
 
@@ -235,7 +254,12 @@ void LocalStore::registerValidPath(const Path & path,
 void LocalStore::registerValidPath(const ValidPathInfo & info)
 {
     Path infoFile = infoFileFor(info.path);
-    if (pathExists(infoFile)) return;
+
+    ValidPathInfo oldInfo;
+    if (pathExists(infoFile)) oldInfo = queryPathInfo(info.path);
+
+    /* Note that it's possible for infoFile to already exist. !!!
+       check what happens in case of repeated registrations */
 
     // !!! acquire PathLock on infoFile here?
 
@@ -258,7 +282,8 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
            have referrer mappings back to `path'.  A " " is prefixed
            to separate it from the previous entry.  It's not suffixed
            to deal with interrupted partial writes to this file. */
-        appendReferrer(*i, info.path);
+        if (oldInfo.references.find(*i) == oldInfo.references.end())
+            appendReferrer(*i, info.path);
     }
 
     string s = (format(
@@ -266,10 +291,16 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
         "References: %2%\n"
         "Deriver: %3%\n"
         "Registered-At: %4%\n")
-        % printHash(info.hash) % refs % info.deriver % time(0)).str();
+        % printHash(info.hash) % refs % info.deriver %
+        (oldInfo.registrationTime ? oldInfo.registrationTime : time(0))).str();
 
-    // !!! atomicity
-    writeFile(infoFile, s);
+    /* Atomically rewrite the info file. */
+    Path tmpFile = tmpFileForAtomicUpdate(infoFile);
+    writeFile(tmpFile, s);
+    if (rename(tmpFile.c_str(), infoFile.c_str()) == -1)
+        throw SysError(format("cannot rename `%1%' to `%2%'") % tmpFile % infoFile);
+
+    pathInfoCache[info.path] = info;
 }
 
 
@@ -290,6 +321,7 @@ Hash parseHashField(const Path & path, const string & s)
 ValidPathInfo LocalStore::queryPathInfo(const Path & path)
 {
     ValidPathInfo res;
+    res.path = path;
 
     assertStorePath(path);
 
@@ -319,6 +351,10 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
             res.deriver = value;
         } else if (name == "Hash") {
             res.hash = parseHashField(path, value);
+        } else if (name == "Registered-At") {
+            int n = 0;
+            string2Int(value, n);
+            res.registrationTime = n;
         }
     }
 
@@ -357,9 +393,19 @@ bool LocalStore::queryReferrersInternal(const Path & path, PathSet & referrers)
     if (!isValidPath(path))
         throw Error(format("path `%1%' is not valid") % path);
 
-    Path p = referrersFileFor(path);
-    if (!pathExists(p)) return true;
-    Paths refs = tokenizeString(readFile(p), " ");
+    /* No locking is necessary here: updates are only done by
+       appending or by atomically replacing the file.  When appending,
+       there is a possibility that we see a partial entry, but it will
+       just be filtered out below (the partially written path will not
+       be valid, so it will be ignored). */
+
+    Path referrersFile = referrersFileFor(path);
+    if (!pathExists(referrersFile)) return true;
+    
+    AutoCloseFD fd = open(referrersFile.c_str(), O_RDONLY);
+    if (fd == -1) throw SysError(format("opening file `%1%'") % referrersFile);
+
+    Paths refs = tokenizeString(readFile(fd), " ");
 
     for (Paths::iterator i = refs.begin(); i != refs.end(); ++i)
         /* Referrers can be invalid (see registerValidPath() for the
@@ -455,22 +501,46 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 }
 
 
+#define foreach(it_type, it, collection)                                \
+    for (it_type it = collection.begin(); it != collection.end(); ++it)
+
+
 /* Invalidate a path.  The caller is responsible for checking that
    there are no referrers. */
-static void invalidatePath(const Path & path)
+void LocalStore::invalidatePath(const Path & path)
 {
     debug(format("invalidating path `%1%'") % path);
 
-    /* Remove the info file. */
-    Path p = infoFileFor(path);
-    if (unlink(p.c_str()) == -1)
+    ValidPathInfo info;
+
+    if (pathExists(infoFileFor(path))) {
+        info = queryPathInfo(path);
+
+        /* Remove the info file. */
+        Path p = infoFileFor(path);
+        if (unlink(p.c_str()) == -1)
+            throw SysError(format("unlinking `%1%'") % p);
+    }
+
+    /* Remove the referrers file for `path'. */
+    Path p = referrersFileFor(path);
+    if (pathExists(p) && unlink(p.c_str()) == -1)
         throw SysError(format("unlinking `%1%'") % p);
+
+    /* Clear `path' from the info cache. */
+    pathInfoCache.erase(path);
 
     /* Remove the corresponding referrer entries for each path
        referenced by this one.  This has to happen after removing the
        info file to preserve the invariant (see
        registerValidPath()). */
-    /* !!! */
+    foreach (PathSet::iterator, i, info.references) {
+        /* !!! O(n) */
+        if (*i == path) continue; /* self-reference */
+        PathSet referrers; queryReferrers(*i, referrers);
+        referrers.erase(path);
+        rewriteReferrers(*i, referrers);
+    }
 }
 
 
@@ -743,10 +813,9 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 }
 
 
-void LocalStore::deleteFromStore(const Path & _path, unsigned long long & bytesFreed)
+void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFreed)
 {
     bytesFreed = 0;
-    Path path(canonPath(_path));
 
     assertStorePath(path);
 
@@ -766,9 +835,6 @@ void LocalStore::deleteFromStore(const Path & _path, unsigned long long & bytesF
 
 void LocalStore::verifyStore(bool checkContents)
 {
-    /* !!! acquire the GC lock or something? */
-
-
     /* Check whether all valid paths actually exist. */
     printMsg(lvlInfo, "checking path existence");
 
@@ -833,8 +899,7 @@ void LocalStore::verifyStore(bool checkContents)
             }
         }
 
-        if (update)
-            /* !!! */;
+        if (update) registerValidPath(info);
     }
 
     referrersCache.clear();

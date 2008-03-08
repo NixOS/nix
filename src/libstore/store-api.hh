@@ -266,6 +266,7 @@ struct ValidPathInfo
     Path deriver;
     Hash hash;
     PathSet references;
+    time_t registrationTime;
 };
 
 typedef list<ValidPathInfo> ValidPathInfos;

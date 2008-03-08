@@ -124,6 +124,8 @@ private:
 
     bool queryReferrersInternal(const Path & path, PathSet & referrers);
     
+    void invalidatePath(const Path & path);
+    
     void upgradeStore12();
 
 };
