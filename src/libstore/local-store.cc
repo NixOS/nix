@@ -82,6 +82,11 @@ LocalStore::LocalStore()
 
 LocalStore::~LocalStore()
 {
+    try {
+        flushDelayedUpdates();
+    } catch (...) {
+        ignoreException();
+    }
 }
 
 
@@ -211,13 +216,20 @@ static void appendReferrer(const Path & from, const Path & to)
 }
 
 
-/* Atomically update the referrers file. */
-static void rewriteReferrers(const Path & path, const PathSet & referrers)
+/* Atomically update the referrers file.  If `purge' is true, the set
+   of referrers is set to `referrers'.  Otherwise, the current set of
+   referrers is purged of invalid paths. */
+void LocalStore::rewriteReferrers(const Path & path, bool purge, PathSet referrers)
 {
     Path referrersFile = referrersFileFor(path);
     
     PathLocks referrersLock(singleton<PathSet, Path>(referrersFile));
     referrersLock.setDeletion(true);
+
+    if (purge)
+        /* queryReferrers() purges invalid paths, so that's all we
+           need. */
+        queryReferrers(path, referrers);
 
     Path tmpFile = tmpFileForAtomicUpdate(referrersFile);
     
@@ -225,7 +237,7 @@ static void rewriteReferrers(const Path & path, const PathSet & referrers)
     if (fd == -1) throw SysError(format("opening file `%1%'") % referrersFile);
     
     string s;
-    for (PathSet::const_iterator i = referrers.begin(); i != referrers.end(); ++i) {
+    foreach (PathSet::const_iterator, i, referrers) {
         s += " "; s += *i;
     }
     
@@ -235,6 +247,15 @@ static void rewriteReferrers(const Path & path, const PathSet & referrers)
 
     if (rename(tmpFile.c_str(), referrersFile.c_str()) == -1)
         throw SysError(format("cannot rename `%1%' to `%2%'") % tmpFile % referrersFile);
+}
+
+
+void LocalStore::flushDelayedUpdates()
+{
+    foreach (PathSet::iterator, i, delayedUpdates) {
+        rewriteReferrers(*i, true, PathSet());
+    }
+    delayedUpdates.clear();
 }
 
 
@@ -501,10 +522,6 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 }
 
 
-#define foreach(it_type, it, collection)                                \
-    for (it_type it = collection.begin(); it != collection.end(); ++it)
-
-
 /* Invalidate a path.  The caller is responsible for checking that
    there are no referrers. */
 void LocalStore::invalidatePath(const Path & path)
@@ -529,18 +546,25 @@ void LocalStore::invalidatePath(const Path & path)
 
     /* Clear `path' from the info cache. */
     pathInfoCache.erase(path);
+    delayedUpdates.erase(path);
 
-    /* Remove the corresponding referrer entries for each path
-       referenced by this one.  This has to happen after removing the
-       info file to preserve the invariant (see
-       registerValidPath()). */
-    foreach (PathSet::iterator, i, info.references) {
-        /* !!! O(n) */
-        if (*i == path) continue; /* self-reference */
-        PathSet referrers; queryReferrers(*i, referrers);
-        referrers.erase(path);
-        rewriteReferrers(*i, referrers);
-    }
+    /* Cause the referrer files for each path referenced by this one
+       to be updated.  This has to happen after removing the info file
+       to preserve the invariant (see registerValidPath()).
+
+       The referrer files are updated lazily in flushDelayedUpdates()
+       to prevent quadratic performance in the garbage collector
+       (i.e., when N referrers to some path X are deleted, we have to
+       rewrite the referrers file for X N times, causing O(N^2) I/O).
+
+       What happens if we die before the referrer file can be updated?
+       That's not a problem, because stale (invalid) entries in the
+       referrer file are ignored by queryReferrers().  Thus a referrer
+       file is allowed to have stale entries; removing them is just an
+       optimisation.  verifyStore() gets rid of them eventually.
+    */
+    foreach (PathSet::iterator, i, info.references)
+        if (*i != path) delayedUpdates.insert(*i);
 }
 
 
@@ -943,7 +967,7 @@ void LocalStore::verifyStore(bool checkContents)
             } else referrersNew.insert(*j);
         }
 
-        if (update) rewriteReferrers(from, referrersNew);
+        if (update) rewriteReferrers(from, false, referrersNew);
     }
 }
 

@@ -118,10 +118,17 @@ private:
        every once in a while. */
     std::map<Path, ValidPathInfo> pathInfoCache;
 
+    /* Store paths for which the referrers file must be purged. */
+    PathSet delayedUpdates;
+
     void registerValidPath(const ValidPathInfo & info);
 
     ValidPathInfo queryPathInfo(const Path & path);
 
+    void rewriteReferrers(const Path & path, bool purge, PathSet referrers);
+
+    void flushDelayedUpdates();
+    
     bool queryReferrersInternal(const Path & path, PathSet & referrers);
     
     void invalidatePath(const Path & path);

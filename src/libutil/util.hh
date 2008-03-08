@@ -12,6 +12,10 @@
 namespace nix {
 
 
+#define foreach(it_type, it, collection)                                \
+    for (it_type it = collection.begin(); it != collection.end(); ++it)
+
+
 /* Return an environment variable. */
 string getEnv(const string & key, const string & def = "");
 
