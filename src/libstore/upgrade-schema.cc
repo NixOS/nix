@@ -3,6 +3,7 @@
 #include "util.hh"
 #include "local-store.hh"
 #include "globals.hh"
+#include "pathlocks.hh"
 
 #include <iostream>
 
@@ -18,7 +19,14 @@ Hash parseHashField(const Path & path, const string & s);
    meta-information in files. */
 void LocalStore::upgradeStore12()
 {
+    if (!lockFile(globalLock, ltWrite, false)) {
+        printMsg(lvlError, "waiting for exclusive access to the Nix store...");
+        lockFile(globalLock, ltWrite, true);
+    }
+
     printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
+
+    if (getSchema() >= nixSchemaVersion) return; /* somebody else beat us to it */
 
     /* Open the old Nix database and tables. */
     Database nixDB;
@@ -76,6 +84,10 @@ void LocalStore::upgradeStore12()
     }
 
     std::cerr << std::endl;
+
+    writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
+
+    lockFile(globalLock, ltRead, true);
 }
 
 

@@ -1,5 +1,5 @@
-#include "local-store.hh"
 #include "util.hh"
+#include "local-store.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

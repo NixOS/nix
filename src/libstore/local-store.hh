@@ -4,6 +4,7 @@
 #include <string>
 
 #include "store-api.hh"
+#include "util.hh"
 
 
 namespace nix {
@@ -114,12 +115,19 @@ public:
 
 private:
 
+    Path schemaPath;
+
+    /* Lock file used for upgrading. */
+    AutoCloseFD globalLock;
+
     /* !!! The cache can grow very big.  Maybe it should be pruned
        every once in a while. */
     std::map<Path, ValidPathInfo> pathInfoCache;
 
     /* Store paths for which the referrers file must be purged. */
     PathSet delayedUpdates;
+
+    int getSchema();
 
     void registerValidPath(const ValidPathInfo & info, bool ignoreValidity = false);
 

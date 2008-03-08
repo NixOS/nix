@@ -1,6 +1,5 @@
 #include "config.h"
 #include "local-store.hh"
-#include "util.hh"
 #include "globals.hh"
 #include "archive.hh"
 #include "pathlocks.hh"
@@ -43,40 +42,37 @@ LocalStore::LocalStore()
 {
     substitutablePathsLoaded = false;
     
+    schemaPath = nixDBPath + "/schema";
+    
     if (readOnlyMode) return;
 
     checkStoreNotSymlink();
 
-    try {
-        createDirs(nixDBPath + "/info");
-        createDirs(nixDBPath + "/referrer");
-    } catch (Error & e) {
-        // !!! fix access check
-        printMsg(lvlTalkative, "cannot access Nix database; continuing anyway");
-        readOnlyMode = true;
-        return;
-    }
+    Path globalLockPath = nixDBPath + "/big-lock";
+    globalLock = open(globalLockPath.c_str(), O_RDWR | O_CREAT, 0666);
+    if (globalLock == -1) throw SysError(format("opening file `%1%'") % globalLockPath);
     
-    int curSchema = 0;
-    Path schemaFN = nixDBPath + "/schema";
-    if (pathExists(schemaFN)) {
-        string s = readFile(schemaFN);
-        if (!string2Int(s, curSchema))
-            throw Error(format("`%1%' is corrupt") % schemaFN);
+    if (!lockFile(globalLock, ltRead, false)) {
+        printMsg(lvlError, "waiting for the big Nix store lock...");
+        lockFile(globalLock, ltRead, true);
     }
 
+    createDirs(nixDBPath + "/info");
+    createDirs(nixDBPath + "/referrer");
+
+    //printMsg(lvlTalkative, "cannot access Nix database; continuing anyway");
+    //readOnlyMode = true;
+
+    int curSchema = getSchema();
     if (curSchema > nixSchemaVersion)
         throw Error(format("current Nix store schema is version %1%, but I only support %2%")
             % curSchema % nixSchemaVersion);
-
-    if (curSchema < nixSchemaVersion) {
-        if (curSchema == 0) /* new store */
-            curSchema = nixSchemaVersion;
-        if (curSchema <= 1)
-            throw Error("your Nix store is no longer supported");
-        if (curSchema <= 4) upgradeStore12();
-        writeFile(schemaFN, (format("%1%") % nixSchemaVersion).str());
+    if (curSchema == 0) { /* new store */
+        curSchema = nixSchemaVersion; 
+        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
     }
+    if (curSchema == 1) throw Error("your Nix store is no longer supported");
+    if (curSchema < nixSchemaVersion) upgradeStore12();
 }
 
 
@@ -87,6 +83,18 @@ LocalStore::~LocalStore()
     } catch (...) {
         ignoreException();
     }
+}
+
+
+int LocalStore::getSchema()
+{
+    int curSchema = 0;
+    if (pathExists(schemaPath)) {
+        string s = readFile(schemaPath);
+        if (!string2Int(s, curSchema))
+            throw Error(format("`%1%' is corrupt") % schemaPath);
+    }
+    return curSchema;
 }
 
 
