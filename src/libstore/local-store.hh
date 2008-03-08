@@ -121,7 +121,7 @@ private:
     /* Store paths for which the referrers file must be purged. */
     PathSet delayedUpdates;
 
-    void registerValidPath(const ValidPathInfo & info);
+    void registerValidPath(const ValidPathInfo & info, bool ignoreValidity = false);
 
     ValidPathInfo queryPathInfo(const Path & path);
 

@@ -58,19 +58,20 @@ void LocalStore::upgradeStore12()
     nixDB.enumTable(noTxn, dbValidPaths, paths);
     
     for (Paths::iterator i = paths.begin(); i != paths.end(); ++i) {
-        PathSet references;
-        Paths references2;
-        nixDB.queryStrings(noTxn, dbReferences, *i, references2);
-        references.insert(references2.begin(), references2.end());
+        ValidPathInfo info;
+        info.path = *i;
+        
+        Paths references;
+        nixDB.queryStrings(noTxn, dbReferences, *i, references);
+        info.references.insert(references.begin(), references.end());
         
         string s;
         nixDB.queryString(noTxn, dbValidPaths, *i, s);
-        Hash hash =parseHashField(*i, s);
+        info.hash = parseHashField(*i, s);
         
-        Path deriver;
-        nixDB.queryString(noTxn, dbDerivers, *i, deriver);
+        nixDB.queryString(noTxn, dbDerivers, *i, info.deriver);
         
-        registerValidPath(*i, hash, references, deriver);
+        registerValidPath(info, true);
         std::cerr << ".";
     }
 

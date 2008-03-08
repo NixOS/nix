@@ -275,7 +275,7 @@ void LocalStore::registerValidPath(const Path & path,
 }
 
 
-void LocalStore::registerValidPath(const ValidPathInfo & info)
+void LocalStore::registerValidPath(const ValidPathInfo & info, bool ignoreValidity)
 {
     Path infoFile = infoFileFor(info.path);
 
@@ -300,7 +300,7 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
         if (!refs.empty()) refs += " ";
         refs += *i;
 
-        if (*i != info.path && !isValidPath(*i))
+        if (!ignoreValidity && *i != info.path && !isValidPath(*i))
             throw Error(format("cannot register `%1%' as valid, because its reference `%2%' isn't valid")
                 % info.path % *i);
 
