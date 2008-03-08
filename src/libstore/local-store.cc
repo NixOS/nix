@@ -201,12 +201,15 @@ static Path tmpFileForAtomicUpdate(const Path & path)
 }
 
 
-static void appendReferrer(const Path & from, const Path & to)
+static void appendReferrer(const Path & from, const Path & to, bool lock)
 {
     Path referrersFile = referrersFileFor(from);
     
-    PathLocks referrersLock(singleton<PathSet, Path>(referrersFile));
-    referrersLock.setDeletion(true);
+    PathLocks referrersLock;
+    if (lock) {
+        referrersLock.lockPaths(singleton<PathSet, Path>(referrersFile));
+        referrersLock.setDeletion(true);
+    }
 
     AutoCloseFD fd = open(referrersFile.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0666);
     if (fd == -1) throw SysError(format("opening file `%1%'") % referrersFile);
@@ -279,20 +282,24 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
     ValidPathInfo oldInfo;
     if (pathExists(infoFile)) oldInfo = queryPathInfo(info.path);
 
-    /* Note that it's possible for infoFile to already exist. !!!
-       check what happens in case of repeated registrations */
+    /* Note that it's possible for infoFile to already exist. */
 
-    // !!! acquire PathLock on infoFile here?
-
+    /* Acquire a lock on each referrer file.  This prevents those
+       paths from being invalidated.  (It would be a violation of the
+       store invariants if we registered info.path as valid while some
+       of its references are invalid.)  NB: there can be no deadlock
+       here since we're acquiring the locks in sorted order. */
+    PathSet lockNames;
+    foreach (PathSet::const_iterator, i, info.references)
+        if (*i != info.path) lockNames.insert(referrersFileFor(*i));
+    PathLocks referrerLocks(lockNames);
+    referrerLocks.setDeletion(true);
+        
     string refs;
-    for (PathSet::const_iterator i = info.references.begin();
-         i != info.references.end(); ++i)
-    {
+    foreach (PathSet::const_iterator, i, info.references) {
         if (!refs.empty()) refs += " ";
         refs += *i;
 
-        /* !!! locking: what if *i becomes invalid between here and
-           `path' becoming valid? */
         if (*i != info.path && !isValidPath(*i))
             throw Error(format("cannot register `%1%' as valid, because its reference `%2%' isn't valid")
                 % info.path % *i);
@@ -304,7 +311,7 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
            to separate it from the previous entry.  It's not suffixed
            to deal with interrupted partial writes to this file. */
         if (oldInfo.references.find(*i) == oldInfo.references.end())
-            appendReferrer(*i, info.path);
+            appendReferrer(*i, info.path, false);
     }
 
     string s = (format(
@@ -844,9 +851,13 @@ void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFr
     assertStorePath(path);
 
     if (isValidPath(path)) {
+        /* Acquire a lock on the referrers file to prevent new
+           referrers to this path from appearing while we're deleting
+           it. */
+        PathLocks referrersLock(singleton<PathSet, Path>(referrersFileFor(path)));
+        referrersLock.setDeletion(true);
         PathSet referrers; queryReferrers(path, referrers);
         referrers.erase(path); /* ignore self-references */
-        /* !!! check: can a new referrer appear now? */
         if (!referrers.empty())
             throw PathInUse(format("cannot delete path `%1%' because it is in use by `%2%'")
                 % path % showPaths(referrers));
@@ -896,7 +907,7 @@ void LocalStore::verifyStore(bool checkContents)
             if (referrersCache[*j].find(*i) == referrersCache[*j].end()) {
                 printMsg(lvlError, format("adding missing referrer mapping from `%1%' to `%2%'")
                     % *j % *i);
-                appendReferrer(*j, *i);
+                appendReferrer(*j, *i, true);
             }
             if (validPaths.find(*j) == validPaths.end()) {
                 printMsg(lvlError, format("incomplete closure: `%1%' needs missing `%2%'")
