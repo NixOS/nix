@@ -19,6 +19,8 @@ Hash parseHashField(const Path & path, const string & s);
    meta-information in files. */
 void LocalStore::upgradeStore12()
 {
+#if OLD_DB_COMPAT
+    
     if (!lockFile(globalLock, ltWrite, false)) {
         printMsg(lvlError, "waiting for exclusive access to the Nix store...");
         lockFile(globalLock, ltWrite, true);
@@ -88,6 +90,12 @@ void LocalStore::upgradeStore12()
     writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
 
     lockFile(globalLock, ltRead, true);
+
+#else
+    throw Error(
+        "Your Nix store has a database in Berkeley DB format. To convert\n"
+        "to the new format, please compile Nix with Berkeley DB support.");
+#endif
 }
 
 

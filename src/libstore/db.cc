@@ -1,3 +1,7 @@
+#include "config.h"
+
+#ifdef OLD_DB_COMPAT
+
 #include "db.hh"
 #include "util.hh"
 #include "pathlocks.hh"
@@ -466,3 +470,5 @@ void Database::clearTable(const Transaction & txn, TableId table)
 
 
 }
+
+#endif

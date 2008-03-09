@@ -7,7 +7,6 @@
 #include "shared.hh"
 #include "dotgraph.hh"
 #include "local-store.hh"
-#include "db.hh"
 #include "util.hh"
 #include "help.txt.hh"
 
