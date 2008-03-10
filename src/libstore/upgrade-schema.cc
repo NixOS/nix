@@ -4,6 +4,7 @@
 #include "local-store.hh"
 #include "globals.hh"
 #include "pathlocks.hh"
+#include "config.h"
 
 #include <iostream>
 

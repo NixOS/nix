@@ -196,7 +196,7 @@ if test "$old_db_compat" = "no"; then
   bdb_lib=
   bdb_include=
 else
-  AC_DEFINE(OLD_DB_COMPAT, 1, [Whether to support converting from old Berkeley DB-based Nix stores.])]
+  AC_DEFINE(OLD_DB_COMPAT, 1, [Whether to support converting from old Berkeley DB-based Nix stores.])
 fi
 AC_SUBST(bdb_lib)
 AC_SUBST(bdb_include)
