@@ -1,3 +1,6 @@
+%% Note: this SDF grammar is no longer used in the Nix expression
+%% parser and may not be up to date.
+
 definition
 
 
