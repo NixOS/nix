@@ -224,13 +224,14 @@ writeManifest $manifest, \%narFiles, \%patches;
 sub copyFile {
     my $src = shift;
     my $dst = shift;
-    system("@coreutils@/cp", $src, "$dst.tmp") == 0 or die "cannot copy file";
-    rename("$dst.tmp", "$dst") or die "cannot rename file";
+    my $tmp = "$dst.tmp.$$";
+    system("@coreutils@/cp", $src, $tmp) == 0 or die "cannot copy file";
+    rename($tmp, $dst) or die "cannot rename file: $!";
 }
 
 
-# Upload the archives.
-print STDERR "uploading archives...\n";
+# Upload/copy the archives.
+print STDERR "uploading/copying archives...\n";
 
 sub archiveExists {
     my $name = shift;
@@ -244,9 +245,12 @@ foreach my $narArchive (@narArchives) {
     my $basename = $1;
 
     if ($localCopy) {
+        # Since nix-push creates $dst atomically, if it exists we
+        # don't have to copy again.
+        my $dst = "$localArchivesDir/$basename";
         if (! -f "$localArchivesDir/$basename") {
             print STDERR "  $narArchive\n";
-            copyFile $narArchive, "$localArchivesDir/$basename";
+            copyFile $narArchive, $dst;
         }
     }
     else {
