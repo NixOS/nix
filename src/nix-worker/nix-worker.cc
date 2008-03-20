@@ -466,10 +466,12 @@ static void processConnection()
         /* If we can't accept clientVersion, then throw an error
            *here* (not above). */
 
+#if 0
         /* Prevent users from doing something very dangerous. */
         if (geteuid() == 0 &&
             querySetting("build-users-group", "") == "")
             throw Error("if you run `nix-worker' as root, then you MUST set `build-users-group'!");
+#endif
 
         /* Open the store. */
         store = boost::shared_ptr<StoreAPI>(new LocalStore(true));
