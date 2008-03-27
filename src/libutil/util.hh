@@ -70,7 +70,8 @@ void deletePath(const Path & path, unsigned long long & bytesFreed);
 void makePathReadOnly(const Path & path);
 
 /* Create a temporary directory. */
-Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix");
+Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
+    bool includePid = true, bool useGlobalCounter = true);
 
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */
