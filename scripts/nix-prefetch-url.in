@@ -78,7 +78,7 @@ if test -z "$finalPath"; then
     # garbage-collected independently.
     if test -n "$NIX_DOWNLOAD_CACHE"; then
         echo -n "$url" > $tmpPath/url
-        urlHash=$(nix-hash --type sha256 --base32 --flat $tmpPath/url)
+        urlHash=$(@bindir@/nix-hash --type sha256 --base32 --flat $tmpPath/url)
         echo "$url" > "$NIX_DOWNLOAD_CACHE/$urlHash.url"
         cachedHashFN="$NIX_DOWNLOAD_CACHE/$urlHash.$hashType"
         cachedTimestampFN="$NIX_DOWNLOAD_CACHE/$urlHash.stamp"
