@@ -542,11 +542,17 @@ static void daemonLoop()
 
     createDirs(dirOf(socketPath));
 
+    /* Urgh, sockaddr_un allows path names of only 108 characters.  So
+       chdir to the socket directory so that we can pass a relative
+       path name. */
+    chdir(dirOf(socketPath).c_str());
+    Path socketPathRel = "./" + baseNameOf(socketPath);
+    
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
-    if (socketPath.size() >= sizeof(addr.sun_path))
-        throw Error(format("socket path `%1%' is too long") % socketPath);
-    strcpy(addr.sun_path, socketPath.c_str());
+    if (socketPathRel.size() >= sizeof(addr.sun_path))
+        throw Error(format("socket path `%1%' is too long") % socketPathRel);
+    strcpy(addr.sun_path, socketPathRel.c_str());
 
     unlink(socketPath.c_str());
 
@@ -558,6 +564,8 @@ static void daemonLoop()
     umask(oldMode);
     if (res == -1)
         throw SysError(format("cannot bind to socket `%1%'") % socketPath);
+
+    chdir("/"); /* back to the root */
 
     if (listen(fdSocket, 5) == -1)
         throw SysError(format("cannot listen on socket `%1%'") % socketPath);
