@@ -22,6 +22,11 @@ void LocalStore::upgradeStore12()
 {
 #if OLD_DB_COMPAT
     
+#ifdef __CYGWIN__
+    /* Cygwin can't upgrade a read lock to a write lock... */
+    lockFile(globalLock, ltNone, true);
+#endif
+
     if (!lockFile(globalLock, ltWrite, false)) {
         printMsg(lvlError, "waiting for exclusive access to the Nix store...");
         lockFile(globalLock, ltWrite, true);

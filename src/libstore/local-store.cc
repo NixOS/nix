@@ -49,8 +49,7 @@ LocalStore::LocalStore()
     checkStoreNotSymlink();
 
     Path globalLockPath = nixDBPath + "/big-lock";
-    globalLock = open(globalLockPath.c_str(), O_RDWR | O_CREAT, 0666);
-    if (globalLock == -1) throw SysError(format("opening file `%1%'") % globalLockPath);
+    globalLock = openLockFile(globalLockPath.c_str(), true);
     
     if (!lockFile(globalLock, ltRead, false)) {
         printMsg(lvlError, "waiting for the big Nix store lock...");
