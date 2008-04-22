@@ -839,7 +839,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
             
             /* !!! if we were clever, we could prevent the hashPath()
                here. */
-            if (!isValidPath(deriver)) deriver = "";
+            if (deriver != "" && !isValidPath(deriver)) deriver = "";
             registerValidPath(dstPath,
                 hashPath(htSHA256, dstPath), references, deriver);
         }
