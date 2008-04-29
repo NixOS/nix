@@ -56,9 +56,18 @@ if test -z "$1" ; then
 fi;
 
 for i in "$@"; do 
-	cat needed-paths | while read; do 
-		nix-copy-closure --from "$i" --gzip "$REPLY" </dev/null || true; 
-	done;
+	sshHost="${i#ssh://}";
+	httpHost="${i#http://}";
+	httpsHost="${i#https://}";
+	if [ "$i" != "$sshHost" ]; then
+		cat needed-paths | while read; do 
+			nix-copy-closure --from "$sshHost" --gzip "$REPLY" </dev/null || true; 
+		done;
+	elif [ "$i" != "$httpHost" ] || [ "$i" != "$httpsHost" ]; then
+		cat needed-paths | while read; do
+			curl -L "$i${REPLY##*/}" | gunzip | nix-store --import;
+		done;
+	fi;
 	mv needed-paths wanted-paths;
 	cat wanted-paths | xargs nix-store --check-validity --print-invalid > needed-paths;
 	echo We still need $(cat needed-paths | wc -l) paths. >&2
