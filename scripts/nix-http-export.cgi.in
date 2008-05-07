@@ -1,0 +1,50 @@
+#! /bin/sh
+
+export HOME=/tmp
+export NIX_REMOTE=daemon
+
+TMP_DIR="${TMP_DIR:-/tmp/nix-export}"
+
+@coreutils@/mkdir -p "$TMP_DIR" || true
+@coreutils@/chmod a+r "$TMP_DIR"
+
+needed_path="?$QUERY_STRING"
+needed_path="${needed_path#*[?&]needed_path=}"
+needed_path="${needed_path%%&*}"
+#needed_path="$(echo $needed_path  | ./unhttp)"
+needed_path="$(echo $needed_path  | sed -e 's/%2B/+/g; s/%3D/=/g')"
+
+echo needed_path: "$needed_path" >&2
+
+NIX_STORE="${NIX_STORE:-/nix/store}"
+
+echo NIX_STORE: "${NIX_STORE}" >&2
+
+full_path="${NIX_STORE}"/"$needed_path"
+
+if [ "$needed_path" != "${needed_path%.drv}" ]; then
+	echo "Status: 403 You should create the derivation file yourself"
+	echo "Content-Type: text/plain"
+	echo
+	echo "Refusing to disclose derivation contents"
+	exit
+fi
+
+if [ -e "$full_path" ]; then
+	if ! [ -e nix-export/"$needed_path".nar.gz ]; then
+		@bindir@/nix-store --export "$full_path" | @gzip@ > "$TMP_DIR"/"$needed_path".nar.gz
+		@coreutils@/ln -fs  "$TMP_DIR"/"$needed_path".nar.gz nix-export/"$needed_path".nar.gz 
+	fi;
+	echo "Status: 301 Moved"
+	echo "Location: nix-export/"$needed_path".nar.gz"
+	echo
+else 
+	echo "Status: 404 No such path found"
+	echo "Content-Type: text/plain"
+	echo
+	echo "Path not found:"
+	echo "$needed_path"
+	echo "checked:"
+	echo "$full_path"
+fi
+

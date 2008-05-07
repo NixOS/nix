@@ -17,6 +17,7 @@
 	 -e "s^@perl\@^$(perl)^g" \
 	 -e "s^@coreutils\@^$(coreutils)^g" \
 	 -e "s^@tar\@^$(tar)^g" \
+	 -e "s^@gzip\@^$(gzip)^g" \
 	 -e "s^@tr\@^$(tr)^g" \
 	 -e "s^@dot\@^$(dot)^g" \
 	 -e "s^@xmllint\@^$(xmllint)^g" \

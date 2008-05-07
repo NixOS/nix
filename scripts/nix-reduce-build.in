@@ -65,7 +65,7 @@ for i in "$@"; do
 		done;
 	elif [ "$i" != "$httpHost" ] || [ "$i" != "$httpsHost" ]; then
 		cat needed-paths | while read; do
-			curl -L "$i${REPLY##*/}" | gunzip | nix-store --import;
+			curl ${BAD_CERTIFICATE:+-k} -L "$i${REPLY##*/}" | gunzip | nix-store --import;
 		done;
 	fi;
 	mv needed-paths wanted-paths;
