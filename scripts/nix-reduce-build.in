@@ -59,6 +59,7 @@ for i in "$@"; do
 	sshHost="${i#ssh://}";
 	httpHost="${i#http://}";
 	httpsHost="${i#https://}";
+	filePath="${i#file:/}";
 	if [ "$i" != "$sshHost" ]; then
 		cat needed-paths | while read; do 
 			nix-copy-closure --from "$sshHost" --gzip "$REPLY" </dev/null || true; 
@@ -66,6 +67,10 @@ for i in "$@"; do
 	elif [ "$i" != "$httpHost" ] || [ "$i" != "$httpsHost" ]; then
 		cat needed-paths | while read; do
 			curl ${BAD_CERTIFICATE:+-k} -L "$i${REPLY##*/}" | gunzip | nix-store --import;
+		done;
+	elif [ "$i" != "filePath" ] ; then
+		cat needed-paths | while read; do 
+			gunzip < "$filePath/${REPLY##*/}".nar.gz | nix-store --import;
 		done;
 	fi;
 	mv needed-paths wanted-paths;
