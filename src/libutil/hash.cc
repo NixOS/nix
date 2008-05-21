@@ -1,6 +1,7 @@
 #include "config.h"
 
 #include <iostream>
+#include <cstring>
 
 #ifdef HAVE_OPENSSL
 #include <openssl/md5.h>

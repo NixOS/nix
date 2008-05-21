@@ -3,6 +3,8 @@
 #include "util.hh"
 
 #include <cerrno>
+#include <cstring>
+#include <cstdlib>
 #include <map>
 
 #include <sys/types.h>

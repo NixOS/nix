@@ -83,7 +83,7 @@ Hash compressHash(const Hash & hash, unsigned int newSize);
 HashType parseHashType(const string & s);
 
 
-typedef union Ctx;
+union Ctx;
 
 class HashSink : public Sink
 {

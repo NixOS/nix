@@ -7,6 +7,7 @@
 #include <iostream>
 #include <cerrno>
 #include <cstdio>
+#include <cstdlib>
 #include <sstream>
 #include <cstring>
 
@@ -529,13 +530,14 @@ AutoDelete::AutoDelete(const string & p, bool recursive) : path(p)
 AutoDelete::~AutoDelete()
 {
     try {
-        if (del)
+        if (del) {
             if (recursive)
                 deletePath(path);
             else {
                 if (remove(path.c_str()) == -1)
                     throw SysError(format("cannot unlink `%1%'") % path);
             }
+        }
     } catch (...) {
         ignoreException();
     }

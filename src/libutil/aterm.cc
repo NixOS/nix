@@ -1,5 +1,7 @@
 #include "aterm.hh"
 
+#include <cstring>
+
 using std::string;
 
 

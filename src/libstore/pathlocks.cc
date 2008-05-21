@@ -2,6 +2,7 @@
 #include "util.hh"
 
 #include <cerrno>
+#include <cstdlib>
 
 #include <sys/types.h>
 #include <sys/stat.h>

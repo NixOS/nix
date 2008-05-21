@@ -17,7 +17,7 @@ int openLockFile(const Path & path, bool create);
 void deleteLockFilePreClose(const Path & path, int fd);
 void deleteLockFilePostClose(const Path & path);
 
-typedef enum LockType { ltRead, ltWrite, ltNone };
+enum LockType { ltRead, ltWrite, ltNone };
 
 bool lockFile(int fd, LockType lockType, bool wait);
 

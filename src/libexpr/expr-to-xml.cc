@@ -4,6 +4,8 @@
 #include "aterm.hh"
 #include "util.hh"
 
+#include <cstdlib>
+
 
 namespace nix {
 

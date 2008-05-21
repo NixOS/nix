@@ -6,6 +6,8 @@
 #include "nixexpr-ast.hh"
 #include "nixexpr-ast.cc"
 
+#include <cstdlib>
+
 
 namespace nix {
     

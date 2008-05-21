@@ -1,6 +1,8 @@
 #include "serialise.hh"
 #include "util.hh"
 
+#include <cstring>
+
 
 namespace nix {
 
