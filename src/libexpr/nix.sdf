@@ -7,7 +7,7 @@ definition
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Top level syntax.
 
-module Nix
+module Main
 imports Nix-Exprs Nix-Layout
 
 
@@ -41,6 +41,7 @@ exports
     "with" Expr ";" Expr -> Expr {cons("With")}
 
     "rec" "{" Bind* "}" -> Expr {cons("Rec")}
+    "let" Bind* "in" Expr -> Expr {cons("Let")}
     "let" "{" Bind* "}" -> Expr {cons("LetRec")}
     "{" Bind* "}" -> Expr {cons("Attrs")}
 
@@ -105,7 +106,8 @@ exports
 
     [0-9]+ -> Int
 
-    "\"" ~[\n\"]* "\"" -> Str
+    "\"" (~[\"\\] | ("\\" ~[]) )* "\"" -> Str
+    "''" (~[\"\\] | ("\\" ~[]) )* "''" -> Str
 
     [a-zA-Z0-9\.\_\-\+]* ("/"[a-zA-Z0-9\.\_\-\+]+)+ -> Path
 
