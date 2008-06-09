@@ -2,6 +2,8 @@
 
 DB = db-4.5.20
 
+if OLD_DB_COMPAT
+
 $(DB).tar.gz:
 	@echo "Nix requires Berkeley DB to build."
 	@echo "Please download version 4.5.20 from"
@@ -30,6 +32,12 @@ build-db: have-db
 	$(MAKE) && \
 	$(MAKE) install_include install_lib)
 	touch build-db
+endif
+
+else
+
+build-db:
+
 endif
 
 

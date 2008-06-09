@@ -16,7 +16,7 @@ if test "$STABLE" != "1"; then
     fi
 fi
 
-AC_DEFINE_UNQUOTED(NIX_VERSION, ["$VERSION"], [version])
+AC_DEFINE_UNQUOTED(NIX_VERSION, ["$VERSION"], [Nix version.])
 
 AC_PREFIX_DEFAULT(/nix)
 
@@ -54,7 +54,7 @@ case $sys_name in
 esac
 
 AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
-  [platform identifier (e.g., `i686-linux')]),
+  [Platform identifier (e.g., `i686-linux').]),
   system=$withval, system="${machine_name}-${sys_name}")
 AC_MSG_RESULT($system)
 AC_SUBST(system)
@@ -94,7 +94,7 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <iostream>
 using namespace std;
 static char buf[1024];]],
     [[cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));]])],
-    [AC_MSG_RESULT(yes) AC_DEFINE(HAVE_PUBSETBUF, 1, [whether pubsetbuf is available])],
+    [AC_MSG_RESULT(yes) AC_DEFINE(HAVE_PUBSETBUF, 1, [Whether pubsetbuf is available.])],
     AC_MSG_RESULT(no))
 AC_LANG_POP(C++)
 
@@ -177,8 +177,13 @@ AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
   storedir=$withval, storedir='${prefix}/store')
 AC_SUBST(storedir)
 
+AC_ARG_ENABLE(old-db-compat, AC_HELP_STRING([--disable-old-db-compat],
+  [disable support for converting from old Berkeley DB-based Nix stores]),
+  old_db_compat=$enableval, old_db_compat=yes)
+AM_CONDITIONAL(OLD_DB_COMPAT, test "$old_db_compat" = "yes")
+
 AC_ARG_WITH(bdb, AC_HELP_STRING([--with-bdb=PATH],
-  [prefix of Berkeley DB]),
+  [prefix of Berkeley DB (for Nix <= 0.11 compatibility)]),
   bdb=$withval, bdb=)
 AM_CONDITIONAL(HAVE_BDB, test -n "$bdb")
 if test -z "$bdb"; then
@@ -187,6 +192,12 @@ if test -z "$bdb"; then
 else
   bdb_lib="-L$bdb/lib -ldb_cxx"
   bdb_include="-I$bdb/include"
+fi
+if test "$old_db_compat" = "no"; then
+  bdb_lib=
+  bdb_include=
+else
+  AC_DEFINE(OLD_DB_COMPAT, 1, [Whether to support converting from old Berkeley DB-based Nix stores.])
 fi
 AC_SUBST(bdb_lib)
 AC_SUBST(bdb_include)
@@ -216,7 +227,7 @@ if test -n "$openssl"; then
   LDFLAGS="-L$openssl/lib -lcrypto $LDFLAGS"
   CFLAGS="-I$openssl/include $CFLAGS"
   CXXFLAGS="-I$openssl/include $CXXFLAGS"
-  AC_DEFINE(HAVE_OPENSSL, 1, [whether to use OpenSSL])
+  AC_DEFINE(HAVE_OPENSSL, 1, [Whether to use OpenSSL.])
 fi
 
 AC_ARG_WITH(bzip2, AC_HELP_STRING([--with-bzip2=PATH],

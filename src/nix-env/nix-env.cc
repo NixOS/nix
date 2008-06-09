@@ -13,7 +13,6 @@
 #include "common-opts.hh"
 #include "xml-writer.hh"
 #include "store-api.hh"
-#include "db.hh"
 #include "util.hh"
 
 #include <cerrno>

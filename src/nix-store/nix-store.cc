@@ -7,7 +7,6 @@
 #include "shared.hh"
 #include "dotgraph.hh"
 #include "local-store.hh"
-#include "db.hh"
 #include "util.hh"
 #include "help.txt.hh"
 
@@ -29,6 +28,14 @@ void printHelp()
 static Path gcRoot;
 static int rootNr = 0;
 static bool indirectRoot = false;
+
+
+LocalStore & ensureLocalStore()
+{
+    LocalStore * store2(dynamic_cast<LocalStore *>(store.get()));
+    if (!store2) throw Error("you don't have sufficient rights to use --verify");
+    return *store2;
+}
 
 
 static Path useDeriver(Path path)
@@ -430,10 +437,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         }
     }
 
-    Transaction txn;
-    createStoreTransaction(txn);
-    registerValidPaths(txn, infos);
-    txn.commit();
+    ensureLocalStore().registerValidPaths(infos);
 }
 
 
@@ -641,9 +645,8 @@ static void opVerify(Strings opFlags, Strings opArgs)
         if (*i == "--check-contents") checkContents = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
     
-    verifyStore(checkContents);
+    ensureLocalStore().verifyStore(checkContents);
 }
-
 
 
 static void showOptimiseStats(OptimiseStats & stats)
@@ -671,12 +674,9 @@ static void opOptimise(Strings opFlags, Strings opArgs)
         if (*i == "--dry-run") dryRun = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
-    LocalStore * store2(dynamic_cast<LocalStore *>(store.get()));
-    if (!store2) throw Error("you don't have sufficient rights to use --optimise");
-
     OptimiseStats stats;
     try {
-        store2->optimiseStore(dryRun, stats);
+        ensureLocalStore().optimiseStore(dryRun, stats);
     } catch (...) {
         showOptimiseStats(stats);
         throw;
@@ -755,7 +755,7 @@ void run(Strings args)
     if (!op) throw UsageError("no operation specified");
 
     if (op != opDump && op != opRestore) /* !!! hack */
-        store = openStore(op != opGC);
+        store = openStore();
 
     op(opFlags, opArgs);
 }

@@ -361,9 +361,10 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
 
 Paths createDirs(const Path & path)
 {
-    if (path == "/") return Paths();
-    Paths created = createDirs(dirOf(path));
+    Paths created;
+    if (path == "/") return created;
     if (!pathExists(path)) {
+        created = createDirs(dirOf(path));
         if (mkdir(path.c_str(), 0777) == -1)
             throw SysError(format("creating directory `%1%'") % path);
         created.push_back(path);

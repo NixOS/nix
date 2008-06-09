@@ -4,18 +4,16 @@
 #include <string>
 
 #include "store-api.hh"
+#include "util.hh"
 
 
 namespace nix {
 
 
-class Transaction;
-
-
 /* Nix store and database schema version.  Version 1 (or 0) was Nix <=
    0.7.  Version 2 was Nix 0.8 and 0.9.  Version 3 is Nix 0.10.
-   Version 4 is Nix 0.11. */
-const int nixSchemaVersion = 4;
+   Version 4 is Nix 0.11.  Version 5 is Nix 0.12*/
+const int nixSchemaVersion = 5;
 
 
 extern string drvsLogDir;
@@ -43,15 +41,9 @@ private:
     
 public:
 
-    /* Open the database environment.  If `reserveSpace' is true, make
-       sure that a big empty file exists in /nix/var/nix/db/reserved.
-       If `reserveSpace' is false, delete this file if it exists.  The
-       idea is that on normal operation, the file exists; but when we
-       run the garbage collector, it is deleted.  This is to ensure
-       that the garbage collector has a small amount of disk space
-       available, which is required to open the Berkeley DB
-       environment. */
-    LocalStore(bool reserveSpace);
+    /* Initialise the local store, upgrading the schema if
+       necessary. */
+    LocalStore();
 
     ~LocalStore();
     
@@ -100,32 +92,62 @@ public:
     void collectGarbage(GCAction action, const PathSet & pathsToDelete,
         bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed);
 
+    /* Delete a path from the Nix store. */
+    void deleteFromStore(const Path & path, unsigned long long & bytesFreed);
+    
     /* Optimise the disk space usage of the Nix store by hard-linking
        files with the same contents. */
     void optimiseStore(bool dryRun, OptimiseStats & stats);
+
+    /* Check the integrity of the Nix store. */
+    void verifyStore(bool checkContents);
+
+    /* Register the validity of a path, i.e., that `path' exists, that
+       the paths referenced by it exists, and in the case of an output
+       path of a derivation, that it has been produced by a succesful
+       execution of the derivation (or something equivalent).  Also
+       register the hash of the file system contents of the path.  The
+       hash must be a SHA-256 hash. */
+    void registerValidPath(const Path & path,
+        const Hash & hash, const PathSet & references, const Path & deriver);
+
+    void registerValidPaths(const ValidPathInfos & infos);
+
+private:
+
+    Path schemaPath;
+
+    /* Lock file used for upgrading. */
+    AutoCloseFD globalLock;
+
+    /* !!! The cache can grow very big.  Maybe it should be pruned
+       every once in a while. */
+    std::map<Path, ValidPathInfo> pathInfoCache;
+
+    /* Store paths for which the referrers file must be purged. */
+    PathSet delayedUpdates;
+
+    int getSchema();
+
+    void registerValidPath(const ValidPathInfo & info, bool ignoreValidity = false);
+
+    ValidPathInfo queryPathInfo(const Path & path);
+
+    void rewriteReferrers(const Path & path, bool purge, PathSet referrers);
+
+    void flushDelayedUpdates();
+    
+    bool queryReferrersInternal(const Path & path, PathSet & referrers);
+    
+    void invalidatePath(const Path & path);
+    
+    void upgradeStore12();
+
 };
 
 
-/* Get a transaction object. */
-void createStoreTransaction(Transaction & txn);
-
 /* Copy a path recursively. */
 void copyPath(const Path & src, const Path & dst);
-
-/* Register the validity of a path, i.e., that `path' exists, that the
-   paths referenced by it exists, and in the case of an output path of
-   a derivation, that it has been produced by a succesful execution of
-   the derivation (or something equivalent).  Also register the hash
-   of the file system contents of the path.  The hash must be a
-   SHA-256 hash. */
-void registerValidPath(const Transaction & txn,
-    const Path & path, const Hash & hash, const PathSet & references,
-    const Path & deriver);
-
-typedef list<ValidPathInfo> ValidPathInfos;
-
-void registerValidPaths(const Transaction & txn,
-    const ValidPathInfos & infos);
 
 /* "Fix", or canonicalise, the meta-data of the files in a store path
    after it has been built.  In particular:
@@ -137,24 +159,9 @@ void registerValidPaths(const Transaction & txn,
      in a setuid Nix installation. */
 void canonicalisePathMetaData(const Path & path);
 
-/* Checks whether a path is valid. */ 
-bool isValidPathTxn(const Transaction & txn, const Path & path);
-
-/* Sets the set of outgoing FS references for a store path.  Use with
-   care! */
-void setReferences(const Transaction & txn, const Path & path,
-    const PathSet & references);
-
-/* Sets the deriver of a store path.  Use with care! */
-void setDeriver(const Transaction & txn, const Path & path,
-    const Path & deriver);
-
-/* Delete a value from the nixStore directory. */
-void deleteFromStore(const Path & path, unsigned long long & bytesFreed);
+void canonicalisePathMetaData(const Path & path, bool recurse);
 
 MakeError(PathInUse, Error);
-
-void verifyStore(bool checkContents);
 
 /* Whether we are in build users mode. */
 bool haveBuildUsers();

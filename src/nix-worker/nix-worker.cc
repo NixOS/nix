@@ -474,7 +474,7 @@ static void processConnection()
 #endif
 
         /* Open the store. */
-        store = boost::shared_ptr<StoreAPI>(new LocalStore(true));
+        store = boost::shared_ptr<StoreAPI>(new LocalStore());
 
         stopWork();
         

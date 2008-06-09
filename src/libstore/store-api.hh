@@ -249,7 +249,12 @@ extern boost::shared_ptr<StoreAPI> store;
 
 /* Factory method: open the Nix database, either through the local or
    remote implementation. */
-boost::shared_ptr<StoreAPI> openStore(bool reserveSpace = true);
+boost::shared_ptr<StoreAPI> openStore();
+
+
+/* Display a set of paths in human-readable form (i.e., between quotes
+   and separated by commas). */
+string showPaths(const PathSet & paths);
 
 
 string makeValidityRegistration(const PathSet & paths,
@@ -261,7 +266,11 @@ struct ValidPathInfo
     Path deriver;
     Hash hash;
     PathSet references;
+    time_t registrationTime;
+    ValidPathInfo() : registrationTime(0) { }
 };
+
+typedef list<ValidPathInfo> ValidPathInfos;
 
 ValidPathInfo decodeValidPathInfo(std::istream & str,
     bool hashGiven = false);

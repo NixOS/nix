@@ -3,7 +3,6 @@
 #include "misc.hh"
 #include "globals.hh"
 #include "local-store.hh"
-#include "db.hh"
 #include "util.hh"
 
 #include <map>
@@ -207,7 +206,9 @@ private:
     
 public:
 
-    Worker();
+    LocalStore & store;
+
+    Worker(LocalStore & store);
     ~Worker();
 
     /* Make a goal (with caching). */
@@ -897,14 +898,14 @@ void DerivationGoal::haveDerivation()
         return;
     }
 
-    assert(store->isValidPath(drvPath));
+    assert(worker.store.isValidPath(drvPath));
 
     /* Get the derivation. */
     drv = derivationFromPath(drvPath);
 
     for (DerivationOutputs::iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
-        store->addTempRoot(i->second.path);
+        worker.store.addTempRoot(i->second.path);
 
     /* Check what outputs paths are not already valid. */
     PathSet invalidOutputs = checkPathValidity(false);
@@ -938,7 +939,7 @@ void DerivationGoal::haveDerivation()
          i != invalidOutputs.end(); ++i)
         /* Don't bother creating a substitution goal if there are no
            substitutes. */
-        if (store->hasSubstitutes(*i))
+        if (worker.store.hasSubstitutes(*i))
             addWaitee(worker.makeSubstitutionGoal(*i));
     
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
@@ -993,7 +994,7 @@ void DerivationGoal::outputsSubstituted()
             throw BuildError(format("`exportBuildReferencesGraph' contains a non-store path `%1%'")
                 % storePath);
         storePath = toStorePath(storePath);
-        if (!store->isValidPath(storePath))
+        if (!worker.store.isValidPath(storePath))
             throw BuildError(format("`exportBuildReferencesGraph' contains an invalid path `%1%'")
                 % storePath);
         
@@ -1250,19 +1251,6 @@ PathSet outputPaths(const DerivationOutputs & outputs)
 }
 
 
-string showPaths(const PathSet & paths)
-{
-    string s;
-    for (PathSet::const_iterator i = paths.begin();
-         i != paths.end(); ++i)
-    {
-        if (s.size() != 0) s += ", ";
-        s += "`" + *i + "'";
-    }
-    return s;
-}
-
-
 DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 {
     if (!useBuildHook) return rpDecline;
@@ -1474,7 +1462,7 @@ DerivationGoal::PrepareBuildReply DerivationGoal::prepareBuild()
          i != drv.outputs.end(); ++i)
     {
         Path path = i->second.path;
-        if (store->isValidPath(path))
+        if (worker.store.isValidPath(path))
             throw BuildError(format("obstructed build: path `%1%' exists") % path);
         if (pathExists(path)) {
             debug(format("removing unregistered path `%1%'") % path);
@@ -1502,7 +1490,7 @@ DerivationGoal::PrepareBuildReply DerivationGoal::prepareBuild()
         /* Add the relevant output closures of the input derivation
            `*i' as input paths.  Only add the closures of output paths
            that are specified as inputs. */
-        assert(store->isValidPath(i->first));
+        assert(worker.store.isValidPath(i->first));
         Derivation inDrv = derivationFromPath(i->first);
         for (StringSet::iterator j = i->second.begin();
              j != i->second.end(); ++j)
@@ -1624,7 +1612,7 @@ void DerivationGoal::startBuilder()
             throw BuildError(format("`exportReferencesGraph' contains a non-store path `%1%'")
                 % storePath);
         storePath = toStorePath(storePath);
-        if (!store->isValidPath(storePath))
+        if (!worker.store.isValidPath(storePath))
             throw BuildError(format("`exportReferencesGraph' contains an invalid path `%1%'")
                 % storePath);
 
@@ -1652,7 +1640,7 @@ void DerivationGoal::startBuilder()
             throw BuildError(format("`exportBuildReferencesGraph' contains a non-store path `%1%'")
                 % storePath);
         storePath = toStorePath(storePath);
-        if (!store->isValidPath(storePath))
+        if (!worker.store.isValidPath(storePath))
             throw BuildError(format("`exportBuildReferencesGraph' contains an invalid path `%1%'")
                 % storePath);
 
@@ -1994,27 +1982,17 @@ void DerivationGoal::computeClosure()
     }
 
     /* Register each output path as valid, and register the sets of
-       paths referenced by each of them.  This is wrapped in one
-       database transaction to ensure that if we crash, either
-       everything is registered or nothing is.  This is for
-       recoverability: unregistered paths in the store can be deleted
-       arbitrarily, while registered paths can only be deleted by
-       running the garbage collector.
-
-       The reason that we do the transaction here and not on the fly
-       while we are scanning (above) is so that we don't hold database
-       locks for too long. */
-    Transaction txn;
-    createStoreTransaction(txn);
+       paths referenced by each of them.  !!! this should be
+       atomic so that either all paths are registered as valid, or
+       none are. */
     for (DerivationOutputs::iterator i = drv.outputs.begin(); 
          i != drv.outputs.end(); ++i)
     {
-        registerValidPath(txn, i->second.path,
+        worker.store.registerValidPath(i->second.path,
             contentHashes[i->second.path],
             allReferences[i->second.path],
             drvPath);
     }
-    txn.commit();
 
     /* It is now safe to delete the lock files, since all future
        lockers will see that the output paths are valid; they will not
@@ -2113,7 +2091,7 @@ PathSet DerivationGoal::checkPathValidity(bool returnValid)
     PathSet result;
     for (DerivationOutputs::iterator i = drv.outputs.begin();
          i != drv.outputs.end(); ++i)
-        if (store->isValidPath(i->second.path)) {
+        if (worker.store.isValidPath(i->second.path)) {
             if (returnValid) result.insert(i->second.path);
         } else {
             if (!returnValid) result.insert(i->second.path);
@@ -2219,10 +2197,10 @@ void SubstitutionGoal::init()
 {
     trace("init");
 
-    store->addTempRoot(storePath);
+    worker.store.addTempRoot(storePath);
     
     /* If the path already exists we're done. */
-    if (store->isValidPath(storePath)) {
+    if (worker.store.isValidPath(storePath)) {
         amDone(ecSuccess);
         return;
     }
@@ -2293,7 +2271,7 @@ void SubstitutionGoal::referencesValid()
     for (PathSet::iterator i = references.begin();
          i != references.end(); ++i)
         if (*i != storePath) /* ignore self-references */
-            assert(store->isValidPath(*i));
+            assert(worker.store.isValidPath(*i));
 
     state = &SubstitutionGoal::tryToRun;
     worker.waitForBuildSlot(shared_from_this());
@@ -2327,7 +2305,7 @@ void SubstitutionGoal::tryToRun()
         (format("waiting for lock on `%1%'") % storePath).str());
 
     /* Check again whether the path is invalid. */
-    if (store->isValidPath(storePath)) {
+    if (worker.store.isValidPath(storePath)) {
         debug(format("store path `%1%' has become valid") % storePath);
         outputLock->setDeletion(true);
         amDone(ecSuccess);
@@ -2434,11 +2412,8 @@ void SubstitutionGoal::finished()
 
     Hash contentHash = hashPath(htSHA256, storePath);
 
-    Transaction txn;
-    createStoreTransaction(txn);
-    registerValidPath(txn, storePath, contentHash,
+    worker.store.registerValidPath(storePath, contentHash,
         references, deriver);
-    txn.commit();
 
     outputLock->setDeletion(true);
     
@@ -2472,7 +2447,8 @@ void SubstitutionGoal::handleEOF(int fd)
 static bool working = false;
 
 
-Worker::Worker()
+Worker::Worker(LocalStore & store)
+    : store(store)
 {
     /* Debugging: prevent recursive workers. */ 
     if (working) abort();
@@ -2870,7 +2846,7 @@ void LocalStore::buildDerivations(const PathSet & drvPaths)
     startNest(nest, lvlDebug,
         format("building %1%") % showPaths(drvPaths));
 
-    Worker worker;
+    Worker worker(*this);
 
     Goals goals;
     for (PathSet::const_iterator i = drvPaths.begin();
@@ -2895,9 +2871,9 @@ void LocalStore::buildDerivations(const PathSet & drvPaths)
 void LocalStore::ensurePath(const Path & path)
 {
     /* If the path is already valid, we're done. */
-    if (store->isValidPath(path)) return;
+    if (isValidPath(path)) return;
 
-    Worker worker;
+    Worker worker(*this);
     GoalPtr goal = worker.makeSubstitutionGoal(path);
     Goals goals = singleton<Goals>(goal);
 

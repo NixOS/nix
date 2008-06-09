@@ -205,6 +205,19 @@ ValidPathInfo decodeValidPathInfo(std::istream & str, bool hashGiven)
 }
 
 
+string showPaths(const PathSet & paths)
+{
+    string s;
+    for (PathSet::const_iterator i = paths.begin();
+         i != paths.end(); ++i)
+    {
+        if (s.size() != 0) s += ", ";
+        s += "`" + *i + "'";
+    }
+    return s;
+}
+
+
 }
 
 
@@ -219,10 +232,10 @@ namespace nix {
 boost::shared_ptr<StoreAPI> store;
 
 
-boost::shared_ptr<StoreAPI> openStore(bool reserveSpace)
+boost::shared_ptr<StoreAPI> openStore()
 {
     if (getEnv("NIX_REMOTE") == "")
-        return boost::shared_ptr<StoreAPI>(new LocalStore(reserveSpace));
+        return boost::shared_ptr<StoreAPI>(new LocalStore());
     else
         return boost::shared_ptr<StoreAPI>(new RemoteStore());
 }

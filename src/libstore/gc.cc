@@ -2,8 +2,6 @@
 #include "misc.hh"
 #include "pathlocks.hh"
 #include "local-store.hh"
-#include "db.hh"
-#include "util.hh"
 
 #include <boost/shared_ptr.hpp>
 
