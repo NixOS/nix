@@ -56,7 +56,7 @@ build farm, since:
 <para>TODO</para>
 
 <para>The sources of the Nix build farm are at <link
-xlink:href='https://svn.cs.uu.nl:12443/repos/trace/release/trunk'/>.</para>
+xlink:href='https://svn.nixos.org/repos/nix/release/trunk'/>.</para>
 
 </section>
 
@@ -85,7 +85,7 @@ nix@scratchy.labs.cs.uu.nl  i686-linux      /home/nix/.ssh/id_scratchy_auto     
 
 <para>An example build hook can be found in the Nix build farm
 sources: <link
-xlink:href='https://svn.cs.uu.nl:12443/repos/trace/release/trunk/common/distributed/build-remote.pl'
+xlink:href='https://svn.nixos.org/repos/nix/release/trunk/common/distributed/build-remote.pl'
 />.  It should be suitable for most purposes, with maybe some minor
 adjustments.  It uses <command>ssh</command> and
 <command>rsync</command> to copy the build inputs and outputs and

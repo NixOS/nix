@@ -38,7 +38,7 @@ to end-user applications like Mozilla Firefox.  (Nix is however not
 tied to the Nix Package collection; you could write your own Nix
 expressions based on it, or completely new ones.)  You can download
 the latest version from <link
-xlink:href='http://nix.cs.uu.nl/dist/nix' />.</para>
+xlink:href='http://nixos.org/releases/full-index-nixpkgs.html' />.</para>
 
 <para>Assuming that you have downloaded and unpacked a release of Nix
 Packages, you can view the set of available packages in the release:
@@ -118,15 +118,15 @@ available somewhere.  This is done using the
 containing a <emphasis>manifest</emphasis> describing what binaries
 are available.  This URL should correspond to the Nix Packages release
 that you’re using.  For instance, if you obtained a release from <link
-xlink:href='http://nix.cs.uu.nl/dist/nix/nixpkgs-0.6pre1554/' />, then
-you should do:
+xlink:href='http://nixos.org/releases/nixpkgs/nixpkgs-0.12pre11712-4lrp7j8x'
+/>, then you should do:
 
 <screen>
-$ nix-pull http://nix.cs.uu.nl/dist/nix/nixpkgs-0.6pre1554/MANIFEST</screen>
+$ nix-pull http://nixos.org/releases/nixpkgs/nixpkgs-0.12pre11712-4lrp7j8x/MANIFEST</screen>
 
 If you then issue the installation command, it should start
 downloading binaries from <systemitem
-class='fqdomainname'>nix.cs.uu.nl</systemitem>, instead of building
+class='fqdomainname'>nixos.org</systemitem>, instead of building
 them from source.  This might still take a while since all
 dependencies must be downloaded, but on a reasonably fast connection
 such as an DSL line it’s on the order of a few minutes.</para>
@@ -458,7 +458,7 @@ URL.</para>
 <command>nix-channel --add</command>, e.g.,
 
 <screen>
-$ nix-channel --add http://nix.cs.uu.nl/dist/nix/channels-v3/nixpkgs-unstable</screen>
+$ nix-channel --add http://nixos.org/releases/nixpkgs/channels/nixpkgs-unstable</screen>
 
 subscribes you to a channel that always contains that latest version
 of the Nix Packages collection.  (Instead of
@@ -496,20 +496,19 @@ available in the subscribed channels.</para>
 
 <para>Often, when you want to install a specific package (e.g., from
 the <link
-xlink:href="http://nix.cs.uu.nl/dist/nix/nixpkgs-unstable-latest/">Nix
-Packages collection</link> or from our <link
-xlink:href='http://nix.cs.uu.nl/dist/'>release server</link>),
-subscribing to a channel is a bit cumbersome.  And channels don’t help
-you at all if you want to install an older version of a package than
-the one provided by the current contents of the channel, or a package
-that has been removed from the channel.  That’s when
-<emphasis>one-click installs</emphasis> come in handy: you can just go
-to the web page that contains the package, click on it, and it will be
-installed with all the necessary dependencies.</para>
+xlink:href="http://nixos.org/releases/nixpkgs/nixpkgs-unstable/">Nix
+Packages collection</link>), subscribing to a channel is a bit
+cumbersome.  And channels don’t help you at all if you want to install
+an older version of a package than the one provided by the current
+contents of the channel, or a package that has been removed from the
+channel.  That’s when <emphasis>one-click installs</emphasis> come in
+handy: you can just go to the web page that contains the package,
+click on it, and it will be installed with all the necessary
+dependencies.</para>
 
 <para>For instance, you can go to <link
-xlink:href="http://nix.cs.uu.nl/dist/nix/nixpkgs-unstable-latest/" />
-— or to any older release of Nix Packages — and click on any link for
+xlink:href="http://nixos.org/releases/nixpkgs/nixpkgs-unstable/" /> —
+or to any older release of Nix Packages — and click on any link for
 the individual packages for your platform (say, <link
 xlink:href='http://nix.cs.uu.nl/dist/nix/nixpkgs-0.10pre6622/pkgs/subversion-1.4.0-i686-linux.nixpkg'><literal>subversion-1.4.0</literal>
 for <literal>i686-linux</literal></link>).  The first time you do

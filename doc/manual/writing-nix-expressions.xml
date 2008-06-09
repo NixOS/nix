@@ -731,9 +731,9 @@ stdenv.mkDerivation {
     xlink:href='http://www.ietf.org/rfc/rfc2396.txt'>RFC 2396</link>
     can be written <emphasis>as is</emphasis>, without quotes.  For
     instance, the string
-    <literal>"https://svn.cs.uu.nl:12443/dist/trace/trace-nix-trunk.tar.bz2"</literal>
+    <literal>"http://example.org/foo.tar.bz2"</literal>
     can also be written as
-    <literal>https://svn.cs.uu.nl:12443/dist/trace/trace-nix-trunk.tar.bz2</literal>.</para>
+    <literal>http://example.org/foo.tar.bz2</literal>.</para>
 
   </listitem>
 

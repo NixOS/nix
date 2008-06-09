@@ -42,25 +42,22 @@ platforms as well.</para>
 <section><title>Obtaining Nix</title>
 
 <para>The easiest way to obtain Nix is to download a <link
-xlink:href="http://nix.cs.uu.nl/">source distribution</link>.  RPMs
+xlink:href="http://nixos.org/">source distribution</link>.  RPMs
 for Red Hat, SuSE, and Fedora Core are also available.</para>
 
 <para>Alternatively, the most recent sources of Nix can be obtained
 from its <link
-xlink:href="https://svn.cs.uu.nl:12443/repos/trace/nix/trunk">Subversion
+xlink:href="https://svn.nixos.org/repos/nix/nix/trunk">Subversion
 repository</link>.  For example, the following command will check out
 the latest revision into a directory called
 <filename>nix</filename>:</para>
 
 <screen>
-$ svn checkout https://svn.cs.uu.nl:12443/repos/trace/nix/trunk nix</screen>
+$ svn checkout https://svn.nixos.org/repos/nix/nix/trunk nix</screen>
 
 <para>Likewise, specific releases can be obtained from the <link
-xlink:href="https://svn.cs.uu.nl:12443/repos/trace/nix/tags">tags
-directory</link> of the repository.  If you don't have Subversion, you
-can also download an automatically generated <link
-xlink:href="https://svn.cs.uu.nl:12443/dist/trace/">compressed
-tar-file</link> of the head revision of the trunk.</para>
+xlink:href="https://svn.nixos.org/repos/nix/nix/tags">tags
+directory</link> of the repository.</para>
 
 </section>
 
@@ -161,7 +158,7 @@ options.</para>
 <section><title>Installing from RPMs</title>
 
 <para>RPM packages of Nix can be downloaded from <link
-xlink:href="http://nix.cs.uu.nl/" />.  These RPMs should work for most
+xlink:href="http://nixos.org/" />.  These RPMs should work for most
 fairly recent releases of SuSE and Red Hat Linux.  They have been
 known to work work on SuSE Linux 8.1 and 9.0, and Red Hat 9.0.  In
 fact, it should work on any RPM-based Linux distribution based on
@@ -193,12 +190,12 @@ $ rm -rf /nix/var</screen>
 
 <para>You can install the latest stable version of Nix through Nix
 itself by subscribing to the channel <link
-xlink:href="http://nix.cs.uu.nl/dist/nix/channels-v3/nix-stable" />,
+xlink:href="http://nixos.org/releases/nix/channels/nix-stable" />,
 or the latest unstable version by subscribing to the channel <link
-xlink:href="http://nix.cs.uu.nl/dist/nix/channels-v3/nix-unstable" />.
+xlink:href="http://nixos.org/releases/nix/channels/nix-unstable" />.
 You can also do a <link linkend="sec-one-click">one-click
 installation</link> by clicking on the package links at <link
-xlink:href="http://nix.cs.uu.nl/dist/nix/" />.</para>
+xlink:href="http://nixos.org/releases/full-index-nix.html" />.</para>
 
 </section>
 
