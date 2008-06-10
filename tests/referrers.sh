@@ -42,7 +42,7 @@ if test "$newTime" != "$oldTime"; then
     exit 1
 fi
 
-if test "$(cat test-tmp/db/referrer/1 | wc -w)" != 1; then
+if test "$(cat test-tmp/db/referrer/1 | wc -w)" -ne 1; then
     echo "reregistration duplicated referrers"
     exit 1
 fi
@@ -51,7 +51,7 @@ echo "collecting garbage..."
 ln -sfn $reference "$NIX_STATE_DIR"/gcroots/ref
 time $nixstore --gc
 
-if test "$(cat test-tmp/db/referrer/abcdef | wc -w)" != 0; then
+if test "$(cat test-tmp/db/referrer/abcdef | wc -w)" -ne 0; then
     echo "referrers not cleaned up"
     exit 1
 fi
