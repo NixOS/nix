@@ -240,7 +240,7 @@ configuration (e.g., to build configuration files in
 possible to easily roll back the entire configuration of the system to
 an earlier state.  Also, users can install software without root
 privileges.  For more information and downloads, see the <link
-xlink:href="http://nix.cs.uu.nl/nixos/">NixOS homepage</link>.</para>
+xlink:href="http://nixos.org/">NixOS homepage</link>.</para>
 
 </simplesect>
 
@@ -257,14 +257,15 @@ xlink:href="http://nix.cs.uu.nl/nixos/">NixOS homepage</link>.</para>
 
 <section><title>About us</title>
 
-<para>Nix was developed at the <link
+<para>Nix was originally developed at the <link
 xlink:href="http://www.cs.uu.nl/">Department of Information and
 Computing Sciences</link>, Utrecht University by the <link
 xlink:href="http://www.cs.uu.nl/wiki/Trace/WebHome">TraCE
-project</link>.  The project is funded by the Software Engineering
-Research Program <link
+project</link> (2003-2008).  The project was funded by the Software
+Engineering Research Program <link
 xlink:href="http://www.jacquard.nl/">Jacquard</link> to improve the
-support for variability in software systems.</para>
+support for variability in software systems.  Further funding is now
+provided by the NIRICT LaQuSo Build Farm project.</para>
 
 </section>
 
@@ -299,24 +300,24 @@ Lesser General Public License for more details.</para>
 
 <para>Some background information on Nix can be found in a number of
 papers.  The ICSE 2004 paper <citetitle
-xlink:href='http://www.cs.uu.nl/~eelco/pubs/immdsd-icse2004-final.pdf'>Imposing
+xlink:href='http://www.st.ewi.tudelft.nl/~dolstra/pubs/immdsd-icse2004-final.pdf'>Imposing
 a Memory Management Discipline on Software Deployment</citetitle>
 discusses the hashing mechanism used to ensure reliable dependency
 identification and non-interference between different versions and
 variants of packages.  The LISA 2004 paper <citetitle
-xlink:href='http://www.cs.uu.nl/~eelco/pubs/nspfssd-lisa2004-final.pdf'>Nix:
+xlink:href='http://www.st.ewi.tudelft.nl/~dolstra/pubs/nspfssd-lisa2004-final.pdf'>Nix:
 A Safe and Policy-Free System for Software Deployment</citetitle>
 gives a more general discussion of Nix from a system-administration
 perspective.  The CBSE 2005 paper <citetitle
-xlink:href='http://www.cs.uu.nl/~eelco/pubs/eupfcdm-cbse2005-final.pdf'>Efficient
+xlink:href='http://www.st.ewi.tudelft.nl/~dolstra/pubs/eupfcdm-cbse2005-final.pdf'>Efficient
 Upgrading in a Purely Functional Component Deployment Model
 </citetitle> is about transparent patch deployment in Nix.  The SCM-12
 paper <citetitle
-xlink:href='http://www.cs.uu.nl/~eelco/pubs/servicecm-scm12-final.pdf'>
+xlink:href='http://www.st.ewi.tudelft.nl/~dolstra/pubs/servicecm-scm12-final.pdf'>
 Service Configuration Management</citetitle> shows how services (e.g.,
 web servers) can be deployed and managed through Nix.  A short
 overview of NixOS is given in the HotOS XI paper <citetitle
-xlink:href="http://www.cs.uu.nl/~eelco/pubs/hotos-final.pdf">Purely
+xlink:href="http://www.st.ewi.tudelft.nl/~dolstra/pubs/hotos-final.pdf">Purely
 Functional System Configuration Management</citetitle>.  The Nix
 homepage has <link
 xlink:href="http://nix.cs.uu.nl/docs/papers.html">an up-to-date list
@@ -328,7 +329,7 @@ Purely Functional Software Deployment Model</citetitle>, which
 contains most of the papers listed above.</para>
 
 <para>Nix has a homepage at <link
-xlink:href="http://nix.cs.uu.nl/"/>.</para>
+xlink:href="http://nixos.org/"/>.</para>
 
 </section>
 

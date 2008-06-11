@@ -11,7 +11,7 @@ to the following chapters.</para>
 <orderedlist>
 
 <listitem><para>Download a source tarball or RPM from <link
-xlink:href='http://nix.cs.uu.nl/'/>.  Build source
+xlink:href='http://nixos.org/'/>.  Build source
 distributions using the regular sequence:
         
 <screen>
@@ -33,7 +33,7 @@ file).</para></listitem>
 
 <screen>
 $ nix-channel --add \
-    http://nix.cs.uu.nl/dist/nix/channels-v3/nixpkgs-unstable</screen>
+    http://nixos.org/releases/nixpkgs/channels/nixpkgs-unstable</screen>
 
 </para></listitem>
 
