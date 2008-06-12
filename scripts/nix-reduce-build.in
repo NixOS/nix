@@ -3,10 +3,19 @@
 WORKING_DIRECTORY=$(mktemp -d "${TMPDIR:-/tmp}"/nix-reduce-build-XXXXXX);
 cd "$WORKING_DIRECTORY";
 
-if test -z "$1" ; then
-	echo 'nix-reduce-build (paths or Nix expressions) -- (logins at remote computers)' >&2
+if test -z "$1" || test "a--help" = "a$1" ; then
+	echo 'nix-reduce-build (paths or Nix expressions) -- (package sources)' >&2
 	echo As in: >&2
-	echo nix-reduce-build /etc/nixos/nixos -- user@somewhere.nowhere.example.org >&2
+	echo nix-reduce-build /etc/nixos/nixos -- ssh://user@somewhere.nowhere.example.org >&2
+	echo nix-reduce-build /etc/nixos/nixos -- \\
+	echo "   " \''http://somewhere.nowhere.example.org/nix/nix-http-export.cgi?needed_path='\' >&2
+	echo "  store path name will be added into the end of the URL" >&2
+	echo nix-reduce-build /etc/nixos/nixos -- file://home/user/nar/ >&2
+	echo "  that should be a directory where gzipped 'nix-store --export' ">&2
+	echo "  files are located (they should have .nar.gz extension)"  >&2
+	echo "        Or all together: " >&2
+	echo -e nix-reduce-build /expr.nix /e2.nix -- \\\\\\\n\
+	"    ssh://a@b.example.com http://n.example.com/get-nar?q= file://nar/" >&2
 	exit;
 fi;
 
@@ -62,17 +71,17 @@ for i in "$@"; do
 	filePath="${i#file:/}";
 	if [ "$i" != "$sshHost" ]; then
 		cat needed-paths | while read; do 
-			echo "Getting $REPLY and its closure over ssh"
+			echo "Getting $REPLY and its closure over ssh" >&2
 			nix-copy-closure --from "$sshHost" --gzip "$REPLY" </dev/null || true; 
 		done;
 	elif [ "$i" != "$httpHost" ] || [ "$i" != "$httpsHost" ]; then
 		cat needed-paths | while read; do
-			echo "Getting $REPLY over http/https"
+			echo "Getting $REPLY over http/https" >&2
 			curl ${BAD_CERTIFICATE:+-k} -L "$i${REPLY##*/}" | gunzip | nix-store --import;
 		done;
 	elif [ "$i" != "filePath" ] ; then
 		cat needed-paths | while read; do 
-			echo "Installing $REPLY from file"
+			echo "Installing $REPLY from file" >&2
 			gunzip < "$filePath/${REPLY##*/}".nar.gz | nix-store --import;
 		done;
 	fi;
