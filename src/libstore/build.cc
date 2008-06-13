@@ -912,7 +912,7 @@ void DerivationGoal::haveDerivation()
 
     /* If they are all valid, then we're done. */
     if (invalidOutputs.size() == 0) {
-        if(! forceInputs) {
+        if(!forceInputs) {
 	    amDone(ecSuccess);
 	    return;
 	}

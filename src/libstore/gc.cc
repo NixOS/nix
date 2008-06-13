@@ -455,6 +455,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
 
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
+    printMsg(lvlError, format("finding garbage collector roots..."));
     Roots rootMap = ignoreLiveness ? Roots() : nix::findRoots(true);
 
     PathSet roots;
@@ -475,6 +476,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
 
     /* Determine the live paths which is just the closure of the
        roots under the `references' relation. */
+    printMsg(lvlError, format("computing live paths..."));
     PathSet livePaths;
     for (PathSet::const_iterator i = roots.begin(); i != roots.end(); ++i)
         computeFSClosure(canonPath(*i), livePaths);
@@ -548,6 +550,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     
     /* Read the Nix store directory to find all currently existing
        paths. */
+    printMsg(lvlError, format("reading the Nix store..."));
     PathSet storePathSet;
     if (action != gcDeleteSpecific) {
         Paths entries = readDirectory(nixStore);
@@ -567,9 +570,14 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
        which things can be deleted safely. */
     /* !!! when we have multiple output paths per derivation, this
        will not work anymore because we get cycles. */
+    printMsg(lvlError, format("toposorting..."));
     Paths storePaths = topoSortPaths(storePathSet);
 
     /* Try to delete store paths in the topologically sorted order. */
+    printMsg(lvlError, action == gcReturnDead
+        ? format("looking for garbage...")
+        : format("deleting garbage..."));
+    
     for (Paths::iterator i = storePaths.begin(); i != storePaths.end(); ++i) {
 
         debug(format("considering deletion of `%1%'") % *i);
