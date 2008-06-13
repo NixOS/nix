@@ -30,7 +30,7 @@ if [ "$needed_path" != "${needed_path%.drv}" ]; then
 	exit
 fi
 
-if [ @bindir@/nix-store --check-validity "$full_path" ]; then
+if @bindir@/nix-store --check-validity "$full_path"; then
 	if ! [ -e nix-export/"$needed_path".nar.gz ]; then
 		@bindir@/nix-store --export "$full_path" | @gzip@ > "$TMP_DIR"/"$needed_path".nar.gz
 		@coreutils@/ln -fs  "$TMP_DIR"/"$needed_path".nar.gz nix-export/"$needed_path".nar.gz 
