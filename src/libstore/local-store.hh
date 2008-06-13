@@ -143,6 +143,10 @@ private:
     
     void upgradeStore12();
 
+    void tryToDelete(GCAction action, const PathSet & livePaths,
+        const PathSet & tempRootsClosed, PathSet & done, PathSet & deleted,
+        const Path & path, unsigned long long & bytesFreed);
+    
 };
 
 

@@ -435,6 +435,83 @@ Paths topoSortPaths(const PathSet & paths)
 }
 
 
+void LocalStore::tryToDelete(GCAction action, const PathSet & livePaths,
+    const PathSet & tempRootsClosed, PathSet & done, PathSet & deleted,
+    const Path & path, unsigned long long & bytesFreed)
+{
+    if (done.find(path) != done.end()) return;
+    done.insert(path);
+    
+    debug(format("considering deletion of `%1%'") % path);
+        
+    if (livePaths.find(path) != livePaths.end()) {
+        if (action == gcDeleteSpecific)
+            throw Error(format("cannot delete path `%1%' since it is still alive") % path);
+        debug(format("live path `%1%'") % path);
+        return;
+    }
+
+    if (tempRootsClosed.find(path) != tempRootsClosed.end()) {
+        debug(format("temporary root `%1%'") % path);
+        return;
+    }
+
+    /* Delete all the referrers first.  They must be garbage too,
+       since if they were in the closure of some live path, then this
+       path would also be in the closure.  Note that
+       deleteFromStore() below still makes sure that the referrer set
+       has become empty, just in case. */
+    PathSet referrers;
+    if (store->isValidPath(path))
+        queryReferrers(path, referrers);
+    foreach (PathSet::iterator, i, referrers)
+        if (*i != path)
+            tryToDelete(action, livePaths, tempRootsClosed, done, deleted, *i, bytesFreed);
+
+    debug(format("dead path `%1%'") % path);
+    deleted.insert(path);
+
+    /* If just returning the set of dead paths, we also return the
+       space that would be freed if we deleted them. */
+    if (action == gcReturnDead) {
+        bytesFreed += computePathSize(path);
+        return;
+    }
+
+#ifndef __CYGWIN__
+    AutoCloseFD fdLock;
+        
+    /* Only delete a lock file if we can acquire a write lock on it.
+       That means that it's either stale, or the process that created
+       it hasn't locked it yet.  In the latter case the other process
+       will detect that we deleted the lock, and retry (see
+       pathlocks.cc). */
+    if (path.size() >= 5 && string(path, path.size() - 5) == ".lock") {
+        fdLock = openLockFile(path, false);
+        if (fdLock != -1 && !lockFile(fdLock, ltWrite, false)) {
+            debug(format("skipping active lock `%1%'") % path);
+            return;
+        }
+    }
+#endif
+
+    if (!pathExists(path)) return;
+                
+    printMsg(lvlInfo, format("deleting `%1%'") % path);
+            
+    /* Okay, it's safe to delete. */
+    unsigned long long freed;
+    deleteFromStore(path, freed);
+    bytesFreed += freed;
+
+#ifndef __CYGWIN__
+    if (fdLock != -1)
+        /* Write token to stale (deleted) lock file. */
+        writeFull(fdLock, (const unsigned char *) "d", 1);
+#endif
+}
+
+
 void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed)
 {
@@ -551,96 +628,28 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     /* Read the Nix store directory to find all currently existing
        paths. */
     printMsg(lvlError, format("reading the Nix store..."));
-    PathSet storePathSet;
+    PathSet storePaths;
     if (action != gcDeleteSpecific) {
         Paths entries = readDirectory(nixStore);
         for (Paths::iterator i = entries.begin(); i != entries.end(); ++i)
-            storePathSet.insert(canonPath(nixStore + "/" + *i));
+            storePaths.insert(canonPath(nixStore + "/" + *i));
     } else {
         for (PathSet::iterator i = pathsToDelete.begin();
              i != pathsToDelete.end(); ++i)
         {
             assertStorePath(*i);
-            storePathSet.insert(*i);
+            storePaths.insert(*i);
         }
     }
-
-    /* Topologically sort them under the `referrers' relation.  That
-       is, a < b iff a is in referrers(b).  This gives us the order in
-       which things can be deleted safely. */
-    /* !!! when we have multiple output paths per derivation, this
-       will not work anymore because we get cycles. */
-    printMsg(lvlError, format("toposorting..."));
-    Paths storePaths = topoSortPaths(storePathSet);
 
     /* Try to delete store paths in the topologically sorted order. */
     printMsg(lvlError, action == gcReturnDead
         ? format("looking for garbage...")
         : format("deleting garbage..."));
-    
-    for (Paths::iterator i = storePaths.begin(); i != storePaths.end(); ++i) {
 
-        debug(format("considering deletion of `%1%'") % *i);
-        
-        if (livePaths.find(*i) != livePaths.end()) {
-            if (action == gcDeleteSpecific)
-                throw Error(format("cannot delete path `%1%' since it is still alive") % *i);
-            debug(format("live path `%1%'") % *i);
-            continue;
-        }
-
-        if (tempRootsClosed.find(*i) != tempRootsClosed.end()) {
-            debug(format("temporary root `%1%'") % *i);
-            continue;
-        }
-
-        debug(format("dead path `%1%'") % *i);
-        result.insert(*i);
-
-        /* If just returning the set of dead paths, we also return the
-           space that would be freed if we deleted them. */
-        if (action == gcReturnDead)
-            bytesFreed += computePathSize(*i);
-
-        if (action == gcDeleteDead || action == gcDeleteSpecific) {
-
-#ifndef __CYGWIN__
-            AutoCloseFD fdLock;
-
-            /* Only delete a lock file if we can acquire a write lock
-               on it.  That means that it's either stale, or the
-               process that created it hasn't locked it yet.  In the
-               latter case the other process will detect that we
-               deleted the lock, and retry (see pathlocks.cc). */
-            if (i->size() >= 5 && string(*i, i->size() - 5) == ".lock") {
-                fdLock = openLockFile(*i, false);
-                if (fdLock != -1 && !lockFile(fdLock, ltWrite, false)) {
-                    debug(format("skipping active lock `%1%'") % *i);
-                    continue;
-                }
-            }
-#endif
-
-            if (!pathExists(*i)) continue;
-                
-            printMsg(lvlInfo, format("deleting `%1%'") % *i);
-            
-            /* Okay, it's safe to delete. */
-            try {
-                unsigned long long freed;
-                deleteFromStore(*i, freed);
-                bytesFreed += freed;
-            } catch (PathInUse & e) {
-                printMsg(lvlError, format("warning: %1%") % e.msg());
-            }
-
-#ifndef __CYGWIN__
-            if (fdLock != -1)
-                /* Write token to stale (deleted) lock file. */
-                writeFull(fdLock, (const unsigned char *) "d", 1);
-#endif
-        }
-    }
+    PathSet done;
+    foreach (PathSet::iterator, i, storePaths)
+        tryToDelete(action, livePaths, tempRootsClosed, done, result, *i, bytesFreed);
 }
 
  
