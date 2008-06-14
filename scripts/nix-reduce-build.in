@@ -16,6 +16,10 @@ if test -z "$1" || test "a--help" = "a$1" ; then
 	echo "        Or all together: " >&2
 	echo -e nix-reduce-build /expr.nix /e2.nix -- \\\\\\\n\
 	"    ssh://a@b.example.com http://n.example.com/get-nar?q= file://nar/" >&2
+	echo "        Also supports best-effort local builds of failing expression set:" >&2
+	echo "nix-reduce-build /e.nix -- nix-daemon:// nix-self://" >&2
+	echo "  nix-daemon:// builds using daemon"
+	echo "  nix-self:// builds directly using nix-store from current installation" >&2
 	exit;
 fi;
 
@@ -28,7 +32,7 @@ echo Will work on $(cat initial | wc -l) targets. >&2
 
 while read ; do
 	case "$REPLY" in 
-		${NIX_STORE_PATH:-/nix/store}/*)
+		${NIX_STORE_DIR:-/nix/store}/*)
 			echo "$REPLY" >> paths; >&2
 			;;
 		*)
@@ -79,10 +83,20 @@ for i in "$@"; do
 			echo "Getting $REPLY over http/https" >&2
 			curl ${BAD_CERTIFICATE:+-k} -L "$i${REPLY##*/}" | gunzip | nix-store --import;
 		done;
-	elif [ "$i" != "filePath" ] ; then
+	elif [ "$i" != "$filePath" ] ; then
 		cat needed-paths | while read; do 
 			echo "Installing $REPLY from file" >&2
 			gunzip < "$filePath/${REPLY##*/}".nar.gz | nix-store --import;
+		done;
+	elif [ "$i" = "nix-daemon://" ] ; then
+		cat needed-paths | while read ; do 
+			echo "Building $REPLY using nix-daemon" >&2
+			NIX_REMOTE=daemon @bindir@/nix-store -r "${NIX_STORE_DIR:-/nix/store}/${REPLY##*/}"
+		done;
+	elif [ "$i" = "nix-self://" ] ; then
+		cat needed-paths | while read ; do 
+			echo "Building $REPLY using direct Nix build" >&2
+			NIX_REMOTE= @bindir@/nix-store -r "${NIX_STORE_DIR:-/nix/store}/${REPLY##*/}"
 		done;
 	fi;
 	mv needed-paths wanted-paths;

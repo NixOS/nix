@@ -16,7 +16,7 @@ needed_path="$(echo $needed_path  | sed -e 's/%2B/+/g; s/%3D/=/g')"
 
 echo needed_path: "$needed_path" >&2
 
-NIX_STORE="${NIX_STORE:-/nix/store}"
+NIX_STORE="${NIX_STORE_DIR:-/nix/store}"
 
 echo NIX_STORE: "${NIX_STORE}" >&2
 
