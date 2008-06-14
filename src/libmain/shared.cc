@@ -70,15 +70,6 @@ static unsigned int getIntArg(const string & opt,
 }
 
 
-struct RemoveTempRoots 
-{
-    ~RemoveTempRoots()
-    {
-        removeTempRoots();
-    }
-};
-
-
 void initDerivationsHelpers();
 
 
@@ -96,6 +87,12 @@ static void closeStore()
         ignoreException();
     }
     abort();
+}
+
+
+RemoveTempRoots::~RemoveTempRoots()
+{
+    removeTempRoots();
 }
 
 

@@ -439,6 +439,8 @@ static void performOp(unsigned int clientVersion,
 
 static void processConnection()
 {
+    RemoveTempRoots removeTempRoots; /* unused variable - don't remove */
+
     canSendStderr = false;
     myPid = getpid();    
     writeToStderr = tunnelStderr;

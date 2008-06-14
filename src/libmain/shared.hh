@@ -33,6 +33,11 @@ extern volatile ::sig_atomic_t blockInt;
 
 MakeError(UsageError, nix::Error);
 
+struct RemoveTempRoots 
+{
+    ~RemoveTempRoots();    
+};
+
 }
 
 
