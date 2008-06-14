@@ -123,7 +123,11 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
         createSymlink(gcRoot, storePath, false);
     }
 
-    /* Check that the root can be found by the garbage collector. */
+    /* Check that the root can be found by the garbage collector.
+       !!! This can be very slow on machines that have many roots.
+       Instead of reading all the roots, it would be more efficient to
+       check if the root is in a directory in or linked from the
+       gcroots directory. */
     if (queryBoolSetting("gc-check-reachability", true)) {
         Roots roots = store->findRoots();
         if (roots.find(gcRoot) == roots.end())
