@@ -93,10 +93,18 @@ for i in "$@"; do
 			echo "Building $REPLY using nix-daemon" >&2
 			NIX_REMOTE=daemon @bindir@/nix-store -r "${NIX_STORE_DIR:-/nix/store}/${REPLY##*/}"
 		done;
+		cat derivers-closure | while read; do 
+			echo "Realising $REPLY using nix-daemon" >&2
+			NIX_REMOTE=daemon @bindir@/nix-store -r "${REPLY}"
+		done;
 	elif [ "$i" = "nix-self://" ] ; then
 		cat needed-paths | while read ; do 
 			echo "Building $REPLY using direct Nix build" >&2
-			NIX_REMOTE= @bindir@/nix-store -r "${NIX_STORE_DIR:-/nix/store}/${REPLY##*/}"
+			NIX_REMOTE= @bindir@/nix-store -r "${NIX_STORE_DIR:-/nix/store}/${REPLY##*/}" 
+		done;
+		cat derivers-closure | while read; do 
+			echo "Realising $REPLY using direct Nix build" >&2
+			NIX_REMOTE= @bindir@/nix-store -r "${REPLY}"
 		done;
 	fi;
 	mv needed-paths wanted-paths;
