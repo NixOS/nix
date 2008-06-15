@@ -66,6 +66,7 @@ $nixenv -p $profiles/test -q '*' | grep -q foo-2.0
 if $nixenv -p $profiles/test -q '*' | grep -q bar; then false; fi
 
 # Count generations.
+$nixenv -p $profiles/test --list-generations
 test "$($nixenv -p $profiles/test --list-generations | wc -l)" -eq 5
 
 # Install foo-1.0, now using its store path.
