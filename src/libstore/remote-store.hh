@@ -65,8 +65,7 @@ public:
     
     Roots findRoots();
 
-    void collectGarbage(GCAction action, const PathSet & pathsToDelete,
-        bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed);
+    void collectGarbage(const GCOptions & options, GCResults & results);
     
 private:
     AutoCloseFD fdSocket;

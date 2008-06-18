@@ -851,7 +851,8 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 }
 
 
-void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFreed)
+void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFreed,
+    unsigned long long & blocksFreed)
 {
     bytesFreed = 0;
 
@@ -871,7 +872,7 @@ void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFr
         invalidatePath(path);
     }
 
-    deletePathWrapped(path, bytesFreed);
+    deletePathWrapped(path, bytesFreed, blocksFreed);
 }
 
 

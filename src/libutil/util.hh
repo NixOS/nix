@@ -61,14 +61,16 @@ string readFile(const Path & path);
 void writeFile(const Path & path, const string & s);
 
 /* Compute the sum of the sizes of all files in `path'. */
-unsigned long long computePathSize(const Path & path);
+void computePathSize(const Path & path,
+    unsigned long long & bytes, unsigned long long & blocks);
 
 /* Delete a path; i.e., in the case of a directory, it is deleted
    recursively.  Don't use this at home, kids.  The second variant
-   returns the number of bytes freed. */
+   returns the number of bytes and blocks freed. */
 void deletePath(const Path & path);
 
-void deletePath(const Path & path, unsigned long long & bytesFreed);
+void deletePath(const Path & path, unsigned long long & bytesFreed,
+    unsigned long long & blocksFreed);
 
 /* Make a path read-only recursively. */
 void makePathReadOnly(const Path & path);

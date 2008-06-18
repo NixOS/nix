@@ -101,6 +101,7 @@ static void hashAndLink(bool dryRun, HashToPath & hashToPath,
         
         stats.filesLinked++;
         stats.bytesFreed += st.st_size;
+        stats.blocksFreed += st.st_blocks;
     }
 
     if (S_ISDIR(st.st_mode)) {

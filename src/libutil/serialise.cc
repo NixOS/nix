@@ -41,6 +41,21 @@ void writeInt(unsigned int n, Sink & sink)
 }
 
 
+void writeLongLong(unsigned long long n, Sink & sink)
+{
+    unsigned char buf[8];
+    buf[0] = n & 0xff;
+    buf[1] = (n >> 8) & 0xff;
+    buf[2] = (n >> 16) & 0xff;
+    buf[3] = (n >> 24) & 0xff;
+    buf[4] = (n >> 32) & 0xff;
+    buf[5] = (n >> 40) & 0xff;
+    buf[6] = (n >> 48) & 0xff;
+    buf[7] = (n >> 56) & 0xff;
+    sink(buf, sizeof(buf));
+}
+
+
 void writeString(const string & s, Sink & sink)
 {
     unsigned int len = s.length();
@@ -81,6 +96,22 @@ unsigned int readInt(Source & source)
         (buf[1] << 8) |
         (buf[2] << 16) |
         (buf[3] << 24);
+}
+
+
+unsigned long long readLongLong(Source & source)
+{
+    unsigned char buf[8];
+    source(buf, sizeof(buf));
+    return
+        ((unsigned long long) buf[0]) |
+        ((unsigned long long) buf[1] << 8) |
+        ((unsigned long long) buf[2] << 16) |
+        ((unsigned long long) buf[3] << 24) |
+        ((unsigned long long) buf[4] << 32) |
+        ((unsigned long long) buf[5] << 40) |
+        ((unsigned long long) buf[6] << 48) |
+        ((unsigned long long) buf[7] << 56);
 }
 
 

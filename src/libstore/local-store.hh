@@ -25,10 +25,11 @@ struct OptimiseStats
     unsigned long sameContents;
     unsigned long filesLinked;
     unsigned long long bytesFreed;
+    unsigned long long blocksFreed;
     OptimiseStats()
     {
         totalFiles = sameContents = filesLinked = 0;
-        bytesFreed = 0;
+        bytesFreed = blocksFreed = 0;
     }
 };
 
@@ -89,11 +90,11 @@ public:
 
     Roots findRoots();
 
-    void collectGarbage(GCAction action, const PathSet & pathsToDelete,
-        bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed);
+    void collectGarbage(const GCOptions & options, GCResults & results);
 
     /* Delete a path from the Nix store. */
-    void deleteFromStore(const Path & path, unsigned long long & bytesFreed);
+    void deleteFromStore(const Path & path, unsigned long long & bytesFreed,
+        unsigned long long & blocksFreed);
     
     /* Optimise the disk space usage of the Nix store by hard-linking
        files with the same contents. */
@@ -143,10 +144,9 @@ private:
     
     void upgradeStore12();
 
-    void tryToDelete(GCAction action, const PathSet & livePaths,
-        const PathSet & tempRootsClosed, PathSet & done, PathSet & deleted,
-        const Path & path, unsigned long long & bytesFreed);
-    
+    void tryToDelete(const GCOptions & options, GCResults & results,
+        const PathSet & livePaths, const PathSet & tempRootsClosed, PathSet & done, 
+        const Path & path);
 };
 
 
@@ -179,7 +179,7 @@ void getOwnership(const Path & path);
 /* Like deletePath(), but changes the ownership of `path' using the
    setuid wrapper if necessary (and possible). */
 void deletePathWrapped(const Path & path,
-    unsigned long long & bytesFreed);
+    unsigned long long & bytesFreed, unsigned long long & blocksFreed);
 
 void deletePathWrapped(const Path & path);
  

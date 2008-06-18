@@ -439,9 +439,9 @@ Paths topoSortPaths(const PathSet & paths)
 }
 
 
-void LocalStore::tryToDelete(GCAction action, const PathSet & livePaths,
-    const PathSet & tempRootsClosed, PathSet & done, PathSet & deleted,
-    const Path & path, unsigned long long & bytesFreed)
+void LocalStore::tryToDelete(const GCOptions & options, GCResults & results, 
+    const PathSet & livePaths, const PathSet & tempRootsClosed, PathSet & done, 
+    const Path & path)
 {
     if (done.find(path) != done.end()) return;
     done.insert(path);
@@ -449,7 +449,7 @@ void LocalStore::tryToDelete(GCAction action, const PathSet & livePaths,
     debug(format("considering deletion of `%1%'") % path);
         
     if (livePaths.find(path) != livePaths.end()) {
-        if (action == gcDeleteSpecific)
+        if (options.action == GCOptions::gcDeleteSpecific)
             throw Error(format("cannot delete path `%1%' since it is still alive") % path);
         debug(format("live path `%1%'") % path);
         return;
@@ -470,15 +470,18 @@ void LocalStore::tryToDelete(GCAction action, const PathSet & livePaths,
         queryReferrers(path, referrers);
     foreach (PathSet::iterator, i, referrers)
         if (*i != path)
-            tryToDelete(action, livePaths, tempRootsClosed, done, deleted, *i, bytesFreed);
+            tryToDelete(options, results, livePaths, tempRootsClosed, done, *i);
 
     debug(format("dead path `%1%'") % path);
-    deleted.insert(path);
+    results.paths.insert(path);
 
     /* If just returning the set of dead paths, we also return the
        space that would be freed if we deleted them. */
-    if (action == gcReturnDead) {
-        bytesFreed += computePathSize(path);
+    if (options.action == GCOptions::gcReturnDead) {
+        unsigned long long bytesFreed, blocksFreed;
+        computePathSize(path, bytesFreed, blocksFreed);
+        results.bytesFreed += bytesFreed;
+        results.blocksFreed += blocksFreed;
         return;
     }
 
@@ -504,9 +507,10 @@ void LocalStore::tryToDelete(GCAction action, const PathSet & livePaths,
     printMsg(lvlInfo, format("deleting `%1%'") % path);
             
     /* Okay, it's safe to delete. */
-    unsigned long long freed;
-    deleteFromStore(path, freed);
-    bytesFreed += freed;
+    unsigned long long bytesFreed, blocksFreed;
+    deleteFromStore(path, bytesFreed, blocksFreed);
+    results.bytesFreed += bytesFreed;
+    results.blocksFreed += blocksFreed;
 
 #ifndef __CYGWIN__
     if (fdLock != -1)
@@ -516,12 +520,8 @@ void LocalStore::tryToDelete(GCAction action, const PathSet & livePaths,
 }
 
 
-void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
-    bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed)
+void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
-    result.clear();
-    bytesFreed = 0;
-
     bool gcKeepOutputs =
         queryBoolSetting("gc-keep-outputs", false);
     bool gcKeepDerivations =
@@ -537,7 +537,7 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
     printMsg(lvlError, format("finding garbage collector roots..."));
-    Roots rootMap = ignoreLiveness ? Roots() : nix::findRoots(true);
+    Roots rootMap = options.ignoreLiveness ? Roots() : nix::findRoots(true);
 
     PathSet roots;
     for (Roots::iterator i = rootMap.begin(); i != rootMap.end(); ++i)
@@ -547,11 +547,11 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
        NIX_ROOT_FINDER environment variable.  This is typically used
        to add running programs to the set of roots (to prevent them
        from being garbage collected). */
-    if (!ignoreLiveness)
+    if (!options.ignoreLiveness)
         addAdditionalRoots(roots);
 
-    if (action == gcReturnRoots) {
-        result = roots;
+    if (options.action == GCOptions::gcReturnRoots) {
+        results.paths = roots;
         return;
     }
 
@@ -595,8 +595,8 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
             }
     }
 
-    if (action == gcReturnLive) {
-        result = livePaths;
+    if (options.action == GCOptions::gcReturnLive) {
+        results.paths = livePaths;
         return;
     }
 
@@ -633,27 +633,25 @@ void LocalStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
        paths. */
     printMsg(lvlError, format("reading the Nix store..."));
     PathSet storePaths;
-    if (action != gcDeleteSpecific) {
+    if (options.action != GCOptions::gcDeleteSpecific) {
         Paths entries = readDirectory(nixStore);
         for (Paths::iterator i = entries.begin(); i != entries.end(); ++i)
             storePaths.insert(canonPath(nixStore + "/" + *i));
     } else {
-        for (PathSet::iterator i = pathsToDelete.begin();
-             i != pathsToDelete.end(); ++i)
-        {
+        foreach (PathSet::iterator, i, options.pathsToDelete) {
             assertStorePath(*i);
             storePaths.insert(*i);
         }
     }
 
     /* Try to delete store paths in the topologically sorted order. */
-    printMsg(lvlError, action == gcReturnDead
+    printMsg(lvlError, options.action == GCOptions::gcReturnDead
         ? format("looking for garbage...")
         : format("deleting garbage..."));
 
     PathSet done;
     foreach (PathSet::iterator, i, storePaths)
-        tryToDelete(action, livePaths, tempRootsClosed, done, result, *i, bytesFreed);
+        tryToDelete(options, results, livePaths, tempRootsClosed, done, *i);
 }
 
  

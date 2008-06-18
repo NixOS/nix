@@ -16,14 +16,82 @@ namespace nix {
 typedef std::map<Path, Path> Roots;
 
 
-/* Garbage collector operation. */
-typedef enum {
-    gcReturnRoots,
-    gcReturnLive,
-    gcReturnDead,
-    gcDeleteDead,
-    gcDeleteSpecific,
-} GCAction;
+
+
+struct GCOptions
+{
+    /* Garbage collector operation:
+
+       - `gcReturnRoots': find and return the set of roots for the
+         garbage collector.  These are the store paths symlinked to in
+         the `gcroots' directory.
+
+       - `gcReturnLive': return the set of paths reachable from
+         (i.e. in the closure of) the roots.
+
+       - `gcReturnDead': return the set of paths not reachable from
+         the roots.
+
+       - `gcDeleteDead': actually delete the latter set.
+
+       - `gcDeleteSpecific': delete the paths listed in
+          `pathsToDelete', insofar as they are not reachable.
+    */
+    typedef enum {
+        gcReturnRoots,
+        gcReturnLive,
+        gcReturnDead,
+        gcDeleteDead,
+        gcDeleteSpecific,
+    } GCAction;
+
+    GCAction action;
+
+    /* If `ignoreLiveness' is set, then reachability from the roots is
+       ignored (dangerous!).  However, the paths must still be
+       unreferenced *within* the store (i.e., there can be no other
+       store paths that depend on them). */
+    bool ignoreLiveness;
+
+    /* For `gcDeleteSpecific', the paths to delete. */
+    PathSet pathsToDelete;
+
+    /* Stop after at least `maxFreed' bytes have been freed. */
+    unsigned long long maxFreed;
+
+    /* Stop after the number of hard links to the Nix store directory
+       has dropped to at least `maxLinks'. */
+    unsigned int maxLinks;
+
+    GCOptions() 
+    {
+        action = gcDeleteDead;
+        ignoreLiveness = false;
+        maxFreed = ULLONG_MAX;
+        maxLinks = UINT_MAX;
+    }
+};
+
+
+struct GCResults 
+{
+    /* Depending on the action, the GC roots, or the paths that would
+       be or have been deleted. */
+    PathSet paths;
+
+    /* For `gcReturnDead', `gcDeleteDead' and `gcDeleteSpecific', the
+       number of bytes that would be or was freed. */
+    unsigned long long bytesFreed;
+
+    /* The number of file system blocks that would be or was freed. */
+    unsigned long long blocksFreed;
+
+    GCResults()
+    {
+        bytesFreed = 0;
+        blocksFreed = 0;
+    }
+};
 
 
 class StoreAPI 
@@ -137,33 +205,8 @@ public:
        outside of the Nix store that point to `storePath'.  */
     virtual Roots findRoots() = 0;
 
-    /* Depending on `action', this function does the following:
-
-       - `gcReturnRoots': find and return the set of roots for the
-         garbage collector.  These are the store paths symlinked to in
-         the `gcroots' directory.
-
-       - `gcReturnLive': return the set of paths reachable from
-         (i.e. in the closure of) the roots.
-
-       - `gcReturnDead': return the set of paths not reachable from
-         the roots.
-
-       - `gcDeleteDead': actually delete the latter set.
-
-       - `gcDeleteSpecific': delete the paths listed in
-         `pathsToDelete', insofar as they are not reachable.
-
-       If `ignoreLiveness' is set, then reachability from the roots is
-       ignored (dangerous!).  However, the paths must still be
-       unreferenced *within* the store (i.e., there can be no other
-       store paths that depend on them).
-
-       For `gcReturnDead', `gcDeleteDead' and `gcDeleteSpecific', the
-       number of bytes that would be or was freed is returned in
-       `bytesFreed'. */
-    virtual void collectGarbage(GCAction action, const PathSet & pathsToDelete,
-        bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed) = 0;
+    /* Perform a garbage collection. */
+    virtual void collectGarbage(const GCOptions & options, GCResults & results) = 0;
 };
 
 

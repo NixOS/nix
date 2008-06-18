@@ -372,24 +372,20 @@ Roots RemoteStore::findRoots()
 }
 
 
-void RemoteStore::collectGarbage(GCAction action, const PathSet & pathsToDelete,
-    bool ignoreLiveness, PathSet & result, unsigned long long & bytesFreed)
+void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
-    result.clear();
-    bytesFreed = 0;
     writeInt(wopCollectGarbage, to);
-    writeInt(action, to);
-    writeStringSet(pathsToDelete, to);
-    writeInt(ignoreLiveness, to);
+    writeInt(options.action, to);
+    writeStringSet(options.pathsToDelete, to);
+    writeInt(options.ignoreLiveness, to);
+    writeLongLong(options.maxFreed, to);
+    writeInt(options.maxLinks, to);
     
     processStderr();
     
-    result = readStringSet(from);
-
-    /* Ugh - NAR integers are 64 bits, but read/writeInt() aren't. */
-    unsigned int lo = readInt(from);
-    unsigned int hi = readInt(from);
-    bytesFreed = (((unsigned long long) hi) << 32) | lo;
+    results.paths = readStringSet(from);
+    results.bytesFreed = readLongLong(from);
+    results.blocksFreed = readLongLong(from);
 }
 
 

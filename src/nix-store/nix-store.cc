@@ -489,19 +489,19 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
 }
 
 
-static string showBytes(unsigned long long bytes)
+static string showBytes(unsigned long long bytes, unsigned long long blocks)
 {
-    return (format("%d bytes (%.2f MiB)")
-        % bytes % (bytes / (1024.0 * 1024.0))).str();
+    return (format("%d bytes (%.2f MiB, %d blocks)")
+        % bytes % (bytes / (1024.0 * 1024.0)) % blocks).str();
 }
 
 
 struct PrintFreed 
 {
     bool show, dryRun;
-    unsigned long long bytesFreed;
-    PrintFreed(bool show, bool dryRun)
-        : show(show), dryRun(dryRun), bytesFreed(0) { }
+    const GCResults & results;
+    PrintFreed(bool show, bool dryRun, const GCResults & results)
+        : show(show), dryRun(dryRun), results(results) { }
     ~PrintFreed() 
     {
         if (show)
@@ -509,33 +509,35 @@ struct PrintFreed
                 (dryRun
                     ? "%1% would be freed\n"
                     : "%1% freed\n"))
-                % showBytes(bytesFreed);
+                % showBytes(results.bytesFreed, results.blocksFreed);
     }
 };
 
 
 static void opGC(Strings opFlags, Strings opArgs)
 {
-    GCAction action = gcDeleteDead;
+    GCOptions options;
+    options.action = GCOptions::gcDeleteDead;
+    
+    GCResults results;
     
     /* Do what? */
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
-        if (*i == "--print-roots") action = gcReturnRoots;
-        else if (*i == "--print-live") action = gcReturnLive;
-        else if (*i == "--print-dead") action = gcReturnDead;
-        else if (*i == "--delete") action = gcDeleteDead;
+        if (*i == "--print-roots") options.action = GCOptions::gcReturnRoots;
+        else if (*i == "--print-live") options.action = GCOptions::gcReturnLive;
+        else if (*i == "--print-dead") options.action = GCOptions::gcReturnDead;
+        else if (*i == "--delete") options.action = GCOptions::gcDeleteDead;
         else throw UsageError(format("bad sub-operation `%1%' in GC") % *i);
 
-    PathSet result;
-    PrintFreed freed(action == gcDeleteDead || action == gcReturnDead,
-        action == gcReturnDead);
-    store->collectGarbage(action, PathSet(), false, result, freed.bytesFreed);
+    PrintFreed freed(
+        options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcReturnDead,
+        options.action == GCOptions::gcReturnDead, results);
+    store->collectGarbage(options, results);
 
-    if (action != gcDeleteDead) {
-        for (PathSet::iterator i = result.begin(); i != result.end(); ++i)
+    if (options.action != GCOptions::gcDeleteDead)
+        foreach (PathSet::iterator, i, results.paths)
             cout << *i << std::endl;
-    }
 }
 
 
@@ -544,22 +546,21 @@ static void opGC(Strings opFlags, Strings opArgs)
    roots). */
 static void opDelete(Strings opFlags, Strings opArgs)
 {
-    bool ignoreLiveness = false;
+    GCOptions options;
+    options.action = GCOptions::gcDeleteSpecific;
     
     for (Strings::iterator i = opFlags.begin();
          i != opFlags.end(); ++i)
-        if (*i == "--ignore-liveness") ignoreLiveness = true;
+        if (*i == "--ignore-liveness") options.ignoreLiveness = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
-    PathSet pathsToDelete;
     for (Strings::iterator i = opArgs.begin();
          i != opArgs.end(); ++i)
-        pathsToDelete.insert(followLinksToStorePath(*i));
+        options.pathsToDelete.insert(followLinksToStorePath(*i));
     
-    PathSet dummy;
-    PrintFreed freed(true, false);
-    store->collectGarbage(gcDeleteSpecific, pathsToDelete, ignoreLiveness,
-        dummy, freed.bytesFreed);
+    GCResults results;
+    PrintFreed freed(true, false, results);
+    store->collectGarbage(options, results);
 }
 
 
@@ -653,7 +654,7 @@ static void showOptimiseStats(OptimiseStats & stats)
 {
     printMsg(lvlError,
         format("%1% freed by hard-linking %2% files; there are %3% files with equal contents out of %4% files in total")
-        % showBytes(stats.bytesFreed)
+        % showBytes(stats.bytesFreed, stats.blocksFreed)
         % stats.filesLinked
         % stats.sameContents
         % stats.totalFiles);

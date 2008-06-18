@@ -395,23 +395,24 @@ static void performOp(unsigned int clientVersion,
     }
 
     case wopCollectGarbage: {
-        GCAction action = (GCAction) readInt(from);
-        PathSet pathsToDelete = readStorePaths(from);
-        bool ignoreLiveness = readInt(from);
+        GCOptions options;
+        options.action = (GCOptions::GCAction) readInt(from);
+        options.pathsToDelete = readStorePaths(from);
+        options.ignoreLiveness = readInt(from);
+        options.maxFreed = readLongLong(from);
+        options.maxLinks = readInt(from);
 
-        PathSet result;
-        unsigned long long bytesFreed;
+        GCResults results;
         
         startWork();
-        if (ignoreLiveness)
+        if (options.ignoreLiveness)
             throw Error("you are not allowed to ignore liveness");
-        store->collectGarbage(action, pathsToDelete, ignoreLiveness,
-            result, bytesFreed);
+        store->collectGarbage(options, results);
         stopWork();
         
-        writeStringSet(result, to);
-        writeInt(bytesFreed & 0xffffffff, to);
-        writeInt(bytesFreed >> 32, to);
+        writeStringSet(results.paths, to);
+        writeLongLong(results.bytesFreed, to);
+        writeLongLong(results.blocksFreed, to);
         
         break;
     }

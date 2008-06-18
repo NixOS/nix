@@ -229,30 +229,38 @@ void writeFile(const Path & path, const string & s)
 }
 
 
-unsigned long long computePathSize(const Path & path)
+static void _computePathSize(const Path & path,
+    unsigned long long & bytes, unsigned long long & blocks)
 {
-    unsigned long long size = 0;
-    
     checkInterrupt();
 
     struct stat st;
     if (lstat(path.c_str(), &st))
 	throw SysError(format("getting attributes of path `%1%'") % path);
 
-    size += st.st_size;
+    bytes += st.st_size;
+    blocks += st.st_blocks;
 
     if (S_ISDIR(st.st_mode)) {
 	Strings names = readDirectory(path);
 
 	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
-            size += computePathSize(path + "/" + *i);
+            _computePathSize(path + "/" + *i, bytes, blocks);
     }
-
-    return size;
 }
 
 
-static void _deletePath(const Path & path, unsigned long long & bytesFreed)
+void computePathSize(const Path & path,
+    unsigned long long & bytes, unsigned long long & blocks)
+{
+    bytes = 0;
+    blocks = 0;
+    _computePathSize(path, bytes, blocks);
+}
+
+
+static void _deletePath(const Path & path, unsigned long long & bytesFreed,
+    unsigned long long & blocksFreed)
 {
     checkInterrupt();
 
@@ -263,6 +271,7 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 	throw SysError(format("getting attributes of path `%1%'") % path);
 
     bytesFreed += st.st_size;
+    blocksFreed += st.st_blocks;
 
     if (S_ISDIR(st.st_mode)) {
 	Strings names = readDirectory(path);
@@ -274,7 +283,7 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 	}
 
 	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
-            _deletePath(path + "/" + *i, bytesFreed);
+            _deletePath(path + "/" + *i, bytesFreed, blocksFreed);
     }
 
     if (remove(path.c_str()) == -1)
@@ -284,17 +293,19 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed)
 
 void deletePath(const Path & path)
 {
-    unsigned long long dummy;
-    deletePath(path, dummy);
+    unsigned long long dummy1, dummy2;
+    deletePath(path, dummy1, dummy2);
 }
 
 
-void deletePath(const Path & path, unsigned long long & bytesFreed)
+void deletePath(const Path & path, unsigned long long & bytesFreed,
+    unsigned long long & blocksFreed)
 {
     startNest(nest, lvlDebug,
         format("recursively deleting path `%1%'") % path);
     bytesFreed = 0;
-    _deletePath(path, bytesFreed);
+    blocksFreed = 0;
+    _deletePath(path, bytesFreed, blocksFreed);
 }
 
 
