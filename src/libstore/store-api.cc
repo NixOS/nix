@@ -2,8 +2,19 @@
 #include "globals.hh"
 #include "util.hh"
 
+#include <stdint.h>
+
 
 namespace nix {
+
+
+GCOptions::GCOptions()
+{
+    action = gcDeleteDead;
+    ignoreLiveness = false;
+    maxFreed = ULLONG_MAX;
+    maxLinks = 0;
+}
 
 
 bool StoreAPI::hasSubstitutes(const Path & path)

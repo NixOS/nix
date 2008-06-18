@@ -439,6 +439,9 @@ Paths topoSortPaths(const PathSet & paths)
 }
 
 
+struct GCLimitReached { };
+
+
 void LocalStore::tryToDelete(const GCOptions & options, GCResults & results, 
     const PathSet & livePaths, const PathSet & tempRootsClosed, PathSet & done, 
     const Path & path)
@@ -511,6 +514,21 @@ void LocalStore::tryToDelete(const GCOptions & options, GCResults & results,
     deleteFromStore(path, bytesFreed, blocksFreed);
     results.bytesFreed += bytesFreed;
     results.blocksFreed += blocksFreed;
+
+    if (results.bytesFreed > options.maxFreed) {
+        printMsg(lvlInfo, format("deleted more than %1% bytes; stopping") % options.maxFreed);
+        throw GCLimitReached();
+    }
+
+    if (options.maxLinks) {
+        struct stat st;
+        if (stat(nixStore.c_str(), &st) == -1)
+            throw SysError(format("statting `%1%'") % nixStore);
+        if (st.st_nlink < options.maxLinks) {
+            printMsg(lvlInfo, format("link count on the store has dropped below %1%; stopping") % options.maxLinks);
+            throw GCLimitReached();
+        }
+    }
 
 #ifndef __CYGWIN__
     if (fdLock != -1)
@@ -650,8 +668,11 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         : format("deleting garbage..."));
 
     PathSet done;
-    foreach (PathSet::iterator, i, storePaths)
-        tryToDelete(options, results, livePaths, tempRootsClosed, done, *i);
+    try {
+        foreach (PathSet::iterator, i, storePaths)
+            tryToDelete(options, results, livePaths, tempRootsClosed, done, *i);
+    } catch (GCLimitReached & e) {
+    }
 }
 
  

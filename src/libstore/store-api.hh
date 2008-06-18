@@ -60,16 +60,10 @@ struct GCOptions
     unsigned long long maxFreed;
 
     /* Stop after the number of hard links to the Nix store directory
-       has dropped to at least `maxLinks'. */
+       has dropped below `maxLinks'. */
     unsigned int maxLinks;
 
-    GCOptions() 
-    {
-        action = gcDeleteDead;
-        ignoreLiveness = false;
-        maxFreed = ULLONG_MAX;
-        maxLinks = UINT_MAX;
-    }
+    GCOptions();
 };
 
 

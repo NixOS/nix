@@ -26,6 +26,9 @@ namespace nix {
 Path makeRootName(const Path & gcRoot, int & counter);
 void printGCWarning();
 
+unsigned int getIntArg(const string & opt,
+    Strings::iterator & i, const Strings::iterator & end);
+
 /* Whether we're running setuid. */
 extern bool setuidMode;
 

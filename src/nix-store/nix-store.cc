@@ -528,6 +528,8 @@ static void opGC(Strings opFlags, Strings opArgs)
         else if (*i == "--print-live") options.action = GCOptions::gcReturnLive;
         else if (*i == "--print-dead") options.action = GCOptions::gcReturnDead;
         else if (*i == "--delete") options.action = GCOptions::gcDeleteDead;
+        else if (*i == "--max-freed") options.maxFreed = getIntArg(*i, i, opFlags.end());
+        else if (*i == "--max-links") options.maxLinks = getIntArg(*i, i, opFlags.end());
         else throw UsageError(format("bad sub-operation `%1%' in GC") % *i);
 
     PrintFreed freed(
@@ -744,8 +746,12 @@ void run(Strings args)
         }
         else if (arg == "--indirect")
             indirectRoot = true;
-        else if (arg[0] == '-')
+        else if (arg[0] == '-') {            
             opFlags.push_back(arg);
+            if (arg == "--max-freed" || arg == "--max-links") { /* !!! hack */
+                if (i != args.end()) opFlags.push_back(*i++);
+            }
+        }
         else
             opArgs.push_back(arg);
 

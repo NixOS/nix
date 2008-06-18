@@ -58,7 +58,7 @@ static void setLogType(string lt)
 }
 
 
-static unsigned int getIntArg(const string & opt,
+unsigned int getIntArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end)
 {
     ++i;
