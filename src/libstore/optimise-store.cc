@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <errno.h>
 
 
 namespace nix {
@@ -20,6 +21,21 @@ static void makeWritable(const Path & path)
     if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
         throw SysError(format("changing writability of `%1%'") % path);
 }
+
+
+struct MakeReadOnly
+{
+    Path path;
+    MakeReadOnly(const Path & path) : path(path) { }
+    ~MakeReadOnly()
+    {
+        try {
+            if (path != "") canonicalisePathMetaData(path, false);
+        } catch (...) {
+            ignoreException();
+        }
+    }
+};
 
 
 static void hashAndLink(bool dryRun, HashToPath & hashToPath,
@@ -82,20 +98,29 @@ static void hashAndLink(bool dryRun, HashToPath & hashToPath,
                mess with  its permissions). */
             bool mustToggle = !isStorePath(path);
             if (mustToggle) makeWritable(dirOf(path));
+            
+            /* When we're done, make the directory read-only again and
+               reset its timestamp back to 0. */
+            MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "");
         
-            if (link(prevPath.first.c_str(), tempLink.c_str()) == -1)
+            if (link(prevPath.first.c_str(), tempLink.c_str()) == -1) {
+                if (errno == EMLINK) {
+                    /* Too many links to the same file (>= 32000 on
+                       most file systems).  This is likely to happen
+                       with empty files.  Just start over, creating
+                       links to the current file. */
+                    printMsg(lvlInfo, format("`%1%' has maximum number of links") % prevPath.first);
+                    hashToPath[hash] = std::pair<Path, ino_t>(path, st.st_ino);
+                    return;
+                }
                 throw SysError(format("cannot link `%1%' to `%2%'")
                     % tempLink % prevPath.first);
+            }
 
             /* Atomically replace the old file with the new hard link. */
             if (rename(tempLink.c_str(), path.c_str()) == -1)
                 throw SysError(format("cannot rename `%1%' to `%2%'")
                     % tempLink % path);
-
-            /* Make the directory read-only again and reset its
-               timestamp back to 0. */
-            if (mustToggle) canonicalisePathMetaData(dirOf(path), false);
-            
         } else
             printMsg(lvlTalkative, format("would link `%1%' to `%2%'") % path % prevPath.first);
         
