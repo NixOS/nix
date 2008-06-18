@@ -1020,6 +1020,14 @@ bool string2Int(const string & s, int & n)
 }
 
 
+bool string2Int(const string & s, long long & n)
+{
+    std::istringstream str(s);
+    str >> n;
+    return str && str.get() == EOF;
+}
+
+
 void ignoreException()
 {
     try {

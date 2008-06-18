@@ -58,12 +58,12 @@ static void setLogType(string lt)
 }
 
 
-unsigned int getIntArg(const string & opt,
+unsigned long long getIntArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end)
 {
     ++i;
     if (i == end) throw UsageError(format("`%1%' requires an argument") % opt);
-    int n;
+    long long n;
     if (!string2Int(*i, n) || n < 0)
         throw UsageError(format("`%1%' requires a non-negative integer") % opt);
     return n;
