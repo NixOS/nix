@@ -2,7 +2,7 @@
 #include "globals.hh"
 #include "util.hh"
 
-#include <stdint.h>
+#include <limits.h>
 
 
 namespace nix {
