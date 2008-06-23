@@ -113,5 +113,5 @@ EXTRA_DIST = $(DB).tar.gz $(ATERM).tar.bz2 $(BZIP2).tar.gz \
   bdb-cygwin.patch
 
 ext-clean:
-	$(RM) -f have-db build-db have-aterm build-aterm
+	$(RM) -f have-db build-db have-aterm build-aterm have-bzip2 build-bzip2
 	$(RM) -rf $(DB) $(ATERM) $(BZIP2)
