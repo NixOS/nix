@@ -7,6 +7,7 @@
 #include "expr-to-xml.hh"
 #include "nixexpr-ast.hh"
 #include "parser.hh"
+#include "names.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -817,7 +818,7 @@ static Expr prim_removeAttrs(EvalState & state, const ATermVector & args)
 }
 
 
-/* Determine whether the argument is a list. */
+/* Determine whether the argument is an attribute set. */
 static Expr prim_isAttrs(EvalState & state, const ATermVector & args)
 {
     ATermList list;
@@ -950,22 +951,53 @@ static Expr prim_unsafeDiscardStringContext(EvalState & state, const ATermVector
     return makeStr(s, PathSet());
 }
 
-/* Expression serialization/deserialization */ 
 
-static Expr prim_ExprToString ( EvalState & state, const ATermVector & args)
+/* Expression serialization/deserialization */
+
+
+static Expr prim_exprToString(EvalState & state, const ATermVector & args)
 {
-	return makeStr ( atPrint ( evalExpr ( state, args [ 0 ] ) ) );
+    /* !!! this disregards context */
+    return makeStr(atPrint(evalExpr(state, args[0])));
 }
 
-static Expr prim_StringToExpr ( EvalState & state, const ATermVector & args)
+
+static Expr prim_stringToExpr(EvalState & state, const ATermVector & args)
 {
-	string s;
-	PathSet l;
-	if (! matchStr ( evalExpr ( state, args[0] ), s, l )) {
-		throw EvalError("__stringToExpr needs string argument!");
-	}
-	return ATreadFromString(s.c_str());
+    /* !!! this can introduce arbitrary garbage terms in the
+       evaluator! */;
+    string s;
+    PathSet l;
+    if (!matchStr(evalExpr(state, args[0]), s, l))
+        throw EvalError("stringToExpr needs string argument!");
+    return ATreadFromString(s.c_str());
 }
+
+
+/*************************************************************
+ * Versions
+ *************************************************************/
+
+
+static Expr prim_parseDrvName(EvalState & state, const ATermVector & args)
+{
+    string name = evalStringNoCtx(state, args[0]);
+    DrvName parsed(name);
+    ATermMap attrs(2);
+    attrs.set(toATerm("name"), makeAttrRHS(makeStr(parsed.name), makeNoPos()));
+    attrs.set(toATerm("version"), makeAttrRHS(makeStr(parsed.version), makeNoPos()));
+    return makeAttrs(attrs);
+}
+
+
+static Expr prim_compareVersions(EvalState & state, const ATermVector & args)
+{
+    string version1 = evalStringNoCtx(state, args[0]);
+    string version2 = evalStringNoCtx(state, args[1]);
+    int d = compareVersions(version1, version2);
+    return makeInt(d);
+}
+
 
 /*************************************************************
  * Primop registration
@@ -994,8 +1026,8 @@ void EvalState::addPrimOps()
     addPrimOp("__trace", 2, prim_trace);
     
     // Expr <-> String
-    addPrimOp("__exprToString", 1, prim_ExprToString);
-    addPrimOp("__stringToExpr", 1, prim_StringToExpr);
+    addPrimOp("__exprToString", 1, prim_exprToString);
+    addPrimOp("__stringToExpr", 1, prim_stringToExpr);
 
     addPrimOp("relativise", 2, prim_relativise);
 
@@ -1039,7 +1071,10 @@ void EvalState::addPrimOps()
     addPrimOp("__substring", 3, prim_substring);
     addPrimOp("__stringLength", 1, prim_stringLength);
     addPrimOp("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
-    
+
+    // Versions
+    addPrimOp("__parseDrvName", 1, prim_parseDrvName);
+    addPrimOp("__compareVersions", 2, prim_compareVersions);
 }
 
 

@@ -12,7 +12,13 @@
 
 <itemizedlist>
 
+  <listitem><para>TODO: Berkeley DB no longer needed.</para></listitem>
+
   <listitem><para><command>nix-store --dump-db / --load-db</command>.</para></listitem>
+
+  <listitem><para>New primops:
+  <varname>builtins.parseDrvName</varname> and
+  <varname>builtins.compareVersions</varname>.</para></listitem>
 
 </itemizedlist>
 

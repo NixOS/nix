@@ -92,25 +92,6 @@ int compareVersions(const string & v1, const string & v2)
 }
 
 
-static void testCompareVersions()
-{
-#define TEST(v1, v2, n) assert( \
-    compareVersions(v1, v2) == n && compareVersions(v2, v1) == -n)
-    TEST("1.0", "2.3", -1);
-    TEST("2.1", "2.3", -1);
-    TEST("2.3", "2.3", 0);
-    TEST("2.5", "2.3", 1);
-    TEST("3.1", "2.3", 1);
-    TEST("2.3.1", "2.3", 1);
-    TEST("2.3.1", "2.3a", 1);
-    TEST("2.3pre1", "2.3", -1);
-    TEST("2.3pre3", "2.3pre12", -1);
-    TEST("2.3a", "2.3c", -1);
-    TEST("2.3pre1", "2.3c", -1);
-    TEST("2.3pre1", "2.3q", -1);
-}
-
-
 DrvNames drvNamesFromArgs(const Strings & opArgs)
 {
     DrvNames result;

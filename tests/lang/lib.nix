@@ -10,6 +10,8 @@ rec {
   concat =
     fold (x: y: x + y) "";
 
+  and = fold (x: y: x && y) true;
+
   flatten = x:
     if isList x
     then fold (x: y: (flatten x) ++ y) [] x
