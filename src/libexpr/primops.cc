@@ -128,59 +128,7 @@ static Expr prim_isFunction(EvalState & state, const ATermVector & args)
 }
 
 
-static Path findDependency(Path dir, string dep)
-{
-    if (dep[0] == '/') throw EvalError(
-        format("illegal absolute dependency `%1%'") % dep);
-
-    Path p = canonPath(dir + "/" + dep);
-
-    if (pathExists(p))
-        return p;
-    else
-        return "";
-}
-
-
-/* Make path `p' relative to directory `pivot'.  E.g.,
-   relativise("/a/b/c", "a/b/x/y") => "../x/y".  Both input paths
-   should be in absolute canonical form. */
-static string relativise(Path pivot, Path p)
-{
-    assert(pivot.size() > 0 && pivot[0] == '/');
-    assert(p.size() > 0 && p[0] == '/');
-        
-    if (pivot == p) return ".";
-
-    /* `p' is in `pivot'? */
-    Path pivot2 = pivot + "/";
-    if (p.substr(0, pivot2.size()) == pivot2) {
-        return p.substr(pivot2.size());
-    }
-
-    /* Otherwise, `p' is in a parent of `pivot'.  Find up till which
-       path component `p' and `pivot' match, and add an appropriate
-       number of `..' components. */
-    string::size_type i = 1;
-    while (1) {
-        string::size_type j = pivot.find('/', i);
-        if (j == string::npos) break;
-        j++;
-        if (pivot.substr(0, j) != p.substr(0, j)) break;
-        i = j;
-    }
-
-    string prefix;
-    unsigned int slashes = count(pivot.begin() + i, pivot.end(), '/') + 1;
-    while (slashes--) {
-        prefix += "../";
-    }
-
-    return prefix + p.substr(i);
-}
-
-
-static Expr prim_dependencyClosure(EvalState & state, const ATermVector & args)
+static Expr prim_genericClosure(EvalState & state, const ATermVector & args)
 {
     startNest(nest, lvlDebug, "finding dependencies");
 
@@ -191,87 +139,40 @@ static Expr prim_dependencyClosure(EvalState & state, const ATermVector & args)
     if (!startSet) throw EvalError("attribute `startSet' required");
     ATermList startSet2 = evalList(state, startSet);
 
-    Path pivot;
-    PathSet workSet;
-    for (ATermIterator i(startSet2); i; ++i) {
-        PathSet context; /* !!! what to do? */
-        Path p = coerceToPath(state, *i, context);
-        workSet.insert(p);
-        pivot = dirOf(p);
-    }
+    set<Expr> workSet; // !!! gc roots
+    for (ATermIterator i(startSet2); i; ++i) workSet.insert(*i);
 
-    /* Get the search path. */
-    PathSet searchPath;
-    Expr e = queryAttr(attrs, "searchPath");
-    if (e) {
-        ATermList list = evalList(state, e);
-        for (ATermIterator i(list); i; ++i) {
-            PathSet context; /* !!! what to do? */
-            Path p = coerceToPath(state, *i, context);
-            searchPath.insert(p);
-        }
-    }
-
-    Expr scanner = queryAttr(attrs, "scanner");
-    if (!scanner) throw EvalError("attribute `scanner' required");
+    /* Get the operator. */
+    Expr op = queryAttr(attrs, "operator");
+    if (!op) throw EvalError("attribute `operator' required");
     
-    /* Construct the dependency closure by querying the dependency of
-       each path in `workSet', adding the dependencies to
-       `workSet'. */
-    PathSet doneSet;
+    /* Construct the closure by applying the operator to element of
+       `workSet', adding the result to `workSet', continuing until
+       no new elements are found. */
+    ATermList res = ATempty;
+    set<Expr> doneKeys; // !!! gc roots
     while (!workSet.empty()) {
-	Path path = *(workSet.begin());
-	workSet.erase(path);
+	Expr e = *(workSet.begin());
+	workSet.erase(e);
 
-	if (doneSet.find(path) != doneSet.end()) continue;
-        doneSet.insert(path);
+        e = strictEvalExpr(state, e);
 
-        try {
-            
-            /* Call the `scanner' function with `path' as argument. */
-            debug(format("finding dependencies in `%1%'") % path);
-            ATermList deps = evalList(state, makeCall(scanner, makeStr(path)));
+        Expr key = queryAttr(e, "key");
+        if (!key) throw EvalError("attribute `key' required");
 
-            /* Try to find the dependencies relative to the `path'. */
-            for (ATermIterator i(deps); i; ++i) {
-                string s = evalStringNoCtx(state, *i);
-                
-                Path dep = findDependency(dirOf(path), s);
+	if (doneKeys.find(key) != doneKeys.end()) continue;
+        doneKeys.insert(key);
+        res = ATinsert(res, e);
+        
+        /* Call the `operator' function with `e' as argument. */
+        ATermList res = evalList(state, makeCall(op, e));
 
-                if (dep == "") {
-                    for (PathSet::iterator j = searchPath.begin();
-                         j != searchPath.end(); ++j)
-                    {
-                        dep = findDependency(*j, s);
-                        if (dep != "") break;
-                    }
-                }
-                
-                if (dep == "")
-                    debug(format("did NOT find dependency `%1%'") % s);
-                else {
-                    debug(format("found dependency `%1%'") % dep);
-                    workSet.insert(dep);
-                }
-            }
-
-        } catch (Error & e) {
-            e.addPrefix(format("while finding dependencies in `%1%':\n")
-                % path);
-            throw;
-        }
+        /* Try to find the dependencies relative to the `path'. */
+        for (ATermIterator i(res); i; ++i)
+            workSet.insert(evalExpr(state, *i));
     }
 
-    /* Return a list of the dependencies we've just found. */
-    ATermList deps = ATempty;
-    for (PathSet::iterator i = doneSet.begin(); i != doneSet.end(); ++i) {
-        deps = ATinsert(deps, makeStr(relativise(pivot, *i)));
-        deps = ATinsert(deps, makeStr(*i));
-    }
-
-    debug(format("dependency list is `%1%'") % makeList(deps));
-    
-    return makeList(deps);
+    return makeList(res);
 }
 
 
@@ -308,15 +209,6 @@ static Expr prim_trace(EvalState & state, const ATermVector & args)
     Expr e = evalExpr(state, args[0]);
     printMsg(lvlError, format("trace: %1%") % e);
     return evalExpr(state, args[1]);
-}
-
-
-static Expr prim_relativise(EvalState & state, const ATermVector & args)
-{
-    PathSet context; /* !!! what to do? */
-    Path pivot = coerceToPath(state, args[0], context);
-    Path path = coerceToPath(state, args[1], context);
-    return makeStr(relativise(pivot, path));
 }
 
 
@@ -874,6 +766,14 @@ static Expr prim_map(EvalState & state, const ATermVector & args)
 }
 
 
+/* Return the length of a list.  This is an O(1) time operation. */
+static Expr prim_length(EvalState & state, const ATermVector & args)
+{
+    ATermList list = evalList(state, args[0]);
+    return makeInt(ATgetLength(list));
+}
+
+
 /*************************************************************
  * Integer arithmetic
  *************************************************************/
@@ -892,6 +792,23 @@ static Expr prim_sub(EvalState & state, const ATermVector & args)
     int i1 = evalInt(state, args[0]);
     int i2 = evalInt(state, args[1]);
     return makeInt(i1 - i2);
+}
+
+
+static Expr prim_mul(EvalState & state, const ATermVector & args)
+{
+    int i1 = evalInt(state, args[0]);
+    int i2 = evalInt(state, args[1]);
+    return makeInt(i1 * i2);
+}
+
+
+static Expr prim_div(EvalState & state, const ATermVector & args)
+{
+    int i1 = evalInt(state, args[0]);
+    int i2 = evalInt(state, args[1]);
+    if (i2 == 0) throw EvalError("division by zero");
+    return makeInt(i1 / i2);
 }
 
 
@@ -1019,7 +936,7 @@ void EvalState::addPrimOps()
     addPrimOp("import", 1, prim_import);
     addPrimOp("isNull", 1, prim_isNull);
     addPrimOp("__isFunction", 1, prim_isFunction);
-    addPrimOp("dependencyClosure", 1, prim_dependencyClosure);
+    addPrimOp("__genericClosure", 1, prim_genericClosure);
     addPrimOp("abort", 1, prim_abort);
     addPrimOp("throw", 1, prim_throw);
     addPrimOp("__getEnv", 1, prim_getEnv);
@@ -1028,8 +945,6 @@ void EvalState::addPrimOps()
     // Expr <-> String
     addPrimOp("__exprToString", 1, prim_exprToString);
     addPrimOp("__stringToExpr", 1, prim_stringToExpr);
-
-    addPrimOp("relativise", 2, prim_relativise);
 
     // Derivations
     addPrimOp("derivation!", 1, prim_derivationStrict);
@@ -1060,10 +975,13 @@ void EvalState::addPrimOps()
     addPrimOp("__head", 1, prim_head);
     addPrimOp("__tail", 1, prim_tail);
     addPrimOp("map", 2, prim_map);
+    addPrimOp("__length", 1, prim_length);
 
     // Integer arithmetic
     addPrimOp("__add", 2, prim_add);
     addPrimOp("__sub", 2, prim_sub);
+    addPrimOp("__mul", 2, prim_mul);
+    addPrimOp("__div", 2, prim_div);
     addPrimOp("__lessThan", 2, prim_lessThan);
 
     // String manipulation
