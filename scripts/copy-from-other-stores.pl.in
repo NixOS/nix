@@ -1,0 +1,82 @@
+#! @perl@ -w
+
+use strict;
+use File::Basename;
+
+#print STDERR "FOO: @ARGV\n";
+
+die unless defined $ENV{"NIX_OTHER_STORES"};
+my @remoteStores = split ':', $ENV{"NIX_OTHER_STORES"};
+
+
+sub findStorePath {
+    my $storePath = shift;
+    
+    my $storePathName = basename $storePath;
+    #print STDERR "GET $storePath\n";
+    
+    foreach my $store (@remoteStores) {
+        # Determine whether $storePath exists by looking for the
+        # existence of the info file, and if so, get store path info
+        # from that file.  This rather breaks abstraction: we should
+        # be using `nix-store' for that.  But right now there is no
+        # good way to tell nix-store to access a store mounted under a
+        # different location (there's $NIX_STORE, but that only works
+        # if the remote store is mounted under its "real" location).
+        my $infoFile = "$store/var/nix/db/info/$storePathName";
+        my $storePath2 = "$store/store/$storePathName";
+        if (-f $infoFile && -e $storePath2) {
+            #print STDERR "FOUND IN $infoFile\n";
+            return ($infoFile, $storePath2);
+        }
+    }
+}
+
+
+if ($ARGV[0] eq "--query-paths") {
+    # !!! not implemented yet; needed for `nix-env -qas'
+}
+
+
+elsif ($ARGV[0] eq "--query-info") {
+    shift @ARGV;
+    
+    foreach my $storePath (@ARGV) {
+
+        (my $infoFile) = findStorePath $storePath;
+        #print STDERR "XXX $infoFile\n";
+        
+        my $deriver = "";
+        my @references = ();
+
+        open INFO, "<$infoFile" or die "cannot read info file $infoFile\n";
+        while (<INFO>) {
+            chomp;
+            #print STDERR "GOT $_\n";
+            /^([\w-]+): (.*)$/ or die "bad info file";
+            my $key = $1;
+            my $value = $2;
+            if ($key eq "Deriver") { $deriver = $value; }
+            elsif ($key eq "References") { @references = split ' ', $value; }
+        }
+        close INFO;
+
+        print "$storePath\n";
+        print "$deriver\n";
+        print scalar @references, "\n";
+        print "$_\n" foreach @references;
+    }
+}
+
+
+elsif ($ARGV[0] eq "--substitute") {
+    die unless scalar @ARGV == 2;
+    my $storePath = $ARGV[1];
+    (my $infoFile, my $sourcePath) = findStorePath $storePath;
+    print "\n*** Copying `$storePath' from `$sourcePath'\n\n";
+    system("nix-store --dump $sourcePath | nix-store --restore $storePath") == 0
+        or die "cannot copy `$sourcePath' to `$storePath'";
+}
+
+
+else { die; }
