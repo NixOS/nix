@@ -111,9 +111,10 @@ static void initAndRun(int argc, char * * argv)
     nixBinDir = canonPath(getEnv("NIX_BIN_DIR", NIX_BIN_DIR));
 
     string subs = getEnv("NIX_SUBSTITUTERS", "default");
-    if (subs == "default")
-        substituters.push_back(nixLibexecDir + "/nix/download-using-manifests.pl");
-    else
+    if (subs == "default") {
+        substituters.push_back(nixLibexecDir + "/nix/substituters/copy-from-other-stores.pl");
+        substituters.push_back(nixLibexecDir + "/nix/substituters/download-using-manifests.pl");
+    } else
         substituters = tokenizeString(subs, ":");
 
     /* Get some settings from the configuration file. */

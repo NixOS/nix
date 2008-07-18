@@ -3,17 +3,18 @@
 use strict;
 use File::Basename;
 
-#print STDERR "FOO: @ARGV\n";
+my @remoteStoresAll = split ':', ($ENV{"NIX_OTHER_STORES"} or "");
 
-die unless defined $ENV{"NIX_OTHER_STORES"};
-my @remoteStores = split ':', $ENV{"NIX_OTHER_STORES"};
+my @remoteStores;
+foreach my $dir (@remoteStoresAll) {
+    push @remoteStores, glob($dir);
+}
 
 
 sub findStorePath {
     my $storePath = shift;
     
     my $storePathName = basename $storePath;
-    #print STDERR "GET $storePath\n";
     
     foreach my $store (@remoteStores) {
         # Determine whether $storePath exists by looking for the
@@ -26,7 +27,6 @@ sub findStorePath {
         my $infoFile = "$store/var/nix/db/info/$storePathName";
         my $storePath2 = "$store/store/$storePathName";
         if (-f $infoFile && -e $storePath2) {
-            #print STDERR "FOUND IN $infoFile\n";
             return ($infoFile, $storePath2);
         }
     }
@@ -34,7 +34,11 @@ sub findStorePath {
 
 
 if ($ARGV[0] eq "--query-paths") {
-    # !!! not implemented yet; needed for `nix-env -qas'
+    foreach my $store (@remoteStores) {
+        opendir DIR, "$store/var/nix/db/info" or next;
+        print "@storedir@/$_\n" foreach readdir DIR;
+        closedir DIR;
+    }
 }
 
 
@@ -44,7 +48,7 @@ elsif ($ARGV[0] eq "--query-info") {
     foreach my $storePath (@ARGV) {
 
         (my $infoFile) = findStorePath $storePath;
-        #print STDERR "XXX $infoFile\n";
+        next unless $infoFile;
         
         my $deriver = "";
         my @references = ();
@@ -73,8 +77,9 @@ elsif ($ARGV[0] eq "--substitute") {
     die unless scalar @ARGV == 2;
     my $storePath = $ARGV[1];
     (my $infoFile, my $sourcePath) = findStorePath $storePath;
+    die unless $infoFile;
     print "\n*** Copying `$storePath' from `$sourcePath'\n\n";
-    system("nix-store --dump $sourcePath | nix-store --restore $storePath") == 0
+    system("@bindir@/nix-store --dump $sourcePath | @bindir@/nix-store --restore $storePath") == 0
         or die "cannot copy `$sourcePath' to `$storePath'";
 }
 

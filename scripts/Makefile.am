@@ -15,10 +15,12 @@ install-exec-local: readmanifest.pm download-using-manifests.pl copy-from-other-
 	$(INSTALL) -d $(DESTDIR)$(libexecdir)/nix
 	$(INSTALL_DATA) readmanifest.pm $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_DATA) readconfig.pm $(DESTDIR)$(libexecdir)/nix 
-	$(INSTALL_PROGRAM) download-using-manifests.pl $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) find-runtime-roots.pl $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) generate-patches.pl $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) build-remote.pl $(DESTDIR)$(libexecdir)/nix 
+	$(INSTALL) -d $(DESTDIR)$(libexecdir)/nix/substituters
+	$(INSTALL_PROGRAM) download-using-manifests.pl $(DESTDIR)$(libexecdir)/nix/substituters
+	$(INSTALL_PROGRAM) copy-from-other-stores.pl $(DESTDIR)$(libexecdir)/nix/substituters
 	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/nix
 
 include ../substitute.mk
