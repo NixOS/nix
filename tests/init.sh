@@ -32,6 +32,7 @@ ln -s $TOP/scripts/nix-pull $NIX_BIN_DIR/
 ln -s $bzip2_bin_test/bzip2 $NIX_BIN_DIR/
 ln -s $bzip2_bin_test/bunzip2 $NIX_BIN_DIR/
 mkdir $NIX_BIN_DIR/nix
+ln -s $TOP/scripts/copy-from-other-stores.pl $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/download-using-manifests.pl $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/readmanifest.pm $NIX_BIN_DIR/nix/
 
@@ -54,6 +55,7 @@ cp -pr $TOP/corepkgs $NIX_DATA_DIR/nix/
 for i in \
     $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh \
     $NIX_BIN_DIR/nix/download-using-manifests.pl \
+    $NIX_BIN_DIR/nix/copy-from-other-stores.pl \
     $NIX_BIN_DIR/nix-prefetch-url \
     $NIX_BIN_DIR/nix-collect-garbage \
     $NIX_BIN_DIR/nix-build \
@@ -90,6 +92,10 @@ export DYLD_LIBRARY_PATH=
 exec $NIX_BIN_DIR/nix/download-using-manifests.pl.real "\$@"
 EOF
 chmod +x $NIX_BIN_DIR/nix/download-using-manifests.pl
+
+mkdir -p $NIX_BIN_DIR/nix/substituters
+mv $NIX_BIN_DIR/nix/copy-from-other-stores.pl $NIX_BIN_DIR/nix/substituters/copy-from-other-stores.pl
+mv $NIX_BIN_DIR/nix/download-using-manifests.pl $NIX_BIN_DIR/nix/substituters/download-using-manifests.pl
 
 # Initialise the database.
 $nixstore --init
