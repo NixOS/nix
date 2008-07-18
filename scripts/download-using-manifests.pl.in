@@ -8,7 +8,6 @@ use File::Temp qw(tempdir);
 my $manifestDir = "@localstatedir@/nix/manifests";
 my $logFile = "@localstatedir@/log/nix/downloads";
 
-open LOGFILE, ">>$logFile" or die "cannot open log file $logFile";
 
 # Create a temporary directory.
 my $tmpDir = tempdir("nix-download.XXXXXX", CLEANUP => 1, TMPDIR => 1)
@@ -75,6 +74,8 @@ elsif ($ARGV[0] ne "--substitute") {
 die unless scalar @ARGV == 2;
 my $targetPath = $ARGV[1];
 
+
+open LOGFILE, ">>$logFile" or die "cannot open log file $logFile";
 
 my $date = strftime ("%F %H:%M:%S UTC", gmtime (time));
 print LOGFILE "$$ get $targetPath $date\n";

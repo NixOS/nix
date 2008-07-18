@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <utime.h>
 #include <fcntl.h>
+#include <errno.h>
 
 
 namespace nix {
@@ -48,8 +49,14 @@ LocalStore::LocalStore()
 
     checkStoreNotSymlink();
 
-    Path globalLockPath = nixDBPath + "/big-lock";
-    globalLock = openLockFile(globalLockPath.c_str(), true);
+    try {
+        Path globalLockPath = nixDBPath + "/big-lock";
+        globalLock = openLockFile(globalLockPath.c_str(), true);
+    } catch (SysError & e) {
+        if (e.errNo != EACCES) throw;
+        readOnlyMode = true;
+        return;
+    }
     
     if (!lockFile(globalLock, ltRead, false)) {
         printMsg(lvlError, "waiting for the big Nix store lock...");
@@ -58,9 +65,6 @@ LocalStore::LocalStore()
 
     createDirs(nixDBPath + "/info");
     createDirs(nixDBPath + "/referrer");
-
-    //printMsg(lvlTalkative, "cannot access Nix database; continuing anyway");
-    //readOnlyMode = true;
 
     int curSchema = getSchema();
     if (curSchema > nixSchemaVersion)
