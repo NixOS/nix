@@ -37,6 +37,7 @@ fi
 
 
 mkTempDir() {
+    if test -n "$tmpPath"; then return; fi
     local i=0
     while true; do
         if test -z "$TMPDIR"; then TMPDIR=/tmp; fi
@@ -62,6 +63,27 @@ doDownload() {
     @curl@ $cacheFlags --fail -# --location --max-redirs 20 --disable-epsv \
         --cookie-jar $tmpPath/cookies "$url" -o $tmpFile
 }
+
+
+# Hack to support the mirror:// scheme from Nixpkgs.
+if test "${url:0:9}" = "mirror://"; then
+    if test -z "$NIXPKGS_ALL"; then
+        echo "Resolving mirror:// URLs requires Nixpkgs.  Please point \$NIXPKGS_ALL at a Nixpkgs tree." >&2
+        exit 1
+    fi
+
+    mkTempDir
+    nix-build "$NIXPKGS_ALL" -A resolveMirrorURLs --argstr url "$url" -o $tmpPath/urls > /dev/null
+
+    expanded=($(cat $tmpPath/urls))
+    if test "${#expanded[*]}" = 0; then
+        echo "$0: cannot resolve $url." >&2
+        exit 1
+    fi
+
+    echo "$url expands to ${expanded[*]} (using ${expanded[0]})" >&2
+    url="${expanded[0]}"
+fi
 
 
 # If we don't know the hash or a file with that hash doesn't exist,
