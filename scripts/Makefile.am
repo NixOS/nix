@@ -5,7 +5,8 @@ bin_SCRIPTS = nix-collect-garbage \
   nix-copy-closure 
 
 noinst_SCRIPTS = nix-profile.sh generate-patches.pl \
-  find-runtime-roots.pl build-remote.pl nix-reduce-build
+  find-runtime-roots.pl build-remote.pl nix-reduce-build \
+  copy-from-other-stores.pl
 
 nix-pull nix-push: readmanifest.pm readconfig.pm download-using-manifests.pl
 
