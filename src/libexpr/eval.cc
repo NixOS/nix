@@ -48,6 +48,11 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
     throw EvalError(format(s) % s2);
 }
 
+LocalNoInlineNoReturn(void throwTypeError(const char * s))
+{
+    throw TypeError(s);
+}
+
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s2))
 {
     throw TypeError(format(s) % s2);
@@ -305,9 +310,11 @@ string coerceToString(EvalState & state, Expr e, PathSet & context,
     }
         
     ATermList es;
-    if (matchAttrs(e, es))
-        return coerceToString(state, makeSelect(e, toATerm("outPath")),
-            context, coerceMore, copyToStore);
+    if (matchAttrs(e, es)) {
+        Expr e2 = queryAttr(e, "outPath");
+        if (!e2) throwTypeError("cannot coerce an attribute set (except a derivation) to a string");
+        return coerceToString(state, e2, context, coerceMore, copyToStore);
+    }
 
     if (coerceMore) {
 
