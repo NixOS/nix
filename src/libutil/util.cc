@@ -579,7 +579,14 @@ AutoCloseFD::AutoCloseFD(int fd)
 
 AutoCloseFD::AutoCloseFD(const AutoCloseFD & fd)
 {
-    abort();
+    /* Copying a AutoCloseFD isn't allowed (who should get to close
+       it?).  But as a edge case, allow copying of closed
+       AutoCloseFDs.  This is necessary due to tiresome reasons
+       involving copy constructor use on default object values in STL
+       containers (like when you do `map[value]' where value isn't in
+       the map yet). */
+    this->fd = fd.fd;
+    if (this->fd != -1) abort();
 }
 
 
@@ -832,7 +839,7 @@ string runProgram(Path program, bool searchPath, const Strings & args)
             pipe.readSide.close();
 
             if (dup2(pipe.writeSide, STDOUT_FILENO) == -1)
-                throw SysError("dupping from-hook write side");
+                throw SysError("dupping stdout");
 
             std::vector<const char *> cargs; /* careful with c_str()! */
             cargs.push_back(program.c_str());
@@ -865,6 +872,17 @@ string runProgram(Path program, bool searchPath, const Strings & args)
             % program % statusToString(status));
 
     return result;
+}
+
+
+void closeMostFDs(const set<int> & exceptions)
+{
+    int maxFD = 0;
+    maxFD = sysconf(_SC_OPEN_MAX);
+    for (int fd = 0; fd < maxFD; ++fd)
+        if (fd != STDIN_FILENO && fd != STDOUT_FILENO && fd != STDERR_FILENO
+            && exceptions.find(fd) == exceptions.end())
+            close(fd); /* ignore result */
 }
 
 

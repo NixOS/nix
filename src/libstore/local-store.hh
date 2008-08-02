@@ -3,6 +3,8 @@
 
 #include <string>
 
+#include <ext/stdio_filebuf.h>
+
 #include "store-api.hh"
 #include "util.hh"
 
@@ -34,11 +36,26 @@ struct OptimiseStats
 };
 
 
+typedef __gnu_cxx::stdio_filebuf<char> stdio_filebuf;
+
+
+struct RunningSubstituter
+{
+    Pid pid;
+    boost::shared_ptr<stdio_filebuf> toBuf, fromBuf;
+    boost::shared_ptr<std::ostream> to;
+    boost::shared_ptr<std::istream> from;
+};
+
+
 class LocalStore : public StoreAPI
 {
 private:
     bool substitutablePathsLoaded;
     PathSet substitutablePaths;
+
+    typedef std::map<Path, RunningSubstituter> RunningSubstituters;
+    RunningSubstituters runningSubstituters;
     
 public:
 
@@ -65,6 +82,9 @@ public:
     PathSet querySubstitutablePaths();
     
     bool hasSubstitutes(const Path & path);
+
+    bool querySubstitutablePathInfo(const Path & path,
+        SubstitutablePathInfo & info);
     
     Path addToStore(const Path & srcPath, bool fixed = false,
         bool recursive = false, string hashAlgo = "",
@@ -147,6 +167,9 @@ private:
     void tryToDelete(const GCOptions & options, GCResults & results,
         const PathSet & livePaths, const PathSet & tempRootsClosed, PathSet & done, 
         const Path & path);
+
+    void startSubstituter(const Path & substituter,
+        RunningSubstituter & runningSubstituter);
 };
 
 

@@ -83,6 +83,13 @@ LocalStore::~LocalStore()
 {
     try {
         flushDelayedUpdates();
+
+        foreach (RunningSubstituters::iterator, i, runningSubstituters) {
+            i->second.toBuf.reset();
+            i->second.to.reset();
+            i->second.pid.wait(true);
+        }
+                
     } catch (...) {
         ignoreException();
     }
@@ -367,8 +374,6 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
     std::map<Path, ValidPathInfo>::iterator lookup = pathInfoCache.find(path);
     if (lookup != pathInfoCache.end()) return lookup->second;
     
-    //printMsg(lvlError, "queryPathInfo: " + path);
-    
     /* Read the info file. */
     Path infoFile = infoFileFor(path);
     if (!pathExists(infoFile))
@@ -467,33 +472,105 @@ Path LocalStore::queryDeriver(const Path & path)
 }
 
 
-PathSet LocalStore::querySubstitutablePaths()
+void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter & run)
 {
-    if (!substitutablePathsLoaded) {
-        for (Paths::iterator i = substituters.begin(); i != substituters.end(); ++i) {
-            debug(format("running `%1%' to find out substitutable paths") % *i);
-            Strings args;
-            args.push_back("--query-paths");
-            Strings ss = tokenizeString(runProgram(*i, false, args), "\n");
-            for (Strings::iterator j = ss.begin(); j != ss.end(); ++j) {
-                if (!isStorePath(*j))
-                    throw Error(format("`%1%' returned a bad substitutable path `%2%'")
-                        % *i % *j);
-                substitutablePaths.insert(*j);
-            }
+    if (run.pid != -1) return;
+    
+    debug(format("starting substituter program `%1%'") % substituter);
+
+    Pipe toPipe, fromPipe;
+            
+    toPipe.create();
+    fromPipe.create();
+
+    run.pid = fork();
+            
+    switch (run.pid) {
+
+    case -1:
+        throw SysError("unable to fork");
+
+    case 0: /* child */
+        try {
+            fromPipe.readSide.close();
+            toPipe.writeSide.close();
+            if (dup2(toPipe.readSide, STDIN_FILENO) == -1)
+                throw SysError("dupping stdin");
+            if (dup2(fromPipe.writeSide, STDOUT_FILENO) == -1)
+                throw SysError("dupping stdout");
+            closeMostFDs(set<int>());
+            execl(substituter.c_str(), substituter.c_str(), "--query", NULL);
+            throw SysError(format("executing `%1%'") % substituter);
+        } catch (std::exception & e) {
+            std::cerr << "error: " << e.what() << std::endl;
         }
-        substitutablePathsLoaded = true;
+        quickExit(1);
     }
 
-    return substitutablePaths;
+    /* Parent. */
+    
+    toPipe.readSide.close();
+    fromPipe.writeSide.close();
+
+    run.toBuf = boost::shared_ptr<stdio_filebuf>(new stdio_filebuf(toPipe.writeSide.borrow(), std::ios_base::out));
+    run.to = boost::shared_ptr<std::ostream>(new std::ostream(&*run.toBuf));
+
+    run.fromBuf = boost::shared_ptr<stdio_filebuf>(new stdio_filebuf(fromPipe.readSide.borrow(), std::ios_base::in));
+    run.from = boost::shared_ptr<std::istream>(new std::istream(&*run.fromBuf));
 }
 
 
 bool LocalStore::hasSubstitutes(const Path & path)
 {
-    if (!substitutablePathsLoaded)
-        querySubstitutablePaths(); 
-    return substitutablePaths.find(path) != substitutablePaths.end();
+    foreach (Paths::iterator, i, substituters) {
+        RunningSubstituter & run(runningSubstituters[*i]);
+        startSubstituter(*i, run);
+
+        *run.to << "have\n" << path << "\n" << std::flush;
+
+        string s;
+
+        int res;
+        getline(*run.from, s);
+        if (!string2Int(s, res)) abort();
+
+        if (res) return true;
+    }
+
+    return false;
+}
+
+
+bool LocalStore::querySubstitutablePathInfo(const Path & path,
+    SubstitutablePathInfo & info)
+{
+    foreach (Paths::iterator, i, substituters) {
+        RunningSubstituter & run(runningSubstituters[*i]);
+        startSubstituter(*i, run);
+
+        *run.to << "info\n" << path << "\n" << std::flush;
+
+        string s;
+
+        int res;
+        getline(*run.from, s);
+        if (!string2Int(s, res)) abort();
+
+        if (res) {
+            getline(*run.from, info.deriver);
+            int nrRefs;
+            getline(*run.from, s);
+            if (!string2Int(s, nrRefs)) abort();
+            while (nrRefs--) {
+                Path p; getline(*run.from, p);
+                info.references.insert(p);
+            }
+            info.downloadSize = 0;
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 

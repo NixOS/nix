@@ -17,13 +17,6 @@ GCOptions::GCOptions()
 }
 
 
-bool StoreAPI::hasSubstitutes(const Path & path)
-{
-    PathSet paths = querySubstitutablePaths();
-    return paths.find(path) != paths.end();
-}
-
-
 bool isInStore(const Path & path)
 {
     return path[0] == '/'

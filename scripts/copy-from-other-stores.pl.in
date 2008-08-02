@@ -2,6 +2,9 @@
 
 use strict;
 use File::Basename;
+use IO::Handle;
+
+STDOUT->autoflush(1);
 
 my @remoteStoresAll = split ':', ($ENV{"NIX_OTHER_STORES"} or "");
 
@@ -33,42 +36,46 @@ sub findStorePath {
 }
 
 
-if ($ARGV[0] eq "--query-paths") {
-    foreach my $store (@remoteStores) {
-        opendir DIR, "$store/var/nix/db/info" or next;
-        print "@storedir@/$_\n" foreach readdir DIR;
-        closedir DIR;
-    }
-}
+if ($ARGV[0] eq "--query") {
 
+    while (<STDIN>) {
+        my $cmd = $_; chomp $cmd;
 
-elsif ($ARGV[0] eq "--query-info") {
-    shift @ARGV;
-    
-    foreach my $storePath (@ARGV) {
-
-        (my $infoFile) = findStorePath $storePath;
-        next unless $infoFile;
-        
-        my $deriver = "";
-        my @references = ();
-
-        open INFO, "<$infoFile" or die "cannot read info file $infoFile\n";
-        while (<INFO>) {
-            chomp;
-            #print STDERR "GOT $_\n";
-            /^([\w-]+): (.*)$/ or die "bad info file";
-            my $key = $1;
-            my $value = $2;
-            if ($key eq "Deriver") { $deriver = $value; }
-            elsif ($key eq "References") { @references = split ' ', $value; }
+        if ($cmd eq "have") {
+            my $storePath = <STDIN>; chomp $storePath;
+            (my $infoFile) = findStorePath $storePath;
+            print STDOUT ($infoFile ? "1\n" : "0\n");
         }
-        close INFO;
 
-        print "$storePath\n";
-        print "$deriver\n";
-        print scalar @references, "\n";
-        print "$_\n" foreach @references;
+        elsif ($cmd eq "info") {
+            my $storePath = <STDIN>; chomp $storePath;
+            (my $infoFile) = findStorePath $storePath;
+            if (!$infoFile) {
+                print "0\n";
+                next; # not an error
+            }
+            print "1\n";
+
+            my $deriver = "";
+            my @references = ();
+
+            open INFO, "<$infoFile" or die "cannot read info file $infoFile\n";
+            while (<INFO>) {
+                chomp;
+                /^([\w-]+): (.*)$/ or die "bad info file";
+                my $key = $1;
+                my $value = $2;
+                if ($key eq "Deriver") { $deriver = $value; }
+                elsif ($key eq "References") { @references = split ' ', $value; }
+            }
+            close INFO;
+
+            print "$deriver\n";
+            print scalar @references, "\n";
+            print "$_\n" foreach @references;
+        }
+
+        else { die "unknown command `$cmd'"; }
     }
 }
 

@@ -37,9 +37,10 @@ public:
 
     Path queryDeriver(const Path & path);
     
-    PathSet querySubstitutablePaths();
-    
     bool hasSubstitutes(const Path & path);
+    
+    bool querySubstitutablePathInfo(const Path & path,
+        SubstitutablePathInfo & info);
     
     Path addToStore(const Path & srcPath, bool fixed = false,
         bool recursive = false, string hashAlgo = "",

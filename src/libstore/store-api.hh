@@ -88,6 +88,14 @@ struct GCResults
 };
 
 
+struct SubstitutablePathInfo
+{
+    Path deriver;
+    PathSet references;
+    unsigned long long downloadSize; /* 0 = unknown or inapplicable */
+};
+
+
 class StoreAPI 
 {
 public:
@@ -117,12 +125,13 @@ public:
        no deriver has been set. */
     virtual Path queryDeriver(const Path & path) = 0;
 
-    /* Query the set of substitutable paths. */
-    virtual PathSet querySubstitutablePaths() = 0;
+    /* Query whether a path has substitutes. */
+    virtual bool hasSubstitutes(const Path & path) = 0;
 
-    /* More efficient variant if we just want to know if a path has
-       substitutes. */
-    virtual bool hasSubstitutes(const Path & path);
+    /* Query the references, deriver and download size of a
+       substitutable path. */
+    virtual bool querySubstitutablePathInfo(const Path & path,
+        SubstitutablePathInfo & info) = 0;
     
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.

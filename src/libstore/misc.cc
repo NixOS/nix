@@ -1,5 +1,6 @@
 #include "misc.hh"
 #include "store-api.hh"
+#include "local-store.hh"
 
 #include <aterm2.h>
 
@@ -79,10 +80,13 @@ void queryMissing(const PathSet & targets,
 
         else {
             if (store->isValidPath(p)) continue;
-            if (store->hasSubstitutes(p))
+            SubstitutablePathInfo info;
+            if (dynamic_cast<LocalStore *>(store.get())->querySubstitutablePathInfo(p, info)) {
                 willSubstitute.insert(p);
-            // XXX call the substituters
-            // store->queryReferences(p, todo);
+                todo.insert(info.references.begin(), info.references.end());
+            }
+            /* Not substitutable and not buildable; should we flag
+               this? */
         }
     }
 }

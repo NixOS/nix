@@ -213,6 +213,13 @@ bool RemoteStore::hasSubstitutes(const Path & path)
 }
 
 
+bool RemoteStore::querySubstitutablePathInfo(const Path & path,
+    SubstitutablePathInfo & info)
+{
+    throw Error("not implemented");
+}
+
+
 Hash RemoteStore::queryPathHash(const Path & path)
 {
     writeInt(wopQueryPathHash, to);
@@ -253,12 +260,6 @@ Path RemoteStore::queryDeriver(const Path & path)
     Path drvPath = readString(from);
     if (drvPath != "") assertStorePath(drvPath);
     return drvPath;
-}
-
-
-PathSet RemoteStore::querySubstitutablePaths()
-{
-    throw Error("not implemented");
 }
 
 

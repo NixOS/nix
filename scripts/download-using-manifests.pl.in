@@ -5,18 +5,10 @@ use readmanifest;
 use POSIX qw(strftime);
 use File::Temp qw(tempdir);
 
+STDOUT->autoflush(1);
+
 my $manifestDir = "@localstatedir@/nix/manifests";
 my $logFile = "@localstatedir@/log/nix/downloads";
-
-
-# Create a temporary directory.
-my $tmpDir = tempdir("nix-download.XXXXXX", CLEANUP => 1, TMPDIR => 1)
-    or die "cannot create a temporary directory";
-
-chdir $tmpDir or die "cannot change to `$tmpDir': $!";
-
-my $tmpNar = "$tmpDir/nar";
-my $tmpNar2 = "$tmpDir/nar2";
 
 
 # Load all manifests.
@@ -25,7 +17,6 @@ my %localPaths;
 my %patches;
 
 for my $manifest (glob "$manifestDir/*.nixmanifest") {
-#    print STDERR "reading $manifest\n";
     if (readManifest($manifest, \%narFiles, \%localPaths, \%patches) < 3) {
         print STDERR "you have an old-style manifest `$manifest'; please delete it\n";
         exit 1;
@@ -35,34 +26,40 @@ for my $manifest (glob "$manifestDir/*.nixmanifest") {
 
 # Parse the arguments.
 
-if ($ARGV[0] eq "--query-paths") {
-    foreach my $storePath (keys %narFiles) { print "$storePath\n"; }
-    foreach my $storePath (keys %localPaths) { print "$storePath\n"; }
-    exit 0;
-}
+if ($ARGV[0] eq "--query") {
 
-elsif ($ARGV[0] eq "--query-info") {
-    shift @ARGV;
-    foreach my $storePath (@ARGV) {
-        my $info;
-        if (defined $narFiles{$storePath}) {
-            $info = @{$narFiles{$storePath}}[0];
+    while (<STDIN>) {
+        my $cmd = $_; chomp $cmd;
+
+        if ($cmd eq "have") {
+            my $storePath = <STDIN>; chomp $storePath;
+            print STDOUT ((defined $narFiles{$storePath} or defined $localPaths{$storePath})
+                ? "1\n" : "0\n");
         }
-        elsif (defined $localPaths{$storePath}) {
-            $info = @{$localPaths{$storePath}}[0];
+
+        elsif ($cmd eq "info") {
+            my $storePath = <STDIN>; chomp $storePath;
+            my $info;
+            if (defined $narFiles{$storePath}) {
+                $info = @{$narFiles{$storePath}}[0];
+            }
+            elsif (defined $localPaths{$storePath}) {
+                $info = @{$localPaths{$storePath}}[0];
+            }
+            else {
+                print "0\n";
+                next; # not an error
+            }
+            print "1\n";
+            print "$info->{deriver}\n";
+            my @references = split " ", $info->{references};
+            print scalar @references, "\n";
+            print "$_\n" foreach @references;
         }
-        else {
-            next; # not an error
-        }
-        print "$storePath\n";
-        print "$info->{deriver}\n";
-        my @references = split " ", $info->{references};
-        my $count = scalar @references;
-        print "$count\n";
-        foreach my $reference (@references) {
-            print "$reference\n";
-        }
+        
+        else { die "unknown command `$cmd'"; }
     }
+
     exit 0;
 }
 
@@ -73,6 +70,16 @@ elsif ($ARGV[0] ne "--substitute") {
 
 die unless scalar @ARGV == 2;
 my $targetPath = $ARGV[1];
+
+
+# Create a temporary directory.
+my $tmpDir = tempdir("nix-download.XXXXXX", CLEANUP => 1, TMPDIR => 1)
+    or die "cannot create a temporary directory";
+
+chdir $tmpDir or die "cannot change to `$tmpDir': $!";
+
+my $tmpNar = "$tmpDir/nar";
+my $tmpNar2 = "$tmpDir/nar2";
 
 
 open LOGFILE, ">>$logFile" or die "cannot open log file $logFile";
