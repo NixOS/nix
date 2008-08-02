@@ -20,6 +20,10 @@ if test -z "$1" || test "a--help" = "a$1" ; then
 	echo "nix-reduce-build /e.nix -- nix-daemon:// nix-self://" >&2
 	echo "  nix-daemon:// builds using daemon"
 	echo "  nix-self:// builds directly using nix-store from current installation" >&2
+	echo "  nix-daemon-fixed:// and nix-self-fixed:// do the same, but only for" >&2;
+	echo "derivations with specified output hash (sha256, sha1 or md5)." >&2
+	echo "  nix-daemon-substitute:// and nix-self-substitute:// try to substitute" >&2;
+	echo "maximum amount of paths" >&2;
 	exit;
 fi;
 
@@ -36,7 +40,10 @@ while read ; do
 			echo "$REPLY" >> paths; >&2
 			;;
 		*)
-			nix-instantiate "$REPLY" >> paths;
+			(
+				IFS=: ;
+				nix-instantiate $REPLY >> paths;
+			);
 			;;
 	esac;
 done < initial;
@@ -105,6 +112,30 @@ for i in "$@"; do
 		cat derivers-closure | while read; do 
 			echo "Realising $REPLY using direct Nix build" >&2
 			NIX_REMOTE= @bindir@/nix-store -r "${REPLY}"
+		done;
+	elif [ "$i" = "nix-daemon-fixed://" ] ; then
+		cat derivers-closure | while read; do 
+			if egrep '"(md5|sha1|sha256)"' "$REPLY" &>/dev/null; then
+				echo "Realising $REPLY using nix-daemon" >&2
+				NIX_REMOTE=daemon @bindir@/nix-store -r "${REPLY}"
+			fi;
+		done;
+	elif [ "$i" = "nix-self-fixed://" ] ; then
+		cat derivers-closure | while read; do 
+			if egrep '"(md5|sha1|sha256)"' "$REPLY" &>/dev/null; then
+				echo "Realising $REPLY using direct Nix build" >&2
+				NIX_REMOTE= @bindir@/nix-store -r "${REPLY}"
+			fi;
+		done;
+	elif [ "$i" = "nix-daemon-substitute://" ] ; then
+		cat needed-paths | while read ; do 
+			echo "Substituting $REPLY using nix-daemon" >&2
+			NIX_REMOTE=daemon @bindir@/nix-store -r "${NIX_STORE_DIR:-/nix/store}/${REPLY##*/}"
+		done;
+	elif [ "$i" = "nix-self-substitute://" ] ; then
+		cat needed-paths | while read ; do 
+			echo "Substituting $REPLY using direct Nix build" >&2
+			NIX_REMOTE= @bindir@/nix-store -r "${NIX_STORE_DIR:-/nix/store}/${REPLY##*/}" 
 		done;
 	fi;
 	mv needed-paths wanted-paths;
