@@ -2187,11 +2187,31 @@ void SubstitutionGoal::init()
         return;
     }
 
-    if (!worker.store.querySubstitutablePathInfo(storePath, info)) {
+    subs = substituters;
+    
+    tryNext();
+}
+
+
+void SubstitutionGoal::tryNext()
+{
+    trace("trying next substituter");
+
+    if (subs.size() == 0) {
+        /* None left.  Terminate this goal and let someone else deal
+           with it. */
         printMsg(lvlError,
-            format("path `%1%' is required, but there is no substituter that knows anything about it")
+            format("path `%1%' is required, but there is no substituter that can build it")
             % storePath);
         amDone(ecFailed);
+        return;
+    }
+
+    sub = subs.front();
+    subs.pop_front();
+
+    if (!worker.store.querySubstitutablePathInfo(sub, storePath, info)) {
+        tryNext();
         return;
     }
 
@@ -2222,29 +2242,6 @@ void SubstitutionGoal::referencesValid()
     foreach (PathSet::iterator, i, info.references)
         if (*i != storePath) /* ignore self-references */
             assert(worker.store.isValidPath(*i));
-
-    subs = substituters;
-
-    tryNext();
-}
-
-
-void SubstitutionGoal::tryNext()
-{
-    trace("trying next substituter");
-
-    if (subs.size() == 0) {
-        /* None left.  Terminate this goal and let someone else deal
-           with it. */
-        printMsg(lvlError,
-            format("path `%1%' is required, but there is no substituter that can build it")
-            % storePath);
-        amDone(ecFailed);
-        return;
-    }
-
-    sub = subs.front();
-    subs.pop_front();
 
     state = &SubstitutionGoal::tryToRun;
     worker.waitForBuildSlot(shared_from_this());

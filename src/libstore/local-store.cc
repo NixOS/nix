@@ -541,38 +541,44 @@ bool LocalStore::hasSubstitutes(const Path & path)
 }
 
 
+bool LocalStore::querySubstitutablePathInfo(const Path & substituter,
+    const Path & path, SubstitutablePathInfo & info)
+{
+    RunningSubstituter & run(runningSubstituters[substituter]);
+    startSubstituter(substituter, run);
+
+    *run.to << "info\n" << path << "\n" << std::flush;
+        
+    string s;
+
+    int res;
+    getline(*run.from, s);
+    if (!string2Int(s, res)) abort();
+
+    if (!res) return false;
+    
+    getline(*run.from, info.deriver);
+    int nrRefs;
+    getline(*run.from, s);
+    if (!string2Int(s, nrRefs)) abort();
+    while (nrRefs--) {
+        Path p; getline(*run.from, p);
+        info.references.insert(p);
+    }
+    getline(*run.from, s);
+    long long size;
+    if (!string2Int(s, size)) abort();
+    info.downloadSize = size;
+    
+    return true;
+}
+
+
 bool LocalStore::querySubstitutablePathInfo(const Path & path,
     SubstitutablePathInfo & info)
 {
-    foreach (Paths::iterator, i, substituters) {
-        RunningSubstituter & run(runningSubstituters[*i]);
-        startSubstituter(*i, run);
-
-        *run.to << "info\n" << path << "\n" << std::flush;
-
-        string s;
-
-        int res;
-        getline(*run.from, s);
-        if (!string2Int(s, res)) abort();
-
-        if (res) {
-            getline(*run.from, info.deriver);
-            int nrRefs;
-            getline(*run.from, s);
-            if (!string2Int(s, nrRefs)) abort();
-            while (nrRefs--) {
-                Path p; getline(*run.from, p);
-                info.references.insert(p);
-            }
-            getline(*run.from, s);
-            long long size;
-            if (!string2Int(s, size)) abort();
-            info.downloadSize = size;
-            return true;
-        }
-    }
-    
+    foreach (Paths::iterator, i, substituters)
+        if (querySubstitutablePathInfo(*i, path, info)) return true;
     return false;
 }
 
