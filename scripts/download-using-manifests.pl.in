@@ -55,6 +55,8 @@ if ($ARGV[0] eq "--query") {
             my @references = split " ", $info->{references};
             print scalar @references, "\n";
             print "$_\n" foreach @references;
+            my $size = $info->{size} or 0;
+            print "$size\n";
         }
         
         else { die "unknown command `$cmd'"; }

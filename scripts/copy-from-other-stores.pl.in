@@ -73,6 +73,7 @@ if ($ARGV[0] eq "--query") {
             print "$deriver\n";
             print scalar @references, "\n";
             print "$_\n" foreach @references;
+            print "0\n"; # !!! showing size not supported (yet)
         }
 
         else { die "unknown command `$cmd'"; }
