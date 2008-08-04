@@ -215,8 +215,34 @@ static DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
 }
 
 
-static void createUserEnv(EvalState & state, const DrvInfos & elems,
-    const Path & profile, bool keepDerivations)
+/* Ensure exclusive access to a profile.  Any command that modifies
+   the profile first acquires this lock. */
+static void lockProfile(PathLocks & lock, const Path & profile)
+{
+    lock.lockPaths(singleton<PathSet>(profile),
+        (format("waiting for lock on profile `%1%'") % profile).str());
+    lock.setDeletion(true);
+}
+
+
+/* Optimistic locking is used by long-running operations like `nix-env
+   -i'.  Instead of acquiring the exclusive lock for the entire
+   duration of the operation, we just perform the operation
+   optimistically (without an exclusive lock), and check at the end
+   whether the profile changed while we were busy (i.e., the symlink
+   target changed).  If so, the operation is restarted.  Restarting is
+   generally cheap, since the build results are still in the Nix
+   store.  Most of the time, only the user environment has to be
+   rebuilt. */
+static string optimisticLockProfile(const Path & profile)
+{
+    return pathExists(profile) ? readLink(profile) : "";
+}
+
+
+static bool createUserEnv(EvalState & state, const DrvInfos & elems,
+    const Path & profile, bool keepDerivations,
+    const string & lockToken)
 {
     /* Build the components in the user environment, if they don't
        exist already. */
@@ -305,9 +331,20 @@ static void createUserEnv(EvalState & state, const DrvInfos & elems,
     store->buildDerivations(singleton<PathSet>(topLevelDrv.queryDrvPath(state)));
 
     /* Switch the current user environment to the output path. */
+    PathLocks lock;
+    lockProfile(lock, profile);
+
+    Path lockTokenCur = optimisticLockProfile(profile);
+    if (lockToken != lockTokenCur) {
+        printMsg(lvlError, format("profile `%1%' changed while we were busy; restarting") % profile);
+        return false;
+    }
+    
     debug(format("switching to new user environment"));
     Path generation = createGeneration(profile, topLevelDrv.queryOutPath(state));
     switchLink(profile, generation);
+
+    return true;
 }
 
 
@@ -544,14 +581,6 @@ static void printMissing(EvalState & state, const DrvInfos & elems)
 }
 
 
-static void lockProfile(PathLocks & lock, const Path & profile)
-{
-    lock.lockPaths(singleton<PathSet>(profile),
-        (format("waiting for lock on profile `%1%'") % profile).str());
-    lock.setDeletion(true);
-}
-
-
 static void installDerivations(Globals & globals,
     const Strings & args, const Path & profile)
 {
@@ -574,35 +603,35 @@ static void installDerivations(Globals & globals,
 
     /* Add in the already installed derivations, unless they have the
        same name as a to-be-installed element. */
-    PathLocks lock;
-    lockProfile(lock, profile);
-    DrvInfos installedElems = queryInstalled(globals.state, profile);
 
-    DrvInfos allElems(newElems);
-    for (DrvInfos::iterator i = installedElems.begin();
-         i != installedElems.end(); ++i)
-    {
-        DrvName drvName(i->name);
-        MetaInfo meta = i->queryMetaInfo(globals.state);
-        if (!globals.preserveInstalled &&
-            newNames.find(drvName.name) != newNames.end() &&
-            meta["keep"] != "true")
-            printMsg(lvlInfo,
-                format("replacing old `%1%'") % i->name);
-        else
-            allElems.push_back(*i);
+    while (true) {
+        string lockToken = optimisticLockProfile(profile);
+        
+        DrvInfos installedElems = queryInstalled(globals.state, profile);
+        
+        DrvInfos allElems(newElems);
+        foreach (DrvInfos::iterator, i, installedElems) {
+            DrvName drvName(i->name);
+            MetaInfo meta = i->queryMetaInfo(globals.state);
+            if (!globals.preserveInstalled &&
+                newNames.find(drvName.name) != newNames.end() &&
+                meta["keep"] != "true")
+                printMsg(lvlInfo,
+                    format("replacing old `%1%'") % i->name);
+            else
+                allElems.push_back(*i);
+        }
+
+        foreach (DrvInfos::iterator, i, newElems)
+            printMsg(lvlInfo, format("installing `%1%'") % i->name);
+    
+        printMissing(globals.state, newElems);
+    
+        if (globals.dryRun) return;
+
+        if (createUserEnv(globals.state, allElems,
+                profile, globals.keepDerivations, lockToken)) break;
     }
-
-    for (DrvInfos::iterator i = newElems.begin(); i != newElems.end(); ++i)
-        printMsg(lvlInfo,
-            format("installing `%1%'") % i->name);
-    
-    printMissing(globals.state, newElems);
-    
-    if (globals.dryRun) return;
-
-    createUserEnv(globals.state, allElems,
-        profile, globals.keepDerivations);
 }
 
 
@@ -634,77 +663,75 @@ static void upgradeDerivations(Globals & globals,
        for a derivation in the input Nix expression that has the same
        name and a higher version number. */
 
-    /* Load the currently installed derivations. */
-    PathLocks lock;
-    lockProfile(lock, globals.profile);
-    DrvInfos installedElems = queryInstalled(globals.state, globals.profile);
+    while (true) {
+        string lockToken = optimisticLockProfile(globals.profile);
+        
+        DrvInfos installedElems = queryInstalled(globals.state, globals.profile);
 
-    /* Fetch all derivations from the input file. */
-    DrvInfos availElems;
-    queryInstSources(globals.state, globals.instSource, args, availElems, false);
+        /* Fetch all derivations from the input file. */
+        DrvInfos availElems;
+        queryInstSources(globals.state, globals.instSource, args, availElems, false);
 
-    /* Go through all installed derivations. */
-    DrvInfos newElems;
-    for (DrvInfos::iterator i = installedElems.begin();
-         i != installedElems.end(); ++i)
-    {
-        DrvName drvName(i->name);
+        /* Go through all installed derivations. */
+        DrvInfos newElems;
+        foreach (DrvInfos::iterator, i, installedElems) {
+            DrvName drvName(i->name);
 
-        MetaInfo meta = i->queryMetaInfo(globals.state);
-        if (meta["keep"] == "true") {
-            newElems.push_back(*i);
-            continue;
-        }
+            MetaInfo meta = i->queryMetaInfo(globals.state);
+            if (meta["keep"] == "true") {
+                newElems.push_back(*i);
+                continue;
+            }
 
-        /* Find the derivation in the input Nix expression with the
-           same name that satisfies the version constraints specified
-           by upgradeType.  If there are multiple matches, take the
-           one with the highest priority.  If there are still multiple
-           matches, take the one with the highest version. */
-        DrvInfos::iterator bestElem = availElems.end();
-        DrvName bestName;
-        for (DrvInfos::iterator j = availElems.begin();
-             j != availElems.end(); ++j)
-        {
-            DrvName newName(j->name);
-            if (newName.name == drvName.name) {
-                int d = comparePriorities(globals.state, *i, *j);
-                if (d == 0) d = compareVersions(drvName.version, newName.version);
-                if (upgradeType == utLt && d < 0 ||
-                    upgradeType == utLeq && d <= 0 ||
-                    upgradeType == utEq && d == 0 ||
-                    upgradeType == utAlways)
-                {
-                    int d2 = -1;
-                    if (bestElem != availElems.end()) {
-                        d2 = comparePriorities(globals.state, *bestElem, *j);
-                        if (d2 == 0) d2 = compareVersions(bestName.version, newName.version);
-                    }
-                    if (d2 < 0) {
-                        bestElem = j;
-                        bestName = newName;
+            /* Find the derivation in the input Nix expression with
+               the same name that satisfies the version constraints
+               specified by upgradeType.  If there are multiple
+               matches, take the one with the highest priority.  If
+               there are still multiple matches, take the one with the
+               highest version. */
+            DrvInfos::iterator bestElem = availElems.end();
+            DrvName bestName;
+            foreach (DrvInfos::iterator, j, availElems) {
+                DrvName newName(j->name);
+                if (newName.name == drvName.name) {
+                    int d = comparePriorities(globals.state, *i, *j);
+                    if (d == 0) d = compareVersions(drvName.version, newName.version);
+                    if (upgradeType == utLt && d < 0 ||
+                        upgradeType == utLeq && d <= 0 ||
+                        upgradeType == utEq && d == 0 ||
+                        upgradeType == utAlways)
+                    {
+                        int d2 = -1;
+                        if (bestElem != availElems.end()) {
+                            d2 = comparePriorities(globals.state, *bestElem, *j);
+                            if (d2 == 0) d2 = compareVersions(bestName.version, newName.version);
+                        }
+                        if (d2 < 0) {
+                            bestElem = j;
+                            bestName = newName;
+                        }
                     }
                 }
             }
-        }
 
-        if (bestElem != availElems.end() &&
-            i->queryOutPath(globals.state) !=
+            if (bestElem != availElems.end() &&
+                i->queryOutPath(globals.state) !=
                 bestElem->queryOutPath(globals.state))
-        {
-            printMsg(lvlInfo,
-                format("upgrading `%1%' to `%2%'")
-                % i->name % bestElem->name);
-            newElems.push_back(*bestElem);
-        } else newElems.push_back(*i);
-    }
+            {
+                printMsg(lvlInfo,
+                    format("upgrading `%1%' to `%2%'")
+                    % i->name % bestElem->name);
+                newElems.push_back(*bestElem);
+            } else newElems.push_back(*i);
+        }
     
-    printMissing(globals.state, newElems);
+        printMissing(globals.state, newElems);
     
-    if (globals.dryRun) return;
+        if (globals.dryRun) return;
 
-    createUserEnv(globals.state, newElems,
-        globals.profile, globals.keepDerivations);
+        if (createUserEnv(globals.state, newElems,
+                globals.profile, globals.keepDerivations, lockToken)) break;
+    }
 }
 
 
@@ -748,29 +775,27 @@ static void opSetFlag(Globals & globals,
     string flagValue = *arg++;
     DrvNames selectors = drvNamesFromArgs(Strings(arg, opArgs.end()));
 
-    /* Load the currently installed derivations. */
-    PathLocks lock;
-    lockProfile(lock, globals.profile);
-    DrvInfos installedElems = queryInstalled(globals.state, globals.profile);
+    while (true) {
+        string lockToken = optimisticLockProfile(globals.profile);
 
-    /* Update all matching derivations. */
-    for (DrvInfos::iterator i = installedElems.begin();
-         i != installedElems.end(); ++i)
-    {
-        DrvName drvName(i->name);
-        for (DrvNames::iterator j = selectors.begin();
-             j != selectors.end(); ++j)
-            if (j->matches(drvName)) {
-                printMsg(lvlInfo,
-                    format("setting flag on `%1%'") % i->name);
-                setMetaFlag(globals.state, *i, flagName, flagValue);
-                break;
-            }
+        DrvInfos installedElems = queryInstalled(globals.state, globals.profile);
+
+        /* Update all matching derivations. */
+        foreach (DrvInfos::iterator, i, installedElems) {
+            DrvName drvName(i->name);
+            foreach (DrvNames::iterator, j, selectors)
+                if (j->matches(drvName)) {
+                    printMsg(lvlInfo,
+                        format("setting flag on `%1%'") % i->name);
+                    setMetaFlag(globals.state, *i, flagName, flagValue);
+                    break;
+                }
+        }
+
+        /* Write the new user environment. */
+        if (createUserEnv(globals.state, installedElems,
+                globals.profile, globals.keepDerivations, lockToken)) break;
     }
-
-    /* Write the new user environment. */
-    createUserEnv(globals.state, installedElems,
-        globals.profile, globals.keepDerivations);
 }
 
 
@@ -812,33 +837,33 @@ static void opSet(Globals & globals,
 static void uninstallDerivations(Globals & globals, Strings & selectors,
     Path & profile)
 {
-    PathLocks lock;
-    lockProfile(lock, profile);
-    DrvInfos installedElems = queryInstalled(globals.state, profile);
-    DrvInfos newElems;
+    while (true) {
+        string lockToken = optimisticLockProfile(profile);
 
-    for (DrvInfos::iterator i = installedElems.begin();
-         i != installedElems.end(); ++i)
-    {
-        DrvName drvName(i->name);
-        bool found = false;
-        for (Strings::iterator j = selectors.begin(); j != selectors.end(); ++j)
-            /* !!! the repeated calls to followLinksToStorePath() are
-               expensive, should pre-compute them. */
-            if ((isPath(*j) && i->queryOutPath(globals.state) == followLinksToStorePath(*j))
-                || DrvName(*j).matches(drvName))
-            {
-                printMsg(lvlInfo, format("uninstalling `%1%'") % i->name);
-                found = true;
-                break;
-            }
-        if (!found) newElems.push_back(*i);
+        DrvInfos installedElems = queryInstalled(globals.state, profile);
+        DrvInfos newElems;
+
+        foreach (DrvInfos::iterator, i, installedElems) {
+            DrvName drvName(i->name);
+            bool found = false;
+            foreach (Strings::iterator, j, selectors)
+                /* !!! the repeated calls to followLinksToStorePath()
+                   are expensive, should pre-compute them. */
+                if ((isPath(*j) && i->queryOutPath(globals.state) == followLinksToStorePath(*j))
+                    || DrvName(*j).matches(drvName))
+                {
+                    printMsg(lvlInfo, format("uninstalling `%1%'") % i->name);
+                    found = true;
+                    break;
+                }
+            if (!found) newElems.push_back(*i);
+        }
+
+        if (globals.dryRun) return;
+
+        if (createUserEnv(globals.state, newElems,
+                profile, globals.keepDerivations, lockToken)) break;
     }
-
-    if (globals.dryRun) return;
-
-    createUserEnv(globals.state, newElems,
-        profile, globals.keepDerivations);
 }
 
 
