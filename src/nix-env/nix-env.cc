@@ -617,11 +617,10 @@ static void installDerivations(Globals & globals,
     for (DrvInfos::iterator i = newElems.begin(); i != newElems.end(); ++i)
         printMsg(lvlInfo,
             format("installing `%1%'") % i->name);
-        
-    if (globals.dryRun) {
-        printMissing(globals.state, newElems);
-        return;
-    }
+    
+    printMissing(globals.state, newElems);
+    
+    if (globals.dryRun) return;
 
     createUserEnv(globals.state, allElems,
         profile, globals.keepDerivations);
@@ -721,10 +720,9 @@ static void upgradeDerivations(Globals & globals,
         } else newElems.push_back(*i);
     }
     
-    if (globals.dryRun) {
-        printMissing(globals.state, newElems);
-        return;
-    }
+    printMissing(globals.state, newElems);
+    
+    if (globals.dryRun) return;
 
     createUserEnv(globals.state, newElems,
         globals.profile, globals.keepDerivations);
