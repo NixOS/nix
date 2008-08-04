@@ -791,10 +791,17 @@ static void opSet(Globals & globals,
     
     DrvInfo & drv(elems.front());
 
-    if (drv.queryDrvPath(globals.state) != "")
-        store->buildDerivations(singleton<PathSet>(drv.queryDrvPath(globals.state)));
-    else
+    if (drv.queryDrvPath(globals.state) != "") {
+        PathSet paths = singleton<PathSet>(drv.queryDrvPath(globals.state));
+        printMissing(paths);
+        if (globals.dryRun) return;
+        store->buildDerivations(paths);
+    }
+    else {
+        printMissing(singleton<PathSet>(drv.queryOutPath(globals.state)));
+        if (globals.dryRun) return;
         store->ensurePath(drv.queryOutPath(globals.state));
+    }
 
     debug(format("switching to new user environment"));
     Path generation = createGeneration(globals.profile, drv.queryOutPath(globals.state));
