@@ -33,6 +33,7 @@ typedef enum {
     wopQueryDeriver = 18,
     wopSetOptions = 19,
     wopCollectGarbage = 20,
+    wopQuerySubstitutablePathInfo = 21,
 } WorkerOp;
 
 

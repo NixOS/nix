@@ -430,7 +430,21 @@ static void performOp(unsigned int clientVersion,
         stopWork();
         break;
     }
-            
+
+    case wopQuerySubstitutablePathInfo: {
+        Path path = absPath(readString(from));
+        startWork();
+        SubstitutablePathInfo info;
+        bool res = store->querySubstitutablePathInfo(path, info);
+        stopWork();
+        writeInt(res ? 1 : 0, to);
+        if (res) {
+            writeString(info.deriver, to);
+            writeStringSet(info.references, to);
+            writeLongLong(info.downloadSize, to);
+        }
+        break;
+    }
             
     default:
         throw Error(format("invalid operation %1%") % op);
@@ -440,7 +454,7 @@ static void performOp(unsigned int clientVersion,
 
 static void processConnection()
 {
-    RemoveTempRoots removeTempRoots; /* unused variable - don't remove */
+    RemoveTempRoots removeTempRoots __attribute__((unused));
 
     canSendStderr = false;
     myPid = getpid();    

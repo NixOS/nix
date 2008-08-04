@@ -531,7 +531,7 @@ static void queryInstSources(EvalState & state,
 
 static void printMissing(EvalState & state, const DrvInfos & elems)
 {
-    PathSet targets, willBuild, willSubstitute;
+    PathSet targets, willBuild, willSubstitute, unknown;
     for (DrvInfos::const_iterator i = elems.begin(); i != elems.end(); ++i) {
         Path drvPath = i->queryDrvPath(state);
         if (drvPath != "")
@@ -540,17 +540,24 @@ static void printMissing(EvalState & state, const DrvInfos & elems)
             targets.insert(i->queryOutPath(state));
     }
 
-    queryMissing(targets, willBuild, willSubstitute);
+    queryMissing(targets, willBuild, willSubstitute, unknown);
 
     if (!willBuild.empty()) {
         printMsg(lvlInfo, format("the following derivations will be built:"));
-        for (PathSet::iterator i = willBuild.begin(); i != willBuild.end(); ++i)
+        foreach (PathSet::iterator, i, willBuild)
             printMsg(lvlInfo, format("  %1%") % *i);
     }
 
     if (!willSubstitute.empty()) {
-        printMsg(lvlInfo, format("the following paths will be substituted:"));
-        for (PathSet::iterator i = willSubstitute.begin(); i != willSubstitute.end(); ++i)
+        printMsg(lvlInfo, format("the following paths will be downloaded/copied:"));
+        foreach (PathSet::iterator, i, willSubstitute)
+            printMsg(lvlInfo, format("  %1%") % *i);
+    }
+
+    if (!unknown.empty()) {
+        printMsg(lvlInfo, format("don't know how to build the following paths%1%:")
+            % (readOnlyMode ? " (may be caused by read-only store access)" : ""));
+        foreach (PathSet::iterator, i, unknown)
             printMsg(lvlInfo, format("  %1%") % *i);
     }
 }

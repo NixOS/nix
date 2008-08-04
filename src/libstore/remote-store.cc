@@ -216,7 +216,16 @@ bool RemoteStore::hasSubstitutes(const Path & path)
 bool RemoteStore::querySubstitutablePathInfo(const Path & path,
     SubstitutablePathInfo & info)
 {
-    throw Error("not implemented");
+    writeInt(wopQuerySubstitutablePathInfo, to);
+    writeString(path, to);
+    processStderr();
+    unsigned int reply = readInt(from);
+    if (reply == 0) return false;
+    info.deriver = readString(from);
+    if (info.deriver != "") assertStorePath(info.deriver);
+    info.references = readStorePaths(from);
+    info.downloadSize = readLongLong(from);
+    return true;
 }
 
 

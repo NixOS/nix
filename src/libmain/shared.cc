@@ -217,7 +217,7 @@ static void initAndRun(int argc, char * * argv)
 
     /* Automatically clean up the temporary roots file when we
        exit. */
-    RemoveTempRoots removeTempRoots; /* unused variable - don't remove */
+    RemoveTempRoots removeTempRoots __attribute__((unused));
 
     /* Make sure that the database gets closed properly, even if
        terminate() is called (which happens sometimes due to bugs in

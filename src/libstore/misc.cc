@@ -46,7 +46,7 @@ Path findOutput(const Derivation & drv, string id)
 
 
 void queryMissing(const PathSet & targets,
-    PathSet & willBuild, PathSet & willSubstitute)
+    PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown)
 {
     PathSet todo(targets.begin(), targets.end()), done;
 
@@ -57,7 +57,10 @@ void queryMissing(const PathSet & targets,
         done.insert(p);
 
         if (isDerivation(p)) {
-            if (!store->isValidPath(p)) continue;
+            if (!store->isValidPath(p)) {
+                unknown.insert(p);
+                continue;
+            }
             Derivation drv = derivationFromPath(p);
 
             bool mustBuild = false;
@@ -81,12 +84,11 @@ void queryMissing(const PathSet & targets,
         else {
             if (store->isValidPath(p)) continue;
             SubstitutablePathInfo info;
-            if (dynamic_cast<LocalStore *>(store.get())->querySubstitutablePathInfo(p, info)) {
+            if (store->querySubstitutablePathInfo(p, info)) {
                 willSubstitute.insert(p);
                 todo.insert(info.references.begin(), info.references.end());
-            }
-            /* Not substitutable and not buildable; should we flag
-               this? */
+            } else
+                unknown.insert(p);
         }
     }
 }
