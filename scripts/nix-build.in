@@ -9,6 +9,8 @@ my $addOutLink = 1;
 my $outLink;
 my $drvLink;
 
+my $dryRun = 0;
+
 my @instArgs = ();
 my @buildArgs = ();
 my @exprs = ();
@@ -89,6 +91,11 @@ EOF
         push @buildArgs, ($arg, $ARGV[$n]);
     }
 
+    elsif ($arg eq "--dry-run") {
+        push @buildArgs, "--dry-run";
+        $dryRun = 1;
+    }
+    
     elsif (substr($arg, 0, 1) eq "-") {
         push @buildArgs, $arg;
     }
@@ -132,6 +139,8 @@ foreach my $expr (@exprs) {
         @buildArgs, @drvPaths;
     while (<OUTPATHS>) {chomp; push @outPaths, $_;}
     close OUTPATHS or exit 1;
+
+    next if $dryRun;
 
     foreach my $outPath (@outPaths) {
         my $target = readlink $outPath or die "cannot read symlink `$outPath'";
