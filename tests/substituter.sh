@@ -16,6 +16,7 @@ if test $1 = "--query"; then
             echo 1
             echo "" # deriver
             echo 0 # nr of refs
+            echo 0 # download size
         else
             echo "bad command $cmd"
             exit 1
