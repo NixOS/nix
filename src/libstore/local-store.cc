@@ -565,7 +565,10 @@ bool LocalStore::querySubstitutablePathInfo(const Path & path,
                 Path p; getline(*run.from, p);
                 info.references.insert(p);
             }
-            info.downloadSize = 0;
+            getline(*run.from, s);
+            long long size;
+            if (!string2Int(s, size)) abort();
+            info.downloadSize = size;
             return true;
         }
     }

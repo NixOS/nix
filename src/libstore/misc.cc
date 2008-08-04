@@ -46,8 +46,11 @@ Path findOutput(const Derivation & drv, string id)
 
 
 void queryMissing(const PathSet & targets,
-    PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown)
+    PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown,
+    unsigned long long & downloadSize)
 {
+    downloadSize = 0;
+    
     PathSet todo(targets.begin(), targets.end()), done;
 
     while (!todo.empty()) {
@@ -86,6 +89,7 @@ void queryMissing(const PathSet & targets,
             SubstitutablePathInfo info;
             if (store->querySubstitutablePathInfo(p, info)) {
                 willSubstitute.insert(p);
+                downloadSize += info.downloadSize;
                 todo.insert(info.references.begin(), info.references.end());
             } else
                 unknown.insert(p);

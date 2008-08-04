@@ -29,7 +29,8 @@ Path findOutput(const Derivation & drv, string id);
    derivations that will be built, and the set of output paths that
    will be substituted. */
 void queryMissing(const PathSet & targets,
-    PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown);
+    PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown,
+    unsigned long long & downloadSize);
 
 
 }

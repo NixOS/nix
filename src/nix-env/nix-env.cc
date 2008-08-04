@@ -540,7 +540,8 @@ static void printMissing(EvalState & state, const DrvInfos & elems)
             targets.insert(i->queryOutPath(state));
     }
 
-    queryMissing(targets, willBuild, willSubstitute, unknown);
+    unsigned long long downloadSize;
+    queryMissing(targets, willBuild, willSubstitute, unknown, downloadSize);
 
     if (!willBuild.empty()) {
         printMsg(lvlInfo, format("the following derivations will be built:"));
@@ -549,7 +550,8 @@ static void printMissing(EvalState & state, const DrvInfos & elems)
     }
 
     if (!willSubstitute.empty()) {
-        printMsg(lvlInfo, format("the following paths will be downloaded/copied:"));
+        printMsg(lvlInfo, format("the following paths will be downloaded/copied (%.2f MiB):") %
+            (downloadSize / (1024.0 * 1024.0)));
         foreach (PathSet::iterator, i, willSubstitute)
             printMsg(lvlInfo, format("  %1%") % *i);
     }
