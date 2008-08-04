@@ -26,6 +26,8 @@ namespace nix {
 Path makeRootName(const Path & gcRoot, int & counter);
 void printGCWarning();
 
+void printMissing(const PathSet & paths);
+
 unsigned long long getIntArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end);
 

@@ -4,6 +4,7 @@
 #include "globals.hh"
 #include "store-api.hh"
 #include "util.hh"
+#include "misc.hh"
 
 #include <iostream>
 #include <cctype>
@@ -46,6 +47,34 @@ void printGCWarning()
     warnOnce(haveWarned, 
         "you did not specify `--add-root'; "
         "the result might be removed by the garbage collector");
+}
+
+
+void printMissing(const PathSet & paths)
+{
+    unsigned long long downloadSize;
+    PathSet willBuild, willSubstitute, unknown;
+    queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize);
+
+    if (!willBuild.empty()) {
+        printMsg(lvlInfo, format("the following derivations will be built:"));
+        foreach (PathSet::iterator, i, willBuild)
+            printMsg(lvlInfo, format("  %1%") % *i);
+    }
+
+    if (!willSubstitute.empty()) {
+        printMsg(lvlInfo, format("the following paths will be downloaded/copied (%.2f MiB):") %
+            (downloadSize / (1024.0 * 1024.0)));
+        foreach (PathSet::iterator, i, willSubstitute)
+            printMsg(lvlInfo, format("  %1%") % *i);
+    }
+
+    if (!unknown.empty()) {
+        printMsg(lvlInfo, format("don't know how to build the following paths%1%:")
+            % (readOnlyMode ? " (may be caused by read-only store access)" : ""));
+        foreach (PathSet::iterator, i, unknown)
+            printMsg(lvlInfo, format("  %1%") % *i);
+    }
 }
 
 

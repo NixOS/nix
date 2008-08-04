@@ -77,23 +77,26 @@ static Path realisePath(const Path & path)
 /* Realise the given paths. */
 static void opRealise(Strings opFlags, Strings opArgs)
 {
-    if (!opFlags.empty()) throw UsageError("unknown flag");
+    bool dryRun = false;
+    
+    foreach (Strings::iterator, i, opFlags)
+        if (*i == "--dry-run") dryRun = true;
+        else throw UsageError(format("unknown flag `%1%'") % *i);
 
-    for (Strings::iterator i = opArgs.begin();
-         i != opArgs.end(); ++i)
+    foreach (Strings::iterator, i, opArgs)
         *i = followLinksToStorePath(*i);
             
-    if (opArgs.size() > 1) {
-        PathSet drvPaths;
-        for (Strings::iterator i = opArgs.begin();
-             i != opArgs.end(); ++i)
-            if (isDerivation(*i))
-                drvPaths.insert(*i);
-        store->buildDerivations(drvPaths);
-    }
+    printMissing(PathSet(opArgs.begin(), opArgs.end()));
+    
+    if (dryRun) return;
+    
+    /* Build all derivations at the same time to exploit parallelism. */
+    PathSet drvPaths;
+    foreach (Strings::iterator, i, opArgs)
+        if (isDerivation(*i)) drvPaths.insert(*i);
+    store->buildDerivations(drvPaths);
 
-    for (Strings::iterator i = opArgs.begin();
-         i != opArgs.end(); ++i)
+    foreach (Strings::iterator, i,opArgs)
         cout << format("%1%\n") % realisePath(*i);
 }
 
