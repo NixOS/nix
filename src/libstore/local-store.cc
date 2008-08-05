@@ -520,6 +520,16 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
 }
 
 
+template<class T> T getIntLine(std::istream & str)
+{
+    string s;
+    T res;
+    getline(str, s);
+    if (!str || !string2Int(s, res)) throw Error("integer expected from stream");
+    return res;
+}
+
+
 bool LocalStore::hasSubstitutes(const Path & path)
 {
     foreach (Paths::iterator, i, substituters) {
@@ -528,13 +538,7 @@ bool LocalStore::hasSubstitutes(const Path & path)
 
         *run.to << "have\n" << path << "\n" << std::flush;
 
-        string s;
-
-        int res;
-        getline(*run.from, s);
-        if (!string2Int(s, res)) abort();
-
-        if (res) return true;
+        if (getIntLine<int>(*run.from)) return true;
     }
 
     return false;
@@ -549,26 +553,17 @@ bool LocalStore::querySubstitutablePathInfo(const Path & substituter,
 
     *run.to << "info\n" << path << "\n" << std::flush;
         
-    string s;
-
-    int res;
-    getline(*run.from, s);
-    if (!string2Int(s, res)) abort();
-
-    if (!res) return false;
+    if (!getIntLine<int>(*run.from)) return false;
     
     getline(*run.from, info.deriver);
-    int nrRefs;
-    getline(*run.from, s);
-    if (!string2Int(s, nrRefs)) abort();
+    if (info.deriver != "") assertStorePath(info.deriver);
+    int nrRefs = getIntLine<int>(*run.from);
     while (nrRefs--) {
         Path p; getline(*run.from, p);
+        assertStorePath(p);
         info.references.insert(p);
     }
-    getline(*run.from, s);
-    long long size;
-    if (!string2Int(s, size)) abort();
-    info.downloadSize = size;
+    info.downloadSize = getIntLine<long long>(*run.from);
     
     return true;
 }
