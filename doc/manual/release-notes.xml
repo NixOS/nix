@@ -14,6 +14,9 @@
 
   <listitem><para>TODO: Berkeley DB no longer needed.</para></listitem>
 
+  <listitem><para>New substituter to copy from remotely mounted Nix
+  stores (TODO: document).</para></listitem>
+
   <listitem><para><command>nix-store --dump-db / --load-db</command>.</para></listitem>
 
   <listitem><para>New primops:
@@ -24,6 +27,25 @@
   <varname>builtins.sub</varname>,
   <varname>builtins.genericClosure</varname>.
   </para></listitem>
+
+  <listitem><para>GC options: <option>--max-freed</option>,
+  <option>--max-links</option>.</para></listitem>
+
+  <listitem><para>TODO: Optimistic profile locking.</para></listitem>
+
+  <listitem><para>The option <option>--dry-run</option> is now
+  supported by <command>nix-store -r</command> and
+  <command>nix-build</command>.</para></listitem>
+
+  <listitem><para>The information previously shown by
+  <option>--dry-run</option> (i.e., which derivations will be built
+  and which paths will be substituted) is now always shown by
+  <command>nix-env</command>, <command>nix-store -r</command> and
+  <command>nix-build</command>.  The total download size of
+  substitutable paths is now also shown.</para></listitem>
+
+  <listitem><para><command>nix-prefetch-url</command> now supports
+  <literal>mirror://</literal> URLs.</para></listitem>
 
 </itemizedlist>
 
