@@ -24,6 +24,9 @@ if test -z "$1" || test "a--help" = "a$1" ; then
 	echo "derivations with specified output hash (sha256, sha1 or md5)." >&2
 	echo "  nix-daemon-substitute:// and nix-self-substitute:// try to substitute" >&2;
 	echo "maximum amount of paths" >&2;
+	echo "  nix-daemon-build:// and nix-self-build:// try to build (not substitute)" >&2;
+	echo "maximum amount of paths" >&2;
+	echo "        If no package sources are specified, required paths are listed." >&2;
 	exit;
 fi;
 
@@ -71,9 +74,36 @@ echo Prepared $(cat wanted-paths | wc -l) paths to get. >&2
 cat wanted-paths | xargs nix-store --check-validity --print-invalid > needed-paths;
 echo We need $(cat needed-paths | wc -l) paths. >&2
 
+egrep '[.]drv$' derivers-closure > critical-derivers;
+
 if test -z "$1" ; then
 	cat needed-paths;	
 fi;
+
+refresh_critical_derivers() {
+    echo "Finding needed derivers..." >&2;
+    cat critical-derivers | while read; do
+        if ! (nix-store --query --outputs "$REPLY" | xargs nix-store --check-validity &> /dev/null;); then
+            echo "$REPLY";
+        fi;
+    done > new-critical-derivers;
+    mv new-critical-derivers critical-derivers;
+    echo The needed paths are realized by $(cat critical-derivers | wc -l) derivers. >&2
+}
+
+build_here() {
+    cat critical-derivers | while read; do 
+        echo "Realising $REPLY using nix-daemon" >&2
+        @bindir@/nix-store -r "${REPLY}"
+    done;
+}
+
+try_to_substitute(){
+    cat needed-paths | while read ; do 
+        echo "Building $REPLY using nix-daemon" >&2
+        @bindir@/nix-store -r "${NIX_STORE_DIR:-/nix/store}/${REPLY##*/}"
+    done;
+}
 
 for i in "$@"; do 
 	sshHost="${i#ssh://}";
@@ -96,47 +126,41 @@ for i in "$@"; do
 			gunzip < "$filePath/${REPLY##*/}".nar.gz | nix-store --import;
 		done;
 	elif [ "$i" = "nix-daemon://" ] ; then
-		cat needed-paths | while read ; do 
-			echo "Building $REPLY using nix-daemon" >&2
-			NIX_REMOTE=daemon @bindir@/nix-store -r "${NIX_STORE_DIR:-/nix/store}/${REPLY##*/}"
-		done;
-		cat derivers-closure | while read; do 
-			echo "Realising $REPLY using nix-daemon" >&2
-			NIX_REMOTE=daemon @bindir@/nix-store -r "${REPLY}"
-		done;
+		NIX_REMOTE=daemon try_to_substitute;
+		refresh_critical_derivers;
+		NIX_REMOTE=daemon build_here;
 	elif [ "$i" = "nix-self://" ] ; then
-		cat needed-paths | while read ; do 
-			echo "Building $REPLY using direct Nix build" >&2
-			NIX_REMOTE= @bindir@/nix-store -r "${NIX_STORE_DIR:-/nix/store}/${REPLY##*/}" 
-		done;
-		cat derivers-closure | while read; do 
-			echo "Realising $REPLY using direct Nix build" >&2
-			NIX_REMOTE= @bindir@/nix-store -r "${REPLY}"
-		done;
+		NIX_REMOTE= try_to_substitute;
+		refresh_critical_derivers;
+		NIX_REMOTE= build_here;
 	elif [ "$i" = "nix-daemon-fixed://" ] ; then
-		cat derivers-closure | while read; do 
+		refresh_critical_derivers;
+
+		cat critical-derivers | while read; do 
 			if egrep '"(md5|sha1|sha256)"' "$REPLY" &>/dev/null; then
 				echo "Realising $REPLY using nix-daemon" >&2
 				NIX_REMOTE=daemon @bindir@/nix-store -r "${REPLY}"
 			fi;
 		done;
 	elif [ "$i" = "nix-self-fixed://" ] ; then
-		cat derivers-closure | while read; do 
+		refresh_critical_derivers;
+
+		cat critical-derivers | while read; do 
 			if egrep '"(md5|sha1|sha256)"' "$REPLY" &>/dev/null; then
 				echo "Realising $REPLY using direct Nix build" >&2
 				NIX_REMOTE= @bindir@/nix-store -r "${REPLY}"
 			fi;
 		done;
 	elif [ "$i" = "nix-daemon-substitute://" ] ; then
-		cat needed-paths | while read ; do 
-			echo "Substituting $REPLY using nix-daemon" >&2
-			NIX_REMOTE=daemon @bindir@/nix-store -r "${NIX_STORE_DIR:-/nix/store}/${REPLY##*/}"
-		done;
+		NIX_REMOTE=daemon try_to_substitute;
 	elif [ "$i" = "nix-self-substitute://" ] ; then
-		cat needed-paths | while read ; do 
-			echo "Substituting $REPLY using direct Nix build" >&2
-			NIX_REMOTE= @bindir@/nix-store -r "${NIX_STORE_DIR:-/nix/store}/${REPLY##*/}" 
-		done;
+		NIX_REMOTE= try_to_substitute;
+	elif [ "$i" = "nix-daemon-build://" ] ; then
+		refresh_critical_derivers;
+		NIX_REMOTE=daemon build_here;
+	elif [ "$i" = "nix-self-build://" ] ; then
+		refresh_critical_derivers;
+		NIX_REMOTE= build_here;
 	fi;
 	mv needed-paths wanted-paths;
 	cat wanted-paths | xargs nix-store --check-validity --print-invalid > needed-paths;
