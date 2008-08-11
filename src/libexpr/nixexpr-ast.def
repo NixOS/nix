@@ -76,10 +76,7 @@ Inherit | Expr ATermList Pos | ATerm |
 
 Scope | | Expr |
 
-Formal | string ValidValues DefaultValue | ATerm |
-
-ValidValues | ATermList | ValidValues |
-UnrestrictedValues | | ValidValues |
+Formal | string DefaultValue | ATerm |
 
 DefaultValue | Expr | DefaultValue |
 NoDefaultValue | | DefaultValue |

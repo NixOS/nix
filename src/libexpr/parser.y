@@ -354,9 +354,8 @@ formals
   ;
 
 formal
-  : ID { $$ = makeFormal($1, makeUnrestrictedValues(), makeNoDefaultValue()); }
-  | ID ':' '[' expr_list ']' { $$ = makeFormal($1, makeValidValues($4), makeNoDefaultValue()); }
-  | ID '?' expr { $$ = makeFormal($1, makeUnrestrictedValues(), makeDefaultValue($3)); }
+  : ID { $$ = makeFormal($1, makeNoDefaultValue()); }
+  | ID '?' expr { $$ = makeFormal($1, makeDefaultValue($3)); }
   ;
   
 %%
@@ -396,8 +395,8 @@ static void checkAttrSets(ATerm e)
         ATermMap names(ATgetLength(formals));
         for (ATermIterator i(formals); i; ++i) {
             ATerm name;
-            ATerm d1, d2;
-            if (!matchFormal(*i, name, d1, d2)) abort();
+            ATerm d1;
+            if (!matchFormal(*i, name, d1)) abort();
             if (names.get(name))
                 throw EvalError(format("duplicate formal function argument `%1%' at %2%")
                     % aterm2String(name) % showPos(pos));

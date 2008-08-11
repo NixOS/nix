@@ -113,17 +113,9 @@ static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
         XMLOpenElement _(doc, "function");
         
         for (ATermIterator i(formals); i; ++i) {
-            Expr name; ValidValues valids; ATerm dummy;
-            if (!matchFormal(*i, name, valids, dummy)) abort();
+            Expr name; ATerm dummy;
+            if (!matchFormal(*i, name, dummy)) abort();
             XMLOpenElement _(doc, "arg", singletonAttrs("name", aterm2String(name)));
-
-            ATermList valids2;
-            if (matchValidValues(valids, valids2)) {
-                for (ATermIterator j(valids2); j; ++j) {
-                    XMLOpenElement _(doc, "value");
-                    printTermAsXML(*j, doc, context, drvsSeen);
-                }
-            }
         }
     }
 

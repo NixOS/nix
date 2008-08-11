@@ -8,6 +8,6 @@ rec {
 
   c = "foo" + "bar";
 
-  f = {z, x : ["a" "b" ("c" + "d")], y : [true false]}: if y then x else z;
+  f = {z, x, y}: if y then x else z;
 
 }

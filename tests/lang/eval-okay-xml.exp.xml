@@ -15,23 +15,8 @@
         <arg name="z">
         </arg>
         <arg name="x">
-          <value>
-            <string value="a" />
-          </value>
-          <value>
-            <string value="b" />
-          </value>
-          <value>
-            <string value="cd" />
-          </value>
         </arg>
         <arg name="y">
-          <value>
-            <bool value="true" />
-          </value>
-          <value>
-            <bool value="false" />
-          </value>
         </arg>
       </function>
     </attr>

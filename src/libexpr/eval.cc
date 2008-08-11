@@ -92,9 +92,8 @@ static Expr substArgs(EvalState & state,
     ATermList recAttrs = ATempty;
     for (ATermIterator i(formals); i; ++i) {
         Expr name, def;
-        ValidValues valids2;
         DefaultValue def2;
-        if (!matchFormal(*i, name, valids2, def2)) abort(); /* can't happen */
+        if (!matchFormal(*i, name, def2)) abort(); /* can't happen */
 
         Expr value = subs[name];
         
@@ -105,21 +104,6 @@ static Expr substArgs(EvalState & state,
             value = def;
             defsUsed.push_back(name);
             recAttrs = ATinsert(recAttrs, makeBind(name, def, makeNoPos()));
-        }
-
-        ATermList valids;
-        if (matchValidValues(valids2, valids)) {
-            value = evalExpr(state, value);
-            bool found = false;
-            for (ATermIterator j(valids); j; ++j) {
-                Expr v = evalExpr(state, *j);
-                if (value == v) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) throw TypeError(format("the argument named `%1%' has an illegal value")
-                % aterm2String(name));            
         }
     }
 
@@ -139,8 +123,8 @@ static Expr substArgs(EvalState & state,
         /* One or more actual arguments were not declared as formal
            arguments.  Find out which. */
         for (ATermIterator i(formals); i; ++i) {
-            Expr name; ATerm d1, d2;
-            if (!matchFormal(*i, name, d1, d2)) abort();
+            Expr name; ATerm d1;
+            if (!matchFormal(*i, name, d1)) abort();
             subs.remove(name);
         }
         throw TypeError(format("the function does not expect an argument named `%1%'")
@@ -393,8 +377,8 @@ Expr autoCallFunction(Expr e, const ATermMap & args)
         ATermMap actualArgs(ATgetLength(formals));
         
         for (ATermIterator i(formals); i; ++i) {
-            Expr name, def, value; ATerm values, def2;
-            if (!matchFormal(*i, name, values, def2)) abort();
+            Expr name, def, value; ATerm def2;
+            if (!matchFormal(*i, name, def2)) abort();
             if ((value = args.get(name)))
                 actualArgs.set(name, makeAttrRHS(value, makeNoPos()));
             else if (!matchDefaultValue(def2, def))
@@ -798,29 +782,6 @@ static Expr strictEvalExpr_(EvalState & state, Expr e, ATermMap & nfs)
         for (ATermIterator i(es); i; ++i)
             es2 = ATinsert(es2, strictEvalExpr(state, *i, nfs));
         return makeList(ATreverse(es2));
-    }
-    
-    ATermList formals;
-    ATerm body, pos;
-    if (matchFunction(e, formals, body, pos)) {
-        ATermList formals2 = ATempty;
-        
-        for (ATermIterator i(formals); i; ++i) {
-            Expr name; ValidValues valids; ATerm dummy;
-            if (!matchFormal(*i, name, valids, dummy)) abort();
-
-            ATermList valids2;
-            if (matchValidValues(valids, valids2)) {
-                ATermList valids3 = ATempty;
-                for (ATermIterator j(valids2); j; ++j)
-                    valids3 = ATinsert(valids3, strictEvalExpr(state, *j, nfs));
-                valids = makeValidValues(ATreverse(valids3));
-            }
-
-            formals2 = ATinsert(formals2, makeFormal(name, valids, dummy));
-        }
-        
-        return makeFunction(ATreverse(formals2), body, pos);
     }
     
     return e;
