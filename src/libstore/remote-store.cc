@@ -216,6 +216,7 @@ bool RemoteStore::hasSubstitutes(const Path & path)
 bool RemoteStore::querySubstitutablePathInfo(const Path & path,
     SubstitutablePathInfo & info)
 {
+    if (GET_PROTOCOL_MINOR(daemonVersion) < 3) return false;
     writeInt(wopQuerySubstitutablePathInfo, to);
     writeString(path, to);
     processStderr();
