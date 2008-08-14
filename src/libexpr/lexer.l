@@ -95,6 +95,7 @@ let         { return LET; }
 in          { return IN; }
 rec         { return REC; }
 inherit     { return INHERIT; }
+\.\.\.      { return ELLIPSIS; }
 
 \=\=        { return EQ; }
 \!\=        { return NEQ; }

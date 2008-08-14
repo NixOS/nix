@@ -66,7 +66,7 @@ PrimOp | int ATermBlob ATermList | Expr |
 Attrs | ATermList | Expr |
 Closed | Expr | Expr |
 Rec | ATermList ATermList | Expr |
-Bool | ATerm | Expr |
+Bool | ATermBool | Expr |
 Null | | Expr |
 
 Bind | string Expr Pos | ATerm |
@@ -76,7 +76,7 @@ Inherit | Expr ATermList Pos | ATerm |
 Scope | | Expr |
 
 VarPat | string | Pattern |
-AttrsPat | ATermList | Pattern |
+AttrsPat | ATermList ATermBool | Pattern | # bool = `...'
 AtPat | Pattern Pattern | Pattern |
 
 Formal | string DefaultValue | ATerm |
@@ -84,8 +84,8 @@ Formal | string DefaultValue | ATerm |
 DefaultValue | Expr | DefaultValue |
 NoDefaultValue | | DefaultValue |
 
-True | | ATerm |
-False | | ATerm |
+True | | ATermBool |
+False | | ATermBool |
 
 PrimOpDef | int ATermBlob | ATerm |
 

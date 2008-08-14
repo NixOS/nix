@@ -14,4 +14,6 @@ rec {
 
   at = args@{x, y, z}: x;
 
+  ellipsis = {x, y, z, ...}: x;
+
 }

@@ -22,6 +22,16 @@
     <attr name="c">
       <string value="foobar" />
     </attr>
+    <attr name="ellipsis">
+      <function>
+        <attrspat>
+          <attr name="x" />
+          <attr name="y" />
+          <attr name="z" />
+          <ellipsis />
+        </attrspat>
+      </function>
+    </attr>
     <attr name="f">
       <function>
         <attrspat>

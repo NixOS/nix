@@ -45,15 +45,17 @@ static void printPatternAsXML(Pattern pat, XMLWriter & doc)
     ATerm name;
     ATermList formals;
     Pattern pat1, pat2;
+    ATermBool ellipsis;
     if (matchVarPat(pat, name))
         doc.writeEmptyElement("varpat", singletonAttrs("name", aterm2String(name)));
-    else if (matchAttrsPat(pat, formals)) {
+    else if (matchAttrsPat(pat, formals, ellipsis)) {
         XMLOpenElement _(doc, "attrspat");
         for (ATermIterator i(formals); i; ++i) {
             Expr name; ATerm dummy;
             if (!matchFormal(*i, name, dummy)) abort();
             doc.writeEmptyElement("attr", singletonAttrs("name", aterm2String(name)));
         }
+        if (ellipsis == eTrue) doc.writeEmptyElement("ellipsis");
     }
     else if (matchAtPat(pat, pat1, pat2)) {
         XMLOpenElement _(doc, "at");

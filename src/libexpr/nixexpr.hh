@@ -24,6 +24,7 @@ typedef ATerm Expr;
 typedef ATerm DefaultValue;
 typedef ATerm Pos;
 typedef ATerm Pattern;
+typedef ATerm ATermBool;
 
 
 /* A STL vector of ATerms.  Should be used with great care since it's

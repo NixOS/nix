@@ -84,11 +84,12 @@ static void patternMatch(EvalState & state,
     ATerm name;
     ATermList formals;
     Pattern pat1, pat2;
+    ATermBool ellipsis;
     
     if (matchVarPat(pat, name)) 
         subs.set(name, arg);
 
-    else if (matchAttrsPat(pat, formals)) {
+    else if (matchAttrsPat(pat, formals, ellipsis)) {
 
         arg = evalExpr(state, arg);
 
@@ -122,8 +123,8 @@ static void patternMatch(EvalState & state,
         }
 
         /* Check that each actual argument is listed as a formal
-           argument. */
-        if (attrsUsed != nrAttrs)
+           argument (unless the attribute match specifies a `...'). */
+        if (ellipsis == eFalse && attrsUsed != nrAttrs)
             throw TypeError(format("the function does not expect an argument named `%1%'")
                 % aterm2String(attrs.begin()->key));
     }
@@ -402,9 +403,10 @@ Expr autoCallFunction(Expr e, const ATermMap & args)
     Pattern pat;
     ATerm body, pos;
     ATermList formals;
-
+    ATermBool ellipsis;
+    
     /* !!! this should be more general */
-    if (matchFunction(e, pat, body, pos) && matchAttrsPat(pat, formals)) {
+    if (matchFunction(e, pat, body, pos) && matchAttrsPat(pat, formals, ellipsis)) {
         ATermMap actualArgs(ATgetLength(formals));
         
         for (ATermIterator i(formals); i; ++i) {
