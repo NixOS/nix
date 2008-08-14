@@ -211,7 +211,7 @@ static void freeAndUnprotect(void * p)
 }
 
 %type <t> start expr expr_function expr_if expr_op
-%type <t> expr_app expr_select expr_simple bind inheritsrc formal
+%type <t> expr_app expr_select expr_simple bind inheritsrc formal pattern
 %type <ts> binds ids expr_list formals string_parts ind_string_parts
 %token <t> ID INT STR IND_STR PATH URI
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL
@@ -236,10 +236,8 @@ start: expr { data->result = $1; };
 expr: expr_function;
 
 expr_function
-  : '{' formals '}' ':' expr_function
-    { $$ = makeFunction(makeAttrsPat($2), $5, CUR_POS); }
-  | ID ':' expr_function
-    { $$ = makeFunction(makeVarPat($1), $3, CUR_POS); }
+  : pattern ':' expr_function
+    { $$ = makeFunction($1, $3, CUR_POS); }
   | ASSERT expr ';' expr_function
     { $$ = makeAssert($2, $4, CUR_POS); }
   | WITH expr ';' expr_function
@@ -318,6 +316,11 @@ ind_string_parts
   : ind_string_parts IND_STR { $$ = ATinsert($1, $2); }
   | ind_string_parts DOLLAR_CURLY expr '}' { backToIndString(scanner); $$ = ATinsert($1, $3); }
   | { $$ = ATempty; }
+  ;
+
+pattern
+  : ID { $$ = makeVarPat($1); }
+  | '{' formals '}' { $$ = makeAttrsPat($2); }
   ;
 
 binds
