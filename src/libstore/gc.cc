@@ -638,10 +638,6 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         else
             tempRootsClosed.insert(*i);
 
-    /* For testing - see tests/gc-concurrent.sh. */
-    if (getenv("NIX_DEBUG_GC_WAIT"))
-        sleep(2);
-    
     /* After this point the set of roots or temporary roots cannot
        increase, since we hold locks on everything.  So everything
        that is not currently in in `livePaths' or `tempRootsClosed'

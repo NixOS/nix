@@ -1,5 +1,7 @@
 source common.sh
 
+$NIX_BIN_DIR/nix-collect-garbage -vvvvv
+
 drvPath1=$($nixinstantiate gc-concurrent.nix)
 outPath1=$($nixstore -q $drvPath1)
 
@@ -13,15 +15,13 @@ ln -s $drvPath2 "$NIX_STATE_DIR"/gcroots/foo
 $nixstore -rvv "$drvPath1" &
 pid1=$!
 
-# Start build #2 in the background after 3 seconds.
-(sleep 3 && $nixstore -rvv "$drvPath2") &
+# Start build #2 in the background after 6 seconds.
+(sleep 6 && $nixstore -rvv "$drvPath2") &
 pid2=$!
 
-# Run the garbage collector while the build is running.  Note: the GC
-# sleeps for *another* 2 seconds after acquiring the GC lock.  This
-# checks whether build #1
-sleep 2
-NIX_DEBUG_GC_WAIT=1 $NIX_BIN_DIR/nix-collect-garbage -vvvvv
+# Run the garbage collector while the build is running.
+sleep 4
+$NIX_BIN_DIR/nix-collect-garbage -vvvvv
 
 # Wait for build #1/#2 to finish.
 echo waiting for pid $pid1 to finish...
@@ -30,11 +30,13 @@ echo waiting for pid $pid2 to finish...
 wait $pid2
 
 # Check that the root of build #1 and its dependencies haven't been
-# deleted.
+# deleted.  The should not be deleted by the GC because they were
+# being built during the GC.
 cat $outPath1/foobar
 cat $outPath1/input-2/bar
 
-# Build #2 should have failed because its derivation got garbage collected.
+# Check that build #2 has succeeded.  It should succeed because the
+# derivation is a GC root.
 cat $outPath2/foobar
 
 rm "$NIX_STATE_DIR"/gcroots/foo
