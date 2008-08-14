@@ -200,7 +200,7 @@ LocalNoInline(ATerm expandRec(EvalState & state, ATerm e, ATermList rbnds, ATerm
     ATermMap overrides;
     if (eOverrides) {
         eOverrides = evalExpr(state, eOverrides);
-        queryAllAttrs(overrides, overrides, false);
+        queryAllAttrs(eOverrides, overrides, false);
         foreach (ATermMap::const_iterator, i, overrides)
             subs.set(i->key, i->value);
     }
