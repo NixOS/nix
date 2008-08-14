@@ -40,10 +40,11 @@ static void showAttrs(const ATermMap & attrs, XMLWriter & doc,
 }
 
 
-static void printPatternAsXML(Pattern pat, XMLWriter & doc, PathSet & context)
+static void printPatternAsXML(Pattern pat, XMLWriter & doc)
 {
     ATerm name;
     ATermList formals;
+    Pattern pat1, pat2;
     if (matchVarPat(pat, name))
         doc.writeEmptyElement("varpat", singletonAttrs("name", aterm2String(name)));
     else if (matchAttrsPat(pat, formals)) {
@@ -53,6 +54,11 @@ static void printPatternAsXML(Pattern pat, XMLWriter & doc, PathSet & context)
             if (!matchFormal(*i, name, dummy)) abort();
             doc.writeEmptyElement("attr", singletonAttrs("name", aterm2String(name)));
         }
+    }
+    else if (matchAtPat(pat, pat1, pat2)) {
+        XMLOpenElement _(doc, "at");
+        printPatternAsXML(pat1, doc);
+        printPatternAsXML(pat2, doc);
     }
 }
 
@@ -128,7 +134,7 @@ static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
 
     else if (matchFunction(e, pat, body, pos)) {
         XMLOpenElement _(doc, "function");
-        printPatternAsXML(pat, doc, context);
+        printPatternAsXML(pat, doc);
     }
 
     else

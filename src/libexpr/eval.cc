@@ -74,11 +74,16 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, 
 }
 
 
+/* Pattern-match `pat' against `arg'.  The result is a set of
+   substitutions (`subs') and a set of recursive substitutions
+   (`subsRecursive').  The latter can refer to the variables bound by
+   both `subs' and `subsRecursive'. */
 static void patternMatch(EvalState & state,
-    Pattern pat, Expr arg, ATermMap & subs)
+    Pattern pat, Expr arg, ATermMap & subs, ATermMap & subsRecursive)
 {
     ATerm name;
     ATermList formals;
+    Pattern pat1, pat2;
     
     if (matchVarPat(pat, name)) 
         subs.set(name, arg);
@@ -87,60 +92,45 @@ static void patternMatch(EvalState & state,
 
         arg = evalExpr(state, arg);
 
-        unsigned int nrFormals = ATgetLength(formals);
+        /* Get the actual arguments. */
+        ATermMap attrs;
+        queryAllAttrs(arg, attrs);
+        unsigned int nrAttrs = attrs.size();
 
-        /* Get the actual arguments and put them in the substitution.
-           !!! shouldn't do this once we add `...'.*/
-        ATermMap args;
-        queryAllAttrs(arg, args);
-        for (ATermMap::const_iterator i = args.begin(); i != args.end(); ++i)
-            subs.set(i->key, i->value);
-        
-        /* Get the formal arguments. */
-        ATermVector defsUsed;
-        ATermList recAttrs = ATempty;
+        /* For each formal argument, get the actual argument.  If
+           there is no matching actual argument but the formal
+           argument has a default, use the default. */
+        unsigned int attrsUsed = 0;
         for (ATermIterator i(formals); i; ++i) {
             Expr name, def;
             DefaultValue def2;
             if (!matchFormal(*i, name, def2)) abort(); /* can't happen */
 
-            Expr value = subs[name];
-        
+            Expr value = attrs[name];
+
             if (value == 0) {
                 if (!matchDefaultValue(def2, def)) def = 0;
                 if (def == 0) throw TypeError(format("the argument named `%1%' required by the function is missing")
                     % aterm2String(name));
-                value = def;
-                defsUsed.push_back(name);
-                recAttrs = ATinsert(recAttrs, makeBind(name, def, makeNoPos()));
+                subsRecursive.set(name, def);
+            } else {
+                attrsUsed++;
+                attrs.remove(name);
+                subs.set(name, value);
             }
 
         }
-        
-        /* Make a recursive attribute set out of the (argument-name,
-           value) tuples.  This is so that we can support default
-           parameters that refer to each other, e.g.  ({x, y ? x + x}:
-           y) {x = "foo";} evaluates to "foofoo". */
-        if (defsUsed.size() != 0) {
-            for (ATermMap::const_iterator i = args.begin(); i != args.end(); ++i)
-                recAttrs = ATinsert(recAttrs, makeBind(i->key, i->value, makeNoPos()));
-            Expr rec = makeRec(recAttrs, ATempty);
-            for (ATermVector::iterator i = defsUsed.begin(); i != defsUsed.end(); ++i)
-                subs.set(*i, makeSelect(rec, *i));
-        }
-    
-        if (subs.size() != nrFormals) {
-            /* One or more actual arguments were not declared as
-               formal arguments.  Find out which. */
-            for (ATermIterator i(formals); i; ++i) {
-                Expr name; ATerm d1;
-                if (!matchFormal(*i, name, d1)) abort();
-                subs.remove(name);
-            }
+
+        /* Check that each actual argument is listed as a formal
+           argument. */
+        if (attrsUsed != nrAttrs)
             throw TypeError(format("the function does not expect an argument named `%1%'")
-                % aterm2String(subs.begin()->key));
-        }
+                % aterm2String(attrs.begin()->key));
+    }
 
+    else if (matchAtPat(pat, pat1, pat2)) {
+        patternMatch(state, pat1, arg, subs, subsRecursive);
+        patternMatch(state, pat2, arg, subs, subsRecursive);
     }
 
     else abort();
@@ -151,9 +141,24 @@ static void patternMatch(EvalState & state,
 static Expr substArgs(EvalState & state,
     Expr body, Pattern pat, Expr arg)
 {
-    ATermMap subs(16);
+    ATermMap subs(16), subsRecursive(16);
     
-    patternMatch(state, pat, arg, subs);
+    patternMatch(state, pat, arg, subs, subsRecursive);
+
+    /* If we used any default values, make a recursive attribute set
+       out of the (argument-name, value) tuples.  This is so that we
+       can support default values that refer to each other, e.g.  ({x,
+       y ? x + x}: y) {x = "foo";} evaluates to "foofoo". */
+    if (subsRecursive.size() != 0) {
+        ATermList recAttrs = ATempty;
+        foreach (ATermMap::const_iterator, i, subs)
+            recAttrs = ATinsert(recAttrs, makeBind(i->key, i->value, makeNoPos()));
+        foreach (ATermMap::const_iterator, i, subsRecursive)
+            recAttrs = ATinsert(recAttrs, makeBind(i->key, i->value, makeNoPos()));
+        Expr rec = makeRec(recAttrs, ATempty);
+        foreach (ATermMap::const_iterator, i, subsRecursive)
+            subs.set(i->key, makeSelect(rec, i->key));
+    }
 
     return substitute(Substitution(0, &subs), body);
 }

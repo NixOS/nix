@@ -12,4 +12,6 @@ rec {
 
   id = x: x;
 
+  at = args@{x, y, z}: x;
+
 }

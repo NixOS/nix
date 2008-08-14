@@ -114,6 +114,7 @@ static void varsBoundByPattern(ATermMap & map, Pattern pat)
 {
     ATerm name;
     ATermList formals;
+    Pattern pat1, pat2;    
     /* Use makeRemoved() so that it can be used directly in
        substitute(). */
     if (matchVarPat(pat, name))
@@ -124,6 +125,10 @@ static void varsBoundByPattern(ATermMap & map, Pattern pat)
             if (!matchFormal(*i, name, d1)) abort();
             map.set(name, makeRemoved());
         }
+    }
+    else if (matchAtPat(pat, pat1, pat2)) {
+        varsBoundByPattern(map, pat1);
+        varsBoundByPattern(map, pat2);
     }
     else abort();
 }
@@ -354,7 +359,7 @@ Expr makeStr(const string & s, const PathSet & context)
 
 string showType(Expr e)
 {
-    ATerm t1, t2, t3;
+    ATerm t1, t2;
     ATermList l1;
     ATermBlob b1;
     int i1;

@@ -211,7 +211,8 @@ static void freeAndUnprotect(void * p)
 }
 
 %type <t> start expr expr_function expr_if expr_op
-%type <t> expr_app expr_select expr_simple bind inheritsrc formal pattern
+%type <t> expr_app expr_select expr_simple bind inheritsrc formal
+%type <t> pattern pattern2
 %type <ts> binds ids expr_list formals string_parts ind_string_parts
 %token <t> ID INT STR IND_STR PATH URI
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL
@@ -319,6 +320,11 @@ ind_string_parts
   ;
 
 pattern
+  : pattern2 '@' pattern { $$ = makeAtPat($1, $3); }
+  | pattern2
+  ;
+
+pattern2
   : ID { $$ = makeVarPat($1); }
   | '{' formals '}' { $$ = makeAttrsPat($2); }
   ;
@@ -394,6 +400,7 @@ static void checkPatternVars(ATerm pos, ATermMap & map, Pattern pat)
 {
     ATerm name;
     ATermList formals;
+    Pattern pat1, pat2;
     if (matchVarPat(pat, name)) {
         if (map.get(name))
             throw EvalError(format("duplicate formal function argument `%1%' at %2%")
@@ -409,6 +416,10 @@ static void checkPatternVars(ATerm pos, ATermMap & map, Pattern pat)
                     % aterm2String(name) % showPos(pos));
             map.set(name, name);
         }
+    }
+    else if (matchAtPat(pat, pat1, pat2)) {
+        checkPatternVars(pos, map, pat1);
+        checkPatternVars(pos, map, pat2);
     }
     else abort();
 }

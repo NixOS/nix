@@ -4,6 +4,18 @@
     <attr name="a">
       <string value="foo" />
     </attr>
+    <attr name="at">
+      <function>
+        <at>
+          <varpat name="args" />
+          <attrspat>
+            <attr name="x" />
+            <attr name="y" />
+            <attr name="z" />
+          </attrspat>
+        </at>
+      </function>
+    </attr>
     <attr name="b">
       <string value="bar" />
     </attr>
