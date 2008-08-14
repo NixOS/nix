@@ -170,21 +170,39 @@ static Expr substArgs(EvalState & state,
    to attributes substituted with selection expressions on the
    original set.  E.g., e = `rec {x = f x y; y = x;}' becomes `{x = f
    (e.x) (e.y); y = e.x;}'. */
-LocalNoInline(ATerm expandRec(ATerm e, ATermList rbnds, ATermList nrbnds))
+LocalNoInline(ATerm expandRec(EvalState & state, ATerm e, ATermList rbnds, ATermList nrbnds))
 {
     ATerm name;
     Expr e2;
     Pos pos;
+    Expr eOverrides = 0;
 
     /* Create the substitution list. */
     ATermMap subs(ATgetLength(rbnds) + ATgetLength(nrbnds));
     for (ATermIterator i(rbnds); i; ++i) {
         if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
+        if (name == sOverrides) eOverrides = e2;
         subs.set(name, makeSelect(e, name));
     }
     for (ATermIterator i(nrbnds); i; ++i) {
         if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
         subs.set(name, e2);
+    }
+
+    /* If the rec contains an attribute called `__overrides', then
+       evaluate it, and add the attributes in that set to the rec.
+       This allows overriding of recursive attributes, which is
+       otherwise not possible.  (You can use the // operator to
+       replace an attribute, but other attributes in the rec will
+       still reference the original value, because that value has been
+       substituted into the bodies of the other attributes.  Hence we
+       need __overrides.) */
+    ATermMap overrides;
+    if (eOverrides) {
+        eOverrides = evalExpr(state, eOverrides);
+        queryAllAttrs(overrides, overrides, false);
+        foreach (ATermMap::const_iterator, i, overrides)
+            subs.set(i->key, i->value);
     }
 
     Substitution subs_(0, &subs);
@@ -195,6 +213,10 @@ LocalNoInline(ATerm expandRec(ATerm e, ATermList rbnds, ATermList nrbnds))
         if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
         as.set(name, makeAttrRHS(substitute(subs_, e2), pos));
     }
+
+    if (eOverrides)
+        foreach (ATermMap::const_iterator, i, overrides)
+            as.set(i->key, makeAttrRHS(i->value, makeNoPos()));
 
     /* Copy the non-recursive bindings.  !!! inefficient */
     for (ATermIterator i(nrbnds); i; ++i) {
@@ -667,7 +689,7 @@ Expr evalExpr2(EvalState & state, Expr e)
     /* Mutually recursive sets. */
     ATermList rbnds, nrbnds;
     if (matchRec(e, rbnds, nrbnds))
-        return expandRec(e, rbnds, nrbnds);
+        return expandRec(state, e, rbnds, nrbnds);
 
     /* Conditionals. */
     if (matchIf(e, e1, e2, e3))

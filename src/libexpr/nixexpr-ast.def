@@ -93,3 +93,4 @@ AttrRHS | Expr Pos | ATerm |
 
 eTrue = makeBool(makeTrue())
 eFalse = makeBool(makeFalse())
+sOverrides = toATerm("__overrides")
