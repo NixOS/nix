@@ -3,8 +3,7 @@ init initNixExprHelpers
 Pos | string int int | Pos |
 NoPos | | Pos |
 
-Function | ATermList Expr Pos | Expr |
-Function1 | string Expr Pos | Expr |
+Function | Pattern Expr Pos | Expr |
 Assert | Expr Expr Pos | Expr |
 With | Expr Expr Pos | Expr |
 If | Expr Expr Expr | Expr |
@@ -75,6 +74,9 @@ Bind | string Expr | ATerm | ObsoleteBind
 Inherit | Expr ATermList Pos | ATerm |
 
 Scope | | Expr |
+
+VarPat | string | Pattern |
+AttrsPat | ATermList | Pattern |
 
 Formal | string DefaultValue | ATerm |
 

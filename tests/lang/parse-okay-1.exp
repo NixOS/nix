@@ -1,1 +1,1 @@
-Function([Formal("x",NoDefaultValue),Formal("y",NoDefaultValue),Formal("z",NoDefaultValue)],OpPlus(OpPlus(Var("x"),Var("y")),Var("z")),NoPos)
+Function(AttrsPat([Formal("x",NoDefaultValue),Formal("y",NoDefaultValue),Formal("z",NoDefaultValue)]),OpPlus(OpPlus(Var("x"),Var("y")),Var("z")),NoPos)

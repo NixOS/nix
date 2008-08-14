@@ -237,9 +237,9 @@ expr: expr_function;
 
 expr_function
   : '{' formals '}' ':' expr_function
-    { $$ = makeFunction($2, $5, CUR_POS); }
+    { $$ = makeFunction(makeAttrsPat($2), $5, CUR_POS); }
   | ID ':' expr_function
-    { $$ = makeFunction1($1, $3, CUR_POS); }
+    { $$ = makeFunction(makeVarPat($1), $3, CUR_POS); }
   | ASSERT expr ';' expr_function
     { $$ = makeAssert($2, $4, CUR_POS); }
   | WITH expr ';' expr_function
@@ -387,21 +387,36 @@ static void checkAttrs(ATermMap & names, ATermList bnds)
 }
 
 
-static void checkAttrSets(ATerm e)
+static void checkPatternVars(ATerm pos, ATermMap & map, Pattern pat)
 {
+    ATerm name;
     ATermList formals;
-    ATerm body, pos;
-    if (matchFunction(e, formals, body, pos)) {
-        ATermMap names(ATgetLength(formals));
+    if (matchVarPat(pat, name)) {
+        if (map.get(name))
+            throw EvalError(format("duplicate formal function argument `%1%' at %2%")
+                % aterm2String(name) % showPos(pos));
+        map.set(name, name);
+    }
+    else if (matchAttrsPat(pat, formals)) { 
         for (ATermIterator i(formals); i; ++i) {
-            ATerm name;
             ATerm d1;
             if (!matchFormal(*i, name, d1)) abort();
-            if (names.get(name))
+            if (map.get(name))
                 throw EvalError(format("duplicate formal function argument `%1%' at %2%")
                     % aterm2String(name) % showPos(pos));
-            names.set(name, name);
+            map.set(name, name);
         }
+    }
+    else abort();
+}
+
+
+static void checkAttrSets(ATerm e)
+{
+    ATerm pat, body, pos;
+    if (matchFunction(e, pat, body, pos)) {
+        ATermMap map(16);
+        checkPatternVars(pos, map, pat);
     }
 
     ATermList bnds;

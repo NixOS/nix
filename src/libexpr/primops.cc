@@ -120,11 +120,9 @@ static Expr prim_isNull(EvalState & state, const ATermVector & args)
 static Expr prim_isFunction(EvalState & state, const ATermVector & args)
 {
     Expr e = evalExpr(state, args[0]);
-    ATermList formals;
-    ATerm name, body, pos;
-    return makeBool(
-        matchFunction(e, formals, body, pos) ||
-        matchFunction1(e, name, body, pos));
+    Pattern pat;
+    ATerm body, pos;
+    return makeBool(matchFunction(e, pat, body, pos));
 }
 
 

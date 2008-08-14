@@ -12,12 +12,16 @@
     </attr>
     <attr name="f">
       <function>
-        <arg name="z">
-        </arg>
-        <arg name="x">
-        </arg>
-        <arg name="y">
-        </arg>
+        <attrspat>
+          <attr name="z" />
+          <attr name="x" />
+          <attr name="y" />
+        </attrspat>
+      </function>
+    </attr>
+    <attr name="id">
+      <function>
+        <varpat name="x" />
       </function>
     </attr>
     <attr name="x">

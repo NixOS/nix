@@ -74,62 +74,86 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, 
 }
 
 
+static void patternMatch(EvalState & state,
+    Pattern pat, Expr arg, ATermMap & subs)
+{
+    ATerm name;
+    ATermList formals;
+    
+    if (matchVarPat(pat, name)) 
+        subs.set(name, arg);
+
+    else if (matchAttrsPat(pat, formals)) {
+
+        arg = evalExpr(state, arg);
+
+        unsigned int nrFormals = ATgetLength(formals);
+
+        /* Get the actual arguments and put them in the substitution.
+           !!! shouldn't do this once we add `...'.*/
+        ATermMap args;
+        queryAllAttrs(arg, args);
+        for (ATermMap::const_iterator i = args.begin(); i != args.end(); ++i)
+            subs.set(i->key, i->value);
+        
+        /* Get the formal arguments. */
+        ATermVector defsUsed;
+        ATermList recAttrs = ATempty;
+        for (ATermIterator i(formals); i; ++i) {
+            Expr name, def;
+            DefaultValue def2;
+            if (!matchFormal(*i, name, def2)) abort(); /* can't happen */
+
+            Expr value = subs[name];
+        
+            if (value == 0) {
+                if (!matchDefaultValue(def2, def)) def = 0;
+                if (def == 0) throw TypeError(format("the argument named `%1%' required by the function is missing")
+                    % aterm2String(name));
+                value = def;
+                defsUsed.push_back(name);
+                recAttrs = ATinsert(recAttrs, makeBind(name, def, makeNoPos()));
+            }
+
+        }
+        
+        /* Make a recursive attribute set out of the (argument-name,
+           value) tuples.  This is so that we can support default
+           parameters that refer to each other, e.g.  ({x, y ? x + x}:
+           y) {x = "foo";} evaluates to "foofoo". */
+        if (defsUsed.size() != 0) {
+            for (ATermMap::const_iterator i = args.begin(); i != args.end(); ++i)
+                recAttrs = ATinsert(recAttrs, makeBind(i->key, i->value, makeNoPos()));
+            Expr rec = makeRec(recAttrs, ATempty);
+            for (ATermVector::iterator i = defsUsed.begin(); i != defsUsed.end(); ++i)
+                subs.set(*i, makeSelect(rec, *i));
+        }
+    
+        if (subs.size() != nrFormals) {
+            /* One or more actual arguments were not declared as
+               formal arguments.  Find out which. */
+            for (ATermIterator i(formals); i; ++i) {
+                Expr name; ATerm d1;
+                if (!matchFormal(*i, name, d1)) abort();
+                subs.remove(name);
+            }
+            throw TypeError(format("the function does not expect an argument named `%1%'")
+                % aterm2String(subs.begin()->key));
+        }
+
+    }
+
+    else abort();
+}
+
+
 /* Substitute an argument set into the body of a function. */
 static Expr substArgs(EvalState & state,
-    Expr body, ATermList formals, Expr arg)
+    Expr body, Pattern pat, Expr arg)
 {
-    unsigned int nrFormals = ATgetLength(formals);
-    ATermMap subs(nrFormals);
-
-    /* Get the actual arguments and put them in the substitution. */
-    ATermMap args;
-    queryAllAttrs(arg, args);
-    for (ATermMap::const_iterator i = args.begin(); i != args.end(); ++i)
-        subs.set(i->key, i->value);
+    ATermMap subs(16);
     
-    /* Get the formal arguments. */
-    ATermVector defsUsed;
-    ATermList recAttrs = ATempty;
-    for (ATermIterator i(formals); i; ++i) {
-        Expr name, def;
-        DefaultValue def2;
-        if (!matchFormal(*i, name, def2)) abort(); /* can't happen */
-
-        Expr value = subs[name];
-        
-        if (value == 0) {
-            if (!matchDefaultValue(def2, def)) def = 0;
-            if (def == 0) throw TypeError(format("the argument named `%1%' required by the function is missing")
-                % aterm2String(name));
-            value = def;
-            defsUsed.push_back(name);
-            recAttrs = ATinsert(recAttrs, makeBind(name, def, makeNoPos()));
-        }
-    }
-
-    /* Make a recursive attribute set out of the (argument-name,
-       value) tuples.  This is so that we can support default
-       parameters that refer to each other, e.g.  ({x, y ? x + x}: y)
-       {x = "foo";} evaluates to "foofoo". */
-    if (defsUsed.size() != 0) {
-        for (ATermMap::const_iterator i = args.begin(); i != args.end(); ++i)
-            recAttrs = ATinsert(recAttrs, makeBind(i->key, i->value, makeNoPos()));
-        Expr rec = makeRec(recAttrs, ATempty);
-        for (ATermVector::iterator i = defsUsed.begin(); i != defsUsed.end(); ++i)
-            subs.set(*i, makeSelect(rec, *i));
-    }
-    
-    if (subs.size() != nrFormals) {
-        /* One or more actual arguments were not declared as formal
-           arguments.  Find out which. */
-        for (ATermIterator i(formals); i; ++i) {
-            Expr name; ATerm d1;
-            if (!matchFormal(*i, name, d1)) abort();
-            subs.remove(name);
-        }
-        throw TypeError(format("the function does not expect an argument named `%1%'")
-            % aterm2String(subs.begin()->key));
-    }
+    patternMatch(state, pat, arg, subs);
 
     return substitute(Substitution(0, &subs), body);
 }
@@ -370,10 +394,12 @@ Path coerceToPath(EvalState & state, Expr e, PathSet & context)
 
 Expr autoCallFunction(Expr e, const ATermMap & args)
 {
-    ATermList formals;
+    Pattern pat;
     ATerm body, pos;
-    
-    if (matchFunction(e, formals, body, pos)) {
+    ATermList formals;
+
+    /* !!! this should be more general */
+    if (matchFunction(e, pat, body, pos) && matchAttrsPat(pat, formals)) {
         ATermMap actualArgs(ATgetLength(formals));
         
         for (ATermIterator i(formals); i; ++i) {
@@ -418,8 +444,8 @@ LocalNoInline(Expr evalVar(EvalState & state, ATerm name))
 
 LocalNoInline(Expr evalCall(EvalState & state, Expr fun, Expr arg))
 {
-    ATermList formals;
-    ATerm pos, name;
+    Pattern pat;
+    ATerm pos;
     Expr body;
         
     /* Evaluate the left-hand side. */
@@ -445,10 +471,9 @@ LocalNoInline(Expr evalCall(EvalState & state, Expr fun, Expr arg))
             return makePrimOp(arity, funBlob, args);
     }
 
-    else if (matchFunction(fun, formals, body, pos)) {
-        arg = evalExpr(state, arg);
+    else if (matchFunction(fun, pat, body, pos)) {
         try {
-            return evalExpr(state, substArgs(state, body, formals, arg));
+            return evalExpr(state, substArgs(state, body, pat, arg));
         } catch (Error & e) {
             addErrorPrefix(e, "while evaluating the function at %1%:\n",
                 showPos(pos));
@@ -456,18 +481,6 @@ LocalNoInline(Expr evalCall(EvalState & state, Expr fun, Expr arg))
         }
     }
         
-    else if (matchFunction1(fun, name, body, pos)) {
-        try {
-            ATermMap subs(1);
-            subs.set(name, arg);
-            return evalExpr(state, substitute(Substitution(0, &subs), body));
-        } catch (Error & e) {
-            addErrorPrefix(e, "while evaluating the function at %1%:\n",
-                showPos(pos));
-            throw;
-        }
-    }
-
     else throwTypeError(
         "attempt to call something which is neither a function nor a primop (built-in operation) but %1%",
         showType(fun));
@@ -624,7 +637,6 @@ Expr evalExpr2(EvalState & state, Expr e)
         sym == symInt ||
         sym == symBool ||
         sym == symFunction ||
-        sym == symFunction1 ||
         sym == symAttrs ||
         sym == symList ||
         sym == symPrimOp)

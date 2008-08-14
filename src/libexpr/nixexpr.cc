@@ -110,6 +110,25 @@ Expr makeAttrs(const ATermMap & attrs)
 }
 
 
+static void varsBoundByPattern(ATermMap & map, Pattern pat)
+{
+    ATerm name;
+    ATermList formals;
+    /* Use makeRemoved() so that it can be used directly in
+       substitute(). */
+    if (matchVarPat(pat, name))
+        map.set(name, makeRemoved());
+    else if (matchAttrsPat(pat, formals)) { 
+        for (ATermIterator i(formals); i; ++i) {
+            ATerm d1;
+            if (!matchFormal(*i, name, d1)) abort();
+            map.set(name, makeRemoved());
+        }
+    }
+    else abort();
+}
+
+
 Expr substitute(const Substitution & subs, Expr e)
 {
     checkInterrupt();
@@ -135,27 +154,17 @@ Expr substitute(const Substitution & subs, Expr e)
 
     /* In case of a function, filter out all variables bound by this
        function. */
-    ATermList formals;
+    Pattern pat;
     ATerm body;
-    if (matchFunction(e, formals, body, pos)) {
-        ATermMap map(ATgetLength(formals));
-        for (ATermIterator i(formals); i; ++i) {
-            ATerm d1;
-            if (!matchFormal(*i, name, d1)) abort();
-            map.set(name, makeRemoved());
-        }
+    if (matchFunction(e, pat, body, pos)) {
+        ATermMap map(16);
+        varsBoundByPattern(map, pat);
         Substitution subs2(&subs, &map);
         return makeFunction(
-            (ATermList) substitute(subs2, (ATerm) formals),
+            (Pattern) substitute(subs2, (Expr) pat),
             substitute(subs2, body), pos);
     }
 
-    if (matchFunction1(e, name, body, pos)) {
-        ATermMap map(1);
-        map.set(name, makeRemoved());
-        return makeFunction1(name, substitute(Substitution(&subs, &map), body), pos);
-    }
-        
     /* Idem for a mutually recursive attribute set. */
     ATermList rbnds, nrbnds;
     if (matchRec(e, rbnds, nrbnds)) {
@@ -213,9 +222,9 @@ static void checkVarDefs2(set<Expr> & done, const ATermMap & defs, Expr e)
     done.insert(e);
     
     ATerm name, pos, value;
-    ATermList formals;
     ATerm with, body;
     ATermList rbnds, nrbnds;
+    Pattern pat;
 
     /* Closed terms don't have free variables, so we don't have to
        check by definition. */
@@ -227,27 +236,11 @@ static void checkVarDefs2(set<Expr> & done, const ATermMap & defs, Expr e)
                 % aterm2String(name));
     }
 
-    else if (matchFunction(e, formals, body, pos)) {
+    else if (matchFunction(e, pat, body, pos)) {
         ATermMap defs2(defs);
-        for (ATermIterator i(formals); i; ++i) {
-            ATerm d1;
-            if (!matchFormal(*i, name, d1)) abort();
-            defs2.set(name, (ATerm) ATempty);
-        }
-        for (ATermIterator i(formals); i; ++i) {
-            ATerm deflt;
-            set<Expr> done2;
-            if (!matchFormal(*i, name, deflt)) abort();
-            checkVarDefs2(done2, defs2, deflt);
-        }
+        varsBoundByPattern(defs2, pat);
         set<Expr> done2;
-        checkVarDefs2(done2, defs2, body);
-    }
-        
-    else if (matchFunction1(e, name, body, pos)) {
-        ATermMap defs2(defs);
-        defs2.set(name, (ATerm) ATempty);
-        set<Expr> done2;
+        checkVarDefs2(done2, defs2, pat);
         checkVarDefs2(done2, defs2, body);
     }
         
@@ -365,13 +358,13 @@ string showType(Expr e)
     ATermList l1;
     ATermBlob b1;
     int i1;
+    Pattern p1;
     if (matchStr(e, t1, l1)) return "a string";
     if (matchPath(e, t1)) return "a path";
     if (matchNull(e)) return "null";
     if (matchInt(e, i1)) return "an integer";
     if (matchBool(e, t1)) return "a boolean";
-    if (matchFunction(e, l1, t1, t2)) return "a function";
-    if (matchFunction1(e, t1, t2, t3)) return "a function";
+    if (matchFunction(e, p1, t1, t2)) return "a function";
     if (matchAttrs(e, l1)) return "an attribute set";
     if (matchList(e, l1)) return "a list";
     if (matchPrimOp(e, i1, b1, l1)) return "a partially applied built-in function";

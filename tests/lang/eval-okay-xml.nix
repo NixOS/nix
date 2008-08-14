@@ -10,4 +10,6 @@ rec {
 
   f = {z, x, y}: if y then x else z;
 
+  id = x: x;
+
 }

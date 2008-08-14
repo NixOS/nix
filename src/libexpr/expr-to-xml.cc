@@ -40,6 +40,23 @@ static void showAttrs(const ATermMap & attrs, XMLWriter & doc,
 }
 
 
+static void printPatternAsXML(Pattern pat, XMLWriter & doc, PathSet & context)
+{
+    ATerm name;
+    ATermList formals;
+    if (matchVarPat(pat, name))
+        doc.writeEmptyElement("varpat", singletonAttrs("name", aterm2String(name)));
+    else if (matchAttrsPat(pat, formals)) {
+        XMLOpenElement _(doc, "attrspat");
+        for (ATermIterator i(formals); i; ++i) {
+            Expr name; ATerm dummy;
+            if (!matchFormal(*i, name, dummy)) abort();
+            doc.writeEmptyElement("attr", singletonAttrs("name", aterm2String(name)));
+        }
+    }
+}
+
+
 static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
     ExprSet & drvsSeen)
 {
@@ -47,8 +64,8 @@ static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
     string s;
     ATerm s2;
     int i;
-    ATermList as, es, formals;
-    ATerm body, pos;
+    ATermList as, es;
+    ATerm pat, body, pos;
 
     checkInterrupt();
 
@@ -109,14 +126,9 @@ static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
             printTermAsXML(*i, doc, context, drvsSeen);
     }
 
-    else if (matchFunction(e, formals, body, pos)) {
+    else if (matchFunction(e, pat, body, pos)) {
         XMLOpenElement _(doc, "function");
-        
-        for (ATermIterator i(formals); i; ++i) {
-            Expr name; ATerm dummy;
-            if (!matchFormal(*i, name, dummy)) abort();
-            XMLOpenElement _(doc, "arg", singletonAttrs("name", aterm2String(name)));
-        }
+        printPatternAsXML(pat, doc, context);
     }
 
     else

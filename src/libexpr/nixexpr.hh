@@ -21,11 +21,9 @@ MakeError(TypeError, EvalError)
    property of the ATerm library allows us to implement caching of
    normals forms efficiently. */
 typedef ATerm Expr;
-
 typedef ATerm DefaultValue;
-typedef ATerm ValidValues;
-
 typedef ATerm Pos;
+typedef ATerm Pattern;
 
 
 /* A STL vector of ATerms.  Should be used with great care since it's
