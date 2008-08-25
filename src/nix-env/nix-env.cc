@@ -154,7 +154,7 @@ static Expr loadSourceExpr(EvalState & state, const Path & path)
        for a user to have a ~/.nix-defexpr directory that includes
        some system-wide directory). */
     ATermMap attrs;
-    attrs.set(toATerm("_combineChannels"), makeAttrRHS(eTrue, makeNoPos()));
+    attrs.set(toATerm("_combineChannels"), makeAttrRHS(makeList(ATempty), makeNoPos()));
     getAllExprs(state, path, attrs);
     return makeAttrs(attrs);
 }

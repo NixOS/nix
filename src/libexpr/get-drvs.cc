@@ -102,7 +102,7 @@ static bool getDerivation(EvalState & state, Expr e,
 
         boost::shared_ptr<ATermMap> attrs(new ATermMap());
         queryAllAttrs(e, *attrs, false);
-    
+        
         Expr a = attrs->get(toATerm("type"));
         if (!a || evalStringNoCtx(state, a) != "derivation") return true;
 
@@ -173,24 +173,21 @@ static void getDerivations(EvalState & state, Expr e,
 
         /* !!! undocumented hackery to support combining channels in
            nix-env.cc. */
-        Expr e2 = drvMap.get(toATerm("_combineChannels"));
-        bool combineChannels = e2 && evalBool(state, e2);
-        
+        bool combineChannels = drvMap.get(toATerm("_combineChannels"));
+
         for (ATermMap::const_iterator i = drvMap.begin(); i != drvMap.end(); ++i) {
             startNest(nest, lvlDebug,
                 format("evaluating attribute `%1%'") % aterm2String(i->key));
             string pathPrefix2 = addToPath(pathPrefix, aterm2String(i->key));
-            if (combineChannels) {
-                if (((string) aterm2String(i->key)) != "_combineChannels")
-                    getDerivations(state, i->value, pathPrefix2, autoArgs, drvs, doneExprs);
-            }
+            if (combineChannels)
+                getDerivations(state, i->value, pathPrefix2, autoArgs, drvs, doneExprs);
             else if (getDerivation(state, i->value, pathPrefix2, drvs, doneExprs)) {
                 /* If the value of this attribute is itself an
                    attribute set, should we recurse into it?  => Only
                    if it has a `recurseForDerivations = true'
                    attribute. */
                 ATermList es;
-                Expr e = evalExpr(state, i->value);
+                Expr e = evalExpr(state, i->value), e2;
                 if (matchAttrs(e, es)) {
                     ATermMap attrs(ATgetLength(es));
                     queryAllAttrs(e, attrs, false);
