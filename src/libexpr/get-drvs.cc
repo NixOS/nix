@@ -175,19 +175,28 @@ static void getDerivations(EvalState & state, Expr e,
            nix-env.cc. */
         bool combineChannels = drvMap.get(toATerm("_combineChannels"));
 
-        for (ATermMap::const_iterator i = drvMap.begin(); i != drvMap.end(); ++i) {
-            startNest(nest, lvlDebug,
-                format("evaluating attribute `%1%'") % aterm2String(i->key));
-            string pathPrefix2 = addToPath(pathPrefix, aterm2String(i->key));
+        /* Consider the attributes in sorted order to get more
+           deterministic behaviour in nix-env operations (e.g. when
+           there are names clashes between derivations, the derivation
+           bound to the attribute with the "lower" name should take
+           precedence). */
+        typedef std::map<string, Expr> AttrsSorted;
+        AttrsSorted attrsSorted;
+        foreach (ATermMap::const_iterator, i, drvMap)
+            attrsSorted[aterm2String(i->key)] = i->value;
+
+        foreach (AttrsSorted::iterator, i, attrsSorted) {
+            startNest(nest, lvlDebug, format("evaluating attribute `%1%'") % i->first);
+            string pathPrefix2 = addToPath(pathPrefix, i->first);
             if (combineChannels)
-                getDerivations(state, i->value, pathPrefix2, autoArgs, drvs, doneExprs);
-            else if (getDerivation(state, i->value, pathPrefix2, drvs, doneExprs)) {
+                getDerivations(state, i->second, pathPrefix2, autoArgs, drvs, doneExprs);
+            else if (getDerivation(state, i->second, pathPrefix2, drvs, doneExprs)) {
                 /* If the value of this attribute is itself an
                    attribute set, should we recurse into it?  => Only
                    if it has a `recurseForDerivations = true'
                    attribute. */
                 ATermList es;
-                Expr e = evalExpr(state, i->value), e2;
+                Expr e = evalExpr(state, i->second), e2;
                 if (matchAttrs(e, es)) {
                     ATermMap attrs(ATgetLength(es));
                     queryAllAttrs(e, attrs, false);
