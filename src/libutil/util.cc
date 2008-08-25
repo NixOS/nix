@@ -1046,6 +1046,12 @@ bool string2Int(const string & s, long long & n)
 }
 
 
+bool hasSuffix(const string & s, const string & suffix)
+{
+    return s.size() >= suffix.size() && string(s, s.size() - suffix.size()) == suffix;
+}
+
+
 void ignoreException()
 {
     try {

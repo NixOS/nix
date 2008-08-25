@@ -2,6 +2,7 @@
 #include "store-api.hh"
 #include "aterm.hh"
 #include "globals.hh"
+#include "util.hh"
 
 #include "derivations-ast.hh"
 #include "derivations-ast.cc"
@@ -163,9 +164,7 @@ ATerm unparseDerivation(const Derivation & drv)
 
 bool isDerivation(const string & fileName)
 {
-    return
-        fileName.size() >= drvExtension.size() &&
-        string(fileName, fileName.size() - drvExtension.size()) == drvExtension;
+    return hasSuffix(fileName, drvExtension);
 }
 
  

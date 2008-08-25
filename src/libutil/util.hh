@@ -294,6 +294,10 @@ bool string2Int(const string & s, int & n);
 bool string2Int(const string & s, long long & n);
 
 
+/* Return true iff `s' ends in `suffix'. */
+bool hasSuffix(const string & s, const string & suffix);
+
+
 /* Exception handling in destructors: print an error message, then
    ignore the exception. */
 void ignoreException();

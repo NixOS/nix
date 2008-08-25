@@ -257,6 +257,7 @@ Hash hashString(HashType ht, const string & s)
     start(ht, ctx);
     update(ht, ctx, (const unsigned char *) s.c_str(), s.length());
     finish(ht, ctx, hash.hash);
+    //printMsg(lvlError, format("hashString %1% --> %2%:\n%3%\n===========END======") % s.size() % printHash(hash) % s);
     return hash;
 }
 

@@ -115,18 +115,29 @@ static void getAllExprs(EvalState & state,
     const Path & path, ATermMap & attrs)
 {
     Strings names = readDirectory(path);
+    StringSet namesSorted(names.begin(), names.end());
 
-    for (Strings::iterator i = names.begin(); i != names.end(); ++i) {
+    foreach (StringSet::iterator, i, namesSorted) {
         Path path2 = path + "/" + *i;
         
         struct stat st;
         if (stat(path2.c_str(), &st) == -1)
             continue; // ignore dangling symlinks in ~/.nix-defexpr
         
-        if (isNixExpr(path2))
-            attrs.set(toATerm(*i), makeAttrRHS(
+        if (isNixExpr(path2)) {
+            /* Strip off the `.nix' filename suffix (if applicable),
+               otherwise the attribute cannot be selected with the
+               `-A' option.  Useful if you want to stick a Nix
+               expression directly in ~/.nix-defexpr. */
+            string attrName = *i;
+            if (hasSuffix(attrName, ".nix"))
+                attrName = string(attrName, 0, attrName.size() - 4);
+            attrs.set(toATerm(attrName), makeAttrRHS(
                     parseExprFromFile(state, absPath(path2)), makeNoPos()));
+        }
         else
+            /* `path2' is a directory (with no default.nix in it);
+               recurse into it. */
             getAllExprs(state, path2, attrs);
     }
 }
