@@ -1610,6 +1610,7 @@ void DerivationGoal::startBuilder()
     }
 
     // The same for derivations
+    // !!! urgh, cut&paste duplication
     s = drv.env["exportBuildReferencesGraph"];
     ss = tokenizeString(s);
     if (ss.size() % 2 != 0)
@@ -1685,9 +1686,15 @@ void DerivationGoal::startBuilder()
     }
 
 
-    /* Are we doing a chroot build? */
+    /* Are we doing a chroot build?  Note that fixed-output
+       derivations are never done in a chroot, mainly so that
+       functions like fetchurl (which needs a proper /etc/resolv.conf)
+       work properly.  Purity checking for fixed-output derivations
+       is somewhat pointless anyway. */
     useChroot = queryBoolSetting("build-use-chroot", false);
     Path tmpRootDir;
+
+    if (fixedOutput) useChroot = false;
 
     if (useChroot) {
 #if CHROOT_ENABLED
