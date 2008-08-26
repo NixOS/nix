@@ -181,11 +181,11 @@ LocalNoInline(ATerm expandRec(EvalState & state, ATerm e, ATermList rbnds, ATerm
     ATermMap subs(ATgetLength(rbnds) + ATgetLength(nrbnds));
     for (ATermIterator i(rbnds); i; ++i) {
         if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
-        if (name == sOverrides) eOverrides = e2;
         subs.set(name, makeSelect(e, name));
     }
     for (ATermIterator i(nrbnds); i; ++i) {
         if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
+        if (name == sOverrides) eOverrides = e2;
         subs.set(name, e2);
     }
 
