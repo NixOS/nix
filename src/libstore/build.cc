@@ -715,12 +715,15 @@ private:
     /* Whether we're currently doing a chroot build. */
     bool useChroot;
 
-    /* A RAII object to delete the chroot directory. */
-    boost::shared_ptr<AutoDelete> autoDelChroot;
+    /* RAII objects to delete the chroot directory and its /tmp
+       directory.  Don't change the order: autoDelChrootTmp has to be
+       deleted before autoDelChrootRoot. */
+    boost::shared_ptr<AutoDelete> autoDelChrootRoot;
+    boost::shared_ptr<AutoDelete> autoDelChrootTmp;
     
     /* In chroot builds, the list of bind mounts currently active.
        The destructor of BindMount will cause the binds to be
-       unmounted. */
+       unmounted.  Keep this *below* autoDelChroot* just to be safe! */
     list<boost::shared_ptr<BindMount> > bindMounts;
 
     typedef void (DerivationGoal::*GoalState)();
@@ -1692,7 +1695,7 @@ void DerivationGoal::startBuilder()
        work properly.  Purity checking for fixed-output derivations
        is somewhat pointless anyway. */
     useChroot = queryBoolSetting("build-use-chroot", false);
-    Path tmpRootDir;
+    Path chrootRootDir;
 
     if (fixedOutput) useChroot = false;
 
@@ -1706,22 +1709,39 @@ void DerivationGoal::startBuilder()
            /tmp/chroot-nix-*" to clean up aborted builds, and if some
            of the bind-mounts are still active, then "rm -rf" will
            happily recurse into those mount points (thereby deleting,
-           say, /nix/store).  Ideally, tmpRootDir should be created in
+           say, /nix/store).  Ideally, chrootRootDir should be created in
            some special location (maybe in /nix/var/nix) where Nix
            takes care of unmounting / deleting old chroots
            automatically. */
-        tmpRootDir = createTempDir("", "chroot-nix");
+        chrootRootDir = createTempDir("", "chroot-nix");
 
         /* Clean up the chroot directory automatically, but don't
            recurse; that would be very very bad if the unmount of a
            bind-mount fails. Instead BindMount::unbind() unmounts and
            deletes exactly those directories that it created to
            produce the mount point, so that after all the BindMount
-           destructors have run, tmpRootDir should be empty. */
-        autoDelChroot = boost::shared_ptr<AutoDelete>(new AutoDelete(tmpRootDir, false));
+           destructors have run, chrootRootDir should be empty. */
+        autoDelChrootRoot = boost::shared_ptr<AutoDelete>(new AutoDelete(chrootRootDir, false));
         
-        printMsg(lvlChatty, format("setting up chroot environment in `%1%'") % tmpRootDir);
+        printMsg(lvlChatty, format("setting up chroot environment in `%1%'") % chrootRootDir);
 
+        /* Create a writable /tmp in the chroot.  Many builders need
+           this.  (Of course they should really respect $TMPDIR
+           instead.) */
+        Path chrootTmpDir = chrootRootDir + "/tmp";
+        createDirs(chrootTmpDir);
+
+        if (chmod(chrootTmpDir.c_str(), 01777) == -1)
+            throw SysError("creating /tmp in the chroot");
+
+        /* When deleting this, do recurse (the builder might have left
+           crap there).  As long as nothing important is bind-mounted
+           under /tmp it's okay (and the bind-mounts are unmounted
+           before autoDelChrootTmp's destructor runs, anyway).  */
+        autoDelChrootTmp = boost::shared_ptr<AutoDelete>(new AutoDelete(chrootTmpDir));
+
+        /* Bind-mount a user-configurable set of directories from the
+           host file system. */
         Paths defaultDirs;
         defaultDirs.push_back("/dev");
         defaultDirs.push_back("/proc");
@@ -1734,7 +1754,7 @@ void DerivationGoal::startBuilder()
            unmounted in LIFO order.  (!!! Does the C++ standard
            guarantee that list elements are destroyed in order?) */
         for (Paths::iterator i = dirsInChroot.begin(); i != dirsInChroot.end(); ++i)
-            bindMounts.push_front(boost::shared_ptr<BindMount>(new BindMount(*i, tmpRootDir + *i)));
+            bindMounts.push_front(boost::shared_ptr<BindMount>(new BindMount(*i, chrootRootDir + *i)));
         
 #else
         throw Error("chroot builds are not supported on this platform");
@@ -1773,8 +1793,8 @@ void DerivationGoal::startBuilder()
                chroot.  (Actually the order doesn't matter, since due
                to the bind mount tmpDir and tmpRootDit/tmpDir are the
                same directories.) */
-            if (useChroot && chroot(tmpRootDir.c_str()) == -1)
-                throw SysError(format("cannot change root directory to `%1%'") % tmpRootDir);
+            if (useChroot && chroot(chrootRootDir.c_str()) == -1)
+                throw SysError(format("cannot change root directory to `%1%'") % chrootRootDir);
 #endif
             
             initChild();
