@@ -1552,6 +1552,12 @@ void DerivationGoal::startBuilder()
     /* Also set TMPDIR and variants to point to this directory. */
     env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDir;
 
+    /* Explicitly set PWD to prevent problems with chroot builds.  In
+       particular, dietlibc cannot figure out the cwd because the
+       inode of the current directory doesn't appear in .. (because
+       getdents returns the inode of the mount point). */
+    env["PWD"] = tmpDir;
+
     /* Compatibility hack with Nix <= 0.7: if this is a fixed-output
        derivation, tell the builder, so that for instance `fetchurl'
        can skip checking the output.  On older Nixes, this environment
