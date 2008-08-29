@@ -13,7 +13,7 @@ Version: @version@
 Release: 1
 License: GPL
 Group: Software Deployment
-URL: http://nix.cs.uu.nl/
+URL: http://nixos.org/
 Source0: %{name}-@version@.tar.bz2
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 %define _prefix /nix
