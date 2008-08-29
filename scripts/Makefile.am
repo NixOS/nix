@@ -6,7 +6,7 @@ bin_SCRIPTS = nix-collect-garbage \
 
 noinst_SCRIPTS = nix-profile.sh generate-patches.pl \
   find-runtime-roots.pl build-remote.pl nix-reduce-build \
-  copy-from-other-stores.pl
+  copy-from-other-stores.pl nix-http-export.cgi
 
 nix-pull nix-push: readmanifest.pm readconfig.pm download-using-manifests.pl
 
@@ -40,4 +40,5 @@ EXTRA_DIST = nix-collect-garbage.in \
   nix-copy-closure.in \
   find-runtime-roots.pl.in \
   build-remote.pl.in \
-  nix-reduce-build.in
+  nix-reduce-build.in \
+  nix-http-export.cgi.in 
