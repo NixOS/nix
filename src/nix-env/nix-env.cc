@@ -284,8 +284,14 @@ static bool createUserEnv(EvalState & state, const DrvInfos & elems,
            output path, and optionally the derivation path, as well as
            the meta attributes. */
         Path drvPath = keepDerivations ? i->queryDrvPath(state) : "";
+
+        MetaInfo meta = i->queryMetaInfo(state);
+        ATermList metaList = ATempty;
+        foreach (MetaInfo::iterator, j, meta)
+            metaList = ATinsert(metaList,
+                makeBind(toATerm(j->first), makeStr(j->second), makeNoPos()));
         
-        ATermList as = ATmakeList4(
+        ATermList as = ATmakeList5(
             makeBind(toATerm("type"),
                 makeStr("derivation"), makeNoPos()),
             makeBind(toATerm("name"),
@@ -293,17 +299,13 @@ static bool createUserEnv(EvalState & state, const DrvInfos & elems,
             makeBind(toATerm("system"),
                 makeStr(i->system), makeNoPos()),
             makeBind(toATerm("outPath"),
-                makeStr(i->queryOutPath(state)), makeNoPos()));
+                makeStr(i->queryOutPath(state)), makeNoPos()), 
+            makeBind(toATerm("meta"), makeAttrs(metaList), makeNoPos()));
         
         if (drvPath != "") as = ATinsert(as, 
             makeBind(toATerm("drvPath"),
                 makeStr(drvPath), makeNoPos()));
         
-        if (i->attrs->get(toATerm("meta"))) as = ATinsert(as, 
-            makeBind(toATerm("meta"),
-                strictEvalExpr(state, i->attrs->get(toATerm("meta"))),
-                makeNoPos()));
-
         manifest = ATinsert(manifest, makeAttrs(as));
         
         inputs = ATinsert(inputs, makeStr(i->queryOutPath(state)));
