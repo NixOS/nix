@@ -75,6 +75,10 @@ struct GCOptions
        atime. */
     bool useAtime;
 
+    /* Do not delete paths newer than `maxAtime'.  -1 means no age
+       limit. */
+    time_t maxAtime;
+
     GCOptions();
 };
 

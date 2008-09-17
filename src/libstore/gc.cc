@@ -531,10 +531,11 @@ void LocalStore::gcPathRecursive(const GCOptions & options,
     startNest(nest, lvlDebug, format("looking at `%1%'") % path);
         
     /* Delete all the referrers first.  They must be garbage too,
-       since if they were in the closure of some live path, then this
-       path would also be in the closure.  Note that
-       deleteFromStore() below still makes sure that the referrer set
-       has become empty, just in case. */
+       since if they were live, then the current path would also be
+       live.  Note that deleteFromStore() below still makes sure that
+       the referrer set has become empty, just in case.  (However that
+       doesn't guard against deleting top-level paths that are only
+       reachable from GC roots.) */
     PathSet referrers;
     if (isValidPath(path))
         queryReferrers(path, referrers);
@@ -571,7 +572,7 @@ struct CachingAtimeComparator : public std::binary_function<Path, Path, bool>
 string showTime(const string & format, time_t t)
 {
     char s[128];
-    strftime(s, sizeof s, format.c_str(), gmtime(&t));
+    strftime(s, sizeof s, format.c_str(), localtime(&t));
     return string(s);
 }
 
@@ -766,7 +767,12 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             while (!prioQueue.empty()) {
                 checkInterrupt();
                 Path path = prioQueue.top(); prioQueue.pop();
-                printMsg(lvlInfo, format("deleting `%1%' (last accessed %2%)") % path % showTime("%F %H:%M:%S", atimeComp.cache[path]));
+
+                if (options.maxAtime != (time_t) -1 &&
+                    atimeComp.lookup(path) > options.maxAtime)
+                    continue;
+                
+                printMsg(lvlInfo, format("deleting `%1%' (last accessed %2%)") % path % showTime("%F %H:%M:%S", atimeComp.lookup(path)));
 
                 PathSet references;
                 if (isValidPath(path)) references = queryReferencesNoSelf(path);

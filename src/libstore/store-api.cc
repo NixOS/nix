@@ -15,6 +15,7 @@ GCOptions::GCOptions()
     maxFreed = ULLONG_MAX;
     maxLinks = 0;
     useAtime = false;
+    maxAtime = (time_t) -1;
 }
 
 

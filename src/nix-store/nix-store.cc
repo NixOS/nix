@@ -531,8 +531,14 @@ static void opGC(Strings opFlags, Strings opArgs)
         else if (*i == "--max-freed") options.maxFreed = getIntArg(*i, i, opFlags.end());
         else if (*i == "--max-links") options.maxLinks = getIntArg(*i, i, opFlags.end());
         else if (*i == "--use-atime") options.useAtime = true;
+        else if (*i == "--max-atime") {
+            options.useAtime = true;
+            options.maxAtime = getIntArg(*i, i, opFlags.end());
+        }
         else throw UsageError(format("bad sub-operation `%1%' in GC") % *i);
 
+    if (!opArgs.empty()) throw UsageError("no arguments expected");
+    
     PrintFreed freed(options.action == GCOptions::gcDeleteDead, results);
     store->collectGarbage(options, results);
 
@@ -745,7 +751,7 @@ void run(Strings args)
             indirectRoot = true;
         else if (arg[0] == '-') {            
             opFlags.push_back(arg);
-            if (arg == "--max-freed" || arg == "--max-links") { /* !!! hack */
+            if (arg == "--max-freed" || arg == "--max-links" || arg == "--max-atime") { /* !!! hack */
                 if (i != args.end()) opFlags.push_back(*i++);
             }
         }
