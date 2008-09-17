@@ -5,6 +5,9 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include <functional>
+#include <queue>
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -439,45 +442,54 @@ Paths topoSortPaths(const PathSet & paths)
 }
 
 
+static time_t lastFileAccessTime(const Path & path)
+{
+    struct stat st;
+    if (lstat(path.c_str(), &st) == -1)
+        throw SysError(format("statting `%1%'") % path);
+
+    if (S_ISDIR(st.st_mode)) {
+        time_t last = 0;
+	Strings names = readDirectory(path);
+	for (Strings::iterator i = names.begin(); i != names.end(); ++i) {
+            time_t t = lastFileAccessTime(path + "/" + *i);
+            if (t > last) last = t;
+        }
+        return last;
+    }
+
+    else if (S_ISLNK(st.st_mode)) return 0;
+
+    else return st.st_atime;
+}
+
+
 struct GCLimitReached { };
 
 
 void LocalStore::tryToDelete(const GCOptions & options, GCResults & results, 
-    const PathSet & livePaths, const PathSet & tempRootsClosed, PathSet & done, 
-    const Path & path)
+    PathSet & done, const Path & path)
 {
     if (done.find(path) != done.end()) return;
     done.insert(path);
-    
-    debug(format("considering deletion of `%1%'") % path);
+
+    startNest(nest, lvlDebug, format("looking at `%1%'") % path);
         
-    if (livePaths.find(path) != livePaths.end()) {
-        if (options.action == GCOptions::gcDeleteSpecific)
-            throw Error(format("cannot delete path `%1%' since it is still alive") % path);
-        debug(format("live path `%1%'") % path);
-        return;
-    }
-
-    if (tempRootsClosed.find(path) != tempRootsClosed.end()) {
-        debug(format("temporary root `%1%'") % path);
-        return;
-    }
-
     /* Delete all the referrers first.  They must be garbage too,
        since if they were in the closure of some live path, then this
        path would also be in the closure.  Note that
        deleteFromStore() below still makes sure that the referrer set
        has become empty, just in case. */
     PathSet referrers;
-    if (store->isValidPath(path))
+    if (isValidPath(path))
         queryReferrers(path, referrers);
     foreach (PathSet::iterator, i, referrers)
-        if (*i != path)
-            tryToDelete(options, results, livePaths, tempRootsClosed, done, *i);
+        if (*i != path) tryToDelete(options, results, done, *i);
 
-    debug(format("dead path `%1%'") % path);
     results.paths.insert(path);
 
+    if (!pathExists(path)) return;
+                
     /* If just returning the set of dead paths, we also return the
        space that would be freed if we deleted them. */
     if (options.action == GCOptions::gcReturnDead) {
@@ -505,8 +517,6 @@ void LocalStore::tryToDelete(const GCOptions & options, GCResults & results,
     }
 #endif
 
-    if (!pathExists(path)) return;
-                
     printMsg(lvlInfo, format("deleting `%1%'") % path);
             
     /* Okay, it's safe to delete. */
@@ -535,6 +545,35 @@ void LocalStore::tryToDelete(const GCOptions & options, GCResults & results,
         /* Write token to stale (deleted) lock file. */
         writeFull(fdLock, (const unsigned char *) "d", 1);
 #endif
+}
+
+
+struct CachingAtimeComparator : public std::binary_function<Path, Path, bool> 
+{
+    std::map<Path, time_t> cache;
+
+    time_t lookup(const Path & p)
+    {
+        std::map<Path, time_t>::iterator i = cache.find(p);
+        if (i != cache.end()) return i->second;
+        debug(format("computing atime of `%1%'") % p);
+        cache[p] = lastFileAccessTime(p);
+        assert(cache.find(p) != cache.end());
+        return cache[p];
+    }
+        
+    bool operator () (const Path & p1, const Path & p2)
+    {
+        return lookup(p2) < lookup(p1);
+    }
+};
+
+
+string showTime(const string & format, time_t t)
+{
+    char s[128];
+    strftime(s, sizeof s, format.c_str(), gmtime(&t));
+    return string(s);
 }
 
 
@@ -587,8 +626,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             /* Note that the deriver need not be valid (e.g., if we
                previously ran the collector with `gcKeepDerivations'
                turned off). */
-            Path deriver = store->queryDeriver(*i);
-            if (deriver != "" && store->isValidPath(deriver))
+            Path deriver = queryDeriver(*i);
+            if (deriver != "" && isValidPath(deriver))
                 computeFSClosure(deriver, livePaths);
         }
     }
@@ -608,7 +647,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 		if (gcLevel >= gcKeepOutputsThreshold)    
 		    for (DerivationOutputs::iterator j = drv.outputs.begin();
                          j != drv.outputs.end(); ++j)
-			if (store->isValidPath(j->second.path))
+			if (isValidPath(j->second.path))
 			    computeFSClosure(j->second.path, livePaths);
             }
     }
@@ -633,7 +672,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        means that it has already been closed). */
     PathSet tempRootsClosed;
     for (PathSet::iterator i = tempRoots.begin(); i != tempRoots.end(); ++i)
-        if (store->isValidPath(*i))
+        if (isValidPath(*i))
             computeFSClosure(*i, tempRootsClosed);
         else
             tempRootsClosed.insert(*i);
@@ -644,32 +683,113 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        can be deleted. */
     
     /* Read the Nix store directory to find all currently existing
-       paths. */
+       paths and filter out all live paths. */
     printMsg(lvlError, format("reading the Nix store..."));
     PathSet storePaths;
+    
     if (options.action != GCOptions::gcDeleteSpecific) {
         Paths entries = readDirectory(nixStore);
-        for (Paths::iterator i = entries.begin(); i != entries.end(); ++i)
-            storePaths.insert(canonPath(nixStore + "/" + *i));
-    } else {
-        foreach (PathSet::iterator, i, options.pathsToDelete) {
-            assertStorePath(*i);
-            storePaths.insert(*i);
+        foreach (Paths::iterator, i, entries) {
+            Path path = canonPath(nixStore + "/" + *i);
+            if (livePaths.find(path) == livePaths.end() &&
+                tempRootsClosed.find(path) == tempRootsClosed.end())
+                storePaths.insert(path);
         }
     }
 
-    /* Try to delete store paths in the topologically sorted order. */
-    printMsg(lvlError, options.action == GCOptions::gcReturnDead
-        ? format("looking for garbage...")
-        : format("deleting garbage..."));
+    else {
+        foreach (PathSet::iterator, i, options.pathsToDelete) {
+            assertStorePath(*i);
+            storePaths.insert(*i);
+            if (livePaths.find(*i) != livePaths.end())
+                throw Error(format("cannot delete path `%1%' since it is still alive") % *i);
+            if (tempRootsClosed.find(*i) != tempRootsClosed.end())
+                throw Error(format("cannot delete path `%1%' since it is temporarily in use") % *i);
+        }
+    }
+
+    if (options.action == GCOptions::gcReturnDead) {
+        results.paths.insert(storePaths.begin(), storePaths.end());
+        return;
+    }
+
+    /* Delete all dead store paths (or until one of the stop
+       conditions is reached). */
 
     PathSet done;
     try {
-        foreach (PathSet::iterator, i, storePaths)
-            tryToDelete(options, results, livePaths, tempRootsClosed, done, *i);
+
+        if (!options.useAtime) {
+            /* Delete the paths, respecting the partial ordering
+               determined by the references graph. */
+            printMsg(lvlError, format("deleting garbage..."));
+            foreach (PathSet::iterator, i, storePaths)
+                tryToDelete(options, results, done, *i);
+        }
+
+        else {
+
+            /* Delete in order of ascending last access time, still
+               maintaining the partial ordering of the reference
+               graph.  Note that we can't use a topological sort for
+               this because that takes time O(V+E), and in this case
+               E=O(V^2) (i.e. the graph is dense because of the edges
+               due to the atime ordering).  So instead we put all
+               deletable paths in a priority queue (ordered by atime),
+               and after deleting a path, add additional paths that
+               have become deletable to the priority queue. */
+
+            CachingAtimeComparator atimeComp;
+
+            /* Create a priority queue that orders paths by ascending
+               atime.  This is why C++ needs type inferencing... */
+            std::priority_queue<Path, vector<Path>, binary_function_ref_adapter<CachingAtimeComparator> > prioQueue =
+                std::priority_queue<Path, vector<Path>, binary_function_ref_adapter<CachingAtimeComparator> >(binary_function_ref_adapter<CachingAtimeComparator>(&atimeComp));
+
+           /* Initially put the paths that are invalid or have no
+              referrers into the priority queue. */
+            printMsg(lvlError, format("finding deletable paths..."));
+            foreach (PathSet::iterator, i, storePaths) {
+                /* We can safely delete a path if it's invalid or
+                   it has no referrers.  Note that all the invalid
+                   paths will be deleted in the first round. */
+                if (isValidPath(*i)) {
+                    if (queryReferrersNoSelf(*i).empty()) prioQueue.push(*i);
+                } else prioQueue.push(*i);
+            }
+
+            debug(format("%1% initially deletable paths") % prioQueue.size());
+
+            /* Now delete everything in the order of the priority
+               queue until nothing is left. */
+            while (!prioQueue.empty()) {
+                Path path = prioQueue.top(); prioQueue.pop();
+                printMsg(lvlTalkative, format("atime %1%: %2%") % showTime("%F %H:%M:%S", atimeComp.cache[path]) % path);
+
+                PathSet references;
+                if (isValidPath(path)) references = queryReferencesNoSelf(path);
+
+                tryToDelete(options, results, done, path);
+
+                /* For each reference of the current path, see if the
+                   reference has now become deletable (i.e. is in the
+                   set of dead paths and has no referrers left).  If
+                   so add it to the priority queue. */
+                foreach (PathSet::iterator, i, references) {
+                    if (storePaths.find(*i) != storePaths.end() &&
+                        queryReferrersNoSelf(*i).empty())
+                    {
+                        debug(format("path `%1%' has become deletable") % *i);
+                        prioQueue.push(*i);
+                    }
+                }
+            }
+            
+        }
+        
     } catch (GCLimitReached & e) {
     }
 }
 
- 
+
 }

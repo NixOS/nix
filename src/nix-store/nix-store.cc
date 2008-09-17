@@ -501,17 +501,14 @@ static string showBytes(unsigned long long bytes, unsigned long long blocks)
 
 struct PrintFreed 
 {
-    bool show, dryRun;
+    bool show;
     const GCResults & results;
-    PrintFreed(bool show, bool dryRun, const GCResults & results)
-        : show(show), dryRun(dryRun), results(results) { }
+    PrintFreed(bool show, const GCResults & results)
+        : show(show), results(results) { }
     ~PrintFreed() 
     {
         if (show)
-            cout << format(
-                (dryRun
-                    ? "%1% would be freed\n"
-                    : "%1% freed\n"))
+            cout << format("%1% freed\n")
                 % showBytes(results.bytesFreed, results.blocksFreed);
     }
 };
@@ -525,19 +522,17 @@ static void opGC(Strings opFlags, Strings opArgs)
     GCResults results;
     
     /* Do what? */
-    for (Strings::iterator i = opFlags.begin();
-         i != opFlags.end(); ++i)
+    foreach (Strings::iterator, i, opFlags)
         if (*i == "--print-roots") options.action = GCOptions::gcReturnRoots;
         else if (*i == "--print-live") options.action = GCOptions::gcReturnLive;
         else if (*i == "--print-dead") options.action = GCOptions::gcReturnDead;
         else if (*i == "--delete") options.action = GCOptions::gcDeleteDead;
         else if (*i == "--max-freed") options.maxFreed = getIntArg(*i, i, opFlags.end());
         else if (*i == "--max-links") options.maxLinks = getIntArg(*i, i, opFlags.end());
+        else if (*i == "--use-atime") options.useAtime = true;
         else throw UsageError(format("bad sub-operation `%1%' in GC") % *i);
 
-    PrintFreed freed(
-        options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcReturnDead,
-        options.action == GCOptions::gcReturnDead, results);
+    PrintFreed freed(options.action == GCOptions::gcDeleteDead, results);
     store->collectGarbage(options, results);
 
     if (options.action != GCOptions::gcDeleteDead)
@@ -554,17 +549,15 @@ static void opDelete(Strings opFlags, Strings opArgs)
     GCOptions options;
     options.action = GCOptions::gcDeleteSpecific;
     
-    for (Strings::iterator i = opFlags.begin();
-         i != opFlags.end(); ++i)
+    foreach (Strings::iterator, i, opFlags)
         if (*i == "--ignore-liveness") options.ignoreLiveness = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
-    for (Strings::iterator i = opArgs.begin();
-         i != opArgs.end(); ++i)
+    foreach (Strings::iterator, i, opArgs)
         options.pathsToDelete.insert(followLinksToStorePath(*i));
     
     GCResults results;
-    PrintFreed freed(true, false, results);
+    PrintFreed freed(true, results);
     store->collectGarbage(options, results);
 }
 

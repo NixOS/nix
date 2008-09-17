@@ -168,8 +168,7 @@ private:
     void upgradeStore12();
 
     void tryToDelete(const GCOptions & options, GCResults & results,
-        const PathSet & livePaths, const PathSet & tempRootsClosed, PathSet & done, 
-        const Path & path);
+        PathSet & done, const Path & path);
 
     void startSubstituter(const Path & substituter,
         RunningSubstituter & runningSubstituter);

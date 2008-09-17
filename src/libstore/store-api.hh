@@ -63,6 +63,18 @@ struct GCOptions
        has dropped below `maxLinks'. */
     unsigned int maxLinks;
 
+    /* Delete paths in order of ascending last access time.  I.e.,
+       prefer deleting unrecently used paths.  Useful in conjunction
+       with `maxFreed' and `maxLinks' (or manual interruption).  The
+       access time of a path is defined as the highest atime of any
+       non-directory, non-symlink file under that path.  Directories
+       and symlinks are ignored because their atimes are frequently
+       mass-updated, e.g. by `locate'.  Note that optimiseStore()
+       somewhat reduces the usefulness of this option: it hard-links
+       regular files and symlink together, giving them a "shared"
+       atime. */
+    bool useAtime;
+
     GCOptions();
 };
 
@@ -116,10 +128,28 @@ public:
     virtual void queryReferences(const Path & path,
         PathSet & references) = 0;
 
+    /* Like queryReferences, but with self-references filtered out. */
+    PathSet queryReferencesNoSelf(const Path & path)
+    {
+        PathSet res;
+        queryReferences(path, res);
+        res.erase(path);
+        return res;
+    }
+
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
     virtual void queryReferrers(const Path & path,
         PathSet & referrers) = 0;
+
+    /* Like queryReferrers, but with self-references filtered out. */
+    PathSet queryReferrersNoSelf(const Path & path)
+    {
+        PathSet res;
+        queryReferrers(path, res);
+        res.erase(path);
+        return res;
+    }
 
     /* Query the deriver of a store path.  Return the empty string if
        no deriver has been set. */
