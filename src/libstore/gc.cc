@@ -766,7 +766,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             while (!prioQueue.empty()) {
                 checkInterrupt();
                 Path path = prioQueue.top(); prioQueue.pop();
-                printMsg(lvlInfo, format("deleting `%1%' (last accesses %2%)") % path % showTime("%F %H:%M:%S", atimeComp.cache[path]));
+                printMsg(lvlInfo, format("deleting `%1%' (last accessed %2%)") % path % showTime("%F %H:%M:%S", atimeComp.cache[path]));
 
                 PathSet references;
                 if (isValidPath(path)) references = queryReferencesNoSelf(path);
