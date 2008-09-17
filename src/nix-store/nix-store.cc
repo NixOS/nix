@@ -508,7 +508,8 @@ struct PrintFreed
     ~PrintFreed() 
     {
         if (show)
-            cout << format("%1% freed\n")
+            cout << format("%1% store paths deleted, %2% freed\n")
+                % results.paths.size()
                 % showBytes(results.bytesFreed, results.blocksFreed);
     }
 };
