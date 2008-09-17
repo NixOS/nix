@@ -444,6 +444,8 @@ Paths topoSortPaths(const PathSet & paths)
 
 static time_t lastFileAccessTime(const Path & path)
 {
+    checkInterrupt();
+    
     struct stat st;
     if (lstat(path.c_str(), &st) == -1)
         throw SysError(format("statting `%1%'") % path);
@@ -467,39 +469,13 @@ static time_t lastFileAccessTime(const Path & path)
 struct GCLimitReached { };
 
 
-void LocalStore::tryToDelete(const GCOptions & options, GCResults & results, 
-    PathSet & done, const Path & path)
+void LocalStore::gcPath(const GCOptions & options, GCResults & results, 
+    const Path & path)
 {
-    if (done.find(path) != done.end()) return;
-    done.insert(path);
-
-    startNest(nest, lvlDebug, format("looking at `%1%'") % path);
-        
-    /* Delete all the referrers first.  They must be garbage too,
-       since if they were in the closure of some live path, then this
-       path would also be in the closure.  Note that
-       deleteFromStore() below still makes sure that the referrer set
-       has become empty, just in case. */
-    PathSet referrers;
-    if (isValidPath(path))
-        queryReferrers(path, referrers);
-    foreach (PathSet::iterator, i, referrers)
-        if (*i != path) tryToDelete(options, results, done, *i);
-
     results.paths.insert(path);
 
     if (!pathExists(path)) return;
                 
-    /* If just returning the set of dead paths, we also return the
-       space that would be freed if we deleted them. */
-    if (options.action == GCOptions::gcReturnDead) {
-        unsigned long long bytesFreed, blocksFreed;
-        computePathSize(path, bytesFreed, blocksFreed);
-        results.bytesFreed += bytesFreed;
-        results.blocksFreed += blocksFreed;
-        return;
-    }
-
 #ifndef __CYGWIN__
     AutoCloseFD fdLock;
         
@@ -517,8 +493,6 @@ void LocalStore::tryToDelete(const GCOptions & options, GCResults & results,
     }
 #endif
 
-    printMsg(lvlInfo, format("deleting `%1%'") % path);
-            
     /* Okay, it's safe to delete. */
     unsigned long long bytesFreed, blocksFreed;
     deleteFromStore(path, bytesFreed, blocksFreed);
@@ -545,6 +519,31 @@ void LocalStore::tryToDelete(const GCOptions & options, GCResults & results,
         /* Write token to stale (deleted) lock file. */
         writeFull(fdLock, (const unsigned char *) "d", 1);
 #endif
+}
+
+
+void LocalStore::gcPathRecursive(const GCOptions & options,
+    GCResults & results, PathSet & done, const Path & path)
+{
+    if (done.find(path) != done.end()) return;
+    done.insert(path);
+
+    startNest(nest, lvlDebug, format("looking at `%1%'") % path);
+        
+    /* Delete all the referrers first.  They must be garbage too,
+       since if they were in the closure of some live path, then this
+       path would also be in the closure.  Note that
+       deleteFromStore() below still makes sure that the referrer set
+       has become empty, just in case. */
+    PathSet referrers;
+    if (isValidPath(path))
+        queryReferrers(path, referrers);
+    foreach (PathSet::iterator, i, referrers)
+        if (*i != path) gcPathRecursive(options, results, done, *i);
+
+    printMsg(lvlInfo, format("deleting `%1%'") % path);
+            
+    gcPath(options, results, path);
 }
 
 
@@ -724,7 +723,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                determined by the references graph. */
             printMsg(lvlError, format("deleting garbage..."));
             foreach (PathSet::iterator, i, storePaths)
-                tryToDelete(options, results, done, *i);
+                gcPathRecursive(options, results, done, *i);
         }
 
         else {
@@ -750,6 +749,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
               referrers into the priority queue. */
             printMsg(lvlError, format("finding deletable paths..."));
             foreach (PathSet::iterator, i, storePaths) {
+                checkInterrupt();
                 /* We can safely delete a path if it's invalid or
                    it has no referrers.  Note that all the invalid
                    paths will be deleted in the first round. */
@@ -762,14 +762,16 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
             /* Now delete everything in the order of the priority
                queue until nothing is left. */
+            printMsg(lvlError, format("deleting garbage..."));
             while (!prioQueue.empty()) {
+                checkInterrupt();
                 Path path = prioQueue.top(); prioQueue.pop();
-                printMsg(lvlTalkative, format("atime %1%: %2%") % showTime("%F %H:%M:%S", atimeComp.cache[path]) % path);
+                printMsg(lvlInfo, format("deleting `%1%' (last accesses %2%)") % path % showTime("%F %H:%M:%S", atimeComp.cache[path]));
 
                 PathSet references;
                 if (isValidPath(path)) references = queryReferencesNoSelf(path);
 
-                tryToDelete(options, results, done, path);
+                gcPath(options, results, path);
 
                 /* For each reference of the current path, see if the
                    reference has now become deletable (i.e. is in the

@@ -167,8 +167,11 @@ private:
     
     void upgradeStore12();
 
-    void tryToDelete(const GCOptions & options, GCResults & results,
-        PathSet & done, const Path & path);
+    void gcPath(const GCOptions & options, GCResults & results,
+        const Path & path);
+
+    void gcPathRecursive(const GCOptions & options,
+        GCResults & results, PathSet & done, const Path & path);
 
     void startSubstituter(const Path & substituter,
         RunningSubstituter & runningSubstituter);
