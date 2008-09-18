@@ -1407,10 +1407,12 @@ void run(Strings args)
             globals.instSource.systemFilter = needArg(i, args, arg);
         else {
             remaining.push_back(arg);
-            if (arg[0] == '-') 
+            if (arg[0] == '-') {
                 opFlags.push_back(arg);
-            else
-                opArgs.push_back(arg);
+                if (arg == "--from-profile") { /* !!! hack */
+                    if (i != args.end()) opFlags.push_back(*i++);
+                }
+            } else opArgs.push_back(arg);
         }
 
         if (oldOp && oldOp != op)
