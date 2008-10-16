@@ -1750,6 +1750,11 @@ void DerivationGoal::startBuilder()
            host file system. */
         Paths defaultDirs;
         defaultDirs.push_back("/dev");
+
+	/* The `/dev/pts' directory must be mounted separately so that
+	   newly-created pseudo-terminals show up.  */
+        defaultDirs.push_back("/dev/pts");
+
         defaultDirs.push_back("/proc");
         Paths dirsInChroot = querySetting("build-chroot-dirs", defaultDirs);
 
