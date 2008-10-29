@@ -1710,16 +1710,13 @@ void DerivationGoal::startBuilder()
         /* Create a temporary directory in which we set up the chroot
            environment using bind-mounts.
 
-           !!! Big danger here: since we're doing this in /tmp, there
-           is a risk that the admin does something like "rm -rf
-           /tmp/chroot-nix-*" to clean up aborted builds, and if some
-           of the bind-mounts are still active, then "rm -rf" will
-           happily recurse into those mount points (thereby deleting,
-           say, /nix/store).  Ideally, chrootRootDir should be created in
-           some special location (maybe in /nix/var/nix) where Nix
-           takes care of unmounting / deleting old chroots
-           automatically. */
-        chrootRootDir = createTempDir("", "chroot-nix");
+           !!! Bind mounts are potentially dangerous: if the user
+           cleans up his system by doing "rm -rf
+           /nix/var/nix/chroots/*", this will recurse into /nix/store
+           via the bind mounts (and potentially other parts of the
+           filesystem, depending on the setting of the
+           `build-chroot-dirs' option). */
+        chrootRootDir = createTempDir(nixChrootsDir, "chroot-nix");
 
         /* Clean up the chroot directory automatically, but don't
            recurse; that would be very very bad if the unmount of a
