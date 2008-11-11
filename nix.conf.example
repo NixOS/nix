@@ -164,13 +164,13 @@
 # (using `mount --bind' on Linux) some directories from the normal
 # file system hierarchy inside the chroot.  These are the Nix store,
 # the temporary build directory (usually /tmp/nix-<pid>-<number>) and
-# the directories listed here.  The default is "/dev /proc".  Files
-# in /dev (such as /dev/null) are needed by many builds, and some
-# files in /proc may also be needed occasionally.
+# the directories listed here.  The default is "/dev /dev/pts /proc".
+# Files in /dev (such as /dev/null) are needed by many builds, and
+# some files in /proc may also be needed occasionally.
 #
 # Example:
 #   build-use-chroot = /dev /proc /bin
-#build-chroot-dirs = /dev /proc
+#build-chroot-dirs = /dev /dev/pts /proc
 
 
 ### Option `system'

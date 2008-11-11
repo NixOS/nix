@@ -1744,15 +1744,14 @@ void DerivationGoal::startBuilder()
         autoDelChrootTmp = boost::shared_ptr<AutoDelete>(new AutoDelete(chrootTmpDir));
 
         /* Bind-mount a user-configurable set of directories from the
-           host file system. */
+           host file system.  The `/dev/pts' directory must be mounted
+           separately so that newly-created pseudo-terminals show
+           up. */
         Paths defaultDirs;
         defaultDirs.push_back("/dev");
-
-	/* The `/dev/pts' directory must be mounted separately so that
-	   newly-created pseudo-terminals show up.  */
         defaultDirs.push_back("/dev/pts");
-
         defaultDirs.push_back("/proc");
+        
         Paths dirsInChroot = querySetting("build-chroot-dirs", defaultDirs);
 
         dirsInChroot.push_front(nixStore);
