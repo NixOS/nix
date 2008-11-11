@@ -426,6 +426,8 @@ static void performOp(unsigned int clientVersion,
         maxSilentTime = readInt(from);
         if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
             useBuildHook = readInt(from) != 0;
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
+            buildVerbosity = (Verbosity) readInt(from);
         startWork();
         stopWork();
         break;
