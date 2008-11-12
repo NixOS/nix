@@ -220,6 +220,8 @@ static void initAndRun(int argc, char * * argv)
             ; /* !!! obsolete - remove eventually */
         else if (arg == "--no-build-output" || arg == "-Q")
             buildVerbosity = lvlVomit;
+        else if (arg == "--print-build-trace")
+            printBuildTrace = true;
         else if (arg == "--help") {
             printHelp();
             return;

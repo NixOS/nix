@@ -183,8 +183,11 @@ void RemoteStore::setOptions()
     writeInt(maxSilentTime, to);
     if (GET_PROTOCOL_MINOR(daemonVersion) >= 2)
         writeInt(useBuildHook, to);
-    if (GET_PROTOCOL_MINOR(daemonVersion) >= 4)
+    if (GET_PROTOCOL_MINOR(daemonVersion) >= 4) {
         writeInt(buildVerbosity, to);
+        writeInt(logType, to);
+        writeInt(printBuildTrace, to);
+    }
     processStderr();
 }
 

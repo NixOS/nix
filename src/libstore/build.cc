@@ -778,7 +778,7 @@ private:
     void computeClosure();
 
     /* Open a log file and a pipe to it. */
-    void openLogFile();
+    Path openLogFile();
 
     /* Common initialisation to be performed in child processes (i.e.,
        both in builders and in build hooks). */
@@ -1081,6 +1081,10 @@ void DerivationGoal::tryToBuild()
 
     } catch (BuildError & e) {
         printMsg(lvlError, e.msg());
+        if (printBuildTrace) {
+            printMsg(lvlError, format("@ build-failed %1% %2% %3% %4%")
+                % drvPath % drv.outputs["out"].path % 0 % e.msg());
+        }
         amDone(ecFailed);
         return;
     }
@@ -1171,9 +1175,13 @@ void DerivationGoal::buildDone()
         /* Compute the FS closure of the outputs and register them as
            being valid. */
         computeClosure();
-        
+
     } catch (BuildError & e) {
         printMsg(lvlError, e.msg());
+        if (printBuildTrace) {
+            printMsg(lvlError, format("@ build-failed %1% %2% %3% %4%")
+                % drvPath % drv.outputs["out"].path % status % e.msg());
+        }
         amDone(ecFailed);
         return;
     }
@@ -1181,6 +1189,11 @@ void DerivationGoal::buildDone()
     /* Release the build user, if applicable. */
     buildUser.release();
 
+    if (printBuildTrace) {
+        printMsg(lvlError, format("@ build-succeeded %1% %2%")
+            % drvPath % drv.outputs["out"].path);
+    }
+    
     amDone(ecSuccess);
 }
 
@@ -1250,7 +1263,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
     tmpDir = createTempDir();
     
     /* Create the log file and pipe. */
-    openLogFile();
+    Path logFile = openLogFile();
 
     /* Create the communication pipes. */
     toHook.create();
@@ -1369,6 +1382,11 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
         /* Tell the hook to proceed. */ 
         writeLine(toHook.writeSide, "okay");
 
+        if (printBuildTrace) {
+            printMsg(lvlError, format("@ build-started %1% %2% %3% %4%")
+                % drvPath % drv.outputs["out"].path % drv.platform % logFile);
+        }
+        
         return rpAccept;
     }
 
@@ -1774,7 +1792,7 @@ void DerivationGoal::startBuilder()
         drv.builder);
 
     /* Create the log file and pipe. */
-    openLogFile();
+    Path logFile = openLogFile();
     
     /* Fork a child to build the package.  Note that while we
        currently use forks to run and wait for the children, it
@@ -1878,6 +1896,11 @@ void DerivationGoal::startBuilder()
     logPipe.writeSide.close();
     worker.childStarted(shared_from_this(), pid,
         singleton<set<int> >(logPipe.readSide), true);
+
+    if (printBuildTrace) {
+        printMsg(lvlError, format("@ build-started %1% %2% %3% %4%")
+            % drvPath % drv.outputs["out"].path % drv.platform % logFile);
+    }
 }
 
 
@@ -2023,7 +2046,7 @@ void DerivationGoal::computeClosure()
 string drvsLogDir = "drvs";
 
 
-void DerivationGoal::openLogFile()
+Path DerivationGoal::openLogFile()
 {
     /* Create a log file. */
     Path dir = (format("%1%/%2%") % nixLogDir % drvsLogDir).str();
@@ -2037,6 +2060,8 @@ void DerivationGoal::openLogFile()
 
     /* Create a pipe to get the output of the child. */
     logPipe.create();
+
+    return logFileName;
 }
 
 
@@ -2367,6 +2392,11 @@ void SubstitutionGoal::tryToRun()
         pid, singleton<set<int> >(logPipe.readSide), true);
 
     state = &SubstitutionGoal::finished;
+
+    if (printBuildTrace) {
+        printMsg(lvlError, format("@ substituter-started %1% %2%")
+            % storePath % sub);
+    }
 }
 
 
@@ -2406,6 +2436,11 @@ void SubstitutionGoal::finished()
             format("substitution of path `%1%' using substituter `%2%' failed: %3%")
             % storePath % sub % e.msg());
         
+        if (printBuildTrace) {
+            printMsg(lvlError, format("@ substituter-failed %1% %2% %3%")
+                % storePath % status % e.msg());
+        }
+        
         /* Try the next substitute. */
         state = &SubstitutionGoal::tryNext;
         worker.wakeUp(shared_from_this());
@@ -2424,6 +2459,10 @@ void SubstitutionGoal::finished()
     printMsg(lvlChatty,
         format("substitution of path `%1%' succeeded") % storePath);
 
+    if (printBuildTrace) {
+        printMsg(lvlError, format("@ substituter-succeeded %1%") % storePath);
+    }
+    
     amDone(ecSuccess);
 }
 

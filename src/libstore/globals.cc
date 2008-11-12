@@ -28,6 +28,7 @@ string thisSystem = "unset";
 unsigned int maxSilentTime = 0;
 Paths substituters;
 bool useBuildHook = true;
+bool printBuildTrace = false;
 
 
 static bool settingsRead = false;
