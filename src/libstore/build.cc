@@ -361,6 +361,15 @@ const char * * strings2CharPtrs(const Strings & ss)
 }
 
 
+/* Restore default handling of SIGPIPE, otherwise some programs will
+   randomly say "Broken pipe". */
+static void restoreSIGPIPE() 
+{
+    struct sigaction act, oact;
+    act.sa_handler = SIG_DFL;
+    act.sa_flags = 0;
+    if (sigaction(SIGPIPE, &act, &oact)) throw SysError("resetting SIGPIPE");
+}
 
 
 //////////////////////////////////////////////////////////////////////
@@ -514,6 +523,8 @@ static void runSetuidHelper(const string & command,
             args.push_back(arg.c_str());
             args.push_back(0);
 
+            restoreSIGPIPE();
+            
             execve(program.c_str(), (char * *) &args[0], 0);
             throw SysError(format("executing `%1%'") % program);
         }
@@ -1877,6 +1888,8 @@ void DerivationGoal::startBuilder()
                  i != drv.args.end(); ++i)
                 args.push_back(i->c_str());
             args.push_back(0);
+
+            restoreSIGPIPE();
 
             /* Execute the program.  This should not return. */
             execve(program.c_str(), (char * *) &args[0], (char * *) envArr);
