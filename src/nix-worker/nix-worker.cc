@@ -534,7 +534,7 @@ static void processConnection()
 static void sigChldHandler(int sigNo)
 {
     /* Reap all dead children. */
-    while (waitpid(-1, 0, WNOHANG) == 0) ;
+    while (waitpid(-1, 0, WNOHANG) > 0) ;
 }
 
 
