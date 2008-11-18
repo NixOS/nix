@@ -47,6 +47,13 @@
   <listitem><para><command>nix-prefetch-url</command> now supports
   <literal>mirror://</literal> URLs.</para></listitem>
 
+  <listitem><para>Removed the commands
+  <command>nix-pack-closure</command> and
+  <command>nix-unpack-closure</command>.   You can do almost the same
+  thing but much more efficiently by doing <literal>nix-store --export
+  $(nix-store -qR <replaceable>paths</replaceable>) > closure</literal> and
+  <literal>nix-store --import &lt; closure</literal>.</para></listitem>
+
 </itemizedlist>
 
 </section>

@@ -89,10 +89,6 @@
         <title>nix-install-package</title>
         <xi:include href="nix-install-package.xml" />
       </section>
-      <section xml:id="sec-nix-pack-closure">
-        <title>nix-pack-closure</title>
-        <xi:include href="nix-pack-closure.xml" />
-      </section>
       <section xml:id="sec-nix-prefetch-url">
         <title>nix-prefetch-url</title>
         <xi:include href="nix-prefetch-url.xml" />
@@ -104,10 +100,6 @@
       <section xml:id="sec-nix-push">
         <title>nix-push</title>
         <xi:include href="nix-push.xml" />
-      </section>
-      <section xml:id="sec-nix-unpack-closure">
-        <title>nix-unpack-closure</title>
-        <xi:include href="nix-unpack-closure.xml" />
       </section>
     </section>
     
