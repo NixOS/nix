@@ -417,9 +417,9 @@ static void opDumpDB(Strings opFlags, Strings opArgs)
     if (!opArgs.empty())
         throw UsageError("no arguments expected");
     PathSet validPaths = store->queryValidPaths();
-    /* !!! this isn't streamy; makeValidityRegistration() builds a
-       potentially gigantic string. */
-    cout << makeValidityRegistration(validPaths, true, true);
+    foreach (PathSet::iterator, i, validPaths) {
+        cout << makeValidityRegistration(singleton<PathSet>(*i), true, true);
+    }
 }
 
 
