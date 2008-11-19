@@ -1,9 +1,10 @@
-For installation and usage instructions, please read the manual, which
-can be found in `docs/manual/manual.html', and additionally at the Nix
-website at <http://nixos.org/>.
+Nix is a purely functional package manager.  For installation and
+usage instructions, please read the manual, which can be found in
+`docs/manual/manual.html', and additionally at the Nix website at
+<http://nixos.org/>.
 
 
 Acknowledgments
 
 This product includes software developed by the OpenSSL Project for
-use in the OpenSSL Toolkit (http://www.OpenSSL.org/)
+use in the OpenSSL Toolkit (http://www.OpenSSL.org/).

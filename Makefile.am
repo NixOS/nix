@@ -18,6 +18,8 @@ install-data-local: init-state
 	if ! test -e $(DESTDIR)$(sysconfdir)/nix/nix.conf; then \
 		$(INSTALL_DATA) $(srcdir)/nix.conf.example $(DESTDIR)$(sysconfdir)/nix/nix.conf; \
 	fi
+	$(INSTALL) -d $(DESTDIR)$(docdir)
+	$(INSTALL_DATA) README $(DESTDIR)$(docdir)/
 
 if INIT_STATE
 

@@ -75,12 +75,12 @@ NEWS.txt: release-notes.xml
 all-local: manual.html NEWS.html NEWS.txt
 
 install-data-local: manual.html
-	$(INSTALL) -d $(DESTDIR)$(datadir)/nix/manual
-	$(INSTALL_DATA) manual.html $(DESTDIR)$(datadir)/nix/manual
-	$(INSTALL_DATA) style.css $(DESTDIR)$(datadir)/nix/manual
-	cp -r images $(DESTDIR)$(datadir)/nix/manual/images
-	$(INSTALL) -d $(DESTDIR)$(datadir)/nix/manual/figures
-	$(INSTALL_DATA) $(FIGURES) $(DESTDIR)$(datadir)/nix/manual/figures
+	$(INSTALL) -d $(DESTDIR)$(docdir)/manual
+	$(INSTALL_DATA) manual.html $(DESTDIR)$(docdir)/manual
+	$(INSTALL_DATA) style.css $(DESTDIR)$(docdir)/manual
+	cp -r images $(DESTDIR)$(docdir)/manual/images
+	$(INSTALL) -d $(DESTDIR)$(docdir)/manual/figures
+	$(INSTALL_DATA) $(FIGURES) $(DESTDIR)$(docdir)/manual/figures
 
 images:
 	mkdir images
