@@ -93,6 +93,23 @@ if builtins ? getEnv then __getEnv "PATH" else ""</programlisting>
   </varlistentry>
 
   
+  <varlistentry><term><function>builtins.compareVersions</function>
+  <replaceable>s1</replaceable> <replaceable>s2</replaceable></term>
+
+    <listitem><para>Compare two strings representing versions and
+    return <literal>-1</literal> if version
+    <replaceable>s1</replaceable> is older than version
+    <replaceable>s2</replaceable>, <literal>0</literal> if they are
+    the same, and <literal>1</literal> if
+    <replaceable>s1</replaceable> is newer than
+    <replaceable>s2</replaceable>.  The version comparison algorithm
+    is the same as the one used by <link
+    linkend="ssec-version-comparisons"><command>nix-env
+    -u</command></link>.</para></listitem>
+
+  </varlistentry>
+
+  
   <varlistentry
   xml:id='builtin-currentSystem'><term><varname>builtins.currentSystem</varname></term>
 
@@ -142,6 +159,16 @@ if builtins ? getEnv then __getEnv "PATH" else ""</programlisting>
     <replaceable>s</replaceable>, that is, everything before the final
     slash in the string.  This is similar to the GNU
     <command>dirname</command> command.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.div</function>
+  <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+
+    <listitem><para>Return the quotient of the integers
+    <replaceable>e1</replaceable> and
+    <replaceable>e2</replaceable>.</para></listitem>
 
   </varlistentry>
 
@@ -352,6 +379,15 @@ x: x + 456</programlisting>
   </varlistentry>
 
   
+  <varlistentry><term><function>builtins.length</function>
+  <replaceable>e</replaceable></term>
+
+    <listitem><para>Return the length of the list
+    <replaceable>e</replaceable>.</para></listitem>
+
+  </varlistentry>
+
+  
   <varlistentry><term><function>builtins.lessThan</function>
   <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
 
@@ -405,6 +441,31 @@ map (x: "foo" + x) ["bar" "bla" "abc"]</programlisting>
     evaluates to <literal>["foobar" "foobla"
     "fooabc"]</literal>.</para></listitem>
     
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.mul</function>
+  <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+
+    <listitem><para>Return the product of the integers
+    <replaceable>e1</replaceable> and
+    <replaceable>e2</replaceable>.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.parseDrvName</function>
+  <replaceable>s</replaceable></term>
+
+    <listitem><para>Split the string <replaceable>s</replaceable> into
+    a package name and version.  The package name is everything up to
+    but not including the first dash followed by a digit, and the
+    version is everything following that dash.  The result is returned
+    in an attribute set <literal>{name, version}</literal>.  Thus,
+    <literal>builtins.parseDrvName "nix-0.12pre12876"</literal>
+    returns <literal>{name = "nix"; version =
+    "0.12pre12876";}</literal>.</para></listitem>
+
   </varlistentry>
 
   

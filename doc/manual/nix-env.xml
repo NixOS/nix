@@ -526,7 +526,7 @@ upgrading `mozilla-1.2' to `mozilla-1.4'</screen>
 
 </refsection>
     
-<refsection><title>Versions</title>
+<refsection xml:id="ssec-version-comparisons"><title>Versions</title>
 
 <para>The upgrade operation determines whether a derivation
 <varname>y</varname> is an upgrade of a derivation
