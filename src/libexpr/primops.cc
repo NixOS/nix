@@ -482,6 +482,27 @@ static Expr prim_toPath(EvalState & state, const ATermVector & args)
 }
 
 
+/* Allow a valid store path to be used in an expression.  This is
+   useful in some generated expressions such as in nix-push, which
+   generates a call to a function with an already existing store path
+   as argument.  You don't want to use `toPath' here because it copies
+   the path to the Nix store, which yields a copy like
+   /nix/store/newhash-oldhash-oldname.  In the past, `toPath' had
+   special case behaviour for store paths, but that created weird
+   corner cases. */
+static Expr prim_storePath(EvalState & state, const ATermVector & args)
+{
+    PathSet context;
+    Path path = canonPath(coerceToPath(state, args[0], context));
+    if (!isInStore(path))
+        throw EvalError(format("path `%1%' is not in the Nix store") % path);
+    if (!store->isValidPath(path))
+        throw EvalError(format("store path `%1%' is not valid") % path);
+    context.insert(toStorePath(path));
+    return makeStr(path, context);
+}
+
+
 static Expr prim_pathExists(EvalState & state, const ATermVector & args)
 {
     PathSet context;
@@ -950,6 +971,7 @@ void EvalState::addPrimOps()
 
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);
+    addPrimOp("__storePath", 1, prim_storePath);
     addPrimOp("__pathExists", 1, prim_pathExists);
     addPrimOp("baseNameOf", 1, prim_baseNameOf);
     addPrimOp("dirOf", 1, prim_dirOf);
