@@ -128,6 +128,7 @@ lrwxrwxrwx    1 ... 2005-03-13 21:10 /home/eelco/bla/result -> /nix/store/1r1134
     <arg choice='plain'><option>-r</option></arg>
   </group>
   <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
+  <arg><option>--dry-run</option></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -165,6 +166,11 @@ the specified store paths.  Realisation is a somewhat overloaded term:
 <para>The output path of each derivation is printed on standard
 output.  (For non-derivations argument, the argument itself is
 printed.)</para>
+
+<para>If the <option>--dry-run</option> option is used, then
+<command>nix-store</command> will print on standard error a
+description of what packages would be built or downloaded, and then
+quit.</para>
 
 </refsection>
             
@@ -204,6 +210,10 @@ linkend="sec-nix-build"><command>nix-build</command></link> does.</para>
     <arg choice='plain'><option>--print-dead</option></arg>
     <arg choice='plain'><option>--delete</option></arg>
   </group>
+  <arg><option>--max-freed</option> <replaceable>bytes</replaceable></arg>
+  <arg><option>--max-links</option> <replaceable>nrlinks</replaceable></arg>
+  <arg><option>--max-atime</option> <replaceable>atime</replaceable></arg>
+  <arg><option>--use-atime</option></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -258,7 +268,70 @@ the Nix store not reachable via file system references from a set of
 
 </variablelist>
 
-<para>The behaviour of the collector is influenced by the <link
+<para>By default, all unreachable paths are deleted.  The following
+options control what gets deleted and in what order:
+
+<variablelist>
+
+  <varlistentry><term><option>--max-freed</option> <replaceable>bytes</replaceable></term>
+  
+    <listitem><para>Keep deleting paths until at least
+    <replaceable>bytes</replaceable> bytes have been
+    deleted, then stop.</para></listitem>
+    
+  </varlistentry>
+
+  <varlistentry><term><option>--max-links</option> <replaceable>nrlinks</replaceable></term>
+  
+    <listitem><para>Keep deleting paths until the hard link count on
+    <filename>/nix/store</filename> is less than
+    <replaceable>nrlinks</replaceable>, then stop.  This is useful for
+    very large Nix stores on filesystems with a 32000 subdirectories
+    limit (like <literal>ext3</literal>).</para></listitem>
+    
+  </varlistentry>
+
+  <varlistentry><term><option>--max-atime</option> <replaceable>atime</replaceable></term>
+  
+    <listitem><para>Only delete a store path if its last-accessed time
+    is less than <replaceable>atime</replaceable>.  This allows you to
+    garbage-collect only packages that haven’t been used recently.
+    The time is expressed as the number of seconds in the Unix epoch,
+    i.e., since 1970-01-01 00:00:00 UTC.  An easy way to convert to
+    this format is <literal>date +%s -d "<replaceable>date
+    specification</replaceable>"</literal>.</para>
+
+    <para>For directories, the last-accessed time is the highest
+    last-accessed time of any regular file in the directory (or in any
+    of its subdirectories).  That is, the <literal>atime</literal>
+    field maintained by the filesystem is ignored for directories.
+    This is because operations such as rebuilding the
+    <command>locate</command> database tend to update the
+    <literal>atime</literal> values of all directories, so they’re not
+    a useful indicator of whether a package was recently used.</para>
+
+    <para>Note that <command>nix-store --optimise</command> reads all
+    regular files in the Nix store, and so causes all last-accessed
+    times to be set to the present time.  This makes
+    <option>--max-atime</option> ineffective (for a while at
+    least).</para></listitem>
+    
+  </varlistentry>
+
+  <varlistentry><term><option>--use-atime</option></term>
+
+    <listitem><para>Delete store paths in order of ascending
+    last-accessed time.  This is useful in conjunction with the other
+    options to delete only the least recently used
+    packages.</para></listitem>
+
+  </varlistentry>
+  
+</variablelist>
+
+</para>
+
+<para>The behaviour of the collector is also influenced by the <link
 linkend="conf-gc-keep-outputs"><literal>gc-keep-outputs</literal></link>
 and <link
 linkend="conf-gc-keep-derivations"><literal>gc-keep-derivations</literal></link>
@@ -281,6 +354,20 @@ $ nix-store --gc
 deleting `/nix/store/kq82idx6g0nyzsp2s14gfsc38npai7lf-cairo-1.0.4.tar.gz.drv'
 <replaceable>...</replaceable>
 8825586 bytes freed (8.42 MiB)</screen>
+
+</para>
+
+<para>To delete unreachable paths not accessed in the last two months:
+
+<screen>
+$ nix-store --gc -v --max-atime $(date +%s -d "2 months ago")</screen>
+
+</para>
+
+<para>To delete at least 100 MiBs of unreachable paths:
+
+<screen>
+$ nix-store --gc --max-freed $((100 * 1024 * 1024))</screen>
 
 </para>
 
@@ -950,7 +1037,51 @@ ktorrent-2.2.1/NEWS
 </refsection>
 
 
-<!-- TODO: export, import operations -->
+<!--######################################################################-->
+
+<refsection><title>Operation <option>--dump-db</option></title>
+
+<refsection>
+  <title>Synopsis</title>
+  <cmdsynopsis>
+    <command>nix-store</command>
+    <arg choice='plain'><option>--dump-db</option></arg>
+  </cmdsynopsis>
+</refsection>
+
+<refsection><title>Description</title>
+            
+<para>The operation <option>--dump-db</option> writes a dump of the
+Nix database to standard output.  It can be loaded into an empty Nix
+store using <option>--load-db</option>.  This is useful for making
+backups and when migrating to different database schemas.</para>
+
+</refsection>
+            
+</refsection>
+
+
+<!--######################################################################-->
+
+<refsection><title>Operation <option>--dump-db</option></title>
+
+<refsection>
+  <title>Synopsis</title>
+  <cmdsynopsis>
+    <command>nix-store</command>
+    <arg choice='plain'><option>--load-db</option></arg>
+  </cmdsynopsis>
+</refsection>
+
+<refsection><title>Description</title>
+            
+<para>The operation <option>--load-db</option> reads a dump of the Nix
+database created by <option>--dump-db</option> from standard input and
+loads it into the Nix database.</para>
+
+</refsection>
+            
+</refsection>
 
 
 </refentry>

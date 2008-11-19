@@ -68,7 +68,7 @@ $ rm __db* log.* derivers references referrers reserved validpaths DB_CONFIG</sc
   have been deleted.  The option <option>--max-links
   <replaceable>N</replaceable></option> tells it to stop after the
   link count on <filename>/nix/store</filename> has dropped below
-  <replaceable>N</replaceable>.  This is useful on very large Nix
+  <replaceable>N</replaceable>.  This is useful for very large Nix
   stores on filesystems with a 32000 subdirectories limit (like
   <literal>ext3</literal>).  The option <option>--use-atime</option>
   causes store paths to be deleted in order of ascending last access
