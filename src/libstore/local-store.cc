@@ -408,6 +408,9 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
 
 bool LocalStore::isValidPath(const Path & path)
 {
+    /* Files in the info directory starting with a `.' are temporary
+       files. */
+    if (baseNameOf(path).at(0) == '.') return false;
     return pathExists(infoFileFor(path));
 }
 
@@ -416,8 +419,8 @@ PathSet LocalStore::queryValidPaths()
 {
     PathSet paths;
     Strings entries = readDirectory(nixDBPath + "/info");
-    for (Strings::iterator i = entries.begin(); i != entries.end(); ++i) 
-        paths.insert(nixStore + "/" + *i);
+    for (Strings::iterator i = entries.begin(); i != entries.end(); ++i)
+        if (i->at(0) != '.') paths.insert(nixStore + "/" + *i);
     return paths;
 }
 
