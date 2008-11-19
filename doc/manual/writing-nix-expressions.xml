@@ -937,17 +937,84 @@ set.</para>
 <para>Functions have the following form:
 
 <programlisting>
-{<replaceable>params</replaceable>}: <replaceable>body</replaceable></programlisting>
+<replaceable>pattern</replaceable>: <replaceable>body</replaceable></programlisting>
 
-This defines a function that must be called with an attribute set
-containing the attributes listed in <replaceable>params</replaceable>,
-which is a comma-separated list of attribute names.  Optionally, for
-each parameter a <emphasis>default value</emphasis> may be specified
-by writing <literal><replaceable>param</replaceable> ?
-<replaceable>e</replaceable></literal>, where
-<replaceable>e</replaceable> is an arbitrary expression.  If a
-parameter has a default, the corresponding attribute may be omitted in
-function calls.</para>
+The pattern specifies what the argument of the function must look
+like, and binds variables in the body to (parts of) the
+argument.  There are three kinds of patterns:</para>
+
+<itemizedlist>
+
+  
+  <listitem><para>If a pattern is a single identifier, then the
+  function matches any argument.  Example:
+
+  <programlisting>
+let negate = x: !x;
+    concat = x: y: x + y;
+in if negate true then concat "foo" "bar" else ""</programlisting>
+
+  Note that <function>concat</function> is a function that takes one
+  argument and returns a function that takes another argument.  This
+  allows partial parameterisation (i.e., only filling some of the
+  arguments of a function); e.g.,
+
+  <programlisting>
+map (concat "foo") ["bar" "bla" "abc"]</programlisting>
+
+  evaluates to <literal>["foobar" "foobla"
+  "fooabc"]</literal>.</para></listitem>
+
+  
+  <listitem><para>An <emphasis>attribute set pattern</emphasis> of the
+  form <literal>{name1, name2, …, nameN}</literal>
+  matches an attribute set containing the listed attributes, and binds
+  the values of those attributes to variables in the function body.
+  For example, the function
+
+<programlisting>
+{x, y, z}: z + y + x</programlisting>
+
+  can only be called with a set containing exactly the attributes
+  <varname>x</varname>, <varname>y</varname> and
+  <varname>z</varname>.  No other attributes are allowed.  If you want
+  to allow additional arguments, you can use an ellipsis
+  (<literal>...</literal>): 
+
+<programlisting>
+{x, y, z, ....}: z + y + x</programlisting>
+
+  This works on any set that contains at least the three named
+  attributes.</para>
+
+  <para>It is possible to provide <emphasis>default values</emphasis>
+  for attributes, in which case they are allowed to be missing.  A
+  default value is specified by writing
+  <literal><replaceable>name</replaceable> ?
+  <replaceable>e</replaceable></literal>, where
+  <replaceable>e</replaceable> is an arbitrary expression.  For example,
+
+<programlisting>
+{x, y ? "foo", z ? "bar"}: z + y + x</programlisting>
+
+  specifies a function that only requires an attribute named
+  <varname>x</varname>, but optionally accepts <varname>y</varname>
+  and <varname>z</varname>.</para></listitem>
+
+
+  <listitem><para>An <literal>@</literal>-pattern requires that the
+  argument matches with the patterns on the left- and right-hand side
+  of the <literal>@</literal>-sign.  For example:
+
+<programlisting>
+args@{x, y, z, ...}: z + y + x + args.a</programlisting>
+
+  Here <varname>args</varname> is bound to the entire argument, which
+  is further matches against the pattern <literal>{x, y, z,
+  ...}</literal>.</para></listitem>
+
+
+</itemizedlist>
 
 <para>Note that functions do not have names.  If you want to give them
 a name, you can bind them to an attribute, e.g.,
@@ -957,31 +1024,6 @@ let concat = {x, y}: x + y;
 in concat {x = "foo"; y = "bar";}</programlisting>
 
 </para>
-
-<para>It is also possible to define a function that takes a single
-argument and that does not need to be called with an attribute set as
-argument.  The syntax is
-
-<programlisting>
-<replaceable>var</replaceable>: <replaceable>body</replaceable></programlisting>
-
-where <replaceable>var</replaceable> is the name of the argument.  It
-is not possible to define a default.  Example:
-
-<programlisting>
-let negate = x: !x;
-    concat = x: y: x + y;
-in if negate true then concat "foo" "bar" else ""</programlisting>
-
-Note that <function>concat</function> is a function that takes one
-arguments and returns a function that takes another argument.  This
-allows partial parameterisation (i.e., only filling some of the
-arguments of a function); e.g.,
-
-<programlisting>
-map (concat "foo") ["bar" "bla" "abc"]</programlisting>
-
-evaluates to <literal>["foobar" "foobla" "fooabc"]</literal>.</para>
 
 </simplesect>
 
