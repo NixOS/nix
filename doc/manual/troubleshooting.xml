@@ -9,117 +9,6 @@ the <link xlink:href="http://bugs.strategoxt.org/browse/NIX">Nix
 bug tracker</link> for a list of currently known issues.</para>
 
 
-<section><title>Berkeley DB: <quote>Cannot allocate memory</quote></title>
-
-<para>Symptom: Nix operations (in particular the
-<command>nix-store</command> operations <option>--gc</option>,
-<option>--verify</option>, and <option>--clear-substitutes</option> —
-the latter being called by <command>nix-channel --update</command>)
-failing:
-
-<screen>
-$ nix-store --verify
-error: Db::del: Cannot allocate memory</screen>
-
-</para>
-
-<para>Possible solution: make sure that no Nix processes are running,
-then do:
-
-<screen>
-$ cd /nix/var/nix/db
-$ rm __db.00*</screen>
-
-</para>
-
-</section>
-
-
-<section><title>Berkeley DB gives weird error messages</title>
-
-<para>Symptom: you get error messages such as
-
-<screen>
-Berkeley DB message: Finding last valid log LSN: file: 1 offset 28
-Berkeley DB error: file validpaths (meta pgno = 0) has LSN [483][34721].
-Berkeley DB error: end of log is [1][28]
-Berkeley DB error: /nix/var/nix/db/validpaths: unexpected file type or format</screen>
-
-or other weird Berkeley DB errors, and they don’t go away (i.e.,
-automatic recovery doesn’t work).  This may be the case after a system
-crash.</para>
-
-<para>Solution: first try to run <command>db_recover</command> and
-then <link linkend='refsec-nix-store-verify'><command>nix-store
---verify</command></link>:
-
-<screen>
-$ db_recover -h /nix/var/nix/db
-$ nix-store --verify</screen>
-
-(Make sure that you have the right version of
-<command>db_recover</command>, namely, Berkeley DB 4.4 for Nix 0.10,
-and 4.5 for Nix 0.11.)</para>
-
-<para>If that doesn’t work, it’s time to bring out the big guns:
-
-<screen>
-$ cd /nix/var/nix
-$ cp -pr db db-backup  <lineannotation>(making a backup just in case)</lineannotation>
-$ cd db
-$ rm __db.* log*  <lineannotation>(removing the Berkeley DB environment)</lineannotation>
-$ mkdir tmp
-$ for i in *; do db_dump $i | (cd tmp &amp;&amp; db_load $i); done 
-<lineannotation>(ignore error messages about non-database files like “reserved”)</lineannotation>
-$ mv tmp/* .
-$ nix-store --verify</screen>
-
-</para>
-
-</section>
-
-
-<section><title>Berkeley DB out of locks</title>
-
-<para>It is possible, especially in <command>nix-store
---verify</command> or when running the garbage collector, to run out
-of Berkeley DB locks, like this:
-
-<screen>
-$ nix-store --verify
-checking path existence
-checking path realisability
-checking the derivers table
-checking the references table
-Berkeley DB error: Lock table is out of available object entries
-error: Db::get: Cannot allocate memory</screen>
-
-</para>
-
-<para>A workaround is to increase the number of locks that Berkeley DB
-allocates.  (The real solution would be for Nix to not use so many
-locks.)  This can be done by putting the following in the file
-<filename>/nix/var/nix/db/<link
-xlink:href="http://www.oracle.com/technology/documentation/berkeley-db/db/ref/env/db_config.html">DB_CONFIG</link></filename>:
-
-<programlisting>
-set_lk_max_locks   100000
-set_lk_max_lockers 100000
-set_lk_max_objects 100000
-</programlisting>
-
-(Increase these numbers if necessary.)  Then make sure that there are
-no running Nix processes and delete the Berkeley DB environment:
-
-<screen>
-$ rm /nix/var/nix/db/__db.*</screen>
-
-The Berkeley DB environment is automatically recreated with the new
-limits when you run any Nix command.</para>
-
-</section>
-
-
 <section><title>Collisions in <command>nix-env</command></title>
 
 <para>Symptom: when installing or upgrading, you get an error message such as
@@ -187,7 +76,8 @@ Furthermore, the <literal>st_nlink</literal> field of the
 <para>This only happens on very large Nix installations (such as build
 machines).</para>
 
-<para>Quick solution: run the garbage collector.</para>
+<para>Quick solution: run the garbage collector.  You may want to use
+the <option>--max-links</option> option.</para>
 
 <para>Real solution: put the Nix store on a file system that supports
 more than 32,000 subdirectories per directory, such as ReiserFS.

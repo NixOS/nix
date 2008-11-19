@@ -87,7 +87,7 @@ $ rm __db* log.* derivers references referrers reserved validpaths DB_CONFIG</sc
   upgrading, instead of setting an exclusive lock on the profile.
   This allows multiple <command>nix-env -i / -u / -e</command>
   operations on the same profile in parallel.  If a
-  <command>nix-env</command> operation sees at th end that the profile
+  <command>nix-env</command> operation sees at the end that the profile
   was changed in the meantime by another process, it will just
   restart.  This is generally cheap because the build results are
   still in the Nix store.</para></listitem>
@@ -171,7 +171,7 @@ the following paths will be downloaded/copied (30.02 MiB):
   <literal>nix-store --import &lt;
   closure</literal>.</para></listitem>
 
-  <listitem><para>Lots of bugfixes, including a big performance bug in
+  <listitem><para>Lots of bug fixes, including a big performance bug in
   the handling of <literal>with</literal>-expressions.</para></listitem>
 
 </itemizedlist>
