@@ -12,26 +12,85 @@
 
 <itemizedlist>
 
-  <listitem><para>TODO: Berkeley DB no longer needed.</para></listitem>
+  <listitem>
+    <para>Nix no longer uses Berkeley DB to store Nix store metadata.
+    The principal advantages of the new storage scheme are: it works
+    properly over decent implementations of NFS (allowing Nix stores
+    to be shared between multiple machines); no recovery is needed
+    when a Nix process crashes; no write access is needed for
+    read-only operations; no more running out of Berkeley DB locks on
+    certain operations.</para>
 
-  <listitem><para>New substituter to copy from remotely mounted Nix
-  stores (TODO: document).</para></listitem>
+    <para>You still need to compile Nix with Berkeley DB support if
+    you want Nix to automatically convert your old Nix store to the
+    new schema.  If you don’t need this, you can build Nix with the
+    <filename>configure</filename> option
+    <option>--disable-old-db-compat</option>.</para>
 
-  <listitem><para><command>nix-store --dump-db / --load-db</command>.</para></listitem>
+    <para>After the automatic conversion to the new schema, you can
+    delete the old Berkeley DB files:
 
-  <listitem><para>New primops:
-  <varname>builtins.parseDrvName</varname>,
-  <varname>builtins.compareVersions</varname>,
-  <varname>builtins.length</varname>,
-  <varname>builtins.add</varname>,
-  <varname>builtins.sub</varname>,
-  <varname>builtins.genericClosure</varname>.
-  </para></listitem>
+    <screen>
+$ cd /nix/var/nix/db
+$ rm __db* log.* derivers references referrers reserved validpaths DB_CONFIG</screen>
 
-  <listitem><para>GC options: <option>--max-freed</option>,
-  <option>--max-links</option>.</para></listitem>
+    The new metadata is stored in the directories
+    <filename>/nix/var/nix/db/info</filename> and
+    <filename>/nix/var/nix/db/referrer</filename>.  Though the
+    metadata is stored in human-readable plain-text files, they are
+    not intended to be human-editable, as Nix is rather strict about
+    the format.</para>
 
-  <listitem><para>TODO: Optimistic profile locking.</para></listitem>
+    <para>The new storage schema may or may not require less disk
+    space than the Berkeley DB environment, mostly depending on the
+    cluster size of your file system.  With 1 KiB clusters (which
+    seems to be the <literal>ext3</literal> default nowadays) it
+    usually takes up much less space.</para>
+  </listitem>
+
+  <listitem><para>There is a new substituter that copies paths
+  directly from other (remote) Nix stores mounted somewhere in the
+  filesystem.  For instance, you can speed up an installation by
+  mounting some remote Nix store that already has the packages in
+  question via NFS or <literal>sshfs</literal>.  The environment
+  variable <envar>NIX_OTHER_STORES</envar> specifies the locations of
+  the remote Nix directories,
+  e.g. <literal>/mnt/remote-fs/nix</literal>.</para></listitem>
+
+  <listitem><para>New <command>nix-store</command> operations
+  <option>--dump-db</option> and <option>--load-db</option> to dump
+  and reload the Nix database.</para></listitem>
+
+  <listitem><para>The garbage collector has a number of new options to
+  allow only some of the garbage to be deleted.  The option
+  <option>--max-freed <replaceable>N</replaceable></option> tells the
+  collector to stop after at least <replaceable>N</replaceable> bytes
+  have been deleted.  The option <option>--max-links
+  <replaceable>N</replaceable></option> tells it to stop after the
+  link count on <filename>/nix/store</filename> has dropped below
+  <replaceable>N</replaceable>.  This is useful on very large Nix
+  stores on filesystems with a 32000 subdirectories limit (like
+  <literal>ext3</literal>).  The option <option>--use-atime</option>
+  causes store paths to be deleted in order of ascending last access
+  time.  This allows non-recently used stuff to be deleted.  The
+  option <option>--max-atime <replaceable>time</replaceable></option>
+  specifies an upper limit to the last accessed time of paths that may
+  be deleted.  For instance,
+
+    <screen>
+    $ nix-store --gc -v --max-atime $(date +%s -d "2 months ago")</screen>
+
+  deletes everything that hasn’t been accessed in two months.</para></listitem>
+
+  <listitem><para><command>nix-env</command> now uses optimistic
+  profile locking when performing an operation like installing or
+  upgrading, instead of setting an exclusive lock on the profile.
+  This allows multiple <command>nix-env -i / -u / -e</command>
+  operations on the same profile in parallel.  If a
+  <command>nix-env</command> operation sees at th end that the profile
+  was changed in the meantime by another process, it will just
+  restart.  This is generally cheap because the build results are
+  still in the Nix store.</para></listitem>
 
   <listitem><para>The option <option>--dry-run</option> is now
   supported by <command>nix-store -r</command> and
@@ -42,17 +101,78 @@
   and which paths will be substituted) is now always shown by
   <command>nix-env</command>, <command>nix-store -r</command> and
   <command>nix-build</command>.  The total download size of
-  substitutable paths is now also shown.</para></listitem>
+  substitutable paths is now also shown.  For instance, a build will
+  show something like
+
+    <screen>
+the following derivations will be built:
+  /nix/store/129sbxnk5n466zg6r1qmq1xjv9zymyy7-activate-configuration.sh.drv
+  /nix/store/7mzy971rdm8l566ch8hgxaf89x7lr7ik-upstart-jobs.drv
+  ...
+the following paths will be downloaded/copied (30.02 MiB):
+  /nix/store/4m8pvgy2dcjgppf5b4cj5l6wyshjhalj-samba-3.2.4
+  /nix/store/7h1kwcj29ip8vk26rhmx6bfjraxp0g4l-libunwind-0.98.6
+  ...</screen>      
+  
+  </para></listitem>
+
+  <listitem><para>Language features:
+
+    <itemizedlist>
+
+      <listitem><para>@-patterns as in Haskell.  For instance, in a
+      function definition
+
+      <programlisting>f = args @ {x, y, z}: <replaceable>...</replaceable>;</programlisting>
+
+      <varname>args</varname> refers to the argument as a whole, which
+      is further pattern-matched against the attribute set pattern
+      <literal>{x, y, z}</literal>.</para></listitem>
+
+      <listitem><para>“<literal>...</literal>” (ellipsis) patterns.
+      An attribute set pattern can now say <literal>...</literal>  at
+      the end of the attribute name list to specify that the function
+      takes <emphasis>at least</emphasis> the listed attributes, while
+      ignoring additional attributes.  For instance,
+
+      <programlisting>{stdenv, fetchurl, fuse, ...}: <replaceable>...</replaceable></programlisting>
+
+      defines a function that accepts any attribute set that includes
+      at least the three listed attributes.</para></listitem>
+
+      <listitem><para>New primops:
+      <varname>builtins.parseDrvName</varname> (split a package name
+      string like <literal>"nix-0.12pre12876"</literal> into its name
+      and version components, e.g. <literal>"nix"</literal> and
+      <literal>"0.12pre12876"</literal>),
+      <varname>builtins.compareVersions</varname> (compare two version
+      strings using the same algorithm that <command>nix-env</command>
+      uses), <varname>builtins.length</varname> (efficiently compute
+      the length of a list), <varname>builtins.mul</varname> (integer
+      multiplication), <varname>builtins.div</varname> (integer
+      division).
+      <!-- <varname>builtins.genericClosure</varname> -->
+      </para></listitem>
+      
+    </itemizedlist>
+
+  </para></listitem>
 
   <listitem><para><command>nix-prefetch-url</command> now supports
-  <literal>mirror://</literal> URLs.</para></listitem>
+  <literal>mirror://</literal> URLs, provided that the environment
+  variable <envar>NIXPKGS_ALL</envar> points at a Nixpkgs
+  tree.</para></listitem>
 
   <listitem><para>Removed the commands
   <command>nix-pack-closure</command> and
   <command>nix-unpack-closure</command>.   You can do almost the same
   thing but much more efficiently by doing <literal>nix-store --export
   $(nix-store -qR <replaceable>paths</replaceable>) > closure</literal> and
-  <literal>nix-store --import &lt; closure</literal>.</para></listitem>
+  <literal>nix-store --import &lt;
+  closure</literal>.</para></listitem>
+
+  <listitem><para>Lots of bugfixes, including a big performance bug in
+  the handling of <literal>with</literal>-expressions.</para></listitem>
 
 </itemizedlist>
 
