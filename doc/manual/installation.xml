@@ -336,8 +336,8 @@ $ chown -R root /nix/store /nix/var/nix</screen>
 
 </para>
 
-<para>The Nix daemon should be started as follows (as
-<literal>root</literal>):
+<para>The <link linkend="sec-nix-worker">Nix daemon</link> should be
+started as follows (as <literal>root</literal>):
 
 <screen>
 $ nix-worker --daemon</screen>

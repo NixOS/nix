@@ -28,7 +28,7 @@
       <holder>Eelco Dolstra</holder>
     </copyright>
 
-    <date>June 2008</date>
+    <date>November 2008</date>
     
   </info>
 
@@ -100,6 +100,10 @@
       <section xml:id="sec-nix-push">
         <title>nix-push</title>
         <xi:include href="nix-push.xml" />
+      </section>
+      <section xml:id="sec-nix-worker">
+        <title>nix-worker</title>
+        <xi:include href="nix-worker.xml" />
       </section>
     </section>
     

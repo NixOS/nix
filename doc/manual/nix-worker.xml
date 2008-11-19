@@ -1,0 +1,34 @@
+<refentry xmlns="http://docbook.org/ns/docbook"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns:xi="http://www.w3.org/2001/XInclude">
+
+<refmeta>
+  <refentrytitle>nix-worker</refentrytitle>
+  <manvolnum>8</manvolnum>
+  <refmiscinfo class="source">Nix</refmiscinfo>
+  <refmiscinfo class="version"><xi:include href="version.txt" parse="text"/></refmiscinfo>
+</refmeta>
+
+<refnamediv>
+  <refname>nix-worker</refname>
+  <refpurpose>Nix multi-user support daemon</refpurpose>
+</refnamediv>
+
+<refsynopsisdiv>
+  <cmdsynopsis>
+    <command>nix-worker</command>
+    <arg choice="plain"><option>--daemon</option></arg>
+  </cmdsynopsis>
+</refsynopsisdiv>
+
+
+<refsection><title>Description</title>
+
+<para>The Nix daemon is necessary in multi-user Nix installations.  It
+performs build actions and other operations on the Nix store on behalf
+of unprivileged users.</para>
+
+
+</refsection>
+
+</refentry>

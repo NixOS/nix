@@ -128,7 +128,7 @@ those paths.  If this bothers you, use
 <para>Copy Firefox with all its dependencies to a remote machine:
 
 <screen>
-$ nix-copy-closure alice@itchy.labs $(type -tP firefox)</screen>
+$ nix-copy-closure --to alice@itchy.labs $(type -tP firefox)</screen>
 
 </para>
 

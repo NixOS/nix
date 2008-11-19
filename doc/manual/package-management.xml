@@ -528,4 +528,82 @@ linkend='sec-nix-install-package' /> for details.</para>
 </section>
 
 
+<section xml:id="sec-sharing-packages"><title>Sharing packages between machines</title>
+
+<para>Sometimes you want to copy a package from one machine to
+another.  Or, you want to install some packages and you know that
+another machine already has some or all of those packages or their
+dependencies.  In that case there are mechanisms to quickly copy
+packages between machines.</para>
+
+<para>The command <command
+linkend="sec-nix-copy-closure">nix-copy-closure</command> copies a Nix
+store path along with all its dependencies to or from another machine
+via the SSH protocol.  It doesn’t copy store paths that are already
+present on the target machine.  For example, the following command
+copies Firefox with all its dependencies:
+
+<screen>
+$ nix-copy-closure --to alice@itchy.example.org $(type -p firefox)</screen>
+
+See <xref linkend='sec-nix-copy-closure' /> for details.</para>
+
+<para>With <command linkend='refsec-nix-store-export'>nix-store
+--export</command> and <command
+linkend='refsec-nix-store-import'>nix-store --import</command> you can
+write the closure of a store path (that is, the path and all its
+dependencies) to a file, and then unpack that file into another Nix
+store.  For example,
+
+<screen>
+$ nix-store --export $(type -p firefox) > firefox.closure</screen>
+
+writes the closure of Firefox to a file.  You can then copy this file
+to another machine and install the closure:
+
+<screen>
+$ nix-store --import &lt; firefox.closure</screen>
+
+Any store paths in the closure that are already present in the target
+store are ignored.  It is also possible to pipe the export into
+another command, e.g. to copy and install a closure directly to/on
+another machine:
+
+<screen>
+$ nix-store --export $(type -p firefox) | bzip2 | \
+    ssh alice@itchy.example.org "bunzip2 | nix-store --import"</screen>
+
+But note that <command>nix-copy-closure</command> is generally more
+efficient in this example because it only copies paths that are not
+already present in the target Nix store.</para>
+
+<para>Finally, if you can mount the Nix store of a remote machine in
+your local filesystem, Nix can copy paths from the remote Nix store to
+the local Nix store <emphasis>on demand</emphasis>.  For instance,
+suppose that you mount a remote machine containing a Nix store via
+<command
+xlink:href="http://fuse.sourceforge.net/sshfs.html">sshfs</command>:
+
+<screen>
+$ sshfs alice@itchy.example.org:/ /mnt</screen>
+
+You should then set the <envar>NIX_OTHER_STORES</envar> environment
+variable to tell Nix about this remote Nix store:
+
+<screen>
+$ export NIX_OTHER_STORES=/mnt/nix</screen>
+
+Then if you do any Nix operation, e.g.
+
+<screen>
+$ nix-env -i firefox</screen>
+
+and Nix has to build a path that it sees is already present in
+<filename>/mnt/nix</filename>, then it will just copy from there
+instead of building it from source.</para>
+ 
+
+</section>
+
+
 </chapter>

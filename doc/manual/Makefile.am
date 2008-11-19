@@ -16,12 +16,14 @@ man1_MANS = nix-env.1 nix-build.1 nix-store.1 nix-instantiate.1 \
  nix-prefetch-url.1 nix-channel.1 \
  nix-install-package.1 nix-hash.1 nix-copy-closure.1
 
+man8_MANS = nix-worker.8
+
 FIGURES = figures/user-environments.png
 
 MANUAL_SRCS = manual.xml introduction.xml installation.xml \
  package-management.xml writing-nix-expressions.xml builtins.xml \
  build-farm.xml \
- $(man1_MANS:.1=.xml) \
+ $(man1_MANS:.1=.xml) $(man8_MANS:.8=.xml) \
  troubleshooting.xml bugs.xml opt-common.xml opt-common-syn.xml \
  env-common.xml quick-start.xml nix-lang-ref.xml glossary.xml \
  conf-file.xml release-notes.xml \
