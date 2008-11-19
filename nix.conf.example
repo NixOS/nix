@@ -29,25 +29,6 @@
 #gc-keep-derivations = true
 
 
-### Option `gc-reserved-space'
-#
-# This option specifies how much space should be reserved in normal
-# use so that the garbage collector can run succesfully.  Since the
-# garbage collector must perform Berkeley DB transactions, it needs
-# some disk space for itself.  However, when the disk is full, this
-# space is not available, so the collector would not be able to run
-# precisely when it is most needed.
-#
-# For this reason, when Nix is run, it allocates a file
-# /nix/var/nix/db/reserved of the size specified by this option.  When
-# the garbage collector is run, this file is deleted before the
-# Berkeley DB environment is opened.  This should give it enough room
-# to proceed.
-#
-# The default is "1048576" (1 MiB).
-#gc-reserved-space = 1048576
-
-
 ### Option `env-keep-derivations'
 #
 # If `false' (default), derivations are not stored in Nix user
