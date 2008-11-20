@@ -1,7 +1,6 @@
 #! @perl@ -w
 
-my $binDir = $ENV{"NIX_BIN_DIR"};
-$binDir = "@bindir@" unless defined $binDir;
+my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
 
 
 if (scalar @ARGV < 1) {

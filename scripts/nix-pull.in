@@ -7,8 +7,7 @@ use readmanifest;
 my $tmpDir = tempdir("nix-pull.XXXXXX", CLEANUP => 1, TMPDIR => 1)
     or die "cannot create a temporary directory";
 
-my $binDir = $ENV{"NIX_BIN_DIR"};
-$binDir = "@bindir@" unless defined $binDir;
+my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
 
 my $libexecDir = $ENV{"NIX_LIBEXEC_DIR"};
 $libexecDir = "@libexecdir@" unless defined $libexecDir;

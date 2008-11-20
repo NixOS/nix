@@ -3,6 +3,8 @@
 use strict;
 use File::Temp qw(tempdir);
 
+my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
+
 
 sub usageError {
     print STDERR <<EOF;
@@ -59,7 +61,7 @@ if ($interactive && !defined $ENV{"NIX_HAVE_TERMINAL"}) {
     $ENV{"NIX_HAVE_TERMINAL"} = "1";
     $ENV{"LD_LIBRARY_PATH"} = "";
     foreach my $term ("xterm", "konsole", "gnome-terminal", "xterm") {
-        exec($term, "-e", "@bindir@/nix-install-package", @ARGV);
+        exec($term, "-e", "$binDir/nix-install-package", @ARGV);
     }
     die "cannot execute `xterm'";
 }
@@ -122,12 +124,12 @@ if ($interactive) {
 
 
 print "\nPulling manifests...\n";
-system("@bindir@/nix-pull", $manifestURL) == 0
+system("$binDir/nix-pull", $manifestURL) == 0
     or barf "nix-pull failed: $?";
 
 
 print "\nInstalling package...\n";
-system("@bindir@/nix-env", "--install", $outPath, "--force-name", $drvName, @extraNixEnvArgs) == 0
+system("$binDir/nix-env", "--install", $outPath, "--force-name", $drvName, @extraNixEnvArgs) == 0
     or barf "nix-env failed: $?";
 
 

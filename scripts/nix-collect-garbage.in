@@ -4,6 +4,8 @@ use strict;
 
 my $profilesDir = "@localstatedir@/nix/profiles";
 
+my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
+
 
 # Process the command line arguments.
 my @args = ();
@@ -34,7 +36,7 @@ sub removeOldGenerations {
         $name = $dir . "/" . $name;
         if (-l $name && (readlink($name) =~ /link/)) {
             print STDERR "removing old generations of profile $name\n";
-            system("@bindir@/nix-env", "-p", $name, "--delete-generations", "old");
+            system("$binDir/nix-env", "-p", $name, "--delete-generations", "old");
         }
         elsif (! -l $name && -d $name) {
             removeOldGenerations $name;
@@ -48,4 +50,4 @@ removeOldGenerations $profilesDir if $removeOld;
 
 
 # Run the actual garbage collector.
-exec "@bindir@/nix-store", "--gc", @args;
+exec "$binDir/nix-store", "--gc", @args;

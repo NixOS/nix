@@ -4,6 +4,9 @@ use strict;
 use File::Basename;
 use IO::Handle;
 
+my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
+
+
 STDOUT->autoflush(1);
 
 my @remoteStoresAll = split ':', ($ENV{"NIX_OTHER_STORES"} or "");
@@ -87,7 +90,7 @@ elsif ($ARGV[0] eq "--substitute") {
     (my $infoFile, my $sourcePath) = findStorePath $storePath;
     die unless $infoFile;
     print "\n*** Copying `$storePath' from `$sourcePath'\n\n";
-    system("@bindir@/nix-store --dump $sourcePath | @bindir@/nix-store --restore $storePath") == 0
+    system("$binDir/nix-store --dump $sourcePath | $binDir/nix-store --restore $storePath") == 0
         or die "cannot copy `$sourcePath' to `$storePath'";
 }
 

@@ -5,6 +5,8 @@ use readmanifest;
 use POSIX qw(strftime);
 use File::Temp qw(tempdir);
 
+my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
+
 STDOUT->autoflush(1);
 
 my $manifestDir = "@localstatedir@/nix/manifests";
@@ -98,7 +100,7 @@ foreach my $localPath (@{$localPathList}) {
     my $sourcePath = $localPath->{copyFrom};
     if (-e $sourcePath) {
         print "\n*** Step 1/1: copying from $sourcePath\n";
-        system("@bindir@/nix-store --dump $sourcePath | @bindir@/nix-store --restore $targetPath") == 0
+        system("$binDir/nix-store --dump $sourcePath | $binDir/nix-store --restore $targetPath") == 0
             or die "cannot copy `$sourcePath' to `$targetPath'";
         exit 0;
     }
@@ -147,7 +149,7 @@ addToQueue $targetPath;
 
 sub isValidPath {
     my $p = shift;
-    return system("@bindir@/nix-store --check-validity '$p' 2> /dev/null") == 0;
+    return system("$binDir/nix-store --check-validity '$p' 2> /dev/null") == 0;
 }
 
 sub parseHash {
@@ -181,7 +183,7 @@ while ($queueFront < scalar @queue) {
                 my ($baseHashAlgo, $baseHash) = parseHash $patch->{baseHash};
                 my $format = "--base32";
                 $format = "" if $baseHashAlgo eq "md5";
-                my $hash = `@bindir@/nix-hash --type '$baseHashAlgo' $format "$patch->{basePath}"`;
+                my $hash = `$binDir/nix-hash --type '$baseHashAlgo' $format "$patch->{basePath}"`;
                 chomp $hash;
 #                print "  MY HASH is $hash\n";
                 if ($hash ne $baseHash) {
@@ -263,7 +265,7 @@ sub downloadFile {
     $ENV{"PRINT_PATH"} = 1;
     $ENV{"QUIET"} = 1;
     $ENV{"NIX_HASH_ALGO"} = $hashAlgo;
-    my ($hash2, $path) = `@bindir@/nix-prefetch-url '$url' '$hash'`;
+    my ($hash2, $path) = `$binDir/nix-prefetch-url '$url' '$hash'`;
     die "download of `$url' failed" unless $? == 0;
     chomp $hash2;
     chomp $path;
@@ -287,7 +289,7 @@ while (scalar @path > 0) {
             # as a base to one or more patches.  So turn the base path
             # into a NAR archive, to which we can apply the patch.
             print "  packing base path...\n";
-            system("@bindir@/nix-store --dump $v > $tmpNar") == 0
+            system("$binDir/nix-store --dump $v > $tmpNar") == 0
                 or die "cannot dump `$v'";
         }
     }
@@ -315,7 +317,7 @@ while (scalar @path > 0) {
             # This was the last patch.  Unpack the final NAR archive
             # into the target path.
             print "  unpacking patched archive...\n";
-            system("@bindir@/nix-store --restore $v < $tmpNar2") == 0
+            system("$binDir/nix-store --restore $v < $tmpNar2") == 0
                 or die "cannot unpack $tmpNar2 into `$v'";
         }
     }
@@ -337,7 +339,7 @@ while (scalar @path > 0) {
         } else {
             # Unpack the archive into the target path.
             print "  unpacking archive...\n";
-            system("@bunzip2@ < '$narFilePath' | @bindir@/nix-store --restore '$v'") == 0
+            system("@bunzip2@ < '$narFilePath' | $binDir/nix-store --restore '$v'") == 0
                 or die "cannot unpack `$narFilePath' into `$v'";
         }
     }
