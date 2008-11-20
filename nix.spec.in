@@ -76,7 +76,8 @@ fi
 %{_prefix}/libexec
 %{_prefix}/include
 %{_prefix}/share
+/etc/profile.d/nix.sh
 /nix/var
 /nix/store
 %config
-%{_prefix}/etc
+/etc/nix
