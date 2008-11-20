@@ -2,7 +2,7 @@ AC_INIT(nix, 0.12)
 AC_CONFIG_SRCDIR(README)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE([dist-bzip2 foreign])
-        
+
 # Change to `1' to produce a `stable' release (i.e., the `preREVISION'
 # suffix is not added).
 STABLE=0
@@ -17,8 +17,6 @@ if test "$STABLE" != "1"; then
 fi
 
 AC_DEFINE_UNQUOTED(NIX_VERSION, ["$VERSION"], [Nix version.])
-
-AC_PREFIX_DEFAULT(/nix)
 
 AC_CANONICAL_HOST
 
@@ -59,6 +57,10 @@ AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
 AC_MSG_RESULT($system)
 AC_SUBST(system)
 AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
+
+
+# State should be stored in /nix/var, unless the user overrides it explicitly.
+test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
 
 
 # Windows-specific stuff.
@@ -174,7 +176,7 @@ AC_SUBST(xmlflags)
 
 AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
   [path of the Nix store]),
-  storedir=$withval, storedir='${prefix}/store')
+  storedir=$withval, storedir='/nix/store')
 AC_SUBST(storedir)
 
 AC_ARG_ENABLE(old-db-compat, AC_HELP_STRING([--disable-old-db-compat],
@@ -240,7 +242,7 @@ if test -z "$bzip2"; then
   bzip2_lib='-L${top_builddir}/externals/inst-bzip2/lib -lbz2'
   bzip2_include='-I${top_builddir}/externals/inst-bzip2/include'
   # The binary will be copied to $libexecdir.
-  bzip2_bin='${libexecdir}'
+  bzip2_bin='${libexecdir}/nix'
   # But for testing, we have to use the temporary copy :-(
   bzip2_bin_test='${top_builddir}/externals/inst-bzip2/bin'
 else

@@ -16,8 +16,7 @@ Group: Software Deployment
 URL: http://nixos.org/
 Source0: %{name}-@version@.tar.bz2
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
-%define _prefix /nix
-Prefix: %{_prefix}
+Prefix: /usr
 Requires: /usr/bin/perl
 Requires: curl
 
@@ -76,9 +75,9 @@ fi
 %{_prefix}/lib
 %{_prefix}/libexec
 %{_prefix}/include
-%{_prefix}/var
 %{_prefix}/share
-%{_prefix}/store
+/nix/var
+/nix/store
 %config
 %{_prefix}/etc
 #%doc

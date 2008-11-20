@@ -29,9 +29,9 @@ ln -s $TOP/scripts/nix-build $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-install-package $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-push $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-pull $NIX_BIN_DIR/
-ln -s $bzip2_bin_test/bzip2 $NIX_BIN_DIR/
-ln -s $bzip2_bin_test/bunzip2 $NIX_BIN_DIR/
 mkdir $NIX_BIN_DIR/nix
+ln -s $bzip2_bin_test/bzip2 $NIX_BIN_DIR/nix/
+ln -s $bzip2_bin_test/bunzip2 $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/copy-from-other-stores.pl $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/download-using-manifests.pl $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/readmanifest.pm $NIX_BIN_DIR/nix/
