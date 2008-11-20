@@ -65,7 +65,6 @@ for i in \
     $NIX_BIN_DIR/nix/readmanifest.pm \
     ; do
     sed < $i > $i.tmp \
-        -e "s^$REAL_BIN_DIR^$NIX_BIN_DIR^" \
         -e "s^$REAL_LIBEXEC_DIR^$NIX_LIBEXEC_DIR^" \
         -e "s^$REAL_LOCALSTATE_DIR^$NIX_LOCALSTATE_DIR^" \
         -e "s^$REAL_DATA_DIR^$NIX_DATA_DIR^" \
