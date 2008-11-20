@@ -7,5 +7,12 @@ if test -n "$HOME"; then
         @coreutils@/ln -s "$_NIX_DEF_LINK" "$NIX_LINK"
     fi
 
-    export PATH=$NIX_LINK/bin:@prefix@/bin:$PATH
+    export PATH=$NIX_LINK/bin:$PATH
+fi
+
+# This is a quick hack to make fontconfig-based packages in Nixpkgs
+# work out of the box on non-NixOS systems.  Of course, we should
+# really fix fontconfig...
+if test -z "$FONTCONFIG_FILE" -a -e /etc/fonts/fonts.conf; then
+    export FONTCONFIG_FILE=/etc/fonts/fonts.conf
 fi
