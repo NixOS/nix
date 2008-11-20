@@ -627,13 +627,17 @@ static void daemonLoop()
 
             case 0:
                 try { /* child */
-                    
+
                     /* Background the worker. */
                     if (setsid() == -1)
                         throw SysError(format("creating a new session"));
 
                     /* Restore normal handling of SIGCHLD. */
                     setSigChldAction(false);
+
+                    /* Since the daemon can be long-running, the
+                       settings may have changed.  So force a reload. */
+                    reloadSettings();
                     
                     /* Handle the connection. */
                     from.fd = remote;

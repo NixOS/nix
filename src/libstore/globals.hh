@@ -107,6 +107,8 @@ bool queryBoolSetting(const string & name, bool def);
 
 unsigned int queryIntSetting(const string & name, unsigned int def);
 
+void reloadSettings();
+
     
 }
 

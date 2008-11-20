@@ -118,5 +118,12 @@ unsigned int queryIntSetting(const string & name, unsigned int def)
     return n;
 }
 
+
+void reloadSettings()
+{
+    settingsRead = false;
+    settings.clear();
+}
+
  
 }
