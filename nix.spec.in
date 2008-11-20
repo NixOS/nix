@@ -46,7 +46,7 @@ if test -n "%{enable_setuid}"; then
         extraFlags="$extraFlags --with-nix-group=%{nix_group}"
     fi
 fi
-./configure --prefix=%{_prefix} $extraFlags
+./configure --prefix=%{_prefix} --sysconfdir=/etc $extraFlags
 make
 make check
 
