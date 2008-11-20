@@ -80,5 +80,3 @@ fi
 /nix/store
 %config
 %{_prefix}/etc
-#%doc
-#%{_prefix}/share/nix/manual
