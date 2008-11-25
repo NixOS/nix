@@ -34,6 +34,8 @@ struct Decoder
     void pushChar(char c);
 
     void finishLine();
+
+    void decodeFile(istream & st);
 };
 
 
@@ -158,16 +160,26 @@ void Decoder::finishLine()
 }
 
 
+void Decoder::decodeFile(istream & st)
+{
+    int c;
+    
+    cout << "<logfile>" << endl;
+    
+    while ((c = st.get()) != EOF) {
+        pushChar(c);
+    }
+
+    if (line.size()) finishLine();
+
+    while (level--) cout << "</nest>" << endl;
+    
+    cout << "</logfile>" << endl;
+}
+
+
 int main(int argc, char * * argv)
 {
     Decoder dec;
-    int c;
-
-    cout << "<logfile>" << endl;
-    
-    while ((c = getchar()) != EOF) {
-        dec.pushChar(c);
-    }
-
-    cout << "</logfile>" << endl;
+    dec.decodeFile(cin);
 }
