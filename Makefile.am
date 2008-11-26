@@ -1,16 +1,10 @@
 SUBDIRS = externals src scripts corepkgs doc misc tests
 EXTRA_DIST = substitute.mk nix.spec nix.spec.in bootstrap.sh \
-  svn-revision nix.conf.example NEWS
+  nix.conf.example NEWS
 
 include ./substitute.mk
 
 nix.spec: nix.spec.in
-
-rpm: nix.spec dist
-	rpm $(EXTRA_RPM_FLAGS) -ta $(distdir).tar.gz
-
-relname:
-	echo -n $(distdir) > relname
 
 install-data-local: init-state
 	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/nix
@@ -44,13 +38,11 @@ init-state:
 	ln -sfn $(localstatedir)/nix/manifests $(DESTDIR)$(localstatedir)/nix/gcroots/manifests
 
 else
+
 init-state:
+
 endif
 
-svn-revision:
-	svnversion . > svn-revision
-
-all-local: NEWS
-
-NEWS: doc/manual/NEWS.txt
+NEWS:
+	$(MAKE) -C doc/manual NEWS.txt
 	cp $(srcdir)/doc/manual/NEWS.txt NEWS
