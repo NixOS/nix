@@ -67,7 +67,8 @@ let jobs = rec {
       '';
       
       postInstall = ''
-        echo "doc manual $out/share/doc/nix/manual/manual.html" >> $out/nix-support/hydra-build-products
+        echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
+        echo "doc release-notes $out/share/doc/nix/release-notes" >> $out/nix-support/hydra-build-products
       '';
     };
 

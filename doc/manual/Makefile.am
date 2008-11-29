@@ -79,10 +79,14 @@ all-local: manual.html NEWS.html NEWS.txt
 install-data-local: manual.html
 	$(INSTALL) -d $(DESTDIR)$(docdir)/manual
 	$(INSTALL_DATA) manual.html $(DESTDIR)$(docdir)/manual
+	ln -sf manual.html $(DESTDIR)$(docdir)/manual/index.html
 	$(INSTALL_DATA) style.css $(DESTDIR)$(docdir)/manual
 	cp -r images $(DESTDIR)$(docdir)/manual/images
 	$(INSTALL) -d $(DESTDIR)$(docdir)/manual/figures
 	$(INSTALL_DATA) $(FIGURES) $(DESTDIR)$(docdir)/manual/figures
+	$(INSTALL) -d $(DESTDIR)$(docdir)/release-notes
+	$(INSTALL_DATA) NEWS.html $(DESTDIR)$(docdir)/release-notes/index.html
+	$(INSTALL_DATA) style.css $(DESTDIR)$(docdir)/release-notes/
 
 images:
 	mkdir images
