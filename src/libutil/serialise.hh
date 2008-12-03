@@ -80,9 +80,9 @@ struct StringSink : Sink
 /* A source that reads data from a string. */
 struct StringSource : Source
 {
-    string & s;
+    const string & s;
     unsigned int pos;
-    StringSource(string & _s) : s(_s), pos(0) { }
+    StringSource(const string & _s) : s(_s), pos(0) { }
     virtual void operator () (unsigned char * data, unsigned int len)
     {
         s.copy((char *) data, len, pos);

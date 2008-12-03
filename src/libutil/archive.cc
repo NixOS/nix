@@ -129,10 +129,11 @@ static void skipGeneric(Source & source)
 }
 
 
-static void restore(const Path & path, Source & source);
+static void parse(ParseSink & sink, Source & source, const Path & path);
 
 
-static void restoreEntry(const Path & path, Source & source)
+
+static void parseEntry(ParseSink & sink, Source & source, const Path & path)
 {
     string s, name;
 
@@ -150,7 +151,7 @@ static void restoreEntry(const Path & path, Source & source)
             name = readString(source);
         } else if (s == "node") {
             if (s == "") throw badArchive("entry name missing");
-            restore(path + "/" + name, source);
+            parse(sink, source, path + "/" + name);
         } else {
             throw badArchive("unknown field " + s);
             skipGeneric(source);
@@ -159,7 +160,7 @@ static void restoreEntry(const Path & path, Source & source)
 }
 
 
-static void restoreContents(int fd, const Path & path, Source & source)
+static void parseContents(ParseSink & sink, Source & source, const Path & path)
 {
     unsigned int size = readInt(source);
     unsigned int left = size;
@@ -170,7 +171,7 @@ static void restoreContents(int fd, const Path & path, Source & source)
         unsigned int n = sizeof(buf);
         if (n > left) n = left;
         source(buf, n);
-        writeFull(fd, buf, n);
+        sink.receiveContents(buf, n);
         left -= n;
     }
 
@@ -178,7 +179,7 @@ static void restoreContents(int fd, const Path & path, Source & source)
 }
 
 
-static void restore(const Path & path, Source & source)
+static void parse(ParseSink & sink, Source & source, const Path & path)
 {
     string s;
 
@@ -186,7 +187,6 @@ static void restore(const Path & path, Source & source)
     if (s != "(") throw badArchive("expected open tag");
 
     enum { tpUnknown, tpRegular, tpDirectory, tpSymlink } type = tpUnknown;
-    AutoCloseFD fd;
 
     while (1) {
         checkInterrupt();
@@ -204,15 +204,12 @@ static void restore(const Path & path, Source & source)
 
             if (t == "regular") {
                 type = tpRegular;
-                fd = open(path.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0666);
-                if (fd == -1)
-                    throw SysError("creating file " + path);
+                sink.createRegularFile(path);
             }
 
             else if (t == "directory") {
+                sink.createDirectory(path);
                 type = tpDirectory;
-                if (mkdir(path.c_str(), 0777) == -1)
-                    throw SysError("creating directory " + path);
             }
 
             else if (t == "symlink") {
@@ -224,42 +221,86 @@ static void restore(const Path & path, Source & source)
         }
 
         else if (s == "contents" && type == tpRegular) {
-            restoreContents(fd, path, source);
+            parseContents(sink, source, path);
         }
 
         else if (s == "executable" && type == tpRegular) {
             readString(source);
-            struct stat st;
-            if (fstat(fd, &st) == -1)
-                throw SysError("fstat");
-            if (fchmod(fd, st.st_mode | (S_IXUSR | S_IXGRP | S_IXOTH)) == -1)
-                throw SysError("fchmod");
+            sink.isExecutable();
         }
 
         else if (s == "entry" && type == tpDirectory) {
-            restoreEntry(path, source);
+            parseEntry(sink, source, path);
         }
 
         else if (s == "target" && type == tpSymlink) {
             string target = readString(source);
-            if (symlink(target.c_str(), path.c_str()) == -1)
-                throw SysError("creating symlink " + path);
+            sink.createSymlink(path, target);
         }
 
         else {
             throw badArchive("unknown field " + s);
             skipGeneric(source);
         }
-        
     }
 }
 
 
-void restorePath(const Path & path, Source & source)
+void parseDump(ParseSink & sink, Source & source)
 {
     if (readString(source) != archiveVersion1)
         throw badArchive("expected Nix archive");
-    restore(path, source);
+    parse(sink, source, "");
+}
+
+
+struct RestoreSink : ParseSink
+{
+    Path dstPath;
+    AutoCloseFD fd;
+
+    void createDirectory(const Path & path)
+    {
+        Path p = dstPath + path;
+        if (mkdir(p.c_str(), 0777) == -1)
+            throw SysError(format("creating directory `%1%'") % p);
+    };
+
+    void createRegularFile(const Path & path)
+    {
+        Path p = dstPath + path;
+        fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0666);
+        if (fd == -1) throw SysError(format("creating file `%1%'") % p);
+    }
+
+    void isExecutable()
+    {
+        struct stat st;
+        if (fstat(fd, &st) == -1)
+            throw SysError("fstat");
+        if (fchmod(fd, st.st_mode | (S_IXUSR | S_IXGRP | S_IXOTH)) == -1)
+            throw SysError("fchmod");
+    }
+
+    void receiveContents(unsigned char * data, unsigned int len)
+    {
+        writeFull(fd, data, len);
+    }
+
+    void createSymlink(const Path & path, const string & target)
+    {
+        Path p = dstPath + path;
+        if (symlink(target.c_str(), p.c_str()) == -1)
+            throw SysError(format("creating symlink `%1%'") % p);
+    }
+};
+
+ 
+void restorePath(const Path & path, Source & source)
+{
+    RestoreSink sink;
+    sink.dstPath = path;
+    parseDump(sink, source);
 }
 
  

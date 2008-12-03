@@ -56,6 +56,19 @@ extern PathFilter defaultPathFilter;
 void dumpPath(const Path & path, Sink & sink,
     PathFilter & filter = defaultPathFilter);
 
+struct ParseSink
+{
+    virtual void createDirectory(const Path & path) { };
+    
+    virtual void createRegularFile(const Path & path) { };
+    virtual void isExecutable() { };
+    virtual void receiveContents(unsigned char * data, unsigned int len) { };
+
+    virtual void createSymlink(const Path & path, const string & target) { };
+};
+    
+void parseDump(ParseSink & sink, Source & source);
+
 void restorePath(const Path & path, Source & source);
 
  
