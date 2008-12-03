@@ -104,3 +104,5 @@ $nixstore --init
 # Did anything happen?
 test -e "$NIX_DB_DIR"/info
 test -e "$NIX_DB_DIR"/referrer
+
+echo 'Hello World' > ./dummy
