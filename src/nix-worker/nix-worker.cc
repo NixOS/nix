@@ -288,12 +288,17 @@ static void performOp(unsigned int clientVersion,
     }
 
     case wopAddToStore: {
-        /* !!! uberquick hack */
         string baseName = readString(from);
-        readInt(from); /* obsolete; was `fixed' flag */
+        bool fixed = readInt(from) == 1; /* obsolete */
         bool recursive = readInt(from) == 1;
-        HashType hashAlgo = parseHashType(readString(from));
-        
+        string s = readString(from);
+        /* Compatibility hack. */
+        if (!fixed) {
+            s = "sha256";
+            recursive = true;
+        }
+        HashType hashAlgo = parseHashType(s);
+
         Path tmp = createTempDir();
         AutoDelete delTmp(tmp);
         Path tmp2 = tmp + "/" + baseName;
