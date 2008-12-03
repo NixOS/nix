@@ -400,7 +400,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
                 % outputHash % outputHashAlgo);
         string s = outputHash;
         outputHash = printHash(h);
-        outPath = makeFixedOutputPath(outputHashRecursive, outputHashAlgo, h, drvName);
+        outPath = makeFixedOutputPath(outputHashRecursive, ht, h, drvName);
         if (outputHashRecursive) outputHashAlgo = "r:" + outputHashAlgo;
     }
 
@@ -634,8 +634,8 @@ static Expr prim_filterSource(EvalState & state, const ATermVector & args)
     FilterFromExpr filter(state, args[0]);
 
     Path dstPath = readOnlyMode
-        ? computeStorePathForPath(path, true, "sha256", filter).first
-        : store->addToStore(path, true, "sha256", filter);
+        ? computeStorePathForPath(path, true, htSHA256, filter).first
+        : store->addToStore(path, true, htSHA256, filter);
 
     return makeStr(dstPath, singleton<PathSet>(dstPath));
 }

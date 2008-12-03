@@ -90,7 +90,7 @@ public:
         const Path & path, SubstitutablePathInfo & info);
     
     Path addToStore(const Path & srcPath,
-        bool recursive = true, string hashAlgo = "sha256",
+        bool recursive = true, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter);
 
     Path addTextToStore(const string & name, const string & s,

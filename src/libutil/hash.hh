@@ -82,6 +82,9 @@ Hash compressHash(const Hash & hash, unsigned int newSize);
 /* Parse a string representing a hash type. */
 HashType parseHashType(const string & s);
 
+/* And the reverse. */
+string printHashType(HashType ht);
+
 
 union Ctx;
 

@@ -656,7 +656,7 @@ void LocalStore::invalidatePath(const Path & path)
 
 
 Path LocalStore::addToStore(const Path & _srcPath,
-    bool recursive, string hashAlgo, PathFilter & filter)
+    bool recursive, HashType hashAlgo, PathFilter & filter)
 {
     Path srcPath(absPath(_srcPath));
     debug(format("adding `%1%' to the store") % srcPath);
@@ -670,7 +670,7 @@ Path LocalStore::addToStore(const Path & _srcPath,
     else
         sink.s = readFile(srcPath);
 
-    Hash h = hashString(parseHashType(hashAlgo), sink.s);
+    Hash h = hashString(hashAlgo, sink.s);
 
     Path dstPath = makeFixedOutputPath(recursive, hashAlgo, h, baseNameOf(srcPath));
 
@@ -700,7 +700,7 @@ Path LocalStore::addToStore(const Path & _srcPath,
                above (if called with recursive == true and hashAlgo ==
                sha256); otherwise, compute it here. */
             registerValidPath(dstPath,
-                (recursive && hashAlgo == "sha256") ? h :
+                (recursive && hashAlgo == htSHA256) ? h :
                 (recursive ? hashString(htSHA256, sink.s) : hashPath(htSHA256, dstPath)),
                 PathSet(), "");
         }

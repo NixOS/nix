@@ -174,7 +174,7 @@ public:
        object `filter' can be used to exclude files (see
        libutil/archive.hh). */
     virtual Path addToStore(const Path & srcPath,
-        bool recursive = true, string hashAlgo = "sha256",
+        bool recursive = true, HashType hashAlgo = htSHA256,
         PathFilter & filter = defaultPathFilter) = 0;
 
     /* Like addToStore, but the contents written to the output path is
@@ -277,7 +277,7 @@ Path makeStorePath(const string & type,
     const Hash & hash, const string & name);
     
 Path makeFixedOutputPath(bool recursive,
-    string hashAlgo, Hash hash, string name);
+    HashType hashAlgo, Hash hash, string name);
 
 
 /* This is the preparatory part of addToStore() and addToStoreFixed();
@@ -285,7 +285,7 @@ Path makeFixedOutputPath(bool recursive,
    Returns the store path and the cryptographic hash of the
    contents of srcPath. */
 std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
-    bool recursive = true, string hashAlgo = "sha256",
+    bool recursive = true, HashType hashAlgo = htSHA256,
     PathFilter & filter = defaultPathFilter);
 
 /* Preparatory part of addTextToStore().

@@ -125,7 +125,7 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     if (opArgs.empty())
         throw UsageError("first argument must be hash algorithm");
     
-    string hashAlgo = opArgs.front();
+    HashType hashAlgo = parseHashType(opArgs.front());
     opArgs.pop_front();
 
     for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); ++i)
@@ -155,13 +155,13 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
         throw UsageError(format("`--print-fixed-path' requires three arguments"));
     
     Strings::iterator i = opArgs.begin();
-    string hashAlgo = *i++;
+    HashType hashAlgo = parseHashType(*i++);
     string hash = *i++;
     string name = *i++;
 
     cout << format("%1%\n") %
         makeFixedOutputPath(recursive, hashAlgo,
-            parseHash16or32(parseHashType(hashAlgo), hash), name);
+            parseHash16or32(hashAlgo, hash), name);
 }
 
 

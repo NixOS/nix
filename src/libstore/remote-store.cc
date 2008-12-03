@@ -279,16 +279,16 @@ Path RemoteStore::queryDeriver(const Path & path)
 
 
 Path RemoteStore::addToStore(const Path & _srcPath,
-    bool recursive, string hashAlgo, PathFilter & filter)
+    bool recursive, HashType hashAlgo, PathFilter & filter)
 {
     Path srcPath(absPath(_srcPath));
     
     writeInt(wopAddToStore, to);
     writeString(baseNameOf(srcPath), to);
     /* backwards compatibility hack */
-    writeInt((hashAlgo == "sha256" && recursive) ? 0 : 1, to);
+    writeInt((hashAlgo == htSHA256 && recursive) ? 0 : 1, to);
     writeInt(recursive ? 1 : 0, to);
-    writeString(hashAlgo, to);
+    writeString(printHashType(hashAlgo), to);
     dumpPath(srcPath, to, filter);
     processStderr();
     return readStorePath(from);

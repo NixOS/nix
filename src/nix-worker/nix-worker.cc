@@ -292,7 +292,7 @@ static void performOp(unsigned int clientVersion,
         string baseName = readString(from);
         readInt(from); /* obsolete; was `fixed' flag */
         bool recursive = readInt(from) == 1;
-        string hashAlgo = readString(from);
+        HashType hashAlgo = parseHashType(readString(from));
         
         Path tmp = createTempDir();
         AutoDelete delTmp(tmp);

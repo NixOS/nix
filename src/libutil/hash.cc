@@ -335,4 +335,13 @@ HashType parseHashType(const string & s)
 }
 
  
+string printHashType(HashType ht)
+{
+    if (ht == htMD5) return "md5";
+    else if (ht == htSHA1) return "sha1";
+    else if (ht == htSHA256) return "sha256";
+    else throw Error("cannot print unknown hash type");
+}
+
+ 
 }
