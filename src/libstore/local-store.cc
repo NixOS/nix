@@ -108,23 +108,6 @@ int LocalStore::getSchema()
 }
 
 
-void copyPath(const Path & src, const Path & dst, PathFilter & filter)
-{
-    debug(format("copying `%1%' to `%2%'") % src % dst);
-
-    /* Dump an archive of the path `src' into a string buffer, then
-       restore the archive to `dst'.  This is not a very good method
-       for very large paths, but `copyPath' is mainly used for small
-       files. */ 
-
-    StringSink sink;
-    dumpPath(src, sink, filter);
-
-    StringSource source(sink.s);
-    restorePath(dst, source);
-}
-
-
 void canonicalisePathMetaData(const Path & path, bool recurse)
 {
     checkInterrupt();
@@ -331,6 +314,8 @@ void LocalStore::registerValidPath(const ValidPathInfo & info, bool ignoreValidi
         if (oldInfo.references.find(*i) == oldInfo.references.end())
             appendReferrer(*i, info.path, false);
     }
+
+    assert(info.hash.type == htSHA256);
 
     string s = (format(
         "Hash: sha256:%1%\n"
@@ -676,10 +661,18 @@ Path LocalStore::addToStore(const Path & _srcPath,
     Path srcPath(absPath(_srcPath));
     debug(format("adding `%1%' to the store") % srcPath);
 
-    std::pair<Path, Hash> pr =
-        computeStorePathForPath(srcPath, recursive, hashAlgo, filter);
-    Path & dstPath(pr.first);
-    Hash & h(pr.second);
+    /* Read the whole path into memory. This is not a very scalable
+       method for very large paths, but `copyPath' is mainly used for
+       small files. */
+    StringSink sink;
+    if (recursive) 
+        dumpPath(srcPath, sink, filter);
+    else
+        sink.s = readFile(srcPath);
+
+    Hash h = hashString(parseHashType(hashAlgo), sink.s);
+
+    Path dstPath = makeFixedOutputPath(recursive, hashAlgo, h, baseNameOf(srcPath));
 
     addTempRoot(dstPath);
 
@@ -694,19 +687,22 @@ Path LocalStore::addToStore(const Path & _srcPath,
 
             if (pathExists(dstPath)) deletePathWrapped(dstPath);
 
-            copyPath(srcPath, dstPath, filter);
-
-            /* !!! */
-#if 0            
-            Hash h2 = hashPath(htSHA256, dstPath, filter);
-            if (h != h2)
-                throw Error(format("contents of `%1%' changed while copying it to `%2%' (%3% -> %4%)")
-                    % srcPath % dstPath % printHash(h) % printHash(h2));
-#endif
+            if (recursive) {
+                StringSource source(sink.s);
+                restorePath(dstPath, source);
+            } else
+                writeStringToFile(dstPath, sink.s);
 
             canonicalisePathMetaData(dstPath);
-            
-            registerValidPath(dstPath, h, PathSet(), "");
+
+            /* Register the SHA-256 hash of the NAR serialisation of
+               the path in the database.  We may just have computed it
+               above (if called with recursive == true and hashAlgo ==
+               sha256); otherwise, compute it here. */
+            registerValidPath(dstPath,
+                (recursive && hashAlgo == "sha256") ? h :
+                (recursive ? hashString(htSHA256, sink.s) : hashPath(htSHA256, dstPath)),
+                PathSet(), "");
         }
 
         outputLock.setDeletion(true);

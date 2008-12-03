@@ -257,9 +257,7 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
     /* For other derivations, replace the inputs paths with recursive
        calls to this function.*/
     DerivationInputs inputs2;
-    for (DerivationInputs::iterator i = drv.inputDrvs.begin();
-         i != drv.inputDrvs.end(); ++i)
-    {
+    foreach (DerivationInputs::const_iterator, i, drv.inputDrvs) {
         Hash h = state.drvHashes[i->first];
         if (h.type == htUnknown) {
             Derivation drv2 = derivationFromPath(i->first);
