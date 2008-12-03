@@ -129,7 +129,7 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     opArgs.pop_front();
 
     for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); ++i)
-        cout << format("%1%\n") % store->addToStore(*i, true, recursive, hashAlgo);
+        cout << format("%1%\n") % store->addToStore(*i, recursive, hashAlgo);
 }
 
 
@@ -151,6 +151,9 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
         if (*i == "--recursive") recursive = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
+    if (opArgs.size() != 3)
+        throw UsageError(format("`--print-fixed-path' requires three arguments"));
+    
     Strings::iterator i = opArgs.begin();
     string hashAlgo = *i++;
     string hash = *i++;

@@ -278,14 +278,15 @@ Path RemoteStore::queryDeriver(const Path & path)
 }
 
 
-Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
+Path RemoteStore::addToStore(const Path & _srcPath,
     bool recursive, string hashAlgo, PathFilter & filter)
 {
     Path srcPath(absPath(_srcPath));
     
     writeInt(wopAddToStore, to);
     writeString(baseNameOf(srcPath), to);
-    writeInt(fixed ? 1 : 0, to);
+    /* backwards compatibility hack */
+    writeInt((hashAlgo == "sha256" && recursive) ? 0 : 1, to);
     writeInt(recursive ? 1 : 0, to);
     writeString(hashAlgo, to);
     dumpPath(srcPath, to, filter);
@@ -294,11 +295,11 @@ Path RemoteStore::addToStore(const Path & _srcPath, bool fixed,
 }
 
 
-Path RemoteStore::addTextToStore(const string & suffix, const string & s,
+Path RemoteStore::addTextToStore(const string & name, const string & s,
     const PathSet & references)
 {
     writeInt(wopAddTextToStore, to);
-    writeString(suffix, to);
+    writeString(name, to);
     writeString(s, to);
     writeStringSet(references, to);
     

@@ -42,11 +42,11 @@ public:
     bool querySubstitutablePathInfo(const Path & path,
         SubstitutablePathInfo & info);
     
-    Path addToStore(const Path & srcPath, bool fixed = false,
-        bool recursive = false, string hashAlgo = "",
+    Path addToStore(const Path & srcPath,
+        bool recursive = true, string hashAlgo = "sha256",
         PathFilter & filter = defaultPathFilter);
 
-    Path addTextToStore(const string & suffix, const string & s,
+    Path addTextToStore(const string & name, const string & s,
         const PathSet & references);
 
     void exportPath(const Path & path, bool sign,

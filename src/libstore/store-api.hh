@@ -173,13 +173,13 @@ public:
        derivation is pre-loaded into the Nix store.  The function
        object `filter' can be used to exclude files (see
        libutil/archive.hh). */
-    virtual Path addToStore(const Path & srcPath, bool fixed = false,
-        bool recursive = false, string hashAlgo = "",
+    virtual Path addToStore(const Path & srcPath,
+        bool recursive = true, string hashAlgo = "sha256",
         PathFilter & filter = defaultPathFilter) = 0;
 
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */
-    virtual Path addTextToStore(const string & suffix, const string & s,
+    virtual Path addTextToStore(const string & name, const string & s,
         const PathSet & references) = 0;
 
     /* Export a store path, that is, create a NAR dump of the store
@@ -274,7 +274,7 @@ Path followLinksToStorePath(const Path & path);
 
 /* Constructs a unique store path name. */
 Path makeStorePath(const string & type,
-    const Hash & hash, const string & suffix);
+    const Hash & hash, const string & name);
     
 Path makeFixedOutputPath(bool recursive,
     string hashAlgo, Hash hash, string name);
@@ -285,7 +285,7 @@ Path makeFixedOutputPath(bool recursive,
    Returns the store path and the cryptographic hash of the
    contents of srcPath. */
 std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
-    bool fixed = false, bool recursive = false, string hashAlgo = "",
+    bool recursive = true, string hashAlgo = "sha256",
     PathFilter & filter = defaultPathFilter);
 
 /* Preparatory part of addTextToStore().
@@ -302,7 +302,7 @@ std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
    simply yield a different store path, so other users wouldn't be
    affected), but it has some backwards compatibility issues (the
    hashing scheme changes), so I'm not doing that for now. */
-Path computeStorePathForText(const string & suffix, const string & s,
+Path computeStorePathForText(const string & name, const string & s,
     const PathSet & references);
 
 

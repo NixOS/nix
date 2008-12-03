@@ -1,13 +1,28 @@
 source common.sh
 
-file=./add.sh
+path1=$($nixstore --add ./dummy)
+echo $path1
 
-path=$($nixstore --add $file)
+path2=$($nixstore --add-fixed sha256 --recursive ./dummy)
+echo $path2
 
-echo $path
+if test "$path1" != "$path2"; then
+    echo "nix-store --add and --add-fixed mismatch"
+    exit 1
+fi    
 
-hash=$($nixstore -q --hash $path)
+path3=$($nixstore --add-fixed sha256 ./dummy)
+echo $path3
+test "$path1" != "$path3" || exit 1
 
-echo $hash
+path4=$($nixstore --add-fixed sha1 --recursive ./dummy)
+echo $path4
+test "$path1" != "$path4" || exit 1
 
-test "$hash" = "sha256:$($nixhash --type sha256 --base32 $file)"
+hash1=$($nixstore -q --hash $path1)
+echo $hash1
+
+hash2=$($nixhash --type sha256 --base32 ./dummy)
+echo $hash2
+
+test "$hash1" = "sha256:$hash2"

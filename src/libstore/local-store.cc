@@ -670,14 +670,14 @@ void LocalStore::invalidatePath(const Path & path)
 }
 
 
-Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
+Path LocalStore::addToStore(const Path & _srcPath,
     bool recursive, string hashAlgo, PathFilter & filter)
 {
     Path srcPath(absPath(_srcPath));
     debug(format("adding `%1%' to the store") % srcPath);
 
     std::pair<Path, Hash> pr =
-        computeStorePathForPath(srcPath, fixed, recursive, hashAlgo, filter);
+        computeStorePathForPath(srcPath, recursive, hashAlgo, filter);
     Path & dstPath(pr.first);
     Hash & h(pr.second);
 
@@ -696,10 +696,13 @@ Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
 
             copyPath(srcPath, dstPath, filter);
 
+            /* !!! */
+#if 0            
             Hash h2 = hashPath(htSHA256, dstPath, filter);
             if (h != h2)
                 throw Error(format("contents of `%1%' changed while copying it to `%2%' (%3% -> %4%)")
                     % srcPath % dstPath % printHash(h) % printHash(h2));
+#endif
 
             canonicalisePathMetaData(dstPath);
             
@@ -713,10 +716,10 @@ Path LocalStore::addToStore(const Path & _srcPath, bool fixed,
 }
 
 
-Path LocalStore::addTextToStore(const string & suffix, const string & s,
+Path LocalStore::addTextToStore(const string & name, const string & s,
     const PathSet & references)
 {
-    Path dstPath = computeStorePathForText(suffix, s, references);
+    Path dstPath = computeStorePathForText(name, s, references);
     
     addTempRoot(dstPath);
 

@@ -215,6 +215,14 @@ static Expr prim_trace(EvalState & state, const ATermVector & args)
  *************************************************************/
 
 
+static bool isFixedOutput(const Derivation & drv)
+{
+    return drv.outputs.size() == 1 &&
+        drv.outputs.begin()->first == "out" &&
+        drv.outputs.begin()->second.hash != "";
+}
+
+
 /* Returns the hash of a derivation modulo fixed-output
    subderivations.  A fixed-output derivation is a derivation with one
    output (`out') for which an expected hash and hash algorithm are
@@ -227,27 +235,23 @@ static Expr prim_trace(EvalState & state, const ATermVector & args)
    function, we do not want to rebuild everything depending on it
    (after all, (the hash of) the file being downloaded is unchanged).
    So the *output paths* should not change.  On the other hand, the
-   *derivation store expression paths* should change to reflect the
-   new dependency graph.
+   *derivation paths* should change to reflect the new dependency
+   graph.
 
    That's what this function does: it returns a hash which is just the
-   of the derivation ATerm, except that any input store expression
+   hash of the derivation ATerm, except that any input derivation
    paths have been replaced by the result of a recursive call to this
-   function, and that for fixed-output derivations we return
-   (basically) its outputHash. */
+   function, and that for fixed-output derivations we return a hash of
+   its output path. */
 static Hash hashDerivationModulo(EvalState & state, Derivation drv)
 {
     /* Return a fixed hash for fixed-output derivations. */
-    if (drv.outputs.size() == 1) {
+    if (isFixedOutput(drv)) {
         DerivationOutputs::const_iterator i = drv.outputs.begin();
-        if (i->first == "out" &&
-            i->second.hash != "")
-        {
-            return hashString(htSHA256, "fixed:out:"
-                + i->second.hashAlgo + ":"
-                + i->second.hash + ":"
-                + i->second.path);
-        }
+        return hashString(htSHA256, "fixed:out:"
+            + i->second.hashAlgo + ":"
+            + i->second.hash + ":"
+            + i->second.path);
     }
 
     /* For other derivations, replace the inputs paths with recursive
@@ -304,8 +308,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     
     PathSet context;
 
-    string outputHash;
-    string outputHashAlgo;
+    string outputHash, outputHashAlgo;
     bool outputHashRecursive = false;
 
     for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
@@ -380,6 +383,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
         throw EvalError("required attribute `system' missing");
 
     /* If an output hash was given, check it. */
+    Path outPath;
     if (outputHash == "")
         outputHashAlgo = "";
     else {
@@ -398,6 +402,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
                 % outputHash % outputHashAlgo);
         string s = outputHash;
         outputHash = printHash(h);
+        outPath = makeFixedOutputPath(outputHashRecursive, outputHashAlgo, h, drvName);
         if (outputHashRecursive) outputHashAlgo = "r:" + outputHashAlgo;
     }
 
@@ -413,13 +418,12 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
        have an empty value.  This ensures that changes in the set of
        output names do get reflected in the hash. */
     drv.env["out"] = "";
-    drv.outputs["out"] =
-        DerivationOutput("", outputHashAlgo, outputHash);
+    drv.outputs["out"] = DerivationOutput("", outputHashAlgo, outputHash);
         
     /* Use the masked derivation expression to compute the output
        path. */
-    Path outPath = makeStorePath("output:out",
-        hashDerivationModulo(state, drv), drvName);
+    if (outPath == "")
+        outPath = makeStorePath("output:out", hashDerivationModulo(state, drv), drvName);
 
     /* Construct the final derivation store expression. */
     drv.env["out"] = outPath;
@@ -632,8 +636,8 @@ static Expr prim_filterSource(EvalState & state, const ATermVector & args)
     FilterFromExpr filter(state, args[0]);
 
     Path dstPath = readOnlyMode
-        ? computeStorePathForPath(path, false, false, "", filter).first
-        : store->addToStore(path, false, false, "", filter);
+        ? computeStorePathForPath(path, true, "sha256", filter).first
+        : store->addToStore(path, true, "sha256", filter);
 
     return makeStr(dstPath, singleton<PathSet>(dstPath));
 }

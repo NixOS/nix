@@ -290,7 +290,7 @@ static void performOp(unsigned int clientVersion,
     case wopAddToStore: {
         /* !!! uberquick hack */
         string baseName = readString(from);
-        bool fixed = readInt(from) == 1;
+        readInt(from); /* obsolete; was `fixed' flag */
         bool recursive = readInt(from) == 1;
         string hashAlgo = readString(from);
         
@@ -300,7 +300,7 @@ static void performOp(unsigned int clientVersion,
         restorePath(tmp2, from);
 
         startWork();
-        Path path = store->addToStore(tmp2, fixed, recursive, hashAlgo);
+        Path path = store->addToStore(tmp2, recursive, hashAlgo);
         stopWork();
         
         writeString(path, to);
