@@ -223,6 +223,43 @@ struct TunnelSource : Source
 };
 
 
+/* If the NAR archive contains a single file at top-level, then save
+   the contents of the file to `s'.  Otherwise barf. */
+struct RetrieveRegularNARSink : ParseSink
+{
+    string s;
+
+    void createDirectory(const Path & path)
+    {
+        throw Error("regular file expected");
+    }
+
+    void receiveContents(unsigned char * data, unsigned int len)
+    {
+        s.append((const char *) data, len);
+    }
+
+    void createSymlink(const Path & path, const string & target)
+    {
+        throw Error("regular file expected");
+    }
+};
+
+
+/* Adapter class of a Source that saves all data read to `s'. */
+struct SavingSourceAdapter : Source
+{
+    Source & orig;
+    string s;
+    SavingSourceAdapter(Source & orig) : orig(orig) { }
+    void operator () (unsigned char * data, unsigned int len)
+    {
+        orig(data, len);
+        s.append((const char *) data, len);
+    }
+};
+
+
 static void performOp(unsigned int clientVersion,
     Source & from, Sink & to, unsigned int op)
 {
@@ -299,13 +336,22 @@ static void performOp(unsigned int clientVersion,
         }
         HashType hashAlgo = parseHashType(s);
 
-        Path tmp = createTempDir();
-        AutoDelete delTmp(tmp);
-        Path tmp2 = tmp + "/" + baseName;
-        restorePath(tmp2, from);
-
+        SavingSourceAdapter savedNAR(from);
+        RetrieveRegularNARSink savedRegular;
+        
+        if (recursive) {
+            /* Get the entire NAR dump from the client and save it to
+               a string so that we can pass it to
+               addToStoreFromDump(). */
+            ParseSink sink; /* null sink; just parse the NAR */
+            parseDump(sink, savedNAR);
+        } else {
+            parseDump(savedRegular, from);
+        }
+            
         startWork();
-        Path path = store->addToStore(tmp2, recursive, hashAlgo);
+        Path path = dynamic_cast<LocalStore *>(store.get())
+            ->addToStoreFromDump(recursive ? savedNAR.s : savedRegular.s, baseName, recursive, hashAlgo);
         stopWork();
         
         writeString(path, to);

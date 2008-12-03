@@ -655,24 +655,12 @@ void LocalStore::invalidatePath(const Path & path)
 }
 
 
-Path LocalStore::addToStore(const Path & _srcPath,
-    bool recursive, HashType hashAlgo, PathFilter & filter)
+Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
+    bool recursive, HashType hashAlgo)
 {
-    Path srcPath(absPath(_srcPath));
-    debug(format("adding `%1%' to the store") % srcPath);
+    Hash h = hashString(hashAlgo, dump);
 
-    /* Read the whole path into memory. This is not a very scalable
-       method for very large paths, but `copyPath' is mainly used for
-       small files. */
-    StringSink sink;
-    if (recursive) 
-        dumpPath(srcPath, sink, filter);
-    else
-        sink.s = readFile(srcPath);
-
-    Hash h = hashString(hashAlgo, sink.s);
-
-    Path dstPath = makeFixedOutputPath(recursive, hashAlgo, h, baseNameOf(srcPath));
+    Path dstPath = makeFixedOutputPath(recursive, hashAlgo, h, name);
 
     addTempRoot(dstPath);
 
@@ -688,10 +676,10 @@ Path LocalStore::addToStore(const Path & _srcPath,
             if (pathExists(dstPath)) deletePathWrapped(dstPath);
 
             if (recursive) {
-                StringSource source(sink.s);
+                StringSource source(dump);
                 restorePath(dstPath, source);
             } else
-                writeStringToFile(dstPath, sink.s);
+                writeStringToFile(dstPath, dump);
 
             canonicalisePathMetaData(dstPath);
 
@@ -701,7 +689,7 @@ Path LocalStore::addToStore(const Path & _srcPath,
                sha256); otherwise, compute it here. */
             registerValidPath(dstPath,
                 (recursive && hashAlgo == htSHA256) ? h :
-                (recursive ? hashString(htSHA256, sink.s) : hashPath(htSHA256, dstPath)),
+                (recursive ? hashString(htSHA256, dump) : hashPath(htSHA256, dstPath)),
                 PathSet(), "");
         }
 
@@ -709,6 +697,25 @@ Path LocalStore::addToStore(const Path & _srcPath,
     }
 
     return dstPath;
+}
+
+
+Path LocalStore::addToStore(const Path & _srcPath,
+    bool recursive, HashType hashAlgo, PathFilter & filter)
+{
+    Path srcPath(absPath(_srcPath));
+    debug(format("adding `%1%' to the store") % srcPath);
+
+    /* Read the whole path into memory. This is not a very scalable
+       method for very large paths, but `copyPath' is mainly used for
+       small files. */
+    StringSink sink;
+    if (recursive) 
+        dumpPath(srcPath, sink, filter);
+    else
+        sink.s = readFile(srcPath);
+
+    return addToStoreFromDump(sink.s, baseNameOf(srcPath), recursive, hashAlgo);
 }
 
 
