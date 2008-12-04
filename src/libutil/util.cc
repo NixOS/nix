@@ -469,11 +469,7 @@ void warnOnce(bool & haveWarned, const format & f)
 
 static void defaultWriteToStderr(const unsigned char * buf, size_t count)
 {
-    try {
-        writeFull(STDERR_FILENO, buf, count);
-    } catch (SysError & e) {
-        /* ignore EPIPE etc. */
-    }
+    writeFull(STDERR_FILENO, buf, count);
 }
 
 
