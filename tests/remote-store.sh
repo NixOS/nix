@@ -12,6 +12,8 @@ clearStore
 clearManifests
 $nixworker --daemon &
 pidDaemon=$!
+trap "kill -9 $pidDaemon" EXIT
 NIX_REMOTE=daemon $SHELL ./user-envs.sh
 kill -9 $pidDaemon
 wait $pidDaemon || true
+trap "" EXIT
