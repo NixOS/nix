@@ -106,13 +106,18 @@ let
       };
 
       
-    rpm_fedora9i386 = makeRPM (diskImages: diskImages.fedora9i386) 50;
-    rpm_fedora10i386 = makeRPM (diskImages: diskImages.fedora10i386) 40;
-    rpm_opensuse103i386 = makeRPM (diskImages: diskImages.opensuse103i386) 40;
+    rpm_fedora5i386 = makeRPM_i686 (diskImages: diskImages.fedora5i386) 20;
+    rpm_fedora9i386 = makeRPM_i686 (diskImages: diskImages.fedora9i386) 50;
+    rpm_fedora9x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora9x86_64) 50;
+    rpm_fedora10i386 = makeRPM_i686 (diskImages: diskImages.fedora10i386) 40;
+    rpm_fedora10x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora10x86_64) 40;
+    rpm_opensuse103i386 = makeRPM_i686 (diskImages: diskImages.opensuse103i386) 40;
 
     
-    deb_debian40i386 = makeDeb (diskImages: diskImages.debian40i386) 30;
-    deb_ubuntu804i386 = makeDeb (diskImages: diskImages.ubuntu804i386) 40;
+    deb_debian40i386 = makeDeb_i686 (diskImages: diskImages.debian40i386) 30;
+    deb_debian40x86_64 = makeDeb_i686 (diskImages: diskImages.debian40x86_64) 30;
+    deb_ubuntu804i386 = makeDeb_i686 (diskImages: diskImages.ubuntu804i386) 40;
+    deb_ubuntu804x86_64 = makeDeb_i686 (diskImages: diskImages.ubuntu804x86_64) 40;
 
 
   };
@@ -143,13 +148,16 @@ let
     };
 
 
-  makeRPM =
-    diskImageFun: prio:
+  makeRPM_i686 = makeRPM "i686-linux";
+  makeRPM_x86_64 = makeRPM "x86_64-linux";
+
+  makeRPM = 
+    system: diskImageFun: prio:
     { tarball ? {path = jobs.tarball {};}
     , nixpkgs ? {path = ../nixpkgs;}
     }:
 
-    with import nixpkgs.path {};
+    with import nixpkgs.path {inherit system;};
 
     releaseTools.rpmBuild rec {
       name = "nix-rpm-${diskImage.name}";
@@ -160,13 +168,16 @@ let
     };
 
 
+  makeDeb_i686 = makeDeb "i686-linux";
+  makeDeb_x86_64 = makeDeb "x86_64-linux";
+  
   makeDeb =
-    diskImageFun: prio:
+    system: diskImageFun: prio:
     { tarball ? {path = jobs.tarball {};}
     , nixpkgs ? {path = ../nixpkgs;}
     }:
 
-    with import nixpkgs.path {};
+    with import nixpkgs.path {inherit system;};
 
     releaseTools.debBuild {
       name = "nix-deb";
