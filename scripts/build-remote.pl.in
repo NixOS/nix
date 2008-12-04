@@ -183,7 +183,12 @@ system("NIX_SSHOPTS=\"$sshOpts\" nix-copy-closure $hostName $maybeSign $drvPath 
 
 print "BUILDING...\n";
 
-system("ssh $sshOpts $hostName 'nix-store -rvvK $drvPath'") == 0
+# `-tt' forces allocation of a pseudo-terminal.  This is required to
+# make the remote nix-store process receive a signal when the
+# connection dies.  Without it, the remote process might continue to
+# run indefinitely (that is, until it next tries to write to
+# stdout/stderr).
+system("ssh -tt $sshOpts $hostName 'nix-store -rvvK $drvPath'") == 0
     or die "remote build on $hostName failed: $?";
 
 print "REMOTE BUILD DONE: $drvPath on $hostName\n";
