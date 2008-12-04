@@ -52,10 +52,7 @@ decline if $amWilling && ($localSystem eq $neededSystem);
 
 
 # Otherwise find a willing remote machine.
-my %machines;
-my %systemTypes;
-my %sshKeys;
-my %maxJobs;
+my @machines;
 my %curJobs;
 
 
@@ -67,10 +64,12 @@ while (<CONF>) {
     s/\#.*$//g;
     next if /^\s*$/;
     /^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\d+)\s*$/ or die;
-    $machines{$1} = "";
-    $systemTypes{$1} = $2;
-    $sshKeys{$1} = $3;
-    $maxJobs{$1} = $4;
+    push @machines,
+        { hostName => $1
+        , systemType => $2
+        , sshKeys => $3
+        , maxJobs => $4
+        };
 }
 
 close CONF;
@@ -85,15 +84,15 @@ flock(MAINLOCK, LOCK_EX) or die;
 # Find a suitable system.
 my $rightType = 0;
 my $machine;
-LOOP: foreach my $cur (keys %machines) {
-    if ($neededSystem eq $systemTypes{$cur}) {
+LOOP: foreach my $cur (@machines) {
+    if ($neededSystem eq $cur->{systemType}) {
         $rightType = 1;
 
         # We have a machine of the right type.  Try to get a lock on
         # one of the machine's lock files.
         my $slot = 0;
-        while ($slot < $maxJobs{$cur}) {
-            my $slotLock = "$currentLoad/$cur-$slot";
+        while ($slot < $cur->{maxJobs}) {
+            my $slotLock = "$currentLoad/" . $cur->{systemType} . "-" . $cur->{hostName} . "-$slot";
             open SLOTLOCK, ">>$slotLock" or die;
             if (flock(SLOTLOCK, LOCK_EX | LOCK_NB)) {
                 $machine = $cur;
@@ -132,7 +131,8 @@ if ($x ne "okay") {
 
 
 # Do the actual job.
-print "BUILDING REMOTE: $drvPath on $machine\n";
+my $hostName = $machine->{hostName};
+print "BUILDING REMOTE: $drvPath on $hostName\n";
 
 # Make sure that we don't get any SSH passphrase or host key popups -
 # if there is any problem it should fail, not do something
@@ -141,10 +141,10 @@ $ENV{"DISPLAY"} = "";
 $ENV{"SSH_PASSWORD_FILE="} = "";
 $ENV{"SSH_ASKPASS="} = "";
 
-my $sshOpts = "-i $sshKeys{$machine} -x";
+my $sshOpts = "-i " . $machine->{sshKeys} . " -x";
 
 # Hack to support Cygwin: if we login without a password, we don't
-# have exactly the same right as when we do.  This causes the
+# have exactly the same rights as when we do.  This causes the
 # Microsoft C compiler to fail with certain flags:
 #
 #   http://connect.microsoft.com/VisualStudio/feedback/ViewFeedback.aspx?FeedbackID=99676
@@ -154,8 +154,8 @@ my $sshOpts = "-i $sshKeys{$machine} -x";
 # password.  (It only calls this command when there is no controlling
 # terminal, but Nix ensures that is is the case.  When doing this
 # manually, use setsid(1).)
-if ($sshKeys{$machine} =~ /^password:/) {
-    my $passwordFile = $sshKeys{$machine};
+if ($machine->{sshKeys} =~ /^password:/) {
+    my $passwordFile = $machine->{sshKeys};
     $passwordFile =~ s/^password://;
     $sshOpts = "ssh -x";
     $ENV{"SSH_PASSWORD_FILE"} = $passwordFile;
@@ -178,22 +178,22 @@ print "COPYING INPUTS...\n";
 my $maybeSign = "";
 $maybeSign = "--sign" if -e "/nix/etc/nix/signing-key.sec";
 
-system("NIX_SSHOPTS=\"$sshOpts\" nix-copy-closure $machine $maybeSign $drvPath $inputs") == 0
-    or die "cannot copy inputs to $machine: $?";
+system("NIX_SSHOPTS=\"$sshOpts\" nix-copy-closure $hostName $maybeSign $drvPath $inputs") == 0
+    or die "cannot copy inputs to $hostName: $?";
 
 print "BUILDING...\n";
 
-system("ssh $sshOpts $machine 'nix-store -rvvK $drvPath'") == 0
-    or die "remote build on $machine failed: $?";
+system("ssh $sshOpts $hostName 'nix-store -rvvK $drvPath'") == 0
+    or die "remote build on $hostName failed: $?";
 
-print "REMOTE BUILD DONE: $drvPath on $machine\n";
+print "REMOTE BUILD DONE: $drvPath on $hostName\n";
 
 foreach my $output (split '\n', $outputs) {
     my $maybeSignRemote = "";
     $maybeSignRemote = "--sign" if $UID != 0;
     
-    system("ssh $sshOpts $machine 'nix-store --export $maybeSignRemote $output' > dump") == 0
-	or die "cannot copy $output from $machine: $?";
+    system("ssh $sshOpts $hostName 'nix-store --export $maybeSignRemote $output' > dump") == 0
+	or die "cannot copy $output from $hostName: $?";
 
     # This doesn't work yet, since the caller has a lock on the output
     # path.  We should move towards lock-free invocation of build
