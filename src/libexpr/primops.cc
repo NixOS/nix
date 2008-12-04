@@ -590,10 +590,11 @@ static Expr prim_toFile(EvalState & state, const ATermVector & args)
     PathSet refs;
 
     for (PathSet::iterator i = context.begin(); i != context.end(); ++i) {
-        if (isDerivation(*i))
+        Path path = *i;
+        if (path.at(0) == '=') path = string(path, 1);
+        if (isDerivation(path))
             throw EvalError(format("in `toFile': the file `%1%' cannot refer to derivation outputs") % name);
-        /* !!! */
-        refs.insert(*i);
+        refs.insert(path);
     }
     
     Path storePath = readOnlyMode
