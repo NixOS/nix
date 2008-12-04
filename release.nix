@@ -115,9 +115,9 @@ let
 
     
     deb_debian40i386 = makeDeb_i686 (diskImages: diskImages.debian40i386) 30;
-    deb_debian40x86_64 = makeDeb_i686 (diskImages: diskImages.debian40x86_64) 30;
+    deb_debian40x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian40x86_64) 30;
     deb_ubuntu804i386 = makeDeb_i686 (diskImages: diskImages.ubuntu804i386) 40;
-    deb_ubuntu804x86_64 = makeDeb_i686 (diskImages: diskImages.ubuntu804x86_64) 40;
+    deb_ubuntu804x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu804x86_64) 40;
 
 
   };
