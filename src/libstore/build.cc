@@ -1301,6 +1301,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
                 drv.platform.c_str(),
                 drvPath.c_str(),
                 (worker.canPostpone() ? (string) "0" : "1").c_str(),
+                (format("%1%") % maxSilentTime).str().c_str(),
                 NULL);
             
             throw SysError(format("executing `%1%'") % buildHook);

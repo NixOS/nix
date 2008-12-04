@@ -23,8 +23,9 @@ use English '-no_match_vars';
 
 my $loadIncreased = 0;
 
-my ($amWilling, $localSystem, $neededSystem, $drvPath, $mustRun) = @ARGV;
+my ($amWilling, $localSystem, $neededSystem, $drvPath, $mustRun, $maxSilentTime) = @ARGV;
 $mustRun = 0 unless defined $mustRun;
+$maxSilentTime = 0 unless defined $maxSilentTime;
 
 sub sendReply {
     my $reply = shift;
@@ -184,12 +185,15 @@ system("NIX_SSHOPTS=\"$sshOpts\" nix-copy-closure $hostName $maybeSign $drvPath 
 
 print "BUILDING...\n";
 
+my $buildFlags = "";
+$buildFlags .= " --max-silent-time $maxSilentTime";
+
 # `-tt' forces allocation of a pseudo-terminal.  This is required to
 # make the remote nix-store process receive a signal when the
 # connection dies.  Without it, the remote process might continue to
 # run indefinitely (that is, until it next tries to write to
 # stdout/stderr).
-system("ssh -tt $sshOpts $hostName 'nix-store -rvvK $drvPath'") == 0
+system("ssh -tt $sshOpts $hostName 'nix-store -rvvK $buildFlags $drvPath'") == 0
     or die "remote build on $hostName failed: $?";
 
 print "REMOTE BUILD DONE: $drvPath on $hostName\n";
