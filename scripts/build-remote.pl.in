@@ -23,10 +23,8 @@ use English '-no_match_vars';
 
 my $loadIncreased = 0;
 
-my $amWilling = shift @ARGV;
-my $localSystem = shift @ARGV;
-my $neededSystem = shift @ARGV;
-my $drvPath = shift @ARGV;
+my ($amWilling, $localSystem, $neededSystem, $drvPath, $mustRun) = @ARGV;
+$mustRun = 0 unless defined $mustRun;
 
 sub sendReply {
     my $reply = shift;
@@ -91,13 +89,15 @@ LOOP: foreach my $cur (@machines) {
         # We have a machine of the right type.  Try to get a lock on
         # one of the machine's lock files.
         my $slot = 0;
-        while ($slot < $cur->{maxJobs}) {
+        while ($slot < $cur->{maxJobs} || $mustRun) {
             my $slotLock = "$currentLoad/" . $cur->{systemType} . "-" . $cur->{hostName} . "-$slot";
             open SLOTLOCK, ">>$slotLock" or die;
             if (flock(SLOTLOCK, LOCK_EX | LOCK_NB)) {
+                print STDERR "warning: exceeding maximum load on " . $cur->{systemType} . "\n"
+                    if $slot >= $cur->{maxJobs};
                 $machine = $cur;
                 last LOOP;
-            }                
+            }
             close SLOTLOCK;
             $slot++;
         }

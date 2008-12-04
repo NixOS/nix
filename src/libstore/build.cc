@@ -219,6 +219,9 @@ public:
     /* Can we start another child process? */
     bool canBuildMore();
 
+    /* Can we postpone a build right now? */
+    bool canPostpone();
+
     /* Registers a running child process.  `inBuildSlot' means that
        the process counts towards the jobs limit. */
     void childStarted(GoalPtr goal, pid_t pid,
@@ -1296,7 +1299,9 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
                 (worker.canBuildMore() ? (string) "1" : "0").c_str(),
                 thisSystem.c_str(),
                 drv.platform.c_str(),
-                drvPath.c_str(), NULL);
+                drvPath.c_str(),
+                (worker.canPostpone() ? (string) "0" : "1").c_str(),
+                NULL);
             
             throw SysError(format("executing `%1%'") % buildHook);
             
@@ -2599,6 +2604,12 @@ void Worker::wakeUp(GoalPtr goal)
 bool Worker::canBuildMore()
 {
     return nrChildren < maxBuildJobs;
+}
+
+
+bool Worker::canPostpone()
+{
+    return children.size() != 0;
 }
 
 
