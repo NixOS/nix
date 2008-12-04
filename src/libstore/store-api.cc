@@ -7,7 +7,7 @@
 
 /* Needed for some ancient environments. */
 #ifndef ULLONG_MAX
-#define ULLONG_MAX 18446744073709551615
+#define ULLONG_MAX 18446744073709551615ULL
 #endif
 
 
