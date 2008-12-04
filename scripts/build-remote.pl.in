@@ -45,8 +45,7 @@ mkdir $currentLoad, 0777 or die unless -d $currentLoad;
 my $conf = $ENV{"NIX_REMOTE_SYSTEMS"};
 decline if !defined $conf || ! -e $conf;
 
-# Decline if the local system can do the build.
-decline if $amWilling && ($localSystem eq $neededSystem);
+my $canBuildLocally = $amWilling && ($localSystem eq $neededSystem);
 
 
 # Otherwise find a willing remote machine.
@@ -89,7 +88,7 @@ LOOP: foreach my $cur (@machines) {
         # We have a machine of the right type.  Try to get a lock on
         # one of the machine's lock files.
         my $slot = 0;
-        while ($slot < $cur->{maxJobs} || $mustRun) {
+        while ($slot < $cur->{maxJobs} || ($mustRun && !$canBuildLocally)) {
             my $slotLock = "$currentLoad/" . $cur->{systemType} . "-" . $cur->{hostName} . "-$slot";
             open SLOTLOCK, ">>$slotLock" or die;
             if (flock(SLOTLOCK, LOCK_EX | LOCK_NB)) {
@@ -107,9 +106,11 @@ LOOP: foreach my $cur (@machines) {
 close MAINLOCK;
 
 
-# Didn't find one?
+# Didn't find one?  Then decline or postpone.
 if (!defined $machine) {
-    if ($rightType) {
+    # Postpone if we have a machine of the right type, except if the
+    # local system can and wants to do the build.
+    if ($rightType && !$canBuildLocally) {
         sendReply "postpone";
         exit 0;
     } else {
