@@ -185,8 +185,7 @@ system("NIX_SSHOPTS=\"$sshOpts\" nix-copy-closure $hostName $maybeSign $drvPath 
 
 print "BUILDING...\n";
 
-my $buildFlags = "";
-$buildFlags .= " --max-silent-time $maxSilentTime";
+my $buildFlags = "--max-silent-time $maxSilentTime";
 
 # `-tt' forces allocation of a pseudo-terminal.  This is required to
 # make the remote nix-store process receive a signal when the
