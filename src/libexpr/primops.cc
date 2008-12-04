@@ -366,12 +366,18 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
        attributes should be added as dependencies of the resulting
        derivation. */
     for (PathSet::iterator i = context.begin(); i != context.end(); ++i) {
-        debug(format("derivation uses `%1%'") % *i);
-        assert(isStorePath(*i));
-        if (isDerivation(*i))
-            drv.inputDrvs[*i] = singleton<StringSet>("out");
+        Path path = *i;
+        bool buildDrv = true;
+        if (path.at(0) == '=') {
+            buildDrv = false;
+            path = string(path, 1);
+        }
+        debug(format("derivation uses `%1%'") % path);
+        assert(isStorePath(path));
+        if (buildDrv && isDerivation(path))
+            drv.inputDrvs[path] = singleton<StringSet>("out");
         else
-            drv.inputSrcs.insert(*i);
+            drv.inputSrcs.insert(path);
     }
             
     /* Do we have all required attributes? */
@@ -498,9 +504,17 @@ static Expr prim_storePath(EvalState & state, const ATermVector & args)
     Path path = canonPath(coerceToPath(state, args[0], context));
     if (!isInStore(path))
         throw EvalError(format("path `%1%' is not in the Nix store") % path);
-    if (!store->isValidPath(path))
-        throw EvalError(format("store path `%1%' is not valid") % path);
-    context.insert(toStorePath(path));
+    Path path2 = toStorePath(path);
+    if (!store->isValidPath(path2))
+        throw EvalError(format("store path `%1%' is not valid") % path2);
+    /* If this is a derivation, mark it so it doesn't get built;
+       i.e. we want the dependency as a "source" dependency.  This is
+       to make nix-push work properly (we want it to create a NAR
+       archive of the derivation, not build the derivation as a
+       side-effect).  The `=' is a special marker that gets stripped
+       off by prim_derivationStrict. */
+    if (isDerivation(path2)) path2 = "=" + path2;
+    context.insert(path2);
     return makeStr(path, context);
 }
 
@@ -578,6 +592,7 @@ static Expr prim_toFile(EvalState & state, const ATermVector & args)
     for (PathSet::iterator i = context.begin(); i != context.end(); ++i) {
         if (isDerivation(*i))
             throw EvalError(format("in `toFile': the file `%1%' cannot refer to derivation outputs") % name);
+        /* !!! */
         refs.insert(*i);
     }
     

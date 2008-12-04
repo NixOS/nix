@@ -128,7 +128,7 @@ while (<READ>) {
 close READ or die "nix-instantiate failed: $?";
 
 
-# Realise the store expressions.
+# Build the derivations.
 print STDERR "creating archives...\n";
 
 my @narPaths;
@@ -144,7 +144,6 @@ while (scalar @tmp > 0) {
     # reference (see above).  Even if that is fixed, using a hook
     # probably wouldn't make that much sense; pumping lots of data
     # around just to compress them won't gain that much.
-    $ENV{"NIX_BUILD_HOOK"} = "";
     my $pid = open(READ, "$binDir/nix-store --no-build-hook --realise @tmp2|")
         or die "cannot run nix-store";
     while (<READ>) {
