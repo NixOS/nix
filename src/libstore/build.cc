@@ -648,6 +648,8 @@ private:
 
     /* Whether we're currently doing a chroot build. */
     bool useChroot;
+    
+    Path chrootRootDir;
 
     /* RAII object to delete the chroot directory. */
     boost::shared_ptr<AutoDelete> autoDelChroot;
@@ -804,9 +806,7 @@ void DerivationGoal::haveDerivation()
     trace("loading derivation");
 
     if (nrFailed != 0) {
-        printMsg(lvlError,
-            format("cannot build missing derivation `%1%'")
-            % drvPath);
+        printMsg(lvlError, format("cannot build missing derivation `%1%'") % drvPath);
         amDone(ecFailed);
         return;
     }
@@ -1062,6 +1062,12 @@ void DerivationGoal::buildDone()
              i != drv.outputs.end(); ++i)
         {
             Path path = i->second.path;
+
+            if (useChroot && pathExists(chrootRootDir + path)) {
+                if (rename((chrootRootDir + path).c_str(), path.c_str()) == -1)
+                    throw SysError(format("moving build output `%1%' from the chroot to the Nix store") % path);
+            }
+            
             if (!pathExists(path)) continue;
 
             struct stat st;
@@ -1449,6 +1455,14 @@ DerivationGoal::PrepareBuildReply DerivationGoal::prepareBuild()
 }
 
 
+void chmod(const Path & path, mode_t mode)
+{
+    if (::chmod(path.c_str(), 01777) == -1)
+        throw SysError(format("setting permissions on `%1%'") % path);
+    
+}
+
+
 void DerivationGoal::startBuilder()
 {
     startNest(nest, lvlInfo,
@@ -1648,7 +1662,6 @@ void DerivationGoal::startBuilder()
        work properly.  Purity checking for fixed-output derivations
        is somewhat pointless anyway. */
     useChroot = queryBoolSetting("build-use-chroot", false);
-    Path chrootRootDir;
     Paths dirsInChroot;
 
     if (fixedOutput) useChroot = false;
@@ -1669,9 +1682,7 @@ void DerivationGoal::startBuilder()
            instead.) */
         Path chrootTmpDir = chrootRootDir + "/tmp";
         createDirs(chrootTmpDir);
-
-        if (chmod(chrootTmpDir.c_str(), 01777) == -1)
-            throw SysError("creating /tmp in the chroot");
+        chmod(chrootTmpDir, 01777);
 
         /* Create a /etc/passwd with entries for the build user and
            the nobody account.  The latter is kind of a hack to
@@ -1695,8 +1706,31 @@ void DerivationGoal::startBuilder()
         
         dirsInChroot = querySetting("build-chroot-dirs", defaultDirs);
 
-        dirsInChroot.push_front(nixStore);
         dirsInChroot.push_front(tmpDir);
+
+        /* Make the closure of the inputs available in the chroot,
+           rather than the whole Nix store.  This prevents any access
+           to undeclared dependencies.  Directories are bind-mounted,
+           while other inputs are hard-linked (since only directories
+           can be bind-mounted).  !!! As an extra security
+           precaution, make the fake Nix store only writable by the
+           build user. */
+        createDirs(chrootRootDir + nixStore);
+        chmod(chrootRootDir + nixStore, 01777);
+
+        foreach (PathSet::iterator, i, inputPaths) {
+            struct stat st;
+            if (lstat(i->c_str(), &st))
+                throw SysError(format("getting attributes of path `%1%'") % *i);
+            if (S_ISDIR(st.st_mode))
+                dirsInChroot.push_back(*i);
+            else {
+                Path p = chrootRootDir + *i;
+                if (link(i->c_str(), p.c_str()) == -1)
+                    throw SysError(format("linking `%1%' to `%2%'") % p % *i);
+            }
+        }
+        
 #else
         throw Error("chroot builds are not supported on this platform");
 #endif
@@ -1742,7 +1776,7 @@ void DerivationGoal::startBuilder()
                 foreach (Paths::iterator, i, dirsInChroot) {
                     Path source = *i;
                     Path target = chrootRootDir + source;
-                    printMsg(lvlError, format("bind mounting `%1%' to `%2%'") % source % target);
+                    debug(format("bind mounting `%1%' to `%2%'") % source % target);
                 
                     createDirs(target);
                 
@@ -1781,7 +1815,7 @@ void DerivationGoal::startBuilder()
                safe.  Also note that setuid() when run as root sets
                the real, effective and saved UIDs. */
             if (buildUser.enabled()) {
-                debug(format("switching to user `%1%'") % buildUser.getUser());
+                printMsg(lvlChatty, format("switching to user `%1%'") % buildUser.getUser());
 
                 if (amPrivileged()) {
                     
