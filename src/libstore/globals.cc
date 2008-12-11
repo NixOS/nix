@@ -16,7 +16,6 @@ string nixDBPath = "/UNINIT";
 string nixConfDir = "/UNINIT";
 string nixLibexecDir = "/UNINIT";
 string nixBinDir = "/UNINIT";
-string nixChrootsDir = "/UNINIT";
 
 bool keepFailed = false;
 bool keepGoing = false;

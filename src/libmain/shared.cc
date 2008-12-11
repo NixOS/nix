@@ -138,7 +138,6 @@ static void initAndRun(int argc, char * * argv)
     nixConfDir = canonPath(getEnv("NIX_CONF_DIR", NIX_CONF_DIR));
     nixLibexecDir = canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR));
     nixBinDir = canonPath(getEnv("NIX_BIN_DIR", NIX_BIN_DIR));
-    nixChrootsDir = canonPath(getEnv("NIX_CHROOTS_DIR", nixStateDir + "/chroots"));
 
     string subs = getEnv("NIX_SUBSTITUTERS", "default");
     if (subs == "default") {

@@ -35,12 +35,6 @@ extern string nixLibexecDir;
 /* nixBinDir is the directory where the main programs are stored. */
 extern string nixBinDir;
 
-/* nixChrootsDir is the directory where we create chroot environments
-   (when chroot builds are enabled).  We don't put these under /tmp to
-   prevent "rm -rf /tmp" from recursing into /nix/store via the bind
-   mounts in the chroots. */
-extern string nixChrootsDir;
-
 
 /* Misc. global flags. */
 

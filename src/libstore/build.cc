@@ -1657,7 +1657,7 @@ void DerivationGoal::startBuilder()
 #if CHROOT_ENABLED
         /* Create a temporary directory in which we set up the chroot
            environment using bind-mounts. */
-        chrootRootDir = createTempDir(nixChrootsDir, "chroot-nix");
+        chrootRootDir = createTempDir("", "nix-chroot");
 
         /* Clean up the chroot directory automatically. */
         autoDelChroot = boost::shared_ptr<AutoDelete>(new AutoDelete(chrootRootDir));
