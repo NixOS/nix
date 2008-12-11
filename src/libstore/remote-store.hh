@@ -74,6 +74,9 @@ private:
     FdSource from;
     Pid child;
     unsigned int daemonVersion;
+    bool initialised;
+
+    void openConnection();
 
     void processStderr(Sink * sink = 0, Source * source = 0);
 

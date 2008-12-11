@@ -37,6 +37,15 @@ PathSet readStorePaths(Source & from)
 
 RemoteStore::RemoteStore()
 {
+    initialised = false;
+}
+
+
+void RemoteStore::openConnection()
+{
+    if (initialised) return;
+    initialised = true;
+
     string remoteMode = getEnv("NIX_REMOTE");
 
     if (remoteMode == "slave")
@@ -64,8 +73,8 @@ RemoteStore::RemoteStore()
             throw Error("Nix daemon protocol version not supported");
         writeInt(PROTOCOL_VERSION, to);
         processStderr();
-
-    } catch (Error & e) {
+    }
+    catch (Error & e) {
         throw Error(format("cannot start worker (%1%)")
             % e.msg());
     }
@@ -194,6 +203,7 @@ void RemoteStore::setOptions()
 
 bool RemoteStore::isValidPath(const Path & path)
 {
+    openConnection();
     writeInt(wopIsValidPath, to);
     writeString(path, to);
     processStderr();
@@ -204,12 +214,14 @@ bool RemoteStore::isValidPath(const Path & path)
 
 PathSet RemoteStore::queryValidPaths()
 {
+    openConnection();
     throw Error("not implemented");
 }
 
 
 bool RemoteStore::hasSubstitutes(const Path & path)
 {
+    openConnection();
     writeInt(wopHasSubstitutes, to);
     writeString(path, to);
     processStderr();
@@ -221,6 +233,7 @@ bool RemoteStore::hasSubstitutes(const Path & path)
 bool RemoteStore::querySubstitutablePathInfo(const Path & path,
     SubstitutablePathInfo & info)
 {
+    openConnection();
     if (GET_PROTOCOL_MINOR(daemonVersion) < 3) return false;
     writeInt(wopQuerySubstitutablePathInfo, to);
     writeString(path, to);
@@ -237,6 +250,7 @@ bool RemoteStore::querySubstitutablePathInfo(const Path & path,
 
 Hash RemoteStore::queryPathHash(const Path & path)
 {
+    openConnection();
     writeInt(wopQueryPathHash, to);
     writeString(path, to);
     processStderr();
@@ -248,6 +262,7 @@ Hash RemoteStore::queryPathHash(const Path & path)
 void RemoteStore::queryReferences(const Path & path,
     PathSet & references)
 {
+    openConnection();
     writeInt(wopQueryReferences, to);
     writeString(path, to);
     processStderr();
@@ -259,6 +274,7 @@ void RemoteStore::queryReferences(const Path & path,
 void RemoteStore::queryReferrers(const Path & path,
     PathSet & referrers)
 {
+    openConnection();
     writeInt(wopQueryReferrers, to);
     writeString(path, to);
     processStderr();
@@ -269,6 +285,7 @@ void RemoteStore::queryReferrers(const Path & path,
 
 Path RemoteStore::queryDeriver(const Path & path)
 {
+    openConnection();
     writeInt(wopQueryDeriver, to);
     writeString(path, to);
     processStderr();
@@ -281,6 +298,8 @@ Path RemoteStore::queryDeriver(const Path & path)
 Path RemoteStore::addToStore(const Path & _srcPath,
     bool recursive, HashType hashAlgo, PathFilter & filter)
 {
+    openConnection();
+    
     Path srcPath(absPath(_srcPath));
     
     writeInt(wopAddToStore, to);
@@ -298,6 +317,7 @@ Path RemoteStore::addToStore(const Path & _srcPath,
 Path RemoteStore::addTextToStore(const string & name, const string & s,
     const PathSet & references)
 {
+    openConnection();
     writeInt(wopAddTextToStore, to);
     writeString(name, to);
     writeString(s, to);
@@ -311,6 +331,7 @@ Path RemoteStore::addTextToStore(const string & name, const string & s,
 void RemoteStore::exportPath(const Path & path, bool sign,
     Sink & sink)
 {
+    openConnection();
     writeInt(wopExportPath, to);
     writeString(path, to);
     writeInt(sign ? 1 : 0, to);
@@ -321,10 +342,10 @@ void RemoteStore::exportPath(const Path & path, bool sign,
 
 Path RemoteStore::importPath(bool requireSignature, Source & source)
 {
+    openConnection();
     writeInt(wopImportPath, to);
     /* We ignore requireSignature, since the worker forces it to true
-       anyway. */
-    
+       anyway. */    
     processStderr(0, &source);
     return readStorePath(from);
 }
@@ -332,6 +353,7 @@ Path RemoteStore::importPath(bool requireSignature, Source & source)
 
 void RemoteStore::buildDerivations(const PathSet & drvPaths)
 {
+    openConnection();
     writeInt(wopBuildDerivations, to);
     writeStringSet(drvPaths, to);
     processStderr();
@@ -341,6 +363,7 @@ void RemoteStore::buildDerivations(const PathSet & drvPaths)
 
 void RemoteStore::ensurePath(const Path & path)
 {
+    openConnection();
     writeInt(wopEnsurePath, to);
     writeString(path, to);
     processStderr();
@@ -350,6 +373,7 @@ void RemoteStore::ensurePath(const Path & path)
 
 void RemoteStore::addTempRoot(const Path & path)
 {
+    openConnection();
     writeInt(wopAddTempRoot, to);
     writeString(path, to);
     processStderr();
@@ -359,6 +383,7 @@ void RemoteStore::addTempRoot(const Path & path)
 
 void RemoteStore::addIndirectRoot(const Path & path)
 {
+    openConnection();
     writeInt(wopAddIndirectRoot, to);
     writeString(path, to);
     processStderr();
@@ -368,6 +393,7 @@ void RemoteStore::addIndirectRoot(const Path & path)
 
 void RemoteStore::syncWithGC()
 {
+    openConnection();
     writeInt(wopSyncWithGC, to);
     processStderr();
     readInt(from);
@@ -376,6 +402,7 @@ void RemoteStore::syncWithGC()
 
 Roots RemoteStore::findRoots()
 {
+    openConnection();
     writeInt(wopFindRoots, to);
     processStderr();
     unsigned int count = readInt(from);
@@ -391,6 +418,8 @@ Roots RemoteStore::findRoots()
 
 void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
+    openConnection();
+    
     writeInt(wopCollectGarbage, to);
     writeInt(options.action, to);
     writeStringSet(options.pathsToDelete, to);

@@ -35,7 +35,7 @@ struct FdSink : Sink
 
     FdSink()
     {
-        fd = 0;
+        fd = -1;
     }
     
     FdSink(int fd) 
@@ -54,7 +54,7 @@ struct FdSource : Source
 
     FdSource()
     {
-        fd = 0;
+        fd = -1;
     }
     
     FdSource(int fd) 
