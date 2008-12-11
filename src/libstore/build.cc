@@ -1673,6 +1673,17 @@ void DerivationGoal::startBuilder()
         if (chmod(chrootTmpDir.c_str(), 01777) == -1)
             throw SysError("creating /tmp in the chroot");
 
+        /* Create a /etc/passwd with entries for the build user and
+           the nobody account.  The latter is kind of a hack to
+           support Samba-in-QEMU. */
+        createDirs(chrootRootDir + "/etc");
+
+        writeStringToFile(chrootRootDir + "/etc/passwd",
+            (format(
+                "nixbld:x:%1%:65534:Nix build user:/:/noshell\n"
+                "nobody:x:65534:65534:Nobody:/:/noshell\n")
+                % (buildUser.enabled() ? buildUser.getUID() : getuid())).str());
+
         /* Bind-mount a user-configurable set of directories from the
            host file system.  The `/dev/pts' directory must be mounted
            separately so that newly-created pseudo-terminals show
@@ -1770,7 +1781,7 @@ void DerivationGoal::startBuilder()
                safe.  Also note that setuid() when run as root sets
                the real, effective and saved UIDs. */
             if (buildUser.enabled()) {
-                printMsg(lvlChatty, format("switching to user `%1%'") % buildUser.getUser());
+                debug(format("switching to user `%1%'") % buildUser.getUser());
 
                 if (amPrivileged()) {
                     
