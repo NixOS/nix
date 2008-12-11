@@ -33,8 +33,11 @@
 #if HAVE_SYS_MOUNT_H
 #include <sys/mount.h>
 #endif
+#if HAVE_SCHED_H
+#include <sched.h>
+#endif
 
-#define CHROOT_ENABLED HAVE_CHROOT && HAVE_SYS_MOUNT_H && defined(MS_BIND)
+#define CHROOT_ENABLED HAVE_CHROOT && HAVE_SYS_MOUNT_H && defined(MS_BIND) && defined(CLONE_NEWNS)
 
 
 namespace nix {
@@ -603,89 +606,6 @@ void deletePathWrapped(const Path & path)
 //////////////////////////////////////////////////////////////////////
 
 
-/* Helper RAII class for automatically unmounting bind-mounts in
-   chroots. */
-struct BindMount
-{
-    Path source, target;
-    Paths created;
-
-    BindMount()
-    {
-    }
-
-    BindMount(const Path & source, const Path & target)
-    {
-        bind(source, target);
-    }
-
-    ~BindMount()
-    {
-        try {
-            unbind();
-        } catch (...) {
-            ignoreException();
-        }
-    }
-    
-    void bind(const Path & source, const Path & target)
-    {
-#if CHROOT_ENABLED        
-        debug(format("bind mounting `%1%' to `%2%'") % source % target);
-
-        this->source = source;
-        this->target = target;
-        
-        created = createDirs(target);
-        
-        if (mount(source.c_str(), target.c_str(), "", MS_BIND, 0) == -1)
-            throw SysError(format("bind mount from `%1%' to `%2%' failed") % source % target);
-#endif
-    }
-
-    void unbind()
-    {
-#if CHROOT_ENABLED
-        if (source == "") return;
-        
-        debug(format("unmount bind-mount `%1%'") % target);
-
-        /* Urgh.  Unmount sometimes doesn't succeed right away because
-           the mount point is still busy.  It shouldn't be, because
-           we've killed all the build processes by now (at least when
-           using a build user; see the check in killUser()).  But
-           maybe this is because those processes are still zombies and
-           are keeping some kernel structures busy (open files,
-           current directories, etc.).  So retry a few times
-           (actually, a 1 second sleep is almost certainly enough for
-           the zombies to be cleaned up). */
-        unsigned int tries = 0;
-        while (umount(target.c_str()) == -1) {
-            if (errno == EBUSY && ++tries < 10) {
-                printMsg(lvlError, format("unmounting `%1%' failed, retrying after 1 second...") % target);
-                sleep(1);
-            }
-            else
-                throw SysError(format("unmounting bind-mount `%1%' failed") % target);
-        }
-
-        /* Get rid of the directories for the mount point created in
-           bind(). */
-        for (Paths::reverse_iterator i = created.rbegin(); i != created.rend(); ++i) {
-            debug(format("deleting `%1%'") % *i);
-            if (remove(i->c_str()) == -1)
-                throw SysError(format("cannot unlink `%1%'") % *i);
-        }
-
-        source = "";
-#endif
-    }
-};
-
-
-//////////////////////////////////////////////////////////////////////
-
-
 class DerivationGoal : public Goal
 {
 private:
@@ -729,17 +649,9 @@ private:
     /* Whether we're currently doing a chroot build. */
     bool useChroot;
 
-    /* RAII objects to delete the chroot directory and its /tmp
-       directory.  Don't change the order: autoDelChrootTmp has to be
-       deleted before autoDelChrootRoot. */
-    boost::shared_ptr<AutoDelete> autoDelChrootRoot;
-    boost::shared_ptr<AutoDelete> autoDelChrootTmp;
+    /* RAII object to delete the chroot directory. */
+    boost::shared_ptr<AutoDelete> autoDelChroot;
     
-    /* In chroot builds, the list of bind mounts currently active.
-       The destructor of BindMount will cause the binds to be
-       unmounted.  Keep this *below* autoDelChroot* just to be safe! */
-    list<boost::shared_ptr<BindMount> > bindMounts;
-
     typedef void (DerivationGoal::*GoalState)();
     GoalState state;
     
@@ -1183,9 +1095,9 @@ void DerivationGoal::buildDone()
     
         deleteTmpDir(true);
 
-        /* In chroot builds, unmount the bind mounts ASAP. */
-        bindMounts.clear(); /* the destructors will do the rest */
-
+        /* Delete the chroot (if we were using one). */
+        autoDelChroot.reset(); /* this runs the destructor */
+        
         /* Compute the FS closure of the outputs and register them as
            being valid. */
         computeClosure();
@@ -1737,29 +1649,18 @@ void DerivationGoal::startBuilder()
        is somewhat pointless anyway. */
     useChroot = queryBoolSetting("build-use-chroot", false);
     Path chrootRootDir;
+    Paths dirsInChroot;
 
     if (fixedOutput) useChroot = false;
 
     if (useChroot) {
 #if CHROOT_ENABLED
         /* Create a temporary directory in which we set up the chroot
-           environment using bind-mounts.
-
-           !!! Bind mounts are potentially dangerous: if the user
-           cleans up his system by doing "rm -rf
-           /nix/var/nix/chroots/*", this will recurse into /nix/store
-           via the bind mounts (and potentially other parts of the
-           filesystem, depending on the setting of the
-           `build-chroot-dirs' option). */
+           environment using bind-mounts. */
         chrootRootDir = createTempDir(nixChrootsDir, "chroot-nix");
 
-        /* Clean up the chroot directory automatically, but don't
-           recurse; that would be very very bad if the unmount of a
-           bind-mount fails. Instead BindMount::unbind() unmounts and
-           deletes exactly those directories that it created to
-           produce the mount point, so that after all the BindMount
-           destructors have run, chrootRootDir should be empty. */
-        autoDelChrootRoot = boost::shared_ptr<AutoDelete>(new AutoDelete(chrootRootDir, false));
+        /* Clean up the chroot directory automatically. */
+        autoDelChroot = boost::shared_ptr<AutoDelete>(new AutoDelete(chrootRootDir));
         
         printMsg(lvlChatty, format("setting up chroot environment in `%1%'") % chrootRootDir);
 
@@ -1772,12 +1673,6 @@ void DerivationGoal::startBuilder()
         if (chmod(chrootTmpDir.c_str(), 01777) == -1)
             throw SysError("creating /tmp in the chroot");
 
-        /* When deleting this, do recurse (the builder might have left
-           crap there).  As long as nothing important is bind-mounted
-           under /tmp it's okay (and the bind-mounts are unmounted
-           before autoDelChrootTmp's destructor runs, anyway).  */
-        autoDelChrootTmp = boost::shared_ptr<AutoDelete>(new AutoDelete(chrootTmpDir));
-
         /* Bind-mount a user-configurable set of directories from the
            host file system.  The `/dev/pts' directory must be mounted
            separately so that newly-created pseudo-terminals show
@@ -1787,17 +1682,10 @@ void DerivationGoal::startBuilder()
         defaultDirs.push_back("/dev/pts");
         defaultDirs.push_back("/proc");
         
-        Paths dirsInChroot = querySetting("build-chroot-dirs", defaultDirs);
+        dirsInChroot = querySetting("build-chroot-dirs", defaultDirs);
 
         dirsInChroot.push_front(nixStore);
         dirsInChroot.push_front(tmpDir);
-
-        /* Push BindMounts at the front of the list so that they get
-           unmounted in LIFO order.  (!!! Does the C++ standard
-           guarantee that list elements are destroyed in order?) */
-        for (Paths::iterator i = dirsInChroot.begin(); i != dirsInChroot.end(); ++i)
-            bindMounts.push_front(boost::shared_ptr<BindMount>(new BindMount(*i, chrootRootDir + *i)));
-        
 #else
         throw Error("chroot builds are not supported on this platform");
 #endif
@@ -1829,14 +1717,37 @@ void DerivationGoal::startBuilder()
         try { /* child */
 
 #if CHROOT_ENABLED
-            /* If building in a chroot, do the chroot right away.
-               initChild() will do a chdir() to the temporary build
-               directory to make sure the current directory is in the
-               chroot.  (Actually the order doesn't matter, since due
-               to the bind mount tmpDir and tmpRootDit/tmpDir are the
-               same directories.) */
-            if (useChroot && chroot(chrootRootDir.c_str()) == -1)
-                throw SysError(format("cannot change root directory to `%1%'") % chrootRootDir);
+            if (useChroot) {
+                /* Create our own mount namespace.  This means that
+                   all the bind mounts we do will only show up in this
+                   process and its children, and will disappear
+                   automatically when we're done. */
+                if (unshare(CLONE_NEWNS) == -1)
+                    throw SysError(format("cannot set up a private mount namespace"));
+
+                /* Bind-mount all the directories from the "host"
+                   filesystem that we want in the chroot
+                   environment. */
+                foreach (Paths::iterator, i, dirsInChroot) {
+                    Path source = *i;
+                    Path target = chrootRootDir + source;
+                    printMsg(lvlError, format("bind mounting `%1%' to `%2%'") % source % target);
+                
+                    createDirs(target);
+                
+                    if (mount(source.c_str(), target.c_str(), "", MS_BIND, 0) == -1)
+                        throw SysError(format("bind mount from `%1%' to `%2%' failed") % source % target);
+                }
+                    
+                /* Do the chroot().  initChild() will do a chdir() to
+                   the temporary build directory to make sure the
+                   current directory is in the chroot.  (Actually the
+                   order doesn't matter, since due to the bind mount
+                   tmpDir and tmpRootDit/tmpDir are the same
+                   directories.) */
+                if (chroot(chrootRootDir.c_str()) == -1)
+                    throw SysError(format("cannot change root directory to `%1%'") % chrootRootDir);
+            }
 #endif
             
             initChild();
