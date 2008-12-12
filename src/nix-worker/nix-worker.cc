@@ -112,12 +112,12 @@ static void sigPollHandler(int sigNo)
                 _isInterrupted = 1;
                 blockInt = 1;
                 canSendStderr = false;
-                string s = "SIGPOLL\n";
-                write(STDERR_FILENO, s.c_str(), s.size());
+                char * s = "SIGPOLL\n";
+                write(STDERR_FILENO, s, strlen(s));
             }
         } else {
-            string s = "spurious SIGPOLL\n";
-            write(STDERR_FILENO, s.c_str(), s.size());
+            char * s = "spurious SIGPOLL\n";
+            write(STDERR_FILENO, s, strlen(s));
         }
     }
     catch (Error & e) {
