@@ -1665,7 +1665,7 @@ void DerivationGoal::startBuilder()
        work properly.  Purity checking for fixed-output derivations
        is somewhat pointless anyway. */
     useChroot = queryBoolSetting("build-use-chroot", false);
-    Paths dirsInChroot;
+    PathSet dirsInChroot;
 
     if (fixedOutput) useChroot = false;
 
@@ -1706,10 +1706,11 @@ void DerivationGoal::startBuilder()
         defaultDirs.push_back("/dev");
         defaultDirs.push_back("/dev/pts");
         defaultDirs.push_back("/proc");
-        
-        dirsInChroot = querySetting("build-chroot-dirs", defaultDirs);
 
-        dirsInChroot.push_front(tmpDir);
+        Paths dirsInChroot_ = querySetting("build-chroot-dirs", defaultDirs);
+        dirsInChroot.insert(dirsInChroot_.begin(), dirsInChroot_.end());
+
+        dirsInChroot.insert(tmpDir);
 
         /* Make the closure of the inputs available in the chroot,
            rather than the whole Nix store.  This prevents any access
@@ -1726,7 +1727,7 @@ void DerivationGoal::startBuilder()
             if (lstat(i->c_str(), &st))
                 throw SysError(format("getting attributes of path `%1%'") % *i);
             if (S_ISDIR(st.st_mode))
-                dirsInChroot.push_back(*i);
+                dirsInChroot.insert(*i);
             else {
                 Path p = chrootRootDir + *i;
                 if (link(i->c_str(), p.c_str()) == -1)
@@ -1776,7 +1777,7 @@ void DerivationGoal::startBuilder()
                 /* Bind-mount all the directories from the "host"
                    filesystem that we want in the chroot
                    environment. */
-                foreach (Paths::iterator, i, dirsInChroot) {
+                foreach (PathSet::iterator, i, dirsInChroot) {
                     Path source = *i;
                     Path target = chrootRootDir + source;
                     debug(format("bind mounting `%1%' to `%2%'") % source % target);
