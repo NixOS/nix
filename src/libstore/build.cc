@@ -34,6 +34,9 @@
 #include <sys/mount.h>
 #endif
 #if HAVE_SCHED_H
+#if !defined _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include <sched.h>
 #endif
 
