@@ -34,13 +34,10 @@
 #include <sys/mount.h>
 #endif
 #if HAVE_SCHED_H
-#if !defined _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
 #include <sched.h>
 #endif
 
-#define CHROOT_ENABLED HAVE_CHROOT && HAVE_SYS_MOUNT_H && defined(MS_BIND) && defined(CLONE_NEWNS)
+#define CHROOT_ENABLED HAVE_CHROOT && HAVE_UNSHARE && HAVE_SYS_MOUNT_H && defined(MS_BIND) && defined(CLONE_NEWNS)
 
 
 namespace nix {
