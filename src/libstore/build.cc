@@ -811,6 +811,11 @@ void DerivationGoal::haveDerivation()
         return;
     }
 
+    /* `drvPath' should already be a root, but let's be on the safe
+       side: if the user forgot to make it a root, we wouldn't want
+       things being garbage collected while we're busy. */
+    worker.store.addTempRoot(drvPath);
+    
     assert(worker.store.isValidPath(drvPath));
 
     /* Get the derivation. */
@@ -1669,8 +1674,10 @@ void DerivationGoal::startBuilder()
     if (useChroot) {
 #if CHROOT_ENABLED
         /* Create a temporary directory in which we set up the chroot
-           environment using bind-mounts. */
-        chrootRootDir = createTempDir("", "nix-chroot");
+           environment using bind-mounts.  We put it in the Nix store
+           to ensure that we can create hard-links to non-directory
+           inputs in the fake Nix store in the chroot (see below). */
+        chrootRootDir = drvPath + ".chroot";
 
         /* Clean up the chroot directory automatically. */
         autoDelChroot = boost::shared_ptr<AutoDelete>(new AutoDelete(chrootRootDir));

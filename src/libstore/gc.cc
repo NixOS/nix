@@ -565,6 +565,11 @@ static bool isLive(const Path & path, const PathSet & livePaths,
     if (hasSuffix(path, ".lock") && tempRoots.find(string(path, 0, path.size() - 5)) != tempRoots.end())
         return true;
 
+    /* Don't delete .chroot directories for derivations that are
+       currently being built. */
+    if (hasSuffix(path, ".chroot") && tempRoots.find(string(path, 0, path.size() - 7)) != tempRoots.end())
+        return true;
+
     return false;
 }
 
