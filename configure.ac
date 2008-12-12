@@ -270,6 +270,17 @@ if test "$(uname)" = "Darwin"; then
 fi
 
 
+if test "$sys_name" = "cygwin"; then
+    # Dynamically linking against the ATerm DLL does work, except that it requires
+    # the ATerm "lib" directory to be in $PATH, as Windows doesn't have anything
+    # like an RPATH embedded in executable.  Since this is kind of annoying, we
+    # use static libraries for now.  This has to happen at the end of
+    # configure, because the C compiler doesn't know about -all-static
+    # (it's filtered out by libtool, but configure doesn't use libtool).
+    LDFLAGS="-all-static $LDFLAGS"
+fi
+
+
 AM_CONFIG_HEADER([config.h])
 AC_CONFIG_FILES([Makefile
    externals/Makefile
