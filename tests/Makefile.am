@@ -7,7 +7,7 @@ dependencies.sh gc.sh nix-push.sh nix-pull.in logging.sh nix-build.sh install-pa
 locking.sh: locking.nix
 parallel.sh: parallel.nix
 build-hook.sh: build-hook.nix
-gc-concurrent.sh: gc-concurrent.nix gc-concurrent2.nix
+gc-concurrent.sh: gc-concurrent.nix gc-concurrent2.nix simple.nix
 user-envs.sh: user-envs.nix
 fixed.sh: fixed.nix
 gc-runtime.sh: gc-runtime.nix

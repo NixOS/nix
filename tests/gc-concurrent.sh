@@ -8,8 +8,15 @@ outPath1=$($nixstore -q $drvPath1)
 drvPath2=$($nixinstantiate gc-concurrent2.nix)
 outPath2=$($nixstore -q $drvPath2)
 
-rm -f "$NIX_STATE_DIR"/gcroots/foo
+drvPath3=$($nixinstantiate simple.nix)
+outPath3=$($nixstore -r $drvPath3)
+
+! test -e $outPath3.lock
+touch $outPath3.lock
+
+rm -f "$NIX_STATE_DIR"/gcroots/foo*
 ln -s $drvPath2 "$NIX_STATE_DIR"/gcroots/foo
+ln -s $outPath3 "$NIX_STATE_DIR"/gcroots/foo2
 
 # Start build #1 in the background.  It starts immediately.
 $nixstore -rvv "$drvPath1" &
@@ -39,4 +46,13 @@ cat $outPath1/input-2/bar
 # derivation is a GC root.
 cat $outPath2/foobar
 
-rm "$NIX_STATE_DIR"/gcroots/foo
+rm -f "$NIX_STATE_DIR"/gcroots/foo*
+
+# The collector should have deleted lock files for paths that have
+# been built previously.
+! test -e $outPath3.lock
+
+# If we run the collector now, it should delete outPath1/2.
+$NIX_BIN_DIR/nix-collect-garbage -vvvvv
+! test -e $outPath1
+! test -e $outPath2

@@ -96,7 +96,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
         if (isDerivation(*i)) drvPaths.insert(*i);
     store->buildDerivations(drvPaths);
 
-    foreach (Strings::iterator, i,opArgs)
+    foreach (Strings::iterator, i, opArgs)
         cout << format("%1%\n") % realisePath(*i);
 }
 

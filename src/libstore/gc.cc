@@ -476,23 +476,6 @@ void LocalStore::gcPath(const GCOptions & options, GCResults & results,
 
     if (!pathExists(path)) return;
                 
-#ifndef __CYGWIN__
-    AutoCloseFD fdLock;
-        
-    /* Only delete a lock file if we can acquire a write lock on it.
-       That means that it's either stale, or the process that created
-       it hasn't locked it yet.  In the latter case the other process
-       will detect that we deleted the lock, and retry (see
-       pathlocks.cc). */
-    if (path.size() >= 5 && string(path, path.size() - 5) == ".lock") {
-        fdLock = openLockFile(path, false);
-        if (fdLock != -1 && !lockFile(fdLock, ltWrite, false)) {
-            debug(format("skipping active lock `%1%'") % path);
-            return;
-        }
-    }
-#endif
-
     /* Okay, it's safe to delete. */
     unsigned long long bytesFreed, blocksFreed;
     deleteFromStore(path, bytesFreed, blocksFreed);
@@ -513,12 +496,6 @@ void LocalStore::gcPath(const GCOptions & options, GCResults & results,
             throw GCLimitReached();
         }
     }
-
-#ifndef __CYGWIN__
-    if (fdLock != -1)
-        /* Write token to stale (deleted) lock file. */
-        writeFull(fdLock, (const unsigned char *) "d", 1);
-#endif
 }
 
 
@@ -569,11 +546,26 @@ struct CachingAtimeComparator : public std::binary_function<Path, Path, bool>
 };
 
 
-string showTime(const string & format, time_t t)
+static string showTime(const string & format, time_t t)
 {
     char s[128];
     strftime(s, sizeof s, format.c_str(), localtime(&t));
     return string(s);
+}
+
+
+static bool isLive(const Path & path, const PathSet & livePaths,
+    const PathSet & tempRoots, const PathSet & tempRootsClosed)
+{
+    if (livePaths.find(path) != livePaths.end() ||
+        tempRootsClosed.find(path) != tempRootsClosed.end()) return true;
+
+    /* A lock file belonging to a path that we're building right
+       now isn't garbage. */
+    if (hasSuffix(path, ".lock") && tempRoots.find(string(path, 0, path.size() - 5)) != tempRoots.end())
+        return true;
+
+    return false;
 }
 
 
@@ -691,9 +683,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         Paths entries = readDirectory(nixStore);
         foreach (Paths::iterator, i, entries) {
             Path path = canonPath(nixStore + "/" + *i);
-            if (livePaths.find(path) == livePaths.end() &&
-                tempRootsClosed.find(path) == tempRootsClosed.end())
-                storePaths.insert(path);
+            if (!isLive(path, livePaths, tempRoots, tempRootsClosed)) storePaths.insert(path);
         }
     }
 
@@ -701,10 +691,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         foreach (PathSet::iterator, i, options.pathsToDelete) {
             assertStorePath(*i);
             storePaths.insert(*i);
-            if (livePaths.find(*i) != livePaths.end())
+            if (isLive(*i, livePaths, tempRoots, tempRootsClosed))
                 throw Error(format("cannot delete path `%1%' since it is still alive") % *i);
-            if (tempRootsClosed.find(*i) != tempRootsClosed.end())
-                throw Error(format("cannot delete path `%1%' since it is temporarily in use") % *i);
         }
     }
 
