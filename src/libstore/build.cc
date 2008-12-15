@@ -1678,6 +1678,7 @@ void DerivationGoal::startBuilder()
            to ensure that we can create hard-links to non-directory
            inputs in the fake Nix store in the chroot (see below). */
         chrootRootDir = drvPath + ".chroot";
+        if (pathExists(chrootRootDir)) deletePath(chrootRootDir);
 
         /* Clean up the chroot directory automatically. */
         autoDelChroot = boost::shared_ptr<AutoDelete>(new AutoDelete(chrootRootDir));
