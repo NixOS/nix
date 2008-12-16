@@ -349,7 +349,7 @@ Hash parseHashField(const Path & path, const string & s)
 }
 
 
-ValidPathInfo LocalStore::queryPathInfo(const Path & path)
+ValidPathInfo LocalStore::queryPathInfo(const Path & path, bool ignoreErrors)
 {
     ValidPathInfo res;
     res.path = path;
@@ -379,7 +379,12 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
         } else if (name == "Deriver") {
             res.deriver = value;
         } else if (name == "Hash") {
-            res.hash = parseHashField(path, value);
+            try {
+                res.hash = parseHashField(path, value);
+            } catch (Error & e) {
+                if (!ignoreErrors) throw;
+                printMsg(lvlError, format("cannot parse hash field in `%1%': %2%") % infoFile % e.msg());
+            }
         } else if (name == "Registered-At") {
             int n = 0;
             string2Int(value, n);
@@ -997,7 +1002,7 @@ void LocalStore::verifyStore(bool checkContents)
     
     for (PathSet::iterator i = validPaths.begin(); i != validPaths.end(); ++i) {
         bool update = false;
-        ValidPathInfo info = queryPathInfo(*i);
+        ValidPathInfo info = queryPathInfo(*i, true);
 
         /* Check the references: each reference should be valid, and
            it should have a matching referrer. */
@@ -1026,7 +1031,11 @@ void LocalStore::verifyStore(bool checkContents)
         }
 
         /* Check the content hash (optionally - slow). */
-        if (checkContents) {
+        if (info.hash.hashSize == 0) {
+            printMsg(lvlError, format("re-hashing `%1%'") % *i);
+            info.hash = hashPath(htSHA256, *i);
+            update = true;
+        } else if (checkContents) {
             debug(format("checking contents of `%1%'") % *i);
             Hash current = hashPath(info.hash.type, *i);
             if (current != info.hash) {
@@ -1052,6 +1061,8 @@ void LocalStore::verifyStore(bool checkContents)
         Path from = nixStore + "/" + *i;
         
         if (validPaths.find(from) == validPaths.end()) {
+            /* !!! This removes lock files as well.  Need to check
+               whether that's okay. */
             printMsg(lvlError, format("removing referrers file for invalid `%1%'") % from);
             Path p = referrersFileFor(from);
             if (unlink(p.c_str()) == -1)

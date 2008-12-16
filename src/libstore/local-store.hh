@@ -162,7 +162,7 @@ private:
 
     void registerValidPath(const ValidPathInfo & info, bool ignoreValidity = false);
 
-    ValidPathInfo queryPathInfo(const Path & path);
+    ValidPathInfo queryPathInfo(const Path & path, bool ignoreErrors = false);
 
     void rewriteReferrers(const Path & path, bool purge, PathSet referrers);
 
