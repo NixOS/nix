@@ -48,7 +48,7 @@ ATERM = aterm-2.4.2-fixes-r2
 $(ATERM).tar.bz2:
 	@echo "Nix requires the CWI ATerm library to build."
 	@echo "Please download version 2.4.2-fixes-r2 from"
-	@echo "  http://losser.st-lab.cs.uu.nl/~eelco/dist/aterm-2.4.2-fixes-r2.tar.bz2"
+	@echo "  http://nixos.org/tarballs/aterm-2.4.2-fixes-r2.tar.bz2"
 	@echo "and place it in the externals/ directory."
 	false
 
