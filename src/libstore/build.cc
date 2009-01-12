@@ -40,6 +40,12 @@
 #define CHROOT_ENABLED HAVE_CHROOT && HAVE_UNSHARE && HAVE_SYS_MOUNT_H && defined(MS_BIND) && defined(CLONE_NEWNS)
 
 
+#if HAVE_SYS_PERSONALITY_H
+#include <sys/personality.h>
+#define CAN_DO_LINUX32_BUILDS
+#endif
+
+
 namespace nix {
 
 using std::map;
@@ -1474,7 +1480,11 @@ void DerivationGoal::startBuilder()
         format("building path(s) %1%") % showPaths(outputPaths(drv.outputs)))
     
     /* Right platform? */
-    if (drv.platform != thisSystem)
+    if (drv.platform != thisSystem 
+#ifdef CAN_DO_LINUX32_BUILDS
+        && !(drv.platform == "i686-linux" && thisSystem == "x86_64-linux")
+#endif
+        )
         throw BuildError(
             format("a `%1%' is required to build `%3%', but I am a `%2%'")
             % drv.platform % thisSystem % drvPath);
@@ -1805,6 +1815,13 @@ void DerivationGoal::startBuilder()
 #endif
             
             initChild();
+
+#ifdef CAN_DO_LINUX32_BUILDS
+            if (drv.platform == "i686-linux" && thisSystem == "x86_64-linux") {
+                if (personality(PER_LINUX32_3GB) == -1)
+                    throw SysError("cannot set i686-linux personality");
+            }
+#endif
 
             /* Fill in the environment. */
             Strings envStrs;

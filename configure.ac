@@ -100,10 +100,15 @@ AC_CHECK_HEADERS([sys/mount.h], [], [],
 ])
 
 
-# Check for <locale>
+# Check for <locale>.
 AC_LANG_PUSH(C++)
 AC_CHECK_HEADERS([locale], [], [], [])
 AC_LANG_POP(C++)
+
+
+# Check whether we have the personality() syscall, which allows us to
+# do i686-linux builds on x86_64-linux machines.
+AC_CHECK_HEADERS([sys/personality.h])
 
 
 AC_DEFUN([NEED_PROG],
