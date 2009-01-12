@@ -25,6 +25,7 @@
     
 #include "parser-tab.hh"
 #include "lexer-tab.hh"
+#define YYSTYPE YYSTYPE // workaround a bug in Bison 2.4
 
 #include "nixexpr.hh"
 #include "nixexpr-ast.hh"
