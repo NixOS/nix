@@ -192,8 +192,16 @@ my $buildFlags = "--max-silent-time $maxSilentTime";
 # connection dies.  Without it, the remote process might continue to
 # run indefinitely (that is, until it next tries to write to
 # stdout/stderr).
-system("ssh -tt $sshOpts $hostName 'nix-store -rvvK $buildFlags $drvPath'") == 0
-    or die "remote build on $hostName failed: $?";
+if (system("ssh -tt $sshOpts $hostName 'nix-store -rvvK $buildFlags $drvPath'") != 0) {
+    # If we couldn't run ssh or there was an ssh problem (indicated by
+    # exit code 255), then we return exit code 1; otherwise we assume
+    # that the builder failed, which we indicated to Nix using exit
+    # code 100.  It's important to distinguish between the two because
+    # the first is a transient failure and the latter is permanent.
+    my $res = $? == -1 || ($? >> 8) == 255 ? 1 : 100;
+    print STDERR "remote build on $hostName failed: $?";
+    exit $res;
+}
 
 print "REMOTE BUILD DONE: $drvPath on $hostName\n";
 

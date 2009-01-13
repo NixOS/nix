@@ -648,6 +648,9 @@ private:
     /* Pipe for the builder's standard output/error. */
     Pipe logPipe;
 
+    /* Whether we're building using a build hook. */
+    bool usingBuildHook;
+
     /* Pipes for talking to the build hook (if any). */
     Pipe toHook;
     Pipe fromHook;
@@ -970,6 +973,7 @@ void DerivationGoal::tryToBuild()
     try {
 
         /* Is the build hook willing to accept this job? */
+        usingBuildHook = true;
         switch (tryBuildHook()) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
@@ -1003,6 +1007,7 @@ void DerivationGoal::tryToBuild()
 
         /* Acquire locks and such.  If we then see that the build has
            been done by somebody else, we're done. */
+        usingBuildHook = false;
         PrepareBuildReply preply = prepareBuild();
         if (preply == prDone) {
             amDone(ecSuccess);
@@ -1019,8 +1024,12 @@ void DerivationGoal::tryToBuild()
     } catch (BuildError & e) {
         printMsg(lvlError, e.msg());
         if (printBuildTrace) {
-            printMsg(lvlError, format("@ build-failed %1% %2% %3% %4%")
-                % drvPath % drv.outputs["out"].path % 0 % e.msg());
+            if (usingBuildHook)
+                printMsg(lvlError, format("@ hook-failed %1% %2% %3% %4%")
+                    % drvPath % drv.outputs["out"].path % 0 % e.msg());
+            else
+                printMsg(lvlError, format("@ build-failed %1% %2% %3% %4%")
+                    % drvPath % drv.outputs["out"].path % 0 % e.msg());
         }
         amDone(ecFailed);
         return;
@@ -1122,8 +1131,15 @@ void DerivationGoal::buildDone()
     } catch (BuildError & e) {
         printMsg(lvlError, e.msg());
         if (printBuildTrace) {
-            printMsg(lvlError, format("@ build-failed %1% %2% %3% %4%")
-                % drvPath % drv.outputs["out"].path % status % e.msg());
+            /* When using a build hook, the hook will return a
+               remote build failure using exit code 100.  Anything
+               else is a hook problem. */
+            if (usingBuildHook && (!WIFEXITED(status) || WEXITSTATUS(status) != 100))
+                printMsg(lvlError, format("@ hook-failed %1% %2% %3% %4%")
+                    % drvPath % drv.outputs["out"].path % status % e.msg());
+            else
+                printMsg(lvlError, format("@ build-failed %1% %2% %3% %4%")
+                    % drvPath % drv.outputs["out"].path % status % e.msg());
         }
         amDone(ecFailed);
         return;
