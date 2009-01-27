@@ -190,6 +190,19 @@ static Expr prim_throw(EvalState & state, const ATermVector & args)
 }
 
 
+static Expr prim_addErrorContext(EvalState & state, const ATermVector & args)
+{
+    PathSet context;
+    try {
+        return evalExpr(state, args[1]);
+    } catch (Error & e) {
+        e.addPrefix(format("%1%\n") %
+            evalString(state, args[0], context));
+        throw;
+    }
+}
+
+
 /* Return an environment variable.  Use with care. */
 static Expr prim_getEnv(EvalState & state, const ATermVector & args)
 {
@@ -976,6 +989,7 @@ void EvalState::addPrimOps()
     addPrimOp("__genericClosure", 1, prim_genericClosure);
     addPrimOp("abort", 1, prim_abort);
     addPrimOp("throw", 1, prim_throw);
+    addPrimOp("__addErrorContext", 2, prim_addErrorContext);
     addPrimOp("__getEnv", 1, prim_getEnv);
     addPrimOp("__trace", 2, prim_trace);
     
