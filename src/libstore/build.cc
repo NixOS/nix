@@ -1834,7 +1834,7 @@ void DerivationGoal::startBuilder()
 
 #ifdef CAN_DO_LINUX32_BUILDS
             if (drv.platform == "i686-linux" && thisSystem == "x86_64-linux") {
-                if (personality(PER_LINUX32_3GB) == -1)
+                if (personality(0x0008 | 0x8000000 /* == PER_LINUX32_3GB */) == -1)
                     throw SysError("cannot set i686-linux personality");
             }
 #endif
