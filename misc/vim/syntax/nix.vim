@@ -21,12 +21,14 @@ syn match nixFuncArg "\zs\w\+\ze\s*:"
 syn region nixStringParam start=+\${+ end=+}+
 syn region nixMultiLineComment start=+/\*+ skip=+\\"+ end=+\*/+
 syn match  nixEndOfLineComment "#.*$"
-syn region nixString      start=+"+ skip=+\\"+ end=+"+ contains=nixStringParam
+syn region nixStringIndented start=+''+ skip=+'''\|''${\|"+ end=+''+ contains=nixStringParam
+syn region nixString         start=+"+ skip=+\\"+ end=+"+ contains=nixStringParam
 
 hi def link nixKeyword       Keyword
 hi def link nixConditional   Conditional
 hi def link nixBrace         Special
 hi def link nixString        String
+hi def link nixStringIndented String
 hi def link nixBuiltin       Special
 hi def link nixStringParam   Macro
 hi def link nixMultiLineComment Comment
