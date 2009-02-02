@@ -924,7 +924,14 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 
     if (!isValidPath(dstPath)) {
 
-        PathLocks outputLock(singleton<PathSet, Path>(dstPath));
+        PathLocks outputLock;
+
+        /* Lock the output path.  But don't lock if we're being called
+           from a build hook (whose parent process already acquired a
+           lock on this path). */
+        Strings locksHeld = tokenizeString(getEnv("NIX_HELD_LOCKS"));
+        if (find(locksHeld.begin(), locksHeld.end(), dstPath) == locksHeld.end())
+            outputLock.lockPaths(singleton<PathSet, Path>(dstPath));
 
         if (!isValidPath(dstPath)) {
 

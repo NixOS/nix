@@ -1240,6 +1240,12 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 
             initChild();
 
+            string s;
+            foreach (DerivationOutputs::const_iterator, i, drv.outputs)
+                s += i->second.path + " ";
+            if (setenv("NIX_HELD_LOCKS", s.c_str(), 1))
+                throw SysError("setting an environment variable");
+
             execl(buildHook.c_str(), buildHook.c_str(),
                 (worker.canBuildMore() ? (string) "1" : "0").c_str(),
                 thisSystem.c_str(),
@@ -1945,13 +1951,21 @@ void DerivationGoal::computeClosure()
 {
     map<Path, PathSet> allReferences;
     map<Path, Hash> contentHashes;
-    
+
+    /* When using a build hook, the build hook can register the output
+       as valid (by doing `nix-store --import').  If so we don't have
+       to do anything here. */
+    if (usingBuildHook) {
+        bool allValid = true;
+        foreach (DerivationOutputs::iterator, i, drv.outputs)
+            if (!worker.store.isValidPath(i->second.path)) allValid = false;
+        if (allValid) return;
+    }
+        
     /* Check whether the output paths were created, and grep each
        output path to determine what other paths it references.  Also make all
        output paths read-only. */
-    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
-         i != drv.outputs.end(); ++i)
-    {
+    foreach (DerivationOutputs::iterator, i, drv.outputs) {
         Path path = i->second.path;
         if (!pathExists(path)) {
             throw BuildError(
@@ -2043,14 +2057,11 @@ void DerivationGoal::computeClosure()
        paths referenced by each of them.  !!! this should be
        atomic so that either all paths are registered as valid, or
        none are. */
-    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
-         i != drv.outputs.end(); ++i)
-    {
+    foreach (DerivationOutputs::iterator, i, drv.outputs)
         worker.store.registerValidPath(i->second.path,
             contentHashes[i->second.path],
             allReferences[i->second.path],
             drvPath);
-    }
 
     /* It is now safe to delete the lock files, since all future
        lockers will see that the output paths are valid; they will not

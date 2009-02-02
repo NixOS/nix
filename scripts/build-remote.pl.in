@@ -192,7 +192,7 @@ my $buildFlags = "--max-silent-time $maxSilentTime";
 # connection dies.  Without it, the remote process might continue to
 # run indefinitely (that is, until it next tries to write to
 # stdout/stderr).
-if (system("ssh -tt $sshOpts $hostName 'nix-store -rvvK $buildFlags $drvPath'") != 0) {
+if (system("ssh -tt $sshOpts $hostName 'nix-store --realise -K $buildFlags $drvPath > /dev/null'") != 0) {
     # If we couldn't run ssh or there was an ssh problem (indicated by
     # exit code 255), then we return exit code 1; otherwise we assume
     # that the builder failed, which we indicated to Nix using exit
@@ -209,17 +209,6 @@ foreach my $output (split '\n', $outputs) {
     my $maybeSignRemote = "";
     $maybeSignRemote = "--sign" if $UID != 0;
     
-    system("ssh $sshOpts $hostName 'nix-store --export $maybeSignRemote $output' > dump") == 0
+    system("ssh $sshOpts $hostName 'nix-store --export $maybeSignRemote $output' | @bindir@/nix-store --import > /dev/null") == 0
 	or die "cannot copy $output from $hostName: $?";
-
-    # This doesn't work yet, since the caller has a lock on the output
-    # path.  We should move towards lock-free invocation of build
-    # hooks and substitutes.
-    #system("nix-store --import < dump") == 0
-    #    or die "cannot import $output: $?";
-
-    # Hack: skip the first 8 bytes (the nix-store --export next
-    # archive marker).  The archive follows.
-    system("(dd bs=1 count=8 of=/dev/null && cat) < dump | nix-store --restore $output") == 0
-	or die "cannot restore $output: $?";
 }
