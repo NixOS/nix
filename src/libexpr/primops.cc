@@ -125,6 +125,27 @@ static Expr prim_isFunction(EvalState & state, const ATermVector & args)
     return makeBool(matchFunction(e, pat, body, pos));
 }
 
+/* Determine whether the argument is an Int. */
+static Expr prim_isInt(EvalState & state, const ATermVector & args)
+{
+    int i;
+    return makeBool(matchInt(evalExpr(state, args[0]), i));
+}
+
+/* Determine whether the argument is an String. */
+static Expr prim_isString(EvalState & state, const ATermVector & args)
+{
+    string s;
+    PathSet l;
+    return makeBool(matchStr(evalExpr(state, args[0]), s, l));
+}
+
+/* Determine whether the argument is an Bool. */
+static Expr prim_isBool(EvalState & state, const ATermVector & args)
+{
+    ATermBool b;
+    return makeBool(matchBool(evalExpr(state, args[0]), b));
+}
 
 static Expr prim_genericClosure(EvalState & state, const ATermVector & args)
 {
@@ -986,12 +1007,16 @@ void EvalState::addPrimOps()
     addPrimOp("import", 1, prim_import);
     addPrimOp("isNull", 1, prim_isNull);
     addPrimOp("__isFunction", 1, prim_isFunction);
+    addPrimOp("__isString", 1, prim_isString);
+    addPrimOp("__isInt", 1, prim_isInt);
+    addPrimOp("__isBool", 1, prim_isBool);
     addPrimOp("__genericClosure", 1, prim_genericClosure);
     addPrimOp("abort", 1, prim_abort);
     addPrimOp("throw", 1, prim_throw);
     addPrimOp("__addErrorContext", 2, prim_addErrorContext);
     addPrimOp("__getEnv", 1, prim_getEnv);
     addPrimOp("__trace", 2, prim_trace);
+
     
     // Expr <-> String
     addPrimOp("__exprToString", 1, prim_exprToString);
