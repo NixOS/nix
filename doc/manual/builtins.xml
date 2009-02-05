@@ -364,6 +364,36 @@ x: x + 456</programlisting>
   </varlistentry>
 
   
+  <varlistentry><term><function>builtins.isString</function>
+  <replaceable>e</replaceable></term>
+
+    <listitem><para>Return <literal>true</literal> if
+    <replaceable>e</replaceable> evaluates to a string, and
+    <literal>false</literal> otherwise.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.isInt</function>
+  <replaceable>e</replaceable></term>
+
+    <listitem><para>Return <literal>true</literal> if
+    <replaceable>e</replaceable> evaluates to a int, and
+    <literal>false</literal> otherwise.</para></listitem>
+
+  </varlistentry>
+
+  
+  <varlistentry><term><function>builtins.isBool</function>
+  <replaceable>e</replaceable></term>
+
+    <listitem><para>Return <literal>true</literal> if
+    <replaceable>e</replaceable> evaluates to a bool, and
+    <literal>false</literal> otherwise.</para></listitem>
+
+  </varlistentry>
+
+  
   <varlistentry><term><function>isNull</function>
   <replaceable>e</replaceable></term>
 
