@@ -36,6 +36,7 @@ public:
     void lockPaths(const PathSet & _paths,
         const string & waitMsg = "");
     ~PathLocks();
+    void unlock();
     void setDeletion(bool deletePaths);
 };
 

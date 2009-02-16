@@ -1023,6 +1023,8 @@ void DerivationGoal::tryToBuild()
 
     } catch (BuildError & e) {
         printMsg(lvlError, e.msg());
+        outputLocks.unlock();
+        buildUser.release();
         if (printBuildTrace) {
             if (usingBuildHook)
                 printMsg(lvlError, format("@ hook-failed %1% %2% %3% %4%")
@@ -1130,6 +1132,8 @@ void DerivationGoal::buildDone()
 
     } catch (BuildError & e) {
         printMsg(lvlError, e.msg());
+        outputLocks.unlock();
+        buildUser.release();
         if (printBuildTrace) {
             /* When using a build hook, the hook will return a
                remote build failure using exit code 100.  Anything
@@ -2068,6 +2072,7 @@ void DerivationGoal::computeClosure()
        create new lock files with the same names as the old (unlinked)
        lock files. */
     outputLocks.setDeletion(true);
+    outputLocks.unlock();
 }
 
 

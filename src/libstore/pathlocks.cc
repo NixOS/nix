@@ -204,6 +204,12 @@ void PathLocks::lockPaths(const PathSet & _paths, const string & waitMsg)
 
 PathLocks::~PathLocks()
 {
+    unlock();
+}
+
+
+void PathLocks::unlock()
+{
     for (list<FDPair>::iterator i = fds.begin(); i != fds.end(); i++) {
         if (deletePaths) deleteLockFilePreClose(i->second, i->first);
 
@@ -216,6 +222,8 @@ PathLocks::~PathLocks()
 
         debug(format("lock released on `%1%'") % i->second);
     }
+
+    fds.clear();
 }
 
 
