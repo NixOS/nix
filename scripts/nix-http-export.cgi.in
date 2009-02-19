@@ -12,7 +12,8 @@ needed_path="?$QUERY_STRING"
 needed_path="${needed_path#*[?&]needed_path=}"
 needed_path="${needed_path%%&*}"
 #needed_path="$(echo $needed_path  | ./unhttp)"
-needed_path="$(echo $needed_path  | sed -e 's/%2B/+/g; s/%3D/=/g')"
+needed_path="${needed_path//%2B/+}"
+needed_path="${needed_path//%3D/=}"
 
 echo needed_path: "$needed_path" >&2
 
