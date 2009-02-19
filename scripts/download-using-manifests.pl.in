@@ -185,13 +185,11 @@ while ($queueFront < scalar @queue) {
                 $format = "" if $baseHashAlgo eq "md5";
                 my $hash = `$binDir/nix-hash --type '$baseHashAlgo' $format "$patch->{basePath}"`;
                 chomp $hash;
-#                print "  MY HASH is $hash\n";
                 if ($hash ne $baseHash) {
                     print LOGFILE "$$ rejecting $patch->{basePath}\n";
                     next;
                 }
             }
-#            print "  PATCH from $patch->{basePath}\n";
             addToQueue $patch->{basePath};
             addEdge $patch->{basePath}, $u, $patch->{size}, "patch", $patch;
         }
@@ -199,10 +197,12 @@ while ($queueFront < scalar @queue) {
         # Add NAR file edges to the start node.
         my $narFileList = $narFiles{$u};
         foreach my $narFile (@{$narFileList}) {
-#            print "  NAR from $narFile->{url}\n";
-            addEdge "start", $u, $narFile->{size}, "narfile", $narFile;
+            # !!! how to handle files whose size is not known in advance?
+            # For now, assume some arbitrary size (1 MB).
+            addEdge "start", $u, ($narFile->{size} || 1000000), "narfile", $narFile;
             if ($u eq $targetPath) {
-                print LOGFILE "$$ full-download-would-be $narFile->{size}\n";
+                my $size = $narFile->{size} || -1;
+                print LOGFILE "$$ full-download-would-be $size\n";
             }
         }
 
@@ -228,8 +228,6 @@ while (scalar @todo > 0) {
 
     my $u_ = $graph{$u};
 
-#    print "IN $u $u_->{d}\n";
-
     foreach my $edge (@{$u_->{edges}}) {
         my $v_ = $graph{$edge->{end}};
         if ($v_->{d} > $u_->{d} + $edge->{weight}) {
@@ -237,7 +235,6 @@ while (scalar @todo > 0) {
             # Store the edge; to edge->start is actually the
             # predecessor.
             $v_->{pred} = $edge; 
-#            print "  RELAX $edge->{end} $v_->{d}\n";
         }
     }
 }
@@ -259,19 +256,17 @@ while ($cur ne "start") {
 my $curStep = 1;
 my $maxStep = scalar @path;
 
-sub downloadFile {
-    my $url = shift;
-    my ($hashAlgo, $hash) = parseHash(shift);
+sub downloadFile { 
+    my $url = shift; 
     $ENV{"PRINT_PATH"} = 1;
     $ENV{"QUIET"} = 1;
-    $ENV{"NIX_HASH_ALGO"} = $hashAlgo;
-    my ($hash2, $path) = `$binDir/nix-prefetch-url '$url' '$hash'`;
+    my ($hash, $path) = `$binDir/nix-prefetch-url '$url'`;
     die "download of `$url' failed" unless $? == 0;
-    chomp $hash2;
     chomp $path;
-    die "hash mismatch, expected $hash, got $hash2" if $hash ne $hash2;
     return $path;
 }
+
+my $finalNarHash;
 
 while (scalar @path > 0) {
     my $edge = pop @path;
@@ -302,7 +297,7 @@ while (scalar @path > 0) {
 
         # Download the patch.
         print "  downloading patch...\n";
-        my $patchPath = downloadFile "$patch->{url}", "$patch->{hash}";
+        my $patchPath = downloadFile "$patch->{url}";
 
         # Apply the patch to the NAR archive produced in step 1 (for
         # the already present path) or a later step (for patch sequences).
@@ -320,17 +315,20 @@ while (scalar @path > 0) {
             system("$binDir/nix-store --restore $v < $tmpNar2") == 0
                 or die "cannot unpack $tmpNar2 into `$v'";
         }
+
+        $finalNarHash = $patch->{narHash};
     }
 
     elsif ($edge->{type} eq "narfile") {
         my $narFile = $edge->{info};
         print "downloading `$narFile->{url}' into `$v'\n";
 
-        print LOGFILE "$$ narfile $narFile->{url} $narFile->{size} $v\n";
+        my $size = $narFile->{size} || -1;
+        print LOGFILE "$$ narfile $narFile->{url} $size $v\n";
         
         # Download the archive.
         print "  downloading archive...\n";
-        my $narFilePath = downloadFile "$narFile->{url}", "$narFile->{hash}";
+        my $narFilePath = downloadFile "$narFile->{url}";
 
         if ($curStep < $maxStep) {
             # The archive will be used a base to a patch.
@@ -342,9 +340,23 @@ while (scalar @path > 0) {
             system("@bunzip2@ < '$narFilePath' | $binDir/nix-store --restore '$v'") == 0
                 or die "cannot unpack `$narFilePath' into `$v'";
         }
+
+        $finalNarHash = $narFile->{narHash};
     }
 
     $curStep++;
+}
+
+
+if (defined $finalNarHash) {
+    my ($hashAlgo, $hash) = parseHash $finalNarHash;
+    my $hash2 = `@bindir@/nix-hash --type $hashAlgo --base32 $targetPath`
+        or die "cannot compute hash of path `$targetPath'";
+    chomp $hash2;
+    die "hash mismatch in downloaded path $targetPath; expected $hash, got $hash2"
+        if $hash ne $hash2;
+} else {
+    die "cannot check integrity of the downloaded path since its hash is not known";
 }
 
 
