@@ -348,11 +348,22 @@ while (scalar @path > 0) {
 }
 
 
+# Make sure that the hash declared in the manifest matches what we
+# downloaded and unpacked.
+
 if (defined $finalNarHash) {
     my ($hashAlgo, $hash) = parseHash $finalNarHash;
-    my $hash2 = `@bindir@/nix-hash --type $hashAlgo --base32 $targetPath`
+
+    # The hash in the manifest can be either in base-16 or base-32.
+    # Handle both.
+    my $extraFlag =
+        ($hashAlgo eq "sha256" && length($hash) != 64)
+        ? "--base32" : "";
+    
+    my $hash2 = `@bindir@/nix-hash --type $hashAlgo $extraFlag $targetPath`
         or die "cannot compute hash of path `$targetPath'";
     chomp $hash2;
+    
     die "hash mismatch in downloaded path $targetPath; expected $hash, got $hash2"
         if $hash ne $hash2;
 } else {
