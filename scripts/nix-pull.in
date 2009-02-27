@@ -68,10 +68,11 @@ sub processURL {
         print "obtaining list of Nix archives at `$url'...\n";
         $manifest = downloadFile $url;
     }
+
+    my $version = readManifest($manifest, \%narFiles, \%localPaths, \%patches);
     
-    if (readManifest($manifest, \%narFiles, \%localPaths, \%patches) < 3) {
-        die "`$url' is not manifest or it is too old (i.e., for Nix <= 0.7)\n";
-    }
+    die "`$url' is not a manifest or it is too old (i.e., for Nix <= 0.7)\n" if $version < 3;
+    die "manifest `$url' is too new\n" if $version >= 5;
 
     if ($skipWrongStore) {
         foreach my $path (keys %narFiles) {
