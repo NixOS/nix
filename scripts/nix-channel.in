@@ -125,15 +125,13 @@ sub update {
 
     my $rootFile = "$rootsDir/per-user/$userName/channels";
     
-    # Instantiate the Nix expression.
+    # Build the Nix expression.
     print "unpacking channel Nix expressions...\n";
-    my $storeExpr = `@bindir@/nix-instantiate --add-root '$rootFile'.tmp @datadir@/nix/corepkgs/channels/unpack.nix --argstr system @system@ --arg inputs '$inputs'`
-        or die "cannot instantiate Nix expression";
-    chomp $storeExpr;
-
-    # Build the resulting derivation.
-    my $outPath = `@bindir@/nix-store --add-root '$rootFile' -r '$storeExpr'`
-        or die "cannot realise store expression";
+    my $outPath = `\\
+        @bindir@/nix-build --out-link '$rootFile' --drv-link '$rootFile'.tmp \\
+        @datadir@/nix/corepkgs/channels/unpack.nix \\
+        --argstr system @system@ --arg inputs '$inputs'`
+        or die "cannot unpack the channels";
     chomp $outPath;
 
     unlink "$rootFile.tmp";
