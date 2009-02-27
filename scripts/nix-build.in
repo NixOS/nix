@@ -87,6 +87,13 @@ EOF
         $n += 2;
     }
 
+    elsif ($arg eq "--option") {
+        die "$0: `$arg' requires two arguments\n" unless $n + 2 < scalar @ARGV;
+        push @instArgs, ($arg, $ARGV[$n + 1], $ARGV[$n + 2]);
+        push @buildArgs, ($arg, $ARGV[$n + 1], $ARGV[$n + 2]);
+        $n += 2;
+    }
+
     elsif ($arg eq "--max-jobs" or $arg eq "-j" or $arg eq "--max-silent-time" or $arg eq "--log-type") {
         $n++;
         die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
