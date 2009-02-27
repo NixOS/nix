@@ -8,15 +8,10 @@ my $tmpDir = tempdir("nix-pull.XXXXXX", CLEANUP => 1, TMPDIR => 1)
     or die "cannot create a temporary directory";
 
 my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
-
-my $libexecDir = $ENV{"NIX_LIBEXEC_DIR"};
-$libexecDir = "@libexecdir@" unless defined $libexecDir;
-
-my $stateDir = $ENV{"NIX_STATE_DIR"};
-$stateDir = "@localstatedir@/nix" unless defined $stateDir;
-
-my $storeDir = $ENV{"NIX_STORE_DIR"};
-$storeDir = "@storedir@" unless defined $storeDir;
+my $libexecDir = ($ENV{"NIX_LIBEXEC_DIR"} or "@libexecdir@");
+my $storeDir = ($ENV{"NIX_STORE_DIR"} or "@storedir@");
+my $stateDir = ($ENV{"NIX_STATE_DIR"} or "@localstatedir@/nix");
+my $manifestDir = ($ENV{"NIX_MANIFESTS_DIR"} or "$stateDir/manifests");
 
 
 # Prevent access problems in shared-stored installations.
@@ -92,7 +87,7 @@ sub processURL {
         or die "cannot hash `$manifest'";
     chomp $hash;
     
-    my $finalPath = "$stateDir/manifests/$baseName-$hash.nixmanifest";
+    my $finalPath = "$manifestDir/$baseName-$hash.nixmanifest";
     
     system("@coreutils@/ln", "-sfn", "$manifest", "$finalPath") == 0
         or die "cannot link `$finalPath to `$manifest'";

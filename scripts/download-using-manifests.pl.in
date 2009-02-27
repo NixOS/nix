@@ -9,7 +9,7 @@ my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
 
 STDOUT->autoflush(1);
 
-my $manifestDir = "@localstatedir@/nix/manifests";
+my $manifestDir = ($ENV{"NIX_MANIFESTS_DIR"} or "@localstatedir@/nix/manifests");
 my $logFile = "@localstatedir@/log/nix/downloads";
 
 

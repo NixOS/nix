@@ -123,6 +123,11 @@ if ($interactive) {
 }
 
 
+# Store the manifest in the temporary directory so that we don't
+# pollute /nix/var/nix/manifests.
+$ENV{NIX_MANIFESTS_DIR} = $tmpDir;
+
+
 print "\nPulling manifests...\n";
 system("$binDir/nix-pull", $manifestURL) == 0
     or barf "nix-pull failed: $?";
