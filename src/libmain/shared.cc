@@ -243,6 +243,13 @@ static void initAndRun(int argc, char * * argv)
             maxSilentTime = getIntArg(arg, i, args.end());
         else if (arg == "--no-build-hook")
             useBuildHook = false;
+        else if (arg == "--option") {
+            ++i; if (i == args.end()) throw UsageError("`--option' requires two arguments");
+            string name = *i;
+            ++i; if (i == args.end()) throw UsageError("`--option' requires two arguments");
+            string value = *i;
+            overrideSetting(name, tokenizeString(value));
+        }
         else remaining.push_back(arg);
     }
 

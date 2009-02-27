@@ -34,6 +34,9 @@ static bool settingsRead = false;
 
 static std::map<string, Strings> settings;
 
+/* Overriden settings. */
+std::map<string, Strings> settingsCmdline;
+
 
 string & at(Strings & ss, unsigned int n)
 {
@@ -73,6 +76,8 @@ static void readSettings()
         advance(i, 2);
         settings[name] = Strings(i, tokens.end());
     };
+
+    settings.insert(settingsCmdline.begin(), settingsCmdline.end());
     
     settingsRead = true;
 }
@@ -115,6 +120,13 @@ unsigned int queryIntSetting(const string & name, unsigned int def)
     if (!string2Int(querySetting(name, int2String(def)), n) || n < 0)
         throw Error(format("configuration setting `%1%' should have an integer value") % name);
     return n;
+}
+
+
+void overrideSetting(const string & name, const Strings & value)
+{
+    if (settingsRead) settings[name] = value;
+    settingsCmdline[name] = value;
 }
 
 

@@ -101,6 +101,8 @@ bool queryBoolSetting(const string & name, bool def);
 
 unsigned int queryIntSetting(const string & name, unsigned int def);
 
+void overrideSetting(const string & name, const Strings & value);
+
 void reloadSettings();
 
     
