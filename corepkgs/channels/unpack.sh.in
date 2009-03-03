@@ -8,8 +8,14 @@ inputs=($inputs)
 for ((n = 0; n < ${#inputs[*]}; n += 2)); do
     channelName=${inputs[n]}
     channelTarball=${inputs[n+1]}
+    
     echo "unpacking channel $channelName"
+    
     @bunzip2@ < $channelTarball | @tar@ xf -
+
+    if test -e */channel-name; then
+        channelName="$(@coreutils@/cat */channel-name)"
+    fi
 
     nr=1
     attrName=$(echo $channelName | @tr@ -- '- ' '__')
