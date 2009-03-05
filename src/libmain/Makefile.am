@@ -1,6 +1,10 @@
 pkglib_LTLIBRARIES = libmain.la
 
-libmain_la_SOURCES = shared.cc shared.hh
+libmain_la_SOURCES = shared.cc
+
+libmain_la_LIBADD = ../libstore/libstore.la
+
+pkginclude_HEADERS = shared.hh
 
 AM_CXXFLAGS = \
  -DNIX_STORE_DIR=\"$(storedir)\" \
