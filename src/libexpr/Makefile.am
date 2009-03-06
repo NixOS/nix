@@ -8,7 +8,7 @@ libexpr_la_SOURCES = \
 pkginclude_HEADERS = \
  nixexpr.hh eval.hh parser.hh lexer-tab.hh parser-tab.hh \
  get-drvs.hh attr-path.hh expr-to-xml.hh common-opts.hh \
- names.hh
+ names.hh nixexpr-ast.hh
 
 libexpr_la_LIBADD = ../libutil/libutil.la ../libstore/libstore.la \
  ../boost/format/libformat.la
