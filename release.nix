@@ -58,7 +58,7 @@ let
       with import nixpkgs.path {inherit system;};
 
       releaseTools.nixBuild {
-        name = "nix-build";
+        name = "nix";
         src = tarball;
 
         buildInputs = [curl perl bzip2 openssl];
