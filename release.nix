@@ -1,18 +1,20 @@
+{ nixpkgs ? ../nixpkgs }:
+
 let
 
   jobs = rec {
 
 
     tarball =
-      { nix ? {path = ./.; rev = 1234;}
-      , nixpkgs ? {path = ../nixpkgs;}
+      { nix ? {outPath = ./.; rev = 1234;}
       , officialRelease ? false
       }:
 
-      with import nixpkgs.path {};
+      with import nixpkgs {};
 
       releaseTools.makeSourceTarball {
         name = "nix-tarball";
+        version = builtins.readFile ./version;
         src = nix;
         inherit officialRelease;
 
@@ -50,12 +52,11 @@ let
 
 
     build =
-      { tarball ? {path = jobs.tarball {};}
-      , nixpkgs ? {path = ../nixpkgs;}
+      { tarball ? jobs.tarball {}
       , system ? "i686-linux"
       }:
 
-      with import nixpkgs.path {inherit system;};
+      with import nixpkgs {inherit system;};
 
       releaseTools.nixBuild {
         name = "nix";
@@ -76,11 +77,10 @@ let
 
       
     coverage =
-      { tarball ? {path = jobs.tarball {};}
-      , nixpkgs ? {path = ../nixpkgs;}
+      { tarball ? jobs.tarball {}
       }:
 
-      with import nixpkgs.path {};
+      with import nixpkgs {};
 
       releaseTools.coverageAnalysis {
         name = "nix-build";
@@ -123,41 +123,15 @@ let
   };
 
 
-  doBuild =
-    { tarball, nixpkgs, system, coverageAnalysis }:
-
-    with import nixpkgs.path {inherit system;};
-
-    releaseTools.nixBuild {
-      name = "nix-build";
-      src = tarball;
-
-      buildInputs = [curl perl bzip2 openssl];
-
-      configureFlags = ''
-        --disable-init-state
-        --with-bdb=${db45} --with-aterm=${aterm242fixes} --with-bzip2=${bzip2}
-      '';
-
-      postInstall = if coverageAnalysis then "" else ''
-        echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
-        echo "doc release-notes $out/share/doc/nix/release-notes" >> $out/nix-support/hydra-build-products
-      '';
-
-      inherit coverageAnalysis;
-    };
-
-
   makeRPM_i686 = makeRPM "i686-linux";
   makeRPM_x86_64 = makeRPM "x86_64-linux";
 
   makeRPM = 
     system: diskImageFun: prio:
-    { tarball ? {path = jobs.tarball {};}
-    , nixpkgs ? {path = ../nixpkgs;}
+    { tarball ? jobs.tarball {}
     }:
 
-    with import nixpkgs.path {inherit system;};
+    with import nixpkgs {inherit system;};
 
     releaseTools.rpmBuild rec {
       name = "nix-rpm-${diskImage.name}";
@@ -173,11 +147,10 @@ let
   
   makeDeb =
     system: diskImageFun: prio:
-    { tarball ? {path = jobs.tarball {};}
-    , nixpkgs ? {path = ../nixpkgs;}
+    { tarball ? jobs.tarball {}
     }:
 
-    with import nixpkgs.path {inherit system;};
+    with import nixpkgs {inherit system;};
 
     releaseTools.debBuild {
       name = "nix-deb";
