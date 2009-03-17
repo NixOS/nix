@@ -76,3 +76,8 @@ clearProfiles() {
 clearManifests() {
     rm -f $NIX_STATE_DIR/manifests/*
 }
+
+fail() {
+    echo "$1"
+    exit 1
+}
