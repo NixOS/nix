@@ -1,30 +1,28 @@
 # Some dummy arguments...
-{ system ? "@system@"
-, foo ? "foo"
+{ foo ? "foo"
 }:
+
+with import ./config.nix;
 
 assert foo == "foo";
 
-let {
+let
 
-  makeDrv = name: progName: (derivation {
+  makeDrv = name: progName: (mkDerivation {
     inherit name progName system;
-    builder = "@shell@";
-    shell = "@shell@";
-    args = ["-e" "-x" ./user-envs.builder.sh];
-    PATH = "@testPath@";
+    builder = ./user-envs.builder.sh;
   } // {
     meta = {
       description = "A silly test package";
     };
   });
 
-  body = [
+in
+
+  [
     (makeDrv "foo-1.0" "foo")
     (makeDrv "foo-2.0pre1" "foo")
     (makeDrv "bar-0.1" "bar")
     (makeDrv "foo-2.0" "foo")
     (makeDrv "bar-0.1.1" "bar")
-  ];
-  
-}
+  ]

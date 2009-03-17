@@ -1,9 +1,17 @@
-{
+rec {
+  shell = "@shell@";
+
+  path = "@testPath@";
+
+  system = "@system@";
+
+  shared = "@extra1@";
+    
   mkDerivation = args:
     derivation ({
-      system = "@system@";
-      builder = "@shell@";
+      inherit system;
+      builder = shell;
       args = ["-e" args.builder];
-      PATH = "@testPath@";
+      PATH = path;
     } // removeAttrs args ["builder"]);
 }

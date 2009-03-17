@@ -4,7 +4,6 @@ rec {
 
   buildGraphBuilder = builtins.toFile "build-graph-builder"
     ''
-      #cat refs
       while read path; do
           read drv
           read nrRefs

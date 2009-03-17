@@ -1,8 +1,8 @@
-derivation {
+with import ./config.nix;
+
+mkDerivation {
   name = "filter";
-  system = "@system@";
-  builder = "@shell@";
-  args = ["-e" "-x" (builtins.toFile "builder" "PATH=@testPath@; ln -s $input $out")];
+  builder = builtins.toFile "builder" "ln -s $input $out";
   input =
     let filter = path: type:
       type != "symlink"

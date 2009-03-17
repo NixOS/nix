@@ -1,14 +1,13 @@
+with import ./config.nix;
+
 rec {
 
-  f2 = dummy: builder: mode: algo: hash: derivation {
+  f2 = dummy: builder: mode: algo: hash: mkDerivation {
     name = "fixed";
-    system = "@system@";
-    builder = "@shell@";
-    args = ["-e" "-x" builder];
+    inherit builder;
     outputHashMode = mode;
     outputHashAlgo = algo;
     outputHash = hash;
-    PATH = "@testPath@";
     inherit dummy;
     impureEnvVars = ["IMPURE_VAR1" "IMPURE_VAR2"];
   };

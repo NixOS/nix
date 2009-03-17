@@ -2,10 +2,10 @@ source common.sh
 
 $NIX_BIN_DIR/nix-collect-garbage -vvvvv
 
-drvPath1=$($nixinstantiate gc-concurrent.nix)
+drvPath1=$($nixinstantiate gc-concurrent.nix -A test1)
 outPath1=$($nixstore -q $drvPath1)
 
-drvPath2=$($nixinstantiate gc-concurrent2.nix)
+drvPath2=$($nixinstantiate gc-concurrent.nix -A test2)
 outPath2=$($nixstore -q $drvPath2)
 
 drvPath3=$($nixinstantiate simple.nix)
