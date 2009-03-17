@@ -830,8 +830,7 @@ void DerivationGoal::haveDerivation()
     /* Get the derivation. */
     drv = derivationFromPath(drvPath);
 
-    for (DerivationOutputs::iterator i = drv.outputs.begin();
-         i != drv.outputs.end(); ++i)
+    foreach (DerivationOutputs::iterator, i, drv.outputs)
         worker.store.addTempRoot(i->second.path);
 
     /* Check what outputs paths are not already valid. */
@@ -850,8 +849,7 @@ void DerivationGoal::haveDerivation()
        where some other process is building it is handled through
        normal locking mechanisms.)  So if any output paths are already
        being built, put this goal to sleep. */
-    for (PathSet::iterator i = invalidOutputs.begin();
-         i != invalidOutputs.end(); ++i)
+    foreach (PathSet::iterator, i, invalidOutputs)
         if (pathIsLockedByMe(*i)) {
             /* Wait until any goal finishes (hopefully the one that is
                locking *i), then retry haveDerivation(). */
@@ -862,8 +860,7 @@ void DerivationGoal::haveDerivation()
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
-    for (PathSet::iterator i = invalidOutputs.begin();
-         i != invalidOutputs.end(); ++i)
+    foreach (PathSet::iterator, i, invalidOutputs)
         /* Don't bother creating a substitution goal if there are no
            substitutes. */
         if (worker.store.hasSubstitutes(*i))
@@ -2755,9 +2752,7 @@ void Worker::waitForInput()
     struct timeval timeout;
     if (maxSilentTime != 0) {
         time_t oldest = 0;
-        for (Children::iterator i = children.begin();
-             i != children.end(); ++i)
-        {
+        foreach (Children::iterator, i, children) {
             oldest = oldest == 0 || i->second.lastOutput < oldest
                 ? i->second.lastOutput : oldest;
         }
@@ -2774,12 +2769,8 @@ void Worker::waitForInput()
     fd_set fds;
     FD_ZERO(&fds);
     int fdMax = 0;
-    for (Children::iterator i = children.begin();
-         i != children.end(); ++i)
-    {
-        for (set<int>::iterator j = i->second.fds.begin();
-             j != i->second.fds.end(); ++j)
-        {
+    foreach (Children::iterator, i, children) {
+        foreach (set<int>::iterator, j, i->second.fds) {
             FD_SET(*j, &fds);
             if (*j >= fdMax) fdMax = *j + 1;
         }
@@ -2799,13 +2790,9 @@ void Worker::waitForInput()
        careful that we don't keep iterators alive across calls to
        cancel(). */
     set<pid_t> pids;
-    for (Children::iterator i = children.begin();
-         i != children.end(); ++i)
-        pids.insert(i->first);
+    foreach (Children::iterator, i, children) pids.insert(i->first);
             
-    for (set<pid_t>::iterator i = pids.begin();
-         i != pids.end(); ++i)
-    {
+    foreach (set<pid_t>::iterator, i, pids) {
         checkInterrupt();
         Children::iterator j = children.find(*i);
         if (j == children.end()) continue; // child destroyed
@@ -2813,7 +2800,7 @@ void Worker::waitForInput()
         assert(goal);
 
         set<int> fds2(j->second.fds);
-        for (set<int>::iterator k = fds2.begin(); k != fds2.end(); ++k) {
+        foreach (set<int>::iterator, k, fds2) {
             if (FD_ISSET(*k, &fds)) {
                 unsigned char buffer[4096];
                 ssize_t rd = read(*k, buffer, sizeof(buffer));
