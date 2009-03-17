@@ -1,0 +1,9 @@
+{
+  mkDerivation = args:
+    derivation ({
+      system = "@system@";
+      builder = "@shell@";
+      args = ["-e" args.builder];
+      PATH = "@testPath@";
+    } // removeAttrs args ["builder"]);
+}

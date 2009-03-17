@@ -19,5 +19,5 @@ if test "$xsltproc" != "false"; then
     # Ideally we would check that the generated HTML is valid...
 
     # A few checks...
-    grep "<li>.*<code>.*echo FOO" $TEST_ROOT/log.html
+    grep "<li>.*<code>.*FOO" $TEST_ROOT/log.html
 fi

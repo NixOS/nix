@@ -5,3 +5,5 @@ ln -s $input2 $out/input-2
 
 # Self-reference.
 ln -s $out $out/self
+
+echo FOO
