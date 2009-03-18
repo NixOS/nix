@@ -58,6 +58,11 @@ readLink() {
     ls -l "$1" | sed 's/.*->\ //'
 }
 
+clearProfiles() {
+    profiles="$NIX_STATE_DIR"/profiles
+    rm -f $profiles/*
+}
+
 clearStore() {
     echo "clearing store..."
     chmod -R +w "$NIX_STORE_DIR"
@@ -66,11 +71,9 @@ clearStore() {
     rm -rf "$NIX_DB_DIR"
     mkdir "$NIX_DB_DIR"
     $nixstore --init
-}
-
-clearProfiles() {
-    profiles="$NIX_STATE_DIR"/profiles
-    rm -f $profiles/*
+    clearProfiles
+    rm -f "$NIX_STATE_DIR"/gcroots/auto/*
+    rm -f "$NIX_STATE_DIR"/gcroots/ref
 }
 
 clearManifests() {
