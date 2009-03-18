@@ -16,6 +16,7 @@ include ../substitute.mk
 $(TESTS): common.sh config.nix
 
 EXTRA_DIST = $(TESTS) \
+  config.nix.in \
   simple.nix simple.builder.sh \
   hash-check.nix \
   dependencies.nix dependencies.builder*.sh \
