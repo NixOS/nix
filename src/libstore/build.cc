@@ -935,8 +935,6 @@ void DerivationGoal::inputsRealised()
     /* Second, the input sources. */
     foreach (PathSet::iterator, i, drv.inputSrcs)
         computeFSClosure(*i, inputPaths);
-        /* !!! if `*i' is a derivation, then add the closure of every
-           output in the dependency graph to `inputPaths'. */
 
     debug(format("added input paths %1%") % showPaths(inputPaths));
 
@@ -1534,55 +1532,27 @@ void DerivationGoal::startBuilder()
             throw BuildError(format("`exportReferencesGraph' contains an invalid path `%1%'")
                 % storePath);
 
-        /* Write closure info to `fileName'. */
-        PathSet refs;
-        computeFSClosure(storePath, refs);
-        /* !!! in secure Nix, the writing should be done on the
-           build uid for security (maybe). */
-        writeStringToFile(tmpDir + "/" + fileName,
-            makeValidityRegistration(refs, false, false));
-    }
+        /* If there are derivations in the graph, then include their
+           outputs as well.  This is useful if you want to do things
+           like passing all build-time dependencies of some path to a
+           derivation that builds a NixOS DVD image. */
+        PathSet paths, paths2;
+        computeFSClosure(storePath, paths);
+        paths2 = paths;
 
-    // The same for derivations
-    // !!! urgh, cut&paste duplication
-    s = drv.env["exportBuildReferencesGraph"];
-    ss = tokenizeString(s);
-    if (ss.size() % 2 != 0)
-        throw BuildError(format("odd number of tokens in `exportBuildReferencesGraph': `%1%'") % s);
-    for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
-        string fileName = *i++;
-        checkStoreName(fileName); /* !!! abuse of this function */
-
-        /* Check that the store path is valid. */
-        Path storePath = *i++;
-        if (!isInStore(storePath))
-            throw BuildError(format("`exportBuildReferencesGraph' contains a non-store path `%1%'")
-                % storePath);
-        storePath = toStorePath(storePath);
-        if (!worker.store.isValidPath(storePath))
-            throw BuildError(format("`exportBuildReferencesGraph' contains an invalid path `%1%'")
-                % storePath);
+        foreach (PathSet::iterator, j, paths2) {
+            if (isDerivation(*j)) {
+                Derivation drv = derivationFromPath(*j);
+                foreach (DerivationOutputs::iterator, k, drv.outputs)
+                    computeFSClosure(k->second.path, paths);
+            }
+        }
 
         /* Write closure info to `fileName'. */
-        PathSet refs1,refs;
-        computeFSClosure(storePath, refs1);
-	for (PathSet::iterator j = refs1.begin(); j != refs1.end() ; j++) {
-		refs.insert (*j);
-		if (isDerivation (*j)) {
-			Derivation deriv = derivationFromPath (*j);
-			for (DerivationOutputs::iterator k=deriv.outputs.begin(); 
-			    k != deriv.outputs.end(); k++) {
-				refs.insert(k->second.path);
-				
-			}
-		}
-	}
-        /* !!! in secure Nix, the writing should be done on the
-           build uid for security (maybe). */
         writeStringToFile(tmpDir + "/" + fileName,
-            makeValidityRegistration(refs, false, false));
+            makeValidityRegistration(paths, false, false));
     }
-    
+
     
     /* If `build-users-group' is not empty, then we have to build as
        one of the members of that group. */
@@ -2167,7 +2137,7 @@ SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker)
 SubstitutionGoal::~SubstitutionGoal()
 {
     /* !!! Once we let substitution goals run under a build user, we
-       need to do use the setuid helper just as in ~DerivationGoal().
+       need to use the setuid helper just as in ~DerivationGoal().
        Idem for cancel. */
     if (pid != -1) worker.childTerminated(pid);
 }

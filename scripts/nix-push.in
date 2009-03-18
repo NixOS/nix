@@ -140,11 +140,7 @@ while (scalar @tmp > 0) {
     my @tmp2 = @tmp[0..$n - 1];
     @tmp = @tmp[$n..scalar @tmp - 1];
 
-    # Note: we disable build hooks because of the impure path
-    # reference (see above).  Even if that is fixed, using a hook
-    # probably wouldn't make that much sense; pumping lots of data
-    # around just to compress them won't gain that much.
-    my $pid = open(READ, "$binDir/nix-store --no-build-hook --realise @tmp2|")
+    my $pid = open(READ, "$binDir/nix-store --realise @tmp2|")
         or die "cannot run nix-store";
     while (<READ>) {
         chomp;

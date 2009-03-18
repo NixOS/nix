@@ -399,16 +399,29 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     /* Everything in the context of the strings in the derivation
        attributes should be added as dependencies of the resulting
        derivation. */
-    for (PathSet::iterator i = context.begin(); i != context.end(); ++i) {
+    foreach (PathSet::iterator, i, context) {
         Path path = *i;
-        bool buildDrv = true;
+        
+        /* Paths marked with `=' denote that the path of a derivation
+           is explicitly passed to the builder.  Since that allows the
+           builder to gain access to every path in the dependency
+           graph of the derivation (including all outputs), all paths
+           in the graph must be added to this derivation's list of
+           inputs to ensure that they are available when the builder
+           runs. */
         if (path.at(0) == '=') {
-            buildDrv = false;
             path = string(path, 1);
+            PathSet refs; computeFSClosure(path, refs);
+            foreach (PathSet::iterator, j, refs) {
+                drv.inputSrcs.insert(*j);
+                if (isDerivation(*j))
+                    drv.inputDrvs[*j] = singleton<StringSet>("out");
+            }
         }
+        
         debug(format("derivation uses `%1%'") % path);
         assert(isStorePath(path));
-        if (buildDrv && isDerivation(path))
+        if (isDerivation(path))
             drv.inputDrvs[path] = singleton<StringSet>("out");
         else
             drv.inputSrcs.insert(path);
@@ -484,7 +497,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     outAttrs.set(toATerm("outPath"),
         makeAttrRHS(makeStr(outPath, singleton<PathSet>(drvPath)), makeNoPos()));
     outAttrs.set(toATerm("drvPath"),
-        makeAttrRHS(makeStr(drvPath, singleton<PathSet>(drvPath)), makeNoPos()));
+        makeAttrRHS(makeStr(drvPath, singleton<PathSet>("=" + drvPath)), makeNoPos()));
 
     return makeAttrs(outAttrs);
 }
@@ -541,13 +554,6 @@ static Expr prim_storePath(EvalState & state, const ATermVector & args)
     Path path2 = toStorePath(path);
     if (!store->isValidPath(path2))
         throw EvalError(format("store path `%1%' is not valid") % path2);
-    /* If this is a derivation, mark it so it doesn't get built;
-       i.e. we want the dependency as a "source" dependency.  This is
-       to make nix-push work properly (we want it to create a NAR
-       archive of the derivation, not build the derivation as a
-       side-effect).  The `=' is a special marker that gets stripped
-       off by prim_derivationStrict. */
-    if (isDerivation(path2)) path2 = "=" + path2;
     context.insert(path2);
     return makeStr(path, context);
 }
