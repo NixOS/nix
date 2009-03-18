@@ -2,7 +2,7 @@ source common.sh
 
 clearStore
 
-outPath=$($nixbuild -vv -j10000 parallel.nix)
+outPath=$($nixbuild -j10000 parallel.nix)
 
 echo "output path is $outPath"
 

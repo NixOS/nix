@@ -1,6 +1,6 @@
 source common.sh
 
-$NIX_BIN_DIR/nix-collect-garbage -vvvvv
+$NIX_BIN_DIR/nix-collect-garbage
 
 drvPath1=$($nixinstantiate gc-concurrent.nix -A test1)
 outPath1=$($nixstore -q $drvPath1)
@@ -28,7 +28,7 @@ pid2=$!
 
 # Run the garbage collector while the build is running.
 sleep 4
-$NIX_BIN_DIR/nix-collect-garbage -vvvvv
+$NIX_BIN_DIR/nix-collect-garbage
 
 # Wait for build #1/#2 to finish.
 echo waiting for pid $pid1 to finish...
@@ -53,6 +53,6 @@ rm -f "$NIX_STATE_DIR"/gcroots/foo*
 ! test -e $outPath3.lock
 
 # If we run the collector now, it should delete outPath1/2.
-$NIX_BIN_DIR/nix-collect-garbage -vvvvv
+$NIX_BIN_DIR/nix-collect-garbage
 ! test -e $outPath1
 ! test -e $outPath2

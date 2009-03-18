@@ -108,15 +108,12 @@ protected:
     {
         nrFailed = 0;
         exitCode = ecBusy;
-	forceInputs = false;
     }
 
     virtual ~Goal()
     {
         trace("goal destroyed");
     }
-
-    bool forceInputs;
 
 public:
     virtual void work() = 0;
@@ -151,11 +148,6 @@ public:
        running child processes that are being monitored by the worker
        (important!), etc. */
     virtual void cancel() = 0;
-
-    void setForceInputs(bool x)
-    {
-       forceInputs = x;
-    }
 
 protected:
     void amDone(ExitCode result);
@@ -264,7 +256,7 @@ public:
 
 
 MakeError(SubstError, Error)
-MakeError(BuildError, Error)
+MakeError(BuildError, Error) /* denoted a permanent build failure */
 
 
 //////////////////////////////////////////////////////////////////////
@@ -496,7 +488,7 @@ void UserLock::acquire()
         }
     }
 
-    throw BuildError(format("all build users are currently in use; "
+    throw Error(format("all build users are currently in use; "
         "consider creating additional users and adding them to the `%1%' group")
         % buildUsersGroup);
 }
@@ -689,7 +681,7 @@ private:
     void buildDone();
 
     /* Is the build hook willing to perform the build? */
-    typedef enum {rpAccept, rpDecline, rpPostpone, rpDone, rpRestart} HookReply;
+    typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
     HookReply tryBuildHook();
 
     /* Synchronously wait for a build hook to finish. */
@@ -838,10 +830,8 @@ void DerivationGoal::haveDerivation()
 
     /* If they are all valid, then we're done. */
     if (invalidOutputs.size() == 0) {
-        if(!forceInputs) {
-	    amDone(ecSuccess);
-	    return;
-	}
+        amDone(ecSuccess);
+        return;
     }
 
     /* If this is a fixed-output derivation, it is possible that some
@@ -883,54 +873,20 @@ void DerivationGoal::outputsSubstituted()
     nrFailed = 0;
 
     if (checkPathValidity(false).size() == 0) {
-        if (! forceInputs){
-		amDone(ecSuccess);
-		return;
-	}
+        amDone(ecSuccess);
+        return;
     }
 
     /* Otherwise, at least one of the output paths could not be
        produced using a substitute.  So we have to build instead. */
 
     /* The inputs must be built before we can build this goal. */
-    /* !!! but if possible, only install the paths that we need */
-    for (DerivationInputs::iterator i = drv.inputDrvs.begin();
-         i != drv.inputDrvs.end(); ++i){
-	GoalPtr newGoal = worker.makeDerivationGoal(i->first);
-	newGoal->setForceInputs(forceInputs);
-        addWaitee(newGoal);
-    }
+    foreach (DerivationInputs::iterator, i, drv.inputDrvs)
+        addWaitee(worker.makeDerivationGoal(i->first));
 
     for (PathSet::iterator i = drv.inputSrcs.begin();
          i != drv.inputSrcs.end(); ++i)
         addWaitee(worker.makeSubstitutionGoal(*i));
-
-    /* Actually, I do some work twice just to be on the safe side */
-    string s = drv.env["exportBuildReferencesGraph"]; 
-    Strings ss = tokenizeString(s);
-    if (ss.size() % 2 !=0)
-	throw BuildError(format("odd number of tokens in `exportBuildReferencesGraph': `%1%'") % s); 
-    for (Strings::iterator i = ss.begin(); i != ss.end(); ) {
-	string fileName = *i++;
-	Path storePath=*i++;
-	
-        if (!isInStore(storePath))
-            throw BuildError(format("`exportBuildReferencesGraph' contains a non-store path `%1%'")
-                % storePath);
-        storePath = toStorePath(storePath);
-        if (!worker.store.isValidPath(storePath))
-            throw BuildError(format("`exportBuildReferencesGraph' contains an invalid path `%1%'")
-                % storePath);
-        
-        /* Build-time closure should be in dependencies 
-	 * We really want just derivation, its closure
-	 * and outputs. Looks like we should build it.
-	 * */
-
-	GoalPtr newGoal = worker.makeDerivationGoal(storePath);
-	newGoal->setForceInputs(true);
-        addWaitee(newGoal);
-    }
 
     state = &DerivationGoal::inputsRealised;
 }
@@ -943,17 +899,48 @@ void DerivationGoal::inputsRealised()
     if (nrFailed != 0) {
         printMsg(lvlError,
             format("cannot build derivation `%1%': "
-                "%2% inputs could not be realised")
+                "%2% dependencies couldn't be built")
             % drvPath % nrFailed);
         amDone(ecFailed);
         return;
     }
 
-    /* Maybe we just wanted to force build of inputs */
-    if (checkPathValidity(false).size() == 0) {
-        amDone(ecSuccess);
-        return;
+    /* Gather information necessary for computing the closure and/or
+       running the build hook. */
+    
+    /* The outputs are referenceable paths. */
+    foreach (DerivationOutputs::iterator, i, drv.outputs) {
+        debug(format("building path `%1%'") % i->second.path);
+        allPaths.insert(i->second.path);
     }
+
+    /* Determine the full set of input paths. */
+
+    /* First, the input derivations. */
+    foreach (DerivationInputs::iterator, i, drv.inputDrvs) {
+        /* Add the relevant output closures of the input derivation
+           `*i' as input paths.  Only add the closures of output paths
+           that are specified as inputs. */
+        assert(worker.store.isValidPath(i->first));
+        Derivation inDrv = derivationFromPath(i->first);
+        foreach (StringSet::iterator, j, i->second)
+            if (inDrv.outputs.find(*j) != inDrv.outputs.end())
+                computeFSClosure(inDrv.outputs[*j].path, inputPaths);
+            else
+                throw Error(
+                    format("derivation `%1%' requires non-existent output `%2%' from input derivation `%3%'")
+                    % drvPath % *j % i->first);
+    }
+
+    /* Second, the input sources. */
+    foreach (PathSet::iterator, i, drv.inputSrcs)
+        computeFSClosure(*i, inputPaths);
+        /* !!! if `*i' is a derivation, then add the closure of every
+           output in the dependency graph to `inputPaths'. */
+
+    debug(format("added input paths %1%") % showPaths(inputPaths));
+
+    allPaths.insert(inputPaths.begin(), inputPaths.end());
 
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
@@ -967,6 +954,20 @@ void DerivationGoal::tryToBuild()
 {
     trace("trying to build");
 
+    /* Acquire locks on the output paths.  After acquiring the locks,
+       it might turn out that somebody else has performed the build
+       already, and we're done.  If not, we can proceed. */
+    switch (prepareBuild()) {
+        case prDone:
+            amDone(ecSuccess);
+            return;
+        case prRestart:
+            worker.waitForAnyGoal(shared_from_this());
+            return;
+        case prProceed:
+            break;
+    }
+        
     try {
 
         /* Is the build hook willing to accept this job? */
@@ -980,38 +981,19 @@ void DerivationGoal::tryToBuild()
             case rpPostpone:
                 /* Not now; wait until at least one child finishes. */
                 worker.waitForChildTermination(shared_from_this());
+                outputLocks.unlock();
                 return;
             case rpDecline:
                 /* We should do it ourselves. */
                 break;
-            case rpDone:
-                /* Somebody else did it. */
-                amDone(ecSuccess);
-                return;
-            case rpRestart:
-                /* Somebody else is building this output path.
-                   Restart from haveDerivation(). */
-                state = &DerivationGoal::haveDerivation;
-                worker.waitForAnyGoal(shared_from_this());
-                return;
         }
+
+        usingBuildHook = false;
 
         /* Make sure that we are allowed to start a build. */
         if (!worker.canBuildMore()) {
             worker.waitForBuildSlot(shared_from_this());
-            return;
-        }
-
-        /* Acquire locks and such.  If we then see that the build has
-           been done by somebody else, we're done. */
-        usingBuildHook = false;
-        PrepareBuildReply preply = prepareBuild();
-        if (preply == prDone) {
-            amDone(ecSuccess);
-            return;
-        } else if (preply == prRestart) {
-            state = &DerivationGoal::haveDerivation;
-            worker.waitForAnyGoal(shared_from_this());
+            outputLocks.unlock();
             return;
         }
 
@@ -1022,14 +1004,13 @@ void DerivationGoal::tryToBuild()
         printMsg(lvlError, e.msg());
         outputLocks.unlock();
         buildUser.release();
-        if (printBuildTrace) {
+        if (printBuildTrace)
             if (usingBuildHook)
                 printMsg(lvlError, format("@ hook-failed %1% %2% %3% %4%")
                     % drvPath % drv.outputs["out"].path % 0 % e.msg());
             else
                 printMsg(lvlError, format("@ build-failed %1% %2% %3% %4%")
                     % drvPath % drv.outputs["out"].path % 0 % e.msg());
-        }
         amDone(ecFailed);
         return;
     }
@@ -1069,8 +1050,7 @@ void DerivationGoal::buildDone()
        malicious user from leaving behind a process that keeps files
        open and modifies them after they have been chown'ed to
        root. */
-    if (buildUser.enabled())
-        buildUser.kill();
+    if (buildUser.enabled()) buildUser.kill();
 
     try {
 
@@ -1140,7 +1120,7 @@ void DerivationGoal::buildDone()
                     % drvPath % drv.outputs["out"].path % status % e.msg());
             else
                 printMsg(lvlError, format("@ build-failed %1% %2% %3% %4%")
-                    % drvPath % drv.outputs["out"].path % status % e.msg());
+                    % drvPath % drv.outputs["out"].path % 1 % e.msg());
         }
         amDone(ecFailed);
         return;
@@ -1296,16 +1276,6 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 
     else if (reply == "accept") {
 
-        /* Acquire locks and such.  If we then see that the output
-           paths are now valid, we're done. */
-        PrepareBuildReply preply = prepareBuild();
-        if (preply == prDone || preply == prRestart) {
-            /* Tell the hook to exit. */
-            writeLine(toHook.writeSide, "cancel");
-            terminateBuildHook();
-            return preply == prDone ? rpDone : rpRestart;
-        }
-
         printMsg(lvlInfo, format("running hook to build path(s) %1%")
             % showPaths(outputPaths(drv.outputs)));
         
@@ -1390,8 +1360,7 @@ DerivationGoal::PrepareBuildReply DerivationGoal::prepareBuild()
        has locked the output since we checked in haveDerivation().
        (It can't happen between here and the lockPaths() call below
        because we're not allowing multi-threading.) */
-    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
-         i != drv.outputs.end(); ++i)
+    foreach (DerivationOutputs::iterator, i, drv.outputs)
         if (pathIsLockedByMe(i->second.path)) {
             debug(format("restarting derivation `%1%' because `%2%' is locked by another goal")
                 % drvPath % i->second.path);
@@ -1425,65 +1394,22 @@ DerivationGoal::PrepareBuildReply DerivationGoal::prepareBuild()
 
     if (validPaths.size() > 0) {
         /* !!! fix this; try to delete valid paths */
-        throw BuildError(
+        throw Error(
             format("derivation `%1%' is blocked by its output paths")
             % drvPath);
     }
 
     /* If any of the outputs already exist but are not registered,
        delete them. */
-    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
-         i != drv.outputs.end(); ++i)
-    {
+    foreach (DerivationOutputs::iterator, i, drv.outputs) {
         Path path = i->second.path;
         if (worker.store.isValidPath(path))
-            throw BuildError(format("obstructed build: path `%1%' exists") % path);
+            throw Error(format("obstructed build: path `%1%' exists") % path);
         if (pathExists(path)) {
             debug(format("removing unregistered path `%1%'") % path);
             deletePathWrapped(path);
         }
     }
-
-    /* Gather information necessary for computing the closure and/or
-       running the build hook. */
-    
-    /* The outputs are referenceable paths. */
-    for (DerivationOutputs::iterator i = drv.outputs.begin();
-         i != drv.outputs.end(); ++i)
-    {
-        debug(format("building path `%1%'") % i->second.path);
-        allPaths.insert(i->second.path);
-    }
-
-    /* Determine the full set of input paths. */
-
-    /* First, the input derivations. */
-    for (DerivationInputs::iterator i = drv.inputDrvs.begin();
-         i != drv.inputDrvs.end(); ++i)
-    {
-        /* Add the relevant output closures of the input derivation
-           `*i' as input paths.  Only add the closures of output paths
-           that are specified as inputs. */
-        assert(worker.store.isValidPath(i->first));
-        Derivation inDrv = derivationFromPath(i->first);
-        for (StringSet::iterator j = i->second.begin();
-             j != i->second.end(); ++j)
-            if (inDrv.outputs.find(*j) != inDrv.outputs.end())
-                computeFSClosure(inDrv.outputs[*j].path, inputPaths);
-            else
-                throw BuildError(
-                    format("derivation `%1%' requires non-existent output `%2%' from input derivation `%3%'")
-                    % drvPath % *j % i->first);
-    }
-
-    /* Second, the input sources. */
-    for (PathSet::iterator i = drv.inputSrcs.begin();
-         i != drv.inputSrcs.end(); ++i)
-        computeFSClosure(*i, inputPaths);
-
-    debug(format("added input paths %1%") % showPaths(inputPaths));
-
-    allPaths.insert(inputPaths.begin(), inputPaths.end());
 
     return prProceed;
 }
@@ -1508,7 +1434,7 @@ void DerivationGoal::startBuilder()
         && !(drv.platform == "i686-linux" && thisSystem == "x86_64-linux")
 #endif
         )
-        throw BuildError(
+        throw Error(
             format("a `%1%' is required to build `%3%', but I am a `%2%'")
             % drv.platform % thisSystem % drvPath);
 

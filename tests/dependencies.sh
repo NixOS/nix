@@ -1,5 +1,7 @@
 source common.sh
 
+clearStore
+
 drvPath=$($nixinstantiate dependencies.nix)
 
 echo "derivation is $drvPath"
@@ -13,7 +15,7 @@ if test -n "$dot"; then
     $dot < $TEST_ROOT/graph
 fi
 
-outPath=$($nixstore -rvv "$drvPath")
+outPath=$($nixstore -rvv "$drvPath") || fail "build failed"
 
 # Test Graphviz graph generation.
 $nixstore -q --graph "$outPath" > $TEST_ROOT/graph
