@@ -77,7 +77,7 @@ EOF
 
     elsif ($arg eq "--attr" or $arg eq "-A") {
         $n++;
-        die "$0: `--attr' requires an argument\n" unless $n < scalar @ARGV;
+        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
         push @instArgs, ("--attr", $ARGV[$n]);
     }
 
@@ -85,6 +85,13 @@ EOF
         die "$0: `$arg' requires two arguments\n" unless $n + 2 < scalar @ARGV;
         push @instArgs, ($arg, $ARGV[$n + 1], $ARGV[$n + 2]);
         $n += 2;
+    }
+
+    elsif ($arg eq "--log-type") {
+        $n++;
+        die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
+        push @instArgs, ($arg, $ARGV[$n]);
+        push @buildArgs, ($arg, $ARGV[$n]);
     }
 
     elsif ($arg eq "--option") {

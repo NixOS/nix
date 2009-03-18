@@ -2,11 +2,7 @@ source common.sh
 
 export NIX_BUILD_HOOK="build-hook.hook.sh"
 
-drvPath=$($nixinstantiate build-hook.nix)
-
-echo "derivation is $drvPath"
-
-outPath=$($nixstore -quf "$drvPath")
+outPath=$($nixbuild build-hook.nix)
 
 echo "output path is $outPath"
 

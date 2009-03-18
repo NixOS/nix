@@ -1,10 +1,8 @@
 source common.sh
 
-drvPath=$($nixinstantiate parallel.nix)
+clearStore
 
-echo "derivation is $drvPath"
-
-outPath=$($nixstore -qfvv -j10000 "$drvPath")
+outPath=$($nixbuild -vv -j10000 parallel.nix)
 
 echo "output path is $outPath"
 

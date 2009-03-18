@@ -6,22 +6,16 @@ export IMPURE_VAR1=foo
 export IMPURE_VAR2=bar
 
 echo 'testing good...'
-drvs=$($nixinstantiate fixed.nix -A good)
-echo $drvs
-$nixstore -r $drvs
+$nixbuild fixed.nix -A good
 
 echo 'testing good2...'
-drvs=$($nixinstantiate fixed.nix -A good2)
-echo $drvs
-$nixstore -r $drvs
+$nixbuild fixed.nix -A good2
 
 echo 'testing bad...'
-drvs=$($nixinstantiate fixed.nix -A bad)
-echo $drvs
-if $nixstore -r $drvs; then false; fi
+$nixbuild fixed.nix -A bad && fail "should fail"
 
 echo 'testing reallyBad...'
-if $nixinstantiate fixed.nix -A reallyBad; then false; fi
+$nixinstantiate fixed.nix -A reallyBad && fail "should fail"
 
 # While we're at it, check attribute selection a bit more.
 echo 'testing attribute selection...'
@@ -31,17 +25,12 @@ test $($nixinstantiate fixed.nix -A good.1 | wc -l) = 1
 # Only one should run at the same time.
 echo 'testing parallelSame...'
 clearStore
-drvs=$($nixinstantiate fixed.nix -A parallelSame)
-echo $drvs
-$nixstore -r $drvs -j2
+$nixbuild fixed.nix -A parallelSame -j2
 
 # Fixed-output derivations with a recursive SHA-256 hash should
 # produce the same path as "nix-store --add".
 echo 'testing sameAsAdd...'
-drv=$($nixinstantiate fixed.nix -A sameAsAdd)
-echo $drv
-out=$($nixstore -r $drv)
-echo $out
+out=$($nixbuild fixed.nix -A sameAsAdd)
 
 # This is what fixed.builder2 produces...
 rm -rf $TEST_ROOT/fixed

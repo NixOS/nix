@@ -1,8 +1,8 @@
 source common.sh
 
-$nixstore --gc
+clearStore
 
-(cd $TEST_ROOT && $NIX_BIN_DIR/nix-build ../dependencies.nix)
+(cd $TEST_ROOT && $nixbuild ../dependencies.nix)
 test "$(cat $TEST_ROOT/result/foobar)" = FOOBAR
 
 # The result should be retained by a GC.
