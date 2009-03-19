@@ -19,8 +19,13 @@ my %localPaths;
 my %patches;
 
 for my $manifest (glob "$manifestDir/*.nixmanifest") {
-    if (readManifest($manifest, \%narFiles, \%localPaths, \%patches) < 3) {
+    my $version = readManifest($manifest, \%narFiles, \%localPaths, \%patches);
+    if ($version < 3) {
         print STDERR "you have an old-style manifest `$manifest'; please delete it\n";
+        exit 1;
+    }
+    if ($version >= 10) {
+        print STDERR "manifest `$manifest' is too new; please delete it or upgrade Nix\n";
         exit 1;
     }
 }
