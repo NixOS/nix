@@ -5,7 +5,6 @@ sub addPatch {
     my $patches = shift;
     my $storePath = shift;
     my $patch = shift;
-    my $allowConflicts = shift;
 
     $$patches{$storePath} = []
         unless defined $$patches{$storePath};
@@ -14,15 +13,9 @@ sub addPatch {
 
     my $found = 0;
     foreach my $patch2 (@{$patchList}) {
-        if ($patch2->{url} eq $patch->{url}) {
-            if ($patch2->{hash} eq $patch->{hash}) {
-                $found = 1 if ($patch2->{basePath} eq $patch->{basePath});
-            } else {
-                die "conflicting hashes for URL $patch->{url}, " .
-                    "namely $patch2->{hash} and $patch->{hash}"
-                    unless $allowConflicts;
-            }
-        }
+        $found = 1 if
+            $patch2->{url} eq $patch->{url} &&
+            $patch2->{basePath} eq $patch->{basePath};
     }
     
     push @{$patchList}, $patch if !$found;
@@ -36,8 +29,6 @@ sub readManifest {
     my $narFiles = shift;
     my $localPaths = shift;
     my $patches = shift;
-    my $allowConflicts = shift;
-    $allowConflicts = 0 unless defined $allowConflicts;
 
     open MANIFEST, "<$manifest"
         or die "cannot open `$manifest': $!";
@@ -98,15 +89,7 @@ sub readManifest {
 
                     my $found = 0;
                     foreach my $narFile (@{$narFileList}) {
-                        if ($narFile->{url} eq $url) {
-                            if ($narFile->{hash} eq $hash) {
-                                $found = 1;
-                            } else {
-                                die "conflicting hashes for URL $url, " .
-                                    "namely $narFile->{hash} and $hash"
-                                    unless $allowConflicts;
-                            }
-                        }
+                        $found = 1 if $narFile->{url} eq $url;
                     }
                     if (!$found) {
                         push @{$narFileList},
@@ -124,7 +107,7 @@ sub readManifest {
                         , basePath => $basePath, baseHash => $baseHash
                         , narHash => $narHash, patchType => $patchType
                         , hashAlgo => $hashAlgo
-                        }, $allowConflicts;
+                        };
                 }
 
                 elsif ($type eq "localPath") {
