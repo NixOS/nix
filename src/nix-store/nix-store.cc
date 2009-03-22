@@ -625,7 +625,7 @@ static void opImport(Strings opFlags, Strings opArgs)
     
     FdSource source(STDIN_FILENO);
     while (true) {
-        int n = readInt(source);
+        unsigned long long n = readLongLong(source);
         if (n == 0) break;
         if (n != 1) throw Error("input doesn't look like something created by `nix-store --export'");
         cout << format("%1%\n") % store->importPath(requireSignature, source) << std::flush;
