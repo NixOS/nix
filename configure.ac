@@ -266,6 +266,7 @@ AC_CHECK_FUNCS([setresuid setreuid lchown])
 
 # Nice to have, but not essential.
 AC_CHECK_FUNCS([strsignal])
+AC_CHECK_FUNCS([posix_fallocate])
 
 
 # This is needed if ATerm, Berkeley DB or bzip2 are static libraries,

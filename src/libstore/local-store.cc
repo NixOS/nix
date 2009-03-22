@@ -865,7 +865,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
        store path follows the archive data proper), and besides, we
        don't know yet whether the signature is valid. */
     Path tmpDir = createTempDir(nixStore);
-    AutoDelete delTmp(tmpDir);
+    AutoDelete delTmp(tmpDir); /* !!! could be GC'ed! */
     Path unpacked = tmpDir + "/unpacked";
 
     restorePath(unpacked, hashAndReadSource);

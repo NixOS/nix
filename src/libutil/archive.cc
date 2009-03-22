@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <vector>
 
+#define _XOPEN_SOURCE 600
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -10,6 +11,8 @@
 
 #include "archive.hh"
 #include "util.hh"
+
+#include "config.h"
 
 
 namespace nix {
@@ -47,17 +50,17 @@ static void dumpEntries(const Path & path, Sink & sink, PathFilter & filter)
 }
 
 
-static void dumpContents(const Path & path, unsigned int size, 
+static void dumpContents(const Path & path, off_t size, 
     Sink & sink)
 {
     writeString("contents", sink);
-    writeInt(size, sink);
+    writeLongLong(size, sink);
 
     AutoCloseFD fd = open(path.c_str(), O_RDONLY);
     if (fd == -1) throw SysError(format("opening file `%1%'") % path);
     
     unsigned char buf[65536];
-    unsigned int left = size;
+    off_t left = size;
 
     while (left > 0) {
         size_t n = left > sizeof(buf) ? sizeof(buf) : left;
@@ -101,7 +104,7 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
         writeString(readLink(path), sink);
     }
 
-    else throw Error("unknown file type: " + path);
+    else throw Error(format("file `%1%' has an unknown type") % path);
 
     writeString(")", sink);
 }
@@ -114,9 +117,9 @@ void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
 }
 
 
-static Error badArchive(string s)
+static SerialisationError badArchive(string s)
 {
-    return Error("bad archive: " + s);
+    return SerialisationError("bad archive: " + s);
 }
 
 
@@ -162,14 +165,17 @@ static void parseEntry(ParseSink & sink, Source & source, const Path & path)
 
 static void parseContents(ParseSink & sink, Source & source, const Path & path)
 {
-    unsigned int size = readInt(source);
-    unsigned int left = size;
+    unsigned long long size = readLongLong(source);
+    
+    sink.preallocateContents(size);
+
+    unsigned long long left = size;
     unsigned char buf[65536];
 
     while (left) {
         checkInterrupt();
         unsigned int n = sizeof(buf);
-        if (n > left) n = left;
+        if ((unsigned long long) n > left) n = left;
         source(buf, n);
         sink.receiveContents(buf, n);
         left -= n;
@@ -248,8 +254,15 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
 
 void parseDump(ParseSink & sink, Source & source)
 {
-    if (readString(source) != archiveVersion1)
-        throw badArchive("expected Nix archive");
+    string version;    
+    try {
+        version = readString(source);
+    } catch (SerialisationError & e) {
+        /* This generally means the integer at the start couldn't be
+           decoded.  Ignore and throw the exception below. */
+    }
+    if (version != archiveVersion1)
+        throw badArchive("input doesn't look like a Nix archive");
     parse(sink, source, "");
 }
 
@@ -280,6 +293,16 @@ struct RestoreSink : ParseSink
             throw SysError("fstat");
         if (fchmod(fd, st.st_mode | (S_IXUSR | S_IXGRP | S_IXOTH)) == -1)
             throw SysError("fchmod");
+    }
+
+    void preallocateContents(unsigned long long len)
+    {
+#if HAVE_POSIX_FALLOCATE
+        if (len) {
+            errno = posix_fallocate(fd, 0, len);
+            if (errno) throw SysError(format("preallocating file of %1% bytes") % len);
+        }
+#endif
     }
 
     void receiveContents(unsigned char * data, unsigned int len)

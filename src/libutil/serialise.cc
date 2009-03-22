@@ -80,7 +80,7 @@ void readPadding(unsigned int len, Source & source)
         unsigned int n = 8 - (len % 8);
         source(zero, n);
         for (unsigned int i = 0; i < n; i++)
-            if (zero[i]) throw Error("non-zero padding");
+            if (zero[i]) throw SerialisationError("non-zero padding");
     }
 }
 
@@ -90,7 +90,7 @@ unsigned int readInt(Source & source)
     unsigned char buf[8];
     source(buf, sizeof(buf));
     if (buf[4] || buf[5] || buf[6] || buf[7])
-        throw Error("implementation cannot deal with > 32-bit integers");
+        throw SerialisationError("implementation cannot deal with > 32-bit integers");
     return
         buf[0] |
         (buf[1] << 8) |

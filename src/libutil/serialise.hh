@@ -106,6 +106,9 @@ string readString(Source & source);
 StringSet readStringSet(Source & source);
 
 
+MakeError(SerialisationError, Error)
+
+
 }
 
 
