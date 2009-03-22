@@ -687,17 +687,6 @@ private:
     /* Synchronously wait for a build hook to finish. */
     void terminateBuildHook(bool kill = false);
 
-    /* Acquires locks on the output paths and gathers information
-       about the build (e.g., the input closures).  During this
-       process its possible that we find out that the build is
-       unnecessary, in which case we return prDone.  It's also
-       possible that some other goal is already building/substituting
-       the output paths, in which case we return prRestart (go back to
-       the haveDerivation() state).  Otherwise, prProceed is
-       returned. */
-    typedef enum {prProceed, prDone, prRestart} PrepareBuildReply;
-    PrepareBuildReply prepareBuild();
-
     /* Start building a derivation. */
     void startBuilder();
 
@@ -834,19 +823,6 @@ void DerivationGoal::haveDerivation()
         return;
     }
 
-    /* If this is a fixed-output derivation, it is possible that some
-       other goal is already building the output paths.  (The case
-       where some other process is building it is handled through
-       normal locking mechanisms.)  So if any output paths are already
-       being built, put this goal to sleep. */
-    foreach (PathSet::iterator, i, invalidOutputs)
-        if (pathIsLockedByMe(*i)) {
-            /* Wait until any goal finishes (hopefully the one that is
-               locking *i), then retry haveDerivation(). */
-            worker.waitForAnyGoal(shared_from_this());
-            return;
-        }
-
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
@@ -948,52 +924,101 @@ void DerivationGoal::inputsRealised()
 }
 
 
+PathSet outputPaths(const DerivationOutputs & outputs)
+{
+    PathSet paths;
+    for (DerivationOutputs::const_iterator i = outputs.begin();
+         i != outputs.end(); ++i)
+        paths.insert(i->second.path);
+    return paths;
+}
+
+
 void DerivationGoal::tryToBuild()
 {
     trace("trying to build");
 
-    /* Acquire locks on the output paths.  After acquiring the locks,
-       it might turn out that somebody else has performed the build
-       already, and we're done.  If not, we can proceed. */
-    switch (prepareBuild()) {
-        case prDone:
-            amDone(ecSuccess);
-            return;
-        case prRestart:
+    /* Check for the possibility that some other goal in this process
+       has locked the output since we checked in haveDerivation().
+       (It can't happen between here and the lockPaths() call below
+       because we're not allowing multi-threading.)  If so, put this
+       goal to sleep until another goal finishes, then try again. */
+    foreach (DerivationOutputs::iterator, i, drv.outputs)
+        if (pathIsLockedByMe(i->second.path)) {
+            debug(format("putting derivation `%1%' to sleep because `%2%' is locked by another goal")
+                % drvPath % i->second.path);
             worker.waitForAnyGoal(shared_from_this());
             return;
-        case prProceed:
-            break;
-    }
-        
-    try {
-
-        /* Is the build hook willing to accept this job? */
-        usingBuildHook = true;
-        switch (tryBuildHook()) {
-            case rpAccept:
-                /* Yes, it has started doing so.  Wait until we get
-                   EOF from the hook. */
-                state = &DerivationGoal::buildDone;
-                return;
-            case rpPostpone:
-                /* Not now; wait until at least one child finishes. */
-                worker.waitForChildTermination(shared_from_this());
-                outputLocks.unlock();
-                return;
-            case rpDecline:
-                /* We should do it ourselves. */
-                break;
         }
+    
+    /* Obtain locks on all output paths.  The locks are automatically
+       released when we exit this function or Nix crashes. */
+    /* !!! nonblock */
+    outputLocks.lockPaths(outputPaths(drv.outputs),
+        (format("waiting for lock on %1%") % showPaths(outputPaths(drv.outputs))).str());
 
-        usingBuildHook = false;
+    /* Now check again whether the outputs are valid.  This is because
+       another process may have started building in parallel.  After
+       it has finished and released the locks, we can (and should)
+       reuse its results.  (Strictly speaking the first check can be
+       omitted, but that would be less efficient.)  Note that since we
+       now hold the locks on the output paths, no other process can
+       build this derivation, so no further checks are necessary. */
+    PathSet validPaths = checkPathValidity(true);
+    if (validPaths.size() == drv.outputs.size()) {
+        debug(format("skipping build of derivation `%1%', someone beat us to it")
+            % drvPath);
+        outputLocks.setDeletion(true);
+        amDone(ecSuccess);
+        return;
+    }
 
-        /* Make sure that we are allowed to start a build. */
-        if (!worker.canBuildMore()) {
-            worker.waitForBuildSlot(shared_from_this());
+    if (validPaths.size() > 0)
+        /* !!! fix this; try to delete valid paths */
+        throw Error(
+            format("derivation `%1%' is blocked by its output paths")
+            % drvPath);
+
+    /* If any of the outputs already exist but are not valid, delete
+       them. */
+    foreach (DerivationOutputs::iterator, i, drv.outputs) {
+        Path path = i->second.path;
+        if (worker.store.isValidPath(path))
+            throw Error(format("obstructed build: path `%1%' exists") % path);
+        if (pathExists(path)) {
+            debug(format("removing unregistered path `%1%'") % path);
+            deletePathWrapped(path);
+        }
+    }
+
+    /* Is the build hook willing to accept this job? */
+    usingBuildHook = true;
+    switch (tryBuildHook()) {
+        case rpAccept:
+            /* Yes, it has started doing so.  Wait until we get EOF
+               from the hook. */
+            state = &DerivationGoal::buildDone;
+            return;
+        case rpPostpone:
+            /* Not now; wait until at least one child finishes. */
+            worker.waitForChildTermination(shared_from_this());
             outputLocks.unlock();
             return;
-        }
+        case rpDecline:
+            /* We should do it ourselves. */
+            break;
+    }
+
+    usingBuildHook = false;
+
+    /* Make sure that we are allowed to start a build. */
+    if (!worker.canBuildMore()) {
+        worker.waitForBuildSlot(shared_from_this());
+        outputLocks.unlock();
+        return;
+    }
+    
+    try {
 
         /* Okay, we have to build. */
         startBuilder();
@@ -1003,12 +1028,8 @@ void DerivationGoal::tryToBuild()
         outputLocks.unlock();
         buildUser.release();
         if (printBuildTrace)
-            if (usingBuildHook)
-                printMsg(lvlError, format("@ hook-failed %1% %2% %3% %4%")
-                    % drvPath % drv.outputs["out"].path % 0 % e.msg());
-            else
-                printMsg(lvlError, format("@ build-failed %1% %2% %3% %4%")
-                    % drvPath % drv.outputs["out"].path % 0 % e.msg());
+            printMsg(lvlError, format("@ build-failed %1% %2% %3% %4%")
+                % drvPath % drv.outputs["out"].path % 0 % e.msg());
         amDone(ecFailed);
         return;
     }
@@ -1179,16 +1200,6 @@ static void drain(int fd)
 }
 
 
-PathSet outputPaths(const DerivationOutputs & outputs)
-{
-    PathSet paths;
-    for (DerivationOutputs::const_iterator i = outputs.begin();
-         i != outputs.end(); ++i)
-        paths.insert(i->second.path);
-    return paths;
-}
-
-
 DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 {
     if (!useBuildHook) return rpDecline;
@@ -1352,72 +1363,10 @@ void DerivationGoal::terminateBuildHook(bool kill)
 }
 
 
-DerivationGoal::PrepareBuildReply DerivationGoal::prepareBuild()
-{
-    /* Check for the possibility that some other goal in this process
-       has locked the output since we checked in haveDerivation().
-       (It can't happen between here and the lockPaths() call below
-       because we're not allowing multi-threading.) */
-    foreach (DerivationOutputs::iterator, i, drv.outputs)
-        if (pathIsLockedByMe(i->second.path)) {
-            debug(format("restarting derivation `%1%' because `%2%' is locked by another goal")
-                % drvPath % i->second.path);
-            return prRestart;
-        }
-    
-    /* Obtain locks on all output paths.  The locks are automatically
-       released when we exit this function or Nix crashes. */
-    /* !!! BUG: this could block, which is not allowed. */
-    /* !!! and once we make this non-blocking, we should carefully
-       consider the case where some but not all locks are required; we
-       should then release the acquired locks so that the other
-       processes and the pathIsLockedByMe() test don't get confused. */
-    outputLocks.lockPaths(outputPaths(drv.outputs),
-        (format("waiting for lock on %1%") % showPaths(outputPaths(drv.outputs))).str());
-
-    /* Now check again whether the outputs are valid.  This is because
-       another process may have started building in parallel.  After
-       it has finished and released the locks, we can (and should)
-       reuse its results.  (Strictly speaking the first check can be
-       omitted, but that would be less efficient.)  Note that since we
-       now hold the locks on the output paths, no other process can
-       build this derivation, so no further checks are necessary. */
-    PathSet validPaths = checkPathValidity(true);
-    if (validPaths.size() == drv.outputs.size()) {
-        debug(format("skipping build of derivation `%1%', someone beat us to it")
-            % drvPath);
-        outputLocks.setDeletion(true);
-        return prDone;
-    }
-
-    if (validPaths.size() > 0) {
-        /* !!! fix this; try to delete valid paths */
-        throw Error(
-            format("derivation `%1%' is blocked by its output paths")
-            % drvPath);
-    }
-
-    /* If any of the outputs already exist but are not registered,
-       delete them. */
-    foreach (DerivationOutputs::iterator, i, drv.outputs) {
-        Path path = i->second.path;
-        if (worker.store.isValidPath(path))
-            throw Error(format("obstructed build: path `%1%' exists") % path);
-        if (pathExists(path)) {
-            debug(format("removing unregistered path `%1%'") % path);
-            deletePathWrapped(path);
-        }
-    }
-
-    return prProceed;
-}
-
-
 void chmod(const Path & path, mode_t mode)
 {
     if (::chmod(path.c_str(), 01777) == -1)
         throw SysError(format("setting permissions on `%1%'") % path);
-    
 }
 
 
