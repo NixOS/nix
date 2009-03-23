@@ -65,7 +65,7 @@ extern string thisSystem;
 /* The maximum time in seconds that a builer can go without producing
    any output on stdout/stderr before it is killed.  0 means
    infinity. */
-extern unsigned int maxSilentTime;
+extern time_t maxSilentTime;
 
 /* The substituters.  There are programs that can somehow realise a
    store path without building, e.g., by downloading it or copying it

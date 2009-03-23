@@ -141,9 +141,9 @@ PathLocks::PathLocks(const PathSet & paths, const string & waitMsg)
 }
 
 
-void PathLocks::lockPaths(const PathSet & _paths, const string & waitMsg)
+bool PathLocks::lockPaths(const PathSet & _paths,
+    const string & waitMsg, bool wait)
 {
-    /* May be called only once! */
     assert(fds.empty());
     
     /* Note that `fds' is built incrementally so that the destructor
@@ -174,8 +174,15 @@ void PathLocks::lockPaths(const PathSet & _paths, const string & waitMsg)
 
             /* Acquire an exclusive lock. */
             if (!lockFile(fd, ltWrite, false)) {
-                if (waitMsg != "") printMsg(lvlError, waitMsg);
-                lockFile(fd, ltWrite, true);
+                if (wait) {
+                    if (waitMsg != "") printMsg(lvlError, waitMsg);
+                    lockFile(fd, ltWrite, true);
+                } else {
+                    /* Failed to lock this path; release all other
+                       locks. */
+                    unlock();
+                    return false;
+                }
             }
 
             debug(format("lock acquired on `%1%'") % lockPath);
@@ -199,6 +206,8 @@ void PathLocks::lockPaths(const PathSet & _paths, const string & waitMsg)
         fds.push_back(FDPair(fd.borrow(), lockPath));
         lockedPaths.insert(lockPath);
     }
+
+    return true;
 }
 
 

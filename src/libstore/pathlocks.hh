@@ -33,8 +33,9 @@ public:
     PathLocks();
     PathLocks(const PathSet & paths,
         const string & waitMsg = "");
-    void lockPaths(const PathSet & _paths,
-        const string & waitMsg = "");
+    bool lockPaths(const PathSet & _paths,
+        const string & waitMsg = "",
+        bool wait = true);
     ~PathLocks();
     void unlock();
     void setDeletion(bool deletePaths);

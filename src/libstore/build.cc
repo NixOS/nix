@@ -8,6 +8,7 @@
 #include <map>
 #include <iostream>
 #include <sstream>
+#include <algorithm>
 #include <boost/shared_ptr.hpp>
 #include <boost/weak_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
@@ -200,6 +201,12 @@ private:
     /* Goals waiting for busy paths to be unlocked. */
     WeakGoals waitingForAnyGoal;
     
+    /* Goals sleeping for a few seconds (polling a lock). */
+    WeakGoals waitingForAWhile;
+
+    /* Last time the goals in `waitingForAWhile' where woken up. */
+    time_t lastWokenUp;
+    
 public:
 
     LocalStore & store;
@@ -245,6 +252,12 @@ public:
     /* Wait for any goal to finish.  Pretty indiscriminate way to
        wait for some resource that some other goal is holding. */
     void waitForAnyGoal(GoalPtr goal);
+    
+    /* Wait for a few seconds and then retry this goal.  Used when
+       waiting for a lock held by another process.  This kind of
+       polling is inefficient, but POSIX doesn't really provide a way
+       to wait for multiple locks in the main select() loop. */
+    void waitForAWhile(GoalPtr goal);
     
     /* Loop until the specified top-level goals have finished. */
     void run(const Goals & topGoals);
@@ -952,10 +965,14 @@ void DerivationGoal::tryToBuild()
         }
     
     /* Obtain locks on all output paths.  The locks are automatically
-       released when we exit this function or Nix crashes. */
-    /* !!! nonblock */
-    outputLocks.lockPaths(outputPaths(drv.outputs),
-        (format("waiting for lock on %1%") % showPaths(outputPaths(drv.outputs))).str());
+       released when we exit this function or Nix crashes.  If we
+       can't acquire the lock, then continue; hopefully some other
+       goal can start a build, and if not, the main loop will sleep a
+       few seconds and then retry this goal. */
+    if (!outputLocks.lockPaths(outputPaths(drv.outputs), "", false)) {
+        worker.waitForAWhile(shared_from_this());
+        return;
+    }
 
     /* Now check again whether the outputs are valid.  This is because
        another process may have started building in parallel.  After
@@ -2205,8 +2222,10 @@ void SubstitutionGoal::tryToRun()
     
     /* Acquire a lock on the output path. */
     outputLock = boost::shared_ptr<PathLocks>(new PathLocks);
-    outputLock->lockPaths(singleton<PathSet>(storePath),
-        (format("waiting for lock on `%1%'") % storePath).str());
+    if (!outputLock->lockPaths(singleton<PathSet>(storePath), "", false)) {
+        worker.waitForAWhile(shared_from_this());
+        return;
+    }
 
     /* Check again whether the path is invalid. */
     if (worker.store.isValidPath(storePath)) {
@@ -2372,6 +2391,7 @@ Worker::Worker(LocalStore & store)
     if (working) abort();
     working = true;
     nrChildren = 0;
+    lastWokenUp = 0;
 }
 
 
@@ -2440,9 +2460,7 @@ void Worker::removeGoal(GoalPtr goal)
     }
 
     /* Wake up goals waiting for any goal to finish. */
-    for (WeakGoals::iterator i = waitingForAnyGoal.begin();
-         i != waitingForAnyGoal.end(); ++i)
-    {
+    foreach (WeakGoals::iterator, i, waitingForAnyGoal) {
         GoalPtr goal = i->lock();
         if (goal) wakeUp(goal);
     }
@@ -2539,6 +2557,13 @@ void Worker::waitForAnyGoal(GoalPtr goal)
 }
 
 
+void Worker::waitForAWhile(GoalPtr goal)
+{
+    debug("wait for a while");
+    waitingForAWhile.insert(goal);
+}
+
+
 void Worker::run(const Goals & _topGoals)
 {
     for (Goals::iterator i = _topGoals.begin();
@@ -2566,10 +2591,9 @@ void Worker::run(const Goals & _topGoals)
         if (topGoals.empty()) break;
 
         /* Wait for input. */
-        if (!children.empty())
+        if (!children.empty() || !waitingForAWhile.empty())
             waitForInput();
         else
-            /* !!! not when we're polling */
             assert(!awake.empty());
     }
 
@@ -2592,21 +2616,35 @@ void Worker::waitForInput()
        the logger pipe of a build, we assume that the builder has
        terminated. */
 
+    bool useTimeout = false;
+    struct timeval timeout;
+    timeout.tv_usec = 0;
+    time_t before = time(0);
+        
     /* If we're monitoring for silence on stdout/stderr, sleep until
        the first deadline for any child. */
-    struct timeval timeout;
     if (maxSilentTime != 0) {
         time_t oldest = 0;
         foreach (Children::iterator, i, children) {
             oldest = oldest == 0 || i->second.lastOutput < oldest
                 ? i->second.lastOutput : oldest;
         }
-        time_t now = time(0);
-        timeout.tv_sec = (time_t) (oldest + maxSilentTime) <= now ? 0 :
-            oldest + maxSilentTime - now;
-        timeout.tv_usec = 0;
+        useTimeout = true;
+        timeout.tv_sec = std::max((time_t) 0, oldest + maxSilentTime - before);
         printMsg(lvlVomit, format("sleeping %1% seconds") % timeout.tv_sec);
     }
+
+    /* If we are polling goals that are waiting for a lock, then wake
+       up after a few seconds at most. */
+    int wakeUpInterval = 3;
+        
+    if (!waitingForAWhile.empty()) {
+        useTimeout = true;
+        if (lastWokenUp == 0 && children.empty())
+            printMsg(lvlError, "waiting for locks...");
+        if (lastWokenUp == 0 || lastWokenUp > before) lastWokenUp = before;
+        timeout.tv_sec = std::max((time_t) 0, lastWokenUp + wakeUpInterval - before);
+    } else lastWokenUp = 0;
 
     /* Use select() to wait for the input side of any logger pipe to
        become `available'.  Note that `available' (i.e., non-blocking)
@@ -2621,12 +2659,12 @@ void Worker::waitForInput()
         }
     }
 
-    if (select(fdMax, &fds, 0, 0, maxSilentTime != 0 ? &timeout : 0) == -1) {
+    if (select(fdMax, &fds, 0, 0, useTimeout ? &timeout : 0) == -1) {
         if (errno == EINTR) return;
         throw SysError("waiting for input");
     }
 
-    time_t now = time(0);
+    time_t after = time(0);
 
     /* Process all available file descriptors. */
 
@@ -2662,19 +2700,28 @@ void Worker::waitForInput()
                         % goal->getName() % rd);
                     string data((char *) buffer, rd);
                     goal->handleChildOutput(*k, data);
-                    j->second.lastOutput = now;
+                    j->second.lastOutput = after;
                 }
             }
         }
 
         if (maxSilentTime != 0 &&
-            now - j->second.lastOutput >= (time_t) maxSilentTime)
+            after - j->second.lastOutput >= (time_t) maxSilentTime)
         {
             printMsg(lvlError,
                 format("%1% timed out after %2% seconds of silence")
                 % goal->getName() % maxSilentTime);
             goal->cancel();
         }
+    }
+
+    if (!waitingForAWhile.empty() && lastWokenUp + wakeUpInterval >= after) {
+        lastWokenUp = after;
+        foreach (WeakGoals::iterator, i, waitingForAWhile) {
+            GoalPtr goal = i->lock();
+            if (goal) wakeUp(goal);
+        }
+        waitingForAWhile.clear();
     }
 }
 
