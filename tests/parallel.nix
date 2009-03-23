@@ -1,3 +1,5 @@
+{sleepTime ? 3}:
+
 with import ./config.nix;
 
 let
@@ -5,7 +7,7 @@ let
   mkDrv = text: inputs: mkDerivation {
     name = "parallel";
     builder = ./parallel.builder.sh;
-    inherit text inputs shared;
+    inherit text inputs shared sleepTime;
   };
 
   a = mkDrv "a" [];

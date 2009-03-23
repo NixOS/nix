@@ -25,21 +25,23 @@ clearStore
 
 rm -f $SHARED.cur $SHARED.max
 
-$nixbuild -j1 parallel.nix &
+cmd="$nixbuild -j1 parallel.nix --argstr sleepTime 7"
+
+$cmd &
 pid1=$!
 echo "pid 1 is $pid1"
 
-$nixbuild -j1 parallel.nix &
+$cmd &
 pid2=$!
 echo "pid 2 is $pid2"
 
-$nixbuild -j1 parallel.nix &
+$cmd &
 pid3=$!
 echo "pid 3 is $pid3"
 
-wait $pid1
-wait $pid2
-wait $pid3
+wait $pid1 || fail "instance 1 failed: $?"
+wait $pid2 || fail "instance 2 failed: $?"
+wait $pid3 || fail "instance 3 failed: $?"
 
 if test "$(cat $SHARED.cur)" != 0; then fail "wrong current process count"; fi
 if test "$(cat $SHARED.max)" != 3; then fail "not enough parallelism"; fi

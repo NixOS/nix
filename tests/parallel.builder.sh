@@ -2,7 +2,7 @@ echo "DOING $text"
 
 
 # increase counter
-while ! ln -s x $shared.lock; do
+while ! ln -s x $shared.lock 2> /dev/null; do
     sleep 1
 done
 test -f $shared.cur || echo 0 > $shared.cur
@@ -17,11 +17,11 @@ rm $shared.lock
 
 echo -n $(cat $inputs)$text > $out
 
-sleep 3
+sleep $sleepTime
 
 
 # decrease counter
-while ! ln -s x $shared.lock; do
+while ! ln -s x $shared.lock 2> /dev/null; do
     sleep 1
 done
 test -f $shared.cur || echo 0 > $shared.cur
