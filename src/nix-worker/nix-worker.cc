@@ -112,11 +112,11 @@ static void sigPollHandler(int sigNo)
                 _isInterrupted = 1;
                 blockInt = 1;
                 canSendStderr = false;
-                char * s = "SIGPOLL\n";
+                const char * s = "SIGPOLL\n";
                 write(STDERR_FILENO, s, strlen(s));
             }
         } else {
-            char * s = "spurious SIGPOLL\n";
+            const char * s = "spurious SIGPOLL\n";
             write(STDERR_FILENO, s, strlen(s));
         }
     }
