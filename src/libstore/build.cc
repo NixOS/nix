@@ -2640,7 +2640,7 @@ void Worker::waitForInput()
         
     if (!waitingForAWhile.empty()) {
         useTimeout = true;
-        if (lastWokenUp == 0 && children.empty())
+        if (lastWokenUp == 0)
             printMsg(lvlError, "waiting for locks...");
         if (lastWokenUp == 0 || lastWokenUp > before) lastWokenUp = before;
         timeout.tv_sec = std::max((time_t) 0, lastWokenUp + wakeUpInterval - before);
