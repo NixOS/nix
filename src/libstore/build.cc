@@ -2715,7 +2715,7 @@ void Worker::waitForInput()
         }
     }
 
-    if (!waitingForAWhile.empty() && lastWokenUp + wakeUpInterval >= after) {
+    if (!waitingForAWhile.empty() && lastWokenUp + wakeUpInterval <= after) {
         lastWokenUp = after;
         foreach (WeakGoals::iterator, i, waitingForAWhile) {
             GoalPtr goal = i->lock();
