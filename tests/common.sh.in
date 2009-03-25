@@ -39,6 +39,7 @@ export dot=@dot@
 export xmllint="@xmllint@"
 export xmlflags="@xmlflags@"
 export xsltproc="@xsltproc@"
+export SHELL="@shell@"
 
 # Hack to get "atdiff" to run on Cygwin (Windows looks for
 # DLLs in $PATH).

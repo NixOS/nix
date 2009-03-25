@@ -1,4 +1,4 @@
-TESTS_ENVIRONMENT = $(SHELL) -e
+TESTS_ENVIRONMENT = $(bash) -e
 
 extra1 = $(shell pwd)/test-tmp/shared
 
