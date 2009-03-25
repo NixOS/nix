@@ -65,6 +65,7 @@ LocalStore::LocalStore()
 
     createDirs(nixDBPath + "/info");
     createDirs(nixDBPath + "/referrer");
+    createDirs(nixDBPath + "/failed");
 
     int curSchema = getSchema();
     if (curSchema > nixSchemaVersion)
@@ -193,6 +194,13 @@ static Path referrersFileFor(const Path & path)
 {
     string baseName = baseNameOf(path);
     return (format("%1%/referrer/%2%") % nixDBPath % baseName).str();
+}
+
+
+static Path failedFileFor(const Path & path)
+{
+    string baseName = baseNameOf(path);
+    return (format("%1%/failed/%2%") % nixDBPath % baseName).str();
 }
 
 
@@ -332,6 +340,20 @@ void LocalStore::registerValidPath(const ValidPathInfo & info, bool ignoreValidi
         throw SysError(format("cannot rename `%1%' to `%2%'") % tmpFile % infoFile);
 
     pathInfoCache[info.path] = info;
+}
+
+
+void LocalStore::registerFailedPath(const Path & path)
+{
+    /* Write an empty file in the .../failed directory to denote the
+       failure of the builder for `path'. */
+    writeFile(failedFileFor(path), "");
+}
+
+
+bool LocalStore::hasPathFailed(const Path & path)
+{
+    return pathExists(failedFileFor(path));
 }
 
 

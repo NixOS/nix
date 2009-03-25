@@ -209,6 +209,8 @@ private:
     
 public:
 
+    bool cacheFailure;
+
     LocalStore & store;
 
     Worker(LocalStore & store);
@@ -667,6 +669,9 @@ private:
 
     /* RAII object to delete the chroot directory. */
     boost::shared_ptr<AutoDelete> autoDelChroot;
+
+    /* Whether this is a fixed-output derivation. */
+    bool fixedOutput;
     
     typedef void (DerivationGoal::*GoalState)();
     GoalState state;
@@ -724,6 +729,9 @@ private:
 
     /* Return the set of (in)valid paths. */
     PathSet checkPathValidity(bool returnValid);
+
+    /* Abort the goal if `path' failed to build. */
+    bool pathFailed(const Path & path);
 
     /* Forcibly kill the child process, if any. */
     void killChild();
@@ -836,6 +844,11 @@ void DerivationGoal::haveDerivation()
         return;
     }
 
+    /* Check whether any output previously failed to build.  If so,
+       don't bother. */
+    foreach (PathSet::iterator, i, invalidOutputs)
+        if (pathFailed(*i)) return;
+        
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
@@ -1008,6 +1021,12 @@ void DerivationGoal::tryToBuild()
         }
     }
 
+    /* Check again whether any output previously failed to build,
+       because some other process may have tried and failed before we
+       acquired the lock. */
+    foreach (DerivationOutputs::iterator, i, drv.outputs)
+        if (pathFailed(i->second.path)) return;
+
     /* Is the build hook willing to accept this job? */
     usingBuildHook = true;
     switch (tryBuildHook()) {
@@ -1093,9 +1112,7 @@ void DerivationGoal::buildDone()
         /* Some cleanup per path.  We do this here and not in
            computeClosure() for convenience when the build has
            failed. */
-        for (DerivationOutputs::iterator i = drv.outputs.begin(); 
-             i != drv.outputs.end(); ++i)
-        {
+        foreach (DerivationOutputs::iterator, i, drv.outputs) {
             Path path = i->second.path;
 
             if (useChroot && pathExists(chrootRootDir + path)) {
@@ -1147,6 +1164,7 @@ void DerivationGoal::buildDone()
         printMsg(lvlError, e.msg());
         outputLocks.unlock();
         buildUser.release();
+        
         if (printBuildTrace) {
             /* When using a build hook, the hook will return a
                remote build failure using exit code 100.  Anything
@@ -1158,6 +1176,16 @@ void DerivationGoal::buildDone()
                 printMsg(lvlError, format("@ build-failed %1% %2% %3% %4%")
                     % drvPath % drv.outputs["out"].path % 1 % e.msg());
         }
+
+        /* Register the outputs of this build as "failed" so we won't
+           try to build them again (negative caching).  However, don't
+           do this for fixed-output derivations, since they're likely
+           to fail for transient reasons (e.g., fetchurl not being
+           able to access the network). */
+        if (worker.cacheFailure && !fixedOutput)
+            foreach (DerivationOutputs::iterator, i, drv.outputs)
+                worker.store.registerFailedPath(i->second.path);
+        
         amDone(ecFailed);
         return;
     }
@@ -1451,9 +1479,8 @@ void DerivationGoal::startBuilder()
        derivation, tell the builder, so that for instance `fetchurl'
        can skip checking the output.  On older Nixes, this environment
        variable won't be set, so `fetchurl' will do the check. */
-    bool fixedOutput = true;
-    for (DerivationOutputs::iterator i = drv.outputs.begin(); 
-         i != drv.outputs.end(); ++i)
+    fixedOutput = true;
+    foreach (DerivationOutputs::iterator, i, drv.outputs)
         if (i->second.hash == "") fixedOutput = false;
     if (fixedOutput) 
         env["NIX_OUTPUT_CHECKED"] = "1";
@@ -2035,6 +2062,22 @@ PathSet DerivationGoal::checkPathValidity(bool returnValid)
 }
 
 
+bool DerivationGoal::pathFailed(const Path & path)
+{
+    if (!worker.cacheFailure) return false;
+    
+    if (!worker.store.hasPathFailed(path)) return false;
+
+    printMsg(lvlError, format("builder for `%1%' failed previously (cached)") % path);
+    
+    if (printBuildTrace)
+        printMsg(lvlError, format("@ build-failed %1% %2% cached") % drvPath % path);
+    
+    amDone(ecFailed);
+
+    return true;
+}
+
 
 //////////////////////////////////////////////////////////////////////
 
@@ -2392,6 +2435,7 @@ Worker::Worker(LocalStore & store)
     working = true;
     nrChildren = 0;
     lastWokenUp = 0;
+    cacheFailure = queryBoolSetting("build-cache-failure", false);
 }
 
 

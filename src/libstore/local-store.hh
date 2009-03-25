@@ -144,6 +144,13 @@ public:
 
     void registerValidPaths(const ValidPathInfos & infos);
 
+    /* Register that the build of a derivation with output `path' has
+       failed. */
+    void registerFailedPath(const Path & path);
+
+    /* Query whether `path' previously failed to build. */
+    bool hasPathFailed(const Path & path);
+
 private:
 
     Path schemaPath;

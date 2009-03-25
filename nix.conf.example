@@ -154,6 +154,22 @@
 #build-chroot-dirs = /dev /dev/pts /proc
 
 
+### Option `build-cache-failure'
+#
+# If this option is enabled, Nix will do negative caching; that is, it
+# will remember failed builds, and won't attempt to try to build them
+# again if you ask for it.  Negative caching is disabled by default
+# because Nix cannot distinguish between permanent build errors (e.g.,
+# a syntax error in a source file) and transient build errors (e.g., a
+# full disk), as they both cause the builder to return a non-zero exit
+# code.  You can clear the cache by doing `rm -f
+# /nix/var/nix/db/failed/*'.
+#
+# Example:
+#   build-cache-failure = true
+#build-cache-failure = false
+
+
 ### Option `system'
 #
 # This option specifies the canonical Nix system name of the current
