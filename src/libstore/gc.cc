@@ -482,7 +482,7 @@ void LocalStore::gcPath(const GCOptions & options, GCResults & results,
     results.bytesFreed += bytesFreed;
     results.blocksFreed += blocksFreed;
 
-    if (results.bytesFreed > options.maxFreed) {
+    if (options.maxFreed && results.bytesFreed > options.maxFreed) {
         printMsg(lvlInfo, format("deleted more than %1% bytes; stopping") % options.maxFreed);
         throw GCLimitReached();
     }

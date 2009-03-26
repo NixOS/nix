@@ -5,12 +5,6 @@
 #include <limits.h>
 
 
-/* Needed for some ancient environments. */
-#ifndef ULLONG_MAX
-#define ULLONG_MAX 18446744073709551615ULL
-#endif
-
-
 namespace nix {
 
 
@@ -18,7 +12,7 @@ GCOptions::GCOptions()
 {
     action = gcDeleteDead;
     ignoreLiveness = false;
-    maxFreed = ULLONG_MAX;
+    maxFreed = 0;
     maxLinks = 0;
     useAtime = false;
     maxAtime = (time_t) -1;
