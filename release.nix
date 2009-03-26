@@ -12,7 +12,7 @@ let
 
       with import nixpkgs {};
 
-      releaseTools.makeSourceTarball {
+      releaseTools.sourceTarball {
         name = "nix-tarball";
         version = builtins.readFile ./version;
         src = nix;
@@ -72,6 +72,27 @@ let
         postInstall = ''
           echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
           echo "doc release-notes $out/share/doc/nix/release-notes" >> $out/nix-support/hydra-build-products
+        '';
+      };
+
+      
+    static =
+      { tarball ? jobs.tarball {}
+      , system ? "i686-linux"
+      }:
+
+      with import nixpkgs {inherit system;};
+
+      releaseTools.binaryTarball {
+        name = "nix-static-tarball";
+        src = tarball;
+
+        buildInputs = [curl perl bzip2];
+
+        configureFlags = ''
+          --disable-init-state
+          --disable-old-db-compat --with-aterm=${aterm242fixes} --with-bzip2=${bzip2}
+          --enable-static-nix
         '';
       };
 
