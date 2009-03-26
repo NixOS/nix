@@ -50,14 +50,30 @@ AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
 test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
 
 
+# Whether to produce a statically linked binary.  On Cygwin, this is
+# the default: dynamically linking against the ATerm DLL does work,
+# except that it requires the ATerm "lib" directory to be in $PATH, as
+# Windows doesn't have anything like an RPATH embedded in executable.
+# Since this is kind of annoying, we use static libraries for now.
+    
+AC_ARG_ENABLE(static-nix, AC_HELP_STRING([--enable-statix-nix],
+  [produce statically linked binaries]),
+  static_nix=$enableval, static_nix=no)
+
+if test "$sys_name" = cygwin; then
+   static_nix=yes
+fi
+  
+if test "$static_nix" = yes; then
+    AC_DISABLE_SHARED
+    AC_ENABLE_STATIC
+fi
+
+  
 # Windows-specific stuff.
 if test "$sys_name" = "cygwin"; then
     # We cannot delete open files.
     AC_DEFINE(CANNOT_DELETE_OPEN_FILES, 1, [Whether it is impossible to delete open files.])
-
-    # Shared libraries don't work, currently.
-    AC_DISABLE_SHARED
-    AC_ENABLE_STATIC
 fi
 
 
@@ -276,13 +292,10 @@ if test "$(uname)" = "Darwin"; then
 fi
 
 
-if test "$sys_name" = "cygwin"; then
-    # Dynamically linking against the ATerm DLL does work, except that it requires
-    # the ATerm "lib" directory to be in $PATH, as Windows doesn't have anything
-    # like an RPATH embedded in executable.  Since this is kind of annoying, we
-    # use static libraries for now.  This has to happen at the end of
-    # configure, because the C compiler doesn't know about -all-static
-    # (it's filtered out by libtool, but configure doesn't use libtool).
+if test "$static_nix" = yes; then
+    # `-all-static' has to be added at the end of configure, because
+    # the C compiler doesn't know about -all-static (it's filtered out
+    # by libtool, but configure doesn't use libtool).
     LDFLAGS="-all-static $LDFLAGS"
 fi
 
