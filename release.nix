@@ -135,10 +135,14 @@ let
     rpm_opensuse103i386 = makeRPM_i686 (diskImages: diskImages.opensuse103i386) 40;
 
     
-    deb_debian40i386 = makeDeb_i686 (diskImages: diskImages.debian40i386) 30;
-    deb_debian40x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian40x86_64) 30;
-    deb_ubuntu804i386 = makeDeb_i686 (diskImages: diskImages.ubuntu804i386) 40;
-    deb_ubuntu804x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu804x86_64) 40;
+    deb_debian40i386 = makeDeb_i686 (diskImages: diskImages.debian40i386) 40;
+    deb_debian40x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian40x86_64) 40;
+    deb_debian50i386 = makeDeb_i686 (diskImages: diskImages.debian50i386) 30;
+    deb_debian50x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian50x86_64) 30;
+    deb_ubuntu804i386 = makeDeb_i686 (diskImages: diskImages.ubuntu804i386) 50;
+    deb_ubuntu804x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu804x86_64) 50;
+    deb_ubuntu810i386 = makeDeb_i686 (diskImages: diskImages.ubuntu810i386) 40;
+    deb_ubuntu810x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu810x86_64) 40;
 
 
   };
