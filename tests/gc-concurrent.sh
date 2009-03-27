@@ -1,6 +1,6 @@
 source common.sh
 
-$NIX_BIN_DIR/nix-collect-garbage
+clearStore
 
 drvPath1=$($nixinstantiate gc-concurrent.nix -A test1)
 outPath1=$($nixstore -q $drvPath1)
@@ -22,12 +22,12 @@ ln -s $outPath3 "$NIX_STATE_DIR"/gcroots/foo2
 $nixstore -rvv "$drvPath1" &
 pid1=$!
 
-# Start build #2 in the background after 6 seconds.
-(sleep 6 && $nixstore -rvv "$drvPath2") &
+# Start build #2 in the background after 10 seconds.
+(sleep 10 && $nixstore -rvv "$drvPath2") &
 pid2=$!
 
 # Run the garbage collector while the build is running.
-sleep 4
+sleep 6
 $NIX_BIN_DIR/nix-collect-garbage
 
 # Wait for build #1/#2 to finish.
