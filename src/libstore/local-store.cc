@@ -47,6 +47,8 @@ LocalStore::LocalStore()
     
     if (readOnlyMode) return;
 
+    createDirs(nixStore);
+    
     checkStoreNotSymlink();
 
     try {
