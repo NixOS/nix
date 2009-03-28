@@ -134,7 +134,7 @@ if ($x ne "okay") {
 
 # Do the actual job.
 my $hostName = $machine->{hostName};
-print "BUILDING REMOTE: $drvPath on $hostName\n";
+print STDERR "building `$drvPath' on `$hostName'\n";
 
 # Make sure that we don't get any SSH passphrase or host key popups -
 # if there is any problem it should fail, not do something
@@ -175,7 +175,7 @@ $inputs =~ s/\n/ /g;
 my $outputs = `cat outputs`; die if ($? != 0);
 $outputs =~ s/\n/ /g;
 
-print "COPYING INPUTS...\n";
+print "copying inputs...\n";
 
 my $maybeSign = "";
 $maybeSign = "--sign" if -e "/nix/etc/nix/signing-key.sec";
@@ -183,7 +183,7 @@ $maybeSign = "--sign" if -e "/nix/etc/nix/signing-key.sec";
 system("NIX_SSHOPTS=\"$sshOpts\" nix-copy-closure --gzip $hostName $maybeSign $drvPath $inputs") == 0
     or die "cannot copy inputs to $hostName: $?";
 
-print "BUILDING...\n";
+print "building...\n";
 
 my $buildFlags = "--max-silent-time $maxSilentTime";
 
@@ -199,11 +199,11 @@ if (system("ssh -tt $sshOpts $hostName 'nix-store --realise -K $buildFlags $drvP
     # code 100.  It's important to distinguish between the two because
     # the first is a transient failure and the latter is permanent.
     my $res = $? == -1 || ($? >> 8) == 255 ? 1 : 100;
-    print STDERR "remote build on $hostName failed: $?";
+    print STDERR "build of `$drvPath' on `$hostName' failed with exit code $?\n";
     exit $res;
 }
 
-print "REMOTE BUILD DONE: $drvPath on $hostName\n";
+print "build of `$drvPath' on `$hostName' succeeded\n";
 
 foreach my $output (split '\n', $outputs) {
     my $maybeSignRemote = "";
