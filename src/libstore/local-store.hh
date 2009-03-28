@@ -3,8 +3,6 @@
 
 #include <string>
 
-#include <ext/stdio_filebuf.h>
-
 #include "store-api.hh"
 #include "util.hh"
 
@@ -36,15 +34,10 @@ struct OptimiseStats
 };
 
 
-typedef __gnu_cxx::stdio_filebuf<char> stdio_filebuf;
-
-
 struct RunningSubstituter
 {
     Pid pid;
-    boost::shared_ptr<stdio_filebuf> toBuf, fromBuf;
-    boost::shared_ptr<std::ostream> to;
-    boost::shared_ptr<std::istream> from;
+    AutoCloseFD to, from;
 };
 
 

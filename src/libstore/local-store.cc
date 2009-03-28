@@ -88,8 +88,8 @@ LocalStore::~LocalStore()
         flushDelayedUpdates();
 
         foreach (RunningSubstituters::iterator, i, runningSubstituters) {
-            i->second.toBuf.reset();
-            i->second.to.reset();
+            i->second.to.close();
+            i->second.from.close();
             i->second.pid.wait(true);
         }
                 
@@ -526,23 +526,16 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
 
     /* Parent. */
     
-    toPipe.readSide.close();
-    fromPipe.writeSide.close();
-
-    run.toBuf = boost::shared_ptr<stdio_filebuf>(new stdio_filebuf(toPipe.writeSide.borrow(), std::ios_base::out));
-    run.to = boost::shared_ptr<std::ostream>(new std::ostream(&*run.toBuf));
-
-    run.fromBuf = boost::shared_ptr<stdio_filebuf>(new stdio_filebuf(fromPipe.readSide.borrow(), std::ios_base::in));
-    run.from = boost::shared_ptr<std::istream>(new std::istream(&*run.fromBuf));
+    run.to = toPipe.writeSide.borrow();
+    run.from = fromPipe.readSide.borrow();
 }
 
 
-template<class T> T getIntLine(std::istream & str)
+template<class T> T getIntLine(int fd)
 {
-    string s;
+    string s = readLine(fd);
     T res;
-    getline(str, s);
-    if (!str || !string2Int(s, res)) throw Error("integer expected from stream");
+    if (!string2Int(s, res)) throw Error("integer expected from stream");
     return res;
 }
 
@@ -552,10 +545,8 @@ bool LocalStore::hasSubstitutes(const Path & path)
     foreach (Paths::iterator, i, substituters) {
         RunningSubstituter & run(runningSubstituters[*i]);
         startSubstituter(*i, run);
-
-        *run.to << "have\n" << path << "\n" << std::flush;
-
-        if (getIntLine<int>(*run.from)) return true;
+        writeLine(run.to, "have\n" + path);
+        if (getIntLine<int>(run.from)) return true;
     }
 
     return false;
@@ -568,19 +559,19 @@ bool LocalStore::querySubstitutablePathInfo(const Path & substituter,
     RunningSubstituter & run(runningSubstituters[substituter]);
     startSubstituter(substituter, run);
 
-    *run.to << "info\n" << path << "\n" << std::flush;
-        
-    if (!getIntLine<int>(*run.from)) return false;
+    writeLine(run.to, "info\n" + path);
+
+    if (!getIntLine<int>(run.from)) return false;
     
-    getline(*run.from, info.deriver);
+    info.deriver = readLine(run.from);
     if (info.deriver != "") assertStorePath(info.deriver);
-    int nrRefs = getIntLine<int>(*run.from);
+    int nrRefs = getIntLine<int>(run.from);
     while (nrRefs--) {
-        Path p; getline(*run.from, p);
+        Path p = readLine(run.from);
         assertStorePath(p);
         info.references.insert(p);
     }
-    info.downloadSize = getIntLine<long long>(*run.from);
+    info.downloadSize = getIntLine<long long>(run.from);
     
     return true;
 }
