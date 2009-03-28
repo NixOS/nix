@@ -942,6 +942,11 @@ void DerivationGoal::inputsRealised()
 
     allPaths.insert(inputPaths.begin(), inputPaths.end());
 
+    /* Is this a fixed-output derivation? */
+    fixedOutput = true;
+    foreach (DerivationOutputs::iterator, i, drv.outputs)
+        if (i->second.hash == "") fixedOutput = false;
+    
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
        build hook. */
@@ -1479,11 +1484,7 @@ void DerivationGoal::startBuilder()
        derivation, tell the builder, so that for instance `fetchurl'
        can skip checking the output.  On older Nixes, this environment
        variable won't be set, so `fetchurl' will do the check. */
-    fixedOutput = true;
-    foreach (DerivationOutputs::iterator, i, drv.outputs)
-        if (i->second.hash == "") fixedOutput = false;
-    if (fixedOutput) 
-        env["NIX_OUTPUT_CHECKED"] = "1";
+    if (fixedOutput) env["NIX_OUTPUT_CHECKED"] = "1";
 
     /* *Only* if this is a fixed-output derivation, propagate the
        values of the environment variables specified in the
