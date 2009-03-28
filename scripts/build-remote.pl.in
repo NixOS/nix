@@ -29,9 +29,7 @@ $maxSilentTime = 0 unless defined $maxSilentTime;
 
 sub sendReply {
     my $reply = shift;
-    open OUT, ">&3" or die;
-    print OUT "$reply\n";
-    close OUT;
+    print STDERR "# $reply\n";
 }
 
 sub decline {
@@ -121,11 +119,8 @@ if (!defined $machine) {
 
 # Yes we did, accept.
 sendReply "accept";
-open IN, "<&4" or die;
-my $x = <IN>;
+my $x = <STDIN>;
 chomp $x;
-#print "got $x\n";  
-close IN;
 
 if ($x ne "okay") {
     exit 0;

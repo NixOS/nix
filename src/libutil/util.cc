@@ -229,6 +229,33 @@ void writeFile(const Path & path, const string & s)
 }
 
 
+string readLine(int fd)
+{
+    string s;
+    while (1) {
+        checkInterrupt();
+        char ch;
+        ssize_t rd = read(fd, &ch, 1);
+        if (rd == -1) {
+            if (errno != EINTR)
+                throw SysError("reading a line");
+        } else if (rd == 0)
+            throw Error("unexpected EOF reading a line");
+        else {
+            if (ch == '\n') return s;
+            s += ch;
+        }
+    }
+}
+
+
+void writeLine(int fd, string s)
+{
+    s += '\n';
+    writeFull(fd, (const unsigned char *) s.c_str(), s.size());
+}
+
+
 static void _computePathSize(const Path & path,
     unsigned long long & bytes, unsigned long long & blocks)
 {

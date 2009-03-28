@@ -151,12 +151,12 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
   <para>On the basis of this information, and whatever persistent
   state the build hook keeps about other machines and their current
   load, it has to decide what to do with the build.  It should print
-  out on file descriptor 3 one of the following responses (terminated
-  by a newline, <literal>"\n"</literal>):
+  out on standard error one of the following responses (terminated by
+  a newline, <literal>"\n"</literal>):
 
   <variablelist>
 
-    <varlistentry><term><literal>decline</literal></term>
+    <varlistentry><term><literal># decline</literal></term>
 
       <listitem><para>The build hook is not willing or able to perform
       the build; the calling Nix process should do the build itself,
@@ -164,7 +164,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
     </varlistentry>
 
-    <varlistentry><term><literal>postpone</literal></term>
+    <varlistentry><term><literal># postpone</literal></term>
 
       <listitem><para>The build hook cannot perform the build now, but
       can do so in the future (e.g., because all available build slots
@@ -174,7 +174,7 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
     </varlistentry>
 
-    <varlistentry><term><literal>accept</literal></term>
+    <varlistentry><term><literal># accept</literal></term>
 
       <listitem><para>The build hook has accepted the
       build.</para></listitem>
@@ -185,37 +185,12 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
   </para>
 
-  <para>If the build hook accepts the build, it is possible that it is
-  no longer necessary to do the build because some other process has
-  performed the build in the meantime.  To prevent races, the hook
-  must read from file descriptor 4 a single line that tells it whether
-  to continue:
-
-  <variablelist>
-
-    <varlistentry><term><literal>cancel</literal></term>
-
-      <listitem><para>The build has already been done, so the hook
-      should exit.</para></listitem>
-
-    </varlistentry>
-  
-    <varlistentry><term><literal>okay</literal></term>
-
-      <listitem><para>The hook should proceed with the build.  At this
-      point, the calling Nix process has acquired locks on the output
-      path, so no other Nix process will perform the
-      build.</para></listitem>
-
-    </varlistentry>
-
-  </variablelist>
-
-  </para>
-
-  <para>If the hook has been told to proceed, Nix will store in the
-  hook’s current directory a number of text files that contain
-  information about the derivation:
+  <para>After sending <literal># accept</literal>, the hook should
+  read one line from standard input, which will be the string
+  <literal>okay</literal>.  It can then proceed with the build.
+  Before sending <literal>okay</literal>, Nix will store in the hook’s
+  current directory a number of text files that contain information
+  about the derivation:
 
   <variablelist>
 
@@ -255,7 +230,9 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
   <para>The hook should copy the inputs to the remote machine,
   register the validity of the inputs, perform the remote build, and
   copy the outputs back to the local machine.  An exit code other than
-  <literal>0</literal> indicates that the hook has failed.</para>
+  <literal>0</literal> indicates that the hook has failed.  An exit
+  code equal to 100 means that the remote build failed (as opposed to,
+  e.g., a network error).</para>
 
   </listitem>
 

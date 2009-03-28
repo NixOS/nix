@@ -660,7 +660,6 @@ private:
 
     /* Pipes for talking to the build hook (if any). */
     Pipe toHook;
-    Pipe fromHook;
 
     /* Whether we're currently doing a chroot build. */
     bool useChroot;
@@ -1207,49 +1206,6 @@ void DerivationGoal::buildDone()
 }
 
 
-static string readLine(int fd)
-{
-    string s;
-    while (1) {
-        checkInterrupt();
-        char ch;
-        ssize_t rd = read(fd, &ch, 1);
-        if (rd == -1) {
-            if (errno != EINTR)
-                throw SysError("reading a line");
-        } else if (rd == 0)
-            throw Error("unexpected EOF reading a line");
-        else {
-            if (ch == '\n') return s;
-            s += ch;
-        }
-    }
-}
-
-
-static void writeLine(int fd, string s)
-{
-    s += '\n';
-    writeFull(fd, (const unsigned char *) s.c_str(), s.size());
-}
-
-
-/* !!! ugly hack */
-static void drain(int fd)
-{
-    unsigned char buffer[1024];
-    while (1) {
-        checkInterrupt();
-        ssize_t rd = read(fd, buffer, sizeof buffer);
-        if (rd == -1) {
-            if (errno != EINTR)
-                throw SysError("draining");
-        } else if (rd == 0) break;
-        else writeToStderr(buffer, rd);
-    }
-}
-
-
 DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 {
     if (!useBuildHook) return rpDecline;
@@ -1266,7 +1222,6 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 
     /* Create the communication pipes. */
     toHook.create();
-    fromHook.create();
 
     /* Fork the hook. */
     pid = fork();
@@ -1310,16 +1265,20 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
     worker.childStarted(shared_from_this(),
         pid, singleton<set<int> >(logPipe.readSide), false);
 
-    fromHook.writeSide.close();
     toHook.readSide.close();
 
     /* Read the first line of input, which should be a word indicating
-       whether the hook wishes to perform the build.  !!! potential
-       for deadlock here: we should also read from the child's logger
-       pipe. */
+       whether the hook wishes to perform the build. */
     string reply;
     try {
-        reply = readLine(fromHook.readSide);
+        while (true) {
+            string s = readLine(logPipe.readSide);
+            if (string(s, 0, 2) == "# ") {
+                reply = string(s, 2);
+                break;
+            }
+            handleChildOutput(logPipe.readSide, s + "\n");
+        }
     } catch (Error & e) {
         terminateBuildHook(true);
         throw;
@@ -1335,7 +1294,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 
     else if (reply == "accept") {
 
-        printMsg(lvlInfo, format("running hook to build path(s) %1%")
+        printMsg(lvlInfo, format("using hook to build path(s) %1%")
             % showPaths(outputPaths(drv.outputs)));
         
         /* Write the information that the hook needs to perform the
@@ -1377,13 +1336,13 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
         writeStringToFile(referencesFN,
             makeValidityRegistration(allInputs, true, false));
 
-        /* Tell the hook to proceed. */ 
+        /* Tell the hook to proceed. */
         writeLine(toHook.writeSide, "okay");
+        toHook.writeSide.close();
 
-        if (printBuildTrace) {
+        if (printBuildTrace)
             printMsg(lvlError, format("@ build-started %1% %2% %3% %4%")
                 % drvPath % drv.outputs["out"].path % drv.platform % logFile);
-        }
         
         return rpAccept;
     }
@@ -1394,7 +1353,6 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
 
 void DerivationGoal::terminateBuildHook(bool kill)
 {
-    /* !!! drain stdout of hook */
     debug("terminating build hook");
     pid_t savedPid = pid;
     if (kill)
@@ -1404,10 +1362,8 @@ void DerivationGoal::terminateBuildHook(bool kill)
     /* `false' means don't wake up waiting goals, since we want to
        keep this build slot ourselves. */
     worker.childTerminated(savedPid, false);
-    fromHook.readSide.close();
     toHook.writeSide.close();
     fdLogFile.close();
-    drain(logPipe.readSide);
     logPipe.readSide.close();
     deleteTmpDir(true); /* get rid of the hook's temporary directory */
 }
@@ -1993,24 +1949,14 @@ void DerivationGoal::initChild()
         throw SysError(format("changing into `%1%'") % tmpDir);
 
     /* When running a hook, dup the communication pipes. */
-    bool inHook = fromHook.writeSide.isOpen();
-    if (inHook) {
-        fromHook.readSide.close();
-        if (dup2(fromHook.writeSide, 3) == -1)
-            throw SysError("dupping from-hook write side");
-
+    if (usingBuildHook) {
         toHook.writeSide.close();
-        if (dup2(toHook.readSide, 4) == -1)
+        if (dup2(toHook.readSide, STDIN_FILENO) == -1)
             throw SysError("dupping to-hook read side");
     }
 
     /* Close all other file descriptors. */
-    set<int> exceptions;
-    if (inHook) {
-        exceptions.insert(3);
-        exceptions.insert(4);
-    }
-    closeMostFDs(exceptions);
+    closeMostFDs(set<int>());
 }
 
 

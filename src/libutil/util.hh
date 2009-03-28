@@ -60,6 +60,12 @@ string readFile(const Path & path);
 /* Write a string to a file. */
 void writeFile(const Path & path, const string & s);
 
+/* Read a line from a file descriptor. */
+string readLine(int fd);
+
+/* Write a line to a file descriptor. */
+void writeLine(int fd, string s);
+
 /* Compute the sum of the sizes of all files in `path'. */
 void computePathSize(const Path & path,
     unsigned long long & bytes, unsigned long long & blocks);
