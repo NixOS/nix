@@ -1864,15 +1864,17 @@ void DerivationGoal::computeClosure()
         /* Get rid of all weird permissions. */
 	canonicalisePathMetaData(path);
 
-	/* For this output path, find the references to other paths contained
-	   in it. */
-        PathSet references = scanForReferences(path, allPaths);
+	/* For this output path, find the references to other paths
+	   contained in it.  Compute the SHA-256 NAR hash at the same
+	   time.  The hash is stored in the database so that we can
+	   verify later on whether nobody has messed with the store. */
+        Hash hash;
+        PathSet references = scanForReferences(path, allPaths, hash);
+        contentHashes[path] = hash;
 
         /* For debugging, print out the referenced and unreferenced
            paths. */
-        for (PathSet::iterator i = inputPaths.begin();
-             i != inputPaths.end(); ++i)
-        {
+        foreach (PathSet::iterator, i, inputPaths) {
             PathSet::iterator j = references.find(*i);
             if (j == references.end())
                 debug(format("unreferenced input: `%1%'") % *i);
@@ -1892,12 +1894,6 @@ void DerivationGoal::computeClosure()
                 if (allowed.find(*i) == allowed.end())
                     throw BuildError(format("output is not allowed to refer to path `%1%'") % *i);
         }
-        
-        /* Hash the contents of the path.  The hash is stored in the
-           database so that we can verify later on whether nobody has
-           messed with the store.  !!! inefficient: it would be nice
-           if we could combine this with filterReferences(). */
-        contentHashes[path] = hashPath(htSHA256, path);
     }
 
     /* Register each output path as valid, and register the sets of
