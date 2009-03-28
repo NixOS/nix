@@ -55,29 +55,17 @@ while (@ARGV) {
 if ($toMode) { # Copy TO the remote machine.
 
     my @allStorePaths;
-    my %storePathsSeen;
 
-    foreach my $storePath (@storePaths) {
-        # $arg might be a symlink to the store, so resolve it.
-        my $storePath2 = (`$binDir/nix-store --query --resolve '$storePath'`
-            or die "cannot resolve `$storePath'");
-        chomp $storePath2;
-
-        # Get the closure of this path.
-        my $pid = open(READ,
-            "$binDir/nix-store --query --requisites '$storePath2'|") or die;
+    # Get the closure of this path.
+    my $pid = open(READ, "$binDir/nix-store --query --requisites @storePaths|") or die;
     
-        while (<READ>) {
-            chomp;
-            die "bad: $_" unless /^\//;
-            if (!defined $storePathsSeen{$_}) {
-                push @allStorePaths, $_;
-                $storePathsSeen{$_} = 1;
-            }
-        }
-
-        close READ or die "nix-store failed: $?";
+    while (<READ>) {
+        chomp;
+        die "bad: $_" unless /^\//;
+        push @allStorePaths, $_;
     }
+
+    close READ or die "nix-store failed: $?";
 
 
     # Ask the remote host which paths are invalid.
@@ -111,15 +99,11 @@ else { # Copy FROM the remote machine.
         "ssh @sshOpts $sshHost nix-store --query --requisites @storePaths|") or die;
     
     my @allStorePaths;
-    my %storePathsSeen;
 
     while (<READ>) {
         chomp;
         die "bad: $_" unless /^\//;
-        if (!defined $storePathsSeen{$_}) {
-            push @allStorePaths, $_;
-            $storePathsSeen{$_} = 1;
-        }
+        push @allStorePaths, $_;
     }
 
     close READ or die "nix-store on remote machine `$sshHost' failed: $?";

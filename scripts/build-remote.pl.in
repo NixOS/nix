@@ -175,7 +175,7 @@ print "copying inputs...\n";
 my $maybeSign = "";
 $maybeSign = "--sign" if -e "/nix/etc/nix/signing-key.sec";
 
-system("NIX_SSHOPTS=\"$sshOpts\" nix-copy-closure --gzip $hostName $maybeSign $drvPath $inputs") == 0
+system("NIX_SSHOPTS=\"$sshOpts\" @bindir@/nix-copy-closure --gzip $hostName $maybeSign $drvPath $inputs") == 0
     or die "cannot copy inputs to $hostName: $?";
 
 print "building...\n";
