@@ -3,6 +3,7 @@
 use strict;
 use Fcntl ':flock';
 use English '-no_match_vars';
+use IO::Handle;
 
 # General operation:
 #
@@ -79,6 +80,7 @@ flock(MAINLOCK, LOCK_EX) or die;
 # Find a suitable system.
 my $rightType = 0;
 my $machine;
+my $slotLock;
 LOOP: foreach my $cur (@machines) {
     if ($neededSystem eq $cur->{systemType}) {
         $rightType = 1;
@@ -87,13 +89,15 @@ LOOP: foreach my $cur (@machines) {
         # one of the machine's lock files.
         my $slot = 0;
         while ($slot < $cur->{maxJobs}) {
-            my $slotLock = "$currentLoad/" . $cur->{systemType} . "-" . $cur->{hostName} . "-$slot";
-            open SLOTLOCK, ">>$slotLock" or die;
-            if (flock(SLOTLOCK, LOCK_EX | LOCK_NB)) {
+            my $slotLockFn = "$currentLoad/" . $cur->{systemType} . "-" . $cur->{hostName} . "-$slot";
+            $slotLock = new IO::Handle;
+            open $slotLock, ">>$slotLockFn" or die;
+            if (flock($slotLock, LOCK_EX | LOCK_NB)) {
+                utime undef, undef, $slotLock;
                 $machine = $cur;
                 last LOOP;
             }
-            close SLOTLOCK;
+            close $slotLock;
             $slot++;
         }
     }
