@@ -52,9 +52,6 @@ namespace nix {
 using std::map;
     
 
-/* !!! TODO derivationFromPath shouldn't be used here */
-
-
 static string pathNullDevice = "/dev/null";
 
 
@@ -229,9 +226,6 @@ public:
     /* Can we start another child process? */
     bool canBuildMore();
 
-    /* Can we postpone a build right now? */
-    bool canPostpone();
-
     /* Registers a running child process.  `inBuildSlot' means that
        the process counts towards the jobs limit. */
     void childStarted(GoalPtr goal, pid_t pid,
@@ -246,10 +240,6 @@ public:
     /* Put `goal' to sleep until a build slot becomes available (which
        might be right away). */
     void waitForBuildSlot(GoalPtr goal);
-
-    /* Put `goal' to sleep until a child process terminates, i.e., a
-       call is made to childTerminate(..., true).  */
-    void waitForChildTermination(GoalPtr goal);
 
     /* Wait for any goal to finish.  Pretty indiscriminate way to
        wait for some resource that some other goal is holding. */
@@ -1041,7 +1031,7 @@ void DerivationGoal::tryToBuild()
             return;
         case rpPostpone:
             /* Not now; wait until at least one child finishes. */
-            worker.waitForChildTermination(shared_from_this());
+            worker.waitForAWhile(shared_from_this());
             outputLocks.unlock();
             return;
         case rpDecline:
@@ -1246,7 +1236,6 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
                 thisSystem.c_str(),
                 drv.platform.c_str(),
                 drvPath.c_str(),
-                (worker.canPostpone() ? (string) "0" : "1").c_str(),
                 (format("%1%") % maxSilentTime).str().c_str(),
                 NULL);
             
@@ -2243,8 +2232,6 @@ void SubstitutionGoal::tryToRun()
 
             logPipe.readSide.close();
 
-            /* !!! close other handles */
-
             commonChildInit(logPipe);
 
             /* Fill in the arguments. */
@@ -2286,7 +2273,6 @@ void SubstitutionGoal::finished()
 
     /* Since we got an EOF on the logger pipe, the substitute is
        presumed to have terminated.  */
-    /* !!! this could block! */
     pid_t savedPid = pid;
     int status = pid.wait(true);
 
@@ -2469,12 +2455,6 @@ bool Worker::canBuildMore()
 }
 
 
-bool Worker::canPostpone()
-{
-    return children.size() != 0;
-}
-
-
 void Worker::childStarted(GoalPtr goal,
     pid_t pid, const set<int> & fds, bool inBuildSlot)
 {
@@ -2524,16 +2504,6 @@ void Worker::waitForBuildSlot(GoalPtr goal)
         wakeUp(goal); /* we can do it right away */
     else
         wantingToBuild.insert(goal);
-}
-
-
-void Worker::waitForChildTermination(GoalPtr goal)
-{
-    debug("wait for child termination");
-    if (children.size() == 0)
-        throw Error("waiting for a build slot, yet there are no running children - "
-            "maybe the build hook gave an inappropriate `postpone' reply?");
-    wantingToBuild.insert(goal);
 }
 
 
