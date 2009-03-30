@@ -2597,12 +2597,12 @@ void Worker::waitForInput()
 
     /* If we are polling goals that are waiting for a lock, then wake
        up after a few seconds at most. */
-    int wakeUpInterval = 3;
+    int wakeUpInterval = queryIntSetting("build-poll-interval", 5);
         
     if (!waitingForAWhile.empty()) {
         useTimeout = true;
         if (lastWokenUp == 0)
-            printMsg(lvlError, "waiting for locks...");
+            printMsg(lvlError, "waiting for locks or build slots...");
         if (lastWokenUp == 0 || lastWokenUp > before) lastWokenUp = before;
         timeout.tv_sec = std::max((time_t) 0, lastWokenUp + wakeUpInterval - before);
     } else lastWokenUp = 0;

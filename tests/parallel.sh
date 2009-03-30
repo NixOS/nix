@@ -27,7 +27,7 @@ clearStore
 
 rm -f $SHARED.cur $SHARED.max
 
-drvPath=$($nixinstantiate parallel.nix --argstr sleepTime 7)
+drvPath=$($nixinstantiate parallel.nix --argstr sleepTime 8)
 
 cmd="$nixstore -j1 -r $drvPath"
 
