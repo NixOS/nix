@@ -4,6 +4,7 @@
 #include "archive.hh"
 
 #include <map>
+#include <cstdlib>
 
 
 namespace nix {
