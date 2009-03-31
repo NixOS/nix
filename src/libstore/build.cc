@@ -186,9 +186,9 @@ private:
     /* Child processes currently running. */
     Children children;
 
-    /* Number of build slots occupied.  Not all child processes
-       (namely build hooks) count as occupied build slots. */
-    unsigned int nrChildren;
+    /* Number of build slots occupied.  This includes local builds and
+       substitutions but not remote builds via the build hook. */
+    unsigned int nrLocalBuilds;
 
     /* Maps used to prevent multiple instantiations of a goal for the
        same derivation / path. */
@@ -223,8 +223,10 @@ public:
     /* Wake up a goal (i.e., there is something for it to do). */
     void wakeUp(GoalPtr goal);
 
-    /* Can we start another child process? */
-    bool canBuildMore();
+    /* Return the number of local build and substitution processes
+       currently running (but not remote builds via the build
+       hook). */
+    unsigned int getNrLocalBuilds();
 
     /* Registers a running child process.  `inBuildSlot' means that
        the process counts towards the jobs limit. */
@@ -1042,7 +1044,7 @@ void DerivationGoal::tryToBuild()
     usingBuildHook = false;
 
     /* Make sure that we are allowed to start a build. */
-    if (!worker.canBuildMore()) {
+    if (worker.getNrLocalBuilds() >= maxBuildJobs) {
         worker.waitForBuildSlot(shared_from_this());
         outputLocks.unlock();
         return;
@@ -1232,7 +1234,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
                 throw SysError("setting an environment variable");
 
             execl(buildHook.c_str(), buildHook.c_str(),
-                (worker.canBuildMore() ? (string) "1" : "0").c_str(),
+                (worker.getNrLocalBuilds() < maxBuildJobs ? (string) "1" : "0").c_str(),
                 thisSystem.c_str(),
                 drv.platform.c_str(),
                 drvPath.c_str(),
@@ -2170,7 +2172,7 @@ void SubstitutionGoal::referencesValid()
             assert(worker.store.isValidPath(*i));
 
     state = &SubstitutionGoal::tryToRun;
-    worker.waitForBuildSlot(shared_from_this());
+    worker.wakeUp(shared_from_this());
 }
 
 
@@ -2178,8 +2180,11 @@ void SubstitutionGoal::tryToRun()
 {
     trace("trying to run");
 
-    /* Make sure that we are allowed to start a build. */
-    if (!worker.canBuildMore()) {
+    /* Make sure that we are allowed to start a build.  Note that even
+       is maxBuildJobs == 0 (no local builds allowed), we still allow
+       a substituter to run.  This is because substitutions cannot be
+       distributed to another machine via the build hook. */
+    if (worker.getNrLocalBuilds() >= (maxBuildJobs == 0 ? 1 : maxBuildJobs)) {
         worker.waitForBuildSlot(shared_from_this());
         return;
     }
@@ -2362,7 +2367,7 @@ Worker::Worker(LocalStore & store)
     /* Debugging: prevent recursive workers. */ 
     if (working) abort();
     working = true;
-    nrChildren = 0;
+    nrLocalBuilds = 0;
     lastWokenUp = 0;
     cacheFailure = queryBoolSetting("build-cache-failure", false);
 }
@@ -2449,9 +2454,9 @@ void Worker::wakeUp(GoalPtr goal)
 }
 
 
-bool Worker::canBuildMore()
+unsigned Worker::getNrLocalBuilds()
 {
-    return nrChildren < maxBuildJobs;
+    return nrLocalBuilds;
 }
 
 
@@ -2464,7 +2469,7 @@ void Worker::childStarted(GoalPtr goal,
     child.lastOutput = time(0);
     child.inBuildSlot = inBuildSlot;
     children[pid] = child;
-    if (inBuildSlot) nrChildren++;
+    if (inBuildSlot) nrLocalBuilds++;
 }
 
 
@@ -2476,8 +2481,8 @@ void Worker::childTerminated(pid_t pid, bool wakeSleepers)
     assert(i != children.end());
 
     if (i->second.inBuildSlot) {
-        assert(nrChildren > 0);
-        nrChildren--;
+        assert(nrLocalBuilds > 0);
+        nrLocalBuilds--;
     }
 
     children.erase(pid);
@@ -2500,7 +2505,7 @@ void Worker::childTerminated(pid_t pid, bool wakeSleepers)
 void Worker::waitForBuildSlot(GoalPtr goal)
 {
     debug("wait for build slot");
-    if (canBuildMore())
+    if (getNrLocalBuilds() < maxBuildJobs)
         wakeUp(goal); /* we can do it right away */
     else
         wantingToBuild.insert(goal);
