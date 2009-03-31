@@ -2551,7 +2551,7 @@ void Worker::run(const Goals & _topGoals)
         if (!children.empty() || !waitingForAWhile.empty())
             waitForInput();
         else {
-            if (maxBuildJobs == 0) throw Error(
+            if (awake.empty() && maxBuildJobs == 0) throw Error(
                 "unable to start any build; either increase `--max-jobs' "
                 "or enable distributed builds");
             assert(!awake.empty());
