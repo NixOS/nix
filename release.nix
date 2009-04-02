@@ -183,6 +183,7 @@ let
       diskImage = diskImageFun vmTools.diskImages;
       memSize = 1024;
       meta = { schedulingPriority = toString prio; };
+      configureFlags = "--sysconfdir=/etc";
     };
 
 
