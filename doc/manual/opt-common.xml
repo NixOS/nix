@@ -251,14 +251,14 @@
 
 <programlisting>
 { # The system (e.g., `i686-linux') for which to build the packages.
-  system ? __currentSystem
+  system ? builtins.currentSystem
   <replaceable>...</replaceable>
 }: <replaceable>...</replaceable></programlisting>
 
   So if you call this Nix expression (e.g., when you do
   <literal>nix-env -i <replaceable>pkgname</replaceable></literal>),
   the function will be called automatically using the value <link
-  linkend='builtin-currentSystem'><literal>__currentSystem</literal></link>
+  linkend='builtin-currentSystem'><literal>builtins.currentSystem</literal></link>
   for the <literal>system</literal> argument.  You can override this
   using <option>--arg</option>, e.g., <literal>nix-env -i
   <replaceable>pkgname</replaceable> --arg system

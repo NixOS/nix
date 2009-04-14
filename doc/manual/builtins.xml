@@ -77,18 +77,8 @@ attrValues = attrs: map (name: builtins.getAttr name attrs) (builtins.attrNames 
 if builtins ? getEnv then builtins.getEnv "PATH" else ""</programlisting>
 
     This allows a Nix expression to fall back gracefully on older Nix
-    installations that don’t have the desired built-in function.
-    However, in that case you should not write
-
-<programlisting>
-if builtins ? getEnv then __getEnv "PATH" else ""</programlisting>
-
-    This Nix expression will trigger an “undefined variable” error on
-    older Nix versions since <function>__getEnv</function> doesn’t
-    exist.  <literal>builtins.getEnv</literal>, on the other hand, is
-    safe since <literal>builtins</literal> always exists and attribute
-    selection is lazy, so it’s only performed if the test
-    succeeds.</para></listitem>
+    installations that don’t have the desired built-in
+    function.</para></listitem>
 
   </varlistentry>
 
