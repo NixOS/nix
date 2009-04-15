@@ -1160,12 +1160,15 @@ void DerivationGoal::buildDone()
         printMsg(lvlError, e.msg());
         outputLocks.unlock();
         buildUser.release();
+
+        /* When using a build hook, the hook will return a remote
+           build failure using exit code 100.  Anything else is a hook
+           problem. */
+        bool hookError = usingBuildHook &&
+            (!WIFEXITED(status) || WEXITSTATUS(status) != 100);
         
         if (printBuildTrace) {
-            /* When using a build hook, the hook will return a
-               remote build failure using exit code 100.  Anything
-               else is a hook problem. */
-            if (usingBuildHook && (!WIFEXITED(status) || WEXITSTATUS(status) != 100))
+            if (usingBuildHook && hookError)
                 printMsg(lvlError, format("@ hook-failed %1% %2% %3% %4%")
                     % drvPath % drv.outputs["out"].path % status % e.msg());
             else
@@ -1177,8 +1180,10 @@ void DerivationGoal::buildDone()
            try to build them again (negative caching).  However, don't
            do this for fixed-output derivations, since they're likely
            to fail for transient reasons (e.g., fetchurl not being
-           able to access the network). */
-        if (worker.cacheFailure && !fixedOutput)
+           able to access the network).  Hook errors (like
+           communication problems with the remote machine) shouldn't
+           be cached either. */
+        if (worker.cacheFailure && !hookError && !fixedOutput)
             foreach (DerivationOutputs::iterator, i, drv.outputs)
                 worker.store.registerFailedPath(i->second.path);
         
