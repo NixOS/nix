@@ -2,9 +2,7 @@ use strict;
 
 
 sub addPatch {
-    my $patches = shift;
-    my $storePath = shift;
-    my $patch = shift;
+    my ($patches, $storePath, $patch) = @_;
 
     $$patches{$storePath} = []
         unless defined $$patches{$storePath};
@@ -25,10 +23,7 @@ sub addPatch {
 
 
 sub readManifest {
-    my $manifest = shift;
-    my $narFiles = shift;
-    my $localPaths = shift;
-    my $patches = shift;
+    my ($manifest, $narFiles, $localPaths, $patches) = @_;
 
     open MANIFEST, "<$manifest"
         or die "cannot open `$manifest': $!";
@@ -154,12 +149,8 @@ sub readManifest {
 }
 
 
-sub writeManifest
-{
-    my $manifest = shift;
-    my $narFiles = shift;
-    my $patches = shift;
-    my $copySources = shift;
+sub writeManifest {
+    my ($manifest, $narFiles, $patches) = @_;
 
     open MANIFEST, ">$manifest.tmp"; # !!! check exclusive
 
@@ -173,9 +164,9 @@ sub writeManifest
             print MANIFEST "{\n";
             print MANIFEST "  StorePath: $storePath\n";
             print MANIFEST "  NarURL: $narFile->{url}\n";
-            print MANIFEST "  Hash: $narFile->{hash}\n";
+            print MANIFEST "  Hash: $narFile->{hash}\n" if defined $narFile->{hash};
             print MANIFEST "  NarHash: $narFile->{narHash}\n";
-            print MANIFEST "  Size: $narFile->{size}\n";
+            print MANIFEST "  Size: $narFile->{size}\n" if defined $narFile->{size};
             print MANIFEST "  References: $narFile->{references}\n"
                 if defined $narFile->{references} && $narFile->{references} ne "";
             print MANIFEST "  Deriver: $narFile->{deriver}\n"
