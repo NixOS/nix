@@ -393,7 +393,7 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path, bool ignoreErrors)
     Strings lines = tokenizeString(info, "\n");
 
     for (Strings::iterator i = lines.begin(); i != lines.end(); ++i) {
-        unsigned int p = i->find(':');
+        string::size_type p = i->find(':');
         if (p == string::npos) continue; /* bad line */
         string name(*i, 0, p);
         string value(*i, p + 2);

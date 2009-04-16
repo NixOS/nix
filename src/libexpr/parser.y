@@ -147,7 +147,7 @@ static Expr stripIndentation(ATermList es)
         /* Remove the last line if it is empty and consists only of
            spaces. */
         if (n == 1) {
-            unsigned int p = s2.find_last_of('\n');
+            string::size_type p = s2.find_last_of('\n');
             if (p != string::npos && s2.find_first_not_of(' ', p + 1) == string::npos)
                 s2 = string(s2, 0, p + 1);
         }

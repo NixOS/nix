@@ -50,7 +50,7 @@ static void dumpEntries(const Path & path, Sink & sink, PathFilter & filter)
 }
 
 
-static void dumpContents(const Path & path, off_t size, 
+static void dumpContents(const Path & path, size_t size, 
     Sink & sink)
 {
     writeString("contents", sink);
@@ -60,7 +60,7 @@ static void dumpContents(const Path & path, off_t size,
     if (fd == -1) throw SysError(format("opening file `%1%'") % path);
     
     unsigned char buf[65536];
-    off_t left = size;
+    size_t left = size;
 
     while (left > 0) {
         size_t n = left > sizeof(buf) ? sizeof(buf) : left;
@@ -88,7 +88,7 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
             writeString("executable", sink);
             writeString("", sink);
         }
-        dumpContents(path, st.st_size, sink);
+        dumpContents(path, (size_t) st.st_size, sink);
     } 
 
     else if (S_ISDIR(st.st_mode)) {
