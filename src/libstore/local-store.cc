@@ -1004,7 +1004,7 @@ void LocalStore::verifyStore(bool checkContents)
 
     PathSet validPaths2 = queryValidPaths(), validPaths;
     
-    for (PathSet::iterator i = validPaths2.begin(); i != validPaths2.end(); ++i) {
+    foreach (PathSet::iterator, i, validPaths2) {
         checkInterrupt();
         if (!isStorePath(*i)) {
             printMsg(lvlError, format("path `%1%' is not in the Nix store") % *i);
@@ -1022,26 +1022,25 @@ void LocalStore::verifyStore(bool checkContents)
 
     std::map<Path, PathSet> referrersCache;
     
-    for (PathSet::iterator i = validPaths.begin(); i != validPaths.end(); ++i) {
+    foreach (PathSet::iterator, i, validPaths) {
         bool update = false;
         ValidPathInfo info = queryPathInfo(*i, true);
 
         /* Check the references: each reference should be valid, and
            it should have a matching referrer. */
-        for (PathSet::iterator j = info.references.begin();
-             j != info.references.end(); ++j)
-        {
-            if (referrersCache.find(*j) == referrersCache.end())
-                queryReferrers(*j, referrersCache[*j]);
-            if (referrersCache[*j].find(*i) == referrersCache[*j].end()) {
-                printMsg(lvlError, format("adding missing referrer mapping from `%1%' to `%2%'")
-                    % *j % *i);
-                appendReferrer(*j, *i, true);
-            }
+        foreach (PathSet::iterator, j, info.references) {
             if (validPaths.find(*j) == validPaths.end()) {
                 printMsg(lvlError, format("incomplete closure: `%1%' needs missing `%2%'")
                     % *i % *j);
                 /* nothing we can do about it... */
+            } else {
+                if (referrersCache.find(*j) == referrersCache.end())
+                    queryReferrers(*j, referrersCache[*j]);
+                if (referrersCache[*j].find(*i) == referrersCache[*j].end()) {
+                    printMsg(lvlError, format("adding missing referrer mapping from `%1%' to `%2%'")
+                        % *j % *i);
+                    appendReferrer(*j, *i, true);
+                }
             }
         }
 
@@ -1079,7 +1078,7 @@ void LocalStore::verifyStore(bool checkContents)
     std::map<Path, PathSet> referencesCache;
     
     Strings entries = readDirectory(nixDBPath + "/referrer");
-    for (Strings::iterator i = entries.begin(); i != entries.end(); ++i) {
+    foreach (Strings::iterator, i, entries) {
         Path from = nixStore + "/" + *i;
         
         if (validPaths.find(from) == validPaths.end()) {
@@ -1103,7 +1102,7 @@ void LocalStore::verifyStore(bool checkContents)
 
         /* Each referrer should have a matching reference. */
         PathSet referrersNew;
-        for (PathSet::iterator j = referrers.begin(); j != referrers.end(); ++j) {
+        foreach (PathSet::iterator, j, referrers) {
             if (referencesCache.find(*j) == referencesCache.end())
                 queryReferences(*j, referencesCache[*j]);
             if (referencesCache[*j].find(from) == referencesCache[*j].end()) {
