@@ -29,8 +29,7 @@ Path readStorePath(Source & from)
 PathSet readStorePaths(Source & from)
 {
     PathSet paths = readStringSet(from);
-    for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i)
-        assertStorePath(*i);
+    foreach (PathSet::iterator, i, paths) assertStorePath(*i);
     return paths;
 }
 

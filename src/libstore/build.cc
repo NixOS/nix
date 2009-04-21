@@ -290,13 +290,11 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
 
         /* If we failed and keepGoing is not set, we remove all
            remaining waitees. */
-        for (Goals::iterator i = waitees.begin(); i != waitees.end(); ++i) {
+        foreach (Goals::iterator, i, waitees) {
             GoalPtr goal = *i;
             WeakGoals waiters2;
-            for (WeakGoals::iterator j = goal->waiters.begin();
-                 j != goal->waiters.end(); ++j)
-                if (j->lock() != shared_from_this())
-                    waiters2.insert(*j);
+            foreach (WeakGoals::iterator, j, goal->waiters)
+                if (j->lock() != shared_from_this()) waiters2.insert(*j);
             goal->waiters = waiters2;
         }
         waitees.clear();
@@ -312,7 +310,7 @@ void Goal::amDone(ExitCode result)
     assert(exitCode == ecBusy);
     assert(result == ecSuccess || result == ecFailed);
     exitCode = result;
-    for (WeakGoals::iterator i = waiters.begin(); i != waiters.end(); ++i) {
+    foreach (WeakGoals::iterator, i, waiters) {
         GoalPtr goal = i->lock();
         if (goal) goal->waiteeDone(shared_from_this(), result);
     }
@@ -365,8 +363,7 @@ const char * * strings2CharPtrs(const Strings & ss)
 {
     const char * * arr = new const char * [ss.size() + 1];
     const char * * p = arr;
-    for (Strings::const_iterator i = ss.begin(); i != ss.end(); ++i)
-        *p++ = i->c_str();
+    foreach (Strings::const_iterator, i, ss) *p++ = i->c_str();
     *p = 0;
     return arr;
 }
@@ -462,7 +459,7 @@ void UserLock::acquire()
 
     /* Find a user account that isn't currently in use for another
        build. */
-    for (Strings::iterator i = users.begin(); i != users.end(); ++i) {
+    foreach (Strings::iterator, i, users) {
         debug(format("trying user `%1%'") % *i);
 
         struct passwd * pw = getpwnam(i->c_str());
@@ -877,8 +874,7 @@ void DerivationGoal::outputsSubstituted()
     foreach (DerivationInputs::iterator, i, drv.inputDrvs)
         addWaitee(worker.makeDerivationGoal(i->first));
 
-    for (PathSet::iterator i = drv.inputSrcs.begin();
-         i != drv.inputSrcs.end(); ++i)
+    foreach (PathSet::iterator, i, drv.inputSrcs)
         addWaitee(worker.makeSubstitutionGoal(*i));
 
     state = &DerivationGoal::inputsRealised;
@@ -949,8 +945,7 @@ void DerivationGoal::inputsRealised()
 PathSet outputPaths(const DerivationOutputs & outputs)
 {
     PathSet paths;
-    for (DerivationOutputs::const_iterator i = outputs.begin();
-         i != outputs.end(); ++i)
+    foreach (DerivationOutputs::const_iterator, i, outputs)
         paths.insert(i->second.path);
     return paths;
 }
@@ -1313,17 +1308,14 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
         computeFSClosure(drvPath, allInputs);
         
         string s;
-        for (PathSet::iterator i = allInputs.begin();
-             i != allInputs.end(); ++i)
-            s += *i + "\n";
+        foreach (PathSet::iterator, i, allInputs) s += *i + "\n";
         
         writeStringToFile(inputListFN, s);
 
         /* The `outputs' file lists all outputs that have to be copied
            from the remote system. */
         s = "";
-        for (DerivationOutputs::iterator i = drv.outputs.begin();
-             i != drv.outputs.end(); ++i)
+        foreach (DerivationOutputs::iterator, i, drv.outputs)
             s += i->second.path + "\n";
         writeStringToFile(outputListFN, s);
 
@@ -1411,8 +1403,7 @@ void DerivationGoal::startBuilder()
     env["NIX_STORE"] = nixStore;
 
     /* Add all bindings specified in the derivation. */
-    for (StringPairs::iterator i = drv.env.begin();
-         i != drv.env.end(); ++i)
+    foreach (StringPairs::iterator, i, drv.env)
         env[i->first] = i->second;
 
     /* Create a temporary directory where the build will take
@@ -1449,8 +1440,7 @@ void DerivationGoal::startBuilder()
        already know the cryptographic hash of the output). */
     if (fixedOutput) {
         Strings varNames = tokenizeString(drv.env["impureEnvVars"]);
-        for (Strings::iterator i = varNames.begin(); i != varNames.end(); ++i)
-            env[*i] = getEnv(*i);
+        foreach (Strings::iterator, i, varNames) env[*i] = getEnv(*i);
     }
 
     /* The `exportReferencesGraph' feature allows the references graph
@@ -1690,8 +1680,7 @@ void DerivationGoal::startBuilder()
 
             /* Fill in the environment. */
             Strings envStrs;
-            for (Environment::const_iterator i = env.begin();
-                 i != env.end(); ++i)
+            foreach (Environment::const_iterator, i, env)
                 envStrs.push_back(i->first + "=" + i->second);
             const char * * envArr = strings2CharPtrs(envStrs);
 
@@ -1737,8 +1726,7 @@ void DerivationGoal::startBuilder()
             /* Fill in the arguments. */
             string builderBasename = baseNameOf(drv.builder);
             args.push_back(builderBasename.c_str());
-            for (Strings::iterator i = drv.args.begin();
-                 i != drv.args.end(); ++i)
+            foreach (Strings::iterator, i, drv.args)
                 args.push_back(i->c_str());
             args.push_back(0);
 
@@ -1777,7 +1765,7 @@ PathSet parseReferenceSpecifiers(const Derivation & drv, string attr)
 {
     PathSet result;
     Paths paths = tokenizeString(attr);
-    for (Strings::iterator i = paths.begin(); i != paths.end(); ++i) {
+    foreach (Strings::iterator, i, paths) {
         if (isStorePath(*i))
             result.insert(*i);
         else if (drv.outputs.find(*i) != drv.outputs.end())
@@ -1886,7 +1874,7 @@ void DerivationGoal::computeClosure()
            allowedReferences should really be per-output. */
         if (drv.env.find("allowedReferences") != drv.env.end()) {
             PathSet allowed = parseReferenceSpecifiers(drv, drv.env["allowedReferences"]);
-            for (PathSet::iterator i = references.begin(); i != references.end(); ++i)
+            foreach (PathSet::iterator, i, references)
                 if (allowed.find(*i) == allowed.end())
                     throw BuildError(format("output is not allowed to refer to path `%1%'") % *i);
         }
@@ -1990,8 +1978,7 @@ void DerivationGoal::handleEOF(int fd)
 PathSet DerivationGoal::checkPathValidity(bool returnValid)
 {
     PathSet result;
-    for (DerivationOutputs::iterator i = drv.outputs.begin();
-         i != drv.outputs.end(); ++i)
+    foreach (DerivationOutputs::iterator, i, drv.outputs)
         if (worker.store.isValidPath(i->second.path)) {
             if (returnValid) result.insert(i->second.path);
         } else {
@@ -2495,9 +2482,7 @@ void Worker::childTerminated(pid_t pid, bool wakeSleepers)
     if (wakeSleepers) {
         
         /* Wake up goals waiting for a build slot. */
-        for (WeakGoals::iterator i = wantingToBuild.begin();
-             i != wantingToBuild.end(); ++i)
-        {
+        foreach (WeakGoals::iterator, i, wantingToBuild) {
             GoalPtr goal = i->lock();
             if (goal) wakeUp(goal);
         }
@@ -2533,9 +2518,7 @@ void Worker::waitForAWhile(GoalPtr goal)
 
 void Worker::run(const Goals & _topGoals)
 {
-    for (Goals::iterator i = _topGoals.begin();
-         i != _topGoals.end(); ++i)
-        topGoals.insert(*i);
+    foreach (Goals::iterator, i,  _topGoals) topGoals.insert(*i);
     
     startNest(nest, lvlDebug, format("entered goal loop"));
 
@@ -2547,7 +2530,7 @@ void Worker::run(const Goals & _topGoals)
         while (!awake.empty() && !topGoals.empty()) {
             WeakGoals awake2(awake);
             awake.clear();
-            for (WeakGoals::iterator i = awake2.begin(); i != awake2.end(); ++i) {
+            foreach (WeakGoals::iterator, i, awake2) {
                 checkInterrupt();
                 GoalPtr goal = i->lock();
                 if (goal) goal->work();
@@ -2709,14 +2692,13 @@ void LocalStore::buildDerivations(const PathSet & drvPaths)
     Worker worker(*this);
 
     Goals goals;
-    for (PathSet::const_iterator i = drvPaths.begin();
-         i != drvPaths.end(); ++i)
+    foreach (PathSet::const_iterator, i, drvPaths)
         goals.insert(worker.makeDerivationGoal(*i));
 
     worker.run(goals);
 
     PathSet failed;
-    for (Goals::iterator i = goals.begin(); i != goals.end(); ++i)
+    foreach (Goals::iterator, i, goals)
         if ((*i)->getExitCode() == Goal::ecFailed) {
             DerivationGoal * i2 = dynamic_cast<DerivationGoal *>(i->get());
             assert(i2);

@@ -30,16 +30,14 @@ void computeFSClosure(const Path & storePath,
     else
         store->queryReferences(storePath, references);
 
-    for (PathSet::iterator i = references.begin();
-         i != references.end(); ++i)
+    foreach (PathSet::iterator, i, references)
         computeFSClosure(*i, paths, flipDirection);
 }
 
 
 Path findOutput(const Derivation & drv, string id)
 {
-    for (DerivationOutputs::const_iterator i = drv.outputs.begin();
-         i != drv.outputs.end(); ++i)
+    foreach (DerivationOutputs::const_iterator, i, drv.outputs)
         if (i->first == id) return i->second.path;
     throw Error(format("derivation has no output `%1%'") % id);
 }
@@ -67,20 +65,17 @@ void queryMissing(const PathSet & targets,
             Derivation drv = derivationFromPath(p);
 
             bool mustBuild = false;
-            for (DerivationOutputs::iterator i = drv.outputs.begin();
-                 i != drv.outputs.end(); ++i)
+            foreach (DerivationOutputs::iterator, i, drv.outputs)
                 if (!store->isValidPath(i->second.path) && !store->hasSubstitutes(i->second.path))
                     mustBuild = true;
 
             if (mustBuild) {
                 willBuild.insert(p);
                 todo.insert(drv.inputSrcs.begin(), drv.inputSrcs.end());
-                for (DerivationInputs::iterator i = drv.inputDrvs.begin();
-                     i != drv.inputDrvs.end(); ++i)
+                foreach (DerivationInputs::iterator, i, drv.inputDrvs)
                     todo.insert(i->first);
             } else 
-                for (DerivationOutputs::iterator i = drv.outputs.begin();
-                     i != drv.outputs.end(); ++i)
+                foreach (DerivationOutputs::iterator, i, drv.outputs)
                     todo.insert(i->second.path);
         }
 

@@ -247,9 +247,7 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
     Strings tempRootFiles = readDirectory(
         (format("%1%/%2%") % nixStateDir % tempRootsDir).str());
 
-    for (Strings::iterator i = tempRootFiles.begin();
-         i != tempRootFiles.end(); ++i)
-    {
+    foreach (Strings::iterator, i, tempRootFiles) {
         Path path = (format("%1%/%2%/%3%") % nixStateDir % tempRootsDir % *i).str();
 
         debug(format("reading temporary root file `%1%'") % path);
@@ -328,7 +326,7 @@ static void findRoots(const Path & path, bool recurseSymlinks,
 
         if (S_ISDIR(st.st_mode)) {
             Strings names = readDirectory(path);
-            for (Strings::iterator i = names.begin(); i != names.end(); ++i)
+            foreach (Strings::iterator, i, names)
                 findRoots(path + "/" + *i, recurseSymlinks, deleteStale, roots);
         }
 
@@ -399,7 +397,7 @@ static void addAdditionalRoots(PathSet & roots)
 
     Strings paths = tokenizeString(result, "\n");
     
-    for (Strings::iterator i = paths.begin(); i != paths.end(); ++i) {
+    foreach (Strings::iterator, i, paths) {
         if (isInStore(*i)) {
             Path path = toStorePath(*i);
             if (roots.find(path) == roots.end() && store->isValidPath(path)) {
@@ -421,8 +419,7 @@ static void dfsVisit(const PathSet & paths, const Path & path,
     if (store->isValidPath(path))
         store->queryReferences(path, references);
     
-    for (PathSet::iterator i = references.begin();
-         i != references.end(); ++i)
+    foreach (PathSet::iterator, i, references)
         /* Don't traverse into paths that don't exist.  That can
            happen due to substitutes for non-existent paths. */
         if (*i != path && paths.find(*i) != paths.end())
@@ -436,7 +433,7 @@ Paths topoSortPaths(const PathSet & paths)
 {
     Paths sorted;
     PathSet visited;
-    for (PathSet::const_iterator i = paths.begin(); i != paths.end(); ++i)
+    foreach (PathSet::const_iterator, i, paths)
         dfsVisit(paths, *i, visited, sorted);
     return sorted;
 }
@@ -453,7 +450,7 @@ static time_t lastFileAccessTime(const Path & path)
     if (S_ISDIR(st.st_mode)) {
         time_t last = 0;
 	Strings names = readDirectory(path);
-	for (Strings::iterator i = names.begin(); i != names.end(); ++i) {
+	foreach (Strings::iterator, i, names) {
             time_t t = lastFileAccessTime(path + "/" + *i);
             if (t > last) last = t;
         }
@@ -594,8 +591,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     Roots rootMap = options.ignoreLiveness ? Roots() : nix::findRoots(true);
 
     PathSet roots;
-    for (Roots::iterator i = rootMap.begin(); i != rootMap.end(); ++i)
-        roots.insert(i->second);
+    foreach (Roots::iterator, i, rootMap) roots.insert(i->second);
 
     /* Add additional roots returned by the program specified by the
        NIX_ROOT_FINDER environment variable.  This is typically used
@@ -613,13 +609,11 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        roots under the `references' relation. */
     printMsg(lvlError, format("computing live paths..."));
     PathSet livePaths;
-    for (PathSet::const_iterator i = roots.begin(); i != roots.end(); ++i)
+    foreach (PathSet::const_iterator, i, roots)
         computeFSClosure(canonPath(*i), livePaths);
 
     if (gcKeepDerivations) {
-        for (PathSet::iterator i = livePaths.begin();
-             i != livePaths.end(); ++i)
-        {
+        foreach (PathSet::iterator, i, livePaths) {
             /* Note that the deriver need not be valid (e.g., if we
                previously ran the collector with `gcKeepDerivations'
                turned off). */
@@ -631,8 +625,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     if (gcKeepOutputs) {
         /* Hmz, identical to storePathRequisites in nix-store. */
-        for (PathSet::iterator i = livePaths.begin();
-             i != livePaths.end(); ++i)
+        foreach (PathSet::iterator, i, livePaths)
             if (isDerivation(*i)) {
                 Derivation drv = derivationFromPath(*i);
 
@@ -642,8 +635,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 		    gcLevel = defaultGcLevel;
 		
 		if (gcLevel >= gcKeepOutputsThreshold)    
-		    for (DerivationOutputs::iterator j = drv.outputs.begin();
-                         j != drv.outputs.end(); ++j)
+		    foreach (DerivationOutputs::iterator, j, drv.outputs)
 			if (isValidPath(j->second.path))
 			    computeFSClosure(j->second.path, livePaths);
             }
@@ -668,7 +660,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        (and computeFSClosure() assumes that the presence of a path
        means that it has already been closed). */
     PathSet tempRootsClosed;
-    for (PathSet::iterator i = tempRoots.begin(); i != tempRoots.end(); ++i)
+    foreach (PathSet::iterator, i, tempRoots)
         if (isValidPath(*i))
             computeFSClosure(*i, tempRootsClosed);
         else

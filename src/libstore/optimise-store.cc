@@ -131,7 +131,7 @@ static void hashAndLink(bool dryRun, HashToPath & hashToPath,
 
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectory(path);
-	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
+	foreach (Strings::iterator, i, names)
 	    hashAndLink(dryRun, hashToPath, stats, path + "/" + *i);
     }
 }
@@ -143,7 +143,7 @@ void LocalStore::optimiseStore(bool dryRun, OptimiseStats & stats)
 
     PathSet paths = queryValidPaths();
 
-    for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i) {
+    foreach (PathSet::iterator, i, paths) {
         addTempRoot(*i);
         if (!isValidPath(*i)) continue; /* path was GC'ed, probably */
         startNest(nest, lvlChatty, format("hashing files in `%1%'") % *i);

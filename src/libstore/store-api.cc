@@ -81,7 +81,7 @@ void checkStoreName(const string & name)
        reasons (e.g., "." and ".."). */
     if (string(name, 0, 1) == ".")
         throw Error(format("illegal name: `%1%'") % name);
-    for (string::const_iterator i = name.begin(); i != name.end(); ++i)
+    foreach (string::const_iterator, i, name)
         if (!((*i >= 'A' && *i <= 'Z') ||
               (*i >= 'a' && *i <= 'z') ||
               (*i >= '0' && *i <= '9') ||
@@ -207,7 +207,7 @@ Path computeStorePathForText(const string & name, const string & s,
        hacky, but we can't put them in `s' since that would be
        ambiguous. */
     string type = "text";
-    for (PathSet::const_iterator i = references.begin(); i != references.end(); ++i) {
+    foreach (PathSet::const_iterator, i, references) {
         type += ":";
         type += *i;
     }
@@ -223,7 +223,7 @@ string makeValidityRegistration(const PathSet & paths,
 {
     string s = "";
     
-    for (PathSet::iterator i = paths.begin(); i != paths.end(); ++i) {
+    foreach (PathSet::iterator, i, paths) {
         s += *i + "\n";
 
         if (showHash)
@@ -237,8 +237,7 @@ string makeValidityRegistration(const PathSet & paths,
 
         s += (format("%1%\n") % references.size()).str();
             
-        for (PathSet::iterator j = references.begin();
-             j != references.end(); ++j)
+        foreach (PathSet::iterator, j, references)
             s += *j + "\n";
     }
 
@@ -272,9 +271,7 @@ ValidPathInfo decodeValidPathInfo(std::istream & str, bool hashGiven)
 string showPaths(const PathSet & paths)
 {
     string s;
-    for (PathSet::const_iterator i = paths.begin();
-         i != paths.end(); ++i)
-    {
+    foreach (PathSet::const_iterator, i, paths) {
         if (s.size() != 0) s += ", ";
         s += "`" + *i + "'";
     }

@@ -162,7 +162,7 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
 
     if (recurse && S_ISDIR(st.st_mode)) {
         Strings names = readDirectory(path);
-	for (Strings::iterator i = names.begin(); i != names.end(); ++i)
+	foreach (Strings::iterator, i, names)
 	    canonicalisePathMetaData(path + "/" + *i, true);
     }
 }
@@ -392,7 +392,7 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path, bool ignoreErrors)
     /* Parse it. */
     Strings lines = tokenizeString(info, "\n");
 
-    for (Strings::iterator i = lines.begin(); i != lines.end(); ++i) {
+    foreach (Strings::iterator, i, lines) {
         string::size_type p = i->find(':');
         if (p == string::npos) continue; /* bad line */
         string name(*i, 0, p);
@@ -433,7 +433,7 @@ PathSet LocalStore::queryValidPaths()
 {
     PathSet paths;
     Strings entries = readDirectory(nixDBPath + "/info");
-    for (Strings::iterator i = entries.begin(); i != entries.end(); ++i)
+    foreach (Strings::iterator, i, entries)
         if (i->at(0) != '.') paths.insert(nixStore + "/" + *i);
     return paths;
 }
@@ -468,7 +468,7 @@ bool LocalStore::queryReferrersInternal(const Path & path, PathSet & referrers)
 
     Paths refs = tokenizeString(readFile(fd), " ");
 
-    for (Paths::iterator i = refs.begin(); i != refs.end(); ++i)
+    foreach (Paths::iterator, i, refs)
         /* Referrers can be invalid (see registerValidPath() for the
            invariant), so we only return one if it is valid. */
         if (isStorePath(*i) && isValidPath(*i)) referrers.insert(*i); else allValid = false;
@@ -600,8 +600,7 @@ static void dfsVisit(std::map<Path, ValidPathInfo> & infos,
 
     ValidPathInfo & info(infos[path]);
     
-    for (PathSet::iterator i = info.references.begin();
-         i != info.references.end(); ++i)
+    foreach (PathSet::iterator, i, info.references)
         if (infos.find(*i) != infos.end())
             dfsVisit(infos, *i, visited, sorted);
 
@@ -616,15 +615,15 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
     /* Sort the paths topologically under the references relation, so
        that if path A is referenced by B, then A is registered before
        B. */
-    for (ValidPathInfos::const_iterator i = infos.begin(); i != infos.end(); ++i)
+    foreach (ValidPathInfos::const_iterator, i, infos)
         infosMap[i->path] = *i;
 
     PathSet visited;
     Paths sorted;
-    for (ValidPathInfos::const_iterator i = infos.begin(); i != infos.end(); ++i)
+    foreach (ValidPathInfos::const_iterator, i, infos)
         dfsVisit(infosMap, i->path, visited, sorted);
 
-    for (Paths::iterator i = sorted.begin(); i != sorted.end(); ++i)
+    foreach (Paths::iterator, i, sorted)
         registerValidPath(infosMap[*i]);
 }
 

@@ -155,7 +155,7 @@ bool PathLocks::lockPaths(const PathSet & _paths,
     paths.sort();
     
     /* Acquire the lock for each path. */
-    for (Paths::iterator i = paths.begin(); i != paths.end(); i++) {
+    foreach (Paths::iterator, i, paths) {
         checkInterrupt();
         Path path = *i;
         Path lockPath = path + ".lock";
@@ -219,7 +219,7 @@ PathLocks::~PathLocks()
 
 void PathLocks::unlock()
 {
-    for (list<FDPair>::iterator i = fds.begin(); i != fds.end(); i++) {
+    foreach (list<FDPair>::iterator, i, fds) {
         if (deletePaths) deleteLockFilePreClose(i->second, i->first);
 
         lockedPaths.erase(i->second);

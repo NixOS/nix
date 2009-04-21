@@ -73,7 +73,7 @@ void LocalStore::upgradeStore12()
     Paths paths;
     nixDB.enumTable(noTxn, dbValidPaths, paths);
     
-    for (Paths::iterator i = paths.begin(); i != paths.end(); ++i) {
+    foreach (Paths::iterator, i, paths) {
         ValidPathInfo info;
         info.path = *i;
         
