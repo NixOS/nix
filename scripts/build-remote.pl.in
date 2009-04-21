@@ -82,7 +82,9 @@ my $rightType = 0;
 my $machine;
 my $slotLock;
 LOOP: foreach my $cur (@machines) {
-    if ($neededSystem eq $cur->{systemType}) {
+    if ($neededSystem eq $cur->{systemType}
+        || ($neededSystem eq "i686-linux" && $cur->{systemType} eq "x86_64-linux"))
+    {
         $rightType = 1;
 
         # We have a machine of the right type.  Try to get a lock on
