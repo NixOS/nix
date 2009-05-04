@@ -64,6 +64,7 @@ struct ParseSink
     virtual void isExecutable() { };
     virtual void preallocateContents(unsigned long long size) { };
     virtual void receiveContents(unsigned char * data, unsigned int len) { };
+    virtual void finalizeContents(unsigned long long size) { };
 
     virtual void createSymlink(const Path & path, const string & target) { };
 };
