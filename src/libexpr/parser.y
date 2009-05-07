@@ -311,7 +311,7 @@ expr_simple
     { $$ = fixAttrs(1, $3); }
   | '{' binds '}'
     { $$ = fixAttrs(0, $2); }
-  | '[' expr_list ']' { $$ = makeList($2); }
+  | '[' expr_list ']' { $$ = makeList(ATreverse($2)); }
   ;
 
 string_parts
@@ -356,15 +356,12 @@ inheritsrc
 ids: ids ID { $$ = ATinsert($1, $2); } | { $$ = ATempty; };
 
 expr_list
-  : expr_select expr_list { $$ = ATinsert($2, $1); }
-    /* yes, this is right-recursive, but it doesn't matter since
-       otherwise we would need ATreverse which requires unbounded
-       stack space */
+  : expr_list expr_select { $$ = ATinsert($1, $2); }
   | { $$ = ATempty; }
   ;
 
 formals
-  : formal ',' formals /* idem - right recursive */
+  : formal ',' formals /* !!! right recursive */
     { $$.formals = ATinsert($3.formals, $1); $$.ellipsis = $3.ellipsis; }
   | formal
     { $$.formals = ATinsert(ATempty, $1); $$.ellipsis = false; }
