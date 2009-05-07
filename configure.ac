@@ -56,7 +56,7 @@ test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
 # Windows doesn't have anything like an RPATH embedded in executable.
 # Since this is kind of annoying, we use static libraries for now.
     
-AC_ARG_ENABLE(static-nix, AC_HELP_STRING([--enable-statix-nix],
+AC_ARG_ENABLE(static-nix, AC_HELP_STRING([--enable-static-nix],
   [produce statically linked binaries]),
   static_nix=$enableval, static_nix=no)
 
