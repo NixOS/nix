@@ -51,12 +51,13 @@ let
 
         preDist = ''
           make -C doc/manual install prefix=$out
-          echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
-          echo "doc release-notes $out/share/doc/nix/release-notes" >> $out/nix-support/hydra-build-products
           
           make -C doc/manual manual.pdf prefix=$out
           cp doc/manual/manual.pdf $out/manual.pdf
+          
+          echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
           echo "doc-pdf manual $out/manual.pdf" >> $out/nix-support/hydra-build-products
+          echo "doc release-notes $out/share/doc/nix/release-notes" >> $out/nix-support/hydra-build-products
         '';
       };
 
