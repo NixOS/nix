@@ -48,6 +48,12 @@ let
           stripHash ${bzip2.src}
           cp -pv ${bzip2.src} externals/$strippedName
         '';
+
+        preDist = ''
+          make -C doc/manual install prefix=$out
+          echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
+          echo "doc release-notes $out/share/doc/nix/release-notes" >> $out/nix-support/hydra-build-products
+        '';
       };
 
 
@@ -67,11 +73,6 @@ let
         configureFlags = ''
           --disable-init-state
           --with-bdb=${db45} --with-aterm=${aterm242fixes} --with-bzip2=${bzip2}
-        '';
-
-        postInstall = ''
-          echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
-          echo "doc release-notes $out/share/doc/nix/release-notes" >> $out/nix-support/hydra-build-products
         '';
       };
 
