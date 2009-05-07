@@ -110,7 +110,7 @@
   </appendix>
 
   <xi:include href="troubleshooting.xml" />
-  <xi:include href="bugs.xml" />
+  <!-- <xi:include href="bugs.xml" /> -->
   <xi:include href="glossary.xml" />
 
   <appendix>
