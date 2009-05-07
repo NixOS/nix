@@ -18,7 +18,7 @@ let
         src = nix;
         inherit officialRelease;
 
-        buildInputs = [curl bison flex2533 perl libxml2 libxslt w3m bzip2 jing_tools];
+        buildInputs = [curl bison flex2533 perl libxml2 libxslt w3m bzip2 jing_tools tetex dblatex];
 
         configureFlags = ''
           --with-docbook-rng=${docbook5}/xml/rng/docbook
@@ -53,6 +53,10 @@ let
           make -C doc/manual install prefix=$out
           echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
           echo "doc release-notes $out/share/doc/nix/release-notes" >> $out/nix-support/hydra-build-products
+          
+          make -C doc/manual manual.pdf prefix=$out
+          cp doc/manual/manual.pdf $out/manual.pdf
+          echo "doc-pdf manual $out/manual.pdf" >> $out/nix-support/hydra-build-products
         '';
       };
 
