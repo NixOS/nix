@@ -644,6 +644,44 @@ LocalNoInline(Expr evalOpConcat(EvalState & state, Expr e1, Expr e2))
 }
 
 
+/* Implementation of the `==' and `!=' operators. */
+LocalNoInline(bool areEqual(EvalState & state, Expr e1, Expr e2))
+{
+    e1 = evalExpr(state, e1);
+    e2 = evalExpr(state, e2);
+
+    /* We cannot test functions/primops for equality, and we currently
+       don't support testing equality between attribute sets or lists
+       - that would have to be a deep equality test to be sound. */
+    AFun sym1 = ATgetAFun(e1);
+    AFun sym2 = ATgetAFun(e2);
+
+    if (sym1 != sym2) return false;
+
+    /* Functions are incomparable. */
+    if (sym1 == symFunction || sym1 == symPrimOp) return false;
+
+    if (sym1 == symAttrs)
+        throw EvalError("comparison of attribute sets is not implemented");
+
+    if (e1 == e2) return true;
+    
+    if (sym1 == symList) {
+        ATermList es1; matchList(e1, es1);
+        ATermList es2; matchList(e2, es2);
+        if (ATgetLength(es1) != ATgetLength(es2)) return false;
+        ATermIterator i(es1), j(es2);
+        while (*i) {
+            if (!areEqual(state, *i, *j)) return false;
+            ++i; ++j;
+        }
+        return true;
+    }
+    
+    return false;
+}
+
+
 static char * deepestStack = (char *) -1; /* for measuring stack usage */
 
 
@@ -707,12 +745,10 @@ Expr evalExpr2(EvalState & state, Expr e)
        However, we don't want to make (==) strict, because that would
        make operations like `big_derivation == null' very slow (unless
        we were to evaluate them side-by-side). */
-    if (matchOpEq(e, e1, e2))
-        return makeBool(evalExpr(state, e1) == evalExpr(state, e2));
-
-    if (matchOpNEq(e, e1, e2))
-        return makeBool(evalExpr(state, e1) != evalExpr(state, e2));
-
+    if (matchOpEq(e, e1, e2)) return makeBool(areEqual(state, e1, e2));
+        
+    if (matchOpNEq(e, e1, e2)) return makeBool(!areEqual(state, e1, e2));
+        
     /* Negation. */
     if (matchOpNot(e, e1))
         return makeBool(!evalBool(state, e1));
