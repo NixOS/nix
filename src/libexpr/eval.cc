@@ -23,6 +23,8 @@ EvalState::EvalState()
     initNixExprHelpers();
 
     addPrimOps();
+
+    allowUnsafeEquality = getEnv("NIX_NO_UNSAFE_EQ", "") == "";
 }
 
 
@@ -661,9 +663,13 @@ LocalNoInline(bool areEqual(EvalState & state, Expr e1, Expr e2))
     /* Functions are incomparable. */
     if (sym1 == symFunction || sym1 == symPrimOp) return false;
 
-    if (sym1 == symAttrs)
+    if (!state.allowUnsafeEquality && sym1 == symAttrs)
         throw EvalError("comparison of attribute sets is not implemented");
 
+    /* !!! This allows comparisons of infinite data structures to
+       succeed, such as `let x = [x]; in x == x'.  This is
+       undesirable, since equivalent (?) terms such as `let x = [x]; y
+       = [y]; in x == y' don't terminate. */
     if (e1 == e2) return true;
     
     if (sym1 == symList) {

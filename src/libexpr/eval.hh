@@ -38,6 +38,8 @@ struct EvalState
     unsigned int nrEvaluated;
     unsigned int nrCached;
 
+    bool allowUnsafeEquality;
+
     EvalState();
 
     void addPrimOps();
