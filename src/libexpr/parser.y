@@ -44,28 +44,77 @@ struct ParseData
     Path path;
     string error;
 };
+ 
 
+static void duplicateAttr(ATerm name, ATerm pos, ATerm prevPos)
+{
+    throw EvalError(format("duplicate attribute `%1%' at %2% (previously defined at %3%)")
+        % aterm2String(name) % showPos(pos) % showPos (prevPos));
+}
+ 
 
-static Expr fixAttrs(int recursive, ATermList as)
+static Expr fixAttrs(bool recursive, ATermList as)
 {
     ATermList bs = ATempty, cs = ATempty;
     ATermList * is = recursive ? &cs : &bs;
+
+    ATermMap used;
+    
     for (ATermIterator i(as); i; ++i) {
-        ATermList names;
-        Expr src;
-        ATerm pos;
+        ATermList names; Expr src, e; ATerm name, pos;
         if (matchInherit(*i, src, names, pos)) {
             bool fromScope = matchScope(src);
             for (ATermIterator j(names); j; ++j) {
                 Expr rhs = fromScope ? makeVar(*j) : makeSelect(src, *j);
+                if (used.get(*j)) duplicateAttr(*j, pos, used[*j]);
+                used.set(*j, pos);
                 *is = ATinsert(*is, makeBind(*j, rhs, pos));
             }
-        } else bs = ATinsert(bs, *i);
+        } else if (matchBind(*i, name, e, pos)) {
+            if (used.get(name)) duplicateAttr(name, pos, used[name]);
+            used.set(name, pos);
+            bs = ATinsert(bs, *i);
+        } else abort(); /* can't happen */
     }
-    if (recursive)
-        return makeRec(bs, cs);
-    else
-        return makeAttrs(bs);
+
+    return recursive? makeRec(bs, cs) : makeAttrs(bs);
+}
+
+
+static void checkPatternVars(ATerm pos, ATermMap & map, Pattern pat)
+{
+    ATerm name;
+    ATermList formals;
+    Pattern pat1, pat2;
+    ATermBool ellipsis;
+    if (matchVarPat(pat, name)) {
+        if (map.get(name))
+            throw EvalError(format("duplicate formal function argument `%1%' at %2%")
+                % aterm2String(name) % showPos(pos));
+        map.set(name, name);
+    }
+    else if (matchAttrsPat(pat, formals, ellipsis)) { 
+        for (ATermIterator i(formals); i; ++i) {
+            ATerm d1;
+            if (!matchFormal(*i, name, d1)) abort();
+            if (map.get(name))
+                throw EvalError(format("duplicate formal function argument `%1%' at %2%")
+                    % aterm2String(name) % showPos(pos));
+            map.set(name, name);
+        }
+    }
+    else if (matchAtPat(pat, pat1, pat2)) {
+        checkPatternVars(pos, map, pat1);
+        checkPatternVars(pos, map, pat2);
+    }
+    else abort();
+}
+
+
+static void checkPatternVars(ATerm pos, Pattern pat)
+{
+    ATermMap map;
+    checkPatternVars(pos, map, pat);
 }
 
 
@@ -245,13 +294,13 @@ expr: expr_function;
 
 expr_function
   : pattern ':' expr_function
-    { $$ = makeFunction($1, $3, CUR_POS); }
+    { checkPatternVars(CUR_POS, $1); $$ = makeFunction($1, $3, CUR_POS); }
   | ASSERT expr ';' expr_function
     { $$ = makeAssert($2, $4, CUR_POS); }
   | WITH expr ';' expr_function
     { $$ = makeWith($2, $4, CUR_POS); }
   | LET binds IN expr_function
-    { $$ = makeSelect(fixAttrs(1, ATinsert($2, makeBind(toATerm("<let-body>"), $4, CUR_POS))), toATerm("<let-body>")); }
+    { $$ = makeSelect(fixAttrs(true, ATinsert($2, makeBind(toATerm("<let-body>"), $4, CUR_POS))), toATerm("<let-body>")); }
   | expr_if
   ;
 
@@ -306,11 +355,11 @@ expr_simple
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { $$ = makeSelect(fixAttrs(1, $3), toATerm("body")); }
+    { $$ = makeSelect(fixAttrs(true, $3), toATerm("body")); }
   | REC '{' binds '}'
-    { $$ = fixAttrs(1, $3); }
+    { $$ = fixAttrs(true, $3); }
   | '{' binds '}'
-    { $$ = fixAttrs(0, $2); }
+    { $$ = fixAttrs(false, $2); }
   | '[' expr_list ']' { $$ = makeList(ATreverse($2)); }
   ;
 
@@ -390,84 +439,6 @@ formal
 namespace nix {
       
 
-static void checkAttrs(ATermMap & names, ATermList bnds)
-{
-    for (ATermIterator i(bnds); i; ++i) {
-        ATerm name;
-        Expr e;
-        ATerm pos;
-        if (!matchBind(*i, name, e, pos)) abort(); /* can't happen */
-        if (names.get(name))
-            throw EvalError(format("duplicate attribute `%1%' at %2%")
-                % aterm2String(name) % showPos(pos));
-        names.set(name, name);
-    }
-}
-
-
-static void checkPatternVars(ATerm pos, ATermMap & map, Pattern pat)
-{
-    ATerm name;
-    ATermList formals;
-    Pattern pat1, pat2;
-    ATermBool ellipsis;
-    if (matchVarPat(pat, name)) {
-        if (map.get(name))
-            throw EvalError(format("duplicate formal function argument `%1%' at %2%")
-                % aterm2String(name) % showPos(pos));
-        map.set(name, name);
-    }
-    else if (matchAttrsPat(pat, formals, ellipsis)) { 
-        for (ATermIterator i(formals); i; ++i) {
-            ATerm d1;
-            if (!matchFormal(*i, name, d1)) abort();
-            if (map.get(name))
-                throw EvalError(format("duplicate formal function argument `%1%' at %2%")
-                    % aterm2String(name) % showPos(pos));
-            map.set(name, name);
-        }
-    }
-    else if (matchAtPat(pat, pat1, pat2)) {
-        checkPatternVars(pos, map, pat1);
-        checkPatternVars(pos, map, pat2);
-    }
-    else abort();
-}
-
-
-static void checkAttrSets(ATerm e)
-{
-    ATerm pat, body, pos;
-    if (matchFunction(e, pat, body, pos)) {
-        ATermMap map(16);
-        checkPatternVars(pos, map, pat);
-    }
-
-    ATermList bnds;
-    if (matchAttrs(e, bnds)) {
-        ATermMap names(ATgetLength(bnds));
-        checkAttrs(names, bnds);
-    }
-    
-    ATermList rbnds, nrbnds;
-    if (matchRec(e, rbnds, nrbnds)) {
-        ATermMap names(ATgetLength(rbnds) + ATgetLength(nrbnds));
-        checkAttrs(names, rbnds);
-        checkAttrs(names, nrbnds);
-    }
-    
-    if (ATgetType(e) == AT_APPL) {
-        int arity = ATgetArity(ATgetAFun(e));
-        for (int i = 0; i < arity; ++i)
-            checkAttrSets(ATgetArgument(e, i));
-    }
-
-    else if (ATgetType(e) == AT_LIST)
-        for (ATermIterator i((ATermList) e); i; ++i)
-            checkAttrSets(*i);
-}
-
-
 static Expr parse(EvalState & state,
     const char * text, const Path & path,
     const Path & basePath)
@@ -490,8 +461,6 @@ static Expr parse(EvalState & state,
         throw EvalError(format("%1%, in `%2%'") % e.msg() % path);
     }
     
-    checkAttrSets(data.result);
-
     return data.result;
 }
 
