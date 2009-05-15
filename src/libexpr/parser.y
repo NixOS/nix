@@ -91,12 +91,13 @@ static Expr fixAttrs(bool recursive, ATermList as)
         if (matchInherit(*i, src, names, pos)) {
             bool fromScope = matchScope(src);
             for (ATermIterator j(names); j; ++j) {
-                Expr rhs = fromScope ? makeVar(*j) : makeSelect(src, *j);
                 if (attrs.children.find(*j) != attrs.children.end()) 
                     throw ParseError(format("duplicate definition of attribute `%1%' at %2%")
                         % showAttrPath(ATmakeList1(*j)) % showPos(pos));
                 Tree & t(attrs.children[*j]);
-                t.leaf = rhs; t.pos = pos; if (recursive) t.recursive = false;
+                t.leaf = fromScope ? makeVar(*j) : makeSelect(src, *j);
+                t.pos = pos;
+                if (recursive && fromScope) t.recursive = false;
             }
         }
 
