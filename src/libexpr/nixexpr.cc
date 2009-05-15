@@ -19,7 +19,7 @@ string showPos(ATerm pos)
     if (matchNoPos(pos)) return "undefined position";
     if (!matchPos(pos, path, line, column))
         throw badTerm("position expected", pos);
-    return (format("`%1%', line %2%") % aterm2String(path) % line).str();
+    return (format("`%1%:%2%:%3%'") % aterm2String(path) % line % column).str();
 }
     
 

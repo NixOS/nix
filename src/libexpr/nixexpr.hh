@@ -11,6 +11,7 @@ namespace nix {
 
 
 MakeError(EvalError, Error)
+MakeError(ParseError, Error)
 MakeError(AssertionError, EvalError)
 MakeError(ThrownError, AssertionError)
 MakeError(Abort, EvalError)

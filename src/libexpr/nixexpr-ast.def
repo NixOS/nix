@@ -70,6 +70,7 @@ Bool | ATermBool | Expr |
 Null | | Expr |
 
 Bind | string Expr Pos | ATerm |
+BindAttrPath | ATermList Expr Pos | ATerm | # desugared during parsing
 Bind | string Expr | ATerm | ObsoleteBind
 Inherit | Expr ATermList Pos | ATerm |
 

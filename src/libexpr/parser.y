@@ -46,38 +46,88 @@ struct ParseData
 };
  
 
-static void duplicateAttr(ATerm name, ATerm pos, ATerm prevPos)
+static string showAttrPath(ATermList attrPath)
 {
-    throw EvalError(format("duplicate attribute `%1%' at %2% (previously defined at %3%)")
-        % aterm2String(name) % showPos(pos) % showPos (prevPos));
+    string s;
+    for (ATermIterator i(attrPath); i; ++i) {
+        if (!s.empty()) s += '.';
+        s += aterm2String(*i);
+    }
+    return s;
+}
+ 
+
+struct Tree
+{
+    Expr leaf; ATerm pos; bool recursive;
+    typedef std::map<ATerm, Tree> Children;
+    Children children;
+    Tree() { leaf = 0; recursive = true; }
+};
+
+
+static ATermList buildAttrs(const Tree & t, ATermList & nonrec)
+{
+    ATermList res = ATempty;
+    for (Tree::Children::const_reverse_iterator i = t.children.rbegin();
+         i != t.children.rend(); ++i)
+        if (!i->second.recursive)
+            nonrec = ATinsert(nonrec, makeBind(i->first, i->second.leaf, i->second.pos));
+        else
+            res = ATinsert(res, i->second.leaf
+                ? makeBind(i->first, i->second.leaf, i->second.pos)
+                : makeBind(i->first, makeAttrs(buildAttrs(i->second, nonrec)), makeNoPos()));
+    return res;
 }
  
 
 static Expr fixAttrs(bool recursive, ATermList as)
 {
-    ATermList bs = ATempty, cs = ATempty;
-    ATermList * is = recursive ? &cs : &bs;
+    Tree attrs;
 
-    ATermMap used;
-    
     for (ATermIterator i(as); i; ++i) {
-        ATermList names; Expr src, e; ATerm name, pos;
+        ATermList names, attrPath; Expr src, e; ATerm name, pos;
+
         if (matchInherit(*i, src, names, pos)) {
             bool fromScope = matchScope(src);
             for (ATermIterator j(names); j; ++j) {
                 Expr rhs = fromScope ? makeVar(*j) : makeSelect(src, *j);
-                if (used.get(*j)) duplicateAttr(*j, pos, used[*j]);
-                used.set(*j, pos);
-                *is = ATinsert(*is, makeBind(*j, rhs, pos));
+                if (attrs.children.find(*j) != attrs.children.end()) 
+                    throw ParseError(format("duplicate definition of attribute `%1%' at %2%")
+                        % showAttrPath(ATmakeList1(*j)) % showPos(pos));
+                Tree & t(attrs.children[*j]);
+                t.leaf = rhs; t.pos = pos; if (recursive) t.recursive = false;
             }
-        } else if (matchBind(*i, name, e, pos)) {
-            if (used.get(name)) duplicateAttr(name, pos, used[name]);
-            used.set(name, pos);
-            bs = ATinsert(bs, *i);
-        } else abort(); /* can't happen */
+        }
+
+        else if (matchBindAttrPath(*i, attrPath, e, pos)) {
+
+            Tree * t(&attrs);
+            
+            for (ATermIterator j(attrPath); j; ) {
+                name = *j; ++j;
+                if (t->leaf) throw ParseError(format("attribute set containing `%1%' at %2% already defined at %3%")
+                    % showAttrPath(attrPath) % showPos(pos) % showPos (t->pos));
+                t = &(t->children[name]);
+            }
+
+            if (t->leaf)
+                throw ParseError(format("duplicate definition of attribute `%1%' at %2% and %3%")
+                    % showAttrPath(attrPath) % showPos(pos) % showPos (t->pos));
+            if (!t->children.empty())
+                throw ParseError(format("duplicate definition of attribute `%1%' at %2%")
+                    % showAttrPath(attrPath) % showPos(pos));
+
+            t->leaf = e; t->pos = pos;
+        }
+
+        else abort(); /* can't happen */
     }
 
-    return recursive? makeRec(bs, cs) : makeAttrs(bs);
+    ATermList nonrec = ATempty;
+    ATermList rec = buildAttrs(attrs, nonrec);
+        
+    return recursive ? makeRec(rec, nonrec) : makeAttrs(rec);
 }
 
 
@@ -89,7 +139,7 @@ static void checkPatternVars(ATerm pos, ATermMap & map, Pattern pat)
     ATermBool ellipsis;
     if (matchVarPat(pat, name)) {
         if (map.get(name))
-            throw EvalError(format("duplicate formal function argument `%1%' at %2%")
+            throw ParseError(format("duplicate formal function argument `%1%' at %2%")
                 % aterm2String(name) % showPos(pos));
         map.set(name, name);
     }
@@ -98,7 +148,7 @@ static void checkPatternVars(ATerm pos, ATermMap & map, Pattern pat)
             ATerm d1;
             if (!matchFormal(*i, name, d1)) abort();
             if (map.get(name))
-                throw EvalError(format("duplicate formal function argument `%1%' at %2%")
+                throw ParseError(format("duplicate formal function argument `%1%' at %2%")
                     % aterm2String(name) % showPos(pos));
             map.set(name, name);
         }
@@ -267,7 +317,7 @@ static void freeAndUnprotect(void * p)
 %type <t> start expr expr_function expr_if expr_op
 %type <t> expr_app expr_select expr_simple bind inheritsrc formal
 %type <t> pattern pattern2
-%type <ts> binds ids expr_list string_parts ind_string_parts
+%type <ts> binds ids attrpath expr_list string_parts ind_string_parts
 %type <formals> formals
 %token <t> ID INT STR IND_STR PATH URI
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL
@@ -300,7 +350,7 @@ expr_function
   | WITH expr ';' expr_function
     { $$ = makeWith($2, $4, CUR_POS); }
   | LET binds IN expr_function
-    { $$ = makeSelect(fixAttrs(true, ATinsert($2, makeBind(toATerm("<let-body>"), $4, CUR_POS))), toATerm("<let-body>")); }
+    { $$ = makeSelect(fixAttrs(true, ATinsert($2, makeBindAttrPath(ATmakeList1(toATerm("<let-body>")), $4, CUR_POS))), toATerm("<let-body>")); }
   | expr_if
   ;
 
@@ -391,8 +441,8 @@ binds
   ;
 
 bind
-  : ID '=' expr ';'
-    { $$ = makeBind($1, $3, CUR_POS); }
+  : attrpath '=' expr ';'
+    { $$ = makeBindAttrPath(ATreverse($1), $3, CUR_POS); }
   | INHERIT inheritsrc ids ';'
     { $$ = makeInherit($2, $3, CUR_POS); }
   ;
@@ -403,6 +453,11 @@ inheritsrc
   ;
 
 ids: ids ID { $$ = ATinsert($1, $2); } | { $$ = ATempty; };
+
+attrpath
+  : attrpath '.' ID { $$ = ATinsert($1, $3); }
+  | ID { $$ = ATmakeList1($1); }
+  ;
 
 expr_list
   : expr_list expr_select { $$ = ATinsert($1, $2); }
@@ -453,12 +508,12 @@ static Expr parse(EvalState & state,
     int res = yyparse(scanner, &data);
     yylex_destroy(scanner);
     
-    if (res) throw EvalError(data.error);
+    if (res) throw ParseError(data.error);
 
     try {
         checkVarDefs(state.primOps, data.result);
     } catch (Error & e) {
-        throw EvalError(format("%1%, in `%2%'") % e.msg() % path);
+        throw ParseError(format("%1%, in `%2%'") % e.msg() % path);
     }
     
     return data.result;
