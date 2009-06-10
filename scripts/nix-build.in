@@ -142,7 +142,10 @@ foreach my $expr (@exprs) {
     # !!! would prefer the perl 5.8.0 pipe open feature here.
     my $pid = open(DRVPATHS, "-|") || exec "$binDir/nix-instantiate", "--add-root", $drvLink, "--indirect", @instArgs, $expr;
     while (<DRVPATHS>) {chomp; push @drvPaths, $_;}
-    close DRVPATHS or exit 1;
+    if (!close DRVPATHS) {
+        die "nix-instantiate killed by signal " . ($? & 127) . "\n" if ($? & 127);
+        exit 1;
+    }
 
     foreach my $drvPath (@drvPaths) {
         my $target = readlink $drvPath or die "cannot read symlink `$drvPath'";
@@ -154,7 +157,10 @@ foreach my $expr (@exprs) {
     $pid = open(OUTPATHS, "-|") || exec "$binDir/nix-store", "--add-root", $outLink, "--indirect", "-rv",
         @buildArgs, @drvPaths;
     while (<OUTPATHS>) {chomp; push @outPaths, $_;}
-    close OUTPATHS or exit 1;
+    if (!close OUTPATHS) {
+        die "nix-store killed by signal " . ($? & 127) . "\n" if ($? & 127);
+        exit 1;
+    }
 
     next if $dryRun;
 
