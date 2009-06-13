@@ -1432,7 +1432,7 @@ command-line argument.  See <xref linkend='sec-standard-environment'
   inputs.</para></listitem>
 
   <listitem><para>After the build, Nix sets the last-modified
-  timestamp on all files in the build result to 0 (00:00:00 1/1/1970
+  timestamp on all files in the build result to 1 (00:00:01 1/1/1970
   UTC), sets the group to the default group, and sets the mode of the
   file to 0444 or 0555 (i.e., read-only, with execute permission
   enabled if the file was originally executable).  Note that possible

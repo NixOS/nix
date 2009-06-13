@@ -153,7 +153,7 @@ void canonicalisePathMetaData(const Path & path, bool recurse)
         if (st.st_mtime != 0) {
             struct utimbuf utimbuf;
             utimbuf.actime = st.st_atime;
-            utimbuf.modtime = 0;
+            utimbuf.modtime = 1; /* 1 second into the epoch */
             if (utime(path.c_str(), &utimbuf) == -1) 
                 throw SysError(format("changing modification time of `%1%'") % path);
         }

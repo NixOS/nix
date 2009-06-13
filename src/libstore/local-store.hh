@@ -190,8 +190,8 @@ void copyPath(const Path & src, const Path & dst);
 
 /* "Fix", or canonicalise, the meta-data of the files in a store path
    after it has been built.  In particular:
-   - the last modification date on each file is set to 0 (i.e.,
-     00:00:00 1/1/1970 UTC)
+   - the last modification date on each file is set to 1 (i.e.,
+     00:00:01 1/1/1970 UTC)
    - the permissions are set of 444 or 555 (i.e., read-only with or
      without execute permission; setuid bits etc. are cleared)
    - the owner and group are set to the Nix user and group, if we're
