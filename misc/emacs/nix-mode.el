@@ -76,10 +76,10 @@ The hook `nix-mode-hook' is run when Nix mode is started.
     ("\\<baseNameOf\\>" . font-lock-builtin-face)
     ("\\<toString\\>" . font-lock-builtin-face)
     ("\\<isNull\\>" . font-lock-builtin-face)
-    ("\\<\\([a-zA-Z_][a-zA-Z0-9_'\.]*\\)[ \t]*="
-     (1 font-lock-variable-name-face nil nil))
     ("[a-zA-Z][a-zA-Z0-9\\+-\\.]*:[a-zA-Z0-9%/\\?:@&=\\+\\$,_\\.!~\\*'-]+"
      . font-lock-constant-face)
+    ("\\<\\([a-zA-Z_][a-zA-Z0-9_'\.]*\\)[ \t]*="
+     (1 font-lock-variable-name-face nil nil))
     ("[a-zA-Z0-9._\\+-]*\\(/[a-zA-Z0-9._\\+-]+\\)+"
      . font-lock-constant-face)
     ))
