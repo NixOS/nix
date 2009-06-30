@@ -24,6 +24,7 @@
 <arg><option>--fallback</option></arg>
 <arg><option>--readonly-mode</option></arg>
 <arg><option>--log-type</option> <replaceable>type</replaceable></arg>
+<arg><option>--show-trace</option></arg>
 <sbr />
 
 </nop>

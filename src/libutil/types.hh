@@ -24,12 +24,14 @@ using boost::format;
 class BaseError : public std::exception 
 {
 protected:
+    string prefix_; // used for location traces etc.
     string err;
 public:
     BaseError(const format & f);
     ~BaseError() throw () { };
     const char * what() const throw () { return err.c_str(); }
     const string & msg() const throw () { return err; }
+    const string & prefix() const throw () { return prefix_; }
     BaseError & addPrefix(const format & f);
 };
 

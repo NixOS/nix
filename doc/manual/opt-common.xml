@@ -305,6 +305,14 @@
 </varlistentry>
 
 
+<varlistentry><term><option>--show-trace</option></term>
+  
+  <listitem><para>Causes Nix to print out a stack trace in case of Nix
+  expression evaluation errors.</para></listitem>
+  
+</varlistentry>
+
+
 </variablelist>
 
 

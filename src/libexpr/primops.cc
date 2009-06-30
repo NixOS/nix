@@ -206,7 +206,7 @@ static Expr prim_abort(EvalState & state, const ATermVector & args)
 static Expr prim_throw(EvalState & state, const ATermVector & args)
 {
     PathSet context;
-    throw ThrownError(format("user-thrown exception: `%1%'") %
+    throw ThrownError(format("user-thrown exception: %1%") %
         evalString(state, args[0], context));
 }
 

@@ -125,6 +125,9 @@ RemoveTempRoots::~RemoveTempRoots()
 }
 
 
+static bool showTrace = false;
+
+
 /* Initialize and reorder arguments, then call the actual argument
    processor. */
 static void initAndRun(int argc, char * * argv)
@@ -243,6 +246,8 @@ static void initAndRun(int argc, char * * argv)
             maxSilentTime = getIntArg(arg, i, args.end());
         else if (arg == "--no-build-hook")
             useBuildHook = false;
+        else if (arg == "--show-trace")
+            showTrace = true;
         else if (arg == "--option") {
             ++i; if (i == args.end()) throw UsageError("`--option' requires two arguments");
             string name = *i;
@@ -365,7 +370,9 @@ int main(int argc, char * * argv)
             % e.what() % programId);
         return 1;
     } catch (BaseError & e) {
-        printMsg(lvlError, format("error: %1%") % e.msg());
+        printMsg(lvlError, format("error: %1%%2%") % (showTrace ? e.prefix() : "") % e.msg());
+        if (e.prefix() != "" && !showTrace)
+            printMsg(lvlError, "(use `--show-trace' to show detailed location information)");
         return 1;
     } catch (std::exception & e) {
         printMsg(lvlError, format("error: %1%") % e.what());

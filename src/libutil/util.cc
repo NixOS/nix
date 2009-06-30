@@ -33,7 +33,7 @@ BaseError::BaseError(const format & f)
 
 BaseError & BaseError::addPrefix(const format & f)
 {
-    err = f.str() + err;
+    prefix_ = f.str() + prefix_;
     return *this;
 }
 
