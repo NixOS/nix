@@ -12,7 +12,16 @@
 namespace nix {
 
 
-typedef std::map<string, string> MetaInfo;
+struct MetaValue
+{
+    enum { tpNone, tpString, tpStrings, tpInt } type;
+    string stringValue;
+    Strings stringValues;
+    int intValue;
+};
+
+
+typedef std::map<string, MetaValue> MetaInfo;
 
 
 struct DrvInfo
@@ -34,7 +43,7 @@ public:
     string queryDrvPath(EvalState & state) const;
     string queryOutPath(EvalState & state) const;
     MetaInfo queryMetaInfo(EvalState & state) const;
-    string queryMetaInfo(EvalState & state, const string & name) const;
+    MetaValue queryMetaInfo(EvalState & state, const string & name) const;
 
     void setDrvPath(const string & s)
     {

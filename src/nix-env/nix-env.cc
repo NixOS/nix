@@ -251,15 +251,14 @@ static string optimisticLockProfile(const Path & profile)
 }
 
 
-static bool createUserEnv(EvalState & state, const DrvInfos & elems,
+static bool createUserEnv(EvalState & state, DrvInfos & elems,
     const Path & profile, bool keepDerivations,
     const string & lockToken)
 {
     /* Build the components in the user environment, if they don't
        exist already. */
     PathSet drvsToBuild;
-    for (DrvInfos::const_iterator i = elems.begin(); 
-         i != elems.end(); ++i)
+    foreach (DrvInfos::const_iterator, i, elems)
         /* Call to `isDerivation' is for compatibility with Nix <= 0.7
            user environments. */
         if (i->queryDrvPath(state) != "" &&
@@ -277,19 +276,16 @@ static bool createUserEnv(EvalState & state, const DrvInfos & elems,
     PathSet references;
     ATermList manifest = ATempty;
     ATermList inputs = ATempty;
-    for (DrvInfos::const_iterator i = elems.begin(); 
-         i != elems.end(); ++i)
-    {
+    foreach (DrvInfos::iterator, i, elems) {
         /* Create a pseudo-derivation containing the name, system,
            output path, and optionally the derivation path, as well as
            the meta attributes. */
         Path drvPath = keepDerivations ? i->queryDrvPath(state) : "";
 
+        /* Round trip to get rid of "bad" meta values (like
+           functions). */
         MetaInfo meta = i->queryMetaInfo(state);
-        ATermList metaList = ATempty;
-        foreach (MetaInfo::iterator, j, meta)
-            metaList = ATinsert(metaList,
-                makeBind(toATerm(j->first), makeStr(j->second), makeNoPos()));
+        i->setMetaInfo(meta);
         
         ATermList as = ATmakeList5(
             makeBind(toATerm("type"),
@@ -300,7 +296,8 @@ static bool createUserEnv(EvalState & state, const DrvInfos & elems,
                 makeStr(i->system), makeNoPos()),
             makeBind(toATerm("outPath"),
                 makeStr(i->queryOutPath(state)), makeNoPos()), 
-            makeBind(toATerm("meta"), makeAttrs(metaList), makeNoPos()));
+            makeBind(toATerm("meta"),
+                i->attrs->get(toATerm("meta")), makeNoPos()));
         
         if (drvPath != "") as = ATinsert(as, 
             makeBind(toATerm("drvPath"),
@@ -361,13 +358,23 @@ static bool createUserEnv(EvalState & state, const DrvInfos & elems,
 }
 
 
+static int getPriority(EvalState & state, const DrvInfo & drv)
+{
+    MetaValue value = drv.queryMetaInfo(state, "priority");
+    int prio = 0;
+    if (value.type == MetaValue::tpInt) prio = value.intValue;
+    else if (value.type == MetaValue::tpString)
+        /* Backwards compatibility.  Priorities used to be strings
+           before we had support for integer meta field. */
+        string2Int(value.stringValue, prio);
+    return prio;
+}
+
+
 static int comparePriorities(EvalState & state,
     const DrvInfo & drv1, const DrvInfo & drv2)
 {
-    int prio1, prio2;
-    if (!string2Int(drv1.queryMetaInfo(state, "priority"), prio1)) prio1 = 0;
-    if (!string2Int(drv2.queryMetaInfo(state, "priority"), prio2)) prio2 = 0;
-    return prio2 - prio1; /* higher number = lower priority, so negate */
+    return getPriority(state, drv2) - getPriority(state, drv1);
 }
 
 
@@ -594,6 +601,13 @@ static void printMissing(EvalState & state, const DrvInfos & elems)
 }
 
 
+static bool keep(MetaInfo & meta)
+{
+    MetaValue value = meta["keep"];
+    return value.type == MetaValue::tpString && value.stringValue == "true";
+}
+
+
 static void installDerivations(Globals & globals,
     const Strings & args, const Path & profile)
 {
@@ -628,7 +642,7 @@ static void installDerivations(Globals & globals,
             MetaInfo meta = i->queryMetaInfo(globals.state);
             if (!globals.preserveInstalled &&
                 newNames.find(drvName.name) != newNames.end() &&
-                meta["keep"] != "true")
+                !keep(meta))
                 printMsg(lvlInfo,
                     format("replacing old `%1%'") % i->name);
             else
@@ -691,7 +705,7 @@ static void upgradeDerivations(Globals & globals,
             DrvName drvName(i->name);
 
             MetaInfo meta = i->queryMetaInfo(globals.state);
-            if (meta["keep"] == "true") {
+            if (keep(meta)) {
                 newElems.push_back(*i);
                 continue;
             }
@@ -709,9 +723,9 @@ static void upgradeDerivations(Globals & globals,
                 if (newName.name == drvName.name) {
                     int d = comparePriorities(globals.state, *i, *j);
                     if (d == 0) d = compareVersions(drvName.version, newName.version);
-                    if (upgradeType == utLt && d < 0 ||
-                        upgradeType == utLeq && d <= 0 ||
-                        upgradeType == utEq && d == 0 ||
+                    if ((upgradeType == utLt && d < 0) ||
+                        (upgradeType == utLeq && d <= 0) ||
+                        (upgradeType == utEq && d == 0) ||
                         upgradeType == utAlways)
                     {
                         int d2 = -1;
@@ -770,7 +784,10 @@ static void setMetaFlag(EvalState & state, DrvInfo & drv,
     const string & name, const string & value)
 {
     MetaInfo meta = drv.queryMetaInfo(state);
-    meta[name] = value;
+    MetaValue v;
+    v.type = MetaValue::tpString;
+    v.stringValue = value;
+    meta[name] = v;
     drv.setMetaInfo(meta);
 }
 
@@ -1075,9 +1092,7 @@ static void opQuery(Globals & globals,
     XMLWriter xml(true, *(xmlOutput ? &cout : &dummy));
     XMLOpenElement xmlRoot(xml, "items");
     
-    for (vector<DrvInfo>::iterator i = elems2.begin();
-         i != elems2.end(); ++i)
-    {
+    foreach (vector<DrvInfo>::iterator, i, elems2) {
         try {
 
             /* For table output. */
@@ -1164,7 +1179,8 @@ static void opQuery(Globals & globals,
 
             if (printDescription) {
                 MetaInfo meta = i->queryMetaInfo(globals.state);
-                string descr = meta["description"];
+                MetaValue value = meta["description"];
+                string descr = value.type == MetaValue::tpString ? value.stringValue : "";
                 if (xmlOutput) {
                     if (descr != "") attrs["description"] = descr;
                 } else
@@ -1178,8 +1194,23 @@ static void opQuery(Globals & globals,
                     for (MetaInfo::iterator j = meta.begin(); j != meta.end(); ++j) {
                         XMLAttrs attrs2;
                         attrs2["name"] = j->first;
-                        attrs2["value"] = j->second;
-                        xml.writeEmptyElement("meta", attrs2);
+                        if (j->second.type == MetaValue::tpString) {
+                            attrs2["type"] = "string";
+                            attrs2["value"] = j->second.stringValue;
+                            xml.writeEmptyElement("meta", attrs2);
+                        } else if (j->second.type == MetaValue::tpInt) {
+                            attrs2["type"] = "int";
+                            attrs2["value"] = (format("%1%") % j->second.intValue).str();
+                            xml.writeEmptyElement("meta", attrs2);
+                        } else if (j->second.type == MetaValue::tpStrings) {
+                            attrs2["type"] = "strings";
+                            XMLOpenElement m(xml, "meta", attrs2);
+                            foreach (Strings::iterator, k, j->second.stringValues) { 
+                                XMLAttrs attrs3;
+                                attrs3["value"] = *k;
+                                xml.writeEmptyElement("string", attrs3);
+                           }
+                        }
                     }
                 }
                 else
@@ -1230,12 +1261,13 @@ static void switchGeneration(Globals & globals, int dstGen)
             (dstGen >= 0 && i->number == dstGen))
             dst = *i;
 
-    if (!dst)
+    if (!dst) {
         if (dstGen == prevGen)
             throw Error(format("no generation older than the current (%1%) exists")
                 % curGen);
         else
             throw Error(format("generation %1% does not exist") % dstGen);
+    }
 
     printMsg(lvlInfo, format("switching from generation %1% to %2%")
         % curGen % dst.number);

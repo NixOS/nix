@@ -50,31 +50,55 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
         Expr e = evalExpr(state, i->value);
         string s;
         PathSet context;
-        if (matchStr(e, s, context))
-            meta[aterm2String(i->key)] = s;
-        /* For future compatibility, ignore attribute values that are
-           not strings. */
+        MetaValue value;
+        int n;
+        ATermList es;
+        if (matchStr(e, s, context)) {
+            value.type = MetaValue::tpString;
+            value.stringValue = s;
+            meta[aterm2String(i->key)] = value;
+        } else if (matchInt(e, n)) {
+            value.type = MetaValue::tpInt;
+            value.intValue = n;
+            meta[aterm2String(i->key)] = value;
+        } else if (matchList(e, es)) {
+            value.type = MetaValue::tpStrings;
+            for (ATermIterator j(es); j; ++j)
+                value.stringValues.push_back(evalStringNoCtx(state, *j));
+            meta[aterm2String(i->key)] = value;
+        }
     }
 
     return meta;
 }
 
 
-string DrvInfo::queryMetaInfo(EvalState & state, const string & name) const
+MetaValue DrvInfo::queryMetaInfo(EvalState & state, const string & name) const
 {
     /* !!! evaluates all meta attributes => inefficient */
-    MetaInfo meta = queryMetaInfo(state);
-    MetaInfo::iterator i = meta.find(name);
-    return i == meta.end() ? "" : i->second;
+    return queryMetaInfo(state)[name];
 }
 
 
 void DrvInfo::setMetaInfo(const MetaInfo & meta)
 {
     ATermMap metaAttrs;
-    for (MetaInfo::const_iterator i = meta.begin(); i != meta.end(); ++i)
-        metaAttrs.set(toATerm(i->first),
-            makeAttrRHS(makeStr(i->second), makeNoPos()));
+    foreach (MetaInfo::const_iterator, i, meta) {
+        Expr e;
+        switch (i->second.type) {
+            case MetaValue::tpInt: e = makeInt(i->second.intValue); break;
+            case MetaValue::tpString: e = makeStr(i->second.stringValue); break;
+            case MetaValue::tpStrings: {
+                ATermList es = ATempty;
+                foreach (Strings::const_iterator, j, i->second.stringValues)
+                    es = ATinsert(es, makeStr(*j));
+                e = makeList(ATreverse(es));
+                break;
+            }
+            default: abort();
+        }
+        metaAttrs.set(toATerm(i->first), makeAttrRHS(e, makeNoPos()));
+    }
     attrs->set(toATerm("meta"), makeAttrs(metaAttrs));
 }
 
