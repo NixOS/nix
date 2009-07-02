@@ -930,7 +930,7 @@ void printTable(Table & table)
     vector<unsigned int> widths;
     widths.resize(nrColumns);
     
-    for (Table::iterator i = table.begin(); i != table.end(); ++i) {
+    foreach (Table::iterator, i, table) {
         assert(i->size() == nrColumns);
         Strings::iterator j;
         unsigned int column;
@@ -938,14 +938,15 @@ void printTable(Table & table)
             if (j->size() > widths[column]) widths[column] = j->size();
     }
 
-    for (Table::iterator i = table.begin(); i != table.end(); ++i) { 
+    foreach (Table::iterator, i, table) { 
         Strings::iterator j;
         unsigned int column;
-        for (j = i->begin(), column = 0; j != i->end(); ++j, ++column)
-        {
-            cout << *j;
+        for (j = i->begin(), column = 0; j != i->end(); ++j, ++column) {
+            string s = *j;
+            replace(s.begin(), s.end(), '\n', ' ');
+            cout << s;
             if (column < nrColumns - 1)
-                cout << string(widths[column] - j->size() + 2, ' ');
+                cout << string(widths[column] - s.size() + 2, ' ');
         }
         cout << std::endl;
     }
