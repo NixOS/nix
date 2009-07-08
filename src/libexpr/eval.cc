@@ -18,7 +18,7 @@ namespace nix {
 EvalState::EvalState()
     : sessionNormalForms(32768), normalForms(32768), primOps(128)
 {
-    nrEvaluated = nrCached = nrDephtAfterReset = 0;
+    nrEvaluated = nrCached = nrDepthAfterReset = 0;
 
     initNixExprHelpers();
 
@@ -815,7 +815,7 @@ Expr evalExpr(EvalState & state, Expr e)
 
     const unsigned int hugeEvalExpr = 100;
     unsigned int nrEvaluated = state.nrEvaluated++;
-    state.nrDephtAfterReset++;
+    state.nrDepthAfterReset++;
 
     /* Consult the memo table to quickly get the normal form of
        previously evaluated expressions. */
@@ -843,12 +843,12 @@ Expr evalExpr(EvalState & state, Expr e)
     }
 
     // session independent condition
-    if (state.nrDephtAfterReset && state.safeCache &&
+    if (state.nrDepthAfterReset && state.safeCache &&
         // heuristic condition
         state.nrEvaluated - nrEvaluated > hugeEvalExpr) {
         state.sessionNormalForms.remove(e);
         state.normalForms.set(e, nf);
-        state.nrDephtAfterReset--;
+        state.nrDepthAfterReset--;
     } else {
         state.sessionNormalForms.set(e, nf);
     }
@@ -860,7 +860,7 @@ Expr evalExpr(EvalState & state, Expr e)
 Expr evalFile(EvalState & state, const Path & path)
 {
     startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
-    state.nrDephtAfterReset = 0;
+    state.nrDepthAfterReset = 0;
     Expr e = parseExprFromFile(state, path);
     try {
         return evalExpr(state, e);

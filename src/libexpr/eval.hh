@@ -38,7 +38,7 @@ struct EvalState
 
     unsigned int nrEvaluated;
     unsigned int nrCached;
-    unsigned int nrDephtAfterReset;
+    unsigned int nrDepthAfterReset;
 
     bool allowUnsafeEquality;
     bool safeCache;
