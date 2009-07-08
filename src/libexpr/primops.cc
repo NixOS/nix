@@ -74,12 +74,14 @@ static Expr prim_null(EvalState & state, const ATermVector & args)
    platforms. */
 static Expr prim_currentSystem(EvalState & state, const ATermVector & args)
 {
+    state.nrDephtAfterReset = 0;
     return makeStr(thisSystem);
 }
 
 
 static Expr prim_currentTime(EvalState & state, const ATermVector & args)
 {
+    state.nrDephtAfterReset = 0;
     return ATmake("Int(<int>)", time(0));
 }
 
@@ -228,6 +230,7 @@ static Expr prim_addErrorContext(EvalState & state, const ATermVector & args)
 static Expr prim_getEnv(EvalState & state, const ATermVector & args)
 {
     string name = evalStringNoCtx(state, args[0]);
+    state.nrDephtAfterReset = 0;
     return makeStr(getEnv(name));
 }
 
@@ -316,6 +319,7 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
 static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
 {
     startNest(nest, lvlVomit, "evaluating derivation");
+    state.nrDephtAfterReset = 0;
 
     ATermMap attrs;
     queryAllAttrs(evalExpr(state, args[0]), attrs, true);
@@ -549,6 +553,7 @@ static Expr prim_storePath(EvalState & state, const ATermVector & args)
 {
     PathSet context;
     Path path = canonPath(coerceToPath(state, args[0], context));
+    state.nrDephtAfterReset = 0;
     if (!isInStore(path))
         throw EvalError(format("path `%1%' is not in the Nix store") % path);
     Path path2 = toStorePath(path);
@@ -565,6 +570,7 @@ static Expr prim_pathExists(EvalState & state, const ATermVector & args)
     Path path = coerceToPath(state, args[0], context);
     if (!context.empty())
         throw EvalError(format("string `%1%' cannot refer to other paths") % path);
+    state.nrDephtAfterReset = 0;
     return makeBool(pathExists(path));
 }
 
@@ -598,6 +604,7 @@ static Expr prim_readFile(EvalState & state, const ATermVector & args)
     Path path = coerceToPath(state, args[0], context);
     if (!context.empty())
         throw EvalError(format("string `%1%' cannot refer to other paths") % path);
+    state.nrDephtAfterReset = 0;
     return makeStr(readFile(path));
 }
 
@@ -637,6 +644,7 @@ static Expr prim_toFile(EvalState & state, const ATermVector & args)
         refs.insert(path);
     }
     
+    state.nrDephtAfterReset = 0;
     Path storePath = readOnlyMode
         ? computeStorePathForText(name, contents, refs)
         : store->addTextToStore(name, contents, refs);
@@ -689,6 +697,7 @@ static Expr prim_filterSource(EvalState & state, const ATermVector & args)
 
     FilterFromExpr filter(state, args[0]);
 
+    state.nrDephtAfterReset = 0;
     Path dstPath = readOnlyMode
         ? computeStorePathForPath(path, true, htSHA256, filter).first
         : store->addToStore(path, true, htSHA256, filter);

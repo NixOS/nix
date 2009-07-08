@@ -16,9 +16,9 @@ namespace nix {
     
 
 EvalState::EvalState()
-    : normalForms(32768), primOps(128)
+    : sessionNormalForms(32768), normalForms(32768), primOps(128)
 {
-    nrEvaluated = nrCached = 0;
+    nrEvaluated = nrCached = nrDephtAfterReset = 0;
 
     initNixExprHelpers();
 
@@ -803,10 +803,17 @@ Expr evalExpr(EvalState & state, Expr e)
 #endif
 
     state.nrEvaluated++;
+    state.nrDephtAfterReset++;
 
     /* Consult the memo table to quickly get the normal form of
        previously evaluated expressions. */
     Expr nf = state.normalForms.get(e);
+    if (nf) {
+        state.nrCached++;
+        return nf;
+    }
+
+    nf = state.sessionNormalForms.get(e);
     if (nf) {
         if (nf == makeBlackHole())
             throwEvalError("infinite recursion encountered");
@@ -815,14 +822,22 @@ Expr evalExpr(EvalState & state, Expr e)
     }
 
     /* Otherwise, evaluate and memoize. */
-    state.normalForms.set(e, makeBlackHole());
+    state.sessionNormalForms.set(e, makeBlackHole());
     try {
         nf = evalExpr2(state, e);
     } catch (Error & err) {
-        state.normalForms.remove(e);
+        state.sessionNormalForms.remove(e);
         throw;
     }
-    state.normalForms.set(e, nf);
+
+    if (state.nrDephtAfterReset) {
+        state.sessionNormalForms.remove(e);
+        state.normalForms.set(e, nf);
+        state.nrDephtAfterReset--;
+    } else {
+        state.sessionNormalForms.set(e, nf);
+    }
+
     return nf;
 }
 
@@ -830,6 +845,7 @@ Expr evalExpr(EvalState & state, Expr e)
 Expr evalFile(EvalState & state, const Path & path)
 {
     startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
+    state.nrDephtAfterReset = 0;
     Expr e = parseExprFromFile(state, path);
     try {
         return evalExpr(state, e);
@@ -901,11 +917,13 @@ void printEvalStats(EvalState & state)
     char x;
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
     printMsg(showStats ? lvlInfo : lvlDebug,
-        format("evaluated %1% expressions, %2% cache hits, %3%%% efficiency, used %4% ATerm bytes, used %5% bytes of stack space")
+        format("evaluated %1% expressions, %2% cache hits, %3%%% efficiency, used %4% ATerm bytes, used %5% bytes of stack space, %6% normal reduction, %7% session dependent reduction.")
         % state.nrEvaluated % state.nrCached
         % ((float) state.nrCached / (float) state.nrEvaluated * 100)
         % AT_calcAllocatedSize()
-        % (&x - deepestStack));
+        % (&x - deepestStack)
+        % state.normalForms.size()
+        % state.sessionNormalForms.size());
     if (showStats)
         printATermMapStats();
 }

@@ -29,6 +29,7 @@ typedef Expr (* PrimOp) (EvalState &, const ATermVector & args);
 
 struct EvalState 
 {
+    ATermMap sessionNormalForms;
     ATermMap normalForms;
     ATermMap primOps;
     DrvRoots drvRoots;
@@ -37,6 +38,7 @@ struct EvalState
 
     unsigned int nrEvaluated;
     unsigned int nrCached;
+    unsigned int nrDephtAfterReset;
 
     bool allowUnsafeEquality;
 
