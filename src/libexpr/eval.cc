@@ -25,6 +25,14 @@ EvalState::EvalState()
     addPrimOps();
 
     allowUnsafeEquality = getEnv("NIX_NO_UNSAFE_EQ", "") == "";
+    safeCache = true;
+
+    loadNormalForms();
+}
+
+EvalState::~EvalState()
+{
+    saveNormalForms();
 }
 
 
@@ -468,8 +476,10 @@ LocalNoInline(Expr evalVar(EvalState & state, ATerm name))
     if (arity == 0)
         /* !!! backtrace for primop call */
         return ((PrimOp) ATgetBlobData(fun)) (state, ATermVector());
-    else
+    else {
+        state.safeCache = false;
         return makePrimOp(arity, fun, ATempty);
+    }
 }
 
 
@@ -495,6 +505,7 @@ LocalNoInline(Expr evalCall(EvalState & state, Expr fun, Expr arg))
             for (ATermIterator i(args); i; ++i)
                 args2[--arity] = *i;
             /* !!! backtrace for primop call */
+            state.safeCache = true;
             return ((PrimOp) ATgetBlobData(funBlob))
                 (state, args2);
         } else
@@ -802,7 +813,8 @@ Expr evalExpr(EvalState & state, Expr e)
         format("evaluating expression: %1%") % e);
 #endif
 
-    state.nrEvaluated++;
+    const unsigned int hugeEvalExpr = 100;
+    unsigned int nrEvaluated = state.nrEvaluated++;
     state.nrDephtAfterReset++;
 
     /* Consult the memo table to quickly get the normal form of
@@ -830,7 +842,10 @@ Expr evalExpr(EvalState & state, Expr e)
         throw;
     }
 
-    if (state.nrDephtAfterReset) {
+    // session independent condition
+    if (state.nrDephtAfterReset && state.safeCache &&
+        // heuristic condition
+        state.nrEvaluated - nrEvaluated > hugeEvalExpr) {
         state.sessionNormalForms.remove(e);
         state.normalForms.set(e, nf);
         state.nrDephtAfterReset--;
@@ -917,7 +932,7 @@ void printEvalStats(EvalState & state)
     char x;
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
     printMsg(showStats ? lvlInfo : lvlDebug,
-        format("evaluated %1% expressions, %2% cache hits, %3%%% efficiency, used %4% ATerm bytes, used %5% bytes of stack space, %6% normal reduction, %7% session dependent reduction.")
+             format("evaluated %1% expressions, %2% cache hits, %3%%% efficiency, used %4% ATerm bytes, used %5% bytes of stack space, %6% cached normal reduction, %7% session dependent reduction.")
         % state.nrEvaluated % state.nrCached
         % ((float) state.nrCached / (float) state.nrEvaluated * 100)
         % AT_calcAllocatedSize()

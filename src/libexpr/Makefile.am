@@ -3,7 +3,7 @@ pkglib_LTLIBRARIES = libexpr.la
 libexpr_la_SOURCES = \
  nixexpr.cc eval.cc primops.cc lexer-tab.cc parser-tab.cc \
  get-drvs.cc attr-path.cc expr-to-xml.cc common-opts.cc \
- names.cc
+ names.cc normal-forms.cc
 
 pkginclude_HEADERS = \
  nixexpr.hh eval.hh parser.hh lexer-tab.hh parser-tab.hh \

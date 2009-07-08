@@ -29,8 +29,8 @@ typedef Expr (* PrimOp) (EvalState &, const ATermVector & args);
 
 struct EvalState 
 {
-    ATermMap sessionNormalForms;
     ATermMap normalForms;
+    ATermMap sessionNormalForms;
     ATermMap primOps;
     DrvRoots drvRoots;
     DrvHashes drvHashes; /* normalised derivation hashes */
@@ -41,12 +41,16 @@ struct EvalState
     unsigned int nrDephtAfterReset;
 
     bool allowUnsafeEquality;
+    bool safeCache;
 
     EvalState();
+    ~EvalState();
 
     void addPrimOps();
     void addPrimOp(const string & name,
         unsigned int arity, PrimOp primOp);
+    void loadNormalForms();
+    void saveNormalForms();
 };
 
 

@@ -1,8 +1,8 @@
 #include "serialise.hh"
 #include "util.hh"
+#include "aterm.hh"
 
 #include <cstring>
-
 
 namespace nix {
 
@@ -73,6 +73,67 @@ void writeStringSet(const StringSet & ss, Sink & sink)
 }
 
 
+void writeATerm(ATerm t, Sink & sink)
+{
+    int len;
+    unsigned char *buf = (unsigned char *) ATwriteToBinaryString(t, &len);
+    AutoDeleteArray<unsigned char> d(buf);
+    writeInt(len, sink);
+    sink(buf, len);
+}
+
+
+/* convert the ATermMap to a list of couple because many terms are shared
+   between the keys and between the values.  Thus the BAF stored by
+   writeATerm consume less memory space.  The list of couples is saved
+   inside a tree structure of /treedepth/ height because the serialiasation
+   of ATerm cause a tail recurssion on list tails. */
+void writeATermMap(const ATermMap & tm, Sink & sink)
+{
+    const unsigned int treedepth = 5;
+    const unsigned int maxarity = 128; // 2 < maxarity < MAX_ARITY (= 255)
+    const unsigned int bufsize = treedepth * maxarity;
+
+    AFun map = ATmakeAFun("map", 2, ATfalse);
+    AFun node = ATmakeAFun("node", maxarity, ATfalse);
+    ATerm empty = (ATerm) ATmakeAppl0(ATmakeAFun("empty", 0, ATfalse));
+
+    unsigned int c[treedepth];
+    ATerm *buf = new ATerm[bufsize];
+    AutoDeleteArray<ATerm> d(buf);
+
+    memset(buf, 0, bufsize * sizeof(ATerm));
+    ATprotectArray(buf, bufsize);
+
+    for (unsigned int j = 0; j < treedepth; j++)
+        c[j] = 0;
+
+    for (ATermMap::const_iterator i = tm.begin(); i != tm.end(); ++i) {
+         unsigned int depth = treedepth - 1;
+         ATerm term = (ATerm) ATmakeAppl2(map, i->key, i->value);
+         buf[depth * maxarity + c[depth]++] = term;
+         while (c[depth] % maxarity == 0) {
+             c[depth] = 0;
+             term = (ATerm) ATmakeApplArray(node, &buf[depth * maxarity]);
+             depth--;
+             buf[depth * maxarity + c[depth]++] = term;
+         }
+    }
+
+    unsigned int depth = treedepth;
+    ATerm last_node = empty;
+    while (depth--) {
+        buf[depth * maxarity + c[depth]++] = last_node;
+        while (c[depth] % maxarity)
+            buf[depth * maxarity + c[depth]++] = empty;
+        last_node = (ATerm) ATmakeApplArray(node, &buf[depth * maxarity]);
+    }
+
+    writeATerm(last_node, sink);
+    ATunprotectArray(buf);
+}
+
+
 void readPadding(unsigned int len, Source & source)
 {
     if (len % 8) {
@@ -133,6 +194,50 @@ StringSet readStringSet(Source & source)
     while (count--)
         ss.insert(readString(source));
     return ss;
+}
+
+
+ATerm readATerm(Source & source)
+{
+    unsigned int len = readInt(source);
+    unsigned char * buf = new unsigned char[len];
+    AutoDeleteArray<unsigned char> d(buf);
+    source(buf, len);
+    ATerm t = ATreadFromBinaryString((char *) buf, len);
+    if (t == 0)
+        throw SerialisationError("cannot read a valid ATerm.");
+    return t;
+}
+
+
+static void recursiveInitATermMap(ATermMap &tm, bool &stop, ATermAppl node)
+{
+    const unsigned int arity = ATgetArity(ATgetAFun(node));
+    ATerm key, value;
+
+    switch (arity) {
+        case 0:
+            stop = true;
+            return;
+        case 2:
+            key = ATgetArgument(node, 0);
+            value = ATgetArgument(node, 1);
+            tm.set(key, value);
+            return;
+        default:
+            for (unsigned int i = 0; i < arity && !stop; i++)
+              recursiveInitATermMap(tm, stop, (ATermAppl) ATgetArgument(node, i));
+            return;
+    }
+}
+
+ATermMap readATermMap(Source & source)
+{
+    ATermMap tm;
+    bool stop = false;
+
+    recursiveInitATermMap(tm, stop, (ATermAppl) readATerm(source));
+    return tm;
 }
 
 

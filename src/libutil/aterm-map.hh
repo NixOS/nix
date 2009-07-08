@@ -59,7 +59,7 @@ public:
 
     void remove(ATerm key);
 
-    unsigned int size();
+    unsigned int size() const;
 
     struct const_iterator
     {

@@ -2,7 +2,7 @@
 #define __SERIALISE_H
 
 #include "types.hh"
-
+#include "aterm-map.hh"
 
 namespace nix {
 
@@ -98,12 +98,16 @@ void writeInt(unsigned int n, Sink & sink);
 void writeLongLong(unsigned long long n, Sink & sink);
 void writeString(const string & s, Sink & sink);
 void writeStringSet(const StringSet & ss, Sink & sink);
+void writeATerm(ATerm t, Sink & sink);
+void writeATermMap(const ATermMap & tm, Sink & sink);
 
 void readPadding(unsigned int len, Source & source);
 unsigned int readInt(Source & source);
 unsigned long long readLongLong(Source & source);
 string readString(Source & source);
 StringSet readStringSet(Source & source);
+ATerm readATerm(Source & source);
+ATermMap readATermMap(Source & source);
 
 
 MakeError(SerialisationError, Error)

@@ -24,6 +24,9 @@ extern string nixStateDir;
 /* nixDBPath is the path name of our Berkeley DB environment. */
 extern string nixDBPath;
 
+/* nixCacheFile is the path name of the normal form cache. */
+extern string nixCacheFile;
+
 /* nixConfDir is the directory where configuration files are
    stored. */
 extern string nixConfDir;

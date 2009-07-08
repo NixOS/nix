@@ -215,7 +215,7 @@ void ATermMap::remove(ATerm key)
 }
 
 
-unsigned int ATermMap::size()
+unsigned int ATermMap::size() const
 {
     return count; /* STL nomenclature */
 }
