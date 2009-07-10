@@ -8,6 +8,10 @@ XSLTPROC = $(xsltproc) $(xmlflags) \
  --param admon.style \'\' \
  --param callout.graphics.extension \'.gif\'
 
+dblatex_opts = \
+ -P doc.collab.show=0 \
+ -P latex.output.revhistory=0
+
 # Note: we use GIF for now, since the PNGs shipped with Docbook aren't
 # transparent.
 
@@ -50,7 +54,7 @@ manual.html: $(MANUAL_SRCS) manual.is-valid images
 
 manual.pdf: $(MANUAL_SRCS) manual.is-valid images
 	if test "$(dblatex)" != ""; then \
-		$(dblatex) manual.xml; \
+		$(dblatex) $(dblatex_opts) manual.xml; \
 	else \
 		echo "Please install dblatex and rerun configure."; \
 		exit 1; \
