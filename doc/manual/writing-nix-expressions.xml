@@ -1106,7 +1106,7 @@ used in the Nix expression for Subversion.</para>
     incompatibility might occur.</para>
   </callout>
 
-  <callout arearefs='ex-subversion-nix-co-2'>
+  <callout arearefs='ex-subversion-nix-co-3'>
     <para>This assertion says that in order for Subversion to have SSL
     support (so that it can access <literal>https</literal> URLs), an
     OpenSSL library must be passed.  Additionally, it says that
