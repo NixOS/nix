@@ -1,6 +1,7 @@
 <refentry xmlns="http://docbook.org/ns/docbook"
           xmlns:xlink="http://www.w3.org/1999/xlink"
-          xmlns:xi="http://www.w3.org/2001/XInclude">
+          xmlns:xi="http://www.w3.org/2001/XInclude"
+          xml:id="sec-nix-push">
 
 <refmeta>
   <refentrytitle>nix-push</refentrytitle>

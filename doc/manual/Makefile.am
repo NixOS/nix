@@ -6,7 +6,8 @@ XSLTPROC = $(xsltproc) $(xmlflags) \
  --param xref.with.number.and.title 1 \
  --param toc.section.depth 3 \
  --param admon.style \'\' \
- --param callout.graphics.extension \'.gif\'
+ --param callout.graphics.extension \'.gif\' \
+ --param contrib.inline.enabled 0
 
 dblatex_opts = \
  -P doc.collab.show=0 \

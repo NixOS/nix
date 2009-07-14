@@ -17,6 +17,7 @@
         <orgname>Delft University of Technology</orgname>
         <orgdiv>Department of Software Technology</orgdiv>
       </affiliation>
+      <contrib>Author</contrib>
     </author>
 
     <copyright>
@@ -49,64 +50,25 @@
     
     <section>
       <title>Main commands</title>
-      <section xml:id="sec-nix-env">
-        <title>nix-env</title>
-        <xi:include href="nix-env.xml" />
-      </section>
-      <section xml:id="sec-nix-instantiate">
-        <title>nix-instantiate</title>
-        <xi:include href="nix-instantiate.xml" />
-      </section>
-      <section xml:id="sec-nix-store">
-        <title>nix-store</title>
-        <xi:include href="nix-store.xml" />
-      </section>
+      <xi:include href="nix-env.xml" />
+      <xi:include href="nix-instantiate.xml" />
+      <xi:include href="nix-store.xml" />
     </section>
     
     <section>
       <title>Utilities</title>
-      <section xml:id="sec-nix-build">
-        <title>nix-build</title>
-        <xi:include href="nix-build.xml" />
-      </section>
-      <section xml:id="sec-nix-channel">
-        <title>nix-channel</title>
-        <xi:include href="nix-channel.xml" />
-      </section>
-      <section xml:id="sec-nix-collect-garbage">
-        <title>nix-collect-garbage</title>
-        <xi:include href="nix-collect-garbage.xml" />
-      </section>
-      <section xml:id="sec-nix-copy-closure">
-        <title>nix-copy-closure</title>
-        <xi:include href="nix-copy-closure.xml" />
-      </section>
-      <section xml:id="sec-nix-hash">
-        <title>nix-hash</title>
-        <xi:include href="nix-hash.xml" />
-      </section>
-      <section xml:id="sec-nix-install-package">
-        <title>nix-install-package</title>
-        <xi:include href="nix-install-package.xml" />
-      </section>
-      <section xml:id="sec-nix-prefetch-url">
-        <title>nix-prefetch-url</title>
-        <xi:include href="nix-prefetch-url.xml" />
-      </section>
-      <section xml:id="sec-nix-pull">
-        <title>nix-pull</title>
-        <xi:include href="nix-pull.xml" />
-      </section>
-      <section xml:id="sec-nix-push">
-        <title>nix-push</title>
-        <xi:include href="nix-push.xml" />
-      </section>
-      <section xml:id="sec-nix-worker">
-        <title>nix-worker</title>
-        <xi:include href="nix-worker.xml" />
-      </section>
+      <xi:include href="nix-build.xml" />
+      <xi:include href="nix-channel.xml" />
+      <xi:include href="nix-collect-garbage.xml" />
+      <xi:include href="nix-copy-closure.xml" />
+      <xi:include href="nix-hash.xml" />
+      <xi:include href="nix-install-package.xml" />
+      <xi:include href="nix-prefetch-url.xml" />
+      <xi:include href="nix-pull.xml" />
+      <xi:include href="nix-push.xml" />
+      <xi:include href="nix-worker.xml" />
     </section>
-    
+
   </appendix>
 
   <xi:include href="troubleshooting.xml" />

@@ -331,7 +331,7 @@ default profile, respectively.  If the profile doesn’t exist, it will
 be created automatically.  You should be careful about storing a
 profile in another location than the <filename>profiles</filename>
 directory, since otherwise it might not be used as a root of the
-garbage collector (see section <xref linkend='sec-garbage-collection'
+garbage collector (see <xref linkend='sec-garbage-collection'
 />).</para>
 
 <para>All <command>nix-env</command> operations work on the profile
