@@ -112,6 +112,10 @@ EOF
         $dryRun = 1;
     }
     
+    elsif ($arg eq "--show-trace") {
+        push @instArgs, $arg;
+    }
+    
     elsif (substr($arg, 0, 1) eq "-") {
         push @buildArgs, $arg;
     }
