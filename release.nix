@@ -47,6 +47,9 @@ let
 
           stripHash ${bzip2.src}
           cp -pv ${bzip2.src} externals/$strippedName
+
+          # TeX needs a writable font cache.
+          export VARTEXFONTS=$TMPDIR/texfonts
         '';
 
         preDist = ''
