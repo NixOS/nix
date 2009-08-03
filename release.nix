@@ -18,7 +18,10 @@ let
         src = nix;
         inherit officialRelease;
 
-        buildInputs = [curl bison flex2533 perl libxml2 libxslt w3m bzip2 jing_tools tetex dblatex];
+        buildInputs =
+          [ curl bison flex2533 perl libxml2 libxslt w3m bzip2 jing_tools
+            tetex dblatex nukeReferences
+          ];
 
         configureFlags = ''
           --with-docbook-rng=${docbook5}/xml/rng/docbook
@@ -57,6 +60,14 @@ let
           
           make -C doc/manual manual.pdf prefix=$out
           cp doc/manual/manual.pdf $out/manual.pdf
+
+          # The PDF containes filenames of included graphics (see
+          # http://www.tug.org/pipermail/pdftex/2007-August/007290.html).
+          # This causes a retained dependency on dblatex, which Hydra
+          # doesn't like (the output of the tarball job is distributed
+          # to Windows and Macs, so there should be no Linux binaries
+          # in the closure).
+          nuke-refs $out/manual.pdf
           
           echo "doc manual $out/share/doc/nix/manual" >> $out/nix-support/hydra-build-products
           echo "doc-pdf manual $out/manual.pdf" >> $out/nix-support/hydra-build-products
