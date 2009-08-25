@@ -223,6 +223,23 @@ static Expr prim_addErrorContext(EvalState & state, const ATermVector & args)
     }
 }
 
+/* Try evaluating the argument. Success => {success=true; value=something;}, 
+ * else => {success=false; value=false;} */
+static Expr prim_tryEval(EvalState & state, const ATermVector & args)
+{
+    ATermMap res = ATermMap();
+    try {
+        Expr val = evalExpr(state, args[0]);
+        res.set(toATerm("value"), makeAttrRHS(val, makeNoPos()));
+        res.set(toATerm("success"), makeAttrRHS(eTrue, makeNoPos()));
+    } catch (Error & e) {
+        printMsg(lvlInfo, format("tryEval caught an error: %1%: %2%") % e.prefix() % e.msg());
+        res.set(toATerm("value"), makeAttrRHS(eFalse, makeNoPos()));
+        res.set(toATerm("success"), makeAttrRHS(eFalse, makeNoPos()));
+    }
+    return makeAttrs(res);
+}
+
 
 /* Return an environment variable.  Use with care. */
 static Expr prim_getEnv(EvalState & state, const ATermVector & args)
@@ -1020,6 +1037,7 @@ void EvalState::addPrimOps()
     addPrimOp("abort", 1, prim_abort);
     addPrimOp("throw", 1, prim_throw);
     addPrimOp("__addErrorContext", 2, prim_addErrorContext);
+    addPrimOp("__tryEval", 1, prim_tryEval);
     addPrimOp("__getEnv", 1, prim_getEnv);
     addPrimOp("__trace", 2, prim_trace);
 
