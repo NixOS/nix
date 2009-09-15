@@ -812,6 +812,70 @@ static Expr prim_isAttrs(EvalState & state, const ATermVector & args)
 }
 
 
+/* Return the right-biased intersection of two attribute sets as1 and
+   as2, i.e. a set that contains every attribute from as2 that is also
+   a member of as1. */
+static Expr prim_intersectAttrs(EvalState & state, const ATermVector & args)
+{
+    ATermMap as1, as2;
+    queryAllAttrs(evalExpr(state, args[0]), as1, true);
+    queryAllAttrs(evalExpr(state, args[1]), as2, true);
+
+    ATermMap res;
+    foreach (ATermMap::const_iterator, i, as2)
+        if (as1[i->key]) res.set(i->key, i->value);
+
+    return makeAttrs(res);
+}
+
+
+static void attrsInPattern(ATermMap & map, Pattern pat)
+{
+    ATerm name;
+    ATermList formals;
+    Pattern pat1, pat2;
+    ATermBool ellipsis;
+    if (matchAttrsPat(pat, formals, ellipsis)) { 
+        for (ATermIterator i(formals); i; ++i) {
+            ATerm def;
+            if (!matchFormal(*i, name, def)) abort();
+            map.set(name, makeAttrRHS(makeBool(def != constNoDefaultValue), makeNoPos()));
+        }
+    }
+    else if (matchAtPat(pat, pat1, pat2)) {
+        attrsInPattern(map, pat1);
+        attrsInPattern(map, pat2);
+    }
+}
+
+
+/* Return a set containing the names of the formal arguments expected
+   by the function `f'.  The value of each attribute is a Boolean
+   denoting whether has a default value.  For instance,
+
+      functionArgs ({ x, y ? 123}: ...)
+   => { x = false; y = true; }
+
+   "Formal argument" here refers to the attributes pattern-matched by
+   the function.  Plain lambdas are not included, e.g.
+
+      functionArgs (x: ...)
+   => { }
+*/
+static Expr prim_functionArgs(EvalState & state, const ATermVector & args)
+{
+    Expr f = evalExpr(state, args[0]);
+    ATerm pat, body, pos;
+    if (!matchFunction(f, pat, body, pos))
+        throw TypeError("`functionArgs' required a function");
+    
+    ATermMap as;
+    attrsInPattern(as, pat);
+
+    return makeAttrs(as);
+}
+
+
 /*************************************************************
  * Lists
  *************************************************************/
@@ -1070,6 +1134,8 @@ void EvalState::addPrimOps()
     addPrimOp("__isAttrs", 1, prim_isAttrs);
     addPrimOp("removeAttrs", 2, prim_removeAttrs);
     addPrimOp("__listToAttrs", 1, prim_listToAttrs);
+    addPrimOp("__intersectAttrs", 2, prim_intersectAttrs);
+    addPrimOp("__functionArgs", 1, prim_functionArgs);
 
     // Lists
     addPrimOp("__isList", 1, prim_isList);
