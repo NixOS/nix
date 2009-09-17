@@ -62,7 +62,7 @@ while (<CONF>) {
     /^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\d+)\s*$/ or die;
     push @machines,
         { hostName => $1
-        , systemType => $2
+        , systemTypes => [split(/,/, $2)]
         , sshKeys => $3
         , maxJobs => $4
         };
@@ -82,16 +82,15 @@ my $rightType = 0;
 my $machine;
 my $slotLock;
 LOOP: foreach my $cur (@machines) {
-    if ($neededSystem eq $cur->{systemType}
-        || ($neededSystem eq "i686-linux" && $cur->{systemType} eq "x86_64-linux"))
-    {
+    print STDERR @{$cur->{systemTypes}}, "\n";
+    if (grep { $neededSystem eq $_ } @{$cur->{systemTypes}}) {
         $rightType = 1;
 
         # We have a machine of the right type.  Try to get a lock on
         # one of the machine's lock files.
         my $slot = 0;
         while ($slot < $cur->{maxJobs}) {
-            my $slotLockFn = "$currentLoad/" . $cur->{systemType} . "-" . $cur->{hostName} . "-$slot";
+            my $slotLockFn = "$currentLoad/" . (join '+', @{$cur->{systemTypes}}) . "-" . $cur->{hostName} . "-$slot";
             $slotLock = new IO::Handle;
             open $slotLock, ">>$slotLockFn" or die;
             if (flock($slotLock, LOCK_EX | LOCK_NB)) {
