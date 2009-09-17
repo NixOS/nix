@@ -152,6 +152,7 @@ my $machine = $selected->{machine};
 
 my $slotLock = openSlotLock($machine, $selected->{free});
 flock($slotLock, LOCK_EX | LOCK_NB) or die;
+utime undef, undef, $slotLock;
 
 close MAINLOCK;
 
