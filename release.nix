@@ -95,7 +95,8 @@ let
         '';
       };
 
-      
+
+    /*
     static =
       { tarball ? jobs.tarball {}
       , system ? "i686-linux"
@@ -115,6 +116,7 @@ let
           --enable-static-nix
         '';
       };
+    */
 
       
     coverage =
