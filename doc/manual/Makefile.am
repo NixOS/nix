@@ -34,13 +34,9 @@ MANUAL_SRCS = manual.xml introduction.xml installation.xml \
  conf-file.xml release-notes.xml \
  style.css images
 
+# Note: RelaxNG validation requires xmllint >= 2.7.4.
 manual.is-valid: $(MANUAL_SRCS) version.txt
-#	$(XMLLINT) --xinclude $< | $(XMLLINT) --noout --nonet --relaxng $(docbookrng)/docbook.rng -
-	if test "$(jing)" != "false"; then \
-		$(XMLLINT) --xinclude $< | $(jing) $(docbookrng)/docbook.rng /dev/fd/0; \
-	else \
-		echo "Not validating."; \
-	fi
+	$(XMLLINT) --noout --nonet --xinclude --noxincludenode --relaxng $(docbookrng)/docbook.rng $<
 	touch $@
 
 version.txt:

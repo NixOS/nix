@@ -140,7 +140,6 @@ NEED_PROG(bash, bash)
 NEED_PROG(patch, patch)
 AC_PATH_PROG(xmllint, xmllint, false)
 AC_PATH_PROG(xsltproc, xsltproc, false)
-AC_PATH_PROG(jing, jing, false) # needed because xmllint --relaxng seems broken
 AC_PATH_PROG(w3m, w3m, false)
 AC_PATH_PROG(flex, flex, false)
 AC_PATH_PROG(bison, bison, false)
