@@ -518,6 +518,13 @@ void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter &
 
     case 0: /* child */
         try {
+            /* Hack to let "make check" succeed on Darwin.  The
+               libtool wrapper script sets DYLD_LIBRARY_PATH to our
+               libutil (among others), but Perl also depends on a
+               library named libutil.  As a result, substituters
+               written in Perl (i.e. all of them) fail. */
+            unsetenv("DYLD_LIBRARY_PATH");
+            
             fromPipe.readSide.close();
             toPipe.writeSide.close();
             if (dup2(toPipe.readSide, STDIN_FILENO) == -1)
