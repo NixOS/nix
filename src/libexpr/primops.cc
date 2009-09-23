@@ -232,8 +232,8 @@ static Expr prim_tryEval(EvalState & state, const ATermVector & args)
         Expr val = evalExpr(state, args[0]);
         res.set(toATerm("value"), makeAttrRHS(val, makeNoPos()));
         res.set(toATerm("success"), makeAttrRHS(eTrue, makeNoPos()));
-    } catch (Error & e) {
-        printMsg(lvlInfo, format("tryEval caught an error: %1%: %2%") % e.prefix() % e.msg());
+    } catch (AssertionError & e) {
+        printMsg(lvlDebug, format("tryEval caught an error: %1%: %2%") % e.prefix() % e.msg());
         res.set(toATerm("value"), makeAttrRHS(eFalse, makeNoPos()));
         res.set(toATerm("success"), makeAttrRHS(eFalse, makeNoPos()));
     }
