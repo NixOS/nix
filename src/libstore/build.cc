@@ -467,6 +467,8 @@ void UserLock::acquire()
         if (!pw)
             throw Error(format("the user `%1%' in the group `%2%' does not exist")
                 % *i % buildUsersGroup);
+
+        createDirs(nixStateDir + "/userpool");
         
         fnUserLock = (format("%1%/userpool/%2%") % nixStateDir % pw->pw_uid).str();
 

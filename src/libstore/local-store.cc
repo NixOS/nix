@@ -47,8 +47,21 @@ LocalStore::LocalStore()
     
     if (readOnlyMode) return;
 
+    /* Create missing state directories if they don't already exist. */
     createDirs(nixStore);
-    
+    createDirs(nixDBPath + "/info");
+    createDirs(nixDBPath + "/referrer");
+    createDirs(nixDBPath + "/failed");
+    Path profilesDir = nixStateDir + "/profiles";
+    createDirs(nixStateDir + "/profiles");
+    createDirs(nixStateDir + "/temproots");
+    Path gcRootsDir = nixStateDir + "/gcroots";
+    if (!pathExists(gcRootsDir)) {
+        createDirs(gcRootsDir);
+        if (symlink(profilesDir.c_str(), (gcRootsDir + "/profiles").c_str()) == -1)
+            throw SysError(format("creating symlink to `%1%'") % profilesDir);
+    }
+  
     checkStoreNotSymlink();
 
     try {
@@ -64,11 +77,7 @@ LocalStore::LocalStore()
         printMsg(lvlError, "waiting for the big Nix store lock...");
         lockFile(globalLock, ltRead, true);
     }
-
-    createDirs(nixDBPath + "/info");
-    createDirs(nixDBPath + "/referrer");
-    createDirs(nixDBPath + "/failed");
-
+    
     int curSchema = getSchema();
     if (curSchema > nixSchemaVersion)
         throw Error(format("current Nix store schema is version %1%, but I only support %2%")
