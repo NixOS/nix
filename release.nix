@@ -91,7 +91,8 @@ let
 
         configureFlags = ''
           --disable-init-state
-          --with-bdb=${db45} --with-aterm=${aterm242fixes} --with-bzip2=${bzip2}
+          ${if system == "i686-cygwin" then "--disable-old-db-compat" else "--with-bdb=${db45}"}
+          --with-aterm=${aterm242fixes} --with-bzip2=${bzip2}
         '';
       };
 
