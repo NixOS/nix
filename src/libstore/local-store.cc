@@ -16,6 +16,7 @@
 #include <utime.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <stdio.h>
 
 
 namespace nix {
