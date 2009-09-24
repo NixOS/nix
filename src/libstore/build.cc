@@ -21,6 +21,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <stdio.h>
 
 #include <pwd.h>
 #include <grp.h>
