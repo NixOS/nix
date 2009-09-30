@@ -20,8 +20,17 @@
 using namespace nix;
 
 
+/* On platforms that have O_ASYNC, we can detect when a client
+   disconnects and immediately kill any ongoing builds.  On platforms
+   that lack it, we only notice the disconnection the next time we try
+   to write to the client.  So if you have a builder that never
+   generates output on stdout/stderr, the worker will never notice
+   that the client has disconnected until the builder terminates. */
+#ifdef O_ASYNC
+#define HAVE_HUP_NOTIFICATION
 #ifndef SIGPOLL
 #define SIGPOLL SIGIO
+#endif
 #endif
 
 
@@ -90,7 +99,7 @@ static bool isFarSideClosed(int socket)
 
 
 /* A SIGPOLL signal is received when data is available on the client
-   communication scoket, or when the client has closed its side of the
+   communication socket, or when the client has closed its side of the
    socket.  This handler is enabled at precisely those moments in the
    protocol when we're doing work and the client is supposed to be
    quiet.  Thus, if we get a SIGPOLL signal, it means that the client
@@ -131,12 +140,14 @@ static void sigPollHandler(int sigNo)
 
 static void setSigPollAction(bool enable)
 {
+#ifdef HAVE_HUP_NOTIFICATION
     struct sigaction act, oact;
     act.sa_handler = enable ? sigPollHandler : SIG_IGN;
     sigfillset(&act.sa_mask);
     act.sa_flags = 0;
     if (sigaction(SIGPOLL, &act, &oact))
         throw SysError("setting handler for SIGPOLL");
+#endif
 }
 
 
@@ -520,12 +531,14 @@ static void processConnection()
     myPid = getpid();    
     writeToStderr = tunnelStderr;
 
+#ifdef HAVE_HUP_NOTIFICATION
     /* Allow us to receive SIGPOLL for events on the client socket. */
     setSigPollAction(false);
     if (fcntl(from.fd, F_SETOWN, getpid()) == -1)
         throw SysError("F_SETOWN");
-    if (fcntl(from.fd, F_SETFL, fcntl(from.fd, F_GETFL, 0) | FASYNC) == -1)
+    if (fcntl(from.fd, F_SETFL, fcntl(from.fd, F_GETFL, 0) | O_ASYNC) == -1)
         throw SysError("F_SETFL");
+#endif
 
     /* Exchange the greeting. */
     unsigned int magic = readInt(from);
@@ -663,11 +676,12 @@ static void daemonLoop()
             AutoCloseFD remote = accept(fdSocket,
                 (struct sockaddr *) &remoteAddr, &remoteAddrLen);
             checkInterrupt();
-            if (remote == -1)
+            if (remote == -1) {
 		if (errno == EINTR)
 		    continue;
 		else
 		    throw SysError("accepting connection");
+            }
 
             printMsg(lvlInfo, format("accepted connection %1%") % remote);
 
