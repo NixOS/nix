@@ -302,7 +302,12 @@ struct RestoreSink : ParseSink
 #if HAVE_POSIX_FALLOCATE
         if (len) {
             errno = posix_fallocate(fd, 0, len);
-            if (errno) throw SysError(format("preallocating file of %1% bytes") % len);
+            /* Note that EINVAL may indicate that the underlying
+               filesystem doesn't support preallocation (e.g. on
+               OpenSolaris).  Since preallocation is just an
+               optimisation, ignore it. */
+            if (errno && errno != EINVAL)
+                throw SysError(format("preallocating file of %1% bytes") % len);
         }
 #endif
     }
