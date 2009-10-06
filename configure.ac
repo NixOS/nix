@@ -55,7 +55,7 @@ test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
 # except that it requires the ATerm "lib" directory to be in $PATH, as
 # Windows doesn't have anything like an RPATH embedded in executable.
 # Since this is kind of annoying, we use static libraries for now.
-    
+
 AC_ARG_ENABLE(static-nix, AC_HELP_STRING([--enable-static-nix],
   [produce statically linked binaries]),
   static_nix=$enableval, static_nix=no)
@@ -63,13 +63,13 @@ AC_ARG_ENABLE(static-nix, AC_HELP_STRING([--enable-static-nix],
 if test "$sys_name" = cygwin; then
    static_nix=yes
 fi
-  
+
 if test "$static_nix" = yes; then
     AC_DISABLE_SHARED
     AC_ENABLE_STATIC
 fi
 
-  
+
 # Windows-specific stuff.
 if test "$sys_name" = "cygwin"; then
     # We cannot delete open files.
@@ -88,8 +88,7 @@ AC_PROG_LIBTOOL
 
 
 # Use 64-bit file system calls so that we can support files > 2 GiB.
-CFLAGS="-D_FILE_OFFSET_BITS=64 $CFLAGS"
-CXXFLAGS="-D_FILE_OFFSET_BITS=64 $CXXFLAGS"
+AC_SYS_LARGEFILE
 
 
 # Check for pubsetbuf.
@@ -259,7 +258,7 @@ else
   bzip2_include="-I$bzip2/include"
   bzip2_bin="$bzip2/bin"
   bzip2_bin_test="$bzip2/bin"
-fi   
+fi
 AC_SUBST(bzip2_lib)
 AC_SUBST(bzip2_include)
 AC_SUBST(bzip2_bin)
