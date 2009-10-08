@@ -76,6 +76,12 @@ if test "$sys_name" = "cygwin"; then
     AC_DEFINE(CANNOT_DELETE_OPEN_FILES, 1, [Whether it is impossible to delete open files.])
 fi
 
+# Solaris-specific stuff.
+if test "$sys_name" = "sunos"; then
+    # Solaris requires -lsocket -lnsl for network functions
+    ADDITIONAL_NETWORK_LIBS="-lsocket -lnsl"
+    AC_SUBST(ADDITIONAL_NETWORK_LIBS)
+fi
 
 AC_PROG_CC
 AC_PROG_CXX

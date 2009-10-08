@@ -10,7 +10,7 @@ pkginclude_HEADERS = \
   globals.hh db.hh references.hh pathlocks.hh \
   worker-protocol.hh
 
-libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la
+libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la @ADDITIONAL_NETWORK_LIBS@
 
 BUILT_SOURCES = derivations-ast.cc derivations-ast.hh
 
