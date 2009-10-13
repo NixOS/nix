@@ -704,52 +704,59 @@ static void upgradeDerivations(Globals & globals,
         foreach (DrvInfos::iterator, i, installedElems) {
             DrvName drvName(i->name);
 
-            MetaInfo meta = i->queryMetaInfo(globals.state);
-            if (keep(meta)) {
-                newElems.push_back(*i);
-                continue;
-            }
+            try {
 
-            /* Find the derivation in the input Nix expression with
-               the same name that satisfies the version constraints
-               specified by upgradeType.  If there are multiple
-               matches, take the one with the highest priority.  If
-               there are still multiple matches, take the one with the
-               highest version. */
-            DrvInfos::iterator bestElem = availElems.end();
-            DrvName bestName;
-            foreach (DrvInfos::iterator, j, availElems) {
-                DrvName newName(j->name);
-                if (newName.name == drvName.name) {
-                    int d = comparePriorities(globals.state, *i, *j);
-                    if (d == 0) d = compareVersions(drvName.version, newName.version);
-                    if ((upgradeType == utLt && d < 0) ||
-                        (upgradeType == utLeq && d <= 0) ||
-                        (upgradeType == utEq && d == 0) ||
-                        upgradeType == utAlways)
-                    {
-                        int d2 = -1;
-                        if (bestElem != availElems.end()) {
-                            d2 = comparePriorities(globals.state, *bestElem, *j);
-                            if (d2 == 0) d2 = compareVersions(bestName.version, newName.version);
-                        }
-                        if (d2 < 0) {
-                            bestElem = j;
-                            bestName = newName;
+                MetaInfo meta = i->queryMetaInfo(globals.state);
+                if (keep(meta)) {
+                    newElems.push_back(*i);
+                    continue;
+                }
+
+                /* Find the derivation in the input Nix expression
+                   with the same name that satisfies the version
+                   constraints specified by upgradeType.  If there are
+                   multiple matches, take the one with the highest
+                   priority.  If there are still multiple matches,
+                   take the one with the highest version. */
+                DrvInfos::iterator bestElem = availElems.end();
+                DrvName bestName;
+                foreach (DrvInfos::iterator, j, availElems) {
+                    DrvName newName(j->name);
+                    if (newName.name == drvName.name) {
+                        int d = comparePriorities(globals.state, *i, *j);
+                        if (d == 0) d = compareVersions(drvName.version, newName.version);
+                        if ((upgradeType == utLt && d < 0) ||
+                            (upgradeType == utLeq && d <= 0) ||
+                            (upgradeType == utEq && d == 0) ||
+                            upgradeType == utAlways)
+                        {
+                            int d2 = -1;
+                            if (bestElem != availElems.end()) {
+                                d2 = comparePriorities(globals.state, *bestElem, *j);
+                                if (d2 == 0) d2 = compareVersions(bestName.version, newName.version);
+                            }
+                            if (d2 < 0) {
+                                bestElem = j;
+                                bestName = newName;
+                            }
                         }
                     }
                 }
-            }
+                
+                if (bestElem != availElems.end() &&
+                    i->queryOutPath(globals.state) !=
+                    bestElem->queryOutPath(globals.state))
+                {
+                    printMsg(lvlInfo,
+                        format("upgrading `%1%' to `%2%'")
+                        % i->name % bestElem->name);
+                    newElems.push_back(*bestElem);
+                } else newElems.push_back(*i);
 
-            if (bestElem != availElems.end() &&
-                i->queryOutPath(globals.state) !=
-                bestElem->queryOutPath(globals.state))
-            {
-                printMsg(lvlInfo,
-                    format("upgrading `%1%' to `%2%'")
-                    % i->name % bestElem->name);
-                newElems.push_back(*bestElem);
-            } else newElems.push_back(*i);
+            } catch (Error & e) {
+                e.addPrefix(format("while trying to find an upgrade for `%1%':\n") % i->name);
+                throw;
+            }
         }
     
         printMissing(globals.state, newElems);
