@@ -435,10 +435,18 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
                     drv.inputDrvs[*j] = singleton<StringSet>("out");
             }
         }
-        
-        debug(format("derivation uses `%1%'") % path);
+
+        /* See prim_unsafeDiscardOutputDependency. */
+        bool useDrvAsSrc = false;
+        if (path.at(0) == '~') {
+            path = string(path, 1);
+            useDrvAsSrc = true;
+        }
+
         assert(isStorePath(path));
-        if (isDerivation(path))
+
+        debug(format("derivation uses `%1%'") % path);
+        if (!useDrvAsSrc && isDerivation(path))
             drv.inputDrvs[path] = singleton<StringSet>("out");
         else
             drv.inputSrcs.insert(path);
@@ -1027,6 +1035,28 @@ static Expr prim_unsafeDiscardStringContext(EvalState & state, const ATermVector
 }
 
 
+/* Sometimes we want to pass a derivation path (i.e. pkg.drvPath) to a
+   builder without causing the derivation to be built (for instance,
+   in the derivation that builds NARs in nix-push, when doing
+   source-only deployment).  This primop marks the string context so
+   that builtins.derivation adds the path to drv.inputSrcs rather than
+   drv.inputDrvs. */
+static Expr prim_unsafeDiscardOutputDependency(EvalState & state, const ATermVector & args)
+{
+    PathSet context;
+    string s = coerceToString(state, args[0], context);
+
+    PathSet context2;
+    foreach (PathSet::iterator, i, context) {
+        Path p = *i;
+        if (p.at(0) == '=') p = "~" + string(p, 1);
+        context2.insert(p);
+    }
+    
+    return makeStr(s, context2);
+}
+
+
 /* Expression serialization/deserialization */
 
 
@@ -1156,6 +1186,7 @@ void EvalState::addPrimOps()
     addPrimOp("__substring", 3, prim_substring);
     addPrimOp("__stringLength", 1, prim_stringLength);
     addPrimOp("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
+    addPrimOp("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
 
     // Versions
     addPrimOp("__parseDrvName", 1, prim_parseDrvName);
