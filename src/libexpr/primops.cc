@@ -256,7 +256,12 @@ static Expr prim_getEnv(EvalState & state, const ATermVector & args)
 static Expr prim_trace(EvalState & state, const ATermVector & args)
 {
     Expr e = evalExpr(state, args[0]);
-    printMsg(lvlError, format("trace: %1%") % e);
+    string s;
+    PathSet context;
+    if (matchStr(e, s, context))
+        printMsg(lvlError, format("trace: %1%") % s);
+    else
+        printMsg(lvlError, format("trace: %1%") % e);
     return evalExpr(state, args[1]);
 }
 
