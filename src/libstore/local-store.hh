@@ -185,9 +185,6 @@ private:
 };
 
 
-/* Copy a path recursively. */
-void copyPath(const Path & src, const Path & dst);
-
 /* "Fix", or canonicalise, the meta-data of the files in a store path
    after it has been built.  In particular:
    - the last modification date on each file is set to 1 (i.e.,
