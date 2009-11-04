@@ -8,7 +8,7 @@
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-0.13"><title>Release 0.13 (September NN,
+<section xml:id="ssec-relnotes-0.13"><title>Release 0.13 (November 4,
 2009)</title>
 
 <para>This is primarily a bug fix release.  It has some new
@@ -85,7 +85,25 @@ features:</para>
     add a string to stack traces — useful for debugging),
     <varname>builtins.isBool</varname>,
     <varname>builtins.isString</varname>,
-    <varname>builtins.isInt</varname>.</para>
+    <varname>builtins.isInt</varname>,
+    <varname>builtins.intersectAttrs</varname>.</para>
+  </listitem>
+
+  <listitem>
+    <para>OpenSolaris support (Sander van der Burg).</para>
+  </listitem>
+
+  <listitem>
+    <para>Stack traces are no longer displayed unless the
+    <option>--show-trace</option> option is used.</para>
+  </listitem>
+
+  <listitem>
+    <para>The scoping rules for <literal>inherit
+    (<replaceable>e</replaceable>) ...</literal> in recursive
+    attribute sets have changed.  The expression
+    <replaceable>e</replaceable> can now refer to the attributes
+    defined in the containing set.</para>
   </listitem>
 
 </itemizedlist>

@@ -324,6 +324,16 @@ x: x + 456</programlisting>
   </varlistentry>
 
   
+  <varlistentry><term><function>builtins.intersectAttrs</function>
+  <replaceable>e1</replaceable> <replaceable>e2</replaceable></term>
+
+    <listitem><para>Return an attribute set consisting of the
+    attributes in the set <replaceable>e2</replaceable> that also
+    exist in the set <replaceable>e1</replaceable>.</para></listitem>
+
+  </varlistentry>
+        
+    
   <varlistentry><term><function>builtins.isAttrs</function>
   <replaceable>e</replaceable></term>
 
