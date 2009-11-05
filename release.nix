@@ -19,7 +19,7 @@ let
         inherit officialRelease;
 
         buildInputs =
-          [ curl bison flex2533 perl libxml2New libxslt w3m bzip2
+          [ curl bison flex2533 perl libxml2 libxslt w3m bzip2
             tetex dblatex nukeReferences
           ];
 
