@@ -140,16 +140,25 @@ $ ./bootstrap</screen>
 <para>The installation path can be specified by passing the
 <option>--prefix=<replaceable>prefix</replaceable></option> to
 <command>configure</command>.  The default installation directory is
-<filename>/nix</filename>.  You can change this to any location you
-like.  You must have write permission to the
+<filename>/usr/local</filename>.  You can change this to any location
+you like.  You must have write permission to the
 <replaceable>prefix</replaceable> path.</para>
 
-<warning><para>It is best <emphasis>not</emphasis> to change the
-installation prefix from its default, since doing so makes it
-impossible to use pre-built binaries from the standard Nixpkgs
-channels.</para></warning>
+<para>Nix keeps its <emphasis>store</emphasis> (the place where
+packages are stored) in <filename>/nix/store</filename> by default.
+This can be changed using
+<option>--with-store-dir=<replaceable>path</replaceable></option>.</para>
 
-<para>If you want to rebuilt the documentation, pass the full path to
+<warning><para>It is best <emphasis>not</emphasis> to change the Nix
+store from its default, since doing so makes it impossible to use
+pre-built binaries from the standard Nixpkgs channels — that is, all
+packages will need to be built from source.</para></warning>
+
+<para>Nix keeps state (such as its database and log files) in
+<filename>/nix/var</filename> by default.  This can be changed using
+<option>--localstatedir=<replaceable>path</replaceable></option>.</para>
+
+<para>If you want to rebuild the documentation, pass the full path to
 the DocBook RELAX NG schemas and to the DocBook XSL stylesheets using
 the
 <option>--with-docbook-rng=<replaceable>path</replaceable></option>
@@ -160,27 +169,26 @@ options.</para>
 </section>
 
 
-<section><title>Installing from RPMs</title>
+<section><title>Installing a binary distribution</title>
 
-<para>RPM packages of Nix can be downloaded from <link
-xlink:href="http://nixos.org/" />.  These RPMs should work for most
-fairly recent releases of SuSE and Red Hat Linux.  They have been
-known to work work on SuSE Linux 8.1 and 9.0, and Red Hat 9.0.  In
-fact, it should work on any RPM-based Linux distribution based on
-<literal>glibc</literal> 2.3 or later.</para>
-
-<para>Once downloaded, the RPMs can be installed or upgraded using
-<command>rpm -U</command>.  For example,
+<para>RPM and Deb packages of Nix for a number of different versions
+of Fedora, openSUSE, Debian and Ubuntu can be downloaded from <link
+xlink:href="http://nixos.org/" />.  Once downloaded, the RPMs can be
+installed or upgraded using <command>rpm -U</command>.  For example,
 
 <screen>
-$ rpm -U nix-0.5pre664-1.i386.rpm</screen>
+$ rpm -U nix-0.13pre18104-1.i386.rpm</screen>
+
+Likewise, for a Deb package:
+
+<screen>
+$ dpkg -i nix_0.13pre18104-1_amd64.deb</screen>
 
 </para>
 
-<para>The RPMs install into the directory <filename>/nix</filename>.
-Nix can be uninstalled using <command>rpm -e nix</command>.  After
-this it will be necessary to manually remove the Nix store and other
-auxiliary data:
+<para>Nix can be uninstalled using <command>rpm -e nix</command> or
+<command>dpkg -r nix</command>.  After this you should manually remove
+the Nix store and other auxiliary data, if desired:
 
 <screen>
 $ rm -rf /nix/store
@@ -191,6 +199,7 @@ $ rm -rf /nix/var</screen>
 </section>
 
 
+<!-- TODO: should be updated
 <section><title>Upgrading Nix through Nix</title>
 
 <para>You can install the latest stable version of Nix through Nix
@@ -203,6 +212,7 @@ installation</link> by clicking on the package links at <link
 xlink:href="http://nixos.org/releases/full-index-nix.html" />.</para>
 
 </section>
+-->
 
 
 <section><title>Security</title>

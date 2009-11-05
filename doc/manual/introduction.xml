@@ -320,7 +320,7 @@ overview of NixOS is given in the HotOS XI paper <citetitle
 xlink:href="http://www.st.ewi.tudelft.nl/~dolstra/pubs/hotos-final.pdf">Purely
 Functional System Configuration Management</citetitle>.  The Nix
 homepage has <link
-xlink:href="http://nix.cs.uu.nl/docs/papers.html">an up-to-date list
+xlink:href="http://nixos.org/docs/papers.html">an up-to-date list
 of Nix-related papers</link>.</para>
 
 <para>Nix is the subject of Eelco Dolstra’s PhD thesis <citetitle

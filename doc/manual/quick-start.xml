@@ -11,9 +11,9 @@ to the following chapters.</para>
 
 <orderedlist>
 
-<listitem><para>Download a source tarball or RPM from <link
-xlink:href='http://nixos.org/'/>.  Build source
-distributions using the regular sequence:
+<listitem><para>Download a source tarball, RPM or Deb from <link
+xlink:href='http://nixos.org/'/>.  Build source distributions using
+the regular sequence:
         
 <screen>
 $ tar xvfj nix-<replaceable>version</replaceable>.tar.bz2
@@ -21,13 +21,21 @@ $ ./configure
 $ make
 $ make install <lineannotation>(as root)</lineannotation></screen>
 
-This will install Nix in <filename>/nix</filename>.  You shouldn't
-change the prefix if at all possible since that will make it
-impossible to use pre-built binaries from the Nixpkgs channel and
-other channels.  Alternatively, you could grab an RPM if you're on an
-RPM-based system.  You should also add
-<filename>/nix/etc/profile.d/nix.sh</filename> to your
-<filename>~/.bashrc</filename> (or some other login
+This will install the Nix binaries in <filename>/usr/local</filename>
+and keep the Nix store and other state in <filename>/nix</filename>.
+You can change the former by specifying
+<option>--prefix=<replaceable>path</replaceable></option>.  The
+location of the store can be changed using
+<option>--with-store-dir=<replaceable>path</replaceable></option>.
+However, you shouldn't change the store location, if at all possible,
+since that will make it impossible to use pre-built binaries from the
+Nixpkgs channel and other channels.  The location of the state can be
+changed using
+<option>--localstatedir=<replaceable>path</replaceable>.</option></para></listitem>
+
+<listitem><para>You should add
+<filename><replaceable>prefix</replaceable>/etc/profile.d/nix.sh</filename>
+to your <filename>~/.bashrc</filename> (or some other login
 file).</para></listitem>
 
 <listitem><para>Subscribe to the Nix Packages channel.
@@ -100,7 +108,7 @@ numbers).</para></listitem>
 
 <listitem><para>You can also install specific packages directly from
 your web browser.  For instance, you can go to <link
-xlink:href="http://nix.cs.uu.nl/dist/nix/nixpkgs-unstable-latest/" />
+xlink:href="http://hydra.nixos.org/jobset/nixpkgs/trunk/channel/latest" />
 and click on any link for the individual packages for your platform.
 Associate <literal>application/nix-package</literal> with the program
 <filename>/nix/bin/nix-install-package</filename>.  A window should

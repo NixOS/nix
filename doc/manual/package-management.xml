@@ -507,19 +507,16 @@ click on it, and it will be installed with all the necessary
 dependencies.</para>
 
 <para>For instance, you can go to <link
-xlink:href="http://nixos.org/releases/nixpkgs/nixpkgs-unstable/" /> —
-or to any older release of Nix Packages — and click on any link for
-the individual packages for your platform (say, <link
-xlink:href='http://nix.cs.uu.nl/dist/nix/nixpkgs-0.10pre6622/pkgs/subversion-1.4.0-i686-linux.nixpkg'><literal>subversion-1.4.0</literal>
-for <literal>i686-linux</literal></link>).  The first time you do
-this, your browser will ask what to do with
-<literal>application/nix-package</literal> files.  You should open
-them with <filename>/nix/bin/nix-install-package</filename>.  This
-will open a window that asks you to confirm that you want to install
-the package.  When you answer <literal>Y</literal>, the package and
-all its dependencies will be installed.  This is a binary deployment
-mechanism — you get packages pre-compiled for the selected platform
-type.</para>
+xlink:href="http://hydra.nixos.org/jobset/nixpkgs/trunk/channel/latest"
+/> and click on any link for the individual packages for your
+platform.  The first time you do this, your browser will ask what to
+do with <literal>application/nix-package</literal> files.  You should
+open them with <filename>/nix/bin/nix-install-package</filename>.
+This will open a window that asks you to confirm that you want to
+install the package.  When you answer <literal>Y</literal>, the
+package and all its dependencies will be installed.  This is a binary
+deployment mechanism — you get packages pre-compiled for the selected
+platform type.</para>
 
 <para>You can also install <literal>application/nix-package</literal>
 files from the command line directly.  See <xref
