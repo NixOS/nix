@@ -213,6 +213,7 @@ let
       memSize = 1024;
       meta = { schedulingPriority = toString prio; };
       configureFlags = "--sysconfdir=/etc";
+      debRequires = ["curl"];
     };
 
 
