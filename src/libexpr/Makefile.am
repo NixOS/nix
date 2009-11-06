@@ -19,7 +19,7 @@ BUILT_SOURCES = nixexpr-ast.cc nixexpr-ast.hh \
 EXTRA_DIST = lexer.l parser.y nixexpr-ast.def nixexpr-ast.cc
 
 AM_CXXFLAGS = \
- -I$(srcdir)/.. ${bdb_include} ${aterm_include} \
+ -I$(srcdir)/.. ${aterm_include} \
  -I$(srcdir)/../libutil -I$(srcdir)/../libstore
 AM_CFLAGS = \
  ${aterm_include}

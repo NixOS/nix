@@ -29,22 +29,8 @@ let
           --with-xml-flags=--nonet
         '';
 
-        # Include the BDB, ATerm and Bzip2 tarballs in the distribution.
+        # Include the ATerm and Bzip2 tarballs in the distribution.
         preConfigure = ''
-          stripHash ${db45.src}
-          # Remove unnecessary stuff from the Berkeley DB tarball.
-          ( mkdir bdb-temp
-            cd bdb-temp
-            tar xfz ${db45.src}
-            cd *
-            rm -rf docs test tcl perl libdb_java java rpc_server build_vxworks \
-              examples_java examples_c examples_cxx dist/tags
-            mkdir test
-            touch test/include.tcl
-            cd ..
-            tar cvfz ../externals/$strippedName *
-          )
-
           stripHash ${aterm242fixes.src}
           cp -pv ${aterm242fixes.src} externals/$strippedName
 
@@ -91,7 +77,6 @@ let
 
         configureFlags = ''
           --disable-init-state
-          ${if system == "i686-cygwin" then "--disable-old-db-compat" else "--with-bdb=${db45}"}
           --with-aterm=${aterm242fixes} --with-bzip2=${bzip2}
         '';
       };
@@ -113,7 +98,7 @@ let
 
         configureFlags = ''
           --disable-init-state
-          --disable-old-db-compat --with-aterm=${aterm242fixes} --with-bzip2=${bzip2}
+          --with-aterm=${aterm242fixes} --with-bzip2=${bzip2}
           --enable-static-nix
         '';
       };
@@ -138,7 +123,7 @@ let
 
         configureFlags = ''
           --disable-init-state --disable-shared
-          --with-bdb=${db45} --with-aterm=${aterm242fixes} --with-bzip2=${bzip2}
+          --with-aterm=${aterm242fixes} --with-bzip2=${bzip2}
         '';
 
         lcovFilter = ["*/boost/*" "*-tab.*"];

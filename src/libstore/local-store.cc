@@ -1133,4 +1133,16 @@ void LocalStore::verifyStore(bool checkContents)
 }
 
 
+/* Upgrade from schema 4 (Nix 0.11) to schema 5 (Nix >= 0.12).  The
+   old schema uses Berkeley DB, the new one stores store path
+   meta-information in files. */
+void LocalStore::upgradeStore12()
+{
+    throw Error(
+        "Your Nix store has a database in Berkeley DB format,\n"
+        "which is no longer supported. To convert to the new format,\n"
+        "please upgrade Nix to version 0.12 first.");
+}
+
+
 }

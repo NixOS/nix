@@ -193,31 +193,6 @@ AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
   storedir=$withval, storedir='/nix/store')
 AC_SUBST(storedir)
 
-AC_ARG_ENABLE(old-db-compat, AC_HELP_STRING([--disable-old-db-compat],
-  [disable support for converting from old Berkeley DB-based Nix stores]),
-  old_db_compat=$enableval, old_db_compat=yes)
-AM_CONDITIONAL(OLD_DB_COMPAT, test "$old_db_compat" = "yes")
-
-AC_ARG_WITH(bdb, AC_HELP_STRING([--with-bdb=PATH],
-  [prefix of Berkeley DB (for Nix <= 0.11 compatibility)]),
-  bdb=$withval, bdb=)
-AM_CONDITIONAL(HAVE_BDB, test -n "$bdb")
-if test -z "$bdb"; then
-  bdb_lib='-L${top_builddir}/externals/inst-bdb/lib -ldb_cxx'
-  bdb_include='-I${top_builddir}/externals/inst-bdb/include'
-else
-  bdb_lib="-L$bdb/lib -ldb_cxx"
-  bdb_include="-I$bdb/include"
-fi
-if test "$old_db_compat" = "no"; then
-  bdb_lib=
-  bdb_include=
-else
-  AC_DEFINE(OLD_DB_COMPAT, 1, [Whether to support converting from old Berkeley DB-based Nix stores.])
-fi
-AC_SUBST(bdb_lib)
-AC_SUBST(bdb_include)
-
 AC_ARG_WITH(aterm, AC_HELP_STRING([--with-aterm=PATH],
   [prefix of CWI ATerm library]),
   aterm=$withval, aterm=)
@@ -289,7 +264,7 @@ AC_CHECK_FUNCS([strsignal])
 AC_CHECK_FUNCS([posix_fallocate])
 
 
-# This is needed if ATerm, Berkeley DB or bzip2 are static libraries,
+# This is needed if ATerm or bzip2 are static libraries,
 # and the Nix libraries are dynamic.
 if test "$(uname)" = "Darwin"; then
     LDFLAGS="-all_load $LDFLAGS"

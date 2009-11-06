@@ -107,13 +107,6 @@ you can use <command>configure</command>'s
 <option>--with-aterm</option> and <option>--with-bzip2</option>
 options to point to their respective locations.</para>
 
-<para>If you want to be able to upgrade Nix stores from before version
-0.12pre12020, you need Sleepycat's Berkeley DB version version 4.5.
-(Other versions may not have compatible database formats.).  Berkeley
-DB 4.5 is included in the Nix source distribution.  If you do not need
-this ability, you can build Nix with the
-<option>--disable-old-db-compat</option> configure option.</para>
-
 </section>
 
 
