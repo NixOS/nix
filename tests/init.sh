@@ -36,12 +36,6 @@ ln -s $TOP/scripts/copy-from-other-stores.pl $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/download-using-manifests.pl $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/readmanifest.pm $NIX_BIN_DIR/nix/
 
-mkdir -p "$NIX_STATE_DIR"/manifests
-mkdir -p "$NIX_STATE_DIR"/gcroots
-mkdir -p "$NIX_STATE_DIR"/temproots
-mkdir -p "$NIX_STATE_DIR"/profiles
-ln -s "$NIX_STATE_DIR"/profiles "$NIX_STATE_DIR"/gcroots/
-
 cat > "$NIX_CONF_DIR"/nix.conf <<EOF
 gc-keep-outputs = false
 gc-keep-derivations = false

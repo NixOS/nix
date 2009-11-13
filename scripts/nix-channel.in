@@ -78,6 +78,9 @@ sub removeChannel {
 sub update {
     readChannels;
 
+    # Create the manifests directory if it doesn't exist.
+    mkdir "$stateDir/manifests", 0755 unless -e "$stateDir/manifests";
+
     # Do we have write permission to the manifests directory?  If not,
     # then just skip pulling the manifest and just download the Nix
     # expressions.  If the user is a non-privileged user in a

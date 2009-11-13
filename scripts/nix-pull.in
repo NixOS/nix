@@ -18,6 +18,12 @@ my $manifestDir = ($ENV{"NIX_MANIFESTS_DIR"} or "$stateDir/manifests");
 umask 0022;
 
 
+# Create the manifests directory if it doesn't exist.
+if (! -e $manifestDir) {
+    mkdir $manifestDir, 0755 or die "cannot create directory `$manifestDir'";
+}
+
+
 # Process the URLs specified on the command line.
 my %narFiles;
 my %localPaths;
