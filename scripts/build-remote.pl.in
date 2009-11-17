@@ -234,7 +234,7 @@ my $buildFlags = "--max-silent-time $maxSilentTime";
 # connection dies.  Without it, the remote process might continue to
 # run indefinitely (that is, until it next tries to write to
 # stdout/stderr).
-if (system("ssh -tt $sshOpts $hostName 'nix-store --realise -K $buildFlags $drvPath > /dev/null'") != 0) {
+if (system("ssh -tt $sshOpts $hostName 'nix-store --realise $buildFlags $drvPath > /dev/null'") != 0) {
     # If we couldn't run ssh or there was an ssh problem (indicated by
     # exit code 255), then we return exit code 1; otherwise we assume
     # that the builder failed, which we indicated to Nix using exit
