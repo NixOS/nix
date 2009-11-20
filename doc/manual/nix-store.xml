@@ -213,8 +213,6 @@ linkend="sec-nix-build"><command>nix-build</command></link> does.</para>
   </group>
   <arg><option>--max-freed</option> <replaceable>bytes</replaceable></arg>
   <arg><option>--max-links</option> <replaceable>nrlinks</replaceable></arg>
-  <arg><option>--max-atime</option> <replaceable>atime</replaceable></arg>
-  <arg><option>--use-atime</option></arg>
 </cmdsynopsis>
 
 </refsection>
@@ -292,42 +290,6 @@ options control what gets deleted and in what order:
     
   </varlistentry>
 
-  <varlistentry><term><option>--max-atime</option> <replaceable>atime</replaceable></term>
-  
-    <listitem><para>Only delete a store path if its last-accessed time
-    is less than <replaceable>atime</replaceable>.  This allows you to
-    garbage-collect only packages that haven’t been used recently.
-    The time is expressed as the number of seconds in the Unix epoch,
-    i.e., since 1970-01-01 00:00:00 UTC.  An easy way to convert to
-    this format is <literal>date +%s -d "<replaceable>date
-    specification</replaceable>"</literal>.</para>
-
-    <para>For directories, the last-accessed time is the highest
-    last-accessed time of any regular file in the directory (or in any
-    of its subdirectories).  That is, the <literal>atime</literal>
-    field maintained by the filesystem is ignored for directories.
-    This is because operations such as rebuilding the
-    <command>locate</command> database tend to update the
-    <literal>atime</literal> values of all directories, so they’re not
-    a useful indicator of whether a package was recently used.</para>
-
-    <para>Note that <command>nix-store --optimise</command> reads all
-    regular files in the Nix store, and so causes all last-accessed
-    times to be set to the present time.  This makes
-    <option>--max-atime</option> ineffective (for a while at
-    least).</para></listitem>
-    
-  </varlistentry>
-
-  <varlistentry><term><option>--use-atime</option></term>
-
-    <listitem><para>Delete store paths in order of ascending
-    last-accessed time.  This is useful in conjunction with the other
-    options to delete only the least recently used
-    packages.</para></listitem>
-
-  </varlistentry>
-  
 </variablelist>
 
 </para>
@@ -355,13 +317,6 @@ $ nix-store --gc
 deleting `/nix/store/kq82idx6g0nyzsp2s14gfsc38npai7lf-cairo-1.0.4.tar.gz.drv'
 <replaceable>...</replaceable>
 8825586 bytes freed (8.42 MiB)</screen>
-
-</para>
-
-<para>To delete unreachable paths not accessed in the last two months:
-
-<screen>
-$ nix-store --gc -v --max-atime $(date +%s -d "2 months ago")</screen>
 
 </para>
 

@@ -64,22 +64,6 @@ struct GCOptions
        has dropped below `maxLinks'. */
     unsigned int maxLinks;
 
-    /* Delete paths in order of ascending last access time.  I.e.,
-       prefer deleting unrecently used paths.  Useful in conjunction
-       with `maxFreed' and `maxLinks' (or manual interruption).  The
-       access time of a path is defined as the highest atime of any
-       non-directory, non-symlink file under that path.  Directories
-       and symlinks are ignored because their atimes are frequently
-       mass-updated, e.g. by `locate'.  Note that optimiseStore()
-       somewhat reduces the usefulness of this option: it hard-links
-       regular files and symlink together, giving them a "shared"
-       atime. */
-    bool useAtime;
-
-    /* Do not delete paths newer than `maxAtime'.  -1 means no age
-       limit. */
-    time_t maxAtime;
-
     GCOptions();
 };
 

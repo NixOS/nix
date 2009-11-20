@@ -14,8 +14,6 @@ GCOptions::GCOptions()
     ignoreLiveness = false;
     maxFreed = 0;
     maxLinks = 0;
-    useAtime = false;
-    maxAtime = (time_t) -1;
 }
 
 

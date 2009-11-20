@@ -439,30 +439,6 @@ Paths topoSortPaths(const PathSet & paths)
 }
 
 
-static time_t lastFileAccessTime(const Path & path)
-{
-    checkInterrupt();
-    
-    struct stat st;
-    if (lstat(path.c_str(), &st) == -1)
-        throw SysError(format("statting `%1%'") % path);
-
-    if (S_ISDIR(st.st_mode)) {
-        time_t last = 0;
-	Strings names = readDirectory(path);
-	foreach (Strings::iterator, i, names) {
-            time_t t = lastFileAccessTime(path + "/" + *i);
-            if (t > last) last = t;
-        }
-        return last;
-    }
-
-    else if (S_ISLNK(st.st_mode)) return 0;
-
-    else return st.st_atime;
-}
-
-
 struct GCLimitReached { };
 
 
@@ -519,35 +495,6 @@ void LocalStore::gcPathRecursive(const GCOptions & options,
     printMsg(lvlInfo, format("deleting `%1%'") % path);
             
     gcPath(options, results, path);
-}
-
-
-struct CachingAtimeComparator : public std::binary_function<Path, Path, bool> 
-{
-    std::map<Path, time_t> cache;
-
-    time_t lookup(const Path & p)
-    {
-        std::map<Path, time_t>::iterator i = cache.find(p);
-        if (i != cache.end()) return i->second;
-        debug(format("computing atime of `%1%'") % p);
-        cache[p] = lastFileAccessTime(p);
-        assert(cache.find(p) != cache.end());
-        return cache[p];
-    }
-        
-    bool operator () (const Path & p1, const Path & p2)
-    {
-        return lookup(p2) < lookup(p1);
-    }
-};
-
-
-static string showTime(const string & format, time_t t)
-{
-    char s[128];
-    strftime(s, sizeof s, format.c_str(), localtime(&t));
-    return string(s);
 }
 
 
@@ -699,87 +646,14 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     }
 
     /* Delete all dead store paths (or until one of the stop
-       conditions is reached). */
+       conditions is reached), respecting the partial ordering
+       determined by the references graph. */
 
     PathSet done;
     try {
-
-        if (!options.useAtime) {
-            /* Delete the paths, respecting the partial ordering
-               determined by the references graph. */
-            printMsg(lvlError, format("deleting garbage..."));
-            foreach (PathSet::iterator, i, storePaths)
-                gcPathRecursive(options, results, done, *i);
-        }
-
-        else {
-
-            /* Delete in order of ascending last access time, still
-               maintaining the partial ordering of the reference
-               graph.  Note that we can't use a topological sort for
-               this because that takes time O(V+E), and in this case
-               E=O(V^2) (i.e. the graph is dense because of the edges
-               due to the atime ordering).  So instead we put all
-               deletable paths in a priority queue (ordered by atime),
-               and after deleting a path, add additional paths that
-               have become deletable to the priority queue. */
-
-            CachingAtimeComparator atimeComp;
-
-            /* Create a priority queue that orders paths by ascending
-               atime.  This is why C++ needs type inferencing... */
-            std::priority_queue<Path, vector<Path>, binary_function_ref_adapter<CachingAtimeComparator> > prioQueue =
-                std::priority_queue<Path, vector<Path>, binary_function_ref_adapter<CachingAtimeComparator> >(binary_function_ref_adapter<CachingAtimeComparator>(&atimeComp));
-
-           /* Initially put the paths that are invalid or have no
-              referrers into the priority queue. */
-            printMsg(lvlError, format("finding deletable paths..."));
-            foreach (PathSet::iterator, i, storePaths) {
-                checkInterrupt();
-                /* We can safely delete a path if it's invalid or
-                   it has no referrers.  Note that all the invalid
-                   paths will be deleted in the first round. */
-                if (isValidPath(*i)) {
-                    if (queryReferrersNoSelf(*i).empty()) prioQueue.push(*i);
-                } else prioQueue.push(*i);
-            }
-
-            debug(format("%1% initially deletable paths") % prioQueue.size());
-
-            /* Now delete everything in the order of the priority
-               queue until nothing is left. */
-            printMsg(lvlError, format("deleting garbage..."));
-            while (!prioQueue.empty()) {
-                checkInterrupt();
-                Path path = prioQueue.top(); prioQueue.pop();
-
-                if (options.maxAtime != (time_t) -1 &&
-                    atimeComp.lookup(path) > options.maxAtime)
-                    continue;
-                
-                printMsg(lvlInfo, format("deleting `%1%' (last accessed %2%)") % path % showTime("%F %H:%M:%S", atimeComp.lookup(path)));
-
-                PathSet references;
-                if (isValidPath(path)) references = queryReferencesNoSelf(path);
-
-                gcPath(options, results, path);
-
-                /* For each reference of the current path, see if the
-                   reference has now become deletable (i.e. is in the
-                   set of dead paths and has no referrers left).  If
-                   so add it to the priority queue. */
-                foreach (PathSet::iterator, i, references) {
-                    if (storePaths.find(*i) != storePaths.end() &&
-                        queryReferrersNoSelf(*i).empty())
-                    {
-                        debug(format("path `%1%' has become deletable") % *i);
-                        prioQueue.push(*i);
-                    }
-                }
-            }
-            
-        }
-        
+        printMsg(lvlError, format("deleting garbage..."));
+        foreach (PathSet::iterator, i, storePaths)
+            gcPathRecursive(options, results, done, *i);
     } catch (GCLimitReached & e) {
     }
 }

@@ -536,11 +536,6 @@ static void opGC(Strings opFlags, Strings opArgs)
             if (options.maxFreed == 0) options.maxFreed = 1;
         }
         else if (*i == "--max-links") options.maxLinks = getIntArg(*i, i, opFlags.end());
-        else if (*i == "--use-atime") options.useAtime = true;
-        else if (*i == "--max-atime") {
-            options.useAtime = true;
-            options.maxAtime = getIntArg(*i, i, opFlags.end());
-        }
         else throw UsageError(format("bad sub-operation `%1%' in GC") % *i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");

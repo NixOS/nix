@@ -464,8 +464,9 @@ static void performOp(unsigned int clientVersion,
         options.maxFreed = readLongLong(from);
         options.maxLinks = readInt(from);
         if (GET_PROTOCOL_MINOR(clientVersion) >= 5) {
-            options.useAtime = readInt(from);
-            options.maxAtime = readInt(from);
+            /* removed options */
+            readInt(from);
+            readInt(from);
         }
 
         GCResults results;
