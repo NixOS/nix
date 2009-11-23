@@ -520,6 +520,7 @@ struct PrintFreed
 
 static void opGC(Strings opFlags, Strings opArgs)
 {
+    bool printRoots = false;
     GCOptions options;
     options.action = GCOptions::gcDeleteDead;
     
@@ -527,7 +528,7 @@ static void opGC(Strings opFlags, Strings opArgs)
     
     /* Do what? */
     foreach (Strings::iterator, i, opFlags)
-        if (*i == "--print-roots") options.action = GCOptions::gcReturnRoots;
+        if (*i == "--print-roots") printRoots = true;
         else if (*i == "--print-live") options.action = GCOptions::gcReturnLive;
         else if (*i == "--print-dead") options.action = GCOptions::gcReturnDead;
         else if (*i == "--delete") options.action = GCOptions::gcDeleteDead;
@@ -539,13 +540,21 @@ static void opGC(Strings opFlags, Strings opArgs)
         else throw UsageError(format("bad sub-operation `%1%' in GC") % *i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
-    
-    PrintFreed freed(options.action == GCOptions::gcDeleteDead, results);
-    store->collectGarbage(options, results);
 
-    if (options.action != GCOptions::gcDeleteDead)
-        foreach (PathSet::iterator, i, results.paths)
-            cout << *i << std::endl;
+    if (printRoots) {
+        Roots roots = store->findRoots();
+        foreach (Roots::iterator, i, roots)
+            cout << i->first << " -> " << i->second << std::endl;
+    }
+
+    else {
+        PrintFreed freed(options.action == GCOptions::gcDeleteDead, results);
+        store->collectGarbage(options, results);
+
+        if (options.action != GCOptions::gcDeleteDead)
+            foreach (PathSet::iterator, i, results.paths)
+                cout << *i << std::endl;
+    }
 }
 
 

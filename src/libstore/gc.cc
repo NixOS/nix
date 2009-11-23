@@ -614,11 +614,6 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     if (!options.ignoreLiveness)
         addAdditionalRoots(state.roots);
 
-    if (options.action == GCOptions::gcReturnRoots) {
-        results.paths = state.roots;
-        return;
-    }
-
     /* Read the temporary roots.  This acquires read locks on all
        per-process temporary root files.  So after this point no paths
        can be added to the set of temporary roots. */

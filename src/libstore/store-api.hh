@@ -22,10 +22,6 @@ struct GCOptions
 {
     /* Garbage collector operation:
 
-       - `gcReturnRoots': find and return the set of roots for the
-         garbage collector.  These are the store paths symlinked to in
-         the `gcroots' directory.
-
        - `gcReturnLive': return the set of paths reachable from
          (i.e. in the closure of) the roots.
 
@@ -38,7 +34,6 @@ struct GCOptions
           `pathsToDelete', insofar as they are not reachable.
     */
     typedef enum {
-        gcReturnRoots,
         gcReturnLive,
         gcReturnDead,
         gcDeleteDead,
