@@ -512,6 +512,11 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
                 }
         }
 
+        /* If gc-keep-derivations and gc-keep-outputs are both set,
+           it's possible that the path has already been deleted (due
+           to the recursion below), so bail out. */
+        if (!pathExists(path)) return true;
+
         /* If gc-keep-outputs is set, then don't delete this path if
            its deriver is not garbage.  !!! This is somewhat buggy,
            since there might be multiple derivers, but the database
