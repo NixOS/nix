@@ -261,14 +261,13 @@ static void opQuery(Strings opFlags, Strings opArgs)
 {
     enum { qOutputs, qRequisites, qReferences, qReferrers
          , qReferrersClosure, qDeriver, qBinding, qHash
-         , qTree, qGraph, qResolve } query = qOutputs;
+         , qTree, qGraph, qResolve, qRoots } query = qOutputs;
     bool useOutput = false;
     bool includeOutputs = false;
     bool forceRealise = false;
     string bindingName;
 
-    for (Strings::iterator i = opFlags.begin();
-         i != opFlags.end(); ++i)
+    foreach (Strings::iterator, i, opFlags)
         if (*i == "--outputs") query = qOutputs;
         else if (*i == "--requisites" || *i == "-R") query = qRequisites;
         else if (*i == "--references") query = qReferences;
@@ -286,6 +285,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--tree") query = qTree;
         else if (*i == "--graph") query = qGraph;
         else if (*i == "--resolve") query = qResolve;
+        else if (*i == "--roots") query = qRoots;
         else if (*i == "--use-output" || *i == "-u") useOutput = true;
         else if (*i == "--force-realise" || *i == "-f") forceRealise = true;
         else if (*i == "--include-outputs") includeOutputs = true;
@@ -294,9 +294,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
     switch (query) {
         
         case qOutputs: {
-            for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); ++i)
-            {
+            foreach (Strings::iterator, i, opArgs) {
                 *i = followLinksToStorePath(*i);
                 if (forceRealise) realisePath(*i);
                 Derivation drv = derivationFromPath(*i);
@@ -310,9 +308,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qReferrers:
         case qReferrersClosure: {
             PathSet paths;
-            for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); ++i)
-            {
+            foreach (Strings::iterator, i, opArgs) {
                 Path path = maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise);
                 if (query == qRequisites)
                     storePathRequisites(path, includeOutputs, paths);
@@ -328,9 +324,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         }
 
         case qDeriver:
-            for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); ++i)
-            {
+            foreach (Strings::iterator, i, opArgs) {
                 Path deriver = store->queryDeriver(followLinksToStorePath(*i));
                 cout << format("%1%\n") %
                     (deriver == "" ? "unknown-deriver" : deriver);
@@ -338,9 +332,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             break;
 
         case qBinding:
-            for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); ++i)
-            {
+            foreach (Strings::iterator, i, opArgs) {
                 Path path = useDeriver(followLinksToStorePath(*i));
                 Derivation drv = derivationFromPath(path);
                 StringPairs::iterator j = drv.env.find(bindingName);
@@ -352,9 +344,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             break;
 
         case qHash:
-            for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); ++i)
-            {
+            foreach (Strings::iterator, i, opArgs) {
                 Path path = maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise);
                 Hash hash = store->queryPathHash(path);
                 assert(hash.type == htSHA256);
@@ -364,25 +354,34 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qTree: {
             PathSet done;
-            for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); ++i)
+            foreach (Strings::iterator, i, opArgs)
                 printTree(followLinksToStorePath(*i), "", "", done);
             break;
         }
             
         case qGraph: {
             PathSet roots;
-            for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); ++i)
+            foreach (Strings::iterator, i, opArgs)
                 roots.insert(maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise));
 	    printDotGraph(roots);
             break;
         }
 
         case qResolve: {
-            for (Strings::iterator i = opArgs.begin();
-                 i != opArgs.end(); ++i)
+            foreach (Strings::iterator, i, opArgs)
                 cout << format("%1%\n") % followLinksToStorePath(*i);
+            break;
+        }
+            
+        case qRoots: {
+            PathSet referrers;
+            foreach (Strings::iterator, i, opArgs)
+                computeFSClosure(maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise),
+                    referrers, true);
+            Roots roots = store->findRoots();
+            foreach (Roots::iterator, i, roots)
+                if (referrers.find(i->second) != referrers.end())
+                    cout << format("%1%\n") % i->first;
             break;
         }
             

@@ -24,7 +24,6 @@ Operations:
   --import: import a path from a Nix archive, and register as 
       valid
 
-  --init: initialise the Nix database
   --verify: verify Nix structures
   --optimise: optimise the Nix store by hard-linking identical files
 
@@ -34,12 +33,14 @@ Operations:
 Query flags:
 
   --outputs: query the output paths of a Nix derivation (default)
-  --requisites / -R: print all paths necessary to realise a path
-  --references: print all paths referenced by the given path
-  --referrers: print all paths directly refering to the given path
-  --referrers-closure: print all paths (in)directly refering to the given path
-  --tree: print a tree showing the dependency graph of the given paths
-  --graph: print a dot graph rooted at given paths
+  --requisites / -R: print all paths necessary to realise the path
+  --references: print all paths referenced by the path
+  --referrers: print all paths directly refering to the path
+  --referrers-closure: print all paths (in)directly refering to the path
+  --tree: print a tree showing the dependency graph of the path
+  --graph: print a dot graph rooted at given path
+  --hash: print the SHA-256 hash of the contents of the path
+  --roots: print the garbage collector roots that point to the path
 
 Query switches (not applicable to all queries):
 

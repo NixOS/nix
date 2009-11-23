@@ -404,6 +404,7 @@ error: cannot delete path `/nix/store/zq0h41l75vlb4z45kzgjjmsjxvcv1qk7-mesa-6.4'
     <arg choice='plain'><option>--tree</option></arg>
     <arg choice='plain'><option>--binding</option> <replaceable>name</replaceable></arg>
     <arg choice='plain'><option>--hash</option></arg>
+    <arg choice='plain'><option>--roots</option></arg>
   </group>
   <arg><option>--use-output</option></arg>
   <arg><option>-u</option></arg>
@@ -586,9 +587,17 @@ query is applied to the target of the symlink.</para>
   <varlistentry><term><option>--hash</option></term>
   
     <listitem><para>Prints the SHA-256 hash of the contents of the
-    store path <replaceable>paths</replaceable>.  Since the hash is
+    store paths <replaceable>paths</replaceable>.  Since the hash is
     stored in the Nix database, this is a fast
     operation.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--roots</option></term>
+  
+    <listitem><para>Prints the garbage collector roots that point,
+    directly or indirectly, at the store paths
+    <replaceable>paths</replaceable>.</para></listitem>
 
   </varlistentry>
 
@@ -666,6 +675,18 @@ user environment:
 <screen>
 $ nix-store -q --graph ~/.nix-profile | dot -Tps > graph.ps
 $ gv graph.ps</screen>
+
+</para>
+
+<para>Show every garbage collector root that points to a store path
+that depends on <command>svn</command>:
+
+<screen>
+$ nix-store -q --roots $(which svn)
+/nix/var/nix/profiles/default-81-link
+/nix/var/nix/profiles/default-82-link
+/nix/var/nix/profiles/per-user/eelco/profile-97-link
+</screen>
 
 </para>
 
