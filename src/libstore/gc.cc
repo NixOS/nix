@@ -401,7 +401,7 @@ static void addAdditionalRoots(PathSet & roots)
         if (isInStore(*i)) {
             Path path = toStorePath(*i);
             if (roots.find(path) == roots.end() && store->isValidPath(path)) {
-                debug(format("found additional root `%1%'") % path);
+                debug(format("got additional root `%1%'") % path);
                 roots.insert(path);
             }
         }
@@ -442,91 +442,159 @@ Paths topoSortPaths(const PathSet & paths)
 struct GCLimitReached { };
 
 
-void LocalStore::gcPath(const GCOptions & options, GCResults & results, 
-    const Path & path)
+struct LocalStore::GCState
 {
-    results.paths.insert(path);
+    GCOptions options;
+    GCResults & results;
+    PathSet roots;
+    PathSet tempRoots;
+    PathSet deleted;
+    PathSet live;
+    PathSet busy;
+    bool gcKeepOutputs;
+    bool gcKeepDerivations;
+    GCState(GCResults & results_) : results(results_)
+    {
+    }
+};
 
-    if (!pathExists(path)) return;
-                
-    /* Okay, it's safe to delete. */
-    unsigned long long bytesFreed, blocksFreed;
-    deleteFromStore(path, bytesFreed, blocksFreed);
-    results.bytesFreed += bytesFreed;
-    results.blocksFreed += blocksFreed;
 
-    if (options.maxFreed && results.bytesFreed > options.maxFreed) {
-        printMsg(lvlInfo, format("deleted more than %1% bytes; stopping") % options.maxFreed);
-        throw GCLimitReached();
+static bool doDelete(GCOptions::GCAction action)
+{
+    return action == GCOptions::gcDeleteDead
+        || action == GCOptions::gcDeleteSpecific;
+}
+
+
+bool LocalStore::isActiveTempFile(const GCState & state,
+    const Path & path, const string & suffix)
+{
+    return hasSuffix(path, suffix)
+        && state.tempRoots.find(string(path, 0, path.size() - suffix.size())) != state.tempRoots.end();
+}
+
+    
+bool LocalStore::tryToDelete(GCState & state, const Path & path)
+{
+    if (!pathExists(path)) return true;
+    if (state.deleted.find(path) != state.deleted.end()) return true;
+    if (state.live.find(path) != state.live.end()) return false;
+
+    startNest(nest, lvlDebug, format("considering whether to delete `%1%'") % path);
+
+    if (state.roots.find(path) != state.roots.end()) {
+        printMsg(lvlDebug, format("cannot delete `%1%' because it's a root") % path);
+        goto isLive;
     }
 
-    if (options.maxLinks) {
-        struct stat st;
-        if (stat(nixStore.c_str(), &st) == -1)
-            throw SysError(format("statting `%1%'") % nixStore);
-        if (st.st_nlink < options.maxLinks) {
-            printMsg(lvlInfo, format("link count on the store has dropped below %1%; stopping") % options.maxLinks);
-            throw GCLimitReached();
+    if (isValidPath(path)) {
+
+        /* Recursively try to delete the referrers of this path.  If
+           any referrer can't be deleted, then this path can't be
+           deleted either. */
+        PathSet referrers;
+        queryReferrers(path, referrers);
+        foreach (PathSet::iterator, i, referrers)
+            if (*i != path && !tryToDelete(state, *i)) {
+                printMsg(lvlDebug, format("cannot delete `%1%' because it has live referrers") % path);
+                goto isLive;
+            }
+
+        /* If gc-keep-derivations is set and this is a derivation,
+           then don't delete the derivation if any of the outputs are
+           live. */
+        if (state.gcKeepDerivations && isDerivation(path)) {
+            Derivation drv = derivationFromPath(path);
+            foreach (DerivationOutputs::iterator, i, drv.outputs)
+                if (!tryToDelete(state, i->second.path)) {
+                    printMsg(lvlDebug, format("cannot delete derivation `%1%' because its output is alive") % path);
+                    goto isLive;
+                }
+        }
+
+        /* If gc-keep-outputs is set, then don't delete this path if
+           its deriver is not garbage.  !!! This is somewhat buggy,
+           since there might be multiple derivers, but the database
+           only stores one. */
+        if (state.gcKeepOutputs) {
+            Path deriver = queryDeriver(path);
+            /* Break an infinite recursion if gc-keep-derivations and
+               gc-keep-outputs are both set by tentatively assuming
+               that this path is garbage.  This is a safe assumption
+               because at this point, the only thing that can prevent
+               it from being garbage is the deriver.  Since
+               tryToDelete() works "upwards" through the dependency
+               graph, it won't encouter this path except in the call
+               to tryToDelete() in the gc-keep-derivation branch. */
+            state.deleted.insert(path);
+            if (deriver != "" && !tryToDelete(state, deriver)) {
+                state.deleted.erase(path);
+                printMsg(lvlDebug, format("cannot delete `%1%' because its deriver is alive") % path);
+                goto isLive;
+            }
         }
     }
-}
 
+    else {
 
-void LocalStore::gcPathRecursive(const GCOptions & options,
-    GCResults & results, PathSet & done, const Path & path)
-{
-    if (done.find(path) != done.end()) return;
-    done.insert(path);
+        /* A lock file belonging to a path that we're building right
+           now isn't garbage. */
+        if (isActiveTempFile(state, path, ".lock")) return false;
 
-    startNest(nest, lvlDebug, format("looking at `%1%'") % path);
+        /* Don't delete .chroot directories for derivations that are
+           currently being built. */
+        if (isActiveTempFile(state, path, ".chroot")) return false;
+
+    }
+
+    /* The path is garbage, so delete it. */
+    if (doDelete(state.options.action)) {
+        printMsg(lvlInfo, format("deleting `%1%'") % path);
+
+        unsigned long long bytesFreed, blocksFreed;
+        deleteFromStore(path, bytesFreed, blocksFreed);
+        state.results.bytesFreed += bytesFreed;
+        state.results.blocksFreed += blocksFreed;
+
+        if (state.options.maxFreed && state.results.bytesFreed > state.options.maxFreed) {
+            printMsg(lvlInfo, format("deleted more than %1% bytes; stopping") % state.options.maxFreed);
+            throw GCLimitReached();
+        }
+
+        if (state.options.maxLinks) {
+            struct stat st;
+            if (stat(nixStore.c_str(), &st) == -1)
+                throw SysError(format("statting `%1%'") % nixStore);
+            if (st.st_nlink < state.options.maxLinks) {
+                printMsg(lvlInfo, format("link count on the store has dropped below %1%; stopping") % state.options.maxLinks);
+                throw GCLimitReached();
+            }
+        }
         
-    /* Delete all the referrers first.  They must be garbage too,
-       since if they were live, then the current path would also be
-       live.  Note that deleteFromStore() below still makes sure that
-       the referrer set has become empty, just in case.  (However that
-       doesn't guard against deleting top-level paths that are only
-       reachable from GC roots.) */
-    PathSet referrers;
-    if (isValidPath(path))
-        queryReferrers(path, referrers);
-    foreach (PathSet::iterator, i, referrers)
-        if (*i != path) gcPathRecursive(options, results, done, *i);
+    } else
+        printMsg(lvlTalkative, format("would delete `%1%'") % path);
+    
+    state.deleted.insert(path);
+    if (state.options.action != GCOptions::gcReturnLive)
+        state.results.paths.insert(path);
+    return true;
 
-    printMsg(lvlInfo, format("deleting `%1%'") % path);
-            
-    gcPath(options, results, path);
-}
-
-
-static bool isLive(const Path & path, const PathSet & livePaths,
-    const PathSet & tempRoots, const PathSet & tempRootsClosed)
-{
-    if (livePaths.find(path) != livePaths.end() ||
-        tempRootsClosed.find(path) != tempRootsClosed.end()) return true;
-
-    /* A lock file belonging to a path that we're building right
-       now isn't garbage. */
-    if (hasSuffix(path, ".lock") && tempRoots.find(string(path, 0, path.size() - 5)) != tempRoots.end())
-        return true;
-
-    /* Don't delete .chroot directories for derivations that are
-       currently being built. */
-    if (hasSuffix(path, ".chroot") && tempRoots.find(string(path, 0, path.size() - 7)) != tempRoots.end())
-        return true;
-
+ isLive:
+    state.live.insert(path);
+    if (state.options.action == GCOptions::gcReturnLive)
+        state.results.paths.insert(path);
     return false;
 }
-
+    
 
 void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
-    bool gcKeepOutputs =
-        queryBoolSetting("gc-keep-outputs", false);
-    bool gcKeepDerivations =
-        queryBoolSetting("gc-keep-derivations", true);
-    int gcKeepOutputsThreshold = 
-        queryIntSetting ("gc-keep-outputs-threshold", defaultGcLevel);
-
+    GCState state(results);
+    state.options = options;    
+    
+    state.gcKeepOutputs = queryBoolSetting("gc-keep-outputs", false);
+    state.gcKeepDerivations = queryBoolSetting("gc-keep-derivations", true);
+    
     /* Acquire the global GC root.  This prevents
        a) New roots from being added.
        b) Processes from creating new temporary root files. */
@@ -537,125 +605,58 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     printMsg(lvlError, format("finding garbage collector roots..."));
     Roots rootMap = options.ignoreLiveness ? Roots() : nix::findRoots(true);
 
-    PathSet roots;
-    foreach (Roots::iterator, i, rootMap) roots.insert(i->second);
+    foreach (Roots::iterator, i, rootMap) state.roots.insert(i->second);
 
     /* Add additional roots returned by the program specified by the
        NIX_ROOT_FINDER environment variable.  This is typically used
        to add running programs to the set of roots (to prevent them
        from being garbage collected). */
     if (!options.ignoreLiveness)
-        addAdditionalRoots(roots);
+        addAdditionalRoots(state.roots);
 
     if (options.action == GCOptions::gcReturnRoots) {
-        results.paths = roots;
-        return;
-    }
-
-    /* Determine the live paths which is just the closure of the
-       roots under the `references' relation. */
-    printMsg(lvlError, format("computing live paths..."));
-    PathSet livePaths;
-    foreach (PathSet::const_iterator, i, roots)
-        computeFSClosure(canonPath(*i), livePaths);
-
-    if (gcKeepDerivations) {
-        foreach (PathSet::iterator, i, livePaths) {
-            /* Note that the deriver need not be valid (e.g., if we
-               previously ran the collector with `gcKeepDerivations'
-               turned off). */
-            Path deriver = queryDeriver(*i);
-            if (deriver != "" && isValidPath(deriver))
-                computeFSClosure(deriver, livePaths);
-        }
-    }
-
-    if (gcKeepOutputs) {
-        /* Hmz, identical to storePathRequisites in nix-store. */
-        foreach (PathSet::iterator, i, livePaths)
-            if (isDerivation(*i)) {
-                Derivation drv = derivationFromPath(*i);
-
-		string gcLevelStr = drv.env["__gcLevel"];
-		int gcLevel;
-		if (!string2Int(gcLevelStr, gcLevel))
-		    gcLevel = defaultGcLevel;
-		
-		if (gcLevel >= gcKeepOutputsThreshold)    
-		    foreach (DerivationOutputs::iterator, j, drv.outputs)
-			if (isValidPath(j->second.path))
-			    computeFSClosure(j->second.path, livePaths);
-            }
-    }
-
-    if (options.action == GCOptions::gcReturnLive) {
-        results.paths = livePaths;
+        results.paths = state.roots;
         return;
     }
 
     /* Read the temporary roots.  This acquires read locks on all
        per-process temporary root files.  So after this point no paths
        can be added to the set of temporary roots. */
-    PathSet tempRoots;
     FDs fds;
-    readTempRoots(tempRoots, fds);
-
-    /* Close the temporary roots.  Note that we *cannot* do this in
-       readTempRoots(), because there we may not have all locks yet,
-       meaning that an invalid path can become valid (and thus add to
-       the references graph) after we have added it to the closure
-       (and computeFSClosure() assumes that the presence of a path
-       means that it has already been closed). */
-    PathSet tempRootsClosed;
-    foreach (PathSet::iterator, i, tempRoots)
-        if (isValidPath(*i))
-            computeFSClosure(*i, tempRootsClosed);
-        else
-            tempRootsClosed.insert(*i);
+    readTempRoots(state.tempRoots, fds);
+    state.roots.insert(state.tempRoots.begin(), state.tempRoots.end());
 
     /* After this point the set of roots or temporary roots cannot
        increase, since we hold locks on everything.  So everything
-       that is not currently in in `livePaths' or `tempRootsClosed'
-       can be deleted. */
-    
-    /* Read the Nix store directory to find all currently existing
-       paths and filter out all live paths. */
-    printMsg(lvlError, format("reading the Nix store..."));
-    PathSet storePaths;
-    
-    if (options.action != GCOptions::gcDeleteSpecific) {
-        Paths entries = readDirectory(nixStore);
-        foreach (Paths::iterator, i, entries) {
-            Path path = canonPath(nixStore + "/" + *i);
-            if (!isLive(path, livePaths, tempRoots, tempRootsClosed)) storePaths.insert(path);
-        }
-    }
+       that is not reachable from `roots'. */
 
-    else {
+    /* Now either delete all garbage paths, or just the specified
+       paths (for gcDeleteSpecific). */
+
+    if (options.action == GCOptions::gcDeleteSpecific) {
+
         foreach (PathSet::iterator, i, options.pathsToDelete) {
             assertStorePath(*i);
-            storePaths.insert(*i);
-            if (isLive(*i, livePaths, tempRoots, tempRootsClosed))
+            if (!tryToDelete(state, *i))
                 throw Error(format("cannot delete path `%1%' since it is still alive") % *i);
         }
-    }
+        
+    } else {
+        
+        printMsg(lvlError, format("reading the Nix store..."));
+        Paths entries = readDirectory(nixStore);
 
-    if (options.action == GCOptions::gcReturnDead) {
-        results.paths.insert(storePaths.begin(), storePaths.end());
-        return;
-    }
-
-    /* Delete all dead store paths (or until one of the stop
-       conditions is reached), respecting the partial ordering
-       determined by the references graph. */
-
-    PathSet done;
-    try {
-        printMsg(lvlError, format("deleting garbage..."));
-        foreach (PathSet::iterator, i, storePaths)
-            gcPathRecursive(options, results, done, *i);
-    } catch (GCLimitReached & e) {
-    }
+        if (doDelete(state.options.action))
+            printMsg(lvlError, format("deleting garbage..."));
+        else
+            printMsg(lvlError, format("determining live/dead paths..."));
+    
+        try {
+            foreach (Paths::iterator, i, entries)
+                tryToDelete(state, canonPath(nixStore + "/" + *i));
+        } catch (GCLimitReached & e) {
+        }
+    }        
 }
 
 

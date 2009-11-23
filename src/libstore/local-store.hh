@@ -174,12 +174,13 @@ private:
     
     void upgradeStore12();
 
-    void gcPath(const GCOptions & options, GCResults & results,
-        const Path & path);
+    struct GCState;
 
-    void gcPathRecursive(const GCOptions & options,
-        GCResults & results, PathSet & done, const Path & path);
-
+    bool tryToDelete(GCState & state, const Path & path);
+    
+    bool isActiveTempFile(const GCState & state,
+        const Path & path, const string & suffix);
+        
     void startSubstituter(const Path & substituter,
         RunningSubstituter & runningSubstituter);
 };
