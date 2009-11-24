@@ -297,8 +297,10 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed,
     if (lstat(path.c_str(), &st))
 	throw SysError(format("getting attributes of path `%1%'") % path);
 
-    bytesFreed += st.st_size;
-    blocksFreed += st.st_blocks;
+    if (!S_ISDIR(st.st_mode) && st.st_nlink == 1) {
+        bytesFreed += st.st_size;
+        blocksFreed += st.st_blocks;
+    }
 
     if (S_ISDIR(st.st_mode)) {
 	Strings names = readDirectory(path);
