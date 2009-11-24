@@ -7,6 +7,7 @@
 
 #include <functional>
 #include <queue>
+#include <algorithm>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -590,7 +591,7 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
         state.results.paths.insert(path);
     return false;
 }
-    
+
 
 void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
@@ -646,13 +647,20 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         printMsg(lvlError, format("reading the Nix store..."));
         Paths entries = readDirectory(nixStore);
 
+        /* Randomise the order in which we delete entries to make the
+           collector less biased towards deleting paths that come
+           alphabetically first (e.g. /nix/store/000...).  This
+           matters when using --max-freed etc. */
+        vector<Path> entries_(entries.begin(), entries.end());
+        random_shuffle(entries_.begin(), entries_.end());
+
         if (doDelete(state.options.action))
             printMsg(lvlError, format("deleting garbage..."));
         else
             printMsg(lvlError, format("determining live/dead paths..."));
     
         try {
-            foreach (Paths::iterator, i, entries)
+            foreach (vector<Path>::iterator, i, entries_)
                 tryToDelete(state, canonPath(nixStore + "/" + *i));
         } catch (GCLimitReached & e) {
         }
