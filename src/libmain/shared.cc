@@ -87,18 +87,6 @@ static void setLogType(string lt)
 }
 
 
-unsigned long long getIntArg(const string & opt,
-    Strings::iterator & i, const Strings::iterator & end)
-{
-    ++i;
-    if (i == end) throw UsageError(format("`%1%' requires an argument") % opt);
-    long long n;
-    if (!string2Int(*i, n) || n < 0)
-        throw UsageError(format("`%1%' requires a non-negative integer") % opt);
-    return n;
-}
-
-
 void initDerivationsHelpers();
 
 
@@ -195,7 +183,7 @@ static void initAndRun(int argc, char * * argv)
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
         string arg = *i;
         if (string(arg, 0, 4) == "-at-") ;
-        else if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-') {
+        else if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-' && !isdigit(arg[1])) {
             for (unsigned int j = 1; j < arg.length(); j++)
                 if (isalpha(arg[j]))
                     remaining.push_back((string) "-" + arg[j]);
@@ -239,11 +227,11 @@ static void initAndRun(int argc, char * * argv)
         else if (arg == "--fallback")
             tryFallback = true;
         else if (arg == "--max-jobs" || arg == "-j")
-            maxBuildJobs = getIntArg(arg, i, args.end());
+            maxBuildJobs = getIntArg<unsigned int>(arg, i, args.end());
         else if (arg == "--readonly-mode")
             readOnlyMode = true;
         else if (arg == "--max-silent-time")
-            maxSilentTime = getIntArg(arg, i, args.end());
+            maxSilentTime = getIntArg<unsigned int>(arg, i, args.end());
         else if (arg == "--no-build-hook")
             useBuildHook = false;
         else if (arg == "--show-trace")

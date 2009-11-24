@@ -532,10 +532,10 @@ static void opGC(Strings opFlags, Strings opArgs)
         else if (*i == "--print-dead") options.action = GCOptions::gcReturnDead;
         else if (*i == "--delete") options.action = GCOptions::gcDeleteDead;
         else if (*i == "--max-freed") {
-            options.maxFreed = getIntArg(*i, i, opFlags.end());
-            if (options.maxFreed == 0) options.maxFreed = 1;
+            long long maxFreed = getIntArg<long long>(*i, i, opFlags.end());
+            options.maxFreed = maxFreed >= 1 ? maxFreed : 1;
         }
-        else if (*i == "--max-links") options.maxLinks = getIntArg(*i, i, opFlags.end());
+        else if (*i == "--max-links") options.maxLinks = getIntArg<unsigned int>(*i, i, opFlags.end());
         else throw UsageError(format("bad sub-operation `%1%' in GC") % *i);
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");

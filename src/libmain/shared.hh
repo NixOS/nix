@@ -22,21 +22,29 @@ extern std::string programId;
 
 namespace nix {
 
+MakeError(UsageError, nix::Error);
+
 /* Ugh.  No better place to put this. */
 Path makeRootName(const Path & gcRoot, int & counter);
 void printGCWarning();
 
 void printMissing(const PathSet & paths);
 
-unsigned long long getIntArg(const string & opt,
-    Strings::iterator & i, const Strings::iterator & end);
+template<class N> N getIntArg(const string & opt,
+    Strings::iterator & i, const Strings::iterator & end)
+{
+    ++i;
+    if (i == end) throw UsageError(format("`%1%' requires an argument") % opt);
+    N n;
+    if (!string2Int(*i, n))
+        throw UsageError(format("`%1%' requires an integer argument") % opt);
+    return n;
+}
 
 /* Whether we're running setuid. */
 extern bool setuidMode;
 
 extern volatile ::sig_atomic_t blockInt;
-
-MakeError(UsageError, nix::Error);
 
 struct RemoveTempRoots 
 {

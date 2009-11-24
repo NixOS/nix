@@ -295,9 +295,14 @@ bool statusOk(int status);
 
 
 /* Parse a string into an integer. */
+template<class N> bool string2Int(const string & s, N & n)
+{
+    std::istringstream str(s);
+    str >> n;
+    return str && str.get() == EOF;
+}
+
 string int2String(int n);
-bool string2Int(const string & s, int & n);
-bool string2Int(const string & s, long long & n);
 
 
 /* Return true iff `s' ends in `suffix'. */

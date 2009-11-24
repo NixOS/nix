@@ -1055,22 +1055,6 @@ string int2String(int n)
 }
 
 
-bool string2Int(const string & s, int & n)
-{
-    std::istringstream str(s);
-    str >> n;
-    return str && str.get() == EOF;
-}
-
-
-bool string2Int(const string & s, long long & n)
-{
-    std::istringstream str(s);
-    str >> n;
-    return str && str.get() == EOF;
-}
-
-
 bool hasSuffix(const string & s, const string & suffix)
 {
     return s.size() >= suffix.size() && string(s, s.size() - suffix.size()) == suffix;
