@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <signal.h>
 
-#include <iostream>
+#include <cstdio>
 
 
 namespace nix {
