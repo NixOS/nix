@@ -8,6 +8,46 @@
 
 <!--==================================================================-->
 
+<section xml:id="ssec-relnotes-0.14"><title>Release 0.14 (TBA)</title>
+
+<para>This release has the following improvements:</para>
+
+<itemizedlist>
+
+  <listitem>
+    <para>The garbage collector now starts deleting garbage much
+    faster than before.  It no longer determines liveness of all paths
+    in the store, but does so on demand.</para>
+  </listitem>
+
+  <listitem>
+    <para>Added a new operation, <command>nix-store --query
+    --roots</command>, that shows the garbage collector roots that
+    directly or indirectly point to the given store paths.</para>
+  </listitem>
+
+  <listitem>
+    <para>Removed support for converting Berkeley DB-based Nix
+    databases to the new schema.</para>
+  </listitem>
+
+  <listitem>
+    <para>Removed the <option>--use-atime</option> and
+    <option>--max-atime</option> garbage collector options.  They were
+    not very useful in practice.</para>
+  </listitem>
+
+  <listitem>
+    <para>A few bug fixes.</para>
+  </listitem>
+
+</itemizedlist>
+
+</section>
+
+
+<!--==================================================================-->
+
 <section xml:id="ssec-relnotes-0.13"><title>Release 0.13 (November 5,
 2009)</title>
 
