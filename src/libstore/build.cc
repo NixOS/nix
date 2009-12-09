@@ -796,6 +796,9 @@ void DerivationGoal::init()
 {
     trace("init");
 
+    if (readOnlyMode)
+        throw Error(format("cannot build derivation `%1%' - no write access to the Nix store") % drvPath);
+
     /* The first thing to do is to make sure that the derivation
        exists.  If it doesn't, it may be created through a
        substitute. */
@@ -2121,6 +2124,9 @@ void SubstitutionGoal::init()
         amDone(ecSuccess);
         return;
     }
+
+    if (readOnlyMode)
+        throw Error(format("cannot substitute path `%1%' - no write access to the Nix store") % storePath);
 
     subs = substituters;
     
