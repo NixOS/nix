@@ -12,6 +12,7 @@ my $outLink;
 my $drvLink;
 
 my $dryRun = 0;
+my $verbose = 0;
 
 my @instArgs = ();
 my @buildArgs = ();
@@ -116,6 +117,12 @@ EOF
         push @instArgs, $arg;
     }
     
+    elsif ($arg eq "--verbose" or substr($arg, 0, 2) eq "-v") {
+        push @buildArgs, $arg;
+        push @instArgs, $arg;
+        $verbose = 1;
+    }
+    
     elsif (substr($arg, 0, 1) eq "-") {
         push @buildArgs, $arg;
     }
@@ -153,7 +160,7 @@ foreach my $expr (@exprs) {
 
     foreach my $drvPath (@drvPaths) {
         my $target = readlink $drvPath or die "cannot read symlink `$drvPath'";
-        print STDERR "store derivation is $target\n";
+        print STDERR "derivation is $target\n" if $verbose;
     }
 
     # Build.
