@@ -51,7 +51,7 @@ sub processURL {
 
     # First see if a bzipped manifest is available.
     if (system("@curl@ --fail --silent --head '$url'.bz2 > /dev/null") == 0) {
-        print "obtaining list of Nix archives at `$url.bz2'...\n";
+        print "fetching list of Nix archives at `$url.bz2'...\n";
         my $bzipped = downloadFile "$url.bz2";
 
         $manifest = "$tmpDir/MANIFEST";
@@ -92,11 +92,31 @@ sub processURL {
     my $hash = `$binDir/nix-hash --flat '$manifest'`
         or die "cannot hash `$manifest'";
     chomp $hash;
+
+    my $urlFile = "$manifestDir/$baseName-$hash.url";
+    open URL, ">$urlFile" or die "cannot create `$urlFile'";
+    print URL "$url";
+    close URL;
     
     my $finalPath = "$manifestDir/$baseName-$hash.nixmanifest";
-    
-    system("@coreutils@/ln", "-sfn", "$manifest", "$finalPath") == 0
+
+    unlink $finalPath if -e $finalPath;
+        
+    symlink("$manifest", "$finalPath")
         or die "cannot link `$finalPath to `$manifest'";
+
+    # Delete all old manifests downloaded from this URL.
+    for my $urlFile2 (glob "$manifestDir/*.url") {
+        next if $urlFile eq $urlFile2;
+        open URL, "<$urlFile2" or die;
+        my $url2 = <URL>;
+        chomp $url2;
+        close URL;
+        next unless $url eq $url2;
+        my $base = $urlFile2; $base =~ s/.url$//;
+        unlink "${base}.url";
+        unlink "${base}.nixmanifest";
+    }
 }
 
 while (@ARGV) {

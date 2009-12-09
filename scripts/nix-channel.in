@@ -88,11 +88,6 @@ sub update {
     # source.
     if (-W "$stateDir/manifests") {
 
-        # Remove all the old manifests.
-        for my $manifest (glob "$stateDir/manifests/*.nixmanifest") {
-            unlink $manifest or die "cannot remove `$manifest': $!";
-        }
-
         # Pull cache manifests.
         foreach my $url (@channels) {
             #print "pulling cache manifest from `$url'\n";
