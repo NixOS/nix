@@ -1,8 +1,7 @@
 #ifndef __ATERM_MAP_H
 #define __ATERM_MAP_H
 
-typedef struct _ATerm * ATerm;
-
+#include <aterm1.h>
 #include <assert.h>
 
 
