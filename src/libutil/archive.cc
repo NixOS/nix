@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <cerrno>
 #include <algorithm>
 #include <vector>
@@ -11,8 +13,6 @@
 
 #include "archive.hh"
 #include "util.hh"
-
-#include "config.h"
 
 
 namespace nix {

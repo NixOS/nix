@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include "references.hh"
 #include "pathlocks.hh"
 #include "misc.hh"
@@ -29,8 +31,6 @@
 
 
 /* Includes required for chroot support. */
-#include "config.h"
-
 #if HAVE_SYS_PARAM_H
 #include <sys/param.h>
 #endif
