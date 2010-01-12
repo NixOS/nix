@@ -143,22 +143,28 @@ static void initAndRun(int argc, char * * argv)
     maxSilentTime = queryIntSetting("build-max-silent-time", 0);
 
     /* Catch SIGINT. */
-    struct sigaction act, oact;
+    struct sigaction act;
     act.sa_handler = sigintHandler;
     sigfillset(&act.sa_mask);
     act.sa_flags = 0;
-    if (sigaction(SIGINT, &act, &oact))
+    if (sigaction(SIGINT, &act, 0))
         throw SysError("installing handler for SIGINT");
-    if (sigaction(SIGTERM, &act, &oact))
+    if (sigaction(SIGTERM, &act, 0))
         throw SysError("installing handler for SIGTERM");
-    if (sigaction(SIGHUP, &act, &oact))
+    if (sigaction(SIGHUP, &act, 0))
         throw SysError("installing handler for SIGHUP");
 
     /* Ignore SIGPIPE. */
     act.sa_handler = SIG_IGN;
     act.sa_flags = 0;
-    if (sigaction(SIGPIPE, &act, &oact))
+    if (sigaction(SIGPIPE, &act, 0))
         throw SysError("ignoring SIGPIPE");
+
+    /* Reset SIGCHLD to its default. */
+    act.sa_handler = SIG_DFL;
+    act.sa_flags = 0;
+    if (sigaction(SIGCHLD, &act, 0))
+        throw SysError("resetting SIGCHLD");
 
     /* There is no privacy in the Nix system ;-)  At least not for
        now.  In particular, store objects should be readable by
