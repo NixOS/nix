@@ -222,7 +222,7 @@ print "copying inputs...\n";
 my $maybeSign = "";
 $maybeSign = "--sign" if -e "/nix/etc/nix/signing-key.sec";
 
-system("NIX_SSHOPTS=\"$sshOpts\" @bindir@/nix-copy-closure --gzip $hostName $maybeSign $drvPath $inputs") == 0
+system("NIX_SSHOPTS=\"$sshOpts\" @bindir@/nix-copy-closure $hostName $maybeSign $drvPath $inputs") == 0
     or die "cannot copy inputs to $hostName: $?";
 
 print "building...\n";
@@ -251,6 +251,6 @@ foreach my $output (split '\n', $outputs) {
     my $maybeSignRemote = "";
     $maybeSignRemote = "--sign" if $UID != 0;
     
-    system("ssh $sshOpts $hostName 'nix-store --export $maybeSignRemote $output | gzip' | gunzip | @bindir@/nix-store --import > /dev/null") == 0
+    system("ssh $sshOpts $hostName 'nix-store --export $maybeSignRemote $output' | @bindir@/nix-store --import > /dev/null") == 0
 	or die "cannot copy $output from $hostName: $?";
 }
