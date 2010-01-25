@@ -19,7 +19,7 @@ Derivation derivationFromPath(const Path & drvPath)
 
 
 void computeFSClosure(const Path & storePath,
-    PathSet & paths, bool flipDirection)
+    PathSet & paths, bool flipDirection, bool includeOutputs)
 {
     if (paths.find(storePath) != paths.end()) return;
     paths.insert(storePath);
@@ -30,8 +30,15 @@ void computeFSClosure(const Path & storePath,
     else
         store->queryReferences(storePath, references);
 
+    if (includeOutputs && isDerivation(storePath)) {
+        Derivation drv = derivationFromPath(storePath);
+        foreach (DerivationOutputs::iterator, i, drv.outputs)
+            if (store->isValidPath(i->second.path))
+                computeFSClosure(i->second.path, paths, flipDirection, true);
+    }
+
     foreach (PathSet::iterator, i, references)
-        computeFSClosure(*i, paths, flipDirection);
+        computeFSClosure(*i, paths, flipDirection, includeOutputs);
 }
 
 

@@ -19,7 +19,8 @@ Derivation derivationFromPath(const Path & drvPath);
    `referrers' relation instead of the `references' relation is
    returned. */
 void computeFSClosure(const Path & storePath,
-    PathSet & paths, bool flipDirection = false);
+    PathSet & paths, bool flipDirection = false,
+    bool includeOutputs = false);
 
 /* Return the path corresponding to the output identifier `id' in the
    given derivation. */
