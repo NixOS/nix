@@ -243,6 +243,12 @@ void checkStoreName(const string & name);
 Path toStorePath(const Path & path);
 
 
+/* Get the "name" part of a store path, that is, the part after the
+   hash and the dash, and with any ".drv" suffix removed
+   (e.g. /nix/store/<hash>-foo-1.2.3.drv => foo-1.2.3). */
+string getNameOfStorePath(const Path & path);
+
+
 /* Follow symlinks until we end up with a path in the Nix store. */
 Path followLinksToStore(const Path & path);
 
