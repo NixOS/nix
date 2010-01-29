@@ -390,6 +390,9 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path, bool ignoreErrors)
 
     assertStorePath(path);
 
+    if (!isValidPath(path))
+        throw Error(format("path `%1%' is not valid") % path);
+
     std::map<Path, ValidPathInfo>::iterator lookup = pathInfoCache.find(path);
     if (lookup != pathInfoCache.end()) return lookup->second;
     
@@ -404,7 +407,11 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path, bool ignoreErrors)
 
     foreach (Strings::iterator, i, lines) {
         string::size_type p = i->find(':');
-        if (p == string::npos) continue; /* bad line */
+        if (p == string::npos) {
+            if (!ignoreErrors)
+                throw Error(format("corrupt line in `%1%': %2%") % infoFile % *i);
+            continue; /* bad line */
+        }
         string name(*i, 0, p);
         string value(*i, p + 2);
         if (name == "References") {
@@ -435,7 +442,22 @@ bool LocalStore::isValidPath(const Path & path)
     /* Files in the info directory starting with a `.' are temporary
        files. */
     if (baseNameOf(path).at(0) == '.') return false;
-    return pathExists(infoFileFor(path));
+
+    /* A path is valid if its info file exists and has a non-zero
+       size.  (The non-zero size restriction is to be robust to
+       certain kinds of filesystem corruption, particularly with
+       ext4.) */
+    Path infoFile = infoFileFor(path);
+
+    struct stat st;
+    if (lstat(infoFile.c_str(), &st)) {
+        if (errno == ENOENT) return false;
+        throw SysError(format("getting status of `%1%'") % infoFile);
+    }
+
+    if (st.st_size == 0) return false;
+    
+    return true;
 }
 
 
@@ -1028,8 +1050,18 @@ void LocalStore::verifyStore(bool checkContents)
         } else if (!pathExists(*i)) {
             printMsg(lvlError, format("path `%1%' disappeared") % *i);
             invalidatePath(*i);
-        } else
-            validPaths.insert(*i);
+        } else {
+            Path infoFile = infoFileFor(*i);
+            struct stat st;
+            if (lstat(infoFile.c_str(), &st))
+                throw SysError(format("getting status of `%1%'") % infoFile);
+            if (st.st_size == 0) {
+                printMsg(lvlError, format("removing corrupt info file `%1%'") % infoFile);
+                if (unlink(infoFile.c_str()) == -1)
+                    throw SysError(format("unlinking `%1%'") % infoFile);
+            }
+            else validPaths.insert(*i);
+        }
     }
 
 
