@@ -158,12 +158,17 @@ private:
     /* Store paths for which the referrers file must be purged. */
     PathSet delayedUpdates;
 
+    /* Whether to do an fsync() after writing Nix metadata. */
+    bool doFsync;
+
     int getSchema();
 
     void registerValidPath(const ValidPathInfo & info, bool ignoreValidity = false);
 
     ValidPathInfo queryPathInfo(const Path & path, bool ignoreErrors = false);
 
+    void appendReferrer(const Path & from, const Path & to, bool lock);
+    
     void rewriteReferrers(const Path & path, bool purge, PathSet referrers);
 
     void flushDelayedUpdates();

@@ -233,7 +233,17 @@ build-use-chroot = /dev /proc /bin</programlisting>
     <filename>configure</filename> at build time.</para></listitem>
 
   </varlistentry>
-  
+
+
+  <varlistentry><term><literal>fsync-metadata</literal></term>
+
+    <listitem><para>If set to <literal>true</literal>, changes to the
+    Nix store metadata (in <filename>/nix/var/nix/db</filename>) are
+    synchronously flushed to disk.  This improves robustness in case
+    of system crashes, but reduces performance.  The default is
+    <literal>false</literal>.</para></listitem>
+
+  </varlistentry>
     
 </variablelist>
 

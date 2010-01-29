@@ -1318,18 +1318,18 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
         string s;
         foreach (PathSet::iterator, i, allInputs) s += *i + "\n";
         
-        writeStringToFile(inputListFN, s);
+        writeFile(inputListFN, s);
 
         /* The `outputs' file lists all outputs that have to be copied
            from the remote system. */
         s = "";
         foreach (DerivationOutputs::iterator, i, drv.outputs)
             s += i->second.path + "\n";
-        writeStringToFile(outputListFN, s);
+        writeFile(outputListFN, s);
 
         /* The `references' file has exactly the format accepted by
            `nix-store --register-validity'. */
-        writeStringToFile(referencesFN,
+        writeFile(referencesFN,
             makeValidityRegistration(allInputs, true, false));
 
         /* Tell the hook to proceed. */
@@ -1493,7 +1493,7 @@ void DerivationGoal::startBuilder()
         }
 
         /* Write closure info to `fileName'. */
-        writeStringToFile(tmpDir + "/" + fileName,
+        writeFile(tmpDir + "/" + fileName,
             makeValidityRegistration(paths, false, false));
     }
 
@@ -1570,7 +1570,7 @@ void DerivationGoal::startBuilder()
            support Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
 
-        writeStringToFile(chrootRootDir + "/etc/passwd",
+        writeFile(chrootRootDir + "/etc/passwd",
             (format(
                 "nixbld:x:%1%:65534:Nix build user:/:/noshell\n"
                 "nobody:x:65534:65534:Nobody:/:/noshell\n")

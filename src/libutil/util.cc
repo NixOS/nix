@@ -15,6 +15,7 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #include "util.hh"
 
@@ -220,12 +221,13 @@ string readFile(const Path & path)
 }
 
 
-void writeFile(const Path & path, const string & s)
+void writeFile(const Path & path, const string & s, bool doFsync)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT, 0666);
     if (fd == -1)
         throw SysError(format("opening file `%1%'") % path);
     writeFull(fd, (unsigned char *) s.c_str(), s.size());
+    if (doFsync) fdatasync(fd);
 }
 
 
@@ -410,16 +412,6 @@ Paths createDirs(const Path & path)
         created.push_back(path);
     }
     return created;
-}
-
-
-void writeStringToFile(const Path & path, const string & s)
-{
-    AutoCloseFD fd(open(path.c_str(),
-        O_CREAT | O_EXCL | O_WRONLY, 0666));
-    if (fd == -1)
-        throw SysError(format("creating file `%1%'") % path);
-    writeFull(fd, (unsigned char *) s.c_str(), s.size());
 }
 
 

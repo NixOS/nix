@@ -89,6 +89,8 @@ LocalStore::LocalStore()
     }
     if (curSchema == 1) throw Error("your Nix store is no longer supported");
     if (curSchema < nixSchemaVersion) upgradeStore12();
+
+    doFsync = queryBoolSetting("fsync-metadata", false);
 }
 
 
@@ -222,7 +224,7 @@ static Path tmpFileForAtomicUpdate(const Path & path)
 }
 
 
-static void appendReferrer(const Path & from, const Path & to, bool lock)
+void LocalStore::appendReferrer(const Path & from, const Path & to, bool lock)
 {
     Path referrersFile = referrersFileFor(from);
     
@@ -237,6 +239,8 @@ static void appendReferrer(const Path & from, const Path & to, bool lock)
     
     string s = " " + to;
     writeFull(fd, (const unsigned char *) s.c_str(), s.size());
+
+    if (doFsync) fdatasync(fd);
 }
 
 
@@ -267,6 +271,8 @@ void LocalStore::rewriteReferrers(const Path & path, bool purge, PathSet referre
     
     writeFull(fd, (const unsigned char *) s.c_str(), s.size());
 
+    if (doFsync) fdatasync(fd);
+    
     fd.close(); /* for Windows; can't rename open file */
 
     if (rename(tmpFile.c_str(), referrersFile.c_str()) == -1)
@@ -347,7 +353,7 @@ void LocalStore::registerValidPath(const ValidPathInfo & info, bool ignoreValidi
 
     /* Atomically rewrite the info file. */
     Path tmpFile = tmpFileForAtomicUpdate(infoFile);
-    writeFile(tmpFile, s);
+    writeFile(tmpFile, s, doFsync);
     if (rename(tmpFile.c_str(), infoFile.c_str()) == -1)
         throw SysError(format("cannot rename `%1%' to `%2%'") % tmpFile % infoFile);
 
@@ -737,7 +743,7 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
                 StringSource source(dump);
                 restorePath(dstPath, source);
             } else
-                writeStringToFile(dstPath, dump);
+                writeFile(dstPath, dump);
 
             canonicalisePathMetaData(dstPath);
 
@@ -792,7 +798,7 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
 
             if (pathExists(dstPath)) deletePathWrapped(dstPath);
 
-            writeStringToFile(dstPath, s);
+            writeFile(dstPath, s);
 
             canonicalisePathMetaData(dstPath);
             
@@ -871,7 +877,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
         Path tmpDir = createTempDir();
         AutoDelete delTmp(tmpDir);
         Path hashFile = tmpDir + "/hash";
-        writeStringToFile(hashFile, printHash(hash));
+        writeFile(hashFile, printHash(hash));
 
         Path secretKey = nixConfDir + "/signing-key.sec";
         checkSecrecy(secretKey);
@@ -947,7 +953,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 
         if (requireSignature) {
             Path sigFile = tmpDir + "/sig";
-            writeStringToFile(sigFile, signature);
+            writeFile(sigFile, signature);
 
             Strings args;
             args.push_back("rsautl");

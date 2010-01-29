@@ -62,7 +62,7 @@ string readFile(int fd);
 string readFile(const Path & path);
 
 /* Write a string to a file. */
-void writeFile(const Path & path, const string & s);
+void writeFile(const Path & path, const string & s, bool doFsync = false);
 
 /* Read a line from a file descriptor. */
 string readLine(int fd);
@@ -93,10 +93,6 @@ Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
    list of created directories, in order of creation. */
 Paths createDirs(const Path & path);
 
-/* Create a file and write the given text to it.  The file is written
-   in binary mode (i.e., no end-of-line conversions).  The path should
-   not already exist. */
-void writeStringToFile(const Path & path, const string & s);
 
 template<class T, class A>
 T singleton(const A & a)
