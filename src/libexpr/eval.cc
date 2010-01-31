@@ -350,8 +350,13 @@ string coerceToString(EvalState & state, Expr e, Context & context,
     if (matchAttrs(e, es)) {
         Expr e2 = queryAttr(e, "outPath");
         if (!e2) throwTypeError("cannot coerce an attribute set (except a derivation) to a string");
-        /* XXX handle derivation */
-        return coerceToString(state, e2, context, coerceMore, copyToStore);
+        /* !!! hacky */
+        ATermList c;
+        string s = evalString(state, e2, c);
+        Context c2; matchContext(c, c2);
+        foreach (Context::const_iterator, i, c2)
+            context.set(i->key, e);
+        return s;
     }
 
     if (coerceMore) {

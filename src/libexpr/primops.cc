@@ -524,7 +524,6 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     state.drvHashes[drvPath] = hashDerivationModulo(state, drv);
 
     /* !!! assumes a single output */
-    /* XXX makeNull? */
     ATermMap outAttrs(2);
     outAttrs.set(toATerm("outPath"),
         makeAttrRHS(makeStr(outPath, ATmakeList1(makeContextElem(toATerm(drvPath), makeNull()))), makeNoPos()));
@@ -1065,6 +1064,17 @@ static Expr prim_unsafeDiscardOutputDependency(EvalState & state, const ATermVec
 }
 
 
+static Expr prim_queryStringContext(EvalState & state, const ATermVector & args)
+{
+    Context context;
+    string s = coerceToString(state, args[0], context);
+    ATermList l = ATempty;
+    foreach (Context::const_iterator, i, context)
+        l = ATinsert(l, i->value);
+    return makeList(l);
+}
+
+
 /* Expression serialization/deserialization */
 
 
@@ -1181,6 +1191,7 @@ void EvalState::addPrimOps()
     addPrimOp("__stringLength", 1, prim_stringLength);
     addPrimOp("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
     addPrimOp("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
+    addPrimOp("__queryStringContext", 1, prim_queryStringContext);
 
     // Versions
     addPrimOp("__parseDrvName", 1, prim_parseDrvName);
