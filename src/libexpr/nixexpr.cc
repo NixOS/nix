@@ -336,25 +336,47 @@ Expr makeBool(bool b)
 }
 
 
-bool matchStr(Expr e, string & s, PathSet & context)
+bool matchStr(Expr e, string & s, ATermList & context)
 {
-    ATermList l;
     ATerm s_;
-
-    if (!matchStr(e, s_, l)) return false;
-
+    if (!matchStr(e, s_, context)) return false;
     s = aterm2String(s_);
-
-    for (ATermIterator i(l); i; ++i)
-        context.insert(aterm2String(*i));
-
     return true;
 }
 
 
-Expr makeStr(const string & s, const PathSet & context)
+bool matchStr(Expr e, string & s, Context & context)
 {
-    return makeStr(toATerm(s), toATermList(context));
+    ATermList c;
+    if (!matchStr(e, s, c)) return false;
+    matchContext(c, context);
+    return true;
+}
+
+
+Expr makeStr(const string & s, ATermList context)
+{
+    return makeStr(toATerm(s), context);
+}
+
+
+Expr makeStr(const string & s, const Context & context)
+{
+    ATermList l = ATempty;
+    /* !!! should define a canonical ordering of context elements. */
+    foreach (Context::const_iterator, i, context)
+        l = ATinsert(l, makeContextElem(i->key, i->value));
+    return makeStr(s, l);
+}
+
+
+void matchContext(ATermList context, Context & result)
+{
+    for (ATermIterator i(context); i; ++i) {
+        ATerm s, e;
+        if (!matchContextElem(*i, s, e)) abort();
+        result.set(s, e);
+    }
 }
 
 
@@ -380,7 +402,7 @@ string showType(Expr e)
 
 string showValue(Expr e)
 {
-    PathSet context;
+    ATermList context;
     string s;
     ATerm s2;
     int i;

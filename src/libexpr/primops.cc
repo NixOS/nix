@@ -93,16 +93,17 @@ static Expr prim_currentTime(EvalState & state, const ATermVector & args)
    argument. */ 
 static Expr prim_import(EvalState & state, const ATermVector & args)
 {
-    PathSet context;
+    Context context;
     Path path = coerceToPath(state, args[0], context);
 
-    for (PathSet::iterator i = context.begin(); i != context.end(); ++i) {
-        assert(isStorePath(*i));
-        if (!store->isValidPath(*i))
+    foreach (Context::const_iterator, i, context) {
+        Path p = aterm2String(i->key);
+        assert(isStorePath(p));
+        if (!store->isValidPath(p))
             throw EvalError(format("cannot import `%1%', since path `%2%' is not valid")
-                % path % *i);
-        if (isDerivation(*i))
-            store->buildDerivations(singleton<PathSet>(*i));
+                % path % p);
+        if (isDerivation(p))
+            store->buildDerivations(singleton<PathSet>(p));
     }
 
     return evalFile(state, path);
@@ -136,8 +137,8 @@ static Expr prim_isInt(EvalState & state, const ATermVector & args)
 static Expr prim_isString(EvalState & state, const ATermVector & args)
 {
     string s;
-    PathSet l;
-    return makeBool(matchStr(evalExpr(state, args[0]), s, l));
+    ATermList context;
+    return makeBool(matchStr(evalExpr(state, args[0]), s, context));
 }
 
 /* Determine whether the argument is an Bool. */
@@ -197,7 +198,7 @@ static Expr prim_genericClosure(EvalState & state, const ATermVector & args)
 
 static Expr prim_abort(EvalState & state, const ATermVector & args)
 {
-    PathSet context;
+    ATermList context;
     throw Abort(format("evaluation aborted with the following error message: `%1%'") %
         evalString(state, args[0], context));
 }
@@ -205,7 +206,7 @@ static Expr prim_abort(EvalState & state, const ATermVector & args)
 
 static Expr prim_throw(EvalState & state, const ATermVector & args)
 {
-    PathSet context;
+    ATermList context;
     throw ThrownError(format("user-thrown exception: %1%") %
         evalString(state, args[0], context));
 }
@@ -213,7 +214,7 @@ static Expr prim_throw(EvalState & state, const ATermVector & args)
 
 static Expr prim_addErrorContext(EvalState & state, const ATermVector & args)
 {
-    PathSet context;
+    ATermList context;
     try {
         return evalExpr(state, args[1]);
     } catch (Error & e) {
@@ -257,7 +258,7 @@ static Expr prim_trace(EvalState & state, const ATermVector & args)
 {
     Expr e = evalExpr(state, args[0]);
     string s;
-    PathSet context;
+    ATermList context;
     if (matchStr(e, s, context))
         printMsg(lvlError, format("trace: %1%") % s);
     else
@@ -360,7 +361,7 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     /* Build the derivation expression by processing the attributes. */
     Derivation drv;
     
-    PathSet context;
+    Context context;
 
     string outputHash, outputHashAlgo;
     bool outputHashRecursive = false;
@@ -421,8 +422,8 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     /* Everything in the context of the strings in the derivation
        attributes should be added as dependencies of the resulting
        derivation. */
-    foreach (PathSet::iterator, i, context) {
-        Path path = *i;
+    foreach (Context::const_iterator, i, context) {
+        Path path = aterm2String(i->key);
         
         /* Paths marked with `=' denote that the path of a derivation
            is explicitly passed to the builder.  Since that allows the
@@ -523,11 +524,12 @@ static Expr prim_derivationStrict(EvalState & state, const ATermVector & args)
     state.drvHashes[drvPath] = hashDerivationModulo(state, drv);
 
     /* !!! assumes a single output */
+    /* XXX makeNull? */
     ATermMap outAttrs(2);
     outAttrs.set(toATerm("outPath"),
-        makeAttrRHS(makeStr(outPath, singleton<PathSet>(drvPath)), makeNoPos()));
+        makeAttrRHS(makeStr(outPath, ATmakeList1(makeContextElem(toATerm(drvPath), makeNull()))), makeNoPos()));
     outAttrs.set(toATerm("drvPath"),
-        makeAttrRHS(makeStr(drvPath, singleton<PathSet>("=" + drvPath)), makeNoPos()));
+        makeAttrRHS(makeStr(drvPath, ATmakeList1(makeContextElem(toATerm("=" + drvPath), makeNull()))), makeNoPos()));
 
     return makeAttrs(outAttrs);
 }
@@ -561,7 +563,7 @@ static Expr prim_derivationLazy(EvalState & state, const ATermVector & args)
 /* Convert the argument to a path.  !!! obsolete? */
 static Expr prim_toPath(EvalState & state, const ATermVector & args)
 {
-    PathSet context;
+    Context context;
     string path = coerceToPath(state, args[0], context);
     return makeStr(canonPath(path), context);
 }
@@ -577,23 +579,23 @@ static Expr prim_toPath(EvalState & state, const ATermVector & args)
    corner cases. */
 static Expr prim_storePath(EvalState & state, const ATermVector & args)
 {
-    PathSet context;
+    Context context;
     Path path = canonPath(coerceToPath(state, args[0], context));
     if (!isInStore(path))
         throw EvalError(format("path `%1%' is not in the Nix store") % path);
     Path path2 = toStorePath(path);
     if (!store->isValidPath(path2))
         throw EvalError(format("store path `%1%' is not valid") % path2);
-    context.insert(path2);
+    context.set(toATerm(path2), makeNull());
     return makeStr(path, context);
 }
 
 
 static Expr prim_pathExists(EvalState & state, const ATermVector & args)
 {
-    PathSet context;
+    Context context;
     Path path = coerceToPath(state, args[0], context);
-    if (!context.empty())
+    if (context.size() != 0)
         throw EvalError(format("string `%1%' cannot refer to other paths") % path);
     return makeBool(pathExists(path));
 }
@@ -603,7 +605,7 @@ static Expr prim_pathExists(EvalState & state, const ATermVector & args)
    following the last slash. */
 static Expr prim_baseNameOf(EvalState & state, const ATermVector & args)
 {
-    PathSet context;
+    Context context;
     return makeStr(baseNameOf(coerceToString(state, args[0], context)), context);
 }
 
@@ -613,7 +615,7 @@ static Expr prim_baseNameOf(EvalState & state, const ATermVector & args)
    of the argument. */
 static Expr prim_dirOf(EvalState & state, const ATermVector & args)
 {
-    PathSet context;
+    Context context;
     Expr e = evalExpr(state, args[0]); ATerm dummy;
     bool isPath = matchPath(e, dummy);
     Path dir = dirOf(coerceToPath(state, e, context));
@@ -624,9 +626,9 @@ static Expr prim_dirOf(EvalState & state, const ATermVector & args)
 /* Return the contents of a file as a string. */
 static Expr prim_readFile(EvalState & state, const ATermVector & args)
 {
-    PathSet context;
+    Context context;
     Path path = coerceToPath(state, args[0], context);
-    if (!context.empty())
+    if (context.size() != 0)
         throw EvalError(format("string `%1%' cannot refer to other paths") % path);
     return makeStr(readFile(path));
 }
@@ -643,7 +645,7 @@ static Expr prim_readFile(EvalState & state, const ATermVector & args)
 static Expr prim_toXML(EvalState & state, const ATermVector & args)
 {
     std::ostringstream out;
-    PathSet context;
+    Context context;
     printTermAsXML(strictEvalExpr(state, args[0]), out, context);
     return makeStr(out.str(), context);
 }
@@ -653,14 +655,15 @@ static Expr prim_toXML(EvalState & state, const ATermVector & args)
    as an input by derivations. */
 static Expr prim_toFile(EvalState & state, const ATermVector & args)
 {
-    PathSet context;
+    ATermList context;
     string name = evalStringNoCtx(state, args[0]);
     string contents = evalString(state, args[1], context);
 
     PathSet refs;
 
-    for (PathSet::iterator i = context.begin(); i != context.end(); ++i) {
-        Path path = *i;
+    Context context2; matchContext(context, context2);
+    foreach (Context::const_iterator, i, context2) {
+        Path path = aterm2String(i->key);
         if (path.at(0) == '=') path = string(path, 1);
         if (isDerivation(path))
             throw EvalError(format("in `toFile': the file `%1%' cannot refer to derivation outputs") % name);
@@ -675,7 +678,7 @@ static Expr prim_toFile(EvalState & state, const ATermVector & args)
        result, since `storePath' itself has references to the paths
        used in args[1]. */
     
-    return makeStr(storePath, singleton<PathSet>(storePath));
+    return makeStr(storePath, ATmakeList1(makeContextElem(toATerm(storePath), makeNull())));
 }
 
 
@@ -712,9 +715,9 @@ struct FilterFromExpr : PathFilter
 
 static Expr prim_filterSource(EvalState & state, const ATermVector & args)
 {
-    PathSet context;
+    Context context;
     Path path = coerceToPath(state, args[1], context);
-    if (!context.empty())
+    if (context.size() != 0)
         throw EvalError(format("string `%1%' cannot refer to other paths") % path);
 
     FilterFromExpr filter(state, args[0]);
@@ -723,7 +726,7 @@ static Expr prim_filterSource(EvalState & state, const ATermVector & args)
         ? computeStorePathForPath(path, true, htSHA256, filter).first
         : store->addToStore(path, true, htSHA256, filter);
 
-    return makeStr(dstPath, singleton<PathSet>(dstPath));
+    return makeStr(dstPath, ATmakeList1(makeContextElem(toATerm(dstPath), makeNull())));
 }
 
 
@@ -746,7 +749,7 @@ static Expr prim_attrNames(EvalState & state, const ATermVector & args)
     ATermList list = ATempty;
     for (StringSet::const_reverse_iterator i = names.rbegin();
          i != names.rend(); ++i)
-        list = ATinsert(list, makeStr(*i, PathSet()));
+        list = ATinsert(list, makeStr(*i));
 
     return makeList(list);
 }
@@ -1001,7 +1004,7 @@ static Expr prim_lessThan(EvalState & state, const ATermVector & args)
    `"/nix/store/whatever..."'. */
 static Expr prim_toString(EvalState & state, const ATermVector & args)
 {
-    PathSet context;
+    Context context;
     string s = coerceToString(state, args[0], context, true, false);
     return makeStr(s, context);
 }
@@ -1015,7 +1018,7 @@ static Expr prim_substring(EvalState & state, const ATermVector & args)
 {
     int start = evalInt(state, args[0]);
     int len = evalInt(state, args[1]);
-    PathSet context;
+    Context context;
     string s = coerceToString(state, args[2], context);
 
     if (start < 0) throw EvalError("negative start position in `substring'");
@@ -1026,7 +1029,7 @@ static Expr prim_substring(EvalState & state, const ATermVector & args)
 
 static Expr prim_stringLength(EvalState & state, const ATermVector & args)
 {
-    PathSet context;
+    Context context;
     string s = coerceToString(state, args[0], context);
     return makeInt(s.size());
 }
@@ -1034,9 +1037,9 @@ static Expr prim_stringLength(EvalState & state, const ATermVector & args)
 
 static Expr prim_unsafeDiscardStringContext(EvalState & state, const ATermVector & args)
 {
-    PathSet context;
+    Context context;
     string s = coerceToString(state, args[0], context);
-    return makeStr(s, PathSet());
+    return makeStr(s);
 }
 
 
@@ -1048,14 +1051,14 @@ static Expr prim_unsafeDiscardStringContext(EvalState & state, const ATermVector
    drv.inputDrvs. */
 static Expr prim_unsafeDiscardOutputDependency(EvalState & state, const ATermVector & args)
 {
-    PathSet context;
+    Context context;
     string s = coerceToString(state, args[0], context);
 
-    PathSet context2;
-    foreach (PathSet::iterator, i, context) {
-        Path p = *i;
+    Context context2;
+    foreach (Context::const_iterator, i, context) {
+        Path p = aterm2String(i->key);
         if (p.at(0) == '=') p = "~" + string(p, 1);
-        context2.insert(p);
+        context2.set(toATerm(p), i->value);
     }
     
     return makeStr(s, context2);
@@ -1069,18 +1072,6 @@ static Expr prim_exprToString(EvalState & state, const ATermVector & args)
 {
     /* !!! this disregards context */
     return makeStr(atPrint(evalExpr(state, args[0])));
-}
-
-
-static Expr prim_stringToExpr(EvalState & state, const ATermVector & args)
-{
-    /* !!! this can introduce arbitrary garbage terms in the
-       evaluator! */;
-    string s;
-    PathSet l;
-    if (!matchStr(evalExpr(state, args[0]), s, l))
-        throw EvalError("stringToExpr needs string argument!");
-    return ATreadFromString(s.c_str());
 }
 
 
@@ -1140,10 +1131,8 @@ void EvalState::addPrimOps()
     addPrimOp("__getEnv", 1, prim_getEnv);
     addPrimOp("__trace", 2, prim_trace);
 
-    
     // Expr <-> String
     addPrimOp("__exprToString", 1, prim_exprToString);
-    addPrimOp("__stringToExpr", 1, prim_stringToExpr);
 
     // Derivations
     addPrimOp("derivation!", 1, prim_derivationStrict);

@@ -23,12 +23,12 @@ static XMLAttrs singletonAttrs(const string & name, const string & value)
 typedef set<Expr> ExprSet;
 
 
-static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
+static void printTermAsXML(Expr e, XMLWriter & doc, Context & context,
     ExprSet & drvsSeen);
 
 
 static void showAttrs(const ATermMap & attrs, XMLWriter & doc,
-    PathSet & context, ExprSet & drvsSeen)
+    Context & context, ExprSet & drvsSeen)
 {
     StringSet names;
     for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i)
@@ -65,7 +65,7 @@ static void printPatternAsXML(Pattern pat, XMLWriter & doc)
 }
 
 
-static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
+static void printTermAsXML(Expr e, XMLWriter & doc, Context & context,
     ExprSet & drvsSeen)
 {
     XMLAttrs attrs;
@@ -144,7 +144,7 @@ static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
 }
 
 
-void printTermAsXML(Expr e, std::ostream & out, PathSet & context)
+void printTermAsXML(Expr e, std::ostream & out, Context & context)
 {
     XMLWriter doc(true, out);
     XMLOpenElement root(doc, "expr");

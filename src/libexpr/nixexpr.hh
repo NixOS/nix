@@ -26,6 +26,7 @@ typedef ATerm DefaultValue;
 typedef ATerm Pos;
 typedef ATerm Pattern;
 typedef ATerm ATermBool;
+typedef ATerm ContextElem;
 
 
 /* A STL vector of ATerms.  Should be used with great care since it's
@@ -104,11 +105,18 @@ Expr canonicaliseExpr(Expr e);
 Expr makeBool(bool b);
 
 
-/* Manipulation of Str() nodes.  Note: matchStr() does not clear
-   context!  */
-bool matchStr(Expr e, string & s, PathSet & context);
+/* Manipulation of Str() nodes. */
+typedef ATermMap Context;
 
-Expr makeStr(const string & s, const PathSet & context = PathSet());
+bool matchStr(Expr e, string & s, ATermList & context);
+
+bool matchStr(Expr e, string & s, Context & context);
+
+Expr makeStr(const string & s, ATermList context = ATempty);
+
+Expr makeStr(const string & s, const Context & context);
+
+void matchContext(ATermList context, Context & result);
 
 
 /* Showing types, values. */

@@ -45,6 +45,8 @@ Int | int | Expr |
 Str | string ATermList | Expr |
 Str | string | Expr | ObsoleteStr
 
+ContextElem | string Expr | ContextElem |
+
 # Internal to the parser, doesn't occur in ASTs.
 IndStr | string | Expr |
 

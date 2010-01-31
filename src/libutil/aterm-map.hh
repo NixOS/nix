@@ -2,6 +2,7 @@
 #define __ATERM_MAP_H
 
 #include <aterm1.h>
+#include <aterm2.h>
 #include <assert.h>
 
 

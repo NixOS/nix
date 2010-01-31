@@ -17,7 +17,7 @@ string DrvInfo::queryDrvPath(EvalState & state) const
         if (a && matchPath(evalExpr(state, a), t))
             return aterm2String(t);
         
-        PathSet context;
+        Context context;
         (string &) drvPath = a ? coerceToPath(state, a, context) : "";
     }
     return drvPath;
@@ -29,7 +29,7 @@ string DrvInfo::queryOutPath(EvalState & state) const
     if (outPath == "") {
         Expr a = attrs->get(toATerm("outPath"));
         if (!a) throw TypeError("output path missing");
-        PathSet context;
+        Context context;
         (string &) outPath = coerceToPath(state, a, context);
     }
     return outPath;
@@ -49,7 +49,7 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
     for (ATermMap::const_iterator i = attrs2.begin(); i != attrs2.end(); ++i) {
         Expr e = evalExpr(state, i->value);
         string s;
-        PathSet context;
+        ATermList context;
         MetaValue value;
         int n;
         ATermList es;

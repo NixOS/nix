@@ -61,7 +61,7 @@ Expr evalFile(EvalState & state, const Path & path);
 Expr strictEvalExpr(EvalState & state, Expr e);
 
 /* Specific results. */
-string evalString(EvalState & state, Expr e, PathSet & context);
+string evalString(EvalState & state, Expr e, ATermList & context);
 string evalStringNoCtx(EvalState & state, Expr e);
 int evalInt(EvalState & state, Expr e);
 bool evalBool(EvalState & state, Expr e);
@@ -74,13 +74,13 @@ ATermList flattenList(EvalState & state, Expr e);
 /* String coercion.  Converts strings, paths and derivations to a
    string.  If `coerceMore' is set, also converts nulls, integers,
    booleans and lists to a string. */
-string coerceToString(EvalState & state, Expr e, PathSet & context,
+string coerceToString(EvalState & state, Expr e, Context & context,
     bool coerceMore = false, bool copyToStore = true);
 
 /* Path coercion.  Converts strings, paths and derivations to a path.
    The result is guaranteed to be an canonicalised, absolute path.
    Nothing is copied to the store. */
-Path coerceToPath(EvalState & state, Expr e, PathSet & context);
+Path coerceToPath(EvalState & state, Expr e, Context & context);
 
 /* Automatically call a function for which each argument has a default
    value or has a binding in the `args' map.  Note: result is a call,

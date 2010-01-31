@@ -242,7 +242,7 @@ LocalNoInline(Expr updateAttrs(Expr e1, Expr e2))
 }
 
 
-string evalString(EvalState & state, Expr e, PathSet & context)
+string evalString(EvalState & state, Expr e, ATermList & context)
 {
     e = evalExpr(state, e);
     string s;
@@ -254,11 +254,10 @@ string evalString(EvalState & state, Expr e, PathSet & context)
 
 string evalStringNoCtx(EvalState & state, Expr e)
 {
-    PathSet context;
+    ATermList context;
     string s = evalString(state, e, context);
-    if (!context.empty())
-        throw EvalError(format("the string `%1%' is not allowed to refer to a store path (such as `%2%')")
-            % s % *(context.begin()));
+    if (context != ATempty)
+        throw EvalError(format("the string `%1%' is not allowed to refer to a store path") % s);
     return s;
 }
 
@@ -312,7 +311,7 @@ ATermList flattenList(EvalState & state, Expr e)
 }
 
 
-string coerceToString(EvalState & state, Expr e, PathSet & context,
+string coerceToString(EvalState & state, Expr e, Context & context,
     bool coerceMore, bool copyToStore)
 {
     e = evalExpr(state, e);
@@ -343,7 +342,7 @@ string coerceToString(EvalState & state, Expr e, PathSet & context,
                 % path % dstPath);
         }
 
-        context.insert(dstPath);
+        context.set(toATerm(dstPath), makeNull());
         return dstPath;
     }
         
@@ -351,6 +350,7 @@ string coerceToString(EvalState & state, Expr e, PathSet & context,
     if (matchAttrs(e, es)) {
         Expr e2 = queryAttr(e, "outPath");
         if (!e2) throwTypeError("cannot coerce an attribute set (except a derivation) to a string");
+        /* XXX handle derivation */
         return coerceToString(state, e2, context, coerceMore, copyToStore);
     }
 
@@ -385,9 +385,9 @@ string coerceToString(EvalState & state, Expr e, PathSet & context,
 static ATerm concatStrings(EvalState & state, ATermVector & args,
     string separator = "")
 {
-    if (args.empty()) return makeStr("", PathSet());
+    if (args.empty()) return makeStr("", ATempty);
     
-    PathSet context;
+    Context context;
     std::ostringstream s;
 
     /* If the first element is a path, then the result will also be a
@@ -403,7 +403,7 @@ static ATerm concatStrings(EvalState & state, ATermVector & args,
         s << coerceToString(state, *i, context, false, !isPath);
     }
 
-    if (isPath && !context.empty())
+    if (isPath && context.size() != 0)
         throw EvalError(format("a string that refers to a store path cannot be appended to a path, in `%1%'")
             % s.str());
     
@@ -413,7 +413,7 @@ static ATerm concatStrings(EvalState & state, ATermVector & args,
 }
 
 
-Path coerceToPath(EvalState & state, Expr e, PathSet & context)
+Path coerceToPath(EvalState & state, Expr e, Context & context)
 {
     string path = coerceToString(state, e, context, false, false);
     if (path == "" || path[0] != '/')
@@ -600,7 +600,7 @@ LocalNoInline(Expr evalPlusConcat(EvalState & state, Expr e))
                     "concatenation of a derivation and a path is deprecated; "
                     "you should write `drv + \"%1%\"' instead of `drv + %1%'")
                 % aterm2String(p));
-            PathSet context;
+            Context context;
             return makeStr(
                 coerceToString(state, makeSelect(e1, toATerm("outPath")), context)
                 + aterm2String(p), context);

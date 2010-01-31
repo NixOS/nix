@@ -40,7 +40,7 @@ static bool indirectRoot = false;
 static void printResult(EvalState & state, Expr e,
     bool evalOnly, bool xmlOutput, const ATermMap & autoArgs)
 {
-    PathSet context;
+    Context context;
     
     if (evalOnly)
         if (xmlOutput)

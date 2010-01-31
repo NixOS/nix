@@ -327,7 +327,7 @@ static bool createUserEnv(EvalState & state, DrvInfos & elems,
         makeBind(toATerm("derivations"),
             makeList(ATreverse(manifest)), makeNoPos()),
         makeBind(toATerm("manifest"),
-            makeStr(manifestFile, singleton<PathSet>(manifestFile)), makeNoPos())
+            makeStr(manifestFile, ATmakeList1(makeContextElem(toATerm(manifestFile), makeNull()))), makeNoPos())
         )));
 
     /* Instantiate it. */
