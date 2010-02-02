@@ -85,8 +85,6 @@ my $targetPath = $ARGV[1];
 my $tmpDir = tempdir("nix-download.XXXXXX", CLEANUP => 1, TMPDIR => 1)
     or die "cannot create a temporary directory";
 
-chdir $tmpDir or die "cannot change to `$tmpDir': $!";
-
 my $tmpNar = "$tmpDir/nar";
 my $tmpNar2 = "$tmpDir/nar2";
 
