@@ -1,5 +1,8 @@
 #! @shell@ -e
 
+# Cygwin compatibility hack: bunzip2 expects cygwin.dll in $PATH.
+export PATH=@coreutils@
+
 @coreutils@/mkdir $out
 @coreutils@/mkdir $out/tmp
 cd $out/tmp
