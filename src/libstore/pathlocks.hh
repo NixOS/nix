@@ -12,10 +12,8 @@ namespace nix {
    because it doesn't exist.  Any other error throws an exception. */
 int openLockFile(const Path & path, bool create);
 
-/* Delete an open lock file.  Both must be called to be fully portable
-   between Unix and Windows. */
-void deleteLockFilePreClose(const Path & path, int fd);
-void deleteLockFilePostClose(const Path & path);
+/* Delete an open lock file. */
+void deleteLockFile(const Path & path, int fd);
 
 enum LockType { ltRead, ltWrite, ltNone };
 

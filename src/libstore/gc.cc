@@ -15,11 +15,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#ifdef __CYGWIN__
-#include <windows.h>
-#include <sys/cygwin.h>
-#endif
-
 
 namespace nix {
 
@@ -179,15 +174,6 @@ void LocalStore::addTempRoot(const Path & path)
 
             fdGCLock.close();
       
-	    /* Note that on Cygwin a lot of the following complexity
-	       is unnecessary, since we cannot delete open lock
-	       files.  If we have the lock file open, then it's valid;
-	       if we can delete it, then it wasn't in use any more. 
-
-	       Also note that on Cygwin we cannot "upgrade" a lock
-	       from a read lock to a write lock. */
-
-#ifndef __CYGWIN__
             debug(format("acquiring read lock on `%1%'") % fnTempRoots);
             lockFile(fdTempRoots, ltRead, true);
 
@@ -201,10 +187,6 @@ void LocalStore::addTempRoot(const Path & path)
             /* The garbage collector deleted this file before we could
                get a lock.  (It won't delete the file after we get a
                lock.)  Try again. */
-
-#else
-            break;
-#endif
         }
 
     }
@@ -217,14 +199,9 @@ void LocalStore::addTempRoot(const Path & path)
     string s = path + '\0';
     writeFull(fdTempRoots, (const unsigned char *) s.c_str(), s.size());
 
-#ifndef __CYGWIN__
     /* Downgrade to a read lock. */
     debug(format("downgrading to read lock on `%1%'") % fnTempRoots);
     lockFile(fdTempRoots, ltRead, true);
-#else
-    debug(format("releasing write lock on `%1%'") % fnTempRoots);
-    lockFile(fdTempRoots, ltNone, true);
-#endif
 }
 
 
@@ -252,19 +229,6 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
         Path path = (format("%1%/%2%/%3%") % nixStateDir % tempRootsDir % *i).str();
 
         debug(format("reading temporary root file `%1%'") % path);
-
-#ifdef __CYGWIN__
-	/* On Cygwin we just try to delete the lock file. */
-	char win32Path[MAX_PATH];
-	cygwin_conv_to_full_win32_path(path.c_str(), win32Path);
-	if (DeleteFile(win32Path)) {
-            printMsg(lvlError, format("removed stale temporary roots file `%1%'")
-                % path);
-            continue;
-        } else
-            debug(format("delete of `%1%' failed: %2%") % path % GetLastError());
-#endif
-
         FDPtr fd(new AutoCloseFD(open(path.c_str(), O_RDWR, 0666)));
         if (*fd == -1) {
             /* It's okay if the file has disappeared. */
@@ -276,7 +240,6 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
         //FDPtr fd(new AutoCloseFD(openLockFile(path, false)));
         //if (*fd == -1) continue;
 
-#ifndef __CYGWIN__
         /* Try to acquire a write lock without blocking.  This can
            only succeed if the owning process has died.  In that case
            we don't care about its temporary roots. */
@@ -287,7 +250,6 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
             writeFull(*fd, (const unsigned char *) "d", 1);
             continue;
         }
-#endif
 
         /* Acquire a read lock.  This will prevent the owning process
            from upgrading to a write lock, therefore it will block in

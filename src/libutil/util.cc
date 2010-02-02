@@ -1,9 +1,5 @@
 #include "config.h"
 
-#ifdef __CYGWIN__
-#include <windows.h>
-#endif
-
 #include <iostream>
 #include <cerrno>
 #include <cstdio>
@@ -905,15 +901,7 @@ void closeMostFDs(const set<int> & exceptions)
 
 void quickExit(int status)
 {
-#ifdef __CYGWIN__
-    /* Hack for Cygwin: _exit() doesn't seem to work quite right,
-       since some Berkeley DB code appears to be called when a child
-       exits through _exit() (e.g., because execve() failed).  So call
-       the Windows API directly. */
-    ExitProcess(status);
-#else
     _exit(status);
-#endif
 }
 
 
