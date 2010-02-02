@@ -12,6 +12,10 @@
 
 #include <cstdio>
 
+#ifndef HAVE_FDATASYNC
+#define fdatasync fsync
+#endif
+
 
 namespace nix {
 
