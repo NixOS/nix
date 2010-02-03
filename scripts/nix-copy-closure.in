@@ -53,7 +53,7 @@ while (@ARGV) {
 }
 
 
-openSSHConnection $sshHost;
+openSSHConnection $sshHost or die "$0: unable to start SSH\n";
 
 
 if ($toMode) { # Copy TO the remote machine.

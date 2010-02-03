@@ -12,15 +12,16 @@ sub openSSHConnection {
     my ($host) = @_;
     die if $sshStarted;
     $sshHost = $host;
-    return if system("ssh $sshHost @sshOpts -O check 2> /dev/null") == 0;
+    return 1 if system("ssh $sshHost @sshOpts -O check 2> /dev/null") == 0;
 
     my $tmpDir = tempdir("nix-ssh.XXXXXX", CLEANUP => 1, TMPDIR => 1)
         or die "cannot create a temporary directory";
     
     push @sshOpts, "-S", "$tmpDir/control";
     system("ssh $sshHost @sshOpts -M -N -f") == 0
-        or die "unable to start SSH: $?";
+        or return 0;
     $sshStarted = 1;
+    return 1;
 }
 
 # Tell the master SSH client to exit.
