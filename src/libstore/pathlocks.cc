@@ -37,8 +37,7 @@ void deleteLockFile(const Path & path, int fd)
 }
 
 
-bool lockFile(int fd, LockType lockType, bool wait,
-    unsigned int progressInterval)
+bool lockFile(int fd, LockType lockType, bool wait)
 {
     struct flock lock;
     if (lockType == ltRead) lock.l_type = F_RDLCK;
@@ -50,20 +49,11 @@ bool lockFile(int fd, LockType lockType, bool wait,
     lock.l_len = 0; /* entire file */
 
     if (wait) {
-        /* Wait until we acquire the lock.  If `progressInterval' is
-           non-zero, when print a message every `progressInterval'
-           seconds.  This is mostly to make sure that remote builders
-           aren't killed due to the `max-silent-time' inactivity
-           monitor while waiting for the garbage collector lock. */
-        while (1) {
-            if (progressInterval) alarm(progressInterval);
-            if (fcntl(fd, F_SETLKW, &lock) == 0) break;
+        while (fcntl(fd, F_SETLKW, &lock) != 0) {
             checkInterrupt();
             if (errno != EINTR)
                 throw SysError(format("acquiring/releasing lock"));
-            if (progressInterval) printMsg(lvlError, "still waiting for lock...");
         }
-        alarm(0);
     } else {
         while (fcntl(fd, F_SETLK, &lock) != 0) {
             checkInterrupt();

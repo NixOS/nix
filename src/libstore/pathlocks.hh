@@ -17,8 +17,7 @@ void deleteLockFile(const Path & path, int fd);
 
 enum LockType { ltRead, ltWrite, ltNone };
 
-bool lockFile(int fd, LockType lockType, bool wait,
-    unsigned int progressInterval = 300);
+bool lockFile(int fd, LockType lockType, bool wait);
 
 
 class PathLocks 

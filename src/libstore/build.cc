@@ -162,6 +162,7 @@ struct Child
 {
     WeakGoalPtr goal;
     set<int> fds;
+    bool monitorForSilence;
     bool inBuildSlot;
     time_t lastOutput; /* time we last got output on stdout/stderr */
 };
@@ -234,7 +235,7 @@ public:
     /* Registers a running child process.  `inBuildSlot' means that
        the process counts towards the jobs limit. */
     void childStarted(GoalPtr goal, pid_t pid,
-        const set<int> & fds, bool inBuildSlot);
+        const set<int> & fds, bool inBuildSlot, bool monitorForSilence);
 
     /* Unregisters a running child process.  `wakeSleepers' should be
        false if there is no sense in waking up goals that are sleeping
@@ -1262,7 +1263,7 @@ DerivationGoal::HookReply DerivationGoal::tryBuildHook()
     pid.setKillSignal(SIGTERM);
     logPipe.writeSide.close();
     worker.childStarted(shared_from_this(),
-        pid, singleton<set<int> >(logPipe.readSide), false);
+        pid, singleton<set<int> >(logPipe.readSide), false, false);
 
     toHook.readSide.close();
 
@@ -1767,7 +1768,7 @@ void DerivationGoal::startBuilder()
     pid.setSeparatePG(true);
     logPipe.writeSide.close();
     worker.childStarted(shared_from_this(), pid,
-        singleton<set<int> >(logPipe.readSide), true);
+        singleton<set<int> >(logPipe.readSide), true, true);
 
     if (printBuildTrace) {
         printMsg(lvlError, format("@ build-started %1% %2% %3% %4%")
@@ -2274,7 +2275,7 @@ void SubstitutionGoal::tryToRun()
     pid.setKillSignal(SIGTERM);
     logPipe.writeSide.close();
     worker.childStarted(shared_from_this(),
-        pid, singleton<set<int> >(logPipe.readSide), true);
+        pid, singleton<set<int> >(logPipe.readSide), true, true);
 
     state = &SubstitutionGoal::finished;
 
@@ -2474,13 +2475,15 @@ unsigned Worker::getNrLocalBuilds()
 
 
 void Worker::childStarted(GoalPtr goal,
-    pid_t pid, const set<int> & fds, bool inBuildSlot)
+    pid_t pid, const set<int> & fds, bool inBuildSlot,
+    bool monitorForSilence)
 {
     Child child;
     child.goal = goal;
     child.fds = fds;
     child.lastOutput = time(0);
     child.inBuildSlot = inBuildSlot;
+    child.monitorForSilence = monitorForSilence;
     children[pid] = child;
     if (inBuildSlot) nrLocalBuilds++;
 }
@@ -2601,12 +2604,16 @@ void Worker::waitForInput()
     if (maxSilentTime != 0) {
         time_t oldest = 0;
         foreach (Children::iterator, i, children) {
-            oldest = oldest == 0 || i->second.lastOutput < oldest
-                ? i->second.lastOutput : oldest;
+            if (i->second.monitorForSilence) {
+                oldest = oldest == 0 || i->second.lastOutput < oldest
+                    ? i->second.lastOutput : oldest;
+            }
         }
-        useTimeout = true;
-        timeout.tv_sec = std::max((time_t) 0, oldest + maxSilentTime - before);
-        printMsg(lvlVomit, format("sleeping %1% seconds") % timeout.tv_sec);
+        if (oldest) {
+            useTimeout = true;
+            timeout.tv_sec = std::max((time_t) 0, oldest + maxSilentTime - before);
+            printMsg(lvlVomit, format("sleeping %1% seconds") % timeout.tv_sec);
+        }
     }
 
     /* If we are polling goals that are waiting for a lock, then wake
@@ -2681,6 +2688,7 @@ void Worker::waitForInput()
         }
 
         if (maxSilentTime != 0 &&
+            j->second.monitorForSilence &&
             after - j->second.lastOutput >= (time_t) maxSilentTime)
         {
             printMsg(lvlError,
