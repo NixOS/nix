@@ -15,6 +15,7 @@ install-exec-local: readmanifest.pm download-using-manifests.pl copy-from-other-
 	$(INSTALL) -d $(DESTDIR)$(libexecdir)/nix
 	$(INSTALL_DATA) readmanifest.pm $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_DATA) readconfig.pm $(DESTDIR)$(libexecdir)/nix 
+	$(INSTALL_DATA) ssh.pm $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) find-runtime-roots.pl $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) generate-patches.pl $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) build-remote.pl $(DESTDIR)$(libexecdir)/nix 
@@ -31,6 +32,7 @@ EXTRA_DIST = nix-collect-garbage.in \
   nix-channel.in \
   readmanifest.pm.in \
   readconfig.pm.in \
+  ssh.pm \
   nix-build.in \
   download-using-manifests.pl.in \
   copy-from-other-stores.pl.in \

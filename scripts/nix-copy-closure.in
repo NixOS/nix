@@ -1,4 +1,6 @@
-#! @perl@ -w
+#! @perl@ -w -I@libexecdir@/nix
+
+use ssh;
 
 my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
 
@@ -14,7 +16,6 @@ EOF
 
 # Get the target host.
 my $sshHost;
-my @sshOpts = split ' ', ($ENV{"NIX_SSHOPTS"} or "");
 
 my $sign = 0;
 
@@ -52,6 +53,9 @@ while (@ARGV) {
 }
 
 
+openSSHConnection $sshHost;
+
+
 if ($toMode) { # Copy TO the remote machine.
 
     my @allStorePaths;
@@ -73,7 +77,6 @@ if ($toMode) { # Copy TO the remote machine.
     my @missing = ();
     while (<READ>) {
         chomp;
-        print STDERR "target machine needs $_\n";
         push @missing, $_;
     }
     close READ or die;
@@ -81,6 +84,8 @@ if ($toMode) { # Copy TO the remote machine.
 
     # Export the store paths and import them on the remote machine.
     if (scalar @missing > 0) {
+        print STDERR "copying these missing paths:\n";
+        print STDERR "  $_\n" foreach @missing;
         my $extraOpts = "";
         $extraOpts .= "--sign" if $sign == 1;
         system("nix-store --export $extraOpts @missing | $compressor | ssh @sshOpts $sshHost '$decompressor | nix-store --import'") == 0
@@ -114,7 +119,6 @@ else { # Copy FROM the remote machine.
     my @missing = ();
     while (<READ>) {
         chomp;
-        print STDERR "local machine needs $_\n";
         push @missing, $_;
     }
     close READ or die;
@@ -122,10 +126,12 @@ else { # Copy FROM the remote machine.
 
     # Export the store paths on the remote machine and import them on locally.
     if (scalar @missing > 0) {
+        print STDERR "copying these missing paths:\n";
+        print STDERR "  $_\n" foreach @missing;
         my $extraOpts = "";
         $extraOpts .= "--sign" if $sign == 1;
         system("ssh @sshOpts $sshHost 'nix-store --export $extraOpts @missing | $compressor' | $decompressor | @bindir@/nix-store --import") == 0
-            or die "copying store paths to remote machine `$sshHost' failed: $?";
+            or die "copying store paths from remote machine `$sshHost' failed: $?";
     }
 
 }
