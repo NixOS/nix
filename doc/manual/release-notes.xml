@@ -8,7 +8,7 @@
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-0.14"><title>Release 0.14 (TBA)</title>
+<section xml:id="ssec-relnotes-0.14"><title>Release 0.14 (February 3, 2010)</title>
 
 <para>This release has the following improvements:</para>
 
@@ -35,6 +35,10 @@
     <para>Removed the <option>--use-atime</option> and
     <option>--max-atime</option> garbage collector options.  They were
     not very useful in practice.</para>
+  </listitem>
+
+  <listitem>
+    <para>On Windows, Nix now requires Cygwin 1.7.x.</para>
   </listitem>
 
   <listitem>
