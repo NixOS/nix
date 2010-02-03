@@ -31,6 +31,11 @@ static void sigintHandler(int signo)
 }
 
 
+static void sigalrmHandler(int signo)
+{
+}
+
+
 Path makeRootName(const Path & gcRoot, int & counter)
 {
     counter++;
@@ -159,6 +164,14 @@ static void initAndRun(int argc, char * * argv)
     act.sa_flags = 0;
     if (sigaction(SIGPIPE, &act, 0))
         throw SysError("ignoring SIGPIPE");
+
+    /* Catch SIGALRM with an empty handler (we just need it to get an
+       EINTR from blocking system calls). */
+    act.sa_handler = sigalrmHandler;
+    sigfillset(&act.sa_mask);
+    act.sa_flags = 0;
+    if (sigaction(SIGALRM, &act, 0))
+        throw SysError("installing handler for SIGALRM");
 
     /* Reset SIGCHLD to its default. */
     act.sa_handler = SIG_DFL;
