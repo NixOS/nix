@@ -1,9 +1,10 @@
-#! @perl@ -w
+#! @perl@ -w -I@libexecdir@/nix
 
-use strict;
 use Fcntl ':flock';
 use English '-no_match_vars';
 use IO::Handle;
+use ssh qw/sshOpts openSSHConnection/;
+
 
 # General operation:
 #
@@ -21,6 +22,14 @@ use IO::Handle;
 #
 # The nice thing about this scheme is that if we die prematurely, the
 # locks are released automatically.
+
+
+# Make sure that we don't get any SSH passphrase or host key popups -
+# if there is any problem it should fail, not do something
+# interactive.
+$ENV{"DISPLAY"} = "";
+$ENV{"SSH_ASKPASS"} = "";
+
 
 my $loadIncreased = 0;
 
@@ -178,38 +187,9 @@ if ($x ne "okay") {
 my $hostName = $machine->{hostName};
 print STDERR "building `$drvPath' on `$hostName'\n";
 
-# Make sure that we don't get any SSH passphrase or host key popups -
-# if there is any problem it should fail, not do something
-# interactive.
-$ENV{"DISPLAY"} = "";
-$ENV{"SSH_PASSWORD_FILE="} = "";
-$ENV{"SSH_ASKPASS="} = "";
+push @sshOpts, "-i", $machine->{sshKeys}, "-x";
 
-my $sshOpts = "-i " . $machine->{sshKeys} . " -x";
-
-# Hack to support Cygwin: if we login without a password, we don't
-# have exactly the same rights as when we do.  This causes the
-# Microsoft C compiler to fail with certain flags:
-#
-#   http://connect.microsoft.com/VisualStudio/feedback/ViewFeedback.aspx?FeedbackID=99676
-#
-# So as a workaround, we pass a verbatim password.  ssh tries to makes
-# this very hard; the trick is to make it call SSH_ASKPASS to get the
-# password.  (It only calls this command when there is no controlling
-# terminal, but Nix ensures that is is the case.  When doing this
-# manually, use setsid(1).)
-if ($machine->{sshKeys} =~ /^password:/) {
-    my $passwordFile = $machine->{sshKeys};
-    $passwordFile =~ s/^password://;
-    $sshOpts = "ssh -x";
-    $ENV{"SSH_PASSWORD_FILE"} = $passwordFile;
-    $ENV{"SSH_ASKPASS"} = "/tmp/writepass";
-
-    open WRITEPASS, ">/tmp/writepass" or die;
-    print WRITEPASS "#! /bin/sh\ncat \"\$SSH_PASSWORD_FILE\"";
-    close WRITEPASS;
-    chmod 0755, "/tmp/writepass" or die;
-}
+openSSHConnection $hostName;
 
 my $inputs = `cat inputs`; die if ($? != 0);
 $inputs =~ s/\n/ /g;
@@ -222,7 +202,7 @@ print "copying inputs...\n";
 my $maybeSign = "";
 $maybeSign = "--sign" if -e "/nix/etc/nix/signing-key.sec";
 
-system("NIX_SSHOPTS=\"$sshOpts\" @bindir@/nix-copy-closure $hostName $maybeSign $drvPath $inputs") == 0
+system("NIX_SSHOPTS=\"@sshOpts\" @bindir@/nix-copy-closure $hostName $maybeSign $drvPath $inputs") == 0
     or die "cannot copy inputs to $hostName: $?";
 
 print "building...\n";
@@ -234,7 +214,7 @@ my $buildFlags = "--max-silent-time $maxSilentTime";
 # connection dies.  Without it, the remote process might continue to
 # run indefinitely (that is, until it next tries to write to
 # stdout/stderr).
-if (system("ssh -tt $sshOpts $hostName 'nix-store --realise $buildFlags $drvPath > /dev/null'") != 0) {
+if (system("ssh $hostName @sshOpts -tt 'nix-store --realise $buildFlags $drvPath > /dev/null'") != 0) {
     # If we couldn't run ssh or there was an ssh problem (indicated by
     # exit code 255), then we return exit code 1; otherwise we assume
     # that the builder failed, which we indicated to Nix using exit
@@ -251,6 +231,6 @@ foreach my $output (split '\n', $outputs) {
     my $maybeSignRemote = "";
     $maybeSignRemote = "--sign" if $UID != 0;
     
-    system("ssh $sshOpts $hostName 'nix-store --export $maybeSignRemote $output' | @bindir@/nix-store --import > /dev/null") == 0
+    system("ssh $hostName @sshOpts 'nix-store --export $maybeSignRemote $output' | @bindir@/nix-store --import > /dev/null") == 0
 	or die "cannot copy $output from $hostName: $?";
 }
