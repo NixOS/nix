@@ -220,7 +220,7 @@ my $buildFlags = "--max-silent-time $maxSilentTime";
 if (system("ssh $hostName @sshOpts -tt 'nix-store --realise $buildFlags $drvPath > /dev/null'") != 0) {
     # If we couldn't run ssh or there was an ssh problem (indicated by
     # exit code 255), then we return exit code 1; otherwise we assume
-    # that the builder failed, which we indicated to Nix using exit
+    # that the builder failed, which we indicate to Nix using exit
     # code 100.  It's important to distinguish between the two because
     # the first is a transient failure and the latter is permanent.
     my $res = $? == -1 || ($? >> 8) == 255 ? 1 : 100;
