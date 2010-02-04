@@ -73,7 +73,7 @@ if ($ARGV[0] eq "--query") {
 }
 
 elsif ($ARGV[0] ne "--substitute") {
-    die "syntax: $0 [--query-paths | --query-info PATHS... | --substitute PATH]\n";
+    die;
 }
 
 
