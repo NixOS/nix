@@ -94,6 +94,7 @@ sub openSlotLock {
     
 
 my $hostName;
+my $slotLock;
 
 while (1) {
     
@@ -164,7 +165,7 @@ while (1) {
     my $selected = $available[0]; 
     my $machine = $selected->{machine};
 
-    my $slotLock = openSlotLock($machine, $selected->{free});
+    $slotLock = openSlotLock($machine, $selected->{free});
     flock($slotLock, LOCK_EX | LOCK_NB) or die;
     utime undef, undef, $slotLock;
 
