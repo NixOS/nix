@@ -32,6 +32,6 @@ sub closeSSHConnection {
     }
 }
 
-END { closeSSHConnection; }
+END { my $saved = $?; closeSSHConnection; $? = $saved; }
 
 return 1;
