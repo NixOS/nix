@@ -18,8 +18,18 @@ sub openSSHConnection {
         or die "cannot create a temporary directory";
     
     push @sshOpts, "-S", "$tmpDir/control";
-    system("ssh $sshHost @sshOpts -M -N -f") == 0
-        or return 0;
+
+    # Start the master.  We can't use the `-f' flag (fork into
+    # background after establishing the connection) because then the
+    # child continues to run if we are killed.  So instead make SSH
+    # print "started" when it has established the connection, and wait
+    # until we see that.
+    open SSH, "ssh $sshHost @sshOpts -M -N -o LocalCommand='echo started' -o PermitLocalCommand=yes |" or die;
+    while (<SSH>) {
+        chomp;
+        last if /started/;
+    }
+    
     $sshStarted = 1;
     return 1;
 }
