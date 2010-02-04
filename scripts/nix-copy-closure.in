@@ -19,8 +19,8 @@ my $sshHost;
 
 my $sign = 0;
 
-my $compressor = "cat";
-my $decompressor = "cat";
+my $compressor = "";
+my $decompressor = "";
 
 my $toMode = 1;
 
@@ -35,8 +35,8 @@ while (@ARGV) {
         $sign = 1;
     }
     elsif ($arg eq "--gzip") {
-        $compressor = "gzip";
-        $decompressor = "gunzip";
+        $compressor = "| gzip";
+        $decompressor = "gunzip |";
     }
     elsif ($arg eq "--from") {
         $toMode = 0;
@@ -73,7 +73,7 @@ if ($toMode) { # Copy TO the remote machine.
 
 
     # Ask the remote host which paths are invalid.
-    open(READ, "ssh @sshOpts $sshHost nix-store --check-validity --print-invalid @allStorePaths|");
+    open(READ, "ssh $sshHost @sshOpts nix-store --check-validity --print-invalid @allStorePaths|");
     my @missing = ();
     while (<READ>) {
         chomp;
@@ -88,7 +88,7 @@ if ($toMode) { # Copy TO the remote machine.
         print STDERR "  $_\n" foreach @missing;
         my $extraOpts = "";
         $extraOpts .= "--sign" if $sign == 1;
-        system("nix-store --export $extraOpts @missing | $compressor | ssh @sshOpts $sshHost '$decompressor | nix-store --import'") == 0
+        system("nix-store --export $extraOpts @missing $compressor | ssh $sshHost @sshOpts '$decompressor nix-store --import'") == 0
             or die "copying store paths to remote machine `$sshHost' failed: $?";
     }
 
@@ -130,7 +130,7 @@ else { # Copy FROM the remote machine.
         print STDERR "  $_\n" foreach @missing;
         my $extraOpts = "";
         $extraOpts .= "--sign" if $sign == 1;
-        system("ssh @sshOpts $sshHost 'nix-store --export $extraOpts @missing | $compressor' | $decompressor | @bindir@/nix-store --import") == 0
+        system("ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $decompressor @bindir@/nix-store --import") == 0
             or die "copying store paths from remote machine `$sshHost' failed: $?";
     }
 
