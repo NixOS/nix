@@ -496,7 +496,7 @@ available in the subscribed channels.</para>
 
 <para>Often, when you want to install a specific package (e.g., from
 the <link
-xlink:href="http://nixos.org/releases/nixpkgs/nixpkgs-unstable/">Nix
+xlink:href="http://nixos.org/nixpkgs/">Nix
 Packages collection</link>), subscribing to a channel is a bit
 cumbersome.  And channels don’t help you at all if you want to install
 an older version of a package than the one provided by the current
