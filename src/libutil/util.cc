@@ -53,10 +53,20 @@ Path absPath(Path path, Path dir)
 {
     if (path[0] != '/') {
         if (dir == "") {
+#ifdef __GNU__
+            /* GNU (aka. GNU/Hurd) doesn't have any limitation on path
+               lengths and doesn't define `PATH_MAX'.  */
+            char *buf = getcwd(NULL, 0);
+            if (buf == NULL)
+#else
             char buf[PATH_MAX];
             if (!getcwd(buf, sizeof(buf)))
+#endif
                 throw SysError("cannot get cwd");
             dir = buf;
+#ifdef __GNU__
+            free(buf);
+#endif
         }
         path = dir + "/" + path;
     }
