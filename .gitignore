@@ -1,0 +1,262 @@
+# START "git svn show-ignore"
+
+# /
+/Makefile
+/Makefile.in
+/aclocal.m4
+/autom4te.cache
+/config.*
+/configure
+/nix.spec
+/stamp-h1
+/svn-revision
+/NEWS
+/libtool
+
+# /config/
+/config/config.guess
+/config/config.sub
+/config/depcomp
+/config/install-sh
+/config/missing
+/config/mkinstalldirs
+/config/ltmain.sh
+
+# /corepkgs/
+/corepkgs/Makefile
+/corepkgs/Makefile.in
+
+# /corepkgs/buildenv/
+/corepkgs/buildenv/Makefile.in
+/corepkgs/buildenv/Makefile
+/corepkgs/buildenv/builder.pl
+
+# /corepkgs/channels/
+/corepkgs/channels/Makefile.in
+/corepkgs/channels/Makefile
+/corepkgs/channels/unpack.sh
+
+# /corepkgs/nar/
+/corepkgs/nar/Makefile
+/corepkgs/nar/Makefile.in
+/corepkgs/nar/nar.sh
+/corepkgs/nar/unnar.sh
+
+# /doc/
+/doc/Makefile
+/doc/Makefile.in
+
+# /doc/manual/
+/doc/manual/Makefile
+/doc/manual/Makefile.in
+/doc/manual/manual.html
+/doc/manual/manual.is-valid
+/doc/manual/*.1
+/doc/manual/*.8
+/doc/manual/images
+/doc/manual/version.txt
+/doc/manual/NEWS.html
+/doc/manual/NEWS.txt
+
+# /externals/
+/externals/Makefile
+/externals/Makefile.in
+/externals/aterm-*
+/externals/have-aterm
+/externals/build-aterm
+/externals/inst-aterm
+/externals/bzip2-*
+/externals/have-bzip2
+/externals/build-bzip2
+/externals/inst-bzip2
+
+# /make/examples/aterm/
+/make/examples/aterm/result*
+
+# /make/examples/aterm/aterm/
+/make/examples/aterm/aterm/*
+
+# /make/examples/aterm/test/
+/make/examples/aterm/test/*
+
+# /misc/
+/misc/Makefile.in
+/misc/Makefile
+
+# /misc/emacs/
+/misc/emacs/Makefile.in
+/misc/emacs/Makefile
+
+# /scripts/
+/scripts/Makefile
+/scripts/Makefile.in
+/scripts/nix-profile.sh
+/scripts/nix-pull
+/scripts/nix-push
+/scripts/nix-switch
+/scripts/nix-collect-garbage
+/scripts/nix-prefetch-url
+/scripts/nix-install-package
+/scripts/nix-channel
+/scripts/nix-build
+/scripts/nix-copy-closure
+/scripts/readmanifest.pm
+/scripts/readconfig.pm
+/scripts/download-using-manifests.pl
+/scripts/copy-from-other-stores.pl
+/scripts/generate-patches.pl
+/scripts/find-runtime-roots.pl
+/scripts/build-remote.pl
+
+# /src/
+/src/Makefile
+/src/Makefile.in
+
+# /src/bin2c/
+/src/bin2c/Makefile.in
+/src/bin2c/Makefile
+/src/bin2c/bin2c
+/src/bin2c/.deps
+/src/bin2c/.libs
+
+# /src/boost/
+/src/boost/Makefile
+/src/boost/Makefile.in
+
+# /src/boost/format/
+/src/boost/format/Makefile
+/src/boost/format/Makefile.in
+/src/boost/format/.deps
+/src/boost/format/libformat.a
+/src/boost/format/.libs
+
+# /src/bsdiff-4.3/
+/src/bsdiff-4.3/Makefile
+/src/bsdiff-4.3/Makefile.in
+/src/bsdiff-4.3/bsdiff
+/src/bsdiff-4.3/bspatch
+/src/bsdiff-4.3/.deps
+/src/bsdiff-4.3/.libs
+
+# /src/libexpr/
+/src/libexpr/Makefile
+/src/libexpr/Makefile.in
+/src/libexpr/.deps
+/src/libexpr/libexpr.a
+/src/libexpr/lexer-tab.cc
+/src/libexpr/lexer-tab.hh
+/src/libexpr/parser-tab.cc
+/src/libexpr/parser-tab.hh
+/src/libexpr/parser-tab.output
+/src/libexpr/nixexpr-ast.hh
+/src/libexpr/nixexpr-ast.cc
+/src/libexpr/.libs
+/src/libexpr/nix.tbl
+
+# /src/libmain/
+/src/libmain/Makefile
+/src/libmain/Makefile.in
+/src/libmain/.deps
+/src/libmain/libmain.a
+/src/libmain/.libs
+
+# /src/libstore/
+/src/libstore/Makefile
+/src/libstore/Makefile.in
+/src/libstore/.deps
+/src/libstore/libstore.a
+/src/libstore/derivations-ast.cc
+/src/libstore/derivations-ast.hh
+/src/libstore/.libs
+
+# /src/libutil/
+/src/libutil/Makefile
+/src/libutil/Makefile.in
+/src/libutil/.deps
+/src/libutil/libutil.a
+/src/libutil/.libs
+
+# /src/nix-env/
+/src/nix-env/Makefile.in
+/src/nix-env/Makefile
+/src/nix-env/.deps
+/src/nix-env/nix-env
+/src/nix-env/help.txt.hh
+/src/nix-env/.libs
+
+# /src/nix-hash/
+/src/nix-hash/Makefile
+/src/nix-hash/Makefile.in
+/src/nix-hash/.deps
+/src/nix-hash/.libs
+/src/nix-hash/nix-hash
+/src/nix-hash/help.txt.hh
+
+# /src/nix-instantiate/
+/src/nix-instantiate/Makefile.in
+/src/nix-instantiate/Makefile
+/src/nix-instantiate/.deps
+/src/nix-instantiate/nix-instantiate
+/src/nix-instantiate/help.txt.hh
+/src/nix-instantiate/.libs
+
+# /src/nix-log2xml/
+/src/nix-log2xml/Makefile.in
+/src/nix-log2xml/Makefile
+/src/nix-log2xml/.deps
+/src/nix-log2xml/nix-log2xml
+/src/nix-log2xml/test*.*
+/src/nix-log2xml/.libs
+/src/nix-log2xml/*.log
+/src/nix-log2xml/*.xml
+/src/nix-log2xml/*.html
+
+# /src/nix-setuid-helper/
+/src/nix-setuid-helper/Makefile.in
+/src/nix-setuid-helper/Makefile
+/src/nix-setuid-helper/.deps
+/src/nix-setuid-helper/nix-setuid-helper
+/src/nix-setuid-helper/help.txt.hh
+/src/nix-setuid-helper/.libs
+
+# /src/nix-store/
+/src/nix-store/Makefile
+/src/nix-store/Makefile.in
+/src/nix-store/.deps
+/src/nix-store/help.txt.hh
+/src/nix-store/nix-store
+/src/nix-store/.libs
+
+# /src/nix-worker/
+/src/nix-worker/Makefile.in
+/src/nix-worker/Makefile
+/src/nix-worker/.deps
+/src/nix-worker/nix-worker
+/src/nix-worker/help.txt.hh
+/src/nix-worker/.libs
+
+# /tests/
+/tests/Makefile
+/tests/Makefile.in
+/tests/test-tmp
+/tests/config.nix
+/tests/common.sh
+/tests/dummy
+
+# /tests/lang/
+/tests/lang/*.out
+/tests/lang/*.out.xml
+/tests/lang/*.ast
+
+# END "git svn show-ignore"
+
+*.lo
+*.la
+*.o
+*~
+
+# GNU Global
+GPATH
+GRTAGS
+GSYMS
+GTAGS
