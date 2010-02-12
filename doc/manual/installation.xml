@@ -126,7 +126,7 @@ $ make install</screen>
 preceded by the command:
 
 <screen>
-$ ./bootstrap</screen>
+$ ./bootstrap.sh</screen>
 
 </para>
 
