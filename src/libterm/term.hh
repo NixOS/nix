@@ -4,26 +4,54 @@
 
 # include <set>
 
-# include <boost/preprocessor/seq/seq.hpp>
-# include <boost/preprocessor/control/iif.hpp>
+# include <boost/preprocessor/tuple.hpp>
+# include <boost/preprocessor/seq.hpp>
+# include <boost/preprocessor/cat.hpp>
+# include <boost/preprocessor/array.hpp>
 
-# include "visitor_fwd.hh"
+
+# define TRM_GRAMMAR_NODE_BINOP(Final, Name)                    \
+  Final(                                                        \
+    Name, Expr,                                                 \
+    (2, (TRM_TYPE_TERM(Expr, lhs), TRM_TYPE_TERM(Expr, rhs))),  \
+    (0,())                                                      \
+  )
+
+# define TRM_GRAMMAR_NODE_SINGLETON(Final, Name)        \
+  Final(Name, Expr, (0,()), (0,()))
 
 namespace term
 {
-  /*
+  class ATerm;
+  class ATermNil;
+
+# define TRM_INTERFACE_DECLARE(Name, Base, Attributes, BaseArgs)        \
+  template <typename T>                                                 \
+  class Name;
+
+# define TRM_FINAL_DECLARE(Name, Base, Attributes, BaseArgs)  \
+  class Name;
+
+  TRM_GRAMMAR_NODES(TRM_INTERFACE_DECLARE, TRM_FINAL_DECLARE)
+
+# undef TRM_FINAL_DECLARE
+# undef TRM_INTERFACE_DECLARE
+
   class ATermVisitor
   {
-    virtual void visit(const ATerm e) = 0;
-    virtual void visit(const Function& e) = 0;
-  };
+    virtual ATerm visit(const ATerm e) {
+      return ATermNil;
+    }
 
-  class ATermConstVisitor
-  {
-    virtual void visit(const ATerm e) const = 0;
-    virtual void visit(const Function& e) const = 0;
+# define TRM_VISITOR(Name, Base, Attributes, BaseArgs)  \
+    virtual ATerm visit(const Name e) {                 \
+      return ATermNil;                                  \
+    }
+
+    TRM_GRAMMAR_NODES(TRM_VISITOR, TRM_VISITOR)
+# undef TRM_VISITOR
+
   };
-  */
 
 
   // Performance issue: Abstract classes should be copied where fully
@@ -44,7 +72,7 @@ namespace term
     }
 
   public:
-    virtual void accept(ATermVisitor& v) const = 0;
+    virtual ATerm accept(ATermVisitor& v) const = 0;
   };
 
 
@@ -67,7 +95,7 @@ namespace term
 
   public:
     inline
-    void accept(ATermVisitor& v)
+    ATerm accept(ATermVisitor& v)
     {
       return ptr_->accept(v);
     }
@@ -93,6 +121,15 @@ namespace term
 
   private:
     const void* ptr_;
+  };
+
+  class ATermNul : public ATerm
+  {
+  public:
+    ATermNil()
+      : ATerm(0)
+    {
+    }
   };
 
 
@@ -134,34 +171,60 @@ namespace term
 
 
 # define TRM_NIL
-# define TRM_NIL_1(_)
-# define TRM_NIL_2(_, _)
-# define TRM_IF_EMPTY_SEQ(Seq, True, False)             \
-  BOOST_PP_IF(BOOST_PP_SEQ_SIZE(Seq), False, True)
+# define TRM_NIL_ARGS(...)
 
-# define TRM_MAP_HELPER(R, Macro, Seq) (Macro(Elt))
+# define TRM_ARRAY_DATA(Array) BOOST_PP_ARRAY_DATA(Array)
+# define TRM_ARRAY_SIZE(Array) BOOST_PP_ARRAY_SIZE(Array)
+
+# define TRM_EVAL_0(Macro1, Macro2, Array, Default) Default
+  /*
+ define TRM_EVAL_1(Macro1, Macro2, Array, Default)                     \
+  Macro1(Macro2, BOOST_PP_TUPLE_TO_SEQ(TRM_ARRAY_SIZE(Array), TRM_ARRAY_DATA(Array)))
+  */
+# define TRM_EVAL_2 TRM_EVAL_1
+# define TRM_EVAL_3 TRM_EVAL_1
+# define TRM_EVAL_4 TRM_EVAL_1
+
+# define TRM_EVAL_II(eval) eval
+# define TRM_EVAL_I(n, tuple) TRM_EVAL_ ## n
+# define TRM_EVAL(Macro1, Macro2, Array, Default)                       \
+  TRM_EVAL_II(TRM_EVAL_I Array (Macro1, Macro2, Array, Default))
+
+
+# define TRM_MAP_HELPER(R, Macro, Elt) (Macro(Elt))
 # define TRM_MAP_(Macro, Seq)                           \
   BOOST_PP_SEQ_FOR_EACH(TRM_MAP_HELPER, Macro, Seq)
-# define TRM_MAP(Macro, Seq)                                    \
-  TRM_IF_EMPTY_SEQ(Seq, TRM_NIL_2, TRM_MAP_)(Macro, Seq)
+# define TRM_MAP_SEQ(Macro, Seq)                \
+  TRM_MAP_(Macro, Seq)
+# define TRM_MAP_SEQ_TO_ARRAY(Macro, Seq)               \
+  BOOST_PP_SEQ_TO_ARRAY(TRM_MAP_SEQ(Macro, Seq))
+# define TRM_MAP_ARRAY(Macro, Array)                    \
+  TRM_EVAL(TRM_MAP_SEQ_TO_ARRAY, Macro, Array, (0, ()))
+# define TRM_MAP(Macro, Array)                          \
+  TRM_EVAL(TRM_MAP_SEQ, Macro, Array, TRM_NIL)
 
-# define TRM_APPLY_HELPER(R, Macro, Seq) Macro(Elt)
-# define TRM_APPLY_(Macro, Seq)                            \
+# define TRM_APPLY_HELPER(R, Macro, Elt) Macro(Elt)
+# define TRM_APPLY_(Macro, Seq)                         \
   BOOST_PP_SEQ_FOR_EACH(TRM_MAP_HELPER, Macro, Seq)
-# define TRM_APPLY(Macro, Seq)                                  \
-  TRM_IF_EMPTY_SEQ(Seq, TRM_NIL_2, TRM_APPLY_)(Macro, Seq)
+# define TRM_APPLY_SEQ(Macro, Seq)              \
+  TRM_APPLY_(Macro, Seq)
+# define TRM_APPLY(Macro, Array)                \
+  TRM_EVAL(TRM_APPLY_, Macro, Array, TRM_NIL)
 
 # define TRM_HEAD(Seq) BOOST_PP_SEQ_HEAD(Seq)
 # define TRM_TAIL(Seq) BOOST_PP_SEQ_TAIL(Seq)
 
 # define TRM_SEPARATE_COMMA_HELPER(Elt) , Elt
-# define TRM_SEPARATE_COMMA_(Seq)                                        \
-  TRM_HEAD(Seq) TRM_APPLY(TRM_SEPARATE_COMMA_HELPER, TRM_TAIL(Seq))
-# define TRM_SEPARATE_COMMA(Seq)                                \
-  TRM_IF_EMPTY_SEQ(Seq, TRM_NIL_1, TRM_SEPARATE_COMMA_)(Seq)
+# define TRM_SEPARATE_COMMA_(_, Seq)                                    \
+  TRM_HEAD(Seq) TRM_APPLY_SEQ(TRM_SEPARATE_COMMA_HELPER, TRM_TAIL(Seq))
+# define TRM_SEPARATE_COMMA_SEQ(Seq)            \
+  TRM_SEPARATE_COMMA_(dummy, Seq)
+# define TRM_SEPARATE_COMMA(Array)                \
+  TRM_EVAL(TRM_SEPARATE_COMMA_, dummy, Array, TRM_NIL)
 
-# define TRM_TYPE_REF(Type, Name) (const Type&, Type &, Name)
-# define TRM_TYPE_COPY(Type, Name) (const Type, Type &, Name)
+
+# define TRM_TYPE_REF(Type, Name) const Type&, Type &, Name
+# define TRM_TYPE_COPY(Type, Name) const Type, Type &, Name
 # define TRM_TYPE_TERM(Type, Name) TRM_TYPE_COPY(A ## Type, Name)
 
 # define TRM_CONST_ABSTRACT_COPY_DECL(Copy, Ref, Name)  Copy Name;
@@ -183,10 +246,16 @@ namespace term
 // with the expected arguments.
 # define TRM_GRAMMAR_NODE_CTR(Name, Base, Attributes, BaseArgs)         \
   private:                                                              \
-    Name ( TRM_SEPARATE_COMMA(TRM_MAP(TRM_CONST_ABSTRACT_COPY_ARG,      \
-                                      Attributes BaseArgs)) )           \
-    : TRM_SEPARATE_COMMA(TRM_MAP(TRM_INIT_ATTRIBUTES, Attributes)) ,    \
-      parent( TRM_SEPARATE_COMMA(TRM_MAP(TRM_ARGUMENTS, BaseArgs)) )    \
+    Name ( TRM_SEPARATE_COMMA(                                          \
+             TRM_MAP_ARRAY(TRM_CONST_ABSTRACT_COPY_ARG, Attributes)     \
+           ) )                                                          \
+    : TRM_SEPARATE_COMMA_SEQ(                                           \
+        TRM_MAP(TRM_INIT_ATTRIBUTES, Attributes)                        \
+        ( parent(TRM_SEPARATE_COMMA(                                    \
+            TRM_MAP_ARRAY(TRM_ARGUMENTS, BaseArgs)                      \
+          ))                                                            \
+        )                                                               \
+      )                                                                 \
     {                                                                   \
     }
 
@@ -200,9 +269,17 @@ namespace term
   public:                                                               \
     static inline                                                       \
     term                                                                \
-    make ## Name(const APattern a1, const AExpr a2, const APos a3)      \
+    make ## Name(                                                       \
+      TRM_SEPARATE_COMMA(                                               \
+        TRM_MAP_ARRAY(TRM_CONST_ABSTRACT_COPY_ARG, Attributes)          \
+      )                                                                 \
+    )                                                                   \
     {                                                                   \
-      return term(get_identity(this_type(a1, a2, a3)));                 \
+      return term(get_identity(this_type(                               \
+        TRM_SEPARATE_COMMA(                                             \
+          TRM_MAP_ARRAY(TRM_ARGUMENTS, Attributes)                      \
+        )                                                               \
+      )));                                                              \
     }
 
 
@@ -215,9 +292,10 @@ namespace term
     static inline                                                       \
     bool                                                                \
     match ## Name(                                                      \
-      const ATerm t,                                                    \
-      TRM_SEPARATE_COMMA(TRM_MAP(TRM_ABSTRACT_REF_ARG,                  \
-                                 Attributes BaseArgs))                  \
+      TRM_SEPARATE_COMMA_SEQ(                                           \
+        ( const ATerm t )                                               \
+        TRM_MAP(TRM_ABSTRACT_REF_ARG, Attributes)                       \
+      )                                                                 \
     )                                                                   \
     {                                                                   \
       this_type* ptr;                                                   \
@@ -225,8 +303,10 @@ namespace term
       {                                                                 \
         TRM_MAP(TRM_COPY_IN_ARG, Attributes);                           \
         return parent::match ## Base (                                  \
-          t,                                                            \
-          TRM_SEPARATE_COMMA(TRM_MAP(TRM_ARGUMENTS, BaseArgs))          \
+          TRM_SEPARATE_COMMA_SEQ(                                       \
+            ( t )                                                       \
+            TRM_MAP(TRM_ARGUMENTS, BaseArgs)                            \
+          )                                                             \
         );                                                              \
       }                                                                 \
       return false;                                                     \
@@ -256,7 +336,6 @@ namespace term
 // implementation of the term.  This class is a wrapper over a pointer which
 // should derivate from the ATerm class.
 # define TRM_ABSTRACT_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs, NoTemplate) \
-  class Name;                                                           \
   class A ## Name : public A ## Base                                    \
   {                                                                     \
     typedef A ## Base parent;                                           \
@@ -309,9 +388,9 @@ namespace term
     TRM_GRAMMAR_NODE_MATCH_METHOD(Name, Base, Attributes, BaseArgs)     \
                                                                         \
   public:                                                               \
-    void accept(ATermVisitor& v) const                                  \
+    ATerm accept(ATermVisitor& v) const                                 \
     {                                                                   \
-      v.visit(*this);                                                   \
+      return v.visit(*this);                                            \
     }                                                                   \
                                                                         \
     TRM_LESS_GRAMMAR_NODE_OP(Name, Base, Attributes, BaseArgs)          \
@@ -322,59 +401,18 @@ namespace term
   using Name::match ## Name;
 
 
-# define TRM_GRAMMAR_NODE_BINOP(Final, Name)                    \
-  Final(Name, Expr, (TRM_TYPE_TERM(Expr, lhs)                   \
-                        TRM_TYPE_TERM(Expr, rhs)), TRM_NIL)
+# define TRM_INTERFACE(Name, Base, Attributes, BaseArgs)                \
+  TRM_ABSTRACT_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs, TRM_NIL_ARGS) \
+  TRM_INTERFACE_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs)
 
-# define TRM_GRAMMAR_NODE_SINGLETON(Final, Name)        \
-  Final(Name, Expr, TRM_NIL, TRM_NIL)
+# define TRM_FINAL(Name, Base, Attributes, BaseArgs)                    \
+  TRM_ABSTRACT_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs, TRM_ADD_FRIEND) \
+  TRM_FINAL_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs)
 
+  TRM_GRAMMAR_NODES(TRM_INTERFACE, TRM_FINAL)
 
-// Test case.  This should be moved inside the libexpr or generated in
-// another manner.
-# define TRM_GAMMAR_NODES(Interface, Final)
-  Interface(Loc, Term, TRM_NIL, TRM_NIL)
-  Interface(Pattern, Term, TRM_NIL, TRM_NIL)
-  Interface(Expr, Term, TRM_NIL, TRM_NIL)
-  Final(Pos, Loc, (TRM_TYPE_REF(std::string, file)
-                   TRM_TYPE_COPY(int, line)
-                   TRM_TYPE_COPY(int, column)), TRM_NIL)
-  Final(NoPos, Loc, TRM_NIL, TRM_NIL)
-  Final(String, Expr, (TRM_TYPE_REF(std::string, value)), TRM_NIL)
-  Final(Var, Expr, (TRM_TYPE_REF(std::string, name)), TRM_NIL)
-  Final(Path, Expr, (TRM_TYPE_REF(std::string, filename)), TRM_NIL)
-  Final(Int, Expr, (TRM_TYPE_COPY(int, value)), TRM_NIL)
-  Final(Function, Expr, (TRM_TYPE_TERM(Pattern, pattern)
-                         TRM_TYPE_TERM(Expr, body)
-                         TRM_TYPE_TERM(Pos, position)), TRM_NIL)
-  Final(Assert, Expr, (TRM_TYPE_TERM(Expr, cond)
-                       TRM_TYPE_TERM(Expr, body)
-                       TRM_TYPE_TERM(Pos, position)), TRM_NIL)
-  Final(With, Expr, (TRM_TYPE_TERM(Expr, set)
-                     TRM_TYPE_TERM(Expr, body)
-                     TRM_TYPE_TERM(Pos, position)), TRM_NIL)
-  Final(If, Expr, (TRM_TYPE_TERM(Expr, cond)
-                   TRM_TYPE_TERM(Expr, thenPart)
-                   TRM_TYPE_TERM(Expr, elsePart)), TRM_NIL)
-  Final(OpNot, Expr, (TRM_TYPE_TERM(Expr, cond)), TRM_NIL)
-  TRM_GRAMMAR_NODE_BINOP(Final, OpEq)
-  TRM_GRAMMAR_NODE_BINOP(Final, OpNEq)
-  TRM_GRAMMAR_NODE_BINOP(Final, OpAnd)
-  TRM_GRAMMAR_NODE_BINOP(Final, OpOr)
-  TRM_GRAMMAR_NODE_BINOP(Final, OpImpl)
-  TRM_GRAMMAR_NODE_BINOP(Final, OpUpdate)
-  TRM_GRAMMAR_NODE_BINOP(Final, SubPath)
-  TRM_GRAMMAR_NODE_BINOP(Final, OpHasAttr)
-  TRM_GRAMMAR_NODE_BINOP(Final, OpPlus)
-  TRM_GRAMMAR_NODE_BINOP(Final, OpConcat)
-  Final(Call, Expr, (TRM_TYPE_TERM(Expr, function)
-                     TRM_TYPE_TERM(Expr, argument)), TRM_NIL)
-  Final(Select, Expr, (TRM_TYPE_TERM(Expr, set)
-                       TRM_TYPE_TERM(Var, var)), TRM_NIL)
-  Final(BlackHole, Expr, TRM_NIL, TRM_NIL)
-  Final(Undefined, Expr, TRM_NIL, TRM_NIL)
-  Final(Removed, Expr, TRM_NIL, TRM_NIL)
-
+# undef TRM_FINAL
+# undef TRM_INTERFACE
 
   /*
   class AExpr : public ATerm
@@ -510,7 +548,6 @@ namespace term
   */
 
 
-  /*
   template <typename T>
   class getVisitor : ATermNoOpVisitor
   {
@@ -520,9 +557,10 @@ namespace term
       t.accept(*this);
     }
 
-    visit(const T& t)
+    ATerm visit(const T& t)
     {
       res = std::pair(true, &t);
+      return ATermNul();
     }
 
     std::pair<bool, T*> res;
@@ -535,7 +573,14 @@ namespace term
     getVisitor v(t);
     return v.res;
   }
-  */
+
+  template <typename T>
+  T
+  as(Aterm t)
+  {
+    getVisitor v(t);
+    return v.res;
+  }
 }
 
 #endif
