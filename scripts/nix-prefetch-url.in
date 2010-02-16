@@ -21,7 +21,10 @@ if test -z "$url"; then
     exit 1
 fi
 
-name=$(basename "$url")
+# Handle escaped characters in the URI.  `+', `=' and `?' are the only
+# characters that are valid in Nix store path names but have a special
+# meaning in URIs.
+name=$(basename "$url" | sed -e 's/%2b/+/g' -e 's/%3d/=/g' -e 's/%3f/\?/g')
 if test -z "$name"; then echo "invalid url"; exit 1; fi
 
 
