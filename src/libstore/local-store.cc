@@ -65,6 +65,37 @@ SQLiteStmt::~SQLiteStmt()
 }
 
 
+struct SQLiteTxn 
+{
+    bool active;
+    sqlite3 * db;
+    
+    SQLiteTxn(sqlite3 * db) : active(false) {
+        this->db = db;
+        if (sqlite3_exec(db, "begin;", 0, 0, 0) != SQLITE_OK)
+            throw SQLiteError(db, "starting transaction");
+        active = true;
+    }
+
+    void commit() 
+    {
+        if (sqlite3_exec(db, "commit;", 0, 0, 0) != SQLITE_OK)
+            throw SQLiteError(db, "committing transaction");
+        active = false;
+    }
+    
+    ~SQLiteTxn() 
+    {
+        try {
+            if (active && sqlite3_exec(db, "rollback;", 0, 0, 0) != SQLITE_OK)
+                throw SQLiteError(db, "aborting transaction");
+        } catch (...) {
+            ignoreException();
+        }
+    }
+};
+
+
 void checkStoreNotSymlink()
 {
     if (getEnv("NIX_IGNORE_SYMLINK_STORE") == "1") return;
@@ -130,7 +161,8 @@ LocalStore::LocalStore()
         throw SQLiteError(db, "setting timeout");
     
     /* Check the current database schema and if necessary do an
-       upgrade. */
+       upgrade.  !!! Race condition: several processes could start
+       the upgrade at the same time. */
     int curSchema = getSchema();
     if (curSchema > nixSchemaVersion)
         throw Error(format("current Nix store schema is version %1%, but I only support %2%")
@@ -1264,9 +1296,8 @@ void LocalStore::upgradeStore6()
 
     PathSet validPaths = queryValidPaths();
 
-    if (sqlite3_exec(db, "begin;", 0, 0, 0) != SQLITE_OK)
-        throw SQLiteError(db, "running `begin' command");
-
+    SQLiteTxn txn(db);
+    
     std::map<Path, sqlite3_int64> pathToId;
     
     foreach (PathSet::iterator, i, validPaths) {
@@ -1319,8 +1350,8 @@ void LocalStore::upgradeStore6()
 
     std::cerr << "\n";
 
-    if (sqlite3_exec(db, "commit;", 0, 0, 0) != SQLITE_OK)
-        throw SQLiteError(db, "running `commit' command");
+    txn.commit();
+
     writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
 
     lockFile(globalLock, ltRead, true);
