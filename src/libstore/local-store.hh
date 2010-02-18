@@ -190,6 +190,7 @@ private:
     SQLiteStmt stmtAddReference;
     SQLiteStmt stmtQueryPathInfo;
     SQLiteStmt stmtQueryReferences;
+    SQLiteStmt stmtQueryReferrers;
 
     int getSchema();
 
@@ -205,8 +206,6 @@ private:
     
     void rewriteReferrers(const Path & path, bool purge, PathSet referrers);
 
-    bool queryReferrersInternal(const Path & path, PathSet & referrers);
-    
     void invalidatePath(const Path & path);
 
     void upgradeStore6();

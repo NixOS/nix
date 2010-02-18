@@ -167,6 +167,9 @@ LocalStore::LocalStore()
 
     if (sqlite3_busy_timeout(db, 60000) != SQLITE_OK)
         throw SQLiteError(db, "setting timeout");
+
+    /* !!! check whether sqlite has been built with foreign key
+       support */
     
     /* Check the current database schema and if necessary do an
        upgrade.  !!! Race condition: several processes could start
@@ -240,6 +243,8 @@ void LocalStore::prepareStatements()
         "select id, hash, registrationTime, deriver from ValidPaths where path = ?;");
     stmtQueryReferences.create(db,
         "select path from Refs join ValidPaths on reference = id where referrer = ?;");
+    stmtQueryReferrers.create(db,
+        "select path from Refs join ValidPaths on referrer = id where reference = (select id from ValidPaths where path = ?);");
 }
 
 
@@ -498,41 +503,24 @@ void LocalStore::queryReferences(const Path & path,
 }
 
 
-bool LocalStore::queryReferrersInternal(const Path & path, PathSet & referrers)
-{
-#if 0
-    bool allValid = true;
-    
-    if (!isValidPath(path))
-        throw Error(format("path `%1%' is not valid") % path);
-
-    /* No locking is necessary here: updates are only done by
-       appending or by atomically replacing the file.  When appending,
-       there is a possibility that we see a partial entry, but it will
-       just be filtered out below (the partially written path will not
-       be valid, so it will be ignored). */
-
-    Path referrersFile = referrersFileFor(path);
-    if (!pathExists(referrersFile)) return true;
-    
-    AutoCloseFD fd = open(referrersFile.c_str(), O_RDONLY);
-    if (fd == -1) throw SysError(format("opening file `%1%'") % referrersFile);
-
-    Paths refs = tokenizeString(readFile(fd), " ");
-
-    foreach (Paths::iterator, i, refs)
-        /* Referrers can be invalid (see registerValidPath() for the
-           invariant), so we only return one if it is valid. */
-        if (isStorePath(*i) && isValidPath(*i)) referrers.insert(*i); else allValid = false;
-
-    return allValid;
-#endif
-}
-
-
 void LocalStore::queryReferrers(const Path & path, PathSet & referrers)
 {
-    queryReferrersInternal(path, referrers);
+    assertStorePath(path);
+
+    stmtQueryReferrers.reset();
+
+    if (sqlite3_bind_text(stmtQueryReferrers, 1, path.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+        throw SQLiteError(db, "binding argument");
+
+    int r;
+    while ((r = sqlite3_step(stmtQueryReferrers)) == SQLITE_ROW) {
+        const char * s = (const char *) sqlite3_column_text(stmtQueryReferrers, 0);
+        assert(s);
+        referrers.insert(s);
+    }
+
+    if (r != SQLITE_DONE)
+        throw Error(format("error getting references of `%1%'") % path);
 }
 
 
