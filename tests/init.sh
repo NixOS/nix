@@ -96,7 +96,6 @@ mv $NIX_BIN_DIR/nix/download-using-manifests.pl $NIX_BIN_DIR/nix/substituters/do
 $nixstore --init
 
 # Did anything happen?
-test -e "$NIX_DB_DIR"/info
-test -e "$NIX_DB_DIR"/referrer
+test -e "$NIX_DB_DIR"/db.sqlite
 
 echo 'Hello World' > ./dummy

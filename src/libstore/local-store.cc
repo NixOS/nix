@@ -56,6 +56,7 @@ void SQLiteStmt::create(sqlite3 * db, const string & s)
 
 void SQLiteStmt::reset()
 {
+    checkInterrupt();
     assert(stmt);
     if (sqlite3_reset(stmt) != SQLITE_OK)
         throw SQLiteError(db, "resetting statement");
@@ -337,6 +338,7 @@ void LocalStore::registerValidPath(const Path & path,
 
 void LocalStore::registerValidPath(const ValidPathInfo & info, bool ignoreValidity)
 {
+    abort();
 #if 0    
     Path infoFile = infoFileFor(info.path);
 
@@ -396,19 +398,13 @@ void LocalStore::registerValidPath(const ValidPathInfo & info, bool ignoreValidi
 
 void LocalStore::registerFailedPath(const Path & path)
 {
-#if 0
-    /* Write an empty file in the .../failed directory to denote the
-       failure of the builder for `path'. */
-    writeFile(failedFileFor(path), "");
-#endif
+    abort();
 }
 
 
 bool LocalStore::hasPathFailed(const Path & path)
 {
-#if 0
-    return pathExists(failedFileFor(path));
-#endif
+    abort();
 }
 
 
@@ -467,7 +463,7 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
     }
 
     if (r != SQLITE_DONE)
-        throw Error(format("error getting references of `%1%'") % path);
+        throw SQLiteError(db, format("error getting references of `%1%'") % path);
 
     return res;
 }
@@ -487,11 +483,22 @@ bool LocalStore::isValidPath(const Path & path)
 
 PathSet LocalStore::queryValidPaths()
 {
-    PathSet paths;
-    Strings entries = readDirectory(nixDBPath + "/info");
-    foreach (Strings::iterator, i, entries)
-        if (i->at(0) != '.') paths.insert(nixStore + "/" + *i);
-    return paths;
+    SQLiteStmt stmt;
+    stmt.create(db, "select path from ValidPaths");
+    
+    PathSet res;
+    
+    int r;
+    while ((r = sqlite3_step(stmt)) == SQLITE_ROW) {
+        const char * s = (const char *) sqlite3_column_text(stmt, 0);
+        assert(s);
+        res.insert(s);
+    }
+
+    if (r != SQLITE_DONE)
+        throw SQLiteError(db, "error getting valid paths");
+
+    return res;
 }
 
 
@@ -520,7 +527,7 @@ void LocalStore::queryReferrers(const Path & path, PathSet & referrers)
     }
 
     if (r != SQLITE_DONE)
-        throw Error(format("error getting references of `%1%'") % path);
+        throw SQLiteError(db, format("error getting references of `%1%'") % path);
 }
 
 
@@ -680,6 +687,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
    there are no referrers. */
 void LocalStore::invalidatePath(const Path & path)
 {
+    abort();
 #if 0    
     debug(format("invalidating path `%1%'") % path);
 
@@ -1002,6 +1010,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFreed,
     unsigned long long & blocksFreed)
 {
+    abort();
 #if 0
     bytesFreed = 0;
 
@@ -1028,7 +1037,6 @@ void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFr
 
 void LocalStore::verifyStore(bool checkContents)
 {
-#if 0
     /* Check whether all valid paths actually exist. */
     printMsg(lvlInfo, "checking path existence");
 
@@ -1036,68 +1044,26 @@ void LocalStore::verifyStore(bool checkContents)
     
     foreach (PathSet::iterator, i, validPaths2) {
         checkInterrupt();
+        /* !!! invalidatePath() will probably fail due to the foreign
+           key constraints on the Ref table. */
         if (!isStorePath(*i)) {
             printMsg(lvlError, format("path `%1%' is not in the Nix store") % *i);
             invalidatePath(*i);
         } else if (!pathExists(*i)) {
             printMsg(lvlError, format("path `%1%' disappeared") % *i);
             invalidatePath(*i);
-        } else {
-            Path infoFile = infoFileFor(*i);
-            struct stat st;
-            if (lstat(infoFile.c_str(), &st))
-                throw SysError(format("getting status of `%1%'") % infoFile);
-            if (st.st_size == 0) {
-                printMsg(lvlError, format("removing corrupt info file `%1%'") % infoFile);
-                if (unlink(infoFile.c_str()) == -1)
-                    throw SysError(format("unlinking `%1%'") % infoFile);
-            }
-            else validPaths.insert(*i);
-        }
+        } else validPaths.insert(*i);
     }
 
+    /* Optionally, check the content hashes (slow). */
+    if (checkContents) {
+        printMsg(lvlInfo, "checking hashes");
 
-    /* Check the store path meta-information. */
-    printMsg(lvlInfo, "checking path meta-information");
+        foreach (PathSet::iterator, i, validPaths) {
+            ValidPathInfo info = queryPathInfo(*i);
 
-    std::map<Path, PathSet> referrersCache;
-    
-    foreach (PathSet::iterator, i, validPaths) {
-        bool update = false;
-        ValidPathInfo info = queryPathInfo(*i, true);
-
-        /* Check the references: each reference should be valid, and
-           it should have a matching referrer. */
-        foreach (PathSet::iterator, j, info.references) {
-            if (validPaths.find(*j) == validPaths.end()) {
-                printMsg(lvlError, format("incomplete closure: `%1%' needs missing `%2%'")
-                    % *i % *j);
-                /* nothing we can do about it... */
-            } else {
-                if (referrersCache.find(*j) == referrersCache.end())
-                    queryReferrers(*j, referrersCache[*j]);
-                if (referrersCache[*j].find(*i) == referrersCache[*j].end()) {
-                    printMsg(lvlError, format("adding missing referrer mapping from `%1%' to `%2%'")
-                        % *j % *i);
-                    appendReferrer(*j, *i, true);
-                }
-            }
-        }
-
-        /* Check the deriver.  (Note that the deriver doesn't have to
-           be a valid path.) */
-        if (!info.deriver.empty() && !isStorePath(info.deriver)) {
-            info.deriver = "";
-            update = true;
-        }
-
-        /* Check the content hash (optionally - slow). */
-        if (info.hash.hashSize == 0) {
-            printMsg(lvlError, format("re-hashing `%1%'") % *i);
-            info.hash = hashPath(htSHA256, *i);
-            update = true;
-        } else if (checkContents) {
-            debug(format("checking contents of `%1%'") % *i);
+            /* Check the content hash (optionally - slow). */
+            printMsg(lvlTalkative, format("checking contents of `%1%'") % *i);
             Hash current = hashPath(info.hash.type, *i);
             if (current != info.hash) {
                 printMsg(lvlError, format("path `%1%' was modified! "
@@ -1105,56 +1071,7 @@ void LocalStore::verifyStore(bool checkContents)
                     % *i % printHash(info.hash) % printHash(current));
             }
         }
-
-        if (update) registerValidPath(info);
     }
-
-    referrersCache.clear();
-    
-
-    /* Check the referrers. */
-    printMsg(lvlInfo, "checking referrers");
-
-    std::map<Path, PathSet> referencesCache;
-    
-    Strings entries = readDirectory(nixDBPath + "/referrer");
-    foreach (Strings::iterator, i, entries) {
-        Path from = nixStore + "/" + *i;
-        
-        if (validPaths.find(from) == validPaths.end()) {
-            /* !!! This removes lock files as well.  Need to check
-               whether that's okay. */
-            printMsg(lvlError, format("removing referrers file for invalid `%1%'") % from);
-            Path p = referrersFileFor(from);
-            if (unlink(p.c_str()) == -1)
-                throw SysError(format("unlinking `%1%'") % p);
-            continue;
-        }
-
-        PathSet referrers;
-        bool allValid = queryReferrersInternal(from, referrers);
-        bool update = false;
-
-        if (!allValid) {
-            printMsg(lvlError, format("removing some stale referrers for `%1%'") % from);
-            update = true;
-        }
-
-        /* Each referrer should have a matching reference. */
-        PathSet referrersNew;
-        foreach (PathSet::iterator, j, referrers) {
-            if (referencesCache.find(*j) == referencesCache.end())
-                queryReferences(*j, referencesCache[*j]);
-            if (referencesCache[*j].find(from) == referencesCache[*j].end()) {
-                printMsg(lvlError, format("removing unexpected referrer mapping from `%1%' to `%2%'")
-                    % from % *j);
-                update = true;
-            } else referrersNew.insert(*j);
-        }
-
-        if (update) rewriteReferrers(from, false, referrersNew);
-    }
-#endif
 }
 
 
