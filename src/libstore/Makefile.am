@@ -19,5 +19,10 @@ EXTRA_DIST = derivations-ast.def derivations-ast.cc
 AM_CXXFLAGS = -Wall \
  -I$(srcdir)/.. ${aterm_include} -I$(srcdir)/../libutil
 
+local-store.lo: schema.sql.hh
+
+%.sql.hh: %.sql
+	../bin2c/bin2c schema < $< > $@ || (rm $@ && exit 1)
+
 derivations-ast.cc derivations-ast.hh: ../aterm-helper.pl derivations-ast.def
 	$(perl) $(srcdir)/../aterm-helper.pl derivations-ast.hh derivations-ast.cc < $(srcdir)/derivations-ast.def

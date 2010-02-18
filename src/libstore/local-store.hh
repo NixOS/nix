@@ -6,6 +6,8 @@
 #include "store-api.hh"
 #include "util.hh"
 
+#include <sqlite3.h>
+
 
 namespace nix {
 
@@ -161,7 +163,11 @@ private:
     /* Whether to do an fsync() after writing Nix metadata. */
     bool doFsync;
 
+    sqlite3 * db;
+
     int getSchema();
+
+    void initSchema();
 
     void registerValidPath(const ValidPathInfo & info, bool ignoreValidity = false);
 
@@ -177,7 +183,7 @@ private:
     
     void invalidatePath(const Path & path);
     
-    void upgradeStore12();
+    void upgradeStore6();
 
     struct GCState;
 

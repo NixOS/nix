@@ -22,6 +22,16 @@
 namespace nix {
 
     
+class SQLiteError : public Error
+{
+public:
+    SQLiteError(sqlite3 * db, const format & f)
+        : Error(format("%1%: %2%") % f.str() % sqlite3_errmsg(db))
+    {
+    }
+};
+
+
 void checkStoreNotSymlink()
 {
     if (getEnv("NIX_IGNORE_SYMLINK_STORE") == "1") return;
@@ -42,6 +52,7 @@ void checkStoreNotSymlink()
 
 LocalStore::LocalStore()
 {
+    db = 0;
     substitutablePathsLoaded = false;
     
     schemaPath = nixDBPath + "/schema";
@@ -50,9 +61,6 @@ LocalStore::LocalStore()
 
     /* Create missing state directories if they don't already exist. */
     createDirs(nixStore);
-    createDirs(nixDBPath + "/info");
-    createDirs(nixDBPath + "/referrer");
-    createDirs(nixDBPath + "/failed");
     Path profilesDir = nixStateDir + "/profiles";
     createDirs(nixStateDir + "/profiles");
     createDirs(nixStateDir + "/temproots");
@@ -88,7 +96,12 @@ LocalStore::LocalStore()
         writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
     }
     if (curSchema == 1) throw Error("your Nix store is no longer supported");
-    if (curSchema < nixSchemaVersion) upgradeStore12();
+    if (curSchema < 5)
+        throw Error(
+            "Your Nix store has a database in Berkeley DB format,\n"
+            "which is no longer supported. To convert to the new format,\n"
+            "please upgrade Nix to version 0.12 first.");
+    if (curSchema < 6) upgradeStore6();
 
     doFsync = queryBoolSetting("fsync-metadata", false);
 }
@@ -98,6 +111,9 @@ LocalStore::~LocalStore()
 {
     try {
         flushDelayedUpdates();
+
+        if (db && sqlite3_close(db) != SQLITE_OK)
+            throw SQLiteError(db, "closing database");
 
         foreach (RunningSubstituters::iterator, i, runningSubstituters) {
             i->second.to.close();
@@ -120,6 +136,22 @@ int LocalStore::getSchema()
             throw Error(format("`%1%' is corrupt") % schemaPath);
     }
     return curSchema;
+}
+
+
+#include "schema.sql.hh"
+
+void LocalStore::initSchema()
+{
+    if (sqlite3_open_v2((nixDBPath + "/db.sqlite").c_str(), &db,
+            SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, 0) != SQLITE_OK)
+        throw Error("cannot open SQLite database");
+
+    if (sqlite3_busy_timeout(db, 60000) != SQLITE_OK)
+        throw SQLiteError(db, "sett");
+    
+    if (sqlite3_exec(db, (const char *) schema, 0, 0, 0) != SQLITE_OK)
+        throw SQLiteError(db, "initialising database schema");
 }
 
 
@@ -1171,15 +1203,78 @@ void LocalStore::verifyStore(bool checkContents)
 }
 
 
-/* Upgrade from schema 4 (Nix 0.11) to schema 5 (Nix >= 0.12).  The
-   old schema uses Berkeley DB, the new one stores store path
-   meta-information in files. */
-void LocalStore::upgradeStore12()
+/* Upgrade from schema 5 (Nix 0.12) to schema 6 (Nix >= 0.15). */
+void LocalStore::upgradeStore6()
 {
-    throw Error(
-        "Your Nix store has a database in Berkeley DB format,\n"
-        "which is no longer supported. To convert to the new format,\n"
-        "please upgrade Nix to version 0.12 first.");
+    if (!lockFile(globalLock, ltWrite, false)) {
+        printMsg(lvlError, "waiting for exclusive access to the Nix store...");
+        lockFile(globalLock, ltWrite, true);
+    }
+
+    printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
+
+    initSchema();
+
+    PathSet validPaths = queryValidPaths();
+
+    sqlite3_stmt * registerStmt;
+    if (sqlite3_prepare_v2(db, "insert into ValidPaths (path, hash, registrationTime) values (?, ?, ?);",
+            -1, &registerStmt, 0) != SQLITE_OK)
+        throw SQLiteError(db, "creating statement");
+    
+    sqlite3_stmt * addRefStmt;
+    if (sqlite3_prepare_v2(db, "insert into Refs (referrer, reference) values (?, ?);",
+            -1, &addRefStmt, 0) != SQLITE_OK)
+        throw SQLiteError(db, "creating statement");
+    
+    if (sqlite3_exec(db, "begin;", 0, 0, 0) != SQLITE_OK)
+        throw SQLiteError(db, "running `begin' command");
+    
+    foreach (PathSet::iterator, i, validPaths) {
+        ValidPathInfo info = queryPathInfo(*i, true);
+        
+        if (sqlite3_reset(registerStmt) != SQLITE_OK)
+            throw SQLiteError(db, "resetting statement");
+        if (sqlite3_bind_text(registerStmt, 1, i->c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+            throw SQLiteError(db, "binding argument 1");
+        string h = "sha256:" + printHash(info.hash);
+        if (sqlite3_bind_text(registerStmt, 2, h.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+            throw SQLiteError(db, "binding argument 2");
+        if (sqlite3_bind_int(registerStmt, 3, info.registrationTime) != SQLITE_OK)
+            throw SQLiteError(db, "binding argument 3");
+        if (sqlite3_step(registerStmt) != SQLITE_DONE)
+            throw SQLiteError(db, "registering valid path in database");
+
+        foreach (PathSet::iterator, j, info.references) {
+            if (sqlite3_reset(addRefStmt) != SQLITE_OK)
+                throw SQLiteError(db, "resetting statement");
+            if (sqlite3_bind_text(addRefStmt, 1, i->c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+                throw SQLiteError(db, "binding argument 1");
+            if (sqlite3_bind_text(addRefStmt, 2, j->c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+                throw SQLiteError(db, "binding argument 2");
+            if (sqlite3_step(addRefStmt) != SQLITE_DONE)
+                throw SQLiteError(db, "adding reference to database");
+        }
+
+        std::cerr << ".";
+    }
+
+    std::cerr << "\n";
+
+    if (sqlite3_exec(db, "commit;", 0, 0, 0) != SQLITE_OK)
+        throw SQLiteError(db, "running `commit' command");
+    
+    if (sqlite3_finalize(registerStmt) != SQLITE_OK)
+        throw SQLiteError(db, "finalizing statement");
+
+    if (sqlite3_finalize(addRefStmt) != SQLITE_OK)
+        throw SQLiteError(db, "finalizing statement");
+
+    throw Error("foo");
+
+    writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
+
+    lockFile(globalLock, ltRead, true);
 }
 
 

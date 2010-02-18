@@ -249,6 +249,9 @@ AC_SUBST(bzip2_bin_test)
 AC_CHECK_LIB(pthread, pthread_mutex_init)
 
 
+LDFLAGS="-lsqlite3"
+
+
 AC_ARG_ENABLE(init-state, AC_HELP_STRING([--disable-init-state],
   [do not initialise DB etc. in `make install']),
   init_state=$enableval, init_state=yes)
