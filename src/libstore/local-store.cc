@@ -18,6 +18,8 @@
 #include <errno.h>
 #include <stdio.h>
 
+#include <sqlite3.h>
+
 
 namespace nix {
 
@@ -30,6 +32,37 @@ public:
     {
     }
 };
+
+
+SQLite::~SQLite()
+{
+    try {
+        if (db && sqlite3_close(db) != SQLITE_OK)
+            throw SQLiteError(db, "closing database");
+    } catch (...) {
+        ignoreException();
+    }
+}
+
+
+void SQLiteStmt::create(sqlite3 * db, const string & s)
+{
+    assert(!stmt);
+    if (sqlite3_prepare_v2(db, s.c_str(), -1, &stmt, 0) != SQLITE_OK)
+        throw SQLiteError(db, "creating statement");
+    this->db = db;
+}
+
+
+SQLiteStmt::~SQLiteStmt()
+{
+    try {
+        if (stmt && sqlite3_finalize(stmt) != SQLITE_OK)
+            throw SQLiteError(db, "finalizing statement");
+    } catch (...) {
+        ignoreException();
+    }
+}
 
 
 void checkStoreNotSymlink()
@@ -52,7 +85,6 @@ void checkStoreNotSymlink()
 
 LocalStore::LocalStore()
 {
-    db = 0;
     substitutablePathsLoaded = false;
     
     schemaPath = nixDBPath + "/schema";
@@ -73,6 +105,8 @@ LocalStore::LocalStore()
   
     checkStoreNotSymlink();
 
+    /* Acquire the big fat lock in shared mode to make sure that no
+       schema upgrade is in progress. */
     try {
         Path globalLockPath = nixDBPath + "/big-lock";
         globalLock = openLockFile(globalLockPath.c_str(), true);
@@ -86,22 +120,34 @@ LocalStore::LocalStore()
         printMsg(lvlError, "waiting for the big Nix store lock...");
         lockFile(globalLock, ltRead, true);
     }
+
+    /* Open the Nix database. */
+    if (sqlite3_open_v2((nixDBPath + "/db.sqlite").c_str(), &db.db,
+            SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, 0) != SQLITE_OK)
+        throw Error("cannot open SQLite database");
+
+    if (sqlite3_busy_timeout(db, 60000) != SQLITE_OK)
+        throw SQLiteError(db, "setting timeout");
     
+    /* Check the current database schema and if necessary do an
+       upgrade. */
     int curSchema = getSchema();
     if (curSchema > nixSchemaVersion)
         throw Error(format("current Nix store schema is version %1%, but I only support %2%")
             % curSchema % nixSchemaVersion);
     if (curSchema == 0) { /* new store */
-        curSchema = nixSchemaVersion; 
+        curSchema = nixSchemaVersion;
+        initSchema();
         writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
     }
-    if (curSchema == 1) throw Error("your Nix store is no longer supported");
-    if (curSchema < 5)
+    else if (curSchema == 1) throw Error("your Nix store is no longer supported");
+    else if (curSchema < 5)
         throw Error(
             "Your Nix store has a database in Berkeley DB format,\n"
             "which is no longer supported. To convert to the new format,\n"
             "please upgrade Nix to version 0.12 first.");
-    if (curSchema < 6) upgradeStore6();
+    else if (curSchema < 6) upgradeStore6();
+    else prepareStatements();
 
     doFsync = queryBoolSetting("fsync-metadata", false);
 }
@@ -111,9 +157,6 @@ LocalStore::~LocalStore()
 {
     try {
         flushDelayedUpdates();
-
-        if (db && sqlite3_close(db) != SQLITE_OK)
-            throw SQLiteError(db, "closing database");
 
         foreach (RunningSubstituters::iterator, i, runningSubstituters) {
             i->second.to.close();
@@ -143,15 +186,19 @@ int LocalStore::getSchema()
 
 void LocalStore::initSchema()
 {
-    if (sqlite3_open_v2((nixDBPath + "/db.sqlite").c_str(), &db,
-            SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, 0) != SQLITE_OK)
-        throw Error("cannot open SQLite database");
-
-    if (sqlite3_busy_timeout(db, 60000) != SQLITE_OK)
-        throw SQLiteError(db, "sett");
-    
     if (sqlite3_exec(db, (const char *) schema, 0, 0, 0) != SQLITE_OK)
         throw SQLiteError(db, "initialising database schema");
+
+    prepareStatements();
+}
+
+
+void LocalStore::prepareStatements()
+{
+    stmtRegisterValidPath.create(db,
+        "insert into ValidPaths (path, hash, registrationTime, deriver) values (?, ?, ?, ?);");
+    stmtAddReference.create(db,
+        "insert into Refs (referrer, reference) values (?, ?);");
 }
 
 
@@ -1220,33 +1267,28 @@ void LocalStore::upgradeStore6()
     if (sqlite3_exec(db, "begin;", 0, 0, 0) != SQLITE_OK)
         throw SQLiteError(db, "running `begin' command");
 
-    sqlite3_stmt * registerStmt;
-    if (sqlite3_prepare_v2(db, "insert into ValidPaths (path, hash, registrationTime, deriver) values (?, ?, ?, ?);",
-            -1, &registerStmt, 0) != SQLITE_OK)
-        throw SQLiteError(db, "creating statement");
-    
     std::map<Path, sqlite3_int64> pathToId;
     
     foreach (PathSet::iterator, i, validPaths) {
         ValidPathInfo info = queryPathInfo(*i, true);
         
-        if (sqlite3_reset(registerStmt) != SQLITE_OK)
+        if (sqlite3_reset(stmtRegisterValidPath) != SQLITE_OK)
             throw SQLiteError(db, "resetting statement");
-        if (sqlite3_bind_text(registerStmt, 1, i->c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+        if (sqlite3_bind_text(stmtRegisterValidPath, 1, i->c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
             throw SQLiteError(db, "binding argument 1");
         string h = "sha256:" + printHash(info.hash);
-        if (sqlite3_bind_text(registerStmt, 2, h.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+        if (sqlite3_bind_text(stmtRegisterValidPath, 2, h.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
             throw SQLiteError(db, "binding argument 2");
-        if (sqlite3_bind_int(registerStmt, 3, info.registrationTime) != SQLITE_OK)
+        if (sqlite3_bind_int(stmtRegisterValidPath, 3, info.registrationTime) != SQLITE_OK)
             throw SQLiteError(db, "binding argument 3");
         if (info.deriver != "") {
-            if (sqlite3_bind_text(registerStmt, 4, info.deriver.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+            if (sqlite3_bind_text(stmtRegisterValidPath, 4, info.deriver.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
                 throw SQLiteError(db, "binding argument 4");
         } else {
-            if (sqlite3_bind_null(registerStmt, 4) != SQLITE_OK)
+            if (sqlite3_bind_null(stmtRegisterValidPath, 4) != SQLITE_OK)
                 throw SQLiteError(db, "binding argument 4");
         }
-        if (sqlite3_step(registerStmt) != SQLITE_DONE)
+        if (sqlite3_step(stmtRegisterValidPath) != SQLITE_DONE)
             throw SQLiteError(db, "registering valid path in database");
 
         pathToId[*i] = sqlite3_last_insert_rowid(db);
@@ -1254,29 +1296,21 @@ void LocalStore::upgradeStore6()
         std::cerr << ".";
     }
 
-    if (sqlite3_finalize(registerStmt) != SQLITE_OK)
-        throw SQLiteError(db, "finalizing statement");
-
     std::cerr << "|";
-    
-    sqlite3_stmt * addRefStmt;
-    if (sqlite3_prepare_v2(db, "insert into Refs (referrer, reference) values (?, ?);",
-            -1, &addRefStmt, 0) != SQLITE_OK)
-        throw SQLiteError(db, "creating statement");
     
     foreach (PathSet::iterator, i, validPaths) {
         ValidPathInfo info = queryPathInfo(*i, true);
         
         foreach (PathSet::iterator, j, info.references) {
-            if (sqlite3_reset(addRefStmt) != SQLITE_OK)
+            if (sqlite3_reset(stmtAddReference) != SQLITE_OK)
                 throw SQLiteError(db, "resetting statement");
-            if (sqlite3_bind_int(addRefStmt, 1, pathToId[*i]) != SQLITE_OK)
+            if (sqlite3_bind_int(stmtAddReference, 1, pathToId[*i]) != SQLITE_OK)
                 throw SQLiteError(db, "binding argument 1");
             if (pathToId.find(*j) == pathToId.end())
                 throw Error(format("path `%1%' referenced by `%2%' is invalid") % *j % *i);
-            if (sqlite3_bind_int(addRefStmt, 2, pathToId[*j]) != SQLITE_OK)
+            if (sqlite3_bind_int(stmtAddReference, 2, pathToId[*j]) != SQLITE_OK)
                 throw SQLiteError(db, "binding argument 2");
-            if (sqlite3_step(addRefStmt) != SQLITE_DONE)
+            if (sqlite3_step(stmtAddReference) != SQLITE_DONE)
                 throw SQLiteError(db, "adding reference to database");
         }
 
@@ -1287,12 +1321,6 @@ void LocalStore::upgradeStore6()
 
     if (sqlite3_exec(db, "commit;", 0, 0, 0) != SQLITE_OK)
         throw SQLiteError(db, "running `commit' command");
-    
-    if (sqlite3_finalize(addRefStmt) != SQLITE_OK)
-        throw SQLiteError(db, "finalizing statement");
-
-    throw Error("foo");
-
     writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
 
     lockFile(globalLock, ltRead, true);

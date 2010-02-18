@@ -6,7 +6,9 @@
 #include "store-api.hh"
 #include "util.hh"
 
-#include <sqlite3.h>
+
+class sqlite3;
+class sqlite3_stmt;
 
 
 namespace nix {
@@ -14,8 +16,9 @@ namespace nix {
 
 /* Nix store and database schema version.  Version 1 (or 0) was Nix <=
    0.7.  Version 2 was Nix 0.8 and 0.9.  Version 3 is Nix 0.10.
-   Version 4 is Nix 0.11.  Version 5 is Nix 0.12*/
-const int nixSchemaVersion = 5;
+   Version 4 is Nix 0.11.  Version 5 is Nix 0.12-0.14.  Version 6 is
+   Nix 0.15. */
+const int nixSchemaVersion = 6;
 
 
 extern string drvsLogDir;
@@ -42,6 +45,28 @@ struct RunningSubstituter
     AutoCloseFD to, from;
 };
 
+
+/* Wrapper object to close the SQLite database automatically. */
+struct SQLite
+{
+    sqlite3 * db;
+    SQLite() { db = 0; }
+    ~SQLite();
+    operator sqlite3 * () { return db; }
+};
+
+
+/* Wrapper object to create and destroy SQLite prepared statements. */
+struct SQLiteStmt
+{
+    sqlite3 * db;
+    sqlite3_stmt * stmt;
+    SQLiteStmt() { stmt = 0; }
+    void create(sqlite3 * db, const string & s);
+    ~SQLiteStmt();
+    operator sqlite3_stmt * () { return stmt; }
+};
+    
 
 class LocalStore : public StoreAPI
 {
@@ -163,11 +188,18 @@ private:
     /* Whether to do an fsync() after writing Nix metadata. */
     bool doFsync;
 
-    sqlite3 * db;
+    /* The SQLite database object. */
+    SQLite db;
+
+    /* Some precompiled SQLite statements. */
+    SQLiteStmt stmtRegisterValidPath;
+    SQLiteStmt stmtAddReference;
 
     int getSchema();
 
     void initSchema();
+
+    void prepareStatements();
 
     void registerValidPath(const ValidPathInfo & info, bool ignoreValidity = false);
 
