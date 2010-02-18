@@ -3,6 +3,7 @@
 # define _LIBTERM_TERM_HH
 
 # include <set>
+# include <pair>
 
 # include <boost/preprocessor/tuple.hpp>
 # include <boost/preprocessor/seq.hpp>
@@ -22,37 +23,12 @@
 
 namespace term
 {
+  // user manipulable terms.
   class ATerm;
-  class ATermNil;
-
-# define TRM_INTERFACE_DECLARE(Name, Base, Attributes, BaseArgs)        \
-  template <typename T>                                                 \
-  class Name;
-
-# define TRM_FINAL_DECLARE(Name, Base, Attributes, BaseArgs)  \
-  class Name;
-
-  TRM_GRAMMAR_NODES(TRM_INTERFACE_DECLARE, TRM_FINAL_DECLARE)
-
-# undef TRM_FINAL_DECLARE
-# undef TRM_INTERFACE_DECLARE
-
-  class ATermVisitor
-  {
-    virtual ATerm visit(const ATerm e) {
-      return ATermNil;
-    }
-
-# define TRM_VISITOR(Name, Base, Attributes, BaseArgs)  \
-    virtual ATerm visit(const Name e) {                 \
-      return ATermNil;                                  \
-    }
-
-    TRM_GRAMMAR_NODES(TRM_VISITOR, TRM_VISITOR)
-# undef TRM_VISITOR
-
-  };
-
+  // internal implementation which is not visible to the user.
+  class ATermImpl;
+  // base class for visitor implementation.
+  class ATermVisitor;
 
   // Performance issue: Abstract classes should be copied where fully
   // defined terms should be used with constant references.  An ATerm is
@@ -63,13 +39,13 @@ namespace term
   class ATermImpl
   {
   public:
-    ATermImplemntation()
+    ATermImpl()
     {
-    }
+    };
 
-    virtual ~ATermImplemntation()
+    virtual ~ATermImpl()
     {
-    }
+    };
 
   public:
     virtual ATerm accept(ATermVisitor& v) const = 0;
@@ -78,24 +54,23 @@ namespace term
 
   class ATerm
   {
-  private:
-    inline
-    ATerm(ATermImpl *ptr)
-      : ptr_(ptr)
-    {
-      assert(ptr_);
-    }
-
   public:
     inline
-    ATerm(ATerm t)
+    ATerm(const ATerm& t)
       : ptr_(t.ptr_)
     {
     }
 
+  protected:
+    inline
+    ATerm(const ATermImpl* ptr)
+      : ptr_(ptr)
+    {
+    }
+
   public:
     inline
-    ATerm accept(ATermVisitor& v)
+    ATerm accept(ATermVisitor& v) const
     {
       return ptr_->accept(v);
     }
@@ -119,11 +94,19 @@ namespace term
       return ptr_ < rhs.ptr_;
     }
 
-  private:
-    const void* ptr_;
+  public:
+    inline
+    const ATermImpl*
+    get_ptr() const
+    {
+      return ptr_;
+    }
+
+  protected:
+    const ATermImpl* /*const*/ ptr_;
   };
 
-  class ATermNul : public ATerm
+  class ATermNil : public ATerm
   {
   public:
     ATermNil()
@@ -133,40 +116,73 @@ namespace term
   };
 
 
+# define TRM_ABSTRACT_DECLARE(Name, Base, Attributes, BaseArgs)        \
+  class A ## Name;
+
+# define TRM_INTERFACE_DECLARE(Name, Base, Attributes, BaseArgs)        \
+  TRM_ABSTRACT_DECLARE(Name, Base, Attributes, BaseArgs)                \
+  template <typename T>                                                 \
+  class Name;
+
+# define TRM_FINAL_DECLARE(Name, Base, Attributes, BaseArgs)    \
+  TRM_ABSTRACT_DECLARE(Name, Base, Attributes, BaseArgs)        \
+  class Name;
+
+  TRM_GRAMMAR_NODES(TRM_INTERFACE_DECLARE, TRM_FINAL_DECLARE)
+
+
+# undef TRM_FINAL_DECLARE
+# undef TRM_INTERFACE_DECLARE
+# undef TRM_ABSTRACT_DECLARE
+
+
+  class ATermVisitor
+  {
+  public:
+# define TRM_VISITOR(Name, Base, Attributes, BaseArgs)  \
+    virtual ATerm visit(const A ## Name);
+
+    TRM_VISITOR(Term, TRM_NIL, TRM_NIL, TRM_NIL)
+    TRM_GRAMMAR_NODES(TRM_VISITOR, TRM_VISITOR)
+# undef TRM_VISITOR
+  };
+
+
   template <typename T>
   struct Term : public ATermImpl
   {
+  public:
+    typedef Term<T> this_type;
     typedef std::set<T> term_set_type;
 
   public:
     inline
-    bool operator <(const Function& rhs)
+    bool operator <(const this_type&)
     {
       return false;
     }
 
     static inline
     bool
-    matchTerm(const ATerm t)
+    match(const ATerm)
     {
       return true;
     }
 
-  private:
-    inline
-    static
-    ATermImpl*
+  protected:
+    static inline
+    const ATermImpl*
     get_identity(const T& t)
     {
-      return static_cast<ATermImpl*>(&*t.set_instance().insert(t).first)
+      return static_cast<const ATermImpl*>(&*set_instance().insert(t).first);
     }
 
-    inline
+    static inline
     term_set_type& set_instance()
     {
-      static term_set_type set();
+      static term_set_type set;
       return set;
-    };
+    }
   };
 
 
@@ -243,8 +259,8 @@ namespace term
 // comma.
 
 # define TRM_SEPARATE_COMMA_HELPER(Elt) , Elt
-# define TRM_SEPARATE_COMMA_(_, Seq)                                    \
-  TRM_SEQ_HEAD(Seq)
+# define TRM_SEPARATE_COMMA_(_, Seq)                            \
+  TRM_SEQ_HEAD(Seq)                                             \
   TRM_APPLY_SEQ(TRM_SEPARATE_COMMA_HELPER, TRM_SEQ_TAIL(Seq))
 # define TRM_SEPARATE_COMMA_SEQ(Seq)            \
   TRM_SEPARATE_COMMA(TRM_SEQ_TO_ARRAY(Seq))
@@ -271,8 +287,8 @@ namespace term
 # define TRM_ABSTRACT_REF_ARG_(Copy, Ref, Name)  Ref Name ## _
 # define TRM_INIT_ATTRIBUTES_(Copy, Ref, Name)  Name (Name ## _)
 # define TRM_ARGUMENTS_(Copy, Ref, Name)  Name ## _
-# define TRM_COPY_IN_ARG_(Copy, Ref, Name)  Name ## _ = Name;
-# define TRM_LESS_RHS_OR_(Copy, Ref, Name)  Name < rhs. Name ||
+# define TRM_COPY_PTR_ATTR_IN_ARG_(Copy, Ref, Name)  Name ## _ = ptr-> Name;
+# define TRM_LESS_RHS_OR_(Copy, Ref, Name)  Name < arg_rhs. Name ||
 
 // These macro are shortcuts used to remove extra parenthesies added by
 // TRM_TYPE_* macros.  Without such parenthesies TRM_APPLY_HELPER won't be
@@ -284,7 +300,7 @@ namespace term
 # define TRM_ABSTRACT_REF_ARG(Elt) TRM_ABSTRACT_REF_ARG_ Elt
 # define TRM_INIT_ATTRIBUTES(Elt) TRM_INIT_ATTRIBUTES_ Elt
 # define TRM_ARGUMENTS(Elt) TRM_ARGUMENTS_ Elt
-# define TRM_COPY_IN_ARG(Elt) TRM_COPY_IN_ARG_ Elt
+# define TRM_COPY_PTR_ATTR_IN_ARG(Elt) TRM_COPY_PTR_ATTR_IN_ARG_ Elt
 # define TRM_LESS_RHS_OR(Elt) TRM_LESS_RHS_OR_ Elt
 
 
@@ -292,13 +308,13 @@ namespace term
 // private constructor.  This reduce interaction with the implementation of
 // the terms.
 # define TRM_ADD_FRIEND(Name, Base, Attributes, BaseArgs)       \
-  friend Name;
+  friend class Name;
 
 
 // Initialized all attributes of the current class and call the base class
 // with the expected arguments.
 # define TRM_GRAMMAR_NODE_CTR(Name, Base, Attributes, BaseArgs)         \
-  private:                                                              \
+  protected:                                                            \
     Name ( TRM_SEPARATE_COMMA(                                          \
              TRM_MAP_ARRAY(TRM_CONST_ABSTRACT_COPY_ARG, Attributes)     \
            ) )                                                          \
@@ -322,7 +338,7 @@ namespace term
   public:                                                               \
     static inline                                                       \
     term                                                                \
-    make ## Name(                                                       \
+    make(                                                               \
       TRM_SEPARATE_COMMA(                                               \
         TRM_MAP_ARRAY(TRM_CONST_ABSTRACT_COPY_ARG, Attributes)          \
       )                                                                 \
@@ -344,18 +360,18 @@ namespace term
   public:                                                               \
     static inline                                                       \
     bool                                                                \
-    match ## Name(                                                      \
+    match(                                                              \
       TRM_SEPARATE_COMMA_SEQ(                                           \
         ( const ATerm t )                                               \
         TRM_MAP(TRM_ABSTRACT_REF_ARG, Attributes)                       \
       )                                                                 \
     )                                                                   \
     {                                                                   \
-      this_type* ptr;                                                   \
-      if (ptr = dynamic_cast<this_type*>(t.ptr_))                       \
+      const this_type* ptr;                                             \
+      if (ptr = dynamic_cast<const this_type*>(t.get_ptr()))            \
       {                                                                 \
-        TRM_APPLY(TRM_COPY_IN_ARG, Attributes);                         \
-        return parent::match ## Base (                                  \
+        TRM_APPLY(TRM_COPY_PTR_ATTR_IN_ARG, Attributes);                \
+        return parent::match (                                          \
           TRM_SEPARATE_COMMA_SEQ(                                       \
             ( t )                                                       \
             TRM_MAP(TRM_ARGUMENTS, BaseArgs)                            \
@@ -372,10 +388,10 @@ namespace term
 # define TRM_LESS_GRAMMAR_NODE_OP(Name, Base, Attributes, BaseArgs)     \
   public:                                                               \
     inline                                                              \
-    bool operator <(const Name& rhs)                                    \
+    bool operator <(const Name& arg_rhs)                                \
     {                                                                   \
       return TRM_APPLY(TRM_LESS_RHS_OR, Attributes)                     \
-        parent::operator < (rhs);                                       \
+        parent::operator < (arg_rhs);                                   \
     }
 
 
@@ -388,38 +404,65 @@ namespace term
 // A class which provide static method (no virtual) to access the
 // implementation of the term.  This class is a wrapper over a pointer which
 // should derivate from the ATerm class.
-# define TRM_ABSTRACT_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs, NoTemplate) \
+# define TRM_ABSTRACT_INTER_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs) \
   class A ## Name : public A ## Base                                    \
   {                                                                     \
     typedef A ## Base parent;                                           \
                                                                         \
   public:                                                               \
-    A ## Name (A ## Name t)                                             \
+    A ## Name (const A ## Name& t)                                      \
       : parent(t)                                                       \
     {                                                                   \
     }                                                                   \
                                                                         \
-    inline                                                              \
+  protected:                                                            \
+    explicit A ## Name (const ATermImpl* ptr)                           \
+      : parent(ptr)                                                     \
+    {                                                                   \
+    }                                                                   \
+  };
+
+
+# define TRM_ABSTRACT_FINAL_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs) \
+  class A ## Name : public A ## Base                                    \
+  {                                                                     \
+    typedef A ## Base parent;                                           \
+                                                                        \
+  public:                                                               \
+    A ## Name (const A ## Name& t)                                      \
+      : parent(t)                                                       \
+    {                                                                   \
+    }                                                                   \
+                                                                        \
     const Name &                                                        \
-    operator() () const                                                 \
+    operator() () const;                                                \
     {                                                                   \
       return *static_cast<const Name *>(ptr_);                          \
     }                                                                   \
                                                                         \
-  private:                                                              \
-    explicit A ## Name (ATermImpl *ptr)                                 \
+  protected:                                                            \
+    explicit A ## Name (const ATermImpl* ptr)                           \
       : parent(ptr)                                                     \
     {                                                                   \
     }                                                                   \
                                                                         \
-    NoTemplate(Name, Base, Attributes, BaseArgs)                        \
+    TRM_ADD_FRIEND(Name, Base, Attributes, BaseArgs)                    \
   };
+
+# define TRM_ABSTRACT_FINAL_DEF_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs) \
+  inline                                                                \
+  const Name &                                                          \
+  A ## Name :: operator() () const                                      \
+  {                                                                     \
+    return *static_cast<const Name *>(ptr_);                            \
+  }
 
 
 # define TRM_INTERFACE_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs)   \
   template <typename T>                                                 \
   class Name : public Base<T>                                           \
   {                                                                     \
+    typedef Name<T> this_type;                                          \
     typedef Base<T> parent;                                             \
                                                                         \
     TRM_GRAMMAR_NODE_CTR(Name, Base, Attributes, BaseArgs)              \
@@ -432,9 +475,9 @@ namespace term
 # define TRM_FINAL_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs)       \
   class Name : public Base<Name>                                        \
   {                                                                     \
+    typedef Name this_type;                                             \
     typedef Base<Name> parent;                                          \
     typedef A ## Name term;                                             \
-    typedef Name this_type;                                             \
                                                                         \
     TRM_GRAMMAR_NODE_CTR(Name, Base, Attributes, BaseArgs)              \
     TRM_GRAMMAR_NODE_MAKE_METHOD(Name, Base, Attributes, BaseArgs)      \
@@ -443,166 +486,43 @@ namespace term
   public:                                                               \
     ATerm accept(ATermVisitor& v) const                                 \
     {                                                                   \
-      return v.visit(*this);                                            \
+      return v.visit(term(this));                                       \
     }                                                                   \
                                                                         \
     TRM_LESS_GRAMMAR_NODE_OP(Name, Base, Attributes, BaseArgs)          \
     TRM_ATTRIBUTE_DECLS(Name, Base, Attributes, BaseArgs)               \
-  };                                                                    \
-                                                                        \
-  using Name::make ## Name;                                             \
-  using Name::match ## Name;
+  };
 
 
 # define TRM_INTERFACE(Name, Base, Attributes, BaseArgs)                \
-  TRM_ABSTRACT_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs, TRM_NIL_ARGS) \
+  TRM_ABSTRACT_INTER_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs)     \
   TRM_INTERFACE_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs)
 
 # define TRM_FINAL(Name, Base, Attributes, BaseArgs)                    \
-  TRM_ABSTRACT_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs, TRM_ADD_FRIEND) \
-  TRM_FINAL_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs)
+  TRM_ABSTRACT_FINAL_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs)     \
+  TRM_FINAL_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs)              \
+  TRM_ABSTRACT_FINAL_DEF_GRAMMAR_NODE(Name, Base, Attributes, BaseArgs)
 
   TRM_GRAMMAR_NODES(TRM_INTERFACE, TRM_FINAL)
 
 # undef TRM_FINAL
 # undef TRM_INTERFACE
 
-  /*
-  class AExpr : public ATerm
-  {
-    typedef ATerm parent;
 
-  public:
-    AExpr(AExpr t)
-      : parent(t)
-    {
+// definition of the ATermVisitor visit functions.
+# define TRM_VISITOR(Name, Base, Attributes, BaseArgs)  \
+    ATerm                                               \
+    ATermVisitor::visit(const A ## Name) {              \
+      return ATermNil();                                \
     }
 
-    inline
-    const Expr&
-    operator() () const
-    {
-      return *static_cast<const Expr*>(ptr_);
-    }
-
-  private:
-    explicit AExpr(ATermImpl *ptr)
-      : parent(ptr)
-    {
-    }
-  };
-
-  template <typename T>
-  class Expr : public Term<T>
-  {
-    typedef Expr<Function> parent;
-
-  public:
-    inline
-    bool operator <(const Function& rhs)
-    {
-      return
-        parent::operator < (rhs);
-    }
-  };
-
-
-  class Function;
-  class AFunction : public AExpr
-  {
-    typedef AExpr parent;
-
-  public:
-    AFunction(AFunction t)
-      : parent(t)
-    {
-    }
-
-    inline
-    const Function&
-    operator() () const
-    {
-      return *static_cast<const Function*>(ptr_);
-    }
-
-  private:
-    explicit AFunction(ATermImpl *ptr)
-      : parent(ptr)
-    {
-    }
-
-    friend Function;
-  };
-
-  class Function : public Expr<Function>
-  {
-    typedef Expr<Function> parent;
-    typedef AFunction term;
-    typedef Function this_type;
-
-  private:
-    Function(const APattern a1, const AExpr a2, const APos a3)
-      : pattern(a1), expr(a2), pos(a3)
-    {
-    }
-
-  public:
-    // provide a function to create an ATerm without any reference to the
-    // ATerm implementation from the user point of view.
-    inline
-    static
-    AFunction
-    makeFunction(const APattern a1, const AExpr a2, const APos a3)
-    {
-      return AFunction(get_identity(Function(a1, a2, a3)));
-    }
-
-    // this function provides backward compatibility but it is inefficient.
-    inline
-    static
-    bool
-    matchFunction(const ATerm t, APattern &a1, AExpr &a2, APos &a3)
-    {
-      Function* ptr;
-      if (ptr = dynamic_cast<this_type*>(t.ptr_))
-      {
-        a1 = pattern;
-        a2 = expr;
-        a3 = pos;
-        return true;
-      }
-      return false;
-    }
-
-  public:
-    void accept(ATermVisitor& v) const
-    {
-      v.visit(*this);
-    }
-
-    // This operator is used for checking if the current ellement has not
-    // been create before.
-    bool operator <(const Function& rhs)
-    {
-      return
-        pos < rhs.pos ||
-        expr < rhs.expr ||
-        pattern < rhs.pattern ||
-        parent::operator < (rhs);
-    }
-
-    const APattern pattern;
-    const AExpr expr;
-    const APos pos;
-  };
-
-  using Function::makeFunction;
-  using Function::matchFunction;
-  */
+    TRM_VISITOR(Term, TRM_NIL, TRM_NIL, TRM_NIL)
+    TRM_GRAMMAR_NODES(TRM_VISITOR, TRM_VISITOR)
+# undef TRM_VISITOR
 
 
   template <typename T>
-  class getVisitor : ATermNoOpVisitor
+  class getVisitor : ATermVisitor
   {
   public:
     getVisitor(ATerm t)
@@ -610,29 +530,29 @@ namespace term
       t.accept(*this);
     }
 
-    ATerm visit(const T& t)
+    ATerm visit(const T t)
     {
-      res = std::pair(true, &t);
-      return ATermNul();
+      res = std::pair<bool, T>(true, t);
+      return ATermNil();
     }
 
-    std::pair<bool, T*> res;
+    std::pair<bool, T> res;
   };
 
   template <typename T>
-  std::pair<bool, T*>
-  is_a(Aterm t)
+  std::pair<bool, T>
+  is_a(ATerm t)
   {
-    getVisitor v(t);
+    getVisitor<T> v(t);
     return v.res;
   }
 
   template <typename T>
   T
-  as(Aterm t)
+  as(ATerm t)
   {
-    getVisitor v(t);
-    return v.res;
+    getVisitor<T> v(t);
+    return v.res.second;
   }
 }
 

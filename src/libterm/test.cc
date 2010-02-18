@@ -9,26 +9,27 @@
 #include "term.hh"
 #undef TRM_GRAMMAR_NODES
 
-class Eval : public term::ATermVisitor
+struct Eval : public term::ATermVisitor
 {
-  int run(const ATerm t)
+  int run(const term::ATerm t)
   {
-    return term::as<AInt>(t.accept(*this))().value;
+    return term::as<term::AInt>(t.accept(*this))().value;
   }
 
-  ATerm visit(const APlus p)
+  term::ATerm visit(const term::APlus p)
   {
-    return makeInt(run(p().lhs) + run(p().rhs));
+    return term::Int::make(run(p().lhs) + run(p().rhs));
   }
 };
 
 int main()
 {
-  AInt a = makeInt(1);
-  AInt b = makeInt(2);
-  AInt c = makeInt(1);
+  using namespace term;
+  AInt a = Int::make(1);
+  AInt b = Int::make(2);
+  AInt c = Int::make(1);
 
-  assert(a == c);
-  Eval e();
-  return e.run(makePlus(a, makePlus(b, c)));
+  // assert(a == c);
+  Eval e;
+  return e.run(Plus::make(a, Plus::make(b, c)));
 }
