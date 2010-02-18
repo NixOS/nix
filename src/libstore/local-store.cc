@@ -54,6 +54,14 @@ void SQLiteStmt::create(sqlite3 * db, const string & s)
 }
 
 
+void SQLiteStmt::reset()
+{
+    assert(stmt);
+    if (sqlite3_reset(stmt) != SQLITE_OK)
+        throw SQLiteError(db, "resetting statement");
+}
+
+
 SQLiteStmt::~SQLiteStmt()
 {
     try {
@@ -188,14 +196,11 @@ LocalStore::LocalStore()
 LocalStore::~LocalStore()
 {
     try {
-        flushDelayedUpdates();
-
         foreach (RunningSubstituters::iterator, i, runningSubstituters) {
             i->second.to.close();
             i->second.from.close();
             i->second.pid.wait(true);
         }
-                
     } catch (...) {
         ignoreException();
     }
@@ -231,6 +236,7 @@ void LocalStore::prepareStatements()
         "insert into ValidPaths (path, hash, registrationTime, deriver) values (?, ?, ?, ?);");
     stmtAddReference.create(db,
         "insert into Refs (referrer, reference) values (?, ?);");
+    stmtIsValidPath.create(db, "select 1 from ValidPaths where path = ?;");
 }
 
 
@@ -308,98 +314,6 @@ void canonicalisePathMetaData(const Path & path)
 }
 
 
-static Path infoFileFor(const Path & path)
-{
-    string baseName = baseNameOf(path);
-    return (format("%1%/info/%2%") % nixDBPath % baseName).str();
-}
-
-
-static Path referrersFileFor(const Path & path)
-{
-    string baseName = baseNameOf(path);
-    return (format("%1%/referrer/%2%") % nixDBPath % baseName).str();
-}
-
-
-static Path failedFileFor(const Path & path)
-{
-    string baseName = baseNameOf(path);
-    return (format("%1%/failed/%2%") % nixDBPath % baseName).str();
-}
-
-
-static Path tmpFileForAtomicUpdate(const Path & path)
-{
-    return (format("%1%/.%2%.%3%") % dirOf(path) % getpid() % baseNameOf(path)).str();
-}
-
-
-void LocalStore::appendReferrer(const Path & from, const Path & to, bool lock)
-{
-    Path referrersFile = referrersFileFor(from);
-    
-    PathLocks referrersLock;
-    if (lock) {
-        referrersLock.lockPaths(singleton<PathSet, Path>(referrersFile));
-        referrersLock.setDeletion(true);
-    }
-
-    AutoCloseFD fd = open(referrersFile.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0666);
-    if (fd == -1) throw SysError(format("opening file `%1%'") % referrersFile);
-    
-    string s = " " + to;
-    writeFull(fd, (const unsigned char *) s.c_str(), s.size());
-
-    if (doFsync) fdatasync(fd);
-}
-
-
-/* Atomically update the referrers file.  If `purge' is true, the set
-   of referrers is set to `referrers'.  Otherwise, the current set of
-   referrers is purged of invalid paths. */
-void LocalStore::rewriteReferrers(const Path & path, bool purge, PathSet referrers)
-{
-    Path referrersFile = referrersFileFor(path);
-    
-    PathLocks referrersLock(singleton<PathSet, Path>(referrersFile));
-    referrersLock.setDeletion(true);
-
-    if (purge)
-        /* queryReferrers() purges invalid paths, so that's all we
-           need. */
-        queryReferrers(path, referrers);
-
-    Path tmpFile = tmpFileForAtomicUpdate(referrersFile);
-    
-    AutoCloseFD fd = open(tmpFile.c_str(), O_WRONLY | O_TRUNC | O_CREAT, 0666);
-    if (fd == -1) throw SysError(format("opening file `%1%'") % referrersFile);
-    
-    string s;
-    foreach (PathSet::const_iterator, i, referrers) {
-        s += " "; s += *i;
-    }
-    
-    writeFull(fd, (const unsigned char *) s.c_str(), s.size());
-
-    if (doFsync) fdatasync(fd);
-    
-    fd.close(); /* for Windows; can't rename open file */
-
-    if (rename(tmpFile.c_str(), referrersFile.c_str()) == -1)
-        throw SysError(format("cannot rename `%1%' to `%2%'") % tmpFile % referrersFile);
-}
-
-
-void LocalStore::flushDelayedUpdates()
-{
-    foreach (PathSet::iterator, i, delayedUpdates) {
-        rewriteReferrers(*i, true, PathSet());
-    }
-    delayedUpdates.clear();
-}
-
-
 void LocalStore::registerValidPath(const Path & path,
     const Hash & hash, const PathSet & references,
     const Path & deriver)
@@ -415,6 +329,7 @@ void LocalStore::registerValidPath(const Path & path,
 
 void LocalStore::registerValidPath(const ValidPathInfo & info, bool ignoreValidity)
 {
+#if 0    
     Path infoFile = infoFileFor(info.path);
 
     ValidPathInfo oldInfo;
@@ -467,22 +382,25 @@ void LocalStore::registerValidPath(const ValidPathInfo & info, bool ignoreValidi
     writeFile(tmpFile, s, doFsync);
     if (rename(tmpFile.c_str(), infoFile.c_str()) == -1)
         throw SysError(format("cannot rename `%1%' to `%2%'") % tmpFile % infoFile);
-
-    pathInfoCache[info.path] = info;
+#endif
 }
 
 
 void LocalStore::registerFailedPath(const Path & path)
 {
+#if 0
     /* Write an empty file in the .../failed directory to denote the
        failure of the builder for `path'. */
     writeFile(failedFileFor(path), "");
+#endif
 }
 
 
 bool LocalStore::hasPathFailed(const Path & path)
 {
+#if 0
     return pathExists(failedFileFor(path));
+#endif
 }
 
 
@@ -502,6 +420,7 @@ Hash parseHashField(const Path & path, const string & s)
 
 ValidPathInfo LocalStore::queryPathInfo(const Path & path, bool ignoreErrors)
 {
+#if 0
     ValidPathInfo res;
     res.path = path;
 
@@ -510,9 +429,6 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path, bool ignoreErrors)
     if (!isValidPath(path))
         throw Error(format("path `%1%' is not valid") % path);
 
-    std::map<Path, ValidPathInfo>::iterator lookup = pathInfoCache.find(path);
-    if (lookup != pathInfoCache.end()) return lookup->second;
-    
     /* Read the info file. */
     Path infoFile = infoFileFor(path);
     if (!pathExists(infoFile))
@@ -550,31 +466,20 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path, bool ignoreErrors)
         }
     }
 
-    return pathInfoCache[path] = res;
+    return res;
+#endif
 }
 
 
 bool LocalStore::isValidPath(const Path & path)
 {
-    /* Files in the info directory starting with a `.' are temporary
-       files. */
-    if (baseNameOf(path).at(0) == '.') return false;
-
-    /* A path is valid if its info file exists and has a non-zero
-       size.  (The non-zero size restriction is to be robust to
-       certain kinds of filesystem corruption, particularly with
-       ext4.) */
-    Path infoFile = infoFileFor(path);
-
-    struct stat st;
-    if (lstat(infoFile.c_str(), &st)) {
-        if (errno == ENOENT) return false;
-        throw SysError(format("getting status of `%1%'") % infoFile);
-    }
-
-    if (st.st_size == 0) return false;
-    
-    return true;
+    stmtIsValidPath.reset();
+    if (sqlite3_bind_text(stmtIsValidPath, 1, path.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+        throw SQLiteError(db, "binding argument");
+    int res = sqlite3_step(stmtIsValidPath);
+    if (res != SQLITE_DONE && res != SQLITE_ROW)
+        throw SQLiteError(db, "querying path in database");
+    return res == SQLITE_ROW;
 }
 
 
@@ -598,6 +503,7 @@ void LocalStore::queryReferences(const Path & path,
 
 bool LocalStore::queryReferrersInternal(const Path & path, PathSet & referrers)
 {
+#if 0
     bool allValid = true;
     
     if (!isValidPath(path))
@@ -623,6 +529,7 @@ bool LocalStore::queryReferrersInternal(const Path & path, PathSet & referrers)
         if (isStorePath(*i) && isValidPath(*i)) referrers.insert(*i); else allValid = false;
 
     return allValid;
+#endif
 }
 
 
@@ -788,6 +695,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
    there are no referrers. */
 void LocalStore::invalidatePath(const Path & path)
 {
+#if 0    
     debug(format("invalidating path `%1%'") % path);
 
     ValidPathInfo info;
@@ -805,28 +713,7 @@ void LocalStore::invalidatePath(const Path & path)
     Path p = referrersFileFor(path);
     if (pathExists(p) && unlink(p.c_str()) == -1)
         throw SysError(format("unlinking `%1%'") % p);
-
-    /* Clear `path' from the info cache. */
-    pathInfoCache.erase(path);
-    delayedUpdates.erase(path);
-
-    /* Cause the referrer files for each path referenced by this one
-       to be updated.  This has to happen after removing the info file
-       to preserve the invariant (see registerValidPath()).
-
-       The referrer files are updated lazily in flushDelayedUpdates()
-       to prevent quadratic performance in the garbage collector
-       (i.e., when N referrers to some path X are deleted, we have to
-       rewrite the referrers file for X N times, causing O(N^2) I/O).
-
-       What happens if we die before the referrer file can be updated?
-       That's not a problem, because stale (invalid) entries in the
-       referrer file are ignored by queryReferrers().  Thus a referrer
-       file is allowed to have stale entries; removing them is just an
-       optimisation.  verifyStore() gets rid of them eventually.
-    */
-    foreach (PathSet::iterator, i, info.references)
-        if (*i != path) delayedUpdates.insert(*i);
+#endif
 }
 
 
@@ -1130,6 +1017,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFreed,
     unsigned long long & blocksFreed)
 {
+#if 0
     bytesFreed = 0;
 
     assertStorePath(path);
@@ -1149,11 +1037,13 @@ void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFr
     }
 
     deletePathWrapped(path, bytesFreed, blocksFreed);
+#endif
 }
 
 
 void LocalStore::verifyStore(bool checkContents)
 {
+#if 0
     /* Check whether all valid paths actually exist. */
     printMsg(lvlInfo, "checking path existence");
 
@@ -1279,6 +1169,64 @@ void LocalStore::verifyStore(bool checkContents)
 
         if (update) rewriteReferrers(from, false, referrersNew);
     }
+#endif
+}
+
+
+/* Functions for upgrading from the pre-SQLite database. */
+
+static Path infoFileFor(const Path & path)
+{
+    string baseName = baseNameOf(path);
+    return (format("%1%/info/%2%") % nixDBPath % baseName).str();
+}
+
+
+PathSet LocalStore::queryValidPathsOld()
+{
+    PathSet paths;
+    Strings entries = readDirectory(nixDBPath + "/info");
+    foreach (Strings::iterator, i, entries)
+        if (i->at(0) != '.') paths.insert(nixStore + "/" + *i);
+    return paths;
+}
+
+
+ValidPathInfo LocalStore::queryPathInfoOld(const Path & path)
+{
+    ValidPathInfo res;
+    res.path = path;
+
+    /* Read the info file. */
+    Path infoFile = infoFileFor(path);
+    if (!pathExists(infoFile))
+        throw Error(format("path `%1%' is not valid") % path);
+    string info = readFile(infoFile);
+
+    /* Parse it. */
+    Strings lines = tokenizeString(info, "\n");
+
+    foreach (Strings::iterator, i, lines) {
+        string::size_type p = i->find(':');
+        if (p == string::npos)
+            throw Error(format("corrupt line in `%1%': %2%") % infoFile % *i);
+        string name(*i, 0, p);
+        string value(*i, p + 2);
+        if (name == "References") {
+            Strings refs = tokenizeString(value, " ");
+            res.references = PathSet(refs.begin(), refs.end());
+        } else if (name == "Deriver") {
+            res.deriver = value;
+        } else if (name == "Hash") {
+            res.hash = parseHashField(path, value);
+        } else if (name == "Registered-At") {
+            int n = 0;
+            string2Int(value, n);
+            res.registrationTime = n;
+        }
+    }
+
+    return res;
 }
 
 
@@ -1294,17 +1242,16 @@ void LocalStore::upgradeStore6()
 
     initSchema();
 
-    PathSet validPaths = queryValidPaths();
+    PathSet validPaths = queryValidPathsOld();
 
     SQLiteTxn txn(db);
     
     std::map<Path, sqlite3_int64> pathToId;
     
     foreach (PathSet::iterator, i, validPaths) {
-        ValidPathInfo info = queryPathInfo(*i, true);
+        ValidPathInfo info = queryPathInfoOld(*i);
         
-        if (sqlite3_reset(stmtRegisterValidPath) != SQLITE_OK)
-            throw SQLiteError(db, "resetting statement");
+        stmtRegisterValidPath.reset();
         if (sqlite3_bind_text(stmtRegisterValidPath, 1, i->c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
             throw SQLiteError(db, "binding argument 1");
         string h = "sha256:" + printHash(info.hash);
@@ -1330,11 +1277,10 @@ void LocalStore::upgradeStore6()
     std::cerr << "|";
     
     foreach (PathSet::iterator, i, validPaths) {
-        ValidPathInfo info = queryPathInfo(*i, true);
+        ValidPathInfo info = queryPathInfoOld(*i);
         
         foreach (PathSet::iterator, j, info.references) {
-            if (sqlite3_reset(stmtAddReference) != SQLITE_OK)
-                throw SQLiteError(db, "resetting statement");
+            stmtAddReference.reset();
             if (sqlite3_bind_int(stmtAddReference, 1, pathToId[*i]) != SQLITE_OK)
                 throw SQLiteError(db, "binding argument 1");
             if (pathToId.find(*j) == pathToId.end())

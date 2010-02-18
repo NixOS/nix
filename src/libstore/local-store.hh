@@ -63,6 +63,7 @@ struct SQLiteStmt
     sqlite3_stmt * stmt;
     SQLiteStmt() { stmt = 0; }
     void create(sqlite3 * db, const string & s);
+    void reset();
     ~SQLiteStmt();
     operator sqlite3_stmt * () { return stmt; }
 };
@@ -178,13 +179,6 @@ private:
     /* Lock file used for upgrading. */
     AutoCloseFD globalLock;
 
-    /* !!! The cache can grow very big.  Maybe it should be pruned
-       every once in a while. */
-    std::map<Path, ValidPathInfo> pathInfoCache;
-
-    /* Store paths for which the referrers file must be purged. */
-    PathSet delayedUpdates;
-
     /* Whether to do an fsync() after writing Nix metadata. */
     bool doFsync;
 
@@ -194,6 +188,7 @@ private:
     /* Some precompiled SQLite statements. */
     SQLiteStmt stmtRegisterValidPath;
     SQLiteStmt stmtAddReference;
+    SQLiteStmt stmtIsValidPath;
 
     int getSchema();
 
@@ -209,13 +204,13 @@ private:
     
     void rewriteReferrers(const Path & path, bool purge, PathSet referrers);
 
-    void flushDelayedUpdates();
-    
     bool queryReferrersInternal(const Path & path, PathSet & referrers);
     
     void invalidatePath(const Path & path);
-    
+
     void upgradeStore6();
+    PathSet queryValidPathsOld();
+    ValidPathInfo queryPathInfoOld(const Path & path);
 
     struct GCState;
 
