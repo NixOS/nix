@@ -1229,6 +1229,8 @@ void LocalStore::upgradeStore6()
     
     if (sqlite3_exec(db, "begin;", 0, 0, 0) != SQLITE_OK)
         throw SQLiteError(db, "running `begin' command");
+
+    std::map<Path, sqlite3_int64> pathToId;
     
     foreach (PathSet::iterator, i, validPaths) {
         ValidPathInfo info = queryPathInfo(*i, true);
@@ -1245,12 +1247,24 @@ void LocalStore::upgradeStore6()
         if (sqlite3_step(registerStmt) != SQLITE_DONE)
             throw SQLiteError(db, "registering valid path in database");
 
+        pathToId[*i] = sqlite3_last_insert_rowid(db);
+
+        std::cerr << ".";
+    }
+
+    std::cerr << "|";
+    
+    foreach (PathSet::iterator, i, validPaths) {
+        ValidPathInfo info = queryPathInfo(*i, true);
+        
         foreach (PathSet::iterator, j, info.references) {
             if (sqlite3_reset(addRefStmt) != SQLITE_OK)
                 throw SQLiteError(db, "resetting statement");
-            if (sqlite3_bind_text(addRefStmt, 1, i->c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+            if (sqlite3_bind_int(addRefStmt, 1, pathToId[*i]) != SQLITE_OK)
                 throw SQLiteError(db, "binding argument 1");
-            if (sqlite3_bind_text(addRefStmt, 2, j->c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+            if (pathToId.find(*j) == pathToId.end())
+                throw Error(format("path `%1%' referenced by `%2%' is invalid") % *j % *i);
+            if (sqlite3_bind_int(addRefStmt, 2, pathToId[*j]) != SQLITE_OK)
                 throw SQLiteError(db, "binding argument 2");
             if (sqlite3_step(addRefStmt) != SQLITE_DONE)
                 throw SQLiteError(db, "adding reference to database");
