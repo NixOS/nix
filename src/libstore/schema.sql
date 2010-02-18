@@ -4,7 +4,8 @@ create table if not exists ValidPaths (
     id               integer primary key autoincrement not null,
     path             text unique not null,
     hash             text not null,
-    registrationTime integer not null
+    registrationTime integer not null,
+    deriver          text
 );
 
 create table if not exists Refs (

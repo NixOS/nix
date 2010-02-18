@@ -1217,19 +1217,14 @@ void LocalStore::upgradeStore6()
 
     PathSet validPaths = queryValidPaths();
 
-    sqlite3_stmt * registerStmt;
-    if (sqlite3_prepare_v2(db, "insert into ValidPaths (path, hash, registrationTime) values (?, ?, ?);",
-            -1, &registerStmt, 0) != SQLITE_OK)
-        throw SQLiteError(db, "creating statement");
-    
-    sqlite3_stmt * addRefStmt;
-    if (sqlite3_prepare_v2(db, "insert into Refs (referrer, reference) values (?, ?);",
-            -1, &addRefStmt, 0) != SQLITE_OK)
-        throw SQLiteError(db, "creating statement");
-    
     if (sqlite3_exec(db, "begin;", 0, 0, 0) != SQLITE_OK)
         throw SQLiteError(db, "running `begin' command");
 
+    sqlite3_stmt * registerStmt;
+    if (sqlite3_prepare_v2(db, "insert into ValidPaths (path, hash, registrationTime, deriver) values (?, ?, ?, ?);",
+            -1, &registerStmt, 0) != SQLITE_OK)
+        throw SQLiteError(db, "creating statement");
+    
     std::map<Path, sqlite3_int64> pathToId;
     
     foreach (PathSet::iterator, i, validPaths) {
@@ -1244,6 +1239,13 @@ void LocalStore::upgradeStore6()
             throw SQLiteError(db, "binding argument 2");
         if (sqlite3_bind_int(registerStmt, 3, info.registrationTime) != SQLITE_OK)
             throw SQLiteError(db, "binding argument 3");
+        if (info.deriver != "") {
+            if (sqlite3_bind_text(registerStmt, 4, info.deriver.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+                throw SQLiteError(db, "binding argument 4");
+        } else {
+            if (sqlite3_bind_null(registerStmt, 4) != SQLITE_OK)
+                throw SQLiteError(db, "binding argument 4");
+        }
         if (sqlite3_step(registerStmt) != SQLITE_DONE)
             throw SQLiteError(db, "registering valid path in database");
 
@@ -1252,7 +1254,15 @@ void LocalStore::upgradeStore6()
         std::cerr << ".";
     }
 
+    if (sqlite3_finalize(registerStmt) != SQLITE_OK)
+        throw SQLiteError(db, "finalizing statement");
+
     std::cerr << "|";
+    
+    sqlite3_stmt * addRefStmt;
+    if (sqlite3_prepare_v2(db, "insert into Refs (referrer, reference) values (?, ?);",
+            -1, &addRefStmt, 0) != SQLITE_OK)
+        throw SQLiteError(db, "creating statement");
     
     foreach (PathSet::iterator, i, validPaths) {
         ValidPathInfo info = queryPathInfo(*i, true);
@@ -1278,9 +1288,6 @@ void LocalStore::upgradeStore6()
     if (sqlite3_exec(db, "commit;", 0, 0, 0) != SQLITE_OK)
         throw SQLiteError(db, "running `commit' command");
     
-    if (sqlite3_finalize(registerStmt) != SQLITE_OK)
-        throw SQLiteError(db, "finalizing statement");
-
     if (sqlite3_finalize(addRefStmt) != SQLITE_OK)
         throw SQLiteError(db, "finalizing statement");
 
