@@ -188,7 +188,8 @@ private:
     /* Some precompiled SQLite statements. */
     SQLiteStmt stmtRegisterValidPath;
     SQLiteStmt stmtAddReference;
-    SQLiteStmt stmtIsValidPath;
+    SQLiteStmt stmtQueryPathInfo;
+    SQLiteStmt stmtQueryReferences;
 
     int getSchema();
 
@@ -198,7 +199,7 @@ private:
 
     void registerValidPath(const ValidPathInfo & info, bool ignoreValidity = false);
 
-    ValidPathInfo queryPathInfo(const Path & path, bool ignoreErrors = false);
+    ValidPathInfo queryPathInfo(const Path & path);
 
     void appendReferrer(const Path & from, const Path & to, bool lock);
     
