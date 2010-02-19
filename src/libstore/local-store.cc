@@ -209,6 +209,9 @@ LocalStore::LocalStore()
     if (sqlite3_busy_timeout(db, 60000) != SQLITE_OK)
         throw SQLiteError(db, "setting timeout");
 
+    if (sqlite3_exec(db, "pragma foreign_keys = 1;", 0, 0, 0) != SQLITE_OK)
+        throw SQLiteError(db, "enabling foreign keys");
+
     /* !!! check whether sqlite has been built with foreign key
        support */
     
@@ -288,6 +291,10 @@ void LocalStore::prepareStatements()
         "select path from Refs join ValidPaths on referrer = id where reference = (select id from ValidPaths where path = ?);");
     stmtInvalidatePath.create(db,
         "delete from ValidPaths where path = ?;");
+    stmtRegisterFailedPath.create(db,
+        "insert into FailedPaths (path, time) values (?, ?);");
+    stmtHasPathFailed.create(db,
+        "select time from FailedPaths where path = ?;");
 }
 
 
@@ -425,13 +432,23 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
 
 void LocalStore::registerFailedPath(const Path & path)
 {
-    throw Error("not implemented");
+    if (hasPathFailed(path)) return;
+    SQLiteStmtUse use(stmtRegisterFailedPath);
+    stmtRegisterFailedPath.bind(path);
+    stmtRegisterFailedPath.bind(time(0));
+    if (sqlite3_step(stmtRegisterFailedPath) != SQLITE_DONE)
+        throw SQLiteError(db, format("registering failed path `%1%'") % path);
 }
 
 
 bool LocalStore::hasPathFailed(const Path & path)
 {
-    throw Error("not implemented");
+    SQLiteStmtUse use(stmtHasPathFailed);
+    stmtHasPathFailed.bind(path);
+    int res = sqlite3_step(stmtHasPathFailed);
+    if (res != SQLITE_DONE && res != SQLITE_ROW)
+        throw SQLiteError(db, "querying whether path failed");
+    return res == SQLITE_ROW;
 }
 
 

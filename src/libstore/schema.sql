@@ -1,5 +1,3 @@
-pragma foreign_keys = on;
-
 create table if not exists ValidPaths (
     id               integer primary key autoincrement not null,
     path             text unique not null,
@@ -19,7 +17,7 @@ create table if not exists Refs (
 create index if not exists IndexReferrer on Refs(referrer);
 create index if not exists IndexReference on Refs(reference);
 
-create table if not exists FailedDerivations (
+create table if not exists FailedPaths (
     path text primary key not null,
     time integer not null
 );

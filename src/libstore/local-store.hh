@@ -196,6 +196,8 @@ private:
     SQLiteStmt stmtQueryReferences;
     SQLiteStmt stmtQueryReferrers;
     SQLiteStmt stmtInvalidatePath;
+    SQLiteStmt stmtRegisterFailedPath;
+    SQLiteStmt stmtHasPathFailed;
 
     int getSchema();
 
