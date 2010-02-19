@@ -74,6 +74,24 @@ SQLiteStmt::~SQLiteStmt()
 }
 
 
+/* Helper class to ensure that prepared statements are reset when
+   leaving the scope that uses them.  Unfinished prepared statements
+   prevent transactions from being aborted, and can cause locks to be
+   kept when they should be released. */
+struct SQLiteStmtUse
+{
+    SQLiteStmt & stmt;
+    SQLiteStmtUse(SQLiteStmt & stmt) : stmt(stmt)
+    {
+        stmt.reset();
+    }
+    ~SQLiteStmtUse()
+    {
+        stmt.reset();
+    }
+};
+
+
 struct SQLiteTxn 
 {
     bool active;
@@ -223,10 +241,10 @@ int LocalStore::getSchema()
 }
 
 
-#include "schema.sql.hh"
-
 void LocalStore::initSchema()
 {
+#include "schema.sql.hh"
+
     if (sqlite3_exec(db, (const char *) schema, 0, 0, 0) != SQLITE_OK)
         throw SQLiteError(db, "initialising database schema");
 
@@ -237,9 +255,9 @@ void LocalStore::initSchema()
 void LocalStore::prepareStatements()
 {
     stmtRegisterValidPath.create(db,
-        "insert into ValidPaths (path, hash, registrationTime, deriver) values (?, ?, ?, ?);");
+        "insert or replace into ValidPaths (path, hash, registrationTime, deriver) values (?, ?, ?, ?);");
     stmtAddReference.create(db,
-        "insert into Refs (referrer, reference) values (?, ?);");
+        "insert or replace into Refs (referrer, reference) values (?, ?);");
     stmtQueryPathInfo.create(db,
         "select id, hash, registrationTime, deriver from ValidPaths where path = ?;");
     stmtQueryReferences.create(db,
@@ -336,75 +354,69 @@ void LocalStore::registerValidPath(const Path & path,
 }
 
 
-void LocalStore::registerValidPath(const ValidPathInfo & info, bool ignoreValidity)
+unsigned long long LocalStore::addValidPath(const ValidPathInfo & info)
 {
-    abort();
-#if 0    
-    Path infoFile = infoFileFor(info.path);
-
-    ValidPathInfo oldInfo;
-    if (pathExists(infoFile)) oldInfo = queryPathInfo(info.path);
-
-    /* Note that it's possible for infoFile to already exist. */
-
-    /* Acquire a lock on each referrer file.  This prevents those
-       paths from being invalidated.  (It would be a violation of the
-       store invariants if we registered info.path as valid while some
-       of its references are invalid.)  NB: there can be no deadlock
-       here since we're acquiring the locks in sorted order. */
-    PathSet lockNames;
-    foreach (PathSet::const_iterator, i, info.references)
-        if (*i != info.path) lockNames.insert(referrersFileFor(*i));
-    PathLocks referrerLocks(lockNames);
-    referrerLocks.setDeletion(true);
-        
-    string refs;
-    foreach (PathSet::const_iterator, i, info.references) {
-        if (!refs.empty()) refs += " ";
-        refs += *i;
-
-        if (!ignoreValidity && *i != info.path && !isValidPath(*i))
-            throw Error(format("cannot register `%1%' as valid, because its reference `%2%' isn't valid")
-                % info.path % *i);
-
-        /* Update the referrer mapping for *i.  This must be done
-           before the info file is written to maintain the invariant
-           that if `path' is a valid path, then all its references
-           have referrer mappings back to `path'.  A " " is prefixed
-           to separate it from the previous entry.  It's not suffixed
-           to deal with interrupted partial writes to this file. */
-        if (oldInfo.references.find(*i) == oldInfo.references.end())
-            appendReferrer(*i, info.path, false);
+    SQLiteStmtUse use(stmtRegisterValidPath);
+    if (sqlite3_bind_text(stmtRegisterValidPath, 1, info.path.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+        throw SQLiteError(db, "binding argument");
+    string h = "sha256:" + printHash(info.hash);
+    if (sqlite3_bind_text(stmtRegisterValidPath, 2, h.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+        throw SQLiteError(db, "binding argument");
+    if (sqlite3_bind_int(stmtRegisterValidPath, 3, info.registrationTime) != SQLITE_OK)
+        throw SQLiteError(db, "binding argument");
+    if (info.deriver != "") {
+        if (sqlite3_bind_text(stmtRegisterValidPath, 4, info.deriver.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+            throw SQLiteError(db, "binding argument");
+    } else {
+        if (sqlite3_bind_null(stmtRegisterValidPath, 4) != SQLITE_OK)
+            throw SQLiteError(db, "binding argument");
     }
+    if (sqlite3_step(stmtRegisterValidPath) != SQLITE_DONE)
+        throw SQLiteError(db, format("registering valid path `%1%' in database") % info.path);
+    return sqlite3_last_insert_rowid(db);
+}
 
+
+void LocalStore::addReference(unsigned long long referrer, unsigned long long reference)
+{
+    SQLiteStmtUse use(stmtAddReference);
+    if (sqlite3_bind_int(stmtAddReference, 1, referrer) != SQLITE_OK)
+        throw SQLiteError(db, "binding argument");
+    if (sqlite3_bind_int(stmtAddReference, 2, reference) != SQLITE_OK)
+        throw SQLiteError(db, "binding argument");
+    if (sqlite3_step(stmtAddReference) != SQLITE_DONE)
+        throw SQLiteError(db, "adding reference to database");
+}
+
+
+void LocalStore::registerValidPath(const ValidPathInfo & info)
+{
     assert(info.hash.type == htSHA256);
+    ValidPathInfo info2(info);
+    if (info2.registrationTime == 0) info2.registrationTime = time(0);
+    
+    SQLiteTxn txn(db);
+    
+    unsigned long long id = addValidPath(info2);
 
-    string s = (format(
-        "Hash: sha256:%1%\n"
-        "References: %2%\n"
-        "Deriver: %3%\n"
-        "Registered-At: %4%\n")
-        % printHash(info.hash) % refs % info.deriver %
-        (oldInfo.registrationTime ? oldInfo.registrationTime : time(0))).str();
-
-    /* Atomically rewrite the info file. */
-    Path tmpFile = tmpFileForAtomicUpdate(infoFile);
-    writeFile(tmpFile, s, doFsync);
-    if (rename(tmpFile.c_str(), infoFile.c_str()) == -1)
-        throw SysError(format("cannot rename `%1%' to `%2%'") % tmpFile % infoFile);
-#endif
+    foreach (PathSet::const_iterator, i, info2.references) {
+        ValidPathInfo ref = queryPathInfo(*i);
+        addReference(id, ref.id);
+    }
+        
+    txn.commit();
 }
 
 
 void LocalStore::registerFailedPath(const Path & path)
 {
-    abort();
+    throw Error("not implemented");
 }
 
 
 bool LocalStore::hasPathFailed(const Path & path)
 {
-    abort();
+    throw Error("not implemented");
 }
 
 
@@ -424,13 +436,13 @@ Hash parseHashField(const Path & path, const string & s)
 
 ValidPathInfo LocalStore::queryPathInfo(const Path & path)
 {
-    ValidPathInfo res;
-    res.path = path;
+    ValidPathInfo info;
+    info.path = path;
 
     assertStorePath(path);
 
     /* Get the path info. */
-    stmtQueryPathInfo.reset();
+    SQLiteStmtUse use1(stmtQueryPathInfo);
     
     if (sqlite3_bind_text(stmtQueryPathInfo, 1, path.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
         throw SQLiteError(db, "binding argument");
@@ -439,39 +451,39 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
     if (r == SQLITE_DONE) throw Error(format("path `%1%' is not valid") % path);
     if (r != SQLITE_ROW) throw SQLiteError(db, "querying path in database");
 
-    unsigned int id = sqlite3_column_int(stmtQueryPathInfo, 0);
+    info.id = sqlite3_column_int(stmtQueryPathInfo, 0);
 
     const char * s = (const char *) sqlite3_column_text(stmtQueryPathInfo, 1);
     assert(s);
-    res.hash = parseHashField(path, s);
+    info.hash = parseHashField(path, s);
     
-    res.registrationTime = sqlite3_column_int(stmtQueryPathInfo, 2);
+    info.registrationTime = sqlite3_column_int(stmtQueryPathInfo, 2);
 
     s = (const char *) sqlite3_column_text(stmtQueryPathInfo, 3);
-    if (s) res.deriver = s;
+    if (s) info.deriver = s;
 
     /* Get the references. */
-    stmtQueryReferences.reset();
+    SQLiteStmtUse use2(stmtQueryReferences);
 
-    if (sqlite3_bind_int(stmtQueryReferences, 1, id) != SQLITE_OK)
+    if (sqlite3_bind_int(stmtQueryReferences, 1, info.id) != SQLITE_OK)
         throw SQLiteError(db, "binding argument");
 
     while ((r = sqlite3_step(stmtQueryReferences)) == SQLITE_ROW) {
         s = (const char *) sqlite3_column_text(stmtQueryReferences, 0);
         assert(s);
-        res.references.insert(s);
+        info.references.insert(s);
     }
 
     if (r != SQLITE_DONE)
         throw SQLiteError(db, format("error getting references of `%1%'") % path);
 
-    return res;
+    return info;
 }
 
 
 bool LocalStore::isValidPath(const Path & path)
 {
-    stmtQueryPathInfo.reset();
+    SQLiteStmtUse use(stmtQueryPathInfo);
     if (sqlite3_bind_text(stmtQueryPathInfo, 1, path.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
         throw SQLiteError(db, "binding argument");
     int res = sqlite3_step(stmtQueryPathInfo);
@@ -514,7 +526,7 @@ void LocalStore::queryReferrers(const Path & path, PathSet & referrers)
 {
     assertStorePath(path);
 
-    stmtQueryReferrers.reset();
+    SQLiteStmtUse use(stmtQueryReferrers);
 
     if (sqlite3_bind_text(stmtQueryReferrers, 1, path.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
         throw SQLiteError(db, "binding argument");
@@ -687,7 +699,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
    there are no referrers. */
 void LocalStore::invalidatePath(const Path & path)
 {
-    abort();
+    throw Error("not implemented");
 #if 0    
     debug(format("invalidating path `%1%'") % path);
 
@@ -1010,7 +1022,8 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFreed,
     unsigned long long & blocksFreed)
 {
-    abort();
+    throw Error("not implemented");
+
 #if 0
     bytesFreed = 0;
 
@@ -1077,13 +1090,6 @@ void LocalStore::verifyStore(bool checkContents)
 
 /* Functions for upgrading from the pre-SQLite database. */
 
-static Path infoFileFor(const Path & path)
-{
-    string baseName = baseNameOf(path);
-    return (format("%1%/info/%2%") % nixDBPath % baseName).str();
-}
-
-
 PathSet LocalStore::queryValidPathsOld()
 {
     PathSet paths;
@@ -1100,7 +1106,8 @@ ValidPathInfo LocalStore::queryPathInfoOld(const Path & path)
     res.path = path;
 
     /* Read the info file. */
-    Path infoFile = infoFileFor(path);
+    string baseName = baseNameOf(path);
+    Path infoFile = (format("%1%/info/%2%") % nixDBPath % baseName).str();
     if (!pathExists(infoFile))
         throw Error(format("path `%1%' is not valid") % path);
     string info = readFile(infoFile);
@@ -1152,27 +1159,7 @@ void LocalStore::upgradeStore6()
     
     foreach (PathSet::iterator, i, validPaths) {
         ValidPathInfo info = queryPathInfoOld(*i);
-        
-        stmtRegisterValidPath.reset();
-        if (sqlite3_bind_text(stmtRegisterValidPath, 1, i->c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
-            throw SQLiteError(db, "binding argument");
-        string h = "sha256:" + printHash(info.hash);
-        if (sqlite3_bind_text(stmtRegisterValidPath, 2, h.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
-            throw SQLiteError(db, "binding argument");
-        if (sqlite3_bind_int(stmtRegisterValidPath, 3, info.registrationTime) != SQLITE_OK)
-            throw SQLiteError(db, "binding argument");
-        if (info.deriver != "") {
-            if (sqlite3_bind_text(stmtRegisterValidPath, 4, info.deriver.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
-                throw SQLiteError(db, "binding argument");
-        } else {
-            if (sqlite3_bind_null(stmtRegisterValidPath, 4) != SQLITE_OK)
-                throw SQLiteError(db, "binding argument");
-        }
-        if (sqlite3_step(stmtRegisterValidPath) != SQLITE_DONE)
-            throw SQLiteError(db, "registering valid path in database");
-
-        pathToId[*i] = sqlite3_last_insert_rowid(db);
-
+        pathToId[*i] = addValidPath(info);
         std::cerr << ".";
     }
 
@@ -1180,19 +1167,11 @@ void LocalStore::upgradeStore6()
     
     foreach (PathSet::iterator, i, validPaths) {
         ValidPathInfo info = queryPathInfoOld(*i);
-        
         foreach (PathSet::iterator, j, info.references) {
-            stmtAddReference.reset();
-            if (sqlite3_bind_int(stmtAddReference, 1, pathToId[*i]) != SQLITE_OK)
-                throw SQLiteError(db, "binding argument");
             if (pathToId.find(*j) == pathToId.end())
                 throw Error(format("path `%1%' referenced by `%2%' is invalid") % *j % *i);
-            if (sqlite3_bind_int(stmtAddReference, 2, pathToId[*j]) != SQLITE_OK)
-                throw SQLiteError(db, "binding argument");
-            if (sqlite3_step(stmtAddReference) != SQLITE_DONE)
-                throw SQLiteError(db, "adding reference to database");
+            addReference(pathToId[*i], pathToId[*j]);
         }
-
         std::cerr << ".";
     }
 

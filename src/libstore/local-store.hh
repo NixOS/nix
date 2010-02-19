@@ -198,7 +198,11 @@ private:
 
     void prepareStatements();
 
-    void registerValidPath(const ValidPathInfo & info, bool ignoreValidity = false);
+    unsigned long long addValidPath(const ValidPathInfo & info);
+        
+    void addReference(unsigned long long referrer, unsigned long long reference);
+    
+    void registerValidPath(const ValidPathInfo & info);
 
     ValidPathInfo queryPathInfo(const Path & path);
 

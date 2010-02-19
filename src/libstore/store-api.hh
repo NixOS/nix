@@ -333,6 +333,7 @@ struct ValidPathInfo
     Hash hash;
     PathSet references;
     time_t registrationTime;
+    unsigned long long id; // internal use only
     ValidPathInfo() : registrationTime(0) { }
 };
 
