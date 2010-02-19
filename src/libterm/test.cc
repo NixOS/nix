@@ -1,5 +1,6 @@
 
 #include <vector>
+#include <iostream>
 
 #define TRM_GRAMMAR_NODES(Interface, Final)                     \
   Interface(Expr, Term, (0, ()), (0, ()))                       \
@@ -9,27 +10,46 @@
 #include "term.hh"
 #undef TRM_GRAMMAR_NODES
 
-struct Eval : public term::ATermVisitor
+using namespace term;
+
+struct Eval : public ATermVisitor
 {
-  int run(const term::ATerm t)
+  int run(const ATerm t)
   {
-    return term::as<term::AInt>(t.accept(*this))().value;
+    return as<AInt>(t.accept(*this))().value;
   }
 
-  term::ATerm visit(const term::APlus p)
+  ATerm visit(const APlus p)
   {
-    return term::Int::make(run(p().lhs) + run(p().rhs));
+    return Int::make(run(p().lhs) + run(p().rhs));
   }
 };
 
+#define CHECK(Cond, Msg)                        \
+  if (Cond)                                     \
+  {                                             \
+    good++;                                     \
+    std::cout << "Ok: " << Msg << std::endl;    \
+  }                                             \
+  else                                          \
+  {                                             \
+    std::cout << "Ko: " << Msg << std::endl;    \
+  }                                             \
+  tests++
+
 int main()
 {
+  unsigned good, tests;
+
   using namespace term;
   AInt a = Int::make(1);
   AInt b = Int::make(2);
   AInt c = Int::make(1);
-
-  // assert(a == c);
   Eval e;
-  return e.run(Plus::make(a, Plus::make(b, c)));
+
+  CHECK(a == c, "Terms are shared.");
+  CHECK(!as<APlus>(a), "Bad convertion returns a zero ATerm.");
+  CHECK(as<AInt>(a), "Good convertion returns a non-zero ATerm.");
+  CHECK(e.run(Plus::make(a, Plus::make(b, c))) == 4, "Visitors are working.");
+  return tests - good;
 }

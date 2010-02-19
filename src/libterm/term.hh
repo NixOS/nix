@@ -3,7 +3,7 @@
 # define _LIBTERM_TERM_HH
 
 # include <set>
-# include <pair>
+# include <utility>
 
 # include <boost/preprocessor/tuple.hpp>
 # include <boost/preprocessor/seq.hpp>
@@ -61,6 +61,12 @@ namespace term
     {
     }
 
+    inline
+    ATerm()
+      : ptr_(0)
+    {
+    }
+
   protected:
     inline
     ATerm(const ATermImpl* ptr)
@@ -94,6 +100,12 @@ namespace term
       return ptr_ < rhs.ptr_;
     }
 
+    inline
+    operator bool()
+    {
+      return ptr_;
+    }
+
   public:
     inline
     const ATermImpl*
@@ -103,16 +115,7 @@ namespace term
     }
 
   protected:
-    const ATermImpl* /*const*/ ptr_;
-  };
-
-  class ATermNil : public ATerm
-  {
-  public:
-    ATermNil()
-      : ATerm(0)
-    {
-    }
+    const ATermImpl* ptr_;
   };
 
 
@@ -157,7 +160,7 @@ namespace term
 
   public:
     inline
-    bool operator <(const this_type&)
+    bool operator <(const this_type&) const
     {
       return false;
     }
@@ -388,7 +391,7 @@ namespace term
 # define TRM_LESS_GRAMMAR_NODE_OP(Name, Base, Attributes, BaseArgs)     \
   public:                                                               \
     inline                                                              \
-    bool operator <(const Name& arg_rhs)                                \
+    bool operator <(const Name& arg_rhs) const                          \
     {                                                                   \
       return TRM_APPLY(TRM_LESS_RHS_OR, Attributes)                     \
         parent::operator < (arg_rhs);                                   \
@@ -415,6 +418,11 @@ namespace term
     {                                                                   \
     }                                                                   \
                                                                         \
+    A ## Name ()                                                        \
+      : parent()                                                        \
+    {                                                                   \
+    }                                                                   \
+                                                                        \
   protected:                                                            \
     explicit A ## Name (const ATermImpl* ptr)                           \
       : parent(ptr)                                                     \
@@ -434,11 +442,13 @@ namespace term
     {                                                                   \
     }                                                                   \
                                                                         \
+    A ## Name ()                                                        \
+      : parent()                                                        \
+    {                                                                   \
+    }                                                                   \
+                                                                        \
     const Name &                                                        \
     operator() () const;                                                \
-    {                                                                   \
-      return *static_cast<const Name *>(ptr_);                          \
-    }                                                                   \
                                                                         \
   protected:                                                            \
     explicit A ## Name (const ATermImpl* ptr)                           \
@@ -512,48 +522,45 @@ namespace term
 // definition of the ATermVisitor visit functions.
 # define TRM_VISITOR(Name, Base, Attributes, BaseArgs)  \
     ATerm                                               \
-    ATermVisitor::visit(const A ## Name) {              \
-      return ATermNil();                                \
+    ATermVisitor::visit(const A ## Name t) {            \
+      return t;                                         \
     }
 
     TRM_VISITOR(Term, TRM_NIL, TRM_NIL, TRM_NIL)
     TRM_GRAMMAR_NODES(TRM_VISITOR, TRM_VISITOR)
 # undef TRM_VISITOR
 
-
-  template <typename T>
-  class getVisitor : ATermVisitor
+  namespace impl
   {
-  public:
-    getVisitor(ATerm t)
+    template <typename T>
+    class asVisitor : ATermVisitor
     {
-      t.accept(*this);
-    }
+    public:
+      asVisitor(ATerm t)
+        : res()
+      {
+        t.accept(*this);
+      }
 
-    ATerm visit(const T t)
-    {
-      res = std::pair<bool, T>(true, t);
-      return ATermNil();
-    }
+      ATerm visit(const T t)
+      {
+        return res = t;
+      }
 
-    std::pair<bool, T> res;
-  };
+    public:
+      T res;
+    };
+  }
 
+  // This function will return a zero ATerm if the element does not have the
+  // expected type.
   template <typename T>
-  std::pair<bool, T>
-  is_a(ATerm t)
+  T as(ATerm t)
   {
-    getVisitor<T> v(t);
+    impl::asVisitor<T> v(t);
     return v.res;
   }
 
-  template <typename T>
-  T
-  as(ATerm t)
-  {
-    getVisitor<T> v(t);
-    return v.res.second;
-  }
 }
 
 #endif
