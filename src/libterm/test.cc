@@ -49,7 +49,7 @@ int main()
 
   CHECK(a == c, "Terms are shared.");
   CHECK(!as<APlus>(a), "Bad convertion returns a zero ATerm.");
-  CHECK(as<AInt>(a), "Good convertion returns a non-zero ATerm.");
+  CHECK(as<AInt>(a) == a, "Good convertion returns the same ATerm.");
   CHECK(e.run(Plus::make(a, Plus::make(b, c))) == 4, "Visitors are working.");
   return tests - good;
 }
