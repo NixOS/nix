@@ -60,6 +60,7 @@ void SQLiteStmt::reset()
     assert(stmt);
     if (sqlite3_reset(stmt) != SQLITE_OK)
         throw SQLiteError(db, "resetting statement");
+    curArg = 1;
 }
 
 
@@ -71,6 +72,27 @@ SQLiteStmt::~SQLiteStmt()
     } catch (...) {
         ignoreException();
     }
+}
+
+
+void SQLiteStmt::bind(const string & value)
+{
+    if (sqlite3_bind_text(stmt, curArg++, value.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+        throw SQLiteError(db, "binding argument");
+}
+
+
+void SQLiteStmt::bind(int value)
+{
+    if (sqlite3_bind_int(stmt, curArg++, value) != SQLITE_OK)
+        throw SQLiteError(db, "binding argument");
+}
+
+
+void SQLiteStmt::bind()
+{
+    if (sqlite3_bind_null(stmt, curArg++) != SQLITE_OK)
+        throw SQLiteError(db, "binding argument");
 }
 
 
@@ -264,6 +286,8 @@ void LocalStore::prepareStatements()
         "select path from Refs join ValidPaths on reference = id where referrer = ?;");
     stmtQueryReferrers.create(db,
         "select path from Refs join ValidPaths on referrer = id where reference = (select id from ValidPaths where path = ?);");
+    stmtInvalidatePath.create(db,
+        "delete from ValidPaths where path = ?;");
 }
 
 
@@ -357,20 +381,13 @@ void LocalStore::registerValidPath(const Path & path,
 unsigned long long LocalStore::addValidPath(const ValidPathInfo & info)
 {
     SQLiteStmtUse use(stmtRegisterValidPath);
-    if (sqlite3_bind_text(stmtRegisterValidPath, 1, info.path.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
-        throw SQLiteError(db, "binding argument");
-    string h = "sha256:" + printHash(info.hash);
-    if (sqlite3_bind_text(stmtRegisterValidPath, 2, h.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
-        throw SQLiteError(db, "binding argument");
-    if (sqlite3_bind_int(stmtRegisterValidPath, 3, info.registrationTime) != SQLITE_OK)
-        throw SQLiteError(db, "binding argument");
-    if (info.deriver != "") {
-        if (sqlite3_bind_text(stmtRegisterValidPath, 4, info.deriver.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
-            throw SQLiteError(db, "binding argument");
-    } else {
-        if (sqlite3_bind_null(stmtRegisterValidPath, 4) != SQLITE_OK)
-            throw SQLiteError(db, "binding argument");
-    }
+    stmtRegisterValidPath.bind(info.path);
+    stmtRegisterValidPath.bind("sha256:" + printHash(info.hash));
+    stmtRegisterValidPath.bind(info.registrationTime);
+    if (info.deriver != "")
+        stmtRegisterValidPath.bind(info.deriver);
+    else
+        stmtRegisterValidPath.bind(); // null
     if (sqlite3_step(stmtRegisterValidPath) != SQLITE_DONE)
         throw SQLiteError(db, format("registering valid path `%1%' in database") % info.path);
     return sqlite3_last_insert_rowid(db);
@@ -380,10 +397,8 @@ unsigned long long LocalStore::addValidPath(const ValidPathInfo & info)
 void LocalStore::addReference(unsigned long long referrer, unsigned long long reference)
 {
     SQLiteStmtUse use(stmtAddReference);
-    if (sqlite3_bind_int(stmtAddReference, 1, referrer) != SQLITE_OK)
-        throw SQLiteError(db, "binding argument");
-    if (sqlite3_bind_int(stmtAddReference, 2, reference) != SQLITE_OK)
-        throw SQLiteError(db, "binding argument");
+    stmtAddReference.bind(referrer);
+    stmtAddReference.bind(reference);
     if (sqlite3_step(stmtAddReference) != SQLITE_DONE)
         throw SQLiteError(db, "adding reference to database");
 }
@@ -443,9 +458,8 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
 
     /* Get the path info. */
     SQLiteStmtUse use1(stmtQueryPathInfo);
-    
-    if (sqlite3_bind_text(stmtQueryPathInfo, 1, path.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
-        throw SQLiteError(db, "binding argument");
+
+    stmtQueryPathInfo.bind(path);
     
     int r = sqlite3_step(stmtQueryPathInfo);
     if (r == SQLITE_DONE) throw Error(format("path `%1%' is not valid") % path);
@@ -465,8 +479,7 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
     /* Get the references. */
     SQLiteStmtUse use2(stmtQueryReferences);
 
-    if (sqlite3_bind_int(stmtQueryReferences, 1, info.id) != SQLITE_OK)
-        throw SQLiteError(db, "binding argument");
+    stmtQueryReferences.bind(info.id);
 
     while ((r = sqlite3_step(stmtQueryReferences)) == SQLITE_ROW) {
         s = (const char *) sqlite3_column_text(stmtQueryReferences, 0);
@@ -484,8 +497,7 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
 bool LocalStore::isValidPath(const Path & path)
 {
     SQLiteStmtUse use(stmtQueryPathInfo);
-    if (sqlite3_bind_text(stmtQueryPathInfo, 1, path.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
-        throw SQLiteError(db, "binding argument");
+    stmtQueryPathInfo.bind(path);
     int res = sqlite3_step(stmtQueryPathInfo);
     if (res != SQLITE_DONE && res != SQLITE_ROW)
         throw SQLiteError(db, "querying path in database");
@@ -528,8 +540,7 @@ void LocalStore::queryReferrers(const Path & path, PathSet & referrers)
 
     SQLiteStmtUse use(stmtQueryReferrers);
 
-    if (sqlite3_bind_text(stmtQueryReferrers, 1, path.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
-        throw SQLiteError(db, "binding argument");
+    stmtQueryReferrers.bind(path);
 
     int r;
     while ((r = sqlite3_step(stmtQueryReferrers)) == SQLITE_ROW) {
@@ -699,26 +710,17 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
    there are no referrers. */
 void LocalStore::invalidatePath(const Path & path)
 {
-    throw Error("not implemented");
-#if 0    
     debug(format("invalidating path `%1%'") % path);
+    
+    SQLiteStmtUse use(stmtInvalidatePath);
 
-    ValidPathInfo info;
+    stmtInvalidatePath.bind(path);
 
-    if (pathExists(infoFileFor(path))) {
-        info = queryPathInfo(path);
+    if (sqlite3_step(stmtInvalidatePath) != SQLITE_DONE)
+        throw SQLiteError(db, format("invalidating path `%1%' in database") % path);
 
-        /* Remove the info file. */
-        Path p = infoFileFor(path);
-        if (unlink(p.c_str()) == -1)
-            throw SysError(format("unlinking `%1%'") % p);
-    }
-
-    /* Remove the referrers file for `path'. */
-    Path p = referrersFileFor(path);
-    if (pathExists(p) && unlink(p.c_str()) == -1)
-        throw SysError(format("unlinking `%1%'") % p);
-#endif
+    /* Note that the foreign key constraints on the Refs table take
+       care of deleting the references entries for `path'. */ 
 }
 
 
@@ -1022,19 +1024,11 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFreed,
     unsigned long long & blocksFreed)
 {
-    throw Error("not implemented");
-
-#if 0
     bytesFreed = 0;
 
     assertStorePath(path);
 
     if (isValidPath(path)) {
-        /* Acquire a lock on the referrers file to prevent new
-           referrers to this path from appearing while we're deleting
-           it. */
-        PathLocks referrersLock(singleton<PathSet, Path>(referrersFileFor(path)));
-        referrersLock.setDeletion(true);
         PathSet referrers; queryReferrers(path, referrers);
         referrers.erase(path); /* ignore self-references */
         if (!referrers.empty())
@@ -1044,7 +1038,6 @@ void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFr
     }
 
     deletePathWrapped(path, bytesFreed, blocksFreed);
-#endif
 }
 
 

@@ -61,11 +61,15 @@ struct SQLiteStmt
 {
     sqlite3 * db;
     sqlite3_stmt * stmt;
+    unsigned int curArg;
     SQLiteStmt() { stmt = 0; }
     void create(sqlite3 * db, const string & s);
     void reset();
     ~SQLiteStmt();
     operator sqlite3_stmt * () { return stmt; }
+    void bind(const string & value);
+    void bind(int value);
+    void bind();
 };
     
 
@@ -191,6 +195,7 @@ private:
     SQLiteStmt stmtQueryPathInfo;
     SQLiteStmt stmtQueryReferences;
     SQLiteStmt stmtQueryReferrers;
+    SQLiteStmt stmtInvalidatePath;
 
     int getSchema();
 
