@@ -803,8 +803,6 @@ void LocalStore::invalidatePath(const Path & path)
 {
     debug(format("invalidating path `%1%'") % path);
 
-    SQLiteTxn txn(db);
-    
     SQLiteStmtUse use(stmtInvalidatePath);
 
     stmtInvalidatePath.bind(path);
@@ -814,8 +812,6 @@ void LocalStore::invalidatePath(const Path & path)
 
     /* Note that the foreign key constraints on the Refs table take
        care of deleting the references entries for `path'. */
-
-    txn.commit();
 }
 
 
