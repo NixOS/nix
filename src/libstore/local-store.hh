@@ -198,6 +198,7 @@ private:
     SQLiteStmt stmtInvalidatePath;
     SQLiteStmt stmtRegisterFailedPath;
     SQLiteStmt stmtHasPathFailed;
+    SQLiteStmt stmtAddDerivationOutput;
 
     int getSchema();
 

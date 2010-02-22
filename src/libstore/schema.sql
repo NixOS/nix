@@ -17,6 +17,16 @@ create table if not exists Refs (
 create index if not exists IndexReferrer on Refs(referrer);
 create index if not exists IndexReference on Refs(reference);
 
+create table if not exists DerivationOutputs (
+    drv  integer not null,
+    id   text not null, -- symbolic output id, usually "out"
+    path text not null,
+    primary key (drv, id),
+    foreign key (drv) references ValidPaths(id) on delete cascade
+);
+
+create index if not exists IndexDerivationOutputs on DerivationOutputs(path);
+
 create table if not exists FailedPaths (
     path text primary key not null,
     time integer not null

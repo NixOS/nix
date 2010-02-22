@@ -3,9 +3,9 @@
 #include "globals.hh"
 #include "archive.hh"
 #include "pathlocks.hh"
-#include "aterm.hh"
 #include "derivations-ast.hh"
 #include "worker-protocol.hh"
+#include "derivations.hh"
     
 #include <iostream>
 #include <algorithm>
@@ -295,6 +295,8 @@ void LocalStore::prepareStatements()
         "insert into FailedPaths (path, time) values (?, ?);");
     stmtHasPathFailed.create(db,
         "select time from FailedPaths where path = ?;");
+    stmtAddDerivationOutput.create(db,
+        "insert or replace into DerivationOutputs (drv, id, path) values (?, ?, ?);");
 }
 
 
@@ -397,7 +399,27 @@ unsigned long long LocalStore::addValidPath(const ValidPathInfo & info)
         stmtRegisterValidPath.bind(); // null
     if (sqlite3_step(stmtRegisterValidPath) != SQLITE_DONE)
         throw SQLiteError(db, format("registering valid path `%1%' in database") % info.path);
-    return sqlite3_last_insert_rowid(db);
+    unsigned long long id = sqlite3_last_insert_rowid(db);
+
+    /* If this is a derivation, then store the derivation outputs in
+       the database.  This is useful for the garbage collector: it can
+       efficiently query whether a path is an output of some
+       derivation. */
+    if (isDerivation(info.path)) {
+        ATerm t = ATreadFromNamedFile(info.path.c_str());
+        if (!t) throw Error(format("cannot read derivation `%1%'") % info.path);
+        Derivation drv = parseDerivation(t);
+        foreach (DerivationOutputs::iterator, i, drv.outputs) {
+            SQLiteStmtUse use(stmtAddDerivationOutput);
+            stmtAddDerivationOutput.bind(id);
+            stmtAddDerivationOutput.bind(i->first);
+            stmtAddDerivationOutput.bind(i->second.path);
+            if (sqlite3_step(stmtAddDerivationOutput) != SQLITE_DONE)
+                throw SQLiteError(db, format("adding derivation output for `%1%' in database") % info.path);
+        }
+    }
+
+    return id;
 }
 
 
