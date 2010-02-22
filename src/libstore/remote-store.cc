@@ -294,6 +294,12 @@ Path RemoteStore::queryDeriver(const Path & path)
 }
 
 
+PathSet RemoteStore::queryDerivationOutputs(const Path & path)
+{
+    throw Error("not yet implemented");
+}
+
+
 Path RemoteStore::addToStore(const Path & _srcPath,
     bool recursive, HashType hashAlgo, PathFilter & filter)
 {

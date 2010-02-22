@@ -37,6 +37,8 @@ public:
 
     Path queryDeriver(const Path & path);
     
+    PathSet queryDerivationOutputs(const Path & path);
+    
     bool hasSubstitutes(const Path & path);
     
     bool querySubstitutablePathInfo(const Path & path,

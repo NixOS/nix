@@ -31,10 +31,10 @@ void computeFSClosure(const Path & storePath,
         store->queryReferences(storePath, references);
 
     if (includeOutputs && isDerivation(storePath)) {
-        Derivation drv = derivationFromPath(storePath);
-        foreach (DerivationOutputs::iterator, i, drv.outputs)
-            if (store->isValidPath(i->second.path))
-                computeFSClosure(i->second.path, paths, flipDirection, true);
+        PathSet outputs = store->queryDerivationOutputs(storePath);
+        foreach (PathSet::iterator, i, outputs)
+            if (store->isValidPath(*i))
+                computeFSClosure(*i, paths, flipDirection, true);
     }
 
     foreach (PathSet::iterator, i, references)

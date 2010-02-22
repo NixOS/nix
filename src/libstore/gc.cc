@@ -467,10 +467,10 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
            then don't delete the derivation if any of the outputs are
            live. */
         if (state.gcKeepDerivations && isDerivation(path)) {
-            Derivation drv = derivationFromPath(path);
-            foreach (DerivationOutputs::iterator, i, drv.outputs)
-                if (!tryToDelete(state, i->second.path)) {
-                    printMsg(lvlDebug, format("cannot delete derivation `%1%' because its output is alive") % path);
+            PathSet outputs = queryDerivationOutputs(path);
+            foreach (PathSet::iterator, i, outputs)
+                if (!tryToDelete(state, *i)) {
+                    printMsg(lvlDebug, format("cannot delete derivation `%1%' because its output `%2%' is alive") % path % *i);
                     goto isLive;
                 }
         }

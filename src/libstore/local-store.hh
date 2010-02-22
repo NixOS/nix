@@ -109,6 +109,8 @@ public:
        derivation that was actually used to produce `path', which may
        not exist anymore.) */
     PathSet queryValidDerivers(const Path & path);
+
+    PathSet queryDerivationOutputs(const Path & path);
     
     PathSet querySubstitutablePaths();
     
@@ -206,6 +208,7 @@ private:
     SQLiteStmt stmtHasPathFailed;
     SQLiteStmt stmtAddDerivationOutput;
     SQLiteStmt stmtQueryValidDerivers;
+    SQLiteStmt stmtQueryDerivationOutputs;
 
     int getSchema();
 

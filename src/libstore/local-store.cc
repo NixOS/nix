@@ -299,6 +299,8 @@ void LocalStore::prepareStatements()
         "insert or replace into DerivationOutputs (drv, id, path) values (?, ?, ?);");
     stmtQueryValidDerivers.create(db,
         "select v.id, v.path from DerivationOutputs d join ValidPaths v on d.drv = v.id where d.path = ?;");
+    stmtQueryDerivationOutputs.create(db,
+        "select id, path from DerivationOutputs where drv = ?;");
 }
 
 
@@ -620,6 +622,28 @@ PathSet LocalStore::queryValidDerivers(const Path & path)
         throw SQLiteError(db, format("error getting valid derivers of `%1%'") % path);
     
     return derivers;
+}
+
+
+PathSet LocalStore::queryDerivationOutputs(const Path & path)
+{
+    SQLiteTxn txn(db);
+    
+    SQLiteStmtUse use(stmtQueryDerivationOutputs);
+    stmtQueryDerivationOutputs.bind(queryPathInfo(path).id);
+    
+    PathSet outputs;
+    int r;
+    while ((r = sqlite3_step(stmtQueryDerivationOutputs)) == SQLITE_ROW) {
+        const char * s = (const char *) sqlite3_column_text(stmtQueryDerivationOutputs, 1);
+        assert(s);
+        outputs.insert(s);
+    }
+    
+    if (r != SQLITE_DONE)
+        throw SQLiteError(db, format("error getting outputs of `%1%'") % path);
+
+    return outputs;
 }
 
 
