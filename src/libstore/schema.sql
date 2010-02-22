@@ -17,6 +17,16 @@ create table if not exists Refs (
 create index if not exists IndexReferrer on Refs(referrer);
 create index if not exists IndexReference on Refs(reference);
 
+-- Paths can refer to themselves, causing a tuple (N, N) in the Refs
+-- table.  This causes a deletion of the corresponding row in
+-- ValidPaths to cause a foreign key constraint violation (due to `on
+-- delete restrict' on the `reference' column).  Therefore, explicitly
+-- get rid of self-references.
+create trigger DeleteSelfRefs before delete on ValidPaths
+  begin
+    delete from Refs where referrer = old.id and reference = old.id;
+  end;
+
 create table if not exists DerivationOutputs (
     drv  integer not null,
     id   text not null, -- symbolic output id, usually "out"

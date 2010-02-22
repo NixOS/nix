@@ -109,7 +109,11 @@ struct SQLiteStmtUse
     }
     ~SQLiteStmtUse()
     {
-        stmt.reset();
+        try {
+            stmt.reset();
+        } catch (...) {
+            ignoreException();
+        }
     }
 };
 
@@ -798,6 +802,8 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 void LocalStore::invalidatePath(const Path & path)
 {
     debug(format("invalidating path `%1%'") % path);
+
+    SQLiteTxn txn(db);
     
     SQLiteStmtUse use(stmtInvalidatePath);
 
@@ -807,7 +813,9 @@ void LocalStore::invalidatePath(const Path & path)
         throw SQLiteError(db, format("invalidating path `%1%' in database") % path);
 
     /* Note that the foreign key constraints on the Refs table take
-       care of deleting the references entries for `path'. */ 
+       care of deleting the references entries for `path'. */
+
+    txn.commit();
 }
 
 
