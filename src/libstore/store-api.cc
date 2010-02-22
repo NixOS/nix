@@ -1,7 +1,6 @@
 #include "store-api.hh"
 #include "globals.hh"
 #include "util.hh"
-#include "derivations.hh"
 
 #include <limits.h>
 
@@ -50,18 +49,6 @@ Path toStorePath(const Path & path)
         return path;
     else
         return Path(path, 0, slash);
-}
-
-
-string getNameOfStorePath(const Path & path)
-{
-    Path::size_type slash = path.rfind('/');
-    string p = slash == Path::npos ? path : string(path, slash + 1);
-    Path::size_type dash = p.find('-');
-    assert(dash != Path::npos);
-    string p2 = string(p, dash + 1);
-    if (isDerivation(p2)) p2 = string(p2, 0, p2.size() - 4);
-    return p2;
 }
 
 

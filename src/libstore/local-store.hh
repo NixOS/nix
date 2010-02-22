@@ -103,6 +103,12 @@ public:
     void queryReferrers(const Path & path, PathSet & referrers);
 
     Path queryDeriver(const Path & path);
+
+    /* Return all currently valid derivations that have `path' as an
+       output.  (Note that the result of `queryDeriver()' is the
+       derivation that was actually used to produce `path', which may
+       not exist anymore.) */
+    PathSet queryValidDerivers(const Path & path);
     
     PathSet querySubstitutablePaths();
     
@@ -199,6 +205,7 @@ private:
     SQLiteStmt stmtRegisterFailedPath;
     SQLiteStmt stmtHasPathFailed;
     SQLiteStmt stmtAddDerivationOutput;
+    SQLiteStmt stmtQueryValidDerivers;
 
     int getSchema();
 
@@ -227,8 +234,6 @@ private:
     struct GCState;
 
     bool tryToDelete(GCState & state, const Path & path);
-    
-    PathSet findDerivers(GCState & state, const Path & path);
     
     bool isActiveTempFile(const GCState & state,
         const Path & path, const string & suffix);
