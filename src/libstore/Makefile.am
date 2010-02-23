@@ -15,7 +15,7 @@ libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la \
 
 BUILT_SOURCES = derivations-ast.cc derivations-ast.hh
 
-EXTRA_DIST = derivations-ast.def derivations-ast.cc
+EXTRA_DIST = derivations-ast.def derivations-ast.cc schema.sql
 
 AM_CXXFLAGS = -Wall \
  -I$(srcdir)/.. ${aterm_include} ${sqlite_include} -I$(srcdir)/../libutil
