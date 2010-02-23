@@ -25,6 +25,7 @@ build-aterm: have-aterm
 	CC="$(CC)" ./configure --prefix=$$pfx/inst-aterm \
 	  --disable-shared --enable-static && \
 	$(MAKE) && \
+	$(MAKE) check && \
 	$(MAKE) install)
 	touch build-aterm
 endif
