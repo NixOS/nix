@@ -77,34 +77,11 @@ let
 
         configureFlags = ''
           --disable-init-state
-          --with-aterm=${aterm} --with-bzip2=${bzip2}
+          --with-aterm=${aterm} --with-bzip2=${bzip2} --with-sqlite=${sqlite}
         '';
       };
 
 
-    /*
-    static =
-      { tarball ? jobs.tarball {}
-      , system ? "i686-linux"
-      }:
-
-      with import nixpkgs {inherit system;};
-
-      releaseTools.binaryTarball {
-        name = "nix-static-tarball";
-        src = tarball;
-
-        buildInputs = [curl perl bzip2];
-
-        configureFlags = ''
-          --disable-init-state
-          --with-aterm=${aterm} --with-bzip2=${bzip2}
-          --enable-static-nix
-        '';
-      };
-    */
-
-      
     coverage =
       { tarball ? jobs.tarball {}
       }:
@@ -123,7 +100,7 @@ let
 
         configureFlags = ''
           --disable-init-state --disable-shared
-          --with-aterm=${aterm} --with-bzip2=${bzip2}
+          --with-aterm=${aterm} --with-bzip2=${bzip2} --with-sqlite=${sqlite}
         '';
 
         lcovFilter = ["*/boost/*" "*-tab.*"];
