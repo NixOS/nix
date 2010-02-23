@@ -245,11 +245,25 @@ AC_SUBST(bzip2_include)
 AC_SUBST(bzip2_bin)
 AC_SUBST(bzip2_bin_test)
 
+AC_ARG_WITH(sqlite, AC_HELP_STRING([--with-sqlite=PATH],
+  [prefix of SQLite]),
+  sqlite=$withval, sqlite=)
+AM_CONDITIONAL(HAVE_SQLITE, test -n "$sqlite")
+if test -z "$sqlite"; then
+  sqlite_lib='-L${top_builddir}/externals/inst-sqlite/lib -lsqlite3'
+  sqlite_include='-I${top_builddir}/externals/inst-sqlite/include'
+  sqlite_bin='${top_builddir}/externals/inst-sqlite/bin'
+else
+  sqlite_lib="-L$sqlite/lib -lsqlite3"
+  sqlite_include="-I$sqlite/include"
+  sqlite_bin="$sqlite/bin"
+fi
+AC_SUBST(sqlite_lib)
+AC_SUBST(sqlite_include)
+AC_SUBST(sqlite_bin)
+
 
 AC_CHECK_LIB(pthread, pthread_mutex_init)
-
-
-LDFLAGS="-lsqlite3"
 
 
 AC_ARG_ENABLE(init-state, AC_HELP_STRING([--disable-init-state],
