@@ -7,7 +7,8 @@
   TRM_GRAMMAR_NODE_BINOP(Final, Plus)                           \
   Final(Int, Expr, (1, (TRM_TYPE_COPY(int, value))), (0, ()))
 
-#include "term.hh"
+#include "term_impl.hh"
+#include "visitor_impl.hh"
 #undef TRM_GRAMMAR_NODES
 
 using namespace term;
@@ -16,12 +17,12 @@ struct Eval : public ATermVisitor
 {
   int run(const ATerm t)
   {
-    return as<AInt>(t.accept(*this))().value;
+    return as<AInt>(t.accept(*this))->value;
   }
 
   ATerm visit(const APlus p)
   {
-    return Int::make(run(p().lhs) + run(p().rhs));
+    return Int::make(run(p->lhs) + run(p->rhs));
   }
 };
 
