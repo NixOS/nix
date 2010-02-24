@@ -173,7 +173,10 @@ LocalStore::LocalStore()
     
     schemaPath = nixDBPath + "/schema";
     
-    if (readOnlyMode) return;
+    if (readOnlyMode) {
+        openDB(false);
+        return;
+    }
 
     /* Create missing state directories if they don't already exist. */
     createDirs(nixStore);
@@ -197,6 +200,7 @@ LocalStore::LocalStore()
     } catch (SysError & e) {
         if (e.errNo != EACCES) throw;
         readOnlyMode = true;
+        openDB(false);
         return;
     }
     
