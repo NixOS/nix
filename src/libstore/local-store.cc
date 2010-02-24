@@ -219,6 +219,10 @@ LocalStore::LocalStore()
     /* !!! check whether sqlite has been built with foreign key
        support */
     
+    /* "Normal" synchronous mode should be safe enough. */
+    if (sqlite3_exec(db, "pragma synchronous = normal;", 0, 0, 0) != SQLITE_OK)
+        throw SQLiteError(db, "changing synchronous mode to normal");
+
     /* Check the current database schema and if necessary do an
        upgrade.  !!! Race condition: several processes could start
        the upgrade at the same time. */
