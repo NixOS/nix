@@ -205,52 +205,43 @@ LocalStore::LocalStore()
         lockFile(globalLock, ltRead, true);
     }
 
-    /* Open the Nix database. */
-    if (sqlite3_open_v2((nixDBPath + "/db.sqlite").c_str(), &db.db,
-            SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, 0) != SQLITE_OK)
-        throw Error("cannot open SQLite database");
-
-    if (sqlite3_busy_timeout(db, 60000) != SQLITE_OK)
-        throw SQLiteError(db, "setting timeout");
-
-    if (sqlite3_exec(db, "pragma foreign_keys = 1;", 0, 0, 0) != SQLITE_OK)
-        throw SQLiteError(db, "enabling foreign keys");
-
-    /* !!! check whether sqlite has been built with foreign key
-       support */
-    
-    /* Whether SQLite should fsync().  "Normal" synchronous mode
-       should be safe enough.  If the user asks for it, don't sync at
-       all.  This can cause database corruption if the system
-       crashes. */
-    string syncMode = queryBoolSetting("fsync-metadata", true) ? "normal" : "off";
-    if (sqlite3_exec(db, ("pragma synchronous = " + syncMode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
-        throw SQLiteError(db, "setting synchronous mode");
-
-    /* Use `truncate' journal mode, which should be a bit faster. */
-    if (sqlite3_exec(db, "pragma main.journal_mode = truncate;", 0, 0, 0) != SQLITE_OK)
-        throw SQLiteError(db, "setting journal mode");
-
     /* Check the current database schema and if necessary do an
-       upgrade.  !!! Race condition: several processes could start
-       the upgrade at the same time. */
+       upgrade.  */
     int curSchema = getSchema();
     if (curSchema > nixSchemaVersion)
         throw Error(format("current Nix store schema is version %1%, but I only support %2%")
             % curSchema % nixSchemaVersion);
-    if (curSchema == 0) { /* new store */
+    
+    else if (curSchema == 0) { /* new store */
         curSchema = nixSchemaVersion;
-        initSchema();
+        openDB(true);
         writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
     }
-    else if (curSchema == 1) throw Error("your Nix store is no longer supported");
-    else if (curSchema < 5)
-        throw Error(
-            "Your Nix store has a database in Berkeley DB format,\n"
-            "which is no longer supported. To convert to the new format,\n"
-            "please upgrade Nix to version 0.12 first.");
-    else if (curSchema < 6) upgradeStore6();
-    else prepareStatements();
+    
+    else if (curSchema < nixSchemaVersion) {
+        if (curSchema < 5)
+            throw Error(
+                "Your Nix store has a database in Berkeley DB format,\n"
+                "which is no longer supported. To convert to the new format,\n"
+                "please upgrade Nix to version 0.12 first.");
+        
+        if (!lockFile(globalLock, ltWrite, false)) {
+            printMsg(lvlError, "waiting for exclusive access to the Nix store...");
+            lockFile(globalLock, ltWrite, true);
+        }
+
+        /* Get the schema version again, because another process may
+           have performed the upgrade already. */
+        curSchema = getSchema();
+
+        if (curSchema < 6) upgradeStore6();
+
+        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
+
+        lockFile(globalLock, ltRead, true);
+    }
+    
+    else openDB(false);
 }
 
 
@@ -280,19 +271,42 @@ int LocalStore::getSchema()
 }
 
 
-void LocalStore::initSchema()
+void LocalStore::openDB(bool create)
 {
+    /* Open the Nix database. */
+    if (sqlite3_open_v2((nixDBPath + "/db.sqlite").c_str(), &db.db,
+            SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), 0) != SQLITE_OK)
+        throw Error("cannot open SQLite database");
+
+    if (sqlite3_busy_timeout(db, 60000) != SQLITE_OK)
+        throw SQLiteError(db, "setting timeout");
+
+    if (sqlite3_exec(db, "pragma foreign_keys = 1;", 0, 0, 0) != SQLITE_OK)
+        throw SQLiteError(db, "enabling foreign keys");
+
+    /* !!! check whether sqlite has been built with foreign key
+       support */
+    
+    /* Whether SQLite should fsync().  "Normal" synchronous mode
+       should be safe enough.  If the user asks for it, don't sync at
+       all.  This can cause database corruption if the system
+       crashes. */
+    string syncMode = queryBoolSetting("fsync-metadata", true) ? "normal" : "off";
+    if (sqlite3_exec(db, ("pragma synchronous = " + syncMode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
+        throw SQLiteError(db, "setting synchronous mode");
+
+    /* Use `truncate' journal mode, which should be a bit faster. */
+    if (sqlite3_exec(db, "pragma main.journal_mode = truncate;", 0, 0, 0) != SQLITE_OK)
+        throw SQLiteError(db, "setting journal mode");
+
+    /* Initialise the database schema, if necessary. */
+    if (create) {
 #include "schema.sql.hh"
+        if (sqlite3_exec(db, (const char *) schema, 0, 0, 0) != SQLITE_OK)
+            throw SQLiteError(db, "initialising database schema");
+    }
 
-    if (sqlite3_exec(db, (const char *) schema, 0, 0, 0) != SQLITE_OK)
-        throw SQLiteError(db, "initialising database schema");
-
-    prepareStatements();
-}
-
-
-void LocalStore::prepareStatements()
-{
+    /* Prepare SQL statements. */
     stmtRegisterValidPath.create(db,
         "insert or replace into ValidPaths (path, hash, registrationTime, deriver) values (?, ?, ?, ?);");
     stmtAddReference.create(db,
@@ -1225,14 +1239,9 @@ ValidPathInfo LocalStore::queryPathInfoOld(const Path & path)
 /* Upgrade from schema 5 (Nix 0.12) to schema 6 (Nix >= 0.15). */
 void LocalStore::upgradeStore6()
 {
-    if (!lockFile(globalLock, ltWrite, false)) {
-        printMsg(lvlError, "waiting for exclusive access to the Nix store...");
-        lockFile(globalLock, ltWrite, true);
-    }
-
     printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
 
-    initSchema();
+    openDB(true);
 
     PathSet validPaths = queryValidPathsOld();
 
@@ -1256,10 +1265,6 @@ void LocalStore::upgradeStore6()
     std::cerr << "\n";
 
     txn.commit();
-
-    writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
-
-    lockFile(globalLock, ltRead, true);
 }
 
 

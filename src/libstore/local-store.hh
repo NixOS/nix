@@ -209,9 +209,7 @@ private:
 
     int getSchema();
 
-    void initSchema();
-
-    void prepareStatements();
+    void openDB(bool create);
 
     unsigned long long queryValidPathId(const Path & path);
 
