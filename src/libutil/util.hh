@@ -12,10 +12,6 @@
 
 #include <cstdio>
 
-#ifndef HAVE_FDATASYNC
-#define fdatasync fsync
-#endif
-
 
 namespace nix {
 
@@ -66,7 +62,7 @@ string readFile(int fd);
 string readFile(const Path & path);
 
 /* Write a string to a file. */
-void writeFile(const Path & path, const string & s, bool doFsync = false);
+void writeFile(const Path & path, const string & s);
 
 /* Read a line from a file descriptor. */
 string readLine(int fd);
