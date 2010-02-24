@@ -765,39 +765,19 @@ Hash LocalStore::queryPathHash(const Path & path)
 }
 
 
-static void dfsVisit(std::map<Path, ValidPathInfo> & infos,
-    const Path & path, PathSet & visited, Paths & sorted)
-{
-    if (visited.find(path) != visited.end()) return;
-    visited.insert(path);
-
-    ValidPathInfo & info(infos[path]);
-    
-    foreach (PathSet::iterator, i, info.references)
-        if (infos.find(*i) != infos.end())
-            dfsVisit(infos, *i, visited, sorted);
-
-    sorted.push_back(path);
-}
-
-
 void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 {
-    std::map<Path, ValidPathInfo> infosMap;
+    SQLiteTxn txn(db);
     
-    /* Sort the paths topologically under the references relation, so
-       that if path A is referenced by B, then A is registered before
-       B. */
-    foreach (ValidPathInfos::const_iterator, i, infos)
-        infosMap[i->path] = *i;
+    foreach (ValidPathInfos::const_iterator, i, infos) addValidPath(*i);
 
-    PathSet visited;
-    Paths sorted;
-    foreach (ValidPathInfos::const_iterator, i, infos)
-        dfsVisit(infosMap, i->path, visited, sorted);
+    foreach (ValidPathInfos::const_iterator, i, infos) {
+        unsigned long long referrer = queryPathInfo(i->path).id;
+        foreach (PathSet::iterator, j, i->references)
+            addReference(referrer, queryPathInfo(*j).id);
+    }
 
-    foreach (Paths::iterator, i, sorted)
-        registerValidPath(infosMap[*i]);
+    txn.commit();
 }
 
 
