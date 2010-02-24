@@ -40,6 +40,7 @@ cat > "$NIX_CONF_DIR"/nix.conf <<EOF
 gc-keep-outputs = false
 gc-keep-derivations = false
 env-keep-derivations = false
+fsync-metadata = false
 EOF
 
 mkdir $NIX_DATA_DIR/nix

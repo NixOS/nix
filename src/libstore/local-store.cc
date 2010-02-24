@@ -219,9 +219,13 @@ LocalStore::LocalStore()
     /* !!! check whether sqlite has been built with foreign key
        support */
     
-    /* "Normal" synchronous mode should be safe enough. */
-    if (sqlite3_exec(db, "pragma synchronous = normal;", 0, 0, 0) != SQLITE_OK)
-        throw SQLiteError(db, "changing synchronous mode to normal");
+    /* Whether SQLite should fsync().  "Normal" synchronous mode
+       should be safe enough.  If the user asks for it, don't sync at
+       all.  This can cause database corruption if the system
+       crashes. */
+    string syncMode = queryBoolSetting("fsync-metadata", true) ? "normal" : "off";
+    if (sqlite3_exec(db, ("pragma synchronous = " + syncMode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
+        throw SQLiteError(db, "setting synchronous mode");
 
     /* Check the current database schema and if necessary do an
        upgrade.  !!! Race condition: several processes could start
@@ -243,8 +247,6 @@ LocalStore::LocalStore()
             "please upgrade Nix to version 0.12 first.");
     else if (curSchema < 6) upgradeStore6();
     else prepareStatements();
-
-    doFsync = queryBoolSetting("fsync-metadata", false);
 }
 
 

@@ -241,7 +241,7 @@ build-use-chroot = /dev /proc /bin</programlisting>
     Nix store metadata (in <filename>/nix/var/nix/db</filename>) are
     synchronously flushed to disk.  This improves robustness in case
     of system crashes, but reduces performance.  The default is
-    <literal>false</literal>.</para></listitem>
+    <literal>true</literal>.</para></listitem>
 
   </varlistentry>
     

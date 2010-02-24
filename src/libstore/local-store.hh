@@ -191,9 +191,6 @@ private:
     /* Lock file used for upgrading. */
     AutoCloseFD globalLock;
 
-    /* Whether to do an fsync() after writing Nix metadata. */
-    bool doFsync;
-
     /* The SQLite database object. */
     SQLite db;
 
