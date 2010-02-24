@@ -461,10 +461,8 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
     
     unsigned long long id = addValidPath(info2);
 
-    foreach (PathSet::const_iterator, i, info2.references) {
-        ValidPathInfo ref = queryPathInfo(*i);
-        addReference(id, ref.id);
-    }
+    foreach (PathSet::const_iterator, i, info2.references)
+        addReference(id, queryValidPathId(*i));
         
     txn.commit();
 }
@@ -548,6 +546,17 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
         throw SQLiteError(db, format("error getting references of `%1%'") % path);
 
     return info;
+}
+
+
+unsigned long long LocalStore::queryValidPathId(const Path & path)
+{
+    SQLiteStmtUse use(stmtQueryPathInfo);
+    stmtQueryPathInfo.bind(path);
+    int res = sqlite3_step(stmtQueryPathInfo);
+    if (res == SQLITE_ROW) return sqlite3_column_int(stmtQueryPathInfo, 0);
+    if (res == SQLITE_DONE) throw Error(format("path `%1%' is not valid") % path);
+    throw SQLiteError(db, "querying path in database");
 }
 
 
@@ -644,7 +653,7 @@ PathSet LocalStore::queryDerivationOutputs(const Path & path)
     SQLiteTxn txn(db);
     
     SQLiteStmtUse use(stmtQueryDerivationOutputs);
-    stmtQueryDerivationOutputs.bind(queryPathInfo(path).id);
+    stmtQueryDerivationOutputs.bind(queryValidPathId(path));
     
     PathSet outputs;
     int r;
@@ -778,9 +787,9 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
     foreach (ValidPathInfos::const_iterator, i, infos) addValidPath(*i);
 
     foreach (ValidPathInfos::const_iterator, i, infos) {
-        unsigned long long referrer = queryPathInfo(i->path).id;
+        unsigned long long referrer = queryValidPathId(i->path);
         foreach (PathSet::iterator, j, i->references)
-            addReference(referrer, queryPathInfo(*j).id);
+            addReference(referrer, queryValidPathId(*j));
     }
 
     txn.commit();
@@ -1229,11 +1238,8 @@ void LocalStore::upgradeStore6()
 
     SQLiteTxn txn(db);
     
-    std::map<Path, sqlite3_int64> pathToId;
-    
     foreach (PathSet::iterator, i, validPaths) {
-        ValidPathInfo info = queryPathInfoOld(*i);
-        pathToId[*i] = addValidPath(info);
+        addValidPath(queryPathInfoOld(*i));
         std::cerr << ".";
     }
 
@@ -1241,11 +1247,9 @@ void LocalStore::upgradeStore6()
     
     foreach (PathSet::iterator, i, validPaths) {
         ValidPathInfo info = queryPathInfoOld(*i);
-        foreach (PathSet::iterator, j, info.references) {
-            if (pathToId.find(*j) == pathToId.end())
-                throw Error(format("path `%1%' referenced by `%2%' is invalid") % *j % *i);
-            addReference(pathToId[*i], pathToId[*j]);
-        }
+        unsigned long long referrer = queryValidPathId(*i);
+        foreach (PathSet::iterator, j, info.references)
+            addReference(referrer, queryValidPathId(*j));
         std::cerr << ".";
     }
 

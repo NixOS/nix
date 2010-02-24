@@ -213,6 +213,8 @@ private:
 
     void prepareStatements();
 
+    unsigned long long queryValidPathId(const Path & path);
+
     unsigned long long addValidPath(const ValidPathInfo & info);
         
     void addReference(unsigned long long referrer, unsigned long long reference);
