@@ -227,6 +227,10 @@ LocalStore::LocalStore()
     if (sqlite3_exec(db, ("pragma synchronous = " + syncMode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
         throw SQLiteError(db, "setting synchronous mode");
 
+    /* Use `truncate' journal mode, which should be a bit faster. */
+    if (sqlite3_exec(db, "pragma main.journal_mode = truncate;", 0, 0, 0) != SQLITE_OK)
+        throw SQLiteError(db, "setting journal mode");
+
     /* Check the current database schema and if necessary do an
        upgrade.  !!! Race condition: several processes could start
        the upgrade at the same time. */
