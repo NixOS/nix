@@ -79,8 +79,7 @@ fi
 # Solaris-specific stuff.
 if test "$sys_name" = "sunos"; then
     # Solaris requires -lsocket -lnsl for network functions
-    ADDITIONAL_NETWORK_LIBS="-lsocket -lnsl"
-    AC_SUBST(ADDITIONAL_NETWORK_LIBS)
+    LIBS="-lsocket -lnsl $LIBS"
 fi
 
 AC_PROG_CC
