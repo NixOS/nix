@@ -1,8 +1,5 @@
 source common.sh
 
-# This takes way to long on Cygwin (because process creation is so slow...).
-if test "$system" = i686-cygwin; then exit 0; fi
-
 clearStore
 
 max=2500
@@ -15,12 +12,12 @@ echo "making registration..."
 
 for ((n = 0; n < $max; n++)); do
     storePath=$NIX_STORE_DIR/$n
-    touch $storePath
+    echo -n > $storePath
     ref2=$NIX_STORE_DIR/$((n+1))
     if test $((n+1)) = $max; then
         ref2=$reference
     fi
-    (echo $storePath && echo && echo 2 && echo $reference && echo $ref2)
+    echo $storePath; echo; echo 2; echo $reference; echo $ref2
 done > $TEST_ROOT/reg_info
 
 echo "registering..."
