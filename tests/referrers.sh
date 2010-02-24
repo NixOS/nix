@@ -2,7 +2,7 @@ source common.sh
 
 clearStore
 
-max=2500
+max=500
 
 reference=$NIX_STORE_DIR/abcdef
 touch $reference
@@ -22,11 +22,11 @@ done > $TEST_ROOT/reg_info
 
 echo "registering..."
 
-time $nixstore --register-validity < $TEST_ROOT/reg_info
+$nixstore --register-validity < $TEST_ROOT/reg_info
 
 echo "collecting garbage..."
 ln -sfn $reference "$NIX_STATE_DIR"/gcroots/ref
-time $nixstore --gc
+$nixstore --gc
 
 if test "$(sqlite3 ./test-tmp/db/db.sqlite 'select count(*) from Refs')" -ne 0; then
     echo "referrers not cleaned up"
