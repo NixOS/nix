@@ -1,8 +1,6 @@
 #ifndef __UTIL_H
 #define __UTIL_H
 
-#include "config.h"
-
 #include "types.hh"
 
 #include <sys/types.h>
@@ -11,10 +9,6 @@
 #include <signal.h>
 
 #include <cstdio>
-
-#ifndef HAVE_FDATASYNC
-#define fdatasync fsync
-#endif
 
 
 namespace nix {

@@ -233,7 +233,7 @@ void writeFile(const Path & path, const string & s, bool doFsync)
     if (fd == -1)
         throw SysError(format("opening file `%1%'") % path);
     writeFull(fd, (unsigned char *) s.c_str(), s.size());
-    if (doFsync) fdatasync(fd);
+    if (doFsync) fsync(fd);
 }
 
 

@@ -240,7 +240,7 @@ void LocalStore::appendReferrer(const Path & from, const Path & to, bool lock)
     string s = " " + to;
     writeFull(fd, (const unsigned char *) s.c_str(), s.size());
 
-    if (doFsync) fdatasync(fd);
+    if (doFsync) fsync(fd);
 }
 
 
@@ -271,7 +271,7 @@ void LocalStore::rewriteReferrers(const Path & path, bool purge, PathSet referre
     
     writeFull(fd, (const unsigned char *) s.c_str(), s.size());
 
-    if (doFsync) fdatasync(fd);
+    if (doFsync) fsync(fd);
     
     fd.close(); /* for Windows; can't rename open file */
 
