@@ -21,7 +21,7 @@ typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
 void printHelp()
 {
-    cout << string((char *) helpText, sizeof helpText);
+    cout << string((char *) helpText);
 }
 
 

@@ -10,7 +10,7 @@ using namespace nix;
 
 void printHelp()
 {
-    std::cout << string((char *) helpText, sizeof helpText);
+    std::cout << string((char *) helpText);
 }
 
 
