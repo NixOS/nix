@@ -11,7 +11,7 @@ pkginclude_HEADERS = \
   worker-protocol.hh
 
 libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la \
-  ${sqlite_lib} @ADDITIONAL_NETWORK_LIBS@
+  @ADDITIONAL_NETWORK_LIBS@
 
 BUILT_SOURCES = derivations-ast.cc derivations-ast.hh
 

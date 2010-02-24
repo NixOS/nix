@@ -2,7 +2,7 @@ bin_PROGRAMS = nix-worker
 
 nix_worker_SOURCES = nix-worker.cc help.txt
 nix_worker_LDADD = ../libmain/libmain.la ../libstore/libstore.la ../libutil/libutil.la \
- ../boost/format/libformat.la ${aterm_lib} @ADDITIONAL_NETWORK_LIBS@
+ ../boost/format/libformat.la ${aterm_lib} ${sqlite_lib} @ADDITIONAL_NETWORK_LIBS@
 
 nix-worker.o: help.txt.hh
 
