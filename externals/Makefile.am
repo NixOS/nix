@@ -14,14 +14,10 @@ $(ATERM): $(ATERM).tar.gz
 	patch -d $(ATERM) -p1 < ./max-long.patch
 	patch -d $(ATERM) -p1 < ./sizeof.patch
 
-have-aterm:
-	$(MAKE) $(ATERM)
-	touch have-aterm
-
 if HAVE_ATERM
 build-aterm:
 else
-build-aterm: have-aterm
+build-aterm: $(ATERM)
 	(pfx=`pwd` && \
 	cd $(ATERM) && \
 	CC="$(CC)" ./configure --prefix=$$pfx/inst-aterm \
@@ -47,14 +43,10 @@ $(BZIP2).tar.gz:
 $(BZIP2): $(BZIP2).tar.gz
 	gunzip < $(srcdir)/$(BZIP2).tar.gz | tar xvf -
 
-have-bzip2:
-	$(MAKE) $(BZIP2)
-	touch have-bzip2
-
 if HAVE_BZIP2
 build-bzip2:
 else
-build-bzip2: have-bzip2
+build-bzip2: $(BZIP2)
 	(pfx=`pwd` && \
 	cd $(BZIP2) && \
 	$(MAKE) && \
@@ -67,10 +59,42 @@ install:
 endif
 
 
-all: build-aterm build-bzip2
+# SQLite
 
-EXTRA_DIST = $(ATERM).tar.gz $(BZIP2).tar.gz max-long.patch sizeof.patch
+SQLITE_VERSION = 3.6.22
+SQLITE = sqlite-$(SQLITE_VERSION)
+SQLITE_TAR = sqlite-amalgamation-$(SQLITE_VERSION).tar.gz
 
-ext-clean:
-	$(RM) -f have-aterm build-aterm have-bzip2 build-bzip2
-	$(RM) -rf $(ATERM) $(BZIP2)
+$(SQLITE_TAR):
+	@echo "Nix requires the SQLite library to build."
+	@echo "Please download version $(SQLITE_VERSION) from"
+	@echo "  http://www.sqlite.org/$(SQLITE_TAR)"
+	@echo "and place it in the externals/ directory."
+	false
+
+$(SQLITE): $(SQLITE_TAR)
+	gzip -d < $(srcdir)/$(SQLITE_TAR) | tar xvf -
+
+if HAVE_SQLITE
+build-sqlite:
+else
+build-sqlite: $(SQLITE)
+	(pfx=`pwd` && \
+	cd $(SQLITE) && \
+	CC="$(CC)" ./configure --prefix=$$pfx/inst-sqlite \
+	  --disable-shared --enable-static && \
+	$(MAKE) && \
+	$(MAKE) check && \
+	$(MAKE) install)
+	touch build-sqlite
+endif
+
+
+all: build-aterm build-bzip2 build-sqlite
+
+EXTRA_DIST = $(ATERM).tar.gz $(BZIP2).tar.gz $(SQLITE_TAR) max-long.patch sizeof.patch
+
+clean:
+	$(RM) -f build-aterm build-bzip2 build-sqlite
+	$(RM) -rf $(ATERM) $(BZIP2) $(SQLITE)
+	$(RM) -rf inst-aterm inst-bzip2 inst-sqlite
