@@ -43,14 +43,14 @@ int main()
   unsigned good, tests;
 
   using namespace term;
-  AInt a = Int::make(1);
-  AInt b = Int::make(2);
-  AInt c = Int::make(1);
+  AInt a = makeInt(1);
+  AInt b = makeInt(2);
+  AInt c = makeInt(1);
   Eval e;
 
   CHECK(a == c, "Terms are shared.");
   CHECK(!as<APlus>(a), "Bad convertion returns a zero ATerm.");
   CHECK(as<AInt>(a) == a, "Good convertion returns the same ATerm.");
-  CHECK(e.run(Plus::make(a, Plus::make(b, c))) == 4, "Visitors are working.");
+  CHECK(e.run(makePlus(a, makePlus(b, c))) == 4, "Visitors are working.");
   return tests - good;
 }
