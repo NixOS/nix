@@ -22,7 +22,7 @@ create index if not exists IndexReference on Refs(reference);
 -- ValidPaths to cause a foreign key constraint violation (due to `on
 -- delete restrict' on the `reference' column).  Therefore, explicitly
 -- get rid of self-references.
-create trigger DeleteSelfRefs before delete on ValidPaths
+create trigger if not exists DeleteSelfRefs before delete on ValidPaths
   begin
     delete from Refs where referrer = old.id and reference = old.id;
   end;
