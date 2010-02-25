@@ -313,14 +313,16 @@ static void performOp(unsigned int clientVersion,
     }
 
     case wopQueryReferences:
-    case wopQueryReferrers: {
+    case wopQueryReferrers:
+    case wopQueryDerivationOutputs: {
         Path path = readStorePath(from);
         startWork();
         PathSet paths;
         if (op == wopQueryReferences)
             store->queryReferences(path, paths);
-        else
+        else if (op == wopQueryReferrers)
             store->queryReferrers(path, paths);
+        else paths = store->queryDerivationOutputs(path);
         stopWork();
         writeStringSet(paths, to);
         break;

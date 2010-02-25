@@ -296,7 +296,11 @@ Path RemoteStore::queryDeriver(const Path & path)
 
 PathSet RemoteStore::queryDerivationOutputs(const Path & path)
 {
-    throw Error("not yet implemented");
+    openConnection();
+    writeInt(wopQueryDerivationOutputs, to);
+    writeString(path, to);
+    processStderr();
+    return readStorePaths(from);
 }
 
 
