@@ -214,7 +214,9 @@ bool RemoteStore::isValidPath(const Path & path)
 PathSet RemoteStore::queryValidPaths()
 {
     openConnection();
-    throw Error("not implemented");
+    writeInt(wopQueryValidPaths, to);
+    processStderr();
+    return readStorePaths(from);
 }
 
 

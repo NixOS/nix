@@ -520,6 +520,14 @@ static void performOp(unsigned int clientVersion,
         break;
     }
             
+    case wopQueryValidPaths: {
+        startWork();
+        PathSet paths = store->queryValidPaths();
+        stopWork();
+        writeStringSet(paths, to);
+        break;
+    }
+
     default:
         throw Error(format("invalid operation %1%") % op);
     }
