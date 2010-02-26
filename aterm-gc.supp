@@ -115,3 +115,35 @@
    fun:*
    fun:AT_collect
 }
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Value4
+   fun:*
+   fun:*
+   fun:mark_phase
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Cond
+   fun:*
+   fun:*
+   fun:mark_phase
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Value4
+   fun:*
+   fun:*
+   fun:mark_phase_young
+}
+
+{
+   ATerm library conservatively scans for GC roots
+   Memcheck:Cond
+   fun:*
+   fun:*
+   fun:mark_phase_young
+}
