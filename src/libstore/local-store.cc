@@ -47,6 +47,7 @@ SQLite::~SQLite()
 
 void SQLiteStmt::create(sqlite3 * db, const string & s)
 {
+    checkInterrupt();
     assert(!stmt);
     if (sqlite3_prepare_v2(db, s.c_str(), -1, &stmt, 0) != SQLITE_OK)
         throw SQLiteError(db, "creating statement");
@@ -56,7 +57,6 @@ void SQLiteStmt::create(sqlite3 * db, const string & s)
 
 void SQLiteStmt::reset()
 {
-    checkInterrupt();
     assert(stmt);
     if (sqlite3_reset(stmt) != SQLITE_OK)
         throw SQLiteError(db, "resetting statement");
