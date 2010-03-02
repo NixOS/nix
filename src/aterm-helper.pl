@@ -146,8 +146,9 @@ while (<STDIN>) {
         my $value = $2;
         print HEADER "extern ATerm $name;\n";
         print IMPL "ATerm $name = 0;\n";
-        $init .= "    $name = $value;\n";
-    }
+        $init .= "    $name = $value;\n"; 
+        $init .= "    ATprotect(&$name);\n";
+   }
 
     elsif (/^\s*init\s+(\w+)\s*$/) {
         $initFun = $1;
