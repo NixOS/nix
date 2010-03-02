@@ -24,7 +24,7 @@ build-aterm: $(ATERM)
 	$(MAKE) check)
 	touch build-aterm
 
-install-exec-local::
+install-exec-local:: build-aterm
 	cd $(ATERM) && make install
 	rm -rf "$(DESTDIR)/$(pkglibdir)/dummy"
 endif
@@ -53,7 +53,7 @@ build-bzip2: $(BZIP2)
 	$(MAKE) install PREFIX=$(abs_builddir)/inst-bzip2)
 	touch build-bzip2
 
-install-exec-local::
+install-exec-local:: build-bzip2
 	mkdir -p $(DESTDIR)${bzip2_bin}
 	$(INSTALL_PROGRAM) $(bzip2_bin_test)/bzip2 $(bzip2_bin_test)/bunzip2 $(DESTDIR)${bzip2_bin}
 endif
@@ -83,7 +83,7 @@ build-sqlite: $(SQLITE)
 	$(MAKE) )
 	touch build-sqlite
 
-install-exec-local::
+install-exec-local:: build-sqlite
 	cd $(SQLITE) && make install
 	rm -rf "$(DESTDIR)/$(pkglibdir)/dummy"
 endif
