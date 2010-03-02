@@ -50,37 +50,23 @@ AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
 test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
 
 
-# Whether to produce a statically linked binary.  On Cygwin, this is
-# the default: dynamically linking against the ATerm DLL does work,
-# except that it requires the ATerm "lib" directory to be in $PATH, as
-# Windows doesn't have anything like an RPATH embedded in executable.
-# Since this is kind of annoying, we use static libraries for now.
-
-AC_ARG_ENABLE(static-nix, AC_HELP_STRING([--enable-static-nix],
-  [produce statically linked binaries]),
-  static_nix=$enableval, static_nix=no)
-
-if test "$sys_name" = cygwin; then
-   static_nix=yes
-fi
-
-if test "$static_nix" = yes; then
+# Windows-specific stuff.  On Cygwin, dynamically linking against the
+# ATerm DLL works, except that it requires the ATerm "lib" directory
+# to be in $PATH, as Windows doesn't have anything like an RPATH
+# embedded in executable.  Since this is kind of annoying, we use
+# static libraries for now.
+if test "$sys_name" = "cygwin"; then
     AC_DISABLE_SHARED
     AC_ENABLE_STATIC
 fi
 
-
-# Windows-specific stuff.
-if test "$sys_name" = "cygwin"; then
-    # We cannot delete open files.
-    AC_DEFINE(CANNOT_DELETE_OPEN_FILES, 1, [Whether it is impossible to delete open files.])
-fi
 
 # Solaris-specific stuff.
 if test "$sys_name" = "sunos"; then
     # Solaris requires -lsocket -lnsl for network functions
     LIBS="-lsocket -lnsl $LIBS"
 fi
+
 
 AC_PROG_CC
 AC_PROG_CXX
@@ -288,14 +274,6 @@ AC_CHECK_FUNCS([posix_fallocate])
 # and the Nix libraries are dynamic.
 if test "$(uname)" = "Darwin"; then
     LDFLAGS="-all_load $LDFLAGS"
-fi
-
-
-if test "$static_nix" = yes; then
-    # `-all-static' has to be added at the end of configure, because
-    # the C compiler doesn't know about -all-static (it's filtered out
-    # by libtool, but configure doesn't use libtool).
-    LDFLAGS="-all-static $LDFLAGS"
 fi
 
 
