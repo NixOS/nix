@@ -77,6 +77,13 @@ AC_DISABLE_STATIC
 AC_ENABLE_SHARED
 AC_PROG_LIBTOOL
 
+if test "$enable_shared" = yes; then
+   SUB_CONFIGURE_FLAGS="--enable-shared --disable-static"
+else
+   SUB_CONFIGURE_FLAGS="--enable-static --disable-shared"
+fi
+AC_SUBST(SUB_CONFIGURE_FLAGS)
+
 
 # Use 64-bit file system calls so that we can support files > 2 GiB.
 AC_SYS_LARGEFILE

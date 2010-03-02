@@ -19,7 +19,7 @@ build-aterm:
 else
 build-aterm: $(ATERM)
 	(cd $(ATERM) && \
-	CC="$(CC)" ./configure --prefix=$(pkglibdir)/dummy --libdir=${pkglibdir} && \
+	CC="$(CC)" ./configure --prefix=$(pkglibdir)/dummy --libdir=${pkglibdir} $(SUB_CONFIGURE_FLAGS) && \
 	$(MAKE) && \
 	$(MAKE) check)
 	touch build-aterm
@@ -79,7 +79,7 @@ build-sqlite:
 else
 build-sqlite: $(SQLITE)
 	(cd $(SQLITE) && \
-	CC="$(CC)" ./configure --disable-static --prefix=$(pkglibdir)/dummy --libdir=${pkglibdir} && \
+	CC="$(CC)" ./configure --disable-static --prefix=$(pkglibdir)/dummy --libdir=${pkglibdir} $(SUB_CONFIGURE_FLAGS) && \
 	$(MAKE) )
 	touch build-sqlite
 
