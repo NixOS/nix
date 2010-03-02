@@ -6,6 +6,7 @@
 #include "derivations.hh"
 #include "nixexpr-ast.hh"
 #include "globals.hh"
+#include "aterm.hh"
 
 
 #define LocalNoInline(f) static f __attribute__((noinline)); f

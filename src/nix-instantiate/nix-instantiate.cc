@@ -11,6 +11,7 @@
 #include "util.hh"
 #include "store-api.hh"
 #include "common-opts.hh"
+#include "aterm.hh"
 #include "help.txt.hh"
 
 

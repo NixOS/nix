@@ -5,7 +5,6 @@
 #include <map>
 
 #include "nixexpr.hh"
-#include "aterm.hh"
 
 namespace nix {
 

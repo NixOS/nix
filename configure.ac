@@ -197,9 +197,9 @@ AC_ARG_WITH(aterm, AC_HELP_STRING([--with-aterm=PATH],
   aterm=$withval, aterm=)
 AM_CONDITIONAL(HAVE_ATERM, test -n "$aterm")
 if test -z "$aterm"; then
-  aterm_lib='-L${top_builddir}/externals/inst-aterm/lib -lATerm'
-  aterm_include='-I${top_builddir}/externals/inst-aterm/include'
-  aterm_bin='${top_builddir}/externals/inst-aterm/bin'
+  aterm_lib='-L${top_builddir}/externals/aterm-2.5/aterm -lATerm'
+  aterm_include='-I${top_builddir}/externals/aterm-2.5/aterm'
+  aterm_bin='${top_builddir}/externals/aterm-2.5/utils'
 else
   aterm_lib="-L$aterm/lib -lATerm"
   aterm_include="-I$aterm/include"
@@ -224,6 +224,8 @@ AC_ARG_WITH(bzip2, AC_HELP_STRING([--with-bzip2=PATH],
   [prefix of bzip2]),
   bzip2=$withval, bzip2=)
 AM_CONDITIONAL(HAVE_BZIP2, test -n "$bzip2")
+ATERM_VERSION=2.5
+AC_SUBST(ATERM_VERSION)
 if test -z "$bzip2"; then
   # Headers and libraries will be used from the temporary installation
   # in externals/inst-bzip2.
@@ -248,10 +250,12 @@ AC_ARG_WITH(sqlite, AC_HELP_STRING([--with-sqlite=PATH],
   [prefix of SQLite]),
   sqlite=$withval, sqlite=)
 AM_CONDITIONAL(HAVE_SQLITE, test -n "$sqlite")
+SQLITE_VERSION=3.6.22
+AC_SUBST(SQLITE_VERSION)
 if test -z "$sqlite"; then
-  sqlite_lib='-L${top_builddir}/externals/inst-sqlite/lib -lsqlite3'
-  sqlite_include='-I${top_builddir}/externals/inst-sqlite/include'
-  sqlite_bin='${top_builddir}/externals/inst-sqlite/bin'
+  sqlite_lib='${top_builddir}/externals/sqlite-$(SQLITE_VERSION)/libsqlite3.la'
+  sqlite_include='-I${top_builddir}/externals/sqlite-$(SQLITE_VERSION)'
+  sqlite_bin='${top_builddir}/externals/sqlite-$(SQLITE_VERSION)'
 else
   sqlite_lib="-L$sqlite/lib -lsqlite3"
   sqlite_include="-I$sqlite/include"

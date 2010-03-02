@@ -1,6 +1,7 @@
 #include "attr-path.hh"
 #include "nixexpr-ast.hh"
 #include "util.hh"
+#include "aterm.hh"
 
 
 namespace nix {

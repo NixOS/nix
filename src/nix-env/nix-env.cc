@@ -14,6 +14,7 @@
 #include "xml-writer.hh"
 #include "store-api.hh"
 #include "util.hh"
+#include "aterm.hh"
 
 #include <cerrno>
 #include <ctime>

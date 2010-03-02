@@ -1,7 +1,7 @@
 #ifndef __DERIVATIONS_H
 #define __DERIVATIONS_H
 
-#include <aterm1.h>
+typedef union _ATerm * ATerm;
 
 #include "hash.hh"
 

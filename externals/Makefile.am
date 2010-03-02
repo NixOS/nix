@@ -1,11 +1,11 @@
 # CWI ATerm
 
-ATERM = aterm-2.5
+ATERM = aterm-$(ATERM_VERSION)
 
 $(ATERM).tar.gz:
 	@echo "Nix requires the CWI ATerm library to build."
-	@echo "Please download version 2.5 from"
-	@echo "  http://nixos.org/tarballs/aterm-2.5.tar.gz"
+	@echo "Please download version $(ATERM_VERSION) from"
+	@echo "  http://nixos.org/tarballs/aterm-$(ATERM_VERSION).tar.gz"
 	@echo "and place it in the externals/ directory."
 	false
 
@@ -20,12 +20,13 @@ else
 build-aterm: $(ATERM)
 	(pfx=`pwd` && \
 	cd $(ATERM) && \
-	CC="$(CC)" ./configure --prefix=$$pfx/inst-aterm \
-	  --disable-shared --enable-static && \
+	CC="$(CC)" ./configure --prefix=$$pfx/inst-aterm --libdir=${pkglibdir} && \
 	$(MAKE) && \
-	$(MAKE) check && \
-	$(MAKE) install)
+	$(MAKE) check)
 	touch build-aterm
+
+install-exec-local::
+	cd $(ATERM) && make install
 endif
 
 
@@ -53,7 +54,7 @@ build-bzip2: $(BZIP2)
 	$(MAKE) install PREFIX=$$pfx/inst-bzip2)
 	touch build-bzip2
 
-install:
+install-exec-local::
 	mkdir -p $(DESTDIR)${bzip2_bin}
 	$(INSTALL_PROGRAM) $(bzip2_bin_test)/bzip2 $(bzip2_bin_test)/bunzip2 $(DESTDIR)${bzip2_bin}
 endif
@@ -61,7 +62,6 @@ endif
 
 # SQLite
 
-SQLITE_VERSION = 3.6.22
 SQLITE = sqlite-$(SQLITE_VERSION)
 SQLITE_TAR = sqlite-amalgamation-$(SQLITE_VERSION).tar.gz
 
@@ -81,12 +81,12 @@ else
 build-sqlite: $(SQLITE)
 	(pfx=`pwd` && \
 	cd $(SQLITE) && \
-	CC="$(CC)" ./configure --prefix=$$pfx/inst-sqlite \
-	  --disable-shared --enable-static && \
-	$(MAKE) && \
-	$(MAKE) check && \
-	$(MAKE) install)
+	CC="$(CC)" ./configure --disable-static --prefix=$$pfx/inst-sqlite --libdir=${pkglibdir} && \
+	$(MAKE) )
 	touch build-sqlite
+
+install-exec-local::
+	cd $(SQLITE) && make install
 endif
 
 

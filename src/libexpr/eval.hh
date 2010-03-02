@@ -3,8 +3,9 @@
 
 #include <map>
 
-#include "aterm.hh"
 #include "nixexpr.hh"
+
+typedef union _ATermList * ATermList;
 
 
 namespace nix {

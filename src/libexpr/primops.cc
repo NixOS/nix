@@ -8,6 +8,7 @@
 #include "nixexpr-ast.hh"
 #include "parser.hh"
 #include "names.hh"
+#include "aterm.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

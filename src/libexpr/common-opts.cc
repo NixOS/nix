@@ -2,6 +2,7 @@
 #include "../libmain/shared.hh"
 #include "util.hh"
 #include "parser.hh"
+#include "aterm.hh"
 
 
 namespace nix {
