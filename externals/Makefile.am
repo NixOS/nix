@@ -18,15 +18,15 @@ if HAVE_ATERM
 build-aterm:
 else
 build-aterm: $(ATERM)
-	(pfx=`pwd` && \
-	cd $(ATERM) && \
-	CC="$(CC)" ./configure --prefix=$$pfx/inst-aterm --libdir=${pkglibdir} && \
+	(cd $(ATERM) && \
+	CC="$(CC)" ./configure --prefix=$(pkglibdir)/dummy --libdir=${pkglibdir} && \
 	$(MAKE) && \
 	$(MAKE) check)
 	touch build-aterm
 
 install-exec-local::
 	cd $(ATERM) && make install
+	rm -rf "$(DESTDIR)/$(pkglibdir)/dummy"
 endif
 
 
@@ -48,10 +48,9 @@ if HAVE_BZIP2
 build-bzip2:
 else
 build-bzip2: $(BZIP2)
-	(pfx=`pwd` && \
-	cd $(BZIP2) && \
+	(cd $(BZIP2) && \
 	$(MAKE) && \
-	$(MAKE) install PREFIX=$$pfx/inst-bzip2)
+	$(MAKE) install PREFIX=$(abs_builddir)/inst-bzip2)
 	touch build-bzip2
 
 install-exec-local::
@@ -79,14 +78,14 @@ if HAVE_SQLITE
 build-sqlite:
 else
 build-sqlite: $(SQLITE)
-	(pfx=`pwd` && \
-	cd $(SQLITE) && \
-	CC="$(CC)" ./configure --disable-static --prefix=$$pfx/inst-sqlite --libdir=${pkglibdir} && \
+	(cd $(SQLITE) && \
+	CC="$(CC)" ./configure --disable-static --prefix=$(pkglibdir)/dummy --libdir=${pkglibdir} && \
 	$(MAKE) )
 	touch build-sqlite
 
 install-exec-local::
 	cd $(SQLITE) && make install
+	rm -rf "$(DESTDIR)/$(pkglibdir)/dummy"
 endif
 
 
@@ -97,4 +96,4 @@ EXTRA_DIST = $(ATERM).tar.gz $(BZIP2).tar.gz $(SQLITE_TAR) max-long.patch sizeof
 clean:
 	$(RM) -f build-aterm build-bzip2 build-sqlite
 	$(RM) -rf $(ATERM) $(BZIP2) $(SQLITE)
-	$(RM) -rf inst-aterm inst-bzip2 inst-sqlite
+	$(RM) -rf inst-bzip2
