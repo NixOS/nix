@@ -18,6 +18,8 @@ struct Decoder
     int priority;
     bool ignoreLF;
     int lineNo, charNo;
+    bool warning;
+    bool error;
 
     Decoder()
     {
@@ -29,6 +31,8 @@ struct Decoder
         ignoreLF = false;
         lineNo = 1;
         charNo = 0;
+        warning = false;
+        error = false;
     }
 
     void pushChar(char c);
@@ -95,6 +99,12 @@ void Decoder::pushChar(char c)
                     case 'b':
                         ignoreLF = false;
                         break;
+                    case 'e':
+                        error = true;
+                        break;
+                    case 'w':
+                        warning = true;
+                        break;
                 }
             } else if (c >= '0' && c <= '9') {
                 int n = 0;
@@ -118,6 +128,8 @@ void Decoder::finishLine()
     string tag = inHeader ? "head" : "line";
     cout << "<" << tag;
     if (priority != 1) cout << " priority='" << priority << "'";
+    if (warning) cout << " warning='1'";
+    if (error) cout << " error='1'";
     cout << ">";
 
     for (unsigned int i = 0; i < line.size(); i++) {
@@ -158,6 +170,8 @@ void Decoder::finishLine()
     line = "";
     inHeader = false;
     priority = 1;
+    warning = false;
+    error = false;
 }
 
 
