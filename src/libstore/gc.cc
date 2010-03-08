@@ -563,6 +563,15 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     
     state.gcKeepOutputs = queryBoolSetting("gc-keep-outputs", false);
     state.gcKeepDerivations = queryBoolSetting("gc-keep-derivations", true);
+
+    /* Using `--ignore-liveness' with `--delete' can have unintended
+       consequences if `gc-keep-outputs' or `gc-keep-derivations' are
+       true (the garbage collector will recurse into deleting the
+       outputs or derivers, respectively).  So disable them. */
+    if (options.action == GCOptions::gcDeleteSpecific && options.ignoreLiveness) {
+        state.gcKeepOutputs = false;
+        state.gcKeepDerivations = false;
+    }
     
     /* Acquire the global GC root.  This prevents
        a) New roots from being added.
