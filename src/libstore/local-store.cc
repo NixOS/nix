@@ -282,7 +282,7 @@ void LocalStore::openDB(bool create)
             SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), 0) != SQLITE_OK)
         throw Error("cannot open SQLite database");
 
-    if (sqlite3_busy_timeout(db, 60000) != SQLITE_OK)
+    if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)
         throw SQLiteError(db, "setting timeout");
 
     if (sqlite3_exec(db, "pragma foreign_keys = 1;", 0, 0, 0) != SQLITE_OK)
