@@ -930,16 +930,19 @@ struct HashAndWriteSink : Sink
 {
     Sink & writeSink;
     HashSink hashSink;
-    bool hashing;
     HashAndWriteSink(Sink & writeSink) : writeSink(writeSink), hashSink(htSHA256)
     {
-        hashing = true;
     }
     virtual void operator ()
         (const unsigned char * data, unsigned int len)
     {
         writeSink(data, len);
-        if (hashing) hashSink(data, len);
+        hashSink(data, len);
+    }
+    Hash currentHash()
+    {
+        HashSink hashSinkClone(hashSink);
+        return hashSinkClone.finish();
     }
 };
 
@@ -970,6 +973,15 @@ void LocalStore::exportPath(const Path & path, bool sign,
     
     dumpPath(path, hashAndWriteSink);
 
+    /* Refuse to export paths that have changed.  This prevents
+       filesystem corruption from spreading to other machines. */
+    Hash hash = hashAndWriteSink.currentHash();
+    Hash storedHash = queryPathHash(path);
+    if (hash != storedHash)
+        throw Error(format("hash of path `%1%' has changed from `%2%' to `%3%'!") % path
+            % printHash(storedHash) % printHash(hash));
+    printMsg(lvlError, printHash(hash));
+
     writeInt(EXPORT_MAGIC, hashAndWriteSink);
 
     writeString(path, hashAndWriteSink);
@@ -982,9 +994,8 @@ void LocalStore::exportPath(const Path & path, bool sign,
     writeString(deriver, hashAndWriteSink);
 
     if (sign) {
-        Hash hash = hashAndWriteSink.hashSink.finish();
-        hashAndWriteSink.hashing = false;
-
+        Hash hash = hashAndWriteSink.currentHash();
+ 
         writeInt(1, hashAndWriteSink);
         
         Path tmpDir = createTempDir();

@@ -289,6 +289,13 @@ HashSink::HashSink(HashType ht) : ht(ht)
     start(ht, *ctx);
 }
     
+HashSink::HashSink(const HashSink & h)
+{
+    ht = h.ht;
+    ctx = new Ctx;
+    *ctx = *h.ctx;
+}
+    
 HashSink::~HashSink()
 {
     delete ctx;

@@ -96,6 +96,7 @@ private:
 
 public:
     HashSink(HashType ht);
+    HashSink(const HashSink & h);
     ~HashSink();
     virtual void operator () (const unsigned char * data, unsigned int len);
     Hash finish();
@@ -104,5 +105,5 @@ public:
 
 }
 
-    
+
 #endif /* !__HASH_H */
