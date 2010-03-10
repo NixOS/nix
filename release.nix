@@ -1,4 +1,7 @@
-{ nixpkgs ? ../nixpkgs }:
+{ nix ? {outPath = ./.; rev = 1234;}
+, nixpkgs ? ../nixpkgs
+, officialRelease ? false
+}:
 
 let
 
@@ -6,10 +9,6 @@ let
 
 
     tarball =
-      { nix ? {outPath = ./.; rev = 1234;}
-      , officialRelease ? false
-      }:
-
       with import nixpkgs {};
 
       releaseTools.sourceTarball {
@@ -66,9 +65,7 @@ let
 
 
     build =
-      { tarball ? jobs.tarball {}
-      , system ? "i686-linux"
-      }:
+      { system ? "i686-linux" }:
 
       with import nixpkgs {inherit system;};
 
@@ -76,7 +73,7 @@ let
         name = "nix";
         src = tarball;
 
-        buildInputs = [curl perl bzip2 openssl];
+        buildInputs = [ curl perl bzip2 openssl ];
 
         configureFlags = ''
           --disable-init-state
@@ -86,27 +83,24 @@ let
 
 
     coverage =
-      { tarball ? jobs.tarball {}
-      }:
-
       with import nixpkgs {};
 
       releaseTools.coverageAnalysis {
         name = "nix-build";
         src = tarball;
 
-        buildInputs = [
-          curl perl bzip2 openssl
-          # These are for "make check" only:
-          graphviz libxml2 libxslt
-        ];
+        buildInputs =
+          [ curl perl bzip2 openssl
+            # These are for "make check" only:
+            graphviz libxml2 libxslt
+          ];
 
         configureFlags = ''
           --disable-init-state --disable-shared
           --with-aterm=${aterm} --with-bzip2=${bzip2} --with-sqlite=${sqlite}
         '';
 
-        lcovFilter = ["*/boost/*" "*-tab.*"];
+        lcovFilter = [ "*/boost/*" "*-tab.*" ];
 
         # We call `dot', and even though we just use it to
         # syntax-check generated dot files, it still requires some
@@ -151,17 +145,15 @@ let
 
   makeRPM = 
     system: diskImageFun: prio:
-    { tarball ? jobs.tarball {}
-    }:
 
     with import nixpkgs {inherit system;};
 
     releaseTools.rpmBuild rec {
       name = "nix-rpm-${diskImage.name}";
-      src = tarball;
+      src = jobs.tarball;
       diskImage = diskImageFun vmTools.diskImages;
       memSize = 1024;
-      meta = { schedulingPriority = toString prio; };
+      meta.schedulingPriority = prio;
     };
 
 
@@ -170,17 +162,15 @@ let
   
   makeDeb =
     system: diskImageFun: prio:
-    { tarball ? jobs.tarball {}
-    }:
 
     with import nixpkgs {inherit system;};
 
     releaseTools.debBuild {
       name = "nix-deb";
-      src = tarball;
+      src = jobs.tarball;
       diskImage = diskImageFun vmTools.diskImages;
       memSize = 1024;
-      meta = { schedulingPriority = toString prio; };
+      meta.schedulingPriority = prio;
       configureFlags = "--sysconfdir=/etc";
       debRequires = ["curl"];
     };
