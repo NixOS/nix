@@ -980,7 +980,6 @@ void LocalStore::exportPath(const Path & path, bool sign,
     if (hash != storedHash)
         throw Error(format("hash of path `%1%' has changed from `%2%' to `%3%'!") % path
             % printHash(storedHash) % printHash(hash));
-    printMsg(lvlError, printHash(hash));
 
     writeInt(EXPORT_MAGIC, hashAndWriteSink);
 
