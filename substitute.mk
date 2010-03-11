@@ -16,6 +16,7 @@
 	 -e "s^@bzip2_bin_test\@^$(bzip2_bin_test)^g" \
 	 -e "s^@perl\@^$(perl)^g" \
 	 -e "s^@coreutils\@^$(coreutils)^g" \
+	 -e "s^@sed\@^$(sed)^g" \
 	 -e "s^@tar\@^$(tar)^g" \
 	 -e "s^@gzip\@^$(gzip)^g" \
 	 -e "s^@tr\@^$(tr)^g" \
