@@ -1568,7 +1568,7 @@ void DerivationGoal::startBuilder()
 
         /* Create a /etc/passwd with entries for the build user and the
            nobody account.  The latter is kind of a hack to support
-           Samba-in-QEMU.  */
+           Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
 
         writeFile(chrootRootDir + "/etc/passwd",
@@ -1576,6 +1576,12 @@ void DerivationGoal::startBuilder()
                 "nixbld:x:%1%:%2%:Nix build user:/:/noshell\n"
                 "nobody:x:65534:65534:Nobody:/:/noshell\n")
                 % (buildUser.enabled() ? buildUser.getUID() : getuid())
+                % (buildUser.enabled() ? buildUser.getGID() : getgid())).str());
+
+	/* Declare the build user's group so that programs get a consistent
+	   view of the system (e.g., "id -gn"). */
+        writeFile(chrootRootDir + "/etc/group",
+            (format("nixbld:!:%1%:\n")
                 % (buildUser.enabled() ? buildUser.getGID() : getgid())).str());
 
         /* Bind-mount a user-configurable set of directories from the
