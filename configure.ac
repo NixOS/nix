@@ -86,6 +86,15 @@ fi
 AC_PROG_CC
 AC_PROG_CXX
 
+# To build programs to be run in the build machine
+if test "$CC_FOR_BUILD" = ""; then
+    if test "$cross_compiling" = "yes"; then
+        AC_CHECK_PROGS(CC_FOR_BUILD, gcc cc)
+    else
+        CC_FOR_BUILD="$CC"
+    fi
+fi
+AC_SUBST([CC_FOR_BUILD])
 
 # We are going to use libtool.
 AC_DISABLE_STATIC
