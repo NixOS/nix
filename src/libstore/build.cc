@@ -1566,14 +1566,15 @@ void DerivationGoal::startBuilder()
         createDirs(chrootTmpDir);
         chmod(chrootTmpDir, 01777);
 
-        /* Create a /etc/passwd with entries for the build user and
-           the nobody account.  The latter is kind of a hack to
-           support Samba-in-QEMU. */
+        /* Create a /etc/passwd with entries for the build user and the
+           nobody account.  The latter is kind of a hack to support
+           Samba-in-QEMU.  For the sake of consistency with the setgroups(2)
+           call below, the build user has no supplementary groups. */
         createDirs(chrootRootDir + "/etc");
 
         writeFile(chrootRootDir + "/etc/passwd",
             (format(
-                "nixbld:x:%1%:65534:Nix build user:/:/noshell\n"
+                "nixbld:x:%1%:%1%:Nix build user:/:/noshell\n"
                 "nobody:x:65534:65534:Nobody:/:/noshell\n")
                 % (buildUser.enabled() ? buildUser.getUID() : getuid())).str());
 
