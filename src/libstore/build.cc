@@ -1578,6 +1578,12 @@ void DerivationGoal::startBuilder()
                 % (buildUser.enabled() ? buildUser.getUID() : getuid())
 	        % (buildUser.enabled() ? buildUser.getGID() : getgid())).str());
 
+	/* Declare the build user's group so that programs get a consistent
+	   view of the system (e.g., "id -gn").  */
+	writeFile(chrootRootDir + "/etc/group",
+		  (format("nixbld:!:%1%:\n")
+		   % (buildUser.enabled() ? buildUser.getGID() : getgid())).str());
+
         /* Bind-mount a user-configurable set of directories from the
            host file system.  The `/dev/pts' directory must be mounted
            separately so that newly-created pseudo-terminals show
