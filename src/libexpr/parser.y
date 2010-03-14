@@ -85,6 +85,10 @@ static Expr fixAttrs(bool recursive, ATermList as)
 {
     Tree attrs;
 
+    /* This ATermMap is needed to ensure that the `leaf' fields in the
+       Tree nodes are not garbage collected. */
+    ATermMap gcRoots;
+
     for (ATermIterator i(as); i; ++i) {
         ATermList names, attrPath; Expr src, e; ATerm name, pos;
 
@@ -95,7 +99,9 @@ static Expr fixAttrs(bool recursive, ATermList as)
                     throw ParseError(format("duplicate definition of attribute `%1%' at %2%")
                         % showAttrPath(ATmakeList1(*j)) % showPos(pos));
                 Tree & t(attrs.children[*j]);
-                t.leaf = fromScope ? makeVar(*j) : makeSelect(src, *j);
+                Expr leaf = fromScope ? makeVar(*j) : makeSelect(src, *j);
+                gcRoots.set(leaf, leaf);
+                t.leaf = leaf;
                 t.pos = pos;
                 if (recursive && fromScope) t.recursive = false;
             }
