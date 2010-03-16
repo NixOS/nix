@@ -8,6 +8,18 @@
 
 <!--==================================================================-->
 
+<section xml:id="ssec-relnotes-0.15"><title>Release 0.15 (March 16, 2010)</title>
+
+<para>This is a bug-fix release.  Among other things, it fixes
+building on Mac OS X (Snow Leopard), and improves the contents of
+<filename>/etc/passwd</filename> and <filename>/etc/group</filename>
+in <literal>chroot</literal> builds.</para>
+
+</section>
+
+
+<!--==================================================================-->
+
 <section xml:id="ssec-relnotes-0.14"><title>Release 0.14 (February 4, 2010)</title>
 
 <para>This release has the following improvements:</para>
