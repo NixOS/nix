@@ -8,7 +8,7 @@
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-0.15"><title>Release 0.15 (March 16, 2010)</title>
+<section xml:id="ssec-relnotes-0.15"><title>Release 0.15 (March 17, 2010)</title>
 
 <para>This is a bug-fix release.  Among other things, it fixes
 building on Mac OS X (Snow Leopard), and improves the contents of
