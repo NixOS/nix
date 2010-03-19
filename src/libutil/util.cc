@@ -810,7 +810,8 @@ void killUser(uid_t uid)
     case 0:
         try { /* child */
 
-            if (setuid(uid) == -1) abort();
+            if (setuid(uid) == -1)
+                throw SysError("setting uid");
 
 	    while (true) {
 		if (kill(-1, SIGKILL) == 0) break;
@@ -820,7 +821,7 @@ void killUser(uid_t uid)
 	    }
 
         } catch (std::exception & e) {
-            std::cerr << format("killing processes beloging to uid `%1%': %1%")
+            std::cerr << format("killing processes belonging to uid `%1%': %2%")
                 % uid % e.what() << std::endl;
             quickExit(1);
         }
@@ -828,8 +829,9 @@ void killUser(uid_t uid)
     }
     
     /* parent */
-    if (pid.wait(true) != 0)
-        throw Error(format("cannot kill processes for uid `%1%'") % uid);
+    int status = pid.wait(true);
+    if (status != 0)
+        throw Error(format("cannot kill processes for uid `%1%': %2%") % uid % statusToString(status));
 
     /* !!! We should really do some check to make sure that there are
        no processes left running under `uid', but there is no portable
