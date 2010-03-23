@@ -8,7 +8,7 @@ namespace nix {
 
 
 /* Parse a Nix expression from the specified file.  If `path' refers
-   to a directory, the "/default.nix" is appended. */
+   to a directory, then "/default.nix" is appended. */
 Expr parseExprFromFile(EvalState & state, Path path);
 
 /* Parse a Nix expression from the specified string. */

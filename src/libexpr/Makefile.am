@@ -49,3 +49,11 @@ nix.tbl: nix.sdf
 
 test.ast: test.nix nix.tbl
 	sglri -p nix.tbl -i test.nix -o test.ast
+
+
+# Testing.
+bin_PROGRAMS = eval-test
+
+eval_test_LDADD = ../libmain/libmain.la ../libexpr/libexpr.la \
+ ../libstore/libstore.la ../libutil/libutil.la \
+ ../boost/format/libformat.la ${aterm_lib} @ADDITIONAL_NETWORK_LIBS@
