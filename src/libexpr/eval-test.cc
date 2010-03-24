@@ -73,14 +73,13 @@ std::ostream & operator << (std::ostream & str, Value_ & v)
 }
 
 
-Value eval(Env env, Expr e);
+void eval(Env env, Expr e, Value v);
 
 
 void forceValue(Value v)
 {
     if (v->type != tThunk) return;
-    Value v2 = eval(v->thunk.env, v->thunk.expr);
-    *v = *v2; // !!! slightly inefficient
+    eval(v->thunk.env, v->thunk.expr, v);
 }
 
 
@@ -94,40 +93,48 @@ Value lookupVar(Env env, const string & name)
 }
 
 
-Value eval(Env env, Expr e)
+unsigned long nrValues = 0;
+
+Value allocValue()
+{
+    nrValues++;
+    return new Value_;
+}
+
+
+void eval(Env env, Expr e, Value v)
 {
     printMsg(lvlError, format("eval: %1%") % e);
 
     ATerm name;
     if (matchVar(e, name)) {
-        Value v = lookupVar(env, aterm2String(name));
-        forceValue(v);
-        return v;
+        Value v2 = lookupVar(env, aterm2String(name));
+        forceValue(v2);
+        *v = *v2;
+        return;
     }
 
     int n;
     if (matchInt(e, n)) {
-        Value v = new Value_;
         v->type = tInt;
         v->integer = n;
-        return v;
+        return;
     }
 
     ATermList es;
     if (matchAttrs(e, es)) {
-        Value v = new Value_;
         v->type = tAttrs;
         v->attrs = new Bindings;
         ATerm e2, pos;
         for (ATermIterator i(es); i; ++i) {
             if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
-            Value v2 = new Value_;
+            Value v2 = allocValue();
             v2->type = tThunk;
             v2->thunk.env = env;
             v2->thunk.expr = e2;
             (*v->attrs)[aterm2String(name)] = v2;
         }
-        return v;
+        return;
     }
 
     ATermList rbnds, nrbnds;
@@ -135,48 +142,48 @@ Value eval(Env env, Expr e)
         Env env2 = new Env_;
         env2->up = env;
         
-        Value v = new Value_;
         v->type = tAttrs;
         v->attrs = &env2->bindings;
         ATerm name, e2, pos;
         for (ATermIterator i(rbnds); i; ++i) {
             if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
-            Value v2 = new Value_;
+            Value v2 = allocValue();
             v2->type = tThunk;
             v2->thunk.env = env2;
             v2->thunk.expr = e2;
             env2->bindings[aterm2String(name)] = v2;
         }
-        return v;
+        
+        return;
     }
 
     Expr e2;
     if (matchSelect(e, e2, name)) {
-        Value v = eval(env, e2);
+        eval(env, e2, v);
         if (v->type != tAttrs) throw TypeError("expected attribute set");
         Value v2 = (*v->attrs)[aterm2String(name)];
         if (!v2) throw TypeError("attribute not found");
         forceValue(v2);
-        return v2;
+        *v = *v2;
+        return;
     }
 
     Pattern pat; Expr body; Pos pos;
     if (matchFunction(e, pat, body, pos)) {
-        Value v = new Value_;
         v->type = tLambda;
         v->lambda.env = env;
         v->lambda.pat = pat;
         v->lambda.body = body;
-        return v;
+        return;
     }
 
     Expr fun, arg;
     if (matchCall(e, fun, arg)) {
-        Value fun_ = eval(env, fun);
-        if (fun_->type != tLambda) throw TypeError("expected function");
-        if (!matchVarPat(fun_->lambda.pat, name)) throw Error("not implemented");
+        eval(env, fun, v);
+        if (v->type != tLambda) throw TypeError("expected function");
+        if (!matchVarPat(v->lambda.pat, name)) throw Error("not implemented");
 
-        Value arg_ = new Value_;
+        Value arg_ = allocValue();
         arg_->type = tThunk;
         arg_->thunk.env = env;
         arg_->thunk.expr = arg;
@@ -185,7 +192,8 @@ Value eval(Env env, Expr e)
         env2->up = env;
         env2->bindings[aterm2String(name)] = arg_;
 
-        return eval(env2, fun_->lambda.body);
+        eval(env2, v->lambda.body, v);
+        return;
     }
 
     abort();
@@ -197,8 +205,9 @@ void doTest(string s)
     EvalState state;
     Expr e = parseExprFromString(state, s, "/");
     printMsg(lvlError, format("%1%") % e);
-    Value v = eval(0, e);
-    printMsg(lvlError, format("result: %1%") % *v);
+    Value_ v;
+    eval(0, e, &v);
+    printMsg(lvlError, format("result: %1%") % v);
 }
 
 
@@ -212,10 +221,13 @@ void run(Strings args)
     doTest("rec { x = 1; y = x; }.y");
     doTest("(x: x) 1");
     doTest("(x: y: y) 1 2");
+    
     //Expr e = parseExprFromString(state, "let x = \"a\"; in x + \"b\"", "/");
     //Expr e = parseExprFromString(state, "(x: x + \"b\") \"a\"", "/");
     //Expr e = parseExprFromString(state, "\"a\" + \"b\"", "/");
     //Expr e = parseExprFromString(state, "\"a\" + \"b\"", "/");
+
+    printMsg(lvlError, format("alloced %1% values") % nrValues);
 }
 
 
