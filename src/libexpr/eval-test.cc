@@ -9,15 +9,15 @@
 using namespace nix;
 
 
-typedef struct Env_ * Env;
-typedef struct Value_ * Value;
+struct Env;
+struct Value;
 
 typedef std::map<string, Value> Bindings;
 
 
-struct Env_
+struct Env
 {
-    Env up;
+    Env * up;
     Bindings bindings;
 };
 
@@ -30,7 +30,7 @@ typedef enum {
 } ValueType;
 
 
-struct Value_
+struct Value
 {
     ValueType type;
     union 
@@ -38,11 +38,11 @@ struct Value_
         int integer;
         Bindings * attrs;
         struct {
-            Env env;
+            Env * env;
             Expr expr;
         } thunk;
         struct {
-            Env env;
+            Env * env;
             Pattern pat;
             Expr body;
         } lambda;
@@ -50,7 +50,7 @@ struct Value_
 };
 
 
-std::ostream & operator << (std::ostream & str, Value_ & v)
+std::ostream & operator << (std::ostream & str, Value & v)
 {
     switch (v.type) {
     case tInt:
@@ -58,9 +58,8 @@ std::ostream & operator << (std::ostream & str, Value_ & v)
         break;
     case tAttrs:
         str << "{ ";
-        foreach (Bindings::iterator, i, *v.attrs) {
-            str << i->first << " = " << *i->second << "; ";
-        }
+        foreach (Bindings::iterator, i, *v.attrs)
+            str << i->first << " = " << i->second << "; ";
         str << "}";
         break;
     case tThunk:
@@ -73,21 +72,21 @@ std::ostream & operator << (std::ostream & str, Value_ & v)
 }
 
 
-void eval(Env env, Expr e, Value v);
+void eval(Env * env, Expr e, Value & v);
 
 
-void forceValue(Value v)
+void forceValue(Value & v)
 {
-    if (v->type != tThunk) return;
-    eval(v->thunk.env, v->thunk.expr, v);
+    if (v.type != tThunk) return;
+    eval(v.thunk.env, v.thunk.expr, v);
 }
 
 
-Value lookupVar(Env env, const string & name)
+Value * lookupVar(Env * env, const string & name)
 {
     for ( ; env; env = env->up) {
-        Value v = env->bindings[name];
-        if (v) return v;
+        Bindings::iterator i = env->bindings.find(name);
+        if (i != env->bindings.end()) return &i->second;
     }
     throw Error("undefined variable");
 }
@@ -95,63 +94,65 @@ Value lookupVar(Env env, const string & name)
 
 unsigned long nrValues = 0;
 
-Value allocValue()
+unsigned long nrEnvs = 0;
+
+Env * allocEnv()
 {
-    nrValues++;
-    return new Value_;
+    nrEnvs++;
+    return new Env;
 }
 
 
-void eval(Env env, Expr e, Value v)
+void eval(Env * env, Expr e, Value & v)
 {
     printMsg(lvlError, format("eval: %1%") % e);
 
     ATerm name;
     if (matchVar(e, name)) {
-        Value v2 = lookupVar(env, aterm2String(name));
-        forceValue(v2);
-        *v = *v2;
+        Value * v2 = lookupVar(env, aterm2String(name));
+        forceValue(*v2);
+        v = *v2;
         return;
     }
 
     int n;
     if (matchInt(e, n)) {
-        v->type = tInt;
-        v->integer = n;
+        v.type = tInt;
+        v.integer = n;
         return;
     }
 
     ATermList es;
     if (matchAttrs(e, es)) {
-        v->type = tAttrs;
-        v->attrs = new Bindings;
+        v.type = tAttrs;
+        v.attrs = new Bindings;
         ATerm e2, pos;
         for (ATermIterator i(es); i; ++i) {
             if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
-            Value v2 = allocValue();
-            v2->type = tThunk;
-            v2->thunk.env = env;
-            v2->thunk.expr = e2;
-            (*v->attrs)[aterm2String(name)] = v2;
+            Value & v2 = (*v.attrs)[aterm2String(name)];
+            nrValues++;
+            v2.type = tThunk;
+            v2.thunk.env = env;
+            v2.thunk.expr = e2;
         }
         return;
     }
 
     ATermList rbnds, nrbnds;
     if (matchRec(e, rbnds, nrbnds)) {
-        Env env2 = new Env_;
+        Env * env2 = allocEnv();
         env2->up = env;
         
-        v->type = tAttrs;
-        v->attrs = &env2->bindings;
+        v.type = tAttrs;
+        v.attrs = &env2->bindings;
         ATerm name, e2, pos;
         for (ATermIterator i(rbnds); i; ++i) {
             if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
-            Value v2 = allocValue();
-            v2->type = tThunk;
-            v2->thunk.env = env2;
-            v2->thunk.expr = e2;
-            env2->bindings[aterm2String(name)] = v2;
+            Value & v2 = env2->bindings[aterm2String(name)];
+            nrValues++;
+            v2.type = tThunk;
+            v2.thunk.env = env2;
+            v2.thunk.expr = e2;
         }
         
         return;
@@ -160,39 +161,39 @@ void eval(Env env, Expr e, Value v)
     Expr e2;
     if (matchSelect(e, e2, name)) {
         eval(env, e2, v);
-        if (v->type != tAttrs) throw TypeError("expected attribute set");
-        Value v2 = (*v->attrs)[aterm2String(name)];
-        if (!v2) throw TypeError("attribute not found");
-        forceValue(v2);
-        *v = *v2;
+        if (v.type != tAttrs) throw TypeError("expected attribute set");
+        Bindings::iterator i = v.attrs->find(aterm2String(name));
+        if (i == v.attrs->end()) throw TypeError("attribute not found");
+        forceValue(i->second);
+        v = i->second;
         return;
     }
 
     Pattern pat; Expr body; Pos pos;
     if (matchFunction(e, pat, body, pos)) {
-        v->type = tLambda;
-        v->lambda.env = env;
-        v->lambda.pat = pat;
-        v->lambda.body = body;
+        v.type = tLambda;
+        v.lambda.env = env;
+        v.lambda.pat = pat;
+        v.lambda.body = body;
         return;
     }
 
     Expr fun, arg;
     if (matchCall(e, fun, arg)) {
         eval(env, fun, v);
-        if (v->type != tLambda) throw TypeError("expected function");
-        if (!matchVarPat(v->lambda.pat, name)) throw Error("not implemented");
+        if (v.type != tLambda) throw TypeError("expected function");
+        if (!matchVarPat(v.lambda.pat, name)) throw Error("not implemented");
 
-        Value arg_ = allocValue();
-        arg_->type = tThunk;
-        arg_->thunk.env = env;
-        arg_->thunk.expr = arg;
-        
-        Env env2 = new Env_;
+        Env * env2 = allocEnv();
         env2->up = env;
-        env2->bindings[aterm2String(name)] = arg_;
+        
+        Value & arg_ = env2->bindings[aterm2String(name)];
+        nrValues++;
+        arg_.type = tThunk;
+        arg_.thunk.env = env;
+        arg_.thunk.expr = arg;
 
-        eval(env2, v->lambda.body, v);
+        eval(env2, v.lambda.body, v);
         return;
     }
 
@@ -205,15 +206,15 @@ void doTest(string s)
     EvalState state;
     Expr e = parseExprFromString(state, s, "/");
     printMsg(lvlError, format("%1%") % e);
-    Value_ v;
-    eval(0, e, &v);
+    Value v;
+    eval(0, e, v);
     printMsg(lvlError, format("result: %1%") % v);
 }
 
 
 void run(Strings args)
 {
-    printMsg(lvlError, format("size of value: %1% bytes") % sizeof(Value_));
+    printMsg(lvlError, format("size of value: %1% bytes") % sizeof(Value));
     
     doTest("123");
     doTest("{ x = 1; y = 2; }");
@@ -228,6 +229,7 @@ void run(Strings args)
     //Expr e = parseExprFromString(state, "\"a\" + \"b\"", "/");
 
     printMsg(lvlError, format("alloced %1% values") % nrValues);
+    printMsg(lvlError, format("alloced %1% environments") % nrEnvs);
 }
 
 
