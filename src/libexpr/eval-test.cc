@@ -25,7 +25,8 @@ struct Env_
 typedef enum {
     tInt = 1,
     tAttrs,
-    tThunk
+    tThunk,
+    tLambda
 } ValueType;
 
 
@@ -40,6 +41,11 @@ struct Value_
             Env env;
             Expr expr;
         } thunk;
+        struct {
+            Env env;
+            Pattern pat;
+            Expr body;
+        } lambda;
     };
 };
 
@@ -144,7 +150,7 @@ Value eval(Env env, Expr e)
         return v;
     }
 
-    ATerm e2;
+    Expr e2;
     if (matchSelect(e, e2, name)) {
         Value v = eval(env, e2);
         if (v->type != tAttrs) throw TypeError("expected attribute set");
@@ -152,6 +158,34 @@ Value eval(Env env, Expr e)
         if (!v2) throw TypeError("attribute not found");
         forceValue(v2);
         return v2;
+    }
+
+    Pattern pat; Expr body; Pos pos;
+    if (matchFunction(e, pat, body, pos)) {
+        Value v = new Value_;
+        v->type = tLambda;
+        v->lambda.env = env;
+        v->lambda.pat = pat;
+        v->lambda.body = body;
+        return v;
+    }
+
+    Expr fun, arg;
+    if (matchCall(e, fun, arg)) {
+        Value fun_ = eval(env, fun);
+        if (fun_->type != tLambda) throw TypeError("expected function");
+        if (!matchVarPat(fun_->lambda.pat, name)) throw Error("not implemented");
+
+        Value arg_ = new Value_;
+        arg_->type = tThunk;
+        arg_->thunk.env = env;
+        arg_->thunk.expr = arg;
+        
+        Env env2 = new Env_;
+        env2->up = env;
+        env2->bindings[aterm2String(name)] = arg_;
+
+        return eval(env2, fun_->lambda.body);
     }
 
     abort();
@@ -176,6 +210,8 @@ void run(Strings args)
     doTest("{ x = 1; y = 2; }");
     doTest("{ x = 1; y = 2; }.y");
     doTest("rec { x = 1; y = x; }.y");
+    doTest("(x: x) 1");
+    doTest("(x: y: y) 1 2");
     //Expr e = parseExprFromString(state, "let x = \"a\"; in x + \"b\"", "/");
     //Expr e = parseExprFromString(state, "(x: x + \"b\") \"a\"", "/");
     //Expr e = parseExprFromString(state, "\"a\" + \"b\"", "/");
