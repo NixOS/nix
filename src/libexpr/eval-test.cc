@@ -83,7 +83,7 @@ std::ostream & operator << (std::ostream & str, Value & v)
 static void eval(Env * env, Expr e, Value & v);
 
 
-void forceValue(Value & v)
+static void forceValue(Value & v)
 {
     if (v.type == tThunk) {
         v.type = tBlackhole;
@@ -98,12 +98,45 @@ void forceValue(Value & v)
 }
 
 
-Value * lookupVar(Env * env, Sym name)
+static Value * lookupWith(Env * env, Sym name)
 {
-    for ( ; env; env = env->up) {
-        Bindings::iterator i = env->bindings.find(name);
-        if (i != env->bindings.end()) return &i->second;
+    if (!env) return 0;
+    Value * v = lookupWith(env->up, name);
+    if (v) return v;
+    Bindings::iterator i = env->bindings.find(sWith);
+    if (i == env->bindings.end()) return 0;
+    Bindings::iterator j = i->second.attrs->find(name);
+    if (j != i->second.attrs->end()) return &j->second;
+    return 0;
+}
+
+
+static Value * lookupVar(Env * env, Sym name)
+{
+    /* First look for a regular variable binding for `name'. */
+    for (Env * env2 = env; env2; env2 = env2->up) {
+        Bindings::iterator i = env2->bindings.find(name);
+        if (i != env2->bindings.end()) return &i->second;
     }
+
+    /* Otherwise, look for a `with' attribute set containing `name'.
+       Outer `withs' take precedence (i.e. `with {x=1;}; with {x=2;};
+       x' evaluates to 1).  */
+    Value * v = lookupWith(env, name);
+    if (v) return v;
+
+    /* Alternative implementation where the inner `withs' take
+       precedence (i.e. `with {x=1;}; with {x=2;}; x' evaluates to
+       2). */
+#if 0
+    for (Env * env2 = env; env2; env2 = env2->up) {
+        Bindings::iterator i = env2->bindings.find(sWith);
+        if (i == env2->bindings.end()) continue;
+        Bindings::iterator j = i->second.attrs->find(name);
+        if (j != i->second.attrs->end()) return &j->second;
+    }
+#endif
+    
     throw Error("undefined variable");
 }
 
@@ -112,7 +145,7 @@ unsigned long nrValues = 0;
 
 unsigned long nrEnvs = 0;
 
-Env * allocEnv()
+static Env * allocEnv()
 {
     nrEnvs++;
     return new Env;
@@ -264,6 +297,19 @@ static void eval(Env * env, Expr e, Value & v)
         return;
     }
 
+    Expr attrs;
+    if (matchWith(e, attrs, body, pos)) {
+        Env * env2 = allocEnv();
+        env2->up = env;
+
+        Value & vAttrs = env2->bindings[sWith];
+        eval(env, attrs, vAttrs);
+        if (vAttrs.type != tAttrs) throw TypeError("`with' should evaluate to an attribute set");
+        
+        eval(env2, body, v);
+        return;
+    }
+
     abort();
 }
 
@@ -299,6 +345,9 @@ void run(Strings args)
     doTest("({x, y, ...}@args: args.z) { x = 1; y = 2; z = 3; }");
     //doTest("({x ? y, y ? x}: y) { }");
     doTest("let x = 1; in x");
+    doTest("with { x = 1; }; x");
+    doTest("let x = 2; in with { x = 1; }; x"); // => 2
+    doTest("with { x = 1; }; with { x = 2; }; x"); // => 1
     
     printMsg(lvlError, format("alloced %1% values") % nrValues);
     printMsg(lvlError, format("alloced %1% environments") % nrEnvs);
