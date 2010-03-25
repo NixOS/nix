@@ -215,20 +215,40 @@ static void eval(Env * env, Expr e, Value & v)
             eval(env, arg, *vArg);
             if (vArg->type != tAttrs) throw TypeError("expected attribute set");
             
+            /* For each formal argument, get the actual argument.  If
+               there is no matching actual argument but the formal
+               argument has a default, use the default. */
+            unsigned int attrsUsed = 0;
             for (ATermIterator i(formals); i; ++i) {
                 Expr name, def;
                 DefaultValue def2;
                 if (!matchFormal(*i, name, def2)) abort(); /* can't happen */
 
                 Bindings::iterator j = vArg->attrs->find(aterm2String(name));
-                if (j == vArg->attrs->end())
-                    throw TypeError(format("the argument named `%1%' required by the function is missing")
-                    % aterm2String(name));
-            
+                
                 Value & v = env2->bindings[aterm2String(name)];
-                v.type = tCopy;
-                v.val = &j->second;
-            }            
+                
+                if (j == vArg->attrs->end()) {
+                    if (!matchDefaultValue(def2, def)) def = 0;
+                    if (def == 0) throw TypeError(format("the argument named `%1%' required by the function is missing")
+                        % aterm2String(name));
+                    v.type = tThunk;
+                    v.thunk.env = env2;
+                    v.thunk.expr = def;
+                } else {
+                    attrsUsed++;
+                    v.type = tCopy;
+                    v.val = &j->second;
+                }
+            
+            }
+
+            /* Check that each actual argument is listed as a formal
+               argument (unless the attribute match specifies a
+               `...').  TODO: show the names of the
+               expected/unexpected arguments. */
+            if (ellipsis == eFalse && attrsUsed != vArg->attrs->size())
+                throw TypeError("function called with unexpected argument");
         }
 
         else abort();
@@ -266,6 +286,10 @@ void run(Strings args)
     doTest("({x, y}: x) { x = 1; y = 2; }");
     doTest("({x, y}@args: args.x) { x = 1; y = 2; }");
     doTest("(args@{x, y}: args.x) { x = 1; y = 2; }");
+    doTest("({x ? 1}: x) { }");
+    doTest("({x ? 1, y ? x}: y) { x = 2; }");
+    doTest("({x, y, ...}: x) { x = 1; y = 2; z = 3; }");
+    doTest("({x, y, ...}@args: args.z) { x = 1; y = 2; z = 3; }");
     
     //Expr e = parseExprFromString(state, "let x = \"a\"; in x + \"b\"", "/");
     //Expr e = parseExprFromString(state, "(x: x + \"b\") \"a\"", "/");
