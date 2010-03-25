@@ -12,7 +12,9 @@ using namespace nix;
 struct Env;
 struct Value;
 
-typedef std::map<string, Value> Bindings;
+typedef ATerm Sym;
+
+typedef std::map<Sym, Value> Bindings;
 
 
 struct Env
@@ -96,7 +98,7 @@ void forceValue(Value & v)
 }
 
 
-Value * lookupVar(Env * env, const string & name)
+Value * lookupVar(Env * env, Sym name)
 {
     for ( ; env; env = env->up) {
         Bindings::iterator i = env->bindings.find(name);
@@ -121,9 +123,9 @@ static void eval(Env * env, Expr e, Value & v)
 {
     printMsg(lvlError, format("eval: %1%") % e);
 
-    ATerm name;
+    Sym name;
     if (matchVar(e, name)) {
-        Value * v2 = lookupVar(env, aterm2String(name));
+        Value * v2 = lookupVar(env, name);
         forceValue(*v2);
         v = *v2;
         return;
@@ -143,7 +145,7 @@ static void eval(Env * env, Expr e, Value & v)
         ATerm e2, pos;
         for (ATermIterator i(es); i; ++i) {
             if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
-            Value & v2 = (*v.attrs)[aterm2String(name)];
+            Value & v2 = (*v.attrs)[name];
             nrValues++;
             v2.type = tThunk;
             v2.thunk.env = env;
@@ -162,7 +164,7 @@ static void eval(Env * env, Expr e, Value & v)
         ATerm name, e2, pos;
         for (ATermIterator i(rbnds); i; ++i) {
             if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
-            Value & v2 = env2->bindings[aterm2String(name)];
+            Value & v2 = env2->bindings[name];
             nrValues++;
             v2.type = tThunk;
             v2.thunk.env = env2;
@@ -176,7 +178,7 @@ static void eval(Env * env, Expr e, Value & v)
     if (matchSelect(e, e2, name)) {
         eval(env, e2, v);
         if (v.type != tAttrs) throw TypeError("expected attribute set");
-        Bindings::iterator i = v.attrs->find(aterm2String(name));
+        Bindings::iterator i = v.attrs->find(name);
         if (i == v.attrs->end()) throw TypeError("attribute not found");
         forceValue(i->second);
         v = i->second;
@@ -203,7 +205,7 @@ static void eval(Env * env, Expr e, Value & v)
         ATermList formals; ATerm ellipsis;
 
         if (matchVarPat(v.lambda.pat, name)) {
-            Value & vArg = env2->bindings[aterm2String(name)];
+            Value & vArg = env2->bindings[name];
             vArg.type = tThunk;
             vArg.thunk.env = env;
             vArg.thunk.expr = arg;
@@ -216,7 +218,7 @@ static void eval(Env * env, Expr e, Value & v)
             if (name == sNoAlias)
                 vArg = &vArg_;
             else 
-                vArg = &env2->bindings[aterm2String(name)];
+                vArg = &env2->bindings[name];
 
             eval(env, arg, *vArg);
             if (vArg->type != tAttrs) throw TypeError("expected attribute set");
@@ -226,13 +228,13 @@ static void eval(Env * env, Expr e, Value & v)
                argument has a default, use the default. */
             unsigned int attrsUsed = 0;
             for (ATermIterator i(formals); i; ++i) {
-                Expr name, def;
+                Expr def; Sym name;
                 DefaultValue def2;
                 if (!matchFormal(*i, name, def2)) abort(); /* can't happen */
 
-                Bindings::iterator j = vArg->attrs->find(aterm2String(name));
+                Bindings::iterator j = vArg->attrs->find(name);
                 
-                Value & v = env2->bindings[aterm2String(name)];
+                Value & v = env2->bindings[name];
                 
                 if (j == vArg->attrs->end()) {
                     if (!matchDefaultValue(def2, def)) def = 0;
@@ -296,6 +298,7 @@ void run(Strings args)
     doTest("({x, y, ...}: x) { x = 1; y = 2; z = 3; }");
     doTest("({x, y, ...}@args: args.z) { x = 1; y = 2; z = 3; }");
     //doTest("({x ? y, y ? x}: y) { }");
+    doTest("let x = 1; in x");
     
     printMsg(lvlError, format("alloced %1% values") % nrValues);
     printMsg(lvlError, format("alloced %1% environments") % nrEnvs);
