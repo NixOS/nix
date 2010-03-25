@@ -161,8 +161,14 @@ static Env * allocEnv()
 }
 
 
+char * p1 = 0, * p2 = 0;
+
+
 static void eval(Env * env, Expr e, Value & v)
 {
+    char c;
+    if (!p1) p1 = &c; else if (!p2) p2 = &c;
+
     printMsg(lvlError, format("eval: %1%") % e);
 
     Sym name;
@@ -333,9 +339,9 @@ static void eval(Env * env, Expr e, Value & v)
 
     if (matchOpConcat(e, e1, e2)) {
         Value v1; eval(env, e1, v1);
-        if (v1.type != tList) throw TypeError("list expecteed");
+        if (v1.type != tList) throw TypeError("list expected");
         Value v2; eval(env, e2, v2);
-        if (v2.type != tList) throw TypeError("list expecteed");
+        if (v2.type != tList) throw TypeError("list expected");
         v.type = tList;
         v.list.length = v1.list.length + v2.list.length;
         v.list.elems = new Value[v.list.length];
@@ -347,7 +353,7 @@ static void eval(Env * env, Expr e, Value & v)
             v.list.elems[n + v1.list.length] = v2.list.elems[n];
         return;
     }
-        
+
     throw Error("unsupported term");
 }
 
@@ -370,6 +376,7 @@ static void strictEval(Env * env, Expr e, Value & v)
 
 void doTest(string s)
 {
+    p1 = p2 = 0;
     EvalState state;
     Expr e = parseExprFromString(state, s, "/");
     printMsg(lvlError, format(">>>>> %1%") % e);
@@ -407,6 +414,7 @@ void run(Strings args)
     
     printMsg(lvlError, format("alloced %1% values") % nrValues);
     printMsg(lvlError, format("alloced %1% environments") % nrEnvs);
+    printMsg(lvlError, format("each eval() uses %1% bytes of stack space") % (p1 - p2));
 }
 
 
