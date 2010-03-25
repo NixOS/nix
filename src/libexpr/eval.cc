@@ -85,15 +85,16 @@ static void patternMatch(EvalState & state,
 {
     ATerm name;
     ATermList formals;
-    Pattern pat1, pat2;
     ATermBool ellipsis;
     
     if (matchVarPat(pat, name)) 
         subs.set(name, arg);
 
-    else if (matchAttrsPat(pat, formals, ellipsis)) {
+    else if (matchAttrsPat(pat, formals, ellipsis, name)) {
 
         arg = evalExpr(state, arg);
+
+        if (name != sNoAlias) subs.set(name, arg);
 
         /* Get the actual arguments. */
         ATermMap attrs;
@@ -129,11 +130,6 @@ static void patternMatch(EvalState & state,
         if (ellipsis == eFalse && attrsUsed != nrAttrs)
             throw TypeError(format("the function does not expect an argument named `%1%'")
                 % aterm2String(attrs.begin()->key));
-    }
-
-    else if (matchAtPat(pat, pat1, pat2)) {
-        patternMatch(state, pat1, arg, subs, subsRecursive);
-        patternMatch(state, pat2, arg, subs, subsRecursive);
     }
 
     else abort();
@@ -425,12 +421,11 @@ Path coerceToPath(EvalState & state, Expr e, PathSet & context)
 Expr autoCallFunction(Expr e, const ATermMap & args)
 {
     Pattern pat;
-    ATerm body, pos;
+    ATerm body, pos, name;
     ATermList formals;
     ATermBool ellipsis;
     
-    /* !!! this should be more general */
-    if (matchFunction(e, pat, body, pos) && matchAttrsPat(pat, formals, ellipsis)) {
+    if (matchFunction(e, pat, body, pos) && matchAttrsPat(pat, formals, ellipsis, name)) {
         ATermMap actualArgs(ATgetLength(formals));
         
         for (ATermIterator i(formals); i; ++i) {

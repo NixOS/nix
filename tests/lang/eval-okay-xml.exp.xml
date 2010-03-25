@@ -6,14 +6,11 @@
     </attr>
     <attr name="at">
       <function>
-        <at>
-          <varpat name="args" />
-          <attrspat>
-            <attr name="x" />
-            <attr name="y" />
-            <attr name="z" />
-          </attrspat>
-        </at>
+        <attrspat name="args">
+          <attr name="x" />
+          <attr name="y" />
+          <attr name="z" />
+        </attrspat>
       </function>
     </attr>
     <attr name="b">
@@ -24,11 +21,10 @@
     </attr>
     <attr name="ellipsis">
       <function>
-        <attrspat>
+        <attrspat ellipsis="1">
           <attr name="x" />
           <attr name="y" />
           <attr name="z" />
-          <ellipsis />
         </attrspat>
       </function>
     </attr>

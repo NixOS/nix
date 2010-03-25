@@ -846,18 +846,13 @@ static void attrsInPattern(ATermMap & map, Pattern pat)
 {
     ATerm name;
     ATermList formals;
-    Pattern pat1, pat2;
     ATermBool ellipsis;
-    if (matchAttrsPat(pat, formals, ellipsis)) { 
+    if (matchAttrsPat(pat, formals, ellipsis, name)) { 
         for (ATermIterator i(formals); i; ++i) {
             ATerm def;
             if (!matchFormal(*i, name, def)) abort();
             map.set(name, makeAttrRHS(makeBool(def != constNoDefaultValue), makeNoPos()));
         }
-    }
-    else if (matchAtPat(pat, pat1, pat2)) {
-        attrsInPattern(map, pat1);
-        attrsInPattern(map, pat2);
     }
 }
 

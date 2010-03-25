@@ -114,22 +114,18 @@ static void varsBoundByPattern(ATermMap & map, Pattern pat)
 {
     ATerm name;
     ATermList formals;
-    Pattern pat1, pat2;
     ATermBool ellipsis;
     /* Use makeRemoved() so that it can be used directly in
        substitute(). */
     if (matchVarPat(pat, name))
         map.set(name, makeRemoved());
-    else if (matchAttrsPat(pat, formals, ellipsis)) { 
+    else if (matchAttrsPat(pat, formals, ellipsis, name)) {
+        if (name != sNoAlias) map.set(name, makeRemoved());
         for (ATermIterator i(formals); i; ++i) {
             ATerm d1;
             if (!matchFormal(*i, name, d1)) abort();
             map.set(name, makeRemoved());
         }
-    }
-    else if (matchAtPat(pat, pat1, pat2)) {
-        varsBoundByPattern(map, pat1);
-        varsBoundByPattern(map, pat2);
     }
     else abort();
 }

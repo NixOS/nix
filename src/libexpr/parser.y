@@ -140,31 +140,29 @@ static Expr fixAttrs(bool recursive, ATermList as)
 
 static void checkPatternVars(ATerm pos, ATermMap & map, Pattern pat)
 {
-    ATerm name;
+    ATerm name = sNoAlias;
     ATermList formals;
-    Pattern pat1, pat2;
     ATermBool ellipsis;
-    if (matchVarPat(pat, name)) {
+    
+    if (matchAttrsPat(pat, formals, ellipsis, name)) { 
+        for (ATermIterator i(formals); i; ++i) {
+            ATerm d1, name2;
+            if (!matchFormal(*i, name2, d1)) abort();
+            if (map.get(name2))
+                throw ParseError(format("duplicate formal function argument `%1%' at %2%")
+                    % aterm2String(name2) % showPos(pos));
+            map.set(name2, name2);
+        }
+    }
+
+    else matchVarPat(pat, name);
+
+    if (name != sNoAlias) {
         if (map.get(name))
             throw ParseError(format("duplicate formal function argument `%1%' at %2%")
                 % aterm2String(name) % showPos(pos));
         map.set(name, name);
     }
-    else if (matchAttrsPat(pat, formals, ellipsis)) { 
-        for (ATermIterator i(formals); i; ++i) {
-            ATerm d1;
-            if (!matchFormal(*i, name, d1)) abort();
-            if (map.get(name))
-                throw ParseError(format("duplicate formal function argument `%1%' at %2%")
-                    % aterm2String(name) % showPos(pos));
-            map.set(name, name);
-        }
-    }
-    else if (matchAtPat(pat, pat1, pat2)) {
-        checkPatternVars(pos, map, pat1);
-        checkPatternVars(pos, map, pat2);
-    }
-    else abort();
 }
 
 
@@ -323,7 +321,7 @@ static void freeAndUnprotect(void * p)
 
 %type <t> start expr expr_function expr_if expr_op
 %type <t> expr_app expr_select expr_simple bind inheritsrc formal
-%type <t> pattern pattern2
+%type <t> pattern
 %type <ts> binds ids attrpath expr_list string_parts ind_string_parts
 %type <formals> formals
 %token <t> ID INT STR IND_STR PATH URI
@@ -433,13 +431,10 @@ ind_string_parts
   ;
 
 pattern
-  : pattern2 '@' pattern { $$ = makeAtPat($1, $3); }
-  | pattern2
-  ;
-
-pattern2
   : ID { $$ = makeVarPat($1); }
-  | '{' formals '}' { $$ = makeAttrsPat($2.formals, $2.ellipsis ? eTrue : eFalse); }
+  | '{' formals '}' { $$ = makeAttrsPat($2.formals, $2.ellipsis ? eTrue : eFalse, sNoAlias); }
+  | '{' formals '}' '@' ID { $$ = makeAttrsPat($2.formals, $2.ellipsis ? eTrue : eFalse, $5); }
+  | ID '@' '{' formals '}' { $$ = makeAttrsPat($4.formals, $4.ellipsis ? eTrue : eFalse, $1); }
   ;
 
 binds
