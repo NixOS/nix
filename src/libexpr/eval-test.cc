@@ -27,6 +27,7 @@ struct Env
 typedef enum {
     tInt = 1,
     tAttrs,
+    tList,
     tThunk,
     tLambda,
     tCopy,
@@ -41,6 +42,10 @@ struct Value
     {
         int integer;
         Bindings * attrs;
+        struct {
+            unsigned int length;
+            Value * elems;
+        } list;
         struct {
             Env * env;
             Expr expr;
@@ -64,8 +69,14 @@ std::ostream & operator << (std::ostream & str, Value & v)
     case tAttrs:
         str << "{ ";
         foreach (Bindings::iterator, i, *v.attrs)
-            str << i->first << " = " << i->second << "; ";
+            str << aterm2String(i->first) << " = " << i->second << "; ";
         str << "}";
+        break;
+    case tList:
+        str << "[ ";
+        for (unsigned int n = 0; n < v.list.length; ++n)
+            str << v.list.elems[n] << " ";
+        str << "]";
         break;
     case tThunk:
         str << "<CODE>";
@@ -141,9 +152,7 @@ static Value * lookupVar(Env * env, Sym name)
 }
 
 
-unsigned long nrValues = 0;
-
-unsigned long nrEnvs = 0;
+unsigned long nrValues = 0, nrEnvs = 0;
 
 static Env * allocEnv()
 {
@@ -207,7 +216,7 @@ static void eval(Env * env, Expr e, Value & v)
         return;
     }
 
-    Expr e2;
+    Expr e1, e2;
     if (matchSelect(e, e2, name)) {
         eval(env, e2, v);
         if (v.type != tAttrs) throw TypeError("expected attribute set");
@@ -310,7 +319,52 @@ static void eval(Env * env, Expr e, Value & v)
         return;
     }
 
-    abort();
+    if (matchList(e, es)) {
+        v.type = tList;
+        v.list.length = ATgetLength(es);
+        v.list.elems = new Value[v.list.length]; // !!! check destructor
+        for (unsigned int n = 0; n < v.list.length; ++n, es = ATgetNext(es)) {
+            v.list.elems[n].type = tThunk;
+            v.list.elems[n].thunk.env = env;
+            v.list.elems[n].thunk.expr = ATgetFirst(es);
+        }
+        return;
+    }
+
+    if (matchOpConcat(e, e1, e2)) {
+        Value v1; eval(env, e1, v1);
+        if (v1.type != tList) throw TypeError("list expecteed");
+        Value v2; eval(env, e2, v2);
+        if (v2.type != tList) throw TypeError("list expecteed");
+        v.type = tList;
+        v.list.length = v1.list.length + v2.list.length;
+        v.list.elems = new Value[v.list.length];
+        /* !!! This loses sharing with the original lists.  We could
+           use a tCopy node, but that would use more memory. */
+        for (unsigned int n = 0; n < v1.list.length; ++n)
+            v.list.elems[n] = v1.list.elems[n];
+        for (unsigned int n = 0; n < v2.list.length; ++n)
+            v.list.elems[n + v1.list.length] = v2.list.elems[n];
+        return;
+    }
+        
+    throw Error("unsupported term");
+}
+
+
+static void strictEval(Env * env, Expr e, Value & v)
+{
+    eval(env, e, v);
+    
+    if (v.type == tAttrs) {
+        foreach (Bindings::iterator, i, *v.attrs)
+            forceValue(i->second);
+    }
+    
+    else if (v.type == tList) {
+        for (unsigned int n = 0; n < v.list.length; ++n)
+            forceValue(v.list.elems[n]);
+    }
 }
 
 
@@ -320,7 +374,7 @@ void doTest(string s)
     Expr e = parseExprFromString(state, s, "/");
     printMsg(lvlError, format(">>>>> %1%") % e);
     Value v;
-    eval(0, e, v);
+    strictEval(0, e, v);
     printMsg(lvlError, format("result: %1%") % v);
 }
 
@@ -348,6 +402,8 @@ void run(Strings args)
     doTest("with { x = 1; }; x");
     doTest("let x = 2; in with { x = 1; }; x"); // => 2
     doTest("with { x = 1; }; with { x = 2; }; x"); // => 1
+    doTest("[ 1 2 3 ]");
+    doTest("[ 1 2 ] ++ [ 3 4 5 ]");
     
     printMsg(lvlError, format("alloced %1% values") % nrValues);
     printMsg(lvlError, format("alloced %1% environments") % nrEnvs);
