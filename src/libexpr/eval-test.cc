@@ -27,7 +27,8 @@ typedef enum {
     tAttrs,
     tThunk,
     tLambda,
-    tCopy
+    tCopy,
+    tBlackhole
 } ValueType;
 
 
@@ -82,11 +83,16 @@ static void eval(Env * env, Expr e, Value & v);
 
 void forceValue(Value & v)
 {
-    if (v.type == tThunk) eval(v.thunk.env, v.thunk.expr, v);
+    if (v.type == tThunk) {
+        v.type = tBlackhole;
+        eval(v.thunk.env, v.thunk.expr, v);
+    }
     else if (v.type == tCopy) {
         forceValue(*v.val);
         v = *v.val;
     }
+    else if (v.type == tBlackhole)
+        throw EvalError("infinite recursion encountered");
 }
 
 
@@ -240,7 +246,6 @@ static void eval(Env * env, Expr e, Value & v)
                     v.type = tCopy;
                     v.val = &j->second;
                 }
-            
             }
 
             /* Check that each actual argument is listed as a formal
@@ -290,12 +295,8 @@ void run(Strings args)
     doTest("({x ? 1, y ? x}: y) { x = 2; }");
     doTest("({x, y, ...}: x) { x = 1; y = 2; z = 3; }");
     doTest("({x, y, ...}@args: args.z) { x = 1; y = 2; z = 3; }");
+    //doTest("({x ? y, y ? x}: y) { }");
     
-    //Expr e = parseExprFromString(state, "let x = \"a\"; in x + \"b\"", "/");
-    //Expr e = parseExprFromString(state, "(x: x + \"b\") \"a\"", "/");
-    //Expr e = parseExprFromString(state, "\"a\" + \"b\"", "/");
-    //Expr e = parseExprFromString(state, "\"a\" + \"b\"", "/");
-
     printMsg(lvlError, format("alloced %1% values") % nrValues);
     printMsg(lvlError, format("alloced %1% environments") % nrEnvs);
 }
