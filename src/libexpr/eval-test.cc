@@ -32,8 +32,13 @@ typedef enum {
     tThunk,
     tLambda,
     tCopy,
-    tBlackhole
+    tBlackhole,
+    tPrimOp,
+    tPrimOpApp,
 } ValueType;
+
+
+typedef void (* PrimOp_) (Value * * args, Value & v);
 
 
 struct Value
@@ -58,6 +63,14 @@ struct Value
             Expr body;
         } lambda;
         Value * val;
+        struct {
+            PrimOp_ fun;
+            unsigned int arity;
+        } primOp;
+        struct {
+            Value * left, * right;
+            unsigned int argsLeft;
+        } primOpApp;
     };
 };
 
@@ -89,6 +102,12 @@ std::ostream & operator << (std::ostream & str, Value & v)
     case tLambda:
         str << "<LAMBDA>";
         break;
+    case tPrimOp:
+        str << "<PRIMOP>";
+        break;
+    case tPrimOpApp:
+        str << "<PRIMOP-APP>";
+        break;
     default:
         abort();
     }
@@ -96,14 +115,14 @@ std::ostream & operator << (std::ostream & str, Value & v)
 }
 
 
-static void eval(Env * env, Expr e, Value & v);
+static void eval(Env & env, Expr e, Value & v);
 
 
 static void forceValue(Value & v)
 {
     if (v.type == tThunk) {
         v.type = tBlackhole;
-        eval(v.thunk.env, v.thunk.expr, v);
+        eval(*v.thunk.env, v.thunk.expr, v);
     }
     else if (v.type == tCopy) {
         forceValue(*v.val);
@@ -208,7 +227,7 @@ static Env * allocEnv()
 char * p1 = 0, * p2 = 0;
 
 
-static void eval(Env * env, Expr e, Value & v)
+static void eval(Env & env, Expr e, Value & v)
 {
     char c;
     if (!p1) p1 = &c; else if (!p2) p2 = &c;
@@ -217,7 +236,7 @@ static void eval(Env * env, Expr e, Value & v)
 
     Sym name;
     if (matchVar(e, name)) {
-        Value * v2 = lookupVar(env, name);
+        Value * v2 = lookupVar(&env, name);
         forceValue(*v2);
         v = *v2;
         return;
@@ -240,7 +259,7 @@ static void eval(Env * env, Expr e, Value & v)
             Value & v2 = (*v.attrs)[name];
             nrValues++;
             v2.type = tThunk;
-            v2.thunk.env = env;
+            v2.thunk.env = &env;
             v2.thunk.expr = e2;
         }
         return;
@@ -249,7 +268,7 @@ static void eval(Env * env, Expr e, Value & v)
     ATermList rbnds, nrbnds;
     if (matchRec(e, rbnds, nrbnds)) {
         Env * env2 = allocEnv();
-        env2->up = env;
+        env2->up = &env;
         
         v.type = tAttrs;
         v.attrs = &env2->bindings;
@@ -280,7 +299,7 @@ static void eval(Env * env, Expr e, Value & v)
     Pattern pat; Expr body; Pos pos;
     if (matchFunction(e, pat, body, pos)) {
         v.type = tLambda;
-        v.lambda.env = env;
+        v.lambda.env = &env;
         v.lambda.pat = pat;
         v.lambda.body = body;
         return;
@@ -289,17 +308,47 @@ static void eval(Env * env, Expr e, Value & v)
     Expr fun, arg;
     if (matchCall(e, fun, arg)) {
         eval(env, fun, v);
+
+        if (v.type == tPrimOp || v.type == tPrimOpApp) {
+            if ((v.type == tPrimOp && v.primOp.arity == 1) ||
+                (v.type == tPrimOpApp && v.primOpApp.argsLeft == 1)) 
+            {
+                /* We have all the arguments, so call the primop.
+                   First find the primop. */
+                Value * primOp = &v;
+                while (primOp->type == tPrimOpApp) primOp = primOp->primOpApp.left;
+                assert(primOp->type == tPrimOp);
+                unsigned int arity = primOp->primOp.arity;
+                
+                Value vLastArg;
+                vLastArg.type = tThunk;
+                vLastArg.thunk.env = &env;
+                vLastArg.thunk.expr = arg;
+
+                Value * vArgs[arity];
+                unsigned int n = arity - 1;
+                vArgs[n--] = &vLastArg;
+                for (Value * arg = &v; arg->type == tPrimOpApp; arg = arg->primOpApp.left)
+                    vArgs[n--] = arg->primOpApp.right;
+                
+                primOp->primOp.fun(vArgs, v);
+            } else {
+                throw Error("bar");
+            }
+            return;
+        }
+        
         if (v.type != tLambda) throw TypeError("expected function");
 
         Env * env2 = allocEnv();
-        env2->up = env;
+        env2->up = &env;
 
         ATermList formals; ATerm ellipsis;
 
         if (matchVarPat(v.lambda.pat, name)) {
             Value & vArg = env2->bindings[name];
             vArg.type = tThunk;
-            vArg.thunk.env = env;
+            vArg.thunk.env = &env;
             vArg.thunk.expr = arg;
         }
 
@@ -352,20 +401,20 @@ static void eval(Env * env, Expr e, Value & v)
 
         else abort();
         
-        eval(env2, v.lambda.body, v);
+        eval(*env2, v.lambda.body, v);
         return;
     }
 
     Expr attrs;
     if (matchWith(e, attrs, body, pos)) {
         Env * env2 = allocEnv();
-        env2->up = env;
+        env2->up = &env;
 
         Value & vAttrs = env2->bindings[sWith];
         eval(env, attrs, vAttrs);
         if (vAttrs.type != tAttrs) throw TypeError("`with' should evaluate to an attribute set");
         
-        eval(env2, body, v);
+        eval(*env2, body, v);
         return;
     }
 
@@ -375,7 +424,7 @@ static void eval(Env * env, Expr e, Value & v)
         v.list.elems = new Value[v.list.length]; // !!! check destructor
         for (unsigned int n = 0; n < v.list.length; ++n, es = ATgetNext(es)) {
             v.list.elems[n].type = tThunk;
-            v.list.elems[n].thunk.env = env;
+            v.list.elems[n].thunk.env = &env;
             v.list.elems[n].thunk.expr = ATgetFirst(es);
         }
         return;
@@ -416,7 +465,7 @@ static void eval(Env * env, Expr e, Value & v)
 }
 
 
-static void strictEval(Env * env, Expr e, Value & v)
+static void strictEval(Env & env, Expr e, Value & v)
 {
     eval(env, e, v);
     
@@ -432,14 +481,59 @@ static void strictEval(Env * env, Expr e, Value & v)
 }
 
 
+static void prim_head(Value * * args, Value & v)
+{
+    forceValue(*args[0]);
+    if (args[0]->type != tList) throw TypeError("list expected");
+    if (args[0]->list.length == 0)
+        throw Error("`head' called on an empty list");
+    forceValue(args[0]->list.elems[0]);
+    v = args[0]->list.elems[0];
+}
+
+
+static void prim_add(Value * * args, Value & v)
+{
+    throw Error("foo");
+}
+
+
+static void addPrimOp(Env & env, const string & name, unsigned int arity, PrimOp_ fun)
+{
+    Value & v = env.bindings[toATerm(name)];
+    v.type = tPrimOp;
+    v.primOp.arity = arity;
+    v.primOp.fun = fun;
+}
+
+
 void doTest(string s)
 {
+    Env baseEnv;
+    baseEnv.up = 0;
+
+    /* Add global constants such as `true' to the base environment. */
+    {
+        Value & v = baseEnv.bindings[toATerm("true")];
+        v.type = tBool;
+        v.boolean = true;
+    }
+    {
+        Value & v = baseEnv.bindings[toATerm("false")];
+        v.type = tBool;
+        v.boolean = false;
+    }
+
+    /* Add primops to the base environment. */
+    addPrimOp(baseEnv, "__head", 1, prim_head);
+    addPrimOp(baseEnv, "__add", 2, prim_add);
+    
     p1 = p2 = 0;
     EvalState state;
     Expr e = parseExprFromString(state, s, "/");
     printMsg(lvlError, format(">>>>> %1%") % e);
     Value v;
-    strictEval(0, e, v);
+    strictEval(baseEnv, e, v);
     printMsg(lvlError, format("result: %1%") % v);
 }
 
@@ -478,6 +572,10 @@ void run(Strings args)
     doTest("{ x = 1; y = 2; } == { x = 2; }");
     doTest("{ x = [ 1 2 ]; } == { x = [ 1 ] ++ [ 2 ]; }");
     doTest("1 != 1");
+    doTest("true");
+    doTest("true == false");
+    doTest("__head [ 1 2 3 ]");
+    doTest("__add 1 2");
     
     printMsg(lvlError, format("alloced %1% values") % nrValues);
     printMsg(lvlError, format("alloced %1% environments") % nrEnvs);
