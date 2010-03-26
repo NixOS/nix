@@ -26,6 +26,7 @@ struct Env
 
 typedef enum {
     tInt = 1,
+    tBool,
     tAttrs,
     tList,
     tThunk,
@@ -41,6 +42,7 @@ struct Value
     union 
     {
         int integer;
+        bool boolean;
         Bindings * attrs;
         struct {
             unsigned int length;
@@ -65,6 +67,9 @@ std::ostream & operator << (std::ostream & str, Value & v)
     switch (v.type) {
     case tInt:
         str << v.integer;
+        break;
+    case tBool:
+        str << (v.boolean ? "true" : "false");
         break;
     case tAttrs:
         str << "{ ";
@@ -149,6 +154,45 @@ static Value * lookupVar(Env * env, Sym name)
 #endif
     
     throw Error("undefined variable");
+}
+
+
+static void setBoolValue(Value & v, bool b)
+{
+    v.type = tBool;
+    v.boolean = b;
+}
+
+
+static bool eqValues(Value & v1, Value & v2)
+{
+    forceValue(v1);
+    forceValue(v2);
+    switch (v1.type) {
+
+        case tInt:
+            return v2.type == tInt && v1.integer == v2.integer;
+
+        case tBool:
+            return v2.type == tBool && v1.boolean == v2.boolean;
+
+        case tList:
+            if (v2.type != tList || v1.list.length != v2.list.length) return false;
+            for (unsigned int n = 0; n < v1.list.length; ++n)
+                if (!eqValues(v1.list.elems[n], v2.list.elems[n])) return false;
+            return true;
+
+        case tAttrs: {
+            if (v2.type != tAttrs || v1.attrs->size() != v2.attrs->size()) return false;
+            Bindings::iterator i, j;
+            for (i = v1.attrs->begin(), j = v2.attrs->begin(); i != v1.attrs->end(); ++i, ++j)
+                if (!eqValues(i->second, j->second)) return false;
+            return true;
+        }
+
+        default:
+            throw Error("cannot compare given values");
+    }
 }
 
 
@@ -337,6 +381,20 @@ static void eval(Env * env, Expr e, Value & v)
         return;
     }
 
+    if (matchOpEq(e, e1, e2)) {
+        Value v1; eval(env, e1, v1);
+        Value v2; eval(env, e2, v2);
+        setBoolValue(v, eqValues(v1, v2));
+        return;
+    }
+
+    if (matchOpNEq(e, e1, e2)) {
+        Value v1; eval(env, e1, v1);
+        Value v2; eval(env, e2, v2);
+        setBoolValue(v, !eqValues(v1, v2));
+        return;
+    }
+
     if (matchOpConcat(e, e1, e2)) {
         Value v1; eval(env, e1, v1);
         if (v1.type != tList) throw TypeError("list expected");
@@ -411,6 +469,15 @@ void run(Strings args)
     doTest("with { x = 1; }; with { x = 2; }; x"); // => 1
     doTest("[ 1 2 3 ]");
     doTest("[ 1 2 ] ++ [ 3 4 5 ]");
+    doTest("123 == 123");
+    doTest("123 == 456");
+    doTest("let id = x: x; in [1 2] == [(id 1) (id 2)]");
+    doTest("let id = x: x; in [1 2] == [(id 1) (id 3)]");
+    doTest("[1 2] == [3 (let x = x; in x)]");
+    doTest("{ x = 1; y.z = 2; } == { y = { z = 2; }; x = 1; }");
+    doTest("{ x = 1; y = 2; } == { x = 2; }");
+    doTest("{ x = [ 1 2 ]; } == { x = [ 1 ] ++ [ 2 ]; }");
+    doTest("1 != 1");
     
     printMsg(lvlError, format("alloced %1% values") % nrValues);
     printMsg(lvlError, format("alloced %1% environments") % nrEnvs);
