@@ -75,6 +75,28 @@ struct Value
 };
 
 
+static void mkThunk(Value & v, Env & env, Expr expr)
+{
+    v.type = tThunk;
+    v.thunk.env = &env;
+    v.thunk.expr = expr;
+}
+
+
+static void mkInt(Value & v, int n)
+{
+    v.type = tInt;
+    v.integer = n;
+}
+
+
+static void mkBool(Value & v, bool b)
+{
+    v.type = tBool;
+    v.boolean = b;
+}
+
+
 std::ostream & operator << (std::ostream & str, Value & v)
 {
     switch (v.type) {
@@ -176,13 +198,6 @@ static Value * lookupVar(Env * env, Sym name)
 }
 
 
-static void setBoolValue(Value & v, bool b)
-{
-    v.type = tBool;
-    v.boolean = b;
-}
-
-
 static bool eqValues(Value & v1, Value & v2)
 {
     forceValue(v1);
@@ -220,13 +235,13 @@ unsigned long nrValues = 0, nrEnvs = 0;
 static Value * allocValues(unsigned int count)
 {
     nrValues += count;
-    return new Value[count];// !!! check destructor
+    return new Value[count]; // !!! check destructor
 }
 
-static Env * allocEnv()
+static Env & allocEnv()
 {
     nrEnvs++;
-    return new Env;
+    return *(new Env);
 }
 
 
@@ -250,8 +265,7 @@ static void eval(Env & env, Expr e, Value & v)
 
     int n;
     if (matchInt(e, n)) {
-        v.type = tInt;
-        v.integer = n;
+        mkInt(v, n);
         return;
     }
 
@@ -264,28 +278,24 @@ static void eval(Env & env, Expr e, Value & v)
             if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
             Value & v2 = (*v.attrs)[name];
             nrValues++;
-            v2.type = tThunk;
-            v2.thunk.env = &env;
-            v2.thunk.expr = e2;
+            mkThunk(v2, env, e2);
         }
         return;
     }
 
     ATermList rbnds, nrbnds;
     if (matchRec(e, rbnds, nrbnds)) {
-        Env * env2 = allocEnv();
-        env2->up = &env;
+        Env & env2(allocEnv());
+        env2.up = &env;
         
         v.type = tAttrs;
-        v.attrs = &env2->bindings;
+        v.attrs = &env2.bindings;
         ATerm name, e2, pos;
         for (ATermIterator i(rbnds); i; ++i) {
             if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
-            Value & v2 = env2->bindings[name];
+            Value & v2 = env2.bindings[name];
             nrValues++;
-            v2.type = tThunk;
-            v2.thunk.env = env2;
-            v2.thunk.expr = e2;
+            mkThunk(v2, env2, e2);
         }
         
         return;
@@ -327,9 +337,7 @@ static void eval(Env & env, Expr e, Value & v)
                 unsigned int arity = primOp->primOp.arity;
                 
                 Value vLastArg;
-                vLastArg.type = tThunk;
-                vLastArg.thunk.env = &env;
-                vLastArg.thunk.expr = arg;
+                mkThunk(vLastArg, env, arg);
 
                 /* Put all the arguments in an array. */
                 Value * vArgs[arity];
@@ -343,9 +351,7 @@ static void eval(Env & env, Expr e, Value & v)
             } else {
                 Value * v2 = allocValues(2);
                 v2[0] = v;
-                v2[1].type = tThunk;
-                v2[1].thunk.env = &env;
-                v2[1].thunk.expr = arg;
+                mkThunk(v2[1], env, arg);
                 v.type = tPrimOpApp;
                 v.primOpApp.left = &v2[0];
                 v.primOpApp.right = &v2[1];
@@ -356,17 +362,15 @@ static void eval(Env & env, Expr e, Value & v)
         
         if (v.type != tLambda) throw TypeError("expected function");
 
-        Env * env2 = allocEnv();
-        env2->up = &env;
+        Env & env2(allocEnv());
+        env2.up = &env;
 
         ATermList formals; ATerm ellipsis;
 
         if (matchVarPat(v.lambda.pat, name)) {
-            Value & vArg = env2->bindings[name];
+            Value & vArg = env2.bindings[name];
             nrValues++;
-            vArg.type = tThunk;
-            vArg.thunk.env = &env;
-            vArg.thunk.expr = arg;
+            mkThunk(vArg, env, arg);
         }
 
         else if (matchAttrsPat(v.lambda.pat, formals, ellipsis, name)) {
@@ -376,7 +380,7 @@ static void eval(Env & env, Expr e, Value & v)
             if (name == sNoAlias)
                 vArg = &vArg_;
             else {
-                vArg = &env2->bindings[name];
+                vArg = &env2.bindings[name];
                 nrValues++;
             }                
 
@@ -394,16 +398,14 @@ static void eval(Env & env, Expr e, Value & v)
 
                 Bindings::iterator j = vArg->attrs->find(name);
                 
-                Value & v = env2->bindings[name];
+                Value & v = env2.bindings[name];
                 nrValues++;
                 
                 if (j == vArg->attrs->end()) {
                     if (!matchDefaultValue(def2, def)) def = 0;
                     if (def == 0) throw TypeError(format("the argument named `%1%' required by the function is missing")
                         % aterm2String(name));
-                    v.type = tThunk;
-                    v.thunk.env = env2;
-                    v.thunk.expr = def;
+                    mkThunk(v, env2, def);
                 } else {
                     attrsUsed++;
                     v.type = tCopy;
@@ -421,21 +423,21 @@ static void eval(Env & env, Expr e, Value & v)
 
         else abort();
         
-        eval(*env2, v.lambda.body, v);
+        eval(env2, v.lambda.body, v);
         return;
     }
 
     Expr attrs;
     if (matchWith(e, attrs, body, pos)) {
-        Env * env2 = allocEnv();
-        env2->up = &env;
+        Env & env2(allocEnv());
+        env2.up = &env;
 
-        Value & vAttrs = env2->bindings[sWith];
+        Value & vAttrs = env2.bindings[sWith];
         nrValues++;
         eval(env, attrs, vAttrs);
         if (vAttrs.type != tAttrs) throw TypeError("`with' should evaluate to an attribute set");
         
-        eval(*env2, body, v);
+        eval(env2, body, v);
         return;
     }
 
@@ -443,25 +445,22 @@ static void eval(Env & env, Expr e, Value & v)
         v.type = tList;
         v.list.length = ATgetLength(es);
         v.list.elems = allocValues(v.list.length);
-        for (unsigned int n = 0; n < v.list.length; ++n, es = ATgetNext(es)) {
-            v.list.elems[n].type = tThunk;
-            v.list.elems[n].thunk.env = &env;
-            v.list.elems[n].thunk.expr = ATgetFirst(es);
-        }
+        for (unsigned int n = 0; n < v.list.length; ++n, es = ATgetNext(es))
+            mkThunk(v.list.elems[n], env, ATgetFirst(es));
         return;
     }
 
     if (matchOpEq(e, e1, e2)) {
         Value v1; eval(env, e1, v1);
         Value v2; eval(env, e2, v2);
-        setBoolValue(v, eqValues(v1, v2));
+        mkBool(v, eqValues(v1, v2));
         return;
     }
 
     if (matchOpNEq(e, e1, e2)) {
         Value v1; eval(env, e1, v1);
         Value v2; eval(env, e2, v2);
-        setBoolValue(v, !eqValues(v1, v2));
+        mkBool(v, !eqValues(v1, v2));
         return;
     }
 
@@ -519,8 +518,7 @@ static void prim_add(Value * * args, Value & v)
     if (args[0]->type != tInt) throw TypeError("integer expected");
     forceValue(*args[1]);
     if (args[1]->type != tInt) throw TypeError("integer expected");
-    v.type = tInt;
-    v.integer = args[0]->integer + args[1]->integer;
+    mkInt(v, args[0]->integer + args[1]->integer);
 }
 
 
