@@ -5,6 +5,7 @@
 #include "nixexpr-ast.hh"
 
 #include <cstdlib>
+#include <cstring>
 
 using namespace nix;
 
@@ -27,6 +28,7 @@ struct Env
 typedef enum {
     tInt = 1,
     tBool,
+    tString,
     tAttrs,
     tList,
     tThunk,
@@ -48,6 +50,10 @@ struct Value
     {
         int integer;
         bool boolean;
+        struct {
+            const char * s;
+            const char * * context;
+        } string;
         Bindings * attrs;
         struct {
             unsigned int length;
@@ -97,6 +103,14 @@ static void mkBool(Value & v, bool b)
 }
 
 
+static void mkString(Value & v, const char * s)
+{
+    v.type = tString;
+    v.string.s = s;
+    v.string.context = 0;
+}
+
+
 std::ostream & operator << (std::ostream & str, Value & v)
 {
     switch (v.type) {
@@ -105,6 +119,9 @@ std::ostream & operator << (std::ostream & str, Value & v)
         break;
     case tBool:
         str << (v.boolean ? "true" : "false");
+        break;
+    case tString:
+        str << "\"" << v.string.s << "\""; // !!! escaping
         break;
     case tAttrs:
         str << "{ ";
@@ -266,6 +283,13 @@ static void eval(Env & env, Expr e, Value & v)
     int n;
     if (matchInt(e, n)) {
         mkInt(v, n);
+        return;
+    }
+
+    ATerm s; ATermList context;
+    if (matchStr(e, s, context)) {
+        assert(context == ATempty);
+        mkString(v, ATgetName(ATgetAFun(s)));
         return;
     }
 
@@ -481,6 +505,25 @@ static void eval(Env & env, Expr e, Value & v)
         return;
     }
 
+    if (matchConcatStrings(e, es)) {
+        unsigned int n = ATgetLength(es), j = 0;
+        Value vs[n];
+        unsigned int len = 0;
+        for (ATermIterator i(es); i; ++i, ++j) {
+            eval(env, *i, vs[j]);
+            if (vs[j].type != tString) throw TypeError("string expected");
+            len += strlen(vs[j].string.s);
+        }
+        char * s = new char[len + 1], * t = s;
+        for (unsigned int i = 0; i < j; ++i) {
+            strcpy(t, vs[i].string.s);
+            t += strlen(vs[i].string.s);
+        }
+        *t = 0;
+        mkString(v, s);
+        return;
+    }
+
     throw Error("unsupported term");
 }
 
@@ -601,6 +644,8 @@ void run(Strings args)
     doTest("true == false");
     doTest("__head [ 1 2 3 ]");
     doTest("__add 1 2");
+    doTest("\"foo\"");
+    doTest("let s = \"bar\"; in \"foo${s}\"");
     
     printMsg(lvlError, format("alloced %1% values") % nrValues);
     printMsg(lvlError, format("alloced %1% environments") % nrEnvs);
