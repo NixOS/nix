@@ -217,6 +217,12 @@ static bool eqValues(Value & v1, Value & v2)
 
 unsigned long nrValues = 0, nrEnvs = 0;
 
+static Value * allocValues(unsigned int count)
+{
+    nrValues += count;
+    return new Value[count];// !!! check destructor
+}
+
 static Env * allocEnv()
 {
     nrEnvs++;
@@ -310,9 +316,9 @@ static void eval(Env & env, Expr e, Value & v)
         eval(env, fun, v);
 
         if (v.type == tPrimOp || v.type == tPrimOpApp) {
-            if ((v.type == tPrimOp && v.primOp.arity == 1) ||
-                (v.type == tPrimOpApp && v.primOpApp.argsLeft == 1)) 
-            {
+            unsigned int argsLeft =
+                v.type == tPrimOp ? v.primOp.arity : v.primOpApp.argsLeft;
+            if (argsLeft == 1) {
                 /* We have all the arguments, so call the primop.
                    First find the primop. */
                 Value * primOp = &v;
@@ -325,15 +331,25 @@ static void eval(Env & env, Expr e, Value & v)
                 vLastArg.thunk.env = &env;
                 vLastArg.thunk.expr = arg;
 
+                /* Put all the arguments in an array. */
                 Value * vArgs[arity];
                 unsigned int n = arity - 1;
                 vArgs[n--] = &vLastArg;
                 for (Value * arg = &v; arg->type == tPrimOpApp; arg = arg->primOpApp.left)
                     vArgs[n--] = arg->primOpApp.right;
-                
+
+                /* And call the primop. */
                 primOp->primOp.fun(vArgs, v);
             } else {
-                throw Error("bar");
+                Value * v2 = allocValues(2);
+                v2[0] = v;
+                v2[1].type = tThunk;
+                v2[1].thunk.env = &env;
+                v2[1].thunk.expr = arg;
+                v.type = tPrimOpApp;
+                v.primOpApp.left = &v2[0];
+                v.primOpApp.right = &v2[1];
+                v.primOpApp.argsLeft = argsLeft - 1;
             }
             return;
         }
@@ -347,6 +363,7 @@ static void eval(Env & env, Expr e, Value & v)
 
         if (matchVarPat(v.lambda.pat, name)) {
             Value & vArg = env2->bindings[name];
+            nrValues++;
             vArg.type = tThunk;
             vArg.thunk.env = &env;
             vArg.thunk.expr = arg;
@@ -358,8 +375,10 @@ static void eval(Env & env, Expr e, Value & v)
 
             if (name == sNoAlias)
                 vArg = &vArg_;
-            else 
+            else {
                 vArg = &env2->bindings[name];
+                nrValues++;
+            }                
 
             eval(env, arg, *vArg);
             if (vArg->type != tAttrs) throw TypeError("expected attribute set");
@@ -376,6 +395,7 @@ static void eval(Env & env, Expr e, Value & v)
                 Bindings::iterator j = vArg->attrs->find(name);
                 
                 Value & v = env2->bindings[name];
+                nrValues++;
                 
                 if (j == vArg->attrs->end()) {
                     if (!matchDefaultValue(def2, def)) def = 0;
@@ -411,6 +431,7 @@ static void eval(Env & env, Expr e, Value & v)
         env2->up = &env;
 
         Value & vAttrs = env2->bindings[sWith];
+        nrValues++;
         eval(env, attrs, vAttrs);
         if (vAttrs.type != tAttrs) throw TypeError("`with' should evaluate to an attribute set");
         
@@ -421,7 +442,7 @@ static void eval(Env & env, Expr e, Value & v)
     if (matchList(e, es)) {
         v.type = tList;
         v.list.length = ATgetLength(es);
-        v.list.elems = new Value[v.list.length]; // !!! check destructor
+        v.list.elems = allocValues(v.list.length);
         for (unsigned int n = 0; n < v.list.length; ++n, es = ATgetNext(es)) {
             v.list.elems[n].type = tThunk;
             v.list.elems[n].thunk.env = &env;
@@ -451,7 +472,7 @@ static void eval(Env & env, Expr e, Value & v)
         if (v2.type != tList) throw TypeError("list expected");
         v.type = tList;
         v.list.length = v1.list.length + v2.list.length;
-        v.list.elems = new Value[v.list.length];
+        v.list.elems = allocValues(v.list.length);
         /* !!! This loses sharing with the original lists.  We could
            use a tCopy node, but that would use more memory. */
         for (unsigned int n = 0; n < v1.list.length; ++n)
@@ -494,13 +515,19 @@ static void prim_head(Value * * args, Value & v)
 
 static void prim_add(Value * * args, Value & v)
 {
-    throw Error("foo");
+    forceValue(*args[0]);
+    if (args[0]->type != tInt) throw TypeError("integer expected");
+    forceValue(*args[1]);
+    if (args[1]->type != tInt) throw TypeError("integer expected");
+    v.type = tInt;
+    v.integer = args[0]->integer + args[1]->integer;
 }
 
 
 static void addPrimOp(Env & env, const string & name, unsigned int arity, PrimOp_ fun)
 {
     Value & v = env.bindings[toATerm(name)];
+    nrValues++;
     v.type = tPrimOp;
     v.primOp.arity = arity;
     v.primOp.fun = fun;
