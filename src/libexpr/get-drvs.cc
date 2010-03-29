@@ -6,6 +6,7 @@
 namespace nix {
 
 
+#if 0
 string DrvInfo::queryDrvPath(EvalState & state) const
 {
     if (drvPath == "") {
@@ -256,6 +257,7 @@ void getDerivations(EvalState & state, Expr e, const string & pathPrefix,
     Exprs doneExprs;
     getDerivations(state, e, pathPrefix, autoArgs, drvs, doneExprs);
 }
+#endif
 
  
 }

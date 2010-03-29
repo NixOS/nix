@@ -375,7 +375,7 @@ expr_op
   | expr_op UPDATE expr_op { $$ = makeOpUpdate($1, $3); }
   | expr_op '~' expr_op { $$ = makeSubPath($1, $3); }
   | expr_op '?' ID { $$ = makeOpHasAttr($1, $3); }
-  | expr_op '+' expr_op { $$ = makeOpPlus($1, $3); }
+  | expr_op '+' expr_op { $$ = makeConcatStrings(ATmakeList2($1, $3)); }
   | expr_op CONCAT expr_op { $$ = makeOpConcat($1, $3); }
   | expr_app
   ;
@@ -513,7 +513,7 @@ static Expr parse(EvalState & state,
     if (res) throw ParseError(data.error);
 
     try {
-        checkVarDefs(state.primOps, data.result);
+        // !!! checkVarDefs(state.primOps, data.result);
     } catch (Error & e) {
         throw ParseError(format("%1%, in `%2%'") % e.msg() % path);
     }

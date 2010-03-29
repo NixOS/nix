@@ -11,7 +11,101 @@ namespace nix {
 
 
 class Hash;
-    
+class EvalState;
+struct Env;
+struct Value;
+
+typedef ATerm Sym;
+
+typedef std::map<Sym, Value> Bindings;
+
+
+struct Env
+{
+    Env * up;
+    Bindings bindings;
+};
+
+
+typedef enum {
+    tInt = 1,
+    tBool,
+    tString,
+    tPath,
+    tNull,
+    tAttrs,
+    tList,
+    tThunk,
+    tLambda,
+    tCopy,
+    tBlackhole,
+    tPrimOp,
+    tPrimOpApp,
+} ValueType;
+
+
+typedef void (* PrimOp) (EvalState & state, Value * * args, Value & v);
+
+
+struct Value
+{
+    ValueType type;
+    union 
+    {
+        int integer;
+        bool boolean;
+        struct {
+            const char * s;
+            const char * * context;
+        } string;
+        Bindings * attrs;
+        struct {
+            unsigned int length;
+            Value * elems;
+        } list;
+        struct {
+            Env * env;
+            Expr expr;
+        } thunk;
+        struct {
+            Env * env;
+            Pattern pat;
+            Expr body;
+        } lambda;
+        Value * val;
+        struct {
+            PrimOp fun;
+            unsigned int arity;
+        } primOp;
+        struct {
+            Value * left, * right;
+            unsigned int argsLeft;
+        } primOpApp;
+    };
+};
+
+
+static inline void mkInt(Value & v, int n)
+{
+    v.type = tInt;
+    v.integer = n;
+}
+
+
+static inline void mkBool(Value & v, bool b)
+{
+    v.type = tBool;
+    v.boolean = b;
+}
+
+
+static inline void mkString(Value & v, const char * s)
+{
+    v.type = tString;
+    v.string.s = s;
+    v.string.context = 0;
+}
+
 
 typedef std::map<Path, PathSet> DrvRoots;
 typedef std::map<Path, Hash> DrvHashes;
@@ -22,32 +116,69 @@ typedef std::map<Path, Path> SrcToStore;
 
 struct EvalState;
 
-/* Note: using a ATermVector is safe here, since when we call a primop
-   we also have an ATermList on the stack. */
-typedef Expr (* PrimOp) (EvalState &, const ATermVector & args);
+
+std::ostream & operator << (std::ostream & str, Value & v);
 
 
 struct EvalState 
 {
-    ATermMap normalForms;
-    ATermMap primOps;
     DrvRoots drvRoots;
     DrvHashes drvHashes; /* normalised derivation hashes */
     SrcToStore srcToStore; 
 
-    unsigned int nrEvaluated;
-    unsigned int nrCached;
+    unsigned long nrValues;
+    unsigned long nrEnvs;
+    unsigned long nrEvaluated;
 
     bool allowUnsafeEquality;
 
     EvalState();
 
-    void addPrimOps();
+    /* Evaluate an expression to normal form, storing the result in
+       value `v'. */
+    void eval(Expr e, Value & v);
+    void eval(Env & env, Expr e, Value & v);
+
+    /* Evaluation the expression, then verify that it has the expected
+       type. */
+    bool evalBool(Env & env, Expr e);
+
+    /* Evaluate an expression, and recursively evaluate list elements
+       and attributes. */
+    void strictEval(Expr e, Value & v);
+    void strictEval(Env & env, Expr e, Value & v);
+
+    /* If `v' is a thunk, enter it and overwrite `v' with the result
+       of the evaluation of the thunk.  Otherwise, this is a no-op. */
+    void forceValue(Value & v);
+
+    /* Force `v', and then verify that it has the expected type. */
+    int forceInt(Value & v);
+    void forceAttrs(Value & v);
+    void forceList(Value & v);
+
+private:
+
+    /* The base environment, containing the builtin functions and
+       values. */
+    Env & baseEnv;
+
+    void createBaseEnv();
+    
     void addPrimOp(const string & name,
         unsigned int arity, PrimOp primOp);
+
+    /* Do a deep equality test between two values.  That is, list
+       elements and attributes are compared recursively. */
+    bool eqValues(Value & v1, Value & v2);
+
+    /* Allocation primitives. */
+    Value * allocValues(unsigned int count);
+    Env & allocEnv();
 };
 
 
+#if 0
 /* Evaluate an expression to normal form. */
 Expr evalExpr(EvalState & state, Expr e);
 
@@ -86,11 +217,12 @@ Path coerceToPath(EvalState & state, Expr e, PathSet & context);
    value or has a binding in the `args' map.  Note: result is a call,
    not a normal form; it should be evaluated by calling evalExpr(). */
 Expr autoCallFunction(Expr e, const ATermMap & args);
+#endif
 
 /* Print statistics. */
 void printEvalStats(EvalState & state);
 
- 
+
 }
 
 

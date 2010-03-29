@@ -7,6 +7,8 @@
 #include "nixexpr-ast.hh"
 #include "globals.hh"
 
+#include <cstring>
+
 
 #define LocalNoInline(f) static f __attribute__((noinline)); f
 #define LocalNoInlineNoReturn(f) static f __attribute__((noinline, noreturn)); f
@@ -15,15 +17,77 @@
 namespace nix {
     
 
-EvalState::EvalState()
-    : normalForms(32768), primOps(128)
+std::ostream & operator << (std::ostream & str, Value & v)
 {
-    nrEvaluated = nrCached = 0;
+    switch (v.type) {
+    case tInt:
+        str << v.integer;
+        break;
+    case tBool:
+        str << (v.boolean ? "true" : "false");
+        break;
+    case tString:
+        str << "\"" << v.string.s << "\""; // !!! escaping
+        break;
+    case tNull:
+        str << "true";
+        break;
+    case tAttrs:
+        str << "{ ";
+        foreach (Bindings::iterator, i, *v.attrs)
+            str << aterm2String(i->first) << " = " << i->second << "; ";
+        str << "}";
+        break;
+    case tList:
+        str << "[ ";
+        for (unsigned int n = 0; n < v.list.length; ++n)
+            str << v.list.elems[n] << " ";
+        str << "]";
+        break;
+    case tThunk:
+        str << "<CODE>";
+        break;
+    case tLambda:
+        str << "<LAMBDA>";
+        break;
+    case tPrimOp:
+        str << "<PRIMOP>";
+        break;
+    case tPrimOpApp:
+        str << "<PRIMOP-APP>";
+        break;
+    default:
+        throw Error("invalid value");
+    }
+    return str;
+}
+
+
+string showType(Value & v)
+{
+    switch (v.type) {
+        case tString: return "a string";
+        case tPath: return "a path";
+        case tNull: return "null";
+        case tInt: return "an integer";
+        case tBool: return "a boolean";
+        case tLambda: return "a function";
+        case tAttrs: return "an attribute set";
+        case tList: return "a list";
+        case tPrimOpApp: return "a partially applied built-in function";
+        default: throw Error("unknown type");
+    }
+}
+
+
+EvalState::EvalState() : baseEnv(allocEnv())
+{
+    nrValues = nrEnvs = nrEvaluated = 0;
 
     initNixExprHelpers();
 
-    addPrimOps();
-
+    createBaseEnv();
+    
     allowUnsafeEquality = getEnv("NIX_NO_UNSAFE_EQ", "") == "";
 }
 
@@ -31,7 +95,11 @@ EvalState::EvalState()
 void EvalState::addPrimOp(const string & name,
     unsigned int arity, PrimOp primOp)
 {
-    primOps.set(toATerm(name), makePrimOpDef(arity, ATmakeBlob(0, (void *) primOp)));
+    Value & v = baseEnv.bindings[toATerm(name)];
+    nrValues++;
+    v.type = tPrimOp;
+    v.primOp.arity = arity;
+    v.primOp.fun = primOp;
 }
 
 
@@ -76,6 +144,471 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, 
 }
 
 
+static void mkThunk(Value & v, Env & env, Expr expr)
+{
+    v.type = tThunk;
+    v.thunk.env = &env;
+    v.thunk.expr = expr;
+}
+
+
+static Value * lookupWith(Env * env, Sym name)
+{
+    if (!env) return 0;
+    Value * v = lookupWith(env->up, name);
+    if (v) return v;
+    Bindings::iterator i = env->bindings.find(sWith);
+    if (i == env->bindings.end()) return 0;
+    Bindings::iterator j = i->second.attrs->find(name);
+    if (j != i->second.attrs->end()) return &j->second;
+    return 0;
+}
+
+
+static Value * lookupVar(Env * env, Sym name)
+{
+    /* First look for a regular variable binding for `name'. */
+    for (Env * env2 = env; env2; env2 = env2->up) {
+        Bindings::iterator i = env2->bindings.find(name);
+        if (i != env2->bindings.end()) return &i->second;
+    }
+
+    /* Otherwise, look for a `with' attribute set containing `name'.
+       Outer `withs' take precedence (i.e. `with {x=1;}; with {x=2;};
+       x' evaluates to 1).  */
+    Value * v = lookupWith(env, name);
+    if (v) return v;
+
+    /* Alternative implementation where the inner `withs' take
+       precedence (i.e. `with {x=1;}; with {x=2;}; x' evaluates to
+       2). */
+#if 0
+    for (Env * env2 = env; env2; env2 = env2->up) {
+        Bindings::iterator i = env2->bindings.find(sWith);
+        if (i == env2->bindings.end()) continue;
+        Bindings::iterator j = i->second.attrs->find(name);
+        if (j != i->second.attrs->end()) return &j->second;
+    }
+#endif
+    
+    throw Error("undefined variable");
+}
+
+
+Value * EvalState::allocValues(unsigned int count)
+{
+    nrValues += count;
+    return new Value[count]; // !!! check destructor
+}
+
+
+Env & EvalState::allocEnv()
+{
+    nrEnvs++;
+    return *(new Env);
+}
+
+
+static char * deepestStack = (char *) -1; /* for measuring stack usage */
+
+
+void EvalState::eval(Env & env, Expr e, Value & v)
+{
+    /* When changing this function, make sure that you don't cause a
+       (large) increase in stack consumption! */
+    
+    char x;
+    if (&x < deepestStack) deepestStack = &x;
+    
+    printMsg(lvlError, format("eval: %1%") % e);
+
+    nrEvaluated++;
+
+    Sym name;
+    if (matchVar(e, name)) {
+        Value * v2 = lookupVar(&env, name);
+        forceValue(*v2);
+        v = *v2;
+        return;
+    }
+
+    int n;
+    if (matchInt(e, n)) {
+        mkInt(v, n);
+        return;
+    }
+
+    ATerm s; ATermList context;
+    if (matchStr(e, s, context)) {
+        assert(context == ATempty);
+        mkString(v, ATgetName(ATgetAFun(s)));
+        return;
+    }
+
+    ATermList es;
+    if (matchAttrs(e, es)) {
+        v.type = tAttrs;
+        v.attrs = new Bindings;
+        ATerm e2, pos;
+        for (ATermIterator i(es); i; ++i) {
+            if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
+            Value & v2 = (*v.attrs)[name];
+            nrValues++;
+            mkThunk(v2, env, e2);
+        }
+        return;
+    }
+
+    ATermList rbnds, nrbnds;
+    if (matchRec(e, rbnds, nrbnds)) {
+        Env & env2(allocEnv());
+        env2.up = &env;
+        
+        v.type = tAttrs;
+        v.attrs = &env2.bindings;
+        ATerm name, e2, pos;
+        for (ATermIterator i(rbnds); i; ++i) {
+            if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
+            Value & v2 = env2.bindings[name];
+            nrValues++;
+            mkThunk(v2, env2, e2);
+        }
+        
+        return;
+    }
+
+    Expr e1, e2;
+    if (matchSelect(e, e2, name)) {
+        eval(env, e2, v);
+        forceAttrs(v); // !!! eval followed by force is slightly inefficient
+        Bindings::iterator i = v.attrs->find(name);
+        if (i == v.attrs->end()) throw TypeError("attribute not found");
+        forceValue(i->second);
+        v = i->second;
+        return;
+    }
+
+    Pattern pat; Expr body; Pos pos;
+    if (matchFunction(e, pat, body, pos)) {
+        v.type = tLambda;
+        v.lambda.env = &env;
+        v.lambda.pat = pat;
+        v.lambda.body = body;
+        return;
+    }
+
+    Expr fun, arg;
+    if (matchCall(e, fun, arg)) {
+        eval(env, fun, v);
+
+        if (v.type == tPrimOp || v.type == tPrimOpApp) {
+            unsigned int argsLeft =
+                v.type == tPrimOp ? v.primOp.arity : v.primOpApp.argsLeft;
+            if (argsLeft == 1) {
+                /* We have all the arguments, so call the primop.
+                   First find the primop. */
+                Value * primOp = &v;
+                while (primOp->type == tPrimOpApp) primOp = primOp->primOpApp.left;
+                assert(primOp->type == tPrimOp);
+                unsigned int arity = primOp->primOp.arity;
+                
+                Value vLastArg;
+                mkThunk(vLastArg, env, arg);
+
+                /* Put all the arguments in an array. */
+                Value * vArgs[arity];
+                unsigned int n = arity - 1;
+                vArgs[n--] = &vLastArg;
+                for (Value * arg = &v; arg->type == tPrimOpApp; arg = arg->primOpApp.left)
+                    vArgs[n--] = arg->primOpApp.right;
+
+                /* And call the primop. */
+                primOp->primOp.fun(*this, vArgs, v);
+            } else {
+                Value * v2 = allocValues(2);
+                v2[0] = v;
+                mkThunk(v2[1], env, arg);
+                v.type = tPrimOpApp;
+                v.primOpApp.left = &v2[0];
+                v.primOpApp.right = &v2[1];
+                v.primOpApp.argsLeft = argsLeft - 1;
+            }
+            return;
+        }
+        
+        if (v.type != tLambda) throw TypeError("expected function");
+
+        Env & env2(allocEnv());
+        env2.up = &env;
+
+        ATermList formals; ATerm ellipsis;
+
+        if (matchVarPat(v.lambda.pat, name)) {
+            Value & vArg = env2.bindings[name];
+            nrValues++;
+            mkThunk(vArg, env, arg);
+        }
+
+        else if (matchAttrsPat(v.lambda.pat, formals, ellipsis, name)) {
+            Value * vArg;
+            Value vArg_;
+
+            if (name == sNoAlias)
+                vArg = &vArg_;
+            else {
+                vArg = &env2.bindings[name];
+                nrValues++;
+            }                
+
+            eval(env, arg, *vArg);
+            forceAttrs(*vArg);
+            
+            /* For each formal argument, get the actual argument.  If
+               there is no matching actual argument but the formal
+               argument has a default, use the default. */
+            unsigned int attrsUsed = 0;
+            for (ATermIterator i(formals); i; ++i) {
+                Expr def; Sym name;
+                DefaultValue def2;
+                if (!matchFormal(*i, name, def2)) abort(); /* can't happen */
+
+                Bindings::iterator j = vArg->attrs->find(name);
+                
+                Value & v = env2.bindings[name];
+                nrValues++;
+                
+                if (j == vArg->attrs->end()) {
+                    if (!matchDefaultValue(def2, def)) def = 0;
+                    if (def == 0) throw TypeError(format("the argument named `%1%' required by the function is missing")
+                        % aterm2String(name));
+                    mkThunk(v, env2, def);
+                } else {
+                    attrsUsed++;
+                    v.type = tCopy;
+                    v.val = &j->second;
+                }
+            }
+
+            /* Check that each actual argument is listed as a formal
+               argument (unless the attribute match specifies a
+               `...').  TODO: show the names of the
+               expected/unexpected arguments. */
+            if (ellipsis == eFalse && attrsUsed != vArg->attrs->size())
+                throw TypeError("function called with unexpected argument");
+        }
+
+        else abort();
+        
+        eval(env2, v.lambda.body, v);
+        return;
+    }
+
+    Expr attrs;
+    if (matchWith(e, attrs, body, pos)) {
+        Env & env2(allocEnv());
+        env2.up = &env;
+
+        Value & vAttrs = env2.bindings[sWith];
+        nrValues++;
+        eval(env, attrs, vAttrs);
+        forceAttrs(vAttrs);
+        
+        eval(env2, body, v);
+        return;
+    }
+
+    if (matchList(e, es)) {
+        v.type = tList;
+        v.list.length = ATgetLength(es);
+        v.list.elems = allocValues(v.list.length);
+        for (unsigned int n = 0; n < v.list.length; ++n, es = ATgetNext(es))
+            mkThunk(v.list.elems[n], env, ATgetFirst(es));
+        return;
+    }
+
+    if (matchOpEq(e, e1, e2)) {
+        Value v1; eval(env, e1, v1);
+        Value v2; eval(env, e2, v2);
+        mkBool(v, eqValues(v1, v2));
+        return;
+    }
+
+    if (matchOpNEq(e, e1, e2)) {
+        Value v1; eval(env, e1, v1);
+        Value v2; eval(env, e2, v2);
+        mkBool(v, !eqValues(v1, v2));
+        return;
+    }
+
+    if (matchOpConcat(e, e1, e2)) {
+        Value v1; eval(env, e1, v1);
+        forceList(v1);
+        Value v2; eval(env, e2, v2);
+        forceList(v2);
+        v.type = tList;
+        v.list.length = v1.list.length + v2.list.length;
+        v.list.elems = allocValues(v.list.length);
+        /* !!! This loses sharing with the original lists.  We could
+           use a tCopy node, but that would use more memory. */
+        for (unsigned int n = 0; n < v1.list.length; ++n)
+            v.list.elems[n] = v1.list.elems[n];
+        for (unsigned int n = 0; n < v2.list.length; ++n)
+            v.list.elems[n + v1.list.length] = v2.list.elems[n];
+        return;
+    }
+
+    if (matchConcatStrings(e, es)) {
+        unsigned int n = ATgetLength(es), j = 0;
+        Value vs[n];
+        unsigned int len = 0;
+        for (ATermIterator i(es); i; ++i, ++j) {
+            eval(env, *i, vs[j]);
+            if (vs[j].type != tString) throw TypeError("string expected");
+            len += strlen(vs[j].string.s);
+        }
+        char * s = new char[len + 1], * t = s;
+        for (unsigned int i = 0; i < j; ++i) {
+            strcpy(t, vs[i].string.s);
+            t += strlen(vs[i].string.s);
+        }
+        *t = 0;
+        mkString(v, s);
+        return;
+    }
+
+    Expr e3;
+    if (matchIf(e, e1, e2, e3)) {
+        eval(env, evalBool(env, e1) ? e2 : e3, v);
+        return;
+    }
+
+    if (matchOpOr(e, e1, e2)) {
+        mkBool(v, evalBool(env, e1) || evalBool(env, e2));
+        return;
+    }
+
+    throw Error("unsupported term");
+}
+
+
+void EvalState::eval(Expr e, Value & v)
+{
+    eval(baseEnv, e, v);
+}
+
+
+bool EvalState::evalBool(Env & env, Expr e)
+{
+    Value v;
+    eval(env, e, v);
+    if (v.type != tBool)
+        throw TypeError(format("value is %1% while a Boolean was expected") % showType(v));
+    return v.boolean;
+}
+
+
+void EvalState::strictEval(Env & env, Expr e, Value & v)
+{
+    eval(env, e, v);
+    
+    if (v.type == tAttrs) {
+        foreach (Bindings::iterator, i, *v.attrs)
+            forceValue(i->second);
+    }
+    
+    else if (v.type == tList) {
+        for (unsigned int n = 0; n < v.list.length; ++n)
+            forceValue(v.list.elems[n]);
+    }
+}
+
+
+void EvalState::strictEval(Expr e, Value & v)
+{
+    strictEval(baseEnv, e, v);
+}
+
+
+void EvalState::forceValue(Value & v)
+{
+    if (v.type == tThunk) {
+        v.type = tBlackhole;
+        eval(*v.thunk.env, v.thunk.expr, v);
+    }
+    else if (v.type == tCopy) {
+        forceValue(*v.val);
+        v = *v.val;
+    }
+    else if (v.type == tBlackhole)
+        throw EvalError("infinite recursion encountered");
+}
+
+
+int EvalState::forceInt(Value & v)
+{
+    forceValue(v);
+    if (v.type != tInt)
+        throw TypeError(format("value is %1% while an integer was expected") % showType(v));
+    return v.integer;
+}
+
+
+void EvalState::forceAttrs(Value & v)
+{
+    forceValue(v);
+    if (v.type != tAttrs)
+        throw TypeError(format("value is %1% while an attribute set was expected") % showType(v));
+}
+
+
+void EvalState::forceList(Value & v)
+{
+    forceValue(v);
+    if (v.type != tList)
+        throw TypeError(format("value is %1% while a list was expected") % showType(v));
+}
+
+
+bool EvalState::eqValues(Value & v1, Value & v2)
+{
+    forceValue(v1);
+    forceValue(v2);
+
+    if (v1.type != v2.type) return false;
+    
+    switch (v1.type) {
+
+        case tInt:
+            return v1.integer == v2.integer;
+
+        case tBool:
+            return v1.boolean == v2.boolean;
+
+        case tString:
+            /* !!! contexts */
+            return strcmp(v1.string.s, v2.string.s) == 0;
+
+        case tList:
+            if (v2.type != tList || v1.list.length != v2.list.length) return false;
+            for (unsigned int n = 0; n < v1.list.length; ++n)
+                if (!eqValues(v1.list.elems[n], v2.list.elems[n])) return false;
+            return true;
+
+        case tAttrs: {
+            if (v2.type != tAttrs || v1.attrs->size() != v2.attrs->size()) return false;
+            Bindings::iterator i, j;
+            for (i = v1.attrs->begin(), j = v2.attrs->begin(); i != v1.attrs->end(); ++i, ++j)
+                if (!eqValues(i->second, j->second)) return false;
+            return true;
+        }
+
+        default:
+            throw Error("cannot compare given values");
+    }
+}
+
+
+#if 0
 /* Pattern-match `pat' against `arg'.  The result is a set of
    substitutions (`subs') and a set of recursive substitutions
    (`subsRecursive').  The latter can refer to the variables bound by
@@ -683,9 +1216,6 @@ LocalNoInline(bool areEqual(EvalState & state, Expr e1, Expr e2))
 }
 
 
-static char * deepestStack = (char *) -1; /* for measuring stack usage */
-
-
 Expr evalExpr2(EvalState & state, Expr e)
 {
     /* When changing this function, make sure that you don't cause a
@@ -884,23 +1414,19 @@ Expr strictEvalExpr(EvalState & state, Expr e)
     ATermMap strictNormalForms;
     return strictEvalExpr(state, e, strictNormalForms);
 }
+#endif
 
-
-/* Yes, this is a really bad idea... */
-extern "C" {
-    unsigned long AT_calcAllocatedSize();
-}
 
 void printEvalStats(EvalState & state)
 {
     char x;
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
     printMsg(showStats ? lvlInfo : lvlDebug,
-        format("evaluated %1% expressions, %2% cache hits, %3%%% efficiency, used %4% ATerm bytes, used %5% bytes of stack space")
-        % state.nrEvaluated % state.nrCached
-        % ((float) state.nrCached / (float) state.nrEvaluated * 100)
-        % AT_calcAllocatedSize()
-        % (&x - deepestStack));
+        format("evaluated %1% expressions, used %2% bytes of stack space, allocated %3% values, allocated %4% environments")
+        % state.nrEvaluated
+        % (&x - deepestStack)
+        % state.nrValues
+        % state.nrEnvs);
     if (showStats)
         printATermMapStats();
 }

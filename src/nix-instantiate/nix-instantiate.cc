@@ -37,6 +37,7 @@ static int rootNr = 0;
 static bool indirectRoot = false;
 
 
+#if 0
 static void printResult(EvalState & state, Expr e,
     bool evalOnly, bool xmlOutput, const ATermMap & autoArgs)
 {
@@ -63,21 +64,28 @@ static void printResult(EvalState & state, Expr e,
         }
     }
 }
+#endif
 
 
 void processExpr(EvalState & state, const Strings & attrPaths,
     bool parseOnly, bool strict, const ATermMap & autoArgs,
     bool evalOnly, bool xmlOutput, Expr e)
 {
+    Value v;
+    state.strictEval(e, v);
+    std::cout << v << std::endl;
+    
+#if 0
     for (Strings::const_iterator i = attrPaths.begin(); i != attrPaths.end(); ++i) {
         Expr e2 = findAlongAttrPath(state, *i, autoArgs, e);
         if (!parseOnly)
             if (strict)
-                e2 = strictEvalExpr(state, e2);
+                e2 = state.strictEval(e2);
             else
                 e2 = evalExpr(state, e2);
         printResult(state, e2, evalOnly, xmlOutput, autoArgs);
     }
+#endif
 }
 
 

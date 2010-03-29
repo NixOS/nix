@@ -6,6 +6,7 @@
 namespace nix {
 
 
+#if 0
 bool isAttrs(EvalState & state, Expr e, ATermMap & attrs)
 {
     e = evalExpr(state, e);
@@ -77,6 +78,7 @@ Expr findAlongAttrPath(EvalState & state, const string & attrPath,
     
     return e;
 }
+#endif
 
  
 }

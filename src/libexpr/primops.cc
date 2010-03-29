@@ -19,6 +19,7 @@
 namespace nix {
 
 
+#if 0
 /*************************************************************
  * Constants
  *************************************************************/
@@ -895,18 +896,21 @@ static Expr prim_isList(EvalState & state, const ATermVector & args)
     ATermList list;
     return makeBool(matchList(evalExpr(state, args[0]), list));
 }
+#endif
 
 
 /* Return the first element of a list. */
-static Expr prim_head(EvalState & state, const ATermVector & args)
+static void prim_head(EvalState & state, Value * * args, Value & v)
 {
-    ATermList list = evalList(state, args[0]);
-    if (ATisEmpty(list))
+    state.forceList(*args[0]);
+    if (args[0]->list.length == 0)
         throw Error("`head' called on an empty list");
-    return evalExpr(state, ATgetFirst(list));
+    state.forceValue(args[0]->list.elems[0]);
+    v = args[0]->list.elems[0];
 }
 
 
+#if 0
 /* Return a list consisting of everything but the the first element of
    a list. */
 static Expr prim_tail(EvalState & state, const ATermVector & args)
@@ -938,6 +942,7 @@ static Expr prim_length(EvalState & state, const ATermVector & args)
     ATermList list = evalList(state, args[0]);
     return makeInt(ATgetLength(list));
 }
+#endif
 
 
 /*************************************************************
@@ -945,14 +950,13 @@ static Expr prim_length(EvalState & state, const ATermVector & args)
  *************************************************************/
 
 
-static Expr prim_add(EvalState & state, const ATermVector & args)
+static void prim_add(EvalState & state, Value * * args, Value & v)
 {
-    int i1 = evalInt(state, args[0]);
-    int i2 = evalInt(state, args[1]);
-    return makeInt(i1 + i2);
+    mkInt(v, state.forceInt(*args[0]) + state.forceInt(*args[1]));
 }
 
 
+#if 0
 static Expr prim_sub(EvalState & state, const ATermVector & args)
 {
     int i1 = evalInt(state, args[0]);
@@ -1102,6 +1106,7 @@ static Expr prim_compareVersions(EvalState & state, const ATermVector & args)
     int d = compareVersions(version1, version2);
     return makeInt(d);
 }
+#endif
 
 
 /*************************************************************
@@ -1109,14 +1114,31 @@ static Expr prim_compareVersions(EvalState & state, const ATermVector & args)
  *************************************************************/
 
 
-void EvalState::addPrimOps()
+void EvalState::createBaseEnv()
 {
-    addPrimOp("builtins", 0, prim_builtins);
-        
+    baseEnv.up = 0;
+
+    {   Value & v = baseEnv.bindings[toATerm("builtins")];
+        v.type = tAttrs;
+        v.attrs = new Bindings;
+    }
+    
+    /* Add global constants such as `true' to the base environment. */
+    {   Value & v = baseEnv.bindings[toATerm("true")];
+        mkBool(v, true);
+    }
+    {   Value & v = baseEnv.bindings[toATerm("false")];
+        mkBool(v, false);
+    }
+    {   Value & v = baseEnv.bindings[toATerm("null")];
+        v.type = tNull;
+    }
+    {   Value & v = (*baseEnv.bindings[toATerm("builtins")].attrs)[toATerm("currentSystem")];
+        mkString(v, thisSystem.c_str()); // !!! copy string
+    }
+
+#if 0    
     // Constants
-    addPrimOp("true", 0, prim_true);
-    addPrimOp("false", 0, prim_false);
-    addPrimOp("null", 0, prim_null);
     addPrimOp("__currentSystem", 0, prim_currentSystem);
     addPrimOp("__currentTime", 0, prim_currentTime);
 
@@ -1134,7 +1156,6 @@ void EvalState::addPrimOps()
     addPrimOp("__tryEval", 1, prim_tryEval);
     addPrimOp("__getEnv", 1, prim_getEnv);
     addPrimOp("__trace", 2, prim_trace);
-
     
     // Expr <-> String
     addPrimOp("__exprToString", 1, prim_exprToString);
@@ -1169,13 +1190,17 @@ void EvalState::addPrimOps()
 
     // Lists
     addPrimOp("__isList", 1, prim_isList);
+#endif
     addPrimOp("__head", 1, prim_head);
+#if 0
     addPrimOp("__tail", 1, prim_tail);
     addPrimOp("map", 2, prim_map);
     addPrimOp("__length", 1, prim_length);
-
+#endif
+    
     // Integer arithmetic
     addPrimOp("__add", 2, prim_add);
+#if 0
     addPrimOp("__sub", 2, prim_sub);
     addPrimOp("__mul", 2, prim_mul);
     addPrimOp("__div", 2, prim_div);
@@ -1191,6 +1216,7 @@ void EvalState::addPrimOps()
     // Versions
     addPrimOp("__parseDrvName", 1, prim_parseDrvName);
     addPrimOp("__compareVersions", 2, prim_compareVersions);
+#endif
 }
 
 
