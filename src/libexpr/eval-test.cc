@@ -125,6 +125,9 @@ std::ostream & operator << (std::ostream & str, Value & v)
     case tString:
         str << "\"" << v.string.s << "\""; // !!! escaping
         break;
+    case tNull:
+        str << "true";
+        break;
     case tAttrs:
         str << "{ ";
         foreach (Bindings::iterator, i, *v.attrs)
@@ -306,6 +309,16 @@ static Env & allocEnv()
 
 
 char * p1 = 0, * p2 = 0;
+
+
+static bool evalBool(Env & env, Expr e)
+{
+    Value v;
+    eval(env, e, v);
+    if (v.type != tBool)
+        throw TypeError(format("value is %1% while a Boolean was expected") % showType(v));
+    return v.boolean;
+}
 
 
 static void eval(Env & env, Expr e, Value & v)
@@ -569,6 +582,17 @@ static void eval(Env & env, Expr e, Value & v)
         return;
     }
 
+    Expr e3;
+    if (matchIf(e, e1, e2, e3)) {
+        eval(env, evalBool(env, e1) ? e2 : e3, v);
+        return;
+    }
+
+    if (matchOpOr(e, e1, e2)) {
+        mkBool(v, evalBool(env, e1) || evalBool(env, e2));
+        return;
+    }
+
     throw Error("unsupported term");
 }
 
@@ -633,6 +657,10 @@ void doTest(string s)
         v.type = tBool;
         v.boolean = false;
     }
+    {
+        Value & v = baseEnv.bindings[toATerm("null")];
+        v.type = tNull;
+    }
 
     /* Add primops to the base environment. */
     addPrimOp(baseEnv, "__head", 1, prim_head);
@@ -689,6 +717,10 @@ void run(Strings args)
     doTest("null");
     doTest("\"foo\"");
     doTest("let s = \"bar\"; in \"foo${s}\"");
+    doTest("if true then 1 else 2");
+    doTest("if false then 1 else 2");
+    doTest("if false || true then 1 else 2");
+    doTest("let x = x; in if true || x then 1 else 2");
     
     printMsg(lvlError, format("alloced %1% values") % nrValues);
     printMsg(lvlError, format("alloced %1% environments") % nrEnvs);
