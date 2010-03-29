@@ -686,6 +686,7 @@ void run(Strings args)
     doTest("true == false");
     doTest("__head [ 1 2 3 ]");
     doTest("__add 1 2");
+    doTest("null");
     doTest("\"foo\"");
     doTest("let s = \"bar\"; in \"foo${s}\"");
     
