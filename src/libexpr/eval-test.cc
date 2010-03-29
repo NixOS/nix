@@ -29,6 +29,8 @@ typedef enum {
     tInt = 1,
     tBool,
     tString,
+    tPath,
+    tNull,
     tAttrs,
     tList,
     tThunk,
@@ -157,6 +159,23 @@ std::ostream & operator << (std::ostream & str, Value & v)
 static void eval(Env & env, Expr e, Value & v);
 
 
+string showType(Value & v)
+{
+    switch (v.type) {
+        case tString: return "a string";
+        case tPath: return "a path";
+        case tNull: return "null";
+        case tInt: return "an integer";
+        case tBool: return "a boolean";
+        case tLambda: return "a function";
+        case tAttrs: return "an attribute set";
+        case tList: return "a list";
+        case tPrimOpApp: return "a partially applied built-in function";
+        default: throw Error("unknown type");
+    }
+}
+
+
 static void forceValue(Value & v)
 {
     if (v.type == tThunk) {
@@ -169,6 +188,30 @@ static void forceValue(Value & v)
     }
     else if (v.type == tBlackhole)
         throw EvalError("infinite recursion encountered");
+}
+
+
+static void forceInt(Value & v)
+{
+    forceValue(v);
+    if (v.type != tInt)
+        throw TypeError(format("value is %1% while an integer was expected") % showType(v));
+}
+
+
+static void forceAttrs(Value & v)
+{
+    forceValue(v);
+    if (v.type != tAttrs)
+        throw TypeError(format("value is %1% while an attribute set was expected") % showType(v));
+}
+
+
+static void forceList(Value & v)
+{
+    forceValue(v);
+    if (v.type != tList)
+        throw TypeError(format("value is %1% while a list was expected") % showType(v));
 }
 
 
@@ -247,7 +290,7 @@ static bool eqValues(Value & v1, Value & v2)
 }
 
 
-unsigned long nrValues = 0, nrEnvs = 0;
+unsigned long nrValues = 0, nrEnvs = 0, nrEvaluated = 0;
 
 static Value * allocValues(unsigned int count)
 {
@@ -271,6 +314,8 @@ static void eval(Env & env, Expr e, Value & v)
     if (!p1) p1 = &c; else if (!p2) p2 = &c;
 
     printMsg(lvlError, format("eval: %1%") % e);
+
+    nrEvaluated++;
 
     Sym name;
     if (matchVar(e, name)) {
@@ -328,7 +373,7 @@ static void eval(Env & env, Expr e, Value & v)
     Expr e1, e2;
     if (matchSelect(e, e2, name)) {
         eval(env, e2, v);
-        if (v.type != tAttrs) throw TypeError("expected attribute set");
+        forceAttrs(v); // !!! eval followed by force is slightly inefficient
         Bindings::iterator i = v.attrs->find(name);
         if (i == v.attrs->end()) throw TypeError("attribute not found");
         forceValue(i->second);
@@ -409,7 +454,7 @@ static void eval(Env & env, Expr e, Value & v)
             }                
 
             eval(env, arg, *vArg);
-            if (vArg->type != tAttrs) throw TypeError("expected attribute set");
+            forceAttrs(*vArg);
             
             /* For each formal argument, get the actual argument.  If
                there is no matching actual argument but the formal
@@ -459,7 +504,7 @@ static void eval(Env & env, Expr e, Value & v)
         Value & vAttrs = env2.bindings[sWith];
         nrValues++;
         eval(env, attrs, vAttrs);
-        if (vAttrs.type != tAttrs) throw TypeError("`with' should evaluate to an attribute set");
+        forceAttrs(vAttrs);
         
         eval(env2, body, v);
         return;
@@ -490,9 +535,9 @@ static void eval(Env & env, Expr e, Value & v)
 
     if (matchOpConcat(e, e1, e2)) {
         Value v1; eval(env, e1, v1);
-        if (v1.type != tList) throw TypeError("list expected");
+        forceList(v1);
         Value v2; eval(env, e2, v2);
-        if (v2.type != tList) throw TypeError("list expected");
+        forceList(v2);
         v.type = tList;
         v.list.length = v1.list.length + v2.list.length;
         v.list.elems = allocValues(v.list.length);
@@ -546,8 +591,7 @@ static void strictEval(Env & env, Expr e, Value & v)
 
 static void prim_head(Value * * args, Value & v)
 {
-    forceValue(*args[0]);
-    if (args[0]->type != tList) throw TypeError("list expected");
+    forceList(*args[0]);
     if (args[0]->list.length == 0)
         throw Error("`head' called on an empty list");
     forceValue(args[0]->list.elems[0]);
@@ -557,10 +601,8 @@ static void prim_head(Value * * args, Value & v)
 
 static void prim_add(Value * * args, Value & v)
 {
-    forceValue(*args[0]);
-    if (args[0]->type != tInt) throw TypeError("integer expected");
-    forceValue(*args[1]);
-    if (args[1]->type != tInt) throw TypeError("integer expected");
+    forceInt(*args[0]);
+    forceInt(*args[1]);
     mkInt(v, args[0]->integer + args[1]->integer);
 }
 
@@ -649,6 +691,7 @@ void run(Strings args)
     
     printMsg(lvlError, format("alloced %1% values") % nrValues);
     printMsg(lvlError, format("alloced %1% environments") % nrEnvs);
+    printMsg(lvlError, format("evaluated %1% expressions") % nrEvaluated);
     printMsg(lvlError, format("each eval() uses %1% bytes of stack space") % (p1 - p2));
 }
 
