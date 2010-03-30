@@ -68,6 +68,8 @@ void run(Strings args)
     doTest("let x = x; in if true || x then 1 else 2");
     doTest("/etc/passwd");
     doTest("import ./foo.nix");
+    doTest("map (x: __add 1 x) [ 1 2 3 ]");
+    doTest("map (__add 1) [ 1 2 3 ]");
 }
 
 

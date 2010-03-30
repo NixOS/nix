@@ -328,106 +328,9 @@ void EvalState::eval(Env & env, Expr e, Value & v)
     Expr fun, arg;
     if (matchCall(e, fun, arg)) {
         eval(env, fun, v);
-
-        if (v.type == tPrimOp || v.type == tPrimOpApp) {
-            unsigned int argsLeft =
-                v.type == tPrimOp ? v.primOp.arity : v.primOpApp.argsLeft;
-            if (argsLeft == 1) {
-                /* We have all the arguments, so call the primop.
-                   First find the primop. */
-                Value * primOp = &v;
-                while (primOp->type == tPrimOpApp) primOp = primOp->primOpApp.left;
-                assert(primOp->type == tPrimOp);
-                unsigned int arity = primOp->primOp.arity;
-                
-                Value vLastArg;
-                mkThunk(vLastArg, env, arg);
-
-                /* Put all the arguments in an array. */
-                Value * vArgs[arity];
-                unsigned int n = arity - 1;
-                vArgs[n--] = &vLastArg;
-                for (Value * arg = &v; arg->type == tPrimOpApp; arg = arg->primOpApp.left)
-                    vArgs[n--] = arg->primOpApp.right;
-
-                /* And call the primop. */
-                primOp->primOp.fun(*this, vArgs, v);
-            } else {
-                Value * v2 = allocValues(2);
-                v2[0] = v;
-                mkThunk(v2[1], env, arg);
-                v.type = tPrimOpApp;
-                v.primOpApp.left = &v2[0];
-                v.primOpApp.right = &v2[1];
-                v.primOpApp.argsLeft = argsLeft - 1;
-            }
-            return;
-        }
-        
-        if (v.type != tLambda) throw TypeError("expected function");
-
-        Env & env2(allocEnv());
-        env2.up = &env;
-
-        ATermList formals; ATerm ellipsis;
-
-        if (matchVarPat(v.lambda.pat, name)) {
-            Value & vArg = env2.bindings[name];
-            nrValues++;
-            mkThunk(vArg, env, arg);
-        }
-
-        else if (matchAttrsPat(v.lambda.pat, formals, ellipsis, name)) {
-            Value * vArg;
-            Value vArg_;
-
-            if (name == sNoAlias)
-                vArg = &vArg_;
-            else {
-                vArg = &env2.bindings[name];
-                nrValues++;
-            }                
-
-            eval(env, arg, *vArg);
-            forceAttrs(*vArg);
-            
-            /* For each formal argument, get the actual argument.  If
-               there is no matching actual argument but the formal
-               argument has a default, use the default. */
-            unsigned int attrsUsed = 0;
-            for (ATermIterator i(formals); i; ++i) {
-                Expr def; Sym name;
-                DefaultValue def2;
-                if (!matchFormal(*i, name, def2)) abort(); /* can't happen */
-
-                Bindings::iterator j = vArg->attrs->find(name);
-                
-                Value & v = env2.bindings[name];
-                nrValues++;
-                
-                if (j == vArg->attrs->end()) {
-                    if (!matchDefaultValue(def2, def)) def = 0;
-                    if (def == 0) throw TypeError(format("the argument named `%1%' required by the function is missing")
-                        % aterm2String(name));
-                    mkThunk(v, env2, def);
-                } else {
-                    attrsUsed++;
-                    v.type = tCopy;
-                    v.val = &j->second;
-                }
-            }
-
-            /* Check that each actual argument is listed as a formal
-               argument (unless the attribute match specifies a
-               `...').  TODO: show the names of the
-               expected/unexpected arguments. */
-            if (ellipsis == eFalse && attrsUsed != vArg->attrs->size())
-                throw TypeError("function called with unexpected argument");
-        }
-
-        else abort();
-        
-        eval(env2, v.lambda.body, v);
+        Value vArg;
+        mkThunk(vArg, env, arg); // !!! should this be on the heap?
+        callFunction(v, vArg, v);
         return;
     }
 
@@ -519,6 +422,103 @@ void EvalState::eval(Env & env, Expr e, Value & v)
 }
 
 
+void EvalState::callFunction(Value & fun, Value & arg, Value & v)
+{
+    if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
+        unsigned int argsLeft =
+            fun.type == tPrimOp ? fun.primOp.arity : fun.primOpApp.argsLeft;
+        if (argsLeft == 1) {
+            /* We have all the arguments, so call the primop.  First
+               find the primop. */
+            Value * primOp = &fun;
+            while (primOp->type == tPrimOpApp) primOp = primOp->primOpApp.left;
+            assert(primOp->type == tPrimOp);
+            unsigned int arity = primOp->primOp.arity;
+                
+            /* Put all the arguments in an array. */
+            Value * vArgs[arity];
+            unsigned int n = arity - 1;
+            vArgs[n--] = &arg;
+            for (Value * arg = &fun; arg->type == tPrimOpApp; arg = arg->primOpApp.left)
+                vArgs[n--] = arg->primOpApp.right;
+
+            /* And call the primop. */
+            primOp->primOp.fun(*this, vArgs, v);
+        } else {
+            Value * v2 = allocValues(2);
+            v2[0] = fun;
+            v2[1] = arg;
+            v.type = tPrimOpApp;
+            v.primOpApp.left = &v2[0];
+            v.primOpApp.right = &v2[1];
+            v.primOpApp.argsLeft = argsLeft - 1;
+        }
+        return;
+    }
+    
+    if (fun.type != tLambda)
+        throwTypeError("attempt to call something which is neither a function nor a primop (built-in operation) but %1%",
+            showType(fun));
+
+    Env & env2(allocEnv());
+    env2.up = fun.lambda.env;
+
+    ATermList formals; ATerm ellipsis, name;
+
+    if (matchVarPat(fun.lambda.pat, name)) {
+        Value & vArg = env2.bindings[name];
+        nrValues++;
+        vArg = arg;
+    }
+
+    else if (matchAttrsPat(fun.lambda.pat, formals, ellipsis, name)) {
+        forceAttrs(arg);
+        
+        if (name != sNoAlias) {
+            env2.bindings[name] = arg;
+            nrValues++;
+        }                
+
+        /* For each formal argument, get the actual argument.  If
+           there is no matching actual argument but the formal
+           argument has a default, use the default. */
+        unsigned int attrsUsed = 0;
+        for (ATermIterator i(formals); i; ++i) {
+            Expr def; Sym name;
+            DefaultValue def2;
+            if (!matchFormal(*i, name, def2)) abort(); /* can't happen */
+
+            Bindings::iterator j = arg.attrs->find(name);
+                
+            Value & v = env2.bindings[name];
+            nrValues++;
+                
+            if (j == arg.attrs->end()) {
+                if (!matchDefaultValue(def2, def)) def = 0;
+                if (def == 0) throw TypeError(format("the argument named `%1%' required by the function is missing")    
+                    % aterm2String(name));
+                mkThunk(v, env2, def);
+            } else {
+                attrsUsed++;
+                v.type = tCopy;
+                v.val = &j->second;
+            }
+        }
+
+        /* Check that each actual argument is listed as a formal
+           argument (unless the attribute match specifies a `...').
+           TODO: show the names of the expected/unexpected
+           arguments. */
+        if (ellipsis == eFalse && attrsUsed != arg.attrs->size())
+            throw TypeError("function called with unexpected argument");
+    }
+
+    else abort();
+        
+    eval(env2, fun.lambda.body, v);
+}
+
+
 void EvalState::eval(Expr e, Value & v)
 {
     eval(baseEnv, e, v);
@@ -567,6 +567,8 @@ void EvalState::forceValue(Value & v)
         forceValue(*v.val);
         v = *v.val;
     }
+    else if (v.type == tApp)
+        callFunction(*v.app.left, *v.app.right, v);
     else if (v.type == tBlackhole)
         throw EvalError("infinite recursion encountered");
 }
@@ -594,6 +596,14 @@ void EvalState::forceList(Value & v)
     forceValue(v);
     if (v.type != tList)
         throw TypeError(format("value is %1% while a list was expected") % showType(v));
+}
+
+
+void EvalState::forceFunction(Value & v)
+{
+    forceValue(v);
+    if (v.type != tLambda && v.type != tPrimOp && v.type != tPrimOpApp)
+        throw TypeError(format("value is %1% while a function was expected") % showType(v));
 }
 
 

@@ -913,22 +913,28 @@ static Expr prim_tail(EvalState & state, const ATermVector & args)
         throw Error("`tail' called on an empty list");
     return makeList(ATgetNext(list));
 }
+#endif
 
 
 /* Apply a function to every element of a list. */
-static Expr prim_map(EvalState & state, const ATermVector & args)
+static void prim_map(EvalState & state, Value * * args, Value & v)
 {
-    Expr fun = evalExpr(state, args[0]);
-    ATermList list = evalList(state, args[1]);
+    state.forceFunction(*args[0]);
+    state.forceList(*args[1]);
 
-    ATermList res = ATempty;
-    for (ATermIterator i(list); i; ++i)
-        res = ATinsert(res, makeCall(fun, *i));
+    v.type = tList;
+    v.list.length = args[1]->list.length;
+    v.list.elems = state.allocValues(v.list.length);
 
-    return makeList(ATreverse(res));
+    for (unsigned int n = 0; n < v.list.length; ++n) {
+        v.list.elems[n].type = tApp;
+        v.list.elems[n].app.left = args[0];
+        v.list.elems[n].app.right = &args[1]->list.elems[n];
+    }
 }
 
 
+#if 0
 /* Return the length of a list.  This is an O(1) time operation. */
 static Expr prim_length(EvalState & state, const ATermVector & args)
 {
@@ -1189,7 +1195,9 @@ void EvalState::createBaseEnv()
     addPrimOp("__head", 1, prim_head);
 #if 0
     addPrimOp("__tail", 1, prim_tail);
+#endif
     addPrimOp("map", 2, prim_map);
+#if 0
     addPrimOp("__length", 1, prim_length);
 #endif
     

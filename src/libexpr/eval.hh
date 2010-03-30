@@ -36,6 +36,7 @@ typedef enum {
     tAttrs,
     tList,
     tThunk,
+    tApp,
     tLambda,
     tCopy,
     tBlackhole,
@@ -68,6 +69,9 @@ struct Value
             Env * env;
             Expr expr;
         } thunk;
+        struct {
+            Value * left, * right;
+        } app;
         struct {
             Env * env;
             Pattern pat;
@@ -161,13 +165,16 @@ struct EvalState
     void strictEval(Env & env, Expr e, Value & v);
 
     /* If `v' is a thunk, enter it and overwrite `v' with the result
-       of the evaluation of the thunk.  Otherwise, this is a no-op. */
+       of the evaluation of the thunk.  If `v' is a delayed function
+       application, call the function and overwrite `v' with the
+       result.  Otherwise, this is a no-op. */
     void forceValue(Value & v);
 
     /* Force `v', and then verify that it has the expected type. */
     int forceInt(Value & v);
     void forceAttrs(Value & v);
     void forceList(Value & v);
+    void forceFunction(Value & v); // either lambda or primop
 
     /* String coercion.  Converts strings, paths and derivations to a
        string.  If `coerceMore' is set, also converts nulls, integers,
@@ -196,6 +203,10 @@ private:
        elements and attributes are compared recursively. */
     bool eqValues(Value & v1, Value & v2);
 
+    void callFunction(Value & fun, Value & arg, Value & v);
+
+public:
+    
     /* Allocation primitives. */
     Value * allocValues(unsigned int count);
     Env & allocEnv();
