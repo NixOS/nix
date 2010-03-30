@@ -58,6 +58,7 @@ struct Value
             const char * s;
             const char * * context;
         } string;
+        const char * path;
         Bindings * attrs;
         struct {
             unsigned int length;
@@ -107,6 +108,13 @@ static inline void mkString(Value & v, const char * s)
 }
 
 
+static inline void mkPath(Value & v, const char * s)
+{
+    v.type = tPath;
+    v.path = s;
+}
+
+
 typedef std::map<Path, PathSet> DrvRoots;
 typedef std::map<Path, Hash> DrvHashes;
 
@@ -134,6 +142,10 @@ struct EvalState
 
     EvalState();
 
+    /* Evaluate an expression read from the given file to normal
+       form. */
+    void evalFile(const Path & path, Value & v);
+
     /* Evaluate an expression to normal form, storing the result in
        value `v'. */
     void eval(Expr e, Value & v);
@@ -156,6 +168,18 @@ struct EvalState
     int forceInt(Value & v);
     void forceAttrs(Value & v);
     void forceList(Value & v);
+
+    /* String coercion.  Converts strings, paths and derivations to a
+       string.  If `coerceMore' is set, also converts nulls, integers,
+       booleans and lists to a string.  If `copyToStore' is set,
+       referenced paths are copied to the Nix store as a side effect.q */
+    string coerceToString(Value & v, PathSet & context,
+        bool coerceMore = false, bool copyToStore = true);
+
+    /* Path coercion.  Converts strings, paths and derivations to a
+       path.  The result is guaranteed to be a canonicalised, absolute
+       path.  Nothing is copied to the store. */
+    Path coerceToPath(Value & v, PathSet & context);
 
 private:
 
@@ -182,9 +206,6 @@ private:
 /* Evaluate an expression to normal form. */
 Expr evalExpr(EvalState & state, Expr e);
 
-/* Evaluate an expression read from the given file to normal form. */
-Expr evalFile(EvalState & state, const Path & path);
-
 /* Evaluate an expression, and recursively evaluate list elements and
    attributes.  If `canonicalise' is true, we remove things like
    position information and make sure that attribute sets are in
@@ -201,17 +222,6 @@ ATermList evalList(EvalState & state, Expr e);
 /* Flatten nested lists into a single list (or expand a singleton into
    a list). */
 ATermList flattenList(EvalState & state, Expr e);
-
-/* String coercion.  Converts strings, paths and derivations to a
-   string.  If `coerceMore' is set, also converts nulls, integers,
-   booleans and lists to a string. */
-string coerceToString(EvalState & state, Expr e, PathSet & context,
-    bool coerceMore = false, bool copyToStore = true);
-
-/* Path coercion.  Converts strings, paths and derivations to a path.
-   The result is guaranteed to be an canonicalised, absolute path.
-   Nothing is copied to the store. */
-Path coerceToPath(EvalState & state, Expr e, PathSet & context);
 
 /* Automatically call a function for which each argument has a default
    value or has a binding in the `args' map.  Note: result is a call,

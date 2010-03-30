@@ -13,7 +13,7 @@ using namespace nix;
 void doTest(string s)
 {
     EvalState state;
-    Expr e = parseExprFromString(state, s, "/");
+    Expr e = parseExprFromString(state, s, absPath("."));
     printMsg(lvlError, format(">>>>> %1%") % e);
     Value v;
     state.strictEval(e, v);
@@ -66,6 +66,8 @@ void run(Strings args)
     doTest("if false then 1 else 2");
     doTest("if false || true then 1 else 2");
     doTest("let x = x; in if true || x then 1 else 2");
+    doTest("/etc/passwd");
+    doTest("import ./foo.nix");
 }
 
 

@@ -14,6 +14,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstring>
 
 
 namespace nix {
@@ -69,20 +70,11 @@ static Expr prim_null(EvalState & state, const ATermVector & args)
 }
 
 
-/* Return a string constant representing the current platform.  Note!
-   that differs between platforms, so Nix expressions using
-   `__currentSystem' can evaluate to different values on different
-   platforms. */
-static Expr prim_currentSystem(EvalState & state, const ATermVector & args)
-{
-    return makeStr(thisSystem);
-}
-
-
 static Expr prim_currentTime(EvalState & state, const ATermVector & args)
 {
     return ATmake("Int(<int>)", time(0));
 }
+#endif
 
 
 /*************************************************************
@@ -92,10 +84,10 @@ static Expr prim_currentTime(EvalState & state, const ATermVector & args)
 
 /* Load and evaluate an expression from path specified by the
    argument. */ 
-static Expr prim_import(EvalState & state, const ATermVector & args)
+static void prim_import(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = coerceToPath(state, args[0], context);
+    Path path = state.coerceToPath(*args[0], context);
 
     for (PathSet::iterator i = context.begin(); i != context.end(); ++i) {
         assert(isStorePath(*i));
@@ -106,10 +98,11 @@ static Expr prim_import(EvalState & state, const ATermVector & args)
             store->buildDerivations(singleton<PathSet>(*i));
     }
 
-    return evalFile(state, path);
+    state.evalFile(path, v);
 }
 
 
+#if 0
 /* Determine whether the argument is the null value. */
 static Expr prim_isNull(EvalState & state, const ATermVector & args)
 {
@@ -1134,7 +1127,7 @@ void EvalState::createBaseEnv()
         v.type = tNull;
     }
     {   Value & v = (*baseEnv.bindings[toATerm("builtins")].attrs)[toATerm("currentSystem")];
-        mkString(v, thisSystem.c_str()); // !!! copy string
+        mkString(v, strdup(thisSystem.c_str()));
     }
 
 #if 0    
@@ -1143,7 +1136,9 @@ void EvalState::createBaseEnv()
     addPrimOp("__currentTime", 0, prim_currentTime);
 
     // Miscellaneous
+#endif
     addPrimOp("import", 1, prim_import);
+#if 0
     addPrimOp("isNull", 1, prim_isNull);
     addPrimOp("__isFunction", 1, prim_isFunction);
     addPrimOp("__isString", 1, prim_isString);

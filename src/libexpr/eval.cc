@@ -29,6 +29,9 @@ std::ostream & operator << (std::ostream & str, Value & v)
     case tString:
         str << "\"" << v.string.s << "\""; // !!! escaping
         break;
+    case tPath:
+        str << v.path; // !!! escaping?
+        break;
     case tNull:
         str << "true";
         break;
@@ -209,6 +212,20 @@ Env & EvalState::allocEnv()
 }
 
 
+void EvalState::evalFile(const Path & path, Value & v)
+{
+    startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
+    Expr e = parseExprFromFile(*this, path);
+    try {
+        eval(e, v);
+    } catch (Error & e) {
+        e.addPrefix(format("while evaluating the file `%1%':\n")
+            % path);
+        throw;
+    }
+}
+
+
 static char * deepestStack = (char *) -1; /* for measuring stack usage */
 
 
@@ -241,7 +258,12 @@ void EvalState::eval(Env & env, Expr e, Value & v)
     ATerm s; ATermList context;
     if (matchStr(e, s, context)) {
         assert(context == ATempty);
-        mkString(v, ATgetName(ATgetAFun(s)));
+        mkString(v, strdup(ATgetName(ATgetAFun(s))));
+        return;
+    }
+
+    if (matchPath(e, s)) {
+        mkPath(v, strdup(ATgetName(ATgetAFun(s))));
         return;
     }
 
@@ -282,8 +304,14 @@ void EvalState::eval(Env & env, Expr e, Value & v)
         eval(env, e2, v);
         forceAttrs(v); // !!! eval followed by force is slightly inefficient
         Bindings::iterator i = v.attrs->find(name);
-        if (i == v.attrs->end()) throw TypeError("attribute not found");
-        forceValue(i->second);
+        if (i == v.attrs->end())
+            throwEvalError("attribute `%1%' missing", aterm2String(name));
+        try {            
+            forceValue(i->second);
+        } catch (Error & e) {
+            addErrorPrefix(e, "while evaluating the attribute `%1%':\n", aterm2String(name));
+            throw;
+        }
         v = i->second;
         return;
     }
@@ -566,6 +594,80 @@ void EvalState::forceList(Value & v)
     forceValue(v);
     if (v.type != tList)
         throw TypeError(format("value is %1% while a list was expected") % showType(v));
+}
+
+
+string EvalState::coerceToString(Value & v, PathSet & context,
+    bool coerceMore, bool copyToStore)
+{
+    forceValue(v);
+
+    string s;
+
+    if (v.type == tString) return v.string.s;
+
+    if (v.type == tPath) {
+        Path path(canonPath(v.path));
+
+        if (!copyToStore) return path;
+        
+        if (isDerivation(path))
+            throw EvalError(format("file names are not allowed to end in `%1%'")
+                % drvExtension);
+
+        Path dstPath;
+        if (srcToStore[path] != "")
+            dstPath = srcToStore[path];
+        else {
+            dstPath = readOnlyMode
+                ? computeStorePathForPath(path).first
+                : store->addToStore(path);
+            srcToStore[path] = dstPath;
+            printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
+                % path % dstPath);
+        }
+
+        context.insert(dstPath);
+        return dstPath;
+    }
+
+    if (v.type == tAttrs) {
+        Bindings::iterator i = v.attrs->find(toATerm("outPath"));
+        if (i == v.attrs->end())
+            throwTypeError("cannot coerce an attribute set (except a derivation) to a string");
+        return coerceToString(i->second, context, coerceMore, copyToStore);
+    }
+
+    if (coerceMore) {
+
+        /* Note that `false' is represented as an empty string for
+           shell scripting convenience, just like `null'. */
+        if (v.type == tBool && v.boolean) return "1";
+        if (v.type == tBool && !v.boolean) return "";
+        if (v.type == tInt) return int2String(v.integer);
+        if (v.type == tNull) return "";
+
+        if (v.type == tList) {
+            string result;
+            for (unsigned int n = 0; n < v.list.length; ++n) {
+                if (n) result += " ";
+                result += coerceToString(v.list.elems[n],
+                    context, coerceMore, copyToStore);
+            }
+            return result;
+        }
+    }
+    
+    throwTypeError("cannot coerce %1% to a string", showType(v));
+}
+
+
+Path EvalState::coerceToPath(Value & v, PathSet & context)
+{
+    string path = coerceToString(v, context, false, false);
+    if (path == "" || path[0] != '/')
+        throw EvalError(format("string `%1%' doesn't represent an absolute path") % path);
+    return path;
 }
 
 
@@ -1046,22 +1148,6 @@ LocalNoInline(Expr evalCall(EvalState & state, Expr fun, Expr arg))
 }
 
 
-LocalNoInline(Expr evalSelect(EvalState & state, Expr e, ATerm name))
-{
-    ATerm pos;
-    string s = aterm2String(name);
-    Expr a = queryAttr(evalExpr(state, e), s, pos);
-    if (!a) throwEvalError("attribute `%1%' missing", s);
-    try {
-        return evalExpr(state, a);
-    } catch (Error & e) {
-        addErrorPrefix(e, "while evaluating the attribute `%1%' at %2%:\n",
-            s, showPos(pos));
-        throw;
-    }
-}
-
-
 LocalNoInline(Expr evalAssert(EvalState & state, Expr cond, Expr body, ATerm pos))
 {
     if (!evalBool(state, cond))
@@ -1349,20 +1435,6 @@ Expr evalExpr(EvalState & state, Expr e)
     }
     state.normalForms.set(e, nf);
     return nf;
-}
-
-
-Expr evalFile(EvalState & state, const Path & path)
-{
-    startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
-    Expr e = parseExprFromFile(state, path);
-    try {
-        return evalExpr(state, e);
-    } catch (Error & e) {
-        e.addPrefix(format("while evaluating the file `%1%':\n")
-            % path);
-        throw;
-    }
 }
 
 
