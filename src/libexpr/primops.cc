@@ -687,24 +687,32 @@ static void prim_attrNames(EvalState & state, Value * * args, Value & v)
 
     return makeList(list);
 }
+#endif
 
 
 /* Dynamic version of the `.' operator. */
 static void prim_getAttr(EvalState & state, Value * * args, Value & v)
 {
-    string attr = evalStringNoCtx(state, args[0]);
-    return evalExpr(state, makeSelect(args[1], toATerm(attr)));
+    string attr = state.forceStringNoCtx(*args[0]);
+    state.forceAttrs(*args[1]);
+    Bindings::iterator i = args[1]->attrs->find(toATerm(attr));
+    if (i == args[1]->attrs->end())
+        throw EvalError(format("attribute `%1%' missing") % attr);
+    state.forceValue(i->second);
+    v = i->second;
 }
 
 
 /* Dynamic version of the `?' operator. */
 static void prim_hasAttr(EvalState & state, Value * * args, Value & v)
 {
-    string attr = evalStringNoCtx(state, args[0]);
-    return evalExpr(state, makeOpHasAttr(args[1], toATerm(attr)));
+    string attr = state.forceStringNoCtx(*args[0]);
+    state.forceAttrs(*args[1]);
+    mkBool(v, args[1]->attrs->find(toATerm(attr)) != args[1]->attrs->end());
 }
 
 
+#if 0
 /* Builds an attribute set from a list specifying (name, value)
    pairs.  To be precise, a list [{name = "name1"; value = value1;}
    ... {name = "nameN"; value = valueN;}] is transformed to {name1 =
@@ -896,31 +904,24 @@ static void prim_add(EvalState & state, Value * * args, Value & v)
 }
 
 
-#if 0
 static void prim_sub(EvalState & state, Value * * args, Value & v)
 {
-    int i1 = evalInt(state, args[0]);
-    int i2 = evalInt(state, args[1]);
-    return makeInt(i1 - i2);
+    mkInt(v, state.forceInt(*args[0]) - state.forceInt(*args[1]));
 }
 
 
 static void prim_mul(EvalState & state, Value * * args, Value & v)
 {
-    int i1 = evalInt(state, args[0]);
-    int i2 = evalInt(state, args[1]);
-    return makeInt(i1 * i2);
+    mkInt(v, state.forceInt(*args[0]) * state.forceInt(*args[1]));
 }
 
 
 static void prim_div(EvalState & state, Value * * args, Value & v)
 {
-    int i1 = evalInt(state, args[0]);
-    int i2 = evalInt(state, args[1]);
+    int i2 = state.forceInt(*args[1]);
     if (i2 == 0) throw EvalError("division by zero");
-    return makeInt(i1 / i2);
+    mkInt(v, state.forceInt(*args[0]) / i2);
 }
-#endif
 
 
 static void prim_lessThan(EvalState & state, Value * * args, Value & v)
@@ -941,36 +942,36 @@ static void prim_toString(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
     string s = state.coerceToString(*args[0], context, true, false);
-    mkString(v, strdup(s.c_str())); // !!! context
+    mkString(v, s.c_str()); // !!! context
 }
 
 
-#if 0
 /* `substring start len str' returns the substring of `str' starting
    at character position `min(start, stringLength str)' inclusive and
    ending at `min(start + len, stringLength str)'.  `start' must be
    non-negative. */
 static void prim_substring(EvalState & state, Value * * args, Value & v)
 {
-    int start = evalInt(state, args[0]);
-    int len = evalInt(state, args[1]);
+    int start = state.forceInt(*args[0]);
+    int len = state.forceInt(*args[1]);
     PathSet context;
-    string s = coerceToString(state, args[2], context);
+    string s = state.coerceToString(*args[2], context);
 
     if (start < 0) throw EvalError("negative start position in `substring'");
 
-    return makeStr(string(s, start, len), context);
+    mkString(v, string(s, start, len), context);
 }
 
 
 static void prim_stringLength(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
-    string s = coerceToString(state, args[0], context);
-    return makeInt(s.size());
+    string s = state.coerceToString(*args[0], context);
+    mkInt(v, s.size());
 }
 
 
+#if 0
 static void prim_unsafeDiscardStringContext(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
@@ -1078,7 +1079,7 @@ void EvalState::createBaseEnv()
     mkInt(v, time(0));
     addConstant("__currentTime", v);
 
-    mkString(v, strdup(thisSystem.c_str()));
+    mkString(v, thisSystem.c_str());
     addConstant("__currentSystem", v);
 
     // Miscellaneous
@@ -1120,8 +1121,10 @@ void EvalState::createBaseEnv()
 
     // Attribute sets
     addPrimOp("__attrNames", 1, prim_attrNames);
+#endif
     addPrimOp("__getAttr", 2, prim_getAttr);
     addPrimOp("__hasAttr", 2, prim_hasAttr);
+#if 0
     addPrimOp("__isAttrs", 1, prim_isAttrs);
     addPrimOp("removeAttrs", 2, prim_removeAttrs);
     addPrimOp("__listToAttrs", 1, prim_listToAttrs);
@@ -1140,18 +1143,16 @@ void EvalState::createBaseEnv()
     
     // Integer arithmetic
     addPrimOp("__add", 2, prim_add);
-#if 0
     addPrimOp("__sub", 2, prim_sub);
     addPrimOp("__mul", 2, prim_mul);
     addPrimOp("__div", 2, prim_div);
-#endif
     addPrimOp("__lessThan", 2, prim_lessThan);
 
     // String manipulation
     addPrimOp("toString", 1, prim_toString);
-#if 0    
     addPrimOp("__substring", 3, prim_substring);
     addPrimOp("__stringLength", 1, prim_stringLength);
+#if 0    
     addPrimOp("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
     addPrimOp("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
 

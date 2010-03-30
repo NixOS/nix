@@ -104,19 +104,9 @@ static inline void mkBool(Value & v, bool b)
 }
 
 
-static inline void mkString(Value & v, const char * s)
-{
-    v.type = tString;
-    v.string.s = s;
-    v.string.context = 0;
-}
-
-
-static inline void mkPath(Value & v, const char * s)
-{
-    v.type = tPath;
-    v.path = s;
-}
+void mkString(Value & v, const char * s);
+void mkString(Value & v, const string & s, const PathSet & context);
+void mkPath(Value & v, const char * s);
 
 
 typedef std::map<Path, PathSet> DrvRoots;
@@ -177,6 +167,7 @@ public:
     void forceAttrs(Value & v);
     void forceList(Value & v);
     void forceFunction(Value & v); // either lambda or primop
+    string forceStringNoCtx(Value & v);
 
     /* String coercion.  Converts strings, paths and derivations to a
        string.  If `coerceMore' is set, also converts nulls, integers,
@@ -234,7 +225,6 @@ Expr strictEvalExpr(EvalState & state, Expr e);
 
 /* Specific results. */
 string evalString(EvalState & state, Expr e, PathSet & context);
-string evalStringNoCtx(EvalState & state, Expr e);
 int evalInt(EvalState & state, Expr e);
 bool evalBool(EvalState & state, Expr e);
 ATermList evalList(EvalState & state, Expr e);

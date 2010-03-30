@@ -167,6 +167,28 @@ static void mkThunk(Value & v, Env & env, Expr expr)
 }
 
 
+void mkString(Value & v, const char * s)
+{
+    v.type = tString;
+    v.string.s = strdup(s);
+    v.string.context = 0;
+}
+
+
+void mkString(Value & v, const string & s, const PathSet & context)
+{
+    mkString(v, s.c_str());
+    // !!! context
+}
+
+
+void mkPath(Value & v, const char * s)
+{
+    v.type = tPath;
+    v.path = strdup(s);
+}
+
+
 static Value * lookupWith(Env * env, Sym name)
 {
     if (!env) return 0;
@@ -206,7 +228,7 @@ static Value * lookupVar(Env * env, Sym name)
     }
 #endif
     
-    throw Error("undefined variable");
+    throw Error(format("undefined variable `%1%'") % aterm2String(name));
 }
 
 
@@ -257,38 +279,35 @@ void EvalState::eval(Env & env, Expr e, Value & v)
     char x;
     if (&x < deepestStack) deepestStack = &x;
     
-    printMsg(lvlError, format("eval: %1%") % e);
+    debug(format("eval: %1%") % e);
 
     nrEvaluated++;
 
     Sym name;
+    int n;
+    ATerm s; ATermList context, es;
+    ATermList rbnds, nrbnds;
+    Expr e1, e2, e3, fun, arg, attrs;
+    Pattern pat; Expr body; Pos pos;
+    
     if (matchVar(e, name)) {
         Value * v2 = lookupVar(&env, name);
         forceValue(*v2);
         v = *v2;
-        return;
     }
 
-    int n;
-    if (matchInt(e, n)) {
+    else if (matchInt(e, n))
         mkInt(v, n);
-        return;
-    }
 
-    ATerm s; ATermList context;
-    if (matchStr(e, s, context)) {
+    else if (matchStr(e, s, context)) {
         assert(context == ATempty);
-        mkString(v, strdup(ATgetName(ATgetAFun(s))));
-        return;
+        mkString(v, ATgetName(ATgetAFun(s)));
     }
 
-    if (matchPath(e, s)) {
-        mkPath(v, strdup(ATgetName(ATgetAFun(s))));
-        return;
-    }
+    else if (matchPath(e, s))
+        mkPath(v, ATgetName(ATgetAFun(s)));
 
-    ATermList es;
-    if (matchAttrs(e, es)) {
+    else if (matchAttrs(e, es)) {
         v.type = tAttrs;
         v.attrs = new Bindings;
         ATerm e2, pos;
@@ -298,11 +317,9 @@ void EvalState::eval(Env & env, Expr e, Value & v)
             nrValues++;
             mkThunk(v2, env, e2);
         }
-        return;
     }
 
-    ATermList rbnds, nrbnds;
-    if (matchRec(e, rbnds, nrbnds)) {
+    else if (matchRec(e, rbnds, nrbnds)) {
         Env & env2(allocEnv());
         env2.up = &env;
         
@@ -315,12 +332,9 @@ void EvalState::eval(Env & env, Expr e, Value & v)
             nrValues++;
             mkThunk(v2, env2, e2);
         }
-        
-        return;
     }
 
-    Expr e1, e2;
-    if (matchSelect(e, e2, name)) {
+    else if (matchSelect(e, e2, name)) {
         eval(env, e2, v);
         forceAttrs(v); // !!! eval followed by force is slightly inefficient
         Bindings::iterator i = v.attrs->find(name);
@@ -333,29 +347,23 @@ void EvalState::eval(Env & env, Expr e, Value & v)
             throw;
         }
         v = i->second;
-        return;
     }
 
-    Pattern pat; Expr body; Pos pos;
-    if (matchFunction(e, pat, body, pos)) {
+    else if (matchFunction(e, pat, body, pos)) {
         v.type = tLambda;
         v.lambda.env = &env;
         v.lambda.pat = pat;
         v.lambda.body = body;
-        return;
     }
 
-    Expr fun, arg;
-    if (matchCall(e, fun, arg)) {
+    else if (matchCall(e, fun, arg)) {
         eval(env, fun, v);
         Value vArg;
         mkThunk(vArg, env, arg); // !!! should this be on the heap?
         callFunction(v, vArg, v);
-        return;
     }
 
-    Expr attrs;
-    if (matchWith(e, attrs, body, pos)) {
+    else if (matchWith(e, attrs, body, pos)) {
         Env & env2(allocEnv());
         env2.up = &env;
 
@@ -365,31 +373,27 @@ void EvalState::eval(Env & env, Expr e, Value & v)
         forceAttrs(vAttrs);
         
         eval(env2, body, v);
-        return;
     }
 
-    if (matchList(e, es)) {
+    else if (matchList(e, es)) {
         mkList(v, ATgetLength(es));
         for (unsigned int n = 0; n < v.list.length; ++n, es = ATgetNext(es))
             mkThunk(v.list.elems[n], env, ATgetFirst(es));
-        return;
     }
 
-    if (matchOpEq(e, e1, e2)) {
+    else if (matchOpEq(e, e1, e2)) {
         Value v1; eval(env, e1, v1);
         Value v2; eval(env, e2, v2);
         mkBool(v, eqValues(v1, v2));
-        return;
     }
 
-    if (matchOpNEq(e, e1, e2)) {
+    else if (matchOpNEq(e, e1, e2)) {
         Value v1; eval(env, e1, v1);
         Value v2; eval(env, e2, v2);
         mkBool(v, !eqValues(v1, v2));
-        return;
     }
 
-    if (matchOpConcat(e, e1, e2)) {
+    else if (matchOpConcat(e, e1, e2)) {
         Value v1; eval(env, e1, v1);
         forceList(v1);
         Value v2; eval(env, e2, v2);
@@ -401,10 +405,9 @@ void EvalState::eval(Env & env, Expr e, Value & v)
             v.list.elems[n] = v1.list.elems[n];
         for (unsigned int n = 0; n < v2.list.length; ++n)
             v.list.elems[n + v1.list.length] = v2.list.elems[n];
-        return;
     }
 
-    if (matchConcatStrings(e, es)) {
+    else if (matchConcatStrings(e, es)) {
         PathSet context;
         std::ostringstream s;
         
@@ -431,24 +434,62 @@ void EvalState::eval(Env & env, Expr e, Value & v)
                 % s.str());
 
         if (isPath)
-            mkPath(v, strdup(s.str().c_str()));
+            mkPath(v, s.str().c_str());
         else
-            mkString(v, strdup(s.str().c_str())); // !!! context
-        return;
+            mkString(v, s.str().c_str()); // !!! context
     }
 
-    Expr e3;
-    if (matchIf(e, e1, e2, e3)) {
+    /* Conditionals. */
+    else if (matchIf(e, e1, e2, e3))
         eval(env, evalBool(env, e1) ? e2 : e3, v);
-        return;
+
+    /* Assertions. */
+    else if (matchAssert(e, e1, e2, pos)) {
+        if (!evalBool(env, e1))
+            throw AssertionError(format("assertion failed at %1%") % showPos(pos));
+        eval(env, e2, v);
     }
 
-    if (matchOpOr(e, e1, e2)) {
+    /* Negation. */
+    else if (matchOpNot(e, e1))
+        mkBool(v, !evalBool(env, e1));
+
+    /* Implication. */
+    else if (matchOpImpl(e, e1, e2))
+        return mkBool(v, !evalBool(env, e1) || evalBool(env, e2));
+    
+    /* Conjunction (logical AND). */
+    else if (matchOpAnd(e, e1, e2))
+        mkBool(v, evalBool(env, e1) && evalBool(env, e2));
+    
+    /* Disjunction (logical OR). */
+    else if (matchOpOr(e, e1, e2))
         mkBool(v, evalBool(env, e1) || evalBool(env, e2));
-        return;
+
+    /* Attribute set update (//). */
+    else if (matchOpUpdate(e, e1, e2)) {
+        v.type = tAttrs;
+        v.attrs = new Bindings;
+        
+        Value v2;
+        eval(env, e2, v2);
+        foreach (Bindings::iterator, i, *v2.attrs)
+            (*v.attrs)[i->first] = i->second;
+        
+        eval(env, e1, v2);
+        foreach (Bindings::iterator, i, *v2.attrs)
+            if (v.attrs->find(i->first) == v.attrs->end())
+                (*v.attrs)[i->first] = i->second;
     }
 
-    throw Error("unsupported term");
+    /* Attribute existence test (?). */
+    else if (matchOpHasAttr(e, e1, name)) {
+        eval(env, e1, v);
+        forceAttrs(v);
+        mkBool(v, v.attrs->find(name) != v.attrs->end());
+    }
+
+    else throw Error("unsupported term");
 }
 
 
@@ -634,6 +675,18 @@ void EvalState::forceFunction(Value & v)
     forceValue(v);
     if (v.type != tLambda && v.type != tPrimOp && v.type != tPrimOpApp)
         throw TypeError(format("value is %1% while a function was expected") % showType(v));
+}
+
+
+string EvalState::forceStringNoCtx(Value & v)
+{
+    forceValue(v);
+    if (v.type != tString)
+        throw TypeError(format("value is %1% while a string was expected") % showType(v));
+    if (v.string.context)
+        throw EvalError(format("the string `%1%' is not allowed to refer to a store path (such as `%2%')")
+            % v.string.s % v.string.context[0]);
+    return string(v.string.s);
 }
 
 
@@ -901,68 +954,6 @@ LocalNoInline(ATerm expandRec(EvalState & state, ATerm e, ATermList rbnds, ATerm
 }
 
 
-LocalNoInline(Expr updateAttrs(Expr e1, Expr e2))
-{
-    /* Note: e1 and e2 should be in normal form. */
-
-    ATermMap attrs;
-    queryAllAttrs(e1, attrs, true);
-    queryAllAttrs(e2, attrs, true);
-
-    return makeAttrs(attrs);
-}
-
-
-string evalString(EvalState & state, Expr e, PathSet & context)
-{
-    e = evalExpr(state, e);
-    string s;
-    if (!matchStr(e, s, context))
-        throwTypeError("value is %1% while a string was expected", showType(e));
-    return s;
-}
-
-
-string evalStringNoCtx(EvalState & state, Expr e)
-{
-    PathSet context;
-    string s = evalString(state, e, context);
-    if (!context.empty())
-        throw EvalError(format("the string `%1%' is not allowed to refer to a store path (such as `%2%')")
-            % s % *(context.begin()));
-    return s;
-}
-
-
-int evalInt(EvalState & state, Expr e)
-{
-    e = evalExpr(state, e);
-    int i;
-    if (!matchInt(e, i))
-        throwTypeError("value is %1% while an integer was expected", showType(e));
-    return i;
-}
-
-
-bool evalBool(EvalState & state, Expr e)
-{
-    e = evalExpr(state, e);
-    if (e == eTrue) return true;
-    else if (e == eFalse) return false;
-    else throwTypeError("value is %1% while a boolean was expected", showType(e));
-}
-
-
-ATermList evalList(EvalState & state, Expr e)
-{
-    e = evalExpr(state, e);
-    ATermList list;
-    if (!matchList(e, list))
-        throwTypeError("value is %1% while a list was expected", showType(e));
-    return list;
-}
-
-
 static void flattenList(EvalState & state, Expr e, ATermList & result)
 {
     ATermList es;
@@ -1078,14 +1069,6 @@ LocalNoInline(Expr evalCall(EvalState & state, Expr fun, Expr arg))
 }
 
 
-LocalNoInline(Expr evalAssert(EvalState & state, Expr cond, Expr body, ATerm pos))
-{
-    if (!evalBool(state, cond))
-        throw AssertionError(format("assertion failed at %1%") % showPos(pos));
-    return evalExpr(state, body);
-}
-
-
 LocalNoInline(Expr evalWith(EvalState & state, Expr defs, Expr body, ATerm pos))
 {
     ATermMap attrs;
@@ -1106,14 +1089,6 @@ LocalNoInline(Expr evalWith(EvalState & state, Expr defs, Expr body, ATerm pos))
             showPos(pos));
         throw;
     } 
-}
-
-
-LocalNoInline(Expr evalHasAttr(EvalState & state, Expr e, ATerm name))
-{
-    ATermMap attrs;
-    queryAllAttrs(evalExpr(state, e), attrs);
-    return makeBool(attrs.get(name) != 0);
 }
 
 
@@ -1174,19 +1149,6 @@ LocalNoInline(Expr evalSubPath(EvalState & state, Expr e1, Expr e2))
     args.push_back(e1);
     args.push_back(e2);
     return concatStrings(state, args, "/");
-}
-
-
-LocalNoInline(Expr evalOpConcat(EvalState & state, Expr e1, Expr e2))
-{
-    try {
-        ATermList l1 = evalList(state, e1);
-        ATermList l2 = evalList(state, e2);
-        return makeList(ATconcat(l1, l2));
-    } catch (Error & e) {
-        addErrorPrefix(e, "in a list concatenation:\n");
-        throw;
-    }
 }
 
 

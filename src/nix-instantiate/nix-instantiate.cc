@@ -71,9 +71,13 @@ void processExpr(EvalState & state, const Strings & attrPaths,
     bool parseOnly, bool strict, const ATermMap & autoArgs,
     bool evalOnly, bool xmlOutput, Expr e)
 {
-    Value v;
-    state.strictEval(e, v);
-    std::cout << v << std::endl;
+    if (parseOnly)
+        std::cout << format("%1%\n") % canonicaliseExpr(e);
+    else {
+        Value v;
+        state.strictEval(e, v);
+        std::cout << v << std::endl;
+    }
     
 #if 0
     for (Strings::const_iterator i = attrPaths.begin(); i != attrPaths.end(); ++i) {

@@ -72,6 +72,7 @@ void run(Strings args)
     //doTest("import ./foo.nix");
     doTest("map (x: __add 1 x) [ 1 2 3 ]");
     doTest("map (builtins.add 1) [ 1 2 3 ]");
+    doTest("builtins.hasAttr \"x\" { x = 1; }");
 }
 
 
