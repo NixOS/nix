@@ -45,45 +45,47 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
 }
 
 
-#if 0
 /* Determine whether the argument is the null value. */
 static void prim_isNull(EvalState & state, Value * * args, Value & v)
 {
-    return makeBool(matchNull(evalExpr(state, args[0])));
+    state.forceValue(*args[0]);
+    mkBool(v, args[0]->type == tNull);
 }
 
 
 /* Determine whether the argument is a function. */
 static void prim_isFunction(EvalState & state, Value * * args, Value & v)
 {
-    Expr e = evalExpr(state, args[0]);
-    Pattern pat;
-    ATerm body, pos;
-    return makeBool(matchFunction(e, pat, body, pos));
+    state.forceValue(*args[0]);
+    mkBool(v, args[0]->type == tLambda);
 }
+
 
 /* Determine whether the argument is an Int. */
 static void prim_isInt(EvalState & state, Value * * args, Value & v)
 {
-    int i;
-    return makeBool(matchInt(evalExpr(state, args[0]), i));
+    state.forceValue(*args[0]);
+    mkBool(v, args[0]->type == tInt);
 }
+
 
 /* Determine whether the argument is an String. */
 static void prim_isString(EvalState & state, Value * * args, Value & v)
 {
-    string s;
-    PathSet l;
-    return makeBool(matchStr(evalExpr(state, args[0]), s, l));
+    state.forceValue(*args[0]);
+    mkBool(v, args[0]->type == tString);
 }
+
 
 /* Determine whether the argument is an Bool. */
 static void prim_isBool(EvalState & state, Value * * args, Value & v)
 {
-    ATermBool b;
-    return makeBool(matchBool(evalExpr(state, args[0]), b));
+    state.forceValue(*args[0]);
+    mkBool(v, args[0]->type == tBool);
 }
 
+
+#if 0
 static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
 {
     startNest(nest, lvlDebug, "finding dependencies");
@@ -130,13 +132,14 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
 
     return makeList(res);
 }
+#endif
 
 
 static void prim_abort(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
     throw Abort(format("evaluation aborted with the following error message: `%1%'") %
-        evalString(state, args[0], context));
+        state.coerceToString(*args[0], context));
 }
 
 
@@ -144,10 +147,11 @@ static void prim_throw(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
     throw ThrownError(format("user-thrown exception: %1%") %
-        evalString(state, args[0], context));
+        state.coerceToString(*args[0], context));
 }
 
 
+#if 0
 static void prim_addErrorContext(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
@@ -176,16 +180,18 @@ static void prim_tryEval(EvalState & state, Value * * args, Value & v)
     }
     return makeAttrs(res);
 }
+#endif
 
 
 /* Return an environment variable.  Use with care. */
 static void prim_getEnv(EvalState & state, Value * * args, Value & v)
 {
-    string name = evalStringNoCtx(state, args[0]);
-    return makeStr(getEnv(name));
+    string name = state.forceStringNoCtx(*args[0]);
+    mkString(v, getEnv(name));
 }
 
 
+#if 0
 /* Evaluate the first expression, and print its abstract syntax tree
    on standard error.  Then return the second expression.  Useful for
    debugging.
@@ -488,6 +494,7 @@ static void prim_derivationLazy(EvalState & state, Value * * args, Value & v)
     
     return makeAttrs(attrs);
 }
+#endif
 
 
 /*************************************************************
@@ -499,11 +506,12 @@ static void prim_derivationLazy(EvalState & state, Value * * args, Value & v)
 static void prim_toPath(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
-    string path = coerceToPath(state, args[0], context);
-    return makeStr(canonPath(path), context);
+    string path = state.coerceToPath(*args[0], context);
+    mkString(v, canonPath(path), context);
 }
 
 
+#if 0
 /* Allow a valid store path to be used in an expression.  This is
    useful in some generated expressions such as in nix-push, which
    generates a call to a function with an already existing store path
@@ -524,15 +532,16 @@ static void prim_storePath(EvalState & state, Value * * args, Value & v)
     context.insert(path2);
     return makeStr(path, context);
 }
+#endif
 
 
 static void prim_pathExists(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = coerceToPath(state, args[0], context);
+    Path path = state.coerceToPath(*args[0], context);
     if (!context.empty())
         throw EvalError(format("string `%1%' cannot refer to other paths") % path);
-    return makeBool(pathExists(path));
+    mkBool(v, pathExists(path));
 }
 
 
@@ -541,7 +550,7 @@ static void prim_pathExists(EvalState & state, Value * * args, Value & v)
 static void prim_baseNameOf(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
-    return makeStr(baseNameOf(coerceToString(state, args[0], context)), context);
+    mkString(v, baseNameOf(state.coerceToString(*args[0], context)), context);
 }
 
 
@@ -551,10 +560,8 @@ static void prim_baseNameOf(EvalState & state, Value * * args, Value & v)
 static void prim_dirOf(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
-    Expr e = evalExpr(state, args[0]); ATerm dummy;
-    bool isPath = matchPath(e, dummy);
-    Path dir = dirOf(coerceToPath(state, e, context));
-    return isPath ? makePath(toATerm(dir)) : makeStr(dir, context);
+    Path dir = dirOf(state.coerceToPath(*args[0], context));
+    if (args[0]->type == tPath) mkPath(v, dir.c_str()); else mkString(v, dir, context);
 }
 
 
@@ -562,10 +569,10 @@ static void prim_dirOf(EvalState & state, Value * * args, Value & v)
 static void prim_readFile(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = coerceToPath(state, args[0], context);
+    Path path = state.coerceToPath(*args[0], context);
     if (!context.empty())
         throw EvalError(format("string `%1%' cannot refer to other paths") % path);
-    return makeStr(readFile(path));
+    mkString(v, readFile(path).c_str());
 }
 
 
@@ -574,6 +581,7 @@ static void prim_readFile(EvalState & state, Value * * args, Value & v)
  *************************************************************/
 
 
+#if 0
 /* Convert the argument (which can be any Nix expression) to an XML
    representation returned in a string.  Not all Nix expressions can
    be sensibly or completely represented (e.g., functions). */
@@ -662,6 +670,7 @@ static void prim_filterSource(EvalState & state, Value * * args, Value & v)
 
     return makeStr(dstPath, singleton<PathSet>(dstPath));
 }
+#endif
 
 
 /*************************************************************
@@ -673,21 +682,18 @@ static void prim_filterSource(EvalState & state, Value * * args, Value & v)
    list of strings. */
 static void prim_attrNames(EvalState & state, Value * * args, Value & v)
 {
-    ATermMap attrs;
-    queryAllAttrs(evalExpr(state, args[0]), attrs);
+    state.forceAttrs(*args[0]);
+
+    state.mkList(v, args[0]->attrs->size());
 
     StringSet names;
-    for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i)
-        names.insert(aterm2String(i->key));
+    foreach (Bindings::iterator, i, *args[0]->attrs)
+        names.insert(aterm2String(i->first));
 
-    ATermList list = ATempty;
-    for (StringSet::const_reverse_iterator i = names.rbegin();
-         i != names.rend(); ++i)
-        list = ATinsert(list, makeStr(*i, PathSet()));
-
-    return makeList(list);
+    unsigned int n = 0;
+    foreach (StringSet::iterator, i, names)
+        mkString(v.list.elems[n++], *i);
 }
-#endif
 
 
 /* Dynamic version of the `.' operator. */
@@ -709,6 +715,31 @@ static void prim_hasAttr(EvalState & state, Value * * args, Value & v)
     string attr = state.forceStringNoCtx(*args[0]);
     state.forceAttrs(*args[1]);
     mkBool(v, args[1]->attrs->find(toATerm(attr)) != args[1]->attrs->end());
+}
+
+
+/* Determine whether the argument is an attribute set. */
+static void prim_isAttrs(EvalState & state, Value * * args, Value & v)
+{
+    state.forceValue(*args[0]);
+    mkBool(v, args[0]->type == tAttrs);
+}
+
+
+static void prim_removeAttrs(EvalState & state, Value * * args, Value & v)
+{
+    state.forceAttrs(*args[0]);
+    state.forceList(*args[1]);
+
+    state.mkAttrs(v);
+        
+    foreach (Bindings::iterator, i, *args[0]->attrs)
+        (*v.attrs)[i->first] = i->second;
+
+    for (unsigned int i = 0; i < args[1]->list.length; ++i) {
+        state.forceStringNoCtx(args[1]->list.elems[i]);
+        v.attrs->erase(toATerm(args[1]->list.elems[i].string.s));
+    }
 }
 
 
@@ -745,31 +776,10 @@ static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
         throw;
     }
 }
+#endif
 
 
-static void prim_removeAttrs(EvalState & state, Value * * args, Value & v)
-{
-    ATermMap attrs;
-    queryAllAttrs(evalExpr(state, args[0]), attrs, true);
-    
-    ATermList list = evalList(state, args[1]);
-
-    for (ATermIterator i(list); i; ++i)
-        /* It's not an error for *i not to exist. */
-        attrs.remove(toATerm(evalStringNoCtx(state, *i)));
-
-    return makeAttrs(attrs);
-}
-
-
-/* Determine whether the argument is an attribute set. */
-static void prim_isAttrs(EvalState & state, Value * * args, Value & v)
-{
-    ATermList list;
-    return makeBool(matchAttrs(evalExpr(state, args[0]), list));
-}
-
-
+#if 0
 /* Return the right-biased intersection of two attribute sets as1 and
    as2, i.e. a set that contains every attribute from as2 that is also
    a member of as1. */
@@ -827,6 +837,7 @@ static void prim_functionArgs(EvalState & state, Value * * args, Value & v)
 
     return makeAttrs(as);
 }
+#endif
 
 
 /*************************************************************
@@ -837,10 +848,9 @@ static void prim_functionArgs(EvalState & state, Value * * args, Value & v)
 /* Determine whether the argument is a list. */
 static void prim_isList(EvalState & state, Value * * args, Value & v)
 {
-    ATermList list;
-    return makeBool(matchList(evalExpr(state, args[0]), list));
+    state.forceValue(*args[0]);
+    mkBool(v, args[0]->type == tList);
 }
-#endif
 
 
 /* Return the first element of a list. */
@@ -883,14 +893,12 @@ static void prim_map(EvalState & state, Value * * args, Value & v)
 }
 
 
-#if 0
 /* Return the length of a list.  This is an O(1) time operation. */
 static void prim_length(EvalState & state, Value * * args, Value & v)
 {
-    ATermList list = evalList(state, args[0]);
-    return makeInt(ATgetLength(list));
+    state.forceList(*args[0]);
+    mkInt(v, v.list.length);
 }
-#endif
 
 
 /*************************************************************
@@ -1022,6 +1030,7 @@ static void prim_stringToExpr(EvalState & state, Value * * args, Value & v)
         throw EvalError("stringToExpr needs string argument!");
     return ATreadFromString(s.c_str());
 }
+#endif
 
 
 /*************************************************************
@@ -1031,23 +1040,20 @@ static void prim_stringToExpr(EvalState & state, Value * * args, Value & v)
 
 static void prim_parseDrvName(EvalState & state, Value * * args, Value & v)
 {
-    string name = evalStringNoCtx(state, args[0]);
+    string name = state.forceStringNoCtx(*args[0]);
     DrvName parsed(name);
-    ATermMap attrs(2);
-    attrs.set(toATerm("name"), makeAttrRHS(makeStr(parsed.name), makeNoPos()));
-    attrs.set(toATerm("version"), makeAttrRHS(makeStr(parsed.version), makeNoPos()));
-    return makeAttrs(attrs);
+    state.mkAttrs(v);
+    mkString((*v.attrs)[toATerm("name")], parsed.name);
+    mkString((*v.attrs)[toATerm("version")], parsed.version);
 }
 
 
 static void prim_compareVersions(EvalState & state, Value * * args, Value & v)
 {
-    string version1 = evalStringNoCtx(state, args[0]);
-    string version2 = evalStringNoCtx(state, args[1]);
-    int d = compareVersions(version1, version2);
-    return makeInt(d);
+    string version1 = state.forceStringNoCtx(*args[0]);
+    string version2 = state.forceStringNoCtx(*args[1]);
+    mkInt(v, compareVersions(version1, version2));
 }
-#endif
 
 
 /*************************************************************
@@ -1084,18 +1090,22 @@ void EvalState::createBaseEnv()
 
     // Miscellaneous
     addPrimOp("import", 1, prim_import);
-#if 0
     addPrimOp("isNull", 1, prim_isNull);
     addPrimOp("__isFunction", 1, prim_isFunction);
     addPrimOp("__isString", 1, prim_isString);
     addPrimOp("__isInt", 1, prim_isInt);
     addPrimOp("__isBool", 1, prim_isBool);
+#if 0
     addPrimOp("__genericClosure", 1, prim_genericClosure);
+#endif
     addPrimOp("abort", 1, prim_abort);
     addPrimOp("throw", 1, prim_throw);
+#if 0
     addPrimOp("__addErrorContext", 2, prim_addErrorContext);
     addPrimOp("__tryEval", 1, prim_tryEval);
+#endif
     addPrimOp("__getEnv", 1, prim_getEnv);
+#if 0
     addPrimOp("__trace", 2, prim_trace);
     
     // Expr <-> String
@@ -1105,41 +1115,43 @@ void EvalState::createBaseEnv()
     // Derivations
     addPrimOp("derivation!", 1, prim_derivationStrict);
     addPrimOp("derivation", 1, prim_derivationLazy);
+#endif
 
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);
+#if 0
     addPrimOp("__storePath", 1, prim_storePath);
+#endif
     addPrimOp("__pathExists", 1, prim_pathExists);
     addPrimOp("baseNameOf", 1, prim_baseNameOf);
     addPrimOp("dirOf", 1, prim_dirOf);
     addPrimOp("__readFile", 1, prim_readFile);
 
     // Creating files
+#if 0
     addPrimOp("__toXML", 1, prim_toXML);
     addPrimOp("__toFile", 2, prim_toFile);
     addPrimOp("__filterSource", 2, prim_filterSource);
+#endif
 
     // Attribute sets
     addPrimOp("__attrNames", 1, prim_attrNames);
-#endif
     addPrimOp("__getAttr", 2, prim_getAttr);
     addPrimOp("__hasAttr", 2, prim_hasAttr);
-#if 0
     addPrimOp("__isAttrs", 1, prim_isAttrs);
     addPrimOp("removeAttrs", 2, prim_removeAttrs);
+#if 0
     addPrimOp("__listToAttrs", 1, prim_listToAttrs);
     addPrimOp("__intersectAttrs", 2, prim_intersectAttrs);
     addPrimOp("__functionArgs", 1, prim_functionArgs);
+#endif
 
     // Lists
     addPrimOp("__isList", 1, prim_isList);
-#endif
     addPrimOp("__head", 1, prim_head);
     addPrimOp("__tail", 1, prim_tail);
     addPrimOp("map", 2, prim_map);
-#if 0
     addPrimOp("__length", 1, prim_length);
-#endif
     
     // Integer arithmetic
     addPrimOp("__add", 2, prim_add);
@@ -1155,11 +1167,11 @@ void EvalState::createBaseEnv()
 #if 0    
     addPrimOp("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
     addPrimOp("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
+#endif
 
     // Versions
     addPrimOp("__parseDrvName", 1, prim_parseDrvName);
     addPrimOp("__compareVersions", 2, prim_compareVersions);
-#endif
 }
 
 

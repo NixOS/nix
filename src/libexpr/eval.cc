@@ -254,6 +254,13 @@ void EvalState::mkList(Value & v, unsigned int length)
 }
 
 
+void EvalState::mkAttrs(Value & v)
+{
+    v.type = tAttrs;
+    v.attrs = new Bindings;
+}
+
+
 void EvalState::evalFile(const Path & path, Value & v)
 {
     startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
@@ -308,8 +315,7 @@ void EvalState::eval(Env & env, Expr e, Value & v)
         mkPath(v, ATgetName(ATgetAFun(s)));
 
     else if (matchAttrs(e, es)) {
-        v.type = tAttrs;
-        v.attrs = new Bindings;
+        mkAttrs(v);
         ATerm e2, pos;
         for (ATermIterator i(es); i; ++i) {
             if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
@@ -468,8 +474,7 @@ void EvalState::eval(Env & env, Expr e, Value & v)
 
     /* Attribute set update (//). */
     else if (matchOpUpdate(e, e1, e2)) {
-        v.type = tAttrs;
-        v.attrs = new Bindings;
+        mkAttrs(v);
         
         Value v2;
         eval(env, e2, v2);

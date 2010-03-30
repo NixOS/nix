@@ -105,7 +105,7 @@ static inline void mkBool(Value & v, bool b)
 
 
 void mkString(Value & v, const char * s);
-void mkString(Value & v, const string & s, const PathSet & context);
+void mkString(Value & v, const string & s, const PathSet & context = PathSet());
 void mkPath(Value & v, const char * s);
 
 
@@ -207,6 +207,7 @@ public:
     Env & allocEnv();
 
     void mkList(Value & v, unsigned int length);
+    void mkAttrs(Value & v);
 
     /* Print statistics. */
     void printStats();
