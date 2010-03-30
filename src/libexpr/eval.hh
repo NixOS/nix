@@ -196,6 +196,8 @@ private:
 
     void createBaseEnv();
     
+    void addConstant(const string & name, Value & v);
+
     void addPrimOp(const string & name,
         unsigned int arity, PrimOp primOp);
 
@@ -210,6 +212,8 @@ public:
     /* Allocation primitives. */
     Value * allocValues(unsigned int count);
     Env & allocEnv();
+
+    void mkList(Value & v, unsigned int length);
 };
 
 

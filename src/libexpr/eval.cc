@@ -95,14 +95,26 @@ EvalState::EvalState() : baseEnv(allocEnv())
 }
 
 
+void EvalState::addConstant(const string & name, Value & v)
+{
+    baseEnv.bindings[toATerm(name)] = v;
+    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
+    (*baseEnv.bindings[toATerm("builtins")].attrs)[toATerm(name2)] = v;
+    nrValues += 2;
+}
+
+
 void EvalState::addPrimOp(const string & name,
     unsigned int arity, PrimOp primOp)
 {
-    Value & v = baseEnv.bindings[toATerm(name)];
-    nrValues++;
+    Value v;
     v.type = tPrimOp;
     v.primOp.arity = arity;
     v.primOp.fun = primOp;
+    baseEnv.bindings[toATerm(name)] = v;
+    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
+    (*baseEnv.bindings[toATerm("builtins")].attrs)[toATerm(name2)] = v;
+    nrValues += 2;
 }
 
 
@@ -209,6 +221,14 @@ Env & EvalState::allocEnv()
 {
     nrEnvs++;
     return *(new Env);
+}
+
+
+void EvalState::mkList(Value & v, unsigned int length)
+{
+    v.type = tList;
+    v.list.length = length;
+    v.list.elems = allocValues(length);
 }
 
 
@@ -349,9 +369,7 @@ void EvalState::eval(Env & env, Expr e, Value & v)
     }
 
     if (matchList(e, es)) {
-        v.type = tList;
-        v.list.length = ATgetLength(es);
-        v.list.elems = allocValues(v.list.length);
+        mkList(v, ATgetLength(es));
         for (unsigned int n = 0; n < v.list.length; ++n, es = ATgetNext(es))
             mkThunk(v.list.elems[n], env, ATgetFirst(es));
         return;
@@ -376,9 +394,7 @@ void EvalState::eval(Env & env, Expr e, Value & v)
         forceList(v1);
         Value v2; eval(env, e2, v2);
         forceList(v2);
-        v.type = tList;
-        v.list.length = v1.list.length + v2.list.length;
-        v.list.elems = allocValues(v.list.length);
+        mkList(v, v1.list.length + v2.list.length);
         /* !!! This loses sharing with the original lists.  We could
            use a tCopy node, but that would use more memory. */
         for (unsigned int n = 0; n < v1.list.length; ++n)

@@ -56,9 +56,11 @@ void run(Strings args)
     doTest("{ x = [ 1 2 ]; } == { x = [ 1 ] ++ [ 2 ]; }");
     doTest("1 != 1");
     doTest("true");
+    doTest("builtins.true");
     doTest("true == false");
     doTest("__head [ 1 2 3 ]");
     doTest("__add 1 2");
+    doTest("null");
     doTest("null");
     doTest("\"foo\"");
     doTest("let s = \"bar\"; in \"foo${s}\"");
@@ -67,9 +69,9 @@ void run(Strings args)
     doTest("if false || true then 1 else 2");
     doTest("let x = x; in if true || x then 1 else 2");
     doTest("/etc/passwd");
-    doTest("import ./foo.nix");
+    //doTest("import ./foo.nix");
     doTest("map (x: __add 1 x) [ 1 2 3 ]");
-    doTest("map (__add 1) [ 1 2 3 ]");
+    doTest("map (builtins.add 1) [ 1 2 3 ]");
 }
 
 

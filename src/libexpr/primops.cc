@@ -20,63 +20,6 @@
 namespace nix {
 
 
-#if 0
-/*************************************************************
- * Constants
- *************************************************************/
-
-
-static Expr prim_builtins(EvalState & state, const ATermVector & args)
-{
-    /* Return an attribute set containing all primops.  This allows
-       Nix expressions to test for new primops and take appropriate
-       action if they're not available.  For instance, rather than
-       calling a primop `foo' directly, they could say `if builtins ?
-       foo then builtins.foo ... else ...'. */
-
-    ATermMap builtins(state.primOps.size());
-
-    for (ATermMap::const_iterator i = state.primOps.begin();
-         i != state.primOps.end(); ++i)
-    {
-        string name = aterm2String(i->key);
-        if (string(name, 0, 2) == "__")
-            name = string(name, 2);
-        /* !!! should use makePrimOp here, I guess. */
-        builtins.set(toATerm(name), makeAttrRHS(makeVar(i->key), makeNoPos()));
-    }
-
-    return makeAttrs(builtins);
-}
-
-
-/* Boolean constructors. */
-static Expr prim_true(EvalState & state, const ATermVector & args)
-{
-    return eTrue;
-}
-
-
-static Expr prim_false(EvalState & state, const ATermVector & args)
-{
-    return eFalse;
-}
-
-
-/* Return the null value. */
-static Expr prim_null(EvalState & state, const ATermVector & args)
-{
-    return makeNull();
-}
-
-
-static Expr prim_currentTime(EvalState & state, const ATermVector & args)
-{
-    return ATmake("Int(<int>)", time(0));
-}
-#endif
-
-
 /*************************************************************
  * Miscellaneous
  *************************************************************/
@@ -903,17 +846,17 @@ static void prim_head(EvalState & state, Value * * args, Value & v)
 }
 
 
-#if 0
 /* Return a list consisting of everything but the the first element of
    a list. */
-static Expr prim_tail(EvalState & state, const ATermVector & args)
+static void prim_tail(EvalState & state, Value * * args, Value & v)
 {
-    ATermList list = evalList(state, args[0]);
-    if (ATisEmpty(list))
+    state.forceList(*args[0]);
+    if (args[0]->list.length == 0)
         throw Error("`tail' called on an empty list");
-    return makeList(ATgetNext(list));
+    state.mkList(v, args[0]->list.length - 1);
+    for (unsigned int n = 0; n < v.list.length; ++n)
+        v.list.elems[n] = args[0]->list.elems[n + 1];
 }
-#endif
 
 
 /* Apply a function to every element of a list. */
@@ -922,9 +865,7 @@ static void prim_map(EvalState & state, Value * * args, Value & v)
     state.forceFunction(*args[0]);
     state.forceList(*args[1]);
 
-    v.type = tList;
-    v.list.length = args[1]->list.length;
-    v.list.elems = state.allocValues(v.list.length);
+    state.mkList(v, args[1]->list.length);
 
     for (unsigned int n = 0; n < v.list.length; ++n) {
         v.list.elems[n].type = tApp;
@@ -1121,28 +1062,26 @@ void EvalState::createBaseEnv()
         v.type = tAttrs;
         v.attrs = new Bindings;
     }
-    
-    /* Add global constants such as `true' to the base environment. */
-    {   Value & v = baseEnv.bindings[toATerm("true")];
-        mkBool(v, true);
-    }
-    {   Value & v = baseEnv.bindings[toATerm("false")];
-        mkBool(v, false);
-    }
-    {   Value & v = baseEnv.bindings[toATerm("null")];
-        v.type = tNull;
-    }
-    {   Value & v = (*baseEnv.bindings[toATerm("builtins")].attrs)[toATerm("currentSystem")];
-        mkString(v, strdup(thisSystem.c_str()));
-    }
 
-#if 0    
-    // Constants
-    addPrimOp("__currentSystem", 0, prim_currentSystem);
-    addPrimOp("__currentTime", 0, prim_currentTime);
+    /* Add global constants such as `true' to the base environment. */
+    Value v;
+
+    mkBool(v, true);
+    addConstant("true", v);
+    
+    mkBool(v, false);
+    addConstant("false", v);
+    
+    v.type = tNull;
+    addConstant("null", v);
+
+    mkInt(v, time(0));
+    addConstant("__currentTime", v);
+
+    mkString(v, strdup(thisSystem.c_str()));
+    addConstant("__currentSystem", v);
 
     // Miscellaneous
-#endif
     addPrimOp("import", 1, prim_import);
 #if 0
     addPrimOp("isNull", 1, prim_isNull);
@@ -1193,9 +1132,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__isList", 1, prim_isList);
 #endif
     addPrimOp("__head", 1, prim_head);
-#if 0
     addPrimOp("__tail", 1, prim_tail);
-#endif
     addPrimOp("map", 2, prim_map);
 #if 0
     addPrimOp("__length", 1, prim_length);
