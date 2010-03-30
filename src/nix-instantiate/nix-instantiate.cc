@@ -159,7 +159,7 @@ void run(Strings args)
             evalOnly, xmlOutput, e);
     }
 
-    printEvalStats(state);
+    state.printStats();
 }
 
 

@@ -132,7 +132,7 @@ struct EvalState;
 std::ostream & operator << (std::ostream & str, Value & v);
 
 
-struct EvalState 
+class EvalState 
 {
     DrvRoots drvRoots;
     DrvHashes drvHashes; /* normalised derivation hashes */
@@ -144,6 +144,8 @@ struct EvalState
 
     bool allowUnsafeEquality;
 
+public:
+    
     EvalState();
 
     /* Evaluate an expression read from the given file to normal
@@ -214,6 +216,9 @@ public:
     Env & allocEnv();
 
     void mkList(Value & v, unsigned int length);
+
+    /* Print statistics. */
+    void printStats();
 };
 
 
@@ -243,9 +248,6 @@ ATermList flattenList(EvalState & state, Expr e);
    not a normal form; it should be evaluated by calling evalExpr(). */
 Expr autoCallFunction(Expr e, const ATermMap & args);
 #endif
-
-/* Print statistics. */
-void printEvalStats(EvalState & state);
 
 
 }

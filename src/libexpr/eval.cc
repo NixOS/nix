@@ -405,21 +405,35 @@ void EvalState::eval(Env & env, Expr e, Value & v)
     }
 
     if (matchConcatStrings(e, es)) {
-        unsigned int n = ATgetLength(es), j = 0;
-        Value vs[n];
-        unsigned int len = 0;
-        for (ATermIterator i(es); i; ++i, ++j) {
-            eval(env, *i, vs[j]);
-            if (vs[j].type != tString) throw TypeError("string expected");
-            len += strlen(vs[j].string.s);
+        PathSet context;
+        std::ostringstream s;
+        
+        bool first = true, isPath;
+        
+        for (ATermIterator i(es); i; ++i) {
+            eval(env, *i, v);
+
+            /* If the first element is a path, then the result will
+               also be a path, we don't copy anything (yet - that's
+               done later, since paths are copied when they are used
+               in a derivation), and none of the strings are allowed
+               to have contexts. */
+            if (first) {
+                isPath = v.type == tPath;
+                first = false;
+            }
+            
+            s << coerceToString(v, context, false, !isPath);
         }
-        char * s = new char[len + 1], * t = s;
-        for (unsigned int i = 0; i < j; ++i) {
-            strcpy(t, vs[i].string.s);
-            t += strlen(vs[i].string.s);
-        }
-        *t = 0;
-        mkString(v, s);
+        
+        if (isPath && !context.empty())
+            throw EvalError(format("a string that refers to a store path cannot be appended to a path, in `%1%'")
+                % s.str());
+
+        if (isPath)
+            mkPath(v, strdup(s.str().c_str()));
+        else
+            mkString(v, strdup(s.str().c_str())); // !!! context
         return;
     }
 
@@ -969,116 +983,6 @@ ATermList flattenList(EvalState & state, Expr e)
 }
 
 
-string coerceToString(EvalState & state, Expr e, PathSet & context,
-    bool coerceMore, bool copyToStore)
-{
-    e = evalExpr(state, e);
-
-    string s;
-
-    if (matchStr(e, s, context)) return s;
-
-    ATerm s2;
-    if (matchPath(e, s2)) {
-        Path path(canonPath(aterm2String(s2)));
-
-        if (!copyToStore) return path;
-        
-        if (isDerivation(path))
-            throw EvalError(format("file names are not allowed to end in `%1%'")
-                % drvExtension);
-
-        Path dstPath;
-        if (state.srcToStore[path] != "")
-            dstPath = state.srcToStore[path];
-        else {
-            dstPath = readOnlyMode
-                ? computeStorePathForPath(path).first
-                : store->addToStore(path);
-            state.srcToStore[path] = dstPath;
-            printMsg(lvlChatty, format("copied source `%1%' -> `%2%'")
-                % path % dstPath);
-        }
-
-        context.insert(dstPath);
-        return dstPath;
-    }
-        
-    ATermList es;
-    if (matchAttrs(e, es)) {
-        Expr e2 = queryAttr(e, "outPath");
-        if (!e2) throwTypeError("cannot coerce an attribute set (except a derivation) to a string");
-        return coerceToString(state, e2, context, coerceMore, copyToStore);
-    }
-
-    if (coerceMore) {
-
-        /* Note that `false' is represented as an empty string for
-           shell scripting convenience, just like `null'. */
-        if (e == eTrue) return "1";
-        if (e == eFalse) return "";
-        int n;
-        if (matchInt(e, n)) return int2String(n);
-        if (matchNull(e)) return "";
-
-        if (matchList(e, es)) {
-            string result;
-            es = flattenList(state, e);
-            bool first = true;
-            for (ATermIterator i(es); i; ++i) {
-                if (!first) result += " "; else first = false;
-                result += coerceToString(state, *i,
-                    context, coerceMore, copyToStore);
-            }
-            return result;
-        }
-    }
-    
-    throwTypeError("cannot coerce %1% to a string", showType(e));
-}
-
-
-/* Common implementation of `+', ConcatStrings and `~'. */
-static ATerm concatStrings(EvalState & state, ATermVector & args,
-    string separator = "")
-{
-    if (args.empty()) return makeStr("", PathSet());
-    
-    PathSet context;
-    std::ostringstream s;
-
-    /* If the first element is a path, then the result will also be a
-       path, we don't copy anything (yet - that's done later, since
-       paths are copied when they are used in a derivation), and none
-       of the strings are allowed to have contexts. */
-    ATerm dummy;
-    args.front() = evalExpr(state, args.front());
-    bool isPath = matchPath(args.front(), dummy);
-
-    for (ATermVector::const_iterator i = args.begin(); i != args.end(); ++i) {
-        if (i != args.begin()) s << separator;
-        s << coerceToString(state, *i, context, false, !isPath);
-    }
-
-    if (isPath && !context.empty())
-        throw EvalError(format("a string that refers to a store path cannot be appended to a path, in `%1%'")
-            % s.str());
-    
-    return isPath
-        ? makePath(toATerm(s.str()))
-        : makeStr(s.str(), context);
-}
-
-
-Path coerceToPath(EvalState & state, Expr e, PathSet & context)
-{
-    string path = coerceToString(state, e, context, false, false);
-    if (path == "" || path[0] != '/')
-        throw EvalError(format("string `%1%' doesn't represent an absolute path") % path);
-    return path;
-}
-
-
 Expr autoCallFunction(Expr e, const ATermMap & args)
 {
     Pattern pat;
@@ -1515,16 +1419,16 @@ Expr strictEvalExpr(EvalState & state, Expr e)
 #endif
 
 
-void printEvalStats(EvalState & state)
+void EvalState::printStats()
 {
     char x;
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
     printMsg(showStats ? lvlInfo : lvlDebug,
         format("evaluated %1% expressions, used %2% bytes of stack space, allocated %3% values, allocated %4% environments")
-        % state.nrEvaluated
+        % nrEvaluated
         % (&x - deepestStack)
-        % state.nrValues
-        % state.nrEnvs);
+        % nrValues
+        % nrEnvs);
     if (showStats)
         printATermMapStats();
 }
