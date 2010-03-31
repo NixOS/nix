@@ -91,6 +91,7 @@ void XMLWriter::writeAttrs(const XMLAttrs & attrs)
             char c = i->second[j];
             if (c == '"') output << "&quot;";
             else if (c == '<') output << "&lt;";
+            else if (c == '>') output << "&gt;";
             else if (c == '&') output << "&amp;";
             /* Escape newlines to prevent attribute normalisation (see
                XML spec, section 3.3.3. */
