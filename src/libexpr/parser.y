@@ -526,12 +526,6 @@ Expr parseExprFromFile(EvalState & state, Path path)
 {
     assert(path[0] == '/');
 
-#if 0
-    /* Perhaps this is already an imploded parse tree? */
-    Expr e = ATreadFromNamedFile(path.c_str());
-    if (e) return e;
-#endif
-
     /* If `path' is a symlink, follow it.  This is so that relative
        path references work. */
     struct stat st;

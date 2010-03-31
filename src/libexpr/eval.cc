@@ -272,7 +272,14 @@ void EvalState::cloneAttrs(Value & src, Value & dst)
 void EvalState::evalFile(const Path & path, Value & v)
 {
     startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
-    Expr e = parseExprFromFile(*this, path);
+
+    Expr e = parseTrees.get(toATerm(path));
+
+    if (!e) {
+        e = parseExprFromFile(*this, path);
+        parseTrees.set(toATerm(path), e);
+    }
+    
     try {
         eval(e, v);
     } catch (Error & e) {

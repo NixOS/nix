@@ -135,6 +135,8 @@ private:
 
     bool allowUnsafeEquality;
 
+    ATermMap parseTrees;
+
 public:
     
     EvalState();
