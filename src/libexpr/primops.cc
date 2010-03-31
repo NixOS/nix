@@ -588,7 +588,7 @@ static void prim_toFile(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
     string name = state.forceStringNoCtx(*args[0]);
-    string contents = state.forceString(*args[1]); // !!! context
+    string contents = state.forceString(*args[1], context);
 
     PathSet refs;
 
@@ -928,7 +928,7 @@ static void prim_toString(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
     string s = state.coerceToString(*args[0], context, true, false);
-    mkString(v, s.c_str()); // !!! context
+    mkString(v, s, context);
 }
 
 

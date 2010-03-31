@@ -172,6 +172,7 @@ public:
     void forceList(Value & v);
     void forceFunction(Value & v); // either lambda or primop
     string forceString(Value & v);
+    string forceString(Value & v, PathSet & context);
     string forceStringNoCtx(Value & v);
 
     /* String coercion.  Converts strings, paths and derivations to a

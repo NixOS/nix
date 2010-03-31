@@ -178,7 +178,13 @@ void mkString(Value & v, const char * s)
 void mkString(Value & v, const string & s, const PathSet & context)
 {
     mkString(v, s.c_str());
-    // !!! context
+    if (!context.empty()) {
+        unsigned int len = 0, n = 0;
+        v.string.context = new const char *[context.size() + 1];
+        foreach (PathSet::const_iterator, i, context) 
+            v.string.context[n++] = strdup(i->c_str());
+        v.string.context[n] = 0;
+    }
 }
 
 
@@ -471,7 +477,7 @@ void EvalState::eval(Env & env, Expr e, Value & v)
         if (isPath)
             mkPath(v, s.str().c_str());
         else
-            mkString(v, s.str().c_str()); // !!! context
+            mkString(v, s.str(), context);
     }
 
     /* Conditionals. */
@@ -727,6 +733,17 @@ string EvalState::forceString(Value & v)
 }
 
 
+string EvalState::forceString(Value & v, PathSet & context)
+{
+    string s = forceString(v);
+    if (v.string.context) {
+        for (const char * * p = v.string.context; *p; ++p) 
+            context.insert(*p);
+    }
+    return s;
+}
+
+
 string EvalState::forceStringNoCtx(Value & v)
 {
     string s = forceString(v);
@@ -744,7 +761,12 @@ string EvalState::coerceToString(Value & v, PathSet & context,
 
     string s;
 
-    if (v.type == tString) return v.string.s;
+    if (v.type == tString) {
+        if (v.string.context) 
+            for (const char * * p = v.string.context; *p; ++p) 
+                context.insert(*p);
+        return v.string.s;
+    }
 
     if (v.type == tPath) {
         Path path(canonPath(v.path));
@@ -1139,66 +1161,6 @@ LocalNoInline(Expr evalWith(EvalState & state, Expr defs, Expr body, ATerm pos))
             showPos(pos));
         throw;
     } 
-}
-
-
-LocalNoInline(Expr evalPlusConcat(EvalState & state, Expr e))
-{
-    Expr e1, e2;
-    ATermList es;
-    
-    ATermVector args;
-    
-    if (matchOpPlus(e, e1, e2)) {
-
-        /* !!! Awful compatibility hack for `drv + /path'.
-           According to regular concatenation, /path should be
-           copied to the store and its store path should be
-           appended to the string.  However, in Nix <= 0.10, /path
-           was concatenated.  So handle that case separately, but
-           do print out a warning.  This code can go in Nix 0.12,
-           maybe. */
-        e1 = evalExpr(state, e1);
-        e2 = evalExpr(state, e2);
-
-        ATermList as;
-        ATerm p;
-        if (matchAttrs(e1, as) && matchPath(e2, p)) {
-            static bool haveWarned = false;
-            warnOnce(haveWarned, format(
-                    "concatenation of a derivation and a path is deprecated; "
-                    "you should write `drv + \"%1%\"' instead of `drv + %1%'")
-                % aterm2String(p));
-            PathSet context;
-            return makeStr(
-                coerceToString(state, makeSelect(e1, toATerm("outPath")), context)
-                + aterm2String(p), context);
-        }
-
-        args.push_back(e1);
-        args.push_back(e2);
-    }
-
-    else if (matchConcatStrings(e, es))
-        for (ATermIterator i(es); i; ++i) args.push_back(*i);
-        
-    try {
-        return concatStrings(state, args);
-    } catch (Error & e) {
-        addErrorPrefix(e, "in a string concatenation:\n");
-        throw;
-    }
-}
-
-
-LocalNoInline(Expr evalSubPath(EvalState & state, Expr e1, Expr e2))
-{
-    static bool haveWarned = false;
-    warnOnce(haveWarned, "the subpath operator (~) is deprecated, use string concatenation (+) instead");
-    ATermVector args;
-    args.push_back(e1);
-    args.push_back(e2);
-    return concatStrings(state, args, "/");
 }
 
 
