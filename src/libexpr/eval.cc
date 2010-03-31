@@ -852,6 +852,9 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             /* !!! contexts */
             return strcmp(v1.string.s, v2.string.s) == 0;
 
+        case tPath:
+            return strcmp(v1.path, v2.path) == 0;
+
         case tNull:
             return true;
 

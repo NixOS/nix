@@ -191,23 +191,18 @@ static void prim_getEnv(EvalState & state, Value * * args, Value & v)
 }
 
 
-#if 0
-/* Evaluate the first expression, and print its abstract syntax tree
-   on standard error.  Then return the second expression.  Useful for
-   debugging.
- */
+/* Evaluate the first expression and print it on standard error.  Then
+   return the second expression.  Useful for debugging. */
 static void prim_trace(EvalState & state, Value * * args, Value & v)
 {
-    Expr e = evalExpr(state, args[0]);
-    string s;
-    PathSet context;
-    if (matchStr(e, s, context))
-        printMsg(lvlError, format("trace: %1%") % s);
+    state.forceValue(*args[0]);
+    if (args[0]->type == tString)
+        printMsg(lvlError, format("trace: %1%") % args[0]->string.s);
     else
-        printMsg(lvlError, format("trace: %1%") % e);
-    return evalExpr(state, args[1]);
+        printMsg(lvlError, format("trace: %1%") % *args[0]);
+    state.forceValue(*args[1]);
+    v = *args[1];
 }
-#endif
 
 
 /*************************************************************
@@ -986,28 +981,6 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, Value * * args
     
     return makeStr(s, context2);
 }
-
-
-/* Expression serialization/deserialization */
-
-
-static void prim_exprToString(EvalState & state, Value * * args, Value & v)
-{
-    /* !!! this disregards context */
-    return makeStr(atPrint(evalExpr(state, args[0])));
-}
-
-
-static void prim_stringToExpr(EvalState & state, Value * * args, Value & v)
-{
-    /* !!! this can introduce arbitrary garbage terms in the
-       evaluator! */;
-    string s;
-    PathSet l;
-    if (!matchStr(evalExpr(state, args[0]), s, l))
-        throw EvalError("stringToExpr needs string argument!");
-    return ATreadFromString(s.c_str());
-}
 #endif
 
 
@@ -1083,13 +1056,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__tryEval", 1, prim_tryEval);
 #endif
     addPrimOp("__getEnv", 1, prim_getEnv);
-#if 0
     addPrimOp("__trace", 2, prim_trace);
-    
-    // Expr <-> String
-    addPrimOp("__exprToString", 1, prim_exprToString);
-    addPrimOp("__stringToExpr", 1, prim_stringToExpr);
-#endif
 
     // Derivations
     addPrimOp("derivation", 1, prim_derivationStrict);
