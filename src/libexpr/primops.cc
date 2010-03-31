@@ -207,6 +207,7 @@ static void prim_trace(EvalState & state, Value * * args, Value & v)
         printMsg(lvlError, format("trace: %1%") % e);
     return evalExpr(state, args[1]);
 }
+#endif
 
 
 /*************************************************************
@@ -282,24 +283,21 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
 {
     startNest(nest, lvlVomit, "evaluating derivation");
 
-    ATermMap attrs;
-    queryAllAttrs(evalExpr(state, args[0]), attrs, true);
+    state.forceAttrs(*args[0]);
 
-    /* Figure out the name already (for stack backtraces). */
-    ATerm posDrvName;
-    Expr eDrvName = attrs.get(toATerm("name"));
-    if (!eDrvName)
+    /* Figure out the name first (for stack backtraces). */
+    Bindings::iterator attr = args[0]->attrs->find(toATerm("name"));
+    if (attr == args[0]->attrs->end())
         throw EvalError("required attribute `name' missing");
-    if (!matchAttrRHS(eDrvName, eDrvName, posDrvName)) abort();
     string drvName;
     try {        
-        drvName = evalStringNoCtx(state, eDrvName);
+        drvName = state.forceStringNoCtx(attr->second);
     } catch (Error & e) {
-        e.addPrefix(format("while evaluating the derivation attribute `name' at %1%:\n")
-            % showPos(posDrvName));
+        e.addPrefix(format("while evaluating the derivation attribute `name' at <SOMEWHERE>:\n"));
+        // !!! % showPos(posDrvName));
         throw;
     }
-
+    
     /* Build the derivation expression by processing the attributes. */
     Derivation drv;
     
@@ -308,12 +306,8 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     string outputHash, outputHashAlgo;
     bool outputHashRecursive = false;
 
-    for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
-        string key = aterm2String(i->key);
-        ATerm value;
-        Expr pos;
-        ATerm rhs = i->value;
-        if (!matchAttrRHS(rhs, value, pos)) abort();
+    foreach (Bindings::iterator, i, *args[0]->attrs) {
+        string key = aterm2String(i->first);
         startNest(nest, lvlVomit, format("processing attribute `%1%'") % key);
 
         try {
@@ -321,15 +315,9 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
             if (key == "args") {
-                ATermList es;
-                value = evalExpr(state, value);
-                if (!matchList(value, es)) {
-                    static bool haveWarned = false;
-                    warnOnce(haveWarned, "the `args' attribute should evaluate to a list");
-                    es = flattenList(state, value);
-                }
-                for (ATermIterator i(es); i; ++i) {
-                    string s = coerceToString(state, *i, context, true);
+                state.forceList(i->second);
+                for (unsigned int n = 0; n < i->second.list.length; ++n) {
+                    string s = state.coerceToString(i->second.list.elems[n], context, true);
                     drv.args.push_back(s);
                 }
             }
@@ -337,7 +325,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
             /* All other attributes are passed to the builder through
                the environment. */
             else {
-                string s = coerceToString(state, value, context, true);
+                string s = state.coerceToString(i->second, context, true);
                 drv.env[key] = s;
                 if (key == "builder") drv.builder = s;
                 else if (key == "system") drv.platform = s;
@@ -352,13 +340,12 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
             }
 
         } catch (Error & e) {
-            e.addPrefix(format("while evaluating the derivation attribute `%1%' at %2%:\n")
-                % key % showPos(pos));
-            e.addPrefix(format("while instantiating the derivation named `%1%' at %2%:\n")
-                % drvName % showPos(posDrvName));
+            e.addPrefix(format("while evaluating the derivation attribute `%1%' at <SOMEWHERE>:\n")
+                % key /* !!! % showPos(pos) */);
+            e.addPrefix(format("while instantiating the derivation named `%1%' at <SOMEWHERE>:\n")
+                % drvName /* !!! % showPos(posDrvName) */);
             throw;
         }
-
     }
     
     /* Everything in the context of the strings in the derivation
@@ -466,25 +453,25 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     state.drvHashes[drvPath] = hashDerivationModulo(state, drv);
 
     /* !!! assumes a single output */
-    ATermMap outAttrs(2);
-    outAttrs.set(toATerm("outPath"),
-        makeAttrRHS(makeStr(outPath, singleton<PathSet>(drvPath)), makeNoPos()));
-    outAttrs.set(toATerm("drvPath"),
-        makeAttrRHS(makeStr(drvPath, singleton<PathSet>("=" + drvPath)), makeNoPos()));
-
-    return makeAttrs(outAttrs);
+    //state.mkAttrs(v);
+    state.cloneAttrs(*args[0], v);
+    mkString((*v.attrs)[toATerm("outPath")], outPath, singleton<PathSet>(drvPath));
+    mkString((*v.attrs)[toATerm("drvPath")], drvPath, singleton<PathSet>("=" + drvPath));
+    mkString((*v.attrs)[toATerm("type")], "derivation"); // !!! remove
 }
 
 
 static void prim_derivationLazy(EvalState & state, Value * * args, Value & v)
 {
-    Expr eAttrs = evalExpr(state, args[0]);
-    ATermMap attrs;    
-    queryAllAttrs(eAttrs, attrs, true);
+    state.forceAttrs(*args[0]);
 
-    attrs.set(toATerm("type"),
-        makeAttrRHS(makeStr("derivation"), makeNoPos()));
+    state.cloneAttrs(*args[0], v);
 
+    mkString((*v.attrs)[toATerm("type")], "derivation");
+
+    /* !!! */
+
+#if 0    
     Expr drvStrict = makeCall(makeVar(toATerm("derivation!")), eAttrs);
 
     attrs.set(toATerm("outPath"),
@@ -493,8 +480,8 @@ static void prim_derivationLazy(EvalState & state, Value * * args, Value & v)
         makeAttrRHS(makeSelect(drvStrict, toATerm("drvPath")), makeNoPos()));
     
     return makeAttrs(attrs);
-}
 #endif
+}
 
 
 /*************************************************************
@@ -592,6 +579,7 @@ static void prim_toXML(EvalState & state, Value * * args, Value & v)
     printTermAsXML(strictEvalExpr(state, args[0]), out, context);
     return makeStr(out.str(), context);
 }
+#endif
 
 
 /* Store a string in the Nix store as a source file that can be used
@@ -599,12 +587,12 @@ static void prim_toXML(EvalState & state, Value * * args, Value & v)
 static void prim_toFile(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
-    string name = evalStringNoCtx(state, args[0]);
-    string contents = evalString(state, args[1], context);
+    string name = state.forceStringNoCtx(*args[0]);
+    string contents = state.forceString(*args[1]); // !!! context
 
     PathSet refs;
 
-    for (PathSet::iterator i = context.begin(); i != context.end(); ++i) {
+    foreach (PathSet::iterator, i, context) {
         Path path = *i;
         if (path.at(0) == '=') path = string(path, 1);
         if (isDerivation(path))
@@ -619,11 +607,12 @@ static void prim_toFile(EvalState & state, Value * * args, Value & v)
     /* Note: we don't need to add `context' to the context of the
        result, since `storePath' itself has references to the paths
        used in args[1]. */
-    
-    return makeStr(storePath, singleton<PathSet>(storePath));
+
+    mkString(v, storePath, singleton<PathSet>(storePath));
 }
 
 
+#if 0
 struct FilterFromExpr : PathFilter
 {
     EvalState & state;
@@ -731,10 +720,7 @@ static void prim_removeAttrs(EvalState & state, Value * * args, Value & v)
     state.forceAttrs(*args[0]);
     state.forceList(*args[1]);
 
-    state.mkAttrs(v);
-        
-    foreach (Bindings::iterator, i, *args[0]->attrs)
-        (*v.attrs)[i->first] = i->second;
+    state.cloneAttrs(*args[0], v);
 
     for (unsigned int i = 0; i < args[1]->list.length; ++i) {
         state.forceStringNoCtx(args[1]->list.elems[i]);
@@ -743,40 +729,32 @@ static void prim_removeAttrs(EvalState & state, Value * * args, Value & v)
 }
 
 
-#if 0
 /* Builds an attribute set from a list specifying (name, value)
    pairs.  To be precise, a list [{name = "name1"; value = value1;}
    ... {name = "nameN"; value = valueN;}] is transformed to {name1 =
    value1; ... nameN = valueN;}. */
 static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
 {
-    try {
-        ATermMap res = ATermMap();
-        ATermList list;
-        list = evalList(state, args[0]);
-        for (ATermIterator i(list); i; ++i){
-            // *i should now contain a pointer to the list item expression
-            ATermList attrs;
-            Expr evaledExpr = evalExpr(state, *i);
-            if (matchAttrs(evaledExpr, attrs)){
-                Expr e = evalExpr(state, makeSelect(evaledExpr, toATerm("name")));
-                string attr = evalStringNoCtx(state,e);
-                Expr r = makeSelect(evaledExpr, toATerm("value"));
-                res.set(toATerm(attr), makeAttrRHS(r, makeNoPos()));
-            }
-            else
-                throw TypeError(format("list element in `listToAttrs' is %s, expected a set { name = \"<name>\"; value = <value>; }")
-                    % showType(evaledExpr));
-        }
-    
-        return makeAttrs(res);
-    
-    } catch (Error & e) {
-        e.addPrefix(format("in `listToAttrs':\n"));
-        throw;
+    state.forceList(*args[0]);
+
+    state.mkAttrs(v);
+
+    for (unsigned int i = 0; i < args[0]->list.length; ++i) {
+        Value & v2(args[0]->list.elems[i]);
+        state.forceAttrs(v2);
+        
+        Bindings::iterator j = v2.attrs->find(toATerm("name"));
+        if (j == v2.attrs->end())
+            throw TypeError("`name' attribute missing in a call to `listToAttrs'");
+        string name = state.forceStringNoCtx(j->second);
+        
+        j = v2.attrs->find(toATerm("value"));
+        if (j == v2.attrs->end())
+            throw TypeError("`value' attribute missing in a call to `listToAttrs'");
+
+        (*v.attrs)[toATerm(name)] = j->second; // !!! sharing?
     }
 }
-#endif
 
 
 #if 0
@@ -897,7 +875,7 @@ static void prim_map(EvalState & state, Value * * args, Value & v)
 static void prim_length(EvalState & state, Value * * args, Value & v)
 {
     state.forceList(*args[0]);
-    mkInt(v, v.list.length);
+    mkInt(v, args[0]->list.length);
 }
 
 
@@ -1111,11 +1089,11 @@ void EvalState::createBaseEnv()
     // Expr <-> String
     addPrimOp("__exprToString", 1, prim_exprToString);
     addPrimOp("__stringToExpr", 1, prim_stringToExpr);
+#endif
 
     // Derivations
-    addPrimOp("derivation!", 1, prim_derivationStrict);
-    addPrimOp("derivation", 1, prim_derivationLazy);
-#endif
+    addPrimOp("derivation", 1, prim_derivationStrict);
+    //addPrimOp("derivation", 1, prim_derivationLazy);
 
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);
@@ -1130,7 +1108,9 @@ void EvalState::createBaseEnv()
     // Creating files
 #if 0
     addPrimOp("__toXML", 1, prim_toXML);
+#endif
     addPrimOp("__toFile", 2, prim_toFile);
+#if 0
     addPrimOp("__filterSource", 2, prim_filterSource);
 #endif
 
@@ -1140,8 +1120,8 @@ void EvalState::createBaseEnv()
     addPrimOp("__hasAttr", 2, prim_hasAttr);
     addPrimOp("__isAttrs", 1, prim_isAttrs);
     addPrimOp("removeAttrs", 2, prim_removeAttrs);
-#if 0
     addPrimOp("__listToAttrs", 1, prim_listToAttrs);
+#if 0
     addPrimOp("__intersectAttrs", 2, prim_intersectAttrs);
     addPrimOp("__functionArgs", 1, prim_functionArgs);
 #endif

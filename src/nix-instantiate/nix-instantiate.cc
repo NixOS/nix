@@ -75,8 +75,23 @@ void processExpr(EvalState & state, const Strings & attrPaths,
         std::cout << format("%1%\n") % canonicaliseExpr(e);
     else {
         Value v;
-        state.strictEval(e, v);
-        std::cout << v << std::endl;
+        if (strict) state.strictEval(e, v); else state.eval(e, v);
+        if (evalOnly)
+            std::cout << v << std::endl;
+        else {
+            DrvInfos drvs;
+            getDerivations(state, v, "", autoArgs, drvs);
+            foreach (DrvInfos::iterator, i, drvs) {
+                Path drvPath = i->queryDrvPath(state);
+                if (gcRoot == "")
+                    printGCWarning();
+                else
+                    drvPath = addPermRoot(drvPath,
+                        makeRootName(gcRoot, rootNr),
+                        indirectRoot);
+                std::cout << format("%1%\n") % drvPath;
+            }
+        }
     }
     
 #if 0

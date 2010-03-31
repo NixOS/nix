@@ -261,6 +261,14 @@ void EvalState::mkAttrs(Value & v)
 }
 
 
+void EvalState::cloneAttrs(Value & src, Value & dst)
+{
+    mkAttrs(dst);
+    foreach (Bindings::iterator, i, *src.attrs)
+        (*dst.attrs)[i->first] = i->second; // !!! sharing?
+}
+
+
 void EvalState::evalFile(const Path & path, Value & v)
 {
     startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
@@ -488,17 +496,14 @@ void EvalState::eval(Env & env, Expr e, Value & v)
 
     /* Attribute set update (//). */
     else if (matchOpUpdate(e, e1, e2)) {
-        mkAttrs(v);
-        
         Value v2;
+        eval(env, e1, v2);
+        
+        cloneAttrs(v2, v);
+        
         eval(env, e2, v2);
         foreach (Bindings::iterator, i, *v2.attrs)
-            (*v.attrs)[i->first] = i->second;
-        
-        eval(env, e1, v2);
-        foreach (Bindings::iterator, i, *v2.attrs)
-            if (v.attrs->find(i->first) == v.attrs->end())
-                (*v.attrs)[i->first] = i->second;
+            (*v.attrs)[i->first] = i->second; // !!! sharing
     }
 
     /* Attribute existence test (?). */
@@ -673,6 +678,15 @@ int EvalState::forceInt(Value & v)
 }
 
 
+bool EvalState::forceBool(Value & v)
+{
+    forceValue(v);
+    if (v.type != tBool)
+        throw TypeError(format("value is %1% while a Boolean was expected") % showType(v));
+    return v.boolean;
+}
+
+
 void EvalState::forceAttrs(Value & v)
 {
     forceValue(v);
@@ -697,15 +711,22 @@ void EvalState::forceFunction(Value & v)
 }
 
 
-string EvalState::forceStringNoCtx(Value & v)
+string EvalState::forceString(Value & v)
 {
     forceValue(v);
     if (v.type != tString)
         throw TypeError(format("value is %1% while a string was expected") % showType(v));
+    return string(v.string.s);
+}
+
+
+string EvalState::forceStringNoCtx(Value & v)
+{
+    string s = forceString(v);
     if (v.string.context)
         throw EvalError(format("the string `%1%' is not allowed to refer to a store path (such as `%2%')")
             % v.string.s % v.string.context[0]);
-    return string(v.string.s);
+    return s;
 }
 
 

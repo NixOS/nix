@@ -35,10 +35,8 @@ public:
     string attrPath; /* path towards the derivation */
     string system;
 
-    /* !!! these should really be hidden, and setMetaInfo() should
-       make a copy since the ATermMap can be shared between multiple
-       DrvInfos. */
-    boost::shared_ptr<ATermMap> attrs;
+    /* !!! make this private */
+    Bindings * attrs;
 
     string queryDrvPath(EvalState & state) const;
     string queryOutPath(EvalState & state) const;
@@ -62,12 +60,11 @@ public:
 typedef list<DrvInfo> DrvInfos;
 
 
-/* Evaluate expression `e'.  If it evaluates to a derivation, store
-   information about the derivation in `drv' and return true.
-   Otherwise, return false. */
-bool getDerivation(EvalState & state, Expr e, DrvInfo & drv);
+/* If value `v' denotes a derivation, store information about the
+   derivation in `drv' and return true.  Otherwise, return false. */
+bool getDerivation(EvalState & state, Value & v, DrvInfo & drv);
 
-void getDerivations(EvalState & state, Expr e, const string & pathPrefix,
+void getDerivations(EvalState & state, Value & v, const string & pathPrefix,
     const ATermMap & autoArgs, DrvInfos & drvs);
 
  

@@ -6,25 +6,18 @@
 namespace nix {
 
 
-#if 0
 string DrvInfo::queryDrvPath(EvalState & state) const
 {
     if (drvPath == "") {
-        Expr a = attrs->get(toATerm("drvPath"));
-
-        /* Backwards compatibility hack with user environments made by
-           Nix <= 0.10: these contain illegal Path("") expressions. */
-        ATerm t;
-        if (a && matchPath(evalExpr(state, a), t))
-            return aterm2String(t);
-        
+        Bindings::iterator i = attrs->find(toATerm("drvPath"));
         PathSet context;
-        (string &) drvPath = a ? coerceToPath(state, a, context) : "";
+        (string &) drvPath = i != attrs->end() ? state.coerceToPath(i->second, context) : "";
     }
     return drvPath;
 }
 
 
+#if 0
 string DrvInfo::queryOutPath(EvalState & state) const
 {
     if (outPath == "") {
@@ -102,54 +95,47 @@ void DrvInfo::setMetaInfo(const MetaInfo & meta)
     }
     attrs->set(toATerm("meta"), makeAttrs(metaAttrs));
 }
+#endif
 
 
-/* Cache for already evaluated derivations.  Usually putting ATerms in
-   a STL container is unsafe (they're not scanning for GC roots), but
-   here it doesn't matter; everything in this set is reachable from
-   the stack as well. */
-typedef set<Expr> Exprs;
+/* Cache for already considered values. */
+typedef set<Value *> Values;
 
 
-/* Evaluate expression `e'.  If it evaluates to an attribute set of
-   type `derivation', then put information about it in `drvs' (unless
-   it's already in `doneExprs').  The result boolean indicates whether
-   it makes sense for the caller to recursively search for derivations
-   in `e'. */
-static bool getDerivation(EvalState & state, Expr e,
-    const string & attrPath, DrvInfos & drvs, Exprs & doneExprs)
+/* Evaluate value `v'.  If it evaluates to an attribute set of type
+   `derivation', then put information about it in `drvs' (unless it's
+   already in `doneExprs').  The result boolean indicates whether it
+   makes sense for the caller to recursively search for derivations in
+   `v'. */
+static bool getDerivation(EvalState & state, Value & v,
+    const string & attrPath, DrvInfos & drvs, Values & doneValues)
 {
     try {
-        
-        ATermList es;
-        e = evalExpr(state, e);
-        if (!matchAttrs(e, es)) return true;
+        state.forceValue(v);
+        if (v.type != tAttrs) return true;
 
-        boost::shared_ptr<ATermMap> attrs(new ATermMap());
-        queryAllAttrs(e, *attrs, false);
-        
-        Expr a = attrs->get(toATerm("type"));
-        if (!a || evalStringNoCtx(state, a) != "derivation") return true;
+        Bindings::iterator i = v.attrs->find(toATerm("type"));
+        if (i == v.attrs->end() || state.forceStringNoCtx(i->second) != "derivation") return true;
 
         /* Remove spurious duplicates (e.g., an attribute set like
            `rec { x = derivation {...}; y = x;}'. */
-        if (doneExprs.find(e) != doneExprs.end()) return false;
-        doneExprs.insert(e);
+        if (doneValues.find(&v) != doneValues.end()) return false;
+        doneValues.insert(&v);
 
         DrvInfo drv;
     
-        a = attrs->get(toATerm("name"));
+        i = v.attrs->find(toATerm("name"));
         /* !!! We really would like to have a decent back trace here. */
-        if (!a) throw TypeError("derivation name missing");
-        drv.name = evalStringNoCtx(state, a);
+        if (i == v.attrs->end()) throw TypeError("derivation name missing");
+        drv.name = state.forceStringNoCtx(i->second);
 
-        a = attrs->get(toATerm("system"));
-        if (!a)
+        i = v.attrs->find(toATerm("system"));
+        if (i == v.attrs->end())
             drv.system = "unknown";
         else
-            drv.system = evalStringNoCtx(state, a);
+            drv.system = state.forceStringNoCtx(i->second);
 
-        drv.attrs = attrs;
+        drv.attrs = v.attrs;
 
         drv.attrPath = attrPath;
 
@@ -162,11 +148,11 @@ static bool getDerivation(EvalState & state, Expr e,
 }
 
 
-bool getDerivation(EvalState & state, Expr e, DrvInfo & drv)
+bool getDerivation(EvalState & state, Value & v, DrvInfo & drv)
 {
-    Exprs doneExprs;
+    Values doneValues;
     DrvInfos drvs;
-    getDerivation(state, e, "", drvs, doneExprs);
+    getDerivation(state, v, "", drvs, doneValues);
     if (drvs.size() != 1) return false;
     drv = drvs.front();
     return true;
@@ -179,85 +165,72 @@ static string addToPath(const string & s1, const string & s2)
 }
 
 
-static void getDerivations(EvalState & state, Expr e,
+static void getDerivations(EvalState & state, Value & v,
     const string & pathPrefix, const ATermMap & autoArgs,
-    DrvInfos & drvs, Exprs & doneExprs)
+    DrvInfos & drvs, Values & doneValues)
 {
-    e = evalExpr(state, autoCallFunction(evalExpr(state, e), autoArgs));
-
+    // !!! autoCallFunction(evalExpr(state, e), autoArgs)
+    
     /* Process the expression. */
-    ATermList es;
     DrvInfo drv;
 
-    if (!getDerivation(state, e, pathPrefix, drvs, doneExprs))
-        return;
+    if (!getDerivation(state, v, pathPrefix, drvs, doneValues)) ;
 
-    if (matchAttrs(e, es)) {
-        ATermMap drvMap(ATgetLength(es));
-        queryAllAttrs(e, drvMap);
+    else if (v.type == tAttrs) {
 
         /* !!! undocumented hackery to support combining channels in
            nix-env.cc. */
-        bool combineChannels = drvMap.get(toATerm("_combineChannels"));
+        bool combineChannels = v.attrs->find(toATerm("_combineChannels")) != v.attrs->end();
 
         /* Consider the attributes in sorted order to get more
            deterministic behaviour in nix-env operations (e.g. when
            there are names clashes between derivations, the derivation
            bound to the attribute with the "lower" name should take
            precedence). */
-        typedef std::map<string, Expr> AttrsSorted;
-        AttrsSorted attrsSorted;
-        foreach (ATermMap::const_iterator, i, drvMap)
-            attrsSorted[aterm2String(i->key)] = i->value;
+        StringSet attrs;
+        foreach (Bindings::iterator, i, *v.attrs)
+            attrs.insert(aterm2String(i->first));
 
-        foreach (AttrsSorted::iterator, i, attrsSorted) {
-            startNest(nest, lvlDebug, format("evaluating attribute `%1%'") % i->first);
-            string pathPrefix2 = addToPath(pathPrefix, i->first);
+        foreach (StringSet::iterator, i, attrs) {
+            startNest(nest, lvlDebug, format("evaluating attribute `%1%'") % *i);
+            string pathPrefix2 = addToPath(pathPrefix, *i);
+            Value & v2((*v.attrs)[toATerm(*i)]);
             if (combineChannels)
-                getDerivations(state, i->second, pathPrefix2, autoArgs, drvs, doneExprs);
-            else if (getDerivation(state, i->second, pathPrefix2, drvs, doneExprs)) {
+                getDerivations(state, v2, pathPrefix2, autoArgs, drvs, doneValues);
+            else if (getDerivation(state, v2, pathPrefix2, drvs, doneValues)) {
                 /* If the value of this attribute is itself an
                    attribute set, should we recurse into it?  => Only
                    if it has a `recurseForDerivations = true'
                    attribute. */
-                ATermList es;
-                Expr e = evalExpr(state, i->second), e2;
-                if (matchAttrs(e, es)) {
-                    ATermMap attrs(ATgetLength(es));
-                    queryAllAttrs(e, attrs, false);
-                    if (((e2 = attrs.get(toATerm("recurseForDerivations")))
-                            && evalBool(state, e2)))
-                        getDerivations(state, e, pathPrefix2, autoArgs, drvs, doneExprs);
+                if (v2.type == tAttrs) {
+                    Bindings::iterator j = v2.attrs->find(toATerm("recurseForDerivations"));
+                    if (j != v2.attrs->end() && state.forceBool(j->second))
+                        getDerivations(state, v2, pathPrefix2, autoArgs, drvs, doneValues);
                 }
             }
         }
-        
-        return;
     }
 
-    if (matchList(e, es)) {
-        int n = 0;
-        for (ATermIterator i(es); i; ++i, ++n) {
+    else if (v.type == tList) {
+        for (unsigned int n = 0; n < v.list.length; ++n) {
             startNest(nest, lvlDebug,
                 format("evaluating list element"));
             string pathPrefix2 = addToPath(pathPrefix, (format("%1%") % n).str());
-            if (getDerivation(state, *i, pathPrefix2, drvs, doneExprs))
-                getDerivations(state, *i, pathPrefix2, autoArgs, drvs, doneExprs);
+            if (getDerivation(state, v.list.elems[n], pathPrefix2, drvs, doneValues))
+                getDerivations(state, v.list.elems[n], pathPrefix2, autoArgs, drvs, doneValues);
         }
-        return;
     }
 
-    throw TypeError("expression does not evaluate to a derivation (or a set or list of those)");
+    else throw TypeError("expression does not evaluate to a derivation (or a set or list of those)");
 }
 
 
-void getDerivations(EvalState & state, Expr e, const string & pathPrefix,
+void getDerivations(EvalState & state, Value & v, const string & pathPrefix,
     const ATermMap & autoArgs, DrvInfos & drvs)
 {
-    Exprs doneExprs;
-    getDerivations(state, e, pathPrefix, autoArgs, drvs, doneExprs);
+    Values doneValues;
+    getDerivations(state, v, pathPrefix, autoArgs, drvs, doneValues);
 }
-#endif
 
  
 }

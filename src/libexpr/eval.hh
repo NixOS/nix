@@ -109,7 +109,6 @@ void mkString(Value & v, const string & s, const PathSet & context = PathSet());
 void mkPath(Value & v, const char * s);
 
 
-typedef std::map<Path, PathSet> DrvRoots;
 typedef std::map<Path, Hash> DrvHashes;
 
 /* Cache for calls to addToStore(); maps source paths to the store
@@ -124,8 +123,10 @@ std::ostream & operator << (std::ostream & str, Value & v);
 
 class EvalState 
 {
-    DrvRoots drvRoots;
+public:
     DrvHashes drvHashes; /* normalised derivation hashes */
+
+private:
     SrcToStore srcToStore; 
 
     unsigned long nrValues;
@@ -164,9 +165,11 @@ public:
 
     /* Force `v', and then verify that it has the expected type. */
     int forceInt(Value & v);
+    bool forceBool(Value & v);
     void forceAttrs(Value & v);
     void forceList(Value & v);
     void forceFunction(Value & v); // either lambda or primop
+    string forceString(Value & v);
     string forceStringNoCtx(Value & v);
 
     /* String coercion.  Converts strings, paths and derivations to a
@@ -208,6 +211,8 @@ public:
 
     void mkList(Value & v, unsigned int length);
     void mkAttrs(Value & v);
+
+    void cloneAttrs(Value & src, Value & dst);
 
     /* Print statistics. */
     void printStats();
