@@ -34,8 +34,25 @@ static void showAttrs(const ATermMap & attrs, XMLWriter & doc,
     for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i)
         names.insert(aterm2String(i->key));
     for (StringSet::iterator i = names.begin(); i != names.end(); ++i) {
-        XMLOpenElement _(doc, "attr", singletonAttrs("name", *i));
-        printTermAsXML(attrs.get(toATerm(*i)), doc, context, drvsSeen);
+        ATerm attrRHS = attrs.get(toATerm(*i));
+	ATerm attr;
+	Pos pos;
+	XMLAttrs xmlAttrs;
+
+	xmlAttrs["name"] = *i;
+	if(matchAttrRHS(attrRHS, attr, pos)) {
+	    ATerm path;
+	    int line, column;
+	    if (matchPos(pos, path, line, column)) {
+		xmlAttrs["path"] = aterm2String(path);
+		xmlAttrs["line"] = (format("%1%") % line).str();
+		xmlAttrs["column"] = (format("%1%") % column).str();
+	    }
+	} else
+	    abort(); // Should not happen.
+
+        XMLOpenElement _(doc, "attr", xmlAttrs);
+        printTermAsXML(attr, doc, context, drvsSeen);
     }
 }
 
@@ -97,9 +114,12 @@ static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
 
     else if (matchAttrs(e, as)) {
         ATermMap attrs;
-        queryAllAttrs(e, attrs);
+        queryAllAttrs(e, attrs, true);
 
-        Expr a = attrs.get(toATerm("type"));
+        Expr aRHS = attrs.get(toATerm("type"));
+	Expr a = NULL;
+	if (aRHS)
+	    matchAttrRHS(aRHS, a, pos);
         if (a && matchStr(a, s, context) && s == "derivation") {
 
             XMLAttrs xmlAttrs;
@@ -135,7 +155,15 @@ static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
     }
 
     else if (matchFunction(e, pat, body, pos)) {
-        XMLOpenElement _(doc, "function");
+        ATerm path;
+	int line, column;
+	XMLAttrs xmlAttrs;
+	if (matchPos(pos, path, line, column)) {
+	    xmlAttrs["path"] = aterm2String(path);
+	    xmlAttrs["line"] = (format("%1%") % line).str();
+	    xmlAttrs["column"] = (format("%1%") % column).str();
+	}
+	XMLOpenElement _(doc, "function", xmlAttrs);
         printPatternAsXML(pat, doc);
     }
 
