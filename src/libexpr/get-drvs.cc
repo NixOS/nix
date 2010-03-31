@@ -17,14 +17,12 @@ string DrvInfo::queryDrvPath(EvalState & state) const
 }
 
 
-#if 0
 string DrvInfo::queryOutPath(EvalState & state) const
 {
     if (outPath == "") {
-        Expr a = attrs->get(toATerm("outPath"));
-        if (!a) throw TypeError("output path missing");
+        Bindings::iterator i = attrs->find(toATerm("outPath"));
         PathSet context;
-        (string &) outPath = coerceToPath(state, a, context);
+        (string &) outPath = i != attrs->end() ? state.coerceToPath(i->second, context) : "";
     }
     return outPath;
 }
@@ -34,33 +32,26 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
 {
     MetaInfo meta;
     
-    Expr a = attrs->get(toATerm("meta"));
-    if (!a) return meta; /* fine, empty meta information */
+    Bindings::iterator a = attrs->find(toATerm("meta"));
+    if (a == attrs->end()) return meta; /* fine, empty meta information */
 
-    ATermMap attrs2;
-    queryAllAttrs(evalExpr(state, a), attrs2);
+    state.forceAttrs(a->second);
 
-    for (ATermMap::const_iterator i = attrs2.begin(); i != attrs2.end(); ++i) {
-        Expr e = evalExpr(state, i->value);
-        string s;
-        PathSet context;
+    foreach (Bindings::iterator, i, *a->second.attrs) {
         MetaValue value;
-        int n;
-        ATermList es;
-        if (matchStr(e, s, context)) {
+        state.forceValue(i->second);
+        if (i->second.type == tString) {
             value.type = MetaValue::tpString;
-            value.stringValue = s;
-            meta[aterm2String(i->key)] = value;
-        } else if (matchInt(e, n)) {
+            value.stringValue = i->second.string.s;
+        } else if (i->second.type == tInt) {
             value.type = MetaValue::tpInt;
-            value.intValue = n;
-            meta[aterm2String(i->key)] = value;
-        } else if (matchList(e, es)) {
+            value.intValue = i->second.integer;
+        } else if (i->second.type == tList) {
             value.type = MetaValue::tpStrings;
-            for (ATermIterator j(es); j; ++j)
-                value.stringValues.push_back(evalStringNoCtx(state, *j));
-            meta[aterm2String(i->key)] = value;
-        }
+            for (unsigned int j = 0; j < i->second.list.length; ++j)
+                value.stringValues.push_back(state.forceStringNoCtx(i->second.list.elems[j]));
+        } else continue;
+        meta[aterm2String(i->first)] = value;
     }
 
     return meta;
@@ -76,6 +67,8 @@ MetaValue DrvInfo::queryMetaInfo(EvalState & state, const string & name) const
 
 void DrvInfo::setMetaInfo(const MetaInfo & meta)
 {
+    throw Error("not implemented");
+#if 0
     ATermMap metaAttrs;
     foreach (MetaInfo::const_iterator, i, meta) {
         Expr e;
@@ -94,8 +87,8 @@ void DrvInfo::setMetaInfo(const MetaInfo & meta)
         metaAttrs.set(toATerm(i->first), makeAttrRHS(e, makeNoPos()));
     }
     attrs->set(toATerm("meta"), makeAttrs(metaAttrs));
-}
 #endif
+}
 
 
 /* Cache for already considered values. */

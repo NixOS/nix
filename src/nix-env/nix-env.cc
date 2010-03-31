@@ -164,9 +164,12 @@ static void loadDerivations(EvalState & state, Path nixExprPath,
     string systemFilter, const ATermMap & autoArgs,
     const string & pathPrefix, DrvInfos & elems)
 {
-    getDerivations(state,
-        findAlongAttrPath(state, pathPrefix, autoArgs, loadSourceExpr(state, nixExprPath)),
-        pathPrefix, autoArgs, elems);
+    Value v;
+    state.eval(loadSourceExpr(state, nixExprPath), v);
+
+    // !!! findAlongAttrPath(state, pathPrefix, autoArgs, loadSourceExpr(state, nixExprPath))
+    
+    getDerivations(state, v, pathPrefix, autoArgs, elems);
 
     /* Filter out all derivations not applicable to the current
        system. */
@@ -221,7 +224,7 @@ static DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
     e = bottomupRewrite(addPos, e);
 
     DrvInfos elems;
-    getDerivations(state, e, "", ATermMap(1), elems);
+    // !!! getDerivations(state, e, "", ATermMap(1), elems);
     return elems;
 }
 
@@ -255,6 +258,8 @@ static bool createUserEnv(EvalState & state, DrvInfos & elems,
     const Path & profile, bool keepDerivations,
     const string & lockToken)
 {
+    throw Error("not implemented");
+#if 0
     /* Build the components in the user environment, if they don't
        exist already. */
     PathSet drvsToBuild;
@@ -355,6 +360,7 @@ static bool createUserEnv(EvalState & state, DrvInfos & elems,
     switchLink(profile, generation);
 
     return true;
+#endif
 }
 
 
@@ -518,12 +524,11 @@ static void queryInstSources(EvalState & state,
                 
             Expr e1 = loadSourceExpr(state, instSource.nixExprPath);
 
-            for (Strings::const_iterator i = args.begin();
-                 i != args.end(); ++i)
-            {
+            foreach (Strings::const_iterator, i, args) {
                 Expr e2 = parseExprFromString(state, *i, absPath("."));
                 Expr call = makeCall(e2, e1);
-                getDerivations(state, call, "", instSource.autoArgs, elems);
+                Value v; state.eval(call, v);
+                getDerivations(state, v, "", instSource.autoArgs, elems);
             }
             
             break;
@@ -540,7 +545,7 @@ static void queryInstSources(EvalState & state,
                 Path path = followLinksToStorePath(*i);
 
                 DrvInfo elem;
-                elem.attrs = boost::shared_ptr<ATermMap>(new ATermMap(0)); /* ugh... */
+                elem.attrs = new Bindings;
                 string name = baseNameOf(path);
                 string::size_type dash = name.find('-');
                 if (dash != string::npos)
@@ -574,12 +579,14 @@ static void queryInstSources(EvalState & state,
         }
 
         case srcAttrPath: {
-            for (Strings::const_iterator i = args.begin();
-                 i != args.end(); ++i)
+            throw Error("not implemented");
+#if 0            
+            foreach (Strings::const_iterator, i, args)
                 getDerivations(state,
                     findAlongAttrPath(state, *i, instSource.autoArgs,
                         loadSourceExpr(state, instSource.nixExprPath)),
                     "", instSource.autoArgs, elems);
+#endif
             break;
         }
     }
@@ -1472,7 +1479,7 @@ void run(Strings args)
 
     op(globals, remaining, opFlags, opArgs);
 
-    printEvalStats(globals.state);
+    globals.state.printStats();
 }
 
 
