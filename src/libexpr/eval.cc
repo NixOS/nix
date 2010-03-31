@@ -417,7 +417,7 @@ void EvalState::eval(Env & env, Expr e, Value & v)
         PathSet context;
         std::ostringstream s;
         
-        bool first = true, isPath;
+        bool first = true, isPath = false;
         
         for (ATermIterator i(es); i; ++i) {
             eval(env, *i, v);
@@ -788,6 +788,9 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             /* !!! contexts */
             return strcmp(v1.string.s, v2.string.s) == 0;
 
+        case tNull:
+            return true;
+
         case tList:
             if (v2.type != tList || v1.list.length != v2.list.length) return false;
             for (unsigned int n = 0; n < v1.list.length; ++n)
@@ -803,7 +806,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
         }
 
         default:
-            throw Error("cannot compare given values");
+            throw Error(format("cannot compare %1% with %2%") % showType(v1) % showType(v2));
     }
 }
 
