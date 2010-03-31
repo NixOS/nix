@@ -73,6 +73,9 @@ void run(Strings args)
     doTest("map (x: __add 1 x) [ 1 2 3 ]");
     doTest("map (builtins.add 1) [ 1 2 3 ]");
     doTest("builtins.hasAttr \"x\" { x = 1; }");
+    doTest("let x = 1; as = rec { inherit x; y = as.x; }; in as.y");
+    doTest("let as = { x = 1; }; bs = rec { inherit (as) x; y = x; }; in bs.y");
+    doTest("let as = rec { inherit (y) x; y = { x = 1; }; }; in as.x");
 }
 
 

@@ -326,17 +326,31 @@ void EvalState::eval(Env & env, Expr e, Value & v)
     }
 
     else if (matchRec(e, rbnds, nrbnds)) {
+        /* Create a new environment that contains the attributes in
+           this `rec'. */
         Env & env2(allocEnv());
         env2.up = &env;
         
         v.type = tAttrs;
         v.attrs = &env2.bindings;
+
+        /* The recursive attributes are evaluated in the new
+           environment. */
         ATerm name, e2, pos;
         for (ATermIterator i(rbnds); i; ++i) {
             if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
             Value & v2 = env2.bindings[name];
             nrValues++;
             mkThunk(v2, env2, e2);
+        }
+
+        /* The non-recursive attributes, on the other hand, are
+           evaluated in the original environment. */
+        for (ATermIterator i(nrbnds); i; ++i) {
+            if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
+            Value & v2 = env2.bindings[name];
+            nrValues++;
+            mkThunk(v2, env, e2);
         }
     }
 
