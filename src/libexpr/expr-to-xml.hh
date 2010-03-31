@@ -9,7 +9,7 @@
 
 namespace nix {
 
-void printTermAsXML(Expr e, std::ostream & out, PathSet & context);
+void printTermAsXML(Expr e, std::ostream & out, PathSet & context, bool location = false);
     
 }
 

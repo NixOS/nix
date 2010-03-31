@@ -38,13 +38,13 @@ static bool indirectRoot = false;
 
 
 static void printResult(EvalState & state, Expr e,
-    bool evalOnly, bool xmlOutput, const ATermMap & autoArgs)
+    bool evalOnly, bool xmlOutput, bool location, const ATermMap & autoArgs)
 {
     PathSet context;
     
     if (evalOnly)
         if (xmlOutput)
-            printTermAsXML(e, std::cout, context);
+            printTermAsXML(e, std::cout, context, location);
         else
             std::cout << format("%1%\n") % canonicaliseExpr(e);
     
@@ -67,7 +67,7 @@ static void printResult(EvalState & state, Expr e,
 
 void processExpr(EvalState & state, const Strings & attrPaths,
     bool parseOnly, bool strict, const ATermMap & autoArgs,
-    bool evalOnly, bool xmlOutput, Expr e)
+    bool evalOnly, bool xmlOutput, bool location, Expr e)
 {
     for (Strings::const_iterator i = attrPaths.begin(); i != attrPaths.end(); ++i) {
         Expr e2 = findAlongAttrPath(state, *i, autoArgs, e);
@@ -76,7 +76,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 e2 = strictEvalExpr(state, e2);
             else
                 e2 = evalExpr(state, e2);
-        printResult(state, e2, evalOnly, xmlOutput, autoArgs);
+        printResult(state, e2, evalOnly, xmlOutput, location, autoArgs);
     }
 }
 
@@ -89,6 +89,7 @@ void run(Strings args)
     bool evalOnly = false;
     bool parseOnly = false;
     bool xmlOutput = false;
+    bool xmlOutputSourceLocation = true;
     bool strict = false;
     Strings attrPaths;
     ATermMap autoArgs(128);
@@ -124,6 +125,8 @@ void run(Strings args)
             indirectRoot = true;
         else if (arg == "--xml")
             xmlOutput = true;
+        else if (arg == "--no-location")
+            xmlOutputSourceLocation = false;
         else if (arg == "--strict")
             strict = true;
         else if (arg[0] == '-')
@@ -139,7 +142,7 @@ void run(Strings args)
     if (readStdin) {
         Expr e = parseStdin(state);
         processExpr(state, attrPaths, parseOnly, strict, autoArgs,
-            evalOnly, xmlOutput, e);
+            evalOnly, xmlOutput, xmlOutputSourceLocation, e);
     }
 
     for (Strings::iterator i = files.begin();
@@ -148,7 +151,7 @@ void run(Strings args)
         Path path = absPath(*i);
         Expr e = parseExprFromFile(state, path);
         processExpr(state, attrPaths, parseOnly, strict, autoArgs,
-            evalOnly, xmlOutput, e);
+            evalOnly, xmlOutput, xmlOutputSourceLocation, e);
     }
 
     printEvalStats(state);
