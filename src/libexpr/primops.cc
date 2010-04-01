@@ -448,34 +448,9 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     state.drvHashes[drvPath] = hashDerivationModulo(state, drv);
 
     /* !!! assumes a single output */
-    //state.mkAttrs(v);
-    state.cloneAttrs(*args[0], v);
+    state.mkAttrs(v);
     mkString((*v.attrs)[toATerm("outPath")], outPath, singleton<PathSet>(drvPath));
     mkString((*v.attrs)[toATerm("drvPath")], drvPath, singleton<PathSet>("=" + drvPath));
-    mkString((*v.attrs)[toATerm("type")], "derivation"); // !!! remove
-}
-
-
-static void prim_derivationLazy(EvalState & state, Value * * args, Value & v)
-{
-    state.forceAttrs(*args[0]);
-
-    state.cloneAttrs(*args[0], v);
-
-    mkString((*v.attrs)[toATerm("type")], "derivation");
-
-    /* !!! */
-
-#if 0    
-    Expr drvStrict = makeCall(makeVar(toATerm("derivation!")), eAttrs);
-
-    attrs.set(toATerm("outPath"),
-        makeAttrRHS(makeSelect(drvStrict, toATerm("outPath")), makeNoPos()));
-    attrs.set(toATerm("drvPath"),
-        makeAttrRHS(makeSelect(drvStrict, toATerm("drvPath")), makeNoPos()));
-    
-    return makeAttrs(attrs);
-#endif
 }
 
 
@@ -1039,6 +1014,12 @@ void EvalState::createBaseEnv()
     mkString(v, thisSystem.c_str());
     addConstant("__currentSystem", v);
 
+    /* Add a wrapper around the derivation primop that computes the
+       `drvPath' and `outPath' attributes lazily. */
+    string s = "attrs: let res = derivationStrict attrs; in attrs // { drvPath = res.drvPath; outPath = res.outPath; type = \"derivation\"; }";
+    mkThunk(v, baseEnv, parseExprFromString(*this, s, "/"));
+    addConstant("derivation", v);
+
     // Miscellaneous
     addPrimOp("import", 1, prim_import);
     addPrimOp("isNull", 1, prim_isNull);
@@ -1059,8 +1040,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__trace", 2, prim_trace);
 
     // Derivations
-    addPrimOp("derivation", 1, prim_derivationStrict);
-    //addPrimOp("derivation", 1, prim_derivationLazy);
+    addPrimOp("derivationStrict", 1, prim_derivationStrict);
 
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);

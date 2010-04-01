@@ -104,6 +104,14 @@ static inline void mkBool(Value & v, bool b)
 }
 
 
+static inline void mkThunk(Value & v, Env & env, Expr expr)
+{
+    v.type = tThunk;
+    v.thunk.env = &env;
+    v.thunk.expr = expr;
+}
+
+
 void mkString(Value & v, const char * s);
 void mkString(Value & v, const string & s, const PathSet & context = PathSet());
 void mkPath(Value & v, const char * s);

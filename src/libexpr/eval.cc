@@ -159,14 +159,6 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, 
 }
 
 
-static void mkThunk(Value & v, Env & env, Expr expr)
-{
-    v.type = tThunk;
-    v.thunk.env = &env;
-    v.thunk.expr = expr;
-}
-
-
 void mkString(Value & v, const char * s)
 {
     v.type = tString;
@@ -179,7 +171,7 @@ void mkString(Value & v, const string & s, const PathSet & context)
 {
     mkString(v, s.c_str());
     if (!context.empty()) {
-        unsigned int len = 0, n = 0;
+        unsigned int n = 0;
         v.string.context = new const char *[context.size() + 1];
         foreach (PathSet::const_iterator, i, context) 
             v.string.context[n++] = strdup(i->c_str());
