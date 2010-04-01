@@ -264,7 +264,7 @@ void EvalState::cloneAttrs(Value & src, Value & dst)
 {
     mkAttrs(dst);
     foreach (Bindings::iterator, i, *src.attrs)
-        (*dst.attrs)[i->first] = i->second; // !!! sharing?
+        mkCopy((*dst.attrs)[i->first], i->second);
 }
 
 
@@ -601,8 +601,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
                 mkThunk(v, env2, def);
             } else {
                 attrsUsed++;
-                v.type = tCopy;
-                v.val = &j->second;
+                mkCopy(v, j->second);
             }
         }
 

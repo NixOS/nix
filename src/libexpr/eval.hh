@@ -112,6 +112,13 @@ static inline void mkThunk(Value & v, Env & env, Expr expr)
 }
 
 
+static inline void mkCopy(Value & v, Value & src)
+{
+    v.type = tCopy;
+    v.val = &src;
+}
+
+
 void mkString(Value & v, const char * s);
 void mkString(Value & v, const string & s, const PathSet & context = PathSet());
 void mkPath(Value & v, const char * s);

@@ -91,8 +91,8 @@ void DrvInfo::setMetaInfo(const MetaInfo & meta)
 }
 
 
-/* Cache for already considered values. */
-typedef set<Value *> Values;
+/* Cache for already considered attrsets. */
+typedef set<Bindings *> Done;
 
 
 /* Evaluate value `v'.  If it evaluates to an attribute set of type
@@ -101,7 +101,7 @@ typedef set<Value *> Values;
    makes sense for the caller to recursively search for derivations in
    `v'. */
 static bool getDerivation(EvalState & state, Value & v,
-    const string & attrPath, DrvInfos & drvs, Values & doneValues)
+    const string & attrPath, DrvInfos & drvs, Done & done)
 {
     try {
         state.forceValue(v);
@@ -112,8 +112,8 @@ static bool getDerivation(EvalState & state, Value & v,
 
         /* Remove spurious duplicates (e.g., an attribute set like
            `rec { x = derivation {...}; y = x;}'. */
-        if (doneValues.find(&v) != doneValues.end()) return false;
-        doneValues.insert(&v);
+        if (done.find(v.attrs) != done.end()) return false;
+        done.insert(v.attrs);
 
         DrvInfo drv;
     
@@ -143,9 +143,9 @@ static bool getDerivation(EvalState & state, Value & v,
 
 bool getDerivation(EvalState & state, Value & v, DrvInfo & drv)
 {
-    Values doneValues;
+    Done done;
     DrvInfos drvs;
-    getDerivation(state, v, "", drvs, doneValues);
+    getDerivation(state, v, "", drvs, done);
     if (drvs.size() != 1) return false;
     drv = drvs.front();
     return true;
@@ -160,14 +160,14 @@ static string addToPath(const string & s1, const string & s2)
 
 static void getDerivations(EvalState & state, Value & v,
     const string & pathPrefix, const ATermMap & autoArgs,
-    DrvInfos & drvs, Values & doneValues)
+    DrvInfos & drvs, Done & done)
 {
     // !!! autoCallFunction(evalExpr(state, e), autoArgs)
     
     /* Process the expression. */
     DrvInfo drv;
 
-    if (!getDerivation(state, v, pathPrefix, drvs, doneValues)) ;
+    if (!getDerivation(state, v, pathPrefix, drvs, done)) ;
 
     else if (v.type == tAttrs) {
 
@@ -189,8 +189,8 @@ static void getDerivations(EvalState & state, Value & v,
             string pathPrefix2 = addToPath(pathPrefix, *i);
             Value & v2((*v.attrs)[toATerm(*i)]);
             if (combineChannels)
-                getDerivations(state, v2, pathPrefix2, autoArgs, drvs, doneValues);
-            else if (getDerivation(state, v2, pathPrefix2, drvs, doneValues)) {
+                getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done);
+            else if (getDerivation(state, v2, pathPrefix2, drvs, done)) {
                 /* If the value of this attribute is itself an
                    attribute set, should we recurse into it?  => Only
                    if it has a `recurseForDerivations = true'
@@ -198,7 +198,7 @@ static void getDerivations(EvalState & state, Value & v,
                 if (v2.type == tAttrs) {
                     Bindings::iterator j = v2.attrs->find(toATerm("recurseForDerivations"));
                     if (j != v2.attrs->end() && state.forceBool(j->second))
-                        getDerivations(state, v2, pathPrefix2, autoArgs, drvs, doneValues);
+                        getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done);
                 }
             }
         }
@@ -209,8 +209,8 @@ static void getDerivations(EvalState & state, Value & v,
             startNest(nest, lvlDebug,
                 format("evaluating list element"));
             string pathPrefix2 = addToPath(pathPrefix, (format("%1%") % n).str());
-            if (getDerivation(state, v.list.elems[n], pathPrefix2, drvs, doneValues))
-                getDerivations(state, v.list.elems[n], pathPrefix2, autoArgs, drvs, doneValues);
+            if (getDerivation(state, v.list.elems[n], pathPrefix2, drvs, done))
+                getDerivations(state, v.list.elems[n], pathPrefix2, autoArgs, drvs, done);
         }
     }
 
@@ -221,8 +221,8 @@ static void getDerivations(EvalState & state, Value & v,
 void getDerivations(EvalState & state, Value & v, const string & pathPrefix,
     const ATermMap & autoArgs, DrvInfos & drvs)
 {
-    Values doneValues;
-    getDerivations(state, v, pathPrefix, autoArgs, drvs, doneValues);
+    Done done;
+    getDerivations(state, v, pathPrefix, autoArgs, drvs, done);
 }
 
  
