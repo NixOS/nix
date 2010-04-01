@@ -9,7 +9,7 @@ let {
 
   input2 = mkDerivation {
     name = "dependencies-input-2";
-    builder = ./. ~ "dependencies.builder2.sh";
+    builder = ./dependencies.builder2.sh;
   };
 
   body = mkDerivation {

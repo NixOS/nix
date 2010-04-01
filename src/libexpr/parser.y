@@ -373,7 +373,6 @@ expr_op
   | expr_op OR expr_op { $$ = makeOpOr($1, $3); }
   | expr_op IMPL expr_op { $$ = makeOpImpl($1, $3); }
   | expr_op UPDATE expr_op { $$ = makeOpUpdate($1, $3); }
-  | expr_op '~' expr_op { $$ = makeSubPath($1, $3); }
   | expr_op '?' ID { $$ = makeOpHasAttr($1, $3); }
   | expr_op '+' expr_op { $$ = makeConcatStrings(ATmakeList2($1, $3)); }
   | expr_op CONCAT expr_op { $$ = makeOpConcat($1, $3); }
