@@ -804,9 +804,12 @@ string EvalState::coerceToString(Value & v, PathSet & context,
         if (v.type == tList) {
             string result;
             for (unsigned int n = 0; n < v.list.length; ++n) {
-                if (n) result += " ";
                 result += coerceToString(v.list.elems[n],
                     context, coerceMore, copyToStore);
+                if (n < v.list.length - 1
+                    /* !!! not quite correct */
+                    && (v.list.elems[n].type != tList || v.list.elems[n].list.length != 0))
+                    result += " ";
             }
             return result;
         }
