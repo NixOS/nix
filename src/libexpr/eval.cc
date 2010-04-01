@@ -69,16 +69,17 @@ std::ostream & operator << (std::ostream & str, Value & v)
 string showType(Value & v)
 {
     switch (v.type) {
-        case tString: return "a string";
-        case tPath: return "a path";
-        case tNull: return "null";
         case tInt: return "an integer";
         case tBool: return "a boolean";
-        case tLambda: return "a function";
+        case tString: return "a string";
+        case tPath: return "a path";
         case tAttrs: return "an attribute set";
         case tList: return "a list";
+        case tNull: return "null";
+        case tLambda: return "a function";
+        case tPrimOp: return "a built-in function";
         case tPrimOpApp: return "a partially applied built-in function";
-        default: throw Error("unknown type");
+        default: throw Error(format("unknown type: %1%") % v.type);
     }
 }
 
@@ -299,7 +300,7 @@ void EvalState::eval(Env & env, Expr e, Value & v)
     char x;
     if (&x < deepestStack) deepestStack = &x;
     
-    debug(format("eval: %1%") % e);
+    //debug(format("eval: %1%") % e);
 
     nrEvaluated++;
 
@@ -863,6 +864,12 @@ bool EvalState::eqValues(Value & v1, Value & v2)
                 if (!eqValues(i->second, j->second)) return false;
             return true;
         }
+
+        /* Functions are incomparable. */
+        case tLambda:
+        case tPrimOp:
+        case tPrimOpApp:
+            return false;
 
         default:
             throw Error(format("cannot compare %1% with %2%") % showType(v1) % showType(v2));
