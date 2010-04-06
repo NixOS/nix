@@ -369,10 +369,11 @@ void EvalState::eval(Env & env, Expr e, Value & v)
     }
 
     else if (matchSelect(e, e2, name)) {
-        eval(env, e2, v);
-        forceAttrs(v); // !!! eval followed by force is slightly inefficient
-        Bindings::iterator i = v.attrs->find(name);
-        if (i == v.attrs->end())
+        Value v2;
+        eval(env, e2, v2);
+        forceAttrs(v2); // !!! eval followed by force is slightly inefficient
+        Bindings::iterator i = v2.attrs->find(name);
+        if (i == v2.attrs->end())
             throwEvalError("attribute `%1%' missing", aterm2String(name));
         try {            
             forceValue(i->second);
@@ -391,10 +392,11 @@ void EvalState::eval(Env & env, Expr e, Value & v)
     }
 
     else if (matchCall(e, fun, arg)) {
-        eval(env, fun, v);
+        Value vFun;
+        eval(env, fun, vFun);
         Value vArg;
         mkThunk(vArg, env, arg); // !!! should this be on the heap?
-        callFunction(v, vArg, v);
+        callFunction(vFun, vArg, v);
     }
 
     else if (matchWith(e, attrs, body, pos)) {
@@ -446,9 +448,10 @@ void EvalState::eval(Env & env, Expr e, Value & v)
         std::ostringstream s;
         
         bool first = true, isPath = false;
+        Value vStr;
         
         for (ATermIterator i(es); i; ++i) {
-            eval(env, *i, v);
+            eval(env, *i, vStr);
 
             /* If the first element is a path, then the result will
                also be a path, we don't copy anything (yet - that's
@@ -456,11 +459,11 @@ void EvalState::eval(Env & env, Expr e, Value & v)
                in a derivation), and none of the strings are allowed
                to have contexts. */
             if (first) {
-                isPath = v.type == tPath;
+                isPath = vStr.type == tPath;
                 first = false;
             }
             
-            s << coerceToString(v, context, false, !isPath);
+            s << coerceToString(vStr, context, false, !isPath);
         }
         
         if (isPath && !context.empty())
@@ -514,9 +517,10 @@ void EvalState::eval(Env & env, Expr e, Value & v)
 
     /* Attribute existence test (?). */
     else if (matchOpHasAttr(e, e1, name)) {
-        eval(env, e1, v);
-        forceAttrs(v);
-        mkBool(v, v.attrs->find(name) != v.attrs->end());
+        Value vAttrs;
+        eval(env, e1, vAttrs);
+        forceAttrs(vAttrs);
+        mkBool(v, vAttrs.attrs->find(name) != vAttrs.attrs->end());
     }
 
     else throw Error("unsupported term");
@@ -660,7 +664,7 @@ void EvalState::strictEval(Expr e, Value & v)
 void EvalState::forceValue(Value & v)
 {
     if (v.type == tThunk) {
-        v.type = tBlackhole;
+        //v.type = tBlackhole;
         eval(*v.thunk.env, v.thunk.expr, v);
     }
     else if (v.type == tCopy) {
