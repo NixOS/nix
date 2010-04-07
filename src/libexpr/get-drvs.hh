@@ -65,7 +65,7 @@ typedef list<DrvInfo> DrvInfos;
 bool getDerivation(EvalState & state, Value & v, DrvInfo & drv);
 
 void getDerivations(EvalState & state, Value & v, const string & pathPrefix,
-    const ATermMap & autoArgs, DrvInfos & drvs);
+    const Bindings & autoArgs, DrvInfos & drvs);
 
  
 }

@@ -47,7 +47,7 @@ struct InstallSourceInfo
     Path profile; /* for srcProfile */
     string systemFilter; /* for srcNixExprDrvs */
     bool prebuiltOnly;
-    ATermMap autoArgs;
+    Bindings autoArgs;
     InstallSourceInfo() : prebuiltOnly(false) { };
 };
 
@@ -161,13 +161,11 @@ static Expr loadSourceExpr(EvalState & state, const Path & path)
 
 
 static void loadDerivations(EvalState & state, Path nixExprPath,
-    string systemFilter, const ATermMap & autoArgs,
+    string systemFilter, const Bindings & autoArgs,
     const string & pathPrefix, DrvInfos & elems)
 {
     Value v;
-    state.eval(loadSourceExpr(state, nixExprPath), v);
-
-    // !!! findAlongAttrPath(state, pathPrefix, autoArgs, loadSourceExpr(state, nixExprPath))
+    findAlongAttrPath(state, pathPrefix, autoArgs, loadSourceExpr(state, nixExprPath), v);
     
     getDerivations(state, v, pathPrefix, autoArgs, elems);
 
@@ -579,14 +577,12 @@ static void queryInstSources(EvalState & state,
         }
 
         case srcAttrPath: {
-            throw Error("not implemented");
-#if 0            
-            foreach (Strings::const_iterator, i, args)
-                getDerivations(state,
-                    findAlongAttrPath(state, *i, instSource.autoArgs,
-                        loadSourceExpr(state, instSource.nixExprPath)),
-                    "", instSource.autoArgs, elems);
-#endif
+            foreach (Strings::const_iterator, i, args) {
+                Value v;
+                findAlongAttrPath(state, *i, instSource.autoArgs,
+                    loadSourceExpr(state, instSource.nixExprPath), v);
+                getDerivations(state, v, "", instSource.autoArgs, elems);
+            }
             break;
         }
     }

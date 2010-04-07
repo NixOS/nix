@@ -226,13 +226,18 @@ public:
     
     void callFunction(Value & fun, Value & arg, Value & v);
 
+    /* Automatically call a function for which each argument has a
+       default value or has a binding in the `args' map. */
+    void autoCallFunction(const Bindings & args, Value & fun, Value & res);
+    
     /* Allocation primitives. */
     Value * allocValues(unsigned int count);
     Env & allocEnv();
 
     void mkList(Value & v, unsigned int length);
     void mkAttrs(Value & v);
-
+    void mkThunk_(Value & v, Expr expr);
+    
     void cloneAttrs(Value & src, Value & dst);
 
     /* Print statistics. */
@@ -242,33 +247,6 @@ public:
 
 /* Return a string representing the type of the value `v'. */
 string showType(Value & v);
-
-
-#if 0
-/* Evaluate an expression to normal form. */
-Expr evalExpr(EvalState & state, Expr e);
-
-/* Evaluate an expression, and recursively evaluate list elements and
-   attributes.  If `canonicalise' is true, we remove things like
-   position information and make sure that attribute sets are in
-   sorded order. */
-Expr strictEvalExpr(EvalState & state, Expr e);
-
-/* Specific results. */
-string evalString(EvalState & state, Expr e, PathSet & context);
-int evalInt(EvalState & state, Expr e);
-bool evalBool(EvalState & state, Expr e);
-ATermList evalList(EvalState & state, Expr e);
-
-/* Flatten nested lists into a single list (or expand a singleton into
-   a list). */
-ATermList flattenList(EvalState & state, Expr e);
-
-/* Automatically call a function for which each argument has a default
-   value or has a binding in the `args' map.  Note: result is a call,
-   not a normal form; it should be evaluated by calling evalExpr(). */
-Expr autoCallFunction(Expr e, const ATermMap & args);
-#endif
 
 
 }

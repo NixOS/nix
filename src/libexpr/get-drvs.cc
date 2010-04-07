@@ -155,11 +155,12 @@ static string addToPath(const string & s1, const string & s2)
 }
 
 
-static void getDerivations(EvalState & state, Value & v,
-    const string & pathPrefix, const ATermMap & autoArgs,
+static void getDerivations(EvalState & state, Value & vIn,
+    const string & pathPrefix, const Bindings & autoArgs,
     DrvInfos & drvs, Done & done)
 {
-    // !!! autoCallFunction(evalExpr(state, e), autoArgs)
+    Value v;
+    state.autoCallFunction(autoArgs, vIn, v);
     
     /* Process the expression. */
     DrvInfo drv;
@@ -216,7 +217,7 @@ static void getDerivations(EvalState & state, Value & v,
 
 
 void getDerivations(EvalState & state, Value & v, const string & pathPrefix,
-    const ATermMap & autoArgs, DrvInfos & drvs)
+    const Bindings & autoArgs, DrvInfos & drvs)
 {
     Done done;
     getDerivations(state, v, pathPrefix, autoArgs, drvs, done);

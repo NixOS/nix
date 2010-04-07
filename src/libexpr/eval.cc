@@ -260,6 +260,12 @@ void EvalState::mkAttrs(Value & v)
 }
 
 
+void EvalState::mkThunk_(Value & v, Expr expr)
+{
+    mkThunk(v, baseEnv, expr);
+}
+
+
 void EvalState::cloneAttrs(Value & src, Value & dst)
 {
     mkAttrs(dst);
@@ -622,6 +628,37 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
     else abort();
         
     eval(env2, fun.lambda.body, v);
+}
+
+
+void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res)
+{
+    forceValue(fun);
+
+    ATerm name;
+    ATermList formals;
+    ATermBool ellipsis;
+    
+    if (fun.type != tLambda || !matchAttrsPat(fun.lambda.pat, formals, ellipsis, name)) {
+        res = fun;
+        return;
+    }
+
+    Value actualArgs;
+    mkAttrs(actualArgs);
+    
+    for (ATermIterator i(formals); i; ++i) {
+        Expr name, def; ATerm def2;
+        if (!matchFormal(*i, name, def2)) abort();
+        Bindings::const_iterator j = args.find(name);
+        if (j != args.end())
+            (*actualArgs.attrs)[name] = j->second;
+        else if (!matchDefaultValue(def2, def))
+            throw TypeError(format("cannot auto-call a function that has an argument without a default value (`%1%      ')")
+                % aterm2String(name));
+    }
+
+    callFunction(fun, actualArgs, res);
 }
 
 
@@ -1055,33 +1092,6 @@ ATermList flattenList(EvalState & state, Expr e)
     ATermList result = ATempty;
     flattenList(state, e, result);
     return ATreverse(result);
-}
-
-
-Expr autoCallFunction(Expr e, const ATermMap & args)
-{
-    Pattern pat;
-    ATerm body, pos, name;
-    ATermList formals;
-    ATermBool ellipsis;
-    
-    if (matchFunction(e, pat, body, pos) && matchAttrsPat(pat, formals, ellipsis, name)) {
-        ATermMap actualArgs(ATgetLength(formals));
-        
-        for (ATermIterator i(formals); i; ++i) {
-            Expr name, def, value; ATerm def2;
-            if (!matchFormal(*i, name, def2)) abort();
-            if ((value = args.get(name)))
-                actualArgs.set(name, makeAttrRHS(value, makeNoPos()));
-            else if (!matchDefaultValue(def2, def))
-                throw TypeError(format("cannot auto-call a function that has an argument without a default value (`%1%')")
-                    % aterm2String(name));
-        }
-        
-        e = makeCall(e, makeAttrs(actualArgs));
-    }
-    
-    return e;
 }
 
 
