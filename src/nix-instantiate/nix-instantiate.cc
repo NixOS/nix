@@ -7,7 +7,7 @@
 #include "parser.hh"
 #include "get-drvs.hh"
 #include "attr-path.hh"
-#include "expr-to-xml.hh"
+#include "value-to-xml.hh"
 #include "util.hh"
 #include "store-api.hh"
 #include "common-opts.hh"
@@ -75,10 +75,15 @@ void processExpr(EvalState & state, const Strings & attrPaths,
         std::cout << format("%1%\n") % canonicaliseExpr(e);
     else {
         Value v;
+        PathSet context;
         state.eval(e, v);
-        if (strict) state.strictForceValue(v);
         if (evalOnly)
-            std::cout << v << std::endl;
+            if (xmlOutput)
+                printValueAsXML(state, strict, v, std::cout, context);
+            else {
+                if (strict) state.strictForceValue(v);
+                std::cout << v << std::endl;
+            }
         else {
             DrvInfos drvs;
             getDerivations(state, v, "", autoArgs, drvs);

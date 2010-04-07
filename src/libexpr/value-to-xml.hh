@@ -1,5 +1,5 @@
-#ifndef __EXPR_TO_XML_H
-#define __EXPR_TO_XML_H
+#ifndef __VALUE_TO_XML_H
+#define __VALUE_TO_XML_H
 
 #include <string>
 #include <map>
@@ -14,4 +14,4 @@ void printValueAsXML(EvalState & state, bool strict,
     
 }
 
-#endif /* !__EXPR_TO_XML_H */
+#endif /* !__VALUE_TO_XML_H */

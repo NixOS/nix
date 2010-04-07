@@ -1,4 +1,4 @@
-#include "expr-to-xml.hh"
+#include "value-to-xml.hh"
 #include "xml-writer.hh"
 #include "nixexpr-ast.hh"
 #include "aterm.hh"

@@ -4,7 +4,7 @@
 #include "store-api.hh"
 #include "util.hh"
 #include "archive.hh"
-#include "expr-to-xml.hh"
+#include "value-to-xml.hh"
 #include "nixexpr-ast.hh"
 #include "parser.hh"
 #include "names.hh"

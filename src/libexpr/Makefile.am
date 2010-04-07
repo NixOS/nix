@@ -2,12 +2,12 @@ pkglib_LTLIBRARIES = libexpr.la
 
 libexpr_la_SOURCES = \
  nixexpr.cc eval.cc primops.cc lexer-tab.cc parser-tab.cc \
- get-drvs.cc attr-path.cc expr-to-xml.cc common-opts.cc \
+ get-drvs.cc attr-path.cc value-to-xml.cc common-opts.cc \
  names.cc
 
 pkginclude_HEADERS = \
  nixexpr.hh eval.hh parser.hh lexer-tab.hh parser-tab.hh \
- get-drvs.hh attr-path.hh expr-to-xml.hh common-opts.hh \
+ get-drvs.hh attr-path.hh value-to-xml.hh common-opts.hh \
  names.hh nixexpr-ast.hh
 
 libexpr_la_LIBADD = ../libutil/libutil.la ../libstore/libstore.la \
