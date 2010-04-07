@@ -5,11 +5,12 @@
 #include <map>
 
 #include "nixexpr.hh"
-#include "aterm.hh"
+#include "eval.hh"
 
 namespace nix {
 
-void printTermAsXML(Expr e, std::ostream & out, PathSet & context);
+void printValueAsXML(EvalState & state, bool strict,
+    Value & v, std::ostream & out, PathSet & context);
     
 }
 

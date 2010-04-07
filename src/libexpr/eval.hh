@@ -169,16 +169,15 @@ public:
        type. */
     bool evalBool(Env & env, Expr e);
 
-    /* Evaluate an expression, and recursively evaluate list elements
-       and attributes. */
-    void strictEval(Expr e, Value & v);
-    void strictEval(Env & env, Expr e, Value & v);
-
     /* If `v' is a thunk, enter it and overwrite `v' with the result
        of the evaluation of the thunk.  If `v' is a delayed function
        application, call the function and overwrite `v' with the
        result.  Otherwise, this is a no-op. */
     void forceValue(Value & v);
+
+    /* Force a value, then recursively force list elements and
+       attributes. */
+    void strictForceValue(Value & v);
 
     /* Force `v', and then verify that it has the expected type. */
     int forceInt(Value & v);
@@ -189,6 +188,10 @@ public:
     string forceString(Value & v);
     string forceString(Value & v, PathSet & context);
     string forceStringNoCtx(Value & v);
+
+    /* Return true iff the value `v' denotes a derivation (i.e. a
+       set with attribute `type = "derivation"'). */
+    bool isDerivation(Value & v);
 
     /* String coercion.  Converts strings, paths and derivations to a
        string.  If `coerceMore' is set, also converts nulls, integers,
@@ -219,10 +222,10 @@ private:
        elements and attributes are compared recursively. */
     bool eqValues(Value & v1, Value & v2);
 
-    void callFunction(Value & fun, Value & arg, Value & v);
-
 public:
     
+    void callFunction(Value & fun, Value & arg, Value & v);
+
     /* Allocation primitives. */
     Value * allocValues(unsigned int count);
     Env & allocEnv();
@@ -235,6 +238,10 @@ public:
     /* Print statistics. */
     void printStats();
 };
+
+
+/* Return a string representing the type of the value `v'. */
+string showType(Value & v);
 
 
 #if 0

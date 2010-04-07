@@ -105,10 +105,7 @@ static bool getDerivation(EvalState & state, Value & v,
 {
     try {
         state.forceValue(v);
-        if (v.type != tAttrs) return true;
-
-        Bindings::iterator i = v.attrs->find(toATerm("type"));
-        if (i == v.attrs->end() || state.forceStringNoCtx(i->second) != "derivation") return true;
+        if (!state.isDerivation(v)) return true;
 
         /* Remove spurious duplicates (e.g., an attribute set like
            `rec { x = derivation {...}; y = x;}'. */
@@ -117,7 +114,7 @@ static bool getDerivation(EvalState & state, Value & v,
 
         DrvInfo drv;
     
-        i = v.attrs->find(toATerm("name"));
+        Bindings::iterator i = v.attrs->find(toATerm("name"));
         /* !!! We really would like to have a decent back trace here. */
         if (i == v.attrs->end()) throw TypeError("derivation name missing");
         drv.name = state.forceStringNoCtx(i->second);

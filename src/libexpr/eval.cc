@@ -302,6 +302,8 @@ void EvalState::eval(Env & env, Expr e, Value & v)
     
     //debug(format("eval: %1%") % e);
 
+    checkInterrupt();
+
     nrEvaluated++;
 
     Sym name;
@@ -639,28 +641,6 @@ bool EvalState::evalBool(Env & env, Expr e)
 }
 
 
-void EvalState::strictEval(Env & env, Expr e, Value & v)
-{
-    eval(env, e, v);
-    
-    if (v.type == tAttrs) {
-        foreach (Bindings::iterator, i, *v.attrs)
-            forceValue(i->second);
-    }
-    
-    else if (v.type == tList) {
-        for (unsigned int n = 0; n < v.list.length; ++n)
-            forceValue(v.list.elems[n]);
-    }
-}
-
-
-void EvalState::strictEval(Expr e, Value & v)
-{
-    strictEval(baseEnv, e, v);
-}
-
-
 void EvalState::forceValue(Value & v)
 {
     if (v.type == tThunk) {
@@ -675,6 +655,22 @@ void EvalState::forceValue(Value & v)
         callFunction(*v.app.left, *v.app.right, v);
     else if (v.type == tBlackhole)
         throw EvalError("infinite recursion encountered");
+}
+
+
+void EvalState::strictForceValue(Value & v)
+{
+    forceValue(v);
+    
+    if (v.type == tAttrs) {
+        foreach (Bindings::iterator, i, *v.attrs)
+            strictForceValue(i->second);
+    }
+    
+    else if (v.type == tList) {
+        for (unsigned int n = 0; n < v.list.length; ++n)
+            strictForceValue(v.list.elems[n]);
+    }
 }
 
 
@@ -750,6 +746,14 @@ string EvalState::forceStringNoCtx(Value & v)
 }
 
 
+bool EvalState::isDerivation(Value & v)
+{
+    if (v.type != tAttrs) return false;
+    Bindings::iterator i = v.attrs->find(toATerm("type"));
+    return i != v.attrs->end() && forceStringNoCtx(i->second) == "derivation";
+}
+
+
 string EvalState::coerceToString(Value & v, PathSet & context,
     bool coerceMore, bool copyToStore)
 {
@@ -769,7 +773,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
 
         if (!copyToStore) return path;
         
-        if (isDerivation(path))
+        if (nix::isDerivation(path))
             throw EvalError(format("file names are not allowed to end in `%1%'")
                 % drvExtension);
 
@@ -1415,5 +1419,5 @@ void EvalState::printStats()
         printATermMapStats();
 }
 
- 
+
 }

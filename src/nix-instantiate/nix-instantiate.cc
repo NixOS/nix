@@ -75,7 +75,8 @@ void processExpr(EvalState & state, const Strings & attrPaths,
         std::cout << format("%1%\n") % canonicaliseExpr(e);
     else {
         Value v;
-        if (strict) state.strictEval(e, v); else state.eval(e, v);
+        state.eval(e, v);
+        if (strict) state.strictForceValue(v);
         if (evalOnly)
             std::cout << v << std::endl;
         else {

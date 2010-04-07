@@ -18,24 +18,19 @@ static XMLAttrs singletonAttrs(const string & name, const string & value)
 }
 
 
-/* set<Expr> is safe because all the expressions are also reachable
-   from the stack, therefore can't be garbage-collected. */
-typedef set<Expr> ExprSet;
+static void printValueAsXML(EvalState & state, bool strict, Value & v,
+    XMLWriter & doc, PathSet & context, PathSet & drvsSeen);
 
 
-static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
-    ExprSet & drvsSeen);
-
-
-static void showAttrs(const ATermMap & attrs, XMLWriter & doc,
-    PathSet & context, ExprSet & drvsSeen)
+static void showAttrs(EvalState & state, bool strict, Bindings & attrs,
+    XMLWriter & doc, PathSet & context, PathSet & drvsSeen)
 {
     StringSet names;
-    for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i)
-        names.insert(aterm2String(i->key));
-    for (StringSet::iterator i = names.begin(); i != names.end(); ++i) {
+    foreach (Bindings::iterator, i, attrs)
+        names.insert(aterm2String(i->first));
+    foreach (StringSet::iterator, i, names) {
         XMLOpenElement _(doc, "attr", singletonAttrs("name", *i));
-        printTermAsXML(attrs.get(toATerm(*i)), doc, context, drvsSeen);
+        printValueAsXML(state, strict, attrs[toATerm(*i)], doc, context, drvsSeen);
     }
 }
 
@@ -61,91 +56,93 @@ static void printPatternAsXML(Pattern pat, XMLWriter & doc)
 }
 
 
-static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
-    ExprSet & drvsSeen)
+static void printValueAsXML(EvalState & state, bool strict, Value & v,
+    XMLWriter & doc, PathSet & context, PathSet & drvsSeen)
 {
-    XMLAttrs attrs;
-    string s;
-    ATerm s2;
-    int i;
-    ATermList as, es;
-    ATerm pat, body, pos;
-
     checkInterrupt();
 
-    if (matchStr(e, s, context)) /* !!! show the context? */
-        doc.writeEmptyElement("string", singletonAttrs("value", s));
+    if (strict) state.forceValue(v);
+        
+    switch (v.type) {
 
-    else if (matchPath(e, s2))
-        doc.writeEmptyElement("path", singletonAttrs("value", aterm2String(s2)));
+        case tInt:
+            doc.writeEmptyElement("int", singletonAttrs("value", (format("%1%") % v.integer).str()));
+            break;
 
-    else if (matchNull(e))
-        doc.writeEmptyElement("null");
+        case tBool:
+            doc.writeEmptyElement("bool", singletonAttrs("value", v.boolean ? "true" : "false"));
+            break;
 
-    else if (matchInt(e, i))
-        doc.writeEmptyElement("int", singletonAttrs("value", (format("%1%") % i).str()));
+        case tString:
+            /* !!! show the context? */
+            doc.writeEmptyElement("string", singletonAttrs("value", v.string.s));
+            break;
 
-    else if (e == eTrue)
-        doc.writeEmptyElement("bool", singletonAttrs("value", "true"));
+        case tPath:
+            doc.writeEmptyElement("path", singletonAttrs("value", v.path));
+            break;
 
-    else if (e == eFalse)
-        doc.writeEmptyElement("bool", singletonAttrs("value", "false"));
+        case tNull:
+            doc.writeEmptyElement("null");
+            break;
 
-    else if (matchAttrs(e, as)) {
-        ATermMap attrs;
-        queryAllAttrs(e, attrs);
-
-        Expr a = attrs.get(toATerm("type"));
-        if (a && matchStr(a, s, context) && s == "derivation") {
-
-            XMLAttrs xmlAttrs;
-            Path outPath, drvPath;
+        case tAttrs:
+            if (state.isDerivation(v)) {
+                XMLAttrs xmlAttrs;
             
-            a = attrs.get(toATerm("drvPath"));
-            if (matchStr(a, drvPath, context))
-                xmlAttrs["drvPath"] = drvPath;
-        
-            a = attrs.get(toATerm("outPath"));
-            if (matchStr(a, outPath, context))
-                xmlAttrs["outPath"] = outPath;
-        
-            XMLOpenElement _(doc, "derivation", xmlAttrs);
+                Bindings::iterator a = v.attrs->find(toATerm("derivation"));
 
-            if (drvsSeen.find(e) == drvsSeen.end()) {
-                drvsSeen.insert(e);
-                showAttrs(attrs, doc, context, drvsSeen);
-            } else
-                doc.writeEmptyElement("repeated");
+                Path drvPath;
+                a = v.attrs->find(toATerm("drvPath"));
+                if (a != v.attrs->end() && a->second.type == tString)
+                    xmlAttrs["drvPath"] = drvPath = a->second.string.s;
+        
+                a = v.attrs->find(toATerm("outPath"));
+                if (a != v.attrs->end() && a->second.type == tString)
+                    xmlAttrs["outPath"] = a->second.string.s;
+
+                XMLOpenElement _(doc, "derivation", xmlAttrs);
+
+                if (drvPath != "" && drvsSeen.find(drvPath) == drvsSeen.end()) {
+                    drvsSeen.insert(drvPath);
+                    showAttrs(state, strict, *v.attrs, doc, context, drvsSeen);
+                } else
+                    doc.writeEmptyElement("repeated");
+            }
+
+            else {
+                XMLOpenElement _(doc, "attrs");
+                showAttrs(state, strict, *v.attrs, doc, context, drvsSeen);
+            }
+            
+            break;
+
+        case tList: {
+            XMLOpenElement _(doc, "list");
+            for (unsigned int n = 0; n < v.list.length; ++n)
+                printValueAsXML(state, strict, v.list.elems[n], doc, context, drvsSeen);
+            break;
         }
 
-        else {
-            XMLOpenElement _(doc, "attrs");
-            showAttrs(attrs, doc, context, drvsSeen);
+        case tLambda: {
+            XMLOpenElement _(doc, "function");
+            printPatternAsXML(v.lambda.pat, doc);
+            break;
         }
-    }
 
-    else if (matchList(e, es)) {
-        XMLOpenElement _(doc, "list");
-        for (ATermIterator i(es); i; ++i)
-            printTermAsXML(*i, doc, context, drvsSeen);
+        default:
+            doc.writeEmptyElement("unevaluated");
     }
-
-    else if (matchFunction(e, pat, body, pos)) {
-        XMLOpenElement _(doc, "function");
-        printPatternAsXML(pat, doc);
-    }
-
-    else
-        doc.writeEmptyElement("unevaluated");
 }
 
 
-void printTermAsXML(Expr e, std::ostream & out, PathSet & context)
+void printValueAsXML(EvalState & state, bool strict,
+    Value & v, std::ostream & out, PathSet & context)
 {
     XMLWriter doc(true, out);
     XMLOpenElement root(doc, "expr");
-    ExprSet drvsSeen;    
-    printTermAsXML(e, doc, context, drvsSeen);
+    PathSet drvsSeen;    
+    printValueAsXML(state, strict, v, doc, context, drvsSeen);
 }
 
  

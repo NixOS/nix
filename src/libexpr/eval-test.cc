@@ -16,7 +16,8 @@ void doTest(string s)
     Expr e = parseExprFromString(state, s, absPath("."));
     printMsg(lvlError, format(">>>>> %1%") % e);
     Value v;
-    state.strictEval(e, v);
+    state.eval(e, v);
+    state.strictForceValue(v);
     printMsg(lvlError, format("result: %1%") % v);
 }
 
@@ -76,6 +77,8 @@ void run(Strings args)
     doTest("let x = 1; as = rec { inherit x; y = as.x; }; in as.y");
     doTest("let as = { x = 1; }; bs = rec { inherit (as) x; y = x; }; in bs.y");
     doTest("let as = rec { inherit (y) x; y = { x = 1; }; }; in as.x");
+    doTest("builtins.toXML 123");
+    doTest("builtins.toXML { a.b = \"x\" + \"y\"; c = [ 1 2 ] ++ [ 3 4 ]; }");
 }
 
 

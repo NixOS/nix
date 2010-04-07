@@ -538,7 +538,6 @@ static void prim_readFile(EvalState & state, Value * * args, Value & v)
  *************************************************************/
 
 
-#if 0
 /* Convert the argument (which can be any Nix expression) to an XML
    representation returned in a string.  Not all Nix expressions can
    be sensibly or completely represented (e.g., functions). */
@@ -546,10 +545,9 @@ static void prim_toXML(EvalState & state, Value * * args, Value & v)
 {
     std::ostringstream out;
     PathSet context;
-    printTermAsXML(strictEvalExpr(state, args[0]), out, context);
-    return makeStr(out.str(), context);
+    printValueAsXML(state, true, *args[0], out, context);
+    mkString(v, out.str(), context);
 }
-#endif
 
 
 /* Store a string in the Nix store as a source file that can be used
@@ -582,13 +580,12 @@ static void prim_toFile(EvalState & state, Value * * args, Value & v)
 }
 
 
-#if 0
 struct FilterFromExpr : PathFilter
 {
     EvalState & state;
-    Expr filter;
+    Value & filter;
     
-    FilterFromExpr(EvalState & state, Expr filter)
+    FilterFromExpr(EvalState & state, Value & filter)
         : state(state), filter(filter)
     {
     }
@@ -599,17 +596,25 @@ struct FilterFromExpr : PathFilter
         if (lstat(path.c_str(), &st))
             throw SysError(format("getting attributes of path `%1%'") % path);
 
-        Expr call =
-            makeCall(
-                makeCall(filter, makeStr(path)),
-                makeStr(
-                    S_ISREG(st.st_mode) ? "regular" :
-                    S_ISDIR(st.st_mode) ? "directory" :
-                    S_ISLNK(st.st_mode) ? "symlink" :
-                    "unknown" /* not supported, will fail! */
-                    ));
-                
-        return evalBool(state, call);
+        /* Call the filter function.  The first argument is the path,
+           the second is a string indicating the type of the file. */
+        Value arg1;
+        mkString(arg1, path);
+
+        Value fun2;
+        state.callFunction(filter, arg1, fun2);
+
+        Value arg2;
+        mkString(arg2, 
+            S_ISREG(st.st_mode) ? "regular" :
+            S_ISDIR(st.st_mode) ? "directory" :
+            S_ISLNK(st.st_mode) ? "symlink" :
+            "unknown" /* not supported, will fail! */);
+        
+        Value res;
+        state.callFunction(fun2, arg2, res);
+
+        return state.forceBool(res);
     }
 };
 
@@ -617,19 +622,22 @@ struct FilterFromExpr : PathFilter
 static void prim_filterSource(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = coerceToPath(state, args[1], context);
+    Path path = state.coerceToPath(*args[1], context);
     if (!context.empty())
         throw EvalError(format("string `%1%' cannot refer to other paths") % path);
 
-    FilterFromExpr filter(state, args[0]);
+    state.forceValue(*args[0]);
+    if (args[0]->type != tLambda)
+        throw TypeError(format("first argument in call to `filterSource' is not a function but %1%") % showType(*args[0]));
+
+    FilterFromExpr filter(state, *args[0]);
 
     Path dstPath = readOnlyMode
         ? computeStorePathForPath(path, true, htSHA256, filter).first
         : store->addToStore(path, true, htSHA256, filter);
 
-    return makeStr(dstPath, singleton<PathSet>(dstPath));
+    mkString(v, dstPath, singleton<PathSet>(dstPath));
 }
-#endif
 
 
 /*************************************************************
@@ -927,15 +935,15 @@ static void prim_stringLength(EvalState & state, Value * * args, Value & v)
 }
 
 
-#if 0
 static void prim_unsafeDiscardStringContext(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
-    string s = coerceToString(state, args[0], context);
-    return makeStr(s, PathSet());
+    string s = state.coerceToString(*args[0], context);
+    mkString(v, s, PathSet());
 }
 
 
+#if 0
 /* Sometimes we want to pass a derivation path (i.e. pkg.drvPath) to a
    builder without causing the derivation to be built (for instance,
    in the derivation that builds NARs in nix-push, when doing
@@ -1053,13 +1061,9 @@ void EvalState::createBaseEnv()
     addPrimOp("__readFile", 1, prim_readFile);
 
     // Creating files
-#if 0
     addPrimOp("__toXML", 1, prim_toXML);
-#endif
     addPrimOp("__toFile", 2, prim_toFile);
-#if 0
     addPrimOp("__filterSource", 2, prim_filterSource);
-#endif
 
     // Attribute sets
     addPrimOp("__attrNames", 1, prim_attrNames);
@@ -1091,8 +1095,8 @@ void EvalState::createBaseEnv()
     addPrimOp("toString", 1, prim_toString);
     addPrimOp("__substring", 3, prim_substring);
     addPrimOp("__stringLength", 1, prim_stringLength);
-#if 0    
     addPrimOp("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
+#if 0    
     addPrimOp("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
 #endif
 
