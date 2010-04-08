@@ -52,50 +52,6 @@ ATerm bottomupRewrite(TermFun & f, ATerm e)
 }
 
 
-void queryAllAttrs(Expr e, ATermMap & attrs, bool withPos)
-{
-    ATermList bnds;
-    if (!matchAttrs(e, bnds))
-        throw TypeError(format("value is %1% while an attribute set was expected") % showType(e));
-
-    for (ATermIterator i(bnds); i; ++i) {
-        ATerm name;
-        Expr e;
-        ATerm pos;
-        if (!matchBind(*i, name, e, pos)) abort(); /* can't happen */
-        attrs.set(name, withPos ? makeAttrRHS(e, pos) : e);
-    }
-}
-
-
-Expr queryAttr(Expr e, const string & name)
-{
-    ATerm dummy;
-    return queryAttr(e, name, dummy);
-}
-
-
-Expr queryAttr(Expr e, const string & name, ATerm & pos)
-{
-    ATermList bnds;
-    if (!matchAttrs(e, bnds))
-        throw TypeError(format("value is %1% while an attribute set was expected") % showType(e));
-
-    for (ATermIterator i(bnds); i; ++i) {
-        ATerm name2, pos2;
-        Expr e;
-        if (!matchBind(*i, name2, e, pos2))
-            abort(); /* can't happen */
-        if (aterm2String(name2) == name) {
-            pos = pos2;
-            return e;
-        }
-    }
-
-    return 0;
-}
-
-
 Expr makeAttrs(const ATermMap & attrs)
 {
     ATermList bnds = ATempty;
@@ -128,88 +84,6 @@ static void varsBoundByPattern(ATermMap & map, Pattern pat)
         }
     }
     else abort();
-}
-
-
-Expr substitute(const Substitution & subs, Expr e)
-{
-    checkInterrupt();
-
-    //if (subs.size() == 0) return e;
-
-    ATerm name, pos, e2;
-
-    /* As an optimisation, don't substitute in subterms known to be
-       closed. */
-    if (matchClosed(e, e2)) return e;
-
-    if (matchVar(e, name)) {
-        Expr sub = subs.lookup(name);
-        if (sub == makeRemoved()) sub = 0;
-        Expr wrapped;
-        /* Add a "closed" wrapper around terms that aren't already
-           closed.  The check is necessary to prevent repeated
-           wrapping, e.g., closed(closed(closed(...))), which kills
-           caching. */
-        return sub ? (matchClosed(sub, wrapped) ? sub : makeClosed(sub)) : e;
-    }
-
-    /* In case of a function, filter out all variables bound by this
-       function. */
-    Pattern pat;
-    ATerm body;
-    if (matchFunction(e, pat, body, pos)) {
-        ATermMap map(16);
-        varsBoundByPattern(map, pat);
-        Substitution subs2(&subs, &map);
-        return makeFunction(
-            (Pattern) substitute(subs2, (Expr) pat),
-            substitute(subs2, body), pos);
-    }
-
-    /* Idem for a mutually recursive attribute set. */
-    ATermList rbnds, nrbnds;
-    if (matchRec(e, rbnds, nrbnds)) {
-        ATermMap map(ATgetLength(rbnds) + ATgetLength(nrbnds));
-        for (ATermIterator i(rbnds); i; ++i)
-            if (matchBind(*i, name, e2, pos)) map.set(name, makeRemoved());
-            else abort(); /* can't happen */
-        for (ATermIterator i(nrbnds); i; ++i)
-            if (matchBind(*i, name, e2, pos)) map.set(name, makeRemoved());
-            else abort(); /* can't happen */
-        return makeRec(
-            (ATermList) substitute(Substitution(&subs, &map), (ATerm) rbnds),
-            (ATermList) substitute(subs, (ATerm) nrbnds));
-    }
-
-    if (ATgetType(e) == AT_APPL) {
-        AFun fun = ATgetAFun(e);
-        int arity = ATgetArity(fun);
-        ATerm args[arity];
-        bool changed = false;
-
-        for (int i = 0; i < arity; ++i) {
-            ATerm arg = ATgetArgument(e, i);
-            args[i] = substitute(subs, arg);
-            if (args[i] != arg) changed = true;
-        }
-        
-        return changed ? (ATerm) ATmakeApplArray(fun, args) : e;
-    }
-
-    if (ATgetType(e) == AT_LIST) {
-        unsigned int len = ATgetLength((ATermList) e);
-        ATerm es[len];
-        ATermIterator i((ATermList) e);
-        for (unsigned int j = 0; i; ++i, ++j)
-            es[j] = substitute(subs, *i);
-        ATermList out = ATempty;
-        for (unsigned int j = len; j; --j)
-            out = ATinsert(out, es[j - 1]);
-        return (ATerm) out;
-    }
-
-    return e;
 }
 
 
@@ -287,51 +161,6 @@ void checkVarDefs(const ATermMap & defs, Expr e)
 }
 
 
-struct Canonicalise : TermFun
-{
-    ATerm operator () (ATerm e)
-    {
-        /* Remove position info. */
-        ATerm path;
-        int line, column;
-        if (matchPos(e, path, line, column))
-            return makeNoPos();
-
-        /* Sort attribute sets. */
-        ATermList _;
-        if (matchAttrs(e, _)) {
-            ATermMap attrs;
-            queryAllAttrs(e, attrs);
-            StringSet names;
-            for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i)
-                names.insert(aterm2String(i->key));
-
-            ATermList attrs2 = ATempty;
-            for (StringSet::reverse_iterator i = names.rbegin(); i != names.rend(); ++i)
-                attrs2 = ATinsert(attrs2,
-                    makeBind(toATerm(*i), attrs.get(toATerm(*i)), makeNoPos()));
-
-            return makeAttrs(attrs2);
-        }
-        
-        return e;
-    }
-};
-
-
-Expr canonicaliseExpr(Expr e)
-{
-    Canonicalise canonicalise;
-    return bottomupRewrite(canonicalise, e);
-}
-
-
-Expr makeBool(bool b)
-{
-    return b ? eTrue : eFalse;
-}
-
-
 bool matchStr(Expr e, string & s, PathSet & context)
 {
     ATermList l;
@@ -354,50 +183,4 @@ Expr makeStr(const string & s, const PathSet & context)
 }
 
 
-string showType(Expr e)
-{
-    ATerm t1, t2;
-    ATermList l1;
-    ATermBlob b1;
-    int i1;
-    Pattern p1;
-    if (matchStr(e, t1, l1)) return "a string";
-    if (matchPath(e, t1)) return "a path";
-    if (matchNull(e)) return "null";
-    if (matchInt(e, i1)) return "an integer";
-    if (matchBool(e, t1)) return "a boolean";
-    if (matchFunction(e, p1, t1, t2)) return "a function";
-    if (matchAttrs(e, l1)) return "an attribute set";
-    if (matchList(e, l1)) return "a list";
-    if (matchPrimOp(e, i1, b1, l1)) return "a partially applied built-in function";
-    return "an unknown type";
-}
-
-
-string showValue(Expr e)
-{
-    PathSet context;
-    string s;
-    ATerm s2;
-    int i;
-    if (matchStr(e, s, context)) {
-        string u;
-        for (string::iterator i = s.begin(); i != s.end(); ++i)
-            if (*i == '\"' || *i == '\\') u += "\\" + *i;
-            else if (*i == '\n') u += "\\n";
-            else if (*i == '\r') u += "\\r";
-            else if (*i == '\t') u += "\\t";
-            else u += *i;
-        return "\"" + u + "\"";
-    }
-    if (matchPath(e, s2)) return aterm2String(s2);
-    if (matchNull(e)) return "null";
-    if (matchInt(e, i)) return (format("%1%") % i).str();
-    if (e == eTrue) return "true";
-    if (e == eFalse) return "false";
-    /* !!! incomplete */
-    return "<unknown>";
-}
-
- 
 }

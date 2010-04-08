@@ -42,7 +42,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
     bool evalOnly, bool xmlOutput, Expr e)
 {
     if (parseOnly)
-        std::cout << format("%1%\n") % canonicaliseExpr(e);
+        std::cout << format("%1%\n");
     else
         foreach (Strings::const_iterator, i, attrPaths) {
             Value v;

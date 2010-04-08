@@ -34,33 +34,9 @@ typedef ATerm ATermBool;
 typedef vector<ATerm> ATermVector;
 
 
-/* A substitution is a linked list of ATermMaps that map names to
-   identifiers.  We use a list of ATermMaps rather than a single to
-   make it easy to grow or shrink a substitution when entering a
-   scope. */
-struct Substitution
-{
-    ATermMap * map;
-    const Substitution * prev;
-
-    Substitution(const Substitution * prev, ATermMap * map)
-    {
-        this->prev = prev;
-        this->map = map;
-    }
-    
-    Expr lookup(Expr name) const
-    {
-        Expr x;
-        for (const Substitution * s(this); s; s = s->prev)
-            if ((x = s->map->get(name))) return x;
-        return 0;
-    }
-};
-
-
 /* Show a position. */
 string showPos(ATerm pos);
+
 
 /* Generic bottomup traversal over ATerms.  The traversal first
    recursively descends into subterms, and then applies the given term
@@ -73,35 +49,13 @@ struct TermFun
 ATerm bottomupRewrite(TermFun & f, ATerm e);
 
 
-/* Query all attributes in an attribute set expression.  The
-   expression must be in normal form. */
-void queryAllAttrs(Expr e, ATermMap & attrs, bool withPos = false);
-
-/* Query a specific attribute from an attribute set expression.  The
-   expression must be in normal form. */
-Expr queryAttr(Expr e, const string & name);
-Expr queryAttr(Expr e, const string & name, ATerm & pos);
-
 /* Create an attribute set expression from an Attrs value. */
 Expr makeAttrs(const ATermMap & attrs);
-
-
-/* Perform a set of substitutions on an expression. */
-Expr substitute(const Substitution & subs, Expr e);
 
 
 /* Check whether all variables are defined in the given expression.
    Throw an exception if this isn't the case. */
 void checkVarDefs(const ATermMap & def, Expr e);
-
-
-/* Canonicalise a Nix expression by sorting attributes and removing
-   location information. */
-Expr canonicaliseExpr(Expr e);
-
-
-/* Create an expression representing a boolean. */
-Expr makeBool(bool b);
 
 
 /* Manipulation of Str() nodes.  Note: matchStr() does not clear
@@ -111,12 +65,6 @@ bool matchStr(Expr e, string & s, PathSet & context);
 Expr makeStr(const string & s, const PathSet & context = PathSet());
 
 
-/* Showing types, values. */
-string showType(Expr e);
-
-string showValue(Expr e);
-
- 
 }
 
 
