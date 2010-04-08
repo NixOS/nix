@@ -681,8 +681,14 @@ bool EvalState::evalBool(Env & env, Expr e)
 void EvalState::forceValue(Value & v)
 {
     if (v.type == tThunk) {
-        //v.type = tBlackhole;
-        eval(*v.thunk.env, v.thunk.expr, v);
+        ValueType saved = v.type;
+        try {
+            v.type = tBlackhole;
+            eval(*v.thunk.env, v.thunk.expr, v);
+        } catch (Error & e) {
+            v.type = saved;
+            throw;
+        }
     }
     else if (v.type == tCopy) {
         forceValue(*v.val);
