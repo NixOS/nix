@@ -124,15 +124,17 @@ static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
 
             XMLAttrs xmlAttrs;
             Path outPath, drvPath;
-            
-            a = attrs.get(toATerm("drvPath"));
+
+            aRHS = attrs.get(toATerm("drvPath"));
+            matchAttrRHS(aRHS, a, pos);
             if (matchStr(a, drvPath, context))
                 xmlAttrs["drvPath"] = drvPath;
-        
-            a = attrs.get(toATerm("outPath"));
+
+            aRHS = attrs.get(toATerm("outPath"));
+            matchAttrRHS(aRHS, a, pos);
             if (matchStr(a, outPath, context))
                 xmlAttrs["outPath"] = outPath;
-        
+
             XMLOpenElement _(doc, "derivation", xmlAttrs);
 
             if (drvsSeen.find(e) == drvsSeen.end()) {
