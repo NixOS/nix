@@ -93,13 +93,20 @@ string showType(Value & v)
 
 EvalState::EvalState() : baseEnv(allocEnv())
 {
-    nrValues = nrEnvs = nrEvaluated = 0;
+    nrValues = nrEnvs = nrEvaluated = recursionDepth = maxRecursionDepth = 0;
+    deepestStack = (char *) -1;
 
     initNixExprHelpers();
 
     createBaseEnv();
     
     allowUnsafeEquality = getEnv("NIX_NO_UNSAFE_EQ", "") == "";
+}
+
+
+EvalState::~EvalState()
+{
+    assert(recursionDepth == 0);
 }
 
 
@@ -141,12 +148,22 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2))
     throw EvalError(format(s) % s2);
 }
 
+LocalNoInlineNoReturn(void throwEvalError(const char * s, const string & s2, const string & s3))
+{
+    throw EvalError(format(s) % s2 % s3);
+}
+
 LocalNoInlineNoReturn(void throwTypeError(const char * s))
 {
     throw TypeError(s);
 }
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s2))
+{
+    throw TypeError(format(s) % s2);
+}
+
+LocalNoInlineNoReturn(void throwAssertionError(const char * s, const string & s2))
 {
     throw TypeError(format(s) % s2);
 }
@@ -234,7 +251,7 @@ static Value * lookupVar(Env * env, Sym name)
     }
 #endif
     
-    throw Error(format("undefined variable `%1%'") % aterm2String(name));
+    throwEvalError("undefined variable `%1%'", aterm2String(name));
 }
 
 
@@ -295,21 +312,35 @@ void EvalState::evalFile(const Path & path, Value & v)
     try {
         eval(e, v);
     } catch (Error & e) {
-        e.addPrefix(format("while evaluating the file `%1%':\n")
-            % path);
+        addErrorPrefix(e, "while evaluating the file `%1%':\n", path);
         throw;
     }
 }
 
 
-static char * deepestStack = (char *) -1; /* for measuring stack usage */
+struct RecursionCounter
+{
+    EvalState & state;
+    RecursionCounter(EvalState & state) : state(state)
+    {
+        state.recursionDepth++;
+        if (state.recursionDepth > state.maxRecursionDepth)
+            state.maxRecursionDepth = state.recursionDepth;
+    }
+    ~RecursionCounter()
+    {   
+        state.recursionDepth--;
+    }
+};
 
 
 void EvalState::eval(Env & env, Expr e, Value & v)
 {
     /* When changing this function, make sure that you don't cause a
        (large) increase in stack consumption! */
-    
+
+    /* !!! Disable this eventually. */
+    RecursionCounter r(*this);
     char x;
     if (&x < deepestStack) deepestStack = &x;
     
@@ -482,8 +513,7 @@ void EvalState::eval(Env & env, Expr e, Value & v)
         }
         
         if (isPath && !context.empty())
-            throw EvalError(format("a string that refers to a store path cannot be appended to a path, in `%1%'")
-                % s.str());
+            throwEvalError("a string that refers to a store path cannot be appended to a path, in `%1%'", s.str());
 
         if (isPath)
             mkPath(v, s.str().c_str());
@@ -498,7 +528,7 @@ void EvalState::eval(Env & env, Expr e, Value & v)
     /* Assertions. */
     else if (matchAssert(e, e1, e2, pos)) {
         if (!evalBool(env, e1))
-            throw AssertionError(format("assertion failed at %1%") % showPos(pos));
+            throwAssertionError("assertion failed at %1%", showPos(pos));
         eval(env, e2, v);
     }
 
@@ -538,7 +568,7 @@ void EvalState::eval(Env & env, Expr e, Value & v)
         mkBool(v, vAttrs.attrs->find(name) != vAttrs.attrs->end());
     }
 
-    else throw Error("unsupported term");
+    else abort();
 }
 
 
@@ -615,8 +645,8 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
                 
             if (j == arg.attrs->end()) {
                 if (!matchDefaultValue(def2, def)) def = 0;
-                if (def == 0) throw TypeError(format("the argument named `%1%' required by the function is missing")    
-                    % aterm2String(name));
+                if (def == 0) throwTypeError("the argument named `%1%' required by the function is missing",
+                    aterm2String(name));
                 mkThunk(v, env2, def);
             } else {
                 attrsUsed++;
@@ -629,7 +659,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
            TODO: show the names of the expected/unexpected
            arguments. */
         if (ellipsis == eFalse && attrsUsed != arg.attrs->size())
-            throw TypeError("function called with unexpected argument");
+            throwTypeError("function called with unexpected argument");
     }
 
     else abort();
@@ -661,8 +691,7 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
         if (j != args.end())
             (*actualArgs.attrs)[name] = j->second;
         else if (!matchDefaultValue(def2, def))
-            throw TypeError(format("cannot auto-call a function that has an argument without a default value (`%1%      ')")
-                % aterm2String(name));
+            throwTypeError("cannot auto-call a function that has an argument without a default value (`%1%')", aterm2String(name));
     }
 
     callFunction(fun, actualArgs, res);
@@ -680,7 +709,7 @@ bool EvalState::evalBool(Env & env, Expr e)
     Value v;
     eval(env, e, v);
     if (v.type != tBool)
-        throw TypeError(format("value is %1% while a Boolean was expected") % showType(v));
+        throwTypeError("value is %1% while a Boolean was expected", showType(v));
     return v.boolean;
 }
 
@@ -704,7 +733,7 @@ void EvalState::forceValue(Value & v)
     else if (v.type == tApp)
         callFunction(*v.app.left, *v.app.right, v);
     else if (v.type == tBlackhole)
-        throw EvalError("infinite recursion encountered");
+        throwEvalError("infinite recursion encountered");
 }
 
 
@@ -728,7 +757,7 @@ int EvalState::forceInt(Value & v)
 {
     forceValue(v);
     if (v.type != tInt)
-        throw TypeError(format("value is %1% while an integer was expected") % showType(v));
+        throwTypeError("value is %1% while an integer was expected", showType(v));
     return v.integer;
 }
 
@@ -737,7 +766,7 @@ bool EvalState::forceBool(Value & v)
 {
     forceValue(v);
     if (v.type != tBool)
-        throw TypeError(format("value is %1% while a Boolean was expected") % showType(v));
+        throwTypeError("value is %1% while a Boolean was expected", showType(v));
     return v.boolean;
 }
 
@@ -746,7 +775,7 @@ void EvalState::forceAttrs(Value & v)
 {
     forceValue(v);
     if (v.type != tAttrs)
-        throw TypeError(format("value is %1% while an attribute set was expected") % showType(v));
+        throwTypeError("value is %1% while an attribute set was expected", showType(v));
 }
 
 
@@ -754,7 +783,7 @@ void EvalState::forceList(Value & v)
 {
     forceValue(v);
     if (v.type != tList)
-        throw TypeError(format("value is %1% while a list was expected") % showType(v));
+        throwTypeError("value is %1% while a list was expected", showType(v));
 }
 
 
@@ -762,7 +791,7 @@ void EvalState::forceFunction(Value & v)
 {
     forceValue(v);
     if (v.type != tLambda && v.type != tPrimOp && v.type != tPrimOpApp)
-        throw TypeError(format("value is %1% while a function was expected") % showType(v));
+        throwTypeError("value is %1% while a function was expected", showType(v));
 }
 
 
@@ -770,7 +799,7 @@ string EvalState::forceString(Value & v)
 {
     forceValue(v);
     if (v.type != tString)
-        throw TypeError(format("value is %1% while a string was expected") % showType(v));
+        throwTypeError("value is %1% while a string was expected", showType(v));
     return string(v.string.s);
 }
 
@@ -778,10 +807,9 @@ string EvalState::forceString(Value & v)
 string EvalState::forceString(Value & v, PathSet & context)
 {
     string s = forceString(v);
-    if (v.string.context) {
+    if (v.string.context)
         for (const char * * p = v.string.context; *p; ++p) 
             context.insert(*p);
-    }
     return s;
 }
 
@@ -790,8 +818,8 @@ string EvalState::forceStringNoCtx(Value & v)
 {
     string s = forceString(v);
     if (v.string.context)
-        throw EvalError(format("the string `%1%' is not allowed to refer to a store path (such as `%2%')")
-            % v.string.s % v.string.context[0]);
+        throwEvalError("the string `%1%' is not allowed to refer to a store path (such as `%2%')",
+            v.string.s, v.string.context[0]);
     return s;
 }
 
@@ -824,8 +852,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
         if (!copyToStore) return path;
         
         if (nix::isDerivation(path))
-            throw EvalError(format("file names are not allowed to end in `%1%'")
-                % drvExtension);
+            throwEvalError("file names are not allowed to end in `%1%'", drvExtension);
 
         Path dstPath;
         if (srcToStore[path] != "")
@@ -881,7 +908,7 @@ Path EvalState::coerceToPath(Value & v, PathSet & context)
 {
     string path = coerceToString(v, context, false, false);
     if (path == "" || path[0] != '/')
-        throw EvalError(format("string `%1%' doesn't represent an absolute path") % path);
+        throwEvalError("string `%1%' doesn't represent an absolute path", path);
     return path;
 }
 
@@ -932,7 +959,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             return false;
 
         default:
-            throw Error(format("cannot compare %1% with %2%") % showType(v1) % showType(v2));
+            throwEvalError("cannot compare %1% with %2%", showType(v1), showType(v2));
     }
 }
 
@@ -941,14 +968,14 @@ void EvalState::printStats()
 {
     char x;
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
-    printMsg(showStats ? lvlInfo : lvlDebug,
-        format("evaluated %1% expressions, used %2% bytes of stack space, allocated %3% values, allocated %4% environments")
-        % nrEvaluated
-        % (&x - deepestStack)
-        % nrValues
-        % nrEnvs);
-    if (showStats)
-        printATermMapStats();
+    Verbosity v = showStats ? lvlInfo : lvlDebug;
+    printMsg(v, "evaluation statistics:");
+    printMsg(v, format("  expressions evaluated: %1%") % nrEvaluated);
+    printMsg(v, format("  stack space used: %1% bytes") % (&x - deepestStack));
+    printMsg(v, format("  max eval() nesting depth: %1%") % maxRecursionDepth);
+    printMsg(v, format("  stack space per eval() level: %1% bytes") % ((&x - deepestStack) / (float) maxRecursionDepth));
+    printMsg(v, format("  values allocated: %1%") % nrValues);
+    printMsg(v, format("  environments allocated: %1%") % nrEnvs);
 }
 
 

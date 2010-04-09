@@ -144,10 +144,6 @@ public:
 private:
     SrcToStore srcToStore; 
 
-    unsigned long nrValues;
-    unsigned long nrEnvs;
-    unsigned long nrEvaluated;
-
     bool allowUnsafeEquality;
 
     ATermMap parseTrees;
@@ -155,6 +151,7 @@ private:
 public:
     
     EvalState();
+    ~EvalState();
 
     /* Evaluate an expression read from the given file to normal
        form. */
@@ -242,6 +239,17 @@ public:
 
     /* Print statistics. */
     void printStats();
+
+private:
+    
+    unsigned long nrValues;
+    unsigned long nrEnvs;
+    unsigned long nrEvaluated;
+    unsigned int recursionDepth;
+    unsigned int maxRecursionDepth;
+    char * deepestStack; /* for measuring stack usage */
+    
+    friend class RecursionCounter;
 };
 
 
