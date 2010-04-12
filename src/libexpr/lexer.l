@@ -111,10 +111,11 @@ inherit     { return INHERIT; }
 
 \"          { BEGIN(STRING); return '"'; }
 <STRING>([^\$\"\\]|\$[^\{\"]|\\.)+ {
-/* !!! Not quite right: we want a follow restriction on "$", it
-   shouldn't be followed by a "{".  Right now "$\"" will be consumed
-   as part of a string, rather than a "$" followed by the string
-   terminator.  Disallow "$\"" for now. */
+              /* !!! Not quite right: we want a follow restriction on
+                 "$", it shouldn't be followed by a "{".  Right now
+                 "$\"" will be consumed as part of a string, rather
+                 than a "$" followed by the string terminator.
+                 Disallow "$\"" for now. */
               yylval->e = unescapeStr(yytext);
               return STR;
             }
@@ -124,25 +125,25 @@ inherit     { return INHERIT; }
 
 \'\'(\ *\n)?     { BEGIN(IND_STRING); return IND_STRING_OPEN; }
 <IND_STRING>([^\$\']|\$[^\{\']|\'[^\'\$])+ {
-                   //yylval->t = makeIndStr(toATerm(yytext));
+                   yylval->e = new ExprIndStr(yytext);
                    return IND_STR;
                  }
 <IND_STRING>\'\'\$ {
-                   //yylval->t = makeIndStr(toATerm("$"));
+                   yylval->e = new ExprIndStr("$");
                    return IND_STR;
                  }
 <IND_STRING>\'\'\' {
-                   //yylval->t = makeIndStr(toATerm("''"));
+                   yylval->e = new ExprIndStr("''");
                    return IND_STR;
                  }
 <IND_STRING>\'\'\\. {
-                   //yylval->t = unescapeStr(yytext + 2);
+                   yylval->e = new ExprIndStr(yytext + 2);
                    return IND_STR;
                  }
 <IND_STRING>\$\{ { BEGIN(INITIAL); return DOLLAR_CURLY; }
 <IND_STRING>\'\' { BEGIN(INITIAL); return IND_STRING_CLOSE; }
 <IND_STRING>\'   {
-                   //yylval->t = makeIndStr(toATerm("'"));
+                   yylval->e = new ExprIndStr("'");
                    return IND_STR;
                  }
 <IND_STRING>.    return yytext[0]; /* just in case: shouldn't be reached */

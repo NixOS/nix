@@ -174,11 +174,12 @@ static void checkPatternVars(ATerm pos, Pattern pat)
     ATermMap map;
     checkPatternVars(pos, map, pat);
 }
+#endif
 
 
-static Expr stripIndentation(ATermList es)
+static Expr * stripIndentation(vector<Expr *> & es)
 {
-    if (es == ATempty) return makeStr("");
+    if (es.empty()) return new ExprString("");
     
     /* Figure out the minimum indentation.  Note that by design
        whitespace-only final lines are not taken into account.  (So
@@ -186,9 +187,9 @@ static Expr stripIndentation(ATermList es)
     bool atStartOfLine = true; /* = seen only whitespace in the current line */
     unsigned int minIndent = 1000000;
     unsigned int curIndent = 0;
-    ATerm e;
-    for (ATermIterator i(es); i; ++i) {
-        if (!matchIndStr(*i, e)) {
+    foreach (vector<Expr *>::iterator, i, es) {
+        ExprIndStr * e = dynamic_cast<ExprIndStr *>(*i);
+        if (!e) {
             /* Anti-quotations end the current start-of-line whitespace. */
             if (atStartOfLine) {
                 atStartOfLine = false;
@@ -196,12 +197,11 @@ static Expr stripIndentation(ATermList es)
             }
             continue;
         }
-        string s = aterm2String(e);
-        for (unsigned int j = 0; j < s.size(); ++j) {
+        for (unsigned int j = 0; j < e->s.size(); ++j) {
             if (atStartOfLine) {
-                if (s[j] == ' ')
+                if (e->s[j] == ' ')
                     curIndent++;
-                else if (s[j] == '\n') {
+                else if (e->s[j] == '\n') {
                     /* Empty line, doesn't influence minimum
                        indentation. */
                     curIndent = 0;
@@ -209,7 +209,7 @@ static Expr stripIndentation(ATermList es)
                     atStartOfLine = false;
                     if (curIndent < minIndent) minIndent = curIndent;
                 }
-            } else if (s[j] == '\n') {
+            } else if (e->s[j] == '\n') {
                 atStartOfLine = true;
                 curIndent = 0;
             }
@@ -217,37 +217,37 @@ static Expr stripIndentation(ATermList es)
     }
 
     /* Strip spaces from each line. */
-    ATermList es2 = ATempty;
+    vector<Expr *> * es2 = new vector<Expr *>;
     atStartOfLine = true;
     unsigned int curDropped = 0;
-    unsigned int n = ATgetLength(es);
-    for (ATermIterator i(es); i; ++i, --n) {
-        if (!matchIndStr(*i, e)) {
+    unsigned int n = es.size();
+    for (vector<Expr *>::iterator i = es.begin(); i != es.end(); ++i, --n) {
+        ExprIndStr * e = dynamic_cast<ExprIndStr *>(*i);
+        if (!e) {
             atStartOfLine = false;
             curDropped = 0;
-            es2 = ATinsert(es2, *i);
+            es2->push_back(*i);
             continue;
         }
         
-        string s = aterm2String(e);
         string s2;
-        for (unsigned int j = 0; j < s.size(); ++j) {
+        for (unsigned int j = 0; j < e->s.size(); ++j) {
             if (atStartOfLine) {
-                if (s[j] == ' ') {
+                if (e->s[j] == ' ') {
                     if (curDropped++ >= minIndent)
-                        s2 += s[j];
+                        s2 += e->s[j];
                 }
-                else if (s[j] == '\n') {
+                else if (e->s[j] == '\n') {
                     curDropped = 0;
-                    s2 += s[j];
+                    s2 += e->s[j];
                 } else {
                     atStartOfLine = false;
                     curDropped = 0;
-                    s2 += s[j];
+                    s2 += e->s[j];
                 }
             } else {
-                s2 += s[j];
-                if (s[j] == '\n') atStartOfLine = true;
+                s2 += e->s[j];
+                if (e->s[j] == '\n') atStartOfLine = true;
             }
         }
 
@@ -258,13 +258,12 @@ static Expr stripIndentation(ATermList es)
             if (p != string::npos && s2.find_first_not_of(' ', p + 1) == string::npos)
                 s2 = string(s2, 0, p + 1);
         }
-            
-        es2 = ATinsert(es2, makeStr(s2));
+
+        es2->push_back(new ExprString(s2));
     }
 
-    return makeConcatStrings(ATreverse(es2));
+    return new ExprConcatStrings(es2);
 }
-#endif
 
 
 void backToString(yyscan_t scanner);
@@ -316,11 +315,10 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <e> expr_app expr_select expr_simple
 %type <list> expr_list
 %type <attrs> binds
-%type <ts> attrpath ind_string_parts
 %type <formals> formals
 %type <formal> formal
-%type <ids> ids
-%type <string_parts> string_parts
+%type <ids> ids attrpath
+%type <string_parts> string_parts ind_string_parts
 %token <id> ID ATTRPATH
 %token <e> STR IND_STR
 %token <n> INT
@@ -411,11 +409,9 @@ expr_simple
       else if ($2->size() == 1) $$ = $2->front();
       else $$ = new ExprConcatStrings($2);
   }
-  /*
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
-      $$ = stripIndentation(ATreverse($2));
+      $$ = stripIndentation(*$2);
   }
-  */
   | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
   | URI { $$ = new ExprString($1); }
   | '(' expr ')' { $$ = $2; }
@@ -437,9 +433,9 @@ string_parts
   ;
 
 ind_string_parts
-  : ind_string_parts IND_STR { $$ = ATinsert($1, $2); }
-  | ind_string_parts DOLLAR_CURLY expr '}' { backToIndString(scanner); $$ = ATinsert($1, $3); }
-  | { $$ = ATempty; }
+  : ind_string_parts IND_STR { $$ = $1; $1->push_back($2); }
+  | ind_string_parts DOLLAR_CURLY expr '}' { backToIndString(scanner); $$ = $1; $1->push_back($3); }
+  | { $$ = new vector<Expr *>; }
   ;
 
 binds

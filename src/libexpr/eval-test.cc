@@ -67,6 +67,7 @@ void run(Strings args)
     doTest(state, "__add 1 2");
     doTest(state, "null");
     doTest(state, "\"foo\"");
+    doTest(state, "''\n  foo\n  bar\n    ''");
     doTest(state, "let s = \"bar\"; in \"foo${s}\"");
     doTest(state, "if true then 1 else 2");
     doTest(state, "if false then 1 else 2");

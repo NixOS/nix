@@ -15,6 +15,11 @@ std::ostream & operator << (std::ostream & str, Expr & e)
 }
 
 
+void Expr::show(std::ostream & str)
+{
+    abort();
+}
+
 void ExprInt::show(std::ostream & str)
 {
     str << n;
@@ -149,20 +154,6 @@ ATerm bottomupRewrite(TermFun & f, ATerm e)
     }
 
     return f(e);
-}
-
-
-Expr makeAttrs(const ATermMap & attrs)
-{
-    ATermList bnds = ATempty;
-    for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i) {
-        Expr e;
-        ATerm pos;
-        if (!matchAttrRHS(i->value, e, pos))
-            abort(); /* can't happen */
-        bnds = ATinsert(bnds, makeBind(i->key, e, pos));
-    }
-    return makeAttrs(bnds);
 }
 
 

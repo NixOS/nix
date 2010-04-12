@@ -35,11 +35,8 @@ struct EvalState;
 
 struct Expr
 {
-    virtual void show(std::ostream & str) = 0;
-    virtual void eval(EvalState & state, Env & env, Value & v)
-    {
-        throw Error("not implemented");
-    }
+    virtual void show(std::ostream & str);
+    virtual void eval(EvalState & state, Env & env, Value & v);
 };
 
 std::ostream & operator << (std::ostream & str, Expr & e);
@@ -60,6 +57,13 @@ struct ExprString : Expr
     string s;
     ExprString(const string & s) : s(s) { };
     COMMON_METHODS
+};
+
+/* Temporary class used during parsing of indented strings. */
+struct ExprIndStr : Expr
+{
+    string s;
+    ExprIndStr(const string & s) : s(s) { };
 };
 
 struct ExprPath : Expr
@@ -204,10 +208,6 @@ struct TermFun
     virtual ATerm operator () (ATerm e) = 0;
 };
 ATerm bottomupRewrite(TermFun & f, ATerm e);
-
-
-/* Create an attribute set expression from an Attrs value. */
-Expr makeAttrs(const ATermMap & attrs);
 
 
 /* Check whether all variables are defined in the given expression.

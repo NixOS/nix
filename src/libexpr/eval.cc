@@ -367,6 +367,12 @@ bool EvalState::evalBool(Env & env, Expr * e)
 }
 
 
+void Expr::eval(EvalState & state, Env & env, Value & v)
+{
+    abort();
+}
+
+
 void ExprInt::eval(EvalState & state, Env & env, Value & v)
 {
     mkInt(v, n);
