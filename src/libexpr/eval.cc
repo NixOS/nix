@@ -918,8 +918,14 @@ bool EvalState::eqValues(Value & v1, Value & v2)
     forceValue(v1);
     forceValue(v2);
 
+    /* !!! Hack to support some old broken code that relies on pointer
+       equality tests between attribute sets.  (Specifically,
+       builderDefs calls uniqList on a list of attribute sets.)  Will
+       remove this eventually. */
+    if (&v1 == &v2) return true;
+
     if (v1.type != v2.type) return false;
-    
+
     switch (v1.type) {
 
         case tInt:
