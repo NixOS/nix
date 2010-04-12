@@ -276,11 +276,6 @@ void inline checkInterrupt()
 MakeError(Interrupted, BaseError)
 
 
-/* String packing / unpacking. */
-string packStrings(const Strings & strings);
-Strings unpackStrings(const string & s);
-
-
 /* String tokenizer. */
 Strings tokenizeString(const string & s, const string & separators = " \t\n\r");
 
