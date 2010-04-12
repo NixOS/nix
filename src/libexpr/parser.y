@@ -317,6 +317,7 @@ static void freeAndUnprotect(void * p)
     ATermList formals;
     bool ellipsis;
   } formals;
+  int n;
 }
 
 %type <t> start expr expr_function expr_if expr_op
@@ -324,7 +325,8 @@ static void freeAndUnprotect(void * p)
 %type <t> pattern
 %type <ts> binds ids attrpath expr_list string_parts ind_string_parts
 %type <formals> formals
-%token <t> ID INT STR IND_STR PATH URI
+%token <t> ID STR IND_STR PATH URI
+%token <n> INT
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL
 %token DOLLAR_CURLY /* == ${ */
 %token IND_STRING_OPEN IND_STRING_CLOSE
@@ -393,7 +395,7 @@ expr_select
 
 expr_simple
   : ID { $$ = makeVar($1); }
-  | INT { $$ = makeInt(ATgetInt((ATermInt) $1)); }
+  | INT { $$ = makeInt($1); }
   | '"' string_parts '"' {
       /* For efficiency, and to simplify parse trees a bit. */
       if ($2 == ATempty) $$ = makeStr(toATerm(""), ATempty);

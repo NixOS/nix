@@ -107,7 +107,7 @@ inherit     { return INHERIT; }
 
 {ID}        { yylval->t = toATerm(yytext); return ID; /* !!! alloc */ }
 {INT}       { int n = atoi(yytext); /* !!! overflow */
-              yylval->t = ATmake("<int>", n);
+              yylval->n = n;
               return INT;
             }
 
