@@ -165,7 +165,7 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s2))
 
 LocalNoInlineNoReturn(void throwAssertionError(const char * s, const string & s2))
 {
-    throw TypeError(format(s) % s2);
+    throw AssertionError(format(s) % s2);
 }
 
 LocalNoInline(void addErrorPrefix(Error & e, const char * s))
