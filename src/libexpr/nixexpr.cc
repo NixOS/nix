@@ -55,7 +55,7 @@ void ExprAttrs::show(std::ostream & str)
     if (recursive) str << "rec ";
     str << "{ ";
     foreach (list<string>::iterator, i, inherited)
-        str << "inherited " << *i << "; ";
+        str << "inherit " << *i << "; ";
     foreach (Attrs::iterator, i, attrs)
         str << i->first << " = " << *i->second << "; ";
     str << "}";

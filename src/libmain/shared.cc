@@ -177,7 +177,7 @@ static void initAndRun(int argc, char * * argv)
     if (lt != "") setLogType(lt);
 
     /* ATerm stuff.  !!! find a better place to put this */
-    //initDerivationsHelpers();
+    initDerivationsHelpers();
     
     /* Put the arguments in a vector. */
     Strings args, remaining;
@@ -335,7 +335,7 @@ int main(int argc, char * * argv)
     
     /* ATerm setup. */
     ATerm bottomOfStack;
-    //ATinit(argc, argv, &bottomOfStack);
+    ATinit(argc, argv, &bottomOfStack);
 
     /* Turn on buffering for cerr. */
 #if HAVE_PUBSETBUF

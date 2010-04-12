@@ -1023,8 +1023,8 @@ void EvalState::createBaseEnv()
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
     string s = "attrs: let res = derivationStrict attrs; in attrs // { drvPath = res.drvPath; outPath = res.outPath; type = \"derivation\"; }";
-    //mkThunk(v, baseEnv, parseExprFromString(s, "/"));
-    //addConstant("derivation", v);
+    mkThunk(v, baseEnv, parseExprFromString(s, "/"));
+    addConstant("derivation", v);
 
     // Miscellaneous
     addPrimOp("import", 1, prim_import);

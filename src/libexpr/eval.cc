@@ -54,6 +54,7 @@ std::ostream & operator << (std::ostream & str, Value & v)
         str << "]";
         break;
     case tThunk:
+    case tCopy:
         str << "<CODE>";
         break;
     case tLambda:
@@ -160,6 +161,16 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s2))
     throw TypeError(format(s) % s2);
 }
 
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos, const string & s2))
+{
+    throw TypeError(format(s) % pos % s2);
+}
+
+LocalNoInlineNoReturn(void throwTypeError(const char * s, const Pos & pos))
+{
+    throw TypeError(format(s) % pos);
+}
+
 LocalNoInlineNoReturn(void throwAssertionError(const char * s, const Pos & pos))
 {
     throw AssertionError(format(s) % pos);
@@ -173,6 +184,11 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s))
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2))
 {
     e.addPrefix(format(s) % s2);
+}
+
+LocalNoInline(void addErrorPrefix(Error & e, const char * s, const Pos & pos))
+{
+    e.addPrefix(format(s) % pos);
 }
 
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, const string & s3))
@@ -424,6 +440,11 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             Value & v2 = (*v.attrs)[i->first];
             mkThunk(v2, env, i->second);
         }
+
+        foreach (list<string>::iterator, i, inherited) {
+            Value & v2 = (*v.attrs)[*i];
+            mkCopy(v2, *lookupVar(&env, *i));
+        }
     }
 }
 
@@ -555,7 +576,8 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
             nrValues++;
                 
             if (j == arg.attrs->end()) {
-                if (!i->def) throwTypeError("the argument named `%1%' required by the function is missing", i->name);
+                if (!i->def) throwTypeError("function at %1% called without required argument `%2%'",
+                    fun.lambda.fun->pos, i->name);   
                 mkThunk(v, env2, i->def);
             } else {
                 attrsUsed++;
@@ -568,10 +590,15 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
            TODO: show the names of the expected/unexpected
            arguments. */
         if (!fun.lambda.fun->formals->ellipsis && attrsUsed != arg.attrs->size())
-            throwTypeError("function called with unexpected argument");
+            throwTypeError("function at %1% called with unexpected argument", fun.lambda.fun->pos);
     }
 
-    eval(env2, fun.lambda.fun->body, v);
+    try {
+        eval(env2, fun.lambda.fun->body, v);
+    } catch (Error & e) {
+        addErrorPrefix(e, "while evaluating the function at %1%:\n", fun.lambda.fun->pos);
+        throw;
+    }
 }
 
 

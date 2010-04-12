@@ -44,99 +44,38 @@ struct ParseData
 };
 
 
-#if 0
-static string showAttrPath(ATermList attrPath)
+static string showAttrPath(const vector<string> & attrPath)
 {
     string s;
-    for (ATermIterator i(attrPath); i; ++i) {
+    foreach (vector<string>::const_iterator, i, attrPath) {
         if (!s.empty()) s += '.';
-        s += aterm2String(*i);
+        s += *i;
     }
     return s;
 }
  
 
-struct Tree
+static void addAttr(ExprAttrs * attrs, const vector<string> & attrPath, Expr * e, const Pos & pos)
 {
-    Expr leaf; ATerm pos; bool recursive;
-    typedef std::map<ATerm, Tree> Children;
-    Children children;
-    Tree() { leaf = 0; recursive = true; }
-};
-
-
-static ATermList buildAttrs(const Tree & t, ATermList & nonrec)
-{
-    ATermList res = ATempty;
-    for (Tree::Children::const_reverse_iterator i = t.children.rbegin();
-         i != t.children.rend(); ++i)
-        if (!i->second.recursive)
-            nonrec = ATinsert(nonrec, makeBind(i->first, i->second.leaf, i->second.pos));
-        else
-            res = ATinsert(res, i->second.leaf
-                ? makeBind(i->first, i->second.leaf, i->second.pos)
-                : makeBind(i->first, makeAttrs(buildAttrs(i->second, nonrec)), makeNoPos()));
-    return res;
-}
-#endif
- 
-
-static void fixAttrs(ExprAttrs & attrs)
-{
-#if 0
-    Tree attrs;
-
-    /* This ATermMap is needed to ensure that the `leaf' fields in the
-       Tree nodes are not garbage collected. */
-    ATermMap gcRoots;
-
-    for (ATermIterator i(as); i; ++i) {
-        ATermList names, attrPath; Expr src, e; ATerm name, pos;
-
-        if (matchInherit(*i, src, names, pos)) {
-            bool fromScope = matchScope(src);
-            for (ATermIterator j(names); j; ++j) {
-                if (attrs.children.find(*j) != attrs.children.end()) 
-                    throw ParseError(format("duplicate definition of attribute `%1%' at %2%")
-                        % showAttrPath(ATmakeList1(*j)) % showPos(pos));
-                Tree & t(attrs.children[*j]);
-                Expr leaf = fromScope ? makeVar(*j) : makeSelect(src, *j);
-                gcRoots.set(leaf, leaf);
-                t.leaf = leaf;
-                t.pos = pos;
-                if (recursive && fromScope) t.recursive = false;
+    unsigned int n = 0;
+    foreach (vector<string>::const_iterator, i, attrPath) {
+        n++;
+        if (attrs->attrs[*i]) {
+            ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(attrs->attrs[*i]);
+            if (!attrs2)
+                throw ParseError(format("attribute `%1%' at %2% already defined at <SOMEWHERE>")
+                    % showAttrPath(attrPath) % pos);
+            attrs = attrs2;
+        } else {
+            if (n == attrPath.size())
+                attrs->attrs[*i] = e;
+            else {
+                ExprAttrs * nested = new ExprAttrs;
+                attrs->attrs[*i] = nested;
+                attrs = nested;
             }
         }
-
-        else if (matchBindAttrPath(*i, attrPath, e, pos)) {
-
-            Tree * t(&attrs);
-            
-            for (ATermIterator j(attrPath); j; ) {
-                name = *j; ++j;
-                if (t->leaf) throw ParseError(format("attribute set containing `%1%' at %2% already defined at %3%")
-                    % showAttrPath(attrPath) % showPos(pos) % showPos(t->pos));
-                t = &(t->children[name]);
-            }
-
-            if (t->leaf)
-                throw ParseError(format("duplicate definition of attribute `%1%' at %2% and %3%")
-                    % showAttrPath(attrPath) % showPos(pos) % showPos(t->pos));
-            if (!t->children.empty())
-                throw ParseError(format("duplicate definition of attribute `%1%' at %2%")
-                    % showAttrPath(attrPath) % showPos(pos));
-
-            t->leaf = e; t->pos = pos;
-        }
-
-        else abort(); /* can't happen */
     }
-
-    ATermList nonrec = ATempty;
-    ATermList rec = buildAttrs(attrs, nonrec);
-        
-    return recursive ? makeRec(rec, nonrec) : makeAttrs(rec);
-#endif
 }
 
 
@@ -307,7 +246,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   char * id;
   char * path;
   char * uri;
-  std::list<std::string> * ids;
+  std::vector<std::string> * ids;
   std::vector<nix::Expr *> * string_parts;
 }
 
@@ -360,7 +299,7 @@ expr_function
   | WITH expr ';' expr_function
     { $$ = new ExprWith(CUR_POS, $2, $4); }
   | LET binds IN expr_function
-    { $2->attrs["<let-body>"] = $4; $2->recursive = true; fixAttrs(*$2); $$ = new ExprSelect($2, "<let-body>"); }
+    { $2->attrs["<let-body>"] = $4; $2->recursive = true; $$ = new ExprSelect($2, "<let-body>"); }
   | expr_if
   ;
 
@@ -418,11 +357,11 @@ expr_simple
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { fixAttrs(*$3); $3->recursive = true; $$ = new ExprSelect($3, "body"); }
+    { $3->recursive = true; $$ = new ExprSelect($3, "body"); }
   | REC '{' binds '}'
-    { fixAttrs(*$3); $3->recursive = true; $$ = $3; }
+    { $3->recursive = true; $$ = $3; }
   | '{' binds '}'
-    { fixAttrs(*$2); $$ = $2; }
+    { $$ = $2; }
   | '[' expr_list ']' { $$ = $2; }
   ;
 
@@ -439,16 +378,16 @@ ind_string_parts
   ;
 
 binds
-  : binds ID '=' expr ';' { $$ = $1; $$->attrs[$2] = $4; }
+  : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, *$2, $4, CUR_POS); }
   | binds INHERIT ids ';'
     { $$ = $1;
-      foreach (list<string>::iterator, i, *$3)
+      foreach (vector<string>::iterator, i, *$3)
         $$->inherited.push_back(*i);
     }
   | binds INHERIT '(' expr ')' ids ';'
     { $$ = $1;
       /* !!! Should ensure sharing of the expression in $4. */
-      foreach (list<string>::iterator, i, *$6)
+      foreach (vector<string>::iterator, i, *$6)
         $$->attrs[*i] = new ExprSelect($4, *i);
     }
   | { $$ = new ExprAttrs; }
@@ -456,12 +395,12 @@ binds
 
 ids
   : ids ID { $$ = $1; $1->push_back($2); /* !!! dangerous */ }
-  | { $$ = new list<string>; }
+  | { $$ = new vector<string>; }
   ;
 
 attrpath
-  : attrpath '.' ID { $$ = ATinsert($1, $3); }
-  | ID { $$ = ATmakeList1($1); }
+  : attrpath '.' ID { $$ = $1; $1->push_back($3); }
+  | ID { $$ = new vector<string>; $$->push_back($1); }
   ;
 
 expr_list

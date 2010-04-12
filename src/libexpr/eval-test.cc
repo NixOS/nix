@@ -56,7 +56,7 @@ void run(Strings args)
     doTest(state, "let id = x: x; in [1 2] == [(id 1) (id 2)]");
     doTest(state, "let id = x: x; in [1 2] == [(id 1) (id 3)]");
     doTest(state, "[1 2] == [3 (let x = x; in x)]");
-    //doTest(state, "{ x = 1; y.z = 2; } == { y = { z = 2; }; x = 1; }");
+    doTest(state, "{ x = 1; y.z = 2; } == { y = { z = 2; }; x = 1; }");
     doTest(state, "{ x = 1; y = 2; } == { x = 2; }");
     doTest(state, "{ x = [ 1 2 ]; } == { x = [ 1 ] ++ [ 2 ]; }");
     doTest(state, "1 != 1");
@@ -84,7 +84,7 @@ void run(Strings args)
     doTest(state, "let as = { x = 1; }; bs = rec { inherit (as) x; y = x; }; in bs.y");
     doTest(state, "let as = rec { inherit (y) x; y = { x = 1; }; }; in as.x");
     doTest(state, "builtins.toXML 123");
-    //doTest(state, "builtins.toXML { a.b = \"x\" + \"y\"; c = [ 1 2 ] ++ [ 3 4 ]; }");
+    doTest(state, "builtins.toXML { a.b = \"x\" + \"y\"; c = [ 1 2 ] ++ [ 3 4 ]; }");
 
     state.printStats();
 }
