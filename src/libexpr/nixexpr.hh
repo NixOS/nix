@@ -24,6 +24,9 @@ struct Pos
 };
 
 
+std::ostream & operator << (std::ostream & str, const Pos & pos);
+
+
 /* Abstract syntax of Nix expressions. */
 
 struct Env;
@@ -78,6 +81,14 @@ struct ExprSelect : Expr
     Expr * e;
     string name;
     ExprSelect(Expr * e, const string & name) : e(e), name(name) { };
+    COMMON_METHODS
+};
+
+struct ExprOpHasAttr : Expr
+{
+    Expr * e;
+    string name;
+    ExprOpHasAttr(Expr * e, const string & name) : e(e), name(name) { };
     COMMON_METHODS
 };
 
@@ -139,6 +150,21 @@ struct ExprIf : Expr
     COMMON_METHODS
 };
 
+struct ExprAssert : Expr
+{
+    Pos pos;
+    Expr * cond, * body;
+    ExprAssert(const Pos & pos, Expr * cond, Expr * body) : pos(pos), cond(cond), body(body) { };
+    COMMON_METHODS
+};
+
+struct ExprOpNot : Expr
+{
+    Expr * e;
+    ExprOpNot(Expr * e) : e(e) { };
+    COMMON_METHODS
+};
+
 #define MakeBinOp(name, s) \
     struct Expr##name : Expr \
     { \
@@ -158,15 +184,17 @@ MakeBinOp(OpAnd, "&&")
 MakeBinOp(OpOr, "||")
 MakeBinOp(OpImpl, "->")
 MakeBinOp(OpUpdate, "//")
-MakeBinOp(OpConcatStrings, "+")
 MakeBinOp(OpConcatLists, "++")
+
+struct ExprConcatStrings : Expr
+{
+    vector<Expr *> * es;
+    ExprConcatStrings(vector<Expr *> * es) : es(es) { };
+    COMMON_METHODS
+};
 
 
 #if 0
-/* Show a position. */
-string showPos(ATerm pos);
-
-
 /* Generic bottomup traversal over ATerms.  The traversal first
    recursively descends into subterms, and then applies the given term
    function to the resulting term. */

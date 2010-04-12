@@ -40,6 +40,11 @@ void ExprSelect::show(std::ostream & str)
     str << "(" << *e << ")." << name;
 }
 
+void ExprOpHasAttr::show(std::ostream & str)
+{
+    str << "(" << *e << ") ? " << name;
+}
+
 void ExprAttrs::show(std::ostream & str)
 {
     if (recursive) str << "rec ";
@@ -87,19 +92,37 @@ void ExprIf::show(std::ostream & str)
     str << "if " << *cond << " then " << *then << " else " << *else_;
 }
 
-
-#if 0
-string showPos(ATerm pos)
+void ExprAssert::show(std::ostream & str)
 {
-    ATerm path;
-    int line, column;
-    if (matchNoPos(pos)) return "undefined position";
-    if (!matchPos(pos, path, line, column))
-        throw badTerm("position expected", pos);
-    return (format("`%1%:%2%:%3%'") % aterm2String(path) % line % column).str();
+    str << "assert " << *cond << "; " << *body;
+}
+
+void ExprOpNot::show(std::ostream & str)
+{
+    str << "! " << *e;
+}
+
+void ExprConcatStrings::show(std::ostream & str)
+{
+    bool first = true;
+    foreach (vector<Expr *>::iterator, i, *es) {
+        if (first) first = false; else str << " + ";
+        str << **i;
+    }
+}
+
+
+std::ostream & operator << (std::ostream & str, const Pos & pos)
+{
+    if (!pos.line)
+        str << "undefined position";
+    else
+        str << (format("`%1%:%2%:%3%'") % pos.file % pos.line % pos.column).str();
+    return str;
 }
     
 
+#if 0
 ATerm bottomupRewrite(TermFun & f, ATerm e)
 {
     checkInterrupt();

@@ -45,7 +45,6 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 
 static Expr * unescapeStr(const char * s)
 {
-#if 0
     string t;
     char c;
     while ((c = *s++)) {
@@ -64,8 +63,7 @@ static Expr * unescapeStr(const char * s)
         }
         else t += c;
     }
-    return makeStr(toATerm(t), ATempty);
-#endif
+    return new ExprString(t);
 }
 
  

@@ -20,7 +20,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "aterm.hh"
 #include "util.hh"
     
 #include "nixexpr.hh"
@@ -116,13 +115,13 @@ static void fixAttrs(ExprAttrs & attrs)
             for (ATermIterator j(attrPath); j; ) {
                 name = *j; ++j;
                 if (t->leaf) throw ParseError(format("attribute set containing `%1%' at %2% already defined at %3%")
-                    % showAttrPath(attrPath) % showPos(pos) % showPos (t->pos));
+                    % showAttrPath(attrPath) % showPos(pos) % showPos(t->pos));
                 t = &(t->children[name]);
             }
 
             if (t->leaf)
                 throw ParseError(format("duplicate definition of attribute `%1%' at %2% and %3%")
-                    % showAttrPath(attrPath) % showPos(pos) % showPos (t->pos));
+                    % showAttrPath(attrPath) % showPos(pos) % showPos(t->pos));
             if (!t->children.empty())
                 throw ParseError(format("duplicate definition of attribute `%1%' at %2%")
                     % showAttrPath(attrPath) % showPos(pos));
@@ -289,28 +288,9 @@ static Pos makeCurPos(YYLTYPE * loc, ParseData * data)
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * error)
 {
-    data->error = (format("%1%, at `%2%':%3%:%4%")
-        % error % data->path % loc->first_line % loc->first_column).str();
+    data->error = (format("%1%, at %2%")
+        % error % makeCurPos(loc, data)).str();
 }
-
-
-/* Make sure that the parse stack is scanned by the ATerm garbage
-   collector. */
-static void * mallocAndProtect(size_t size)
-{
-    void * p = malloc(size);
-    if (p) ATprotectMemory(p, size);
-    return p;
-}
-
-static void freeAndUnprotect(void * p)
-{
-    ATunprotectMemory(p);
-    free(p);
-}
-
-#define YYMALLOC mallocAndProtect
-#define YYFREE freeAndUnprotect
 
 
 #endif
@@ -329,18 +309,20 @@ static void freeAndUnprotect(void * p)
   char * path;
   char * uri;
   std::list<std::string> * ids;
+  std::vector<nix::Expr *> * string_parts;
 }
 
 %type <e> start expr expr_function expr_if expr_op
 %type <e> expr_app expr_select expr_simple
 %type <list> expr_list
 %type <attrs> binds
-%type <ts> attrpath string_parts ind_string_parts
+%type <ts> attrpath ind_string_parts
 %type <formals> formals
 %type <formal> formal
 %type <ids> ids
+%type <string_parts> string_parts
 %token <id> ID ATTRPATH
-%token <t> STR IND_STR
+%token <e> STR IND_STR
 %token <n> INT
 %token <path> PATH
 %token <uri> URI
@@ -375,9 +357,8 @@ expr_function
     { $$ = new ExprLambda(CUR_POS, $5, true, $2, $7); }
   | ID '@' '{' formals '}' ':' expr_function
     { $$ = new ExprLambda(CUR_POS, $1, true, $4, $7); }
-  /* | ASSERT expr ';' expr_function
-    { $$ = makeAssert($2, $4, CUR_POS); }
-    */
+  | ASSERT expr ';' expr_function
+    { $$ = new ExprAssert(CUR_POS, $2, $4); }
   | WITH expr ';' expr_function
     { $$ = new ExprWith(CUR_POS, $2, $4); }
   | LET binds IN expr_function
@@ -391,18 +372,20 @@ expr_if
   ;
 
 expr_op
-  : /* '!' expr_op %prec NEG { $$ = makeOpNot($2); }
-       | */
-    expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
+  : '!' expr_op %prec NEG { $$ = new ExprOpNot($2); }
+  | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
   | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
   | expr_op AND expr_op { $$ = new ExprOpAnd($1, $3); }
   | expr_op OR expr_op { $$ = new ExprOpOr($1, $3); }
   | expr_op IMPL expr_op { $$ = new ExprOpImpl($1, $3); }
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate($1, $3); }
-  /*
-  | expr_op '?' ID { $$ = makeOpHasAttr($1, $3); }
-  */
-  | expr_op '+' expr_op { $$ = new ExprOpConcatStrings($1, $3); }
+  | expr_op '?' ID { $$ = new ExprOpHasAttr($1, $3); }
+  | expr_op '+' expr_op
+    { vector<Expr *> * l = new vector<Expr *>;
+      l->push_back($1);
+      l->push_back($3);
+      $$ = new ExprConcatStrings(l);
+    }
   | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists($1, $3); }
   | expr_app
   ;
@@ -421,26 +404,25 @@ expr_select
 
 expr_simple
   : ID { $$ = new ExprVar($1); }
-  | INT { $$ = new ExprInt($1); } /*
+  | INT { $$ = new ExprInt($1); }
   | '"' string_parts '"' {
-      /* For efficiency, and to simplify parse trees a bit. * /
-      if ($2 == ATempty) $$ = makeStr(toATerm(""), ATempty);
-      else if (ATgetNext($2) == ATempty) $$ = ATgetFirst($2);
-      else $$ = makeConcatStrings(ATreverse($2));
+      /* For efficiency, and to simplify parse trees a bit. */
+      if ($2->empty()) $$ = new ExprString("");
+      else if ($2->size() == 1) $$ = $2->front();
+      else $$ = new ExprConcatStrings($2);
   }
+  /*
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = stripIndentation(ATreverse($2));
   }
-                                  */
+  */
   | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
   | URI { $$ = new ExprString($1); }
   | '(' expr ')' { $$ = $2; }
-/*
   /* Let expressions `let {..., body = ...}' are just desugared
-     into `(rec {..., body = ...}).body'. * /
+     into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { $$ = makeSelect(fixAttrs(true, $3), toATerm("body")); }
-  */
+    { fixAttrs(*$3); $3->recursive = true; $$ = new ExprSelect($3, "body"); }
   | REC '{' binds '}'
     { fixAttrs(*$3); $3->recursive = true; $$ = $3; }
   | '{' binds '}'
@@ -449,9 +431,9 @@ expr_simple
   ;
 
 string_parts
-  : string_parts STR { $$ = ATinsert($1, $2); }
-  | string_parts DOLLAR_CURLY expr '}' { backToString(scanner); $$ = ATinsert($1, $3); }
-  | { $$ = ATempty; }
+  : string_parts STR { $$ = $1; $1->push_back($2); }
+  | string_parts DOLLAR_CURLY expr '}' { backToString(scanner); $$ = $1; $1->push_back($3); }
+  | { $$ = new vector<Expr *>; }
   ;
 
 ind_string_parts

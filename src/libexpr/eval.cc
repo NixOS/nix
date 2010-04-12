@@ -160,9 +160,9 @@ LocalNoInlineNoReturn(void throwTypeError(const char * s, const string & s2))
     throw TypeError(format(s) % s2);
 }
 
-LocalNoInlineNoReturn(void throwAssertionError(const char * s, const string & s2))
+LocalNoInlineNoReturn(void throwAssertionError(const char * s, const Pos & pos))
 {
-    throw AssertionError(format(s) % s2);
+    throw AssertionError(format(s) % pos);
 }
 
 LocalNoInline(void addErrorPrefix(Error & e, const char * s))
@@ -341,73 +341,13 @@ void EvalState::eval(Env & env, Expr * e, Value & v)
     char x;
     if (&x < deepestStack) deepestStack = &x;
     
-    //debug(format("eval: %1%") % e);
+    //debug(format("eval: %1%") % *e);
 
     checkInterrupt();
 
     nrEvaluated++;
 
     e->eval(*this, env, v);
-
-#if 0
-    Sym name;
-    int n;
-    ATerm s; ATermList context, es;
-    ATermList rbnds, nrbnds;
-    Expr e1, e2, e3, fun, arg, attrs;
-    Pattern pat; Expr body; Pos pos;
-    
-    else if (matchConcatStrings(e, es)) {
-        PathSet context;
-        std::ostringstream s;
-        
-        bool first = true, isPath = false;
-        Value vStr;
-        
-        for (ATermIterator i(es); i; ++i) {
-            eval(env, *i, vStr);
-
-            /* If the first element is a path, then the result will
-               also be a path, we don't copy anything (yet - that's
-               done later, since paths are copied when they are used
-               in a derivation), and none of the strings are allowed
-               to have contexts. */
-            if (first) {
-                isPath = vStr.type == tPath;
-                first = false;
-            }
-            
-            s << coerceToString(vStr, context, false, !isPath);
-        }
-        
-        if (isPath && !context.empty())
-            throwEvalError("a string that refers to a store path cannot be appended to a path, in `%1%'", s.str());
-
-        if (isPath)
-            mkPath(v, s.str().c_str());
-        else
-            mkString(v, s.str(), context);
-    }
-
-    /* Assertions. */
-    else if (matchAssert(e, e1, e2, pos)) {
-        if (!evalBool(env, e1))
-            throwAssertionError("assertion failed at %1%", showPos(pos));
-        eval(env, e2, v);
-    }
-
-    /* Negation. */
-    else if (matchOpNot(e, e1))
-        mkBool(v, !evalBool(env, e1));
-
-    /* Attribute existence test (?). */
-    else if (matchOpHasAttr(e, e1, name)) {
-        Value vAttrs;
-        eval(env, e1, vAttrs);
-        forceAttrs(vAttrs);
-        mkBool(v, vAttrs.attrs->find(name) != vAttrs.attrs->end());
-    }
-#endif
 }
 
 
@@ -513,6 +453,15 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
         throw;
     }
     v = i->second;
+}
+
+
+void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
+{
+    Value vAttrs;
+    state.eval(env, e, vAttrs);
+    state.forceAttrs(vAttrs);
+    mkBool(v, vAttrs.attrs->find(name) != vAttrs.attrs->end());
 }
 
 
@@ -663,6 +612,20 @@ void ExprIf::eval(EvalState & state, Env & env, Value & v)
 }
 
     
+void ExprAssert::eval(EvalState & state, Env & env, Value & v)
+{
+    if (!state.evalBool(env, cond))
+        throwAssertionError("assertion failed at %1%", pos);
+    state.eval(env, body, v);
+}
+
+    
+void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
+{
+    mkBool(v, !state.evalBool(env, e));
+}
+
+
 void ExprOpEq::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1; state.eval(env, e1, v1);
@@ -713,12 +676,6 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 }
 
 
-void ExprOpConcatStrings::eval(EvalState & state, Env & env, Value & v)
-{
-    abort();
-}
-
-
 void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1; state.eval(env, e1, v1);
@@ -732,6 +689,39 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
         v.list.elems[n] = v1.list.elems[n];
     for (unsigned int n = 0; n < v2.list.length; ++n)
         v.list.elems[n + v1.list.length] = v2.list.elems[n];
+}
+
+
+void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
+{
+    PathSet context;
+    std::ostringstream s;
+        
+    bool first = true, isPath = false;
+    Value vStr;
+
+    foreach (vector<Expr *>::iterator, i, *es) {
+        state.eval(env, *i, vStr);
+
+        /* If the first element is a path, then the result will also
+           be a path, we don't copy anything (yet - that's done later,
+           since paths are copied when they are used in a derivation),
+           and none of the strings are allowed to have contexts. */
+        if (first) {
+            isPath = vStr.type == tPath;
+            first = false;
+        }
+            
+        s << state.coerceToString(vStr, context, false, !isPath);
+    }
+        
+    if (isPath && !context.empty())
+        throwEvalError("a string that refers to a store path cannot be appended to a path, in `%1%'", s.str());
+
+    if (isPath)
+        mkPath(v, s.str().c_str());
+    else
+        mkString(v, s.str(), context);
 }
 
 
