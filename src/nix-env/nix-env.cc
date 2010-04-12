@@ -6,7 +6,6 @@
 #include "parser.hh"
 #include "eval.hh"
 #include "help.txt.hh"
-#include "nixexpr-ast.hh"
 #include "get-drvs.hh"
 #include "attr-path.hh"
 #include "pathlocks.hh"
@@ -143,9 +142,9 @@ static void getAllExprs(EvalState & state,
 }
 
 
-static Expr loadSourceExpr(EvalState & state, const Path & path)
+static Expr * loadSourceExpr(EvalState & state, const Path & path)
 {
-    if (isNixExpr(path)) return parseExprFromFile(state, absPath(path));
+    if (isNixExpr(path)) return parseExprFromFile(absPath(path));
 
     /* The path is a directory.  Put the Nix expressions in the
        directory in an attribute set, with the file name of each

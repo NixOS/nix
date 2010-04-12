@@ -4,7 +4,6 @@
 #include "util.hh"
 #include "store-api.hh"
 #include "derivations.hh"
-#include "nixexpr-ast.hh"
 #include "globals.hh"
 
 #include <cstring>
@@ -45,7 +44,7 @@ std::ostream & operator << (std::ostream & str, Value & v)
     case tAttrs:
         str << "{ ";
         foreach (Bindings::iterator, i, *v.attrs)
-            str << aterm2String(i->first) << " = " << i->second << "; ";
+            str << i->first << " = " << i->second << "; ";
         str << "}";
         break;
     case tList:
@@ -96,8 +95,6 @@ EvalState::EvalState() : baseEnv(allocEnv())
     nrValues = nrEnvs = nrEvaluated = recursionDepth = maxRecursionDepth = 0;
     deepestStack = (char *) -1;
 
-    initNixExprHelpers();
-
     createBaseEnv();
     
     allowUnsafeEquality = getEnv("NIX_NO_UNSAFE_EQ", "") == "";
@@ -112,9 +109,9 @@ EvalState::~EvalState()
 
 void EvalState::addConstant(const string & name, Value & v)
 {
-    baseEnv.bindings[toATerm(name)] = v;
+    baseEnv.bindings[name] = v;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    (*baseEnv.bindings[toATerm("builtins")].attrs)[toATerm(name2)] = v;
+    (*baseEnv.bindings["builtins"].attrs)[name2] = v;
     nrValues += 2;
 }
 
@@ -126,9 +123,9 @@ void EvalState::addPrimOp(const string & name,
     v.type = tPrimOp;
     v.primOp.arity = arity;
     v.primOp.fun = primOp;
-    baseEnv.bindings[toATerm(name)] = v;
+    baseEnv.bindings[name] = v;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    (*baseEnv.bindings[toATerm("builtins")].attrs)[toATerm(name2)] = v;
+    (*baseEnv.bindings["builtins"].attrs)[name2] = v;
     nrValues += 2;
 }
 
@@ -212,12 +209,12 @@ void mkPath(Value & v, const char * s)
 }
 
 
-static Value * lookupWith(Env * env, Sym name)
+static Value * lookupWith(Env * env, const Sym & name)
 {
     if (!env) return 0;
     Value * v = lookupWith(env->up, name);
     if (v) return v;
-    Bindings::iterator i = env->bindings.find(sWith);
+    Bindings::iterator i = env->bindings.find("<with>");
     if (i == env->bindings.end()) return 0;
     Bindings::iterator j = i->second.attrs->find(name);
     if (j != i->second.attrs->end()) return &j->second;
@@ -225,7 +222,7 @@ static Value * lookupWith(Env * env, Sym name)
 }
 
 
-static Value * lookupVar(Env * env, Sym name)
+static Value * lookupVar(Env * env, const Sym & name)
 {
     /* First look for a regular variable binding for `name'. */
     for (Env * env2 = env; env2; env2 = env2->up) {
@@ -251,7 +248,7 @@ static Value * lookupVar(Env * env, Sym name)
     }
 #endif
     
-    throwEvalError("undefined variable `%1%'", aterm2String(name));
+    throwEvalError("undefined variable `%1%'", name);
 }
 
 
@@ -284,7 +281,7 @@ void EvalState::mkAttrs(Value & v)
 }
 
 
-void EvalState::mkThunk_(Value & v, Expr expr)
+void EvalState::mkThunk_(Value & v, Expr * expr)
 {
     mkThunk(v, baseEnv, expr);
 }
@@ -302,11 +299,11 @@ void EvalState::evalFile(const Path & path, Value & v)
 {
     startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
 
-    Expr e = parseTrees.get(toATerm(path));
+    Expr * e = parseTrees[path];
 
     if (!e) {
-        e = parseExprFromFile(*this, path);
-        parseTrees.set(toATerm(path), e);
+        e = parseExprFromFile(path);
+        parseTrees[path] = e;
     }
     
     try {
@@ -334,7 +331,7 @@ struct RecursionCounter
 };
 
 
-void EvalState::eval(Env & env, Expr e, Value & v)
+void EvalState::eval(Env & env, Expr * e, Value & v)
 {
     /* When changing this function, make sure that you don't cause a
        (large) increase in stack consumption! */
@@ -350,6 +347,9 @@ void EvalState::eval(Env & env, Expr e, Value & v)
 
     nrEvaluated++;
 
+    e->eval(*this, env, v);
+
+#if 0
     Sym name;
     int n;
     ATerm s; ATermList context, es;
@@ -357,138 +357,6 @@ void EvalState::eval(Env & env, Expr e, Value & v)
     Expr e1, e2, e3, fun, arg, attrs;
     Pattern pat; Expr body; Pos pos;
     
-    if (matchVar(e, name)) {
-        Value * v2 = lookupVar(&env, name);
-        forceValue(*v2);
-        v = *v2;
-    }
-
-    else if (matchInt(e, n))
-        mkInt(v, n);
-
-    else if (matchStr(e, s, context)) {
-        assert(context == ATempty);
-        mkString(v, ATgetName(ATgetAFun(s)));
-    }
-
-    else if (matchPath(e, s))
-        mkPath(v, ATgetName(ATgetAFun(s)));
-
-    else if (matchAttrs(e, es)) {
-        mkAttrs(v);
-        ATerm e2, pos;
-        for (ATermIterator i(es); i; ++i) {
-            if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
-            Value & v2 = (*v.attrs)[name];
-            nrValues++;
-            mkThunk(v2, env, e2);
-        }
-    }
-
-    else if (matchRec(e, rbnds, nrbnds)) {
-        /* Create a new environment that contains the attributes in
-           this `rec'. */
-        Env & env2(allocEnv());
-        env2.up = &env;
-        
-        v.type = tAttrs;
-        v.attrs = &env2.bindings;
-
-        /* The recursive attributes are evaluated in the new
-           environment. */
-        ATerm name, e2, pos;
-        for (ATermIterator i(rbnds); i; ++i) {
-            if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
-            Value & v2 = env2.bindings[name];
-            nrValues++;
-            mkThunk(v2, env2, e2);
-        }
-
-        /* The non-recursive attributes, on the other hand, are
-           evaluated in the original environment. */
-        for (ATermIterator i(nrbnds); i; ++i) {
-            if (!matchBind(*i, name, e2, pos)) abort(); /* can't happen */
-            Value & v2 = env2.bindings[name];
-            nrValues++;
-            mkThunk(v2, env, e2);
-        }
-    }
-
-    else if (matchSelect(e, e2, name)) {
-        Value v2;
-        eval(env, e2, v2);
-        forceAttrs(v2); // !!! eval followed by force is slightly inefficient
-        Bindings::iterator i = v2.attrs->find(name);
-        if (i == v2.attrs->end())
-            throwEvalError("attribute `%1%' missing", aterm2String(name));
-        try {            
-            forceValue(i->second);
-        } catch (Error & e) {
-            addErrorPrefix(e, "while evaluating the attribute `%1%':\n", aterm2String(name));
-            throw;
-        }
-        v = i->second;
-    }
-
-    else if (matchFunction(e, pat, body, pos)) {
-        v.type = tLambda;
-        v.lambda.env = &env;
-        v.lambda.pat = pat;
-        v.lambda.body = body;
-    }
-
-    else if (matchCall(e, fun, arg)) {
-        Value vFun;
-        eval(env, fun, vFun);
-        Value vArg;
-        mkThunk(vArg, env, arg); // !!! should this be on the heap?
-        callFunction(vFun, vArg, v);
-    }
-
-    else if (matchWith(e, attrs, body, pos)) {
-        Env & env2(allocEnv());
-        env2.up = &env;
-
-        Value & vAttrs = env2.bindings[sWith];
-        nrValues++;
-        eval(env, attrs, vAttrs);
-        forceAttrs(vAttrs);
-        
-        eval(env2, body, v);
-    }
-
-    else if (matchList(e, es)) {
-        mkList(v, ATgetLength(es));
-        for (unsigned int n = 0; n < v.list.length; ++n, es = ATgetNext(es))
-            mkThunk(v.list.elems[n], env, ATgetFirst(es));
-    }
-
-    else if (matchOpEq(e, e1, e2)) {
-        Value v1; eval(env, e1, v1);
-        Value v2; eval(env, e2, v2);
-        mkBool(v, eqValues(v1, v2));
-    }
-
-    else if (matchOpNEq(e, e1, e2)) {
-        Value v1; eval(env, e1, v1);
-        Value v2; eval(env, e2, v2);
-        mkBool(v, !eqValues(v1, v2));
-    }
-
-    else if (matchOpConcat(e, e1, e2)) {
-        Value v1; eval(env, e1, v1);
-        forceList(v1);
-        Value v2; eval(env, e2, v2);
-        forceList(v2);
-        mkList(v, v1.list.length + v2.list.length);
-        /* !!! This loses sharing with the original lists.  We could
-           use a tCopy node, but that would use more memory. */
-        for (unsigned int n = 0; n < v1.list.length; ++n)
-            v.list.elems[n] = v1.list.elems[n];
-        for (unsigned int n = 0; n < v2.list.length; ++n)
-            v.list.elems[n + v1.list.length] = v2.list.elems[n];
-    }
-
     else if (matchConcatStrings(e, es)) {
         PathSet context;
         std::ostringstream s;
@@ -521,10 +389,6 @@ void EvalState::eval(Env & env, Expr e, Value & v)
             mkString(v, s.str(), context);
     }
 
-    /* Conditionals. */
-    else if (matchIf(e, e1, e2, e3))
-        eval(env, evalBool(env, e1) ? e2 : e3, v);
-
     /* Assertions. */
     else if (matchAssert(e, e1, e2, pos)) {
         if (!evalBool(env, e1))
@@ -536,30 +400,6 @@ void EvalState::eval(Env & env, Expr e, Value & v)
     else if (matchOpNot(e, e1))
         mkBool(v, !evalBool(env, e1));
 
-    /* Implication. */
-    else if (matchOpImpl(e, e1, e2))
-        return mkBool(v, !evalBool(env, e1) || evalBool(env, e2));
-    
-    /* Conjunction (logical AND). */
-    else if (matchOpAnd(e, e1, e2))
-        mkBool(v, evalBool(env, e1) && evalBool(env, e2));
-    
-    /* Disjunction (logical OR). */
-    else if (matchOpOr(e, e1, e2))
-        mkBool(v, evalBool(env, e1) || evalBool(env, e2));
-
-    /* Attribute set update (//). */
-    else if (matchOpUpdate(e, e1, e2)) {
-        Value v2;
-        eval(env, e1, v2);
-        
-        cloneAttrs(v2, v);
-        
-        eval(env, e2, v2);
-        foreach (Bindings::iterator, i, *v2.attrs)
-            (*v.attrs)[i->first] = i->second; // !!! sharing
-    }
-
     /* Attribute existence test (?). */
     else if (matchOpHasAttr(e, e1, name)) {
         Value vAttrs;
@@ -567,8 +407,130 @@ void EvalState::eval(Env & env, Expr e, Value & v)
         forceAttrs(vAttrs);
         mkBool(v, vAttrs.attrs->find(name) != vAttrs.attrs->end());
     }
+#endif
+}
 
-    else abort();
+
+void EvalState::eval(Expr * e, Value & v)
+{
+    eval(baseEnv, e, v);
+}
+
+
+bool EvalState::evalBool(Env & env, Expr * e)
+{
+    Value v;
+    eval(env, e, v);
+    if (v.type != tBool)
+        throwTypeError("value is %1% while a Boolean was expected", showType(v));
+    return v.boolean;
+}
+
+
+void ExprInt::eval(EvalState & state, Env & env, Value & v)
+{
+    mkInt(v, n);
+}
+
+
+void ExprString::eval(EvalState & state, Env & env, Value & v)
+{
+    mkString(v, s.c_str());
+}
+
+
+void ExprPath::eval(EvalState & state, Env & env, Value & v)
+{
+    mkPath(v, s.c_str());
+}
+
+
+void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
+{
+    if (recursive) {
+
+        /* Create a new environment that contains the attributes in
+           this `rec'. */
+        Env & env2(state.allocEnv());
+        env2.up = &env;
+        
+        v.type = tAttrs;
+        v.attrs = &env2.bindings;
+
+        /* The recursive attributes are evaluated in the new
+           environment. */
+        foreach (Attrs::iterator, i, attrs) {
+            Value & v2 = env2.bindings[i->first];
+            mkThunk(v2, env2, i->second);
+        }
+
+        /* The inherited attributes, on the other hand, are
+           evaluated in the original environment. */
+        foreach (list<string>::iterator, i, inherited) {
+            Value & v2 = env2.bindings[*i];
+            mkCopy(v2, *lookupVar(&env, *i));
+        }
+    }
+
+    else {
+        state.mkAttrs(v);
+        foreach (Attrs::iterator, i, attrs) {
+            Value & v2 = (*v.attrs)[i->first];
+            mkThunk(v2, env, i->second);
+        }
+    }
+}
+
+
+void ExprList::eval(EvalState & state, Env & env, Value & v)
+{
+    state.mkList(v, elems.size());
+    for (unsigned int n = 0; n < v.list.length; ++n)
+        mkThunk(v.list.elems[n], env, elems[n]);
+}
+
+
+void ExprVar::eval(EvalState & state, Env & env, Value & v)
+{
+    Value * v2 = lookupVar(&env, name);
+    state.forceValue(*v2);
+    v = *v2;
+}
+
+
+void ExprSelect::eval(EvalState & state, Env & env, Value & v)
+{
+    Value v2;
+    state.eval(env, e, v2);
+    state.forceAttrs(v2); // !!! eval followed by force is slightly inefficient
+    Bindings::iterator i = v2.attrs->find(name);
+    if (i == v2.attrs->end())
+        throwEvalError("attribute `%1%' missing", name);
+    try {            
+        state.forceValue(i->second);
+    } catch (Error & e) {
+        addErrorPrefix(e, "while evaluating the attribute `%1%':\n", name);
+        throw;
+    }
+    v = i->second;
+}
+
+
+void ExprLambda::eval(EvalState & state, Env & env, Value & v)
+{
+    v.type = tLambda;
+    v.lambda.env = &env;
+    v.lambda.fun = this;
+}
+
+
+void ExprApp::eval(EvalState & state, Env & env, Value & v)
+{
+    Value vFun;
+    state.eval(env, e1, vFun);
+    Value vArg;
+    mkThunk(vArg, env, e2); // !!! should this be on the heap?
+    state.callFunction(vFun, vArg, v);
 }
 
 
@@ -613,19 +575,17 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
     Env & env2(allocEnv());
     env2.up = fun.lambda.env;
 
-    ATermList formals; ATerm ellipsis, name;
-
-    if (matchVarPat(fun.lambda.pat, name)) {
-        Value & vArg = env2.bindings[name];
+    if (!fun.lambda.fun->matchAttrs) {
+        Value & vArg = env2.bindings[fun.lambda.fun->arg];
         nrValues++;
         vArg = arg;
     }
 
-    else if (matchAttrsPat(fun.lambda.pat, formals, ellipsis, name)) {
+    else {
         forceAttrs(arg);
         
-        if (name != sNoAlias) {
-            env2.bindings[name] = arg;
+        if (!fun.lambda.fun->arg.empty()) {
+            env2.bindings[fun.lambda.fun->arg] = arg;
             nrValues++;
         }                
 
@@ -633,21 +593,15 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
            there is no matching actual argument but the formal
            argument has a default, use the default. */
         unsigned int attrsUsed = 0;
-        for (ATermIterator i(formals); i; ++i) {
-            Expr def; Sym name;
-            DefaultValue def2;
-            if (!matchFormal(*i, name, def2)) abort(); /* can't happen */
-
-            Bindings::iterator j = arg.attrs->find(name);
+        foreach (Formals::Formals_::iterator, i, fun.lambda.fun->formals->formals) {
+            Bindings::iterator j = arg.attrs->find(i->name);
                 
-            Value & v = env2.bindings[name];
+            Value & v = env2.bindings[i->name];
             nrValues++;
                 
             if (j == arg.attrs->end()) {
-                if (!matchDefaultValue(def2, def)) def = 0;
-                if (def == 0) throwTypeError("the argument named `%1%' required by the function is missing",
-                    aterm2String(name));
-                mkThunk(v, env2, def);
+                if (!i->def) throwTypeError("the argument named `%1%' required by the function is missing", i->name);
+                mkThunk(v, env2, i->def);
             } else {
                 attrsUsed++;
                 mkCopy(v, j->second);
@@ -658,13 +612,11 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
            argument (unless the attribute match specifies a `...').
            TODO: show the names of the expected/unexpected
            arguments. */
-        if (ellipsis == eFalse && attrsUsed != arg.attrs->size())
+        if (!fun.lambda.fun->formals->ellipsis && attrsUsed != arg.attrs->size())
             throwTypeError("function called with unexpected argument");
     }
 
-    else abort();
-        
-    eval(env2, fun.lambda.body, v);
+    eval(env2, fun.lambda.fun->body, v);
 }
 
 
@@ -672,45 +624,114 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
 {
     forceValue(fun);
 
-    ATerm name;
-    ATermList formals;
-    ATermBool ellipsis;
-    
-    if (fun.type != tLambda || !matchAttrsPat(fun.lambda.pat, formals, ellipsis, name)) {
+    if (fun.type != tLambda || !fun.lambda.fun->matchAttrs) {
         res = fun;
         return;
     }
 
     Value actualArgs;
     mkAttrs(actualArgs);
-    
-    for (ATermIterator i(formals); i; ++i) {
-        Expr name, def; ATerm def2;
-        if (!matchFormal(*i, name, def2)) abort();
-        Bindings::const_iterator j = args.find(name);
+
+    foreach (Formals::Formals_::iterator, i, fun.lambda.fun->formals->formals) {
+        Bindings::const_iterator j = args.find(i->name);
         if (j != args.end())
-            (*actualArgs.attrs)[name] = j->second;
-        else if (!matchDefaultValue(def2, def))
-            throwTypeError("cannot auto-call a function that has an argument without a default value (`%1%')", aterm2String(name));
+            (*actualArgs.attrs)[i->name] = j->second;
+        else if (!i->def)
+            throwTypeError("cannot auto-call a function that has an argument without a default value (`%1%')", i->name);
     }
 
     callFunction(fun, actualArgs, res);
 }
 
 
-void EvalState::eval(Expr e, Value & v)
+void ExprWith::eval(EvalState & state, Env & env, Value & v)
 {
-    eval(baseEnv, e, v);
+    Env & env2(state.allocEnv());
+    env2.up = &env;
+
+    Value & vAttrs = env2.bindings["<with>"];
+    state.eval(env, attrs, vAttrs);
+    state.forceAttrs(vAttrs);
+        
+    state.eval(env2, body, v);
 }
 
 
-bool EvalState::evalBool(Env & env, Expr e)
+void ExprIf::eval(EvalState & state, Env & env, Value & v)
 {
-    Value v;
-    eval(env, e, v);
-    if (v.type != tBool)
-        throwTypeError("value is %1% while a Boolean was expected", showType(v));
-    return v.boolean;
+    state.eval(env, state.evalBool(env, cond) ? then : else_, v);
+}
+
+    
+void ExprOpEq::eval(EvalState & state, Env & env, Value & v)
+{
+    Value v1; state.eval(env, e1, v1);
+    Value v2; state.eval(env, e2, v2);
+    mkBool(v, state.eqValues(v1, v2));
+}
+
+
+void ExprOpNEq::eval(EvalState & state, Env & env, Value & v)
+{
+    Value v1; state.eval(env, e1, v1);
+    Value v2; state.eval(env, e2, v2);
+    mkBool(v, !state.eqValues(v1, v2));
+}
+
+
+void ExprOpAnd::eval(EvalState & state, Env & env, Value & v)
+{
+    mkBool(v, state.evalBool(env, e1) && state.evalBool(env, e2));
+}
+
+
+void ExprOpOr::eval(EvalState & state, Env & env, Value & v)
+{
+    mkBool(v, state.evalBool(env, e1) || state.evalBool(env, e2));
+}
+
+
+void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
+{
+    mkBool(v, !state.evalBool(env, e1) || state.evalBool(env, e2));
+}
+
+
+void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
+{
+    Value v2;
+    state.eval(env, e1, v2);
+    state.forceAttrs(v2);
+        
+    state.cloneAttrs(v2, v);
+        
+    state.eval(env, e2, v2);
+    state.forceAttrs(v2);
+    
+    foreach (Bindings::iterator, i, *v2.attrs)
+        (*v.attrs)[i->first] = i->second; // !!! sharing
+}
+
+
+void ExprOpConcatStrings::eval(EvalState & state, Env & env, Value & v)
+{
+    abort();
+}
+
+
+void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
+{
+    Value v1; state.eval(env, e1, v1);
+    state.forceList(v1);
+    Value v2; state.eval(env, e2, v2);
+    state.forceList(v2);
+    state.mkList(v, v1.list.length + v2.list.length);
+    /* !!! This loses sharing with the original lists.  We could use a
+       tCopy node, but that would use more memory. */
+    for (unsigned int n = 0; n < v1.list.length; ++n)
+        v.list.elems[n] = v1.list.elems[n];
+    for (unsigned int n = 0; n < v2.list.length; ++n)
+        v.list.elems[n + v1.list.length] = v2.list.elems[n];
 }
 
 
@@ -827,7 +848,7 @@ string EvalState::forceStringNoCtx(Value & v)
 bool EvalState::isDerivation(Value & v)
 {
     if (v.type != tAttrs) return false;
-    Bindings::iterator i = v.attrs->find(toATerm("type"));
+    Bindings::iterator i = v.attrs->find("type");
     return i != v.attrs->end() && forceStringNoCtx(i->second) == "derivation";
 }
 
@@ -871,7 +892,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
     }
 
     if (v.type == tAttrs) {
-        Bindings::iterator i = v.attrs->find(toATerm("outPath"));
+        Bindings::iterator i = v.attrs->find("outPath");
         if (i == v.attrs->end())
             throwTypeError("cannot coerce an attribute set (except a derivation) to a string");
         return coerceToString(i->second, context, coerceMore, copyToStore);

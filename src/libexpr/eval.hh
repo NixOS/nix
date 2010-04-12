@@ -3,7 +3,6 @@
 
 #include <map>
 
-#include "aterm.hh"
 #include "nixexpr.hh"
 
 
@@ -15,7 +14,7 @@ class EvalState;
 struct Env;
 struct Value;
 
-typedef ATerm Sym;
+typedef string Sym;
 
 typedef std::map<Sym, Value> Bindings;
 
@@ -55,10 +54,32 @@ struct Value
     {
         int integer;
         bool boolean;
+        
+        /* Strings in the evaluator carry a so-called `context' (the
+           ATermList) which is a list of strings representing store
+           paths.  This is to allow users to write things like
+
+             "--with-freetype2-library=" + freetype + "/lib"
+
+           where `freetype' is a derivation (or a source to be copied
+           to the store).  If we just concatenated the strings without
+           keeping track of the referenced store paths, then if the
+           string is used as a derivation attribute, the derivation
+           will not have the correct dependencies in its inputDrvs and
+           inputSrcs.
+
+           The semantics of the context is as follows: when a string
+           with context C is used as a derivation attribute, then the
+           derivations in C will be added to the inputDrvs of the
+           derivation, and the other store paths in C will be added to
+           the inputSrcs of the derivations.
+
+           For canonicity, the store paths should be in sorted order. */
         struct {
             const char * s;
             const char * * context;
         } string;
+        
         const char * path;
         Bindings * attrs;
         struct {
@@ -67,15 +88,14 @@ struct Value
         } list;
         struct {
             Env * env;
-            Expr expr;
+            Expr * expr;
         } thunk;
         struct {
             Value * left, * right;
         } app;
         struct {
             Env * env;
-            Pattern pat;
-            Expr body;
+            ExprLambda * fun;
         } lambda;
         Value * val;
         struct {
@@ -104,7 +124,7 @@ static inline void mkBool(Value & v, bool b)
 }
 
 
-static inline void mkThunk(Value & v, Env & env, Expr expr)
+static inline void mkThunk(Value & v, Env & env, Expr * expr)
 {
     v.type = tThunk;
     v.thunk.env = &env;
@@ -146,7 +166,7 @@ private:
 
     bool allowUnsafeEquality;
 
-    ATermMap parseTrees;
+    std::map<Path, Expr *> parseTrees;
 
 public:
     
@@ -159,12 +179,12 @@ public:
 
     /* Evaluate an expression to normal form, storing the result in
        value `v'. */
-    void eval(Expr e, Value & v);
-    void eval(Env & env, Expr e, Value & v);
+    void eval(Expr * e, Value & v);
+    void eval(Env & env, Expr * e, Value & v);
 
     /* Evaluation the expression, then verify that it has the expected
        type. */
-    bool evalBool(Env & env, Expr e);
+    bool evalBool(Env & env, Expr * e);
 
     /* If `v' is a thunk, enter it and overwrite `v' with the result
        of the evaluation of the thunk.  If `v' is a delayed function
@@ -215,12 +235,12 @@ private:
     void addPrimOp(const string & name,
         unsigned int arity, PrimOp primOp);
 
+public:
+    
     /* Do a deep equality test between two values.  That is, list
        elements and attributes are compared recursively. */
     bool eqValues(Value & v1, Value & v2);
 
-public:
-    
     void callFunction(Value & fun, Value & arg, Value & v);
 
     /* Automatically call a function for which each argument has a
@@ -233,7 +253,7 @@ public:
 
     void mkList(Value & v, unsigned int length);
     void mkAttrs(Value & v);
-    void mkThunk_(Value & v, Expr expr);
+    void mkThunk_(Value & v, Expr * expr);
     
     void cloneAttrs(Value & src, Value & dst);
 

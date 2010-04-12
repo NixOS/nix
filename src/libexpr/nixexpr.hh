@@ -3,7 +3,6 @@
 
 #include <map>
 
-#include "aterm-map.hh"
 #include "types.hh"
 
 
@@ -18,22 +17,152 @@ MakeError(Abort, EvalError)
 MakeError(TypeError, EvalError)
 
 
-/* Nix expressions are represented as ATerms.  The maximal sharing
-   property of the ATerm library allows us to implement caching of
-   normals forms efficiently. */
-typedef ATerm Expr;
-typedef ATerm DefaultValue;
-typedef ATerm Pos;
-typedef ATerm Pattern;
-typedef ATerm ATermBool;
+struct Pos
+{
+    string file;
+    unsigned int line, column;
+};
 
 
-/* A STL vector of ATerms.  Should be used with great care since it's
-   stored on the heap, and the elements are therefore not roots to the
-   ATerm garbage collector. */
-typedef vector<ATerm> ATermVector;
+/* Abstract syntax of Nix expressions. */
+
+struct Env;
+struct Value;
+struct EvalState;
+
+struct Expr
+{
+    virtual void show(std::ostream & str) = 0;
+    virtual void eval(EvalState & state, Env & env, Value & v)
+    {
+        throw Error("not implemented");
+    }
+};
+
+std::ostream & operator << (std::ostream & str, Expr & e);
+
+#define COMMON_METHODS \
+    void show(std::ostream & str); \
+    void eval(EvalState & state, Env & env, Value & v);
+
+struct ExprInt : Expr
+{
+    int n;
+    ExprInt(int n) : n(n) { };
+    COMMON_METHODS
+};
+
+struct ExprString : Expr
+{
+    string s;
+    ExprString(const string & s) : s(s) { };
+    COMMON_METHODS
+};
+
+struct ExprPath : Expr
+{
+    string s;
+    ExprPath(const string & s) : s(s) { };
+    COMMON_METHODS
+};
+
+struct ExprVar : Expr
+{
+    string name;
+    ExprVar(const string & name) : name(name) { };
+    COMMON_METHODS
+};
+
+struct ExprSelect : Expr
+{
+    Expr * e;
+    string name;
+    ExprSelect(Expr * e, const string & name) : e(e), name(name) { };
+    COMMON_METHODS
+};
+
+struct ExprAttrs : Expr
+{
+    bool recursive;
+    typedef std::map<string, Expr *> Attrs;
+    Attrs attrs;
+    list<string> inherited;
+    ExprAttrs() : recursive(false) { };
+    COMMON_METHODS
+};
+
+struct ExprList : Expr
+{
+    std::vector<Expr *> elems;
+    ExprList() { };
+    COMMON_METHODS
+};
+
+struct Formal
+{
+    string name;
+    Expr * def;
+    Formal(const string & name, Expr * def) : name(name), def(def) { };
+};
+
+struct Formals
+{
+    typedef std::list<Formal> Formals_;
+    Formals_ formals;
+    bool ellipsis;
+};
+
+struct ExprLambda : Expr
+{
+    Pos pos;
+    string arg;
+    bool matchAttrs;
+    Formals * formals;
+    Expr * body;
+    ExprLambda(const Pos & pos, const string & arg, bool matchAttrs, Formals * formals, Expr * body)
+        : pos(pos), arg(arg), matchAttrs(matchAttrs), formals(formals), body(body) { };
+    COMMON_METHODS
+};
+
+struct ExprWith : Expr
+{
+    Pos pos;
+    Expr * attrs, * body;
+    ExprWith(const Pos & pos, Expr * attrs, Expr * body) : pos(pos), attrs(attrs), body(body) { };
+    COMMON_METHODS
+};
+
+struct ExprIf : Expr
+{
+    Expr * cond, * then, * else_;
+    ExprIf(Expr * cond, Expr * then, Expr * else_) : cond(cond), then(then), else_(else_) { };
+    COMMON_METHODS
+};
+
+#define MakeBinOp(name, s) \
+    struct Expr##name : Expr \
+    { \
+        Expr * e1, * e2; \
+        Expr##name(Expr * e1, Expr * e2) : e1(e1), e2(e2) { }; \
+        void show(std::ostream & str) \
+        { \
+            str << *e1 << " " s " " << *e2; \
+        } \
+        void eval(EvalState & state, Env & env, Value & v); \
+    };
+
+MakeBinOp(App, "")
+MakeBinOp(OpEq, "==")
+MakeBinOp(OpNEq, "!=")
+MakeBinOp(OpAnd, "&&")
+MakeBinOp(OpOr, "||")
+MakeBinOp(OpImpl, "->")
+MakeBinOp(OpUpdate, "//")
+MakeBinOp(OpConcatStrings, "+")
+MakeBinOp(OpConcatLists, "++")
 
 
+#if 0
 /* Show a position. */
 string showPos(ATerm pos);
 
@@ -56,13 +185,7 @@ Expr makeAttrs(const ATermMap & attrs);
 /* Check whether all variables are defined in the given expression.
    Throw an exception if this isn't the case. */
 void checkVarDefs(const ATermMap & def, Expr e);
-
-
-/* Manipulation of Str() nodes.  Note: matchStr() does not clear
-   context!  */
-bool matchStr(Expr e, string & s, PathSet & context);
-
-Expr makeStr(const string & s, const PathSet & context = PathSet());
+#endif
 
 
 }

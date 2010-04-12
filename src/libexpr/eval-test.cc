@@ -2,8 +2,8 @@
 #include "parser.hh"
 #include "hash.hh"
 #include "util.hh"
-#include "nixexpr-ast.hh"
 
+#include <iostream>
 #include <cstdlib>
 #include <cstring>
 
@@ -12,8 +12,8 @@ using namespace nix;
 
 void doTest(EvalState & state, string s)
 {
-    Expr e = parseExprFromString(state, s, absPath("."));
-    printMsg(lvlError, format(">>>>> %1%") % e);
+    Expr * e = parseExprFromString(s, absPath("."));
+    std::cerr << ">>>>> " << *e << std::endl;
     Value v;
     state.eval(e, v);
     state.strictForceValue(v);
@@ -24,8 +24,10 @@ void doTest(EvalState & state, string s)
 void run(Strings args)
 {
     EvalState state;
-    
+
     printMsg(lvlError, format("size of value: %1% bytes") % sizeof(Value));
+    printMsg(lvlError, format("size of int AST node: %1% bytes") % sizeof(ExprInt));
+    printMsg(lvlError, format("size of attrset AST node: %1% bytes") % sizeof(ExprAttrs));
     
     doTest(state, "123");
     doTest(state, "{ x = 1; y = 2; }");
@@ -53,7 +55,7 @@ void run(Strings args)
     doTest(state, "let id = x: x; in [1 2] == [(id 1) (id 2)]");
     doTest(state, "let id = x: x; in [1 2] == [(id 1) (id 3)]");
     doTest(state, "[1 2] == [3 (let x = x; in x)]");
-    doTest(state, "{ x = 1; y.z = 2; } == { y = { z = 2; }; x = 1; }");
+    //doTest(state, "{ x = 1; y.z = 2; } == { y = { z = 2; }; x = 1; }");
     doTest(state, "{ x = 1; y = 2; } == { x = 2; }");
     doTest(state, "{ x = [ 1 2 ]; } == { x = [ 1 ] ++ [ 2 ]; }");
     doTest(state, "1 != 1");
@@ -63,23 +65,23 @@ void run(Strings args)
     doTest(state, "__head [ 1 2 3 ]");
     doTest(state, "__add 1 2");
     doTest(state, "null");
-    doTest(state, "null");
-    doTest(state, "\"foo\"");
-    doTest(state, "let s = \"bar\"; in \"foo${s}\"");
+    //doTest(state, "\"foo\"");
+    //doTest(state, "let s = \"bar\"; in \"foo${s}\"");
     doTest(state, "if true then 1 else 2");
     doTest(state, "if false then 1 else 2");
     doTest(state, "if false || true then 1 else 2");
     doTest(state, "let x = x; in if true || x then 1 else 2");
+    doTest(state, "http://nixos.org/");
     doTest(state, "/etc/passwd");
     //doTest(state, "import ./foo.nix");
     doTest(state, "map (x: __add 1 x) [ 1 2 3 ]");
     doTest(state, "map (builtins.add 1) [ 1 2 3 ]");
-    doTest(state, "builtins.hasAttr \"x\" { x = 1; }");
+    //doTest(state, "builtins.hasAttr \"x\" { x = 1; }");
     doTest(state, "let x = 1; as = rec { inherit x; y = as.x; }; in as.y");
     doTest(state, "let as = { x = 1; }; bs = rec { inherit (as) x; y = x; }; in bs.y");
     doTest(state, "let as = rec { inherit (y) x; y = { x = 1; }; }; in as.x");
     doTest(state, "builtins.toXML 123");
-    doTest(state, "builtins.toXML { a.b = \"x\" + \"y\"; c = [ 1 2 ] ++ [ 3 4 ]; }");
+    //doTest(state, "builtins.toXML { a.b = \"x\" + \"y\"; c = [ 1 2 ] ++ [ 3 4 ]; }");
 
     state.printStats();
 }

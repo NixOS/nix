@@ -5,7 +5,6 @@
 #include "util.hh"
 #include "archive.hh"
 #include "value-to-xml.hh"
-#include "nixexpr-ast.hh"
 #include "parser.hh"
 #include "names.hh"
 
@@ -281,7 +280,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     state.forceAttrs(*args[0]);
 
     /* Figure out the name first (for stack backtraces). */
-    Bindings::iterator attr = args[0]->attrs->find(toATerm("name"));
+    Bindings::iterator attr = args[0]->attrs->find("name");
     if (attr == args[0]->attrs->end())
         throw EvalError("required attribute `name' missing");
     string drvName;
@@ -302,7 +301,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     bool outputHashRecursive = false;
 
     foreach (Bindings::iterator, i, *args[0]->attrs) {
-        string key = aterm2String(i->first);
+        string key = i->first;
         startNest(nest, lvlVomit, format("processing attribute `%1%'") % key);
 
         try {
@@ -449,8 +448,8 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
 
     /* !!! assumes a single output */
     state.mkAttrs(v);
-    mkString((*v.attrs)[toATerm("outPath")], outPath, singleton<PathSet>(drvPath));
-    mkString((*v.attrs)[toATerm("drvPath")], drvPath, singleton<PathSet>("=" + drvPath));
+    mkString((*v.attrs)["outPath"], outPath, singleton<PathSet>(drvPath));
+    mkString((*v.attrs)["drvPath"], drvPath, singleton<PathSet>("=" + drvPath));
 }
 
 
@@ -655,7 +654,7 @@ static void prim_attrNames(EvalState & state, Value * * args, Value & v)
 
     StringSet names;
     foreach (Bindings::iterator, i, *args[0]->attrs)
-        names.insert(aterm2String(i->first));
+        names.insert(i->first);
 
     unsigned int n = 0;
     foreach (StringSet::iterator, i, names)
@@ -668,7 +667,7 @@ static void prim_getAttr(EvalState & state, Value * * args, Value & v)
 {
     string attr = state.forceStringNoCtx(*args[0]);
     state.forceAttrs(*args[1]);
-    Bindings::iterator i = args[1]->attrs->find(toATerm(attr));
+    Bindings::iterator i = args[1]->attrs->find(attr);
     if (i == args[1]->attrs->end())
         throw EvalError(format("attribute `%1%' missing") % attr);
     state.forceValue(i->second);
@@ -681,7 +680,7 @@ static void prim_hasAttr(EvalState & state, Value * * args, Value & v)
 {
     string attr = state.forceStringNoCtx(*args[0]);
     state.forceAttrs(*args[1]);
-    mkBool(v, args[1]->attrs->find(toATerm(attr)) != args[1]->attrs->end());
+    mkBool(v, args[1]->attrs->find(attr) != args[1]->attrs->end());
 }
 
 
@@ -702,7 +701,7 @@ static void prim_removeAttrs(EvalState & state, Value * * args, Value & v)
 
     for (unsigned int i = 0; i < args[1]->list.length; ++i) {
         state.forceStringNoCtx(args[1]->list.elems[i]);
-        v.attrs->erase(toATerm(args[1]->list.elems[i].string.s));
+        v.attrs->erase(args[1]->list.elems[i].string.s);
     }
 }
 
@@ -721,16 +720,16 @@ static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
         Value & v2(args[0]->list.elems[i]);
         state.forceAttrs(v2);
         
-        Bindings::iterator j = v2.attrs->find(toATerm("name"));
+        Bindings::iterator j = v2.attrs->find("name");
         if (j == v2.attrs->end())
             throw TypeError("`name' attribute missing in a call to `listToAttrs'");
         string name = state.forceStringNoCtx(j->second);
         
-        j = v2.attrs->find(toATerm("value"));
+        j = v2.attrs->find("value");
         if (j == v2.attrs->end())
             throw TypeError("`value' attribute missing in a call to `listToAttrs'");
 
-        (*v.attrs)[toATerm(name)] = j->second; // !!! sharing?
+        (*v.attrs)[name] = j->second; // !!! sharing?
     }
 }
 
@@ -977,8 +976,8 @@ static void prim_parseDrvName(EvalState & state, Value * * args, Value & v)
     string name = state.forceStringNoCtx(*args[0]);
     DrvName parsed(name);
     state.mkAttrs(v);
-    mkString((*v.attrs)[toATerm("name")], parsed.name);
-    mkString((*v.attrs)[toATerm("version")], parsed.version);
+    mkString((*v.attrs)["name"], parsed.name);
+    mkString((*v.attrs)["version"], parsed.version);
 }
 
 
@@ -999,10 +998,9 @@ void EvalState::createBaseEnv()
 {
     baseEnv.up = 0;
 
-    {   Value & v = baseEnv.bindings[toATerm("builtins")];
-        v.type = tAttrs;
-        v.attrs = new Bindings;
-    }
+    Value & builtins = baseEnv.bindings["builtins"];
+    builtins.type = tAttrs;
+    builtins.attrs = new Bindings;
 
     /* Add global constants such as `true' to the base environment. */
     Value v;
@@ -1025,8 +1023,8 @@ void EvalState::createBaseEnv()
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
     string s = "attrs: let res = derivationStrict attrs; in attrs // { drvPath = res.drvPath; outPath = res.outPath; type = \"derivation\"; }";
-    mkThunk(v, baseEnv, parseExprFromString(*this, s, "/"));
-    addConstant("derivation", v);
+    //mkThunk(v, baseEnv, parseExprFromString(s, "/"));
+    //addConstant("derivation", v);
 
     // Miscellaneous
     addPrimOp("import", 1, prim_import);

@@ -23,12 +23,12 @@ void printHelp()
 }
 
 
-static Expr parseStdin(EvalState & state)
+static Expr * parseStdin(EvalState & state)
 {
     startNest(nest, lvlTalkative, format("parsing standard input"));
     string s, s2;
     while (getline(std::cin, s2)) s += s2 + "\n";
-    return parseExprFromString(state, s, absPath("."));
+    return parseExprFromString(s, absPath("."));
 }
 
 
@@ -39,7 +39,7 @@ static bool indirectRoot = false;
 
 void processExpr(EvalState & state, const Strings & attrPaths,
     bool parseOnly, bool strict, const Bindings & autoArgs,
-    bool evalOnly, bool xmlOutput, Expr e)
+    bool evalOnly, bool xmlOutput, Expr * e)
 {
     if (parseOnly)
         std::cout << format("%1%\n");
@@ -129,14 +129,14 @@ void run(Strings args)
     store = openStore();
 
     if (readStdin) {
-        Expr e = parseStdin(state);
+        Expr * e = parseStdin(state);
         processExpr(state, attrPaths, parseOnly, strict, autoArgs,
             evalOnly, xmlOutput, e);
     }
 
     foreach (Strings::iterator, i, files) {
         Path path = absPath(*i);
-        Expr e = parseExprFromFile(state, path);
+        Expr * e = parseExprFromFile(path);
         processExpr(state, attrPaths, parseOnly, strict, autoArgs,
             evalOnly, xmlOutput, e);
     }

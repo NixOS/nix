@@ -1,5 +1,4 @@
 #include "get-drvs.hh"
-#include "nixexpr-ast.hh"
 #include "util.hh"
 
 
@@ -9,7 +8,7 @@ namespace nix {
 string DrvInfo::queryDrvPath(EvalState & state) const
 {
     if (drvPath == "") {
-        Bindings::iterator i = attrs->find(toATerm("drvPath"));
+        Bindings::iterator i = attrs->find("drvPath");
         PathSet context;
         (string &) drvPath = i != attrs->end() ? state.coerceToPath(i->second, context) : "";
     }
@@ -20,7 +19,7 @@ string DrvInfo::queryDrvPath(EvalState & state) const
 string DrvInfo::queryOutPath(EvalState & state) const
 {
     if (outPath == "") {
-        Bindings::iterator i = attrs->find(toATerm("outPath"));
+        Bindings::iterator i = attrs->find("outPath");
         PathSet context;
         (string &) outPath = i != attrs->end() ? state.coerceToPath(i->second, context) : "";
     }
@@ -32,7 +31,7 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
 {
     MetaInfo meta;
     
-    Bindings::iterator a = attrs->find(toATerm("meta"));
+    Bindings::iterator a = attrs->find("meta");
     if (a == attrs->end()) return meta; /* fine, empty meta information */
 
     state.forceAttrs(a->second);
@@ -51,7 +50,7 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
             for (unsigned int j = 0; j < i->second.list.length; ++j)
                 value.stringValues.push_back(state.forceStringNoCtx(i->second.list.elems[j]));
         } else continue;
-        meta[aterm2String(i->first)] = value;
+        meta[i->first] = value;
     }
 
     return meta;
@@ -114,12 +113,12 @@ static bool getDerivation(EvalState & state, Value & v,
 
         DrvInfo drv;
     
-        Bindings::iterator i = v.attrs->find(toATerm("name"));
+        Bindings::iterator i = v.attrs->find("name");
         /* !!! We really would like to have a decent back trace here. */
         if (i == v.attrs->end()) throw TypeError("derivation name missing");
         drv.name = state.forceStringNoCtx(i->second);
 
-        i = v.attrs->find(toATerm("system"));
+        i = v.attrs->find("system");
         if (i == v.attrs->end())
             drv.system = "unknown";
         else
@@ -171,7 +170,7 @@ static void getDerivations(EvalState & state, Value & vIn,
 
         /* !!! undocumented hackery to support combining channels in
            nix-env.cc. */
-        bool combineChannels = v.attrs->find(toATerm("_combineChannels")) != v.attrs->end();
+        bool combineChannels = v.attrs->find("_combineChannels") != v.attrs->end();
 
         /* Consider the attributes in sorted order to get more
            deterministic behaviour in nix-env operations (e.g. when
@@ -180,12 +179,12 @@ static void getDerivations(EvalState & state, Value & vIn,
            precedence). */
         StringSet attrs;
         foreach (Bindings::iterator, i, *v.attrs)
-            attrs.insert(aterm2String(i->first));
+            attrs.insert(i->first);
 
         foreach (StringSet::iterator, i, attrs) {
             startNest(nest, lvlDebug, format("evaluating attribute `%1%'") % *i);
             string pathPrefix2 = addToPath(pathPrefix, *i);
-            Value & v2((*v.attrs)[toATerm(*i)]);
+            Value & v2((*v.attrs)[*i]);
             if (combineChannels)
                 getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done);
             else if (getDerivation(state, v2, pathPrefix2, drvs, done)) {
@@ -194,7 +193,7 @@ static void getDerivations(EvalState & state, Value & vIn,
                    if it has a `recurseForDerivations = true'
                    attribute. */
                 if (v2.type == tAttrs) {
-                    Bindings::iterator j = v2.attrs->find(toATerm("recurseForDerivations"));
+                    Bindings::iterator j = v2.attrs->find("recurseForDerivations");
                     if (j != v2.attrs->end() && state.forceBool(j->second))
                         getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done);
                 }

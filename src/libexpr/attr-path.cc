@@ -1,5 +1,4 @@
 #include "attr-path.hh"
-#include "nixexpr-ast.hh"
 #include "util.hh"
 
 
@@ -7,7 +6,7 @@ namespace nix {
 
 
 void findAlongAttrPath(EvalState & state, const string & attrPath,
-    const Bindings & autoArgs, Expr e, Value & v)
+    const Bindings & autoArgs, Expr * e, Value & v)
 {
     Strings tokens = tokenizeString(attrPath, ".");
 
@@ -46,7 +45,7 @@ void findAlongAttrPath(EvalState & state, const string & attrPath,
                     format("the expression selected by the selection path `%1%' should be an attribute set but is %2%")
                     % curPath % showType(v));
 
-            Bindings::iterator a = v.attrs->find(toATerm(attr));
+            Bindings::iterator a = v.attrs->find(attr);
             if (a == v.attrs->end())
                 throw Error(format("attribute `%1%' in selection path `%2%' not found") % attr % curPath);
             v = a->second;

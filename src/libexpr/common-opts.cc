@@ -20,10 +20,10 @@ bool parseOptionArg(const string & arg, Strings::iterator & i,
     if (i == argsEnd) throw error;
     string value = *i++;
 
-    Value & v(autoArgs[toATerm(name)]);
+    Value & v(autoArgs[name]);
 
     if (arg == "--arg")
-        state.mkThunk_(v, parseExprFromString(state, value, absPath(".")));
+        state.mkThunk_(v, parseExprFromString(value, absPath(".")));
     else
         mkString(v, value);
     

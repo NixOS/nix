@@ -8,9 +8,7 @@
 
 
 %{
-#include "aterm.hh"
 #include "nixexpr.hh"
-#include "nixexpr-ast.hh"
 #define BISON_HEADER_HACK
 #include "parser-tab.hh"
 
@@ -45,8 +43,9 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 }
 
 
-static Expr unescapeStr(const char * s)
+static Expr * unescapeStr(const char * s)
 {
+#if 0
     string t;
     char c;
     while ((c = *s++)) {
@@ -66,6 +65,7 @@ static Expr unescapeStr(const char * s)
         else t += c;
     }
     return makeStr(toATerm(t), ATempty);
+#endif
 }
 
  
@@ -105,7 +105,7 @@ inherit     { return INHERIT; }
 \/\/        { return UPDATE; }
 \+\+        { return CONCAT; }
 
-{ID}        { yylval->t = toATerm(yytext); return ID; /* !!! alloc */ }
+{ID}        { yylval->id = strdup(yytext); return ID; }
 {INT}       { int n = atoi(yytext); /* !!! overflow */
               yylval->n = n;
               return INT;
@@ -117,7 +117,7 @@ inherit     { return INHERIT; }
    shouldn't be followed by a "{".  Right now "$\"" will be consumed
    as part of a string, rather than a "$" followed by the string
    terminator.  Disallow "$\"" for now. */
-              yylval->t = unescapeStr(yytext); /* !!! alloc */ 
+              yylval->e = unescapeStr(yytext);
               return STR;
             }
 <STRING>\$\{  { BEGIN(INITIAL); return DOLLAR_CURLY; }
@@ -126,31 +126,31 @@ inherit     { return INHERIT; }
 
 \'\'(\ *\n)?     { BEGIN(IND_STRING); return IND_STRING_OPEN; }
 <IND_STRING>([^\$\']|\$[^\{\']|\'[^\'\$])+ {
-                   yylval->t = makeIndStr(toATerm(yytext));
+                   //yylval->t = makeIndStr(toATerm(yytext));
                    return IND_STR;
                  }
 <IND_STRING>\'\'\$ {
-                   yylval->t = makeIndStr(toATerm("$"));
+                   //yylval->t = makeIndStr(toATerm("$"));
                    return IND_STR;
                  }
 <IND_STRING>\'\'\' {
-                   yylval->t = makeIndStr(toATerm("''"));
+                   //yylval->t = makeIndStr(toATerm("''"));
                    return IND_STR;
                  }
 <IND_STRING>\'\'\\. {
-                   yylval->t = unescapeStr(yytext + 2);
+                   //yylval->t = unescapeStr(yytext + 2);
                    return IND_STR;
                  }
 <IND_STRING>\$\{ { BEGIN(INITIAL); return DOLLAR_CURLY; }
 <IND_STRING>\'\' { BEGIN(INITIAL); return IND_STRING_CLOSE; }
 <IND_STRING>\'   {
-                   yylval->t = makeIndStr(toATerm("'"));
+                   //yylval->t = makeIndStr(toATerm("'"));
                    return IND_STR;
                  }
 <IND_STRING>.    return yytext[0]; /* just in case: shouldn't be reached */
 
-{PATH}      { yylval->t = toATerm(yytext); return PATH; /* !!! alloc */ }
-{URI}       { yylval->t = toATerm(yytext); return URI; /* !!! alloc */ }
+{PATH}      { yylval->path = strdup(yytext); return PATH; }
+{URI}       { yylval->uri = strdup(yytext); return URI; }
 
 [ \t\r\n]+    /* eat up whitespace */
 \#[^\r\n]*    /* single-line comments */

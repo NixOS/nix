@@ -1,17 +1,94 @@
 #include "nixexpr.hh"
 #include "derivations.hh"
 #include "util.hh"
-#include "aterm.hh"
-
-#include "nixexpr-ast.hh"
-#include "nixexpr-ast.cc"
 
 #include <cstdlib>
 
 
 namespace nix {
-    
 
+
+std::ostream & operator << (std::ostream & str, Expr & e)
+{
+    e.show(str);
+    return str;
+}
+
+
+void ExprInt::show(std::ostream & str)
+{
+    str << n;
+}
+
+void ExprString::show(std::ostream & str)
+{
+    str << "\"" << s << "\""; // !!! escaping
+}
+
+void ExprPath::show(std::ostream & str)
+{
+    str << s;
+}
+
+void ExprVar::show(std::ostream & str)
+{
+    str << name;
+}
+
+void ExprSelect::show(std::ostream & str)
+{
+    str << "(" << *e << ")." << name;
+}
+
+void ExprAttrs::show(std::ostream & str)
+{
+    if (recursive) str << "rec ";
+    str << "{ ";
+    foreach (list<string>::iterator, i, inherited)
+        str << "inherited " << *i << "; ";
+    foreach (Attrs::iterator, i, attrs)
+        str << i->first << " = " << *i->second << "; ";
+    str << "}";
+}
+
+void ExprList::show(std::ostream & str)
+{
+    str << "[ ";
+    foreach (vector<Expr *>::iterator, i, elems)
+        str << "(" << **i << ") ";
+    str << "]";
+}
+
+void ExprLambda::show(std::ostream & str)
+{
+    str << "(";
+    if (matchAttrs) {
+        str << "{ ";
+        bool first = true;
+        foreach (Formals::Formals_::iterator, i, formals->formals) {
+            if (first) first = false; else str << ", ";
+            str << i->name;
+            if (i->def) str << " ? " << *i->def;
+        }
+        str << " }";
+        if (arg != "") str << " @ ";
+    }
+    if (arg != "") str << arg;
+    str << ": " << *body << ")";
+}
+
+void ExprWith::show(std::ostream & str)
+{
+    str << "with " << *attrs << "; " << *body;
+}
+
+void ExprIf::show(std::ostream & str)
+{
+    str << "if " << *cond << " then " << *then << " else " << *else_;
+}
+
+
+#if 0
 string showPos(ATerm pos)
 {
     ATerm path;
@@ -159,28 +236,7 @@ void checkVarDefs(const ATermMap & defs, Expr e)
     set<Expr> done;
     checkVarDefs2(done, defs, e);
 }
-
-
-bool matchStr(Expr e, string & s, PathSet & context)
-{
-    ATermList l;
-    ATerm s_;
-
-    if (!matchStr(e, s_, l)) return false;
-
-    s = aterm2String(s_);
-
-    for (ATermIterator i(l); i; ++i)
-        context.insert(aterm2String(*i));
-
-    return true;
-}
-
-
-Expr makeStr(const string & s, const PathSet & context)
-{
-    return makeStr(toATerm(s), toATermList(context));
-}
+#endif
 
 
 }

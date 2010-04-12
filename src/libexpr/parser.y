@@ -23,12 +23,11 @@
 #include "aterm.hh"
 #include "util.hh"
     
+#include "nixexpr.hh"
+
 #include "parser-tab.hh"
 #include "lexer-tab.hh"
 #define YYSTYPE YYSTYPE // workaround a bug in Bison 2.4
-
-#include "nixexpr.hh"
-#include "nixexpr-ast.hh"
 
 
 using namespace nix;
@@ -39,13 +38,14 @@ namespace nix {
     
 struct ParseData 
 {
-    Expr result;
+    Expr * result;
     Path basePath;
     Path path;
     string error;
 };
- 
 
+
+#if 0
 static string showAttrPath(ATermList attrPath)
 {
     string s;
@@ -79,10 +79,12 @@ static ATermList buildAttrs(const Tree & t, ATermList & nonrec)
                 : makeBind(i->first, makeAttrs(buildAttrs(i->second, nonrec)), makeNoPos()));
     return res;
 }
+#endif
  
 
-static Expr fixAttrs(bool recursive, ATermList as)
+static void fixAttrs(ExprAttrs & attrs)
 {
+#if 0
     Tree attrs;
 
     /* This ATermMap is needed to ensure that the `leaf' fields in the
@@ -135,9 +137,11 @@ static Expr fixAttrs(bool recursive, ATermList as)
     ATermList rec = buildAttrs(attrs, nonrec);
         
     return recursive ? makeRec(rec, nonrec) : makeAttrs(rec);
+#endif
 }
 
 
+#if 0
 static void checkPatternVars(ATerm pos, ATermMap & map, Pattern pat)
 {
     ATerm name = sNoAlias;
@@ -261,6 +265,7 @@ static Expr stripIndentation(ATermList es)
 
     return makeConcatStrings(ATreverse(es2));
 }
+#endif
 
 
 void backToString(yyscan_t scanner);
@@ -269,8 +274,11 @@ void backToIndString(yyscan_t scanner);
 
 static Pos makeCurPos(YYLTYPE * loc, ParseData * data)
 {
-    return makePos(toATerm(data->path),
-        loc->first_line, loc->first_column);
+    Pos pos;
+    pos.file = data->path;
+    pos.line = loc->first_line;
+    pos.column = loc->first_column;
+    return pos;
 }
 
 #define CUR_POS makeCurPos(yylocp, data)
@@ -311,22 +319,31 @@ static void freeAndUnprotect(void * p)
 %}
 
 %union {
-  ATerm t;
-  ATermList ts;
-  struct {
-    ATermList formals;
-    bool ellipsis;
-  } formals;
+  nix::Expr * e;
+  nix::ExprList * list;
+  nix::ExprAttrs * attrs;
+  nix::Formals * formals;
+  nix::Formal * formal;
   int n;
+  char * id;
+  char * path;
+  char * uri;
+  std::list<std::string> * ids;
 }
 
-%type <t> start expr expr_function expr_if expr_op
-%type <t> expr_app expr_select expr_simple bind inheritsrc formal
-%type <t> pattern
-%type <ts> binds ids attrpath expr_list string_parts ind_string_parts
+%type <e> start expr expr_function expr_if expr_op
+%type <e> expr_app expr_select expr_simple
+%type <list> expr_list
+%type <attrs> binds
+%type <ts> attrpath string_parts ind_string_parts
 %type <formals> formals
-%token <t> ID STR IND_STR PATH URI
+%type <formal> formal
+%type <ids> ids
+%token <id> ID ATTRPATH
+%token <t> STR IND_STR
 %token <n> INT
+%token <path> PATH
+%token <uri> URI
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL
 %token DOLLAR_CURLY /* == ${ */
 %token IND_STRING_OPEN IND_STRING_CLOSE
@@ -350,54 +367,63 @@ start: expr { data->result = $1; };
 expr: expr_function;
 
 expr_function
-  : pattern ':' expr_function
-    { checkPatternVars(CUR_POS, $1); $$ = makeFunction($1, $3, CUR_POS); }
-  | ASSERT expr ';' expr_function
+  : ID ':' expr_function
+    { $$ = new ExprLambda(CUR_POS, $1, false, 0, $3); /* checkPatternVars(CUR_POS, $1); $$ = makeFunction($1, $3, CUR_POS); */ }
+  | '{' formals '}' ':' expr_function
+    { $$ = new ExprLambda(CUR_POS, "", true, $2, $5); }
+  | '{' formals '}' '@' ID ':' expr_function
+    { $$ = new ExprLambda(CUR_POS, $5, true, $2, $7); }
+  | ID '@' '{' formals '}' ':' expr_function
+    { $$ = new ExprLambda(CUR_POS, $1, true, $4, $7); }
+  /* | ASSERT expr ';' expr_function
     { $$ = makeAssert($2, $4, CUR_POS); }
+    */
   | WITH expr ';' expr_function
-    { $$ = makeWith($2, $4, CUR_POS); }
+    { $$ = new ExprWith(CUR_POS, $2, $4); }
   | LET binds IN expr_function
-    { $$ = makeSelect(fixAttrs(true, ATinsert($2, makeBindAttrPath(ATmakeList1(toATerm("<let-body>")), $4, CUR_POS))), toATerm("<let-body>")); }
+    { $2->attrs["<let-body>"] = $4; $2->recursive = true; fixAttrs(*$2); $$ = new ExprSelect($2, "<let-body>"); }
   | expr_if
   ;
 
 expr_if
-  : IF expr THEN expr ELSE expr
-    { $$ = makeIf($2, $4, $6); }
+  : IF expr THEN expr ELSE expr { $$ = new ExprIf($2, $4, $6); }
   | expr_op
   ;
 
 expr_op
-  : '!' expr_op %prec NEG { $$ = makeOpNot($2); }
-  | expr_op EQ expr_op { $$ = makeOpEq($1, $3); }
-  | expr_op NEQ expr_op { $$ = makeOpNEq($1, $3); }
-  | expr_op AND expr_op { $$ = makeOpAnd($1, $3); }
-  | expr_op OR expr_op { $$ = makeOpOr($1, $3); }
-  | expr_op IMPL expr_op { $$ = makeOpImpl($1, $3); }
-  | expr_op UPDATE expr_op { $$ = makeOpUpdate($1, $3); }
+  : /* '!' expr_op %prec NEG { $$ = makeOpNot($2); }
+       | */
+    expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
+  | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
+  | expr_op AND expr_op { $$ = new ExprOpAnd($1, $3); }
+  | expr_op OR expr_op { $$ = new ExprOpOr($1, $3); }
+  | expr_op IMPL expr_op { $$ = new ExprOpImpl($1, $3); }
+  | expr_op UPDATE expr_op { $$ = new ExprOpUpdate($1, $3); }
+  /*
   | expr_op '?' ID { $$ = makeOpHasAttr($1, $3); }
-  | expr_op '+' expr_op { $$ = makeConcatStrings(ATmakeList2($1, $3)); }
-  | expr_op CONCAT expr_op { $$ = makeOpConcat($1, $3); }
+  */
+  | expr_op '+' expr_op { $$ = new ExprOpConcatStrings($1, $3); }
+  | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists($1, $3); }
   | expr_app
   ;
 
 expr_app
   : expr_app expr_select
-    { $$ = makeCall($1, $2); }
+    { $$ = new ExprApp($1, $2); }
   | expr_select { $$ = $1; }
   ;
 
 expr_select
   : expr_select '.' ID
-    { $$ = makeSelect($1, $3); }
+    { $$ = new ExprSelect($1, $3); }
   | expr_simple { $$ = $1; }
   ;
 
 expr_simple
-  : ID { $$ = makeVar($1); }
-  | INT { $$ = makeInt($1); }
+  : ID { $$ = new ExprVar($1); }
+  | INT { $$ = new ExprInt($1); } /*
   | '"' string_parts '"' {
-      /* For efficiency, and to simplify parse trees a bit. */
+      /* For efficiency, and to simplify parse trees a bit. * /
       if ($2 == ATempty) $$ = makeStr(toATerm(""), ATempty);
       else if (ATgetNext($2) == ATempty) $$ = ATgetFirst($2);
       else $$ = makeConcatStrings(ATreverse($2));
@@ -405,18 +431,21 @@ expr_simple
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = stripIndentation(ATreverse($2));
   }
-  | PATH { $$ = makePath(toATerm(absPath(aterm2String($1), data->basePath))); }
-  | URI { $$ = makeStr($1, ATempty); }
+                                  */
+  | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
+  | URI { $$ = new ExprString($1); }
   | '(' expr ')' { $$ = $2; }
+/*
   /* Let expressions `let {..., body = ...}' are just desugared
-     into `(rec {..., body = ...}).body'. */
+     into `(rec {..., body = ...}).body'. * /
   | LET '{' binds '}'
     { $$ = makeSelect(fixAttrs(true, $3), toATerm("body")); }
+  */
   | REC '{' binds '}'
-    { $$ = fixAttrs(true, $3); }
+    { fixAttrs(*$3); $3->recursive = true; $$ = $3; }
   | '{' binds '}'
-    { $$ = fixAttrs(false, $2); }
-  | '[' expr_list ']' { $$ = makeList(ATreverse($2)); }
+    { fixAttrs(*$2); $$ = $2; }
+  | '[' expr_list ']' { $$ = $2; }
   ;
 
 string_parts
@@ -431,31 +460,26 @@ ind_string_parts
   | { $$ = ATempty; }
   ;
 
-pattern
-  : ID { $$ = makeVarPat($1); }
-  | '{' formals '}' { $$ = makeAttrsPat($2.formals, $2.ellipsis ? eTrue : eFalse, sNoAlias); }
-  | '{' formals '}' '@' ID { $$ = makeAttrsPat($2.formals, $2.ellipsis ? eTrue : eFalse, $5); }
-  | ID '@' '{' formals '}' { $$ = makeAttrsPat($4.formals, $4.ellipsis ? eTrue : eFalse, $1); }
-  ;
-
 binds
-  : binds bind { $$ = ATinsert($1, $2); }
-  | { $$ = ATempty; }
+  : binds ID '=' expr ';' { $$ = $1; $$->attrs[$2] = $4; }
+  | binds INHERIT ids ';'
+    { $$ = $1;
+      foreach (list<string>::iterator, i, *$3)
+        $$->inherited.push_back(*i);
+    }
+  | binds INHERIT '(' expr ')' ids ';'
+    { $$ = $1;
+      /* !!! Should ensure sharing of the expression in $4. */
+      foreach (list<string>::iterator, i, *$6)
+        $$->attrs[*i] = new ExprSelect($4, *i);
+    }
+  | { $$ = new ExprAttrs; }
   ;
 
-bind
-  : attrpath '=' expr ';'
-    { $$ = makeBindAttrPath(ATreverse($1), $3, CUR_POS); }
-  | INHERIT inheritsrc ids ';'
-    { $$ = makeInherit($2, $3, CUR_POS); }
+ids
+  : ids ID { $$ = $1; $1->push_back($2); /* !!! dangerous */ }
+  | { $$ = new list<string>; }
   ;
-
-inheritsrc
-  : '(' expr ')' { $$ = $2; }
-  | { $$ = makeScope(); }
-  ;
-
-ids: ids ID { $$ = ATinsert($1, $2); } | { $$ = ATempty; };
 
 attrpath
   : attrpath '.' ID { $$ = ATinsert($1, $3); }
@@ -463,30 +487,28 @@ attrpath
   ;
 
 expr_list
-  : expr_list expr_select { $$ = ATinsert($1, $2); }
-  | { $$ = ATempty; }
+  : expr_list expr_select { $$ = $1; $1->elems.push_back($2); /* !!! dangerous */ }
+  | { $$ = new ExprList; }
   ;
 
 formals
-  : formal ',' formals /* !!! right recursive */
-    { $$.formals = ATinsert($3.formals, $1); $$.ellipsis = $3.ellipsis; }
+  : formal ',' formals
+    { $$ = $3; $$->formals.push_front(*$1); /* !!! dangerous */ }
   | formal
-    { $$.formals = ATinsert(ATempty, $1); $$.ellipsis = false; }
+    { $$ = new Formals; $$->formals.push_back(*$1); $$->ellipsis = false; }
   |
-    { $$.formals = ATempty; $$.ellipsis = false; }
+    { $$ = new Formals; $$->ellipsis = false; }
   | ELLIPSIS
-    { $$.formals = ATempty; $$.ellipsis = true; }
+    { $$ = new Formals; $$->ellipsis = true; }
   ;
 
 formal
-  : ID { $$ = makeFormal($1, makeNoDefaultValue()); }
-  | ID '?' expr { $$ = makeFormal($1, makeDefaultValue($3)); }
+  : ID { $$ = new Formal($1, 0); }
+  | ID '?' expr { $$ = new Formal($1, $3); }
   ;
   
 %%
 
-
-#include "eval.hh"  
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -497,9 +519,7 @@ formal
 namespace nix {
       
 
-static Expr parse(EvalState & state,
-    const char * text, const Path & path,
-    const Path & basePath)
+static Expr * parse(const char * text, const Path & path, const Path & basePath)
 {
     yyscan_t scanner;
     ParseData data;
@@ -523,7 +543,7 @@ static Expr parse(EvalState & state,
 }
 
 
-Expr parseExprFromFile(EvalState & state, Path path)
+Expr * parseExprFromFile(Path path)
 {
     assert(path[0] == '/');
 
@@ -544,14 +564,13 @@ Expr parseExprFromFile(EvalState & state, Path path)
         path = canonPath(path + "/default.nix");
 
     /* Read and parse the input file. */
-    return parse(state, readFile(path).c_str(), path, dirOf(path));
+    return parse(readFile(path).c_str(), path, dirOf(path));
 }
 
 
-Expr parseExprFromString(EvalState & state,
-    const string & s, const Path & basePath)
+Expr * parseExprFromString(const string & s, const Path & basePath)
 {
-    return parse(state, s.c_str(), "(string)", basePath);
+    return parse(s.c_str(), "(string)", basePath);
 }
 
  
