@@ -2,6 +2,7 @@
 #define __SYMBOL_TABLE_H
 
 #include <map>
+#include <tr1/unordered_set>
 
 #include "types.hh"
 
@@ -59,7 +60,7 @@ inline std::ostream & operator << (std::ostream & str, const Symbol & sym)
 class SymbolTable
 {
 private:
-    typedef std::set<string> Symbols;
+    typedef std::tr1::unordered_set<string> Symbols;
     Symbols symbols;
 
 public:
@@ -67,6 +68,11 @@ public:
     {
         std::pair<Symbols::iterator, bool> res = symbols.insert(s);
         return Symbol(&*res.first);
+    }
+
+    unsigned int size() const
+    {
+        return symbols.size();
     }
 };
 

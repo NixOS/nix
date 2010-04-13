@@ -1058,6 +1058,7 @@ void EvalState::printStats()
     printMsg(v, format("  stack space per eval() level: %1% bytes") % ((&x - deepestStack) / (float) maxRecursionDepth));
     printMsg(v, format("  values allocated: %1%") % nrValues);
     printMsg(v, format("  environments allocated: %1%") % nrEnvs);
+    printMsg(v, format("  symbols in symbol table: %1%") % symbols.size());
 }
 
 
