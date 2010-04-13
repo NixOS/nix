@@ -456,6 +456,31 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 }
 
 
+void ExprLet::eval(EvalState & state, Env & env, Value & v)
+{
+    /* Create a new environment that contains the attributes in this
+       `let'. */
+    Env & env2(state.allocEnv());
+    env2.up = &env;
+        
+    /* The recursive attributes are evaluated in the new
+       environment. */
+    foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs) {
+        Value & v2 = env2.bindings[i->first];
+        mkThunk(v2, env2, i->second);
+    }
+
+    /* The inherited attributes, on the other hand, are evaluated in
+       the original environment. */
+    foreach (list<Symbol>::iterator, i, attrs->inherited) {
+        Value & v2 = env2.bindings[*i];
+        mkCopy(v2, *state.lookupVar(&env, *i));
+    }
+
+    state.eval(env2, body, v);
+}
+
+
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkList(v, elems.size());

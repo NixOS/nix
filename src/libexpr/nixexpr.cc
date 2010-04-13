@@ -87,6 +87,16 @@ void ExprLambda::show(std::ostream & str)
     str << ": " << *body << ")";
 }
 
+void ExprLet::show(std::ostream & str)
+{
+    str << "let ";
+    foreach (list<Symbol>::iterator, i, attrs->inherited)
+        str << "inherit " << *i << "; ";
+    foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
+        str << i->first << " = " << *i->second << "; ";
+    str << "in " << *body;
+}
+
 void ExprWith::show(std::ostream & str)
 {
     str << "with " << *attrs << "; " << *body;

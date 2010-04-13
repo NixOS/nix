@@ -244,6 +244,7 @@ private:
 
     friend class ExprVar;
     friend class ExprAttrs;
+    friend class ExprLet;
 
 public:
     

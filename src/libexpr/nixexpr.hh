@@ -139,6 +139,14 @@ struct ExprLambda : Expr
     COMMON_METHODS
 };
 
+struct ExprLet : Expr
+{
+    ExprAttrs * attrs;
+    Expr * body;
+    ExprLet(ExprAttrs * attrs, Expr * body) : attrs(attrs), body(body) { };
+    COMMON_METHODS
+};
+
 struct ExprWith : Expr
 {
     Pos pos;

@@ -306,7 +306,7 @@ expr_function
   | WITH expr ';' expr_function
     { $$ = new ExprWith(CUR_POS, $2, $4); }
   | LET binds IN expr_function
-    { $2->attrs[data->sLetBody] = $4; $2->recursive = true; $$ = new ExprSelect($2, data->sLetBody); }
+    { $$ = new ExprLet($2, $4); }
   | expr_if
   ;
 
