@@ -9,10 +9,10 @@ namespace nix {
 
 /* Parse a Nix expression from the specified file.  If `path' refers
    to a directory, then "/default.nix" is appended. */
-Expr * parseExprFromFile(Path path);
+Expr * parseExprFromFile(EvalState & state, Path path);
 
 /* Parse a Nix expression from the specified string. */
-Expr * parseExprFromString(const string & s, const Path & basePath);
+Expr * parseExprFromString(EvalState & state, const string & s, const Path & basePath);
 
 
 }

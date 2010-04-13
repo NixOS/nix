@@ -37,17 +37,23 @@ namespace nix {
     
 struct ParseData 
 {
+    SymbolTable & symbols;
     Expr * result;
     Path basePath;
     Path path;
     string error;
+    Symbol sLetBody;
+    ParseData(SymbolTable & symbols)
+        : symbols(symbols)
+        , sLetBody(symbols.create("<let-body>"))
+    { };
 };
 
 
-static string showAttrPath(const vector<string> & attrPath)
+static string showAttrPath(const vector<Symbol> & attrPath)
 {
     string s;
-    foreach (vector<string>::const_iterator, i, attrPath) {
+    foreach (vector<Symbol>::const_iterator, i, attrPath) {
         if (!s.empty()) s += '.';
         s += *i;
     }
@@ -55,10 +61,11 @@ static string showAttrPath(const vector<string> & attrPath)
 }
  
 
-static void addAttr(ExprAttrs * attrs, const vector<string> & attrPath, Expr * e, const Pos & pos)
+static void addAttr(ExprAttrs * attrs, const vector<Symbol> & attrPath,
+    Expr * e, const Pos & pos)
 {
     unsigned int n = 0;
-    foreach (vector<string>::const_iterator, i, attrPath) {
+    foreach (vector<Symbol>::const_iterator, i, attrPath) {
         n++;
         if (attrs->attrs[*i]) {
             ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(attrs->attrs[*i]);
@@ -243,10 +250,10 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   nix::Formals * formals;
   nix::Formal * formal;
   int n;
-  char * id;
+  char * id; // !!! -> Symbol
   char * path;
   char * uri;
-  std::vector<std::string> * ids;
+  std::vector<nix::Symbol> * ids;
   std::vector<nix::Expr *> * string_parts;
 }
 
@@ -287,19 +294,19 @@ expr: expr_function;
 
 expr_function
   : ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, $1, false, 0, $3); /* checkPatternVars(CUR_POS, $1); $$ = makeFunction($1, $3, CUR_POS); */ }
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), false, 0, $3); /* checkPatternVars(CUR_POS, $1); */ }
   | '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, "", true, $2, $5); }
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create(""), true, $2, $5); }
   | '{' formals '}' '@' ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, $5, true, $2, $7); }
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create($5), true, $2, $7); }
   | ID '@' '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, $1, true, $4, $7); }
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), true, $4, $7); }
   | ASSERT expr ';' expr_function
     { $$ = new ExprAssert(CUR_POS, $2, $4); }
   | WITH expr ';' expr_function
     { $$ = new ExprWith(CUR_POS, $2, $4); }
   | LET binds IN expr_function
-    { $2->attrs["<let-body>"] = $4; $2->recursive = true; $$ = new ExprSelect($2, "<let-body>"); }
+    { $2->attrs[data->sLetBody] = $4; $2->recursive = true; $$ = new ExprSelect($2, data->sLetBody); }
   | expr_if
   ;
 
@@ -316,7 +323,7 @@ expr_op
   | expr_op OR expr_op { $$ = new ExprOpOr($1, $3); }
   | expr_op IMPL expr_op { $$ = new ExprOpImpl($1, $3); }
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate($1, $3); }
-  | expr_op '?' ID { $$ = new ExprOpHasAttr($1, $3); }
+  | expr_op '?' ID { $$ = new ExprOpHasAttr($1, data->symbols.create($3)); }
   | expr_op '+' expr_op
     { vector<Expr *> * l = new vector<Expr *>;
       l->push_back($1);
@@ -335,12 +342,12 @@ expr_app
 
 expr_select
   : expr_select '.' ID
-    { $$ = new ExprSelect($1, $3); }
+    { $$ = new ExprSelect($1, data->symbols.create($3)); }
   | expr_simple { $$ = $1; }
   ;
 
 expr_simple
-  : ID { $$ = new ExprVar($1); }
+  : ID { $$ = new ExprVar(data->symbols.create($1)); }
   | INT { $$ = new ExprInt($1); }
   | '"' string_parts '"' {
       /* For efficiency, and to simplify parse trees a bit. */
@@ -357,7 +364,7 @@ expr_simple
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { $3->recursive = true; $$ = new ExprSelect($3, "body"); }
+    { $3->recursive = true; $$ = new ExprSelect($3, data->symbols.create("body")); }
   | REC '{' binds '}'
     { $3->recursive = true; $$ = $3; }
   | '{' binds '}'
@@ -381,26 +388,26 @@ binds
   : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, *$2, $4, CUR_POS); }
   | binds INHERIT ids ';'
     { $$ = $1;
-      foreach (vector<string>::iterator, i, *$3)
+      foreach (vector<Symbol>::iterator, i, *$3)
         $$->inherited.push_back(*i);
     }
   | binds INHERIT '(' expr ')' ids ';'
     { $$ = $1;
       /* !!! Should ensure sharing of the expression in $4. */
-      foreach (vector<string>::iterator, i, *$6)
+      foreach (vector<Symbol>::iterator, i, *$6)
         $$->attrs[*i] = new ExprSelect($4, *i);
     }
   | { $$ = new ExprAttrs; }
   ;
 
 ids
-  : ids ID { $$ = $1; $1->push_back($2); /* !!! dangerous */ }
-  | { $$ = new vector<string>; }
+  : ids ID { $$ = $1; $1->push_back(data->symbols.create($2)); /* !!! dangerous */ }
+  | { $$ = new vector<Symbol>; }
   ;
 
 attrpath
-  : attrpath '.' ID { $$ = $1; $1->push_back($3); }
-  | ID { $$ = new vector<string>; $$->push_back($1); }
+  : attrpath '.' ID { $$ = $1; $1->push_back(data->symbols.create($3)); }
+  | ID { $$ = new vector<Symbol>; $$->push_back(data->symbols.create($1)); }
   ;
 
 expr_list
@@ -420,8 +427,8 @@ formals
   ;
 
 formal
-  : ID { $$ = new Formal($1, 0); }
-  | ID '?' expr { $$ = new Formal($1, $3); }
+  : ID { $$ = new Formal(data->symbols.create($1), 0); }
+  | ID '?' expr { $$ = new Formal(data->symbols.create($1), $3); }
   ;
   
 %%
@@ -432,14 +439,17 @@ formal
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <eval.hh>
+
 
 namespace nix {
       
 
-static Expr * parse(const char * text, const Path & path, const Path & basePath)
+static Expr * parse(EvalState & state, const char * text,
+    const Path & path, const Path & basePath)
 {
     yyscan_t scanner;
-    ParseData data;
+    ParseData data(state.symbols);
     data.basePath = basePath;
     data.path = path;
 
@@ -460,7 +470,7 @@ static Expr * parse(const char * text, const Path & path, const Path & basePath)
 }
 
 
-Expr * parseExprFromFile(Path path)
+Expr * parseExprFromFile(EvalState & state, Path path)
 {
     assert(path[0] == '/');
 
@@ -481,13 +491,14 @@ Expr * parseExprFromFile(Path path)
         path = canonPath(path + "/default.nix");
 
     /* Read and parse the input file. */
-    return parse(readFile(path).c_str(), path, dirOf(path));
+    return parse(state, readFile(path).c_str(), path, dirOf(path));
 }
 
 
-Expr * parseExprFromString(const string & s, const Path & basePath)
+Expr * parseExprFromString(EvalState & state,
+    const string & s, const Path & basePath)
 {
-    return parse(s.c_str(), "(string)", basePath);
+    return parse(state, s.c_str(), "(string)", basePath);
 }
 
  

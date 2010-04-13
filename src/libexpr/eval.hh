@@ -4,6 +4,7 @@
 #include <map>
 
 #include "nixexpr.hh"
+#include "symbol-table.hh"
 
 
 namespace nix {
@@ -14,9 +15,7 @@ class EvalState;
 struct Env;
 struct Value;
 
-typedef string Sym;
-
-typedef std::map<Sym, Value> Bindings;
+typedef std::map<Symbol, Value> Bindings;
 
 
 struct Env
@@ -161,6 +160,10 @@ class EvalState
 public:
     DrvHashes drvHashes; /* normalised derivation hashes */
 
+    SymbolTable symbols;
+
+    const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName;
+
 private:
     SrcToStore srcToStore; 
 
@@ -234,6 +237,13 @@ private:
 
     void addPrimOp(const string & name,
         unsigned int arity, PrimOp primOp);
+
+    Value * lookupVar(Env * env, const Symbol & name);
+    
+    Value * lookupWith(Env * env, const Symbol & name);
+
+    friend class ExprVar;
+    friend class ExprAttrs;
 
 public:
     

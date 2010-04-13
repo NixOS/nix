@@ -54,7 +54,7 @@ void ExprAttrs::show(std::ostream & str)
 {
     if (recursive) str << "rec ";
     str << "{ ";
-    foreach (list<string>::iterator, i, inherited)
+    foreach (list<Symbol>::iterator, i, inherited)
         str << "inherit " << *i << "; ";
     foreach (Attrs::iterator, i, attrs)
         str << i->first << " = " << *i->second << "; ";
@@ -81,9 +81,9 @@ void ExprLambda::show(std::ostream & str)
             if (i->def) str << " ? " << *i->def;
         }
         str << " }";
-        if (arg != "") str << " @ ";
+        if (!arg.empty()) str << " @ ";
     }
-    if (arg != "") str << arg;
+    if (!arg.empty()) str << arg;
     str << ": " << *body << ")";
 }
 

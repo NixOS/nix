@@ -45,7 +45,7 @@ void findAlongAttrPath(EvalState & state, const string & attrPath,
                     format("the expression selected by the selection path `%1%' should be an attribute set but is %2%")
                     % curPath % showType(v));
 
-            Bindings::iterator a = v.attrs->find(attr);
+            Bindings::iterator a = v.attrs->find(state.symbols.create(attr));
             if (a == v.attrs->end())
                 throw Error(format("attribute `%1%' in selection path `%2%' not found") % attr % curPath);
             v = a->second;

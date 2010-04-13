@@ -280,7 +280,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     state.forceAttrs(*args[0]);
 
     /* Figure out the name first (for stack backtraces). */
-    Bindings::iterator attr = args[0]->attrs->find("name");
+    Bindings::iterator attr = args[0]->attrs->find(state.sName);
     if (attr == args[0]->attrs->end())
         throw EvalError("required attribute `name' missing");
     string drvName;
@@ -448,8 +448,8 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
 
     /* !!! assumes a single output */
     state.mkAttrs(v);
-    mkString((*v.attrs)["outPath"], outPath, singleton<PathSet>(drvPath));
-    mkString((*v.attrs)["drvPath"], drvPath, singleton<PathSet>("=" + drvPath));
+    mkString((*v.attrs)[state.sOutPath], outPath, singleton<PathSet>(drvPath));
+    mkString((*v.attrs)[state.sDrvPath], drvPath, singleton<PathSet>("=" + drvPath));
 }
 
 
@@ -667,7 +667,8 @@ static void prim_getAttr(EvalState & state, Value * * args, Value & v)
 {
     string attr = state.forceStringNoCtx(*args[0]);
     state.forceAttrs(*args[1]);
-    Bindings::iterator i = args[1]->attrs->find(attr);
+    // !!! Should we create a symbol here or just do a lookup?
+    Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
     if (i == args[1]->attrs->end())
         throw EvalError(format("attribute `%1%' missing") % attr);
     state.forceValue(i->second);
@@ -680,7 +681,7 @@ static void prim_hasAttr(EvalState & state, Value * * args, Value & v)
 {
     string attr = state.forceStringNoCtx(*args[0]);
     state.forceAttrs(*args[1]);
-    mkBool(v, args[1]->attrs->find(attr) != args[1]->attrs->end());
+    mkBool(v, args[1]->attrs->find(state.symbols.create(attr)) != args[1]->attrs->end());
 }
 
 
@@ -701,7 +702,7 @@ static void prim_removeAttrs(EvalState & state, Value * * args, Value & v)
 
     for (unsigned int i = 0; i < args[1]->list.length; ++i) {
         state.forceStringNoCtx(args[1]->list.elems[i]);
-        v.attrs->erase(args[1]->list.elems[i].string.s);
+        v.attrs->erase(state.symbols.create(args[1]->list.elems[i].string.s));
     }
 }
 
@@ -720,16 +721,16 @@ static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
         Value & v2(args[0]->list.elems[i]);
         state.forceAttrs(v2);
         
-        Bindings::iterator j = v2.attrs->find("name");
+        Bindings::iterator j = v2.attrs->find(state.sName);
         if (j == v2.attrs->end())
             throw TypeError("`name' attribute missing in a call to `listToAttrs'");
         string name = state.forceStringNoCtx(j->second);
         
-        j = v2.attrs->find("value");
+        j = v2.attrs->find(state.symbols.create("value"));
         if (j == v2.attrs->end())
             throw TypeError("`value' attribute missing in a call to `listToAttrs'");
 
-        (*v.attrs)[name] = j->second; // !!! sharing?
+        (*v.attrs)[state.symbols.create(name)] = j->second; // !!! sharing?
     }
 }
 
@@ -976,8 +977,8 @@ static void prim_parseDrvName(EvalState & state, Value * * args, Value & v)
     string name = state.forceStringNoCtx(*args[0]);
     DrvName parsed(name);
     state.mkAttrs(v);
-    mkString((*v.attrs)["name"], parsed.name);
-    mkString((*v.attrs)["version"], parsed.version);
+    mkString((*v.attrs)[state.sName], parsed.name);
+    mkString((*v.attrs)[state.symbols.create("version")], parsed.version);
 }
 
 
@@ -998,7 +999,7 @@ void EvalState::createBaseEnv()
 {
     baseEnv.up = 0;
 
-    Value & builtins = baseEnv.bindings["builtins"];
+    Value & builtins = baseEnv.bindings[symbols.create("builtins")];
     builtins.type = tAttrs;
     builtins.attrs = new Bindings;
 
@@ -1023,7 +1024,7 @@ void EvalState::createBaseEnv()
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
     string s = "attrs: let res = derivationStrict attrs; in attrs // { drvPath = res.drvPath; outPath = res.outPath; type = \"derivation\"; }";
-    mkThunk(v, baseEnv, parseExprFromString(s, "/"));
+    mkThunk(v, baseEnv, parseExprFromString(*this, s, "/"));
     addConstant("derivation", v);
 
     // Miscellaneous

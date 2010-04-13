@@ -3,7 +3,7 @@
 
 #include <map>
 
-#include "types.hh"
+#include "symbol-table.hh"
 
 
 namespace nix {
@@ -75,33 +75,33 @@ struct ExprPath : Expr
 
 struct ExprVar : Expr
 {
-    string name;
-    ExprVar(const string & name) : name(name) { };
+    Symbol name;
+    ExprVar(const Symbol & name) : name(name) { };
     COMMON_METHODS
 };
 
 struct ExprSelect : Expr
 {
     Expr * e;
-    string name;
-    ExprSelect(Expr * e, const string & name) : e(e), name(name) { };
+    Symbol name;
+    ExprSelect(Expr * e, const Symbol & name) : e(e), name(name) { };
     COMMON_METHODS
 };
 
 struct ExprOpHasAttr : Expr
 {
     Expr * e;
-    string name;
-    ExprOpHasAttr(Expr * e, const string & name) : e(e), name(name) { };
+    Symbol name;
+    ExprOpHasAttr(Expr * e, const Symbol & name) : e(e), name(name) { };
     COMMON_METHODS
 };
 
 struct ExprAttrs : Expr
 {
     bool recursive;
-    typedef std::map<string, Expr *> Attrs;
+    typedef std::map<Symbol, Expr *> Attrs;
     Attrs attrs;
-    list<string> inherited;
+    list<Symbol> inherited;
     ExprAttrs() : recursive(false) { };
     COMMON_METHODS
 };
@@ -115,9 +115,9 @@ struct ExprList : Expr
 
 struct Formal
 {
-    string name;
+    Symbol name;
     Expr * def;
-    Formal(const string & name, Expr * def) : name(name), def(def) { };
+    Formal(const Symbol & name, Expr * def) : name(name), def(def) { };
 };
 
 struct Formals
@@ -130,11 +130,11 @@ struct Formals
 struct ExprLambda : Expr
 {
     Pos pos;
-    string arg;
+    Symbol arg;
     bool matchAttrs;
     Formals * formals;
     Expr * body;
-    ExprLambda(const Pos & pos, const string & arg, bool matchAttrs, Formals * formals, Expr * body)
+    ExprLambda(const Pos & pos, const Symbol & arg, bool matchAttrs, Formals * formals, Expr * body)
         : pos(pos), arg(arg), matchAttrs(matchAttrs), formals(formals), body(body) { };
     COMMON_METHODS
 };

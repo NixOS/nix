@@ -28,7 +28,7 @@ static void showAttrs(EvalState & state, bool strict, Bindings & attrs,
         names.insert(i->first);
     foreach (StringSet::iterator, i, names) {
         XMLOpenElement _(doc, "attr", singletonAttrs("name", *i));
-        printValueAsXML(state, strict, attrs[*i], doc, context, drvsSeen);
+        printValueAsXML(state, strict, attrs[state.symbols.create(*i)], doc, context, drvsSeen);
     }
 }
 
@@ -67,14 +67,14 @@ static void printValueAsXML(EvalState & state, bool strict, Value & v,
             if (state.isDerivation(v)) {
                 XMLAttrs xmlAttrs;
             
-                Bindings::iterator a = v.attrs->find("derivation");
+                Bindings::iterator a = v.attrs->find(state.symbols.create("derivation"));
 
                 Path drvPath;
-                a = v.attrs->find("drvPath");
+                a = v.attrs->find(state.sDrvPath);
                 if (a != v.attrs->end() && a->second.type == tString)
                     xmlAttrs["drvPath"] = drvPath = a->second.string.s;
         
-                a = v.attrs->find("outPath");
+                a = v.attrs->find(state.sOutPath);
                 if (a != v.attrs->end() && a->second.type == tString)
                     xmlAttrs["outPath"] = a->second.string.s;
 

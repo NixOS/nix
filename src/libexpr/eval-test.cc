@@ -12,7 +12,7 @@ using namespace nix;
 
 void doTest(EvalState & state, string s)
 {
-    Expr * e = parseExprFromString(s, absPath("."));
+    Expr * e = parseExprFromString(state, s, absPath("."));
     std::cerr << ">>>>> " << *e << std::endl;
     Value v;
     state.eval(e, v);
@@ -23,6 +23,29 @@ void doTest(EvalState & state, string s)
 
 void run(Strings args)
 {
+    SymbolTable t;
+
+    printMsg(lvlError, format("size of symbol: %1% bytes") % sizeof(Symbol));
+    
+    Symbol s1 = t.create("foo");
+    Symbol s2 = t.create("foo");
+    Symbol s3 = t.create("bar");
+    Symbol s4 = t.create("foo");
+
+    assert(s1 == s2);
+    assert(s1 == s4);
+    assert(s1 != s3);
+
+    std::map<Symbol, int> m;
+
+    m[s1] = 123;
+    m[s3] = 456;
+
+    std::cout << m[s1] << std::endl;
+    std::cout << m[s2] << std::endl;
+    std::cout << m[s3] << std::endl;
+    std::cout << m[s4] << std::endl;
+
     EvalState state;
 
     printMsg(lvlError, format("size of value: %1% bytes") % sizeof(Value));

@@ -43,8 +43,8 @@ std::ostream & operator << (std::ostream & str, Value & v)
         break;
     case tAttrs:
         str << "{ ";
-        foreach (Bindings::iterator, i, *v.attrs)
-            str << i->first << " = " << i->second << "; ";
+        foreach (Bindings::iterator, i, *v.attrs) 
+            str << (string) i->first << " = " << i->second << "; ";
         str << "}";
         break;
     case tList:
@@ -91,7 +91,14 @@ string showType(Value & v)
 }
 
 
-EvalState::EvalState() : baseEnv(allocEnv())
+EvalState::EvalState()
+    : sWith(symbols.create("<with>"))
+    , sOutPath(symbols.create("outPath"))
+    , sDrvPath(symbols.create("drvPath"))
+    , sType(symbols.create("type"))
+    , sMeta(symbols.create("meta"))
+    , sName(symbols.create("name"))
+    , baseEnv(allocEnv())
 {
     nrValues = nrEnvs = nrEvaluated = recursionDepth = maxRecursionDepth = 0;
     deepestStack = (char *) -1;
@@ -110,9 +117,9 @@ EvalState::~EvalState()
 
 void EvalState::addConstant(const string & name, Value & v)
 {
-    baseEnv.bindings[name] = v;
+    baseEnv.bindings[symbols.create(name)] = v;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    (*baseEnv.bindings["builtins"].attrs)[name2] = v;
+    (*baseEnv.bindings[symbols.create("builtins")].attrs)[symbols.create(name2)] = v;
     nrValues += 2;
 }
 
@@ -124,9 +131,9 @@ void EvalState::addPrimOp(const string & name,
     v.type = tPrimOp;
     v.primOp.arity = arity;
     v.primOp.fun = primOp;
-    baseEnv.bindings[name] = v;
+    baseEnv.bindings[symbols.create(name)] = v;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    (*baseEnv.bindings["builtins"].attrs)[name2] = v;
+    (*baseEnv.bindings[symbols.create("builtins")].attrs)[symbols.create(name2)] = v;
     nrValues += 2;
 }
 
@@ -225,12 +232,12 @@ void mkPath(Value & v, const char * s)
 }
 
 
-static Value * lookupWith(Env * env, const Sym & name)
+Value * EvalState::lookupWith(Env * env, const Symbol & name)
 {
     if (!env) return 0;
     Value * v = lookupWith(env->up, name);
     if (v) return v;
-    Bindings::iterator i = env->bindings.find("<with>");
+    Bindings::iterator i = env->bindings.find(sWith);
     if (i == env->bindings.end()) return 0;
     Bindings::iterator j = i->second.attrs->find(name);
     if (j != i->second.attrs->end()) return &j->second;
@@ -238,7 +245,7 @@ static Value * lookupWith(Env * env, const Sym & name)
 }
 
 
-static Value * lookupVar(Env * env, const Sym & name)
+Value * EvalState::lookupVar(Env * env, const Symbol & name)
 {
     /* First look for a regular variable binding for `name'. */
     for (Env * env2 = env; env2; env2 = env2->up) {
@@ -318,7 +325,7 @@ void EvalState::evalFile(const Path & path, Value & v)
     Expr * e = parseTrees[path];
 
     if (!e) {
-        e = parseExprFromFile(path);
+        e = parseExprFromFile(*this, path);
         parseTrees[path] = e;
     }
     
@@ -428,9 +435,9 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 
         /* The inherited attributes, on the other hand, are
            evaluated in the original environment. */
-        foreach (list<string>::iterator, i, inherited) {
+        foreach (list<Symbol>::iterator, i, inherited) {
             Value & v2 = env2.bindings[*i];
-            mkCopy(v2, *lookupVar(&env, *i));
+            mkCopy(v2, *state.lookupVar(&env, *i));
         }
     }
 
@@ -441,9 +448,9 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             mkThunk(v2, env, i->second);
         }
 
-        foreach (list<string>::iterator, i, inherited) {
+        foreach (list<Symbol>::iterator, i, inherited) {
             Value & v2 = (*v.attrs)[*i];
-            mkCopy(v2, *lookupVar(&env, *i));
+            mkCopy(v2, *state.lookupVar(&env, *i));
         }
     }
 }
@@ -459,7 +466,7 @@ void ExprList::eval(EvalState & state, Env & env, Value & v)
 
 void ExprVar::eval(EvalState & state, Env & env, Value & v)
 {
-    Value * v2 = lookupVar(&env, name);
+    Value * v2 = state.lookupVar(&env, name);
     state.forceValue(*v2);
     v = *v2;
 }
@@ -631,7 +638,7 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
     Env & env2(state.allocEnv());
     env2.up = &env;
 
-    Value & vAttrs = env2.bindings["<with>"];
+    Value & vAttrs = env2.bindings[state.sWith];
     state.eval(env, attrs, vAttrs);
     state.forceAttrs(vAttrs);
         
@@ -871,7 +878,7 @@ string EvalState::forceStringNoCtx(Value & v)
 bool EvalState::isDerivation(Value & v)
 {
     if (v.type != tAttrs) return false;
-    Bindings::iterator i = v.attrs->find("type");
+    Bindings::iterator i = v.attrs->find(sType);
     return i != v.attrs->end() && forceStringNoCtx(i->second) == "derivation";
 }
 
@@ -915,7 +922,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
     }
 
     if (v.type == tAttrs) {
-        Bindings::iterator i = v.attrs->find("outPath");
+        Bindings::iterator i = v.attrs->find(sOutPath);
         if (i == v.attrs->end())
             throwTypeError("cannot coerce an attribute set (except a derivation) to a string");
         return coerceToString(i->second, context, coerceMore, copyToStore);
