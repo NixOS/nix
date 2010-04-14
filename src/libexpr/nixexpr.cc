@@ -138,35 +138,6 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
     
 
 #if 0
-ATerm bottomupRewrite(TermFun & f, ATerm e)
-{
-    checkInterrupt();
-
-    if (ATgetType(e) == AT_APPL) {
-        AFun fun = ATgetAFun(e);
-        int arity = ATgetArity(fun);
-        ATerm args[arity];
-
-        for (int i = 0; i < arity; ++i)
-            args[i] = bottomupRewrite(f, ATgetArgument(e, i));
-        
-        e = (ATerm) ATmakeApplArray(fun, args);
-    }
-
-    else if (ATgetType(e) == AT_LIST) {
-        ATermList in = (ATermList) e;
-        ATermList out = ATempty;
-
-        for (ATermIterator i(in); i; ++i)
-            out = ATinsert(out, bottomupRewrite(f, *i));
-
-        e = (ATerm) ATreverse(out);
-    }
-
-    return f(e);
-}
-
-
 static void varsBoundByPattern(ATermMap & map, Pattern pat)
 {
     ATerm name;

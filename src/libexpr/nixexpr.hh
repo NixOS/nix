@@ -207,17 +207,6 @@ struct ExprConcatStrings : Expr
 
 
 #if 0
-/* Generic bottomup traversal over ATerms.  The traversal first
-   recursively descends into subterms, and then applies the given term
-   function to the resulting term. */
-struct TermFun
-{
-    virtual ~TermFun() { }
-    virtual ATerm operator () (ATerm e) = 0;
-};
-ATerm bottomupRewrite(TermFun & f, ATerm e);
-
-
 /* Check whether all variables are defined in the given expression.
    Throw an exception if this isn't the case. */
 void checkVarDefs(const ATermMap & def, Expr e);
