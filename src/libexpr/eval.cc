@@ -102,7 +102,8 @@ EvalState::EvalState()
     , baseEnvDispl(0)
     , staticBaseEnv(false, 0)
 {
-    nrValues = nrEnvs = nrEvaluated = recursionDepth = maxRecursionDepth = 0;
+    nrEnvs = nrValuesInEnvs = nrValuesInLists = nrValues = 0;
+    nrEvaluated = recursionDepth = maxRecursionDepth = 0;
     deepestStack = (char *) -1;
 
     createBaseEnv();
@@ -250,7 +251,6 @@ Value * EvalState::lookupVar(Env * env, const VarRef & var)
 
 Value * EvalState::allocValues(unsigned int count)
 {
-    nrValues += count;
     return new Value[count]; // !!! check destructor
 }
 
@@ -258,6 +258,7 @@ Value * EvalState::allocValues(unsigned int count)
 Env & EvalState::allocEnv(unsigned int size)
 {
     nrEnvs++;
+    nrValuesInEnvs += size;
     Env * env = (Env *) malloc(sizeof(Env) + size * sizeof(Value));
     return *env;
 }
@@ -268,6 +269,7 @@ void EvalState::mkList(Value & v, unsigned int length)
     v.type = tList;
     v.list.length = length;
     v.list.elems = allocValues(length);
+    nrValuesInLists += length;
 }
 
 
@@ -541,6 +543,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
             primOp->primOp.fun(*this, vArgs, v);
         } else {
             Value * v2 = allocValues(2);
+            nrValues += 2;
             v2[0] = fun;
             v2[1] = arg;
             v.type = tPrimOpApp;
@@ -1039,8 +1042,14 @@ void EvalState::printStats()
     printMsg(v, format("  stack space used: %1% bytes") % (&x - deepestStack));
     printMsg(v, format("  max eval() nesting depth: %1%") % maxRecursionDepth);
     printMsg(v, format("  stack space per eval() level: %1% bytes") % ((&x - deepestStack) / (float) maxRecursionDepth));
-    printMsg(v, format("  values allocated: %1%") % nrValues);
-    printMsg(v, format("  environments allocated: %1%") % nrEnvs);
+    printMsg(v, format("  environments allocated: %1% (%2% bytes)")
+        % nrEnvs % (nrEnvs * sizeof(Env)));
+    printMsg(v, format("  values allocated in environments: %1% (%2% bytes)")
+        % nrValuesInEnvs % (nrValuesInEnvs * sizeof(Value)));
+    printMsg(v, format("  values allocated in lists: %1% (%2% bytes)")
+        % nrValuesInLists % (nrValuesInLists * sizeof(Value)));
+    printMsg(v, format("  misc. values allocated: %1% (%2% bytes) ")
+        % nrValues % (nrValues * sizeof(Value)));
     printMsg(v, format("  symbols in symbol table: %1%") % symbols.size());
 }
 

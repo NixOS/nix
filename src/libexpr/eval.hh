@@ -280,8 +280,10 @@ public:
 
 private:
     
-    unsigned long nrValues;
     unsigned long nrEnvs;
+    unsigned long nrValuesInEnvs;
+    unsigned long nrValuesInLists;
+    unsigned long nrValues;
     unsigned long nrEvaluated;
     unsigned int recursionDepth;
     unsigned int maxRecursionDepth;
