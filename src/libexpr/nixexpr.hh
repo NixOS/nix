@@ -170,6 +170,7 @@ struct ExprWith : Expr
 {
     Pos pos;
     Expr * attrs, * body;
+    int prevWith;
     ExprWith(const Pos & pos, Expr * attrs, Expr * body) : pos(pos), attrs(attrs), body(body) { };
     COMMON_METHODS
 };

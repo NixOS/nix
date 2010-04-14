@@ -72,7 +72,8 @@ void run(Strings args)
     doTest(state, "let { x = 1; body = x; }");
     doTest(state, "with { x = 1; }; x");
     doTest(state, "let x = 2; in with { x = 1; }; x"); // => 2
-    doTest(state, "with { x = 1; }; with { x = 2; }; x"); // => 1
+    doTest(state, "with { x = 1; }; with { x = 2; }; x"); // => 2
+    doTest(state, "with { x = 1; }; with { y = 2; }; x"); // => 1
     doTest(state, "[ 1 2 3 ]");
     doTest(state, "[ 1 2 ] ++ [ 3 4 5 ]");
     doTest(state, "123 == 123");

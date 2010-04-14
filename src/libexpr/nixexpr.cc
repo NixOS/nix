@@ -264,6 +264,18 @@ void ExprLet::bindVars(const StaticEnv & env)
 
 void ExprWith::bindVars(const StaticEnv & env)
 {
+    /* Does this `with' have an enclosing `with'?  If so, record its
+       level so that we can copy the attributes of the enclosing
+       `with'. */
+    const StaticEnv * curEnv;
+    unsigned int level;
+    prevWith = -1;
+    for (curEnv = &env, level = 0; curEnv; curEnv = curEnv->up, level++)
+        if (curEnv->isWith) {
+            prevWith = level;
+            break;
+        }
+    
     attrs->bindVars(env);    
     StaticEnv newEnv(true, &env);
     body->bindVars(newEnv);

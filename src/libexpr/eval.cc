@@ -253,8 +253,6 @@ Value * EvalState::lookupVar(Env * env, const Symbol & name)
         Bindings::iterator j = i->second.attrs->find(name);
         if (j != i->second.attrs->end()) return &j->second;
     }
-    
-    throwEvalError("urgh! undefined variable `%1%'", name);
 #endif
 }
 
@@ -483,13 +481,15 @@ void ExprList::eval(EvalState & state, Env & env, Value & v)
 
 void ExprVar::eval(EvalState & state, Env & env, Value & v)
 {
-    printMsg(lvlError, format("eval var %1% %2% %3%") % fromWith % level % displ);
-
+    Env * env2 = &env;
+    for (unsigned int l = level; l; --l, env2 = env2->up) ;
+    
     if (fromWith) {
-        abort();
+        Bindings::iterator j = env2->values[0].attrs->find(name);
+        if (j == env2->values[0].attrs->end())
+            throwEvalError("undefined variable `%1%'", name);
+        v = j->second;
     } else {
-        Env * env2 = &env;
-        for (unsigned int l = level; l; --l, env2 = env2->up) ;
         state.forceValue(env2->values[displ]);
         v = env2->values[displ];
     }
@@ -655,17 +655,26 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
 
 void ExprWith::eval(EvalState & state, Env & env, Value & v)
 {
-    abort();
-#if 0
-    Env & env2(state.allocEnv());
+    Env & env2(state.allocEnv(1));
     env2.up = &env;
 
-    Value & vAttrs = env2.bindings[state.sWith];
-    state.eval(env, attrs, vAttrs);
-    state.forceAttrs(vAttrs);
+    state.eval(env, attrs, env2.values[0]);
+    state.forceAttrs(env2.values[0]);
+
+    /* If there is an enclosing `with', copy all attributes that don't
+       appear in this `with'. */
+    if (prevWith != -1) {
+        Env * env3 = &env;
+        for (unsigned int l = prevWith; l; --l, env3 = env3->up) ;
+
+        foreach (Bindings::iterator, i, *env3->values[0].attrs) {
+            Bindings::iterator j = env2.values[0].attrs->find(i->first);
+            if (j == env2.values[0].attrs->end())
+                (*env2.values[0].attrs)[i->first] = i->second; // !!! sharing
+        }
+    }
         
     state.eval(env2, body, v);
-#endif
 }
 
 
