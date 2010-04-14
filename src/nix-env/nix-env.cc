@@ -111,7 +111,7 @@ static bool isNixExpr(const Path & path)
 
 
 static void getAllExprs(EvalState & state,
-    const Path & path, ATermMap & attrs)
+    const Path & path, ExprAttrs & attrs)
 {
     Strings names = readDirectory(path);
     StringSet namesSorted(names.begin(), names.end());
@@ -131,8 +131,8 @@ static void getAllExprs(EvalState & state,
             string attrName = *i;
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
-            attrs.set(toATerm(attrName), makeAttrRHS(
-                    parseExprFromFile(state, absPath(path2)), makeNoPos()));
+            attrs.attrs[state.symbols.create(attrName)] =
+                parseExprFromFile(state, absPath(path2));
         }
         else
             /* `path2' is a directory (with no default.nix in it);
@@ -144,7 +144,7 @@ static void getAllExprs(EvalState & state,
 
 static Expr * loadSourceExpr(EvalState & state, const Path & path)
 {
-    if (isNixExpr(path)) return parseExprFromFile(absPath(path));
+    if (isNixExpr(path)) return parseExprFromFile(state, absPath(path));
 
     /* The path is a directory.  Put the Nix expressions in the
        directory in an attribute set, with the file name of each
@@ -152,10 +152,10 @@ static Expr * loadSourceExpr(EvalState & state, const Path & path)
        (but keep the attribute set flat, not nested, to make it easier
        for a user to have a ~/.nix-defexpr directory that includes
        some system-wide directory). */
-    ATermMap attrs;
-    attrs.set(toATerm("_combineChannels"), makeAttrRHS(makeList(ATempty), makeNoPos()));
-    getAllExprs(state, path, attrs);
-    return makeAttrs(attrs);
+    ExprAttrs * attrs = new ExprAttrs;
+    attrs->attrs[state.symbols.create("_combineChannels")] = new ExprInt(1);
+    getAllExprs(state, path, *attrs);
+    return attrs;
 }
 
 
@@ -192,20 +192,6 @@ static Path getDefNixExprPath()
 }
 
 
-struct AddPos : TermFun
-{
-    ATerm operator () (ATerm e)
-    {
-        ATerm x, y;
-        if (matchObsoleteBind(e, x, y))
-            return makeBind(x, y, makeNoPos());
-        if (matchObsoleteStr(e, x))
-            return makeStr(x, ATempty);
-        return e;
-    }
-};
-
-
 static DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
 {
     Path path = userEnv + "/manifest";
@@ -213,16 +199,15 @@ static DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
     if (!pathExists(path))
         return DrvInfos(); /* not an error, assume nothing installed */
 
+    throw Error("not implemented");
+#if 0
     Expr e = ATreadFromNamedFile(path.c_str());
     if (!e) throw Error(format("cannot read Nix expression from `%1%'") % path);
-
-    /* Compatibility: Bind(x, y) -> Bind(x, y, NoPos). */
-    AddPos addPos;
-    e = bottomupRewrite(addPos, e);
 
     DrvInfos elems;
     // !!! getDerivations(state, e, "", ATermMap(1), elems);
     return elems;
+#endif
 }
 
 
@@ -519,11 +504,11 @@ static void queryInstSources(EvalState & state,
            (import ./foo.nix)' = `(import ./foo.nix).bar'. */
         case srcNixExprs: {
                 
-            Expr e1 = loadSourceExpr(state, instSource.nixExprPath);
+            Expr * e1 = loadSourceExpr(state, instSource.nixExprPath);
 
             foreach (Strings::const_iterator, i, args) {
-                Expr e2 = parseExprFromString(state, *i, absPath("."));
-                Expr call = makeCall(e2, e1);
+                Expr * e2 = parseExprFromString(state, *i, absPath("."));
+                Expr * call = new ExprApp(e2, e1);
                 Value v; state.eval(call, v);
                 getDerivations(state, v, "", instSource.autoArgs, elems);
             }
