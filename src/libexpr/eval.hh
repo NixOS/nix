@@ -231,6 +231,15 @@ private:
        values. */
     Env & baseEnv;
 
+    unsigned int baseEnvDispl;
+
+public:
+    
+    /* The same, but used during parsing to resolve variables. */
+    StaticEnv staticBaseEnv; // !!! should be private
+
+private:
+    
     void createBaseEnv();
     
     void addConstant(const string & name, Value & v);

@@ -461,8 +461,7 @@ static Expr * parse(EvalState & state, const char * text,
     if (res) throw ParseError(data.error);
 
     try {
-        StaticEnv env(false, 0);
-        data.result->bindVars(env);
+        data.result->bindVars(state.staticBaseEnv);
     } catch (Error & e) {
         throw ParseError(format("%1%, in `%2%'") % e.msg() % path);
     }

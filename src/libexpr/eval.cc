@@ -43,7 +43,7 @@ std::ostream & operator << (std::ostream & str, Value & v)
         break;
     case tAttrs:
         str << "{ ";
-        foreach (Bindings::iterator, i, *v.attrs) 
+        foreach (Bindings::iterator, i, *v.attrs)
             str << (string) i->first << " = " << i->second << "; ";
         str << "}";
         break;
@@ -99,6 +99,8 @@ EvalState::EvalState()
     , sMeta(symbols.create("meta"))
     , sName(symbols.create("name"))
     , baseEnv(allocEnv(128))
+    , baseEnvDispl(0)
+    , staticBaseEnv(false, 0)
 {
     nrValues = nrEnvs = nrEvaluated = recursionDepth = maxRecursionDepth = 0;
     deepestStack = (char *) -1;
@@ -117,28 +119,24 @@ EvalState::~EvalState()
 
 void EvalState::addConstant(const string & name, Value & v)
 {
-#if 0
-    baseEnv.bindings[symbols.create(name)] = v;
+    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
+    baseEnv.values[baseEnvDispl++] = v;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    (*baseEnv.bindings[symbols.create("builtins")].attrs)[symbols.create(name2)] = v;
-    nrValues += 2;
-#endif
+    (*baseEnv.values[0].attrs)[symbols.create(name2)] = v;
 }
 
 
 void EvalState::addPrimOp(const string & name,
     unsigned int arity, PrimOp primOp)
 {
-#if 0
     Value v;
     v.type = tPrimOp;
     v.primOp.arity = arity;
     v.primOp.fun = primOp;
-    baseEnv.bindings[symbols.create(name)] = v;
+    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
+    baseEnv.values[baseEnvDispl++] = v;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    (*baseEnv.bindings[symbols.create("builtins")].attrs)[symbols.create(name2)] = v;
-    nrValues += 2;
-#endif
+    (*baseEnv.values[0].attrs)[symbols.create(name2)] = v;
 }
 
 

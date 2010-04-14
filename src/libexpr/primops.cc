@@ -999,14 +999,12 @@ void EvalState::createBaseEnv()
 {
     baseEnv.up = 0;
 
-#if 0    
-    Value & builtins = baseEnv.bindings[symbols.create("builtins")];
-    builtins.type = tAttrs;
-    builtins.attrs = new Bindings;
-#endif
-
     /* Add global constants such as `true' to the base environment. */
     Value v;
+
+    /* `builtins' must be first! */
+    mkAttrs(v);
+    addConstant("builtins", v);
 
     mkBool(v, true);
     addConstant("true", v);
@@ -1022,14 +1020,6 @@ void EvalState::createBaseEnv()
 
     mkString(v, thisSystem.c_str());
     addConstant("__currentSystem", v);
-
-    /* Add a wrapper around the derivation primop that computes the
-       `drvPath' and `outPath' attributes lazily. */
-#if 0
-    string s = "attrs: let res = derivationStrict attrs; in attrs // { drvPath = res.drvPath; outPath = res.outPath; type = \"derivation\"; }";
-    mkThunk(v, baseEnv, parseExprFromString(*this, s, "/"));
-    addConstant("derivation", v);
-#endif
 
     // Miscellaneous
     addPrimOp("import", 1, prim_import);
@@ -1052,6 +1042,12 @@ void EvalState::createBaseEnv()
 
     // Derivations
     addPrimOp("derivationStrict", 1, prim_derivationStrict);
+
+    /* Add a wrapper around the derivation primop that computes the
+       `drvPath' and `outPath' attributes lazily. */
+    string s = "attrs: let res = derivationStrict attrs; in attrs // { drvPath = res.drvPath; outPath = res.outPath; type = \"derivation\"; }";
+    mkThunk(v, baseEnv, parseExprFromString(*this, s, "/"));
+    addConstant("derivation", v);
 
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);
@@ -1105,7 +1101,7 @@ void EvalState::createBaseEnv()
 
     // Versions
     addPrimOp("__parseDrvName", 1, prim_parseDrvName);
-    addPrimOp("__compareVersions", 2, prim_compareVersions);
+    addPrimOp("__compareVersions", 2, prim_compareVersions);    
 }
 
 
