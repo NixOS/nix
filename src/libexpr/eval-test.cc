@@ -105,9 +105,12 @@ void run(Strings args)
     doTest(state, "map (x: __add 1 x) [ 1 2 3 ]");
     doTest(state, "map (builtins.add 1) [ 1 2 3 ]");
     doTest(state, "builtins.hasAttr \"x\" { x = 1; }");
-    doTest(state, "let x = 1; as = rec { inherit x; y = as.x; }; in as.y");
+    doTest(state, "let x = 1; as = { inherit x; y = as.x; }; in as.y");
+    doTest(state, "let x = 1; as = rec { inherit x; y = x; }; in as.y");
     doTest(state, "let as = { x = 1; }; bs = rec { inherit (as) x; y = x; }; in bs.y");
     doTest(state, "let as = rec { inherit (y) x; y = { x = 1; }; }; in as.x");
+    doTest(state, "let x = 1; in let inherit x; in x");
+    doTest(state, "with { x = 1; }; let inherit x; y = x; in y");
     doTest(state, "builtins.toXML 123");
     doTest(state, "builtins.toXML { a.b = \"x\" + \"y\"; c = [ 1 2 ] ++ [ 3 4 ]; }");
 

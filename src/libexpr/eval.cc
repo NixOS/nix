@@ -338,7 +338,7 @@ void EvalState::eval(Env & env, Expr * e, Value & v)
     char x;
     if (&x < deepestStack) deepestStack = &x;
     
-    debug(format("eval: %1%") % *e);
+    //debug(format("eval: %1%") % *e);
 
     checkInterrupt();
 
@@ -390,14 +390,13 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 
 void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
+    state.mkAttrs(v);
+
     if (recursive) {
         /* Create a new environment that contains the attributes in
            this `rec'. */
         Env & env2(state.allocEnv(attrs.size() + inherited.size()));
         env2.up = &env;
-        
-        v.type = tAttrs;
-        v.attrs = new Bindings;
 
         unsigned int displ = 0;
         
@@ -409,26 +408,25 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             mkThunk(env2.values[displ++], env2, i->second);
         }
 
-#if 0
         /* The inherited attributes, on the other hand, are
            evaluated in the original environment. */
-        foreach (list<Symbol>::iterator, i, inherited) {
-            Value & v2 = env2.bindings[*i];
-            mkCopy(v2, *state.lookupVar(&env, *i));
+        foreach (list<VarRef>::iterator, i, inherited) {
+            Value & v2 = (*v.attrs)[i->name];
+            Value * v3 = state.lookupVar(&env, *i);
+            mkCopy(v2, *v3);
+            mkCopy(env2.values[displ++], *v3);
         }
-#endif
 
     }
 
     else {
-        state.mkAttrs(v);
         foreach (Attrs::iterator, i, attrs) {
             Value & v2 = (*v.attrs)[i->first];
             mkThunk(v2, env, i->second);
         }
 
-        foreach (list<Symbol>::iterator, i, inherited) {
-            Value & v2 = (*v.attrs)[*i];
+        foreach (list<VarRef>::iterator, i, inherited) {
+            Value & v2 = (*v.attrs)[i->name];
             mkCopy(v2, *state.lookupVar(&env, *i));
         }
     }
@@ -449,14 +447,10 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
     foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
         mkThunk(env2.values[displ++], env2, i->second);
 
-#if 0
     /* The inherited attributes, on the other hand, are evaluated in
        the original environment. */
-    foreach (list<Symbol>::iterator, i, attrs->inherited) {
-        Value & v2 = env2.bindings[*i];
-        mkCopy(v2, *state.lookupVar(&env, *i));
-    }
-#endif
+    foreach (list<VarRef>::iterator, i, attrs->inherited)
+        mkCopy(env2.values[displ++], *state.lookupVar(&env, *i));
 
     state.eval(env2, body, v);
 }

@@ -127,7 +127,7 @@ struct ExprAttrs : Expr
     bool recursive;
     typedef std::map<Symbol, Expr *> Attrs;
     Attrs attrs;
-    list<Symbol> inherited;
+    list<VarRef> inherited;
     ExprAttrs() : recursive(false) { };
     COMMON_METHODS
 };
