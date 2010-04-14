@@ -238,7 +238,7 @@ private:
     void addPrimOp(const string & name,
         unsigned int arity, PrimOp primOp);
 
-    Value * lookupVar(Env * env, const Symbol & name);
+    Value * lookupVar(Env * env, const VarRef & var);
     
     friend class ExprVar;
     friend class ExprAttrs;

@@ -38,7 +38,7 @@ void ExprPath::show(std::ostream & str)
 
 void ExprVar::show(std::ostream & str)
 {
-    str << name;
+    str << info.name;
 }
 
 void ExprSelect::show(std::ostream & str)
@@ -157,7 +157,7 @@ void ExprPath::bindVars(const StaticEnv & env)
 {
 }
 
-void ExprVar::bindVars(const StaticEnv & env)
+void VarRef::bind(const StaticEnv & env)
 {
     /* Check whether the variable appears in the environment.  If so,
        set its level and displacement. */
@@ -185,6 +185,11 @@ void ExprVar::bindVars(const StaticEnv & env)
 
     fromWith = true;
     this->level = withLevel;
+}
+
+void ExprVar::bindVars(const StaticEnv & env)
+{
+    info.bind(env);
 }
 
 void ExprSelect::bindVars(const StaticEnv & env)

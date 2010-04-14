@@ -236,24 +236,17 @@ void mkPath(Value & v, const char * s)
 }
 
 
-Value * EvalState::lookupVar(Env * env, const Symbol & name)
+Value * EvalState::lookupVar(Env * env, const VarRef & var)
 {
-#if 0
-    /* First look for a regular variable binding for `name'. */
-        Bindings::iterator i = env2->bindings.find(name);
-        if (i != env2->bindings.end()) return &i->second;
-    }
-
-    /* Otherwise, look for a `with' attribute set containing `name'.
-       Inner `withs' take precedence (i.e. `with {x=1;}; with {x=2;};
-       x' evaluates to 2). */
-    for (Env * env2 = env; env2; env2 = env2->up) {
-        Bindings::iterator i = env2->bindings.find(sWith);
-        if (i == env2->bindings.end()) continue;
-        Bindings::iterator j = i->second.attrs->find(name);
-        if (j != i->second.attrs->end()) return &j->second;
-    }
-#endif
+    for (unsigned int l = var.level; l; --l, env = env->up) ;
+    
+    if (var.fromWith) {
+        Bindings::iterator j = env->values[0].attrs->find(var.name);
+        if (j == env->values[0].attrs->end())
+            throwEvalError("undefined variable `%1%'", var.name);
+        return &j->second;
+    } else
+        return &env->values[var.displ];
 }
 
 
@@ -481,18 +474,9 @@ void ExprList::eval(EvalState & state, Env & env, Value & v)
 
 void ExprVar::eval(EvalState & state, Env & env, Value & v)
 {
-    Env * env2 = &env;
-    for (unsigned int l = level; l; --l, env2 = env2->up) ;
-    
-    if (fromWith) {
-        Bindings::iterator j = env2->values[0].attrs->find(name);
-        if (j == env2->values[0].attrs->end())
-            throwEvalError("undefined variable `%1%'", name);
-        v = j->second;
-    } else {
-        state.forceValue(env2->values[displ]);
-        v = env2->values[displ];
-    }
+    Value * v2 = state.lookupVar(&env, info);
+    state.forceValue(*v2);
+    v = *v2;
 }
 
 

@@ -78,7 +78,7 @@ struct ExprPath : Expr
     COMMON_METHODS
 };
 
-struct ExprVar : Expr
+struct VarRef
 {
     Symbol name;
 
@@ -94,8 +94,15 @@ struct ExprVar : Expr
        levels up from the current one.*/
     unsigned int level;
     unsigned int displ;
-    
-    ExprVar(const Symbol & name) : name(name) { };
+
+    VarRef(const Symbol & name) : name(name) { };
+    void bind(const StaticEnv & env);
+};
+
+struct ExprVar : Expr
+{
+    VarRef info;
+    ExprVar(const Symbol & name) : info(name) { };
     COMMON_METHODS
 };
 
