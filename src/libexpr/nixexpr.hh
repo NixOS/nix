@@ -17,25 +17,29 @@ MakeError(Abort, EvalError)
 MakeError(TypeError, EvalError)
 
 
+/* Position objects. */
+
 struct Pos
 {
     string file;
     unsigned int line, column;
 };
 
-
 std::ostream & operator << (std::ostream & str, const Pos & pos);
 
-
-/* Abstract syntax of Nix expressions. */
 
 struct Env;
 struct Value;
 struct EvalState;
+struct StaticEnv;
+
+
+/* Abstract syntax of Nix expressions. */
 
 struct Expr
 {
     virtual void show(std::ostream & str);
+    virtual void bindVars(const StaticEnv & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
 };
 
@@ -43,7 +47,8 @@ std::ostream & operator << (std::ostream & str, Expr & e);
 
 #define COMMON_METHODS \
     void show(std::ostream & str); \
-    void eval(EvalState & state, Env & env, Value & v);
+    void eval(EvalState & state, Env & env, Value & v); \
+    void bindVars(const StaticEnv & env);
 
 struct ExprInt : Expr
 {
@@ -76,6 +81,20 @@ struct ExprPath : Expr
 struct ExprVar : Expr
 {
     Symbol name;
+
+    /* Whether the variable comes from an environment (e.g. a rec, let
+       or function argument) or from a "with". */
+    bool fromWith;
+    
+    /* In the former case, the value is obtained by going `level'
+       levels up from the current environment and getting the
+       `displ'th value in that environment.  In the latter case, the
+       value is obtained by getting the attribute named `name' from
+       the attribute set stored in the environment that is `level'
+       levels up from the current one.*/
+    unsigned int level;
+    unsigned int displ;
+    
     ExprVar(const Symbol & name) : name(name) { };
     COMMON_METHODS
 };
@@ -186,6 +205,10 @@ struct ExprOpNot : Expr
         { \
             str << *e1 << " " s " " << *e2; \
         } \
+        void bindVars(const StaticEnv & env) \
+        { \
+            e1->bindVars(env); e2->bindVars(env); \
+        } \
         void eval(EvalState & state, Env & env, Value & v); \
     };
 
@@ -206,11 +229,18 @@ struct ExprConcatStrings : Expr
 };
 
 
-#if 0
-/* Check whether all variables are defined in the given expression.
-   Throw an exception if this isn't the case. */
-void checkVarDefs(const ATermMap & def, Expr e);
-#endif
+/* Static environments are used to map variable names onto (level,
+   displacement) pairs used to obtain the value of the variable at
+   runtime. */
+struct StaticEnv
+{
+    bool isWith;
+    const StaticEnv * up;
+    typedef std::map<Symbol, unsigned int> Vars;
+    Vars vars;
+    StaticEnv(bool isWith, const StaticEnv * up) : isWith(isWith), up(up) { };
+};
+
 
 
 }

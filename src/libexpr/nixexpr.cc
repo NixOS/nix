@@ -8,12 +8,13 @@
 namespace nix {
 
 
+/* Displaying abstract syntax trees. */
+
 std::ostream & operator << (std::ostream & str, Expr & e)
 {
     e.show(str);
     return str;
 }
-
 
 void Expr::show(std::ostream & str)
 {
@@ -135,103 +136,162 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
         str << (format("`%1%:%2%:%3%'") % pos.file % pos.line % pos.column).str();
     return str;
 }
-    
 
-#if 0
-static void varsBoundByPattern(ATermMap & map, Pattern pat)
+
+/* Computing levels/displacements for variables. */
+
+void Expr::bindVars(const StaticEnv & env)
 {
-    ATerm name;
-    ATermList formals;
-    ATermBool ellipsis;
-    /* Use makeRemoved() so that it can be used directly in
-       substitute(). */
-    if (matchVarPat(pat, name))
-        map.set(name, makeRemoved());
-    else if (matchAttrsPat(pat, formals, ellipsis, name)) {
-        if (name != sNoAlias) map.set(name, makeRemoved());
-        for (ATermIterator i(formals); i; ++i) {
-            ATerm d1;
-            if (!matchFormal(*i, name, d1)) abort();
-            map.set(name, makeRemoved());
-        }
-    }
-    else abort();
+    abort();
 }
 
-
-/* We use memoisation to prevent exponential complexity on heavily
-   shared ATerms (remember, an ATerm is a graph, not a tree!).  Note
-   that using an STL set is fine here wrt to ATerm garbage collection
-   since all the ATerms in the set are already reachable from
-   somewhere else. */
-static void checkVarDefs2(set<Expr> & done, const ATermMap & defs, Expr e)
+void ExprInt::bindVars(const StaticEnv & env)
 {
-    if (done.find(e) != done.end()) return;
-    done.insert(e);
-    
-    ATerm name, pos, value;
-    ATerm with, body;
-    ATermList rbnds, nrbnds;
-    Pattern pat;
-
-    /* Closed terms don't have free variables, so we don't have to
-       check by definition. */
-    if (matchClosed(e, value)) return;
-    
-    else if (matchVar(e, name)) {
-        if (!defs.get(name))
-            throw EvalError(format("undefined variable `%1%'")
-                % aterm2String(name));
-    }
-
-    else if (matchFunction(e, pat, body, pos)) {
-        ATermMap defs2(defs);
-        varsBoundByPattern(defs2, pat);
-        set<Expr> done2;
-        checkVarDefs2(done2, defs2, pat);
-        checkVarDefs2(done2, defs2, body);
-    }
-        
-    else if (matchRec(e, rbnds, nrbnds)) {
-        checkVarDefs2(done, defs, (ATerm) nrbnds);
-        ATermMap defs2(defs);
-        for (ATermIterator i(rbnds); i; ++i) {
-            if (!matchBind(*i, name, value, pos)) abort(); /* can't happen */
-            defs2.set(name, (ATerm) ATempty);
-        }
-        for (ATermIterator i(nrbnds); i; ++i) {
-            if (!matchBind(*i, name, value, pos)) abort(); /* can't happen */
-            defs2.set(name, (ATerm) ATempty);
-        }
-        set<Expr> done2;
-        checkVarDefs2(done2, defs2, (ATerm) rbnds);
-    }
-
-    else if (matchWith(e, with, body, pos)) {
-        /* We can't check the body without evaluating the definitions
-           (which is an arbitrary expression), so we don't do that
-           here but only when actually evaluating the `with'. */
-        checkVarDefs2(done, defs, with);
-    }
-    
-    else if (ATgetType(e) == AT_APPL) {
-        int arity = ATgetArity(ATgetAFun(e));
-        for (int i = 0; i < arity; ++i)
-            checkVarDefs2(done, defs, ATgetArgument(e, i));
-    }
-
-    else if (ATgetType(e) == AT_LIST)
-        for (ATermIterator i((ATermList) e); i; ++i)
-            checkVarDefs2(done, defs, *i);
 }
 
-
-void checkVarDefs(const ATermMap & defs, Expr e)
+void ExprString::bindVars(const StaticEnv & env)
 {
-    set<Expr> done;
-    checkVarDefs2(done, defs, e);
 }
-#endif
+
+void ExprPath::bindVars(const StaticEnv & env)
+{
+}
+
+void ExprVar::bindVars(const StaticEnv & env)
+{
+    /* Check whether the variable appears in the environment.  If so,
+       set its level and displacement. */
+    const StaticEnv * curEnv;
+    unsigned int level;
+    int withLevel = -1;
+    for (curEnv = &env, level = 0; curEnv; curEnv = curEnv->up, level++) {
+        if (curEnv->isWith) {
+            if (withLevel == -1) withLevel = level;
+        } else {
+            StaticEnv::Vars::const_iterator i = curEnv->vars.find(name);
+            if (i != curEnv->vars.end()) {
+                fromWith = false;
+                this->level = level;
+                displ = i->second;
+                return;
+            }
+        }
+    }
+
+    /* Otherwise, the variable must be obtained from the nearest
+       enclosing `with'.  If there is no `with', then we can issue an
+       "undefined variable" error now. */
+    if (withLevel == -1) throw EvalError(format("undefined variable `%1%'") % name);
+
+    fromWith = true;
+    this->level = withLevel;
+}
+
+void ExprSelect::bindVars(const StaticEnv & env)
+{
+    e->bindVars(env);
+}
+
+void ExprOpHasAttr::bindVars(const StaticEnv & env)
+{
+    e->bindVars(env);
+}
+
+void ExprAttrs::bindVars(const StaticEnv & env)
+{
+    if (recursive) {
+        StaticEnv newEnv(false, &env);
+    
+        unsigned int displ = 0;
+
+        foreach (ExprAttrs::Attrs::iterator, i, attrs)
+            newEnv.vars[i->first] = displ++;
+
+        foreach (list<Symbol>::iterator, i, inherited)
+            newEnv.vars[*i] = displ++;
+
+        foreach (ExprAttrs::Attrs::iterator, i, attrs)
+            i->second->bindVars(newEnv);
+    }
+
+    else
+        foreach (ExprAttrs::Attrs::iterator, i, attrs)
+            i->second->bindVars(env);
+}
+
+void ExprList::bindVars(const StaticEnv & env)
+{
+    foreach (vector<Expr *>::iterator, i, elems)
+        (*i)->bindVars(env);
+}
+
+void ExprLambda::bindVars(const StaticEnv & env)
+{
+    StaticEnv newEnv(false, &env);
+    
+    unsigned int displ = 0;
+    
+    if (!arg.empty()) newEnv.vars[arg] = displ++;
+
+    if (matchAttrs) {
+        foreach (Formals::Formals_::iterator, i, formals->formals)
+            newEnv.vars[i->name] = displ++;
+
+        foreach (Formals::Formals_::iterator, i, formals->formals)
+            if (i->def) i->def->bindVars(newEnv);
+    }
+
+    body->bindVars(newEnv);
+}
+
+void ExprLet::bindVars(const StaticEnv & env)
+{
+    StaticEnv newEnv(false, &env);
+    
+    unsigned int displ = 0;
+
+    foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
+        newEnv.vars[i->first] = displ++;
+
+    foreach (list<Symbol>::iterator, i, attrs->inherited)
+        newEnv.vars[*i] = displ++;
+
+    foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
+        i->second->bindVars(newEnv);
+    
+    body->bindVars(newEnv);
+}
+
+void ExprWith::bindVars(const StaticEnv & env)
+{
+    attrs->bindVars(env);    
+    StaticEnv newEnv(true, &env);
+    body->bindVars(newEnv);
+}
+
+void ExprIf::bindVars(const StaticEnv & env)
+{
+    cond->bindVars(env);
+    then->bindVars(env);
+    else_->bindVars(env);
+}
+
+void ExprAssert::bindVars(const StaticEnv & env)
+{
+    cond->bindVars(env);
+    body->bindVars(env);
+}
+
+void ExprOpNot::bindVars(const StaticEnv & env)
+{
+    e->bindVars(env);
+}
+
+void ExprConcatStrings::bindVars(const StaticEnv & env)
+{
+    foreach (vector<Expr *>::iterator, i, *es)
+        (*i)->bindVars(env);
+}
 
 
 }

@@ -999,9 +999,11 @@ void EvalState::createBaseEnv()
 {
     baseEnv.up = 0;
 
+#if 0    
     Value & builtins = baseEnv.bindings[symbols.create("builtins")];
     builtins.type = tAttrs;
     builtins.attrs = new Bindings;
+#endif
 
     /* Add global constants such as `true' to the base environment. */
     Value v;
@@ -1023,9 +1025,11 @@ void EvalState::createBaseEnv()
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
+#if 0
     string s = "attrs: let res = derivationStrict attrs; in attrs // { drvPath = res.drvPath; outPath = res.outPath; type = \"derivation\"; }";
     mkThunk(v, baseEnv, parseExprFromString(*this, s, "/"));
     addConstant("derivation", v);
+#endif
 
     // Miscellaneous
     addPrimOp("import", 1, prim_import);

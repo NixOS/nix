@@ -18,13 +18,6 @@ struct Value;
 typedef std::map<Symbol, Value> Bindings;
 
 
-struct Env
-{
-    Env * up;
-    Bindings bindings;
-};
-
-
 typedef enum {
     tInt = 1,
     tBool,
@@ -106,6 +99,13 @@ struct Value
             unsigned int argsLeft;
         } primOpApp;
     };
+};
+
+
+struct Env
+{
+    Env * up;
+    Value values[0];
 };
 
 
@@ -258,7 +258,7 @@ public:
     
     /* Allocation primitives. */
     Value * allocValues(unsigned int count);
-    Env & allocEnv();
+    Env & allocEnv(unsigned int size);
 
     void mkList(Value & v, unsigned int length);
     void mkAttrs(Value & v);

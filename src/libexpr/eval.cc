@@ -98,7 +98,7 @@ EvalState::EvalState()
     , sType(symbols.create("type"))
     , sMeta(symbols.create("meta"))
     , sName(symbols.create("name"))
-    , baseEnv(allocEnv())
+    , baseEnv(allocEnv(128))
 {
     nrValues = nrEnvs = nrEvaluated = recursionDepth = maxRecursionDepth = 0;
     deepestStack = (char *) -1;
@@ -117,16 +117,19 @@ EvalState::~EvalState()
 
 void EvalState::addConstant(const string & name, Value & v)
 {
+#if 0
     baseEnv.bindings[symbols.create(name)] = v;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
     (*baseEnv.bindings[symbols.create("builtins")].attrs)[symbols.create(name2)] = v;
     nrValues += 2;
+#endif
 }
 
 
 void EvalState::addPrimOp(const string & name,
     unsigned int arity, PrimOp primOp)
 {
+#if 0
     Value v;
     v.type = tPrimOp;
     v.primOp.arity = arity;
@@ -135,6 +138,7 @@ void EvalState::addPrimOp(const string & name,
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
     (*baseEnv.bindings[symbols.create("builtins")].attrs)[symbols.create(name2)] = v;
     nrValues += 2;
+#endif
 }
 
 
@@ -234,8 +238,8 @@ void mkPath(Value & v, const char * s)
 
 Value * EvalState::lookupVar(Env * env, const Symbol & name)
 {
+#if 0
     /* First look for a regular variable binding for `name'. */
-    for (Env * env2 = env; env2; env2 = env2->up) {
         Bindings::iterator i = env2->bindings.find(name);
         if (i != env2->bindings.end()) return &i->second;
     }
@@ -250,7 +254,8 @@ Value * EvalState::lookupVar(Env * env, const Symbol & name)
         if (j != i->second.attrs->end()) return &j->second;
     }
     
-    throwEvalError("undefined variable `%1%'", name);
+    throwEvalError("urgh! undefined variable `%1%'", name);
+#endif
 }
 
 
@@ -261,10 +266,11 @@ Value * EvalState::allocValues(unsigned int count)
 }
 
 
-Env & EvalState::allocEnv()
+Env & EvalState::allocEnv(unsigned int size)
 {
     nrEnvs++;
-    return *(new Env);
+    Env * env = (Env *) malloc(sizeof(Env) + size * sizeof(Value));
+    return *env;
 }
 
 
@@ -343,7 +349,7 @@ void EvalState::eval(Env & env, Expr * e, Value & v)
     char x;
     if (&x < deepestStack) deepestStack = &x;
     
-    //debug(format("eval: %1%") % *e);
+    debug(format("eval: %1%") % *e);
 
     checkInterrupt();
 
@@ -396,28 +402,33 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
     if (recursive) {
-
         /* Create a new environment that contains the attributes in
            this `rec'. */
-        Env & env2(state.allocEnv());
+        Env & env2(state.allocEnv(attrs.size() + inherited.size()));
         env2.up = &env;
         
         v.type = tAttrs;
-        v.attrs = &env2.bindings;
+        v.attrs = new Bindings;
 
+        unsigned int displ = 0;
+        
         /* The recursive attributes are evaluated in the new
            environment. */
         foreach (Attrs::iterator, i, attrs) {
-            Value & v2 = env2.bindings[i->first];
-            mkThunk(v2, env2, i->second);
+            Value & v2 = (*v.attrs)[i->first];
+            mkCopy(v2, env2.values[displ]);
+            mkThunk(env2.values[displ++], env2, i->second);
         }
 
+#if 0
         /* The inherited attributes, on the other hand, are
            evaluated in the original environment. */
         foreach (list<Symbol>::iterator, i, inherited) {
             Value & v2 = env2.bindings[*i];
             mkCopy(v2, *state.lookupVar(&env, *i));
         }
+#endif
+
     }
 
     else {
@@ -439,22 +450,24 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 {
     /* Create a new environment that contains the attributes in this
        `let'. */
-    Env & env2(state.allocEnv());
+    Env & env2(state.allocEnv(attrs->attrs.size() + attrs->inherited.size()));
     env2.up = &env;
-        
+
+    unsigned int displ = 0;
+
     /* The recursive attributes are evaluated in the new
        environment. */
-    foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs) {
-        Value & v2 = env2.bindings[i->first];
-        mkThunk(v2, env2, i->second);
-    }
+    foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
+        mkThunk(env2.values[displ++], env2, i->second);
 
+#if 0
     /* The inherited attributes, on the other hand, are evaluated in
        the original environment. */
     foreach (list<Symbol>::iterator, i, attrs->inherited) {
         Value & v2 = env2.bindings[*i];
         mkCopy(v2, *state.lookupVar(&env, *i));
     }
+#endif
 
     state.eval(env2, body, v);
 }
@@ -470,9 +483,16 @@ void ExprList::eval(EvalState & state, Env & env, Value & v)
 
 void ExprVar::eval(EvalState & state, Env & env, Value & v)
 {
-    Value * v2 = state.lookupVar(&env, name);
-    state.forceValue(*v2);
-    v = *v2;
+    printMsg(lvlError, format("eval var %1% %2% %3%") % fromWith % level % displ);
+
+    if (fromWith) {
+        abort();
+    } else {
+        Env * env2 = &env;
+        for (unsigned int l = level; l; --l, env2 = env2->up) ;
+        state.forceValue(env2->values[displ]);
+        v = env2->values[displ];
+    }
 }
 
 
@@ -559,22 +579,22 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
         throwTypeError("attempt to call something which is neither a function nor a primop (built-in operation) but %1%",
             showType(fun));
 
-    Env & env2(allocEnv());
+    unsigned int size =
+        (fun.lambda.fun->arg.empty() ? 0 : 1) +
+        (fun.lambda.fun->matchAttrs ? fun.lambda.fun->formals->formals.size() : 0);
+    Env & env2(allocEnv(size));
     env2.up = fun.lambda.env;
 
-    if (!fun.lambda.fun->matchAttrs) {
-        Value & vArg = env2.bindings[fun.lambda.fun->arg];
-        nrValues++;
-        vArg = arg;
-    }
+    unsigned int displ = 0;
+
+    if (!fun.lambda.fun->matchAttrs)
+        env2.values[displ++] = arg;
 
     else {
         forceAttrs(arg);
         
-        if (!fun.lambda.fun->arg.empty()) {
-            env2.bindings[fun.lambda.fun->arg] = arg;
-            nrValues++;
-        }                
+        if (!fun.lambda.fun->arg.empty())
+            env2.values[displ++] = arg;
 
         /* For each formal argument, get the actual argument.  If
            there is no matching actual argument but the formal
@@ -582,17 +602,13 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
         unsigned int attrsUsed = 0;
         foreach (Formals::Formals_::iterator, i, fun.lambda.fun->formals->formals) {
             Bindings::iterator j = arg.attrs->find(i->name);
-                
-            Value & v = env2.bindings[i->name];
-            nrValues++;
-                
             if (j == arg.attrs->end()) {
                 if (!i->def) throwTypeError("function at %1% called without required argument `%2%'",
                     fun.lambda.fun->pos, i->name);   
-                mkThunk(v, env2, i->def);
+                mkThunk(env2.values[displ++], env2, i->def);
             } else {
                 attrsUsed++;
-                mkCopy(v, j->second);
+                mkCopy(env2.values[displ++], j->second);
             }
         }
 
@@ -639,6 +655,8 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
 
 void ExprWith::eval(EvalState & state, Env & env, Value & v)
 {
+    abort();
+#if 0
     Env & env2(state.allocEnv());
     env2.up = &env;
 
@@ -647,6 +665,7 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
     state.forceAttrs(vAttrs);
         
     state.eval(env2, body, v);
+#endif
 }
 
 

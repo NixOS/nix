@@ -51,11 +51,12 @@ void run(Strings args)
     printMsg(lvlError, format("size of value: %1% bytes") % sizeof(Value));
     printMsg(lvlError, format("size of int AST node: %1% bytes") % sizeof(ExprInt));
     printMsg(lvlError, format("size of attrset AST node: %1% bytes") % sizeof(ExprAttrs));
-    
+
     doTest(state, "123");
     doTest(state, "{ x = 1; y = 2; }");
     doTest(state, "{ x = 1; y = 2; }.y");
-    doTest(state, "rec { x = 1; y = x; }.y");
+    doTest(state, "let x = 1; y = 2; z = 3; in let a = 4; in y");
+    doTest(state, "rec { x = 1; y = x; }.x");
     doTest(state, "(x: x) 1");
     doTest(state, "(x: y: y) 1 2");
     doTest(state, "x: x");
