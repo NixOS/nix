@@ -232,19 +232,6 @@ void mkPath(Value & v, const char * s)
 }
 
 
-Value * EvalState::lookupWith(Env * env, const Symbol & name)
-{
-    if (!env) return 0;
-    Value * v = lookupWith(env->up, name);
-    if (v) return v;
-    Bindings::iterator i = env->bindings.find(sWith);
-    if (i == env->bindings.end()) return 0;
-    Bindings::iterator j = i->second.attrs->find(name);
-    if (j != i->second.attrs->end()) return &j->second;
-    return 0;
-}
-
-
 Value * EvalState::lookupVar(Env * env, const Symbol & name)
 {
     /* First look for a regular variable binding for `name'. */
@@ -254,22 +241,14 @@ Value * EvalState::lookupVar(Env * env, const Symbol & name)
     }
 
     /* Otherwise, look for a `with' attribute set containing `name'.
-       Outer `withs' take precedence (i.e. `with {x=1;}; with {x=2;};
-       x' evaluates to 1).  */
-    Value * v = lookupWith(env, name);
-    if (v) return v;
-
-    /* Alternative implementation where the inner `withs' take
-       precedence (i.e. `with {x=1;}; with {x=2;}; x' evaluates to
-       2). */
-#if 0
+       Inner `withs' take precedence (i.e. `with {x=1;}; with {x=2;};
+       x' evaluates to 2). */
     for (Env * env2 = env; env2; env2 = env2->up) {
         Bindings::iterator i = env2->bindings.find(sWith);
         if (i == env2->bindings.end()) continue;
         Bindings::iterator j = i->second.attrs->find(name);
         if (j != i->second.attrs->end()) return &j->second;
     }
-#endif
     
     throwEvalError("undefined variable `%1%'", name);
 }

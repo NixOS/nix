@@ -240,8 +240,6 @@ private:
 
     Value * lookupVar(Env * env, const Symbol & name);
     
-    Value * lookupWith(Env * env, const Symbol & name);
-
     friend class ExprVar;
     friend class ExprAttrs;
     friend class ExprLet;
