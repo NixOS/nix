@@ -76,7 +76,7 @@ struct Value
         Bindings * attrs;
         struct {
             unsigned int length;
-            Value * elems;
+            Value * * elems;
         } list;
         struct {
             Env * env;
@@ -282,8 +282,8 @@ private:
     
     unsigned long nrEnvs;
     unsigned long nrValuesInEnvs;
-    unsigned long nrValuesInLists;
     unsigned long nrValues;
+    unsigned long nrListElems;
     unsigned long nrEvaluated;
     unsigned int recursionDepth;
     unsigned int maxRecursionDepth;

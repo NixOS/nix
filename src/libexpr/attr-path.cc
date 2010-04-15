@@ -61,7 +61,7 @@ void findAlongAttrPath(EvalState & state, const string & attrPath,
             if (attrIndex >= v.list.length)
                 throw Error(format("list index %1% in selection path `%2%' is out of range") % attrIndex % curPath);
 
-            v = v.list.elems[attrIndex];
+            v = *v.list.elems[attrIndex];
         }
         
     }

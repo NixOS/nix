@@ -113,6 +113,7 @@ void run(Strings args)
     doTest(state, "with { x = 1; }; let inherit x; y = x; in y");
     doTest(state, "builtins.toXML 123");
     doTest(state, "builtins.toXML { a.b = \"x\" + \"y\"; c = [ 1 2 ] ++ [ 3 4 ]; }");
+    doTest(state, "builtins.attrNames { x = 1; y = 2; }");
 
     state.printStats();
 }

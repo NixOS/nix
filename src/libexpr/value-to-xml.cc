@@ -97,7 +97,7 @@ static void printValueAsXML(EvalState & state, bool strict, Value & v,
         case tList: {
             XMLOpenElement _(doc, "list");
             for (unsigned int n = 0; n < v.list.length; ++n)
-                printValueAsXML(state, strict, v.list.elems[n], doc, context, drvsSeen);
+                printValueAsXML(state, strict, *v.list.elems[n], doc, context, drvsSeen);
             break;
         }
 

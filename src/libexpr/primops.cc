@@ -311,7 +311,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
             if (key == "args") {
                 state.forceList(i->second);
                 for (unsigned int n = 0; n < i->second.list.length; ++n) {
-                    string s = state.coerceToString(i->second.list.elems[n], context, true);
+                    string s = state.coerceToString(*i->second.list.elems[n], context, true);
                     drv.args.push_back(s);
                 }
             }
@@ -651,14 +651,17 @@ static void prim_attrNames(EvalState & state, Value * * args, Value & v)
     state.forceAttrs(*args[0]);
 
     state.mkList(v, args[0]->attrs->size());
+    Value * vs = state.allocValues(v.list.length);
 
     StringSet names;
     foreach (Bindings::iterator, i, *args[0]->attrs)
         names.insert(i->first);
 
     unsigned int n = 0;
-    foreach (StringSet::iterator, i, names)
-        mkString(v.list.elems[n++], *i);
+    foreach (StringSet::iterator, i, names) {
+        v.list.elems[n] = &vs[n];
+        mkString(vs[n++], *i);
+    }
 }
 
 
@@ -701,8 +704,8 @@ static void prim_removeAttrs(EvalState & state, Value * * args, Value & v)
     state.cloneAttrs(*args[0], v);
 
     for (unsigned int i = 0; i < args[1]->list.length; ++i) {
-        state.forceStringNoCtx(args[1]->list.elems[i]);
-        v.attrs->erase(state.symbols.create(args[1]->list.elems[i].string.s));
+        state.forceStringNoCtx(*args[1]->list.elems[i]);
+        v.attrs->erase(state.symbols.create(args[1]->list.elems[i]->string.s));
     }
 }
 
@@ -718,7 +721,7 @@ static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
     state.mkAttrs(v);
 
     for (unsigned int i = 0; i < args[0]->list.length; ++i) {
-        Value & v2(args[0]->list.elems[i]);
+        Value & v2(*args[0]->list.elems[i]);
         state.forceAttrs(v2);
         
         Bindings::iterator j = v2.attrs->find(state.sName);
@@ -815,8 +818,8 @@ static void prim_head(EvalState & state, Value * * args, Value & v)
     state.forceList(*args[0]);
     if (args[0]->list.length == 0)
         throw Error("`head' called on an empty list");
-    state.forceValue(args[0]->list.elems[0]);
-    v = args[0]->list.elems[0];
+    state.forceValue(*args[0]->list.elems[0]);
+    v = *args[0]->list.elems[0];
 }
 
 
@@ -840,11 +843,13 @@ static void prim_map(EvalState & state, Value * * args, Value & v)
     state.forceList(*args[1]);
 
     state.mkList(v, args[1]->list.length);
+    Value * vs = state.allocValues(v.list.length);
 
     for (unsigned int n = 0; n < v.list.length; ++n) {
-        v.list.elems[n].type = tApp;
-        v.list.elems[n].app.left = args[0];
-        v.list.elems[n].app.right = &args[1]->list.elems[n];
+        v.list.elems[n] = &vs[n];
+        vs[n].type = tApp;
+        vs[n].app.left = args[0];
+        vs[n].app.right = args[1]->list.elems[n];
     }
 }
 

@@ -48,7 +48,7 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
         } else if (i->second.type == tList) {
             value.type = MetaValue::tpStrings;
             for (unsigned int j = 0; j < i->second.list.length; ++j)
-                value.stringValues.push_back(state.forceStringNoCtx(i->second.list.elems[j]));
+                value.stringValues.push_back(state.forceStringNoCtx(*i->second.list.elems[j]));
         } else continue;
         meta[i->first] = value;
     }
@@ -206,8 +206,8 @@ static void getDerivations(EvalState & state, Value & vIn,
             startNest(nest, lvlDebug,
                 format("evaluating list element"));
             string pathPrefix2 = addToPath(pathPrefix, (format("%1%") % n).str());
-            if (getDerivation(state, v.list.elems[n], pathPrefix2, drvs, done))
-                getDerivations(state, v.list.elems[n], pathPrefix2, autoArgs, drvs, done);
+            if (getDerivation(state, *v.list.elems[n], pathPrefix2, drvs, done))
+                getDerivations(state, *v.list.elems[n], pathPrefix2, autoArgs, drvs, done);
         }
     }
 

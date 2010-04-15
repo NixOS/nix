@@ -50,7 +50,7 @@ std::ostream & operator << (std::ostream & str, Value & v)
     case tList:
         str << "[ ";
         for (unsigned int n = 0; n < v.list.length; ++n)
-            str << v.list.elems[n] << " ";
+            str << *v.list.elems[n] << " ";
         str << "]";
         break;
     case tThunk:
@@ -102,7 +102,7 @@ EvalState::EvalState()
     , baseEnvDispl(0)
     , staticBaseEnv(false, 0)
 {
-    nrEnvs = nrValuesInEnvs = nrValuesInLists = nrValues = 0;
+    nrEnvs = nrValuesInEnvs = nrValues = nrListElems = 0;
     nrEvaluated = recursionDepth = maxRecursionDepth = 0;
     deepestStack = (char *) -1;
 
@@ -251,6 +251,7 @@ Value * EvalState::lookupVar(Env * env, const VarRef & var)
 
 Value * EvalState::allocValues(unsigned int count)
 {
+    nrValues += count;
     return new Value[count]; // !!! check destructor
 }
 
@@ -268,8 +269,8 @@ void EvalState::mkList(Value & v, unsigned int length)
 {
     v.type = tList;
     v.list.length = length;
-    v.list.elems = allocValues(length);
-    nrValuesInLists += length;
+    v.list.elems = new Value *[length];
+    nrListElems += length;
 }
 
 
@@ -461,8 +462,11 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkList(v, elems.size());
-    for (unsigned int n = 0; n < v.list.length; ++n)
-        mkThunk(v.list.elems[n], env, elems[n]);
+    Value * vs = state.allocValues(v.list.length);
+    for (unsigned int n = 0; n < v.list.length; ++n) {
+        v.list.elems[n] = &vs[n];
+        mkThunk(vs[n], env, elems[n]);
+    }
 }
 
 
@@ -543,7 +547,6 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
             primOp->primOp.fun(*this, vArgs, v);
         } else {
             Value * v2 = allocValues(2);
-            nrValues += 2;
             v2[0] = fun;
             v2[1] = arg;
             v.type = tPrimOpApp;
@@ -734,8 +737,6 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
     Value v2; state.eval(env, e2, v2);
     state.forceList(v2);
     state.mkList(v, v1.list.length + v2.list.length);
-    /* !!! This loses sharing with the original lists.  We could use a
-       tCopy node, but that would use more memory. */
     for (unsigned int n = 0; n < v1.list.length; ++n)
         v.list.elems[n] = v1.list.elems[n];
     for (unsigned int n = 0; n < v2.list.length; ++n)
@@ -810,7 +811,7 @@ void EvalState::strictForceValue(Value & v)
     
     else if (v.type == tList) {
         for (unsigned int n = 0; n < v.list.length; ++n)
-            strictForceValue(v.list.elems[n]);
+            strictForceValue(*v.list.elems[n]);
     }
 }
 
@@ -951,11 +952,11 @@ string EvalState::coerceToString(Value & v, PathSet & context,
         if (v.type == tList) {
             string result;
             for (unsigned int n = 0; n < v.list.length; ++n) {
-                result += coerceToString(v.list.elems[n],
+                result += coerceToString(*v.list.elems[n],
                     context, coerceMore, copyToStore);
                 if (n < v.list.length - 1
                     /* !!! not quite correct */
-                    && (v.list.elems[n].type != tList || v.list.elems[n].list.length != 0))
+                    && (v.list.elems[n]->type != tList || v.list.elems[n]->list.length != 0))
                     result += " ";
             }
             return result;
@@ -1009,14 +1010,14 @@ bool EvalState::eqValues(Value & v1, Value & v2)
         case tList:
             if (v2.type != tList || v1.list.length != v2.list.length) return false;
             for (unsigned int n = 0; n < v1.list.length; ++n)
-                if (!eqValues(v1.list.elems[n], v2.list.elems[n])) return false;
+                if (!eqValues(*v1.list.elems[n], *v2.list.elems[n])) return false;
             return true;
 
         case tAttrs: {
             if (v2.type != tAttrs || v1.attrs->size() != v2.attrs->size()) return false;
             Bindings::iterator i, j;
             for (i = v1.attrs->begin(), j = v2.attrs->begin(); i != v1.attrs->end(); ++i, ++j)
-                if (!eqValues(i->second, j->second)) return false;
+                if (i->first != j->first || !eqValues(i->second, j->second)) return false;
             return true;
         }
 
@@ -1046,8 +1047,8 @@ void EvalState::printStats()
         % nrEnvs % (nrEnvs * sizeof(Env)));
     printMsg(v, format("  values allocated in environments: %1% (%2% bytes)")
         % nrValuesInEnvs % (nrValuesInEnvs * sizeof(Value)));
-    printMsg(v, format("  values allocated in lists: %1% (%2% bytes)")
-        % nrValuesInLists % (nrValuesInLists * sizeof(Value)));
+    printMsg(v, format("  list elements: %1% (%2% bytes)")
+        % nrListElems % (nrListElems * sizeof(Value *)));
     printMsg(v, format("  misc. values allocated: %1% (%2% bytes) ")
         % nrValues % (nrValues * sizeof(Value)));
     printMsg(v, format("  symbols in symbol table: %1%") % symbols.size());
