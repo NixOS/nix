@@ -1013,13 +1013,13 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             return true;
 
         case tList:
-            if (v2.type != tList || v1.list.length != v2.list.length) return false;
+            if (v1.list.length != v2.list.length) return false;
             for (unsigned int n = 0; n < v1.list.length; ++n)
                 if (!eqValues(*v1.list.elems[n], *v2.list.elems[n])) return false;
             return true;
 
         case tAttrs: {
-            if (v2.type != tAttrs || v1.attrs->size() != v2.attrs->size()) return false;
+            if (v1.attrs->size() != v2.attrs->size()) return false;
             Bindings::iterator i, j;
             for (i = v1.attrs->begin(), j = v2.attrs->begin(); i != v1.attrs->end(); ++i, ++j)
                 if (i->first != j->first || !eqValues(i->second, j->second)) return false;
@@ -1055,7 +1055,7 @@ void EvalState::printStats()
         % nrValuesInEnvs % (nrValuesInEnvs * sizeof(Value)));
     printMsg(v, format("  list elements: %1% (%2% bytes)")
         % nrListElems % (nrListElems * sizeof(Value *)));
-    printMsg(v, format("  misc. values allocated: %1% (%2% bytes) ")
+    printMsg(v, format("  misc. values allocated: %1% (%2% bytes)")
         % nrValues % (nrValues * sizeof(Value)));
     printMsg(v, format("  symbols in symbol table: %1%") % symbols.size());
 }
