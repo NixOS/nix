@@ -652,15 +652,18 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
         /* Because the first `with' may be a shallow copy of another
            attribute set (through a tCopy node), we need to clone its
            `attrs' before modifying them. */
-        env2.values[0].attrs = new Bindings(*env2.values[0].attrs);
+        Bindings * old(env2.values[0].attrs);
+        state.mkAttrs(env2.values[0]);
+        foreach (Bindings::iterator, i, *old)
+            mkCopy((*env2.values[0].attrs)[i->first], i->second);
 
         foreach (Bindings::iterator, i, *env3->values[0].attrs) {
             Bindings::iterator j = env2.values[0].attrs->find(i->first);
             if (j == env2.values[0].attrs->end())
-                (*env2.values[0].attrs)[i->first] = i->second; // !!! sharing
+                mkCopy((*env2.values[0].attrs)[i->first], i->second);
         }
     }
-        
+
     state.eval(env2, body, v);
 }
 
@@ -731,7 +734,7 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
     state.forceAttrs(v2);
     
     foreach (Bindings::iterator, i, *v2.attrs)
-        (*v.attrs)[i->first] = i->second; // !!! sharing
+        mkCopy((*v.attrs)[i->first], i->second);
 }
 
 

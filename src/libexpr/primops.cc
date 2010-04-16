@@ -733,7 +733,7 @@ static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
         if (j == v2.attrs->end())
             throw TypeError("`value' attribute missing in a call to `listToAttrs'");
 
-        (*v.attrs)[state.symbols.create(name)] = j->second; // !!! sharing?
+        mkCopy((*v.attrs)[state.symbols.create(name)], j->second);
     }
 }
 
