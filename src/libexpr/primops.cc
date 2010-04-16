@@ -462,12 +462,11 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
 static void prim_toPath(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
-    string path = state.coerceToPath(*args[0], context);
+    Path path = state.coerceToPath(*args[0], context);
     mkString(v, canonPath(path), context);
 }
 
 
-#if 0
 /* Allow a valid store path to be used in an expression.  This is
    useful in some generated expressions such as in nix-push, which
    generates a call to a function with an already existing store path
@@ -479,16 +478,15 @@ static void prim_toPath(EvalState & state, Value * * args, Value & v)
 static void prim_storePath(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
-    Path path = canonPath(coerceToPath(state, args[0], context));
+    Path path = canonPath(state.coerceToPath(*args[0], context));
     if (!isInStore(path))
         throw EvalError(format("path `%1%' is not in the Nix store") % path);
     Path path2 = toStorePath(path);
     if (!store->isValidPath(path2))
         throw EvalError(format("store path `%1%' is not valid") % path2);
     context.insert(path2);
-    return makeStr(path, context);
+    mkString(v, path, context);
 }
-#endif
 
 
 static void prim_pathExists(EvalState & state, Value * * args, Value & v)
@@ -738,35 +736,20 @@ static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
 }
 
 
-#if 0
 /* Return the right-biased intersection of two attribute sets as1 and
    as2, i.e. a set that contains every attribute from as2 that is also
    a member of as1. */
 static void prim_intersectAttrs(EvalState & state, Value * * args, Value & v)
 {
-    ATermMap as1, as2;
-    queryAllAttrs(evalExpr(state, args[0]), as1, true);
-    queryAllAttrs(evalExpr(state, args[1]), as2, true);
-
-    ATermMap res;
-    foreach (ATermMap::const_iterator, i, as2)
-        if (as1[i->key]) res.set(i->key, i->value);
-
-    return makeAttrs(res);
-}
-
-
-static void attrsInPattern(ATermMap & map, Pattern pat)
-{
-    ATerm name;
-    ATermList formals;
-    ATermBool ellipsis;
-    if (matchAttrsPat(pat, formals, ellipsis, name)) { 
-        for (ATermIterator i(formals); i; ++i) {
-            ATerm def;
-            if (!matchFormal(*i, name, def)) abort();
-            map.set(name, makeAttrRHS(makeBool(def != constNoDefaultValue), makeNoPos()));
-        }
+    state.forceAttrs(*args[0]);
+    state.forceAttrs(*args[1]);
+        
+    state.mkAttrs(v);
+    
+    foreach (Bindings::iterator, i, *args[1]->attrs) {
+        Bindings::iterator j = args[0]->attrs->find(i->first);
+        if (j != args[0]->attrs->end())
+            mkCopy((*v.attrs)[i->first], i->second);
     }
 }
 
@@ -786,17 +769,17 @@ static void attrsInPattern(ATermMap & map, Pattern pat)
 */
 static void prim_functionArgs(EvalState & state, Value * * args, Value & v)
 {
-    Expr f = evalExpr(state, args[0]);
-    ATerm pat, body, pos;
-    if (!matchFunction(f, pat, body, pos))
-        throw TypeError("`functionArgs' required a function");
-    
-    ATermMap as;
-    attrsInPattern(as, pat);
+    state.forceValue(*args[0]);
+    if (args[0]->type != tLambda)
+        throw TypeError("`functionArgs' requires a function");
 
-    return makeAttrs(as);
+    state.mkAttrs(v);
+
+    if (!args[0]->lambda.fun->matchAttrs) return;
+
+    foreach (Formals::Formals_::iterator, i, args[0]->lambda.fun->formals->formals)
+        mkBool((*v.attrs)[i->name], i->def);
 }
-#endif
 
 
 /*************************************************************
@@ -948,7 +931,6 @@ static void prim_unsafeDiscardStringContext(EvalState & state, Value * * args, V
 }
 
 
-#if 0
 /* Sometimes we want to pass a derivation path (i.e. pkg.drvPath) to a
    builder without causing the derivation to be built (for instance,
    in the derivation that builds NARs in nix-push, when doing
@@ -958,7 +940,7 @@ static void prim_unsafeDiscardStringContext(EvalState & state, Value * * args, V
 static void prim_unsafeDiscardOutputDependency(EvalState & state, Value * * args, Value & v)
 {
     PathSet context;
-    string s = coerceToString(state, args[0], context);
+    string s = state.coerceToString(*args[0], context);
 
     PathSet context2;
     foreach (PathSet::iterator, i, context) {
@@ -967,9 +949,8 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, Value * * args
         context2.insert(p);
     }
     
-    return makeStr(s, context2);
+    mkString(v, s, context2);
 }
-#endif
 
 
 /*************************************************************
@@ -1056,9 +1037,7 @@ void EvalState::createBaseEnv()
 
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);
-#if 0
     addPrimOp("__storePath", 1, prim_storePath);
-#endif
     addPrimOp("__pathExists", 1, prim_pathExists);
     addPrimOp("baseNameOf", 1, prim_baseNameOf);
     addPrimOp("dirOf", 1, prim_dirOf);
@@ -1076,10 +1055,8 @@ void EvalState::createBaseEnv()
     addPrimOp("__isAttrs", 1, prim_isAttrs);
     addPrimOp("removeAttrs", 2, prim_removeAttrs);
     addPrimOp("__listToAttrs", 1, prim_listToAttrs);
-#if 0
     addPrimOp("__intersectAttrs", 2, prim_intersectAttrs);
     addPrimOp("__functionArgs", 1, prim_functionArgs);
-#endif
 
     // Lists
     addPrimOp("__isList", 1, prim_isList);
@@ -1100,9 +1077,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__substring", 3, prim_substring);
     addPrimOp("__stringLength", 1, prim_stringLength);
     addPrimOp("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
-#if 0    
     addPrimOp("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
-#endif
 
     // Versions
     addPrimOp("__parseDrvName", 1, prim_parseDrvName);

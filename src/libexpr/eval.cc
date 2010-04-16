@@ -367,6 +367,14 @@ bool EvalState::evalBool(Env & env, Expr * e)
 }
 
 
+void EvalState::evalAttrs(Env & env, Expr * e, Value & v)
+{
+    eval(env, e, v);
+    if (v.type != tAttrs)
+        throwTypeError("value is %1% while an attribute set was expected", showType(v));
+}
+
+
 void Expr::eval(EvalState & state, Env & env, Value & v)
 {
     abort();
@@ -481,8 +489,7 @@ void ExprVar::eval(EvalState & state, Env & env, Value & v)
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
     Value v2;
-    state.eval(env, e, v2);
-    state.forceAttrs(v2); // !!! eval followed by force is slightly inefficient
+    state.evalAttrs(env, e, v2);
     Bindings::iterator i = v2.attrs->find(name);
     if (i == v2.attrs->end())
         throwEvalError("attribute `%1%' missing", name);
@@ -499,8 +506,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
 {
     Value vAttrs;
-    state.eval(env, e, vAttrs);
-    state.forceAttrs(vAttrs);
+    state.evalAttrs(env, e, vAttrs);
     mkBool(v, vAttrs.attrs->find(name) != vAttrs.attrs->end());
 }
 
@@ -640,8 +646,7 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
     Env & env2(state.allocEnv(1));
     env2.up = &env;
 
-    state.eval(env, attrs, env2.values[0]);
-    state.forceAttrs(env2.values[0]);
+    state.evalAttrs(env, attrs, env2.values[0]);
 
     /* If there is an enclosing `with', copy all attributes that don't
        appear in this `with'. */
@@ -725,13 +730,11 @@ void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
 void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 {
     Value v2;
-    state.eval(env, e1, v2);
-    state.forceAttrs(v2);
+    state.evalAttrs(env, e1, v2);
         
     state.cloneAttrs(v2, v);
         
-    state.eval(env, e2, v2);
-    state.forceAttrs(v2);
+    state.evalAttrs(env, e2, v2);
     
     foreach (Bindings::iterator, i, *v2.attrs)
         mkCopy((*v.attrs)[i->first], i->second);

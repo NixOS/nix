@@ -188,6 +188,7 @@ public:
     /* Evaluation the expression, then verify that it has the expected
        type. */
     bool evalBool(Env & env, Expr * e);
+    void evalAttrs(Env & env, Expr * e, Value & v);
 
     /* If `v' is a thunk, enter it and overwrite `v' with the result
        of the evaluation of the thunk.  If `v' is a delayed function
