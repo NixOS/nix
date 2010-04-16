@@ -153,7 +153,7 @@ static Expr * loadSourceExpr(EvalState & state, const Path & path)
        for a user to have a ~/.nix-defexpr directory that includes
        some system-wide directory). */
     ExprAttrs * attrs = new ExprAttrs;
-    attrs->attrs[state.symbols.create("_combineChannels")] = new ExprInt(1);
+    attrs->attrs[state.symbols.create("_combineChannels")] = new ExprList();
     getAllExprs(state, path, *attrs);
     return attrs;
 }
