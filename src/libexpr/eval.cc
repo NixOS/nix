@@ -649,6 +649,11 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
         Env * env3 = &env;
         for (unsigned int l = prevWith; l; --l, env3 = env3->up) ;
 
+        /* Because the first `with' may be a shallow copy of another
+           attribute set (through a tCopy node), we need to clone its
+           `attrs' before modifying them. */
+        env2.values[0].attrs = new Bindings(*env2.values[0].attrs);
+
         foreach (Bindings::iterator, i, *env3->values[0].attrs) {
             Bindings::iterator j = env2.values[0].attrs->find(i->first);
             if (j == env2.values[0].attrs->end())
@@ -1042,7 +1047,8 @@ void EvalState::printStats()
     printMsg(v, format("  expressions evaluated: %1%") % nrEvaluated);
     printMsg(v, format("  stack space used: %1% bytes") % (&x - deepestStack));
     printMsg(v, format("  max eval() nesting depth: %1%") % maxRecursionDepth);
-    printMsg(v, format("  stack space per eval() level: %1% bytes") % ((&x - deepestStack) / (float) maxRecursionDepth));
+    printMsg(v, format("  stack space per eval() level: %1% bytes")
+        % ((&x - deepestStack) / (float) maxRecursionDepth));
     printMsg(v, format("  environments allocated: %1% (%2% bytes)")
         % nrEnvs % (nrEnvs * sizeof(Env)));
     printMsg(v, format("  values allocated in environments: %1% (%2% bytes)")

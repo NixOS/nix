@@ -177,14 +177,15 @@ static void getDerivations(EvalState & state, Value & vIn,
            there are names clashes between derivations, the derivation
            bound to the attribute with the "lower" name should take
            precedence). */
-        StringSet attrs;
+        typedef std::map<string, Symbol> SortedSymbols;
+        SortedSymbols attrs;
         foreach (Bindings::iterator, i, *v.attrs)
-            attrs.insert(i->first);
+            attrs.insert(std::pair<string, Symbol>(i->first, i->first));
 
-        foreach (StringSet::iterator, i, attrs) {
-            startNest(nest, lvlDebug, format("evaluating attribute `%1%'") % *i);
-            string pathPrefix2 = addToPath(pathPrefix, *i);
-            Value & v2((*v.attrs)[state.symbols.create(*i)]);
+        foreach (SortedSymbols::iterator, i, attrs) {
+            startNest(nest, lvlDebug, format("evaluating attribute `%1%'") % i->first);
+            string pathPrefix2 = addToPath(pathPrefix, i->first);
+            Value & v2((*v.attrs)[i->second]);
             if (combineChannels)
                 getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done);
             else if (getDerivation(state, v2, pathPrefix2, drvs, done)) {

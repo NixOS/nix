@@ -1089,6 +1089,7 @@ static void opQuery(Globals & globals,
     
     foreach (vector<DrvInfo>::iterator, i, elems2) {
         try {
+            startNest(nest, lvlDebug, format("outputting query result `%1%'") % i->attrPath);
 
             /* For table output. */
             Strings columns;
