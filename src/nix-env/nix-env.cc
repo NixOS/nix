@@ -12,6 +12,7 @@
 #include "common-opts.hh"
 #include "xml-writer.hh"
 #include "store-api.hh"
+#include "user-env.hh"
 #include "util.hh"
 
 #include <cerrno>
@@ -189,25 +190,6 @@ static Path getHomeDir()
 static Path getDefNixExprPath()
 {
     return getHomeDir() + "/.nix-defexpr";
-}
-
-
-static DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
-{
-    Path path = userEnv + "/manifest";
-
-    if (!pathExists(path))
-        return DrvInfos(); /* not an error, assume nothing installed */
-
-    throw Error("not implemented");
-#if 0
-    Expr e = ATreadFromNamedFile(path.c_str());
-    if (!e) throw Error(format("cannot read Nix expression from `%1%'") % path);
-
-    DrvInfos elems;
-    // !!! getDerivations(state, e, "", ATermMap(1), elems);
-    return elems;
-#endif
 }
 
 
