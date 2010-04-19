@@ -29,6 +29,9 @@ struct DrvInfo
 private:
     string drvPath;
     string outPath;
+
+    bool metaInfoRead;
+    MetaInfo meta;
     
 public:
     string name;
@@ -37,6 +40,8 @@ public:
 
     /* !!! make this private */
     Bindings * attrs;
+
+    DrvInfo() : metaInfoRead(false) { };
 
     string queryDrvPath(EvalState & state) const;
     string queryOutPath(EvalState & state) const;

@@ -7,7 +7,7 @@ namespace nix {
 
 string DrvInfo::queryDrvPath(EvalState & state) const
 {
-    if (drvPath == "") {
+    if (drvPath == "" && attrs) {
         Bindings::iterator i = attrs->find(state.sDrvPath);
         PathSet context;
         (string &) drvPath = i != attrs->end() ? state.coerceToPath(i->second, context) : "";
@@ -18,7 +18,7 @@ string DrvInfo::queryDrvPath(EvalState & state) const
 
 string DrvInfo::queryOutPath(EvalState & state) const
 {
-    if (outPath == "") {
+    if (outPath == "" && attrs) {
         Bindings::iterator i = attrs->find(state.sOutPath);
         PathSet context;
         (string &) outPath = i != attrs->end() ? state.coerceToPath(i->second, context) : "";
@@ -29,7 +29,9 @@ string DrvInfo::queryOutPath(EvalState & state) const
 
 MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
 {
-    MetaInfo meta;
+    if (metaInfoRead) return meta;
+    
+    (bool &) metaInfoRead = true;
     
     Bindings::iterator a = attrs->find(state.sMeta);
     if (a == attrs->end()) return meta; /* fine, empty meta information */
@@ -50,7 +52,7 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
             for (unsigned int j = 0; j < i->second.list.length; ++j)
                 value.stringValues.push_back(state.forceStringNoCtx(*i->second.list.elems[j]));
         } else continue;
-        meta[i->first] = value;
+        ((MetaInfo &) meta)[i->first] = value;
     }
 
     return meta;
@@ -66,9 +68,11 @@ MetaValue DrvInfo::queryMetaInfo(EvalState & state, const string & name) const
 
 void DrvInfo::setMetaInfo(const MetaInfo & meta)
 {
-    throw Error("not implemented");
+    metaInfoRead = true;
+    this->meta = meta;
+    
 #if 0
-    ATermMap metaAttrs;
+    Value * metaAttrs = state.allocValues(1);
     foreach (MetaInfo::const_iterator, i, meta) {
         Expr e;
         switch (i->second.type) {
