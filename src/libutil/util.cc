@@ -1006,6 +1006,47 @@ bool hasSuffix(const string & s, const string & suffix)
 }
 
 
+void expect(std::istream & str, const string & s)
+{
+    char s2[s.size()];
+    str.read(s2, s.size());
+    if (string(s2, s.size()) != s)
+        throw Error(format("expected string `%1%'") % s);
+}
+
+
+string parseString(std::istream & str)
+{
+    string res;
+    expect(str, "\"");
+    int c;
+    while ((c = str.get()) != '"')
+        if (c == '\\') {
+            c = str.get();
+            if (c == 'n') res += '\n';
+            else if (c == 'r') res += '\r';
+            else if (c == 't') res += '\t';
+            else res += c;
+        }
+        else res += c;
+    return res;
+}
+
+
+bool endOfList(std::istream & str)
+{
+    if (str.peek() == ',') {
+        str.get();
+        return false;
+    }
+    if (str.peek() == ']') {
+        str.get();
+        return true;
+    }
+    return false;
+}
+
+
 void ignoreException()
 {
     try {

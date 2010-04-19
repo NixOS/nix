@@ -1,20 +1,10 @@
 #include "derivations.hh"
 #include "store-api.hh"
-#include "aterm.hh"
 #include "globals.hh"
 #include "util.hh"
 
-#include "derivations-ast.hh"
-#include "derivations-ast.cc"
-
 
 namespace nix {
-
-
-Hash hashTerm(ATerm t)
-{
-    return hashString(htSHA256, atPrint(t));
-}
 
 
 Path writeDerivation(const Derivation & drv, const string & name)
@@ -27,137 +17,150 @@ Path writeDerivation(const Derivation & drv, const string & name)
        (that can be missing (of course) and should not necessarily be
        held during a garbage collection). */
     string suffix = name + drvExtension;
-    string contents = atPrint(unparseDerivation(drv));
+    string contents = unparseDerivation(drv);
     return readOnlyMode
         ? computeStorePathForText(suffix, contents, references)
         : store->addTextToStore(suffix, contents, references);
 }
 
 
-static void checkPath(const string & s)
+static Path parsePath(std::istream & str)
 {
+    string s = parseString(str);
     if (s.size() == 0 || s[0] != '/')
         throw Error(format("bad path `%1%' in derivation") % s);
+    return s;
 }
     
 
-static void parseStrings(ATermList paths, StringSet & out, bool arePaths)
+static StringSet parseStrings(std::istream & str, bool arePaths)
 {
-    for (ATermIterator i(paths); i; ++i) {
-        if (ATgetType(*i) != AT_APPL)
-            throw badTerm("not a path", *i);
-        string s = aterm2String(*i);
-        if (arePaths) checkPath(s);
-        out.insert(s);
-    }
+    StringSet res;
+    while (!endOfList(str))
+        res.insert(arePaths ? parsePath(str) : parseString(str));
+    return res;
 }
+    
 
-
-/* Shut up warnings. */
-void throwBadDrv(ATerm t) __attribute__ ((noreturn));
-
-void throwBadDrv(ATerm t) 
-{
-    throw badTerm("not a valid derivation", t);
-}
-
-
-Derivation parseDerivation(ATerm t)
+Derivation parseDerivation(const string & s)
 {
     Derivation drv;
-    ATermList outs, inDrvs, inSrcs, args, bnds;
-    ATerm builder, platform;
+    std::istringstream str(s);
+    expect(str, "Derive([");
 
-    if (!matchDerive(t, outs, inDrvs, inSrcs, platform, builder, args, bnds))
-        throwBadDrv(t);
-
-    for (ATermIterator i(outs); i; ++i) {
-        ATerm id, path, hashAlgo, hash;
-        if (!matchDerivationOutput(*i, id, path, hashAlgo, hash))
-            throwBadDrv(t);
+    /* Parse the list of outputs. */
+    while (!endOfList(str)) {
         DerivationOutput out;
-        out.path = aterm2String(path);
-        checkPath(out.path);
-        out.hashAlgo = aterm2String(hashAlgo);
-        out.hash = aterm2String(hash);
-        drv.outputs[aterm2String(id)] = out;
+        expect(str, "("); string id = parseString(str);
+        expect(str, ","); out.path = parsePath(str);
+        expect(str, ","); out.hashAlgo = parseString(str);
+        expect(str, ","); out.hash = parseString(str);
+        expect(str, ")");
+        drv.outputs[id] = out;
     }
 
-    for (ATermIterator i(inDrvs); i; ++i) {
-        ATerm drvPath;
-        ATermList ids;
-        if (!matchDerivationInput(*i, drvPath, ids))
-            throwBadDrv(t);
-        Path drvPath2 = aterm2String(drvPath);
-        checkPath(drvPath2);
-        StringSet ids2;
-        parseStrings(ids, ids2, false);
-        drv.inputDrvs[drvPath2] = ids2;
+    /* Parse the list of input derivations. */
+    expect(str, ",[");
+    while (!endOfList(str)) {
+        expect(str, "(");
+        Path drvPath = parsePath(str);
+        expect(str, ",[");
+        drv.inputDrvs[drvPath] = parseStrings(str, false);
+        expect(str, ")");
+    }
+
+    expect(str, ",["); drv.inputSrcs = parseStrings(str, true);
+    expect(str, ","); drv.platform = parseString(str);
+    expect(str, ","); drv.builder = parseString(str);
+
+    /* Parse the builder arguments. */
+    expect(str, ",[");
+    while (!endOfList(str))
+        drv.args.push_back(parseString(str));
+
+    /* Parse the environment variables. */
+    expect(str, ",[");
+    while (!endOfList(str)) {
+        expect(str, "("); string name = parseString(str);
+        expect(str, ","); string value = parseString(str);
+        expect(str, ")");
+        drv.env[name] = value;
     }
     
-    parseStrings(inSrcs, drv.inputSrcs, true);
-
-    drv.builder = aterm2String(builder);
-    drv.platform = aterm2String(platform);
-    
-    for (ATermIterator i(args); i; ++i) {
-        if (ATgetType(*i) != AT_APPL)
-            throw badTerm("string expected", *i);
-        drv.args.push_back(aterm2String(*i));
-    }
-
-    for (ATermIterator i(bnds); i; ++i) {
-        ATerm s1, s2;
-        if (!matchEnvBinding(*i, s1, s2))
-            throw badTerm("tuple of strings expected", *i);
-        drv.env[aterm2String(s1)] = aterm2String(s2);
-    }
-
+    expect(str, ")");
     return drv;
 }
 
 
-ATerm unparseDerivation(const Derivation & drv)
+void printString(std::ostream & str, const string & s)
 {
-    ATermList outputs = ATempty;
-    for (DerivationOutputs::const_reverse_iterator i = drv.outputs.rbegin();
-         i != drv.outputs.rend(); ++i)
-        outputs = ATinsert(outputs,
-            makeDerivationOutput(
-                toATerm(i->first),
-                toATerm(i->second.path),
-                toATerm(i->second.hashAlgo),
-                toATerm(i->second.hash)));
+    str << "\"";
+    for (const char * i = s.c_str(); *i; i++)
+        if (*i == '\"' || *i == '\\') str << "\\" << *i;
+        else if (*i == '\n') str << "\\n";
+        else if (*i == '\r') str << "\\r";
+        else if (*i == '\t') str << "\\t";
+        else str << *i;
+    str << "\"";
+}
 
-    ATermList inDrvs = ATempty;
-    for (DerivationInputs::const_reverse_iterator i = drv.inputDrvs.rbegin();
-         i != drv.inputDrvs.rend(); ++i)
-        inDrvs = ATinsert(inDrvs,
-            makeDerivationInput(
-                toATerm(i->first),
-                toATermList(i->second)));
+
+template<class ForwardIterator>
+void printStrings(std::ostream & str, ForwardIterator i, ForwardIterator j)
+{
+    str << "[";
+    bool first = true;
+    for ( ; i != j; ++i) {
+        if (first) first = false; else str << ",";
+        printString(str, *i);
+    }
+    str << "]";
+}
+
+
+string unparseDerivation(const Derivation & drv)
+{
+    std::ostringstream str;
+    str << "Derive([";
+
+    bool first = true;
+    foreach (DerivationOutputs::const_iterator, i, drv.outputs) {
+        if (first) first = false; else str << ",";
+        str << "("; printString(str, i->first);
+        str << ","; printString(str, i->second.path);
+        str << ","; printString(str, i->second.hashAlgo);
+        str << ","; printString(str, i->second.hash);
+        str << ")";
+    }
+
+    str << "],[";
+    first = true;
+    foreach (DerivationInputs::const_iterator, i, drv.inputDrvs) {
+        if (first) first = false; else str << ",";
+        str << "("; printString(str, i->first);
+        str << ","; printStrings(str, i->second.begin(), i->second.end());
+        str << ")";
+    }
+
+    str << "],";
+    printStrings(str, drv.inputSrcs.begin(), drv.inputSrcs.end());
     
-    ATermList args = ATempty;
-    for (Strings::const_reverse_iterator i = drv.args.rbegin();
-         i != drv.args.rend(); ++i)
-        args = ATinsert(args, toATerm(*i));
+    str << ","; printString(str, drv.platform);
+    str << ","; printString(str, drv.builder);
+    str << ","; printStrings(str, drv.args.begin(), drv.args.end());
 
-    ATermList env = ATempty;
-    for (StringPairs::const_reverse_iterator i = drv.env.rbegin();
-         i != drv.env.rend(); ++i)
-        env = ATinsert(env,
-            makeEnvBinding(
-                toATerm(i->first),
-                toATerm(i->second)));
-
-    return makeDerive(
-        outputs,
-        inDrvs,
-        toATermList(drv.inputSrcs),
-        toATerm(drv.platform),
-        toATerm(drv.builder),
-        args,
-        env);
+    str << ",[";
+    first = true;
+    foreach (StringPairs::const_iterator, i, drv.env) {
+        if (first) first = false; else str << ",";
+        str << "("; printString(str, i->first);
+        str << ","; printString(str, i->second);
+        str << ")";
+    }
+    
+    str << "])";
+    
+    return str.str();
 }
 
 

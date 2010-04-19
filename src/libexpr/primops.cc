@@ -262,7 +262,7 @@ static Hash hashDerivationModulo(EvalState & state, Derivation drv)
     }
     drv.inputDrvs = inputs2;
     
-    return hashTerm(unparseDerivation(drv));
+    return hashString(htSHA256, unparseDerivation(drv));
 }
 
 

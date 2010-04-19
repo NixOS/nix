@@ -87,9 +87,6 @@ static void setLogType(string lt)
 }
 
 
-void initDerivationsHelpers();
-
-
 static void closeStore()
 {
     try {
@@ -176,9 +173,6 @@ static void initAndRun(int argc, char * * argv)
     string lt = getEnv("NIX_LOG_TYPE");
     if (lt != "") setLogType(lt);
 
-    /* ATerm stuff.  !!! find a better place to put this */
-    initDerivationsHelpers();
-    
     /* Put the arguments in a vector. */
     Strings args, remaining;
     while (argc--) args.push_back(*argv++);
@@ -333,10 +327,6 @@ int main(int argc, char * * argv)
     if (argc == 0) abort();
     setuidInit();
     
-    /* ATerm setup. */
-    ATerm bottomOfStack;
-    ATinit(argc, argv, &bottomOfStack);
-
     /* Turn on buffering for cerr. */
 #if HAVE_PUBSETBUF
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));

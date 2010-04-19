@@ -3,8 +3,6 @@
 #include "globals.hh"
 #include "archive.hh"
 #include "pathlocks.hh"
-#include "aterm.hh"
-#include "derivations-ast.hh"
 #include "worker-protocol.hh"
     
 #include <iostream>
