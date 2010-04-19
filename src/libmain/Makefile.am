@@ -15,5 +15,5 @@ AM_CXXFLAGS = \
  -DNIX_LIBEXEC_DIR=\"$(libexecdir)\" \
  -DNIX_BIN_DIR=\"$(bindir)\" \
  -DNIX_VERSION=\"$(VERSION)\" \
- -I$(srcdir)/.. ${aterm_include} -I$(srcdir)/../libutil \
+ -I$(srcdir)/.. -I$(srcdir)/../libutil \
  -I$(srcdir)/../libstore

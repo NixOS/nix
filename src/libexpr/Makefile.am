@@ -19,10 +19,8 @@ BUILT_SOURCES = \
 EXTRA_DIST = lexer.l parser.y
 
 AM_CXXFLAGS = \
- -I$(srcdir)/.. ${aterm_include} \
+ -I$(srcdir)/.. \
  -I$(srcdir)/../libutil -I$(srcdir)/../libstore
-AM_CFLAGS = \
- ${aterm_include}
 
 
 # Parser generation.
@@ -47,4 +45,4 @@ bin_PROGRAMS = eval-test
 
 eval_test_LDADD = ../libmain/libmain.la ../libexpr/libexpr.la \
  ../libstore/libstore.la ../libutil/libutil.la \
- ../boost/format/libformat.la ${aterm_lib} @ADDITIONAL_NETWORK_LIBS@
+ ../boost/format/libformat.la @ADDITIONAL_NETWORK_LIBS@

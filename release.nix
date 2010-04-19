@@ -29,11 +29,8 @@ let
           --with-xml-flags=--nonet
         '';
 
-        # Include the ATerm and Bzip2 tarballs in the distribution.
+        # Include the Bzip2 tarball in the distribution.
         preConfigure = ''
-          stripHash ${aterm.src}
-          cp -pv ${aterm.src} externals/$strippedName
-
           stripHash ${bzip2.src}
           cp -pv ${bzip2.src} externals/$strippedName
 
@@ -77,7 +74,7 @@ let
 
         configureFlags = ''
           --disable-init-state
-          --with-aterm=${aterm} --with-bzip2=${bzip2}
+          --with-bzip2=${bzip2}
         '';
       };
 
@@ -98,7 +95,7 @@ let
 
         configureFlags = ''
           --disable-init-state
-          --with-aterm=${aterm} --with-bzip2=${bzip2}
+          --with-bzip2=${bzip2}
           --enable-static-nix
         '';
       };
@@ -123,7 +120,7 @@ let
 
         configureFlags = ''
           --disable-init-state --disable-shared
-          --with-aterm=${aterm} --with-bzip2=${bzip2}
+          --with-bzip2=${bzip2}
         '';
 
         lcovFilter = ["*/boost/*" "*-tab.*"];

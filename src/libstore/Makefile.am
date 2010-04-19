@@ -13,4 +13,4 @@ pkginclude_HEADERS = \
 libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la @ADDITIONAL_NETWORK_LIBS@
 
 AM_CXXFLAGS = -Wall \
- -I$(srcdir)/.. ${aterm_include} -I$(srcdir)/../libutil
+ -I$(srcdir)/.. -I$(srcdir)/../libutil
