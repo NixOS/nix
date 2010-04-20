@@ -38,7 +38,7 @@ to end-user applications like Mozilla Firefox.  (Nix is however not
 tied to the Nix Package collection; you could write your own Nix
 expressions based on it, or completely new ones.)  You can download
 the latest version from <link
-xlink:href='http://nixos.org/releases/full-index-nixpkgs.html' />.</para>
+xlink:href='http://nixos.org/nixpkgs/download.html' />.</para>
 
 <para>Assuming that you have downloaded and unpacked a release of Nix
 Packages, you can view the set of available packages in the release:

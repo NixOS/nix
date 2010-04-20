@@ -24,18 +24,35 @@ typedef set<Expr> ExprSet;
 
 
 static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
-    ExprSet & drvsSeen);
+    ExprSet & drvsSeen, bool location);
 
 
 static void showAttrs(const ATermMap & attrs, XMLWriter & doc,
-    PathSet & context, ExprSet & drvsSeen)
+    PathSet & context, ExprSet & drvsSeen, bool location)
 {
     StringSet names;
     for (ATermMap::const_iterator i = attrs.begin(); i != attrs.end(); ++i)
         names.insert(aterm2String(i->key));
     for (StringSet::iterator i = names.begin(); i != names.end(); ++i) {
-        XMLOpenElement _(doc, "attr", singletonAttrs("name", *i));
-        printTermAsXML(attrs.get(toATerm(*i)), doc, context, drvsSeen);
+        ATerm attrRHS = attrs.get(toATerm(*i));
+	ATerm attr;
+	Pos pos;
+	XMLAttrs xmlAttrs;
+
+	xmlAttrs["name"] = *i;
+	if(matchAttrRHS(attrRHS, attr, pos)) {
+	    ATerm path;
+	    int line, column;
+            if (location && matchPos(pos, path, line, column)) {
+		xmlAttrs["path"] = aterm2String(path);
+		xmlAttrs["line"] = (format("%1%") % line).str();
+		xmlAttrs["column"] = (format("%1%") % column).str();
+	    }
+	} else
+	    abort(); // Should not happen.
+
+        XMLOpenElement _(doc, "attr", xmlAttrs);
+        printTermAsXML(attr, doc, context, drvsSeen, location);
     }
 }
 
@@ -66,7 +83,7 @@ static void printPatternAsXML(Pattern pat, XMLWriter & doc)
 
 
 static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
-    ExprSet & drvsSeen)
+    ExprSet & drvsSeen, bool location)
 {
     XMLAttrs attrs;
     string s;
@@ -97,45 +114,58 @@ static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
 
     else if (matchAttrs(e, as)) {
         ATermMap attrs;
-        queryAllAttrs(e, attrs);
+        queryAllAttrs(e, attrs, true);
 
-        Expr a = attrs.get(toATerm("type"));
+        Expr aRHS = attrs.get(toATerm("type"));
+	Expr a = NULL;
+	if (aRHS)
+	    matchAttrRHS(aRHS, a, pos);
         if (a && matchStr(a, s, context) && s == "derivation") {
 
             XMLAttrs xmlAttrs;
             Path outPath, drvPath;
-            
-            a = attrs.get(toATerm("drvPath"));
+
+            aRHS = attrs.get(toATerm("drvPath"));
+            matchAttrRHS(aRHS, a, pos);
             if (matchStr(a, drvPath, context))
                 xmlAttrs["drvPath"] = drvPath;
-        
-            a = attrs.get(toATerm("outPath"));
+
+            aRHS = attrs.get(toATerm("outPath"));
+            matchAttrRHS(aRHS, a, pos);
             if (matchStr(a, outPath, context))
                 xmlAttrs["outPath"] = outPath;
-        
+
             XMLOpenElement _(doc, "derivation", xmlAttrs);
 
             if (drvsSeen.find(e) == drvsSeen.end()) {
                 drvsSeen.insert(e);
-                showAttrs(attrs, doc, context, drvsSeen);
+                showAttrs(attrs, doc, context, drvsSeen, location);
             } else
                 doc.writeEmptyElement("repeated");
         }
 
         else {
             XMLOpenElement _(doc, "attrs");
-            showAttrs(attrs, doc, context, drvsSeen);
+            showAttrs(attrs, doc, context, drvsSeen, location);
         }
     }
 
     else if (matchList(e, es)) {
         XMLOpenElement _(doc, "list");
         for (ATermIterator i(es); i; ++i)
-            printTermAsXML(*i, doc, context, drvsSeen);
+            printTermAsXML(*i, doc, context, drvsSeen, location);
     }
 
     else if (matchFunction(e, pat, body, pos)) {
-        XMLOpenElement _(doc, "function");
+        ATerm path;
+	int line, column;
+	XMLAttrs xmlAttrs;
+	if (location && matchPos(pos, path, line, column)) {
+	    xmlAttrs["path"] = aterm2String(path);
+	    xmlAttrs["line"] = (format("%1%") % line).str();
+	    xmlAttrs["column"] = (format("%1%") % column).str();
+	}
+	XMLOpenElement _(doc, "function", xmlAttrs);
         printPatternAsXML(pat, doc);
     }
 
@@ -144,12 +174,12 @@ static void printTermAsXML(Expr e, XMLWriter & doc, PathSet & context,
 }
 
 
-void printTermAsXML(Expr e, std::ostream & out, PathSet & context)
+void printTermAsXML(Expr e, std::ostream & out, PathSet & context, bool location)
 {
     XMLWriter doc(true, out);
     XMLOpenElement root(doc, "expr");
     ExprSet drvsSeen;    
-    printTermAsXML(e, doc, context, drvsSeen);
+    printTermAsXML(e, doc, context, drvsSeen, location);
 }
 
  

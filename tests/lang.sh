@@ -54,7 +54,8 @@ for i in lang/eval-okay-*.nix; do
     fi
     
     if test -e lang/$i.exp.xml; then
-        if ! $nixinstantiate --eval-only --xml --strict lang/$i.nix > lang/$i.out.xml; then
+        if ! $nixinstantiate --eval-only --xml --no-location --strict \
+                lang/$i.nix > lang/$i.out.xml; then
             echo "FAIL: $i should evaluate"
             fail=1
         elif ! cmp -s lang/$i.out.xml lang/$i.exp.xml; then

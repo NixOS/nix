@@ -22,6 +22,8 @@ Options:
 For --eval-only / --parse-only:
 
   --xml: print an XML representation of the abstract syntax tree
+  --no-location: don't provide source location information in the
+    output XML tree
 
 For --eval-only:
 

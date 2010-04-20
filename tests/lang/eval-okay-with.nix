@@ -7,7 +7,13 @@ let {
     b = "bar";
   };
 
+  bs = {
+    a = "bar";
+  };
+
   x = with as; a + b;
 
-  body = x;
+  y = with as; with bs; a + b;
+
+  body = x + y;
 }
