@@ -40,14 +40,13 @@ for i in lang/eval-okay-*.nix; do
         if test -e lang/$i.flags; then
             flags=$(cat lang/$i.flags)
         fi
-        if ! $nixinstantiate $flags --eval-only lang/$i.nix > lang/$i.out; then
+        if ! $nixinstantiate $flags --eval-only --strict lang/$i.nix > lang/$i.out; then
             echo "FAIL: $i should evaluate"
             fail=1
+        elif ! diff lang/$i.out lang/$i.exp; then
+            echo "FAIL: evaluation result of $i not as expected"
+            fail=1
         fi
-        #elif ! $aterm_bin/atdiff lang/$i.out lang/$i.exp; then
-        #    echo "FAIL: evaluation result of $i not as expected"
-        #    fail=1
-        #fi
     fi
     
     if test -e lang/$i.exp.xml; then
