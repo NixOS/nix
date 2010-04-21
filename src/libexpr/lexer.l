@@ -137,7 +137,7 @@ inherit     { return INHERIT; }
                    return IND_STR;
                  }
 <IND_STRING>\'\'\\. {
-                   yylval->e = new ExprIndStr(yytext + 2);
+                   yylval->e = unescapeStr(yytext + 2);
                    return IND_STR;
                  }
 <IND_STRING>\$\{ { BEGIN(INITIAL); return DOLLAR_CURLY; }
