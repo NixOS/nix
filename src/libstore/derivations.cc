@@ -92,75 +92,76 @@ Derivation parseDerivation(const string & s)
 }
 
 
-void printString(std::ostream & str, const string & s)
+static void printString(string & res, const string & s)
 {
-    str << "\"";
+    res += '"';
     for (const char * i = s.c_str(); *i; i++)
-        if (*i == '\"' || *i == '\\') str << "\\" << *i;
-        else if (*i == '\n') str << "\\n";
-        else if (*i == '\r') str << "\\r";
-        else if (*i == '\t') str << "\\t";
-        else str << *i;
-    str << "\"";
+        if (*i == '\"' || *i == '\\') { res += "\\"; res += *i; }
+        else if (*i == '\n') res += "\\n";
+        else if (*i == '\r') res += "\\r";
+        else if (*i == '\t') res += "\\t";
+        else res += *i;
+    res += '"';
 }
 
 
 template<class ForwardIterator>
-void printStrings(std::ostream & str, ForwardIterator i, ForwardIterator j)
+static void printStrings(string & res, ForwardIterator i, ForwardIterator j)
 {
-    str << "[";
+    res += '[';
     bool first = true;
     for ( ; i != j; ++i) {
-        if (first) first = false; else str << ",";
-        printString(str, *i);
+        if (first) first = false; else res += ',';
+        printString(res, *i);
     }
-    str << "]";
+    res += ']';
 }
 
 
 string unparseDerivation(const Derivation & drv)
 {
-    std::ostringstream str;
-    str << "Derive([";
+    string s;
+    s.reserve(65536);
+    s += "Derive([";
 
     bool first = true;
     foreach (DerivationOutputs::const_iterator, i, drv.outputs) {
-        if (first) first = false; else str << ",";
-        str << "("; printString(str, i->first);
-        str << ","; printString(str, i->second.path);
-        str << ","; printString(str, i->second.hashAlgo);
-        str << ","; printString(str, i->second.hash);
-        str << ")";
+        if (first) first = false; else s += ',';
+        s += '('; printString(s, i->first);
+        s += ','; printString(s, i->second.path);
+        s += ','; printString(s, i->second.hashAlgo);
+        s += ','; printString(s, i->second.hash);
+        s += ')';
     }
 
-    str << "],[";
+    s += "],[";
     first = true;
     foreach (DerivationInputs::const_iterator, i, drv.inputDrvs) {
-        if (first) first = false; else str << ",";
-        str << "("; printString(str, i->first);
-        str << ","; printStrings(str, i->second.begin(), i->second.end());
-        str << ")";
+        if (first) first = false; else s += ',';
+        s += '('; printString(s, i->first);
+        s += ','; printStrings(s, i->second.begin(), i->second.end());
+        s += ')';
     }
 
-    str << "],";
-    printStrings(str, drv.inputSrcs.begin(), drv.inputSrcs.end());
+    s += "],";
+    printStrings(s, drv.inputSrcs.begin(), drv.inputSrcs.end());
     
-    str << ","; printString(str, drv.platform);
-    str << ","; printString(str, drv.builder);
-    str << ","; printStrings(str, drv.args.begin(), drv.args.end());
+    s += ','; printString(s, drv.platform);
+    s += ','; printString(s, drv.builder);
+    s += ','; printStrings(s, drv.args.begin(), drv.args.end());
 
-    str << ",[";
+    s += ",[";
     first = true;
     foreach (StringPairs::const_iterator, i, drv.env) {
-        if (first) first = false; else str << ",";
-        str << "("; printString(str, i->first);
-        str << ","; printString(str, i->second);
-        str << ")";
+        if (first) first = false; else s += ',';
+        s += '('; printString(s, i->first);
+        s += ','; printString(s, i->second);
+        s += ')';
     }
     
-    str << "])";
+    s += "])";
     
-    return str.str();
+    return s;
 }
 
 
