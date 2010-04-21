@@ -304,7 +304,7 @@ private:
 
 
 /* Return a string representing the type of the value `v'. */
-string showType(Value & v);
+string showType(const Value & v);
 
 
 }

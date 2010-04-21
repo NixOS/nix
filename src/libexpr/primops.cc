@@ -84,7 +84,26 @@ static void prim_isBool(EvalState & state, Value * * args, Value & v)
 }
 
 
-#if 0
+struct CompareValues
+{
+    bool operator () (const Value & v1, const Value & v2) const
+    {
+        if (v1.type != v2.type)
+            throw EvalError("cannot compare values of different types");
+        switch (v1.type) {
+            case tInt:
+                return v1.integer < v2.integer;
+            case tString:
+                return strcmp(v1.string.s, v2.string.s) < 0;
+            case tPath:
+                return strcmp(v1.path, v2.path) < 0;
+            default:
+                throw EvalError(format("cannot compare %1% with %2%") % showType(v1) % showType(v2));
+        }
+    }
+};
+
+
 static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
 {
     startNest(nest, lvlDebug, "finding dependencies");
@@ -98,45 +117,60 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
         throw EvalError("attribute `startSet' required");
     state.forceList(startSet->second);
 
-    list<Value> workSet;
+    list<Value *> workSet;
     for (unsigned int n = 0; n < startSet->second.list.length; ++n)
-        workSet.push_back(*startSet->second.list.elems[n]);
+        workSet.push_back(startSet->second.list.elems[n]);
 
     /* Get the operator. */
     Bindings::iterator op =
         args[0]->attrs->find(state.symbols.create("operator"));
     if (op == args[0]->attrs->end())
         throw EvalError("attribute `operator' required");
-    
+    state.forceValue(op->second);
+
     /* Construct the closure by applying the operator to element of
        `workSet', adding the result to `workSet', continuing until
        no new elements are found. */
     list<Value> res;
-    set<Expr> doneKeys; // !!! gc roots
+    set<Value, CompareValues> doneKeys;
     while (!workSet.empty()) {
-	Expr e = *(workSet.begin());
-	workSet.erase(e);
+	Value * e = *(workSet.begin());
+	workSet.pop_front();
 
-        e = strictEvalExpr(state, e);
+        state.forceAttrs(*e);
 
-        Expr key = queryAttr(e, "key");
-        if (!key) throw EvalError("attribute `key' required");
+        Bindings::iterator key =
+            e->attrs->find(state.symbols.create("key"));
+        if (key == e->attrs->end())
+            throw EvalError("attribute `key' required");
+        state.forceValue(key->second);
 
-	if (doneKeys.find(key) != doneKeys.end()) continue;
-        doneKeys.insert(key);
-        res = ATinsert(res, e);
+        if (doneKeys.find(key->second) != doneKeys.end()) continue;
+        doneKeys.insert(key->second);
+        res.push_back(*e);
         
         /* Call the `operator' function with `e' as argument. */
-        ATermList res = evalList(state, makeCall(op, e));
+        Value call;
+        mkApp(call, op->second, *e);
+        state.forceList(call);
 
-        /* Try to find the dependencies relative to the `path'. */
-        for (ATermIterator i(res); i; ++i)
-            workSet.insert(evalExpr(state, *i));
+        /* Add the values returned by the operator to the work set. */
+        for (unsigned int n = 0; n < call.list.length; ++n) {
+            state.forceValue(*call.list.elems[n]);
+            workSet.push_back(call.list.elems[n]);
+        }
     }
 
-    return makeList(res);
+    /* Create the result list. */
+    state.mkList(v, res.size());
+    Value * vs = state.allocValues(res.size());
+
+    unsigned int n = 0;
+    foreach (list<Value>::iterator, i, res) {
+        v.list.elems[n] = &vs[n];
+        vs[n++] = *i;
+    }
 }
-#endif
 
 
 static void prim_abort(EvalState & state, Value * * args, Value & v)
@@ -1017,9 +1051,7 @@ void EvalState::createBaseEnv()
     addPrimOp("__isString", 1, prim_isString);
     addPrimOp("__isInt", 1, prim_isInt);
     addPrimOp("__isBool", 1, prim_isBool);
-#if 0
     addPrimOp("__genericClosure", 1, prim_genericClosure);
-#endif
     addPrimOp("abort", 1, prim_abort);
     addPrimOp("throw", 1, prim_throw);
 #if 0
