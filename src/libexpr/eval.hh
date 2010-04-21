@@ -92,6 +92,7 @@ struct Value
         Value * val;
         struct {
             PrimOp fun;
+            char * name;
             unsigned int arity;
         } primOp;
         struct {
@@ -138,6 +139,14 @@ static inline void mkCopy(Value & v, Value & src)
 }
 
 
+static inline void mkApp(Value & v, Value & left, Value & right)
+{
+    v.type = tApp;
+    v.app.left = &left;
+    v.app.right = &right;
+}
+
+
 void mkString(Value & v, const char * s);
 void mkString(Value & v, const string & s, const PathSet & context = PathSet());
 void mkPath(Value & v, const char * s);
@@ -162,7 +171,7 @@ public:
 
     SymbolTable symbols;
 
-    const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName;
+    const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sSystem;
 
 private:
     SrcToStore srcToStore; 

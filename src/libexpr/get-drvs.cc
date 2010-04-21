@@ -70,27 +70,6 @@ void DrvInfo::setMetaInfo(const MetaInfo & meta)
 {
     metaInfoRead = true;
     this->meta = meta;
-    
-#if 0
-    Value * metaAttrs = state.allocValues(1);
-    foreach (MetaInfo::const_iterator, i, meta) {
-        Expr e;
-        switch (i->second.type) {
-            case MetaValue::tpInt: e = makeInt(i->second.intValue); break;
-            case MetaValue::tpString: e = makeStr(i->second.stringValue); break;
-            case MetaValue::tpStrings: {
-                ATermList es = ATempty;
-                foreach (Strings::const_iterator, j, i->second.stringValues)
-                    es = ATinsert(es, makeStr(*j));
-                e = makeList(ATreverse(es));
-                break;
-            }
-            default: abort();
-        }
-        metaAttrs.set(toATerm(i->first), makeAttrRHS(e, makeNoPos()));
-    }
-    attrs->set(toATerm("meta"), makeAttrs(metaAttrs));
-#endif
 }
 
 
@@ -122,7 +101,7 @@ static bool getDerivation(EvalState & state, Value & v,
         if (i == v.attrs->end()) throw TypeError("derivation name missing");
         drv.name = state.forceStringNoCtx(i->second);
 
-        i = v.attrs->find(state.symbols.create("system"));
+        i = v.attrs->find(state.sSystem);
         if (i == v.attrs->end())
             drv.system = "unknown";
         else

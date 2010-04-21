@@ -41,7 +41,7 @@ public:
     /* !!! make this private */
     Bindings * attrs;
 
-    DrvInfo() : metaInfoRead(false) { };
+    DrvInfo() : metaInfoRead(false), attrs(0) { };
 
     string queryDrvPath(EvalState & state) const;
     string queryOutPath(EvalState & state) const;

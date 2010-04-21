@@ -7,6 +7,10 @@ namespace nix {
 
 DrvInfos queryInstalled(EvalState & state, const Path & userEnv);
 
+bool createUserEnv(EvalState & state, DrvInfos & elems,
+    const Path & profile, bool keepDerivations,
+    const string & lockToken);
+
 }
 
 #endif /* !__USER_ENV_H */

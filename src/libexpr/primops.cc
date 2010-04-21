@@ -89,24 +89,29 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
 {
     startNest(nest, lvlDebug, "finding dependencies");
 
-    Expr attrs = evalExpr(state, args[0]);
+    state.forceAttrs(*args[0]);
 
     /* Get the start set. */
-    Expr startSet = queryAttr(attrs, "startSet");
-    if (!startSet) throw EvalError("attribute `startSet' required");
-    ATermList startSet2 = evalList(state, startSet);
+    Bindings::iterator startSet =
+        args[0]->attrs->find(state.symbols.create("startSet"));
+    if (startSet == args[0]->attrs->end())
+        throw EvalError("attribute `startSet' required");
+    state.forceList(startSet->second);
 
-    set<Expr> workSet; // !!! gc roots
-    for (ATermIterator i(startSet2); i; ++i) workSet.insert(*i);
+    list<Value> workSet;
+    for (unsigned int n = 0; n < startSet->second.list.length; ++n)
+        workSet.push_back(*startSet->second.list.elems[n]);
 
     /* Get the operator. */
-    Expr op = queryAttr(attrs, "operator");
-    if (!op) throw EvalError("attribute `operator' required");
+    Bindings::iterator op =
+        args[0]->attrs->find(state.symbols.create("operator"));
+    if (op == args[0]->attrs->end())
+        throw EvalError("attribute `operator' required");
     
     /* Construct the closure by applying the operator to element of
        `workSet', adding the result to `workSet', continuing until
        no new elements are found. */
-    ATermList res = ATempty;
+    list<Value> res;
     set<Expr> doneKeys; // !!! gc roots
     while (!workSet.empty()) {
 	Expr e = *(workSet.begin());
@@ -322,8 +327,8 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
                 string s = state.coerceToString(i->second, context, true);
                 drv.env[key] = s;
                 if (key == "builder") drv.builder = s;
-                else if (key == "system") drv.platform = s;
-                else if (key == "name") drvName = s;
+                else if (i->first == state.sSystem) drv.platform = s;
+                else if (i->first == state.sName) drvName = s;
                 else if (key == "outputHash") outputHash = s;
                 else if (key == "outputHashAlgo") outputHashAlgo = s;
                 else if (key == "outputHashMode") {
@@ -830,9 +835,7 @@ static void prim_map(EvalState & state, Value * * args, Value & v)
 
     for (unsigned int n = 0; n < v.list.length; ++n) {
         v.list.elems[n] = &vs[n];
-        vs[n].type = tApp;
-        vs[n].app.left = args[0];
-        vs[n].app.right = args[1]->list.elems[n];
+        mkApp(vs[n], *args[0], *args[1]->list.elems[n]);
     }
 }
 

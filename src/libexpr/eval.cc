@@ -98,6 +98,7 @@ EvalState::EvalState()
     , sType(symbols.create("type"))
     , sMeta(symbols.create("meta"))
     , sName(symbols.create("name"))
+    , sSystem(symbols.create("system"))
     , baseEnv(allocEnv(128))
     , baseEnvDispl(0)
     , staticBaseEnv(false, 0)
@@ -131,12 +132,13 @@ void EvalState::addPrimOp(const string & name,
     unsigned int arity, PrimOp primOp)
 {
     Value v;
+    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
     v.type = tPrimOp;
     v.primOp.arity = arity;
     v.primOp.fun = primOp;
+    v.primOp.name = strdup(name2.c_str());
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
-    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
     (*baseEnv.values[0].attrs)[symbols.create(name2)] = v;
 }
 
@@ -550,7 +552,12 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
                 vArgs[n--] = arg->primOpApp.right;
 
             /* And call the primop. */
-            primOp->primOp.fun(*this, vArgs, v);
+            try {
+                primOp->primOp.fun(*this, vArgs, v);
+            } catch (Error & e) {
+                addErrorPrefix(e, "while evaluating the builtin function `%1%':\n", primOp->primOp.name);
+                throw;
+            }
         } else {
             Value * v2 = allocValues(2);
             v2[0] = fun;
