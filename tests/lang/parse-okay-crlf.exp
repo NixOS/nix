@@ -1,1 +1,0 @@
-Rec([Bind("x",Var("y"),NoPos),Bind("y",Int(123),NoPos),Bind("foo",Str("multi\nline\n  string\n  test\r",[]),NoPos),Bind("z",Int(456),NoPos)],[])

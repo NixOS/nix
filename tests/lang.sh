@@ -16,12 +16,8 @@ done
 for i in lang/parse-okay-*.nix; do
     echo "parsing $i (should succeed)";
     i=$(basename $i .nix)
-    if ! $nixinstantiate --parse-only - < lang/$i.nix > lang/$i.ast; then
+    if ! $nixinstantiate --parse-only - < lang/$i.nix > lang/$i.out; then
         echo "FAIL: $i should parse"
-        fail=1
-    fi
-    if ! $aterm_bin/atdiff lang/$i.ast lang/$i.exp; then
-        echo "FAIL: parse tree of $i not as expected"
         fail=1
     fi
 done
