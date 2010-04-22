@@ -69,7 +69,7 @@ struct Value
            For canonicity, the store paths should be in sorted order. */
         struct {
             const char * s;
-            const char * * context;
+            const char * * context; // must be in sorted order
         } string;
         
         const char * path;

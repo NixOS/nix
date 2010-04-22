@@ -1019,9 +1019,17 @@ bool EvalState::eqValues(Value & v1, Value & v2)
         case tBool:
             return v1.boolean == v2.boolean;
 
-        case tString:
-            /* !!! contexts */
-            return strcmp(v1.string.s, v2.string.s) == 0;
+        case tString: {
+            /* Compare both the string and its context. */
+            if (strcmp(v1.string.s, v2.string.s) != 0) return false;
+            const char * * p = v1.string.context, * * q = v2.string.context;
+            if (!p && !q) return true;
+            if (!p || !q) return false;
+            for ( ; *p && *q; ++p, ++q)
+                if (strcmp(*p, *q) != 0) return false;
+            if (*p || *q) return false;
+            return true;
+        }
 
         case tPath:
             return strcmp(v1.path, v2.path) == 0;
