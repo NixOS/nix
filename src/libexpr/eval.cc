@@ -246,10 +246,14 @@ Value * EvalState::lookupVar(Env * env, const VarRef & var)
     for (unsigned int l = var.level; l; --l, env = env->up) ;
     
     if (var.fromWith) {
-        Bindings::iterator j = env->values[0].attrs->find(var.name);
-        if (j == env->values[0].attrs->end())
-            throwEvalError("undefined variable `%1%'", var.name);
-        return &j->second;
+        while (1) {
+            Bindings::iterator j = env->values[0].attrs->find(var.name);
+            if (j != env->values[0].attrs->end())
+                return &j->second;
+            if (env->prevWith == 0)
+                throwEvalError("undefined variable `%1%'", var.name);
+            for (unsigned int l = env->prevWith; l; --l, env = env->up) ;
+        }
     } else
         return &env->values[var.displ];
 }
@@ -656,29 +660,9 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
 {
     Env & env2(state.allocEnv(1));
     env2.up = &env;
+    env2.prevWith = prevWith;
 
     state.evalAttrs(env, attrs, env2.values[0]);
-
-    /* If there is an enclosing `with', copy all attributes that don't
-       appear in this `with'. */
-    if (prevWith != -1) {
-        Env * env3 = &env;
-        for (unsigned int l = prevWith; l; --l, env3 = env3->up) ;
-
-        /* Because the first `with' may be a shallow copy of another
-           attribute set (through a tCopy node), we need to clone its
-           `attrs' before modifying them. */
-        Bindings * old(env2.values[0].attrs);
-        state.mkAttrs(env2.values[0]);
-        foreach (Bindings::iterator, i, *old)
-            mkCopy((*env2.values[0].attrs)[i->first], i->second);
-
-        foreach (Bindings::iterator, i, *env3->values[0].attrs) {
-            Bindings::iterator j = env2.values[0].attrs->find(i->first);
-            if (j == env2.values[0].attrs->end())
-                mkCopy((*env2.values[0].attrs)[i->first], i->second);
-        }
-    }
 
     state.eval(env2, body, v);
 }

@@ -278,12 +278,12 @@ void ExprLet::bindVars(const StaticEnv & env)
 void ExprWith::bindVars(const StaticEnv & env)
 {
     /* Does this `with' have an enclosing `with'?  If so, record its
-       level so that we can copy the attributes of the enclosing
-       `with'. */
+       level so that `lookupVar' can look up variables in the previous
+       `with' if this one doesn't contain the desired attribute. */
     const StaticEnv * curEnv;
     unsigned int level;
-    prevWith = -1;
-    for (curEnv = &env, level = 0; curEnv; curEnv = curEnv->up, level++)
+    prevWith = 0;
+    for (curEnv = &env, level = 1; curEnv; curEnv = curEnv->up, level++)
         if (curEnv->isWith) {
             prevWith = level;
             break;

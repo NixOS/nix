@@ -106,6 +106,7 @@ struct Value
 struct Env
 {
     Env * up;
+    unsigned int prevWith; // nr of levels up to next `with' environment
     Value values[0];
 };
 
