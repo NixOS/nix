@@ -34,7 +34,7 @@ endif
 
 all: build-bzip2
 
-EXTRA_DIST = $(BZIP2).tar.gz max-long.patch sizeof.patch
+EXTRA_DIST = $(BZIP2).tar.gz
 
 ext-clean:
 	$(RM) -f have-bzip2 build-bzip2
