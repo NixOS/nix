@@ -59,6 +59,21 @@ static string showAttrPath(const vector<Symbol> & attrPath)
     }
     return s;
 }
+
+
+static void dupAttr(const vector<Symbol> & attrPath, const Pos & pos)
+{
+    throw ParseError(format("attribute `%1%' at %2% already defined at <SOMEWHERE>")
+        % showAttrPath(attrPath) % pos);
+}
+ 
+
+static void dupAttr(Symbol attr, const Pos & pos)
+{
+    vector<Symbol> attrPath; attrPath.push_back(attr);
+    throw ParseError(format("attribute `%1%' at %2% already defined at <SOMEWHERE>")
+        % showAttrPath(attrPath) % pos);
+}
  
 
 static void addAttr(ExprAttrs * attrs, const vector<Symbol> & attrPath,
@@ -69,11 +84,12 @@ static void addAttr(ExprAttrs * attrs, const vector<Symbol> & attrPath,
         n++;
         if (attrs->attrs[*i]) {
             ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(attrs->attrs[*i]);
-            if (!attrs2)
-                throw ParseError(format("attribute `%1%' at %2% already defined at <SOMEWHERE>")
-                    % showAttrPath(attrPath) % pos);
+            if (!attrs2 || n == attrPath.size()) dupAttr(attrPath, pos);
             attrs = attrs2;
         } else {
+            if (attrs->attrNames.find(*i) != attrs->attrNames.end())
+                dupAttr(attrPath, pos);
+            attrs->attrNames.insert(*i);
             if (n == attrPath.size())
                 attrs->attrs[*i] = e;
             else {
@@ -86,41 +102,14 @@ static void addAttr(ExprAttrs * attrs, const vector<Symbol> & attrPath,
 }
 
 
-#if 0
-static void checkPatternVars(ATerm pos, ATermMap & map, Pattern pat)
+static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 {
-    ATerm name = sNoAlias;
-    ATermList formals;
-    ATermBool ellipsis;
-    
-    if (matchAttrsPat(pat, formals, ellipsis, name)) { 
-        for (ATermIterator i(formals); i; ++i) {
-            ATerm d1, name2;
-            if (!matchFormal(*i, name2, d1)) abort();
-            if (map.get(name2))
-                throw ParseError(format("duplicate formal function argument `%1%' at %2%")
-                    % aterm2String(name2) % showPos(pos));
-            map.set(name2, name2);
-        }
-    }
-
-    else matchVarPat(pat, name);
-
-    if (name != sNoAlias) {
-        if (map.get(name))
-            throw ParseError(format("duplicate formal function argument `%1%' at %2%")
-                % aterm2String(name) % showPos(pos));
-        map.set(name, name);
-    }
+    if (formals->argNames.find(formal.name) != formals->argNames.end())
+        throw ParseError(format("duplicate formal function argument `%1%' at %2%")
+            % formal.name % pos);
+    formals->formals.push_front(formal);
+    formals->argNames.insert(formal.name);
 }
-
-
-static void checkPatternVars(ATerm pos, Pattern pat)
-{
-    ATermMap map;
-    checkPatternVars(pos, map, pat);
-}
-#endif
 
 
 static Expr * stripIndentation(vector<Expr *> & es)
@@ -294,7 +283,7 @@ expr: expr_function;
 
 expr_function
   : ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), false, 0, $3); /* checkPatternVars(CUR_POS, $1); */ }
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), false, 0, $3); }
   | '{' formals '}' ':' expr_function
     { $$ = new ExprLambda(CUR_POS, data->symbols.create(""), true, $2, $5); }
   | '{' formals '}' '@' ID ':' expr_function
@@ -388,14 +377,22 @@ binds
   : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, *$2, $4, CUR_POS); }
   | binds INHERIT ids ';'
     { $$ = $1;
-      foreach (vector<Symbol>::iterator, i, *$3)
-        $$->inherited.push_back(*i);
+      foreach (vector<Symbol>::iterator, i, *$3) {
+          if ($$->attrNames.find(*i) != $$->attrNames.end())
+              dupAttr(*i, CUR_POS);
+          $$->inherited.push_back(*i);
+          $$->attrNames.insert(*i);
+      }
     }
   | binds INHERIT '(' expr ')' ids ';'
     { $$ = $1;
       /* !!! Should ensure sharing of the expression in $4. */
-      foreach (vector<Symbol>::iterator, i, *$6)
-        $$->attrs[*i] = new ExprSelect($4, *i);
+      foreach (vector<Symbol>::iterator, i, *$6) {
+          if ($$->attrNames.find(*i) != $$->attrNames.end())
+              dupAttr(*i, CUR_POS);
+          $$->attrs[*i] = new ExprSelect($4, *i);
+          $$->attrNames.insert(*i);
+      }
     }
   | { $$ = new ExprAttrs; }
   ;
@@ -417,9 +414,9 @@ expr_list
 
 formals
   : formal ',' formals
-    { $$ = $3; $$->formals.push_front(*$1); /* !!! dangerous */ }
+    { $$ = $3; addFormal(CUR_POS, $$, *$1); }
   | formal
-    { $$ = new Formals; $$->formals.push_back(*$1); $$->ellipsis = false; }
+    { $$ = new Formals; addFormal(CUR_POS, $$, *$1); $$->ellipsis = false; }
   |
     { $$ = new Formals; $$->ellipsis = false; }
   | ELLIPSIS

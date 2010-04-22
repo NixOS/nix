@@ -128,6 +128,7 @@ struct ExprAttrs : Expr
     typedef std::map<Symbol, Expr *> Attrs;
     Attrs attrs;
     list<VarRef> inherited;
+    set<Symbol> attrNames; // used during parsing
     ExprAttrs() : recursive(false) { };
     COMMON_METHODS
 };
@@ -150,6 +151,7 @@ struct Formals
 {
     typedef std::list<Formal> Formals_;
     Formals_ formals;
+    std::set<Symbol> argNames; // used during parsing
     bool ellipsis;
 };
 
@@ -161,7 +163,12 @@ struct ExprLambda : Expr
     Formals * formals;
     Expr * body;
     ExprLambda(const Pos & pos, const Symbol & arg, bool matchAttrs, Formals * formals, Expr * body)
-        : pos(pos), arg(arg), matchAttrs(matchAttrs), formals(formals), body(body) { };
+        : pos(pos), arg(arg), matchAttrs(matchAttrs), formals(formals), body(body)
+    {
+        if (!arg.empty() && formals && formals->argNames.find(arg) != formals->argNames.end())
+            throw ParseError(format("duplicate formal function argument `%1%' at %2%")
+                % arg % pos);
+    };
     COMMON_METHODS
 };
 
