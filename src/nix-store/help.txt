@@ -27,6 +27,9 @@ Operations:
   --verify: verify Nix structures
   --optimise: optimise the Nix store by hard-linking identical files
 
+  --query-failed-paths: list paths that failed to build (if enabled)
+  --clear-failed-paths: clear the failed status of the given paths
+
   --version: output version information
   --help: display help
 
