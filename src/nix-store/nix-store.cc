@@ -666,13 +666,21 @@ static void opOptimise(Strings opFlags, Strings opArgs)
 }
 
 
-static  void opQueryFailedPaths(Strings opFlags, Strings opArgs)
+static void opQueryFailedPaths(Strings opFlags, Strings opArgs)
 {
     if (!opArgs.empty() || !opFlags.empty())
         throw UsageError("no arguments expected");
     PathSet failed = ensureLocalStore().queryFailedPaths();
     foreach (PathSet::iterator, i, failed)
         cout << format("%1%\n") % *i;
+}
+
+
+static void opClearFailedPaths(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty())
+        throw UsageError("no flags expected");
+    ensureLocalStore().clearFailedPaths(PathSet(opArgs.begin(), opArgs.end()));
 }
 
 
@@ -729,6 +737,8 @@ void run(Strings args)
             op = opOptimise;
         else if (arg == "--query-failed-paths")
             op = opQueryFailedPaths;
+        else if (arg == "--clear-failed-paths")
+            op = opClearFailedPaths;
         else if (arg == "--add-root") {
             if (i == args.end())
                 throw UsageError("`--add-root requires an argument");

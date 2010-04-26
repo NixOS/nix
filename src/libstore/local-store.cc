@@ -329,6 +329,8 @@ void LocalStore::openDB(bool create)
         "select time from FailedPaths where path = ?;");
     stmtQueryFailedPaths.create(db,
         "select path from FailedPaths;");
+    stmtClearFailedPath.create(db,
+        "delete from FailedPaths where ?1 = '*' or path = ?1;");
     stmtAddDerivationOutput.create(db,
         "insert or replace into DerivationOutputs (drv, id, path) values (?, ?, ?);");
     stmtQueryValidDerivers.create(db,
@@ -526,6 +528,21 @@ PathSet LocalStore::queryFailedPaths()
         throw SQLiteError(db, "error querying failed paths");
 
     return res;
+}
+
+
+void LocalStore::clearFailedPaths(const PathSet & paths)
+{
+    SQLiteTxn txn(db);
+
+    foreach (PathSet::const_iterator, i, paths) {
+        SQLiteStmtUse use(stmtClearFailedPath);
+        stmtClearFailedPath.bind(*i);
+        if (sqlite3_step(stmtClearFailedPath) != SQLITE_DONE)
+            throw SQLiteError(db, format("clearing failed path `%1%' in database") % *i);
+    }
+
+    txn.commit();
 }
 
 

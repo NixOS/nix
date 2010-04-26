@@ -187,6 +187,10 @@ public:
     /* Return the set of paths that have failed to build.*/
     PathSet queryFailedPaths();
 
+    /* Clear the "failed" status of the given paths.  The special
+       value `*' causes all failed paths to be cleared. */
+    void clearFailedPaths(const PathSet & paths);
+
 private:
 
     Path schemaPath;
@@ -207,6 +211,7 @@ private:
     SQLiteStmt stmtRegisterFailedPath;
     SQLiteStmt stmtHasPathFailed;
     SQLiteStmt stmtQueryFailedPaths;
+    SQLiteStmt stmtClearFailedPath;
     SQLiteStmt stmtAddDerivationOutput;
     SQLiteStmt stmtQueryValidDerivers;
     SQLiteStmt stmtQueryDerivationOutputs;
