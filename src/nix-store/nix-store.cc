@@ -33,7 +33,7 @@ static bool indirectRoot = false;
 LocalStore & ensureLocalStore()
 {
     LocalStore * store2(dynamic_cast<LocalStore *>(store.get()));
-    if (!store2) throw Error("you don't have sufficient rights to use --verify");
+    if (!store2) throw Error("you don't have sufficient rights to use this command");
     return *store2;
 }
 
@@ -651,8 +651,7 @@ static void opOptimise(Strings opFlags, Strings opArgs)
 
     bool dryRun = false;
 
-    for (Strings::iterator i = opFlags.begin();
-         i != opFlags.end(); ++i)
+    foreach (Strings::iterator, i, opFlags)
         if (*i == "--dry-run") dryRun = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
@@ -664,6 +663,16 @@ static void opOptimise(Strings opFlags, Strings opArgs)
         throw;
     }
     showOptimiseStats(stats);
+}
+
+
+static  void opQueryFailedPaths(Strings opFlags, Strings opArgs)
+{
+    if (!opArgs.empty() || !opFlags.empty())
+        throw UsageError("no arguments expected");
+    PathSet failed = ensureLocalStore().queryFailedPaths();
+    foreach (PathSet::iterator, i, failed)
+        cout << format("%1%\n") % *i;
 }
 
 
@@ -718,6 +727,8 @@ void run(Strings args)
             op = opVerify;
         else if (arg == "--optimise")
             op = opOptimise;
+        else if (arg == "--query-failed-paths")
+            op = opQueryFailedPaths;
         else if (arg == "--add-root") {
             if (i == args.end())
                 throw UsageError("`--add-root requires an argument");

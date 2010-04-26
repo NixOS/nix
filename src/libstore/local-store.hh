@@ -184,6 +184,9 @@ public:
     /* Query whether `path' previously failed to build. */
     bool hasPathFailed(const Path & path);
 
+    /* Return the set of paths that have failed to build.*/
+    PathSet queryFailedPaths();
+
 private:
 
     Path schemaPath;
@@ -203,6 +206,7 @@ private:
     SQLiteStmt stmtInvalidatePath;
     SQLiteStmt stmtRegisterFailedPath;
     SQLiteStmt stmtHasPathFailed;
+    SQLiteStmt stmtQueryFailedPaths;
     SQLiteStmt stmtAddDerivationOutput;
     SQLiteStmt stmtQueryValidDerivers;
     SQLiteStmt stmtQueryDerivationOutputs;

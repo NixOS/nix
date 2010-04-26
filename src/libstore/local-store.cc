@@ -327,6 +327,8 @@ void LocalStore::openDB(bool create)
         "insert into FailedPaths (path, time) values (?, ?);");
     stmtHasPathFailed.create(db,
         "select time from FailedPaths where path = ?;");
+    stmtQueryFailedPaths.create(db,
+        "select path from FailedPaths;");
     stmtAddDerivationOutput.create(db,
         "insert or replace into DerivationOutputs (drv, id, path) values (?, ?, ?);");
     stmtQueryValidDerivers.create(db,
@@ -505,6 +507,25 @@ bool LocalStore::hasPathFailed(const Path & path)
     if (res != SQLITE_DONE && res != SQLITE_ROW)
         throw SQLiteError(db, "querying whether path failed");
     return res == SQLITE_ROW;
+}
+
+
+PathSet LocalStore::queryFailedPaths()
+{
+    SQLiteStmtUse use(stmtQueryFailedPaths);
+
+    PathSet res;
+    int r;
+    while ((r = sqlite3_step(stmtQueryFailedPaths)) == SQLITE_ROW) {
+        const char * s = (const char *) sqlite3_column_text(stmtQueryFailedPaths, 0);
+        assert(s);
+        res.insert(s);
+    }
+
+    if (r != SQLITE_DONE)
+        throw SQLiteError(db, "error querying failed paths");
+
+    return res;
 }
 
 
