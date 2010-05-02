@@ -60,7 +60,7 @@ available remotely.</para></listitem>
 in the channel:
 
 <screen>
-$ nix-env -qa ’*’ <lineannotation>(mind the quotes!)</lineannotation>
+$ nix-env -qa \*
 docbook-xml-4.2
 firefox-1.0pre-PR-0.10.1
 hello-2.1.1
