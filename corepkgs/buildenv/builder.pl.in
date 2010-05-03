@@ -29,10 +29,16 @@ sub createLinks {
         $baseName =~ s/^.*\///g; # strip directory
         my $dstFile = "$dstDir/$baseName";
 
+        # The files below are special-cased so that they don't show up
+        # in user profiles, either because they are useless, or
+        # because they would cause pointless collisions (e.g., each
+        # Python package brings its own
+        # `$out/lib/pythonX.Y/site-packages/easy-install.pth'.)
         # Urgh, hacky...
-	if ($srcFile =~ /\/propagated-build-inputs$/ ||
+        if ($srcFile =~ /\/propagated-build-inputs$/ ||
             $srcFile =~ /\/nix-support$/ ||
             $srcFile =~ /\/perllocal.pod$/ ||
+            $srcFile =~ /\/easy-install.pth$/ ||
             $srcFile =~ /\/info\/dir$/ ||
             $srcFile =~ /\/log$/)
         {
