@@ -184,11 +184,8 @@ public:
     /* Query whether `path' previously failed to build. */
     bool hasPathFailed(const Path & path);
 
-    /* Return the set of paths that have failed to build.*/
     PathSet queryFailedPaths();
 
-    /* Clear the "failed" status of the given paths.  The special
-       value `*' causes all failed paths to be cleared. */
     void clearFailedPaths(const PathSet & paths);
 
 private:

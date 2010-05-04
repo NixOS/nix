@@ -70,6 +70,10 @@ public:
 
     void collectGarbage(const GCOptions & options, GCResults & results);
     
+    PathSet queryFailedPaths();
+
+    void clearFailedPaths(const PathSet & paths);
+    
 private:
     AutoCloseFD fdSocket;
     FdSink to;

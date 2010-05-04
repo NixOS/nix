@@ -670,7 +670,7 @@ static void opQueryFailedPaths(Strings opFlags, Strings opArgs)
 {
     if (!opArgs.empty() || !opFlags.empty())
         throw UsageError("no arguments expected");
-    PathSet failed = ensureLocalStore().queryFailedPaths();
+    PathSet failed = store->queryFailedPaths();
     foreach (PathSet::iterator, i, failed)
         cout << format("%1%\n") % *i;
 }
@@ -680,7 +680,7 @@ static void opClearFailedPaths(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty())
         throw UsageError("no flags expected");
-    ensureLocalStore().clearFailedPaths(PathSet(opArgs.begin(), opArgs.end()));
+    store->clearFailedPaths(PathSet(opArgs.begin(), opArgs.end()));
 }
 
 

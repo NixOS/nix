@@ -528,6 +528,23 @@ static void performOp(unsigned int clientVersion,
         break;
     }
 
+    case wopQueryFailedPaths: {
+        startWork();
+        PathSet paths = store->queryFailedPaths();
+        stopWork();
+        writeStringSet(paths, to);
+        break;
+    }
+
+    case wopClearFailedPaths: {
+        PathSet paths = readStringSet(from);
+        startWork();
+        store->clearFailedPaths(paths);
+        stopWork();
+        writeInt(1, to);
+        break;
+    }
+
     default:
         throw Error(format("invalid operation %1%") % op);
     }

@@ -451,6 +451,25 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 }
 
 
+PathSet RemoteStore::queryFailedPaths()
+{
+    openConnection();
+    writeInt(wopQueryFailedPaths, to);
+    processStderr();
+    return readStorePaths(from);
+}
+
+
+void RemoteStore::clearFailedPaths(const PathSet & paths)
+{
+    openConnection();
+    writeInt(wopClearFailedPaths, to);
+    writeStringSet(paths, to);
+    processStderr();
+    readInt(from);
+}
+
+
 void RemoteStore::processStderr(Sink * sink, Source * source)
 {
     unsigned int msg;
