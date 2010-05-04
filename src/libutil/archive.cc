@@ -181,8 +181,6 @@ static void parseContents(ParseSink & sink, Source & source, const Path & path)
         left -= n;
     }
 
-    sink.finalizeContents(size);
-
     readPadding(size, source);
 }
 
@@ -315,12 +313,6 @@ struct RestoreSink : ParseSink
     void receiveContents(unsigned char * data, unsigned int len)
     {
         writeFull(fd, data, len);
-    }
-
-    void finalizeContents(unsigned long long size)
-    {
-        errno = ftruncate(fd, size);
-        if (errno) throw SysError(format("truncating file to its allocated length of %1% bytes") % size);
     }
 
     void createSymlink(const Path & path, const string & target)
