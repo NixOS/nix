@@ -19,13 +19,16 @@ namespace nix {
     
 static void initLoc(YYLTYPE * loc)
 {
-    loc->first_line = 1;
-    loc->first_column = 1;
+    loc->first_line = loc->last_line = 1;
+    loc->first_column = loc->last_column = 1;
 }
 
     
 static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 {
+    loc->first_line = loc->last_line;
+    loc->first_column = loc->last_column;
+
     while (len--) {
        switch (*s++) {
        case '\r':
@@ -33,11 +36,11 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
                s++;
            /* fall through */
        case '\n': 
-           ++loc->first_line;
-           loc->first_column = 1;
+           ++loc->last_line;
+           loc->last_column = 1;
            break;
        default:
-           ++loc->first_column;
+           ++loc->last_column;
        }
     }
 }

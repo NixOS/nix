@@ -192,11 +192,6 @@ LocalNoInlineNoReturn(void throwAssertionError(const char * s, const Pos & pos))
     throw AssertionError(format(s) % pos);
 }
 
-LocalNoInline(void addErrorPrefix(Error & e, const char * s))
-{
-    e.addPrefix(s);
-}
-
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2))
 {
     e.addPrefix(format(s) % s2);
@@ -205,11 +200,6 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2))
 LocalNoInline(void addErrorPrefix(Error & e, const char * s, const Pos & pos))
 {
     e.addPrefix(format(s) % pos);
-}
-
-LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, const string & s3))
-{
-    e.addPrefix(format(s) % s2 % s3);
 }
 
 
@@ -426,7 +416,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         foreach (Attrs::iterator, i, attrs) {
             Value & v2 = (*v.attrs)[i->first];
             mkCopy(v2, env2.values[displ]);
-            mkThunk(env2.values[displ++], env2, i->second);
+            mkThunk(env2.values[displ++], env2, i->second.first);
         }
 
         /* The inherited attributes, on the other hand, are
@@ -443,7 +433,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
     else {
         foreach (Attrs::iterator, i, attrs) {
             Value & v2 = (*v.attrs)[i->first];
-            mkThunk(v2, env, i->second);
+            mkThunk(v2, env, i->second.first);
         }
 
         foreach (list<VarRef>::iterator, i, inherited) {
@@ -466,7 +456,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
     /* The recursive attributes are evaluated in the new
        environment. */
     foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
-        mkThunk(env2.values[displ++], env2, i->second);
+        mkThunk(env2.values[displ++], env2, i->second.first);
 
     /* The inherited attributes, on the other hand, are evaluated in
        the original environment. */

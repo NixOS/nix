@@ -61,18 +61,18 @@ static string showAttrPath(const vector<Symbol> & attrPath)
 }
 
 
-static void dupAttr(const vector<Symbol> & attrPath, const Pos & pos)
+static void dupAttr(const vector<Symbol> & attrPath, const Pos & pos, const Pos & prevPos)
 {
-    throw ParseError(format("attribute `%1%' at %2% already defined at <SOMEWHERE>")
-        % showAttrPath(attrPath) % pos);
+    throw ParseError(format("attribute `%1%' at %2% already defined at %3%")
+        % showAttrPath(attrPath) % pos % prevPos);
 }
  
 
-static void dupAttr(Symbol attr, const Pos & pos)
+static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
 {
     vector<Symbol> attrPath; attrPath.push_back(attr);
-    throw ParseError(format("attribute `%1%' at %2% already defined at <SOMEWHERE>")
-        % showAttrPath(attrPath) % pos);
+    throw ParseError(format("attribute `%1%' at %2% already defined at %3%")
+        % showAttrPath(attrPath) % pos % prevPos);
 }
  
 
@@ -82,19 +82,20 @@ static void addAttr(ExprAttrs * attrs, const vector<Symbol> & attrPath,
     unsigned int n = 0;
     foreach (vector<Symbol>::const_iterator, i, attrPath) {
         n++;
-        if (attrs->attrs[*i]) {
-            ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(attrs->attrs[*i]);
-            if (!attrs2 || n == attrPath.size()) dupAttr(attrPath, pos);
+        ExprAttrs::Attrs::iterator j = attrs->attrs.find(*i);
+        if (j != attrs->attrs.end()) {
+            ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.first);
+            if (!attrs2 || n == attrPath.size()) dupAttr(attrPath, pos, j->second.second);
             attrs = attrs2;
         } else {
             if (attrs->attrNames.find(*i) != attrs->attrNames.end())
-                dupAttr(attrPath, pos);
-            attrs->attrNames.insert(*i);
+                dupAttr(attrPath, pos, attrs->attrNames[*i]);
+            attrs->attrNames[*i] = pos;
             if (n == attrPath.size())
-                attrs->attrs[*i] = e;
+                attrs->attrs[*i] = ExprAttrs::Attr(e, pos);
             else {
                 ExprAttrs * nested = new ExprAttrs;
-                attrs->attrs[*i] = nested;
+                attrs->attrs[*i] = ExprAttrs::Attr(nested, pos);
                 attrs = nested;
             }
         }
@@ -205,16 +206,12 @@ void backToString(yyscan_t scanner);
 void backToIndString(yyscan_t scanner);
 
 
-static Pos makeCurPos(YYLTYPE * loc, ParseData * data)
+static Pos makeCurPos(const YYLTYPE & loc, ParseData * data)
 {
-    Pos pos;
-    pos.file = data->path;
-    pos.line = loc->first_line;
-    pos.column = loc->first_column;
-    return pos;
+    return Pos(data->path, loc.first_line, loc.first_column);
 }
 
-#define CUR_POS makeCurPos(yylocp, data)
+#define CUR_POS makeCurPos(*yylocp, data)
 
 
 }
@@ -223,7 +220,7 @@ static Pos makeCurPos(YYLTYPE * loc, ParseData * data)
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * error)
 {
     data->error = (format("%1%, at %2%")
-        % error % makeCurPos(loc, data)).str();
+        % error % makeCurPos(*loc, data)).str();
 }
 
 
@@ -374,14 +371,14 @@ ind_string_parts
   ;
 
 binds
-  : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, *$2, $4, CUR_POS); }
+  : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, *$2, $4, makeCurPos(@2, data)); }
   | binds INHERIT ids ';'
     { $$ = $1;
       foreach (vector<Symbol>::iterator, i, *$3) {
           if ($$->attrNames.find(*i) != $$->attrNames.end())
-              dupAttr(*i, CUR_POS);
+              dupAttr(*i, makeCurPos(@3, data), $$->attrNames[*i]);
           $$->inherited.push_back(*i);
-          $$->attrNames.insert(*i);
+          $$->attrNames[*i] = makeCurPos(@3, data);
       }
     }
   | binds INHERIT '(' expr ')' ids ';'
@@ -389,11 +386,11 @@ binds
       /* !!! Should ensure sharing of the expression in $4. */
       foreach (vector<Symbol>::iterator, i, *$6) {
           if ($$->attrNames.find(*i) != $$->attrNames.end())
-              dupAttr(*i, CUR_POS);
-          $$->attrs[*i] = new ExprSelect($4, *i);
-          $$->attrNames.insert(*i);
-      }
-    }
+              dupAttr(*i, makeCurPos(@6, data), $$->attrNames[*i]);
+          $$->attrs[*i] = ExprAttrs::Attr(new ExprSelect($4, *i), makeCurPos(@6, data));
+          $$->attrNames[*i] = makeCurPos(@6, data);
+      }}
+
   | { $$ = new ExprAttrs; }
   ;
 

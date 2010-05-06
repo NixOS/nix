@@ -23,7 +23,12 @@ struct Pos
 {
     string file;
     unsigned int line, column;
+    Pos() : line(0), column(0) { };
+    Pos(const string & file, unsigned int line, unsigned int column)
+        : file(file), line(line), column(column) { };
 };
+
+extern Pos noPos;
 
 std::ostream & operator << (std::ostream & str, const Pos & pos);
 
@@ -125,10 +130,11 @@ struct ExprOpHasAttr : Expr
 struct ExprAttrs : Expr
 {
     bool recursive;
-    typedef std::map<Symbol, Expr *> Attrs;
+    typedef std::pair<Expr *, Pos> Attr;
+    typedef std::map<Symbol, Attr> Attrs;
     Attrs attrs;
     list<VarRef> inherited;
-    set<Symbol> attrNames; // used during parsing
+    std::map<Symbol, Pos> attrNames; // used during parsing
     ExprAttrs() : recursive(false) { };
     COMMON_METHODS
 };

@@ -132,7 +132,7 @@ static void getAllExprs(EvalState & state,
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
             attrs.attrs[state.symbols.create(attrName)] =
-                parseExprFromFile(state, absPath(path2));
+                ExprAttrs::Attr(parseExprFromFile(state, absPath(path2)), noPos);
         }
         else
             /* `path2' is a directory (with no default.nix in it);
@@ -153,7 +153,8 @@ static Expr * loadSourceExpr(EvalState & state, const Path & path)
        for a user to have a ~/.nix-defexpr directory that includes
        some system-wide directory). */
     ExprAttrs * attrs = new ExprAttrs;
-    attrs->attrs[state.symbols.create("_combineChannels")] = new ExprList();
+    attrs->attrs[state.symbols.create("_combineChannels")] =
+        ExprAttrs::Attr(new ExprList(), noPos);
     getAllExprs(state, path, *attrs);
     return attrs;
 }

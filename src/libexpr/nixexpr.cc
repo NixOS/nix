@@ -58,7 +58,7 @@ void ExprAttrs::show(std::ostream & str)
     foreach (list<VarRef>::iterator, i, inherited)
         str << "inherit " << i->name << "; ";
     foreach (Attrs::iterator, i, attrs)
-        str << i->first << " = " << *i->second << "; ";
+        str << i->first << " = " << *i->second.first << "; ";
     str << "}";
 }
 
@@ -94,7 +94,7 @@ void ExprLet::show(std::ostream & str)
     foreach (list<VarRef>::iterator, i, attrs->inherited)
         str << "inherit " << i->name << "; ";
     foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
-        str << i->first << " = " << *i->second << "; ";
+        str << i->first << " = " << *i->second.first << "; ";
     str << "in " << *body;
 }
 
@@ -136,6 +136,9 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
         str << (format("`%1%:%2%:%3%'") % pos.file % pos.line % pos.column).str();
     return str;
 }
+
+
+Pos noPos;
 
 
 /* Computing levels/displacements for variables. */
@@ -218,12 +221,12 @@ void ExprAttrs::bindVars(const StaticEnv & env)
         }
 
         foreach (ExprAttrs::Attrs::iterator, i, attrs)
-            i->second->bindVars(newEnv);
+            i->second.first->bindVars(newEnv);
     }
 
     else {
         foreach (ExprAttrs::Attrs::iterator, i, attrs)
-            i->second->bindVars(env);
+            i->second.first->bindVars(env);
 
         foreach (list<VarRef>::iterator, i, inherited)
             i->bind(env);
@@ -270,7 +273,7 @@ void ExprLet::bindVars(const StaticEnv & env)
     }
 
     foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
-        i->second->bindVars(newEnv);
+        i->second.first->bindVars(newEnv);
     
     body->bindVars(newEnv);
 }
