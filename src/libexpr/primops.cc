@@ -189,19 +189,20 @@ static void prim_throw(EvalState & state, Value * * args, Value & v)
 }
 
 
-#if 0
 static void prim_addErrorContext(EvalState & state, Value * * args, Value & v)
 {
-    PathSet context;
     try {
-        return evalExpr(state, args[1]);
+        state.forceValue(*args[1]);
+        v = *args[1];
     } catch (Error & e) {
-        e.addPrefix(format("%1%\n") %
-            evalString(state, args[0], context));
+        PathSet context;
+        e.addPrefix(format("%1%\n") % state.coerceToString(*args[0], context));
         throw;
     }
 }
 
+
+#if 0
 /* Try evaluating the argument. Success => {success=true; value=something;}, 
  * else => {success=false; value=false;} */
 static void prim_tryEval(EvalState & state, Value * * args, Value & v)
@@ -1060,8 +1061,8 @@ void EvalState::createBaseEnv()
     addPrimOp("__genericClosure", 1, prim_genericClosure);
     addPrimOp("abort", 1, prim_abort);
     addPrimOp("throw", 1, prim_throw);
-#if 0
     addPrimOp("__addErrorContext", 2, prim_addErrorContext);
+#if 0
     addPrimOp("__tryEval", 1, prim_tryEval);
 #endif
     addPrimOp("__getEnv", 1, prim_getEnv);
