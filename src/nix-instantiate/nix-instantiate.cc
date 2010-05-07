@@ -39,7 +39,7 @@ static bool indirectRoot = false;
 
 void processExpr(EvalState & state, const Strings & attrPaths,
     bool parseOnly, bool strict, const Bindings & autoArgs,
-    bool evalOnly, bool xmlOutput, Expr * e)
+    bool evalOnly, bool xmlOutput, bool location, Expr * e)
 {
     if (parseOnly)
         std::cout << format("%1%\n") % *e;
@@ -52,7 +52,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             PathSet context;
             if (evalOnly)
                 if (xmlOutput)
-                    printValueAsXML(state, strict, v, std::cout, context);
+                    printValueAsXML(state, strict, location, v, std::cout, context);
                 else {
                     if (strict) state.strictForceValue(v);
                     std::cout << v << std::endl;
@@ -83,6 +83,7 @@ void run(Strings args)
     bool evalOnly = false;
     bool parseOnly = false;
     bool xmlOutput = false;
+    bool xmlOutputSourceLocation = true;
     bool strict = false;
     Strings attrPaths;
     Bindings autoArgs;
@@ -116,6 +117,8 @@ void run(Strings args)
             indirectRoot = true;
         else if (arg == "--xml")
             xmlOutput = true;
+        else if (arg == "--no-location")
+            xmlOutputSourceLocation = false;
         else if (arg == "--strict")
             strict = true;
         else if (arg[0] == '-')
@@ -131,14 +134,14 @@ void run(Strings args)
     if (readStdin) {
         Expr * e = parseStdin(state);
         processExpr(state, attrPaths, parseOnly, strict, autoArgs,
-            evalOnly, xmlOutput, e);
+            evalOnly, xmlOutput, xmlOutputSourceLocation, e);
     }
 
     foreach (Strings::iterator, i, files) {
         Path path = absPath(*i);
         Expr * e = parseExprFromFile(state, path);
         processExpr(state, attrPaths, parseOnly, strict, autoArgs,
-            evalOnly, xmlOutput, e);
+            evalOnly, xmlOutput, xmlOutputSourceLocation, e);
     }
 
     state.printStats();

@@ -16,26 +16,40 @@ static XMLAttrs singletonAttrs(const string & name, const string & value)
 }
 
 
-static void printValueAsXML(EvalState & state, bool strict, Value & v,
-    XMLWriter & doc, PathSet & context, PathSet & drvsSeen);
+static void printValueAsXML(EvalState & state, bool strict, bool location,
+    Value & v, XMLWriter & doc, PathSet & context, PathSet & drvsSeen);
 
 
-static void showAttrs(EvalState & state, bool strict, Bindings & attrs,
-    XMLWriter & doc, PathSet & context, PathSet & drvsSeen)
+static void posToXML(XMLAttrs & xmlAttrs, const Pos & pos)
+{
+    xmlAttrs["path"] = pos.file;
+    xmlAttrs["line"] = (format("%1%") % pos.line).str();
+    xmlAttrs["column"] = (format("%1%") % pos.column).str();
+}
+
+
+static void showAttrs(EvalState & state, bool strict, bool location,
+    Bindings & attrs, XMLWriter & doc, PathSet & context, PathSet & drvsSeen)
 {
     StringSet names;
     foreach (Bindings::iterator, i, attrs)
         names.insert(i->first);
     foreach (StringSet::iterator, i, names) {
-        XMLOpenElement _(doc, "attr", singletonAttrs("name", *i));
-        printValueAsXML(state, strict, attrs[state.symbols.create(*i)].value,
-            doc, context, drvsSeen);
+        Attr & a(attrs[state.symbols.create(*i)]);
+        
+        XMLAttrs xmlAttrs;
+        xmlAttrs["name"] = *i;
+        if (location && a.pos != &noPos) posToXML(xmlAttrs, *a.pos);
+        
+        XMLOpenElement _(doc, "attr", xmlAttrs);
+        printValueAsXML(state, strict, location,
+            a.value, doc, context, drvsSeen);
     }
 }
 
 
-static void printValueAsXML(EvalState & state, bool strict, Value & v,
-    XMLWriter & doc, PathSet & context, PathSet & drvsSeen)
+static void printValueAsXML(EvalState & state, bool strict, bool location,
+    Value & v, XMLWriter & doc, PathSet & context, PathSet & drvsSeen)
 {
     checkInterrupt();
 
@@ -72,25 +86,31 @@ static void printValueAsXML(EvalState & state, bool strict, Value & v,
 
                 Path drvPath;
                 a = v.attrs->find(state.sDrvPath);
-                if (a != v.attrs->end() && a->second.value.type == tString)
-                    xmlAttrs["drvPath"] = drvPath = a->second.value.string.s;
+                if (a != v.attrs->end()) {
+                    if (strict) state.forceValue(a->second.value);
+                    if (a->second.value.type == tString)
+                        xmlAttrs["drvPath"] = drvPath = a->second.value.string.s;
+                }
         
                 a = v.attrs->find(state.sOutPath);
-                if (a != v.attrs->end() && a->second.value.type == tString)
-                    xmlAttrs["outPath"] = a->second.value.string.s;
+                if (a != v.attrs->end()) {
+                    if (strict) state.forceValue(a->second.value);
+                    if (a->second.value.type == tString)
+                        xmlAttrs["outPath"] = a->second.value.string.s;
+                }
 
                 XMLOpenElement _(doc, "derivation", xmlAttrs);
 
                 if (drvPath != "" && drvsSeen.find(drvPath) == drvsSeen.end()) {
                     drvsSeen.insert(drvPath);
-                    showAttrs(state, strict, *v.attrs, doc, context, drvsSeen);
+                    showAttrs(state, strict, location, *v.attrs, doc, context, drvsSeen);
                 } else
                     doc.writeEmptyElement("repeated");
             }
 
             else {
                 XMLOpenElement _(doc, "attrs");
-                showAttrs(state, strict, *v.attrs, doc, context, drvsSeen);
+                showAttrs(state, strict, location, *v.attrs, doc, context, drvsSeen);
             }
             
             break;
@@ -98,12 +118,15 @@ static void printValueAsXML(EvalState & state, bool strict, Value & v,
         case tList: {
             XMLOpenElement _(doc, "list");
             for (unsigned int n = 0; n < v.list.length; ++n)
-                printValueAsXML(state, strict, *v.list.elems[n], doc, context, drvsSeen);
+                printValueAsXML(state, strict, location, *v.list.elems[n], doc, context, drvsSeen);
             break;
         }
 
         case tLambda: {
-            XMLOpenElement _(doc, "function");
+            XMLAttrs xmlAttrs;
+            if (location) posToXML(xmlAttrs, v.lambda.fun->pos);
+            XMLOpenElement _(doc, "function", xmlAttrs);
+            
             if (v.lambda.fun->matchAttrs) {
                 XMLAttrs attrs;
                 if (!v.lambda.fun->arg.empty()) attrs["name"] = v.lambda.fun->arg;
@@ -113,6 +136,7 @@ static void printValueAsXML(EvalState & state, bool strict, Value & v,
                     doc.writeEmptyElement("attr", singletonAttrs("name", i->name));
             } else
                 doc.writeEmptyElement("varpat", singletonAttrs("name", v.lambda.fun->arg));
+            
             break;
         }
 
@@ -122,13 +146,13 @@ static void printValueAsXML(EvalState & state, bool strict, Value & v,
 }
 
 
-void printValueAsXML(EvalState & state, bool strict,
+void printValueAsXML(EvalState & state, bool strict, bool location,
     Value & v, std::ostream & out, PathSet & context)
 {
     XMLWriter doc(true, out);
     XMLOpenElement root(doc, "expr");
     PathSet drvsSeen;    
-    printValueAsXML(state, strict, v, doc, context, drvsSeen);
+    printValueAsXML(state, strict, location, v, doc, context, drvsSeen);
 }
 
  

@@ -582,7 +582,7 @@ static void prim_toXML(EvalState & state, Value * * args, Value & v)
 {
     std::ostringstream out;
     PathSet context;
-    printValueAsXML(state, true, *args[0], out, context);
+    printValueAsXML(state, true, false, *args[0], out, context);
     mkString(v, out.str(), context);
 }
 
