@@ -131,9 +131,10 @@ struct ExprAttrs : Expr
 {
     bool recursive;
     typedef std::pair<Expr *, Pos> Attr;
+    typedef std::pair<VarRef, Pos> Inherited;
     typedef std::map<Symbol, Attr> Attrs;
     Attrs attrs;
-    list<VarRef> inherited;
+    list<Inherited> inherited;
     std::map<Symbol, Pos> attrNames; // used during parsing
     ExprAttrs() : recursive(false) { };
     COMMON_METHODS

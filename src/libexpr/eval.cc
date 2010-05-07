@@ -430,11 +430,12 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 
         /* The inherited attributes, on the other hand, are
            evaluated in the original environment. */
-        foreach (list<VarRef>::iterator, i, inherited) {
-            Value & v2 = (*v.attrs)[i->name].value;
-            Value * v3 = state.lookupVar(&env, *i);
-            mkCopy(v2, *v3);
-            mkCopy(env2.values[displ++], *v3);
+        foreach (list<Inherited>::iterator, i, inherited) {
+            nix::Attr & a = (*v.attrs)[i->first.name];
+            Value * v2 = state.lookupVar(&env, i->first);
+            mkCopy(a.value, *v2);
+            mkCopy(env2.values[displ++], *v2);
+            a.pos = &i->second;
         }
 
     }
@@ -446,9 +447,10 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             a.pos = &i->second.second;
         }
 
-        foreach (list<VarRef>::iterator, i, inherited) {
-            Value & v2 = (*v.attrs)[i->name].value;
-            mkCopy(v2, *state.lookupVar(&env, *i));
+        foreach (list<Inherited>::iterator, i, inherited) {
+            nix::Attr & a = (*v.attrs)[i->first.name];
+            mkCopy(a.value, *state.lookupVar(&env, i->first));
+            a.pos = &i->second;
         }
     }
 }
@@ -470,8 +472,8 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 
     /* The inherited attributes, on the other hand, are evaluated in
        the original environment. */
-    foreach (list<VarRef>::iterator, i, attrs->inherited)
-        mkCopy(env2.values[displ++], *state.lookupVar(&env, *i));
+    foreach (list<ExprAttrs::Inherited>::iterator, i, attrs->inherited)
+        mkCopy(env2.values[displ++], *state.lookupVar(&env, i->first));
 
     state.eval(env2, body, v);
 }

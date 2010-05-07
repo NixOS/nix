@@ -377,8 +377,9 @@ binds
       foreach (vector<Symbol>::iterator, i, *$3) {
           if ($$->attrNames.find(*i) != $$->attrNames.end())
               dupAttr(*i, makeCurPos(@3, data), $$->attrNames[*i]);
-          $$->inherited.push_back(*i);
-          $$->attrNames[*i] = makeCurPos(@3, data);
+          Pos pos = makeCurPos(@3, data);
+          $$->inherited.push_back(ExprAttrs::Inherited(*i, pos));
+          $$->attrNames[*i] = pos;
       }
     }
   | binds INHERIT '(' expr ')' ids ';'

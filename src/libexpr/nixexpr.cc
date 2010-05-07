@@ -55,8 +55,8 @@ void ExprAttrs::show(std::ostream & str)
 {
     if (recursive) str << "rec ";
     str << "{ ";
-    foreach (list<VarRef>::iterator, i, inherited)
-        str << "inherit " << i->name << "; ";
+    foreach (list<Inherited>::iterator, i, inherited)
+        str << "inherit " << i->first.name << "; ";
     foreach (Attrs::iterator, i, attrs)
         str << i->first << " = " << *i->second.first << "; ";
     str << "}";
@@ -91,8 +91,8 @@ void ExprLambda::show(std::ostream & str)
 void ExprLet::show(std::ostream & str)
 {
     str << "let ";
-    foreach (list<VarRef>::iterator, i, attrs->inherited)
-        str << "inherit " << i->name << "; ";
+    foreach (list<ExprAttrs::Inherited>::iterator, i, attrs->inherited)
+        str << "inherit " << i->first.name << "; ";
     foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
         str << i->first << " = " << *i->second.first << "; ";
     str << "in " << *body;
@@ -215,9 +215,9 @@ void ExprAttrs::bindVars(const StaticEnv & env)
         foreach (ExprAttrs::Attrs::iterator, i, attrs)
             newEnv.vars[i->first] = displ++;
 
-        foreach (list<VarRef>::iterator, i, inherited) {
-            newEnv.vars[i->name] = displ++;
-            i->bind(env);
+        foreach (list<Inherited>::iterator, i, inherited) {
+            newEnv.vars[i->first.name] = displ++;
+            i->first.bind(env);
         }
 
         foreach (ExprAttrs::Attrs::iterator, i, attrs)
@@ -228,8 +228,8 @@ void ExprAttrs::bindVars(const StaticEnv & env)
         foreach (ExprAttrs::Attrs::iterator, i, attrs)
             i->second.first->bindVars(env);
 
-        foreach (list<VarRef>::iterator, i, inherited)
-            i->bind(env);
+        foreach (list<Inherited>::iterator, i, inherited)
+            i->first.bind(env);
     }
 }
 
@@ -267,9 +267,9 @@ void ExprLet::bindVars(const StaticEnv & env)
     foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
         newEnv.vars[i->first] = displ++;
 
-    foreach (list<VarRef>::iterator, i, attrs->inherited) {
-        newEnv.vars[i->name] = displ++;
-        i->bind(env);
+    foreach (list<ExprAttrs::Inherited>::iterator, i, attrs->inherited) {
+        newEnv.vars[i->first.name] = displ++;
+        i->first.bind(env);
     }
 
     foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
