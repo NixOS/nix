@@ -32,8 +32,10 @@ static void showAttrs(EvalState & state, bool strict, bool location,
     Bindings & attrs, XMLWriter & doc, PathSet & context, PathSet & drvsSeen)
 {
     StringSet names;
+    
     foreach (Bindings::iterator, i, attrs)
         names.insert(i->first);
+    
     foreach (StringSet::iterator, i, names) {
         Attr & a(attrs[state.symbols.create(*i)]);
         
