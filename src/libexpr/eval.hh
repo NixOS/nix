@@ -14,8 +14,9 @@ class Hash;
 class EvalState;
 struct Env;
 struct Value;
+struct Attr;
 
-typedef std::map<Symbol, Value> Bindings;
+typedef std::map<Symbol, Attr> Bindings;
 
 
 typedef enum {
@@ -108,6 +109,14 @@ struct Env
     Env * up;
     unsigned int prevWith; // nr of levels up to next `with' environment
     Value values[0];
+};
+
+
+struct Attr
+{
+    Value value;
+    Pos * pos;
+    Attr() : pos(&noPos) { };
 };
 
 

@@ -115,18 +115,18 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
         args[0]->attrs->find(state.symbols.create("startSet"));
     if (startSet == args[0]->attrs->end())
         throw EvalError("attribute `startSet' required");
-    state.forceList(startSet->second);
+    state.forceList(startSet->second.value);
 
     list<Value *> workSet;
-    for (unsigned int n = 0; n < startSet->second.list.length; ++n)
-        workSet.push_back(startSet->second.list.elems[n]);
+    for (unsigned int n = 0; n < startSet->second.value.list.length; ++n)
+        workSet.push_back(startSet->second.value.list.elems[n]);
 
     /* Get the operator. */
     Bindings::iterator op =
         args[0]->attrs->find(state.symbols.create("operator"));
     if (op == args[0]->attrs->end())
         throw EvalError("attribute `operator' required");
-    state.forceValue(op->second);
+    state.forceValue(op->second.value);
 
     /* Construct the closure by applying the operator to element of
        `workSet', adding the result to `workSet', continuing until
@@ -143,15 +143,15 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
             e->attrs->find(state.symbols.create("key"));
         if (key == e->attrs->end())
             throw EvalError("attribute `key' required");
-        state.forceValue(key->second);
+        state.forceValue(key->second.value);
 
-        if (doneKeys.find(key->second) != doneKeys.end()) continue;
-        doneKeys.insert(key->second);
+        if (doneKeys.find(key->second.value) != doneKeys.end()) continue;
+        doneKeys.insert(key->second.value);
         res.push_back(*e);
         
         /* Call the `operator' function with `e' as argument. */
         Value call;
-        mkApp(call, op->second, *e);
+        mkApp(call, op->second.value, *e);
         state.forceList(call);
 
         /* Add the values returned by the operator to the work set. */
@@ -323,11 +323,11 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     if (attr == args[0]->attrs->end())
         throw EvalError("required attribute `name' missing");
     string drvName;
+    Pos & posDrvName(*attr->second.pos);
     try {        
-        drvName = state.forceStringNoCtx(attr->second);
+        drvName = state.forceStringNoCtx(attr->second.value);
     } catch (Error & e) {
-        e.addPrefix(format("while evaluating the derivation attribute `name' at <SOMEWHERE>:\n"));
-        // !!! % showPos(posDrvName));
+        e.addPrefix(format("while evaluating the derivation attribute `name' at %1%:\n") % posDrvName);
         throw;
     }
     
@@ -348,9 +348,9 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
             if (key == "args") {
-                state.forceList(i->second);
-                for (unsigned int n = 0; n < i->second.list.length; ++n) {
-                    string s = state.coerceToString(*i->second.list.elems[n], context, true);
+                state.forceList(i->second.value);
+                for (unsigned int n = 0; n < i->second.value.list.length; ++n) {
+                    string s = state.coerceToString(*i->second.value.list.elems[n], context, true);
                     drv.args.push_back(s);
                 }
             }
@@ -358,7 +358,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
             /* All other attributes are passed to the builder through
                the environment. */
             else {
-                string s = state.coerceToString(i->second, context, true);
+                string s = state.coerceToString(i->second.value, context, true);
                 drv.env[key] = s;
                 if (key == "builder") drv.builder = s;
                 else if (i->first == state.sSystem) drv.platform = s;
@@ -373,10 +373,10 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
             }
 
         } catch (Error & e) {
-            e.addPrefix(format("while evaluating the derivation attribute `%1%' at <SOMEWHERE>:\n")
-                % key /* !!! % showPos(pos) */);
-            e.addPrefix(format("while instantiating the derivation named `%1%' at <SOMEWHERE>:\n")
-                % drvName /* !!! % showPos(posDrvName) */);
+            e.addPrefix(format("while evaluating the derivation attribute `%1%' at %2%:\n")
+                % key % *i->second.pos);
+            e.addPrefix(format("while instantiating the derivation named `%1%' at %2%:\n")
+                % drvName % posDrvName);
             throw;
         }
     }
@@ -487,8 +487,8 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
 
     /* !!! assumes a single output */
     state.mkAttrs(v);
-    mkString((*v.attrs)[state.sOutPath], outPath, singleton<PathSet>(drvPath));
-    mkString((*v.attrs)[state.sDrvPath], drvPath, singleton<PathSet>("=" + drvPath));
+    mkString((*v.attrs)[state.sOutPath].value, outPath, singleton<PathSet>(drvPath));
+    mkString((*v.attrs)[state.sDrvPath].value, drvPath, singleton<PathSet>("=" + drvPath));
 }
 
 
@@ -711,8 +711,9 @@ static void prim_getAttr(EvalState & state, Value * * args, Value & v)
     Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
     if (i == args[1]->attrs->end())
         throw EvalError(format("attribute `%1%' missing") % attr);
-    state.forceValue(i->second);
-    v = i->second;
+    // !!! add to stack trace?
+    state.forceValue(i->second.value);
+    v = i->second.value;
 }
 
 
@@ -764,13 +765,15 @@ static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
         Bindings::iterator j = v2.attrs->find(state.sName);
         if (j == v2.attrs->end())
             throw TypeError("`name' attribute missing in a call to `listToAttrs'");
-        string name = state.forceStringNoCtx(j->second);
+        string name = state.forceStringNoCtx(j->second.value);
         
         j = v2.attrs->find(state.symbols.create("value"));
         if (j == v2.attrs->end())
             throw TypeError("`value' attribute missing in a call to `listToAttrs'");
 
-        mkCopy((*v.attrs)[state.symbols.create(name)], j->second);
+        Attr & a = (*v.attrs)[state.symbols.create(name)];
+        mkCopy(a.value, j->second.value);
+        a.pos = j->second.pos;
     }
 }
 
@@ -787,8 +790,11 @@ static void prim_intersectAttrs(EvalState & state, Value * * args, Value & v)
     
     foreach (Bindings::iterator, i, *args[1]->attrs) {
         Bindings::iterator j = args[0]->attrs->find(i->first);
-        if (j != args[0]->attrs->end())
-            mkCopy((*v.attrs)[i->first], i->second);
+        if (j != args[0]->attrs->end()) {
+            Attr & a = (*v.attrs)[i->first];
+            mkCopy(a.value, i->second.value);
+            a.pos = i->second.pos;
+        }
     }
 }
 
@@ -817,7 +823,7 @@ static void prim_functionArgs(EvalState & state, Value * * args, Value & v)
     if (!args[0]->lambda.fun->matchAttrs) return;
 
     foreach (Formals::Formals_::iterator, i, args[0]->lambda.fun->formals->formals)
-        mkBool((*v.attrs)[i->name], i->def);
+        mkBool((*v.attrs)[i->name].value, i->def);
 }
 
 
@@ -1000,8 +1006,8 @@ static void prim_parseDrvName(EvalState & state, Value * * args, Value & v)
     string name = state.forceStringNoCtx(*args[0]);
     DrvName parsed(name);
     state.mkAttrs(v);
-    mkString((*v.attrs)[state.sName], parsed.name);
-    mkString((*v.attrs)[state.symbols.create("version")], parsed.version);
+    mkString((*v.attrs)[state.sName].value, parsed.name);
+    mkString((*v.attrs)[state.symbols.create("version")].value, parsed.version);
 }
 
 

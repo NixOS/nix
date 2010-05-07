@@ -48,7 +48,7 @@ void findAlongAttrPath(EvalState & state, const string & attrPath,
             Bindings::iterator a = v.attrs->find(state.symbols.create(attr));
             if (a == v.attrs->end())
                 throw Error(format("attribute `%1%' in selection path `%2%' not found") % attr % curPath);
-            v = a->second;
+            v = a->second.value;
         }
 
         else if (apType == apIndex) {

@@ -44,7 +44,7 @@ std::ostream & operator << (std::ostream & str, Value & v)
     case tAttrs:
         str << "{ ";
         foreach (Bindings::iterator, i, *v.attrs)
-            str << (string) i->first << " = " << i->second << "; ";
+            str << (string) i->first << " = " << i->second.value << "; ";
         str << "}";
         break;
     case tList:
@@ -128,7 +128,7 @@ void EvalState::addConstant(const string & name, Value & v)
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    (*baseEnv.values[0].attrs)[symbols.create(name2)] = v;
+    (*baseEnv.values[0].attrs)[symbols.create(name2)].value = v;
 }
 
 
@@ -143,7 +143,7 @@ void EvalState::addPrimOp(const string & name,
     v.primOp.name = strdup(name2.c_str());
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
-    (*baseEnv.values[0].attrs)[symbols.create(name2)] = v;
+    (*baseEnv.values[0].attrs)[symbols.create(name2)].value = v;
 }
 
 
@@ -202,6 +202,11 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const Pos & pos))
     e.addPrefix(format(s) % pos);
 }
 
+LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, const Pos & pos))
+{
+    e.addPrefix(format(s) % s2 % pos);
+}
+
 
 void mkString(Value & v, const char * s)
 {
@@ -239,7 +244,7 @@ Value * EvalState::lookupVar(Env * env, const VarRef & var)
         while (1) {
             Bindings::iterator j = env->values[0].attrs->find(var.name);
             if (j != env->values[0].attrs->end())
-                return &j->second;
+                return &j->second.value;
             if (env->prevWith == 0)
                 throwEvalError("undefined variable `%1%'", var.name);
             for (unsigned int l = env->prevWith; l; --l, env = env->up) ;
@@ -290,8 +295,11 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 void EvalState::cloneAttrs(Value & src, Value & dst)
 {
     mkAttrs(dst);
-    foreach (Bindings::iterator, i, *src.attrs)
-        mkCopy((*dst.attrs)[i->first], i->second);
+    foreach (Bindings::iterator, i, *src.attrs) {
+        Attr & a = (*dst.attrs)[i->first];
+        mkCopy(a.value, i->second.value);
+        a.pos = i->second.pos;
+    }
 }
 
 
@@ -414,15 +422,16 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         /* The recursive attributes are evaluated in the new
            environment. */
         foreach (Attrs::iterator, i, attrs) {
-            Value & v2 = (*v.attrs)[i->first];
-            mkCopy(v2, env2.values[displ]);
+            nix::Attr & a = (*v.attrs)[i->first];
+            mkCopy(a.value, env2.values[displ]);
             mkThunk(env2.values[displ++], env2, i->second.first);
+            a.pos = &i->second.second;
         }
 
         /* The inherited attributes, on the other hand, are
            evaluated in the original environment. */
         foreach (list<VarRef>::iterator, i, inherited) {
-            Value & v2 = (*v.attrs)[i->name];
+            Value & v2 = (*v.attrs)[i->name].value;
             Value * v3 = state.lookupVar(&env, *i);
             mkCopy(v2, *v3);
             mkCopy(env2.values[displ++], *v3);
@@ -432,12 +441,13 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 
     else {
         foreach (Attrs::iterator, i, attrs) {
-            Value & v2 = (*v.attrs)[i->first];
-            mkThunk(v2, env, i->second.first);
+            nix::Attr & a = (*v.attrs)[i->first];
+            mkThunk(a.value, env, i->second.first);
+            a.pos = &i->second.second;
         }
 
         foreach (list<VarRef>::iterator, i, inherited) {
-            Value & v2 = (*v.attrs)[i->name];
+            Value & v2 = (*v.attrs)[i->name].value;
             mkCopy(v2, *state.lookupVar(&env, *i));
         }
     }
@@ -494,12 +504,13 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     if (i == v2.attrs->end())
         throwEvalError("attribute `%1%' missing", name);
     try {            
-        state.forceValue(i->second);
+        state.forceValue(i->second.value);
     } catch (Error & e) {
-        addErrorPrefix(e, "while evaluating the attribute `%1%':\n", name);
+        addErrorPrefix(e, "while evaluating the attribute `%1%' at %2%:\n",
+            name, *i->second.pos);
         throw;
     }
-    v = i->second;
+    v = i->second.value;
 }
 
 
@@ -601,7 +612,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
                 mkThunk(env2.values[displ++], env2, i->def);
             } else {
                 attrsUsed++;
-                mkCopy(env2.values[displ++], j->second);
+                mkCopy(env2.values[displ++], j->second.value);
             }
         }
 
@@ -721,8 +732,11 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
         
     state.evalAttrs(env, e2, v2);
     
-    foreach (Bindings::iterator, i, *v2.attrs)
-        mkCopy((*v.attrs)[i->first], i->second);
+    foreach (Bindings::iterator, i, *v2.attrs) {
+        Attr & a = (*v.attrs)[i->first];
+        mkCopy(a.value, i->second.value);
+        a.pos = i->second.pos;
+    }
 }
 
 
@@ -802,7 +816,7 @@ void EvalState::strictForceValue(Value & v)
     
     if (v.type == tAttrs) {
         foreach (Bindings::iterator, i, *v.attrs)
-            strictForceValue(i->second);
+            strictForceValue(i->second.value);
     }
     
     else if (v.type == tList) {
@@ -887,7 +901,7 @@ bool EvalState::isDerivation(Value & v)
 {
     if (v.type != tAttrs) return false;
     Bindings::iterator i = v.attrs->find(sType);
-    return i != v.attrs->end() && forceStringNoCtx(i->second) == "derivation";
+    return i != v.attrs->end() && forceStringNoCtx(i->second.value) == "derivation";
 }
 
 
@@ -933,7 +947,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
         Bindings::iterator i = v.attrs->find(sOutPath);
         if (i == v.attrs->end())
             throwTypeError("cannot coerce an attribute set (except a derivation) to a string");
-        return coerceToString(i->second, context, coerceMore, copyToStore);
+        return coerceToString(i->second.value, context, coerceMore, copyToStore);
     }
 
     if (coerceMore) {
@@ -1021,7 +1035,8 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             if (v1.attrs->size() != v2.attrs->size()) return false;
             Bindings::iterator i, j;
             for (i = v1.attrs->begin(), j = v2.attrs->begin(); i != v1.attrs->end(); ++i, ++j)
-                if (i->first != j->first || !eqValues(i->second, j->second)) return false;
+                if (i->first != j->first || !eqValues(i->second.value, j->second.value))
+                    return false;
             return true;
         }
 
