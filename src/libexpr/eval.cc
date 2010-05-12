@@ -41,12 +41,17 @@ std::ostream & operator << (std::ostream & str, Value & v)
     case tNull:
         str << "true";
         break;
-    case tAttrs:
+    case tAttrs: {
         str << "{ ";
+        typedef std::map<string, Value *> Sorted;
+        Sorted sorted;
         foreach (Bindings::iterator, i, *v.attrs)
-            str << (string) i->first << " = " << i->second.value << "; ";
+            sorted[i->first] = &i->second.value;
+        foreach (Sorted::iterator, i, sorted)
+            str << i->first << " = " << *i->second << "; ";
         str << "}";
         break;
+    }
     case tList:
         str << "[ ";
         for (unsigned int n = 0; n < v.list.length; ++n)

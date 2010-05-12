@@ -1,1 +1,1 @@
-{ x = { value = "x"; success = true; }; y = { value = false; success = false; }; z = { value = false; success = false; }; }
+{ x = { success = true; value = "x"; }; y = { success = false; value = false; }; z = { success = false; value = false; }; }
