@@ -202,24 +202,20 @@ static void prim_addErrorContext(EvalState & state, Value * * args, Value & v)
 }
 
 
-#if 0
 /* Try evaluating the argument. Success => {success=true; value=something;}, 
  * else => {success=false; value=false;} */
 static void prim_tryEval(EvalState & state, Value * * args, Value & v)
 {
-    ATermMap res = ATermMap();
+    state.mkAttrs(v);
     try {
-        Expr val = evalExpr(state, args[0]);
-        res.set(toATerm("value"), makeAttrRHS(val, makeNoPos()));
-        res.set(toATerm("success"), makeAttrRHS(eTrue, makeNoPos()));
+        state.forceValue(*args[0]);
+        (*v.attrs)[state.symbols.create("value")].value = *args[0];
+        mkBool((*v.attrs)[state.symbols.create("success")].value, true);
     } catch (AssertionError & e) {
-        printMsg(lvlDebug, format("tryEval caught an error: %1%: %2%") % e.prefix() % e.msg());
-        res.set(toATerm("value"), makeAttrRHS(eFalse, makeNoPos()));
-        res.set(toATerm("success"), makeAttrRHS(eFalse, makeNoPos()));
+        mkBool((*v.attrs)[state.symbols.create("value")].value, false);
+        mkBool((*v.attrs)[state.symbols.create("success")].value, false);
     }
-    return makeAttrs(res);
 }
-#endif
 
 
 /* Return an environment variable.  Use with care. */
@@ -1062,9 +1058,7 @@ void EvalState::createBaseEnv()
     addPrimOp("abort", 1, prim_abort);
     addPrimOp("throw", 1, prim_throw);
     addPrimOp("__addErrorContext", 2, prim_addErrorContext);
-#if 0
     addPrimOp("__tryEval", 1, prim_tryEval);
-#endif
     addPrimOp("__getEnv", 1, prim_getEnv);
     addPrimOp("__trace", 2, prim_trace);
 
