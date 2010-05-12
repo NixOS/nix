@@ -3,7 +3,6 @@
 #include "globals.hh"
 #include "archive.hh"
 #include "pathlocks.hh"
-#include "derivations-ast.hh"
 #include "worker-protocol.hh"
 #include "derivations.hh"
     
@@ -446,9 +445,7 @@ unsigned long long LocalStore::addValidPath(const ValidPathInfo & info)
        efficiently query whether a path is an output of some
        derivation. */
     if (isDerivation(info.path)) {
-        ATerm t = ATreadFromNamedFile(info.path.c_str());
-        if (!t) throw Error(format("cannot read derivation `%1%'") % info.path);
-        Derivation drv = parseDerivation(t);
+        Derivation drv = parseDerivation(readFile(info.path));
         foreach (DerivationOutputs::iterator, i, drv.outputs) {
             SQLiteStmtUse use(stmtAddDerivationOutput);
             stmtAddDerivationOutput.bind(id);

@@ -130,6 +130,20 @@ void switchLink(Path link, Path target)
         throw SysError(format("renaming `%1%' to `%2%'") % tmp % link);
 }
 
- 
+
+void lockProfile(PathLocks & lock, const Path & profile)
+{
+    lock.lockPaths(singleton<PathSet>(profile),
+        (format("waiting for lock on profile `%1%'") % profile).str());
+    lock.setDeletion(true);
+}
+
+
+string optimisticLockProfile(const Path & profile)
+{
+    return pathExists(profile) ? readLink(profile) : "";
+}
+
+
 }
 

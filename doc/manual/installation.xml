@@ -96,15 +96,13 @@ ubiquitous 2.5.4a won't.  Note that these are only required if you
 modify the parser or when you are building from the Subversion
 repository.</para>
 
-<para>Nix uses CWI's ATerm library and the bzip2 compressor (including
-the bzip2 library).  These are included in the Nix source
-distribution.  If you build from the Subversion repository, you must
-download them yourself and place them in the
-<filename>externals/</filename> directory.  See
+<para>Nix uses the bzip2 compressor (including the bzip2 library).  It
+is included in the Nix source distribution.  If you build from the
+Subversion repository, you must download it yourself and place it in
+the <filename>externals/</filename> directory.  See
 <filename>externals/Makefile.am</filename> for the precise URLs of
-these packages.  Alternatively, if you already have them installed,
-you can use <command>configure</command>'s
-<option>--with-aterm</option> and <option>--with-bzip2</option>
+this packages.  Alternatively, if you already have it installed, you
+can use <command>configure</command>'s <option>--with-bzip2</option>
 options to point to their respective locations.</para>
 
 </section>

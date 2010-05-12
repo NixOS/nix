@@ -1,11 +1,9 @@
 #ifndef __DERIVATIONS_H
 #define __DERIVATIONS_H
 
-typedef union _ATerm * ATerm;
-
-#include "hash.hh"
-
 #include <map>
+
+#include "types.hh"
 
 
 namespace nix {
@@ -53,17 +51,14 @@ struct Derivation
 };
 
 
-/* Hash an aterm. */
-Hash hashTerm(ATerm t);
-
 /* Write a derivation to the Nix store, and return its path. */
 Path writeDerivation(const Derivation & drv, const string & name);
 
 /* Parse a derivation. */
-Derivation parseDerivation(ATerm t);
+Derivation parseDerivation(const string & s);
 
-/* Parse a derivation. */
-ATerm unparseDerivation(const Derivation & drv);
+/* Print a derivation. */
+string unparseDerivation(const Derivation & drv);
 
 /* Check whether a file name ends with the extensions for
    derivations. */

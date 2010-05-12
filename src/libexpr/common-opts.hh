@@ -9,7 +9,7 @@ namespace nix {
 /* Some common option parsing between nix-env and nix-instantiate. */
 bool parseOptionArg(const string & arg, Strings::iterator & i,
     const Strings::iterator & argsEnd, EvalState & state,
-    ATermMap & autoArgs);
+    Bindings & autoArgs);
     
 }
 

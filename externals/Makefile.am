@@ -1,35 +1,3 @@
-# CWI ATerm
-
-ATERM = aterm-$(ATERM_VERSION)
-
-$(ATERM).tar.gz:
-	@echo "Nix requires the CWI ATerm library to build."
-	@echo "Please download version $(ATERM_VERSION) from"
-	@echo "  http://nixos.org/tarballs/aterm-$(ATERM_VERSION).tar.gz"
-	@echo "and place it in the externals/ directory."
-	false
-
-$(ATERM): $(ATERM).tar.gz
-	gzip -d < $(srcdir)/$(ATERM).tar.gz | tar xvf -
-	patch -d $(ATERM) -p1 < ./max-long.patch
-	patch -d $(ATERM) -p1 < ./sizeof.patch
-
-if HAVE_ATERM
-build-aterm:
-else
-build-aterm: $(ATERM)
-	(cd $(ATERM) && \
-	CC="$(CC)" ./configure --prefix=$(pkglibdir)/dummy --libdir=${pkglibdir} $(SUB_CONFIGURE_FLAGS) && \
-	$(MAKE) && \
-	$(MAKE) check)
-	touch build-aterm
-
-install-exec-local:: build-aterm
-	cd $(ATERM) && make install
-	rm -rf "$(DESTDIR)/$(pkglibdir)/dummy"
-endif
-
-
 # bzip2
 
 BZIP2 = bzip2-1.0.5
@@ -89,11 +57,11 @@ install-exec-local:: build-sqlite
 endif
 
 
-all: build-aterm build-bzip2 build-sqlite
+all: build-bzip2 build-sqlite
 
-EXTRA_DIST = $(ATERM).tar.gz $(BZIP2).tar.gz $(SQLITE_TAR) max-long.patch sizeof.patch
+EXTRA_DIST = $(BZIP2).tar.gz $(SQLITE_TAR)
 
 clean:
-	$(RM) -f build-aterm build-bzip2 build-sqlite
-	$(RM) -rf $(ATERM) $(BZIP2) $(SQLITE)
+	$(RM) -f build-bzip2 build-sqlite
+	$(RM) -rf $(BZIP2) $(SQLITE)
 	$(RM) -rf inst-bzip2

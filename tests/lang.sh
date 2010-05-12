@@ -16,12 +16,8 @@ done
 for i in lang/parse-okay-*.nix; do
     echo "parsing $i (should succeed)";
     i=$(basename $i .nix)
-    if ! $nixinstantiate --parse-only - < lang/$i.nix > lang/$i.ast; then
+    if ! $nixinstantiate --parse-only - < lang/$i.nix > lang/$i.out; then
         echo "FAIL: $i should parse"
-        fail=1
-    fi
-    if ! $aterm_bin/atdiff lang/$i.ast lang/$i.exp; then
-        echo "FAIL: parse tree of $i not as expected"
         fail=1
     fi
 done
@@ -44,10 +40,10 @@ for i in lang/eval-okay-*.nix; do
         if test -e lang/$i.flags; then
             flags=$(cat lang/$i.flags)
         fi
-        if ! $nixinstantiate $flags --eval-only lang/$i.nix > lang/$i.out; then
+        if ! $nixinstantiate $flags --eval-only --strict lang/$i.nix > lang/$i.out; then
             echo "FAIL: $i should evaluate"
             fail=1
-        elif ! $aterm_bin/atdiff lang/$i.out lang/$i.exp; then
+        elif ! diff lang/$i.out lang/$i.exp; then
             echo "FAIL: evaluation result of $i not as expected"
             fail=1
         fi

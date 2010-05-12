@@ -3,8 +3,7 @@
 
 #include <map>
 
-#include "aterm-map.hh"
-#include "types.hh"
+#include "symbol-table.hh"
 
 
 namespace nix {
@@ -18,105 +17,254 @@ MakeError(Abort, EvalError)
 MakeError(TypeError, EvalError)
 
 
-/* Nix expressions are represented as ATerms.  The maximal sharing
-   property of the ATerm library allows us to implement caching of
-   normals forms efficiently. */
-typedef ATerm Expr;
-typedef ATerm DefaultValue;
-typedef ATerm Pos;
-typedef ATerm Pattern;
-typedef ATerm ATermBool;
+/* Position objects. */
 
-
-/* A STL vector of ATerms.  Should be used with great care since it's
-   stored on the heap, and the elements are therefore not roots to the
-   ATerm garbage collector. */
-typedef vector<ATerm> ATermVector;
-
-
-/* A substitution is a linked list of ATermMaps that map names to
-   identifiers.  We use a list of ATermMaps rather than a single to
-   make it easy to grow or shrink a substitution when entering a
-   scope. */
-struct Substitution
+struct Pos
 {
-    ATermMap * map;
-    const Substitution * prev;
+    string file;
+    unsigned int line, column;
+    Pos() : line(0), column(0) { };
+    Pos(const string & file, unsigned int line, unsigned int column)
+        : file(file), line(line), column(column) { };
+};
 
-    Substitution(const Substitution * prev, ATermMap * map)
-    {
-        this->prev = prev;
-        this->map = map;
-    }
+extern Pos noPos;
+
+std::ostream & operator << (std::ostream & str, const Pos & pos);
+
+
+struct Env;
+struct Value;
+struct EvalState;
+struct StaticEnv;
+
+
+/* Abstract syntax of Nix expressions. */
+
+struct Expr
+{
+    virtual void show(std::ostream & str);
+    virtual void bindVars(const StaticEnv & env);
+    virtual void eval(EvalState & state, Env & env, Value & v);
+};
+
+std::ostream & operator << (std::ostream & str, Expr & e);
+
+#define COMMON_METHODS \
+    void show(std::ostream & str); \
+    void eval(EvalState & state, Env & env, Value & v); \
+    void bindVars(const StaticEnv & env);
+
+struct ExprInt : Expr
+{
+    int n;
+    ExprInt(int n) : n(n) { };
+    COMMON_METHODS
+};
+
+struct ExprString : Expr
+{
+    string s;
+    ExprString(const string & s) : s(s) { };
+    COMMON_METHODS
+};
+
+/* Temporary class used during parsing of indented strings. */
+struct ExprIndStr : Expr
+{
+    string s;
+    ExprIndStr(const string & s) : s(s) { };
+};
+
+struct ExprPath : Expr
+{
+    string s;
+    ExprPath(const string & s) : s(s) { };
+    COMMON_METHODS
+};
+
+struct VarRef
+{
+    Symbol name;
+
+    /* Whether the variable comes from an environment (e.g. a rec, let
+       or function argument) or from a "with". */
+    bool fromWith;
     
-    Expr lookup(Expr name) const
-    {
-        Expr x;
-        for (const Substitution * s(this); s; s = s->prev)
-            if ((x = s->map->get(name))) return x;
-        return 0;
-    }
+    /* In the former case, the value is obtained by going `level'
+       levels up from the current environment and getting the
+       `displ'th value in that environment.  In the latter case, the
+       value is obtained by getting the attribute named `name' from
+       the attribute set stored in the environment that is `level'
+       levels up from the current one.*/
+    unsigned int level;
+    unsigned int displ;
+
+    VarRef(const Symbol & name) : name(name) { };
+    void bind(const StaticEnv & env);
 };
 
-
-/* Show a position. */
-string showPos(ATerm pos);
-
-/* Generic bottomup traversal over ATerms.  The traversal first
-   recursively descends into subterms, and then applies the given term
-   function to the resulting term. */
-struct TermFun
+struct ExprVar : Expr
 {
-    virtual ~TermFun() { }
-    virtual ATerm operator () (ATerm e) = 0;
+    VarRef info;
+    ExprVar(const Symbol & name) : info(name) { };
+    COMMON_METHODS
 };
-ATerm bottomupRewrite(TermFun & f, ATerm e);
+
+struct ExprSelect : Expr
+{
+    Expr * e;
+    Symbol name;
+    ExprSelect(Expr * e, const Symbol & name) : e(e), name(name) { };
+    COMMON_METHODS
+};
+
+struct ExprOpHasAttr : Expr
+{
+    Expr * e;
+    Symbol name;
+    ExprOpHasAttr(Expr * e, const Symbol & name) : e(e), name(name) { };
+    COMMON_METHODS
+};
+
+struct ExprAttrs : Expr
+{
+    bool recursive;
+    typedef std::pair<Expr *, Pos> Attr;
+    typedef std::pair<VarRef, Pos> Inherited;
+    typedef std::map<Symbol, Attr> Attrs;
+    Attrs attrs;
+    list<Inherited> inherited;
+    std::map<Symbol, Pos> attrNames; // used during parsing
+    ExprAttrs() : recursive(false) { };
+    COMMON_METHODS
+};
+
+struct ExprList : Expr
+{
+    std::vector<Expr *> elems;
+    ExprList() { };
+    COMMON_METHODS
+};
+
+struct Formal
+{
+    Symbol name;
+    Expr * def;
+    Formal(const Symbol & name, Expr * def) : name(name), def(def) { };
+};
+
+struct Formals
+{
+    typedef std::list<Formal> Formals_;
+    Formals_ formals;
+    std::set<Symbol> argNames; // used during parsing
+    bool ellipsis;
+};
+
+struct ExprLambda : Expr
+{
+    Pos pos;
+    Symbol arg;
+    bool matchAttrs;
+    Formals * formals;
+    Expr * body;
+    ExprLambda(const Pos & pos, const Symbol & arg, bool matchAttrs, Formals * formals, Expr * body)
+        : pos(pos), arg(arg), matchAttrs(matchAttrs), formals(formals), body(body)
+    {
+        if (!arg.empty() && formals && formals->argNames.find(arg) != formals->argNames.end())
+            throw ParseError(format("duplicate formal function argument `%1%' at %2%")
+                % arg % pos);
+    };
+    COMMON_METHODS
+};
+
+struct ExprLet : Expr
+{
+    ExprAttrs * attrs;
+    Expr * body;
+    ExprLet(ExprAttrs * attrs, Expr * body) : attrs(attrs), body(body) { };
+    COMMON_METHODS
+};
+
+struct ExprWith : Expr
+{
+    Pos pos;
+    Expr * attrs, * body;
+    unsigned int prevWith;
+    ExprWith(const Pos & pos, Expr * attrs, Expr * body) : pos(pos), attrs(attrs), body(body) { };
+    COMMON_METHODS
+};
+
+struct ExprIf : Expr
+{
+    Expr * cond, * then, * else_;
+    ExprIf(Expr * cond, Expr * then, Expr * else_) : cond(cond), then(then), else_(else_) { };
+    COMMON_METHODS
+};
+
+struct ExprAssert : Expr
+{
+    Pos pos;
+    Expr * cond, * body;
+    ExprAssert(const Pos & pos, Expr * cond, Expr * body) : pos(pos), cond(cond), body(body) { };
+    COMMON_METHODS
+};
+
+struct ExprOpNot : Expr
+{
+    Expr * e;
+    ExprOpNot(Expr * e) : e(e) { };
+    COMMON_METHODS
+};
+
+#define MakeBinOp(name, s) \
+    struct Expr##name : Expr \
+    { \
+        Expr * e1, * e2; \
+        Expr##name(Expr * e1, Expr * e2) : e1(e1), e2(e2) { }; \
+        void show(std::ostream & str) \
+        { \
+            str << *e1 << " " s " " << *e2; \
+        } \
+        void bindVars(const StaticEnv & env) \
+        { \
+            e1->bindVars(env); e2->bindVars(env); \
+        } \
+        void eval(EvalState & state, Env & env, Value & v); \
+    };
+
+MakeBinOp(App, "")
+MakeBinOp(OpEq, "==")
+MakeBinOp(OpNEq, "!=")
+MakeBinOp(OpAnd, "&&")
+MakeBinOp(OpOr, "||")
+MakeBinOp(OpImpl, "->")
+MakeBinOp(OpUpdate, "//")
+MakeBinOp(OpConcatLists, "++")
+
+struct ExprConcatStrings : Expr
+{
+    vector<Expr *> * es;
+    ExprConcatStrings(vector<Expr *> * es) : es(es) { };
+    COMMON_METHODS
+};
 
 
-/* Query all attributes in an attribute set expression.  The
-   expression must be in normal form. */
-void queryAllAttrs(Expr e, ATermMap & attrs, bool withPos = false);
-
-/* Query a specific attribute from an attribute set expression.  The
-   expression must be in normal form. */
-Expr queryAttr(Expr e, const string & name);
-Expr queryAttr(Expr e, const string & name, ATerm & pos);
-
-/* Create an attribute set expression from an Attrs value. */
-Expr makeAttrs(const ATermMap & attrs);
-
-
-/* Perform a set of substitutions on an expression. */
-Expr substitute(const Substitution & subs, Expr e);
+/* Static environments are used to map variable names onto (level,
+   displacement) pairs used to obtain the value of the variable at
+   runtime. */
+struct StaticEnv
+{
+    bool isWith;
+    const StaticEnv * up;
+    typedef std::map<Symbol, unsigned int> Vars;
+    Vars vars;
+    StaticEnv(bool isWith, const StaticEnv * up) : isWith(isWith), up(up) { };
+};
 
 
-/* Check whether all variables are defined in the given expression.
-   Throw an exception if this isn't the case. */
-void checkVarDefs(const ATermMap & def, Expr e);
 
-
-/* Canonicalise a Nix expression by sorting attributes and removing
-   location information. */
-Expr canonicaliseExpr(Expr e);
-
-
-/* Create an expression representing a boolean. */
-Expr makeBool(bool b);
-
-
-/* Manipulation of Str() nodes.  Note: matchStr() does not clear
-   context!  */
-bool matchStr(Expr e, string & s, PathSet & context);
-
-Expr makeStr(const string & s, const PathSet & context = PathSet());
-
-
-/* Showing types, values. */
-string showType(Expr e);
-
-string showValue(Expr e);
-
- 
 }
 
 

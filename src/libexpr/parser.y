@@ -20,15 +20,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "aterm.hh"
 #include "util.hh"
     
+#include "nixexpr.hh"
+
 #include "parser-tab.hh"
 #include "lexer-tab.hh"
 #define YYSTYPE YYSTYPE // workaround a bug in Bison 2.4
-
-#include "nixexpr.hh"
-#include "nixexpr-ast.hh"
 
 
 using namespace nix;
@@ -39,145 +37,85 @@ namespace nix {
     
 struct ParseData 
 {
-    Expr result;
+    SymbolTable & symbols;
+    Expr * result;
     Path basePath;
     Path path;
     string error;
+    Symbol sLetBody;
+    ParseData(SymbolTable & symbols)
+        : symbols(symbols)
+        , sLetBody(symbols.create("<let-body>"))
+    { };
 };
- 
 
-static string showAttrPath(ATermList attrPath)
+
+static string showAttrPath(const vector<Symbol> & attrPath)
 {
     string s;
-    for (ATermIterator i(attrPath); i; ++i) {
+    foreach (vector<Symbol>::const_iterator, i, attrPath) {
         if (!s.empty()) s += '.';
-        s += aterm2String(*i);
+        s += *i;
     }
     return s;
 }
- 
 
-struct Tree
+
+static void dupAttr(const vector<Symbol> & attrPath, const Pos & pos, const Pos & prevPos)
 {
-    Expr leaf; ATerm pos; bool recursive;
-    typedef std::map<ATerm, Tree> Children;
-    Children children;
-    Tree() { leaf = 0; recursive = true; }
-};
-
-
-static ATermList buildAttrs(const Tree & t, ATermList & nonrec)
-{
-    ATermList res = ATempty;
-    for (Tree::Children::const_reverse_iterator i = t.children.rbegin();
-         i != t.children.rend(); ++i)
-        if (!i->second.recursive)
-            nonrec = ATinsert(nonrec, makeBind(i->first, i->second.leaf, i->second.pos));
-        else
-            res = ATinsert(res, i->second.leaf
-                ? makeBind(i->first, i->second.leaf, i->second.pos)
-                : makeBind(i->first, makeAttrs(buildAttrs(i->second, nonrec)), makeNoPos()));
-    return res;
+    throw ParseError(format("attribute `%1%' at %2% already defined at %3%")
+        % showAttrPath(attrPath) % pos % prevPos);
 }
  
 
-static Expr fixAttrs(bool recursive, ATermList as)
+static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
 {
-    Tree attrs;
+    vector<Symbol> attrPath; attrPath.push_back(attr);
+    throw ParseError(format("attribute `%1%' at %2% already defined at %3%")
+        % showAttrPath(attrPath) % pos % prevPos);
+}
+ 
 
-    /* This ATermMap is needed to ensure that the `leaf' fields in the
-       Tree nodes are not garbage collected. */
-    ATermMap gcRoots;
-
-    for (ATermIterator i(as); i; ++i) {
-        ATermList names, attrPath; Expr src, e; ATerm name, pos;
-
-        if (matchInherit(*i, src, names, pos)) {
-            bool fromScope = matchScope(src);
-            for (ATermIterator j(names); j; ++j) {
-                if (attrs.children.find(*j) != attrs.children.end()) 
-                    throw ParseError(format("duplicate definition of attribute `%1%' at %2%")
-                        % showAttrPath(ATmakeList1(*j)) % showPos(pos));
-                Tree & t(attrs.children[*j]);
-                Expr leaf = fromScope ? makeVar(*j) : makeSelect(src, *j);
-                gcRoots.set(leaf, leaf);
-                t.leaf = leaf;
-                t.pos = pos;
-                if (recursive && fromScope) t.recursive = false;
+static void addAttr(ExprAttrs * attrs, const vector<Symbol> & attrPath,
+    Expr * e, const Pos & pos)
+{
+    unsigned int n = 0;
+    foreach (vector<Symbol>::const_iterator, i, attrPath) {
+        n++;
+        ExprAttrs::Attrs::iterator j = attrs->attrs.find(*i);
+        if (j != attrs->attrs.end()) {
+            ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.first);
+            if (!attrs2 || n == attrPath.size()) dupAttr(attrPath, pos, j->second.second);
+            attrs = attrs2;
+        } else {
+            if (attrs->attrNames.find(*i) != attrs->attrNames.end())
+                dupAttr(attrPath, pos, attrs->attrNames[*i]);
+            attrs->attrNames[*i] = pos;
+            if (n == attrPath.size())
+                attrs->attrs[*i] = ExprAttrs::Attr(e, pos);
+            else {
+                ExprAttrs * nested = new ExprAttrs;
+                attrs->attrs[*i] = ExprAttrs::Attr(nested, pos);
+                attrs = nested;
             }
         }
-
-        else if (matchBindAttrPath(*i, attrPath, e, pos)) {
-
-            Tree * t(&attrs);
-            
-            for (ATermIterator j(attrPath); j; ) {
-                name = *j; ++j;
-                if (t->leaf) throw ParseError(format("attribute set containing `%1%' at %2% already defined at %3%")
-                    % showAttrPath(attrPath) % showPos(pos) % showPos (t->pos));
-                t = &(t->children[name]);
-            }
-
-            if (t->leaf)
-                throw ParseError(format("duplicate definition of attribute `%1%' at %2% and %3%")
-                    % showAttrPath(attrPath) % showPos(pos) % showPos (t->pos));
-            if (!t->children.empty())
-                throw ParseError(format("duplicate definition of attribute `%1%' at %2%")
-                    % showAttrPath(attrPath) % showPos(pos));
-
-            t->leaf = e; t->pos = pos;
-        }
-
-        else abort(); /* can't happen */
     }
-
-    ATermList nonrec = ATempty;
-    ATermList rec = buildAttrs(attrs, nonrec);
-        
-    return recursive ? makeRec(rec, nonrec) : makeAttrs(rec);
 }
 
 
-static void checkPatternVars(ATerm pos, ATermMap & map, Pattern pat)
+static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 {
-    ATerm name;
-    ATermList formals;
-    Pattern pat1, pat2;
-    ATermBool ellipsis;
-    if (matchVarPat(pat, name)) {
-        if (map.get(name))
-            throw ParseError(format("duplicate formal function argument `%1%' at %2%")
-                % aterm2String(name) % showPos(pos));
-        map.set(name, name);
-    }
-    else if (matchAttrsPat(pat, formals, ellipsis)) { 
-        for (ATermIterator i(formals); i; ++i) {
-            ATerm d1;
-            if (!matchFormal(*i, name, d1)) abort();
-            if (map.get(name))
-                throw ParseError(format("duplicate formal function argument `%1%' at %2%")
-                    % aterm2String(name) % showPos(pos));
-            map.set(name, name);
-        }
-    }
-    else if (matchAtPat(pat, pat1, pat2)) {
-        checkPatternVars(pos, map, pat1);
-        checkPatternVars(pos, map, pat2);
-    }
-    else abort();
+    if (formals->argNames.find(formal.name) != formals->argNames.end())
+        throw ParseError(format("duplicate formal function argument `%1%' at %2%")
+            % formal.name % pos);
+    formals->formals.push_front(formal);
+    formals->argNames.insert(formal.name);
 }
 
 
-static void checkPatternVars(ATerm pos, Pattern pat)
+static Expr * stripIndentation(vector<Expr *> & es)
 {
-    ATermMap map;
-    checkPatternVars(pos, map, pat);
-}
-
-
-static Expr stripIndentation(ATermList es)
-{
-    if (es == ATempty) return makeStr("");
+    if (es.empty()) return new ExprString("");
     
     /* Figure out the minimum indentation.  Note that by design
        whitespace-only final lines are not taken into account.  (So
@@ -185,9 +123,9 @@ static Expr stripIndentation(ATermList es)
     bool atStartOfLine = true; /* = seen only whitespace in the current line */
     unsigned int minIndent = 1000000;
     unsigned int curIndent = 0;
-    ATerm e;
-    for (ATermIterator i(es); i; ++i) {
-        if (!matchIndStr(*i, e)) {
+    foreach (vector<Expr *>::iterator, i, es) {
+        ExprIndStr * e = dynamic_cast<ExprIndStr *>(*i);
+        if (!e) {
             /* Anti-quotations end the current start-of-line whitespace. */
             if (atStartOfLine) {
                 atStartOfLine = false;
@@ -195,12 +133,11 @@ static Expr stripIndentation(ATermList es)
             }
             continue;
         }
-        string s = aterm2String(e);
-        for (unsigned int j = 0; j < s.size(); ++j) {
+        for (unsigned int j = 0; j < e->s.size(); ++j) {
             if (atStartOfLine) {
-                if (s[j] == ' ')
+                if (e->s[j] == ' ')
                     curIndent++;
-                else if (s[j] == '\n') {
+                else if (e->s[j] == '\n') {
                     /* Empty line, doesn't influence minimum
                        indentation. */
                     curIndent = 0;
@@ -208,7 +145,7 @@ static Expr stripIndentation(ATermList es)
                     atStartOfLine = false;
                     if (curIndent < minIndent) minIndent = curIndent;
                 }
-            } else if (s[j] == '\n') {
+            } else if (e->s[j] == '\n') {
                 atStartOfLine = true;
                 curIndent = 0;
             }
@@ -216,37 +153,37 @@ static Expr stripIndentation(ATermList es)
     }
 
     /* Strip spaces from each line. */
-    ATermList es2 = ATempty;
+    vector<Expr *> * es2 = new vector<Expr *>;
     atStartOfLine = true;
     unsigned int curDropped = 0;
-    unsigned int n = ATgetLength(es);
-    for (ATermIterator i(es); i; ++i, --n) {
-        if (!matchIndStr(*i, e)) {
+    unsigned int n = es.size();
+    for (vector<Expr *>::iterator i = es.begin(); i != es.end(); ++i, --n) {
+        ExprIndStr * e = dynamic_cast<ExprIndStr *>(*i);
+        if (!e) {
             atStartOfLine = false;
             curDropped = 0;
-            es2 = ATinsert(es2, *i);
+            es2->push_back(*i);
             continue;
         }
         
-        string s = aterm2String(e);
         string s2;
-        for (unsigned int j = 0; j < s.size(); ++j) {
+        for (unsigned int j = 0; j < e->s.size(); ++j) {
             if (atStartOfLine) {
-                if (s[j] == ' ') {
+                if (e->s[j] == ' ') {
                     if (curDropped++ >= minIndent)
-                        s2 += s[j];
+                        s2 += e->s[j];
                 }
-                else if (s[j] == '\n') {
+                else if (e->s[j] == '\n') {
                     curDropped = 0;
-                    s2 += s[j];
+                    s2 += e->s[j];
                 } else {
                     atStartOfLine = false;
                     curDropped = 0;
-                    s2 += s[j];
+                    s2 += e->s[j];
                 }
             } else {
-                s2 += s[j];
-                if (s[j] == '\n') atStartOfLine = true;
+                s2 += e->s[j];
+                if (e->s[j] == '\n') atStartOfLine = true;
             }
         }
 
@@ -257,11 +194,11 @@ static Expr stripIndentation(ATermList es)
             if (p != string::npos && s2.find_first_not_of(' ', p + 1) == string::npos)
                 s2 = string(s2, 0, p + 1);
         }
-            
-        es2 = ATinsert(es2, makeStr(s2));
+
+        es2->push_back(new ExprString(s2));
     }
 
-    return makeConcatStrings(ATreverse(es2));
+    return new ExprConcatStrings(es2);
 }
 
 
@@ -269,13 +206,12 @@ void backToString(yyscan_t scanner);
 void backToIndString(yyscan_t scanner);
 
 
-static Pos makeCurPos(YYLTYPE * loc, ParseData * data)
+static Pos makeCurPos(const YYLTYPE & loc, ParseData * data)
 {
-    return makePos(toATerm(data->path),
-        loc->first_line, loc->first_column);
+    return Pos(data->path, loc.first_line, loc.first_column);
 }
 
-#define CUR_POS makeCurPos(yylocp, data)
+#define CUR_POS makeCurPos(*yylocp, data)
 
 
 }
@@ -283,28 +219,9 @@ static Pos makeCurPos(YYLTYPE * loc, ParseData * data)
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * error)
 {
-    data->error = (format("%1%, at `%2%':%3%:%4%")
-        % error % data->path % loc->first_line % loc->first_column).str();
+    data->error = (format("%1%, at %2%")
+        % error % makeCurPos(*loc, data)).str();
 }
-
-
-/* Make sure that the parse stack is scanned by the ATerm garbage
-   collector. */
-static void * mallocAndProtect(size_t size)
-{
-    void * p = malloc(size);
-    if (p) ATprotectMemory(p, size);
-    return p;
-}
-
-static void freeAndUnprotect(void * p)
-{
-    ATunprotectMemory(p);
-    free(p);
-}
-
-#define YYMALLOC mallocAndProtect
-#define YYFREE freeAndUnprotect
 
 
 #endif
@@ -313,20 +230,32 @@ static void freeAndUnprotect(void * p)
 %}
 
 %union {
-  ATerm t;
-  ATermList ts;
-  struct {
-    ATermList formals;
-    bool ellipsis;
-  } formals;
+  nix::Expr * e;
+  nix::ExprList * list;
+  nix::ExprAttrs * attrs;
+  nix::Formals * formals;
+  nix::Formal * formal;
+  int n;
+  char * id; // !!! -> Symbol
+  char * path;
+  char * uri;
+  std::vector<nix::Symbol> * ids;
+  std::vector<nix::Expr *> * string_parts;
 }
 
-%type <t> start expr expr_function expr_if expr_op
-%type <t> expr_app expr_select expr_simple bind inheritsrc formal
-%type <t> pattern pattern2
-%type <ts> binds ids attrpath expr_list string_parts ind_string_parts
+%type <e> start expr expr_function expr_if expr_op
+%type <e> expr_app expr_select expr_simple
+%type <list> expr_list
+%type <attrs> binds
 %type <formals> formals
-%token <t> ID INT STR IND_STR PATH URI
+%type <formal> formal
+%type <ids> ids attrpath
+%type <string_parts> string_parts ind_string_parts
+%token <id> ID ATTRPATH
+%token <e> STR IND_STR
+%token <n> INT
+%token <path> PATH
+%token <uri> URI
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL
 %token DOLLAR_CURLY /* == ${ */
 %token IND_STRING_OPEN IND_STRING_CLOSE
@@ -350,163 +279,172 @@ start: expr { data->result = $1; };
 expr: expr_function;
 
 expr_function
-  : pattern ':' expr_function
-    { checkPatternVars(CUR_POS, $1); $$ = makeFunction($1, $3, CUR_POS); }
+  : ID ':' expr_function
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), false, 0, $3); }
+  | '{' formals '}' ':' expr_function
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create(""), true, $2, $5); }
+  | '{' formals '}' '@' ID ':' expr_function
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create($5), true, $2, $7); }
+  | ID '@' '{' formals '}' ':' expr_function
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), true, $4, $7); }
   | ASSERT expr ';' expr_function
-    { $$ = makeAssert($2, $4, CUR_POS); }
+    { $$ = new ExprAssert(CUR_POS, $2, $4); }
   | WITH expr ';' expr_function
-    { $$ = makeWith($2, $4, CUR_POS); }
+    { $$ = new ExprWith(CUR_POS, $2, $4); }
   | LET binds IN expr_function
-    { $$ = makeSelect(fixAttrs(true, ATinsert($2, makeBindAttrPath(ATmakeList1(toATerm("<let-body>")), $4, CUR_POS))), toATerm("<let-body>")); }
+    { $$ = new ExprLet($2, $4); }
   | expr_if
   ;
 
 expr_if
-  : IF expr THEN expr ELSE expr
-    { $$ = makeIf($2, $4, $6); }
+  : IF expr THEN expr ELSE expr { $$ = new ExprIf($2, $4, $6); }
   | expr_op
   ;
 
 expr_op
-  : '!' expr_op %prec NEG { $$ = makeOpNot($2); }
-  | expr_op EQ expr_op { $$ = makeOpEq($1, $3); }
-  | expr_op NEQ expr_op { $$ = makeOpNEq($1, $3); }
-  | expr_op AND expr_op { $$ = makeOpAnd($1, $3); }
-  | expr_op OR expr_op { $$ = makeOpOr($1, $3); }
-  | expr_op IMPL expr_op { $$ = makeOpImpl($1, $3); }
-  | expr_op UPDATE expr_op { $$ = makeOpUpdate($1, $3); }
-  | expr_op '~' expr_op { $$ = makeSubPath($1, $3); }
-  | expr_op '?' ID { $$ = makeOpHasAttr($1, $3); }
-  | expr_op '+' expr_op { $$ = makeOpPlus($1, $3); }
-  | expr_op CONCAT expr_op { $$ = makeOpConcat($1, $3); }
+  : '!' expr_op %prec NEG { $$ = new ExprOpNot($2); }
+  | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
+  | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
+  | expr_op AND expr_op { $$ = new ExprOpAnd($1, $3); }
+  | expr_op OR expr_op { $$ = new ExprOpOr($1, $3); }
+  | expr_op IMPL expr_op { $$ = new ExprOpImpl($1, $3); }
+  | expr_op UPDATE expr_op { $$ = new ExprOpUpdate($1, $3); }
+  | expr_op '?' ID { $$ = new ExprOpHasAttr($1, data->symbols.create($3)); }
+  | expr_op '+' expr_op
+    { vector<Expr *> * l = new vector<Expr *>;
+      l->push_back($1);
+      l->push_back($3);
+      $$ = new ExprConcatStrings(l);
+    }
+  | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists($1, $3); }
   | expr_app
   ;
 
 expr_app
   : expr_app expr_select
-    { $$ = makeCall($1, $2); }
+    { $$ = new ExprApp($1, $2); }
   | expr_select { $$ = $1; }
   ;
 
 expr_select
   : expr_select '.' ID
-    { $$ = makeSelect($1, $3); }
+    { $$ = new ExprSelect($1, data->symbols.create($3)); }
   | expr_simple { $$ = $1; }
   ;
 
 expr_simple
-  : ID { $$ = makeVar($1); }
-  | INT { $$ = makeInt(ATgetInt((ATermInt) $1)); }
+  : ID { $$ = new ExprVar(data->symbols.create($1)); }
+  | INT { $$ = new ExprInt($1); }
   | '"' string_parts '"' {
       /* For efficiency, and to simplify parse trees a bit. */
-      if ($2 == ATempty) $$ = makeStr(toATerm(""), ATempty);
-      else if (ATgetNext($2) == ATempty) $$ = ATgetFirst($2);
-      else $$ = makeConcatStrings(ATreverse($2));
+      if ($2->empty()) $$ = new ExprString("");
+      else if ($2->size() == 1) $$ = $2->front();
+      else $$ = new ExprConcatStrings($2);
   }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
-      $$ = stripIndentation(ATreverse($2));
+      $$ = stripIndentation(*$2);
   }
-  | PATH { $$ = makePath(toATerm(absPath(aterm2String($1), data->basePath))); }
-  | URI { $$ = makeStr($1, ATempty); }
+  | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
+  | URI { $$ = new ExprString($1); }
   | '(' expr ')' { $$ = $2; }
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { $$ = makeSelect(fixAttrs(true, $3), toATerm("body")); }
+    { $3->recursive = true; $$ = new ExprSelect($3, data->symbols.create("body")); }
   | REC '{' binds '}'
-    { $$ = fixAttrs(true, $3); }
+    { $3->recursive = true; $$ = $3; }
   | '{' binds '}'
-    { $$ = fixAttrs(false, $2); }
-  | '[' expr_list ']' { $$ = makeList(ATreverse($2)); }
+    { $$ = $2; }
+  | '[' expr_list ']' { $$ = $2; }
   ;
 
 string_parts
-  : string_parts STR { $$ = ATinsert($1, $2); }
-  | string_parts DOLLAR_CURLY expr '}' { backToString(scanner); $$ = ATinsert($1, $3); }
-  | { $$ = ATempty; }
+  : string_parts STR { $$ = $1; $1->push_back($2); }
+  | string_parts DOLLAR_CURLY expr '}' { backToString(scanner); $$ = $1; $1->push_back($3); }
+  | { $$ = new vector<Expr *>; }
   ;
 
 ind_string_parts
-  : ind_string_parts IND_STR { $$ = ATinsert($1, $2); }
-  | ind_string_parts DOLLAR_CURLY expr '}' { backToIndString(scanner); $$ = ATinsert($1, $3); }
-  | { $$ = ATempty; }
-  ;
-
-pattern
-  : pattern2 '@' pattern { $$ = makeAtPat($1, $3); }
-  | pattern2
-  ;
-
-pattern2
-  : ID { $$ = makeVarPat($1); }
-  | '{' formals '}' { $$ = makeAttrsPat($2.formals, $2.ellipsis ? eTrue : eFalse); }
+  : ind_string_parts IND_STR { $$ = $1; $1->push_back($2); }
+  | ind_string_parts DOLLAR_CURLY expr '}' { backToIndString(scanner); $$ = $1; $1->push_back($3); }
+  | { $$ = new vector<Expr *>; }
   ;
 
 binds
-  : binds bind { $$ = ATinsert($1, $2); }
-  | { $$ = ATempty; }
+  : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, *$2, $4, makeCurPos(@2, data)); }
+  | binds INHERIT ids ';'
+    { $$ = $1;
+      foreach (vector<Symbol>::iterator, i, *$3) {
+          if ($$->attrNames.find(*i) != $$->attrNames.end())
+              dupAttr(*i, makeCurPos(@3, data), $$->attrNames[*i]);
+          Pos pos = makeCurPos(@3, data);
+          $$->inherited.push_back(ExprAttrs::Inherited(*i, pos));
+          $$->attrNames[*i] = pos;
+      }
+    }
+  | binds INHERIT '(' expr ')' ids ';'
+    { $$ = $1;
+      /* !!! Should ensure sharing of the expression in $4. */
+      foreach (vector<Symbol>::iterator, i, *$6) {
+          if ($$->attrNames.find(*i) != $$->attrNames.end())
+              dupAttr(*i, makeCurPos(@6, data), $$->attrNames[*i]);
+          $$->attrs[*i] = ExprAttrs::Attr(new ExprSelect($4, *i), makeCurPos(@6, data));
+          $$->attrNames[*i] = makeCurPos(@6, data);
+      }}
+
+  | { $$ = new ExprAttrs; }
   ;
 
-bind
-  : attrpath '=' expr ';'
-    { $$ = makeBindAttrPath(ATreverse($1), $3, CUR_POS); }
-  | INHERIT inheritsrc ids ';'
-    { $$ = makeInherit($2, $3, CUR_POS); }
+ids
+  : ids ID { $$ = $1; $1->push_back(data->symbols.create($2)); /* !!! dangerous */ }
+  | { $$ = new vector<Symbol>; }
   ;
-
-inheritsrc
-  : '(' expr ')' { $$ = $2; }
-  | { $$ = makeScope(); }
-  ;
-
-ids: ids ID { $$ = ATinsert($1, $2); } | { $$ = ATempty; };
 
 attrpath
-  : attrpath '.' ID { $$ = ATinsert($1, $3); }
-  | ID { $$ = ATmakeList1($1); }
+  : attrpath '.' ID { $$ = $1; $1->push_back(data->symbols.create($3)); }
+  | ID { $$ = new vector<Symbol>; $$->push_back(data->symbols.create($1)); }
   ;
 
 expr_list
-  : expr_list expr_select { $$ = ATinsert($1, $2); }
-  | { $$ = ATempty; }
+  : expr_list expr_select { $$ = $1; $1->elems.push_back($2); /* !!! dangerous */ }
+  | { $$ = new ExprList; }
   ;
 
 formals
-  : formal ',' formals /* !!! right recursive */
-    { $$.formals = ATinsert($3.formals, $1); $$.ellipsis = $3.ellipsis; }
+  : formal ',' formals
+    { $$ = $3; addFormal(CUR_POS, $$, *$1); }
   | formal
-    { $$.formals = ATinsert(ATempty, $1); $$.ellipsis = false; }
+    { $$ = new Formals; addFormal(CUR_POS, $$, *$1); $$->ellipsis = false; }
   |
-    { $$.formals = ATempty; $$.ellipsis = false; }
+    { $$ = new Formals; $$->ellipsis = false; }
   | ELLIPSIS
-    { $$.formals = ATempty; $$.ellipsis = true; }
+    { $$ = new Formals; $$->ellipsis = true; }
   ;
 
 formal
-  : ID { $$ = makeFormal($1, makeNoDefaultValue()); }
-  | ID '?' expr { $$ = makeFormal($1, makeDefaultValue($3)); }
+  : ID { $$ = new Formal(data->symbols.create($1), 0); }
+  | ID '?' expr { $$ = new Formal(data->symbols.create($1), $3); }
   ;
   
 %%
 
-
-#include "eval.hh"  
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <eval.hh>
+
 
 namespace nix {
       
 
-static Expr parse(EvalState & state,
-    const char * text, const Path & path,
-    const Path & basePath)
+static Expr * parse(EvalState & state, const char * text,
+    const Path & path, const Path & basePath)
 {
     yyscan_t scanner;
-    ParseData data;
+    ParseData data(state.symbols);
     data.basePath = basePath;
     data.path = path;
 
@@ -518,7 +456,7 @@ static Expr parse(EvalState & state,
     if (res) throw ParseError(data.error);
 
     try {
-        checkVarDefs(state.primOps, data.result);
+        data.result->bindVars(state.staticBaseEnv);
     } catch (Error & e) {
         throw ParseError(format("%1%, in `%2%'") % e.msg() % path);
     }
@@ -527,15 +465,9 @@ static Expr parse(EvalState & state,
 }
 
 
-Expr parseExprFromFile(EvalState & state, Path path)
+Expr * parseExprFromFile(EvalState & state, Path path)
 {
     assert(path[0] == '/');
-
-#if 0
-    /* Perhaps this is already an imploded parse tree? */
-    Expr e = ATreadFromNamedFile(path.c_str());
-    if (e) return e;
-#endif
 
     /* If `path' is a symlink, follow it.  This is so that relative
        path references work. */
@@ -558,7 +490,7 @@ Expr parseExprFromFile(EvalState & state, Path path)
 }
 
 
-Expr parseExprFromString(EvalState & state,
+Expr * parseExprFromString(EvalState & state,
     const string & s, const Path & basePath)
 {
     return parse(state, s.c_str(), "(string)", basePath);

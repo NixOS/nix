@@ -15,7 +15,7 @@ namespace nix {
 
 
 #define foreach(it_type, it, collection)                                \
-    for (it_type it = collection.begin(); it != collection.end(); ++it)
+    for (it_type it = (collection).begin(); it != (collection).end(); ++it)
 
 
 /* Return an environment variable. */
@@ -276,11 +276,6 @@ void inline checkInterrupt()
 MakeError(Interrupted, BaseError)
 
 
-/* String packing / unpacking. */
-string packStrings(const Strings & strings);
-Strings unpackStrings(const string & s);
-
-
 /* String tokenizer. */
 Strings tokenizeString(const string & s, const string & separators = " \t\n\r");
 
@@ -307,32 +302,21 @@ string int2String(int n);
 bool hasSuffix(const string & s, const string & suffix);
 
 
+/* Read string `s' from stream `str'. */
+void expect(std::istream & str, const string & s);
+
+
+/* Read a C-style string from stream `str'. */
+string parseString(std::istream & str);
+
+
+/* Utility function used to parse legacy ATerms. */
+bool endOfList(std::istream & str);
+
+
 /* Exception handling in destructors: print an error message, then
    ignore the exception. */
 void ignoreException();
-
-
-/* STL functions such as sort() pass a binary function object around
-   by value, so it gets cloned a lot.  This is bad if the function
-   object has state or is simply large.  This adapter wraps the
-   function object to simulate passing by reference. */
-template<class F>
-struct binary_function_ref_adapter
-{
-    F * p;
-
-    binary_function_ref_adapter(F * _p)
-    {
-        p = _p;
-    }
-    
-    typename F::result_type operator () (
-        const typename F::first_argument_type & x,
-        const typename F::second_argument_type & y)
-    {
-        return (*p)(x, y);
-    }
-};
 
 
 }

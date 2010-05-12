@@ -342,7 +342,7 @@ $ nix-store --gc --max-freed $((100 * 1024 * 1024))</screen>
 
 <cmdsynopsis>
   <command>nix-store</command>
-  <arg choice='plain'><option>--gc</option></arg>
+  <arg choice='plain'><option>--delete</option></arg>
   <arg><option>--ignore-liveness</option></arg>
   <arg choice='plain' rep='repeat'><replaceable>paths</replaceable></arg>
 </cmdsynopsis>

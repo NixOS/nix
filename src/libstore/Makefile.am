@@ -12,17 +12,12 @@ pkginclude_HEADERS = \
 
 libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la ${aterm_lib} ${sqlite_lib}
 
-BUILT_SOURCES = derivations-ast.cc derivations-ast.hh
-
-EXTRA_DIST = derivations-ast.def derivations-ast.cc schema.sql
+EXTRA_DIST = schema.sql
 
 AM_CXXFLAGS = -Wall \
- -I$(srcdir)/.. ${aterm_include} ${sqlite_include} -I$(srcdir)/../libutil -I${top_srcdir}/externals/sqlite-3.6.22/
+ ${sqlite_include} -I$(srcdir)/.. -I$(srcdir)/../libutil
 
 local-store.lo: schema.sql.hh
 
 %.sql.hh: %.sql
 	../bin2c/bin2c schema < $< > $@ || (rm $@ && exit 1)
-
-derivations-ast.cc derivations-ast.hh: ../aterm-helper.pl derivations-ast.def
-	$(perl) $(srcdir)/../aterm-helper.pl derivations-ast.hh derivations-ast.cc < $(srcdir)/derivations-ast.def

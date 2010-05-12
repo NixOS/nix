@@ -29,10 +29,18 @@ sub createLinks {
         $baseName =~ s/^.*\///g; # strip directory
         my $dstFile = "$dstDir/$baseName";
 
+        # The files below are special-cased so that they don't show up
+        # in user profiles, either because they are useless, or
+        # because they would cause pointless collisions (e.g., each
+        # Python package brings its own
+        # `$out/lib/pythonX.Y/site-packages/easy-install.pth'.)
         # Urgh, hacky...
-	if ($srcFile =~ /\/propagated-build-inputs$/ ||
+        if ($srcFile =~ /\/propagated-build-inputs$/ ||
             $srcFile =~ /\/nix-support$/ ||
             $srcFile =~ /\/perllocal.pod$/ ||
+            $srcFile =~ /\/easy-install.pth$/ ||
+            $srcFile =~ /\/site.py$/ ||
+            $srcFile =~ /\/site.pyc$/ ||
             $srcFile =~ /\/info\/dir$/ ||
             $srcFile =~ /\/log$/)
         {
@@ -160,4 +168,4 @@ while (scalar(keys %postponed) > 0) {
 print STDERR "created $symlinks symlinks in user environment\n";
 
 
-symlink($ENV{"manifest"}, "$out/manifest") or die "cannot create manifest";
+symlink($ENV{"manifest"}, "$out/manifest.nix") or die "cannot create manifest";
