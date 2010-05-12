@@ -10,8 +10,8 @@
 namespace nix {
 
     
-Expr findAlongAttrPath(EvalState & state, const string & attrPath,
-    const ATermMap & autoArgs, Expr e);
+void findAlongAttrPath(EvalState & state, const string & attrPath,
+    const Bindings & autoArgs, Expr * e, Value & v);
 
     
 }

@@ -168,4 +168,4 @@ while (scalar(keys %postponed) > 0) {
 print STDERR "created $symlinks symlinks in user environment\n";
 
 
-symlink($ENV{"manifest"}, "$out/manifest") or die "cannot create manifest";
+symlink($ENV{"manifest"}, "$out/manifest.nix") or die "cannot create manifest";

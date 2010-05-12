@@ -6,13 +6,12 @@
 #include "parser.hh"
 #include "eval.hh"
 #include "help.txt.hh"
-#include "nixexpr-ast.hh"
 #include "get-drvs.hh"
 #include "attr-path.hh"
-#include "pathlocks.hh"
 #include "common-opts.hh"
 #include "xml-writer.hh"
 #include "store-api.hh"
+#include "user-env.hh"
 #include "util.hh"
 
 #include <cerrno>
@@ -47,7 +46,7 @@ struct InstallSourceInfo
     Path profile; /* for srcProfile */
     string systemFilter; /* for srcNixExprDrvs */
     bool prebuiltOnly;
-    ATermMap autoArgs;
+    Bindings autoArgs;
     InstallSourceInfo() : prebuiltOnly(false) { };
 };
 
@@ -112,7 +111,7 @@ static bool isNixExpr(const Path & path)
 
 
 static void getAllExprs(EvalState & state,
-    const Path & path, ATermMap & attrs)
+    const Path & path, ExprAttrs & attrs)
 {
     Strings names = readDirectory(path);
     StringSet namesSorted(names.begin(), names.end());
@@ -132,8 +131,8 @@ static void getAllExprs(EvalState & state,
             string attrName = *i;
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
-            attrs.set(toATerm(attrName), makeAttrRHS(
-                    parseExprFromFile(state, absPath(path2)), makeNoPos()));
+            attrs.attrs[state.symbols.create(attrName)] =
+                ExprAttrs::Attr(parseExprFromFile(state, absPath(path2)), noPos);
         }
         else
             /* `path2' is a directory (with no default.nix in it);
@@ -143,7 +142,7 @@ static void getAllExprs(EvalState & state,
 }
 
 
-static Expr loadSourceExpr(EvalState & state, const Path & path)
+static Expr * loadSourceExpr(EvalState & state, const Path & path)
 {
     if (isNixExpr(path)) return parseExprFromFile(state, absPath(path));
 
@@ -153,20 +152,22 @@ static Expr loadSourceExpr(EvalState & state, const Path & path)
        (but keep the attribute set flat, not nested, to make it easier
        for a user to have a ~/.nix-defexpr directory that includes
        some system-wide directory). */
-    ATermMap attrs;
-    attrs.set(toATerm("_combineChannels"), makeAttrRHS(makeList(ATempty), makeNoPos()));
-    getAllExprs(state, path, attrs);
-    return makeAttrs(attrs);
+    ExprAttrs * attrs = new ExprAttrs;
+    attrs->attrs[state.symbols.create("_combineChannels")] =
+        ExprAttrs::Attr(new ExprList(), noPos);
+    getAllExprs(state, path, *attrs);
+    return attrs;
 }
 
 
 static void loadDerivations(EvalState & state, Path nixExprPath,
-    string systemFilter, const ATermMap & autoArgs,
+    string systemFilter, const Bindings & autoArgs,
     const string & pathPrefix, DrvInfos & elems)
 {
-    getDerivations(state,
-        findAlongAttrPath(state, pathPrefix, autoArgs, loadSourceExpr(state, nixExprPath)),
-        pathPrefix, autoArgs, elems);
+    Value v;
+    findAlongAttrPath(state, pathPrefix, autoArgs, loadSourceExpr(state, nixExprPath), v);
+    
+    getDerivations(state, v, pathPrefix, autoArgs, elems);
 
     /* Filter out all derivations not applicable to the current
        system. */
@@ -189,172 +190,6 @@ static Path getHomeDir()
 static Path getDefNixExprPath()
 {
     return getHomeDir() + "/.nix-defexpr";
-}
-
-
-struct AddPos : TermFun
-{
-    ATerm operator () (ATerm e)
-    {
-        ATerm x, y;
-        if (matchObsoleteBind(e, x, y))
-            return makeBind(x, y, makeNoPos());
-        if (matchObsoleteStr(e, x))
-            return makeStr(x, ATempty);
-        return e;
-    }
-};
-
-
-static DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
-{
-    Path path = userEnv + "/manifest";
-
-    if (!pathExists(path))
-        return DrvInfos(); /* not an error, assume nothing installed */
-
-    Expr e = ATreadFromNamedFile(path.c_str());
-    if (!e) throw Error(format("cannot read Nix expression from `%1%'") % path);
-
-    /* Compatibility: Bind(x, y) -> Bind(x, y, NoPos). */
-    AddPos addPos;
-    e = bottomupRewrite(addPos, e);
-
-    DrvInfos elems;
-    getDerivations(state, e, "", ATermMap(1), elems);
-    return elems;
-}
-
-
-/* Ensure exclusive access to a profile.  Any command that modifies
-   the profile first acquires this lock. */
-static void lockProfile(PathLocks & lock, const Path & profile)
-{
-    lock.lockPaths(singleton<PathSet>(profile),
-        (format("waiting for lock on profile `%1%'") % profile).str());
-    lock.setDeletion(true);
-}
-
-
-/* Optimistic locking is used by long-running operations like `nix-env
-   -i'.  Instead of acquiring the exclusive lock for the entire
-   duration of the operation, we just perform the operation
-   optimistically (without an exclusive lock), and check at the end
-   whether the profile changed while we were busy (i.e., the symlink
-   target changed).  If so, the operation is restarted.  Restarting is
-   generally cheap, since the build results are still in the Nix
-   store.  Most of the time, only the user environment has to be
-   rebuilt. */
-static string optimisticLockProfile(const Path & profile)
-{
-    return pathExists(profile) ? readLink(profile) : "";
-}
-
-
-static bool createUserEnv(EvalState & state, DrvInfos & elems,
-    const Path & profile, bool keepDerivations,
-    const string & lockToken)
-{
-    /* Build the components in the user environment, if they don't
-       exist already. */
-    PathSet drvsToBuild;
-    foreach (DrvInfos::const_iterator, i, elems)
-        /* Call to `isDerivation' is for compatibility with Nix <= 0.7
-           user environments. */
-        if (i->queryDrvPath(state) != "" &&
-            isDerivation(i->queryDrvPath(state)))
-            drvsToBuild.insert(i->queryDrvPath(state));
-
-    debug(format("building user environment dependencies"));
-    store->buildDerivations(drvsToBuild);
-
-    /* Get the environment builder expression. */
-    Expr envBuilder = parseExprFromFile(state,
-        nixDataDir + "/nix/corepkgs/buildenv"); /* !!! */
-
-    /* Construct the whole top level derivation. */
-    PathSet references;
-    ATermList manifest = ATempty;
-    ATermList inputs = ATempty;
-    foreach (DrvInfos::iterator, i, elems) {
-        /* Create a pseudo-derivation containing the name, system,
-           output path, and optionally the derivation path, as well as
-           the meta attributes. */
-        Path drvPath = keepDerivations ? i->queryDrvPath(state) : "";
-
-        /* Round trip to get rid of "bad" meta values (like
-           functions). */
-        MetaInfo meta = i->queryMetaInfo(state);
-        i->setMetaInfo(meta);
-        
-        ATermList as = ATmakeList5(
-            makeBind(toATerm("type"),
-                makeStr("derivation"), makeNoPos()),
-            makeBind(toATerm("name"),
-                makeStr(i->name), makeNoPos()),
-            makeBind(toATerm("system"),
-                makeStr(i->system), makeNoPos()),
-            makeBind(toATerm("outPath"),
-                makeStr(i->queryOutPath(state)), makeNoPos()), 
-            makeBind(toATerm("meta"),
-                i->attrs->get(toATerm("meta")), makeNoPos()));
-        
-        if (drvPath != "") as = ATinsert(as, 
-            makeBind(toATerm("drvPath"),
-                makeStr(drvPath), makeNoPos()));
-        
-        manifest = ATinsert(manifest, makeAttrs(as));
-        
-        inputs = ATinsert(inputs, makeStr(i->queryOutPath(state)));
-
-        /* This is only necessary when installing store paths, e.g.,
-           `nix-env -i /nix/store/abcd...-foo'. */
-        store->addTempRoot(i->queryOutPath(state));
-        store->ensurePath(i->queryOutPath(state));
-        
-        references.insert(i->queryOutPath(state));
-        if (drvPath != "") references.insert(drvPath);
-    }
-
-    /* Also write a copy of the list of inputs to the store; we need
-       it for future modifications of the environment. */
-    Path manifestFile = store->addTextToStore("env-manifest",
-        atPrint(canonicaliseExpr(makeList(ATreverse(manifest)))), references);
-
-    Expr topLevel = makeCall(envBuilder, makeAttrs(ATmakeList3(
-        makeBind(toATerm("system"),
-            makeStr(thisSystem), makeNoPos()),
-        makeBind(toATerm("derivations"),
-            makeList(ATreverse(manifest)), makeNoPos()),
-        makeBind(toATerm("manifest"),
-            makeStr(manifestFile, singleton<PathSet>(manifestFile)), makeNoPos())
-        )));
-
-    /* Instantiate it. */
-    debug(format("evaluating builder expression `%1%'") % topLevel);
-    DrvInfo topLevelDrv;
-    if (!getDerivation(state, topLevel, topLevelDrv))
-        abort();
-    
-    /* Realise the resulting store expression. */
-    debug(format("building user environment"));
-    store->buildDerivations(singleton<PathSet>(topLevelDrv.queryDrvPath(state)));
-
-    /* Switch the current user environment to the output path. */
-    PathLocks lock;
-    lockProfile(lock, profile);
-
-    Path lockTokenCur = optimisticLockProfile(profile);
-    if (lockToken != lockTokenCur) {
-        printMsg(lvlError, format("profile `%1%' changed while we were busy; restarting") % profile);
-        return false;
-    }
-    
-    debug(format("switching to new user environment"));
-    Path generation = createGeneration(profile, topLevelDrv.queryOutPath(state));
-    switchLink(profile, generation);
-
-    return true;
 }
 
 
@@ -516,14 +351,13 @@ static void queryInstSources(EvalState & state,
            (import ./foo.nix)' = `(import ./foo.nix).bar'. */
         case srcNixExprs: {
                 
-            Expr e1 = loadSourceExpr(state, instSource.nixExprPath);
+            Expr * e1 = loadSourceExpr(state, instSource.nixExprPath);
 
-            for (Strings::const_iterator i = args.begin();
-                 i != args.end(); ++i)
-            {
-                Expr e2 = parseExprFromString(state, *i, absPath("."));
-                Expr call = makeCall(e2, e1);
-                getDerivations(state, call, "", instSource.autoArgs, elems);
+            foreach (Strings::const_iterator, i, args) {
+                Expr * e2 = parseExprFromString(state, *i, absPath("."));
+                Expr * call = new ExprApp(e2, e1);
+                Value v; state.eval(call, v);
+                getDerivations(state, v, "", instSource.autoArgs, elems);
             }
             
             break;
@@ -540,7 +374,7 @@ static void queryInstSources(EvalState & state,
                 Path path = followLinksToStorePath(*i);
 
                 DrvInfo elem;
-                elem.attrs = boost::shared_ptr<ATermMap>(new ATermMap(0)); /* ugh... */
+                elem.attrs = new Bindings;
                 string name = baseNameOf(path);
                 string::size_type dash = name.find('-');
                 if (dash != string::npos)
@@ -574,12 +408,12 @@ static void queryInstSources(EvalState & state,
         }
 
         case srcAttrPath: {
-            for (Strings::const_iterator i = args.begin();
-                 i != args.end(); ++i)
-                getDerivations(state,
-                    findAlongAttrPath(state, *i, instSource.autoArgs,
-                        loadSourceExpr(state, instSource.nixExprPath)),
-                    "", instSource.autoArgs, elems);
+            foreach (Strings::const_iterator, i, args) {
+                Value v;
+                findAlongAttrPath(state, *i, instSource.autoArgs,
+                    loadSourceExpr(state, instSource.nixExprPath), v);
+                getDerivations(state, v, "", instSource.autoArgs, elems);
+            }
             break;
         }
     }
@@ -1102,6 +936,7 @@ static void opQuery(Globals & globals,
     
     foreach (vector<DrvInfo>::iterator, i, elems2) {
         try {
+            startNest(nest, lvlDebug, format("outputting query result `%1%'") % i->attrPath);
 
             /* For table output. */
             Strings columns;
@@ -1472,7 +1307,7 @@ void run(Strings args)
 
     op(globals, remaining, opFlags, opArgs);
 
-    printEvalStats(globals.state);
+    globals.state.printStats();
 }
 
 

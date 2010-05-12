@@ -1,38 +1,3 @@
-# CWI ATerm
-
-ATERM = aterm-2.5
-
-$(ATERM).tar.gz:
-	@echo "Nix requires the CWI ATerm library to build."
-	@echo "Please download version 2.5 from"
-	@echo "  http://nixos.org/tarballs/aterm-2.5.tar.gz"
-	@echo "and place it in the externals/ directory."
-	false
-
-$(ATERM): $(ATERM).tar.gz
-	gzip -d < $(srcdir)/$(ATERM).tar.gz | tar xvf -
-	patch -d $(ATERM) -p1 < ./max-long.patch
-	patch -d $(ATERM) -p1 < ./sizeof.patch
-
-have-aterm:
-	$(MAKE) $(ATERM)
-	touch have-aterm
-
-if HAVE_ATERM
-build-aterm:
-else
-build-aterm: have-aterm
-	(pfx=`pwd` && \
-	cd $(ATERM) && \
-	CC="$(CC)" ./configure --prefix=$$pfx/inst-aterm \
-	  --disable-shared --enable-static && \
-	$(MAKE) && \
-	$(MAKE) check && \
-	$(MAKE) install)
-	touch build-aterm
-endif
-
-
 # bzip2
 
 BZIP2 = bzip2-1.0.5
@@ -67,10 +32,10 @@ install:
 endif
 
 
-all: build-aterm build-bzip2
+all: build-bzip2
 
-EXTRA_DIST = $(ATERM).tar.gz $(BZIP2).tar.gz max-long.patch sizeof.patch
+EXTRA_DIST = $(BZIP2).tar.gz
 
 ext-clean:
-	$(RM) -f have-aterm build-aterm have-bzip2 build-bzip2
-	$(RM) -rf $(ATERM) $(BZIP2)
+	$(RM) -f have-bzip2 build-bzip2
+	$(RM) -rf $(BZIP2)

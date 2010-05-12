@@ -8,9 +8,7 @@
 
 
 %{
-#include "aterm.hh"
 #include "nixexpr.hh"
-#include "nixexpr-ast.hh"
 #define BISON_HEADER_HACK
 #include "parser-tab.hh"
 
@@ -21,13 +19,16 @@ namespace nix {
     
 static void initLoc(YYLTYPE * loc)
 {
-    loc->first_line = 1;
-    loc->first_column = 1;
+    loc->first_line = loc->last_line = 1;
+    loc->first_column = loc->last_column = 1;
 }
 
     
 static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 {
+    loc->first_line = loc->last_line;
+    loc->first_column = loc->last_column;
+
     while (len--) {
        switch (*s++) {
        case '\r':
@@ -35,17 +36,17 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
                s++;
            /* fall through */
        case '\n': 
-           ++loc->first_line;
-           loc->first_column = 1;
+           ++loc->last_line;
+           loc->last_column = 1;
            break;
        default:
-           ++loc->first_column;
+           ++loc->last_column;
        }
     }
 }
 
 
-static Expr unescapeStr(const char * s)
+static Expr * unescapeStr(const char * s)
 {
     string t;
     char c;
@@ -65,7 +66,7 @@ static Expr unescapeStr(const char * s)
         }
         else t += c;
     }
-    return makeStr(toATerm(t), ATempty);
+    return new ExprString(t);
 }
 
  
@@ -105,19 +106,20 @@ inherit     { return INHERIT; }
 \/\/        { return UPDATE; }
 \+\+        { return CONCAT; }
 
-{ID}        { yylval->t = toATerm(yytext); return ID; /* !!! alloc */ }
+{ID}        { yylval->id = strdup(yytext); return ID; }
 {INT}       { int n = atoi(yytext); /* !!! overflow */
-              yylval->t = ATmake("<int>", n);
+              yylval->n = n;
               return INT;
             }
 
 \"          { BEGIN(STRING); return '"'; }
 <STRING>([^\$\"\\]|\$[^\{\"]|\\.)+ {
-/* !!! Not quite right: we want a follow restriction on "$", it
-   shouldn't be followed by a "{".  Right now "$\"" will be consumed
-   as part of a string, rather than a "$" followed by the string
-   terminator.  Disallow "$\"" for now. */
-              yylval->t = unescapeStr(yytext); /* !!! alloc */ 
+              /* !!! Not quite right: we want a follow restriction on
+                 "$", it shouldn't be followed by a "{".  Right now
+                 "$\"" will be consumed as part of a string, rather
+                 than a "$" followed by the string terminator.
+                 Disallow "$\"" for now. */
+              yylval->e = unescapeStr(yytext);
               return STR;
             }
 <STRING>\$\{  { BEGIN(INITIAL); return DOLLAR_CURLY; }
@@ -126,31 +128,31 @@ inherit     { return INHERIT; }
 
 \'\'(\ *\n)?     { BEGIN(IND_STRING); return IND_STRING_OPEN; }
 <IND_STRING>([^\$\']|\$[^\{\']|\'[^\'\$])+ {
-                   yylval->t = makeIndStr(toATerm(yytext));
+                   yylval->e = new ExprIndStr(yytext);
                    return IND_STR;
                  }
 <IND_STRING>\'\'\$ {
-                   yylval->t = makeIndStr(toATerm("$"));
+                   yylval->e = new ExprIndStr("$");
                    return IND_STR;
                  }
 <IND_STRING>\'\'\' {
-                   yylval->t = makeIndStr(toATerm("''"));
+                   yylval->e = new ExprIndStr("''");
                    return IND_STR;
                  }
 <IND_STRING>\'\'\\. {
-                   yylval->t = unescapeStr(yytext + 2);
+                   yylval->e = unescapeStr(yytext + 2);
                    return IND_STR;
                  }
 <IND_STRING>\$\{ { BEGIN(INITIAL); return DOLLAR_CURLY; }
 <IND_STRING>\'\' { BEGIN(INITIAL); return IND_STRING_CLOSE; }
 <IND_STRING>\'   {
-                   yylval->t = makeIndStr(toATerm("'"));
+                   yylval->e = new ExprIndStr("'");
                    return IND_STR;
                  }
 <IND_STRING>.    return yytext[0]; /* just in case: shouldn't be reached */
 
-{PATH}      { yylval->t = toATerm(yytext); return PATH; /* !!! alloc */ }
-{URI}       { yylval->t = toATerm(yytext); return URI; /* !!! alloc */ }
+{PATH}      { yylval->path = strdup(yytext); return PATH; }
+{URI}       { yylval->uri = strdup(yytext); return URI; }
 
 [ \t\r\n]+    /* eat up whitespace */
 \#[^\r\n]*    /* single-line comments */

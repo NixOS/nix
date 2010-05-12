@@ -1,1 +1,1 @@
-Str("<?xml version='1.0' encoding='utf-8'?>\n<expr>\n  <attrs>\n    <attr name=\"a\">\n      <string value=\"s\" />\n    </attr>\n  </attrs>\n</expr>\n",[])
+"<?xml version='1.0' encoding='utf-8'?>\n<expr>\n  <attrs>\n    <attr name=\"a\">\n      <string value=\"s\" />\n    </attr>\n  </attrs>\n</expr>\n"

@@ -9,7 +9,7 @@ namespace nix {
 
 bool parseOptionArg(const string & arg, Strings::iterator & i,
     const Strings::iterator & argsEnd, EvalState & state,
-    ATermMap & autoArgs)
+    Bindings & autoArgs)
 {
     if (arg != "--arg" && arg != "--argstr") return false;
 
@@ -19,11 +19,13 @@ bool parseOptionArg(const string & arg, Strings::iterator & i,
     string name = *i++;
     if (i == argsEnd) throw error;
     string value = *i++;
-    
-    Expr e = arg == "--arg"
-        ? parseExprFromString(state, value, absPath("."))
-        : makeStr(value);
-    autoArgs.set(toATerm(name), e);
+
+    Value & v(autoArgs[state.symbols.create(name)].value);
+
+    if (arg == "--arg")
+        state.mkThunk_( v, parseExprFromString(state, value, absPath(".")));
+    else
+        mkString(v, value);
     
     return true;
 }

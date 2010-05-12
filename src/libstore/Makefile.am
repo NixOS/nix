@@ -12,12 +12,5 @@ pkginclude_HEADERS = \
 
 libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la @ADDITIONAL_NETWORK_LIBS@
 
-BUILT_SOURCES = derivations-ast.cc derivations-ast.hh
-
-EXTRA_DIST = derivations-ast.def derivations-ast.cc
-
 AM_CXXFLAGS = -Wall \
- -I$(srcdir)/.. ${aterm_include} -I$(srcdir)/../libutil
-
-derivations-ast.cc derivations-ast.hh: ../aterm-helper.pl derivations-ast.def
-	$(perl) $(srcdir)/../aterm-helper.pl derivations-ast.hh derivations-ast.cc < $(srcdir)/derivations-ast.def
+ -I$(srcdir)/.. -I$(srcdir)/../libutil

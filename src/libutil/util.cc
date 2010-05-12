@@ -951,53 +951,6 @@ void _interrupted()
 //////////////////////////////////////////////////////////////////////
 
 
-string packStrings(const Strings & strings)
-{
-    string d;
-    for (Strings::const_iterator i = strings.begin();
-         i != strings.end(); ++i)
-    {
-        unsigned int len = i->size();
-        d += len & 0xff;
-        d += (len >> 8) & 0xff;
-        d += (len >> 16) & 0xff;
-        d += (len >> 24) & 0xff;
-        d += *i;
-    }
-    return d;
-}
-
-    
-Strings unpackStrings(const string & s)
-{
-    Strings strings;
-    
-    string::const_iterator i = s.begin();
-    
-    while (i != s.end()) {
-
-        if (i + 4 > s.end())
-            throw Error(format("short db entry: `%1%'") % s);
-        
-        unsigned int len;
-        len = (unsigned char) *i++;
-        len |= ((unsigned char) *i++) << 8;
-        len |= ((unsigned char) *i++) << 16;
-        len |= ((unsigned char) *i++) << 24;
-
-        if (len == 0xffffffff) return strings; /* explicit end-of-list */
-        
-        if (i + len > s.end())
-            throw Error(format("short db entry: `%1%'") % s);
-
-        strings.push_back(string(i, i + len));
-        i += len;
-    }
-    
-    return strings;
-}
-
-
 Strings tokenizeString(const string & s, const string & separators)
 {
     Strings result;
@@ -1050,6 +1003,47 @@ string int2String(int n)
 bool hasSuffix(const string & s, const string & suffix)
 {
     return s.size() >= suffix.size() && string(s, s.size() - suffix.size()) == suffix;
+}
+
+
+void expect(std::istream & str, const string & s)
+{
+    char s2[s.size()];
+    str.read(s2, s.size());
+    if (string(s2, s.size()) != s)
+        throw Error(format("expected string `%1%'") % s);
+}
+
+
+string parseString(std::istream & str)
+{
+    string res;
+    expect(str, "\"");
+    int c;
+    while ((c = str.get()) != '"')
+        if (c == '\\') {
+            c = str.get();
+            if (c == 'n') res += '\n';
+            else if (c == 'r') res += '\r';
+            else if (c == 't') res += '\t';
+            else res += c;
+        }
+        else res += c;
+    return res;
+}
+
+
+bool endOfList(std::istream & str)
+{
+    if (str.peek() == ',') {
+        str.get();
+        return false;
+    }
+    if (str.peek() == ']') {
+        str.get();
+        return true;
+    }
+    return false;
 }
 
 

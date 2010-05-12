@@ -2,8 +2,6 @@
 #include "store-api.hh"
 #include "local-store.hh"
 
-#include <aterm2.h>
-
 
 namespace nix {
 
@@ -12,9 +10,7 @@ Derivation derivationFromPath(const Path & drvPath)
 {
     assertStorePath(drvPath);
     store->ensurePath(drvPath);
-    ATerm t = ATreadFromNamedFile(drvPath.c_str());
-    if (!t) throw Error(format("cannot read aterm from `%1%'") % drvPath);
-    return parseDerivation(t);
+    return parseDerivation(readFile(drvPath));
 }
 
 

@@ -7,7 +7,7 @@
 #include "parser.hh"
 #include "get-drvs.hh"
 #include "attr-path.hh"
-#include "expr-to-xml.hh"
+#include "value-to-xml.hh"
 #include "util.hh"
 #include "store-api.hh"
 #include "common-opts.hh"
@@ -23,7 +23,7 @@ void printHelp()
 }
 
 
-static Expr parseStdin(EvalState & state)
+static Expr * parseStdin(EvalState & state)
 {
     startNest(nest, lvlTalkative, format("parsing standard input"));
     string s, s2;
@@ -37,47 +37,41 @@ static int rootNr = 0;
 static bool indirectRoot = false;
 
 
-static void printResult(EvalState & state, Expr e,
-    bool evalOnly, bool xmlOutput, bool location, const ATermMap & autoArgs)
-{
-    PathSet context;
-    
-    if (evalOnly)
-        if (xmlOutput)
-            printTermAsXML(e, std::cout, context, location);
-        else
-            std::cout << format("%1%\n") % canonicaliseExpr(e);
-    
-    else {
-        DrvInfos drvs;
-        getDerivations(state, e, "", autoArgs, drvs);
-        for (DrvInfos::iterator i = drvs.begin(); i != drvs.end(); ++i) {
-            Path drvPath = i->queryDrvPath(state);
-            if (gcRoot == "")
-                printGCWarning();
-            else
-                drvPath = addPermRoot(drvPath,
-                    makeRootName(gcRoot, rootNr),
-                    indirectRoot);
-            std::cout << format("%1%\n") % drvPath;
-        }
-    }
-}
-
-
 void processExpr(EvalState & state, const Strings & attrPaths,
-    bool parseOnly, bool strict, const ATermMap & autoArgs,
-    bool evalOnly, bool xmlOutput, bool location, Expr e)
+    bool parseOnly, bool strict, const Bindings & autoArgs,
+    bool evalOnly, bool xmlOutput, bool location, Expr * e)
 {
-    for (Strings::const_iterator i = attrPaths.begin(); i != attrPaths.end(); ++i) {
-        Expr e2 = findAlongAttrPath(state, *i, autoArgs, e);
-        if (!parseOnly)
-            if (strict)
-                e2 = strictEvalExpr(state, e2);
-            else
-                e2 = evalExpr(state, e2);
-        printResult(state, e2, evalOnly, xmlOutput, location, autoArgs);
-    }
+    if (parseOnly)
+        std::cout << format("%1%\n") % *e;
+    else
+        foreach (Strings::const_iterator, i, attrPaths) {
+            Value v;
+            findAlongAttrPath(state, *i, autoArgs, e, v);
+            state.forceValue(v);
+
+            PathSet context;
+            if (evalOnly)
+                if (xmlOutput)
+                    printValueAsXML(state, strict, location, v, std::cout, context);
+                else {
+                    if (strict) state.strictForceValue(v);
+                    std::cout << v << std::endl;
+                }
+            else {
+                DrvInfos drvs;
+                getDerivations(state, v, "", autoArgs, drvs);
+                foreach (DrvInfos::iterator, i, drvs) {
+                    Path drvPath = i->queryDrvPath(state);
+                    if (gcRoot == "")
+                        printGCWarning();
+                    else
+                        drvPath = addPermRoot(drvPath,
+                            makeRootName(gcRoot, rootNr),
+                            indirectRoot);
+                    std::cout << format("%1%\n") % drvPath;
+                }
+            }
+        }
 }
 
 
@@ -92,11 +86,9 @@ void run(Strings args)
     bool xmlOutputSourceLocation = true;
     bool strict = false;
     Strings attrPaths;
-    ATermMap autoArgs(128);
+    Bindings autoArgs;
 
-    for (Strings::iterator i = args.begin();
-         i != args.end(); )
-    {
+    for (Strings::iterator i = args.begin(); i != args.end(); ) {
         string arg = *i++;
 
         if (arg == "-")
@@ -140,21 +132,19 @@ void run(Strings args)
     store = openStore();
 
     if (readStdin) {
-        Expr e = parseStdin(state);
+        Expr * e = parseStdin(state);
         processExpr(state, attrPaths, parseOnly, strict, autoArgs,
             evalOnly, xmlOutput, xmlOutputSourceLocation, e);
     }
 
-    for (Strings::iterator i = files.begin();
-         i != files.end(); i++)
-    {
+    foreach (Strings::iterator, i, files) {
         Path path = absPath(*i);
-        Expr e = parseExprFromFile(state, path);
+        Expr * e = parseExprFromFile(state, path);
         processExpr(state, attrPaths, parseOnly, strict, autoArgs,
             evalOnly, xmlOutput, xmlOutputSourceLocation, e);
     }
 
-    printEvalStats(state);
+    state.printStats();
 }
 
 

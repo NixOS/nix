@@ -6,8 +6,6 @@ let
 
   h = {x ? "d", y ? x, z ? args.x}@args: x + y + z;
 
-  i = args@args2: args.x + args2.y;
-
   j = {x, y, z, ...}: x + y + z;
 
 in
@@ -15,5 +13,4 @@ in
   g {x = "x"; y = "y"; z = "z";} +
   h {x = "D";} +
   h {x = "D"; y = "E"; z = "F";} +
-  i {x = "g"; y = "h";} +
   j {x = "i"; y = "j"; z = "k"; bla = "bla"; foo = "bar";}
