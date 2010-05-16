@@ -108,6 +108,7 @@ EvalState::EvalState()
     , sMeta(symbols.create("meta"))
     , sName(symbols.create("name"))
     , sSystem(symbols.create("system"))
+    , sOverrides(symbols.create("__overrides"))
     , baseEnv(allocEnv(128))
     , baseEnvDispl(0)
     , staticBaseEnv(false, 0)
@@ -428,8 +429,8 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            environment. */
         foreach (Attrs::iterator, i, attrs) {
             nix::Attr & a = (*v.attrs)[i->first];
-            mkCopy(a.value, env2.values[displ]);
-            mkThunk(env2.values[displ++], env2, i->second.first);
+            mkThunk(a.value, env2, i->second.first);
+            mkCopy(env2.values[displ++], a.value);
             a.pos = &i->second.second;
         }
 
@@ -443,6 +444,22 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             a.pos = &i->second;
         }
 
+        /* If the rec contains an attribute called `__overrides', then
+           evaluate it, and add the attributes in that set to the rec.
+           This allows overriding of recursive attributes, which is
+           otherwise not possible.  (You can use the // operator to
+           replace an attribute, but other attributes in the rec will
+           still reference the original value, because that value has
+           been substituted into the bodies of the other attributes.
+           Hence we need __overrides.) */
+        Bindings::iterator overrides = v.attrs->find(state.sOverrides);
+        if (overrides != v.attrs->end()) {
+            state.forceAttrs(overrides->second.value);
+            foreach (Bindings::iterator, i, *overrides->second.value.attrs) {
+                nix::Attr & a = (*v.attrs)[i->first];
+                mkCopy(a.value, i->second.value);
+            }
+        }
     }
 
     else {
