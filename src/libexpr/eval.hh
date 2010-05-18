@@ -171,7 +171,7 @@ typedef std::map<Path, Path> SrcToStore;
 struct EvalState;
 
 
-std::ostream & operator << (std::ostream & str, Value & v);
+std::ostream & operator << (std::ostream & str, const Value & v);
 
 
 class EvalState 

@@ -23,7 +23,7 @@ bool parseOptionArg(const string & arg, Strings::iterator & i,
     Value & v(autoArgs[state.symbols.create(name)].value);
 
     if (arg == "--arg")
-        state.mkThunk_( v, parseExprFromString(state, value, absPath(".")));
+        state.mkThunk_(v, parseExprFromString(state, value, absPath(".")));
     else
         mkString(v, value);
     
