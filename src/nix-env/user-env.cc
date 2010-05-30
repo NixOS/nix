@@ -106,8 +106,6 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     Path manifestFile = store->addTextToStore("env-manifest.nix",
         (format("%1%") % manifest).str(), references);
 
-    printMsg(lvlError, manifestFile);
-
     /* Get the environment builder expression. */
     Value envBuilder;
     state.eval(parseExprFromFile(state, nixDataDir + "/nix/corepkgs/buildenv"), envBuilder);
