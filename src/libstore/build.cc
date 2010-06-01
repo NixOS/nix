@@ -1545,6 +1545,9 @@ void DerivationGoal::startBuilder()
 
     if (fixedOutput) useChroot = false;
 
+    /* Hack to allow derivations to disable chroot builds. */
+    if (drv.env["__noChroot"] == "1") useChroot = false;
+
     if (useChroot) {
 #if CHROOT_ENABLED
         /* Create a temporary directory in which we set up the chroot
