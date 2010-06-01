@@ -16,8 +16,6 @@ namespace nix {
 typedef std::map<Path, Path> Roots;
 
 
-
-
 struct GCOptions
 {
     /* Garbage collector operation:

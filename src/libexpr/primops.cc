@@ -37,7 +37,11 @@ static void prim_import(EvalState & state, Value * * args, Value & v)
             throw EvalError(format("cannot import `%1%', since path `%2%' is not valid")
                 % path % *i);
         if (isDerivation(*i))
-            store->buildDerivations(singleton<PathSet>(*i));
+            try {
+                store->buildDerivations(singleton<PathSet>(*i));
+            } catch (Error & e) {
+                throw ImportError(e.msg());
+            }
     }
 
     state.evalFile(path, v);

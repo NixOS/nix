@@ -267,7 +267,7 @@ public:
 
 
 MakeError(SubstError, Error)
-MakeError(BuildError, Error) /* denoted a permanent build failure */
+MakeError(BuildError, Error) /* denotes a permanent build failure */
 
 
 //////////////////////////////////////////////////////////////////////
