@@ -59,6 +59,7 @@ std::ostream & operator << (std::ostream & str, const Value & v)
         str << "]";
         break;
     case tThunk:
+    case tApp:
     case tCopy:
         str << "<CODE>";
         break;
