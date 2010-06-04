@@ -119,9 +119,23 @@ static void hashAndLink(bool dryRun, HashToPath & hashToPath,
             }
 
             /* Atomically replace the old file with the new hard link. */
-            if (rename(tempLink.c_str(), path.c_str()) == -1)
+            if (rename(tempLink.c_str(), path.c_str()) == -1) {
+                if (errno == EMLINK) {
+                    /* Some filesystems generate too many links on the
+                       rename, rather than on the original link.
+                       (Probably it temporarily increases the st_nlink
+                       field before decreasing it again.) */
+                    printMsg(lvlInfo, format("`%1%' has maximum number of links") % prevPath.first);
+                    hashToPath[hash] = std::pair<Path, ino_t>(path, st.st_ino);
+
+                    /* Unlink the temp link. */
+                    if (unlink(tempLink.c_str()) == -1)
+                        printMsg(lvlError, format("unable to unlink `%1%'") % tempLink);
+                    return;
+                }
                 throw SysError(format("cannot rename `%1%' to `%2%'")
                     % tempLink % path);
+            }
         } else
             printMsg(lvlTalkative, format("would link `%1%' to `%2%'") % path % prevPath.first);
         
