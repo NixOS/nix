@@ -311,7 +311,7 @@ void LocalStore::openDB(bool create)
 
     /* Prepare SQL statements. */
     stmtRegisterValidPath.create(db,
-        "insert or replace into ValidPaths (path, hash, registrationTime, deriver) values (?, ?, ?, ?);");
+        "insert into ValidPaths (path, hash, registrationTime, deriver) values (?, ?, ?, ?);");
     stmtAddReference.create(db,
         "insert or replace into Refs (referrer, reference) values (?, ?);");
     stmtQueryPathInfo.create(db,
@@ -837,7 +837,10 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 {
     SQLiteTxn txn(db);
     
-    foreach (ValidPathInfos::const_iterator, i, infos) addValidPath(*i);
+    foreach (ValidPathInfos::const_iterator, i, infos)
+        /* !!! Maybe the registration info should be updated if the
+           path is already valid. */
+        if (!isValidPath(i->path)) addValidPath(*i);
 
     foreach (ValidPathInfos::const_iterator, i, infos) {
         unsigned long long referrer = queryValidPathId(i->path);
