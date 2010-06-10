@@ -69,6 +69,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
         case tString:
             /* !!! show the context? */
+            copyContext(v, context);
             doc.writeEmptyElement("string", singletonAttrs("value", v.string.s));
             break;
 

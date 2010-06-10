@@ -161,6 +161,8 @@ void mkString(Value & v, const char * s);
 void mkString(Value & v, const string & s, const PathSet & context = PathSet());
 void mkPath(Value & v, const char * s);
 
+void copyContext(const Value & v, PathSet & context);
+
 
 typedef std::map<Path, Hash> DrvHashes;
 

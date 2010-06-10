@@ -902,12 +902,18 @@ string EvalState::forceString(Value & v)
 }
 
 
-string EvalState::forceString(Value & v, PathSet & context)
+void copyContext(const Value & v, PathSet & context)
 {
-    string s = forceString(v);
     if (v.string.context)
         for (const char * * p = v.string.context; *p; ++p) 
             context.insert(*p);
+}
+
+
+string EvalState::forceString(Value & v, PathSet & context)
+{
+    string s = forceString(v);
+    copyContext(v, context);
     return s;
 }
 
@@ -938,9 +944,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
     string s;
 
     if (v.type == tString) {
-        if (v.string.context) 
-            for (const char * * p = v.string.context; *p; ++p) 
-                context.insert(*p);
+        copyContext(v, context);
         return v.string.s;
     }
 
