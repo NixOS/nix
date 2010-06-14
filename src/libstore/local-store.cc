@@ -873,6 +873,8 @@ void LocalStore::exportPath(const Path & path, bool sign,
         writeInt(1, hashAndWriteSink);
         
         Path tmpDir = createTempDir();
+        PathLocks tmpDirLock(singleton<PathSet, Path>(tmpDir));
+        tmpDirLock.setDeletion(true);
         AutoDelete delTmp(tmpDir);
         Path hashFile = tmpDir + "/hash";
         writeFile(hashFile, printHash(hash));
@@ -922,6 +924,8 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
        store path follows the archive data proper), and besides, we
        don't know yet whether the signature is valid. */
     Path tmpDir = createTempDir(nixStore);
+    PathLocks tmpDirLock(singleton<PathSet, Path>(tmpDir));
+    tmpDirLock.setDeletion(true);
     AutoDelete delTmp(tmpDir); /* !!! could be GC'ed! */
     Path unpacked = tmpDir + "/unpacked";
 
