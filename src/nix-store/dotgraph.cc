@@ -52,13 +52,13 @@ static string symbolicName(const string & path)
 }
 
 
+#if 0
 string pathLabel(const Path & nePath, const string & elemPath)
 {
     return (string) nePath + "-" + elemPath;
 }
 
 
-#if 0
 void printClosure(const Path & nePath, const StoreExpr & fs)
 {
     PathSet workList(fs.closure.roots);

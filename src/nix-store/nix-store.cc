@@ -6,6 +6,7 @@
 #include "archive.hh"
 #include "shared.hh"
 #include "dotgraph.hh"
+#include "xmlgraph.hh"
 #include "local-store.hh"
 #include "util.hh"
 #include "help.txt.hh"
@@ -226,7 +227,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 {
     enum { qOutputs, qRequisites, qReferences, qReferrers
          , qReferrersClosure, qDeriver, qBinding, qHash
-         , qTree, qGraph, qResolve, qRoots } query = qOutputs;
+         , qTree, qGraph, qXml, qResolve, qRoots } query = qOutputs;
     bool useOutput = false;
     bool includeOutputs = false;
     bool forceRealise = false;
@@ -249,6 +250,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (*i == "--hash") query = qHash;
         else if (*i == "--tree") query = qTree;
         else if (*i == "--graph") query = qGraph;
+        else if (*i == "--xml") query = qXml;
         else if (*i == "--resolve") query = qResolve;
         else if (*i == "--roots") query = qRoots;
         else if (*i == "--use-output" || *i == "-u") useOutput = true;
@@ -327,7 +329,15 @@ static void opQuery(Strings opFlags, Strings opArgs)
             PathSet roots;
             foreach (Strings::iterator, i, opArgs)
                 roots.insert(maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise));
-	    printDotGraph(roots);
+            printDotGraph(roots);
+            break;
+        }
+
+        case qXml: {
+            PathSet roots;
+            foreach (Strings::iterator, i, opArgs)
+                roots.insert(maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise));
+            printXmlGraph(roots);
             break;
         }
 

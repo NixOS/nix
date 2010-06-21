@@ -15,6 +15,7 @@ MakeError(AssertionError, EvalError)
 MakeError(ThrownError, AssertionError)
 MakeError(Abort, EvalError)
 MakeError(TypeError, EvalError)
+MakeError(ImportError, EvalError) // error building an imported derivation
 
 
 /* Position objects. */
