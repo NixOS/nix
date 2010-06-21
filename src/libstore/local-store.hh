@@ -246,6 +246,8 @@ private:
         
     void startSubstituter(const Path & substituter,
         RunningSubstituter & runningSubstituter);
+
+    Path createTempDirInStore();
 };
 
 

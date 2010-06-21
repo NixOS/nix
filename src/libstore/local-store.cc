@@ -1036,8 +1036,6 @@ void LocalStore::exportPath(const Path & path, bool sign,
         writeInt(1, hashAndWriteSink);
         
         Path tmpDir = createTempDir();
-        PathLocks tmpDirLock(singleton<PathSet, Path>(tmpDir));
-        tmpDirLock.setDeletion(true);
         AutoDelete delTmp(tmpDir);
         Path hashFile = tmpDir + "/hash";
         writeFile(hashFile, printHash(hash));
@@ -1079,6 +1077,22 @@ struct HashAndReadSource : Source
 };
 
 
+/* Create a temporary directory in the store that won't be
+   garbage-collected. */
+Path LocalStore::createTempDirInStore()
+{
+    Path tmpDir;
+    do {
+        /* There is a slight possibility that `tmpDir' gets deleted by
+           the GC between createTempDir() and addTempRoot(), so repeat
+           until `tmpDir' exists. */
+        tmpDir = createTempDir(nixStore);
+        addTempRoot(tmpDir);
+    } while (!pathExists(tmpDir));
+    return tmpDir;
+}
+
+
 Path LocalStore::importPath(bool requireSignature, Source & source)
 {
     HashAndReadSource hashAndReadSource(source);
@@ -1086,10 +1100,8 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
     /* We don't yet know what store path this archive contains (the
        store path follows the archive data proper), and besides, we
        don't know yet whether the signature is valid. */
-    Path tmpDir = createTempDir(nixStore);
-    PathLocks tmpDirLock(singleton<PathSet, Path>(tmpDir));
-    tmpDirLock.setDeletion(true);
-    AutoDelete delTmp(tmpDir); /* !!! could be GC'ed! */
+    Path tmpDir = createTempDirInStore();
+    AutoDelete delTmp(tmpDir);
     Path unpacked = tmpDir + "/unpacked";
 
     restorePath(unpacked, hashAndReadSource);
