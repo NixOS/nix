@@ -211,14 +211,14 @@ system("NIX_SSHOPTS=\"@sshOpts\" @bindir@/nix-copy-closure $hostName $maybeSign 
 
 print "building...\n";
 
-my $buildFlags = "--max-silent-time $maxSilentTime";
+my $buildFlags = "--max-silent-time $maxSilentTime --fallback";
 
 # `-tt' forces allocation of a pseudo-terminal.  This is required to
 # make the remote nix-store process receive a signal when the
 # connection dies.  Without it, the remote process might continue to
 # run indefinitely (that is, until it next tries to write to
 # stdout/stderr).
-if (system("ssh $hostName @sshOpts -tt 'nix-store --realise $buildFlags $drvPath > /dev/null'") != 0) {
+if (system("ssh $hostName @sshOpts -tt 'nix-store -r $drvPath $buildFlags > /dev/null'") != 0) {
     # If we couldn't run ssh or there was an ssh problem (indicated by
     # exit code 255), then we return exit code 1; otherwise we assume
     # that the builder failed, which we indicate to Nix using exit
