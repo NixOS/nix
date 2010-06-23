@@ -135,6 +135,12 @@ static void initAndRun(int argc, char * * argv)
     /* Get some settings from the configuration file. */
     thisSystem = querySetting("system", SYSTEM);
     maxBuildJobs = queryIntSetting("build-max-jobs", 1);
+    string tmp = querySetting("build-cores", "/UNDEFINED");
+    std::transform(tmp.begin(), tmp.end(), tmp.begin(), tolower);
+    if (tmp == "auto" || tmp == "guess")
+      buildCores = 0;
+    else
+      buildCores = queryIntSetting("build-cores", 1);
     maxSilentTime = queryIntSetting("build-max-silent-time", 0);
 
     /* Catch SIGINT. */
@@ -226,6 +232,14 @@ static void initAndRun(int argc, char * * argv)
             tryFallback = true;
         else if (arg == "--max-jobs" || arg == "-j")
             maxBuildJobs = getIntArg<unsigned int>(arg, i, args.end());
+        else if (arg == "--cores") {
+            string tmp = *(++i);
+            std::transform(tmp.begin(), tmp.end(), tmp.begin(), tolower);
+            if (tmp == "auto" || tmp == "guess")
+              buildCores = 0u;
+            else
+              buildCores = getIntArg<unsigned int>(arg, --i, args.end());
+        }
         else if (arg == "--readonly-mode")
             readOnlyMode = true;
         else if (arg == "--max-silent-time")

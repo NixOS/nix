@@ -59,6 +59,18 @@
 #build-max-jobs = 1
 
 
+### Option `build-cores'
+#
+# This option defines the number of CPU cores to utilize in parallel
+# within a build job, i.e. by passing an appropriate `-jN' flag to
+# GNU make. The default is 1, meaning that parallel building within
+# jobs is disabled. Passing the special values `0', `auto', or
+# `guess' causes Nix to try and auto-detect the number of available
+# cores on the local host. This setting can be overridden using the
+# `--cores' command line switch.
+#build-cores = 1
+
+
 ### Option `build-max-silent-time'
 #
 # This option defines the maximum number of seconds that a builder can

@@ -1411,6 +1411,9 @@ void DerivationGoal::startBuilder()
        in the store or in the build directory). */
     env["NIX_STORE"] = nixStore;
 
+    /* The maximum number of cores to utilize for parallel building. */
+    env["NIX_BUILD_CORES"] = (format("%d") % buildCores).str();
+
     /* Add all bindings specified in the derivation. */
     foreach (StringPairs::iterator, i, drv.env)
         env[i->first] = i->second;
