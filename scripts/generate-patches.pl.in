@@ -20,11 +20,11 @@ die unless scalar @ARGV == 5;
 
 my $hashAlgo = "sha256";
 
-my $cacheDir = $ARGV[0];
+my $narDir = $ARGV[0];
 my $patchesDir = $ARGV[1];
 my $patchesURL = $ARGV[2];
-my $srcDir = $ARGV[3];
-my $dstDir = $ARGV[4];
+my $srcManifest = $ARGV[3];
+my $dstManifest = $ARGV[4];
 
 my $tmpDir = tempdir("nix-generate-patches.XXXXXX", CLEANUP => 1, TMPDIR => 1)
     or die "cannot create a temporary directory";
@@ -41,10 +41,10 @@ my %dstNarFiles;
 my %dstLocalPaths;
 my %dstPatches;
 
-readManifest "$srcDir/MANIFEST",
+readManifest "$srcManifest",
     \%srcNarFiles, \%srcLocalPaths, \%srcPatches;
 
-readManifest "$dstDir/MANIFEST",
+readManifest "$dstManifest",
     \%dstNarFiles, \%dstLocalPaths, \%dstPatches;
 
 
@@ -55,8 +55,7 @@ sub findOutputPaths {
     
     foreach my $p (keys %{$narFiles}) {
 
-        # Ignore store expressions.
-        next if ($p =~ /\.store$/);
+        # Ignore derivations.
         next if ($p =~ /\.drv$/);
         
         # Ignore builders (too much ambiguity -- they're all called
@@ -85,6 +84,7 @@ sub getNameVersion {
     $p =~ /\/[0-9a-z]+((?:-[a-zA-Z][^\/-]*)+)([^\/]*)$/;
     my $name = $1;
     my $version = $2;
+    return undef unless defined $name && defined $version;
     $name =~ s/^-//;
     $version =~ s/^-//;
     return ($name, $version);
@@ -112,14 +112,14 @@ sub getNarBz2 {
     my $storePath = shift;
     
     my $narFileList = $$narFiles{$storePath};
-    die "missing store expression $storePath" unless defined $narFileList;
+    die "missing path $storePath" unless defined $narFileList;
 
     my $narFile = @{$narFileList}[0];
     die unless defined $narFile;
 
     $narFile->{url} =~ /\/([^\/]+)$/;
     die unless defined $1;
-    return "$cacheDir/$1";
+    return "$narDir/$1";
 }
 
 
@@ -213,6 +213,7 @@ foreach my $p (keys %dstOutPaths) {
     # this path.
 
     (my $name, my $version) = getNameVersion $p;
+    next unless defined $name && defined $version;
 
     my @closest = ();
     my $closestVersion;
@@ -222,6 +223,8 @@ foreach my $p (keys %dstOutPaths) {
 
     foreach my $q (keys %srcOutPaths) {
         (my $name2, my $version2) = getNameVersion $q;
+	next unless defined $name2 && defined $version2;
+
         if ($name eq $name2) {
 
             # If the sizes differ too much, then skip.  This
@@ -241,11 +244,11 @@ foreach my $p (keys %dstOutPaths) {
             # If the numbers of weighted uses differ too much, then
             # skip.  This disambiguates between, e.g., the bootstrap
             # GCC and the final GCC in Nixpkgs.
-            my $srcUses = computeUses \%srcNarFiles, $q;
-            my $dstUses = computeUses \%dstNarFiles, $p;
-            $ratio = $srcUses / $dstUses;
-            $ratio = 1 / $ratio if $ratio < 1;
-            print "  USE $srcUses $dstUses $ratio $q\n";
+#            my $srcUses = computeUses \%srcNarFiles, $q;
+#            my $dstUses = computeUses \%dstNarFiles, $p;
+#            $ratio = $srcUses / $dstUses;
+#            $ratio = 1 / $ratio if $ratio < 1;
+#            print "  USE $srcUses $dstUses $ratio $q\n";
             
 #            if ($ratio >= 2) {
 #                print "  SKIPPING $q due to use ratio $ratio ($srcUses $dstUses)\n";
@@ -404,5 +407,5 @@ do {
 
 
 # Rewrite the manifest of the destination (with the new patches).
-writeManifest "$dstDir/MANIFEST",
+writeManifest "${dstManifest}",
     \%dstNarFiles, \%dstPatches;
