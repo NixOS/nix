@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <limits.h>
 
 #include "util.hh"
 
