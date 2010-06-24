@@ -136,6 +136,10 @@ AC_CHECK_HEADERS([locale], [], [], [])
 AC_LANG_POP(C++)
 
 
+# Check for <err.h>.
+AC_CHECK_HEADER([err.h], [], [bsddiff_compat_include="-Icompat-include"])
+AC_SUBST([bsddiff_compat_include])
+
 # Check whether we have the personality() syscall, which allows us to
 # do i686-linux builds on x86_64-linux machines.
 AC_CHECK_HEADERS([sys/personality.h])
