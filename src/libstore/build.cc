@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
+#include <cstring>
 
 #include <pwd.h>
 #include <grp.h>
@@ -2638,6 +2639,7 @@ void Worker::waitForInput()
         timeout.tv_sec = std::max((time_t) 0, lastWokenUp + wakeUpInterval - before);
     } else lastWokenUp = 0;
 
+    using namespace std;
     /* Use select() to wait for the input side of any logger pipe to
        become `available'.  Note that `available' (i.e., non-blocking)
        includes EOF. */
