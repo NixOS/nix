@@ -1,3 +1,5 @@
+EXTRA_DIST = compat-include
+
 libexec_PROGRAMS = bsdiff bspatch
 
 bsdiff_SOURCES = bsdiff.c
