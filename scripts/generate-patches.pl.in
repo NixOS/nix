@@ -64,7 +64,7 @@ sub findOutputPaths {
         next if ($p =~ /\.patch$/);
         
         # Don't bother including tar files etc.
-        next if ($p =~ /\.tar\.(gz|bz2)$/ || $p =~ /\.zip$/ || $p =~ /\.bin$/);
+        next if ($p =~ /\.tar$/ || $p =~ /\.tar\.(gz|bz2|Z|lzma|xz)$/ || $p =~ /\.zip$/ || $p =~ /\.bin$/ || $p =~ /\.tgz$/ || $p =~ /\.rpm$/ || $p =~ /cvs-export$/ || $p =~ /fetchhg$/);
 
         $outPaths{$p} = 1;
     }
@@ -290,6 +290,11 @@ foreach my $p (keys %dstOutPaths) {
         
         my $srcNarBz2 = getNarBz2 \%srcNarFiles, $closest;
         my $dstNarBz2 = getNarBz2 \%dstNarFiles, $p;
+
+        if (! -f $srcNarBz2) {
+            warn "patch source archive $srcNarBz2 is missing\n";
+            next;
+        }
 
         system("@bunzip2@ < $srcNarBz2 > $tmpDir/A") == 0
             or die "cannot unpack $srcNarBz2";
