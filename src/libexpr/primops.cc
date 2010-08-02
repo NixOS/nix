@@ -788,13 +788,13 @@ static void prim_intersectAttrs(EvalState & state, Value * * args, Value & v)
     state.forceAttrs(*args[1]);
         
     state.mkAttrs(v);
-    
-    foreach (Bindings::iterator, i, *args[1]->attrs) {
-        Bindings::iterator j = args[0]->attrs->find(i->first);
-        if (j != args[0]->attrs->end()) {
-            Attr & a = (*v.attrs)[i->first];
-            mkCopy(a.value, i->second.value);
-            a.pos = i->second.pos;
+
+    foreach (Bindings::iterator, i, *args[0]->attrs) {
+        Bindings::iterator j = args[1]->attrs->find(i->first);
+        if (j != args[1]->attrs->end()) {
+            Attr & a = (*v.attrs)[j->first];
+            mkCopy(a.value, j->second.value);
+            a.pos = j->second.pos;
         }
     }
 }
