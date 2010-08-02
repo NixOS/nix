@@ -750,13 +750,15 @@ void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 {
-    Value v2;
-    state.evalAttrs(env, e1, v2);
-        
-    state.cloneAttrs(v2, v);
-        
+    Value v1, v2;
+    state.evalAttrs(env, e1, v1);
     state.evalAttrs(env, e2, v2);
-    
+
+    if (v1.attrs->size() == 0) { v = v2; return; }
+    if (v2.attrs->size() == 0) { v = v1; return; }
+
+    state.cloneAttrs(v1, v);
+
     foreach (Bindings::iterator, i, *v2.attrs) {
         Attr & a = (*v.attrs)[i->first];
         mkCopy(a.value, i->second.value);
