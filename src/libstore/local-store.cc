@@ -298,10 +298,20 @@ void LocalStore::openDB(bool create)
     if (sqlite3_exec(db, ("pragma synchronous = " + syncMode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
         throw SQLiteError(db, "setting synchronous mode");
 
-    /* Use `truncate' journal mode, which should be a bit faster. */
-    if (sqlite3_exec(db, "pragma main.journal_mode = truncate;", 0, 0, 0) != SQLITE_OK)
+    /* Set the SQLite journal mode.  The default is write-ahead
+       logging since it's the fastest and supports more concurrency.
+       The downside is that it doesn't work over NFS, so allow
+       truncate mode alternatively. */
+    string mode = queryBoolSetting("use-sqlite-wal", true) ? "wal" : "truncate";
+    if (sqlite3_exec(db, ("pragma main.journal_mode = " + mode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
         throw SQLiteError(db, "setting journal mode");
 
+    /* Increase the auto-checkpoint interval to 8192 pages.  This
+       seems enough to ensure that instantiating the NixOS system
+       derivation is done in a single fsync(). */
+    if (sqlite3_exec(db, "pragma wal_autocheckpoint = 8192;", 0, 0, 0) != SQLITE_OK)
+        throw SQLiteError(db, "setting autocheckpoint interval");
+    
     /* Initialise the database schema, if necessary. */
     if (create) {
 #include "schema.sql.hh"
