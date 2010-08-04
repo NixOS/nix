@@ -960,6 +960,16 @@ PathSet outputPaths(const DerivationOutputs & outputs)
 }
 
 
+static bool canBuildLocally(const string & platform)
+{
+    return platform == thisSystem 
+#ifdef CAN_DO_LINUX32_BUILDS
+        || (platform == "i686-linux" && thisSystem == "x86_64-linux")
+#endif
+        ;
+}
+
+
 void DerivationGoal::tryToBuild()
 {
     trace("trying to build");
@@ -1027,28 +1037,38 @@ void DerivationGoal::tryToBuild()
     foreach (DerivationOutputs::iterator, i, drv.outputs)
         if (pathFailed(i->second.path)) return;
 
-    /* Is the build hook willing to accept this job? */
-    usingBuildHook = true;
-    switch (tryBuildHook()) {
-        case rpAccept:
-            /* Yes, it has started doing so.  Wait until we get EOF
-               from the hook. */
-            state = &DerivationGoal::buildDone;
-            return;
-        case rpPostpone:
-            /* Not now; wait until at least one child finishes. */
-            worker.waitForAWhile(shared_from_this());
-            outputLocks.unlock();
-            return;
-        case rpDecline:
-            /* We should do it ourselves. */
-            break;
-    }
+    /* Don't do a remote build if the derivation has the attribute
+       `preferLocalBuild' set. */
+    bool preferLocalBuild =
+        drv.env["preferLocalBuild"] == "1" && canBuildLocally(drv.platform);
 
+    /* Is the build hook willing to accept this job? */
+    if (!preferLocalBuild) {
+        usingBuildHook = true;
+        switch (tryBuildHook()) {
+            case rpAccept:
+                /* Yes, it has started doing so.  Wait until we get
+                   EOF from the hook. */
+                state = &DerivationGoal::buildDone;
+                return;
+            case rpPostpone:
+                /* Not now; wait until at least one child finishes. */
+                worker.waitForAWhile(shared_from_this());
+                outputLocks.unlock();
+                return;
+            case rpDecline:
+                /* We should do it ourselves. */
+                break;
+        }
+    }
+    
     usingBuildHook = false;
 
-    /* Make sure that we are allowed to start a build. */
-    if (worker.getNrLocalBuilds() >= maxBuildJobs) {
+    /* Make sure that we are allowed to start a build.  If this
+       derivation prefers to be done locally, do it even if
+       maxBuildJobs is 0. */
+    unsigned int curBuilds = worker.getNrLocalBuilds();
+    if (curBuilds >= maxBuildJobs && !(preferLocalBuild && curBuilds == 0)) {
         worker.waitForBuildSlot(shared_from_this());
         outputLocks.unlock();
         return;
@@ -1379,11 +1399,7 @@ void DerivationGoal::startBuilder()
         format("building path(s) %1%") % showPaths(outputPaths(drv.outputs)))
     
     /* Right platform? */
-    if (drv.platform != thisSystem 
-#ifdef CAN_DO_LINUX32_BUILDS
-        && !(drv.platform == "i686-linux" && thisSystem == "x86_64-linux")
-#endif
-        )
+    if (!canBuildLocally(drv.platform))
         throw Error(
             format("a `%1%' is required to build `%3%', but I am a `%2%'")
             % drv.platform % thisSystem % drvPath);
