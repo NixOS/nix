@@ -135,6 +135,7 @@ static void initAndRun(int argc, char * * argv)
     /* Get some settings from the configuration file. */
     thisSystem = querySetting("system", SYSTEM);
     maxBuildJobs = queryIntSetting("build-max-jobs", 1);
+    buildCores = queryIntSetting("build-cores", 1);
     maxSilentTime = queryIntSetting("build-max-silent-time", 0);
 
     /* Catch SIGINT. */
@@ -226,6 +227,8 @@ static void initAndRun(int argc, char * * argv)
             tryFallback = true;
         else if (arg == "--max-jobs" || arg == "-j")
             maxBuildJobs = getIntArg<unsigned int>(arg, i, args.end());
+        else if (arg == "--cores")
+            buildCores = getIntArg<unsigned int>(arg, i, args.end());
         else if (arg == "--readonly-mode")
             readOnlyMode = true;
         else if (arg == "--max-silent-time")

@@ -10,8 +10,8 @@ AC_CANONICAL_HOST
 
 # Construct a Nix system name (like "i686-linux").
 AC_MSG_CHECKING([for the canonical Nix system name])
-cpu_name=$(uname -p | tr 'A-Z ' 'a-z_')
-machine_name=$(uname -m | tr 'A-Z ' 'a-z_')
+cpu_name=$(uname -p | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ ' 'abcdefghijklmnopqrstuvwxyz_')
+machine_name=$(uname -m | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ ' 'abcdefghijklmnopqrstuvwxyz_')
 
 case $machine_name in
     i*86)
@@ -30,7 +30,7 @@ case $machine_name in
         ;;
 esac
 
-sys_name=$(uname -s | tr 'A-Z ' 'a-z_')
+sys_name=$(uname -s | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ ' 'abcdefghijklmnopqrstuvwxyz_')
 
 case $sys_name in
     cygwin*)
@@ -127,6 +127,10 @@ AC_LANG_PUSH(C++)
 AC_CHECK_HEADERS([locale], [], [], [])
 AC_LANG_POP(C++)
 
+
+# Check for <err.h>.
+AC_CHECK_HEADER([err.h], [], [bsddiff_compat_include="-Icompat-include"])
+AC_SUBST([bsddiff_compat_include])
 
 # Check whether we have the personality() syscall, which allows us to
 # do i686-linux builds on x86_64-linux machines.

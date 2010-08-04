@@ -55,6 +55,11 @@ extern Verbosity buildVerbosity;
 /* Maximum number of parallel build jobs.  0 means unlimited. */
 extern unsigned int maxBuildJobs;
 
+/* Number of CPU cores to utilize in parallel within a build, i.e. by passing
+   this number to Make via '-j'. 0 means that the number of actual CPU cores on
+   the local host ought to be auto-detected. */
+extern unsigned int buildCores;
+
 /* Read-only mode.  Don't copy stuff to the store, don't change the
    database. */
 extern bool readOnlyMode;

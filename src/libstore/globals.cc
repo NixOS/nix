@@ -22,6 +22,7 @@ bool keepGoing = false;
 bool tryFallback = false;
 Verbosity buildVerbosity = lvlInfo;
 unsigned int maxBuildJobs = 1;
+unsigned int buildCores = 1;
 bool readOnlyMode = false;
 string thisSystem = "unset";
 time_t maxSilentTime = 0;

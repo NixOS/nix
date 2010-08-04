@@ -7,6 +7,7 @@
 #include "globals.hh"
 
 #include <iostream>
+#include <cstring>
 #include <unistd.h>
 #include <signal.h>
 #include <sys/types.h>
@@ -111,6 +112,7 @@ static bool isFarSideClosed(int socket)
    time and wouldn't have to worry about races. */
 static void sigPollHandler(int sigNo)
 {
+    using namespace std;
     try {
         /* Check that the far side actually closed.  We're still
            getting spurious signals every once in a while.  I.e.,

@@ -13,6 +13,7 @@
 
 #include <iostream>
 #include <unistd.h>
+#include <cstring>
 
 
 namespace nix {
@@ -158,6 +159,7 @@ void RemoteStore::connectToDaemon()
     addr.sun_family = AF_UNIX;
     if (socketPathRel.size() >= sizeof(addr.sun_path))
         throw Error(format("socket path `%1%' is too long") % socketPathRel);
+    using namespace std;
     strcpy(addr.sun_path, socketPathRel.c_str());
     
     if (connect(fdSocket, (struct sockaddr *) &addr, sizeof(addr)) == -1)

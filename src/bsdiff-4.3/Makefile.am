@@ -1,3 +1,5 @@
+EXTRA_DIST = compat-include
+
 libexec_PROGRAMS = bsdiff bspatch
 
 bsdiff_SOURCES = bsdiff.c
@@ -8,4 +10,4 @@ bspatch_SOURCES = bspatch.c
 
 bspatch_LDADD = ${bzip2_lib}
 
-AM_CFLAGS = -O3 ${bzip2_include}
+AM_CFLAGS = -O3 ${bzip2_include} ${bsddiff_compat_include}
