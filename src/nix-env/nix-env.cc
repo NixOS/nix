@@ -247,11 +247,12 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
         }
 
         /* If `newestOnly', if a selector matches multiple derivations
-           with the same name, pick the one with the highest priority.
-           If there are multiple derivations with the same priority,
-           pick the one with the highest version.  If there are
-           multiple derivations with the same priority and name and
-           version, then pick the first one. */
+           with the same name, pick the one matching the current
+           system.  If there are still multiple derivations, pick the
+           one with the highest priority.  If there are still multiple
+           derivations, pick the one with the highest version.
+           Finally, if there are still multiple derivations,
+           arbitrarily pick the first one. */
         if (newestOnly) {
 
             /* Map from package names to derivations. */
@@ -266,7 +267,12 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
                 Newest::iterator k = newest.find(drvName.name);
                 
                 if (k != newest.end()) {
-                    d = comparePriorities(state, j->first, k->second.first);
+                    d = j->first.system == k->second.first.system ? 0 :
+                        j->first.system == thisSystem ? 1 :
+                        k->second.first.system == thisSystem ? -1 : 0;
+                    printMsg(lvlError, format("%1% %2% %3% %4%") % j->first.system % k->second.first.system % thisSystem % d);
+                    if (d == 0)
+                        d = comparePriorities(state, j->first, k->second.first);
                     if (d == 0)
                         d = compareVersions(drvName.version, DrvName(k->second.first.name).version);
                 }
@@ -1230,7 +1236,7 @@ void run(Strings args)
     
     globals.instSource.type = srcUnknown;
     globals.instSource.nixExprPath = getDefNixExprPath();
-    globals.instSource.systemFilter = thisSystem;
+    globals.instSource.systemFilter = "*";
     
     globals.dryRun = false;
     globals.preserveInstalled = false;
