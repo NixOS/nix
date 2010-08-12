@@ -198,6 +198,9 @@ void RemoteStore::setOptions()
         writeInt(logType, to);
         writeInt(printBuildTrace, to);
     }
+    if (GET_PROTOCOL_MINOR(daemonVersion) >= 6) {
+        writeInt(buildCores, to);
+    }
     processStderr();
 }
 

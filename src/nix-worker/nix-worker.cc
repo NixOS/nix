@@ -500,6 +500,9 @@ static void performOp(unsigned int clientVersion,
             logType = (LogType) readInt(from);
             printBuildTrace = readInt(from) != 0;
         }
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 6) {
+            buildCores = readInt(from);
+        }
         startWork();
         stopWork();
         break;
