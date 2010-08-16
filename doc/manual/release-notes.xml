@@ -8,6 +8,59 @@
 
 <!--==================================================================-->
 
+<section xml:id="ssec-relnotes-0.16"><title>Release 0.16 (August 16, 2010)</title>
+
+<para>This release has the following improvements:</para>
+
+<itemizedlist>
+
+  <listitem>
+    <para>The Nix expression evaluator is now much faster in most
+    cases: typically, <link
+    xlink:href="http://www.mail-archive.com/nix-dev@cs.uu.nl/msg04113.html">3
+    to 8 times compared to the old implementation</link>.  It also
+    uses less memory.  It no longer depends on the ATerm
+    library.</para>
+  </listitem>
+
+  <listitem>
+    <para>
+      Support for configurable parallelism inside builders.  Build
+      scripts have always had the ability to perform multiple build
+      actions in parallel (for instance, by running <command>make -j
+      2</command>), but this was not desirable because the number of
+      actions to be performed in parallel was not configurable.  Nix
+      now has an option <option>--cores
+      <replaceable>N</replaceable></option> as well as a configuration
+      setting <varname>build-cores =
+      <replaceable>N</replaceable></varname> that causes the
+      environment variable <envar>NIX_BUILD_CORES</envar> to be set to
+      <replaceable>N</replaceable> when the builder is invoked.  The
+      builder can use this at its discretion to perform a parallel
+      build, e.g., by calling <command>make -j
+      <replaceable>N</replaceable></command>.  In Nixpkgs, this can be
+      enabled on a per-package basis by setting
+      <varname>enableParallelBuilding</varname> to
+      <literal>true</literal>.
+    </para>
+  </listitem>
+
+  <listitem>
+    <para><command>nix-store -q</command> now supports XML output
+    through the <option>--xml</option> flag.</para>
+  </listitem>
+
+  <listitem>
+    <para>Several bug fixes.</para>
+  </listitem>
+
+</itemizedlist>
+
+</section>
+
+
+<!--==================================================================-->
+
 <section xml:id="ssec-relnotes-0.15"><title>Release 0.15 (March 17, 2010)</title>
 
 <para>This is a bug-fix release.  Among other things, it fixes
