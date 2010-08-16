@@ -1,4 +1,7 @@
-{ nixpkgs ? ../nixpkgs }:
+{ nixpkgs ? ../nixpkgs
+, nix ? { outPath = ./.; rev = 1234; }
+, officialRelease ? false
+}:
 
 let
 
@@ -6,10 +9,6 @@ let
 
 
     tarball =
-      { nix ? {outPath = ./.; rev = 1234;}
-      , officialRelease ? false
-      }:
-
       with import nixpkgs {};
 
       releaseTools.sourceTarball {
@@ -60,17 +59,15 @@ let
 
 
     build =
-      { tarball ? jobs.tarball {}
-      , system ? "i686-linux"
-      }:
+      { system ? "i686-linux" }:
 
-      with import nixpkgs {inherit system;};
+      with import nixpkgs { inherit system; };
 
       releaseTools.nixBuild {
         name = "nix";
         src = tarball;
 
-        buildInputs = [curl perl bzip2 openssl];
+        buildInputs = [ curl perl bzip2 openssl ];
 
         configureFlags = ''
           --disable-init-state
@@ -79,44 +76,18 @@ let
       };
 
 
-    /*
-    static =
-      { tarball ? jobs.tarball {}
-      , system ? "i686-linux"
-      }:
-
-      with import nixpkgs {inherit system;};
-
-      releaseTools.binaryTarball {
-        name = "nix-static-tarball";
-        src = tarball;
-
-        buildInputs = [curl perl bzip2];
-
-        configureFlags = ''
-          --disable-init-state
-          --with-bzip2=${bzip2}
-          --enable-static-nix
-        '';
-      };
-    */
-
-      
     coverage =
-      { tarball ? jobs.tarball {}
-      }:
-
-      with import nixpkgs {};
+      with import nixpkgs { system = "x86_64-linux"; };
 
       releaseTools.coverageAnalysis {
         name = "nix-build";
         src = tarball;
 
-        buildInputs = [
-          curl perl bzip2 openssl
-          # These are for "make check" only:
-          graphviz libxml2 libxslt
-        ];
+        buildInputs =
+          [ curl perl bzip2 openssl
+            # These are for "make check" only:
+            graphviz libxml2 libxslt
+          ];
 
         configureFlags = ''
           --disable-init-state --disable-shared
@@ -168,17 +139,15 @@ let
 
   makeRPM = 
     system: diskImageFun: prio:
-    { tarball ? jobs.tarball {}
-    }:
 
-    with import nixpkgs {inherit system;};
+    with import nixpkgs { inherit system; };
 
     releaseTools.rpmBuild rec {
       name = "nix-rpm-${diskImage.name}";
-      src = tarball;
+      src = jobs.tarball;
       diskImage = diskImageFun vmTools.diskImages;
       memSize = 1024;
-      meta = { schedulingPriority = toString prio; };
+      meta = { schedulingPriority = prio; };
     };
 
 
@@ -187,19 +156,17 @@ let
   
   makeDeb =
     system: diskImageFun: prio:
-    { tarball ? jobs.tarball {}
-    }:
 
-    with import nixpkgs {inherit system;};
+    with import nixpkgs { inherit system; };
 
     releaseTools.debBuild {
       name = "nix-deb";
-      src = tarball;
+      src = jobs.tarball;
       diskImage = diskImageFun vmTools.diskImages;
       memSize = 1024;
-      meta = { schedulingPriority = toString prio; };
+      meta = { schedulingPriority = prio; };
       configureFlags = "--sysconfdir=/etc";
-      debRequires = ["curl"];
+      debRequires = [ "curl" ];
     };
 
 
