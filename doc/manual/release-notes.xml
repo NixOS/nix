@@ -8,7 +8,7 @@
 
 <!--==================================================================-->
 
-<section xml:id="ssec-relnotes-0.16"><title>Release 0.16 (August 16, 2010)</title>
+<section xml:id="ssec-relnotes-0.16"><title>Release 0.16 (August 17, 2010)</title>
 
 <para>This release has the following improvements:</para>
 
@@ -39,8 +39,8 @@
       builder can use this at its discretion to perform a parallel
       build, e.g., by calling <command>make -j
       <replaceable>N</replaceable></command>.  In Nixpkgs, this can be
-      enabled on a per-package basis by setting
-      <varname>enableParallelBuilding</varname> to
+      enabled on a per-package basis by setting the derivation
+      attribute <varname>enableParallelBuilding</varname> to
       <literal>true</literal>.
     </para>
   </listitem>
