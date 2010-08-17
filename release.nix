@@ -143,7 +143,7 @@ let
     with import nixpkgs { inherit system; };
 
     releaseTools.rpmBuild rec {
-      name = "nix-rpm-${diskImage.name}";
+      name = "nix-rpm";
       src = jobs.tarball;
       diskImage = diskImageFun vmTools.diskImages;
       memSize = 1024;
