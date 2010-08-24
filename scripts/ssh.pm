@@ -25,13 +25,16 @@ sub openSSHConnection {
     # print "started" when it has established the connection, and wait
     # until we see that.
     open SSH, "ssh $sshHost @sshOpts -M -N -o LocalCommand='echo started' -o PermitLocalCommand=yes |" or die;
+
     while (<SSH>) {
         chomp;
-        last if /started/;
+        if ($_ eq "started") {
+            $sshStarted = 1;
+            return 1;
+        }
     }
-    
-    $sshStarted = 1;
-    return 1;
+
+    return 0;
 }
 
 # Tell the master SSH client to exit.
