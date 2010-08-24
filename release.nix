@@ -1,5 +1,5 @@
-{ nix ? {outPath = ./.; rev = 1234;}
-, nixpkgs ? ../nixpkgs
+{ nixpkgs ? ../nixpkgs
+, nix ? { outPath = ./.; rev = 1234; }
 , officialRelease ? false
 }:
 
@@ -64,7 +64,7 @@ let
     build =
       { system ? "i686-linux" }:
 
-      with import nixpkgs {inherit system;};
+      with import nixpkgs { inherit system; };
 
       releaseTools.nixBuild {
         name = "nix";
@@ -80,7 +80,7 @@ let
 
 
     coverage =
-      with import nixpkgs {};
+      with import nixpkgs { system = "x86_64-linux"; };
 
       releaseTools.coverageAnalysis {
         name = "nix-build";
@@ -143,7 +143,7 @@ let
   makeRPM = 
     system: diskImageFun: prio:
 
-    with import nixpkgs {inherit system;};
+    with import nixpkgs { inherit system; };
 
     releaseTools.rpmBuild rec {
       name = "nix-rpm-${diskImage.name}";
@@ -160,7 +160,7 @@ let
   makeDeb =
     system: diskImageFun: prio:
 
-    with import nixpkgs {inherit system;};
+    with import nixpkgs { inherit system; };
 
     releaseTools.debBuild {
       name = "nix-deb";
@@ -169,7 +169,7 @@ let
       memSize = 1024;
       meta.schedulingPriority = prio;
       configureFlags = "--sysconfdir=/etc";
-      debRequires = ["curl"];
+      debRequires = [ "curl" ];
     };
 
 

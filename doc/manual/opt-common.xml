@@ -98,7 +98,25 @@
   linkend='conf-build-max-jobs'><literal>build-max-jobs</literal></link>
   configuration setting, which itself defaults to
   <literal>1</literal>.  A higher value is useful on SMP systems or to
-  exploit I/O latency.  </para></listitem>
+  exploit I/O latency.</para></listitem>
+  
+</varlistentry>
+
+
+<varlistentry xml:id="opt-cores"><term><option>--cores</option></term>
+
+  <listitem><para>Sets the value of the <envar>NIX_BUILD_CORES</envar>
+  environment variable in the invocation of builders.  Builders can
+  use this variable at their discretion to control the maximum amount
+  of parallelism.  For instance, in Nixpkgs, if the derivation
+  attribute <varname>enableParallelBuilding</varname> is set to
+  <literal>true</literal>, the builder passes the
+  <option>-j<replaceable>N</replaceable></option> flag to GNU Make.
+  It defaults to the value of the <link
+  linkend='conf-build-cores'><literal>build-cores</literal></link>
+  configuration setting, if set, or <literal>1</literal> otherwise.
+  The value <literal>0</literal> means that the builder should use all
+  available CPU cores in the system.</para></listitem>
   
 </varlistentry>
 

@@ -97,6 +97,25 @@ env-keep-derivations = false
   </varlistentry>
 
 
+  <varlistentry xml:id="conf-build-cores"><term><literal>build-cores</literal></term>
+
+    <listitem><para>Sets the value of the
+    <envar>NIX_BUILD_CORES</envar> environment variable in the
+    invocation of builders.  Builders can use this variable at their
+    discretion to control the maximum amount of parallelism.  For
+    instance, in Nixpkgs, if the derivation attribute
+    <varname>enableParallelBuilding</varname> is set to
+    <literal>true</literal>, the builder passes the
+    <option>-j<replaceable>N</replaceable></option> flag to GNU Make.
+    It can be overriden using the <option
+    linkend='opt-cores'>--cores</option> command line switch and
+    defaults to <literal>1</literal>.  The value <literal>0</literal>
+    means that the builder should use all available CPU cores in the
+    system.</para></listitem>
+
+  </varlistentry>
+
+
   <varlistentry xml:id="conf-build-max-silent-time"><term><literal>build-max-silent-time</literal></term>
 
     <listitem>

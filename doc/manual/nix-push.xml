@@ -120,7 +120,7 @@ dependencies used in the build, such as compilers).</para>
 dependencies, we can do:
       
 <screen>
-$ nix-push <replaceable>urls</replaceable> $(nix-instantiate $(nix-store -r foo.nix))</screen>
+$ nix-push <replaceable>urls</replaceable> $(nix-store -r $(nix-instantiate foo.nix))</screen>
     
 </para>
 
