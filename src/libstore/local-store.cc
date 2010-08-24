@@ -1022,10 +1022,11 @@ void LocalStore::exportPath(const Path & path, bool sign,
     dumpPath(path, hashAndWriteSink);
 
     /* Refuse to export paths that have changed.  This prevents
-       filesystem corruption from spreading to other machines. */
+       filesystem corruption from spreading to other machines.
+       Don't complain if the stored hash is zero (unknown). */
     Hash hash = hashAndWriteSink.currentHash();
     Hash storedHash = queryPathHash(path);
-    if (hash != storedHash)
+    if (hash != storedHash && storedHash != Hash(storedHash.type))
         throw Error(format("hash of path `%1%' has changed from `%2%' to `%3%'!") % path
             % printHash(storedHash) % printHash(hash));
 
