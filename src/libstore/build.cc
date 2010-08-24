@@ -887,7 +887,10 @@ void DerivationGoal::outputsSubstituted()
     foreach (PathSet::iterator, i, drv.inputSrcs)
         addWaitee(worker.makeSubstitutionGoal(*i));
 
-    state = &DerivationGoal::inputsRealised;
+    if (waitees.empty()) /* to prevent hang (no wake-up event) */
+        inputsRealised();
+    else
+        state = &DerivationGoal::inputsRealised;
 }
 
 
