@@ -194,11 +194,8 @@ if ($x ne "okay") {
 
 print STDERR "building `$drvPath' on `$hostName'\n";
 
-my $inputs = `cat inputs`; die if ($? != 0);
-$inputs =~ s/\n/ /g;
-
-my $outputs = `cat outputs`; die if ($? != 0);
-$outputs =~ s/\n/ /g;
+my @inputs = split /\s/, do { local $/; local @ARGV = "inputs"; <> };
+my @outputs = split /\s/, do { local $/; local @ARGV = "outputs"; <> };
 
 my $maybeSign = "";
 $maybeSign = "--sign" if -e "/nix/etc/nix/signing-key.sec";
@@ -217,7 +214,7 @@ sub removeRoots {
 
 
 # Copy the derivation and its dependencies to the build machine.
-system("NIX_SSHOPTS=\"@sshOpts\" @bindir@/nix-copy-closure $hostName $maybeSign $drvPath $inputs") == 0
+system("NIX_SSHOPTS=\"@sshOpts\" @bindir@/nix-copy-closure $hostName $maybeSign $drvPath @inputs") == 0
     or die "cannot copy inputs to $hostName: $?";
 
 
@@ -245,7 +242,7 @@ print "build of `$drvPath' on `$hostName' succeeded\n";
 
 
 # Copy the output from the build machine.
-foreach my $output (split '\n', $outputs) {
+foreach my $output (@outputs) {
     my $maybeSignRemote = "";
     $maybeSignRemote = "--sign" if $UID != 0;
     
