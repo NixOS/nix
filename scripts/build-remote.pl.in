@@ -192,7 +192,6 @@ if ($x ne "okay") {
 }
 
 
-# Do the actual build.
 print STDERR "building `$drvPath' on `$hostName'\n";
 
 my $inputs = `cat inputs`; die if ($? != 0);
@@ -201,17 +200,29 @@ $inputs =~ s/\n/ /g;
 my $outputs = `cat outputs`; die if ($? != 0);
 $outputs =~ s/\n/ /g;
 
-print "copying inputs...\n";
-
 my $maybeSign = "";
 $maybeSign = "--sign" if -e "/nix/etc/nix/signing-key.sec";
 
+
+# Register the derivation as a temporary GC root.  Note that $PPID is
+# the PID of the remote SSH process, which, due to the use of a
+# persistant SSH connection, should be the same across all remote
+# command invocations for this session.
+my $rootsDir = "@localstatedir@/nix/gcroots/tmp";
+system("ssh $hostName @sshOpts 'mkdir -m 1777 -p $rootsDir; ln -sfn $drvPath $rootsDir/\$PPID.drv'");
+
+sub removeRoots {
+    system("ssh $hostName @sshOpts 'rm -f $rootsDir/\$PPID.drv $rootsDir/\$PPID.out'");
+}
+
+
+# Copy the derivation and its dependencies to the build machine.
 system("NIX_SSHOPTS=\"@sshOpts\" @bindir@/nix-copy-closure $hostName $maybeSign $drvPath $inputs") == 0
     or die "cannot copy inputs to $hostName: $?";
 
-print "building...\n";
 
-my $buildFlags = "--max-silent-time $maxSilentTime --fallback";
+# Perform the build.
+my $buildFlags = "--max-silent-time $maxSilentTime --fallback --add-root $rootsDir/\$PPID.out";
 
 # `-tt' forces allocation of a pseudo-terminal.  This is required to
 # make the remote nix-store process receive a signal when the
@@ -226,11 +237,14 @@ if (system("ssh $hostName @sshOpts -tt 'nix-store -r $drvPath $buildFlags > /dev
     # the first is a transient failure and the latter is permanent.
     my $res = $? == -1 || ($? >> 8) == 255 ? 1 : 100;
     print STDERR "build of `$drvPath' on `$hostName' failed with exit code $?\n";
+    removeRoots;
     exit $res;
 }
 
 print "build of `$drvPath' on `$hostName' succeeded\n";
 
+
+# Copy the output from the build machine.
 foreach my $output (split '\n', $outputs) {
     my $maybeSignRemote = "";
     $maybeSignRemote = "--sign" if $UID != 0;
@@ -238,3 +252,7 @@ foreach my $output (split '\n', $outputs) {
     system("ssh $hostName @sshOpts 'nix-store --export $maybeSignRemote $output' | @bindir@/nix-store --import > /dev/null") == 0
 	or die "cannot copy $output from $hostName: $?";
 }
+
+
+# Get rid of the temporary GC roots.
+removeRoots;
