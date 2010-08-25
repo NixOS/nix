@@ -31,57 +31,20 @@ $ENV{"DISPLAY"} = "";
 $ENV{"SSH_ASKPASS"} = "";
 
 
-my $loadIncreased = 0;
-
-my ($amWilling, $localSystem, $neededSystem, $drvPath, $maxSilentTime) = @ARGV;
-$maxSilentTime = 0 unless defined $maxSilentTime;
-
 sub sendReply {
     my $reply = shift;
     print STDERR "# $reply\n";
 }
 
-sub decline {
-    sendReply "decline";
-    exit 0;
-}
+
+# Initialisation.
+my $loadIncreased = 0;
+
+my ($localSystem, $maxSilentTime) = @ARGV;
+$maxSilentTime = 0 unless defined $maxSilentTime;
 
 my $currentLoad = $ENV{"NIX_CURRENT_LOAD"};
-decline unless defined $currentLoad;
-mkdir $currentLoad, 0777 or die unless -d $currentLoad;
-
 my $conf = $ENV{"NIX_REMOTE_SYSTEMS"};
-decline if !defined $conf || ! -e $conf;
-
-my $canBuildLocally = $amWilling && ($localSystem eq $neededSystem);
-
-
-# Read the list of machines.
-my @machines;
-open CONF, "< $conf" or die;
-
-while (<CONF>) {
-    chomp;
-    s/\#.*$//g;
-    next if /^\s*$/;
-    /^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\d+)(\s+([0-9\.]+))?\s*$/ or die;
-    push @machines,
-        { hostName => $1
-        , systemTypes => [split(/,/, $2)]
-        , sshKeys => $3
-        , maxJobs => $4
-        , speedFactor => 1.0 * ($6 || 1)
-        , enabled => 1
-        };
-}
-
-close CONF;
-
-
-# Acquire the exclusive lock on $currentLoad/main-lock.
-my $mainLock = "$currentLoad/main-lock";
-open MAINLOCK, ">>$mainLock" or die;
-flock(MAINLOCK, LOCK_EX) or die;
 
 
 sub openSlotLock {
@@ -91,111 +54,147 @@ sub openSlotLock {
     open $slotLock, ">>$slotLockFn" or die;
     return $slotLock;
 }
+
+
+# Read the list of machines.
+my @machines;
+if (defined $conf && -e $conf) {
+    open CONF, "< $conf" or die;
+    while (<CONF>) {
+        chomp;
+        s/\#.*$//g;
+        next if /^\s*$/;
+        /^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\d+)(\s+([0-9\.]+))?\s*$/ or die;
+        push @machines,
+            { hostName => $1
+            , systemTypes => [split(/,/, $2)]
+            , sshKeys => $3
+            , maxJobs => $4
+            , speedFactor => 1.0 * ($6 || 1)
+            , enabled => 1
+            };
+    }
+    close CONF;
+}
+
+
+
+# Wait for the calling process to ask us whether we can build some derivation.
+my ($drvPath, $hostName, $slotLock);
+
+REQ: while (1) {
+    $_ = <STDIN> || exit 0;
+    my ($amWilling, $neededSystem);
+    ($amWilling, $neededSystem, $drvPath) = split;
+
+    my $canBuildLocally = $amWilling && ($localSystem eq $neededSystem);
+
+    if (!defined $currentLoad) {
+        sendReply "decline";
+        next;
+    }
     
-
-my $hostName;
-my $slotLock;
-
-while (1) {
+    # Acquire the exclusive lock on $currentLoad/main-lock.
+    mkdir $currentLoad, 0777 or die unless -d $currentLoad;
+    my $mainLock = "$currentLoad/main-lock";
+    open MAINLOCK, ">>$mainLock" or die;
+    flock(MAINLOCK, LOCK_EX) or die;
     
-    # Find all machine that can execute this build, i.e., that support
-    # builds for the given platform and are not at their job limit.
-    my $rightType = 0;
-    my @available = ();
-    LOOP: foreach my $cur (@machines) {
-        if ($cur->{enabled} && grep { $neededSystem eq $_ } @{$cur->{systemTypes}}) {
-            $rightType = 1;
+    
+    while (1) {
+        # Find all machine that can execute this build, i.e., that
+        # support builds for the given platform and are not at their
+        # job limit.
+        my $rightType = 0;
+        my @available = ();
+        LOOP: foreach my $cur (@machines) {
+            if ($cur->{enabled} && grep { $neededSystem eq $_ } @{$cur->{systemTypes}}) {
+                $rightType = 1;
 
-            # We have a machine of the right type.  Determine the load on
-            # the machine.
-            my $slot = 0;
-            my $load = 0;
-            my $free;
-            while ($slot < $cur->{maxJobs}) {
-                my $slotLock = openSlotLock($cur, $slot);
-                if (flock($slotLock, LOCK_EX | LOCK_NB)) {
-                    $free = $slot unless defined $free;
-                    flock($slotLock, LOCK_UN) or die;
-                } else {
-                    $load++;
+                # We have a machine of the right type.  Determine the load on
+                # the machine.
+                my $slot = 0;
+                my $load = 0;
+                my $free;
+                while ($slot < $cur->{maxJobs}) {
+                    my $slotLock = openSlotLock($cur, $slot);
+                    if (flock($slotLock, LOCK_EX | LOCK_NB)) {
+                        $free = $slot unless defined $free;
+                        flock($slotLock, LOCK_UN) or die;
+                    } else {
+                        $load++;
+                    }
+                    close $slotLock;
+                    $slot++;
                 }
-                close $slotLock;
-                $slot++;
+                
+                push @available, { machine => $cur, load => $load, free => $free }
+                if $load < $cur->{maxJobs};
             }
-
-            push @available, { machine => $cur, load => $load, free => $free }
-            if $load < $cur->{maxJobs};
         }
-    }
 
-    if (defined $ENV{NIX_DEBUG_HOOK}) {
-        print STDERR "load on " . $_->{machine}->{hostName} . " = " . $_->{load} . "\n"
-            foreach @available;
-    }
-
-
-    # Didn't find any available machine?  Then decline or postpone.
-    if (scalar @available == 0) {
-        # Postpone if we have a machine of the right type, except if the
-        # local system can and wants to do the build.
-        if ($rightType && !$canBuildLocally) {
-            sendReply "postpone";
-            exit 0;
-        } else {
-            decline;
+        if (defined $ENV{NIX_DEBUG_HOOK}) {
+            print STDERR "load on " . $_->{machine}->{hostName} . " = " . $_->{load} . "\n"
+                foreach @available;
         }
-    }
 
 
-    # Prioritise the available machines as follows:
-    # - First by load divided by speed factor, rounded to the nearest
-    #   integer.  This causes fast machines to be preferred over slow
-    #   machines with similar loads.
-    # - Then by speed factor.
-    # - Finally by load.
-    sub lf { my $x = shift; return int($x->{load} / $x->{machine}->{speedFactor} + 0.4999); }
-    @available = sort
-        { lf($a) <=> lf($b)
-              || $b->{machine}->{speedFactor} <=> $a->{machine}->{speedFactor}
-              || $a->{load} <=> $b->{load}
-        } @available;
+        # Didn't find any available machine?  Then decline or postpone.
+        if (scalar @available == 0) {
+            # Postpone if we have a machine of the right type, except
+            # if the local system can and wants to do the build.
+            if ($rightType && !$canBuildLocally) {
+                sendReply "postpone";
+            } else {
+                sendReply "decline";                
+            }
+            close MAINLOCK;
+            next REQ;
+        }
 
 
-    # Select the best available machine and lock a free slot.
-    my $selected = $available[0]; 
-    my $machine = $selected->{machine};
+        # Prioritise the available machines as follows:
+        # - First by load divided by speed factor, rounded to the nearest
+        #   integer.  This causes fast machines to be preferred over slow
+        #   machines with similar loads.
+        # - Then by speed factor.
+        # - Finally by load.
+        sub lf { my $x = shift; return int($x->{load} / $x->{machine}->{speedFactor} + 0.4999); }
+        @available = sort
+            { lf($a) <=> lf($b)
+                  || $b->{machine}->{speedFactor} <=> $a->{machine}->{speedFactor}
+                  || $a->{load} <=> $b->{load}
+            } @available;
 
-    $slotLock = openSlotLock($machine, $selected->{free});
-    flock($slotLock, LOCK_EX | LOCK_NB) or die;
-    utime undef, undef, $slotLock;
 
-    close MAINLOCK;
+        # Select the best available machine and lock a free slot.
+        my $selected = $available[0]; 
+        my $machine = $selected->{machine};
+        
+        $slotLock = openSlotLock($machine, $selected->{free});
+        flock($slotLock, LOCK_EX | LOCK_NB) or die;
+        utime undef, undef, $slotLock;
+
+        close MAINLOCK;
 
 
-    # Connect to the selected machine.
-    @sshOpts = ("-i", $machine->{sshKeys}, "-x");
-    $hostName = $machine->{hostName};
-    last if openSSHConnection $hostName;
+        # Connect to the selected machine.
+        @sshOpts = ("-i", $machine->{sshKeys}, "-x");
+        $hostName = $machine->{hostName};
+        last REQ if openSSHConnection $hostName;
     
-    warn "unable to open SSH connection to $hostName, trying other available machines...\n";
-    $machine->{enabled} = 0;
+        warn "unable to open SSH connection to $hostName, trying other available machines...\n";
+        $machine->{enabled} = 0;
+    }
 }
 
 
 # Tell Nix we've accepted the build.
-sendReply "accept";
-my $x = <STDIN>;
-chomp $x;
-
-if ($x ne "okay") {
-    exit 0;
-}
-
-
 print STDERR "building `$drvPath' on `$hostName'\n";
+sendReply "accept";
+my @inputs = split /\s/, readline(STDIN);
+my @outputs = split /\s/, readline(STDIN);
 
-my @inputs = split /\s/, do { local $/; local @ARGV = "inputs"; <> };
-my @outputs = split /\s/, do { local $/; local @ARGV = "outputs"; <> };
 
 my $maybeSign = "";
 $maybeSign = "--sign" if -e "/nix/etc/nix/signing-key.sec";
@@ -238,7 +237,7 @@ if (system("ssh $hostName @sshOpts -tt 'nix-store -r $drvPath $buildFlags > /dev
     exit $res;
 }
 
-print "build of `$drvPath' on `$hostName' succeeded\n";
+#print "build of `$drvPath' on `$hostName' succeeded\n";
 
 
 # Copy the output from the build machine.
@@ -246,7 +245,8 @@ foreach my $output (@outputs) {
     my $maybeSignRemote = "";
     $maybeSignRemote = "--sign" if $UID != 0;
     
-    system("ssh $hostName @sshOpts 'nix-store --export $maybeSignRemote $output' | @bindir@/nix-store --import > /dev/null") == 0
+    system("ssh $hostName @sshOpts 'nix-store --export $maybeSignRemote $output'" .
+           "| NIX_HELD_LOCKS=$output @bindir@/nix-store --import > /dev/null") == 0
 	or die "cannot copy $output from $hostName: $?";
 }
 
