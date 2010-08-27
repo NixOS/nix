@@ -1327,8 +1327,16 @@ HookReply DerivationGoal::tryBuildHook()
     if (!worker.hook)
         worker.hook = boost::shared_ptr<HookInstance>(new HookInstance);
 
-    writeLine(worker.hook->toHook.writeSide, (format("%1% %2% %3%") %
-        (worker.getNrLocalBuilds() < maxBuildJobs ? "1" : "0") % drv.platform % drvPath).str());
+    /* Tell the hook about system features (beyond the system type)
+       required from the build machine.  (The hook could parse the
+       drv file itself, but this is easier.) */
+    Strings features = tokenizeString(drv.env["requiredSystemFeatures"]);
+    foreach (Strings::iterator, i, features) checkStoreName(*i); /* !!! abuse */
+
+    /* Send the request to the hook. */
+    writeLine(worker.hook->toHook.writeSide, (format("%1% %2% %3% %4%")
+        % (worker.getNrLocalBuilds() < maxBuildJobs ? "1" : "0")
+        % drv.platform % drvPath % concatStringsSep(",", features)).str());
 
     /* Read the first line of input, which should be a word indicating
        whether the hook wishes to perform the build. */

@@ -280,6 +280,11 @@ MakeError(Interrupted, BaseError)
 Strings tokenizeString(const string & s, const string & separators = " \t\n\r");
 
 
+/* Concatenate the given strings with a separator between the
+   elements. */
+string concatStringsSep(const string & sep, const Strings & ss);
+
+
 /* Convert the exit status of a child as returned by wait() into an
    error string. */
 string statusToString(int status);

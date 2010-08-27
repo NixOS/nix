@@ -966,6 +966,17 @@ Strings tokenizeString(const string & s, const string & separators)
 }
 
 
+string concatStringsSep(const string & sep, const Strings & ss)
+{
+    string s;
+    foreach (Strings::const_iterator, i, ss) {
+        if (s.size() != 0) s += sep;
+        s += *i;
+    }
+    return s;
+}
+
+
 string statusToString(int status)
 {
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {

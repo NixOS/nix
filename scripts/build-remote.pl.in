@@ -36,6 +36,8 @@ sub sendReply {
     print STDERR "# $reply\n";
 }
 
+sub all { $_ || return 0 for @_; 1 }
+
 
 # Initialisation.
 my $loadIncreased = 0;
@@ -64,13 +66,14 @@ if (defined $conf && -e $conf) {
         chomp;
         s/\#.*$//g;
         next if /^\s*$/;
-        /^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\d+)(\s+([0-9\.]+))?\s*$/ or die;
+        my @tokens = split /\s/, $_;
         push @machines,
-            { hostName => $1
-            , systemTypes => [split(/,/, $2)]
-            , sshKeys => $3
-            , maxJobs => $4
-            , speedFactor => 1.0 * ($6 || 1)
+            { hostName => $tokens[0]
+            , systemTypes => [ split(/,/, $tokens[1]) ]
+            , sshKeys => $tokens[2]
+            , maxJobs => int($tokens[3])
+            , speedFactor => 1.0 * (defined $tokens[4] ? int($tokens[4]) : 1)
+            , features => [ split(/,/, $tokens[5] || "") ]
             , enabled => 1
             };
     }
@@ -85,7 +88,8 @@ my ($drvPath, $hostName, $slotLock);
 REQ: while (1) {
     $_ = <STDIN> || exit 0;
     my ($amWilling, $neededSystem);
-    ($amWilling, $neededSystem, $drvPath) = split;
+    ($amWilling, $neededSystem, $drvPath, $requiredFeatures) = split;
+    my @requiredFeatures = split /,/, $requiredFeatures;
 
     my $canBuildLocally = $amWilling && ($localSystem eq $neededSystem);
 
@@ -103,12 +107,15 @@ REQ: while (1) {
     
     while (1) {
         # Find all machine that can execute this build, i.e., that
-        # support builds for the given platform and are not at their
-        # job limit.
+        # support builds for the given platform and features, and are
+        # not at their job limit.
         my $rightType = 0;
         my @available = ();
         LOOP: foreach my $cur (@machines) {
-            if ($cur->{enabled} && grep { $neededSystem eq $_ } @{$cur->{systemTypes}}) {
+            if ($cur->{enabled}
+                && (grep { $neededSystem eq $_ } @{$cur->{systemTypes}})
+                && all(map { my $f = $_; 0 != grep { $f eq $_ } @{$cur->{features}} } @requiredFeatures))
+            {
                 $rightType = 1;
 
                 # We have a machine of the right type.  Determine the load on
