@@ -127,7 +127,7 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
        Instead of reading all the roots, it would be more efficient to
        check if the root is in a directory in or linked from the
        gcroots directory. */
-    if (queryBoolSetting("gc-check-reachability", true)) {
+    if (queryBoolSetting("gc-check-reachability", false)) {
         Roots roots = store->findRoots();
         if (roots.find(gcRoot) == roots.end())
             printMsg(lvlError, 
