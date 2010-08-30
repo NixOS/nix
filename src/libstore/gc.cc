@@ -136,7 +136,7 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
                     "therefore, `%2%' might be removed by the garbage collector")
                 % gcRoot % storePath);
     }
-        
+
     /* Grab the global GC root, causing us to block while a GC is in
        progress.  This prevents the set of permanent roots from
        increasing while a GC is in progress. */

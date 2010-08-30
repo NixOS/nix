@@ -626,6 +626,9 @@ struct HookInstance
     /* Pipe for the hook's standard output/error. */
     Pipe fromHook;
 
+    /* Pipe for the builder's standard output/error. */
+    Pipe builderOut;
+    
     /* The process ID of the hook. */
     Pid pid;
 
@@ -647,6 +650,9 @@ HookInstance::HookInstance()
     /* Create the communication pipes. */
     toHook.create();
 
+    /* Create a pipe to get the output of the builder. */
+    builderOut.create();
+
     /* Fork the hook. */
     pid = fork();
     switch (pid) {
@@ -666,6 +672,11 @@ HookInstance::HookInstance()
             if (dup2(toHook.readSide, STDIN_FILENO) == -1)
                 throw SysError("dupping to-hook read side");
 
+            /* Use fd 4 for the builder's stdout/stderr. */
+            builderOut.readSide.close();
+            if (dup2(builderOut.writeSide, 4) == -1)
+                throw SysError("dupping builder's stdout/stderr");
+            
             execl(buildHook.c_str(), buildHook.c_str(), thisSystem.c_str(),
                 (format("%1%") % maxSilentTime).str().c_str(), NULL);
             
@@ -740,7 +751,7 @@ private:
     AutoCloseFD fdLogFile;
 
     /* Pipe for the builder's standard output/error. */
-    Pipe logPipe;
+    Pipe builderOut;
 
     /* The build hook. */
     boost::shared_ptr<HookInstance> hook;
@@ -1208,7 +1219,11 @@ void DerivationGoal::buildDone()
     worker.childTerminated(savedPid);
     
     /* Close the read side of the logger pipe. */
-    logPipe.readSide.close();
+    if (hook) {
+        hook->builderOut.readSide.close();
+        hook->fromHook.readSide.close();
+    }
+    else builderOut.readSide.close();
 
     /* Close the log file. */
     fdLogFile.close();
@@ -1387,9 +1402,11 @@ HookReply DerivationGoal::tryBuildHook()
 
     /* Create the log file and pipe. */
     Path logFile = openLogFile();
-    
-    worker.childStarted(shared_from_this(),
-        hook->pid, singleton<set<int> >(hook->fromHook.readSide), false, false);
+
+    set<int> fds;
+    fds.insert(hook->fromHook.readSide);
+    fds.insert(hook->builderOut.readSide);
+    worker.childStarted(shared_from_this(), hook->pid, fds, false, false);
     
     if (printBuildTrace)
         printMsg(lvlError, format("@ build-started %1% %2% %3% %4%")
@@ -1679,8 +1696,8 @@ void DerivationGoal::startBuilder()
     /* Create the log file. */
     Path logFile = openLogFile();
     
-    /* Create a pipe to get the output of the child. */
-    logPipe.create();
+    /* Create a pipe to get the output of the builder. */
+    builderOut.create();
 
     /* Fork a child to build the package.  Note that while we
        currently use forks to run and wait for the children, it
@@ -1732,7 +1749,7 @@ void DerivationGoal::startBuilder()
             }
 #endif
             
-            commonChildInit(logPipe);
+            commonChildInit(builderOut);
     
             if (chdir(tmpDir.c_str()) == -1)
                 throw SysError(format("changing into `%1%'") % tmpDir);
@@ -1816,9 +1833,9 @@ void DerivationGoal::startBuilder()
     
     /* parent */
     pid.setSeparatePG(true);
-    logPipe.writeSide.close();
+    builderOut.writeSide.close();
     worker.childStarted(shared_from_this(), pid,
-        singleton<set<int> >(logPipe.readSide), true, true);
+        singleton<set<int> >(builderOut.readSide), true, true);
 
     if (printBuildTrace) {
         printMsg(lvlError, format("@ build-started %1% %2% %3% %4%")
@@ -2008,7 +2025,8 @@ void DerivationGoal::handleChildOutput(int fd, const string & data)
 {
     if (verbosity >= buildVerbosity)
         writeToStderr((unsigned char *) data.c_str(), data.size());
-    if (fdLogFile != -1)
+    if ((hook && fd == hook->builderOut.readSide) ||
+        (!hook && fd == builderOut.readSide))
         writeFull(fdLogFile, (unsigned char *) data.c_str(), data.size());
 }
 

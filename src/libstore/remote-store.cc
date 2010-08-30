@@ -97,10 +97,6 @@ void RemoteStore::forkSlave()
     if (worker == "")
         worker = nixBinDir + "/nix-worker";
 
-    string verbosityArg = "-";
-    for (int i = 1; i < verbosity; ++i)
-        verbosityArg += "v";
-
     child = fork();
     
     switch (child) {
@@ -120,10 +116,7 @@ void RemoteStore::forkSlave()
             close(fdSocket);
             close(fdChild);
 
-            execlp(worker.c_str(), worker.c_str(), "--slave",
-                /* hacky - must be at the end */
-                verbosityArg == "-" ? NULL : verbosityArg.c_str(),
-                NULL);
+            execlp(worker.c_str(), worker.c_str(), "--slave", NULL);
 
             throw SysError(format("executing `%1%'") % worker);
             

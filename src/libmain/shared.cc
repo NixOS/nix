@@ -196,17 +196,16 @@ static void initAndRun(int argc, char * * argv)
     remaining.clear();
 
     /* Process default options. */
+    int verbosityDelta = 0;
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
         string arg = *i;
-        if (arg == "--verbose" || arg == "-v")
-            verbosity = (Verbosity) ((int) verbosity + 1);
+        if (arg == "--verbose" || arg == "-v") verbosityDelta++;
+        else if (arg == "--quiet") verbosityDelta--;
         else if (arg == "--log-type") {
             ++i;
             if (i == args.end()) throw UsageError("`--log-type' requires an argument");
             setLogType(*i);
         }
-        else if (arg == "--build-output" || arg == "-B")
-            ; /* !!! obsolete - remove eventually */
         else if (arg == "--no-build-output" || arg == "-Q")
             buildVerbosity = lvlVomit;
         else if (arg == "--print-build-trace")
@@ -247,6 +246,9 @@ static void initAndRun(int argc, char * * argv)
         else remaining.push_back(arg);
     }
 
+    verbosityDelta += queryIntSetting("verbosity", lvlInfo);
+    verbosity = (Verbosity) (verbosityDelta < 0 ? 0 : verbosityDelta);
+    
     /* Automatically clean up the temporary roots file when we
        exit. */
     RemoveTempRoots removeTempRoots __attribute__((unused));

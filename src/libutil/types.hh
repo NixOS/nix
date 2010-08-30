@@ -63,7 +63,7 @@ typedef set<Path> PathSet;
 
  
 typedef enum { 
-    lvlError,
+    lvlError = 0,
     lvlInfo,
     lvlTalkative,
     lvlChatty,
