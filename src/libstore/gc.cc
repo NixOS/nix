@@ -1,6 +1,5 @@
 #include "globals.hh"
 #include "misc.hh"
-#include "pathlocks.hh"
 #include "local-store.hh"
 
 #include <boost/shared_ptr.hpp>
@@ -31,7 +30,7 @@ static const int defaultGcLevel = 1000;
    read.  To be precise: when they try to create a new temporary root
    file, they will block until the garbage collector has finished /
    yielded the GC lock. */
-static int openGCLock(LockType lockType)
+int LocalStore::openGCLock(LockType lockType)
 {
     Path fnGCLock = (format("%1%/%2%")
         % nixStateDir % gcLockName).str();

@@ -1226,27 +1226,25 @@ void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFr
 
 void LocalStore::verifyStore(bool checkContents)
 {
-    /* Check whether all valid paths actually exist. */
-    printMsg(lvlInfo, "checking path existence");
+    printMsg(lvlError, format("reading the Nix store..."));
 
-    PathSet validPaths2 = queryValidPaths(), validPaths;
+    /* Acquire the global GC lock to prevent a garbage collection. */
+    AutoCloseFD fdGCLock = openGCLock(ltWrite);
     
-    foreach (PathSet::iterator, i, validPaths2) {
-        checkInterrupt();
-        /* !!! invalidatePath() will probably fail due to the foreign
-           key constraints on the Ref table. */
-        if (!isStorePath(*i)) {
-            printMsg(lvlError, format("path `%1%' is not in the Nix store") % *i);
-            invalidatePath(*i);
-        } else if (!pathExists(*i)) {
-            printMsg(lvlError, format("path `%1%' disappeared") % *i);
-            invalidatePath(*i);
-        } else validPaths.insert(*i);
-    }
+    Paths entries = readDirectory(nixStore);
+    PathSet store(entries.begin(), entries.end());
+
+    /* Check whether all valid paths actually exist. */
+    printMsg(lvlInfo, "checking path existence...");
+
+    PathSet validPaths2 = queryValidPaths(), validPaths, done;
+
+    foreach (PathSet::iterator, i, validPaths2)
+        verifyPath(*i, store, done, validPaths);
 
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {
-        printMsg(lvlInfo, "checking hashes");
+        printMsg(lvlInfo, "checking hashes...");
 
         foreach (PathSet::iterator, i, validPaths) {
             ValidPathInfo info = queryPathInfo(*i);
@@ -1261,6 +1259,45 @@ void LocalStore::verifyStore(bool checkContents)
             }
         }
     }
+}
+
+
+void LocalStore::verifyPath(const Path & path, const PathSet & store,
+    PathSet & done, PathSet & validPaths)
+{
+    checkInterrupt();
+    
+    if (done.find(path) != done.end()) return;
+    done.insert(path);
+
+    if (!isStorePath(path)) {
+        printMsg(lvlError, format("path `%1%' is not in the Nix store") % path);
+        invalidatePath(path);
+        return;
+    }
+
+    if (store.find(baseNameOf(path)) == store.end()) {
+        /* Check any referrers first.  If we can invalidate them
+           first, then we can invalidate this path as well. */
+        bool canInvalidate = true;
+        PathSet referrers; queryReferrers(path, referrers);
+        foreach (PathSet::iterator, i, referrers)
+            if (*i != path) {
+                verifyPath(*i, store, done, validPaths);
+                if (validPaths.find(*i) != validPaths.end())
+                    canInvalidate = false;
+            }
+
+        if (canInvalidate) {
+            printMsg(lvlError, format("path `%1%' disappeared, removing from database...") % path);
+            invalidatePath(path);
+        } else
+            printMsg(lvlError, format("path `%1%' disappeared, but it still has valid referrers!") % path);
+        
+        return;
+    }
+    
+    validPaths.insert(path);
 }
 
 
