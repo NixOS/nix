@@ -678,7 +678,9 @@ HookInstance::HookInstance()
                 throw SysError("dupping builder's stdout/stderr");
             
             execl(buildHook.c_str(), buildHook.c_str(), thisSystem.c_str(),
-                (format("%1%") % maxSilentTime).str().c_str(), NULL);
+                (format("%1%") % maxSilentTime).str().c_str(),
+                (format("%1%") % printBuildTrace).str().c_str(),
+                NULL);
             
             throw SysError(format("executing `%1%'") % buildHook);
             
@@ -1362,7 +1364,8 @@ HookReply DerivationGoal::tryBuildHook()
             reply = string(s, 2);
             break;
         }
-        handleChildOutput(worker.hook->fromHook.readSide, s + "\n");
+        s += "\n";
+        writeToStderr((unsigned char *) s.c_str(), s.size());
     }
 
     debug(format("hook reply is `%1%'") % reply);
@@ -2023,11 +2026,16 @@ void DerivationGoal::deleteTmpDir(bool force)
 
 void DerivationGoal::handleChildOutput(int fd, const string & data)
 {
-    if (verbosity >= buildVerbosity)
-        writeToStderr((unsigned char *) data.c_str(), data.size());
     if ((hook && fd == hook->builderOut.readSide) ||
         (!hook && fd == builderOut.readSide))
+    {
+        if (verbosity >= buildVerbosity)
+            writeToStderr((unsigned char *) data.c_str(), data.size());
         writeFull(fdLogFile, (unsigned char *) data.c_str(), data.size());
+    }
+
+    if (hook && fd == hook->fromHook.readSide)
+        writeToStderr((unsigned char *) data.c_str(), data.size());
 }
 
 

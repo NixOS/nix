@@ -42,7 +42,7 @@ sub all { $_ || return 0 for @_; 1 }
 # Initialisation.
 my $loadIncreased = 0;
 
-my ($localSystem, $maxSilentTime) = @ARGV;
+my ($localSystem, $maxSilentTime, $printBuildTrace) = @ARGV;
 $maxSilentTime = 0 unless defined $maxSilentTime;
 
 my $currentLoad = $ENV{"NIX_CURRENT_LOAD"};
@@ -197,10 +197,13 @@ REQ: while (1) {
 
 
 # Tell Nix we've accepted the build.
-print STDERR "building `$drvPath' on `$hostName'\n";
 sendReply "accept";
 my @inputs = split /\s/, readline(STDIN);
 my @outputs = split /\s/, readline(STDIN);
+
+
+print STDERR "building `$drvPath' on `$hostName'\n";
+print STDERR "@ build-remote $drvPath $hostName\n" if $printBuildTrace;
 
 
 my $maybeSign = "";
