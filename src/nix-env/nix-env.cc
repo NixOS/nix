@@ -270,7 +270,6 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
                     d = j->first.system == k->second.first.system ? 0 :
                         j->first.system == thisSystem ? 1 :
                         k->second.first.system == thisSystem ? -1 : 0;
-                    printMsg(lvlError, format("%1% %2% %3% %4%") % j->first.system % k->second.first.system % thisSystem % d);
                     if (d == 0)
                         d = comparePriorities(state, j->first, k->second.first);
                     if (d == 0)
