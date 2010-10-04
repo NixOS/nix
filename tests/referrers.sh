@@ -3,7 +3,7 @@ source common.sh
 # This takes way to long on Cygwin (because process creation is so slow...).
 if test "$system" = i686-cygwin; then exit 0; fi
 
-max=2500
+max=1000
 
 reference=$NIX_STORE_DIR/abcdef
 touch $reference
