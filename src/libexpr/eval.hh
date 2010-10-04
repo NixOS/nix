@@ -5,6 +5,7 @@
 
 #include "nixexpr.hh"
 #include "symbol-table.hh"
+#include "hash.hh"
 
 typedef union _ATermList * ATermList;
 
@@ -12,7 +13,6 @@ typedef union _ATermList * ATermList;
 namespace nix {
 
 
-class Hash;
 class EvalState;
 struct Env;
 struct Value;

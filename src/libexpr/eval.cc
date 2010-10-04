@@ -39,7 +39,7 @@ std::ostream & operator << (std::ostream & str, const Value & v)
         str << v.path; // !!! escaping?
         break;
     case tNull:
-        str << "true";
+        str << "null";
         break;
     case tAttrs: {
         str << "{ ";
