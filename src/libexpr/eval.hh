@@ -5,12 +5,12 @@
 
 #include "nixexpr.hh"
 #include "symbol-table.hh"
+#include "hash.hh"
 
 
 namespace nix {
 
 
-class Hash;
 class EvalState;
 struct Env;
 struct Value;
