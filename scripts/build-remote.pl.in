@@ -4,6 +4,7 @@ use Fcntl ':flock';
 use English '-no_match_vars';
 use IO::Handle;
 use ssh qw/sshOpts openSSHConnection/;
+no warnings('once');
 
 
 # General operation:
@@ -230,12 +231,15 @@ system("NIX_SSHOPTS=\"@sshOpts\" @bindir@/nix-copy-closure $hostName $maybeSign 
 # Perform the build.
 my $buildFlags = "--max-silent-time $maxSilentTime --fallback --add-root $rootsDir/\$PPID.out --option verbosity 0";
 
-# `-tt' forces allocation of a pseudo-terminal.  This is required to
-# make the remote nix-store process receive a signal when the
-# connection dies.  Without it, the remote process might continue to
-# run indefinitely (that is, until it next tries to write to
-# stdout/stderr).
-if (system("ssh $hostName @sshOpts -tt 'nix-store -r $drvPath $buildFlags > /dev/null' >&4") != 0) {
+# We let the remote side kill its process group when the connection is
+# closed unexpectedly.  This is necessary to ensure that no processes
+# are left running on the remote system if the local Nix process is
+# killed.  (SSH itself doesn't kill child processes if the connection
+# is interrupted unless the `-tt' flag is used to force a pseudo-tty,
+# in which case every child receives SIGHUP; however, `-tt' doesn't
+# work on some platforms when connection sharing is used.)
+pipe STDIN, DUMMY; # make sure we have a readable STDIN
+if (system("ssh $hostName @sshOpts '(read; kill -INT -\$\$) <&0 & nix-store -r $drvPath $buildFlags > /dev/null' 2>&4") != 0) {
     # If we couldn't run ssh or there was an ssh problem (indicated by
     # exit code 255), then we return exit code 1; otherwise we assume
     # that the builder failed, which we indicate to Nix using exit
