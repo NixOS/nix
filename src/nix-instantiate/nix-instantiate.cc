@@ -1,6 +1,3 @@
-#include <map>
-#include <iostream>
-
 #include "globals.hh"
 #include "shared.hh"
 #include "eval.hh"
@@ -12,6 +9,9 @@
 #include "store-api.hh"
 #include "common-opts.hh"
 #include "help.txt.hh"
+
+#include <map>
+#include <iostream>
 
 
 using namespace nix;

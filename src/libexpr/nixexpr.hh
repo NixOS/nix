@@ -1,9 +1,9 @@
 #ifndef __NIXEXPR_H
 #define __NIXEXPR_H
 
-#include <map>
-
 #include "symbol-table.hh"
+
+#include <map>
 
 
 namespace nix {

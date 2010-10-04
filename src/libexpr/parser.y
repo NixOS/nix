@@ -15,10 +15,6 @@
    stuff.  So allow it to be excluded. */
 #ifndef BISON_HEADER_HACK
 #define BISON_HEADER_HACK
-    
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include "util.hh"
     
@@ -27,6 +23,10 @@
 #include "parser-tab.hh"
 #include "lexer-tab.hh"
 #define YYSTYPE YYSTYPE // workaround a bug in Bison 2.4
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 
 using namespace nix;
@@ -480,8 +480,6 @@ Expr * parseExprFromFile(EvalState & state, Path path)
     }
 
     /* If `path' refers to a directory, append `/default.nix'. */
-    if (stat(path.c_str(), &st))
-        throw SysError(format("getting status of `%1%'") % path);
     if (S_ISDIR(st.st_mode))
         path = canonPath(path + "/default.nix");
 

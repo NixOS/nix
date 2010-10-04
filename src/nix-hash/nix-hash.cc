@@ -1,8 +1,8 @@
-#include <iostream>
-
 #include "hash.hh"
 #include "shared.hh"
 #include "help.txt.hh"
+
+#include <iostream>
 
 
 using namespace nix;

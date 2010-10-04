@@ -1,10 +1,10 @@
 #ifndef __ATTR_PATH_H
 #define __ATTR_PATH_H
 
+#include "eval.hh"
+
 #include <string>
 #include <map>
-
-#include "eval.hh"
 
 
 namespace nix {

@@ -1,11 +1,11 @@
 #ifndef __EVAL_H
 #define __EVAL_H
 
-#include <map>
-
 #include "nixexpr.hh"
 #include "symbol-table.hh"
 #include "hash.hh"
+
+#include <map>
 
 
 namespace nix {
