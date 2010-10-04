@@ -482,7 +482,16 @@ void printMsg_(Verbosity level, const format & f)
     else if (logType == ltEscapes && level != lvlInfo)
         prefix = "\033[" + escVerbosity(level) + "s";
     string s = (format("%1%%2%\n") % prefix % f.str()).str();
-    writeToStderr((const unsigned char *) s.c_str(), s.size());
+    try {
+        writeToStderr((const unsigned char *) s.c_str(), s.size());
+    } catch (SysError & e) {
+        /* Ignore failing writes to stderr if we're in an exception
+           handler, otherwise throw an exception.  We need to ignore
+           write errors in exception handlers to ensure that cleanup
+           code runs to completion if the other side of stderr has
+           been closed unexpectedly. */
+        if (!std::uncaught_exception()) throw;
+    }
 }
 
 
