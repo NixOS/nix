@@ -298,11 +298,10 @@ void LocalStore::openDB(bool create)
     if (sqlite3_exec(db, ("pragma synchronous = " + syncMode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
         throw SQLiteError(db, "setting synchronous mode");
 
-    /* Set the SQLite journal mode.  The default is write-ahead
-       logging since it's the fastest and supports more concurrency.
-       The downside is that it doesn't work over NFS, so allow
-       truncate mode alternatively. */
-    string mode = queryBoolSetting("use-sqlite-wal", true) ? "wal" : "truncate";
+    /* Set the SQLite journal mode.  WAL mode is fastest, but doesn't
+       seem entirely stable at the moment (Oct. 2010).  Thus, use
+       truncate mode by default. */
+    string mode = queryBoolSetting("use-sqlite-wal", false) ? "wal" : "truncate";
     string prevMode;
     {
         SQLiteStmt stmt;
@@ -1220,6 +1219,8 @@ void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFr
 
     assertStorePath(path);
 
+    SQLiteTxn txn(db);
+
     if (isValidPath(path)) {
         PathSet referrers; queryReferrers(path, referrers);
         referrers.erase(path); /* ignore self-references */
@@ -1230,6 +1231,8 @@ void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFr
     }
 
     deletePathWrapped(path, bytesFreed, blocksFreed);
+
+    txn.commit();
 }
 
 

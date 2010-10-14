@@ -421,7 +421,7 @@ struct LocalStore::GCState
 };
 
 
-static bool doDelete(GCOptions::GCAction action)
+static bool shouldDelete(GCOptions::GCAction action)
 {
     return action == GCOptions::gcDeleteDead
         || action == GCOptions::gcDeleteSpecific;
@@ -438,6 +438,8 @@ bool LocalStore::isActiveTempFile(const GCState & state,
     
 bool LocalStore::tryToDelete(GCState & state, const Path & path)
 {
+    checkInterrupt();
+    
     if (!pathExists(path)) return true;
     if (state.deleted.find(path) != state.deleted.end()) return true;
     if (state.live.find(path) != state.live.end()) return false;
@@ -516,7 +518,7 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
     }
 
     /* The path is garbage, so delete it. */
-    if (doDelete(state.options.action)) {
+    if (shouldDelete(state.options.action)) {
         printMsg(lvlInfo, format("deleting `%1%'") % path);
 
         unsigned long long bytesFreed, blocksFreed;
@@ -625,7 +627,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         vector<Path> entries_(entries.begin(), entries.end());
         random_shuffle(entries_.begin(), entries_.end());
 
-        if (doDelete(state.options.action))
+        if (shouldDelete(state.options.action))
             printMsg(lvlError, format("deleting garbage..."));
         else
             printMsg(lvlError, format("determining live/dead paths..."));
