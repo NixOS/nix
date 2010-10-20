@@ -8,6 +8,9 @@
 
 #include <cstring>
 
+#include <gc/gc.h>
+#include <gc/gc_cpp.h>
+
 
 #define LocalNoInline(f) static f __attribute__((noinline)); f
 #define LocalNoInlineNoReturn(f) static f __attribute__((noinline, noreturn)); f
@@ -147,7 +150,7 @@ void EvalState::addPrimOp(const string & name,
     v.type = tPrimOp;
     v.primOp.arity = arity;
     v.primOp.fun = primOp;
-    v.primOp.name = strdup(name2.c_str());
+    v.primOp.name = GC_strdup(name2.c_str());
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     (*baseEnv.values[0].attrs)[symbols.create(name2)].value = v;
@@ -218,7 +221,7 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, 
 void mkString(Value & v, const char * s)
 {
     v.type = tString;
-    v.string.s = strdup(s);
+    v.string.s = GC_strdup(s);
     v.string.context = 0;
 }
 
@@ -228,9 +231,10 @@ void mkString(Value & v, const string & s, const PathSet & context)
     mkString(v, s.c_str());
     if (!context.empty()) {
         unsigned int n = 0;
-        v.string.context = new const char *[context.size() + 1];
+        v.string.context = (const char * *)
+            GC_malloc((context.size() + 1) * sizeof(char *));
         foreach (PathSet::const_iterator, i, context) 
-            v.string.context[n++] = strdup(i->c_str());
+            v.string.context[n++] = GC_strdup(i->c_str());
         v.string.context[n] = 0;
     }
 }
@@ -239,7 +243,7 @@ void mkString(Value & v, const string & s, const PathSet & context)
 void mkPath(Value & v, const char * s)
 {
     v.type = tPath;
-    v.path = strdup(s);
+    v.path = GC_strdup(s);
 }
 
 
@@ -264,7 +268,7 @@ Value * EvalState::lookupVar(Env * env, const VarRef & var)
 Value * EvalState::allocValues(unsigned int count)
 {
     nrValues += count;
-    return new Value[count]; // !!! check destructor
+    return (Value *) GC_MALLOC(count * sizeof(Value));
 }
 
 
@@ -272,7 +276,7 @@ Env & EvalState::allocEnv(unsigned int size)
 {
     nrEnvs++;
     nrValuesInEnvs += size;
-    Env * env = (Env *) malloc(sizeof(Env) + size * sizeof(Value));
+    Env * env = (Env *) GC_MALLOC(sizeof(Env) + size * sizeof(Value));
     return *env;
 }
 
@@ -281,7 +285,7 @@ void EvalState::mkList(Value & v, unsigned int length)
 {
     v.type = tList;
     v.list.length = length;
-    v.list.elems = new Value *[length];
+    v.list.elems = (Value * *) GC_MALLOC(length * sizeof(Value *));
     nrListElems += length;
 }
 
@@ -289,7 +293,7 @@ void EvalState::mkList(Value & v, unsigned int length)
 void EvalState::mkAttrs(Value & v)
 {
     v.type = tAttrs;
-    v.attrs = new Bindings;
+    v.attrs = new (UseGC) Bindings;
 }
 
 
@@ -1089,6 +1093,7 @@ void EvalState::printStats()
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
     Verbosity v = showStats ? lvlInfo : lvlDebug;
     printMsg(v, "evaluation statistics:");
+    printMsg(v, format("  size of a value: %1%") % sizeof(Value));
     printMsg(v, format("  expressions evaluated: %1%") % nrEvaluated);
     printMsg(v, format("  stack space used: %1% bytes") % (&x - deepestStack));
     printMsg(v, format("  max eval() nesting depth: %1%") % maxRecursionDepth);

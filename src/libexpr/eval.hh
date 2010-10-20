@@ -7,6 +7,8 @@
 
 #include <map>
 
+#include <gc/gc_allocator.h>
+
 
 namespace nix {
 
@@ -16,7 +18,7 @@ struct Env;
 struct Value;
 struct Attr;
 
-typedef std::map<Symbol, Attr> Bindings;
+typedef std::map<Symbol, Attr, std::less<Symbol>, gc_allocator<std::pair<const Symbol, Attr> > > Bindings;
 
 
 typedef enum {
@@ -313,6 +315,7 @@ private:
     char * deepestStack; /* for measuring stack usage */
     
     friend class RecursionCounter;
+    friend class ExprOpUpdate;
 };
 
 
