@@ -119,6 +119,7 @@ EvalState::EvalState()
 {
     nrEnvs = nrValuesInEnvs = nrValues = nrListElems = 0;
     nrEvaluated = recursionDepth = maxRecursionDepth = 0;
+    nrAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
     deepestStack = (char *) -1;
 
     createBaseEnv();
@@ -294,6 +295,7 @@ void EvalState::mkAttrs(Value & v)
 {
     v.type = tAttrs;
     v.attrs = new (UseGC) Bindings;
+    nrAttrsets++;
 }
 
 
@@ -758,6 +760,8 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
     state.evalAttrs(env, e1, v1);
     state.evalAttrs(env, e2, v2);
 
+    state.nrOpUpdates++;
+
     if (v1.attrs->size() == 0) { v = v2; return; }
     if (v2.attrs->size() == 0) { v = v1; return; }
 
@@ -768,6 +772,8 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
         mkCopy(a.value, i->second.value);
         a.pos = i->second.pos;
     }
+
+    state.nrOpUpdateValuesCopied += v.attrs->size();
 }
 
 
@@ -1107,6 +1113,9 @@ void EvalState::printStats()
         % nrListElems % (nrListElems * sizeof(Value *)));
     printMsg(v, format("  misc. values allocated: %1% (%2% bytes)")
         % nrValues % (nrValues * sizeof(Value)));
+    printMsg(v, format("  attribute sets allocated: %1%") % nrAttrsets);
+    printMsg(v, format("  right-biased unions: %1%") % nrOpUpdates);
+    printMsg(v, format("  values copied in right-biased unions: %1%") % nrOpUpdateValuesCopied);
     printMsg(v, format("  symbols in symbol table: %1%") % symbols.size());
 }
 
