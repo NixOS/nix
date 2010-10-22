@@ -4,7 +4,7 @@ nix_instantiate_SOURCES = nix-instantiate.cc help.txt
 nix_instantiate_LDADD = ../libmain/libmain.la ../libexpr/libexpr.la \
  ../libstore/libstore.la ../libutil/libutil.la \
  ../boost/format/libformat.la @ADDITIONAL_NETWORK_LIBS@ \
- -L/home/eelco/Dev/nix/boehmgc/lib -lgc
+ @boehmgc_lib@
 
 nix-instantiate.o: help.txt.hh
 
@@ -13,6 +13,4 @@ nix-instantiate.o: help.txt.hh
 
 AM_CXXFLAGS = \
  -I$(srcdir)/.. -I$(srcdir)/../libutil -I$(srcdir)/../libstore \
- -I$(srcdir)/../libexpr -I$(srcdir)/../libmain -I../libexpr \
- -I/home/eelco/Dev/nix/boehmgc/include
-
+ -I$(srcdir)/../libexpr -I$(srcdir)/../libmain -I../libexpr

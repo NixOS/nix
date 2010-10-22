@@ -5,7 +5,7 @@ nix_env_SOURCES = nix-env.cc profiles.cc profiles.hh user-env.cc user-env.hh hel
 nix_env_LDADD = ../libmain/libmain.la ../libexpr/libexpr.la \
  ../libstore/libstore.la ../libutil/libutil.la \
  ../boost/format/libformat.la @ADDITIONAL_NETWORK_LIBS@ \
- -L/home/eelco/Dev/nix/boehmgc/lib -lgc
+ @boehmgc_lib@
 
 nix-env.o: help.txt.hh
 
@@ -15,5 +15,4 @@ nix-env.o: help.txt.hh
 AM_CXXFLAGS = \
  -I$(srcdir)/.. \
  -I$(srcdir)/../libutil -I$(srcdir)/../libstore \
- -I$(srcdir)/../libexpr -I$(srcdir)/../libmain -I../libexpr \
- -I/home/eelco/Dev/nix/boehmgc/include
+ -I$(srcdir)/../libexpr -I$(srcdir)/../libmain -I../libexpr

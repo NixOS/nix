@@ -7,7 +7,9 @@
 
 #include <map>
 
+#if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>
+#endif
 
 
 namespace nix {
@@ -18,7 +20,11 @@ struct Env;
 struct Value;
 struct Attr;
 
+#if HAVE_BOEHMGC
 typedef std::map<Symbol, Attr, std::less<Symbol>, gc_allocator<std::pair<const Symbol, Attr> > > Bindings;
+#else
+typedef std::map<Symbol, Attr> Bindings;
+#endif
 
 
 typedef enum {

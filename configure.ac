@@ -250,6 +250,19 @@ AC_SUBST(bzip2_bin)
 AC_SUBST(bzip2_bin_test)
 
 
+# Whether to use the Boehm garbage collector.
+AC_ARG_WITH(boehm-gc, AC_HELP_STRING([--with-boehm-gc=PATH],
+  [prefix of the Boehm GC package to enable garbage collection in the Nix expression evaluator]),
+  boehmgc=$withval, boehmgc=)
+if test -n "$boehmgc"; then
+  boehmgc_lib="-L$boehmgc/lib -lgc"
+  CXXFLAGS="-I$boehmgc/include $CXXFLAGS"
+  AC_DEFINE(HAVE_BOEHMGC, 1, [Whether to use the Boehm garbage collector.])
+fi
+AC_SUBST(boehmgc_lib)
+AC_SUBST(boehmgc_include)
+  
+
 AC_ARG_ENABLE(init-state, AC_HELP_STRING([--disable-init-state],
   [do not initialise DB etc. in `make install']),
   init_state=$enableval, init_state=yes)

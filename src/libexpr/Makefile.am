@@ -20,8 +20,7 @@ EXTRA_DIST = lexer.l parser.y
 
 AM_CXXFLAGS = \
  -I$(srcdir)/.. \
- -I$(srcdir)/../libutil -I$(srcdir)/../libstore \
- -I/home/eelco/Dev/nix/boehmgc/include
+ -I$(srcdir)/../libutil -I$(srcdir)/../libstore
 
 
 # Parser generation.

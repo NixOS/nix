@@ -8,8 +8,17 @@
 
 #include <cstring>
 
+#if HAVE_BOEHMGC
+
 #include <gc/gc.h>
 #include <gc/gc_cpp.h>
+
+#else
+
+#define GC_STRDUP strdup
+#define GC_MALLOC malloc
+
+#endif
 
 
 #define LocalNoInline(f) static f __attribute__((noinline)); f
@@ -151,7 +160,7 @@ void EvalState::addPrimOp(const string & name,
     v.type = tPrimOp;
     v.primOp.arity = arity;
     v.primOp.fun = primOp;
-    v.primOp.name = GC_strdup(name2.c_str());
+    v.primOp.name = GC_STRDUP(name2.c_str());
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     (*baseEnv.values[0].attrs)[symbols.create(name2)].value = v;
@@ -222,7 +231,7 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, 
 void mkString(Value & v, const char * s)
 {
     v.type = tString;
-    v.string.s = GC_strdup(s);
+    v.string.s = GC_STRDUP(s);
     v.string.context = 0;
 }
 
@@ -233,9 +242,9 @@ void mkString(Value & v, const string & s, const PathSet & context)
     if (!context.empty()) {
         unsigned int n = 0;
         v.string.context = (const char * *)
-            GC_malloc((context.size() + 1) * sizeof(char *));
+            GC_MALLOC((context.size() + 1) * sizeof(char *));
         foreach (PathSet::const_iterator, i, context) 
-            v.string.context[n++] = GC_strdup(i->c_str());
+            v.string.context[n++] = GC_STRDUP(i->c_str());
         v.string.context[n] = 0;
     }
 }
@@ -244,7 +253,7 @@ void mkString(Value & v, const string & s, const PathSet & context)
 void mkPath(Value & v, const char * s)
 {
     v.type = tPath;
-    v.path = GC_strdup(s);
+    v.path = GC_STRDUP(s);
 }
 
 
@@ -294,7 +303,11 @@ void EvalState::mkList(Value & v, unsigned int length)
 void EvalState::mkAttrs(Value & v)
 {
     v.type = tAttrs;
+#if HAVE_BOEHMGC
     v.attrs = new (UseGC) Bindings;
+#else
+    v.attrs = new Bindings;
+#endif
     nrAttrsets++;
 }
 
