@@ -72,7 +72,6 @@ std::ostream & operator << (std::ostream & str, const Value & v)
         break;
     case tThunk:
     case tApp:
-    case tCopy:
         str << "<CODE>";
         break;
     case tLambda:
@@ -104,7 +103,6 @@ string showType(const Value & v)
         case tThunk: return "a thunk";
         case tApp: return "a function application";
         case tLambda: return "a function";
-        case tCopy: return "a copy";
         case tBlackhole: return "a black hole";
         case tPrimOp: return "a built-in function";
         case tPrimOpApp: return "a partially applied built-in function";
@@ -148,9 +146,9 @@ void EvalState::addConstant(const string & name, Value & v)
     Value * v2 = allocValue();
     *v2 = v;
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
-    baseEnv.values[baseEnvDispl++] = v;
+    baseEnv.values[baseEnvDispl++] = v2;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    (*baseEnv.values[0].attrs)[symbols.create(name2)].value = v2;
+    (*baseEnv.values[0]->attrs)[symbols.create(name2)].value = v2;
 }
 
 
@@ -164,8 +162,8 @@ void EvalState::addPrimOp(const string & name,
     v->primOp.fun = primOp;
     v->primOp.name = GC_STRDUP(name2.c_str());
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
-    baseEnv.values[baseEnvDispl++] = *v;
-    (*baseEnv.values[0].attrs)[symbols.create(name2)].value = v;
+    baseEnv.values[baseEnvDispl++] = v;
+    (*baseEnv.values[0]->attrs)[symbols.create(name2)].value = v;
 }
 
 
@@ -265,15 +263,15 @@ Value * EvalState::lookupVar(Env * env, const VarRef & var)
     
     if (var.fromWith) {
         while (1) {
-            Bindings::iterator j = env->values[0].attrs->find(var.name);
-            if (j != env->values[0].attrs->end())
+            Bindings::iterator j = env->values[0]->attrs->find(var.name);
+            if (j != env->values[0]->attrs->end())
                 return j->second.value;
             if (env->prevWith == 0)
                 throwEvalError("undefined variable `%1%'", var.name);
             for (unsigned int l = env->prevWith; l; --l, env = env->up) ;
         }
     } else
-        return &env->values[var.displ];
+        return env->values[var.displ];
 }
 
 
@@ -295,7 +293,7 @@ Env & EvalState::allocEnv(unsigned int size)
 {
     nrEnvs++;
     nrValuesInEnvs += size;
-    Env * env = (Env *) GC_MALLOC(sizeof(Env) + size * sizeof(Value));
+    Env * env = (Env *) GC_MALLOC(sizeof(Env) + size * sizeof(Value *));
     return *env;
 }
 
@@ -465,7 +463,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             nix::Attr & a = (*v.attrs)[i->first];
             a.value = state.allocValue();
             mkThunk(*a.value, env2, i->second.first);
-            mkCopy(env2.values[displ++], *a.value);
+            env2.values[displ++] = a.value;
             a.pos = &i->second.second;
         }
 
@@ -475,7 +473,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             nix::Attr & a = (*v.attrs)[i->first.name];
             Value * v2 = state.lookupVar(&env, i->first);
             a.value = v2;
-            mkCopy(env2.values[displ++], *v2);
+            env2.values[displ++] = v2;
             a.pos = &i->second;
         }
 
@@ -493,7 +491,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             foreach (Bindings::iterator, i, *overrides->second.value->attrs) {
                 nix::Attr & a = (*v.attrs)[i->first];
                 if (a.value)
-                    mkCopy(env2.values[displs[i->first]], *i->second.value);
+                    env2.values[displs[i->first]] = i->second.value;
                 a = i->second;
             }
         }
@@ -527,13 +525,15 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 
     /* The recursive attributes are evaluated in the new
        environment. */
-    foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
-        mkThunk(env2.values[displ++], env2, i->second.first);
+    foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs) {
+        env2.values[displ] = state.allocValue();
+        mkThunk(*env2.values[displ++], env2, i->second.first);
+    }
 
     /* The inherited attributes, on the other hand, are evaluated in
        the original environment. */
     foreach (list<ExprAttrs::Inherited>::iterator, i, attrs->inherited)
-        mkCopy(env2.values[displ++], *state.lookupVar(&env, i->first));
+        env2.values[displ++] = state.lookupVar(&env, i->first);
 
     state.eval(env2, body, v);
 }
@@ -654,13 +654,13 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
     unsigned int displ = 0;
 
     if (!fun.lambda.fun->matchAttrs)
-        env2.values[displ++] = arg;
+        env2.values[displ++] = &arg;
 
     else {
         forceAttrs(arg);
         
         if (!fun.lambda.fun->arg.empty())
-            env2.values[displ++] = arg;
+            env2.values[displ++] = &arg;
 
         /* For each formal argument, get the actual argument.  If
            there is no matching actual argument but the formal
@@ -670,11 +670,12 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
             Bindings::iterator j = arg.attrs->find(i->name);
             if (j == arg.attrs->end()) {
                 if (!i->def) throwTypeError("function at %1% called without required argument `%2%'",
-                    fun.lambda.fun->pos, i->name);   
-                mkThunk(env2.values[displ++], env2, i->def);
+                    fun.lambda.fun->pos, i->name);
+                env2.values[displ] = allocValue();
+                mkThunk(*env2.values[displ++], env2, i->def);
             } else {
                 attrsUsed++;
-                mkCopy(env2.values[displ++], *j->second.value);
+                env2.values[displ++] = j->second.value;
             }
         }
 
@@ -725,7 +726,8 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
     env2.up = &env;
     env2.prevWith = prevWith;
 
-    state.evalAttrs(env, attrs, env2.values[0]);
+    env2.values[0] = state.allocValue();
+    state.evalAttrs(env, attrs, *env2.values[0]);
 
     state.eval(env2, body, v);
 }
@@ -863,10 +865,6 @@ void EvalState::forceValue(Value & v)
             v.type = saved;
             throw;
         }
-    }
-    else if (v.type == tCopy) {
-        forceValue(*v.val);
-        v = *v.val;
     }
     else if (v.type == tApp)
         callFunction(*v.app.left, *v.app.right, v);

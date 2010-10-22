@@ -38,7 +38,6 @@ typedef enum {
     tThunk,
     tApp,
     tLambda,
-    tCopy,
     tBlackhole,
     tPrimOp,
     tPrimOpApp,
@@ -116,7 +115,7 @@ struct Env
 {
     Env * up;
     unsigned int prevWith; // nr of levels up to next `with' environment
-    Value values[0];
+    Value * values[0];
 };
 
 
@@ -147,13 +146,6 @@ static inline void mkThunk(Value & v, Env & env, Expr * expr)
     v.type = tThunk;
     v.thunk.env = &env;
     v.thunk.expr = expr;
-}
-
-
-static inline void mkCopy(Value & v, Value & src)
-{
-    v.type = tCopy;
-    v.val = &src;
 }
 
 
