@@ -119,24 +119,24 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
         args[0]->attrs->find(state.symbols.create("startSet"));
     if (startSet == args[0]->attrs->end())
         throw EvalError("attribute `startSet' required");
-    state.forceList(startSet->second.value);
+    state.forceList(*startSet->second.value);
 
     list<Value *> workSet;
-    for (unsigned int n = 0; n < startSet->second.value.list.length; ++n)
-        workSet.push_back(startSet->second.value.list.elems[n]);
+    for (unsigned int n = 0; n < startSet->second.value->list.length; ++n)
+        workSet.push_back(startSet->second.value->list.elems[n]);
 
     /* Get the operator. */
     Bindings::iterator op =
         args[0]->attrs->find(state.symbols.create("operator"));
     if (op == args[0]->attrs->end())
         throw EvalError("attribute `operator' required");
-    state.forceValue(op->second.value);
+    state.forceValue(*op->second.value);
 
     /* Construct the closure by applying the operator to element of
        `workSet', adding the result to `workSet', continuing until
        no new elements are found. */
     list<Value> res;
-    set<Value, CompareValues> doneKeys;
+    set<Value, CompareValues> doneKeys; // !!! use Value *?
     while (!workSet.empty()) {
 	Value * e = *(workSet.begin());
 	workSet.pop_front();
@@ -147,15 +147,15 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
             e->attrs->find(state.symbols.create("key"));
         if (key == e->attrs->end())
             throw EvalError("attribute `key' required");
-        state.forceValue(key->second.value);
+        state.forceValue(*key->second.value);
 
-        if (doneKeys.find(key->second.value) != doneKeys.end()) continue;
-        doneKeys.insert(key->second.value);
+        if (doneKeys.find(*key->second.value) != doneKeys.end()) continue;
+        doneKeys.insert(*key->second.value);
         res.push_back(*e);
         
         /* Call the `operator' function with `e' as argument. */
         Value call;
-        mkApp(call, op->second.value, *e);
+        mkApp(call, *op->second.value, *e);
         state.forceList(call);
 
         /* Add the values returned by the operator to the work set. */
@@ -213,11 +213,13 @@ static void prim_tryEval(EvalState & state, Value * * args, Value & v)
     state.mkAttrs(v);
     try {
         state.forceValue(*args[0]);
-        (*v.attrs)[state.symbols.create("value")].value = *args[0];
-        mkBool((*v.attrs)[state.symbols.create("success")].value, true);
+        printMsg(lvlError, format("%1%") % *args[0]);
+        (*v.attrs)[state.symbols.create("value")].value = args[0];
+        mkBool(*state.allocAttr(v, state.symbols.create("success")), true);
+        printMsg(lvlError, format("%1%") % v);
     } catch (AssertionError & e) {
-        mkBool((*v.attrs)[state.symbols.create("value")].value, false);
-        mkBool((*v.attrs)[state.symbols.create("success")].value, false);
+        mkBool(*state.allocAttr(v, state.symbols.create("value")), false);
+        mkBool(*state.allocAttr(v, state.symbols.create("success")), false);
     }
 }
 
@@ -326,7 +328,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     string drvName;
     Pos & posDrvName(*attr->second.pos);
     try {        
-        drvName = state.forceStringNoCtx(attr->second.value);
+        drvName = state.forceStringNoCtx(*attr->second.value);
     } catch (Error & e) {
         e.addPrefix(format("while evaluating the derivation attribute `name' at %1%:\n") % posDrvName);
         throw;
@@ -349,9 +351,9 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
             if (key == "args") {
-                state.forceList(i->second.value);
-                for (unsigned int n = 0; n < i->second.value.list.length; ++n) {
-                    string s = state.coerceToString(*i->second.value.list.elems[n], context, true);
+                state.forceList(*i->second.value);
+                for (unsigned int n = 0; n < i->second.value->list.length; ++n) {
+                    string s = state.coerceToString(*i->second.value->list.elems[n], context, true);
                     drv.args.push_back(s);
                 }
             }
@@ -359,7 +361,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
             /* All other attributes are passed to the builder through
                the environment. */
             else {
-                string s = state.coerceToString(i->second.value, context, true);
+                string s = state.coerceToString(*i->second.value, context, true);
                 drv.env[key] = s;
                 if (key == "builder") drv.builder = s;
                 else if (i->first == state.sSystem) drv.platform = s;
@@ -488,8 +490,8 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
 
     /* !!! assumes a single output */
     state.mkAttrs(v);
-    mkString((*v.attrs)[state.sOutPath].value, outPath, singleton<PathSet>(drvPath));
-    mkString((*v.attrs)[state.sDrvPath].value, drvPath, singleton<PathSet>("=" + drvPath));
+    mkString(*state.allocAttr(v, state.sOutPath), outPath, singleton<PathSet>(drvPath));
+    mkString(*state.allocAttr(v, state.sDrvPath), drvPath, singleton<PathSet>("=" + drvPath));
 }
 
 
@@ -713,8 +715,8 @@ static void prim_getAttr(EvalState & state, Value * * args, Value & v)
     if (i == args[1]->attrs->end())
         throw EvalError(format("attribute `%1%' missing") % attr);
     // !!! add to stack trace?
-    state.forceValue(i->second.value);
-    v = i->second.value;
+    state.forceValue(*i->second.value);
+    v = *i->second.value;
 }
 
 
@@ -766,15 +768,13 @@ static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
         Bindings::iterator j = v2.attrs->find(state.sName);
         if (j == v2.attrs->end())
             throw TypeError("`name' attribute missing in a call to `listToAttrs'");
-        string name = state.forceStringNoCtx(j->second.value);
+        string name = state.forceStringNoCtx(*j->second.value);
         
-        j = v2.attrs->find(state.symbols.create("value"));
-        if (j == v2.attrs->end())
+        Bindings::iterator j2 = v2.attrs->find(state.symbols.create("value"));
+        if (j2 == v2.attrs->end())
             throw TypeError("`value' attribute missing in a call to `listToAttrs'");
 
-        Attr & a = (*v.attrs)[state.symbols.create(name)];
-        mkCopy(a.value, j->second.value);
-        a.pos = j->second.pos;
+        (*v.attrs)[state.symbols.create(name)] = j2->second;
     }
 }
 
@@ -791,11 +791,8 @@ static void prim_intersectAttrs(EvalState & state, Value * * args, Value & v)
 
     foreach (Bindings::iterator, i, *args[0]->attrs) {
         Bindings::iterator j = args[1]->attrs->find(i->first);
-        if (j != args[1]->attrs->end()) {
-            Attr & a = (*v.attrs)[j->first];
-            mkCopy(a.value, j->second.value);
-            a.pos = j->second.pos;
-        }
+        if (j != args[1]->attrs->end())
+            (*v.attrs)[j->first] = j->second;
     }
 }
 
@@ -824,7 +821,8 @@ static void prim_functionArgs(EvalState & state, Value * * args, Value & v)
     if (!args[0]->lambda.fun->matchAttrs) return;
 
     foreach (Formals::Formals_::iterator, i, args[0]->lambda.fun->formals->formals)
-        mkBool((*v.attrs)[i->name].value, i->def);
+        // !!! should optimise booleans (allocate only once)
+        mkBool(*state.allocAttr(v, i->name), i->def);
 }
 
 
@@ -1007,8 +1005,8 @@ static void prim_parseDrvName(EvalState & state, Value * * args, Value & v)
     string name = state.forceStringNoCtx(*args[0]);
     DrvName parsed(name);
     state.mkAttrs(v);
-    mkString((*v.attrs)[state.sName].value, parsed.name);
-    mkString((*v.attrs)[state.symbols.create("version")].value, parsed.version);
+    mkString(*state.allocAttr(v, state.sName), parsed.name);
+    mkString(*state.allocAttr(v, state.symbols.create("version")), parsed.version);
 }
 
 

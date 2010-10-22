@@ -137,6 +137,7 @@ struct ExprAttrs : Expr
     Attrs attrs;
     list<Inherited> inherited;
     std::map<Symbol, Pos> attrNames; // used during parsing
+    std::map<Symbol, unsigned int> displs;
     ExprAttrs() : recursive(false) { };
     COMMON_METHODS
 };

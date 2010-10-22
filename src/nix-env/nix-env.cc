@@ -161,7 +161,7 @@ static Expr * loadSourceExpr(EvalState & state, const Path & path)
 
 
 static void loadDerivations(EvalState & state, Path nixExprPath,
-    string systemFilter, const Bindings & autoArgs,
+    string systemFilter, Bindings & autoArgs,
     const string & pathPrefix, DrvInfos & elems)
 {
     Value v;
@@ -321,7 +321,7 @@ static bool isPath(const string & s)
 
 
 static void queryInstSources(EvalState & state,
-    const InstallSourceInfo & instSource, const Strings & args,
+    InstallSourceInfo & instSource, const Strings & args,
     DrvInfos & elems, bool newestOnly)
 {
     InstallSourceType type = instSource.type;

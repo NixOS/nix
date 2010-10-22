@@ -122,7 +122,7 @@ struct Env
 
 struct Attr
 {
-    Value value;
+    Value * value;
     Pos * pos;
     Attr() : pos(&noPos) { };
 };
@@ -294,11 +294,14 @@ public:
 
     /* Automatically call a function for which each argument has a
        default value or has a binding in the `args' map. */
-    void autoCallFunction(const Bindings & args, Value & fun, Value & res);
+    void autoCallFunction(Bindings & args, Value & fun, Value & res);
     
     /* Allocation primitives. */
+    Value * allocValue();
     Value * allocValues(unsigned int count);
     Env & allocEnv(unsigned int size);
+
+    Value * allocAttr(Value & vAttrs, const Symbol & name);
 
     void mkList(Value & v, unsigned int length);
     void mkAttrs(Value & v);

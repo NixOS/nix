@@ -213,10 +213,10 @@ void ExprAttrs::bindVars(const StaticEnv & env)
         unsigned int displ = 0;
 
         foreach (ExprAttrs::Attrs::iterator, i, attrs)
-            newEnv.vars[i->first] = displ++;
+            displs[i->first] = newEnv.vars[i->first] = displ++;
 
         foreach (list<Inherited>::iterator, i, inherited) {
-            newEnv.vars[i->first.name] = displ++;
+            displs[i->first.name] = newEnv.vars[i->first.name] = displ++;
             i->first.bind(env);
         }
 
