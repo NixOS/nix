@@ -7,18 +7,43 @@
 %parse-param { yyscan_t scanner }
 %parse-param { ParseData * data }
 %lex-param { yyscan_t scanner }
+%lex-param { ParseData * data }
 
-
-%{
-/* Newer versions of Bison copy the declarations below to
-   parser-tab.hh, which sucks bigtime since lexer.l doesn't want that
-   stuff.  So allow it to be excluded. */
-#ifndef BISON_HEADER_HACK
-#define BISON_HEADER_HACK
-
+%code requires {
+    
+#ifndef BISON_HEADER
+#define BISON_HEADER
+    
 #include "util.hh"
     
 #include "nixexpr.hh"
+
+namespace nix {
+
+    struct ParseData 
+    {
+        SymbolTable & symbols;
+        Expr * result;
+        Path basePath;
+        Path path;
+        string error;
+        Symbol sLetBody;
+        ParseData(SymbolTable & symbols)
+            : symbols(symbols)
+            , sLetBody(symbols.create("<let-body>"))
+            { };
+    };
+    
+}
+
+#define YY_DECL int yylex \
+    (YYSTYPE * yylval_param, YYLTYPE * yylloc_param, yyscan_t yyscanner, nix::ParseData * data)
+
+#endif
+
+}
+
+%{
 
 #include "parser-tab.hh"
 #include "lexer-tab.hh"
@@ -28,27 +53,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+YY_DECL;
 
 using namespace nix;
 
 
 namespace nix {
-
     
-struct ParseData 
-{
-    SymbolTable & symbols;
-    Expr * result;
-    Path basePath;
-    Path path;
-    string error;
-    Symbol sLetBody;
-    ParseData(SymbolTable & symbols)
-        : symbols(symbols)
-        , sLetBody(symbols.create("<let-body>"))
-    { };
-};
-
 
 static string showAttrPath(const vector<Symbol> & attrPath)
 {
@@ -113,9 +124,9 @@ static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
 }
 
 
-static Expr * stripIndentation(vector<Expr *> & es)
+static Expr * stripIndentation(SymbolTable & symbols, vector<Expr *> & es)
 {
-    if (es.empty()) return new ExprString("");
+    if (es.empty()) return new ExprString(symbols.create(""));
     
     /* Figure out the minimum indentation.  Note that by design
        whitespace-only final lines are not taken into account.  (So
@@ -195,7 +206,7 @@ static Expr * stripIndentation(vector<Expr *> & es)
                 s2 = string(s2, 0, p + 1);
         }
 
-        es2->push_back(new ExprString(s2));
+        es2->push_back(new ExprString(symbols.create(s2)));
     }
 
     return new ExprConcatStrings(es2);
@@ -222,9 +233,6 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
     data->error = (format("%1%, at %2%")
         % error % makeCurPos(*loc, data)).str();
 }
-
-
-#endif
 
 
 %}
@@ -337,15 +345,15 @@ expr_simple
   | INT { $$ = new ExprInt($1); }
   | '"' string_parts '"' {
       /* For efficiency, and to simplify parse trees a bit. */
-      if ($2->empty()) $$ = new ExprString("");
+      if ($2->empty()) $$ = new ExprString(data->symbols.create(""));
       else if ($2->size() == 1) $$ = $2->front();
       else $$ = new ExprConcatStrings($2);
   }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
-      $$ = stripIndentation(*$2);
+      $$ = stripIndentation(data->symbols, *$2);
   }
   | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
-  | URI { $$ = new ExprString($1); }
+  | URI { $$ = new ExprString(data->symbols.create($1)); }
   | '(' expr ')' { $$ = $2; }
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */

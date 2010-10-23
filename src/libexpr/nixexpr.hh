@@ -65,8 +65,8 @@ struct ExprInt : Expr
 
 struct ExprString : Expr
 {
-    string s;
-    ExprString(const string & s) : s(s) { };
+    Symbol s;
+    ExprString(const Symbol & s) : s(s) { };
     COMMON_METHODS
 };
 

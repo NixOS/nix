@@ -249,6 +249,14 @@ void mkString(Value & v, const string & s, const PathSet & context)
 }
 
 
+void mkString(Value & v, const Symbol & s)
+{
+    v.type = tString;
+    v.string.s = ((string) s).c_str();
+    v.string.context = 0;
+}
+
+
 void mkPath(Value & v, const char * s)
 {
     clearValue(v);
@@ -429,7 +437,7 @@ void ExprInt::eval(EvalState & state, Env & env, Value & v)
 
 void ExprString::eval(EvalState & state, Env & env, Value & v)
 {
-    mkString(v, s.c_str());
+    mkString(v, s);
 }
 
 
