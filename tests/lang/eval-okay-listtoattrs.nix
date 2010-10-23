@@ -7,4 +7,5 @@ let
   a = builtins.listToAttrs list;
   b = builtins.listToAttrs ( list ++ list );
   r = builtins.listToAttrs [ (asi "result" [ a b ]) ( asi "throw" (throw "this should not be thrown")) ];
-in concat (map (x: x.a) r.result)
+  x = builtins.listToAttrs [ (asi "foo" "bla") (asi "foo" "bar") ];
+in concat (map (x: x.a) r.result) + x.foo
