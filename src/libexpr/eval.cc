@@ -153,15 +153,14 @@ void EvalState::addConstant(const string & name, Value & v)
 
 
 void EvalState::addPrimOp(const string & name,
-    unsigned int arity, PrimOp primOp)
+    unsigned int arity, PrimOpFun primOp)
 {
     Value * v = allocValue();
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
+    Symbol sym = symbols.create(name);
     v->type = tPrimOp;
-    v->primOp.arity = arity;
-    v->primOp.fun = primOp;
-    v->primOp.name = GC_STRDUP(name2.c_str());
-    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
+    v->primOp = new (UseGC) PrimOp(primOp, arity, sym);
+    staticBaseEnv.vars[sym] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     (*baseEnv.values[0]->attrs)[symbols.create(name2)].value = v;
 }
@@ -252,6 +251,7 @@ void mkString(Value & v, const string & s, const PathSet & context)
 
 void mkPath(Value & v, const char * s)
 {
+    clearValue(v);
     v.type = tPath;
     v.path = GC_STRDUP(s);
 }
@@ -310,6 +310,7 @@ void EvalState::mkList(Value & v, unsigned int length)
 
 void EvalState::mkAttrs(Value & v)
 {
+    clearValue(v);
     v.type = tAttrs;
 #if HAVE_BOEHMGC
     v.attrs = new (UseGC) Bindings;
@@ -595,15 +596,20 @@ void ExprApp::eval(EvalState & state, Env & env, Value & v)
 void EvalState::callFunction(Value & fun, Value & arg, Value & v)
 {
     if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
-        unsigned int argsLeft =
-            fun.type == tPrimOp ? fun.primOp.arity : fun.primOpApp.argsLeft;
+
+        /* Figure out the number of arguments still needed. */
+        unsigned int argsDone = 0;
+        Value * primOp = &fun;
+        while (primOp->type == tPrimOpApp) {
+            argsDone++;
+            primOp = primOp->primOpApp.left;
+        }
+        assert(primOp->type == tPrimOp);
+        unsigned int arity = primOp->primOp->arity;
+        unsigned int argsLeft = arity - argsDone;
+        
         if (argsLeft == 1) {
-            /* We have all the arguments, so call the primop.  First
-               find the primop. */
-            Value * primOp = &fun;
-            while (primOp->type == tPrimOpApp) primOp = primOp->primOpApp.left;
-            assert(primOp->type == tPrimOp);
-            unsigned int arity = primOp->primOp.arity;
+            /* We have all the arguments, so call the primop. */
                 
             /* Put all the arguments in an array. */
             Value * vArgs[arity];
@@ -614,9 +620,9 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
 
             /* And call the primop. */
             try {
-                primOp->primOp.fun(*this, vArgs, v);
+                primOp->primOp->fun(*this, vArgs, v);
             } catch (Error & e) {
-                addErrorPrefix(e, "while evaluating the builtin function `%1%':\n", primOp->primOp.name);
+                addErrorPrefix(e, "while evaluating the builtin function `%1%':\n", primOp->primOp->name);
                 throw;
             }
         } else {
@@ -624,7 +630,6 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
             v.primOpApp.left = allocValue();
             *v.primOpApp.left = fun;
             v.primOpApp.right = &arg;
-            v.primOpApp.argsLeft = argsLeft - 1;
         }
         return;
     }

@@ -44,7 +44,17 @@ typedef enum {
 } ValueType;
 
 
-typedef void (* PrimOp) (EvalState & state, Value * * args, Value & v);
+typedef void (* PrimOpFun) (EvalState & state, Value * * args, Value & v);
+
+
+struct PrimOp
+{
+    PrimOpFun fun;
+    unsigned int arity;
+    Symbol name;
+    PrimOp(PrimOpFun fun, unsigned int arity, Symbol name)
+        : fun(fun), arity(arity), name(name) { }
+};
 
 
 struct Value
@@ -97,15 +107,9 @@ struct Value
             Env * env;
             ExprLambda * fun;
         } lambda;
-        Value * val;
-        struct {
-            PrimOp fun;
-            char * name;
-            unsigned int arity;
-        } primOp;
+        PrimOp * primOp;
         struct {
             Value * left, * right;
-            unsigned int argsLeft;
         } primOpApp;
     };
 };
@@ -127,8 +131,17 @@ struct Attr
 };
 
 
+/* After overwriting an app node, be sure to clear pointers in the
+   Value to ensure that the target isn't kept alive unnecessarily. */
+static inline void clearValue(Value & v)
+{
+    v.app.right = 0;
+}
+
+
 static inline void mkInt(Value & v, int n)
 {
+    clearValue(v);
     v.type = tInt;
     v.integer = n;
 }
@@ -136,6 +149,7 @@ static inline void mkInt(Value & v, int n)
 
 static inline void mkBool(Value & v, bool b)
 {
+    clearValue(v);
     v.type = tBool;
     v.boolean = b;
 }
@@ -268,7 +282,7 @@ private:
     void addConstant(const string & name, Value & v);
 
     void addPrimOp(const string & name,
-        unsigned int arity, PrimOp primOp);
+        unsigned int arity, PrimOpFun primOp);
 
     Value * lookupVar(Env * env, const VarRef & var);
     
