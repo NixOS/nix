@@ -13,10 +13,14 @@
 #include <gc/gc.h>
 #include <gc/gc_cpp.h>
 
+#define NEW (UseGC)
+
 #else
 
 #define GC_STRDUP strdup
 #define GC_MALLOC malloc
+
+#define NEW new
 
 #endif
 
@@ -159,7 +163,7 @@ void EvalState::addPrimOp(const string & name,
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
     Symbol sym = symbols.create(name);
     v->type = tPrimOp;
-    v->primOp = new (UseGC) PrimOp(primOp, arity, sym);
+    v->primOp = NEW PrimOp(primOp, arity, sym);
     staticBaseEnv.vars[sym] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
     (*baseEnv.values[0]->attrs)[symbols.create(name2)].value = v;
@@ -320,11 +324,7 @@ void EvalState::mkAttrs(Value & v)
 {
     clearValue(v);
     v.type = tAttrs;
-#if HAVE_BOEHMGC
-    v.attrs = new (UseGC) Bindings;
-#else
-    v.attrs = new Bindings;
-#endif
+    v.attrs = NEW Bindings;
     nrAttrsets++;
 }
 
@@ -1133,12 +1133,10 @@ void EvalState::printStats()
     printMsg(v, format("  stack space per eval() level: %1% bytes")
         % ((&x - deepestStack) / (float) maxRecursionDepth));
     printMsg(v, format("  environments allocated: %1% (%2% bytes)")
-        % nrEnvs % (nrEnvs * sizeof(Env)));
-    printMsg(v, format("  values allocated in environments: %1% (%2% bytes)")
-        % nrValuesInEnvs % (nrValuesInEnvs * sizeof(Value)));
+        % nrEnvs % (nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *)));
     printMsg(v, format("  list elements: %1% (%2% bytes)")
         % nrListElems % (nrListElems * sizeof(Value *)));
-    printMsg(v, format("  misc. values allocated: %1% (%2% bytes)")
+    printMsg(v, format("  values allocated: %1% (%2% bytes)")
         % nrValues % (nrValues * sizeof(Value)));
     printMsg(v, format("  attribute sets allocated: %1%") % nrAttrsets);
     printMsg(v, format("  right-biased unions: %1%") % nrOpUpdates);
