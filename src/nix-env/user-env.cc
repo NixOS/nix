@@ -59,7 +59,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
            the meta attributes. */
         Path drvPath = keepDerivations ? i->queryDrvPath(state) : "";
 
-        Value & v(*state.allocValues(1));
+        Value & v(*state.allocValue());
         manifest.list.elems[n++] = &v;
         state.mkAttrs(v);
 
@@ -83,7 +83,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
                     state.mkList(v2, j->second.stringValues.size());
                     unsigned int m = 0;
                     foreach (Strings::const_iterator, k, j->second.stringValues) {
-                        v2.list.elems[m] = state.allocValues(1);
+                        v2.list.elems[m] = state.allocValue();
                         mkString(*v2.list.elems[m++], *k);
                     }
                     break;

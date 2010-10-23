@@ -167,13 +167,9 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
 
     /* Create the result list. */
     state.mkList(v, res.size());
-    Value * vs = state.allocValues(res.size());
-
     unsigned int n = 0;
-    foreach (list<Value>::iterator, i, res) {
-        v.list.elems[n] = &vs[n];
-        vs[n++] = *i;
-    }
+    foreach (list<Value>::iterator, i, res)
+        *(v.list.elems[n++] = state.allocValue()) = *i;
 }
 
 
@@ -691,17 +687,14 @@ static void prim_attrNames(EvalState & state, Value * * args, Value & v)
     state.forceAttrs(*args[0]);
 
     state.mkList(v, args[0]->attrs->size());
-    Value * vs = state.allocValues(v.list.length);
 
     StringSet names;
     foreach (Bindings::iterator, i, *args[0]->attrs)
         names.insert(i->first);
 
     unsigned int n = 0;
-    foreach (StringSet::iterator, i, names) {
-        v.list.elems[n] = &vs[n];
-        mkString(vs[n++], *i);
-    }
+    foreach (StringSet::iterator, i, names)
+        mkString(*(v.list.elems[n++] = state.allocValue()), *i);
 }
 
 
@@ -870,12 +863,10 @@ static void prim_map(EvalState & state, Value * * args, Value & v)
     state.forceList(*args[1]);
 
     state.mkList(v, args[1]->list.length);
-    Value * vs = state.allocValues(v.list.length);
 
-    for (unsigned int n = 0; n < v.list.length; ++n) {
-        v.list.elems[n] = &vs[n];
-        mkApp(vs[n], *args[0], *args[1]->list.elems[n]);
-    }
+    for (unsigned int n = 0; n < v.list.length; ++n)
+        mkApp(*(v.list.elems[n] = state.allocValue()), 
+            *args[0], *args[1]->list.elems[n]);
 }
 
 

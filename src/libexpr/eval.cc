@@ -282,13 +282,6 @@ Value * EvalState::allocValue()
 }
 
 
-Value * EvalState::allocValues(unsigned int count)
-{
-    nrValues += count;
-    return (Value *) GC_MALLOC(count * sizeof(Value));
-}
-
-
 Env & EvalState::allocEnv(unsigned int size)
 {
     nrEnvs++;
@@ -542,11 +535,8 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkList(v, elems.size());
-    Value * vs = state.allocValues(v.list.length);
-    for (unsigned int n = 0; n < v.list.length; ++n) {
-        v.list.elems[n] = &vs[n];
-        mkThunk(vs[n], env, elems[n]);
-    }
+    for (unsigned int n = 0; n < v.list.length; ++n)
+        mkThunk(*(v.list.elems[n] = state.allocValue()), env, elems[n]);
 }
 
 
@@ -630,12 +620,10 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
                 throw;
             }
         } else {
-            Value * v2 = allocValues(2);
-            v2[0] = fun;
-            v2[1] = arg;
             v.type = tPrimOpApp;
-            v.primOpApp.left = &v2[0];
-            v.primOpApp.right = &v2[1];
+            v.primOpApp.left = allocValue();
+            *v.primOpApp.left = fun;
+            v.primOpApp.right = &arg;
             v.primOpApp.argsLeft = argsLeft - 1;
         }
         return;

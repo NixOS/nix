@@ -290,7 +290,6 @@ public:
     
     /* Allocation primitives. */
     Value * allocValue();
-    Value * allocValues(unsigned int count);
     Env & allocEnv(unsigned int size);
 
     Value * allocAttr(Value & vAttrs, const Symbol & name);
