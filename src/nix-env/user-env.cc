@@ -61,7 +61,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
         Value & v(*state.allocValue());
         manifest.list.elems[n++] = &v;
-        state.mkAttrs(v);
+        state.mkAttrs(v, 8);
 
         mkString(*state.allocAttr(v, state.sType), "derivation");
         mkString(*state.allocAttr(v, state.sName), i->name);
@@ -71,7 +71,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
             mkString(*state.allocAttr(v, state.sDrvPath), i->queryDrvPath(state));
 
         Value & vMeta = *state.allocAttr(v, state.sMeta);
-        state.mkAttrs(vMeta);
+        state.mkAttrs(vMeta, 16);
 
         MetaInfo meta = i->queryMetaInfo(state);
 
@@ -118,7 +118,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     /* Construct a Nix expression that calls the user environment
        builder with the manifest as argument. */
     Value args, topLevel;
-    state.mkAttrs(args);
+    state.mkAttrs(args, 3);
     mkString(*state.allocAttr(args, state.sSystem), thisSystem);
     mkString(*state.allocAttr(args, state.symbols.create("manifest")),
         manifestFile, singleton<PathSet>(manifestFile));

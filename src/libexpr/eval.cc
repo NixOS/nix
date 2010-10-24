@@ -340,11 +340,12 @@ void EvalState::mkList(Value & v, unsigned int length)
 }
 
 
-void EvalState::mkAttrs(Value & v)
+void EvalState::mkAttrs(Value & v, unsigned int expected)
 {
     clearValue(v);
     v.type = tAttrs;
     v.attrs = NEW Bindings;
+    v.attrs->reserve(expected);
     nrAttrsets++;
 }
 
@@ -388,13 +389,6 @@ Value * EvalState::maybeThunk(Env & env, Expr * expr)
     mkThunk(*v, env, expr);
 
     return v;
-}
-
-
-void EvalState::cloneAttrs(Value & src, Value & dst)
-{
-    mkAttrs(dst);
-    *dst.attrs = *src.attrs;
 }
 
 
@@ -504,7 +498,7 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 
 void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
-    state.mkAttrs(v); // !!! reserve size
+    state.mkAttrs(v, attrs.size());
 
     if (recursive) {
         /* Create a new environment that contains the attributes in
@@ -758,7 +752,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
     }
 
     Value actualArgs;
-    mkAttrs(actualArgs);
+    mkAttrs(actualArgs, fun.lambda.fun->formals->formals.size());
 
     foreach (Formals::Formals_::iterator, i, fun.lambda.fun->formals->formals) {
         Bindings::iterator j = args.find(i->name);
@@ -852,7 +846,7 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
     if (v1.attrs->size() == 0) { v = v2; return; }
     if (v2.attrs->size() == 0) { v = v1; return; }
 
-    state.mkAttrs(v);
+    state.mkAttrs(v, v1.attrs->size() + v2.attrs->size());
 
     /* Merge the attribute sets, preferring values from the second
        set.  Make sure to keep the resulting vector in sorted

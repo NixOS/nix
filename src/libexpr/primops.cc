@@ -206,7 +206,7 @@ static void prim_addErrorContext(EvalState & state, Value * * args, Value & v)
  * else => {success=false; value=false;} */
 static void prim_tryEval(EvalState & state, Value * * args, Value & v)
 {
-    state.mkAttrs(v);
+    state.mkAttrs(v, 2);
     try {
         state.forceValue(*args[0]);
         v.attrs->push_back(Attr(state.symbols.create("value"), args[0]));
@@ -484,7 +484,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     state.drvHashes[drvPath] = hashDerivationModulo(state, drv);
 
     /* !!! assumes a single output */
-    state.mkAttrs(v);
+    state.mkAttrs(v, 2);
     mkString(*state.allocAttr(v, state.sOutPath), outPath, singleton<PathSet>(drvPath));
     mkString(*state.allocAttr(v, state.sDrvPath), drvPath, singleton<PathSet>("=" + drvPath));
     v.attrs->sort();
@@ -745,7 +745,7 @@ static void prim_removeAttrs(EvalState & state, Value * * args, Value & v)
     /* Copy all attributes not in that set.  Note that we don't need
        to sort v.attrs because it's a subset of an already sorted
        vector. */
-    state.mkAttrs(v);
+    state.mkAttrs(v, args[0]->attrs->size());
     foreach (Bindings::iterator, i, *args[0]->attrs) {
         if (names.find(i->name) == names.end())
             v.attrs->push_back(*i);
@@ -761,7 +761,7 @@ static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
 {
     state.forceList(*args[0]);
 
-    state.mkAttrs(v);
+    state.mkAttrs(v, args[0]->list.length);
 
     std::set<Symbol> seen;
 
@@ -798,7 +798,7 @@ static void prim_intersectAttrs(EvalState & state, Value * * args, Value & v)
     state.forceAttrs(*args[0]);
     state.forceAttrs(*args[1]);
         
-    state.mkAttrs(v);
+    state.mkAttrs(v, std::min(args[0]->attrs->size(), args[1]->attrs->size()));
 
     foreach (Bindings::iterator, i, *args[0]->attrs) {
         Bindings::iterator j = args[1]->attrs->find(i->name);
@@ -827,14 +827,15 @@ static void prim_functionArgs(EvalState & state, Value * * args, Value & v)
     if (args[0]->type != tLambda)
         throw TypeError("`functionArgs' requires a function");
 
-    state.mkAttrs(v);
+    if (!args[0]->lambda.fun->matchAttrs) {
+        state.mkAttrs(v, 0);
+        return;
+    }
 
-    if (!args[0]->lambda.fun->matchAttrs) return;
-
+    state.mkAttrs(v, args[0]->lambda.fun->formals->formals.size());
     foreach (Formals::Formals_::iterator, i, args[0]->lambda.fun->formals->formals)
         // !!! should optimise booleans (allocate only once)
         mkBool(*state.allocAttr(v, i->name), i->def);
-
     v.attrs->sort();
 }
 
@@ -1015,7 +1016,7 @@ static void prim_parseDrvName(EvalState & state, Value * * args, Value & v)
 {
     string name = state.forceStringNoCtx(*args[0]);
     DrvName parsed(name);
-    state.mkAttrs(v);
+    state.mkAttrs(v, 2);
     mkString(*state.allocAttr(v, state.sName), parsed.name);
     mkString(*state.allocAttr(v, state.symbols.create("version")), parsed.version);
     v.attrs->sort();
@@ -1043,7 +1044,7 @@ void EvalState::createBaseEnv()
     Value v;
 
     /* `builtins' must be first! */
-    mkAttrs(v);
+    mkAttrs(v, 128);
     addConstant("builtins", v);
 
     mkBool(v, true);

@@ -319,13 +319,11 @@ public:
     Value * allocAttr(Value & vAttrs, const Symbol & name);
 
     void mkList(Value & v, unsigned int length);
-    void mkAttrs(Value & v);
+    void mkAttrs(Value & v, unsigned int expected);
     void mkThunk_(Value & v, Expr * expr);
 
     Value * maybeThunk(Env & env, Expr * expr);
     
-    void cloneAttrs(Value & src, Value & dst);
-
     /* Print statistics. */
     void printStats();
 
