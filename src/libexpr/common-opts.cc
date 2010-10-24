@@ -20,14 +20,17 @@ bool parseOptionArg(const string & arg, Strings::iterator & i,
     if (i == argsEnd) throw error;
     string value = *i++;
 
+    /* !!! check for duplicates! */
     Value * v = state.allocValue();
-    autoArgs[state.symbols.create(name)].value = v;
+    autoArgs.push_back(Attr(state.symbols.create(name), v));
 
     if (arg == "--arg")
         state.mkThunk_(*v, parseExprFromString(state, value, absPath(".")));
     else
         mkString(*v, value);
-    
+
+    autoArgs.sort(); // !!! inefficient
+
     return true;
 }
 

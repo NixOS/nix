@@ -209,14 +209,13 @@ static void prim_tryEval(EvalState & state, Value * * args, Value & v)
     state.mkAttrs(v);
     try {
         state.forceValue(*args[0]);
-        printMsg(lvlError, format("%1%") % *args[0]);
-        (*v.attrs)[state.symbols.create("value")].value = args[0];
+        v.attrs->push_back(Attr(state.symbols.create("value"), args[0]));
         mkBool(*state.allocAttr(v, state.symbols.create("success")), true);
-        printMsg(lvlError, format("%1%") % v);
     } catch (AssertionError & e) {
         mkBool(*state.allocAttr(v, state.symbols.create("value")), false);
         mkBool(*state.allocAttr(v, state.symbols.create("success")), false);
     }
+    v.attrs->sort();
 }
 
 
@@ -488,6 +487,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     state.mkAttrs(v);
     mkString(*state.allocAttr(v, state.sOutPath), outPath, singleton<PathSet>(drvPath));
     mkString(*state.allocAttr(v, state.sDrvPath), drvPath, singleton<PathSet>("=" + drvPath));
+    v.attrs->sort();
 }
 
 
@@ -742,7 +742,9 @@ static void prim_removeAttrs(EvalState & state, Value * * args, Value & v)
         names.insert(state.symbols.create(args[1]->list.elems[i]->string.s));
     }
 
-    /* Copy all attributes not in that set. */
+    /* Copy all attributes not in that set.  Note that we don't need
+       to sort v.attrs because it's a subset of an already sorted
+       vector. */
     state.mkAttrs(v);
     foreach (Bindings::iterator, i, *args[0]->attrs) {
         if (names.find(i->name) == names.end())
@@ -761,6 +763,8 @@ static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
 
     state.mkAttrs(v);
 
+    std::set<Symbol> seen;
+
     for (unsigned int i = 0; i < args[0]->list.length; ++i) {
         Value & v2(*args[0]->list.elems[i]);
         state.forceAttrs(v2);
@@ -774,10 +778,15 @@ static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
         if (j2 == v2.attrs->end())
             throw TypeError("`value' attribute missing in a call to `listToAttrs'");
 
-        Attr & a = (*v.attrs)[state.symbols.create(name)];
-        a.value = j2->value;
-        a.pos = j2->pos;
+        Symbol sym = state.symbols.create(name);
+        if (seen.find(sym) == seen.end()) {
+            v.attrs->push_back(Attr(sym, j2->value, j2->pos));
+            seen.insert(sym);
+        }
+        /* !!! Throw an error if `name' already exists? */
     }
+
+    v.attrs->sort();
 }
 
 
@@ -825,6 +834,8 @@ static void prim_functionArgs(EvalState & state, Value * * args, Value & v)
     foreach (Formals::Formals_::iterator, i, args[0]->lambda.fun->formals->formals)
         // !!! should optimise booleans (allocate only once)
         mkBool(*state.allocAttr(v, i->name), i->def);
+
+    v.attrs->sort();
 }
 
 
@@ -1007,6 +1018,7 @@ static void prim_parseDrvName(EvalState & state, Value * * args, Value & v)
     state.mkAttrs(v);
     mkString(*state.allocAttr(v, state.sName), parsed.name);
     mkString(*state.allocAttr(v, state.symbols.create("version")), parsed.version);
+    v.attrs->sort();
 }
 
 
@@ -1119,7 +1131,11 @@ void EvalState::createBaseEnv()
 
     // Versions
     addPrimOp("__parseDrvName", 1, prim_parseDrvName);
-    addPrimOp("__compareVersions", 2, prim_compareVersions);    
+    addPrimOp("__compareVersions", 2, prim_compareVersions);
+
+    /* Now that we've added all primops, sort the `builtins' attribute
+       set, because attribute lookups expect it to be sorted. */
+    baseEnv.values[0]->attrs->sort();
 }
 
 

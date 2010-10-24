@@ -34,18 +34,16 @@ namespace nix {
 
 Bindings::iterator Bindings::find(const Symbol & name)
 {
-    iterator i = begin();
-    for ( ; i != end() && i->name != name; ++i) ;
-    return i;
+    Attr key(name, 0);
+    iterator i = lower_bound(begin(), end(), key);
+    if (i != end() && i->name == name) return i;
+    return end();
 }
 
 
-Attr & Bindings::operator [] (const Symbol & name)
+void Bindings::sort()
 {
-    iterator i = find(name);
-    if (i != end()) return *i;
-    push_back(Attr(name, 0));
-    return back();
+    std::sort(begin(), end());
 }
     
 
@@ -178,12 +176,12 @@ void EvalState::addPrimOp(const string & name,
 {
     Value * v = allocValue();
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    Symbol sym = symbols.create(name);
+    Symbol sym = symbols.create(name2);
     v->type = tPrimOp;
     v->primOp = NEW PrimOp(primOp, arity, sym);
-    staticBaseEnv.vars[sym] = baseEnvDispl;
+    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
-    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v));
+    baseEnv.values[0]->attrs->push_back(Attr(sym, v));
 }
 
 
@@ -506,32 +504,38 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 
 void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
-    state.mkAttrs(v);
+    state.mkAttrs(v); // !!! reserve size
 
     if (recursive) {
         /* Create a new environment that contains the attributes in
            this `rec'. */
-        Env & env2(state.allocEnv(attrs.size() + inherited.size()));
+        Env & env2(state.allocEnv(attrs.size()));
         env2.up = &env;
 
-        unsigned int displ = 0;
-        
+        AttrDefs::iterator overrides = attrs.find(state.sOverrides);
+        bool hasOverrides = overrides != attrs.end();
+
         /* The recursive attributes are evaluated in the new
-           environment. */
-        foreach (Attrs::iterator, i, attrs) {
-            Value * vAttr = state.maybeThunk(env2, i->second.first);
-            env2.values[displ++] = vAttr;
-            v.attrs->push_back(nix::Attr(i->first, vAttr, &i->second.second));
-        }
-
-        /* The inherited attributes, on the other hand, are
-           evaluated in the original environment. */
-        foreach (list<Inherited>::iterator, i, inherited) {
-            Value * vAttr = state.lookupVar(&env, i->first);
-            env2.values[displ++] = vAttr;
-            v.attrs->push_back(nix::Attr(i->first.name, vAttr, &i->second));
-        }
-
+           environment, while the inherited attributes are evaluated
+           in the original environment. */
+        unsigned int displ = 0;
+        foreach (AttrDefs::iterator, i, attrs)
+            if (i->second.inherited) {
+                /* !!! handle overrides? */
+                Value * vAttr = state.lookupVar(&env, i->second.var);
+                env2.values[displ++] = vAttr;
+                v.attrs->push_back(Attr(i->first, vAttr, &i->second.pos));
+            } else {
+                Value * vAttr;
+                if (hasOverrides) {
+                    vAttr = state.allocValue();
+                    mkThunk(*vAttr, env2, i->second.e);
+                } else
+                    vAttr = state.maybeThunk(env2, i->second.e);
+                env2.values[displ++] = vAttr;
+                v.attrs->push_back(Attr(i->first, vAttr, &i->second.pos));
+            }
+        
         /* If the rec contains an attribute called `__overrides', then
            evaluate it, and add the attributes in that set to the rec.
            This allows overriding of recursive attributes, which is
@@ -540,30 +544,27 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            still reference the original value, because that value has
            been substituted into the bodies of the other attributes.
            Hence we need __overrides.) */
-        Bindings::iterator overrides = v.attrs->find(state.sOverrides);
-        if (overrides != v.attrs->end()) {
-            state.forceAttrs(*overrides->value);
-            foreach (Bindings::iterator, i, *overrides->value->attrs) {
-                nix::Attr & a = (*v.attrs)[i->name];
-                if (a.value)
-                    env2.values[displs[i->name]] = i->value;
-                a = *i;
+        if (hasOverrides) {
+            Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
+            state.forceAttrs(*vOverrides);
+            foreach (Bindings::iterator, i, *vOverrides->attrs) {
+                AttrDefs::iterator j = attrs.find(i->name);
+                if (j != attrs.end()) {
+                    (*v.attrs)[j->second.displ] = *i;
+                    env2.values[j->second.displ] = i->value;
+                } else
+                    v.attrs->push_back(*i);
             }
+            v.attrs->sort();
         }
     }
 
     else {
-        foreach (Attrs::iterator, i, attrs) {
-            nix::Attr & a = (*v.attrs)[i->first];
-            a.value = state.maybeThunk(env, i->second.first);
-            a.pos = &i->second.second;
-        }
-
-        foreach (list<Inherited>::iterator, i, inherited) {
-            nix::Attr & a = (*v.attrs)[i->first.name];
-            a.value = state.lookupVar(&env, i->first);
-            a.pos = &i->second;
-        }
+        foreach (AttrDefs::iterator, i, attrs)
+            if (i->second.inherited)
+                v.attrs->push_back(Attr(i->first, state.lookupVar(&env, i->second.var), &i->second.pos));
+            else
+                v.attrs->push_back(Attr(i->first, state.maybeThunk(env, i->second.e), &i->second.pos));
     }
 }
 
@@ -572,20 +573,18 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 {
     /* Create a new environment that contains the attributes in this
        `let'. */
-    Env & env2(state.allocEnv(attrs->attrs.size() + attrs->inherited.size()));
+    Env & env2(state.allocEnv(attrs->attrs.size()));
     env2.up = &env;
 
-    unsigned int displ = 0;
-
-    /* The recursive attributes are evaluated in the new
+    /* The recursive attributes are evaluated in the new environment,
+       while the inherited attributes are evaluated in the original
        environment. */
-    foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
-        env2.values[displ++] = state.maybeThunk(env2, i->second.first);
-
-    /* The inherited attributes, on the other hand, are evaluated in
-       the original environment. */
-    foreach (list<ExprAttrs::Inherited>::iterator, i, attrs->inherited)
-        env2.values[displ++] = state.lookupVar(&env, i->first);
+    unsigned int displ = 0;
+    foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
+        if (i->second.inherited)
+            env2.values[displ++] = state.lookupVar(&env, i->second.var);
+        else
+            env2.values[displ++] = state.maybeThunk(env2, i->second.e);
 
     state.eval(env2, body, v);
 }
@@ -736,7 +735,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
            argument (unless the attribute match specifies a `...').
            TODO: show the names of the expected/unexpected
            arguments. */
-        if (!fun.lambda.fun->formals->ellipsis && attrsUsed != arg.attrs->size())
+        if (!fun.lambda.fun->formals->ellipsis && attrsUsed != arg.attrs->size()) 
             throwTypeError("function at %1% called with unexpected argument", fun.lambda.fun->pos);
     }
 
@@ -764,10 +763,12 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
     foreach (Formals::Formals_::iterator, i, fun.lambda.fun->formals->formals) {
         Bindings::iterator j = args.find(i->name);
         if (j != args.end())
-            (*actualArgs.attrs)[i->name] = *j;
+            actualArgs.attrs->push_back(*j);
         else if (!i->def)
             throwTypeError("cannot auto-call a function that has an argument without a default value (`%1%')", i->name);
     }
+
+    actualArgs.attrs->sort();
 
     callFunction(fun, actualArgs, res);
 }
@@ -851,12 +852,28 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
     if (v1.attrs->size() == 0) { v = v2; return; }
     if (v2.attrs->size() == 0) { v = v1; return; }
 
-    state.cloneAttrs(v1, v);
+    state.mkAttrs(v);
 
-    /* !!! fix */
-    foreach (Bindings::iterator, i, *v2.attrs)
-        (*v.attrs)[i->name] = *i;
+    /* Merge the attribute sets, preferring values from the second
+       set.  Make sure to keep the resulting vector in sorted
+       order. */
+    Bindings::iterator i = v1.attrs->begin();
+    Bindings::iterator j = v2.attrs->begin();
 
+    while (i != v1.attrs->end() && j != v2.attrs->end()) {
+        if (i->name == j->name) {
+            v.attrs->push_back(*j);
+            ++i; ++j;
+        }
+        else if (i->name < j->name)
+            v.attrs->push_back(*i++);
+        else
+            v.attrs->push_back(*j++);
+    }
+
+    while (i != v1.attrs->end()) v.attrs->push_back(*i++);
+    while (j != v2.attrs->end()) v.attrs->push_back(*j++);
+    
     state.nrOpUpdateValuesCopied += v.attrs->size();
 }
 

@@ -93,20 +93,20 @@ static void addAttr(ExprAttrs * attrs, const vector<Symbol> & attrPath,
     unsigned int n = 0;
     foreach (vector<Symbol>::const_iterator, i, attrPath) {
         n++;
-        ExprAttrs::Attrs::iterator j = attrs->attrs.find(*i);
+        ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(*i);
         if (j != attrs->attrs.end()) {
-            ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.first);
-            if (!attrs2 || n == attrPath.size()) dupAttr(attrPath, pos, j->second.second);
-            attrs = attrs2;
+            if (!j->second.inherited) {
+                ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
+                if (!attrs2 || n == attrPath.size()) dupAttr(attrPath, pos, j->second.pos);
+                attrs = attrs2;
+            } else
+                dupAttr(attrPath, pos, j->second.pos);
         } else {
-            if (attrs->attrNames.find(*i) != attrs->attrNames.end())
-                dupAttr(attrPath, pos, attrs->attrNames[*i]);
-            attrs->attrNames[*i] = pos;
             if (n == attrPath.size())
-                attrs->attrs[*i] = ExprAttrs::Attr(e, pos);
+                attrs->attrs[*i] = ExprAttrs::AttrDef(e, pos);
             else {
                 ExprAttrs * nested = new ExprAttrs;
-                attrs->attrs[*i] = ExprAttrs::Attr(nested, pos);
+                attrs->attrs[*i] = ExprAttrs::AttrDef(nested, pos);
                 attrs = nested;
             }
         }
@@ -383,21 +383,19 @@ binds
   | binds INHERIT ids ';'
     { $$ = $1;
       foreach (vector<Symbol>::iterator, i, *$3) {
-          if ($$->attrNames.find(*i) != $$->attrNames.end())
-              dupAttr(*i, makeCurPos(@3, data), $$->attrNames[*i]);
+          if ($$->attrs.find(*i) != $$->attrs.end())
+              dupAttr(*i, makeCurPos(@3, data), $$->attrs[*i].pos);
           Pos pos = makeCurPos(@3, data);
-          $$->inherited.push_back(ExprAttrs::Inherited(*i, pos));
-          $$->attrNames[*i] = pos;
+          $$->attrs[*i] = ExprAttrs::AttrDef(*i, pos);
       }
     }
   | binds INHERIT '(' expr ')' ids ';'
     { $$ = $1;
       /* !!! Should ensure sharing of the expression in $4. */
       foreach (vector<Symbol>::iterator, i, *$6) {
-          if ($$->attrNames.find(*i) != $$->attrNames.end())
-              dupAttr(*i, makeCurPos(@6, data), $$->attrNames[*i]);
-          $$->attrs[*i] = ExprAttrs::Attr(new ExprSelect($4, *i), makeCurPos(@6, data));
-          $$->attrNames[*i] = makeCurPos(@6, data);
+          if ($$->attrs.find(*i) != $$->attrs.end())
+              dupAttr(*i, makeCurPos(@6, data), $$->attrs[*i].pos);
+          $$->attrs[*i] = ExprAttrs::AttrDef(new ExprSelect($4, *i), makeCurPos(@6, data));
       }}
 
   | { $$ = new ExprAttrs; }

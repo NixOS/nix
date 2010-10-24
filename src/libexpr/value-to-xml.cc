@@ -37,7 +37,7 @@ static void showAttrs(EvalState & state, bool strict, bool location,
         names.insert(i->name);
     
     foreach (StringSet::iterator, i, names) {
-        Attr & a(attrs[state.symbols.create(*i)]);
+        Attr & a(*attrs.find(state.symbols.create(*i)));
         
         XMLAttrs xmlAttrs;
         xmlAttrs["name"] = *i;

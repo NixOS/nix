@@ -34,7 +34,7 @@ class Bindings : public BindingsBase
 {
 public:
     iterator find(const Symbol & name);
-    Attr & operator [] (const Symbol & name);
+    void sort();
 };
 
 
@@ -142,6 +142,10 @@ struct Attr
     Attr(Symbol name, Value * value, Pos * pos = &noPos)
         : name(name), value(value), pos(pos) { };
     Attr() : pos(&noPos) { };
+    bool operator < (const Attr & a) const
+    {
+        return name < a.name;
+    }
 };
 
 

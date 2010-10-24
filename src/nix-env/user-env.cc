@@ -69,13 +69,14 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         mkString(*state.allocAttr(v, state.sOutPath), i->queryOutPath(state));
         if (drvPath != "")
             mkString(*state.allocAttr(v, state.sDrvPath), i->queryDrvPath(state));
-        
-        state.mkAttrs(*state.allocAttr(v, state.sMeta));
-        
+
+        Value & vMeta = *state.allocAttr(v, state.sMeta);
+        state.mkAttrs(vMeta);
+
         MetaInfo meta = i->queryMetaInfo(state);
 
         foreach (MetaInfo::const_iterator, j, meta) {
-            Value & v2(*state.allocAttr(*(*v.attrs)[state.sMeta].value, state.symbols.create(j->first)));
+            Value & v2(*state.allocAttr(vMeta, state.symbols.create(j->first)));
             switch (j->second.type) {
                 case MetaValue::tpInt: mkInt(v2, j->second.intValue); break;
                 case MetaValue::tpString: mkString(v2, j->second.stringValue); break;
@@ -92,6 +93,9 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
             }
         }
     
+        vMeta.attrs->sort();
+        v.attrs->sort();
+        
         /* This is only necessary when installing store paths, e.g.,
            `nix-env -i /nix/store/abcd...-foo'. */
         store->addTempRoot(i->queryOutPath(state));
@@ -118,7 +122,8 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     mkString(*state.allocAttr(args, state.sSystem), thisSystem);
     mkString(*state.allocAttr(args, state.symbols.create("manifest")),
         manifestFile, singleton<PathSet>(manifestFile));
-    (*args.attrs)[state.symbols.create("derivations")].value = &manifest;
+    args.attrs->push_back(Attr(state.symbols.create("derivations"), &manifest));
+    args.attrs->sort();
     mkApp(topLevel, envBuilder, args);
         
     /* Evaluate it. */

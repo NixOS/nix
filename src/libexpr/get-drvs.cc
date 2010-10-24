@@ -168,7 +168,7 @@ static void getDerivations(EvalState & state, Value & vIn,
         foreach (SortedSymbols::iterator, i, attrs) {
             startNest(nest, lvlDebug, format("evaluating attribute `%1%'") % i->first);
             string pathPrefix2 = addToPath(pathPrefix, i->first);
-            Value & v2(*(*v.attrs)[i->second].value);
+            Value & v2(*v.attrs->find(i->second)->value);
             if (combineChannels)
                 getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done);
             else if (getDerivation(state, v2, pathPrefix2, drvs, done)) {
