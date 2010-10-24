@@ -18,7 +18,7 @@ let
         inherit officialRelease;
 
         buildInputs =
-          [ curl bison flex2533 perl libxml2 libxslt w3m bzip2
+          [ curl bison24 flex2535 perl libxml2 libxslt w3m bzip2
             tetex dblatex nukeReferences
           ];
 
@@ -72,6 +72,7 @@ let
         configureFlags = ''
           --disable-init-state
           --with-bzip2=${bzip2}
+          --with-boehm-gc=${boehmgc}
         '';
       };
 
