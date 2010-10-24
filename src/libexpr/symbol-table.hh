@@ -28,6 +28,8 @@ private:
     friend class SymbolTable;
 
 public:
+    Symbol() : s(0) { };
+    
     bool operator == (const Symbol & s2) const
     {
         return s == s2.s;

@@ -13,7 +13,7 @@
 #include <gc/gc.h>
 #include <gc/gc_cpp.h>
 
-#define NEW (UseGC)
+#define NEW new (UseGC)
 
 #else
 
@@ -30,6 +30,23 @@
 
 
 namespace nix {
+
+
+Bindings::iterator Bindings::find(const Symbol & name)
+{
+    iterator i = begin();
+    for ( ; i != end() && i->name != name; ++i) ;
+    return i;
+}
+
+
+Attr & Bindings::operator [] (const Symbol & name)
+{
+    iterator i = find(name);
+    if (i != end()) return *i;
+    push_back(Attr(name, 0));
+    return back();
+}
     
 
 std::ostream & operator << (std::ostream & str, const Value & v)
@@ -62,7 +79,7 @@ std::ostream & operator << (std::ostream & str, const Value & v)
         typedef std::map<string, Value *> Sorted;
         Sorted sorted;
         foreach (Bindings::iterator, i, *v.attrs)
-            sorted[i->first] = i->second.value;
+            sorted[i->name] = i->value;
         foreach (Sorted::iterator, i, sorted)
             str << i->first << " = " << *i->second << "; ";
         str << "}";
@@ -152,7 +169,7 @@ void EvalState::addConstant(const string & name, Value & v)
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v2;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    (*baseEnv.values[0]->attrs)[symbols.create(name2)].value = v2;
+    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
 }
 
 
@@ -166,7 +183,7 @@ void EvalState::addPrimOp(const string & name,
     v->primOp = NEW PrimOp(primOp, arity, sym);
     staticBaseEnv.vars[sym] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
-    (*baseEnv.values[0]->attrs)[symbols.create(name2)].value = v;
+    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v));
 }
 
 
@@ -277,7 +294,7 @@ Value * EvalState::lookupVar(Env * env, const VarRef & var)
         while (1) {
             Bindings::iterator j = env->values[0]->attrs->find(var.name);
             if (j != env->values[0]->attrs->end())
-                return j->second.value;
+                return j->value;
             if (env->prevWith == 0)
                 throwEvalError("undefined variable `%1%'", var.name);
             for (unsigned int l = env->prevWith; l; --l, env = env->up) ;
@@ -305,9 +322,9 @@ Env & EvalState::allocEnv(unsigned int size)
 
 Value * EvalState::allocAttr(Value & vAttrs, const Symbol & name)
 {
-    Attr & a = (*vAttrs.attrs)[name];
-    a.value = allocValue();
-    return a.value;
+    Value * v = allocValue();
+    vAttrs.attrs->push_back(Attr(name, v));
+    return v;
 }
 
     
@@ -338,8 +355,7 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 void EvalState::cloneAttrs(Value & src, Value & dst)
 {
     mkAttrs(dst);
-    foreach (Bindings::iterator, i, *src.attrs)
-        (*dst.attrs)[i->first] = i->second;
+    *dst.attrs = *src.attrs;
 }
 
 
@@ -462,21 +478,18 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         /* The recursive attributes are evaluated in the new
            environment. */
         foreach (Attrs::iterator, i, attrs) {
-            nix::Attr & a = (*v.attrs)[i->first];
-            a.value = state.allocValue();
-            mkThunk(*a.value, env2, i->second.first);
-            env2.values[displ++] = a.value;
-            a.pos = &i->second.second;
+            Value * vAttr = state.allocValue();
+            mkThunk(*vAttr, env2, i->second.first);
+            env2.values[displ++] = vAttr;
+            v.attrs->push_back(nix::Attr(i->first, vAttr, &i->second.second));
         }
 
         /* The inherited attributes, on the other hand, are
            evaluated in the original environment. */
         foreach (list<Inherited>::iterator, i, inherited) {
-            nix::Attr & a = (*v.attrs)[i->first.name];
-            Value * v2 = state.lookupVar(&env, i->first);
-            a.value = v2;
-            env2.values[displ++] = v2;
-            a.pos = &i->second;
+            Value * vAttr = state.lookupVar(&env, i->first);
+            env2.values[displ++] = vAttr;
+            v.attrs->push_back(nix::Attr(i->first.name, vAttr, &i->second));
         }
 
         /* If the rec contains an attribute called `__overrides', then
@@ -489,12 +502,12 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            Hence we need __overrides.) */
         Bindings::iterator overrides = v.attrs->find(state.sOverrides);
         if (overrides != v.attrs->end()) {
-            state.forceAttrs(*overrides->second.value);
-            foreach (Bindings::iterator, i, *overrides->second.value->attrs) {
-                nix::Attr & a = (*v.attrs)[i->first];
+            state.forceAttrs(*overrides->value);
+            foreach (Bindings::iterator, i, *overrides->value->attrs) {
+                nix::Attr & a = (*v.attrs)[i->name];
                 if (a.value)
-                    env2.values[displs[i->first]] = i->second.value;
-                a = i->second;
+                    env2.values[displs[i->name]] = i->value;
+                a = *i;
             }
         }
     }
@@ -565,13 +578,13 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     if (i == v2.attrs->end())
         throwEvalError("attribute `%1%' missing", name);
     try {            
-        state.forceValue(*i->second.value);
+        state.forceValue(*i->value);
     } catch (Error & e) {
         addErrorPrefix(e, "while evaluating the attribute `%1%' at %2%:\n",
-            name, *i->second.pos);
+            name, *i->pos);
         throw;
     }
-    v = *i->second.value;
+    v = *i->value;
 }
 
 
@@ -676,7 +689,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
                 mkThunk(*env2.values[displ++], env2, i->def);
             } else {
                 attrsUsed++;
-                env2.values[displ++] = j->second.value;
+                env2.values[displ++] = j->value;
             }
         }
 
@@ -712,7 +725,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
     foreach (Formals::Formals_::iterator, i, fun.lambda.fun->formals->formals) {
         Bindings::iterator j = args.find(i->name);
         if (j != args.end())
-            (*actualArgs.attrs)[i->name] = j->second;
+            (*actualArgs.attrs)[i->name] = *j;
         else if (!i->def)
             throwTypeError("cannot auto-call a function that has an argument without a default value (`%1%')", i->name);
     }
@@ -801,8 +814,9 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 
     state.cloneAttrs(v1, v);
 
+    /* !!! fix */
     foreach (Bindings::iterator, i, *v2.attrs)
-        (*v.attrs)[i->first] = i->second;
+        (*v.attrs)[i->name] = *i;
 
     state.nrOpUpdateValuesCopied += v.attrs->size();
 }
@@ -880,7 +894,7 @@ void EvalState::strictForceValue(Value & v)
     
     if (v.type == tAttrs) {
         foreach (Bindings::iterator, i, *v.attrs)
-            strictForceValue(*i->second.value);
+            strictForceValue(*i->value);
     }
     
     else if (v.type == tList) {
@@ -971,7 +985,7 @@ bool EvalState::isDerivation(Value & v)
 {
     if (v.type != tAttrs) return false;
     Bindings::iterator i = v.attrs->find(sType);
-    return i != v.attrs->end() && forceStringNoCtx(*i->second.value) == "derivation";
+    return i != v.attrs->end() && forceStringNoCtx(*i->value) == "derivation";
 }
 
 
@@ -1015,7 +1029,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
         Bindings::iterator i = v.attrs->find(sOutPath);
         if (i == v.attrs->end())
             throwTypeError("cannot coerce an attribute set (except a derivation) to a string");
-        return coerceToString(*i->second.value, context, coerceMore, copyToStore);
+        return coerceToString(*i->value, context, coerceMore, copyToStore);
     }
 
     if (coerceMore) {
@@ -1103,7 +1117,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             if (v1.attrs->size() != v2.attrs->size()) return false;
             Bindings::iterator i = v1.attrs->begin(), j = v2.attrs->begin();
             for ( ; i != v1.attrs->end(); ++i, ++j)
-                if (i->first != j->first || !eqValues(*i->second.value, *j->second.value))
+                if (i->name != j->name || !eqValues(*i->value, *j->value))
                     return false;
             return true;
         }

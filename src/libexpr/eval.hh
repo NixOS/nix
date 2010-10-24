@@ -20,11 +20,22 @@ struct Env;
 struct Value;
 struct Attr;
 
+
+/* Attribute sets are represented as a vector of attributes, sorted by
+   symbol (i.e. pointer to the attribute name in the symbol table). */
 #if HAVE_BOEHMGC
-typedef std::map<Symbol, Attr, std::less<Symbol>, gc_allocator<std::pair<const Symbol, Attr> > > Bindings;
+typedef std::vector<Attr, gc_allocator<Attr> > BindingsBase;
 #else
-typedef std::map<Symbol, Attr> Bindings;
+typedef std::vector<Attr> BindingsBase;
 #endif
+
+
+class Bindings : public BindingsBase
+{
+public:
+    iterator find(const Symbol & name);
+    Attr & operator [] (const Symbol & name);
+};
 
 
 typedef enum {
@@ -125,8 +136,11 @@ struct Env
 
 struct Attr
 {
+    Symbol name;
     Value * value;
     Pos * pos;
+    Attr(Symbol name, Value * value, Pos * pos = &noPos)
+        : name(name), value(value), pos(pos) { };
     Attr() : pos(&noPos) { };
 };
 
