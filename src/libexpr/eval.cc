@@ -316,6 +316,11 @@ Env & EvalState::allocEnv(unsigned int size)
     nrEnvs++;
     nrValuesInEnvs += size;
     Env * env = (Env *) GC_MALLOC(sizeof(Env) + size * sizeof(Value *));
+
+    /* Clear the values because maybeThunk() expects this. */
+    for (unsigned i = 0; i < size; ++i)
+        env->values[i] = 0;
+    
     return *env;
 }
 
@@ -346,9 +351,45 @@ void EvalState::mkAttrs(Value & v)
 }
 
 
+unsigned long nrThunks = 0;
+
+static inline void mkThunk(Value & v, Env & env, Expr * expr)
+{
+    v.type = tThunk;
+    v.thunk.env = &env;
+    v.thunk.expr = expr;
+    nrThunks++;
+}
+
+
 void EvalState::mkThunk_(Value & v, Expr * expr)
 {
     mkThunk(v, baseEnv, expr);
+}
+
+
+unsigned long nrAvoided = 0;
+
+/* Create a thunk for the delayed computation of the given expression
+   in the given environment.  But if the expression is a variable,
+   then look it up right away.  This significantly reduces the number
+   of thunks allocated. */
+Value * EvalState::maybeThunk(Env & env, Expr * expr)
+{
+    ExprVar * var;
+    /* Ignore variables from `withs' because they can throw an
+       exception. */
+    if ((var = dynamic_cast<ExprVar *>(expr))) {
+        Value * v = lookupVar(&env, var->info);
+        /* The value might not be initialised in the environment yet.
+           In that case, ignore it. */
+        if (v) { nrAvoided++; return v; }
+    }
+
+    Value * v = allocValue();
+    mkThunk(*v, env, expr);
+
+    return v;
 }
 
 
@@ -478,8 +519,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         /* The recursive attributes are evaluated in the new
            environment. */
         foreach (Attrs::iterator, i, attrs) {
-            Value * vAttr = state.allocValue();
-            mkThunk(*vAttr, env2, i->second.first);
+            Value * vAttr = state.maybeThunk(env2, i->second.first);
             env2.values[displ++] = vAttr;
             v.attrs->push_back(nix::Attr(i->first, vAttr, &i->second.second));
         }
@@ -515,8 +555,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
     else {
         foreach (Attrs::iterator, i, attrs) {
             nix::Attr & a = (*v.attrs)[i->first];
-            a.value = state.allocValue();
-            mkThunk(*a.value, env, i->second.first);
+            a.value = state.maybeThunk(env, i->second.first);
             a.pos = &i->second.second;
         }
 
@@ -540,10 +579,8 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 
     /* The recursive attributes are evaluated in the new
        environment. */
-    foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs) {
-        env2.values[displ] = state.allocValue();
-        mkThunk(*env2.values[displ++], env2, i->second.first);
-    }
+    foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
+        env2.values[displ++] = state.maybeThunk(env2, i->second.first);
 
     /* The inherited attributes, on the other hand, are evaluated in
        the original environment. */
@@ -558,7 +595,7 @@ void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkList(v, elems.size());
     for (unsigned int n = 0; n < v.list.length; ++n)
-        mkThunk(*(v.list.elems[n] = state.allocValue()), env, elems[n]);
+        v.list.elems[n] = state.maybeThunk(env, elems[n]);
 }
 
 
@@ -570,10 +607,15 @@ void ExprVar::eval(EvalState & state, Env & env, Value & v)
 }
 
 
+unsigned long nrLookups = 0;
+unsigned long nrLookupSize = 0;
+
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
+    nrLookups++;
     Value v2;
     state.evalAttrs(env, e, v2);
+    nrLookupSize += v2.attrs->size();
     Bindings::iterator i = v2.attrs->find(name);
     if (i == v2.attrs->end())
         throwEvalError("attribute `%1%' missing", name);
@@ -608,9 +650,7 @@ void ExprApp::eval(EvalState & state, Env & env, Value & v)
 {
     Value vFun;
     state.eval(env, e1, vFun);
-    Value * vArg = state.allocValue();
-    mkThunk(*vArg, env, e2);
-    state.callFunction(vFun, *vArg, v);
+    state.callFunction(vFun, *state.maybeThunk(env, e2), v);
 }
 
 
@@ -685,8 +725,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
             if (j == arg.attrs->end()) {
                 if (!i->def) throwTypeError("function at %1% called without required argument `%2%'",
                     fun.lambda.fun->pos, i->name);
-                env2.values[displ] = allocValue();
-                mkThunk(*env2.values[displ++], env2, i->def);
+                env2.values[displ++] = maybeThunk(env2, i->def);
             } else {
                 attrsUsed++;
                 env2.values[displ++] = j->value;
@@ -1156,6 +1195,10 @@ void EvalState::printStats()
     printMsg(v, format("  right-biased unions: %1%") % nrOpUpdates);
     printMsg(v, format("  values copied in right-biased unions: %1%") % nrOpUpdateValuesCopied);
     printMsg(v, format("  symbols in symbol table: %1%") % symbols.size());
+    printMsg(v, format("  number of thunks: %1%") % nrThunks);
+    printMsg(v, format("  number of thunks avoided: %1%") % nrAvoided);
+    printMsg(v, format("  number of attr lookups: %1%") % nrLookups);
+    printMsg(v, format("  attr lookup size: %1%") % nrLookupSize);
 }
 
 

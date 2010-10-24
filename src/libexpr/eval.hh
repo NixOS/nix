@@ -169,14 +169,6 @@ static inline void mkBool(Value & v, bool b)
 }
 
 
-static inline void mkThunk(Value & v, Env & env, Expr * expr)
-{
-    v.type = tThunk;
-    v.thunk.env = &env;
-    v.thunk.expr = expr;
-}
-
-
 static inline void mkApp(Value & v, Value & left, Value & right)
 {
     v.type = tApp;
@@ -325,6 +317,8 @@ public:
     void mkList(Value & v, unsigned int length);
     void mkAttrs(Value & v);
     void mkThunk_(Value & v, Expr * expr);
+
+    Value * maybeThunk(Env & env, Expr * expr);
     
     void cloneAttrs(Value & src, Value & dst);
 

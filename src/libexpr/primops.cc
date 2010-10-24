@@ -1070,7 +1070,7 @@ void EvalState::createBaseEnv()
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
     string s = "attrs: let res = derivationStrict attrs; in attrs // { drvPath = res.drvPath; outPath = res.outPath; type = \"derivation\"; }";
-    mkThunk(v, baseEnv, parseExprFromString(*this, s, "/"));
+    mkThunk_(v, parseExprFromString(*this, s, "/"));
     addConstant("derivation", v);
 
     // Paths
