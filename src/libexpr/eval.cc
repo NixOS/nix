@@ -259,9 +259,8 @@ void mkString(Value & v, const string & s, const PathSet & context)
     mkString(v, s.c_str());
     if (!context.empty()) {
         unsigned int n = 0;
-        v.string.context = (const char * *)
-            GC_MALLOC((context.size() + 1) * sizeof(char *));
-        foreach (PathSet::const_iterator, i, context) 
+        v.string.context = NEW const char *[context.size() + 1];
+        foreach (PathSet::const_iterator, i, context)  
             v.string.context[n++] = GC_STRDUP(i->c_str());
         v.string.context[n] = 0;
     }
@@ -305,7 +304,7 @@ Value * EvalState::lookupVar(Env * env, const VarRef & var)
 Value * EvalState::allocValue()
 {
     nrValues++;
-    return (Value *) GC_MALLOC(sizeof(Value));
+    return NEW Value;
 }
 
 
@@ -314,6 +313,7 @@ Env & EvalState::allocEnv(unsigned int size)
     nrEnvs++;
     nrValuesInEnvs += size;
     Env * env = (Env *) GC_MALLOC(sizeof(Env) + size * sizeof(Value *));
+    if (!env) throw std::bad_alloc();
 
     /* Clear the values because maybeThunk() expects this. */
     for (unsigned i = 0; i < size; ++i)
@@ -335,7 +335,7 @@ void EvalState::mkList(Value & v, unsigned int length)
 {
     v.type = tList;
     v.list.length = length;
-    v.list.elems = (Value * *) GC_MALLOC(length * sizeof(Value *));
+    v.list.elems = NEW Value *[length];
     nrListElems += length;
 }
 

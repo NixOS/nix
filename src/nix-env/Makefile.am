@@ -4,8 +4,7 @@ nix_env_SOURCES = nix-env.cc profiles.cc profiles.hh user-env.cc user-env.hh hel
 
 nix_env_LDADD = ../libmain/libmain.la ../libexpr/libexpr.la \
  ../libstore/libstore.la ../libutil/libutil.la \
- ../boost/format/libformat.la @ADDITIONAL_NETWORK_LIBS@ \
- @boehmgc_lib@
+ ../boost/format/libformat.la @ADDITIONAL_NETWORK_LIBS@
 
 nix-env.o: help.txt.hh
 
