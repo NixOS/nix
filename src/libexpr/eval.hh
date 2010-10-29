@@ -7,6 +7,10 @@
 
 #include <map>
 
+#if HAVE_BOEHMGC
+#include <gc/gc_allocator.h>
+#endif
+
 
 namespace nix {
 
@@ -16,7 +20,22 @@ struct Env;
 struct Value;
 struct Attr;
 
-typedef std::map<Symbol, Attr> Bindings;
+
+/* Attribute sets are represented as a vector of attributes, sorted by
+   symbol (i.e. pointer to the attribute name in the symbol table). */
+#if HAVE_BOEHMGC
+typedef std::vector<Attr, gc_allocator<Attr> > BindingsBase;
+#else
+typedef std::vector<Attr> BindingsBase;
+#endif
+
+
+class Bindings : public BindingsBase
+{
+public:
+    iterator find(const Symbol & name);
+    void sort();
+};
 
 
 typedef enum {
@@ -30,14 +49,23 @@ typedef enum {
     tThunk,
     tApp,
     tLambda,
-    tCopy,
     tBlackhole,
     tPrimOp,
     tPrimOpApp,
 } ValueType;
 
 
-typedef void (* PrimOp) (EvalState & state, Value * * args, Value & v);
+typedef void (* PrimOpFun) (EvalState & state, Value * * args, Value & v);
+
+
+struct PrimOp
+{
+    PrimOpFun fun;
+    unsigned int arity;
+    Symbol name;
+    PrimOp(PrimOpFun fun, unsigned int arity, Symbol name)
+        : fun(fun), arity(arity), name(name) { }
+};
 
 
 struct Value
@@ -90,15 +118,9 @@ struct Value
             Env * env;
             ExprLambda * fun;
         } lambda;
-        Value * val;
-        struct {
-            PrimOp fun;
-            char * name;
-            unsigned int arity;
-        } primOp;
+        PrimOp * primOp;
         struct {
             Value * left, * right;
-            unsigned int argsLeft;
         } primOpApp;
     };
 };
@@ -108,20 +130,36 @@ struct Env
 {
     Env * up;
     unsigned int prevWith; // nr of levels up to next `with' environment
-    Value values[0];
+    Value * values[0];
 };
 
 
 struct Attr
 {
-    Value value;
+    Symbol name;
+    Value * value;
     Pos * pos;
+    Attr(Symbol name, Value * value, Pos * pos = &noPos)
+        : name(name), value(value), pos(pos) { };
     Attr() : pos(&noPos) { };
+    bool operator < (const Attr & a) const
+    {
+        return name < a.name;
+    }
 };
+
+
+/* After overwriting an app node, be sure to clear pointers in the
+   Value to ensure that the target isn't kept alive unnecessarily. */
+static inline void clearValue(Value & v)
+{
+    v.app.right = 0;
+}
 
 
 static inline void mkInt(Value & v, int n)
 {
+    clearValue(v);
     v.type = tInt;
     v.integer = n;
 }
@@ -129,23 +167,9 @@ static inline void mkInt(Value & v, int n)
 
 static inline void mkBool(Value & v, bool b)
 {
+    clearValue(v);
     v.type = tBool;
     v.boolean = b;
-}
-
-
-static inline void mkThunk(Value & v, Env & env, Expr * expr)
-{
-    v.type = tThunk;
-    v.thunk.env = &env;
-    v.thunk.expr = expr;
-}
-
-
-static inline void mkCopy(Value & v, Value & src)
-{
-    v.type = tCopy;
-    v.val = &src;
 }
 
 
@@ -268,7 +292,7 @@ private:
     void addConstant(const string & name, Value & v);
 
     void addPrimOp(const string & name,
-        unsigned int arity, PrimOp primOp);
+        unsigned int arity, PrimOpFun primOp);
 
     Value * lookupVar(Env * env, const VarRef & var);
     
@@ -286,18 +310,20 @@ public:
 
     /* Automatically call a function for which each argument has a
        default value or has a binding in the `args' map. */
-    void autoCallFunction(const Bindings & args, Value & fun, Value & res);
+    void autoCallFunction(Bindings & args, Value & fun, Value & res);
     
     /* Allocation primitives. */
-    Value * allocValues(unsigned int count);
+    Value * allocValue();
     Env & allocEnv(unsigned int size);
 
-    void mkList(Value & v, unsigned int length);
-    void mkAttrs(Value & v);
-    void mkThunk_(Value & v, Expr * expr);
-    
-    void cloneAttrs(Value & src, Value & dst);
+    Value * allocAttr(Value & vAttrs, const Symbol & name);
 
+    void mkList(Value & v, unsigned int length);
+    void mkAttrs(Value & v, unsigned int expected);
+    void mkThunk_(Value & v, Expr * expr);
+
+    Value * maybeThunk(Env & env, Expr * expr);
+    
     /* Print statistics. */
     void printStats();
 
@@ -308,11 +334,15 @@ private:
     unsigned long nrValues;
     unsigned long nrListElems;
     unsigned long nrEvaluated;
+    unsigned long nrAttrsets;
+    unsigned long nrOpUpdates;
+    unsigned long nrOpUpdateValuesCopied;
     unsigned int recursionDepth;
     unsigned int maxRecursionDepth;
     char * deepestStack; /* for measuring stack usage */
     
     friend class RecursionCounter;
+    friend class ExprOpUpdate;
 };
 
 

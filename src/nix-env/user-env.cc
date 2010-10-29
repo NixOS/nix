@@ -25,7 +25,8 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
     if (pathExists(manifestFile)) {
         Value v;
         state.eval(parseExprFromFile(state, manifestFile), v);
-        getDerivations(state, v, "", Bindings(), elems);
+        Bindings bindings;
+        getDerivations(state, v, "", bindings, elems);
     } else if (pathExists(oldManifestFile))
         readLegacyManifest(oldManifestFile, elems);
 
@@ -58,23 +59,24 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
            the meta attributes. */
         Path drvPath = keepDerivations ? i->queryDrvPath(state) : "";
 
-        Value & v(*state.allocValues(1));
+        Value & v(*state.allocValue());
         manifest.list.elems[n++] = &v;
-        state.mkAttrs(v);
+        state.mkAttrs(v, 8);
 
-        mkString((*v.attrs)[state.sType].value, "derivation");
-        mkString((*v.attrs)[state.sName].value, i->name);
-        mkString((*v.attrs)[state.sSystem].value, i->system);
-        mkString((*v.attrs)[state.sOutPath].value, i->queryOutPath(state));
+        mkString(*state.allocAttr(v, state.sType), "derivation");
+        mkString(*state.allocAttr(v, state.sName), i->name);
+        mkString(*state.allocAttr(v, state.sSystem), i->system);
+        mkString(*state.allocAttr(v, state.sOutPath), i->queryOutPath(state));
         if (drvPath != "")
-            mkString((*v.attrs)[state.sDrvPath].value, i->queryDrvPath(state));
-        
-        state.mkAttrs((*v.attrs)[state.sMeta].value);
-        
+            mkString(*state.allocAttr(v, state.sDrvPath), i->queryDrvPath(state));
+
+        Value & vMeta = *state.allocAttr(v, state.sMeta);
+        state.mkAttrs(vMeta, 16);
+
         MetaInfo meta = i->queryMetaInfo(state);
 
         foreach (MetaInfo::const_iterator, j, meta) {
-            Value & v2((*(*v.attrs)[state.sMeta].value.attrs)[state.symbols.create(j->first)].value);
+            Value & v2(*state.allocAttr(vMeta, state.symbols.create(j->first)));
             switch (j->second.type) {
                 case MetaValue::tpInt: mkInt(v2, j->second.intValue); break;
                 case MetaValue::tpString: mkString(v2, j->second.stringValue); break;
@@ -82,7 +84,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
                     state.mkList(v2, j->second.stringValues.size());
                     unsigned int m = 0;
                     foreach (Strings::const_iterator, k, j->second.stringValues) {
-                        v2.list.elems[m] = state.allocValues(1);
+                        v2.list.elems[m] = state.allocValue();
                         mkString(*v2.list.elems[m++], *k);
                     }
                     break;
@@ -91,6 +93,9 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
             }
         }
     
+        vMeta.attrs->sort();
+        v.attrs->sort();
+        
         /* This is only necessary when installing store paths, e.g.,
            `nix-env -i /nix/store/abcd...-foo'. */
         store->addTempRoot(i->queryOutPath(state));
@@ -113,11 +118,12 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     /* Construct a Nix expression that calls the user environment
        builder with the manifest as argument. */
     Value args, topLevel;
-    state.mkAttrs(args);
-    mkString((*args.attrs)[state.sSystem].value, thisSystem);
-    mkString((*args.attrs)[state.symbols.create("manifest")].value,
+    state.mkAttrs(args, 3);
+    mkString(*state.allocAttr(args, state.sSystem), thisSystem);
+    mkString(*state.allocAttr(args, state.symbols.create("manifest")),
         manifestFile, singleton<PathSet>(manifestFile));
-    (*args.attrs)[state.symbols.create("derivations")].value = manifest;
+    args.attrs->push_back(Attr(state.symbols.create("derivations"), &manifest));
+    args.attrs->sort();
     mkApp(topLevel, envBuilder, args);
         
     /* Evaluate it. */

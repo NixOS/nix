@@ -119,24 +119,24 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
         args[0]->attrs->find(state.symbols.create("startSet"));
     if (startSet == args[0]->attrs->end())
         throw EvalError("attribute `startSet' required");
-    state.forceList(startSet->second.value);
+    state.forceList(*startSet->value);
 
     list<Value *> workSet;
-    for (unsigned int n = 0; n < startSet->second.value.list.length; ++n)
-        workSet.push_back(startSet->second.value.list.elems[n]);
+    for (unsigned int n = 0; n < startSet->value->list.length; ++n)
+        workSet.push_back(startSet->value->list.elems[n]);
 
     /* Get the operator. */
     Bindings::iterator op =
         args[0]->attrs->find(state.symbols.create("operator"));
     if (op == args[0]->attrs->end())
         throw EvalError("attribute `operator' required");
-    state.forceValue(op->second.value);
+    state.forceValue(*op->value);
 
     /* Construct the closure by applying the operator to element of
        `workSet', adding the result to `workSet', continuing until
        no new elements are found. */
     list<Value> res;
-    set<Value, CompareValues> doneKeys;
+    set<Value, CompareValues> doneKeys; // !!! use Value *?
     while (!workSet.empty()) {
 	Value * e = *(workSet.begin());
 	workSet.pop_front();
@@ -147,15 +147,15 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
             e->attrs->find(state.symbols.create("key"));
         if (key == e->attrs->end())
             throw EvalError("attribute `key' required");
-        state.forceValue(key->second.value);
+        state.forceValue(*key->value);
 
-        if (doneKeys.find(key->second.value) != doneKeys.end()) continue;
-        doneKeys.insert(key->second.value);
+        if (doneKeys.find(*key->value) != doneKeys.end()) continue;
+        doneKeys.insert(*key->value);
         res.push_back(*e);
         
         /* Call the `operator' function with `e' as argument. */
         Value call;
-        mkApp(call, op->second.value, *e);
+        mkApp(call, *op->value, *e);
         state.forceList(call);
 
         /* Add the values returned by the operator to the work set. */
@@ -167,13 +167,9 @@ static void prim_genericClosure(EvalState & state, Value * * args, Value & v)
 
     /* Create the result list. */
     state.mkList(v, res.size());
-    Value * vs = state.allocValues(res.size());
-
     unsigned int n = 0;
-    foreach (list<Value>::iterator, i, res) {
-        v.list.elems[n] = &vs[n];
-        vs[n++] = *i;
-    }
+    foreach (list<Value>::iterator, i, res)
+        *(v.list.elems[n++] = state.allocValue()) = *i;
 }
 
 
@@ -210,15 +206,16 @@ static void prim_addErrorContext(EvalState & state, Value * * args, Value & v)
  * else => {success=false; value=false;} */
 static void prim_tryEval(EvalState & state, Value * * args, Value & v)
 {
-    state.mkAttrs(v);
+    state.mkAttrs(v, 2);
     try {
         state.forceValue(*args[0]);
-        (*v.attrs)[state.symbols.create("value")].value = *args[0];
-        mkBool((*v.attrs)[state.symbols.create("success")].value, true);
+        v.attrs->push_back(Attr(state.symbols.create("value"), args[0]));
+        mkBool(*state.allocAttr(v, state.symbols.create("success")), true);
     } catch (AssertionError & e) {
-        mkBool((*v.attrs)[state.symbols.create("value")].value, false);
-        mkBool((*v.attrs)[state.symbols.create("success")].value, false);
+        mkBool(*state.allocAttr(v, state.symbols.create("value")), false);
+        mkBool(*state.allocAttr(v, state.symbols.create("success")), false);
     }
+    v.attrs->sort();
 }
 
 
@@ -324,9 +321,9 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     if (attr == args[0]->attrs->end())
         throw EvalError("required attribute `name' missing");
     string drvName;
-    Pos & posDrvName(*attr->second.pos);
+    Pos & posDrvName(*attr->pos);
     try {        
-        drvName = state.forceStringNoCtx(attr->second.value);
+        drvName = state.forceStringNoCtx(*attr->value);
     } catch (Error & e) {
         e.addPrefix(format("while evaluating the derivation attribute `name' at %1%:\n") % posDrvName);
         throw;
@@ -341,7 +338,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     bool outputHashRecursive = false;
 
     foreach (Bindings::iterator, i, *args[0]->attrs) {
-        string key = i->first;
+        string key = i->name;
         startNest(nest, lvlVomit, format("processing attribute `%1%'") % key);
 
         try {
@@ -349,9 +346,9 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
             if (key == "args") {
-                state.forceList(i->second.value);
-                for (unsigned int n = 0; n < i->second.value.list.length; ++n) {
-                    string s = state.coerceToString(*i->second.value.list.elems[n], context, true);
+                state.forceList(*i->value);
+                for (unsigned int n = 0; n < i->value->list.length; ++n) {
+                    string s = state.coerceToString(*i->value->list.elems[n], context, true);
                     drv.args.push_back(s);
                 }
             }
@@ -359,11 +356,11 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
             /* All other attributes are passed to the builder through
                the environment. */
             else {
-                string s = state.coerceToString(i->second.value, context, true);
+                string s = state.coerceToString(*i->value, context, true);
                 drv.env[key] = s;
                 if (key == "builder") drv.builder = s;
-                else if (i->first == state.sSystem) drv.platform = s;
-                else if (i->first == state.sName) drvName = s;
+                else if (i->name == state.sSystem) drv.platform = s;
+                else if (i->name == state.sName) drvName = s;
                 else if (key == "outputHash") outputHash = s;
                 else if (key == "outputHashAlgo") outputHashAlgo = s;
                 else if (key == "outputHashMode") {
@@ -375,7 +372,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
 
         } catch (Error & e) {
             e.addPrefix(format("while evaluating the derivation attribute `%1%' at %2%:\n")
-                % key % *i->second.pos);
+                % key % *i->pos);
             e.addPrefix(format("while instantiating the derivation named `%1%' at %2%:\n")
                 % drvName % posDrvName);
             throw;
@@ -487,9 +484,10 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     state.drvHashes[drvPath] = hashDerivationModulo(state, drv);
 
     /* !!! assumes a single output */
-    state.mkAttrs(v);
-    mkString((*v.attrs)[state.sOutPath].value, outPath, singleton<PathSet>(drvPath));
-    mkString((*v.attrs)[state.sDrvPath].value, drvPath, singleton<PathSet>("=" + drvPath));
+    state.mkAttrs(v, 2);
+    mkString(*state.allocAttr(v, state.sOutPath), outPath, singleton<PathSet>(drvPath));
+    mkString(*state.allocAttr(v, state.sDrvPath), drvPath, singleton<PathSet>("=" + drvPath));
+    v.attrs->sort();
 }
 
 
@@ -689,17 +687,14 @@ static void prim_attrNames(EvalState & state, Value * * args, Value & v)
     state.forceAttrs(*args[0]);
 
     state.mkList(v, args[0]->attrs->size());
-    Value * vs = state.allocValues(v.list.length);
 
     StringSet names;
     foreach (Bindings::iterator, i, *args[0]->attrs)
-        names.insert(i->first);
+        names.insert(i->name);
 
     unsigned int n = 0;
-    foreach (StringSet::iterator, i, names) {
-        v.list.elems[n] = &vs[n];
-        mkString(vs[n++], *i);
-    }
+    foreach (StringSet::iterator, i, names)
+        mkString(*(v.list.elems[n++] = state.allocValue()), *i);
 }
 
 
@@ -713,8 +708,8 @@ static void prim_getAttr(EvalState & state, Value * * args, Value & v)
     if (i == args[1]->attrs->end())
         throw EvalError(format("attribute `%1%' missing") % attr);
     // !!! add to stack trace?
-    state.forceValue(i->second.value);
-    v = i->second.value;
+    state.forceValue(*i->value);
+    v = *i->value;
 }
 
 
@@ -740,11 +735,20 @@ static void prim_removeAttrs(EvalState & state, Value * * args, Value & v)
     state.forceAttrs(*args[0]);
     state.forceList(*args[1]);
 
-    state.cloneAttrs(*args[0], v);
-
+    /* Get the attribute names to be removed. */
+    std::set<Symbol> names;
     for (unsigned int i = 0; i < args[1]->list.length; ++i) {
         state.forceStringNoCtx(*args[1]->list.elems[i]);
-        v.attrs->erase(state.symbols.create(args[1]->list.elems[i]->string.s));
+        names.insert(state.symbols.create(args[1]->list.elems[i]->string.s));
+    }
+
+    /* Copy all attributes not in that set.  Note that we don't need
+       to sort v.attrs because it's a subset of an already sorted
+       vector. */
+    state.mkAttrs(v, args[0]->attrs->size());
+    foreach (Bindings::iterator, i, *args[0]->attrs) {
+        if (names.find(i->name) == names.end())
+            v.attrs->push_back(*i);
     }
 }
 
@@ -757,7 +761,9 @@ static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
 {
     state.forceList(*args[0]);
 
-    state.mkAttrs(v);
+    state.mkAttrs(v, args[0]->list.length);
+
+    std::set<Symbol> seen;
 
     for (unsigned int i = 0; i < args[0]->list.length; ++i) {
         Value & v2(*args[0]->list.elems[i]);
@@ -766,16 +772,21 @@ static void prim_listToAttrs(EvalState & state, Value * * args, Value & v)
         Bindings::iterator j = v2.attrs->find(state.sName);
         if (j == v2.attrs->end())
             throw TypeError("`name' attribute missing in a call to `listToAttrs'");
-        string name = state.forceStringNoCtx(j->second.value);
+        string name = state.forceStringNoCtx(*j->value);
         
-        j = v2.attrs->find(state.symbols.create("value"));
-        if (j == v2.attrs->end())
+        Bindings::iterator j2 = v2.attrs->find(state.symbols.create("value"));
+        if (j2 == v2.attrs->end())
             throw TypeError("`value' attribute missing in a call to `listToAttrs'");
 
-        Attr & a = (*v.attrs)[state.symbols.create(name)];
-        mkCopy(a.value, j->second.value);
-        a.pos = j->second.pos;
+        Symbol sym = state.symbols.create(name);
+        if (seen.find(sym) == seen.end()) {
+            v.attrs->push_back(Attr(sym, j2->value, j2->pos));
+            seen.insert(sym);
+        }
+        /* !!! Throw an error if `name' already exists? */
     }
+
+    v.attrs->sort();
 }
 
 
@@ -787,15 +798,12 @@ static void prim_intersectAttrs(EvalState & state, Value * * args, Value & v)
     state.forceAttrs(*args[0]);
     state.forceAttrs(*args[1]);
         
-    state.mkAttrs(v);
+    state.mkAttrs(v, std::min(args[0]->attrs->size(), args[1]->attrs->size()));
 
     foreach (Bindings::iterator, i, *args[0]->attrs) {
-        Bindings::iterator j = args[1]->attrs->find(i->first);
-        if (j != args[1]->attrs->end()) {
-            Attr & a = (*v.attrs)[j->first];
-            mkCopy(a.value, j->second.value);
-            a.pos = j->second.pos;
-        }
+        Bindings::iterator j = args[1]->attrs->find(i->name);
+        if (j != args[1]->attrs->end())
+            v.attrs->push_back(*j);
     }
 }
 
@@ -819,12 +827,16 @@ static void prim_functionArgs(EvalState & state, Value * * args, Value & v)
     if (args[0]->type != tLambda)
         throw TypeError("`functionArgs' requires a function");
 
-    state.mkAttrs(v);
+    if (!args[0]->lambda.fun->matchAttrs) {
+        state.mkAttrs(v, 0);
+        return;
+    }
 
-    if (!args[0]->lambda.fun->matchAttrs) return;
-
+    state.mkAttrs(v, args[0]->lambda.fun->formals->formals.size());
     foreach (Formals::Formals_::iterator, i, args[0]->lambda.fun->formals->formals)
-        mkBool((*v.attrs)[i->name].value, i->def);
+        // !!! should optimise booleans (allocate only once)
+        mkBool(*state.allocAttr(v, i->name), i->def);
+    v.attrs->sort();
 }
 
 
@@ -872,12 +884,10 @@ static void prim_map(EvalState & state, Value * * args, Value & v)
     state.forceList(*args[1]);
 
     state.mkList(v, args[1]->list.length);
-    Value * vs = state.allocValues(v.list.length);
 
-    for (unsigned int n = 0; n < v.list.length; ++n) {
-        v.list.elems[n] = &vs[n];
-        mkApp(vs[n], *args[0], *args[1]->list.elems[n]);
-    }
+    for (unsigned int n = 0; n < v.list.length; ++n)
+        mkApp(*(v.list.elems[n] = state.allocValue()), 
+            *args[0], *args[1]->list.elems[n]);
 }
 
 
@@ -1006,9 +1016,10 @@ static void prim_parseDrvName(EvalState & state, Value * * args, Value & v)
 {
     string name = state.forceStringNoCtx(*args[0]);
     DrvName parsed(name);
-    state.mkAttrs(v);
-    mkString((*v.attrs)[state.sName].value, parsed.name);
-    mkString((*v.attrs)[state.symbols.create("version")].value, parsed.version);
+    state.mkAttrs(v, 2);
+    mkString(*state.allocAttr(v, state.sName), parsed.name);
+    mkString(*state.allocAttr(v, state.symbols.create("version")), parsed.version);
+    v.attrs->sort();
 }
 
 
@@ -1033,7 +1044,7 @@ void EvalState::createBaseEnv()
     Value v;
 
     /* `builtins' must be first! */
-    mkAttrs(v);
+    mkAttrs(v, 128);
     addConstant("builtins", v);
 
     mkBool(v, true);
@@ -1072,7 +1083,7 @@ void EvalState::createBaseEnv()
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
     string s = "attrs: let res = derivationStrict attrs; in attrs // { drvPath = res.drvPath; outPath = res.outPath; type = \"derivation\"; }";
-    mkThunk(v, baseEnv, parseExprFromString(*this, s, "/"));
+    mkThunk_(v, parseExprFromString(*this, s, "/"));
     addConstant("derivation", v);
 
     // Paths
@@ -1121,7 +1132,11 @@ void EvalState::createBaseEnv()
 
     // Versions
     addPrimOp("__parseDrvName", 1, prim_parseDrvName);
-    addPrimOp("__compareVersions", 2, prim_compareVersions);    
+    addPrimOp("__compareVersions", 2, prim_compareVersions);
+
+    /* Now that we've added all primops, sort the `builtins' attribute
+       set, because attribute lookups expect it to be sorted. */
+    baseEnv.values[0]->attrs->sort();
 }
 
 

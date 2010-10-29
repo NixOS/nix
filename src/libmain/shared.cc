@@ -13,6 +13,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#if HAVE_BOEHMGC
+#include <gc/gc.h>
+#endif
+
 
 namespace nix {
 
@@ -314,6 +318,14 @@ static void setuidInit()
 }
 
 
+/* Called when the Boehm GC runs out of memory. */
+static void * oomHandler(size_t requested)
+{
+    /* Convert this to a proper C++ exception. */
+    throw std::bad_alloc();
+}
+
+
 }
 
 
@@ -334,6 +346,26 @@ int main(int argc, char * * argv)
 #endif
 
     std::ios::sync_with_stdio(false);
+
+#if HAVE_BOEHMGC
+    /* Initialise the Boehm garbage collector.  This isn't necessary
+       on most platforms, but for portability we do it anyway. */
+    GC_INIT();
+
+    GC_oom_fn = oomHandler;
+
+    /* Set the initial heap size to something fairly big (384 MiB) so
+       that in most cases we don't need to garbage collect at all.
+       (Collection has a fairly significant overhead, some.)  The heap
+       size can be overriden through libgc's GC_INITIAL_HEAP_SIZE
+       environment variable.  We should probably also provide a
+       nix.conf setting for this.  Note that GC_expand_hp() causes a
+       lot of virtual, but not physical (resident) memory to be
+       allocated.  This might be a problem on systems that don't
+       overcommit. */
+    if (!getenv("GC_INITIAL_HEAP_SIZE"))
+        GC_expand_hp(384 * 1024 * 1024);
+#endif
 
     try {
         try {

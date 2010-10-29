@@ -8,12 +8,43 @@
 
 #include <cstring>
 
+#if HAVE_BOEHMGC
+
+#include <gc/gc.h>
+#include <gc/gc_cpp.h>
+
+#define NEW new (UseGC)
+
+#else
+
+#define GC_STRDUP strdup
+#define GC_MALLOC malloc
+
+#define NEW new
+
+#endif
+
 
 #define LocalNoInline(f) static f __attribute__((noinline)); f
 #define LocalNoInlineNoReturn(f) static f __attribute__((noinline, noreturn)); f
 
 
 namespace nix {
+
+
+Bindings::iterator Bindings::find(const Symbol & name)
+{
+    Attr key(name, 0);
+    iterator i = lower_bound(begin(), end(), key);
+    if (i != end() && i->name == name) return i;
+    return end();
+}
+
+
+void Bindings::sort()
+{
+    std::sort(begin(), end());
+}
     
 
 std::ostream & operator << (std::ostream & str, const Value & v)
@@ -46,7 +77,7 @@ std::ostream & operator << (std::ostream & str, const Value & v)
         typedef std::map<string, Value *> Sorted;
         Sorted sorted;
         foreach (Bindings::iterator, i, *v.attrs)
-            sorted[i->first] = &i->second.value;
+            sorted[i->name] = i->value;
         foreach (Sorted::iterator, i, sorted)
             str << i->first << " = " << *i->second << "; ";
         str << "}";
@@ -60,7 +91,6 @@ std::ostream & operator << (std::ostream & str, const Value & v)
         break;
     case tThunk:
     case tApp:
-    case tCopy:
         str << "<CODE>";
         break;
     case tLambda:
@@ -92,7 +122,6 @@ string showType(const Value & v)
         case tThunk: return "a thunk";
         case tApp: return "a function application";
         case tLambda: return "a function";
-        case tCopy: return "a copy";
         case tBlackhole: return "a black hole";
         case tPrimOp: return "a built-in function";
         case tPrimOpApp: return "a partially applied built-in function";
@@ -116,6 +145,7 @@ EvalState::EvalState()
 {
     nrEnvs = nrValuesInEnvs = nrValues = nrListElems = 0;
     nrEvaluated = recursionDepth = maxRecursionDepth = 0;
+    nrAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
     deepestStack = (char *) -1;
 
     createBaseEnv();
@@ -132,25 +162,26 @@ EvalState::~EvalState()
 
 void EvalState::addConstant(const string & name, Value & v)
 {
+    Value * v2 = allocValue();
+    *v2 = v;
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
-    baseEnv.values[baseEnvDispl++] = v;
+    baseEnv.values[baseEnvDispl++] = v2;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    (*baseEnv.values[0].attrs)[symbols.create(name2)].value = v;
+    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
 }
 
 
 void EvalState::addPrimOp(const string & name,
-    unsigned int arity, PrimOp primOp)
+    unsigned int arity, PrimOpFun primOp)
 {
-    Value v;
+    Value * v = allocValue();
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    v.type = tPrimOp;
-    v.primOp.arity = arity;
-    v.primOp.fun = primOp;
-    v.primOp.name = strdup(name2.c_str());
+    Symbol sym = symbols.create(name2);
+    v->type = tPrimOp;
+    v->primOp = NEW PrimOp(primOp, arity, sym);
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
-    (*baseEnv.values[0].attrs)[symbols.create(name2)].value = v;
+    baseEnv.values[0]->attrs->push_back(Attr(sym, v));
 }
 
 
@@ -218,7 +249,7 @@ LocalNoInline(void addErrorPrefix(Error & e, const char * s, const string & s2, 
 void mkString(Value & v, const char * s)
 {
     v.type = tString;
-    v.string.s = strdup(s);
+    v.string.s = GC_STRDUP(s);
     v.string.context = 0;
 }
 
@@ -228,18 +259,28 @@ void mkString(Value & v, const string & s, const PathSet & context)
     mkString(v, s.c_str());
     if (!context.empty()) {
         unsigned int n = 0;
-        v.string.context = new const char *[context.size() + 1];
-        foreach (PathSet::const_iterator, i, context) 
-            v.string.context[n++] = strdup(i->c_str());
+        v.string.context = (const char * *)
+            GC_MALLOC((context.size() + 1) * sizeof(char *));
+        foreach (PathSet::const_iterator, i, context)  
+            v.string.context[n++] = GC_STRDUP(i->c_str());
         v.string.context[n] = 0;
     }
 }
 
 
+void mkString(Value & v, const Symbol & s)
+{
+    v.type = tString;
+    v.string.s = ((string) s).c_str();
+    v.string.context = 0;
+}
+
+
 void mkPath(Value & v, const char * s)
 {
+    clearValue(v);
     v.type = tPath;
-    v.path = strdup(s);
+    v.path = GC_STRDUP(s);
 }
 
 
@@ -249,22 +290,22 @@ Value * EvalState::lookupVar(Env * env, const VarRef & var)
     
     if (var.fromWith) {
         while (1) {
-            Bindings::iterator j = env->values[0].attrs->find(var.name);
-            if (j != env->values[0].attrs->end())
-                return &j->second.value;
+            Bindings::iterator j = env->values[0]->attrs->find(var.name);
+            if (j != env->values[0]->attrs->end())
+                return j->value;
             if (env->prevWith == 0)
                 throwEvalError("undefined variable `%1%'", var.name);
             for (unsigned int l = env->prevWith; l; --l, env = env->up) ;
         }
     } else
-        return &env->values[var.displ];
+        return env->values[var.displ];
 }
 
 
-Value * EvalState::allocValues(unsigned int count)
+Value * EvalState::allocValue()
 {
-    nrValues += count;
-    return new Value[count]; // !!! check destructor
+    nrValues++;
+    return (Value *) GC_MALLOC(sizeof(Value));
 }
 
 
@@ -272,24 +313,51 @@ Env & EvalState::allocEnv(unsigned int size)
 {
     nrEnvs++;
     nrValuesInEnvs += size;
-    Env * env = (Env *) malloc(sizeof(Env) + size * sizeof(Value));
+    Env * env = (Env *) GC_MALLOC(sizeof(Env) + size * sizeof(Value *));
+
+    /* Clear the values because maybeThunk() expects this. */
+    for (unsigned i = 0; i < size; ++i)
+        env->values[i] = 0;
+    
     return *env;
 }
 
 
+Value * EvalState::allocAttr(Value & vAttrs, const Symbol & name)
+{
+    Value * v = allocValue();
+    vAttrs.attrs->push_back(Attr(name, v));
+    return v;
+}
+
+    
 void EvalState::mkList(Value & v, unsigned int length)
 {
     v.type = tList;
     v.list.length = length;
-    v.list.elems = new Value *[length];
+    v.list.elems = (Value * *) GC_MALLOC(length * sizeof(Value *));
     nrListElems += length;
 }
 
 
-void EvalState::mkAttrs(Value & v)
+void EvalState::mkAttrs(Value & v, unsigned int expected)
 {
+    clearValue(v);
     v.type = tAttrs;
-    v.attrs = new Bindings;
+    v.attrs = NEW Bindings;
+    v.attrs->reserve(expected);
+    nrAttrsets++;
+}
+
+
+unsigned long nrThunks = 0;
+
+static inline void mkThunk(Value & v, Env & env, Expr * expr)
+{
+    v.type = tThunk;
+    v.thunk.env = &env;
+    v.thunk.expr = expr;
+    nrThunks++;
 }
 
 
@@ -299,14 +367,28 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 }
 
 
-void EvalState::cloneAttrs(Value & src, Value & dst)
+unsigned long nrAvoided = 0;
+
+/* Create a thunk for the delayed computation of the given expression
+   in the given environment.  But if the expression is a variable,
+   then look it up right away.  This significantly reduces the number
+   of thunks allocated. */
+Value * EvalState::maybeThunk(Env & env, Expr * expr)
 {
-    mkAttrs(dst);
-    foreach (Bindings::iterator, i, *src.attrs) {
-        Attr & a = (*dst.attrs)[i->first];
-        mkCopy(a.value, i->second.value);
-        a.pos = i->second.pos;
+    ExprVar * var;
+    /* Ignore variables from `withs' because they can throw an
+       exception. */
+    if ((var = dynamic_cast<ExprVar *>(expr))) {
+        Value * v = lookupVar(&env, var->info);
+        /* The value might not be initialised in the environment yet.
+           In that case, ignore it. */
+        if (v) { nrAvoided++; return v; }
     }
+
+    Value * v = allocValue();
+    mkThunk(*v, env, expr);
+
+    return v;
 }
 
 
@@ -404,7 +486,7 @@ void ExprInt::eval(EvalState & state, Env & env, Value & v)
 
 void ExprString::eval(EvalState & state, Env & env, Value & v)
 {
-    mkString(v, s.c_str());
+    mkString(v, s);
 }
 
 
@@ -416,35 +498,38 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 
 void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
-    state.mkAttrs(v);
+    state.mkAttrs(v, attrs.size());
 
     if (recursive) {
         /* Create a new environment that contains the attributes in
            this `rec'. */
-        Env & env2(state.allocEnv(attrs.size() + inherited.size()));
+        Env & env2(state.allocEnv(attrs.size()));
         env2.up = &env;
 
-        unsigned int displ = 0;
-        
+        AttrDefs::iterator overrides = attrs.find(state.sOverrides);
+        bool hasOverrides = overrides != attrs.end();
+
         /* The recursive attributes are evaluated in the new
-           environment. */
-        foreach (Attrs::iterator, i, attrs) {
-            nix::Attr & a = (*v.attrs)[i->first];
-            mkThunk(a.value, env2, i->second.first);
-            mkCopy(env2.values[displ++], a.value);
-            a.pos = &i->second.second;
-        }
-
-        /* The inherited attributes, on the other hand, are
-           evaluated in the original environment. */
-        foreach (list<Inherited>::iterator, i, inherited) {
-            nix::Attr & a = (*v.attrs)[i->first.name];
-            Value * v2 = state.lookupVar(&env, i->first);
-            mkCopy(a.value, *v2);
-            mkCopy(env2.values[displ++], *v2);
-            a.pos = &i->second;
-        }
-
+           environment, while the inherited attributes are evaluated
+           in the original environment. */
+        unsigned int displ = 0;
+        foreach (AttrDefs::iterator, i, attrs)
+            if (i->second.inherited) {
+                /* !!! handle overrides? */
+                Value * vAttr = state.lookupVar(&env, i->second.var);
+                env2.values[displ++] = vAttr;
+                v.attrs->push_back(Attr(i->first, vAttr, &i->second.pos));
+            } else {
+                Value * vAttr;
+                if (hasOverrides) {
+                    vAttr = state.allocValue();
+                    mkThunk(*vAttr, env2, i->second.e);
+                } else
+                    vAttr = state.maybeThunk(env2, i->second.e);
+                env2.values[displ++] = vAttr;
+                v.attrs->push_back(Attr(i->first, vAttr, &i->second.pos));
+            }
+        
         /* If the rec contains an attribute called `__overrides', then
            evaluate it, and add the attributes in that set to the rec.
            This allows overriding of recursive attributes, which is
@@ -453,28 +538,27 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            still reference the original value, because that value has
            been substituted into the bodies of the other attributes.
            Hence we need __overrides.) */
-        Bindings::iterator overrides = v.attrs->find(state.sOverrides);
-        if (overrides != v.attrs->end()) {
-            state.forceAttrs(overrides->second.value);
-            foreach (Bindings::iterator, i, *overrides->second.value.attrs) {
-                nix::Attr & a = (*v.attrs)[i->first];
-                mkCopy(a.value, i->second.value);
+        if (hasOverrides) {
+            Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
+            state.forceAttrs(*vOverrides);
+            foreach (Bindings::iterator, i, *vOverrides->attrs) {
+                AttrDefs::iterator j = attrs.find(i->name);
+                if (j != attrs.end()) {
+                    (*v.attrs)[j->second.displ] = *i;
+                    env2.values[j->second.displ] = i->value;
+                } else
+                    v.attrs->push_back(*i);
             }
+            v.attrs->sort();
         }
     }
 
     else {
-        foreach (Attrs::iterator, i, attrs) {
-            nix::Attr & a = (*v.attrs)[i->first];
-            mkThunk(a.value, env, i->second.first);
-            a.pos = &i->second.second;
-        }
-
-        foreach (list<Inherited>::iterator, i, inherited) {
-            nix::Attr & a = (*v.attrs)[i->first.name];
-            mkCopy(a.value, *state.lookupVar(&env, i->first));
-            a.pos = &i->second;
-        }
+        foreach (AttrDefs::iterator, i, attrs)
+            if (i->second.inherited)
+                v.attrs->push_back(Attr(i->first, state.lookupVar(&env, i->second.var), &i->second.pos));
+            else
+                v.attrs->push_back(Attr(i->first, state.maybeThunk(env, i->second.e), &i->second.pos));
     }
 }
 
@@ -483,20 +567,18 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 {
     /* Create a new environment that contains the attributes in this
        `let'. */
-    Env & env2(state.allocEnv(attrs->attrs.size() + attrs->inherited.size()));
+    Env & env2(state.allocEnv(attrs->attrs.size()));
     env2.up = &env;
 
-    unsigned int displ = 0;
-
-    /* The recursive attributes are evaluated in the new
+    /* The recursive attributes are evaluated in the new environment,
+       while the inherited attributes are evaluated in the original
        environment. */
-    foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
-        mkThunk(env2.values[displ++], env2, i->second.first);
-
-    /* The inherited attributes, on the other hand, are evaluated in
-       the original environment. */
-    foreach (list<ExprAttrs::Inherited>::iterator, i, attrs->inherited)
-        mkCopy(env2.values[displ++], *state.lookupVar(&env, i->first));
+    unsigned int displ = 0;
+    foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
+        if (i->second.inherited)
+            env2.values[displ++] = state.lookupVar(&env, i->second.var);
+        else
+            env2.values[displ++] = state.maybeThunk(env2, i->second.e);
 
     state.eval(env2, body, v);
 }
@@ -505,11 +587,8 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkList(v, elems.size());
-    Value * vs = state.allocValues(v.list.length);
-    for (unsigned int n = 0; n < v.list.length; ++n) {
-        v.list.elems[n] = &vs[n];
-        mkThunk(vs[n], env, elems[n]);
-    }
+    for (unsigned int n = 0; n < v.list.length; ++n)
+        v.list.elems[n] = state.maybeThunk(env, elems[n]);
 }
 
 
@@ -521,21 +600,26 @@ void ExprVar::eval(EvalState & state, Env & env, Value & v)
 }
 
 
+unsigned long nrLookups = 0;
+unsigned long nrLookupSize = 0;
+
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
+    nrLookups++;
     Value v2;
     state.evalAttrs(env, e, v2);
+    nrLookupSize += v2.attrs->size();
     Bindings::iterator i = v2.attrs->find(name);
     if (i == v2.attrs->end())
         throwEvalError("attribute `%1%' missing", name);
     try {            
-        state.forceValue(i->second.value);
+        state.forceValue(*i->value);
     } catch (Error & e) {
         addErrorPrefix(e, "while evaluating the attribute `%1%' at %2%:\n",
-            name, *i->second.pos);
+            name, *i->pos);
         throw;
     }
-    v = i->second.value;
+    v = *i->value;
 }
 
 
@@ -559,24 +643,27 @@ void ExprApp::eval(EvalState & state, Env & env, Value & v)
 {
     Value vFun;
     state.eval(env, e1, vFun);
-    Value vArg;
-    mkThunk(vArg, env, e2); // !!! should this be on the heap?
-    state.callFunction(vFun, vArg, v);
+    state.callFunction(vFun, *state.maybeThunk(env, e2), v);
 }
 
 
 void EvalState::callFunction(Value & fun, Value & arg, Value & v)
 {
     if (fun.type == tPrimOp || fun.type == tPrimOpApp) {
-        unsigned int argsLeft =
-            fun.type == tPrimOp ? fun.primOp.arity : fun.primOpApp.argsLeft;
+
+        /* Figure out the number of arguments still needed. */
+        unsigned int argsDone = 0;
+        Value * primOp = &fun;
+        while (primOp->type == tPrimOpApp) {
+            argsDone++;
+            primOp = primOp->primOpApp.left;
+        }
+        assert(primOp->type == tPrimOp);
+        unsigned int arity = primOp->primOp->arity;
+        unsigned int argsLeft = arity - argsDone;
+        
         if (argsLeft == 1) {
-            /* We have all the arguments, so call the primop.  First
-               find the primop. */
-            Value * primOp = &fun;
-            while (primOp->type == tPrimOpApp) primOp = primOp->primOpApp.left;
-            assert(primOp->type == tPrimOp);
-            unsigned int arity = primOp->primOp.arity;
+            /* We have all the arguments, so call the primop. */
                 
             /* Put all the arguments in an array. */
             Value * vArgs[arity];
@@ -587,19 +674,16 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
 
             /* And call the primop. */
             try {
-                primOp->primOp.fun(*this, vArgs, v);
+                primOp->primOp->fun(*this, vArgs, v);
             } catch (Error & e) {
-                addErrorPrefix(e, "while evaluating the builtin function `%1%':\n", primOp->primOp.name);
+                addErrorPrefix(e, "while evaluating the builtin function `%1%':\n", primOp->primOp->name);
                 throw;
             }
         } else {
-            Value * v2 = allocValues(2);
-            v2[0] = fun;
-            v2[1] = arg;
             v.type = tPrimOpApp;
-            v.primOpApp.left = &v2[0];
-            v.primOpApp.right = &v2[1];
-            v.primOpApp.argsLeft = argsLeft - 1;
+            v.primOpApp.left = allocValue();
+            *v.primOpApp.left = fun;
+            v.primOpApp.right = &arg;
         }
         return;
     }
@@ -617,13 +701,13 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
     unsigned int displ = 0;
 
     if (!fun.lambda.fun->matchAttrs)
-        env2.values[displ++] = arg;
+        env2.values[displ++] = &arg;
 
     else {
         forceAttrs(arg);
         
         if (!fun.lambda.fun->arg.empty())
-            env2.values[displ++] = arg;
+            env2.values[displ++] = &arg;
 
         /* For each formal argument, get the actual argument.  If
            there is no matching actual argument but the formal
@@ -633,11 +717,11 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
             Bindings::iterator j = arg.attrs->find(i->name);
             if (j == arg.attrs->end()) {
                 if (!i->def) throwTypeError("function at %1% called without required argument `%2%'",
-                    fun.lambda.fun->pos, i->name);   
-                mkThunk(env2.values[displ++], env2, i->def);
+                    fun.lambda.fun->pos, i->name);
+                env2.values[displ++] = maybeThunk(env2, i->def);
             } else {
                 attrsUsed++;
-                mkCopy(env2.values[displ++], j->second.value);
+                env2.values[displ++] = j->value;
             }
         }
 
@@ -645,7 +729,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
            argument (unless the attribute match specifies a `...').
            TODO: show the names of the expected/unexpected
            arguments. */
-        if (!fun.lambda.fun->formals->ellipsis && attrsUsed != arg.attrs->size())
+        if (!fun.lambda.fun->formals->ellipsis && attrsUsed != arg.attrs->size()) 
             throwTypeError("function at %1% called with unexpected argument", fun.lambda.fun->pos);
     }
 
@@ -658,7 +742,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
 }
 
 
-void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res)
+void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 {
     forceValue(fun);
 
@@ -668,15 +752,17 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
     }
 
     Value actualArgs;
-    mkAttrs(actualArgs);
+    mkAttrs(actualArgs, fun.lambda.fun->formals->formals.size());
 
     foreach (Formals::Formals_::iterator, i, fun.lambda.fun->formals->formals) {
-        Bindings::const_iterator j = args.find(i->name);
+        Bindings::iterator j = args.find(i->name);
         if (j != args.end())
-            (*actualArgs.attrs)[i->name] = j->second;
+            actualArgs.attrs->push_back(*j);
         else if (!i->def)
             throwTypeError("cannot auto-call a function that has an argument without a default value (`%1%')", i->name);
     }
+
+    actualArgs.attrs->sort();
 
     callFunction(fun, actualArgs, res);
 }
@@ -688,7 +774,8 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
     env2.up = &env;
     env2.prevWith = prevWith;
 
-    state.evalAttrs(env, attrs, env2.values[0]);
+    env2.values[0] = state.allocValue();
+    state.evalAttrs(env, attrs, *env2.values[0]);
 
     state.eval(env2, body, v);
 }
@@ -754,16 +841,34 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
     state.evalAttrs(env, e1, v1);
     state.evalAttrs(env, e2, v2);
 
+    state.nrOpUpdates++;
+
     if (v1.attrs->size() == 0) { v = v2; return; }
     if (v2.attrs->size() == 0) { v = v1; return; }
 
-    state.cloneAttrs(v1, v);
+    state.mkAttrs(v, v1.attrs->size() + v2.attrs->size());
 
-    foreach (Bindings::iterator, i, *v2.attrs) {
-        Attr & a = (*v.attrs)[i->first];
-        mkCopy(a.value, i->second.value);
-        a.pos = i->second.pos;
+    /* Merge the attribute sets, preferring values from the second
+       set.  Make sure to keep the resulting vector in sorted
+       order. */
+    Bindings::iterator i = v1.attrs->begin();
+    Bindings::iterator j = v2.attrs->begin();
+
+    while (i != v1.attrs->end() && j != v2.attrs->end()) {
+        if (i->name == j->name) {
+            v.attrs->push_back(*j);
+            ++i; ++j;
+        }
+        else if (i->name < j->name)
+            v.attrs->push_back(*i++);
+        else
+            v.attrs->push_back(*j++);
     }
+
+    while (i != v1.attrs->end()) v.attrs->push_back(*i++);
+    while (j != v2.attrs->end()) v.attrs->push_back(*j++);
+    
+    state.nrOpUpdateValuesCopied += v.attrs->size();
 }
 
 
@@ -826,10 +931,6 @@ void EvalState::forceValue(Value & v)
             throw;
         }
     }
-    else if (v.type == tCopy) {
-        forceValue(*v.val);
-        v = *v.val;
-    }
     else if (v.type == tApp)
         callFunction(*v.app.left, *v.app.right, v);
     else if (v.type == tBlackhole)
@@ -843,7 +944,7 @@ void EvalState::strictForceValue(Value & v)
     
     if (v.type == tAttrs) {
         foreach (Bindings::iterator, i, *v.attrs)
-            strictForceValue(i->second.value);
+            strictForceValue(*i->value);
     }
     
     else if (v.type == tList) {
@@ -934,7 +1035,7 @@ bool EvalState::isDerivation(Value & v)
 {
     if (v.type != tAttrs) return false;
     Bindings::iterator i = v.attrs->find(sType);
-    return i != v.attrs->end() && forceStringNoCtx(i->second.value) == "derivation";
+    return i != v.attrs->end() && forceStringNoCtx(*i->value) == "derivation";
 }
 
 
@@ -978,7 +1079,7 @@ string EvalState::coerceToString(Value & v, PathSet & context,
         Bindings::iterator i = v.attrs->find(sOutPath);
         if (i == v.attrs->end())
             throwTypeError("cannot coerce an attribute set (except a derivation) to a string");
-        return coerceToString(i->second.value, context, coerceMore, copyToStore);
+        return coerceToString(*i->value, context, coerceMore, copyToStore);
     }
 
     if (coerceMore) {
@@ -1064,9 +1165,9 @@ bool EvalState::eqValues(Value & v1, Value & v2)
 
         case tAttrs: {
             if (v1.attrs->size() != v2.attrs->size()) return false;
-            Bindings::iterator i, j;
-            for (i = v1.attrs->begin(), j = v2.attrs->begin(); i != v1.attrs->end(); ++i, ++j)
-                if (i->first != j->first || !eqValues(i->second.value, j->second.value))
+            Bindings::iterator i = v1.attrs->begin(), j = v2.attrs->begin();
+            for ( ; i != v1.attrs->end(); ++i, ++j)
+                if (i->name != j->name || !eqValues(*i->value, *j->value))
                     return false;
             return true;
         }
@@ -1089,20 +1190,26 @@ void EvalState::printStats()
     bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
     Verbosity v = showStats ? lvlInfo : lvlDebug;
     printMsg(v, "evaluation statistics:");
+    printMsg(v, format("  size of a value: %1%") % sizeof(Value));
     printMsg(v, format("  expressions evaluated: %1%") % nrEvaluated);
     printMsg(v, format("  stack space used: %1% bytes") % (&x - deepestStack));
     printMsg(v, format("  max eval() nesting depth: %1%") % maxRecursionDepth);
     printMsg(v, format("  stack space per eval() level: %1% bytes")
         % ((&x - deepestStack) / (float) maxRecursionDepth));
     printMsg(v, format("  environments allocated: %1% (%2% bytes)")
-        % nrEnvs % (nrEnvs * sizeof(Env)));
-    printMsg(v, format("  values allocated in environments: %1% (%2% bytes)")
-        % nrValuesInEnvs % (nrValuesInEnvs * sizeof(Value)));
+        % nrEnvs % (nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *)));
     printMsg(v, format("  list elements: %1% (%2% bytes)")
         % nrListElems % (nrListElems * sizeof(Value *)));
-    printMsg(v, format("  misc. values allocated: %1% (%2% bytes)")
+    printMsg(v, format("  values allocated: %1% (%2% bytes)")
         % nrValues % (nrValues * sizeof(Value)));
+    printMsg(v, format("  attribute sets allocated: %1%") % nrAttrsets);
+    printMsg(v, format("  right-biased unions: %1%") % nrOpUpdates);
+    printMsg(v, format("  values copied in right-biased unions: %1%") % nrOpUpdateValuesCopied);
     printMsg(v, format("  symbols in symbol table: %1%") % symbols.size());
+    printMsg(v, format("  number of thunks: %1%") % nrThunks);
+    printMsg(v, format("  number of thunks avoided: %1%") % nrAvoided);
+    printMsg(v, format("  number of attr lookups: %1%") % nrLookups);
+    printMsg(v, format("  attr lookup size: %1%") % nrLookupSize);
 }
 
 

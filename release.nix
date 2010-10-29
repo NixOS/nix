@@ -18,8 +18,8 @@ let
         inherit officialRelease;
 
         buildInputs =
-          [ curl bison flex2533 perl libxml2 libxslt w3m bzip2
-            tetex dblatex nukeReferences
+          [ curl bison24 flex2535 perl libxml2 libxslt w3m bzip2
+            tetex dblatex nukeReferences pkgconfig
           ];
 
         configureFlags = ''
@@ -67,11 +67,12 @@ let
         name = "nix";
         src = tarball;
 
-        buildInputs = [ curl perl bzip2 openssl ];
+        buildInputs = [ curl perl bzip2 openssl pkgconfig boehmgc ];
 
         configureFlags = ''
           --disable-init-state
           --with-bzip2=${bzip2}
+          --enable-gc
         '';
       };
 

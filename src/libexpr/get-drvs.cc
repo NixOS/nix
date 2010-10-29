@@ -10,7 +10,7 @@ string DrvInfo::queryDrvPath(EvalState & state) const
     if (drvPath == "" && attrs) {
         Bindings::iterator i = attrs->find(state.sDrvPath);
         PathSet context;
-        (string &) drvPath = i != attrs->end() ? state.coerceToPath(i->second.value, context) : "";
+        (string &) drvPath = i != attrs->end() ? state.coerceToPath(*i->value, context) : "";
     }
     return drvPath;
 }
@@ -21,7 +21,7 @@ string DrvInfo::queryOutPath(EvalState & state) const
     if (outPath == "" && attrs) {
         Bindings::iterator i = attrs->find(state.sOutPath);
         PathSet context;
-        (string &) outPath = i != attrs->end() ? state.coerceToPath(i->second.value, context) : "";
+        (string &) outPath = i != attrs->end() ? state.coerceToPath(*i->value, context) : "";
     }
     return outPath;
 }
@@ -36,23 +36,23 @@ MetaInfo DrvInfo::queryMetaInfo(EvalState & state) const
     Bindings::iterator a = attrs->find(state.sMeta);
     if (a == attrs->end()) return meta; /* fine, empty meta information */
 
-    state.forceAttrs(a->second.value);
+    state.forceAttrs(*a->value);
 
-    foreach (Bindings::iterator, i, *a->second.value.attrs) {
+    foreach (Bindings::iterator, i, *a->value->attrs) {
         MetaValue value;
-        state.forceValue(i->second.value);
-        if (i->second.value.type == tString) {
+        state.forceValue(*i->value);
+        if (i->value->type == tString) {
             value.type = MetaValue::tpString;
-            value.stringValue = i->second.value.string.s;
-        } else if (i->second.value.type == tInt) {
+            value.stringValue = i->value->string.s;
+        } else if (i->value->type == tInt) {
             value.type = MetaValue::tpInt;
-            value.intValue = i->second.value.integer;
-        } else if (i->second.value.type == tList) {
+            value.intValue = i->value->integer;
+        } else if (i->value->type == tList) {
             value.type = MetaValue::tpStrings;
-            for (unsigned int j = 0; j < i->second.value.list.length; ++j)
-                value.stringValues.push_back(state.forceStringNoCtx(*i->second.value.list.elems[j]));
+            for (unsigned int j = 0; j < i->value->list.length; ++j)
+                value.stringValues.push_back(state.forceStringNoCtx(*i->value->list.elems[j]));
         } else continue;
-        ((MetaInfo &) meta)[i->first] = value;
+        ((MetaInfo &) meta)[i->name] = value;
     }
 
     return meta;
@@ -99,13 +99,13 @@ static bool getDerivation(EvalState & state, Value & v,
         Bindings::iterator i = v.attrs->find(state.sName);
         /* !!! We really would like to have a decent back trace here. */
         if (i == v.attrs->end()) throw TypeError("derivation name missing");
-        drv.name = state.forceStringNoCtx(i->second.value);
+        drv.name = state.forceStringNoCtx(*i->value);
 
-        i = v.attrs->find(state.sSystem);
-        if (i == v.attrs->end())
+        Bindings::iterator i2 = v.attrs->find(state.sSystem);
+        if (i2 == v.attrs->end())
             drv.system = "unknown";
         else
-            drv.system = state.forceStringNoCtx(i->second.value);
+            drv.system = state.forceStringNoCtx(*i2->value);
 
         drv.attrs = v.attrs;
 
@@ -138,7 +138,7 @@ static string addToPath(const string & s1, const string & s2)
 
 
 static void getDerivations(EvalState & state, Value & vIn,
-    const string & pathPrefix, const Bindings & autoArgs,
+    const string & pathPrefix, Bindings & autoArgs,
     DrvInfos & drvs, Done & done)
 {
     Value v;
@@ -163,12 +163,12 @@ static void getDerivations(EvalState & state, Value & vIn,
         typedef std::map<string, Symbol> SortedSymbols;
         SortedSymbols attrs;
         foreach (Bindings::iterator, i, *v.attrs)
-            attrs.insert(std::pair<string, Symbol>(i->first, i->first));
+            attrs.insert(std::pair<string, Symbol>(i->name, i->name));
 
         foreach (SortedSymbols::iterator, i, attrs) {
             startNest(nest, lvlDebug, format("evaluating attribute `%1%'") % i->first);
             string pathPrefix2 = addToPath(pathPrefix, i->first);
-            Value & v2((*v.attrs)[i->second].value);
+            Value & v2(*v.attrs->find(i->second)->value);
             if (combineChannels)
                 getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done);
             else if (getDerivation(state, v2, pathPrefix2, drvs, done)) {
@@ -178,7 +178,7 @@ static void getDerivations(EvalState & state, Value & vIn,
                    attribute. */
                 if (v2.type == tAttrs) {
                     Bindings::iterator j = v2.attrs->find(state.symbols.create("recurseForDerivations"));
-                    if (j != v2.attrs->end() && state.forceBool(j->second.value))
+                    if (j != v2.attrs->end() && state.forceBool(*j->value))
                         getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done);
                 }
             }
@@ -200,7 +200,7 @@ static void getDerivations(EvalState & state, Value & vIn,
 
 
 void getDerivations(EvalState & state, Value & v, const string & pathPrefix,
-    const Bindings & autoArgs, DrvInfos & drvs)
+    Bindings & autoArgs, DrvInfos & drvs)
 {
     Done done;
     getDerivations(state, v, pathPrefix, autoArgs, drvs, done);

@@ -38,7 +38,7 @@ static bool indirectRoot = false;
 
 
 void processExpr(EvalState & state, const Strings & attrPaths,
-    bool parseOnly, bool strict, const Bindings & autoArgs,
+    bool parseOnly, bool strict, Bindings & autoArgs,
     bool evalOnly, bool xmlOutput, bool location, Expr * e)
 {
     if (parseOnly)

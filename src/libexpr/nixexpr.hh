@@ -65,8 +65,8 @@ struct ExprInt : Expr
 
 struct ExprString : Expr
 {
-    string s;
-    ExprString(const string & s) : s(s) { };
+    Symbol s;
+    ExprString(const Symbol & s) : s(s) { };
     COMMON_METHODS
 };
 
@@ -101,6 +101,7 @@ struct VarRef
     unsigned int level;
     unsigned int displ;
 
+    VarRef() { };
     VarRef(const Symbol & name) : name(name) { };
     void bind(const StaticEnv & env);
 };
@@ -131,12 +132,18 @@ struct ExprOpHasAttr : Expr
 struct ExprAttrs : Expr
 {
     bool recursive;
-    typedef std::pair<Expr *, Pos> Attr;
-    typedef std::pair<VarRef, Pos> Inherited;
-    typedef std::map<Symbol, Attr> Attrs;
-    Attrs attrs;
-    list<Inherited> inherited;
-    std::map<Symbol, Pos> attrNames; // used during parsing
+    struct AttrDef {
+        bool inherited;
+        Expr * e; // if not inherited
+        VarRef var; // if inherited
+        Pos pos;
+        unsigned int displ; // displacement
+        AttrDef(Expr * e, const Pos & pos) : inherited(false), e(e), pos(pos) { };
+        AttrDef(const Symbol & name, const Pos & pos) : inherited(true), var(name), pos(pos) { };
+        AttrDef() { };
+    };
+    typedef std::map<Symbol, AttrDef> AttrDefs;
+    AttrDefs attrs;
     ExprAttrs() : recursive(false) { };
     COMMON_METHODS
 };
