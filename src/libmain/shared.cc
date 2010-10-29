@@ -364,7 +364,7 @@ int main(int argc, char * * argv)
        allocated.  This might be a problem on systems that don't
        overcommit. */
     if (!getenv("GC_INITIAL_HEAP_SIZE"))
-        GC_expand_hp(384000000);
+        GC_expand_hp(384 * 1024 * 1024);
 #endif
 
     try {
