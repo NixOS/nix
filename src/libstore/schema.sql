@@ -3,7 +3,8 @@ create table if not exists ValidPaths (
     path             text unique not null,
     hash             text not null,
     registrationTime integer not null,
-    deriver          text
+    deriver          text,
+    narSize          integer
 );
 
 create table if not exists Refs (

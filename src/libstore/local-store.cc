@@ -327,9 +327,16 @@ void LocalStore::openDB(bool create)
             throw SQLiteError(db, "initialising database schema");
     }
 
+    /* Backwards compatibility with old (pre-release) databases.  Can
+       remove this eventually. */
+    if (sqlite3_table_column_metadata(db, 0, "ValidPaths", "narSize", 0, 0, 0, 0, 0) != SQLITE_OK) {
+        if (sqlite3_exec(db, "alter table ValidPaths add column narSize integer" , 0, 0, 0) != SQLITE_OK)
+            throw SQLiteError(db, "adding column narSize");
+    }
+
     /* Prepare SQL statements. */
     stmtRegisterValidPath.create(db,
-        "insert into ValidPaths (path, hash, registrationTime, deriver) values (?, ?, ?, ?);");
+        "insert into ValidPaths (path, hash, registrationTime, deriver, narSize) values (?, ?, ?, ?, ?);");
     stmtAddReference.create(db,
         "insert or replace into Refs (referrer, reference) values (?, ?);");
     stmtQueryPathInfo.create(db,
@@ -431,19 +438,6 @@ void canonicalisePathMetaData(const Path & path)
 }
 
 
-void LocalStore::registerValidPath(const Path & path,
-    const Hash & hash, const PathSet & references,
-    const Path & deriver)
-{
-    ValidPathInfo info;
-    info.path = path;
-    info.hash = hash;
-    info.references = references;
-    info.deriver = deriver;
-    registerValidPath(info);
-}
-
-
 unsigned long long LocalStore::addValidPath(const ValidPathInfo & info)
 {
     SQLiteStmtUse use(stmtRegisterValidPath);
@@ -452,6 +446,10 @@ unsigned long long LocalStore::addValidPath(const ValidPathInfo & info)
     stmtRegisterValidPath.bind(info.registrationTime);
     if (info.deriver != "")
         stmtRegisterValidPath.bind(info.deriver);
+    else
+        stmtRegisterValidPath.bind(); // null
+    if (info.narSize != 0)
+        stmtRegisterValidPath.bind(info.narSize);
     else
         stmtRegisterValidPath.bind(); // null
     if (sqlite3_step(stmtRegisterValidPath) != SQLITE_DONE)
@@ -920,10 +918,18 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
                the path in the database.  We may just have computed it
                above (if called with recursive == true and hashAlgo ==
                sha256); otherwise, compute it here. */
-            registerValidPath(dstPath,
-                (recursive && hashAlgo == htSHA256) ? h :
-                (recursive ? hashString(htSHA256, dump) : hashPath(htSHA256, dstPath)),
-                PathSet(), "");
+            HashResult hash;
+            if (recursive) {
+                hash.first = hashAlgo == htSHA256 ? h : hashString(htSHA256, dump);
+                hash.second = dump.size();
+            } else
+                hash = hashPath(htSHA256, dstPath);
+            
+            ValidPathInfo info;
+            info.path = dstPath;
+            info.hash = hash.first;
+            info.narSize = hash.second;
+            registerValidPath(info);
         }
 
         outputLock.setDeletion(true);
@@ -970,9 +976,15 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
             writeFile(dstPath, s);
 
             canonicalisePathMetaData(dstPath);
+
+            HashResult hash = hashPath(htSHA256, dstPath);
             
-            registerValidPath(dstPath,
-                hashPath(htSHA256, dstPath), references, "");
+            ValidPathInfo info;
+            info.path = dstPath;
+            info.hash = hash.first;
+            info.narSize = hash.second;
+            info.references = references;
+            registerValidPath(info);
         }
 
         outputLock.setDeletion(true);
@@ -998,7 +1010,7 @@ struct HashAndWriteSink : Sink
     Hash currentHash()
     {
         HashSink hashSinkClone(hashSink);
-        return hashSinkClone.finish();
+        return hashSinkClone.finish().first;
     }
 };
 
@@ -1136,7 +1148,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
     Path deriver = readString(hashAndReadSource);
     if (deriver != "") assertStorePath(deriver);
 
-    Hash hash = hashAndReadSource.hashSink.finish();
+    Hash hash = hashAndReadSource.hashSink.finish().first;
     hashAndReadSource.hashing = false;
 
     bool haveSignature = readInt(hashAndReadSource) == 1;
@@ -1200,9 +1212,15 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
             
             /* !!! if we were clever, we could prevent the hashPath()
                here. */
-            if (deriver != "" && !isValidPath(deriver)) deriver = "";
-            registerValidPath(dstPath,
-                hashPath(htSHA256, dstPath), references, deriver);
+            HashResult hash = hashPath(htSHA256, dstPath);
+            
+            ValidPathInfo info;
+            info.path = dstPath;
+            info.hash = hash.first;
+            info.narSize = hash.second;
+            info.references = references;
+            info.deriver = deriver != "" && isValidPath(deriver) ? deriver : "";
+            registerValidPath(info);
         }
         
         outputLock.setDeletion(true);
@@ -1263,12 +1281,14 @@ void LocalStore::verifyStore(bool checkContents)
 
             /* Check the content hash (optionally - slow). */
             printMsg(lvlTalkative, format("checking contents of `%1%'") % *i);
-            Hash current = hashPath(info.hash.type, *i);
+            Hash current = hashPath(info.hash.type, *i).first;
             if (current != info.hash) {
                 printMsg(lvlError, format("path `%1%' was modified! "
                         "expected hash `%2%', got `%3%'")
                     % *i % printHash(info.hash) % printHash(current));
             }
+            
+            /* !!! Check info.narSize */
         }
     }
 }

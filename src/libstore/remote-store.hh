@@ -29,6 +29,8 @@ public:
 
     PathSet queryValidPaths();
     
+    ValidPathInfo queryPathInfo(const Path & path);
+
     Hash queryPathHash(const Path & path);
 
     void queryReferences(const Path & path, PathSet & references);

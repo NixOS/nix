@@ -247,6 +247,12 @@ bool RemoteStore::querySubstitutablePathInfo(const Path & path,
 }
 
 
+ValidPathInfo RemoteStore::queryPathInfo(const Path & path)
+{
+    throw Error("not implemented");
+}
+
+
 Hash RemoteStore::queryPathHash(const Path & path)
 {
     openConnection();

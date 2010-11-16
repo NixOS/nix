@@ -47,7 +47,7 @@ build-sqlite:
 else
 build-sqlite: $(SQLITE)
 	(cd $(SQLITE) && \
-	CC="$(CC)" ./configure --disable-static --prefix=$(pkglibdir)/dummy --libdir=${pkglibdir} $(SUB_CONFIGURE_FLAGS) && \
+	CC="$(CC)" CFLAGS="-DSQLITE_ENABLE_COLUMN_METADATA=1" ./configure --disable-static --prefix=$(pkglibdir)/dummy --libdir=${pkglibdir} $(SUB_CONFIGURE_FLAGS) && \
 	$(MAKE) )
 	touch build-sqlite
 

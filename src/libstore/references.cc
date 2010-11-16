@@ -81,7 +81,7 @@ void RefScanSink::operator () (const unsigned char * data, unsigned int len)
 
 
 PathSet scanForReferences(const string & path,
-    const PathSet & refs, Hash & hash)
+    const PathSet & refs, HashResult & hash)
 {
     RefScanSink sink;
     std::map<string, Path> backMap;

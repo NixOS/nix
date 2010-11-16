@@ -393,9 +393,8 @@ static void opDumpDB(Strings opFlags, Strings opArgs)
     if (!opArgs.empty())
         throw UsageError("no arguments expected");
     PathSet validPaths = store->queryValidPaths();
-    foreach (PathSet::iterator, i, validPaths) {
-        cout << makeValidityRegistration(singleton<PathSet>(*i), true, true);
-    }
+    foreach (PathSet::iterator, i, validPaths)
+        cout << store->makeValidityRegistration(singleton<PathSet>(*i), true, true);
 }
 
 
@@ -410,8 +409,11 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
             /* !!! races */
             if (canonicalise)
                 canonicalisePathMetaData(info.path);
-            if (!hashGiven)
-                info.hash = hashPath(htSHA256, info.path);
+            if (!hashGiven) {
+                HashResult hash = hashPath(htSHA256, info.path);
+                info.hash = hash.first;
+                info.narSize = hash.second;
+            }
             infos.push_back(info);
         }
     }

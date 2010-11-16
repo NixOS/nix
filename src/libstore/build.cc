@@ -1547,7 +1547,7 @@ void DerivationGoal::startBuilder()
 
         /* Write closure info to `fileName'. */
         writeFile(tmpDir + "/" + fileName,
-            makeValidityRegistration(paths, false, false));
+            worker.store.makeValidityRegistration(paths, false, false));
     }
 
     
@@ -1870,7 +1870,7 @@ PathSet parseReferenceSpecifiers(const Derivation & drv, string attr)
 void DerivationGoal::computeClosure()
 {
     map<Path, PathSet> allReferences;
-    map<Path, Hash> contentHashes;
+    map<Path, HashResult> contentHashes;
 
     /* When using a build hook, the build hook can register the output
        as valid (by doing `nix-store --import').  If so we don't have
@@ -1927,7 +1927,7 @@ void DerivationGoal::computeClosure()
             if (ht == htUnknown)
                 throw BuildError(format("unknown hash algorithm `%1%'") % algo);
             Hash h = parseHash(ht, i->second.hash);
-            Hash h2 = recursive ? hashPath(ht, path) : hashFile(ht, path);
+            Hash h2 = recursive ? hashPath(ht, path).first : hashFile(ht, path);
             if (h != h2)
                 throw BuildError(
                     format("output path `%1%' should have %2% hash `%3%', instead has `%4%'")
@@ -1941,7 +1941,7 @@ void DerivationGoal::computeClosure()
 	   contained in it.  Compute the SHA-256 NAR hash at the same
 	   time.  The hash is stored in the database so that we can
 	   verify later on whether nobody has messed with the store. */
-        Hash hash;
+        HashResult hash;
         PathSet references = scanForReferences(path, allPaths, hash);
         contentHashes[path] = hash;
 
@@ -1970,14 +1970,18 @@ void DerivationGoal::computeClosure()
     }
 
     /* Register each output path as valid, and register the sets of
-       paths referenced by each of them.  !!! this should be
-       atomic so that either all paths are registered as valid, or
-       none are. */
-    foreach (DerivationOutputs::iterator, i, drv.outputs)
-        worker.store.registerValidPath(i->second.path,
-            contentHashes[i->second.path],
-            allReferences[i->second.path],
-            drvPath);
+       paths referenced by each of them. */
+    ValidPathInfos infos;
+    foreach (DerivationOutputs::iterator, i, drv.outputs) {
+        ValidPathInfo info;
+        info.path = i->second.path;
+        info.hash = contentHashes[i->second.path].first;
+        info.narSize = contentHashes[i->second.path].second;
+        info.references = allReferences[i->second.path];
+        info.deriver = drvPath;
+        infos.push_back(info);
+    }
+    worker.store.registerValidPaths(infos);
 
     /* It is now safe to delete the lock files, since all future
        lockers will see that the output paths are valid; they will not
@@ -2385,10 +2389,15 @@ void SubstitutionGoal::finished()
 
     canonicalisePathMetaData(storePath);
 
-    Hash contentHash = hashPath(htSHA256, storePath);
-
-    worker.store.registerValidPath(storePath, contentHash,
-        info.references, info.deriver);
+    HashResult hash = hashPath(htSHA256, storePath);
+    
+    ValidPathInfo info2;
+    info2.path = storePath;
+    info2.hash = hash.first;
+    info2.narSize = hash.second;
+    info2.references = info.references;
+    info2.deriver = info.deriver;
+    worker.store.registerValidPath(info2);
 
     outputLock->setDeletion(true);
     

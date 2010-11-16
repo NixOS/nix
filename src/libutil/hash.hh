@@ -40,7 +40,6 @@ struct Hash
 
     /* For sorting. */
     bool operator < (const Hash & h) const;
-
 };
 
 
@@ -72,7 +71,8 @@ Hash hashFile(HashType ht, const Path & path);
    (essentially) hashString(ht, dumpPath(path)). */
 struct PathFilter;
 extern PathFilter defaultPathFilter;
-Hash hashPath(HashType ht, const Path & path,
+typedef std::pair<Hash, unsigned long long> HashResult;
+HashResult hashPath(HashType ht, const Path & path,
     PathFilter & filter = defaultPathFilter);
 
 /* Compress a hash to the specified number of bytes by cyclically
@@ -93,13 +93,14 @@ class HashSink : public Sink
 private:
     HashType ht;
     Ctx * ctx;
+    unsigned long long bytes;
 
 public:
     HashSink(HashType ht);
     HashSink(const HashSink & h);
     ~HashSink();
     virtual void operator () (const unsigned char * data, unsigned int len);
-    Hash finish();
+    HashResult finish();
 };
 
 

@@ -90,6 +90,21 @@ struct SubstitutablePathInfo
 };
 
 
+struct ValidPathInfo 
+{
+    Path path;
+    Path deriver;
+    Hash hash;
+    PathSet references;
+    time_t registrationTime;
+    unsigned long long narSize; // 0 = unknown
+    unsigned long long id; // internal use only
+    ValidPathInfo() : registrationTime(0), narSize(0) { }
+};
+
+typedef list<ValidPathInfo> ValidPathInfos;
+
+
 class StoreAPI 
 {
 public:
@@ -101,6 +116,9 @@ public:
 
     /* Query the set of valid paths. */
     virtual PathSet queryValidPaths() = 0;
+
+    /* Query information about a valid path. */
+    virtual ValidPathInfo queryPathInfo(const Path & path) = 0;
 
     /* Queries the hash of a valid path. */ 
     virtual Hash queryPathHash(const Path & path) = 0;
@@ -214,6 +232,12 @@ public:
     /* Clear the "failed" status of the given paths.  The special
        value `*' causes all failed paths to be cleared. */
     virtual void clearFailedPaths(const PathSet & paths) = 0;
+
+    /* Return a string representing information about the path that
+       can be loaded into the database using `nix-store --load-db' or
+       `nix-store --register-validity'. */
+    string makeValidityRegistration(const PathSet & paths,
+        bool showDerivers, bool showHash);
 };
 
 
@@ -306,22 +330,6 @@ boost::shared_ptr<StoreAPI> openStore();
    and separated by commas). */
 string showPaths(const PathSet & paths);
 
-
-string makeValidityRegistration(const PathSet & paths,
-    bool showDerivers, bool showHash);
-    
-struct ValidPathInfo 
-{
-    Path path;
-    Path deriver;
-    Hash hash;
-    PathSet references;
-    time_t registrationTime;
-    unsigned long long id; // internal use only
-    ValidPathInfo() : registrationTime(0) { }
-};
-
-typedef list<ValidPathInfo> ValidPathInfos;
 
 ValidPathInfo decodeValidPathInfo(std::istream & str,
     bool hashGiven = false);

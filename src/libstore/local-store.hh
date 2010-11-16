@@ -97,6 +97,8 @@ public:
 
     PathSet queryValidPaths();
     
+    ValidPathInfo queryPathInfo(const Path & path);
+
     Hash queryPathHash(const Path & path);
 
     void queryReferences(const Path & path, PathSet & references);
@@ -173,8 +175,7 @@ public:
        execution of the derivation (or something equivalent).  Also
        register the hash of the file system contents of the path.  The
        hash must be a SHA-256 hash. */
-    void registerValidPath(const Path & path,
-        const Hash & hash, const PathSet & references, const Path & deriver);
+    void registerValidPath(const ValidPathInfo & info);
 
     void registerValidPaths(const ValidPathInfos & infos);
 
@@ -224,10 +225,6 @@ private:
         
     void addReference(unsigned long long referrer, unsigned long long reference);
     
-    void registerValidPath(const ValidPathInfo & info);
-
-    ValidPathInfo queryPathInfo(const Path & path);
-
     void appendReferrer(const Path & from, const Path & to, bool lock);
     
     void rewriteReferrers(const Path & path, bool purge, PathSet referrers);
