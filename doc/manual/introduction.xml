@@ -113,7 +113,7 @@ $ nix-env --rollback
 
 <simplesect><title>Garbage collection</title>
 
-<para>When you install a package like this…
+<para>When you uninstall a package like this…
 
 <screen>
 $ nix-env --uninstall firefox

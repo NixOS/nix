@@ -1,6 +1,3 @@
-#include <iostream>
-#include <algorithm>
-
 #include "globals.hh"
 #include "misc.hh"
 #include "archive.hh"
@@ -10,6 +7,9 @@
 #include "local-store.hh"
 #include "util.hh"
 #include "help.txt.hh"
+
+#include <iostream>
+#include <algorithm>
 
 
 using namespace nix;

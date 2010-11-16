@@ -132,9 +132,16 @@ AC_LANG_POP(C++)
 AC_CHECK_HEADER([err.h], [], [bsddiff_compat_include="-Icompat-include"])
 AC_SUBST([bsddiff_compat_include])
 
+
 # Check whether we have the personality() syscall, which allows us to
 # do i686-linux builds on x86_64-linux machines.
 AC_CHECK_HEADERS([sys/personality.h])
+
+
+# Check for tr1/unordered_set.
+AC_LANG_PUSH(C++)
+AC_CHECK_HEADERS([tr1/unordered_set], [], [], [])
+AC_LANG_POP(C++)
 
 
 AC_DEFUN([NEED_PROG],
@@ -254,6 +261,18 @@ fi
 AC_SUBST(sqlite_lib)
 AC_SUBST(sqlite_include)
 AC_SUBST(sqlite_bin)
+
+# Whether to use the Boehm garbage collector.
+AC_ARG_ENABLE(gc, AC_HELP_STRING([--enable-gc],
+  [enable garbage collection in the Nix expression evaluator (requires Boehm GC)]),
+  gc=$enableval, gc=)
+if test -n "$gc"; then
+  PKG_CHECK_MODULES([BDW_GC], [bdw-gc])
+  boehmgc_lib="-L$boehmgc/lib -lgc"
+  CXXFLAGS="$BDW_GC_CFLAGS $CXXFLAGS"
+  AC_DEFINE(HAVE_BOEHMGC, 1, [Whether to use the Boehm garbage collector.])
+fi
+AC_SUBST(boehmgc_lib)
 
 
 AC_ARG_ENABLE(init-state, AC_HELP_STRING([--disable-init-state],

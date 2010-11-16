@@ -132,7 +132,7 @@ static void getAllExprs(EvalState & state,
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
             attrs.attrs[state.symbols.create(attrName)] =
-                ExprAttrs::Attr(parseExprFromFile(state, absPath(path2)), noPos);
+                ExprAttrs::AttrDef(parseExprFromFile(state, absPath(path2)), noPos);
         }
         else
             /* `path2' is a directory (with no default.nix in it);
@@ -154,14 +154,14 @@ static Expr * loadSourceExpr(EvalState & state, const Path & path)
        some system-wide directory). */
     ExprAttrs * attrs = new ExprAttrs;
     attrs->attrs[state.symbols.create("_combineChannels")] =
-        ExprAttrs::Attr(new ExprList(), noPos);
+        ExprAttrs::AttrDef(new ExprList(), noPos);
     getAllExprs(state, path, *attrs);
     return attrs;
 }
 
 
 static void loadDerivations(EvalState & state, Path nixExprPath,
-    string systemFilter, const Bindings & autoArgs,
+    string systemFilter, Bindings & autoArgs,
     const string & pathPrefix, DrvInfos & elems)
 {
     Value v;
@@ -321,7 +321,7 @@ static bool isPath(const string & s)
 
 
 static void queryInstSources(EvalState & state,
-    const InstallSourceInfo & instSource, const Strings & args,
+    InstallSourceInfo & instSource, const Strings & args,
     DrvInfos & elems, bool newestOnly)
 {
     InstallSourceType type = instSource.type;

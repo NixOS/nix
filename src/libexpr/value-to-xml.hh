@@ -1,11 +1,11 @@
 #ifndef __VALUE_TO_XML_H
 #define __VALUE_TO_XML_H
 
-#include <string>
-#include <map>
-
 #include "nixexpr.hh"
 #include "eval.hh"
+
+#include <string>
+#include <map>
 
 namespace nix {
 

@@ -271,6 +271,17 @@ $ mount -o bind /mnt/otherdisk/nix /nix</screen>
 
 </varlistentry>
 
+
+<varlistentry><term><envar>GC_INITIAL_HEAP_SIZE</envar></term>
+
+  <listitem><para>If Nix has been configured to use the Boehm garbage
+  collector, this variable sets the initial size of the heap in bytes.
+  It defaults to 384 MiB.  Setting it to a low value reduces memory
+  consumption, but will increase runtime due to the overhead of
+  garbage collection.</para></listitem>
+
+</varlistentry>
+
     
 </variablelist>
 

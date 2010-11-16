@@ -55,10 +55,11 @@ void ExprAttrs::show(std::ostream & str)
 {
     if (recursive) str << "rec ";
     str << "{ ";
-    foreach (list<Inherited>::iterator, i, inherited)
-        str << "inherit " << i->first.name << "; ";
-    foreach (Attrs::iterator, i, attrs)
-        str << i->first << " = " << *i->second.first << "; ";
+    foreach (AttrDefs::iterator, i, attrs)
+        if (i->second.inherited)
+            str << "inherit " << i->first << " " << "; ";
+        else
+            str << i->first << " = " << *i->second.e << "; ";
     str << "}";
 }
 
@@ -91,10 +92,11 @@ void ExprLambda::show(std::ostream & str)
 void ExprLet::show(std::ostream & str)
 {
     str << "let ";
-    foreach (list<ExprAttrs::Inherited>::iterator, i, attrs->inherited)
-        str << "inherit " << i->first.name << "; ";
-    foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
-        str << i->first << " = " << *i->second.first << "; ";
+    foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
+        if (i->second.inherited)
+            str << "inherit " << i->first << "; ";
+        else
+            str << i->first << " = " << *i->second.e << "; ";
     str << "in " << *body;
 }
 
@@ -211,26 +213,18 @@ void ExprAttrs::bindVars(const StaticEnv & env)
         StaticEnv newEnv(false, &env);
     
         unsigned int displ = 0;
-
-        foreach (ExprAttrs::Attrs::iterator, i, attrs)
-            newEnv.vars[i->first] = displ++;
-
-        foreach (list<Inherited>::iterator, i, inherited) {
-            newEnv.vars[i->first.name] = displ++;
-            i->first.bind(env);
-        }
-
-        foreach (ExprAttrs::Attrs::iterator, i, attrs)
-            i->second.first->bindVars(newEnv);
+        foreach (AttrDefs::iterator, i, attrs)
+            newEnv.vars[i->first] = i->second.displ = displ++;
+        
+        foreach (AttrDefs::iterator, i, attrs)
+            if (i->second.inherited) i->second.var.bind(env);
+            else i->second.e->bindVars(newEnv);
     }
 
-    else {
-        foreach (ExprAttrs::Attrs::iterator, i, attrs)
-            i->second.first->bindVars(env);
-
-        foreach (list<Inherited>::iterator, i, inherited)
-            i->first.bind(env);
-    }
+    else
+        foreach (AttrDefs::iterator, i, attrs)
+            if (i->second.inherited) i->second.var.bind(env);
+            else i->second.e->bindVars(env);
 }
 
 void ExprList::bindVars(const StaticEnv & env)
@@ -263,17 +257,12 @@ void ExprLet::bindVars(const StaticEnv & env)
     StaticEnv newEnv(false, &env);
     
     unsigned int displ = 0;
-
-    foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
-        newEnv.vars[i->first] = displ++;
-
-    foreach (list<ExprAttrs::Inherited>::iterator, i, attrs->inherited) {
-        newEnv.vars[i->first.name] = displ++;
-        i->first.bind(env);
-    }
-
-    foreach (ExprAttrs::Attrs::iterator, i, attrs->attrs)
-        i->second.first->bindVars(newEnv);
+    foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
+        newEnv.vars[i->first] = i->second.displ = displ++;
+    
+    foreach (ExprAttrs::AttrDefs::iterator, i, attrs->attrs)
+        if (i->second.inherited) i->second.var.bind(env);
+        else i->second.e->bindVars(newEnv);
     
     body->bindVars(newEnv);
 }

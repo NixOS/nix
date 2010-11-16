@@ -1,13 +1,13 @@
 #ifndef __STOREAPI_H
 #define __STOREAPI_H
 
+#include "hash.hh"
+#include "serialise.hh"
+
 #include <string>
 #include <map>
 
 #include <boost/shared_ptr.hpp>
-
-#include "hash.hh"
-#include "serialise.hh"
 
 
 namespace nix {

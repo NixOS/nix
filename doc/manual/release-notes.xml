@@ -8,6 +8,27 @@
 
 <!--==================================================================-->
 
+<section xml:id="ssec-relnotes-1.0"><title>Release 1.0 (TBA)</title>
+
+<para>This release has the following improvements:</para>
+
+<itemizedlist>
+
+  <listitem>
+    <para>Nix can now optionally use the Boehm garbage collector.
+    This significantly reduces the Nix evaluator’s memory footprint,
+    especially when evaluating large NixOS system configurations.  It
+    can be enabled using the <option>--enable-gc</option> configure
+    option.</para>
+  </listitem>
+
+</itemizedlist>
+
+</section>
+
+
+<!--==================================================================-->
+
 <section xml:id="ssec-relnotes-0.16"><title>Release 0.16 (August 17, 2010)</title>
 
 <para>This release has the following improvements:</para>

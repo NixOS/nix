@@ -2,6 +2,8 @@ SUBDIRS = externals src scripts corepkgs doc misc tests
 EXTRA_DIST = substitute.mk nix.spec nix.spec.in bootstrap.sh \
   nix.conf.example NEWS version
 
+pkginclude_HEADERS = config.h
+
 include ./substitute.mk
 
 nix.spec: nix.spec.in

@@ -46,7 +46,7 @@ static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 }
 
 
-static Expr * unescapeStr(const char * s)
+static Expr * unescapeStr(SymbolTable & symbols, const char * s)
 {
     string t;
     char c;
@@ -66,7 +66,7 @@ static Expr * unescapeStr(const char * s)
         }
         else t += c;
     }
-    return new ExprString(t);
+    return new ExprString(symbols.create(t));
 }
 
  
@@ -119,7 +119,7 @@ inherit     { return INHERIT; }
                  "$\"" will be consumed as part of a string, rather
                  than a "$" followed by the string terminator.
                  Disallow "$\"" for now. */
-              yylval->e = unescapeStr(yytext);
+              yylval->e = unescapeStr(data->symbols, yytext);
               return STR;
             }
 <STRING>\$\{  { BEGIN(INITIAL); return DOLLAR_CURLY; }
@@ -140,7 +140,7 @@ inherit     { return INHERIT; }
                    return IND_STR;
                  }
 <IND_STRING>\'\'\\. {
-                   yylval->e = unescapeStr(yytext + 2);
+                   yylval->e = unescapeStr(data->symbols, yytext + 2);
                    return IND_STR;
                  }
 <IND_STRING>\$\{ { BEGIN(INITIAL); return DOLLAR_CURLY; }

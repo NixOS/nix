@@ -34,10 +34,10 @@ static void showAttrs(EvalState & state, bool strict, bool location,
     StringSet names;
     
     foreach (Bindings::iterator, i, attrs)
-        names.insert(i->first);
+        names.insert(i->name);
     
     foreach (StringSet::iterator, i, names) {
-        Attr & a(attrs[state.symbols.create(*i)]);
+        Attr & a(*attrs.find(state.symbols.create(*i)));
         
         XMLAttrs xmlAttrs;
         xmlAttrs["name"] = *i;
@@ -45,7 +45,7 @@ static void showAttrs(EvalState & state, bool strict, bool location,
         
         XMLOpenElement _(doc, "attr", xmlAttrs);
         printValueAsXML(state, strict, location,
-            a.value, doc, context, drvsSeen);
+            *a.value, doc, context, drvsSeen);
     }
 }
 
@@ -90,16 +90,16 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
                 Path drvPath;
                 a = v.attrs->find(state.sDrvPath);
                 if (a != v.attrs->end()) {
-                    if (strict) state.forceValue(a->second.value);
-                    if (a->second.value.type == tString)
-                        xmlAttrs["drvPath"] = drvPath = a->second.value.string.s;
+                    if (strict) state.forceValue(*a->value);
+                    if (a->value->type == tString)
+                        xmlAttrs["drvPath"] = drvPath = a->value->string.s;
                 }
         
                 a = v.attrs->find(state.sOutPath);
                 if (a != v.attrs->end()) {
-                    if (strict) state.forceValue(a->second.value);
-                    if (a->second.value.type == tString)
-                        xmlAttrs["outPath"] = a->second.value.string.s;
+                    if (strict) state.forceValue(*a->value);
+                    if (a->value->type == tString)
+                        xmlAttrs["outPath"] = a->value->string.s;
                 }
 
                 XMLOpenElement _(doc, "derivation", xmlAttrs);

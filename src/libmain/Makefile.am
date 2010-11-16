@@ -2,7 +2,7 @@ pkglib_LTLIBRARIES = libmain.la
 
 libmain_la_SOURCES = shared.cc
 
-libmain_la_LIBADD = ../libstore/libstore.la
+libmain_la_LIBADD = ../libstore/libstore.la @boehmgc_lib@
 
 pkginclude_HEADERS = shared.hh
 
