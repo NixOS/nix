@@ -165,8 +165,9 @@ sub writeManifest {
             print MANIFEST "  StorePath: $storePath\n";
             print MANIFEST "  NarURL: $narFile->{url}\n";
             print MANIFEST "  Hash: $narFile->{hash}\n" if defined $narFile->{hash};
-            print MANIFEST "  NarHash: $narFile->{narHash}\n";
             print MANIFEST "  Size: $narFile->{size}\n" if defined $narFile->{size};
+            print MANIFEST "  NarHash: $narFile->{narHash}\n";
+            print MANIFEST "  NarSize: $narFile->{narSize}\n" if $narFile->{narSize};
             print MANIFEST "  References: $narFile->{references}\n"
                 if defined $narFile->{references} && $narFile->{references} ne "";
             print MANIFEST "  Deriver: $narFile->{deriver}\n"

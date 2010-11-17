@@ -193,6 +193,10 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     die "cannot query hash for `$storePath'" if $? != 0;
     chomp $narHash;
 
+    my $narSize = `$binDir/nix-store --query --size '$storePath'`;
+    die "cannot query size for `$storePath'" if $? != 0;
+    chomp $narSize;
+
     my $url;
     if ($localCopy) {
         $url = "$targetArchivesUrl/$narName";
@@ -204,6 +208,7 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
         , hash => "$hashAlgo:$narbz2Hash"
         , size => $narbz2Size
         , narHash => "$narHash"
+        , narSize => $narSize
         , references => $references
         , deriver => $deriver
         }
