@@ -1,5 +1,7 @@
 source common.sh
 
+clearManifests
+
 mkdir -p $TEST_ROOT/cache2 $TEST_ROOT/patches
 
 RESULT=$TEST_ROOT/result
@@ -28,6 +30,10 @@ $NIX_BIN_DIR/nix-pull file://$TEST_ROOT/manifest2
 
 # To make sure that we're using the patch, delete the full NARs.
 rm -f $TEST_ROOT/cache2/*
+
+# Make sure that the download size prediction uses the patch rather
+# than the full download.
+$nixbuild -o $RESULT binary-patching.nix --arg version 2 --dry-run 2>&1 | grep -q "0.01 MiB"
 
 # Now rebuild it.  This should use the patch generated above.
 $nixbuild -o $RESULT binary-patching.nix --arg version 2

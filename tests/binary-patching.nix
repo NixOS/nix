@@ -9,7 +9,7 @@ mkDerivation {
       mkdir $out
       seq 1 1000000 > $out/foo
       ${if version == 2 then ''
-        echo bla >> $out/foo
+        seq 1000000 1010000 >> $out/foo
       '' else ""}
     '';
 }

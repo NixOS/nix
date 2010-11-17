@@ -31,6 +31,144 @@ for my $manifest (glob "$manifestDir/*.nixmanifest") {
 }
 
 
+sub isValidPath {
+    my $p = shift;
+    return system("$binDir/nix-store --check-validity '$p' 2> /dev/null") == 0;
+}
+
+
+sub parseHash {
+    my $hash = shift;
+    if ($hash =~ /^(.+):(.+)$/) {
+        return ($1, $2);
+    } else {
+        return ("md5", $hash);
+    }
+}
+
+
+# Compute the most efficient sequence of downloads to produce the
+# given path.
+sub computeSmallestDownload {
+    my $targetPath = shift;
+    
+    # Build a graph of all store paths that might contribute to the
+    # construction of $targetPath, and the special node "start".  The
+    # edges are either patch operations, or downloads of full NAR
+    # files.  The latter edges only occur between "start" and a store
+    # path.
+    my %graph;
+
+    $graph{"start"} = {d => 0, pred => undef, edges => []};
+
+    my @queue = ();
+    my $queueFront = 0;
+    my %done;
+
+    sub addNode {
+        my $graph = shift;
+        my $u = shift;
+        $$graph{$u} = {d => 999999999999, pred => undef, edges => []}
+            unless defined $$graph{$u};
+    }
+
+    sub addEdge {
+        my $graph = shift;
+        my $u = shift;
+        my $v = shift;
+        my $w = shift;
+        my $type = shift;
+        my $info = shift;
+        addNode $graph, $u;
+        push @{$$graph{$u}->{edges}},
+            {weight => $w, start => $u, end => $v, type => $type, info => $info};
+        my $n = scalar @{$$graph{$u}->{edges}};
+    }
+
+    push @queue, $targetPath;
+
+    while ($queueFront < scalar @queue) {
+        my $u = $queue[$queueFront++];
+        return if defined $done{$u};
+        $done{$u} = 1;
+
+        addNode \%graph, $u;
+
+        # If the path already exists, it has distance 0 from the
+        # "start" node.
+        if (isValidPath($u)) {
+            addEdge \%graph, "start", $u, 0, "present", undef;
+        }
+
+        else {
+
+            # Add patch edges.
+            my $patchList = $patches{$u};
+            foreach my $patch (@{$patchList}) {
+                if (isValidPath($patch->{basePath})) {
+                    # !!! this should be cached
+                    my ($baseHashAlgo, $baseHash) = parseHash $patch->{baseHash};
+                    my $format = "--base32";
+                    $format = "" if $baseHashAlgo eq "md5";
+                    my $hash = `$binDir/nix-hash --type '$baseHashAlgo' $format "$patch->{basePath}"`;
+                    chomp $hash;
+                    next if $hash ne $baseHash;
+                }
+                push @queue, $patch->{basePath};
+                addEdge \%graph, $patch->{basePath}, $u, $patch->{size}, "patch", $patch;
+            }
+
+            # Add NAR file edges to the start node.
+            my $narFileList = $narFiles{$u};
+            foreach my $narFile (@{$narFileList}) {
+                # !!! how to handle files whose size is not known in advance?
+                # For now, assume some arbitrary size (1 MB).
+                addEdge \%graph, "start", $u, ($narFile->{size} || 1000000), "narfile", $narFile;
+            }
+        }
+    }
+
+
+    # Run Dijkstra's shortest path algorithm to determine the shortest
+    # sequence of download and/or patch actions that will produce
+    # $targetPath.
+
+    my @todo = keys %graph;
+
+    while (scalar @todo > 0) {
+
+        # Remove the closest element from the todo list.
+        # !!! inefficient, use a priority queue
+        @todo = sort { -($graph{$a}->{d} <=> $graph{$b}->{d}) } @todo;
+        my $u = pop @todo;
+
+        my $u_ = $graph{$u};
+
+        foreach my $edge (@{$u_->{edges}}) {
+            my $v_ = $graph{$edge->{end}};
+            if ($v_->{d} > $u_->{d} + $edge->{weight}) {
+                $v_->{d} = $u_->{d} + $edge->{weight};
+                # Store the edge; to edge->start is actually the
+                # predecessor.
+                $v_->{pred} = $edge; 
+            }
+        }
+    }
+
+
+    # Retrieve the shortest path from "start" to $targetPath.
+    my @path = ();
+    my $cur = $targetPath;
+    return () unless defined $graph{$targetPath}->{pred};
+    while ($cur ne "start") {
+        push @path, $graph{$cur}->{pred};
+        $cur = $graph{$cur}->{pred}->{start};
+    }
+
+    return @path;
+}
+
+
 # Parse the arguments.
 
 if ($ARGV[0] eq "--query") {
@@ -46,6 +184,7 @@ if ($ARGV[0] eq "--query") {
 
         elsif ($cmd eq "info") {
             my $storePath = <STDIN>; chomp $storePath;
+
             my $info;
             if (defined $narFiles{$storePath}) {
                 $info = @{$narFiles{$storePath}}[0];
@@ -57,13 +196,30 @@ if ($ARGV[0] eq "--query") {
                 print "0\n";
                 next; # not an error
             }
+
             print "1\n";
             print "$info->{deriver}\n";
             my @references = split " ", $info->{references};
             print scalar @references, "\n";
             print "$_\n" foreach @references;
-            my $size = $info->{size} || 0;
-            print "$size\n";
+
+            my @path = computeSmallestDownload $storePath;
+            
+            my $downloadSize = 0;
+            while (scalar @path > 0) {
+                my $edge = pop @path;
+                my $u = $edge->{start};
+                my $v = $edge->{end};
+                if ($edge->{type} eq "patch") {
+                    $downloadSize += $edge->{info}->{size};
+                }
+                elsif ($edge->{type} eq "narfile") {
+                    $downloadSize += $edge->{info}->{size};
+                }
+            }
+                
+            print "$downloadSize\n";
+            
             my $narSize = $info->{narSize} || 0;
             print "$narSize\n";
         }
@@ -112,148 +268,9 @@ foreach my $localPath (@{$localPathList}) {
 }
 
 
-# Build a graph of all store paths that might contribute to the
-# construction of $targetPath, and the special node "start".  The
-# edges are either patch operations, or downloads of full NAR files.
-# The latter edges only occur between "start" and a store path.
-
-my %graph;
-
-$graph{"start"} = {d => 0, pred => undef, edges => []};
-
-my @queue = ();
-my $queueFront = 0;
-my %done;
-
-sub addToQueue {
-    my $v = shift;
-    return if defined $done{$v};
-    $done{$v} = 1;
-    push @queue, $v;
-}
-
-sub addNode {
-    my $u = shift;
-    $graph{$u} = {d => 999999999999, pred => undef, edges => []}
-        unless defined $graph{$u};
-}
-
-sub addEdge {
-    my $u = shift;
-    my $v = shift;
-    my $w = shift;
-    my $type = shift;
-    my $info = shift;
-    addNode $u;
-    push @{$graph{$u}->{edges}},
-        {weight => $w, start => $u, end => $v, type => $type, info => $info};
-    my $n = scalar @{$graph{$u}->{edges}};
-}
-
-addToQueue $targetPath;
-
-sub isValidPath {
-    my $p = shift;
-    return system("$binDir/nix-store --check-validity '$p' 2> /dev/null") == 0;
-}
-
-sub parseHash {
-    my $hash = shift;
-    if ($hash =~ /^(.+):(.+)$/) {
-        return ($1, $2);
-    } else {
-        return ("md5", $hash);
-    }
-}
-
-while ($queueFront < scalar @queue) {
-    my $u = $queue[$queueFront++];
-#    print "$u\n";
-
-    addNode $u;
-
-    # If the path already exists, it has distance 0 from the "start"
-    # node.
-    if (isValidPath($u)) {
-        addEdge "start", $u, 0, "present", undef;
-    }
-
-    else {
-
-        # Add patch edges.
-        my $patchList = $patches{$u};
-        foreach my $patch (@{$patchList}) {
-            if (isValidPath($patch->{basePath})) {
-                # !!! this should be cached
-                my ($baseHashAlgo, $baseHash) = parseHash $patch->{baseHash};
-                my $format = "--base32";
-                $format = "" if $baseHashAlgo eq "md5";
-                my $hash = `$binDir/nix-hash --type '$baseHashAlgo' $format "$patch->{basePath}"`;
-                chomp $hash;
-                if ($hash ne $baseHash) {
-                    print LOGFILE "$$ rejecting $patch->{basePath}\n";
-                    next;
-                }
-            }
-            addToQueue $patch->{basePath};
-            addEdge $patch->{basePath}, $u, $patch->{size}, "patch", $patch;
-        }
-
-        # Add NAR file edges to the start node.
-        my $narFileList = $narFiles{$u};
-        foreach my $narFile (@{$narFileList}) {
-            # !!! how to handle files whose size is not known in advance?
-            # For now, assume some arbitrary size (1 MB).
-            addEdge "start", $u, ($narFile->{size} || 1000000), "narfile", $narFile;
-            if ($u eq $targetPath) {
-                my $size = $narFile->{size} || -1;
-                print LOGFILE "$$ full-download-would-be $size\n";
-            }
-        }
-
-    }
-}
-
-
-# Run Dijkstra's shortest path algorithm to determine the shortest
-# sequence of download and/or patch actions that will produce
-# $targetPath.
-
-sub byDistance { # sort by distance, reversed
-    return -($graph{$a}->{d} <=> $graph{$b}->{d});
-}
-
-my @todo = keys %graph;
-
-while (scalar @todo > 0) {
-
-    # Remove the closest element from the todo list.
-    @todo = sort byDistance @todo;
-    my $u = pop @todo;
-
-    my $u_ = $graph{$u};
-
-    foreach my $edge (@{$u_->{edges}}) {
-        my $v_ = $graph{$edge->{end}};
-        if ($v_->{d} > $u_->{d} + $edge->{weight}) {
-            $v_->{d} = $u_->{d} + $edge->{weight};
-            # Store the edge; to edge->start is actually the
-            # predecessor.
-            $v_->{pred} = $edge; 
-        }
-    }
-}
-
-
-# Retrieve the shortest path from "start" to $targetPath.
-my @path = ();
-my $cur = $targetPath;
-die "don't know how to produce $targetPath\n"
-    unless defined $graph{$targetPath}->{pred};
-while ($cur ne "start") {
-    push @path, $graph{$cur}->{pred};
-    $cur = $graph{$cur}->{pred}->{start};
-}
+# Compute the shortest path.
+my @path = computeSmallestDownload $targetPath;
+die "don't know how to produce $targetPath\n" if scalar @path == 0;
 
 
 # Traverse the shortest path, perform the actions described by the
