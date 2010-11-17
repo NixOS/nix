@@ -550,6 +550,19 @@ static void performOp(unsigned int clientVersion,
         break;
     }
 
+    case wopQueryPathInfo: {
+        Path path = readStorePath(from);
+        startWork();
+        ValidPathInfo info = store->queryPathInfo(path);
+        stopWork();
+        writeString(info.deriver, to);
+        writeString(printHash(info.hash), to);
+        writeStringSet(info.references, to);
+        writeInt(info.registrationTime, to);
+        writeLongLong(info.narSize, to);
+        break;
+    }
+
     default:
         throw Error(format("invalid operation %1%") % op);
     }

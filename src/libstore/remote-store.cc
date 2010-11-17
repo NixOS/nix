@@ -249,7 +249,19 @@ bool RemoteStore::querySubstitutablePathInfo(const Path & path,
 
 ValidPathInfo RemoteStore::queryPathInfo(const Path & path)
 {
-    throw Error("not implemented");
+    openConnection();
+    writeInt(wopQueryPathInfo, to);
+    writeString(path, to);
+    processStderr();
+    ValidPathInfo info;
+    info.path = path;
+    info.deriver = readString(from);
+    if (info.deriver != "") assertStorePath(info.deriver);
+    info.hash = parseHash(htSHA256, readString(from));
+    info.references = readStorePaths(from);
+    info.registrationTime = readInt(from);
+    info.narSize = readLongLong(from);
+    return info;
 }
 
 
