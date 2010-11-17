@@ -16,8 +16,8 @@ if test $1 = "--query"; then
             echo 1
             echo "" # deriver
             echo 0 # nr of refs
-            echo 0 # download size
-            echo 0 # nar size
+            echo $((1 * 1024 * 1024)) # download size
+            echo $((2 * 1024 * 1024)) # nar size
         else
             echo "bad command $cmd"
             exit 1
