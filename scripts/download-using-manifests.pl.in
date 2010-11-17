@@ -90,7 +90,7 @@ sub computeSmallestDownload {
 
     while ($queueFront < scalar @queue) {
         my $u = $queue[$queueFront++];
-        return if defined $done{$u};
+        next if defined $done{$u};
         $done{$u} = 1;
 
         addNode \%graph, $u;
