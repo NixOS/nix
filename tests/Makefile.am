@@ -32,5 +32,6 @@ EXTRA_DIST = $(TESTS) \
   filter-source.nix \
   export-graph.nix \
   negative-caching.nix \
+  binary-patching.nix \
   $(wildcard lang/*.nix) $(wildcard lang/*.exp) $(wildcard lang/*.exp.xml) $(wildcard lang/*.flags) \
   common.sh.in
