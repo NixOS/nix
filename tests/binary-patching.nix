@@ -8,8 +8,11 @@ mkDerivation {
     ''
       mkdir $out
       seq 1 1000000 > $out/foo
-      ${if version == 2 then ''
+      ${if version != 1 then ''
         seq 1000000 1010000 >> $out/foo
+      '' else ""}
+      ${if version == 3 then ''
+        echo foobar >> $out/foo
       '' else ""}
     '';
 }
