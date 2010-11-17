@@ -226,7 +226,7 @@ static void printTree(const Path & path,
 static void opQuery(Strings opFlags, Strings opArgs)
 {
     enum { qOutputs, qRequisites, qReferences, qReferrers
-         , qReferrersClosure, qDeriver, qBinding, qHash
+         , qReferrersClosure, qDeriver, qBinding, qHash, qSize
          , qTree, qGraph, qXml, qResolve, qRoots } query = qOutputs;
     bool useOutput = false;
     bool includeOutputs = false;
@@ -248,6 +248,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             query = qBinding;
         }
         else if (*i == "--hash") query = qHash;
+        else if (*i == "--size") query = qSize;
         else if (*i == "--tree") query = qTree;
         else if (*i == "--graph") query = qGraph;
         else if (*i == "--xml") query = qXml;
@@ -310,11 +311,15 @@ static void opQuery(Strings opFlags, Strings opArgs)
             break;
 
         case qHash:
+        case qSize:
             foreach (Strings::iterator, i, opArgs) {
                 Path path = maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise);
-                Hash hash = store->queryPathHash(path);
-                assert(hash.type == htSHA256);
-                cout << format("sha256:%1%\n") % printHash32(hash);
+                ValidPathInfo info = store->queryPathInfo(path);
+                if (query == qHash) {
+                    assert(info.hash.type == htSHA256);
+                    cout << format("sha256:%1%\n") % printHash32(info.hash);
+                } else if (query == qSize) 
+                    cout << format("%1%\n") % info.narSize;
             }
             break;
 

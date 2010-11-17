@@ -16,7 +16,7 @@ Operations:
 
   --gc: run the garbage collector
 
-  --dump: dump a path as a Nix archive, forgetting dependencies
+  --dump: dump a path as a Nix archive (NAR), forgetting dependencies
   --restore: restore a path from a Nix archive, without
       registering validity
 
@@ -44,6 +44,7 @@ Query flags:
   --graph: print a dot graph rooted at given path
   --xml: emit an XML representation of the graph rooted at the given path
   --hash: print the SHA-256 hash of the contents of the path
+  --size: print the size of the NAR dump of the path
   --roots: print the garbage collector roots that point to the path
 
 Query switches (not applicable to all queries):

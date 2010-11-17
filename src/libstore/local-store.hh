@@ -70,6 +70,7 @@ struct SQLiteStmt
     operator sqlite3_stmt * () { return stmt; }
     void bind(const string & value);
     void bind(int value);
+    void bind64(long long value);
     void bind();
 };
     

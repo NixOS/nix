@@ -88,6 +88,13 @@ void SQLiteStmt::bind(int value)
 }
 
 
+void SQLiteStmt::bind64(long long value)
+{
+    if (sqlite3_bind_int64(stmt, curArg++, value) != SQLITE_OK)
+        throw SQLiteError(db, "binding argument");
+}
+
+
 void SQLiteStmt::bind()
 {
     if (sqlite3_bind_null(stmt, curArg++) != SQLITE_OK)
@@ -340,7 +347,7 @@ void LocalStore::openDB(bool create)
     stmtAddReference.create(db,
         "insert or replace into Refs (referrer, reference) values (?, ?);");
     stmtQueryPathInfo.create(db,
-        "select id, hash, registrationTime, deriver from ValidPaths where path = ?;");
+        "select id, hash, registrationTime, deriver, narSize from ValidPaths where path = ?;");
     stmtQueryReferences.create(db,
         "select path from Refs join ValidPaths on reference = id where referrer = ?;");
     stmtQueryReferrers.create(db,
@@ -449,7 +456,7 @@ unsigned long long LocalStore::addValidPath(const ValidPathInfo & info)
     else
         stmtRegisterValidPath.bind(); // null
     if (info.narSize != 0)
-        stmtRegisterValidPath.bind(info.narSize);
+        stmtRegisterValidPath.bind64(info.narSize);
     else
         stmtRegisterValidPath.bind(); // null
     if (sqlite3_step(stmtRegisterValidPath) != SQLITE_DONE)
@@ -599,6 +606,9 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
 
     s = (const char *) sqlite3_column_text(stmtQueryPathInfo, 3);
     if (s) info.deriver = s;
+
+    /* Note that narSize = NULL yields 0. */
+    info.narSize = sqlite3_column_int64(stmtQueryPathInfo, 4);
 
     /* Get the references. */
     SQLiteStmtUse use2(stmtQueryReferences);
