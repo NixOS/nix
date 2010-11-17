@@ -51,6 +51,7 @@ sub parseHash {
 # given path.
 sub computeSmallestDownload {
     my $targetPath = shift;
+    my $fast = shift;
     
     # Build a graph of all store paths that might contribute to the
     # construction of $targetPath, and the special node "start".  The
@@ -110,8 +111,11 @@ sub computeSmallestDownload {
                     my ($baseHashAlgo, $baseHash) = parseHash $patch->{baseHash};
                     my $format = "--base32";
                     $format = "" if $baseHashAlgo eq "md5";
-                    my $hash = `$binDir/nix-hash --type '$baseHashAlgo' $format "$patch->{basePath}"`;
+                    my $hash = $fast && $baseHashAlgo eq "sha256"
+                        ? `$binDir/nix-store -q --hash "$patch->{basePath}"`
+                        : `$binDir/nix-hash --type '$baseHashAlgo' $format "$patch->{basePath}"`;
                     chomp $hash;
+                    $hash =~ s/.*://;
                     next if $hash ne $baseHash;
                 }
                 push @queue, $patch->{basePath};
@@ -203,7 +207,7 @@ if ($ARGV[0] eq "--query") {
             print scalar @references, "\n";
             print "$_\n" foreach @references;
 
-            my @path = computeSmallestDownload $storePath;
+            my @path = computeSmallestDownload $storePath, 1;
             
             my $downloadSize = 0;
             while (scalar @path > 0) {
@@ -269,7 +273,7 @@ foreach my $localPath (@{$localPathList}) {
 
 
 # Compute the shortest path.
-my @path = computeSmallestDownload $targetPath;
+my @path = computeSmallestDownload $targetPath, 0;
 die "don't know how to produce $targetPath\n" if scalar @path == 0;
 
 
