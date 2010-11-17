@@ -23,6 +23,8 @@ ln -s $nixinstantiate $NIX_BIN_DIR/
 ln -s $nixhash $NIX_BIN_DIR/
 ln -s $nixenv $NIX_BIN_DIR/
 ln -s $nixworker $NIX_BIN_DIR/
+ln -s $TOP/src/bsdiff-*/bsdiff $NIX_BIN_DIR/
+ln -s $TOP/src/bsdiff-*/bspatch $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-prefetch-url $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-collect-garbage $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-build $NIX_BIN_DIR/
@@ -34,6 +36,7 @@ ln -s $bzip2_bin_test/bzip2 $NIX_BIN_DIR/nix/
 ln -s $bzip2_bin_test/bunzip2 $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/copy-from-other-stores.pl $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/download-using-manifests.pl $NIX_BIN_DIR/nix/
+ln -s $TOP/scripts/generate-patches.pl $NIX_BIN_DIR/
 ln -s $TOP/scripts/readmanifest.pm $NIX_BIN_DIR/nix/
 
 cat > "$NIX_CONF_DIR"/nix.conf <<EOF
@@ -45,7 +48,7 @@ EOF
 
 mkdir $NIX_DATA_DIR/nix
 cp -pr $TOP/corepkgs $NIX_DATA_DIR/nix/
-# Bah, script has the prefix hard-coded.  This is really messy stuff
+# Bah, scripts have the prefix hard-coded.  This is really messy stuff
 # (and likely to fail).
 for i in \
     $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh \
@@ -58,6 +61,7 @@ for i in \
     $NIX_BIN_DIR/nix-push \
     $NIX_BIN_DIR/nix-pull \
     $NIX_BIN_DIR/nix/readmanifest.pm \
+    $NIX_BIN_DIR/generate-patches.pl \
     ; do
     sed < $i > $i.tmp \
         -e "s^$REAL_BIN_DIR/nix-store^$NIX_BIN_DIR/nix-store^" \
