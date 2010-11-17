@@ -87,6 +87,7 @@ struct SubstitutablePathInfo
     Path deriver;
     PathSet references;
     unsigned long long downloadSize; /* 0 = unknown or inapplicable */
+    unsigned long long narSize; /* 0 = unknown */
 };
 
 

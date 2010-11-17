@@ -521,6 +521,8 @@ static void performOp(unsigned int clientVersion,
             writeString(info.deriver, to);
             writeStringSet(info.references, to);
             writeLongLong(info.downloadSize, to);
+            if (GET_PROTOCOL_MINOR(clientVersion) >= 7)
+                writeLongLong(info.narSize, to);
         }
         break;
     }

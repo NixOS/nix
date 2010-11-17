@@ -839,6 +839,7 @@ bool LocalStore::querySubstitutablePathInfo(const Path & substituter,
         info.references.insert(p);
     }
     info.downloadSize = getIntLine<long long>(run.from);
+    info.narSize = getIntLine<long long>(run.from);
     
     return true;
 }

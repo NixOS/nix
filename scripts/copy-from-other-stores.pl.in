@@ -63,10 +63,15 @@ if ($ARGV[0] eq "--query") {
                 `@bindir@/nix-store --query --references $storePath`;
             die "cannot query references of `$storePath'" if $? != 0;
 
+            my $narSize = `@bindir@/nix-store --query --size $storePath`;
+            die "cannot query size of `$storePath'" if $? != 0;
+            chomp $narSize;
+
             print "$deriver\n";
             print scalar @references, "\n";
             print "$_\n" foreach @references;
-            print "0\n"; # !!! showing size not supported (yet)
+            print "$narSize\n";
+            print "$narSize\n";
         }
 
         else { die "unknown command `$cmd'"; }

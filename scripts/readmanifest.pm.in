@@ -33,18 +33,8 @@ sub readManifest {
 
     my $manifestVersion = 2;
 
-    my $storePath;
-    my $url;
-    my $hash;
-    my $size;
-    my $basePath;
-    my $baseHash;
-    my $patchType;
-    my $narHash;
-    my $references;
-    my $deriver;
-    my $hashAlgo;
-    my $copyFrom;
+    my ($storePath, $url, $hash, $size, $basePath, $baseHash, $patchType);
+    my ($narHash, $narSize, $references, $deriver, $hashAlgo, $copyFrom);
 
     while (<MANIFEST>) {
         chomp;
@@ -62,6 +52,7 @@ sub readManifest {
                 undef $hash;
                 undef $size;
                 undef $narHash;
+                undef $narSize;
                 undef $basePath;
                 undef $baseHash;
                 undef $patchType;
@@ -89,7 +80,8 @@ sub readManifest {
                     if (!$found) {
                         push @{$narFileList},
                             { url => $url, hash => $hash, size => $size
-                            , narHash => $narHash, references => $references
+                            , narHash => $narHash, narSize => $narSize
+                            , references => $references
                             , deriver => $deriver, hashAlgo => $hashAlgo
                             };
                     }
@@ -100,8 +92,8 @@ sub readManifest {
                     addPatch $patches, $storePath,
                         { url => $url, hash => $hash, size => $size
                         , basePath => $basePath, baseHash => $baseHash
-                        , narHash => $narHash, patchType => $patchType
-                        , hashAlgo => $hashAlgo
+                        , narHash => $narHash, narSize => $narSize
+                        , patchType => $patchType, hashAlgo => $hashAlgo
                         };
                 }
 
@@ -132,6 +124,7 @@ sub readManifest {
             elsif (/^\s*BaseHash:\s*(\S+)\s*$/) { $baseHash = $1; }
             elsif (/^\s*Type:\s*(\S+)\s*$/) { $patchType = $1; }
             elsif (/^\s*NarHash:\s*(\S+)\s*$/) { $narHash = $1; }
+            elsif (/^\s*NarSize:\s*(\d+)\s*$/) { $narSize = $1; }
             elsif (/^\s*References:\s*(.*)\s*$/) { $references = $1; }
             elsif (/^\s*Deriver:\s*(\S+)\s*$/) { $deriver = $1; }
             elsif (/^\s*ManifestVersion:\s*(\d+)\s*$/) { $manifestVersion = $1; }
@@ -183,8 +176,9 @@ sub writeManifest {
             print MANIFEST "  StorePath: $storePath\n";
             print MANIFEST "  NarURL: $patch->{url}\n";
             print MANIFEST "  Hash: $patch->{hash}\n";
-            print MANIFEST "  NarHash: $patch->{narHash}\n";
             print MANIFEST "  Size: $patch->{size}\n";
+            print MANIFEST "  NarHash: $patch->{narHash}\n";
+            print MANIFEST "  NarSize: $patch->{narSize}\n" if $patch->{narSize};
             print MANIFEST "  BasePath: $patch->{basePath}\n";
             print MANIFEST "  BaseHash: $patch->{baseHash}\n";
             print MANIFEST "  Type: $patch->{patchType}\n";

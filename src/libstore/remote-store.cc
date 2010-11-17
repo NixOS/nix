@@ -191,9 +191,8 @@ void RemoteStore::setOptions()
         writeInt(logType, to);
         writeInt(printBuildTrace, to);
     }
-    if (GET_PROTOCOL_MINOR(daemonVersion) >= 6) {
+    if (GET_PROTOCOL_MINOR(daemonVersion) >= 6)
         writeInt(buildCores, to);
-    }
     processStderr();
 }
 
@@ -243,6 +242,7 @@ bool RemoteStore::querySubstitutablePathInfo(const Path & path,
     if (info.deriver != "") assertStorePath(info.deriver);
     info.references = readStorePaths(from);
     info.downloadSize = readLongLong(from);
+    info.narSize = GET_PROTOCOL_MINOR(daemonVersion) >= 7 ? readLongLong(from) : 0;
     return true;
 }
 

@@ -64,6 +64,8 @@ if ($ARGV[0] eq "--query") {
             print "$_\n" foreach @references;
             my $size = $info->{size} || 0;
             print "$size\n";
+            my $narSize = $info->{narSize} || 0;
+            print "$narSize\n";
         }
         
         else { die "unknown command `$cmd'"; }

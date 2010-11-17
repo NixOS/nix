@@ -54,25 +54,26 @@ void printGCWarning()
 
 void printMissing(const PathSet & paths)
 {
-    unsigned long long downloadSize;
+    unsigned long long downloadSize, narSize;
     PathSet willBuild, willSubstitute, unknown;
-    queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize);
+    queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     if (!willBuild.empty()) {
-        printMsg(lvlInfo, format("the following derivations will be built:"));
+        printMsg(lvlInfo, format("these derivations will be built:"));
         foreach (PathSet::iterator, i, willBuild)
             printMsg(lvlInfo, format("  %1%") % *i);
     }
 
     if (!willSubstitute.empty()) {
-        printMsg(lvlInfo, format("the following paths will be downloaded/copied (%.2f MiB):") %
-            (downloadSize / (1024.0 * 1024.0)));
+        printMsg(lvlInfo, format("these paths will be downloaded/copied (%.2f MiB download, %.2f MiB unpacked):")
+            % (downloadSize / (1024.0 * 1024.0))
+            % (narSize / (1024.0 * 1024.0)));
         foreach (PathSet::iterator, i, willSubstitute)
             printMsg(lvlInfo, format("  %1%") % *i);
     }
 
     if (!unknown.empty()) {
-        printMsg(lvlInfo, format("don't know how to build the following paths%1%:")
+        printMsg(lvlInfo, format("don't know how to build these paths%1%:")
             % (readOnlyMode ? " (may be caused by read-only store access)" : ""));
         foreach (PathSet::iterator, i, unknown)
             printMsg(lvlInfo, format("  %1%") % *i);
