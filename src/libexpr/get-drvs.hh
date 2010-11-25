@@ -62,7 +62,11 @@ public:
 };
 
 
+#if HAVE_BOEHMGC
+typedef list<DrvInfo, traceable_allocator<DrvInfo> > DrvInfos;
+#else
 typedef list<DrvInfo> DrvInfos;
+#endif
 
 
 /* If value `v' denotes a derivation, store information about the
