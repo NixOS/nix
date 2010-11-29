@@ -15,6 +15,9 @@ $maxNarSize = 100 * 1024 * 1024 if !defined $maxNarSize;
 my $maxPatchFraction = $ENV{"NIX_PATCH_FRACTION"};
 $maxPatchFraction = 0.60 if !defined $maxPatchFraction;
 
+my $timeLimit = $ENV{"NIX_BSDIFF_TIME_LIMIT"};
+$timeLimit = 180 if !defined $timeLimit;
+
 
 die unless scalar @ARGV == 5;
 
@@ -28,8 +31,6 @@ my $dstManifest = $ARGV[4];
 
 my $tmpDir = tempdir("nix-generate-patches.XXXXXX", CLEANUP => 1, TMPDIR => 1)
     or die "cannot create a temporary directory";
-
-print "TEMP = $tmpDir\n";
 
 #END { rmdir $tmpDir; }
 
@@ -223,7 +224,7 @@ foreach my $p (keys %dstOutPaths) {
 
     foreach my $q (keys %srcOutPaths) {
         (my $name2, my $version2) = getNameVersion $q;
-	next unless defined $name2 && defined $version2;
+        next unless defined $name2 && defined $version2;
 
         if ($name eq $name2) {
 
@@ -312,8 +313,13 @@ foreach my $p (keys %dstOutPaths) {
             next;
         }
         
-        system("@libexecdir@/bsdiff $tmpDir/A $tmpDir/B $tmpDir/DIFF") == 0
-            or die "cannot compute binary diff";
+        my $time1 = time();
+        my $res = system("ulimit -t $timeLimit; @libexecdir@/bsdiff $tmpDir/A $tmpDir/B $tmpDir/DIFF");
+        my $time2 = time();
+        if ($res) {
+            warn "binary diff computation aborted after ", $time2 - $time1, " seconds\n";
+            next;
+        }
 
         my $baseHash = `@bindir@/nix-hash --flat --type $hashAlgo --base32 $tmpDir/A` or die;
         chomp $baseHash;
@@ -327,7 +333,7 @@ foreach my $p (keys %dstOutPaths) {
         my $narDiffSize = (stat "$tmpDir/DIFF")[7];
         my $dstNarBz2Size = (stat $dstNarBz2)[7];
 
-        print "    size $narDiffSize; full size $dstNarBz2Size\n";
+        print "    size $narDiffSize; full size $dstNarBz2Size; ", $time2 - $time1, " seconds\n";
         
         if ($narDiffSize >= $dstNarBz2Size) {
             print "    rejecting; patch bigger than full archive\n";
