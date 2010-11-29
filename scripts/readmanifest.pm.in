@@ -34,7 +34,7 @@ sub readManifest {
     my $manifestVersion = 2;
 
     my ($storePath, $url, $hash, $size, $basePath, $baseHash, $patchType);
-    my ($narHash, $narSize, $references, $deriver, $hashAlgo, $copyFrom);
+    my ($narHash, $narSize, $references, $deriver, $hashAlgo, $copyFrom, $system);
 
     while (<MANIFEST>) {
         chomp;
@@ -56,6 +56,7 @@ sub readManifest {
                 undef $basePath;
                 undef $baseHash;
                 undef $patchType;
+                undef $system;
                 $references = "";
                 $deriver = "";
                 $hashAlgo = "md5";
@@ -83,6 +84,7 @@ sub readManifest {
                             , narHash => $narHash, narSize => $narSize
                             , references => $references
                             , deriver => $deriver, hashAlgo => $hashAlgo
+                            , system => $system
                             };
                     }
                 
@@ -128,6 +130,7 @@ sub readManifest {
             elsif (/^\s*References:\s*(.*)\s*$/) { $references = $1; }
             elsif (/^\s*Deriver:\s*(\S+)\s*$/) { $deriver = $1; }
             elsif (/^\s*ManifestVersion:\s*(\d+)\s*$/) { $manifestVersion = $1; }
+            elsif (/^\s*System:\s*(\S+)\s*$/) { $system = $1; }
 
             # Compatibility;
             elsif (/^\s*NarURL:\s*(\S+)\s*$/) { $url = $1; }
@@ -165,6 +168,7 @@ sub writeManifest {
                 if defined $narFile->{references} && $narFile->{references} ne "";
             print MANIFEST "  Deriver: $narFile->{deriver}\n"
                 if defined $narFile->{deriver} && $narFile->{deriver} ne "";
+            print MANIFEST "  System: $narFile->{system}\n" if defined $narFile->{system};
             print MANIFEST "}\n";
         }
     }

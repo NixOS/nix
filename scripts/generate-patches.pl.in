@@ -228,6 +228,13 @@ foreach my $p (keys %dstOutPaths) {
 
         if ($name eq $name2) {
 
+            my $srcSystem = @{$dstNarFiles{$p}}[0]->{system};
+            my $dstSystem = @{$srcNarFiles{$q}}[0]->{system};
+            if (defined $srcSystem && defined $dstSystem && $srcSystem ne $dstSystem) {
+                print "  SKIPPING $q due to different systems ($srcSystem vs. $dstSystem)\n";
+                next;
+            }
+
             # If the sizes differ too much, then skip.  This
             # disambiguates between, e.g., a real component and a
             # wrapper component (cf. Firefox in Nixpkgs).
@@ -238,7 +245,7 @@ foreach my $p (keys %dstOutPaths) {
 #            print "  SIZE $srcSize $dstSize $ratio $q\n";
 
             if ($ratio >= 3) {
-                print "  SKIPPING $q due to size ratio $ratio ($srcSize $dstSize)\n";
+                print "  SKIPPING $q due to size ratio $ratio ($srcSize vs. $dstSize)\n";
                 next;
             }
 
