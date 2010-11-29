@@ -3,7 +3,7 @@ bin_SCRIPTS = nix-collect-garbage \
   nix-install-package nix-channel nix-build \
   nix-copy-closure 
 
-noinst_SCRIPTS = nix-profile.sh generate-patches.pl \
+noinst_SCRIPTS = nix-profile.sh GeneratePatches.pm \
   find-runtime-roots.pl build-remote.pl nix-reduce-build \
   copy-from-other-stores.pl nix-http-export.cgi
 
@@ -17,7 +17,7 @@ install-exec-local: readmanifest.pm download-using-manifests.pl copy-from-other-
 	$(INSTALL_DATA) readconfig.pm $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_DATA) ssh.pm $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) find-runtime-roots.pl $(DESTDIR)$(libexecdir)/nix 
-	$(INSTALL_PROGRAM) generate-patches.pl $(DESTDIR)$(libexecdir)/nix 
+	$(INSTALL_PROGRAM) GeneratePatches.pm $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) build-remote.pl $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL) -d $(DESTDIR)$(libexecdir)/nix/substituters
 	$(INSTALL_PROGRAM) download-using-manifests.pl $(DESTDIR)$(libexecdir)/nix/substituters
@@ -36,7 +36,7 @@ EXTRA_DIST = nix-collect-garbage.in \
   nix-build.in \
   download-using-manifests.pl.in \
   copy-from-other-stores.pl.in \
-  generate-patches.pl.in \
+  GeneratePatches.pm.in \
   nix-copy-closure.in \
   find-runtime-roots.pl.in \
   build-remote.pl.in \
