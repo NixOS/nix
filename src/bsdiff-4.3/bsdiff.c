@@ -277,6 +277,7 @@ int main(int argc,char *argv[])
 		for(scsc=scan+=len;scan<newsize;scan++) {
 			len=search(I,old,oldsize,new+scan,newsize-scan,
 					0,oldsize,&pos);
+			if (len > 64 * 1024) break;
 
 			for(;scsc<scan+len;scsc++)
 			if((scsc+lastoffset<oldsize) &&
