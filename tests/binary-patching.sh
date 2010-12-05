@@ -19,10 +19,10 @@ $NIX_BIN_DIR/nix-push --copy $TEST_ROOT/cache2 $TEST_ROOT/manifest3 $out3
 rm $RESULT
 
 # Generate binary patches.
-$NIX_BIN_DIR/generate-patches.pl $TEST_ROOT/cache2 $TEST_ROOT/patches \
+$NIX_BIN_DIR/nix-generate-patches $TEST_ROOT/cache2 $TEST_ROOT/patches \
     file://$TEST_ROOT/patches $TEST_ROOT/manifest1 $TEST_ROOT/manifest2
 
-$NIX_BIN_DIR/generate-patches.pl $TEST_ROOT/cache2 $TEST_ROOT/patches \
+$NIX_BIN_DIR/nix-generate-patches $TEST_ROOT/cache2 $TEST_ROOT/patches \
     file://$TEST_ROOT/patches $TEST_ROOT/manifest2 $TEST_ROOT/manifest3
 
 grep -q "patch {" $TEST_ROOT/manifest3
@@ -45,7 +45,7 @@ rm $RESULT
 [ "$(grep ' patch ' $TEST_ROOT/var/log/nix/downloads | wc -l)" -eq 2 ]
 
 # Add a patch from version 1 directly to version 3.
-$NIX_BIN_DIR/generate-patches.pl $TEST_ROOT/cache2 $TEST_ROOT/patches \
+$NIX_BIN_DIR/nix-generate-patches $TEST_ROOT/cache2 $TEST_ROOT/patches \
     file://$TEST_ROOT/patches $TEST_ROOT/manifest1 $TEST_ROOT/manifest3
 
 # Rebuild version 3.  This should use the direct patch rather than the

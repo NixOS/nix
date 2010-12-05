@@ -1,0 +1,42 @@
+#! @perl@ -w -I@libexecdir@/nix
+
+use strict;
+use File::Temp qw(tempdir);
+use readmanifest;
+use GeneratePatches;
+
+if (scalar @ARGV != 5) {
+    print STDERR <<EOF;
+Usage: nix-generate-patches NAR-DIR PATCH-DIR PATCH-URI OLD-MANIFEST NEW-MANIFEST
+
+This command generates binary patches between NAR files listed in
+OLD-MANIFEST and NEW-MANIFEST.  The patches are written to the
+directory PATCH-DIR, and the prefix PATCH-URI is used to generate URIs
+for the patches.  The patches are added to NEW-MANIFEST.  All NARs are
+required to exist in NAR-DIR.  Patches are generated between
+succeeding versions of packages with the same name.
+EOF
+    exit 1;
+}
+
+my $narPath = $ARGV[0];
+my $patchesPath = $ARGV[1];
+my $patchesURL = $ARGV[2];
+my $srcManifest = $ARGV[3];
+my $dstManifest = $ARGV[4];
+
+my (%srcNarFiles, %srcLocalPaths, %srcPatches);
+readManifest $srcManifest, \%srcNarFiles, \%srcLocalPaths, \%srcPatches;
+
+my (%dstNarFiles, %dstLocalPaths, %dstPatches);
+readManifest $dstManifest, \%dstNarFiles, \%dstLocalPaths, \%dstPatches;
+
+my $tmpDir = tempdir("nix-generate-patches.XXXXXX", CLEANUP => 1, TMPDIR => 1)
+    or die "cannot create a temporary directory";
+
+generatePatches \%srcNarFiles, \%dstNarFiles, \%srcPatches, \%dstPatches,
+    $narPath, $patchesPath, $patchesURL, $tmpDir;
+
+propagatePatches \%srcPatches, \%dstNarFiles, \%dstPatches;
+
+writeManifest $dstManifest, \%dstNarFiles, \%dstPatches;

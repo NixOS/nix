@@ -1,7 +1,7 @@
 bin_SCRIPTS = nix-collect-garbage \
   nix-pull nix-push nix-prefetch-url \
   nix-install-package nix-channel nix-build \
-  nix-copy-closure 
+  nix-copy-closure nix-generate-patches
 
 noinst_SCRIPTS = nix-profile.sh GeneratePatches.pm \
   find-runtime-roots.pl build-remote.pl nix-reduce-build \
@@ -41,4 +41,5 @@ EXTRA_DIST = nix-collect-garbage.in \
   find-runtime-roots.pl.in \
   build-remote.pl.in \
   nix-reduce-build.in \
-  nix-http-export.cgi.in 
+  nix-http-export.cgi.in \
+  nix-generate-patches.in
