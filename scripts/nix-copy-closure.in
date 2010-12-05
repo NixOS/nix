@@ -1,6 +1,6 @@
 #! @perl@ -w -I@libexecdir@/nix
 
-use ssh;
+use SSH;
 
 my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
 

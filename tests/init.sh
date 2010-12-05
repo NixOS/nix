@@ -38,7 +38,7 @@ ln -s $bzip2_bin_test/bunzip2 $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/copy-from-other-stores.pl $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/download-using-manifests.pl $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/GeneratePatches.pm $NIX_BIN_DIR/nix/
-ln -s $TOP/scripts/readmanifest.pm $NIX_BIN_DIR/nix/
+ln -s $TOP/scripts/NixManifest.pm $NIX_BIN_DIR/nix/
 
 cat > "$NIX_CONF_DIR"/nix.conf <<EOF
 gc-keep-outputs = false
@@ -62,7 +62,7 @@ for i in \
     $NIX_BIN_DIR/nix-push \
     $NIX_BIN_DIR/nix-pull \
     $NIX_BIN_DIR/nix-generate-patches \
-    $NIX_BIN_DIR/nix/readmanifest.pm \
+    $NIX_BIN_DIR/nix/NixManifest.pm \
     $NIX_BIN_DIR/nix/GeneratePatches.pm \
     ; do
     sed < $i > $i.tmp \

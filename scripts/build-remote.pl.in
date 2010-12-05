@@ -3,7 +3,7 @@
 use Fcntl ':flock';
 use English '-no_match_vars';
 use IO::Handle;
-use ssh qw/sshOpts openSSHConnection/;
+use SSH qw/sshOpts openSSHConnection/;
 no warnings('once');
 
 

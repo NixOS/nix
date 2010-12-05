@@ -2,7 +2,7 @@
 
 use strict;
 use File::Temp qw(tempdir);
-use readmanifest;
+use NixManifest;
 use GeneratePatches;
 
 if (scalar @ARGV != 5) {

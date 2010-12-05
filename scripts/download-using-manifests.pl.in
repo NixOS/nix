@@ -1,7 +1,7 @@
 #! @perl@ -w -I@libexecdir@/nix
 
 use strict;
-use readmanifest;
+use NixManifest;
 use POSIX qw(strftime);
 use File::Temp qw(tempdir);
 
