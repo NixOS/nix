@@ -22,22 +22,31 @@
 
 namespace nix {
 
-    
-class SQLiteError : public Error
+
+MakeError(SQLiteError, Error);
+MakeError(SQLiteBusy, SQLiteError);
+
+
+static void throwSQLiteError(sqlite3 * db, const format & f)
+    __attribute__ ((noreturn));
+
+static void throwSQLiteError(sqlite3 * db, const format & f)
 {
-public:
-    SQLiteError(sqlite3 * db, const format & f)
-        : Error(format("%1%: %2%") % f.str() % sqlite3_errmsg(db))
-    {
+    int err = sqlite3_errcode(db);
+    if (err == SQLITE_BUSY) {
+        printMsg(lvlError, "warning: SQLite database is busy");
+        throw SQLiteBusy(format("%1%: %2%") % f.str() % sqlite3_errmsg(db));
     }
-};
+    else
+        throw SQLiteError(format("%1%: %2%") % f.str() % sqlite3_errmsg(db));
+}
 
 
 SQLite::~SQLite()
 {
     try {
         if (db && sqlite3_close(db) != SQLITE_OK)
-            throw SQLiteError(db, "closing database");
+            throwSQLiteError(db, "closing database");
     } catch (...) {
         ignoreException();
     }
@@ -49,7 +58,7 @@ void SQLiteStmt::create(sqlite3 * db, const string & s)
     checkInterrupt();
     assert(!stmt);
     if (sqlite3_prepare_v2(db, s.c_str(), -1, &stmt, 0) != SQLITE_OK)
-        throw SQLiteError(db, "creating statement");
+        throwSQLiteError(db, "creating statement");
     this->db = db;
 }
 
@@ -58,7 +67,7 @@ void SQLiteStmt::reset()
 {
     assert(stmt);
     if (sqlite3_reset(stmt) != SQLITE_OK)
-        throw SQLiteError(db, "resetting statement");
+        throwSQLiteError(db, "resetting statement");
     curArg = 1;
 }
 
@@ -67,7 +76,7 @@ SQLiteStmt::~SQLiteStmt()
 {
     try {
         if (stmt && sqlite3_finalize(stmt) != SQLITE_OK)
-            throw SQLiteError(db, "finalizing statement");
+            throwSQLiteError(db, "finalizing statement");
     } catch (...) {
         ignoreException();
     }
@@ -77,28 +86,28 @@ SQLiteStmt::~SQLiteStmt()
 void SQLiteStmt::bind(const string & value)
 {
     if (sqlite3_bind_text(stmt, curArg++, value.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
-        throw SQLiteError(db, "binding argument");
+        throwSQLiteError(db, "binding argument");
 }
 
 
 void SQLiteStmt::bind(int value)
 {
     if (sqlite3_bind_int(stmt, curArg++, value) != SQLITE_OK)
-        throw SQLiteError(db, "binding argument");
+        throwSQLiteError(db, "binding argument");
 }
 
 
 void SQLiteStmt::bind64(long long value)
 {
     if (sqlite3_bind_int64(stmt, curArg++, value) != SQLITE_OK)
-        throw SQLiteError(db, "binding argument");
+        throwSQLiteError(db, "binding argument");
 }
 
 
 void SQLiteStmt::bind()
 {
     if (sqlite3_bind_null(stmt, curArg++) != SQLITE_OK)
-        throw SQLiteError(db, "binding argument");
+        throwSQLiteError(db, "binding argument");
 }
 
 
@@ -132,14 +141,14 @@ struct SQLiteTxn
     SQLiteTxn(sqlite3 * db) : active(false) {
         this->db = db;
         if (sqlite3_exec(db, "begin;", 0, 0, 0) != SQLITE_OK)
-            throw SQLiteError(db, "starting transaction");
+            throwSQLiteError(db, "starting transaction");
         active = true;
     }
 
     void commit() 
     {
         if (sqlite3_exec(db, "commit;", 0, 0, 0) != SQLITE_OK)
-            throw SQLiteError(db, "committing transaction");
+            throwSQLiteError(db, "committing transaction");
         active = false;
     }
     
@@ -147,7 +156,7 @@ struct SQLiteTxn
     {
         try {
             if (active && sqlite3_exec(db, "rollback;", 0, 0, 0) != SQLITE_OK)
-                throw SQLiteError(db, "aborting transaction");
+                throwSQLiteError(db, "aborting transaction");
         } catch (...) {
             ignoreException();
         }
@@ -289,10 +298,10 @@ void LocalStore::openDB(bool create)
         throw Error("cannot open SQLite database");
 
     if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)
-        throw SQLiteError(db, "setting timeout");
+        throwSQLiteError(db, "setting timeout");
 
     if (sqlite3_exec(db, "pragma foreign_keys = 1;", 0, 0, 0) != SQLITE_OK)
-        throw SQLiteError(db, "enabling foreign keys");
+        throwSQLiteError(db, "enabling foreign keys");
 
     /* !!! check whether sqlite has been built with foreign key
        support */
@@ -303,7 +312,7 @@ void LocalStore::openDB(bool create)
        crashes. */
     string syncMode = queryBoolSetting("fsync-metadata", true) ? "normal" : "off";
     if (sqlite3_exec(db, ("pragma synchronous = " + syncMode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
-        throw SQLiteError(db, "setting synchronous mode");
+        throwSQLiteError(db, "setting synchronous mode");
 
     /* Set the SQLite journal mode.  WAL mode is fastest, but doesn't
        seem entirely stable at the moment (Oct. 2010).  Thus, use
@@ -314,31 +323,31 @@ void LocalStore::openDB(bool create)
         SQLiteStmt stmt;
         stmt.create(db, "pragma main.journal_mode;");
         if (sqlite3_step(stmt) != SQLITE_ROW)
-            throw SQLiteError(db, "querying journal mode");
+            throwSQLiteError(db, "querying journal mode");
         prevMode = string((const char *) sqlite3_column_text(stmt, 0));
     }
     if (prevMode != mode &&
         sqlite3_exec(db, ("pragma main.journal_mode = " + mode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
-        throw SQLiteError(db, "setting journal mode");
+        throwSQLiteError(db, "setting journal mode");
 
     /* Increase the auto-checkpoint interval to 8192 pages.  This
        seems enough to ensure that instantiating the NixOS system
        derivation is done in a single fsync(). */
     if (sqlite3_exec(db, "pragma wal_autocheckpoint = 8192;", 0, 0, 0) != SQLITE_OK)
-        throw SQLiteError(db, "setting autocheckpoint interval");
+        throwSQLiteError(db, "setting autocheckpoint interval");
     
     /* Initialise the database schema, if necessary. */
     if (create) {
 #include "schema.sql.hh"
         if (sqlite3_exec(db, (const char *) schema, 0, 0, 0) != SQLITE_OK)
-            throw SQLiteError(db, "initialising database schema");
+            throwSQLiteError(db, "initialising database schema");
     }
 
     /* Backwards compatibility with old (pre-release) databases.  Can
        remove this eventually. */
     if (sqlite3_table_column_metadata(db, 0, "ValidPaths", "narSize", 0, 0, 0, 0, 0) != SQLITE_OK) {
         if (sqlite3_exec(db, "alter table ValidPaths add column narSize integer" , 0, 0, 0) != SQLITE_OK)
-            throw SQLiteError(db, "adding column narSize");
+            throwSQLiteError(db, "adding column narSize");
     }
 
     /* Prepare SQL statements. */
@@ -460,7 +469,7 @@ unsigned long long LocalStore::addValidPath(const ValidPathInfo & info)
     else
         stmtRegisterValidPath.bind(); // null
     if (sqlite3_step(stmtRegisterValidPath) != SQLITE_DONE)
-        throw SQLiteError(db, format("registering valid path `%1%' in database") % info.path);
+        throwSQLiteError(db, format("registering valid path `%1%' in database") % info.path);
     unsigned long long id = sqlite3_last_insert_rowid(db);
 
     /* If this is a derivation, then store the derivation outputs in
@@ -475,7 +484,7 @@ unsigned long long LocalStore::addValidPath(const ValidPathInfo & info)
             stmtAddDerivationOutput.bind(i->first);
             stmtAddDerivationOutput.bind(i->second.path);
             if (sqlite3_step(stmtAddDerivationOutput) != SQLITE_DONE)
-                throw SQLiteError(db, format("adding derivation output for `%1%' in database") % info.path);
+                throwSQLiteError(db, format("adding derivation output for `%1%' in database") % info.path);
         }
     }
 
@@ -489,7 +498,7 @@ void LocalStore::addReference(unsigned long long referrer, unsigned long long re
     stmtAddReference.bind(referrer);
     stmtAddReference.bind(reference);
     if (sqlite3_step(stmtAddReference) != SQLITE_DONE)
-        throw SQLiteError(db, "adding reference to database");
+        throwSQLiteError(db, "adding reference to database");
 }
 
 
@@ -498,15 +507,23 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
     assert(info.hash.type == htSHA256);
     ValidPathInfo info2(info);
     if (info2.registrationTime == 0) info2.registrationTime = time(0);
-    
-    SQLiteTxn txn(db);
-    
-    unsigned long long id = addValidPath(info2);
 
-    foreach (PathSet::const_iterator, i, info2.references)
-        addReference(id, queryValidPathId(*i));
-        
-    txn.commit();
+    while (1) {
+        try {
+            SQLiteTxn txn(db);
+
+            unsigned long long id = addValidPath(info2);
+
+            foreach (PathSet::const_iterator, i, info2.references)
+                addReference(id, queryValidPathId(*i));
+
+            txn.commit();
+            break;
+        } catch (SQLiteBusy & e) {
+            /* Retry; the `txn' destructor will roll back the current
+               transaction. */
+        }
+    }
 }
 
 
@@ -517,7 +534,7 @@ void LocalStore::registerFailedPath(const Path & path)
     stmtRegisterFailedPath.bind(path);
     stmtRegisterFailedPath.bind(time(0));
     if (sqlite3_step(stmtRegisterFailedPath) != SQLITE_DONE)
-        throw SQLiteError(db, format("registering failed path `%1%'") % path);
+        throwSQLiteError(db, format("registering failed path `%1%'") % path);
 }
 
 
@@ -527,7 +544,7 @@ bool LocalStore::hasPathFailed(const Path & path)
     stmtHasPathFailed.bind(path);
     int res = sqlite3_step(stmtHasPathFailed);
     if (res != SQLITE_DONE && res != SQLITE_ROW)
-        throw SQLiteError(db, "querying whether path failed");
+        throwSQLiteError(db, "querying whether path failed");
     return res == SQLITE_ROW;
 }
 
@@ -545,7 +562,7 @@ PathSet LocalStore::queryFailedPaths()
     }
 
     if (r != SQLITE_DONE)
-        throw SQLiteError(db, "error querying failed paths");
+        throwSQLiteError(db, "error querying failed paths");
 
     return res;
 }
@@ -559,7 +576,7 @@ void LocalStore::clearFailedPaths(const PathSet & paths)
         SQLiteStmtUse use(stmtClearFailedPath);
         stmtClearFailedPath.bind(*i);
         if (sqlite3_step(stmtClearFailedPath) != SQLITE_DONE)
-            throw SQLiteError(db, format("clearing failed path `%1%' in database") % *i);
+            throwSQLiteError(db, format("clearing failed path `%1%' in database") % *i);
     }
 
     txn.commit();
@@ -594,7 +611,7 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
     
     int r = sqlite3_step(stmtQueryPathInfo);
     if (r == SQLITE_DONE) throw Error(format("path `%1%' is not valid") % path);
-    if (r != SQLITE_ROW) throw SQLiteError(db, "querying path in database");
+    if (r != SQLITE_ROW) throwSQLiteError(db, "querying path in database");
 
     info.id = sqlite3_column_int(stmtQueryPathInfo, 0);
 
@@ -622,7 +639,7 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
     }
 
     if (r != SQLITE_DONE)
-        throw SQLiteError(db, format("error getting references of `%1%'") % path);
+        throwSQLiteError(db, format("error getting references of `%1%'") % path);
 
     return info;
 }
@@ -635,7 +652,7 @@ unsigned long long LocalStore::queryValidPathId(const Path & path)
     int res = sqlite3_step(stmtQueryPathInfo);
     if (res == SQLITE_ROW) return sqlite3_column_int(stmtQueryPathInfo, 0);
     if (res == SQLITE_DONE) throw Error(format("path `%1%' is not valid") % path);
-    throw SQLiteError(db, "querying path in database");
+    throwSQLiteError(db, "querying path in database");
 }
 
 
@@ -645,7 +662,7 @@ bool LocalStore::isValidPath(const Path & path)
     stmtQueryPathInfo.bind(path);
     int res = sqlite3_step(stmtQueryPathInfo);
     if (res != SQLITE_DONE && res != SQLITE_ROW)
-        throw SQLiteError(db, "querying path in database");
+        throwSQLiteError(db, "querying path in database");
     return res == SQLITE_ROW;
 }
 
@@ -665,7 +682,7 @@ PathSet LocalStore::queryValidPaths()
     }
 
     if (r != SQLITE_DONE)
-        throw SQLiteError(db, "error getting valid paths");
+        throwSQLiteError(db, "error getting valid paths");
 
     return res;
 }
@@ -695,7 +712,7 @@ void LocalStore::queryReferrers(const Path & path, PathSet & referrers)
     }
 
     if (r != SQLITE_DONE)
-        throw SQLiteError(db, format("error getting references of `%1%'") % path);
+        throwSQLiteError(db, format("error getting references of `%1%'") % path);
 }
 
 
@@ -721,7 +738,7 @@ PathSet LocalStore::queryValidDerivers(const Path & path)
     }
     
     if (r != SQLITE_DONE)
-        throw SQLiteError(db, format("error getting valid derivers of `%1%'") % path);
+        throwSQLiteError(db, format("error getting valid derivers of `%1%'") % path);
     
     return derivers;
 }
@@ -743,7 +760,7 @@ PathSet LocalStore::queryDerivationOutputs(const Path & path)
     }
     
     if (r != SQLITE_DONE)
-        throw SQLiteError(db, format("error getting outputs of `%1%'") % path);
+        throwSQLiteError(db, format("error getting outputs of `%1%'") % path);
 
     return outputs;
 }
@@ -890,7 +907,7 @@ void LocalStore::invalidatePath(const Path & path)
     stmtInvalidatePath.bind(path);
 
     if (sqlite3_step(stmtInvalidatePath) != SQLITE_DONE)
-        throw SQLiteError(db, format("invalidating path `%1%' in database") % path);
+        throwSQLiteError(db, format("invalidating path `%1%' in database") % path);
 
     /* Note that the foreign key constraints on the Refs table take
        care of deleting the references entries for `path'. */
@@ -1248,20 +1265,25 @@ void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFr
 
     assertStorePath(path);
 
-    SQLiteTxn txn(db);
+    while (1) {
+        try {
+            SQLiteTxn txn(db);
 
-    if (isValidPath(path)) {
-        PathSet referrers; queryReferrers(path, referrers);
-        referrers.erase(path); /* ignore self-references */
-        if (!referrers.empty())
-            throw PathInUse(format("cannot delete path `%1%' because it is in use by `%2%'")
-                % path % showPaths(referrers));
-        invalidatePath(path);
+            if (isValidPath(path)) {
+                PathSet referrers; queryReferrers(path, referrers);
+                referrers.erase(path); /* ignore self-references */
+                if (!referrers.empty())
+                    throw PathInUse(format("cannot delete path `%1%' because it is in use by `%2%'")
+                        % path % showPaths(referrers));
+                invalidatePath(path);
+            }
+
+            txn.commit();
+            break;
+        } catch (SQLiteBusy & e) { };
     }
-
+    
     deletePathWrapped(path, bytesFreed, blocksFreed);
-
-    txn.commit();
 }
 
 
