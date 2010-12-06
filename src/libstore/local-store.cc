@@ -353,6 +353,8 @@ void LocalStore::openDB(bool create)
     /* Prepare SQL statements. */
     stmtRegisterValidPath.create(db,
         "insert into ValidPaths (path, hash, registrationTime, deriver, narSize) values (?, ?, ?, ?, ?);");
+    stmtUpdatePathInfo.create(db,
+        "update ValidPaths set narSize = ? where path = ?;");
     stmtAddReference.create(db,
         "insert or replace into Refs (referrer, reference) values (?, ?);");
     stmtQueryPathInfo.create(db,
@@ -642,6 +644,21 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
         throwSQLiteError(db, format("error getting references of `%1%'") % path);
 
     return info;
+}
+
+
+/* Update path info in the database.  Currently only updated the
+   narSize field. */
+void LocalStore::updatePathInfo(const ValidPathInfo & info)
+{
+    SQLiteStmtUse use(stmtUpdatePathInfo);
+    if (info.narSize != 0)
+        stmtUpdatePathInfo.bind64(info.narSize);
+    else
+        stmtUpdatePathInfo.bind(); // null
+    stmtUpdatePathInfo.bind(info.path);
+    if (sqlite3_step(stmtUpdatePathInfo) != SQLITE_DONE)
+        throwSQLiteError(db, format("updating info of path `%1%' in database") % info.path);
 }
 
 
@@ -1305,23 +1322,41 @@ void LocalStore::verifyStore(bool checkContents)
     foreach (PathSet::iterator, i, validPaths2)
         verifyPath(*i, store, done, validPaths);
 
+    /* Release the GC lock so that checking content hashes (which can
+       take ages) doesn't block the GC or builds. */
+    fdGCLock.close();
+
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {
         printMsg(lvlInfo, "checking hashes...");
 
         foreach (PathSet::iterator, i, validPaths) {
-            ValidPathInfo info = queryPathInfo(*i);
+            try {
+                ValidPathInfo info = queryPathInfo(*i);
 
-            /* Check the content hash (optionally - slow). */
-            printMsg(lvlTalkative, format("checking contents of `%1%'") % *i);
-            Hash current = hashPath(info.hash.type, *i).first;
-            if (current != info.hash) {
-                printMsg(lvlError, format("path `%1%' was modified! "
-                        "expected hash `%2%', got `%3%'")
-                    % *i % printHash(info.hash) % printHash(current));
-            }
+                /* Check the content hash (optionally - slow). */
+                printMsg(lvlTalkative, format("checking contents of `%1%'") % *i);
+                HashResult current = hashPath(info.hash.type, *i);
+                
+                if (current.first != info.hash) {
+                    printMsg(lvlError, format("path `%1%' was modified! "
+                            "expected hash `%2%', got `%3%'")
+                        % *i % printHash(info.hash) % printHash(current.first));
+                } else {
+                    /* Fill in missing narSize fields (from old stores). */
+                    if (info.narSize == 0) {
+                        printMsg(lvlError, format("updating size field on `%1%' to %2%") % *i % current.second);
+                        info.narSize = current.second;
+                        updatePathInfo(info);
+                    }
+                }
             
-            /* !!! Check info.narSize */
+            } catch (Error & e) {
+                /* It's possible that the path got GC'ed, so ignore
+                   errors on invalid paths. */
+                if (isValidPath(*i)) throw;
+                printMsg(lvlError, format("warning: %1%") % e.msg());
+            }
         }
     }
 }

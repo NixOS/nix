@@ -203,6 +203,7 @@ private:
 
     /* Some precompiled SQLite statements. */
     SQLiteStmt stmtRegisterValidPath;
+    SQLiteStmt stmtUpdatePathInfo;
     SQLiteStmt stmtAddReference;
     SQLiteStmt stmtQueryPathInfo;
     SQLiteStmt stmtQueryReferences;
@@ -234,6 +235,8 @@ private:
 
     void verifyPath(const Path & path, const PathSet & store,
         PathSet & done, PathSet & validPaths);
+
+    void updatePathInfo(const ValidPathInfo & info);
 
     void upgradeStore6();
     PathSet queryValidPathsOld();
