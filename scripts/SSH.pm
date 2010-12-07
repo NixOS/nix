@@ -24,9 +24,9 @@ sub openSSHConnection {
     # child continues to run if we are killed.  So instead make SSH
     # print "started" when it has established the connection, and wait
     # until we see that.
-    open SSH, "ssh $sshHost @sshOpts -M -N -o LocalCommand='echo started' -o PermitLocalCommand=yes |" or die;
+    open SSHPIPE, "ssh $sshHost @sshOpts -M -N -o LocalCommand='echo started' -o PermitLocalCommand=yes |" or die;
 
-    while (<SSH>) {
+    while (<SSHPIPE>) {
         chomp;
         if ($_ eq "started") {
             $sshStarted = 1;
