@@ -66,8 +66,9 @@ void SQLiteStmt::create(sqlite3 * db, const string & s)
 void SQLiteStmt::reset()
 {
     assert(stmt);
-    if (sqlite3_reset(stmt) != SQLITE_OK)
-        throwSQLiteError(db, "resetting statement");
+    /* Note: sqlite3_reset() returns the error code for the most
+       recent call to sqlite3_step().  So ignore it. */
+    sqlite3_reset(stmt);
     curArg = 1;
 }
 
@@ -333,7 +334,7 @@ void LocalStore::openDB(bool create)
     /* Increase the auto-checkpoint interval to 8192 pages.  This
        seems enough to ensure that instantiating the NixOS system
        derivation is done in a single fsync(). */
-    if (sqlite3_exec(db, "pragma wal_autocheckpoint = 8192;", 0, 0, 0) != SQLITE_OK)
+    if (mode == "wal" && sqlite3_exec(db, "pragma wal_autocheckpoint = 8192;", 0, 0, 0) != SQLITE_OK)
         throwSQLiteError(db, "setting autocheckpoint interval");
     
     /* Initialise the database schema, if necessary. */
