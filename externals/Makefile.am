@@ -29,8 +29,8 @@ endif
 
 # SQLite
 
-SQLITE = sqlite-$(SQLITE_VERSION)
-SQLITE_TAR = sqlite-amalgamation-$(SQLITE_VERSION).tar.gz
+SQLITE = sqlite-autoconf-$(SQLITE_VERSION)
+SQLITE_TAR = sqlite-autoconf-$(SQLITE_VERSION).tar.gz
 
 $(SQLITE_TAR):
 	@echo "Nix requires the SQLite library to build."
