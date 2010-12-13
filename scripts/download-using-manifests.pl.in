@@ -12,6 +12,10 @@ STDOUT->autoflush(1);
 my $manifestDir = ($ENV{"NIX_MANIFESTS_DIR"} or "@localstatedir@/nix/manifests");
 my $logFile = "@localstatedir@/log/nix/downloads";
 
+# For queries, skip expensive calls to nix-hash etc.  We're just
+# estimating the expected download size.
+my $fast = 1;
+
 
 # Load all manifests.
 my %narFiles;
@@ -33,7 +37,11 @@ for my $manifest (glob "$manifestDir/*.nixmanifest") {
 
 sub isValidPath {
     my $p = shift;
-    return system("$binDir/nix-store --check-validity '$p' 2> /dev/null") == 0;
+    if ($fast) {
+        return -e $p;
+    } else {
+        return system("$binDir/nix-store --check-validity '$p' 2> /dev/null") == 0;
+    }
 }
 
 
@@ -51,7 +59,6 @@ sub parseHash {
 # given path.
 sub computeSmallestDownload {
     my $targetPath = shift;
-    my $fast = shift;
     
     # Build a graph of all store paths that might contribute to the
     # construction of $targetPath, and the special node "start".  The
@@ -207,7 +214,7 @@ if ($ARGV[0] eq "--query") {
             print scalar @references, "\n";
             print "$_\n" foreach @references;
 
-            my @path = computeSmallestDownload $storePath, 1;
+            my @path = computeSmallestDownload $storePath;
             
             my $downloadSize = 0;
             while (scalar @path > 0) {
@@ -241,6 +248,7 @@ elsif ($ARGV[0] ne "--substitute") {
 
 die unless scalar @ARGV == 2;
 my $targetPath = $ARGV[1];
+$fast = 0;
 
 
 # Create a temporary directory.
@@ -273,7 +281,7 @@ foreach my $localPath (@{$localPathList}) {
 
 
 # Compute the shortest path.
-my @path = computeSmallestDownload $targetPath, 0;
+my @path = computeSmallestDownload $targetPath;
 die "don't know how to produce $targetPath\n" if scalar @path == 0;
 
 
