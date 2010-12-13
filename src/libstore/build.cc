@@ -214,6 +214,10 @@ public:
 
     bool cacheFailure;
 
+    /* Set if at least one derivation had a BuildError (i.e. permanent
+       failure). */
+    bool permanentFailure;
+
     LocalStore & store;
 
     boost::shared_ptr<HookInstance> hook;
@@ -266,7 +270,8 @@ public:
 
     /* Wait for input to become available. */
     void waitForInput();
-    
+
+    unsigned int exitStatus();
 };
 
 
@@ -1185,6 +1190,7 @@ void DerivationGoal::tryToBuild()
         if (printBuildTrace)
             printMsg(lvlError, format("@ build-failed %1% %2% %3% %4%")
                 % drvPath % drv.outputs["out"].path % 0 % e.msg());
+        worker.permanentFailure = true;
         amDone(ecFailed);
         return;
     }
@@ -1321,6 +1327,7 @@ void DerivationGoal::buildDone()
             foreach (DerivationOutputs::iterator, i, drv.outputs)
                 worker.store.registerFailedPath(i->second.path);
         
+        worker.permanentFailure = !hookError && !fixedOutput;
         amDone(ecFailed);
         return;
     }
@@ -2444,6 +2451,7 @@ Worker::Worker(LocalStore & store)
     nrLocalBuilds = 0;
     lastWokenUp = 0;
     cacheFailure = queryBoolSetting("build-cache-failure", false);
+    permanentFailure = false;
 }
 
 
@@ -2770,6 +2778,11 @@ void Worker::waitForInput()
 }
 
 
+unsigned int Worker::exitStatus()
+{
+    return permanentFailure ? 100 : 1;
+}
+
 
 //////////////////////////////////////////////////////////////////////
 
@@ -2796,7 +2809,7 @@ void LocalStore::buildDerivations(const PathSet & drvPaths)
         }
             
     if (!failed.empty())
-        throw Error(format("build of %1% failed") % showPaths(failed));
+        throw Error(format("build of %1% failed") % showPaths(failed), worker.exitStatus());
 }
 
 
@@ -2812,7 +2825,7 @@ void LocalStore::ensurePath(const Path & path)
     worker.run(goals);
 
     if (goal->getExitCode() != Goal::ecSuccess)
-        throw Error(format("path `%1%' does not exist and cannot be created") % path);
+        throw Error(format("path `%1%' does not exist and cannot be created") % path, worker.exitStatus());
 }
 
  

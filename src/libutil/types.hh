@@ -29,7 +29,8 @@ protected:
     string prefix_; // used for location traces etc.
     string err;
 public:
-    BaseError(const format & f);
+    unsigned int status; // exit status
+    BaseError(const format & f, unsigned int status = 1);
     ~BaseError() throw () { };
     const char * what() const throw () { return err.c_str(); }
     const string & msg() const throw () { return err; }
@@ -41,7 +42,7 @@ public:
     class newClass : public superClass                  \
     {                                                   \
     public:                                             \
-        newClass(const format & f) : superClass(f) { }; \
+        newClass(const format & f, unsigned int status = 1) : superClass(f, status) { }; \
     };
 
 MakeError(Error, BaseError)

@@ -240,13 +240,13 @@ my $buildFlags = "--max-silent-time $maxSilentTime --fallback --add-root $rootsD
 # work on some platforms when connection sharing is used.)
 pipe STDIN, DUMMY; # make sure we have a readable STDIN
 if (system("ssh $hostName @sshOpts '(read; kill -INT -\$\$) <&0 & nix-store -r $drvPath $buildFlags > /dev/null' 2>&4") != 0) {
-    # If we couldn't run ssh or there was an ssh problem (indicated by
-    # exit code 255), then we return exit code 1; otherwise we assume
-    # that the builder failed, which we indicate to Nix using exit
-    # code 100.  It's important to distinguish between the two because
-    # the first is a transient failure and the latter is permanent.
-    my $res = $? == -1 || ($? >> 8) == 255 ? 1 : 100;
-    print STDERR "build of `$drvPath' on `$hostName' failed with exit code $?\n";
+    # Note that if we get exit code 100 from `nix-store -r', it
+    # denotes a permanent build failure (as opposed to an SSH problem
+    # or a temporary Nix problem).  We propagate this to the caller to
+    # allow it to distinguish between transient and permanent
+    # failures.
+    my $res = $? >> 8;
+    print STDERR "build of `$drvPath' on `$hostName' failed with exit code $res\n";
     removeRoots;
     exit $res;
 }

@@ -20,7 +20,8 @@ extern char * * environ;
 namespace nix {
 
 
-BaseError::BaseError(const format & f)
+BaseError::BaseError(const format & f, unsigned int status)
+    : status(status)
 {
     err = f.str();
 }
