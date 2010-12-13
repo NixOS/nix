@@ -4,6 +4,7 @@
 #include "types.hh"
 
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
 #include <signal.h>
@@ -41,6 +42,9 @@ Path dirOf(const Path & path);
 /* Return the base name of the given canonical path, i.e., everything
    following the final `/'. */
 string baseNameOf(const Path & path);
+
+/* Get status of `path'. */
+struct stat lstat(const Path & path);
 
 /* Return true iff the given path exists. */
 bool pathExists(const Path & path);

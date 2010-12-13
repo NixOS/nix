@@ -7,11 +7,8 @@
 #include <sstream>
 #include <cstring>
 
-#include <sys/stat.h>
 #include <sys/wait.h>
-#include <sys/types.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <limits.h>
 
 #include "util.hh"
@@ -149,6 +146,15 @@ string baseNameOf(const Path & path)
 }
 
 
+struct stat lstat(const Path & path)
+{
+    struct stat st;
+    if (lstat(path.c_str(), &st))
+        throw SysError(format("getting status of `%1%'") % path);
+    return st;
+}
+
+
 bool pathExists(const Path & path)
 {
     int res;
@@ -164,9 +170,7 @@ bool pathExists(const Path & path)
 Path readLink(const Path & path)
 {
     checkInterrupt();
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError(format("getting status of `%1%'") % path);
+    struct stat st = lstat(path);
     if (!S_ISLNK(st.st_mode))
         throw Error(format("`%1%' is not a symlink") % path);
     char buf[st.st_size];
@@ -178,9 +182,7 @@ Path readLink(const Path & path)
 
 bool isLink(const Path & path)
 {
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError(format("getting status of `%1%'") % path);
+    struct stat st = lstat(path);
     return S_ISLNK(st.st_mode);
 }
 
@@ -269,9 +271,7 @@ static void _computePathSize(const Path & path,
 {
     checkInterrupt();
 
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-	throw SysError(format("getting attributes of path `%1%'") % path);
+    struct stat st = lstat(path);
 
     bytes += st.st_size;
     blocks += st.st_blocks;
@@ -301,9 +301,7 @@ static void _deletePath(const Path & path, unsigned long long & bytesFreed,
 
     printMsg(lvlVomit, format("%1%") % path);
 
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-	throw SysError(format("getting attributes of path `%1%'") % path);
+    struct stat st = lstat(path);
 
     if (!S_ISDIR(st.st_mode) && st.st_nlink == 1) {
         bytesFreed += st.st_size;
@@ -350,9 +348,7 @@ void makePathReadOnly(const Path & path)
 {
     checkInterrupt();
 
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-	throw SysError(format("getting attributes of path `%1%'") % path);
+    struct stat st = lstat(path);
 
     if (!S_ISLNK(st.st_mode) && (st.st_mode & S_IWUSR)) {
 	if (chmod(path.c_str(), st.st_mode & ~S_IWUSR) == -1)
@@ -411,12 +407,18 @@ Paths createDirs(const Path & path)
 {
     Paths created;
     if (path == "/") return created;
-    if (!pathExists(path)) {
+
+    struct stat st;
+    if (lstat(path.c_str(), &st) == -1) {
         created = createDirs(dirOf(path));
-        if (mkdir(path.c_str(), 0777) == -1)
+        if (mkdir(path.c_str(), 0777) == -1 && errno != EEXIST)
             throw SysError(format("creating directory `%1%'") % path);
+        st = lstat(path);
         created.push_back(path);
     }
+
+    if (!S_ISDIR(st.st_mode)) throw Error(format("`%1%' is not a directory") % path);
+    
     return created;
 }
 
