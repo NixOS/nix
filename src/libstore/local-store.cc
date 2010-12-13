@@ -199,6 +199,7 @@ LocalStore::LocalStore()
     Path profilesDir = nixStateDir + "/profiles";
     createDirs(nixStateDir + "/profiles");
     createDirs(nixStateDir + "/temproots");
+    createDirs(nixDBPath);
     Path gcRootsDir = nixStateDir + "/gcroots";
     if (!pathExists(gcRootsDir)) {
         createDirs(gcRootsDir);
