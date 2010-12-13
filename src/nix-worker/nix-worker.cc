@@ -712,9 +712,8 @@ static void daemonLoop()
     while (1) {
 
         try {
-            /* Important: the server process *cannot* open the
-               Berkeley DB environment, because it doesn't like forks
-               very much. */
+            /* Important: the server process *cannot* open the SQLite
+               database, because it doesn't like forks very much. */
             assert(!store);
             
             /* Accept a connection. */

@@ -1715,7 +1715,7 @@ void DerivationGoal::startBuilder()
     case 0:
 
         /* Warning: in the child we should absolutely not make any
-           Berkeley DB calls! */
+           SQLite calls! */
 
         try { /* child */
 
