@@ -463,7 +463,7 @@ unsigned long long LocalStore::addValidPath(const ValidPathInfo & info)
     SQLiteStmtUse use(stmtRegisterValidPath);
     stmtRegisterValidPath.bind(info.path);
     stmtRegisterValidPath.bind("sha256:" + printHash(info.hash));
-    stmtRegisterValidPath.bind(info.registrationTime);
+    stmtRegisterValidPath.bind(info.registrationTime == 0 ? time(0) : info.registrationTime);
     if (info.deriver != "")
         stmtRegisterValidPath.bind(info.deriver);
     else
@@ -503,31 +503,6 @@ void LocalStore::addReference(unsigned long long referrer, unsigned long long re
     stmtAddReference.bind(reference);
     if (sqlite3_step(stmtAddReference) != SQLITE_DONE)
         throwSQLiteError(db, "adding reference to database");
-}
-
-
-void LocalStore::registerValidPath(const ValidPathInfo & info)
-{
-    assert(info.hash.type == htSHA256);
-    ValidPathInfo info2(info);
-    if (info2.registrationTime == 0) info2.registrationTime = time(0);
-
-    while (1) {
-        try {
-            SQLiteTxn txn(db);
-
-            unsigned long long id = addValidPath(info2);
-
-            foreach (PathSet::const_iterator, i, info2.references)
-                addReference(id, queryValidPathId(*i));
-
-            txn.commit();
-            break;
-        } catch (SQLiteBusy & e) {
-            /* Retry; the `txn' destructor will roll back the current
-               transaction. */
-        }
-    }
 }
 
 
@@ -896,22 +871,40 @@ Hash LocalStore::queryPathHash(const Path & path)
 }
 
 
+void LocalStore::registerValidPath(const ValidPathInfo & info)
+{
+    ValidPathInfos infos;
+    infos.push_back(info);
+    registerValidPaths(infos);
+}
+
+
 void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 {
-    SQLiteTxn txn(db);
+    while (1) {
+        try {
+            SQLiteTxn txn(db);
     
-    foreach (ValidPathInfos::const_iterator, i, infos)
-        /* !!! Maybe the registration info should be updated if the
-           path is already valid. */
-        if (!isValidPath(i->path)) addValidPath(*i);
+            foreach (ValidPathInfos::const_iterator, i, infos) {
+                assert(i->hash.type == htSHA256);
+                /* !!! Maybe the registration info should be updated if the
+                   path is already valid. */
+                if (!isValidPath(i->path)) addValidPath(*i);
+            }
 
-    foreach (ValidPathInfos::const_iterator, i, infos) {
-        unsigned long long referrer = queryValidPathId(i->path);
-        foreach (PathSet::iterator, j, i->references)
-            addReference(referrer, queryValidPathId(*j));
+            foreach (ValidPathInfos::const_iterator, i, infos) {
+                unsigned long long referrer = queryValidPathId(i->path);
+                foreach (PathSet::iterator, j, i->references)
+                    addReference(referrer, queryValidPathId(*j));
+            }
+
+            txn.commit();
+            break;
+        } catch (SQLiteBusy & e) {
+            /* Retry; the `txn' destructor will roll back the current
+               transaction. */
+        }
     }
-
-    txn.commit();
 }
 
 
