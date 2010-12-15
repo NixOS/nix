@@ -3,6 +3,8 @@ use File::Temp qw(tempdir);
 
 our @sshOpts = split ' ', ($ENV{"NIX_SSHOPTS"} or "");
 
+push @sshOpts, "-x";
+
 my $sshStarted = 0;
 my $sshHost;
 
