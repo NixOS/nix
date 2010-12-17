@@ -52,7 +52,7 @@ build-sqlite: $(SQLITE)
 	touch build-sqlite
 
 install-exec-local:: build-sqlite
-	cd $(SQLITE) && make install
+	cd $(SQLITE) && $(MAKE) install
 	rm -rf "$(DESTDIR)/$(pkglibdir)/dummy"
 endif
 
