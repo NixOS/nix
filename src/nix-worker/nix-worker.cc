@@ -178,7 +178,7 @@ static void startWork()
 
 /* stopWork() means that we're done; stop sending stderr to the
    client. */
-static void stopWork(bool success = true, const string & msg = "")
+static void stopWork(bool success = true, const string & msg = "", unsigned int status = 0)
 {
     /* Stop handling async client death; we're going to a state where
        we're either sending or receiving from the client, so we'll be
@@ -192,6 +192,7 @@ static void stopWork(bool success = true, const string & msg = "")
     else {
         writeInt(STDERR_ERROR, to);
         writeString(msg, to);
+        if (status != 0) writeInt(status, to);
     }
 }
 
@@ -637,7 +638,7 @@ static void processConnection()
         try {
             performOp(clientVersion, from, to, op);
         } catch (Error & e) {
-            stopWork(false, e.msg());
+            stopWork(false, e.msg(), GET_PROTOCOL_MINOR(clientVersion) >= 8 ? e.status : 0);
         }
 
         assert(!canSendStderr);
