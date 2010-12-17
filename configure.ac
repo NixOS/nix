@@ -286,8 +286,7 @@ AC_CHECK_FUNCS([setresuid setreuid lchown])
 
 
 # Nice to have, but not essential.
-AC_CHECK_FUNCS([strsignal])
-AC_CHECK_FUNCS([posix_fallocate])
+AC_CHECK_FUNCS([strsignal posix_fallocate nanosleep])
 
 
 # This is needed if ATerm or bzip2 are static libraries,

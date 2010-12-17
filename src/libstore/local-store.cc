@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <stdio.h>
+#include <time.h>
 
 #include <sqlite3.h>
 
@@ -35,6 +36,16 @@ static void throwSQLiteError(sqlite3 * db, const format & f)
     int err = sqlite3_errcode(db);
     if (err == SQLITE_BUSY) {
         printMsg(lvlError, "warning: SQLite database is busy");
+        /* Sleep for a while since retrying the transaction right away
+           is likely to fail again. */
+#if HAVE_NANOSLEEP
+        struct timespec t;
+        t.tv_sec = 0;
+        t.tv_nsec = 100 * 1000 * 1000; /* 0.1s */
+        nanosleep(&t, 0);
+#else
+        sleep(1);
+#endif
         throw SQLiteBusy(format("%1%: %2%") % f.str() % sqlite3_errmsg(db));
     }
     else
