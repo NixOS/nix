@@ -222,10 +222,10 @@ if ($ARGV[0] eq "--query") {
                 my $u = $edge->{start};
                 my $v = $edge->{end};
                 if ($edge->{type} eq "patch") {
-                    $downloadSize += $edge->{info}->{size};
+                    $downloadSize += $edge->{info}->{size} || 0;
                 }
                 elsif ($edge->{type} eq "narfile") {
-                    $downloadSize += $edge->{info}->{size};
+                    $downloadSize += $edge->{info}->{size} || 0;
                 }
             }
                 
