@@ -965,7 +965,7 @@ static void prim_substring(EvalState & state, Value * * args, Value & v)
 
     if (start < 0) throw EvalError("negative start position in `substring'");
 
-    mkString(v, string(s, start, len), context);
+    mkString(v, start >= s.size() ? "" : string(s, start, len), context);
 }
 
 
