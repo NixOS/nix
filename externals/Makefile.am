@@ -17,7 +17,7 @@ build-bzip2:
 else
 build-bzip2: $(BZIP2)
 	(cd $(BZIP2) && \
-	$(MAKE) && \
+	$(MAKE) CC="$(CC)" && \
 	$(MAKE) install PREFIX=$(abs_builddir)/inst-bzip2)
 	touch build-bzip2
 
