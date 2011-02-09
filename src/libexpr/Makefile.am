@@ -11,7 +11,7 @@ pkginclude_HEADERS = \
  names.hh symbol-table.hh
 
 libexpr_la_LIBADD = ../libutil/libutil.la ../libstore/libstore.la \
- ../boost/format/libformat.la @boehmgc_lib@
+ ../boost/format/libformat.la @BDW_GC_LIBS@
 
 BUILT_SOURCES = \
  parser-tab.hh lexer-tab.hh parser-tab.cc lexer-tab.cc
