@@ -178,7 +178,7 @@ static void startWork()
 
 /* stopWork() means that we're done; stop sending stderr to the
    client. */
-static void stopWork(bool success = true, const string & msg = "")
+static void stopWork(bool success = true, const string & msg = "", unsigned int status = 0)
 {
     /* Stop handling async client death; we're going to a state where
        we're either sending or receiving from the client, so we'll be
@@ -192,6 +192,7 @@ static void stopWork(bool success = true, const string & msg = "")
     else {
         writeInt(STDERR_ERROR, to);
         writeString(msg, to);
+        if (status != 0) writeInt(status, to);
     }
 }
 
@@ -315,14 +316,16 @@ static void performOp(unsigned int clientVersion,
     }
 
     case wopQueryReferences:
-    case wopQueryReferrers: {
+    case wopQueryReferrers:
+    case wopQueryDerivationOutputs: {
         Path path = readStorePath(from);
         startWork();
         PathSet paths;
         if (op == wopQueryReferences)
             store->queryReferences(path, paths);
-        else
+        else if (op == wopQueryReferrers)
             store->queryReferrers(path, paths);
+        else paths = store->queryDerivationOutputs(path);
         stopWork();
         writeStringSet(paths, to);
         break;
@@ -519,10 +522,50 @@ static void performOp(unsigned int clientVersion,
             writeString(info.deriver, to);
             writeStringSet(info.references, to);
             writeLongLong(info.downloadSize, to);
+            if (GET_PROTOCOL_MINOR(clientVersion) >= 7)
+                writeLongLong(info.narSize, to);
         }
         break;
     }
             
+    case wopQueryValidPaths: {
+        startWork();
+        PathSet paths = store->queryValidPaths();
+        stopWork();
+        writeStringSet(paths, to);
+        break;
+    }
+
+    case wopQueryFailedPaths: {
+        startWork();
+        PathSet paths = store->queryFailedPaths();
+        stopWork();
+        writeStringSet(paths, to);
+        break;
+    }
+
+    case wopClearFailedPaths: {
+        PathSet paths = readStringSet(from);
+        startWork();
+        store->clearFailedPaths(paths);
+        stopWork();
+        writeInt(1, to);
+        break;
+    }
+
+    case wopQueryPathInfo: {
+        Path path = readStorePath(from);
+        startWork();
+        ValidPathInfo info = store->queryPathInfo(path);
+        stopWork();
+        writeString(info.deriver, to);
+        writeString(printHash(info.hash), to);
+        writeStringSet(info.references, to);
+        writeInt(info.registrationTime, to);
+        writeLongLong(info.narSize, to);
+        break;
+    }
+
     default:
         throw Error(format("invalid operation %1%") % op);
     }
@@ -595,7 +638,7 @@ static void processConnection()
         try {
             performOp(clientVersion, from, to, op);
         } catch (Error & e) {
-            stopWork(false, e.msg());
+            stopWork(false, e.msg(), GET_PROTOCOL_MINOR(clientVersion) >= 8 ? e.status : 0);
         }
 
         assert(!canSendStderr);
@@ -670,9 +713,8 @@ static void daemonLoop()
     while (1) {
 
         try {
-            /* Important: the server process *cannot* open the
-               Berkeley DB environment, because it doesn't like forks
-               very much. */
+            /* Important: the server process *cannot* open the SQLite
+               database, because it doesn't like forks very much. */
             assert(!store);
             
             /* Accept a connection. */
@@ -770,7 +812,7 @@ void run(Strings args)
 
 void printHelp()
 {
-    std::cout << string((char *) helpText, sizeof helpText);
+    std::cout << string((char *) helpText);
 }
 
 

@@ -7,7 +7,7 @@
 namespace nix {
 
 PathSet scanForReferences(const Path & path, const PathSet & refs,
-    Hash & hash);
+    HashResult & hash);
     
 }
 

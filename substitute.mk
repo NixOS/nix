@@ -24,6 +24,7 @@
 	 -e "s^@xmllint\@^$(xmllint)^g" \
 	 -e "s^@xmlflags\@^$(xmlflags)^g" \
 	 -e "s^@xsltproc\@^$(xsltproc)^g" \
+	 -e "s^@sqlite_bin\@^$(sqlite_bin)^g" \
 	 -e "s^@version\@^$(VERSION)^g" \
 	 -e "s^@testPath\@^$(coreutils):$$(dirname $$(type -p expr))^g" \
 	 < $< > $@ || rm $@

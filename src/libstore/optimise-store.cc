@@ -68,7 +68,7 @@ static void hashAndLink(bool dryRun, HashToPath & hashToPath,
            the contents of the symlink (i.e. the result of
            readlink()), not the contents of the target (which may not
            even exist). */
-        Hash hash = hashPath(htSHA256, path);
+        Hash hash = hashPath(htSHA256, path).first;
         stats.totalFiles++;
         printMsg(lvlDebug, format("`%1%' has hash `%2%'") % path % printHash(hash));
 

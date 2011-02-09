@@ -10,7 +10,7 @@ using namespace nix;
 
 void printHelp()
 {
-    std::cout << string((char *) helpText, sizeof helpText);
+    std::cout << string((char *) helpText);
 }
 
 
@@ -44,7 +44,7 @@ void run(Strings args)
 
     if (op == opHash) {
         for (Strings::iterator i = ss.begin(); i != ss.end(); ++i) {
-            Hash h = flat ? hashFile(ht, *i) : hashPath(ht, *i);
+            Hash h = flat ? hashFile(ht, *i) : hashPath(ht, *i).first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
             std::cout << format("%1%\n") %
                 (base32 ? printHash32(h) : printHash(h));

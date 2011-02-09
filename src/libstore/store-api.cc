@@ -1,7 +1,6 @@
 #include "store-api.hh"
 #include "globals.hh"
 #include "util.hh"
-#include "derivations.hh"
 
 #include <limits.h>
 
@@ -50,18 +49,6 @@ Path toStorePath(const Path & path)
         return path;
     else
         return Path(path, 0, slash);
-}
-
-
-string getNameOfStorePath(const Path & path)
-{
-    Path::size_type slash = path.rfind('/');
-    string p = slash == Path::npos ? path : string(path, slash + 1);
-    Path::size_type dash = p.find('-');
-    assert(dash != Path::npos);
-    string p2 = string(p, dash + 1);
-    if (isDerivation(p2)) p2 = string(p2, 0, p2.size() - 4);
-    return p2;
 }
 
 
@@ -203,7 +190,7 @@ std::pair<Path, Hash> computeStorePathForPath(const Path & srcPath,
     bool recursive, HashType hashAlgo, PathFilter & filter)
 {
     HashType ht(hashAlgo);
-    Hash h = recursive ? hashPath(ht, srcPath, filter) : hashFile(ht, srcPath);
+    Hash h = recursive ? hashPath(ht, srcPath, filter).first : hashFile(ht, srcPath);
     string name = baseNameOf(srcPath);
     Path dstPath = makeFixedOutputPath(recursive, hashAlgo, h, name);
     return std::pair<Path, Hash>(dstPath, h);
@@ -229,7 +216,7 @@ Path computeStorePathForText(const string & name, const string & s,
 /* Return a string accepted by decodeValidPathInfo() that
    registers the specified paths as valid.  Note: it's the
    responsibility of the caller to provide a closure. */
-string makeValidityRegistration(const PathSet & paths,
+string StoreAPI::makeValidityRegistration(const PathSet & paths,
     bool showDerivers, bool showHash)
 {
     string s = "";
@@ -237,18 +224,19 @@ string makeValidityRegistration(const PathSet & paths,
     foreach (PathSet::iterator, i, paths) {
         s += *i + "\n";
 
-        if (showHash)
-            s += printHash(store->queryPathHash(*i)) + "\n";
+        ValidPathInfo info = queryPathInfo(*i);
 
-        Path deriver = showDerivers ? store->queryDeriver(*i) : "";
+        if (showHash) {
+            s += printHash(info.hash) + "\n";
+            s += (format("%1%\n") % info.narSize).str();
+        }
+
+        Path deriver = showDerivers ? info.deriver : "";
         s += deriver + "\n";
 
-        PathSet references;
-        store->queryReferences(*i, references);
+        s += (format("%1%\n") % info.references.size()).str();
 
-        s += (format("%1%\n") % references.size()).str();
-            
-        foreach (PathSet::iterator, j, references)
+        foreach (PathSet::iterator, j, info.references)
             s += *j + "\n";
     }
 
@@ -265,6 +253,8 @@ ValidPathInfo decodeValidPathInfo(std::istream & str, bool hashGiven)
         string s;
         getline(str, s);
         info.hash = parseHash(htSHA256, s);
+        getline(str, s);
+        if (!string2Int(s, info.narSize)) throw Error("number expected");
     }
     getline(str, info.deriver);
     string s; int n;

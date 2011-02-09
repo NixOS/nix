@@ -1,7 +1,7 @@
 #ifndef __SHARED_H
 #define __SHARED_H
 
-#include "types.hh"
+#include "util.hh"
 
 #include <signal.h>
 

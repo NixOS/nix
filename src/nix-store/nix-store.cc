@@ -22,7 +22,7 @@ typedef void (* Operation) (Strings opFlags, Strings opArgs);
 
 void printHelp()
 {
-    cout << string((char *) helpText, sizeof helpText);
+    cout << string((char *) helpText);
 }
 
 
@@ -34,7 +34,7 @@ static bool indirectRoot = false;
 LocalStore & ensureLocalStore()
 {
     LocalStore * store2(dynamic_cast<LocalStore *>(store.get()));
-    if (!store2) throw Error("you don't have sufficient rights to use --verify");
+    if (!store2) throw Error("you don't have sufficient rights to use this command");
     return *store2;
 }
 
@@ -226,7 +226,7 @@ static void printTree(const Path & path,
 static void opQuery(Strings opFlags, Strings opArgs)
 {
     enum { qOutputs, qRequisites, qReferences, qReferrers
-         , qReferrersClosure, qDeriver, qBinding, qHash
+         , qReferrersClosure, qDeriver, qBinding, qHash, qSize
          , qTree, qGraph, qXml, qResolve, qRoots } query = qOutputs;
     bool useOutput = false;
     bool includeOutputs = false;
@@ -248,6 +248,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             query = qBinding;
         }
         else if (*i == "--hash") query = qHash;
+        else if (*i == "--size") query = qSize;
         else if (*i == "--tree") query = qTree;
         else if (*i == "--graph") query = qGraph;
         else if (*i == "--xml") query = qXml;
@@ -310,11 +311,15 @@ static void opQuery(Strings opFlags, Strings opArgs)
             break;
 
         case qHash:
+        case qSize:
             foreach (Strings::iterator, i, opArgs) {
                 Path path = maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise);
-                Hash hash = store->queryPathHash(path);
-                assert(hash.type == htSHA256);
-                cout << format("sha256:%1%\n") % printHash32(hash);
+                ValidPathInfo info = store->queryPathInfo(path);
+                if (query == qHash) {
+                    assert(info.hash.type == htSHA256);
+                    cout << format("sha256:%1%\n") % printHash32(info.hash);
+                } else if (query == qSize) 
+                    cout << format("%1%\n") % info.narSize;
             }
             break;
 
@@ -393,9 +398,8 @@ static void opDumpDB(Strings opFlags, Strings opArgs)
     if (!opArgs.empty())
         throw UsageError("no arguments expected");
     PathSet validPaths = store->queryValidPaths();
-    foreach (PathSet::iterator, i, validPaths) {
-        cout << makeValidityRegistration(singleton<PathSet>(*i), true, true);
-    }
+    foreach (PathSet::iterator, i, validPaths)
+        cout << store->makeValidityRegistration(singleton<PathSet>(*i), true, true);
 }
 
 
@@ -410,8 +414,11 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
             /* !!! races */
             if (canonicalise)
                 canonicalisePathMetaData(info.path);
-            if (!hashGiven)
-                info.hash = hashPath(htSHA256, info.path);
+            if (!hashGiven) {
+                HashResult hash = hashPath(htSHA256, info.path);
+                info.hash = hash.first;
+                info.narSize = hash.second;
+            }
             infos.push_back(info);
         }
     }
@@ -661,8 +668,7 @@ static void opOptimise(Strings opFlags, Strings opArgs)
 
     bool dryRun = false;
 
-    for (Strings::iterator i = opFlags.begin();
-         i != opFlags.end(); ++i)
+    foreach (Strings::iterator, i, opFlags)
         if (*i == "--dry-run") dryRun = true;
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
@@ -674,6 +680,24 @@ static void opOptimise(Strings opFlags, Strings opArgs)
         throw;
     }
     showOptimiseStats(stats);
+}
+
+
+static void opQueryFailedPaths(Strings opFlags, Strings opArgs)
+{
+    if (!opArgs.empty() || !opFlags.empty())
+        throw UsageError("no arguments expected");
+    PathSet failed = store->queryFailedPaths();
+    foreach (PathSet::iterator, i, failed)
+        cout << format("%1%\n") % *i;
+}
+
+
+static void opClearFailedPaths(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty())
+        throw UsageError("no flags expected");
+    store->clearFailedPaths(PathSet(opArgs.begin(), opArgs.end()));
 }
 
 
@@ -728,6 +752,10 @@ void run(Strings args)
             op = opVerify;
         else if (arg == "--optimise")
             op = opOptimise;
+        else if (arg == "--query-failed-paths")
+            op = opQueryFailedPaths;
+        else if (arg == "--clear-failed-paths")
+            op = opClearFailedPaths;
         else if (arg == "--add-root") {
             if (i == args.end())
                 throw UsageError("`--add-root requires an argument");

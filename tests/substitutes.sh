@@ -14,6 +14,8 @@ echo $outPath > $TEST_ROOT/sub-paths
 
 export NIX_SUBSTITUTERS=$(pwd)/substituter.sh
 
+$nixstore -r "$drvPath" --dry-run 2>&1 | grep -q "1.00 MiB.*2.00 MiB"
+
 $nixstore -rvv "$drvPath"
 
 text=$(cat "$outPath"/hello)

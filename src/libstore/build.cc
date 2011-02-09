@@ -64,6 +64,7 @@ static const uid_t rootUserId = 0;
 
 /* Forward definition. */
 class Worker;
+class HookInstance;
 
 
 /* A pointer to a goal. */
@@ -213,8 +214,14 @@ public:
 
     bool cacheFailure;
 
+    /* Set if at least one derivation had a BuildError (i.e. permanent
+       failure). */
+    bool permanentFailure;
+
     LocalStore & store;
 
+    boost::shared_ptr<HookInstance> hook;
+    
     Worker(LocalStore & store);
     ~Worker();
 
@@ -263,7 +270,8 @@ public:
 
     /* Wait for input to become available. */
     void waitForInput();
-    
+
+    unsigned int exitStatus();
 };
 
 
@@ -615,6 +623,107 @@ void deletePathWrapped(const Path & path)
 //////////////////////////////////////////////////////////////////////
 
 
+struct HookInstance
+{
+    /* Pipes for talking to the build hook. */
+    Pipe toHook;
+
+    /* Pipe for the hook's standard output/error. */
+    Pipe fromHook;
+
+    /* Pipe for the builder's standard output/error. */
+    Pipe builderOut;
+    
+    /* The process ID of the hook. */
+    Pid pid;
+
+    HookInstance();
+
+    ~HookInstance();
+};
+
+
+HookInstance::HookInstance()
+{
+    debug("starting build hook");
+    
+    Path buildHook = absPath(getEnv("NIX_BUILD_HOOK"));
+    
+    /* Create a pipe to get the output of the child. */
+    fromHook.create();
+    
+    /* Create the communication pipes. */
+    toHook.create();
+
+    /* Create a pipe to get the output of the builder. */
+    builderOut.create();
+
+    /* Fork the hook. */
+    pid = fork();
+    switch (pid) {
+        
+    case -1:
+        throw SysError("unable to fork");
+
+    case 0:
+        try { /* child */
+
+            commonChildInit(fromHook);
+
+            if (chdir("/") == -1) throw SysError("changing into `/");
+            
+            /* Dup the communication pipes. */
+            toHook.writeSide.close();
+            if (dup2(toHook.readSide, STDIN_FILENO) == -1)
+                throw SysError("dupping to-hook read side");
+
+            /* Use fd 4 for the builder's stdout/stderr. */
+            builderOut.readSide.close();
+            if (dup2(builderOut.writeSide, 4) == -1)
+                throw SysError("dupping builder's stdout/stderr");
+            
+            execl(buildHook.c_str(), buildHook.c_str(), thisSystem.c_str(),
+                (format("%1%") % maxSilentTime).str().c_str(),
+                (format("%1%") % printBuildTrace).str().c_str(),
+                NULL);
+            
+            throw SysError(format("executing `%1%'") % buildHook);
+            
+        } catch (std::exception & e) {
+            std::cerr << format("build hook error: %1%") % e.what() << std::endl;
+        }
+        quickExit(1);
+    }
+    
+    /* parent */
+    pid.setSeparatePG(true);
+    pid.setKillSignal(SIGTERM);
+    fromHook.writeSide.close();
+    toHook.readSide.close();
+}
+
+
+HookInstance::~HookInstance()
+{
+    try {
+        /* Cleanly shut down the hook by closing its stdin if it's not
+           already building.  Otherwise pid's destructor will kill
+           it. */
+        if (pid != -1 && toHook.writeSide != -1) {
+            toHook.writeSide.close();
+            pid.wait(true);
+        }
+    } catch (...) {
+        ignoreException();
+    }
+}
+
+
+//////////////////////////////////////////////////////////////////////
+
+
+typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
+
 class DerivationGoal : public Goal
 {
 private:
@@ -649,14 +758,11 @@ private:
     AutoCloseFD fdLogFile;
 
     /* Pipe for the builder's standard output/error. */
-    Pipe logPipe;
+    Pipe builderOut;
 
-    /* Whether we're building using a build hook. */
-    bool usingBuildHook;
-
-    /* Pipes for talking to the build hook (if any). */
-    Pipe toHook;
-
+    /* The build hook. */
+    boost::shared_ptr<HookInstance> hook;
+    
     /* Whether we're currently doing a chroot build. */
     bool useChroot;
     
@@ -694,11 +800,7 @@ private:
     void buildDone();
 
     /* Is the build hook willing to perform the build? */
-    typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
     HookReply tryBuildHook();
-
-    /* Synchronously wait for a build hook to finish. */
-    void terminateBuildHook(bool kill = false);
 
     /* Start building a derivation. */
     void startBuilder();
@@ -711,10 +813,6 @@ private:
     /* Open a log file and a pipe to it. */
     Path openLogFile();
 
-    /* Common initialisation to be performed in child processes (i.e.,
-       both in builders and in build hooks). */
-    void initChild();
-    
     /* Delete the temporary directory, if we have one. */
     void deleteTmpDir(bool force);
 
@@ -742,6 +840,7 @@ DerivationGoal::DerivationGoal(const Path & drvPath, Worker & worker)
     trace("created");
 }
 
+
 DerivationGoal::~DerivationGoal()
 {
     /* Careful: we should never ever throw an exception from a
@@ -753,6 +852,7 @@ DerivationGoal::~DerivationGoal()
         ignoreException();
     }
 }
+
 
 void DerivationGoal::killChild()
 {
@@ -778,6 +878,8 @@ void DerivationGoal::killChild()
         
         assert(pid == -1);
     }
+
+    hook.reset();
 }
 
 
@@ -887,7 +989,10 @@ void DerivationGoal::outputsSubstituted()
     foreach (PathSet::iterator, i, drv.inputSrcs)
         addWaitee(worker.makeSubstitutionGoal(*i));
 
-    state = &DerivationGoal::inputsRealised;
+    if (waitees.empty()) /* to prevent hang (no wake-up event) */
+        inputsRealised();
+    else
+        state = &DerivationGoal::inputsRealised;
 }
 
 
@@ -961,6 +1066,16 @@ PathSet outputPaths(const DerivationOutputs & outputs)
 }
 
 
+static bool canBuildLocally(const string & platform)
+{
+    return platform == thisSystem 
+#ifdef CAN_DO_LINUX32_BUILDS
+        || (platform == "i686-linux" && thisSystem == "x86_64-linux")
+#endif
+        ;
+}
+
+
 void DerivationGoal::tryToBuild()
 {
     trace("trying to build");
@@ -1028,28 +1143,36 @@ void DerivationGoal::tryToBuild()
     foreach (DerivationOutputs::iterator, i, drv.outputs)
         if (pathFailed(i->second.path)) return;
 
+    /* Don't do a remote build if the derivation has the attribute
+       `preferLocalBuild' set. */
+    bool preferLocalBuild =
+        drv.env["preferLocalBuild"] == "1" && canBuildLocally(drv.platform);
+
     /* Is the build hook willing to accept this job? */
-    usingBuildHook = true;
-    switch (tryBuildHook()) {
-        case rpAccept:
-            /* Yes, it has started doing so.  Wait until we get EOF
-               from the hook. */
-            state = &DerivationGoal::buildDone;
-            return;
-        case rpPostpone:
-            /* Not now; wait until at least one child finishes. */
-            worker.waitForAWhile(shared_from_this());
-            outputLocks.unlock();
-            return;
-        case rpDecline:
-            /* We should do it ourselves. */
-            break;
+    if (!preferLocalBuild) {
+        switch (tryBuildHook()) {
+            case rpAccept:
+                /* Yes, it has started doing so.  Wait until we get
+                   EOF from the hook. */
+                state = &DerivationGoal::buildDone;
+                return;
+            case rpPostpone:
+                /* Not now; wait until at least one child finishes or
+                   the wake-up timeout expires. */
+                worker.waitForAWhile(shared_from_this());
+                outputLocks.unlock();
+                return;
+            case rpDecline:
+                /* We should do it ourselves. */
+                break;
+        }
     }
-
-    usingBuildHook = false;
-
-    /* Make sure that we are allowed to start a build. */
-    if (worker.getNrLocalBuilds() >= maxBuildJobs) {
+    
+    /* Make sure that we are allowed to start a build.  If this
+       derivation prefers to be done locally, do it even if
+       maxBuildJobs is 0. */
+    unsigned int curBuilds = worker.getNrLocalBuilds();
+    if (curBuilds >= maxBuildJobs && !(preferLocalBuild && curBuilds == 0)) {
         worker.waitForBuildSlot(shared_from_this());
         outputLocks.unlock();
         return;
@@ -1067,6 +1190,7 @@ void DerivationGoal::tryToBuild()
         if (printBuildTrace)
             printMsg(lvlError, format("@ build-failed %1% %2% %3% %4%")
                 % drvPath % drv.outputs["out"].path % 0 % e.msg());
+        worker.permanentFailure = true;
         amDone(ecFailed);
         return;
     }
@@ -1085,18 +1209,29 @@ void DerivationGoal::buildDone()
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe --- just don't do that
        :-) */
-    /* !!! this could block! security problem! solution: kill the
-       child */
-    pid_t savedPid = pid;
-    int status = pid.wait(true);
+    int status;
+    pid_t savedPid;
+    if (hook) {
+        savedPid = hook->pid;
+        status = hook->pid.wait(true);
+    } else {
+        /* !!! this could block! security problem! solution: kill the
+           child */
+        savedPid = pid;
+        status = pid.wait(true);
+    }
 
     debug(format("builder process for `%1%' finished") % drvPath);
 
     /* So the child is gone now. */
     worker.childTerminated(savedPid);
-
+    
     /* Close the read side of the logger pipe. */
-    logPipe.readSide.close();
+    if (hook) {
+        hook->builderOut.readSide.close();
+        hook->fromHook.readSide.close();
+    }
+    else builderOut.readSide.close();
 
     /* Close the log file. */
     fdLogFile.close();
@@ -1169,11 +1304,11 @@ void DerivationGoal::buildDone()
         /* When using a build hook, the hook will return a remote
            build failure using exit code 100.  Anything else is a hook
            problem. */
-        bool hookError = usingBuildHook &&
+        bool hookError = hook &&
             (!WIFEXITED(status) || WEXITSTATUS(status) != 100);
         
         if (printBuildTrace) {
-            if (usingBuildHook && hookError)
+            if (hook && hookError)
                 printMsg(lvlError, format("@ hook-failed %1% %2% %3% %4%")
                     % drvPath % drv.outputs["out"].path % status % e.msg());
             else
@@ -1192,6 +1327,7 @@ void DerivationGoal::buildDone()
             foreach (DerivationOutputs::iterator, i, drv.outputs)
                 worker.store.registerFailedPath(i->second.path);
         
+        worker.permanentFailure = !hookError && !fixedOutput;
         amDone(ecFailed);
         return;
     }
@@ -1208,162 +1344,85 @@ void DerivationGoal::buildDone()
 }
 
 
-DerivationGoal::HookReply DerivationGoal::tryBuildHook()
+HookReply DerivationGoal::tryBuildHook()
 {
-    if (!useBuildHook) return rpDecline;
-    Path buildHook = getEnv("NIX_BUILD_HOOK");
-    if (buildHook == "") return rpDecline;
-    buildHook = absPath(buildHook);
+    if (!useBuildHook || getEnv("NIX_BUILD_HOOK") == "") return rpDecline;
 
-    /* Create a directory where we will store files used for
-       communication between us and the build hook. */
-    tmpDir = createTempDir();
-    
-    /* Create the log file and pipe. */
-    Path logFile = openLogFile();
+    if (!worker.hook)
+        worker.hook = boost::shared_ptr<HookInstance>(new HookInstance);
 
-    /* Create the communication pipes. */
-    toHook.create();
+    /* Tell the hook about system features (beyond the system type)
+       required from the build machine.  (The hook could parse the
+       drv file itself, but this is easier.) */
+    Strings features = tokenizeString(drv.env["requiredSystemFeatures"]);
+    foreach (Strings::iterator, i, features) checkStoreName(*i); /* !!! abuse */
 
-    /* Fork the hook. */
-    pid = fork();
-    switch (pid) {
-        
-    case -1:
-        throw SysError("unable to fork");
-
-    case 0:
-        try { /* child */
-
-            initChild();
-
-            string s;
-            foreach (DerivationOutputs::const_iterator, i, drv.outputs)
-                s += i->second.path + " ";
-            if (setenv("NIX_HELD_LOCKS", s.c_str(), 1))
-                throw SysError("setting an environment variable");
-
-            execl(buildHook.c_str(), buildHook.c_str(),
-                (worker.getNrLocalBuilds() < maxBuildJobs ? (string) "1" : "0").c_str(),
-                thisSystem.c_str(),
-                drv.platform.c_str(),
-                drvPath.c_str(),
-                (format("%1%") % maxSilentTime).str().c_str(),
-                NULL);
-            
-            throw SysError(format("executing `%1%'") % buildHook);
-            
-        } catch (std::exception & e) {
-            std::cerr << format("build hook error: %1%") % e.what() << std::endl;
-        }
-        quickExit(1);
-    }
-    
-    /* parent */
-    pid.setSeparatePG(true);
-    pid.setKillSignal(SIGTERM);
-    logPipe.writeSide.close();
-    worker.childStarted(shared_from_this(),
-        pid, singleton<set<int> >(logPipe.readSide), false, false);
-
-    toHook.readSide.close();
+    /* Send the request to the hook. */
+    writeLine(worker.hook->toHook.writeSide, (format("%1% %2% %3% %4%")
+        % (worker.getNrLocalBuilds() < maxBuildJobs ? "1" : "0")
+        % drv.platform % drvPath % concatStringsSep(",", features)).str());
 
     /* Read the first line of input, which should be a word indicating
        whether the hook wishes to perform the build. */
     string reply;
-    try {
-        while (true) {
-            string s = readLine(logPipe.readSide);
-            if (string(s, 0, 2) == "# ") {
-                reply = string(s, 2);
-                break;
-            }
-            handleChildOutput(logPipe.readSide, s + "\n");
+    while (true) {
+        string s = readLine(worker.hook->fromHook.readSide);
+        if (string(s, 0, 2) == "# ") {
+            reply = string(s, 2);
+            break;
         }
-    } catch (Error & e) {
-        terminateBuildHook(true);
-        throw;
+        s += "\n";
+        writeToStderr((unsigned char *) s.c_str(), s.size());
     }
 
     debug(format("hook reply is `%1%'") % reply);
 
-    if (reply == "decline" || reply == "postpone") {
-        /* Clean up the child.  !!! hacky / should verify */
-        terminateBuildHook();
+    if (reply == "decline" || reply == "postpone")
         return reply == "decline" ? rpDecline : rpPostpone;
-    }
+    else if (reply != "accept")
+        throw Error(format("bad hook reply `%1%'") % reply);
 
-    else if (reply == "accept") {
+    printMsg(lvlTalkative, format("using hook to build path(s) %1%")
+        % showPaths(outputPaths(drv.outputs)));
 
-        printMsg(lvlInfo, format("using hook to build path(s) %1%")
-            % showPaths(outputPaths(drv.outputs)));
+    hook = worker.hook;
+    worker.hook.reset();
         
-        /* Write the information that the hook needs to perform the
-           build, i.e., the set of input paths, the set of output
-           paths, and the references (pointer graph) in the input
-           paths. */
+    /* Tell the hook all the inputs that have to be copied to the
+       remote system.  This unfortunately has to contain the entire
+       derivation closure to ensure that the validity invariant holds
+       on the remote system.  (I.e., it's unfortunate that we have to
+       list it since the remote system *probably* already has it.) */
+    PathSet allInputs;
+    allInputs.insert(inputPaths.begin(), inputPaths.end());
+    computeFSClosure(drvPath, allInputs);
         
-        Path inputListFN = tmpDir + "/inputs";
-        Path outputListFN = tmpDir + "/outputs";
-        Path referencesFN = tmpDir + "/references";
-
-        /* The `inputs' file lists all inputs that have to be copied
-           to the remote system.  This unfortunately has to contain
-           the entire derivation closure to ensure that the validity
-           invariant holds on the remote system.  (I.e., it's
-           unfortunate that we have to list it since the remote system
-           *probably* already has it.) */
-        PathSet allInputs;
-        allInputs.insert(inputPaths.begin(), inputPaths.end());
-        computeFSClosure(drvPath, allInputs);
+    string s;
+    foreach (PathSet::iterator, i, allInputs) s += *i + " ";
+    writeLine(hook->toHook.writeSide, s);
         
-        string s;
-        foreach (PathSet::iterator, i, allInputs) s += *i + "\n";
+    /* Tell the hooks the outputs that have to be copied back from the
+       remote system. */
+    s = "";
+    foreach (DerivationOutputs::iterator, i, drv.outputs)
+        s += i->second.path + " ";
+    writeLine(hook->toHook.writeSide, s);
+    
+    hook->toHook.writeSide.close();
+
+    /* Create the log file and pipe. */
+    Path logFile = openLogFile();
+
+    set<int> fds;
+    fds.insert(hook->fromHook.readSide);
+    fds.insert(hook->builderOut.readSide);
+    worker.childStarted(shared_from_this(), hook->pid, fds, false, false);
+    
+    if (printBuildTrace)
+        printMsg(lvlError, format("@ build-started %1% %2% %3% %4%")
+            % drvPath % drv.outputs["out"].path % drv.platform % logFile);
         
-        writeFile(inputListFN, s);
-
-        /* The `outputs' file lists all outputs that have to be copied
-           from the remote system. */
-        s = "";
-        foreach (DerivationOutputs::iterator, i, drv.outputs)
-            s += i->second.path + "\n";
-        writeFile(outputListFN, s);
-
-        /* The `references' file has exactly the format accepted by
-           `nix-store --register-validity'. */
-        writeFile(referencesFN,
-            makeValidityRegistration(allInputs, true, false));
-
-        /* Tell the hook to proceed. */
-        writeLine(toHook.writeSide, "okay");
-        toHook.writeSide.close();
-
-        if (printBuildTrace)
-            printMsg(lvlError, format("@ build-started %1% %2% %3% %4%")
-                % drvPath % drv.outputs["out"].path % drv.platform % logFile);
-        
-        return rpAccept;
-    }
-
-    else throw Error(format("bad hook reply `%1%'") % reply);
-}
-
-
-void DerivationGoal::terminateBuildHook(bool kill)
-{
-    debug("terminating build hook");
-    pid_t savedPid = pid;
-    if (kill)
-        pid.kill();
-    else
-        pid.wait(true);
-    /* `false' means don't wake up waiting goals, since we want to
-       keep this build slot ourselves. */
-    worker.childTerminated(savedPid, false);
-    toHook.writeSide.close();
-    fdLogFile.close();
-    logPipe.readSide.close();
-    deleteTmpDir(true); /* get rid of the hook's temporary directory */
+    return rpAccept;    
 }
 
 
@@ -1380,11 +1439,7 @@ void DerivationGoal::startBuilder()
         format("building path(s) %1%") % showPaths(outputPaths(drv.outputs)))
     
     /* Right platform? */
-    if (drv.platform != thisSystem 
-#ifdef CAN_DO_LINUX32_BUILDS
-        && !(drv.platform == "i686-linux" && thisSystem == "x86_64-linux")
-#endif
-        )
+    if (!canBuildLocally(drv.platform))
         throw Error(
             format("a `%1%' is required to build `%3%', but I am a `%2%'")
             % drv.platform % thisSystem % drvPath);
@@ -1499,7 +1554,7 @@ void DerivationGoal::startBuilder()
 
         /* Write closure info to `fileName'. */
         writeFile(tmpDir + "/" + fileName,
-            makeValidityRegistration(paths, false, false));
+            worker.store.makeValidityRegistration(paths, false, false));
     }
 
     
@@ -1549,6 +1604,9 @@ void DerivationGoal::startBuilder()
 
     if (fixedOutput) useChroot = false;
 
+    /* Hack to allow derivations to disable chroot builds. */
+    if (drv.env["__noChroot"] == "1") useChroot = false;
+
     if (useChroot) {
 #if CHROOT_ENABLED
         /* Create a temporary directory in which we set up the chroot
@@ -1572,7 +1630,7 @@ void DerivationGoal::startBuilder()
 
         /* Create a /etc/passwd with entries for the build user and the
            nobody account.  The latter is kind of a hack to support
-           Samba-in-QEMU.  */
+           Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
 
         writeFile(chrootRootDir + "/etc/passwd",
@@ -1580,13 +1638,13 @@ void DerivationGoal::startBuilder()
                 "nixbld:x:%1%:%2%:Nix build user:/:/noshell\n"
                 "nobody:x:65534:65534:Nobody:/:/noshell\n")
                 % (buildUser.enabled() ? buildUser.getUID() : getuid())
-	        % (buildUser.enabled() ? buildUser.getGID() : getgid())).str());
+                % (buildUser.enabled() ? buildUser.getGID() : getgid())).str());
 
 	/* Declare the build user's group so that programs get a consistent
-	   view of the system (e.g., "id -gn").  */
-	writeFile(chrootRootDir + "/etc/group",
-		  (format("nixbld:!:%1%:\n")
-		   % (buildUser.enabled() ? buildUser.getGID() : getgid())).str());
+	   view of the system (e.g., "id -gn"). */
+        writeFile(chrootRootDir + "/etc/group",
+            (format("nixbld:!:%1%:\n")
+                % (buildUser.enabled() ? buildUser.getGID() : getgid())).str());
 
         /* Bind-mount a user-configurable set of directories from the
            host file system.  The `/dev/pts' directory must be mounted
@@ -1645,9 +1703,12 @@ void DerivationGoal::startBuilder()
     printMsg(lvlChatty, format("executing builder `%1%'") %
         drv.builder);
 
-    /* Create the log file and pipe. */
+    /* Create the log file. */
     Path logFile = openLogFile();
     
+    /* Create a pipe to get the output of the builder. */
+    builderOut.create();
+
     /* Fork a child to build the package.  Note that while we
        currently use forks to run and wait for the children, it
        shouldn't be hard to use threads for this on systems where
@@ -1661,7 +1722,7 @@ void DerivationGoal::startBuilder()
     case 0:
 
         /* Warning: in the child we should absolutely not make any
-           Berkeley DB calls! */
+           SQLite calls! */
 
         try { /* child */
 
@@ -1688,18 +1749,23 @@ void DerivationGoal::startBuilder()
                         throw SysError(format("bind mount from `%1%' to `%2%' failed") % source % target);
                 }
                     
-                /* Do the chroot().  initChild() will do a chdir() to
-                   the temporary build directory to make sure the
-                   current directory is in the chroot.  (Actually the
-                   order doesn't matter, since due to the bind mount
-                   tmpDir and tmpRootDit/tmpDir are the same
-                   directories.) */
+                /* Do the chroot().  Below we do a chdir() to the
+                   temporary build directory to make sure the current
+                   directory is in the chroot.  (Actually the order
+                   doesn't matter, since due to the bind mount tmpDir
+                   and tmpRootDit/tmpDir are the same directories.) */
                 if (chroot(chrootRootDir.c_str()) == -1)
                     throw SysError(format("cannot change root directory to `%1%'") % chrootRootDir);
             }
 #endif
             
-            initChild();
+            commonChildInit(builderOut);
+    
+            if (chdir(tmpDir.c_str()) == -1)
+                throw SysError(format("changing into `%1%'") % tmpDir);
+
+            /* Close all other file descriptors. */
+            closeMostFDs(set<int>());
 
 #ifdef CAN_DO_LINUX32_BUILDS
             if (drv.platform == "i686-linux" && thisSystem == "x86_64-linux") {
@@ -1720,10 +1786,10 @@ void DerivationGoal::startBuilder()
             
             /* If we are running in `build-users' mode, then switch to
                the user we allocated above.  Make sure that we drop
-               all root privileges.  Note that initChild() above has
-               closed all file descriptors except std*, so that's
-               safe.  Also note that setuid() when run as root sets
-               the real, effective and saved UIDs. */
+               all root privileges.  Note that above we have closed
+               all file descriptors except std*, so that's safe.  Also
+               note that setuid() when run as root sets the real,
+               effective and saved UIDs. */
             if (buildUser.enabled()) {
                 printMsg(lvlChatty, format("switching to user `%1%'") % buildUser.getUser());
 
@@ -1777,9 +1843,9 @@ void DerivationGoal::startBuilder()
     
     /* parent */
     pid.setSeparatePG(true);
-    logPipe.writeSide.close();
+    builderOut.writeSide.close();
     worker.childStarted(shared_from_this(), pid,
-        singleton<set<int> >(logPipe.readSide), true, true);
+        singleton<set<int> >(builderOut.readSide), true, true);
 
     if (printBuildTrace) {
         printMsg(lvlError, format("@ build-started %1% %2% %3% %4%")
@@ -1811,12 +1877,12 @@ PathSet parseReferenceSpecifiers(const Derivation & drv, string attr)
 void DerivationGoal::computeClosure()
 {
     map<Path, PathSet> allReferences;
-    map<Path, Hash> contentHashes;
+    map<Path, HashResult> contentHashes;
 
     /* When using a build hook, the build hook can register the output
        as valid (by doing `nix-store --import').  If so we don't have
        to do anything here. */
-    if (usingBuildHook) {
+    if (hook) {
         bool allValid = true;
         foreach (DerivationOutputs::iterator, i, drv.outputs)
             if (!worker.store.isValidPath(i->second.path)) allValid = false;
@@ -1868,7 +1934,7 @@ void DerivationGoal::computeClosure()
             if (ht == htUnknown)
                 throw BuildError(format("unknown hash algorithm `%1%'") % algo);
             Hash h = parseHash(ht, i->second.hash);
-            Hash h2 = recursive ? hashPath(ht, path) : hashFile(ht, path);
+            Hash h2 = recursive ? hashPath(ht, path).first : hashFile(ht, path);
             if (h != h2)
                 throw BuildError(
                     format("output path `%1%' should have %2% hash `%3%', instead has `%4%'")
@@ -1882,7 +1948,7 @@ void DerivationGoal::computeClosure()
 	   contained in it.  Compute the SHA-256 NAR hash at the same
 	   time.  The hash is stored in the database so that we can
 	   verify later on whether nobody has messed with the store. */
-        Hash hash;
+        HashResult hash;
         PathSet references = scanForReferences(path, allPaths, hash);
         contentHashes[path] = hash;
 
@@ -1911,14 +1977,18 @@ void DerivationGoal::computeClosure()
     }
 
     /* Register each output path as valid, and register the sets of
-       paths referenced by each of them.  !!! this should be
-       atomic so that either all paths are registered as valid, or
-       none are. */
-    foreach (DerivationOutputs::iterator, i, drv.outputs)
-        worker.store.registerValidPath(i->second.path,
-            contentHashes[i->second.path],
-            allReferences[i->second.path],
-            drvPath);
+       paths referenced by each of them. */
+    ValidPathInfos infos;
+    foreach (DerivationOutputs::iterator, i, drv.outputs) {
+        ValidPathInfo info;
+        info.path = i->second.path;
+        info.hash = contentHashes[i->second.path].first;
+        info.narSize = contentHashes[i->second.path].second;
+        info.references = allReferences[i->second.path];
+        info.deriver = drvPath;
+        infos.push_back(info);
+    }
+    worker.store.registerValidPaths(infos);
 
     /* It is now safe to delete the lock files, since all future
        lockers will see that the output paths are valid; they will not
@@ -1944,29 +2014,7 @@ Path DerivationGoal::openLogFile()
     if (fdLogFile == -1)
         throw SysError(format("creating log file `%1%'") % logFileName);
 
-    /* Create a pipe to get the output of the child. */
-    logPipe.create();
-
     return logFileName;
-}
-
-
-void DerivationGoal::initChild()
-{
-    commonChildInit(logPipe);
-    
-    if (chdir(tmpDir.c_str()) == -1)
-        throw SysError(format("changing into `%1%'") % tmpDir);
-
-    /* When running a hook, dup the communication pipes. */
-    if (usingBuildHook) {
-        toHook.writeSide.close();
-        if (dup2(toHook.readSide, STDIN_FILENO) == -1)
-            throw SysError("dupping to-hook read side");
-    }
-
-    /* Close all other file descriptors. */
-    closeMostFDs(set<int>());
 }
 
 
@@ -1989,19 +2037,22 @@ void DerivationGoal::deleteTmpDir(bool force)
 
 void DerivationGoal::handleChildOutput(int fd, const string & data)
 {
-    if (fd == logPipe.readSide) {
+    if ((hook && fd == hook->builderOut.readSide) ||
+        (!hook && fd == builderOut.readSide))
+    {
         if (verbosity >= buildVerbosity)
             writeToStderr((unsigned char *) data.c_str(), data.size());
         writeFull(fdLogFile, (unsigned char *) data.c_str(), data.size());
     }
 
-    else abort();
+    if (hook && fd == hook->fromHook.readSide)
+        writeToStderr((unsigned char *) data.c_str(), data.size());
 }
 
 
 void DerivationGoal::handleEOF(int fd)
 {
-    if (fd == logPipe.readSide) worker.wakeUp(shared_from_this());
+    worker.wakeUp(shared_from_this());
 }
 
 
@@ -2345,10 +2396,15 @@ void SubstitutionGoal::finished()
 
     canonicalisePathMetaData(storePath);
 
-    Hash contentHash = hashPath(htSHA256, storePath);
-
-    worker.store.registerValidPath(storePath, contentHash,
-        info.references, info.deriver);
+    HashResult hash = hashPath(htSHA256, storePath);
+    
+    ValidPathInfo info2;
+    info2.path = storePath;
+    info2.hash = hash.first;
+    info2.narSize = hash.second;
+    info2.references = info.references;
+    info2.deriver = info.deriver;
+    worker.store.registerValidPath(info2);
 
     outputLock->setDeletion(true);
     
@@ -2395,6 +2451,7 @@ Worker::Worker(LocalStore & store)
     nrLocalBuilds = 0;
     lastWokenUp = 0;
     cacheFailure = queryBoolSetting("build-cache-failure", false);
+    permanentFailure = false;
 }
 
 
@@ -2721,6 +2778,11 @@ void Worker::waitForInput()
 }
 
 
+unsigned int Worker::exitStatus()
+{
+    return permanentFailure ? 100 : 1;
+}
+
 
 //////////////////////////////////////////////////////////////////////
 
@@ -2747,7 +2809,7 @@ void LocalStore::buildDerivations(const PathSet & drvPaths)
         }
             
     if (!failed.empty())
-        throw Error(format("build of %1% failed") % showPaths(failed));
+        throw Error(format("build of %1% failed") % showPaths(failed), worker.exitStatus());
 }
 
 
@@ -2763,7 +2825,7 @@ void LocalStore::ensurePath(const Path & path)
     worker.run(goals);
 
     if (goal->getExitCode() != Goal::ecSuccess)
-        throw Error(format("path `%1%' does not exist and cannot be created") % path);
+        throw Error(format("path `%1%' does not exist and cannot be created") % path, worker.exitStatus());
 }
 
  

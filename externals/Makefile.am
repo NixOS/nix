@@ -12,30 +12,56 @@ $(BZIP2).tar.gz:
 $(BZIP2): $(BZIP2).tar.gz
 	gunzip < $(srcdir)/$(BZIP2).tar.gz | tar xvf -
 
-have-bzip2:
-	$(MAKE) $(BZIP2)
-	touch have-bzip2
-
 if HAVE_BZIP2
 build-bzip2:
 else
-build-bzip2: have-bzip2
-	(pfx=`pwd` && \
-	cd $(BZIP2) && \
-	$(MAKE) && \
-	$(MAKE) install PREFIX=$$pfx/inst-bzip2)
+build-bzip2: $(BZIP2)
+	(cd $(BZIP2) && \
+	$(MAKE) CC="$(CC)" && \
+	$(MAKE) install PREFIX=$(abs_builddir)/inst-bzip2)
 	touch build-bzip2
 
-install:
+install-exec-local:: build-bzip2
 	mkdir -p $(DESTDIR)${bzip2_bin}
 	$(INSTALL_PROGRAM) $(bzip2_bin_test)/bzip2 $(bzip2_bin_test)/bunzip2 $(DESTDIR)${bzip2_bin}
 endif
 
 
-all: build-bzip2
+# SQLite
 
-EXTRA_DIST = $(BZIP2).tar.gz
+SQLITE = sqlite-autoconf-$(SQLITE_VERSION)
+SQLITE_TAR = sqlite-autoconf-$(SQLITE_VERSION).tar.gz
 
-ext-clean:
-	$(RM) -f have-bzip2 build-bzip2
-	$(RM) -rf $(BZIP2)
+$(SQLITE_TAR):
+	@echo "Nix requires the SQLite library to build."
+	@echo "Please download version $(SQLITE_VERSION) from"
+	@echo "  http://www.sqlite.org/$(SQLITE_TAR)"
+	@echo "and place it in the externals/ directory."
+	false
+
+$(SQLITE): $(SQLITE_TAR)
+	gzip -d < $(srcdir)/$(SQLITE_TAR) | tar xvf -
+
+if HAVE_SQLITE
+build-sqlite:
+else
+build-sqlite: $(SQLITE)
+	(cd $(SQLITE) && \
+	CC="$(CC)" CFLAGS="-DSQLITE_ENABLE_COLUMN_METADATA=1" ./configure --disable-static --prefix=$(pkglibdir)/dummy --libdir=${pkglibdir} $(SUB_CONFIGURE_FLAGS) && \
+	$(MAKE) )
+	touch build-sqlite
+
+install-exec-local:: build-sqlite
+	cd $(SQLITE) && $(MAKE) install
+	rm -rf "$(DESTDIR)/$(pkglibdir)/dummy"
+endif
+
+
+all: build-bzip2 build-sqlite
+
+EXTRA_DIST = $(BZIP2).tar.gz $(SQLITE_TAR)
+
+clean:
+	$(RM) -f build-bzip2 build-sqlite
+	$(RM) -rf $(BZIP2) $(SQLITE)
+	$(RM) -rf inst-bzip2

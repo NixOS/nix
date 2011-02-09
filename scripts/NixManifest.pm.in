@@ -33,18 +33,8 @@ sub readManifest {
 
     my $manifestVersion = 2;
 
-    my $storePath;
-    my $url;
-    my $hash;
-    my $size;
-    my $basePath;
-    my $baseHash;
-    my $patchType;
-    my $narHash;
-    my $references;
-    my $deriver;
-    my $hashAlgo;
-    my $copyFrom;
+    my ($storePath, $url, $hash, $size, $basePath, $baseHash, $patchType);
+    my ($narHash, $narSize, $references, $deriver, $hashAlgo, $copyFrom, $system);
 
     while (<MANIFEST>) {
         chomp;
@@ -62,9 +52,11 @@ sub readManifest {
                 undef $hash;
                 undef $size;
                 undef $narHash;
+                undef $narSize;
                 undef $basePath;
                 undef $baseHash;
                 undef $patchType;
+                undef $system;
                 $references = "";
                 $deriver = "";
                 $hashAlgo = "md5";
@@ -89,8 +81,10 @@ sub readManifest {
                     if (!$found) {
                         push @{$narFileList},
                             { url => $url, hash => $hash, size => $size
-                            , narHash => $narHash, references => $references
+                            , narHash => $narHash, narSize => $narSize
+                            , references => $references
                             , deriver => $deriver, hashAlgo => $hashAlgo
+                            , system => $system
                             };
                     }
                 
@@ -100,8 +94,8 @@ sub readManifest {
                     addPatch $patches, $storePath,
                         { url => $url, hash => $hash, size => $size
                         , basePath => $basePath, baseHash => $baseHash
-                        , narHash => $narHash, patchType => $patchType
-                        , hashAlgo => $hashAlgo
+                        , narHash => $narHash, narSize => $narSize
+                        , patchType => $patchType, hashAlgo => $hashAlgo
                         };
                 }
 
@@ -132,9 +126,11 @@ sub readManifest {
             elsif (/^\s*BaseHash:\s*(\S+)\s*$/) { $baseHash = $1; }
             elsif (/^\s*Type:\s*(\S+)\s*$/) { $patchType = $1; }
             elsif (/^\s*NarHash:\s*(\S+)\s*$/) { $narHash = $1; }
+            elsif (/^\s*NarSize:\s*(\d+)\s*$/) { $narSize = $1; }
             elsif (/^\s*References:\s*(.*)\s*$/) { $references = $1; }
             elsif (/^\s*Deriver:\s*(\S+)\s*$/) { $deriver = $1; }
             elsif (/^\s*ManifestVersion:\s*(\d+)\s*$/) { $manifestVersion = $1; }
+            elsif (/^\s*System:\s*(\S+)\s*$/) { $system = $1; }
 
             # Compatibility;
             elsif (/^\s*NarURL:\s*(\S+)\s*$/) { $url = $1; }
@@ -150,7 +146,7 @@ sub readManifest {
 
 
 sub writeManifest {
-    my ($manifest, $narFiles, $patches) = @_;
+    my ($manifest, $narFiles, $patches, $noCompress) = @_;
 
     open MANIFEST, ">$manifest.tmp"; # !!! check exclusive
 
@@ -165,12 +161,14 @@ sub writeManifest {
             print MANIFEST "  StorePath: $storePath\n";
             print MANIFEST "  NarURL: $narFile->{url}\n";
             print MANIFEST "  Hash: $narFile->{hash}\n" if defined $narFile->{hash};
-            print MANIFEST "  NarHash: $narFile->{narHash}\n";
             print MANIFEST "  Size: $narFile->{size}\n" if defined $narFile->{size};
+            print MANIFEST "  NarHash: $narFile->{narHash}\n";
+            print MANIFEST "  NarSize: $narFile->{narSize}\n" if $narFile->{narSize};
             print MANIFEST "  References: $narFile->{references}\n"
                 if defined $narFile->{references} && $narFile->{references} ne "";
             print MANIFEST "  Deriver: $narFile->{deriver}\n"
                 if defined $narFile->{deriver} && $narFile->{deriver} ne "";
+            print MANIFEST "  System: $narFile->{system}\n" if defined $narFile->{system};
             print MANIFEST "}\n";
         }
     }
@@ -182,8 +180,9 @@ sub writeManifest {
             print MANIFEST "  StorePath: $storePath\n";
             print MANIFEST "  NarURL: $patch->{url}\n";
             print MANIFEST "  Hash: $patch->{hash}\n";
-            print MANIFEST "  NarHash: $patch->{narHash}\n";
             print MANIFEST "  Size: $patch->{size}\n";
+            print MANIFEST "  NarHash: $patch->{narHash}\n";
+            print MANIFEST "  NarSize: $patch->{narSize}\n" if $patch->{narSize};
             print MANIFEST "  BasePath: $patch->{basePath}\n";
             print MANIFEST "  BaseHash: $patch->{baseHash}\n";
             print MANIFEST "  Type: $patch->{patchType}\n";
@@ -199,11 +198,13 @@ sub writeManifest {
 
 
     # Create a bzipped manifest.
-    system("@bzip2@ < $manifest > $manifest.bz2.tmp") == 0
-        or die "cannot compress manifest";
+    unless (defined $noCompress) {
+	system("@bzip2@ < $manifest > $manifest.bz2.tmp") == 0
+	    or die "cannot compress manifest";
 
-    rename("$manifest.bz2.tmp", "$manifest.bz2")
-        or die "cannot rename $manifest.bz2.tmp: $!";
+	rename("$manifest.bz2.tmp", "$manifest.bz2")
+	    or die "cannot rename $manifest.bz2.tmp: $!";
+    }
 }
 
 

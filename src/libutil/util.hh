@@ -4,6 +4,7 @@
 #include "types.hh"
 
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
 #include <signal.h>
@@ -42,6 +43,9 @@ Path dirOf(const Path & path);
    following the final `/'. */
 string baseNameOf(const Path & path);
 
+/* Get status of `path'. */
+struct stat lstat(const Path & path);
+
 /* Return true iff the given path exists. */
 bool pathExists(const Path & path);
 
@@ -60,7 +64,7 @@ string readFile(int fd);
 string readFile(const Path & path);
 
 /* Write a string to a file. */
-void writeFile(const Path & path, const string & s, bool doFsync = false);
+void writeFile(const Path & path, const string & s);
 
 /* Read a line from a file descriptor. */
 string readLine(int fd);
@@ -278,6 +282,11 @@ MakeError(Interrupted, BaseError)
 
 /* String tokenizer. */
 Strings tokenizeString(const string & s, const string & separators = " \t\n\r");
+
+
+/* Concatenate the given strings with a separator between the
+   elements. */
+string concatStringsSep(const string & sep, const Strings & ss);
 
 
 /* Convert the exit status of a child as returned by wait() into an

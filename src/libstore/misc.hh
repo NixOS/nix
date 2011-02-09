@@ -31,7 +31,7 @@ Path findOutput(const Derivation & drv, string id);
    will be substituted. */
 void queryMissing(const PathSet & targets,
     PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown,
-    unsigned long long & downloadSize);
+    unsigned long long & downloadSize, unsigned long long & narSize);
 
 
 }

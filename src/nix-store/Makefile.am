@@ -5,7 +5,7 @@ nix_store_SOURCES =				\
   xmlgraph.cc xmlgraph.hh
 
 nix_store_LDADD = ../libmain/libmain.la ../libstore/libstore.la ../libutil/libutil.la \
- ../boost/format/libformat.la @ADDITIONAL_NETWORK_LIBS@
+ ../boost/format/libformat.la
 
 nix-store.o: help.txt.hh
 

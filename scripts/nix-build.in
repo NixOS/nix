@@ -123,6 +123,11 @@ EOF
         $verbose = 1;
     }
     
+    elsif ($arg eq "--quiet") {
+        push @buildArgs, $arg;
+        push @instArgs, $arg;
+    }
+    
     elsif (substr($arg, 0, 1) eq "-") {
         push @buildArgs, $arg;
     }
@@ -165,7 +170,7 @@ foreach my $expr (@exprs) {
 
     # Build.
     my @outPaths;
-    $pid = open(OUTPATHS, "-|") || exec "$binDir/nix-store", "--add-root", $outLink, "--indirect", "-rv",
+    $pid = open(OUTPATHS, "-|") || exec "$binDir/nix-store", "--add-root", $outLink, "--indirect", "-r",
         @buildArgs, @drvPaths;
     while (<OUTPATHS>) {chomp; push @outPaths, $_;}
     if (!close OUTPATHS) {

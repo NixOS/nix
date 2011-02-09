@@ -54,25 +54,26 @@ void printGCWarning()
 
 void printMissing(const PathSet & paths)
 {
-    unsigned long long downloadSize;
+    unsigned long long downloadSize, narSize;
     PathSet willBuild, willSubstitute, unknown;
-    queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize);
+    queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     if (!willBuild.empty()) {
-        printMsg(lvlInfo, format("the following derivations will be built:"));
+        printMsg(lvlInfo, format("these derivations will be built:"));
         foreach (PathSet::iterator, i, willBuild)
             printMsg(lvlInfo, format("  %1%") % *i);
     }
 
     if (!willSubstitute.empty()) {
-        printMsg(lvlInfo, format("the following paths will be downloaded/copied (%.2f MiB):") %
-            (downloadSize / (1024.0 * 1024.0)));
+        printMsg(lvlInfo, format("these paths will be downloaded/copied (%.2f MiB download, %.2f MiB unpacked):")
+            % (downloadSize / (1024.0 * 1024.0))
+            % (narSize / (1024.0 * 1024.0)));
         foreach (PathSet::iterator, i, willSubstitute)
             printMsg(lvlInfo, format("  %1%") % *i);
     }
 
     if (!unknown.empty()) {
-        printMsg(lvlInfo, format("don't know how to build the following paths%1%:")
+        printMsg(lvlInfo, format("don't know how to build these paths%1%:")
             % (readOnlyMode ? " (may be caused by read-only store access)" : ""));
         foreach (PathSet::iterator, i, unknown)
             printMsg(lvlInfo, format("  %1%") % *i);
@@ -200,17 +201,16 @@ static void initAndRun(int argc, char * * argv)
     remaining.clear();
 
     /* Process default options. */
+    int verbosityDelta = 0;
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
         string arg = *i;
-        if (arg == "--verbose" || arg == "-v")
-            verbosity = (Verbosity) ((int) verbosity + 1);
+        if (arg == "--verbose" || arg == "-v") verbosityDelta++;
+        else if (arg == "--quiet") verbosityDelta--;
         else if (arg == "--log-type") {
             ++i;
             if (i == args.end()) throw UsageError("`--log-type' requires an argument");
             setLogType(*i);
         }
-        else if (arg == "--build-output" || arg == "-B")
-            ; /* !!! obsolete - remove eventually */
         else if (arg == "--no-build-output" || arg == "-Q")
             buildVerbosity = lvlVomit;
         else if (arg == "--print-build-trace")
@@ -251,6 +251,9 @@ static void initAndRun(int argc, char * * argv)
         else remaining.push_back(arg);
     }
 
+    verbosityDelta += queryIntSetting("verbosity", lvlInfo);
+    verbosity = (Verbosity) (verbosityDelta < 0 ? 0 : verbosityDelta);
+    
     /* Automatically clean up the temporary roots file when we
        exit. */
     RemoveTempRoots removeTempRoots __attribute__((unused));
@@ -390,7 +393,7 @@ int main(int argc, char * * argv)
         printMsg(lvlError, format("error: %1%%2%") % (showTrace ? e.prefix() : "") % e.msg());
         if (e.prefix() != "" && !showTrace)
             printMsg(lvlError, "(use `--show-trace' to show detailed location information)");
-        return 1;
+        return e.status;
     } catch (std::exception & e) {
         printMsg(lvlError, format("error: %1%") % e.what());
         return 1;

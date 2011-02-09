@@ -17,3 +17,5 @@ substring 1 2 s
 + substring 3 0 s
 + "b"
 + substring 3 1 s
++ "c"
++ substring 5 10 "perl"

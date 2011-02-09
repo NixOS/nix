@@ -50,38 +50,23 @@ AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
 test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
 
 
-# Whether to produce a statically linked binary.  On Cygwin, this is
-# the default: dynamically linking against the ATerm DLL does work,
-# except that it requires the ATerm "lib" directory to be in $PATH, as
-# Windows doesn't have anything like an RPATH embedded in executable.
-# Since this is kind of annoying, we use static libraries for now.
-
-AC_ARG_ENABLE(static-nix, AC_HELP_STRING([--enable-static-nix],
-  [produce statically linked binaries]),
-  static_nix=$enableval, static_nix=no)
-
-if test "$sys_name" = cygwin; then
-   static_nix=yes
-fi
-
-if test "$static_nix" = yes; then
+# Windows-specific stuff.  On Cygwin, dynamically linking against the
+# ATerm DLL works, except that it requires the ATerm "lib" directory
+# to be in $PATH, as Windows doesn't have anything like an RPATH
+# embedded in executable.  Since this is kind of annoying, we use
+# static libraries for now.
+if test "$sys_name" = "cygwin"; then
     AC_DISABLE_SHARED
     AC_ENABLE_STATIC
 fi
 
 
-# Windows-specific stuff.
-if test "$sys_name" = "cygwin"; then
-    # We cannot delete open files.
-    AC_DEFINE(CANNOT_DELETE_OPEN_FILES, 1, [Whether it is impossible to delete open files.])
-fi
-
 # Solaris-specific stuff.
 if test "$sys_name" = "sunos"; then
     # Solaris requires -lsocket -lnsl for network functions
-    ADDITIONAL_NETWORK_LIBS="-lsocket -lnsl"
-    AC_SUBST(ADDITIONAL_NETWORK_LIBS)
+    LIBS="-lsocket -lnsl $LIBS"
 fi
+
 
 AC_PROG_CC
 AC_PROG_CXX
@@ -100,6 +85,13 @@ AC_SUBST([CC_FOR_BUILD])
 AC_DISABLE_STATIC
 AC_ENABLE_SHARED
 AC_PROG_LIBTOOL
+
+if test "$enable_shared" = yes; then
+   SUB_CONFIGURE_FLAGS="--enable-shared --disable-static"
+else
+   SUB_CONFIGURE_FLAGS="--enable-static --disable-shared"
+fi
+AC_SUBST(SUB_CONFIGURE_FLAGS)
 
 
 # Use 64-bit file system calls so that we can support files > 2 GiB.
@@ -229,6 +221,8 @@ AC_ARG_WITH(bzip2, AC_HELP_STRING([--with-bzip2=PATH],
   [prefix of bzip2]),
   bzip2=$withval, bzip2=)
 AM_CONDITIONAL(HAVE_BZIP2, test -n "$bzip2")
+ATERM_VERSION=2.5
+AC_SUBST(ATERM_VERSION)
 if test -z "$bzip2"; then
   # Headers and libraries will be used from the temporary installation
   # in externals/inst-bzip2.
@@ -249,6 +243,24 @@ AC_SUBST(bzip2_include)
 AC_SUBST(bzip2_bin)
 AC_SUBST(bzip2_bin_test)
 
+AC_ARG_WITH(sqlite, AC_HELP_STRING([--with-sqlite=PATH],
+  [prefix of SQLite]),
+  sqlite=$withval, sqlite=)
+AM_CONDITIONAL(HAVE_SQLITE, test -n "$sqlite")
+SQLITE_VERSION=3070500
+AC_SUBST(SQLITE_VERSION)
+if test -z "$sqlite"; then
+  sqlite_lib='${top_builddir}/externals/sqlite-autoconf-$(SQLITE_VERSION)/libsqlite3.la'
+  sqlite_include='-I${top_builddir}/externals/sqlite-autoconf-$(SQLITE_VERSION)'
+  sqlite_bin='${top_builddir}/externals/sqlite-autoconf-$(SQLITE_VERSION)'
+else
+  sqlite_lib="-L$sqlite/lib -lsqlite3"
+  sqlite_include="-I$sqlite/include"
+  sqlite_bin="$sqlite/bin"
+fi
+AC_SUBST(sqlite_lib)
+AC_SUBST(sqlite_include)
+AC_SUBST(sqlite_bin)
 
 # Whether to use the Boehm garbage collector.
 AC_ARG_ENABLE(gc, AC_HELP_STRING([--enable-gc],
@@ -274,22 +286,13 @@ AC_CHECK_FUNCS([setresuid setreuid lchown])
 
 
 # Nice to have, but not essential.
-AC_CHECK_FUNCS([strsignal])
-AC_CHECK_FUNCS([posix_fallocate])
+AC_CHECK_FUNCS([strsignal posix_fallocate nanosleep])
 
 
 # This is needed if ATerm or bzip2 are static libraries,
 # and the Nix libraries are dynamic.
 if test "$(uname)" = "Darwin"; then
     LDFLAGS="-all_load $LDFLAGS"
-fi
-
-
-if test "$static_nix" = yes; then
-    # `-all-static' has to be added at the end of configure, because
-    # the C compiler doesn't know about -all-static (it's filtered out
-    # by libtool, but configure doesn't use libtool).
-    LDFLAGS="-all-static $LDFLAGS"
 fi
 
 

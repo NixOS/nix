@@ -286,7 +286,16 @@ Hash hashFile(HashType ht, const Path & path)
 HashSink::HashSink(HashType ht) : ht(ht)
 {
     ctx = new Ctx;
+    bytes = 0;
     start(ht, *ctx);
+}
+    
+HashSink::HashSink(const HashSink & h)
+{
+    ht = h.ht;
+    bytes = h.bytes;
+    ctx = new Ctx;
+    *ctx = *h.ctx;
 }
     
 HashSink::~HashSink()
@@ -297,18 +306,20 @@ HashSink::~HashSink()
 void HashSink::operator ()
     (const unsigned char * data, unsigned int len)
 {
+    bytes += len;
     update(ht, *ctx, data, len);
 }
 
-Hash HashSink::finish()
+HashResult HashSink::finish()
 {
     Hash hash(ht);
     nix::finish(ht, *ctx, hash.hash);
-    return hash;
+    return HashResult(hash, bytes);
 }
 
 
-Hash hashPath(HashType ht, const Path & path, PathFilter & filter)
+HashResult hashPath(
+    HashType ht, const Path & path, PathFilter & filter)
 {
     HashSink sink(ht);
     dumpPath(path, sink, filter);

@@ -4,6 +4,7 @@
 #include "archive.hh"
 #include "pathlocks.hh"
 #include "worker-protocol.hh"
+#include "derivations.hh"
     
 #include <iostream>
 #include <algorithm>
@@ -15,11 +16,166 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <stdio.h>
+#include <time.h>
+
+#include <sqlite3.h>
 
 
 namespace nix {
 
+
+MakeError(SQLiteError, Error);
+MakeError(SQLiteBusy, SQLiteError);
+
+
+static void throwSQLiteError(sqlite3 * db, const format & f)
+    __attribute__ ((noreturn));
+
+static void throwSQLiteError(sqlite3 * db, const format & f)
+{
+    int err = sqlite3_errcode(db);
+    if (err == SQLITE_BUSY) {
+        printMsg(lvlError, "warning: SQLite database is busy");
+        /* Sleep for a while since retrying the transaction right away
+           is likely to fail again. */
+#if HAVE_NANOSLEEP
+        struct timespec t;
+        t.tv_sec = 0;
+        t.tv_nsec = 100 * 1000 * 1000; /* 0.1s */
+        nanosleep(&t, 0);
+#else
+        sleep(1);
+#endif
+        throw SQLiteBusy(format("%1%: %2%") % f.str() % sqlite3_errmsg(db));
+    }
+    else
+        throw SQLiteError(format("%1%: %2%") % f.str() % sqlite3_errmsg(db));
+}
+
+
+SQLite::~SQLite()
+{
+    try {
+        if (db && sqlite3_close(db) != SQLITE_OK)
+            throwSQLiteError(db, "closing database");
+    } catch (...) {
+        ignoreException();
+    }
+}
+
+
+void SQLiteStmt::create(sqlite3 * db, const string & s)
+{
+    checkInterrupt();
+    assert(!stmt);
+    if (sqlite3_prepare_v2(db, s.c_str(), -1, &stmt, 0) != SQLITE_OK)
+        throwSQLiteError(db, "creating statement");
+    this->db = db;
+}
+
+
+void SQLiteStmt::reset()
+{
+    assert(stmt);
+    /* Note: sqlite3_reset() returns the error code for the most
+       recent call to sqlite3_step().  So ignore it. */
+    sqlite3_reset(stmt);
+    curArg = 1;
+}
+
+
+SQLiteStmt::~SQLiteStmt()
+{
+    try {
+        if (stmt && sqlite3_finalize(stmt) != SQLITE_OK)
+            throwSQLiteError(db, "finalizing statement");
+    } catch (...) {
+        ignoreException();
+    }
+}
+
+
+void SQLiteStmt::bind(const string & value)
+{
+    if (sqlite3_bind_text(stmt, curArg++, value.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+        throwSQLiteError(db, "binding argument");
+}
+
+
+void SQLiteStmt::bind(int value)
+{
+    if (sqlite3_bind_int(stmt, curArg++, value) != SQLITE_OK)
+        throwSQLiteError(db, "binding argument");
+}
+
+
+void SQLiteStmt::bind64(long long value)
+{
+    if (sqlite3_bind_int64(stmt, curArg++, value) != SQLITE_OK)
+        throwSQLiteError(db, "binding argument");
+}
+
+
+void SQLiteStmt::bind()
+{
+    if (sqlite3_bind_null(stmt, curArg++) != SQLITE_OK)
+        throwSQLiteError(db, "binding argument");
+}
+
+
+/* Helper class to ensure that prepared statements are reset when
+   leaving the scope that uses them.  Unfinished prepared statements
+   prevent transactions from being aborted, and can cause locks to be
+   kept when they should be released. */
+struct SQLiteStmtUse
+{
+    SQLiteStmt & stmt;
+    SQLiteStmtUse(SQLiteStmt & stmt) : stmt(stmt)
+    {
+        stmt.reset();
+    }
+    ~SQLiteStmtUse()
+    {
+        try {
+            stmt.reset();
+        } catch (...) {
+            ignoreException();
+        }
+    }
+};
+
+
+struct SQLiteTxn 
+{
+    bool active;
+    sqlite3 * db;
     
+    SQLiteTxn(sqlite3 * db) : active(false) {
+        this->db = db;
+        if (sqlite3_exec(db, "begin;", 0, 0, 0) != SQLITE_OK)
+            throwSQLiteError(db, "starting transaction");
+        active = true;
+    }
+
+    void commit() 
+    {
+        if (sqlite3_exec(db, "commit;", 0, 0, 0) != SQLITE_OK)
+            throwSQLiteError(db, "committing transaction");
+        active = false;
+    }
+    
+    ~SQLiteTxn() 
+    {
+        try {
+            if (active && sqlite3_exec(db, "rollback;", 0, 0, 0) != SQLITE_OK)
+                throwSQLiteError(db, "aborting transaction");
+        } catch (...) {
+            ignoreException();
+        }
+    }
+};
+
+
 void checkStoreNotSymlink()
 {
     if (getEnv("NIX_IGNORE_SYMLINK_STORE") == "1") return;
@@ -44,16 +200,17 @@ LocalStore::LocalStore()
     
     schemaPath = nixDBPath + "/schema";
     
-    if (readOnlyMode) return;
+    if (readOnlyMode) {
+        openDB(false);
+        return;
+    }
 
     /* Create missing state directories if they don't already exist. */
     createDirs(nixStore);
-    createDirs(nixDBPath + "/info");
-    createDirs(nixDBPath + "/referrer");
-    createDirs(nixDBPath + "/failed");
     Path profilesDir = nixStateDir + "/profiles";
     createDirs(nixStateDir + "/profiles");
     createDirs(nixStateDir + "/temproots");
+    createDirs(nixDBPath);
     Path gcRootsDir = nixStateDir + "/gcroots";
     if (!pathExists(gcRootsDir)) {
         createDirs(gcRootsDir);
@@ -63,12 +220,15 @@ LocalStore::LocalStore()
   
     checkStoreNotSymlink();
 
+    /* Acquire the big fat lock in shared mode to make sure that no
+       schema upgrade is in progress. */
     try {
         Path globalLockPath = nixDBPath + "/big-lock";
         globalLock = openLockFile(globalLockPath.c_str(), true);
     } catch (SysError & e) {
         if (e.errNo != EACCES) throw;
         readOnlyMode = true;
+        openDB(false);
         return;
     }
     
@@ -76,33 +236,55 @@ LocalStore::LocalStore()
         printMsg(lvlError, "waiting for the big Nix store lock...");
         lockFile(globalLock, ltRead, true);
     }
-    
+
+    /* Check the current database schema and if necessary do an
+       upgrade.  */
     int curSchema = getSchema();
     if (curSchema > nixSchemaVersion)
         throw Error(format("current Nix store schema is version %1%, but I only support %2%")
             % curSchema % nixSchemaVersion);
-    if (curSchema == 0) { /* new store */
-        curSchema = nixSchemaVersion; 
+    
+    else if (curSchema == 0) { /* new store */
+        curSchema = nixSchemaVersion;
+        openDB(true);
         writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
     }
-    if (curSchema == 1) throw Error("your Nix store is no longer supported");
-    if (curSchema < nixSchemaVersion) upgradeStore12();
+    
+    else if (curSchema < nixSchemaVersion) {
+        if (curSchema < 5)
+            throw Error(
+                "Your Nix store has a database in Berkeley DB format,\n"
+                "which is no longer supported. To convert to the new format,\n"
+                "please upgrade Nix to version 0.12 first.");
+        
+        if (!lockFile(globalLock, ltWrite, false)) {
+            printMsg(lvlError, "waiting for exclusive access to the Nix store...");
+            lockFile(globalLock, ltWrite, true);
+        }
 
-    doFsync = queryBoolSetting("fsync-metadata", false);
+        /* Get the schema version again, because another process may
+           have performed the upgrade already. */
+        curSchema = getSchema();
+
+        if (curSchema < 6) upgradeStore6();
+
+        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
+
+        lockFile(globalLock, ltRead, true);
+    }
+    
+    else openDB(false);
 }
 
 
 LocalStore::~LocalStore()
 {
     try {
-        flushDelayedUpdates();
-
         foreach (RunningSubstituters::iterator, i, runningSubstituters) {
             i->second.to.close();
             i->second.from.close();
             i->second.pid.wait(true);
         }
-                
     } catch (...) {
         ignoreException();
     }
@@ -118,6 +300,98 @@ int LocalStore::getSchema()
             throw Error(format("`%1%' is corrupt") % schemaPath);
     }
     return curSchema;
+}
+
+
+void LocalStore::openDB(bool create)
+{
+    /* Open the Nix database. */
+    if (sqlite3_open_v2((nixDBPath + "/db.sqlite").c_str(), &db.db,
+            SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), 0) != SQLITE_OK)
+        throw Error("cannot open SQLite database");
+
+    if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)
+        throwSQLiteError(db, "setting timeout");
+
+    if (sqlite3_exec(db, "pragma foreign_keys = 1;", 0, 0, 0) != SQLITE_OK)
+        throwSQLiteError(db, "enabling foreign keys");
+
+    /* !!! check whether sqlite has been built with foreign key
+       support */
+    
+    /* Whether SQLite should fsync().  "Normal" synchronous mode
+       should be safe enough.  If the user asks for it, don't sync at
+       all.  This can cause database corruption if the system
+       crashes. */
+    string syncMode = queryBoolSetting("fsync-metadata", true) ? "normal" : "off";
+    if (sqlite3_exec(db, ("pragma synchronous = " + syncMode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
+        throwSQLiteError(db, "setting synchronous mode");
+
+    /* Set the SQLite journal mode.  WAL mode is fastest, but doesn't
+       seem entirely stable at the moment (Oct. 2010).  Thus, use
+       truncate mode by default. */
+    string mode = queryBoolSetting("use-sqlite-wal", false) ? "wal" : "truncate";
+    string prevMode;
+    {
+        SQLiteStmt stmt;
+        stmt.create(db, "pragma main.journal_mode;");
+        if (sqlite3_step(stmt) != SQLITE_ROW)
+            throwSQLiteError(db, "querying journal mode");
+        prevMode = string((const char *) sqlite3_column_text(stmt, 0));
+    }
+    if (prevMode != mode &&
+        sqlite3_exec(db, ("pragma main.journal_mode = " + mode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
+        throwSQLiteError(db, "setting journal mode");
+
+    /* Increase the auto-checkpoint interval to 8192 pages.  This
+       seems enough to ensure that instantiating the NixOS system
+       derivation is done in a single fsync(). */
+    if (mode == "wal" && sqlite3_exec(db, "pragma wal_autocheckpoint = 8192;", 0, 0, 0) != SQLITE_OK)
+        throwSQLiteError(db, "setting autocheckpoint interval");
+    
+    /* Initialise the database schema, if necessary. */
+    if (create) {
+#include "schema.sql.hh"
+        if (sqlite3_exec(db, (const char *) schema, 0, 0, 0) != SQLITE_OK)
+            throwSQLiteError(db, "initialising database schema");
+    }
+
+    /* Backwards compatibility with old (pre-release) databases.  Can
+       remove this eventually. */
+    if (sqlite3_table_column_metadata(db, 0, "ValidPaths", "narSize", 0, 0, 0, 0, 0) != SQLITE_OK) {
+        if (sqlite3_exec(db, "alter table ValidPaths add column narSize integer" , 0, 0, 0) != SQLITE_OK)
+            throwSQLiteError(db, "adding column narSize");
+    }
+
+    /* Prepare SQL statements. */
+    stmtRegisterValidPath.create(db,
+        "insert into ValidPaths (path, hash, registrationTime, deriver, narSize) values (?, ?, ?, ?, ?);");
+    stmtUpdatePathInfo.create(db,
+        "update ValidPaths set narSize = ? where path = ?;");
+    stmtAddReference.create(db,
+        "insert or replace into Refs (referrer, reference) values (?, ?);");
+    stmtQueryPathInfo.create(db,
+        "select id, hash, registrationTime, deriver, narSize from ValidPaths where path = ?;");
+    stmtQueryReferences.create(db,
+        "select path from Refs join ValidPaths on reference = id where referrer = ?;");
+    stmtQueryReferrers.create(db,
+        "select path from Refs join ValidPaths on referrer = id where reference = (select id from ValidPaths where path = ?);");
+    stmtInvalidatePath.create(db,
+        "delete from ValidPaths where path = ?;");
+    stmtRegisterFailedPath.create(db,
+        "insert into FailedPaths (path, time) values (?, ?);");
+    stmtHasPathFailed.create(db,
+        "select time from FailedPaths where path = ?;");
+    stmtQueryFailedPaths.create(db,
+        "select path from FailedPaths;");
+    stmtClearFailedPath.create(db,
+        "delete from FailedPaths where ?1 = '*' or path = ?1;");
+    stmtAddDerivationOutput.create(db,
+        "insert or replace into DerivationOutputs (drv, id, path) values (?, ?, ?);");
+    stmtQueryValidDerivers.create(db,
+        "select v.id, v.path from DerivationOutputs d join ValidPaths v on d.drv = v.id where d.path = ?;");
+    stmtQueryDerivationOutputs.create(db,
+        "select id, path from DerivationOutputs where drv = ?;");
 }
 
 
@@ -195,181 +469,107 @@ void canonicalisePathMetaData(const Path & path)
 }
 
 
-static Path infoFileFor(const Path & path)
+unsigned long long LocalStore::addValidPath(const ValidPathInfo & info)
 {
-    string baseName = baseNameOf(path);
-    return (format("%1%/info/%2%") % nixDBPath % baseName).str();
-}
+    SQLiteStmtUse use(stmtRegisterValidPath);
+    stmtRegisterValidPath.bind(info.path);
+    stmtRegisterValidPath.bind("sha256:" + printHash(info.hash));
+    stmtRegisterValidPath.bind(info.registrationTime == 0 ? time(0) : info.registrationTime);
+    if (info.deriver != "")
+        stmtRegisterValidPath.bind(info.deriver);
+    else
+        stmtRegisterValidPath.bind(); // null
+    if (info.narSize != 0)
+        stmtRegisterValidPath.bind64(info.narSize);
+    else
+        stmtRegisterValidPath.bind(); // null
+    if (sqlite3_step(stmtRegisterValidPath) != SQLITE_DONE)
+        throwSQLiteError(db, format("registering valid path `%1%' in database") % info.path);
+    unsigned long long id = sqlite3_last_insert_rowid(db);
 
-
-static Path referrersFileFor(const Path & path)
-{
-    string baseName = baseNameOf(path);
-    return (format("%1%/referrer/%2%") % nixDBPath % baseName).str();
-}
-
-
-static Path failedFileFor(const Path & path)
-{
-    string baseName = baseNameOf(path);
-    return (format("%1%/failed/%2%") % nixDBPath % baseName).str();
-}
-
-
-static Path tmpFileForAtomicUpdate(const Path & path)
-{
-    return (format("%1%/.%2%.%3%") % dirOf(path) % getpid() % baseNameOf(path)).str();
-}
-
-
-void LocalStore::appendReferrer(const Path & from, const Path & to, bool lock)
-{
-    Path referrersFile = referrersFileFor(from);
-    
-    PathLocks referrersLock;
-    if (lock) {
-        referrersLock.lockPaths(singleton<PathSet, Path>(referrersFile));
-        referrersLock.setDeletion(true);
+    /* If this is a derivation, then store the derivation outputs in
+       the database.  This is useful for the garbage collector: it can
+       efficiently query whether a path is an output of some
+       derivation. */
+    if (isDerivation(info.path)) {
+        Derivation drv = parseDerivation(readFile(info.path));
+        foreach (DerivationOutputs::iterator, i, drv.outputs) {
+            SQLiteStmtUse use(stmtAddDerivationOutput);
+            stmtAddDerivationOutput.bind(id);
+            stmtAddDerivationOutput.bind(i->first);
+            stmtAddDerivationOutput.bind(i->second.path);
+            if (sqlite3_step(stmtAddDerivationOutput) != SQLITE_DONE)
+                throwSQLiteError(db, format("adding derivation output for `%1%' in database") % info.path);
+        }
     }
 
-    AutoCloseFD fd = open(referrersFile.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0666);
-    if (fd == -1) throw SysError(format("opening file `%1%'") % referrersFile);
-    
-    string s = " " + to;
-    writeFull(fd, (const unsigned char *) s.c_str(), s.size());
-
-    if (doFsync) fsync(fd);
+    return id;
 }
 
 
-/* Atomically update the referrers file.  If `purge' is true, the set
-   of referrers is set to `referrers'.  Otherwise, the current set of
-   referrers is purged of invalid paths. */
-void LocalStore::rewriteReferrers(const Path & path, bool purge, PathSet referrers)
+void LocalStore::addReference(unsigned long long referrer, unsigned long long reference)
 {
-    Path referrersFile = referrersFileFor(path);
-    
-    PathLocks referrersLock(singleton<PathSet, Path>(referrersFile));
-    referrersLock.setDeletion(true);
-
-    if (purge)
-        /* queryReferrers() purges invalid paths, so that's all we
-           need. */
-        queryReferrers(path, referrers);
-
-    Path tmpFile = tmpFileForAtomicUpdate(referrersFile);
-    
-    AutoCloseFD fd = open(tmpFile.c_str(), O_WRONLY | O_TRUNC | O_CREAT, 0666);
-    if (fd == -1) throw SysError(format("opening file `%1%'") % referrersFile);
-    
-    string s;
-    foreach (PathSet::const_iterator, i, referrers) {
-        s += " "; s += *i;
-    }
-    
-    writeFull(fd, (const unsigned char *) s.c_str(), s.size());
-
-    if (doFsync) fsync(fd);
-    
-    fd.close(); /* for Windows; can't rename open file */
-
-    if (rename(tmpFile.c_str(), referrersFile.c_str()) == -1)
-        throw SysError(format("cannot rename `%1%' to `%2%'") % tmpFile % referrersFile);
-}
-
-
-void LocalStore::flushDelayedUpdates()
-{
-    foreach (PathSet::iterator, i, delayedUpdates) {
-        rewriteReferrers(*i, true, PathSet());
-    }
-    delayedUpdates.clear();
-}
-
-
-void LocalStore::registerValidPath(const Path & path,
-    const Hash & hash, const PathSet & references,
-    const Path & deriver)
-{
-    ValidPathInfo info;
-    info.path = path;
-    info.hash = hash;
-    info.references = references;
-    info.deriver = deriver;
-    registerValidPath(info);
-}
-
-
-void LocalStore::registerValidPath(const ValidPathInfo & info, bool ignoreValidity)
-{
-    Path infoFile = infoFileFor(info.path);
-
-    ValidPathInfo oldInfo;
-    if (pathExists(infoFile)) oldInfo = queryPathInfo(info.path);
-
-    /* Note that it's possible for infoFile to already exist. */
-
-    /* Acquire a lock on each referrer file.  This prevents those
-       paths from being invalidated.  (It would be a violation of the
-       store invariants if we registered info.path as valid while some
-       of its references are invalid.)  NB: there can be no deadlock
-       here since we're acquiring the locks in sorted order. */
-    PathSet lockNames;
-    foreach (PathSet::const_iterator, i, info.references)
-        if (*i != info.path) lockNames.insert(referrersFileFor(*i));
-    PathLocks referrerLocks(lockNames);
-    referrerLocks.setDeletion(true);
-        
-    string refs;
-    foreach (PathSet::const_iterator, i, info.references) {
-        if (!refs.empty()) refs += " ";
-        refs += *i;
-
-        if (!ignoreValidity && *i != info.path && !isValidPath(*i))
-            throw Error(format("cannot register `%1%' as valid, because its reference `%2%' isn't valid")
-                % info.path % *i);
-
-        /* Update the referrer mapping for *i.  This must be done
-           before the info file is written to maintain the invariant
-           that if `path' is a valid path, then all its references
-           have referrer mappings back to `path'.  A " " is prefixed
-           to separate it from the previous entry.  It's not suffixed
-           to deal with interrupted partial writes to this file. */
-        if (oldInfo.references.find(*i) == oldInfo.references.end())
-            appendReferrer(*i, info.path, false);
-    }
-
-    assert(info.hash.type == htSHA256);
-
-    string s = (format(
-        "Hash: sha256:%1%\n"
-        "References: %2%\n"
-        "Deriver: %3%\n"
-        "Registered-At: %4%\n")
-        % printHash(info.hash) % refs % info.deriver %
-        (oldInfo.registrationTime ? oldInfo.registrationTime : time(0))).str();
-
-    /* Atomically rewrite the info file. */
-    Path tmpFile = tmpFileForAtomicUpdate(infoFile);
-    writeFile(tmpFile, s, doFsync);
-    if (rename(tmpFile.c_str(), infoFile.c_str()) == -1)
-        throw SysError(format("cannot rename `%1%' to `%2%'") % tmpFile % infoFile);
-
-    pathInfoCache[info.path] = info;
+    SQLiteStmtUse use(stmtAddReference);
+    stmtAddReference.bind(referrer);
+    stmtAddReference.bind(reference);
+    if (sqlite3_step(stmtAddReference) != SQLITE_DONE)
+        throwSQLiteError(db, "adding reference to database");
 }
 
 
 void LocalStore::registerFailedPath(const Path & path)
 {
-    /* Write an empty file in the .../failed directory to denote the
-       failure of the builder for `path'. */
-    writeFile(failedFileFor(path), "");
+    if (hasPathFailed(path)) return;
+    SQLiteStmtUse use(stmtRegisterFailedPath);
+    stmtRegisterFailedPath.bind(path);
+    stmtRegisterFailedPath.bind(time(0));
+    if (sqlite3_step(stmtRegisterFailedPath) != SQLITE_DONE)
+        throwSQLiteError(db, format("registering failed path `%1%'") % path);
 }
 
 
 bool LocalStore::hasPathFailed(const Path & path)
 {
-    return pathExists(failedFileFor(path));
+    SQLiteStmtUse use(stmtHasPathFailed);
+    stmtHasPathFailed.bind(path);
+    int res = sqlite3_step(stmtHasPathFailed);
+    if (res != SQLITE_DONE && res != SQLITE_ROW)
+        throwSQLiteError(db, "querying whether path failed");
+    return res == SQLITE_ROW;
+}
+
+
+PathSet LocalStore::queryFailedPaths()
+{
+    SQLiteStmtUse use(stmtQueryFailedPaths);
+
+    PathSet res;
+    int r;
+    while ((r = sqlite3_step(stmtQueryFailedPaths)) == SQLITE_ROW) {
+        const char * s = (const char *) sqlite3_column_text(stmtQueryFailedPaths, 0);
+        assert(s);
+        res.insert(s);
+    }
+
+    if (r != SQLITE_DONE)
+        throwSQLiteError(db, "error querying failed paths");
+
+    return res;
+}
+
+
+void LocalStore::clearFailedPaths(const PathSet & paths)
+{
+    SQLiteTxn txn(db);
+
+    foreach (PathSet::const_iterator, i, paths) {
+        SQLiteStmtUse use(stmtClearFailedPath);
+        stmtClearFailedPath.bind(*i);
+        if (sqlite3_step(stmtClearFailedPath) != SQLITE_DONE)
+            throwSQLiteError(db, format("clearing failed path `%1%' in database") % *i);
+    }
+
+    txn.commit();
 }
 
 
@@ -387,91 +587,109 @@ Hash parseHashField(const Path & path, const string & s)
 }
 
 
-ValidPathInfo LocalStore::queryPathInfo(const Path & path, bool ignoreErrors)
+ValidPathInfo LocalStore::queryPathInfo(const Path & path)
 {
-    ValidPathInfo res;
-    res.path = path;
+    ValidPathInfo info;
+    info.path = path;
 
     assertStorePath(path);
 
-    if (!isValidPath(path))
-        throw Error(format("path `%1%' is not valid") % path);
+    /* Get the path info. */
+    SQLiteStmtUse use1(stmtQueryPathInfo);
 
-    std::map<Path, ValidPathInfo>::iterator lookup = pathInfoCache.find(path);
-    if (lookup != pathInfoCache.end()) return lookup->second;
+    stmtQueryPathInfo.bind(path);
     
-    /* Read the info file. */
-    Path infoFile = infoFileFor(path);
-    if (!pathExists(infoFile))
-        throw Error(format("path `%1%' is not valid") % path);
-    string info = readFile(infoFile);
+    int r = sqlite3_step(stmtQueryPathInfo);
+    if (r == SQLITE_DONE) throw Error(format("path `%1%' is not valid") % path);
+    if (r != SQLITE_ROW) throwSQLiteError(db, "querying path in database");
 
-    /* Parse it. */
-    Strings lines = tokenizeString(info, "\n");
+    info.id = sqlite3_column_int(stmtQueryPathInfo, 0);
 
-    foreach (Strings::iterator, i, lines) {
-        string::size_type p = i->find(':');
-        if (p == string::npos) {
-            if (!ignoreErrors)
-                throw Error(format("corrupt line in `%1%': %2%") % infoFile % *i);
-            continue; /* bad line */
-        }
-        string name(*i, 0, p);
-        string value(*i, p + 2);
-        if (name == "References") {
-            Strings refs = tokenizeString(value, " ");
-            res.references = PathSet(refs.begin(), refs.end());
-        } else if (name == "Deriver") {
-            res.deriver = value;
-        } else if (name == "Hash") {
-            try {
-                res.hash = parseHashField(path, value);
-            } catch (Error & e) {
-                if (!ignoreErrors) throw;
-                printMsg(lvlError, format("cannot parse hash field in `%1%': %2%") % infoFile % e.msg());
-            }
-        } else if (name == "Registered-At") {
-            int n = 0;
-            string2Int(value, n);
-            res.registrationTime = n;
-        }
+    const char * s = (const char *) sqlite3_column_text(stmtQueryPathInfo, 1);
+    assert(s);
+    info.hash = parseHashField(path, s);
+    
+    info.registrationTime = sqlite3_column_int(stmtQueryPathInfo, 2);
+
+    s = (const char *) sqlite3_column_text(stmtQueryPathInfo, 3);
+    if (s) info.deriver = s;
+
+    /* Note that narSize = NULL yields 0. */
+    info.narSize = sqlite3_column_int64(stmtQueryPathInfo, 4);
+
+    /* Get the references. */
+    SQLiteStmtUse use2(stmtQueryReferences);
+
+    stmtQueryReferences.bind(info.id);
+
+    while ((r = sqlite3_step(stmtQueryReferences)) == SQLITE_ROW) {
+        s = (const char *) sqlite3_column_text(stmtQueryReferences, 0);
+        assert(s);
+        info.references.insert(s);
     }
 
-    return pathInfoCache[path] = res;
+    if (r != SQLITE_DONE)
+        throwSQLiteError(db, format("error getting references of `%1%'") % path);
+
+    return info;
+}
+
+
+/* Update path info in the database.  Currently only updated the
+   narSize field. */
+void LocalStore::updatePathInfo(const ValidPathInfo & info)
+{
+    SQLiteStmtUse use(stmtUpdatePathInfo);
+    if (info.narSize != 0)
+        stmtUpdatePathInfo.bind64(info.narSize);
+    else
+        stmtUpdatePathInfo.bind(); // null
+    stmtUpdatePathInfo.bind(info.path);
+    if (sqlite3_step(stmtUpdatePathInfo) != SQLITE_DONE)
+        throwSQLiteError(db, format("updating info of path `%1%' in database") % info.path);
+}
+
+
+unsigned long long LocalStore::queryValidPathId(const Path & path)
+{
+    SQLiteStmtUse use(stmtQueryPathInfo);
+    stmtQueryPathInfo.bind(path);
+    int res = sqlite3_step(stmtQueryPathInfo);
+    if (res == SQLITE_ROW) return sqlite3_column_int(stmtQueryPathInfo, 0);
+    if (res == SQLITE_DONE) throw Error(format("path `%1%' is not valid") % path);
+    throwSQLiteError(db, "querying path in database");
 }
 
 
 bool LocalStore::isValidPath(const Path & path)
 {
-    /* Files in the info directory starting with a `.' are temporary
-       files. */
-    if (baseNameOf(path).at(0) == '.') return false;
-
-    /* A path is valid if its info file exists and has a non-zero
-       size.  (The non-zero size restriction is to be robust to
-       certain kinds of filesystem corruption, particularly with
-       ext4.) */
-    Path infoFile = infoFileFor(path);
-
-    struct stat st;
-    if (lstat(infoFile.c_str(), &st)) {
-        if (errno == ENOENT) return false;
-        throw SysError(format("getting status of `%1%'") % infoFile);
-    }
-
-    if (st.st_size == 0) return false;
-    
-    return true;
+    SQLiteStmtUse use(stmtQueryPathInfo);
+    stmtQueryPathInfo.bind(path);
+    int res = sqlite3_step(stmtQueryPathInfo);
+    if (res != SQLITE_DONE && res != SQLITE_ROW)
+        throwSQLiteError(db, "querying path in database");
+    return res == SQLITE_ROW;
 }
 
 
 PathSet LocalStore::queryValidPaths()
 {
-    PathSet paths;
-    Strings entries = readDirectory(nixDBPath + "/info");
-    foreach (Strings::iterator, i, entries)
-        if (i->at(0) != '.') paths.insert(nixStore + "/" + *i);
-    return paths;
+    SQLiteStmt stmt;
+    stmt.create(db, "select path from ValidPaths");
+    
+    PathSet res;
+    
+    int r;
+    while ((r = sqlite3_step(stmt)) == SQLITE_ROW) {
+        const char * s = (const char *) sqlite3_column_text(stmt, 0);
+        assert(s);
+        res.insert(s);
+    }
+
+    if (r != SQLITE_DONE)
+        throwSQLiteError(db, "error getting valid paths");
+
+    return res;
 }
 
 
@@ -483,45 +701,73 @@ void LocalStore::queryReferences(const Path & path,
 }
 
 
-bool LocalStore::queryReferrersInternal(const Path & path, PathSet & referrers)
-{
-    bool allValid = true;
-    
-    if (!isValidPath(path))
-        throw Error(format("path `%1%' is not valid") % path);
-
-    /* No locking is necessary here: updates are only done by
-       appending or by atomically replacing the file.  When appending,
-       there is a possibility that we see a partial entry, but it will
-       just be filtered out below (the partially written path will not
-       be valid, so it will be ignored). */
-
-    Path referrersFile = referrersFileFor(path);
-    if (!pathExists(referrersFile)) return true;
-    
-    AutoCloseFD fd = open(referrersFile.c_str(), O_RDONLY);
-    if (fd == -1) throw SysError(format("opening file `%1%'") % referrersFile);
-
-    Paths refs = tokenizeString(readFile(fd), " ");
-
-    foreach (Paths::iterator, i, refs)
-        /* Referrers can be invalid (see registerValidPath() for the
-           invariant), so we only return one if it is valid. */
-        if (isStorePath(*i) && isValidPath(*i)) referrers.insert(*i); else allValid = false;
-
-    return allValid;
-}
-
-
 void LocalStore::queryReferrers(const Path & path, PathSet & referrers)
 {
-    queryReferrersInternal(path, referrers);
+    assertStorePath(path);
+
+    SQLiteStmtUse use(stmtQueryReferrers);
+
+    stmtQueryReferrers.bind(path);
+
+    int r;
+    while ((r = sqlite3_step(stmtQueryReferrers)) == SQLITE_ROW) {
+        const char * s = (const char *) sqlite3_column_text(stmtQueryReferrers, 0);
+        assert(s);
+        referrers.insert(s);
+    }
+
+    if (r != SQLITE_DONE)
+        throwSQLiteError(db, format("error getting references of `%1%'") % path);
 }
 
 
 Path LocalStore::queryDeriver(const Path & path)
 {
     return queryPathInfo(path).deriver;
+}
+
+
+PathSet LocalStore::queryValidDerivers(const Path & path)
+{
+    assertStorePath(path);
+
+    SQLiteStmtUse use(stmtQueryValidDerivers);
+    stmtQueryValidDerivers.bind(path);
+
+    PathSet derivers;
+    int r;
+    while ((r = sqlite3_step(stmtQueryValidDerivers)) == SQLITE_ROW) {
+        const char * s = (const char *) sqlite3_column_text(stmtQueryValidDerivers, 1);
+        assert(s);
+        derivers.insert(s);
+    }
+    
+    if (r != SQLITE_DONE)
+        throwSQLiteError(db, format("error getting valid derivers of `%1%'") % path);
+    
+    return derivers;
+}
+
+
+PathSet LocalStore::queryDerivationOutputs(const Path & path)
+{
+    SQLiteTxn txn(db);
+    
+    SQLiteStmtUse use(stmtQueryDerivationOutputs);
+    stmtQueryDerivationOutputs.bind(queryValidPathId(path));
+    
+    PathSet outputs;
+    int r;
+    while ((r = sqlite3_step(stmtQueryDerivationOutputs)) == SQLITE_ROW) {
+        const char * s = (const char *) sqlite3_column_text(stmtQueryDerivationOutputs, 1);
+        assert(s);
+        outputs.insert(s);
+    }
+    
+    if (r != SQLITE_DONE)
+        throwSQLiteError(db, format("error getting outputs of `%1%'") % path);
+
+    return outputs;
 }
 
 
@@ -615,6 +861,7 @@ bool LocalStore::querySubstitutablePathInfo(const Path & substituter,
         info.references.insert(p);
     }
     info.downloadSize = getIntLine<long long>(run.from);
+    info.narSize = getIntLine<long long>(run.from);
     
     return true;
 }
@@ -635,39 +882,40 @@ Hash LocalStore::queryPathHash(const Path & path)
 }
 
 
-static void dfsVisit(std::map<Path, ValidPathInfo> & infos,
-    const Path & path, PathSet & visited, Paths & sorted)
+void LocalStore::registerValidPath(const ValidPathInfo & info)
 {
-    if (visited.find(path) != visited.end()) return;
-    visited.insert(path);
-
-    ValidPathInfo & info(infos[path]);
-    
-    foreach (PathSet::iterator, i, info.references)
-        if (infos.find(*i) != infos.end())
-            dfsVisit(infos, *i, visited, sorted);
-
-    sorted.push_back(path);
+    ValidPathInfos infos;
+    infos.push_back(info);
+    registerValidPaths(infos);
 }
 
 
 void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 {
-    std::map<Path, ValidPathInfo> infosMap;
+    while (1) {
+        try {
+            SQLiteTxn txn(db);
     
-    /* Sort the paths topologically under the references relation, so
-       that if path A is referenced by B, then A is registered before
-       B. */
-    foreach (ValidPathInfos::const_iterator, i, infos)
-        infosMap[i->path] = *i;
+            foreach (ValidPathInfos::const_iterator, i, infos) {
+                assert(i->hash.type == htSHA256);
+                /* !!! Maybe the registration info should be updated if the
+                   path is already valid. */
+                if (!isValidPath(i->path)) addValidPath(*i);
+            }
 
-    PathSet visited;
-    Paths sorted;
-    foreach (ValidPathInfos::const_iterator, i, infos)
-        dfsVisit(infosMap, i->path, visited, sorted);
+            foreach (ValidPathInfos::const_iterator, i, infos) {
+                unsigned long long referrer = queryValidPathId(i->path);
+                foreach (PathSet::iterator, j, i->references)
+                    addReference(referrer, queryValidPathId(*j));
+            }
 
-    foreach (Paths::iterator, i, sorted)
-        registerValidPath(infosMap[*i]);
+            txn.commit();
+            break;
+        } catch (SQLiteBusy & e) {
+            /* Retry; the `txn' destructor will roll back the current
+               transaction. */
+        }
+    }
 }
 
 
@@ -677,43 +925,15 @@ void LocalStore::invalidatePath(const Path & path)
 {
     debug(format("invalidating path `%1%'") % path);
 
-    ValidPathInfo info;
+    SQLiteStmtUse use(stmtInvalidatePath);
 
-    if (pathExists(infoFileFor(path))) {
-        info = queryPathInfo(path);
+    stmtInvalidatePath.bind(path);
 
-        /* Remove the info file. */
-        Path p = infoFileFor(path);
-        if (unlink(p.c_str()) == -1)
-            throw SysError(format("unlinking `%1%'") % p);
-    }
+    if (sqlite3_step(stmtInvalidatePath) != SQLITE_DONE)
+        throwSQLiteError(db, format("invalidating path `%1%' in database") % path);
 
-    /* Remove the referrers file for `path'. */
-    Path p = referrersFileFor(path);
-    if (pathExists(p) && unlink(p.c_str()) == -1)
-        throw SysError(format("unlinking `%1%'") % p);
-
-    /* Clear `path' from the info cache. */
-    pathInfoCache.erase(path);
-    delayedUpdates.erase(path);
-
-    /* Cause the referrer files for each path referenced by this one
-       to be updated.  This has to happen after removing the info file
-       to preserve the invariant (see registerValidPath()).
-
-       The referrer files are updated lazily in flushDelayedUpdates()
-       to prevent quadratic performance in the garbage collector
-       (i.e., when N referrers to some path X are deleted, we have to
-       rewrite the referrers file for X N times, causing O(N^2) I/O).
-
-       What happens if we die before the referrer file can be updated?
-       That's not a problem, because stale (invalid) entries in the
-       referrer file are ignored by queryReferrers().  Thus a referrer
-       file is allowed to have stale entries; removing them is just an
-       optimisation.  verifyStore() gets rid of them eventually.
-    */
-    foreach (PathSet::iterator, i, info.references)
-        if (*i != path) delayedUpdates.insert(*i);
+    /* Note that the foreign key constraints on the Refs table take
+       care of deleting the references entries for `path'. */
 }
 
 
@@ -749,10 +969,18 @@ Path LocalStore::addToStoreFromDump(const string & dump, const string & name,
                the path in the database.  We may just have computed it
                above (if called with recursive == true and hashAlgo ==
                sha256); otherwise, compute it here. */
-            registerValidPath(dstPath,
-                (recursive && hashAlgo == htSHA256) ? h :
-                (recursive ? hashString(htSHA256, dump) : hashPath(htSHA256, dstPath)),
-                PathSet(), "");
+            HashResult hash;
+            if (recursive) {
+                hash.first = hashAlgo == htSHA256 ? h : hashString(htSHA256, dump);
+                hash.second = dump.size();
+            } else
+                hash = hashPath(htSHA256, dstPath);
+            
+            ValidPathInfo info;
+            info.path = dstPath;
+            info.hash = hash.first;
+            info.narSize = hash.second;
+            registerValidPath(info);
         }
 
         outputLock.setDeletion(true);
@@ -799,9 +1027,15 @@ Path LocalStore::addTextToStore(const string & name, const string & s,
             writeFile(dstPath, s);
 
             canonicalisePathMetaData(dstPath);
+
+            HashResult hash = hashPath(htSHA256, dstPath);
             
-            registerValidPath(dstPath,
-                hashPath(htSHA256, dstPath), references, "");
+            ValidPathInfo info;
+            info.path = dstPath;
+            info.hash = hash.first;
+            info.narSize = hash.second;
+            info.references = references;
+            registerValidPath(info);
         }
 
         outputLock.setDeletion(true);
@@ -815,16 +1049,19 @@ struct HashAndWriteSink : Sink
 {
     Sink & writeSink;
     HashSink hashSink;
-    bool hashing;
     HashAndWriteSink(Sink & writeSink) : writeSink(writeSink), hashSink(htSHA256)
     {
-        hashing = true;
     }
     virtual void operator ()
         (const unsigned char * data, unsigned int len)
     {
         writeSink(data, len);
-        if (hashing) hashSink(data, len);
+        hashSink(data, len);
+    }
+    Hash currentHash()
+    {
+        HashSink hashSinkClone(hashSink);
+        return hashSinkClone.finish().first;
     }
 };
 
@@ -855,6 +1092,15 @@ void LocalStore::exportPath(const Path & path, bool sign,
     
     dumpPath(path, hashAndWriteSink);
 
+    /* Refuse to export paths that have changed.  This prevents
+       filesystem corruption from spreading to other machines.
+       Don't complain if the stored hash is zero (unknown). */
+    Hash hash = hashAndWriteSink.currentHash();
+    Hash storedHash = queryPathHash(path);
+    if (hash != storedHash && storedHash != Hash(storedHash.type))
+        throw Error(format("hash of path `%1%' has changed from `%2%' to `%3%'!") % path
+            % printHash(storedHash) % printHash(hash));
+
     writeInt(EXPORT_MAGIC, hashAndWriteSink);
 
     writeString(path, hashAndWriteSink);
@@ -867,14 +1113,11 @@ void LocalStore::exportPath(const Path & path, bool sign,
     writeString(deriver, hashAndWriteSink);
 
     if (sign) {
-        Hash hash = hashAndWriteSink.hashSink.finish();
-        hashAndWriteSink.hashing = false;
-
+        Hash hash = hashAndWriteSink.currentHash();
+ 
         writeInt(1, hashAndWriteSink);
         
         Path tmpDir = createTempDir();
-        PathLocks tmpDirLock(singleton<PathSet, Path>(tmpDir));
-        tmpDirLock.setDeletion(true);
         AutoDelete delTmp(tmpDir);
         Path hashFile = tmpDir + "/hash";
         writeFile(hashFile, printHash(hash));
@@ -916,6 +1159,22 @@ struct HashAndReadSource : Source
 };
 
 
+/* Create a temporary directory in the store that won't be
+   garbage-collected. */
+Path LocalStore::createTempDirInStore()
+{
+    Path tmpDir;
+    do {
+        /* There is a slight possibility that `tmpDir' gets deleted by
+           the GC between createTempDir() and addTempRoot(), so repeat
+           until `tmpDir' exists. */
+        tmpDir = createTempDir(nixStore);
+        addTempRoot(tmpDir);
+    } while (!pathExists(tmpDir));
+    return tmpDir;
+}
+
+
 Path LocalStore::importPath(bool requireSignature, Source & source)
 {
     HashAndReadSource hashAndReadSource(source);
@@ -923,10 +1182,8 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
     /* We don't yet know what store path this archive contains (the
        store path follows the archive data proper), and besides, we
        don't know yet whether the signature is valid. */
-    Path tmpDir = createTempDir(nixStore);
-    PathLocks tmpDirLock(singleton<PathSet, Path>(tmpDir));
-    tmpDirLock.setDeletion(true);
-    AutoDelete delTmp(tmpDir); /* !!! could be GC'ed! */
+    Path tmpDir = createTempDirInStore();
+    AutoDelete delTmp(tmpDir);
     Path unpacked = tmpDir + "/unpacked";
 
     restorePath(unpacked, hashAndReadSource);
@@ -942,7 +1199,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
     Path deriver = readString(hashAndReadSource);
     if (deriver != "") assertStorePath(deriver);
 
-    Hash hash = hashAndReadSource.hashSink.finish();
+    Hash hash = hashAndReadSource.hashSink.finish().first;
     hashAndReadSource.hashing = false;
 
     bool haveSignature = readInt(hashAndReadSource) == 1;
@@ -1006,9 +1263,15 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
             
             /* !!! if we were clever, we could prevent the hashPath()
                here. */
-            if (deriver != "" && !isValidPath(deriver)) deriver = "";
-            registerValidPath(dstPath,
-                hashPath(htSHA256, dstPath), references, deriver);
+            HashResult hash = hashPath(htSHA256, dstPath);
+            
+            ValidPathInfo info;
+            info.path = dstPath;
+            info.hash = hash.first;
+            info.narSize = hash.second;
+            info.references = references;
+            info.deriver = deriver != "" && isValidPath(deriver) ? deriver : "";
+            registerValidPath(info);
         }
         
         outputLock.setDeletion(true);
@@ -1025,163 +1288,205 @@ void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFr
 
     assertStorePath(path);
 
-    if (isValidPath(path)) {
-        /* Acquire a lock on the referrers file to prevent new
-           referrers to this path from appearing while we're deleting
-           it. */
-        PathLocks referrersLock(singleton<PathSet, Path>(referrersFileFor(path)));
-        referrersLock.setDeletion(true);
-        PathSet referrers; queryReferrers(path, referrers);
-        referrers.erase(path); /* ignore self-references */
-        if (!referrers.empty())
-            throw PathInUse(format("cannot delete path `%1%' because it is in use by `%2%'")
-                % path % showPaths(referrers));
-        invalidatePath(path);
-    }
+    while (1) {
+        try {
+            SQLiteTxn txn(db);
 
+            if (isValidPath(path)) {
+                PathSet referrers; queryReferrers(path, referrers);
+                referrers.erase(path); /* ignore self-references */
+                if (!referrers.empty())
+                    throw PathInUse(format("cannot delete path `%1%' because it is in use by `%2%'")
+                        % path % showPaths(referrers));
+                invalidatePath(path);
+            }
+
+            txn.commit();
+            break;
+        } catch (SQLiteBusy & e) { };
+    }
+    
     deletePathWrapped(path, bytesFreed, blocksFreed);
 }
 
 
 void LocalStore::verifyStore(bool checkContents)
 {
+    printMsg(lvlError, format("reading the Nix store..."));
+
+    /* Acquire the global GC lock to prevent a garbage collection. */
+    AutoCloseFD fdGCLock = openGCLock(ltWrite);
+    
+    Paths entries = readDirectory(nixStore);
+    PathSet store(entries.begin(), entries.end());
+
     /* Check whether all valid paths actually exist. */
-    printMsg(lvlInfo, "checking path existence");
+    printMsg(lvlInfo, "checking path existence...");
 
-    PathSet validPaths2 = queryValidPaths(), validPaths;
-    
-    foreach (PathSet::iterator, i, validPaths2) {
-        checkInterrupt();
-        if (!isStorePath(*i)) {
-            printMsg(lvlError, format("path `%1%' is not in the Nix store") % *i);
-            invalidatePath(*i);
-        } else if (!pathExists(*i)) {
-            printMsg(lvlError, format("path `%1%' disappeared") % *i);
-            invalidatePath(*i);
-        } else {
-            Path infoFile = infoFileFor(*i);
-            struct stat st;
-            if (lstat(infoFile.c_str(), &st))
-                throw SysError(format("getting status of `%1%'") % infoFile);
-            if (st.st_size == 0) {
-                printMsg(lvlError, format("removing corrupt info file `%1%'") % infoFile);
-                if (unlink(infoFile.c_str()) == -1)
-                    throw SysError(format("unlinking `%1%'") % infoFile);
-            }
-            else validPaths.insert(*i);
-        }
-    }
+    PathSet validPaths2 = queryValidPaths(), validPaths, done;
 
+    foreach (PathSet::iterator, i, validPaths2)
+        verifyPath(*i, store, done, validPaths);
 
-    /* Check the store path meta-information. */
-    printMsg(lvlInfo, "checking path meta-information");
+    /* Release the GC lock so that checking content hashes (which can
+       take ages) doesn't block the GC or builds. */
+    fdGCLock.close();
 
-    std::map<Path, PathSet> referrersCache;
-    
-    foreach (PathSet::iterator, i, validPaths) {
-        bool update = false;
-        ValidPathInfo info = queryPathInfo(*i, true);
+    /* Optionally, check the content hashes (slow). */
+    if (checkContents) {
+        printMsg(lvlInfo, "checking hashes...");
 
-        /* Check the references: each reference should be valid, and
-           it should have a matching referrer. */
-        foreach (PathSet::iterator, j, info.references) {
-            if (validPaths.find(*j) == validPaths.end()) {
-                printMsg(lvlError, format("incomplete closure: `%1%' needs missing `%2%'")
-                    % *i % *j);
-                /* nothing we can do about it... */
-            } else {
-                if (referrersCache.find(*j) == referrersCache.end())
-                    queryReferrers(*j, referrersCache[*j]);
-                if (referrersCache[*j].find(*i) == referrersCache[*j].end()) {
-                    printMsg(lvlError, format("adding missing referrer mapping from `%1%' to `%2%'")
-                        % *j % *i);
-                    appendReferrer(*j, *i, true);
+        foreach (PathSet::iterator, i, validPaths) {
+            try {
+                ValidPathInfo info = queryPathInfo(*i);
+
+                /* Check the content hash (optionally - slow). */
+                printMsg(lvlTalkative, format("checking contents of `%1%'") % *i);
+                HashResult current = hashPath(info.hash.type, *i);
+                
+                if (current.first != info.hash) {
+                    printMsg(lvlError, format("path `%1%' was modified! "
+                            "expected hash `%2%', got `%3%'")
+                        % *i % printHash(info.hash) % printHash(current.first));
+                } else {
+                    /* Fill in missing narSize fields (from old stores). */
+                    if (info.narSize == 0) {
+                        printMsg(lvlError, format("updating size field on `%1%' to %2%") % *i % current.second);
+                        info.narSize = current.second;
+                        updatePathInfo(info);
+                    }
                 }
+            
+            } catch (Error & e) {
+                /* It's possible that the path got GC'ed, so ignore
+                   errors on invalid paths. */
+                if (isValidPath(*i)) throw;
+                printMsg(lvlError, format("warning: %1%") % e.msg());
             }
         }
-
-        /* Check the deriver.  (Note that the deriver doesn't have to
-           be a valid path.) */
-        if (!info.deriver.empty() && !isStorePath(info.deriver)) {
-            info.deriver = "";
-            update = true;
-        }
-
-        /* Check the content hash (optionally - slow). */
-        if (info.hash.hashSize == 0) {
-            printMsg(lvlError, format("re-hashing `%1%'") % *i);
-            info.hash = hashPath(htSHA256, *i);
-            update = true;
-        } else if (checkContents) {
-            debug(format("checking contents of `%1%'") % *i);
-            Hash current = hashPath(info.hash.type, *i);
-            if (current != info.hash) {
-                printMsg(lvlError, format("path `%1%' was modified! "
-                        "expected hash `%2%', got `%3%'")
-                    % *i % printHash(info.hash) % printHash(current));
-            }
-        }
-
-        if (update) registerValidPath(info);
-    }
-
-    referrersCache.clear();
-    
-
-    /* Check the referrers. */
-    printMsg(lvlInfo, "checking referrers");
-
-    std::map<Path, PathSet> referencesCache;
-    
-    Strings entries = readDirectory(nixDBPath + "/referrer");
-    foreach (Strings::iterator, i, entries) {
-        Path from = nixStore + "/" + *i;
-        
-        if (validPaths.find(from) == validPaths.end()) {
-            /* !!! This removes lock files as well.  Need to check
-               whether that's okay. */
-            printMsg(lvlError, format("removing referrers file for invalid `%1%'") % from);
-            Path p = referrersFileFor(from);
-            if (unlink(p.c_str()) == -1)
-                throw SysError(format("unlinking `%1%'") % p);
-            continue;
-        }
-
-        PathSet referrers;
-        bool allValid = queryReferrersInternal(from, referrers);
-        bool update = false;
-
-        if (!allValid) {
-            printMsg(lvlError, format("removing some stale referrers for `%1%'") % from);
-            update = true;
-        }
-
-        /* Each referrer should have a matching reference. */
-        PathSet referrersNew;
-        foreach (PathSet::iterator, j, referrers) {
-            if (referencesCache.find(*j) == referencesCache.end())
-                queryReferences(*j, referencesCache[*j]);
-            if (referencesCache[*j].find(from) == referencesCache[*j].end()) {
-                printMsg(lvlError, format("removing unexpected referrer mapping from `%1%' to `%2%'")
-                    % from % *j);
-                update = true;
-            } else referrersNew.insert(*j);
-        }
-
-        if (update) rewriteReferrers(from, false, referrersNew);
     }
 }
 
 
-/* Upgrade from schema 4 (Nix 0.11) to schema 5 (Nix >= 0.12).  The
-   old schema uses Berkeley DB, the new one stores store path
-   meta-information in files. */
-void LocalStore::upgradeStore12()
+void LocalStore::verifyPath(const Path & path, const PathSet & store,
+    PathSet & done, PathSet & validPaths)
 {
-    throw Error(
-        "Your Nix store has a database in Berkeley DB format,\n"
-        "which is no longer supported. To convert to the new format,\n"
-        "please upgrade Nix to version 0.12 first.");
+    checkInterrupt();
+    
+    if (done.find(path) != done.end()) return;
+    done.insert(path);
+
+    if (!isStorePath(path)) {
+        printMsg(lvlError, format("path `%1%' is not in the Nix store") % path);
+        invalidatePath(path);
+        return;
+    }
+
+    if (store.find(baseNameOf(path)) == store.end()) {
+        /* Check any referrers first.  If we can invalidate them
+           first, then we can invalidate this path as well. */
+        bool canInvalidate = true;
+        PathSet referrers; queryReferrers(path, referrers);
+        foreach (PathSet::iterator, i, referrers)
+            if (*i != path) {
+                verifyPath(*i, store, done, validPaths);
+                if (validPaths.find(*i) != validPaths.end())
+                    canInvalidate = false;
+            }
+
+        if (canInvalidate) {
+            printMsg(lvlError, format("path `%1%' disappeared, removing from database...") % path);
+            invalidatePath(path);
+        } else
+            printMsg(lvlError, format("path `%1%' disappeared, but it still has valid referrers!") % path);
+        
+        return;
+    }
+    
+    validPaths.insert(path);
+}
+
+
+/* Functions for upgrading from the pre-SQLite database. */
+
+PathSet LocalStore::queryValidPathsOld()
+{
+    PathSet paths;
+    Strings entries = readDirectory(nixDBPath + "/info");
+    foreach (Strings::iterator, i, entries)
+        if (i->at(0) != '.') paths.insert(nixStore + "/" + *i);
+    return paths;
+}
+
+
+ValidPathInfo LocalStore::queryPathInfoOld(const Path & path)
+{
+    ValidPathInfo res;
+    res.path = path;
+
+    /* Read the info file. */
+    string baseName = baseNameOf(path);
+    Path infoFile = (format("%1%/info/%2%") % nixDBPath % baseName).str();
+    if (!pathExists(infoFile))
+        throw Error(format("path `%1%' is not valid") % path);
+    string info = readFile(infoFile);
+
+    /* Parse it. */
+    Strings lines = tokenizeString(info, "\n");
+
+    foreach (Strings::iterator, i, lines) {
+        string::size_type p = i->find(':');
+        if (p == string::npos)
+            throw Error(format("corrupt line in `%1%': %2%") % infoFile % *i);
+        string name(*i, 0, p);
+        string value(*i, p + 2);
+        if (name == "References") {
+            Strings refs = tokenizeString(value, " ");
+            res.references = PathSet(refs.begin(), refs.end());
+        } else if (name == "Deriver") {
+            res.deriver = value;
+        } else if (name == "Hash") {
+            res.hash = parseHashField(path, value);
+        } else if (name == "Registered-At") {
+            int n = 0;
+            string2Int(value, n);
+            res.registrationTime = n;
+        }
+    }
+
+    return res;
+}
+
+
+/* Upgrade from schema 5 (Nix 0.12) to schema 6 (Nix >= 0.15). */
+void LocalStore::upgradeStore6()
+{
+    printMsg(lvlError, "upgrading Nix store to new schema (this may take a while)...");
+
+    openDB(true);
+
+    PathSet validPaths = queryValidPathsOld();
+
+    SQLiteTxn txn(db);
+    
+    foreach (PathSet::iterator, i, validPaths) {
+        addValidPath(queryPathInfoOld(*i));
+        std::cerr << ".";
+    }
+
+    std::cerr << "|";
+    
+    foreach (PathSet::iterator, i, validPaths) {
+        ValidPathInfo info = queryPathInfoOld(*i);
+        unsigned long long referrer = queryValidPathId(*i);
+        foreach (PathSet::iterator, j, info.references)
+            addReference(referrer, queryValidPathId(*j));
+        std::cerr << ".";
+    }
+
+    std::cerr << "\n";
+
+    txn.commit();
 }
 
 

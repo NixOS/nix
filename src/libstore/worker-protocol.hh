@@ -8,7 +8,7 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION 0x106
+#define PROTOCOL_VERSION 0x108
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -34,6 +34,11 @@ typedef enum {
     wopSetOptions = 19,
     wopCollectGarbage = 20,
     wopQuerySubstitutablePathInfo = 21,
+    wopQueryDerivationOutputs = 22,
+    wopQueryValidPaths = 23,
+    wopQueryFailedPaths = 24,
+    wopClearFailedPaths = 25,
+    wopQueryPathInfo = 26,
 } WorkerOp;
 
 

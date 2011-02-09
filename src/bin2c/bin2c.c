@@ -14,10 +14,10 @@ int main(int argc, char * * argv)
 {
     int c;
     if (argc != 2) abort();
-    print("static unsigned char %s[] = {", argv[1]);
+    print("static unsigned char %s[] = { ", argv[1]);
     while ((c = getchar()) != EOF) {
         print("0x%02x, ", (unsigned char) c);
     }
-    print("};\n");
+    print("0 };\n");
     return 0;
 }

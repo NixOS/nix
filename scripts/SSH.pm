@@ -3,6 +3,8 @@ use File::Temp qw(tempdir);
 
 our @sshOpts = split ' ', ($ENV{"NIX_SSHOPTS"} or "");
 
+push @sshOpts, "-x";
+
 my $sshStarted = 0;
 my $sshHost;
 
@@ -24,14 +26,17 @@ sub openSSHConnection {
     # child continues to run if we are killed.  So instead make SSH
     # print "started" when it has established the connection, and wait
     # until we see that.
-    open SSH, "ssh $sshHost @sshOpts -M -N -o LocalCommand='echo started' -o PermitLocalCommand=yes |" or die;
-    while (<SSH>) {
+    open SSHPIPE, "ssh $sshHost @sshOpts -M -N -o LocalCommand='echo started' -o PermitLocalCommand=yes |" or die;
+
+    while (<SSHPIPE>) {
         chomp;
-        last if /started/;
+        if ($_ eq "started") {
+            $sshStarted = 1;
+            return 1;
+        }
     }
-    
-    $sshStarted = 1;
-    return 1;
+
+    return 0;
 }
 
 # Tell the master SSH client to exit.

@@ -1,6 +1,6 @@
 #! @perl@ -w -I@libexecdir@/nix
 
-use ssh;
+use SSH;
 
 my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
 
@@ -61,7 +61,7 @@ if ($toMode) { # Copy TO the remote machine.
     my @allStorePaths;
 
     # Get the closure of this path.
-    my $pid = open(READ, "$binDir/nix-store --query --requisites @storePaths|") or die;
+    my $pid = open(READ, "set -f; $binDir/nix-store --query --requisites @storePaths|") or die;
     
     while (<READ>) {
         chomp;
@@ -73,7 +73,7 @@ if ($toMode) { # Copy TO the remote machine.
 
 
     # Ask the remote host which paths are invalid.
-    open(READ, "ssh $sshHost @sshOpts nix-store --check-validity --print-invalid @allStorePaths|");
+    open(READ, "set -f; ssh $sshHost @sshOpts nix-store --check-validity --print-invalid @allStorePaths|");
     my @missing = ();
     while (<READ>) {
         chomp;
@@ -88,7 +88,7 @@ if ($toMode) { # Copy TO the remote machine.
         print STDERR "  $_\n" foreach @missing;
         my $extraOpts = "";
         $extraOpts .= "--sign" if $sign == 1;
-        system("nix-store --export $extraOpts @missing $compressor | ssh $sshHost @sshOpts '$decompressor nix-store --import'") == 0
+        system("set -f; nix-store --export $extraOpts @missing $compressor | ssh $sshHost @sshOpts '$decompressor nix-store --import'") == 0
             or die "copying store paths to remote machine `$sshHost' failed: $?";
     }
 
@@ -101,7 +101,7 @@ else { # Copy FROM the remote machine.
     # machine.  Paths are assumed to be store paths; there is no
     # resolution (following of symlinks).
     my $pid = open(READ,
-        "ssh @sshOpts $sshHost nix-store --query --requisites @storePaths|") or die;
+        "set -f; ssh @sshOpts $sshHost nix-store --query --requisites @storePaths|") or die;
     
     my @allStorePaths;
 
@@ -115,7 +115,7 @@ else { # Copy FROM the remote machine.
 
 
     # What paths are already valid locally?
-    open(READ, "@bindir@/nix-store --check-validity --print-invalid @allStorePaths|");
+    open(READ, "set -f; @bindir@/nix-store --check-validity --print-invalid @allStorePaths|");
     my @missing = ();
     while (<READ>) {
         chomp;
@@ -130,7 +130,7 @@ else { # Copy FROM the remote machine.
         print STDERR "  $_\n" foreach @missing;
         my $extraOpts = "";
         $extraOpts .= "--sign" if $sign == 1;
-        system("ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $decompressor @bindir@/nix-store --import") == 0
+        system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $decompressor @bindir@/nix-store --import") == 0
             or die "copying store paths from remote machine `$sshHost' failed: $?";
     }
 

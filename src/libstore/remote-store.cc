@@ -97,10 +97,6 @@ void RemoteStore::forkSlave()
     if (worker == "")
         worker = nixBinDir + "/nix-worker";
 
-    string verbosityArg = "-";
-    for (int i = 1; i < verbosity; ++i)
-        verbosityArg += "v";
-
     child = fork();
     
     switch (child) {
@@ -120,10 +116,7 @@ void RemoteStore::forkSlave()
             close(fdSocket);
             close(fdChild);
 
-            execlp(worker.c_str(), worker.c_str(), "--slave",
-                /* hacky - must be at the end */
-                verbosityArg == "-" ? NULL : verbosityArg.c_str(),
-                NULL);
+            execlp(worker.c_str(), worker.c_str(), "--slave", NULL);
 
             throw SysError(format("executing `%1%'") % worker);
             
@@ -198,9 +191,8 @@ void RemoteStore::setOptions()
         writeInt(logType, to);
         writeInt(printBuildTrace, to);
     }
-    if (GET_PROTOCOL_MINOR(daemonVersion) >= 6) {
+    if (GET_PROTOCOL_MINOR(daemonVersion) >= 6)
         writeInt(buildCores, to);
-    }
     processStderr();
 }
 
@@ -219,7 +211,9 @@ bool RemoteStore::isValidPath(const Path & path)
 PathSet RemoteStore::queryValidPaths()
 {
     openConnection();
-    throw Error("not implemented");
+    writeInt(wopQueryValidPaths, to);
+    processStderr();
+    return readStorePaths(from);
 }
 
 
@@ -248,7 +242,26 @@ bool RemoteStore::querySubstitutablePathInfo(const Path & path,
     if (info.deriver != "") assertStorePath(info.deriver);
     info.references = readStorePaths(from);
     info.downloadSize = readLongLong(from);
+    info.narSize = GET_PROTOCOL_MINOR(daemonVersion) >= 7 ? readLongLong(from) : 0;
     return true;
+}
+
+
+ValidPathInfo RemoteStore::queryPathInfo(const Path & path)
+{
+    openConnection();
+    writeInt(wopQueryPathInfo, to);
+    writeString(path, to);
+    processStderr();
+    ValidPathInfo info;
+    info.path = path;
+    info.deriver = readString(from);
+    if (info.deriver != "") assertStorePath(info.deriver);
+    info.hash = parseHash(htSHA256, readString(from));
+    info.references = readStorePaths(from);
+    info.registrationTime = readInt(from);
+    info.narSize = readLongLong(from);
+    return info;
 }
 
 
@@ -296,6 +309,16 @@ Path RemoteStore::queryDeriver(const Path & path)
     Path drvPath = readString(from);
     if (drvPath != "") assertStorePath(drvPath);
     return drvPath;
+}
+
+
+PathSet RemoteStore::queryDerivationOutputs(const Path & path)
+{
+    openConnection();
+    writeInt(wopQueryDerivationOutputs, to);
+    writeString(path, to);
+    processStderr();
+    return readStorePaths(from);
 }
 
 
@@ -444,6 +467,25 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 }
 
 
+PathSet RemoteStore::queryFailedPaths()
+{
+    openConnection();
+    writeInt(wopQueryFailedPaths, to);
+    processStderr();
+    return readStorePaths(from);
+}
+
+
+void RemoteStore::clearFailedPaths(const PathSet & paths)
+{
+    openConnection();
+    writeInt(wopClearFailedPaths, to);
+    writeStringSet(paths, to);
+    processStderr();
+    readInt(from);
+}
+
+
 void RemoteStore::processStderr(Sink * sink, Source * source)
 {
     unsigned int msg;
@@ -467,8 +509,11 @@ void RemoteStore::processStderr(Sink * sink, Source * source)
             writeToStderr((const unsigned char *) s.c_str(), s.size());
         }
     }
-    if (msg == STDERR_ERROR)
-        throw Error(readString(from));
+    if (msg == STDERR_ERROR) {
+        string error = readString(from);
+        unsigned int status = GET_PROTOCOL_MINOR(daemonVersion) >= 8 ? readInt(from) : 1;
+        throw Error(error, status);
+    }
     else if (msg != STDERR_LAST)
         throw Error("protocol error processing standard error");
 }

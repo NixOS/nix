@@ -10,7 +10,14 @@ pkginclude_HEADERS = \
   globals.hh references.hh pathlocks.hh \
   worker-protocol.hh
 
-libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la @ADDITIONAL_NETWORK_LIBS@
+libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la ${aterm_lib} ${sqlite_lib}
+
+EXTRA_DIST = schema.sql
 
 AM_CXXFLAGS = -Wall \
- -I$(srcdir)/.. -I$(srcdir)/../libutil
+ ${sqlite_include} -I$(srcdir)/.. -I$(srcdir)/../libutil
+
+local-store.lo: schema.sql.hh
+
+%.sql.hh: %.sql
+	../bin2c/bin2c schema < $< > $@ || (rm $@ && exit 1)

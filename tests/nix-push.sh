@@ -5,7 +5,7 @@ outPath=$($nixstore -r $drvPath)
 
 echo "pushing $drvPath"
 
-mkdir $TEST_ROOT/cache
+mkdir -p $TEST_ROOT/cache
 
 $NIX_BIN_DIR/nix-push \
     --copy $TEST_ROOT/cache $TEST_ROOT/manifest $drvPath

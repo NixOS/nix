@@ -1,6 +1,5 @@
 #include "globals.hh"
 #include "misc.hh"
-#include "pathlocks.hh"
 #include "local-store.hh"
 
 #include <boost/shared_ptr.hpp>
@@ -31,7 +30,7 @@ static const int defaultGcLevel = 1000;
    read.  To be precise: when they try to create a new temporary root
    file, they will block until the garbage collector has finished /
    yielded the GC lock. */
-static int openGCLock(LockType lockType)
+int LocalStore::openGCLock(LockType lockType)
 {
     Path fnGCLock = (format("%1%/%2%")
         % nixStateDir % gcLockName).str();
@@ -127,7 +126,7 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
        Instead of reading all the roots, it would be more efficient to
        check if the root is in a directory in or linked from the
        gcroots directory. */
-    if (queryBoolSetting("gc-check-reachability", true)) {
+    if (queryBoolSetting("gc-check-reachability", false)) {
         Roots roots = store->findRoots();
         if (roots.find(gcRoot) == roots.end())
             printMsg(lvlError, 
@@ -136,7 +135,7 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
                     "therefore, `%2%' might be removed by the garbage collector")
                 % gcRoot % storePath);
     }
-        
+
     /* Grab the global GC root, causing us to block while a GC is in
        progress.  This prevents the set of permanent roots from
        increasing while a GC is in progress. */
@@ -416,18 +415,13 @@ struct LocalStore::GCState
     PathSet busy;
     bool gcKeepOutputs;
     bool gcKeepDerivations;
-
-    bool drvsIndexed;
-    typedef std::multimap<string, Path> DrvsByName;
-    DrvsByName drvsByName; // derivation paths hashed by name attribute
-
-    GCState(GCResults & results_) : results(results_), drvsIndexed(false)
+    GCState(GCResults & results_) : results(results_)
     {
     }
 };
 
 
-static bool doDelete(GCOptions::GCAction action)
+static bool shouldDelete(GCOptions::GCAction action)
 {
     return action == GCOptions::gcDeleteDead
         || action == GCOptions::gcDeleteSpecific;
@@ -441,45 +435,11 @@ bool LocalStore::isActiveTempFile(const GCState & state,
         && state.tempRoots.find(string(path, 0, path.size() - suffix.size())) != state.tempRoots.end();
 }
 
-
-/* Return all the derivations in the Nix store that have `path' as an
-   output.  This function assumes that derivations have the same name
-   as their outputs. */
-PathSet LocalStore::findDerivers(GCState & state, const Path & path)
-{
-    PathSet derivers;
-
-    Path deriver = queryDeriver(path);
-    if (deriver != "") derivers.insert(deriver);
-
-    if (!state.drvsIndexed) {
-        Paths entries = readDirectory(nixStore);
-        foreach (Paths::iterator, i, entries)
-            if (isDerivation(*i))
-                state.drvsByName.insert(std::pair<string, Path>(
-                        getNameOfStorePath(*i), nixStore + "/" + *i));
-        state.drvsIndexed = true;
-    }
-    
-    string name = getNameOfStorePath(path);
-
-    // Urgh, I should have used Haskell...
-    std::pair<GCState::DrvsByName::iterator, GCState::DrvsByName::iterator> range =
-        state.drvsByName.equal_range(name);
-
-    for (GCState::DrvsByName::iterator i = range.first; i != range.second; ++i)
-        if (isValidPath(i->second)) {
-            Derivation drv = derivationFromPath(i->second);
-            foreach (DerivationOutputs::iterator, j, drv.outputs)
-                if (j->second.path == path) derivers.insert(i->second);
-        }
-
-    return derivers;
-}
-
     
 bool LocalStore::tryToDelete(GCState & state, const Path & path)
 {
+    checkInterrupt();
+    
     if (!pathExists(path)) return true;
     if (state.deleted.find(path) != state.deleted.end()) return true;
     if (state.live.find(path) != state.live.end()) return false;
@@ -508,10 +468,10 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
            then don't delete the derivation if any of the outputs are
            live. */
         if (state.gcKeepDerivations && isDerivation(path)) {
-            Derivation drv = derivationFromPath(path);
-            foreach (DerivationOutputs::iterator, i, drv.outputs)
-                if (!tryToDelete(state, i->second.path)) {
-                    printMsg(lvlDebug, format("cannot delete derivation `%1%' because its output is alive") % path);
+            PathSet outputs = queryDerivationOutputs(path);
+            foreach (PathSet::iterator, i, outputs)
+                if (!tryToDelete(state, *i)) {
+                    printMsg(lvlDebug, format("cannot delete derivation `%1%' because its output `%2%' is alive") % path % *i);
                     goto isLive;
                 }
         }
@@ -522,18 +482,9 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
         if (!pathExists(path)) return true;
 
         /* If gc-keep-outputs is set, then don't delete this path if
-           its deriver is not garbage.  !!! Nix does not reliably
-           store derivers, so we have to look at all derivations to
-           determine which of them derive `path'.  Since this makes
-           the garbage collector very slow to start on large Nix
-           stores, here we just look for all derivations that have the
-           same name as `path' (where the name is the part of the
-           filename after the hash, i.e. the `name' attribute of the
-           derivation).  This is somewhat hacky: currently, the
-           deriver of a path always has the same name as the output,
-           but this might change in the future. */
+           there are derivers of this path that are not garbage. */
         if (state.gcKeepOutputs) {
-            PathSet derivers = findDerivers(state, path);
+            PathSet derivers = queryValidDerivers(path);
             foreach (PathSet::iterator, deriver, derivers) {
                 /* Break an infinite recursion if gc-keep-derivations
                    and gc-keep-outputs are both set by tentatively
@@ -567,7 +518,7 @@ bool LocalStore::tryToDelete(GCState & state, const Path & path)
     }
 
     /* The path is garbage, so delete it. */
-    if (doDelete(state.options.action)) {
+    if (shouldDelete(state.options.action)) {
         printMsg(lvlInfo, format("deleting `%1%'") % path);
 
         unsigned long long bytesFreed, blocksFreed;
@@ -613,6 +564,15 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     
     state.gcKeepOutputs = queryBoolSetting("gc-keep-outputs", false);
     state.gcKeepDerivations = queryBoolSetting("gc-keep-derivations", true);
+
+    /* Using `--ignore-liveness' with `--delete' can have unintended
+       consequences if `gc-keep-outputs' or `gc-keep-derivations' are
+       true (the garbage collector will recurse into deleting the
+       outputs or derivers, respectively).  So disable them. */
+    if (options.action == GCOptions::gcDeleteSpecific && options.ignoreLiveness) {
+        state.gcKeepOutputs = false;
+        state.gcKeepDerivations = false;
+    }
     
     /* Acquire the global GC root.  This prevents
        a) New roots from being added.
@@ -667,7 +627,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         vector<Path> entries_(entries.begin(), entries.end());
         random_shuffle(entries_.begin(), entries_.end());
 
-        if (doDelete(state.options.action))
+        if (shouldDelete(state.options.action))
             printMsg(lvlError, format("deleting garbage..."));
         else
             printMsg(lvlError, format("determining live/dead paths..."));

@@ -1,9 +1,9 @@
 #ifndef __DERIVATIONS_H
 #define __DERIVATIONS_H
 
-#include "hash.hh"
-
 #include <map>
+
+#include "types.hh"
 
 
 namespace nix {

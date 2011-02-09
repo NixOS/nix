@@ -23,28 +23,33 @@ ln -s $nixinstantiate $NIX_BIN_DIR/
 ln -s $nixhash $NIX_BIN_DIR/
 ln -s $nixenv $NIX_BIN_DIR/
 ln -s $nixworker $NIX_BIN_DIR/
+ln -s $TOP/src/bsdiff-*/bsdiff $NIX_BIN_DIR/
+ln -s $TOP/src/bsdiff-*/bspatch $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-prefetch-url $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-collect-garbage $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-build $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-install-package $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-push $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-pull $NIX_BIN_DIR/
+ln -s $TOP/scripts/nix-generate-patches $NIX_BIN_DIR/
 mkdir $NIX_BIN_DIR/nix
 ln -s $bzip2_bin_test/bzip2 $NIX_BIN_DIR/nix/
 ln -s $bzip2_bin_test/bunzip2 $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/copy-from-other-stores.pl $NIX_BIN_DIR/nix/
 ln -s $TOP/scripts/download-using-manifests.pl $NIX_BIN_DIR/nix/
-ln -s $TOP/scripts/readmanifest.pm $NIX_BIN_DIR/nix/
+ln -s $TOP/scripts/GeneratePatches.pm $NIX_BIN_DIR/nix/
+ln -s $TOP/scripts/NixManifest.pm $NIX_BIN_DIR/nix/
 
 cat > "$NIX_CONF_DIR"/nix.conf <<EOF
 gc-keep-outputs = false
 gc-keep-derivations = false
 env-keep-derivations = false
+fsync-metadata = false
 EOF
 
 mkdir $NIX_DATA_DIR/nix
 cp -pr $TOP/corepkgs $NIX_DATA_DIR/nix/
-# Bah, script has the prefix hard-coded.  This is really messy stuff
+# Bah, scripts have the prefix hard-coded.  This is really messy stuff
 # (and likely to fail).
 for i in \
     $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh \
@@ -56,7 +61,9 @@ for i in \
     $NIX_BIN_DIR/nix-install-package \
     $NIX_BIN_DIR/nix-push \
     $NIX_BIN_DIR/nix-pull \
-    $NIX_BIN_DIR/nix/readmanifest.pm \
+    $NIX_BIN_DIR/nix-generate-patches \
+    $NIX_BIN_DIR/nix/NixManifest.pm \
+    $NIX_BIN_DIR/nix/GeneratePatches.pm \
     ; do
     sed < $i > $i.tmp \
         -e "s^$REAL_BIN_DIR/nix-store^$NIX_BIN_DIR/nix-store^" \
@@ -96,7 +103,6 @@ mv $NIX_BIN_DIR/nix/download-using-manifests.pl $NIX_BIN_DIR/nix/substituters/do
 $nixstore --init
 
 # Did anything happen?
-test -e "$NIX_DB_DIR"/info
-test -e "$NIX_DB_DIR"/referrer
+test -e "$NIX_DB_DIR"/db.sqlite
 
 echo 'Hello World' > ./dummy

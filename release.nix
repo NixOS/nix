@@ -33,6 +33,9 @@ let
           stripHash ${bzip2.src}
           cp -pv ${bzip2.src} externals/$strippedName
 
+          stripHash ${sqlite.src}
+          cp -pv ${sqlite.src} externals/$strippedName
+
           # TeX needs a writable font cache.
           export VARTEXFONTS=$TMPDIR/texfonts
         '';
@@ -71,7 +74,7 @@ let
 
         configureFlags = ''
           --disable-init-state
-          --with-bzip2=${bzip2}
+          --with-bzip2=${bzip2} --with-sqlite=${sqlite}
           --enable-gc
         '';
       };
@@ -92,10 +95,10 @@ let
 
         configureFlags = ''
           --disable-init-state --disable-shared
-          --with-bzip2=${bzip2}
+          --with-bzip2=${bzip2} --with-sqlite=${sqlite}
         '';
 
-        lcovFilter = ["*/boost/*" "*-tab.*"];
+        lcovFilter = [ "*/boost/*" "*-tab.*" ];
 
         # We call `dot', and even though we just use it to
         # syntax-check generated dot files, it still requires some
@@ -144,11 +147,11 @@ let
     with import nixpkgs { inherit system; };
 
     releaseTools.rpmBuild rec {
-      name = "nix-rpm";
+      name = "nix-rpm-${diskImage.name}";
       src = jobs.tarball;
       diskImage = diskImageFun vmTools.diskImages;
       memSize = 1024;
-      meta = { schedulingPriority = prio; };
+      meta.schedulingPriority = prio;
     };
 
 
@@ -165,7 +168,7 @@ let
       src = jobs.tarball;
       diskImage = diskImageFun vmTools.diskImages;
       memSize = 1024;
-      meta = { schedulingPriority = prio; };
+      meta.schedulingPriority = prio;
       configureFlags = "--sysconfdir=/etc";
       debRequires = [ "curl" ];
     };

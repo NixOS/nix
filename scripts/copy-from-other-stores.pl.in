@@ -17,25 +17,19 @@ foreach my $dir (@remoteStoresAll) {
 }
 
 
+$ENV{"NIX_REMOTE"} = "";
+
+
 sub findStorePath {
     my $storePath = shift;
-    
-    my $storePathName = basename $storePath;
-    
     foreach my $store (@remoteStores) {
-        # Determine whether $storePath exists by looking for the
-        # existence of the info file, and if so, get store path info
-        # from that file.  This rather breaks abstraction: we should
-        # be using `nix-store' for that.  But right now there is no
-        # good way to tell nix-store to access a store mounted under a
-        # different location (there's $NIX_STORE, but that only works
-        # if the remote store is mounted under its "real" location).
-        my $infoFile = "$store/var/nix/db/info/$storePathName";
-        my $storePath2 = "$store/store/$storePathName";
-        if (-f $infoFile && -e $storePath2) {
-            return ($infoFile, $storePath2);
-        }
+        my $sourcePath = "$store/store/" . basename $storePath;
+        next unless -e $sourcePath || -l $sourcePath;
+        $ENV{"NIX_DB_DIR"} = "$store/var/nix/db";
+        return ($store, $sourcePath) if
+            system("@bindir@/nix-store --check-validity $storePath") == 0;
     }
+    return undef;
 }
 
 
@@ -46,37 +40,38 @@ if ($ARGV[0] eq "--query") {
 
         if ($cmd eq "have") {
             my $storePath = <STDIN>; chomp $storePath;
-            (my $infoFile) = findStorePath $storePath;
-            print STDOUT ($infoFile ? "1\n" : "0\n");
+            print STDOUT (defined findStorePath($storePath) ? "1\n" : "0\n");
         }
 
         elsif ($cmd eq "info") {
             my $storePath = <STDIN>; chomp $storePath;
-            (my $infoFile) = findStorePath $storePath;
-            if (!$infoFile) {
+            my ($store, $sourcePath) = findStorePath($storePath);
+            if (!defined $store) {
                 print "0\n";
                 next; # not an error
             }
             print "1\n";
 
-            my $deriver = "";
-            my @references = ();
+            $ENV{"NIX_DB_DIR"} = "$store/var/nix/db";
+            
+            my $deriver = `@bindir@/nix-store --query --deriver $storePath`;
+            die "cannot query deriver of `$storePath'" if $? != 0;
+            chomp $deriver;
+            $deriver = "" if $deriver eq "unknown-deriver";
 
-            open INFO, "<$infoFile" or die "cannot read info file $infoFile\n";
-            while (<INFO>) {
-                chomp;
-                /^([\w-]+): (.*)$/ or die "bad info file";
-                my $key = $1;
-                my $value = $2;
-                if ($key eq "Deriver") { $deriver = $value; }
-                elsif ($key eq "References") { @references = split ' ', $value; }
-            }
-            close INFO;
+            my @references = split "\n",
+                `@bindir@/nix-store --query --references $storePath`;
+            die "cannot query references of `$storePath'" if $? != 0;
+
+            my $narSize = `@bindir@/nix-store --query --size $storePath`;
+            die "cannot query size of `$storePath'" if $? != 0;
+            chomp $narSize;
 
             print "$deriver\n";
             print scalar @references, "\n";
             print "$_\n" foreach @references;
-            print "0\n"; # !!! showing size not supported (yet)
+            print "$narSize\n";
+            print "$narSize\n";
         }
 
         else { die "unknown command `$cmd'"; }
@@ -87,8 +82,8 @@ if ($ARGV[0] eq "--query") {
 elsif ($ARGV[0] eq "--substitute") {
     die unless scalar @ARGV == 2;
     my $storePath = $ARGV[1];
-    (my $infoFile, my $sourcePath) = findStorePath $storePath;
-    die unless $infoFile;
+    my ($store, $sourcePath) = findStorePath $storePath;
+    die unless $store;
     print "\n*** Copying `$storePath' from `$sourcePath'\n\n";
     system("$binDir/nix-store --dump $sourcePath | $binDir/nix-store --restore $storePath") == 0
         or die "cannot copy `$sourcePath' to `$storePath'";

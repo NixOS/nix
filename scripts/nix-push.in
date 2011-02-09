@@ -2,7 +2,7 @@
 
 use strict;
 use File::Temp qw(tempdir);
-use readmanifest;
+use NixManifest;
 
 my $hashAlgo = "sha256";
 
@@ -172,12 +172,6 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     $narbz2Hash =~ /^[0-9a-z]+$/ or die "invalid hash";
     close HASH;
 
-    open HASH, "$narDir/nar-hash" or die "cannot open nar-hash";
-    my $narHash = <HASH>;
-    chomp $narHash;
-    $narHash =~ /^[0-9a-z]+$/ or die "invalid hash";
-    close HASH;
-    
     my $narName = "$narbz2Hash.nar.bz2";
 
     my $narFile = "$narDir/$narName";
@@ -195,6 +189,14 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     chomp $deriver;
     $deriver = "" if $deriver eq "unknown-deriver";
 
+    my $narHash = `$binDir/nix-store --query --hash '$storePath'`;
+    die "cannot query hash for `$storePath'" if $? != 0;
+    chomp $narHash;
+
+    my $narSize = `$binDir/nix-store --query --size '$storePath'`;
+    die "cannot query size for `$storePath'" if $? != 0;
+    chomp $narSize;
+
     my $url;
     if ($localCopy) {
         $url = "$targetArchivesUrl/$narName";
@@ -205,7 +207,8 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
         { url => $url
         , hash => "$hashAlgo:$narbz2Hash"
         , size => $narbz2Size
-        , narHash => "$hashAlgo:$narHash"
+        , narHash => "$narHash"
+        , narSize => $narSize
         , references => $references
         , deriver => $deriver
         }

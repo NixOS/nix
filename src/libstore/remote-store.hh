@@ -29,6 +29,8 @@ public:
 
     PathSet queryValidPaths();
     
+    ValidPathInfo queryPathInfo(const Path & path);
+
     Hash queryPathHash(const Path & path);
 
     void queryReferences(const Path & path, PathSet & references);
@@ -36,6 +38,8 @@ public:
     void queryReferrers(const Path & path, PathSet & referrers);
 
     Path queryDeriver(const Path & path);
+    
+    PathSet queryDerivationOutputs(const Path & path);
     
     bool hasSubstitutes(const Path & path);
     
@@ -67,6 +71,10 @@ public:
     Roots findRoots();
 
     void collectGarbage(const GCOptions & options, GCResults & results);
+    
+    PathSet queryFailedPaths();
+
+    void clearFailedPaths(const PathSet & paths);
     
 private:
     AutoCloseFD fdSocket;

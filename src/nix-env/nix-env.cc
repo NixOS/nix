@@ -69,7 +69,7 @@ typedef void (* Operation) (Globals & globals,
 
 void printHelp()
 {
-    cout << string((char *) helpText, sizeof helpText);
+    cout << string((char *) helpText);
 }
 
 

@@ -87,7 +87,23 @@ struct SubstitutablePathInfo
     Path deriver;
     PathSet references;
     unsigned long long downloadSize; /* 0 = unknown or inapplicable */
+    unsigned long long narSize; /* 0 = unknown */
 };
+
+
+struct ValidPathInfo 
+{
+    Path path;
+    Path deriver;
+    Hash hash;
+    PathSet references;
+    time_t registrationTime;
+    unsigned long long narSize; // 0 = unknown
+    unsigned long long id; // internal use only
+    ValidPathInfo() : registrationTime(0), narSize(0) { }
+};
+
+typedef list<ValidPathInfo> ValidPathInfos;
 
 
 class StoreAPI 
@@ -102,6 +118,9 @@ public:
     /* Query the set of valid paths. */
     virtual PathSet queryValidPaths() = 0;
 
+    /* Query information about a valid path. */
+    virtual ValidPathInfo queryPathInfo(const Path & path) = 0;
+
     /* Queries the hash of a valid path. */ 
     virtual Hash queryPathHash(const Path & path) = 0;
 
@@ -110,33 +129,18 @@ public:
     virtual void queryReferences(const Path & path,
         PathSet & references) = 0;
 
-    /* Like queryReferences, but with self-references filtered out. */
-    PathSet queryReferencesNoSelf(const Path & path)
-    {
-        PathSet res;
-        queryReferences(path, res);
-        res.erase(path);
-        return res;
-    }
-
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
     virtual void queryReferrers(const Path & path,
         PathSet & referrers) = 0;
 
-    /* Like queryReferrers, but with self-references filtered out. */
-    PathSet queryReferrersNoSelf(const Path & path)
-    {
-        PathSet res;
-        queryReferrers(path, res);
-        res.erase(path);
-        return res;
-    }
-
     /* Query the deriver of a store path.  Return the empty string if
        no deriver has been set. */
     virtual Path queryDeriver(const Path & path) = 0;
 
+    /* Query the outputs of the derivation denoted by `path'. */
+    virtual PathSet queryDerivationOutputs(const Path & path) = 0;
+    
     /* Query whether a path has substitutes. */
     virtual bool hasSubstitutes(const Path & path) = 0;
 
@@ -222,6 +226,19 @@ public:
 
     /* Perform a garbage collection. */
     virtual void collectGarbage(const GCOptions & options, GCResults & results) = 0;
+
+    /* Return the set of paths that have failed to build.*/
+    virtual PathSet queryFailedPaths() = 0;
+
+    /* Clear the "failed" status of the given paths.  The special
+       value `*' causes all failed paths to be cleared. */
+    virtual void clearFailedPaths(const PathSet & paths) = 0;
+
+    /* Return a string representing information about the path that
+       can be loaded into the database using `nix-store --load-db' or
+       `nix-store --register-validity'. */
+    string makeValidityRegistration(const PathSet & paths,
+        bool showDerivers, bool showHash);
 };
 
 
@@ -239,12 +256,6 @@ void checkStoreName(const string & name);
 /* Chop off the parts after the top-level store name, e.g.,
    /nix/store/abcd-foo/bar => /nix/store/abcd-foo. */
 Path toStorePath(const Path & path);
-
-
-/* Get the "name" part of a store path, that is, the part after the
-   hash and the dash, and with any ".drv" suffix removed
-   (e.g. /nix/store/<hash>-foo-1.2.3.drv => foo-1.2.3). */
-string getNameOfStorePath(const Path & path);
 
 
 /* Follow symlinks until we end up with a path in the Nix store. */
@@ -320,21 +331,6 @@ boost::shared_ptr<StoreAPI> openStore();
    and separated by commas). */
 string showPaths(const PathSet & paths);
 
-
-string makeValidityRegistration(const PathSet & paths,
-    bool showDerivers, bool showHash);
-    
-struct ValidPathInfo 
-{
-    Path path;
-    Path deriver;
-    Hash hash;
-    PathSet references;
-    time_t registrationTime;
-    ValidPathInfo() : registrationTime(0) { }
-};
-
-typedef list<ValidPathInfo> ValidPathInfos;
 
 ValidPathInfo decodeValidPathInfo(std::istream & str,
     bool hashGiven = false);

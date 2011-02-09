@@ -404,6 +404,7 @@ error: cannot delete path `/nix/store/zq0h41l75vlb4z45kzgjjmsjxvcv1qk7-mesa-6.4'
     <arg choice='plain'><option>--tree</option></arg>
     <arg choice='plain'><option>--binding</option> <replaceable>name</replaceable></arg>
     <arg choice='plain'><option>--hash</option></arg>
+    <arg choice='plain'><option>--size</option></arg>
     <arg choice='plain'><option>--roots</option></arg>
   </group>
   <arg><option>--use-output</option></arg>
@@ -587,9 +588,21 @@ query is applied to the target of the symlink.</para>
   <varlistentry><term><option>--hash</option></term>
   
     <listitem><para>Prints the SHA-256 hash of the contents of the
-    store paths <replaceable>paths</replaceable>.  Since the hash is
-    stored in the Nix database, this is a fast
-    operation.</para></listitem>
+    store paths <replaceable>paths</replaceable> (that is, the hash of
+    the output of <command>nix-store --dump</command> on the given
+    paths).  Since the hash is stored in the Nix database, this is a
+    fast operation.</para></listitem>
+
+  </varlistentry>
+
+  <varlistentry><term><option>--size</option></term>
+  
+    <listitem><para>Prints the size in bytes of the contents of the
+    store paths <replaceable>paths</replaceable> — to be precise, the
+    size of the output of <command>nix-store --dump</command> on the
+    given paths.  Note that the actual disk space required by the
+    store paths may be higher, especially on filesystems with large
+    cluster sizes.</para></listitem>
 
   </varlistentry>
 
