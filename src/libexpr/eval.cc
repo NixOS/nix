@@ -151,6 +151,24 @@ EvalState::EvalState()
     createBaseEnv();
     
     allowUnsafeEquality = getEnv("NIX_NO_UNSAFE_EQ", "") == "";
+
+#if HAVE_BOEHMGC
+    static bool gcInitialised = true;
+    if (gcInitialised) {
+        /* Set the initial heap size to something fairly big (384 MiB)
+           so that in most cases we don't need to garbage collect at
+           all.  (Collection has a fairly significant overhead.)  The
+           heap size can be overriden through libgc's
+           GC_INITIAL_HEAP_SIZE environment variable.  We should
+           probably also provide a nix.conf setting for this.  Note
+           that GC_expand_hp() causes a lot of virtual, but not
+           physical (resident) memory to be allocated.  This might be
+           a problem on systems that don't overcommit. */
+        if (!getenv("GC_INITIAL_HEAP_SIZE"))
+            GC_expand_hp(384 * 1024 * 1024);
+        gcInitialised = true;
+    }
+#endif
 }
 
 
