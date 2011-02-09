@@ -75,7 +75,7 @@ let
         configureFlags = ''
           --disable-init-state
           --with-bzip2=${bzip2} --with-sqlite=${sqlite}
-          ${lib.optionalString (system != "i386-sunos") "--enable-gc"}
+          --enable-gc
         '';
       };
 

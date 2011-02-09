@@ -268,7 +268,7 @@ AC_ARG_ENABLE(gc, AC_HELP_STRING([--enable-gc],
   gc=$enableval, gc=)
 if test -n "$gc"; then
   PKG_CHECK_MODULES([BDW_GC], [bdw-gc])
-  boehmgc_lib="-L$boehmgc/lib -lgc"
+  boehmgc_lib="$BDW_GC_LIBS"
   CXXFLAGS="$BDW_GC_CFLAGS $CXXFLAGS"
   AC_DEFINE(HAVE_BOEHMGC, 1, [Whether to use the Boehm garbage collector.])
 fi
