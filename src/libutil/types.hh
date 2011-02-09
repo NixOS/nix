@@ -1,8 +1,6 @@
 #ifndef __TYPES_H
 #define __TYPES_H
 
-#include "config.h"
-
 #include <string>
 #include <list>
 #include <set>
