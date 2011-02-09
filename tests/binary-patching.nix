@@ -7,9 +7,9 @@ mkDerivation {
   builder = builtins.toFile "builder.sh"
     ''
       mkdir $out
-      seq 1 1000000 > $out/foo
+      (for ((n = 1; n < 100000; n++)); do echo $n; done) > $out/foo
       ${if version != 1 then ''
-        seq 1000000 1010000 >> $out/foo
+        (for ((n = 100000; n < 110000; n++)); do echo $n; done) >> $out/foo
       '' else ""}
       ${if version == 3 then ''
         echo foobar >> $out/foo
