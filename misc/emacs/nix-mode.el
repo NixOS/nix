@@ -107,3 +107,5 @@ The hook `nix-mode-hook' is run when Nix mode is started.
 
 (setq auto-mode-alist (cons '("\\.nix\\'" . nix-mode) auto-mode-alist))
 (setq auto-mode-alist (cons '("\\.nix.in\\'" . nix-mode) auto-mode-alist))
+
+(provide 'nix-mode)
