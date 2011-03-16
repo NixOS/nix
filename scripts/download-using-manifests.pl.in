@@ -295,7 +295,7 @@ sub downloadFile {
     $ENV{"PRINT_PATH"} = 1;
     $ENV{"QUIET"} = 1;
     my ($hash, $path) = `$binDir/nix-prefetch-url '$url'`;
-    die "download of `$url' failed" unless $? == 0;
+    die "download of `$url' failed" . ($! ? ": $!" : "") unless $? == 0;
     chomp $path;
     return $path;
 }
