@@ -26,7 +26,6 @@ if (! -e $manifestDir) {
 
 # Process the URLs specified on the command line.
 my %narFiles;
-my %localPaths;
 my %patches;
 
 my $skipWrongStore = 0;
@@ -70,7 +69,7 @@ sub processURL {
         $manifest = downloadFile $url;
     }
 
-    my $version = readManifest($manifest, \%narFiles, \%localPaths, \%patches);
+    my $version = readManifest($manifest, \%narFiles, \%patches);
     
     die "`$url' is not a manifest or it is too old (i.e., for Nix <= 0.7)\n" if $version < 3;
     die "manifest `$url' is too new\n" if $version >= 5;
@@ -129,5 +128,5 @@ while (@ARGV) {
 }
 
 
-my $size = scalar (keys %narFiles) + scalar (keys %localPaths);
+my $size = scalar (keys %narFiles);
 print "$size store paths in manifest\n";

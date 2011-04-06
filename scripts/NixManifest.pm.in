@@ -23,7 +23,7 @@ sub addPatch {
 
 
 sub readManifest {
-    my ($manifest, $narFiles, $localPaths, $patches) = @_;
+    my ($manifest, $narFiles, $patches) = @_;
 
     open MANIFEST, "<$manifest"
         or die "cannot open `$manifest': $!";
@@ -96,21 +96,6 @@ sub readManifest {
                         , basePath => $basePath, baseHash => $baseHash
                         , narHash => $narHash, narSize => $narSize
                         , patchType => $patchType, hashAlgo => $hashAlgo
-                        };
-                }
-
-                elsif ($type eq "localPath") {
-
-                    $$localPaths{$storePath} = []
-                        unless defined $$localPaths{$storePath};
-
-                    my $localPathsList = $$localPaths{$storePath};
-
-                    # !!! remove duplicates
-                    
-                    push @{$localPathsList},
-                        { copyFrom => $copyFrom, references => $references
-                        , deriver => ""
                         };
                 }
 

@@ -19,11 +19,10 @@ my $fast = 1;
 
 # Load all manifests.
 my %narFiles;
-my %localPaths;
 my %patches;
 
 for my $manifest (glob "$manifestDir/*.nixmanifest") {
-    my $version = readManifest($manifest, \%narFiles, \%localPaths, \%patches);
+    my $version = readManifest($manifest, \%narFiles, \%patches);
     if ($version < 3) {
         print STDERR "you have an old-style manifest `$manifest'; please delete it\n";
         exit 1;
@@ -189,8 +188,7 @@ if ($ARGV[0] eq "--query") {
 
         if ($cmd eq "have") {
             my $storePath = <STDIN>; chomp $storePath;
-            print STDOUT ((defined $narFiles{$storePath} or defined $localPaths{$storePath})
-                ? "1\n" : "0\n");
+            print STDOUT (defined $narFiles{$storePath} ? "1\n" : "0\n");
         }
 
         elsif ($cmd eq "info") {
@@ -199,9 +197,6 @@ if ($ARGV[0] eq "--query") {
             my $info;
             if (defined $narFiles{$storePath}) {
                 $info = @{$narFiles{$storePath}}[0];
-            }
-            elsif (defined $localPaths{$storePath}) {
-                $info = @{$localPaths{$storePath}}[0];
             }
             else {
                 print "0\n";
@@ -265,19 +260,6 @@ my $date = strftime ("%F %H:%M:%S UTC", gmtime (time));
 print LOGFILE "$$ get $targetPath $date\n";
 
 print "\n*** Trying to download/patch `$targetPath'\n";
-
-
-# If we can copy from a local path, do that.
-my $localPathList = $localPaths{$targetPath};
-foreach my $localPath (@{$localPathList}) {
-    my $sourcePath = $localPath->{copyFrom};
-    if (-e $sourcePath) {
-        print "\n*** Step 1/1: copying from $sourcePath\n";
-        system("$binDir/nix-store --dump $sourcePath | $binDir/nix-store --restore $targetPath") == 0
-            or die "cannot copy `$sourcePath' to `$targetPath'";
-        exit 0;
-    }
-}
 
 
 # Compute the shortest path.

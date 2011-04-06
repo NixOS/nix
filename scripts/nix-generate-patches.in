@@ -26,10 +26,10 @@ my $srcManifest = $ARGV[3];
 my $dstManifest = $ARGV[4];
 
 my (%srcNarFiles, %srcLocalPaths, %srcPatches);
-readManifest $srcManifest, \%srcNarFiles, \%srcLocalPaths, \%srcPatches;
+readManifest $srcManifest, \%srcNarFiles, \%srcPatches;
 
 my (%dstNarFiles, %dstLocalPaths, %dstPatches);
-readManifest $dstManifest, \%dstNarFiles, \%dstLocalPaths, \%dstPatches;
+readManifest $dstManifest, \%dstNarFiles, \%dstPatches;
 
 my $tmpDir = tempdir("nix-generate-patches.XXXXXX", CLEANUP => 1, TMPDIR => 1)
     or die "cannot create a temporary directory";

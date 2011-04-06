@@ -6,10 +6,9 @@ use readmanifest;
 for my $p (@ARGV) {
 
     my %narFiles;
-    my %localPaths;
     my %patches;
 
-    readManifest $p, \%narFiles, \%localPaths, \%patches;
+    readManifest $p, \%narFiles, \%patches;
 
     %patches = ();
     
