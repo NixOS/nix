@@ -17,21 +17,8 @@ my $logFile = "@localstatedir@/log/nix/downloads";
 my $fast = 1;
 
 
-# Load all manifests.
-my %narFiles;
-my %patches;
-
-for my $manifest (glob "$manifestDir/*.nixmanifest") {
-    my $version = readManifest($manifest, \%narFiles, \%patches);
-    if ($version < 3) {
-        print STDERR "you have an old-style manifest `$manifest'; please delete it\n";
-        exit 1;
-    }
-    if ($version >= 10) {
-        print STDERR "manifest `$manifest' is too new; please delete it or upgrade Nix\n";
-        exit 1;
-    }
-}
+# Open the manifest cache and update it if necessary.
+my $dbh = updateManifestDB();
 
 
 sub isValidPath {
@@ -110,7 +97,10 @@ sub computeSmallestDownload {
         else {
 
             # Add patch edges.
-            my $patchList = $patches{$u};
+            my $patchList = $dbh->selectall_arrayref(
+                "select * from Patches where storePath = ?",
+                { Slice => {} }, $u);
+            
             foreach my $patch (@{$patchList}) {
                 if (isValidPath($patch->{basePath})) {
                     # !!! this should be cached
@@ -129,11 +119,15 @@ sub computeSmallestDownload {
             }
 
             # Add NAR file edges to the start node.
-            my $narFileList = $narFiles{$u};
+            my $narFileList = $dbh->selectall_arrayref(
+                "select * from NARs where storePath = ?",
+                { Slice => {} }, $u);
+                
             foreach my $narFile (@{$narFileList}) {
                 # !!! how to handle files whose size is not known in advance?
-                # For now, assume some arbitrary size (1 MB).
-                addEdge \%graph, "start", $u, ($narFile->{size} || 1000000), "narfile", $narFile;
+                # For now, assume some arbitrary size (1 GB).
+                # This has the side-effect of preferring non-Hydra downloads.
+                addEdge \%graph, "start", $u, ($narFile->{size} || 1000000000), "narfile", $narFile;
             }
         }
     }
@@ -160,7 +154,7 @@ sub computeSmallestDownload {
                 $v_->{d} = $u_->{d} + $edge->{weight};
                 # Store the edge; to edge->start is actually the
                 # predecessor.
-                $v_->{pred} = $edge; 
+                $v_->{pred} = $edge;
             }
         }
     }
@@ -188,15 +182,21 @@ if ($ARGV[0] eq "--query") {
 
         if ($cmd eq "have") {
             my $storePath = <STDIN>; chomp $storePath;
-            print STDOUT (defined $narFiles{$storePath} ? "1\n" : "0\n");
+            print STDOUT (
+                scalar @{$dbh->selectcol_arrayref("select 1 from NARs where storePath = ?", {}, $storePath)} > 0
+                ? "1\n" : "0\n");
         }
 
         elsif ($cmd eq "info") {
             my $storePath = <STDIN>; chomp $storePath;
 
+            my $infos = $dbh->selectall_arrayref(
+                "select * from NARs where storePath = ?",
+                { Slice => {} }, $storePath);
+            
             my $info;
-            if (defined $narFiles{$storePath}) {
-                $info = @{$narFiles{$storePath}}[0];
+            if (scalar @{$infos} > 0) {
+                $info = @{$infos}[0];
             }
             else {
                 print "0\n";
@@ -205,12 +205,12 @@ if ($ARGV[0] eq "--query") {
 
             print "1\n";
             print "$info->{deriver}\n";
-            my @references = split " ", $info->{references};
+            my @references = split " ", $info->{refs};
             print scalar @references, "\n";
             print "$_\n" foreach @references;
 
             my @path = computeSmallestDownload $storePath;
-            
+
             my $downloadSize = 0;
             while (scalar @path > 0) {
                 my $edge = pop @path;
@@ -223,7 +223,7 @@ if ($ARGV[0] eq "--query") {
                     $downloadSize += $edge->{info}->{size} || 0;
                 }
             }
-                
+
             print "$downloadSize\n";
             
             my $narSize = $info->{narSize} || 0;
