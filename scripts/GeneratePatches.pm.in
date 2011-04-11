@@ -2,6 +2,7 @@
 
 use strict;
 use File::Temp qw(tempdir);
+use File::stat;
 
 
 # Some patch generations options.
@@ -205,7 +206,7 @@ sub generatePatches {
             system("@bunzip2@ < $srcNarBz2 > $tmpDir/A") == 0
                 or die "cannot unpack $srcNarBz2";
 
-            if ((stat "$tmpDir/A")[7] >= $maxNarSize) {
+            if (stat("$tmpDir/A")->size >= $maxNarSize) {
                 print "    skipping, source is too large\n";
                 next;
             }
@@ -213,7 +214,7 @@ sub generatePatches {
             system("@bunzip2@ < $dstNarBz2 > $tmpDir/B") == 0
                 or die "cannot unpack $dstNarBz2";
 
-            if ((stat "$tmpDir/B")[7] >= $maxNarSize) {
+            if (stat("$tmpDir/B")->size >= $maxNarSize) {
                 print "    skipping, destination is too large\n";
                 next;
             }
@@ -235,8 +236,8 @@ sub generatePatches {
             my $narDiffHash = `@bindir@/nix-hash --flat --type $hashAlgo --base32 $tmpDir/DIFF` or die;
             chomp $narDiffHash;
 
-            my $narDiffSize = (stat "$tmpDir/DIFF")[7];
-            my $dstNarBz2Size = (stat $dstNarBz2)[7];
+            my $narDiffSize = stat("$tmpDir/DIFF")->size;
+            my $dstNarBz2Size = stat($dstNarBz2)->size;
 
             print "    size $narDiffSize; full size $dstNarBz2Size; ", $time2 - $time1, " seconds\n";
         

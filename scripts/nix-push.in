@@ -2,6 +2,7 @@
 
 use strict;
 use File::Temp qw(tempdir);
+use File::stat;
 use NixManifest;
 
 my $hashAlgo = "sha256";
@@ -178,7 +179,7 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     (-f $narFile) or die "narfile for $storePath not found";
     push @narArchives, $narFile;
 
-    my $narbz2Size = (stat $narFile)[7];
+    my $narbz2Size = stat($narFile)->size;
 
     my $references = `$binDir/nix-store --query --references '$storePath'`;
     die "cannot query references for `$storePath'" if $? != 0;
