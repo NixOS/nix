@@ -6,6 +6,23 @@ use File::Path;
 use Fcntl ':flock';
 
 
+sub addNAR {
+    my ($narFiles, $storePath, $info) = @_;
+    
+    $$narFiles{$storePath} = []
+        unless defined $$narFiles{$storePath};
+
+    my $narFileList = $$narFiles{$storePath};
+
+    my $found = 0;
+    foreach my $narFile (@{$narFileList}) {
+        $found = 1 if $narFile->{url} eq $info->{url};
+    }
+    
+    push @{$narFileList}, $info if !$found;
+}
+
+
 sub addPatch {
     my ($patches, $storePath, $patch) = @_;
 
@@ -27,8 +44,8 @@ sub addPatch {
 }
 
 
-sub readManifest {
-    my ($manifest, $narFiles, $patches) = @_;
+sub readManifest_ {
+    my ($manifest, $addNAR, $addPatch) = @_;
 
     open MANIFEST, "<$manifest"
         or die "cannot open `$manifest': $!";
@@ -72,35 +89,22 @@ sub readManifest {
                 $inside = 0;
 
                 if ($type eq "narfile") {
-
-                    $$narFiles{$storePath} = []
-                        unless defined $$narFiles{$storePath};
-
-                    my $narFileList = $$narFiles{$storePath};
-
-                    my $found = 0;
-                    foreach my $narFile (@{$narFileList}) {
-                        $found = 1 if $narFile->{url} eq $url;
-                    }
-                    if (!$found) {
-                        push @{$narFileList},
-                            { url => $url, hash => $hash, size => $size
-                            , narHash => $narHash, narSize => $narSize
-                            , references => $references
-                            , deriver => $deriver
-                            , system => $system
-                            };
-                    }
-                
+                    &$addNAR($storePath,
+                        { url => $url, hash => $hash, size => $size
+                        , narHash => $narHash, narSize => $narSize
+                        , references => $references
+                        , deriver => $deriver
+                        , system => $system
+                        });
                 }
 
                 elsif ($type eq "patch") {
-                    addPatch $patches, $storePath,
+                    &$addPatch($storePath,
                         { url => $url, hash => $hash, size => $size
                         , basePath => $basePath, baseHash => $baseHash
                         , narHash => $narHash, narSize => $narSize
                         , patchType => $patchType
-                        };
+                        });
                 }
 
             }
@@ -131,6 +135,14 @@ sub readManifest {
     close MANIFEST;
 
     return $manifestVersion;
+}
+
+
+sub readManifest {
+    my ($manifest, $narFiles, $patches) = @_;
+    readManifest_($manifest,
+        sub { addNAR($narFiles, @_); },
+        sub { addPatch($patches, @_); } );
 }
 
 
@@ -205,7 +217,7 @@ sub updateManifestDB {
     my $dbPath = "$manifestDir/cache.sqlite";
 
     # Open/create the database.
-    my $dbh = DBI->connect("dbi:SQLite:dbname=$dbPath", "", "")
+    our $dbh = DBI->connect("dbi:SQLite:dbname=$dbPath", "", "")
         or die "cannot open database `$dbPath'";
     $dbh->{AutoCommit} = 0;
     $dbh->{RaiseError} = 1;
@@ -279,47 +291,40 @@ EOF
             "select 1 from Manifests where path = ? and timestamp = ?",
             {}, $manifest, $timestamp)} == 1;
 
-        # !!! Insert directly into the DB.
-        my %narFiles;
-        my %patches;
-        my $version = readManifest($manifest, \%narFiles, \%patches);
+        $dbh->do("delete from Manifests where path = ?", {}, $manifest);
+                 
+        $dbh->do("insert into Manifests(path, timestamp) values (?, ?)",
+                 {}, $manifest, $timestamp);
+
+        our $id = $dbh->sqlite_last_insert_rowid();
+
+        sub addNARToDB {
+            my ($storePath, $narFile) = @_;
+            $dbh->do(
+                "insert into NARs(manifest, storePath, url, hash, size, narHash, " .
+                "narSize, refs, deriver, system) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                {}, $id, $storePath, $narFile->{url}, $narFile->{hash}, $narFile->{size},
+                $narFile->{narHash}, $narFile->{narSize}, $narFile->{references},
+                $narFile->{deriver}, $narFile->{system});
+        };
+        
+        sub addPatchToDB {
+            my ($storePath, $patch) = @_;
+            $dbh->do(
+                "insert into Patches(manifest, storePath, basePath, baseHash, url, hash, " .
+                "size, narHash, narSize, patchType) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                {}, $id, $storePath, $patch->{basePath}, $patch->{baseHash}, $patch->{url},
+                $patch->{hash}, $patch->{size}, $patch->{narHash}, $patch->{narSize},
+                $patch->{patchType});
+        };
+
+        my $version = readManifest_($manifest, \&addNARToDB, \&addPatchToDB);
         
         if ($version < 3) {
             die "you have an old-style manifest `$manifest'; please delete it";
         }
         if ($version >= 10) {
             die "manifest `$manifest' is too new; please delete it or upgrade Nix";
-        }
-
-        $dbh->do("delete from Manifests where path = ?", {}, $manifest);
-                 
-        $dbh->do("insert into Manifests(path, timestamp) values (?, ?)",
-                 {}, $manifest, $timestamp);
-
-        my $id = $dbh->sqlite_last_insert_rowid();
-
-        foreach my $storePath (keys %narFiles) {
-            my $narFileList = $narFiles{$storePath};
-            foreach my $narFile (@{$narFiles{$storePath}}) {
-                $dbh->do(
-                    "insert into NARs(manifest, storePath, url, hash, size, narHash, " .
-                    "narSize, refs, deriver, system) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    {}, $id, $storePath, $narFile->{url}, $narFile->{hash}, $narFile->{size},
-                    $narFile->{narHash}, $narFile->{narSize}, $narFile->{references},
-                    $narFile->{deriver}, $narFile->{system});
-            }
-        }
-
-        foreach my $storePath (keys %patches) {
-            my $patchList = $patches{$storePath};
-            foreach my $patch (@{$patchList}) {
-                $dbh->do(
-                    "insert into Patches(manifest, storePath, basePath, baseHash, url, hash, " .
-                    "size, narHash, narSize, patchType) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    {}, $id, $storePath, $patch->{basePath}, $patch->{baseHash}, $patch->{url},
-                    $patch->{hash}, $patch->{size}, $patch->{narHash}, $patch->{narSize},
-                    $patch->{patchType});
-            }
         }
     }
 
