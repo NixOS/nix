@@ -3,6 +3,7 @@ use DBI;
 use Cwd;
 use File::stat;
 use File::Path;
+use Fcntl ':flock';
 
 
 sub addPatch {
@@ -259,7 +260,11 @@ EOF
 
     $dbh->do("create index if not exists Patches_storePath on Patches(storePath)");
 
-    # !!! locking?
+    # Acquire an exclusive lock to ensure that only one process
+    # updates the DB at the same time.  This isn't really necessary,
+    # but it prevents work duplication and lock contention in SQLite.
+    open MAINLOCK, ">>$manifestDir/cache.lock" or die;
+    flock(MAINLOCK, LOCK_EX) or die;
 
     # Read each manifest in $manifestDir and add it to the database,
     # unless we've already done so on a previous run.
@@ -325,6 +330,8 @@ EOF
     }
 
     $dbh->commit;
+
+    close MAINLOCK;
 
     return $dbh;
 }
