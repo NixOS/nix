@@ -26,6 +26,8 @@ let
           --with-docbook-rng=${docbook5}/xml/rng/docbook
           --with-docbook-xsl=${docbook5_xsl}/xml/xsl/docbook
           --with-xml-flags=--nonet
+          --with-dbi=${perlPackages.DBI}/lib/perl5/site_perl
+          --with-dbd-sqlite=${perlPackages.DBDSQLite}/lib/perl5/site_perl
         '';
 
         # Include the Bzip2 tarball in the distribution.
@@ -75,6 +77,8 @@ let
         configureFlags = ''
           --disable-init-state
           --with-bzip2=${bzip2} --with-sqlite=${sqlite}
+          --with-dbi=${perlPackages.DBI}/lib/perl5/site_perl
+          --with-dbd-sqlite=${perlPackages.DBDSQLite}/lib/perl5/site_perl
           --enable-gc
         '';
       };
@@ -96,6 +100,8 @@ let
         configureFlags = ''
           --disable-init-state --disable-shared
           --with-bzip2=${bzip2} --with-sqlite=${sqlite}
+          --with-dbi=${perlPackages.DBI}/lib/perl5/site_perl
+          --with-dbd-sqlite=${perlPackages.DBDSQLite}/lib/perl5/site_perl
         '';
 
         lcovFilter = [ "*/boost/*" "*-tab.*" ];
