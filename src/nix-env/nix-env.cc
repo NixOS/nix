@@ -45,9 +45,7 @@ struct InstallSourceInfo
     Path nixExprPath; /* for srcNixExprDrvs, srcNixExprs */
     Path profile; /* for srcProfile */
     string systemFilter; /* for srcNixExprDrvs */
-    bool prebuiltOnly;
     Bindings autoArgs;
-    InstallSourceInfo() : prebuiltOnly(false) { };
 };
 
 
@@ -60,6 +58,7 @@ struct Globals
     bool preserveInstalled;
     bool keepDerivations;
     string forceName;
+    bool prebuiltOnly;
 };
 
 
@@ -93,8 +92,6 @@ static bool parseInstallSourceOptions(Globals & globals,
     }
     else if (arg == "--attr" || arg == "-A")
         globals.instSource.type = srcAttrPath;
-    else if (arg == "--prebuilt-only" || arg == "-b")
-        globals.instSource.prebuiltOnly = true;
     else return false;
     return true;
 }
@@ -222,7 +219,7 @@ static bool isPrebuilt(EvalState & state, const DrvInfo & elem)
 
 
 static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
-    const Strings & args, bool newestOnly, bool prebuiltOnly)
+    const Strings & args, bool newestOnly)
 {
     DrvNames selectors = drvNamesFromArgs(args);
 
@@ -241,8 +238,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
             DrvName drvName(j->name);
             if (i->matches(drvName)) {
                 i->hits++;
-                if (!prebuiltOnly || isPrebuilt(state, *j))
-                    matches.push_back(std::pair<DrvInfo, unsigned int>(*j, n));
+                matches.push_back(std::pair<DrvInfo, unsigned int>(*j, n));
             }
         }
 
@@ -342,8 +338,7 @@ static void queryInstSources(EvalState & state,
             loadDerivations(state, instSource.nixExprPath,
                 instSource.systemFilter, instSource.autoArgs, "", allElems);
 
-            elems = filterBySelector(state, allElems, args,
-                newestOnly, instSource.prebuiltOnly);
+            elems = filterBySelector(state, allElems, args, newestOnly);
     
             break;
         }
@@ -408,7 +403,7 @@ static void queryInstSources(EvalState & state,
         case srcProfile: {
             elems = filterBySelector(state,
                 queryInstalled(state, instSource.profile),
-                args, newestOnly, instSource.prebuiltOnly);
+                args, newestOnly);
             break;
         }
 
@@ -453,8 +448,13 @@ static void installDerivations(Globals & globals,
     debug(format("installing derivations"));
 
     /* Get the set of user environment elements to be installed. */
-    DrvInfos newElems;
-    queryInstSources(globals.state, globals.instSource, args, newElems, true);
+    DrvInfos newElems, newElemsTmp;
+    queryInstSources(globals.state, globals.instSource, args, newElemsTmp, true);
+
+    /* If --prebuilt-only is given, filter out source-only packages. */
+    foreach (DrvInfos::iterator, i, newElemsTmp)
+        if (!globals.prebuiltOnly || isPrebuilt(globals.state, *i))
+            newElems.push_back(*i);
 
     StringSet newNames;
     for (DrvInfos::iterator i = newElems.begin(); i != newElems.end(); ++i) {
@@ -574,7 +574,7 @@ static void upgradeDerivations(Globals & globals,
                                 d2 = comparePriorities(globals.state, *bestElem, *j);
                                 if (d2 == 0) d2 = compareVersions(bestName.version, newName.version);
                             }
-                            if (d2 < 0) {
+                            if (d2 < 0 && (!globals.prebuiltOnly || isPrebuilt(globals.state, *j))) {
                                 bestElem = j;
                                 bestName = newName;
                             }
@@ -862,7 +862,6 @@ static void opQuery(Globals & globals,
     bool printOutPath = false;
     bool printDescription = false;
     bool printMeta = false;
-    bool prebuiltOnly = false;
     bool compareVersions = false;
     bool xmlOutput = false;
 
@@ -882,7 +881,6 @@ static void opQuery(Globals & globals,
         else if (arg == "--meta") printMeta = true;
         else if (arg == "--installed") source = sInstalled;
         else if (arg == "--available" || arg == "-a") source = sAvailable;
-        else if (arg == "--prebuilt-only" || arg == "-b") prebuiltOnly = true;
         else if (arg == "--xml") xmlOutput = true;
         else if (arg == "--attr-path" || arg == "-P") printAttrPath = true;
         else if (arg == "--attr" || arg == "-A")
@@ -909,8 +907,8 @@ static void opQuery(Globals & globals,
 
     DrvInfos elems = filterBySelector(globals.state,
         source == sInstalled ? installedElems : availElems,
-        remaining, false, prebuiltOnly);
-    
+        remaining, false);
+
     DrvInfos & otherElems(source == sInstalled ? availElems : installedElems);
 
     
@@ -942,6 +940,8 @@ static void opQuery(Globals & globals,
     foreach (vector<DrvInfo>::iterator, i, elems2) {
         try {
             startNest(nest, lvlDebug, format("outputting query result `%1%'") % i->attrPath);
+
+            if (globals.prebuiltOnly && !isPrebuilt(globals.state, *i)) continue;
 
             /* For table output. */
             Strings columns;
@@ -1239,6 +1239,7 @@ void run(Strings args)
     
     globals.dryRun = false;
     globals.preserveInstalled = false;
+    globals.prebuiltOnly = false;
 
     globals.keepDerivations =
         queryBoolSetting("env-keep-derivations", false);
@@ -1285,6 +1286,8 @@ void run(Strings args)
         }
         else if (arg == "--system-filter")
             globals.instSource.systemFilter = needArg(i, args, arg);
+        else if (arg == "--prebuilt-only" || arg == "-b")
+            globals.prebuiltOnly = true;
         else {
             remaining.push_back(arg);
             if (arg[0] == '-') {
