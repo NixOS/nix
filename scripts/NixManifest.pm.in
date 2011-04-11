@@ -2,6 +2,7 @@ use strict;
 use DBI;
 use Cwd;
 use File::stat;
+use File::Path;
 
 
 sub addPatch {
@@ -198,6 +199,8 @@ sub writeManifest {
 sub updateManifestDB {
     my $manifestDir = ($ENV{"NIX_MANIFESTS_DIR"} or "@localstatedir@/nix/manifests");
 
+    mkpath($manifestDir);
+    
     my $dbPath = "$manifestDir/cache.sqlite";
 
     # Open/create the database.
