@@ -1,5 +1,3 @@
-#! @perl@ -w -I@libexecdir@/nix
-
 use strict;
 use File::Temp qw(tempdir);
 use File::stat;

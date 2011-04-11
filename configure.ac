@@ -171,6 +171,7 @@ AC_PATH_PROG(openssl_prog, openssl, openssl) # if not found, call openssl in $PA
 AC_SUBST(openssl_prog)
 AC_DEFINE_UNQUOTED(OPENSSL_PATH, ["$openssl_prog"], [Path of the OpenSSL binary])
 
+
 # Test that Perl has the open/fork feature (Perl 5.8.0 and beyond).
 AC_MSG_CHECKING([whether Perl is recent enough])
 if ! $perl -e 'open(FOO, "-|", "true"); while (<FOO>) { print; }; close FOO or die;'; then
@@ -179,12 +180,14 @@ if ! $perl -e 'open(FOO, "-|", "true"); while (<FOO>) { print; }; close FOO or d
 fi
 AC_MSG_RESULT(yes)
 
+
 NEED_PROG(cat, cat)
 NEED_PROG(tr, tr)
 AC_ARG_WITH(coreutils-bin, AC_HELP_STRING([--with-coreutils-bin=PATH],
   [path of cat, mkdir, etc.]),
   coreutils=$withval, coreutils=$(dirname $cat))
 AC_SUBST(coreutils)
+
 
 AC_ARG_WITH(docbook-rng, AC_HELP_STRING([--with-docbook-rng=PATH],
   [path of the DocBook RelaxNG schema]),
@@ -196,15 +199,18 @@ AC_ARG_WITH(docbook-xsl, AC_HELP_STRING([--with-docbook-xsl=PATH],
   docbookxsl=$withval, docbookxsl=/docbook-xsl-missing)
 AC_SUBST(docbookxsl)
 
+
 AC_ARG_WITH(xml-flags, AC_HELP_STRING([--with-xml-flags=FLAGS],
   [extra flags to be passed to xmllint and xsltproc]),
   xmlflags=$withval, xmlflags=)
 AC_SUBST(xmlflags)
 
+
 AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
   [path of the Nix store]),
   storedir=$withval, storedir='/nix/store')
 AC_SUBST(storedir)
+
 
 AC_ARG_WITH(openssl, AC_HELP_STRING([--with-openssl=PATH],
   [prefix of the OpenSSL library]),
@@ -216,6 +222,7 @@ if test -n "$openssl"; then
   CXXFLAGS="-I$openssl/include $CXXFLAGS"
   AC_DEFINE(HAVE_OPENSSL, 1, [Whether to use OpenSSL.])
 fi
+
 
 AC_ARG_WITH(bzip2, AC_HELP_STRING([--with-bzip2=PATH],
   [prefix of bzip2]),
@@ -243,6 +250,7 @@ AC_SUBST(bzip2_include)
 AC_SUBST(bzip2_bin)
 AC_SUBST(bzip2_bin_test)
 
+
 AC_ARG_WITH(sqlite, AC_HELP_STRING([--with-sqlite=PATH],
   [prefix of SQLite]),
   sqlite=$withval, sqlite=)
@@ -262,6 +270,7 @@ AC_SUBST(sqlite_lib)
 AC_SUBST(sqlite_include)
 AC_SUBST(sqlite_bin)
 
+
 # Whether to use the Boehm garbage collector.
 AC_ARG_ENABLE(gc, AC_HELP_STRING([--enable-gc],
   [enable garbage collection in the Nix expression evaluator (requires Boehm GC)]),
@@ -271,6 +280,25 @@ if test -n "$gc"; then
   CXXFLAGS="$BDW_GC_CFLAGS $CXXFLAGS"
   AC_DEFINE(HAVE_BOEHMGC, 1, [Whether to use the Boehm garbage collector.])
 fi
+
+
+# Check for the required Perl dependencies (DBI and DBD::SQLite).
+AC_ARG_WITH(dbi, AC_HELP_STRING([--with-dbi=PATH],
+  [prefix of the Perl DBI library]),
+  perlFlags="$perlFlags -I$withval")
+
+AC_ARG_WITH(dbd-sqlite, AC_HELP_STRING([--with-dbd-sqlite=PATH],
+  [prefix of the Perl DBD::SQLite library]),
+  perlFlags="$perlFlags -I$withval")
+
+AC_MSG_CHECKING([whether DBD::SQLite works])
+if ! $perl $perlFlags -e 'use DBI; use DBD::SQLite;' 2>&5; then
+    AC_MSG_RESULT(no)
+    AC_MSG_FAILURE([The Perl modules DBI and/or DBD::SQLite are missing.])
+fi
+AC_MSG_RESULT(yes)
+  
+AC_SUBST(perlFlags)
 
 
 AC_ARG_ENABLE(init-state, AC_HELP_STRING([--disable-init-state],

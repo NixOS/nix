@@ -1,4 +1,4 @@
-#! @perl@ -w -I@libexecdir@/nix
+#! @perl@ -w -I@libexecdir@/nix @perlFlags@
 
 use strict;
 use File::Temp qw(tempdir);
