@@ -124,8 +124,11 @@ if ($interactive) {
 
 
 # Store the manifest in the temporary directory so that we don't
-# pollute /nix/var/nix/manifests.
+# pollute /nix/var/nix/manifests.  This also requires that we don't
+# use the Nix daemon (because otherwise download-using-manifests won't
+# see our NIX_MANIFESTS_DIRS environment variable).
 $ENV{NIX_MANIFESTS_DIR} = $tmpDir;
+$ENV{NIX_REMOTE} = "";
 
 
 print "\nPulling manifests...\n";
