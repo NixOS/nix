@@ -512,7 +512,7 @@ void RemoteStore::processStderr(Sink * sink, Source * source)
     if (msg == STDERR_ERROR) {
         string error = readString(from);
         unsigned int status = GET_PROTOCOL_MINOR(daemonVersion) >= 8 ? readInt(from) : 1;
-        throw Error(error, status);
+        throw Error(format("%1%") % error, status);
     }
     else if (msg != STDERR_LAST)
         throw Error("protocol error processing standard error");
