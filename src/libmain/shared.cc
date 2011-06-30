@@ -142,6 +142,7 @@ static void initAndRun(int argc, char * * argv)
     maxBuildJobs = queryIntSetting("build-max-jobs", 1);
     buildCores = queryIntSetting("build-cores", 1);
     maxSilentTime = queryIntSetting("build-max-silent-time", 0);
+    buildTimeout = queryIntSetting("build-timeout", 0);
 
     /* Catch SIGINT. */
     struct sigaction act;
@@ -237,6 +238,8 @@ static void initAndRun(int argc, char * * argv)
             readOnlyMode = true;
         else if (arg == "--max-silent-time")
             maxSilentTime = getIntArg<unsigned int>(arg, i, args.end());
+        else if (arg == "--timeout")
+            buildTimeout = getIntArg<unsigned int>(arg, i, args.end());
         else if (arg == "--no-build-hook")
             useBuildHook = false;
         else if (arg == "--show-trace")

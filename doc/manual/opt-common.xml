@@ -132,6 +132,16 @@
 
 </varlistentry>
 
+<varlistentry xml:id="opt-timeout"><term><option>--timeout</option></term>
+
+  <listitem><para>Sets the maximum number of seconds that a builder
+  can run.  The default is specified by the <link
+  linkend='conf-build-timeout'><literal>build-timeout</literal></link>
+  configuration setting.  <literal>0</literal> means no
+  timeout.</para></listitem>
+
+</varlistentry>
+
 <varlistentry><term><option>--keep-going</option></term>
   <term><option>-k</option></term>
 

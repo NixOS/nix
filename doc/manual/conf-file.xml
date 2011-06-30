@@ -134,6 +134,23 @@ env-keep-derivations = false
 
     </listitem>
 
+  <varlistentry xml:id="conf-build-timeout"><term><literal>build-timeout</literal></term>
+
+    <listitem>
+
+      <para>This option defines the maximum number of seconds that a
+      builder can run.  This is useful (for instance in a automated
+      build system) to catch builds that are stuck in an infinite loop
+      but keep writing to their standard output or standard error.  It
+      can be overriden using the <option
+      linkend="opt-timeout">--timeout</option> command line
+      switch.</para>
+
+      <para>The value <literal>0</literal> means that there is no
+      timeout.  This is also the default.</para>
+
+    </listitem>
+
   </varlistentry>
 
 

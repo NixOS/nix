@@ -22,6 +22,16 @@
     option.</para>
   </listitem>
 
+  <listitem>
+    <para>The option <option>--timeout</option> (corresponding to the
+    configuration setting <literal>build-timeout</literal>) allows you
+    to set an absolute timeout on builds — if a build runs for more than
+    the given number of seconds, it is terminated.  This is useful for
+    recovering automatically from builds that are stuck in an infinite
+    loop but keep producing output, and for which
+    <literal>--max-silent-time</literal> is ineffective.</para>
+  </listitem>
+
 </itemizedlist>
 
 </section>

@@ -72,6 +72,10 @@ extern string thisSystem;
    infinity. */
 extern time_t maxSilentTime;
 
+/* The maximum duration in seconds that a builder can run.  0 means
+   infinity.  */
+extern time_t buildTimeout;
+
 /* The substituters.  There are programs that can somehow realise a
    store path without building, e.g., by downloading it or copying it
    from a CD. */

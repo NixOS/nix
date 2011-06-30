@@ -26,6 +26,7 @@ unsigned int buildCores = 1;
 bool readOnlyMode = false;
 string thisSystem = "unset";
 time_t maxSilentTime = 0;
+time_t buildTimeout = 0;
 Paths substituters;
 bool useBuildHook = true;
 bool printBuildTrace = false;

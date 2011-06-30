@@ -209,7 +209,10 @@ private:
 
     /* Last time the goals in `waitingForAWhile' where woken up. */
     time_t lastWokenUp;
-    
+
+    /* Last time `waitForInput' was last called.  */
+    time_t lastWait;
+
 public:
 
     bool cacheFailure;
@@ -681,7 +684,8 @@ HookInstance::HookInstance()
             builderOut.readSide.close();
             if (dup2(builderOut.writeSide, 4) == -1)
                 throw SysError("dupping builder's stdout/stderr");
-            
+
+	    /* XXX: Pass `buildTimeout' to the hook?  */
             execl(buildHook.c_str(), buildHook.c_str(), thisSystem.c_str(),
                 (format("%1%") % maxSilentTime).str().c_str(),
                 (format("%1%") % printBuildTrace).str().c_str(),
@@ -2666,7 +2670,14 @@ void Worker::waitForInput()
     struct timeval timeout;
     timeout.tv_usec = 0;
     time_t before = time(0);
-        
+
+    /* If a global timeout has been set, sleep until it's done.  */
+    if (buildTimeout != 0) {
+	useTimeout = true;
+        if (lastWait == 0 || lastWait > before) lastWait = before;
+	timeout.tv_sec = std::max((time_t) 0, lastWait + buildTimeout - before);
+    }
+
     /* If we're monitoring for silence on stdout/stderr, sleep until
        the first deadline for any child. */
     if (maxSilentTime != 0) {
@@ -2678,8 +2689,11 @@ void Worker::waitForInput()
             }
         }
         if (oldest) {
+	    time_t silenceTimeout = std::max((time_t) 0, oldest + maxSilentTime - before);
+            timeout.tv_sec = useTimeout
+		? std::min(silenceTimeout, timeout.tv_sec)
+		: silenceTimeout;
             useTimeout = true;
-            timeout.tv_sec = std::max((time_t) 0, oldest + maxSilentTime - before);
             printMsg(lvlVomit, format("sleeping %1% seconds") % timeout.tv_sec);
         }
     }
@@ -2716,6 +2730,9 @@ void Worker::waitForInput()
     }
 
     time_t after = time(0);
+
+    /* Keep track of when we were last called.  */
+    lastWait = after;
 
     /* Process all available file descriptors. */
 
@@ -2763,6 +2780,15 @@ void Worker::waitForInput()
             printMsg(lvlError,
                 format("%1% timed out after %2% seconds of silence")
                 % goal->getName() % maxSilentTime);
+            goal->cancel();
+        }
+
+	if (buildTimeout != 0 &&
+	    after - before >= (time_t) buildTimeout)
+        {
+            printMsg(lvlError,
+                format("%1% timed out after %2% seconds of activity")
+                % goal->getName() % buildTimeout);
             goal->cancel();
         }
     }
