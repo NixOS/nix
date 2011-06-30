@@ -134,6 +134,8 @@ env-keep-derivations = false
 
     </listitem>
 
+  </varlistentry>
+
   <varlistentry xml:id="conf-build-timeout"><term><literal>build-timeout</literal></term>
 
     <listitem>
