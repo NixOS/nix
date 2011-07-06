@@ -40,6 +40,12 @@ struct EvalState;
 struct StaticEnv;
 
 
+/* An attribute path is a sequence of attribute names. */
+typedef vector<Symbol> AttrPath;
+
+string showAttrPath(const AttrPath & attrPath);
+
+
 /* Abstract syntax of Nix expressions. */
 
 struct Expr
@@ -124,8 +130,8 @@ struct ExprSelect : Expr
 struct ExprOpHasAttr : Expr
 {
     Expr * e;
-    Symbol name;
-    ExprOpHasAttr(Expr * e, const Symbol & name) : e(e), name(name) { };
+    AttrPath attrPath;
+    ExprOpHasAttr(Expr * e, const AttrPath & attrPath) : e(e), attrPath(attrPath) { };
     COMMON_METHODS
 };
 

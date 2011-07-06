@@ -656,9 +656,25 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
 {
-    Value vAttrs;
-    state.evalAttrs(env, e, vAttrs);
-    mkBool(v, vAttrs.attrs->find(name) != vAttrs.attrs->end());
+    Value vTmp;
+    Value * vAttrs = &vTmp;
+
+    state.eval(env, e, vTmp);
+
+    foreach (AttrPath::const_iterator, i, attrPath) {
+        state.forceValue(*vAttrs);
+        Bindings::iterator j;
+        if (vAttrs->type != tAttrs ||
+            (j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+        {
+            mkBool(v, false);
+            return;
+        } else {
+            vAttrs = j->value;
+        }
+    }
+    
+    mkBool(v, true);
 }
 
 

@@ -61,18 +61,7 @@ using namespace nix;
 namespace nix {
     
 
-static string showAttrPath(const vector<Symbol> & attrPath)
-{
-    string s;
-    foreach (vector<Symbol>::const_iterator, i, attrPath) {
-        if (!s.empty()) s += '.';
-        s += *i;
-    }
-    return s;
-}
-
-
-static void dupAttr(const vector<Symbol> & attrPath, const Pos & pos, const Pos & prevPos)
+static void dupAttr(const AttrPath & attrPath, const Pos & pos, const Pos & prevPos)
 {
     throw ParseError(format("attribute `%1%' at %2% already defined at %3%")
         % showAttrPath(attrPath) % pos % prevPos);
@@ -81,17 +70,17 @@ static void dupAttr(const vector<Symbol> & attrPath, const Pos & pos, const Pos 
 
 static void dupAttr(Symbol attr, const Pos & pos, const Pos & prevPos)
 {
-    vector<Symbol> attrPath; attrPath.push_back(attr);
+    AttrPath attrPath; attrPath.push_back(attr);
     throw ParseError(format("attribute `%1%' at %2% already defined at %3%")
         % showAttrPath(attrPath) % pos % prevPos);
 }
  
 
-static void addAttr(ExprAttrs * attrs, const vector<Symbol> & attrPath,
+static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
     Expr * e, const Pos & pos)
 {
     unsigned int n = 0;
-    foreach (vector<Symbol>::const_iterator, i, attrPath) {
+    foreach (AttrPath::const_iterator, i, attrPath) {
         n++;
         ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(*i);
         if (j != attrs->attrs.end()) {
@@ -238,6 +227,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %}
 
 %union {
+  // !!! We're probably leaking stuff here.  
   nix::Expr * e;
   nix::ExprList * list;
   nix::ExprAttrs * attrs;
@@ -317,7 +307,7 @@ expr_op
   | expr_op OR expr_op { $$ = new ExprOpOr($1, $3); }
   | expr_op IMPL expr_op { $$ = new ExprOpImpl($1, $3); }
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate($1, $3); }
-  | expr_op '?' ID { $$ = new ExprOpHasAttr($1, data->symbols.create($3)); }
+  | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, *$3); }
   | expr_op '+' expr_op
     { vector<Expr *> * l = new vector<Expr *>;
       l->push_back($1);
@@ -382,7 +372,7 @@ binds
   : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, *$2, $4, makeCurPos(@2, data)); }
   | binds INHERIT ids ';'
     { $$ = $1;
-      foreach (vector<Symbol>::iterator, i, *$3) {
+      foreach (AttrPath::iterator, i, *$3) {
           if ($$->attrs.find(*i) != $$->attrs.end())
               dupAttr(*i, makeCurPos(@3, data), $$->attrs[*i].pos);
           Pos pos = makeCurPos(@3, data);
@@ -392,7 +382,7 @@ binds
   | binds INHERIT '(' expr ')' ids ';'
     { $$ = $1;
       /* !!! Should ensure sharing of the expression in $4. */
-      foreach (vector<Symbol>::iterator, i, *$6) {
+      foreach (AttrPath::iterator, i, *$6) {
           if ($$->attrs.find(*i) != $$->attrs.end())
               dupAttr(*i, makeCurPos(@6, data), $$->attrs[*i].pos);
           $$->attrs[*i] = ExprAttrs::AttrDef(new ExprSelect($4, *i), makeCurPos(@6, data));

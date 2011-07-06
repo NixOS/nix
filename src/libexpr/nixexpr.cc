@@ -48,7 +48,7 @@ void ExprSelect::show(std::ostream & str)
 
 void ExprOpHasAttr::show(std::ostream & str)
 {
-    str << "(" << *e << ") ? " << name;
+    str << "(" << *e << ") ? " << showAttrPath(attrPath);
 }
 
 void ExprAttrs::show(std::ostream & str)
@@ -137,6 +137,17 @@ std::ostream & operator << (std::ostream & str, const Pos & pos)
     else
         str << (format("`%1%:%2%:%3%'") % pos.file % pos.line % pos.column).str();
     return str;
+}
+
+
+string showAttrPath(const AttrPath & attrPath)
+{
+    string s;
+    foreach (AttrPath::const_iterator, i, attrPath) {
+        if (!s.empty()) s += '.';
+        s += *i;
+    }
+    return s;
 }
 
 
