@@ -43,7 +43,7 @@ void ExprVar::show(std::ostream & str)
 
 void ExprSelect::show(std::ostream & str)
 {
-    str << "(" << *e << ")." << name;
+    str << "(" << *e << ")." << showAttrPath(attrPath);
 }
 
 void ExprOpHasAttr::show(std::ostream & str)

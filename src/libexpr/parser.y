@@ -325,8 +325,8 @@ expr_app
   ;
 
 expr_select
-  : expr_select '.' ID
-    { $$ = new ExprSelect($1, data->symbols.create($3)); }
+  : expr_simple '.' attrpath
+    { $$ = new ExprSelect($1, *$3); }
   | expr_simple { $$ = $1; }
   ;
 
@@ -382,7 +382,7 @@ binds
   | binds INHERIT '(' expr ')' ids ';'
     { $$ = $1;
       /* !!! Should ensure sharing of the expression in $4. */
-      foreach (AttrPath::iterator, i, *$6) {
+      foreach (vector<Symbol>::iterator, i, *$6) {
           if ($$->attrs.find(*i) != $$->attrs.end())
               dupAttr(*i, makeCurPos(@6, data), $$->attrs[*i].pos);
           $$->attrs[*i] = ExprAttrs::AttrDef(new ExprSelect($4, *i), makeCurPos(@6, data));

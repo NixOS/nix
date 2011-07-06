@@ -122,8 +122,9 @@ struct ExprVar : Expr
 struct ExprSelect : Expr
 {
     Expr * e;
-    Symbol name;
-    ExprSelect(Expr * e, const Symbol & name) : e(e), name(name) { };
+    AttrPath attrPath;
+    ExprSelect(Expr * e, const AttrPath & attrPath) : e(e), attrPath(attrPath) { };
+    ExprSelect(Expr * e, const Symbol & name) : e(e) { attrPath.push_back(name); };
     COMMON_METHODS
 };
 

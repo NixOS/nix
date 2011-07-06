@@ -636,21 +636,35 @@ unsigned long nrLookupSize = 0;
 
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
-    nrLookups++;
-    Value v2;
-    state.evalAttrs(env, e, v2);
-    nrLookupSize += v2.attrs->size();
-    Bindings::iterator i = v2.attrs->find(name);
-    if (i == v2.attrs->end())
-        throwEvalError("attribute `%1%' missing", name);
-    try {            
-        state.forceValue(*i->value);
+    Value vTmp;
+    Pos * pos = 0;
+    Value * vAttrs = &vTmp;
+
+    state.eval(env, e, vTmp);
+
+    try {
+        
+        foreach (AttrPath::const_iterator, i, attrPath) {
+            nrLookups++;
+            state.forceAttrs(*vAttrs);
+            nrLookupSize += vAttrs->attrs->size();
+            Bindings::iterator j;
+            if ((j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+                throwEvalError("attribute `%1%' missing", showAttrPath(attrPath));
+            vAttrs = j->value;
+            pos = j->pos;
+        }
+    
+        state.forceValue(*vAttrs);
+        
     } catch (Error & e) {
-        addErrorPrefix(e, "while evaluating the attribute `%1%' at %2%:\n",
-            name, *i->pos);
+        if (pos)
+            addErrorPrefix(e, "while evaluating the attribute `%1%' at %2%:\n",
+                showAttrPath(attrPath), *pos);
         throw;
     }
-    v = *i->value;
+    
+    v = *vAttrs;
 }
 
 
