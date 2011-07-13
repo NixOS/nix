@@ -267,6 +267,12 @@ my @path = computeSmallestDownload $targetPath;
 die "don't know how to produce $targetPath\n" if scalar @path == 0;
 
 
+# We don't need the manifest anymore, so close it as an optimisation:
+# if we still have SQLite locks blocking other processes (we
+# shouldn't), this gets rid of them.
+$dbh->disconnect;
+
+
 # Traverse the shortest path, perform the actions described by the
 # edges.
 my $curStep = 1;

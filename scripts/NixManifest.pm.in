@@ -219,11 +219,12 @@ sub updateManifestDB {
     # Open/create the database.
     our $dbh = DBI->connect("dbi:SQLite:dbname=$dbPath", "", "")
         or die "cannot open database `$dbPath'";
-    $dbh->{AutoCommit} = 0;
     $dbh->{RaiseError} = 1;
     $dbh->{PrintError} = 0;
 
     $dbh->do("pragma foreign_keys = on");
+    $dbh->do("pragma synchronous = off"); # we can always reproduce the cache
+    $dbh->do("pragma journal_mode = truncate");
 
     # Initialise the database schema, if necessary.
     $dbh->do(<<EOF);
@@ -278,6 +279,8 @@ EOF
     open MAINLOCK, ">>$manifestDir/cache.lock" or die;
     flock(MAINLOCK, LOCK_EX) or die;
 
+    $dbh->begin_work;
+
     # Read each manifest in $manifestDir and add it to the database,
     # unless we've already done so on a previous run.
     my %seen;
@@ -291,6 +294,8 @@ EOF
             "select 1 from Manifests where path = ? and timestamp = ?",
             {}, $manifest, $timestamp)} == 1;
 
+        print STDERR "caching $manifest...\n";
+        
         $dbh->do("delete from Manifests where path = ?", {}, $manifest);
                  
         $dbh->do("insert into Manifests(path, timestamp) values (?, ?)",
