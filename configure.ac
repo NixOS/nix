@@ -207,7 +207,7 @@ AC_SUBST(xmlflags)
 
 
 AC_ARG_WITH(store-dir, AC_HELP_STRING([--with-store-dir=PATH],
-  [path of the Nix store]),
+  [path of the Nix store (defaults to /nix/store)]),
   storedir=$withval, storedir='/nix/store')
 AC_SUBST(storedir)
 
