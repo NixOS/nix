@@ -632,7 +632,6 @@ void ExprVar::eval(EvalState & state, Env & env, Value & v)
 
 
 unsigned long nrLookups = 0;
-unsigned long nrLookupSize = 0;
 
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
@@ -646,11 +645,20 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
         
         foreach (AttrPath::const_iterator, i, attrPath) {
             nrLookups++;
-            state.forceAttrs(*vAttrs);
-            nrLookupSize += vAttrs->attrs->size();
             Bindings::iterator j;
-            if ((j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
-                throwEvalError("attribute `%1%' missing", showAttrPath(attrPath));
+            if (def) {
+                state.forceValue(*vAttrs);
+                if (vAttrs->type != tAttrs ||
+                    (j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+                {
+                    state.eval(env, def, v);
+                    return;
+                }
+            } else {
+                state.forceAttrs(*vAttrs);
+                if ((j = vAttrs->attrs->find(*i)) == vAttrs->attrs->end())
+                    throwEvalError("attribute `%1%' missing", showAttrPath(attrPath));
+            }
             vAttrs = j->value;
             pos = j->pos;
         }
@@ -1270,7 +1278,6 @@ void EvalState::printStats()
     printMsg(v, format("  number of thunks: %1%") % nrThunks);
     printMsg(v, format("  number of thunks avoided: %1%") % nrAvoided);
     printMsg(v, format("  number of attr lookups: %1%") % nrLookups);
-    printMsg(v, format("  attr lookup size: %1%") % nrLookupSize);
 }
 
 

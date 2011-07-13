@@ -44,6 +44,7 @@ void ExprVar::show(std::ostream & str)
 void ExprSelect::show(std::ostream & str)
 {
     str << "(" << *e << ")." << showAttrPath(attrPath);
+    if (def) str << " or " << *def;
 }
 
 void ExprOpHasAttr::show(std::ostream & str)
@@ -211,6 +212,7 @@ void ExprVar::bindVars(const StaticEnv & env)
 void ExprSelect::bindVars(const StaticEnv & env)
 {
     e->bindVars(env);
+    if (def) def->bindVars(env);
 }
 
 void ExprOpHasAttr::bindVars(const StaticEnv & env)

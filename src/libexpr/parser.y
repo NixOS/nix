@@ -237,7 +237,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   char * id; // !!! -> Symbol
   char * path;
   char * uri;
-  std::vector<nix::Symbol> * ids;
+  std::vector<nix::Symbol> * attrNames;
   std::vector<nix::Expr *> * string_parts;
 }
 
@@ -247,14 +247,15 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <attrs> binds
 %type <formals> formals
 %type <formal> formal
-%type <ids> ids attrpath
+%type <attrNames> attrs attrpath
 %type <string_parts> string_parts ind_string_parts
+%type <id> attr
 %token <id> ID ATTRPATH
 %token <e> STR IND_STR
 %token <n> INT
 %token <path> PATH
 %token <uri> URI
-%token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL
+%token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW
 %token DOLLAR_CURLY /* == ${ */
 %token IND_STRING_OPEN IND_STRING_CLOSE
 %token ELLIPSIS
@@ -326,7 +327,13 @@ expr_app
 
 expr_select
   : expr_simple '.' attrpath
-    { $$ = new ExprSelect($1, *$3); }
+    { $$ = new ExprSelect($1, *$3, 0); }
+  | expr_simple '.' attrpath OR_KW expr_select
+    { $$ = new ExprSelect($1, *$3, $5); }
+  | /* Backwards compatibility: because Nixpkgs has a rarely used
+       function named ‘or’, allow stuff like ‘map or [...]’. */
+    expr_simple OR_KW
+    { $$ = new ExprApp($1, new ExprVar(data->symbols.create("or"))); }
   | expr_simple { $$ = $1; }
   ;
 
@@ -370,7 +377,7 @@ ind_string_parts
 
 binds
   : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, *$2, $4, makeCurPos(@2, data)); }
-  | binds INHERIT ids ';'
+  | binds INHERIT attrs ';'
     { $$ = $1;
       foreach (AttrPath::iterator, i, *$3) {
           if ($$->attrs.find(*i) != $$->attrs.end())
@@ -379,26 +386,31 @@ binds
           $$->attrs[*i] = ExprAttrs::AttrDef(*i, pos);
       }
     }
-  | binds INHERIT '(' expr ')' ids ';'
+  | binds INHERIT '(' expr ')' attrs ';'
     { $$ = $1;
       /* !!! Should ensure sharing of the expression in $4. */
       foreach (vector<Symbol>::iterator, i, *$6) {
           if ($$->attrs.find(*i) != $$->attrs.end())
               dupAttr(*i, makeCurPos(@6, data), $$->attrs[*i].pos);
           $$->attrs[*i] = ExprAttrs::AttrDef(new ExprSelect($4, *i), makeCurPos(@6, data));
-      }}
-
+      }
+    }
   | { $$ = new ExprAttrs; }
   ;
 
-ids
-  : ids ID { $$ = $1; $1->push_back(data->symbols.create($2)); /* !!! dangerous */ }
+attrs
+  : attrs attr { $$ = $1; $1->push_back(data->symbols.create($2)); /* !!! dangerous */ }
   | { $$ = new vector<Symbol>; }
   ;
 
 attrpath
-  : attrpath '.' ID { $$ = $1; $1->push_back(data->symbols.create($3)); }
-  | ID { $$ = new vector<Symbol>; $$->push_back(data->symbols.create($1)); }
+  : attrpath '.' attr { $$ = $1; $1->push_back(data->symbols.create($3)); }
+  | attr { $$ = new vector<Symbol>; $$->push_back(data->symbols.create($1)); }
+  ;
+
+attr
+  : ID { $$ = $1; }
+  | OR_KW { $$ = "or"; }
   ;
 
 expr_list

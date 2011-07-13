@@ -67,7 +67,7 @@ The hook `nix-mode-hook' is run when Nix mode is started.
 
 (defvar nix-keywords
   '("\\<if\\>" "\\<then\\>" "\\<else\\>" "\\<assert\\>" "\\<with\\>"
-    "\\<let\\>" "\\<in\\>" "\\<rec\\>" "\\<inherit\\>"
+    "\\<let\\>" "\\<in\\>" "\\<rec\\>" "\\<inherit\\>" "\\<or\\>"
     ("\\<true\\>" . font-lock-builtin-face)
     ("\\<false\\>" . font-lock-builtin-face)
     ("\\<null\\>" . font-lock-builtin-face)

@@ -32,6 +32,10 @@
     <literal>--max-silent-time</literal> is ineffective.</para>
   </listitem>
 
+  <listitem>
+    <para>TODO: “or” keyword.</para>
+  </listitem>
+
 </itemizedlist>
 
 </section>
