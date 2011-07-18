@@ -337,6 +337,9 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     string outputHash, outputHashAlgo;
     bool outputHashRecursive = false;
 
+    StringSet outputs;
+    outputs.insert("out");
+
     foreach (Bindings::iterator, i, *args[0]->attrs) {
         string key = i->name;
         startNest(nest, lvlVomit, format("processing attribute `%1%'") % key);
@@ -367,6 +370,24 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
                     if (s == "recursive") outputHashRecursive = true; 
                     else if (s == "flat") outputHashRecursive = false;
                     else throw EvalError(format("invalid value `%1%' for `outputHashMode' attribute") % s);
+                }
+                else if (key == "outputs") {
+                    Strings tmp = tokenizeString(s);
+                    outputs.clear();
+                    foreach (Strings::iterator, j, tmp) {
+                        if (outputs.find(*j) != outputs.end())
+                            throw EvalError(format("duplicate derivation output `%1%'") % *j);
+                        /* !!! Check whether *j is a valid attribute
+                           name. */
+                        /* Derivations cannot be named ‘drv’, because
+                           then we'd have an attribute ‘drvPath’ in
+                           the resulting set. */
+                        if (*j == "drv")
+                            throw EvalError(format("invalid derivation output name `drv'") % *j);
+                        outputs.insert(*j);
+                    }
+                    if (outputs.empty())
+                        throw EvalError("derivation cannot have an empty set of outputs");
                 }
             }
 
@@ -424,54 +445,68 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     if (drv.platform == "")
         throw EvalError("required attribute `system' missing");
 
-    /* If an output hash was given, check it. */
-    Path outPath;
-    if (outputHash == "")
-        outputHashAlgo = "";
-    else {
-        HashType ht = parseHashType(outputHashAlgo);
-        if (ht == htUnknown)
-            throw EvalError(format("unknown hash algorithm `%1%'") % outputHashAlgo);
-        Hash h(ht);
-        if (outputHash.size() == h.hashSize * 2)
-            /* hexadecimal representation */
-            h = parseHash(ht, outputHash);
-        else if (outputHash.size() == hashLength32(h))
-            /* base-32 representation */
-            h = parseHash32(ht, outputHash);
-        else
-            throw Error(format("hash `%1%' has wrong length for hash type `%2%'")
-                % outputHash % outputHashAlgo);
-        string s = outputHash;
-        outputHash = printHash(h);
-        outPath = makeFixedOutputPath(outputHashRecursive, ht, h, drvName);
-        if (outputHashRecursive) outputHashAlgo = "r:" + outputHashAlgo;
-    }
-
     /* Check whether the derivation name is valid. */
     checkStoreName(drvName);
     if (isDerivation(drvName))
         throw EvalError(format("derivation names are not allowed to end in `%1%'")
             % drvExtension);
 
-    /* Construct the "masked" derivation store expression, which is
-       the final one except that in the list of outputs, the output
-       paths are empty, and the corresponding environment variables
-       have an empty value.  This ensures that changes in the set of
-       output names do get reflected in the hash. */
-    drv.env["out"] = "";
-    drv.outputs["out"] = DerivationOutput("", outputHashAlgo, outputHash);
-        
+    /* Construct the "masked" store derivation, which is the final one
+       except that in the list of outputs, the output paths are empty,
+       and the corresponding environment variables have an empty
+       value.  This ensures that changes in the set of output names do
+       get reflected in the hash.
+
+       However, for fixed-output derivations, we can compute the
+       output path directly, so we don't need this. */
+    bool fixedOnly = true;
+    foreach (StringSet::iterator, i, outputs) {
+        if (*i != "out" || outputHash == "") {
+            drv.env[*i] = "";
+            drv.outputs[*i] = DerivationOutput("", "", "");
+            fixedOnly = false;
+        } else {
+            /* If an output hash was given, check it, and compute the
+               output path. */
+            HashType ht = parseHashType(outputHashAlgo);
+            if (ht == htUnknown)
+                throw EvalError(format("unknown hash algorithm `%1%'") % outputHashAlgo);
+            Hash h(ht);
+            if (outputHash.size() == h.hashSize * 2)
+                /* hexadecimal representation */
+                h = parseHash(ht, outputHash);
+            else if (outputHash.size() == hashLength32(h))
+                /* base-32 representation */
+                h = parseHash32(ht, outputHash);
+            else
+                throw Error(format("hash `%1%' has wrong length for hash type `%2%'")
+                    % outputHash % outputHashAlgo);
+            string s = outputHash;
+            outputHash = printHash(h);
+            if (outputHashRecursive) outputHashAlgo = "r:" + outputHashAlgo;
+            Path outPath = makeFixedOutputPath(outputHashRecursive, ht, h, drvName);
+            drv.env[*i] = outPath;
+            drv.outputs[*i] = DerivationOutput(outPath, outputHashAlgo, outputHash);
+        }
+    }
+
     /* Use the masked derivation expression to compute the output
-       path. */
-    if (outPath == "")
-        outPath = makeStorePath("output:out", hashDerivationModulo(state, drv), drvName);
-
-    /* Construct the final derivation store expression. */
-    drv.env["out"] = outPath;
-    drv.outputs["out"] =
-        DerivationOutput(outPath, outputHashAlgo, outputHash);
-
+       path.  !!! Isn't it a potential security problem that the name
+       of each output path (including the suffix) isn't taken into
+       account?  For instance, changing the suffix for one path
+       (‘i->first == "out" ...’) doesn't affect the hash of the
+       others.  Is that exploitable? */
+    if (!fixedOnly) {
+        Hash h = hashDerivationModulo(state, drv);
+        foreach (DerivationOutputs::iterator, i, drv.outputs)
+            if (i->second.path == "") {
+                Path outPath = makeStorePath("output:" + i->first, h,
+                    drvName + (i->first == "out" ? "" : "-" + i->first));
+                drv.env[i->first] = outPath;
+                i->second.path = outPath;
+            }
+    }
+    
     /* Write the resulting term into the Nix store directory. */
     Path drvPath = writeDerivation(drv, drvName);
 
@@ -479,14 +514,18 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
         % drvName % drvPath);
 
     /* Optimisation, but required in read-only mode! because in that
-       case we don't actually write store expressions, so we can't
+       case we don't actually write store derivations, so we can't
        read them later. */
     state.drvHashes[drvPath] = hashDerivationModulo(state, drv);
 
-    /* !!! assumes a single output */
-    state.mkAttrs(v, 2);
-    mkString(*state.allocAttr(v, state.sOutPath), outPath, singleton<PathSet>(drvPath));
+    state.mkAttrs(v, 1 + drv.outputs.size());
     mkString(*state.allocAttr(v, state.sDrvPath), drvPath, singleton<PathSet>("=" + drvPath));
+    foreach (DerivationOutputs::iterator, i, drv.outputs) {
+        /* The output path of an output X is ‘<X>Path’,
+           e.g. ‘outPath’. */
+        mkString(*state.allocAttr(v, state.symbols.create(i->first + "Path")),
+            i->second.path, singleton<PathSet>(drvPath));
+    }
     v.attrs->sort();
 }
 
