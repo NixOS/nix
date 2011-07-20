@@ -469,6 +469,47 @@ void canonicalisePathMetaData(const Path & path)
 }
 
 
+void LocalStore::checkDerivationOutputs(const Path & drvPath, const Derivation & drv)
+{
+    string drvName = storePathToName(drvPath);
+    assert(isDerivation(drvName));
+    drvName = string(drvName, 0, drvName.size() - drvExtension.size());
+        
+    if (isFixedOutputDrv(drv)) {
+        DerivationOutputs::const_iterator out = drv.outputs.find("out");
+        if (out == drv.outputs.end())
+            throw Error(format("derivation `%1%' does not have an output named `out'") % drvPath);
+
+        bool recursive; HashType ht; Hash h;
+        out->second.parseHashInfo(recursive, ht, h);
+        Path outPath = makeFixedOutputPath(recursive, ht, h, drvName);
+
+        StringPairs::const_iterator j = drv.env.find("out");
+        if (out->second.path != outPath || j == drv.env.end() || j->second != outPath)
+            throw Error(format("derivation `%1%' has incorrect output `%2%', should be `%3%'")
+                % drvPath % out->second.path % outPath);
+    }
+
+    else {
+        Derivation drvCopy(drv);
+        foreach (DerivationOutputs::iterator, i, drvCopy.outputs) {
+            i->second.path = "";
+            drvCopy.env[i->first] = "";
+        }
+
+        Hash h = hashDerivationModulo(drvCopy);
+        
+        foreach (DerivationOutputs::const_iterator, i, drv.outputs) {
+            Path outPath = makeOutputPath(i->first, h, drvName);
+            StringPairs::const_iterator j = drv.env.find(i->first);
+            if (i->second.path != outPath || j == drv.env.end() || j->second != outPath)
+                throw Error(format("derivation `%1%' has incorrect output `%2%', should be `%3%'")
+                    % drvPath % i->second.path % outPath);
+        }
+    }
+}
+
+
 unsigned long long LocalStore::addValidPath(const ValidPathInfo & info)
 {
     SQLiteStmtUse use(stmtRegisterValidPath);
@@ -493,6 +534,14 @@ unsigned long long LocalStore::addValidPath(const ValidPathInfo & info)
        derivation. */
     if (isDerivation(info.path)) {
         Derivation drv = parseDerivation(readFile(info.path));
+        
+        /* Verify that the output paths in the derivation are correct
+           (i.e., follow the scheme for computing output paths from
+           derivations).  Note that if this throws an error, then the
+           DB transaction is rolled back, so the path validity
+           registration above is undone. */
+        checkDerivationOutputs(info.path, drv);
+        
         foreach (DerivationOutputs::iterator, i, drv.outputs) {
             SQLiteStmtUse use(stmtAddDerivationOutput);
             stmtAddDerivationOutput.bind(id);
@@ -924,6 +973,8 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 void LocalStore::invalidatePath(const Path & path)
 {
     debug(format("invalidating path `%1%'") % path);
+
+    drvHashes.erase(path);
 
     SQLiteStmtUse use(stmtInvalidatePath);
 

@@ -188,8 +188,6 @@ void mkPath(Value & v, const char * s);
 void copyContext(const Value & v, PathSet & context);
 
 
-typedef std::map<Path, Hash> DrvHashes;
-
 /* Cache for calls to addToStore(); maps source paths to the store
    paths. */
 typedef std::map<Path, Path> SrcToStore;
@@ -203,8 +201,6 @@ std::ostream & operator << (std::ostream & str, const Value & v);
 class EvalState 
 {
 public:
-    DrvHashes drvHashes; /* normalised derivation hashes */
-
     SymbolTable symbols;
 
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName,

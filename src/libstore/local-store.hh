@@ -25,6 +25,9 @@ const int nixSchemaVersion = 6;
 extern string drvsLogDir;
 
 
+struct Derivation;
+
+
 struct OptimiseStats
 {
     unsigned long totalFiles;
@@ -255,6 +258,8 @@ private:
         RunningSubstituter & runningSubstituter);
 
     Path createTempDirInStore();
+
+    void checkDerivationOutputs(const Path & drvPath, const Derivation & drv);
 };
 
 

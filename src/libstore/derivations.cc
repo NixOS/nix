@@ -2,9 +2,28 @@
 #include "store-api.hh"
 #include "globals.hh"
 #include "util.hh"
+#include "misc.hh"
 
 
 namespace nix {
+
+
+void DerivationOutput::parseHashInfo(bool & recursive, HashType & hashType, Hash & hash) const
+{
+    recursive = false;
+    string algo = hashAlgo;
+        
+    if (string(algo, 0, 2) == "r:") {
+        recursive = true;
+        algo = string(algo, 2);
+    }
+
+    hashType = parseHashType(algo);
+    if (hashType == htUnknown)
+        throw Error(format("unknown hash algorithm `%1%'") % algo);
+        
+    hash = parseHash(hashType, this->hash);
+}
 
 
 Path writeDerivation(const Derivation & drv, const string & name)
@@ -171,4 +190,64 @@ bool isDerivation(const string & fileName)
 }
 
  
+bool isFixedOutputDrv(const Derivation & drv)
+{
+    return drv.outputs.size() == 1 &&
+        drv.outputs.begin()->first == "out" &&
+        drv.outputs.begin()->second.hash != "";
+}
+
+
+DrvHashes drvHashes;
+
+
+/* Returns the hash of a derivation modulo fixed-output
+   subderivations.  A fixed-output derivation is a derivation with one
+   output (`out') for which an expected hash and hash algorithm are
+   specified (using the `outputHash' and `outputHashAlgo'
+   attributes).  We don't want changes to such derivations to
+   propagate upwards through the dependency graph, changing output
+   paths everywhere.
+
+   For instance, if we change the url in a call to the `fetchurl'
+   function, we do not want to rebuild everything depending on it
+   (after all, (the hash of) the file being downloaded is unchanged).
+   So the *output paths* should not change.  On the other hand, the
+   *derivation paths* should change to reflect the new dependency
+   graph.
+
+   That's what this function does: it returns a hash which is just the
+   hash of the derivation ATerm, except that any input derivation
+   paths have been replaced by the result of a recursive call to this
+   function, and that for fixed-output derivations we return a hash of
+   its output path. */
+Hash hashDerivationModulo(Derivation drv)
+{
+    /* Return a fixed hash for fixed-output derivations. */
+    if (isFixedOutputDrv(drv)) {
+        DerivationOutputs::const_iterator i = drv.outputs.begin();
+        return hashString(htSHA256, "fixed:out:"
+            + i->second.hashAlgo + ":"
+            + i->second.hash + ":"
+            + i->second.path);
+    }
+
+    /* For other derivations, replace the inputs paths with recursive
+       calls to this function.*/
+    DerivationInputs inputs2;
+    foreach (DerivationInputs::const_iterator, i, drv.inputDrvs) {
+        Hash h = drvHashes[i->first];
+        if (h.type == htUnknown) {
+            Derivation drv2 = derivationFromPath(i->first);
+            h = hashDerivationModulo(drv2);
+            drvHashes[i->first] = h;
+        }
+        inputs2[printHash(h)] = i->second;
+    }
+    drv.inputDrvs = inputs2;
+    
+    return hashString(htSHA256, unparseDerivation(drv));
+}
+
+
 }

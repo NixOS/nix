@@ -72,6 +72,13 @@ Path followLinksToStorePath(const Path & path)
 }
 
 
+string storePathToName(const Path & path)
+{
+    assertStorePath(path);
+    return string(path, nixStore.size() + 34);
+}
+
+
 void checkStoreName(const string & name)
 {
     string validChars = "+-._?=";
@@ -101,7 +108,9 @@ void checkStoreName(const string & name)
    
    <name> = a human readable name for the path, typically obtained
      from the name attribute of the derivation, or the name of the
-     source file from which the store path is created
+     source file from which the store path is created.  For derivation
+     outputs other than the default "out" output, the string "-<id>"
+     is suffixed to <name>.
      
    <h> = base-32 representation of the first 160 bits of a SHA-256
      hash of <s>; the hash part of the store name
@@ -120,11 +129,12 @@ void checkStoreName(const string & name)
      "source"
        for paths copied to the store using addToStore() when recursive
        = true and hashAlgo = "sha256"
-     "output:out"
+     "output:<id>"
        for either the outputs created by derivations, OR paths copied
        to the store using addToStore() with recursive != true or
        hashAlgo != "sha256" (in that case "source" is used; it's
-       silly, but it's done that way for compatibility).
+       silly, but it's done that way for compatibility).  <id> is the
+       name of the output (usually, "out").
 
    <h2> = base-16 representation of a SHA-256 hash of:
      if <type> = "text:...":
@@ -171,6 +181,14 @@ Path makeStorePath(const string & type,
     return nixStore + "/"
         + printHash32(compressHash(hashString(htSHA256, s), 20))
         + "-" + name;
+}
+
+
+Path makeOutputPath(const string & id,
+    const Hash & hash, const string & name)
+{
+    return makeStorePath("output:" + id, hash,
+        name + (id == "out" ? "" : "-" + id));
 }
 
 

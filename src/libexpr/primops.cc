@@ -246,63 +246,6 @@ static void prim_trace(EvalState & state, Value * * args, Value & v)
  *************************************************************/
 
 
-static bool isFixedOutput(const Derivation & drv)
-{
-    return drv.outputs.size() == 1 &&
-        drv.outputs.begin()->first == "out" &&
-        drv.outputs.begin()->second.hash != "";
-}
-
-
-/* Returns the hash of a derivation modulo fixed-output
-   subderivations.  A fixed-output derivation is a derivation with one
-   output (`out') for which an expected hash and hash algorithm are
-   specified (using the `outputHash' and `outputHashAlgo'
-   attributes).  We don't want changes to such derivations to
-   propagate upwards through the dependency graph, changing output
-   paths everywhere.
-
-   For instance, if we change the url in a call to the `fetchurl'
-   function, we do not want to rebuild everything depending on it
-   (after all, (the hash of) the file being downloaded is unchanged).
-   So the *output paths* should not change.  On the other hand, the
-   *derivation paths* should change to reflect the new dependency
-   graph.
-
-   That's what this function does: it returns a hash which is just the
-   hash of the derivation ATerm, except that any input derivation
-   paths have been replaced by the result of a recursive call to this
-   function, and that for fixed-output derivations we return a hash of
-   its output path. */
-static Hash hashDerivationModulo(EvalState & state, Derivation drv)
-{
-    /* Return a fixed hash for fixed-output derivations. */
-    if (isFixedOutput(drv)) {
-        DerivationOutputs::const_iterator i = drv.outputs.begin();
-        return hashString(htSHA256, "fixed:out:"
-            + i->second.hashAlgo + ":"
-            + i->second.hash + ":"
-            + i->second.path);
-    }
-
-    /* For other derivations, replace the inputs paths with recursive
-       calls to this function.*/
-    DerivationInputs inputs2;
-    foreach (DerivationInputs::const_iterator, i, drv.inputDrvs) {
-        Hash h = state.drvHashes[i->first];
-        if (h.type == htUnknown) {
-            Derivation drv2 = derivationFromPath(i->first);
-            h = hashDerivationModulo(state, drv2);
-            state.drvHashes[i->first] = h;
-        }
-        inputs2[printHash(h)] = i->second;
-    }
-    drv.inputDrvs = inputs2;
-    
-    return hashString(htSHA256, unparseDerivation(drv));
-}
-
-
 /* Construct (as a unobservable side effect) a Nix derivation
    expression that performs the derivation described by the argument
    set.  Returns the original set extended with the following
@@ -497,11 +440,10 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
        (‘i->first == "out" ...’) doesn't affect the hash of the
        others.  Is that exploitable? */
     if (!fixedOnly) {
-        Hash h = hashDerivationModulo(state, drv);
+        Hash h = hashDerivationModulo(drv);
         foreach (DerivationOutputs::iterator, i, drv.outputs)
             if (i->second.path == "") {
-                Path outPath = makeStorePath("output:" + i->first, h,
-                    drvName + (i->first == "out" ? "" : "-" + i->first));
+                Path outPath = makeOutputPath(i->first, h, drvName);
                 drv.env[i->first] = outPath;
                 i->second.path = outPath;
             }
@@ -516,7 +458,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store derivations, so we can't
        read them later. */
-    state.drvHashes[drvPath] = hashDerivationModulo(state, drv);
+    drvHashes[drvPath] = hashDerivationModulo(drv);
 
     state.mkAttrs(v, 1 + drv.outputs.size());
     mkString(*state.allocAttr(v, state.sDrvPath), drvPath, singleton<PathSet>("=" + drvPath));

@@ -1916,14 +1916,9 @@ void DerivationGoal::computeClosure()
            hash). */ 
         if (i->second.hash != "") {
 
-            bool recursive = false;
-            string algo = i->second.hashAlgo;
+            bool recursive; HashType ht; Hash h;
+            i->second.parseHashInfo(recursive, ht, h);
             
-            if (string(algo, 0, 2) == "r:") {
-                recursive = true;
-                algo = string(algo, 2);
-            }
-
             if (!recursive) {
                 /* The output path should be a regular file without
                    execute permission. */
@@ -1934,15 +1929,11 @@ void DerivationGoal::computeClosure()
             }
 
             /* Check the hash. */
-            HashType ht = parseHashType(algo);
-            if (ht == htUnknown)
-                throw BuildError(format("unknown hash algorithm `%1%'") % algo);
-            Hash h = parseHash(ht, i->second.hash);
             Hash h2 = recursive ? hashPath(ht, path).first : hashFile(ht, path);
             if (h != h2)
                 throw BuildError(
                     format("output path `%1%' should have %2% hash `%3%', instead has `%4%'")
-                    % path % algo % printHash(h) % printHash(h2));
+                    % path % i->second.hashAlgo % printHash(h) % printHash(h2));
         }
 
         /* Get rid of all weird permissions. */

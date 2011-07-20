@@ -250,6 +250,9 @@ void assertStorePath(const Path & path);
 bool isInStore(const Path & path);
 bool isStorePath(const Path & path);
 
+/* Extract the name part of the given store path. */
+string storePathToName(const Path & path);
+    
 void checkStoreName(const string & name);
 
 
@@ -271,6 +274,9 @@ Path followLinksToStorePath(const Path & path);
 Path makeStorePath(const string & type,
     const Hash & hash, const string & name);
     
+Path makeOutputPath(const string & id,
+    const Hash & hash, const string & name);
+
 Path makeFixedOutputPath(bool recursive,
     HashType hashAlgo, Hash hash, string name);
 

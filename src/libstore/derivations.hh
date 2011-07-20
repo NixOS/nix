@@ -4,6 +4,7 @@
 #include <map>
 
 #include "types.hh"
+#include "hash.hh"
 
 
 namespace nix {
@@ -29,6 +30,7 @@ struct DerivationOutput
         this->hashAlgo = hashAlgo;
         this->hash = hash;
     }
+    void parseHashInfo(bool & recursive, HashType & hashType, Hash & hash) const;
 };
 
 typedef std::map<string, DerivationOutput> DerivationOutputs;
@@ -64,7 +66,16 @@ string unparseDerivation(const Derivation & drv);
    derivations. */
 bool isDerivation(const string & fileName);
 
- 
+/* Return true iff this is a fixed-output derivation. */
+bool isFixedOutputDrv(const Derivation & drv);
+
+Hash hashDerivationModulo(Derivation drv);
+
+/* Memoisation of hashDerivationModulo(). */
+typedef std::map<Path, Hash> DrvHashes;
+
+extern DrvHashes drvHashes;
+
 }
 
 
