@@ -24,6 +24,14 @@ if (! -e $manifestDir) {
 }
 
 
+# Make sure that the manifests directory is scanned for GC roots.
+my $gcRootsDir = "$stateDir/gcroots";
+my $manifestDirLink = "$gcRootsDir/manifests";
+if (! -l $manifestDirLink) {
+    symlink($manifestDir, $manifestDirLink) or die "cannot create symlink `$manifestDirLink'";
+}
+
+
 # Process the URLs specified on the command line.
 my %narFiles;
 my %patches;
