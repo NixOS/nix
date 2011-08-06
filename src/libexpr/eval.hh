@@ -213,8 +213,9 @@ private:
 
     std::map<Path, Expr *> parseTrees;
 
-    Paths searchPath;
-    Paths::iterator searchPathInsertionPoint;
+    typedef list<std::pair<string, Path> > SearchPath;
+    SearchPath searchPath;
+    SearchPath::iterator searchPathInsertionPoint;
 
 public:
     

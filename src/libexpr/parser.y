@@ -530,18 +530,36 @@ Expr * EvalState::parseExprFromString(const string & s, const Path & basePath)
 
 void EvalState::addToSearchPath(const string & s)
 {
-    Path path = absPath(s);
+    size_t pos = s.find('=');
+    string prefix;
+    Path path;
+    if (pos == string::npos) {
+        path = s;
+    } else {
+        prefix = string(s, 0, pos);
+        path = string(s, pos + 1);
+    }
+    
+    path = absPath(path);
     if (pathExists(path)) {
         debug(format("adding path `%1%' to the search path") % path);
-        searchPath.insert(searchPathInsertionPoint, path);
+        searchPath.insert(searchPathInsertionPoint, std::pair<string, Path>(prefix, path));
     }
 }
 
 
 Path EvalState::findFile(const string & path)
 {
-    foreach (Paths::iterator, i, searchPath) {
-        Path res = *i + "/" + path;
+    foreach (SearchPath::iterator, i, searchPath) {
+        Path res;
+        if (i->first.empty()) 
+            res = i->second + "/" + path;
+        else {
+            if (path.compare(0, i->first.size(), i->first) != 0 ||
+                (path.size() > i->first.size() && path[i->first.size()] != '/'))
+                continue;
+            res = i->second + "/" + string(path, i->first.size());
+        }
         if (pathExists(res)) return canonPath(res);
     }
     return "";
