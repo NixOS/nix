@@ -33,5 +33,15 @@ bool parseOptionArg(const string & arg, Strings::iterator & i,
     return true;
 }
 
- 
+
+bool parseSearchPathArg(const string & arg, Strings::iterator & i,
+    const Strings::iterator & argsEnd, EvalState & state)
+{
+    if (arg != "-I") return false;
+    if (i == argsEnd) throw UsageError(format("`%1%' requires an argument") % arg);;
+    state.addToSearchPath(*i++);
+    return true;
+}
+
+
 }

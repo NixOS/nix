@@ -107,6 +107,8 @@ void run(Strings args)
         }
         else if (parseOptionArg(arg, i, args.end(), state, autoArgs))
             ;
+        else if (parseSearchPathArg(arg, i, args.end(), state))
+            ;
         else if (arg == "--add-root") {
             if (i == args.end())
                 throw UsageError("`--add-root' requires an argument");

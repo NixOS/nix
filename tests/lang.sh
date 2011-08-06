@@ -40,7 +40,7 @@ for i in lang/eval-okay-*.nix; do
         if test -e lang/$i.flags; then
             flags=$(cat lang/$i.flags)
         fi
-        if ! $nixinstantiate $flags --eval-only --strict lang/$i.nix > lang/$i.out; then
+        if ! NIX_PATH=lang/dir3:lang/dir4 $nixinstantiate $flags --eval-only --strict lang/$i.nix > lang/$i.out; then
             echo "FAIL: $i should evaluate"
             fail=1
         elif ! diff lang/$i.out lang/$i.exp; then

@@ -181,6 +181,12 @@ EvalState::EvalState()
         gcInitialised = true;
     }
 #endif
+
+    /* Initialise the Nix expression search path. */
+    searchPathInsertionPoint = searchPath.end();
+    Strings paths = tokenizeString(getEnv("NIX_PATH", ""), ":");
+    foreach (Strings::iterator, i, paths) addToSearchPath(*i);
+    searchPathInsertionPoint = searchPath.begin();
 }
 
 

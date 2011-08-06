@@ -17,19 +17,22 @@
 #include "util.hh"
     
 #include "nixexpr.hh"
+#include "eval.hh"
 
 namespace nix {
 
     struct ParseData 
     {
+        EvalState & state;
         SymbolTable & symbols;
         Expr * result;
         Path basePath;
         Path path;
         string error;
         Symbol sLetBody;
-        ParseData(SymbolTable & symbols)
-            : symbols(symbols)
+        ParseData(EvalState & state)
+            : state(state)
+            , symbols(state.symbols)
             , sLetBody(symbols.create("<let-body>"))
             { };
     };
@@ -253,7 +256,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %token <id> ID ATTRPATH
 %token <e> STR IND_STR
 %token <n> INT
-%token <path> PATH
+%token <path> PATH SPATH
 %token <uri> URI
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW
 %token DOLLAR_CURLY /* == ${ */
@@ -350,6 +353,20 @@ expr_simple
       $$ = stripIndentation(data->symbols, *$2);
   }
   | PATH { $$ = new ExprPath(absPath($1, data->basePath)); }
+  | SPATH {
+      string path($1 + 1, strlen($1) - 2);
+      Path path2 = data->state.findFile(path);
+      /* The file wasn't found in the search path.  However, we can't
+         throw an error here, because the expression might never be
+         evaluated.  So return an expression that lazily calls
+         ‘abort’. */
+      $$ = path2 == ""
+          ? (Expr * ) new ExprApp(
+              new ExprVar(data->symbols.create("throw")),
+              new ExprString(data->symbols.create(
+                      (format("file `%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)") % path).str())))
+          : (Expr * ) new ExprPath(path2);
+  }
   | URI { $$ = new ExprString(data->symbols.create($1)); }
   | '(' expr ')' { $$ = $2; }
   /* Let expressions `let {..., body = ...}' are just desugared
@@ -454,7 +471,7 @@ Expr * EvalState::parse(const char * text,
     const Path & path, const Path & basePath)
 {
     yyscan_t scanner;
-    ParseData data(symbols);
+    ParseData data(*this);
     data.basePath = basePath;
     data.path = path;
 
@@ -510,5 +527,25 @@ Expr * EvalState::parseExprFromString(const string & s, const Path & basePath)
     return parse(s.c_str(), "(string)", basePath);
 }
 
- 
+
+void EvalState::addToSearchPath(const string & s)
+{
+    Path path = absPath(s);
+    if (pathExists(path)) {
+        debug(format("adding path `%1%' to the search path") % path);
+        searchPath.insert(searchPathInsertionPoint, path);
+    }
+}
+
+
+Path EvalState::findFile(const string & path)
+{
+    foreach (Paths::iterator, i, searchPath) {
+        Path res = *i + "/" + path;
+        if (pathExists(res)) return canonPath(res);
+    }
+    return "";
+}
+
+
 }

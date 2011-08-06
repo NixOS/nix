@@ -36,6 +36,10 @@
     <para>TODO: “or” keyword.</para>
   </listitem>
 
+  <listitem>
+    <para>TODO: Nix expression search path (<literal>import &lt;foo/bar.nix></literal>).</para>
+  </listitem>
+
 </itemizedlist>
 
 </section>

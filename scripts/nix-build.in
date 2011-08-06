@@ -76,10 +76,10 @@ EOF
         $outLink = $ARGV[$n];
     }
 
-    elsif ($arg eq "--attr" or $arg eq "-A") {
+    elsif ($arg eq "--attr" or $arg eq "-A" or $arg eq "-I") {
         $n++;
         die "$0: `$arg' requires an argument\n" unless $n < scalar @ARGV;
-        push @instArgs, ("--attr", $ARGV[$n]);
+        push @instArgs, ($arg, $ARGV[$n]);
     }
 
     elsif ($arg eq "--arg" || $arg eq "--argstr") {

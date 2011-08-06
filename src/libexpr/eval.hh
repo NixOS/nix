@@ -213,10 +213,15 @@ private:
 
     std::map<Path, Expr *> parseTrees;
 
+    Paths searchPath;
+    Paths::iterator searchPathInsertionPoint;
+
 public:
     
     EvalState();
     ~EvalState();
+
+    void addToSearchPath(const string & s);
 
     /* Parse a Nix expression from the specified file.  If `path'
        refers to a directory, then "/default.nix" is appended. */
@@ -228,6 +233,9 @@ public:
     /* Evaluate an expression read from the given file to normal
        form. */
     void evalFile(const Path & path, Value & v);
+
+    /* Look up a file in the search path. */
+    Path findFile(const string & path);
 
     /* Evaluate an expression to normal form, storing the result in
        value `v'. */

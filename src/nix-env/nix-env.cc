@@ -1253,6 +1253,8 @@ void run(Strings args)
         else if (parseOptionArg(arg, i, args.end(),
                      globals.state, globals.instSource.autoArgs))
             ;
+        else if (parseSearchPathArg(arg, i, args.end(), globals.state))
+            ;
         else if (arg == "--force-name") // undocumented flag for nix-install-package
             globals.forceName = needArg(i, args, arg);
         else if (arg == "--uninstall" || arg == "-e")
