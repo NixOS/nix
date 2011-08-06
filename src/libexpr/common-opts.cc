@@ -1,7 +1,6 @@
 #include "common-opts.hh"
 #include "../libmain/shared.hh"
 #include "util.hh"
-#include "parser.hh"
 
 
 namespace nix {
@@ -25,7 +24,7 @@ bool parseOptionArg(const string & arg, Strings::iterator & i,
     autoArgs.push_back(Attr(state.symbols.create(name), v));
 
     if (arg == "--arg")
-        state.mkThunk_(*v, parseExprFromString(state, value, absPath(".")));
+        state.mkThunk_(*v, state.parseExprFromString(value, absPath(".")));
     else
         mkString(*v, value);
 

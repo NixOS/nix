@@ -450,11 +450,11 @@ formal
 namespace nix {
       
 
-static Expr * parse(EvalState & state, const char * text,
+Expr * EvalState::parse(const char * text,
     const Path & path, const Path & basePath)
 {
     yyscan_t scanner;
-    ParseData data(state.symbols);
+    ParseData data(symbols);
     data.basePath = basePath;
     data.path = path;
 
@@ -466,7 +466,7 @@ static Expr * parse(EvalState & state, const char * text,
     if (res) throw ParseError(data.error);
 
     try {
-        data.result->bindVars(state.staticBaseEnv);
+        data.result->bindVars(staticBaseEnv);
     } catch (Error & e) {
         throw ParseError(format("%1%, in `%2%'") % e.msg() % path);
     }
@@ -475,7 +475,7 @@ static Expr * parse(EvalState & state, const char * text,
 }
 
 
-Expr * parseExprFromFile(EvalState & state, Path path)
+Expr * EvalState::parseExprFromFile(Path path)
 {
     assert(path[0] == '/');
 
@@ -493,15 +493,21 @@ Expr * parseExprFromFile(EvalState & state, Path path)
     if (S_ISDIR(st.st_mode))
         path = canonPath(path + "/default.nix");
 
-    /* Read and parse the input file. */
-    return parse(state, readFile(path).c_str(), path, dirOf(path));
+    /* Read and parse the input file, unless it's already in the parse
+       tree cache. */
+    Expr * e = parseTrees[path];
+    if (!e) {
+        e = parse(readFile(path).c_str(), path, dirOf(path));
+        parseTrees[path] = e;
+    }
+
+    return e;
 }
 
 
-Expr * parseExprFromString(EvalState & state,
-    const string & s, const Path & basePath)
+Expr * EvalState::parseExprFromString(const string & s, const Path & basePath)
 {
-    return parse(state, s.c_str(), "(string)", basePath);
+    return parse(s.c_str(), "(string)", basePath);
 }
 
  

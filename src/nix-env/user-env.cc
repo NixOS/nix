@@ -5,7 +5,6 @@
 #include "globals.hh"
 #include "shared.hh"
 #include "eval.hh"
-#include "parser.hh"
 #include "profiles.hh"
 
 
@@ -24,7 +23,7 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
 
     if (pathExists(manifestFile)) {
         Value v;
-        state.eval(parseExprFromFile(state, manifestFile), v);
+        state.evalFile(manifestFile, v);
         Bindings bindings;
         getDerivations(state, v, "", bindings, elems);
     } else if (pathExists(oldManifestFile))
@@ -113,7 +112,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     /* Get the environment builder expression. */
     Value envBuilder;
-    state.eval(parseExprFromFile(state, nixDataDir + "/nix/corepkgs/buildenv"), envBuilder);
+    state.evalFile(nixDataDir + "/nix/corepkgs/buildenv", envBuilder);
 
     /* Construct a Nix expression that calls the user environment
        builder with the manifest as argument. */

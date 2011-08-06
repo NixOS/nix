@@ -5,7 +5,6 @@
 #include "util.hh"
 #include "archive.hh"
 #include "value-to-xml.hh"
-#include "parser.hh"
 #include "names.hh"
 
 #include <sys/types.h>
@@ -1059,7 +1058,7 @@ void EvalState::createBaseEnv()
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
     string s = "attrs: let res = derivationStrict attrs; in attrs // { drvPath = res.drvPath; outPath = res.outPath; type = \"derivation\"; }";
-    mkThunk_(v, parseExprFromString(*this, s, "/"));
+    mkThunk_(v, parseExprFromString(s, "/"));
     addConstant("derivation", v);
 
     // Paths

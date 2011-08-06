@@ -3,7 +3,6 @@
 #include "globals.hh"
 #include "misc.hh"
 #include "shared.hh"
-#include "parser.hh"
 #include "eval.hh"
 #include "help.txt.hh"
 #include "get-drvs.hh"
@@ -129,7 +128,7 @@ static void getAllExprs(EvalState & state,
             if (hasSuffix(attrName, ".nix"))
                 attrName = string(attrName, 0, attrName.size() - 4);
             attrs.attrs[state.symbols.create(attrName)] =
-                ExprAttrs::AttrDef(parseExprFromFile(state, absPath(path2)), noPos);
+                ExprAttrs::AttrDef(state.parseExprFromFile(absPath(path2)), noPos);
         }
         else
             /* `path2' is a directory (with no default.nix in it);
@@ -141,7 +140,7 @@ static void getAllExprs(EvalState & state,
 
 static Expr * loadSourceExpr(EvalState & state, const Path & path)
 {
-    if (isNixExpr(path)) return parseExprFromFile(state, absPath(path));
+    if (isNixExpr(path)) return state.parseExprFromFile(absPath(path));
 
     /* The path is a directory.  Put the Nix expressions in the
        directory in an attribute set, with the file name of each
@@ -354,7 +353,7 @@ static void queryInstSources(EvalState & state,
             Expr * e1 = loadSourceExpr(state, instSource.nixExprPath);
 
             foreach (Strings::const_iterator, i, args) {
-                Expr * e2 = parseExprFromString(state, *i, absPath("."));
+                Expr * e2 = state.parseExprFromString(*i, absPath("."));
                 Expr * call = new ExprApp(e2, e1);
                 Value v; state.eval(call, v);
                 getDerivations(state, v, "", instSource.autoArgs, elems);

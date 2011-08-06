@@ -1,5 +1,4 @@
 #include "eval.hh"
-#include "parser.hh"
 #include "hash.hh"
 #include "util.hh"
 #include "store-api.hh"
@@ -427,14 +426,10 @@ void EvalState::evalFile(const Path & path, Value & v)
 {
     startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
 
-    Expr * e = parseTrees[path];
-
-    if (!e) {
-        e = parseExprFromFile(*this, path);
-        parseTrees[path] = e;
-    }
+    Expr * e = parseExprFromFile(path);
     
     try {
+        /* !!! Maybe we should cache the evaluation result. */
         eval(e, v);
     } catch (Error & e) {
         addErrorPrefix(e, "while evaluating the file `%1%':\n", path);

@@ -218,6 +218,13 @@ public:
     EvalState();
     ~EvalState();
 
+    /* Parse a Nix expression from the specified file.  If `path'
+       refers to a directory, then "/default.nix" is appended. */
+    Expr * parseExprFromFile(Path path);
+
+    /* Parse a Nix expression from the specified string. */
+    Expr * parseExprFromString(const string & s, const Path & basePath);
+    
     /* Evaluate an expression read from the given file to normal
        form. */
     void evalFile(const Path & path, Value & v);
@@ -295,6 +302,9 @@ private:
     friend class ExprVar;
     friend class ExprAttrs;
     friend class ExprLet;
+
+    Expr * parse(const char * text,
+        const Path & path, const Path & basePath);
 
 public:
     

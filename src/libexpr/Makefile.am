@@ -6,7 +6,7 @@ libexpr_la_SOURCES = \
  names.cc
 
 pkginclude_HEADERS = \
- nixexpr.hh eval.hh parser.hh lexer-tab.hh parser-tab.hh \
+ nixexpr.hh eval.hh lexer-tab.hh parser-tab.hh \
  get-drvs.hh attr-path.hh value-to-xml.hh common-opts.hh \
  names.hh symbol-table.hh
 

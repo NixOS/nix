@@ -1,7 +1,6 @@
 #include "globals.hh"
 #include "shared.hh"
 #include "eval.hh"
-#include "parser.hh"
 #include "get-drvs.hh"
 #include "attr-path.hh"
 #include "value-to-xml.hh"
@@ -28,7 +27,7 @@ static Expr * parseStdin(EvalState & state)
     startNest(nest, lvlTalkative, format("parsing standard input"));
     string s, s2;
     while (getline(std::cin, s2)) s += s2 + "\n";
-    return parseExprFromString(state, s, absPath("."));
+    return state.parseExprFromString(s, absPath("."));
 }
 
 
@@ -139,7 +138,7 @@ void run(Strings args)
 
     foreach (Strings::iterator, i, files) {
         Path path = absPath(*i);
-        Expr * e = parseExprFromFile(state, path);
+        Expr * e = state.parseExprFromFile(path);
         processExpr(state, attrPaths, parseOnly, strict, autoArgs,
             evalOnly, xmlOutput, xmlOutputSourceLocation, e);
     }
