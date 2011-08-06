@@ -558,7 +558,8 @@ Path EvalState::findFile(const string & path)
             if (path.compare(0, i->first.size(), i->first) != 0 ||
                 (path.size() > i->first.size() && path[i->first.size()] != '/'))
                 continue;
-            res = i->second + "/" + string(path, i->first.size());
+            res = i->second +
+                (path.size() == i->first.size() ? "" : "/" + string(path, i->first.size()));
         }
         if (pathExists(res)) return canonPath(res);
     }
