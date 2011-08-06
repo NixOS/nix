@@ -35,5 +35,6 @@ EXTRA_DIST = $(TESTS) \
   binary-patching.nix \
   timeout.nix timeout.builder.sh \
   secure-drv-outputs.nix \
-  $(wildcard lang/*.nix) $(wildcard lang/*.exp) $(wildcard lang/*.exp.xml) $(wildcard lang/*.flags) \
+  $(wildcard lang/*.nix) $(wildcard lang/*.exp) $(wildcard lang/*.exp.xml) $(wildcard lang/*.flags) $(wildcard lang/dir*/*.nix) \
   common.sh.in
+
