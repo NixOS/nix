@@ -186,7 +186,6 @@ EvalState::EvalState()
     searchPathInsertionPoint = searchPath.end();
     Strings paths = tokenizeString(getEnv("NIX_PATH", ""), ":");
     foreach (Strings::iterator, i, paths) addToSearchPath(*i);
-    printMsg(lvlError, nixDataDir);
     addToSearchPath("nix=" + nixDataDir + "/nix/corepkgs");
     searchPathInsertionPoint = searchPath.begin();
 }
