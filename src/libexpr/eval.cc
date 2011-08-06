@@ -431,17 +431,19 @@ Value * EvalState::maybeThunk(Env & env, Expr * expr)
 
 void EvalState::evalFile(const Path & path, Value & v)
 {
-    startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
-
-    Expr * e = parseExprFromFile(path);
-    
-    try {
-        /* !!! Maybe we should cache the evaluation result. */
-        eval(e, v);
-    } catch (Error & e) {
-        addErrorPrefix(e, "while evaluating the file `%1%':\n", path);
-        throw;
-    }
+    FileEvalCache::iterator i = fileEvalCache.find(path);
+    if (i == fileEvalCache.end()) {
+        startNest(nest, lvlTalkative, format("evaluating file `%1%'") % path);
+        Expr * e = parseExprFromFile(path);
+        try {
+            eval(e, v);
+        } catch (Error & e) {
+            addErrorPrefix(e, "while evaluating the file `%1%':\n", path);
+            throw;
+        }
+        fileEvalCache[path] = v;
+    } else
+        v = i->second;
 }
 
 

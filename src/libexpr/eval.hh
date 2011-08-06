@@ -211,7 +211,16 @@ private:
 
     bool allowUnsafeEquality;
 
+    /* A cache from path names to parse trees. */
     std::map<Path, Expr *> parseTrees;
+
+    /* A cache from path names to values. */
+#if HAVE_BOEHMGC
+    typedef std::map<Path, Value, std::less<Path>, gc_allocator<std::pair<const Path, Value> > > FileEvalCache;
+#else
+    typedef std::map<Path, Value> FileEvalCache;
+#endif
+    FileEvalCache fileEvalCache;
 
     typedef list<std::pair<string, Path> > SearchPath;
     SearchPath searchPath;
