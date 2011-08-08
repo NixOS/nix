@@ -113,17 +113,17 @@ let
       };
 
       
-    rpm_fedora10i386 = makeRPM_i686 (diskImages: diskImages.fedora10i386) 20;
-    rpm_fedora10x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora10x86_64) 20;
-    rpm_fedora11i386 = makeRPM_i686 (diskImages: diskImages.fedora11i386) 30;
-    rpm_fedora11x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora11x86_64) 30;
-    rpm_fedora12i386 = makeRPM_i686 (diskImages: diskImages.fedora12i386) 40;
-    rpm_fedora12x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora12x86_64) 40;
-    rpm_fedora13i386 = makeRPM_i686 (diskImages: diskImages.fedora13i386) 50;
-    rpm_fedora13x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora13x86_64) 50;
-    rpm_opensuse103i386 = makeRPM_i686 (diskImages: diskImages.opensuse103i386) 40;
-    rpm_opensuse110i386 = makeRPM_i686 (diskImages: diskImages.opensuse110i386) 50;
-    rpm_opensuse110x86_64 = makeRPM_x86_64 (diskImages: diskImages.opensuse110x86_64) 50;
+    rpm_fedora10i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora10i386) 20;
+    rpm_fedora10x86_64 = makeRPM_x86_64 (diskImageFuns: diskImageFuns.fedora10x86_64) 20;
+    rpm_fedora11i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora11i386) 30;
+    rpm_fedora11x86_64 = makeRPM_x86_64 (diskImageFuns: diskImageFuns.fedora11x86_64) 30;
+    rpm_fedora12i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora12i386) 40;
+    rpm_fedora12x86_64 = makeRPM_x86_64 (diskImageFuns: diskImageFuns.fedora12x86_64) 40;
+    rpm_fedora13i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.fedora13i386) 50;
+    rpm_fedora13x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora13x86_64) 50;
+    rpm_opensuse103i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.opensuse103i386) 40;
+    rpm_opensuse110i386 = makeRPM_i686 (diskImageFuns: diskImageFuns.opensuse110i386) 50;
+    rpm_opensuse110x86_64 = makeRPM_x86_64 (diskImageFuns: diskImageFuns.opensuse110x86_64) 50;
 
     
     deb_debian50i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian50i386) 50;
@@ -154,7 +154,8 @@ let
     releaseTools.rpmBuild rec {
       name = "nix-rpm-${diskImage.name}";
       src = jobs.tarball;
-      diskImage = diskImageFun vmTools.diskImages;
+      diskImage = (diskImageFun vmTools.diskImageFuns)
+        { extraPackages = [ "perl-DBD-SQLite" ]; };
       memSize = 1024;
       meta.schedulingPriority = prio;
     };

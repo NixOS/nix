@@ -19,6 +19,7 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 Prefix: /usr
 Requires: /usr/bin/perl
 Requires: curl
+Requires: perl-DBD-SQLite
 
 # Hack to make that shitty RPM scanning hack shut up.
 Provides: perl(readmanifest)
