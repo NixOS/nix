@@ -7,7 +7,7 @@ with import ./config.nix;
     builder = builtins.toFile "builder"
       ''
         mkdir $out
-        touch $out/good
+        echo > $out/good
       '';
   };
 
@@ -16,7 +16,7 @@ with import ./config.nix;
     builder = builtins.toFile "builder"
       ''
         mkdir $out
-        touch $out/bad
+        echo > $out/bad
       '';
   };
 
