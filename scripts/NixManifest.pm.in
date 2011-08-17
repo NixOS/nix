@@ -301,7 +301,7 @@ EOF
         $dbh->do("insert into Manifests(path, timestamp) values (?, ?)",
                  {}, $manifest, $timestamp);
 
-        our $id = $dbh->sqlite_last_insert_rowid();
+        our $id = $dbh->last_insert_id("", "", "", "");
 
         sub addNARToDB {
             my ($storePath, $narFile) = @_;
