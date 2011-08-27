@@ -1,8 +1,9 @@
-#! /usr/bin/perl -w -I. -I..
+#! /var/run/current-system/sw/bin/perl -w -I. -I..
 
 use strict;
-use readmanifest;
+use NixManifest;
 use readcache;
+use File::Basename;
 
 
 # Read the manifests.
@@ -49,6 +50,9 @@ foreach my $patch (keys %patches) {
 foreach my $archive (keys %readcache::archives) {
     next if $archive eq "." || $archive eq "..";
     if (!defined $usedFiles{$archive}) {
-        print $readcache::archives{$archive}, "\n";
+	my $file = $readcache::archives{$archive};
+        print "$file\n";
+	my $hashFile = dirname($file) . "/.hash." . basename($file);
+	print "$hashFile\n" if -e $hashFile;
     }
 }

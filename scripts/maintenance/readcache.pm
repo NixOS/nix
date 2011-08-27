@@ -9,13 +9,13 @@ sub readDir {
     opendir(DIR, "$dir") or die "cannot open `$dir': $!";
     my @as = readdir DIR;
     foreach my $archive (@as) {
+        next unless $archive =~ /^sha256_/ || $archive =~ /\.nar-bsdiff$/ || $archive =~ /\.nar\.bz2$/;
         $archives{$archive} = "$dir/$archive";
     }
     closedir DIR;
 }
 
-readDir "/data/webserver/dist/nix-cache";
-readDir "/data/webserver/dist/test-cache";
-readDir "/data/webserver/dist/patches";
+readDir "/data/releases/nars";
+readDir "/data/releases/patches";
 
 print STDERR scalar (keys %archives), "\n";
