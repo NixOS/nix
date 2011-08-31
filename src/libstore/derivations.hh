@@ -53,8 +53,12 @@ struct Derivation
 };
 
 
+class StoreAPI;
+
+
 /* Write a derivation to the Nix store, and return its path. */
-Path writeDerivation(const Derivation & drv, const string & name);
+Path writeDerivation(StoreAPI & store,
+    const Derivation & drv, const string & name);
 
 /* Parse a derivation. */
 Derivation parseDerivation(const string & s);
@@ -69,7 +73,7 @@ bool isDerivation(const string & fileName);
 /* Return true iff this is a fixed-output derivation. */
 bool isFixedOutputDrv(const Derivation & drv);
 
-Hash hashDerivationModulo(Derivation drv);
+Hash hashDerivationModulo(StoreAPI & store, Derivation drv);
 
 /* Memoisation of hashDerivationModulo(). */
 typedef std::map<Path, Hash> DrvHashes;

@@ -24,11 +24,13 @@ namespace nix {
 
 MakeError(UsageError, nix::Error);
 
+class StoreAPI;
+
 /* Ugh.  No better place to put this. */
 Path makeRootName(const Path & gcRoot, int & counter);
 void printGCWarning();
 
-void printMissing(const PathSet & paths);
+void printMissing(StoreAPI & store, const PathSet & paths);
 
 template<class N> N getIntArg(const string & opt,
     Strings::iterator & i, const Strings::iterator & end)

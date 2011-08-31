@@ -58,14 +58,13 @@ static Path realisePath(const Path & path)
         PathSet paths;
         paths.insert(path);
         store->buildDerivations(paths);
-        Path outPath = findOutput(derivationFromPath(path), "out");
+        Path outPath = findOutput(derivationFromPath(*store, path), "out");
         
         if (gcRoot == "")
             printGCWarning();
         else
-            outPath = addPermRoot(outPath,
-                makeRootName(gcRoot, rootNr),
-                indirectRoot);
+            outPath = addPermRoot(*store, outPath,
+                makeRootName(gcRoot, rootNr), indirectRoot);
         
         return outPath;
     } else {
@@ -87,7 +86,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     foreach (Strings::iterator, i, opArgs)
         *i = followLinksToStorePath(*i);
             
-    printMissing(PathSet(opArgs.begin(), opArgs.end()));
+    printMissing(*store, PathSet(opArgs.begin(), opArgs.end()));
     
     if (dryRun) return;
     
@@ -170,7 +169,7 @@ static Path maybeUseOutput(const Path & storePath, bool useOutput, bool forceRea
 {
     if (forceRealise) realisePath(storePath);
     if (useOutput && isDerivation(storePath)) {
-        Derivation drv = derivationFromPath(storePath);
+        Derivation drv = derivationFromPath(*store, storePath);
         return findOutput(drv, "out");
     }
     else return storePath;
@@ -210,7 +209,7 @@ static void printTree(const Path & path,
        closure(B).  That is, if derivation A is an (possibly indirect)
        input of B, then A is printed first.  This has the effect of
        flattening the tree, preventing deeply nested structures.  */
-    Paths sorted = topoSortPaths(references);
+    Paths sorted = topoSortPaths(*store, references);
     reverse(sorted.begin(), sorted.end());
 
     for (Paths::iterator i = sorted.begin(); i != sorted.end(); ++i) {
@@ -265,7 +264,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             foreach (Strings::iterator, i, opArgs) {
                 *i = followLinksToStorePath(*i);
                 if (forceRealise) realisePath(*i);
-                Derivation drv = derivationFromPath(*i);
+                Derivation drv = derivationFromPath(*store, *i);
                 cout << format("%1%\n") % findOutput(drv, "out");
             }
             break;
@@ -278,12 +277,12 @@ static void opQuery(Strings opFlags, Strings opArgs)
             PathSet paths;
             foreach (Strings::iterator, i, opArgs) {
                 Path path = maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise);
-                if (query == qRequisites) computeFSClosure(path, paths, false, includeOutputs);
+                if (query == qRequisites) computeFSClosure(*store, path, paths, false, includeOutputs);
                 else if (query == qReferences) store->queryReferences(path, paths);
                 else if (query == qReferrers) store->queryReferrers(path, paths);
-                else if (query == qReferrersClosure) computeFSClosure(path, paths, true);
+                else if (query == qReferrersClosure) computeFSClosure(*store, path, paths, true);
             }
-            Paths sorted = topoSortPaths(paths);
+            Paths sorted = topoSortPaths(*store, paths);
             for (Paths::reverse_iterator i = sorted.rbegin(); 
                  i != sorted.rend(); ++i)
                 cout << format("%s\n") % *i;
@@ -301,7 +300,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qBinding:
             foreach (Strings::iterator, i, opArgs) {
                 Path path = useDeriver(followLinksToStorePath(*i));
-                Derivation drv = derivationFromPath(path);
+                Derivation drv = derivationFromPath(*store, path);
                 StringPairs::iterator j = drv.env.find(bindingName);
                 if (j == drv.env.end())
                     throw Error(format("derivation `%1%' has no environment binding named `%2%'")
@@ -355,7 +354,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
         case qRoots: {
             PathSet referrers;
             foreach (Strings::iterator, i, opArgs)
-                computeFSClosure(maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise),
+                computeFSClosure(*store,
+                    maybeUseOutput(followLinksToStorePath(*i), useOutput, forceRealise),
                     referrers, true);
             Roots roots = store->findRoots();
             foreach (Roots::iterator, i, roots)

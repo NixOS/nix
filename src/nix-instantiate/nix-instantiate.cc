@@ -64,9 +64,8 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                     if (gcRoot == "")
                         printGCWarning();
                     else
-                        drvPath = addPermRoot(drvPath,
-                            makeRootName(gcRoot, rootNr),
-                            indirectRoot);
+                        drvPath = addPermRoot(*store, drvPath,
+                            makeRootName(gcRoot, rootNr), indirectRoot);
                     std::cout << format("%1%\n") % drvPath;
                 }
             }

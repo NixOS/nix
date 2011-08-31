@@ -52,11 +52,11 @@ void printGCWarning()
 }
 
 
-void printMissing(const PathSet & paths)
+void printMissing(StoreAPI & store, const PathSet & paths)
 {
     unsigned long long downloadSize, narSize;
     PathSet willBuild, willSubstitute, unknown;
-    queryMissing(paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
+    queryMissing(store, paths, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     if (!willBuild.empty()) {
         printMsg(lvlInfo, format("these derivations will be built:"));

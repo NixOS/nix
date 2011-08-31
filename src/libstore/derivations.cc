@@ -26,7 +26,8 @@ void DerivationOutput::parseHashInfo(bool & recursive, HashType & hashType, Hash
 }
 
 
-Path writeDerivation(const Derivation & drv, const string & name)
+Path writeDerivation(StoreAPI & store,
+    const Derivation & drv, const string & name)
 {
     PathSet references;
     references.insert(drv.inputSrcs.begin(), drv.inputSrcs.end());
@@ -39,7 +40,7 @@ Path writeDerivation(const Derivation & drv, const string & name)
     string contents = unparseDerivation(drv);
     return readOnlyMode
         ? computeStorePathForText(suffix, contents, references)
-        : store->addTextToStore(suffix, contents, references);
+        : store.addTextToStore(suffix, contents, references);
 }
 
 
@@ -221,7 +222,7 @@ DrvHashes drvHashes;
    paths have been replaced by the result of a recursive call to this
    function, and that for fixed-output derivations we return a hash of
    its output path. */
-Hash hashDerivationModulo(Derivation drv)
+Hash hashDerivationModulo(StoreAPI & store, Derivation drv)
 {
     /* Return a fixed hash for fixed-output derivations. */
     if (isFixedOutputDrv(drv)) {
@@ -238,8 +239,8 @@ Hash hashDerivationModulo(Derivation drv)
     foreach (DerivationInputs::const_iterator, i, drv.inputDrvs) {
         Hash h = drvHashes[i->first];
         if (h.type == htUnknown) {
-            Derivation drv2 = derivationFromPath(i->first);
-            h = hashDerivationModulo(drv2);
+            Derivation drv2 = derivationFromPath(store, i->first);
+            h = hashDerivationModulo(store, drv2);
             drvHashes[i->first] = h;
         }
         inputs2[printHash(h)] = i->second;

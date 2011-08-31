@@ -934,7 +934,7 @@ void DerivationGoal::haveDerivation()
     assert(worker.store.isValidPath(drvPath));
 
     /* Get the derivation. */
-    drv = derivationFromPath(drvPath);
+    drv = derivationFromPath(worker.store, drvPath);
 
     foreach (DerivationOutputs::iterator, i, drv.outputs)
         worker.store.addTempRoot(i->second.path);
@@ -1030,10 +1030,10 @@ void DerivationGoal::inputsRealised()
            `*i' as input paths.  Only add the closures of output paths
            that are specified as inputs. */
         assert(worker.store.isValidPath(i->first));
-        Derivation inDrv = derivationFromPath(i->first);
+        Derivation inDrv = derivationFromPath(worker.store, i->first);
         foreach (StringSet::iterator, j, i->second)
             if (inDrv.outputs.find(*j) != inDrv.outputs.end())
-                computeFSClosure(inDrv.outputs[*j].path, inputPaths);
+                computeFSClosure(worker.store, inDrv.outputs[*j].path, inputPaths);
             else
                 throw Error(
                     format("derivation `%1%' requires non-existent output `%2%' from input derivation `%3%'")
@@ -1042,7 +1042,7 @@ void DerivationGoal::inputsRealised()
 
     /* Second, the input sources. */
     foreach (PathSet::iterator, i, drv.inputSrcs)
-        computeFSClosure(*i, inputPaths);
+        computeFSClosure(worker.store, *i, inputPaths);
 
     debug(format("added input paths %1%") % showPaths(inputPaths));
 
@@ -1399,7 +1399,7 @@ HookReply DerivationGoal::tryBuildHook()
        list it since the remote system *probably* already has it.) */
     PathSet allInputs;
     allInputs.insert(inputPaths.begin(), inputPaths.end());
-    computeFSClosure(drvPath, allInputs);
+    computeFSClosure(worker.store, drvPath, allInputs);
         
     string s;
     foreach (PathSet::iterator, i, allInputs) s += *i + " ";
@@ -1545,14 +1545,14 @@ void DerivationGoal::startBuilder()
            like passing all build-time dependencies of some path to a
            derivation that builds a NixOS DVD image. */
         PathSet paths, paths2;
-        computeFSClosure(storePath, paths);
+        computeFSClosure(worker.store, storePath, paths);
         paths2 = paths;
 
         foreach (PathSet::iterator, j, paths2) {
             if (isDerivation(*j)) {
-                Derivation drv = derivationFromPath(*j);
+                Derivation drv = derivationFromPath(worker.store, *j);
                 foreach (DerivationOutputs::iterator, k, drv.outputs)
-                    computeFSClosure(k->second.path, paths);
+                    computeFSClosure(worker.store, k->second.path, paths);
             }
         }
 

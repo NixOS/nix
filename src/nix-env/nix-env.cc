@@ -381,7 +381,7 @@ static void queryInstSources(EvalState & state,
 
                 if (isDerivation(path)) {
                     elem.setDrvPath(path);
-                    elem.setOutPath(findOutput(derivationFromPath(path), "out"));
+                    elem.setOutPath(findOutput(derivationFromPath(*store, path), "out"));
                     if (name.size() >= drvExtension.size() &&
                         string(name, name.size() - drvExtension.size()) == drvExtension)
                         name = string(name, 0, name.size() - drvExtension.size());
@@ -430,7 +430,7 @@ static void printMissing(EvalState & state, const DrvInfos & elems)
             targets.insert(i->queryOutPath(state));
     }
 
-    printMissing(targets);
+    printMissing(*store, targets);
 }
 
 
@@ -693,12 +693,12 @@ static void opSet(Globals & globals,
 
     if (drv.queryDrvPath(globals.state) != "") {
         PathSet paths = singleton<PathSet>(drv.queryDrvPath(globals.state));
-        printMissing(paths);
+        printMissing(*store, paths);
         if (globals.dryRun) return;
         store->buildDerivations(paths);
     }
     else {
-        printMissing(singleton<PathSet>(drv.queryOutPath(globals.state)));
+        printMissing(*store, singleton<PathSet>(drv.queryOutPath(globals.state)));
         if (globals.dryRun) return;
         store->ensurePath(drv.queryOutPath(globals.state));
     }

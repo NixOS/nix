@@ -357,7 +357,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
            runs. */
         if (path.at(0) == '=') {
             path = string(path, 1);
-            PathSet refs; computeFSClosure(path, refs);
+            PathSet refs; computeFSClosure(*store, path, refs);
             foreach (PathSet::iterator, j, refs) {
                 drv.inputSrcs.insert(*j);
                 if (isDerivation(*j))
@@ -433,7 +433,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
 
         /* Use the masked derivation expression to compute the output
            path. */
-        Hash h = hashDerivationModulo(drv);
+        Hash h = hashDerivationModulo(*store, drv);
         
         foreach (DerivationOutputs::iterator, i, drv.outputs)
             if (i->second.path == "") {
@@ -444,7 +444,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     }
 
     /* Write the resulting term into the Nix store directory. */
-    Path drvPath = writeDerivation(drv, drvName);
+    Path drvPath = writeDerivation(*store, drv, drvName);
 
     printMsg(lvlChatty, format("instantiated `%1%' -> `%2%'")
         % drvName % drvPath);
@@ -452,7 +452,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store derivations, so we can't
        read them later. */
-    drvHashes[drvPath] = hashDerivationModulo(drv);
+    drvHashes[drvPath] = hashDerivationModulo(*store, drv);
 
     state.mkAttrs(v, 1 + drv.outputs.size());
     mkString(*state.allocAttr(v, state.sDrvPath), drvPath, singleton<PathSet>("=" + drvPath));

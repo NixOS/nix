@@ -314,13 +314,13 @@ void removeTempRoots();
 
 
 /* Register a permanent GC root. */
-Path addPermRoot(const Path & storePath, const Path & gcRoot,
-    bool indirect, bool allowOutsideRootsDir = false);
+Path addPermRoot(StoreAPI & store, const Path & storePath,
+    const Path & gcRoot, bool indirect, bool allowOutsideRootsDir = false);
 
 
 /* Sort a set of paths topologically under the references relation.
    If p refers to q, then p follows q in this list. */
-Paths topoSortPaths(const PathSet & paths);
+Paths topoSortPaths(StoreAPI & store, const PathSet & paths);
 
 
 /* For now, there is a single global store API object, but we'll

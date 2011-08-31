@@ -6,15 +6,15 @@
 namespace nix {
 
 
-Derivation derivationFromPath(const Path & drvPath)
+Derivation derivationFromPath(StoreAPI & store, const Path & drvPath)
 {
     assertStorePath(drvPath);
-    store->ensurePath(drvPath);
+    store.ensurePath(drvPath);
     return parseDerivation(readFile(drvPath));
 }
 
 
-void computeFSClosure(const Path & storePath,
+void computeFSClosure(StoreAPI & store, const Path & storePath,
     PathSet & paths, bool flipDirection, bool includeOutputs)
 {
     if (paths.find(storePath) != paths.end()) return;
@@ -22,19 +22,19 @@ void computeFSClosure(const Path & storePath,
 
     PathSet references;
     if (flipDirection)
-        store->queryReferrers(storePath, references);
+        store.queryReferrers(storePath, references);
     else
-        store->queryReferences(storePath, references);
+        store.queryReferences(storePath, references);
 
     if (includeOutputs && isDerivation(storePath)) {
-        PathSet outputs = store->queryDerivationOutputs(storePath);
+        PathSet outputs = store.queryDerivationOutputs(storePath);
         foreach (PathSet::iterator, i, outputs)
-            if (store->isValidPath(*i))
-                computeFSClosure(*i, paths, flipDirection, true);
+            if (store.isValidPath(*i))
+                computeFSClosure(store, *i, paths, flipDirection, true);
     }
 
     foreach (PathSet::iterator, i, references)
-        computeFSClosure(*i, paths, flipDirection, includeOutputs);
+        computeFSClosure(store, *i, paths, flipDirection, includeOutputs);
 }
 
 
@@ -46,7 +46,7 @@ Path findOutput(const Derivation & drv, string id)
 }
 
 
-void queryMissing(const PathSet & targets,
+void queryMissing(StoreAPI & store, const PathSet & targets,
     PathSet & willBuild, PathSet & willSubstitute, PathSet & unknown,
     unsigned long long & downloadSize, unsigned long long & narSize)
 {
@@ -61,15 +61,15 @@ void queryMissing(const PathSet & targets,
         done.insert(p);
 
         if (isDerivation(p)) {
-            if (!store->isValidPath(p)) {
+            if (!store.isValidPath(p)) {
                 unknown.insert(p);
                 continue;
             }
-            Derivation drv = derivationFromPath(p);
+            Derivation drv = derivationFromPath(store, p);
 
             bool mustBuild = false;
             foreach (DerivationOutputs::iterator, i, drv.outputs)
-                if (!store->isValidPath(i->second.path) && !store->hasSubstitutes(i->second.path))
+                if (!store.isValidPath(i->second.path) && !store.hasSubstitutes(i->second.path))
                     mustBuild = true;
 
             if (mustBuild) {
@@ -83,9 +83,9 @@ void queryMissing(const PathSet & targets,
         }
 
         else {
-            if (store->isValidPath(p)) continue;
+            if (store.isValidPath(p)) continue;
             SubstitutablePathInfo info;
-            if (store->querySubstitutablePathInfo(p, info)) {
+            if (store.querySubstitutablePathInfo(p, info)) {
                 willSubstitute.insert(p);
                 downloadSize += info.downloadSize;
                 narSize += info.narSize;

@@ -90,8 +90,8 @@ void LocalStore::addIndirectRoot(const Path & path)
 }
 
 
-Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
-    bool indirect, bool allowOutsideRootsDir)
+Path addPermRoot(StoreAPI & store, const Path & _storePath,
+    const Path & _gcRoot, bool indirect, bool allowOutsideRootsDir)
 {
     Path storePath(canonPath(_storePath));
     Path gcRoot(canonPath(_gcRoot));
@@ -104,7 +104,7 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
 
     if (indirect) {
         createSymlink(gcRoot, storePath, true);
-        store->addIndirectRoot(gcRoot);
+        store.addIndirectRoot(gcRoot);
     }
 
     else {
@@ -127,7 +127,7 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
        check if the root is in a directory in or linked from the
        gcroots directory. */
     if (queryBoolSetting("gc-check-reachability", false)) {
-        Roots roots = store->findRoots();
+        Roots roots = store.findRoots();
         if (roots.find(gcRoot) == roots.end())
             printMsg(lvlError, 
                 format(
@@ -139,7 +139,7 @@ Path addPermRoot(const Path & _storePath, const Path & _gcRoot,
     /* Grab the global GC root, causing us to block while a GC is in
        progress.  This prevents the set of permanent roots from
        increasing while a GC is in progress. */
-    store->syncWithGC();
+    store.syncWithGC();
     
     return gcRoot;
 }
@@ -275,8 +275,8 @@ static void readTempRoots(PathSet & tempRoots, FDs & fds)
 }
 
 
-static void findRoots(const Path & path, bool recurseSymlinks,
-    bool deleteStale, Roots & roots)
+static void findRoots(StoreAPI & store, const Path & path,
+    bool recurseSymlinks, bool deleteStale, Roots & roots)
 {
     try {
         
@@ -289,7 +289,7 @@ static void findRoots(const Path & path, bool recurseSymlinks,
         if (S_ISDIR(st.st_mode)) {
             Strings names = readDirectory(path);
             foreach (Strings::iterator, i, names)
-                findRoots(path + "/" + *i, recurseSymlinks, deleteStale, roots);
+                findRoots(store, path + "/" + *i, recurseSymlinks, deleteStale, roots);
         }
 
         else if (S_ISLNK(st.st_mode)) {
@@ -299,7 +299,7 @@ static void findRoots(const Path & path, bool recurseSymlinks,
                 debug(format("found root `%1%' in `%2%'")
                     % target % path);
                 Path storePath = toStorePath(target);
-                if (store->isValidPath(storePath)) 
+                if (store.isValidPath(storePath)) 
                     roots[path] = storePath;
                 else
                     printMsg(lvlInfo, format("skipping invalid root from `%1%' to `%2%'")
@@ -308,7 +308,7 @@ static void findRoots(const Path & path, bool recurseSymlinks,
 
             else if (recurseSymlinks) {
                 if (pathExists(target))
-                    findRoots(target, false, deleteStale, roots);
+                    findRoots(store, target, false, deleteStale, roots);
                 else if (deleteStale) {
                     printMsg(lvlInfo, format("removing stale link from `%1%' to `%2%'") % path % target);
                     /* Note that we only delete when recursing, i.e.,
@@ -331,22 +331,22 @@ static void findRoots(const Path & path, bool recurseSymlinks,
 }
 
 
-static Roots findRoots(bool deleteStale)
+static Roots findRoots(StoreAPI & store, bool deleteStale)
 {
     Roots roots;
     Path rootsDir = canonPath((format("%1%/%2%") % nixStateDir % gcRootsDir).str());
-    findRoots(rootsDir, true, deleteStale, roots);
+    findRoots(store, rootsDir, true, deleteStale, roots);
     return roots;
 }
 
 
 Roots LocalStore::findRoots()
 {
-    return nix::findRoots(false);
+    return nix::findRoots(*this, false);
 }
 
 
-static void addAdditionalRoots(PathSet & roots)
+static void addAdditionalRoots(StoreAPI & store, PathSet & roots)
 {
     Path rootFinder = getEnv("NIX_ROOT_FINDER",
         nixLibexecDir + "/nix/find-runtime-roots.pl");
@@ -362,7 +362,7 @@ static void addAdditionalRoots(PathSet & roots)
     foreach (Strings::iterator, i, paths) {
         if (isInStore(*i)) {
             Path path = toStorePath(*i);
-            if (roots.find(path) == roots.end() && store->isValidPath(path)) {
+            if (roots.find(path) == roots.end() && store.isValidPath(path)) {
                 debug(format("got additional root `%1%'") % path);
                 roots.insert(path);
             }
@@ -371,32 +371,32 @@ static void addAdditionalRoots(PathSet & roots)
 }
 
 
-static void dfsVisit(const PathSet & paths, const Path & path,
-    PathSet & visited, Paths & sorted)
+static void dfsVisit(StoreAPI & store, const PathSet & paths,
+    const Path & path, PathSet & visited, Paths & sorted)
 {
     if (visited.find(path) != visited.end()) return;
     visited.insert(path);
     
     PathSet references;
-    if (store->isValidPath(path))
-        store->queryReferences(path, references);
+    if (store.isValidPath(path))
+        store.queryReferences(path, references);
     
     foreach (PathSet::iterator, i, references)
         /* Don't traverse into paths that don't exist.  That can
            happen due to substitutes for non-existent paths. */
         if (*i != path && paths.find(*i) != paths.end())
-            dfsVisit(paths, *i, visited, sorted);
+            dfsVisit(store, paths, *i, visited, sorted);
 
     sorted.push_front(path);
 }
 
 
-Paths topoSortPaths(const PathSet & paths)
+Paths topoSortPaths(StoreAPI & store, const PathSet & paths)
 {
     Paths sorted;
     PathSet visited;
     foreach (PathSet::const_iterator, i, paths)
-        dfsVisit(paths, *i, visited, sorted);
+        dfsVisit(store, paths, *i, visited, sorted);
     return sorted;
 }
 
@@ -582,7 +582,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
     printMsg(lvlError, format("finding garbage collector roots..."));
-    Roots rootMap = options.ignoreLiveness ? Roots() : nix::findRoots(true);
+    Roots rootMap = options.ignoreLiveness ? Roots() : nix::findRoots(*this, true);
 
     foreach (Roots::iterator, i, rootMap) state.roots.insert(i->second);
 
@@ -591,7 +591,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        to add running programs to the set of roots (to prevent them
        from being garbage collected). */
     if (!options.ignoreLiveness)
-        addAdditionalRoots(state.roots);
+        addAdditionalRoots(*this, state.roots);
 
     /* Read the temporary roots.  This acquires read locks on all
        per-process temporary root files.  So after this point no paths

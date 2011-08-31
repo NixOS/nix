@@ -91,7 +91,7 @@ Path createGeneration(Path profile, Path outPath)
        user environment etc. we've just built. */
     Path generation;
     makeName(profile, num + 1, generation);
-    addPermRoot(outPath, generation, false, true);
+    addPermRoot(*store, outPath, generation, false, true);
 
     return generation;
 }
