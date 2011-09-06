@@ -40,6 +40,10 @@
     <para>TODO: Nix expression search path (<literal>import &lt;foo/bar.nix></literal>).</para>
   </listitem>
 
+  <listitem>
+    <para>TODO: <command>nix-store --verify-path</command> command.</para>
+  </listitem>
+
 </itemizedlist>
 
 </section>

@@ -187,12 +187,11 @@ static void initAndRun(int argc, char * * argv)
        ignore options for the ATerm library. */
     for (Strings::iterator i = args.begin(); i != args.end(); ++i) {
         string arg = *i;
-        if (string(arg, 0, 4) == "-at-") ;
-        else if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-' && !isdigit(arg[1])) {
+        if (arg.length() > 2 && arg[0] == '-' && arg[1] != '-' && !isdigit(arg[1])) {
             for (unsigned int j = 1; j < arg.length(); j++)
                 if (isalpha(arg[j]))
                     remaining.push_back((string) "-" + arg[j]);
-                else {
+                else     {
                     remaining.push_back(string(arg, j));
                     break;
                 }
@@ -332,6 +331,9 @@ static void * oomHandler(size_t requested)
 }
 
 
+int exitCode = 0;
+
+
 }
 
 
@@ -390,7 +392,5 @@ int main(int argc, char * * argv)
         return 1;
     }
 
-    return 0;
+    return exitCode;
 }
-
- 

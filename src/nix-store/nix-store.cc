@@ -466,11 +466,12 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
          i != opArgs.end(); ++i)
     {
         Path path = followLinksToStorePath(*i);
-        if (!store->isValidPath(path))
+        if (!store->isValidPath(path)) {
             if (printInvalid)
                 cout << format("%1%\n") % path;
             else
                 throw Error(format("path `%1%' is not valid") % path);
+        }
     }
 }
 
@@ -648,6 +649,27 @@ static void opVerify(Strings opFlags, Strings opArgs)
 }
 
 
+/* Verify whether the contents of the given store path have not changed. */
+static void opVerifyPath(Strings opFlags, Strings opArgs)
+{
+    if (!opFlags.empty())
+        throw UsageError("no flags expected");
+
+    foreach (Strings::iterator, i, opArgs) {
+        Path path = followLinksToStorePath(*i);
+        printMsg(lvlTalkative, format("checking path `%1%'...") % path);
+        ValidPathInfo info = store->queryPathInfo(path);
+        HashResult current = hashPath(info.hash.type, path);
+        if (current.first != info.hash) {
+            printMsg(lvlError,
+                format("path `%1%' was modified! expected hash `%2%', got `%3%'")
+                % path % printHash(info.hash) % printHash(current.first));
+            exitCode = 1;
+        }
+    }
+}
+
+
 static void showOptimiseStats(OptimiseStats & stats)
 {
     printMsg(lvlError,
@@ -750,6 +772,8 @@ void run(Strings args)
             op = opInit;
         else if (arg == "--verify")
             op = opVerify;
+        else if (arg == "--verify-path")
+            op = opVerifyPath;
         else if (arg == "--optimise")
             op = opOptimise;
         else if (arg == "--query-failed-paths")

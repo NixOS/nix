@@ -25,6 +25,7 @@ Operations:
       valid
 
   --verify: verify Nix structures
+  --verify-path: verify whether the given store paths haven't been modified
   --optimise: optimise the Nix store by hard-linking identical files
 
   --query-failed-paths: list paths that failed to build (if enabled)

@@ -53,6 +53,9 @@ struct RemoveTempRoots
     ~RemoveTempRoots();    
 };
 
+/* Exit code of the program. */
+extern int exitCode;
+
 }
 
 
