@@ -1,8 +1,8 @@
 #! /bin/sh -e
 rm -f aclocal.m4
 mkdir -p config
-libtoolize --copy
+libtoolize --copy -f
 aclocal
-autoheader
-automake --add-missing --copy
-autoconf
+autoheader -f
+automake --add-missing --copy -f
+autoconf -f
