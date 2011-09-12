@@ -226,7 +226,7 @@ private:
 
     unsigned long long queryValidPathId(const Path & path);
 
-    unsigned long long addValidPath(const ValidPathInfo & info);
+    unsigned long long addValidPath(const ValidPathInfo & info, bool checkOutputs = true);
         
     void addReference(unsigned long long referrer, unsigned long long reference);
     
