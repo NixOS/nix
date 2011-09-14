@@ -1052,15 +1052,6 @@ void EvalState::createBaseEnv()
     addPrimOp("__getEnv", 1, prim_getEnv);
     addPrimOp("__trace", 2, prim_trace);
 
-    // Derivations
-    addPrimOp("derivationStrict", 1, prim_derivationStrict);
-
-    /* Add a wrapper around the derivation primop that computes the
-       `drvPath' and `outPath' attributes lazily. */
-    string s = "attrs: let res = derivationStrict attrs; in attrs // { drvPath = res.drvPath; outPath = res.outPath; type = \"derivation\"; }";
-    mkThunk_(v, parseExprFromString(s, "/"));
-    addConstant("derivation", v);
-
     // Paths
     addPrimOp("__toPath", 1, prim_toPath);
     addPrimOp("__storePath", 1, prim_storePath);
@@ -1108,6 +1099,33 @@ void EvalState::createBaseEnv()
     // Versions
     addPrimOp("__parseDrvName", 1, prim_parseDrvName);
     addPrimOp("__compareVersions", 2, prim_compareVersions);
+
+    // Derivations
+    addPrimOp("derivationStrict", 1, prim_derivationStrict);
+
+    /* Add a wrapper around the derivation primop that computes the
+       `drvPath' and `outPath' attributes lazily. */
+    string s = "attrs: \
+      let \
+        strict = derivationStrict attrs; \
+        attrValues = attrs: \
+          map (name: builtins.getAttr name attrs) (builtins.attrNames attrs); \
+        outputToAttrListElement = output: \
+          let outPath = builtins.getAttr (output + \"Path\") strict; in { \
+            name = output; \
+            value = attrs // { \
+              drvPath = strict.drvPath; inherit outPath; type = \"derivation\"; \
+            } // outputsAttrs // { all = allList; }; \
+          }; \
+        outputsList = if attrs ? outputs then \
+          map outputToAttrListElement attrs.outputs else \
+          [ (outputToAttrListElement \"out\") ]; \
+        outputsAttrs = builtins.listToAttrs outputsList; \
+        allList = attrValues outputsAttrs; \
+        head = if attrs ? outputs then builtins.head attrs.outputs else \"out\"; \
+      in builtins.getAttr head outputsAttrs";
+    mkThunk_(v, parseExprFromString(s, "/"));
+    addConstant("derivation", v);
 
     /* Now that we've added all primops, sort the `builtins' attribute
        set, because attribute lookups expect it to be sorted. */
