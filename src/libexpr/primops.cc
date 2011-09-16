@@ -1114,7 +1114,10 @@ void EvalState::createBaseEnv()
           let outPath = builtins.getAttr (output + \"Path\") strict; in { \
             name = output; \
             value = attrs // { \
-              drvPath = strict.drvPath; inherit outPath; type = \"derivation\"; \
+              drvPath = strict.drvPath; \
+              inherit outPath; \
+              type = \"derivation\"; \
+              currentOutput = output; \
             } // outputsAttrs // { all = allList; }; \
           }; \
         outputsList = if attrs ? outputs then \
