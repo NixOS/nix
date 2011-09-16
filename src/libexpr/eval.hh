@@ -204,7 +204,7 @@ public:
     SymbolTable symbols;
 
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName,
-        sSystem, sOverrides;
+        sSystem, sOverrides, sCurrentOutput;
 
 private:
     SrcToStore srcToStore; 
