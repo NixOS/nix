@@ -61,23 +61,11 @@
 # /externals/
 /externals/Makefile
 /externals/Makefile.in
-/externals/aterm-*
-/externals/have-aterm
-/externals/build-aterm
-/externals/inst-aterm
 /externals/bzip2-*
-/externals/have-bzip2
 /externals/build-bzip2
 /externals/inst-bzip2
-
-# /make/examples/aterm/
-/make/examples/aterm/result*
-
-# /make/examples/aterm/aterm/
-/make/examples/aterm/aterm/*
-
-# /make/examples/aterm/test/
-/make/examples/aterm/test/*
+/externals/sqlite-*
+/externals/build-sqlite
 
 # /misc/
 /misc/Makefile.in
@@ -100,13 +88,16 @@
 /scripts/nix-channel
 /scripts/nix-build
 /scripts/nix-copy-closure
-/scripts/readmanifest.pm
-/scripts/readconfig.pm
+/scripts/nix-generate-patches
+/scripts/NixConfig.pm
+/scripts/NixManifest.pm
+/scripts/GeneratePatches.pm
 /scripts/download-using-manifests.pl
 /scripts/copy-from-other-stores.pl
-/scripts/generate-patches.pl
 /scripts/find-runtime-roots.pl
 /scripts/build-remote.pl
+/scripts/nix-reduce-build
+/scripts/nix-http-export.cgi
 
 # /src/
 /src/Makefile
@@ -168,6 +159,7 @@
 /src/libstore/derivations-ast.cc
 /src/libstore/derivations-ast.hh
 /src/libstore/.libs
+/src/libstore/schema.sql.hh
 
 # /src/libutil/
 /src/libutil/Makefile
@@ -242,6 +234,7 @@
 /tests/config.nix
 /tests/common.sh
 /tests/dummy
+/tests/result*
 
 # /tests/lang/
 /tests/lang/*.out
