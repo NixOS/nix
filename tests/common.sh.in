@@ -1,5 +1,7 @@
 set -e
 
+export TOP=$(pwd)/..
+
 export TEST_ROOT=$(pwd)/test-tmp
 export NIX_STORE_DIR
 if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
@@ -15,8 +17,11 @@ export NIX_DB_DIR=$TEST_ROOT/db
 export NIX_CONF_DIR=$TEST_ROOT/etc
 export NIX_BIN_DIR=$TEST_ROOT/bin
 export NIX_LIBEXEC_DIR=$TEST_ROOT/bin
+export NIX_MANIFESTS_DIR=$TEST_ROOT/var/nix/manifests
 export NIX_ROOT_FINDER=
 export SHARED=$TEST_ROOT/shared
+
+export PATH=$NIX_BIN_DIR:$TOP/scripts:$PATH
 
 export NIX_REMOTE=
 
@@ -27,10 +32,10 @@ export REAL_DATA_DIR=@datadir@
 export REAL_STORE_DIR=@storedir@
 export NIX_BUILD_HOOK=
 export PERL=perl
-export TOP=$(pwd)/..
-export bzip2_bin_test="@bzip2_bin_test@"
-if test "${bzip2_bin_test:0:1}" != "/"; then
-    bzip2_bin_test=`pwd`/${bzip2_bin_test}
+export PERL5LIB=$TOP/perl/lib
+export NIX_BZIP2="@bzip2_bin_test@/bzip2"
+if test "${NIX_BZIP2:0:1}" != "/"; then
+    NIX_BZIP2=`pwd`/${NIX_BZIP2}
 fi
 export dot=@dot@
 export xmllint="@xmllint@"

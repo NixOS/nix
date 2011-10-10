@@ -1,9 +1,15 @@
+package Nix::Manifest;
+
 use strict;
 use DBI;
 use Cwd;
 use File::stat;
 use File::Path;
 use Fcntl ':flock';
+use Nix::Config;
+
+our @ISA = qw(Exporter);
+our @EXPORT = qw(readManifest writeManifest updateManifestDB addPatch);
 
 
 sub addNAR {
@@ -200,7 +206,7 @@ sub writeManifest {
 
     # Create a bzipped manifest.
     unless (defined $noCompress) {
-	system("@bzip2@ < $manifest > $manifest.bz2.tmp") == 0
+	system("$Nix::Config::bzip2 < $manifest > $manifest.bz2.tmp") == 0
 	    or die "cannot compress manifest";
 
 	rename("$manifest.bz2.tmp", "$manifest.bz2")
@@ -210,7 +216,7 @@ sub writeManifest {
 
 
 sub updateManifestDB {
-    my $manifestDir = ($ENV{"NIX_MANIFESTS_DIR"} or "@localstatedir@/nix/manifests");
+    my $manifestDir = $Nix::Config::manifestDir;
 
     mkpath($manifestDir);
     
@@ -276,7 +282,8 @@ EOF
     # Acquire an exclusive lock to ensure that only one process
     # updates the DB at the same time.  This isn't really necessary,
     # but it prevents work duplication and lock contention in SQLite.
-    open MAINLOCK, ">>$manifestDir/cache.lock" or die;
+    my $lockFile = "$manifestDir/cache.lock";
+    open MAINLOCK, ">>$lockFile" or die "unable to acquire lock ‘$lockFile’: $!\n";
     flock(MAINLOCK, LOCK_EX) or die;
 
     $dbh->begin_work;

@@ -7,5 +7,4 @@ echo "pushing $drvPath"
 
 mkdir -p $TEST_ROOT/cache
 
-$NIX_BIN_DIR/nix-push \
-    --copy $TEST_ROOT/cache $TEST_ROOT/manifest $drvPath
+nix-push --copy $TEST_ROOT/cache $TEST_ROOT/manifest $drvPath

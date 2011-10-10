@@ -283,6 +283,8 @@ fi
 
 
 # Check for the required Perl dependencies (DBI and DBD::SQLite).
+perlFlags="-I${libdir}/perl5/site_perl"
+
 AC_ARG_WITH(dbi, AC_HELP_STRING([--with-dbi=PATH],
   [prefix of the Perl DBI library]),
   perlFlags="$perlFlags -I$withval")

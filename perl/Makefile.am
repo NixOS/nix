@@ -2,7 +2,9 @@ perlversion := $(shell perl -e 'use Config; print $$Config{version};')
 perlarchname := $(shell perl -e 'use Config; print $$Config{archname};')
 perllibdir = $(libdir)/perl5/site_perl/$(perlversion)/$(perlarchname)
 
-install-exec-local: lib/Nix/*.pm
+all: lib/Nix/Config.pm
+
+install-exec-local: lib/Nix/*.pm lib/Nix/Config.pm
 	$(INSTALL) -d $(DESTDIR)$(perllibdir)/Nix
 	$(INSTALL_DATA) lib/Nix/*.pm $(DESTDIR)$(perllibdir)/Nix
 	$(INSTALL) -d $(DESTDIR)$(perllibdir)/auto/Nix/Store
@@ -22,4 +24,6 @@ AM_CXXFLAGS = \
 lib/Nix/Store.cc: lib/Nix/Store.xs
 	xsubpp $^ -output $@
 
-EXTRA_DIST = lib/Nix/*.pm lib/Nix/Store.xs
+EXTRA_DIST = lib/Nix/Store.pm lib/Nix/Manifest.pm lib/Nix/Config.pm.in lib/Nix/Store.xs
+
+include ../substitute.mk

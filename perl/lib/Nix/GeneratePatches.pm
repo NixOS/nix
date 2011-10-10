@@ -1,6 +1,13 @@
+package Nix::GeneratePatches;
+
 use strict;
 use File::Temp qw(tempdir);
 use File::stat;
+use Nix::Config;
+use Nix::Manifest;
+
+our @ISA = qw(Exporter);
+our @EXPORT = qw(generatePatches propagatePatches copyPatches);
 
 
 # Some patch generations options.
@@ -201,7 +208,7 @@ sub generatePatches {
                 next;
             }
 
-            system("@bunzip2@ < $srcNarBz2 > $tmpDir/A") == 0
+            system("$Nix::Config::bzip2 -d < $srcNarBz2 > $tmpDir/A") == 0
                 or die "cannot unpack $srcNarBz2";
 
             if (stat("$tmpDir/A")->size >= $maxNarSize) {
@@ -209,7 +216,7 @@ sub generatePatches {
                 next;
             }
         
-            system("@bunzip2@ < $dstNarBz2 > $tmpDir/B") == 0
+            system("$Nix::Config::bzip2 -d < $dstNarBz2 > $tmpDir/B") == 0
                 or die "cannot unpack $dstNarBz2";
 
             if (stat("$tmpDir/B")->size >= $maxNarSize) {
@@ -218,20 +225,20 @@ sub generatePatches {
             }
         
             my $time1 = time();
-            my $res = system("ulimit -t $timeLimit; @libexecdir@/bsdiff $tmpDir/A $tmpDir/B $tmpDir/DIFF");
+            my $res = system("ulimit -t $timeLimit; $Nix::Config::libexecDir/bsdiff $tmpDir/A $tmpDir/B $tmpDir/DIFF");
             my $time2 = time();
             if ($res) {
                 warn "binary diff computation aborted after ", $time2 - $time1, " seconds\n";
                 next;
             }
 
-            my $baseHash = `@bindir@/nix-hash --flat --type $hashAlgo --base32 $tmpDir/A` or die;
+            my $baseHash = `$Nix::Config::binDir/nix-hash --flat --type $hashAlgo --base32 $tmpDir/A` or die;
             chomp $baseHash;
 
-            my $narHash = `@bindir@/nix-hash --flat --type $hashAlgo --base32 $tmpDir/B` or die;
+            my $narHash = `$Nix::Config::binDir/nix-hash --flat --type $hashAlgo --base32 $tmpDir/B` or die;
             chomp $narHash;
 
-            my $narDiffHash = `@bindir@/nix-hash --flat --type $hashAlgo --base32 $tmpDir/DIFF` or die;
+            my $narDiffHash = `$Nix::Config::binDir/nix-hash --flat --type $hashAlgo --base32 $tmpDir/DIFF` or die;
             chomp $narDiffHash;
 
             my $narDiffSize = stat("$tmpDir/DIFF")->size;

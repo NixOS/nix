@@ -3,6 +3,9 @@
 url=$1
 expHash=$2
 
+binDir=@bindir@
+if [ -n "$NIX_BIN_DIR" ]; then binDir="$NIX_BIN_DIR"; fi
+
 # needed to make it work on NixOS
 export PATH=$PATH:@coreutils@
 
@@ -31,8 +34,8 @@ if test -z "$name"; then echo "invalid url"; exit 1; fi
 # If the hash was given, a file with that hash may already be in the
 # store.
 if test -n "$expHash"; then
-    finalPath=$(@bindir@/nix-store --print-fixed-path "$hashType" "$expHash" "$name")
-    if ! @bindir@/nix-store --check-validity "$finalPath" 2> /dev/null; then
+    finalPath=$($binDir/nix-store --print-fixed-path "$hashType" "$expHash" "$name")
+    if ! $bindir/nix-store --check-validity "$finalPath" 2> /dev/null; then
         finalPath=
     fi
     hash=$expHash
@@ -103,7 +106,7 @@ if test -z "$finalPath"; then
     # garbage-collected independently.
     if test -n "$NIX_DOWNLOAD_CACHE"; then
         echo -n "$url" > $tmpPath/url
-        urlHash=$(@bindir@/nix-hash --type sha256 --base32 --flat $tmpPath/url)
+        urlHash=$($binDir/nix-hash --type sha256 --base32 --flat $tmpPath/url)
         echo "$url" > "$NIX_DOWNLOAD_CACHE/$urlHash.url"
         cachedHashFN="$NIX_DOWNLOAD_CACHE/$urlHash.$hashType"
         cachedTimestampFN="$NIX_DOWNLOAD_CACHE/$urlHash.stamp"
@@ -121,8 +124,8 @@ if test -z "$finalPath"; then
         # Curl didn't create $tmpFile, so apparently there's no newer
         # file on the server.
         hash=$(cat $cachedHashFN)
-        finalPath=$(@bindir@/nix-store --print-fixed-path "$hashType" "$hash" "$name") 
-        if ! @bindir@/nix-store --check-validity "$finalPath" 2> /dev/null; then
+        finalPath=$($binDir/nix-store --print-fixed-path "$hashType" "$hash" "$name") 
+        if ! $binDir/nix-store --check-validity "$finalPath" 2> /dev/null; then
             echo "cached contents of \`$url' disappeared, redownloading..." >&2
             finalPath=
             cacheFlags="--remote-time"
@@ -133,7 +136,7 @@ if test -z "$finalPath"; then
     if test -z "$finalPath"; then
 
         # Compute the hash.
-        hash=$(@bindir@/nix-hash --type "$hashType" $hashFormat --flat $tmpFile)
+        hash=$($binDir/nix-hash --type "$hashType" $hashFormat --flat $tmpFile)
         if ! test -n "$QUIET"; then echo "hash is $hash" >&2; fi
 
         if test -n "$NIX_DOWNLOAD_CACHE"; then
@@ -142,7 +145,7 @@ if test -z "$finalPath"; then
         fi
 
         # Add the downloaded file to the Nix store.
-        finalPath=$(@bindir@/nix-store --add-fixed "$hashType" $tmpFile)
+        finalPath=$($binDir/nix-store --add-fixed "$hashType" $tmpFile)
 
         if test -n "$expHash" -a "$expHash" != "$hash"; then
             echo "hash mismatch for URL \`$url'" >&2

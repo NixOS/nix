@@ -7,22 +7,22 @@ mkdir -p $TEST_ROOT/cache2 $TEST_ROOT/patches
 RESULT=$TEST_ROOT/result
 
 # Build version 1 and 2 of the "foo" package.
-$NIX_BIN_DIR/nix-push --copy $TEST_ROOT/cache2 $TEST_ROOT/manifest1 \
+nix-push --copy $TEST_ROOT/cache2 $TEST_ROOT/manifest1 \
     $($nixbuild -o $RESULT binary-patching.nix --arg version 1)
 
 out2=$($nixbuild -o $RESULT binary-patching.nix --arg version 2)
-$NIX_BIN_DIR/nix-push --copy $TEST_ROOT/cache2 $TEST_ROOT/manifest2 $out2
+nix-push --copy $TEST_ROOT/cache2 $TEST_ROOT/manifest2 $out2
     
 out3=$($nixbuild -o $RESULT binary-patching.nix --arg version 3)
-$NIX_BIN_DIR/nix-push --copy $TEST_ROOT/cache2 $TEST_ROOT/manifest3 $out3
+nix-push --copy $TEST_ROOT/cache2 $TEST_ROOT/manifest3 $out3
 
 rm $RESULT
 
 # Generate binary patches.
-$NIX_BIN_DIR/nix-generate-patches $TEST_ROOT/cache2 $TEST_ROOT/patches \
+nix-generate-patches $TEST_ROOT/cache2 $TEST_ROOT/patches \
     file://$TEST_ROOT/patches $TEST_ROOT/manifest1 $TEST_ROOT/manifest2
 
-$NIX_BIN_DIR/nix-generate-patches $TEST_ROOT/cache2 $TEST_ROOT/patches \
+nix-generate-patches $TEST_ROOT/cache2 $TEST_ROOT/patches \
     file://$TEST_ROOT/patches $TEST_ROOT/manifest2 $TEST_ROOT/manifest3
 
 grep -q "patch {" $TEST_ROOT/manifest3
@@ -45,7 +45,7 @@ rm $RESULT
 [ "$(grep ' patch ' $TEST_ROOT/var/log/nix/downloads | wc -l)" -eq 2 ]
 
 # Add a patch from version 1 directly to version 3.
-$NIX_BIN_DIR/nix-generate-patches $TEST_ROOT/cache2 $TEST_ROOT/patches \
+nix-generate-patches $TEST_ROOT/cache2 $TEST_ROOT/patches \
     file://$TEST_ROOT/patches $TEST_ROOT/manifest1 $TEST_ROOT/manifest3
 
 # Rebuild version 3.  This should use the direct patch rather than the
