@@ -37,3 +37,6 @@ EXTRA_DIST = nix-collect-garbage.in \
   nix-reduce-build.in \
   nix-http-export.cgi.in \
   nix-generate-patches.in
+
+clean:
+	rm -f $(bin_SCRIPTS) $(noinst_SCRIPTS)
