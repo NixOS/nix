@@ -27,9 +27,7 @@ EXTRA_DIST = nix-collect-garbage.in \
   nix-pull.in nix-push.in nix-profile.sh.in \
   nix-prefetch-url.in nix-install-package.in \
   nix-channel.in \
-  NixConfig.pm.in \
   SSH.pm \
-  GeneratePatches.pm.in \
   nix-build.in \
   download-using-manifests.pl.in \
   copy-from-other-stores.pl.in \
