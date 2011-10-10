@@ -155,7 +155,7 @@ let
       name = "nix-rpm-${diskImage.name}";
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
-        { extraPackages = [ "perl-DBD-SQLite" ]; };
+        { extraPackages = [ "perl-DBD-SQLite" "perl-devel" ]; };
       memSize = 1024;
       meta.schedulingPriority = prio;
     };
