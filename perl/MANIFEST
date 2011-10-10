@@ -1,0 +1,7 @@
+Changes
+Makefile.PL
+MANIFEST
+Nix.xs
+README
+t/Nix.t
+lib/Nix.pm

@@ -341,6 +341,7 @@ AC_CONFIG_FILES([Makefile
    src/nix-setuid-helper/Makefile
    src/nix-log2xml/Makefile
    src/bsdiff-4.3/Makefile
+   perl/Makefile
    scripts/Makefile
    corepkgs/Makefile
    corepkgs/nar/Makefile
