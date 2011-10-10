@@ -1,7 +1,7 @@
 source common.sh
 
-drvPath=$($nixinstantiate dependencies.nix)
-outPath=$($nixstore -r $drvPath)
+drvPath=$(nix-instantiate dependencies.nix)
+outPath=$(nix-store -r $drvPath)
 
 echo "pushing $drvPath"
 

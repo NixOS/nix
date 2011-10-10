@@ -8,7 +8,7 @@ clearStore
 
 rm -f $SHARED.cur $SHARED.max
 
-outPath=$($nixbuild -j10000 parallel.nix)
+outPath=$(nix-build -j10000 parallel.nix)
 
 echo "output path is $outPath"
 
@@ -27,9 +27,9 @@ clearStore
 
 rm -f $SHARED.cur $SHARED.max
 
-drvPath=$($nixinstantiate parallel.nix --argstr sleepTime 15)
+drvPath=$(nix-instantiate parallel.nix --argstr sleepTime 15)
 
-cmd="$nixstore -j1 -r $drvPath"
+cmd="nix-store -j1 -r $drvPath"
 
 $cmd &
 pid1=$!

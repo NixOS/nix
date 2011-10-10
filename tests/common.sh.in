@@ -47,13 +47,6 @@ export SHELL="@shell@"
 export version=@version@
 export system=@system@
 
-export nixinstantiate=$TOP/src/nix-instantiate/nix-instantiate
-export nixstore=$TOP/src/nix-store/nix-store
-export nixenv=$TOP/src/nix-env/nix-env
-export nixhash=$TOP/src/nix-hash/nix-hash
-export nixworker=$TOP/src/nix-worker/nix-worker
-export nixbuild=$NIX_BIN_DIR/nix-build
-
 readLink() {
     ls -l "$1" | sed 's/.*->\ //'
 }
@@ -70,7 +63,7 @@ clearStore() {
     mkdir "$NIX_STORE_DIR"
     rm -rf "$NIX_DB_DIR"
     mkdir "$NIX_DB_DIR"
-    $nixstore --init
+    nix-store --init
     clearProfiles
     rm -f "$NIX_STATE_DIR"/gcroots/auto/*
     rm -f "$NIX_STATE_DIR"/gcroots/ref
@@ -81,7 +74,7 @@ clearManifests() {
 }
 
 startDaemon() {
-    $nixworker --daemon &
+    nix-worker --daemon &
     pidDaemon=$!
     trap "kill -9 $pidDaemon" EXIT
     export NIX_REMOTE=daemon

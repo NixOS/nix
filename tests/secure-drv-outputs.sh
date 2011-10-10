@@ -10,11 +10,11 @@ clearManifests
 startDaemon
 
 # Determine the output path of the "good" derivation.
-goodOut=$($nixstore -q $($nixinstantiate ./secure-drv-outputs.nix -A good))
+goodOut=$(nix-store -q $(nix-instantiate ./secure-drv-outputs.nix -A good))
 
 # Instantiate the "bad" derivation.
-badDrv=$($nixinstantiate ./secure-drv-outputs.nix -A bad)
-badOut=$($nixstore -q $badDrv)
+badDrv=$(nix-instantiate ./secure-drv-outputs.nix -A bad)
+badOut=$(nix-store -q $badDrv)
 
 # Rewrite the bad derivation to produce the output path of the good
 # derivation.
@@ -23,12 +23,12 @@ sed -e "s|$badOut|$goodOut|g" < $badDrv > $TEST_ROOT/bad.drv
 
 # Add the manipulated derivation to the store and build it.  This
 # should fail.
-if badDrv2=$($nixstore --add $TEST_ROOT/bad.drv); then
-    $nixstore -r "$badDrv2"
+if badDrv2=$(nix-store --add $TEST_ROOT/bad.drv); then
+    nix-store -r "$badDrv2"
 fi
 
 # Now build the good derivation.
-goodOut2=$($nixbuild ./secure-drv-outputs.nix -A good)
+goodOut2=$(nix-build ./secure-drv-outputs.nix -A good)
 test "$goodOut" = "$goodOut2"
 
 if ! test -e "$goodOut"/good; then

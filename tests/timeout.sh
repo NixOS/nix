@@ -2,14 +2,14 @@
 
 source common.sh
 
-drvPath=$($nixinstantiate timeout.nix)
+drvPath=$(nix-instantiate timeout.nix)
 
-test "$($nixstore -q --binding system "$drvPath")" = "$system"
+test "$(nix-store -q --binding system "$drvPath")" = "$system"
 
 echo "derivation is $drvPath"
 
 failed=0
-messages="`$nixstore -r --timeout 2 $drvPath 2>&1 || failed=1`"
+messages="`nix-store -r --timeout 2 $drvPath 2>&1 || failed=1`"
 if test $failed -ne 0; then
     echo "error: \`nix-store' succeeded; should have timed out" >&2
     exit 1

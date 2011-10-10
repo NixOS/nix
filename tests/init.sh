@@ -18,22 +18,19 @@ mkdir "$NIX_DB_DIR"
 mkdir "$NIX_CONF_DIR"
 
 mkdir $NIX_BIN_DIR
-ln -s $nixstore $NIX_BIN_DIR/
-ln -s $nixinstantiate $NIX_BIN_DIR/
-ln -s $nixhash $NIX_BIN_DIR/
-ln -s $nixenv $NIX_BIN_DIR/
-ln -s $nixworker $NIX_BIN_DIR/
+ln -s $TOP/src/nix-store/nix-store $NIX_BIN_DIR/
+ln -s $TOP/src/nix-instantiate/nix-instantiate $NIX_BIN_DIR/
+ln -s $TOP/src/nix-hash/nix-hash $NIX_BIN_DIR/
+ln -s $TOP/src/nix-env/nix-env $NIX_BIN_DIR/
+ln -s $TOP/src/nix-worker/nix-worker $NIX_BIN_DIR/
 ln -s $TOP/src/bsdiff-*/bsdiff $NIX_BIN_DIR/
 ln -s $TOP/src/bsdiff-*/bspatch $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-prefetch-url $NIX_BIN_DIR/
-ln -s $TOP/scripts/nix-collect-garbage $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-build $NIX_BIN_DIR/
-ln -s $TOP/scripts/nix-install-package $NIX_BIN_DIR/
 ln -s $TOP/scripts/nix-pull $NIX_BIN_DIR/
-mkdir $NIX_BIN_DIR/nix
+mkdir -p $NIX_BIN_DIR/nix/substituters
 ln -s $NIX_BZIP2 $NIX_BIN_DIR/nix/
-ln -s $TOP/scripts/copy-from-other-stores.pl $NIX_BIN_DIR/nix/
-ln -s $TOP/scripts/download-using-manifests.pl $NIX_BIN_DIR/nix/
+ln -s $TOP/scripts/copy-from-other-stores.pl $NIX_BIN_DIR/nix/substituters
 
 cat > "$NIX_CONF_DIR"/nix.conf <<EOF
 gc-keep-outputs = false
@@ -71,20 +68,15 @@ mv tmp $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh
 # binaries sets DYLD_LIBRARY_PATH so that Perl finds Nix's (completely
 # different) libutil --- so it barfs.  So generate a shell wrapper
 # around download-using-manifests that clears DYLD_LIBRARY_PATH.
-mv $NIX_BIN_DIR/nix/download-using-manifests.pl $NIX_BIN_DIR/nix/download-using-manifests.pl.real
-cat > $NIX_BIN_DIR/nix/download-using-manifests.pl <<EOF
+cat > $NIX_BIN_DIR/nix/substituters/download-using-manifests.pl <<EOF
 #! $SHELL -e
 export DYLD_LIBRARY_PATH=
-exec $NIX_BIN_DIR/nix/download-using-manifests.pl.real "\$@"
+exec $TOP/scripts/download-using-manifests.pl "\$@"
 EOF
-chmod +x $NIX_BIN_DIR/nix/download-using-manifests.pl
-
-mkdir -p $NIX_BIN_DIR/nix/substituters
-mv $NIX_BIN_DIR/nix/copy-from-other-stores.pl $NIX_BIN_DIR/nix/substituters/copy-from-other-stores.pl
-mv $NIX_BIN_DIR/nix/download-using-manifests.pl $NIX_BIN_DIR/nix/substituters/download-using-manifests.pl
+chmod +x $NIX_BIN_DIR/nix/substituters/download-using-manifests.pl
 
 # Initialise the database.
-$nixstore --init
+nix-store --init
 
 # Did anything happen?
 test -e "$NIX_DB_DIR"/db.sqlite

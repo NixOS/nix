@@ -1,3 +1,3 @@
 source common.sh
 
-$nixstore --verify
+nix-store --verify
