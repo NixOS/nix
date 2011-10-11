@@ -1,8 +1,7 @@
-#! @perl@ -w -I@libexecdir@/nix
+#! @perl@ -w @perlFlags@
 
-use SSH;
-
-my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
+use Nix::SSH;
+use Nix::Config;
 
 
 if (scalar @ARGV < 1) {
@@ -61,7 +60,7 @@ if ($toMode) { # Copy TO the remote machine.
     my @allStorePaths;
 
     # Get the closure of this path.
-    my $pid = open(READ, "set -f; $binDir/nix-store --query --requisites @storePaths|") or die;
+    my $pid = open(READ, "set -f; $Nix::Config::binDir/nix-store --query --requisites @storePaths|") or die;
     
     while (<READ>) {
         chomp;
@@ -130,7 +129,7 @@ else { # Copy FROM the remote machine.
         print STDERR "  $_\n" foreach @missing;
         my $extraOpts = "";
         $extraOpts .= "--sign" if $sign == 1;
-        system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $decompressor @bindir@/nix-store --import") == 0
+        system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $decompressor $Nix::Config::binDir/nix-store --import") == 0
             or die "copying store paths from remote machine `$sshHost' failed: $?";
     }
 

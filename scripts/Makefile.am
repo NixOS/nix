@@ -13,7 +13,6 @@ install-exec-local: download-using-manifests.pl copy-from-other-stores.pl find-r
 	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/profile.d
 	$(INSTALL_PROGRAM) nix-profile.sh $(DESTDIR)$(sysconfdir)/profile.d/nix.sh
 	$(INSTALL) -d $(DESTDIR)$(libexecdir)/nix
-	$(INSTALL_DATA) SSH.pm $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) find-runtime-roots.pl $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL_PROGRAM) build-remote.pl $(DESTDIR)$(libexecdir)/nix 
 	$(INSTALL) -d $(DESTDIR)$(libexecdir)/nix/substituters
@@ -27,7 +26,6 @@ EXTRA_DIST = nix-collect-garbage.in \
   nix-pull.in nix-push.in nix-profile.sh.in \
   nix-prefetch-url.in nix-install-package.in \
   nix-channel.in \
-  SSH.pm \
   nix-build.in \
   download-using-manifests.pl.in \
   copy-from-other-stores.pl.in \

@@ -1,9 +1,9 @@
-#! @perl@ -w -I@libexecdir@/nix
+#! @perl@ -w @perlFlags@
 
 use Fcntl ':flock';
 use English '-no_match_vars';
 use IO::Handle;
-use SSH qw/sshOpts openSSHConnection/;
+use Nix::SSH qw/sshOpts openSSHConnection/;
 no warnings('once');
 
 
