@@ -32,7 +32,7 @@ export REAL_DATA_DIR=@datadir@
 export REAL_STORE_DIR=@storedir@
 export NIX_BUILD_HOOK=
 export PERL=perl
-export PERL5LIB=$TOP/perl/lib
+export PERL5LIB=$TOP/perl/lib:$PERL5LIB
 export NIX_BZIP2="@bzip2_bin_test@/bzip2"
 if test "${NIX_BZIP2:0:1}" != "/"; then
     NIX_BZIP2=`pwd`/${NIX_BZIP2}
@@ -74,7 +74,14 @@ clearManifests() {
 }
 
 startDaemon() {
+    # Start the daemon, wait for the socket to appear.  !!!
+    # ‘nix-worker’ should have an option to fork into the background.
+    rm -f $NIX_STATE_DIR/daemon-socket/socket
     nix-worker --daemon &
+    for ((i = 0; i < 30; i++)); do
+        if [ -e $NIX_STATE_DIR/daemon-socket/socket ]; then break; fi
+        sleep 1
+    done
     pidDaemon=$!
     trap "kill -9 $pidDaemon" EXIT
     export NIX_REMOTE=daemon
