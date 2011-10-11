@@ -39,8 +39,7 @@ void init()
         doInit();
 
 
-int isValidPath(path)
-        char * path
+int isValidPath(char * path)
     CODE:
         try {
             doInit();
@@ -52,8 +51,7 @@ int isValidPath(path)
         RETVAL
 
 
-SV * queryReferences(path)
-        char * path
+SV * queryReferences(char * path)
     PPCODE:
         try {
             doInit();
@@ -66,8 +64,7 @@ SV * queryReferences(path)
         }
 
 
-SV * queryPathHash(path)
-        char * path
+SV * queryPathHash(char * path)
     PPCODE:
         try {
             doInit();
@@ -79,8 +76,7 @@ SV * queryPathHash(path)
         }
 
 
-SV * queryDeriver(path)
-        char * path
+SV * queryDeriver(char * path)
     PPCODE:
         try {
             doInit();
@@ -92,8 +88,7 @@ SV * queryDeriver(path)
         }
 
 
-SV * queryPathInfo(path)
-        char * path
+SV * queryPathInfo(char * path)
     PPCODE:
         try {
             doInit();
@@ -127,3 +122,29 @@ SV * computeFSClosure(int flipDirection, int includeOutputs, ...)
         } catch (Error & e) {
             croak(e.what());
         }
+
+
+SV * topoSortPaths(...)
+    PPCODE:
+        try {
+            doInit();
+            PathSet paths;
+            for (int n = 0; n < items; ++n) paths.insert(SvPV_nolen(ST(n)));
+            Paths sorted = topoSortPaths(*store, paths);
+            for (Paths::iterator i = sorted.begin(); i != sorted.end(); ++i)
+                XPUSHs(sv_2mortal(newSVpv(i->c_str(), 0)));
+        } catch (Error & e) {
+            croak(e.what());
+        }
+
+
+SV * followLinksToStorePath(char * path)
+    CODE:
+        try {
+            doInit();
+            RETVAL = newSVpv(followLinksToStorePath(path).c_str(), 0);
+        } catch (Error & e) {
+            croak(e.what());
+        }
+    OUTPUT:
+        RETVAL

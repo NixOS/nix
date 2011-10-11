@@ -2,6 +2,7 @@
 
 use Nix::SSH;
 use Nix::Config;
+use Nix::Store;
 
 
 if (scalar @ARGV < 1) {
@@ -57,19 +58,8 @@ openSSHConnection $sshHost or die "$0: unable to start SSH\n";
 
 if ($toMode) { # Copy TO the remote machine.
 
-    my @allStorePaths;
-
     # Get the closure of this path.
-    my $pid = open(READ, "set -f; $Nix::Config::binDir/nix-store --query --requisites @storePaths|") or die;
-    
-    while (<READ>) {
-        chomp;
-        die "bad: $_" unless /^\//;
-        push @allStorePaths, $_;
-    }
-
-    close READ or die "nix-store failed: $?";
-
+    my @allStorePaths = reverse(topoSortPaths(computeFSClosure(0, 0, map { followLinksToStorePath $_ } @storePaths)));
 
     # Ask the remote host which paths are invalid.
     open(READ, "set -f; ssh $sshHost @sshOpts nix-store --check-validity --print-invalid @allStorePaths|");
@@ -79,7 +69,6 @@ if ($toMode) { # Copy TO the remote machine.
         push @missing, $_;
     }
     close READ or die;
-
 
     # Export the store paths and import them on the remote machine.
     if (scalar @missing > 0) {
@@ -93,7 +82,6 @@ if ($toMode) { # Copy TO the remote machine.
 
 }
 
-
 else { # Copy FROM the remote machine.
 
     # Query the closure of the given store paths on the remote
@@ -102,26 +90,13 @@ else { # Copy FROM the remote machine.
     my $pid = open(READ,
         "set -f; ssh @sshOpts $sshHost nix-store --query --requisites @storePaths|") or die;
     
-    my @allStorePaths;
-
     while (<READ>) {
         chomp;
         die "bad: $_" unless /^\//;
-        push @allStorePaths, $_;
+        push @missing, $_ unless isValidPath($_);
     }
 
     close READ or die "nix-store on remote machine `$sshHost' failed: $?";
-
-
-    # What paths are already valid locally?
-    open(READ, "set -f; @bindir@/nix-store --check-validity --print-invalid @allStorePaths|");
-    my @missing = ();
-    while (<READ>) {
-        chomp;
-        push @missing, $_;
-    }
-    close READ or die;
-    
 
     # Export the store paths on the remote machine and import them on locally.
     if (scalar @missing > 0) {
