@@ -145,6 +145,10 @@ let
       inherit nixpkgs nixos; nix = build { inherit system; }; system = "x86_64-linux";
     }).test;
 
+    tests.nix_copy_closure = (import ./tests/nix-copy-closure.nix rec {
+      inherit nixpkgs nixos; nix = build { inherit system; }; system = "x86_64-linux";
+    }).test;
+
   };
 
 
