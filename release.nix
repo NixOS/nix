@@ -1,5 +1,5 @@
-{ nixpkgs ? ../nixpkgs
-, nix ? { outPath = ./.; rev = 1234; }
+{ nixpkgs ? <nixpkgs>, nixos ? <nixos>
+, nix ? { outPath = ../nix-export; rev = 1234; }
 , officialRelease ? false
 }:
 
@@ -139,6 +139,11 @@ let
     deb_ubuntu1010i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1010i386) 50;
     deb_ubuntu1010x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1010x86_64) 50;
 
+
+    # System tests.
+    tests.remote_builds = (import ./tests/remote-builds.nix rec {
+      inherit nixpkgs nixos; nix = build { inherit system; }; system = "x86_64-linux";
+    }).test;
 
   };
 
