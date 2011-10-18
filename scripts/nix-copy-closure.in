@@ -24,6 +24,10 @@ my $decompressor = "";
 
 my $toMode = 1;
 
+my $includeOutputs = 0;
+
+my $dryRun = 0;
+
 
 # !!! Copied from nix-pack-closure, should put this in a module.
 my @storePaths = ();
@@ -44,6 +48,12 @@ while (@ARGV) {
     elsif ($arg eq "--to") {
         $toMode = 1;
     }
+    elsif ($arg eq "--include-outputs") {
+        $includeOutputs = 1;
+    }
+    elsif ($arg eq "--dry-run") {
+        $dryRun = 1;
+    }
     elsif (!defined $sshHost) {
         $sshHost = $arg;
     }
@@ -59,7 +69,7 @@ openSSHConnection $sshHost or die "$0: unable to start SSH\n";
 if ($toMode) { # Copy TO the remote machine.
 
     # Get the closure of this path.
-    my @allStorePaths = reverse(topoSortPaths(computeFSClosure(0, 0, map { followLinksToStorePath $_ } @storePaths)));
+    my @allStorePaths = reverse(topoSortPaths(computeFSClosure(0, $includeOutputs, map { followLinksToStorePath $_ } @storePaths)));
 
     # Ask the remote host which paths are invalid.
     open(READ, "set -f; ssh $sshHost @sshOpts nix-store --check-validity --print-invalid @allStorePaths|");
@@ -74,10 +84,11 @@ if ($toMode) { # Copy TO the remote machine.
     if (scalar @missing > 0) {
         print STDERR "copying these missing paths:\n";
         print STDERR "  $_\n" foreach @missing;
-        my $extraOpts = "";
-        $extraOpts .= "--sign" if $sign == 1;
-        system("set -f; nix-store --export $extraOpts @missing $compressor | ssh $sshHost @sshOpts '$decompressor nix-store --import'") == 0
-            or die "copying store paths to remote machine `$sshHost' failed: $?";
+        unless ($dryRun) {
+            my $extraOpts = $sign ? "--sign" : "";
+            system("set -f; nix-store --export $extraOpts @missing $compressor | ssh $sshHost @sshOpts '$decompressor nix-store --import'") == 0
+                or die "copying store paths to remote machine `$sshHost' failed: $?";
+        }
     }
 
 }
@@ -87,8 +98,9 @@ else { # Copy FROM the remote machine.
     # Query the closure of the given store paths on the remote
     # machine.  Paths are assumed to be store paths; there is no
     # resolution (following of symlinks).
+    my $extraOpts = $includeOutputs ? "--include-outputs" : "";
     my $pid = open(READ,
-        "set -f; ssh @sshOpts $sshHost nix-store --query --requisites @storePaths|") or die;
+        "set -f; ssh @sshOpts $sshHost nix-store --query --requisites $extraOpts @storePaths|") or die;
     
     while (<READ>) {
         chomp;
@@ -102,10 +114,11 @@ else { # Copy FROM the remote machine.
     if (scalar @missing > 0) {
         print STDERR "copying these missing paths:\n";
         print STDERR "  $_\n" foreach @missing;
-        my $extraOpts = "";
-        $extraOpts .= "--sign" if $sign == 1;
-        system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $decompressor $Nix::Config::binDir/nix-store --import") == 0
-            or die "copying store paths from remote machine `$sshHost' failed: $?";
+        unless ($dryRun) {
+            my $extraOpts = $sign ? "--sign" : "";
+            system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $decompressor $Nix::Config::binDir/nix-store --import") == 0
+                or die "copying store paths from remote machine `$sshHost' failed: $?";
+        }
     }
 
 }
