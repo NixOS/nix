@@ -73,7 +73,7 @@ sub processURL {
 
     # Otherwise, just get the uncompressed manifest.
     else {
-        print "obtaining list of Nix archives at `$url'...\n";
+        print "fetching list of Nix archives at `$url'...\n";
         $manifest = downloadFile $url;
     }
 
