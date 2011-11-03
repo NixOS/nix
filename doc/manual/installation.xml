@@ -323,7 +323,7 @@ $ chmod 1775 /nix/store
 specifying the build users group in the <link
 linkend="conf-build-users-group"><literal>build-users-group</literal>
 option</link> in the <link linkend="sec-conf-file">Nix configuration
-file</link> (<literal>/nix/etc/nix/nix.conf</literal>):
+file</link> (usually <literal>/etc/nix/nix.conf</literal>):
 
 <programlisting>
 build-users-group = nixbld
