@@ -37,6 +37,7 @@ makeTest ({ pkgs, ... }: let pkgA = pkgs.aterm; pkgB = pkgs.wget; in {
       $server->succeed("mkdir -m 700 /root/.ssh");
       $server->copyFileFromHost("key.pub", "/root/.ssh/authorized_keys");
       $server->waitForJob("sshd");
+      $client->waitForJob("network-interfaces");
       $client->succeed("ssh -o StrictHostKeyChecking=no " . $server->name() . " 'echo hello world'");
 
       # Copy the closure of package A from the client to the server.
