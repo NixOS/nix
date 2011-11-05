@@ -23,7 +23,7 @@ build-bzip2: $(BZIP2)
 
 install-exec-local:: build-bzip2
 	mkdir -p $(DESTDIR)${bzip2_bin}
-	$(INSTALL_PROGRAM) $(bzip2_bin_test)/bzip2 $(bzip2_bin_test)/bunzip2 $(DESTDIR)${bzip2_bin}
+	$(INSTALL_PROGRAM) $(bzip2_bin_test)/bzip2 $(DESTDIR)${bzip2_bin}
 endif
 
 
