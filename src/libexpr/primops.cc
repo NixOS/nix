@@ -989,7 +989,7 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, Value * * args
     PathSet context2;
     foreach (PathSet::iterator, i, context) {
         Path p = *i;
-        p = "~" + string(p, 1);
+        if (p.at(0) == '=') p = "~" + string(p, 1);
         context2.insert(p);
     }
     
