@@ -470,8 +470,8 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     drvHashes[drvPath] = hashDerivationModulo(*store, drv);
 
     state.mkAttrs(v, 1 + drv.outputs.size());
+    mkString(*state.allocAttr(v, state.sDrvPath), drvPath, singleton<PathSet>("=" + drvPath));
     foreach (DerivationOutputs::iterator, i, drv.outputs) {
-        mkString(*state.allocAttr(v, state.symbols.create(i->first + "DrvPath")), drvPath, singleton<PathSet>("=" + drvPath));
         /* The output path of an output X is ‘<X>Path’,
            e.g. ‘outPath’. */
         mkString(*state.allocAttr(v, state.symbols.create(i->first + "Path")),
@@ -1126,13 +1126,11 @@ void EvalState::createBaseEnv()
         attrValues = attrs: \
           map (name: builtins.getAttr name attrs) (builtins.attrNames attrs); \
         outputToAttrListElement = output: \
-          let \
-            outPath = builtins.getAttr (output + \"Path\") strict; \
-            drvPath = builtins.getAttr (output + \"DrvPath\") strict; \
-          in { \
+          { \
             name = output; \
             value = attrs // { \
-              inherit outPath drvPath; \
+              outPath = builtins.getAttr (output + \"Path\") strict; \
+              drvPath = strict.drvPath; \
               type = \"derivation\"; \
               currentOutput = output; \
             } // outputsAttrs // { all = allList; }; \
