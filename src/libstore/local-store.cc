@@ -820,6 +820,28 @@ PathSet LocalStore::queryDerivationOutputs(const Path & path)
 }
 
 
+StringSet LocalStore::queryDerivationOutputNames(const Path & path)
+{
+    SQLiteTxn txn(db);
+    
+    SQLiteStmtUse use(stmtQueryDerivationOutputs);
+    stmtQueryDerivationOutputs.bind(queryValidPathId(path));
+    
+    StringSet outputNames;
+    int r;
+    while ((r = sqlite3_step(stmtQueryDerivationOutputs)) == SQLITE_ROW) {
+        const char * s = (const char *) sqlite3_column_text(stmtQueryDerivationOutputs, 0);
+        assert(s);
+        outputNames.insert(s);
+    }
+    
+    if (r != SQLITE_DONE)
+        throwSQLiteError(db, format("error getting output names of `%1%'") % path);
+
+    return outputNames;
+}
+
+
 void LocalStore::startSubstituter(const Path & substituter, RunningSubstituter & run)
 {
     if (run.pid != -1) return;

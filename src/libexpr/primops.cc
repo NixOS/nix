@@ -347,6 +347,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
        derivation. */
     foreach (PathSet::iterator, i, context) {
         Path path = *i;
+        bool explicitlyPassed = false;
         
         /* Paths marked with `=' denote that the path of a derivation
            is explicitly passed to the builder.  Since that allows the
@@ -361,8 +362,10 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
             foreach (PathSet::iterator, j, refs) {
                 drv.inputSrcs.insert(*j);
                 if (isDerivation(*j))
-                    drv.inputDrvs[*j] = singleton<StringSet>("out");
+                    drv.inputDrvs[*j] = store -> queryDerivationOutputNames(*j);
             }
+
+            explicitlyPassed = true;
         }
 
         /* See prim_unsafeDiscardOutputDependency. */
@@ -376,7 +379,10 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
 
         debug(format("derivation uses `%1%'") % path);
         if (!useDrvAsSrc && isDerivation(path))
-            drv.inputDrvs[path] = singleton<StringSet>("out");
+            if (explicitlyPassed)
+                drv.inputDrvs[path] = store -> queryDerivationOutputNames(path);
+            else
+                drv.inputDrvs[path] = singleton<StringSet>("out");
         else
             drv.inputSrcs.insert(path);
     }

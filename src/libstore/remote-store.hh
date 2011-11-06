@@ -41,6 +41,8 @@ public:
     
     PathSet queryDerivationOutputs(const Path & path);
     
+    StringSet queryDerivationOutputNames(const Path & path);
+
     bool hasSubstitutes(const Path & path);
     
     bool querySubstitutablePathInfo(const Path & path,
