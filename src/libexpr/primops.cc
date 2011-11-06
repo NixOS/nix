@@ -456,7 +456,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
 
     state.mkAttrs(v, 1 + drv.outputs.size());
     foreach (DerivationOutputs::iterator, i, drv.outputs) {
-        mkString(*state.allocAttr(v, state.symbols.create(i->first + "DrvPath")), drvPath, singleton<PathSet>("=" + i->first + "=" + drvPath));
+        mkString(*state.allocAttr(v, state.symbols.create(i->first + "DrvPath")), drvPath, singleton<PathSet>("=" + drvPath));
         /* The output path of an output X is ‘<X>Path’,
            e.g. ‘outPath’. */
         mkString(*state.allocAttr(v, state.symbols.create(i->first + "Path")),
@@ -974,14 +974,7 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, Value * * args
     PathSet context2;
     foreach (PathSet::iterator, i, context) {
         Path p = *i;
-        if (p.at(0) == '=')
-        {
-            size_t index;
-            p = "~" + string(p, 1);
-            index = p.find("=");
-            if (index < p.find("/"))
-                p = "~" + string(p, index + 1);
-        }
+        p = "~" + string(p, 1);
         context2.insert(p);
     }
     
