@@ -2,11 +2,11 @@ source common.sh
 
 echo "Testing multiple outputs..."
 
-drvPath=$($nixinstantiate multiple-outputs.nix)
+drvPath=$(nix-instantiate multiple-outputs.nix)
 
 echo "derivation is $drvPath"
 
-outPath=$($nixstore -rvv "$drvPath")
+outPath=$(nix-store -rvv "$drvPath")
 
 echo "output path is $outPath"
 
