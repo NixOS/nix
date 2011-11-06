@@ -388,8 +388,10 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
         if (!useDrvAsSrc && isDerivation(path))
             if (explicitlyPassed)
                 drv.inputDrvs[path] = store -> queryDerivationOutputNames(path);
-            else
+            else if (drv.inputDrvs.find(path) == drv.inputDrvs.end())
                 drv.inputDrvs[path] = singleton<StringSet>(output);
+            else
+                drv.inputDrvs[path].insert(output);
         else
             drv.inputSrcs.insert(path);
     }
