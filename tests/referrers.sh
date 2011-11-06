@@ -6,7 +6,7 @@ max=500
 
 reference=$NIX_STORE_DIR/abcdef
 touch $reference
-(echo $reference && echo && echo 0) | $nixstore --register-validity 
+(echo $reference && echo && echo 0) | nix-store --register-validity 
 
 echo "making registration..."
 
@@ -22,11 +22,11 @@ done > $TEST_ROOT/reg_info
 
 echo "registering..."
 
-$nixstore --register-validity < $TEST_ROOT/reg_info
+nix-store --register-validity < $TEST_ROOT/reg_info
 
 echo "collecting garbage..."
 ln -sfn $reference "$NIX_STATE_DIR"/gcroots/ref
-$nixstore --gc
+nix-store --gc
 
 if test "$(sqlite3 ./test-tmp/db/db.sqlite 'select count(*) from Refs')" -ne 0; then
     echo "referrers not cleaned up"

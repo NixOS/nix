@@ -10,7 +10,7 @@ touch $TEST_ROOT/filterin/bak
 touch $TEST_ROOT/filterin/bla.c.bak
 ln -s xyzzy $TEST_ROOT/filterin/link
 
-$NIX_BIN_DIR/nix-build ./filter-source.nix -o $TEST_ROOT/filterout
+nix-build ./filter-source.nix -o $TEST_ROOT/filterout
 
 set -x
 test ! -e $TEST_ROOT/filterout/foo/bar

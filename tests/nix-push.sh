@@ -1,11 +1,10 @@
 source common.sh
 
-drvPath=$($nixinstantiate dependencies.nix)
-outPath=$($nixstore -r $drvPath)
+drvPath=$(nix-instantiate dependencies.nix)
+outPath=$(nix-store -r $drvPath)
 
 echo "pushing $drvPath"
 
 mkdir -p $TEST_ROOT/cache
 
-$NIX_BIN_DIR/nix-push \
-    --copy $TEST_ROOT/cache $TEST_ROOT/manifest $drvPath
+nix-push --copy $TEST_ROOT/cache $TEST_ROOT/manifest $drvPath

@@ -171,8 +171,8 @@ EvalState::EvalState()
             size_t size = 32 * 1024 * 1024;
 #if HAVE_SYSCONF && defined(_SC_PAGESIZE) && defined(_SC_PHYS_PAGES)
             long pageSize = sysconf(_SC_PAGESIZE);
-            long pages = sysconf (_SC_PHYS_PAGES);
-            if (pageSize != -1 && size != -1)
+            long pages = sysconf(_SC_PHYS_PAGES);
+            if (pageSize != -1)
                 size = (pageSize * pages) / 4; // 25% of RAM
             if (size > maxSize) size = maxSize;
 #endif
@@ -1109,7 +1109,10 @@ bool EvalState::isDerivation(Value & v)
 {
     if (v.type != tAttrs) return false;
     Bindings::iterator i = v.attrs->find(sType);
-    return i != v.attrs->end() && forceStringNoCtx(*i->value) == "derivation";
+    if (i == v.attrs->end()) return false;
+    forceValue(*i->value);
+    if (i->value->type != tString) return false;
+    return forceStringNoCtx(*i->value) == "derivation";
 }
 
 

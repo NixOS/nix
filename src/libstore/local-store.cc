@@ -510,7 +510,7 @@ void LocalStore::checkDerivationOutputs(const Path & drvPath, const Derivation &
 }
 
 
-unsigned long long LocalStore::addValidPath(const ValidPathInfo & info)
+unsigned long long LocalStore::addValidPath(const ValidPathInfo & info, bool checkOutputs)
 {
     SQLiteStmtUse use(stmtRegisterValidPath);
     stmtRegisterValidPath.bind(info.path);
@@ -540,7 +540,7 @@ unsigned long long LocalStore::addValidPath(const ValidPathInfo & info)
            derivations).  Note that if this throws an error, then the
            DB transaction is rolled back, so the path validity
            registration above is undone. */
-        checkDerivationOutputs(info.path, drv);
+        if (checkOutputs) checkDerivationOutputs(info.path, drv);
         
         foreach (DerivationOutputs::iterator, i, drv.outputs) {
             SQLiteStmtUse use(stmtAddDerivationOutput);
@@ -1521,7 +1521,7 @@ void LocalStore::upgradeStore6()
     SQLiteTxn txn(db);
     
     foreach (PathSet::iterator, i, validPaths) {
-        addValidPath(queryPathInfoOld(*i));
+        addValidPath(queryPathInfoOld(*i), false);
         std::cerr << ".";
     }
 

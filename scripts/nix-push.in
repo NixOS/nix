@@ -1,9 +1,10 @@
-#! @perl@ -w -I@libexecdir@/nix @perlFlags@
+#! @perl@ -w @perlFlags@
 
 use strict;
 use File::Temp qw(tempdir);
 use File::stat;
-use NixManifest;
+use Nix::Config;
+use Nix::Manifest;
 
 my $hashAlgo = "sha256";
 
@@ -13,7 +14,7 @@ my $tmpDir = tempdir("nix-push.XXXXXX", CLEANUP => 1, TMPDIR => 1)
 my $nixExpr = "$tmpDir/create-nars.nix";
 my $manifest = "$tmpDir/MANIFEST";
 
-my $curl = "@curl@ --fail --silent";
+my $curl = "$Nix::Config::curl --fail --silent";
 my $extraCurlFlags = ${ENV{'CURL_FLAGS'}};
 $curl = "$curl $extraCurlFlags" if defined $extraCurlFlags;
 
@@ -107,7 +108,7 @@ foreach my $storePath (@storePaths) {
     # Construct a Nix expression that creates a Nix archive.
     my $nixexpr = 
         "((import $dataDir/nix/corepkgs/nar/nar.nix) " .
-        "{storePath = builtins.storePath \"$storePath\"; system = \"@system@\"; hashAlgo = \"$hashAlgo\";}) ";
+        "{ storePath = builtins.storePath \"$storePath\"; system = \"@system@\"; hashAlgo = \"$hashAlgo\"; }) ";
     
     print NIX $nixexpr;
 }

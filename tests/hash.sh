@@ -2,7 +2,7 @@ source common.sh
 
 try () {
     printf "%s" "$2" > $TEST_ROOT/vector
-    hash=$($nixhash $EXTRA --flat --type "$1" $TEST_ROOT/vector)
+    hash=$(nix-hash $EXTRA --flat --type "$1" $TEST_ROOT/vector)
     if test "$hash" != "$3"; then
         echo "hash $1, expected $3, got $hash"
         exit 1
@@ -28,7 +28,7 @@ try sha256 "abc" "1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s"
 EXTRA=
 
 try2 () {
-    hash=$($nixhash --type "$1" $TEST_ROOT/hash-path)
+    hash=$(nix-hash --type "$1" $TEST_ROOT/hash-path)
     if test "$hash" != "$2"; then
         echo "hash $1, expected $2, got $hash"
         exit 1
@@ -56,7 +56,7 @@ ln -s x $TEST_ROOT/hash-path/hello
 try2 md5 "f78b733a68f5edbdf9413899339eaa4a"
 
 # Conversion.
-test $($nixhash --type sha256 --to-base32 "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad") = "1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s"
-test $($nixhash --type sha256 --to-base16 "1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s") = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-test $($nixhash --type sha1 --to-base32 "800d59cfcd3c05e900cb4e214be48f6b886a08df") = "vw46m23bizj4n8afrc0fj19wrp7mj3c0"
-test $($nixhash --type sha1 --to-base16 "vw46m23bizj4n8afrc0fj19wrp7mj3c0") = "800d59cfcd3c05e900cb4e214be48f6b886a08df"
+test $(nix-hash --type sha256 --to-base32 "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad") = "1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s"
+test $(nix-hash --type sha256 --to-base16 "1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s") = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+test $(nix-hash --type sha1 --to-base32 "800d59cfcd3c05e900cb4e214be48f6b886a08df") = "vw46m23bizj4n8afrc0fj19wrp7mj3c0"
+test $(nix-hash --type sha1 --to-base16 "vw46m23bizj4n8afrc0fj19wrp7mj3c0") = "800d59cfcd3c05e900cb4e214be48f6b886a08df"

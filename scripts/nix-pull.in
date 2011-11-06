@@ -1,17 +1,17 @@
-#! @perl@ -w -I@libexecdir@/nix @perlFlags@
+#! @perl@ -w @perlFlags@
 
 use strict;
 use File::Temp qw(tempdir);
-use NixManifest;
+use Nix::Config;
+use Nix::Manifest;
 
 my $tmpDir = tempdir("nix-pull.XXXXXX", CLEANUP => 1, TMPDIR => 1)
     or die "cannot create a temporary directory";
 
-my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
 my $libexecDir = ($ENV{"NIX_LIBEXEC_DIR"} or "@libexecdir@");
 my $storeDir = ($ENV{"NIX_STORE_DIR"} or "@storedir@");
 my $stateDir = ($ENV{"NIX_STATE_DIR"} or "@localstatedir@/nix");
-my $manifestDir = ($ENV{"NIX_MANIFESTS_DIR"} or "$stateDir/manifests");
+my $manifestDir = $Nix::Config::manifestDir;
 
 
 # Prevent access problems in shared-stored installations.
@@ -42,7 +42,7 @@ sub downloadFile {
     my $url = shift;
     $ENV{"PRINT_PATH"} = 1;
     $ENV{"QUIET"} = 1;
-    my ($dummy, $path) = `$binDir/nix-prefetch-url '$url'`;
+    my ($dummy, $path) = `$Nix::Config::binDir/nix-prefetch-url '$url'`;
     die "cannot fetch `$url'" if $? != 0;
     die "nix-prefetch-url did not return a path" unless defined $path;
     chomp $path;
@@ -57,23 +57,23 @@ sub processURL {
     my $manifest;
 
     # First see if a bzipped manifest is available.
-    if (system("@curl@ --fail --silent --head '$url'.bz2 > /dev/null") == 0) {
+    if (system("$Nix::Config::curl --fail --silent --head '$url'.bz2 > /dev/null") == 0) {
         print "fetching list of Nix archives at `$url.bz2'...\n";
         my $bzipped = downloadFile "$url.bz2";
 
         $manifest = "$tmpDir/MANIFEST";
 
-        system("@bunzip2@ < $bzipped > $manifest") == 0
+        system("$Nix::Config::bzip2 -d < $bzipped > $manifest") == 0
             or die "cannot decompress manifest";
 
-        $manifest = (`$binDir/nix-store --add $manifest`
+        $manifest = (`$Nix::Config::binDir/nix-store --add $manifest`
                      or die "cannot copy $manifest to the store");
         chomp $manifest;
     }
 
     # Otherwise, just get the uncompressed manifest.
     else {
-        print "obtaining list of Nix archives at `$url'...\n";
+        print "fetching list of Nix archives at `$url'...\n";
         $manifest = downloadFile $url;
     }
 
@@ -96,7 +96,7 @@ sub processURL {
         $baseName = $1;
     }
 
-    my $hash = `$binDir/nix-hash --flat '$manifest'`
+    my $hash = `$Nix::Config::binDir/nix-hash --flat '$manifest'`
         or die "cannot hash `$manifest'";
     chomp $hash;
 

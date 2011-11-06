@@ -239,7 +239,8 @@ Hash hashDerivationModulo(StoreAPI & store, Derivation drv)
     foreach (DerivationInputs::const_iterator, i, drv.inputDrvs) {
         Hash h = drvHashes[i->first];
         if (h.type == htUnknown) {
-            Derivation drv2 = derivationFromPath(store, i->first);
+            assert(store.isValidPath(i->first));
+            Derivation drv2 = parseDerivation(readFile(i->first));
             h = hashDerivationModulo(store, drv2);
             drvHashes[i->first] = h;
         }

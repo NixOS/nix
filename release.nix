@@ -1,5 +1,5 @@
-{ nixpkgs ? ../nixpkgs
-, nix ? { outPath = ./.; rev = 1234; }
+{ nixpkgs ? <nixpkgs>, nixos ? <nixos>
+, nix ? { outPath = ../nix-export; rev = 1234; }
 , officialRelease ? false
 }:
 
@@ -140,6 +140,15 @@ let
     deb_ubuntu1010x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1010x86_64) 50;
 
 
+    # System tests.
+    tests.remote_builds = (import ./tests/remote-builds.nix rec {
+      inherit nixpkgs nixos; nix = build { inherit system; }; system = "x86_64-linux";
+    }).test;
+
+    tests.nix_copy_closure = (import ./tests/nix-copy-closure.nix rec {
+      inherit nixpkgs nixos; nix = build { inherit system; }; system = "x86_64-linux";
+    }).test;
+
   };
 
 
@@ -155,7 +164,7 @@ let
       name = "nix-rpm-${diskImage.name}";
       src = jobs.tarball;
       diskImage = (diskImageFun vmTools.diskImageFuns)
-        { extraPackages = [ "perl-DBD-SQLite" ]; };
+        { extraPackages = [ "perl-DBD-SQLite" "perl-devel" ]; };
       memSize = 1024;
       meta.schedulingPriority = prio;
     };

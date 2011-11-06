@@ -6,7 +6,7 @@
 
 
 <para>A number of persistent settings of Nix are stored in the file
-<filename><replaceable>prefix</replaceable>/etc/nix/nix.conf</filename>.
+<filename><replaceable>sysconfdir</replaceable>/nix/nix.conf</filename>.
 This file is a list of <literal><replaceable>name</replaceable> =
 <replaceable>value</replaceable></literal> pairs, one per line.
 Comments start with a <literal>#</literal> character.  An example

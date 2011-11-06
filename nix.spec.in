@@ -20,6 +20,7 @@ Prefix: /usr
 Requires: /usr/bin/perl
 Requires: curl
 Requires: perl-DBD-SQLite
+Requires: perl-devel
 
 # Hack to make that shitty RPM scanning hack shut up.
 Provides: perl(readmanifest)

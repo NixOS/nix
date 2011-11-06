@@ -1,9 +1,9 @@
-#! @perl@ -w -I@libexecdir@/nix @perlFlags@
+#! @perl@ -w @perlFlags@
 
 use strict;
 use File::Temp qw(tempdir);
-use NixManifest;
-use GeneratePatches;
+use Nix::Manifest;
+use Nix::GeneratePatches;
 
 if (scalar @ARGV != 5) {
     print STDERR <<EOF;

@@ -1,4 +1,4 @@
-{system, storePath, hashAlgo}: 
+{ system, storePath, hashAlgo }:
 
 derivation {
   name = "nar";

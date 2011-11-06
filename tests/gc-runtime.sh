@@ -12,9 +12,9 @@ set -m # enable job control, needed for kill
 profiles="$NIX_STATE_DIR"/profiles
 rm -f $profiles/*
 
-$nixenv -p $profiles/test -f ./gc-runtime.nix -i gc-runtime
+nix-env -p $profiles/test -f ./gc-runtime.nix -i gc-runtime
 
-outPath=$($nixenv -p $profiles/test -q --no-name --out-path gc-runtime)
+outPath=$(nix-env -p $profiles/test -q --no-name --out-path gc-runtime)
 echo $outPath
 
 echo "backgrounding program..."
@@ -23,12 +23,12 @@ sleep 2 # hack - wait for the program to get started
 child=$!
 echo PID=$child
 
-$nixenv -p $profiles/test -e gc-runtime
-$nixenv -p $profiles/test --delete-generations old
+nix-env -p $profiles/test -e gc-runtime
+nix-env -p $profiles/test --delete-generations old
 
 cp $TOP/scripts/find-runtime-roots.pl $TEST_ROOT/foo.pl
 chmod +x $TEST_ROOT/foo.pl
-NIX_ROOT_FINDER=$TEST_ROOT/foo.pl $nixstore --gc
+NIX_ROOT_FINDER=$TEST_ROOT/foo.pl nix-store --gc
 
 kill -- -$child
 

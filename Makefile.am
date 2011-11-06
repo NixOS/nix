@@ -1,4 +1,4 @@
-SUBDIRS = externals src scripts corepkgs doc misc tests
+SUBDIRS = externals src perl scripts corepkgs doc misc tests
 EXTRA_DIST = substitute.mk nix.spec nix.spec.in bootstrap.sh \
   nix.conf.example NEWS version
 
@@ -33,7 +33,7 @@ init-state:
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/temproots
 	ln -sfn $(localstatedir)/nix/profiles $(DESTDIR)$(localstatedir)/nix/gcroots/profiles
 	$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(localstatedir)/nix/userpool
-	-$(INSTALL) $(INIT_FLAGS) -m 1777 -d $(DESTDIR)$(storedir)
+	-$(INSTALL) $(INIT_FLAGS) -d $(DESTDIR)$(storedir)
 	$(INSTALL) $(INIT_FLAGS) $(GROUP_WRITABLE) -d $(DESTDIR)$(localstatedir)/nix/manifests
 	ln -sfn $(localstatedir)/nix/manifests $(DESTDIR)$(localstatedir)/nix/gcroots/manifests
 
