@@ -348,6 +348,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     foreach (PathSet::iterator, i, context) {
         Path path = *i;
         bool explicitlyPassed = false;
+        string output = "out";
         
         /* Paths marked with `=' denote that the path of a derivation
            is explicitly passed to the builder.  Since that allows the
@@ -366,6 +367,12 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
             }
 
             explicitlyPassed = true;
+        } else if (path.at(0) == '!') {
+            size_t index;
+            path = string(path, 1);
+            index = path.find("!");
+            output = path.substr(0, index);
+            path = string(path, index + 1);
         }
 
         /* See prim_unsafeDiscardOutputDependency. */
@@ -382,7 +389,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
             if (explicitlyPassed)
                 drv.inputDrvs[path] = store -> queryDerivationOutputNames(path);
             else
-                drv.inputDrvs[path] = singleton<StringSet>("out");
+                drv.inputDrvs[path] = singleton<StringSet>(output);
         else
             drv.inputSrcs.insert(path);
     }
@@ -466,7 +473,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
         /* The output path of an output X is ‘<X>Path’,
            e.g. ‘outPath’. */
         mkString(*state.allocAttr(v, state.symbols.create(i->first + "Path")),
-            i->second.path, singleton<PathSet>(drvPath));
+            i->second.path, singleton<PathSet>("!" + i->first + "!" + drvPath));
     }
     v.attrs->sort();
 }
