@@ -1,7 +1,7 @@
 mkdir $out
 test "$firstOutput $secondOutput" = "$allOutputs"
 test "$defaultOutput" = "$firstOutput"
-test "$(cat $first/file)" = "second"
-test "$(cat $second/file)" = "first"
+test "$(cat $firstOutput/file)" = "second"
+test "$(cat $secondOutput/file)" = "first"
 
 echo "success" > $out/file
