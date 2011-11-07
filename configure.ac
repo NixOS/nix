@@ -255,7 +255,7 @@ AC_ARG_WITH(sqlite, AC_HELP_STRING([--with-sqlite=PATH],
   [prefix of SQLite]),
   sqlite=$withval, sqlite=)
 AM_CONDITIONAL(HAVE_SQLITE, test -n "$sqlite")
-SQLITE_VERSION=3070701
+SQLITE_VERSION=3070900
 AC_SUBST(SQLITE_VERSION)
 if test -z "$sqlite"; then
   sqlite_lib='${top_builddir}/externals/sqlite-autoconf-$(SQLITE_VERSION)/libsqlite3.la'

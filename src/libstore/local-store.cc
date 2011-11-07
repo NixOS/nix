@@ -327,10 +327,9 @@ void LocalStore::openDB(bool create)
     if (sqlite3_exec(db, ("pragma synchronous = " + syncMode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
         throwSQLiteError(db, "setting synchronous mode");
 
-    /* Set the SQLite journal mode.  WAL mode is fastest, but doesn't
-       seem entirely stable at the moment (Oct. 2010).  Thus, use
-       truncate mode by default. */
-    string mode = queryBoolSetting("use-sqlite-wal", false) ? "wal" : "truncate";
+    /* Set the SQLite journal mode.  WAL mode is fastest, so it's the
+       default. */
+    string mode = queryBoolSetting("use-sqlite-wal", true) ? "wal" : "truncate";
     string prevMode;
     {
         SQLiteStmt stmt;
