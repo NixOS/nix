@@ -14,14 +14,21 @@ AC_MSG_CHECKING([for the canonical Nix system name])
 AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
   [Platform identifier (e.g., `i686-linux').]),
   [system=$withval],
-  [case "$host_os" in
+  [case "$host_cpu" in
+     i*86)
+        machine_name="i686";;
+     *)
+        machine_name="$host_cpu";;
+   esac
+
+   case "$host_os" in
      linux-gnu*)
 	# For backward compatibility, strip the `-gnu' part.
-	system="$host_cpu-linux";;
+	system="$machine_name-linux";;
      *)
         # Strip the version number from names such as `gnu0.3',
         # `darwin10.2.0', etc.
-	system="$host_cpu-`echo $host_os | "$SED" -e's/[0-9.]\+$//g'`";;
+	system="$machine_name-`echo $host_os | "$SED" -e's/[0-9.]\+$//g'`";;
    esac])
 
 AC_MSG_RESULT($system)
