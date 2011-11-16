@@ -5,42 +5,25 @@ AM_INIT_AUTOMAKE([dist-bzip2 foreign])
 
 AC_DEFINE_UNQUOTED(NIX_VERSION, ["$VERSION"], [Nix version.])
 
-AC_CANONICAL_HOST
-
+AC_PROG_SED
 
 # Construct a Nix system name (like "i686-linux").
+AC_CANONICAL_HOST
 AC_MSG_CHECKING([for the canonical Nix system name])
-cpu_name=$(uname -p | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ ' 'abcdefghijklmnopqrstuvwxyz_')
-machine_name=$(uname -m | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ ' 'abcdefghijklmnopqrstuvwxyz_')
-
-case $machine_name in
-    i*86)
-        machine_name=i686
-        ;;
-    x86_64)
-        machine_name=x86_64
-        ;;
-    ppc)
-        machine_name=powerpc
-        ;;
-    *)
-        if test "$cpu_name" != "unknown"; then
-            machine_name=$cpu_name
-        fi
-        ;;
-esac
-
-sys_name=$(uname -s | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ ' 'abcdefghijklmnopqrstuvwxyz_')
-
-case $sys_name in
-    cygwin*)
-        sys_name=cygwin
-        ;;
-esac
 
 AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
   [Platform identifier (e.g., `i686-linux').]),
-  system=$withval, system="${machine_name}-${sys_name}")
+  [system=$withval],
+  [case "$host_os" in
+     linux-gnu*)
+	# For backward compatibility, strip the `-gnu' part.
+	system="$host_cpu-linux";;
+     *)
+        # Strip the version number from names such as `gnu0.3',
+        # `darwin10.2.0', etc.
+	system="$host_cpu-`echo $host_os | "$SED" -e's/[0-9.]\+$//g'`";;
+   esac])
+
 AC_MSG_RESULT($system)
 AC_SUBST(system)
 AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
