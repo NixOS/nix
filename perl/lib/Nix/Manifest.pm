@@ -305,8 +305,8 @@ EOF
     # unless we've already done so on a previous run.
     my %seen;
     
-    for my $manifest (glob "$manifestDir/*.nixmanifest") {
-        $manifest = Cwd::abs_path($manifest);
+    for my $manifestLink (glob "$manifestDir/*.nixmanifest") {
+        my $manifest = Cwd::abs_path($manifestLink);
         my $timestamp = lstat($manifest)->mtime;
         $seen{$manifest} = 1;
 
@@ -342,10 +342,10 @@ EOF
         my $version = readManifest_($manifest, \&addNARToDB, \&addPatchToDB);
         
         if ($version < 3) {
-            die "you have an old-style manifest `$manifest'; please delete it";
+            die "you have an old-style or corrupt manifest `$manifestLink'; please delete it";
         }
         if ($version >= 10) {
-            die "manifest `$manifest' is too new; please delete it or upgrade Nix";
+            die "manifest `$manifestLink' is too new; please delete it or upgrade Nix";
         }
     }
 

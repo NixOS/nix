@@ -33,10 +33,6 @@ if (! -l $manifestDirLink) {
 
 
 # Process the URLs specified on the command line.
-my %narFiles;
-my %patches;
-
-my $skipWrongStore = 0;
 
 sub downloadFile {
     my $url = shift;
@@ -66,20 +62,6 @@ sub processURL {
     else {
         print "fetching list of Nix archives at `$url'...\n";
         $manifest = downloadFile $url;
-    }
-
-    my $version = readManifest($manifest, \%narFiles, \%patches);
-    
-    die "`$url' is not a manifest or it is too old (i.e., for Nix <= 0.7)\n" if $version < 3;
-    die "manifest `$url' is too new\n" if $version >= 5;
-
-    if ($skipWrongStore) {
-        foreach my $path (keys %narFiles) {
-            if (substr($path, 0, length($storeDir) + 1) ne "$storeDir/") {
-                print STDERR "warning: manifest `$url' assumes a Nix store at a different location than $storeDir, skipping...\n";
-                exit 0;
-            }
-        }
     }
 
     my $baseName = "unnamed";
@@ -120,12 +102,12 @@ sub processURL {
 while (@ARGV) {
     my $url = shift @ARGV;
     if ($url eq "--skip-wrong-store") {
-        $skipWrongStore = 1;
+        # No-op, no longer supported.
     } else {
         processURL $url;
     }
 }
 
 
-my $size = scalar (keys %narFiles);
-print "$size store paths in manifest\n";
+# Update the cache.
+updateManifestDB();
