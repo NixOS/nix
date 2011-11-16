@@ -120,7 +120,6 @@ sub readManifest_ {
             elsif (/^\s*Hash:\s*(\S+)\s*$/) { $hash = $1; }
             elsif (/^\s*URL:\s*(\S+)\s*$/) { $url = $1; }
             elsif (/^\s*Size:\s*(\d+)\s*$/) { $size = $1; }
-            elsif (/^\s*SuccOf:\s*(\/\S+)\s*$/) { } # obsolete
             elsif (/^\s*BasePath:\s*(\/\S+)\s*$/) { $basePath = $1; }
             elsif (/^\s*BaseHash:\s*(\S+)\s*$/) { $baseHash = $1; }
             elsif (/^\s*Type:\s*(\S+)\s*$/) { $patchType = $1; }
