@@ -53,8 +53,14 @@ sub addPatch {
 sub readManifest_ {
     my ($manifest, $addNAR, $addPatch) = @_;
 
-    open MANIFEST, "<$manifest"
-        or die "cannot open `$manifest': $!";
+    # Decompress the manifest if necessary.
+    if ($manifest =~ /\.bz2$/) {
+        open MANIFEST, "$Nix::Config::bzip2 -d < $manifest |"
+            or die "cannot decompress `$manifest': $!";
+    } else {
+        open MANIFEST, "<$manifest"
+            or die "cannot open `$manifest': $!";
+    }
 
     my $inside = 0;
     my $type;

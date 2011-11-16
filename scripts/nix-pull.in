@@ -59,16 +59,7 @@ sub processURL {
     # First see if a bzipped manifest is available.
     if (system("$Nix::Config::curl --fail --silent --head '$url'.bz2 > /dev/null") == 0) {
         print "fetching list of Nix archives at `$url.bz2'...\n";
-        my $bzipped = downloadFile "$url.bz2";
-
-        $manifest = "$tmpDir/MANIFEST";
-
-        system("$Nix::Config::bzip2 -d < $bzipped > $manifest") == 0
-            or die "cannot decompress manifest";
-
-        $manifest = (`$Nix::Config::binDir/nix-store --add $manifest`
-                     or die "cannot copy $manifest to the store");
-        chomp $manifest;
+        $manifest = downloadFile "$url.bz2";
     }
 
     # Otherwise, just get the uncompressed manifest.
