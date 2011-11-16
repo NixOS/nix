@@ -286,6 +286,14 @@ EOF
     open MAINLOCK, ">>$lockFile" or die "unable to acquire lock ‘$lockFile’: $!\n";
     flock(MAINLOCK, LOCK_EX) or die;
 
+    our $insertNAR = $dbh->prepare(
+        "insert into NARs(manifest, storePath, url, hash, size, narHash, " .
+        "narSize, refs, deriver, system) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)") or die;
+
+    our $insertPatch = $dbh->prepare(
+        "insert into Patches(manifest, storePath, basePath, baseHash, url, hash, " .
+        "size, narHash, narSize, patchType) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
     $dbh->begin_work;
 
     # Read each manifest in $manifestDir and add it to the database,
@@ -312,20 +320,16 @@ EOF
 
         sub addNARToDB {
             my ($storePath, $narFile) = @_;
-            $dbh->do(
-                "insert into NARs(manifest, storePath, url, hash, size, narHash, " .
-                "narSize, refs, deriver, system) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                {}, $id, $storePath, $narFile->{url}, $narFile->{hash}, $narFile->{size},
+            $insertNAR->execute(
+                $id, $storePath, $narFile->{url}, $narFile->{hash}, $narFile->{size},
                 $narFile->{narHash}, $narFile->{narSize}, $narFile->{references},
                 $narFile->{deriver}, $narFile->{system});
         };
         
         sub addPatchToDB {
             my ($storePath, $patch) = @_;
-            $dbh->do(
-                "insert into Patches(manifest, storePath, basePath, baseHash, url, hash, " .
-                "size, narHash, narSize, patchType) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                {}, $id, $storePath, $patch->{basePath}, $patch->{baseHash}, $patch->{url},
+            $insertPatch->execute(
+                $id, $storePath, $patch->{basePath}, $patch->{baseHash}, $patch->{url},
                 $patch->{hash}, $patch->{size}, $patch->{narHash}, $patch->{narSize},
                 $patch->{patchType});
         };
