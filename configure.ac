@@ -17,6 +17,8 @@ AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
   [case "$host_cpu" in
      i*86)
         machine_name="i686";;
+     amd64)
+        machine_name="x86_64";;
      *)
         machine_name="$host_cpu";;
    esac
@@ -25,6 +27,9 @@ AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
      linux-gnu*)
 	# For backward compatibility, strip the `-gnu' part.
 	system="$machine_name-linux";;
+     freebsd*)
+	# Strip the version number (e.g. freebsd8.2).
+	system="$machine_name-freebsd";;
      *)
         # Strip the version number from names such as `gnu0.3',
         # `darwin10.2.0', etc.
