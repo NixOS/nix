@@ -27,13 +27,10 @@ AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
      linux-gnu*)
 	# For backward compatibility, strip the `-gnu' part.
 	system="$machine_name-linux";;
-     freebsd*)
-	# Strip the version number (e.g. freebsd8.2).
-	system="$machine_name-freebsd";;
      *)
         # Strip the version number from names such as `gnu0.3',
         # `darwin10.2.0', etc.
-	system="$machine_name-`echo $host_os | "$SED" -e's/[0-9.]\+$//g'`";;
+	system="$machine_name-`echo $host_os | "$SED" -e's/[0-9.]*$//g'`";;
    esac])
 
 AC_MSG_RESULT($system)
