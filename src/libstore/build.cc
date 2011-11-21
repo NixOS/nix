@@ -1650,6 +1650,9 @@ void DerivationGoal::startBuilder()
             (format("nixbld:!:%1%:\n")
                 % (buildUser.enabled() ? buildUser.getGID() : getgid())).str());
 
+        /* Create /etc/hosts with localhost entry. */
+        writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n");
+
         /* Bind-mount a user-configurable set of directories from the
            host file system.  The `/dev/pts' directory must be mounted
            separately so that newly-created pseudo-terminals show
