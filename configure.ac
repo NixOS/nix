@@ -62,7 +62,7 @@ fi
 
 
 # Solaris-specific stuff.
-if [ "$sys_name" = sunos ]; then
+if test "$sys_name" = sunos; then
     # Solaris requires -lsocket -lnsl for network functions
     LIBS="-lsocket -lnsl $LIBS"
 fi
