@@ -30,7 +30,7 @@ AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
      *)
         # Strip the version number from names such as `gnu0.3',
         # `darwin10.2.0', etc.
-	system="$machine_name-`echo $host_os | "$SED" -e's/[0-9.]*$//g'`";;
+	system="$machine_name-`echo $host_os | "$SED" -e's/@<:@0-9.@:>@*$//g'`";;
    esac])
 
 AC_MSG_RESULT($system)
