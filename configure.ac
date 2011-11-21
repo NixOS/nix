@@ -33,6 +33,14 @@ AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
 	system="$machine_name-`echo $host_os | "$SED" -e's/@<:@0-9.@:>@*$//g'`";;
    esac])
 
+sys_name=$(uname -s | tr 'A-Z ' 'a-z_')
+
+case $sys_name in
+    cygwin*)
+        sys_name=cygwin
+        ;;
+esac
+   
 AC_MSG_RESULT($system)
 AC_SUBST(system)
 AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier (`cpu-os')])
@@ -54,7 +62,7 @@ fi
 
 
 # Solaris-specific stuff.
-if test "$sys_name" = "sunos"; then
+if [ "$sys_name" = sunos ]; then
     # Solaris requires -lsocket -lnsl for network functions
     LIBS="-lsocket -lnsl $LIBS"
 fi
