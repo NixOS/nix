@@ -114,7 +114,9 @@ void overrideSetting(const string & name, const Strings & value);
 
 void reloadSettings();
 
-    
+void setDefaultsFromEnvironment();
+
+
 }
 
 

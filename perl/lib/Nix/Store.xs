@@ -18,10 +18,8 @@ using namespace nix;
 void doInit() 
 {
     if (!store) {
-        nixStore = canonPath(getEnv("NIX_STORE_DIR", getEnv("NIX_STORE", "/nix/store")));
-        nixStateDir = canonPath(getEnv("NIX_STATE_DIR", "/nix/var/nix"));
-        nixDBPath = getEnv("NIX_DB_DIR", nixStateDir + "/db");
         try {
+            setDefaultsFromEnvironment();
             store = openStore();
         } catch (Error & e) {
             croak(e.what());
