@@ -26,6 +26,7 @@
     <arg><option>--gzip</option></arg>
     <arg><option>--bzip2</option></arg>
     <arg><option>--xz</option></arg>
+    <arg><option>--include-outputs</option></arg>
     <arg choice='plain'>
       <arg><replaceable>user@</replaceable></arg><replaceable>machine</replaceable>
     </arg>
@@ -86,15 +87,16 @@ those paths.  If this bothers you, use
 
     <listitem><para>Let the sending machine cryptographically sign the
     dump of each path with the key in
-    <filename>/nix/etc/nix/signing-key.sec</filename>.  If the user on
-    the target machine does not have direct access to the Nix store
-    (i.e., if the target machine has a multi-user Nix installation),
-    then the target machine will check the dump against
-    <filename>/nix/etc/nix/signing-key.pub</filename> before unpacking
-    it in its Nix store.  This allows secure sharing of store paths
-    between untrusted users on two machines, provided that there is a
-    trust relation between the Nix installations on both machines
-    (namely, they have matching public/secret keys).</para></listitem>
+    <filename><replaceable>sysconfdir</replaceable>/nix/signing-key.sec</filename>.
+    If the user on the target machine does not have direct access to
+    the Nix store (i.e., if the target machine has a multi-user Nix
+    installation), then the target machine will check the dump against
+    <filename><replaceable>sysconfdir</replaceable>/nix/signing-key.pub</filename>
+    before unpacking it in its Nix store.  This allows secure sharing
+    of store paths between untrusted users on two machines, provided
+    that there is a trust relation between the Nix installations on
+    both machines (namely, they have matching public/secret
+    keys).</para></listitem>
 
   </varlistentry>
 
@@ -106,6 +108,13 @@ those paths.  If this bothers you, use
     decompression program must be installed on the target
     machine.</para></listitem>
 
+  </varlistentry>
+
+  <varlistentry><term><option>--include-outputs</option></term>
+  
+  <listitem><para>Also copy the outputs of store derivations included
+  in the closure.</para></listitem>
+  
   </varlistentry>
 
 </variablelist>
