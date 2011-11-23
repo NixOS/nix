@@ -3,6 +3,7 @@
 use Fcntl ':flock';
 use English '-no_match_vars';
 use IO::Handle;
+use Nix::Config;
 use Nix::SSH qw/sshOpts openSSHConnection/;
 no warnings('once');
 
@@ -208,7 +209,7 @@ print STDERR "@ build-remote $drvPath $hostName\n" if $printBuildTrace;
 
 
 my $maybeSign = "";
-$maybeSign = "--sign" if -e "/nix/etc/nix/signing-key.sec";
+$maybeSign = "--sign" if -e "$Nix::Config::confDir/signing-key.sec";
 
 
 # Register the derivation as a temporary GC root.  Note that $PPID is

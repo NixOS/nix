@@ -4,6 +4,7 @@ $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
 $libexecDir = $ENV{"NIX_LIBEXEC_DIR"} || "@libexecdir@";
 $manifestDir = $ENV{"NIX_MANIFESTS_DIR"} || "@localstatedir@/nix/manifests";
 $logDir = $ENV{"NIX_LOG_DIR"} || "@localstatedir@/log/nix";
+$confDir = $ENV{"NIX_CONF_DIR"} || "@sysconfdir@/nix";
 
 $bzip2 = $ENV{"NIX_BZIP2"} || "@bzip2@";
 $curl = "@curl@";
