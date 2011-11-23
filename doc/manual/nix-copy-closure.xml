@@ -28,7 +28,7 @@
     <arg><option>--xz</option></arg>
     <arg><option>--include-outputs</option></arg>
     <arg choice='plain'>
-      <arg><replaceable>user@</replaceable></arg><replaceable>machine</replaceable>
+      <replaceable>user@</replaceable><replaceable>machine</replaceable>
     </arg>
     <arg choice='plain'><replaceable>paths</replaceable></arg>
   </cmdsynopsis>
