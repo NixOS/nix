@@ -298,6 +298,17 @@ string showPaths(const PathSet & paths)
 }
 
 
+void exportPaths(StoreAPI & store, const Paths & paths,
+    bool sign, Sink & sink)
+{
+    foreach (Paths::const_iterator, i, paths) {
+        writeInt(1, sink);
+        store.exportPath(*i, sign, sink);
+    }
+    writeInt(0, sink);
+}
+
+
 }
 
 

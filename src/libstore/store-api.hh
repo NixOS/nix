@@ -342,6 +342,12 @@ ValidPathInfo decodeValidPathInfo(std::istream & str,
     bool hashGiven = false);
 
 
+/* Export multiple paths in the format expected by ‘nix-store
+   --import’. */
+void exportPaths(StoreAPI & store, const Paths & paths,
+    bool sign, Sink & sink);
+
+
 }
 
 

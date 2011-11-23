@@ -12,7 +12,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw( ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our @EXPORT = qw(isValidPath topoSortPaths computeFSClosure followLinksToStorePath);
+our @EXPORT = qw(isValidPath topoSortPaths computeFSClosure followLinksToStorePath exportPaths);
 
 our $VERSION = '0.15';
 

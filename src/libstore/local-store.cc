@@ -1255,7 +1255,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
     bool haveSignature = readInt(hashAndReadSource) == 1;
 
     if (requireSignature && !haveSignature)
-        throw Error("imported archive lacks a signature");
+        throw Error(format("imported archive of `%1%' lacks a signature") % dstPath);
     
     if (haveSignature) {
         string signature = readString(hashAndReadSource);

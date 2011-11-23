@@ -594,11 +594,7 @@ static void opExport(Strings opFlags, Strings opArgs)
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
     FdSink sink(STDOUT_FILENO);
-    for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); ++i) {
-        writeInt(1, sink);
-        store->exportPath(*i, sign, sink);
-    }
-    writeInt(0, sink);
+    exportPaths(*store, opArgs, sign, sink);
 }
 
 

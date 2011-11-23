@@ -146,3 +146,16 @@ SV * followLinksToStorePath(char * path)
         }
     OUTPUT:
         RETVAL
+
+
+void exportPaths(int fd, int sign, ...)
+    PPCODE:
+        try {
+            doInit();
+            Paths paths;
+            for (int n = 2; n < items; ++n) paths.push_back(SvPV_nolen(ST(n)));
+            FdSink sink(fd);
+            exportPaths(*store, paths, sign, sink);
+        } catch (Error & e) {
+            croak(e.what());
+        }
