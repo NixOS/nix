@@ -24,6 +24,8 @@
     </group>
     <arg><option>--sign</option></arg>
     <arg><option>--gzip</option></arg>
+    <arg><option>--bzip2</option></arg>
+    <arg><option>--xz</option></arg>
     <arg choice='plain'>
       <arg><replaceable>user@</replaceable></arg><replaceable>machine</replaceable>
     </arg>
@@ -96,10 +98,13 @@ those paths.  If this bothers you, use
 
   </varlistentry>
 
-  <varlistentry><term><option>--gzip</option></term>
+  <varlistentry><term><option>--gzip</option> / <option>--bzip2</option> / <option>--xz</option></term>
 
-    <listitem><para>Compress the dump of each path with
-    <command>gzip</command> before sending it.</para></listitem>
+    <listitem><para>Compress the dump of each path with respectively
+    <command>gzip</command>, <command>bzip2</command> or
+    <command>xz</command> before sending it.  The corresponding
+    decompression program must be installed on the target
+    machine.</para></listitem>
 
   </varlistentry>
 
