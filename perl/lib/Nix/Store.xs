@@ -67,7 +67,7 @@ SV * queryPathHash(char * path)
         try {
             doInit();
             Hash hash = store->queryPathHash(path);
-            string s = "sha256:" + printHash(hash);
+            string s = "sha256:" + printHash32(hash);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
             croak(e.what());
