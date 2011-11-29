@@ -240,7 +240,7 @@ my $buildFlags = "--max-silent-time $maxSilentTime --fallback --add-root $rootsD
 # in which case every child receives SIGHUP; however, `-tt' doesn't
 # work on some platforms when connection sharing is used.)
 pipe STDIN, DUMMY; # make sure we have a readable STDIN
-if (system("ssh $hostName @sshOpts '(read; kill -INT -\$\$) <&0 & nix-store -r $drvPath $buildFlags > /dev/null' 2>&4") != 0) {
+if (system("exec ssh $hostName @sshOpts '(read; kill -INT -\$\$) <&0 & nix-store -r $drvPath $buildFlags > /dev/null' 2>&4") != 0) {
     # Note that if we get exit code 100 from `nix-store -r', it
     # denotes a permanent build failure (as opposed to an SSH problem
     # or a temporary Nix problem).  We propagate this to the caller to
@@ -260,7 +260,7 @@ foreach my $output (@outputs) {
     my $maybeSignRemote = "";
     $maybeSignRemote = "--sign" if $UID != 0;
     
-    system("ssh $hostName @sshOpts 'nix-store --export $maybeSignRemote $output'" .
+    system("exec ssh $hostName @sshOpts 'nix-store --export $maybeSignRemote $output'" .
            "| NIX_HELD_LOCKS=$output @bindir@/nix-store --import > /dev/null") == 0
 	or die "cannot copy $output from $hostName: $?";
 }
