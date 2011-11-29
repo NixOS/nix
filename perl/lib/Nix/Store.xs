@@ -159,3 +159,14 @@ void exportPaths(int fd, int sign, ...)
         } catch (Error & e) {
             croak(e.what());
         }
+
+
+SV * hashPath(char * algo, int base32, char * path)
+    PPCODE:
+        try {
+            Hash h = hashPath(parseHashType(algo), path).first;
+            string s = base32 ? printHash32(h) : printHash(h);
+            XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
+        } catch (Error & e) {
+            croak(e.what());
+        }
