@@ -1,6 +1,5 @@
 package Nix::Store;
 
-use 5.010001;
 use strict;
 use warnings;
 
