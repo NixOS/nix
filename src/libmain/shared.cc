@@ -65,7 +65,7 @@ void printMissing(StoreAPI & store, const PathSet & paths)
     }
 
     if (!willSubstitute.empty()) {
-        printMsg(lvlInfo, format("these paths will be downloaded/copied (%.2f MiB download, %.2f MiB unpacked):")
+        printMsg(lvlInfo, format("these paths will be fetched (%.2f MiB download, %.2f MiB unpacked):")
             % (downloadSize / (1024.0 * 1024.0))
             % (narSize / (1024.0 * 1024.0)));
         foreach (PathSet::iterator, i, willSubstitute)
