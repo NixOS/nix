@@ -364,12 +364,11 @@ static void performOp(unsigned int clientVersion,
                addToStoreFromDump(). */
             ParseSink sink; /* null sink; just parse the NAR */
             parseDump(sink, savedNAR);
-        } else {
+        } else
             parseDump(savedRegular, from);
-            if (!savedRegular.regular) throw Error("regular file expected");
-        }
             
         startWork();
+        if (!savedRegular.regular) throw Error("regular file expected");
         Path path = dynamic_cast<LocalStore *>(store.get())
             ->addToStoreFromDump(recursive ? savedNAR.s : savedRegular.s, baseName, recursive, hashAlgo);
         stopWork();
