@@ -256,7 +256,7 @@ number of possible ways:
   <emphasis>attribute paths</emphasis> that select attributes from the
   top-level Nix expression.  This is faster than using derivation
   names and unambiguous.  To find out the attribute paths of available
-  packages, use <literal>nix-env -qaA '*'</literal>.</para></listitem>
+  packages, use <literal>nix-env -qaP '*'</literal>.</para></listitem>
 
   <listitem><para>If <option>--from-profile</option>
   <replaceable>path</replaceable> is given,
