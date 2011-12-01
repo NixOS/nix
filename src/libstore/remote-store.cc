@@ -328,7 +328,7 @@ Path RemoteStore::addToStore(const Path & _srcPath,
     openConnection();
     
     Path srcPath(absPath(_srcPath));
-    
+
     writeInt(wopAddToStore, to);
     writeString(baseNameOf(srcPath), to);
     /* backwards compatibility hack */

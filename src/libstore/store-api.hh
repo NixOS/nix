@@ -151,9 +151,7 @@ public:
     
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
-       If `fixed' is true, then the output of a fixed-output
-       derivation is pre-loaded into the Nix store.  The function
-       object `filter' can be used to exclude files (see
+       The function object `filter' can be used to exclude files (see
        libutil/archive.hh). */
     virtual Path addToStore(const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,

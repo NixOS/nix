@@ -241,11 +241,14 @@ struct TunnelSource : Source
    the contents of the file to `s'.  Otherwise barf. */
 struct RetrieveRegularNARSink : ParseSink
 {
+    bool regular;
     string s;
+
+    RetrieveRegularNARSink() : regular(true) { }
 
     void createDirectory(const Path & path)
     {
-        throw Error("regular file expected");
+        regular = false;
     }
 
     void receiveContents(unsigned char * data, unsigned int len)
@@ -255,7 +258,7 @@ struct RetrieveRegularNARSink : ParseSink
 
     void createSymlink(const Path & path, const string & target)
     {
-        throw Error("regular file expected");
+        regular = false;
     }
 };
 
@@ -363,6 +366,7 @@ static void performOp(unsigned int clientVersion,
             parseDump(sink, savedNAR);
         } else {
             parseDump(savedRegular, from);
+            if (!savedRegular.regular) throw Error("regular file expected");
         }
             
         startWork();
@@ -638,7 +642,15 @@ static void processConnection()
         try {
             performOp(clientVersion, from, to, op);
         } catch (Error & e) {
+            /* If we're not in a state were we can send replies, then
+               something went wrong processing the input of the
+               client.  This can happen especially if I/O errors occur
+               during addTextToStore() / importPath().  If that
+               happens, just send the error message and exit. */
+            bool errorAllowed = canSendStderr;
+            if (!errorAllowed) printMsg(lvlError, format("error processing client input: %1%") % e.msg());
             stopWork(false, e.msg(), GET_PROTOCOL_MINOR(clientVersion) >= 8 ? e.status : 0);
+            if (!errorAllowed) break;
         }
 
         assert(!canSendStderr);
