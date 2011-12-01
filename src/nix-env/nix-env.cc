@@ -1270,7 +1270,7 @@ void run(Strings args)
         else if (arg == "--profile" || arg == "-p")
             globals.profile = absPath(needArg(i, args, arg));
         else if (arg == "--file" || arg == "-f")
-            globals.instSource.nixExprPath = absPath(needArg(i, args, arg));
+            globals.instSource.nixExprPath = lookupFileArg(globals.state, needArg(i, args, arg));
         else if (arg == "--switch-profile" || arg == "-S")
             op = opSwitchProfile;
         else if (arg == "--switch-generation" || arg == "-G")

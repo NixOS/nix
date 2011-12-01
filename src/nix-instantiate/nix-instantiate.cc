@@ -138,8 +138,7 @@ void run(Strings args)
     }
 
     foreach (Strings::iterator, i, files) {
-        Path path = absPath(*i);
-        Expr * e = state.parseExprFromFile(path);
+        Expr * e = state.parseExprFromFile(lookupFileArg(state, *i));
         processExpr(state, attrPaths, parseOnly, strict, autoArgs,
             evalOnly, xmlOutput, xmlOutputSourceLocation, e);
     }

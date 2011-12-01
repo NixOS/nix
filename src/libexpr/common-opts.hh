@@ -14,6 +14,8 @@ bool parseOptionArg(const string & arg, Strings::iterator & i,
 bool parseSearchPathArg(const string & arg, Strings::iterator & i,
     const Strings::iterator & argsEnd, EvalState & state);
 
+Path lookupFileArg(EvalState & state, string s);
+
 }
 
 

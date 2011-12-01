@@ -44,4 +44,15 @@ bool parseSearchPathArg(const string & arg, Strings::iterator & i,
 }
 
 
+Path lookupFileArg(EvalState & state, string s)
+{
+    if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
+        Path p = state.findFile(s.substr(1, s.size() - 2));
+        if (p == "") throw Error(format("file `%1%' was not found in the Nix search path (add it using $NIX_PATH or -I)") % p);
+        return p;
+    } else
+        return absPath(s);
+}
+
+
 }
