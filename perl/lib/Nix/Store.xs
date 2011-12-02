@@ -170,3 +170,49 @@ SV * hashPath(char * algo, int base32, char * path)
         } catch (Error & e) {
             croak(e.what());
         }
+
+
+SV * hashFile(char * algo, int base32, char * path)
+    PPCODE:
+        try {
+            Hash h = hashFile(parseHashType(algo), path);
+            string s = base32 ? printHash32(h) : printHash(h);
+            XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
+        } catch (Error & e) {
+            croak(e.what());
+        }
+
+
+SV * hashString(char * algo, int base32, char * s)
+    PPCODE:
+        try {
+            Hash h = hashString(parseHashType(algo), s);
+            string s = base32 ? printHash32(h) : printHash(h);
+            XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
+        } catch (Error & e) {
+            croak(e.what());
+        }
+
+
+SV * addToStore(char * srcPath, int recursive, char * algo)
+    PPCODE:
+        try {
+            doInit();
+            Path path = store->addToStore(srcPath, recursive, parseHashType(algo));
+            XPUSHs(sv_2mortal(newSVpv(path.c_str(), 0)));
+        } catch (Error & e) {
+            croak(e.what());
+        }
+
+
+SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
+    PPCODE:
+        try {
+            doInit();
+            HashType ht = parseHashType(algo);
+            Path path = makeFixedOutputPath(recursive, ht,
+                parseHash16or32(ht, hash), name);
+            XPUSHs(sv_2mortal(newSVpv(path.c_str(), 0)));
+        } catch (Error & e) {
+            croak(e.what());
+        }

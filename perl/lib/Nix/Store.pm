@@ -14,7 +14,8 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw(
     isValidPath queryReferences queryPathInfo queryDeriver queryPathHash
     topoSortPaths computeFSClosure followLinksToStorePath exportPaths
-    hashPath
+    hashPath hashFile hashString
+    addToStore makeFixedOutputPath
 );
 
 our $VERSION = '0.15';
