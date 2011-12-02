@@ -133,14 +133,6 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
 }
 
 
-static Hash parseHash16or32(HashType ht, const string & s)
-{
-    return s.size() == Hash(ht).hashSize * 2
-        ? parseHash(ht, s)
-        : parseHash32(ht, s);
-}
-
-
 /* Hack to support caching in `nix-prefetch-url'. */
 static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 {

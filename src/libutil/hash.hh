@@ -58,6 +58,9 @@ string printHash32(const Hash & hash);
 /* Parse a base-32 representation of a hash code. */
 Hash parseHash32(HashType ht, const string & s);
 
+/* Parse a base-16 or base-32 representation of a hash code. */
+Hash parseHash16or32(HashType ht, const string & s);
+
 /* Verify that the given string is a valid hash code. */
 bool isHash(const string & s);
 

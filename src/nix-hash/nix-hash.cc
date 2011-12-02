@@ -43,7 +43,7 @@ void run(Strings args)
     }
 
     if (op == opHash) {
-        for (Strings::iterator i = ss.begin(); i != ss.end(); ++i) {
+        foreach (Strings::iterator, i, ss) {
             Hash h = flat ? hashFile(ht, *i) : hashPath(ht, *i).first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
             std::cout << format("%1%\n") %
@@ -52,8 +52,8 @@ void run(Strings args)
     }
 
     else {
-        for (Strings::iterator i = ss.begin(); i != ss.end(); ++i) {
-            Hash h = op == opTo16 ? parseHash32(ht, *i) : parseHash(ht, *i);
+        foreach (Strings::iterator, i, ss) {
+            Hash h = parseHash16or32(ht, *i);
             std::cout << format("%1%\n") %
                 (op == opTo16 ? printHash(h) : printHash32(h));
         }
