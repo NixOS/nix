@@ -366,7 +366,7 @@ void LocalStore::openDB(bool create)
     stmtRegisterValidPath.create(db,
         "insert into ValidPaths (path, hash, registrationTime, deriver, narSize) values (?, ?, ?, ?, ?);");
     stmtUpdatePathInfo.create(db,
-        "update ValidPaths set narSize = ? where path = ?;");
+        "update ValidPaths set narSize = ?, hash = ? where path = ?;");
     stmtAddReference.create(db,
         "insert or replace into Refs (referrer, reference) values (?, ?);");
     stmtQueryPathInfo.create(db,
@@ -683,7 +683,7 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
 }
 
 
-/* Update path info in the database.  Currently only updated the
+/* Update path info in the database.  Currently only updates the
    narSize field. */
 void LocalStore::updatePathInfo(const ValidPathInfo & info)
 {
@@ -692,6 +692,7 @@ void LocalStore::updatePathInfo(const ValidPathInfo & info)
         stmtUpdatePathInfo.bind64(info.narSize);
     else
         stmtUpdatePathInfo.bind(); // null
+    stmtUpdatePathInfo.bind("sha256:" + printHash(info.hash));
     stmtUpdatePathInfo.bind(info.path);
     if (sqlite3_step(stmtUpdatePathInfo) != SQLITE_DONE)
         throwSQLiteError(db, format("updating info of path `%1%' in database") % info.path);
@@ -1386,6 +1387,8 @@ void LocalStore::verifyStore(bool checkContents)
     if (checkContents) {
         printMsg(lvlInfo, "checking hashes...");
 
+        Hash nullHash(htSHA256);
+
         foreach (PathSet::iterator, i, validPaths) {
             try {
                 ValidPathInfo info = queryPathInfo(*i);
@@ -1394,17 +1397,30 @@ void LocalStore::verifyStore(bool checkContents)
                 printMsg(lvlTalkative, format("checking contents of `%1%'") % *i);
                 HashResult current = hashPath(info.hash.type, *i);
                 
-                if (current.first != info.hash) {
+                if (info.hash != nullHash && info.hash != current.first) {
                     printMsg(lvlError, format("path `%1%' was modified! "
                             "expected hash `%2%', got `%3%'")
                         % *i % printHash(info.hash) % printHash(current.first));
                 } else {
+
+                    bool update = false;
+
+                    /* Fill in missing hashes. */
+                    if (info.hash == nullHash) {
+                        printMsg(lvlError, format("fixing missing hash on `%1%'") % *i);
+                        info.hash = current.first;
+                        update = true;
+                    }
+                    
                     /* Fill in missing narSize fields (from old stores). */
                     if (info.narSize == 0) {
                         printMsg(lvlError, format("updating size field on `%1%' to %2%") % *i % current.second);
                         info.narSize = current.second;
-                        updatePathInfo(info);
+                        update = true;                        
                     }
+
+                    if (update) updatePathInfo(info);
+
                 }
             
             } catch (Error & e) {
