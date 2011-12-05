@@ -1347,7 +1347,7 @@ void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFr
                 PathSet referrers; queryReferrers(path, referrers);
                 referrers.erase(path); /* ignore self-references */
                 if (!referrers.empty())
-                    throw PathInUse(format("cannot delete path `%1%' because it is in use by `%2%'")
+                    throw PathInUse(format("cannot delete path `%1%' because it is in use by %2%")
                         % path % showPaths(referrers));
                 invalidatePath(path);
             }
