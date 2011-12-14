@@ -1,4 +1,4 @@
-TESTS_ENVIRONMENT = $(bash) -e
+TESTS_ENVIRONMENT = NIX_REMOTE= $(bash) -e
 
 extra1 = $(shell pwd)/test-tmp/shared
 
