@@ -28,22 +28,29 @@ struct Source
 };
 
 
-/* A sink that writes data to a file descriptor. */
+/* A sink that writes data to a file descriptor (using a buffer). */
 struct FdSink : Sink
 {
     int fd;
+    unsigned int bufSize, bufPos;
+    unsigned char * buffer;
 
-    FdSink()
-    {
-        fd = -1;
-    }
+    FdSink() : fd(-1), bufSize(32 * 1024), bufPos(0), buffer(0) { }
     
-    FdSink(int fd) 
+    FdSink(int fd, unsigned int bufSize = 32 * 1024)
+        : fd(fd), bufSize(bufSize), bufPos(0), buffer(0)
     {
-        this->fd = fd;
+    }
+
+    ~FdSink()
+    {
+        flush();
+        if (buffer) delete[] buffer;
     }
     
     void operator () (const unsigned char * data, unsigned int len);
+
+    void flush();
 };
 
 

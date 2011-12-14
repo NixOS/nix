@@ -65,6 +65,7 @@ void RemoteStore::openConnection()
     /* Send the magic greeting, check for the reply. */
     try {
         writeInt(WORKER_MAGIC_1, to);
+        to.flush();
         unsigned int magic = readInt(from);
         if (magic != WORKER_MAGIC_2) throw Error("protocol mismatch");
 
@@ -166,6 +167,7 @@ void RemoteStore::connectToDaemon()
 RemoteStore::~RemoteStore()
 {
     try {
+        to.flush();
         fdSocket.close();
         if (child != -1)
             child.wait(true);
@@ -488,6 +490,7 @@ void RemoteStore::clearFailedPaths(const PathSet & paths)
 
 void RemoteStore::processStderr(Sink * sink, Source * source)
 {
+    to.flush();
     unsigned int msg;
     while ((msg = readInt(from)) == STDERR_NEXT
         || msg == STDERR_READ || msg == STDERR_WRITE) {
@@ -503,6 +506,7 @@ void RemoteStore::processStderr(Sink * sink, Source * source)
             AutoDeleteArray<unsigned char> d(buf);
             (*source)(buf, len);
             writeString(string((const char *) buf, len), to);
+            to.flush();
         }
         else {
             string s = readString(from);

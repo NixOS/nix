@@ -9,7 +9,30 @@ namespace nix {
 
 void FdSink::operator () (const unsigned char * data, unsigned int len)
 {
-    writeFull(fd, data, len);
+    if (!buffer) buffer = new unsigned char[bufSize];
+    
+    while (len) {
+        /* Optimisation: bypass the buffer if the data exceeds the
+           buffer size and there is no unflushed data. */
+        if (bufPos == 0 && len >= bufSize) {
+            writeFull(fd, data, len);
+            break;
+        }
+        /* Otherwise, copy the bytes to the buffer.  Flush the buffer
+           when it's full. */
+        size_t n = bufPos + len > bufSize ? bufSize - bufPos : len;
+        memcpy(buffer + bufPos, data, n);
+        data += n; bufPos += n; len -= n;
+        if (bufPos == bufSize) flush();
+    }
+}
+
+
+void FdSink::flush()
+{
+    if (fd == -1 || bufPos == 0) return;
+    writeFull(fd, buffer, bufPos);
+    bufPos = 0;
 }
 
 

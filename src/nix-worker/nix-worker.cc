@@ -57,6 +57,7 @@ static void tunnelStderr(const unsigned char * buf, size_t count)
         try {
             writeInt(STDERR_NEXT, to);
             writeString(string((char *) buf, count), to);
+            to.flush();
         } catch (...) {
             /* Write failed; that means that the other side is
                gone. */
@@ -200,9 +201,7 @@ static void stopWork(bool success = true, const string & msg = "", unsigned int 
 struct TunnelSink : Sink
 {
     Sink & to;
-    TunnelSink(Sink & to) : to(to)
-    {
-    }
+    TunnelSink(Sink & to) : to(to) { }
     virtual void operator ()
         (const unsigned char * data, unsigned int len)
     {
@@ -215,9 +214,7 @@ struct TunnelSink : Sink
 struct TunnelSource : Source
 {
     Source & from;
-    TunnelSource(Source & from) : from(from)
-    {
-    }
+    TunnelSource(Source & from) : from(from) { }
     virtual void operator ()
         (unsigned char * data, unsigned int len)
     {
@@ -228,6 +225,7 @@ struct TunnelSource : Source
         
         writeInt(STDERR_READ, to);
         writeInt(len, to);
+        to.flush();
         string s = readString(from);
         if (s.size() != len) throw Error("not enough data");
         memcpy(data, (const unsigned char *) s.c_str(), len);
@@ -596,8 +594,8 @@ static void processConnection()
     unsigned int magic = readInt(from);
     if (magic != WORKER_MAGIC_1) throw Error("protocol mismatch");
     writeInt(WORKER_MAGIC_2, to);
-
     writeInt(PROTOCOL_VERSION, to);
+    to.flush();
     unsigned int clientVersion = readInt(from);
 
     /* Send startup error messages to the client. */
@@ -619,9 +617,11 @@ static void processConnection()
         store = boost::shared_ptr<StoreAPI>(new LocalStore());
 
         stopWork();
+        to.flush();
         
     } catch (Error & e) {
         stopWork(false, e.msg());
+        to.flush();
         return;
     }
 
@@ -651,6 +651,8 @@ static void processConnection()
             stopWork(false, e.msg(), GET_PROTOCOL_MINOR(clientVersion) >= 8 ? e.status : 0);
             if (!errorAllowed) break;
         }
+
+        to.flush();
 
         assert(!canSendStderr);
     };
