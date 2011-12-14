@@ -90,23 +90,6 @@ static void setLogType(string lt)
 }
 
 
-static void closeStore()
-{
-    try {
-        throw;
-    } catch (std::exception & e) {
-        printMsg(lvlError,
-            format("FATAL: unexpected exception (closing store and aborting): %1%") % e.what());
-    }
-    try {
-        store.reset((StoreAPI *) 0);
-    } catch (...) {
-        ignoreException();
-    }
-    abort();
-}
-
-
 RemoveTempRoots::~RemoveTempRoots()
 {
     removeTempRoots();
@@ -238,12 +221,6 @@ static void initAndRun(int argc, char * * argv)
        exit. */
     RemoveTempRoots removeTempRoots __attribute__((unused));
 
-    /* Make sure that the database gets closed properly, even if
-       terminate() is called (which happens sometimes due to bugs in
-       destructor/exceptions interaction, but that needn't preclude a
-       clean shutdown of the database). */
-    std::set_terminate(closeStore);
-    
     run(remaining);
 
     /* Close the Nix database. */
