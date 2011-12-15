@@ -38,9 +38,7 @@ struct FdSink : Sink
     FdSink() : fd(-1), bufSize(32 * 1024), bufPos(0), buffer(0) { }
     
     FdSink(int fd, unsigned int bufSize = 32 * 1024)
-        : fd(fd), bufSize(bufSize), bufPos(0), buffer(0)
-    {
-    }
+        : fd(fd), bufSize(bufSize), bufPos(0), buffer(0) { }
 
     ~FdSink()
     {
@@ -58,15 +56,17 @@ struct FdSink : Sink
 struct FdSource : Source
 {
     int fd;
+    unsigned int bufSize, bufPosIn, bufPosOut;
+    unsigned char * buffer;
 
-    FdSource()
-    {
-        fd = -1;
-    }
+    FdSource() : fd(-1), bufSize(32 * 1024), bufPosIn(0), bufPosOut(0), buffer(0) { }
     
-    FdSource(int fd) 
+    FdSource(int fd, unsigned int bufSize = 32 * 1024)
+        : fd(fd), bufSize(bufSize), bufPosIn(0), bufPosOut(0), buffer(0) { }
+    
+    ~FdSource()
     {
-        this->fd = fd;
+        if (buffer) delete[] buffer;
     }
     
     void operator () (unsigned char * data, unsigned int len);

@@ -2,6 +2,7 @@
 #include "util.hh"
 
 #include <cstring>
+#include <cerrno>
 
 
 namespace nix {
@@ -38,7 +39,28 @@ void FdSink::flush()
 
 void FdSource::operator () (unsigned char * data, unsigned int len)
 {
-    readFull(fd, data, len);
+    if (!buffer) buffer = new unsigned char[bufSize];
+
+    while (len) {
+        if (!bufPosIn) {
+            /* Read as much data as is available (up to the buffer
+               size). */
+            checkInterrupt();
+            ssize_t n = read(fd, (char *) buffer, bufSize);
+            if (n == -1) {
+                if (errno == EINTR) continue;
+                throw SysError("reading from file");
+            }
+            if (n == 0) throw EndOfFile("unexpected end-of-file");
+            bufPosIn = n;
+        }
+            
+        /* Copy out the data in the buffer. */
+        size_t n = len > bufPosIn - bufPosOut ? bufPosIn - bufPosOut : len;
+        memcpy(data, buffer + bufPosOut, n);
+        data += n; bufPosOut += n; len -= n;
+        if (bufPosIn == bufPosOut) bufPosIn = bufPosOut = 0;
+    }
 }
 
 
