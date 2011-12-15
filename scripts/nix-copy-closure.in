@@ -96,7 +96,7 @@ else { # Copy FROM the remote machine.
 
     close READ or die "nix-store on remote machine `$sshHost' failed: $?";
 
-    # Export the store paths on the remote machine and import them on locally.
+    # Export the store paths on the remote machine and import them locally.
     if (scalar @missing > 0) {
         print STDERR "copying ", scalar @missing, " missing paths from ‘$sshHost’...\n";
         #print STDERR "  $_\n" foreach @missing;
