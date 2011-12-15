@@ -202,8 +202,7 @@ struct TunnelSink : Sink
 {
     Sink & to;
     TunnelSink(Sink & to) : to(to) { }
-    virtual void operator ()
-        (const unsigned char * data, unsigned int len)
+    virtual void operator () (const unsigned char * data, size_t len)
     {
         writeInt(STDERR_WRITE, to);
         writeString(string((const char *) data, len), to);
@@ -215,8 +214,7 @@ struct TunnelSource : Source
 {
     Source & from;
     TunnelSource(Source & from) : from(from) { }
-    virtual void operator ()
-        (unsigned char * data, unsigned int len)
+    virtual void operator () (unsigned char * data, size_t len)
     {
         /* Careful: we're going to receive data from the client now,
            so we have to disable the SIGPOLL handler. */
@@ -267,7 +265,7 @@ struct SavingSourceAdapter : Source
     Source & orig;
     string s;
     SavingSourceAdapter(Source & orig) : orig(orig) { }
-    void operator () (unsigned char * data, unsigned int len)
+    void operator () (unsigned char * data, size_t len)
     {
         orig(data, len);
         s.append((const char *) data, len);

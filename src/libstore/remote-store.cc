@@ -374,7 +374,7 @@ Path RemoteStore::importPath(bool requireSignature, Source & source)
     openConnection();
     writeInt(wopImportPath, to);
     /* We ignore requireSignature, since the worker forces it to true
-       anyway. */    
+       anyway. */
     processStderr(0, &source);
     return readStorePath(from);
 }

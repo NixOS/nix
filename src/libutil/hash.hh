@@ -91,7 +91,7 @@ string printHashType(HashType ht);
 
 union Ctx;
 
-class HashSink : public Sink
+class HashSink : public BufferedSink
 {
 private:
     HashType ht;
@@ -102,8 +102,9 @@ public:
     HashSink(HashType ht);
     HashSink(const HashSink & h);
     ~HashSink();
-    virtual void operator () (const unsigned char * data, unsigned int len);
+    void write(const unsigned char * data, size_t len);
     HashResult finish();
+    HashResult currentHash();
 };
 
 

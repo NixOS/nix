@@ -57,11 +57,11 @@ struct RefScanSink : Sink
 
     RefScanSink() : hashSink(htSHA256) { }
     
-    void operator () (const unsigned char * data, unsigned int len);
+    void operator () (const unsigned char * data, size_t len);
 };
 
 
-void RefScanSink::operator () (const unsigned char * data, unsigned int len)
+void RefScanSink::operator () (const unsigned char * data, size_t len)
 {
     hashSink(data, len);
 

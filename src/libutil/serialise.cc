@@ -8,7 +8,16 @@
 namespace nix {
 
 
-void FdSink::operator () (const unsigned char * data, unsigned int len)
+BufferedSink::~BufferedSink()
+{
+    /* We can't call flush() here, because C++ for some insane reason
+       doesn't allow you to call virtual methods from a destructor. */
+    assert(!bufPos);
+    if (buffer) delete[] buffer;
+}
+
+    
+void BufferedSink::operator () (const unsigned char * data, size_t len)
 {
     if (!buffer) buffer = new unsigned char[bufSize];
     
@@ -16,7 +25,7 @@ void FdSink::operator () (const unsigned char * data, unsigned int len)
         /* Optimisation: bypass the buffer if the data exceeds the
            buffer size and there is no unflushed data. */
         if (bufPos == 0 && len >= bufSize) {
-            writeFull(fd, data, len);
+            write(data, len);
             break;
         }
         /* Otherwise, copy the bytes to the buffer.  Flush the buffer
@@ -29,31 +38,32 @@ void FdSink::operator () (const unsigned char * data, unsigned int len)
 }
 
 
-void FdSink::flush()
+void BufferedSink::flush()
 {
-    if (fd == -1 || bufPos == 0) return;
-    writeFull(fd, buffer, bufPos);
+    if (bufPos == 0) return;
+    write(buffer, bufPos);
     bufPos = 0;
 }
 
 
-void FdSource::operator () (unsigned char * data, unsigned int len)
+void FdSink::write(const unsigned char * data, size_t len)
+{
+    writeFull(fd, data, len);
+}
+
+
+BufferedSource::~BufferedSource()
+{
+    if (buffer) delete[] buffer;
+}
+
+
+void BufferedSource::operator () (unsigned char * data, size_t len)
 {
     if (!buffer) buffer = new unsigned char[bufSize];
 
     while (len) {
-        if (!bufPosIn) {
-            /* Read as much data as is available (up to the buffer
-               size). */
-            checkInterrupt();
-            ssize_t n = read(fd, (char *) buffer, bufSize);
-            if (n == -1) {
-                if (errno == EINTR) continue;
-                throw SysError("reading from file");
-            }
-            if (n == 0) throw EndOfFile("unexpected end-of-file");
-            bufPosIn = n;
-        }
+        if (!bufPosIn) bufPosIn = read(buffer, bufSize);
             
         /* Copy out the data in the buffer. */
         size_t n = len > bufPosIn - bufPosOut ? bufPosIn - bufPosOut : len;
@@ -64,7 +74,20 @@ void FdSource::operator () (unsigned char * data, unsigned int len)
 }
 
 
-void writePadding(unsigned int len, Sink & sink)
+size_t FdSource::read(unsigned char * data, size_t len)
+{
+    ssize_t n;
+    do {
+        checkInterrupt();
+        n = ::read(fd, (char *) data, bufSize);
+    } while (n == -1 && errno == EINTR);
+    if (n == -1) throw SysError("reading from file");
+    if (n == 0) throw EndOfFile("unexpected end-of-file");
+    return n;
+}
+
+
+void writePadding(size_t len, Sink & sink)
 {
     if (len % 8) {
         unsigned char zero[8];
@@ -103,7 +126,7 @@ void writeLongLong(unsigned long long n, Sink & sink)
 
 void writeString(const string & s, Sink & sink)
 {
-    unsigned int len = s.length();
+    size_t len = s.length();
     writeInt(len, sink);
     sink((const unsigned char *) s.c_str(), len);
     writePadding(len, sink);
@@ -118,11 +141,11 @@ void writeStringSet(const StringSet & ss, Sink & sink)
 }
 
 
-void readPadding(unsigned int len, Source & source)
+void readPadding(size_t len, Source & source)
 {
     if (len % 8) {
         unsigned char zero[8];
-        unsigned int n = 8 - (len % 8);
+        size_t n = 8 - (len % 8);
         source(zero, n);
         for (unsigned int i = 0; i < n; i++)
             if (zero[i]) throw SerialisationError("non-zero padding");
@@ -162,7 +185,7 @@ unsigned long long readLongLong(Source & source)
 
 string readString(Source & source)
 {
-    unsigned int len = readInt(source);
+    size_t len = readInt(source);
     unsigned char * buf = new unsigned char[len];
     AutoDeleteArray<unsigned char> d(buf);
     source(buf, len);

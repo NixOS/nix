@@ -1103,16 +1103,14 @@ struct HashAndWriteSink : Sink
     HashAndWriteSink(Sink & writeSink) : writeSink(writeSink), hashSink(htSHA256)
     {
     }
-    virtual void operator ()
-        (const unsigned char * data, unsigned int len)
+    virtual void operator () (const unsigned char * data, size_t len)
     {
         writeSink(data, len);
         hashSink(data, len);
     }
     Hash currentHash()
     {
-        HashSink hashSinkClone(hashSink);
-        return hashSinkClone.finish().first;
+        return hashSink.currentHash().first;
     }
 };
 
@@ -1201,8 +1199,7 @@ struct HashAndReadSource : Source
     {
         hashing = true;
     }
-    virtual void operator ()
-        (unsigned char * data, unsigned int len)
+    virtual void operator () (unsigned char * data, size_t len)
     {
         readSource(data, len);
         if (hashing) hashSink(data, len);

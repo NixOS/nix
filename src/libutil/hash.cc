@@ -306,21 +306,13 @@ HashSink::HashSink(HashType ht) : ht(ht)
     start(ht, *ctx);
 }
     
-HashSink::HashSink(const HashSink & h)
-{
-    ht = h.ht;
-    bytes = h.bytes;
-    ctx = new Ctx;
-    *ctx = *h.ctx;
-}
-    
 HashSink::~HashSink()
 {
+    bufPos = 0;
     delete ctx;
 }
 
-void HashSink::operator ()
-    (const unsigned char * data, unsigned int len)
+void HashSink::write(const unsigned char * data, size_t len)
 {
     bytes += len;
     update(ht, *ctx, data, len);
@@ -328,8 +320,18 @@ void HashSink::operator ()
 
 HashResult HashSink::finish()
 {
+    flush();
     Hash hash(ht);
     nix::finish(ht, *ctx, hash.hash);
+    return HashResult(hash, bytes);
+}
+
+HashResult HashSink::currentHash()
+{
+    flush();
+    Ctx ctx2 = *ctx;
+    Hash hash(ht);
+    nix::finish(ht, ctx2, hash.hash);
     return HashResult(hash, bytes);
 }
 

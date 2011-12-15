@@ -11,7 +11,25 @@ namespace nix {
 struct Sink 
 {
     virtual ~Sink() { }
-    virtual void operator () (const unsigned char * data, unsigned int len) = 0;
+    virtual void operator () (const unsigned char * data, size_t len) = 0;
+};
+
+
+/* A buffered abstract sink. */
+struct BufferedSink : Sink
+{
+    size_t bufSize, bufPos;
+    unsigned char * buffer;
+
+    BufferedSink(size_t bufSize = 32 * 1024)
+        : bufSize(bufSize), bufPos(0), buffer(0) { }
+    ~BufferedSink();
+    
+    void operator () (const unsigned char * data, size_t len);
+    
+    void flush();
+    
+    virtual void write(const unsigned char * data, size_t len) = 0;
 };
 
 
@@ -20,56 +38,52 @@ struct Source
 {
     virtual ~Source() { }
     
-    /* The callee should store exactly *len bytes in the buffer
-       pointed to by data.  It should block if that much data is not
-       yet available, or throw an error if it is not going to be
-       available. */
-    virtual void operator () (unsigned char * data, unsigned int len) = 0;
+    /* Store exactly ‘len’ bytes in the buffer pointed to by ‘data’.
+       It blocks if that much data is not yet available, or throws an
+       error if it is not going to be available. */
+    virtual void operator () (unsigned char * data, size_t len) = 0;
 };
 
 
-/* A sink that writes data to a file descriptor (using a buffer). */
-struct FdSink : Sink
+/* A buffered abstract source. */
+struct BufferedSource : Source
 {
-    int fd;
-    unsigned int bufSize, bufPos;
+    size_t bufSize, bufPosIn, bufPosOut;
     unsigned char * buffer;
 
-    FdSink() : fd(-1), bufSize(32 * 1024), bufPos(0), buffer(0) { }
+    BufferedSource(size_t bufSize = 32 * 1024)
+        : bufSize(bufSize), bufPosIn(0), bufPosOut(0), buffer(0) { }
+    ~BufferedSource();
     
-    FdSink(int fd, unsigned int bufSize = 32 * 1024)
-        : fd(fd), bufSize(bufSize), bufPos(0), buffer(0) { }
-
-    ~FdSink()
-    {
-        flush();
-        if (buffer) delete[] buffer;
-    }
+    void operator () (unsigned char * data, size_t len);
     
-    void operator () (const unsigned char * data, unsigned int len);
+    /* Store up to ‘len’ in the buffer pointed to by ‘data’, and
+       return the number of bytes stored.  If should block until at
+       least one byte is available. */
+    virtual size_t read(unsigned char * data, size_t len) = 0;
+};
 
-    void flush();
+
+/* A sink that writes data to a file descriptor. */
+struct FdSink : BufferedSink
+{
+    int fd;
+
+    FdSink() : fd(-1) { }
+    FdSink(int fd) : fd(fd) { }
+    ~FdSink() { flush(); }
+    
+    void write(const unsigned char * data, size_t len);
 };
 
 
 /* A source that reads data from a file descriptor. */
-struct FdSource : Source
+struct FdSource : BufferedSource
 {
     int fd;
-    unsigned int bufSize, bufPosIn, bufPosOut;
-    unsigned char * buffer;
-
-    FdSource() : fd(-1), bufSize(32 * 1024), bufPosIn(0), bufPosOut(0), buffer(0) { }
-    
-    FdSource(int fd, unsigned int bufSize = 32 * 1024)
-        : fd(fd), bufSize(bufSize), bufPosIn(0), bufPosOut(0), buffer(0) { }
-    
-    ~FdSource()
-    {
-        if (buffer) delete[] buffer;
-    }
-    
-    void operator () (unsigned char * data, unsigned int len);
+    FdSource() : fd(-1) { }
+    FdSource(int fd) : fd(fd) { }
+    size_t read(unsigned char * data, size_t len);
 };
 
 
@@ -77,7 +91,7 @@ struct FdSource : Source
 struct StringSink : Sink
 {
     string s;
-    virtual void operator () (const unsigned char * data, unsigned int len)
+    void operator () (const unsigned char * data, size_t len)
     {
         s.append((const char *) data, len);
     }
@@ -88,9 +102,9 @@ struct StringSink : Sink
 struct StringSource : Source
 {
     const string & s;
-    unsigned int pos;
+    size_t pos;
     StringSource(const string & _s) : s(_s), pos(0) { }
-    virtual void operator () (unsigned char * data, unsigned int len)
+    virtual void operator () (unsigned char * data, size_t len)
     {
         s.copy((char *) data, len, pos);
         pos += len;
@@ -100,13 +114,13 @@ struct StringSource : Source
 };
 
 
-void writePadding(unsigned int len, Sink & sink);
+void writePadding(size_t len, Sink & sink);
 void writeInt(unsigned int n, Sink & sink);
 void writeLongLong(unsigned long long n, Sink & sink);
 void writeString(const string & s, Sink & sink);
 void writeStringSet(const StringSet & ss, Sink & sink);
 
-void readPadding(unsigned int len, Source & source);
+void readPadding(size_t len, Source & source);
 unsigned int readInt(Source & source);
 unsigned long long readLongLong(Source & source);
 string readString(Source & source);
