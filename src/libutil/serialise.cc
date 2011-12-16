@@ -41,8 +41,15 @@ void BufferedSink::operator () (const unsigned char * data, size_t len)
 void BufferedSink::flush()
 {
     if (bufPos == 0) return;
-    write(buffer, bufPos);
-    bufPos = 0;
+    size_t n = bufPos;
+    bufPos = 0; // don't trigger the assert() in ~BufferedSink()
+    write(buffer, n);
+}
+
+
+FdSink::~FdSink()
+{
+    try { flush(); } catch (...) { ignoreException(); }
 }
 
 

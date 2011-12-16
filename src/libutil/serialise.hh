@@ -71,7 +71,7 @@ struct FdSink : BufferedSink
 
     FdSink() : fd(-1) { }
     FdSink(int fd) : fd(fd) { }
-    ~FdSink() { flush(); }
+    ~FdSink();
     
     void write(const unsigned char * data, size_t len);
 };
