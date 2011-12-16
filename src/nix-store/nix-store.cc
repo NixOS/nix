@@ -133,14 +133,6 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
 }
 
 
-static Hash parseHash16or32(HashType ht, const string & s)
-{
-    return s.size() == Hash(ht).hashSize * 2
-        ? parseHash(ht, s)
-        : parseHash32(ht, s);
-}
-
-
 /* Hack to support caching in `nix-prefetch-url'. */
 static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 {
@@ -594,11 +586,7 @@ static void opExport(Strings opFlags, Strings opArgs)
         else throw UsageError(format("unknown flag `%1%'") % *i);
 
     FdSink sink(STDOUT_FILENO);
-    for (Strings::iterator i = opArgs.begin(); i != opArgs.end(); ++i) {
-        writeInt(1, sink);
-        store->exportPath(*i, sign, sink);
-    }
-    writeInt(0, sink);
+    exportPaths(*store, opArgs, sign, sink);
 }
 
 
@@ -612,12 +600,10 @@ static void opImport(Strings opFlags, Strings opArgs)
     if (!opArgs.empty()) throw UsageError("no arguments expected");
     
     FdSource source(STDIN_FILENO);
-    while (true) {
-        unsigned long long n = readLongLong(source);
-        if (n == 0) break;
-        if (n != 1) throw Error("input doesn't look like something created by `nix-store --export'");
-        cout << format("%1%\n") % store->importPath(requireSignature, source) << std::flush;
-    }
+    Paths paths = store->importPaths(requireSignature, source);
+
+    foreach (Paths::iterator, i, paths)
+        cout << format("%1%\n") % *i << std::flush;
 }
 
 

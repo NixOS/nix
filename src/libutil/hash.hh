@@ -58,6 +58,9 @@ string printHash32(const Hash & hash);
 /* Parse a base-32 representation of a hash code. */
 Hash parseHash32(HashType ht, const string & s);
 
+/* Parse a base-16 or base-32 representation of a hash code. */
+Hash parseHash16or32(HashType ht, const string & s);
+
 /* Verify that the given string is a valid hash code. */
 bool isHash(const string & s);
 
@@ -88,7 +91,7 @@ string printHashType(HashType ht);
 
 union Ctx;
 
-class HashSink : public Sink
+class HashSink : public BufferedSink
 {
 private:
     HashType ht;
@@ -99,8 +102,9 @@ public:
     HashSink(HashType ht);
     HashSink(const HashSink & h);
     ~HashSink();
-    virtual void operator () (const unsigned char * data, unsigned int len);
+    void write(const unsigned char * data, size_t len);
     HashResult finish();
+    HashResult currentHash();
 };
 
 

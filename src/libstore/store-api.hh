@@ -154,9 +154,7 @@ public:
     
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
-       If `fixed' is true, then the output of a fixed-output
-       derivation is pre-loaded into the Nix store.  The function
-       object `filter' can be used to exclude files (see
+       The function object `filter' can be used to exclude files (see
        libutil/archive.hh). */
     virtual Path addToStore(const Path & srcPath,
         bool recursive = true, HashType hashAlgo = htSHA256,
@@ -174,9 +172,9 @@ public:
     virtual void exportPath(const Path & path, bool sign,
         Sink & sink) = 0;
 
-    /* Import a NAR dump created by exportPath() into the Nix
-       store. */
-    virtual Path importPath(bool requireSignature, Source & source) = 0;
+    /* Import a sequence of NAR dumps created by exportPaths() into
+       the Nix store. */
+    virtual Paths importPaths(bool requireSignature, Source & source) = 0;
 
     /* Ensure that the output paths of the derivation are valid.  If
        they are already valid, this is a no-op.  Otherwise, validity
@@ -343,6 +341,12 @@ string showPaths(const PathSet & paths);
 
 ValidPathInfo decodeValidPathInfo(std::istream & str,
     bool hashGiven = false);
+
+
+/* Export multiple paths in the format expected by ‘nix-store
+   --import’. */
+void exportPaths(StoreAPI & store, const Paths & paths,
+    bool sign, Sink & sink);
 
 
 }

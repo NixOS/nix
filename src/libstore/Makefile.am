@@ -15,7 +15,16 @@ libstore_la_LIBADD = ../libutil/libutil.la ../boost/format/libformat.la ${aterm_
 EXTRA_DIST = schema.sql
 
 AM_CXXFLAGS = -Wall \
- ${sqlite_include} -I$(srcdir)/.. -I$(srcdir)/../libutil
+ ${sqlite_include} -I$(srcdir)/.. -I$(srcdir)/../libutil \
+ -DNIX_STORE_DIR=\"$(storedir)\" \
+ -DNIX_DATA_DIR=\"$(datadir)\" \
+ -DNIX_STATE_DIR=\"$(localstatedir)/nix\" \
+ -DNIX_LOG_DIR=\"$(localstatedir)/log/nix\" \
+ -DNIX_CONF_DIR=\"$(sysconfdir)/nix\" \
+ -DNIX_LIBEXEC_DIR=\"$(libexecdir)\" \
+ -DNIX_BIN_DIR=\"$(bindir)\" \
+ -I$(srcdir)/.. -I$(srcdir)/../libutil \
+ -I$(srcdir)/../libstore
 
 local-store.lo: schema.sql.hh
 

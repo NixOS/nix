@@ -198,8 +198,8 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     # In some exceptional cases (such as VM tests that use the Nix
     # store of the host), the database doesn't contain the hash.  So
     # compute it.
-    if ($narHash eq "sha256:0000000000000000000000000000000000000000000000000000") {
-        $narHash = `$binDir/nix-hash --type sha256 '$storePath'`;
+    if ($narHash =~ /^sha256:0*$/) {
+        $narHash = `$binDir/nix-hash --type sha256 --base32 '$storePath'`;
         die "cannot hash `$storePath'" if $? != 0;
         chomp $narHash;
         $narHash = "sha256:$narHash";

@@ -65,7 +65,7 @@ void printMissing(StoreAPI & store, const PathSet & paths)
     }
 
     if (!willSubstitute.empty()) {
-        printMsg(lvlInfo, format("these paths will be downloaded/copied (%.2f MiB download, %.2f MiB unpacked):")
+        printMsg(lvlInfo, format("these paths will be fetched (%.2f MiB download, %.2f MiB unpacked):")
             % (downloadSize / (1024.0 * 1024.0))
             % (narSize / (1024.0 * 1024.0)));
         foreach (PathSet::iterator, i, willSubstitute)
@@ -90,23 +90,6 @@ static void setLogType(string lt)
 }
 
 
-static void closeStore()
-{
-    try {
-        throw;
-    } catch (std::exception & e) {
-        printMsg(lvlError,
-            format("FATAL: unexpected exception (closing store and aborting): %1%") % e.what());
-    }
-    try {
-        store.reset((StoreAPI *) 0);
-    } catch (...) {
-        ignoreException();
-    }
-    abort();
-}
-
-
 RemoveTempRoots::~RemoveTempRoots()
 {
     removeTempRoots();
@@ -120,30 +103,8 @@ static bool showTrace = false;
    processor. */
 static void initAndRun(int argc, char * * argv)
 {
-    /* Setup Nix paths. */
-    nixStore = canonPath(getEnv("NIX_STORE_DIR", getEnv("NIX_STORE", NIX_STORE_DIR)));
-    nixDataDir = canonPath(getEnv("NIX_DATA_DIR", NIX_DATA_DIR));
-    nixLogDir = canonPath(getEnv("NIX_LOG_DIR", NIX_LOG_DIR));
-    nixStateDir = canonPath(getEnv("NIX_STATE_DIR", NIX_STATE_DIR));
-    nixDBPath = getEnv("NIX_DB_DIR", nixStateDir + "/db");
-    nixConfDir = canonPath(getEnv("NIX_CONF_DIR", NIX_CONF_DIR));
-    nixLibexecDir = canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR));
-    nixBinDir = canonPath(getEnv("NIX_BIN_DIR", NIX_BIN_DIR));
-
-    string subs = getEnv("NIX_SUBSTITUTERS", "default");
-    if (subs == "default") {
-        substituters.push_back(nixLibexecDir + "/nix/substituters/copy-from-other-stores.pl");
-        substituters.push_back(nixLibexecDir + "/nix/substituters/download-using-manifests.pl");
-    } else
-        substituters = tokenizeString(subs, ":");
-
-    /* Get some settings from the configuration file. */
-    thisSystem = querySetting("system", SYSTEM);
-    maxBuildJobs = queryIntSetting("build-max-jobs", 1);
-    buildCores = queryIntSetting("build-cores", 1);
-    maxSilentTime = queryIntSetting("build-max-silent-time", 0);
-    buildTimeout = queryIntSetting("build-timeout", 0);
-
+    setDefaultsFromEnvironment();
+    
     /* Catch SIGINT. */
     struct sigaction act;
     act.sa_handler = sigintHandler;
@@ -260,12 +221,6 @@ static void initAndRun(int argc, char * * argv)
        exit. */
     RemoveTempRoots removeTempRoots __attribute__((unused));
 
-    /* Make sure that the database gets closed properly, even if
-       terminate() is called (which happens sometimes due to bugs in
-       destructor/exceptions interaction, but that needn't preclude a
-       clean shutdown of the database). */
-    std::set_terminate(closeStore);
-    
     run(remaining);
 
     /* Close the Nix database. */

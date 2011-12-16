@@ -2,7 +2,7 @@
           xmlns:xlink="http://www.w3.org/1999/xlink"
           xmlns:xi="http://www.w3.org/2001/XInclude"
           xml:id="sec-nix-env">
-  
+
 <refmeta>
   <refentrytitle>nix-env</refentrytitle>
   <manvolnum>1</manvolnum>
@@ -60,7 +60,7 @@ environments.</para>
 <para><command>nix-env</command> takes exactly one
 <emphasis>operation</emphasis> flag which indicates the subcommand to
 be performed.  These are documented below.</para>
-    
+
 </refsection>
 
 
@@ -78,19 +78,19 @@ linkend="sec-common-options" />.</para>
 
   <varlistentry><term><option>--file</option></term>
     <term><option>-f</option></term>
-  
+
     <listitem><para>Specifies the Nix expression (designated below as
     the <emphasis>active Nix expression</emphasis>) used by the
     <option>--install</option>, <option>--upgrade</option>, and
     <option>--query --available</option> operations to obtain
     derivations.  The default is
     <filename>~/.nix-defexpr</filename>.</para></listitem>
-    
+
   </varlistentry>
-      
+
   <varlistentry><term><option>--profile</option></term>
     <term><option>-p</option></term>
-  
+
     <listitem><para>Specifies the profile to be used by those
     operations that operate on a profile (designated below as the
     <emphasis>active profile</emphasis>).  A profile is sequence of
@@ -98,11 +98,11 @@ linkend="sec-common-options" />.</para>
     which is the <emphasis>current generation</emphasis>.  The default
     profile is the target of the symbolic link
     <filename>~/.nix-profile</filename> (see below).</para></listitem>
-    
+
   </varlistentry>
-      
+
   <varlistentry><term><option>--dry-run</option></term>
-  
+
     <listitem><para>For the <option>--install</option>,
     <option>--upgrade</option>, <option>--uninstall</option>,
     <option>--switch-generation</option> and
@@ -117,23 +117,23 @@ linkend="sec-common-options" />.</para>
     substitute is available).</para></listitem>
 
   </varlistentry>
-      
+
   <varlistentry><term><option>--system-filter</option> <replaceable>system</replaceable></term>
-  
+
     <listitem><para>By default, operations such as <option>--query
     --available</option> only include derivations matching the current
     platform.  This option allows you to use derivations for the
     specified platform <replaceable>system</replaceable>.  The special
     value <literal>*</literal> causes derivations for any platform to
     be included.</para></listitem>
-    
+
   </varlistentry>
 
 </variablelist>
 
 </refsection>
 
-  
+
 
 <!--######################################################################-->
 
@@ -170,25 +170,25 @@ linkend="sec-common-options" />.</para>
     this directory.</para>
 
     </listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><filename>~/.nix-profile</filename></term>
-  
+
     <listitem><para>A symbolic link to the user's current profile.  By
     default, this symlink points to
     <filename><replaceable>prefix</replaceable>/var/nix/profiles/default</filename>.
     The <envar>PATH</envar> environment variable should include
     <filename>~/.nix-profile/bin</filename> for the user environment
     to be visible to the user.</para></listitem>
-    
+
   </varlistentry>
 
 </variablelist>
-        
+
 </refsection>
 
-  
+
 
 <!--######################################################################-->
 
@@ -214,7 +214,7 @@ linkend="sec-common-options" />.</para>
 
 
 <refsection><title>Description</title>
-            
+
 <para>The install operation creates a new user environment, based on
 the current generation of the active profile, to which a set of store
 paths described by <replaceable>args</replaceable> is added.  The
@@ -256,7 +256,7 @@ number of possible ways:
   <emphasis>attribute paths</emphasis> that select attributes from the
   top-level Nix expression.  This is faster than using derivation
   names and unambiguous.  To find out the attribute paths of available
-  packages, use <literal>nix-env -qaA '*'</literal>.</para></listitem>
+  packages, use <literal>nix-env -qaP '*'</literal>.</para></listitem>
 
   <listitem><para>If <option>--from-profile</option>
   <replaceable>path</replaceable> is given,
@@ -306,20 +306,20 @@ number of possible ways:
 
   <varlistentry><term><option>--preserve-installed</option></term>
     <term><option>-P</option></term>
-  
+
     <listitem><para>Do not remove derivations with a name matching one
     of the derivations being installed.  Usually, trying to have two
     versions of the same package installed in the same generation of a
     profile will lead to an error in building the generation, due to
     file name clashes between the two versions.  However, this is not
     the case for all packages.</para></listitem>
-    
+
   </varlistentry>
 
 </variablelist>
 
 </refsection>
-            
+
 
 <refsection xml:id='refsec-nix-env-install-examples'><title>Examples</title>
 
@@ -327,7 +327,7 @@ number of possible ways:
 active Nix expression:
 
 <screen>
-$ nix-env --install gcc-3.3.2 
+$ nix-env --install gcc-3.3.2
 installing `gcc-3.3.2'
 uninstalling `gcc-3.1'</screen>
 
@@ -408,15 +408,15 @@ the following paths will be substituted:
   /nix/store/8zbipvm4gp9jfqh9nnk1n3bary1a37gs-perl-XML-Parser-2.34
   /nix/store/b8a2bg7gnyvvvjjibp4axg9x1hzkw36c-mono-1.1.4
   <replaceable>...</replaceable></screen>
-  
+
 </para>
 
 </refsection>
-    
+
 </refsection>
 
 
-  
+
 <!--######################################################################-->
 
 <refsection xml:id="rsec-nix-env-upgrade"><title>Operation <option>--upgrade</option></title>
@@ -442,7 +442,7 @@ the following paths will be substituted:
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>The upgrade operation creates a new user environment, based on
 the current generation of the active profile, in which all store paths
 are replaced for which there are newer versions in the set of paths
@@ -459,47 +459,47 @@ the same symbolic name, only the one with the highest version is
 installed.</para>
 
 </refsection>
-            
+
 <refsection><title>Flags</title>
 
 <variablelist>
 
   <varlistentry><term><option>--lt</option></term>
-  
+
     <listitem><para>Only upgrade a derivation to newer versions.  This
     is the default.</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--leq</option></term>
-  
+
     <listitem><para>In addition to upgrading to newer versions, also
     “upgrade” to derivations that have the same version.  Version are
     not a unique identification of a derivation, so there may be many
     derivations that have the same version.  This flag may be useful
     to force “synchronisation” between the installed and available
     derivations.</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--eq</option></term>
-  
+
     <listitem><para><emphasis>Only</emphasis> “upgrade” to derivations
     that have the same version.  This may not seem very useful, but it
     actually is, e.g., when there is a new release of Nixpkgs and you
     want to replace installed applications with the same versions
     built against newer dependencies (to reduce the number of
     dependencies floating around on your system).</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--always</option></term>
-  
+
     <listitem><para>In addition to upgrading to newer versions, also
     “upgrade” to derivations that have the same or a lower version.
     I.e., derivations may actually be downgraded depending on what is
     available in the active Nix expression.</para></listitem>
-    
+
   </varlistentry>
 
 </variablelist>
@@ -523,10 +523,10 @@ $ nix-env --upgrade pan
 
 $ nix-env -u '*' <lineannotation>(try to upgrade everything)</lineannotation>
 upgrading `hello-2.1.2' to `hello-2.1.3'
-upgrading `mozilla-1.2' to `mozilla-1.4'</screen>        
+upgrading `mozilla-1.2' to `mozilla-1.4'</screen>
 
 </refsection>
-    
+
 <refsection xml:id="ssec-version-comparisons"><title>Versions</title>
 
 <para>The upgrade operation determines whether a derivation
@@ -570,14 +570,14 @@ lexicographically (i.e., using case-sensitive string comparison).</para>
 2.3a &lt; 2.3c
 2.3pre1 &lt; 2.3c
 2.3pre1 &lt; 2.3q</screen>
-        
+
 </para>
 
 </refsection>
-            
+
 </refsection>
 
-  
+
 
 <!--######################################################################-->
 
@@ -596,14 +596,14 @@ lexicographically (i.e., using case-sensitive string comparison).</para>
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>The uninstall operation creates a new user environment, based on
 the current generation of the active profile, from which the store
 paths designated by the symbolic names
 <replaceable>names</replaceable> are removed.</para>
 
 </refsection>
-            
+
 <refsection><title>Examples</title>
 
 <screen>
@@ -611,11 +611,11 @@ $ nix-env --uninstall gcc
 $ nix-env -e '*' <lineannotation>(remove everything)</lineannotation></screen>
 
 </refsection>
-    
+
 </refsection>
 
 
-  
+
 <!--######################################################################-->
 
 <refsection xml:id="rsec-nix-env-set-flag"><title>Operation <option>--set-flag</option></title>
@@ -632,7 +632,7 @@ $ nix-env -e '*' <lineannotation>(remove everything)</lineannotation></screen>
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>The <option>--set-flag</option> operation allows meta attributes
 of installed packages to be modified.  There are several attributes
 that can be usefully modified, because they affect the behaviour of
@@ -670,7 +670,7 @@ script:
 </para>
 
 </refsection>
-            
+
 <refsection><title>Examples</title>
 
 <para>To prevent the currently installed Firefox from being upgraded:
@@ -716,13 +716,13 @@ $ nix-env --set-flag priority 10 gcc</screen>
 </para>
 
 </refsection>
-    
+
 </refsection>
 
 
-  
+
 <!--######################################################################-->
-  
+
 <refsection><title>Operation <option>--query</option></title>
 
 <refsection><title>Synopsis</title>
@@ -738,9 +738,9 @@ $ nix-env --set-flag priority 10 gcc</screen>
     <arg choice='plain'><option>--available</option></arg>
     <arg choice='plain'><option>-a</option></arg>
   </group>
-  
+
   <sbr />
-  
+
   <arg>
     <group choice='req'>
       <arg choice='plain'><option>--status</option></arg>
@@ -785,7 +785,7 @@ $ nix-env --set-flag priority 10 gcc</screen>
   </arg>
 
   <sbr />
-  
+
   <arg choice='plain' rep='repeat'><replaceable>names</replaceable></arg>
 </cmdsynopsis>
 
@@ -793,7 +793,7 @@ $ nix-env --set-flag priority 10 gcc</screen>
 
 
 <refsection><title>Description</title>
-            
+
 <para>The query operation displays information about either the store
 paths that are installed in the current generation of the active
 profile (<option>--installed</option>), or the derivations that are
@@ -817,23 +817,23 @@ operates.</para>
 <variablelist>
 
   <varlistentry><term><option>--installed</option></term>
-  
+
     <listitem><para>The query operates on the store paths that are
     installed in the current generation of the active profile.  This
     is the default.</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--available</option></term>
     <term><option>-a</option></term>
-  
+
     <listitem><para>The query operates on the derivations that are
     available in the active Nix expression.</para></listitem>
-    
+
   </varlistentry>
 
 </variablelist>
-            
+
 </refsection>
 
 
@@ -874,7 +874,7 @@ user environment elements, etc. -->
 
   <varlistentry><term><option>--status</option></term>
     <term><option>-s</option></term>
-  
+
     <listitem><para>Print the <emphasis>status</emphasis> of the
     derivation.  The status consists of three characters.  The first
     is <literal>I</literal> or <literal>-</literal>, indicating
@@ -888,7 +888,7 @@ user environment elements, etc. -->
     third is <literal>S</literal> or <literal>-</literal>, indicating
     whether a substitute is available for the
     derivation.</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--attr-path</option></term>
@@ -901,17 +901,17 @@ user environment elements, etc. -->
     <literal>nix-env --install</literal>.</para></listitem>
 
   </varlistentry>
-  
+
   <varlistentry><term><option>--no-name</option></term>
-  
+
     <listitem><para>Suppress printing of the <literal>name</literal>
     attribute of each derivation.</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--compare-versions</option> /
   <option>-c</option></term>
-  
+
     <listitem><para>Compare installed versions to available versions,
     or vice versa (if <option>--available</option> is given).  This is
     useful for quickly seeing whether upgrades for installed
@@ -926,21 +926,21 @@ user environment elements, etc. -->
         or installed.</para></listitem>
 
       </varlistentry>
-      
+
       <varlistentry><term><literal>=</literal> <replaceable>version</replaceable></term>
 
         <listitem><para>At most the same version of the package is
         available or installed.</para></listitem>
 
       </varlistentry>
-      
+
       <varlistentry><term><literal>></literal> <replaceable>version</replaceable></term>
 
         <listitem><para>Only older versions of the package are
         available or installed.</para></listitem>
 
       </varlistentry>
-      
+
       <varlistentry><term><literal>- ?</literal></term>
 
         <listitem><para>No version of the package is available or
@@ -951,45 +951,45 @@ user environment elements, etc. -->
     </variablelist>
 
     </para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--system</option></term>
-  
+
     <listitem><para>Print the <literal>system</literal> attribute of
     the derivation.</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--drv-path</option></term>
-  
+
     <listitem><para>Print the path of the store
     derivation.</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--out-path</option></term>
-  
+
     <listitem><para>Print the output path of the
     derivation.</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--description</option></term>
-  
+
     <listitem><para>Print a short (one-line) description of the
     derivation, if available.  The description is taken from the
     <literal>meta.description</literal> attribute of the
     derivation.</para></listitem>
-    
+
   </varlistentry>
 
   <varlistentry><term><option>--meta</option></term>
-  
+
     <listitem><para>Print all of the meta-attributes of the
     derivation.  This option is only available with
     <option>--xml</option>.</para></listitem>
-    
+
   </varlistentry>
 
 </variablelist>
@@ -1023,7 +1023,7 @@ IP- ORBit2-2.8.3    <lineannotation>(installed and by definition present)</linea
 ...
 
 <lineannotation>(show available derivations in the Nix expression <!-- !!! <filename>-->foo.nix<!-- </filename> -->)</lineannotation>
-$ nix-env -f ./foo.nix -qa '*' 
+$ nix-env -f ./foo.nix -qa '*'
 foo-1.2.3
 
 $ nix-env -qc '*' <lineannotation>(compare installed versions to what’s available)</lineannotation>
@@ -1034,7 +1034,7 @@ firefox-1.0.4      &lt; 1.0.7  <lineannotation>(a more recent version is availab
 <replaceable>...</replaceable>
 
 <lineannotation>(show info about a specific package, in XML)</lineannotation>
-$ nix-env -qa --xml --description firefox 
+$ nix-env -qa --xml --description firefox
 <![CDATA[<?xml version='1.0' encoding='utf-8'?>
 <items>
   <item attrPath="0.0.firefoxWrapper"
@@ -1045,8 +1045,8 @@ $ nix-env -qa --xml --description firefox
 </refsection>
 
 </refsection>
-  
-    
+
+
 
 <!--######################################################################-->
 
@@ -1067,25 +1067,25 @@ $ nix-env -qa --xml --description firefox
 
 
 <refsection><title>Description</title>
-            
+
 <para>This operation makes <replaceable>path</replaceable> the current
 profile for the user.  That is, the symlink
 <filename>~/.nix-profile</filename> is made to point to
 <replaceable>path</replaceable>.</para>
 
 </refsection>
-            
+
 <refsection><title>Examples</title>
 
 <screen>
 $ nix-env -S ~/my-profile</screen>
 
 </refsection>
-    
+
 </refsection>
 
 
-  
+
 <!--######################################################################-->
 
 <refsection><title>Operation <option>--list-generations</option></title>
@@ -1101,7 +1101,7 @@ $ nix-env -S ~/my-profile</screen>
 
 
 <refsection><title>Description</title>
-            
+
 <para>This operation print a list of all the currently existing
 generations for the active profile.  These may be switched to using
 the <option>--switch-generation</option> operation.  It also prints
@@ -1121,11 +1121,11 @@ $ nix-env --list-generations
   98   2004-02-06 16:24:33   (current)</screen>
 
 </refsection>
-    
+
 </refsection>
 
 
-  
+
 <!--######################################################################-->
 
 <refsection><title>Operation <option>--delete-generations</option></title>
@@ -1142,7 +1142,7 @@ $ nix-env --list-generations
 
 
 <refsection><title>Description</title>
-            
+
 <para>This operation deletes the specified generations of the current
 profile.  The generations can be a list of generation numbers, or the
 special value <literal>old</literal> to delete all non-current
@@ -1150,7 +1150,7 @@ generations.  Periodically deleting old generations is important to
 make garbage collection effective.</para>
 
 </refsection>
-            
+
 <refsection><title>Examples</title>
 
 <screen>
@@ -1159,11 +1159,11 @@ $ nix-env --delete-generations 3 4 8
 $ nix-env -p other_profile --delete-generations old</screen>
 
 </refsection>
-    
+
 </refsection>
 
 
-  
+
 <!--######################################################################-->
 
 <refsection><title>Operation <option>--switch-generation</option></title>
@@ -1183,7 +1183,7 @@ $ nix-env -p other_profile --delete-generations old</screen>
 
 
 <refsection><title>Description</title>
-            
+
 <para>This operation makes generation number
 <replaceable>generation</replaceable> the current generation of the
 active profile.  That is, if the
@@ -1207,11 +1207,11 @@ $ nix-env -G 42
 switching from generation 50 to 42</screen>
 
 </refsection>
-    
+
 </refsection>
 
 
-  
+
 <!--######################################################################-->
 
 <refsection><title>Operation <option>--rollback</option></title>
@@ -1226,7 +1226,7 @@ switching from generation 50 to 42</screen>
 </refsection>
 
 <refsection><title>Description</title>
-            
+
 <para>This operation switches to the “previous” generation of the
 active profile, that is, the highest numbered generation lower than
 the current generation, if it exists.  It is just a convenience
@@ -1246,9 +1246,9 @@ $ nix-env --rolback
 error: no generation older than the current (91) exists</screen>
 
 </refsection>
-    
+
 </refsection>
 
 
-  
+
 </refentry>

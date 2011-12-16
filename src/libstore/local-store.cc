@@ -327,10 +327,9 @@ void LocalStore::openDB(bool create)
     if (sqlite3_exec(db, ("pragma synchronous = " + syncMode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
         throwSQLiteError(db, "setting synchronous mode");
 
-    /* Set the SQLite journal mode.  WAL mode is fastest, but doesn't
-       seem entirely stable at the moment (Oct. 2010).  Thus, use
-       truncate mode by default. */
-    string mode = queryBoolSetting("use-sqlite-wal", false) ? "wal" : "truncate";
+    /* Set the SQLite journal mode.  WAL mode is fastest, so it's the
+       default. */
+    string mode = queryBoolSetting("use-sqlite-wal", true) ? "wal" : "truncate";
     string prevMode;
     {
         SQLiteStmt stmt;
@@ -367,7 +366,7 @@ void LocalStore::openDB(bool create)
     stmtRegisterValidPath.create(db,
         "insert into ValidPaths (path, hash, registrationTime, deriver, narSize) values (?, ?, ?, ?, ?);");
     stmtUpdatePathInfo.create(db,
-        "update ValidPaths set narSize = ? where path = ?;");
+        "update ValidPaths set narSize = ?, hash = ? where path = ?;");
     stmtAddReference.create(db,
         "insert or replace into Refs (referrer, reference) values (?, ?);");
     stmtQueryPathInfo.create(db,
@@ -684,7 +683,7 @@ ValidPathInfo LocalStore::queryPathInfo(const Path & path)
 }
 
 
-/* Update path info in the database.  Currently only updated the
+/* Update path info in the database.  Currently only updates the
    narSize field. */
 void LocalStore::updatePathInfo(const ValidPathInfo & info)
 {
@@ -693,6 +692,7 @@ void LocalStore::updatePathInfo(const ValidPathInfo & info)
         stmtUpdatePathInfo.bind64(info.narSize);
     else
         stmtUpdatePathInfo.bind(); // null
+    stmtUpdatePathInfo.bind("sha256:" + printHash(info.hash));
     stmtUpdatePathInfo.bind(info.path);
     if (sqlite3_step(stmtUpdatePathInfo) != SQLITE_DONE)
         throwSQLiteError(db, format("updating info of path `%1%' in database") % info.path);
@@ -1125,16 +1125,14 @@ struct HashAndWriteSink : Sink
     HashAndWriteSink(Sink & writeSink) : writeSink(writeSink), hashSink(htSHA256)
     {
     }
-    virtual void operator ()
-        (const unsigned char * data, unsigned int len)
+    virtual void operator () (const unsigned char * data, size_t len)
     {
         writeSink(data, len);
         hashSink(data, len);
     }
     Hash currentHash()
     {
-        HashSink hashSinkClone(hashSink);
-        return hashSinkClone.finish().first;
+        return hashSink.currentHash().first;
     }
 };
 
@@ -1180,7 +1178,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
     
     PathSet references;
     queryReferences(path, references);
-    writeStringSet(references, hashAndWriteSink);
+    writeStrings(references, hashAndWriteSink);
 
     Path deriver = queryDeriver(path);
     writeString(deriver, hashAndWriteSink);
@@ -1223,11 +1221,11 @@ struct HashAndReadSource : Source
     {
         hashing = true;
     }
-    virtual void operator ()
-        (unsigned char * data, unsigned int len)
+    size_t read(unsigned char * data, size_t len)
     {
-        readSource(data, len);
-        if (hashing) hashSink(data, len);
+        size_t n = readSource.read(data, len);
+        if (hashing) hashSink(data, n);
+        return n;
     }
 };
 
@@ -1267,7 +1265,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 
     Path dstPath = readStorePath(hashAndReadSource);
 
-    PathSet references = readStorePaths(hashAndReadSource);
+    PathSet references = readStorePaths<PathSet>(hashAndReadSource);
 
     Path deriver = readString(hashAndReadSource);
     if (deriver != "") assertStorePath(deriver);
@@ -1278,7 +1276,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
     bool haveSignature = readInt(hashAndReadSource) == 1;
 
     if (requireSignature && !haveSignature)
-        throw Error("imported archive lacks a signature");
+        throw Error(format("imported archive of `%1%' lacks a signature") % dstPath);
     
     if (haveSignature) {
         string signature = readString(hashAndReadSource);
@@ -1354,6 +1352,19 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 }
 
 
+Paths LocalStore::importPaths(bool requireSignature, Source & source)
+{
+    Paths res;
+    while (true) {
+        unsigned long long n = readLongLong(source);
+        if (n == 0) break;
+        if (n != 1) throw Error("input doesn't look like something created by `nix-store --export'");
+        res.push_back(importPath(requireSignature, source));
+    }
+    return res;
+}
+
+
 void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFreed,
     unsigned long long & blocksFreed)
 {
@@ -1369,7 +1380,7 @@ void LocalStore::deleteFromStore(const Path & path, unsigned long long & bytesFr
                 PathSet referrers; queryReferrers(path, referrers);
                 referrers.erase(path); /* ignore self-references */
                 if (!referrers.empty())
-                    throw PathInUse(format("cannot delete path `%1%' because it is in use by `%2%'")
+                    throw PathInUse(format("cannot delete path `%1%' because it is in use by %2%")
                         % path % showPaths(referrers));
                 invalidatePath(path);
             }
@@ -1409,6 +1420,8 @@ void LocalStore::verifyStore(bool checkContents)
     if (checkContents) {
         printMsg(lvlInfo, "checking hashes...");
 
+        Hash nullHash(htSHA256);
+
         foreach (PathSet::iterator, i, validPaths) {
             try {
                 ValidPathInfo info = queryPathInfo(*i);
@@ -1417,17 +1430,30 @@ void LocalStore::verifyStore(bool checkContents)
                 printMsg(lvlTalkative, format("checking contents of `%1%'") % *i);
                 HashResult current = hashPath(info.hash.type, *i);
                 
-                if (current.first != info.hash) {
+                if (info.hash != nullHash && info.hash != current.first) {
                     printMsg(lvlError, format("path `%1%' was modified! "
                             "expected hash `%2%', got `%3%'")
                         % *i % printHash(info.hash) % printHash(current.first));
                 } else {
+
+                    bool update = false;
+
+                    /* Fill in missing hashes. */
+                    if (info.hash == nullHash) {
+                        printMsg(lvlError, format("fixing missing hash on `%1%'") % *i);
+                        info.hash = current.first;
+                        update = true;
+                    }
+                    
                     /* Fill in missing narSize fields (from old stores). */
                     if (info.narSize == 0) {
                         printMsg(lvlError, format("updating size field on `%1%' to %2%") % *i % current.second);
                         info.narSize = current.second;
-                        updatePathInfo(info);
+                        update = true;                        
                     }
+
+                    if (update) updatePathInfo(info);
+
                 }
             
             } catch (Error & e) {

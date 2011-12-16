@@ -204,6 +204,22 @@ Hash parseHash32(HashType ht, const string & s)
 }
 
 
+Hash parseHash16or32(HashType ht, const string & s)
+{
+    Hash hash(ht);
+    if (s.size() == hash.hashSize * 2)
+        /* hexadecimal representation */
+        hash = parseHash(ht, s);
+    else if (s.size() == hashLength32(hash))
+        /* base-32 representation */
+        hash = parseHash32(ht, s);
+    else
+        throw Error(format("hash `%1%' has wrong length for hash type `%2%'")
+            % s % printHashType(ht));
+    return hash;
+}
+
+
 bool isHash(const string & s)
 {
     if (s.length() != 32) return false;
@@ -290,21 +306,13 @@ HashSink::HashSink(HashType ht) : ht(ht)
     start(ht, *ctx);
 }
     
-HashSink::HashSink(const HashSink & h)
-{
-    ht = h.ht;
-    bytes = h.bytes;
-    ctx = new Ctx;
-    *ctx = *h.ctx;
-}
-    
 HashSink::~HashSink()
 {
+    bufPos = 0;
     delete ctx;
 }
 
-void HashSink::operator ()
-    (const unsigned char * data, unsigned int len)
+void HashSink::write(const unsigned char * data, size_t len)
 {
     bytes += len;
     update(ht, *ctx, data, len);
@@ -312,8 +320,18 @@ void HashSink::operator ()
 
 HashResult HashSink::finish()
 {
+    flush();
     Hash hash(ht);
     nix::finish(ht, *ctx, hash.hash);
+    return HashResult(hash, bytes);
+}
+
+HashResult HashSink::currentHash()
+{
+    flush();
+    Ctx ctx2 = *ctx;
+    Hash hash(ht);
+    nix::finish(ht, ctx2, hash.hash);
     return HashResult(hash, bytes);
 }
 

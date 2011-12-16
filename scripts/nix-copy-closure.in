@@ -3,11 +3,12 @@
 use Nix::SSH;
 use Nix::Config;
 use Nix::Store;
+use Nix::CopyClosure;
 
 
 if (scalar @ARGV < 1) {
     print STDERR <<EOF
-Usage: nix-copy-closure [--from | --to] HOSTNAME [--sign] [--gzip] PATHS...
+Usage: nix-copy-closure [--from | --to] HOSTNAME [--sign] [--gzip] [--bzip2] [--xz] PATHS...
 EOF
     ;
     exit 1;
@@ -39,8 +40,16 @@ while (@ARGV) {
         $sign = 1;
     }
     elsif ($arg eq "--gzip") {
-        $compressor = "| gzip";
-        $decompressor = "gunzip |";
+        $compressor = "gzip";
+        $decompressor = "gunzip";
+    }
+    elsif ($arg eq "--bzip2") {
+        $compressor = "bzip2";
+        $decompressor = "bunzip2";
+    }
+    elsif ($arg eq "--xz") {
+        $compressor = "xz";
+        $decompressor = "xz -d";
     }
     elsif ($arg eq "--from") {
         $toMode = 0;
@@ -67,30 +76,7 @@ openSSHConnection $sshHost or die "$0: unable to start SSH\n";
 
 
 if ($toMode) { # Copy TO the remote machine.
-
-    # Get the closure of this path.
-    my @allStorePaths = reverse(topoSortPaths(computeFSClosure(0, $includeOutputs, map { followLinksToStorePath $_ } @storePaths)));
-
-    # Ask the remote host which paths are invalid.
-    open(READ, "set -f; ssh $sshHost @sshOpts nix-store --check-validity --print-invalid @allStorePaths|");
-    my @missing = ();
-    while (<READ>) {
-        chomp;
-        push @missing, $_;
-    }
-    close READ or die;
-
-    # Export the store paths and import them on the remote machine.
-    if (scalar @missing > 0) {
-        print STDERR "copying these missing paths:\n";
-        print STDERR "  $_\n" foreach @missing;
-        unless ($dryRun) {
-            my $extraOpts = $sign ? "--sign" : "";
-            system("set -f; nix-store --export $extraOpts @missing $compressor | ssh $sshHost @sshOpts '$decompressor nix-store --import'") == 0
-                or die "copying store paths to remote machine `$sshHost' failed: $?";
-        }
-    }
-
+    Nix::CopyClosure::copyTo($sshHost, [ @sshOpts ], [ @storePaths ], $compressor, $decompressor, $includeOutputs, $dryRun, $sign);
 }
 
 else { # Copy FROM the remote machine.
@@ -110,10 +96,12 @@ else { # Copy FROM the remote machine.
 
     close READ or die "nix-store on remote machine `$sshHost' failed: $?";
 
-    # Export the store paths on the remote machine and import them on locally.
+    # Export the store paths on the remote machine and import them locally.
     if (scalar @missing > 0) {
-        print STDERR "copying these missing paths:\n";
-        print STDERR "  $_\n" foreach @missing;
+        print STDERR "copying ", scalar @missing, " missing paths from ‘$sshHost’...\n";
+        #print STDERR "  $_\n" foreach @missing;
+        $compressor = "| $compressor" if $compressor ne "";
+        $decompressor = "$decompressor |" if $decompressor ne "";
         unless ($dryRun) {
             my $extraOpts = $sign ? "--sign" : "";
             system("set -f; ssh $sshHost @sshOpts 'nix-store --export $extraOpts @missing $compressor' | $decompressor $Nix::Config::binDir/nix-store --import") == 0

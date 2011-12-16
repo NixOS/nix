@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include "globals.hh"
 #include "util.hh"
 
@@ -136,6 +138,34 @@ void reloadSettings()
 {
     settingsRead = false;
     settings.clear();
+}
+
+
+void setDefaultsFromEnvironment()
+{
+    /* Setup Nix paths. */
+    nixStore = canonPath(getEnv("NIX_STORE_DIR", getEnv("NIX_STORE", NIX_STORE_DIR)));
+    nixDataDir = canonPath(getEnv("NIX_DATA_DIR", NIX_DATA_DIR));
+    nixLogDir = canonPath(getEnv("NIX_LOG_DIR", NIX_LOG_DIR));
+    nixStateDir = canonPath(getEnv("NIX_STATE_DIR", NIX_STATE_DIR));
+    nixDBPath = getEnv("NIX_DB_DIR", nixStateDir + "/db");
+    nixConfDir = canonPath(getEnv("NIX_CONF_DIR", NIX_CONF_DIR));
+    nixLibexecDir = canonPath(getEnv("NIX_LIBEXEC_DIR", NIX_LIBEXEC_DIR));
+    nixBinDir = canonPath(getEnv("NIX_BIN_DIR", NIX_BIN_DIR));
+
+    string subs = getEnv("NIX_SUBSTITUTERS", "default");
+    if (subs == "default") {
+        substituters.push_back(nixLibexecDir + "/nix/substituters/copy-from-other-stores.pl");
+        substituters.push_back(nixLibexecDir + "/nix/substituters/download-using-manifests.pl");
+    } else
+        substituters = tokenizeString(subs, ":");
+
+    /* Get some settings from the configuration file. */
+    thisSystem = querySetting("system", SYSTEM);
+    maxBuildJobs = queryIntSetting("build-max-jobs", 1);
+    buildCores = queryIntSetting("build-cores", 1);
+    maxSilentTime = queryIntSetting("build-max-silent-time", 0);
+    buildTimeout = queryIntSetting("build-timeout", 0);
 }
 
  

@@ -1650,6 +1650,9 @@ void DerivationGoal::startBuilder()
             (format("nixbld:!:%1%:\n")
                 % (buildUser.enabled() ? buildUser.getGID() : getgid())).str());
 
+        /* Create /etc/hosts with localhost entry. */
+        writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n");
+
         /* Bind-mount a user-configurable set of directories from the
            host file system.  The `/dev/pts' directory must be mounted
            separately so that newly-created pseudo-terminals show
@@ -2199,9 +2202,7 @@ void SubstitutionGoal::tryNext()
     if (subs.size() == 0) {
         /* None left.  Terminate this goal and let someone else deal
            with it. */
-        printMsg(lvlError,
-            format("path `%1%' is required, but there is no substituter that can build it")
-            % storePath);
+        debug(format("path `%1%' is required, but there is no substituter that can build it") % storePath);
         amDone(ecFailed);
         return;
     }
@@ -2232,8 +2233,7 @@ void SubstitutionGoal::referencesValid()
     trace("all references realised");
 
     if (nrFailed > 0) {
-        printMsg(lvlError,
-            format("some references of path `%1%' could not be realised") % storePath);
+        debug(format("some references of path `%1%' could not be realised") % storePath);
         amDone(ecFailed);
         return;
     }
@@ -2286,9 +2286,7 @@ void SubstitutionGoal::tryToRun()
         return;
     }
 
-    printMsg(lvlInfo,
-        format("substituting path `%1%' using substituter `%2%'")
-        % storePath % sub);
+    printMsg(lvlInfo, format("fetching path `%1%'...") % storePath);
     
     logPipe.create();
 
@@ -2364,19 +2362,15 @@ void SubstitutionGoal::finished()
     try {
         
         if (!statusOk(status))
-            throw SubstError(format("builder for `%1%' %2%")
+            throw SubstError(format("fetching path `%1%' %2%")
                 % storePath % statusToString(status));
 
         if (!pathExists(storePath))
-            throw SubstError(
-                format("substitute did not produce path `%1%'")
-                % storePath);
+            throw SubstError(format("substitute did not produce path `%1%'") % storePath);
         
     } catch (SubstError & e) {
 
-        printMsg(lvlInfo,
-            format("substitution of path `%1%' using substituter `%2%' failed: %3%")
-            % storePath % sub % e.msg());
+        printMsg(lvlInfo, e.msg());
         
         if (printBuildTrace) {
             printMsg(lvlError, format("@ substituter-failed %1% %2% %3%")

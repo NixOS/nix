@@ -2,10 +2,12 @@ perlversion := $(shell perl -e 'use Config; print $$Config{version};')
 perlarchname := $(shell perl -e 'use Config; print $$Config{archname};')
 perllibdir = $(libdir)/perl5/site_perl/$(perlversion)/$(perlarchname)
 
-PERL_MODULES = lib/Nix/Store.pm lib/Nix/Manifest.pm lib/Nix/GeneratePatches.pm lib/Nix/SSH.pm lib/Nix/Config.pm.in
+PERL_MODULES = lib/Nix/Store.pm lib/Nix/Manifest.pm lib/Nix/GeneratePatches.pm lib/Nix/SSH.pm lib/Nix/CopyClosure.pm lib/Nix/Config.pm.in
 
+# Hack required by "make check".
 all: $(PERL_MODULES:.in=)
-	ln -sfn $(abs_builddir)/.libs/libNixStore.so lib/Store.so
+	mkdir -p lib/auto/Nix/Store
+	ln -sfn $(abs_builddir)/.libs/libNixStore.so lib/auto/Nix/Store/Store.so
 
 install-exec-local: $(PERL_MODULES:.in=)
 	$(INSTALL) -d $(DESTDIR)$(perllibdir)/Nix

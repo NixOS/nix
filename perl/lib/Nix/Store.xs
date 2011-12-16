@@ -18,10 +18,8 @@ using namespace nix;
 void doInit() 
 {
     if (!store) {
-        nixStore = canonPath(getEnv("NIX_STORE_DIR", getEnv("NIX_STORE", "/nix/store")));
-        nixStateDir = canonPath(getEnv("NIX_STATE_DIR", "/nix/var/nix"));
-        nixDBPath = getEnv("NIX_DB_DIR", nixStateDir + "/db");
         try {
+            setDefaultsFromEnvironment();
             store = openStore();
         } catch (Error & e) {
             croak(e.what());
@@ -69,7 +67,7 @@ SV * queryPathHash(char * path)
         try {
             doInit();
             Hash hash = store->queryPathHash(path);
-            string s = "sha256:" + printHash(hash);
+            string s = "sha256:" + printHash32(hash);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
             croak(e.what());
@@ -148,3 +146,73 @@ SV * followLinksToStorePath(char * path)
         }
     OUTPUT:
         RETVAL
+
+
+void exportPaths(int fd, int sign, ...)
+    PPCODE:
+        try {
+            doInit();
+            Paths paths;
+            for (int n = 2; n < items; ++n) paths.push_back(SvPV_nolen(ST(n)));
+            FdSink sink(fd);
+            exportPaths(*store, paths, sign, sink);
+        } catch (Error & e) {
+            croak(e.what());
+        }
+
+
+SV * hashPath(char * algo, int base32, char * path)
+    PPCODE:
+        try {
+            Hash h = hashPath(parseHashType(algo), path).first;
+            string s = base32 ? printHash32(h) : printHash(h);
+            XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
+        } catch (Error & e) {
+            croak(e.what());
+        }
+
+
+SV * hashFile(char * algo, int base32, char * path)
+    PPCODE:
+        try {
+            Hash h = hashFile(parseHashType(algo), path);
+            string s = base32 ? printHash32(h) : printHash(h);
+            XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
+        } catch (Error & e) {
+            croak(e.what());
+        }
+
+
+SV * hashString(char * algo, int base32, char * s)
+    PPCODE:
+        try {
+            Hash h = hashString(parseHashType(algo), s);
+            string s = base32 ? printHash32(h) : printHash(h);
+            XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
+        } catch (Error & e) {
+            croak(e.what());
+        }
+
+
+SV * addToStore(char * srcPath, int recursive, char * algo)
+    PPCODE:
+        try {
+            doInit();
+            Path path = store->addToStore(srcPath, recursive, parseHashType(algo));
+            XPUSHs(sv_2mortal(newSVpv(path.c_str(), 0)));
+        } catch (Error & e) {
+            croak(e.what());
+        }
+
+
+SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
+    PPCODE:
+        try {
+            doInit();
+            HashType ht = parseHashType(algo);
+            Path path = makeFixedOutputPath(recursive, ht,
+                parseHash16or32(ht, hash), name);
+            XPUSHs(sv_2mortal(newSVpv(path.c_str(), 0)));
+        } catch (Error & e) {
+            croak(e.what());
+        }

@@ -8,7 +8,7 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION 0x108
+#define PROTOCOL_VERSION 0x109
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -29,7 +29,6 @@ typedef enum {
     wopSyncWithGC = 13,
     wopFindRoots = 14,
     wopExportPath = 16,
-    wopImportPath = 17,
     wopQueryDeriver = 18,
     wopSetOptions = 19,
     wopCollectGarbage = 20,
@@ -39,7 +38,8 @@ typedef enum {
     wopQueryFailedPaths = 24,
     wopClearFailedPaths = 25,
     wopQueryPathInfo = 26,
-    wopQueryDerivationOutputNames = 27,
+    wopImportPaths = 27,
+    wopQueryDerivationOutputNames = 28,
 } WorkerOp;
 
 
@@ -59,7 +59,7 @@ typedef enum {
 
 
 Path readStorePath(Source & from);
-PathSet readStorePaths(Source & from);
+template<class T> T readStorePaths(Source & from);
 
     
 }

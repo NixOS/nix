@@ -3,6 +3,7 @@
 use strict;
 use Nix::Config;
 use Nix::Manifest;
+use Nix::Store;
 use POSIX qw(strftime);
 use File::Temp qw(tempdir);
 
@@ -19,14 +20,8 @@ my $fast = 1;
 my $dbh = updateManifestDB();
 
 
-sub isValidPath {
-    my $p = shift;
-    if ($fast) {
-        return -e $p;
-    } else {
-        return system("$Nix::Config::binDir/nix-store --check-validity '$p' 2> /dev/null") == 0;
-    }
-}
+# $hashCache->{$algo}->{$path} yields the $algo-hash of $path.
+my $hashCache;
 
 
 sub parseHash {
@@ -101,15 +96,17 @@ sub computeSmallestDownload {
             
             foreach my $patch (@{$patchList}) {
                 if (isValidPath($patch->{basePath})) {
-                    # !!! this should be cached
                     my ($baseHashAlgo, $baseHash) = parseHash $patch->{baseHash};
-                    my $format = "--base32";
-                    $format = "" if $baseHashAlgo eq "md5";
-                    my $hash = $fast && $baseHashAlgo eq "sha256"
-                        ? `$Nix::Config::binDir/nix-store -q --hash "$patch->{basePath}"`
-                        : `$Nix::Config::binDir/nix-hash --type '$baseHashAlgo' $format "$patch->{basePath}"`;
-                    chomp $hash;
-                    $hash =~ s/.*://;
+
+                    my $hash = $hashCache->{$baseHashAlgo}->{$patch->{basePath}};
+                    if (!defined $hash) {
+                        $hash = $fast && $baseHashAlgo eq "sha256"
+                            ? queryPathHash($patch->{basePath})
+                            : hashPath($baseHashAlgo, $baseHashAlgo ne "md5", $patch->{basePath});
+                        $hash =~ s/.*://;
+                        $hashCache->{$baseHashAlgo}->{$patch->{basePath}} = $hash;
+                    }
+                    
                     next if $hash ne $baseHash;
                 }
                 push @queue, $patch->{basePath};
@@ -257,7 +254,7 @@ open LOGFILE, ">>$logFile" or die "cannot open log file $logFile";
 my $date = strftime ("%F %H:%M:%S UTC", gmtime (time));
 print LOGFILE "$$ get $targetPath $date\n";
 
-print "\n*** Trying to download/patch `$targetPath'\n";
+print STDERR "\n*** Trying to download/patch `$targetPath'\n";
 
 
 # Compute the shortest path.
@@ -281,7 +278,7 @@ sub downloadFile {
     $ENV{"PRINT_PATH"} = 1;
     $ENV{"QUIET"} = 1;
     my ($hash, $path) = `$Nix::Config::binDir/nix-prefetch-url '$url'`;
-    die "download of `$url' failed" . ($! ? ": $!" : "") unless $? == 0;
+    die "download of `$url' failed" . ($! ? ": $!" : "") . "\n" unless $? == 0;
     chomp $path;
     return $path;
 }
@@ -293,17 +290,17 @@ while (scalar @path > 0) {
     my $u = $edge->{start};
     my $v = $edge->{end};
 
-    print "\n*** Step $curStep/$maxStep: ";
+    print STDERR "\n*** Step $curStep/$maxStep: ";
 
     if ($edge->{type} eq "present") {
-        print "using already present path `$v'\n";
+        print STDERR "using already present path `$v'\n";
         print LOGFILE "$$ present $v\n";
 
         if ($curStep < $maxStep) {
             # Since this is not the last step, the path will be used
             # as a base to one or more patches.  So turn the base path
             # into a NAR archive, to which we can apply the patch.
-            print "  packing base path...\n";
+            print STDERR "  packing base path...\n";
             system("$Nix::Config::binDir/nix-store --dump $v > $tmpNar") == 0
                 or die "cannot dump `$v'";
         }
@@ -311,17 +308,17 @@ while (scalar @path > 0) {
 
     elsif ($edge->{type} eq "patch") {
         my $patch = $edge->{info};
-        print "applying patch `$patch->{url}' to `$u' to create `$v'\n";
+        print STDERR "applying patch `$patch->{url}' to `$u' to create `$v'\n";
 
         print LOGFILE "$$ patch $patch->{url} $patch->{size} $patch->{baseHash} $u $v\n";
 
         # Download the patch.
-        print "  downloading patch...\n";
+        print STDERR "  downloading patch...\n";
         my $patchPath = downloadFile "$patch->{url}";
 
         # Apply the patch to the NAR archive produced in step 1 (for
         # the already present path) or a later step (for patch sequences).
-        print "  applying patch...\n";
+        print STDERR "  applying patch...\n";
         system("$Nix::Config::libexecDir/bspatch $tmpNar $tmpNar2 $patchPath") == 0
             or die "cannot apply patch `$patchPath' to $tmpNar";
 
@@ -331,7 +328,7 @@ while (scalar @path > 0) {
         } else {
             # This was the last patch.  Unpack the final NAR archive
             # into the target path.
-            print "  unpacking patched archive...\n";
+            print STDERR "  unpacking patched archive...\n";
             system("$Nix::Config::binDir/nix-store --restore $v < $tmpNar2") == 0
                 or die "cannot unpack $tmpNar2 into `$v'";
         }
@@ -341,13 +338,13 @@ while (scalar @path > 0) {
 
     elsif ($edge->{type} eq "narfile") {
         my $narFile = $edge->{info};
-        print "downloading `$narFile->{url}' into `$v'\n";
+        print STDERR "downloading `$narFile->{url}' into `$v'\n";
 
         my $size = $narFile->{size} || -1;
         print LOGFILE "$$ narfile $narFile->{url} $size $v\n";
         
         # Download the archive.
-        print "  downloading archive...\n";
+        print STDERR "  downloading archive...\n";
         my $narFilePath = downloadFile "$narFile->{url}";
 
         if ($curStep < $maxStep) {
@@ -356,7 +353,7 @@ while (scalar @path > 0) {
                 or die "cannot unpack `$narFilePath' into `$v'";
         } else {
             # Unpack the archive into the target path.
-            print "  unpacking archive...\n";
+            print STDERR "  unpacking archive...\n";
             system("$Nix::Config::bzip2 -d < '$narFilePath' | $Nix::Config::binDir/nix-store --restore '$v'") == 0
                 or die "cannot unpack `$narFilePath' into `$v'";
         }
@@ -376,20 +373,15 @@ if (defined $finalNarHash) {
 
     # The hash in the manifest can be either in base-16 or base-32.
     # Handle both.
-    my $extraFlag =
-        ($hashAlgo eq "sha256" && length($hash) != 64)
-        ? "--base32" : "";
+    my $hash2 = hashPath($hashAlgo, $hashAlgo eq "sha256" && length($hash) != 64, $targetPath);
     
-    my $hash2 = `$Nix::Config::binDir/nix-hash --type $hashAlgo $extraFlag $targetPath`
-        or die "cannot compute hash of path `$targetPath'";
-    chomp $hash2;
-    
-    die "hash mismatch in downloaded path $targetPath; expected $hash, got $hash2"
+    die "hash mismatch in downloaded path $targetPath; expected $hash, got $hash2\n"
         if $hash ne $hash2;
 } else {
-    die "cannot check integrity of the downloaded path since its hash is not known";
+    die "cannot check integrity of the downloaded path since its hash is not known\n";
 }
 
 
+print STDERR "\n";
 print LOGFILE "$$ success\n";
 close LOGFILE;

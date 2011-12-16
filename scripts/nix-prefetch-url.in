@@ -1,165 +1,128 @@
-#! @shell@ -e
+#! @perl@ -w @perlFlags@
 
-url=$1
-expHash=$2
+use strict;
+use File::Basename;
+use File::Temp qw(tempdir);
+use File::stat;
+use Nix::Store;
+use Nix::Config;
 
-binDir=@bindir@
-if [ -n "$NIX_BIN_DIR" ]; then binDir="$NIX_BIN_DIR"; fi
+my $url = shift;
+my $expHash = shift;
+my $hashType = $ENV{'NIX_HASH_ALGO'} || "sha256";
+my $cacheDir = $ENV{'NIX_DOWNLOAD_CACHE'};
 
-# needed to make it work on NixOS
-export PATH=$PATH:@coreutils@
+if (!defined $url || $url eq "") {
+    print STDERR <<EOF
+Usage: nix-prefetch-url URL [EXPECTED-HASH]
+EOF
+    ;
+    exit 1;
+}
 
-hashType=$NIX_HASH_ALGO
-if test -z "$hashType"; then
-    hashType=sha256
-fi
+sub writeFile {
+    my ($fn, $s) = @_;
+    open TMP, ">$fn" or die;
+    print TMP "$s" or die;
+    close TMP or die;
+}
 
-hashFormat=
-if test "$hashType" != "md5"; then
-    hashFormat=--base32
-fi
+sub readFile {
+    local $/ = undef;
+    my ($fn) = @_;
+    open TMP, "<$fn" or die;
+    my $s = <TMP>;
+    close TMP or die;
+    return $s;
+}
 
-if test -z "$url"; then
-    echo "syntax: nix-prefetch-url URL [EXPECTED-HASH]" >&2
-    exit 1
-fi
+my $tmpDir = tempdir("nix-prefetch-url.XXXXXX", CLEANUP => 1, TMPDIR => 1)
+    or die "cannot create a temporary directory";
+
+# Hack to support the mirror:// scheme from Nixpkgs.
+if ($url =~ /^mirror:\/\//) {
+    system("$Nix::Config::binDir/nix-build '<nixpkgs>' -A resolveMirrorURLs --argstr url '$url' -o $tmpDir/urls > /dev/null") == 0
+        or die "$0: nix-build failed; maybe \$NIX_PATH is not set properly\n";
+    my @expanded = split ' ', readFile("$tmpDir/urls");
+    die "$0: cannot resolve ‘$url’" unless scalar @expanded > 0;
+    print STDERR "$url expands to $expanded[0]\n";
+    $url = $expanded[0];
+}
 
 # Handle escaped characters in the URI.  `+', `=' and `?' are the only
 # characters that are valid in Nix store path names but have a special
 # meaning in URIs.
-name=$(basename "$url" | @sed@ -e 's/%2b/+/g' -e 's/%3d/=/g' -e 's/%3f/\?/g')
-if test -z "$name"; then echo "invalid url"; exit 1; fi
+my $name = basename $url;
+die "cannot figure out file name for ‘$url’\n" if $name eq ""; 
+$name =~ s/%2b/+/g;
+$name =~ s/%3d/=/g;
+$name =~ s/%3f/?/g;
 
+my $finalPath;
+my $hash;
 
 # If the hash was given, a file with that hash may already be in the
 # store.
-if test -n "$expHash"; then
-    finalPath=$($binDir/nix-store --print-fixed-path "$hashType" "$expHash" "$name")
-    if ! $bindir/nix-store --check-validity "$finalPath" 2> /dev/null; then
-        finalPath=
-    fi
-    hash=$expHash
-fi
-
-
-mkTempDir() {
-    if test -n "$tmpPath"; then return; fi
-    local i=0
-    while true; do
-        if test -z "$TMPDIR"; then TMPDIR=/tmp; fi
-        tmpPath=$TMPDIR/nix-prefetch-url-$$-$i
-        if mkdir "$tmpPath"; then break; fi
-        # !!! to bad we can't check for ENOENT in mkdir, so this check
-        # is slightly racy (it bombs out if somebody just removed
-        # $tmpPath...).
-        if ! test -e "$tmpPath"; then exit 1; fi
-        i=$((i + 1))
-    done
-    trap removeTempDir EXIT SIGINT SIGQUIT
+if (defined $expHash) {
+    $finalPath = makeFixedOutputPath(0, $hashType, $expHash, $name);
+    if (isValidPath($finalPath)) { $hash = $expHash; } else { $finalPath = undef; }
 }
-
-removeTempDir() {
-    if test -n "$tmpPath"; then
-        rm -rf "$tmpPath" || true
-    fi
-}
-
-
-doDownload() {
-    @curl@ $cacheFlags --fail --location --max-redirs 20 --disable-epsv \
-        --cookie-jar $tmpPath/cookies "$url" -o $tmpFile
-}
-
-
-# Hack to support the mirror:// scheme from Nixpkgs.
-if test "${url:0:9}" = "mirror://"; then
-    if test -z "$NIXPKGS_ALL"; then
-        echo "Resolving mirror:// URLs requires Nixpkgs.  Please point \$NIXPKGS_ALL at a Nixpkgs tree." >&2
-        exit 1
-    fi
-
-    mkTempDir
-    nix-build "$NIXPKGS_ALL" -A resolveMirrorURLs --argstr url "$url" -o $tmpPath/urls > /dev/null
-
-    expanded=($(cat $tmpPath/urls))
-    if test "${#expanded[*]}" = 0; then
-        echo "$0: cannot resolve $url." >&2
-        exit 1
-    fi
-
-    echo "$url expands to ${expanded[*]} (using ${expanded[0]})" >&2
-    url="${expanded[0]}"
-fi
-
 
 # If we don't know the hash or a file with that hash doesn't exist,
 # download the file and add it to the store.
-if test -z "$finalPath"; then
+if (!defined $finalPath) {
 
-    mkTempDir
-    tmpFile=$tmpPath/$name
-
+    my $tmpFile = "$tmpDir/$name";
+    
     # Optionally do timestamp-based caching of the download.
     # Actually, the only thing that we cache in $NIX_DOWNLOAD_CACHE is
     # the hash and the timestamp of the file at $url.  The caching of
     # the file *contents* is done in Nix store, where it can be
     # garbage-collected independently.
-    if test -n "$NIX_DOWNLOAD_CACHE"; then
-        echo -n "$url" > $tmpPath/url
-        urlHash=$($binDir/nix-hash --type sha256 --base32 --flat $tmpPath/url)
-        echo "$url" > "$NIX_DOWNLOAD_CACHE/$urlHash.url"
-        cachedHashFN="$NIX_DOWNLOAD_CACHE/$urlHash.$hashType"
-        cachedTimestampFN="$NIX_DOWNLOAD_CACHE/$urlHash.stamp"
-        cacheFlags="--remote-time"
-        if test -e "$cachedTimestampFN" -a -e "$cachedHashFN"; then
-            # Only download the file if it is newer than the cached version.
-            cacheFlags="$cacheFlags --time-cond $cachedTimestampFN"
-        fi
-    fi
-
+    my ($cachedTimestampFN, $cachedHashFN, @cacheFlags);
+    if (defined $cacheDir) {
+        my $urlHash = hashString("sha256", 1, $url);
+        writeFile "$cacheDir/$urlHash.url", $url;
+        $cachedHashFN = "$cacheDir/$urlHash.$hashType";
+        $cachedTimestampFN = "$cacheDir/$urlHash.stamp";
+        @cacheFlags = ("--time-cond", $cachedTimestampFN) if -f $cachedHashFN && -f $cachedTimestampFN;
+    }
+    
     # Perform the download.
-    doDownload
+    my @curlFlags = ("curl", $url, "-o", $tmpFile, "--fail", "--location", "--max-redirs", "20", "--disable-epsv", "--cookie-jar", "$tmpDir/cookies", "--remote-time", (split " ", ($ENV{NIX_CURL_FLAGS} || "")));
+    (system $Nix::Config::curl @curlFlags, @cacheFlags) == 0 or die "$0: download of ‘$url’ failed\n";
 
-    if test -n "$NIX_DOWNLOAD_CACHE" -a ! -e $tmpFile; then
+    if (defined $cacheDir && ! -e $tmpFile) {
         # Curl didn't create $tmpFile, so apparently there's no newer
         # file on the server.
-        hash=$(cat $cachedHashFN)
-        finalPath=$($binDir/nix-store --print-fixed-path "$hashType" "$hash" "$name") 
-        if ! $binDir/nix-store --check-validity "$finalPath" 2> /dev/null; then
-            echo "cached contents of \`$url' disappeared, redownloading..." >&2
-            finalPath=
-            cacheFlags="--remote-time"
-            doDownload
-        fi
-    fi
+        $hash = readFile $cachedHashFN or die;
+        $finalPath = makeFixedOutputPath(0, $hashType, $hash, $name);
+        unless (isValidPath $finalPath) {
+            print STDERR "cached contents of ‘$url’ disappeared, redownloading...\n";
+            $finalPath = undef;
+            (system $Nix::Config::curl @curlFlags) == 0 or die "$0: download of ‘$url’ failed\n";
+        }
+    }
 
-    if test -z "$finalPath"; then
-
-        # Compute the hash.
-        hash=$($binDir/nix-hash --type "$hashType" $hashFormat --flat $tmpFile)
-        if ! test -n "$QUIET"; then echo "hash is $hash" >&2; fi
-
-        if test -n "$NIX_DOWNLOAD_CACHE"; then
-            echo $hash > $cachedHashFN
-            touch -r $tmpFile $cachedTimestampFN
-        fi
-
-        # Add the downloaded file to the Nix store.
-        finalPath=$($binDir/nix-store --add-fixed "$hashType" $tmpFile)
-
-        if test -n "$expHash" -a "$expHash" != "$hash"; then
-            echo "hash mismatch for URL \`$url'" >&2
-            exit 1
-        fi
+    if (!defined $finalPath) {
         
-    fi
-fi
+        # Compute the hash.
+        $hash = hashFile($hashType, $hashType ne "md5", $tmpFile);
 
+        if (defined $cacheDir) {
+            writeFile $cachedHashFN, $hash;
+            my $st = stat($tmpFile) or die;
+            open STAMP, ">$cachedTimestampFN" or die; close STAMP;
+            utime($st->atime, $st->mtime, $cachedTimestampFN) or die;
+        }
+    
+        # Add the downloaded file to the Nix store.
+        $finalPath = addToStore($tmpFile, 0, $hashType);
+    }
 
-if ! test -n "$QUIET"; then echo "path is $finalPath" >&2; fi
+    die "$0: hash mismatch for ‘$url’\n" if defined $expHash && $expHash ne $hash;
+}
 
-echo $hash
-
-if test -n "$PRINT_PATH"; then
-    echo $finalPath
-fi
+print STDERR "path is ‘$finalPath’\n" unless $ENV{'QUIET'};
+print "$hash\n";
+print "$finalPath\n" if $ENV{'PRINT_PATH'};

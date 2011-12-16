@@ -53,8 +53,14 @@ sub addPatch {
 sub readManifest_ {
     my ($manifest, $addNAR, $addPatch) = @_;
 
-    open MANIFEST, "<$manifest"
-        or die "cannot open `$manifest': $!";
+    # Decompress the manifest if necessary.
+    if ($manifest =~ /\.bz2$/) {
+        open MANIFEST, "$Nix::Config::bzip2 -d < $manifest |"
+            or die "cannot decompress `$manifest': $!";
+    } else {
+        open MANIFEST, "<$manifest"
+            or die "cannot open `$manifest': $!";
+    }
 
     my $inside = 0;
     my $type;
@@ -120,7 +126,6 @@ sub readManifest_ {
             elsif (/^\s*Hash:\s*(\S+)\s*$/) { $hash = $1; }
             elsif (/^\s*URL:\s*(\S+)\s*$/) { $url = $1; }
             elsif (/^\s*Size:\s*(\d+)\s*$/) { $size = $1; }
-            elsif (/^\s*SuccOf:\s*(\/\S+)\s*$/) { } # obsolete
             elsif (/^\s*BasePath:\s*(\/\S+)\s*$/) { $basePath = $1; }
             elsif (/^\s*BaseHash:\s*(\S+)\s*$/) { $baseHash = $1; }
             elsif (/^\s*Type:\s*(\S+)\s*$/) { $patchType = $1; }
@@ -286,14 +291,22 @@ EOF
     open MAINLOCK, ">>$lockFile" or die "unable to acquire lock ‘$lockFile’: $!\n";
     flock(MAINLOCK, LOCK_EX) or die;
 
+    our $insertNAR = $dbh->prepare(
+        "insert into NARs(manifest, storePath, url, hash, size, narHash, " .
+        "narSize, refs, deriver, system) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)") or die;
+
+    our $insertPatch = $dbh->prepare(
+        "insert into Patches(manifest, storePath, basePath, baseHash, url, hash, " .
+        "size, narHash, narSize, patchType) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
     $dbh->begin_work;
 
     # Read each manifest in $manifestDir and add it to the database,
     # unless we've already done so on a previous run.
     my %seen;
     
-    for my $manifest (glob "$manifestDir/*.nixmanifest") {
-        $manifest = Cwd::abs_path($manifest);
+    for my $manifestLink (glob "$manifestDir/*.nixmanifest") {
+        my $manifest = Cwd::abs_path($manifestLink);
         my $timestamp = lstat($manifest)->mtime;
         $seen{$manifest} = 1;
 
@@ -312,20 +325,16 @@ EOF
 
         sub addNARToDB {
             my ($storePath, $narFile) = @_;
-            $dbh->do(
-                "insert into NARs(manifest, storePath, url, hash, size, narHash, " .
-                "narSize, refs, deriver, system) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                {}, $id, $storePath, $narFile->{url}, $narFile->{hash}, $narFile->{size},
+            $insertNAR->execute(
+                $id, $storePath, $narFile->{url}, $narFile->{hash}, $narFile->{size},
                 $narFile->{narHash}, $narFile->{narSize}, $narFile->{references},
                 $narFile->{deriver}, $narFile->{system});
         };
         
         sub addPatchToDB {
             my ($storePath, $patch) = @_;
-            $dbh->do(
-                "insert into Patches(manifest, storePath, basePath, baseHash, url, hash, " .
-                "size, narHash, narSize, patchType) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                {}, $id, $storePath, $patch->{basePath}, $patch->{baseHash}, $patch->{url},
+            $insertPatch->execute(
+                $id, $storePath, $patch->{basePath}, $patch->{baseHash}, $patch->{url},
                 $patch->{hash}, $patch->{size}, $patch->{narHash}, $patch->{narSize},
                 $patch->{patchType});
         };
@@ -333,10 +342,10 @@ EOF
         my $version = readManifest_($manifest, \&addNARToDB, \&addPatchToDB);
         
         if ($version < 3) {
-            die "you have an old-style manifest `$manifest'; please delete it";
+            die "you have an old-style or corrupt manifest `$manifestLink'; please delete it";
         }
         if ($version >= 10) {
-            die "manifest `$manifest' is too new; please delete it or upgrade Nix";
+            die "manifest `$manifestLink' is too new; please delete it or upgrade Nix";
         }
     }
 

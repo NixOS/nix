@@ -363,9 +363,8 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
             foreach (PathSet::iterator, j, refs) {
                 drv.inputSrcs.insert(*j);
                 if (isDerivation(*j))
-                    drv.inputDrvs[*j] = store -> queryDerivationOutputNames(*j);
+                    drv.inputDrvs[*j] = store->queryDerivationOutputNames(*j);
             }
-
             explicitlyPassed = true;
         } else if (path.at(0) == '!') {
             size_t index;
@@ -387,7 +386,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
         debug(format("derivation uses `%1%'") % path);
         if (!useDrvAsSrc && isDerivation(path))
             if (explicitlyPassed)
-                drv.inputDrvs[path] = store -> queryDerivationOutputNames(path);
+                drv.inputDrvs[path] = store->queryDerivationOutputNames(path);
             else if (drv.inputDrvs.find(path) == drv.inputDrvs.end())
                 drv.inputDrvs[path] = singleton<StringSet>(output);
             else
@@ -416,17 +415,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
         HashType ht = parseHashType(outputHashAlgo);
         if (ht == htUnknown)
             throw EvalError(format("unknown hash algorithm `%1%'") % outputHashAlgo);
-        Hash h(ht);
-        if (outputHash.size() == h.hashSize * 2)
-            /* hexadecimal representation */
-            h = parseHash(ht, outputHash);
-        else if (outputHash.size() == hashLength32(h))
-            /* base-32 representation */
-            h = parseHash32(ht, outputHash);
-        else
-            throw Error(format("hash `%1%' has wrong length for hash type `%2%'")
-                % outputHash % outputHashAlgo);
-        string s = outputHash;
+        Hash h = parseHash16or32(ht, outputHash);
         outputHash = printHash(h);
         if (outputHashRecursive) outputHashAlgo = "r:" + outputHashAlgo;
         
