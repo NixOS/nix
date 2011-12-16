@@ -56,7 +56,7 @@ static void tunnelStderr(const unsigned char * buf, size_t count)
     if (canSendStderr && myPid == getpid()) {
         try {
             writeInt(STDERR_NEXT, to);
-            writeString(string((char *) buf, count), to);
+            writeString(buf, count, to);
             to.flush();
         } catch (...) {
             /* Write failed; that means that the other side is
@@ -205,7 +205,7 @@ struct TunnelSink : Sink
     virtual void operator () (const unsigned char * data, size_t len)
     {
         writeInt(STDERR_WRITE, to);
-        writeString(string((const char *) data, len), to);
+        writeString(data, len, to);
     }
 };
 
@@ -224,16 +224,11 @@ struct TunnelSource : BufferedSource
         writeInt(STDERR_READ, to);
         writeInt(len, to);
         to.flush();
-        string s = readString(from); // !!! inefficient
+        size_t n = readString(data, len, from);
 
         startWork();
-
-        if (s.empty()) throw EndOfFile("unexpected end-of-file");
-        if (s.size() > len) throw Error("client sent too much data");
-
-        memcpy(data, (const unsigned char *) s.c_str(), s.size());
-
-        return s.size();
+        if (n == 0) throw EndOfFile("unexpected end-of-file");
+        return n;
     }
 };
 

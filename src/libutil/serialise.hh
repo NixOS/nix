@@ -114,12 +114,14 @@ struct StringSource : Source
 void writePadding(size_t len, Sink & sink);
 void writeInt(unsigned int n, Sink & sink);
 void writeLongLong(unsigned long long n, Sink & sink);
+void writeString(const unsigned char * buf, size_t len, Sink & sink);
 void writeString(const string & s, Sink & sink);
 void writeStringSet(const StringSet & ss, Sink & sink);
 
 void readPadding(size_t len, Source & source);
 unsigned int readInt(Source & source);
 unsigned long long readLongLong(Source & source);
+size_t readString(unsigned char * buf, size_t max, Source & source);
 string readString(Source & source);
 StringSet readStringSet(Source & source);
 

@@ -149,12 +149,17 @@ void writeLongLong(unsigned long long n, Sink & sink)
 }
 
 
+void writeString(const unsigned char * buf, size_t len, Sink & sink)
+{
+    writeInt(len, sink);
+    sink(buf, len);
+    writePadding(len, sink);
+}
+
+
 void writeString(const string & s, Sink & sink)
 {
-    size_t len = s.length();
-    writeInt(len, sink);
-    sink((const unsigned char *) s.c_str(), len);
-    writePadding(len, sink);
+    writeString((const unsigned char *) s.c_str(), s.size(), sink);
 }
 
 
@@ -208,6 +213,16 @@ unsigned long long readLongLong(Source & source)
 }
 
 
+size_t readString(unsigned char * buf, size_t max, Source & source)
+{
+    size_t len = readInt(source);
+    if (len > max) throw Error("string is too long");
+    source(buf, len);
+    readPadding(len, source);
+    return len;
+}
+
+ 
 string readString(Source & source)
 {
     size_t len = readInt(source);
