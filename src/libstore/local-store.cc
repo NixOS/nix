@@ -1156,7 +1156,7 @@ void LocalStore::exportPath(const Path & path, bool sign,
     
     PathSet references;
     queryReferences(path, references);
-    writeStringSet(references, hashAndWriteSink);
+    writeStrings(references, hashAndWriteSink);
 
     Path deriver = queryDeriver(path);
     writeString(deriver, hashAndWriteSink);
@@ -1243,7 +1243,7 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
 
     Path dstPath = readStorePath(hashAndReadSource);
 
-    PathSet references = readStorePaths(hashAndReadSource);
+    PathSet references = readStorePaths<PathSet>(hashAndReadSource);
 
     Path deriver = readString(hashAndReadSource);
     if (deriver != "") assertStorePath(deriver);
@@ -1327,6 +1327,19 @@ Path LocalStore::importPath(bool requireSignature, Source & source)
     }
     
     return dstPath;
+}
+
+
+Paths LocalStore::importPaths(bool requireSignature, Source & source)
+{
+    Paths res;
+    while (true) {
+        unsigned long long n = readLongLong(source);
+        if (n == 0) break;
+        if (n != 1) throw Error("input doesn't look like something created by `nix-store --export'");
+        res.push_back(importPath(requireSignature, source));
+    }
+    return res;
 }
 
 

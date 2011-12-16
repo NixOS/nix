@@ -169,9 +169,9 @@ public:
     virtual void exportPath(const Path & path, bool sign,
         Sink & sink) = 0;
 
-    /* Import a NAR dump created by exportPath() into the Nix
-       store. */
-    virtual Path importPath(bool requireSignature, Source & source) = 0;
+    /* Import a sequence of NAR dumps created by exportPaths() into
+       the Nix store. */
+    virtual Paths importPaths(bool requireSignature, Source & source) = 0;
 
     /* Ensure that the output paths of the derivation are valid.  If
        they are already valid, this is a no-op.  Otherwise, validity

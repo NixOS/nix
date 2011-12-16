@@ -163,12 +163,15 @@ void writeString(const string & s, Sink & sink)
 }
 
 
-void writeStringSet(const StringSet & ss, Sink & sink)
+template<class T> void writeStrings(const T & ss, Sink & sink)
 {
     writeInt(ss.size(), sink);
-    for (StringSet::iterator i = ss.begin(); i != ss.end(); ++i)
+    foreach (typename T::const_iterator, i, ss)
         writeString(*i, sink);
 }
+
+template void writeStrings(const Paths & ss, Sink & sink);
+template void writeStrings(const PathSet & ss, Sink & sink);
 
 
 void readPadding(size_t len, Source & source)
@@ -234,14 +237,17 @@ string readString(Source & source)
 }
 
  
-StringSet readStringSet(Source & source)
+template<class T> T readStrings(Source & source)
 {
     unsigned int count = readInt(source);
-    StringSet ss;
+    T ss;
     while (count--)
-        ss.insert(readString(source));
+        ss.insert(ss.end(), readString(source));
     return ss;
 }
+
+template Paths readStrings(Source & source);
+template PathSet readStrings(Source & source);
 
 
 }

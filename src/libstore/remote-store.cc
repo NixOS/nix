@@ -27,12 +27,14 @@ Path readStorePath(Source & from)
 }
 
 
-PathSet readStorePaths(Source & from)
+template<class T> T readStorePaths(Source & from)
 {
-    PathSet paths = readStringSet(from);
-    foreach (PathSet::iterator, i, paths) assertStorePath(*i);
+    T paths = readStrings<T>(from);
+    foreach (typename T::iterator, i, paths) assertStorePath(*i);
     return paths;
 }
+
+template PathSet readStorePaths(Source & from);
 
 
 RemoteStore::RemoteStore()
@@ -215,7 +217,7 @@ PathSet RemoteStore::queryValidPaths()
     openConnection();
     writeInt(wopQueryValidPaths, to);
     processStderr();
-    return readStorePaths(from);
+    return readStorePaths<PathSet>(from);
 }
 
 
@@ -242,7 +244,7 @@ bool RemoteStore::querySubstitutablePathInfo(const Path & path,
     if (reply == 0) return false;
     info.deriver = readString(from);
     if (info.deriver != "") assertStorePath(info.deriver);
-    info.references = readStorePaths(from);
+    info.references = readStorePaths<PathSet>(from);
     info.downloadSize = readLongLong(from);
     info.narSize = GET_PROTOCOL_MINOR(daemonVersion) >= 7 ? readLongLong(from) : 0;
     return true;
@@ -260,7 +262,7 @@ ValidPathInfo RemoteStore::queryPathInfo(const Path & path)
     info.deriver = readString(from);
     if (info.deriver != "") assertStorePath(info.deriver);
     info.hash = parseHash(htSHA256, readString(from));
-    info.references = readStorePaths(from);
+    info.references = readStorePaths<PathSet>(from);
     info.registrationTime = readInt(from);
     info.narSize = readLongLong(from);
     return info;
@@ -285,7 +287,7 @@ void RemoteStore::queryReferences(const Path & path,
     writeInt(wopQueryReferences, to);
     writeString(path, to);
     processStderr();
-    PathSet references2 = readStorePaths(from);
+    PathSet references2 = readStorePaths<PathSet>(from);
     references.insert(references2.begin(), references2.end());
 }
 
@@ -297,7 +299,7 @@ void RemoteStore::queryReferrers(const Path & path,
     writeInt(wopQueryReferrers, to);
     writeString(path, to);
     processStderr();
-    PathSet referrers2 = readStorePaths(from);
+    PathSet referrers2 = readStorePaths<PathSet>(from);
     referrers.insert(referrers2.begin(), referrers2.end());
 }
 
@@ -320,7 +322,7 @@ PathSet RemoteStore::queryDerivationOutputs(const Path & path)
     writeInt(wopQueryDerivationOutputs, to);
     writeString(path, to);
     processStderr();
-    return readStorePaths(from);
+    return readStorePaths<PathSet>(from);
 }
 
 
@@ -350,7 +352,7 @@ Path RemoteStore::addTextToStore(const string & name, const string & s,
     writeInt(wopAddTextToStore, to);
     writeString(name, to);
     writeString(s, to);
-    writeStringSet(references, to);
+    writeStrings(references, to);
     
     processStderr();
     return readStorePath(from);
@@ -369,14 +371,14 @@ void RemoteStore::exportPath(const Path & path, bool sign,
 }
 
 
-Path RemoteStore::importPath(bool requireSignature, Source & source)
+Paths RemoteStore::importPaths(bool requireSignature, Source & source)
 {
     openConnection();
-    writeInt(wopImportPath, to);
+    writeInt(wopImportPaths, to);
     /* We ignore requireSignature, since the worker forces it to true
        anyway. */
     processStderr(0, &source);
-    return readStorePath(from);
+    return readStorePaths<Paths>(from);
 }
 
 
@@ -384,7 +386,7 @@ void RemoteStore::buildDerivations(const PathSet & drvPaths)
 {
     openConnection();
     writeInt(wopBuildDerivations, to);
-    writeStringSet(drvPaths, to);
+    writeStrings(drvPaths, to);
     processStderr();
     readInt(from);
 }
@@ -451,7 +453,7 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
     
     writeInt(wopCollectGarbage, to);
     writeInt(options.action, to);
-    writeStringSet(options.pathsToDelete, to);
+    writeStrings(options.pathsToDelete, to);
     writeInt(options.ignoreLiveness, to);
     writeLongLong(options.maxFreed, to);
     writeInt(options.maxLinks, to);
@@ -463,7 +465,7 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
     
     processStderr();
     
-    results.paths = readStringSet(from);
+    results.paths = readStrings<PathSet>(from);
     results.bytesFreed = readLongLong(from);
     results.blocksFreed = readLongLong(from);
 }
@@ -474,7 +476,7 @@ PathSet RemoteStore::queryFailedPaths()
     openConnection();
     writeInt(wopQueryFailedPaths, to);
     processStderr();
-    return readStorePaths(from);
+    return readStorePaths<PathSet>(from);
 }
 
 
@@ -482,7 +484,7 @@ void RemoteStore::clearFailedPaths(const PathSet & paths)
 {
     openConnection();
     writeInt(wopClearFailedPaths, to);
-    writeStringSet(paths, to);
+    writeStrings(paths, to);
     processStderr();
     readInt(from);
 }
@@ -504,8 +506,7 @@ void RemoteStore::processStderr(Sink * sink, Source * source)
             size_t len = readInt(from);
             unsigned char * buf = new unsigned char[len];
             AutoDeleteArray<unsigned char> d(buf);
-            size_t n = source->read(buf, len);
-            writeString(string((const char *) buf, n), to); // !!! inefficient
+            writeString(buf, source->read(buf, len), to);
             to.flush();
         }
         else {

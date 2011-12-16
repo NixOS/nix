@@ -56,7 +56,7 @@ public:
     void exportPath(const Path & path, bool sign,
         Sink & sink);
 
-    Path importPath(bool requireSignature, Source & source);
+    Paths importPaths(bool requireSignature, Source & source);
     
     void buildDerivations(const PathSet & drvPaths);
 

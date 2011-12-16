@@ -327,7 +327,7 @@ static void performOp(unsigned int clientVersion,
             store->queryReferrers(path, paths);
         else paths = store->queryDerivationOutputs(path);
         stopWork();
-        writeStringSet(paths, to);
+        writeStrings(paths, to);
         break;
     }
 
@@ -377,7 +377,7 @@ static void performOp(unsigned int clientVersion,
     case wopAddTextToStore: {
         string suffix = readString(from);
         string s = readString(from);
-        PathSet refs = readStorePaths(from);
+        PathSet refs = readStorePaths<PathSet>(from);
         startWork();
         Path path = store->addTextToStore(suffix, s, refs);
         stopWork();
@@ -396,19 +396,17 @@ static void performOp(unsigned int clientVersion,
         break;
     }
 
-    case wopImportPath: {
+    case wopImportPaths: {
         startWork();
-        if (GET_PROTOCOL_MINOR(clientVersion) < 9)
-            throw Error("import not supported; upgrade your client");
         TunnelSource source(from);
-        Path path = store->importPath(true, source);
+        Paths paths = store->importPaths(true, source);
         stopWork();
-        writeString(path, to);
+        writeStrings(paths, to);
         break;
     }
 
     case wopBuildDerivations: {
-        PathSet drvs = readStorePaths(from);
+        PathSet drvs = readStorePaths<PathSet>(from);
         startWork();
         store->buildDerivations(drvs);
         stopWork();
@@ -466,7 +464,7 @@ static void performOp(unsigned int clientVersion,
     case wopCollectGarbage: {
         GCOptions options;
         options.action = (GCOptions::GCAction) readInt(from);
-        options.pathsToDelete = readStorePaths(from);
+        options.pathsToDelete = readStorePaths<PathSet>(from);
         options.ignoreLiveness = readInt(from);
         options.maxFreed = readLongLong(from);
         options.maxLinks = readInt(from);
@@ -484,7 +482,7 @@ static void performOp(unsigned int clientVersion,
         store->collectGarbage(options, results);
         stopWork();
         
-        writeStringSet(results.paths, to);
+        writeStrings(results.paths, to);
         writeLongLong(results.bytesFreed, to);
         writeLongLong(results.blocksFreed, to);
         
@@ -522,7 +520,7 @@ static void performOp(unsigned int clientVersion,
         writeInt(res ? 1 : 0, to);
         if (res) {
             writeString(info.deriver, to);
-            writeStringSet(info.references, to);
+            writeStrings(info.references, to);
             writeLongLong(info.downloadSize, to);
             if (GET_PROTOCOL_MINOR(clientVersion) >= 7)
                 writeLongLong(info.narSize, to);
@@ -534,7 +532,7 @@ static void performOp(unsigned int clientVersion,
         startWork();
         PathSet paths = store->queryValidPaths();
         stopWork();
-        writeStringSet(paths, to);
+        writeStrings(paths, to);
         break;
     }
 
@@ -542,12 +540,12 @@ static void performOp(unsigned int clientVersion,
         startWork();
         PathSet paths = store->queryFailedPaths();
         stopWork();
-        writeStringSet(paths, to);
+        writeStrings(paths, to);
         break;
     }
 
     case wopClearFailedPaths: {
-        PathSet paths = readStringSet(from);
+        PathSet paths = readStrings<PathSet>(from);
         startWork();
         store->clearFailedPaths(paths);
         stopWork();
@@ -562,7 +560,7 @@ static void performOp(unsigned int clientVersion,
         stopWork();
         writeString(info.deriver, to);
         writeString(printHash(info.hash), to);
-        writeStringSet(info.references, to);
+        writeStrings(info.references, to);
         writeInt(info.registrationTime, to);
         writeLongLong(info.narSize, to);
         break;

@@ -600,12 +600,10 @@ static void opImport(Strings opFlags, Strings opArgs)
     if (!opArgs.empty()) throw UsageError("no arguments expected");
     
     FdSource source(STDIN_FILENO);
-    while (true) {
-        unsigned long long n = readLongLong(source);
-        if (n == 0) break;
-        if (n != 1) throw Error("input doesn't look like something created by `nix-store --export'");
-        cout << format("%1%\n") % store->importPath(requireSignature, source) << std::flush;
-    }
+    Paths paths = store->importPaths(requireSignature, source);
+
+    foreach (Paths::iterator, i, paths)
+        cout << format("%1%\n") % *i << std::flush;
 }
 
 

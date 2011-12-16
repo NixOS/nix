@@ -29,7 +29,6 @@ typedef enum {
     wopSyncWithGC = 13,
     wopFindRoots = 14,
     wopExportPath = 16,
-    wopImportPath = 17,
     wopQueryDeriver = 18,
     wopSetOptions = 19,
     wopCollectGarbage = 20,
@@ -39,6 +38,7 @@ typedef enum {
     wopQueryFailedPaths = 24,
     wopClearFailedPaths = 25,
     wopQueryPathInfo = 26,
+    wopImportPaths = 27,
 } WorkerOp;
 
 
@@ -58,7 +58,7 @@ typedef enum {
 
 
 Path readStorePath(Source & from);
-PathSet readStorePaths(Source & from);
+template<class T> T readStorePaths(Source & from);
 
     
 }

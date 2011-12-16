@@ -146,7 +146,7 @@ public:
     void exportPath(const Path & path, bool sign,
         Sink & sink);
 
-    Path importPath(bool requireSignature, Source & source);
+    Paths importPaths(bool requireSignature, Source & source);
     
     void buildDerivations(const PathSet & drvPaths);
 
@@ -259,6 +259,8 @@ private:
 
     Path createTempDirInStore();
 
+    Path importPath(bool requireSignature, Source & source);
+    
     void checkDerivationOutputs(const Path & drvPath, const Derivation & drv);
 };
 
