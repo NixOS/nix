@@ -1199,10 +1199,11 @@ struct HashAndReadSource : Source
     {
         hashing = true;
     }
-    virtual void operator () (unsigned char * data, size_t len)
+    size_t read(unsigned char * data, size_t len)
     {
-        readSource(data, len);
-        if (hashing) hashSink(data, len);
+        size_t n = readSource.read(data, len);
+        if (hashing) hashSink(data, n);
+        return n;
     }
 };
 

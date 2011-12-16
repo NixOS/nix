@@ -23,8 +23,9 @@ void BufferedSink::operator () (const unsigned char * data, size_t len)
     
     while (len) {
         /* Optimisation: bypass the buffer if the data exceeds the
-           buffer size and there is no unflushed data. */
-        if (bufPos == 0 && len >= bufSize) {
+           buffer size. */
+        if (bufPos + len >= bufSize) {
+            flush();
             write(data, len);
             break;
         }
@@ -59,29 +60,37 @@ void FdSink::write(const unsigned char * data, size_t len)
 }
 
 
+void Source::operator () (unsigned char * data, size_t len)
+{
+    while (len) {
+        size_t n = read(data, len);
+        data += n; len -= n;
+    }
+}
+
+
 BufferedSource::~BufferedSource()
 {
     if (buffer) delete[] buffer;
 }
 
 
-void BufferedSource::operator () (unsigned char * data, size_t len)
+size_t BufferedSource::read(unsigned char * data, size_t len)
 {
     if (!buffer) buffer = new unsigned char[bufSize];
 
-    while (len) {
-        if (!bufPosIn) bufPosIn = read(buffer, bufSize);
+    if (!bufPosIn) bufPosIn = readUnbuffered(buffer, bufSize);
             
-        /* Copy out the data in the buffer. */
-        size_t n = len > bufPosIn - bufPosOut ? bufPosIn - bufPosOut : len;
-        memcpy(data, buffer + bufPosOut, n);
-        data += n; bufPosOut += n; len -= n;
-        if (bufPosIn == bufPosOut) bufPosIn = bufPosOut = 0;
-    }
+    /* Copy out the data in the buffer. */
+    size_t n = len > bufPosIn - bufPosOut ? bufPosIn - bufPosOut : len;
+    memcpy(data, buffer + bufPosOut, n);
+    bufPosOut += n;
+    if (bufPosIn == bufPosOut) bufPosIn = bufPosOut = 0;
+    return n;
 }
 
 
-size_t FdSource::read(unsigned char * data, size_t len)
+size_t FdSource::readUnbuffered(unsigned char * data, size_t len)
 {
     ssize_t n;
     do {
@@ -90,6 +99,15 @@ size_t FdSource::read(unsigned char * data, size_t len)
     } while (n == -1 && errno == EINTR);
     if (n == -1) throw SysError("reading from file");
     if (n == 0) throw EndOfFile("unexpected end-of-file");
+    return n;
+}
+
+
+size_t StringSource::read(unsigned char * data, size_t len)
+{
+    if (pos == s.size()) throw EndOfFile("end of string reached");
+    size_t n = s.copy((char *) data, len, pos);
+    pos += n;
     return n;
 }
 

@@ -24,7 +24,7 @@ struct BufferedSink : Sink
     BufferedSink(size_t bufSize = 32 * 1024)
         : bufSize(bufSize), bufPos(0), buffer(0) { }
     ~BufferedSink();
-    
+
     void operator () (const unsigned char * data, size_t len);
     
     void flush();
@@ -39,9 +39,14 @@ struct Source
     virtual ~Source() { }
     
     /* Store exactly ‘len’ bytes in the buffer pointed to by ‘data’.
-       It blocks if that much data is not yet available, or throws an
-       error if it is not going to be available. */
-    virtual void operator () (unsigned char * data, size_t len) = 0;
+       It blocks until all the requested data is available, or throws
+       an error if it is not going to be available.   */
+    void operator () (unsigned char * data, size_t len);
+
+    /* Store up to ‘len’ in the buffer pointed to by ‘data’, and
+       return the number of bytes stored.  If blocks until at least
+       one byte is available. */
+    virtual size_t read(unsigned char * data, size_t len) = 0;
 };
 
 
@@ -55,12 +60,10 @@ struct BufferedSource : Source
         : bufSize(bufSize), bufPosIn(0), bufPosOut(0), buffer(0) { }
     ~BufferedSource();
     
-    void operator () (unsigned char * data, size_t len);
+    size_t read(unsigned char * data, size_t len);
     
-    /* Store up to ‘len’ in the buffer pointed to by ‘data’, and
-       return the number of bytes stored.  If should block until at
-       least one byte is available. */
-    virtual size_t read(unsigned char * data, size_t len) = 0;
+    /* Underlying read call, to be overriden. */
+    virtual size_t readUnbuffered(unsigned char * data, size_t len) = 0;
 };
 
 
@@ -83,7 +86,7 @@ struct FdSource : BufferedSource
     int fd;
     FdSource() : fd(-1) { }
     FdSource(int fd) : fd(fd) { }
-    size_t read(unsigned char * data, size_t len);
+    size_t readUnbuffered(unsigned char * data, size_t len);
 };
 
 
@@ -104,13 +107,7 @@ struct StringSource : Source
     const string & s;
     size_t pos;
     StringSource(const string & _s) : s(_s), pos(0) { }
-    virtual void operator () (unsigned char * data, size_t len)
-    {
-        s.copy((char *) data, len, pos);
-        pos += len;
-        if (pos > s.size())
-            throw Error("end of string reached");
-    }
+    size_t read(unsigned char * data, size_t len);    
 };
 
 

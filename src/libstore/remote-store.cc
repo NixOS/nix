@@ -501,11 +501,11 @@ void RemoteStore::processStderr(Sink * sink, Source * source)
         }
         else if (msg == STDERR_READ) {
             if (!source) throw Error("no source");
-            unsigned int len = readInt(from);
+            size_t len = readInt(from);
             unsigned char * buf = new unsigned char[len];
             AutoDeleteArray<unsigned char> d(buf);
-            (*source)(buf, len);
-            writeString(string((const char *) buf, len), to);
+            size_t n = source->read(buf, len);
+            writeString(string((const char *) buf, n), to); // !!! inefficient
             to.flush();
         }
         else {

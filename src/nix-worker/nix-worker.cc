@@ -210,11 +210,11 @@ struct TunnelSink : Sink
 };
 
 
-struct TunnelSource : Source
+struct TunnelSource : BufferedSource
 {
     Source & from;
     TunnelSource(Source & from) : from(from) { }
-    virtual void operator () (unsigned char * data, size_t len)
+    size_t readUnbuffered(unsigned char * data, size_t len)
     {
         /* Careful: we're going to receive data from the client now,
            so we have to disable the SIGPOLL handler. */
@@ -224,11 +224,16 @@ struct TunnelSource : Source
         writeInt(STDERR_READ, to);
         writeInt(len, to);
         to.flush();
-        string s = readString(from);
-        if (s.size() != len) throw Error("not enough data");
-        memcpy(data, (const unsigned char *) s.c_str(), len);
+        string s = readString(from); // !!! inefficient
 
         startWork();
+
+        if (s.empty()) throw EndOfFile("unexpected end-of-file");
+        if (s.size() > len) throw Error("client sent too much data");
+
+        memcpy(data, (const unsigned char *) s.c_str(), s.size());
+
+        return s.size();
     }
 };
 
@@ -265,10 +270,11 @@ struct SavingSourceAdapter : Source
     Source & orig;
     string s;
     SavingSourceAdapter(Source & orig) : orig(orig) { }
-    void operator () (unsigned char * data, size_t len)
+    size_t read(unsigned char * data, size_t len)
     {
-        orig(data, len);
-        s.append((const char *) data, len);
+        size_t n = orig.read(data, len);
+        s.append((const char *) data, n);
+        return n;
     }
 };
 
@@ -397,6 +403,8 @@ static void performOp(unsigned int clientVersion,
 
     case wopImportPath: {
         startWork();
+        if (GET_PROTOCOL_MINOR(clientVersion) < 9)
+            throw Error("import not supported; upgrade your client");
         TunnelSource source(from);
         Path path = store->importPath(true, source);
         stopWork();
