@@ -32,4 +32,15 @@ rec {
       '';
   };
 
+  cyclic = (mkDerivation {
+    name = "cyclic-outputs";
+    outputs = [ "a" "b" ];
+    builder = builtins.toFile "builder.sh"
+      ''
+        mkdir $a $b
+        echo $a > $b/foo
+        echo $b > $a/bar
+      '';
+  }).a;
+
 }
