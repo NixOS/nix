@@ -332,7 +332,7 @@ PathSet RemoteStore::queryDerivationOutputNames(const Path & path)
     writeInt(wopQueryDerivationOutputNames, to);
     writeString(path, to);
     processStderr();
-    return readStringSet(from);
+    return readStrings<PathSet>(from);
 }
 
 

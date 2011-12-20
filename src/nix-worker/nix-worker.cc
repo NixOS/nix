@@ -337,7 +337,7 @@ static void performOp(unsigned int clientVersion,
         StringSet names;
         names = store->queryDerivationOutputNames(path);
         stopWork();
-        writeStringSet(names, to);
+        writeStrings(names, to);
         break;
     }
 
