@@ -15,4 +15,4 @@ if nix-build multiple-outputs.nix -A cyclic; then
     exit 1
 fi
 
-clearStore
+nix-store --gc
