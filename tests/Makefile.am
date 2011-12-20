@@ -36,7 +36,6 @@ EXTRA_DIST = $(TESTS) \
   timeout.nix timeout.builder.sh \
   secure-drv-outputs.nix \
   multiple-outputs.nix \
-  multiple-outputs.a.builder.sh multiple-outputs.b.builder.sh \
   $(wildcard lang/*.nix) $(wildcard lang/*.exp) $(wildcard lang/*.exp.xml) $(wildcard lang/*.flags) $(wildcard lang/dir*/*.nix) \
   common.sh.in
 
