@@ -225,8 +225,17 @@ sub removeRoots {
 }
 
 
-# Copy the derivation and its dependencies to the build machine.
+# Copy the derivation and its dependencies to the build machine.  This
+# is guarded by an exclusive lock per machine to prevent multiple
+# build-remote instances from copying to a machine simultaneously.
+# That's undesirable because we may end up with N instances uploading
+# the same missing path simultaneously, causing the effective network
+# bandwidth and target disk speed to be divided by N.
+my $uploadLock = "$currentLoad/$hostName.upload-lock";
+open MAINLOCK, ">>$uploadLock" or die;
+flock(MAINLOCK, LOCK_EX) or die;
 Nix::CopyClosure::copyTo($hostName, [ @sshOpts ], [ $drvPath, @inputs ], "", "", 0, 0, $maybeSign ne "");
+close MAINLOCK;
 
 
 # Perform the build.
