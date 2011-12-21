@@ -14,6 +14,12 @@ drvPath2=$(nix-instantiate multiple-outputs.nix -A c)
 grep -q 'multiple-outputs-a.drv",\["first","second"\]' $drvPath
 grep -q 'multiple-outputs-b.drv",\["out"\]' $drvPath
 
+# While we're at it, test the ‘unsafeDiscardOutputDependency’ primop.
+outPath=$(nix-build multiple-outputs.nix -A d)
+drvPath=$(cat $outPath/drv)
+outPath=$(nix-store -q $drvPath)
+! [ -e "$outPath" ]
+
 # Do a build of something that depends on a derivation with multiple
 # outputs.
 echo "building b..."
