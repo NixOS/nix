@@ -32,6 +32,16 @@ rec {
       '';
   };
 
+  c = mkDerivation {
+    name = "multiple-outputs-c";
+    drv = b.drvPath;
+    builder = builtins.toFile "builder.sh"
+      ''
+        mkdir $out
+        ln -s $drv $out/drv
+      '';
+  };
+
   cyclic = (mkDerivation {
     name = "cyclic-outputs";
     outputs = [ "a" "b" ];
