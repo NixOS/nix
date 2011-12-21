@@ -54,12 +54,13 @@ rec {
 
   cyclic = (mkDerivation {
     name = "cyclic-outputs";
-    outputs = [ "a" "b" ];
+    outputs = [ "a" "b" "c" ];
     builder = builtins.toFile "builder.sh"
       ''
-        mkdir $a $b
+        mkdir $a $b $c
         echo $a > $b/foo
-        echo $b > $a/bar
+        echo $b > $c/bar
+        echo $c > $a/baz
       '';
   }).a;
 
