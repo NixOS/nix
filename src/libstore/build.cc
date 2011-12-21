@@ -1986,15 +1986,6 @@ void DerivationGoal::computeClosure()
         info.deriver = drvPath;
         infos.push_back(info);
     }
-
-    /* Mutually recursive outputs are not allowed */
-    foreach (ValidPathInfos::iterator, i, infos)
-        foreach (ValidPathInfos::iterator, j, infos)
-            if ((i->path != j->path) &&
-                (i->references.find(j->path) != i->references.end()) &&
-                (j->references.find(i->path) != j->references.end())) 
-                    throw BuildError(format("Mutually referential outputs are not allowed: outputs `%1%' and `%2%' refer to each other") % i->path % j->path);
-
     worker.store.registerValidPaths(infos);
 
     /* It is now safe to delete the lock files, since all future
