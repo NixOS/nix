@@ -356,6 +356,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
            inputs to ensure that they are available when the builder
            runs. */
         if (path.at(0) == '=') {
+            /* !!! This doesn't work if readOnlyMode is set. */
             PathSet refs; computeFSClosure(*store, string(path, 1), refs);
             foreach (PathSet::iterator, j, refs) {
                 drv.inputSrcs.insert(*j);
@@ -377,7 +378,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
         /* Handle derivation contexts returned by
            ‘builtins.storePath’. */
         else if (isDerivation(path))
-            drv.inputDrvs[path] = store->queryDerivationOutputNames(path); 
+            drv.inputDrvs[path] = store->queryDerivationOutputNames(path);
 
         /* Otherwise it's a source file. */
         else

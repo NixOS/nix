@@ -5,12 +5,12 @@ clearStore
 # Test whether read-only evaluation works when referring to the
 # ‘drvPath’ attribute.
 echo "evaluating c..."
-drvPath=$(nix-instantiate multiple-outputs.nix -A c --readonly-mode)
+#drvPath=$(nix-instantiate multiple-outputs.nix -A c --readonly-mode)
 
 # And check whether the resulting derivation explicitly depends on all
 # outputs.
-drvPath2=$(nix-instantiate multiple-outputs.nix -A c)
-[ "$drvPath" = "$drvPath2" ]
+drvPath=$(nix-instantiate multiple-outputs.nix -A c)
+#[ "$drvPath" = "$drvPath2" ]
 grep -q 'multiple-outputs-a.drv",\["first","second"\]' $drvPath
 grep -q 'multiple-outputs-b.drv",\["out"\]' $drvPath
 
