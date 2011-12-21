@@ -347,8 +347,6 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
        derivation. */
     foreach (PathSet::iterator, i, context) {
         Path path = *i;
-        bool explicitlyPassed = false;
-        string output = "out";
         
         /* Paths marked with `=' denote that the path of a derivation
            is explicitly passed to the builder.  Since that allows the
@@ -358,39 +356,30 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
            inputs to ensure that they are available when the builder
            runs. */
         if (path.at(0) == '=') {
-            path = string(path, 1);
-            PathSet refs; computeFSClosure(*store, path, refs);
+            PathSet refs; computeFSClosure(*store, string(path, 1), refs);
             foreach (PathSet::iterator, j, refs) {
                 drv.inputSrcs.insert(*j);
                 if (isDerivation(*j))
                     drv.inputDrvs[*j] = store->queryDerivationOutputNames(*j);
             }
-            explicitlyPassed = true;
-        } else if (path.at(0) == '!') {
-            size_t index;
-            path = string(path, 1);
-            index = path.find("!");
-            output = path.substr(0, index);
-            path = string(path, index + 1);
         }
 
         /* See prim_unsafeDiscardOutputDependency. */
-        bool useDrvAsSrc = false;
-        if (path.at(0) == '~') {
-            path = string(path, 1);
-            useDrvAsSrc = true;
+        else if (path.at(0) == '~')
+            drv.inputSrcs.insert(string(path, 1));
+
+        /* Handle derivation outputs of the form ‘!<name>!<path>’. */
+        else if (path.at(0) == '!') {
+            size_t index = path.find("!", 1);
+            drv.inputDrvs[string(path, index + 1)].insert(string(path, 1, index - 1));
         }
 
-        assert(isStorePath(path));
+        /* Handle derivation contexts returned by
+           ‘builtins.storePath’. */
+        else if (isDerivation(path))
+            drv.inputDrvs[path] = store->queryDerivationOutputNames(path); 
 
-        debug(format("derivation uses `%1%'") % path);
-        if (!useDrvAsSrc && isDerivation(path))
-            if (explicitlyPassed)
-                drv.inputDrvs[path] = store->queryDerivationOutputNames(path);
-            else if (drv.inputDrvs.find(path) == drv.inputDrvs.end())
-                drv.inputDrvs[path] = singleton<StringSet>(output);
-            else
-                drv.inputDrvs[path].insert(output);
+        /* Otherwise it's a source file. */
         else
             drv.inputSrcs.insert(path);
     }
