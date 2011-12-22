@@ -223,6 +223,7 @@ public:
     ~AutoCloseDir();
     void operator =(DIR * dir);
     operator DIR *();
+    void close();
 };
 
 

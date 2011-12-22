@@ -701,7 +701,7 @@ AutoCloseDir::AutoCloseDir(DIR * dir)
 
 AutoCloseDir::~AutoCloseDir()
 {
-    if (dir) closedir(dir);
+    close();
 }
 
 
@@ -716,6 +716,14 @@ AutoCloseDir::operator DIR *()
     return dir;
 }
 
+
+void AutoCloseDir::close()
+{
+    if (dir) {
+	closedir(dir);
+	dir = 0;
+    }
+}
 
 
 //////////////////////////////////////////////////////////////////////
