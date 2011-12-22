@@ -657,7 +657,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             random_shuffle(entries_.begin(), entries_.end());
 
             foreach (vector<Path>::iterator, i, entries_)
-                tryToDelete(state, nixStore + "/" + *i);
+                tryToDelete(state, *i);
 
         } catch (GCLimitReached & e) {
         }
