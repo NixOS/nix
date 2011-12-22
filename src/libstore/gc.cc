@@ -634,7 +634,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     
         try {
             foreach (vector<Path>::iterator, i, entries_)
-                tryToDelete(state, canonPath(nixStore + "/" + *i));
+                tryToDelete(state, nixStore + "/" + *i);
         } catch (GCLimitReached & e) {
         }
     }        
