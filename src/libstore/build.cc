@@ -1300,6 +1300,13 @@ void DerivationGoal::buildDone()
            being valid. */
         computeClosure();
 
+        /* It is now safe to delete the lock files, since all future
+           lockers will see that the output paths are valid; they will
+           not create new lock files with the same names as the old
+           (unlinked) lock files. */
+        outputLocks.setDeletion(true);
+        outputLocks.unlock();
+
     } catch (BuildError & e) {
         printMsg(lvlError, e.msg());
         outputLocks.unlock();
@@ -1987,13 +1994,6 @@ void DerivationGoal::computeClosure()
         infos.push_back(info);
     }
     worker.store.registerValidPaths(infos);
-
-    /* It is now safe to delete the lock files, since all future
-       lockers will see that the output paths are valid; they will not
-       create new lock files with the same names as the old (unlinked)
-       lock files. */
-    outputLocks.setDeletion(true);
-    outputLocks.unlock();
 }
 
 
