@@ -982,7 +982,7 @@ map (concat "foo") ["bar" "bla" "abc"]</programlisting>
   (<literal>...</literal>): 
 
 <programlisting>
-{x, y, z, ....}: z + y + x</programlisting>
+{x, y, z, ...}: z + y + x</programlisting>
 
   This works on any set that contains at least the three named
   attributes.</para>
