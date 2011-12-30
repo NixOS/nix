@@ -103,10 +103,10 @@ static void dfsVisit(StoreAPI & store, const PathSet & paths,
 {
     if (parents.find(path) != parents.end())
         throw BuildError(format("cycle detected in the references of `%1%'") % path);
-    parents.insert(path);
     
     if (visited.find(path) != visited.end()) return;
     visited.insert(path);
+    parents.insert(path);
     
     PathSet references;
     if (store.isValidPath(path))
