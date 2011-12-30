@@ -12,7 +12,7 @@
 
 <refnamediv>
   <refname>nix-prefetch-url</refname>
-  <refpurpose>copy a file from a URL into the store and print its MD5 hash</refpurpose>
+  <refpurpose>copy a file from a URL into the store and print its hash</refpurpose>
 </refnamediv>
 
 <refsynopsisdiv>
