@@ -617,27 +617,51 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         
     } else {
         
-        printMsg(lvlError, format("reading the Nix store..."));
-        Paths entries = readDirectory(nixStore);
-
-        /* Randomise the order in which we delete entries to make the
-           collector less biased towards deleting paths that come
-           alphabetically first (e.g. /nix/store/000...).  This
-           matters when using --max-freed etc. */
-        vector<Path> entries_(entries.begin(), entries.end());
-        random_shuffle(entries_.begin(), entries_.end());
-
         if (shouldDelete(state.options.action))
             printMsg(lvlError, format("deleting garbage..."));
         else
             printMsg(lvlError, format("determining live/dead paths..."));
     
         try {
+
+            AutoCloseDir dir = opendir(nixStore.c_str());
+            if (!dir) throw SysError(format("opening directory `%1%'") % nixStore);
+
+            /* Read the store and immediately delete all paths that
+               aren't valid.  When using --max-freed etc., deleting
+               invalid paths is preferred over deleting unreachable
+               paths, since unreachable paths could become reachable
+               again.  We don't use readDirectory() here so that GCing
+               can start faster. */
+            Paths entries;
+            struct dirent * dirent;
+            while (errno = 0, dirent = readdir(dir)) {
+                checkInterrupt();
+                string name = dirent->d_name;
+                if (name == "." || name == "..") continue;
+                Path path = nixStore + "/" + name;
+                if (isValidPath(path))
+                    entries.push_back(path);
+                else
+                    tryToDelete(state, path);
+            }
+
+	    dir.close();
+
+            /* Now delete the unreachable valid paths.  Randomise the
+               order in which we delete entries to make the collector
+               less biased towards deleting paths that come
+               alphabetically first (e.g. /nix/store/000...).  This
+               matters when using --max-freed etc. */
+            vector<Path> entries_(entries.begin(), entries.end());
+            random_shuffle(entries_.begin(), entries_.end());
+
             foreach (vector<Path>::iterator, i, entries_)
-                tryToDelete(state, canonPath(nixStore + "/" + *i));
+                tryToDelete(state, *i);
+
         } catch (GCLimitReached & e) {
         }
-    }        
+    }
 }
 
 

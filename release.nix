@@ -1,5 +1,5 @@
 { nixpkgs ? <nixpkgs>, nixos ? <nixos>
-, nix ? { outPath = ../nix-export; rev = 1234; }
+, nix ? { outPath = ./.; rev = 1234; }
 , officialRelease ? false
 }:
 
@@ -98,7 +98,7 @@ let
           ];
 
         configureFlags = ''
-          --disable-init-state --disable-shared
+          --disable-init-state
           --with-bzip2=${bzip2} --with-sqlite=${sqlite}
           --with-dbi=${perlPackages.DBI}/lib/perl5/site_perl
           --with-dbd-sqlite=${perlPackages.DBDSQLite}/lib/perl5/site_perl
