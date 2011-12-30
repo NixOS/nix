@@ -97,4 +97,40 @@ void queryMissing(StoreAPI & store, const PathSet & targets,
 }
 
  
+static void dfsVisit(StoreAPI & store, const PathSet & paths,
+    const Path & path, PathSet & visited, Paths & sorted,
+    PathSet & parents)
+{
+    if (parents.find(path) != parents.end())
+        throw BuildError(format("cycle detected in the references of `%1%'") % path);
+    parents.insert(path);
+    
+    if (visited.find(path) != visited.end()) return;
+    visited.insert(path);
+    
+    PathSet references;
+    if (store.isValidPath(path))
+        store.queryReferences(path, references);
+    
+    foreach (PathSet::iterator, i, references)
+        /* Don't traverse into paths that don't exist.  That can
+           happen due to substitutes for non-existent paths. */
+        if (*i != path && paths.find(*i) != paths.end())
+            dfsVisit(store, paths, *i, visited, sorted, parents);
+
+    sorted.push_front(path);
+    parents.erase(path);
+}
+
+
+Paths topoSortPaths(StoreAPI & store, const PathSet & paths)
+{
+    Paths sorted;
+    PathSet visited, parents;
+    foreach (PathSet::const_iterator, i, paths)
+        dfsVisit(store, paths, *i, visited, sorted, parents);
+    return sorted;
+}
+
+
 }
