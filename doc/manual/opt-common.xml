@@ -264,8 +264,8 @@
   expression evaluator will automatically try to call functions that
   it encounters.  It can automatically call functions for which every
   argument has a <link linkend='ss-functions'>default value</link>
-  (e.g., <literal>{<replaceable>argName</replaceable> ?
-  <replaceable>defaultValue</replaceable>}:
+  (e.g., <literal>{ <replaceable>argName</replaceable> ?
+  <replaceable>defaultValue</replaceable> }:
   <replaceable>...</replaceable></literal>).  With
   <option>--arg</option>, you can also call functions that have
   arguments without a default value (or override a default value).

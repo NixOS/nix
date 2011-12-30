@@ -43,10 +43,10 @@ is also available as <function>builtins.derivation</function>.</para>
 
     <listitem><para>Return the names of the attributes in the
     attribute set <replaceable>attrs</replaceable> in a sorted list.
-    For instance, <literal>builtins.attrNames {y = 1; x =
-    "foo";}</literal> evaluates to <literal>["x" "y"]</literal>.
-    There is no built-in function <function>attrValues</function>, but
-    you can easily define it yourself:
+    For instance, <literal>builtins.attrNames { y = 1; x = "foo";
+    }</literal> evaluates to <literal>[ "x" "y" ]</literal>.  There is
+    no built-in function <function>attrValues</function>, but you can
+    easily define it yourself:
 
 <programlisting>
 attrValues = attrs: map (name: builtins.getAttr name attrs) (builtins.attrNames attrs);</programlisting>
@@ -442,10 +442,10 @@ x: x + 456</programlisting>
     Example:
 
 <programlisting>
-builtins.listToAttrs [
-  {name = "foo"; value = 123;}
-  {name = "bar"; value = 456;}
-]
+builtins.listToAttrs
+  [ { name = "foo"; value = 123; }
+    { name = "bar"; value = 456; }
+  ]
 </programlisting>
 
     evaluates to
@@ -466,10 +466,10 @@ builtins.listToAttrs [
     example,
 
 <programlisting>
-map (x: "foo" + x) ["bar" "bla" "abc"]</programlisting>
+map (x: "foo" + x) [ "bar" "bla" "abc" ]</programlisting>
 
-    evaluates to <literal>["foobar" "foobla"
-    "fooabc"]</literal>.</para></listitem>
+    evaluates to <literal>[ "foobar" "foobla" "fooabc"
+    ]</literal>.</para></listitem>
     
   </varlistentry>
 
@@ -491,10 +491,10 @@ map (x: "foo" + x) ["bar" "bla" "abc"]</programlisting>
     a package name and version.  The package name is everything up to
     but not including the first dash followed by a digit, and the
     version is everything following that dash.  The result is returned
-    in an attribute set <literal>{name, version}</literal>.  Thus,
+    in an attribute set <literal>{ name, version }</literal>.  Thus,
     <literal>builtins.parseDrvName "nix-0.12pre12876"</literal>
-    returns <literal>{name = "nix"; version =
-    "0.12pre12876";}</literal>.</para></listitem>
+    returns <literal>{ name = "nix"; version = "0.12pre12876";
+    }</literal>.</para></listitem>
 
   </varlistentry>
 
@@ -550,9 +550,9 @@ in config.someSetting</programlisting>
     exist in <replaceable>attrs</replaceable>. For instance,
 
 <screen>
-removeAttrs { x = 1; y = 2; z = 3; } ["a" "x" "z"]</screen>
+removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]</screen>
 
-    evaluates to <literal>{y = 2;}</literal>.</para></listitem>
+    evaluates to <literal>{ y = 2; }</literal>.</para></listitem>
 
   </varlistentry>
 
@@ -632,7 +632,7 @@ removeAttrs { x = 1; y = 2; z = 3; } ["a" "x" "z"]</screen>
     linkend='ex-hello-builder' /> into one file:
 
 <programlisting>
-{stdenv, fetchurl, perl}:
+{ stdenv, fetchurl, perl }:
 
 stdenv.mkDerivation {
   name = "hello-2.1.1";
@@ -765,12 +765,12 @@ in foo</programlisting>
     using <function>toXML</function></title>
     
 <programlisting><![CDATA[
-{stdenv, fetchurl, libxslt, jira, uberwiki}:
+{ stdenv, fetchurl, libxslt, jira, uberwiki }:
 
 stdenv.mkDerivation (rec {
   name = "web-server";
 
-  buildInputs = [libxslt];
+  buildInputs = [ libxslt ];
   
   builder = builtins.toFile "builder.sh" "
     source $stdenv/setup
