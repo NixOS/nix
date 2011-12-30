@@ -966,12 +966,14 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
     while (1) {
         try {
             SQLiteTxn txn(db);
+            PathSet paths;
     
             foreach (ValidPathInfos::const_iterator, i, infos) {
                 assert(i->hash.type == htSHA256);
                 /* !!! Maybe the registration info should be updated if the
                    path is already valid. */
                 if (!isValidPath(i->path)) addValidPath(*i);
+                paths.insert(i->path);
             }
 
             foreach (ValidPathInfos::const_iterator, i, infos) {
@@ -979,6 +981,12 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
                 foreach (PathSet::iterator, j, i->references)
                     addReference(referrer, queryValidPathId(*j));
             }
+
+            /* Do a topological sort of the paths.  This will throw an
+               error if a cycle is detected and roll back the
+               transaction.  Cycles can only occur when a derivation
+               has multiple outputs. */
+            topoSortPaths(*this, paths);
 
             txn.commit();
             break;

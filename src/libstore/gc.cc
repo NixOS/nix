@@ -372,8 +372,13 @@ static void addAdditionalRoots(StoreAPI & store, PathSet & roots)
 
 
 static void dfsVisit(StoreAPI & store, const PathSet & paths,
-    const Path & path, PathSet & visited, Paths & sorted)
+    const Path & path, PathSet & visited, Paths & sorted,
+    PathSet & parents)
 {
+    if (parents.find(path) != parents.end())
+        throw BuildError(format("cycle detected in the references of `%1%'") % path);
+    parents.insert(path);
+    
     if (visited.find(path) != visited.end()) return;
     visited.insert(path);
     
@@ -385,18 +390,19 @@ static void dfsVisit(StoreAPI & store, const PathSet & paths,
         /* Don't traverse into paths that don't exist.  That can
            happen due to substitutes for non-existent paths. */
         if (*i != path && paths.find(*i) != paths.end())
-            dfsVisit(store, paths, *i, visited, sorted);
+            dfsVisit(store, paths, *i, visited, sorted, parents);
 
     sorted.push_front(path);
+    parents.erase(path);
 }
 
 
 Paths topoSortPaths(StoreAPI & store, const PathSet & paths)
 {
     Paths sorted;
-    PathSet visited;
+    PathSet visited, parents;
     foreach (PathSet::const_iterator, i, paths)
-        dfsVisit(store, paths, *i, visited, sorted);
+        dfsVisit(store, paths, *i, visited, sorted, parents);
     return sorted;
 }
 

@@ -349,6 +349,10 @@ void exportPaths(StoreAPI & store, const Paths & paths,
     bool sign, Sink & sink);
 
 
+MakeError(SubstError, Error)
+MakeError(BuildError, Error) /* denotes a permanent build failure */
+
+
 }
 
 
