@@ -148,8 +148,6 @@ EvalState::EvalState()
     nrAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
     deepestStack = (char *) -1;
 
-    createBaseEnv();
-    
     allowUnsafeEquality = getEnv("NIX_NO_UNSAFE_EQ", "") == "";
 
 #if HAVE_BOEHMGC
@@ -188,6 +186,8 @@ EvalState::EvalState()
     foreach (Strings::iterator, i, paths) addToSearchPath(*i);
     addToSearchPath("nix=" + nixDataDir + "/nix/corepkgs");
     searchPathInsertionPoint = searchPath.begin();
+
+    createBaseEnv();
 }
 
 
