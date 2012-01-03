@@ -7,13 +7,13 @@ let
   attrValues = attrs:
     map (name: builtins.getAttr name attrs) (builtins.attrNames attrs);
     
-  outputToAttrListElement = output:
-    { name = output;
+  outputToAttrListElement = outputName:
+    { name = outputName;
       value = attrs // {
-        outPath = builtins.getAttr (output + "Path") strict;
+        outPath = builtins.getAttr outputName strict;
         drvPath = strict.drvPath;
         type = "derivation";
-        currentOutput = output;
+        currentOutput = outputName;
       } // outputsAttrs // { all = allList; };
     };
     

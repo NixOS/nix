@@ -451,9 +451,7 @@ static void prim_derivationStrict(EvalState & state, Value * * args, Value & v)
     state.mkAttrs(v, 1 + drv.outputs.size());
     mkString(*state.allocAttr(v, state.sDrvPath), drvPath, singleton<PathSet>("=" + drvPath));
     foreach (DerivationOutputs::iterator, i, drv.outputs) {
-        /* The output path of an output X is ‘<X>Path’,
-           e.g. ‘outPath’. */
-        mkString(*state.allocAttr(v, state.symbols.create(i->first + "Path")),
+        mkString(*state.allocAttr(v, state.symbols.create(i->first)),
             i->second.path, singleton<PathSet>("!" + i->first + "!" + drvPath));
     }
     v.attrs->sort();
