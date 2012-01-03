@@ -20,9 +20,6 @@ $curl = "$curl $extraCurlFlags" if defined $extraCurlFlags;
 
 my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
 
-my $dataDir = $ENV{"NIX_DATA_DIR"};
-$dataDir = "@datadir@" unless defined $dataDir;
-
 
 # Parse the command line.
 my $localCopy;
@@ -107,7 +104,7 @@ foreach my $storePath (@storePaths) {
 
     # Construct a Nix expression that creates a Nix archive.
     my $nixexpr = 
-        "((import $dataDir/nix/corepkgs/nar/nar.nix) " .
+        "(import <nix/nar.nix> " .
         "{ storePath = builtins.storePath \"$storePath\"; system = \"@system@\"; hashAlgo = \"$hashAlgo\"; }) ";
     
     print NIX $nixexpr;

@@ -9,7 +9,6 @@ if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
     export NIX_IGNORE_SYMLINK_STORE=1
     NIX_STORE_DIR=$TEST_ROOT/store
 fi
-export NIX_DATA_DIR=$TEST_ROOT/data
 export NIX_LOCALSTATE_DIR=$TEST_ROOT/var
 export NIX_LOG_DIR=$TEST_ROOT/var/log/nix
 export NIX_STATE_DIR=$TEST_ROOT/var/nix
@@ -19,15 +18,11 @@ export NIX_BIN_DIR=$TEST_ROOT/bin
 export NIX_LIBEXEC_DIR=$TEST_ROOT/bin
 export NIX_MANIFESTS_DIR=$TEST_ROOT/var/nix/manifests
 export NIX_ROOT_FINDER=
+export NIX_PATH=nix=$TOP/corepkgs
 export SHARED=$TEST_ROOT/shared
 
 export PATH=$NIX_BIN_DIR:$TOP/scripts:$PATH
 
-export REAL_BIN_DIR=@bindir@
-export REAL_LIBEXEC_DIR=@libexecdir@
-export REAL_LOCALSTATE_DIR=@localstatedir@
-export REAL_DATA_DIR=@datadir@
-export REAL_STORE_DIR=@storedir@
 export NIX_BUILD_HOOK=
 export PERL=perl
 export PERL5LIB=$TOP/perl/lib:$PERL5LIB

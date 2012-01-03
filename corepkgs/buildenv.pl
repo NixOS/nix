@@ -1,5 +1,3 @@
-#! @perl@ -w
-
 use strict;
 use Cwd;
 use IO::Handle;

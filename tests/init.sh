@@ -10,7 +10,6 @@ fi
 mkdir "$TEST_ROOT"
 
 mkdir "$NIX_STORE_DIR"
-mkdir "$NIX_DATA_DIR"
 mkdir "$NIX_LOCALSTATE_DIR"
 mkdir -p "$NIX_LOG_DIR"/drvs
 mkdir "$NIX_STATE_DIR"
@@ -38,29 +37,6 @@ gc-keep-derivations = false
 env-keep-derivations = false
 fsync-metadata = false
 EOF
-
-mkdir $NIX_DATA_DIR/nix
-cp -pr $TOP/corepkgs $NIX_DATA_DIR/nix/
-# Bah, scripts have the prefix hard-coded.  This is really messy stuff
-# (and likely to fail).
-for i in \
-    $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh \
-    ; do
-    sed < $i > $i.tmp \
-        -e "s^$REAL_BIN_DIR/nix-store^$NIX_BIN_DIR/nix-store^" \
-        -e "s^$REAL_BIN_DIR/nix-hash^$NIX_BIN_DIR/nix-hash^" \
-        -e "s^$REAL_LIBEXEC_DIR^$NIX_LIBEXEC_DIR^" \
-        -e "s^$REAL_LOCALSTATE_DIR^$NIX_LOCALSTATE_DIR^" \
-        -e "s^$REAL_DATA_DIR^$NIX_DATA_DIR^" \
-        -e "s^$REAL_STORE_DIR\([^/]\)^$NIX_STORE_DIR\1^"
-    mv $i.tmp $i
-    chmod +x $i
-done
-
-# Another ugly hack.
-sed "s|^$|PATH='$PATH'|" < $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh > tmp
-chmod +x tmp
-mv tmp $NIX_DATA_DIR/nix/corepkgs/nar/nar.sh
 
 # An uberhack for Mac OS X 10.5: download-using-manifests uses Perl,
 # and Perl links against Darwin's libutil.dylib (in /usr/lib), but
