@@ -13,5 +13,6 @@ rec {
       builder = shell;
       args = ["-e" args.builder];
       PATH = path;
-    } // removeAttrs args ["builder"]);
+    } // removeAttrs args ["builder" "meta"])
+    // { meta = args.meta or {}; };
 }

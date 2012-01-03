@@ -2,6 +2,7 @@ package Nix::Config;
 
 $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
 $libexecDir = $ENV{"NIX_LIBEXEC_DIR"} || "@libexecdir@";
+$stateDir = $ENV{"NIX_STATE_DIR"} || "@localstatedir@/nix";
 $manifestDir = $ENV{"NIX_MANIFESTS_DIR"} || "@localstatedir@/nix/manifests";
 $logDir = $ENV{"NIX_LOG_DIR"} || "@localstatedir@/log/nix";
 $confDir = $ENV{"NIX_CONF_DIR"} || "@sysconfdir@/nix";

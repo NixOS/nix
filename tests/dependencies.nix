@@ -17,6 +17,7 @@ let {
     builder = ./dependencies.builder0.sh  + "/FOOBAR/../.";
     input1 = input1 + "/.";
     inherit input2;
+    meta.description = "Random test package";
   };
 
 }

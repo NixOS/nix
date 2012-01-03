@@ -346,9 +346,6 @@ AC_CONFIG_FILES([Makefile
    perl/Makefile
    scripts/Makefile
    corepkgs/Makefile
-   corepkgs/nar/Makefile
-   corepkgs/buildenv/Makefile
-   corepkgs/channels/Makefile
    doc/Makefile
    doc/manual/Makefile
    misc/Makefile
