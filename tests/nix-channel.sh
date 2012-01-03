@@ -24,7 +24,7 @@ rm -rf $TEST_ROOT/nixexprs
 mkdir -p $TEST_ROOT/nixexprs
 cp config.nix dependencies.nix dependencies.builder*.sh $TEST_ROOT/nixexprs/
 ln -s dependencies.nix $TEST_ROOT/nixexprs/default.nix
-(cd $TEST_ROOT && tar cv nixexprs) | bzip2 > $TEST_ROOT/foo/nixexprs.tar.bz2
+(cd $TEST_ROOT && tar cvf - nixexprs) | bzip2 > $TEST_ROOT/foo/nixexprs.tar.bz2
 
 # Test the update action.
 nix-channel --add file://$TEST_ROOT/foo
