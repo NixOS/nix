@@ -1,9 +1,12 @@
-{system, derivations, manifest}:
+with import <nix/config.nix>;
+
+{ system, derivations, manifest }:
 
 derivation { 
   name = "user-environment";
   system = system;
-  builder = ./builder.pl;
+  builder = perl;
+  args = [ "-w" ./buildenv.pl ];
   
   manifest = manifest;
 

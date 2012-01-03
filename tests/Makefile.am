@@ -8,7 +8,8 @@ TESTS = init.sh hash.sh lang.sh add.sh simple.sh dependencies.sh \
   referrers.sh user-envs.sh logging.sh nix-build.sh misc.sh fixed.sh \
   gc-runtime.sh install-package.sh check-refs.sh filter-source.sh \
   remote-store.sh export.sh export-graph.sh negative-caching.sh \
-  binary-patching.sh timeout.sh secure-drv-outputs.sh multiple-outputs.sh
+  binary-patching.sh timeout.sh secure-drv-outputs.sh nix-channel.sh \
+  multiple-outputs.sh
 
 XFAIL_TESTS =
 
@@ -38,4 +39,3 @@ EXTRA_DIST = $(TESTS) \
   multiple-outputs.nix \
   $(wildcard lang/*.nix) $(wildcard lang/*.exp) $(wildcard lang/*.exp.xml) $(wildcard lang/*.flags) $(wildcard lang/dir*/*.nix) \
   common.sh.in
-

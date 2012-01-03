@@ -8,9 +8,6 @@ use Nix::Manifest;
 my $tmpDir = tempdir("nix-pull.XXXXXX", CLEANUP => 1, TMPDIR => 1)
     or die "cannot create a temporary directory";
 
-my $libexecDir = ($ENV{"NIX_LIBEXEC_DIR"} or "@libexecdir@");
-my $storeDir = ($ENV{"NIX_STORE_DIR"} or "@storedir@");
-my $stateDir = ($ENV{"NIX_STATE_DIR"} or "@localstatedir@/nix");
 my $manifestDir = $Nix::Config::manifestDir;
 
 
@@ -25,7 +22,7 @@ if (! -e $manifestDir) {
 
 
 # Make sure that the manifests directory is scanned for GC roots.
-my $gcRootsDir = "$stateDir/gcroots";
+my $gcRootsDir = "$Nix::Config::stateDir/gcroots";
 my $manifestDirLink = "$gcRootsDir/manifests";
 if (! -l $manifestDirLink) {
     symlink($manifestDir, $manifestDirLink) or die "cannot create symlink `$manifestDirLink'";

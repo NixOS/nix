@@ -18,11 +18,6 @@ my $curl = "$Nix::Config::curl --fail --silent";
 my $extraCurlFlags = ${ENV{'CURL_FLAGS'}};
 $curl = "$curl $extraCurlFlags" if defined $extraCurlFlags;
 
-my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
-
-my $dataDir = $ENV{"NIX_DATA_DIR"};
-$dataDir = "@datadir@" unless defined $dataDir;
-
 
 # Parse the command line.
 my $localCopy;
@@ -82,7 +77,7 @@ foreach my $path (@ARGV) {
     # Get all paths referenced by the normalisation of the given 
     # Nix expression.
     my $pid = open(READ,
-        "$binDir/nix-store --query --requisites --force-realise " .
+        "$Nix::Config::binDir/nix-store --query --requisites --force-realise " .
         "--include-outputs '$path'|") or die;
     
     while (<READ>) {
@@ -107,7 +102,7 @@ foreach my $storePath (@storePaths) {
 
     # Construct a Nix expression that creates a Nix archive.
     my $nixexpr = 
-        "((import $dataDir/nix/corepkgs/nar/nar.nix) " .
+        "(import <nix/nar.nix> " .
         "{ storePath = builtins.storePath \"$storePath\"; system = \"@system@\"; hashAlgo = \"$hashAlgo\"; }) ";
     
     print NIX $nixexpr;
@@ -120,7 +115,7 @@ close NIX;
 # Instantiate store derivations from the Nix expression.
 my @storeExprs;
 print STDERR "instantiating store derivations...\n";
-my $pid = open(READ, "$binDir/nix-instantiate $nixExpr|")
+my $pid = open(READ, "$Nix::Config::binDir/nix-instantiate $nixExpr|")
     or die "cannot run nix-instantiate";
 while (<READ>) {
     chomp;
@@ -142,7 +137,7 @@ while (scalar @tmp > 0) {
     my @tmp2 = @tmp[0..$n - 1];
     @tmp = @tmp[$n..scalar @tmp - 1];
 
-    my $pid = open(READ, "$binDir/nix-store --realise @tmp2|")
+    my $pid = open(READ, "$Nix::Config::binDir/nix-store --realise @tmp2|")
         or die "cannot run nix-store";
     while (<READ>) {
         chomp;
@@ -182,16 +177,16 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
 
     my $narbz2Size = stat($narFile)->size;
 
-    my $references = `$binDir/nix-store --query --references '$storePath'`;
+    my $references = `$Nix::Config::binDir/nix-store --query --references '$storePath'`;
     die "cannot query references for `$storePath'" if $? != 0;
     $references = join(" ", split(" ", $references));
 
-    my $deriver = `$binDir/nix-store --query --deriver '$storePath'`;
+    my $deriver = `$Nix::Config::binDir/nix-store --query --deriver '$storePath'`;
     die "cannot query deriver for `$storePath'" if $? != 0;
     chomp $deriver;
     $deriver = "" if $deriver eq "unknown-deriver";
 
-    my $narHash = `$binDir/nix-store --query --hash '$storePath'`;
+    my $narHash = `$Nix::Config::binDir/nix-store --query --hash '$storePath'`;
     die "cannot query hash for `$storePath'" if $? != 0;
     chomp $narHash;
 
@@ -199,13 +194,13 @@ for (my $n = 0; $n < scalar @storePaths; $n++) {
     # store of the host), the database doesn't contain the hash.  So
     # compute it.
     if ($narHash =~ /^sha256:0*$/) {
-        $narHash = `$binDir/nix-hash --type sha256 --base32 '$storePath'`;
+        $narHash = `$Nix::Config::binDir/nix-hash --type sha256 --base32 '$storePath'`;
         die "cannot hash `$storePath'" if $? != 0;
         chomp $narHash;
         $narHash = "sha256:$narHash";
     }
 
-    my $narSize = `$binDir/nix-store --query --size '$storePath'`;
+    my $narSize = `$Nix::Config::binDir/nix-store --query --size '$storePath'`;
     die "cannot query size for `$storePath'" if $? != 0;
     chomp $narSize;
 

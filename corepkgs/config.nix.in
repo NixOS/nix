@@ -1,0 +1,13 @@
+let
+  fromEnv = var: def:
+    let val = builtins.getEnv var; in
+    if val != "" then val else def;
+in {
+  perl = "@perl@";
+  shell = "@shell@";
+  coreutils = "@coreutils@";
+  bzip2 = fromEnv "NIX_BZIP2" "@bzip2@";
+  tar = "@tar@";
+  tr = "@tr@";
+  nixBinDir = fromEnv "NIX_BIN_DIR" "@bindir@";
+}

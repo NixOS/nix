@@ -112,7 +112,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     /* Get the environment builder expression. */
     Value envBuilder;
-    state.evalFile(nixDataDir + "/nix/corepkgs/buildenv", envBuilder);
+    state.evalFile(state.findFile("nix/buildenv.nix"), envBuilder);
 
     /* Construct a Nix expression that calls the user environment
        builder with the manifest as argument. */

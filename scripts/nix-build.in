@@ -1,8 +1,7 @@
 #! @perl@ -w -I@libexecdir@/nix
 
 use strict;
-
-my $binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
+use Nix::Config;
 
 
 my $addDrvLink = 0;
@@ -156,7 +155,7 @@ foreach my $expr (@exprs) {
     # Instantiate.
     my @drvPaths;
     # !!! would prefer the perl 5.8.0 pipe open feature here.
-    my $pid = open(DRVPATHS, "-|") || exec "$binDir/nix-instantiate", "--add-root", $drvLink, "--indirect", @instArgs, $expr;
+    my $pid = open(DRVPATHS, "-|") || exec "$Nix::Config::binDir/nix-instantiate", "--add-root", $drvLink, "--indirect", @instArgs, $expr;
     while (<DRVPATHS>) {chomp; push @drvPaths, $_;}
     if (!close DRVPATHS) {
         die "nix-instantiate killed by signal " . ($? & 127) . "\n" if ($? & 127);
@@ -170,7 +169,7 @@ foreach my $expr (@exprs) {
 
     # Build.
     my @outPaths;
-    $pid = open(OUTPATHS, "-|") || exec "$binDir/nix-store", "--add-root", $outLink, "--indirect", "-r",
+    $pid = open(OUTPATHS, "-|") || exec "$Nix::Config::binDir/nix-store", "--add-root", $outLink, "--indirect", "-r",
         @buildArgs, @drvPaths;
     while (<OUTPATHS>) {chomp; push @outPaths, $_;}
     if (!close OUTPATHS) {

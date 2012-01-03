@@ -52,7 +52,7 @@ need to do three things:
 <example xml:id='ex-hello-nix'><title>Nix expression for GNU Hello
 (<filename>default.nix</filename>)</title>
 <programlisting>
-{stdenv, fetchurl, perl}: <co xml:id='ex-hello-nix-co-1' />
+{ stdenv, fetchurl, perl }: <co xml:id='ex-hello-nix-co-1' />
 
 stdenv.mkDerivation { <co xml:id='ex-hello-nix-co-2' />
   name = "hello-2.1.1"; <co xml:id='ex-hello-nix-co-3' />
@@ -92,8 +92,8 @@ the single Nix expression in that directory
     function that downloads files.  <varname>perl</varname> is the
     Perl interpreter.</para>
 
-    <para>Nix functions generally have the form <literal>{x, y, ...,
-    z}: e</literal> where <varname>x</varname>, <varname>y</varname>,
+    <para>Nix functions generally have the form <literal>{ x, y, ...,
+    z }: e</literal> where <varname>x</varname>, <varname>y</varname>,
     etc. are the names of the expected arguments, and where
     <replaceable>e</replaceable> is the body of the function.  So
     here, the entire remainder of the file is the body of the
@@ -114,10 +114,10 @@ the single Nix expression in that directory
     <emphasis>attributes</emphasis>.  An attribute set is just a list
     of key/value pairs where each value is an arbitrary Nix
     expression.  They take the general form
-    <literal>{<replaceable>name1</replaceable> =
+    <literal>{ <replaceable>name1</replaceable> =
     <replaceable>expr1</replaceable>; <replaceable>...</replaceable>
     <replaceable>nameN</replaceable> =
-    <replaceable>exprN</replaceable>;}</literal>.</para>
+    <replaceable>exprN</replaceable>; }</literal>.</para>
 
   </callout>
 
@@ -564,7 +564,7 @@ genericBuild <co xml:id='ex-hello-builder2-co-3' /></programlisting>
 expression, like this:
 
 <programlisting>
-  buildInputs = [perl];</programlisting>
+  buildInputs = [ perl ];</programlisting>
 
 The <varname>perl</varname> attribute can then be removed, and the
 builder becomes even shorter:
@@ -771,14 +771,14 @@ stdenv.mkDerivation {
 values between square brackets.  For example,
 
 <programlisting>
-[ 123 ./foo.nix "abc" (f {x=y;}) ]</programlisting>
+[ 123 ./foo.nix "abc" (f { x = y; }) ]</programlisting>
 
 defines a list of four elements, the last being the result of a call
 to the function <varname>f</varname>.  Note that function calls have
 to be enclosed in parentheses.  If they had been omitted, e.g.,
 
 <programlisting>
-[ 123 ./foo.nix "abc" f {x=y;} ]</programlisting>
+[ 123 ./foo.nix "abc" f { x = y; } ]</programlisting>
 
 the result would be a list of five elements, the fourth one being a
 function and the fifth being an attribute set.</para>
@@ -891,15 +891,12 @@ propagate attributes).  This can be shortened using the
 <literal>inherit</literal> keyword.  For instance,
 
 <programlisting>
-let
-  x = 123;
-in 
-  {
-    inherit x;
-    y = 456;
-  }</programlisting>
+let x = 123; in 
+{ inherit x;
+  y = 456;
+}</programlisting>
 
-evaluates to <literal>{x = 123; y = 456;}</literal>.  (Note that this
+evaluates to <literal>{ x = 123; y = 456; }</literal>.  (Note that this
 works because <varname>x</varname> is added to the lexical scope by
 the <literal>let</literal> construct.)  It is also possible to inherit
 attributes from another attribute set.  For instance, in this fragment
@@ -960,20 +957,20 @@ in if negate true then concat "foo" "bar" else ""</programlisting>
   arguments of a function); e.g.,
 
   <programlisting>
-map (concat "foo") ["bar" "bla" "abc"]</programlisting>
+map (concat "foo") [ "bar" "bla" "abc" ]</programlisting>
 
-  evaluates to <literal>["foobar" "foobla"
-  "fooabc"]</literal>.</para></listitem>
+  evaluates to <literal>[ "foobar" "foobla"
+  "fooabc" ]</literal>.</para></listitem>
 
   
   <listitem><para>An <emphasis>attribute set pattern</emphasis> of the
-  form <literal>{name1, name2, …, nameN}</literal>
+  form <literal>{ name1, name2, …, nameN }</literal>
   matches an attribute set containing the listed attributes, and binds
   the values of those attributes to variables in the function body.
   For example, the function
 
 <programlisting>
-{x, y, z}: z + y + x</programlisting>
+{ x, y, z }: z + y + x</programlisting>
 
   can only be called with a set containing exactly the attributes
   <varname>x</varname>, <varname>y</varname> and
@@ -982,7 +979,7 @@ map (concat "foo") ["bar" "bla" "abc"]</programlisting>
   (<literal>...</literal>): 
 
 <programlisting>
-{x, y, z, ....}: z + y + x</programlisting>
+{ x, y, z, ... }: z + y + x</programlisting>
 
   This works on any set that contains at least the three named
   attributes.</para>
@@ -995,7 +992,7 @@ map (concat "foo") ["bar" "bla" "abc"]</programlisting>
   <replaceable>e</replaceable> is an arbitrary expression.  For example,
 
 <programlisting>
-{x, y ? "foo", z ? "bar"}: z + y + x</programlisting>
+{ x, y ? "foo", z ? "bar" }: z + y + x</programlisting>
 
   specifies a function that only requires an attribute named
   <varname>x</varname>, but optionally accepts <varname>y</varname>
@@ -1007,11 +1004,11 @@ map (concat "foo") ["bar" "bla" "abc"]</programlisting>
   of the <literal>@</literal>-sign.  For example:
 
 <programlisting>
-args@{x, y, z, ...}: z + y + x + args.a</programlisting>
+args@{ x, y, z, ... }: z + y + x + args.a</programlisting>
 
   Here <varname>args</varname> is bound to the entire argument, which
-  is further matches against the pattern <literal>{x, y, z,
-  ...}</literal>.</para></listitem>
+  is further matches against the pattern <literal>{ x, y, z,
+  ... }</literal>.</para></listitem>
 
 
 </itemizedlist>
@@ -1020,8 +1017,8 @@ args@{x, y, z, ...}: z + y + x + args.a</programlisting>
 a name, you can bind them to an attribute, e.g.,
 
 <programlisting>
-let concat = {x, y}: x + y;
-in concat {x = "foo"; y = "bar";}</programlisting>
+let concat = { x, y }: x + y;
+in concat { x = "foo"; y = "bar"; }</programlisting>
 
 </para>
 
@@ -1142,7 +1139,7 @@ lexical scope of the expression <replaceable>e2</replaceable>.  For
 instance,
 
 <programlisting>
-let as = {x = "foo"; y = "bar";};
+let as = { x = "foo"; y = "bar"; };
 in with as; x + y</programlisting>
 
 evaluates to <literal>"foobar"</literal> since the
@@ -1480,21 +1477,20 @@ allowedReferences = [];
     references graph of their inputs.  The attribute is a list of
     inputs in the Nix store whose references graph the builder needs
     to know.  The value of this attribute should be a list of pairs
-    <literal>[<replaceable>name1</replaceable>
+    <literal>[ <replaceable>name1</replaceable>
     <replaceable>path1</replaceable> <replaceable>name2</replaceable>
-    <replaceable>path2</replaceable>
-    <replaceable>...</replaceable>]</literal>.  The references graph
-    of each <replaceable>pathN</replaceable> will be stored in a text
-    file <replaceable>nameN</replaceable> in the temporary build
-    directory.  The text files have the format used by
-    <command>nix-store --register-validity</command> (with the deriver
-    fields left empty).  For example, when the following derivation is
-    built:
+    <replaceable>path2</replaceable> <replaceable>...</replaceable>
+    ]</literal>.  The references graph of each
+    <replaceable>pathN</replaceable> will be stored in a text file
+    <replaceable>nameN</replaceable> in the temporary build directory.
+    The text files have the format used by <command>nix-store
+    --register-validity</command> (with the deriver fields left
+    empty).  For example, when the following derivation is built:
 
 <programlisting>
 derivation {
   ...
-  exportReferencesGraph = ["libfoo-graph" libfoo];
+  exportReferencesGraph = [ "libfoo-graph" libfoo ];
 };
 </programlisting>
 
@@ -1571,14 +1567,14 @@ fetchurl {
     <varname>fetchurl</varname>:
 
 <programlisting>
-{stdenv, curl}: # The <command>curl</command> program is used for downloading.
+{ stdenv, curl }: # The <command>curl</command> program is used for downloading.
 
-{url, md5}:
+{ url, md5 }:
 
 stdenv.mkDerivation {
   name = baseNameOf (toString url);
   builder = ./builder.sh;
-  buildInputs = [curl];
+  buildInputs = [ curl ];
 
   # This is a fixed-output derivation; the output must be a regular
   # file with MD5 hash <varname>md5</varname>.
@@ -1650,7 +1646,7 @@ stdenv.mkDerivation {
     Nixpkgs has the line
 
 <programlisting>
-impureEnvVars = ["http_proxy" "https_proxy" <replaceable>...</replaceable>];
+impureEnvVars = [ "http_proxy" "https_proxy" <replaceable>...</replaceable> ];
 </programlisting>
 
     to make it use the proxy server configuration specified by the

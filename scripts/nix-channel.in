@@ -1,15 +1,13 @@
 #! @perl@ -w
 
 use strict;
+use Nix::Config;
 
-my $rootsDir = "@localstatedir@/nix/gcroots";
-
-my $stateDir = $ENV{"NIX_STATE_DIR"};
-$stateDir = "@localstatedir@/nix" unless defined $stateDir;
+my $manifestDir = $Nix::Config::manifestDir;
 
 
 # Turn on caching in nix-prefetch-url.
-my $channelCache = "$stateDir/channel-cache";
+my $channelCache = "$Nix::Config::stateDir/channel-cache";
 mkdir $channelCache, 0755 unless -e $channelCache;
 $ENV{'NIX_DOWNLOAD_CACHE'} = $channelCache if -W $channelCache;
 
@@ -79,19 +77,19 @@ sub update {
     readChannels;
 
     # Create the manifests directory if it doesn't exist.
-    mkdir "$stateDir/manifests", 0755 unless -e "$stateDir/manifests";
+    mkdir $manifestDir, 0755 unless -e $manifestDir;
 
     # Do we have write permission to the manifests directory?  If not,
     # then just skip pulling the manifest and just download the Nix
     # expressions.  If the user is a non-privileged user in a
     # multi-user Nix installation, he at least gets installation from
     # source.
-    if (-W "$stateDir/manifests") {
+    if (-W $manifestDir) {
 
         # Pull cache manifests.
         foreach my $url (@channels) {
             #print "pulling cache manifest from `$url'\n";
-            system("@bindir@/nix-pull", "--skip-wrong-store", "$url/MANIFEST") == 0
+            system("$Nix::Config::binDir/nix-pull", "--skip-wrong-store", "$url/MANIFEST") == 0
                 or die "cannot pull cache manifest from `$url'";
         }
 
@@ -110,7 +108,7 @@ sub update {
         print "downloading Nix expressions from `$fullURL'...\n";
         $ENV{"PRINT_PATH"} = 1;
         $ENV{"QUIET"} = 1;
-        my ($hash, $path) = `@bindir@/nix-prefetch-url '$fullURL'`;
+        my ($hash, $path) = `$Nix::Config::binDir/nix-prefetch-url '$fullURL'`;
         die "cannot fetch `$fullURL'" if $? != 0;
         chomp $path;
         $inputs .= '"' . $channelName . '"' . " " . $path . " ";
@@ -121,13 +119,13 @@ sub update {
     my $userName = getpwuid($<);
     die "who ARE you? go away" unless defined $userName;
 
-    my $rootFile = "$rootsDir/per-user/$userName/channels";
+    my $rootFile = "$Nix::Config::stateDir/gcroots/per-user/$userName/channels";
     
     # Build the Nix expression.
     print "unpacking channel Nix expressions...\n";
     my $outPath = `\\
-        @bindir@/nix-build --out-link '$rootFile' --drv-link '$rootFile'.tmp \\
-        @datadir@/nix/corepkgs/channels/unpack.nix \\
+        $Nix::Config::binDir/nix-build --out-link '$rootFile' --drv-link '$rootFile'.tmp \\
+        '<nix/unpack-channel.nix>' \\
         --argstr system @system@ --arg inputs '$inputs'`
         or die "cannot unpack the channels";
     chomp $outPath;
