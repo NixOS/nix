@@ -148,8 +148,6 @@ EvalState::EvalState()
     nrAttrsets = nrOpUpdates = nrOpUpdateValuesCopied = 0;
     deepestStack = (char *) -1;
 
-    allowUnsafeEquality = getEnv("NIX_NO_UNSAFE_EQ", "") == "";
-
 #if HAVE_BOEHMGC
     static bool gcInitialised = true;
     if (gcInitialised) {

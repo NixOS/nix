@@ -209,8 +209,6 @@ public:
 private:
     SrcToStore srcToStore; 
 
-    bool allowUnsafeEquality;
-
     /* A cache from path names to parse trees. */
     std::map<Path, Expr *> parseTrees;
 
