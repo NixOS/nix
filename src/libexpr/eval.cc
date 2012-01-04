@@ -404,28 +404,27 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 }
 
 
-unsigned long nrAvoided = 0;
-
 /* Create a thunk for the delayed computation of the given expression
    in the given environment.  But if the expression is a variable,
    then look it up right away.  This significantly reduces the number
    of thunks allocated. */
-Value * EvalState::maybeThunk(Env & env, Expr * expr)
+Value * Expr::maybeThunk(EvalState & state, Env & env)
 {
-    ExprVar * var;
-    /* Ignore variables from `withs' because they can throw an
-       exception. */
-    if ((var = dynamic_cast<ExprVar *>(expr))) {
-        Value * v = lookupVar(&env, var->info);
-        /* The value might not be initialised in the environment yet.
-           In that case, ignore it. */
-        if (v) { nrAvoided++; return v; }
-    }
-
-    Value * v = allocValue();
-    mkThunk(*v, env, expr);
-
+    Value * v = state.allocValue();
+    mkThunk(*v, env, this);
     return v;
+}
+
+
+unsigned long nrAvoided = 0;
+
+Value * ExprVar::maybeThunk(EvalState & state, Env & env)
+{
+    Value * v = state.lookupVar(&env, info);
+    /* The value might not be initialised in the environment yet.
+       In that case, ignore it. */
+    if (v) { nrAvoided++; return v; }
+    return Expr::maybeThunk(state, env);
 }
 
 
@@ -560,7 +559,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
                     vAttr = state.allocValue();
                     mkThunk(*vAttr, env2, i->second.e);
                 } else
-                    vAttr = state.maybeThunk(env2, i->second.e);
+                    vAttr = i->second.e->maybeThunk(state, env2);
                 env2.values[displ++] = vAttr;
                 v.attrs->push_back(Attr(i->first, vAttr, &i->second.pos));
             }
@@ -593,7 +592,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             if (i->second.inherited)
                 v.attrs->push_back(Attr(i->first, state.lookupVar(&env, i->second.var), &i->second.pos));
             else
-                v.attrs->push_back(Attr(i->first, state.maybeThunk(env, i->second.e), &i->second.pos));
+                v.attrs->push_back(Attr(i->first, i->second.e->maybeThunk(state, env), &i->second.pos));
     }
 }
 
@@ -613,7 +612,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
         if (i->second.inherited)
             env2.values[displ++] = state.lookupVar(&env, i->second.var);
         else
-            env2.values[displ++] = state.maybeThunk(env2, i->second.e);
+            env2.values[displ++] = i->second.e->maybeThunk(state, env2);
 
     state.eval(env2, body, v);
 }
@@ -623,7 +622,7 @@ void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkList(v, elems.size());
     for (unsigned int n = 0; n < v.list.length; ++n)
-        v.list.elems[n] = state.maybeThunk(env, elems[n]);
+        v.list.elems[n] = elems[n]->maybeThunk(state, env);
 }
 
 
@@ -716,7 +715,7 @@ void ExprApp::eval(EvalState & state, Env & env, Value & v)
 {
     Value vFun;
     state.eval(env, e1, vFun);
-    state.callFunction(vFun, *state.maybeThunk(env, e2), v);
+    state.callFunction(vFun, *(e2->maybeThunk(state, env)), v);
 }
 
 
@@ -791,7 +790,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v)
             if (j == arg.attrs->end()) {
                 if (!i->def) throwTypeError("function at %1% called without required argument `%2%'",
                     fun.lambda.fun->pos, i->name);
-                env2.values[displ++] = maybeThunk(env2, i->def);
+                env2.values[displ++] = i->def->maybeThunk(*this, env2);
             } else {
                 attrsUsed++;
                 env2.values[displ++] = j->value;

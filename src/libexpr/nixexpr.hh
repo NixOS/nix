@@ -53,6 +53,7 @@ struct Expr
     virtual void show(std::ostream & str);
     virtual void bindVars(const StaticEnv & env);
     virtual void eval(EvalState & state, Env & env, Value & v);
+    virtual Value * maybeThunk(EvalState & state, Env & env);
 };
 
 std::ostream & operator << (std::ostream & str, Expr & e);
@@ -117,6 +118,7 @@ struct ExprVar : Expr
     VarRef info;
     ExprVar(const Symbol & name) : info(name) { };
     COMMON_METHODS
+    Value * maybeThunk(EvalState & state, Env & env);
 };
 
 struct ExprSelect : Expr

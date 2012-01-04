@@ -346,8 +346,6 @@ public:
     void mkAttrs(Value & v, unsigned int expected);
     void mkThunk_(Value & v, Expr * expr);
 
-    Value * maybeThunk(Env & env, Expr * expr);
-    
     /* Print statistics. */
     void printStats();
 
