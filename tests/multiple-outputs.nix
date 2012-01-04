@@ -17,8 +17,8 @@ rec {
 
   b = mkDerivation {
     defaultOutput = assert a.second.helloString == "Hello, world!"; a;
-    firstOutput = a.first.first;
-    secondOutput = a.second.first.first.second.second.first.second;
+    firstOutput = assert a.outputName == "first"; a.first.first;
+    secondOutput = assert a.second.outputName == "second"; a.second.first.first.second.second.first.second;
     allOutputs = a.all;
     name = "multiple-outputs-b";
     builder = builtins.toFile "builder.sh"
