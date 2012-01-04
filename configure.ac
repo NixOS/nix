@@ -274,8 +274,8 @@ AC_SUBST(sqlite_bin)
 # Whether to use the Boehm garbage collector.
 AC_ARG_ENABLE(gc, AC_HELP_STRING([--enable-gc],
   [enable garbage collection in the Nix expression evaluator (requires Boehm GC)]),
-  gc=$enableval, gc=)
-if test -n "$gc"; then
+  gc=$enableval, gc=no)
+if test "$gc" = yes; then
   PKG_CHECK_MODULES([BDW_GC], [bdw-gc])
   CXXFLAGS="$BDW_GC_CFLAGS $CXXFLAGS"
   AC_DEFINE(HAVE_BOEHMGC, 1, [Whether to use the Boehm garbage collector.])
