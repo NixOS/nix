@@ -18,7 +18,7 @@ let
         outPath = builtins.getAttr outputName strict;
         drvPath = strict.drvPath;
         type = "derivation";
-        currentOutput = outputName;
+        inherit outputName;
       };
     };
     
