@@ -1,31 +1,24 @@
-attrs:
+/* This is the implementation of the ‘derivation’ builtin function.
+   It's actually a wrapper around the ‘derivationStrict’ primop. */
+
+drvAttrs @ { outputs ? [ "out" ], ... }:
 
 let
 
-  strict = derivationStrict attrs;
+  strict = derivationStrict drvAttrs;
   
-  attrValues = attrs:
-    map (name: builtins.getAttr name attrs) (builtins.attrNames attrs);
-    
+  commonAttrs = drvAttrs // (builtins.listToAttrs outputsList) // { all = map (x: x.value) outputsList; };
+
   outputToAttrListElement = outputName:
     { name = outputName;
-      value = attrs // {
+      value = commonAttrs // {
         outPath = builtins.getAttr outputName strict;
         drvPath = strict.drvPath;
         type = "derivation";
         currentOutput = outputName;
-      } // outputsAttrs // { all = allList; };
+      };
     };
     
-  outputsList =
-    if attrs ? outputs
-    then map outputToAttrListElement attrs.outputs
-    else [ (outputToAttrListElement "out") ];
+  outputsList = map outputToAttrListElement outputs;
     
-  outputsAttrs = builtins.listToAttrs outputsList;
-  
-  allList = attrValues outputsAttrs;
-  
-  head = if attrs ? outputs then builtins.head attrs.outputs else "out";
-  
-in builtins.getAttr head outputsAttrs
+in (builtins.head outputsList).value
